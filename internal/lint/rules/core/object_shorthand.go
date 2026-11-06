@@ -53,7 +53,7 @@ type ObjectShorthandSettings struct {
 
 // DefaultObjectShorthandSettings is upstream's `defaultOptions: ["always"]`.
 //
-// Spelled out because the zero value of the struct has an EMPTY mode, which matches none of the six
+// Spelled out because the zero value of the struct has an empty mode, which matches none of the six
 // and would make the rule silently report nothing.
 func DefaultObjectShorthandSettings() ObjectShorthandSettings {
 	return ObjectShorthandSettings{Mode: ObjectShorthandAlways}
@@ -82,15 +82,15 @@ func DefaultObjectShorthandSettings() ObjectShorthandSettings {
 //
 // A mode that is not one of the six is an error rather than a silent fallback to "always". A typo
 // in a mode name would otherwise produce a rule that looks configured and enforces the default.
-func DecodeObjectShorthandOptions(list []byte) (any, error) {
+func DecodeObjectShorthandOptions(list []byte) (ObjectShorthandSettings, error) {
 	settings := DefaultObjectShorthandSettings()
-	elements, err := rule.OptionElements(list, 2)
-	if err != nil || len(elements) == 0 {
-		return settings, err
+	elements, optionElementsError := rule.OptionElements(list, 2)
+	if optionElementsError != nil || len(elements) == 0 {
+		return settings, optionElementsError
 	}
 
 	var modeText string
-	if err := json.Unmarshal(elements[0], &modeText); err != nil {
+	if decodeError := json.Unmarshal(elements[0], &modeText); decodeError != nil {
 		return settings, fmt.Errorf("object-shorthand element 1 takes a mode string, got %s", elements[0])
 	}
 	mode, ok := objectShorthandModeFor(modeText)
@@ -109,8 +109,8 @@ func DecodeObjectShorthandOptions(list []byte) (any, error) {
 		MethodsIgnorePattern      *string `json:"methodsIgnorePattern"`
 		AvoidExplicitReturnArrows *bool   `json:"avoidExplicitReturnArrows"`
 	}
-	if err := rule.UnmarshalOptions(elements[1], &wire); err != nil {
-		return settings, fmt.Errorf("object-shorthand element 2: %w", err)
+	if unmarshalOptionsError := rule.UnmarshalOptions(elements[1], &wire); unmarshalOptionsError != nil {
+		return settings, fmt.Errorf("object-shorthand element 2: %w", unmarshalOptionsError)
 	}
 
 	// Upstream's schema: no flags beside never or the consistent modes, only avoidQuotes beside
@@ -141,11 +141,11 @@ func DecodeObjectShorthandOptions(list []byte) (any, error) {
 		// Upstream's `new RegExp(PARAMS.methodsIgnorePattern, "u")`, read as JavaScript reads it: RE2
 		// refuses a lookaround or a backreference its user wrote, and reads `\s` and `\b` differently
 		// (#7mztrdd).
-		compiled, err := esregexp.Compile(*wire.MethodsIgnorePattern, "u")
-		if err != nil {
+		compiled, compileError := esregexp.Compile(*wire.MethodsIgnorePattern, "u")
+		if compileError != nil {
 			return settings, fmt.Errorf(
 				"object-shorthand methodsIgnorePattern %q does not compile: %w",
-				*wire.MethodsIgnorePattern, err)
+				*wire.MethodsIgnorePattern, compileError)
 		}
 		settings.MethodsIgnorePattern = compiled
 		settings.MethodsIgnorePatternText = *wire.MethodsIgnorePattern
@@ -173,8 +173,8 @@ func objectShorthandModeFor(text string) (ObjectShorthandMode, bool) {
 }
 
 // objectShorthandSettingsFrom recovers the settings from whatever the config layer handed over.
-func objectShorthandSettingsFrom(options any) ObjectShorthandSettings {
-	if settings, ok := rule.OptionsAs[ObjectShorthandSettings](options); ok && settings.Mode != "" {
+func objectShorthandSettingsFrom(options rule.Given[ObjectShorthandSettings]) ObjectShorthandSettings {
+	if settings, ok := options.Read(); ok && settings.Mode != "" {
 		return settings
 	}
 	return DefaultObjectShorthandSettings()
@@ -244,7 +244,7 @@ var messageObjectShorthandUnexpectedMix = rule.Message{
 // # Six modes, and `consistent` is a different question from the rest
 //
 // The four simple modes judge each property alone. `consistent` and `consistent-as-needed` judge
-// the OBJECT: every property must use the same style, and under `consistent-as-needed` that style
+// the object: every property must use the same style, and under `consistent-as-needed` that style
 // must be shorthand when every property could be. Those two report on the object literal rather
 // than on a property, which is why they are a separate arm and a separate message id.
 //
@@ -253,26 +253,26 @@ var messageObjectShorthandUnexpectedMix = rule.Message{
 // Upstream attaches a fix only to the per-property modes. Making an object consistent means
 // choosing which style to convert everything to, and only the author knows which. Reported without
 // a repair, which is the subset that can be shown correct.
-var ObjectShorthand = rule.Rule{
+var ObjectShorthand = rule.Rule[ObjectShorthandSettings]{
 	Name: "object-shorthand",
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[ObjectShorthandSettings]) rule.Listeners {
 		settings := objectShorthandSettingsFrom(options)
 
 		return rule.Listeners{
 			ast.KindObjectLiteralExpression: func(node *ast.Node) {
 				switch settings.Mode {
 				case ObjectShorthandConsistent:
-					checkObjectShorthandConsistency(ctx, node, false)
+					checkObjectShorthandConsistency(ruleContext, node, false)
 				case ObjectShorthandConsistentAsNeeded:
-					checkObjectShorthandConsistency(ctx, node, true)
+					checkObjectShorthandConsistency(ruleContext, node, true)
 				default:
 					literal := node.AsObjectLiteralExpression()
 					if literal == nil || literal.Properties == nil {
 						return
 					}
 					for _, member := range literal.Properties.Nodes {
-						checkObjectShorthandMember(ctx, member, settings)
+						checkObjectShorthandMember(ruleContext, member, settings)
 					}
 				}
 			},
@@ -281,7 +281,7 @@ var ObjectShorthand = rule.Rule{
 }
 
 // checkObjectShorthandMember is upstream's `Property:exit` for the four per-property modes.
-func checkObjectShorthandMember(ctx rule.Context, member *ast.Node, settings ObjectShorthandSettings) {
+func checkObjectShorthandMember(ruleContext rule.Context, member *ast.Node, settings ObjectShorthandSettings) {
 	// Upstream needs two guards here that this port does not, and they are recorded rather than
 	// carried as dead code.
 	//
@@ -305,11 +305,11 @@ func checkObjectShorthandMember(ctx rule.Context, member *ast.Node, settings Obj
 			if applyNever {
 				message = messageObjectShorthandExpectedMethodLongform
 			}
-			if fix, ok := objectShorthandMethodToLongform(ctx, member); ok {
-				ctx.ReportNodeWithFixes(member, message, fix...)
+			if fix, ok := objectShorthandMethodToLongform(ruleContext, member); ok {
+				ruleContext.ReportNodeWithFixes(member, message, fix...)
 				return
 			}
-			ctx.ReportNode(member, message)
+			ruleContext.ReportNode(member, message)
 		}
 
 	case ast.KindShorthandPropertyAssignment:
@@ -319,7 +319,7 @@ func checkObjectShorthandMember(ctx rule.Context, member *ast.Node, settings Obj
 				return
 			}
 			name := assignment.Name()
-			ctx.ReportNodeWithFixes(member, messageObjectShorthandExpectedPropertyLongform,
+			ruleContext.ReportNodeWithFixes(member, messageObjectShorthandExpectedPropertyLongform,
 				rule.ReplaceRange(core.NewTextRange(name.End(), name.End()), ": "+name.Text()))
 		}
 
@@ -357,10 +357,10 @@ func checkObjectShorthandMember(ctx rule.Context, member *ast.Node, settings Obj
 			if settings.AvoidQuotes && objectShorthandKeyIsStringLiteral(member) {
 				return
 			}
-			// An arrow converts only when it has a BLOCK body and `avoidExplicitReturnArrows` is
+			// An arrow converts only when it has a block body and `avoidExplicitReturnArrows` is
 			// on. Upstream's condition is
 			// `ArrowFunctionExpression && body.type === "BlockStatement" && AVOID_EXPLICIT_RETURN_ARROWS`,
-			// so an expression-bodied arrow such as `{ x: () => foo }` is NEVER reported: turning
+			// so an expression-bodied arrow such as `{ x: () => foo }` is never reported: turning
 			// it into a method would have to invent a `return`, which changes what the source says
 			// rather than how it says it. A first draft had this backwards and reported three
 			// corpus cases upstream leaves clean.
@@ -375,11 +375,11 @@ func checkObjectShorthandMember(ctx rule.Context, member *ast.Node, settings Obj
 					return
 				}
 			}
-			if fix, ok := objectShorthandFunctionToShorthand(ctx, member, assignment, value); ok {
-				ctx.ReportNodeWithFixes(member, messageObjectShorthandExpectedMethodShorthand, fix)
+			if fix, ok := objectShorthandFunctionToShorthand(ruleContext, member, assignment, value); ok {
+				ruleContext.ReportNodeWithFixes(member, messageObjectShorthandExpectedMethodShorthand, fix)
 				return
 			}
-			ctx.ReportNode(member, messageObjectShorthandExpectedMethodShorthand)
+			ruleContext.ReportNode(member, messageObjectShorthandExpectedMethodShorthand)
 			return
 		}
 
@@ -395,8 +395,8 @@ func checkObjectShorthandMember(ctx rule.Context, member *ast.Node, settings Obj
 			unwrapped = inner.Expression
 		}
 		if applyToProperties && unwrapped.Kind == ast.KindIdentifier {
-			// Upstream has TWO property-shorthand branches, and the second is easy to miss: a
-			// QUOTED key counts too, when its string value equals the identifier. `{'x': x}` is
+			// Upstream has two property-shorthand branches, and the second is easy to miss: a
+			// quoted key counts too, when its string value equals the identifier. `{'x': x}` is
 			// reportable and `{'x': y}` is not.
 			key := assignment.Name()
 			quoted := key.Kind == ast.KindStringLiteral
@@ -411,17 +411,17 @@ func checkObjectShorthandMember(ctx rule.Context, member *ast.Node, settings Obj
 			}
 			// A JSDoc comment carrying `@type` is documentation attached to this property, and the
 			// shorthand form has nowhere to put it. Both of upstream's branches skip it.
-			if objectShorthandHasTypeJsDoc(ctx, member) {
+			if objectShorthandHasTypeJsDoc(ruleContext, member) {
 				return
 			}
-			// Upstream's fixer declines whenever ANY comment sits inside the property, because the
+			// Upstream's fixer declines whenever any comment sits inside the property, because the
 			// replacement writes just the name and would delete it.
-			if objectShorthandHasCommentInside(ctx, member) {
-				ctx.ReportNode(member, messageObjectShorthandExpectedPropertyShorthand)
+			if objectShorthandHasCommentInside(ruleContext, member) {
+				ruleContext.ReportNode(member, messageObjectShorthandExpectedPropertyShorthand)
 				return
 			}
-			ctx.ReportNodeWithFixes(member, messageObjectShorthandExpectedPropertyShorthand,
-				ctx.ReplaceNode(member, unwrapped.Text()))
+			ruleContext.ReportNodeWithFixes(member, messageObjectShorthandExpectedPropertyShorthand,
+				ruleContext.ReplaceNode(member, unwrapped.Text()))
 		}
 	}
 }
@@ -429,9 +429,9 @@ func checkObjectShorthandMember(ctx rule.Context, member *ast.Node, settings Obj
 // checkObjectShorthandConsistency is upstream's `checkConsistency`.
 //
 // Every property in one object literal must use the same style. Under `checkRedundancy` the chosen
-// style must additionally be shorthand whenever every property COULD be shorthand, which is what
+// style must additionally be shorthand whenever every property could be shorthand, which is what
 // separates `consistent-as-needed` from `consistent`.
-func checkObjectShorthandConsistency(ctx rule.Context, node *ast.Node, checkRedundancy bool) {
+func checkObjectShorthandConsistency(ruleContext rule.Context, node *ast.Node, checkRedundancy bool) {
 	literal := node.AsObjectLiteralExpression()
 	if literal == nil || literal.Properties == nil {
 		return
@@ -443,11 +443,11 @@ func checkObjectShorthandConsistency(ctx rule.Context, node *ast.Node, checkRedu
 		switch member.Kind {
 		case ast.KindGetAccessor, ast.KindSetAccessor, ast.KindSpreadAssignment:
 			// Upstream's `canHaveShorthand` filter drops accessors and spreads before counting, and
-			// unlike the per-property guards above this one is NOT redundant in spirit -- an
+			// unlike the per-property guards above this one is not redundant in spirit -- an
 			// accessor reaching the shorthand tally would make `{ get a() {}, b }` look mixed and
 			// report `unexpectedMix`, where upstream is clean.
 			//
-			// It is redundant in FACT here for the same parser reason: neither kind matches the
+			// It is redundant in fact here for the same parser reason: neither kind matches the
 			// counting arms below either, so a mutation deleting this case also survives. Kept
 			// because it states the intent at the place a reader looks for it, and because a future
 			// arm added to this switch would need it.
@@ -477,11 +477,11 @@ func checkObjectShorthandConsistency(ctx rule.Context, node *ast.Node, checkRedu
 		return
 	}
 	if shorthand > 0 && longform > 0 {
-		ctx.ReportNode(node, messageObjectShorthandUnexpectedMix)
+		ruleContext.ReportNode(node, messageObjectShorthandUnexpectedMix)
 		return
 	}
 	if checkRedundancy && longform > 0 && allCouldBeShorthand {
-		ctx.ReportNode(node, messageObjectShorthandExpectedAllPropertiesShorthanded)
+		ruleContext.ReportNode(node, messageObjectShorthandExpectedAllPropertiesShorthanded)
 	}
 }
 
@@ -489,9 +489,9 @@ func checkObjectShorthandConsistency(ctx rule.Context, node *ast.Node, checkRedu
 //
 // A block comment starting with `*` and containing `@type` is a type annotation for this property,
 // and the shorthand form has nowhere to carry it.
-func objectShorthandHasTypeJsDoc(ctx rule.Context, member *ast.Node) bool {
-	text := ctx.SourceFile.Text()
-	span := text[objectShorthandMemberStart(ctx, member):member.End()]
+func objectShorthandHasTypeJsDoc(ruleContext rule.Context, member *ast.Node) bool {
+	text := ruleContext.SourceFile.Text()
+	span := text[objectShorthandMemberStart(ruleContext, member):member.End()]
 	for index := 0; index+3 < len(span); index++ {
 		if span[index] == '/' && span[index+1] == '*' && span[index+2] == '*' {
 			closing := strings.Index(span[index:], "*/")
@@ -508,9 +508,9 @@ func objectShorthandHasTypeJsDoc(ctx rule.Context, member *ast.Node) bool {
 
 // objectShorthandHasCommentInside answers upstream's `getCommentsInside(node).length > 0`, which is
 // what makes its fixer decline rather than delete a comment.
-func objectShorthandHasCommentInside(ctx rule.Context, member *ast.Node) bool {
-	text := ctx.SourceFile.Text()
-	span := text[objectShorthandMemberStart(ctx, member):member.End()]
+func objectShorthandHasCommentInside(ruleContext rule.Context, member *ast.Node) bool {
+	text := ruleContext.SourceFile.Text()
+	span := text[objectShorthandMemberStart(ruleContext, member):member.End()]
 	for index := 0; index+1 < len(span); index++ {
 		if span[index] == '/' && (span[index+1] == '/' || span[index+1] == '*') {
 			return true
@@ -540,7 +540,7 @@ func objectShorthandKeyIsStringLiteral(member *ast.Node) bool {
 
 // objectShorthandFunctionIsAnonymous answers upstream's `!node.value.id`.
 //
-// A NAMED function expression cannot become a method, because the method form has nowhere to put
+// A named function expression cannot become a method, because the method form has nowhere to put
 // the name and dropping it would remove a binding the body may use.
 func objectShorthandFunctionIsAnonymous(value *ast.Node) bool {
 	if value.Kind != ast.KindFunctionExpression {
@@ -552,8 +552,8 @@ func objectShorthandFunctionIsAnonymous(value *ast.Node) bool {
 
 // objectShorthandIsConstructorName answers upstream's `isConstructor`.
 //
-// NOT simply "starts with a capital". Upstream skips a leading run of `_`, `$` and digits with
-// `CTOR_PREFIX_REGEX = /[^_$0-9]/u` and tests the first character AFTER it, so
+// Not simply "starts with a capital". Upstream skips a leading run of `_`, `$` and digits with
+// `CTOR_PREFIX_REGEX = /[^_$0-9]/u` and tests the first character after it, so
 // `__ConstructorFunction` and `_0ConstructorFunction` are both constructors. A name made entirely
 // of those characters -- `_`, `$$`, `_8` -- matches nothing and is not a constructor.
 //
@@ -596,7 +596,7 @@ func objectShorthandUsesLexicalIdentifier(value *ast.Node) bool {
 			}
 			return
 		// A nested function establishes its own `this` and `arguments`, so what it contains does
-		// not constrain the arrow. So does a CLASS: the `super()` inside a nested class's
+		// not constrain the arrow. So does a class: the `super()` inside a nested class's
 		// constructor belongs to that class, and upstream's scope stack stops there for the same
 		// reason. Missing the class arm made a corpus case go silent, since its arrow body
 		// contained `class Foo extends Bar { constructor() { super(); } }`.
@@ -619,7 +619,7 @@ func objectShorthandUsesLexicalIdentifier(value *ast.Node) bool {
 //
 // The pieces move rather than the text being rebuilt: the modifiers and the key stay where they
 // are, and `: function` is inserted after the key with any `*` or `async` carried across.
-func objectShorthandMethodToLongform(ctx rule.Context, member *ast.Node) ([]rule.Fix, bool) {
+func objectShorthandMethodToLongform(ruleContext rule.Context, member *ast.Node) ([]rule.Fix, bool) {
 	method := member.AsMethodDeclaration()
 	if method == nil || member.Name() == nil {
 		return nil, false
@@ -638,8 +638,8 @@ func objectShorthandMethodToLongform(ctx rule.Context, member *ast.Node) ([]rule
 
 	// Remove the modifiers and the `*`, which move into the inserted function expression.
 	fixes := make([]rule.Fix, 0, 3)
-	keyStart := scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, name.Pos()).Pos()
-	memberStart := scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, member.Pos()).Pos()
+	keyStart := scanner.GetRangeOfTokenAtPosition(ruleContext.SourceFile, name.Pos()).Pos()
+	memberStart := scanner.GetRangeOfTokenAtPosition(ruleContext.SourceFile, member.Pos()).Pos()
 	if keyStart > memberStart {
 		fixes = append(fixes, rule.RemoveRange(core.NewTextRange(memberStart, keyStart)))
 	}
@@ -659,32 +659,32 @@ func objectShorthandMethodToLongform(ctx rule.Context, member *ast.Node) ([]rule
 // objectShorthandFunctionToShorthand is upstream's `makeFunctionShorthand`, which rewrites
 // `{ a: function() {} }` into `{ a() {} }`.
 //
-// The replacement runs from the KEY's first token through the end of the property, and is built as
+// The replacement runs from the key's first token through the end of the property, and is built as
 // the key text plus whatever follows the `function` keyword (or the `*` after it, for a generator),
 // with `async ` and `*` carried across as a prefix. Slicing rather than reconstructing is what keeps
 // the parameter list, the return type and the body exactly as the author wrote them.
 //
 // Declines when a comment sits between the key and the value, because the removed span would take
 // it: `{ key: /* c */ () => {} }` is reported and not repaired.
-func objectShorthandFunctionToShorthand(ctx rule.Context, member *ast.Node,
+func objectShorthandFunctionToShorthand(ruleContext rule.Context, member *ast.Node,
 	assignment *ast.PropertyAssignment, value *ast.Node) (rule.Fix, bool) {
 
-	sourceText := ctx.SourceFile.Text()
+	sourceText := ruleContext.SourceFile.Text()
 	key := assignment.Name()
 	if key == nil {
 		return rule.Fix{}, false
 	}
-	keyStart := scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, key.Pos()).Pos()
+	keyStart := scanner.GetRangeOfTokenAtPosition(ruleContext.SourceFile, key.Pos()).Pos()
 	keyText := sourceText[keyStart:key.End()]
 
 	// A comment between the key and the value would be inside the replaced span, so upstream
 	// declines: `{ f: /* c */ function(){} }` is reported and not repaired.
 	//
-	// The scan runs to the value's first TOKEN rather than to `Pos()`, because `Pos()` begins at
+	// The scan runs to the value's first token rather than to `Pos()`, because `Pos()` begins at
 	// the previous token's end and so starts inside the comment rather than after the colon. It
-	// also has to use the ORIGINAL initializer rather than the paren-unwrapped value, since
+	// also has to use the original initializer rather than the paren-unwrapped value, since
 	// unwrapping moves the start past a parenthesis the comment may sit behind.
-	valueStart := scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, assignment.Initializer.Pos()).Pos()
+	valueStart := scanner.GetRangeOfTokenAtPosition(ruleContext.SourceFile, assignment.Initializer.Pos()).Pos()
 	if objectShorthandHasCommentBetween(sourceText, key.End(), valueStart) {
 		return rule.Fix{}, false
 	}
@@ -711,34 +711,34 @@ func objectShorthandFunctionToShorthand(ctx rule.Context, member *ast.Node,
 		if body == nil || body.Kind != ast.KindBlock {
 			return rule.Fix{}, false
 		}
-		parameterStart := scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, value.Pos()).Pos()
-		bodyStart := scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, body.Pos()).Pos()
+		parameterStart := scanner.GetRangeOfTokenAtPosition(ruleContext.SourceFile, value.Pos()).Pos()
+		bodyStart := scanner.GetRangeOfTokenAtPosition(ruleContext.SourceFile, body.Pos()).Pos()
 		arrow := value.AsArrowFunction()
 		if arrow == nil || arrow.EqualsGreaterThanToken == nil {
 			return rule.Fix{}, false
 		}
-		// The slice runs to the arrow token's START and the body slice from the body's start, so
-		// the whitespace between them is whatever sat AFTER the arrow rather than before it. That
+		// The slice runs to the arrow token's start and the body slice from the body's start, so
+		// the whitespace between them is whatever sat after the arrow rather than before it. That
 		// is what upstream produces: `x: () => { ... }` becomes `x() { ... }`, keeping the space
 		// the author wrote before the brace.
 		// The parameter list as written, taken from the arrow's own parameter nodes rather than
 		// from a text scan: the slice starts at the arrow's first token, which for
-		// `async (bar = 1) => {}` is `async`, so testing whether the SLICE starts with `(` reads
+		// `async (bar = 1) => {}` is `async`, so testing whether the slice starts with `(` reads
 		// the modifier and wrongly adds a second pair.
-		// Start at the TYPE PARAMETER list when there is one, and at the parameter list otherwise.
+		// Start at the type parameter list when there is one, and at the parameter list otherwise.
 		// Two things make this more than a scan for `(`. The arrow's first token is `async` for
 		// `async (bar) => {}`, which `prefix` already carries, so slicing from it writes the
 		// modifier twice. And a generic arrow `<T>(): void => {}` keeps its `<T>`, which sits
-		// BEFORE the parenthesis: slicing from `(` silently drops the type parameters, which cost
+		// before the parenthesis: slicing from `(` silently drops the type parameters, which cost
 		// one corpus case whose four findings all lost their generics.
-		parameterStart = objectShorthandSignatureStart(ctx, value, parameterStart,
+		parameterStart = objectShorthandSignatureStart(ruleContext, value, parameterStart,
 			arrow.EqualsGreaterThanToken.Pos())
 		parameters := strings.TrimRight(sourceText[parameterStart:arrow.EqualsGreaterThanToken.Pos()], " \t")
 		if declared := value.Parameters(); len(declared) == 1 {
 			// A single parameter may be written without parentheses -- `foo => {}` -- and a
 			// method's list always has them. The test is whether a `(` appears before the
 			// parameter itself, not anywhere in the slice.
-			parameterStartOffset := scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, declared[0].Pos()).Pos()
+			parameterStartOffset := scanner.GetRangeOfTokenAtPosition(ruleContext.SourceFile, declared[0].Pos()).Pos()
 			hasParenthesis := false
 			for index := parameterStart; index < parameterStartOffset; index++ {
 				if sourceText[index] == '(' {
@@ -757,7 +757,7 @@ func objectShorthandFunctionToShorthand(ctx rule.Context, member *ast.Node,
 	}
 
 	// Everything from after the `function` keyword onward, which survives unchanged.
-	tail := objectShorthandParameterListStart(ctx, value, generator)
+	tail := objectShorthandParameterListStart(ruleContext, value, generator)
 	if tail < 0 {
 		return rule.Fix{}, false
 	}
@@ -770,8 +770,8 @@ func objectShorthandFunctionToShorthand(ctx rule.Context, member *ast.Node,
 // For a function expression that is the `(` of its parameter list, which upstream reaches as the
 // token after `function` (or after the `*` for a generator). For an arrow it is the arrow's own
 // start, since an arrow has no keyword to drop.
-func objectShorthandParameterListStart(ctx rule.Context, value *ast.Node, generator bool) int {
-	text := ctx.SourceFile.Text()
+func objectShorthandParameterListStart(ruleContext rule.Context, value *ast.Node, generator bool) int {
+	text := ruleContext.SourceFile.Text()
 	limit := value.End()
 	if body := value.Body(); body != nil {
 		limit = body.Pos()
@@ -779,13 +779,13 @@ func objectShorthandParameterListStart(ctx rule.Context, value *ast.Node, genera
 	if limit > len(text) {
 		limit = len(text)
 	}
-	// Upstream slices from the token after `function`, or after the `*` for a generator, NOT from
+	// Upstream slices from the token after `function`, or after the `*` for a generator, not from
 	// the parenthesis. The difference is the whitespace the author wrote between them:
 	// `foo: async function () {}` becomes `async foo () {}`, keeping the space, where slicing from
 	// `(` would produce `async foo() {}`. An arrow has no keyword to skip, so its whole text is
 	// kept from its own start.
 	if value.Kind == ast.KindArrowFunction {
-		return scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, value.Pos()).Pos()
+		return scanner.GetRangeOfTokenAtPosition(ruleContext.SourceFile, value.Pos()).Pos()
 	}
 	for index := value.Pos(); index+8 <= limit && index+8 <= len(text); index++ {
 		if text[index:index+8] == "function" {
@@ -820,19 +820,17 @@ func objectShorthandParameterListStart(ctx rule.Context, value *ast.Node, genera
 // Upstream needs no equivalent because its corpus's generic cases come through a fixture parser and
 // its slice happens to start early enough. Here the offset has to be computed, and getting it wrong
 // drops the generics without changing any message id.
-func objectShorthandSignatureStart(ctx rule.Context, value *ast.Node, from int, to int) int {
-	text := ctx.SourceFile.Text()
-	if to > len(text) {
-		to = len(text)
-	}
+func objectShorthandSignatureStart(ruleContext rule.Context, value *ast.Node, from int, to int) int {
+	text := ruleContext.SourceFile.Text()
+	end := min(to, len(text))
 	if typeParameters := value.TypeParameterList(); typeParameters != nil && len(typeParameters.Nodes) > 0 {
-		for index := from; index < to; index++ {
+		for index := from; index < end; index++ {
 			if text[index] == '<' {
 				return index
 			}
 		}
 	}
-	for index := from; index < to; index++ {
+	for index := from; index < end; index++ {
 		if text[index] == '(' {
 			return index
 		}
@@ -853,13 +851,13 @@ func objectShorthandHasCommentBetween(text string, start int, end int) bool {
 	return false
 }
 
-// objectShorthandMemberStart is the member's first TOKEN, which is upstream's `node.range[0]`.
+// objectShorthandMemberStart is the member's first token, which is upstream's `node.range[0]`.
 //
 // `Pos()` begins at the previous token's end, so it includes the leading trivia -- the whitespace
-// AND any comment sitting between the previous property and this one. Upstream's
+// and any comment sitting between the previous property and this one. Upstream's
 // `getCommentsInside` looks only within the node's own range, so a comment before the property is
 // not inside it. Scanning from `Pos()` made a comment between two properties look like a comment
 // inside the second, and the fixer declined a repair upstream performs.
-func objectShorthandMemberStart(ctx rule.Context, member *ast.Node) int {
-	return scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, member.Pos()).Pos()
+func objectShorthandMemberStart(ruleContext rule.Context, member *ast.Node) int {
+	return scanner.GetRangeOfTokenAtPosition(ruleContext.SourceFile, member.Pos()).Pos()
 }

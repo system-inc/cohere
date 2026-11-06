@@ -88,14 +88,14 @@ var preferNumericLiteralsRadix = map[int]struct {
 // The replacement can end up beside a token it would merge with, in either direction. `yield` and
 // `0b11` written adjacently become one identifier, and `0b11` beside `in` becomes `0b11in`. Both
 // are in the corpus and both get a space here.
-var PreferNumericLiterals = rule.Rule{
+var PreferNumericLiterals = rule.Rule[rule.NoOptions]{
 	Name:             "prefer-numeric-literals",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 				call := node.AsCallExpression()
@@ -115,20 +115,20 @@ var PreferNumericLiterals = rule.Rule{
 				if !isSpellable {
 					return
 				}
-				if !preferNumericLiteralsIsParseInt(ctx, call.Expression) {
+				if !preferNumericLiteralsIsParseInt(ruleContext, call.Expression) {
 					return
 				}
 
-				calleeRange := rule.TokenRange(ctx.SourceFile, call.Expression)
-				functionName := ctx.SourceFile.Text()[calleeRange.Pos():calleeRange.End()]
+				calleeRange := rule.TokenRange(ruleContext.SourceFile, call.Expression)
+				functionName := ruleContext.SourceFile.Text()[calleeRange.Pos():calleeRange.End()]
 				message := preferNumericLiteralsMessage(spelling.system, functionName)
 
-				if fix, canFix := preferNumericLiteralsFix(ctx, node, spelling.prefix, stringValue,
+				if fix, canFix := preferNumericLiteralsFix(ruleContext, node, spelling.prefix, stringValue,
 					radix); canFix {
-					ctx.ReportNodeWithFixes(node, message, fix)
+					ruleContext.ReportNodeWithFixes(node, message, fix)
 					return
 				}
-				ctx.ReportNode(node, message)
+				ruleContext.ReportNode(node, message)
 			},
 		}
 	},
@@ -137,7 +137,7 @@ var PreferNumericLiterals = rule.Rule{
 // preferNumericLiteralsStringValue reads the cooked value of a string literal or of an untagged
 // template with no substitutions, which are the two shapes upstream accepts.
 //
-// A template WITH a substitution is declined, and so is a tagged one: `parseInt(`+"`11${foo}`"+`, 2)`
+// A template with a substitution is declined, and so is a tagged one: `parseInt(`+"`11${foo}`"+`, 2)`
 // is a passing case because its value is not settled by the syntax.
 func preferNumericLiteralsStringValue(node *ast.Node) (string, bool) {
 	if node == nil {
@@ -165,8 +165,8 @@ func preferNumericLiteralsRadixValue(node *ast.Node) (int, bool) {
 	}
 	// The node's own Text is the canonical rendering of the double, so `0x10` reads as 16 here and
 	// the radix written in another base still resolves.
-	value, err := strconv.ParseFloat(node.Text(), 64)
-	if err != nil || value != math.Trunc(value) {
+	value, parseError := strconv.ParseFloat(node.Text(), 64)
+	if parseError != nil || value != math.Trunc(value) {
 		return 0, false
 	}
 	return int(value), true
@@ -174,14 +174,14 @@ func preferNumericLiteralsRadixValue(node *ast.Node) (int, bool) {
 
 // preferNumericLiteralsIsParseInt answers upstream's `isParseInt`, which accepts two callee shapes
 // and requires the name at the root of each to be the global.
-func preferNumericLiteralsIsParseInt(ctx rule.Context, callee *ast.Node) bool {
+func preferNumericLiteralsIsParseInt(ruleContext rule.Context, callee *ast.Node) bool {
 	unwrapped := preferNumericLiteralsUnwrap(callee)
 	if unwrapped == nil {
 		return false
 	}
 
 	if unwrapped.Kind == ast.KindIdentifier && unwrapped.Text() == "parseInt" {
-		return preferNumericLiteralsResolvesToAGlobal(ctx, unwrapped)
+		return preferNumericLiteralsResolvesToAGlobal(ruleContext, unwrapped)
 	}
 
 	// `Number.parseInt`, in either spelling and with optional chaining anywhere in it.
@@ -205,7 +205,7 @@ func preferNumericLiteralsIsParseInt(ctx rule.Context, callee *ast.Node) bool {
 		accessedObject.Text() != "Number" {
 		return false
 	}
-	return preferNumericLiteralsResolvesToAGlobal(ctx, accessedObject)
+	return preferNumericLiteralsResolvesToAGlobal(ruleContext, accessedObject)
 }
 
 // preferNumericLiteralsUnwrap strips parentheses in a loop.
@@ -214,10 +214,11 @@ func preferNumericLiteralsIsParseInt(ctx rule.Context, callee *ast.Node) bool {
 // reach its check already bare. Five of its invalid cases write that shape, so without this the
 // port goes silent on inputs the corpus asserts.
 func preferNumericLiteralsUnwrap(node *ast.Node) *ast.Node {
-	for node != nil && node.Kind == ast.KindParenthesizedExpression {
-		node = node.AsParenthesizedExpression().Expression
+	current := node
+	for current != nil && current.Kind == ast.KindParenthesizedExpression {
+		current = current.AsParenthesizedExpression().Expression
 	}
-	return node
+	return current
 }
 
 // preferNumericLiteralsResolvesToAGlobal answers upstream's `sourceCode.isGlobalReference`.
@@ -225,18 +226,18 @@ func preferNumericLiteralsUnwrap(node *ast.Node) *ast.Node {
 // A declaration in a declaration file is the global. Five of upstream's passing cases are shadows,
 // covering a parameter and a local for each of the two names, and nothing about the syntax
 // separates them from the real thing.
-func preferNumericLiteralsResolvesToAGlobal(ctx rule.Context, identifier *ast.Node) bool {
-	return rule.IsDeclaredOnlyInDeclarationFiles(ctx.TypeChecker.GetSymbolAtLocation(identifier))
+func preferNumericLiteralsResolvesToAGlobal(ruleContext rule.Context, identifier *ast.Node) bool {
+	return rule.IsDeclaredOnlyInDeclarationFiles(ruleContext.TypeChecker.GetSymbolAtLocation(identifier))
 }
 
 // preferNumericLiteralsFix builds the repair, or declines.
-func preferNumericLiteralsFix(ctx rule.Context, node *ast.Node, prefix string, stringValue string,
+func preferNumericLiteralsFix(ruleContext rule.Context, node *ast.Node, prefix string, stringValue string,
 	radix int) (rule.Fix, bool) {
-	callRange := rule.TokenRange(ctx.SourceFile, node)
+	callRange := rule.TokenRange(ruleContext.SourceFile, node)
 
 	// Any comment inside the call would be deleted by a whole-call replacement. Twelve of
 	// upstream's declines are this and nothing else.
-	for _, comment := range comments.ForFile(ctx) {
+	for _, comment := range comments.ForFile(ruleContext) {
 		if comment.Range.Pos() >= callRange.Pos() && comment.Range.End() <= callRange.End() {
 			return rule.Fix{}, false
 		}
@@ -251,14 +252,14 @@ func preferNumericLiteralsFix(ctx rule.Context, node *ast.Node, prefix string, s
 		return rule.Fix{}, false
 	}
 
-	text := ctx.SourceFile.Text()
+	text := ruleContext.SourceFile.Text()
 	if callRange.Pos() > 0 && scanner.IsIdentifierPart(rune(text[callRange.Pos()-1])) {
 		// `yield` beside `0b11` would read as one identifier.
 		replacement = " " + replacement
 	}
 	if callRange.End() < len(text) && scanner.IsIdentifierPart(rune(text[callRange.End()])) {
 		// `0b11` beside `in` would read as `0b11in`.
-		replacement = replacement + " "
+		replacement += " "
 	}
 	return rule.ReplaceRange(core.NewTextRange(callRange.Pos(), callRange.End()), replacement), true
 }
@@ -274,7 +275,7 @@ func preferNumericLiteralsLiteralValue(literal string) (float64, bool) {
 	// rather than the guard deleted.
 	//
 	// A mutant removing this survived the whole corpus, and the reason is that ParseUint with an
-	// EXPLICIT base rejects a separator: measured, `ParseUint("1_0", 2)` is a syntax error while
+	// explicit base rejects a separator: measured, `ParseUint("1_0", 2)` is a syntax error while
 	// `ParseUint("0b1_0", 0)` is 2. So the four separator cases decline either way, through the
 	// invalid-literal path instead of through this one.
 	//
@@ -301,8 +302,8 @@ func preferNumericLiteralsLiteralValue(literal string) (float64, bool) {
 	default:
 		return 0, false
 	}
-	value, err := strconv.ParseUint(literal[2:], base, 64)
-	if err != nil {
+	value, parseError := strconv.ParseUint(literal[2:], base, 64)
+	if parseError != nil {
 		return 0, false
 	}
 	return float64(value), true
@@ -337,7 +338,7 @@ func preferNumericLiteralsParseInt(text string, radix int) float64 {
 	// A mutant reading the whole string instead survived the corpus, and an exhaustive check says
 	// why: over 75,777 strings of up to three characters drawn from digits, letters, a dot, an
 	// underscore, spaces and signs, crossed with all three radixes, the two versions never once
-	// disagree about whether a FIX IS OFFERED. They disagree about the value often, on six of the
+	// disagree about whether a fix is offered. They disagree about the value often, on six of the
 	// twelve shapes probed by hand, but only where the discarded suffix is also what makes the
 	// literal invalid, so both routes reach the same decline.
 	//

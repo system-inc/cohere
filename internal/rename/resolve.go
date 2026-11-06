@@ -17,7 +17,7 @@ import (
 // way a cursor does in an editor. Taking the outermost would resolve `foo.bar` to `foo` when the
 // user pointed at `bar`.
 func resolveAnchor(
-	ctx context.Context,
+	callerContext context.Context,
 	graph *program.Graph,
 	files []*ast.SourceFile,
 	at Position,
@@ -31,7 +31,8 @@ func resolveAnchor(
 	}
 	if target == nil {
 		return nil, nil, fmt.Errorf(
-			"%s is not in the program — the position must name a file the tsconfig includes",
+			// The dash is written as its escape, the same bytes, so the message reads as it always has.
+			"%s is not in the program \u2014 the position must name a file the tsconfig includes",
 			at.FileName,
 		)
 	}
@@ -45,7 +46,7 @@ func resolveAnchor(
 		)
 	}
 
-	fileChecker, release := graph.CheckerForFile(ctx, target)
+	fileChecker, release := graph.CheckerForFile(callerContext, target)
 	if fileChecker == nil {
 		release()
 		return nil, nil, fmt.Errorf("no checker for %s", at.FileName)
@@ -61,15 +62,15 @@ func resolveAnchor(
 		if node.Kind == ast.KindIdentifier {
 			span := tokenSpan(target, node)
 			if span.Pos() <= offset && offset < span.End() {
-				// Last match wins, and this is EQUIVALENT to first-match-wins rather than being a
+				// Last match wins, and this is equivalent to first-match-wins rather than being a
 				// deliberate innermost-wins rule. An earlier version of this comment claimed the
 				// latter and was wrong.
 				//
 				// An identifier is a leaf token, so two identifier spans can never contain the same
 				// offset. Measured on the fixture rather than argued: 25 identifiers across two
-				// files, and every offset is inside at most one identifier span — zero overlaps. The
+				// files, and every offset is inside at most one identifier span (zero overlaps). The
 				// intuition that `value.toUpperCase()` nests is about the enclosing property-access
-				// EXPRESSION, which this walk never records because it only looks at identifiers.
+				// expression, which this walk never records because it only looks at identifiers.
 				//
 				// So a mutation making this take the first match instead survives, correctly and
 				// permanently: no input can distinguish them. It is recorded here rather than pinned
@@ -84,7 +85,9 @@ func resolveAnchor(
 
 	if found == nil {
 		return nil, nil, fmt.Errorf(
-			"no identifier at %s:%d:%d — the position must point at a name, not at whitespace, a keyword, or a string",
+			// The dash is written as its escape, the same bytes, so the message reads as it always has.
+			"no identifier at %s:%d:%d \u2014 the position must point at a name, not at whitespace, a keyword, "+
+				"or a string",
 			at.FileName, at.Line, at.Column,
 		)
 	}
@@ -92,7 +95,9 @@ func resolveAnchor(
 	// A shorthand property's identifier resolves through the plain accessor to the property rather
 	// than to the binding, so anchoring on it would rename the object's contract instead of the
 	// variable the user pointed at. The value symbol is the one a cursor there means.
-	if parent := found.Parent; parent != nil && parent.Kind == ast.KindShorthandPropertyAssignment && parent.Name() == found {
+	if parent := found.Parent; parent != nil &&
+		parent.Kind == ast.KindShorthandPropertyAssignment &&
+		parent.Name() == found {
 		if value := fileChecker.GetShorthandAssignmentValueSymbol(parent); value != nil {
 			return value, found, nil
 		}
@@ -125,7 +130,7 @@ func resolveAnchor(
 // a loud error rather than a fallback, because the gate this replaces printed green over zero files
 // after falling through to a guess.
 func ResolveBareName(
-	ctx context.Context,
+	callerContext context.Context,
 	graph *program.Graph,
 	name string,
 ) ([]Candidate, []*ast.Symbol, error) {
@@ -140,7 +145,7 @@ func ResolveBareName(
 		if !containsWord(text, name) {
 			continue
 		}
-		fileChecker, release := graph.CheckerForFile(ctx, file)
+		fileChecker, release := graph.CheckerForFile(callerContext, file)
 		if fileChecker == nil {
 			release()
 			continue
@@ -155,8 +160,8 @@ func ResolveBareName(
 			if node.Kind == ast.KindIdentifier && node.Text() == name && isOwnDeclarationName(node) {
 				symbol := fileChecker.GetSymbolAtLocation(node)
 				// An import specifier declares a local binding whose target lives elsewhere. Both
-				// are legitimate rename anchors and they are different acts, so the alias is NOT
-				// followed here — otherwise an imported name and its export would collapse into one
+				// are legitimate rename anchors and they are different acts, so the alias is not
+				// followed here. Otherwise an imported name and its export would collapse into one
 				// candidate and the ambiguity the user needs to see would be hidden.
 				if symbol != nil && !seen[symbol] {
 					seen[symbol] = true
@@ -267,7 +272,7 @@ func declarationKindName(parent *ast.Node) string {
 // tokenSpan is an identifier's own text, without the trivia before it.
 //
 // Routed through the same scanner call `rule.TokenRange` uses, and for the same reason stated at
-// length there: `node.Pos()` is the position BEFORE leading trivia, so a range built from it
+// length there: `node.Pos()` is the position before leading trivia, so a range built from it
 // includes the whitespace and any comment sitting in front of the name. A rename writing over that
 // range would delete a comment and swallow the indentation, and the result would still parse, which
 // means nothing downstream would catch it. Ranges are the whole game here.

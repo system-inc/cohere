@@ -16,35 +16,18 @@ import (
 //	app/os/Session.ts:12:5 error nexus/consistency-no-abbreviated-identifier `ctx` is ...
 //	✗ ☠️ 0.8s • 1 finding • 3 cohered (480 rules • 3 checked • 3,923 cached)
 
-// textStyle colors text for a terminal, and does nothing when the output is not one or NO_COLOR is set,
-// so a log, a pipe or a reader who asked for no color gets no escape codes at all.
-type textStyle struct {
-	color bool
-}
-
 // styleFor is the style for a stream: color only on a terminal, and never under NO_COLOR, whose
 // convention is that any value, empty included, turns color off.
 func styleFor(stream *os.File) textStyle {
 	if _, set := os.LookupEnv("NO_COLOR"); set {
 		return textStyle{}
 	}
-	information, err := stream.Stat()
-	if err != nil {
+	information, statError := stream.Stat()
+	if statError != nil {
 		return textStyle{}
 	}
 	return textStyle{color: information.Mode()&os.ModeCharDevice != 0}
 }
-
-func (style textStyle) wrap(text, open, close string) string {
-	if !style.color || text == "" {
-		return text
-	}
-	return open + text + close
-}
-
-func (style textStyle) bold(text string) string { return style.wrap(text, "\x1b[1m", "\x1b[22m") }
-func (style textStyle) dim(text string) string  { return style.wrap(text, "\x1b[2m", "\x1b[22m") }
-func (style textStyle) red(text string) string  { return style.wrap(text, "\x1b[31m", "\x1b[39m") }
 
 // changedFilesShown is how many rewritten files the default view lists before saying how many more.
 const changedFilesShown = 20
@@ -122,6 +105,13 @@ func findingLine(finding runFinding, style textStyle) string {
 	if finding.Path == "" {
 		return fmt.Sprintf("%s %s %s", severity, style.dim(finding.Rule), singleLineDescription(finding.Message))
 	}
-	return fmt.Sprintf("%s:%d:%d %s %s %s",
-		finding.Path, finding.Line, finding.Column, severity, style.dim(finding.Rule), singleLineDescription(finding.Message))
+	return fmt.Sprintf(
+		"%s:%d:%d %s %s %s",
+		finding.Path,
+		finding.Line,
+		finding.Column,
+		severity,
+		style.dim(finding.Rule),
+		singleLineDescription(finding.Message),
+	)
 }

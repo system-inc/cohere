@@ -2,13 +2,13 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/gitignore"
+	"github.com/system-inc/cohere/internal/streams"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
@@ -37,9 +37,9 @@ const missingGeneratedRule = "missing-generated-file"
 // git there. Outside root, or when root's ignore files cannot be read, nothing is, so the cause is never
 // claimed on a guess.
 func generatedOutputUnder(root string) func(target string) bool {
-	matcher, err := gitignore.New(root)
+	matcher, newGitignoreError := gitignore.New(root)
 	return func(target string) bool {
-		if err != nil {
+		if newGitignoreError != nil {
 			return false
 		}
 		relative, relativeError := filepath.Rel(root, filepath.FromSlash(target))
@@ -61,7 +61,11 @@ func missingGeneratedRemedy(target string) string {
 
 // missingGeneratedMessage is the cause as its line says it.
 func missingGeneratedMessage(input program.MissingInput) string {
-	return fmt.Sprintf("%s does not exist: it is generated output (git ignores it), and %s", input.Specifier, missingGeneratedRemedy(input.Target))
+	return fmt.Sprintf(
+		"%s does not exist: it is generated output (git ignores it), and %s",
+		input.Specifier,
+		missingGeneratedRemedy(input.Target),
+	)
 }
 
 // printMissingGenerated prints each missing generated file as a finding, in every view, ahead of anything
@@ -69,14 +73,21 @@ func missingGeneratedMessage(input program.MissingInput) string {
 func printMissingGenerated(missing []program.MissingInput) {
 	for _, input := range missing {
 		message := missingGeneratedMessage(input)
-		printFinding(os.Stdout, runFinding{
+		printFinding(streams.Output, runFinding{
 			Path:     input.Importer,
 			Line:     input.Line,
 			Column:   input.Column,
 			Severity: "error",
 			Rule:     missingGeneratedRule,
 			Message:  message,
-		}, fmt.Sprintf("%s:%d:%d - error %s: %s\n", input.Importer, input.Line, input.Column, missingGeneratedRule, message))
+		}, fmt.Sprintf(
+			"%s:%d:%d - error %s: %s\n",
+			input.Importer,
+			input.Line,
+			input.Column,
+			missingGeneratedRule,
+			message,
+		))
 	}
 }
 
@@ -86,7 +97,7 @@ func foldTypeDiagnostics(missing []program.MissingInput, diagnostics []*ast.Diag
 	if len(missing) == 0 || len(diagnostics) == 0 || activeOutput.Mode != outputHuman {
 		return false
 	}
-	fmt.Fprintln(os.Stdout, activeOutput.Style.dim(foldedLine(diagnostics)))
+	fmt.Fprintln(streams.Output, activeOutput.Style.dim(foldedLine(diagnostics)))
 	return true
 }
 
@@ -100,11 +111,11 @@ func foldedLine(diagnostics []*ast.Diagnostic) string {
 	for code := range byCode {
 		codes = append(codes, code)
 	}
-	sort.Slice(codes, func(i, j int) bool {
-		if byCode[codes[i]] != byCode[codes[j]] {
-			return byCode[codes[i]] > byCode[codes[j]]
+	sort.Slice(codes, func(left, right int) bool {
+		if byCode[codes[left]] != byCode[codes[right]] {
+			return byCode[codes[left]] > byCode[codes[right]]
 		}
-		return codes[i] < codes[j]
+		return codes[left] < codes[right]
 	})
 	parts := make([]string, 0, len(codes))
 	for _, code := range codes {
@@ -120,7 +131,7 @@ func missingGeneratedTargets(missing []program.MissingInput, root string) []stri
 	var targets []string
 	for _, input := range missing {
 		target := input.Target
-		if relative, err := filepath.Rel(root, filepath.FromSlash(target)); err == nil {
+		if relative, relativePathError := filepath.Rel(root, filepath.FromSlash(target)); relativePathError == nil {
 			target = filepath.ToSlash(relative)
 		}
 		if !seen[target] {

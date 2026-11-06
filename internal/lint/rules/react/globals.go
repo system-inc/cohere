@@ -76,7 +76,7 @@ const messageGlobalReassignmentReason = "Render has to be able to run at any tim
 // The second is a closure capture, and it is the case the intermediate representation in
 // `internal/utilities/hir` gets wrong. See the note on routes below.
 //
-// # Why this does not read the HIR, which lowers `StoreGlobal` directly
+// # Why this does not read the `HIR`, which lowers `StoreGlobal` directly
 //
 // `internal/utilities/hir` landed the same day as this rule and emits a `StoreGlobal` instruction,
 // which reads as the whole detection already done. It was not used, and the reasons were measured
@@ -95,7 +95,7 @@ const messageGlobalReassignmentReason = "Render has to be able to run at any tim
 // **The capture gap is half closed, and the surviving half is the half this rule would meet.**
 // Before `19ac208` a write to an enclosing function's local lowered to `StoreGlobal`, where React
 // classifies it as a `StoreContext` and is silent. That is now fixed when the enclosing component is
-// the lowering root. It is NOT fixed when the nested function is lowered as its own root, which is
+// the lowering root. It is not fixed when the nested function is lowered as its own root, which is
 // how a per-function rule reaches it. Measured at current head on one input, printing both:
 //
 //	function Component() { let x = 1; const f = () => { x = 2; }; f(); return null; }
@@ -198,7 +198,7 @@ const messageGlobalReassignmentReason = "Render has to be able to run at any tim
 // Reusing it rather than restating it is deliberate: two copies of a gate this intricate would
 // drift, and the drift would be invisible because each copy would pass its own fixtures.
 //
-// # What this port does NOT reproduce, stated as a subset rather than left to be discovered
+// # What this port does not reproduce, stated as a subset rather than left to be discovered
 //
 // A write inside a **nested function** is reported by React only when its effects pass can prove
 // that function runs during render, and that proof is an inter-procedural aliasing analysis rather
@@ -232,7 +232,7 @@ const messageGlobalReassignmentReason = "Render has to be able to run at any tim
 //
 // No fix. The repair is a `useState` or an effect, which is a change of design rather than of text,
 // and upstream proposes none either.
-var Globals = rule.Rule{
+var Globals = rule.Rule[CompilerRuleOptions]{
 	// No namespace prefix. The config writes `react/globals`, and the parity guard strips the
 	// namespace on a `/` boundary, so `react-globals` would match no inventory entry while still
 	// passing every fixture in this package. Measured in both spellings; see the test.
@@ -246,7 +246,7 @@ var Globals = rule.Rule{
 	// for the reporting case and a `KindParameter` inside the component for the silent one.
 	NeedsTypeChecker: true,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[CompilerRuleOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindIdentifier: func(node *ast.Node) {
 				// The engine hands a rule a nil checker when the program could not be built. This
@@ -254,7 +254,7 @@ var Globals = rule.Rule{
 				// silence rather than a panic, because `GetSymbolAtLocation` tolerates a nil
 				// receiver. Silence is the more dangerous of the two, so the guard is explicit and
 				// `TestGlobalsRequiresTheTypedHarness` fails loudly if it is ever removed.
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 
@@ -289,11 +289,11 @@ var Globals = rule.Rule{
 					return
 				}
 
-				if !declaredOutsideCompilationRoot(ctx, node, root) {
+				if !declaredOutsideCompilationRoot(ruleContext, node, root) {
 					return
 				}
 
-				ctx.ReportNode(globalStoreReportNode(node), rule.Message{
+				ruleContext.ReportNode(globalStoreReportNode(node), rule.Message{
 					Id: messageGlobalReassignmentId,
 					Description: fmt.Sprintf(
 						"This writes to `%s`, which is declared outside the component or hook, "+
@@ -323,9 +323,9 @@ func isGlobalStoreTarget(identifier *ast.Node) bool {
 
 	switch parent.Kind {
 	case ast.KindBinaryExpression:
-		// There is deliberately no test here that the identifier is on the LEFT of the operator,
+		// There is deliberately no test here that the identifier is on the left of the operator,
 		// and its absence is a measurement rather than an oversight. It was written first, reading
-		// as obviously load-bearing, and a mutant disabling it entirely SURVIVED the whole suite.
+		// as obviously load-bearing, and a mutant disabling it entirely survived the whole suite.
 		//
 		// Probed rather than patched with another fixture. Over ten shapes putting an identifier on
 		// the right of an assignment (`h = g`, `h += g`, `(h) = g`, `h ||= g`, `h = g = 1`,
@@ -347,7 +347,7 @@ func isGlobalStoreTarget(identifier *ast.Node) bool {
 		return false
 
 	case ast.KindForOfStatement, ast.KindForInStatement:
-		// `for (g of xs) {}` with no declaration in the head. Upstream takes the WHOLE FUNCTION
+		// `for (g of xs) {}` with no declaration in the head. Upstream takes the whole function
 		// silent on this input, control included, which is a lowering failure rather than a
 		// decision about the write. Reproduced here as silence on the write alone; the divergence
 		// is stated on the rule.
@@ -365,7 +365,7 @@ func isGlobalStoreTarget(identifier *ast.Node) bool {
 // isGlobalStoreOperator reports whether an assignment operator lowers to a global store.
 //
 // Plain assignment and the arithmetic and bitwise compounds do. The three logical compounds
-// (`||=`, `&&=`, `??=`) do NOT, and that is the surprising half: they are assignment operators, they
+// (`||=`, `&&=`, `??=`) do not, and that is the surprising half: they are assignment operators, they
 // sit in the same `KindBinaryExpression` shape, and they are silent upstream. Measured on React's
 // own rule with a control assignment in the same function, so it is not a bailout. They lower as
 // branching structures rather than as a store, which is why nothing is emitted for them.
@@ -405,7 +405,7 @@ func isGlobalStoreOperator(operator ast.Kind) bool {
 // compound case arriving through a different shape: the node is whichever one holds both the target
 // and the value.
 //
-// A NODE rather than a range, so the report goes through `ctx.ReportNode` and picks up its leading
+// A node rather than a range, so the report goes through `ctx.ReportNode` and picks up its leading
 // trivia strip. Written as `ReportRange` first, and every span fixture failed by exactly the
 // indentation: `Loc.Pos()` sits before leading trivia, so a statement at the start of a line reports
 // from the previous line's newline. `ReportRange` is documented as the helper for a span that is not
@@ -504,7 +504,7 @@ func crossesNestedFunctionBoundary(node *ast.Node, root *ast.Node) bool {
 // `try {} catch (e) { g = 1; }` and `try {} finally { g = 1; }` do not, in files whose control
 // assignment fires either way.
 //
-// The try BLOCK is deliberately not excluded, for the same reason.
+// The try block is deliberately not excluded, for the same reason.
 func isInsideCatchOrFinally(node *ast.Node, root *ast.Node) bool {
 	for current := node; current != nil && current != root; current = current.Parent {
 		parent := current.Parent
@@ -586,7 +586,7 @@ func statementListOf(node *ast.Node) ([]*ast.Node, bool) {
 // `Object` carries two declarations, an interface and a variable, both in `lib.es5.d.ts`; a merged
 // `interface Foo` above a `var Foo` in source carries two in the source file.
 //
-// **A mutant replacing this loop with `symbol.Declarations[0]` SURVIVES the whole suite, and so does
+// **A mutant replacing this loop with `symbol.Declarations[0]` survives the whole suite, and so does
 // one taking the last declaration.** That was chased rather than accepted, because the brief calls
 // equivalence the comfortable verdict and the one most likely to be wrong.
 //
@@ -600,7 +600,7 @@ func statementListOf(node *ast.Node) ([]*ast.Node, bool) {
 //
 // **Not one straddles**, and the reason is structural rather than a property of the sample.
 // Declaration merging happens within a single scope; an inner declaration of the same name does not
-// merge with an outer one, it SHADOWS it, and the checker mints a separate symbol. Every probe with
+// merge with an outer one, it shadows it, and the checker mints a separate symbol. Every probe with
 // an inner declaration came back `decls=1` pointing inside, and every probe with only outer ones
 // came back with all of them outside. So no input can put declarations of one symbol on both sides,
 // and the mutants are equivalent rather than unseen.
@@ -613,25 +613,25 @@ func statementListOf(node *ast.Node) ([]*ast.Node, bool) {
 //
 // An unresolved name is outside by definition, and it is the case the rule's own name suggests and
 // the smallest part of what it catches.
-func declaredOutsideCompilationRoot(ctx rule.Context, identifier *ast.Node, root *ast.Node) bool {
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(identifier)
+func declaredOutsideCompilationRoot(ruleContext rule.Context, identifier *ast.Node, root *ast.Node) bool {
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(identifier)
 
 	// A shorthand property in a destructuring target resolves through the plain accessor to the
-	// PROPERTY's own symbol, which is declared in source inside the component and therefore reads
+	// property's own symbol, which is declared in source inside the component and therefore reads
 	// exactly like a correctly declined local. `({g} = props)` is a case React reports, so the
 	// plain accessor would drop it silently. TypeScript has a separate accessor for the value side,
 	// and the same recovery is shipped in `core/no-global-assign` for the same shape.
 	//
-	// The substitution is UNCONDITIONAL, and that is the correction this rule needed. The sibling
+	// The substitution is unconditional, and that is the correction this rule needed. The sibling
 	// rule keeps the value symbol only when it is non-nil, which is right for a rule asking "is this
 	// a standard-library binding", where nil means "no evidence" and declining is correct. Here nil
-	// means the opposite: the shorthand target resolves to NO binding at all, which is precisely the
+	// means the opposite: the shorthand target resolves to no binding at all, which is precisely the
 	// reporting case, and `({a} = props)` on an undeclared `a` is one React reports. Written
 	// conditionally first, and the fixture for that exact input was the only one of forty-two that
 	// failed, because falling back to the plain symbol hands this function the property's own
 	// declaration sitting inside the component and it correctly answers "inside".
 	if identifier.Parent != nil && identifier.Parent.Kind == ast.KindShorthandPropertyAssignment {
-		symbol = ctx.TypeChecker.GetShorthandAssignmentValueSymbol(identifier.Parent)
+		symbol = ruleContext.TypeChecker.GetShorthandAssignmentValueSymbol(identifier.Parent)
 	}
 
 	// No binding anywhere in the program. `someUnknownGlobal = true` is upstream's own first

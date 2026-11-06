@@ -26,30 +26,30 @@ import (
 var creatingGetters = map[string]bool{"GetLocals": true, "GetMembers": true, "GetExports": true, "GetSymbolTable": true}
 
 // No rule code calls a compiler getter that creates what it returns.
-func TestRulesCallNoCompilerGetterThatWrites(t *testing.T) {
-	t.Parallel()
+func TestRulesCallNoCompilerGetterThatWrites(test *testing.T) {
+	test.Parallel()
 
-	for _, call := range creatingGetterCalls(t, guardOverlay(t)) {
-		t.Errorf("%s, which creates the table when it is missing and so writes to a node or symbol other "+
+	for _, call := range creatingGetterCalls(test, guardOverlay(test)) {
+		test.Errorf("%s, which creates the table when it is missing and so writes to a node or symbol other "+
 			"workers read; read it without creating it (node.Locals(), symbol.Members, symbol.Exports)", call)
 	}
 }
 
 // creatingGetterCalls lists every call to a creating getter in the rule packages, read with overlay in
 // place of the files it names. The loader reads files itself, so `go test -overlay` never reaches
-// this scan; the guard hands in the overlay GOFLAGS names (guardOverlay), and a probe hands in its own.
-func creatingGetterCalls(t *testing.T, overlay map[string][]byte) []string {
-	t.Helper()
-	loaded := lintPackages(t, overlay)
+// this scan; the guard hands in the overlay `GOFLAGS` names (guardOverlay), and a probe hands in its own.
+func creatingGetterCalls(test *testing.T, overlay map[string][]byte) []string {
+	test.Helper()
+	loaded := lintPackages(test, overlay)
 
 	found := map[string]bool{}
 	calls := []string{}
-	for _, pkg := range loaded {
-		if len(pkg.Errors) > 0 {
-			t.Fatalf("loading %s: %v", pkg.ImportPath, pkg.Errors[0])
+	for _, loadedPackage := range loaded {
+		if len(loadedPackage.Errors) > 0 {
+			test.Fatalf("loading %s: %v", loadedPackage.ImportPath, loadedPackage.Errors[0])
 		}
-		for _, file := range pkg.Syntax {
-			path := pkg.Fset.Position(file.Pos()).Filename
+		for _, file := range loadedPackage.Syntax {
+			path := loadedPackage.Fset.Position(file.Pos()).Filename
 			if strings.HasSuffix(path, "_test.go") {
 				continue
 			}
@@ -58,14 +58,17 @@ func creatingGetterCalls(t *testing.T, overlay map[string][]byte) []string {
 				if !ok {
 					return true
 				}
-				function, ok := pkg.TypesInfo.Uses[selector.Sel].(*types.Func)
+				function, ok := loadedPackage.TypesInfo.Uses[selector.Sel].(*types.Func)
 				if !ok || function.Pkg() == nil || !strings.Contains(function.Pkg().Path(), "TypeScript/tsc") {
 					return true
 				}
 				if creatingGetters[function.Name()] {
-					position := pkg.Fset.Position(selector.Pos())
-					calls = append(calls, filepath.Base(filepath.Dir(position.Filename))+"/"+filepath.Base(position.Filename)+
-						":"+strconv.Itoa(position.Line)+" calls "+function.Name())
+					position := loadedPackage.Fset.Position(selector.Pos())
+					calls = append(
+						calls,
+						filepath.Base(filepath.Dir(position.Filename))+"/"+filepath.Base(position.Filename)+
+							":"+strconv.Itoa(position.Line)+" calls "+function.Name(),
+					)
 				}
 				found[function.Pkg().Path()] = true
 				return true
@@ -73,31 +76,31 @@ func creatingGetterCalls(t *testing.T, overlay map[string][]byte) []string {
 		}
 	}
 	if len(found) == 0 {
-		t.Fatal("the scan saw no compiler function at all, so it proved nothing")
+		test.Fatal("the scan saw no compiler function at all, so it proved nothing")
 	}
 	sort.Strings(calls)
 	return calls
 }
 
 // The scan sees a creating getter where one is called: planted into no-shadow, it is named.
-func TestTheCreatingGetterScanSeesAPlantedCall(t *testing.T) {
-	t.Parallel()
+func TestTheCreatingGetterScanSeesAPlantedCall(test *testing.T) {
+	test.Parallel()
 
-	root, err := filepath.Abs("../..")
-	if err != nil {
-		t.Fatal(err)
+	root, absolutePathError := filepath.Abs("../..")
+	if absolutePathError != nil {
+		test.Fatal(absolutePathError)
 	}
 	path := filepath.Join(root, "internal/lint/rules/typescript/no_shadow.go")
-	original, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
+	original, readError := os.ReadFile(path)
+	if readError != nil {
+		test.Fatal(readError)
 	}
 	planted := strings.Replace(string(original), "range node.Locals()", "range ast.GetLocals(node)", 1)
 	if planted == string(original) {
-		t.Fatal("no-shadow no longer ranges over node.Locals(), so the plant missed; update the probe")
+		test.Fatal("no-shadow no longer ranges over node.Locals(), so the plant missed; update the probe")
 	}
-	calls := creatingGetterCalls(t, map[string][]byte{path: []byte(planted)})
+	calls := creatingGetterCalls(test, map[string][]byte{path: []byte(planted)})
 	if len(calls) != 1 || !strings.Contains(calls[0], "no_shadow.go") || !strings.HasSuffix(calls[0], "GetLocals") {
-		t.Fatalf("a GetLocals call planted in no-shadow was not seen: %v", calls)
+		test.Fatalf("a GetLocals call planted in no-shadow was not seen: %v", calls)
 	}
 }

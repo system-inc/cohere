@@ -11,11 +11,18 @@ import (
 // The rule's messages, one handle per id, whose wording lives in
 // `policy/messages/network-require-hook-request-suffix.json`.
 var (
-	networkRequireHookRequestSuffixHookShouldEndWithRequestText = policy.MessageOf("structure/network-require-hook-request-suffix", "hookShouldEndWithRequest")
-	networkRequireHookRequestSuffixFileShouldEndWithRequestText = policy.MessageOf("structure/network-require-hook-request-suffix", "fileShouldEndWithRequest")
+	networkRequireHookRequestSuffixHookShouldEndWithRequestText = policy.MessageOf(
+		"structure/network-require-hook-request-suffix",
+		"hookShouldEndWithRequest",
+	)
+	networkRequireHookRequestSuffixFileShouldEndWithRequestText = policy.MessageOf(
+		"structure/network-require-hook-request-suffix",
+		"fileShouldEndWithRequest",
+	)
 )
 
-// messageHookShouldEndWithRequest is the finding, rendered when it is reported so the text comes from the current catalog.
+// messageHookShouldEndWithRequest is the finding, rendered when it is reported so the text comes from the current
+// catalog.
 func messageHookShouldEndWithRequest() rule.Message {
 	return rule.Message{
 		Id:          networkRequireHookRequestSuffixHookShouldEndWithRequestText.Id,
@@ -23,7 +30,8 @@ func messageHookShouldEndWithRequest() rule.Message {
 	}
 }
 
-// messageFileShouldEndWithRequest is the finding, rendered when it is reported so the text comes from the current catalog.
+// messageFileShouldEndWithRequest is the finding, rendered when it is reported so the text comes from the current
+// catalog.
 func messageFileShouldEndWithRequest() rule.Message {
 	return rule.Message{
 		Id:          networkRequireHookRequestSuffixFileShouldEndWithRequestText.Id,
@@ -49,11 +57,11 @@ func messageFileShouldEndWithRequest() rule.Message {
 // `useUserQuery` is suggested as `useUserRequest` rather than `useUserQueryRequest`. Only one suffix
 // is stripped, matching the original: chaining the strips would rewrite `useQueryHook` past what
 // anyone asked for.
-var NetworkRequireHookRequestSuffix = rule.Rule{
+var NetworkRequireHookRequestSuffix = rule.Rule[rule.NoOptions]{
 	Name:       "structure/network-require-hook-request-suffix",
 	NoListener: rule.NoListenerAnswersInRun,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		analysis := NetworkFileAnalysisFor(ctx)
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		analysis := NetworkFileAnalysisFor(ruleContext)
 		if len(analysis.HookDeclarations) == 0 {
 			// Declining the file rather than registering a listener that would find nothing. A file
 			// with no NetworkService hooks is the overwhelming majority of files.
@@ -62,15 +70,15 @@ var NetworkRequireHookRequestSuffix = rule.Rule{
 
 		for _, hook := range analysis.HookDeclarations {
 			if !strings.HasSuffix(hook.Name, "Request") {
-				ctx.ReportNode(hook.NameNode, messageHookShouldEndWithRequest())
+				ruleContext.ReportNode(hook.NameNode, messageHookShouldEndWithRequest())
 			}
 		}
 
 		// The file check reports at most once, against the first hook, even when several hooks are
 		// declared. The defect is the file's name, and reporting it once per hook would say the same
 		// thing three times about one rename.
-		if fileNeedsRequestSuffix(ctx.SourceFile.FileName().AsString()) {
-			ctx.ReportNode(analysis.HookDeclarations[0].NameNode, messageFileShouldEndWithRequest())
+		if fileNeedsRequestSuffix(ruleContext.SourceFile.FileName().AsString()) {
+			ruleContext.ReportNode(analysis.HookDeclarations[0].NameNode, messageFileShouldEndWithRequest())
 		}
 
 		return nil
@@ -97,7 +105,7 @@ func fileNeedsRequestSuffix(fileName string) bool {
 	if stem, isTypeScript := strings.CutSuffix(sourcename.TreatedAs(base), ".ts"); isTypeScript {
 		return !strings.HasSuffix(stem, "Request")
 	}
-	if stem, isTSX := strings.CutSuffix(base, ".tsx"); isTSX {
+	if stem, isTsx := strings.CutSuffix(base, ".tsx"); isTsx {
 		return !strings.HasSuffix(stem, "Request")
 	}
 	return false

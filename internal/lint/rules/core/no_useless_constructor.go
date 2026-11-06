@@ -42,7 +42,7 @@ var messageNoUselessConstructorRemove = rule.Message{
 // of the same identifier. Anything else, including a reordering or a renamed argument, means the
 // constructor does something.
 //
-// Every parameter must also be SIMPLE, an identifier or a rest. A default or a destructuring pattern
+// Every parameter must also be simple, an identifier or a rest. A default or a destructuring pattern
 // can run arbitrary code while binding, so `constructor(x = f()) { super(x); }` is not useless even
 // though it forwards.
 //
@@ -78,12 +78,12 @@ var messageNoUselessConstructorRemove = rule.Message{
 // Sixty-five inputs, no divergence. This rule was then run against that same extension corpus and
 // reproduced it exactly, 32 of 32 passing and 9 of 9 failing.
 //
-// So porting the extension would register a second NAME rather than a second check, and the name is
+// So porting the extension would register a second name rather than a second check, and the name is
 // not free: a rule package may not import another rule package, so a wrapper would need this file's
 // body lifted into `internal/utilities` the way `no-dupe-class-members` was at `27c5ff0`. That is
 // 427 lines and sixteen helpers moved for no behavioural change.
 //
-// Nothing asks for the name either. `TestParityAgainstInventory` walks REGISTERED rules and asks
+// Nothing asks for the name either. `TestParityAgainstInventory` walks registered rules and asks
 // whether each appeared in the captured rule inventory, not the reverse, and it carried no entry for
 // this rule under either spelling, so a missing `@typescript-eslint/` registration costs nothing in
 // the differential. Checked with a control against a rule that does have an entry.
@@ -95,9 +95,9 @@ var messageNoUselessConstructorRemove = rule.Message{
 //
 // Upstream sets `hasSuggestions` and no `fixable`. Deleting a constructor is a change to what the
 // class declares rather than to how it is spelled, so nothing may apply it unattended.
-var NoUselessConstructor = rule.Rule{
+var NoUselessConstructor = rule.Rule[rule.NoOptions]{
 	Name: "no-useless-constructor",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindConstructor: func(node *ast.Node) {
 				constructor := node.AsConstructorDeclaration()
@@ -123,10 +123,10 @@ var NoUselessConstructor = rule.Rule{
 					return
 				}
 
-				ctx.ReportRangeWithSuggestions(uselessConstructorHeadRange(ctx, node),
+				ruleContext.ReportRangeWithSuggestions(uselessConstructorHeadRange(ruleContext, node),
 					messageNoUselessConstructor, rule.Suggestion{
 						Message: messageNoUselessConstructorRemove,
-						Fixes:   []rule.Fix{uselessConstructorRemoval(ctx, node)},
+						Fixes:   []rule.Fix{uselessConstructorRemoval(ruleContext, node)},
 					})
 			},
 		}
@@ -142,9 +142,9 @@ var NoUselessConstructor = rule.Rule{
 // The end is found by scanning to the opening parenthesis rather than by asking for a token list,
 // because the only thing between the member start and that parenthesis is modifiers and the keyword,
 // and neither can contain one.
-func uselessConstructorHeadRange(ctx rule.Context, node *ast.Node) core.TextRange {
-	nodeRange := rule.TokenRange(ctx.SourceFile, node)
-	text := ctx.SourceFile.Text()
+func uselessConstructorHeadRange(ruleContext rule.Context, node *ast.Node) core.TextRange {
+	nodeRange := rule.TokenRange(ruleContext.SourceFile, node)
+	text := ruleContext.SourceFile.Text()
 	end := nodeRange.Pos()
 	for end < nodeRange.End() && text[end] != '(' {
 		end++
@@ -175,9 +175,9 @@ func uselessConstructorHeadRange(ctx rule.Context, node *ast.Node) core.TextRang
 // one that can continue an expression, which is `[`, `*`, `in` or `instanceof` and nothing else.
 // And the member before must be one that could be continued, which a method or an
 // already-semicolon-terminated field is not.
-func uselessConstructorRemoval(ctx rule.Context, node *ast.Node) rule.Fix {
-	nodeRange := rule.TokenRange(ctx.SourceFile, node)
-	if uselessConstructorRemovalNeedsSemicolon(ctx, node) {
+func uselessConstructorRemoval(ruleContext rule.Context, node *ast.Node) rule.Fix {
+	nodeRange := rule.TokenRange(ruleContext.SourceFile, node)
+	if uselessConstructorRemovalNeedsSemicolon(ruleContext, node) {
 		return rule.ReplaceRange(nodeRange, ";")
 	}
 	return rule.RemoveRange(nodeRange)
@@ -185,15 +185,15 @@ func uselessConstructorRemoval(ctx rule.Context, node *ast.Node) rule.Fix {
 
 // uselessConstructorRemovalNeedsSemicolon reports whether deleting this constructor would let the
 // preceding member run into the following one.
-func uselessConstructorRemovalNeedsSemicolon(ctx rule.Context, node *ast.Node) bool {
+func uselessConstructorRemovalNeedsSemicolon(ruleContext rule.Context, node *ast.Node) bool {
 	previous, next := uselessConstructorSiblings(node)
 	if previous == nil || next == nil {
 		return false
 	}
-	if !uselessConstructorCanBeContinued(previous, ctx) {
+	if !uselessConstructorCanBeContinued(previous, ruleContext) {
 		return false
 	}
-	return uselessConstructorCanContinueExpression(ctx, next)
+	return uselessConstructorCanContinueExpression(ruleContext, next)
 }
 
 // uselessConstructorSiblings returns the class members either side of a member.
@@ -211,7 +211,8 @@ func uselessConstructorSiblings(node *ast.Node) (*ast.Node, *ast.Node) {
 		if member != node {
 			continue
 		}
-		var previous, next *ast.Node
+		var previous *ast.Node
+		var next *ast.Node
 		if index > 0 {
 			previous = members[index-1]
 		}
@@ -227,17 +228,17 @@ func uselessConstructorSiblings(node *ast.Node) (*ast.Node, *ast.Node) {
 //
 // Three conditions, and the middle one was measured rather than assumed. It must be a property
 // declaration, because a method's body ends in a brace and nothing continues that. It must have an
-// INITIALIZER, because a bare `foo` is only a name and there is no expression to continue; upstream
+// initializer, because a bare `foo` is only a name and there is no expression to continue; upstream
 // leaves no semicolon for `class A { foo <constructor> [0]() {} }` and a draft testing only for a
 // property inserted one. And it must not already end in a semicolon, which terminates it.
-func uselessConstructorCanBeContinued(member *ast.Node, ctx rule.Context) bool {
+func uselessConstructorCanBeContinued(member *ast.Node, ruleContext rule.Context) bool {
 	if member.Kind != ast.KindPropertyDeclaration {
 		return false
 	}
 	if member.AsPropertyDeclaration().Initializer == nil {
 		return false
 	}
-	text := ctx.SourceFile.Text()
+	text := ruleContext.SourceFile.Text()
 	end := member.End()
 	for end > 0 && (text[end-1] == ' ' || text[end-1] == '\t' ||
 		text[end-1] == '\n' || text[end-1] == '\r') {
@@ -251,13 +252,13 @@ func uselessConstructorCanBeContinued(member *ast.Node, ctx rule.Context) bool {
 // Four token values and no others: a computed key opens with `[`, a generator with `*`, and `in` and
 // `instanceof` are binary operators that read as a continuation rather than as a member name.
 // Measured against the installed build, a plain `bar() {}` following needs no semicolon.
-func uselessConstructorCanContinueExpression(ctx rule.Context, member *ast.Node) bool {
-	memberRange := rule.TokenRange(ctx.SourceFile, member)
-	text := ctx.SourceFile.Text()[memberRange.Pos():memberRange.End()]
+func uselessConstructorCanContinueExpression(ruleContext rule.Context, member *ast.Node) bool {
+	memberRange := rule.TokenRange(ruleContext.SourceFile, member)
+	text := ruleContext.SourceFile.Text()[memberRange.Pos():memberRange.End()]
 	switch {
 	case strings.HasPrefix(text, "["), strings.HasPrefix(text, "*"):
 		return true
-	// `instanceof` is tested BEFORE `in`, because `in` is its prefix: testing `in` first answers
+	// `instanceof` is tested before `in`, because `in` is its prefix: testing `in` first answers
 	// false for `instanceof` on the whole-word check and never reaches the longer arm. A draft with
 	// the two the other way round failed upstream's own `instanceof` case.
 	case strings.HasPrefix(text, "instanceof"):
@@ -435,7 +436,7 @@ func uselessConstructorIsPassingThrough(parameters []*ast.Node, arguments []*ast
 // uselessConstructorIsValidPair reports whether one parameter forwards to one argument unchanged.
 //
 // Two accepted shapes: the same identifier on both sides, or a rest parameter matched by a spread of
-// the same identifier. A rest forwarded as a bare identifier is NOT a pass-through, because
+// the same identifier. A rest forwarded as a bare identifier is not a pass-through, because
 // `super(args)` passes the array itself where `super(...args)` passes its elements.
 func uselessConstructorIsValidPair(parameter *ast.Node, argument *ast.Node) bool {
 	declaration := parameter.AsParameterDeclaration()

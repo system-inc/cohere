@@ -18,38 +18,47 @@ import (
 //
 // The descriptor arrives the way the dispatcher passes it, without close-on-exec, so a child would hold
 // it: the first spawn proves that, which is what makes the second one's answer mean something.
-// Not parallel: it sets the verdict variable with t.Setenv, which a parallel test may not
-func TestTheVerdictDescriptorIsNotInheritedByAChild(t *testing.T) {
-	reader, writer, err := os.Pipe()
-	if err != nil {
-		t.Fatal(err)
+// Not parallel: it sets the verdict variable with test.Setenv, which a parallel test may not
+func TestTheVerdictDescriptorIsNotInheritedByAChild(test *testing.T) {
+	reader, writer, pipeError := os.Pipe()
+	if pipeError != nil {
+		test.Fatal(pipeError)
 	}
+	// Ignored: a pipe made only so there is a descriptor to name, and nothing is written through it.
 	defer reader.Close()
-	defer writer.Close()
-	descriptor, err := syscall.Dup(int(writer.Fd()))
-	if err != nil {
-		t.Fatal(err)
+	defer writer.Close() // Ignored: as the reader's, above.
+	descriptor, duplicateError := syscall.Dup(int(writer.Fd()))
+	if duplicateError != nil {
+		test.Fatal(duplicateError)
 	}
 	probe := func() string {
-		script := fmt.Sprintf("if [ -e /dev/fd/%d ]; then echo open; else echo closed; fi; echo ${%s:-unset}", descriptor, VerdictVariable)
-		output, err := exec.Command("/bin/sh", "-c", script).Output()
-		if err != nil {
-			t.Fatal(err)
+		script := fmt.Sprintf(
+			"if [ -e /dev/fd/%d ]; then echo open; else echo closed; fi; echo ${%s:-unset}",
+			descriptor,
+			VerdictVariable,
+		)
+		output, outputError := exec.Command("/bin/sh", "-c", script).Output()
+		if outputError != nil {
+			test.Fatal(outputError)
 		}
 		return strings.Join(strings.Fields(string(output)), " ")
 	}
 
-	t.Setenv(VerdictVariable, strconv.Itoa(descriptor))
+	test.Setenv(VerdictVariable, strconv.Itoa(descriptor))
 	if before := probe(); !strings.HasPrefix(before, "open") {
-		t.Fatalf("a child did not see the descriptor even before it was taken (%s), so this proves nothing", before)
+		test.Fatalf("a child did not see the descriptor even before it was taken (%s), so this proves nothing", before)
 	}
 	file := takeVerdictFile()
 	if file == nil {
-		t.Fatal("the verdict descriptor was not taken")
+		test.Fatal("the verdict descriptor was not taken")
 	}
+	// Ignored: never written.
 	defer file.Close()
 	if after := probe(); after != "closed unset" {
-		t.Errorf("a child started after the verdict descriptor was taken sees %q, want the descriptor closed and the variable unset", after)
+		test.Errorf(
+			"a child started after the verdict descriptor was taken sees %q, want the descriptor closed and the variable unset",
+			after,
+		)
 	}
 }
 
@@ -57,48 +66,56 @@ func TestTheVerdictDescriptorIsNotInheritedByAChild(t *testing.T) {
 // to it. A script that opened a log on 3 (`3>log`) and inherited the variable from somewhere would
 // otherwise find a stray byte in its log. A pipe in the same place is taken, which is what makes the
 // refusal mean something.
-// Not parallel: it sets the verdict variable with t.Setenv and assigns the package-level verdictFile
-func TestAVerdictDescriptorThatIsNotAPipeIsLeftAlone(t *testing.T) {
-	logPath := t.TempDir() + "/log"
-	log, err := os.Create(logPath)
-	if err != nil {
-		t.Fatal(err)
+// Not parallel: it sets the verdict variable with test.Setenv and assigns the package-level verdictFile
+func TestAVerdictDescriptorThatIsNotAPipeIsLeftAlone(test *testing.T) {
+	logPath := test.TempDir() + "/log"
+	log, createError := os.Create(logPath)
+	if createError != nil {
+		test.Fatal(createError)
 	}
+	// Ignored: written unbuffered, and read back by name before this close.
 	defer log.Close()
-	t.Setenv(VerdictVariable, strconv.Itoa(int(log.Fd())))
+	test.Setenv(VerdictVariable, strconv.Itoa(int(log.Fd())))
 	verdictFile = takeVerdictFile()
 	if verdictFile != nil {
-		t.Fatal("a regular file was taken as the verdict descriptor")
+		test.Fatal("a regular file was taken as the verdict descriptor")
 	}
 	if sendVerdict(1) {
-		t.Fatal("a verdict was sent with no pipe to send it to")
+		test.Fatal("a verdict was sent with no pipe to send it to")
 	}
-	if _, err := log.Write([]byte("still open\n")); err != nil {
-		t.Fatalf("the regular file was closed: %v", err)
+	if _, writeError := log.Write([]byte("still open\n")); writeError != nil {
+		test.Fatalf("the regular file was closed: %v", writeError)
 	}
-	if contents, _ := os.ReadFile(logPath); string(contents) != "still open\n" {
-		t.Errorf("the regular file holds %q, want only what its owner wrote", contents)
+	contents, readError := os.ReadFile(logPath)
+	if readError != nil {
+		test.Fatal(readError)
+	}
+	if string(contents) != "still open\n" {
+		test.Errorf("the regular file holds %q, want only what its owner wrote", contents)
 	}
 
-	reader, writer, err := os.Pipe()
-	if err != nil {
-		t.Fatal(err)
+	reader, writer, pipeError := os.Pipe()
+	if pipeError != nil {
+		test.Fatal(pipeError)
 	}
+	// Ignored: a pipe made only so there is a descriptor to name, and nothing is written through it.
 	defer reader.Close()
-	defer writer.Close()
+	defer writer.Close() // Ignored: as the reader's, above.
 	// A descriptor of its own for takeVerdictFile to own and close. Handed the writer's, it would make a
 	// second *os.File around one descriptor, whose finalizer closes that number again after the writer
 	// has, by then most likely another test's pipe: a command's output read end closed out from under the
 	// poller hangs its Wait forever (#zqsdzbq, reproduced at round 145 of a stress loop).
-	descriptor, err := syscall.Dup(int(writer.Fd()))
-	if err != nil {
-		t.Fatal(err)
+	descriptor, duplicateError := syscall.Dup(int(writer.Fd()))
+	if duplicateError != nil {
+		test.Fatal(duplicateError)
 	}
-	t.Setenv(VerdictVariable, strconv.Itoa(descriptor))
+	test.Setenv(VerdictVariable, strconv.Itoa(descriptor))
 	file := takeVerdictFile()
 	if file == nil {
-		syscall.Close(descriptor)
-		t.Fatal("a pipe was not taken as the verdict descriptor")
+		// Ignored: the test fails on the next line whatever the close does.
+		_ = syscall.Close(descriptor)
+		test.Fatal("a pipe was not taken as the verdict descriptor")
 	}
-	file.Close()
+	// Ignored: never written.
+	_ = file.Close()
 }

@@ -40,34 +40,34 @@ const reactiveDeclarations = `declare module 'react' {
 //
 // Temporaries are excluded because they have no source name to assert against, and their count is
 // an artifact of how an expression happened to be lowered rather than a fact about the program.
-func reactiveNames(t *testing.T, source string) []string {
-	t.Helper()
+func reactiveNames(test *testing.T, source string) []string {
+	test.Helper()
 
 	found := map[string]bool{}
-	probe := rule.Rule{
+	probe := rule.Rule[rule.NoOptions]{
 		Name:             "reactive-names-harness",
 		NeedsTypeChecker: true,
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
-					if ctx.TypeChecker == nil {
-						t.Fatal("the typed harness handed this probe a nil checker, so it would " +
+					if ruleContext.TypeChecker == nil {
+						test.Fatal("the typed harness handed this probe a nil checker, so it would " +
 							"pass vacuously; run it through RunTypedFiles")
 					}
 					forEachFunctionLike(node, func(functionNode *ast.Node) {
-						function := Lower(functionNode, ctx.TypeChecker)
+						function := Lower(functionNode, ruleContext.TypeChecker)
 						if function == nil {
 							return
 						}
 						Construct(function)
-						InferReactive(function, ctx.TypeChecker)
+						InferReactive(function, ruleContext.TypeChecker)
 						collectReactiveNames(function, found)
 					})
 				},
 			}
 		},
 	}
-	rule_testing.RunTypedFiles(t, probe, map[string]string{
+	rule_testing.RunTypedFiles(test, probe, map[string]string{
 		"react.d.ts":  reactiveDeclarations,
 		"fixture.tsx": source,
 	}, "fixture.tsx")
@@ -80,6 +80,9 @@ func reactiveNames(t *testing.T, source string) []string {
 	return names
 }
 
+// collectReactiveNames records the name of every reactive place in a function.
+//
+// Mutates: found the caller gathers the names across every function the probe visits into one set
 func collectReactiveNames(function *Function, found map[string]bool) {
 	record := func(place Place) {
 		if !place.Reactive {
@@ -103,8 +106,8 @@ func collectReactiveNames(function *Function, found map[string]bool) {
 		}
 		EachTerminalPlace(block.Terminal, func(place Place, role PlaceRole) { record(place) })
 	}
-	for _, param := range function.Params {
-		record(param)
+	for _, parameter := range function.Parameters {
+		record(parameter)
 	}
 	for _, nested := range function.Functions {
 		collectReactiveNames(nested, found)
@@ -120,45 +123,45 @@ func hasName(names []string, want string) bool {
 	return false
 }
 
-func assertReactive(t *testing.T, names []string, want ...string) {
-	t.Helper()
+func assertReactive(test *testing.T, names []string, want ...string) {
+	test.Helper()
 	for _, name := range want {
 		if !hasName(names, name) {
-			t.Errorf("expected %q to be reactive, got reactive set [%s]", name, strings.Join(names, " "))
+			test.Errorf("expected %q to be reactive, got reactive set [%s]", name, strings.Join(names, " "))
 		}
 	}
 }
 
-func assertNotReactive(t *testing.T, names []string, want ...string) {
-	t.Helper()
+func assertNotReactive(test *testing.T, names []string, want ...string) {
+	test.Helper()
 	for _, name := range want {
 		if hasName(names, name) {
-			t.Errorf("expected %q NOT to be reactive, got reactive set [%s]", name, strings.Join(names, " "))
+			test.Errorf("expected %q NOT to be reactive, got reactive set [%s]", name, strings.Join(names, " "))
 		}
 	}
 }
 
 // TestReactiveMarksParameters pins the root source: a component's props vary between renders.
-func TestReactiveMarksParameters(t *testing.T) {
-	t.Parallel()
+func TestReactiveMarksParameters(test *testing.T) {
+	test.Parallel()
 
-	names := reactiveNames(t, `
+	names := reactiveNames(test, `
 export function Component(props: {title: string}) {
   const shown = props.title;
   return shown;
 }
 `)
-	assertReactive(t, names, "props", "shown")
+	assertReactive(test, names, "props", "shown")
 }
 
 // TestReactivePropagatesThroughAliases pins that an alias chain of any length carries reactivity.
 //
 // This is the load/store propagation. Without it a rule asking about `c` would answer false while
 // `c` is the same value as `props`, which is the class of defect the representation exists to end.
-func TestReactivePropagatesThroughAliases(t *testing.T) {
-	t.Parallel()
+func TestReactivePropagatesThroughAliases(test *testing.T) {
+	test.Parallel()
 
-	names := reactiveNames(t, `
+	names := reactiveNames(test, `
 export function Component(props: {title: string}) {
   const a = props;
   const b = a;
@@ -166,7 +169,7 @@ export function Component(props: {title: string}) {
   return c;
 }
 `)
-	assertReactive(t, names, "props", "a", "b", "c")
+	assertReactive(test, names, "props", "a", "b", "c")
 }
 
 // TestReactiveLeavesConstantsAlone is the negative half of the two-sided key.
@@ -174,28 +177,28 @@ export function Component(props: {title: string}) {
 // A test asserting only that reactive things are reactive is equally satisfied by a pass that marks
 // everything, so this asserts a value derived from nothing but literals stays false while a value
 // derived from props in the same function is true.
-func TestReactiveLeavesConstantsAlone(t *testing.T) {
-	t.Parallel()
+func TestReactiveLeavesConstantsAlone(test *testing.T) {
+	test.Parallel()
 
-	names := reactiveNames(t, `
+	names := reactiveNames(test, `
 export function Component(props: {n: number}) {
   const constant = 1 + 2;
   const derived = props.n;
   return constant + derived;
 }
 `)
-	assertReactive(t, names, "props", "derived")
-	assertNotReactive(t, names, "constant")
+	assertReactive(test, names, "props", "derived")
+	assertNotReactive(test, names, "constant")
 }
 
-// TestReactiveJoinsAtPhi pins the merge: reactive on ANY path means reactive after the join.
+// TestReactiveJoinsAtPhi pins the merge: reactive on any path means reactive after the join.
 //
 // This is the case that cannot be answered from the syntax tree without re-deriving control flow,
 // and it is why this pass is in the representation rather than in a rule.
-func TestReactiveJoinsAtPhi(t *testing.T) {
-	t.Parallel()
+func TestReactiveJoinsAtPhi(test *testing.T) {
+	test.Parallel()
 
-	names := reactiveNames(t, `
+	names := reactiveNames(test, `
 export function Component(props: {c: boolean, n: number}) {
   let value = 0;
   if (props.c) {
@@ -204,36 +207,36 @@ export function Component(props: {c: boolean, n: number}) {
   return value;
 }
 `)
-	assertReactive(t, names, "props", "value")
+	assertReactive(test, names, "props", "value")
 }
 
-// phiResultIsReactive reports whether the phi DEFINING the named binding is itself reactive.
+// phiResultIsReactive reports whether the phi defining the named binding is itself reactive.
 //
 // `reactiveNames` cannot answer this and the difference is the whole reason this helper exists. That
-// collector records every place naming a reactive value, and a phi's OPERANDS are places. So a phi
+// collector records every place naming a reactive value, and a phi's operands are places. So a phi
 // whose operand is reactive puts the binding's name in the collected set whether or not the phi
-// RESULT was ever marked, and an assertion built on it passes while the merge rule is disabled.
+// result was ever marked, and an assertion built on it passes while the merge rule is disabled.
 //
 // Found by a surviving mutant. Disabling the phi operand join left every name-based assertion green
 // because the operand `value$25` carries the name `value` on its own. The layer being asserted was
 // "some value called value is reactive" when the property under test is "the MERGE is reactive".
-func phiResultIsReactive(t *testing.T, source string, binding string) bool {
-	t.Helper()
+func phiResultIsReactive(test *testing.T, source string, binding string) bool {
+	test.Helper()
 
 	found, sawPhi := false, false
-	probe := rule.Rule{
+	probe := rule.Rule[rule.NoOptions]{
 		Name:             "reactive-phi-result-harness",
 		NeedsTypeChecker: true,
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
 					forEachFunctionLike(node, func(functionNode *ast.Node) {
-						function := Lower(functionNode, ctx.TypeChecker)
+						function := Lower(functionNode, ruleContext.TypeChecker)
 						if function == nil {
 							return
 						}
 						Construct(function)
-						InferReactive(function, ctx.TypeChecker)
+						InferReactive(function, ruleContext.TypeChecker)
 						for _, block := range function.Blocks {
 							for _, phi := range block.Phis {
 								identifier := function.Identifiers[phi.Place.Identifier]
@@ -251,30 +254,30 @@ func phiResultIsReactive(t *testing.T, source string, binding string) bool {
 			}
 		},
 	}
-	rule_testing.RunTypedFiles(t, probe, map[string]string{
+	rule_testing.RunTypedFiles(test, probe, map[string]string{
 		"react.d.ts":  reactiveDeclarations,
 		"fixture.tsx": source,
 	}, "fixture.tsx")
 
 	if !sawPhi {
-		t.Fatalf("no phi defines %q, so this assertion would prove nothing about the merge rule; "+
+		test.Fatalf("no phi defines %q, so this assertion would prove nothing about the merge rule; "+
 			"the fixture must contain a real join", binding)
 	}
 	return found
 }
 
-// TestReactivePhiResultIsMarkedByOperandJoin asserts the MERGE rather than the name.
+// TestReactivePhiResultIsMarkedByOperandJoin asserts the merge rather than the name.
 //
 // This is the fixture that kills the phi-operand-join mutant, and the second attempt at it. The
 // first asserted through `reactiveNames` and stayed green under the mutation for the reason
 // `phiResultIsReactive` documents: the operands carry the binding's name themselves.
 //
-// The branch test is a local constant, so the block is NOT reactive-controlled — checked directly,
-// the controlled set is empty for this input — which means the operand join is the only rule that
+// The branch test is a local constant, so the block is not reactive-controlled (checked directly,
+// the controlled set is empty for this input), which means the operand join is the only rule that
 // can mark this phi. That isolates the two phi rules from each other, which mutating them
 // separately proved was necessary.
-func TestReactivePhiResultIsMarkedByOperandJoin(t *testing.T) {
-	t.Parallel()
+func TestReactivePhiResultIsMarkedByOperandJoin(test *testing.T) {
+	test.Parallel()
 
 	source := `
 export function Component(props: {n: number}) {
@@ -286,8 +289,8 @@ export function Component(props: {n: number}) {
   return value;
 }
 `
-	if !phiResultIsReactive(t, source, "value") {
-		t.Error("the phi merging a reactive operand with a constant must itself be reactive; " +
+	if !phiResultIsReactive(test, source, "value") {
+		test.Error("the phi merging a reactive operand with a constant must itself be reactive; " +
 			"a consumer reading the merge sees a value that cannot change between renders")
 	}
 }
@@ -297,8 +300,8 @@ export function Component(props: {n: number}) {
 // Both operands are constants here, so the operand join cannot mark this phi and only the
 // control-dominator rule can. Together with the test above, each phi rule now has a case the other
 // cannot satisfy, which is what mutating them independently requires.
-func TestReactivePhiResultIsMarkedByReactiveControl(t *testing.T) {
-	t.Parallel()
+func TestReactivePhiResultIsMarkedByReactiveControl(test *testing.T) {
+	test.Parallel()
 
 	source := `
 export function Component(props: {c: boolean}) {
@@ -309,27 +312,27 @@ export function Component(props: {c: boolean}) {
   return value;
 }
 `
-	if !phiResultIsReactive(t, source, "value") {
-		t.Error("a phi whose operands are constants but whose branch tests a reactive value must " +
+	if !phiResultIsReactive(test, source, "value") {
+		test.Error("a phi whose operands are constants but whose branch tests a reactive value must " +
 			"be reactive; which constant it holds depends on something that varies per render")
 	}
 }
 
 // TestReactiveJoinsReactiveOperandUnderConstantBranch separates the phi's two marking rules.
 //
-// This exists because a mutant disabling the phi OPERAND join survived the whole suite while a
-// mutant disabling the phi CONTROL rule was caught. Reading rather than adding a fixture blind, the
+// This exists because a mutant disabling the phi operand join survived the whole suite while a
+// mutant disabling the phi control rule was caught. Reading rather than adding a fixture blind, the
 // cause was subsumption: in every phi fixture written first, the branch test was `props.c`, so the
 // joined value was reactive-controlled as well as having a reactive operand, and the control rule
 // alone produced the same answer.
 //
-// The distinguishing input is a phi with a reactive OPERAND under a NON-reactive test. `flag` is a
+// The distinguishing input is a phi with a reactive operand under a non-reactive test. `flag` is a
 // local constant, so the block is not reactive-controlled and only the operand join can mark
 // `value`. Confirmed by re-scoring: with this case present the operand mutant is caught.
-func TestReactiveJoinsReactiveOperandUnderConstantBranch(t *testing.T) {
-	t.Parallel()
+func TestReactiveJoinsReactiveOperandUnderConstantBranch(test *testing.T) {
+	test.Parallel()
 
-	names := reactiveNames(t, `
+	names := reactiveNames(test, `
 export function Component(props: {n: number}) {
   const flag = true;
   let value = 0;
@@ -339,20 +342,20 @@ export function Component(props: {n: number}) {
   return value;
 }
 `)
-	assertReactive(t, names, "props", "value")
-	assertNotReactive(t, names, "flag")
+	assertReactive(test, names, "props", "value")
+	assertNotReactive(test, names, "flag")
 }
 
 // TestReactiveMarksValueAssignedUnderReactiveBranch pins the control-dominator rule.
 //
 // Both operands are constants, so the operand rule alone leaves `value` non-reactive. It is
-// reactive because WHICH constant it holds depends on a reactive test, which is what the
+// reactive because which constant it holds depends on a reactive test, which is what the
 // post-dominator frontier computes. A pass missing this reports a stale dependency array as
 // correct.
-func TestReactiveMarksValueAssignedUnderReactiveBranch(t *testing.T) {
-	t.Parallel()
+func TestReactiveMarksValueAssignedUnderReactiveBranch(test *testing.T) {
+	test.Parallel()
 
-	names := reactiveNames(t, `
+	names := reactiveNames(test, `
 export function Component(props: {c: boolean}) {
   let value = 1;
   if (props.c) {
@@ -361,7 +364,7 @@ export function Component(props: {c: boolean}) {
   return value;
 }
 `)
-	assertReactive(t, names, "props", "value")
+	assertReactive(test, names, "props", "value")
 }
 
 // TestReactiveLeavesConstantBranchAlone is the control-rule's negative case.
@@ -369,10 +372,10 @@ export function Component(props: {c: boolean}) {
 // Identical shape to the test above with a non-reactive test, so a pass that marked every joined
 // value regardless of the branch would pass that one and fail this. Without this pair the control
 // rule is asserted in only one direction.
-func TestReactiveLeavesConstantBranchAlone(t *testing.T) {
-	t.Parallel()
+func TestReactiveLeavesConstantBranchAlone(test *testing.T) {
+	test.Parallel()
 
-	names := reactiveNames(t, `
+	names := reactiveNames(test, `
 export function Component() {
   const flag = true;
   let value = 1;
@@ -382,7 +385,7 @@ export function Component() {
   return value;
 }
 `)
-	assertNotReactive(t, names, "value", "flag")
+	assertNotReactive(test, names, "value", "flag")
 }
 
 // TestReactiveMarksValueUnderReactiveSwitchDiscriminant is the discriminant half of the same rule.
@@ -390,10 +393,10 @@ export function Component() {
 // Every case test is a constant here and only the switched value is reactive, so the case-test
 // branch cannot answer this one. With the case-test fixture above, each half of the switch arm now
 // has an input the other cannot satisfy, which is what scoring them independently requires.
-func TestReactiveMarksValueUnderReactiveSwitchDiscriminant(t *testing.T) {
-	t.Parallel()
+func TestReactiveMarksValueUnderReactiveSwitchDiscriminant(test *testing.T) {
+	test.Parallel()
 
-	names := reactiveNames(t, `
+	names := reactiveNames(test, `
 export function Component(props: {n: number}) {
   let value = 1;
   switch (props.n) {
@@ -408,22 +411,22 @@ export function Component(props: {n: number}) {
   return value;
 }
 `)
-	assertReactive(t, names, "props", "value")
+	assertReactive(test, names, "props", "value")
 }
 
-// TestReactiveMarksValueUnderReactiveSwitchCase covers a switch whose CASE TEST is reactive.
+// TestReactiveMarksValueUnderReactiveSwitchCase covers a switch whose case test is reactive.
 //
 // Upstream's control-dominator test asks three terminal kinds, and for a `switch` it asks both the
-// discriminant AND every case test. The case-test half is a separate branch, and a mutant disabling
+// discriminant and every case test. The case-test half is a separate branch, and a mutant disabling
 // it survived every other fixture here.
 //
 // The discriminant is a local constant and only the case test is reactive, which is what isolates
 // the branch: a fixture switching on `props.kind` would be caught by the discriminant half and
 // would leave this one unmeasured.
-func TestReactiveMarksValueUnderReactiveSwitchCase(t *testing.T) {
-	t.Parallel()
+func TestReactiveMarksValueUnderReactiveSwitchCase(test *testing.T) {
+	test.Parallel()
 
-	names := reactiveNames(t, `
+	names := reactiveNames(test, `
 export function Component(props: {n: number}) {
   const key = 0;
   let value = 1;
@@ -439,7 +442,7 @@ export function Component(props: {n: number}) {
   return value;
 }
 `)
-	assertReactive(t, names, "props", "value")
+	assertReactive(test, names, "props", "value")
 }
 
 // TestReactiveMarksHookResults pins the hook rule: a hook can read state or context, so its result
@@ -447,10 +450,10 @@ export function Component(props: {n: number}) {
 //
 // `useState(0)`, `useContext(Ctx)` and a custom hook all take constant or non-reactive arguments, so
 // nothing but the hook rule can make any of them reactive.
-func TestReactiveMarksHookResults(t *testing.T) {
-	t.Parallel()
+func TestReactiveMarksHookResults(test *testing.T) {
+	test.Parallel()
 
-	names := reactiveNames(t, `
+	names := reactiveNames(test, `
 import {useState, useContext, Context} from 'react';
 declare const Ctx: Context<{a: number}>;
 declare function useCustomThing(): number;
@@ -461,7 +464,7 @@ export function Component() {
   return count + ctx.a + custom;
 }
 `)
-	assertReactive(t, names, "count", "ctx", "custom")
+	assertReactive(test, names, "count", "ctx", "custom")
 }
 
 // TestReactiveMarksNamespacedHookResults covers the `React.useState(0)` form.
@@ -471,22 +474,22 @@ export function Component() {
 // not an exotic spelling: it is what `import * as React from 'react'` produces, which is one of the
 // two shapes real code is written in.
 //
-// Upstream tests the call's PROPERTY rather than its receiver, which is what makes
+// Upstream tests the call's property rather than its receiver, which is what makes
 // `React.useState(0)` a hook call while a receiver named `useThing` would not be. Probed on our own
 // lowering: the property's identifier carries an empty Name and a node whose text is `useState`,
 // which is the same shape the plain-call arm sees.
-func TestReactiveMarksNamespacedHookResults(t *testing.T) {
-	t.Parallel()
+func TestReactiveMarksNamespacedHookResults(test *testing.T) {
+	test.Parallel()
 
-	names := reactiveNames(t, `
+	names := reactiveNames(test, `
 import * as React from 'react';
 export function Component() {
   const [count, setCount] = React.useState(0);
   return count;
 }
 `)
-	assertReactive(t, names, "count")
-	assertNotReactive(t, names, "setCount")
+	assertReactive(test, names, "count")
+	assertNotReactive(test, names, "setCount")
 }
 
 // TestReactiveExemptsStableHookValues is the stable side-map, and it is the highest-value negative
@@ -497,12 +500,12 @@ export function Component() {
 // three names are the three the checker can actually see: Dispatch, ActionDispatch, RefObject.
 //
 // `count` is asserted reactive in the same input as the control: it comes out of the same call, so
-// a pass that exempted the whole call rather than the stable ELEMENTS would pass the negative
+// a pass that exempted the whole call rather than the stable elements would pass the negative
 // assertions and fail this one.
-func TestReactiveExemptsStableHookValues(t *testing.T) {
-	t.Parallel()
+func TestReactiveExemptsStableHookValues(test *testing.T) {
+	test.Parallel()
 
-	names := reactiveNames(t, `
+	names := reactiveNames(test, `
 import {useState, useRef, useReducer} from 'react';
 declare function reducer(s: number, a: {type: string}): number;
 export function Component() {
@@ -512,16 +515,16 @@ export function Component() {
   return count + reduced;
 }
 `)
-	assertReactive(t, names, "count", "reduced")
-	assertNotReactive(t, names, "setCount", "myRef", "dispatch")
+	assertReactive(test, names, "count", "reduced")
+	assertNotReactive(test, names, "setCount", "myRef", "dispatch")
 }
 
 // TestReactiveExemptsAliasedSetter pins that stability survives an alias, matching upstream's
 // StableSidemap propagation through LoadLocal and StoreLocal.
-func TestReactiveExemptsAliasedSetter(t *testing.T) {
-	t.Parallel()
+func TestReactiveExemptsAliasedSetter(test *testing.T) {
+	test.Parallel()
 
-	names := reactiveNames(t, `
+	names := reactiveNames(test, `
 import {useState} from 'react';
 export function Component() {
   const [count, setCount] = useState(0);
@@ -529,19 +532,19 @@ export function Component() {
   return count;
 }
 `)
-	assertReactive(t, names, "count")
-	assertNotReactive(t, names, "setCount", "aliased")
+	assertReactive(test, names, "count")
+	assertNotReactive(test, names, "setCount", "aliased")
 }
 
-// TestReactiveDistinguishesHookNameFromOrdinaryCall pins the hook NAME test in both directions.
+// TestReactiveDistinguishesHookNameFromOrdinaryCall pins the hook name test in both directions.
 //
 // A call to `notAHook` with constant arguments is not a source; a call to `useThing` with the same
 // arguments is. Asserting only the positive would be satisfied by a pass that treated every call as
 // a source, which is the natural wrong implementation here.
-func TestReactiveDistinguishesHookNameFromOrdinaryCall(t *testing.T) {
-	t.Parallel()
+func TestReactiveDistinguishesHookNameFromOrdinaryCall(test *testing.T) {
+	test.Parallel()
 
-	names := reactiveNames(t, `
+	names := reactiveNames(test, `
 declare function useThing(n: number): number;
 declare function notAHook(n: number): number;
 export function Component() {
@@ -550,19 +553,19 @@ export function Component() {
   return hookValue + plainValue;
 }
 `)
-	assertReactive(t, names, "hookValue")
-	assertNotReactive(t, names, "plainValue")
+	assertReactive(test, names, "hookValue")
+	assertNotReactive(test, names, "plainValue")
 }
 
 // TestReactiveRequiresCapitalAfterUse pins that `use` alone is not a hook name.
 //
 // Upstream's convention is `use` followed by a capital or a digit, which `classifyFunction` already
 // applies. A function named `used` or `user` must not read as a hook. This is also the reason the
-// `use` OPERATOR is not reachable by this pass, recorded as a divergence at `isHookCallee`.
-func TestReactiveRequiresCapitalAfterUse(t *testing.T) {
-	t.Parallel()
+// `use` operator is not reachable by this pass, recorded as a divergence at `isHookCallee`.
+func TestReactiveRequiresCapitalAfterUse(test *testing.T) {
+	test.Parallel()
 
-	names := reactiveNames(t, `
+	names := reactiveNames(test, `
 declare function user(n: number): number;
 declare function useThing(n: number): number;
 export function Component() {
@@ -571,8 +574,8 @@ export function Component() {
   return notAHook + isAHook;
 }
 `)
-	assertReactive(t, names, "isAHook")
-	assertNotReactive(t, names, "notAHook")
+	assertReactive(test, names, "isAHook")
+	assertNotReactive(test, names, "notAHook")
 }
 
 // TestReactiveIsIdempotent pins the property that separates this pass from Construct.
@@ -580,8 +583,8 @@ export function Component() {
 // `Construct` is not idempotent and the cache exists because of it. This one is, because the flags
 // are written once from a settled set rather than as a side effect of the traversal. A caller that
 // runs it twice must get the same answer, and the failure if it did not would be silent.
-func TestReactiveIsIdempotent(t *testing.T) {
-	t.Parallel()
+func TestReactiveIsIdempotent(test *testing.T) {
+	test.Parallel()
 
 	source := `
 export function Component(props: {c: boolean, n: number}) {
@@ -590,28 +593,29 @@ export function Component(props: {c: boolean, n: number}) {
   return value;
 }
 `
-	var first, second []string
-	probe := rule.Rule{
+	var first []string
+	var second []string
+	probe := rule.Rule[rule.NoOptions]{
 		Name:             "reactive-idempotent-harness",
 		NeedsTypeChecker: true,
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
 					forEachFunctionLike(node, func(functionNode *ast.Node) {
-						function := Lower(functionNode, ctx.TypeChecker)
+						function := Lower(functionNode, ruleContext.TypeChecker)
 						if function == nil {
 							return
 						}
 						Construct(function)
 
-						InferReactive(function, ctx.TypeChecker)
+						InferReactive(function, ruleContext.TypeChecker)
 						found := map[string]bool{}
 						collectReactiveNames(function, found)
 						for name := range found {
 							first = append(first, name)
 						}
 
-						InferReactive(function, ctx.TypeChecker)
+						InferReactive(function, ruleContext.TypeChecker)
 						found = map[string]bool{}
 						collectReactiveNames(function, found)
 						for name := range found {
@@ -622,7 +626,7 @@ export function Component(props: {c: boolean, n: number}) {
 			}
 		},
 	}
-	rule_testing.RunTypedFiles(t, probe, map[string]string{
+	rule_testing.RunTypedFiles(test, probe, map[string]string{
 		"react.d.ts":  reactiveDeclarations,
 		"fixture.tsx": source,
 	}, "fixture.tsx")
@@ -630,11 +634,11 @@ export function Component(props: {c: boolean, n: number}) {
 	sort.Strings(first)
 	sort.Strings(second)
 	if len(first) == 0 {
-		t.Fatal("the first run marked nothing reactive, so this test would compare two empty " +
+		test.Fatal("the first run marked nothing reactive, so this test would compare two empty " +
 			"slices and prove nothing")
 	}
 	if strings.Join(first, " ") != strings.Join(second, " ") {
-		t.Errorf("InferReactive is not idempotent: first run [%s], second run [%s]",
+		test.Errorf("InferReactive is not idempotent: first run [%s], second run [%s]",
 			strings.Join(first, " "), strings.Join(second, " "))
 	}
 }
@@ -642,11 +646,11 @@ export function Component(props: {c: boolean, n: number}) {
 // TestReactiveWithoutCheckerStillMarksParameters pins the documented degradation.
 //
 // With no checker the stable exemption and the hook test cannot be made, so the answer shrinks to
-// parameters and what derives from them. It must SHRINK rather than become wrong, and it must not
+// parameters and what derives from them. It must shrink rather than become wrong, and it must not
 // panic: `stableTypeName` returning early on a nil checker is the guard, and a rule handed a nil
 // checker going vacuously green is a failure mode this tree has shipped three times.
-func TestReactiveWithoutCheckerStillMarksParameters(t *testing.T) {
-	t.Parallel()
+func TestReactiveWithoutCheckerStillMarksParameters(test *testing.T) {
+	test.Parallel()
 
 	source := `
 export function Component(props: {n: number}) {
@@ -655,9 +659,9 @@ export function Component(props: {n: number}) {
 }
 `
 	var names []string
-	probe := rule.Rule{
+	probe := rule.Rule[rule.NoOptions]{
 		Name: "reactive-no-checker-harness",
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
 					forEachFunctionLike(node, func(functionNode *ast.Node) {
@@ -678,11 +682,11 @@ export function Component(props: {n: number}) {
 			}
 		},
 	}
-	rule_testing.Run(t, probe, "fixture.tsx", source)
+	rule_testing.Run(test, probe, "fixture.tsx", source)
 
 	sort.Strings(names)
 	if !hasName(names, "props") {
-		t.Errorf("with no checker a parameter must still be reactive, got [%s]", strings.Join(names, " "))
+		test.Errorf("with no checker a parameter must still be reactive, got [%s]", strings.Join(names, " "))
 	}
 }
 
@@ -690,15 +694,15 @@ export function Component(props: {n: number}) {
 //
 // The fixpoint's value is a set keyed on IdentifierId alone, and the whole reason for that choice is
 // that a comparison including spans or freshly-minted identifiers never settles. The failure mode is
-// a HANG rather than a wrong answer, so it is worth an assertion that would catch a future edit
+// a hang rather than a wrong answer, so it is worth an assertion that would catch a future edit
 // making the value richer.
 //
 // Measured over 685 lowered functions of real TypeScript: max 4 rounds, with 508 settling in 2 and
 // only 5 needing 4, against a bound of 10,000. A loop shape needs one extra round to carry a back
 // edge, which is where 3 and 4 come from. An assertion of a small constant here is therefore
 // generous rather than tight, and a regression that made this iterate would blow through it.
-func TestReactiveConvergesInFewRounds(t *testing.T) {
-	t.Parallel()
+func TestReactiveConvergesInFewRounds(test *testing.T) {
+	test.Parallel()
 
 	source := `
 export function Component(props: {a: boolean, b: number, items: number[]}) {
@@ -719,21 +723,21 @@ export function Component(props: {a: boolean, b: number, items: number[]}) {
 }
 `
 	worst := 0
-	probe := rule.Rule{
+	probe := rule.Rule[rule.NoOptions]{
 		Name:             "reactive-rounds-harness",
 		NeedsTypeChecker: true,
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
 					forEachFunctionLike(node, func(functionNode *ast.Node) {
-						function := Lower(functionNode, ctx.TypeChecker)
+						function := Lower(functionNode, ruleContext.TypeChecker)
 						if function == nil {
 							return
 						}
 						Construct(function)
 						state := &reactivity{
 							function:    function,
-							typeChecker: ctx.TypeChecker,
+							typeChecker: ruleContext.TypeChecker,
 							reactive:    map[static_single_assignment.IdentifierId]bool{},
 							stable:      map[static_single_assignment.IdentifierId]bool{},
 						}
@@ -746,16 +750,16 @@ export function Component(props: {a: boolean, b: number, items: number[]}) {
 			}
 		},
 	}
-	rule_testing.RunTypedFiles(t, probe, map[string]string{
+	rule_testing.RunTypedFiles(test, probe, map[string]string{
 		"react.d.ts":  reactiveDeclarations,
 		"fixture.tsx": source,
 	}, "fixture.tsx")
 
 	if worst == 0 {
-		t.Fatal("no function was analysed, so this test measured nothing")
+		test.Fatal("no function was analysed, so this test measured nothing")
 	}
 	if worst > 10 {
-		t.Errorf("the fixpoint took %d rounds over a function with two loops; the lattice value is "+
+		test.Errorf("the fixpoint took %d rounds over a function with two loops; the lattice value is "+
 			"probably no longer a plain identifier set, which is the shape that terminates", worst)
 	}
 }
@@ -765,20 +769,20 @@ export function Component(props: {a: boolean, b: number, items: number[]}) {
 // The list is asserted rather than described so that closing a gap is a visible event: a pass that
 // learned to compute mutation-derived reactivity would have to change this test, which is where the
 // under-approximation is documented in the API.
-func TestReactiveGapsAreNamed(t *testing.T) {
-	t.Parallel()
+func TestReactiveGapsAreNamed(test *testing.T) {
+	test.Parallel()
 
 	gaps := ReactiveGaps()
 	if len(gaps) != 2 {
-		t.Fatalf("expected exactly the two declared gaps, got %d", len(gaps))
+		test.Fatalf("expected exactly the two declared gaps, got %d", len(gaps))
 	}
 	if gaps[0] != ReactiveGapMutation || gaps[1] != ReactiveGapAliasing {
-		t.Errorf("the declared gaps changed; if a gap was closed, update the package comment and "+
+		test.Errorf("the declared gaps changed; if a gap was closed, update the package comment and "+
 			"the ReactiveGap constants together, got %v", gaps)
 	}
 }
 
-// TestReactiveIsAnUnderApproximation pins the DIRECTION of the mutation gap.
+// TestReactiveIsAnUnderApproximation pins the direction of the mutation gap.
 //
 // Upstream marks `sink` reactive here: `sink` is passed to a call alongside a reactive argument, so
 // its mutable operand is marked. This pass cannot, because every Place.Effect is EffectUnknown.
@@ -787,10 +791,10 @@ func TestReactiveGapsAreNamed(t *testing.T) {
 // expectation, and it names the input so that a later pass filling Place.Effect turns this test red
 // and forces the package comment to be revisited. A gap asserted as silence is findable; a gap left
 // undocumented is not.
-func TestReactiveIsAnUnderApproximation(t *testing.T) {
-	t.Parallel()
+func TestReactiveIsAnUnderApproximation(test *testing.T) {
+	test.Parallel()
 
-	names := reactiveNames(t, `
+	names := reactiveNames(test, `
 declare function mutate(target: number[], source: number): void;
 export function Component(props: {n: number}) {
   const sink: number[] = [];
@@ -798,9 +802,9 @@ export function Component(props: {n: number}) {
   return sink;
 }
 `)
-	assertReactive(t, names, "props")
+	assertReactive(test, names, "props")
 	if hasName(names, "sink") {
-		t.Errorf("`sink` became reactive, which means mutation-derived reactivity is now being " +
+		test.Errorf("`sink` became reactive, which means mutation-derived reactivity is now being " +
 			"computed. That is upstream's answer and a real improvement, but ReactiveGapMutation " +
 			"and the package comment now describe a gap that no longer exists; update both.")
 	}

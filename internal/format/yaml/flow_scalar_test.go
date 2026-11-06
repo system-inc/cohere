@@ -12,8 +12,8 @@ import (
 // fillWords per line, then doc.Join with hardlines. The fixtures cover what the trims and the split decide
 // on: a no-break space, a tab and a run of spaces at a line's ends and inside it, empty and blank lines,
 // a lone line, and a text that is only line feeds.
-func TestPreservedFlowScalarMatchesGeneralPath(t *testing.T) {
-	t.Parallel()
+func TestPreservedFlowScalarMatchesGeneralPath(test *testing.T) {
+	test.Parallel()
 	contents := []string{
 		"", "a", "a b", "a  b", " a ", "\ta\t", " a ", "a b",
 		"\n", "\n\n", "a\n", "\na", "a\nb", "a \n b", " a\n\nb ", "a\n \n\tb",
@@ -30,7 +30,7 @@ func TestPreservedFlowScalarMatchesGeneralPath(t *testing.T) {
 			var expected doc.Doc = doc.Join(doc.Hardline, lines)
 			actual := printPreservedFlowScalarContent(content)
 			if !reflect.DeepEqual(actual, expected) {
-				t.Errorf("%s %q: built %#v, the general path %#v", nodeType, content, actual, expected)
+				test.Errorf("%s %q: built %#v, the general path %#v", nodeType, content, actual, expected)
 			}
 		}
 	}

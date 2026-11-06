@@ -58,7 +58,7 @@ import (
 // The first version of this helper walked upward from `.`, the package directory. That finds nothing,
 // so every fixture in this file skipped, and `go test` reports a file whose every case skipped as
 // `ok`. Measured: 7 of 7 reporting cases and 13 of 13 silent ones skipped while the package printed
-// PASS. A skip that reads as a pass is the same failure as silence that reads as agreement, one layer
+// `PASS`. A skip that reads as a pass is the same failure as silence that reads as agreement, one layer
 // out, so `TestClassOrderFixturesActuallyRan` below fails rather than skips when the package cannot
 // be found, and that test is the one that makes the rest of this file's greenness mean something.
 //
@@ -66,22 +66,23 @@ import (
 //
 // Pointing the fixture's `@import` at an absolute path does not work, and the reason is worth stating
 // because it looks like it should. The rule does not resolve the import itself: it calls
-// `findTailwindPackageRoot`, which walks UP from the stylesheet's own directory looking for
+// `findTailwindPackageRoot`, which walks up from the stylesheet's own directory looking for
 // `node_modules/tailwindcss`, and hands the result to `LoadDesignSystem` as the resolver's root. A
 // fixture in `t.TempDir()` has nothing above it, so that walk fails and the rule declines before it
 // ever reads what the stylesheet imports. Measured: every reporting fixture came back
 // `designSystemUnavailable` while the stylesheet held a perfectly good absolute import.
 //
 // So the fixture gets a real `node_modules/tailwindcss`, symlinked to the installed one. That makes
-// the rule take exactly the path it takes on a repository — its own upward walk, its own resolver,
-// the bare `tailwindcss` specifier — rather than a path arranged for the test.
+// the rule take exactly the path it takes on a repository (its own upward walk, its own resolver,
+// the bare `tailwindcss` specifier) rather than a path arranged for the test.
 const classOrderFixtureStylesheetPath = "app/_theme/styles/theme.css"
 
 // classOrderFixturePackageRoot is the installed tailwindcss the fixture stylesheets import: the vendored
 // snapshot of 4.3.3, the version the class-order corpus in collapse/testdata was captured against, so the
 // fixtures and the corpus agree on which engine they mean, on any machine (#sycrdr6).
-func classOrderFixturePackageRoot() string {
-	return vendored.TailwindPackageRoot()
+func classOrderFixturePackageRoot(test *testing.T) string {
+	test.Helper()
+	return vendored.TailwindPackageRootForTest(test)
 }
 
 // classOrderFixtureStylesheet is the fixture's root stylesheet.
@@ -98,31 +99,31 @@ const classOrderFixtureStylesheet = `@import "tailwindcss";`
 //
 // The symlink is planted before the program is built, into the same temp directory
 // `rule_testing.RunTypedFiles` writes the fixture files to, so the rule's own upward walk finds it.
-func runClassOrderFixture(t *testing.T, fileName string, source string) rule_testing.Result {
-	t.Helper()
+func runClassOrderFixture(test *testing.T, fileName string, source string) rule_testing.Result {
+	test.Helper()
 
-	packageRoot := classOrderFixturePackageRoot()
+	packageRoot := classOrderFixturePackageRoot(test)
 	if packageRoot == "" {
-		t.Skip("no installed tailwindcss on this machine, so the rule's design system cannot be " +
+		test.Skip("no installed tailwindcss on this machine, so the rule's design system cannot be " +
 			"built and these fixtures would measure a decline rather than an order")
 	}
 
-	return rule_testing.RunTypedFilesWithSetup(t, EnforceConsistentClassOrder, map[string]string{
+	return rule_testing.RunTypedFilesWithSetup(test, EnforceConsistentClassOrder, map[string]string{
 		fileName:                        source,
 		classOrderFixtureStylesheetPath: classOrderFixtureStylesheet,
 	}, fileName, func(root string) {
 		modules := filepath.Join(root, "node_modules")
-		if err := os.MkdirAll(modules, 0o755); err != nil {
-			t.Fatalf("creating the fixture node_modules: %v", err)
+		if createDirectoryError := os.MkdirAll(modules, 0o755); createDirectoryError != nil {
+			test.Fatalf("creating the fixture node_modules: %v", createDirectoryError)
 		}
-		if err := os.Symlink(packageRoot, filepath.Join(modules, "tailwindcss")); err != nil {
-			t.Fatalf("linking the installed tailwindcss into the fixture: %v", err)
+		if symlinkError := os.Symlink(packageRoot, filepath.Join(modules, "tailwindcss")); symlinkError != nil {
+			test.Fatalf("linking the installed tailwindcss into the fixture: %v", symlinkError)
 		}
 	})
 }
 
-func TestEnforceConsistentClassOrderReportsMisordering(t *testing.T) {
-	t.Parallel()
+func TestEnforceConsistentClassOrderReportsMisordering(test *testing.T) {
+	test.Parallel()
 	testCases := []struct {
 		name     string
 		fileName string
@@ -189,18 +190,18 @@ func TestEnforceConsistentClassOrderReportsMisordering(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runClassOrderFixture(t, testCase.fileName, testCase.source)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runClassOrderFixture(test, testCase.fileName, testCase.source)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
 
 // The silent half. Several of these are shapes an earlier version of the comparator got wrong, and
 // each one is a case where reporting would be reporting correct code.
-func TestEnforceConsistentClassOrderStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestEnforceConsistentClassOrderStaysSilent(test *testing.T) {
+	test.Parallel()
 	testCases := []struct {
 		name     string
 		fileName string
@@ -237,8 +238,9 @@ func TestEnforceConsistentClassOrderStaysSilent(t *testing.T) {
 			// pointed at the table it reads.
 			name:     "ring-offset resolves to its own root, not to ring",
 			fileName: "Component.tsx",
-			source: `const element = <div className="focus-visible:ring-1 focus-visible:ring-(--color-content-informative) ` +
-				`focus-visible:ring-offset-1 focus-visible:outline-none" />;`,
+			source: `const element = <div className="focus-visible:ring-1 ` +
+				`focus-visible:ring-(--color-content-informative) focus-visible:ring-offset-1 ` +
+				`focus-visible:outline-none" />;`,
 		},
 		{
 			// Both spellings are accepted, which is what pins the tiebreak to source order rather
@@ -292,10 +294,10 @@ func TestEnforceConsistentClassOrderStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runClassOrderFixture(t, testCase.fileName, testCase.source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runClassOrderFixture(test, testCase.fileName, testCase.source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -305,17 +307,17 @@ func TestEnforceConsistentClassOrderStaysSilent(t *testing.T) {
 // The order is not guessable from the class names, which is the whole reason the rule needs a table.
 // A finding that says only "these are misordered" leaves the reader to run the formatter and diff
 // the result.
-func TestClassOrderMessageNamesTheOrder(t *testing.T) {
-	t.Parallel()
-	result := runClassOrderFixture(t, "Component.tsx",
+func TestClassOrderMessageNamesTheOrder(test *testing.T) {
+	test.Parallel()
+	result := runClassOrderFixture(test, "Component.tsx",
 		`const element = <div className="gap-2 items-center flex" />;`)
 
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("expected one finding, got %d", len(result.Diagnostics))
+		test.Fatalf("expected one finding, got %d", len(result.Diagnostics))
 	}
 	description := result.Diagnostics[0].Message.Description
 	if !strings.Contains(description, "\"flex items-center gap-2\"") {
-		t.Errorf("message does not name the correct order: %s", description)
+		test.Errorf("message does not name the correct order: %s", description)
 	}
 }
 
@@ -326,8 +328,8 @@ func TestClassOrderMessageNamesTheOrder(t *testing.T) {
 // plugin never reflowed them: it permutes the classes between the same whitespace runs, and so does
 // this fix, which writes only the slots whose class changes. The wrapped and padded cases below are
 // that property, and the padding staying put is `no-unnecessary-whitespace`'s to remove.
-func TestClassOrderFixMatchesThePlugin(t *testing.T) {
-	t.Parallel()
+func TestClassOrderFixMatchesThePlugin(test *testing.T) {
+	test.Parallel()
 	testCases := []struct {
 		name, source, want string
 	}{
@@ -358,10 +360,10 @@ func TestClassOrderFixMatchesThePlugin(t *testing.T) {
 		},
 	}
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runClassOrderFixture(t, "Component.tsx", testCase.source)
-			rule_testing.ExpectFixedSource(t, result, testCase.want+"\n")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runClassOrderFixture(test, "Component.tsx", testCase.source)
+			rule_testing.ExpectFixedSource(test, result, testCase.want+"\n")
 		})
 	}
 }
@@ -369,8 +371,8 @@ func TestClassOrderFixMatchesThePlugin(t *testing.T) {
 // TestClassOrderReportsWithoutAFixItCannotPlace covers the cases that keep the finding and drop the
 // fix: rewriting at source offsets needs the source to be the value, and a class the deprecation rule
 // renames is renamed before it is moved, since both edits would claim its bytes.
-func TestClassOrderReportsWithoutAFixItCannotPlace(t *testing.T) {
-	t.Parallel()
+func TestClassOrderReportsWithoutAFixItCannotPlace(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range []struct {
 		name, source string
 	}{
@@ -383,12 +385,12 @@ func TestClassOrderReportsWithoutAFixItCannotPlace(t *testing.T) {
 			source: `const element = <div className="items-center flex-grow" />;`,
 		},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runClassOrderFixture(t, "Component.tsx", testCase.source)
-			rule_testing.ExpectFindings(t, result, "inconsistentClassOrder")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runClassOrderFixture(test, "Component.tsx", testCase.source)
+			rule_testing.ExpectFindings(test, result, "inconsistentClassOrder")
 			if len(result.Diagnostics[0].Fixes) != 0 {
-				t.Fatalf("expected no fix, got %+v", result.Diagnostics[0].Fixes)
+				test.Fatalf("expected no fix, got %+v", result.Diagnostics[0].Fixes)
 			}
 		})
 	}
@@ -414,9 +416,9 @@ func TestClassOrderReportsWithoutAFixItCannotPlace(t *testing.T) {
 //
 // So each dimension is exercised by a pair only it can order correctly. The pairs are unchanged from
 // the test this replaces; the mechanism asked is the live sort rather than the pairwise comparator.
-func TestClassOrderDimensionsAreAllUsed(t *testing.T) {
-	t.Parallel()
-	forEachEngineSystem(t, func(t *testing.T, designSystem DesignSystemResult) {
+func TestClassOrderDimensionsAreAllUsed(test *testing.T) {
+	test.Parallel()
+	forEachEngineSystem(test, func(test *testing.T, designSystem DesignSystemResult) {
 
 		testCases := []struct {
 			name      string
@@ -445,19 +447,19 @@ func TestClassOrderDimensionsAreAllUsed(t *testing.T) {
 		}
 
 		for _, testCase := range testCases {
-			t.Run(testCase.name, func(t *testing.T) {
-				t.Parallel()
-				forward := classOrderLiveSort(t, designSystem, []string{testCase.first, testCase.second})
-				reverse := classOrderLiveSort(t, designSystem, []string{testCase.second, testCase.first})
+			test.Run(testCase.name, func(test *testing.T) {
+				test.Parallel()
+				forward := classOrderLiveSort(test, designSystem, []string{testCase.first, testCase.second})
+				reverse := classOrderLiveSort(test, designSystem, []string{testCase.second, testCase.first})
 				want := []string{testCase.first, testCase.second}
 
 				if strings.Join(forward, " ") != strings.Join(want, " ") {
-					t.Errorf("got %v, expected %v, decided by %s", forward, want, testCase.dimension)
+					test.Errorf("got %v, expected %v, decided by %s", forward, want, testCase.dimension)
 				}
 				// Sorted from the other input too, because a sort that merely preserves its input would
 				// pass the first assertion and order nothing.
 				if strings.Join(reverse, " ") != strings.Join(want, " ") {
-					t.Errorf("from reversed input got %v, expected %v; the sort is not deciding, it is "+
+					test.Errorf("from reversed input got %v, expected %v; the sort is not deciding, it is "+
 						"preserving", reverse, want)
 				}
 			})
@@ -472,9 +474,9 @@ func TestClassOrderDimensionsAreAllUsed(t *testing.T) {
 // `getClassOrder` returned, rather than restated from the port.
 //
 // The two dropped cases are the subject of TestClassOrderDepthIsNotADimension below.
-func TestClassOrderVariantDimensions(t *testing.T) {
-	t.Parallel()
-	forEachEngineSystem(t, func(t *testing.T, designSystem DesignSystemResult) {
+func TestClassOrderVariantDimensions(test *testing.T) {
+	test.Parallel()
+	forEachEngineSystem(test, func(test *testing.T, designSystem DesignSystemResult) {
 
 		testCases := []struct {
 			name     string
@@ -507,11 +509,11 @@ func TestClassOrderVariantDimensions(t *testing.T) {
 		}
 
 		for _, testCase := range testCases {
-			t.Run(testCase.name, func(t *testing.T) {
-				t.Parallel()
-				ordered := classOrderLiveSort(t, designSystem, testCase.input)
+			test.Run(testCase.name, func(test *testing.T) {
+				test.Parallel()
+				ordered := classOrderLiveSort(test, designSystem, testCase.input)
 				if strings.Join(ordered, " ") != strings.Join(testCase.expected, " ") {
-					t.Errorf("got %v, %s says %v: %s",
+					test.Errorf("got %v, %s says %v: %s",
 						ordered, testCase.fixture, testCase.expected, testCase.why)
 				}
 			})
@@ -532,7 +534,7 @@ func TestClassOrderVariantDimensions(t *testing.T) {
 //
 // The second is false as stated, and the first is true only by coincidence. The engine ORs one bit
 // per variant into a mask and compares masks numerically, so a class's position is decided by its
-// HIGHEST-ranked variant. A stacked variant sorts first whenever the class it is compared against
+// highest-ranked variant. A stacked variant sorts first whenever the class it is compared against
 // carries a higher bit.
 //
 // The evidence is the engine's own, from `class-order/stacked-against-single` and
@@ -544,28 +546,28 @@ func TestClassOrderVariantDimensions(t *testing.T) {
 // The first case is kept, with its reason corrected: `group-hover:` does precede
 // `group-hover:disabled:`, not because it is shorter but because the two share the `group-hover` bit
 // and the stacked one carries `disabled` on top of it, so its mask is strictly larger.
-func TestClassOrderDepthIsNotADimension(t *testing.T) {
-	t.Parallel()
-	forEachEngineSystem(t, func(t *testing.T, designSystem DesignSystemResult) {
+func TestClassOrderDepthIsNotADimension(test *testing.T) {
+	test.Parallel()
+	forEachEngineSystem(test, func(test *testing.T, designSystem DesignSystemResult) {
 
-		t.Run("a superset mask sorts after the subset it extends", func(t *testing.T) {
-			t.Parallel()
-			ordered := classOrderLiveSort(t, designSystem,
+		test.Run("a superset mask sorts after the subset it extends", func(test *testing.T) {
+			test.Parallel()
+			ordered := classOrderLiveSort(test, designSystem,
 				[]string{"group-hover:disabled:flex", "group-hover:flex"})
 			expected := []string{"group-hover:flex", "group-hover:disabled:flex"}
 			if strings.Join(ordered, " ") != strings.Join(expected, " ") {
-				t.Errorf("got %v, expected %v: both carry the `group-hover` bit and the stacked class "+
+				test.Errorf("got %v, expected %v: both carry the `group-hover` bit and the stacked class "+
 					"carries `disabled` on top of it, so its mask is strictly larger", ordered, expected)
 			}
 		})
 
-		t.Run("but a stacked variant precedes a higher-ranked single one", func(t *testing.T) {
-			t.Parallel()
-			ordered := classOrderLiveSort(t, designSystem,
+		test.Run("but a stacked variant precedes a higher-ranked single one", func(test *testing.T) {
+			test.Parallel()
+			ordered := classOrderLiveSort(test, designSystem,
 				[]string{"dark:flex", "group-hover:disabled:flex"})
 			expected := []string{"group-hover:disabled:flex", "dark:flex"}
 			if strings.Join(ordered, " ") != strings.Join(expected, " ") {
-				t.Errorf("got %v, class-order/stacked-against-single says %v; the deleted rule asserted "+
+				test.Errorf("got %v, class-order/stacked-against-single says %v; the deleted rule asserted "+
 					"'every single variant precedes every stacked one' and the engine does no such thing",
 					ordered, expected)
 			}
@@ -585,7 +587,7 @@ func TestClassOrderDepthIsNotADimension(t *testing.T) {
 //	shadow-lg   {order: [315, 316], count: 2}
 //	ring-1      {order: [315, 318], count: 2}
 //
-// They SHARE their leading index and separate on the second. Index 315 is the `--tw-*` custom
+// They share their leading index and separate on the second. Index 315 is the `--tw-*` custom
 // property they both emit; 316 and 318 are their differing second declarations. So the property that
 // matters is that the reading holds more than one index at all: a lookup that dropped custom
 // properties, the way the conflict tables do, would leave both as a single `[box-shadow]` index and
@@ -593,37 +595,37 @@ func TestClassOrderDepthIsNotADimension(t *testing.T) {
 // conflict tables here.
 //
 // Asserting on `order[0]` differing, as the original did, is an assertion the engine fails. It passed
-// only because the deleted `declaredPropertiesForOrdering` returned property NAMES from a different
+// only because the deleted `declaredPropertiesForOrdering` returned property names from a different
 // table with a different shape, so the two tests were never asking the same question.
-func TestClassOrderReadingsKeepCustomProperties(t *testing.T) {
-	t.Parallel()
-	forEachEngineSystem(t, func(t *testing.T, designSystem DesignSystemResult) {
+func TestClassOrderReadingsKeepCustomProperties(test *testing.T) {
+	test.Parallel()
+	forEachEngineSystem(test, func(test *testing.T, designSystem DesignSystemResult) {
 
 		keys, unplaceable, resolved := classOrderKeys(
 			[]string{"shadow-lg", "ring-1"}, designSystem.System, designSystem.Table)
 		if !resolved {
-			t.Fatalf("could not place %q", unplaceable)
+			test.Fatalf("could not place %q", unplaceable)
 		}
 
 		shadow, ring := keys["shadow-lg"], keys["ring-1"]
 		// Both indices, because one index each is what dropping the custom property would leave.
 		if len(shadow.order) < 2 || len(ring.order) < 2 {
-			t.Fatalf("expected both to declare a custom property and box-shadow, got %v and %v; a single "+
+			test.Fatalf("expected both to declare a custom property and box-shadow, got %v and %v; a single "+
 				"index each means the `--tw-*` property was dropped and the two cannot be separated",
 				shadow.order, ring.order)
 		}
 		// And they must still differ somewhere, which for these two is the second index.
 		if shadow.order[0] == ring.order[0] && shadow.order[1] == ring.order[1] {
-			t.Errorf("shadow-lg %v and ring-1 %v are identical readings, so the sort cannot separate "+
+			test.Errorf("shadow-lg %v and ring-1 %v are identical readings, so the sort cannot separate "+
 				"them and the engine does", shadow.order, ring.order)
 		}
 		// The engine's own numbers, quoted so a drift in either reading fails here rather than silently
 		// changing every class list that holds a shadow and a ring.
 		if shadow.order[0] != 315 || shadow.order[1] != 316 {
-			t.Errorf("shadow-lg reads %v; classorder_fixtures.json recorded [315 316]", shadow.order)
+			test.Errorf("shadow-lg reads %v; classorder_fixtures.json recorded [315 316]", shadow.order)
 		}
 		if ring.order[0] != 315 || ring.order[1] != 318 {
-			t.Errorf("ring-1 reads %v; classorder_fixtures.json recorded [315 318]", ring.order)
+			test.Errorf("ring-1 reads %v; classorder_fixtures.json recorded [315 318]", ring.order)
 		}
 	})
 }
@@ -638,22 +640,22 @@ func TestClassOrderReadingsKeepCustomProperties(t *testing.T) {
 // The live path cannot make that mistake in the same way, because `ParseCandidate` resolves the root
 // against the design system's own registrations rather than by walking a table of names. The property
 // is still worth pinning, and it is pinned the same way: the two classes must not share a reading.
-func TestClassOrderRootsResolveAgainstTheDesignSystem(t *testing.T) {
-	t.Parallel()
-	forEachEngineSystem(t, func(t *testing.T, designSystem DesignSystemResult) {
+func TestClassOrderRootsResolveAgainstTheDesignSystem(test *testing.T) {
+	test.Parallel()
+	forEachEngineSystem(test, func(test *testing.T, designSystem DesignSystemResult) {
 
 		keys, unplaceable, resolved := classOrderKeys(
 			[]string{"ring-offset-1", "ring-1"}, designSystem.System, designSystem.Table)
 		if !resolved {
-			t.Fatalf("could not place %q", unplaceable)
+			test.Fatalf("could not place %q", unplaceable)
 		}
 
 		offset, ring := keys["ring-offset-1"], keys["ring-1"]
 		if len(offset.order) == 0 || len(ring.order) == 0 {
-			t.Fatalf("both should declare properties, got %v and %v", offset.order, ring.order)
+			test.Fatalf("both should declare properties, got %v and %v", offset.order, ring.order)
 		}
 		if offset.order[0] == ring.order[0] {
-			t.Errorf("ring-offset-1 and ring-1 lead with the same property index %d, so the sort cannot "+
+			test.Errorf("ring-offset-1 and ring-1 lead with the same property index %d, so the sort cannot "+
 				"separate them and the engine does", offset.order[0])
 		}
 	})
@@ -665,13 +667,13 @@ func TestClassOrderRootsResolveAgainstTheDesignSystem(t *testing.T) {
 // Replaces TestUnrankedClassesSortFirstRegardlessOfVariant. `group` has no reading and a
 // variant-prefixed class has a mask, so an ordering that consulted the mask before the marker
 // partition would put `group` in the middle of the list. It belongs at the front, ahead of both.
-func TestClassOrderMarkersLeadRegardlessOfVariant(t *testing.T) {
-	t.Parallel()
-	forEachEngineSystem(t, func(t *testing.T, designSystem DesignSystemResult) {
+func TestClassOrderMarkersLeadRegardlessOfVariant(test *testing.T) {
+	test.Parallel()
+	forEachEngineSystem(test, func(test *testing.T, designSystem DesignSystemResult) {
 
-		ordered := classOrderLiveSort(t, designSystem, []string{"hover:px-8", "group", "flex"})
+		ordered := classOrderLiveSort(test, designSystem, []string{"hover:px-8", "group", "flex"})
 		if ordered[0] != "group" {
-			t.Errorf("got %v: a marker must lead even when the other classes carry variants, which "+
+			test.Errorf("got %v: a marker must lead even when the other classes carry variants, which "+
 				"means the partition has to happen before the mask is consulted", ordered)
 		}
 	})
@@ -682,14 +684,14 @@ func TestClassOrderMarkersLeadRegardlessOfVariant(t *testing.T) {
 // Replaces TestUnrankedClassesKeepSourceOrder. The sort must express no preference between two
 // markers in either direction, so both `peer group` and `group peer` survive: `better-tailwindcss`
 // accepts both, and an alphabetical tiebreak would rewrite the first.
-func TestClassOrderMarkersKeepSourceOrder(t *testing.T) {
-	t.Parallel()
-	forEachEngineSystem(t, func(t *testing.T, designSystem DesignSystemResult) {
+func TestClassOrderMarkersKeepSourceOrder(test *testing.T) {
+	test.Parallel()
+	forEachEngineSystem(test, func(test *testing.T, designSystem DesignSystemResult) {
 
 		for _, input := range [][]string{{"group", "peer", "flex"}, {"peer", "group", "flex"}} {
-			ordered := classOrderLiveSort(t, designSystem, input)
+			ordered := classOrderLiveSort(test, designSystem, input)
 			if strings.Join(ordered, " ") != strings.Join(input, " ") {
-				t.Errorf("got %v from %v: two markers must keep the order they were written in, and "+
+				test.Errorf("got %v from %v: two markers must keep the order they were written in, and "+
 					"alphabetical would rewrite `peer group`", ordered, input)
 			}
 		}
@@ -702,13 +704,13 @@ func TestClassOrderMarkersKeepSourceOrder(t *testing.T) {
 // path the rule does not take. Fails rather than skips on an unplaceable class: every class these
 // tests use is one this repository's design system knows, so a decline is a defect in the port and
 // not a property of the input.
-func classOrderLiveSort(t *testing.T, designSystem DesignSystemResult, classes []string) []string {
-	t.Helper()
+func classOrderLiveSort(test *testing.T, designSystem DesignSystemResult, classes []string) []string {
+	test.Helper()
 
 	unranked, placeable := partitionUnranked(classes, designSystem)
 	keys, unplaceable, resolved := classOrderKeys(placeable, designSystem.System, designSystem.Table)
 	if !resolved {
-		t.Fatalf("the rule could not place %q out of %v, so this case proves nothing",
+		test.Fatalf("the rule could not place %q out of %v, so this case proves nothing",
 			unplaceable, classes)
 	}
 	return append(unranked, sortClassesByKey(placeable, keys)...)
@@ -718,33 +720,33 @@ func classOrderLiveSort(t *testing.T, designSystem DesignSystemResult, classes [
 //
 // Every fixture above skips when no installed tailwindcss can be found, and a skip is the honest
 // answer for a machine that genuinely has none. The problem is that `go test` prints `ok` for a
-// package whose every case skipped, so a mistake in where the walk STARTS looks identical to a
+// package whose every case skipped, so a mistake in where the walk starts looks identical to a
 // machine that lacks the package.
 //
 // That was not hypothetical. The first version of the helper walked upward from `.`, which is this
 // package's own directory inside a repository that vendors no `node_modules`. Every fixture skipped,
-// the package reported PASS, and the swap under test was never exercised by a single one of them.
+// the package reported `PASS`, and the swap under test was never exercised by a single one of them.
 //
 // So this test fails where the others skip. It asserts the package is findable and that the rule can
 // actually build a design system from the fixture stylesheet, which together are the precondition
 // every other fixture in this file silently depends on.
-func TestClassOrderFixturesActuallyRan(t *testing.T) {
-	t.Parallel()
-	packageRoot := classOrderFixturePackageRoot()
+func TestClassOrderFixturesActuallyRan(test *testing.T) {
+	test.Parallel()
+	packageRoot := classOrderFixturePackageRoot(test)
 	if packageRoot == "" {
-		t.Fatalf(
+		test.Fatalf(
 			"the vendored tailwindcss at %s is missing, so every fixture in this file would skip and the "+
 				"package still report ok; restore it (internal/lint/rules/tailwind/vendored)",
-			vendored.TailwindPackageRoot(),
+			vendored.TailwindPackageRootForTest(test),
 		)
 	}
 
 	// And the stylesheet the fixtures write must actually produce findings, which is the end-to-end
 	// version of the same claim: a design system that builds but resolves nothing would let the
 	// silent half pass while the reporting half failed.
-	result := runClassOrderFixture(t, "Component.tsx",
+	result := runClassOrderFixture(test, "Component.tsx",
 		`const element = <div className="items-center flex" />;`)
-	rule_testing.ExpectFindings(t, result, "inconsistentClassOrder")
+	rule_testing.ExpectFindings(test, result, "inconsistentClassOrder")
 }
 
 // TestClassOrderSortsTemplateRunsLikeThePlugin pins the template half, each case quoted from what
@@ -753,8 +755,8 @@ func TestClassOrderFixturesActuallyRan(t *testing.T) {
 // Each static run sorts on its own, and a class glued to a hole stays put: `px-` is half of a class
 // the hole completes. Whitespace is left exactly where it was, since collapsing it is
 // `no-unnecessary-whitespace`'s, so the cases with padding show the order alone.
-func TestClassOrderSortsTemplateRunsLikeThePlugin(t *testing.T) {
-	t.Parallel()
+func TestClassOrderSortsTemplateRunsLikeThePlugin(test *testing.T) {
+	test.Parallel()
 	testCases := []struct {
 		name, source, want string
 	}{
@@ -790,17 +792,17 @@ func TestClassOrderSortsTemplateRunsLikeThePlugin(t *testing.T) {
 		},
 	}
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runClassOrderFixture(t, "Component.tsx", testCase.source)
-			rule_testing.ExpectFixedSource(t, result, testCase.want+"\n")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runClassOrderFixture(test, "Component.tsx", testCase.source)
+			rule_testing.ExpectFixedSource(test, result, testCase.want+"\n")
 		})
 	}
 }
 
 // The template runs the plugin leaves alone, and so must this rule.
-func TestClassOrderLeavesTemplateRunsThePluginLeaves(t *testing.T) {
-	t.Parallel()
+func TestClassOrderLeavesTemplateRunsThePluginLeaves(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range []struct {
 		name, source string
 	}{
@@ -821,9 +823,9 @@ func TestClassOrderLeavesTemplateRunsThePluginLeaves(t *testing.T) {
 			source: "const element = <div className={`items-center flex flex ${x}`} />;",
 		},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, runClassOrderFixture(t, "Component.tsx", testCase.source))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, runClassOrderFixture(test, "Component.tsx", testCase.source))
 		})
 	}
 }

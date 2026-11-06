@@ -19,8 +19,8 @@ const upstreamFail1 = "\n\t\t\t      import Document, { Html, Main, NextScript }
 
 const upstreamFail2 = "\n\t\t\t      import Document, { Html, Main, NextScript } from 'next/document'\n\t\t\t      import Head from 'next/head'\n\n\t\t\t      class MyDocument extends Document {\n\t\t\t        render() {\n\t\t\t          return (\n\t\t\t            <Html>\n\t\t\t              <Head>\n\t\t\t                <meta charSet=\"utf-8\" />\n\t\t\t                <link\n\t\t\t                  href=\"https://fonts.googleapis.com/css2?family=Sarabun:ital,wght@0,400;0,700;1,400;1,700&display=swap\"\n\t\t\t                  rel=\"stylesheet\"\n\t\t\t                />\n\t\t\t              </Head>\n\t\t\t              <body>\n\t\t\t                <Main />\n\t\t\t                <NextScript />\n\t\t\t              </body>\n\t\t\t              <Head>\n\t\t\t                <script\n\t\t\t                  dangerouslySetInnerHTML={{\n\t\t\t                    __html: '',\n\t\t\t                  }}\n\t\t\t                />\n\t\t\t              </Head>\n\t\t\t            </Html>\n\t\t\t          )\n\t\t\t        }\n\t\t\t      }\n\n\t\t\t      export default MyDocument\n\t\t\t      "
 
-func TestNoDuplicateHeadReports(t *testing.T) {
-	t.Parallel()
+func TestNoDuplicateHeadReports(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name     string
@@ -51,7 +51,7 @@ func TestNoDuplicateHeadReports(t *testing.T) {
 		},
 		{
 			// Not upstream, and the axis the recorded research had backwards. oxc matches the
-			// specifier's LOCAL name, so an import whose *imported* name is `Header` but which
+			// specifier's local name, so an import whose *imported* name is `Header` but which
 			// binds locally to `Head` reports. Measured reporting.
 			name:     "aliased so the local name is Head",
 			fileName: "components/Shell.tsx",
@@ -91,7 +91,7 @@ func TestNoDuplicateHeadReports(t *testing.T) {
 		{
 			// Not upstream, and it exists because a mutant reading only `Declarations[0]` survived
 			// every other fixture here. Declaration merging gives one symbol two declarations, and
-			// the checker lists them in source order, so writing the interface FIRST puts the
+			// the checker lists them in source order, so writing the interface first puts the
 			// import at index 1 and a rule reading only the first declaration goes silent on an
 			// input the release binary reports. Measured both ways: the binary reports, and the
 			// probe confirmed the ordering flips with the source order.
@@ -116,16 +116,16 @@ func TestNoDuplicateHeadReports(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoDuplicateHead, testCase.fileName, testCase.source)
-			rule_testing.ExpectFindings(t, result, messageNoDuplicateHead.Id)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoDuplicateHead, testCase.fileName, testCase.source)
+			rule_testing.ExpectFindings(test, result, messageNoDuplicateHead.Id)
 		})
 	}
 }
 
-func TestNoDuplicateHeadIsSilent(t *testing.T) {
-	t.Parallel()
+func TestNoDuplicateHeadIsSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name     string
@@ -221,10 +221,10 @@ func TestNoDuplicateHeadIsSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoDuplicateHead, testCase.fileName, testCase.source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoDuplicateHead, testCase.fileName, testCase.source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -232,14 +232,14 @@ func TestNoDuplicateHeadIsSilent(t *testing.T) {
 // TestNoDuplicateHeadReportsOncePerFile pins the count, which is the question the corpus cannot
 // answer and the one a reader is most likely to get wrong.
 //
-// oxc accumulates labels and calls `ctx.diagnostic` once, so N copies produce ONE finding carrying N
+// oxc accumulates labels and calls `ctx.diagnostic` once, so N copies produce one finding carrying N
 // underlines. The two other readings are both natural designs: one finding per extra copy, which is
 // what `jsx-no-duplicate-props` in this tree does for a structurally similar question, and one per
 // pair. All three agree on a two-copy input, which is why the corpus cannot separate them, and they
 // disagree at three: one, two, and three respectively. Measured on the release oxlint binary at
 // three copies and again at four, both producing a single diagnostic.
-func TestNoDuplicateHeadReportsOncePerFile(t *testing.T) {
-	t.Parallel()
+func TestNoDuplicateHeadReportsOncePerFile(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -264,11 +264,11 @@ func TestNoDuplicateHeadReportsOncePerFile(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoDuplicateHead, "components/Shell.tsx", testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoDuplicateHead, "components/Shell.tsx", testCase.source)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("expected exactly one finding however many copies, got %d", len(result.Diagnostics))
+				test.Fatalf("expected exactly one finding however many copies, got %d", len(result.Diagnostics))
 			}
 		})
 	}
@@ -280,8 +280,8 @@ func TestNoDuplicateHeadReportsOncePerFile(t *testing.T) {
 // rather than the first, or at the whole element rather than its tag name, passes every fixture
 // above. oxc's diagnostic renders at the first `<Head`: the snapshot for the three-copy fail prints
 // `9:19`, and the underline is four bytes wide, the tag name alone.
-func TestNoDuplicateHeadPointsAtTheFirstOccurrence(t *testing.T) {
-	t.Parallel()
+func TestNoDuplicateHeadPointsAtTheFirstOccurrence(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -306,19 +306,23 @@ func TestNoDuplicateHeadPointsAtTheFirstOccurrence(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoDuplicateHead, "components/Shell.tsx", testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoDuplicateHead, "components/Shell.tsx", testCase.source)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("expected one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("expected one finding, got %d", len(result.Diagnostics))
 			}
 			diagnostic := result.Diagnostics[0]
 			reported := testCase.source[diagnostic.Range.Pos():diagnostic.Range.End()]
 			if reported != testCase.want {
-				t.Errorf("reported text = %q, want %q", reported, testCase.want)
+				test.Errorf("reported text = %q, want %q", reported, testCase.want)
 			}
 			if diagnostic.Range.Pos() != testCase.offset {
-				t.Errorf("reported at offset %d, want %d (the FIRST occurrence)", diagnostic.Range.Pos(), testCase.offset)
+				test.Errorf(
+					"reported at offset %d, want %d (the FIRST occurrence)",
+					diagnostic.Range.Pos(),
+					testCase.offset,
+				)
 			}
 		})
 	}
@@ -329,19 +333,22 @@ func TestNoDuplicateHeadPointsAtTheFirstOccurrence(t *testing.T) {
 // A `strings.Contains` predicate over an interpolated message is weaker than the property it
 // guards, so equality is asserted here. This message interpolates nothing, which is itself worth
 // pinning: a later edit adding a name into it would need this assertion updated deliberately.
-func TestNoDuplicateHeadMessageText(t *testing.T) {
-	t.Parallel()
+func TestNoDuplicateHeadMessageText(test *testing.T) {
+	test.Parallel()
 
 	source := "import { Head } from 'next/document'\nconst a = <div><Head/><Head/></div>\n"
-	result := rule_testing.RunTyped(t, NoDuplicateHead, "components/Shell.tsx", source)
+	result := rule_testing.RunTyped(test, NoDuplicateHead, "components/Shell.tsx", source)
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("expected one finding, got %d", len(result.Diagnostics))
+		test.Fatalf("expected one finding, got %d", len(result.Diagnostics))
 	}
 	if got := result.Diagnostics[0].Message.Description; got != messageNoDuplicateHead.Description {
-		t.Errorf("description = %q, want %q", got, messageNoDuplicateHead.Description)
+		test.Errorf("description = %q, want %q", got, messageNoDuplicateHead.Description)
 	}
-	if !strings.HasPrefix(messageNoDuplicateHead.Description, "This file renders the imported `Head` component more than once.") {
-		t.Errorf("description no longer opens by saying what is wrong: %q", messageNoDuplicateHead.Description)
+	if !strings.HasPrefix(
+		messageNoDuplicateHead.Description,
+		"This file renders the imported `Head` component more than once.",
+	) {
+		test.Errorf("description no longer opens by saying what is wrong: %q", messageNoDuplicateHead.Description)
 	}
 }
 
@@ -351,10 +358,10 @@ func TestNoDuplicateHeadMessageText(t *testing.T) {
 // goes completely silent: every StaysSilent case above would pass vacuously and every Fires case
 // would fail looking like a rule defect. A later revert of `NeedsTypeChecker` fails here loudly
 // instead.
-func TestNoDuplicateHeadNeedsTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestNoDuplicateHeadNeedsTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	if !NoDuplicateHead.NeedsTypeChecker {
-		t.Fatal("rule must declare NeedsTypeChecker; symbol identity is what separates a shadow from the import")
+		test.Fatal("rule must declare NeedsTypeChecker; symbol identity is what separates a shadow from the import")
 	}
 }

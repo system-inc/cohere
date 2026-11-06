@@ -76,38 +76,51 @@ func main() {
 	if *input == "" || *output == "" {
 		fail("-input and -output are both required")
 	}
-	raw, err := os.ReadFile(*input)
-	if err != nil {
-		fail("read %s: %v", *input, err)
+	raw, readError := os.ReadFile(*input)
+	if readError != nil {
+		fail("read %s: %v", *input, readError)
 	}
 	var file suggestionsFile
-	if err := json.Unmarshal(raw, &file); err != nil {
-		fail("parse %s: %v", *input, err)
+	if decodeError := json.Unmarshal(raw, &file); decodeError != nil {
+		fail("parse %s: %v", *input, decodeError)
 	}
-	if len(file.Functional) == 0 || len(file.Statics) == 0 || len(file.DefaultSpacingSuggestions) == 0 || len(file.SuggestedFractions) == 0 {
-		fail("%s is missing recipes, statics, the spacing scale or the fractions, so it is not a whole extraction", *input)
+	if len(file.Functional) == 0 ||
+		len(file.Statics) == 0 ||
+		len(file.DefaultSpacingSuggestions) == 0 ||
+		len(file.SuggestedFractions) == 0 {
+		fail(
+			"%s is missing recipes, statics, the spacing scale or the fractions, so it is not a whole extraction",
+			*input,
+		)
 	}
 
-	source, err := render(file)
-	if err != nil {
-		fail("render: %v", err)
+	source, renderError := render(file)
+	if renderError != nil {
+		fail("render: %v", renderError)
 	}
 
 	if *check {
-		existing, err := os.ReadFile(*output)
-		if err != nil {
-			fail("read %s: %v", *output, err)
+		existing, readError := os.ReadFile(*output)
+		if readError != nil {
+			fail("read %s: %v", *output, readError)
 		}
 		if !bytes.Equal(existing, source) {
 			fail("%s is stale: the engine's recipes changed, so regenerate it and read the diff", *output)
 		}
+		// Ignored: the check has passed, and the exit code says so whether or not this lands.
 		fmt.Fprintf(os.Stderr, "generate_suggestions: %s is current\n", *output)
 		return
 	}
-	if err := os.WriteFile(*output, source, 0o644); err != nil {
-		fail("write %s: %v", *output, err)
+	if writeError := os.WriteFile(*output, source, 0o644); writeError != nil {
+		fail("write %s: %v", *output, writeError)
 	}
-	fmt.Fprintf(os.Stderr, "generate_suggestions: %d functional roots, %d statics\n", len(file.Functional), len(file.Statics))
+	// Ignored: what it reports is already written, and a summary that cannot reach the terminal changes none of it.
+	fmt.Fprintf(
+		os.Stderr,
+		"generate_suggestions: %d functional roots, %d statics\n",
+		len(file.Functional),
+		len(file.Statics),
+	)
 }
 
 func render(file suggestionsFile) ([]byte, error) {
@@ -139,7 +152,12 @@ var SuggestedFractions = %s
 // it. The false ones are the deprecated spellings Tailwind still compiles and no longer offers, whose
 // `+"`suggest`"+` returns nothing.
 var FrameworkStaticSuggested = map[string]bool{
-`, file.TailwindVersion, file.ProbedNamespaces, stringSlice(file.DefaultSpacingSuggestions), stringSlice(file.SuggestedFractions))
+`,
+		file.TailwindVersion,
+		file.ProbedNamespaces,
+		stringSlice(file.DefaultSpacingSuggestions),
+		stringSlice(file.SuggestedFractions),
+	)
 
 	names := make([]string, 0, len(file.Statics))
 	for name := range file.Statics {
@@ -238,6 +256,7 @@ func stringSlice(values []string) string {
 }
 
 func fail(format string, arguments ...any) {
+	// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 	fmt.Fprintf(os.Stderr, "generate_suggestions: "+format+"\n", arguments...)
 	os.Exit(1)
 }

@@ -1,6 +1,7 @@
 package markdown
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -21,27 +22,27 @@ import (
 // proseWrapOracle formats markdown with the embedded bundles and a proseWrap of its own. Its answers are
 // recorded (see oracletest), so the runtime is built only when they are recorded again.
 type proseWrapOracle struct {
-	golden  *oracletest.Golden
-	once    sync.Once
-	runtime *goja.Runtime
-	err     error
+	golden    *oracletest.Golden
+	once      sync.Once
+	runtime   *goja.Runtime
+	loadError error
 }
 
-func newProseWrapOracle(t *testing.T) *proseWrapOracle {
-	t.Helper()
-	return &proseWrapOracle{golden: oracletest.Open(t, t.Name())}
+func newProseWrapOracle(test *testing.T) *proseWrapOracle {
+	test.Helper()
+	return &proseWrapOracle{golden: oracletest.Open(test, test.Name())}
 }
 
 func (oracle *proseWrapOracle) load() {
-	bundles, err := prettier.Bundles()
-	if err != nil {
-		oracle.err = err
+	bundles, bundlesError := prettier.Bundles()
+	if bundlesError != nil {
+		oracle.loadError = bundlesError
 		return
 	}
 	runtime := goja.New()
 	for _, name := range prettier.BundleFiles {
-		if _, err := runtime.RunString(string(bundles.Files[name])); err != nil {
-			oracle.err = fmt.Errorf("evaluating %s: %w", name, err)
+		if _, runStringError := runtime.RunString(string(bundles.Files[name])); runStringError != nil {
+			oracle.loadError = fmt.Errorf("evaluating %s: %w", name, runStringError)
 			return
 		}
 	}
@@ -54,26 +55,35 @@ func (oracle *proseWrapOracle) format(text string, options formatoptions.Options
 	key := oracletest.Key("proseWrap", text, "fixture.md", "markdown", fmt.Sprintf("%+v", options), proseWrap)
 	return oracle.golden.Answer(key, func() (string, error) {
 		oracle.once.Do(oracle.load)
-		if oracle.err != nil {
-			return "", oracle.err
+		if oracle.loadError != nil {
+			return "", oracle.loadError
 		}
 		return oracle.formatLive(text, options, proseWrap)
 	})
 }
 
-func (oracle *proseWrapOracle) formatLive(text string, options formatoptions.Options, proseWrap string) (string, error) {
-	oracle.runtime.Set("__source", text)
-	oracle.runtime.Set("__proseWrap", proseWrap)
-	oracle.runtime.Set("__printWidth", options.PrintWidth)
-	oracle.runtime.Set("__tabWidth", options.TabWidth)
-	oracle.runtime.Set("__useTabs", options.UseTabs)
-	oracle.runtime.Set("__singleQuote", options.SingleQuote)
-	value, err := oracle.runtime.RunString(`prettier.format(__source, {
+func (oracle *proseWrapOracle) formatLive(
+	text string,
+	options formatoptions.Options,
+	proseWrap string,
+) (string, error) {
+	setError := errors.Join(
+		oracle.runtime.Set("__source", text),
+		oracle.runtime.Set("__proseWrap", proseWrap),
+		oracle.runtime.Set("__printWidth", options.PrintWidth),
+		oracle.runtime.Set("__tabWidth", options.TabWidth),
+		oracle.runtime.Set("__useTabs", options.UseTabs),
+		oracle.runtime.Set("__singleQuote", options.SingleQuote),
+	)
+	if setError != nil {
+		return "", fmt.Errorf("setting the oracle's inputs: %w", setError)
+	}
+	value, runStringError := oracle.runtime.RunString(`prettier.format(__source, {
 		filepath: "fixture.md", parser: "markdown", plugins: prettierPlugins, proseWrap: __proseWrap,
 		printWidth: __printWidth, tabWidth: __tabWidth, useTabs: __useTabs, singleQuote: __singleQuote,
 	})`)
-	if err != nil {
-		return "", err
+	if runStringError != nil {
+		return "", runStringError
 	}
 	// prettier.format returns a promise; each RunString drains goja's job queue, so pump until settled.
 	promise, isPromise := value.Export().(*goja.Promise)
@@ -81,8 +91,8 @@ func (oracle *proseWrapOracle) formatLive(text string, options formatoptions.Opt
 		return value.String(), nil
 	}
 	for pump := 0; pump < 100000 && promise.State() == goja.PromiseStatePending; pump++ {
-		if _, err := oracle.runtime.RunString("0"); err != nil {
-			return "", err
+		if _, runStringError := oracle.runtime.RunString("0"); runStringError != nil {
+			return "", runStringError
 		}
 	}
 	if promise.State() != goja.PromiseStateFulfilled {
@@ -106,26 +116,32 @@ var proseWrapFixtures = []string{
 	"*a*\nb", "a\n*b*", "**中文**\nabc", "`a`\n中文", "a[^1]\nb\n\n[^1]: c\nd", "[^1]: a\n  b",
 }
 
-func TestProseWrapFixturesMatchOracle(t *testing.T) {
-	t.Parallel()
-	oracle := newProseWrapOracle(t)
+func TestProseWrapFixturesMatchOracle(test *testing.T) {
+	test.Parallel()
+	oracle := newProseWrapOracle(test)
 	for _, proseWrap := range []string{"always", "never", "preserve"} {
 		for variantIndex, options := range formatVariants {
 			for _, input := range append(append([]string{}, proseWrapFixtures...), formatFixtures...) {
 				if dependsOnEmbed(input) {
 					continue
 				}
-				expected, err := oracle.format(input, options, proseWrap)
-				if err != nil {
-					t.Fatalf("the oracle failed on %q: %v", input, err)
+				expected, formatError := oracle.format(input, options, proseWrap)
+				if formatError != nil {
+					test.Fatalf("the oracle failed on %q: %v", input, formatError)
 				}
-				actual, err := formatWithProseWrap(input, options, proseWrap, nil)
-				if err != nil {
-					t.Errorf("%s, variant %d, %q: %v", proseWrap, variantIndex, input, err)
+				actual, formatWithProseWrapError := formatWithProseWrap(input, options, proseWrap, nil)
+				if formatWithProseWrapError != nil {
+					test.Errorf("%s, variant %d, %q: %v", proseWrap, variantIndex, input, formatWithProseWrapError)
 					continue
 				}
 				if actual != expected {
-					t.Errorf("%s, variant %d, %q: %s", proseWrap, variantIndex, input, differential.FirstDifference(expected, actual))
+					test.Errorf(
+						"%s, variant %d, %q: %s",
+						proseWrap,
+						variantIndex,
+						input,
+						differential.FirstDifference(expected, actual),
+					)
 				}
 			}
 		}

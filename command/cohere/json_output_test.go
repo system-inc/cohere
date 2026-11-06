@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
+	"math"
 	"os"
 	"reflect"
 	"sort"
@@ -11,62 +13,91 @@ import (
 	"time"
 )
 
-func TestJSONLines(t *testing.T) {
-	t.Parallel()
+func TestJsonLines(test *testing.T) {
+	test.Parallel()
 	var out bytes.Buffer
-	finding := runFinding{Path: "/repo/a.ts", Line: 3, Column: 7, Severity: "error", Rule: "prefer-const", MessageID: "useConst", Message: "Use const."}
-	if err := writeJSONLine(&out, findingAsJSON(finding)); err != nil {
-		t.Fatal(err)
+	stream := bufio.NewWriter(&out)
+	finding := runFinding{
+		Path:      "/repo/a.ts",
+		Line:      3,
+		Column:    7,
+		Severity:  "error",
+		Rule:      "prefer-const",
+		MessageId: "useConst",
+		Message:   "Use const.",
 	}
-	for _, line := range changedFilesAsJSON([]changedFile{
+	writeJsonLine(stream, findingAsJson(finding))
+	for _, line := range changedFilesAsJson([]changedFile{
 		{Path: "b.ts", Fixed: true, Formatted: true, FixedBy: map[string]int{"prefer-const": 2, "object-shorthand": 1}},
 	}) {
-		if err := writeJSONLine(&out, line); err != nil {
-			t.Fatal(err)
-		}
+		writeJsonLine(stream, line)
 	}
+	flushStream(test, stream)
 	want := `{"kind":"finding","path":"/repo/a.ts","line":3,"column":7,"severity":"error","rule":"prefer-const","messageId":"useConst","message":"Use const."}
 {"kind":"fixed","path":"b.ts","rules":["object-shorthand","prefer-const"]}
 {"kind":"formatted","path":"b.ts"}
 `
 	if out.String() != want {
-		t.Errorf("lines:\n got\n%s want\n%s", out.String(), want)
+		test.Errorf("lines:\n got\n%s want\n%s", out.String(), want)
 	}
 }
 
-func TestJSONSummary(t *testing.T) {
-	t.Parallel()
+func TestJsonSummary(test *testing.T) {
+	test.Parallel()
 	summary := cleanSummary()
 	warmSummary(&summary)
 	summary.Findings = 2
 	summary.Changed = []changedFile{{Path: "b.ts", Fixed: true, Formatted: true}, {Path: "c.ts", Formatted: true}}
 	summary.Gaps.CrashedFiles = 1
 
-	encoded, err := json.Marshal(summaryAsJSON(summary))
-	if err != nil {
-		t.Fatal(err)
+	encoded, encodeError := json.Marshal(summaryAsJson(summary))
+	if encodeError != nil {
+		test.Fatal(encodeError)
 	}
-	var decoded map[string]any
-	if err := json.Unmarshal(encoded, &decoded); err != nil {
-		t.Fatal(err)
+	// The line is read back under the names a reader reads it by, spelled here apart from summaryJSON's tags, so
+	// a field written under another name reads as zero and fails the comparison, and one written as another kind
+	// fails the decode.
+	type phaseLine struct {
+		Name string `json:"name"`
 	}
-	for key, want := range map[string]any{
-		"kind": "summary", "schemaVersion": float64(outputSchemaVersion), "verdict": "fail", "seconds": 0.7,
-		"findings": float64(2), "filesFixed": float64(1), "filesFormatted": float64(2),
-		"cohered": float64(2), "checked": float64(3), "cached": float64(3923), "filesInScope": float64(3926), "rules": float64(480), "formattingSeconds": 0.02,
-	} {
-		if decoded[key] != want {
-			t.Errorf("summary %s = %v, want %v", key, decoded[key], want)
-		}
+	type gapsLine struct {
+		CrashedFiles int `json:"crashedFiles"`
 	}
-	if gaps := decoded["gaps"].(map[string]any); gaps["crashedFiles"] != float64(1) {
-		t.Errorf("the summary's gaps dropped the crashed file: %v", gaps)
+	type summaryLine struct {
+		Kind              string      `json:"kind"`
+		SchemaVersion     int         `json:"schemaVersion"`
+		Verdict           string      `json:"verdict"`
+		Seconds           float64     `json:"seconds"`
+		Findings          int         `json:"findings"`
+		FilesFixed        int         `json:"filesFixed"`
+		FilesFormatted    int         `json:"filesFormatted"`
+		Cohered           int         `json:"cohered"`
+		Checked           int         `json:"checked"`
+		Cached            int         `json:"cached"`
+		FilesInScope      int         `json:"filesInScope"`
+		Rules             int         `json:"rules"`
+		FormattingSeconds float64     `json:"formattingSeconds"`
+		Gaps              gapsLine    `json:"gaps"`
+		Phases            []phaseLine `json:"phases"`
 	}
-	if phases := decoded["phases"].([]any); len(phases) != 3 || phases[0].(map[string]any)["name"] != "fix" {
-		t.Errorf("phases: %v", phases)
+	var decoded summaryLine
+	if decodeError := json.Unmarshal(encoded, &decoded); decodeError != nil {
+		test.Fatal(decodeError)
 	}
-	if replay := summaryAsJSON(runSummary{Total: 50 * time.Millisecond, Cache: cacheUse{Replayed: true}}); !replay.Cache.Replayed || replay.Verdict != "pass" {
-		t.Errorf("a replay's summary: %+v", replay)
+	want := summaryLine{
+		Kind: "summary", SchemaVersion: outputSchemaVersion, Verdict: "fail", Seconds: 0.7,
+		Findings: 2, FilesFixed: 1, FilesFormatted: 2,
+		Cohered: 2, Checked: 3, Cached: 3923, FilesInScope: 3926, Rules: 480, FormattingSeconds: 0.02,
+		Gaps:   gapsLine{CrashedFiles: 1},
+		Phases: []phaseLine{{Name: "fix"}, {Name: "types"}, {Name: "lint"}},
+	}
+	if !reflect.DeepEqual(decoded, want) {
+		test.Errorf("the summary line:\n got %+v\nwant %+v", decoded, want)
+	}
+	if replay := summaryAsJson(
+		runSummary{Total: 50 * time.Millisecond, Cache: cacheUse{Replayed: true}},
+	); !replay.Cache.Replayed || replay.Verdict != "pass" {
+		test.Errorf("a replay's summary: %+v", replay)
 	}
 }
 
@@ -74,40 +105,47 @@ func TestJSONSummary(t *testing.T) {
 // every field a type writes is a property in the schema, every property is a field, and the required
 // list is exactly the fields that are never omitted. A field added to a type without the schema, or a
 // property the code stopped writing, fails here rather than in a consumer.
-func TestOutputSchemaMatchesTheTypes(t *testing.T) {
-	t.Parallel()
-	raw, err := os.ReadFile("../../schema/CohereOutput.schema.json")
-	if err != nil {
-		t.Fatal(err)
+func TestOutputSchemaMatchesTheTypes(test *testing.T) {
+	test.Parallel()
+	raw, readError := os.ReadFile("../../schema/CohereOutput.schema.json")
+	if readError != nil {
+		test.Fatal(readError)
 	}
 	var schema struct {
 		Defs map[string]schemaObject `json:"$defs"`
 	}
-	if err := json.Unmarshal(raw, &schema); err != nil {
-		t.Fatal(err)
+	if decodeError := json.Unmarshal(raw, &schema); decodeError != nil {
+		test.Fatal(decodeError)
 	}
 	summary := schema.Defs["summary"]
 	for name, check := range map[string]struct {
 		object schemaObject
 		value  any
 	}{
-		"finding":                     {schema.Defs["finding"], findingJSON{}},
-		"changedFile":                 {schema.Defs["changedFile"], changedFileJSON{}},
-		"summary":                     {summary, summaryJSON{}},
-		"summary.phase":               {*summary.Properties["phases"].Items, phaseJSON{}},
-		"summary.cache":               {summary.Properties["cache"], cacheUse{}},
-		"summary.gaps":                {summary.Properties["gaps"], runGaps{}},
-		"summary.gaps.uncheckedSwift": {*summary.Properties["gaps"].Properties["uncheckedSwift"].Items, uncheckedSwiftFile{}},
-		"summary.gaps.crashes":        {*summary.Properties["gaps"].Properties["crashes"].Items, runCrash{}},
+		"finding":       {schema.Defs["finding"], findingJson{}},
+		"changedFile":   {schema.Defs["changedFile"], changedFileJson{}},
+		"summary":       {summary, summaryJson{}},
+		"summary.phase": {*summary.Properties["phases"].Items, phaseJson{}},
+		"summary.cache": {summary.Properties["cache"], cacheUse{}},
+		"summary.gaps":  {summary.Properties["gaps"], runGaps{}},
+		"summary.gaps.uncheckedSwift": {
+			*summary.Properties["gaps"].Properties["uncheckedSwift"].Items,
+			uncheckedSwiftFile{},
+		},
+		"summary.gaps.crashes": {*summary.Properties["gaps"].Properties["crashes"].Items, runCrash{}},
+		"summary.gaps.withheldInDependencyCgo": {
+			*summary.Properties["gaps"].Properties["withheldInDependencyCgo"].Items,
+			withheldCgoFile{},
+		},
 	} {
 		fields, required := jsonFields(reflect.TypeOf(check.value))
 		if got := schemaPropertyNames(check.object.Properties); strings.Join(got, ",") != strings.Join(fields, ",") {
-			t.Errorf("%s: the schema's properties are %v, the type writes %v", name, got, fields)
+			test.Errorf("%s: the schema's properties are %v, the type writes %v", name, got, fields)
 		}
 		schemaRequired := append([]string(nil), check.object.Required...)
 		sort.Strings(schemaRequired)
 		if strings.Join(schemaRequired, ",") != strings.Join(required, ",") {
-			t.Errorf("%s: the schema requires %v, the type always writes %v", name, schemaRequired, required)
+			test.Errorf("%s: the schema requires %v, the type always writes %v", name, schemaRequired, required)
 		}
 	}
 }
@@ -149,4 +187,13 @@ func schemaPropertyNames(properties map[string]schemaObject) []string {
 	}
 	sort.Strings(keys)
 	return keys
+}
+
+// A value that does not encode is no line at all rather than a broken one. jsonLine also reports it to package
+// streams, which ends the run nonzero; that report is the process's, and no test here finishes the process.
+func TestAValueThatDoesNotEncodeIsNoLine(test *testing.T) {
+	test.Parallel()
+	if line := jsonLine(map[string]float64{"seconds": math.NaN()}); line != "" {
+		test.Errorf("a value JSON cannot hold printed %q", line)
+	}
 }

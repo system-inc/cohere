@@ -16,12 +16,13 @@ import (
 // exceeds its order length on 30 roots and a latched order on six. An emitter that dropped a
 // declaration, emitted one too many, or lost a `--tw-sort` changes the count or the order and fails
 // here, where a property-name comparison would see nothing.
-func TestMultiDeclarationEmittersAgreeWithTheMeasuredReading(t *testing.T) {
-	t.Parallel()
+func TestMultiDeclarationEmittersAgreeWithTheMeasuredReading(test *testing.T) {
+	test.Parallel()
 	const sentinel = "zzsentinel"
 
 	var agreed int
-	var disagreements, unported []string
+	var disagreements []string
+	var unported []string
 
 	for root, utility := range FrameworkMultiDeclarationUtilities {
 		emitted := utility.Emit(root, "", ResolvedUtilityValue{Value: sentinel})
@@ -31,7 +32,7 @@ func TestMultiDeclarationEmittersAgreeWithTheMeasuredReading(t *testing.T) {
 		}
 
 		sorted := PropertySort(emitted)
-		computed := Reading{Order: sorted.Order, Count: sorted.Count}
+		computed := Reading(sorted)
 		if readingsEqual(utility.Reading, computed) {
 			agreed++
 			continue
@@ -44,20 +45,29 @@ func TestMultiDeclarationEmittersAgreeWithTheMeasuredReading(t *testing.T) {
 	sort.Strings(disagreements)
 	sort.Strings(unported)
 
-	t.Logf("ported multi-declaration handles: %d roots in the table, %d compared, %d agreed, %d unported, %d disagreed",
-		len(FrameworkMultiDeclarationUtilities), agreed+len(disagreements), agreed, len(unported), len(disagreements))
+	test.Logf(
+		"ported multi-declaration handles: %d roots in the table, %d compared, %d agreed, %d unported, %d disagreed",
+		len(FrameworkMultiDeclarationUtilities),
+		agreed+len(disagreements),
+		agreed,
+		len(unported),
+		len(disagreements),
+	)
 
 	if len(FrameworkMultiDeclarationUtilities) != 152 {
-		t.Errorf("the table holds %d roots and this comparison was written against 152; the population moved and the assertions below were sized for the old one", len(FrameworkMultiDeclarationUtilities))
+		test.Errorf(
+			"the table holds %d roots and this comparison was written against 152; the population moved and the assertions below were sized for the old one",
+			len(FrameworkMultiDeclarationUtilities),
+		)
 	}
 	if agreed != 152 {
-		t.Errorf("%d of 152 roots agreed; the acceptance condition is every root, not a rate", agreed)
+		test.Errorf("%d of 152 roots agreed; the acceptance condition is every root, not a rate", agreed)
 	}
 	for _, root := range unported {
-		t.Errorf("%s is in the table and has no ported handle, so it emits nothing and reads nothing", root)
+		test.Errorf("%s is in the table and has no ported handle, so it emits nothing and reads nothing", root)
 	}
 	for _, disagreement := range disagreements {
-		t.Error(disagreement)
+		test.Error(disagreement)
 	}
 }
 
@@ -70,25 +80,29 @@ func TestMultiDeclarationEmittersAgreeWithTheMeasuredReading(t *testing.T) {
 // The population matters more than usual here. 34 roots declare literals and most of them agree with
 // their root, so a comparison that only visited the four divergent ones would still report a rate of
 // one and would miss an emitter that broke every agreeing literal.
-func TestMultiDeclarationLiteralsAgreeWithTheirMeasuredReading(t *testing.T) {
-	t.Parallel()
+func TestMultiDeclarationLiteralsAgreeWithTheirMeasuredReading(test *testing.T) {
+	test.Parallel()
 	const sentinel = "zzsentinel"
 
-	var agreed, divergent int
+	var agreed int
+	var divergent int
 	var disagreements []string
 
 	for root, utility := range FrameworkMultiDeclarationUtilities {
 		for literal, measured := range utility.LiteralReadings {
 			emitted := utility.Emit(root, literal, ResolvedUtilityValue{Value: sentinel})
 			if len(emitted) == 0 {
-				disagreements = append(disagreements, root+"-"+literal+": emits nothing, measured "+formatReading(measured))
+				disagreements = append(
+					disagreements,
+					root+"-"+literal+": emits nothing, measured "+formatReading(measured),
+				)
 				continue
 			}
 			if !measured.Equal(utility.Reading) {
 				divergent++
 			}
 			sorted := PropertySort(emitted)
-			computed := Reading{Order: sorted.Order, Count: sorted.Count}
+			computed := Reading(sorted)
 			if readingsEqual(measured, computed) {
 				agreed++
 				continue
@@ -100,19 +114,25 @@ func TestMultiDeclarationLiteralsAgreeWithTheirMeasuredReading(t *testing.T) {
 	}
 
 	sort.Strings(disagreements)
-	t.Logf("literals: %d compared, %d agreed, %d of them read differently from their root, %d disagreed",
+	test.Logf("literals: %d compared, %d agreed, %d of them read differently from their root, %d disagreed",
 		agreed+len(disagreements), agreed, divergent, len(disagreements))
 
 	if agreed+len(disagreements) < 60 {
-		t.Errorf("only %d literals were compared; the table declares far more, so this measured the wrong population", agreed+len(disagreements))
+		test.Errorf(
+			"only %d literals were compared; the table declares far more, so this measured the wrong population",
+			agreed+len(disagreements),
+		)
 	}
 	// Named rather than left implicit: these four are the whole reason literal emitters exist, and a
 	// count that drops to zero means the divergence stopped being exercised.
 	if divergent != 4 {
-		t.Errorf("%d literals read differently from their root; four do at 4.3.3 (divide-none, ease-initial, transition-none, translate-none), so the branch coverage moved", divergent)
+		test.Errorf(
+			"%d literals read differently from their root; four do at 4.3.3 (divide-none, ease-initial, transition-none, translate-none), so the branch coverage moved",
+			divergent,
+		)
 	}
 	for _, disagreement := range disagreements {
-		t.Error(disagreement)
+		test.Error(disagreement)
 	}
 }
 
@@ -121,32 +141,36 @@ func TestMultiDeclarationLiteralsAgreeWithTheirMeasuredReading(t *testing.T) {
 // A literal whose declaration list matches its root's needs no entry, and adding one anyway would be
 // a second copy of the same fact that nothing forces to stay in step. So an override that agrees
 // with its root's ordinary path is a defect rather than harmless duplication.
-func TestMultiDeclarationLiteralsAreOnlyListedWhenTheyDiffer(t *testing.T) {
-	t.Parallel()
+func TestMultiDeclarationLiteralsAreOnlyListedWhenTheyDiffer(test *testing.T) {
+	test.Parallel()
 	const sentinel = "zzsentinel"
 
 	listed := 0
 	for root, byLiteral := range frameworkMultiLiteralEmitters {
 		utility, known := FrameworkMultiDeclarationUtilities[root]
 		if !known {
-			t.Errorf("%s has literal emitters and is not in the table", root)
+			test.Errorf("%s has literal emitters and is not in the table", root)
 			continue
 		}
 		for literal, emitter := range byLiteral {
 			listed++
 			ordinary := PropertySort(utility.Emit(root, "", ResolvedUtilityValue{Value: sentinel}))
 			override := PropertySort(emitter(ResolvedUtilityValue{Value: sentinel}))
-			if readingsEqual(Reading{Order: ordinary.Order, Count: ordinary.Count}, Reading{Order: override.Order, Count: override.Count}) {
-				t.Errorf("%s-%s is listed as an override and reads the same as its root, so the entry restates a fact rather than correcting one", root, literal)
+			if readingsEqual(Reading(ordinary), Reading(override)) {
+				test.Errorf(
+					"%s-%s is listed as an override and reads the same as its root, so the entry restates a fact rather than correcting one",
+					root,
+					literal,
+				)
 			}
 			if _, measured := utility.LiteralReadings[literal]; !measured {
-				t.Errorf("%s-%s has an override and no measured reading, so nothing checks it", root, literal)
+				test.Errorf("%s-%s has an override and no measured reading, so nothing checks it", root, literal)
 			}
 		}
 	}
-	t.Logf("%d literal overrides listed", listed)
+	test.Logf("%d literal overrides listed", listed)
 	if listed != 4 {
-		t.Errorf("%d overrides listed; four literals diverge at 4.3.3", listed)
+		test.Errorf("%d overrides listed; four literals diverge at 4.3.3", listed)
 	}
 }
 
@@ -159,12 +183,12 @@ func TestMultiDeclarationLiteralsAreOnlyListedWhenTheyDiffer(t *testing.T) {
 // Asserted on the readings directly, because the latch is the one part of this port where removing
 // a declaration and removing the redirect produce different failures, and a test that only compared
 // counts would not tell them apart.
-func TestSortLatchIsObservableInTheMultiTable(t *testing.T) {
-	t.Parallel()
+func TestSortLatchIsObservableInTheMultiTable(test *testing.T) {
+	test.Parallel()
 	for _, root := range []string{"divide", "divide-x", "divide-y", "space-x", "space-y", "placeholder"} {
 		utility, known := FrameworkMultiDeclarationUtilities[root]
 		if !known {
-			t.Errorf("%s is not in the table", root)
+			test.Errorf("%s is not in the table", root)
 			continue
 		}
 		emitted := utility.Emit(root, "", ResolvedUtilityValue{Value: "zzsentinel"})
@@ -177,15 +201,20 @@ func TestSortLatchIsObservableInTheMultiTable(t *testing.T) {
 			leading = leading[0].Nodes
 		}
 		if len(leading) == 0 || leading[0].Property != "--tw-sort" {
-			t.Errorf("%s does not lead with a --tw-sort declaration, so its order cannot latch", root)
+			test.Errorf("%s does not lead with a --tw-sort declaration, so its order cannot latch", root)
 			continue
 		}
 		sorted := PropertySort(emitted)
 		if len(sorted.Order) != 1 {
-			t.Errorf("%s reads %d positions; the latch should hold it to one", root, len(sorted.Order))
+			test.Errorf("%s reads %d positions; the latch should hold it to one", root, len(sorted.Order))
 		}
 		if sorted.Count <= len(sorted.Order) {
-			t.Errorf("%s reads %d positions at count %d; a latched root counts more declarations than it positions", root, len(sorted.Order), sorted.Count)
+			test.Errorf(
+				"%s reads %d positions at count %d; a latched root counts more declarations than it positions",
+				root,
+				len(sorted.Order),
+				sorted.Count,
+			)
 		}
 	}
 
@@ -195,7 +224,10 @@ func TestSortLatchIsObservableInTheMultiTable(t *testing.T) {
 	emitted := size.Emit("size", "", ResolvedUtilityValue{Value: "zzsentinel"})
 	sorted := PropertySort(emitted)
 	if len(sorted.Order) != 2 {
-		t.Errorf("size reads %d positions; its --tw-sort names `size`, which PropertyOrder does not know, so it does not latch and width and height both contribute", len(sorted.Order))
+		test.Errorf(
+			"size reads %d positions; its --tw-sort names `size`, which PropertyOrder does not know, so it does not latch and width and height both contribute",
+			len(sorted.Order),
+		)
 	}
 }
 
@@ -205,8 +237,8 @@ func TestSortLatchIsObservableInTheMultiTable(t *testing.T) {
 // outside `PropertyOrder` or because a `--tw-sort` latched. That gap is the thing a property-name
 // table could not express and the reason these roots carried a measured reading, so it is asserted
 // rather than left to the acceptance test to imply.
-func TestMultiDeclarationCountsExceedOrderWhereMeasured(t *testing.T) {
-	t.Parallel()
+func TestMultiDeclarationCountsExceedOrderWhereMeasured(test *testing.T) {
+	test.Parallel()
 	const sentinel = "zzsentinel"
 
 	measuredGap, emittedGap := 0, 0
@@ -220,11 +252,15 @@ func TestMultiDeclarationCountsExceedOrderWhereMeasured(t *testing.T) {
 		}
 	}
 
-	t.Logf("roots reading fewer positions than declarations: %d measured, %d emitted", measuredGap, emittedGap)
+	test.Logf("roots reading fewer positions than declarations: %d measured, %d emitted", measuredGap, emittedGap)
 	if measuredGap != emittedGap {
-		t.Errorf("%d roots are measured with a count above their order length and %d emit that way; the ported handles disagree with the table about which roots have invisible declarations", measuredGap, emittedGap)
+		test.Errorf(
+			"%d roots are measured with a count above their order length and %d emit that way; the ported handles disagree with the table about which roots have invisible declarations",
+			measuredGap,
+			emittedGap,
+		)
 	}
 	if measuredGap < 25 {
-		t.Errorf("only %d roots show the gap; 30 do at 4.3.3, so this measured the wrong population", measuredGap)
+		test.Errorf("only %d roots show the gap; 30 do at 4.3.3, so this measured the wrong population", measuredGap)
 	}
 }

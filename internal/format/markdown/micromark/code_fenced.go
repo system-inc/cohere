@@ -13,15 +13,30 @@ func tokenizeCodeFenced(self *Self, effects *Effects, ok State, nok State) State
 	sizeOpen := 0
 	var marker Code
 
-	var start, beforeSequenceOpen, sequenceOpen, infoBefore, info, metaBefore, meta, atNonLazyBreak,
-		contentBefore, contentStart, beforeContentChunk, contentChunk, after State
+	var start State
+	var beforeSequenceOpen State
+	var sequenceOpen State
+	var infoBefore State
+	var info State
+	var metaBefore State
+	var meta State
+	var atNonLazyBreak State
+	var contentBefore State
+	var contentStart State
+	var beforeContentChunk State
+	var contentChunk State
+	var after State
 
 	// closeStart is upstream's `closeStart`, declared inside tokenizeCodeFenced because its tokenizer
 	// closes over `marker` and `sizeOpen`, and reads `self.parser` from the outer context.
 	closeStart := &Construct{Partial: true, Tokenize: func(_ *Self, effects *Effects, ok State, nok State) State {
 		size := 0
 
-		var startBefore, start, beforeSequenceClose, sequenceClose, sequenceCloseAfter State
+		var startBefore State
+		var start State
+		var beforeSequenceClose State
+		var sequenceClose State
+		var sequenceCloseAfter State
 
 		startBefore = func(code Code) State {
 			effects.Enter(TypeLineEnding, nil)
@@ -38,11 +53,11 @@ func tokenizeCodeFenced(self *Self, effects *Effects, ok State, nok State) State
 			effects.Enter(TypeCodeFencedFence, nil)
 			if markdownSpace(code) {
 				// Upstream passes `undefined` (no limit) when codeIndented is disabled, else 4.
-				max := tabSize
+				maximum := tabSize
 				if slices.Contains(self.Parser.Constructs.Disable, "codeIndented") {
-					max = 0
+					maximum = 0
 				}
-				return factorySpace(effects, beforeSequenceClose, TypeLinePrefix, max)(code)
+				return factorySpace(effects, beforeSequenceClose, TypeLinePrefix, maximum)(code)
 			}
 			return beforeSequenceClose(code)
 		}
@@ -120,7 +135,7 @@ func tokenizeCodeFenced(self *Self, effects *Effects, ok State, nok State) State
 			return sequenceOpen
 		}
 
-		if sizeOpen < codeFencedSequenceSizeMin {
+		if sizeOpen < codeFencedSequenceSizeMinimum {
 			return nok(code)
 		}
 
@@ -247,7 +262,8 @@ func tokenizeCodeFenced(self *Self, effects *Effects, ok State, nok State) State
 }
 
 func tokenizeCodeFencedNonLazyContinuation(self *Self, effects *Effects, ok State, nok State) State {
-	var start, lineStart State
+	var start State
+	var lineStart State
 
 	start = func(code Code) State {
 		if code == CodeEof {

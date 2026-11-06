@@ -100,11 +100,11 @@ type NoUselessEscapeOptions struct {
 // where a backslash is a literal backslash and the language never read it as an escape, so there is
 // nothing useless about it. The second is a real string literal that merely sits inside JSX. The
 // difference is visible as the literal's parent and nothing else.
-var NoUselessEscape = rule.Rule{
+var NoUselessEscape = rule.Rule[NoUselessEscapeOptions]{
 	Name: "no-useless-escape",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoUselessEscapeOptions]) rule.Listeners {
 		allowed := map[rune]bool{}
-		if configured, isConfigured := rule.OptionsAs[NoUselessEscapeOptions](options); isConfigured {
+		if configured, isConfigured := options.Read(); isConfigured {
 			for _, entry := range configured.AllowRegexCharacters {
 				// One character per entry. A longer string can never equal a single escaped
 				// character, so admitting it would widen nothing and hide a typo in the configuration.
@@ -115,9 +115,9 @@ var NoUselessEscape = rule.Rule{
 		}
 
 		report := func(start int, end int, escaped string) {
-			ctx.Report(rule.Diagnostic{
+			ruleContext.Report(rule.Diagnostic{
 				Range:      core.NewTextRange(start, end),
-				SourceFile: ctx.SourceFile,
+				SourceFile: ruleContext.SourceFile,
 				Message: rule.Message{
 					Id: "noUselessEscape",
 					Description: fmt.Sprintf(
@@ -147,8 +147,8 @@ var NoUselessEscape = rule.Rule{
 				if node.Parent != nil && node.Parent.Kind == ast.KindJsxAttribute {
 					return
 				}
-				literalRange := rule.TokenRange(ctx.SourceFile, node)
-				raw := ctx.SourceFile.Text()[literalRange.Pos():literalRange.End()]
+				literalRange := rule.TokenRange(ruleContext.SourceFile, node)
+				raw := ruleContext.SourceFile.Text()[literalRange.Pos():literalRange.End()]
 				reportQuoted(literalRange.Pos(), raw, uselessStringEscapes(raw))
 			},
 
@@ -156,8 +156,8 @@ var NoUselessEscape = rule.Rule{
 				if isTaggedTemplateBody(node) {
 					return
 				}
-				literalRange := rule.TokenRange(ctx.SourceFile, node)
-				raw := ctx.SourceFile.Text()[literalRange.Pos():literalRange.End()]
+				literalRange := rule.TokenRange(ruleContext.SourceFile, node)
+				raw := ruleContext.SourceFile.Text()[literalRange.Pos():literalRange.End()]
 				reportQuoted(literalRange.Pos(), raw, uselessTemplateEscapes(raw))
 			},
 
@@ -166,8 +166,8 @@ var NoUselessEscape = rule.Rule{
 					return
 				}
 				for _, part := range templateTextParts(node) {
-					partRange := rule.TokenRange(ctx.SourceFile, part)
-					raw := ctx.SourceFile.Text()[partRange.Pos():partRange.End()]
+					partRange := rule.TokenRange(ruleContext.SourceFile, part)
+					raw := ruleContext.SourceFile.Text()[partRange.Pos():partRange.End()]
 					reportQuoted(partRange.Pos(), raw, uselessTemplateEscapes(raw))
 				}
 			},
@@ -409,6 +409,8 @@ func uselessPatternEscapes(pattern string, flags regexsyntax.RegexFlags) []int {
 // ask where this escape sits relative to *its own* class's brackets. Under the `v` flag classes
 // nest, and the innermost is the one that answers: in `/[[\.&]--[\.&]]/v` each dot sits at the start
 // of an inner class, not of the outer one.
+//
+// Mutates: offsets the walk appends every useless escape it finds, so one slice gathers every nested class
 func scanEscapes(pattern string, flags regexsyntax.RegexFlags, enclosing *classSpan, offsets *[]int) {
 	end := len(pattern)
 	start := 0
@@ -511,7 +513,13 @@ func isUselessPatternEscape(pattern string, index int, flags regexsyntax.RegexFl
 // The caret carries an extra condition, and it is the reason this cannot be a symmetric test. A
 // caret at the very start of a negated class is the negation rather than a member, so a `^` escaped
 // immediately after it is not separating a pair at all and stays a finding.
-func isReservedDoublePunctuatorEscape(pattern string, escapeStart int, escapeEnd int, escaped rune, enclosing *classSpan) bool {
+func isReservedDoublePunctuatorEscape(
+	pattern string,
+	escapeStart int,
+	escapeEnd int,
+	escaped rune,
+	enclosing *classSpan,
+) bool {
 	if !strings.ContainsRune(regexClassSetReservedDoublePuncts, escaped) {
 		return false
 	}

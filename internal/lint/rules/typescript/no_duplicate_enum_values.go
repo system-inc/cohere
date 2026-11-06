@@ -45,9 +45,10 @@ var messageNoDuplicateEnumValues = rule.Message{
 //     not fixed it. Six more commented-out fail cases sit beside it, all of them signs or coercions.
 //     Reproduced as silence rather than improved on, and the corpus pins the observable half:
 //     `A = -0, B = +0` and `A = -+-0, B = +-+0` are both shipped passing cases.
-//   - A template literal is a different node even with no substitution. `A = 'A', B = `+"`A`"+` is
-//     silent, and upstream marks that with a literal `TODO: Fix the following cases where there is a
-//     raw template literal` above two commented-out fail cases. `@typescript-eslint` **does** resolve
+//   - A template literal is a different node even with no substitution. `A = 'A'` beside a `B` set
+//     to the same text as a template literal is silent, and upstream marks that with a literal
+//     `TODO: Fix the following cases where there is a raw template literal` above two commented-out
+//     fail cases. `@typescript-eslint` **does** resolve
 //     a substitution-free template, so this is a real behavioral difference between the two
 //     upstreams and oxc's answer is the one that ships here.
 //   - A BigInt is `KindBigIntLiteral`, a separate kind, so `A = 1n, B = 1n` is silent in both tools.
@@ -110,11 +111,11 @@ var messageNoDuplicateEnumValues = rule.Message{
 // is what this reproduces. The member name lives in the message description rather than in a format
 // verb, because `rule.Message` has no interpolation layer, so the identifying detail a reader needs
 // is the span rather than the text.
-var NoDuplicateEnumValues = rule.Rule{
+var NoDuplicateEnumValues = rule.Rule[rule.NoOptions]{
 	// No namespace prefix. The config writes `typescript/no-duplicate-enum-values` and the parity
 	// guard strips the namespace on a `/` boundary.
 	Name: "@typescript-eslint/no-duplicate-enum-values",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindEnumDeclaration: func(node *ast.Node) {
 				declaration := node.AsEnumDeclaration()
@@ -147,7 +148,7 @@ var NoDuplicateEnumValues = rule.Rule{
 					case ast.KindNumericLiteral:
 						text := initializer.AsNumericLiteral().Text
 						if earlier, duplicated := seenNumbers[text]; duplicated {
-							ctx.ReportNode(earlier, messageNoDuplicateEnumValues)
+							ruleContext.ReportNode(earlier, messageNoDuplicateEnumValues)
 							// Deliberately not rewritten. Upstream's number table is a vector it
 							// appends to only when the value is new, so a third copy reports
 							// against the first rather than the second.
@@ -158,7 +159,7 @@ var NoDuplicateEnumValues = rule.Rule{
 					case ast.KindStringLiteral:
 						text := initializer.AsStringLiteral().Text
 						if earlier, duplicated := seenStrings[text]; duplicated {
-							ctx.ReportNode(earlier, messageNoDuplicateEnumValues)
+							ruleContext.ReportNode(earlier, messageNoDuplicateEnumValues)
 						}
 						// Written on every hit, duplicate or not, which is what makes a third copy
 						// report against the second. Upstream's `insert` returns the displaced

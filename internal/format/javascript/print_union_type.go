@@ -1,11 +1,14 @@
 package javascript
 
-import "github.com/system-inc/cohere/internal/format/printing"
+import (
+	"github.com/system-inc/cohere/internal/format/doc"
+	"github.com/system-inc/cohere/internal/format/printing"
+)
 
 // print/union-type.js and print/intersection-type.js.
 
 // printUnionType is upstream's printUnionType, for `TSUnionType` and `UnionTypeAnnotation`.
-func printUnionType(path *Path, options *Options, print PrintFunc, args *printArguments) Doc {
+func printUnionType(path *Path, options *Options, print PrintFunc, arguments *printArguments) Doc {
 	current := node(path)
 
 	// {
@@ -13,7 +16,7 @@ func printUnionType(path *Path, options *Options, print PrintFunc, args *printAr
 	// } | null | void
 	// should be inlined and not be printed in the multi-line variant
 	if shouldHugUnionType(current) {
-		return join(" | ", printAll(path, print, "types"))
+		return join(doc.Text(" | "), printAll(path, print, "types"))
 	}
 
 	// single-line variation
@@ -28,20 +31,20 @@ func printUnionType(path *Path, options *Options, print PrintFunc, args *printAr
 	// | child1
 	// // comment
 	// | child2
-	var printed Doc = groupIn(path, mapPath(path, func(path *Path, _ int) Doc {
+	var printed Doc = groupIn(path, doc.Concat(mapPath(path, func(path *Path, _ int) Doc {
 		var bar Doc
 		if path.IsFirst() {
-			bar = ifBreak("| ", "")
+			bar = ifBreak(doc.Text("| "), doc.Text(""))
 		} else {
-			bar = concatIn(path, line, "| ")
+			bar = concatIn(path, line, doc.Text("| "))
 		}
-		typeDoc := print(nil, nil)
+		typeDoc := print("", nil)
 		if hasComment(node(path), commentLeading, nil) {
 			return concatIn(path, bar, align(2, printing.PrintComments(path, typeDoc, options, nil)))
 		}
 
 		return concatIn(path, bar, printing.PrintComments(path, align(2, typeDoc), options, nil))
-	}, "types"),
+	}, "types")),
 	)
 
 	if shouldUnionTypePrintOwnComments(path) {
@@ -53,14 +56,19 @@ func printUnionType(path *Path, options *Options, print PrintFunc, args *printAr
 	}
 
 	if isMultipleTupleTypeElement(path) {
-		return groupIn(path, concatIn(path, indentIn(path, concatIn(path, ifBreak(concatIn(path, "(", softline), ""), printed)),
-			softline,
-			ifBreak(")", ""),
-		))
+		return groupIn(
+			path,
+			concatIn(
+				path,
+				indentIn(path, concatIn(path, ifBreak(concatIn(path, doc.Text("("), softline), doc.Text("")), printed)),
+				softline,
+				ifBreak(doc.Text(")"), doc.Text("")),
+			),
+		)
 	}
 
 	// Already indent in parent
-	if (args != nil && args.assignmentLayout == "break-after-operator") ||
+	if (arguments != nil && arguments.assignmentLayout == "break-after-operator") ||
 		!shouldIndentUnionType(path) {
 		return printed
 	}
@@ -88,8 +96,8 @@ func shouldIndentUnionType(path *Path) bool {
 // `IntersectionTypeAnnotation`.
 func printIntersectionType(path *Path, options *Options, print PrintFunc) Doc {
 	wasIndented := false
-	return groupIn(path, mapPath(path, func(path *Path, index int) Doc {
-		printed := print(nil, nil)
+	return groupIn(path, doc.Concat(mapPath(path, func(path *Path, index int) Doc {
+		printed := print("", nil)
 		if path.IsFirst() {
 			return printed
 		}
@@ -100,9 +108,9 @@ func printIntersectionType(path *Path, options *Options, print PrintFunc) Doc {
 		// If both are objects, don't indent
 		if previousIsObjectType && currentIsObjectType {
 			if wasIndented {
-				return concatIn(path, " & ", indentIn(path, printed))
+				return concatIn(path, doc.Text(" & "), indentIn(path, printed))
 			}
-			return concatIn(path, " & ", printed)
+			return concatIn(path, doc.Text(" & "), printed)
 		}
 
 		if
@@ -110,7 +118,7 @@ func printIntersectionType(path *Path, options *Options, print PrintFunc) Doc {
 		(!previousIsObjectType && !currentIsObjectType) ||
 			hasLeadingOwnLineComment(options.OriginalText, node(path)) {
 			// experimentalOperatorPosition is always "end", so upstream's "start" branch is dropped.
-			return indentIn(path, concatIn(path, " &", line, printed))
+			return indentIn(path, concatIn(path, doc.Text(" &"), line, printed))
 		}
 
 		// If you go from object to non-object or vis-versa, then inline it
@@ -119,9 +127,9 @@ func printIntersectionType(path *Path, options *Options, print PrintFunc) Doc {
 		}
 
 		if index > 1 {
-			return concatIn(path, " & ", indentIn(path, printed))
+			return concatIn(path, doc.Text(" & "), indentIn(path, printed))
 		}
-		return concatIn(path, " & ", printed)
-	}, "types"),
+		return concatIn(path, doc.Text(" & "), printed)
+	}, "types")),
 	)
 }

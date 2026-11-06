@@ -15,13 +15,13 @@ import (
 // could compare a diagnostic against by identity.
 const messageMaxNestedCallbacksId = "exceed"
 
-// maxNestedCallbacksMessage renders the finding.
+// maximumNestedCallbacksMessage renders the finding.
 //
 // Upstream's template is `Too many nested callbacks ({{num}}). Maximum allowed is {{max}}.` Both
 // values move and both are integers, so passing them in the wrong order renders a sentence that
 // reads perfectly and says the opposite thing. That is why the tests assert the rendered string
 // rather than only the id.
-func maxNestedCallbacksMessage(depth int, maximum int) rule.Message {
+func maximumNestedCallbacksMessage(depth int, maximum int) rule.Message {
 	return rule.Message{
 		Id: messageMaxNestedCallbacksId,
 		Description: fmt.Sprintf("Too many nested callbacks (%d). Maximum allowed is %d. "+
@@ -57,13 +57,13 @@ func DefaultMaxNestedCallbacksSettings() MaxNestedCallbacksOptions {
 	}
 }
 
-// maxNestedCallbacksObjectShape is the object arm of upstream's `oneOf`.
+// maximumNestedCallbacksObjectShape is the object arm of upstream's `oneOf`.
 //
 // Both spellings of the limit are carried because upstream accepts both and prefers `maximum`, and
 // the preference is expressed in a way that has an observable defect. See the decoder.
-type maxNestedCallbacksObjectShape struct {
+type maximumNestedCallbacksObjectShape struct {
 	Maximum                       *int  `json:"maximum"`
-	Max                           *int  `json:"max"`
+	DeprecatedMaximum             *int  `json:"max"`
 	CheckConstructorCallCallbacks *bool `json:"checkConstructorCallCallbacks"`
 }
 
@@ -73,14 +73,14 @@ type maxNestedCallbacksObjectShape struct {
 // default is not the zero value, and the two spellings of the limit interact in a way no struct tag
 // can express.
 //
-// The value may be a bare INTEGER: cohere's config layer strips the severity tuple, so a config
+// The value may be a bare integer: cohere's config layer strips the severity tuple, so a config
 // writing `["error", 3]` hands this the JSON `3`, which no struct can unmarshal.
 //
-// An ABSENT value must mean 10 rather than 0. A rule configured as a bare `"error"` reaches the
+// An absent value must mean 10 rather than 0. A rule configured as a bare `"error"` reaches the
 // decoder with empty input, and a plain int field would read that as a limit of zero, reporting
 // every callback in the tree. That is the live config's own shape, so it is the ordinary path.
 //
-// An object with NEITHER key must also mean 10. Upstream reaches the object arm only when
+// An object with neither key must also mean 10. Upstream reaches the object arm only when
 // `Object.hasOwn(option, "maximum") || Object.hasOwn(option, "max")`, so `{}` and
 // `{checkConstructorCallCallbacks: true}` both leave the limit at ten. Measured against the
 // installed build at 10.8.1: `[{}]` is clean on a two-deep nest that `[{max: 1}]` reports.
@@ -88,7 +88,7 @@ type maxNestedCallbacksObjectShape struct {
 // # An upstream defect this reproduces
 //
 // Upstream resolves the two spellings with `option.maximum || option.max`, which is a truthiness
-// test rather than a presence test, so a `maximum` of ZERO falls through to `max`. Measured:
+// test rather than a presence test, so a `maximum` of zero falls through to `max`. Measured:
 //
 //	[{maximum: 0, max: 5}]   clean on a one-deep callback, so the limit in force is 5
 //	[{maximum: 5, max: 1}]   clean on a two-deep nest, so the limit in force is 5
@@ -98,7 +98,7 @@ type maxNestedCallbacksObjectShape struct {
 // than corrected, because a port that quietly disagrees with the tool it is compared against turns
 // a shared defect into a divergence nobody can see. The intuitive reading is that an explicit 0
 // wins, and it is wrong.
-func DecodeMaxNestedCallbacksOptions(raw []byte) (any, error) {
+func DecodeMaxNestedCallbacksOptions(raw []byte) (MaxNestedCallbacksOptions, error) {
 	if len(raw) == 0 {
 		return DefaultMaxNestedCallbacksSettings(), nil
 	}
@@ -108,7 +108,7 @@ func DecodeMaxNestedCallbacksOptions(raw []byte) (any, error) {
 	// The integer arm first, because it is the narrower shape: a JSON number cannot also decode as
 	// an object, so trying it first cannot swallow a case belonging to the other arm.
 	var configuredMaximum int
-	if err := json.Unmarshal(raw, &configuredMaximum); err == nil {
+	if decodeError := json.Unmarshal(raw, &configuredMaximum); decodeError == nil {
 		if configuredMaximum < 0 {
 			return DefaultMaxNestedCallbacksSettings(), fmt.Errorf(
 				"max-nested-callbacks takes a maximum of at least 0, got %d", configuredMaximum)
@@ -117,21 +117,21 @@ func DecodeMaxNestedCallbacksOptions(raw []byte) (any, error) {
 		return settings, nil
 	}
 
-	var object maxNestedCallbacksObjectShape
-	if err := rule.UnmarshalOptions(raw, &object); err != nil {
-		return DefaultMaxNestedCallbacksSettings(), err
+	var object maximumNestedCallbacksObjectShape
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &object); unmarshalOptionsError != nil {
+		return DefaultMaxNestedCallbacksSettings(), unmarshalOptionsError
 	}
 	// `option.maximum || option.max`, truthiness and all. A zero `maximum` is falsy in JavaScript
 	// and falls through to `max`; only when both are absent or both are zero does the default stand.
 	var resolved *int
 	if object.Maximum != nil && *object.Maximum != 0 {
 		resolved = object.Maximum
-	} else if object.Max != nil && *object.Max != 0 {
-		resolved = object.Max
+	} else if object.DeprecatedMaximum != nil && *object.DeprecatedMaximum != 0 {
+		resolved = object.DeprecatedMaximum
 	} else if object.Maximum != nil {
 		resolved = object.Maximum
-	} else if object.Max != nil {
-		resolved = object.Max
+	} else if object.DeprecatedMaximum != nil {
+		resolved = object.DeprecatedMaximum
 	}
 	if resolved != nil {
 		if *resolved < 0 {
@@ -156,12 +156,12 @@ func DecodeMaxNestedCallbacksOptions(raw []byte) (any, error) {
 //
 // # What counts, and what the depth is counted over
 //
-// Only a function that is an ARGUMENT to a call counts. A function that is the callee does not, so
+// Only a function that is an argument to a call counts. A function that is the callee does not, so
 // an immediately invoked expression is clean at a limit of zero, and neither does a function stored
 // in a variable, held in an object property, or used as a method body. Those all appear in the
 // corpus and each one is a class of false positive a looser reading would ship.
 //
-// The count is the depth of the callback CHAIN rather than the number of callbacks in the file.
+// The count is the depth of the callback chain rather than the number of callbacks in the file.
 // Upstream pushes on entering such a function and pops on leaving it, so two callbacks side by side
 // at the same level each reach depth one. Three of upstream's invalid cases exist only to pin this:
 // each writes a function declaration or an unrelated callback beside the nest and asserts a single
@@ -178,7 +178,7 @@ func DecodeMaxNestedCallbacksOptions(raw []byte) (any, error) {
 //
 // # Where a finding points
 //
-// At the function HEAD rather than the whole function, which upstream gets from
+// At the function head rather than the whole function, which upstream gets from
 // `astUtils.getFunctionHeadLoc`. That helper has three branches and only two are reachable here:
 //
 //	an arrow                     the `=>` token alone, so `async () => {}` reports on the arrow
@@ -195,19 +195,19 @@ func DecodeMaxNestedCallbacksOptions(raw []byte) (any, error) {
 // clean at a limit of 1 while the same shape with a bare function argument reports. The callers
 // enumerated for that verdict are the two listeners upstream registers and nothing else; a future
 // change that counted method bodies would void it.
-var MaxNestedCallbacks = rule.Rule{
+var MaxNestedCallbacks = rule.Rule[MaxNestedCallbacksOptions]{
 	Name: "max-nested-callbacks",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[MaxNestedCallbacksOptions]) rule.Listeners {
 		// A rule configured as a bare severity is handed nil, and the zero value of the struct
 		// carries a nil Maximum, so the default has to be restored somewhere.
 		//
-		// It is restored in BOTH places on purpose, and the two are mutually redundant: mutating
+		// It is restored in both places on purpose, and the two are mutually redundant: mutating
 		// either one alone leaves every fixture green because the other still supplies the ten,
 		// and mutating both at once fails four. That pair is invisible to a sweep that changes one
 		// site at a time, so it is recorded here rather than left looking like two guards where one
 		// would do. The redundancy is cheap and the failure it prevents is a limit of zero, which
 		// reports every callback in the tree.
-		settings, isSettings := rule.OptionsAs[MaxNestedCallbacksOptions](options)
+		settings, isSettings := options.Read()
 		if !isSettings {
 			settings = DefaultMaxNestedCallbacksSettings()
 		}
@@ -223,11 +223,11 @@ var MaxNestedCallbacks = rule.Rule{
 				var walk func(current *ast.Node, depth int)
 				walk = func(current *ast.Node, depth int) {
 					next := depth
-					if maxNestedCallbacksIsCountedCallback(current, checkConstructorCallCallbacks) {
+					if maximumNestedCallbacksIsCountedCallback(current, checkConstructorCallCallbacks) {
 						next = depth + 1
 						if next > maximum {
-							ctx.ReportRange(maxNestedCallbacksHeadRange(ctx, current),
-								maxNestedCallbacksMessage(next, maximum))
+							ruleContext.ReportRange(maximumNestedCallbacksHeadRange(ruleContext, current),
+								maximumNestedCallbacksMessage(next, maximum))
 						}
 					}
 					current.ForEachChild(func(child *ast.Node) bool {
@@ -241,14 +241,14 @@ var MaxNestedCallbacks = rule.Rule{
 	},
 }
 
-// maxNestedCallbacksIsCountedCallback answers whether this node is a function being passed as an
+// maximumNestedCallbacksIsCountedCallback answers whether this node is a function being passed as an
 // argument to a call, which is the only thing the depth counts.
 //
 // The callee test is upstream's `parent.callee === node` and it is not redundant with the argument
-// test. An immediately invoked function is the CHILD of a call expression, so a check that only
+// test. An immediately invoked function is the child of a call expression, so a check that only
 // asked about the parent's kind would count `(function() {})()` and report it at a limit of zero,
 // which upstream's corpus writes as a passing case twice.
-func maxNestedCallbacksIsCountedCallback(node *ast.Node, checkConstructorCallCallbacks bool) bool {
+func maximumNestedCallbacksIsCountedCallback(node *ast.Node, checkConstructorCallCallbacks bool) bool {
 	if node.Kind != ast.KindFunctionExpression && node.Kind != ast.KindArrowFunction {
 		return false
 	}
@@ -268,7 +268,7 @@ func maxNestedCallbacksIsCountedCallback(node *ast.Node, checkConstructorCallCal
 	return false
 }
 
-// maxNestedCallbacksHeadRange is the reachable half of upstream's `getFunctionHeadLoc`.
+// maximumNestedCallbacksHeadRange is the reachable half of upstream's `getFunctionHeadLoc`.
 //
 // For an arrow the head is the `=>` token by itself. For anything else it runs from the function's
 // own first token through to the opening paren of its parameters, which places `async` and a
@@ -277,8 +277,8 @@ func maxNestedCallbacksIsCountedCallback(node *ast.Node, checkConstructorCallCal
 // position is inside the paren by construction. Verified across a named function, an async one, a
 // generator, an async generator, one carrying type parameters, one with a comment before its
 // parens, and one broken across three lines.
-func maxNestedCallbacksHeadRange(ctx rule.Context, node *ast.Node) core.TextRange {
-	start := scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, node.Pos()).Pos()
+func maximumNestedCallbacksHeadRange(ruleContext rule.Context, node *ast.Node) core.TextRange {
+	start := scanner.GetRangeOfTokenAtPosition(ruleContext.SourceFile, node.Pos()).Pos()
 
 	if node.Kind == ast.KindArrowFunction {
 		arrow := node.AsArrowFunction().EqualsGreaterThanToken
@@ -286,7 +286,7 @@ func maxNestedCallbacksHeadRange(ctx rule.Context, node *ast.Node) core.TextRang
 			return core.NewTextRange(start, node.End())
 		}
 		return core.NewTextRange(
-			scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, arrow.Pos()).Pos(), arrow.End())
+			scanner.GetRangeOfTokenAtPosition(ruleContext.SourceFile, arrow.Pos()).Pos(), arrow.End())
 	}
 
 	parameters := node.AsFunctionExpression().Parameters

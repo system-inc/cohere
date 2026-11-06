@@ -27,7 +27,7 @@ import (
 // # An enum counts, and that was measured rather than assumed
 //
 // Two of the three implementations this replaces counted interface, type alias and class; the third
-// also counted enum, and nobody had stated which was right. An enum declares a value and a TYPE of
+// also counted enum, and nobody had stated which was right. An enum declares a value and a type of
 // the same name, so it shadows exactly as an interface does.
 //
 // Established with the checker rather than by reading the specification: in `enum Number { A }

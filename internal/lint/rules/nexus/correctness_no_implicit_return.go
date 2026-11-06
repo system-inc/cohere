@@ -41,7 +41,7 @@ var correctnessNoImplicitReturnText = policy.MessageOf("nexus/correctness-no-imp
  * return type with no return at all, a declared type that excludes undefined) are type errors whatever
  * the flag says, so the rule leaves them to the type check, as TypeScript does.
  */
-var CorrectnessNoImplicitReturn = rule.Rule{
+var CorrectnessNoImplicitReturn = rule.Rule[rule.NoOptions]{
 	Name: "nexus/correctness-no-implicit-return",
 
 	// The reachability of a function's end and the type it returns are the checker's answers
@@ -49,51 +49,59 @@ var CorrectnessNoImplicitReturn = rule.Rule{
 	// Whether noImplicitReturns is already on, and whether strictNullChecks is
 	ProgramReads: rule.ReadsCompilerOptions,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.TypeChecker == nil || ctx.Program == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		if ruleContext.TypeChecker == nil || ruleContext.Program == nil {
 			return nil
 		}
-		compilerOptions := ctx.Program.Options()
+		compilerOptions := ruleContext.Program.Options()
 		if compilerOptions.NoImplicitReturns.IsTrue() {
-			ctx.SkipCovered(rule.CoverTypeCheck, "noImplicitReturns is on, so the type check reports these itself")
+			ruleContext.SkipCovered(
+				rule.CoverTypeCheck,
+				"noImplicitReturns is on, so the type check reports these itself",
+			)
 			return nil
 		}
 		strictNullChecks := compilerOptions.GetStrictOptionValue(compilerOptions.StrictNullChecks)
 
 		// isUndefinedVoidOrAny is the checker's own test of a return type that needs no return value
 		isUndefinedVoidOrAny := func(returnType *checker.Type, functionFlags ast.FunctionFlags) bool {
-			unwrapped := checker.Checker_unwrapReturnType(ctx.TypeChecker, returnType, functionFlags)
-			return unwrapped != nil && (checker.Checker_maybeTypeOfKind(ctx.TypeChecker, unwrapped, checker.TypeFlagsVoid) ||
-				checker.Type_flags(unwrapped)&(checker.TypeFlagsAny|checker.TypeFlagsUndefined) != 0)
+			unwrapped := checker.Checker_unwrapReturnType(ruleContext.TypeChecker, returnType, functionFlags)
+			return unwrapped != nil &&
+				(checker.Checker_maybeTypeOfKind(ruleContext.TypeChecker, unwrapped, checker.TypeFlagsVoid) ||
+					checker.Type_flags(unwrapped)&(checker.TypeFlagsAny|checker.TypeFlagsUndefined) != 0)
 		}
 
 		report := func(node *ast.Node) {
-			ctx.ReportRange(scanner.GetErrorRangeForNode(ctx.SourceFile, node),
+			ruleContext.ReportRange(scanner.GetErrorRangeForNode(ruleContext.SourceFile, node),
 				rule.Message{Id: "implicitReturn", Description: correctnessNoImplicitReturnText.Render(nil)})
 		}
 
 		// The end of the function: checkAllCodePathsInNonVoidFunctionReturnOrThrow's noImplicitReturns branch
 		checkEnd := func(function *ast.Node) {
 			body := function.Body()
-			if ast.IsMethodSignatureDeclaration(function) || body == nil || ast.NodeIsMissing(body) || !ast.IsBlock(body) {
+			if ast.IsMethodSignatureDeclaration(function) ||
+				body == nil ||
+				ast.NodeIsMissing(body) ||
+				!ast.IsBlock(body) {
 				return
 			}
 			functionFlags := ast.GetFunctionFlags(function)
 			var declared *checker.Type
 			if function.Kind == ast.KindGetAccessor {
-				declared = checker.Checker_getTypeOfAccessors(ctx.TypeChecker, function.Symbol())
+				declared = checker.Checker_getTypeOfAccessors(ruleContext.TypeChecker, function.Symbol())
 			} else {
-				declared = checker.Checker_getReturnTypeFromAnnotation(ctx.TypeChecker, function)
+				declared = checker.Checker_getReturnTypeFromAnnotation(ruleContext.TypeChecker, function)
 			}
 			var unwrapped *checker.Type
 			if declared != nil {
-				unwrapped = checker.Checker_unwrapReturnType(ctx.TypeChecker, declared, functionFlags)
+				unwrapped = checker.Checker_unwrapReturnType(ruleContext.TypeChecker, declared, functionFlags)
 			}
-			if unwrapped != nil && (checker.Checker_maybeTypeOfKind(ctx.TypeChecker, unwrapped, checker.TypeFlagsVoid) ||
-				checker.Type_flags(unwrapped)&(checker.TypeFlagsAny|checker.TypeFlagsUndefined) != 0) {
+			if unwrapped != nil &&
+				(checker.Checker_maybeTypeOfKind(ruleContext.TypeChecker, unwrapped, checker.TypeFlagsVoid) ||
+					checker.Type_flags(unwrapped)&(checker.TypeFlagsAny|checker.TypeFlagsUndefined) != 0) {
 				return
 			}
-			if !checker.Checker_functionHasImplicitReturn(ctx.TypeChecker, function) {
+			if !checker.Checker_functionHasImplicitReturn(ruleContext.TypeChecker, function) {
 				return
 			}
 			hasExplicitReturn := function.Flags&ast.NodeFlagsHasExplicitReturn != 0
@@ -104,15 +112,22 @@ var CorrectnessNoImplicitReturn = rule.Rule{
 			case unwrapped != nil && !hasExplicitReturn:
 				return
 			case unwrapped != nil && strictNullChecks &&
-				!checker.Checker_isTypeAssignableTo(ctx.TypeChecker, checker.Checker_undefinedType(ctx.TypeChecker), unwrapped):
+				!checker.Checker_isTypeAssignableTo(
+					ruleContext.TypeChecker,
+					checker.Checker_undefinedType(ruleContext.TypeChecker),
+					unwrapped,
+				):
 				return
 			case unwrapped == nil:
 				// No annotation: with no return value anywhere the inferred type is void, and nothing is owed
 				if !hasExplicitReturn {
 					return
 				}
-				signature := checker.Checker_getSignatureFromDeclaration(ctx.TypeChecker, function)
-				if isUndefinedVoidOrAny(checker.Checker_getReturnTypeOfSignature(ctx.TypeChecker, signature), functionFlags) {
+				signature := checker.Checker_getSignatureFromDeclaration(ruleContext.TypeChecker, function)
+				if isUndefinedVoidOrAny(
+					checker.Checker_getReturnTypeOfSignature(ruleContext.TypeChecker, signature),
+					functionFlags,
+				) {
 					return
 				}
 			}
@@ -142,11 +157,13 @@ var CorrectnessNoImplicitReturn = rule.Rule{
 					return
 				}
 				container := ast.FindAncestor(node.Parent, ast.IsFunctionLikeOrClassStaticBlockDeclaration)
-				if container == nil || ast.IsClassStaticBlockDeclaration(container) || ast.IsConstructorDeclaration(container) {
+				if container == nil ||
+					ast.IsClassStaticBlockDeclaration(container) ||
+					ast.IsConstructorDeclaration(container) {
 					return
 				}
-				signature := checker.Checker_getSignatureFromDeclaration(ctx.TypeChecker, container)
-				returnType := checker.Checker_getReturnTypeOfSignature(ctx.TypeChecker, signature)
+				signature := checker.Checker_getSignatureFromDeclaration(ruleContext.TypeChecker, container)
+				returnType := checker.Checker_getReturnTypeOfSignature(ruleContext.TypeChecker, signature)
 				if checker.Type_flags(returnType)&checker.TypeFlagsNever != 0 {
 					return
 				}

@@ -9,8 +9,8 @@ import (
 // TestCorrectnessNoLoadTimeImportMetaPathFires pins each shape that reads a path while the module
 // loads, with the exact text reported, so a finding on the wrong node fails rather than passing on its
 // id alone.
-func TestCorrectnessNoLoadTimeImportMetaPathFires(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoLoadTimeImportMetaPathFires(test *testing.T) {
+	test.Parallel()
 
 	cases := map[string]struct {
 		source  string
@@ -27,11 +27,20 @@ func TestCorrectnessNoLoadTimeImportMetaPathFires(t *testing.T) {
 		},
 		// Undefined at load and thrown later, wherever it is joined.
 		"a bare read into a constant": {"const directory = import.meta.dirname;\n", []string{"import.meta.dirname"}},
-		"filename into a constant":    {"export const file = import.meta.filename;\n", []string{"import.meta.filename"}},
+		"filename into a constant": {
+			"export const file = import.meta.filename;\n",
+			[]string{"import.meta.filename"},
+		},
 		"a top-level call's argument": {"console.log(import.meta.dirname);\n", []string{"import.meta.dirname"}},
 		"a top-level statement":       {"if (import.meta.dirname) { run(); }\n", []string{"import.meta.dirname"}},
-		"an element access":           {"const directory = import.meta['dirname'];\n", []string{"import.meta['dirname']"}},
-		"parenthesized meta":          {"const directory = (import.meta).dirname;\n", []string{"(import.meta).dirname"}},
+		"an element access": {
+			"const directory = import.meta['dirname'];\n",
+			[]string{"import.meta['dirname']"},
+		},
+		"parenthesized meta": {
+			"const directory = (import.meta).dirname;\n",
+			[]string{"(import.meta).dirname"},
+		},
 		"a function invoked on the spot": {
 			"const directory = (() => import.meta.dirname)();\n",
 			[]string{"import.meta.dirname"},
@@ -41,7 +50,10 @@ func TestCorrectnessNoLoadTimeImportMetaPathFires(t *testing.T) {
 			[]string{"import.meta.dirname"},
 		},
 		"a static field": {"class Paths { static root = import.meta.dirname; }\n", []string{"import.meta.dirname"}},
-		"a static block": {"class Paths { static { register(import.meta.dirname); } }\n", []string{"import.meta.dirname"}},
+		"a static block": {
+			"class Paths { static { register(import.meta.dirname); } }\n",
+			[]string{"import.meta.dirname"},
+		},
 		"a computed method name, evaluated when the class is defined": {
 			"class Paths { [import.meta.filename]() {} }\n",
 			[]string{"import.meta.filename"},
@@ -50,7 +62,10 @@ func TestCorrectnessNoLoadTimeImportMetaPathFires(t *testing.T) {
 			"class Paths { method(@inject(import.meta.dirname) value: string) {} }\n",
 			[]string{"import.meta.dirname"},
 		},
-		"a namespace body": {"namespace Paths { export const root = import.meta.dirname; }\n", []string{"import.meta.dirname"}},
+		"a namespace body": {
+			"namespace Paths { export const root = import.meta.dirname; }\n",
+			[]string{"import.meta.dirname"},
+		},
 		// The guard's exemption is filename against process.argv; dirname there is an ordinary read.
 		"dirname compared with process.argv": {
 			"if (process.argv[1] === import.meta.dirname) { main(); }\n",
@@ -66,26 +81,26 @@ func TestCorrectnessNoLoadTimeImportMetaPathFires(t *testing.T) {
 		},
 	}
 	for name, testCase := range cases {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, CorrectnessNoLoadTimeImportMetaPath, "probe.ts", testCase.source)
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, CorrectnessNoLoadTimeImportMetaPath, "probe.ts", testCase.source)
 			wantIds := make([]string, len(testCase.reports))
 			for index := range wantIds {
 				wantIds[index] = "loadTimeImportMetaPath"
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 			for index, diagnostic := range result.Diagnostics {
 				reported := result.SourceFile.Text()[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if reported != testCase.reports[index] {
-					t.Errorf("finding %d reported %q, want %q", index, reported, testCase.reports[index])
+					test.Errorf("finding %d reported %q, want %q", index, reported, testCase.reports[index])
 				}
 			}
 		})
 	}
 }
 
-func TestCorrectnessNoLoadTimeImportMetaPathStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoLoadTimeImportMetaPathStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := map[string]string{
 		// The repair: resolved when called (ahra 36b7fe07, f43214af).
@@ -117,10 +132,10 @@ func TestCorrectnessNoLoadTimeImportMetaPathStaysSilent(t *testing.T) {
 		"the words in a string":       "const message = 'import.meta.dirname at module scope';\n",
 	}
 	for name, source := range cases {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, CorrectnessNoLoadTimeImportMetaPath, "probe.ts", source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, CorrectnessNoLoadTimeImportMetaPath, "probe.ts", source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }

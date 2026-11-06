@@ -1,10 +1,10 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"slices"
 	"strconv"
 	"strings"
@@ -30,28 +30,37 @@ type printedDeparture struct {
 	Reason string `json:"reason"`
 }
 
-// writeResolvedConfig answers language questions from the same program the lint run builds.
+// writeResolvedConfiguration answers language questions from the same program the lint run builds.
 // Globals come from TypeScript declarations, including the selected standard libraries; naming the
 // declaration files explains their origin without pretending ESLint's writable/readonly knob exists.
-func writeResolvedConfig(out io.Writer, config *configuration.Config, resolved configuration.Resolved, location projectLocation, path string) error {
-	base := optionsBase(config, location.Root)
-	if err := registry.CheckSettings(base); err != nil {
-		return fmt.Errorf("validating the lint config: %w", err)
+func writeResolvedConfiguration(
+	out *bufio.Writer,
+	lintConfiguration *configuration.Configuration,
+	resolved configuration.Resolved,
+	location projectLocation,
+	path string,
+) error {
+	base := optionsBase(lintConfiguration, location.Root)
+	if checkSettingsError := registry.CheckSettings(base); checkSettingsError != nil {
+		return fmt.Errorf("validating the lint config: %w", checkSettingsError)
 	}
-	settings, err := settingsForFile(base, resolved, rule.RegisteredSettings())
-	if err != nil {
-		return err
+	settings, settingsForFileError := settingsForFile(base, resolved, rule.RegisteredSettings())
+	if settingsForFileError != nil {
+		return settingsForFileError
 	}
-	graph, err := program.Build(program.Options{ConfigFileName: location.ConfigFileName, CurrentDirectory: location.Root, SingleThreaded: true})
-	if err != nil {
-		return err
+	graph, buildError := program.Build(
+		program.Options{ConfigFileName: location.ConfigFileName, CurrentDirectory: location.Root, SingleThreaded: true},
+	)
+	if buildError != nil {
+		return buildError
 	}
+	absolutePath := path
 	if !tspath.IsRootedDiskPath(path) {
-		path = absoluteFrom(config.Root, path)
+		absolutePath = absoluteFrom(lintConfiguration.Root, path)
 	}
-	source := graph.Program.GetSourceFile(tspath.RootedFilePath(path))
+	source := graph.Program.GetSourceFile(tspath.RootedFilePath(absolutePath))
 	if source == nil {
-		return fmt.Errorf("%s does not belong to %s", path, graph.ConfigFileName)
+		return fmt.Errorf("%s does not belong to %s", absolutePath, graph.ConfigFileName)
 	}
 	sourceType := "script"
 	if ast.IsExternalModule(source) {
@@ -78,15 +87,24 @@ func writeResolvedConfig(out io.Writer, config *configuration.Config, resolved c
 	}
 	overrides := []printedOverride{}
 	for _, index := range resolved.MatchedOverrideIndices() {
-		override := config.Overrides[index]
+		override := lintConfiguration.Overrides[index]
 		rules := map[string][]json.RawMessage{}
 		for name, setting := range override.Rules {
-			rules[name] = append([]json.RawMessage{json.RawMessage(strconv.Itoa(int(setting.Severity)))}, setting.Options...)
+			rules[name] = append(
+				[]json.RawMessage{json.RawMessage(strconv.Itoa(int(setting.Severity)))},
+				setting.Options...,
+			)
 		}
-		overrides = append(overrides, printedOverride{Index: index, File: override.File, Files: override.Files, Reason: override.Reason, Rules: rules})
+		overrides = append(overrides, printedOverride{
+			Index:  index,
+			File:   override.File,
+			Files:  override.Files,
+			Reason: override.Reason,
+			Rules:  rules,
+		})
 	}
 	departures := map[string]printedDeparture{}
-	for name, departure := range config.Departures {
+	for name, departure := range lintConfiguration.Departures {
 		departures[name] = printedDeparture{File: departure.File, Reason: departure.Reason}
 	}
 	// Struct field order fixes the public top-level order; encoding/json sorts every map's keys.
@@ -106,8 +124,14 @@ func writeResolvedConfig(out io.Writer, config *configuration.Config, resolved c
 		// is ESLint's linterOptions.reportUnusedDisableDirectives, as a severity.
 		UnusedDisable int                          `json:"unusedDisable"`
 		Rules         map[string][]json.RawMessage `json:"rules"`
-	}{Settings: settings, Overrides: overrides, Departures: departures, RuleAliases: resolved.RuleAliases(registeredRuleNames()),
-		UnusedDisable: int(resolved.UnusedDisableSeverity()), Rules: resolvedConfigRules(resolved)}
+	}{
+		Settings:      settings,
+		Overrides:     overrides,
+		Departures:    departures,
+		RuleAliases:   resolved.RuleAliases(registeredRuleNames()),
+		UnusedDisable: int(resolved.UnusedDisableSeverity()),
+		Rules:         resolvedConfigRules(resolved),
+	}
 	document.LanguageOptions.SourceType = sourceType
 	document.LanguageOptions.Target = strings.ToLower(graph.Program.Options().GetEmitScriptTarget().String())
 	document.LanguageOptions.Tsconfig = graph.ConfigFileName
@@ -120,7 +144,11 @@ func writeResolvedConfig(out io.Writer, config *configuration.Config, resolved c
 // settingsForFile asks the registered readers which keys enabled rules consume. Settings keep their
 // configured values (paths are relative to ConfigDirectory), rather than mixing in a rule's own
 // options or inventing plugin defaults. A later settings reader needs no change to this command.
-func settingsForFile(base rule.OptionsBase, resolved configuration.Resolved, registrations []rule.SettingsRegistration) (map[string]json.RawMessage, error) {
+func settingsForFile(
+	base rule.OptionsBase,
+	resolved configuration.Resolved,
+	registrations []rule.SettingsRegistration,
+) (map[string]json.RawMessage, error) {
 	settings := map[string]json.RawMessage{}
 	for _, registration := range registrations {
 		for _, namespace := range registration.Namespaces {
@@ -128,9 +156,9 @@ func settingsForFile(base rule.OptionsBase, resolved configuration.Resolved, reg
 			if !written {
 				continue
 			}
-			parts, err := registration.Split(raw)
-			if err != nil {
-				return nil, fmt.Errorf("settings[%q]: %w", namespace, err)
+			parts, splitError := registration.Split(raw)
+			if splitError != nil {
+				return nil, fmt.Errorf("settings[%q]: %w", namespace, splitError)
 			}
 			read := map[string]json.RawMessage{}
 			for name, part := range parts {
@@ -138,17 +166,17 @@ func settingsForFile(base rule.OptionsBase, resolved configuration.Resolved, reg
 					continue
 				}
 				var keys map[string]json.RawMessage
-				if err := json.Unmarshal(part, &keys); err != nil {
-					return nil, fmt.Errorf("settings[%q], as %s reads it: %w", namespace, name, err)
+				if decodeError := json.Unmarshal(part, &keys); decodeError != nil {
+					return nil, fmt.Errorf("settings[%q], as %s reads it: %w", namespace, name, decodeError)
 				}
 				for key, value := range keys {
 					read[key] = value
 				}
 			}
 			if len(read) > 0 {
-				encoded, err := json.Marshal(read)
-				if err != nil {
-					return nil, err
+				encoded, encodeError := json.Marshal(read)
+				if encodeError != nil {
+					return nil, encodeError
 				}
 				settings[namespace] = encoded
 			}

@@ -25,21 +25,21 @@ const sharedReaderSource = "const className = (open ? 'flex flex' : 'hidden') as
 	"const notClasses = 'flex flex';\n" +
 	"const bare = /* tw */ `gap-2 gap-2`;\n"
 
-func TestClassLiteralReaderIsSharedPerSettingsPerFile(t *testing.T) {
-	t.Parallel()
+func TestClassLiteralReaderIsSharedPerSettingsPerFile(test *testing.T) {
+	test.Parallel()
 	twSettings := TailwindClassLiteralOptions{Attributes: []LegacySelector{{Name: "tw"}}}.ClassLiteralSettings()
 
 	cache := rule.NewFileCache()
 	first := ClassLiteralSurfacesFor(DefaultClassLiteralSettings()).ReaderFor(cache)
 	second := DefaultClassLiteralSurfaces().ReaderFor(cache)
 	if first != second {
-		t.Fatal("two rules with the same settings got two readers for one file, so each reads every node again")
+		test.Fatal("two rules with the same settings got two readers for one file, so each reads every node again")
 	}
 	if fills := cache.Fills()["tailwind.classValues:"+DefaultClassLiteralSettings().key()]; fills != 1 {
-		t.Fatalf("the shared reader was built %d times for one file, want 1", fills)
+		test.Fatalf("the shared reader was built %d times for one file, want 1", fills)
 	}
 	if ClassLiteralSurfacesFor(twSettings).ReaderFor(cache) == first {
-		t.Fatal("rules reading different attributes shared a reader, so one reads the other's surfaces")
+		test.Fatal("rules reading different attributes shared a reader, so one reads the other's surfaces")
 	}
 
 	// Names that run together the same way are still different settings.
@@ -48,27 +48,27 @@ func TestClassLiteralReaderIsSharedPerSettingsPerFile(t *testing.T) {
 	split := ClassLiteralSettings{Selectors: []Selector{attribute("a"), attribute("b")}}
 	moved := ClassLiteralSettings{Selectors: []Selector{attribute("a"), {Kind: SelectorKindCallee, Name: "b"}}}
 	if joined.key() == split.key() || split.key() == moved.key() || joined.key() == moved.key() {
-		t.Fatalf("distinct settings share a key: %q %q %q", joined.key(), split.key(), moved.key())
+		test.Fatalf("distinct settings share a key: %q %q %q", joined.key(), split.key(), moved.key())
 	}
 
 	// A new file gets its own memo, and still the patterns compiled once for the run.
 	nextFile := DefaultClassLiteralSurfaces().ReaderFor(rule.NewFileCache())
 	if nextFile == first {
-		t.Fatal("two files shared a memo, so a node pointer from one could answer for the other")
+		test.Fatal("two files shared a memo, so a node pointer from one could answer for the other")
 	}
 	if nextFile.variables == nil || nextFile.variables != first.variables {
-		t.Fatal("the variable patterns were compiled again for a second file")
+		test.Fatal("the variable patterns were compiled again for a second file")
 	}
 }
 
-func TestSharedReadingAgreesWithAFreshOne(t *testing.T) {
-	t.Parallel()
+func TestSharedReadingAgreesWithAFreshOne(test *testing.T) {
+	test.Parallel()
 	fileName := tspath.NormalizePath("/Component.tsx")
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: tspath.RootedFilePath(fileName), PathKey: tspath.PathKey(fileName),
 	}, sharedReaderSource, core.ScriptKindTSX)
 	if sourceFile == nil {
-		t.Fatal("could not parse the fixture")
+		test.Fatal("could not parse the fixture")
 	}
 
 	twSettings := TailwindClassLiteralOptions{Attributes: []LegacySelector{{Name: "tw"}}}.ClassLiteralSettings()
@@ -88,8 +88,13 @@ func TestSharedReadingAgreesWithAFreshOne(t *testing.T) {
 			for range 2 {
 				shared := bound.classValuesIn(node)
 				if expected := fresh.classValuesIn(node); !reflect.DeepEqual(shared, expected) {
-					t.Fatalf("settings %s: a shared reading of %s differs from a fresh one:\n  shared: %+v\n  fresh:  %+v",
-						settings.key(), node.Kind, shared, expected)
+					test.Fatalf(
+						"settings %s: a shared reading of %s differs from a fresh one:\n  shared: %+v\n  fresh:  %+v",
+						settings.key(),
+						node.Kind,
+						shared,
+						expected,
+					)
 				}
 			}
 			read += len(fresh.classValuesIn(node).literals)
@@ -102,7 +107,7 @@ func TestSharedReadingAgreesWithAFreshOne(t *testing.T) {
 
 		// Proof the comparison saw class strings and the memo was used, not a vacuous agreement.
 		if read == 0 || len(bound.values) == 0 {
-			t.Fatalf("settings %s: read %d literals and remembered %d nodes; the fixture reached nothing",
+			test.Fatalf("settings %s: read %d literals and remembered %d nodes; the fixture reached nothing",
 				settings.key(), read, len(bound.values))
 		}
 
@@ -114,7 +119,12 @@ func TestSharedReadingAgreesWithAFreshOne(t *testing.T) {
 			}
 		}
 		if wantBare := settings.key() == tagSettings.key(); rememberedBare != wantBare {
-			t.Fatalf("settings %s: remembered a bare template's reading %v, want %v", settings.key(), rememberedBare, wantBare)
+			test.Fatalf(
+				"settings %s: remembered a bare template's reading %v, want %v",
+				settings.key(),
+				rememberedBare,
+				wantBare,
+			)
 		}
 	}
 }

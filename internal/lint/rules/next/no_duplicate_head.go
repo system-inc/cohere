@@ -114,7 +114,7 @@ var messageNoDuplicateHead = rule.Message{
 // which is a difference the differential harness would read as ours being wrong. The four upstream
 // spellings of that path test disagree with each other anyway. Recorded here rather than fixed so
 // the next reader finds the decision rather than re-deriving it.
-var NoDuplicateHead = rule.Rule{
+var NoDuplicateHead = rule.Rule[rule.NoOptions]{
 	// No family prefix. The config writes `nextjs/no-duplicate-head` and matching strips the
 	// namespace on a `/` boundary, so a prefixed name matches nothing and runs on no files.
 	Name: "@next/next/no-duplicate-head",
@@ -124,13 +124,13 @@ var NoDuplicateHead = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 	NoListener:       rule.NoListenerDeclinesIrrelevantFiles,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// Every declaration node that binds a local name `Head` at the module root. Keyed by node
 		// so identity is compared rather than kind: two files can each declare a `Head` and a tag
 		// resolving to the wrong one must not count.
 		headDeclarations := map[*ast.Node]bool{}
 
-		for _, statement := range ctx.SourceFile.Statements.Nodes {
+		for _, statement := range ruleContext.SourceFile.Statements.Nodes {
 			// Root scope only, which is oxc's `symbol_scope_id != root_scope_id` guard. Walking
 			// statements rather than the whole tree is that guard: an import is only legal at the
 			// module root, so a nested one cannot be reached from here in valid source.
@@ -177,7 +177,7 @@ var NoDuplicateHead = rule.Rule{
 				}
 				// A named specifier and a namespace import carry their local name in `Name()`; a
 				// default binding is already that identifier. `ImportedNameOf` is deliberately not
-				// used: oxc matches the specifier's LOCAL name, so an aliased import is matched on
+				// used: oxc matches the specifier's local name, so an aliased import is matched on
 				// its alias and never on the name the source module exports.
 				local := binding
 				if binding.Kind == ast.KindImportSpecifier || binding.Kind == ast.KindNamespaceImport {
@@ -220,7 +220,7 @@ var NoDuplicateHead = rule.Rule{
 						// silent on it because the reference's parent is the property access rather
 						// than the opening element, and reading `Text()` off that kind panics here.
 						if tagName != nil && tagName.Kind == ast.KindIdentifier &&
-							tagName.Text() == "Head" && resolvesToDeclaration(ctx, tagName, headDeclarations) {
+							tagName.Text() == "Head" && resolvesToDeclaration(ruleContext, tagName, headDeclarations) {
 							occurrences++
 							if first == nil {
 								first = tagName
@@ -235,7 +235,7 @@ var NoDuplicateHead = rule.Rule{
 				// One `Head` is the point of the component. Two or more is the finding, and it is
 				// one finding however many there are.
 				if occurrences > 1 {
-					ctx.ReportNode(first, messageNoDuplicateHead)
+					ruleContext.ReportNode(first, messageNoDuplicateHead)
 				}
 			},
 		}
@@ -247,6 +247,6 @@ var NoDuplicateHead = rule.Rule{
 // Node identity rather than declaration kind, which is the distinction that survives a shadow: a
 // `const Head` inside a function and an imported `Head` at the root are two declarations and a tag
 // under the function resolves to the inner one. Comparing kinds, or comparing text, would count it.
-func resolvesToDeclaration(ctx rule.Context, tagName *ast.Node, declarations map[*ast.Node]bool) bool {
-	return rule.HasDeclarationInSet(ctx.TypeChecker.GetSymbolAtLocation(tagName), declarations)
+func resolvesToDeclaration(ruleContext rule.Context, tagName *ast.Node, declarations map[*ast.Node]bool) bool {
+	return rule.HasDeclarationInSet(ruleContext.TypeChecker.GetSymbolAtLocation(tagName), declarations)
 }

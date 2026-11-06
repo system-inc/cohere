@@ -27,13 +27,13 @@ var preferReduceTypeParameterModules = map[string]string{
 // TestPreferReduceTypeParameterStaysSilent is upstream's seventeen passing cases verbatim, plus
 // the divergences this port measured against the installed build.
 //
-// Every one of these was measured ONE FILE PER PROGRAM against @typescript-eslint 8.67.0. That
+// Every one of these was measured one file per program against @typescript-eslint 8.67.0. That
 // detail is load-bearing: run as a single program the corpus contradicts itself, because these
 // files carry no import or export and so are global scripts whose `declare const tuple` merges
 // across files. Under that merge upstream's valid case 10 reports, which reads exactly like a
 // wrong case in upstream's own corpus and is an artifact of how it was measured.
-func TestPreferReduceTypeParameterStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestPreferReduceTypeParameterStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		"new (class Mine {\n  reduce() {}\n})().reduce(() => {}, 1 as any);\n",
@@ -63,13 +63,13 @@ func TestPreferReduceTypeParameterStaysSilent(t *testing.T) {
 		// A spread argument is not a second argument the rule can read.
 		"declare const a: number[];\na.reduce((x, s) => x.concat(s), ...([[] as number[]] as [number[]]));\n",
 
-		// A computed key folded through a const binding. This one REPORTS upstream and is silent
+		// A computed key folded through a const binding. This one reports upstream and is silent
 		// here: it needs ESLint's scope-level constant folding, which this tree does not have. The
 		// case is pinned as silent so the divergence is a fixture rather than a doc comment nobody
 		// re-measures. Measured on the installed build, which rewrites it to `a[key]<number[]>(...)`.
 		"declare const a: number[];\nconst reduceKey = 'reduce';\na[reduceKey]((x, s) => x.concat(s), [] as number[]);\n",
 
-		// `as const` REPORTS upstream and is declined here. Upstream's own fixer writes
+		// `as const` reports upstream and is declined here. Upstream's own fixer writes
 		// `reduce<const>`, which does not parse, and this rule's repair is a fix rather than a
 		// suggestion, so it would be applied with nobody watching. Measured on the installed build.
 		"declare const a: number[];\na.reduce((x, s) => x.concat(s), [] as const);\n",
@@ -82,9 +82,9 @@ func TestPreferReduceTypeParameterStaysSilent(t *testing.T) {
 		"declare const a: number[];\na.reduceRight((x, s) => x.concat(s), [] as number[]);\n",
 	}
 	for index, sourceText := range cases {
-		t.Run(preferReduceTypeParameterCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTypedFiles(t, PreferReduceTypeParameter,
+		test.Run(preferReduceTypeParameterCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTypedFiles(test, PreferReduceTypeParameter,
 				preferReduceTypeParameterFilesFor(sourceText), preferReduceTypeParameterFile))
 		})
 	}
@@ -102,17 +102,17 @@ func preferReduceTypeParameterFilesFor(sourceText string) map[string]string {
 // TestPreferReduceTypeParameterFires is upstream's fourteen reporting cases verbatim.
 //
 // Every row asserts the span, the whole rendered message, and the rewritten file. The rewrite
-// matters most: this rule assembles up to THREE edits per finding and the third is conditional on
+// matters most: this rule assembles up to three edits per finding and the third is conditional on
 // the call already carrying a type argument, so a message-id assertion cannot see a repair that
 // strips the assertion and forgets the type parameter, which is source that still parses and no
 // longer type-checks.
 //
 // The expected rewrites are upstream's own `output` fields, re-measured against the installed
-// build over the TRIMMED source, because the harness writes each fixture as
+// build over the trimmed source, because the harness writes each fixture as
 // `strings.TrimSpace(source)+"\n"` and comparing against the untrimmed literal fails on the
 // trailing bytes alone.
-func TestPreferReduceTypeParameterFires(t *testing.T) {
-	t.Parallel()
+func TestPreferReduceTypeParameterFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText  string
@@ -209,7 +209,7 @@ func TestPreferReduceTypeParameterFires(t *testing.T) {
 		// these were measured against the installed build rather than reasoned about.
 		{
 			// A parenthesized callee. estree has no parenthesized node, so upstream's child
-			// selector sees straight through it and the insert lands INSIDE the parentheses.
+			// selector sees straight through it and the insert lands inside the parentheses.
 			sourceText:  "declare const a: number[];\n(a.reduce)((x, s) => x.concat(s), [] as number[]);\n",
 			wantSpan:    "[] as number[]",
 			wantMessage: "Unnecessary assertion: Array#reduce accepts a type parameter for the default value.",
@@ -248,12 +248,12 @@ func TestPreferReduceTypeParameterFires(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(preferReduceTypeParameterCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedFiles(t, PreferReduceTypeParameter,
+		test.Run(preferReduceTypeParameterCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedFiles(test, PreferReduceTypeParameter,
 				preferReduceTypeParameterFilesFor(testCase.sourceText), preferReduceTypeParameterFile)
 
-			rule_testing.ExpectFindings(t, result, "preferTypeParameter")
+			rule_testing.ExpectFindings(test, result, "preferTypeParameter")
 
 			// The harness writes the fixture trimmed, so both the span slice and the expected
 			// rewrite are against that text rather than the Go literal above.
@@ -262,17 +262,17 @@ func TestPreferReduceTypeParameterFires(t *testing.T) {
 
 			gotSpan := onDisk[diagnostic.Range.Pos():diagnostic.Range.End()]
 			if gotSpan != testCase.wantSpan {
-				t.Fatalf("span: expected %q, got %q", testCase.wantSpan, gotSpan)
+				test.Fatalf("span: expected %q, got %q", testCase.wantSpan, gotSpan)
 			}
 			if diagnostic.Message.Description != testCase.wantMessage {
-				t.Fatalf("message: expected %q, got %q", testCase.wantMessage,
+				test.Fatalf("message: expected %q, got %q", testCase.wantMessage,
 					diagnostic.Message.Description)
 			}
 			if diagnostic.Message.Id != "preferTypeParameter" {
-				t.Fatalf("message id: expected %q, got %q", "preferTypeParameter", diagnostic.Message.Id)
+				test.Fatalf("message id: expected %q, got %q", "preferTypeParameter", diagnostic.Message.Id)
 			}
 
-			rule_testing.ExpectFixedSource(t, result, strings.TrimSpace(testCase.wantFixed)+"\n")
+			rule_testing.ExpectFixedSource(test, result, strings.TrimSpace(testCase.wantFixed)+"\n")
 		})
 	}
 }

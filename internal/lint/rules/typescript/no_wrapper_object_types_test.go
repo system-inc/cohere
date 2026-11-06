@@ -12,8 +12,8 @@ const wrapperObjectFile = "/repository/source/Thing.ts"
 // the discipline that found a shipped false positive in this package. A porter's fixtures encode the
 // porter's beliefs; the upstream corpus is the only source of cases independent of them.
 
-func TestNoWrapperObjectTypesFires(t *testing.T) {
-	t.Parallel()
+func TestNoWrapperObjectTypesFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -37,10 +37,13 @@ func TestNoWrapperObjectTypesFires(t *testing.T) {
 		{"an interface extending it", "export interface MyInterface extends Number {}\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.Run(t, NoWrapperObjectTypes, wrapperObjectFile, testCase.sourceText),
-				"bannedWrapperObjectType")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(
+				test,
+				rule_testing.Run(test, NoWrapperObjectTypes, wrapperObjectFile, testCase.sourceText),
+				"bannedWrapperObjectType",
+			)
 		})
 	}
 }
@@ -50,11 +53,11 @@ func TestNoWrapperObjectTypesFires(t *testing.T) {
 // oxc lists `Number & String` in its fail vector without saying how many diagnostics it produces.
 // One report for the whole annotation would leave the second name unfixed and the author would
 // repair half the problem, so the count is asserted rather than assumed.
-func TestNoWrapperObjectTypesReportsEachWrapper(t *testing.T) {
-	t.Parallel()
+func TestNoWrapperObjectTypesReportsEachWrapper(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectFindings(t,
-		rule_testing.Run(t, NoWrapperObjectTypes, wrapperObjectFile, "export type MyType = Number & String;\n"),
+	rule_testing.ExpectFindings(test,
+		rule_testing.Run(test, NoWrapperObjectTypes, wrapperObjectFile, "export type MyType = Number & String;\n"),
 		"bannedWrapperObjectType", "bannedWrapperObjectType")
 }
 
@@ -63,8 +66,8 @@ func TestNoWrapperObjectTypesReportsEachWrapper(t *testing.T) {
 // A fix is the one part of a rule that rewrites source, so a wrong range or wrong text changes
 // something else silently. Each wrapper maps to its own primitive, and getting that mapping wrong
 // would produce code that compiles and means something different.
-func TestNoWrapperObjectTypesFixesToThePrimitive(t *testing.T) {
-	t.Parallel()
+func TestNoWrapperObjectTypesFixesToThePrimitive(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -78,13 +81,17 @@ func TestNoWrapperObjectTypesFixesToThePrimitive(t *testing.T) {
 		{"Object", "export let value: Object;\n", "export let value: object;\n"},
 		{"Symbol", "export let value: Symbol;\n", "export let value: symbol;\n"},
 		// The fix replaces only the name, leaving the rest of the annotation intact.
-		{"inside a property type", "export let value: { property: Number };\n", "export let value: { property: number };\n"},
+		{
+			"inside a property type",
+			"export let value: { property: Number };\n",
+			"export let value: { property: number };\n",
+		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFixedSource(t,
-				rule_testing.Run(t, NoWrapperObjectTypes, wrapperObjectFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFixedSource(test,
+				rule_testing.Run(test, NoWrapperObjectTypes, wrapperObjectFile, testCase.sourceText),
 				testCase.wantSource)
 		})
 	}
@@ -94,20 +101,25 @@ func TestNoWrapperObjectTypesFixesToThePrimitive(t *testing.T) {
 //
 // `class C implements number {}` does not compile, so replacing the name there would hand the author
 // a repair that breaks the build. oxc makes the same distinction.
-func TestNoWrapperObjectTypesOffersNoFixForImplements(t *testing.T) {
-	t.Parallel()
+func TestNoWrapperObjectTypesOffersNoFixForImplements(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, NoWrapperObjectTypes, wrapperObjectFile, "export class MyClass implements Number {}\n")
+	result := rule_testing.Run(
+		test,
+		NoWrapperObjectTypes,
+		wrapperObjectFile,
+		"export class MyClass implements Number {}\n",
+	)
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("expected one finding, got %d", len(result.Diagnostics))
+		test.Fatalf("expected one finding, got %d", len(result.Diagnostics))
 	}
 	if len(result.Diagnostics[0].Fixes) != 0 {
-		t.Fatalf("expected no fix on an implements clause, got %d", len(result.Diagnostics[0].Fixes))
+		test.Fatalf("expected no fix on an implements clause, got %d", len(result.Diagnostics[0].Fixes))
 	}
 }
 
-func TestNoWrapperObjectTypesStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoWrapperObjectTypesStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -130,7 +142,7 @@ func TestNoWrapperObjectTypesStaysSilent(t *testing.T) {
 		{"a shadowing type alias", "type Number = 0 | 1;\nexport let value: Number;\n"},
 		{"a shadowing interface", "interface Number {\n    tag: string;\n}\nexport let value: Number;\n"},
 		// An enum shadows too, and that was measured rather than assumed. An enum declares a value
-		// and a TYPE of the same name, so the annotation below resolves to the enum: asked through
+		// and a type of the same name, so the annotation below resolves to the enum: asked through
 		// the checker, `Number` here resolves to a declaration in this file, while without the enum
 		// it resolves into a library declaration file. The shadow walk counted only interface, type
 		// alias and class until it was lifted onto the shelf, so this was a false positive on a name
@@ -144,9 +156,12 @@ func TestNoWrapperObjectTypesStaysSilent(t *testing.T) {
 		{"a qualified name", "export let value: Foo.Number;\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoWrapperObjectTypes, wrapperObjectFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(
+				test,
+				rule_testing.Run(test, NoWrapperObjectTypes, wrapperObjectFile, testCase.sourceText),
+			)
 		})
 	}
 }

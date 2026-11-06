@@ -9,8 +9,8 @@
 //	    -output <base_table.go>
 //
 // The inputs are what `internal/lint/rules/tailwind/tools/generate_descriptors/extract.mjs --json` and
-// `internal/lint/rules/tailwind/tools/generate_descriptor_table/context.mjs` write, one pair per design system. Several pairs
-// are accepted and at least two are required, because this command's entire job is to separate what
+// `internal/lint/rules/tailwind/tools/generate_descriptor_table/context.mjs` write, one pair per design system. Several
+// pairs are accepted and at least two are required, because this command's entire job is to separate what
 // is a fact about Tailwind from what is a fact about one repository, and a single extraction cannot
 // tell those apart. With one input every per-repository token looks invariant.
 //
@@ -49,8 +49,8 @@
 // rather than approximate. Over 1,425 namespace buckets across the three systems, every bucket is
 // one of exactly two things and there are no others:
 //
-//   - **399 buckets consumed by the root**, keyed on one of 14 namespaces — `--color`, `--font`,
-//     `--text`, `--leading` and their kin — which read identically in all three systems. A fact
+//   - **399 buckets consumed by the root**, keyed on one of 14 namespaces (`--color`, `--font`,
+//     `--text`, `--leading` and their kin), which read identically in all three systems. A fact
 //     about Tailwind, printed here.
 //   - **1,026 buckets the root does not consume**, every one of which reads *exactly* its axis's
 //     `@none` bucket. A namespace a root ignores does not produce a reading of its own; the value
@@ -60,7 +60,7 @@
 // Zero violations. That is why a repository declaring `--color-weird` gets `border-weird-1` right
 // without this file knowing the token exists: `border` does not consume `--color-weird`, so the
 // bucket equals `@none`, and `@none` is already here. It is also why the split is not merely a size
-// optimisation — the 1,026 are not omitted because they compress well, they are omitted because
+// optimisation: the 1,026 are not omitted because they compress well, they are omitted because
 // storing them would be storing one repository's token names.
 //
 // # What is deliberately not printed
@@ -128,16 +128,6 @@ type extractedContext struct {
 	UnlistedStatics map[string]*reading `json:"unlistedStatics"`
 }
 
-// pathList collects a repeatable flag.
-type pathList []string
-
-func (list *pathList) String() string { return strings.Join(*list, ",") }
-
-func (list *pathList) Set(value string) error {
-	*list = append(*list, value)
-	return nil
-}
-
 // system is one design system's pair of extractions.
 type system struct {
 	table   extractedTable
@@ -148,16 +138,22 @@ func main() {
 	var inputPaths pathList
 	var contextPaths pathList
 	flag.Var(&inputPaths, "input", "path to a JSON file written by generate_descriptors/extract.mjs --json; repeatable")
-	flag.Var(&contextPaths, "context", "path to a JSON file written by context.mjs, in the same order as -input; repeatable")
+	flag.Var(
+		&contextPaths,
+		"context",
+		"path to a JSON file written by context.mjs, in the same order as -input; repeatable",
+	)
 	outputPath := flag.String("output", "", "path to write the generated Go file to; - writes to stdout")
 	packageName := flag.String("package", "tailwind", "package clause of the generated file")
 	flag.Parse()
 
 	if len(inputPaths) == 0 || *outputPath == "" {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 		fmt.Fprintln(os.Stderr, "generate_descriptor_base: -input and -output are required")
 		os.Exit(2)
 	}
 	if len(inputPaths) != len(contextPaths) {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 		fmt.Fprintf(os.Stderr, "generate_descriptor_base: %d -input and %d -context; they pair up one to one\n",
 			len(inputPaths), len(contextPaths))
 		os.Exit(2)
@@ -166,28 +162,52 @@ func main() {
 	// one extraction every per-repository token looks invariant, and this command would print them
 	// as framework facts, which is precisely the bug the port exists to remove.
 	if len(inputPaths) < 2 {
-		fmt.Fprintln(os.Stderr, "generate_descriptor_base: at least two design systems are required; one cannot separate the framework from a repository")
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
+		fmt.Fprintln(
+			os.Stderr,
+			"generate_descriptor_base: at least two design systems are required; one cannot separate the framework from a repository",
+		)
 		os.Exit(2)
 	}
 
 	systems := make([]system, 0, len(inputPaths))
 	for index := range inputPaths {
 		var loaded system
-		readJSON(inputPaths[index], &loaded.table)
-		readJSON(contextPaths[index], &loaded.context)
+		readJson(inputPaths[index], &loaded.table)
+		readJson(contextPaths[index], &loaded.context)
 		if len(loaded.table.Roots) == 0 || len(loaded.table.Statics) == 0 || loaded.table.TailwindVersion == "" {
-			fmt.Fprintf(os.Stderr, "generate_descriptor_base: %s looks empty (%d roots, %d statics, version %q); refusing to generate\n",
-				inputPaths[index], len(loaded.table.Roots), len(loaded.table.Statics), loaded.table.TailwindVersion)
+			// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
+			fmt.Fprintf(
+				os.Stderr,
+				"generate_descriptor_base: %s looks empty (%d roots, %d statics, version %q); refusing to generate\n",
+				inputPaths[index],
+				len(loaded.table.Roots),
+				len(loaded.table.Statics),
+				loaded.table.TailwindVersion,
+			)
 			os.Exit(3)
 		}
 		if loaded.context.TailwindVersion != loaded.table.TailwindVersion {
-			fmt.Fprintf(os.Stderr, "generate_descriptor_base: %s is Tailwind %s and %s is Tailwind %s; refusing to generate\n",
-				inputPaths[index], loaded.table.TailwindVersion, contextPaths[index], loaded.context.TailwindVersion)
+			// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
+			fmt.Fprintf(
+				os.Stderr,
+				"generate_descriptor_base: %s is Tailwind %s and %s is Tailwind %s; refusing to generate\n",
+				inputPaths[index],
+				loaded.table.TailwindVersion,
+				contextPaths[index],
+				loaded.context.TailwindVersion,
+			)
 			os.Exit(3)
 		}
 		if loaded.table.TailwindVersion != systems0Version(systems) && len(systems) > 0 {
-			fmt.Fprintf(os.Stderr, "generate_descriptor_base: %s is Tailwind %s and an earlier input is Tailwind %s; refusing to mix engines\n",
-				inputPaths[index], loaded.table.TailwindVersion, systems0Version(systems))
+			// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
+			fmt.Fprintf(
+				os.Stderr,
+				"generate_descriptor_base: %s is Tailwind %s and an earlier input is Tailwind %s; refusing to mix engines\n",
+				inputPaths[index],
+				loaded.table.TailwindVersion,
+				systems0Version(systems),
+			)
 			os.Exit(3)
 		}
 		systems = append(systems, loaded)
@@ -195,28 +215,46 @@ func main() {
 
 	generated, stats := generate(systems, *packageName)
 
-	formatted, err := format.Source(generated)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "generate_descriptor_base: generated file does not parse: %v\n", err)
+	formatted, sourceError := format.Source(generated)
+	if sourceError != nil {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
+		fmt.Fprintf(os.Stderr, "generate_descriptor_base: generated file does not parse: %v\n", sourceError)
 		os.Exit(1)
 	}
 
 	if *outputPath == "-" {
-		os.Stdout.Write(formatted)
-	} else if err := os.WriteFile(*outputPath, formatted, 0o644); err != nil {
-		fmt.Fprintf(os.Stderr, "generate_descriptor_base: writing output: %v\n", err)
+		if _, writeError := os.Stdout.Write(formatted); writeError != nil {
+			// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
+			fmt.Fprintf(os.Stderr, "generate_descriptor_base: writing output: %v\n", writeError)
+			os.Exit(1)
+		}
+	} else if writeError := os.WriteFile(*outputPath, formatted, 0o644); writeError != nil {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
+		fmt.Fprintf(os.Stderr, "generate_descriptor_base: writing output: %v\n", writeError)
 		os.Exit(1)
 	}
 
 	// Printed on every run. The counts below are the measurement this file's shape rests on, so a
 	// future extraction that moves them says so out loud rather than silently printing a table with
 	// a different meaning.
-	fmt.Printf("generate_descriptor_base: %d design systems, %d roots invariant across all of them (%d dropped as not shared)\n",
-		len(systems), stats.roots, stats.rootsDropped)
-	fmt.Printf("  namespace buckets: %d consumed identically by every system, %d equal to their axis @none and derived live, %d violations\n",
-		stats.consumedBuckets, stats.noneBuckets, stats.violations)
+	// Ignored: what it reports is already written, and a summary that cannot reach the terminal changes none of it.
+	fmt.Printf(
+		"generate_descriptor_base: %d design systems, %d roots invariant across all of them (%d dropped as not shared)\n",
+		len(systems),
+		stats.roots,
+		stats.rootsDropped,
+	)
+	// Ignored: the rest of the same summary, which changes nothing already written.
+	fmt.Printf(
+		"  namespace buckets: %d consumed identically by every system, %d equal to their axis @none and derived live, %d violations\n",
+		stats.consumedBuckets,
+		stats.noneBuckets,
+		stats.violations,
+	)
+	// Ignored: the rest of the same summary, which changes nothing already written.
 	fmt.Printf("  %d framework namespaces, %d statics invariant (%d dropped as repository-specific)\n",
 		stats.frameworkNamespaces, stats.statics, stats.staticsDropped)
+	// Ignored: the rest of the same summary, which changes nothing already written.
 	fmt.Printf("  readings %d interned, output %s\n", stats.distinctReadings, humanSize(len(formatted)))
 }
 
@@ -227,14 +265,16 @@ func systems0Version(systems []system) string {
 	return systems[0].table.TailwindVersion
 }
 
-func readJSON(path string, into any) {
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "generate_descriptor_base: reading %s: %v\n", path, err)
+func readJson[Target any](path string, into *Target) {
+	raw, readError := os.ReadFile(path)
+	if readError != nil {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
+		fmt.Fprintf(os.Stderr, "generate_descriptor_base: reading %s: %v\n", path, readError)
 		os.Exit(1)
 	}
-	if err := json.Unmarshal(raw, into); err != nil {
-		fmt.Fprintf(os.Stderr, "generate_descriptor_base: parsing %s: %v\n", path, err)
+	if decodeError := json.Unmarshal(raw, into); decodeError != nil {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
+		fmt.Fprintf(os.Stderr, "generate_descriptor_base: parsing %s: %v\n", path, decodeError)
 		os.Exit(1)
 	}
 }
@@ -405,6 +445,8 @@ func generate(systems []system, packageName string) ([]byte, generationStats) {
 						stats.noneBuckets++
 					default:
 						stats.violations++
+						// Ignored: each violation is told on the way to the refusal below, whose exit code says it
+						// either way.
 						fmt.Fprintf(os.Stderr,
 							"generate_descriptor_base: %s %s namespace %q reads %s, which is neither shared by every system nor equal to its axis @none (%s)\n",
 							root, axis.goName, key, readingKey(value), readingKey(noneReading))
@@ -416,7 +458,12 @@ func generate(systems []system, packageName string) ([]byte, generationStats) {
 	// A violation means the two-way split this file encodes does not hold on these inputs, so the
 	// generated table would be wrong in a way no test names. Refuse rather than print it.
 	if stats.violations > 0 {
-		fmt.Fprintf(os.Stderr, "generate_descriptor_base: %d namespace buckets fit neither half of the split; refusing to generate\n", stats.violations)
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
+		fmt.Fprintf(
+			os.Stderr,
+			"generate_descriptor_base: %d namespace buckets fit neither half of the split; refusing to generate\n",
+			stats.violations,
+		)
 		os.Exit(4)
 	}
 
@@ -476,14 +523,16 @@ func generate(systems []system, packageName string) ([]byte, generationStats) {
 	for index := range systems {
 		sources = append(sources, jsonPathComment(systems[index].table.EntryPoint))
 	}
+	// The generated comment's dashes are spelled as escapes between the raw pieces, since a raw string cannot hold
+	// one, so the generated file keeps the same bytes and the checked-in table matches a regeneration.
 	fmt.Fprintf(&body, `// Code generated by internal/lint/rules/tailwind/tools/generate_descriptor_base. DO NOT EDIT.
 //
 // Generated against Tailwind %s from %d design systems: %s.
 //
 // This is the half of the descriptor table that is a fact about Tailwind rather than about any one
 // repository, and it is checked in because it was measured to be invariant rather than assumed to
-// be. The other half — which theme namespaces exist, which keys are in them, and the repository's
-// own `+"`@utility`"+` blocks — is read off the live design system by NewTable in descriptor_live.go.
+// be. The other half `+"\u2014"+` which theme namespaces exist, which keys are in them, and the repository's
+// own `+"`@utility` blocks \u2014"+` is read off the live design system by NewTable in descriptor_live.go.
 //
 // The seam is measured, and the measurement is the reason the split is exactly here:
 //
@@ -559,11 +608,12 @@ var FrameworkNamespaces = map[string]bool{
 	}
 	fmt.Fprintf(&body, "}\n\n")
 
+	// The dashes are escapes between raw pieces for the same reason as the header's.
 	fmt.Fprintf(&body, `// baseStatics is every static utility whose reading is a fact about Tailwind.
 //
 // %d of them. A static one system registers and another does not is a repository `+"`@utility`"+`
-// block — ahra declares `+"`markdown-content`"+` and `+"`typing-dots`"+`, www-connected-app declares
-// neither — and NewTable adds those from the live evaluator rather than this file carrying one
+// block `+"\u2014 ahra declares `markdown-content` and `typing-dots`"+`, www-connected-app declares
+// neither `+"\u2014"+` and NewTable adds those from the live evaluator rather than this file carrying one
 // repository's utilities as framework facts.
 var baseStatics = map[string]Reading{
 `, stats.statics)
@@ -598,7 +648,7 @@ func sameEverywhere(maps []map[string]*reading, key string, value *reading) bool
 //
 // The last three path segments are not enough on their own. Every corpus repository's stylesheet
 // ends `_theme/styles/theme.css`, so three segments name two different systems identically, and a
-// system generated from a temporary directory leaks a session-specific path into a checked-in file —
+// system generated from a temporary directory leaks a session-specific path into a checked-in file,
 // which is what the first version of this table did, baking a scratchpad directory into line 3.
 //
 // So the repository directory is used where the path has the shape a repository has, and anything
@@ -644,7 +694,13 @@ func writeDescriptor(out *bytes.Buffer, entry *rootEntry, frameworkNamespaces ma
 	fmt.Fprintf(out, "\t},\n")
 }
 
-func writeAxis(out *bytes.Buffer, axis axisSelector, entry *rootEntry, frameworkNamespaces map[string]bool, pool *readingPool) {
+func writeAxis(
+	out *bytes.Buffer,
+	axis axisSelector,
+	entry *rootEntry,
+	frameworkNamespaces map[string]bool,
+	pool *readingPool,
+) {
 	fallback := axis.fallback(entry)
 	empty := axis.empty(entry)
 
@@ -652,7 +708,7 @@ func writeAxis(out *bytes.Buffer, axis axisSelector, entry *rootEntry, framework
 	writeStringReadingMap(&axisBuffer, "ByType", "\t\t\t", axis.byType(entry), fallback, nil, pool)
 	// Namespaces keep their fallback-equal entries: a miss here continues the bare-value precedence
 	// to inference rather than ending at the fallback, so eliding one changes the answer. What is
-	// filtered instead is which namespaces appear at all — the framework's, plus the two
+	// filtered instead is which namespaces appear at all: the framework's, plus the two
 	// pseudo-namespaces, and never a repository token.
 	writeStringReadingMap(&axisBuffer, "ByNamespace", "\t\t\t", axis.byNamespace(entry), nil, frameworkNamespaces, pool)
 	if fallback != nil {
@@ -678,7 +734,14 @@ func writeAxis(out *bytes.Buffer, axis axisSelector, entry *rootEntry, framework
 // The keep filter is the framework/repository seam, and it applies only to ByNamespace. The two
 // pseudo-namespaces are always kept: `@colorKeyword` is Tailwind's own colour keywords and `@none`
 // is the last step of the bare path, which is also the reading every unconsumed namespace takes.
-func writeStringReadingMap(out *bytes.Buffer, name, indent string, entries map[string]*reading, fallback *reading, keep map[string]bool, pool *readingPool) {
+func writeStringReadingMap(
+	out *bytes.Buffer,
+	name, indent string,
+	entries map[string]*reading,
+	fallback *reading,
+	keep map[string]bool,
+	pool *readingPool,
+) {
 	if len(entries) == 0 {
 		return
 	}

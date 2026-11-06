@@ -18,7 +18,12 @@ func init() {
 	print := func(fileName string, text string, options formatoptions.Options) (string, error) {
 		return javascript.Format(fileName, text, options, TextToDoc(options, "typescript", nil))
 	}
-	printParsed := func(fileName string, text string, parsed *ast.SourceFile, options formatoptions.Options) (string, error) {
+	printParsed := func(
+		fileName string,
+		text string,
+		parsed *ast.SourceFile,
+		options formatoptions.Options,
+	) (string, error) {
 		return javascript.FormatParsed(fileName, text, parsed, options, TextToDoc(options, "typescript", nil))
 	}
 	Register(".ts", print)

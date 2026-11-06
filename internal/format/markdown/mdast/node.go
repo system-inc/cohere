@@ -65,7 +65,7 @@ type Node struct {
 	Meta *string
 
 	// Link, image, definition and their references.
-	URL           string
+	Url           string
 	Title         *string
 	Alt           *string
 	Label         *string
@@ -89,10 +89,10 @@ type Node struct {
 	// Sentence, word and whitespace nodes, made by splitText. UsesCJSpaces caches a sentence's answer
 	// once whitespace.js computes it, as upstream injects the property.
 	Kind                   string
-	IsCJ                   bool
+	IsCj                   bool
 	HasLeadingPunctuation  bool
 	HasTrailingPunctuation bool
-	UsesCJSpaces           *bool
+	UsesCjSpaces           *bool
 
 	comments printing.CommentFields[*Node]
 }
@@ -112,17 +112,17 @@ func (node *Node) Type() string { return node.NodeType }
 
 // Field is upstream's node[name] for the keys the print core navigates: "children", the only key the
 // markdown printer walks, and "comments", which markdown never has.
-func (node *Node) Field(name string) any {
+func (node *Node) Field(name string) printing.Value[*Node] {
 	switch name {
 	case "children":
 		if !node.IsParent {
-			return nil
+			return printing.Value[*Node]{}
 		}
-		return node.Children
+		return printing.ListValue(node.Children)
 	case "comments":
-		return node.comments.Comments
+		return printing.ListValue(node.comments.Comments)
 	default:
-		return nil
+		return printing.Value[*Node]{}
 	}
 }
 

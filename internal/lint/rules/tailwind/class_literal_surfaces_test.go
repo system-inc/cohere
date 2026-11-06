@@ -7,27 +7,25 @@ import (
 )
 
 // surfacesOf is the compiled surfaces a rule reads from its decoded options, as its Run reads them.
-func surfacesOf(t *testing.T, decoded any) *ClassLiteralSurfaces {
-	t.Helper()
-	carrier, carries := decoded.(interface{ ClassLiteralSurfaces() *ClassLiteralSurfaces })
-	if !carries {
-		t.Fatalf("%T carries no class literal surfaces", decoded)
-	}
-	return carrier.ClassLiteralSurfaces()
+func surfacesOf(test *testing.T, decoded tailwindOptions) *ClassLiteralSurfaces {
+	test.Helper()
+	return decoded.ClassLiteralSurfaces()
 }
 
 // TestClassLiteralSurfacesAreKeyedByTheMergedSettings pins that every decoder compiles its rule's
 // surfaces, and that the compiled surfaces belong to the settings' value rather than to whoever asked:
 // twelve rules, written in settings or in their own options, share one entry when they read the same
 // surfaces, and never share one when they do not.
-func TestClassLiteralSurfacesAreKeyedByTheMergedSettings(t *testing.T) {
-	t.Parallel()
-	handBuilt := ClassLiteralSurfacesFor(TailwindClassLiteralOptions{Attributes: []LegacySelector{{Name: "tw"}}}.ClassLiteralSettings())
+func TestClassLiteralSurfacesAreKeyedByTheMergedSettings(test *testing.T) {
+	test.Parallel()
+	handBuilt := ClassLiteralSurfacesFor(
+		TailwindClassLiteralOptions{Attributes: []LegacySelector{{Name: "tw"}}}.ClassLiteralSettings(),
+	)
 	if handBuilt == DefaultClassLiteralSurfaces() {
-		t.Fatal("settings reading the tw attribute share the defaults' surfaces")
+		test.Fatal("settings reading the tw attribute share the defaults' surfaces")
 	}
 
-	for ruleName, decode := range tailwindDecoders(t) {
+	for ruleName, decode := range tailwindDecoders(test) {
 		for _, testCase := range []struct {
 			name string
 			raw  string
@@ -43,12 +41,12 @@ func TestClassLiteralSurfacesAreKeyedByTheMergedSettings(t *testing.T) {
 			if testCase.raw != "" {
 				raw = []byte(testCase.raw)
 			}
-			decoded, err := decode(raw, testCase.base)
-			if err != nil {
-				t.Fatalf("%s, %s: %v", ruleName, testCase.name, err)
+			decoded, decodeError := decode(raw, testCase.base)
+			if decodeError != nil {
+				test.Fatalf("%s, %s: %v", ruleName, testCase.name, decodeError)
 			}
-			if surfaces := surfacesOf(t, decoded); surfaces != testCase.want {
-				t.Errorf("%s, %s: decoded to surfaces of their own rather than the ones their settings "+
+			if surfaces := surfacesOf(test, decoded); surfaces != testCase.want {
+				test.Errorf("%s, %s: decoded to surfaces of their own rather than the ones their settings "+
 					"share, so each selection compiles and memoizes apart", ruleName, testCase.name)
 			}
 		}
@@ -61,20 +59,24 @@ func TestClassLiteralSurfacesAreKeyedByTheMergedSettings(t *testing.T) {
 // TestClassLiteralSurfacesAreReadWithoutAllocating pins that a rule asking for its surfaces on every
 // file reads what its decoder compiled, configured or not. Building them on every ask cost an ahra
 // cold run 41 MB in 456K objects (#y2nj5ex).
-func TestClassLiteralSurfacesAreReadWithoutAllocating(t *testing.T) {
-	decoded, err := tailwindDecoders(t)[NoDuplicateClasses.Name]([]byte(`{"attributes":["tw"]}`), settingsBase(`{"callees":["merge"]}`))
-	if err != nil {
-		t.Fatal(err)
+func TestClassLiteralSurfacesAreReadWithoutAllocating(test *testing.T) {
+	decoded, decodeTailwindOptionsError := decodeTailwindOptionsAt[NoDuplicateClassesOptions]()(
+		[]byte(`{"attributes":["tw"]}`),
+		settingsBase(`{"callees":["merge"]}`),
+	)
+	if decodeTailwindOptionsError != nil {
+		test.Fatal(decodeTailwindOptionsError)
 	}
-	var options any = decoded
+	// Handed and read as the rule's Run is handed and reads them.
+	options := rule.Configured(decoded)
 	allocations := testing.AllocsPerRun(100, func() {
 		surfaces := DefaultClassLiteralSurfaces()
-		if configured, isConfigured := rule.OptionsAs[NoDuplicateClassesOptions](options); isConfigured {
+		if configured, isConfigured := options.Read(); isConfigured {
 			surfaces = configured.ClassLiteralSurfaces()
 		}
 		_ = surfaces
 	})
 	if allocations != 0 {
-		t.Errorf("reading a rule's class literal surfaces allocated %.0f times per file, want 0", allocations)
+		test.Errorf("reading a rule's class literal surfaces allocated %.0f times per file, want 0", allocations)
 	}
 }

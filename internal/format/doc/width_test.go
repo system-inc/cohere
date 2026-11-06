@@ -46,9 +46,9 @@ var widthCases = []string{
 // Off unless COHERE_PRETTIER_FORK names the fork checkout, because it runs node. Then it checks the
 // curated cases and, when COHERE_FORMAT_CORPORA is also set, every distinct line containing a
 // non-ASCII byte in those repositories, which is the population that actually reaches the printer.
-func TestStringWidthAgreesWithUpstream(t *testing.T) {
-	t.Parallel()
-	root := corpus.PrettierFork.Root(t)
+func TestStringWidthAgreesWithUpstream(test *testing.T) {
+	test.Parallel()
+	root := corpus.PrettierFork.Root(test)
 
 	inputs := append([]string(nil), widthCases...)
 	seen := map[string]bool{}
@@ -59,7 +59,7 @@ func TestStringWidthAgreesWithUpstream(t *testing.T) {
 		if corpus == "" {
 			continue
 		}
-		inputs = append(inputs, nonASCIILines(t, corpus, seen)...)
+		inputs = append(inputs, nonAsciiLines(test, corpus, seen)...)
 	}
 
 	// Batched, because the corpus population is hundreds of megabytes and a single JSON payload
@@ -69,25 +69,25 @@ func TestStringWidthAgreesWithUpstream(t *testing.T) {
 	expected := make([]int, 0, len(inputs))
 	for start := 0; start < len(inputs); start += batchSize {
 		end := min(start+batchSize, len(inputs))
-		expected = append(expected, upstreamWidths(t, root, inputs[start:end])...)
+		expected = append(expected, upstreamWidths(test, root, inputs[start:end])...)
 	}
 	mismatches := 0
 	for index, input := range inputs {
 		if got := StringWidth(input); got != expected[index] {
 			mismatches++
 			if mismatches <= 20 {
-				t.Errorf("StringWidth(%q) = %d, upstream %d", input, got, expected[index])
+				test.Errorf("StringWidth(%q) = %d, upstream %d", input, got, expected[index])
 			}
 		}
 	}
-	t.Logf("%d strings measured, %d curated, %d mismatches", len(inputs), len(widthCases), mismatches)
+	test.Logf("%d strings measured, %d curated, %d mismatches", len(inputs), len(widthCases), mismatches)
 }
 
 // TestWidthControlCanFail proves the comparison above can disagree, so its agreement means something.
-func TestWidthControlCanFail(t *testing.T) {
-	t.Parallel()
+func TestWidthControlCanFail(test *testing.T) {
+	test.Parallel()
 	if StringWidth("中") != 2 || StringWidth("a") != 1 || StringWidth("😀") != 2 || StringWidth("é") != 1 {
-		t.Fatalf("basic widths wrong: 中=%d a=%d 😀=%d e+combining=%d",
+		test.Fatalf("basic widths wrong: 中=%d a=%d 😀=%d e+combining=%d",
 			StringWidth("中"), StringWidth("a"), StringWidth("😀"), StringWidth("é"))
 	}
 }
@@ -98,37 +98,38 @@ func TestWidthControlCanFail(t *testing.T) {
 // each chunk on its own, so a multi-byte character split across a 64 KB boundary became two U+FFFD
 // and measured one or two columns wider. The first corpus run reported eight such "mismatches", all on
 // non-ASCII lines, all with Go narrower; every one was the instrument splitting a character.
-func upstreamWidths(t *testing.T, root string, inputs []string) []int {
-	t.Helper()
+func upstreamWidths(test *testing.T, root string, inputs []string) []int {
+	test.Helper()
 	script := `
 import getStringWidth from "./src/utilities/get-string-width.js";
 process.stdin.setEncoding("utf8");
 let data = ""; process.stdin.on("data", (chunk) => data += chunk);
 process.stdin.on("end", () => process.stdout.write(JSON.stringify(JSON.parse(data).map(getStringWidth))));
 `
-	encoded, err := json.Marshal(inputs)
-	if err != nil {
-		t.Fatal(err)
+	encoded, encodeError := json.Marshal(inputs)
+	if encodeError != nil {
+		test.Fatal(encodeError)
 	}
 	command := exec.Command("node", "--input-type=module", "-e", script)
 	command.Dir = root
 	command.Stdin = bytes.NewReader(encoded)
-	var stdout, stderr bytes.Buffer
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
 	command.Stdout, command.Stderr = &stdout, &stderr
-	if err := command.Run(); err != nil {
-		t.Fatalf("node: %v\n%s", err, stderr.String())
+	if runError := command.Run(); runError != nil {
+		test.Fatalf("node: %v\n%s", runError, stderr.String())
 	}
 	var widths []int
-	if err := json.Unmarshal(stdout.Bytes(), &widths); err != nil {
-		t.Fatal(err)
+	if decodeError := json.Unmarshal(stdout.Bytes(), &widths); decodeError != nil {
+		test.Fatal(decodeError)
 	}
 	if len(widths) != len(inputs) {
-		t.Fatalf("upstream returned %d widths for %d inputs", len(widths), len(inputs))
+		test.Fatalf("upstream returned %d widths for %d inputs", len(widths), len(inputs))
 	}
 	return widths
 }
 
-// nonASCIILines collects distinct lines with a non-ASCII byte from the files the formatter is offered
+// nonAsciiLines collects distinct lines with a non-ASCII byte from the files the formatter is offered
 // under root, nested repositories included, which is the population that actually reaches a printer.
 //
 // The first version walked every text file under the root and collected 1.08 GB across 607,275 lines,
@@ -138,11 +139,13 @@ process.stdin.on("end", () => process.stdout.write(JSON.stringify(JSON.parse(dat
 //
 // Invalid UTF-8 is skipped: json.Marshal would replace it before node saw it, so the two sides would
 // be measuring different strings, which is exactly the comparison that looks clean and proves nothing.
-func nonASCIILines(t *testing.T, root string, seen map[string]bool) []string {
-	t.Helper()
-	engine, err := prettier.New(formatoptions.Default())
-	if err != nil {
-		t.Fatal(err)
+//
+// Mutates: seen gains every line collected, so the caller's next corpus skips the lines this one found.
+func nonAsciiLines(test *testing.T, root string, seen map[string]bool) []string {
+	test.Helper()
+	engine, newPrettierError := prettier.New(formatoptions.Default())
+	if newPrettierError != nil {
+		test.Fatal(newPrettierError)
 	}
 	var lines []string
 	pending := []string{root}
@@ -153,41 +156,45 @@ func nonASCIILines(t *testing.T, root string, seen map[string]bool) []string {
 		pending = pending[1:]
 		// Nested repositories regardless of current's own ignore lists, as the differential finds them
 		// (#k6vebep): a repository under a path current never formats is still a corpus.
-		nestedRepositories, err := formatfiles.NestedRepositoriesBelow(current)
-		if err != nil {
-			t.Fatalf("finding the repositories nested in %s: %v", current, err)
+		nestedRepositories, nestedRepositoriesBelowError := formatfiles.NestedRepositoriesBelow(current)
+		if nestedRepositoriesBelowError != nil {
+			test.Fatalf("finding the repositories nested in %s: %v", current, nestedRepositoriesBelowError)
 		}
 		for _, nested := range nestedRepositories {
 			pending = append(pending, filepath.Join(current, nested))
 		}
 
-		enumeration, err := engine.Enumerate(current)
-		if errors.Is(err, formatoptions.ErrPrettierConfigRemains) {
-			t.Logf("skipping %s, not yet adopted: %v", current, err)
+		enumeration, enumerateError := engine.Enumerate(current)
+		if errors.Is(enumerateError, formatoptions.ErrPrettierConfigRemains) {
+			test.Logf("skipping %s, not yet adopted: %v", current, enumerateError)
 			continue
 		}
-		if err != nil {
-			t.Fatalf("enumerating %s: %v", current, err)
+		if enumerateError != nil {
+			test.Fatalf("enumerating %s: %v", current, enumerateError)
 		}
 		measured = append(measured, fmt.Sprintf("%s (%d)", current, len(enumeration.Files)))
 		for _, path := range enumeration.Files {
-			file, err := os.Open(path)
-			if err != nil {
+			file, openError := os.Open(path)
+			if openError != nil {
 				continue
 			}
 			scanner := bufio.NewScanner(file)
 			scanner.Buffer(make([]byte, 1<<20), 1<<24)
 			for scanner.Scan() {
 				line := scanner.Text()
-				if isPrintableASCII(line) || !utf8.ValidString(line) || seen[line] {
+				if isPrintableAscii(line) || !utf8.ValidString(line) || seen[line] {
 					continue
 				}
 				seen[line] = true
 				lines = append(lines, line)
 			}
+			// Ignored: the file was only read, so closing it can lose nothing the scan did not already see.
 			file.Close()
+			if scanError := scanner.Err(); scanError != nil {
+				test.Fatalf("reading %s: %v", path, scanError)
+			}
 		}
 	}
-	t.Logf("corpora walked: %d\n  %s", len(measured), strings.Join(measured, "\n  "))
+	test.Logf("corpora walked: %d\n  %s", len(measured), strings.Join(measured, "\n  "))
 	return lines
 }

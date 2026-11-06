@@ -26,9 +26,9 @@ var messageUnexpectedDuplicateElseIf = rule.Message{
 // expression, because everything the second matches the first already matched.
 //
 // The algorithm is ESLint's and is worth stating in one line, since the nested loops obscure it: a
-// condition is written as an OR of AND-groups, and a branch is unreachable when every one of its
-// OR-groups has been covered by some earlier branch. A group is covered when an earlier group is a
-// subset of it, since a smaller AND is a weaker requirement and therefore matches more.
+// condition is written as an `OR` of `AND`-groups, and a branch is unreachable when every one of its
+// `OR`-groups has been covered by some earlier branch. A group is covered when an earlier group is a
+// subset of it, since a smaller `AND` is a weaker requirement and therefore matches more.
 //
 // Both operands of a commutative operator are tried when comparing, so `a && b` equals `b && a`.
 // That is only sound because these are conditions read for truthiness, where reordering cannot
@@ -37,9 +37,9 @@ var messageUnexpectedDuplicateElseIf = rule.Message{
 //
 // A chain of length n costs O(n squared) comparisons, which the original accepts and so do we. An
 // if-else-if chain long enough to matter is a defect this rule is not the one to report.
-var NoDupeElseIf = rule.Rule{
+var NoDupeElseIf = rule.Rule[rule.NoOptions]{
 	Name: "no-dupe-else-if",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindIfStatement: func(node *ast.Node) {
 				test := node.AsIfStatement().Expression
@@ -52,10 +52,13 @@ var NoDupeElseIf = rule.Rule{
 				// catching the second needs the parts as well as the whole.
 				conditionsToCheck := []*ast.Node{test}
 				if isLogicalOperator(test, ast.KindAmpersandAmpersandToken) {
-					conditionsToCheck = append(conditionsToCheck, splitByOperator(test, ast.KindAmpersandAmpersandToken)...)
+					conditionsToCheck = append(
+						conditionsToCheck,
+						splitByOperator(test, ast.KindAmpersandAmpersandToken)...,
+					)
 				}
 
-				// Each condition becomes a list of OR-groups, each group a list of AND-operands.
+				// Each condition becomes a list of `OR`-groups, each group a list of `AND`-operands.
 				remaining := make([][][]*ast.Node, 0, len(conditionsToCheck))
 				for _, condition := range conditionsToCheck {
 					orGroups := splitByOperator(condition, ast.KindBarBarToken)
@@ -88,11 +91,11 @@ var NoDupeElseIf = rule.Rule{
 						earlierGroups = append(earlierGroups, splitByOperator(orGroup, ast.KindAmpersandAmpersandToken))
 					}
 
-					// Drop every OR-group this earlier condition covers.
+					// Drop every `OR`-group this earlier condition covers.
 					for conditionIndex, groups := range remaining {
 						kept := groups[:0]
 						for _, group := range groups {
-							if !anyGroupIsSubsetOf(ctx.SourceFile, earlierGroups, group) {
+							if !anyGroupIsSubsetOf(ruleContext.SourceFile, earlierGroups, group) {
 								kept = append(kept, group)
 							}
 						}
@@ -102,7 +105,7 @@ var NoDupeElseIf = rule.Rule{
 					// A condition with nothing left is fully covered, so this branch is dead.
 					for _, groups := range remaining {
 						if len(groups) == 0 {
-							ctx.ReportNode(test, messageUnexpectedDuplicateElseIf)
+							ruleContext.ReportNode(test, messageUnexpectedDuplicateElseIf)
 							return
 						}
 					}
@@ -112,9 +115,9 @@ var NoDupeElseIf = rule.Rule{
 	},
 }
 
-// anyGroupIsSubsetOf reports whether some earlier AND-group is a subset of this one.
+// anyGroupIsSubsetOf reports whether some earlier `AND`-group is a subset of this one.
 //
-// The direction is the part that reads backwards and is correct: a smaller AND is a weaker
+// The direction is the part that reads backwards and is correct: a smaller `AND` is a weaker
 // condition, so if an earlier branch required only `a` and this one requires `a && b`, everything
 // this one matches the earlier one already matched.
 func anyGroupIsSubsetOf(sourceFile *ast.SourceFile, earlierGroups [][]*ast.Node, group []*ast.Node) bool {
@@ -149,18 +152,18 @@ func isAndSubset(sourceFile *ast.SourceFile, subset []*ast.Node, superset []*ast
 // `a?.b` distinct and two differently written literals distinct, while ignoring comments and
 // whitespace.
 func conditionsAreEqual(sourceFile *ast.SourceFile, left *ast.Node, right *ast.Node) bool {
-	left = ast.SkipParentheses(left)
-	right = ast.SkipParentheses(right)
-	if left == nil || right == nil {
+	unwrappedLeft := ast.SkipParentheses(left)
+	unwrappedRight := ast.SkipParentheses(right)
+	if unwrappedLeft == nil || unwrappedRight == nil {
 		return false
 	}
-	if left.Kind != right.Kind {
+	if unwrappedLeft.Kind != unwrappedRight.Kind {
 		return false
 	}
 
-	if left.Kind == ast.KindBinaryExpression {
-		leftBinary := left.AsBinaryExpression()
-		rightBinary := right.AsBinaryExpression()
+	if unwrappedLeft.Kind == ast.KindBinaryExpression {
+		leftBinary := unwrappedLeft.AsBinaryExpression()
+		rightBinary := unwrappedRight.AsBinaryExpression()
 		if leftBinary.OperatorToken != nil && rightBinary.OperatorToken != nil &&
 			leftBinary.OperatorToken.Kind == rightBinary.OperatorToken.Kind &&
 			(leftBinary.OperatorToken.Kind == ast.KindBarBarToken ||
@@ -172,7 +175,7 @@ func conditionsAreEqual(sourceFile *ast.SourceFile, left *ast.Node, right *ast.N
 		}
 	}
 
-	return hasSameTokens(sourceFile, left, right)
+	return hasSameTokens(sourceFile, unwrappedLeft, unwrappedRight)
 }
 
 // splitByOperator flattens a chain of one logical operator into its operands.
@@ -181,26 +184,26 @@ func conditionsAreEqual(sourceFile *ast.SourceFile, left *ast.Node, right *ast.N
 // than three and misses `else if(b)`. Flattening is what makes the group comparison work on the
 // operands people actually wrote.
 func splitByOperator(node *ast.Node, operator ast.Kind) []*ast.Node {
-	node = ast.SkipParentheses(node)
-	if node == nil {
+	unwrapped := ast.SkipParentheses(node)
+	if unwrapped == nil {
 		return nil
 	}
-	if isLogicalOperator(node, operator) {
-		binary := node.AsBinaryExpression()
+	if isLogicalOperator(unwrapped, operator) {
+		binary := unwrapped.AsBinaryExpression()
 		return append(
 			splitByOperator(binary.Left, operator),
 			splitByOperator(binary.Right, operator)...,
 		)
 	}
-	return []*ast.Node{node}
+	return []*ast.Node{unwrapped}
 }
 
 // isLogicalOperator reports a binary expression joined by exactly this operator.
 func isLogicalOperator(node *ast.Node, operator ast.Kind) bool {
-	node = ast.SkipParentheses(node)
-	if node == nil || node.Kind != ast.KindBinaryExpression {
+	unwrapped := ast.SkipParentheses(node)
+	if unwrapped == nil || unwrapped.Kind != ast.KindBinaryExpression {
 		return false
 	}
-	binary := node.AsBinaryExpression()
+	binary := unwrapped.AsBinaryExpression()
 	return binary.OperatorToken != nil && binary.OperatorToken.Kind == operator
 }

@@ -10,8 +10,8 @@ import (
 
 const forbiddenSourceFile = "/repository/source/Thing.tsx"
 
-func TestImportNoForbiddenSourceFires(t *testing.T) {
-	t.Parallel()
+func TestImportNoForbiddenSourceFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -65,19 +65,19 @@ func TestImportNoForbiddenSourceFires(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ImportNoForbiddenSource, forbiddenSourceFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.wantId)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ImportNoForbiddenSource, forbiddenSourceFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, testCase.wantId)
 
 			// A fixable rule whose fix is never checked is half-tested: the finding proves it saw
 			// the problem, the fix text proves it would repair it rather than corrupt the file.
 			fixes := result.Diagnostics[0].Fixes
 			if len(fixes) != 1 {
-				t.Fatalf("expected exactly one fix, got %d", len(fixes))
+				test.Fatalf("expected exactly one fix, got %d", len(fixes))
 			}
 			if fixes[0].Text != testCase.wantFix {
-				t.Fatalf("expected fix %q, got %q", testCase.wantFix, fixes[0].Text)
+				test.Fatalf("expected fix %q, got %q", testCase.wantFix, fixes[0].Text)
 			}
 
 			// The text alone does not pin the rewrite, because the range is half of it. A correct
@@ -88,7 +88,7 @@ func TestImportNoForbiddenSourceFires(t *testing.T) {
 			//
 			// The expectation is derived from the case rather than written out, so a new row cannot
 			// forget it and cannot disagree with itself.
-			rule_testing.ExpectFixedSource(t, result,
+			rule_testing.ExpectFixedSource(test, result,
 				strings.Replace(testCase.sourceText, quotedSourceOf(testCase.sourceText), testCase.wantFix, 1))
 		})
 	}
@@ -98,8 +98,8 @@ func TestImportNoForbiddenSourceFires(t *testing.T) {
 // the fix rewrite the wrapper into an import of itself, so a wrapper is exempt and produces no finding
 // and no fix. A file beside a wrapper is not the wrapper, so it still reports, and its fix points at
 // the wrapper.
-func TestImportNoForbiddenSourceExemptsOnlyTheSanctionedWrapper(t *testing.T) {
-	t.Parallel()
+func TestImportNoForbiddenSourceExemptsOnlyTheSanctionedWrapper(test *testing.T) {
+	test.Parallel()
 
 	wrappers := []struct {
 		name       string
@@ -118,9 +118,12 @@ func TestImportNoForbiddenSourceExemptsOnlyTheSanctionedWrapper(t *testing.T) {
 			"const NextImage = import('next/image');\n"},
 	}
 	for _, wrapper := range wrappers {
-		t.Run(wrapper.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, ImportNoForbiddenSource, wrapper.fileName, wrapper.sourceText))
+		test.Run(wrapper.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(
+				test,
+				rule_testing.Run(test, ImportNoForbiddenSource, wrapper.fileName, wrapper.sourceText),
+			)
 		})
 	}
 
@@ -131,19 +134,29 @@ func TestImportNoForbiddenSourceExemptsOnlyTheSanctionedWrapper(t *testing.T) {
 		wantId     string
 		wantFix    string
 	}{
-		{"a dialog beside the Image wrapper", "/repository/libraries/structure/source/components/images/dialogs/ImageDialog.tsx",
-			"import Image from 'next/image';\n", "forbiddenImageImport", "'@structure/source/components/images/Image'"},
-		{"a component beside the Link wrapper", "/repository/libraries/structure/source/components/navigation/NavigationMenu.tsx",
-			"import Link from 'next/link';\n", "forbiddenLinkImport", "'@structure/source/components/navigation/Link'"},
+		{
+			"a dialog beside the Image wrapper",
+			"/repository/libraries/structure/source/components/images/dialogs/ImageDialog.tsx",
+			"import Image from 'next/image';\n",
+			"forbiddenImageImport",
+			"'@structure/source/components/images/Image'",
+		},
+		{
+			"a component beside the Link wrapper",
+			"/repository/libraries/structure/source/components/navigation/NavigationMenu.tsx",
+			"import Link from 'next/link';\n",
+			"forbiddenLinkImport",
+			"'@structure/source/components/navigation/Link'",
+		},
 		{"framer-motion has no wrapper to exempt", "/repository/libraries/structure/source/router/hooks/useRouter.ts",
 			"import { motion } from 'framer-motion';\n", "forbiddenMotionImport", "'motion/react'"},
 	}
 	for _, neighbour := range neighbours {
-		t.Run(neighbour.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ImportNoForbiddenSource, neighbour.fileName, neighbour.sourceText)
-			rule_testing.ExpectFindings(t, result, neighbour.wantId)
-			rule_testing.ExpectFixedSource(t, result,
+		test.Run(neighbour.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ImportNoForbiddenSource, neighbour.fileName, neighbour.sourceText)
+			rule_testing.ExpectFindings(test, result, neighbour.wantId)
+			rule_testing.ExpectFixedSource(test, result,
 				strings.Replace(neighbour.sourceText, quotedSourceOf(neighbour.sourceText), neighbour.wantFix, 1))
 		})
 	}
@@ -156,26 +169,26 @@ func TestImportNoForbiddenSourceExemptsOnlyTheSanctionedWrapper(t *testing.T) {
 // Next wrapper files while the `eslint-disable-next-line` sat on line 3 covering line 4, making them
 // unreachable by any suppression that could be written. A finding at the wrong location is invisible
 // in a findings count and fatal to suppression, so the location is asserted rather than assumed.
-func TestImportNoForbiddenSourceReportsAtTheSpecifier(t *testing.T) {
-	t.Parallel()
+func TestImportNoForbiddenSourceReportsAtTheSpecifier(test *testing.T) {
+	test.Parallel()
 
 	sourceText := "// Dependencies - Frameworks\n" +
 		"// This is the only place this import is valid\n" +
 		"// eslint-disable-next-line nexus/import-no-forbidden-source\n" +
 		"import NextImage from 'next/image';\n"
 
-	result := rule_testing.Run(t, ImportNoForbiddenSource, forbiddenSourceFile, sourceText)
-	rule_testing.ExpectFindings(t, result, "forbiddenImageImport")
+	result := rule_testing.Run(test, ImportNoForbiddenSource, forbiddenSourceFile, sourceText)
+	rule_testing.ExpectFindings(test, result, "forbiddenImageImport")
 
 	line, _ := scanner.GetECMALineAndByteOffsetOfPosition(result.SourceFile, result.Diagnostics[0].Range.Pos())
 	const importLine = 3 // zero-based, so the fourth line
 	if line != importLine {
-		t.Fatalf("expected the finding on the import line (%d), got line %d", importLine+1, line+1)
+		test.Fatalf("expected the finding on the import line (%d), got line %d", importLine+1, line+1)
 	}
 }
 
-func TestImportNoForbiddenSourceStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestImportNoForbiddenSourceStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -193,10 +206,10 @@ func TestImportNoForbiddenSourceStaysSilent(t *testing.T) {
 		{"no imports at all", "export const Value = 1;\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ImportNoForbiddenSource, forbiddenSourceFile, testCase.sourceText)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ImportNoForbiddenSource, forbiddenSourceFile, testCase.sourceText)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }

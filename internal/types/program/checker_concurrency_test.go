@@ -8,6 +8,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/lint/testing"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
@@ -33,9 +34,9 @@ import (
 // The existing checker test uses one file, so it runs one worker and could never have caught this.
 // **The file count is the instrument here**, which is why it is written out rather than trimmed to
 // something tidier.
-func TestCheckerSurvivesTheParallelWalk(t *testing.T) {
-	t.Parallel()
-	files := map[string]string{"tsconfig.json": minimalConfig}
+func TestCheckerSurvivesTheParallelWalk(test *testing.T) {
+	test.Parallel()
+	files := map[string]string{"tsconfig.json": minimalConfiguration}
 
 	// Enough files, cross-importing, that several workers run at once and reach across checkers.
 	// Sixty-four standalone files was not enough: the fix reverted, that version passed five of five,
@@ -52,38 +53,38 @@ func TestCheckerSurvivesTheParallelWalk(t *testing.T) {
 		)
 	}
 
-	directory := writeProject(t, files)
-	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
-	if err != nil {
-		t.Fatalf("building: %v", err)
+	directory := writeProject(test, files)
+	graph, buildError := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
+	if buildError != nil {
+		test.Fatalf("building: %v", buildError)
 	}
 
 	if graph.Workers() < 2 {
 		// One worker cannot race, so a pass here would prove nothing. This is the same shape as a
 		// sweep whose probe never ran.
-		t.Skipf("this machine gave the walk %d worker, so nothing ran concurrently", graph.Workers())
+		test.Skipf("this machine gave the walk %d worker, so nothing ran concurrently", graph.Workers())
 	}
 
 	// Counted atomically: the listeners run on every worker at once, which is the point of the test.
 	var queries atomic.Int64
-	probe := rule.Rule{
+	probe := rule.Rule[rule.NoOptions]{
 		Name: "test-checker-under-concurrency",
 
 		// Declared, because the walk hands out a checker only to rules that ask for one. Without
 		// this the probe is dispatched with a nil checker and the test fails on its own first
-		// assertion — which is the guard working, and is why that assertion is worth keeping.
+		// assertion, which is the guard working, and is why that assertion is worth keeping.
 		NeedsTypeChecker: true,
 
-		Run: func(ctx rule.Context, options any) rule.Listeners {
-			if ctx.TypeChecker == nil {
-				t.Error("a rule was dispatched without a checker")
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+			if ruleContext.TypeChecker == nil {
+				test.Error("a rule was dispatched without a checker")
 				return nil
 			}
 			return rule.Listeners{
 				// Every identifier, deliberately. A rule would not query this indiscriminately, and
 				// that is the point: it maximizes the chance of two workers reaching one checker.
 				ast.KindIdentifier: func(node *ast.Node) {
-					if ctx.TypeChecker.GetTypeAtLocation(node) != nil {
+					if ruleContext.TypeChecker.GetTypeAtLocation(node) != nil {
 						queries.Add(1)
 					}
 				},
@@ -93,15 +94,19 @@ func TestCheckerSurvivesTheParallelWalk(t *testing.T) {
 
 	projectFiles := graph.ProjectFiles()
 	if len(projectFiles) < 2 {
-		t.Fatalf("expected the project to hold many files, got %d", len(projectFiles))
+		test.Fatalf("expected the project to hold many files, got %d", len(projectFiles))
 	}
 
-	if _, err := graph.Walk(context.Background(), projectFiles, []rule.Rule{probe}); err != nil {
-		t.Fatalf("walking with a type-querying rule: %v", err)
+	if _, walkError := graph.Walk(
+		context.Background(),
+		projectFiles,
+		rule_testing.EntriesOf(test, probe),
+	); walkError != nil {
+		test.Fatalf("walking with a type-querying rule: %v", walkError)
 	}
 
 	if queries.Load() == 0 {
 		// Surviving a walk that asked nothing is exactly the vacuous pass this file exists to avoid.
-		t.Fatal("the probe rule completed without answering a single type query, so nothing was proven")
+		test.Fatal("the probe rule completed without answering a single type query, so nothing was proven")
 	}
 }

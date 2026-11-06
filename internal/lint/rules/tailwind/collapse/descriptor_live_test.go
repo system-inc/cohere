@@ -43,12 +43,12 @@ var corpusRepositories = []struct {
 
 // liveEntryPointFor resolves a corpus repository's stylesheet and the tailwindcss installed beside it: a
 // skip naming the variable when the corpus is unset, and a failure when it is set but lacks either.
-func liveEntryPointFor(t testing.TB, spelling string) (entryPoint, packageRoot string) {
-	t.Helper()
-	entryPoint = corpus.Resolve(t, spelling)
+func liveEntryPointFor(test testing.TB, spelling string) (entryPoint, packageRoot string) {
+	test.Helper()
+	entryPoint = corpus.Resolve(test, spelling)
 	packageRoot = findTailwindPackageRootForTest(filepath.Dir(entryPoint))
 	if packageRoot == "" {
-		t.Fatalf("%s holds no installed tailwindcss reachable from %s", spelling, entryPoint)
+		test.Fatalf("%s holds no installed tailwindcss reachable from %s", spelling, entryPoint)
 	}
 	return entryPoint, packageRoot
 }
@@ -56,30 +56,36 @@ func liveEntryPointFor(t testing.TB, spelling string) (entryPoint, packageRoot s
 // liveTableForOracle is liveTableFor for the design system an oracle records: a corpus repository with
 // the tailwindcss installed beside it, as before, or a repository path such as the public theme's over
 // the vendored tailwindcss.
-func liveTableForOracle(t *testing.T, entryPoint string) (*LoadedDesignSystem, *Table) {
-	t.Helper()
-	if _, _, spelled, _ := corpus.Spelled(entryPoint); spelled {
-		return liveTableFor(t, entryPoint)
+func liveTableForOracle(test *testing.T, entryPoint string) (*LoadedDesignSystem, *Table) {
+	test.Helper()
+	_, _, spelled, spelledError := corpus.Spelled(entryPoint)
+	if spelledError != nil {
+		test.Fatalf("reading the corpus %s names: %v", entryPoint, spelledError)
 	}
-	system := oracleSystem(t, entryPoint)
+	if spelled {
+		return liveTableFor(test, entryPoint)
+	}
+	system := oracleSystem(test, entryPoint)
 	table := NewTable(system)
 	if table == nil {
-		t.Fatalf("NewTable returned nil for %s", entryPoint)
+		test.Fatalf("NewTable returned nil for %s", entryPoint)
 	}
 	return system, table
 }
 
 // liveTableFor loads a repository's design system and builds its table, or skips.
-func liveTableFor(t *testing.T, spelling string) (*LoadedDesignSystem, *Table) {
-	t.Helper()
-	entryPoint, packageRoot := liveEntryPointFor(t, spelling)
-	system, err := LoadDesignSystem(LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot})
-	if err != nil {
-		t.Fatalf("loading the design system at %s: %v", entryPoint, err)
+func liveTableFor(test *testing.T, spelling string) (*LoadedDesignSystem, *Table) {
+	test.Helper()
+	entryPoint, packageRoot := liveEntryPointFor(test, spelling)
+	system, loadDesignSystemError := LoadDesignSystem(
+		LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot},
+	)
+	if loadDesignSystemError != nil {
+		test.Fatalf("loading the design system at %s: %v", entryPoint, loadDesignSystemError)
 	}
 	table := NewTable(system)
 	if table == nil {
-		t.Fatalf("NewTable returned nil for %s", entryPoint)
+		test.Fatalf("NewTable returned nil for %s", entryPoint)
 	}
 	return system, table
 }
@@ -92,7 +98,7 @@ func findTailwindPackageRootForTest(start string) string {
 	directory := start
 	for {
 		candidate := filepath.Join(directory, "node_modules", "tailwindcss")
-		if info, err := os.Stat(filepath.Join(candidate, "index.css")); err == nil && !info.IsDir() {
+		if info, statError := os.Stat(filepath.Join(candidate, "index.css")); statError == nil && !info.IsDir() {
 			return candidate
 		}
 		parent := filepath.Dir(directory)
@@ -115,21 +121,25 @@ func findTailwindPackageRootForTest(start string) string {
 // engine is the only thing that can refuse it.
 //
 // Run on the public theme's oracle and on ahra's (#f598zk0), each against the design system it records.
-func TestLiveTableAgreesWithTheEngineOverTheFixtureCorpus(t *testing.T) {
-	t.Parallel()
-	forEachOracleCopy(t, "descriptor_fixtures.json", func(t *testing.T, fixtureName string) {
-		fixtures := loadDescriptorFixtures(t, fixtureName)
-		_, live := liveTableForOracle(t, fixtures.EntryPoint)
-		expectLiveTableAgreesWithTheEngine(t, fixtures, live)
+func TestLiveTableAgreesWithTheEngineOverTheFixtureCorpus(test *testing.T) {
+	test.Parallel()
+	forEachOracleCopy(test, "descriptor_fixtures.json", func(test *testing.T, fixtureName string) {
+		fixtures := loadDescriptorFixtures(test, fixtureName)
+		_, live := liveTableForOracle(test, fixtures.EntryPoint)
+		expectLiveTableAgreesWithTheEngine(test, fixtures, live)
 	})
 }
 
 // expectLiveTableAgreesWithTheEngine scores one live table against the engine's readings in one oracle.
-func expectLiveTableAgreesWithTheEngine(t *testing.T, fixtures *descriptorFixtures, live *Table) {
-	t.Helper()
+func expectLiveTableAgreesWithTheEngine(test *testing.T, fixtures *descriptorFixtures, live *Table) {
+	test.Helper()
 
 	if fixtures.TailwindVersion != live.TailwindVersion {
-		t.Fatalf("the fixtures are Tailwind %s and the live table is Tailwind %s", fixtures.TailwindVersion, live.TailwindVersion)
+		test.Fatalf(
+			"the fixtures are Tailwind %s and the live table is Tailwind %s",
+			fixtures.TailwindVersion,
+			live.TailwindVersion,
+		)
 	}
 
 	agreed, mismatched, declined, withoutReading := 0, 0, 0, 0
@@ -145,7 +155,7 @@ func expectLiveTableAgreesWithTheEngine(t *testing.T, fixtures *descriptorFixtur
 				if !found || !descriptor.PerDeclaration {
 					mismatched++
 					if mismatched <= 20 {
-						t.Errorf("%s: the live table declined but the engine read %v#%d",
+						test.Errorf("%s: the live table declined but the engine read %v#%d",
 							one.ClassName, one.Reading.Order, one.Reading.Count)
 					}
 				}
@@ -162,7 +172,7 @@ func expectLiveTableAgreesWithTheEngine(t *testing.T, fixtures *descriptorFixtur
 		if !got.Equal(want) {
 			mismatched++
 			if mismatched <= 20 {
-				t.Errorf("%s (root %q, %s %q, modifier %s %q): the live table read %v#%d, the engine said %v#%d",
+				test.Errorf("%s (root %q, %s %q, modifier %s %q): the live table read %v#%d, the engine said %v#%d",
 					one.ClassName, one.Root, one.ValueKind, one.Value, one.ModifierKind, one.ModifierValue,
 					got.Order, got.Count, want.Order, want.Count)
 			}
@@ -172,20 +182,20 @@ func expectLiveTableAgreesWithTheEngine(t *testing.T, fixtures *descriptorFixtur
 	}
 
 	if mismatched > 0 {
-		t.Errorf("%d of %d cases disagreed with the engine", mismatched, len(fixtures.Cases))
+		test.Errorf("%d of %d cases disagreed with the engine", mismatched, len(fixtures.Cases))
 	}
 	scored := agreed + mismatched
-	t.Logf("the live table agreed on %d of %d scored cases over %d roots", agreed, scored, fixtures.Counts.Roots)
-	t.Logf("  %d cases had no engine reading and were reported rather than scored", withoutReading)
-	t.Logf("  %d lookups declined", declined)
+	test.Logf("the live table agreed on %d of %d scored cases over %d roots", agreed, scored, fixtures.Counts.Roots)
+	test.Logf("  %d cases had no engine reading and were reported rather than scored", withoutReading)
+	test.Logf("  %d lookups declined", declined)
 
 	// Volume assertions, in the extractor's spirit: a suite that agreed on everything because it
 	// tested almost nothing reports the same green line as one that did the work.
 	if withoutReading > len(fixtures.Cases)/2 {
-		t.Errorf("%d of %d cases had no reading; the corpus is mostly unscored", withoutReading, len(fixtures.Cases))
+		test.Errorf("%d of %d cases had no reading; the corpus is mostly unscored", withoutReading, len(fixtures.Cases))
 	}
 	if agreed < 5000 {
-		t.Errorf("only %d agreements; the corpus is too small for the number to mean anything", agreed)
+		test.Errorf("only %d agreements; the corpus is too small for the number to mean anything", agreed)
 	}
 }
 
@@ -195,13 +205,13 @@ func expectLiveTableAgreesWithTheEngine(t *testing.T, fixtures *descriptorFixtur
 // claiming to describe this repository would answer most classes correctly and be wrong on exactly
 // the tokens the repository added, which is the failure the port exists to remove and the one no
 // aggregate agreement number would surface.
-func TestLiveTableCarriesTheRepositoryTheme(t *testing.T) {
-	t.Parallel()
+func TestLiveTableCarriesTheRepositoryTheme(test *testing.T) {
+	test.Parallel()
 	for _, repository := range corpusRepositories {
-		t.Run(repository.name, func(t *testing.T) {
-			t.Parallel()
-			system, table := liveTableFor(t, repository.spelling)
-			checkTableCarriesTheTheme(t, repository.name, system, table)
+		test.Run(repository.name, func(test *testing.T) {
+			test.Parallel()
+			system, table := liveTableFor(test, repository.spelling)
+			checkTableCarriesTheTheme(test, repository.name, system, table)
 		})
 	}
 }
@@ -209,16 +219,16 @@ func TestLiveTableCarriesTheRepositoryTheme(t *testing.T) {
 // checkTableCarriesTheTheme is the composition TestLiveTableCarriesTheRepositoryTheme asserts, shared with
 // its public twin: namespaces longest-first and drawn from the theme, and every `@utility` block composed
 // into the table, functional ones marked PerDeclaration.
-func checkTableCarriesTheTheme(t *testing.T, name string, system *LoadedDesignSystem, table *Table) {
-	t.Helper()
+func checkTableCarriesTheTheme(test *testing.T, name string, system *LoadedDesignSystem, table *Table) {
+	test.Helper()
 
 	if len(table.Namespaces) == 0 {
-		t.Fatal("the table carries no namespaces, so every bare value resolves through inference alone")
+		test.Fatal("the table carries no namespaces, so every bare value resolves through inference alone")
 	}
 	// Longest-first is the engine's precedence and a contract of the field.
 	for index := 1; index < len(table.Namespaces); index++ {
 		if len(table.Namespaces[index-1]) < len(table.Namespaces[index]) {
-			t.Fatalf("namespaces are not longest-first at %d: %q before %q",
+			test.Fatalf("namespaces are not longest-first at %d: %q before %q",
 				index, table.Namespaces[index-1], table.Namespaces[index])
 		}
 	}
@@ -229,7 +239,7 @@ func checkTableCarriesTheTheme(t *testing.T, name string, system *LoadedDesignSy
 	for _, namespace := range table.Namespaces {
 		keys := table.KeysByNamespace[namespace]
 		if len(keys) == 0 {
-			t.Fatalf("namespace %q holds no keys", namespace)
+			test.Fatalf("namespace %q holds no keys", namespace)
 		}
 		fromTheme := map[string]bool{}
 		for _, key := range system.Theme().KeysInNamespaces([]string{namespace}) {
@@ -237,7 +247,7 @@ func checkTableCarriesTheTheme(t *testing.T, name string, system *LoadedDesignSy
 		}
 		for key := range keys {
 			if !fromTheme[key] {
-				t.Fatalf("namespace %q holds key %q, which this repository's theme does not", namespace, key)
+				test.Fatalf("namespace %q holds key %q, which this repository's theme does not", namespace, key)
 			}
 		}
 	}
@@ -252,26 +262,29 @@ func checkTableCarriesTheTheme(t *testing.T, name string, system *LoadedDesignSy
 	for root, kinds := range system.utilityRoots {
 		if kinds[UtilityKindStatic] {
 			if _, found := table.Statics[root]; !found {
-				t.Errorf("static `@utility %s` is missing from the table's statics", root)
+				test.Errorf("static `@utility %s` is missing from the table's statics", root)
 			}
 			staticRoots++
 		}
 		if kinds[UtilityKindFunctional] {
 			descriptor, found := table.Descriptors[root]
 			if !found {
-				t.Errorf("functional `@utility %s` is missing from the table's descriptors", root)
+				test.Errorf("functional `@utility %s` is missing from the table's descriptors", root)
 				continue
 			}
 			if !descriptor.PerDeclaration {
-				t.Errorf("functional `@utility %s` is not marked PerDeclaration, so the table would answer it from a row rather than declining to the evaluator", root)
+				test.Errorf(
+					"functional `@utility %s` is not marked PerDeclaration, so the table would answer it from a row rather than declining to the evaluator",
+					root,
+				)
 			}
 			functionalRoots++
 		}
 	}
 	if staticRoots+functionalRoots == 0 {
-		t.Fatal("this repository declares no `@utility` blocks, so this test proved nothing about composition")
+		test.Fatal("this repository declares no `@utility` blocks, so this test proved nothing about composition")
 	}
-	t.Logf("%s: %d namespaces, %d static and %d functional `@utility` roots composed in",
+	test.Logf("%s: %d namespaces, %d static and %d functional `@utility` roots composed in",
 		name, len(table.Namespaces), staticRoots, functionalRoots)
 }
 
@@ -280,8 +293,8 @@ func checkTableCarriesTheTheme(t *testing.T, name string, system *LoadedDesignSy
 // The checked-in half must be a fact about Tailwind. Every namespace it keys a reading on has to be
 // one of the framework's, or the file is carrying one repository's tokens under a name that says
 // otherwise, which is the exact bug descriptor.go's comment on Table refuses.
-func TestLiveTableBaseHalfCarriesNoRepositoryTokens(t *testing.T) {
-	t.Parallel()
+func TestLiveTableBaseHalfCarriesNoRepositoryTokens(test *testing.T) {
+	test.Parallel()
 	checked := 0
 	for root, descriptor := range baseDescriptors {
 		for _, axis := range []AxisReadings{descriptor.Absent, descriptor.Alpha, descriptor.Themed} {
@@ -290,16 +303,24 @@ func TestLiveTableBaseHalfCarriesNoRepositoryTokens(t *testing.T) {
 					continue
 				}
 				if !FrameworkNamespaces[namespace] {
-					t.Errorf("%s keys a reading on namespace %q, which is not one of the framework's", root, namespace)
+					test.Errorf(
+						"%s keys a reading on namespace %q, which is not one of the framework's",
+						root,
+						namespace,
+					)
 				}
 				checked++
 			}
 		}
 	}
 	if checked == 0 {
-		t.Fatal("no namespace buckets were checked, so this test proved nothing")
+		test.Fatal("no namespace buckets were checked, so this test proved nothing")
 	}
-	t.Logf("%d namespace buckets in the base table, all keyed on the %d framework namespaces", checked, len(FrameworkNamespaces))
+	test.Logf(
+		"%d namespace buckets in the base table, all keyed on the %d framework namespaces",
+		checked,
+		len(FrameworkNamespaces),
+	)
 }
 
 // TestLiveTableDeclinesOnlyWhereTheEvaluatorAnswers is the price of declining, measured.
@@ -313,31 +334,44 @@ func TestLiveTableBaseHalfCarriesNoRepositoryTokens(t *testing.T) {
 //
 // Run on the public theme's oracle and on ahra's (#f598zk0): each copy's fixtures, its measured table and
 // its live table come from one design system.
-func TestLiveTableDeclinesOnlyWhereTheEvaluatorAnswers(t *testing.T) {
-	t.Parallel()
-	forEachOracleCopy(t, "descriptor_fixtures.json", func(t *testing.T, fixtureName string) {
-		fixtures := loadDescriptorFixtures(t, fixtureName)
-		measured := testTable(t)
-		if tableName := oracleSibling(t, fixtureName, "descriptor_table.json"); tableName != "descriptor_table.json" {
-			var err error
-			measured, err = loadTestTable(tableName, oracleSibling(t, fixtureName, "descriptor_context.json"))
-			if err != nil {
-				t.Fatalf("building the measured table from %s: %v", tableName, err)
+func TestLiveTableDeclinesOnlyWhereTheEvaluatorAnswers(test *testing.T) {
+	test.Parallel()
+	forEachOracleCopy(test, "descriptor_fixtures.json", func(test *testing.T, fixtureName string) {
+		fixtures := loadDescriptorFixtures(test, fixtureName)
+		measured := testTable(test)
+		if tableName := oracleSibling(
+			test,
+			fixtureName,
+			"descriptor_table.json",
+		); tableName != "descriptor_table.json" {
+			var loadTestTableError error
+			measured, loadTestTableError = loadTestTable(
+				tableName,
+				oracleSibling(test, fixtureName, "descriptor_context.json"),
+			)
+			if loadTestTableError != nil {
+				test.Fatalf("building the measured table from %s: %v", tableName, loadTestTableError)
 			}
 		}
-		system, live := liveTableForOracle(t, fixtures.EntryPoint)
-		expectLiveTableDeclinesOnlyWhereTheEvaluatorAnswers(t, fixtures, measured, system, live)
+		system, live := liveTableForOracle(test, fixtures.EntryPoint)
+		expectLiveTableDeclinesOnlyWhereTheEvaluatorAnswers(test, fixtures, measured, system, live)
 	})
 }
 
 // expectLiveTableDeclinesOnlyWhereTheEvaluatorAnswers checks every case one live table declines and its
 // measured table answers against the evaluator.
-func expectLiveTableDeclinesOnlyWhereTheEvaluatorAnswers(t *testing.T, fixtures *descriptorFixtures, measured *Table, system *LoadedDesignSystem, live *Table) {
-	t.Helper()
+func expectLiveTableDeclinesOnlyWhereTheEvaluatorAnswers(
+	test *testing.T,
+	fixtures *descriptorFixtures,
+	measured *Table,
+	system *LoadedDesignSystem,
+	live *Table,
+) {
+	test.Helper()
 
 	evaluator := system.Utilities()
 	if evaluator == nil {
-		t.Fatal("this repository declares no `@utility` blocks, so this test proved nothing")
+		test.Fatal("this repository declares no `@utility` blocks, so this test proved nothing")
 	}
 
 	moved, recovered, unscored := 0, 0, 0
@@ -358,12 +392,15 @@ func expectLiveTableDeclinesOnlyWhereTheEvaluatorAnswers(t *testing.T, fixtures 
 		}
 		reading, answered := evaluator.Reading(candidate)
 		if !answered {
-			t.Errorf("%s: the live table declined, the measured table answered, and the evaluator cannot answer it either", one.ClassName)
+			test.Errorf(
+				"%s: the live table declined, the measured table answered, and the evaluator cannot answer it either",
+				one.ClassName,
+			)
 			continue
 		}
 		want := Reading{Order: one.Reading.Order, Count: one.Reading.Count}
 		if !reading.Equal(want) {
-			t.Errorf("%s: the evaluator read %v#%d where the engine said %v#%d",
+			test.Errorf("%s: the evaluator read %v#%d where the engine said %v#%d",
 				one.ClassName, reading.Order, reading.Count, want.Order, want.Count)
 			continue
 		}
@@ -371,20 +408,26 @@ func expectLiveTableDeclinesOnlyWhereTheEvaluatorAnswers(t *testing.T, fixtures 
 	}
 
 	if moved == 0 {
-		t.Fatal("no cases moved from answered to declined, so this test proved nothing")
+		test.Fatal("no cases moved from answered to declined, so this test proved nothing")
 	}
-	t.Logf("%d cases the live table declines and the measured table answers: %d recovered exactly by the evaluator, %d had no engine reading",
-		moved, recovered, unscored)
+	test.Logf(
+		"%d cases the live table declines and the measured table answers: %d recovered exactly by the evaluator, %d had no engine reading",
+		moved,
+		recovered,
+		unscored,
+	)
 }
 
 // TestLiveTableIsNilWithoutADesignSystem pins the failing-safe behaviour.
 //
 // A bare framework table would answer every class confidently and be wrong on every repository
 // token. Nil forces the caller to decline instead.
-func TestLiveTableIsNilWithoutADesignSystem(t *testing.T) {
-	t.Parallel()
+func TestLiveTableIsNilWithoutADesignSystem(test *testing.T) {
+	test.Parallel()
 	if table := NewTable(nil); table != nil {
-		t.Fatalf("NewTable(nil) returned a table; a caller with no design system must decline rather than read a framework-only one")
+		test.Fatalf(
+			"NewTable(nil) returned a table; a caller with no design system must decline rather than read a framework-only one",
+		)
 	}
 }
 
@@ -395,9 +438,11 @@ func TestLiveTableIsNilWithoutADesignSystem(t *testing.T) {
 // the order of magnitude of a per-run cost, not whether it is fast in isolation.
 func BenchmarkNewTable(benchmark *testing.B) {
 	entryPoint, packageRoot := liveEntryPointFor(benchmark, corpusRepositories[0].spelling)
-	system, err := LoadDesignSystem(LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot})
-	if err != nil {
-		benchmark.Fatalf("loading the design system: %v", err)
+	system, loadDesignSystemError := LoadDesignSystem(
+		LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot},
+	)
+	if loadDesignSystemError != nil {
+		benchmark.Fatalf("loading the design system: %v", loadDesignSystemError)
 	}
 
 	benchmark.ReportAllocs()
@@ -418,9 +463,11 @@ func BenchmarkLoadDesignSystemWithTable(benchmark *testing.B) {
 	benchmark.ReportAllocs()
 	benchmark.ResetTimer()
 	for range benchmark.N {
-		system, err := LoadDesignSystem(LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot})
-		if err != nil {
-			benchmark.Fatalf("loading the design system: %v", err)
+		system, loadDesignSystemError := LoadDesignSystem(
+			LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot},
+		)
+		if loadDesignSystemError != nil {
+			benchmark.Fatalf("loading the design system: %v", loadDesignSystemError)
 		}
 		if table := NewTable(system); table == nil {
 			benchmark.Fatal("NewTable returned nil")

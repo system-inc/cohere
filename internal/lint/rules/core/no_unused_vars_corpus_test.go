@@ -20,13 +20,13 @@ import (
 // producing a verdict. Its one clean case is
 // `export function promisify() { var fn; function fn() {} return fn; }`, which is clean ONLY as
 // JavaScript: there `var fn` and `function fn` are one merged binding that `return fn` reads. As
-// TypeScript the checker keeps them separate — measured, the read resolves to the function at
-// offset 37 while the `var` at offset 33 is genuinely unread — so the same source is a true
+// TypeScript the checker keeps them separate (measured, the read resolves to the function at
+// offset 37 while the `var` at offset 33 is genuinely unread), so the same source is a true
 // positive under `.ts` and reproducing it as clean would require making the rule wrong about
 // TypeScript to be right about a file it never sees.
 //
 // The JSX cases are handled in `no_unused_vars_jsx_test.go` under a `.tsx` harness.
-var noUnusedVarsUpstreamClean = []string{
+var noUnusedVariablesUpstreamClean = []string{
 	"function foo(cb) { cb = function(a) { return cb(1 + a); }(); } foo();",
 	"function foo(cb) { cb = (0, function(a) { cb(1 + a); }); } foo();",
 	"let x = [];\n             x = x.concat(x);",
@@ -439,7 +439,7 @@ var noUnusedVarsUpstreamClean = []string{
 	"\n        import type * as NS from 'foo';\n        export class Bar<NS> implements NS.Foo {\n          value: NS;\n        }\n            ",
 	"\n        const foo = { KEY: 'token' };\n        declare function Inject(token: unknown): ParameterDecorator;\n\n        export class C {\n          constructor(@Inject(foo.KEY) private readonly foo: number) {}\n        }\n            ",
 }
-var noUnusedVarsUpstreamReports = []string{
+var noUnusedVariablesUpstreamReports = []string{
 	"function foox() { return foox(); }",
 	"(function() { function foox() { if (true) { return foox(); } } }())",
 	"var a=10",
@@ -745,63 +745,35 @@ var noUnusedVarsUpstreamReports = []string{
 	"const foo: number = 1;",
 }
 
-// TestNoUnusedVarsStaysSilentOnUpstreamCleanCases asserts every clean case upstream ships stays
+// TestNoUnusedVariablesStaysSilentOnUpstreamCleanCases asserts every clean case upstream ships stays
 // clean here. All 406 pass, which is the half of the corpus that catches a rule reporting too much.
 //
 // oxc ships 409. Two of them are clean only under oxc's leading-underscore default, which this rule
-// no longer has, and they moved to noUnusedVarsReportedOnlyWithoutTheUnderscoreDefault below.
+// no longer has, and they moved to noUnusedVariablesReportedOnlyWithoutTheUnderscoreDefault below.
 // A third, an override method's unused parameter, is withheld above because typescript-eslint reports it.
-func TestNoUnusedVarsStaysSilentOnUpstreamCleanCases(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedVariablesStaysSilentOnUpstreamCleanCases(test *testing.T) {
+	test.Parallel()
 
-	for _, source := range noUnusedVarsUpstreamClean {
-		result := rule_testing.RunTyped(t, NoUnusedVars, "a.ts", source)
+	for _, source := range noUnusedVariablesUpstreamClean {
+		result := rule_testing.RunTyped(test, NoUnusedVariables, "a.ts", source)
 		if len(result.Diagnostics) != 0 {
-			t.Errorf("want clean, got %d findings for %q", len(result.Diagnostics), source)
+			test.Errorf("want clean, got %d findings for %q", len(result.Diagnostics), source)
 		}
 	}
 }
 
-// TestNoUnusedVarsFiresOnUpstreamReportingCases asserts the reporting half.
-//
-// A count rather than a whitelist, and it is deliberately an EXACT count rather than a floor. A
-// floor would go green if the rule started reporting more, which is the direction a false positive
-// arrives from, and this rule's clean-case suite is the only other thing watching for that.
-//
-// The number is measured, not aspirational: 301 of upstream's 303 reporting cases report here. The
-// 2 that do not are a stated subset rather than an accident, and `noUnusedVarsKnownGaps` below
-// names both with its cause, so a change in either direction fails this test and has to be
-// explained rather than absorbed.
-//
-// One of the two is a case upstream cannot report either and documents as such in its own source.
-func TestNoUnusedVarsFiresOnUpstreamReportingCases(t *testing.T) {
-	t.Parallel()
-
-	silent := 0
-	for _, source := range noUnusedVarsUpstreamReports {
-		if len(rule_testing.RunTyped(t, NoUnusedVars, "a.ts", source).Diagnostics) == 0 {
-			silent++
-		}
-	}
-	if silent != len(noUnusedVarsKnownGaps) {
-		t.Errorf("want %d upstream reporting cases silent, got %d — a change here means the "+
-			"ported subset moved and the gap list needs updating with the reason",
-			len(noUnusedVarsKnownGaps), silent)
-	}
-}
-
-// noUnusedVarsKnownGaps names every upstream reporting case this port does not report, with the
-// cause. It exists so the count assertion above cannot be satisfied by a different set of cases: a
+// noUnusedVariablesKnownGaps names every upstream reporting case this port does not report, with the
+// cause. It exists so the count assertion below cannot be satisfied by a different set of cases: a
 // fix in one place and a regression in another would net to zero and go green.
 //
 // It started at 35 and is now 2. Both survivors are stated rather than pending, and neither can be
 // closed without giving something up that is worth more than the finding.
-var noUnusedVarsKnownGaps = []string{
+var noUnusedVariablesKnownGaps = []string{
 	// Upstream cannot report this one either, and says so in its own source. `tests/eslint.rs:744`
-	// ships this line in the FAIL list while the two neighbouring spellings sit COMMENTED OUT at
-	// `:743` and `:745` — oxc knows all three should report and can only manage one. The two it
+	// ships this line in the fail list while the two neighbouring spellings sit commented out at
+	// `:743` and `:745`: oxc knows all three should report and can only manage one. The two it
 	// gives up on are `cb = function(a){ return cb(1+a); }()` and `cb = (0, function(a){ cb(1+a);
-	// })`, and both appear in its PASS list at `:16` and `:17`, so the same source text is
+	// })`, and both appear in its pass list at `:16` and `:17`, so the same source text is
 	// simultaneously a passing case and a known-unreportable failing case.
 	//
 	// This port reports the two spellings upstream reports and stays silent on the sequence form,
@@ -822,22 +794,54 @@ var noUnusedVarsKnownGaps = []string{
 	"with (a) var foo;",
 }
 
-// noUnusedVarsReportedOnlyWithoutTheUnderscoreDefault are the two oxc clean cases that were clean
+// TestNoUnusedVariablesFiresOnUpstreamReportingCases asserts the reporting half.
+//
+// A count rather than a whitelist, and it is deliberately an exact count rather than a floor. A
+// floor would go green if the rule started reporting more, which is the direction a false positive
+// arrives from, and this rule's clean-case suite is the only other thing watching for that.
+//
+// The number is measured, not aspirational: 301 of upstream's 303 reporting cases report here. The
+// 2 that do not are a stated subset rather than an accident, and `noUnusedVariablesKnownGaps` above
+// names both with its cause, so a change in either direction fails this test and has to be
+// explained rather than absorbed.
+//
+// One of the two is a case upstream cannot report either and documents as such in its own source.
+func TestNoUnusedVariablesFiresOnUpstreamReportingCases(test *testing.T) {
+	test.Parallel()
+
+	silent := 0
+	for _, source := range noUnusedVariablesUpstreamReports {
+		if len(rule_testing.RunTyped(test, NoUnusedVariables, "a.ts", source).Diagnostics) == 0 {
+			silent++
+		}
+	}
+	if silent != len(noUnusedVariablesKnownGaps) {
+		test.Errorf("want %d upstream reporting cases silent, got %d; a change here means the "+
+			"ported subset moved and the gap list needs updating with the reason",
+			len(noUnusedVariablesKnownGaps), silent)
+	}
+}
+
+// noUnusedVariablesReportedOnlyWithoutTheUnderscoreDefault are the two oxc clean cases that were clean
 // only because oxc ignores a leading underscore by default.
 //
 // ESLint has no such default, and under the parity doctrine ESLint is the floor. Measured on the
 // installed `@typescript-eslint/no-unused-vars` 8.67.0 with no options: `_thunk` reports at 1:7 and
 // `_unused` at 1:12, both "is assigned a value but never used".
-var noUnusedVarsReportedOnlyWithoutTheUnderscoreDefault = []string{
+var noUnusedVariablesReportedOnlyWithoutTheUnderscoreDefault = []string{
 	"const _thunk = (function createThunk(count) {\n            if (count === 0) return () => count\n            return () => createThunk(count - 1)()\n        })()",
 	"for (const _unused of []) {}",
 }
 
-// TestNoUnusedVarsReportsWhatOnlyTheUnderscoreDefaultHid pins the two cases above as reporting.
-func TestNoUnusedVarsReportsWhatOnlyTheUnderscoreDefaultHid(t *testing.T) {
-	t.Parallel()
+// TestNoUnusedVariablesReportsWhatOnlyTheUnderscoreDefaultHid pins the two cases above as reporting.
+func TestNoUnusedVariablesReportsWhatOnlyTheUnderscoreDefaultHid(test *testing.T) {
+	test.Parallel()
 
-	for _, source := range noUnusedVarsReportedOnlyWithoutTheUnderscoreDefault {
-		rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoUnusedVars, "a.ts", source), "noUnusedVars")
+	for _, source := range noUnusedVariablesReportedOnlyWithoutTheUnderscoreDefault {
+		rule_testing.ExpectFindings(
+			test,
+			rule_testing.RunTyped(test, NoUnusedVariables, "a.ts", source),
+			"noUnusedVars",
+		)
 	}
 }

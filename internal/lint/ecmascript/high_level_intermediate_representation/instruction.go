@@ -1,7 +1,7 @@
 // The instruction set.
 //
-// 43 variants, matching upstream's count and names. See high_level_intermediate_representation.go's package comment for why fidelity
-// to upstream is the priority here and where it is deliberately broken.
+// 43 variants, matching upstream's count and names. See high_level_intermediate_representation.go's package comment for
+// why fidelity to upstream is the priority here and where it is deliberately broken.
 //
 // # Why an interface rather than a tagged struct
 //
@@ -170,7 +170,7 @@ type ComputedDelete struct {
 // CallExpression calls a value.
 type CallExpression struct {
 	Callee       Place
-	Args         []Argument
+	Arguments    []Argument
 	Optional     bool
 	CalleeOrigin ModuleExportOrigin
 }
@@ -183,7 +183,7 @@ type CallExpression struct {
 type MethodCall struct {
 	Receiver     Place
 	Property     Place
-	Args         []Argument
+	Arguments    []Argument
 	Optional     bool
 	CalleeOrigin ModuleExportOrigin
 }
@@ -195,8 +195,8 @@ type ModuleExportOrigin struct {
 
 // NewExpression constructs a value.
 type NewExpression struct {
-	Callee Place
-	Args   []Argument
+	Callee    Place
+	Arguments []Argument
 }
 
 // Argument is one argument to a call: a value, or a spread of one.
@@ -211,7 +211,7 @@ type Argument struct {
 
 // BinaryExpression applies a binary operator.
 //
-// `&&`, `||`, and `??` are NOT here. They short-circuit, so they are control flow and lower to a
+// `&&`, `||`, and `??` are not here. They short-circuit, so they are control flow and lower to a
 // Logical terminal.
 type BinaryExpression struct {
 	Left     Place
@@ -239,8 +239,10 @@ type PostfixUpdate struct {
 	Value     Place
 }
 
-// Primitive is a literal number, string, boolean, null, or undefined.
-type Primitive struct{ Value any }
+// Primitive is a literal number, string, bigint, boolean, null, or undefined.
+//
+// Value says which, as a variant of `PrimitiveValue` in primitive_value.go.
+type Primitive struct{ Value PrimitiveValue }
 
 // RegExpLiteral is a regular expression literal.
 type RegExpLiteral struct {
@@ -347,9 +349,9 @@ type NextPropertyOf struct{ Value Place }
 type JsxExpression struct {
 	// Tag is the element name. For a lowercase host element this is the literal string; for a
 	// component it is a Place naming the component value.
-	Tag      JsxTag
-	Props    []JsxAttribute
-	Children []Place
+	Tag        JsxTag
+	Properties []JsxAttribute
+	Children   []Place
 }
 
 // JsxTag is either a host element name or a component value.
@@ -380,12 +382,12 @@ type JsxText struct{ Value string }
 // Inserted by a later pass and read by a later pass. Nothing in lowering produces them and no
 // generic pass must interpret them; they cost one variant each.
 
-// ManualMemoDependency is one entry a developer WROTE in a `useMemo`/`useCallback` dependency
+// ManualMemoDependency is one entry a developer wrote in a `useMemo`/`useCallback` dependency
 // array: an access path, not a value.
 //
 // This is upstream's `ManualMemoDependency` and it is deliberately the same shape as
 // `ReactiveScopeDependency` in `dependencies.go`, because the entire purpose of these markers is
-// for the two to be COMPARED. `preserve-manual-memoization` reports when what the developer wrote
+// for the two to be compared. `preserve-manual-memoization` reports when what the developer wrote
 // and what the compiler inferred disagree, so a difference in spelling between the two sides would
 // become a false report at every call site.
 //
@@ -395,7 +397,7 @@ type JsxText struct{ Value string }
 //
 // The path reuses `DependencyPathEntry` rather than declaring a second spelling of the same idea.
 // That reuse is load-bearing rather than tidy: `DependencyPathEntry.Optional` is compared by
-// `equalPaths`, so `props.a` and `props?.a` are different dependencies on BOTH sides of the
+// `equalPaths`, so `props.a` and `props?.a` are different dependencies on both sides of the
 // comparison. Collapsing them on this side only would make a one-character source difference
 // invisible to the rule whose whole job is to see it.
 type ManualMemoDependency struct {
@@ -419,7 +421,7 @@ type ManualMemoRoot struct {
 
 // StartMemoize marks the beginning of a manually memoized region.
 //
-// `Deps` is nil when the call had NO dependency array at all, which is a different fact from an
+// `Deps` is nil when the call had no dependency array at all, which is a different fact from an
 // empty array and is why the field is a nil-able slice rather than a length. `useMemo(fn)` with no
 // second argument recomputes every render and is not a memoization claim; `useMemo(fn, [])` claims
 // the value never changes. A rule comparing declared against inferred dependencies must not read
@@ -431,7 +433,7 @@ type StartMemoize struct {
 	// another), so the markers do not form a simple stack in instruction order once the callbacks
 	// are inlined, and a consumer matching by proximity would pair the wrong two.
 	ManualMemoId int
-	// Deps are the dependencies the developer WROTE, nil when the dependency array was absent.
+	// Deps are the dependencies the developer wrote, nil when the dependency array was absent.
 	Deps []ManualMemoDependency
 }
 

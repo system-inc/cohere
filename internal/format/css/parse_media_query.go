@@ -7,12 +7,12 @@ import (
 	"github.com/system-inc/cohere/internal/format/estree"
 )
 
-func parseMediaQuery(params string) *estree.Node {
-	result, err := mediaquery.Parse(params)
-	if err != nil {
+func parseMediaQuery(parameters string) *estree.Node {
+	result, parseError := mediaquery.Parse(parameters)
+	if parseError != nil {
 		// Ignore bad media queries
 		/* c8 ignore next 4 */
-		return estree.New("selector-unknown", 0, 0, "value", params)
+		return estree.New("selector-unknown", 0, 0, []estree.Property{{Key: "value", Value: estree.String(parameters)}})
 	}
 
 	addTypePrefix(addMissingType(result), "media-", nil)

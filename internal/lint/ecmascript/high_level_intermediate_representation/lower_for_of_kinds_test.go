@@ -6,9 +6,9 @@ import (
 	"testing"
 )
 
-func TestForOfHeaderBlockKinds(t *testing.T) {
-	t.Parallel()
-	function := lowerTypedFunctions(t, "loop.ts", `function useRows(rows) {
+func TestForOfHeaderBlockKinds(test *testing.T) {
+	test.Parallel()
+	function := lowerTypedFunctions(test, "loop.ts", `function useRows(rows) {
 for (const row of rows) { for (const cell of row) { consume(cell); } }
 }`)[0]
 	Construct(function)
@@ -22,25 +22,25 @@ for (const row of rows) { for (const cell of row) { consume(cell); } }
 		for _, blockId := range []static_single_assignment.BlockId{loop.Init, loop.Test} {
 			header, found := function.Block(blockId)
 			if !found || header.Kind != BlockKindLoop {
-				t.Errorf("header block %d must have loop kind", blockId)
+				test.Errorf("header block %d must have loop kind", blockId)
 			}
 		}
 		continuation, found := function.Block(loop.Fallthrough)
 		if !found || continuation.Kind != BlockKindBlock {
-			t.Error("the loop continuation must remain an ordinary statement block")
+			test.Error("the loop continuation must remain an ordinary statement block")
 		}
 	}
 	if loops != 2 {
-		t.Fatalf("found %d loops, want two", loops)
+		test.Fatalf("found %d loops, want two", loops)
 	}
 }
 
-func TestForOfHeaderScopeAlignment(t *testing.T) {
-	t.Parallel()
+func TestForOfHeaderScopeAlignment(test *testing.T) {
+	test.Parallel()
 	for _, location := range []string{"initializer", "test", "before", "after"} {
-		t.Run(location, func(t *testing.T) {
-			t.Parallel()
-			function := lowerTypedFunctions(t, "loop.ts", `function useRows(rows) {
+		test.Run(location, func(test *testing.T) {
+			test.Parallel()
+			function := lowerTypedFunctions(test, "loop.ts", `function useRows(rows) {
 before();
 for (const row of rows) { row.read(); row.finish(); }
 after();
@@ -53,7 +53,7 @@ after();
 				}
 			}
 			if loop == nil {
-				t.Fatal("no loop was lowered")
+				test.Fatal("no loop was lowered")
 			}
 			var target *Instruction
 			for _, instruction := range function.Instructions {
@@ -73,7 +73,7 @@ after();
 				}
 			}
 			if target == nil {
-				t.Fatal("the fixture did not produce the target instruction")
+				test.Fatal("the fixture did not produce the target instruction")
 			}
 			original := mutation_aliasing.MutableRange{Start: target.Order, End: target.Order + 1}
 			expected := original
@@ -81,7 +81,10 @@ after();
 				body, _ := function.Block(loop.Loop)
 				continuation, _ := function.Block(loop.Fallthrough)
 				original.End = startingIdOf(function, body) + 1
-				expected = mutation_aliasing.MutableRange{Start: TerminalOrder(loop), End: startingIdOf(function, continuation)}
+				expected = mutation_aliasing.MutableRange{
+					Start: TerminalOrder(loop),
+					End:   startingIdOf(function, continuation),
+				}
 			}
 			identifier := target.LValue.Identifier
 			scopes := &ReactiveScopes{
@@ -92,10 +95,13 @@ after();
 			}
 			aligned, merged := AlignThenMergeReactiveScopes(function, scopes)
 			if actual := aligned.RangeOf(1); actual != expected {
-				t.Fatalf("range %v aligned to %v, want %v", original, actual, expected)
+				test.Fatalf("range %v aligned to %v, want %v", original, actual, expected)
 			}
-			if violations := blockNestingViolations(scopeNestingItems(alignedRangeMap(aligned)), programBlockSubtrees(function)); violations != 0 {
-				t.Errorf("aligned scope leaves %d nesting violations", violations)
+			if violations := blockNestingViolations(
+				scopeNestingItems(alignedRangeMap(aligned)),
+				programBlockSubtrees(function),
+			); violations != 0 {
+				test.Errorf("aligned scope leaves %d nesting violations", violations)
 			}
 			BuildReactiveScopeTerminals(function, scopes, MergedScopeIdentity{Aligned: aligned, Merged: merged})
 			instructions := 0
@@ -103,15 +109,22 @@ after();
 				instructions += len(block.Instructions)
 			}
 			tree, result := BuildReactiveFunction(function)
-			if tree == nil || result.Instructions != instructions || result.DoubleEmitted != 0 || result.UnmatchedGotos != 0 {
-				t.Errorf("conversion must preserve all %d instructions without duplicate blocks or unmatched gotos: %+v", instructions, result)
+			if tree == nil ||
+				result.Instructions != instructions ||
+				result.DoubleEmitted != 0 ||
+				result.UnmatchedGotos != 0 {
+				test.Errorf(
+					"conversion must preserve all %d instructions without duplicate blocks or unmatched gotos: %+v",
+					instructions,
+					result,
+				)
 			}
 		})
 	}
 }
 
-func TestForOfScopedHeadersPreserveInstructions(t *testing.T) {
-	t.Parallel()
+func TestForOfScopedHeadersPreserveInstructions(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range []struct {
 		name   string
 		source string
@@ -132,9 +145,9 @@ subscriber.handlers.current?.onResync?.(channel);
 }
 }`},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			function := lowerTypedFunctions(t, "dispatch.ts", testCase.source)[0]
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			function := lowerTypedFunctions(test, "dispatch.ts", testCase.source)[0]
 			Construct(function)
 			scopes := AssignReactiveScopes(function)
 			aligned, merged := AlignThenMergeReactiveScopes(function, scopes)
@@ -145,10 +158,14 @@ subscriber.handlers.current?.onResync?.(channel);
 			}
 			tree, result := BuildReactiveFunction(function)
 			if instructions == 0 || tree == nil {
-				t.Fatal("the fixture must produce a nonempty graph and reactive tree")
+				test.Fatal("the fixture must produce a nonempty graph and reactive tree")
 			}
 			if result.Instructions != instructions || result.DoubleEmitted != 0 || result.UnmatchedGotos != 0 {
-				t.Errorf("conversion must preserve all %d instructions without duplicate blocks or unmatched gotos: %+v", instructions, result)
+				test.Errorf(
+					"conversion must preserve all %d instructions without duplicate blocks or unmatched gotos: %+v",
+					instructions,
+					result,
+				)
 			}
 		})
 	}

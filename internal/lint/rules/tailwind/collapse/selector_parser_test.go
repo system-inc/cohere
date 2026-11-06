@@ -205,14 +205,14 @@ var selectorParseCases = []struct {
 }
 
 // TestParseSelector is upstream's `describe('parse')`.
-func TestParseSelector(t *testing.T) {
-	t.Parallel()
+func TestParseSelector(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range selectorParseCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			got := ParseSelector(testCase.input)
 			if difference := diffSelectorNodes(got, testCase.want, ""); difference != "" {
-				t.Errorf("ParseSelector(%q):\n  %s\n  got:      %s\n  upstream: %s",
+				test.Errorf("ParseSelector(%q):\n  %s\n  got:      %s\n  upstream: %s",
 					testCase.input, difference, renderSelectorNodes(got), renderSelectorNodes(testCase.want))
 			}
 		})
@@ -251,13 +251,13 @@ var selectorToCssCases = []struct {
 }
 
 // TestSelectorToCss is upstream's `describe('toCss')`.
-func TestSelectorToCss(t *testing.T) {
-	t.Parallel()
+func TestSelectorToCss(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range selectorToCssCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			if printed := SelectorToCss(ParseSelector(testCase.input), testCase.minify); printed != testCase.want {
-				t.Errorf("SelectorToCss(ParseSelector(%q), %t) = %q, upstream prints %q",
+				test.Errorf("SelectorToCss(ParseSelector(%q), %t) = %q, upstream prints %q",
 					testCase.input, testCase.minify, printed, testCase.want)
 			}
 		})
@@ -268,8 +268,8 @@ func TestSelectorToCss(t *testing.T) {
 // replaces `:not(…)` through `walk` and `WalkAction.Replace`. Neither is ported for this tree, so
 // the replacement is done by hand. What the case pins survives: the parsed tree is an ordinary
 // editable value, and SelectorToCss prints the edit rather than the original text.
-func TestSelectorTreeReprintsAnEdit(t *testing.T) {
-	t.Parallel()
+func TestSelectorTreeReprintsAnEdit(test *testing.T) {
+	test.Parallel()
 	nodes := ParseSelector(".foo:hover:not(.bar:focus)")
 	nodes = replaceSelectorNodes(nodes, func(node SelectorNode) (SelectorNode, bool) {
 		if node.Kind == SelectorNodeKindFunction && node.Value == ":not" {
@@ -278,7 +278,7 @@ func TestSelectorTreeReprintsAnEdit(t *testing.T) {
 		return node, false
 	})
 	if printed := SelectorToCss(nodes, false); printed != ".foo:hover.inverted-bar" {
-		t.Errorf("printed %q, upstream prints %q", printed, ".foo:hover.inverted-bar")
+		test.Errorf("printed %q, upstream prints %q", printed, ".foo:hover.inverted-bar")
 	}
 }
 
@@ -303,8 +303,8 @@ func replaceSelectorNodes(nodes []SelectorNode, replace func(SelectorNode) (Sele
 // TestParseSelectorFollowsJavaScriptSemantics pins the behaviors listed at the top of
 // selector_parser.go, none of which upstream's own tests reach. Every expectation here is
 // upstream's output for the input, read off its source run under Node.
-func TestParseSelectorFollowsJavaScriptSemantics(t *testing.T) {
-	t.Parallel()
+func TestParseSelectorFollowsJavaScriptSemantics(test *testing.T) {
+	test.Parallel()
 	cases := []struct {
 		name    string
 		input   string
@@ -353,23 +353,28 @@ func TestParseSelectorFollowsJavaScriptSemantics(t *testing.T) {
 		}, ":nth-child(2 of\t.a)"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			got := ParseSelector(testCase.input)
 			if difference := diffSelectorNodes(got, testCase.want, ""); difference != "" {
-				t.Errorf("ParseSelector(%q):\n  %s\n  got:      %s\n  upstream: %s",
+				test.Errorf("ParseSelector(%q):\n  %s\n  got:      %s\n  upstream: %s",
 					testCase.input, difference, renderSelectorNodes(got), renderSelectorNodes(testCase.want))
 			}
 			if printed := SelectorToCss(got, false); printed != testCase.printed {
-				t.Errorf("SelectorToCss(ParseSelector(%q), false) = %q, upstream prints %q", testCase.input, printed, testCase.printed)
+				test.Errorf(
+					"SelectorToCss(ParseSelector(%q), false) = %q, upstream prints %q",
+					testCase.input,
+					printed,
+					testCase.printed,
+				)
 			}
 		})
 	}
 }
 
 // TestSelectorPredicates covers upstream's `is…Selector` helpers, which upstream's tests do not.
-func TestSelectorPredicates(t *testing.T) {
-	t.Parallel()
+func TestSelectorPredicates(test *testing.T) {
+	test.Parallel()
 	predicates := []struct {
 		name string
 		test func(SelectorNode) bool
@@ -403,7 +408,13 @@ func TestSelectorPredicates(t *testing.T) {
 	for _, testCase := range cases {
 		for _, predicate := range predicates {
 			if got, want := predicate.test(testCase.node), predicate.name == testCase.want; got != want {
-				t.Errorf("%s predicate on %s = %t, want %t", predicate.name, renderSelectorNodes([]SelectorNode{testCase.node}), got, want)
+				test.Errorf(
+					"%s predicate on %s = %t, want %t",
+					predicate.name,
+					renderSelectorNodes([]SelectorNode{testCase.node}),
+					got,
+					want,
+				)
 			}
 		}
 	}
@@ -411,21 +422,21 @@ func TestSelectorPredicates(t *testing.T) {
 
 // TestCloneSelectorNodeIsDeep covers upstream's `cloneAstNode`: a clone shares nothing with its
 // original, and keeps only the fields its kind uses.
-func TestCloneSelectorNodeIsDeep(t *testing.T) {
-	t.Parallel()
+func TestCloneSelectorNodeIsDeep(test *testing.T) {
+	test.Parallel()
 	original := ParseSelector(".a:not(.b, .c)")[0]
 	clone := CloneSelectorNode(original)
 	if difference := diffSelectorNodes([]SelectorNode{clone}, []SelectorNode{original}, ""); difference != "" {
-		t.Fatalf("clone differs from original: %s", difference)
+		test.Fatalf("clone differs from original: %s", difference)
 	}
 	clone.Nodes[1].Nodes[0].Nodes[0].Value = ".changed"
 	if printed := SelectorToCss([]SelectorNode{original}, false); printed != ".a:not(.b, .c)" {
-		t.Errorf("editing the clone changed the original to %q", printed)
+		test.Errorf("editing the clone changed the original to %q", printed)
 	}
 
 	stray := CloneSelectorNode(SelectorNode{Kind: SelectorNodeKindCompound, Value: "dropped", Nodes: []SelectorNode{}})
 	if stray.Value != "" || stray.Nodes == nil {
-		t.Errorf("compound clone = %+v, want no value and an empty non-nil Nodes", stray)
+		test.Errorf("compound clone = %+v, want no value and an empty non-nil Nodes", stray)
 	}
 }
 
@@ -445,7 +456,12 @@ func diffSelectorNodes(got, want []SelectorNode, path string) string {
 			return fmt.Sprintf("at %s: value %q, upstream says %q", here, got[index].Value, want[index].Value)
 		}
 		if (got[index].Nodes == nil) != (want[index].Nodes == nil) {
-			return fmt.Sprintf("at %s: nodes nil is %t, upstream's is %t", here, got[index].Nodes == nil, want[index].Nodes == nil)
+			return fmt.Sprintf(
+				"at %s: nodes nil is %t, upstream's is %t",
+				here,
+				got[index].Nodes == nil,
+				want[index].Nodes == nil,
+			)
 		}
 		if difference := diffSelectorNodes(got[index].Nodes, want[index].Nodes, here); difference != "" {
 			return difference

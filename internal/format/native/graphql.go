@@ -13,7 +13,14 @@ func init() {
 	print := func(_ string, text string, options formatoptions.Options) (string, error) {
 		return graphql.Format(text, options)
 	}
-	printDoc := func(_ string, text string, options formatoptions.Options, _ string, _ string, _ printing.TextToDoc) (doc.Doc, error) {
+	printDoc := func(
+		_ string,
+		text string,
+		options formatoptions.Options,
+		_ string,
+		_ string,
+		_ printing.TextToDoc,
+	) (doc.Doc, error) {
 		return graphql.PrintToDoc(text, options)
 	}
 	for _, extension := range []string{".graphql", ".gql"} {

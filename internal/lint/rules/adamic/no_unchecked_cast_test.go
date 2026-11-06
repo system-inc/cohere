@@ -16,8 +16,8 @@ declare function load(): unknown;
 `
 
 // TestNoUncheckedCastFiresOnCastsNothingCouldCheck: adamic's refusal 2, and the hatches around it.
-func TestNoUncheckedCastFiresOnCastsNothingCouldCheck(t *testing.T) {
-	t.Parallel()
+func TestNoUncheckedCastFiresOnCastsNothingCouldCheck(test *testing.T) {
+	test.Parallel()
 	for name, fixture := range map[string]struct {
 		source string
 		span   string
@@ -26,22 +26,28 @@ func TestNoUncheckedCastFiresOnCastsNothingCouldCheck(t *testing.T) {
 		"unknown to an interface": {shapes + `const user = load() as User;`, "load() as User"},
 		"through unknown":         {shapes + `const user = (shape as unknown) as User;`, "(shape as unknown) as User"},
 		"from any":                {shapes + `declare const raw: any; const user = raw as User;`, "raw as User"},
-		"from an any array":       {shapes + `declare const rows: any[]; const users = rows as User[];`, "rows as User[]"},
-		"an angle bracket":        {shapes + `const user = <User>load();`, "<User>load()"},
-		"members with no tag":     {`type A = { readonly a: number }; type B = { readonly b: number }; declare const either: A | B; const a = either as A;`, "either as A"},
+		"from an any array": {
+			shapes + `declare const rows: any[]; const users = rows as User[];`,
+			"rows as User[]",
+		},
+		"an angle bracket": {shapes + `const user = <User>load();`, "<User>load()"},
+		"members with no tag": {
+			`type A = { readonly a: number }; type B = { readonly b: number }; declare const either: A | B; const a = either as A;`,
+			"either as A",
+		},
 	} {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			result := runAdamic(t, NoUncheckedCast, fixture.source)
-			rule_testing.ExpectFindings(t, result, "uncheckedCast")
-			expectSpans(t, fixture.source, result, fixture.span)
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+			result := runAdamic(test, NoUncheckedCast, fixture.source)
+			rule_testing.ExpectFindings(test, result, "uncheckedCast")
+			expectSpans(test, fixture.source, result, fixture.span)
 		})
 	}
 }
 
 // TestNoUncheckedCastStaysCleanOnChecksAndUpcasts: what Adamic compiles, checked or not needing a check.
-func TestNoUncheckedCastStaysCleanOnChecksAndUpcasts(t *testing.T) {
-	t.Parallel()
+func TestNoUncheckedCastStaysCleanOnChecksAndUpcasts(test *testing.T) {
+	test.Parallel()
 	for name, source := range map[string]string{
 		"a discriminated member":    shapes + `const circle = shape as Circle;`,
 		"typeof apart":              `declare const value: string | number; const text = value as string;`,
@@ -52,15 +58,15 @@ func TestNoUncheckedCastStaysCleanOnChecksAndUpcasts(t *testing.T) {
 		"to unknown":                shapes + `const opaque = shape as unknown;`,
 		"an any array to unknown[]": `declare const rows: any[]; const opaque = rows as unknown[];`,
 	} {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, runAdamic(t, NoUncheckedCast, source))
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, runAdamic(test, NoUncheckedCast, source))
 		})
 	}
 }
 
 // TestNoUncheckedCastStaysCleanOnAdamicsPrograms: Adamic 0.1 compiles all ten.
-func TestNoUncheckedCastStaysCleanOnAdamicsPrograms(t *testing.T) {
-	t.Parallel()
-	expectProgramsClean(t, NoUncheckedCast)
+func TestNoUncheckedCastStaysCleanOnAdamicsPrograms(test *testing.T) {
+	test.Parallel()
+	expectProgramsClean(test, NoUncheckedCast)
 }

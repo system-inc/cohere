@@ -32,98 +32,113 @@ import (
 )
 
 func main() {
-	output := flag.String("output", filepath.Join("internal", "format", "markdown", "classes_generated.go"), "where to write the Go")
+	output := flag.String(
+		"output",
+		filepath.Join("internal", "format", "markdown", "classes_generated.go"),
+		"where to write the Go",
+	)
 	check := flag.Bool("check", false, "regenerate and fail if the committed file disagrees")
 	flag.Parse()
 
-	generated, err := generate()
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
+	generated, generateError := generate()
+	if generateError != nil {
+		// Ignored: the process exits on the next line, so a failed write to stderr has nowhere left to go.
+		fmt.Fprintln(os.Stderr, generateError)
 		os.Exit(1)
 	}
 
 	if *check {
-		committed, err := os.ReadFile(*output)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
+		committed, readError := os.ReadFile(*output)
+		if readError != nil {
+			// Ignored: the process exits on the next line, so a failed write to stderr has nowhere left to go.
+			fmt.Fprintln(os.Stderr, readError)
 			os.Exit(1)
 		}
 		if !bytes.Equal(committed, generated) {
+			// Ignored: the process exits on the next line, so a failed write to stderr has nowhere left to go.
 			fmt.Fprintf(os.Stderr, "%s is stale: regenerate it\n", *output)
 			os.Exit(1)
 		}
 		return
 	}
 
-	if err := os.WriteFile(*output, generated, 0o644); err != nil {
-		fmt.Fprintln(os.Stderr, err)
+	if writeError := os.WriteFile(*output, generated, 0o644); writeError != nil {
+		// Ignored: the process exits on the next line, so a failed write to stderr has nowhere left to go.
+		fmt.Fprintln(os.Stderr, writeError)
 		os.Exit(1)
 	}
 }
 
 // The way splitText uses each regex, with the name captured.
 var (
-	cjkUse         = regexp.MustCompile(`split\(new RegExp\(` + "`" + `\(\$\{([A-Za-z_$]{1,3})\.source\}\)` + "`" + `,"u"\)\)`)
+	cjkUse = regexp.MustCompile(
+		`split\(new RegExp\(` + "`" + `\(\$\{([A-Za-z_$]{1,3})\.source\}\)` + "`" + `,"u"\)\)`,
+	)
 	punctuationUse = regexp.MustCompile(`hasLeadingPunctuation:([A-Za-z_$]{1,3})\.test\(s\[0\]\)`)
-	hangulUse      = regexp.MustCompile(`if\(([A-Za-z_$]{1,3})\.test\(s\)\)\{n\(\{type:"word",value:s,kind:[A-Za-z_$]{1,3},isCJ:!1`)
-	spaceUse       = regexp.MustCompile(`/(\[\\u\{20\}\\u\{A0\}[^/]*\\t\\n\\f\\r\])\$/u\.test`)
+	hangulUse      = regexp.MustCompile(
+		`if\(([A-Za-z_$]{1,3})\.test\(s\)\)\{n\(\{type:"word",value:s,kind:[A-Za-z_$]{1,3},isCJ:!1`,
+	)
+	spaceUse = regexp.MustCompile(`/(\[\\u\{20\}\\u\{A0\}[^/]*\\t\\n\\f\\r\])\$/u\.test`)
 )
 
+// cjkShape is CJK_REGEXP's literal, `(?:[cjk])(?:[variation selectors])?`, with the two classes captured.
+var cjkShape = regexp.MustCompile(`^\(\?:(\[.*\])\)\(\?:(\[.*\])\)\?$`)
+
 func generate() ([]byte, error) {
-	bundles, err := prettier.Bundles()
-	if err != nil {
-		return nil, err
+	bundles, bundlesError := prettier.Bundles()
+	if bundlesError != nil {
+		return nil, bundlesError
 	}
 	markdown := string(bundles.Files["plugins/markdown.js"])
 
 	splitStart := strings.Index(markdown, `.split(/([\t\n ]+)/)`)
 	if splitStart < 0 || strings.Count(markdown, `.split(/([\t\n ]+)/)`) != 1 {
-		return nil, fmt.Errorf("could not find splitText's split exactly once")
+		return nil, fmt.Errorf("splitText's split is not in the bundle exactly once")
 	}
 	splitText := markdown[splitStart : splitStart+1500]
 
 	name := func(pattern *regexp.Regexp, what string) (string, error) {
 		match := pattern.FindStringSubmatch(splitText)
 		if match == nil {
-			return "", fmt.Errorf("could not find how splitText uses %s", what)
+			return "", fmt.Errorf("splitText has no use of %s", what)
 		}
 		return match[1], nil
 	}
-	cjkName, err := name(cjkUse, "CJK_REGEXP")
-	if err != nil {
-		return nil, err
+	cjkName, nameError := name(cjkUse, "CJK_REGEXP")
+	if nameError != nil {
+		return nil, nameError
 	}
-	punctuationName, err := name(punctuationUse, "PUNCTUATION_REGEXP")
-	if err != nil {
-		return nil, err
+	punctuationName, nameError := name(punctuationUse, "PUNCTUATION_REGEXP")
+	if nameError != nil {
+		return nil, nameError
 	}
-	hangulName, err := name(hangulUse, "the Hangul regex")
-	if err != nil {
-		return nil, err
+	hangulName, nameError := name(hangulUse, "the Hangul regex")
+	if nameError != nil {
+		return nil, nameError
 	}
 
-	cjkLiteral, err := literal(markdown, cjkName)
-	if err != nil {
-		return nil, err
+	cjkLiteral, literalError := literal(markdown, cjkName)
+	if literalError != nil {
+		return nil, literalError
 	}
-	punctuationLiteral, err := literal(markdown, punctuationName)
-	if err != nil {
-		return nil, err
+	punctuationLiteral, literalError := literal(markdown, punctuationName)
+	if literalError != nil {
+		return nil, literalError
 	}
-	hangulLiteral, err := literal(markdown, hangulName)
-	if err != nil {
-		return nil, err
+	hangulLiteral, literalError := literal(markdown, hangulName)
+	if literalError != nil {
+		return nil, literalError
 	}
 
 	// CJK_REGEXP is `(?:[cjk])(?:[variation selectors])?`: the two classes are asked about separately.
-	cjkParts := regexp.MustCompile(`^\(\?:(\[.*\])\)\(\?:(\[.*\])\)\?$`).FindStringSubmatch(cjkLiteral)
+	cjkParts := cjkShape.FindStringSubmatch(cjkLiteral)
 	if cjkParts == nil {
 		return nil, fmt.Errorf("CJK_REGEXP does not have the shape (?:[...])(?:[...])?: %.80s", cjkLiteral)
 	}
 
 	spaces := spaceUse.FindAllStringSubmatch(markdown, -1)
 	if len(spaces) == 0 {
-		return nil, fmt.Errorf("could not find the space-separator class")
+		return nil, fmt.Errorf("the bundle has no space-separator class")
 	}
 	for _, space := range spaces[1:] {
 		if space[1] != spaces[0][1] {
@@ -141,21 +156,27 @@ func generate() ([]byte, error) {
 		{"variationSelectorRanges", "are the code points CJK_REGEXP's optional second class matches.", cjkParts[2]},
 		{"punctuationRanges", "are the code points PUNCTUATION_REGEXP matches.", punctuationLiteral},
 		{"hangulRanges", "are the code points the printer's Hangul test matches.", hangulLiteral},
-		{"spaceSeparatorRanges", "are the code points of the class `[\\p{Space_Separator}\\t\\n\\f\\r]` was rewritten to.", spaces[0][1]},
+		{
+			"spaceSeparatorRanges",
+			"are the code points of the class `[\\p{Space_Separator}\\t\\n\\f\\r]` was rewritten to.",
+			spaces[0][1],
+		},
 	}
 
 	var source bytes.Buffer
 	source.WriteString("// Code generated by generate_classes. DO NOT EDIT.\n//\n")
-	source.WriteString("// Captured from the embedded markdown bundle, run by goja: the rewritten classes the printer splits and\n")
+	source.WriteString(
+		"// Captured from the embedded markdown bundle, run by goja: the rewritten classes the printer splits and\n",
+	)
 	source.WriteString("// wraps prose by, each asked about every code point. Regenerate with:\n//\n")
 	source.WriteString("//\tgo run ./internal/format/markdown/tools/generate_classes\n\n")
 	source.WriteString("package markdown\n\n")
 
 	answers := map[string][][2]int{}
 	for _, class := range classes {
-		ranges, err := codePointRanges(runtime, class.pattern)
-		if err != nil {
-			return nil, fmt.Errorf("%s: %w", class.name, err)
+		ranges, codePointRangesError := codePointRanges(runtime, class.pattern)
+		if codePointRangesError != nil {
+			return nil, fmt.Errorf("%s: %w", class.name, codePointRangesError)
 		}
 		answers[class.name] = ranges
 		fmt.Fprintf(&source, "// %s %s\nvar %s = [][2]rune{\n", class.name, class.description, class.name)
@@ -171,14 +192,27 @@ func generate() ([]byte, error) {
 		point int
 		want  bool
 	}{
-		{"cjkRanges", 0x4E2D, true}, {"cjkRanges", 'a', false},
-		{"variationSelectorRanges", 0xFE0F, true}, {"variationSelectorRanges", 'a', false},
-		{"punctuationRanges", '!', true}, {"punctuationRanges", 0x3002, true}, {"punctuationRanges", 'a', false},
-		{"hangulRanges", 0xAC00, true}, {"hangulRanges", 0x4E2D, false},
-		{"spaceSeparatorRanges", ' ', true}, {"spaceSeparatorRanges", 0x3000, true}, {"spaceSeparatorRanges", 'a', false},
+		{"cjkRanges", 0x4E2D, true},
+		{"cjkRanges", 'a', false},
+		{"variationSelectorRanges", 0xFE0F, true},
+		{"variationSelectorRanges", 'a', false},
+		{"punctuationRanges", '!', true},
+		{"punctuationRanges", 0x3002, true},
+		{"punctuationRanges", 'a', false},
+		{"hangulRanges", 0xAC00, true},
+		{"hangulRanges", 0x4E2D, false},
+		{"spaceSeparatorRanges", ' ', true},
+		{"spaceSeparatorRanges", 0x3000, true},
+		{"spaceSeparatorRanges", 'a', false},
 	} {
 		if contains(answers[probe.class], probe.point) != probe.want {
-			return nil, fmt.Errorf("control failed: %s U+%04X answered %v, want %v", probe.class, probe.point, !probe.want, probe.want)
+			return nil, fmt.Errorf(
+				"control failed: %s U+%04X answered %v, want %v",
+				probe.class,
+				probe.point,
+				!probe.want,
+				probe.want,
+			)
 		}
 	}
 
@@ -187,7 +221,10 @@ func generate() ([]byte, error) {
 
 // literal cuts the regex literal assigned to name out of the bundle, without its slashes or flags.
 func literal(markdown string, name string) (string, error) {
-	pattern := regexp.MustCompile(`[,; ]` + regexp.QuoteMeta(name) + `=/`)
+	pattern, compileError := regexp.Compile(`[,; ]` + regexp.QuoteMeta(name) + `=/`)
+	if compileError != nil {
+		return "", fmt.Errorf("compiling the assignment pattern for %s: %w", name, compileError)
+	}
 	matches := pattern.FindAllStringIndex(markdown, -1)
 	if len(matches) != 1 {
 		return "", fmt.Errorf("found %d assignments of %s to a regex literal, want exactly 1", len(matches), name)
@@ -216,8 +253,10 @@ func literal(markdown string, name string) (string, error) {
 
 // codePointRanges asks a u-flag regex, anchored, about every code point, lone surrogates included.
 func codePointRanges(runtime *goja.Runtime, pattern string) ([][2]int, error) {
-	runtime.Set("__pattern", pattern)
-	value, err := runtime.RunString(`
+	if setError := runtime.Set("__pattern", pattern); setError != nil {
+		return nil, fmt.Errorf("setting the pattern: %w", setError)
+	}
+	value, runStringError := runtime.RunString(`
 		(function () {
 			const regex = new RegExp("^(?:" + __pattern + ")$", "u");
 			const ranges = [];
@@ -230,12 +269,12 @@ func codePointRanges(runtime *goja.Runtime, pattern string) ([][2]int, error) {
 			return JSON.stringify(ranges);
 		})()
 	`)
-	if err != nil {
-		return nil, err
+	if runStringError != nil {
+		return nil, runStringError
 	}
 	var ranges [][2]int
-	if err := json.Unmarshal([]byte(value.String()), &ranges); err != nil {
-		return nil, err
+	if decodeError := json.Unmarshal([]byte(value.String()), &ranges); decodeError != nil {
+		return nil, decodeError
 	}
 	if len(ranges) == 0 {
 		return nil, fmt.Errorf("matched no code point")

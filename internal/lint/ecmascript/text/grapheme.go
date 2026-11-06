@@ -7,7 +7,7 @@ import "unicode"
 // way for anything that is not plain ASCII.
 //
 // Go's standard library has no grapheme segmenter and this module takes no dependency for one, so
-// this follows Unicode's extended grapheme cluster rules (UAX #29) for the shapes source text holds,
+// this follows Unicode's extended grapheme cluster rules (`UAX #29`) for the shapes source text holds,
 // from the character categories Go ships:
 //
 //   - CR LF is one cluster, and nothing else joins a control character, a line or paragraph
@@ -17,7 +17,7 @@ import "unicode"
 //   - A pictograph after a zero width joiner continues a cluster that began with a pictograph, which
 //     is what makes a family emoji one character.
 //   - Regional indicators pair up, so a flag is one character and three flags are three.
-//   - In six Indic scripts a virama joins the consonant after it, and Thai and Lao SARA AM joins
+//   - In six Indic scripts a virama joins the consonant after it, and Thai and Lao `SARA AM` joins
 //     the letter before it.
 //   - Hangul jamo join as a syllable: a leading consonant before a vowel or syllable, a vowel or
 //     vowel syllable before a vowel or trailing consonant, a trailing one after either.
@@ -50,6 +50,8 @@ func GraphemeCount(value string) int {
 	return count
 }
 
+const zeroWidthJoiner = 0x200D
+
 // continuesCluster reports whether character belongs to the cluster previous is in.
 func continuesCluster(previous rune, character rune, startsWithPictograph bool, regionalIndicators int) bool {
 	switch {
@@ -69,9 +71,7 @@ func continuesCluster(previous rune, character rune, startsWithPictograph bool, 
 	return hangulJoins(previous, character)
 }
 
-const zeroWidthJoiner = 0x200D
-
-// isGraphemeExtend is UAX #29's Extend, ZWJ and SpacingMark together: what never begins a cluster.
+// isGraphemeExtend is `UAX #29`'s Extend, ZWJ and SpacingMark together: what never begins a cluster.
 func isGraphemeExtend(character rune) bool {
 	switch {
 	case unicode.In(character, unicode.Mn, unicode.Me, unicode.Mc):
@@ -85,13 +85,13 @@ func isGraphemeExtend(character rune) bool {
 		// Tag characters, the tail of a subdivision flag such as England's.
 		return true
 	case character == 0x0E33 || character == 0x0EB3:
-		// Thai and Lao SARA AM, filed as letters and joined as spacing marks.
+		// Thai and Lao `SARA AM`, filed as letters and joined as spacing marks.
 		return true
 	}
 	return false
 }
 
-// isGraphemeControl is UAX #29's Control, CR and LF: a cluster of its own, which nothing extends.
+// isGraphemeControl is `UAX #29`'s Control, CR and LF: a cluster of its own, which nothing extends.
 func isGraphemeControl(character rune) bool {
 	if unicode.In(character, unicode.Cc, unicode.Zl, unicode.Zp) {
 		return true
@@ -99,7 +99,7 @@ func isGraphemeControl(character rune) bool {
 	return unicode.Is(unicode.Cf, character) && !isGraphemeExtend(character)
 }
 
-// isIndicLinker is a virama UAX #29 lets join two consonants into one cluster (GB9c): Devanagari,
+// isIndicLinker is a virama `UAX #29` lets join two consonants into one cluster (GB9c): Devanagari,
 // Bengali, Gujarati, Oriya, Telugu and Malayalam. The consonant after it must be a letter in the same
 // 128-code-point block, which is how these scripts are laid out.
 func isIndicLinker(character rune) bool {

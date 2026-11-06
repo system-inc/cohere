@@ -40,50 +40,10 @@ const (
 	EqeqeqNullIgnore EqeqeqNullPolicy = "Ignore"
 )
 
-// EqeqeqOptions configures the rule.
-//
-// Upstream's option surface is a positional list whose legal second element depends on the first:
-// `["always", {"null": ...}]` is valid and `["smart", {"null": ...}]` is not, which its schema
-// expresses as a two-branch `anyOf`. `DecodeEqeqeqOptions` reads that list and enforces the same
-// dependency, and this struct is what it decodes to.
-//
-// Upstream also accepts `"allow-null"` as a deprecated first element. Its own code reads it as
-// `nullOption = config === "always" ? ... : "ignore"` with no smart exemption, which is Always plus
-// a null policy of Ignore, so that is what it decodes to.
-type EqeqeqOptions struct {
-	// Mode is how strictly to ask. Absent means Always, which is upstream's default.
-	Mode EqeqeqMode
-
-	// Null is what to do about a comparison against the `null` literal.
-	//
-	// Absent means Always under the Always mode, matching upstream's `options.null || "always"`.
-	// Under Smart it is forced to Ignore, because Smart already exempts every null comparison and
-	// upstream hardcodes `nullOption = "ignore"` for it.
-	Null EqeqeqNullPolicy
-}
-
 // eqeqeqSettings is the decoded form with the mode-dependency already resolved.
 type eqeqeqSettings struct {
 	mode EqeqeqMode
 	null EqeqeqNullPolicy
-}
-
-// resolve applies upstream's defaults, including the one that depends on the mode.
-func (options EqeqeqOptions) resolve() eqeqeqSettings {
-	settings := eqeqeqSettings{mode: options.Mode, null: options.Null}
-	if settings.mode == "" {
-		settings.mode = EqeqeqAlways
-	}
-	// `nullOption = config === "always" ? options.null || "always" : "ignore"`. The null policy is
-	// only consulted under Always; Smart exempts every null comparison on its own, so a null policy
-	// written beside Smart is discarded rather than honoured. Upstream's schema makes that
-	// combination unwritable; ours cannot, so the discard happens here.
-	if settings.mode != EqeqeqAlways {
-		settings.null = EqeqeqNullIgnore
-	} else if settings.null == "" {
-		settings.null = EqeqeqNullAlways
-	}
-	return settings
 }
 
 // DecodeEqeqeqOptions reads upstream's option list off the config: `["always", {"null": ...}]`,
@@ -93,15 +53,15 @@ func (options EqeqeqOptions) resolve() eqeqeqSettings {
 // Every arm of this rule is selected by string equality, so a typo would silently pick a fourth
 // behaviour of reporting nothing. A second element beside anything but "always" is refused, which is
 // upstream's schema: its `anyOf` gives `smart` and `allow-null` a one-element list.
-func DecodeEqeqeqOptions(list []byte) (any, error) {
+func DecodeEqeqeqOptions(list []byte) (EqeqeqOptions, error) {
 	options := EqeqeqOptions{}
-	elements, err := rule.OptionElements(list, 2)
-	if err != nil || len(elements) == 0 {
-		return options, err
+	elements, optionElementsError := rule.OptionElements(list, 2)
+	if optionElementsError != nil || len(elements) == 0 {
+		return options, optionElementsError
 	}
 
 	var mode string
-	if err := json.Unmarshal(elements[0], &mode); err != nil {
+	if decodeError := json.Unmarshal(elements[0], &mode); decodeError != nil {
 		return options, fmt.Errorf("eqeqeq element 1 takes a string, got %s", elements[0])
 	}
 	switch mode {
@@ -128,8 +88,8 @@ func DecodeEqeqeqOptions(list []byte) (any, error) {
 	var second struct {
 		Null *string `json:"null"`
 	}
-	if err := rule.UnmarshalOptions(elements[1], &second); err != nil {
-		return options, fmt.Errorf("eqeqeq element 2: %w", err)
+	if unmarshalOptionsError := rule.UnmarshalOptions(elements[1], &second); unmarshalOptionsError != nil {
+		return options, fmt.Errorf("eqeqeq element 2: %w", unmarshalOptionsError)
 	}
 	if second.Null == nil {
 		return options, nil
@@ -164,9 +124,9 @@ func DecodeEqeqeqOptions(list []byte) (any, error) {
 // relation that is not transitive, which is the property every reader unconsciously assumes a
 // comparison has. `===` compares without coercion and is transitive.
 //
-// # The repair is a fix sometimes and a suggestion otherwise, and that split IS the rule
+// # The repair is a fix sometimes and a suggestion otherwise, and that split is the rule
 //
-// Changing `==` to `===` changes what the code DOES wherever the operands can differ in type, so
+// Changing `==` to `===` changes what the code does wherever the operands can differ in type, so
 // applying it unattended could turn a passing comparison into a failing one. Upstream draws the line
 // where it can prove coercion is impossible:
 //
@@ -181,7 +141,7 @@ func DecodeEqeqeqOptions(list []byte) (any, error) {
 // # `null` is its own axis
 //
 // `x == null` is the idiomatic test for "null or undefined", so it is broken out as a separate
-// option rather than folded into the general judgment. Under `Null: Never` the rule INVERTS for
+// option rather than folded into the general judgment. Under `Null: Never` the rule inverts for
 // null, reporting `x === null` and asking for `==` -- the only configuration in which this rule
 // reports an identity operator at all.
 //
@@ -190,25 +150,25 @@ func DecodeEqeqeqOptions(list []byte) (any, error) {
 // All three predicates see through them, and that is fidelity rather than a widening: espree gives a
 // parenthesized expression no node, so upstream's direct field reads already look past them.
 // Measured against the installed build -- `(typeof a) == 'number'` and `(1) == (2)` both take the
-// FIX arm, and `x == (null)` takes the null arm. Reading the operands directly would put all three
+// fix arm, and `x == (null)` takes the null arm. Reading the operands directly would put all three
 // on the wrong arm while every unparenthesized case stayed green.
-var Eqeqeq = rule.Rule{
+var Eqeqeq = rule.Rule[EqeqeqOptions]{
 	Name: "eqeqeq",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[EqeqeqOptions]) rule.Listeners {
 		settings := EqeqeqOptions{}.resolve()
-		if decoded, configured := rule.OptionsAs[EqeqeqOptions](options); configured {
+		if decoded, configured := options.Read(); configured {
 			settings = decoded.resolve()
 		}
 		return rule.Listeners{
 			ast.KindBinaryExpression: func(node *ast.Node) {
-				checkEqeqeq(ctx, node, settings)
+				checkEqeqeq(ruleContext, node, settings)
 			},
 		}
 	},
 }
 
 // checkEqeqeq judges one binary expression.
-func checkEqeqeq(ctx rule.Context, node *ast.Node, settings eqeqeqSettings) {
+func checkEqeqeq(ruleContext rule.Context, node *ast.Node, settings eqeqeqSettings) {
 	binary := node.AsBinaryExpression()
 	// The operator token is optional on the node type even though the parser always supplies one,
 	// and the predicates below dereference their operands, so all three nil tests are here rather
@@ -223,10 +183,10 @@ func checkEqeqeq(ctx rule.Context, node *ast.Node, settings eqeqeqSettings) {
 	case ast.KindEqualsEqualsToken, ast.KindExclamationEqualsToken:
 		// A loose operator, which is the ordinary case.
 	case ast.KindEqualsEqualsEqualsToken, ast.KindExclamationEqualsEqualsToken:
-		// An identity operator is reported ONLY under the inverted null policy, and only against
+		// An identity operator is reported only under the inverted null policy, and only against
 		// null. Everywhere else it is the repair this rule asks for.
 		if settings.null == EqeqeqNullNever && isNull {
-			reportEqeqeq(ctx, node, binary, eqeqeqLooseSpellingOf(binary.OperatorToken.Kind))
+			reportEqeqeq(ruleContext, node, binary, eqeqeqLooseSpellingOf(binary.OperatorToken.Kind))
 		}
 		return
 	default:
@@ -246,22 +206,22 @@ func checkEqeqeq(ctx rule.Context, node *ast.Node, settings eqeqeqSettings) {
 		return
 	}
 
-	reportEqeqeq(ctx, node, binary, eqeqeqStrictSpellingOf(binary.OperatorToken.Kind))
+	reportEqeqeq(ruleContext, node, binary, eqeqeqStrictSpellingOf(binary.OperatorToken.Kind))
 }
 
 // reportEqeqeq reports one comparison, with a fix where coercion is provably impossible and a
 // suggestion everywhere else.
 //
-// The finding is anchored on the OPERATOR TOKEN rather than on the whole expression, which is
+// The finding is anchored on the operator token rather than on the whole expression, which is
 // upstream's `loc: operatorToken.loc`. That matters for a reader: a finding spanning `a == b` puts
 // the caret on `a`, and the thing being complained about is the two characters in the middle.
-func reportEqeqeq(ctx rule.Context, node *ast.Node, binary *ast.BinaryExpression, expected string) {
-	// The operator's spelling comes from the SOURCE rather than from `Text()`, which panics on a
+func reportEqeqeq(ruleContext rule.Context, node *ast.Node, binary *ast.BinaryExpression, expected string) {
+	// The operator's spelling comes from the source rather than from `Text()`, which panics on a
 	// token node: `Unhandled case in Node.Text: *ast.Token`. That is the same hazard the shelf's
 	// `property.Name` documents for a computed key, arriving through a different kind, and it takes
 	// the whole file down rather than returning empty.
-	operatorRange := rule.TokenRange(ctx.SourceFile, binary.OperatorToken)
-	actual := ctx.SourceFile.Text()[operatorRange.Pos():operatorRange.End()]
+	operatorRange := rule.TokenRange(ruleContext.SourceFile, binary.OperatorToken)
+	actual := ruleContext.SourceFile.Text()[operatorRange.Pos():operatorRange.End()]
 
 	message := rule.Message{
 		Id: "unexpected",
@@ -275,14 +235,14 @@ func reportEqeqeq(ctx rule.Context, node *ast.Node, binary *ast.BinaryExpression
 
 	// The fix arm: both operands are provably the same type, so swapping the operator cannot change
 	// what the comparison answers. Everything else is offered rather than applied, because there
-	// the swap CHANGES BEHAVIOUR and a human has to agree to it.
+	// the swap changes behaviour and a human has to agree to it.
 	if eqeqeqHasTypeOfOperand(binary) || eqeqeqOperandsAreSameTypedLiterals(binary) {
-		ctx.ReportRangeWithFixes(operatorRange, message,
+		ruleContext.ReportRangeWithFixes(operatorRange, message,
 			rule.ReplaceRange(operatorRange, expected))
 		return
 	}
 
-	ctx.ReportRangeWithSuggestions(operatorRange, message, rule.Suggestion{
+	ruleContext.ReportRangeWithSuggestions(operatorRange, message, rule.Suggestion{
 		Message: rule.Message{
 			Id: "replaceOperator",
 			Description: fmt.Sprintf("Use `%s` instead of `%s`. This changes what the "+
@@ -332,7 +292,7 @@ func eqeqeqIsTypeOfExpression(operand *ast.Node) bool {
 // class.
 //
 // Upstream's `areLiteralsAndSameType`, which compares `typeof node.value` for each side. Two string
-// literals are the same type; a number and a string are not; a number and a bigint are NOT, because
+// literals are the same type; a number and a string are not; a number and a bigint are not, because
 // `typeof 1n` is `"bigint"` -- measured, `1 == 1n` takes the suggestion arm.
 func eqeqeqOperandsAreSameTypedLiterals(binary *ast.BinaryExpression) bool {
 	leftType := eqeqeqLiteralTypeOf(binary.Left)
@@ -344,7 +304,7 @@ func eqeqeqOperandsAreSameTypedLiterals(binary *ast.BinaryExpression) bool {
 // Upstream reads `typeof node.value` on an ESTree `Literal`, which is one node kind covering every
 // literal form; our parser splits them by kind, so the mapping is written out. A no-substitution
 // template counts as a string, matching upstream's `isStaticTemplateLiteral` branch, while a
-// template WITH substitutions does not, because its value is not known until it runs.
+// template with substitutions does not, because its value is not known until it runs.
 //
 // A regular expression literal answers "object", which is what `typeof /a/` evaluates to, and is why
 // `/a/ == /a/` takes the fix arm -- measured against the installed build rather than reasoned about,

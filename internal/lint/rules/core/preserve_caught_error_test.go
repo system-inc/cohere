@@ -13,24 +13,24 @@ import (
 // from ESLint, the decoder, the checker's two jobs, and the messages.
 
 // TestPreserveCaughtErrorFiresAndStaysQuiet is the fixture pair in its smallest form.
-func TestPreserveCaughtErrorFiresAndStaysQuiet(t *testing.T) {
-	t.Parallel()
+func TestPreserveCaughtErrorFiresAndStaysQuiet(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, PreserveCaughtError, "input.ts",
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, PreserveCaughtError, "input.ts",
 		`try { a(); } catch (err) { throw new Error("m"); }`), "missingCause")
-	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, PreserveCaughtError, "input.ts",
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, PreserveCaughtError, "input.ts",
 		`try { a(); } catch (err) { throw new Error("m", { cause: err.message }); }`), "incorrectCause")
-	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, PreserveCaughtError, "input.ts",
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, PreserveCaughtError, "input.ts",
 		`try { a(); } catch ({ message }) { throw new Error(message); }`), "partiallyLostError")
-	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, PreserveCaughtError, "input.ts",
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, PreserveCaughtError, "input.ts",
 		`try { a(); } catch (err) { { const err = 1; throw new Error("m", { cause: err }); } }`), "caughtErrorShadowed")
-	rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, PreserveCaughtError, "input.ts",
+	rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, PreserveCaughtError, "input.ts",
 		`try { a(); } catch { throw new Error("m"); }`, PreserveCaughtErrorOptions{RequireCatchParameter: true}),
 		"missingCatchErrorParam")
 
-	rule_testing.ExpectClean(t, rule_testing.RunTyped(t, PreserveCaughtError, "input.ts",
+	rule_testing.ExpectClean(test, rule_testing.RunTyped(test, PreserveCaughtError, "input.ts",
 		`try { a(); } catch (err) { throw new Error("m", { cause: err }); }`))
-	rule_testing.ExpectClean(t, rule_testing.RunTyped(t, PreserveCaughtError, "input.ts",
+	rule_testing.ExpectClean(test, rule_testing.RunTyped(test, PreserveCaughtError, "input.ts",
 		`try { a(); } catch (err) { throw new Error("m", { "cause": err }); }`))
 }
 
@@ -42,8 +42,8 @@ func TestPreserveCaughtErrorFiresAndStaysQuiet(t *testing.T) {
 // it writes `new Error<("", { cause: err }) => void>()`, which no longer parses as the same code. The
 // rule inserts at the argument list's own position instead, which also steps past a parenthesis in
 // a block or line comment.
-func TestPreserveCaughtErrorWritesIntoTheArgumentListTheParserFound(t *testing.T) {
-	t.Parallel()
+func TestPreserveCaughtErrorWritesIntoTheArgumentListTheParserFound(test *testing.T) {
+	test.Parallel()
 
 	vectors := []struct {
 		before string
@@ -63,13 +63,21 @@ func TestPreserveCaughtErrorWritesIntoTheArgumentListTheParserFound(t *testing.T
 		},
 	}
 	for index, vector := range vectors {
-		result := rule_testing.RunTyped(t, PreserveCaughtError, "input.ts", vector.before)
+		result := rule_testing.RunTyped(test, PreserveCaughtError, "input.ts", vector.before)
 		if len(result.Diagnostics) != 1 || len(result.Diagnostics[0].Suggestions) != 1 {
-			t.Errorf("vector %d: want one finding with one suggestion, got %d findings", index, len(result.Diagnostics))
+			test.Errorf(
+				"vector %d: want one finding with one suggestion, got %d findings",
+				index,
+				len(result.Diagnostics),
+			)
 			continue
 		}
-		if applied := applySuggestion(t, result.SourceFile.Text(), result.Diagnostics[0].Suggestions[0]); applied != vector.after+"\n" {
-			t.Errorf("vector %d: the suggestion writes\n  %q\nwant\n  %q", index, applied, vector.after+"\n")
+		if applied := applySuggestion(
+			test,
+			result.SourceFile.Text(),
+			result.Diagnostics[0].Suggestions[0],
+		); applied != vector.after+"\n" {
+			test.Errorf("vector %d: the suggestion writes\n  %q\nwant\n  %q", index, applied, vector.after+"\n")
 		}
 	}
 }
@@ -79,8 +87,8 @@ func TestPreserveCaughtErrorWritesIntoTheArgumentListTheParserFound(t *testing.T
 // A local declaration of a built-in's name shadows the global, and its constructor takes whatever it
 // takes, so the throw is not this rule's. Naming the class in errorClassNames makes it the rule's
 // again, at the position given, which is what a project that wraps Error under its own name wants.
-func TestPreserveCaughtErrorRequiresTheGlobalBinding(t *testing.T) {
-	t.Parallel()
+func TestPreserveCaughtErrorRequiresTheGlobalBinding(test *testing.T) {
+	test.Parallel()
 
 	shadowed := []string{
 		"class Error {}\ntry { a(); } catch (err) { throw new Error(\"m\"); }",
@@ -88,57 +96,70 @@ func TestPreserveCaughtErrorRequiresTheGlobalBinding(t *testing.T) {
 		"function TypeError() {}\ntry { a(); } catch (err) { throw new TypeError(\"m\"); }",
 	}
 	for _, source := range shadowed {
-		rule_testing.ExpectClean(t, rule_testing.RunTyped(t, PreserveCaughtError, "input.ts", source))
+		rule_testing.ExpectClean(test, rule_testing.RunTyped(test, PreserveCaughtError, "input.ts", source))
 	}
 
-	named := PreserveCaughtErrorOptions{ErrorClassNames: []PreserveCaughtErrorClassName{{Name: "Error", ArgumentPosition: 2}}}
-	rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, PreserveCaughtError, "input.ts", shadowed[0], named),
-		"missingCause")
+	named := PreserveCaughtErrorOptions{
+		ErrorClassNames: []PreserveCaughtErrorClassName{{Name: "Error", ArgumentPosition: 2}},
+	}
+	rule_testing.ExpectFindings(
+		test,
+		rule_testing.RunTypedWithOptions(test, PreserveCaughtError, "input.ts", shadowed[0], named),
+		"missingCause",
+	)
 }
 
 // TestPreserveCaughtErrorComparesTheCauseBySymbol pins the checker's second job, in both directions,
 // in one-line form so a mutant comparing names has something small to fail against.
-func TestPreserveCaughtErrorComparesTheCauseBySymbol(t *testing.T) {
-	t.Parallel()
+func TestPreserveCaughtErrorComparesTheCauseBySymbol(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectClean(t, rule_testing.RunTyped(t, PreserveCaughtError, "input.ts",
+	rule_testing.ExpectClean(test, rule_testing.RunTyped(test, PreserveCaughtError, "input.ts",
 		`try { a(); } catch (err) { if (w) { throw new Error("m", { cause: err }); } }`))
-	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, PreserveCaughtError, "input.ts",
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, PreserveCaughtError, "input.ts",
 		`try { a(); } catch (err) { if (w) { const err = other; throw new Error("m", { cause: err }); } }`),
 		"caughtErrorShadowed")
 
 	// A shorthand names the variable `cause`, read through the shorthand to its value's symbol.
-	rule_testing.ExpectClean(t, rule_testing.RunTyped(t, PreserveCaughtError, "input.ts",
+	rule_testing.ExpectClean(test, rule_testing.RunTyped(test, PreserveCaughtError, "input.ts",
 		`try { a(); } catch (cause) { throw new Error("m", { cause }); }`))
-	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, PreserveCaughtError, "input.ts",
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, PreserveCaughtError, "input.ts",
 		`try { a(); } catch (cause) { { const cause = 1; throw new Error("m", { cause }); } }`),
 		"caughtErrorShadowed")
 }
 
 // TestPreserveCaughtErrorDecodesErrorClassNames routes both spellings through the registered decoder,
 // since that is what turns a configuration into options.
-func TestPreserveCaughtErrorDecodesErrorClassNames(t *testing.T) {
-	t.Parallel()
+func TestPreserveCaughtErrorDecodesErrorClassNames(test *testing.T) {
+	test.Parallel()
 
 	decode := rule.DecodeOptionsInto[PreserveCaughtErrorOptions]()
 
-	decoded, err := decode([]byte(`{"errorClassNames": ["AppError", {"name": "WideError", "argumentPosition": 3}]}`))
-	if err != nil {
-		t.Fatalf("decoding both spellings failed: %v", err)
+	decoded, decodeError := decode(
+		[]byte(`{"errorClassNames": ["AppError", {"name": "WideError", "argumentPosition": 3}]}`),
+	)
+	if decodeError != nil {
+		test.Fatalf("decoding both spellings failed: %v", decodeError)
 	}
-	options := decoded.(PreserveCaughtErrorOptions)
-	want := []PreserveCaughtErrorClassName{{Name: "AppError", ArgumentPosition: 2}, {Name: "WideError", ArgumentPosition: 3}}
-	if len(options.ErrorClassNames) != 2 || options.ErrorClassNames[0] != want[0] || options.ErrorClassNames[1] != want[1] {
-		t.Errorf("decoded %#v, want %#v", options.ErrorClassNames, want)
+	want := []PreserveCaughtErrorClassName{
+		{Name: "AppError", ArgumentPosition: 2},
+		{Name: "WideError", ArgumentPosition: 3},
+	}
+	if len(decoded.ErrorClassNames) != 2 ||
+		decoded.ErrorClassNames[0] != want[0] ||
+		decoded.ErrorClassNames[1] != want[1] {
+		test.Errorf("decoded %#v, want %#v", decoded.ErrorClassNames, want)
 	}
 
 	// The same name twice takes the later position, as ESLint's Map does. Position 3 reads the third
 	// argument, so the object in second place is not the options and the throw has none.
-	twice, err := decode([]byte(`{"errorClassNames": [{"name": "AppError", "argumentPosition": 2}, {"name": "AppError", "argumentPosition": 3}]}`))
-	if err != nil {
-		t.Fatalf("decoding a repeated name failed: %v", err)
+	twice, decodeError := decode([]byte(
+		`{"errorClassNames": [{"name": "AppError", "argumentPosition": 2}, {"name": "AppError", "argumentPosition": 3}]}`,
+	))
+	if decodeError != nil {
+		test.Fatalf("decoding a repeated name failed: %v", decodeError)
 	}
-	rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, PreserveCaughtError, "input.ts",
+	rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, PreserveCaughtError, "input.ts",
 		`try { a(); } catch (err) { throw new AppError("m", { cause: err }); }`, twice), "missingCause")
 
 	refused := []string{
@@ -150,38 +171,47 @@ func TestPreserveCaughtErrorDecodesErrorClassNames(t *testing.T) {
 		`{"errorClassNames": [7]}`,
 	}
 	for _, configuration := range refused {
-		if _, err := decode([]byte(configuration)); err == nil {
-			t.Errorf("ESLint's schema refuses %s, and the decoder accepted it", configuration)
+		if _, decodeError := decode([]byte(configuration)); decodeError == nil {
+			test.Errorf("ESLint's schema refuses %s, and the decoder accepted it", configuration)
 		}
 	}
 }
 
 // TestPreserveCaughtErrorRequireCatchParameterDefaultsOff pins the default through the decoder and
 // through nil, which is what a rule configured as bare "error" is handed.
-func TestPreserveCaughtErrorRequireCatchParameterDefaultsOff(t *testing.T) {
-	t.Parallel()
+func TestPreserveCaughtErrorRequireCatchParameterDefaultsOff(test *testing.T) {
+	test.Parallel()
 
 	bareCatch := `try { a(); } catch { throw new Error("m"); }`
 	decode := rule.DecodeOptionsInto[PreserveCaughtErrorOptions]()
 
-	rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, PreserveCaughtError, "input.ts", bareCatch, nil))
+	rule_testing.ExpectClean(
+		test,
+		rule_testing.RunTyped(test, PreserveCaughtError, "input.ts", bareCatch),
+	)
 
-	explicitFalse, err := decode([]byte(`{"requireCatchParameter": false}`))
-	if err != nil {
-		t.Fatalf("decoding an explicit false failed: %v", err)
+	explicitFalse, decodeError := decode([]byte(`{"requireCatchParameter": false}`))
+	if decodeError != nil {
+		test.Fatalf("decoding an explicit false failed: %v", decodeError)
 	}
-	rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, PreserveCaughtError, "input.ts", bareCatch, explicitFalse))
+	rule_testing.ExpectClean(
+		test,
+		rule_testing.RunTypedWithOptions(test, PreserveCaughtError, "input.ts", bareCatch, explicitFalse),
+	)
 
-	explicitTrue, err := decode([]byte(`{"requireCatchParameter": true}`))
-	if err != nil {
-		t.Fatalf("decoding an explicit true failed: %v", err)
+	explicitTrue, decodeError := decode([]byte(`{"requireCatchParameter": true}`))
+	if decodeError != nil {
+		test.Fatalf("decoding an explicit true failed: %v", decodeError)
 	}
-	rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, PreserveCaughtError, "input.ts", bareCatch, explicitTrue),
-		"missingCatchErrorParam")
+	rule_testing.ExpectFindings(
+		test,
+		rule_testing.RunTypedWithOptions(test, PreserveCaughtError, "input.ts", bareCatch, explicitTrue),
+		"missingCatchErrorParam",
+	)
 
 	// A parameterless catch that throws nothing new is silent even with the option on: the finding
 	// is about a throw that cannot carry the caught error, not about the clause.
-	rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, PreserveCaughtError, "input.ts",
+	rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, PreserveCaughtError, "input.ts",
 		`try { a(); } catch { log(); }`, explicitTrue))
 }
 
@@ -193,11 +223,11 @@ func TestPreserveCaughtErrorRequireCatchParameterDefaultsOff(t *testing.T) {
 // throw would reach the missing-parameter and destructuring findings and then the cause comparison,
 // which asks the checker. Uniform silence is the answer: a file whose program failed to build should
 // read as a rule that could not run, not as one with a few odd complaints.
-func TestPreserveCaughtErrorRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestPreserveCaughtErrorRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	if !PreserveCaughtError.NeedsTypeChecker {
-		t.Fatalf("this rule resolves symbols and must declare NeedsTypeChecker")
+		test.Fatalf("this rule resolves symbols and must declare NeedsTypeChecker")
 	}
 	options := PreserveCaughtErrorOptions{
 		RequireCatchParameter: true,
@@ -212,11 +242,23 @@ func TestPreserveCaughtErrorRequiresTheTypedHarness(t *testing.T) {
 		`try { a(); } catch (err) { throw new AppError("m", { cause: other }); }`,
 	}
 	for _, source := range sources {
-		if result := rule_testing.RunWithOptions(t, PreserveCaughtError, "input.ts", source, options); len(result.Diagnostics) != 0 {
-			t.Errorf("the untyped harness hands the rule a nil checker, and it must decline:\n%s", source)
+		if result := rule_testing.RunWithOptions(
+			test,
+			PreserveCaughtError,
+			"input.ts",
+			source,
+			options,
+		); len(result.Diagnostics) != 0 {
+			test.Errorf("the untyped harness hands the rule a nil checker, and it must decline:\n%s", source)
 		}
-		if result := rule_testing.RunTypedWithOptions(t, PreserveCaughtError, "input.ts", source, options); len(result.Diagnostics) != 1 {
-			t.Errorf("the typed harness must reach one finding, got %d:\n%s", len(result.Diagnostics), source)
+		if result := rule_testing.RunTypedWithOptions(
+			test,
+			PreserveCaughtError,
+			"input.ts",
+			source,
+			options,
+		); len(result.Diagnostics) != 1 {
+			test.Errorf("the typed harness must reach one finding, got %d:\n%s", len(result.Diagnostics), source)
 		}
 	}
 }
@@ -224,13 +266,13 @@ func TestPreserveCaughtErrorRequiresTheTypedHarness(t *testing.T) {
 // TestPreserveCaughtErrorMessagesSayDifferentThings guards the messages against each other, with the
 // ids typed here as literals: a mutation rewriting a constant moves both sides of a comparison against
 // the constant, and the assertion stays green.
-func TestPreserveCaughtErrorMessagesSayDifferentThings(t *testing.T) {
-	t.Parallel()
+func TestPreserveCaughtErrorMessagesSayDifferentThings(test *testing.T) {
+	test.Parallel()
 
 	messages := map[string]rule.Message{
 		"missingCause":           messageMissingCause,
 		"incorrectCause":         messageIncorrectCause,
-		"missingCatchErrorParam": messageMissingCatchErrorParam,
+		"missingCatchErrorParam": messageMissingCatchErrorParameter,
 		"partiallyLostError":     messagePartiallyLostError,
 		"caughtErrorShadowed":    messageCaughtErrorShadowed,
 		"includeCause":           messageIncludeCause,
@@ -238,14 +280,14 @@ func TestPreserveCaughtErrorMessagesSayDifferentThings(t *testing.T) {
 	descriptions := map[string]string{}
 	for id, message := range messages {
 		if message.Id != id {
-			t.Errorf("the message filed under %s has id %q", id, message.Id)
+			test.Errorf("the message filed under %s has id %q", id, message.Id)
 		}
 		if other, taken := descriptions[message.Description]; taken {
-			t.Errorf("%s and %s share a description", id, other)
+			test.Errorf("%s and %s share a description", id, other)
 		}
 		descriptions[message.Description] = id
 		if !strings.Contains(message.Description, "`cause`") {
-			t.Errorf("%s must name the `cause` option, since that is what every finding is about", id)
+			test.Errorf("%s must name the `cause` option, since that is what every finding is about", id)
 		}
 	}
 }

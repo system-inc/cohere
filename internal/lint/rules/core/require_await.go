@@ -24,7 +24,7 @@ import (
 // `async` changes a function's contract: it wraps the return value in a promise and makes every
 // caller either await it or handle a floating promise. A function that never awaits pays that cost
 // and buys nothing, and a reader seeing `async` reasonably assumes there is asynchrony inside to
-// find. Removing the keyword is offered as a SUGGESTION rather than applied, because it changes the
+// find. Removing the keyword is offered as a suggestion rather than applied, because it changes the
 // function's return type from `Promise<T>` to `T` and every caller has to agree.
 //
 // # Three things count as awaiting, and missing any one reports a legitimate function
@@ -36,18 +36,18 @@ import (
 //	                         expression node at all
 //
 // That last one is the sharpest and it carries a trap worth stating: `NodeFlagsAwaitUsing` is
-// `Const|Using` rather than a bit of its own, so `flags&NodeFlagsAwaitUsing != 0` is TRUE for an
+// `Const|Using` rather than a bit of its own, so `flags&NodeFlagsAwaitUsing != 0` is true for an
 // ordinary `const`. Measured: a plain `const x` in a `for...of` header answers true to the naive
 // test. The correct discrimination is the mask idiom typescript-go itself uses at
 // `ast/utilities.go:1214`, comparing the block-scoped bits for equality.
 //
 // # Two exclusions, both deliberate upstream
 //
-// An EMPTY body is never reported. Upstream declines it on the reasoning that an empty async
+// An empty body is never reported. Upstream declines it on the reasoning that an empty async
 // function is a stub or an interface implementation rather than an oversight, and reporting it
 // would fire on every unimplemented method in a codebase.
 //
-// A GENERATOR is never reported, whatever its body. An async generator's `async` governs its
+// A generator is never reported, whatever its body. An async generator's `async` governs its
 // iteration protocol rather than its return value, so the keyword is doing work even with no
 // `await` inside.
 //
@@ -57,15 +57,15 @@ import (
 // fresh frame per function, so the inner await sets the inner frame's flag and the outer one stays
 // unset. Here the search stops at every nested function boundary, which is the same rule stated as
 // a walk. Measured on upstream's own case: `async function foo() { async () => { await x; } }`
-// reports the OUTER function, and the inner arrow is separately clean because it does await.
-var RequireAwait = rule.Rule{
+// reports the outer function, and the inner arrow is separately clean because it does await.
+var RequireAwait = rule.Rule[rule.NoOptions]{
 	Name: "require-await",
 	// The contract check reads the checker. Without this the checker is nil, the guard silently
 	// never fires, and the rule quietly reverts to upstream's blindness.
 	NeedsTypeChecker: true,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		check := func(node *ast.Node) {
-			checkRequireAwait(ctx, node)
+			checkRequireAwait(ruleContext, node)
 		}
 		return rule.Listeners{
 			ast.KindFunctionDeclaration: check,
@@ -84,7 +84,7 @@ var RequireAwait = rule.Rule{
 }
 
 // checkRequireAwait judges one function-like node.
-func checkRequireAwait(ctx rule.Context, node *ast.Node) {
+func checkRequireAwait(ruleContext rule.Context, node *ast.Node) {
 	if node.ModifierFlags()&ast.ModifierFlagsAsync == 0 {
 		return
 	}
@@ -103,33 +103,33 @@ func checkRequireAwait(ctx rule.Context, node *ast.Node) {
 	if requireAwaitContainsAwait(body) {
 		return
 	}
-	if requireAwaitSatisfiesPromiseContract(ctx, node) {
+	if requireAwaitSatisfiesPromiseContract(ruleContext, node) {
 		return
 	}
 
-	head := requireAwaitHeadRange(ctx, node)
-	asyncRange, found := requireAwaitAsyncKeywordRange(ctx, node)
+	head := requireAwaitHeadRange(ruleContext, node)
+	asyncRange, found := requireAwaitAsyncKeywordRange(ruleContext, node)
 	if !found {
 		// The `async` keyword could not be located, which should not happen for a node whose
 		// modifier flag is set. Reported without a suggestion rather than skipped: the finding is
 		// still true, and offering a repair whose span was not found would be worse.
-		ctx.ReportRange(head, requireAwaitMessage(ctx, node))
+		ruleContext.ReportRange(head, requireAwaitMessage(ruleContext, node))
 		return
 	}
 
-	ctx.ReportRangeWithSuggestions(head, requireAwaitMessage(ctx, node), rule.Suggestion{
+	ruleContext.ReportRangeWithSuggestions(head, requireAwaitMessage(ruleContext, node), rule.Suggestion{
 		Message: rule.Message{
 			Id: "removeAsync",
 			Description: "Remove `async`. This changes the function's return type from a " +
 				"promise to the value itself, so every caller has to stop awaiting it, which " +
 				"is why it is offered rather than applied.",
 		},
-		Fixes: []rule.Fix{rule.ReplaceRange(asyncRange, requireAwaitReplacement(ctx, node))},
+		Fixes: []rule.Fix{rule.ReplaceRange(asyncRange, requireAwaitReplacement(ruleContext, node))},
 	})
 }
 
 // requireAwaitMessage renders the finding, naming the function the way upstream names it.
-func requireAwaitMessage(ctx rule.Context, node *ast.Node) rule.Message {
+func requireAwaitMessage(ruleContext rule.Context, node *ast.Node) rule.Message {
 	return rule.Message{
 		Id: "missingAwait",
 		Description: fmt.Sprintf(
@@ -138,7 +138,7 @@ func requireAwaitMessage(ctx rule.Context, node *ast.Node) rule.Message {
 				"a function that never awaits pays that cost for nothing and tells the reader "+
 				"there is asynchrony here to find. Remove `async`, or await what this was "+
 				"waiting for.",
-			requireAwaitDescribe(ctx, node)),
+			requireAwaitDescribe(ruleContext, node)),
 	}
 }
 
@@ -162,7 +162,7 @@ func requireAwaitIsGenerator(node *ast.Node) bool {
 //
 // Upstream's `isEmptyFunction`, which tests for a block with an empty body. A concise arrow body is
 // an expression rather than a block and is never empty, so it always answers false. A block holding
-// only an empty statement is NOT empty -- measured, `async function f() { ; }` reports.
+// only an empty statement is not empty -- measured, `async function f() { ; }` reports.
 func requireAwaitBodyIsEmpty(body *ast.Node) bool {
 	if body.Kind != ast.KindBlock {
 		return false
@@ -211,7 +211,7 @@ func requireAwaitContainsAwait(node *ast.Node) bool {
 			return found
 		})
 	}
-	// The body itself is walked rather than passed to the switch, so a body that IS one of the
+	// The body itself is walked rather than passed to the switch, so a body that is one of the
 	// stopping kinds -- which it never is, being a block or an expression -- could not end the
 	// search before it starts.
 	node.ForEachChild(func(child *ast.Node) bool {
@@ -232,7 +232,7 @@ func requireAwaitContainsAwait(node *ast.Node) bool {
 //
 // `NodeFlagsAwaitUsing` is defined as `NodeFlagsConst | NodeFlagsUsing`, not as a bit of its own,
 // and typescript-go's own definition carries the note that on a single node those flags would
-// otherwise be mutually exclusive. So `flags&NodeFlagsAwaitUsing != 0` is true for ANY const and
+// otherwise be mutually exclusive. So `flags&NodeFlagsAwaitUsing != 0` is true for any const and
 // for any using, which measured true on a plain `const` in a for-of header.
 //
 // The correct test compares the block-scoped bits for equality, which is the idiom typescript-go
@@ -256,7 +256,7 @@ func requireAwaitIsAwaitUsing(list *ast.Node) bool {
 // Upstream calls `getFunctionHeadLoc`, which is three branches in a specific order, and the order
 // is the part worth stating because the branches overlap:
 //
-//  1. If the function's PARENT is a property, a method definition or a property definition, the
+//  1. If the function's parent is a property, a method definition or a property definition, the
 //     span starts at the parent and runs to the opening parenthesis of the parameters. This branch
 //     is tested first, so it wins over the arrow branch below.
 //  2. Otherwise, if the function is an arrow, the span is the arrow token alone.
@@ -280,32 +280,32 @@ func requireAwaitIsAwaitUsing(list *ast.Node) bool {
 //	const f = async (a) => {}                       "=>"                <- the arrow, no parent
 //
 // Every span above was measured against the installed rule rather than read off the source.
-func requireAwaitHeadRange(ctx rule.Context, node *ast.Node) core.TextRange {
+func requireAwaitHeadRange(ruleContext rule.Context, node *ast.Node) core.TextRange {
 	// Branch one, and it is first for the reason above: a property value takes the parent's start
 	// even when the function is an arrow. Our parser models a method as one node rather than as a
 	// property holding a function, so the method shapes reach this through the node itself and
 	// only the value-holding shapes have a parent to climb to.
 	if parent := node.Parent; parent != nil && requireAwaitParentOwnsTheHead(parent) {
-		start := rule.TokenRange(ctx.SourceFile, parent).Pos()
-		return core.NewTextRange(start, requireAwaitParametersStart(ctx, node, start))
+		start := rule.TokenRange(ruleContext.SourceFile, parent).Pos()
+		return core.NewTextRange(start, requireAwaitParametersStart(ruleContext, node, start))
 	}
 
 	// Branch two.
 	if node.Kind == ast.KindArrowFunction {
 		if arrow := node.AsArrowFunction().EqualsGreaterThanToken; arrow != nil {
-			return rule.TokenRange(ctx.SourceFile, arrow)
+			return rule.TokenRange(ruleContext.SourceFile, arrow)
 		}
 	}
 
 	// Branch three. The head runs from the first token of the node that carries the `async` keyword
 	// through the end of the name. A method's `async` sits on the method rather than on any inner
 	// function, which our parser already gives us since the two are one node.
-	start := requireAwaitHeadStart(ctx, node)
+	start := requireAwaitHeadStart(ruleContext, node)
 	end := start
 	if name := node.Name(); name != nil {
 		end = name.End()
 	} else {
-		end = requireAwaitParametersStart(ctx, node, start)
+		end = requireAwaitParametersStart(ruleContext, node, start)
 	}
 	if end <= start {
 		end = start + len("async")
@@ -315,8 +315,8 @@ func requireAwaitHeadRange(ctx rule.Context, node *ast.Node) core.TextRange {
 
 // requireAwaitHeadStart finds where the reported span begins for a function that owns its own head.
 //
-// Upstream starts at `node.loc.start`, and the subtlety is what that node CONTAINS. ESTree treats a
-// class member's modifiers as part of the function's parent and an `export` as a wrapper AROUND the
+// Upstream starts at `node.loc.start`, and the subtlety is what that node contains. ESTree treats a
+// class member's modifiers as part of the function's parent and an `export` as a wrapper around the
 // declaration, so the two kinds of leading keyword fall on opposite sides of the start:
 //
 //	class A { static async foo() {} }           "static async foo"
@@ -332,8 +332,8 @@ func requireAwaitHeadRange(ctx rule.Context, node *ast.Node) core.TextRange {
 // So only the export-ish modifiers are skipped, and the class member modifiers are deliberately
 // kept. Skipping all of them would move `static async foo` to `async foo`, which trades one column
 // defect for another and looks equally plausible from the inside.
-func requireAwaitHeadStart(ctx rule.Context, node *ast.Node) int {
-	start := rule.TokenRange(ctx.SourceFile, node).Pos()
+func requireAwaitHeadStart(ruleContext rule.Context, node *ast.Node) int {
+	start := rule.TokenRange(ruleContext.SourceFile, node).Pos()
 	modifiers := node.Modifiers()
 	if modifiers == nil {
 		return start
@@ -345,30 +345,31 @@ func requireAwaitHeadStart(ctx rule.Context, node *ast.Node) int {
 		switch modifier.Kind {
 		case ast.KindExportKeyword, ast.KindDefaultKeyword, ast.KindDeclareKeyword:
 			// Skip past it and keep looking, since `export default` is two of them.
-			if end := rule.TokenRange(ctx.SourceFile, modifier).End(); end > start {
+			if end := rule.TokenRange(ruleContext.SourceFile, modifier).End(); end > start {
 				start = end
 			}
 		default:
 			// The first modifier that belongs to the head stops the scan, so a `static` after an
 			// `export` still starts the span.
-			return requireAwaitSkipSpaces(ctx, start)
+			return requireAwaitSkipSpaces(ruleContext, start)
 		}
 	}
-	return requireAwaitSkipSpaces(ctx, start)
+	return requireAwaitSkipSpaces(ruleContext, start)
 }
 
 // requireAwaitSkipSpaces advances past whitespace, so a skipped keyword does not leave its space.
-func requireAwaitSkipSpaces(ctx rule.Context, start int) int {
-	text := ctx.SourceFile.Text()
-	for start < len(text) {
-		switch text[start] {
+func requireAwaitSkipSpaces(ruleContext rule.Context, start int) int {
+	text := ruleContext.SourceFile.Text()
+	offset := start
+	for offset < len(text) {
+		switch text[offset] {
 		case ' ', '\t', '\n', '\r':
-			start++
+			offset++
 			continue
 		}
 		break
 	}
-	return start
+	return offset
 }
 
 // requireAwaitParentOwnsTheHead answers whether the reported span starts at the function's parent.
@@ -379,7 +380,7 @@ func requireAwaitSkipSpaces(ctx rule.Context, start int) int {
 // a property declaration in a class.
 //
 // Upstream also has no value test and needs none, and neither does this. A function nested deeper
-// inside an initializer, `foo = [async function(){}]`, has the ARRAY as its parent rather than the
+// inside an initializer, `foo = [async function(){}]`, has the array as its parent rather than the
 // property, so the kind test alone already declines it. A guard comparing the initializer against
 // the node was written here first and then removed: it survived every mutation because nothing can
 // reach it, which is the signature of a condition that only looks like it is doing work. The four
@@ -398,8 +399,8 @@ func requireAwaitParentOwnsTheHead(parent *ast.Node) bool {
 // the parameter list node, whose type carries a position but no `*ast.Node` to hand `TokenRange`.
 // A type parameter list can put an earlier `<` in the way but never an earlier `(`, so the first
 // one after the start is the right one.
-func requireAwaitParametersStart(ctx rule.Context, node *ast.Node, start int) int {
-	text := ctx.SourceFile.Text()
+func requireAwaitParametersStart(ruleContext rule.Context, node *ast.Node, start int) int {
+	text := ruleContext.SourceFile.Text()
 	for scan := start; scan < node.End() && scan < len(text); scan++ {
 		if text[scan] == '(' {
 			return scan
@@ -410,10 +411,10 @@ func requireAwaitParametersStart(ctx rule.Context, node *ast.Node, start int) in
 
 // requireAwaitAsyncKeywordRange returns the span the suggestion replaces.
 //
-// Upstream's range runs from the `async` token to the start of the NEXT token including comments,
+// Upstream's range runs from the `async` token to the start of the next token including comments,
 // so the trailing whitespace goes with the keyword while a comment after it survives. Measured:
 // `async /* c */ function foo` becomes `/* c */ function foo`.
-func requireAwaitAsyncKeywordRange(ctx rule.Context, node *ast.Node) (core.TextRange, bool) {
+func requireAwaitAsyncKeywordRange(ruleContext rule.Context, node *ast.Node) (core.TextRange, bool) {
 	modifiers := node.Modifiers()
 	if modifiers == nil {
 		return core.TextRange{}, false
@@ -422,8 +423,8 @@ func requireAwaitAsyncKeywordRange(ctx rule.Context, node *ast.Node) (core.TextR
 		if modifier == nil || modifier.Kind != ast.KindAsyncKeyword {
 			continue
 		}
-		keyword := rule.TokenRange(ctx.SourceFile, modifier)
-		text := ctx.SourceFile.Text()
+		keyword := rule.TokenRange(ruleContext.SourceFile, modifier)
+		text := ruleContext.SourceFile.Text()
 		end := keyword.End()
 		// Consume the whitespace that follows, stopping at the next non-space byte. That byte
 		// begins either the next token or a comment, and upstream stops before both.
@@ -442,7 +443,7 @@ func requireAwaitAsyncKeywordRange(ctx rule.Context, node *ast.Node) (core.TextR
 
 // requireAwaitReplacement returns what the suggestion writes in place of `async`.
 //
-// Almost always the empty string. Upstream substitutes a SEMICOLON instead when removing the
+// Almost always the empty string. Upstream substitutes a semicolon instead when removing the
 // keyword would let automatic semicolon insertion join this construct to the previous line, which
 // its corpus exercises three times:
 //
@@ -455,8 +456,8 @@ func requireAwaitAsyncKeywordRange(ctx rule.Context, node *ast.Node) (core.TextR
 // that reach it here are exactly the two the corpus names: a class member whose predecessor is a
 // property with no semicolon, and an expression statement beginning with a parenthesis or a
 // bracket.
-func requireAwaitReplacement(ctx rule.Context, node *ast.Node) string {
-	if requireAwaitNeedsPrecedingSemicolon(ctx, node) {
+func requireAwaitReplacement(ruleContext rule.Context, node *ast.Node) string {
+	if requireAwaitNeedsPrecedingSemicolon(ruleContext, node) {
 		return ";"
 	}
 	return ""
@@ -467,7 +468,7 @@ func requireAwaitReplacement(ctx rule.Context, node *ast.Node) string {
 // # Both halves are required, and each was measured
 //
 // Upstream asks two questions and emits a semicolon only when both answer yes: whether the token
-// after `async` could CONTINUE the preceding expression, and whether the preceding construct
+// after `async` could continue the preceding expression, and whether the preceding construct
 // actually needs a semicolon. Testing only the second reports a semicolon on shapes upstream leaves
 // alone, which is how this arm was wrong on two of upstream's own cases before it was measured:
 //
@@ -477,11 +478,11 @@ func requireAwaitReplacement(ctx rule.Context, node *ast.Node) string {
 //	class A { a \n async [b](){} }        ""    the property has no initializer to continue
 //	class A { foo() {} \n async [bar](){} } ""  a method needs no semicolon after it
 //
-// So the continuation test is about the token AFTER `async`, and the semicolon test is about what
-// comes BEFORE the member. Reproduced narrowly rather than by porting upstream's full
+// So the continuation test is about the token after `async`, and the semicolon test is about what
+// comes before the member. Reproduced narrowly rather than by porting upstream's full
 // `needsPrecedingSemicolon`, because the shapes that reach it here are exactly these.
-func requireAwaitNeedsPrecedingSemicolon(ctx rule.Context, node *ast.Node) bool {
-	if !requireAwaitTokenAfterAsyncContinuesExpression(ctx, node) {
+func requireAwaitNeedsPrecedingSemicolon(ruleContext rule.Context, node *ast.Node) bool {
+	if !requireAwaitTokenAfterAsyncContinuesExpression(ruleContext, node) {
 		return false
 	}
 	previous := requireAwaitPreviousSibling(node)
@@ -494,7 +495,7 @@ func requireAwaitNeedsPrecedingSemicolon(ctx rule.Context, node *ast.Node) bool 
 		return false
 	}
 	// A previous sibling that already ends in a semicolon cannot be continued either.
-	text := ctx.SourceFile.Text()
+	text := ruleContext.SourceFile.Text()
 	end := previous.End()
 	for end > 0 && (text[end-1] == ' ' || text[end-1] == '\t' || text[end-1] == '\n' ||
 		text[end-1] == '\r') {
@@ -505,7 +506,7 @@ func requireAwaitNeedsPrecedingSemicolon(ctx rule.Context, node *ast.Node) bool 
 
 // requireAwaitCanBeContinued answers whether a preceding member could still be an open expression.
 //
-// A property declaration WITH an initializer is the only class member that can, because the
+// A property declaration with an initializer is the only class member that can, because the
 // initializer is an expression and the next line can extend it. A property with no initializer, a
 // method, an accessor and a constructor are all closed already.
 func requireAwaitCanBeContinued(previous *ast.Node) bool {
@@ -524,12 +525,12 @@ func requireAwaitCanBeContinued(previous *ast.Node) bool {
 // Three shapes can: an opening bracket (an index), an opening parenthesis (a call), and a keyword
 // that is also a binary operator, of which `in` and `instanceof` are the ones a method can be named.
 // A plain identifier cannot, because two identifiers in a row are not an expression.
-func requireAwaitTokenAfterAsyncContinuesExpression(ctx rule.Context, node *ast.Node) bool {
-	asyncRange, found := requireAwaitAsyncKeywordRange(ctx, node)
+func requireAwaitTokenAfterAsyncContinuesExpression(ruleContext rule.Context, node *ast.Node) bool {
+	asyncRange, found := requireAwaitAsyncKeywordRange(ruleContext, node)
 	if !found {
 		return false
 	}
-	text := ctx.SourceFile.Text()
+	text := ruleContext.SourceFile.Text()
 	scan := asyncRange.End()
 	for scan < len(text) && (text[scan] == ' ' || text[scan] == '\t' || text[scan] == '\n' ||
 		text[scan] == '\r') {
@@ -575,7 +576,7 @@ func requireAwaitIsIdentifierByte(character byte) bool {
 // Only two containers matter: a class body, where a property with an initializer can run into the
 // next member, and a statement list, where an expression statement can continue onto the next line.
 //
-// The walk climbs through intermediate nodes so a function EXPRESSION reaches the statement that
+// The walk climbs through intermediate nodes so a function expression reaches the statement that
 // holds it: `foo \n async () => {}` has the arrow nested inside an expression statement rather than
 // sitting in the statement list itself.
 func requireAwaitPreviousSibling(node *ast.Node) *ast.Node {
@@ -624,7 +625,7 @@ func requireAwaitPreviousSibling(node *ast.Node) *ast.Node {
 //
 // The property name wins over the function's own where both exist: `{ async: async function foo() }`
 // renders `Async method 'async'`, because the object property is what a reader searches for.
-func requireAwaitDescribe(ctx rule.Context, node *ast.Node) string {
+func requireAwaitDescribe(ruleContext rule.Context, node *ast.Node) string {
 	kind := "function"
 	switch node.Kind {
 	case ast.KindArrowFunction:
@@ -661,8 +662,8 @@ func requireAwaitDescribe(ctx rule.Context, node *ast.Node) string {
 //
 // A computed name answers nothing, which is what produces the bare `Async method` rendering. A
 // string-literal name answers its cooked value, so a method named with an empty string
-// literal renders WITH that empty name rather than as an unnamed method -- the
-// empty string is a NAME rather than an absent one, and the two render differently.
+// literal renders with that empty name rather than as an unnamed method -- the
+// empty string is a name rather than an absent one, and the two render differently.
 func requireAwaitNameText(name *ast.Node) (string, bool) {
 	switch name.Kind {
 	case ast.KindIdentifier, ast.KindPrivateIdentifier:
@@ -687,9 +688,9 @@ func requireAwaitNameText(name *ast.Node) (string, bool) {
 // not-yet-wired ads collector in a map typed `=> Promise<...>`, a test double standing in for a
 // dependency whose real implementation awaits, a condition function matching its interface.
 //
-// Upstream already concedes the case in a narrower form. An EMPTY body is exempt precisely because
-// reporting it "would fire on every unimplemented method in a codebase" — the same reasoning,
-// drawn by body shape rather than by contract. A stub with one `return emptyReport(...)` in it is
+// Upstream already concedes the case in a narrower form. An empty body is exempt precisely because
+// reporting it "would fire on every unimplemented method in a codebase", which is the same
+// reasoning drawn by body shape rather than by contract. A stub with one `return emptyReport(...)` in it is
 // the same animal and falls outside that line.
 //
 // We hold a resident type graph and a real checker, so we can ask the question upstream cannot:
@@ -697,36 +698,39 @@ func requireAwaitNameText(name *ast.Node) (string, bool) {
 // promise, the `async` is load-bearing and removing it would break the assignment. Reporting it
 // would be telling the author to make their code wrong.
 //
-// The check is deliberately narrow. It fires only when a contextual type exists AND every call
-// signature it offers returns a thenable. A position that accepts `T | Promise<T>` is NOT exempt,
-// because there the keyword really is optional and the finding is real — that union is exactly
+// The check is deliberately narrow. It fires only when a contextual type exists and every call
+// signature it offers returns a thenable. A position that accepts `T | Promise<T>` is not exempt,
+// because there the keyword really is optional and the finding is real: that union is exactly
 // what a widened interface looks like, and widening is the right repair when no implementation
 // awaits. Absent contextual type means absent exemption.
-func requireAwaitSatisfiesPromiseContract(ctx rule.Context, node *ast.Node) bool {
-	if ctx.TypeChecker == nil {
+func requireAwaitSatisfiesPromiseContract(ruleContext rule.Context, node *ast.Node) bool {
+	if ruleContext.TypeChecker == nil {
 		return false
 	}
 
-	// A position inside a generic call is judged by what the call DECLARES, not by what it inferred.
+	// A position inside a generic call is judged by what the call declares, not by what it inferred.
 	// See requireAwaitDeclaredGenericDemand for why the inferred answer is the function grading its
 	// own homework.
-	if declared, substitutions, throughGenericCall := requireAwaitDeclaredGenericDemand(ctx, node); throughGenericCall {
-		return requireAwaitTypesDemandPromise(ctx, node, declared, substitutions)
+	if declared, substitutions, throughGenericCall := requireAwaitDeclaredGenericDemand(
+		ruleContext,
+		node,
+	); throughGenericCall {
+		return requireAwaitTypesDemandPromise(ruleContext, node, declared, substitutions)
 	}
 
-	contextualType := checker.Checker_getContextualType(ctx.TypeChecker, node, checker.ContextFlagsNone)
+	contextualType := checker.Checker_getContextualType(ruleContext.TypeChecker, node, checker.ContextFlagsNone)
 	if contextualType == nil {
 		// A class method has no contextual type of its own; its contract comes from whatever the
 		// class implements or extends. Without this, an adapter satisfying an interface whose
 		// declared member returns a promise reads as a stray keyword, and the repair the rule
 		// suggests would stop the class from satisfying its own interface.
-		contextualType = requireAwaitHeritageMemberType(ctx, node)
+		contextualType = requireAwaitHeritageMemberType(ruleContext, node)
 	}
 	if contextualType == nil {
 		return false
 	}
 
-	return requireAwaitTypesDemandPromise(ctx, node, []*checker.Type{contextualType}, nil)
+	return requireAwaitTypesDemandPromise(ruleContext, node, []*checker.Type{contextualType}, nil)
 }
 
 // requireAwaitTypesDemandPromise answers whether every call signature the position's types offer
@@ -736,19 +740,24 @@ func requireAwaitSatisfiesPromiseContract(ctx rule.Context, node *ast.Node) bool
 // value, the author had a choice and the keyword is not required of them. A type parameter with a
 // substitution is read as the types standing in for it, and one without is read through its
 // apparent type, which is its constraint: an unconstrained `U` offers no signature and no `then`.
-func requireAwaitTypesDemandPromise(ctx rule.Context, node *ast.Node, types []*checker.Type, substitutions map[*checker.Type][]*checker.Type) bool {
+func requireAwaitTypesDemandPromise(
+	ruleContext rule.Context,
+	node *ast.Node,
+	types []*checker.Type,
+	substitutions map[*checker.Type][]*checker.Type,
+) bool {
 	sawSignature := false
 	for _, part := range requireAwaitExpandTypes(types, substitutions) {
-		for _, signature := range type_checking.GetCallSignatures(ctx.TypeChecker, part) {
+		for _, signature := range type_checking.GetCallSignatures(ruleContext.TypeChecker, part) {
 			sawSignature = true
-			returnType := checker.Checker_getReturnTypeOfSignature(ctx.TypeChecker, signature)
+			returnType := checker.Checker_getReturnTypeOfSignature(ruleContext.TypeChecker, signature)
 
-			// Split the RETURN type, not the function type. A position declared
+			// Split the return type, not the function type. A position declared
 			// `T | Promise<T>` offers one signature whose return is a union, and the author may
 			// legitimately answer with either, so the keyword is optional and the finding stands.
 			// Only a return type that is thenable in every branch actually demands a promise.
 			for _, returnPart := range requireAwaitExpandTypes([]*checker.Type{returnType}, substitutions) {
-				if !type_checking.IsThenableType(ctx.TypeChecker, node, returnPart) {
+				if !type_checking.IsThenableType(ruleContext.TypeChecker, node, returnPart) {
 					return false
 				}
 			}
@@ -762,8 +771,8 @@ func requireAwaitTypesDemandPromise(ctx rule.Context, node *ast.Node, types []*c
 // parameter with the types standing in for it.
 func requireAwaitExpandTypes(types []*checker.Type, substitutions map[*checker.Type][]*checker.Type) []*checker.Type {
 	var expanded []*checker.Type
-	for _, t := range types {
-		for part := range type_checking.UnionTypePartsSeq(t) {
+	for _, listedType := range types {
+		for part := range type_checking.UnionTypePartsSequence(listedType) {
 			if standIns, substituted := substitutions[part]; substituted {
 				for _, standIn := range standIns {
 					expanded = append(expanded, type_checking.UnionTypeParts(standIn)...)
@@ -796,7 +805,7 @@ type requireAwaitContextStep struct {
 	index int
 }
 
-// requireAwaitDeclaredGenericDemand finds the type a generic call DECLARES for the position this
+// requireAwaitDeclaredGenericDemand finds the type a generic call declares for the position this
 // function is written into, when the position's contextual type comes from a generic call.
 //
 // # Why the inferred contextual type is the wrong question here
@@ -811,7 +820,7 @@ type requireAwaitContextStep struct {
 //
 // TypeScript's own `ContextFlagsIgnoreNodeInferences` does not close this. It blocks an inference
 // only when the inferred source type's own symbol is the blocked node, which catches
-// `identity(async () => 1)` and misses `map`, whose `U` is inferred from the callback's RETURN type
+// `identity(async () => 1)` and misses `map`, whose `U` is inferred from the callback's return type
 // (a `Promise` whose symbol is the global one). It also works by re-resolving the enclosing calls
 // with inference blocked, which leaves expression types cached from that blocked run on a checker
 // every other rule reads afterwards. This walk only reads.
@@ -821,7 +830,7 @@ type requireAwaitContextStep struct {
 // From the function up to the nearest call it is an argument of, record each step a contextual
 // type takes on the way down: an object literal's property, an array's element, a contextually
 // typed function's return. If that call resolved to an instantiation of a generic signature and
-// wrote no explicit type arguments, replay the steps over the DECLARED parameter type instead of
+// wrote no explicit type arguments, replay the steps over the declared parameter type instead of
 // the instantiated one. A type parameter met on the way is read through its constraint, which is
 // how `(api) => Promise<T>` and `T extends () => Promise<void>` still demand a promise and `() => U`
 // does not, with two stand-ins where the parameter is fixed by something other than this function:
@@ -836,12 +845,15 @@ type requireAwaitContextStep struct {
 //     assignment, so the demand is real.
 //
 // A deeper mention of the parameter in another argument is not followed, and an overload chosen
-// BECAUSE this function returns a promise is not undone; both are named here rather than claimed.
+// because this function returns a promise is not undone; both are named here rather than claimed.
 //
 // The third result is false when the position does not come from a generic call, or when the walk
 // meets a shape it does not model; the caller then asks for the ordinary contextual type, which is
 // what this rule did before the walk existed.
-func requireAwaitDeclaredGenericDemand(ctx rule.Context, node *ast.Node) ([]*checker.Type, map[*checker.Type][]*checker.Type, bool) {
+func requireAwaitDeclaredGenericDemand(
+	ruleContext rule.Context,
+	node *ast.Node,
+) ([]*checker.Type, map[*checker.Type][]*checker.Type, bool) {
 	var steps []requireAwaitContextStep
 	current := node
 
@@ -935,7 +947,7 @@ func requireAwaitDeclaredGenericDemand(ctx rule.Context, node *ast.Node) ([]*che
 			steps = append(steps, requireAwaitContextStep{kind: requireAwaitStepReturn})
 
 		case ast.KindCallExpression, ast.KindNewExpression:
-			return requireAwaitDemandFromGenericCall(ctx, parent, current, steps)
+			return requireAwaitDemandFromGenericCall(ruleContext, parent, current, steps)
 
 		default:
 			return nil, nil, false
@@ -963,7 +975,12 @@ func requireAwaitReturnTakesContextualType(function *ast.Node) bool {
 
 // requireAwaitDemandFromGenericCall replays the recorded steps over the parameter type a generic
 // call declares at the argument's position.
-func requireAwaitDemandFromGenericCall(ctx rule.Context, call *ast.Node, argument *ast.Node, steps []requireAwaitContextStep) ([]*checker.Type, map[*checker.Type][]*checker.Type, bool) {
+func requireAwaitDemandFromGenericCall(
+	ruleContext rule.Context,
+	call *ast.Node,
+	argument *ast.Node,
+	steps []requireAwaitContextStep,
+) ([]*checker.Type, map[*checker.Type][]*checker.Type, bool) {
 	// Explicit type arguments are written by the author, so nothing was inferred from this function.
 	if len(call.TypeArguments()) != 0 {
 		return nil, nil, false
@@ -985,7 +1002,7 @@ func requireAwaitDemandFromGenericCall(ctx rule.Context, call *ast.Node, argumen
 		return nil, nil, false
 	}
 
-	resolved := checker.Checker_getResolvedSignature(ctx.TypeChecker, call, nil, checker.CheckModeNormal)
+	resolved := checker.Checker_getResolvedSignature(ruleContext.TypeChecker, call, nil, checker.CheckModeNormal)
 	if resolved == nil {
 		return nil, nil, false
 	}
@@ -996,42 +1013,56 @@ func requireAwaitDemandFromGenericCall(ctx rule.Context, call *ast.Node, argumen
 		return nil, nil, false
 	}
 
-	parameterType := requireAwaitParameterTypeAt(ctx, declared, argumentIndex)
+	parameterType := requireAwaitParameterTypeAt(ruleContext, declared, argumentIndex)
 	if parameterType == nil {
 		return nil, nil, false
 	}
 
-	substitutions := requireAwaitTypeParameterStandIns(ctx, call, resolved, declared, argumentIndex)
+	substitutions := requireAwaitTypeParameterStandIns(ruleContext, call, resolved, declared, argumentIndex)
 
 	types := []*checker.Type{parameterType}
 	for stepIndex := len(steps) - 1; stepIndex >= 0; stepIndex-- {
-		types = requireAwaitApplyContextStep(ctx, requireAwaitExpandTypes(types, substitutions), steps[stepIndex])
+		types = requireAwaitApplyContextStep(
+			ruleContext,
+			requireAwaitExpandTypes(types, substitutions),
+			steps[stepIndex],
+		)
 	}
 	return types, substitutions, true
 }
 
 // requireAwaitParameterTypeAt is the type a signature declares for the argument at an index,
 // reading a rest parameter's element type.
-func requireAwaitParameterTypeAt(ctx rule.Context, signature *checker.Signature, index int) *checker.Type {
+func requireAwaitParameterTypeAt(ruleContext rule.Context, signature *checker.Signature, index int) *checker.Type {
 	parameters := signature.Parameters()
 	if signature.HasRestParameter() && index >= len(parameters)-1 {
-		restType := checker.Checker_getTypeOfSymbol(ctx.TypeChecker, parameters[len(parameters)-1])
-		return checker.Checker_getIndexTypeOfType(ctx.TypeChecker, restType, checker.Checker_numberType(ctx.TypeChecker))
+		restType := checker.Checker_getTypeOfSymbol(ruleContext.TypeChecker, parameters[len(parameters)-1])
+		return checker.Checker_getIndexTypeOfType(
+			ruleContext.TypeChecker,
+			restType,
+			checker.Checker_numberType(ruleContext.TypeChecker),
+		)
 	}
 	if index >= len(parameters) {
 		return nil
 	}
-	return checker.Checker_getTypeOfSymbol(ctx.TypeChecker, parameters[index])
+	return checker.Checker_getTypeOfSymbol(ruleContext.TypeChecker, parameters[index])
 }
 
 // requireAwaitTypeParameterStandIns finds, for each of the declared signature's type parameters,
 // the types that fix it independently of the argument being judged.
-func requireAwaitTypeParameterStandIns(ctx rule.Context, call *ast.Node, resolved *checker.Signature, declared *checker.Signature, argumentIndex int) map[*checker.Type][]*checker.Type {
+func requireAwaitTypeParameterStandIns(
+	ruleContext rule.Context,
+	call *ast.Node,
+	resolved *checker.Signature,
+	declared *checker.Signature,
+	argumentIndex int,
+) map[*checker.Type][]*checker.Type {
 	substitutions := map[*checker.Type][]*checker.Type{}
 	typeParameters := declared.TypeParameters()
-	isTypeParameter := func(t *checker.Type) bool {
+	isTypeParameter := func(candidateType *checker.Type) bool {
 		for _, typeParameter := range typeParameters {
-			if t == typeParameter {
+			if candidateType == typeParameter {
 				return true
 			}
 		}
@@ -1047,17 +1078,21 @@ func requireAwaitTypeParameterStandIns(ctx rule.Context, call *ast.Node, resolve
 		if declared.HasRestParameter() && index >= len(declaredParameters)-1 {
 			continue
 		}
-		declaredType := checker.Checker_getTypeOfSymbol(ctx.TypeChecker, declaredParameters[index])
+		declaredType := checker.Checker_getTypeOfSymbol(ruleContext.TypeChecker, declaredParameters[index])
 		if !isTypeParameter(declaredType) {
 			continue
 		}
-		resolvedType := checker.Checker_getTypeOfSymbol(ctx.TypeChecker, resolvedParameters[index])
+		resolvedType := checker.Checker_getTypeOfSymbol(ruleContext.TypeChecker, resolvedParameters[index])
 		substitutions[declaredType] = append(substitutions[declaredType], resolvedType)
 	}
 
-	declaredReturn := checker.Checker_getReturnTypeOfSignature(ctx.TypeChecker, declared)
+	declaredReturn := checker.Checker_getReturnTypeOfSignature(ruleContext.TypeChecker, declared)
 	if isTypeParameter(declaredReturn) {
-		if positionType := checker.Checker_getContextualType(ctx.TypeChecker, call, checker.ContextFlagsNone); positionType != nil {
+		if positionType := checker.Checker_getContextualType(
+			ruleContext.TypeChecker,
+			call,
+			checker.ContextFlagsNone,
+		); positionType != nil {
 			substitutions[declaredReturn] = append(substitutions[declaredReturn], positionType)
 		}
 	}
@@ -1069,32 +1104,49 @@ func requireAwaitTypeParameterStandIns(ctx rule.Context, call *ast.Node, resolve
 //
 // Property and signature lookups read a type parameter through its apparent type, so an
 // unconstrained one yields nothing here, which is the point: nothing is demanded of the child.
-func requireAwaitApplyContextStep(ctx rule.Context, types []*checker.Type, step requireAwaitContextStep) []*checker.Type {
+func requireAwaitApplyContextStep(
+	ruleContext rule.Context,
+	types []*checker.Type,
+	step requireAwaitContextStep,
+) []*checker.Type {
 	var next []*checker.Type
 	for _, part := range types {
 		switch step.kind {
 		case requireAwaitStepProperty:
-			if property := checker.Checker_getPropertyOfType(ctx.TypeChecker, part, step.name); property != nil {
-				next = append(next, checker.Checker_getTypeOfSymbol(ctx.TypeChecker, property))
+			if property := checker.Checker_getPropertyOfType(
+				ruleContext.TypeChecker,
+				part,
+				step.name,
+			); property != nil {
+				next = append(next, checker.Checker_getTypeOfSymbol(ruleContext.TypeChecker, property))
 				continue
 			}
-			if indexed := checker.Checker_getIndexTypeOfType(ctx.TypeChecker, part, checker.Checker_stringType(ctx.TypeChecker)); indexed != nil {
+			if indexed := checker.Checker_getIndexTypeOfType(
+				ruleContext.TypeChecker,
+				part,
+				checker.Checker_stringType(ruleContext.TypeChecker),
+			); indexed != nil {
 				next = append(next, indexed)
 			}
 		case requireAwaitStepElement:
-			if checker.Checker_isArrayOrTupleType(ctx.TypeChecker, part) && !checker.Checker_isArrayType(ctx.TypeChecker, part) {
-				elements := checker.Checker_getTypeArguments(ctx.TypeChecker, part)
+			if checker.Checker_isArrayOrTupleType(ruleContext.TypeChecker, part) &&
+				!checker.Checker_isArrayType(ruleContext.TypeChecker, part) {
+				elements := checker.Checker_getTypeArguments(ruleContext.TypeChecker, part)
 				if step.index < len(elements) {
 					next = append(next, elements[step.index])
 				}
 				continue
 			}
-			if indexed := checker.Checker_getIndexTypeOfType(ctx.TypeChecker, part, checker.Checker_numberType(ctx.TypeChecker)); indexed != nil {
+			if indexed := checker.Checker_getIndexTypeOfType(
+				ruleContext.TypeChecker,
+				part,
+				checker.Checker_numberType(ruleContext.TypeChecker),
+			); indexed != nil {
 				next = append(next, indexed)
 			}
 		case requireAwaitStepReturn:
-			for _, signature := range type_checking.GetCallSignatures(ctx.TypeChecker, part) {
-				next = append(next, checker.Checker_getReturnTypeOfSignature(ctx.TypeChecker, signature))
+			for _, signature := range type_checking.GetCallSignatures(ruleContext.TypeChecker, part) {
+				next = append(next, checker.Checker_getReturnTypeOfSignature(ruleContext.TypeChecker, signature))
 			}
 		}
 	}
@@ -1108,7 +1160,7 @@ func requireAwaitApplyContextStep(ctx rule.Context, types []*checker.Type, step 
 // clause and asking for the member of the same name recovers it. Measured on ahra: five finance
 // adapters implement one interface whose fetch members return promises, and two of the five
 // genuinely await, so the promise is earned and the other three have no choice about the keyword.
-func requireAwaitHeritageMemberType(ctx rule.Context, node *ast.Node) *checker.Type {
+func requireAwaitHeritageMemberType(ruleContext rule.Context, node *ast.Node) *checker.Type {
 	if !ast.IsMethodDeclaration(node) || ast.IsStatic(node) {
 		return nil
 	}
@@ -1127,15 +1179,15 @@ func requireAwaitHeritageMemberType(ctx rule.Context, node *ast.Node) *checker.T
 
 	for _, clause := range heritageClauses.Nodes {
 		for _, typeNode := range clause.AsHeritageClause().Types.Nodes {
-			heritageType := ctx.TypeChecker.GetTypeAtLocation(typeNode)
+			heritageType := ruleContext.TypeChecker.GetTypeAtLocation(typeNode)
 			if heritageType == nil {
 				continue
 			}
-			member := checker.Checker_getPropertyOfType(ctx.TypeChecker, heritageType, name.Text())
+			member := checker.Checker_getPropertyOfType(ruleContext.TypeChecker, heritageType, name.Text())
 			if member == nil {
 				continue
 			}
-			return ctx.TypeChecker.GetTypeOfSymbolAtLocation(member, node)
+			return ruleContext.TypeChecker.GetTypeOfSymbolAtLocation(member, node)
 		}
 	}
 	return nil

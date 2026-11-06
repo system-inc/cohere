@@ -55,7 +55,7 @@ func noPlusplusUnexpectedUnaryOp(operator string) rule.Message {
 // # The afterthought exemption is recursive, and that is the whole of the port
 //
 // With `allowForLoopAfterthoughts`, upstream exempts the update expression of a `for` loop. But the
-// update may be a SEQUENCE expression, and the exemption reaches through it to any depth:
+// update may be a sequence expression, and the exemption reaches through it to any depth:
 //
 //	for (;; i++) {}                          exempt, the update itself
 //	for (;; foo(), i++) {}                   exempt, an operand of the update
@@ -64,7 +64,7 @@ func noPlusplusUnexpectedUnaryOp(operator string) rule.Message {
 // Upstream expresses this as `isForLoopAfterthought` recursing while the parent is a
 // `SequenceExpression`. Reproduced as the same recursion rather than as a "somewhere inside a for
 // update" containment test, and the difference is measurable: containment would also exempt
-// `for (;; foo(i++)) {}`, where the operator is an ARGUMENT rather than an operand, and upstream
+// `for (;; foo(i++)) {}`, where the operator is an argument rather than an operand, and upstream
 // reports that. The corpus writes it.
 //
 // # Our parser keeps parentheses, and here that costs nothing
@@ -73,11 +73,11 @@ func noPlusplusUnexpectedUnaryOp(operator string) rule.Message {
 // would stop at a paren that upstream never sees. `for (;; (i++)) {}` is the shape, and it is not in
 // the corpus. The walk skips parentheses as well as sequences for that reason; a fixture covers it,
 // written from reading our AST rather than from upstream's cases.
-var NoPlusplus = rule.Rule{
+var NoPlusplus = rule.Rule[NoPlusplusOptions]{
 	Name: "no-plusplus",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoPlusplusOptions]) rule.Listeners {
 		allowForLoopAfterthoughts := false
-		if resolved, isNoPlusplusOptions := rule.OptionsAs[NoPlusplusOptions](options); isNoPlusplusOptions {
+		if resolved, isNoPlusplusOptions := options.Read(); isNoPlusplusOptions {
 			allowForLoopAfterthoughts = resolved.AllowForLoopAfterthoughts
 		}
 
@@ -90,7 +90,7 @@ var NoPlusplus = rule.Rule{
 				if allowForLoopAfterthoughts && noPlusplusIsForLoopAfterthought(node) {
 					return
 				}
-				ctx.ReportNode(node, noPlusplusUnexpectedUnaryOp(
+				ruleContext.ReportNode(node, noPlusplusUnexpectedUnaryOp(
 					noPlusplusOperatorText(expression.Operator)))
 			},
 
@@ -109,7 +109,7 @@ var NoPlusplus = rule.Rule{
 				if allowForLoopAfterthoughts && noPlusplusIsForLoopAfterthought(node) {
 					return
 				}
-				ctx.ReportNode(node, noPlusplusUnexpectedUnaryOp(
+				ruleContext.ReportNode(node, noPlusplusUnexpectedUnaryOp(
 					noPlusplusOperatorText(expression.Operator)))
 			},
 		}
@@ -118,7 +118,7 @@ var NoPlusplus = rule.Rule{
 
 // noPlusplusIsForLoopAfterthought reproduces upstream's `isForLoopAfterthought`.
 //
-// Walks up through sequence expressions to see whether this node IS the update expression of a
+// Walks up through sequence expressions to see whether this node is the update expression of a
 // `for` statement. Identity against `statement.Incrementor` rather than containment, which is what
 // keeps `for (;; foo(i++)) {}` reporting: there the operator is an argument to a call that is the
 // update, not an operand of the update.
@@ -180,13 +180,13 @@ func DefaultNoPlusplusOptions() NoPlusplusOptions {
 //
 // Hand-rolled rather than `rule.DecodeOptionsInto` so a bare `"error"` configuration, which arrives
 // as empty input, resolves to the documented default instead of erroring.
-func DecodeNoPlusplusOptions(raw []byte) (any, error) {
+func DecodeNoPlusplusOptions(raw []byte) (NoPlusplusOptions, error) {
 	options := DefaultNoPlusplusOptions()
 	if len(raw) == 0 {
 		return options, nil
 	}
-	if err := rule.UnmarshalOptions(raw, &options); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &options); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 	return options, nil
 }

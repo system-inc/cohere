@@ -7,13 +7,13 @@ import (
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
-// configFile is where the fixtures pretend to live.
+// configurationFile is where the fixtures pretend to live.
 //
 // A `.tsx` extension because two of the four upstream fixtures contain JSX. Under `.ts` the parser
 // reads `<div>` as a type assertion rather than an element, and those two cases would then parse
-// into a tree with no JSX in it, still import the same module, and still report — passing for a
+// into a tree with no JSX in it, still import the same module, and still report, passing for a
 // reason that has nothing to do with what they test.
-const configFile = "/repository/source/Config.tsx"
+const configurationFile = "/repository/source/Config.tsx"
 
 // withSeededProvider swaps the module type table for the duration of one test.
 //
@@ -25,14 +25,14 @@ const configFile = "/repository/source/Config.tsx"
 //
 // The seeded entries are upstream's own, from `snap/src/sprout/shared-runtime-type-provider.ts`,
 // which is the provider the four `error.invalid-type-provider-*` fixtures are written against.
-func withSeededProvider(t *testing.T, seeded map[string]map[string]typeConfigKind) {
-	t.Helper()
+func withSeededProvider(test *testing.T, seeded map[string]map[string]typeConfigKind) {
+	test.Helper()
 	previous := moduleTypeProvider
 	moduleTypeProvider = func(moduleName string) (map[string]typeConfigKind, bool) {
 		properties, present := seeded[moduleName]
 		return properties, present
 	}
-	t.Cleanup(func() { moduleTypeProvider = previous })
+	test.Cleanup(func() { moduleTypeProvider = previous })
 }
 
 // upstreamTestProvider is the `ReactCompilerTest` entry from upstream's snap type provider.
@@ -53,7 +53,7 @@ func upstreamTestProvider() map[string]map[string]typeConfigKind {
 		"useDefaultExportNotTypedAsHook": {
 			"default": typeConfigFunction,
 		},
-		// A hook-named module that IS configured but declares no `default` property. Not an
+		// A hook-named module that is configured but declares no `default` property. Not an
 		// upstream module; added from reading React's `getGlobalDeclaration`, where the default arm
 		// runs `getPropertyType(moduleType, 'default')` and returns null when the module has no
 		// such property, so the comparison below it is never reached. Without this entry the
@@ -81,8 +81,8 @@ func upstreamTestProvider() map[string]map[string]typeConfigKind {
 // Not parallel: it swaps the package variable moduleTypeProvider through withSeededProvider, which the
 // config rule reads on every run, so a parallel test running that rule would race the swap and could read
 // the seeded table.
-func TestConfigFiresOnUpstreamFixtures(t *testing.T) {
-	withSeededProvider(t, upstreamTestProvider())
+func TestConfigFiresOnUpstreamFixtures(test *testing.T) {
+	withSeededProvider(test, upstreamTestProvider())
 
 	cases := []struct {
 		name   string
@@ -90,18 +90,24 @@ func TestConfigFiresOnUpstreamFixtures(t *testing.T) {
 	}{
 		// error.invalid-type-provider-hook-name-not-typed-as-hook
 		// A `use`-prefixed named import whose configured type is a plain function.
-		{"namedHookNotTypedAsHook", "import {useHookNotTypedAsHook} from 'ReactCompilerTest';\n\nfunction Component() {\n  return useHookNotTypedAsHook();\n}\n"},
+		{
+			"namedHookNotTypedAsHook",
+			"import {useHookNotTypedAsHook} from 'ReactCompilerTest';\n\nfunction Component() {\n  return useHookNotTypedAsHook();\n}\n",
+		},
 		// error.invalid-type-provider-hooklike-module-default-not-hook
-		// A default import from a `use`-prefixed MODULE whose default is a plain function.
+		// A default import from a `use`-prefixed module whose default is a plain function.
 		// The name checked here is the module's, not the property's.
-		{"defaultFromHooklikeModule", "import foo from 'useDefaultExportNotTypedAsHook';\n\nfunction Component() {\n  return <div>{foo()}</div>;\n}\n"},
+		{
+			"defaultFromHooklikeModule",
+			"import foo from 'useDefaultExportNotTypedAsHook';\n\nfunction Component() {\n  return <div>{foo()}</div>;\n}\n",
+		},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, Config, configFile, testCase.source)
-			rule_testing.ExpectFindings(t, result, "invalidTypeConfiguration")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, Configuration, configurationFile, testCase.source)
+			rule_testing.ExpectFindings(test, result, "invalidTypeConfiguration")
 		})
 	}
 }
@@ -116,14 +122,14 @@ func TestConfigFiresOnUpstreamFixtures(t *testing.T) {
 // Not parallel: it swaps the package variable moduleTypeProvider through withSeededProvider, which the
 // config rule reads on every run, so a parallel test running that rule would race the swap and could read
 // the seeded table.
-func TestConfigFiresOnNonHookNameTypedAsHook(t *testing.T) {
-	withSeededProvider(t, upstreamTestProvider())
+func TestConfigFiresOnNonHookNameTypedAsHook(test *testing.T) {
+	withSeededProvider(test, upstreamTestProvider())
 	source := "import {notAhookTypedAsHook} from 'ReactCompilerTest';\n\nfunction Component() {\n  return <div>{notAhookTypedAsHook()}</div>;\n}\n"
-	result := rule_testing.Run(t, Config, configFile, source)
-	rule_testing.ExpectFindings(t, result, "invalidTypeConfiguration")
+	result := rule_testing.Run(test, Configuration, configurationFile, source)
+	rule_testing.ExpectFindings(test, result, "invalidTypeConfiguration")
 }
 
-// TestConfigReadsThroughAnAlias pins that the IMPORTED name decides, never the local one.
+// TestConfigReadsThroughAnAlias pins that the imported name decides, never the local one.
 //
 // React computes `expectHook` from `binding.imported`, so `{useHookNotTypedAsHook as safe}` still
 // reports even though the local name is not hook-shaped, and `{notAhookTypedAsHook as useThing}`
@@ -133,8 +139,8 @@ func TestConfigFiresOnNonHookNameTypedAsHook(t *testing.T) {
 // Not parallel: it swaps the package variable moduleTypeProvider through withSeededProvider, which the
 // config rule reads on every run, so a parallel test running that rule would race the swap and could read
 // the seeded table.
-func TestConfigReadsThroughAnAlias(t *testing.T) {
-	withSeededProvider(t, upstreamTestProvider())
+func TestConfigReadsThroughAnAlias(test *testing.T) {
+	withSeededProvider(test, upstreamTestProvider())
 	cases := []struct {
 		name   string
 		source string
@@ -143,10 +149,10 @@ func TestConfigReadsThroughAnAlias(t *testing.T) {
 		{"plainNameAliasedToHook", "import {notAhookTypedAsHook as useThing} from 'ReactCompilerTest';\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, Config, configFile, testCase.source)
-			rule_testing.ExpectFindings(t, result, "invalidTypeConfiguration")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, Configuration, configurationFile, testCase.source)
+			rule_testing.ExpectFindings(test, result, "invalidTypeConfiguration")
 		})
 	}
 }
@@ -155,8 +161,8 @@ func TestConfigReadsThroughAnAlias(t *testing.T) {
 // Not parallel: it swaps the package variable moduleTypeProvider through withSeededProvider, which the
 // config rule reads on every run, so a parallel test running that rule would race the swap and could read
 // the seeded table.
-func TestConfigStaysSilent(t *testing.T) {
-	withSeededProvider(t, upstreamTestProvider())
+func TestConfigStaysSilent(test *testing.T) {
+	withSeededProvider(test, upstreamTestProvider())
 
 	cases := []struct {
 		name   string
@@ -168,7 +174,7 @@ func TestConfigStaysSilent(t *testing.T) {
 		// A property the configured module does not declare falls through to the hook-name
 		// fallback rather than being validated.
 		{"propertyNotInTable", "import {somethingElse} from 'ReactCompilerTest';\n"},
-		// The same absence, but the imported name IS hook-shaped. React's `getPropertyType` returns
+		// The same absence, but the imported name is hook-shaped. React's `getPropertyType` returns
 		// null for a property the module type does not carry, so the whole validation block is
 		// skipped and the binding falls through to the custom-hook fallback: this is silent
 		// upstream even though the name promises a hook the configuration never declares.
@@ -189,7 +195,7 @@ func TestConfigStaysSilent(t *testing.T) {
 		{"nonLiteralSpecifier", "import {useHookNotTypedAsHook} from ReactCompilerTest;\n"},
 		// A default import from a module with no `default` property in its table.
 		{"defaultNotInTable", "import anything from 'ReactCompilerTest';\n"},
-		// The same absence, but from a HOOK-NAMED module. React resolves `default` off the module
+		// The same absence, but from a hook-named module. React resolves `default` off the module
 		// type and finds nothing, so the name comparison below it never runs and the import is
 		// silent even though the module name promises a hook. This is the case that separates the
 		// presence check from the name check: the case above cannot, because a non-hook-named
@@ -203,10 +209,10 @@ func TestConfigStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, Config, configFile, testCase.source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, Configuration, configurationFile, testCase.source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -215,60 +221,66 @@ func TestConfigStaysSilent(t *testing.T) {
 // reproduce, and why.
 //
 // Both point at a use site inside a component body rather than at the import, because React only
-// consults the provider when its HIR resolves a binding. Reproducing that needs the binding
-// resolution pass this rule deliberately does not build. They are asserted as CLEAN here rather
+// consults the provider when its `HIR` resolves a binding. Reproducing that needs the binding
+// resolution pass this rule deliberately does not build. They are asserted as clean here rather
 // than deleted: a case removed from a corpus is a divergence no later reader can find, while a case
 // asserted with its reason at the line is one they can act on.
 //
 // Fixture two is the more interesting of the pair. Its name says "namespace" and its source is
 // `import ReactCompilerTest from 'ReactCompilerTest'`, which our parser reads as an ImportDefault
-// rather than a namespace import — probed rather than assumed. It is silent here because
+// rather than a namespace import, which was probed rather than assumed. It is silent here because
 // `ReactCompilerTest`'s table declares no `default` property, so the default arm finds nothing to
 // compare, which is the same reason `defaultNotInTable` above is silent.
 // Not parallel: it swaps the package variable moduleTypeProvider through withSeededProvider, which the
 // config rule reads on every run, so a parallel test running that rule would race the swap and could read
 // the seeded table.
-func TestConfigDeclinesTheUseSiteFixtures(t *testing.T) {
-	withSeededProvider(t, upstreamTestProvider())
+func TestConfigDeclinesTheUseSiteFixtures(test *testing.T) {
+	withSeededProvider(test, upstreamTestProvider())
 
 	cases := []struct {
 		name   string
 		source string
 	}{
 		// error.invalid-type-provider-hook-name-not-typed-as-hook-namespace
-		{"dottedMemberUseSite", "import ReactCompilerTest from 'ReactCompilerTest';\n\nfunction Component() {\n  return ReactCompilerTest.useHookNotTypedAsHook();\n}\n"},
+		{
+			"dottedMemberUseSite",
+			"import ReactCompilerTest from 'ReactCompilerTest';\n\nfunction Component() {\n  return ReactCompilerTest.useHookNotTypedAsHook();\n}\n",
+		},
 		// error.invalid-type-provider-nonhook-name-typed-as-hook
-		{"jsxUseSite", "import {notAhookTypedAsHook} from 'ReactCompilerTest';\n\nfunction Component() {\n  return <div>{notAhookTypedAsHook()}</div>;\n}\n"},
+		{
+			"jsxUseSite",
+			"import {notAhookTypedAsHook} from 'ReactCompilerTest';\n\nfunction Component() {\n  return <div>{notAhookTypedAsHook()}</div>;\n}\n",
+		},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, Config, configFile, testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, Configuration, configurationFile, testCase.source)
 			// The dotted-member fixture reports nothing because its module declares no `default`.
-			// The JSX fixture DOES report here, on its named import, which is a superset of what
+			// The JSX fixture does report here, on its named import, which is a superset of what
 			// upstream reports rather than a miss: upstream points at the use site, this points at
 			// the import that carries the misconfigured name. Asserted rather than described.
 			if testCase.name == "jsxUseSite" {
-				rule_testing.ExpectFindings(t, result, "invalidTypeConfiguration")
+				rule_testing.ExpectFindings(test, result, "invalidTypeConfiguration")
 				return
 			}
-			rule_testing.ExpectClean(t, result)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
 
 // TestConfigIsSilentOnTheRealDefaultTable is the proof that this rule's zero is a real zero.
 //
-// It runs WITHOUT the seeded provider, so the rule consults the hardcoded `defaultModuleTypeProvider`
+// It runs without the seeded provider, so the rule consults the hardcoded `defaultModuleTypeProvider`
 // exactly as it does on Kirk's tree. Every entry in that table pairs a `use`-prefixed name with a
 // hook type, so `expectHook != isHook` is false at all of them and the rule cannot report.
 //
 // This is the pair the brief asks for: the seeded probe above shows the rule fires on a malformed
 // configuration, and this shows it declines a well-formed one. Together they separate "declines
 // correctly" from "wired and inert", which a zero on its own cannot do.
-func TestConfigIsSilentOnTheRealDefaultTable(t *testing.T) {
-	t.Parallel()
+func TestConfigIsSilentOnTheRealDefaultTable(test *testing.T) {
+	test.Parallel()
 	cases := []struct {
 		name   string
 		source string
@@ -278,15 +290,15 @@ func TestConfigIsSilentOnTheRealDefaultTable(t *testing.T) {
 		{"tanstackVirtual", "import {useVirtualizer} from '@tanstack/react-virtual';\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, Config, configFile, testCase.source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, Configuration, configurationFile, testCase.source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
 
-// TestConfigReportsOnTheImportSpecifier pins WHERE the finding points.
+// TestConfigReportsOnTheImportSpecifier pins where the finding points.
 //
 // `ExpectFindings` asserts ids and count and nothing else, so a rule pointing at the whole import
 // statement, or at the module specifier, passes every case above while being wrong. The span is
@@ -295,17 +307,17 @@ func TestConfigIsSilentOnTheRealDefaultTable(t *testing.T) {
 // Not parallel: it swaps the package variable moduleTypeProvider through withSeededProvider, which the
 // config rule reads on every run, so a parallel test running that rule would race the swap and could read
 // the seeded table.
-func TestConfigReportsOnTheImportSpecifier(t *testing.T) {
-	withSeededProvider(t, upstreamTestProvider())
+func TestConfigReportsOnTheImportSpecifier(test *testing.T) {
+	withSeededProvider(test, upstreamTestProvider())
 	source := "import {useHookNotTypedAsHook} from 'ReactCompilerTest';\n"
-	result := rule_testing.Run(t, Config, configFile, source)
+	result := rule_testing.Run(test, Configuration, configurationFile, source)
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("want 1 diagnostic, got %d", len(result.Diagnostics))
+		test.Fatalf("want 1 diagnostic, got %d", len(result.Diagnostics))
 	}
 	found := result.Diagnostics[0]
 	reported := source[found.Range.Pos():found.Range.End()]
 	if reported != "useHookNotTypedAsHook" {
-		t.Errorf("reported span = %q, want %q", reported, "useHookNotTypedAsHook")
+		test.Errorf("reported span = %q, want %q", reported, "useHookNotTypedAsHook")
 	}
 }
 
@@ -317,17 +329,17 @@ func TestConfigReportsOnTheImportSpecifier(t *testing.T) {
 // Not parallel: it swaps the package variable moduleTypeProvider through withSeededProvider, which the
 // config rule reads on every run, so a parallel test running that rule would race the swap and could read
 // the seeded table.
-func TestConfigReportsOnTheDefaultBinding(t *testing.T) {
-	withSeededProvider(t, upstreamTestProvider())
+func TestConfigReportsOnTheDefaultBinding(test *testing.T) {
+	withSeededProvider(test, upstreamTestProvider())
 	source := "import foo from 'useDefaultExportNotTypedAsHook';\n"
-	result := rule_testing.Run(t, Config, configFile, source)
+	result := rule_testing.Run(test, Configuration, configurationFile, source)
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("want 1 diagnostic, got %d", len(result.Diagnostics))
+		test.Fatalf("want 1 diagnostic, got %d", len(result.Diagnostics))
 	}
 	found := result.Diagnostics[0]
 	reported := source[found.Range.Pos():found.Range.End()]
 	if reported != "foo" {
-		t.Errorf("reported span = %q, want %q", reported, "foo")
+		test.Errorf("reported span = %q, want %q", reported, "foo")
 	}
 }
 
@@ -340,19 +352,25 @@ func TestConfigReportsOnTheDefaultBinding(t *testing.T) {
 // Not parallel: it swaps the package variable moduleTypeProvider through withSeededProvider, which the
 // config rule reads on every run, so a parallel test running that rule would race the swap and could read
 // the seeded table.
-func TestConfigMessageText(t *testing.T) {
-	withSeededProvider(t, upstreamTestProvider())
+func TestConfigMessageText(test *testing.T) {
+	withSeededProvider(test, upstreamTestProvider())
 	source := "import {useHookNotTypedAsHook} from 'ReactCompilerTest';\n"
-	result := rule_testing.Run(t, Config, configFile, source)
+	result := rule_testing.Run(test, Configuration, configurationFile, source)
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("want 1 diagnostic, got %d", len(result.Diagnostics))
+		test.Fatalf("want 1 diagnostic, got %d", len(result.Diagnostics))
 	}
 	found := result.Diagnostics[0]
 	if found.Message.Id != "invalidTypeConfiguration" {
-		t.Errorf("message id = %q, want %q", found.Message.Id, "invalidTypeConfiguration")
+		test.Errorf("message id = %q, want %q", found.Message.Id, "invalidTypeConfiguration")
 	}
-	if !strings.HasPrefix(found.Message.Description, "A module's compiler type configuration disagrees with the name it is attached to.") {
-		t.Errorf("message description = %q, want it to open with the disagreement sentence", found.Message.Description)
+	if !strings.HasPrefix(
+		found.Message.Description,
+		"A module's compiler type configuration disagrees with the name it is attached to.",
+	) {
+		test.Errorf(
+			"message description = %q, want it to open with the disagreement sentence",
+			found.Message.Description,
+		)
 	}
 }
 
@@ -360,11 +378,11 @@ func TestConfigMessageText(t *testing.T) {
 //
 // `/^use[A-Z0-9]/` at React, and an imperative `is_ascii_uppercase() || is_ascii_digit()` at oxc.
 // The interesting rows are the last three: a lowercase fourth character is not a hook name, a
-// bare `use` is too short to be one, and a non-ASCII uppercase letter is NOT one at either
+// bare `use` is too short to be one, and a non-ASCII uppercase letter is not one at either
 // upstream. That last row is the axis that splits `react.IsLikelyComponentName` across trees, and
 // it is pinned here so this rule cannot drift onto the Unicode side of it.
-func TestIsHookNameMatchesUpstream(t *testing.T) {
-	t.Parallel()
+func TestIsHookNameMatchesUpstream(test *testing.T) {
+	test.Parallel()
 	cases := []struct {
 		name string
 		want bool
@@ -383,7 +401,7 @@ func TestIsHookNameMatchesUpstream(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		if got := isHookName(testCase.name); got != testCase.want {
-			t.Errorf("isHookName(%q) = %v, want %v", testCase.name, got, testCase.want)
+			test.Errorf("isHookName(%q) = %v, want %v", testCase.name, got, testCase.want)
 		}
 	}
 }
@@ -393,8 +411,8 @@ func TestIsHookNameMatchesUpstream(t *testing.T) {
 // Both upstreams lowercase before comparing, so the odd casings take the short-circuit path. A
 // version comparing exactly would validate `React` against the provider and could report where
 // upstream is silent.
-func TestIsKnownReactModuleIsCaseInsensitive(t *testing.T) {
-	t.Parallel()
+func TestIsKnownReactModuleIsCaseInsensitive(test *testing.T) {
+	test.Parallel()
 	cases := []struct {
 		name string
 		want bool
@@ -410,7 +428,7 @@ func TestIsKnownReactModuleIsCaseInsensitive(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		if got := isKnownReactModule(testCase.name); got != testCase.want {
-			t.Errorf("isKnownReactModule(%q) = %v, want %v", testCase.name, got, testCase.want)
+			test.Errorf("isKnownReactModule(%q) = %v, want %v", testCase.name, got, testCase.want)
 		}
 	}
 }

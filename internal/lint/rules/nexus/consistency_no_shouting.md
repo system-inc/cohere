@@ -16,6 +16,18 @@ allowed groups: acronyms, file names and the `ISO` 4217 currency codes, the one 
 abbreviation, or has no vowel. Code is masked first: fenced blocks, backticks, double-quoted strings, single-quoted
 tokens, single-quoted capital phrases, `@example` blocks, and command lines.
 
+A run of `//` comments on consecutive lines, with nothing but whitespace between them, is masked as
+one text, as a block comment is, so a backtick pair or a fence wrapped across its lines masks what it
+holds. A blank line, code between two comments, or a block comment ends the run. The generated-code
+marker, `// Code generated ... DO NOT EDIT.` before the file's first token, is not read: its capitals
+are fixed by go.dev/s/generatedcode, which tools match exactly. Each finding covers one shouted word,
+each occurrence, and names it. The text rules corpus holds all three (`sh04`, `sh05`, `sh10`, and the
+span cases), task #34fejeq.
+
+The masks live in `internal/shouting/shouting.go`, and the safe list in `policy/Shouting.json`, which
+`internal/shouting/vocabulary.go` reads. The Go engine's `cohere-go/consistency-no-shouting` reads both
+too, and Swift compiles in the same list, so every engine agrees on what an acronym is.
+
 Kirk's ruling on the 2026-10-01 review: all caps belongs in backticks, single quotes or double quotes
 unless it is on the safe list. The safe list is the authority for what an acronym is.
 
@@ -52,7 +64,7 @@ Go port afterwards and belongs in the original's list too.
   requires a word boundary outside both quotes, which is what keeps a possessive or a leading
   apostrophe (`the '90s were LOUD and the users' data`) from pairing into a mask. Zero ahra sites
   differ today, so `internal/differential/acknowledged.go` carries no entry. The same change belongs
-  in `Shouting.ts` (`maskCodeAndCommands`), after the single-quoted token replace.
+  in `Shouting.ts` (`maskCodeAndCommands`, `MaskCodeAndCommands` here), after the single-quoted token replace.
 - **A double-quoted phrase that wraps onto the next comment line is masked.** Kirk's ruling: a quoted
   all-caps phrase is a literal. The original's double-quote pattern stops at a newline, so a block
   comment that reflowed `"the caller's job and you must NOT"` across two lines read the `NOT` as
@@ -65,5 +77,8 @@ Go port afterwards and belongs in the original's list too.
   comment is masked. Recorded in `maskCommandLines`.
 
 Fixtures: `TestConsistencyNoShoutingKnowsTheAcronymsTheReviewFound` (the review's lines verbatim, both
-directions), `TestConsistencyNoShoutingMasksASingleQuotedCapitalPhrase` and
-`TestConsistencyNoShoutingMasksADoubleQuoteThatWraps`.
+directions), `TestConsistencyNoShoutingMasksASingleQuotedCapitalPhrase`,
+`TestConsistencyNoShoutingMasksADoubleQuoteThatWraps`,
+`TestConsistencyNoShoutingMasksARunOfLineCommentsAsOneText`,
+`TestConsistencyNoShoutingSetsAsideTheGeneratedMarker` and
+`TestConsistencyNoShoutingReportsEachWordAtTheWord`.

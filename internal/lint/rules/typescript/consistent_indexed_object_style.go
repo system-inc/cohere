@@ -28,7 +28,7 @@ func DefaultConsistentIndexedObjectStyleSettings() ConsistentIndexedObjectStyleO
 
 // DecodeConsistentIndexedObjectStyleOptions reads the rule's configuration.
 //
-// The wire value is a bare STRING rather than an object, which is why this cannot use
+// The wire value is a bare string rather than an object, which is why this cannot use
 // `rule.DecodeOptionsInto` at all: there is no struct to decode into. Empty input and `null` are a
 // rule configured as a bare `"error"`, and get upstream's default.
 //
@@ -37,7 +37,7 @@ func DefaultConsistentIndexedObjectStyleSettings() ConsistentIndexedObjectStyleO
 // disable the rule. It did not disable it; it ran a mode nobody wrote, and the config loaded clean.
 // Upstream's schema is a string enum and refuses those at load, and the config layer now refuses a
 // decoder's error by rule name, so refusing is what tells the author (#p9s1131).
-func DecodeConsistentIndexedObjectStyleOptions(raw []byte) (any, error) {
+func DecodeConsistentIndexedObjectStyleOptions(raw []byte) (ConsistentIndexedObjectStyleOptions, error) {
 	options := DefaultConsistentIndexedObjectStyleSettings()
 
 	// Go whitespace: raw JSON bytes of a rule's options, whose whitespace is the same in both sets.
@@ -47,7 +47,7 @@ func DecodeConsistentIndexedObjectStyleOptions(raw []byte) (any, error) {
 	}
 
 	var mode string
-	if err := json.Unmarshal(raw, &mode); err != nil {
+	if decodeError := json.Unmarshal(raw, &mode); decodeError != nil {
 		return options, fmt.Errorf(`expected a mode string, "record" or "index-signature", got %s`, trimmed)
 	}
 	if mode != "index-signature" && mode != "record" {
@@ -86,7 +86,7 @@ func DecodeConsistentIndexedObjectStyleOptions(raw []byte) (any, error) {
 // builtin `Mutable<T>`, so a minus-readonly mapped type cannot be written as a Record at all.
 // Reporting without a repair is the subset that can be shown correct.
 //
-// # A comment inside the replaced span downgrades the fix to a SUGGESTION
+// # A comment inside the replaced span downgrades the fix to a suggestion
 //
 // The repair reads only the key type and the value type, so a comment sitting anywhere else inside
 // the node would be dropped by the rewrite. Upstream detects that and offers the change rather than
@@ -99,10 +99,10 @@ func DecodeConsistentIndexedObjectStyleOptions(raw []byte) (any, error) {
 // itself through a type argument rather than through a member and TypeScript rejects it. Upstream
 // answers this with `isDeeplyReferencingType`, walking its scope manager's definitions.
 //
-// This port resolves identifiers through the CHECKER instead and compares symbols against the
+// This port resolves identifiers through the checker instead and compares symbols against the
 // enclosing declaration's own symbol, which answers the same question without a scope manager.
 // Probed before the rule was written, including the case that separates it from a naive name
-// match: `namespace A { export type Foo = 1 }` beside `type Foo = { [k: string]: A.Foo }` is NOT
+// match: `namespace A { export type Foo = 1 }` beside `type Foo = { [k: string]: A.Foo }` is not
 // circular, because `A.Foo` resolves to a different symbol, and upstream reports it.
 //
 // # Cost
@@ -110,14 +110,14 @@ func DecodeConsistentIndexedObjectStyleOptions(raw []byte) (any, error) {
 // Four anchors, all of them type nodes, which are rare outside declaration files. The checker is
 // consulted only after a node has already been shown to be a single-member index signature or a
 // convertible mapped type.
-var ConsistentIndexedObjectStyle = rule.Rule{
+var ConsistentIndexedObjectStyle = rule.Rule[ConsistentIndexedObjectStyleOptions]{
 	Name: "@typescript-eslint/consistent-indexed-object-style",
 
 	// The circularity test resolves an identifier to its declaration.
 	NeedsTypeChecker: true,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, isSettings := rule.OptionsAs[ConsistentIndexedObjectStyleOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[ConsistentIndexedObjectStyleOptions]) rule.Listeners {
+		settings, isSettings := options.Read()
 		if !isSettings {
 			settings = DefaultConsistentIndexedObjectStyleSettings()
 		}
@@ -126,15 +126,15 @@ var ConsistentIndexedObjectStyle = rule.Rule{
 			if node == nil {
 				return ""
 			}
-			nodeRange := rule.TokenRange(ctx.SourceFile, node)
-			return ctx.SourceFile.Text()[nodeRange.Pos():nodeRange.End()]
+			nodeRange := rule.TokenRange(ruleContext.SourceFile, node)
+			return ruleContext.SourceFile.Text()[nodeRange.Pos():nodeRange.End()]
 		}
 
 		// hasUnpreservedComments answers upstream's helper of the same name: is there a comment
 		// inside the replaced range that does not sit inside one of the sub-nodes the repair copies
 		// out?
 		//
-		// It takes the RANGE the repair replaces rather than a node, because for an interface those
+		// It takes the range the repair replaces rather than a node, because for an interface those
 		// differ: the modifiers sit inside the node and outside the replacement, so a comment between
 		// `export` and `interface` survives the rewrite and must not downgrade it.
 		//
@@ -144,20 +144,20 @@ var ConsistentIndexedObjectStyle = rule.Rule{
 		// The comment ranges are scanned out of the source text here rather than read from the
 		// shelf's `comments.ForFile`, and that is a measured decision rather than a preference.
 		// Probed on upstream's own case, a line comment sitting between a mapped type's opening
-		// brace and its key: `comments.ForFile` returned ZERO comments for it. That helper anchors
+		// brace and its key: `comments.ForFile` returned zero comments for it. That helper anchors
 		// its scan on node positions and documents a known family of gaps around empty lists; this
 		// comment falls in a different gap, before the key of a mapped type. The question here is
 		// narrower than the one that helper answers, being only "is any byte in this range inside a
 		// comment", so it is answered directly.
 		hasUnpreservedComments := func(nodeRange core.TextRange, preserved ...*ast.Node) bool {
-			text := ctx.SourceFile.Text()
+			text := ruleContext.SourceFile.Text()
 
 			survives := func(start int, end int) bool {
 				for _, target := range preserved {
 					if target == nil {
 						continue
 					}
-					targetRange := rule.TokenRange(ctx.SourceFile, target)
+					targetRange := rule.TokenRange(ruleContext.SourceFile, target)
 					if start >= targetRange.Pos() && end <= targetRange.End() {
 						return true
 					}
@@ -210,7 +210,7 @@ var ConsistentIndexedObjectStyle = rule.Rule{
 		// constructor that a Record can legally hold, so the rewrite compiles. A union, an
 		// intersection, a conditional or a bare alias hop does not, so those are followed.
 		//
-		// The traversal therefore recurses only through the TYPE-TRANSPARENT kinds upstream lists
+		// The traversal therefore recurses only through the type-transparent kinds upstream lists
 		// and stops everywhere else, rather than walking every child. A walk over every child was
 		// the first version of this and it got eight of upstream's cases wrong in both directions at
 		// once: it missed `Foo1` to `Foo2` to `Foo1`, and it wrongly silenced all four wrapper
@@ -232,7 +232,7 @@ var ConsistentIndexedObjectStyle = rule.Rule{
 
 			switch node.Kind {
 			case ast.KindIdentifier:
-				symbol := ctx.TypeChecker.GetSymbolAtLocation(node)
+				symbol := ruleContext.TypeChecker.GetSymbolAtLocation(node)
 				if symbol == nil {
 					return false
 				}
@@ -332,10 +332,10 @@ var ConsistentIndexedObjectStyle = rule.Rule{
 		}
 
 		referencesDeclaration := func(body *ast.Node, declarationName *ast.Node) bool {
-			if ctx.TypeChecker == nil || declarationName == nil || body == nil {
+			if ruleContext.TypeChecker == nil || declarationName == nil || body == nil {
 				return false
 			}
-			anchor := ctx.TypeChecker.GetSymbolAtLocation(declarationName)
+			anchor := ruleContext.TypeChecker.GetSymbolAtLocation(declarationName)
 			if anchor == nil {
 				return false
 			}
@@ -351,7 +351,7 @@ var ConsistentIndexedObjectStyle = rule.Rule{
 		// type alias while a type literal is replaced in place.
 		//
 		// `replacedRange` is both what the finding underlines and what the repair overwrites, and for
-		// an interface it starts at the `interface` keyword, AFTER the modifiers. That is what keeps
+		// an interface it starts at the `interface` keyword, after the modifiers. That is what keeps
 		// `export` and `declare`: the repair rebuilds only `type <name><generics> = ...`, so it must
 		// replace only the text that spelling covers. Replacing from the first modifier is how this
 		// fixer once turned `export interface X` into `type X` and broke six imports.
@@ -392,18 +392,18 @@ var ConsistentIndexedObjectStyle = rule.Rule{
 			replacement := prefix + record + postfix
 
 			if !repairIsSafe {
-				ctx.ReportRange(replacedRange, buildPreferRecordMessage())
+				ruleContext.ReportRange(replacedRange, buildPreferRecordMessage())
 				return
 			}
 			fix := rule.ReplaceRange(replacedRange, replacement)
 			if hasUnpreservedComments(replacedRange, keyType, valueType) {
-				ctx.ReportRangeWithSuggestions(replacedRange, buildPreferRecordMessage(), rule.Suggestion{
+				ruleContext.ReportRangeWithSuggestions(replacedRange, buildPreferRecordMessage(), rule.Suggestion{
 					Message: buildPreferRecordSuggestionMessage(),
 					Fixes:   []rule.Fix{fix},
 				})
 				return
 			}
-			ctx.ReportRangeWithFixes(replacedRange, buildPreferRecordMessage(), fix)
+			ruleContext.ReportRangeWithFixes(replacedRange, buildPreferRecordMessage(), fix)
 		}
 
 		listeners := rule.Listeners{}
@@ -431,13 +431,14 @@ var ConsistentIndexedObjectStyle = rule.Rule{
 					keyArgument.Kind == ast.KindSymbolKeyword
 
 				replacement := "{ [key: " + textOf(keyArgument) + "]: " + textOf(valueArgument) + " }"
-				fix := rule.ReplaceRange(rule.TokenRange(ctx.SourceFile, node), replacement)
+				fix := rule.ReplaceRange(rule.TokenRange(ruleContext.SourceFile, node), replacement)
 
-				if repairIsSafe && !hasUnpreservedComments(rule.TokenRange(ctx.SourceFile, node), keyArgument, valueArgument) {
-					ctx.ReportNodeWithFixes(node, buildPreferIndexSignatureMessage(), fix)
+				if repairIsSafe &&
+					!hasUnpreservedComments(rule.TokenRange(ruleContext.SourceFile, node), keyArgument, valueArgument) {
+					ruleContext.ReportNodeWithFixes(node, buildPreferIndexSignatureMessage(), fix)
 					return
 				}
-				ctx.ReportNodeWithSuggestions(node, buildPreferIndexSignatureMessage(), rule.Suggestion{
+				ruleContext.ReportNodeWithSuggestions(node, buildPreferIndexSignatureMessage(), rule.Suggestion{
 					Message: buildPreferIndexSignatureSuggestionMessage(),
 					Fixes:   []rule.Fix{fix},
 				})
@@ -445,7 +446,7 @@ var ConsistentIndexedObjectStyle = rule.Rule{
 			return listeners
 		}
 
-		// interfaceReplacedRange is the interface's span WITHOUT its leading modifiers.
+		// interfaceReplacedRange is the interface's span without its leading modifiers.
 		//
 		// `rule.TokenRange` starts at the first token, which for `export interface Foo` is `export`.
 		// Upstream's node begins at the `interface` keyword, because estree hangs the export off a
@@ -455,11 +456,14 @@ var ConsistentIndexedObjectStyle = rule.Rule{
 		// modifiers. Upstream's estree does put `declare` inside its node and drops it; this keeps it,
 		// since `declare type` is equally valid and the rewrite has no reason to touch it.
 		interfaceReplacedRange := func(node *ast.Node) core.TextRange {
-			nodeRange := rule.TokenRange(ctx.SourceFile, node)
+			nodeRange := rule.TokenRange(ruleContext.SourceFile, node)
 			if node.Modifiers() != nil && len(node.Modifiers().Nodes) != 0 {
 				last := node.Modifiers().Nodes[len(node.Modifiers().Nodes)-1]
 				return core.NewTextRange(
-					scanner.SkipTrivia(ctx.SourceFile.Text(), rule.TokenRange(ctx.SourceFile, last).End()),
+					scanner.SkipTrivia(
+						ruleContext.SourceFile.Text(),
+						rule.TokenRange(ruleContext.SourceFile, last).End(),
+					),
 					nodeRange.End())
 			}
 			return nodeRange
@@ -505,7 +509,7 @@ var ConsistentIndexedObjectStyle = rule.Rule{
 				declarationName = parent.AsTypeAliasDeclaration().Name()
 			}
 			reportIndexSignature(literal.Members.Nodes, node, declarationName, "", "", true,
-				rule.TokenRange(ctx.SourceFile, node))
+				rule.TokenRange(ruleContext.SourceFile, node))
 		}
 
 		listeners[ast.KindMappedType] = func(node *ast.Node) {
@@ -521,9 +525,9 @@ var ConsistentIndexedObjectStyle = rule.Rule{
 			// A `keyof` constraint preserves the source type's own modifiers through the mapped
 			// type, which a Record does not, so the two are not equivalent and upstream declines.
 			//
-			// The exemption applies ONLY to an unparenthesized keyof. Upstream writes that as
+			// The exemption applies only to an unparenthesized keyof. Upstream writes that as
 			// `!isParenthesized(constraint)`, and it looks like an oversight until you see the case
-			// built for it: `{ [k in (keyof ParseResult)]: unknown }` REPORTS and repairs to
+			// built for it: `{ [k in (keyof ParseResult)]: unknown }` reports and repairs to
 			// `Record<keyof ParseResult, unknown>`. Our parser gives the parenthesized form a
 			// `KindParenthesizedType` wrapper, so the operator test simply does not match it, which
 			// reproduces upstream's behavior without a separate parenthesis check.
@@ -534,7 +538,7 @@ var ConsistentIndexedObjectStyle = rule.Rule{
 
 			// If the key is used to compute the value, the mapping is not uniform and no Record can
 			// express it.
-			if mappedKeyIsUsedInValue(ctx, mapped) {
+			if mappedKeyIsUsedInValue(ruleContext, mapped) {
 				return
 			}
 
@@ -548,7 +552,7 @@ var ConsistentIndexedObjectStyle = rule.Rule{
 			if mapped.Type != nil {
 				valueText = textOf(mapped.Type)
 			}
-			// The key text is read from INSIDE any parentheses. estree has no parenthesized type
+			// The key text is read from inside any parentheses. estree has no parenthesized type
 			// node, so upstream's `getText(constraint)` on `(keyof P)` yields `keyof P`, and the
 			// repair it records is `Record<keyof ParseResult, unknown>` rather than one carrying the
 			// brackets. Measured on the one corpus case that writes a parenthesized constraint.
@@ -576,18 +580,18 @@ var ConsistentIndexedObjectStyle = rule.Rule{
 			}
 
 			if declineRepair {
-				ctx.ReportNode(node, buildPreferRecordMessage())
+				ruleContext.ReportNode(node, buildPreferRecordMessage())
 				return
 			}
-			fix := rule.ReplaceRange(rule.TokenRange(ctx.SourceFile, node), record)
-			if hasUnpreservedComments(rule.TokenRange(ctx.SourceFile, node), constraint, mapped.Type) {
-				ctx.ReportNodeWithSuggestions(node, buildPreferRecordMessage(), rule.Suggestion{
+			fix := rule.ReplaceRange(rule.TokenRange(ruleContext.SourceFile, node), record)
+			if hasUnpreservedComments(rule.TokenRange(ruleContext.SourceFile, node), constraint, mapped.Type) {
+				ruleContext.ReportNodeWithSuggestions(node, buildPreferRecordMessage(), rule.Suggestion{
 					Message: buildPreferRecordSuggestionMessage(),
 					Fixes:   []rule.Fix{fix},
 				})
 				return
 			}
-			ctx.ReportNodeWithFixes(node, buildPreferRecordMessage(), fix)
+			ruleContext.ReportNodeWithFixes(node, buildPreferRecordMessage(), fix)
 		}
 
 		return listeners
@@ -641,10 +645,10 @@ func enclosingTypeAliasDeclaration(node *ast.Node) *ast.Node {
 			return current
 		}
 
-		// Upstream stops the walk at a type ANNOTATION, and that stop is load-bearing rather than
+		// Upstream stops the walk at a type annotation, and that stop is load-bearing rather than
 		// tidiness. estree gives an index signature's value a `TSTypeAnnotation` wrapper, so for
 		// `type Foo = { [k: string]: { [k: string]: Foo } }` the inner literal's walk halts there,
-		// finds no declaration, runs no circularity check, and REPORTS. The outer literal does find
+		// finds no declaration, runs no circularity check, and reports. The outer literal does find
 		// `Foo`, is circular, and stays silent. One input, two nested nodes, opposite verdicts.
 		//
 		// Our tree has no annotation wrapper: the value type is the index signature's own `Type`
@@ -676,7 +680,7 @@ func enclosingTypeAliasDeclaration(node *ast.Node) *ast.Node {
 // upstream declines. It asks its scope manager whether the key variable has any type reference;
 // here the value subtree is walked for an identifier spelled the same, which answers the same
 // question because a mapped type's key is bound to exactly that subtree.
-func mappedKeyIsUsedInValue(ctx rule.Context, mapped *ast.MappedTypeNode) bool {
+func mappedKeyIsUsedInValue(ruleContext rule.Context, mapped *ast.MappedTypeNode) bool {
 	if mapped.Type == nil || mapped.TypeParameter == nil {
 		return false
 	}
@@ -725,7 +729,10 @@ func buildPreferRecordMessage() rule.Message {
 }
 
 func buildPreferRecordSuggestionMessage() rule.Message {
-	return rule.Message{Id: "preferRecordSuggestion", Description: "Change into a record instead of an index signature."}
+	return rule.Message{
+		Id:          "preferRecordSuggestion",
+		Description: "Change into a record instead of an index signature.",
+	}
 }
 
 func buildPreferIndexSignatureMessage() rule.Message {
@@ -733,5 +740,8 @@ func buildPreferIndexSignatureMessage() rule.Message {
 }
 
 func buildPreferIndexSignatureSuggestionMessage() rule.Message {
-	return rule.Message{Id: "preferIndexSignatureSuggestion", Description: "Change into an index signature instead of a record."}
+	return rule.Message{
+		Id:          "preferIndexSignatureSuggestion",
+		Description: "Change into an index signature instead of a record.",
+	}
 }

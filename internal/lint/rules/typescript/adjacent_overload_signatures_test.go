@@ -29,8 +29,8 @@ func adjacentOverloadSignaturesCaseName(index int) string {
 //
 // These are the false positives upstream already thought about, and they are most of what this file
 // is for: the reporting half of this rule is easy and the discrimination is not.
-func TestAdjacentOverloadSignaturesStaysSilentOnUpstreamPassCases(t *testing.T) {
-	t.Parallel()
+func TestAdjacentOverloadSignaturesStaysSilentOnUpstreamPassCases(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		"\nfunction error(a: string);\nfunction error(b: number);\nfunction error(ab: string | number) {}\nexport { error };\n      ",
@@ -68,9 +68,9 @@ func TestAdjacentOverloadSignaturesStaysSilentOnUpstreamPassCases(t *testing.T) 
 		"\nif (true) {\n  function foo(s: string);\n  function foo(n: number);\n  function foo(sn: string | number) {}\n}\n    ",
 	}
 	for index, sourceText := range cases {
-		t.Run(adjacentOverloadSignaturesCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, AdjacentOverloadSignatures,
+		test.Run(adjacentOverloadSignaturesCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, AdjacentOverloadSignatures,
 				adjacentOverloadSignaturesFile, sourceText))
 		})
 	}
@@ -87,8 +87,8 @@ func TestAdjacentOverloadSignaturesStaysSilentOnUpstreamPassCases(t *testing.T) 
 // carries the same keywords as modifiers on the declaration itself, so the reported text matches
 // without the rule doing anything about it. Only a fixture can say that, since no harness knows
 // which node a finding should have pointed at.
-func TestAdjacentOverloadSignaturesFiresOnUpstreamFailCases(t *testing.T) {
-	t.Parallel()
+func TestAdjacentOverloadSignaturesFiresOnUpstreamFailCases(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -267,21 +267,22 @@ func TestAdjacentOverloadSignaturesFiresOnUpstreamFailCases(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(adjacentOverloadSignaturesCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, AdjacentOverloadSignatures,
+		test.Run(adjacentOverloadSignaturesCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, AdjacentOverloadSignatures,
 				adjacentOverloadSignaturesFile, testCase.sourceText)
 
 			wantIds := make([]string, len(testCase.wantSpans))
 			for index := range wantIds {
 				wantIds[index] = "adjacentSignature"
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 
 			for index, wantSpan := range testCase.wantSpans {
-				reported := testCase.sourceText[result.Diagnostics[index].Range.Pos():result.Diagnostics[index].Range.End()]
+				reported :=
+					testCase.sourceText[result.Diagnostics[index].Range.Pos():result.Diagnostics[index].Range.End()]
 				if reported != wantSpan {
-					t.Errorf("finding %d covers %q, want %q", index, reported, wantSpan)
+					test.Errorf("finding %d covers %q, want %q", index, reported, wantSpan)
 				}
 				// The member name is the only part of the description that varies per input, and it
 				// is the part upstream interpolates. Equality against a literal typed here rather
@@ -289,7 +290,7 @@ func TestAdjacentOverloadSignaturesFiresOnUpstreamFailCases(t *testing.T) {
 				// it was built from moves both sides under mutation and asserts nothing.
 				want := messageAdjacentOverloadSignatures(testCase.wantNames[index]).Description
 				if result.Diagnostics[index].Message.Description != want {
-					t.Errorf("finding %d reads %q, want %q", index,
+					test.Errorf("finding %d reads %q, want %q", index,
 						result.Diagnostics[index].Message.Description, want)
 				}
 			}
@@ -306,8 +307,8 @@ func TestAdjacentOverloadSignaturesFiresOnUpstreamFailCases(t *testing.T) {
 // carries the verdict that build produced, so a row asserting silence asserts upstream's silence.
 //
 // Read as a group these rows are the name-keying table from the rule's doc comment, executable.
-func TestAdjacentOverloadSignaturesDiscriminatesOnCasesUpstreamDoesNotWrite(t *testing.T) {
-	t.Parallel()
+func TestAdjacentOverloadSignaturesDiscriminatesOnCasesUpstreamDoesNotWrite(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -355,7 +356,7 @@ func TestAdjacentOverloadSignaturesDiscriminatesOnCasesUpstreamDoesNotWrite(t *t
 			reason:     "anything else keys by the source text of the key",
 		},
 		{
-			// The expression arm keys by SOURCE TEXT, so whether that text carries the key's leading
+			// The expression arm keys by source text, so whether that text carries the key's leading
 			// trivia decides whether two spellings of one key match. `Pos()` includes trivia and
 			// upstream's `range` does not, and this is the input that separates them: with trivia
 			// the two keys read as `Symbol.iterator` and a newline-and-spaces followed by
@@ -485,15 +486,15 @@ func TestAdjacentOverloadSignaturesDiscriminatesOnCasesUpstreamDoesNotWrite(t *t
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(adjacentOverloadSignaturesCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, AdjacentOverloadSignatures,
+		test.Run(adjacentOverloadSignaturesCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, AdjacentOverloadSignatures,
 				adjacentOverloadSignaturesFile, testCase.sourceText)
 			wantIds := make([]string, testCase.wantCount)
 			for index := range wantIds {
 				wantIds[index] = "adjacentSignature"
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 		})
 	}
 }
@@ -503,8 +504,8 @@ func TestAdjacentOverloadSignaturesDiscriminatesOnCasesUpstreamDoesNotWrite(t *t
 // The name is invisible to a message-id assertion and it is the whole of what upstream interpolates,
 // including its `static ` prefix. Each row's expectation is the name the installed build printed for
 // that exact input, recovered from its message text rather than predicted.
-func TestAdjacentOverloadSignaturesNamesTheMemberUpstreamNames(t *testing.T) {
-	t.Parallel()
+func TestAdjacentOverloadSignaturesNamesTheMemberUpstreamNames(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -568,14 +569,14 @@ func TestAdjacentOverloadSignaturesNamesTheMemberUpstreamNames(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(adjacentOverloadSignaturesCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, AdjacentOverloadSignatures,
+		test.Run(adjacentOverloadSignaturesCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, AdjacentOverloadSignatures,
 				adjacentOverloadSignaturesFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "adjacentSignature")
+			rule_testing.ExpectFindings(test, result, "adjacentSignature")
 			want := messageAdjacentOverloadSignatures(testCase.wantName).Description
 			if result.Diagnostics[0].Message.Description != want {
-				t.Errorf("the description is %q, want %q",
+				test.Errorf("the description is %q, want %q",
 					result.Diagnostics[0].Message.Description, want)
 			}
 		})
@@ -584,7 +585,7 @@ func TestAdjacentOverloadSignaturesNamesTheMemberUpstreamNames(t *testing.T) {
 
 // TestAdjacentOverloadSignaturesSurvivesContainersWithNoMemberList is a crash fixture.
 //
-// `Members()` and `Statements()` both PANIC on a kind that has no such list, and the listener map is
+// `Members()` and `Statements()` both panic on a kind that has no such list, and the listener map is
 // the only thing keeping each call on a kind that does. The walk recovers per file rather than per
 // rule, so one panic would cost every rule that file rather than one finding. Probed directly:
 // `Members()` on a `KindSourceFile` panics with `Unhandled case in Node.MemberList`.
@@ -592,8 +593,8 @@ func TestAdjacentOverloadSignaturesNamesTheMemberUpstreamNames(t *testing.T) {
 // These sources put the rule's seven container kinds beside the kinds nearest them in the tree, so a
 // listener wired to the wrong accessor takes the run down here rather than in the real tree. There
 // is no finding to assert; the assertion is that the run completes.
-func TestAdjacentOverloadSignaturesSurvivesContainersWithNoMemberList(t *testing.T) {
-	t.Parallel()
+func TestAdjacentOverloadSignaturesSurvivesContainersWithNoMemberList(test *testing.T) {
+	test.Parallel()
 
 	for name, sourceText := range map[string]string{
 		"enum":         "enum E { A, B }",
@@ -605,9 +606,9 @@ func TestAdjacentOverloadSignaturesSurvivesContainersWithNoMemberList(t *testing
 		"arrowBody":    "const f = () => { function g(): void; function g(a: number): void {} };",
 		"objectType":   "const o: { foo(): void; bar(): void } = { foo() {}, bar() {} };",
 	} {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.Run(t, AdjacentOverloadSignatures,
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.Run(test, AdjacentOverloadSignatures,
 				adjacentOverloadSignaturesFile, sourceText)
 		})
 	}

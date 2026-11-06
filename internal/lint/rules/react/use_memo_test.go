@@ -20,7 +20,7 @@ const useMemoFile = "use_memo.tsx"
 // which report, and four more whose bodies are written inside a function named lowercase
 // `component`: `error.invalid-ReactUseMemo-async-callback`, `error.invalid-useMemo-async-callback`,
 // `error.invalid-useMemo-callback-args` and `error.useMemo-callback-generator`. Those four exercise
-// the rule through React's compiler test harness, which compiles whatever it is handed, and NOT
+// the rule through React's compiler test harness, which compiles whatever it is handed, and not
 // through the ESLint rule, which applies the component gate first. Run verbatim through React's own
 // `react-hooks/use-memo`, all four are silent and only `rules-of-hooks` fires on them, saying the
 // call sits in a function that is neither a component nor a hook.
@@ -41,15 +41,15 @@ type useMemoCase struct {
 	source string
 	// ids are the message ids expected, one per finding, in the order the rule reports them.
 	ids []string
-	// reported is the source text the FIRST finding's range must cover. Asserted because
+	// reported is the source text the first finding's range must cover. Asserted because
 	// `ExpectFindings` sees ids and count and never where a finding points, and this rule has four
 	// different anchors: the whole call, the callback, the first parameter, and an assignment
 	// target.
 	reported string
 }
 
-func TestUseMemoFires(t *testing.T) {
-	t.Parallel()
+func TestUseMemoFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []useMemoCase{
 		{
@@ -257,7 +257,7 @@ func TestUseMemoFires(t *testing.T) {
 			reported: "props.fn",
 		},
 		{
-			// The receiver is keyed on the LOCAL name alone, with no module test, so a default
+			// The receiver is keyed on the local name alone, with no module test, so a default
 			// import named `React` reports whatever module it came from. Measured against React's
 			// own rule on this exact source, and it is the input that killed a surviving mutant
 			// whose verdict was right where the original rule was wrong. See the note at
@@ -277,7 +277,7 @@ func TestUseMemoFires(t *testing.T) {
 		},
 		{
 			// A callback bound to a variable one line above still reports, which is worth pinning
-			// because a sibling porting `void-use-memo` measured the OPPOSITE for their half of
+			// because a sibling porting `void-use-memo` measured the opposite for their half of
 			// this function: upstream's `functions` table is keyed on the single-assignment
 			// temporary a FunctionExpression produced, so binding the callback to a variable
 			// interposes a store and a load, the identifier differs, and their lookup misses.
@@ -329,14 +329,14 @@ func TestUseMemoFires(t *testing.T) {
 			reported: "props.fn",
 		},
 		{
-			// Upstream is silent here, and NOT because of anything this rule decides. Reassigning a
+			// Upstream is silent here, and not because of anything this rule decides. Reassigning a
 			// `const` is a semantic error, and React's own `react-hooks/syntax` rule claims the
 			// input first with "Cannot reassign a `const` variable", so the compiler never lowers a
 			// StoreContext for it and this category never sees it. Confirmed by running every
 			// `react-hooks` rule over this exact source: two `syntax` findings appear and no
 			// `use-memo` one.
 			//
-			// Pinned as REPORTING rather than as silent, which is the port brief's rule for a case
+			// Pinned as reporting rather than as silent, which is the port brief's rule for a case
 			// decided above the rule. `rule_testing` runs one rule against one file and consults no
 			// other, so no layer here could reproduce the upstream silence, and bending this rule to
 			// go quiet on a `const` target would break the ordinary `let` case it shares a code path
@@ -356,24 +356,24 @@ func TestUseMemoFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, UseMemo, useMemoFile, testCase.source)
-			rule_testing.ExpectFindings(t, result, testCase.ids...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, UseMemo, useMemoFile, testCase.source)
+			rule_testing.ExpectFindings(test, result, testCase.ids...)
 			if len(result.Diagnostics) == 0 {
 				return
 			}
 			first := result.Diagnostics[0].Range
 			got := testCase.source[first.Pos():first.End()]
 			if got != testCase.reported {
-				t.Errorf("finding covers %q, want %q", got, testCase.reported)
+				test.Errorf("finding covers %q, want %q", got, testCase.reported)
 			}
 		})
 	}
 }
 
-func TestUseMemoStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestUseMemoStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []useMemoCase{
 		{
@@ -449,7 +449,7 @@ func TestUseMemoStaysSilent(t *testing.T) {
 			source: "function Component(props) {\n  const m = useMemo;\n  const x = m(props.fn, [props.a]);\n  return <div>{x}</div>;\n}\n",
 		},
 		{
-			// A callback whose only return is bare is CLEAN for these four diagnostics. Recorded
+			// A callback whose only return is bare is clean for these four diagnostics. Recorded
 			// because React's own pass documentation at `docs/passes/40-validateUseMemo.md` says a
 			// bare `return;` triggers an error, and a sibling measured that the documentation is
 			// wrong: the lowering hardcodes an explicit return variant and the case is silent.
@@ -531,10 +531,10 @@ func TestUseMemoStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, UseMemo, useMemoFile, testCase.source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, UseMemo, useMemoFile, testCase.source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -542,21 +542,21 @@ func TestUseMemoStaysSilent(t *testing.T) {
 // TestUseMemoRequiresTheTypedHarness pins that this rule needs a real checker.
 //
 // The port brief measures that a rule declaring `NeedsTypeChecker` and then guarding on nil goes
-// COMPLETELY SILENT under the plain harness, which makes every StaysSilent case pass vacuously and
+// completely silent under the plain harness, which makes every StaysSilent case pass vacuously and
 // makes the whole suite look healthy while the rule decides nothing. That failure is invisible from
 // outside, so it is pinned here rather than left to a reader to notice: an input that reports under
 // `RunTyped` must be silent under `Run`, and if a later change makes the plain harness report, this
 // test fails and says the guard moved.
-func TestUseMemoRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestUseMemoRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	source := "function Component(props) {\n  const x = useMemo(props.fn, [props.a]);\n  return <div>{x}</div>;\n}\n"
 
-	typed := rule_testing.RunTyped(t, UseMemo, useMemoFile, source)
-	rule_testing.ExpectFindings(t, typed, "useMemoCallbackNotInline")
+	typed := rule_testing.RunTyped(test, UseMemo, useMemoFile, source)
+	rule_testing.ExpectFindings(test, typed, "useMemoCallbackNotInline")
 
-	untyped := rule_testing.Run(t, UseMemo, useMemoFile, source)
-	rule_testing.ExpectClean(t, untyped)
+	untyped := rule_testing.Run(test, UseMemo, useMemoFile, source)
+	rule_testing.ExpectClean(test, untyped)
 }
 
 // TestUseMemoMessages asserts the message identifiers and descriptions against literals typed here.
@@ -567,8 +567,8 @@ func TestUseMemoRequiresTheTypedHarness(t *testing.T) {
 //
 // A `rule.Message` is `{Id, Description}` with no interpolation layer, and this rule uses no format
 // verbs, so there is no rendered text to guard beyond these two fields.
-func TestUseMemoMessages(t *testing.T) {
-	t.Parallel()
+func TestUseMemoMessages(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		message         rule.Message
@@ -592,13 +592,13 @@ func TestUseMemoMessages(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.id, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.id, func(test *testing.T) {
+			test.Parallel()
 			if testCase.message.Id != testCase.id {
-				t.Errorf("id is %q, want %q", testCase.message.Id, testCase.id)
+				test.Errorf("id is %q, want %q", testCase.message.Id, testCase.id)
 			}
 			if !strings.HasPrefix(testCase.message.Description, testCase.descriptionHead) {
-				t.Errorf("description is %q, want it to start with %q",
+				test.Errorf("description is %q, want it to start with %q",
 					testCase.message.Description, testCase.descriptionHead)
 			}
 		})
@@ -611,13 +611,13 @@ func TestUseMemoMessages(t *testing.T) {
 // `matchRegistered` tries an exact match against the inventory entry `react/use-memo` before it
 // strips the namespace. So the parity guard reports the same count either way and cannot see the
 // mistake. This is the assertion that can.
-func TestUseMemoRuleName(t *testing.T) {
-	t.Parallel()
+func TestUseMemoRuleName(test *testing.T) {
+	test.Parallel()
 
 	if UseMemo.Name != "react-hooks/use-memo" {
-		t.Errorf("rule name is %q, want %q", UseMemo.Name, "use-memo")
+		test.Errorf("rule name is %q, want %q", UseMemo.Name, "use-memo")
 	}
 	if !UseMemo.NeedsTypeChecker {
-		t.Error("rule must declare NeedsTypeChecker: the callee test resolves bindings")
+		test.Error("rule must declare NeedsTypeChecker: the callee test resolves bindings")
 	}
 }

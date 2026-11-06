@@ -19,34 +19,34 @@ const noUnknownPropertyFile = "/repository/source/NoUnknownProperty.tsx"
 // byte against the decoded corpus with a script. Upstream carries 92 valid and 33 invalid cases.
 //
 // All 125 were replayed against the installed build, eslint-plugin-react 7.37.5, through the ESLint
-// Linter API before any Go was written, and 121 agreed. The four disagreements are TABLE CONTENT
+// Linter API before any Go was written, and 121 agreed. The four disagreements are table content
 // rather than logic: the clone knows three property names the installed build does not and widens
 // one tag list.
 //
-// The tables in this port come from the CLONE, so those four cases are clean here and agree with
+// The tables in this port come from the clone, so those four cases are clean here and agree with
 // upstream's own expectation. Both artifacts declare 7.37.5, meaning the clone is unreleased
 // commits on the same tag rather than a release we lag, and diffing the two extractions shows the
 // clone is a strict superset with no removals. The four rows carry the reasoning at their site.
 //
 // Every other expected message id is the installed build's own, per case, so a case reporting
-// twice carries two ids and their ORDER is asserted. The two artifacts agree on all 121.
+// twice carries two ids and their order is asserted. The two artifacts agree on all 121.
 
 // noUnknownPropertyOptions decodes a raw option body the way the config layer does.
 //
 // Fixtures route through the exported decoder rather than building the struct, which is what puts
-// the defaults under test. An empty body is the nil-options case.
-func noUnknownPropertyOptions(t *testing.T, raw string) any {
-	t.Helper()
-	decoded, err := DecodeNoUnknownPropertyOptions([]byte(raw))
-	if err != nil {
-		t.Fatalf("decoding %q: %v", raw, err)
+// the defaults under test. An empty body is the bare-severity case.
+func noUnknownPropertyOptions(test *testing.T, raw string) NoUnknownPropertyOptions {
+	test.Helper()
+	decoded, decodeNoUnknownPropertyOptionsError := DecodeNoUnknownPropertyOptions([]byte(raw))
+	if decodeNoUnknownPropertyOptionsError != nil {
+		test.Fatalf("decoding %q: %v", raw, decodeNoUnknownPropertyOptionsError)
 	}
 	return decoded
 }
 
 // TestNoUnknownPropertyFires runs every case this port reports on.
-func TestNoUnknownPropertyFires(t *testing.T) {
-	t.Parallel()
+func TestNoUnknownPropertyFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -68,21 +68,64 @@ func TestNoUnknownPropertyFires(t *testing.T) {
 		{"invalid 11", `<div onmousedown="bar"></div>;`, ``, []string{`unknownPropWithStandardName`}},
 		{"invalid 12", `<div onMousedown="bar"></div>;`, ``, []string{`unknownPropWithStandardName`}},
 		{"invalid 13", `<use xlink:href="bar" />;`, ``, []string{`unknownPropWithStandardName`}},
-		{"invalid 14", `<rect clip-path="bar" transform-origin="center" />;`, ``, []string{`unknownPropWithStandardName`}},
-		{"invalid 15", `<script crossorigin nomodule />`, ``, []string{`unknownPropWithStandardName`, `unknownPropWithStandardName`}},
+		{
+			"invalid 14",
+			`<rect clip-path="bar" transform-origin="center" />;`,
+			``,
+			[]string{`unknownPropWithStandardName`},
+		},
+		{
+			"invalid 15",
+			`<script crossorigin nomodule />`,
+			``,
+			[]string{`unknownPropWithStandardName`, `unknownPropWithStandardName`},
+		},
 		{"invalid 16", `<div crossorigin />`, ``, []string{`unknownPropWithStandardName`}},
 		{"invalid 17", `<div crossOrigin />`, ``, []string{`invalidPropOnTag`}},
 		{"invalid 18", `<div as="audio" />`, ``, []string{`invalidPropOnTag`}},
-		{"invalid 19", `<div onAbort={this.abort} onDurationChange={this.durationChange} onEmptied={this.emptied} onEnded={this.end} onResize={this.resize} onError={this.error} />`, ``, []string{`invalidPropOnTag`, `invalidPropOnTag`, `invalidPropOnTag`, `invalidPropOnTag`, `invalidPropOnTag`, `invalidPropOnTag`}},
+		{
+			"invalid 19",
+			`<div onAbort={this.abort} onDurationChange={this.durationChange} onEmptied={this.emptied} onEnded={this.end} onResize={this.resize} onError={this.error} />`,
+			``,
+			[]string{
+				`invalidPropOnTag`,
+				`invalidPropOnTag`,
+				`invalidPropOnTag`,
+				`invalidPropOnTag`,
+				`invalidPropOnTag`,
+				`invalidPropOnTag`,
+			},
+		},
 		{"invalid 20", `<div onLoad={this.load} />`, ``, []string{`invalidPropOnTag`}},
 		{"invalid 21", `<div fill="pink" />`, ``, []string{`invalidPropOnTag`}},
-		{"invalid 22", `<div controls={this.controls} loop={true} muted={false} src={this.videoSrc} playsInline={true} allowFullScreen></div>`, ``, []string{`invalidPropOnTag`, `invalidPropOnTag`, `invalidPropOnTag`, `invalidPropOnTag`, `invalidPropOnTag`}},
+		{
+			"invalid 22",
+			`<div controls={this.controls} loop={true} muted={false} src={this.videoSrc} playsInline={true} allowFullScreen></div>`,
+			``,
+			[]string{
+				`invalidPropOnTag`,
+				`invalidPropOnTag`,
+				`invalidPropOnTag`,
+				`invalidPropOnTag`,
+				`invalidPropOnTag`,
+			},
+		},
 		{"invalid 23", `<div download="foo" />`, ``, []string{`invalidPropOnTag`}},
 		{"invalid 24", `<div imageSrcSet="someImageSrcSet" />`, ``, []string{`invalidPropOnTag`}},
 		{"invalid 25", `<div imageSizes="someImageSizes" />`, ``, []string{`invalidPropOnTag`}},
 		{"invalid 26", `<div data-xml-anything="invalid" />`, ``, []string{`unknownProp`}},
-		{"invalid 27", `<div data-testID="bar" data-under_sCoRe="bar" dataNotAnDataAttribute="yes" />;`, `{"requireDataLowercase":true}`, []string{`dataLowercaseRequired`, `dataLowercaseRequired`, `unknownProp`}},
-		{"invalid 28", `<App data-testID="bar" data-under_sCoRe="bar" dataNotAnDataAttribute="yes" />;`, `{"requireDataLowercase":true}`, []string{`dataLowercaseRequired`, `dataLowercaseRequired`}},
+		{
+			"invalid 27",
+			`<div data-testID="bar" data-under_sCoRe="bar" dataNotAnDataAttribute="yes" />;`,
+			`{"requireDataLowercase":true}`,
+			[]string{`dataLowercaseRequired`, `dataLowercaseRequired`, `unknownProp`},
+		},
+		{
+			"invalid 28",
+			`<App data-testID="bar" data-under_sCoRe="bar" dataNotAnDataAttribute="yes" />;`,
+			`{"requireDataLowercase":true}`,
+			[]string{`dataLowercaseRequired`, `dataLowercaseRequired`},
+		},
 		{"invalid 29", `<div abbr="abbr" />`, ``, []string{`invalidPropOnTag`}},
 		{"invalid 30", `<div webkitDirectory="" />`, ``, []string{`invalidPropOnTag`}},
 		{"invalid 31", `<div webkitdirectory="" />`, ``, []string{`invalidPropOnTag`}},
@@ -92,66 +135,102 @@ func TestNoUnknownPropertyFires(t *testing.T) {
         </div>
       `, ``, []string{`unknownProp`}},
 
-		// The only two corpus cases carrying `settings.react.version`, and each is clean UPSTREAM
+		// The only two corpus cases carrying `settings.react.version`, and each is clean upstream
 		// only because of that setting. cohere has no shared-settings surface, so this port answers
 		// as though there were none, and both report. Recorded here at this port's verdict with the
 		// upstream one named, rather than deleted: the gap is a missing configuration surface, not
 		// a defect in the judgment, and deleting the cases would hide it.
 		//
-		// Upstream sets 16.0.99 to ACCEPT `allowTransparency`, a name React dropped in 16.1.
+		// Upstream sets 16.0.99 to accept `allowTransparency`, a name React dropped in 16.1.
 		{"valid 46", `<div allowTransparency="true" />`, ``, []string{`unknownProp`}},
 		// Upstream sets 19.0.0 to accept `precedence`, which the no-settings default does not reach.
-		{"valid 50", `<link precedence="medium" href="https://foo.bar" rel="canonical" />`, ``, []string{`unknownProp`}},
+		{
+			"valid 50",
+			`<link precedence="medium" href="https://foo.bar" rel="canonical" />`,
+			``,
+			[]string{`unknownProp`},
+		},
 		// Cases upstream's corpus does not write, each measured against the installed build.
 
-		// A namespaced attribute REPORTS, which is why this rule reads source text rather than
+		// A namespaced attribute reports, which is why this rule reads source text rather than
 		// calling jsx.AttributeName: that shelf helper declines a namespaced name by design, and
 		// using it would silently drop every one of these.
-		{"a namespaced xlink attribute", `<svg><use xlink:href="#a" /></svg>`, ``, []string{"unknownPropWithStandardName"}},
+		{
+			"a namespaced xlink attribute",
+			`<svg><use xlink:href="#a" /></svg>`,
+			``,
+			[]string{"unknownPropWithStandardName"},
+		},
 		{"a namespaced xmlns attribute", `<svg xmlns:xlink="u" />`, ``, []string{"unknownProp"}},
 		{"a bogus namespaced attribute", `<div foo:bar="x" />`, ``, []string{"unknownProp"}},
 		// The xml exclusion inside the data-attribute test.
 		{"a data-xml prefixed attribute", `<div data-xmlFoo="x" />`, ``, []string{"unknownProp"}},
-		// An ARIA name is matched EXACTLY, so a miscased one is not exempt.
+		// An ARIA name is matched exactly, so a miscased one is not exempt.
 		{"an unknown aria attribute", `<div aria-bogus="true" />`, ``, []string{"unknownProp"}},
 		// The tag-restricted table reports when the tag is wrong.
 		{"a restricted attribute on the wrong tag", `<div charset="utf-8" />`, ``, []string{"invalidPropOnTag"}},
-		// The ignore list is matched against the spelling as WRITTEN, before case normalisation.
+		// The ignore list is matched against the spelling as written, before case normalisation.
 		// Naming the canonical form does not exempt the written one, which is the half a single
 		// row would miss and which a mutant normalising first survives without these two.
 		// `charset` is already the canonical spelling in the ignore-case list, so normalising it
 		// changes nothing and that row cannot separate the two orders. `allowfullscreen` can:
-		// normalisation rewrites it to `allowFullScreen`, so a port matching the ignore list AFTER
+		// normalisation rewrites it to `allowFullScreen`, so a port matching the ignore list after
 		// normalisation would exempt on the canonical spelling and not on the written one, which is
 		// the exact inverse of upstream. All three rows measured against the installed build.
-		{"the canonical spelling does not exempt allowfullscreen", `<div allowfullscreen="true" />`, `{"ignore":["allowFullScreen"]}`, []string{"invalidPropOnTag"}},
-		{"an unignored allowfullscreen on the wrong tag reports", `<div allowfullscreen="true" />`, ``, []string{"invalidPropOnTag"}},
-		{"the canonical spelling does not exempt charset", `<div charset="utf-8" />`, `{"ignore":["charSet"]}`, []string{"invalidPropOnTag"}},
-		// The ARIA list is matched EXACTLY, unlike the property search below it. A mutant lowering
+		{
+			"the canonical spelling does not exempt allowfullscreen",
+			`<div allowfullscreen="true" />`,
+			`{"ignore":["allowFullScreen"]}`,
+			[]string{"invalidPropOnTag"},
+		},
+		{
+			"an unignored allowfullscreen on the wrong tag reports",
+			`<div allowfullscreen="true" />`,
+			``,
+			[]string{"invalidPropOnTag"},
+		},
+		{
+			"the canonical spelling does not exempt charset",
+			`<div charset="utf-8" />`,
+			`{"ignore":["charSet"]}`,
+			[]string{"invalidPropOnTag"},
+		},
+		// The ARIA list is matched exactly, unlike the property search below it. A mutant lowering
 		// the name before the lookup survives every corpus case, because upstream writes no
 		// miscased ARIA attribute anywhere.
-		// A plain COMPONENT reaches the data-attribute branch, because that branch runs before the
+		// A plain component reaches the data-attribute branch, because that branch runs before the
 		// html-like guard. This is the control for the member-tag row in the silent table: the two
 		// differ only in the dot, and without upstream's early member-tag return the member form
 		// would report here too. Both measured on the installed build.
-		{"a component reaches the data branch", `<Foo data-Baz="x" />`, `{"requireDataLowercase":true}`, []string{"dataLowercaseRequired"}},
+		{
+			"a component reaches the data branch",
+			`<Foo data-Baz="x" />`,
+			`{"requireDataLowercase":true}`,
+			[]string{"dataLowercaseRequired"},
+		},
 		{"a miscased aria attribute", `<div aria-Hidden="true" />`, ``, []string{"unknownProp"}},
 		{"an uppercase aria attribute", `<div ARIA-HIDDEN="true" />`, ``, []string{"unknownProp"}},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			options := noUnknownPropertyOptions(t, testCase.rawOptions)
-			result := rule_testing.RunWithOptions(t, NoUnknownProperty, noUnknownPropertyFile, testCase.sourceText, options)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			options := noUnknownPropertyOptions(test, testCase.rawOptions)
+			result := rule_testing.RunWithOptions(
+				test,
+				NoUnknownProperty,
+				noUnknownPropertyFile,
+				testCase.sourceText,
+				options,
+			)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
 
 // TestNoUnknownPropertyStaysSilent runs every case this port declines.
-func TestNoUnknownPropertyStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoUnknownPropertyStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -171,7 +250,11 @@ func TestNoUnknownPropertyStaysSilent(t *testing.T) {
 		{"valid 10", `<div onMouseDown={this._onMouseDown}></div>;`, ``},
 		{"valid 13", `<a href="someLink" download="foo">Read more</a>`, ``},
 		{"valid 14", `<area download="foo" />`, ``},
-		{"valid 15", `<img src="cat_keyboard.jpeg" alt="A cat sleeping on a keyboard" align="top" fetchPriority="high" />`, ``},
+		{
+			"valid 15",
+			`<img src="cat_keyboard.jpeg" alt="A cat sleeping on a keyboard" align="top" fetchPriority="high" />`,
+			``,
+		},
 		{"valid 16", `<input type="password" required />`, ``},
 		{"valid 17", `<input ref={this.input} type="radio" />`, ``},
 		{"valid 18", `<input type="file" webkitdirectory="" />`, ``},
@@ -180,7 +263,11 @@ func TestNoUnknownPropertyStaysSilent(t *testing.T) {
 		{"valid 21", `<iframe scrolling="?" onLoad={a} onError={b} align="top" />`, ``},
 		{"valid 22", `<input key="bar" type="radio" />`, ``},
 		{"valid 23", `<button disabled>You cannot click me</button>;`, ``},
-		{"valid 24", `<svg key="lock" viewBox="box" fill={10} d="d" stroke={1} strokeWidth={2} strokeLinecap={3} strokeLinejoin={4} transform="something" clipRule="else" x1={5} x2="6" y1="7" y2="8"></svg>`, ``},
+		{
+			"valid 24",
+			`<svg key="lock" viewBox="box" fill={10} d="d" stroke={1} strokeWidth={2} strokeLinecap={3} strokeLinejoin={4} transform="something" clipRule="else" x1={5} x2="6" y1="7" y2="8"></svg>`,
+			``,
+		},
 		{"valid 25", `<g fill="#7B82A0" fillRule="evenodd"></g>`, ``},
 		{"valid 26", `<mask fill="#7B82A0"></mask>`, ``},
 		{"valid 27", `<symbol fill="#7B82A0"></symbol>`, ``},
@@ -193,17 +280,29 @@ func TestNoUnknownPropertyStaysSilent(t *testing.T) {
 		{"valid 34", `<script onLoad={bar} onError={foo} />`, ``},
 		{"valid 35", `<source onLoad={bar} onError={foo} />`, ``},
 		{"valid 36", `<link onLoad={bar} onError={foo} />`, ``},
-		{"valid 37", `<link rel="preload" as="image" href="someHref" imageSrcSet="someImageSrcSet" imageSizes="someImageSizes" />`, ``},
+		{
+			"valid 37",
+			`<link rel="preload" as="image" href="someHref" imageSrcSet="someImageSrcSet" imageSizes="someImageSizes" />`,
+			``,
+		},
 		{"valid 38", `<object onLoad={bar} />`, ``},
 		{"valid 40", `<video allowFullScreen webkitAllowFullScreen mozAllowFullScreen />`, ``},
 		{"valid 41", `<iframe allowFullScreen webkitAllowFullScreen mozAllowFullScreen />`, ``},
 		{"valid 42", `<table border="1" />`, ``},
 		{"valid 43", `<th abbr="abbr" />`, ``},
 		{"valid 44", `<td abbr="abbr" />`, ``},
-		{"valid 45", `<template shadowrootmode="open" shadowrootclonable shadowrootdelegatesfocus shadowrootserializable />`, ``},
+		{
+			"valid 45",
+			`<template shadowrootmode="open" shadowrootclonable shadowrootdelegatesfocus shadowrootserializable />`,
+			``,
+		},
 		{"valid 47", `<div onPointerDown={this.onDown} onPointerUp={this.onUp} />`, ``},
 		{"valid 48", `<input type="checkbox" defaultChecked={this.state.checkbox} />`, ``},
-		{"valid 49", `<div onTouchStart={this.startAnimation} onTouchEnd={this.stopAnimation} onTouchCancel={this.cancel} onTouchMove={this.move} onMouseMoveCapture={this.capture} onTouchCancelCapture={this.log} />`, ``},
+		{
+			"valid 49",
+			`<div onTouchStart={this.startAnimation} onTouchEnd={this.stopAnimation} onTouchCancel={this.cancel} onTouchMove={this.move} onMouseMoveCapture={this.capture} onTouchCancelCapture={this.log} />`,
+			``,
+		},
 		{"valid 51", `<meta charset="utf-8" />;`, ``},
 		{"valid 52", `<meta charSet="utf-8" />;`, ``},
 		{"valid 53", `<div class="foo" is="my-elem"></div>;`, ``},
@@ -225,12 +324,28 @@ func TestNoUnknownPropertyStaysSilent(t *testing.T) {
 		{"valid 69", `<audio crossOrigin />`, ``},
 		{"valid 70", `<svg focusable><image crossOrigin /></svg>`, ``},
 		{"valid 71", `<details onToggle={this.onToggle}>Some details</details>`, ``},
-		{"valid 72", `<path fill="pink" d="M 10,30 A 20,20 0,0,1 50,30 A 20,20 0,0,1 90,30 Q 90,60 50,90 Q 10,60 10,30 z"></path>`, ``},
+		{
+			"valid 72",
+			`<path fill="pink" d="M 10,30 A 20,20 0,0,1 50,30 A 20,20 0,0,1 90,30 Q 90,60 50,90 Q 10,60 10,30 z"></path>`,
+			``,
+		},
 		{"valid 73", `<line fill="pink" x1="0" y1="80" x2="100" y2="20"></line>`, ``},
 		{"valid 74", `<link as="audio">Audio content</link>`, ``},
-		{"valid 75", `<video controlsList="nodownload" controls={this.controls} loop={true} muted={false} src={this.videoSrc} playsInline={true} onResize={this.onResize}></video>`, ``},
-		{"valid 76", `<audio controlsList="nodownload" controls={this.controls} crossOrigin="anonymous" disableRemotePlayback loop muted preload="none" src="something" onAbort={this.abort} onDurationChange={this.durationChange} onEmptied={this.emptied} onEnded={this.end} onError={this.error} onResize={this.onResize}></audio>`, ``},
-		{"valid 77", `<marker id={markerId} viewBox="0 0 2 2" refX="1" refY="1" markerWidth="1" markerHeight="1" orient="auto" />`, ``},
+		{
+			"valid 75",
+			`<video controlsList="nodownload" controls={this.controls} loop={true} muted={false} src={this.videoSrc} playsInline={true} onResize={this.onResize}></video>`,
+			``,
+		},
+		{
+			"valid 76",
+			`<audio controlsList="nodownload" controls={this.controls} crossOrigin="anonymous" disableRemotePlayback loop muted preload="none" src="something" onAbort={this.abort} onDurationChange={this.durationChange} onEmptied={this.emptied} onEnded={this.end} onError={this.error} onResize={this.onResize}></audio>`,
+			``,
+		},
+		{
+			"valid 77",
+			`<marker id={markerId} viewBox="0 0 2 2" refX="1" refY="1" markerWidth="1" markerHeight="1" orient="auto" />`,
+			``,
+		},
 		{"valid 78", `<pattern id="pattern" viewBox="0,0,10,10" width="10%" height="10%" />`, ``},
 		{"valid 79", `<symbol id="myDot" width="10" height="10" viewBox="0 0 2 2" />`, ``},
 		{"valid 80", `<view id="one" viewBox="0 0 100 100" />`, ``},
@@ -288,11 +403,15 @@ func TestNoUnknownPropertyStaysSilent(t *testing.T) {
 		{"valid 11", `<div onScrollEnd={this._onScrollEnd}></div>;`, ``},
 		{"valid 12", `<div onScrollEndCapture={this._onScrollEndCapture}></div>;`, ``},
 		{"valid 39", `<body onLoad={bar} />`, ``},
-		{"valid 84", `<dialog closedby="something" onClose={handler} open id="dialog" returnValue="something" onCancel={handler2} />`, ``},
+		{
+			"valid 84",
+			`<dialog closedby="something" onClose={handler} open id="dialog" returnValue="something" onCancel={handler2} />`,
+			``,
+		},
 
 		// Cases upstream's corpus does not write, each measured against the installed build.
 
-		// A hyphenated name is a plain identifier in our parser, NOT a namespaced node, and both
+		// A hyphenated name is a plain identifier in our parser, not a namespaced node, and both
 		// of these branches depend on reading it correctly.
 		{"a well formed data attribute", `<div data-foo="x" />`, ``},
 		{"an uppercase data attribute is accepted by default", `<div data-Foo="x" />`, ``},
@@ -300,10 +419,10 @@ func TestNoUnknownPropertyStaysSilent(t *testing.T) {
 		// A component, a member tag and a custom element are all outside the rule's scope.
 		{"an unknown attribute on a component", `<Foo bogus="x" />`, ``},
 		{"an unknown attribute on a member tag", `<Foo.Bar bogus="x" />`, ``},
-		// The member-tag return happens BEFORE the data-attribute branch, so this stays clean while
+		// The member-tag return happens before the data-attribute branch, so this stays clean while
 		// the same attribute on a plain component reports. A mutant deleting that early return
 		// survives every other fixture, because the html-like guard further down declines the same
-		// inputs for every branch AFTER it. This row is the only one that can see it.
+		// inputs for every branch after it. This row is the only one that can see it.
 		{"a member tag is skipped before the data branch", `<Foo.Bar data-Baz="x" />`, `{"requireDataLowercase":true}`},
 		{"an unknown attribute on a custom element", `<my-elem bogus="x" />`, ``},
 		{"the is attribute exempts a customised built-in", `<div is="my-elem" bogus="x" />`, ``},
@@ -315,28 +434,38 @@ func TestNoUnknownPropertyStaysSilent(t *testing.T) {
 		{"the canonical svg spelling", `<path strokeWidth="1" />`, ``},
 		// The control for the ignore-list pair above: the written spelling exempts.
 		{"the written spelling exempts charset", `<div charset="utf-8" />`, `{"ignore":["charset"]}`},
-		// The control for the pair above: the WRITTEN spelling exempts, and this is the row the
+		// The control for the pair above: the written spelling exempts, and this is the row the
 		// mutant has to break.
-		{"the written spelling exempts allowfullscreen", `<div allowfullscreen="true" />`, `{"ignore":["allowfullscreen"]}`},
+		{
+			"the written spelling exempts allowfullscreen",
+			`<div allowfullscreen="true" />`,
+			`{"ignore":["allowfullscreen"]}`,
+		},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			options := noUnknownPropertyOptions(t, testCase.rawOptions)
-			result := rule_testing.RunWithOptions(t, NoUnknownProperty, noUnknownPropertyFile, testCase.sourceText, options)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			options := noUnknownPropertyOptions(test, testCase.rawOptions)
+			result := rule_testing.RunWithOptions(
+				test,
+				NoUnknownProperty,
+				noUnknownPropertyFile,
+				testCase.sourceText,
+				options,
+			)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
 
-// TestNoUnknownPropertyRepairs asserts what the fixer WRITES, not merely that it fires.
+// TestNoUnknownPropertyRepairs asserts what the fixer writes, not merely that it fires.
 //
-// Only the standard-name branch carries a repair, and it replaces the NAME node alone so the value
+// Only the standard-name branch carries a repair, and it replaces the name node alone so the value
 // survives. `ExpectFixedSource` replays the fix and compares the whole rewritten file, so a repair
 // with the right text over the wrong span fails here even though its message id is correct.
-func TestNoUnknownPropertyRepairs(t *testing.T) {
-	t.Parallel()
+func TestNoUnknownPropertyRepairs(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -350,15 +479,25 @@ func TestNoUnknownPropertyRepairs(t *testing.T) {
 		// The value is untouched, including one holding an expression that must survive intact.
 		{"the value survives the repair", `<div class={someExpression} />`, `<div className={someExpression} />`},
 		// A namespaced name is replaced whole, colon included.
-		{"a namespaced name is replaced whole", `<svg><use xlink:href="#a" /></svg>`, `<svg><use xlinkHref="#a" /></svg>`},
+		{
+			"a namespaced name is replaced whole",
+			`<svg><use xlink:href="#a" /></svg>`,
+			`<svg><use xlinkHref="#a" /></svg>`,
+		},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoUnknownProperty, noUnknownPropertyFile, testCase.sourceText, noUnknownPropertyOptions(t, ``))
-			rule_testing.ExpectFindings(t, result, "unknownPropWithStandardName")
-			rule_testing.ExpectFixedSource(t, result, testCase.wantFixed)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(
+				test,
+				NoUnknownProperty,
+				noUnknownPropertyFile,
+				testCase.sourceText,
+				noUnknownPropertyOptions(test, ``),
+			)
+			rule_testing.ExpectFindings(test, result, "unknownPropWithStandardName")
+			rule_testing.ExpectFixedSource(test, result, testCase.wantFixed)
 		})
 	}
 }
@@ -367,10 +506,10 @@ func TestNoUnknownPropertyRepairs(t *testing.T) {
 // repair.
 //
 // Only `unknownPropWithStandardName` knows what to write. A fixer on the other three would be
-// guessing, and a fix is applied unattended. Asserting the ABSENCE of a repair is something no
+// guessing, and a fix is applied unattended. Asserting the absence of a repair is something no
 // message-id fixture can see.
-func TestNoUnknownPropertyDoesNotRepairWhatItCannotName(t *testing.T) {
-	t.Parallel()
+func TestNoUnknownPropertyDoesNotRepairWhatItCannotName(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -383,14 +522,20 @@ func TestNoUnknownPropertyDoesNotRepairWhatItCannotName(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoUnknownProperty, noUnknownPropertyFile, testCase.sourceText, noUnknownPropertyOptions(t, testCase.rawOptions))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(
+				test,
+				NoUnknownProperty,
+				noUnknownPropertyFile,
+				testCase.sourceText,
+				noUnknownPropertyOptions(test, testCase.rawOptions),
+			)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("expected one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("expected one finding, got %d", len(result.Diagnostics))
 			}
 			if fixes := result.Diagnostics[0].Fixes; len(fixes) != 0 {
-				t.Fatalf("a repair was offered for a name the rule cannot spell: %v", fixes)
+				test.Fatalf("a repair was offered for a name the rule cannot spell: %v", fixes)
 			}
 		})
 	}
@@ -401,8 +546,8 @@ func TestNoUnknownPropertyDoesNotRepairWhatItCannotName(t *testing.T) {
 // Three of the four messages interpolate, so an id assertion cannot see what the format string
 // computed, and the tag-restricted one joins a whole list into its text. Asserted against literals
 // typed here rather than against the rule's own constants, which would move under mutation.
-func TestNoUnknownPropertyMessageText(t *testing.T) {
-	t.Parallel()
+func TestNoUnknownPropertyMessageText(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -434,27 +579,33 @@ func TestNoUnknownPropertyMessageText(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoUnknownProperty, noUnknownPropertyFile, testCase.sourceText, noUnknownPropertyOptions(t, testCase.rawOptions))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(
+				test,
+				NoUnknownProperty,
+				noUnknownPropertyFile,
+				testCase.sourceText,
+				noUnknownPropertyOptions(test, testCase.rawOptions),
+			)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("expected one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("expected one finding, got %d", len(result.Diagnostics))
 			}
 			if got := result.Diagnostics[0].Message.Description; got != testCase.want {
-				t.Fatalf("message is %q, want %q", got, testCase.want)
+				test.Fatalf("message is %q, want %q", got, testCase.want)
 			}
 		})
 	}
 }
 
-// TestNoUnknownPropertyAnchor pins WHERE each finding points.
+// TestNoUnknownPropertyAnchor pins where each finding points.
 //
 // Upstream reports on the whole JSXAttribute for every message, so the span covers the name and the
-// value together rather than either alone. The repair, by contrast, replaces only the NAME node,
+// value together rather than either alone. The repair, by contrast, replaces only the name node,
 // and that asymmetry is exactly the shape the brief warns about: a fix that lands correctly while
 // the finding points elsewhere shows the reader a line they were never told about.
-func TestNoUnknownPropertyAnchor(t *testing.T) {
-	t.Parallel()
+func TestNoUnknownPropertyAnchor(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -467,43 +618,67 @@ func TestNoUnknownPropertyAnchor(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoUnknownProperty, noUnknownPropertyFile, testCase.sourceText, noUnknownPropertyOptions(t, ``))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(
+				test,
+				NoUnknownProperty,
+				noUnknownPropertyFile,
+				testCase.sourceText,
+				noUnknownPropertyOptions(test, ``),
+			)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("expected one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("expected one finding, got %d", len(result.Diagnostics))
 			}
 			fixture := strings.TrimSpace(testCase.sourceText) + "\n"
 			span := result.Diagnostics[0].Range
 			if got := fixture[span.Pos():span.End()]; got != testCase.want {
-				t.Fatalf("finding spans %q, want %q", got, testCase.want)
+				test.Fatalf("finding spans %q, want %q", got, testCase.want)
 			}
 		})
 	}
 }
 
-// TestNoUnknownPropertyIgnoreOption pins that the ignore list matches the ACTUAL spelling.
+// TestNoUnknownPropertyIgnoreOption pins that the ignore list matches the actual spelling.
 //
 // Upstream tests the ignore list before normalising case, so an entry has to be written the way the
-// attribute is written. Naming the canonical spelling does NOT exempt the DOM one, which is the
+// attribute is written. Naming the canonical spelling does not exempt the DOM one, which is the
 // half a single-row fixture would miss.
-func TestNoUnknownPropertyIgnoreOption(t *testing.T) {
-	t.Parallel()
+func TestNoUnknownPropertyIgnoreOption(test *testing.T) {
+	test.Parallel()
 
-	t.Run("the written spelling exempts", func(t *testing.T) {
-		t.Parallel()
-		result := rule_testing.RunWithOptions(t, NoUnknownProperty, noUnknownPropertyFile, `<div class="x" />`, noUnknownPropertyOptions(t, `{"ignore":["class"]}`))
-		rule_testing.ExpectClean(t, result)
+	test.Run("the written spelling exempts", func(test *testing.T) {
+		test.Parallel()
+		result := rule_testing.RunWithOptions(
+			test,
+			NoUnknownProperty,
+			noUnknownPropertyFile,
+			`<div class="x" />`,
+			noUnknownPropertyOptions(test, `{"ignore":["class"]}`),
+		)
+		rule_testing.ExpectClean(test, result)
 	})
-	t.Run("the canonical spelling does not exempt the written one", func(t *testing.T) {
-		t.Parallel()
-		result := rule_testing.RunWithOptions(t, NoUnknownProperty, noUnknownPropertyFile, `<div class="x" />`, noUnknownPropertyOptions(t, `{"ignore":["className"]}`))
-		rule_testing.ExpectFindings(t, result, "unknownPropWithStandardName")
+	test.Run("the canonical spelling does not exempt the written one", func(test *testing.T) {
+		test.Parallel()
+		result := rule_testing.RunWithOptions(
+			test,
+			NoUnknownProperty,
+			noUnknownPropertyFile,
+			`<div class="x" />`,
+			noUnknownPropertyOptions(test, `{"ignore":["className"]}`),
+		)
+		rule_testing.ExpectFindings(test, result, "unknownPropWithStandardName")
 	})
-	t.Run("an unrelated entry exempts nothing", func(t *testing.T) {
-		t.Parallel()
-		result := rule_testing.RunWithOptions(t, NoUnknownProperty, noUnknownPropertyFile, `<div class="x" />`, noUnknownPropertyOptions(t, `{"ignore":["other"]}`))
-		rule_testing.ExpectFindings(t, result, "unknownPropWithStandardName")
+	test.Run("an unrelated entry exempts nothing", func(test *testing.T) {
+		test.Parallel()
+		result := rule_testing.RunWithOptions(
+			test,
+			NoUnknownProperty,
+			noUnknownPropertyFile,
+			`<div class="x" />`,
+			noUnknownPropertyOptions(test, `{"ignore":["other"]}`),
+		)
+		rule_testing.ExpectFindings(test, result, "unknownPropWithStandardName")
 	})
 }
 
@@ -511,28 +686,52 @@ func TestNoUnknownPropertyIgnoreOption(t *testing.T) {
 //
 // The default is false, and the default matters: with it off an uppercase data attribute is
 // accepted silently, which is the opposite verdict from every other unknown name.
-func TestNoUnknownPropertyRequireDataLowercase(t *testing.T) {
-	t.Parallel()
+func TestNoUnknownPropertyRequireDataLowercase(test *testing.T) {
+	test.Parallel()
 
-	t.Run("off by default", func(t *testing.T) {
-		t.Parallel()
-		result := rule_testing.RunWithOptions(t, NoUnknownProperty, noUnknownPropertyFile, `<div data-Foo="x" />`, noUnknownPropertyOptions(t, ``))
-		rule_testing.ExpectClean(t, result)
+	test.Run("off by default", func(test *testing.T) {
+		test.Parallel()
+		result := rule_testing.RunWithOptions(
+			test,
+			NoUnknownProperty,
+			noUnknownPropertyFile,
+			`<div data-Foo="x" />`,
+			noUnknownPropertyOptions(test, ``),
+		)
+		rule_testing.ExpectClean(test, result)
 	})
-	t.Run("explicitly false", func(t *testing.T) {
-		t.Parallel()
-		result := rule_testing.RunWithOptions(t, NoUnknownProperty, noUnknownPropertyFile, `<div data-Foo="x" />`, noUnknownPropertyOptions(t, `{"requireDataLowercase":false}`))
-		rule_testing.ExpectClean(t, result)
+	test.Run("explicitly false", func(test *testing.T) {
+		test.Parallel()
+		result := rule_testing.RunWithOptions(
+			test,
+			NoUnknownProperty,
+			noUnknownPropertyFile,
+			`<div data-Foo="x" />`,
+			noUnknownPropertyOptions(test, `{"requireDataLowercase":false}`),
+		)
+		rule_testing.ExpectClean(test, result)
 	})
-	t.Run("on reports", func(t *testing.T) {
-		t.Parallel()
-		result := rule_testing.RunWithOptions(t, NoUnknownProperty, noUnknownPropertyFile, `<div data-Foo="x" />`, noUnknownPropertyOptions(t, `{"requireDataLowercase":true}`))
-		rule_testing.ExpectFindings(t, result, "dataLowercaseRequired")
+	test.Run("on reports", func(test *testing.T) {
+		test.Parallel()
+		result := rule_testing.RunWithOptions(
+			test,
+			NoUnknownProperty,
+			noUnknownPropertyFile,
+			`<div data-Foo="x" />`,
+			noUnknownPropertyOptions(test, `{"requireDataLowercase":true}`),
+		)
+		rule_testing.ExpectFindings(test, result, "dataLowercaseRequired")
 	})
-	t.Run("on leaves a lowercase data attribute alone", func(t *testing.T) {
-		t.Parallel()
-		result := rule_testing.RunWithOptions(t, NoUnknownProperty, noUnknownPropertyFile, `<div data-foo="x" />`, noUnknownPropertyOptions(t, `{"requireDataLowercase":true}`))
-		rule_testing.ExpectClean(t, result)
+	test.Run("on leaves a lowercase data attribute alone", func(test *testing.T) {
+		test.Parallel()
+		result := rule_testing.RunWithOptions(
+			test,
+			NoUnknownProperty,
+			noUnknownPropertyFile,
+			`<div data-foo="x" />`,
+			noUnknownPropertyOptions(test, `{"requireDataLowercase":true}`),
+		)
+		rule_testing.ExpectClean(test, result)
 	})
 }
 
@@ -541,10 +740,10 @@ func TestNoUnknownPropertyRequireDataLowercase(t *testing.T) {
 // Three siblings in this package once gated on `.tsx` and `.jsx`, which was oxc residue and has
 // since been removed from all three. Upstream gates nothing.
 //
-// `.ts` is absent for a PARSER reason rather than a rule one: TypeScript reads an opening angle
+// `.ts` is absent for a parser reason rather than a rule one: TypeScript reads an opening angle
 // bracket there as a type assertion, so no JSX attribute node exists for any rule to see.
-func TestNoUnknownPropertyHasNoFileSuffixGate(t *testing.T) {
-	t.Parallel()
+func TestNoUnknownPropertyHasNoFileSuffixGate(test *testing.T) {
+	test.Parallel()
 
 	const source = `<div class="x" />`
 
@@ -553,59 +752,62 @@ func TestNoUnknownPropertyHasNoFileSuffixGate(t *testing.T) {
 		"/repository/source/NoUnknownProperty.jsx",
 		"/repository/source/NoUnknownProperty.js",
 	} {
-		t.Run(fileName, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoUnknownProperty, fileName, source, noUnknownPropertyOptions(t, ``))
-			rule_testing.ExpectFindings(t, result, "unknownPropWithStandardName")
+		test.Run(fileName, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(
+				test,
+				NoUnknownProperty,
+				fileName,
+				source,
+				noUnknownPropertyOptions(test, ``),
+			)
+			rule_testing.ExpectFindings(test, result, "unknownPropWithStandardName")
 		})
 	}
 }
 
-// TestDecodeNoUnknownPropertyOptions covers both options and the nil-options path.
-func TestDecodeNoUnknownPropertyOptions(t *testing.T) {
-	t.Parallel()
+// TestDecodeNoUnknownPropertyOptions covers both options and the empty-body path.
+func TestDecodeNoUnknownPropertyOptions(test *testing.T) {
+	test.Parallel()
 
-	t.Run("an empty body carries upstream's defaults", func(t *testing.T) {
-		t.Parallel()
-		decoded, err := DecodeNoUnknownPropertyOptions(nil)
-		if err != nil {
-			t.Fatalf("decoding an empty body: %v", err)
+	test.Run("an empty body carries upstream's defaults", func(test *testing.T) {
+		test.Parallel()
+		decoded, decodeNoUnknownPropertyOptionsError := DecodeNoUnknownPropertyOptions(nil)
+		if decodeNoUnknownPropertyOptionsError != nil {
+			test.Fatalf("decoding an empty body: %v", decodeNoUnknownPropertyOptionsError)
 		}
-		options, ok := decoded.(NoUnknownPropertyOptions)
-		if !ok {
-			t.Fatalf("decoded to %T, want NoUnknownPropertyOptions", decoded)
+		if len(decoded.Ignore) != 0 {
+			test.Fatalf("ignore list is %v, want empty", decoded.Ignore)
 		}
-		if len(options.Ignore) != 0 {
-			t.Fatalf("ignore list is %v, want empty", options.Ignore)
-		}
-		if options.RequireDataLowercase {
-			t.Fatal("requireDataLowercase defaulted to true, want false")
+		if decoded.RequireDataLowercase {
+			test.Fatal("requireDataLowercase defaulted to true, want false")
 		}
 	})
 
-	t.Run("both keys decode", func(t *testing.T) {
-		t.Parallel()
-		decoded, err := DecodeNoUnknownPropertyOptions([]byte(`{"ignore":["a","b"],"requireDataLowercase":true}`))
-		if err != nil {
-			t.Fatalf("decoding both keys: %v", err)
+	test.Run("both keys decode", func(test *testing.T) {
+		test.Parallel()
+		decoded, decodeNoUnknownPropertyOptionsError := DecodeNoUnknownPropertyOptions(
+			[]byte(`{"ignore":["a","b"],"requireDataLowercase":true}`),
+		)
+		if decodeNoUnknownPropertyOptionsError != nil {
+			test.Fatalf("decoding both keys: %v", decodeNoUnknownPropertyOptionsError)
 		}
-		options := decoded.(NoUnknownPropertyOptions)
-		if strings.Join(options.Ignore, ",") != "a,b" {
-			t.Fatalf("ignore list is %v", options.Ignore)
+		if strings.Join(decoded.Ignore, ",") != "a,b" {
+			test.Fatalf("ignore list is %v", decoded.Ignore)
 		}
-		if !options.RequireDataLowercase {
-			t.Fatal("requireDataLowercase is false, want true")
+		if !decoded.RequireDataLowercase {
+			test.Fatal("requireDataLowercase is false, want true")
 		}
 	})
 }
 
 // TestNoUnknownPropertyTables guards the extracted data against silent truncation.
 //
-// The tables ARE the rule, so a generator that emitted half of one would leave most fixtures
+// The tables are the rule, so a generator that emitted half of one would leave most fixtures
 // passing while the rule quietly stopped knowing names. These counts were taken from the installed
 // module's own constants at extraction time.
-func TestNoUnknownPropertyTables(t *testing.T) {
-	t.Parallel()
+func TestNoUnknownPropertyTables(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name string
@@ -626,18 +828,18 @@ func TestNoUnknownPropertyTables(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		if testCase.got != testCase.want {
-			t.Errorf("%s holds %d entries, want %d", testCase.name, testCase.got, testCase.want)
+			test.Errorf("%s holds %d entries, want %d", testCase.name, testCase.got, testCase.want)
 		}
 	}
 
-	// Spot-check the entries whose CASING is the rule, in both directions.
+	// Spot-check the entries whose casing is the rule, in both directions.
 	if noUnknownPropertySvgDomAttributeNames["stroke-width"] != "strokeWidth" {
-		t.Error("the svg map lost its stroke-width entry")
+		test.Error("the svg map lost its stroke-width entry")
 	}
 	if noUnknownPropertyDomAttributeNames["class"] != "className" {
-		t.Error("the dom map lost its class entry")
+		test.Error("the dom map lost its class entry")
 	}
 	if _, present := noUnknownPropertySvgDomAttributeNames["strokeWidth"]; present {
-		t.Error("the svg map keys on the canonical spelling, which would invert the rule")
+		test.Error("the svg map keys on the canonical spelling, which would invert the rule")
 	}
 }

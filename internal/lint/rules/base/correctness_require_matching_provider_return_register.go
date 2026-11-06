@@ -11,5 +11,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // lint layer rather than ahra's, and ahra's config names no `base/` rule at all, so which trees
 // enforce it is Kirk's call rather than a porter's.
 func init() {
-	rule.Register(rule.Registration{Rule: CorrectnessRequireMatchingProviderReturn})
+	rule.Register(rule.Registration[rule.NoOptions]{Rule: CorrectnessRequireMatchingProviderReturn})
 }

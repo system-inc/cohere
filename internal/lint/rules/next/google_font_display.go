@@ -47,11 +47,11 @@ var messageGoogleFontDisplayNotRecommended = rule.Message{
 // `find_url_query_value`. Order does not matter, so `?display=fallback&family=Krona+One` is caught,
 // and that case is in the upstream corpus precisely because a port that assumed `family` came first
 // would miss it.
-var GoogleFontDisplay = rule.Rule{
+var GoogleFontDisplay = rule.Rule[rule.NoOptions]{
 	// No family prefix. The config writes `nextjs/google-font-display` and matching strips the
 	// namespace on a `/` boundary, so a prefixed name matches nothing and runs on no files.
 	Name: "@next/next/google-font-display",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		report := func(node *ast.Node) {
 			tagName, attributes := jsx.ElementParts(node)
 			if !jsx.IsIntrinsicElementNamed(tagName, "link") {
@@ -68,13 +68,13 @@ var GoogleFontDisplay = rule.Rule{
 
 			display, hasDisplay := urlQueryValue(reference, "display")
 			if !hasDisplay {
-				ctx.ReportNode(node, messageGoogleFontDisplayMissing)
+				ruleContext.ReportNode(node, messageGoogleFontDisplayMissing)
 				return
 			}
 
 			switch display {
 			case "auto", "block", "fallback":
-				ctx.ReportNode(node, messageGoogleFontDisplayNotRecommended)
+				ruleContext.ReportNode(node, messageGoogleFontDisplayNotRecommended)
 			}
 		}
 

@@ -11,12 +11,22 @@ import (
 // The rule's messages, one handle per id, whose wording lives in
 // `policy/messages/network-require-hook-options-parameter.json`.
 var (
-	networkRequireHookOptionsParameterMissingOptionsParameterText          = policy.MessageOf("structure/network-require-hook-options-parameter", "missingOptionsParameter")
-	networkRequireHookOptionsParameterOptionsParameterNotPassedThroughText = policy.MessageOf("structure/network-require-hook-options-parameter", "optionsParameterNotPassedThrough")
-	networkRequireHookOptionsParameterIncorrectOptionsParameterTypeText    = policy.MessageOf("structure/network-require-hook-options-parameter", "incorrectOptionsParameterType")
+	networkRequireHookOptionsParameterMissingOptionsParameterText = policy.MessageOf(
+		"structure/network-require-hook-options-parameter",
+		"missingOptionsParameter",
+	)
+	networkRequireHookOptionsParameterOptionsParameterNotPassedThroughText = policy.MessageOf(
+		"structure/network-require-hook-options-parameter",
+		"optionsParameterNotPassedThrough",
+	)
+	networkRequireHookOptionsParameterIncorrectOptionsParameterTypeText = policy.MessageOf(
+		"structure/network-require-hook-options-parameter",
+		"incorrectOptionsParameterType",
+	)
 )
 
-// messageMissingOptionsParameter is the finding, rendered when it is reported so the text comes from the current catalog.
+// messageMissingOptionsParameter is the finding, rendered when it is reported so the text comes from the current
+// catalog.
 func messageMissingOptionsParameter() rule.Message {
 	return rule.Message{
 		Id:          networkRequireHookOptionsParameterMissingOptionsParameterText.Id,
@@ -24,7 +34,8 @@ func messageMissingOptionsParameter() rule.Message {
 	}
 }
 
-// messageOptionsParameterNotPassedThrough is the finding, rendered when it is reported so the text comes from the current catalog.
+// messageOptionsParameterNotPassedThrough is the finding, rendered when it is reported so the text comes from the
+// current catalog.
 func messageOptionsParameterNotPassedThrough() rule.Message {
 	return rule.Message{
 		Id:          networkRequireHookOptionsParameterOptionsParameterNotPassedThroughText.Id,
@@ -32,7 +43,8 @@ func messageOptionsParameterNotPassedThrough() rule.Message {
 	}
 }
 
-// messageIncorrectOptionsParameterType is the finding, rendered when it is reported so the text comes from the current catalog.
+// messageIncorrectOptionsParameterType is the finding, rendered when it is reported so the text comes from the current
+// catalog.
 func messageIncorrectOptionsParameterType() rule.Message {
 	return rule.Message{
 		Id:          networkRequireHookOptionsParameterIncorrectOptionsParameterTypeText.Id,
@@ -72,18 +84,18 @@ var inferOptionsTypeNames = map[string]bool{
 // that a query with no variables may pass options second directly. The original decides by looking
 // at what the second argument actually is, and that is reproduced here rather than simplified: a
 // simplification would report "options must be third" at a call site where second is correct.
-var NetworkRequireHookOptionsParameter = rule.Rule{
+var NetworkRequireHookOptionsParameter = rule.Rule[rule.NoOptions]{
 	Name:       "structure/network-require-hook-options-parameter",
 	NoListener: rule.NoListenerAnswersInRun,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		analysis := NetworkFileAnalysisFor(ctx)
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		analysis := NetworkFileAnalysisFor(ruleContext)
 		if len(analysis.HookDeclarations) == 0 {
 			return nil
 		}
 
 		for _, hook := range analysis.HookDeclarations {
 			for _, call := range findNetworkServiceCalls(hook.Body) {
-				checkHookOptionsPattern(ctx, hook, call)
+				checkHookOptionsPattern(ruleContext, hook, call)
 			}
 		}
 		return nil
@@ -91,7 +103,7 @@ var NetworkRequireHookOptionsParameter = rule.Rule{
 }
 
 // checkHookOptionsPattern judges one hook against one of its NetworkService calls.
-func checkHookOptionsPattern(ctx rule.Context, hook NetworkHookDeclaration, call NetworkServiceCall) {
+func checkHookOptionsPattern(ruleContext rule.Context, hook NetworkHookDeclaration, call NetworkServiceCall) {
 	isQuery := call.MethodName == "useGraphQlQuery" || call.MethodName == "useSuspenseGraphQlQuery"
 	isMutation := call.MethodName == "useGraphQlMutation"
 	if !isQuery && !isMutation {
@@ -114,20 +126,20 @@ func checkHookOptionsPattern(ctx rule.Context, hook NetworkHookDeclaration, call
 	hasOptionsParameter := strings.Contains(strings.ToLower(lastParameterName), "option")
 
 	if hasOptionsParameter && !hasInferOptionsType(lastParameter) {
-		ctx.ReportNode(lastParameter, messageIncorrectOptionsParameterType())
+		ruleContext.ReportNode(lastParameter, messageIncorrectOptionsParameterType())
 	}
 
 	if !hasOptionsParameter {
 		// Reported against the function rather than the name, unlike the naming rule: what is wrong
 		// is the signature, so the range should cover the thing that needs changing.
-		ctx.ReportNode(hook.FunctionNode, messageMissingOptionsParameter())
+		ruleContext.ReportNode(hook.FunctionNode, messageMissingOptionsParameter())
 		return
 	}
 
 	if !callForwardsOptions(call, optionsArgumentIndex, lastParameterName) {
 		// Reported against the call rather than the parameter. The parameter is correct; the call
 		// is what fails to use it.
-		ctx.ReportNode(call.Node, messageOptionsParameterNotPassedThrough())
+		ruleContext.ReportNode(call.Node, messageOptionsParameterNotPassedThrough())
 	}
 }
 

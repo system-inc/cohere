@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
-	"strings"
 	"sync"
 	"time"
 )
@@ -19,7 +18,7 @@ import (
 // This is a different cache from the lint findings cache beside it, and the difference is the whole
 // reason it exists. That cache was measured at about 9% and left unwired because it still walked the
 // tree: it could only skip map lookups the one-traversal design had already made nearly free. This
-// one skips the walk AND the graph build, which is roughly 0.45s on the ahra tree before any rule
+// one skips the walk and the graph build as well, which is roughly 0.45s on the ahra tree before any rule
 // runs. Its prize is the entire run, so the earlier verdict says nothing about it.
 //
 // # The rule it has to keep
@@ -34,7 +33,7 @@ import (
 //
 // The program's file list only exists after the graph is built, which is the cost this cache exists
 // to skip. So a full run records the list and the next run re-stats what was recorded. That is sound
-// for a file edited or deleted. It is blind to a file ADDED: a new source file under an include glob
+// for a file edited or deleted. It is blind to a file that was added: a new source file under an include glob
 // is an input the recorded list has never heard of, and re-statting the old list finds nothing wrong.
 //
 // Directories close that gap. Adding or removing an entry changes the mtime of the directory that
@@ -89,36 +88,6 @@ type RunCache struct {
 	Summary []byte
 }
 
-// RunCacheInput is one input's signature.
-type RunCacheInput struct {
-	Path string
-
-	// Directory is true for an entry recorded to catch files added beneath it. Kept explicit
-	// rather than inferred, because a path that was a directory and is now a file is a change.
-	Directory bool
-
-	// Exists is false for an input that was absent when recorded and must stay absent. A config the
-	// run looked for and did not find is still an input: creating it changes the run.
-	Exists bool
-
-	Size                int64
-	ModifiedNanoseconds int64
-
-	// ChangedNanoseconds and Inode catch what the modification time cannot: different bytes of the same
-	// size under a restored modification time, as cp -p, rsync -t and touch -r leave a file. Nothing in
-	// userland can set a change time, and a file replaced by a rename has a new inode. Zero where the
-	// platform's stat does not give them.
-	ChangedNanoseconds int64
-	Inode              uint64
-
-	// ExistenceOnly is set on a directory the run only asked whether it exists (see InputRecorder.Inputs),
-	// which matches while it is still the same directory, by inode, whatever was added to it since. Module
-	// resolution asks it of every directory from the project up to the root, and on a busy machine /tmp and
-	// the like change many times a second: checked at full signature, they cost a replay on a tree nothing
-	// had touched (#q51f02a). A package.json or node_modules appearing in one is its own absent input.
-	ExistenceOnly bool
-}
-
 // runCacheVersion is bumped whenever the manifest's meaning changes, not only its shape.
 //
 // 2: Output no longer carries the lines that describe the recorded invocation (graph built in, types and
@@ -143,47 +112,26 @@ var ErrRunCacheMiss = errors.New("run cache miss")
 
 // RunCacheKey hashes what identifies a run apart from its files. It is RunCacheKeyPartsOf's key.
 func RunCacheKey(arguments []string, workingDirectory string, facts ...string) (string, error) {
-	parts, err := RunCacheKeyPartsOf(arguments, workingDirectory, facts...)
-	if err != nil {
-		return "", err
+	parts, runCacheKeyPartsOfError := RunCacheKeyPartsOf(arguments, workingDirectory, facts...)
+	if runCacheKeyPartsOfError != nil {
+		return "", runCacheKeyPartsOfError
 	}
 	return parts.Key(), nil
 }
 
-// RunCacheKeyParts is what identifies a run apart from its files, in four parts hashed apart, so a run that
-// misses can say which one moved rather than that something did (#547dhjz).
-type RunCacheKeyParts struct {
-	// Binary is the running binary: its resolved path, size and modification time, and the format and
-	// platform it reads. Keyed by path, size and time rather than by hashing its bytes: it is about 70 MB,
-	// reading it every run would spend the budget this cache exists to save, and a rebuilt binary has a
-	// new modification time, which is all this needs.
-	Binary string
-
-	// Directory is the working directory the caller resolved, the project root's target.
-	Directory string
-
-	// Arguments is the command line.
-	Arguments string
-
-	// Facts is anything else the run's output depends on that is not a file the build reads: config paths
-	// the command resolved, and results it computes from sources the build never sees. Order matters, and
-	// an empty fact still counts.
-	Facts string
-}
-
 // RunCacheKeyPartsOf hashes each part of a run's identity.
 func RunCacheKeyPartsOf(arguments []string, workingDirectory string, facts ...string) (RunCacheKeyParts, error) {
-	executable, err := os.Executable()
-	if err != nil {
-		return RunCacheKeyParts{}, fmt.Errorf("locating the running binary: %w", err)
+	executable, executableError := os.Executable()
+	if executableError != nil {
+		return RunCacheKeyParts{}, fmt.Errorf("locating the running binary: %w", executableError)
 	}
 	// Resolved, as the callers resolve the directory, so a binary reached through a link keys as itself (#547dhjz).
-	if resolved, err := filepath.EvalSymlinks(executable); err == nil {
+	if resolved, resolveSymlinksError := filepath.EvalSymlinks(executable); resolveSymlinksError == nil {
 		executable = resolved
 	}
-	information, err := os.Stat(executable)
-	if err != nil {
-		return RunCacheKeyParts{}, fmt.Errorf("reading the running binary: %w", err)
+	information, statError := os.Stat(executable)
+	if statError != nil {
+		return RunCacheKeyParts{}, fmt.Errorf("reading the running binary: %w", statError)
 	}
 	part := func(values ...string) string {
 		hash := sha256.New()
@@ -200,37 +148,6 @@ func RunCacheKeyPartsOf(arguments []string, workingDirectory string, facts ...st
 		Arguments: part(append([]string{fmt.Sprintf("%d", len(arguments))}, arguments...)...),
 		Facts:     part(append([]string{fmt.Sprintf("%d facts", len(facts))}, facts...)...),
 	}, nil
-}
-
-// Key is the parts as one key.
-func (parts RunCacheKeyParts) Key() string {
-	sum := sha256.Sum256([]byte(parts.Binary + "\x00" + parts.Directory + "\x00" + parts.Arguments + "\x00" + parts.Facts))
-	return fmt.Sprintf("%x", sum)
-}
-
-// Changed says which parts differ from recorded, in words, or that the record kept no parts to compare, as
-// one written before they were kept.
-func (parts RunCacheKeyParts) Changed(recorded RunCacheKeyParts) string {
-	if recorded == (RunCacheKeyParts{}) {
-		return "it was recorded without its key's parts, so which one moved cannot be said"
-	}
-	var changed []string
-	if parts.Binary != recorded.Binary {
-		changed = append(changed, "the cohere binary")
-	}
-	if parts.Directory != recorded.Directory {
-		changed = append(changed, "the project root")
-	}
-	if parts.Arguments != recorded.Arguments {
-		changed = append(changed, "the arguments")
-	}
-	if parts.Facts != recorded.Facts {
-		changed = append(changed, "the configuration (the tsconfig or lint config, their extends chains, the rules, or the output's color)")
-	}
-	if len(changed) == 0 {
-		return "no part changed, though the key did"
-	}
-	return strings.Join(changed, " and ") + " changed"
 }
 
 // RecordRunCache captures a run that just finished.
@@ -252,7 +169,16 @@ func (parts RunCacheKeyParts) Changed(recorded RunCacheKeyParts) string {
 // the change, so the stat taken here would sign the new bytes against a verdict computed from the old ones,
 // and the next run would replay that verdict over a tree it does not describe: a file saved in an editor
 // while cohere runs is exactly this. Such a run is not recorded. The zero time checks nothing.
-func RecordRunCache(key string, files []string, extraDirectories []string, absent []string, probed []string, output []byte, exitCode int, readSince time.Time) (*RunCache, error) {
+func RecordRunCache(
+	key string,
+	files []string,
+	extraDirectories []string,
+	absent []string,
+	probed []string,
+	output []byte,
+	exitCode int,
+	readSince time.Time,
+) (*RunCache, error) {
 	cache := &RunCache{Version: runCacheVersion, Key: key, Output: output, ExitCode: exitCode}
 
 	// One entry per path. A path can arrive as a file read, a directory listed, and the parent of
@@ -267,9 +193,9 @@ func RecordRunCache(key string, files []string, extraDirectories []string, absen
 			present = append(present, file)
 		}
 	}
-	inputs, err := signaturesOf(present)
-	if err != nil {
-		return nil, err
+	inputs, signaturesOfError := signaturesOf(present)
+	if signaturesOfError != nil {
+		return nil, signaturesOfError
 	}
 
 	// The directory holding each file, so a file added beside one the run read is noticed. Only a file's:
@@ -294,9 +220,9 @@ func RecordRunCache(key string, files []string, extraDirectories []string, absen
 		}
 	}
 	sort.Strings(directories)
-	directoryInputs, err := signaturesOf(directories)
-	if err != nil {
-		return nil, err
+	directoryInputs, signaturesOfError := signaturesOf(directories)
+	if signaturesOfError != nil {
+		return nil, signaturesOfError
 	}
 	cache.Inputs = append(inputs, directoryInputs...)
 
@@ -328,7 +254,10 @@ func RecordRunCache(key string, files []string, extraDirectories []string, absen
 				continue
 			}
 			if max(input.ModifiedNanoseconds, input.ChangedNanoseconds) > readSince.UnixNano() {
-				return nil, fmt.Errorf("%s changed after the run began reading, so what the run saw of it is not known", input.Path)
+				return nil, fmt.Errorf(
+					"%s changed after the run began reading, so what the run saw of it is not known",
+					input.Path,
+				)
 			}
 		}
 	}
@@ -364,9 +293,9 @@ func signaturesOf(paths []string) ([]RunCacheInput, error) {
 		}()
 	}
 	group.Wait()
-	for _, err := range failures {
-		if err != nil {
-			return nil, err
+	for _, failure := range failures {
+		if failure != nil {
+			return nil, failure
 		}
 	}
 	return inputs, nil
@@ -376,9 +305,9 @@ func signaturesOf(paths []string) ([]RunCacheInput, error) {
 // than an absent entry: recording it as absent would make the next run's absence look like a match,
 // and the run that just finished did read it.
 func signatureOf(path string) (RunCacheInput, error) {
-	information, err := os.Stat(path)
-	if err != nil {
-		return RunCacheInput{}, fmt.Errorf("recording %s: %w", path, err)
+	information, statError := os.Stat(path)
+	if statError != nil {
+		return RunCacheInput{}, fmt.Errorf("recording %s: %w", path, statError)
 	}
 	changed, inode := changeTimeAndInode(path, information)
 	return RunCacheInput{
@@ -397,28 +326,28 @@ func signatureOf(path string) (RunCacheInput, error) {
 // It returns the stored run only when the key matches and every input still has the signature it
 // was recorded with. The first mismatch is the answer; there is no partial hit, because a run's
 // verdict is a property of all its inputs together.
-func (c *RunCache) Check(key string) error {
-	return c.CheckNoting(key, nil)
+func (cache *RunCache) Check(key string) error {
+	return cache.CheckNoting(key, nil)
 }
 
 // CheckNoting is Check, noting in snapshot what it found at every path it statted, so the build and the content
 // pack can use stats this run already took rather than take each again (#kdee854). A nil snapshot notes nothing.
-func (c *RunCache) CheckNoting(key string, snapshot *StatSnapshot) error {
-	if c == nil {
+func (cache *RunCache) CheckNoting(key string, snapshot *StatSnapshot) error {
+	if cache == nil {
 		return fmt.Errorf("%w: no cache", ErrRunCacheMiss)
 	}
-	if c.Version != runCacheVersion {
-		return fmt.Errorf("%w: format version %d, this build reads %d", ErrRunCacheMiss, c.Version, runCacheVersion)
+	if cache.Version != runCacheVersion {
+		return fmt.Errorf("%w: format version %d, this build reads %d", ErrRunCacheMiss, cache.Version, runCacheVersion)
 	}
-	if c.Key != key {
+	if cache.Key != key {
 		return fmt.Errorf("%w: the binary, flags or directory changed", ErrRunCacheMiss)
 	}
-	if len(c.Inputs) == 0 {
+	if len(cache.Inputs) == 0 {
 		// A manifest with no inputs would match any tree. A run always depends on something, so
 		// an empty list is a manifest that was written wrong, not a run that read nothing.
 		return fmt.Errorf("%w: the manifest records no inputs", ErrRunCacheMiss)
 	}
-	return c.changedInput(snapshot)
+	return cache.changedInput(snapshot)
 }
 
 // ChangedInput reports the first recorded input whose signature no longer matches the disk, nil when every
@@ -427,16 +356,16 @@ func (c *RunCache) CheckNoting(key string, snapshot *StatSnapshot) error {
 //
 // The input named is the earliest recorded one that moved, whichever worker found it, so a run that misses
 // says the same thing every time rather than the first thing a worker happened to reach (#547dhjz).
-func (c *RunCache) ChangedInput() error {
-	return c.changedInput(nil)
+func (cache *RunCache) ChangedInput() error {
+	return cache.changedInput(nil)
 }
 
 // changedInput is ChangedInput, noting what each stat found in snapshot when it is not nil.
-func (c *RunCache) changedInput(snapshot *StatSnapshot) error {
+func (cache *RunCache) changedInput(snapshot *StatSnapshot) error {
 	workers := min(runtime.NumCPU(), 8)
 	var mutex sync.Mutex
 	var mismatch error
-	earliest := len(c.Inputs)
+	earliest := len(cache.Inputs)
 	var waitGroup sync.WaitGroup
 	next := make(chan int, 256)
 
@@ -445,65 +374,21 @@ func (c *RunCache) changedInput(snapshot *StatSnapshot) error {
 		go func() {
 			defer waitGroup.Done()
 			for index := range next {
-				if err := c.Inputs[index].stillMatches(snapshot); err != nil {
+				if stillMatchesError := cache.Inputs[index].stillMatches(snapshot); stillMatchesError != nil {
 					mutex.Lock()
 					if index < earliest {
-						earliest, mismatch = index, err
+						earliest, mismatch = index, stillMatchesError
 					}
 					mutex.Unlock()
 				}
 			}
 		}()
 	}
-	for index := range c.Inputs {
+	for index := range cache.Inputs {
 		next <- index
 	}
 	close(next)
 	waitGroup.Wait()
 
 	return mismatch
-}
-
-// stillMatches compares one input against the filesystem now, noting what the stat found in snapshot, matching or
-// not: the stat is current either way.
-func (input RunCacheInput) stillMatches(snapshot *StatSnapshot) error {
-	information, err := os.Stat(input.Path)
-	if snapshot != nil {
-		snapshot.note(input.Path, information, err)
-	}
-	if !input.Exists {
-		if err == nil {
-			return fmt.Errorf("%w: %s now exists", ErrRunCacheMiss, input.Path)
-		}
-		if errors.Is(err, os.ErrNotExist) {
-			return nil
-		}
-		// Neither present nor provably absent, for example a permission error. Doubt is a miss.
-		return fmt.Errorf("%w: %s cannot be checked: %v", ErrRunCacheMiss, input.Path, err)
-	}
-	if err != nil {
-		return fmt.Errorf("%w: %s: %v", ErrRunCacheMiss, input.Path, err)
-	}
-	if information.IsDir() != input.Directory {
-		return fmt.Errorf("%w: %s changed between file and directory", ErrRunCacheMiss, input.Path)
-	}
-	if input.ExistenceOnly {
-		// Still there and still the same directory, which is all the run asked of it.
-		if _, inode := changeTimeAndInode(input.Path, information); inode != input.Inode {
-			return fmt.Errorf("%w: %s was replaced", ErrRunCacheMiss, input.Path)
-		}
-		return nil
-	}
-	// A directory's size is filesystem bookkeeping and moves with its entries on some filesystems,
-	// so only its modification time decides. A file needs both.
-	if !input.Directory && information.Size() != input.Size {
-		return fmt.Errorf("%w: %s changed size", ErrRunCacheMiss, input.Path)
-	}
-	if information.ModTime().UnixNano() != input.ModifiedNanoseconds {
-		return fmt.Errorf("%w: %s was modified", ErrRunCacheMiss, input.Path)
-	}
-	if changed, inode := changeTimeAndInode(input.Path, information); changed != input.ChangedNanoseconds || inode != input.Inode {
-		return fmt.Errorf("%w: %s was changed or replaced under its modification time", ErrRunCacheMiss, input.Path)
-	}
-	return nil
 }

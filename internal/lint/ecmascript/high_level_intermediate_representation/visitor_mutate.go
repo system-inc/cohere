@@ -1,7 +1,7 @@
 // Mutating place visitors: the write-side mirror of visitor.go.
 //
 // `EachPlace` and friends hand out a Place by value, which is right for every pass that only reads.
-// Renaming needs to WRITE one back, and a value copy cannot. So this file mirrors the same variant
+// Renaming needs to write one back, and a value copy cannot. So this file mirrors the same variant
 // switches with `*Place` instead of `Place`.
 //
 // # Why this is a mirror rather than a rewrite of visitor.go to use pointers
@@ -21,140 +21,140 @@ import "github.com/system-inc/cohere/static_single_assignment"
 // EachPlacePointer calls visit for every place the instruction value touches, with the role it
 // plays, handing each one out by pointer so the caller can rename it in place.
 //
-// The instruction's own LValue is NOT included; see EachInstructionPlacePointer.
+// The instruction's own LValue is not included; see EachInstructionPlacePointer.
 func EachPlacePointer(value InstructionValue, visit func(place *Place, role PlaceRole)) {
-	switch v := value.(type) {
+	switch typed := value.(type) {
 	case *LoadLocal:
-		visit(&v.Place, PlaceRoleUse)
+		visit(&typed.Place, PlaceRoleUse)
 	case *LoadContext:
-		visit(&v.Place, PlaceRoleUse)
+		visit(&typed.Place, PlaceRoleUse)
 	case *DeclareLocal:
-		visit(&v.LValue, PlaceRoleDefine)
+		visit(&typed.LValue, PlaceRoleDefine)
 	case *DeclareContext:
-		visit(&v.LValue, PlaceRoleDefine)
+		visit(&typed.LValue, PlaceRoleDefine)
 	case *StoreLocal:
-		visit(&v.LValue, PlaceRoleDefine)
-		visit(&v.Value, PlaceRoleUse)
+		visit(&typed.LValue, PlaceRoleDefine)
+		visit(&typed.Value, PlaceRoleUse)
 	case *StoreContext:
-		visit(&v.LValue, PlaceRoleDefine)
-		visit(&v.Value, PlaceRoleUse)
+		visit(&typed.LValue, PlaceRoleDefine)
+		visit(&typed.Value, PlaceRoleUse)
 	case *Destructure:
-		eachPatternPlacePointer(v.LValue, visit)
-		visit(&v.Value, PlaceRoleUse)
+		eachPatternPlacePointer(typed.LValue, visit)
+		visit(&typed.Value, PlaceRoleUse)
 	case *LoadGlobal:
 		// No places: the name is resolved statically.
 	case *StoreGlobal:
-		visit(&v.Value, PlaceRoleUse)
+		visit(&typed.Value, PlaceRoleUse)
 	case *PropertyLoad:
-		visit(&v.Object, PlaceRoleReceiver)
+		visit(&typed.Object, PlaceRoleReceiver)
 	case *PropertyStore:
-		visit(&v.Object, PlaceRoleReceiver)
-		visit(&v.Value, PlaceRoleUse)
+		visit(&typed.Object, PlaceRoleReceiver)
+		visit(&typed.Value, PlaceRoleUse)
 	case *PropertyDelete:
-		visit(&v.Object, PlaceRoleReceiver)
+		visit(&typed.Object, PlaceRoleReceiver)
 	case *ComputedLoad:
-		visit(&v.Object, PlaceRoleReceiver)
-		visit(&v.Property, PlaceRoleUse)
+		visit(&typed.Object, PlaceRoleReceiver)
+		visit(&typed.Property, PlaceRoleUse)
 	case *ComputedStore:
-		visit(&v.Object, PlaceRoleReceiver)
-		visit(&v.Property, PlaceRoleUse)
-		visit(&v.Value, PlaceRoleUse)
+		visit(&typed.Object, PlaceRoleReceiver)
+		visit(&typed.Property, PlaceRoleUse)
+		visit(&typed.Value, PlaceRoleUse)
 	case *ComputedDelete:
-		visit(&v.Object, PlaceRoleReceiver)
-		visit(&v.Property, PlaceRoleUse)
+		visit(&typed.Object, PlaceRoleReceiver)
+		visit(&typed.Property, PlaceRoleUse)
 	case *CallExpression:
-		visit(&v.Callee, PlaceRoleUse)
-		eachArgumentPlacePointer(v.Args, visit)
+		visit(&typed.Callee, PlaceRoleUse)
+		eachArgumentPlacePointer(typed.Arguments, visit)
 	case *MethodCall:
-		visit(&v.Receiver, PlaceRoleReceiver)
-		visit(&v.Property, PlaceRoleUse)
-		eachArgumentPlacePointer(v.Args, visit)
+		visit(&typed.Receiver, PlaceRoleReceiver)
+		visit(&typed.Property, PlaceRoleUse)
+		eachArgumentPlacePointer(typed.Arguments, visit)
 	case *NewExpression:
-		visit(&v.Callee, PlaceRoleUse)
-		eachArgumentPlacePointer(v.Args, visit)
+		visit(&typed.Callee, PlaceRoleUse)
+		eachArgumentPlacePointer(typed.Arguments, visit)
 	case *BinaryExpression:
-		visit(&v.Left, PlaceRoleUse)
-		visit(&v.Right, PlaceRoleUse)
+		visit(&typed.Left, PlaceRoleUse)
+		visit(&typed.Right, PlaceRoleUse)
 	case *UnaryExpression:
-		visit(&v.Value, PlaceRoleUse)
+		visit(&typed.Value, PlaceRoleUse)
 	case *PrefixUpdate:
-		visit(&v.LValue, PlaceRoleDefine)
-		visit(&v.Value, PlaceRoleUse)
+		visit(&typed.LValue, PlaceRoleDefine)
+		visit(&typed.Value, PlaceRoleUse)
 	case *PostfixUpdate:
-		visit(&v.LValue, PlaceRoleDefine)
-		visit(&v.Value, PlaceRoleUse)
+		visit(&typed.LValue, PlaceRoleDefine)
+		visit(&typed.Value, PlaceRoleUse)
 	case *Primitive:
 		// No places.
 	case *RegExpLiteral:
 		// No places.
 	case *TemplateLiteral:
-		for index := range v.Subexprs {
-			visit(&v.Subexprs[index], PlaceRoleUse)
+		for index := range typed.Subexprs {
+			visit(&typed.Subexprs[index], PlaceRoleUse)
 		}
 	case *TaggedTemplateExpression:
-		visit(&v.Tag, PlaceRoleUse)
-		for index := range v.Subexprs {
-			visit(&v.Subexprs[index], PlaceRoleUse)
+		visit(&typed.Tag, PlaceRoleUse)
+		for index := range typed.Subexprs {
+			visit(&typed.Subexprs[index], PlaceRoleUse)
 		}
 	case *TypeCastExpression:
-		visit(&v.Value, PlaceRoleUse)
+		visit(&typed.Value, PlaceRoleUse)
 	case *MetaProperty:
 		// No places.
 	case *ObjectExpression:
-		for index := range v.Properties {
-			if v.Properties[index].ComputedKey != nil {
-				visit(v.Properties[index].ComputedKey, PlaceRoleUse)
+		for index := range typed.Properties {
+			if typed.Properties[index].ComputedKey != nil {
+				visit(typed.Properties[index].ComputedKey, PlaceRoleUse)
 			}
-			visit(&v.Properties[index].Value, PlaceRoleUse)
+			visit(&typed.Properties[index].Value, PlaceRoleUse)
 		}
 	case *ObjectMethod:
 		// The body is a nested function, reached through Function.Functions.
 	case *ArrayExpression:
-		for index := range v.Elements {
-			if v.Elements[index].Hole {
+		for index := range typed.Elements {
+			if typed.Elements[index].Hole {
 				continue
 			}
-			visit(&v.Elements[index].Place, PlaceRoleUse)
+			visit(&typed.Elements[index].Place, PlaceRoleUse)
 		}
 	case *FunctionExpression:
-		for index := range v.Captures {
-			visit(&v.Captures[index], PlaceRoleUse)
+		for index := range typed.Captures {
+			visit(&typed.Captures[index], PlaceRoleUse)
 		}
 	case *Await:
-		visit(&v.Value, PlaceRoleUse)
+		visit(&typed.Value, PlaceRoleUse)
 	case *GetIterator:
-		visit(&v.Value, PlaceRoleUse)
+		visit(&typed.Value, PlaceRoleUse)
 	case *IteratorNext:
-		visit(&v.Iterator, PlaceRoleReceiver)
-		visit(&v.Collection, PlaceRoleUse)
+		visit(&typed.Iterator, PlaceRoleReceiver)
+		visit(&typed.Collection, PlaceRoleUse)
 	case *NextPropertyOf:
-		visit(&v.Value, PlaceRoleUse)
+		visit(&typed.Value, PlaceRoleUse)
 	case *JsxExpression:
-		if v.Tag.Place != nil {
-			visit(v.Tag.Place, PlaceRoleUse)
+		if typed.Tag.Place != nil {
+			visit(typed.Tag.Place, PlaceRoleUse)
 		}
-		for index := range v.Props {
-			visit(&v.Props[index].Value, PlaceRoleUse)
+		for index := range typed.Properties {
+			visit(&typed.Properties[index].Value, PlaceRoleUse)
 		}
-		for index := range v.Children {
-			visit(&v.Children[index], PlaceRoleUse)
+		for index := range typed.Children {
+			visit(&typed.Children[index], PlaceRoleUse)
 		}
 	case *JsxFragment:
-		for index := range v.Children {
-			visit(&v.Children[index], PlaceRoleUse)
+		for index := range typed.Children {
+			visit(&typed.Children[index], PlaceRoleUse)
 		}
 	case *JsxText:
 		// No places.
 	case *StartMemoize:
-		for index := range v.Deps {
+		for index := range typed.Deps {
 			// See the matching note in `visitor.go`: a global root has no place to rewrite.
-			if v.Deps[index].Root.IsGlobal {
+			if typed.Deps[index].Root.IsGlobal {
 				continue
 			}
-			visit(&v.Deps[index].Root.Place, PlaceRoleUse)
+			visit(&typed.Deps[index].Root.Place, PlaceRoleUse)
 		}
 	case *FinishMemoize:
-		visit(&v.Value, PlaceRoleUse)
+		visit(&typed.Value, PlaceRoleUse)
 	case *Debugger:
 		// No places.
 	case *UnsupportedNode:
@@ -173,71 +173,71 @@ func EachInstructionPlacePointer(instruction *Instruction, visit func(place *Pla
 //
 // A terminal never defines a place except for a catch binding, which mirrors EachTerminalPlace.
 func EachTerminalPlacePointer(terminal Terminal, visit func(place *Place, role PlaceRole)) {
-	switch t := terminal.(type) {
+	switch typed := terminal.(type) {
 	case *Return:
-		visit(&t.Value, PlaceRoleUse)
+		visit(&typed.Value, PlaceRoleUse)
 	case *Throw:
-		visit(&t.Value, PlaceRoleUse)
+		visit(&typed.Value, PlaceRoleUse)
 	case *If:
-		visit(&t.Test, PlaceRoleUse)
+		visit(&typed.Test, PlaceRoleUse)
 	case *Branch:
-		visit(&t.Test, PlaceRoleUse)
+		visit(&typed.Test, PlaceRoleUse)
 	case *Switch:
-		visit(&t.Test, PlaceRoleUse)
-		for index := range t.Cases {
-			if t.Cases[index].Test != nil {
-				visit(t.Cases[index].Test, PlaceRoleUse)
+		visit(&typed.Test, PlaceRoleUse)
+		for index := range typed.Cases {
+			if typed.Cases[index].Test != nil {
+				visit(typed.Cases[index].Test, PlaceRoleUse)
 			}
 		}
 	case *Try:
-		if t.HandlerBinding != nil {
-			visit(t.HandlerBinding, PlaceRoleDefine)
+		if typed.HandlerBinding != nil {
+			visit(typed.HandlerBinding, PlaceRoleDefine)
 		}
 	}
 }
 
-func eachArgumentPlacePointer(args []Argument, visit func(place *Place, role PlaceRole)) {
-	for index := range args {
-		visit(&args[index].Place, PlaceRoleUse)
+func eachArgumentPlacePointer(arguments []Argument, visit func(place *Place, role PlaceRole)) {
+	for index := range arguments {
+		visit(&arguments[index].Place, PlaceRoleUse)
 	}
 }
 
 func eachPatternPlacePointer(pattern Pattern, visit func(place *Place, role PlaceRole)) {
-	switch p := pattern.(type) {
+	switch typed := pattern.(type) {
 	case *PlacePattern:
-		visit(&p.Place, PlaceRoleDefine)
+		visit(&typed.Place, PlaceRoleDefine)
 	case *ObjectPattern:
-		for index := range p.Properties {
-			if p.Properties[index].ComputedKey != nil {
-				visit(p.Properties[index].ComputedKey, PlaceRoleUse)
+		for index := range typed.Properties {
+			if typed.Properties[index].ComputedKey != nil {
+				visit(typed.Properties[index].ComputedKey, PlaceRoleUse)
 			}
-			if p.Properties[index].Default != nil {
-				visit(p.Properties[index].Default, PlaceRoleUse)
+			if typed.Properties[index].Default != nil {
+				visit(typed.Properties[index].Default, PlaceRoleUse)
 			}
-			eachPatternPlacePointer(p.Properties[index].Value, visit)
+			eachPatternPlacePointer(typed.Properties[index].Value, visit)
 		}
-		if p.Rest != nil {
-			visit(p.Rest, PlaceRoleDefine)
+		if typed.Rest != nil {
+			visit(typed.Rest, PlaceRoleDefine)
 		}
 	case *ArrayPattern:
-		for index := range p.Elements {
-			if p.Elements[index].Value == nil {
+		for index := range typed.Elements {
+			if typed.Elements[index].Value == nil {
 				continue
 			}
-			if p.Elements[index].Default != nil {
-				visit(p.Elements[index].Default, PlaceRoleUse)
+			if typed.Elements[index].Default != nil {
+				visit(typed.Elements[index].Default, PlaceRoleUse)
 			}
-			eachPatternPlacePointer(p.Elements[index].Value, visit)
+			eachPatternPlacePointer(typed.Elements[index].Value, visit)
 		}
-		if p.Rest != nil {
-			visit(p.Rest, PlaceRoleDefine)
+		if typed.Rest != nil {
+			visit(typed.Rest, PlaceRoleDefine)
 		}
 	}
 }
 
 // EachBlockReferencePointer visits every block id a terminal names, by pointer so it can be rewritten.
 //
-// The read-only pair is `EachSuccessor` plus `Fallthrough`, and this is deliberately BOTH of them at
+// The read-only pair is `EachSuccessor` plus `Fallthrough`, and this is deliberately both of them at
 // once rather than a mutating mirror of either. A pass that renames blocks has to rewrite every
 // reference a terminal holds, and a fallthrough is a reference even where it is not an edge: a
 // `Switch` with a default reaches its fallthrough only through a case, and `EachSuccessor` correctly
@@ -258,71 +258,71 @@ func EachBlockReferencePointer(terminal Terminal, visit func(block *static_singl
 			visit(block)
 		}
 	}
-	switch t := terminal.(type) {
+	switch typed := terminal.(type) {
 	case *Return, *Throw, *Unreachable, *Unsupported:
 		// Control leaves the function; no block is named.
 	case *Goto:
-		visitReal(&t.Block)
+		visitReal(&typed.Block)
 	case *If:
-		visitReal(&t.Consequent)
-		visitReal(&t.Alternate)
-		visitReal(&t.Fallthrough)
+		visitReal(&typed.Consequent)
+		visitReal(&typed.Alternate)
+		visitReal(&typed.Fallthrough)
 	case *Branch:
-		visitReal(&t.Consequent)
-		visitReal(&t.Alternate)
-		visitReal(&t.Fallthrough)
+		visitReal(&typed.Consequent)
+		visitReal(&typed.Alternate)
+		visitReal(&typed.Fallthrough)
 	case *Switch:
-		for index := range t.Cases {
-			visitReal(&t.Cases[index].Block)
+		for index := range typed.Cases {
+			visitReal(&typed.Cases[index].Block)
 		}
-		visitReal(&t.Fallthrough)
+		visitReal(&typed.Fallthrough)
 	case *While:
-		visitReal(&t.Test)
-		visitReal(&t.Loop)
-		visitReal(&t.Fallthrough)
+		visitReal(&typed.Test)
+		visitReal(&typed.Loop)
+		visitReal(&typed.Fallthrough)
 	case *DoWhile:
-		visitReal(&t.Loop)
-		visitReal(&t.Test)
-		visitReal(&t.Fallthrough)
+		visitReal(&typed.Loop)
+		visitReal(&typed.Test)
+		visitReal(&typed.Fallthrough)
 	case *For:
-		visitReal(&t.Init)
-		visitReal(&t.Test)
-		visitReal(&t.Loop)
-		visitReal(&t.Update)
-		visitReal(&t.Fallthrough)
+		visitReal(&typed.Init)
+		visitReal(&typed.Test)
+		visitReal(&typed.Loop)
+		visitReal(&typed.Update)
+		visitReal(&typed.Fallthrough)
 	case *ForOf:
-		visitReal(&t.Init)
-		visitReal(&t.Test)
-		visitReal(&t.Loop)
-		visitReal(&t.Fallthrough)
+		visitReal(&typed.Init)
+		visitReal(&typed.Test)
+		visitReal(&typed.Loop)
+		visitReal(&typed.Fallthrough)
 	case *ForIn:
-		visitReal(&t.Init)
-		visitReal(&t.Loop)
-		visitReal(&t.Fallthrough)
+		visitReal(&typed.Init)
+		visitReal(&typed.Loop)
+		visitReal(&typed.Fallthrough)
 	case *Logical:
-		visitReal(&t.Test)
-		visitReal(&t.Fallthrough)
+		visitReal(&typed.Test)
+		visitReal(&typed.Fallthrough)
 	case *Ternary:
-		visitReal(&t.Test)
-		visitReal(&t.Fallthrough)
+		visitReal(&typed.Test)
+		visitReal(&typed.Fallthrough)
 	case *Optional:
-		visitReal(&t.Test)
-		visitReal(&t.Fallthrough)
+		visitReal(&typed.Test)
+		visitReal(&typed.Fallthrough)
 	case *Sequence:
-		visitReal(&t.Block)
-		visitReal(&t.Fallthrough)
+		visitReal(&typed.Block)
+		visitReal(&typed.Fallthrough)
 	case *Label:
-		visitReal(&t.Block)
-		visitReal(&t.Fallthrough)
+		visitReal(&typed.Block)
+		visitReal(&typed.Fallthrough)
 	case *Try:
-		visitReal(&t.Block)
-		visitReal(&t.Handler)
-		visitReal(&t.Fallthrough)
+		visitReal(&typed.Block)
+		visitReal(&typed.Handler)
+		visitReal(&typed.Fallthrough)
 	case *MaybeThrow:
-		visitReal(&t.Continuation)
-		visitReal(&t.Handler)
+		visitReal(&typed.Continuation)
+		visitReal(&typed.Handler)
 	case *Scope:
-		visitReal(&t.Block)
-		visitReal(&t.Fallthrough)
+		visitReal(&typed.Block)
+		visitReal(&typed.Fallthrough)
 	}
 }

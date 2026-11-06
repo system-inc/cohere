@@ -11,7 +11,7 @@ import (
 // The distinction is forced by the graph rather than chosen. `controlflow`'s Read hook fires for
 // every identifier assignment target, plain ones included: `patternReads` calls `b.read(node)` on a
 // `KindIdentifier` target before the assigned expression, because ESLint counts naming the target as
-// a point where an enclosing `try` can throw. Measured directly — `let v = 'a'; f(v); v = 'dead';`
+// a point where an enclosing `try` can throw. Measured directly: `let v = 'a'; f(v); v = 'dead';`
 // emits `R(v@3) W(v@3) R(f@12) R(v@15) R(v@18) W(v@18)`, and the `R(v@18)` is the dead store's own
 // target, not a read of it. Trusting the hook would make every write trivially live and the rule
 // would report nothing at all.
@@ -56,7 +56,7 @@ type deadStoreEvent struct {
 //
 // # Why this replaced an inverted walk over TypeScript's flow graph
 //
-// The question is forward — which reads follow this write — and `ast.FlowNode` carries only
+// The question is forward (which reads follow this write), and `ast.FlowNode` carries only
 // `Antecedent`/`Antecedents`, pointing backward, because it exists for type narrowing. The previous
 // implementation inverted the question rather than the graph, asking each read whether its own
 // antecedent chain passed back through the candidate write. That is the same predicate and it works,
@@ -68,7 +68,7 @@ type deadStoreEvent struct {
 // `internal/lint/ecmascript/control_flow_graph` supplies forward `Successors`, so the question is asked in the
 // direction it is posed. Measured against the same imported corpus, that recovers the update
 // expressions, the destructuring targets, and the try-block kills the inversion had to decline.
-func analyzeDeadStoresByLiveness(ctx rule.Context, sourceFile *ast.Node) {
+func analyzeDeadStoresByLiveness(ruleContext rule.Context, sourceFile *ast.Node) {
 	// Export state is a property of the file rather than of any root, so it is collected once. A
 	// binding another module can read has no provably dead write.
 	exported := exportedNames(sourceFile)
@@ -76,26 +76,28 @@ func analyzeDeadStoresByLiveness(ctx rule.Context, sourceFile *ast.Node) {
 	// Symbol-level judgments are file-wide even though the liveness pass is per-root: a closure in
 	// one root reading a binding declared in another is exactly the shape the capture guard exists
 	// for, and a per-root scan cannot see it.
-	symbols, occupied := collectSymbolFacts(ctx, sourceFile)
+	symbols, occupied := collectSymbolFacts(ruleContext, sourceFile)
 
 	// Only a root holding an occurrence of a tracked binding emits an event, and a root with no event
 	// solves to nothing, so only those are built. On a cold ahra run that is 8.1% of roots (#tmn9n27).
-	for _, root := range codePathRoots(ctx, sourceFile) {
+	for _, root := range codePathRoots(ruleContext, sourceFile) {
 		if !occupied[root.Node] {
 			if CheckCodePathGates {
-				deadStoreCheckSkipped(ctx, root.Node, symbols)
+				deadStoreCheckSkipped(ruleContext, root.Node, symbols)
 			}
 			continue
 		}
-		analyzeRootLiveness(ctx, root.Node, exported, symbols)
+		analyzeRootLiveness(ruleContext, root.Node, exported, symbols)
 	}
 }
 
 // deadStoreCheckSkipped is the gate's check under CheckCodePathGates: a root skipped for holding no
 // tracked occurrence must emit no event.
-func deadStoreCheckSkipped(ctx rule.Context, root *ast.Node, symbols map[*ast.Symbol]*symbolFacts) {
-	for _, block := range deadStoreGraph(ctx, root, symbols).Blocks {
+func deadStoreCheckSkipped(ruleContext rule.Context, root *ast.Node, symbols map[*ast.Symbol]*symbolFacts) {
+	for _, block := range deadStoreGraph(ruleContext, root, symbols).Blocks {
 		if len(block.Events) > 0 {
+			// Invariant: the gate skips a root only when it holds no occurrence of a tracked binding, the only
+			// thing that emits an event, and the tests turn CheckCodePathGates on to hold the two to agreeing.
 			panic("no-useless-assignment skipped a root whose graph holds an event")
 		}
 	}
@@ -128,7 +130,10 @@ type symbolFacts struct {
 //
 // The second result is the roots an eligible binding's occurrence runs in, by RootOf. They are the
 // only roots whose graph can hold an event, since an event is an occurrence of an eligible binding.
-func collectSymbolFacts(ctx rule.Context, sourceFile *ast.Node) (map[*ast.Symbol]*symbolFacts, map[*ast.Node]bool) {
+func collectSymbolFacts(
+	ruleContext rule.Context,
+	sourceFile *ast.Node,
+) (map[*ast.Symbol]*symbolFacts, map[*ast.Node]bool) {
 	var identifiers []*ast.Node
 	interesting := map[string]bool{}
 
@@ -162,10 +167,10 @@ func collectSymbolFacts(ctx rule.Context, sourceFile *ast.Node) (map[*ast.Symbol
 		if !interesting[identifier.Text()] {
 			continue
 		}
-		symbol := resolveOccurrence(ctx, identifier)
+		symbol := resolveOccurrence(ruleContext, identifier)
 		entry := facts[symbol]
 		if entry == nil {
-			declarations := rule.DeclarationsIn(ctx.SourceFile, symbol)
+			declarations := rule.DeclarationsIn(ruleContext.SourceFile, symbol)
 			if len(declarations) == 0 {
 				continue
 			}
@@ -181,7 +186,7 @@ func collectSymbolFacts(ctx rule.Context, sourceFile *ast.Node) (map[*ast.Symbol
 		// a root is what gets its own graph, so an occurrence inside one has no edge to or from any
 		// write in another and no dataflow can see the two together.
 		//
-		// The two directions are NOT the same guard, and collapsing them costs a real diagnostic.
+		// The two directions are not the same guard, and collapsing them costs a real diagnostic.
 		// Measured against the release binary on the two shapes that separate them:
 		//
 		//	cross-root READ    `let v = 'used'; console.log(v); setTimeout(() => v = 42, 1);
@@ -223,18 +228,23 @@ func collectSymbolFacts(ctx rule.Context, sourceFile *ast.Node) (map[*ast.Symbol
 //
 // A loop back-edge makes a block its own transitive successor, so the live set at the loop header
 // depends on the live set at the loop bottom, which depends on the header. Upstream reaches this
-// with an explicit loop-header search plus a cached per-loop liveness set — `find_loop_start`,
+// with an explicit loop-header search plus a cached per-loop liveness set: `find_loop_start`,
 // `analyze_loop_recursive`, `merge_loop_liveness`, and their four scratch bitsets. Iterating the
 // whole transfer function to a fixed point instead reaches the same answer with none of that
 // machinery, because a fixed point is what those caches are approximating. The cost is bounded:
 // liveness is a monotone union over a finite symbol set, so each round either adds a bit somewhere
 // or ends, and the block count bounds the rounds.
-func analyzeRootLiveness(ctx rule.Context, root *ast.Node, exported map[string]bool, symbols map[*ast.Symbol]*symbolFacts) {
+func analyzeRootLiveness(
+	ruleContext rule.Context,
+	root *ast.Node,
+	exported map[string]bool,
+	symbols map[*ast.Symbol]*symbolFacts,
+) {
 	if len(symbols) == 0 {
 		return
 	}
 
-	graph := deadStoreGraph(ctx, root, symbols)
+	graph := deadStoreGraph(ruleContext, root, symbols)
 
 	// Each symbol the events name gets a number in this root, its bit in the live sets below.
 	numbers := map[*ast.Symbol]int{}
@@ -255,22 +265,22 @@ func analyzeRootLiveness(ctx rule.Context, root *ast.Node, exported map[string]b
 	//
 	// # The duplicate-layout trap, and why position-keyed reachability alone is not enough here
 	//
-	// The graph lays a `finally` block out TWICE, once for normal completion and once for the path
+	// The graph lays a `finally` block out twice, once for normal completion and once for the path
 	// leaving the `try` through `return`, `throw`, or a suspended `yield`. Both copies carry the
 	// same source positions. `unused_exports.FindUnreachable` hit this first and keyed liveness on source
-	// position rather than block identity, because for its question — can this statement run — any
+	// position rather than block identity, because for its question (can this statement run), any
 	// reachable copy settles it.
 	//
 	// That is not sufficient for this rule, and the difference cost a real false positive on an
 	// imported clean case. Measured on upstream's clean case 39,
-	// `let a; try { foo(); } finally { a = 5; } console.log(a);`, BOTH copies of `a = 5` are
+	// `let a; try { foo(); } finally { a = 5; } console.log(a);`, both copies of `a = 5` are
 	// reachable: one sits on the normal path and flows to the `console.log(a)` that reads it, and
 	// the other sits on the abrupt path and is a terminal block with no successors at all. A
 	// per-block verdict reports the terminal copy, because nothing follows it, and the write it
 	// names certainly runs and is certainly read.
 	//
 	// So the reachability question and the liveness question need different keys. Reachability is
-	// keyed by position, as `unused` established. Liveness has to be UNIONED across every copy of
+	// keyed by position, as `unused` established. Liveness has to be unioned across every copy of
 	// one position before a write is judged, because the copies are one write in the source and a
 	// value read after any copy is a value that write produced.
 	reachable := map[int]bool{}
@@ -287,14 +297,14 @@ func analyzeRootLiveness(ctx rule.Context, root *ast.Node, exported map[string]b
 	//
 	// # What moved out of this file, and what did not
 	//
-	// This used to be a hand-written loop here: iterate blocks by DESCENDING INDEX, rebuild each
+	// This used to be a hand-written loop here: iterate blocks by descending index, rebuild each
 	// block's successor union from scratch every round, compare, repeat. Both of those were
 	// workarounds for the graph exposing neither an iteration order nor predecessor edges, and both
 	// are now the framework's problem rather than this rule's. `Solve` walks reverse postorder
 	// reversed, which is the order a backward analysis wants, and it excludes unreachable blocks for
 	// the reason spelled out above.
 	//
-	// The LATTICE did not move. The meet is still the union of the reachable successors' entry sets
+	// The lattice did not move. The meet is still the union of the reachable successors' entry sets
 	// and the transfer is still `applyBlockTransfer` walking one block's events backward, because
 	// those two are what this rule believes about liveness and they are exactly what the framework
 	// declines to have an opinion about. What changed is who runs them, not what they say.
@@ -309,7 +319,7 @@ func analyzeRootLiveness(ctx rule.Context, root *ast.Node, exported map[string]b
 	)
 
 	// The reporting pass runs once the sets have settled, walking each reachable block backward and
-	// collecting a verdict per write. A write is named only when EVERY reachable copy of it found
+	// collecting a verdict per write. A write is named only when every reachable copy of it found
 	// its bit dead, which is the union described above expressed as an all-copies-agree test.
 	type writeVerdict struct {
 		event deadStoreEvent
@@ -320,7 +330,7 @@ func analyzeRootLiveness(ctx rule.Context, root *ast.Node, exported map[string]b
 
 	// Only reachable blocks are walked, and that costs one shape upstream reports.
 	//
-	// A write that exists ONLY in an unreachable block is never judged. `function f() { let v = 1;
+	// A write that exists only in an unreachable block is never judged. `function f() { let v = 1;
 	// g(v); return v; v = 2; }` puts `v = 2` after the return, in a block nothing arrives at, and
 	// the release binary reports it while this stays silent. Measured, with a control case in the
 	// same invocation firing to prove the rule was running.
@@ -340,7 +350,7 @@ func analyzeRootLiveness(ctx rule.Context, root *ast.Node, exported map[string]b
 		if !block.Reachable {
 			continue
 		}
-		// `In` on a Backward solution is the value on EXIT from the block: the symbols live after it.
+		// `In` on a Backward solution is the value on exit from the block: the symbols live after it.
 		// That is what the reporting walk starts from, exactly as `liveOnExit` used to supply it.
 		liveAfter, ok := solution.In(block)
 		if !ok {
@@ -362,142 +372,39 @@ func analyzeRootLiveness(ctx rule.Context, root *ast.Node, exported map[string]b
 	for _, position := range order {
 		verdict := verdicts[position]
 		if verdict.dead {
-			reportDeadStore(ctx, verdict.event, exported, symbols)
+			reportDeadStore(ruleContext, verdict.event, exported, symbols)
 		}
 	}
 }
 
 // deadStoreGraph builds one root's graph with an event for each occurrence of an eligible binding.
-func deadStoreGraph(ctx rule.Context, root *ast.Node, symbols map[*ast.Symbol]*symbolFacts) *control_flow_graph.Graph[deadStoreEvent] {
+func deadStoreGraph(
+	ruleContext rule.Context,
+	root *ast.Node,
+	symbols map[*ast.Symbol]*symbolFacts,
+) *control_flow_graph.Graph[deadStoreEvent] {
 	return control_flow_graph.Build(root, control_flow_graph.Hooks[deadStoreEvent]{
 		Read: func(builder *control_flow_graph.Builder[deadStoreEvent], node *ast.Node) {
 			// The Read hook fires for plain write targets too, so what this occurrence is comes
 			// from the AST. A plain write emits nothing here; its store is recorded by the Write
 			// hook, which is where it belongs in evaluation order.
 			if kind := occurrenceKindOf(node); kind != occurrenceWrite {
-				recordDeadStoreEvent(builder, ctx, node, occurrenceRead, symbols)
+				recordDeadStoreEvent(builder, ruleContext, node, occurrenceRead, symbols)
 			}
 		},
 		Write: func(builder *control_flow_graph.Builder[deadStoreEvent], node *ast.Node) {
-			recordDeadStoreEvent(builder, ctx, node, occurrenceWrite, symbols)
+			recordDeadStoreEvent(builder, ruleContext, node, occurrenceWrite, symbols)
 		},
 	})
-}
-
-// deadStoreLiveness is this rule's lattice: a set of symbols, met by union, transferred by walking
-// one block's events backward.
-//
-// # The meet, and why union is the conservative choice here
-//
-// Upstream distinguishes six edge kinds — Normal, Jump, Backedge, Error, Finalize, Join — and unions
-// all but Unreachable into one of two sets, keeping the error set separate so a write bypassed by a
-// throw is not reported. Our graph carries no edge kinds, so the same conservatism is obtained by a
-// different route: the fork to a handler is a real successor edge, so the handler's live set is
-// unioned in like any other, and a write followed by a throwing call stays live because the catch
-// path reads the earlier value. Measured on
-// `function f() { let v = 1; try { h(); } catch (e) { v = 2; } return v; }`, where the fork out of
-// the `try` block reaches the catch and the join before it.
-//
-// # Bottom and Entry are both empty, and they mean different things
-//
-// Bottom is the identity for union, so it is the empty set. Entry is the claim that NOTHING is live
-// where the code path leaves — no symbol declared inside this root can be read after it returns —
-// and it is also the empty set. They coincide numerically and not in meaning, which is why they are
-// written separately rather than sharing one constructor.
-type deadStoreLiveness struct {
-	// reachable is keyed by source position, and `applyBlockTransfer` consults it to decide whether
-	// a write is judged at all. It is threaded through the lattice because the transfer needs it and
-	// the framework hands the lattice nothing but the block.
-	reachable map[int]bool
-	// words is how long a live set this root needs, one bit per symbol its events name.
-	words int
-}
-
-// Bottom is the empty set, nil, which costs nothing. Solve asks for it for every block on every
-// round, and the map it used to be was the largest single allocation in this rule (#tmn9n27).
-func (deadStoreLiveness) Bottom() liveSymbols { return nil }
-
-func (deadStoreLiveness) Entry() liveSymbols { return nil }
-
-func (l deadStoreLiveness) Meet(left, right liveSymbols) liveSymbols {
-	// Neither argument is written: `Solve` holds one of them as a settled boundary value and
-	// compares against it to decide whether anything moved. One that already holds the other is
-	// returned as it is, which is most meets, since Solve folds every block's neighbours from
-	// Bottom. Returning it shares it, and that is safe because nothing writes into a live set it did
-	// not just make: Transfer and the reporting walk each copy before they write.
-	if left.covers(right) {
-		return left
-	}
-	if right.covers(left) {
-		return right
-	}
-	merged := left.withWords(l.words)
-	for index, bits := range right {
-		merged[index] |= bits
-	}
-	return merged
-}
-
-func (l deadStoreLiveness) Transfer(
-	block *control_flow_graph.Block[deadStoreEvent],
-	incoming liveSymbols,
-) liveSymbols {
-	// A block with no event passes its set through unchanged, so it is handed back rather than
-	// copied.
-	if len(block.Events) == 0 {
-		return incoming
-	}
-	outgoing := incoming.withWords(l.words)
-	// nil observer: the fixed-point rounds must report nothing, because a block is transferred many
-	// times before the sets settle. Reporting happens once afterwards, in a separate walk.
-	applyBlockTransfer(block, outgoing, l.reachable, nil)
-	return outgoing
-}
-
-func (deadStoreLiveness) Equal(left, right liveSymbols) bool {
-	return left.covers(right) && right.covers(left)
-}
-
-// liveSymbols is the set of a root's symbols live at one point: bit n stands for the symbol its
-// events number n (deadStoreEvent.number). Nil is the empty set, and a set reads as zero past its
-// end, so sets of different lengths compare and combine as the sets they stand for.
-//
-// A bitset rather than the map it replaced, because a root's symbols are few and fixed once its
-// graph is built: one or two words, against a map per block per round (#tmn9n27).
-type liveSymbols []uint64
-
-// has reports whether symbol number is in the set.
-func (set liveSymbols) has(number int) bool {
-	word := number / 64
-	return word < len(set) && set[word]&(1<<(number%64)) != 0
-}
-
-// covers reports whether every symbol in other is also in set.
-func (set liveSymbols) covers(other liveSymbols) bool {
-	for index, bits := range other {
-		var mine uint64
-		if index < len(set) {
-			mine = set[index]
-		}
-		if bits&^mine != 0 {
-			return false
-		}
-	}
-	return true
-}
-
-// withWords returns a copy of set, words long, which the caller may write without touching set.
-func (set liveSymbols) withWords(words int) liveSymbols {
-	copied := make(liveSymbols, words)
-	copy(copied, set)
-	return copied
 }
 
 // applyBlockTransfer walks one block's events backward, updating the live set and optionally
 // reporting each write it finds dead.
 //
+// Mutates: current the walk sets and clears its bits in place, so the caller reads the block's live-in set off it
+//
 // The order within a block is what makes `a = a + 1` work without upstream's deferred-write
-// reordering. The graph already emits the right-hand read before the store — measured on
+// reordering. The graph already emits the right-hand read before the store, as measured on
 // `let a = 42; f(a); a = 10; a = a + 1; f(a);`, which lays out `R(a@25) R(a@29) W(a@25)`, the
 // target's throwable read, the operand read, then the store. Upstream reaches the same ordering by
 // pushing a synthetic Read op before a deferred write and carries a `pending_assignment_lhs`
@@ -526,8 +433,8 @@ func applyBlockTransfer(
 			// backward walk reaches it.
 			//
 			// Measured rather than argued, because the argument runs the wrong way round. A mutant
-			// replacing a set-live here with a clear SURVIVED the whole imported corpus and every
-			// fixture, and the first hypothesis — that no fixture wrote a compound assignment — was
+			// replacing a set-live here with a clear survived the whole imported corpus and every
+			// fixture, and the first hypothesis (that no fixture wrote a compound assignment) was
 			// wrong: three fixtures added for it did not kill the mutant either. The line was
 			// subsumed by the Read event, so no input could distinguish the two versions. The
 			// inverse mutation, forcing the store's verdict to dead, fails 23 lines, which is what
@@ -553,7 +460,7 @@ func applyBlockTransfer(
 // recordDeadStoreEvent files one identifier occurrence into the block the walk is currently in.
 func recordDeadStoreEvent(
 	builder *control_flow_graph.Builder[deadStoreEvent],
-	ctx rule.Context,
+	ruleContext rule.Context,
 	node *ast.Node,
 	hookKind occurrenceKind,
 	symbols map[*ast.Symbol]*symbolFacts,
@@ -561,7 +468,7 @@ func recordDeadStoreEvent(
 	if isNonReferenceIdentifier(node) {
 		return
 	}
-	symbol := resolveOccurrence(ctx, node)
+	symbol := resolveOccurrence(ruleContext, node)
 	if symbol == nil {
 		return
 	}
@@ -574,7 +481,7 @@ func recordDeadStoreEvent(
 	if hookKind == occurrenceWrite {
 		// The Write hook does not distinguish a store that loaded first, so the AST is asked.
 		//
-		// This is kept for what it SAYS rather than for what it decides, and that is recorded
+		// This is kept for what it says rather than for what it decides, and that is recorded
 		// because the honest verdict is equivalence rather than coverage. A mutant forcing this
 		// branch off survived every fixture and the whole imported corpus, and five constructed
 		// inputs across `+=`, `++` twice over, an update killed by a later write, and `||=` produced
@@ -610,7 +517,7 @@ func recordDeadStoreEvent(
 // event entirely would make the write it overwrites look live, which costs the five diagnostics the
 // previous implementation declined for exactly this reason.
 func reportDeadStore(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	event deadStoreEvent,
 	exported map[string]bool,
 	symbols map[*ast.Symbol]*symbolFacts,
@@ -625,7 +532,7 @@ func reportDeadStore(
 	if exported[event.symbol.Name] {
 		return
 	}
-	ctx.ReportNode(event.node, messageNoUselessAssignment)
+	ruleContext.ReportNode(event.node, messageNoUselessAssignment)
 }
 
 // occurrenceKindOf classifies one identifier occurrence from the AST alone.
@@ -681,8 +588,8 @@ func occurrenceKindOf(identifier *ast.Node) occurrenceKind {
 
 	case ast.KindBindingElement:
 		// A destructured binding, `let [a, b] = arr` or `let { a } = obj`. The graph emits a real
-		// Write for it — measured on `let [a, b] = arr; a = 3; console.log(a, b);`, which lays out
-		// `W(a@24)` at the binding — and upstream reports the binding when a later write kills it.
+		// Write for it (measured on `let [a, b] = arr; a = 3; console.log(a, b);`, which lays out
+		// `W(a@24)` at the binding), and upstream reports the binding when a later write kills it.
 		// The previous implementation declined the whole shape because a pattern element's flow
 		// node did not line up with a single-identifier reachability question; the liveness pass
 		// has no such difficulty, since the graph already placed the write where it happens.

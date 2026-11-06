@@ -14,7 +14,10 @@ const correctnessNoLeakedNumberRenderId = "leakedNumberRender"
 
 // correctnessNoLeakedNumberRenderText is the rule's message, whose wording lives in
 // `policy/messages/correctness-no-leaked-number-render.json`.
-var correctnessNoLeakedNumberRenderText = policy.MessageOf("nexus/correctness-no-leaked-number-render", correctnessNoLeakedNumberRenderId)
+var correctnessNoLeakedNumberRenderText = policy.MessageOf(
+	"nexus/correctness-no-leaked-number-render",
+	correctnessNoLeakedNumberRenderId,
+)
 
 func correctnessNoLeakedNumberRenderMessage() rule.Message {
 	return rule.Message{
@@ -97,7 +100,7 @@ func correctnessNoLeakedNumberRenderMessage() rule.Message {
 // Whether a `0` should render nothing or "0 records" is the author's call: `PaginationControls`
 // arguably wants the count shown, and `!!count`, `count > 0` and `count !== undefined` each mean
 // something different at a different site.
-var CorrectnessNoLeakedNumberRender = rule.Rule{
+var CorrectnessNoLeakedNumberRender = rule.Rule[rule.NoOptions]{
 	Name: "nexus/correctness-no-leaked-number-render",
 
 	// The whole rule is a question about the operand's type; without the checker it would be
@@ -106,8 +109,8 @@ var CorrectnessNoLeakedNumberRender = rule.Rule{
 	// The rule asks only for the operand's type, never into an imported body.
 	TypeReach: rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.TypeChecker == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		if ruleContext.TypeChecker == nil {
 			return nil
 		}
 		return rule.Listeners{
@@ -119,7 +122,7 @@ var CorrectnessNoLeakedNumberRender = rule.Rule{
 				if node.Parent.Kind != ast.KindJsxElement && node.Parent.Kind != ast.KindJsxFragment {
 					return
 				}
-				correctnessNoLeakedNumberRenderRendered(ctx, container.Expression)
+				correctnessNoLeakedNumberRenderRendered(ruleContext, container.Expression)
 			},
 		}
 	},
@@ -127,54 +130,57 @@ var CorrectnessNoLeakedNumberRender = rule.Rule{
 
 // correctnessNoLeakedNumberRenderRendered walks an expression whose value is rendered as a JSX
 // child, and checks the falsy operand of every `&&` whose result is rendered.
-func correctnessNoLeakedNumberRenderRendered(ctx rule.Context, expression *ast.Node) {
-	expression = ast.SkipParentheses(expression)
-	switch expression.Kind {
+func correctnessNoLeakedNumberRenderRendered(ruleContext rule.Context, expression *ast.Node) {
+	unwrapped := ast.SkipParentheses(expression)
+	switch unwrapped.Kind {
 	case ast.KindConditionalExpression:
-		conditional := expression.AsConditionalExpression()
-		correctnessNoLeakedNumberRenderRendered(ctx, conditional.WhenTrue)
-		correctnessNoLeakedNumberRenderRendered(ctx, conditional.WhenFalse)
+		conditional := unwrapped.AsConditionalExpression()
+		correctnessNoLeakedNumberRenderRendered(ruleContext, conditional.WhenTrue)
+		correctnessNoLeakedNumberRenderRendered(ruleContext, conditional.WhenFalse)
 	case ast.KindBinaryExpression:
-		binary := expression.AsBinaryExpression()
+		binary := unwrapped.AsBinaryExpression()
 		switch binary.OperatorToken.Kind {
 		case ast.KindAmpersandAmpersandToken:
-			correctnessNoLeakedNumberRenderFalsy(ctx, binary.Left)
-			correctnessNoLeakedNumberRenderRendered(ctx, binary.Right)
+			correctnessNoLeakedNumberRenderFalsy(ruleContext, binary.Left)
+			correctnessNoLeakedNumberRenderRendered(ruleContext, binary.Right)
 		case ast.KindBarBarToken:
 			// The left side is rendered only when it is truthy, which is a value the author chose.
-			correctnessNoLeakedNumberRenderRendered(ctx, binary.Right)
+			correctnessNoLeakedNumberRenderRendered(ruleContext, binary.Right)
 		case ast.KindQuestionQuestionToken:
-			correctnessNoLeakedNumberRenderRendered(ctx, binary.Left)
-			correctnessNoLeakedNumberRenderRendered(ctx, binary.Right)
+			correctnessNoLeakedNumberRenderRendered(ruleContext, binary.Left)
+			correctnessNoLeakedNumberRenderRendered(ruleContext, binary.Right)
 		}
 	}
 }
 
 // correctnessNoLeakedNumberRenderFalsy checks every leaf whose value an expression returns when it
 // is falsy, and reports a leaf whose type says that value can be a number.
-func correctnessNoLeakedNumberRenderFalsy(ctx rule.Context, expression *ast.Node) {
-	expression = ast.SkipParentheses(expression)
-	switch expression.Kind {
+func correctnessNoLeakedNumberRenderFalsy(ruleContext rule.Context, expression *ast.Node) {
+	unwrapped := ast.SkipParentheses(expression)
+	switch unwrapped.Kind {
 	case ast.KindConditionalExpression:
-		conditional := expression.AsConditionalExpression()
-		correctnessNoLeakedNumberRenderFalsy(ctx, conditional.WhenTrue)
-		correctnessNoLeakedNumberRenderFalsy(ctx, conditional.WhenFalse)
+		conditional := unwrapped.AsConditionalExpression()
+		correctnessNoLeakedNumberRenderFalsy(ruleContext, conditional.WhenTrue)
+		correctnessNoLeakedNumberRenderFalsy(ruleContext, conditional.WhenFalse)
 		return
 	case ast.KindBinaryExpression:
-		binary := expression.AsBinaryExpression()
+		binary := unwrapped.AsBinaryExpression()
 		switch binary.OperatorToken.Kind {
 		case ast.KindAmpersandAmpersandToken, ast.KindQuestionQuestionToken:
-			correctnessNoLeakedNumberRenderFalsy(ctx, binary.Left)
-			correctnessNoLeakedNumberRenderFalsy(ctx, binary.Right)
+			correctnessNoLeakedNumberRenderFalsy(ruleContext, binary.Left)
+			correctnessNoLeakedNumberRenderFalsy(ruleContext, binary.Right)
 			return
 		case ast.KindBarBarToken:
 			// `a || b` is falsy only when it returns `b`.
-			correctnessNoLeakedNumberRenderFalsy(ctx, binary.Right)
+			correctnessNoLeakedNumberRenderFalsy(ruleContext, binary.Right)
 			return
 		}
 	}
-	if correctnessNoLeakedNumberRenderCanLeak(ctx.TypeChecker, ctx.TypeChecker.GetTypeAtLocation(expression)) {
-		ctx.ReportNode(expression, correctnessNoLeakedNumberRenderMessage())
+	if correctnessNoLeakedNumberRenderCanLeak(
+		ruleContext.TypeChecker,
+		ruleContext.TypeChecker.GetTypeAtLocation(unwrapped),
+	) {
+		ruleContext.ReportNode(unwrapped, correctnessNoLeakedNumberRenderMessage())
 	}
 }
 
@@ -195,7 +201,7 @@ const (
 // render nothing, with at least one number that can be falsy.
 func correctnessNoLeakedNumberRenderCanLeak(typeChecker *checker.Checker, operandType *checker.Type) bool {
 	leaks := false
-	for part := range type_checking.UnionTypePartsSeq(operandType) {
+	for part := range type_checking.UnionTypePartsSequence(operandType) {
 		switch correctnessNoLeakedNumberRenderClassify(typeChecker, part, 0) {
 		case correctnessNoLeakedNumberRenderDecline:
 			return false
@@ -208,11 +214,18 @@ func correctnessNoLeakedNumberRenderCanLeak(typeChecker *checker.Checker, operan
 
 // correctnessNoLeakedNumberRenderClassify reads one part of a union. depth bounds the walk through
 // type parameter constraints, which can name each other.
-func correctnessNoLeakedNumberRenderClassify(typeChecker *checker.Checker, part *checker.Type, depth int) correctnessNoLeakedNumberRenderPart {
+func correctnessNoLeakedNumberRenderClassify(
+	typeChecker *checker.Checker,
+	part *checker.Type,
+	depth int,
+) correctnessNoLeakedNumberRenderPart {
 	switch {
 	case part == nil:
 		return correctnessNoLeakedNumberRenderDecline
-	case type_checking.IsTypeFlagSet(part, checker.TypeFlagsNullable|checker.TypeFlagsVoid|checker.TypeFlagsNever|checker.TypeFlagsBooleanLiteral):
+	case type_checking.IsTypeFlagSet(
+		part,
+		checker.TypeFlagsNullable|checker.TypeFlagsVoid|checker.TypeFlagsNever|checker.TypeFlagsBooleanLiteral,
+	):
 		return correctnessNoLeakedNumberRenderSilent
 	case type_checking.IsTypeFlagSet(part, checker.TypeFlagsNumber|checker.TypeFlagsBigInt):
 		return correctnessNoLeakedNumberRenderLeaks
@@ -243,7 +256,7 @@ func correctnessNoLeakedNumberRenderClassify(typeChecker *checker.Checker, part 
 			return correctnessNoLeakedNumberRenderDecline
 		}
 		verdict := correctnessNoLeakedNumberRenderSilent
-		for constraintPart := range type_checking.UnionTypePartsSeq(constraint) {
+		for constraintPart := range type_checking.UnionTypePartsSequence(constraint) {
 			switch correctnessNoLeakedNumberRenderClassify(typeChecker, constraintPart, depth+1) {
 			case correctnessNoLeakedNumberRenderDecline:
 				return correctnessNoLeakedNumberRenderDecline

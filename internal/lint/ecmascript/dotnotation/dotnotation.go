@@ -21,6 +21,26 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
+// keywords is upstream's shared ES3 keyword list, copied verbatim and in order.
+//
+// ES3 rather than modern: it includes `abstract`, `boolean`, `byte`, `goto` and friends, which are
+// not reserved in any current JavaScript. That is deliberate upstream, and the list is what
+// `allowKeywords: false` bans, so trimming it to today's reserved words would silently narrow the
+// rule.
+var keywords = map[string]bool{
+	"abstract": true, "boolean": true, "break": true, "byte": true, "case": true, "catch": true,
+	"char": true, "class": true, "const": true, "continue": true, "debugger": true,
+	"default": true, "delete": true, "do": true, "double": true, "else": true, "enum": true,
+	"export": true, "extends": true, "false": true, "final": true, "finally": true, "float": true,
+	"for": true, "function": true, "goto": true, "if": true, "implements": true, "import": true,
+	"in": true, "instanceof": true, "int": true, "interface": true, "long": true, "native": true,
+	"new": true, "null": true, "package": true, "private": true, "protected": true, "public": true,
+	"return": true, "short": true, "static": true, "super": true, "switch": true,
+	"synchronized": true, "this": true, "throw": true, "throws": true, "transient": true,
+	"true": true, "try": true, "typeof": true, "var": true, "void": true, "volatile": true,
+	"while": true, "with": true,
+}
+
 // Settings is what the judgment reads, decoded by each rule from its own option surface.
 type Settings struct {
 	// AllowKeywords permits `a.class` and friends. Upstream's default is true.
@@ -41,14 +61,14 @@ type Settings struct {
 
 // CompileAllowPattern compiles an allowPattern option, and an empty one allows nothing.
 //
-// A pattern Go's RE2 cannot compile is dropped rather than crashing the run, which reports MORE rather
+// A pattern Go's RE2 cannot compile is dropped rather than crashing the run, which reports more rather
 // than less. Upstream's `new RegExp` throws and takes every other rule's verdict on that file with it.
 func CompileAllowPattern(source string) *regexp.Regexp {
 	if source == "" {
 		return nil
 	}
-	compiled, err := regexp.Compile(source)
-	if err != nil {
+	compiled, compileError := regexp.Compile(source)
+	if compileError != nil {
 		return nil
 	}
 	return compiled
@@ -56,7 +76,7 @@ func CompileAllowPattern(source string) *regexp.Regexp {
 
 // Listeners is the core rule's listeners under settings: a computed access with a convertible literal
 // key reports useDot, and under AllowKeywords false a keyword after a dot reports useBrackets.
-func Listeners(ctx rule.Context, settings Settings) rule.Listeners {
+func Listeners(ruleContext rule.Context, settings Settings) rule.Listeners {
 	return rule.Listeners{
 		ast.KindElementAccessExpression: func(node *ast.Node) {
 			access := node.AsElementAccessExpression()
@@ -68,7 +88,7 @@ func Listeners(ctx rule.Context, settings Settings) rule.Listeners {
 			// upstream never sees, and without the unwrap it costs two of upstream's own
 			// reporting cases. Measured: cases invalid[17] and invalid[18] report nothing
 			// until the key is unwrapped, while invalid[19] `(foo)['bar']` passes either way
-			// because the parentheses are on the RECEIVER rather than the key.
+			// because the parentheses are on the receiver rather than the key.
 			//
 			// A loop rather than one step, because `((x))` nests. Not `ast.SkipParentheses`:
 			// it dereferences its argument, and this project lost 167 files to that on an
@@ -85,7 +105,7 @@ func Listeners(ctx rule.Context, settings Settings) rule.Listeners {
 			if !readable {
 				return
 			}
-			checkComputed(ctx, node, access, argument, key, formatted, settings)
+			checkComputed(ruleContext, node, access, argument, key, formatted, settings)
 		},
 
 		ast.KindPropertyAccessExpression: func(node *ast.Node) {
@@ -103,11 +123,11 @@ func Listeners(ctx rule.Context, settings Settings) rule.Listeners {
 			if !keywords[name.Text()] {
 				return
 			}
-			if fixes, repairable := keywordFix(ctx, node, access, name); repairable {
-				ctx.ReportNodeWithFixes(name, useBracketsMessage(name.Text()), fixes...)
+			if fixes, repairable := keywordFix(ruleContext, node, access, name); repairable {
+				ruleContext.ReportNodeWithFixes(name, useBracketsMessage(name.Text()), fixes...)
 				return
 			}
-			ctx.ReportNode(name, useBracketsMessage(name.Text()))
+			ruleContext.ReportNode(name, useBracketsMessage(name.Text()))
 		},
 	}
 }
@@ -122,7 +142,7 @@ var validIdentifier = regexp.MustCompile(`^[a-zA-Z_$][\w$]*$`)
 
 // decimalInteger is upstream's `DECIMAL_INTEGER_PATTERN`, used by `isDecimalInteger`.
 //
-// It decides whether the fixer must insert a SPACE before the dot. `5['prop']` becomes `5 .prop`
+// It decides whether the fixer must insert a space before the dot. `5['prop']` becomes `5 .prop`
 // rather than `5.prop`, because the latter re-lexes as the number `5.` followed by `prop`, which is
 // a syntax error -- a fixer writing broken source into a file it was asked to repair.
 //
@@ -139,26 +159,6 @@ var validIdentifier = regexp.MustCompile(`^[a-zA-Z_$][\w$]*$`)
 // following fraction, `5.000_000` already contains a dot, and `0b1010_1010` is not decimal. The
 // corpus pins the split exactly -- 25 and 26 expect no space, 27 through 31 expect one.
 var decimalInteger = regexp.MustCompile(`^(?:0|0[0-7]*[89][0-9]*|[1-9](?:_?[0-9])*)$`)
-
-// keywords is upstream's shared ES3 keyword list, copied verbatim and in order.
-//
-// ES3 rather than modern: it includes `abstract`, `boolean`, `byte`, `goto` and friends, which are
-// not reserved in any current JavaScript. That is deliberate upstream, and the list is what
-// `allowKeywords: false` bans, so trimming it to today's reserved words would silently narrow the
-// rule.
-var keywords = map[string]bool{
-	"abstract": true, "boolean": true, "break": true, "byte": true, "case": true, "catch": true,
-	"char": true, "class": true, "const": true, "continue": true, "debugger": true,
-	"default": true, "delete": true, "do": true, "double": true, "else": true, "enum": true,
-	"export": true, "extends": true, "false": true, "final": true, "finally": true, "float": true,
-	"for": true, "function": true, "goto": true, "if": true, "implements": true, "import": true,
-	"in": true, "instanceof": true, "int": true, "interface": true, "long": true, "native": true,
-	"new": true, "null": true, "package": true, "private": true, "protected": true, "public": true,
-	"return": true, "short": true, "static": true, "super": true, "switch": true,
-	"synchronized": true, "this": true, "throw": true, "throws": true, "transient": true,
-	"true": true, "try": true, "typeof": true, "var": true, "void": true, "volatile": true,
-	"while": true, "with": true,
-}
 
 // useDotMessage builds the finding for a computed access that should be a dot access.
 //
@@ -196,7 +196,7 @@ func useBracketsMessage(key string) rule.Message {
 
 // checkComputed is upstream's `checkComputedProperty`.
 func checkComputed(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	node *ast.Node,
 	access *ast.ElementAccessExpression,
 	keyNode *ast.Node,
@@ -217,16 +217,16 @@ func checkComputed(
 		return
 	}
 
-	if fixes, repairable := computedFix(ctx, node, access, keyNode, key); repairable {
-		ctx.ReportNodeWithFixes(keyNode, useDotMessage(formattedKey), fixes...)
+	if fixes, repairable := computedFix(ruleContext, node, access, keyNode, key); repairable {
+		ruleContext.ReportNodeWithFixes(keyNode, useDotMessage(formattedKey), fixes...)
 		return
 	}
-	ctx.ReportNode(keyNode, useDotMessage(formattedKey))
+	ruleContext.ReportNode(keyNode, useDotMessage(formattedKey))
 }
 
 // computedFix builds the repair that turns `a['b']` into `a.b`.
 //
-// Returns false where upstream returns without yielding, which is a DECLINE rather than an absent
+// Returns false where upstream returns without yielding, which is a decline rather than an absent
 // repair: the finding is still reported, only the fix is withheld. Two corpus cases are `output:
 // null` for the comment reason below.
 //
@@ -235,16 +235,16 @@ func checkComputed(
 // one edit rather than two avoids the overlapping-edit refusal the harness makes when two fixes
 // touch one expression.
 func computedFix(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	node *ast.Node,
 	access *ast.ElementAccessExpression,
 	keyNode *ast.Node,
 	key string,
 ) ([]rule.Fix, bool) {
-	if ctx.SourceFile == nil || access.Expression == nil {
+	if ruleContext.SourceFile == nil || access.Expression == nil {
 		return nil, false
 	}
-	source := ctx.SourceFile.Text()
+	source := ruleContext.SourceFile.Text()
 
 	// The span runs from the `[` that follows the object to the `]` that closes the access.
 	openBracket := strings.IndexByte(source[access.Expression.End():node.End()], '[')
@@ -259,7 +259,7 @@ func computedFix(
 
 	// Upstream: "Don't perform any fixes if there are comments inside the brackets." Applying the
 	// repair would delete them, which is why upstream reports without fixing rather than reformatting.
-	if hasCommentBetween(ctx, openBracket, closeBracket) {
+	if hasCommentBetween(ruleContext, openBracket, closeBracket) {
 		return nil, false
 	}
 
@@ -334,9 +334,9 @@ func isOptionalAccess(source string, from int, to int) bool {
 // The third return separates "not a convertible key" from "an empty key", which matters because an
 // empty string is a real literal and simply fails the identifier test rather than being skipped.
 //
-// A NUMERIC literal is deliberately absent, and it is the shape a reader adds back. `a[0]` must stay
+// A numeric literal is deliberately absent, and it is the shape a reader adds back. `a[0]` must stay
 // bracketed: `a.0` is a syntax error, and upstream's `literalTypesToCheck` is `{string, boolean}`
-// precisely to exclude it. Corpus case `a['1']` is CLEAN for the same reason once it reaches the
+// precisely to exclude it. Corpus case `a['1']` is clean for the same reason once it reaches the
 // identifier pattern, which rejects a leading digit.
 func literalKey(argument *ast.Node) (key string, formatted string, readable bool) {
 	switch argument.Kind {
@@ -399,11 +399,11 @@ func jsonQuote(text string) string {
 // reason, and the decline is reproduced rather than improved on.
 //
 // Reads the shared per-file comment list rather than rescanning; see `comments.ForFile`.
-func hasCommentBetween(ctx rule.Context, start int, end int) bool {
+func hasCommentBetween(ruleContext rule.Context, start int, end int) bool {
 	if end <= start {
 		return false
 	}
-	for _, comment := range comments.ForFile(ctx) {
+	for _, comment := range comments.ForFile(ruleContext) {
 		if comment.Range.Pos() >= start && comment.Range.End() <= end {
 			return true
 		}
@@ -422,20 +422,20 @@ func hasCommentBetween(ctx rule.Context, start int, end int) bool {
 //	                            declaration rather than a member access, so bracketing changes
 //	                            what the statement IS
 //
-// The second is the sharper one, and it is narrower than it looks: `let?.true` IS repaired, to
+// The second is the sharper one, and it is narrower than it looks: `let?.true` is repaired, to
 // `let?.["true"]`, because the optional-chaining token keeps the form unambiguous. Upstream guards
 // with `node.object.name === 'let' && !node.optional`, and both halves are load-bearing -- corpus
 // cases 22 and 37 sit on either side of that `&&`.
 func keywordFix(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	node *ast.Node,
 	access *ast.PropertyAccessExpression,
 	name *ast.Node,
 ) ([]rule.Fix, bool) {
-	if ctx.SourceFile == nil || access.Expression == nil {
+	if ruleContext.SourceFile == nil || access.Expression == nil {
 		return nil, false
 	}
-	source := ctx.SourceFile.Text()
+	source := ruleContext.SourceFile.Text()
 
 	optional := isOptionalAccess(source, access.Expression.End(), name.Pos())
 
@@ -459,7 +459,7 @@ func keywordFix(
 
 	// Upstream: "Don't perform any fixes if there are comments between the dot and the property
 	// name." Applying the repair would delete them.
-	if hasCommentBetween(ctx, access.Expression.End(), name.End()) {
+	if hasCommentBetween(ruleContext, access.Expression.End(), name.End()) {
 		return nil, false
 	}
 

@@ -9,10 +9,10 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 //
 // No Decode entry, because the original's `schema` is `[]` and the rule reads no options at all.
 //
-// Registered and NOT enabled. `api-phi-health` carries no CohereSettings.json of its own, and ahra's
+// Registered and not enabled. `api-phi-health` carries no CohereSettings.json of its own, and ahra's
 // config names no `base/` keys because base is that project's layer rather than ahra's. Where these
 // rules get turned on is a decision for whoever owns that configuration, and a port that enabled
 // itself would be making it silently.
 func init() {
-	rule.Register(rule.Registration{Rule: ConsistencyNoBareThrow})
+	rule.Register(rule.Registration[rule.NoOptions]{Rule: ConsistencyNoBareThrow})
 }

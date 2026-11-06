@@ -11,12 +11,12 @@ import (
 // mechanically rather than transcribed, because three of the fail cases contain template literals
 // whose escapes a hand copy or a heredoc would cook.
 //
-// Two of the fail inputs contain a second <script> that does NOT report, which is the corpus'
+// Two of the fail inputs contain a second <script> that does not report, which is the corpus'
 // sharpest content and the thing a reading of the rule name gets backwards. Those are asserted with
 // a single finding each rather than two.
 
-func TestNextScriptForGaReports(t *testing.T) {
-	t.Parallel()
+func TestNextScriptForGaReports(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -57,16 +57,16 @@ func TestNextScriptForGaReports(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NextScriptForGa, "pages/index.tsx", testCase.source)
-			rule_testing.ExpectFindings(t, result, "nextScriptForGa")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NextScriptForGa, "pages/index.tsx", testCase.source)
+			rule_testing.ExpectFindings(test, result, "nextScriptForGa")
 		})
 	}
 }
 
-func TestNextScriptForGaIsSilent(t *testing.T) {
-	t.Parallel()
+func TestNextScriptForGaIsSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -97,10 +97,10 @@ func TestNextScriptForGaIsSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NextScriptForGa, "pages/index.tsx", testCase.source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NextScriptForGa, "pages/index.tsx", testCase.source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -110,16 +110,16 @@ func TestNextScriptForGaIsSilent(t *testing.T) {
 // alongside as a control so that a silent probe could be told apart from a config that never loaded
 // the plugin. Each case names the verdict it pins.
 
-func TestNextScriptForGaReportsTheMeasuredEdgeCases(t *testing.T) {
-	t.Parallel()
+func TestNextScriptForGaReportsTheMeasuredEdgeCases(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
 		source string
 	}{
 		{
-			// The attribute NAME is matched case-insensitively even though the tag name and the
-			// attribute VALUE are not. Upstream reaches both attributes through
+			// The attribute name is matched case-insensitively even though the tag name and the
+			// attribute value are not. Upstream reaches both attributes through
 			// `has_jsx_prop_ignore_case`.
 			name:   "an uppercase src attribute name",
 			source: "export const A = <script SRC=\"https://www.google-analytics.com/analytics.js\" />;\n",
@@ -136,7 +136,7 @@ func TestNextScriptForGaReportsTheMeasuredEdgeCases(t *testing.T) {
 			source: "export const A = <script src=\"http://www.google-analytics.com/analytics.js\" />;\n",
 		},
 		{
-			// Only the first template chunk is searched, so a URL BEFORE the interpolation is
+			// Only the first template chunk is searched, so a URL before the interpolation is
 			// found. Its mirror image below is silent, and the pair is what pins the index.
 			name:   "a url before an interpolation",
 			source: "export const A = <script dangerouslySetInnerHTML={{__html: `www.google-analytics.com/analytics.js${x}tail`}} />;\n",
@@ -168,23 +168,23 @@ func TestNextScriptForGaReportsTheMeasuredEdgeCases(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NextScriptForGa, "pages/index.tsx", testCase.source)
-			rule_testing.ExpectFindings(t, result, "nextScriptForGa")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NextScriptForGa, "pages/index.tsx", testCase.source)
+			rule_testing.ExpectFindings(test, result, "nextScriptForGa")
 		})
 	}
 }
 
-func TestNextScriptForGaIsSilentOnTheMeasuredEdgeCases(t *testing.T) {
-	t.Parallel()
+func TestNextScriptForGaIsSilentOnTheMeasuredEdgeCases(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
 		source string
 	}{
 		{
-			// The two substring lists are NOT the same list. `gtm.js` is inline-only, so a src
+			// The two substring lists are not the same list. `gtm.js` is inline-only, so a src
 			// naming it is silent even though the identical string reports inline.
 			name:   "the tag manager gtm.js path in a src",
 			source: "export const A = <script src=\"https://www.googletagmanager.com/gtm.js?id=X\" />;\n",
@@ -201,7 +201,7 @@ func TestNextScriptForGaIsSilentOnTheMeasuredEdgeCases(t *testing.T) {
 			source: "export const A = <SCRIPT src=\"https://www.google-analytics.com/analytics.js\" />;\n",
 		},
 		{
-			// The VALUE is compared case-sensitively, which is the opposite of how its attribute
+			// The value is compared case-sensitively, which is the opposite of how its attribute
 			// name was found two lines earlier in the same rule.
 			name:   "an uppercase src value",
 			source: "export const A = <script src=\"WWW.GOOGLE-ANALYTICS.COM/ANALYTICS.JS\" />;\n",
@@ -232,13 +232,13 @@ func TestNextScriptForGaIsSilentOnTheMeasuredEdgeCases(t *testing.T) {
 			source: "export const A = <script dangerouslySetInnerHTML={{__html: \"www.google-analytics.com/analytics.js\"}} />;\n",
 		},
 		{
-			// Only quasis[0]. The mirror of the reporting case above: a URL AFTER an interpolation
+			// Only quasis[0]. The mirror of the reporting case above: a URL after an interpolation
 			// sits in a later chunk that upstream never reads.
 			name:   "a url after an interpolation",
 			source: "export const A = <script dangerouslySetInnerHTML={{__html: `head${x}www.google-analytics.com/analytics.js`}} />;\n",
 		},
 		{
-			// The RAW text is searched, not the cooked value. A unicode escape for the period
+			// The raw text is searched, not the cooked value. A unicode escape for the period
 			// survives as six characters upstream and matches nothing. Reading Node.Text() here
 			// would cook it to a period and report, which is the single most invisible way this
 			// port could have diverged.
@@ -252,7 +252,7 @@ func TestNextScriptForGaIsSilentOnTheMeasuredEdgeCases(t *testing.T) {
 		},
 		{
 			// Nor is a computed one. ast.TryGetTextOfPropertyName resolves both of these shapes and
-			// is deliberately not used, because using it would silence nothing and instead START
+			// is deliberately not used, because using it would silence nothing and instead start
 			// reporting two inputs upstream declines.
 			name:   "a computed __html key",
 			source: "export const A = <script dangerouslySetInnerHTML={{[\"__html\"]: `www.google-analytics.com/analytics.js`}} />;\n",
@@ -277,10 +277,10 @@ func TestNextScriptForGaIsSilentOnTheMeasuredEdgeCases(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NextScriptForGa, "pages/index.tsx", testCase.source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NextScriptForGa, "pages/index.tsx", testCase.source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -288,30 +288,30 @@ func TestNextScriptForGaIsSilentOnTheMeasuredEdgeCases(t *testing.T) {
 // A matching src ends the element rather than adding a second finding, which is upstream's `return`
 // inside the src branch. Without it this input reports twice and no fixture above can see it,
 // because every other case carries at most one matching arm.
-func TestNextScriptForGaReportsOnceWhenBothArmsMatch(t *testing.T) {
-	t.Parallel()
+func TestNextScriptForGaReportsOnceWhenBothArmsMatch(test *testing.T) {
+	test.Parallel()
 
 	source := "export const A = <script src=\"https://www.google-analytics.com/analytics.js\" dangerouslySetInnerHTML={{__html: `www.googletagmanager.com/gtm.js`}} />;\n"
-	result := rule_testing.Run(t, NextScriptForGa, "pages/index.tsx", source)
-	rule_testing.ExpectFindings(t, result, "nextScriptForGa")
+	result := rule_testing.Run(test, NextScriptForGa, "pages/index.tsx", source)
+	rule_testing.ExpectFindings(test, result, "nextScriptForGa")
 }
 
 // The first `__html` wins and the search stops, matching upstream's find_map. A rule that kept
 // looking would find the second value and report on an input that is silent upstream, measured
 // against a duplicated key.
-func TestNextScriptForGaReadsOnlyTheFirstHtmlKey(t *testing.T) {
-	t.Parallel()
+func TestNextScriptForGaReadsOnlyTheFirstHtmlKey(test *testing.T) {
+	test.Parallel()
 
 	source := "export const A = <script dangerouslySetInnerHTML={{__html: `harmless`, __html: `www.google-analytics.com/analytics.js`}} />;\n"
-	result := rule_testing.Run(t, NextScriptForGa, "pages/index.tsx", source)
-	rule_testing.ExpectClean(t, result)
+	result := rule_testing.Run(test, NextScriptForGa, "pages/index.tsx", source)
+	rule_testing.ExpectClean(test, result)
 }
 
 // The finding points at the tag name rather than the whole element or the attribute, taken from the
 // snapshot's caret, which underlines the six characters of `script`. Message ids cannot see where a
 // finding points, so this is the only fixture that records the choice.
-func TestNextScriptForGaPointsAtTheTagName(t *testing.T) {
-	t.Parallel()
+func TestNextScriptForGaPointsAtTheTagName(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -328,15 +328,15 @@ func TestNextScriptForGaPointsAtTheTagName(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NextScriptForGa, "pages/index.tsx", testCase.source)
-			rule_testing.ExpectFindings(t, result, "nextScriptForGa")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NextScriptForGa, "pages/index.tsx", testCase.source)
+			rule_testing.ExpectFindings(test, result, "nextScriptForGa")
 
 			diagnostic := result.Diagnostics[0]
 			reported := testCase.source[diagnostic.Range.Pos():diagnostic.Range.End()]
 			if reported != "script" {
-				t.Fatalf("reported span: want %q, got %q", "script", reported)
+				test.Fatalf("reported span: want %q, got %q", "script", reported)
 			}
 		})
 	}
@@ -346,22 +346,22 @@ func TestNextScriptForGaPointsAtTheTagName(t *testing.T) {
 // rule's own message constant, because a comparison to the constant moves with any mutation of it
 // and proves nothing. This rule interpolates nothing, so the description is fixed text and equality
 // is the right predicate.
-func TestNextScriptForGaMessage(t *testing.T) {
-	t.Parallel()
+func TestNextScriptForGaMessage(test *testing.T) {
+	test.Parallel()
 
 	source := "export const A = <script src=\"https://www.google-analytics.com/analytics.js\" />;\n"
-	result := rule_testing.Run(t, NextScriptForGa, "pages/index.tsx", source)
-	rule_testing.ExpectFindings(t, result, "nextScriptForGa")
+	result := rule_testing.Run(test, NextScriptForGa, "pages/index.tsx", source)
+	rule_testing.ExpectFindings(test, result, "nextScriptForGa")
 
 	wantDescription := "This loads Google Analytics through a plain <script> tag, which the " +
 		"framework cannot schedule: it has no loading strategy, so it competes with hydration for " +
 		"the main thread, and nothing deduplicates it across client navigations. Use the `Script` " +
 		"component from `next/script`, which picks a strategy and injects the tag once."
 	if messageNextScriptForGa.Description != wantDescription {
-		t.Fatalf("description: want %q, got %q", wantDescription, messageNextScriptForGa.Description)
+		test.Fatalf("description: want %q, got %q", wantDescription, messageNextScriptForGa.Description)
 	}
 	if messageNextScriptForGa.Id != "nextScriptForGa" {
-		t.Fatalf("id: want %q, got %q", "nextScriptForGa", messageNextScriptForGa.Id)
+		test.Fatalf("id: want %q, got %q", "nextScriptForGa", messageNextScriptForGa.Id)
 	}
 }
 
@@ -373,8 +373,8 @@ func TestNextScriptForGaMessage(t *testing.T) {
 // not *ast.PropertyAssignment", probed directly. A linter panic takes the whole run down rather than
 // costing one finding, and no ExpectFindings fixture can see one, so this asserts on the shapes
 // themselves. Upstream is silent on all of them, measured.
-func TestNextScriptForGaSurvivesPropertyShapesItCannotConvert(t *testing.T) {
-	t.Parallel()
+func TestNextScriptForGaSurvivesPropertyShapesItCannotConvert(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -403,26 +403,26 @@ func TestNextScriptForGaSurvivesPropertyShapesItCannotConvert(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			// The assertion that matters is that Run returns at all. The verdicts are recorded
 			// alongside because upstream is silent on the two that supply no readable value and
 			// reports on the two where a real __html key survives an unconvertible property in
 			// front of it. That last pair was measured after this fixture failed on a wrong
 			// prediction of mine: I expected a leading shorthand to end the search, and both
 			// upstream and this port keep looking, because find_map skips rather than stops.
-			result := rule_testing.Run(t, NextScriptForGa, "pages/index.tsx", testCase.source)
+			result := rule_testing.Run(test, NextScriptForGa, "pages/index.tsx", testCase.source)
 			if testCase.name == "a spread beside the real key" ||
 				testCase.name == "a shorthand beside the real key" {
-				rule_testing.ExpectFindings(t, result, "nextScriptForGa")
+				rule_testing.ExpectFindings(test, result, "nextScriptForGa")
 				return
 			}
-			rule_testing.ExpectClean(t, result)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
 
-// The attribute search stops at the FIRST dangerouslySetInnerHTML and answers from it, rather than
+// The attribute search stops at the first dangerouslySetInnerHTML and answers from it, rather than
 // searching on for one that yields a usable value. Upstream's `has_jsx_prop_ignore_case` is a
 // `find`, so a second copy of the attribute is never consulted whatever it holds.
 //
@@ -431,8 +431,8 @@ func TestNextScriptForGaSurvivesPropertyShapesItCannotConvert(t *testing.T) {
 // survived the entire suite before this was added. All three shapes were measured silent upstream,
 // including the third, where the two spellings differ only in case and the case-insensitive matcher
 // makes the first one the match.
-func TestNextScriptForGaAnswersFromTheFirstDangerouslySetInnerHtml(t *testing.T) {
-	t.Parallel()
+func TestNextScriptForGaAnswersFromTheFirstDangerouslySetInnerHtml(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -453,36 +453,44 @@ func TestNextScriptForGaAnswersFromTheFirstDangerouslySetInnerHtml(t *testing.T)
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NextScriptForGa, "pages/index.tsx", testCase.source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NextScriptForGa, "pages/index.tsx", testCase.source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
 
-// TestNextScriptForGaDecodesEntities reads its attribute as ESLint does, with HTML entities decoded: typescript-estree decodes a
-// JSX attribute string before any rule sees it. Each row's verdict is the installed
+// TestNextScriptForGaDecodesEntities reads its attribute as ESLint does, with HTML entities decoded: typescript-estree
+// decodes a JSX attribute string before any rule sees it. Each row's verdict is the installed
 // @next/eslint-plugin-next 16.3.1's under the typescript-eslint parser (#51y9jh2).
-func TestNextScriptForGaDecodesEntities(t *testing.T) {
-	t.Parallel()
+func TestNextScriptForGaDecodesEntities(test *testing.T) {
+	test.Parallel()
 
 	for _, row := range []struct {
 		name   string
 		source string
 		ids    []string
 	}{
-		{`an encoded slash in the analytics src`, `export const A = <script src="https://www.google-analytics.com&#47;analytics.js" />;`, []string{messageNextScriptForGa.Id}},
-		{`an encoded slash in another src`, `export const A = <script src="https://www.example.com&#47;analytics.js" />;`, []string{}},
+		{
+			`an encoded slash in the analytics src`,
+			`export const A = <script src="https://www.google-analytics.com&#47;analytics.js" />;`,
+			[]string{messageNextScriptForGa.Id},
+		},
+		{
+			`an encoded slash in another src`,
+			`export const A = <script src="https://www.example.com&#47;analytics.js" />;`,
+			[]string{},
+		},
 	} {
-		t.Run(row.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NextScriptForGa, "pages/index.tsx", row.source)
+		test.Run(row.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NextScriptForGa, "pages/index.tsx", row.source)
 			if len(row.ids) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, row.ids...)
+			rule_testing.ExpectFindings(test, result, row.ids...)
 		})
 	}
 }

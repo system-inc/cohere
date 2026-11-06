@@ -10,5 +10,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 //
 // No Decode entry, because `meta.schema` is `[]` upstream and the rule reads no options at all.
 func init() {
-	rule.Register(rule.Registration{Rule: BanTslintComment})
+	rule.Register(rule.Registration[rule.NoOptions]{Rule: BanTslintComment})
 }

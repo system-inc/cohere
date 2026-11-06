@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/cohere/internal/lint/checking"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/sqltext"
 	"github.com/system-inc/cohere/policy"
 )
 
@@ -17,8 +18,14 @@ const securityNoInterpolatedSqlValueId = "interpolatedSqlValue"
 // The rule's two messages, whose wording lives in `policy/messages/security-no-interpolated-sql-string.json`,
 // the quoted one shared with the Swift twin.
 var (
-	securityNoInterpolatedSqlStringText = policy.MessageOf("nexus/security-no-interpolated-sql-string", securityNoInterpolatedSqlStringId)
-	securityNoInterpolatedSqlValueText  = policy.MessageOf("nexus/security-no-interpolated-sql-string", securityNoInterpolatedSqlValueId)
+	securityNoInterpolatedSqlStringText = policy.MessageOf(
+		"nexus/security-no-interpolated-sql-string",
+		securityNoInterpolatedSqlStringId,
+	)
+	securityNoInterpolatedSqlValueText = policy.MessageOf(
+		"nexus/security-no-interpolated-sql-string",
+		securityNoInterpolatedSqlValueId,
+	)
 )
 
 // SecurityNoInterpolatedSqlString reports a value interpolated inside the single quotes of a SQL string
@@ -101,7 +108,8 @@ var (
 //
 // Only comparisons, on purpose. After `(`, `,`, `AND`, `FROM` or `ORDER BY`, an unquoted interpolation
 // builds SQL from code (an `IN (${placeholders})` list, an `AND ${condition}` fragment, a table or a
-// column), and reading those would be false findings.
+// column), and reading those would be false findings. For the same reason an interpolation the next text continues
+// with `.` (`= ${table}.id`) is a table qualifying a column, not a value, and is not reported.
 //
 // Where it came from: `#3ng4vkk`. On ahra in 2026-10 it found 25 sites. 23 were GAQL ids typed `string`
 // from the command line across `modules/google/ads` (fixed in `#kx29bm3` by typing them as numbers),
@@ -150,7 +158,7 @@ var (
 // A query assembled with `+` from plain strings, a quote that opens in one template and closes in
 // another, and a value interpolated inside a double-quoted string (a string in MySQL, a name in
 // standard SQL) are all missed. So is SQL that starts with a lowercase keyword or with an
-// interpolation. LIKE wildcards (`%`, `_`) in a value are not a quote problem and are not reported.
+// interpolation. `LIKE` wildcards (`%`, `_`) in a value are not a quote problem and are not reported.
 //
 // # No fix
 //
@@ -158,13 +166,13 @@ var (
 // beside it, an edit across two expressions the rule cannot write safely. For a query language with
 // no parameters (GAQL, QuickBooks), the fix is a narrower type or the visible escape above, and which
 // one is right is the author's call.
-var SecurityNoInterpolatedSqlString = rule.Rule{
+var SecurityNoInterpolatedSqlString = rule.Rule[rule.NoOptions]{
 	Name:             "nexus/security-no-interpolated-sql-string",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.TypeChecker == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		if ruleContext.TypeChecker == nil {
 			// Which values can hold a quote is a question about types. Without a checker every
 			// number and literal union would be reported, so the rule declines the file.
 			return nil
@@ -188,20 +196,34 @@ var SecurityNoInterpolatedSqlString = rule.Rule{
 				}
 				for _, spanIndex := range quotedSpans {
 					expression := template.TemplateSpans.Nodes[spanIndex].AsTemplateSpan().Expression
-					if !securityNoInterpolatedSqlStringCanHoldQuote(ctx.TypeChecker, ctx.TypeChecker.GetTypeAtLocation(expression), 0) {
+					if !securityNoInterpolatedSqlStringCanHoldQuote(
+						ruleContext.TypeChecker,
+						ruleContext.TypeChecker.GetTypeAtLocation(expression),
+						0,
+					) {
 						continue
 					}
-					if securityNoInterpolatedSqlStringIsEscaped(ctx, expression) {
+					if securityNoInterpolatedSqlStringIsEscaped(ruleContext, expression) {
 						continue
 					}
-					ctx.ReportNode(expression, rule.Message{Id: securityNoInterpolatedSqlStringId, Description: securityNoInterpolatedSqlStringText.Render(nil)})
+					ruleContext.ReportNode(expression, rule.Message{
+						Id:          securityNoInterpolatedSqlStringId,
+						Description: securityNoInterpolatedSqlStringText.Render(nil),
+					})
 				}
 				for _, spanIndex := range bareSpans {
 					expression := template.TemplateSpans.Nodes[spanIndex].AsTemplateSpan().Expression
-					if !securityNoInterpolatedSqlStringCanHoldText(ctx.TypeChecker, ctx.TypeChecker.GetTypeAtLocation(expression), 0) {
+					if !securityNoInterpolatedSqlStringCanHoldText(
+						ruleContext.TypeChecker,
+						ruleContext.TypeChecker.GetTypeAtLocation(expression),
+						0,
+					) {
 						continue
 					}
-					ctx.ReportNode(expression, rule.Message{Id: securityNoInterpolatedSqlValueId, Description: securityNoInterpolatedSqlValueText.Render(nil)})
+					ruleContext.ReportNode(expression, rule.Message{
+						Id:          securityNoInterpolatedSqlValueId,
+						Description: securityNoInterpolatedSqlValueText.Render(nil),
+					})
 				}
 			},
 		}
@@ -221,28 +243,6 @@ var securityNoInterpolatedSqlStringLeadingKeywords = map[string]bool{
 // `DELETE`, `WITH` or `AND` could open a shouted English sentence.
 var securityNoInterpolatedSqlStringSelfConfirmingKeywords = map[string]bool{"WHERE": true, "HAVING": true}
 
-// securityNoInterpolatedSqlStringKeywords are the uppercase words that count as SQL when a statement
-// is confirmed by a second keyword outside its strings and comments.
-var securityNoInterpolatedSqlStringKeywords = map[string]bool{
-	"SELECT": true, "INSERT": true, "UPDATE": true, "DELETE": true, "REPLACE": true, "WITH": true,
-	"SHOW": true, "EXPLAIN": true, "PRAGMA": true, "WHERE": true, "AND": true, "OR": true, "SET": true,
-	"VALUES": true, "HAVING": true, "FROM": true, "INTO": true, "LIKE": true, "GLOB": true,
-	"BETWEEN": true, "JOIN": true, "ON": true, "IN": true, "IS": true, "NOT": true, "NULL": true,
-	"ORDER": true, "GROUP": true, "BY": true, "LIMIT": true, "OFFSET": true, "AS": true,
-	"DISTINCT": true, "COUNT": true, "TABLE": true, "STATUS": true, "CASE": true, "WHEN": true,
-	"THEN": true, "ELSE": true, "END": true, "UNION": true, "ESCAPE": true, "ASC": true, "DESC": true,
-}
-
-// securityNoInterpolatedSqlStringValueTokens are the tokens after which an opening quote begins a
-// value: comparisons, concatenation, an argument or list position, and the keywords that take a value.
-var securityNoInterpolatedSqlStringValueTokens = map[string]bool{
-	"=": true, "==": true, "<": true, ">": true, "<=": true, ">=": true, "<>": true, "!=": true,
-	"||": true, "+": true, "(": true, ",": true,
-	"LIKE": true, "GLOB": true, "REGEXP": true, "RLIKE": true, "BETWEEN": true, "AND": true,
-	"SELECT": true, "WHEN": true, "THEN": true, "ELSE": true, "ESCAPE": true, "DEFAULT": true,
-	"INTERVAL": true,
-}
-
 // securityNoInterpolatedSqlStringFragmentKeywords are the second keyword a `LIKE` fragment must carry.
 var securityNoInterpolatedSqlStringFragmentKeywords = map[string]bool{
 	"AND": true, "OR": true, "NOT": true, "WHERE": true, "SELECT": true, "FROM": true, "ESCAPE": true,
@@ -258,180 +258,25 @@ func securityNoInterpolatedSqlStringOpensWithStatement(head string) bool {
 // and `(`.
 func securityNoInterpolatedSqlStringLeadingWord(head string) string {
 	trimmed := strings.TrimLeft(head, " \t\r\n(")
-	return trimmed[:securityNoInterpolatedSqlStringWordLength(trimmed, 0)]
+	return trimmed[:sqltext.WordLength(trimmed, 0)]
 }
-
-// securityNoInterpolatedSqlStringIsWordCharacter is a character of a SQL name or keyword.
-func securityNoInterpolatedSqlStringIsWordCharacter(character byte) bool {
-	return character == '_' || (character >= 'a' && character <= 'z') || (character >= 'A' && character <= 'Z') ||
-		(character >= '0' && character <= '9')
-}
-
-// securityNoInterpolatedSqlStringWordLength is the length of the word starting at `start`.
-func securityNoInterpolatedSqlStringWordLength(text string, start int) int {
-	end := start
-	for end < len(text) && securityNoInterpolatedSqlStringIsWordCharacter(text[end]) {
-		end++
-	}
-	return end - start
-}
-
-func securityNoInterpolatedSqlStringIsWhitespace(character byte) bool {
-	return character == ' ' || character == '\t' || character == '\r' || character == '\n'
-}
-
-// securityNoInterpolatedSqlStringState is where a SQL reading stands between two characters.
-type securityNoInterpolatedSqlStringState int
-
-const (
-	securityNoInterpolatedSqlStringInCode securityNoInterpolatedSqlStringState = iota
-	securityNoInterpolatedSqlStringInString
-	securityNoInterpolatedSqlStringInDoubleQuotes
-	securityNoInterpolatedSqlStringInBackquotes
-	securityNoInterpolatedSqlStringInLineComment
-	securityNoInterpolatedSqlStringInBlockComment
-)
 
 // securityNoInterpolatedSqlStringReadStatement reads a template's texts as one SQL statement, with each
 // interpolation an opaque value between two texts, and returns the indexes of the interpolations that
-// sit inside a single-quoted string in a value position. It returns nothing when the text is not
-// confirmed as SQL or when its reading is uncertain anywhere (see the doc comment).
+// sit inside a single-quoted string in a value position, and of those bare after a comparison. The
+// reading is package sqltext's, shared with the Go engine's twin. It returns nothing when the reading is
+// uncertain anywhere (see the doc comment), or when the text is not confirmed as SQL: a second uppercase
+// keyword outside its strings and comments, or a leading `WHERE` or `HAVING`.
 func securityNoInterpolatedSqlStringReadStatement(texts []string) ([]int, []int) {
-	state := securityNoInterpolatedSqlStringInCode
-	previousToken := ""
-	keywordCount := 0
-	openedAtValue := false
-	var quotedSpans []int
-	var bareSpans []int
-	for textIndex, text := range texts {
-		for index := 0; index < len(text); {
-			character := text[index]
-			switch state {
-			case securityNoInterpolatedSqlStringInCode:
-				switch {
-				case securityNoInterpolatedSqlStringIsWhitespace(character):
-					index++
-				case character == '\'':
-					state = securityNoInterpolatedSqlStringInString
-					openedAtValue = securityNoInterpolatedSqlStringValueTokens[previousToken]
-					index++
-				case character == '"':
-					state = securityNoInterpolatedSqlStringInDoubleQuotes
-					index++
-				case character == '`':
-					state = securityNoInterpolatedSqlStringInBackquotes
-					index++
-				case character == '-' && index+1 < len(text) && text[index+1] == '-':
-					if index+2 >= len(text) || !securityNoInterpolatedSqlStringIsWhitespace(text[index+2]) {
-						return nil, nil
-					}
-					state = securityNoInterpolatedSqlStringInLineComment
-					index += 3
-				case character == '/' && index+1 < len(text) && text[index+1] == '*':
-					state = securityNoInterpolatedSqlStringInBlockComment
-					index += 2
-				case character == '#':
-					return nil, nil
-				case character == '$':
-					// `$1` and `$name` are placeholders; `$$` and `$tag$` open a dollar-quoted string.
-					length := securityNoInterpolatedSqlStringWordLength(text, index+1)
-					if index+1+length < len(text) && text[index+1+length] == '$' {
-						return nil, nil
-					}
-					previousToken = "$"
-					index += 1 + length
-				case securityNoInterpolatedSqlStringIsWordCharacter(character):
-					length := securityNoInterpolatedSqlStringWordLength(text, index)
-					word := text[index : index+length]
-					if securityNoInterpolatedSqlStringKeywords[word] {
-						keywordCount++
-					}
-					previousToken = strings.ToUpper(word)
-					index += length
-				case strings.IndexByte("=<>!|", character) >= 0:
-					end := index
-					for end < len(text) && strings.IndexByte("=<>!|", text[end]) >= 0 {
-						end++
-					}
-					previousToken = text[index:end]
-					index = end
-				default:
-					previousToken = string(character)
-					index++
-				}
-			case securityNoInterpolatedSqlStringInString:
-				switch character {
-				case '\\':
-					return nil, nil
-				case '\'':
-					if index+1 < len(text) && text[index+1] == '\'' {
-						index += 2
-						continue
-					}
-					state = securityNoInterpolatedSqlStringInCode
-					previousToken = "'"
-				}
-				index++
-			case securityNoInterpolatedSqlStringInDoubleQuotes, securityNoInterpolatedSqlStringInBackquotes:
-				closing := byte('"')
-				if state == securityNoInterpolatedSqlStringInBackquotes {
-					closing = '`'
-				}
-				switch character {
-				case '\\':
-					return nil, nil
-				case closing:
-					if index+1 < len(text) && text[index+1] == closing {
-						index += 2
-						continue
-					}
-					state = securityNoInterpolatedSqlStringInCode
-					previousToken = string(closing)
-				}
-				index++
-			case securityNoInterpolatedSqlStringInLineComment:
-				if character == '\n' {
-					state = securityNoInterpolatedSqlStringInCode
-				}
-				index++
-			case securityNoInterpolatedSqlStringInBlockComment:
-				if character == '*' && index+1 < len(text) && text[index+1] == '/' {
-					state = securityNoInterpolatedSqlStringInCode
-					index += 2
-					continue
-				}
-				index++
-			}
-		}
-		if textIndex == len(texts)-1 {
-			break
-		}
-		// The interpolation after this text.
-		switch state {
-		case securityNoInterpolatedSqlStringInString:
-			if openedAtValue {
-				quotedSpans = append(quotedSpans, textIndex)
-			}
-		case securityNoInterpolatedSqlStringInCode:
-			if securityNoInterpolatedSqlStringComparisons[previousToken] {
-				bareSpans = append(bareSpans, textIndex)
-			}
-			previousToken = "${}"
-		}
-	}
-	if state != securityNoInterpolatedSqlStringInCode && state != securityNoInterpolatedSqlStringInLineComment {
+	statement, certain := sqltext.ReadStatement(texts)
+	if !certain {
 		return nil, nil
 	}
-	if keywordCount < 2 && !securityNoInterpolatedSqlStringSelfConfirmingKeywords[securityNoInterpolatedSqlStringLeadingWord(texts[0])] {
+	if statement.KeywordCount < 2 &&
+		!securityNoInterpolatedSqlStringSelfConfirmingKeywords[securityNoInterpolatedSqlStringLeadingWord(texts[0])] {
 		return nil, nil
 	}
-	return quotedSpans, bareSpans
-}
-
-// securityNoInterpolatedSqlStringComparisons are the operators after which an unquoted interpolation is
-// a value compared, not a name or a fragment of SQL.
-var securityNoInterpolatedSqlStringComparisons = map[string]bool{
-	"=": true, "==": true, "<": true, ">": true, "<=": true, ">=": true, "<>": true, "!=": true,
+	return statement.QuotedSpans, statement.BareSpans
 }
 
 // securityNoInterpolatedSqlStringCanHoldText says whether a value of this type can print arbitrary text,
@@ -440,7 +285,7 @@ func securityNoInterpolatedSqlStringCanHoldText(typeChecker *checker.Checker, va
 	if valueType == nil || depth > 8 {
 		return false
 	}
-	for part := range type_checking.UnionTypePartsSeq(valueType) {
+	for part := range type_checking.UnionTypePartsSequence(valueType) {
 		flags := part.Flags()
 		switch {
 		case type_checking.IsIntrinsicErrorType(part):
@@ -462,7 +307,9 @@ func securityNoInterpolatedSqlStringCanHoldText(typeChecker *checker.Checker, va
 			}
 		case flags&checker.TypeFlagsInstantiable != 0:
 			constraint := checker.Checker_getBaseConstraintOfType(typeChecker, part)
-			if constraint == nil || constraint == part || securityNoInterpolatedSqlStringCanHoldText(typeChecker, constraint, depth+1) {
+			if constraint == nil ||
+				constraint == part ||
+				securityNoInterpolatedSqlStringCanHoldText(typeChecker, constraint, depth+1) {
 				return true
 			}
 		}
@@ -487,14 +334,14 @@ func securityNoInterpolatedSqlStringReadLikePatterns(texts []string) []int {
 				continue
 			}
 			if !strings.HasPrefix(text[index:], "LIKE") ||
-				(index > 0 && securityNoInterpolatedSqlStringIsWordCharacter(text[index-1])) {
+				(index > 0 && sqltext.IsWordCharacter(text[index-1])) {
 				continue
 			}
 			quote := index + len("LIKE")
-			if quote >= len(text) || !securityNoInterpolatedSqlStringIsWhitespace(text[quote]) {
+			if quote >= len(text) || !sqltext.IsWhitespace(text[quote]) {
 				continue
 			}
-			for quote < len(text) && securityNoInterpolatedSqlStringIsWhitespace(text[quote]) {
+			for quote < len(text) && sqltext.IsWhitespace(text[quote]) {
 				quote++
 			}
 			if quote >= len(text) || text[quote] != '\'' {
@@ -523,7 +370,7 @@ func securityNoInterpolatedSqlStringReadLikePatterns(texts []string) []int {
 func securityNoInterpolatedSqlStringHasFragmentKeyword(texts []string) bool {
 	for _, text := range texts {
 		for index := 0; index < len(text); {
-			length := securityNoInterpolatedSqlStringWordLength(text, index)
+			length := sqltext.WordLength(text, index)
 			if length == 0 {
 				index++
 				continue
@@ -541,10 +388,10 @@ func securityNoInterpolatedSqlStringHasFragmentKeyword(texts []string) bool {
 // opening quote, across interpolations, and returns the interpolations inside it with the text and
 // index of its closing quote. It returns a closing text of -1 when the string never closes or holds a
 // backslash.
-func securityNoInterpolatedSqlStringReadString(texts []string, textIndex int, start int) ([]int, int, int) {
+func securityNoInterpolatedSqlStringReadString(texts []string, startTextIndex int, start int) ([]int, int, int) {
 	var spans []int
 	index := start
-	for ; textIndex < len(texts); textIndex++ {
+	for textIndex := startTextIndex; textIndex < len(texts); textIndex++ {
 		text := texts[textIndex]
 		for ; index < len(text); index++ {
 			switch text[index] {
@@ -568,11 +415,15 @@ func securityNoInterpolatedSqlStringReadString(texts []string, textIndex int, st
 
 // securityNoInterpolatedSqlStringCanHoldQuote says whether a value of this type can print a single
 // quote or a backslash into the text around it. `depth` bounds the walk through template literal holes.
-func securityNoInterpolatedSqlStringCanHoldQuote(typeChecker *checker.Checker, valueType *checker.Type, depth int) bool {
+func securityNoInterpolatedSqlStringCanHoldQuote(
+	typeChecker *checker.Checker,
+	valueType *checker.Type,
+	depth int,
+) bool {
 	if valueType == nil || depth > 8 {
 		return false
 	}
-	for part := range type_checking.UnionTypePartsSeq(valueType) {
+	for part := range type_checking.UnionTypePartsSequence(valueType) {
 		if securityNoInterpolatedSqlStringPartCanHoldQuote(typeChecker, part, depth) {
 			return true
 		}
@@ -627,15 +478,15 @@ func securityNoInterpolatedSqlStringPartCanHoldQuote(typeChecker *checker.Checke
 
 // securityNoInterpolatedSqlStringIsEscaped says whether an interpolated expression, or the
 // initializer of the `const` it names, ends in the one escape the doc comment accepts.
-func securityNoInterpolatedSqlStringIsEscaped(ctx rule.Context, expression *ast.Node) bool {
-	expression = ast.SkipParentheses(expression)
-	if securityNoInterpolatedSqlStringIsEscapeChain(ctx, expression) {
+func securityNoInterpolatedSqlStringIsEscaped(ruleContext rule.Context, expression *ast.Node) bool {
+	unwrapped := ast.SkipParentheses(expression)
+	if securityNoInterpolatedSqlStringIsEscapeChain(ruleContext, unwrapped) {
 		return true
 	}
-	if expression.Kind != ast.KindIdentifier {
+	if unwrapped.Kind != ast.KindIdentifier {
 		return false
 	}
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(expression)
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(unwrapped)
 	if symbol == nil || symbol.ValueDeclaration == nil || symbol.ValueDeclaration.Kind != ast.KindVariableDeclaration {
 		return false
 	}
@@ -645,18 +496,19 @@ func securityNoInterpolatedSqlStringIsEscaped(ctx rule.Context, expression *ast.
 		return false
 	}
 	initializer := declaration.AsVariableDeclaration().Initializer
-	return initializer != nil && securityNoInterpolatedSqlStringIsEscapeChain(ctx, ast.SkipParentheses(initializer))
+	return initializer != nil &&
+		securityNoInterpolatedSqlStringIsEscapeChain(ruleContext, ast.SkipParentheses(initializer))
 }
 
 // securityNoInterpolatedSqlStringIsEscapeChain says whether an expression's last two calls are a
 // string `replace` or `replaceAll` doubling every backslash and one doubling every single quote, in
 // either order.
-func securityNoInterpolatedSqlStringIsEscapeChain(ctx rule.Context, expression *ast.Node) bool {
-	outer, outerReceiver := securityNoInterpolatedSqlStringReplaceStep(ctx, expression)
+func securityNoInterpolatedSqlStringIsEscapeChain(ruleContext rule.Context, expression *ast.Node) bool {
+	outer, outerReceiver := securityNoInterpolatedSqlStringReplaceStep(ruleContext, expression)
 	if outer == "" {
 		return false
 	}
-	inner, _ := securityNoInterpolatedSqlStringReplaceStep(ctx, ast.SkipParentheses(outerReceiver))
+	inner, _ := securityNoInterpolatedSqlStringReplaceStep(ruleContext, ast.SkipParentheses(outerReceiver))
 	return (outer == "'" && inner == "\\") || (outer == "\\" && inner == "'")
 }
 
@@ -664,7 +516,7 @@ func securityNoInterpolatedSqlStringIsEscapeChain(ctx rule.Context, expression *
 // `replaceAll` with the string `"'"`, whose replacement is two quotes, and their backslash twins
 // (`/\\/g` or `'\\'` to `'\\\\'`), on a string receiver. It returns which character the step doubles,
 // with the receiver, and an empty character for anything else.
-func securityNoInterpolatedSqlStringReplaceStep(ctx rule.Context, expression *ast.Node) (string, *ast.Node) {
+func securityNoInterpolatedSqlStringReplaceStep(ruleContext rule.Context, expression *ast.Node) (string, *ast.Node) {
 	if expression.Kind != ast.KindCallExpression {
 		return "", nil
 	}
@@ -678,7 +530,7 @@ func securityNoInterpolatedSqlStringReplaceStep(ctx rule.Context, expression *as
 	if method != "replace" && method != "replaceAll" {
 		return "", nil
 	}
-	receiverType := ctx.TypeChecker.GetTypeAtLocation(access.Expression)
+	receiverType := ruleContext.TypeChecker.GetTypeAtLocation(access.Expression)
 	if receiverType == nil || receiverType.Flags()&checker.TypeFlagsStringLike == 0 {
 		return "", nil
 	}

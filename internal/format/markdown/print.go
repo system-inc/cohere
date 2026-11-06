@@ -13,8 +13,9 @@ import (
 // src/language-markdown/print/mdast.js, for the markdown parser.
 
 type (
-	astPath = printing.AstPath[*Node]
-	options = printing.Options[*Node]
+	astPath   = printing.AstPath[*Node, *settings]
+	options   = printing.Options[*Node, *settings, printing.NoArguments]
+	printFunc = printing.PrintFunc[printing.NoArguments]
 )
 
 // settings are the Prettier options the markdown printer reads, carried on options.Settings.
@@ -29,7 +30,7 @@ type settings struct {
 	nodes *arena.Arena[Node]
 }
 
-func settingsOf(options *options) *settings { return options.Settings.(*settings) }
+func settingsOf(options *options) *settings { return options.Settings }
 
 func currentNode(path *astPath) *Node {
 	node, _ := path.Node()
@@ -58,11 +59,10 @@ func pathIndex(path *astPath) int {
 
 // siblingAt is path.siblings[index], nil when out of range or not in a list.
 func siblingAt(path *astPath, index int) *Node {
-	siblings, isList := path.Siblings().([]*Node)
-	if !isList || index < 0 || index >= len(siblings) {
+	if index < 0 || index >= len(path.Siblings()) {
 		return nil
 	}
-	return siblings[index]
+	return path.Siblings()[index]
 }
 
 var spaceAtEndPattern = func(text string) bool {
@@ -80,7 +80,7 @@ var spaceAtStartPattern = func(text string) bool {
 	return inClass(spaceSeparatorRanges, []rune(text)[0])
 }
 
-func prevOrNextWord(path *astPath) bool {
+func previousOrNextWord(path *astPath) bool {
 	previous, next := previousNode(path), nextNode(path)
 	return (previous != nil && previous.NodeType == "sentence" &&
 		len(previous.Children) > 0 && previous.Children[len(previous.Children)-1].NodeType == "word" &&
@@ -94,7 +94,7 @@ func prevOrNextWord(path *astPath) bool {
 }
 
 func hasFakeWhitespaceAfterNextToken(path *astPath) bool {
-	if path.Siblings() == nil {
+	if !path.IsInArray() {
 		return false
 	}
 	if _, present := path.Index(); !present {
@@ -116,7 +116,13 @@ func isNextTokenFakeSetextH2Line(path *astPath) bool {
 
 var syntaxLeadingPattern = regexp.MustCompile(`^>|^(?:[*+-]|#{1,6}|\d+[).])$`)
 
-func printMdast(path *astPath, options *options, print printing.PrintFunc, _ any) doc.Doc {
+var (
+	tabsAndNewlinesPattern = regexp.MustCompile(`[\t\n]+`)
+	htmlCommentPattern     = regexp.MustCompile(`(?s)^<!--.*-->$`)
+	javaScriptSpaceRuns    = regexp.MustCompile(`[` + javaScriptSpace + `]+`)
+)
+
+func printMdast(path *astPath, options *options, print printFunc, _ *printing.NoArguments) doc.Doc {
 	node := currentNode(path)
 	settings := settingsOf(options)
 
@@ -130,7 +136,10 @@ func printMdast(path *astPath, options *options, print printing.PrintFunc, _ any
 		// - parts.length is odd
 		// - odd (0-indexed) elements are line-like doc
 		parts := []doc.Doc{doc.Text("")}
-		textsNodes := splitText(options.OriginalText[node.Position.Start.Offset:node.Position.End.Offset], settings.nodes)
+		textsNodes := splitText(
+			options.OriginalText[node.Position.Start.Offset:node.Position.End.Offset],
+			settings.nodes,
+		)
 		for _, textNode := range textsNodes {
 			if textNode.NodeType == "word" {
 				parts[len(parts)-1] = doc.Concat{parts[len(parts)-1], doc.Text(textNode.Value)}
@@ -179,10 +188,10 @@ func printMdast(path *astPath, options *options, print printing.PrintFunc, _ any
 		if len(node.Children) > 0 && isAutolink(node.Children[0]) {
 			style = options.OriginalText[node.Position.Start.Offset : node.Position.Start.Offset+1]
 		} else {
-			hasPrevOrNextWord := prevOrNextWord(path) // `1*2*3` is considered emphasis but `1_2_3` is not
+			hasPrevOrNextWord := previousOrNextWord(path) // `1*2*3` is considered emphasis but `1_2_3` is not
 			// `1***2***3` is considered strong emphasis but `1**_2_**3` is not
 			inStrongAndHasPrevOrNextWord := printing.CallParent(path, func(path *astPath) bool {
-				return currentNode(path).NodeType == "strong" && prevOrNextWord(path)
+				return currentNode(path).NodeType == "strong" && previousOrNextWord(path)
 			}, 0)
 			if hasPrevOrNextWord || inStrongAndHasPrevOrNextWord ||
 				path.HasAncestor(func(node *Node) bool { return node.NodeType == "emphasis" }) {
@@ -209,13 +218,24 @@ func printMdast(path *astPath, options *options, print printing.PrintFunc, _ any
 		padding := ""
 		if strings.HasPrefix(code, "`") || strings.HasSuffix(code, "`") ||
 			(len(code) > 0 && strings.ContainsAny(code[:1], "\n ") && strings.ContainsAny(code[len(code)-1:], "\n ") &&
-				strings.ContainsFunc(code, func(character rune) bool { return character != '\n' && character != ' ' })) {
+				strings.ContainsFunc(
+					code,
+					func(character rune) bool { return character != '\n' && character != ' ' },
+				)) {
 			padding = " "
 		}
-		return doc.Concat{doc.Text(backtickString), doc.Text(padding), doc.Text(code), doc.Text(padding), doc.Text(backtickString)}
+		return doc.Concat{
+			doc.Text(backtickString),
+			doc.Text(padding),
+			doc.Text(code),
+			doc.Text(padding),
+			doc.Text(backtickString),
+		}
 	case "wikiLink":
 		if node.ValueNull {
 			// Upstream prints a null value into the doc, which the doc printer rejects.
+			// Invariant: the wiki link syntax refuses a link without target data, and the target's exit in
+			// wikiLinkFromMarkdown sets the value, so a parsed wiki link always has one.
 			panic("markdown: a wiki link with no target")
 		}
 		contents := node.Value
@@ -228,18 +248,18 @@ func printMdast(path *astPath, options *options, print printing.PrintFunc, _ any
 		switch options.OriginalText[node.Position.Start.Offset] {
 		case '<':
 			mailto := "mailto:"
-			link := node.URL
+			link := node.Url
 			// <hello@example.com> is parsed as { url: "mailto:hello@example.com" }
 			start := node.Position.Start.Offset + 1
 			end := min(start+len(mailto), len(options.OriginalText))
-			if strings.HasPrefix(node.URL, mailto) && options.OriginalText[start:end] != mailto {
-				link = node.URL[len(mailto):]
+			if strings.HasPrefix(node.Url, mailto) && options.OriginalText[start:end] != mailto {
+				link = node.Url[len(mailto):]
 			}
 			return doc.Concat{doc.Text("<"), doc.Text(link), doc.Text(">")}
 		case '[':
 			destination := doc.Text("<>")
-			if node.URL != "" {
-				destination = doc.Text(printURL(node.URL, ")"))
+			if node.Url != "" {
+				destination = doc.Text(printUrl(node.Url, ")"))
 			}
 			return doc.Concat{
 				doc.Text("["),
@@ -254,8 +274,8 @@ func printMdast(path *astPath, options *options, print printing.PrintFunc, _ any
 		}
 	case "image":
 		destination := "<>"
-		if node.URL != "" {
-			destination = printURL(node.URL, ")")
+		if node.Url != "" {
+			destination = printUrl(node.Url, ")")
 		}
 		return doc.Concat{
 			doc.Text("!["),
@@ -273,7 +293,10 @@ func printMdast(path *astPath, options *options, print printing.PrintFunc, _ any
 		if node.IsIndented {
 			// indented code block
 			alignment := strings.Repeat(" ", 4)
-			return doc.AlignWithString(alignment, doc.Concat{doc.Text(alignment), replaceEndOfLine(node.Value, doc.Hardline)})
+			return doc.AlignWithString(
+				alignment,
+				doc.Concat{doc.Text(alignment), replaceEndOfLine(node.Value, doc.Hardline)},
+			)
 		}
 
 		// fenced code block
@@ -350,8 +373,8 @@ func printMdast(path *astPath, options *options, print printing.PrintFunc, _ any
 			lineOrSpace = doc.LineDoc
 		}
 		destination := doc.Text("<>")
-		if node.URL != "" {
-			destination = doc.Text(printURL(node.URL, ""))
+		if node.Url != "" {
+			destination = doc.Text(printUrl(node.Url, ""))
 		}
 		var title doc.Doc = doc.Text("")
 		if node.Title != nil {
@@ -371,7 +394,11 @@ func printMdast(path *astPath, options *options, print printing.PrintFunc, _ any
 				(settings.proseWrap == "preserve" &&
 					node.Children[0].Position.Start.Line == node.Children[0].Position.End.Line))
 		if shouldInlineFootnote {
-			return doc.Concat{doc.Text(printFootnoteReference(node)), doc.Text(": "), printChildren(path, options, print, nil)}
+			return doc.Concat{
+				doc.Text(printFootnoteReference(node)),
+				doc.Text(": "),
+				printChildren(path, options, print, nil),
+			}
 		}
 		return doc.Concat{
 			doc.Text(printFootnoteReference(node)),
@@ -380,9 +407,9 @@ func printMdast(path *astPath, options *options, print printing.PrintFunc, _ any
 				// align(" ".repeat(4), ...): a string, not a width.
 				doc.AlignWithString("    ", printChildren(path, options, print, func(path *astPath) (doc.Doc, bool) {
 					if path.IsFirst() {
-						return doc.NewGroup(doc.Concat{doc.Softline, print(nil, nil)}, doc.GroupOptions{}), true
+						return doc.NewGroup(doc.Concat{doc.Softline, print("", nil)}, doc.GroupOptions{}), true
 					}
-					return print(nil, nil), true
+					return print("", nil), true
 				})),
 			}, doc.GroupOptions{}),
 		}
@@ -415,15 +442,11 @@ func printMdast(path *astPath, options *options, print printing.PrintFunc, _ any
 		return replaceEndOfLine(node.Value, doc.Hardline)
 	default:
 		// tableRow is handled in "table" and listItem in "list".
+		// Invariant: mdast builds only the node types above, a fragment never outlives the resume that
+		// pops it, and table and list print their rows and items themselves.
 		panic("markdown: unexpected node type " + node.NodeType)
 	}
 }
-
-var (
-	tabsAndNewlinesPattern = regexp.MustCompile(`[\t\n]+`)
-	htmlCommentPattern     = regexp.MustCompile(`(?s)^<!--.*-->$`)
-	javaScriptSpaceRuns    = regexp.MustCompile(`[` + javaScriptSpace + `]+`)
-)
 
 func isJavaScriptSpace(character rune) bool {
 	return character >= 0 && strings.ContainsRune(javaScriptSpaceText, character)
@@ -452,7 +475,7 @@ func replaceEndOfLine(text string, replacement doc.Doc) doc.Doc {
 	return doc.Join(replacement, parts)
 }
 
-func printRoot(path *astPath, options *options, print printing.PrintFunc) doc.Doc {
+func printRoot(path *astPath, options *options, print printFunc) doc.Doc {
 	type ignorePosition struct{ index, offset int }
 	type ignoreRange struct{ start, end ignorePosition }
 	var ignoreRanges []ignoreRange
@@ -500,7 +523,7 @@ func printRoot(path *astPath, options *options, print printing.PrintFunc) doc.Do
 			}
 		}
 
-		return print(nil, nil), true
+		return print("", nil), true
 	})
 }
 
@@ -513,19 +536,20 @@ func shouldRemainTheSameContent(path *astPath) bool {
 	return found && (node.NodeType != "linkReference" || node.ReferenceType != "full")
 }
 
-// encodeURL is encodeUrl: each character replaced by its encodeURIComponent.
-func encodeURL(link string, characters string) string {
+// encodeUrl is encodeUrl: each character replaced by its encodeURIComponent.
+func encodeUrl(link string, characters string) string {
+	encoded := link
 	for _, character := range characters {
-		link = strings.ReplaceAll(link, string(character), url.PathEscape(string(character)))
+		encoded = strings.ReplaceAll(encoded, string(character), url.PathEscape(string(character)))
 	}
-	return link
+	return encoded
 }
 
-// printURL is printUrl: wrap the url in `<>` when it holds a space or the dangerous character.
-func printURL(link string, dangerousCharacter string) string {
+// printUrl is printUrl: wrap the url in `<>` when it holds a space or the dangerous character.
+func printUrl(link string, dangerousCharacter string) string {
 	dangerous := strings.Contains(link, " ") || (dangerousCharacter != "" && strings.Contains(link, dangerousCharacter))
 	if dangerous {
-		return "<" + encodeURL(link, "<>") + ">"
+		return "<" + encodeUrl(link, "<>") + ">"
 	}
 	return link
 }

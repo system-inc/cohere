@@ -128,7 +128,8 @@ var attentionFixtures = []string{
 	"**foo **bar baz**\n",
 	"*foo *bar baz*\n",
 
-	// start and inside: a lone sequence (a `*` or `* ` opening a line would be a list), end of input in the sequence, every length up to past use.
+	// start and inside: a lone sequence (a `*` or `* ` opening a line would be a list), end of input in the sequence,
+	// every length up to past use.
 	"a *",
 	"_",
 	"**",
@@ -194,7 +195,8 @@ var attentionFixtures = []string{
 	"«*a*»",
 	"“_a_”",
 	"a_«b»_c",
-	"—*a*—",
+	// The em-dash is the punctuation under test, so it is data, spelled as its escape.
+	"\u2014*a*\u2014",
 	"*¿a?*",
 	"*£*bravo.\n\n*€*charlie.\n",
 	"_£_a",
@@ -226,7 +228,7 @@ var attentionFixtures = []string{
 	"a\n\n_b_\n\nc",
 }
 
-func TestAttentionEvents(t *testing.T) {
-	t.Parallel()
-	compareEvents(t, attentionFixtures)
+func TestAttentionEvents(test *testing.T) {
+	test.Parallel()
+	compareEvents(test, attentionFixtures)
 }

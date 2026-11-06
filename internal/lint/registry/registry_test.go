@@ -24,15 +24,15 @@ import (
 // a mention proved a name appeared in a file, while a registration proves the rule is loaded into
 // the process that will run it. It also catches the failure mode self-registration introduces,
 // where a rule package nothing imports contributes nothing and does not fail to compile.
-func TestEveryRuleIsRegistered(t *testing.T) {
-	t.Parallel()
-	declared := declaredRules(t)
+func TestEveryRuleIsRegistered(test *testing.T) {
+	test.Parallel()
+	declared := declaredRules(test)
 	registered := registeredRuleNames()
 
 	if len(declared) == 0 {
 		// A test that finds nothing to check passes for the wrong reason, which is the same shape
 		// as the defect it guards against.
-		t.Fatal("found no rule declarations to check, so this test proved nothing")
+		test.Fatal("found no rule declarations to check, so this test proved nothing")
 	}
 
 	live := make(map[string]bool, len(registered))
@@ -42,13 +42,13 @@ func TestEveryRuleIsRegistered(t *testing.T) {
 
 	for _, declaration := range declared {
 		if !live[declaration.ruleName] {
-			t.Errorf("rule %s declares the name %q and nothing registered it, so it would never run",
+			test.Errorf("rule %s declares the name %q and nothing registered it, so it would never run",
 				declaration.identifier, declaration.ruleName)
 		}
 	}
 }
 
-// ruleDeclaration is one `var Name = rule.Rule{...}` found on disk.
+// ruleDeclaration is one `var Name = rule.Rule[Options]{...}` found on disk.
 //
 // Both halves are needed. The identifier is what a reader greps for when the test fails, and the
 // declared Name is the only thing the catalog can be checked against, since registration keys on
@@ -58,17 +58,17 @@ type ruleDeclaration struct {
 	ruleName   string
 }
 
-// declaredRules parses the rules packages for `var Name = rule.Rule{...}` declarations.
+// declaredRules parses the rules packages for `var Name = rule.Rule[Options]{...}` declarations.
 //
 // Parsing rather than reflecting: a rule that never registers is also absent from anything the
 // catalog could reflect over, so reflection would see exactly the rules that are already fine.
-func declaredRules(t *testing.T) []ruleDeclaration {
-	t.Helper()
+func declaredRules(test *testing.T) []ruleDeclaration {
+	test.Helper()
 
 	var declarations []ruleDeclaration
-	matches, err := filepath.Glob("../rules/*/*.go")
-	if err != nil {
-		t.Fatalf("globbing rule files: %v", err)
+	matches, globError := filepath.Glob("../rules/*/*.go")
+	if globError != nil {
+		test.Fatalf("globbing rule files: %v", globError)
 	}
 
 	for _, path := range matches {
@@ -77,9 +77,9 @@ func declaredRules(t *testing.T) []ruleDeclaration {
 		}
 
 		fileSet := token.NewFileSet()
-		parsed, parseErr := parser.ParseFile(fileSet, path, nil, 0)
-		if parseErr != nil {
-			t.Fatalf("parsing %s: %v", path, parseErr)
+		parsed, parseError := parser.ParseFile(fileSet, path, nil, 0)
+		if parseError != nil {
+			test.Fatalf("parsing %s: %v", path, parseError)
 		}
 
 		for _, declaration := range parsed.Decls {
@@ -103,7 +103,7 @@ func declaredRules(t *testing.T) []ruleDeclaration {
 				if !named {
 					// A rule literal with no Name field cannot be addressed by the config at all,
 					// which is a different defect and one the compiler will not catch either.
-					t.Errorf("rule %s.%s declares no Name, so no configuration could address it",
+					test.Errorf("rule %s.%s declares no Name, so no configuration could address it",
 						parsed.Name.Name, name)
 					continue
 				}
@@ -117,7 +117,7 @@ func declaredRules(t *testing.T) []ruleDeclaration {
 	return declarations
 }
 
-// ruleNameIn reads the Name field out of a `rule.Rule{...}` literal.
+// ruleNameIn reads the Name field out of a `rule.Rule[Options]{...}` literal.
 func ruleNameIn(expression ast.Expr) (string, bool) {
 	composite, isComposite := expression.(*ast.CompositeLit)
 	if !isComposite {
@@ -141,13 +141,18 @@ func ruleNameIn(expression ast.Expr) (string, bool) {
 	return "", false
 }
 
-// isRuleLiteral reports whether an expression is a `rule.Rule{...}` composite literal.
+// isRuleLiteral reports whether an expression is a `rule.Rule[Options]{...}` composite literal.
 func isRuleLiteral(expression ast.Expr) bool {
 	composite, isComposite := expression.(*ast.CompositeLit)
 	if !isComposite {
 		return false
 	}
-	selector, isSelector := composite.Type.(*ast.SelectorExpr)
+	// A Rule is generic over its options, so its literal's type is `rule.Rule` indexed by them.
+	indexed, isIndexed := composite.Type.(*ast.IndexExpr)
+	if !isIndexed {
+		return false
+	}
+	selector, isSelector := indexed.X.(*ast.SelectorExpr)
 	if !isSelector {
 		return false
 	}
@@ -156,12 +161,12 @@ func isRuleLiteral(expression ast.Expr) bool {
 }
 
 // The registry must not contain duplicates: a rule listed twice reports every finding twice.
-func TestNoDuplicateRules(t *testing.T) {
-	t.Parallel()
+func TestNoDuplicateRules(test *testing.T) {
+	test.Parallel()
 	seen := make(map[string]bool)
 	for _, subject := range All() {
 		if seen[subject.Name] {
-			t.Errorf("rule %q appears in the registry more than once", subject.Name)
+			test.Errorf("rule %q appears in the registry more than once", subject.Name)
 		}
 		seen[subject.Name] = true
 	}
@@ -169,9 +174,9 @@ func TestNoDuplicateRules(t *testing.T) {
 
 // Count must reflect what All actually returns, since the coverage line reports it and a coverage
 // line that overstates what ran is the failure this tool exists to prevent.
-func TestCountMatchesAll(t *testing.T) {
-	t.Parallel()
+func TestCountMatchesAll(test *testing.T) {
+	test.Parallel()
 	if Count() != len(All()) {
-		t.Errorf("Count() = %d but All() returned %d rules", Count(), len(All()))
+		test.Errorf("Count() = %d but All() returned %d rules", Count(), len(All()))
 	}
 }

@@ -15,7 +15,14 @@ func init() {
 		return yaml.Format(fileName, text, options, TextToDoc(options, "yaml", nil))
 	}
 	// The doc entry is raw: TextToDoc strips its trailing hardline, into the embedding format's slab.
-	printDoc := func(_ string, text string, options formatoptions.Options, _ string, _ string, textToDoc printing.TextToDoc) (doc.Doc, error) {
+	printDoc := func(
+		_ string,
+		text string,
+		options formatoptions.Options,
+		_ string,
+		_ string,
+		textToDoc printing.TextToDoc,
+	) (doc.Doc, error) {
 		return yaml.FormatDoc(text, options, textToDoc)
 	}
 	for _, extension := range []string{".yaml", ".yml"} {

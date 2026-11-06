@@ -37,7 +37,7 @@ var graphQlOperationDecorators = map[string]struct{}{
 //
 // # What this rule deliberately does not check, because a sibling already does
 //
-// Whether the parameter's BASE type is an operation context at all is `inject-type-matches-parameter`'s
+// Whether the parameter's base type is an operation context at all is `inject-type-matches-parameter`'s
 // question, answered through the decorator's branded resolved type. This rule reports a wrong base
 // type anyway, under its own message, because it has already resolved the type and the alternative
 // is silence on the shape that most needs saying something. The original's header comment states
@@ -63,7 +63,7 @@ var graphQlOperationDecorators = map[string]struct{}{
 // The original ships none and neither does this. The two ways to satisfy the rule are to change the
 // generic or to change the return type, and which one is right depends on what the resolver is
 // meant to do, which is not recoverable from the source.
-var GraphQlOperationContextMatchesReturn = rule.Rule{
+var GraphQlOperationContextMatchesReturn = rule.Rule[rule.NoOptions]{
 	Name: "base/correctness-require-matching-operation-context",
 
 	// Both halves are type questions: what the parameter's generic resolves to, and what the
@@ -71,10 +71,10 @@ var GraphQlOperationContextMatchesReturn = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindDecorator: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 				if decorators.CallName(node) != "InjectGraphQlOperationContext" {
@@ -88,13 +88,13 @@ var GraphQlOperationContextMatchesReturn = rule.Rule{
 				// KindParameter for each. That is fidelity to what the rule decides rather than to
 				// how the original obtained it.
 				//
-				// The KIND GUARD is the one part of that helper that survives, and it is
+				// The kind guard is the one part of that helper that survives, and it is
 				// load-bearing rather than defensive. A decorator can sit on a class, a method, a
 				// property or an accessor, and all four reach this listener with a non-parameter
 				// parent, measured. Most are then declined by the enclosing-method walk below,
 				// because a class member has no enclosing method, which is why the obvious
 				// placements cannot prove the guard. The shape that can is a decorator on a member
-				// of a LOCAL CLASS declared inside an operation method: the walk finds the outer
+				// of a local class declared inside an operation method: the walk finds the outer
 				// method, and without this guard the rule reports a bogus mismatch on its property
 				// and a bogus wrongBaseType on its method. Both are silent upstream, where
 				// `resolveDecoratedParameterNode` answers null for a non-parameter owner, and both
@@ -112,31 +112,31 @@ var GraphQlOperationContextMatchesReturn = rule.Rule{
 					return
 				}
 
-				parameterType := ctx.TypeChecker.GetTypeAtLocation(parameterNode)
+				parameterType := ruleContext.TypeChecker.GetTypeAtLocation(parameterNode)
 				if parameterType == nil {
 					return
 				}
 
-				// The base type has to BE an operation context. Reported rather than skipped, for
+				// The base type has to be an operation context. Reported rather than skipped, for
 				// the reason in the doc comment.
 				symbol := checker.Type_symbol(parameterType)
 				if symbol == nil || symbol.Name != "GraphQlOperationContext" {
-					ctx.ReportNode(parameterNode, buildWrongBaseTypeMessage(
-						ctx.TypeChecker.TypeToString(parameterType)))
+					ruleContext.ReportNode(parameterNode, buildWrongBaseTypeMessage(
+						ruleContext.TypeChecker.TypeToString(parameterType)))
 					return
 				}
 
-				typeArguments := checker.Checker_getTypeArguments(ctx.TypeChecker, parameterType)
+				typeArguments := checker.Checker_getTypeArguments(ruleContext.TypeChecker, parameterType)
 				if len(typeArguments) == 0 {
 					return
 				}
-				parameterGenericType := unwrapToElementType(ctx, typeArguments[0])
+				parameterGenericType := unwrapToElementType(ruleContext, typeArguments[0])
 
-				returnType := methodReturnTypeOf(ctx, methodDeclaration)
+				returnType := methodReturnTypeOf(ruleContext, methodDeclaration)
 				if returnType == nil {
 					return
 				}
-				returnType = unwrapToElementType(ctx, returnType)
+				returnType = unwrapToElementType(ruleContext, returnType)
 
 				if parameterGenericType == nil || returnType == nil {
 					return
@@ -144,14 +144,14 @@ var GraphQlOperationContextMatchesReturn = rule.Rule{
 
 				// Bidirectional assignability. Each direction alone admits a subtype, which is the
 				// case this rule exists to catch.
-				if checker.Checker_isTypeAssignableTo(ctx.TypeChecker, parameterGenericType, returnType) &&
-					checker.Checker_isTypeAssignableTo(ctx.TypeChecker, returnType, parameterGenericType) {
+				if checker.Checker_isTypeAssignableTo(ruleContext.TypeChecker, parameterGenericType, returnType) &&
+					checker.Checker_isTypeAssignableTo(ruleContext.TypeChecker, returnType, parameterGenericType) {
 					return
 				}
 
-				ctx.ReportNode(parameterNode, buildMismatchMessage(
-					ctx.TypeChecker.TypeToString(parameterGenericType),
-					ctx.TypeChecker.TypeToString(returnType)))
+				ruleContext.ReportNode(parameterNode, buildMismatchMessage(
+					ruleContext.TypeChecker.TypeToString(parameterGenericType),
+					ruleContext.TypeChecker.TypeToString(returnType)))
 			},
 		}
 	},
@@ -161,7 +161,7 @@ var GraphQlOperationContextMatchesReturn = rule.Rule{
 //
 // Nil when the parameter belongs to a plain function, an arrow, or a constructor.
 //
-// The loop is EQUIVALENT to a single step today and is written as a loop anyway. Probed: a decorated
+// The loop is equivalent to a single step today and is written as a loop anyway. Probed: a decorated
 // parameter's parent is always the method or constructor directly, with nothing between them, so a
 // mutant stopping after one iteration survives every fixture. It is kept because the original is a
 // loop and because a future parser change that introduced an intermediate node would silently
@@ -169,8 +169,8 @@ var GraphQlOperationContextMatchesReturn = rule.Rule{
 //
 // The constructor case is a real narrowing against the original and it costs nothing, which was
 // measured rather than argued. estree calls a constructor a MethodDefinition, so the original's walk
-// reaches it while this one does not. But a GraphQL operation decorator on a constructor is a PARSE
-// ERROR, so the scope gate would decline it anyway: driving the real rule over a seeded constructor
+// reaches it while this one does not. But a GraphQL operation decorator on a constructor is a parse
+// error, so the scope gate would decline it anyway: driving the real rule over a seeded constructor
 // carrying one reports `Decorators are not valid here` and nothing else, and over a legal
 // constructor parameter with no operation decorator it reports nothing. The two versions reach the
 // same set through different routes.
@@ -187,17 +187,25 @@ func enclosingMethodOf(node *ast.Node) *ast.Node {
 //
 // Through the signature rather than off the annotation, because an unannotated method still has a
 // return type the checker inferred and the original reads it the same way.
-func methodReturnTypeOf(ctx rule.Context, methodDeclaration *ast.Node) *checker.Type {
-	methodType := ctx.TypeChecker.GetTypeAtLocation(methodDeclaration)
+func methodReturnTypeOf(ruleContext rule.Context, methodDeclaration *ast.Node) *checker.Type {
+	methodType := ruleContext.TypeChecker.GetTypeAtLocation(methodDeclaration)
 	if methodType == nil {
 		return nil
 	}
-	signatures := checker.Checker_getSignaturesOfType(ctx.TypeChecker, methodType, checker.SignatureKindCall)
+	signatures := checker.Checker_getSignaturesOfType(ruleContext.TypeChecker, methodType, checker.SignatureKindCall)
 	if len(signatures) == 0 {
 		return nil
 	}
-	return checker.Checker_getReturnTypeOfSignature(ctx.TypeChecker, signatures[0])
+	return checker.Checker_getReturnTypeOfSignature(ruleContext.TypeChecker, signatures[0])
 }
+
+// unwrapDepthLimit bounds the unwrap loop.
+//
+// The original recurses without one and relies on types being finite, which they are for every
+// shape this rule sees. The bound is here because a rule that loops forever takes the whole run
+// down rather than reporting badly, and a type deeper than this is not a selection set anybody
+// wrote by hand.
+const unwrapDepthLimit = 64
 
 // unwrapToElementType strips the wrappers that do not change a value's selection-set element type.
 //
@@ -210,76 +218,81 @@ func methodReturnTypeOf(ctx rule.Context, methodDeclaration *ast.Node) *checker.
 // unchanged. The set is the original's exactly; widening it would make two genuinely different
 // selection sets compare equal.
 //
-// The union arm requires exactly ONE non-nullish member rather than taking the first: a real union
+// The union arm requires exactly one non-nullish member rather than taking the first: a real union
 // of two object types is a different selection set from either, and collapsing it would compare the
 // wrong thing.
-func unwrapToElementType(ctx rule.Context, subject *checker.Type) *checker.Type {
-	for depth := 0; subject != nil && depth < unwrapDepthLimit; depth++ {
-		symbol := checker.Type_symbol(subject)
+func unwrapToElementType(ruleContext rule.Context, subject *checker.Type) *checker.Type {
+	element := subject
+	for depth := 0; element != nil && depth < unwrapDepthLimit; depth++ {
+		symbol := checker.Type_symbol(element)
 
 		if symbol != nil && symbol.Name == "Promise" {
-			if typeArguments := checker.Checker_getTypeArguments(ctx.TypeChecker, subject); len(typeArguments) > 0 {
-				subject = typeArguments[0]
+			if typeArguments := checker.Checker_getTypeArguments(
+				ruleContext.TypeChecker,
+				element,
+			); len(typeArguments) > 0 {
+				element = typeArguments[0]
 				continue
 			}
 		}
 
-		// EQUIVALENT for this rule, and kept for fidelity. Measured twice over: the arm is
+		// Equivalent for this rule, and kept for fidelity. Measured twice over: the arm is
 		// reachable and does unwrap `Readonly<T>` to `T`, and a mutant deleting it still changes no
-		// verdict, because `Readonly<T>` and `T` are MUTUALLY ASSIGNABLE while not being identical.
+		// verdict, because `Readonly<T>` and `T` are mutually assignable while not being identical.
 		// The bidirectional comparison below therefore accepts the pair whether or not the wrapper
 		// was stripped, so no input can distinguish the two versions.
 		//
 		// Worth stating precisely, because the obvious fixture does not reach here at all: the
 		// checker resolves `Readonly<T[]>` to `ReadonlyArray<T>`, symbol `ReadonlyArray` and no
 		// alias, so the array arm handles it. Only `Readonly<T>` over a non-array keeps the alias.
-		if aliasSymbol := checker.Type_alias(subject); aliasSymbol != nil {
+		if aliasSymbol := checker.Type_alias(element); aliasSymbol != nil {
 			if aliasSymbol.Symbol() != nil && aliasSymbol.Symbol().Name == "Readonly" {
 				if aliasArguments := aliasSymbol.TypeArguments(); len(aliasArguments) > 0 {
-					subject = aliasArguments[0]
+					element = aliasArguments[0]
 					continue
 				}
 			}
 		}
 
-		if subject.IsUnion() {
+		if element.IsUnion() {
 			var nonNullish []*checker.Type
-			for _, member := range subject.AsUnionType().Types() {
+			for _, member := range element.AsUnionType().Types() {
 				if !type_checking.IsTypeFlagSet(member,
 					checker.TypeFlagsNull|checker.TypeFlagsUndefined) {
 					nonNullish = append(nonNullish, member)
 				}
 			}
 			if len(nonNullish) == 1 {
-				subject = nonNullish[0]
+				element = nonNullish[0]
 				continue
 			}
 		}
 
 		if symbol != nil && (symbol.Name == "Array" || symbol.Name == "ReadonlyArray") {
-			if typeArguments := checker.Checker_getTypeArguments(ctx.TypeChecker, subject); len(typeArguments) > 0 {
-				subject = typeArguments[0]
+			if typeArguments := checker.Checker_getTypeArguments(
+				ruleContext.TypeChecker,
+				element,
+			); len(typeArguments) > 0 {
+				element = typeArguments[0]
 				continue
 			}
 		}
 
-		return subject
+		return element
 	}
-	return subject
+	return element
 }
-
-// unwrapDepthLimit bounds the unwrap loop.
-//
-// The original recurses without one and relies on types being finite, which they are for every
-// shape this rule sees. The bound is here because a rule that loops forever takes the whole run
-// down rather than reporting badly, and a type deeper than this is not a selection set anybody
-// wrote by hand.
-const unwrapDepthLimit = 64
 
 // The rule's messages, whose wording lives in `policy/messages/correctness-require-matching-operation-context.json`.
 var (
-	graphQlOperationContextMatchesReturnMismatchText      = policy.MessageOf("base/correctness-require-matching-operation-context", "mismatch")
-	graphQlOperationContextMatchesReturnWrongBaseTypeText = policy.MessageOf("base/correctness-require-matching-operation-context", "wrongBaseType")
+	graphQlOperationContextMatchesReturnMismatchText = policy.MessageOf(
+		"base/correctness-require-matching-operation-context",
+		"mismatch",
+	)
+	graphQlOperationContextMatchesReturnWrongBaseTypeText = policy.MessageOf(
+		"base/correctness-require-matching-operation-context",
+		"wrongBaseType",
+	)
 )
 
 func buildMismatchMessage(parameterGeneric string, returnType string) rule.Message {
@@ -294,7 +307,9 @@ func buildMismatchMessage(parameterGeneric string, returnType string) rule.Messa
 
 func buildWrongBaseTypeMessage(parameterType string) rule.Message {
 	return rule.Message{
-		Id:          graphQlOperationContextMatchesReturnWrongBaseTypeText.Id,
-		Description: graphQlOperationContextMatchesReturnWrongBaseTypeText.Render(map[string]string{"parameterType": parameterType}),
+		Id: graphQlOperationContextMatchesReturnWrongBaseTypeText.Id,
+		Description: graphQlOperationContextMatchesReturnWrongBaseTypeText.Render(
+			map[string]string{"parameterType": parameterType},
+		),
 	}
 }

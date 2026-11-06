@@ -4,9 +4,6 @@ import (
 	"io"
 	"os"
 	"sync"
-
-	"github.com/microsoft/TypeScript/tsc/shim/tspath"
-	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 )
 
 // readIdentities is the stat each file's bytes were read under, for a program built without a content pack,
@@ -17,32 +14,14 @@ type readIdentities struct {
 	byPath map[string]fileIdentity
 }
 
-// identityFS stats each file before reading it, as the content pack does, so the identity it records can only
-// be older than the bytes read after it, and records it when both succeed. Everything else passes through.
-type identityFS struct {
-	vfs.FS
-	identities *readIdentities
-}
-
-func (f *identityFS) ReadFile(path tspath.RootedFilePath) (string, bool) {
-	identity, statted := statIdentity(path.AsString())
-	contents, ok := f.FS.ReadFile(path)
-	if statted && ok {
-		f.identities.mutex.Lock()
-		f.identities.byPath[path.AsString()] = identity
-		f.identities.mutex.Unlock()
-	}
-	return contents, ok
-}
-
 // identity is the stat path was read under, when one was recorded.
-func (r *readIdentities) identity(path string) (fileIdentity, bool) {
-	if r == nil {
+func (identities *readIdentities) identity(path string) (fileIdentity, bool) {
+	if identities == nil {
 		return fileIdentity{}, false
 	}
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-	identity, known := r.byPath[path]
+	identities.mutex.Lock()
+	defer identities.mutex.Unlock()
+	identity, known := identities.byPath[path]
 	return identity, known
 }
 
@@ -53,14 +32,15 @@ func (r *readIdentities) identity(path string) (fileIdentity, bool) {
  * counts as marked, so the caller reads the disk.
  */
 func startsWithByteOrderMark(path string) bool {
-	file, err := os.Open(path)
-	if err != nil {
+	file, openError := os.Open(path)
+	if openError != nil {
 		return true
 	}
+	// Ignored: the file is opened read-only, so closing it loses nothing.
 	defer file.Close()
 	var head [3]byte
-	count, err := io.ReadFull(file, head[:])
-	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
+	count, readError := io.ReadFull(file, head[:])
+	if readError != nil && readError != io.EOF && readError != io.ErrUnexpectedEOF {
 		return true
 	}
 	switch {

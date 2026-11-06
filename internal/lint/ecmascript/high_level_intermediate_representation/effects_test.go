@@ -14,30 +14,30 @@ import (
 
 // effectsFor lowers one function and returns its effect table plus the function.
 //
-// Runs through the TYPED harness even though this pass reads no types, because `Lower` refuses a
+// Runs through the typed harness even though this pass reads no types, because `Lower` refuses a
 // nil checker and would otherwise hand back nil, which reads as "the pass found nothing" rather
 // than "the pass never ran". The explicit fatal below is the guard the brief calls for: a typed
 // probe handed a nil checker passes vacuously, and vacuous green is more dangerous than a crash.
-func effectsFor(t *testing.T, source string) (*Function, *AliasingEffects) {
-	t.Helper()
+func effectsFor(test *testing.T, source string) (*Function, *AliasingEffects) {
+	test.Helper()
 
 	var function *Function
 	var table *AliasingEffects
-	probe := rule.Rule{
+	probe := rule.Rule[rule.NoOptions]{
 		Name:             "effects-harness",
 		NeedsTypeChecker: true,
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
-					if ctx.TypeChecker == nil {
-						t.Fatal("the typed harness handed this probe a nil checker, so every " +
+					if ruleContext.TypeChecker == nil {
+						test.Fatal("the typed harness handed this probe a nil checker, so every " +
 							"assertion below would pass vacuously")
 					}
 					forEachFunctionLike(node, func(functionNode *ast.Node) {
 						if function != nil {
 							return
 						}
-						lowered := Lower(functionNode, ctx.TypeChecker)
+						lowered := Lower(functionNode, ruleContext.TypeChecker)
 						if lowered == nil {
 							return
 						}
@@ -49,16 +49,16 @@ func effectsFor(t *testing.T, source string) (*Function, *AliasingEffects) {
 			}
 		},
 	}
-	rule_testing.RunTypedFiles(t, probe, map[string]string{"fixture.tsx": source}, "fixture.tsx")
+	rule_testing.RunTypedFiles(test, probe, map[string]string{"fixture.tsx": source}, "fixture.tsx")
 	if function == nil || table == nil {
-		t.Fatal("nothing was lowered, so this test measured nothing")
+		test.Fatal("nothing was lowered, so this test measured nothing")
 	}
 	return function, table
 }
 
 // effectsOn returns the sorted set of effect kinds naming one source binding, as strings.
 //
-// Keyed by the binding's DECLARATION rather than by IdentifierId or by name, and that distinction
+// Keyed by the binding's declaration rather than by IdentifierId or by name, and that distinction
 // cost the first version of this file every one of its assertions.
 //
 // Single-assignment form gives one source binding several numbered values, and only the value the
@@ -83,7 +83,7 @@ func effectsOn(function *Function, table *AliasingEffects, name string) []string
 	}
 
 	// Seed with every value carrying the binding's declaration, then follow assignment edges
-	// forward. A `LoadLocal` of `o` produces a FRESH temporary with its own DeclarationId, and it
+	// forward. A `LoadLocal` of `o` produces a fresh temporary with its own DeclarationId, and it
 	// is that temporary the property store mutates, so a set closed only over the declaration stops
 	// one hop short of every interesting effect. Closing over Assign edges is what makes "the
 	// effects on `o`" include what happens to the value just loaded out of it.
@@ -152,10 +152,10 @@ func hasEffect(list []string, want string) bool {
 // fresh mutable container and Capture the source, while the instruction's own lvalue aliases the
 // source with Assign. The ordinary-binding edge is load-bearing for destructured component props:
 // without it a frozen props object becomes an unknown mutable `prop` before an optional-chain phi.
-func TestDestructureEffectsNameEveryBinding(t *testing.T) {
-	t.Parallel()
+func TestDestructureEffectsNameEveryBinding(test *testing.T) {
+	test.Parallel()
 
-	function, table := effectsFor(t, `
+	function, table := effectsFor(test, `
 		function Component(source: {a: object, nested: {b: object}, c: object}) {
 			const {a, nested: {b}, ...rest} = source;
 			return [a, b, rest];
@@ -175,7 +175,7 @@ func TestDestructureEffectsNameEveryBinding(t *testing.T) {
 		}
 	}
 	if instruction == nil {
-		t.Fatal("no Destructure instruction was lowered")
+		test.Fatal("no Destructure instruction was lowered")
 	}
 
 	effects := table.Get(instruction.Id)
@@ -204,22 +204,22 @@ func TestDestructureEffectsNameEveryBinding(t *testing.T) {
 			rests++
 			if !hasCreate(place.Identifier, mutation_aliasing.EffectValueMutable) ||
 				!has(mutation_aliasing.AliasingEffectCapture, destructure.Value.Identifier, place.Identifier) {
-				t.Errorf("rest binding %d effects=%v, want Create Mutable and Capture from %d",
+				test.Errorf("rest binding %d effects=%v, want Create Mutable and Capture from %d",
 					place.Identifier, effects, destructure.Value.Identifier)
 			}
 			return
 		}
 		ordinary++
 		if !has(mutation_aliasing.AliasingEffectCreateFrom, destructure.Value.Identifier, place.Identifier) {
-			t.Errorf("ordinary binding %d effects=%v, want CreateFrom from %d",
+			test.Errorf("ordinary binding %d effects=%v, want CreateFrom from %d",
 				place.Identifier, effects, destructure.Value.Identifier)
 		}
 	})
 	if ordinary != 2 || rests != 1 {
-		t.Fatalf("walked %d ordinary and %d rest bindings, want 2 and 1", ordinary, rests)
+		test.Fatalf("walked %d ordinary and %d rest bindings, want 2 and 1", ordinary, rests)
 	}
 	if !has(mutation_aliasing.AliasingEffectAssign, destructure.Value.Identifier, instruction.LValue.Identifier) {
-		t.Errorf("Destructure instruction effects=%v, want Assign from %d into %d", effects,
+		test.Errorf("Destructure instruction effects=%v, want Assign from %d into %d", effects,
 			destructure.Value.Identifier, instruction.LValue.Identifier)
 	}
 }
@@ -230,12 +230,12 @@ func TestDestructureEffectsNameEveryBinding(t *testing.T) {
 // defaults on, while a first-line `:false` pragma disables it. The distinction matters because a
 // later unknown call is allowed to conditionally mutate an ordinary value but not a value whose
 // identity a live manual memo has frozen.
-func TestManualMemoMarkersFreezeTheirOperands(t *testing.T) {
-	t.Parallel()
+func TestManualMemoMarkersFreezeTheirOperands(test *testing.T) {
+	test.Parallel()
 
-	test := func(source string, wantFreeze bool) {
-		function, _ := effectsFor(t, source)
-		value := function.Params[0]
+	checkFreezes := func(source string, wantFreeze bool) {
+		function, _ := effectsFor(test, source)
+		value := function.Parameters[0]
 		finish := &Instruction{
 			LValue: Place{Identifier: function.NewIdentifier("", nil, 0).Id},
 			Value:  &FinishMemoize{ManualMemoId: 1, Value: value},
@@ -262,12 +262,12 @@ func TestManualMemoMarkersFreezeTheirOperands(t *testing.T) {
 			wantCount = 2
 		}
 		if freezeCount != wantCount {
-			t.Fatalf("manual memo Freeze effects = %d, want %d", freezeCount, wantCount)
+			test.Fatalf("manual memo Freeze effects = %d, want %d", freezeCount, wantCount)
 		}
 	}
 
-	test(`function f(value: object) { return value; }`, true)
-	test(`// @enablePreserveExistingMemoizationGuarantees:false
+	checkFreezes(`function f(value: object) { return value; }`, true)
+	checkFreezes(`// @enablePreserveExistingMemoizationGuarantees:false
 function f(value: object) { return value; }`, false)
 }
 
@@ -278,8 +278,8 @@ function f(value: object) { return value; }`, false)
 // FinishMemoize marker. React's abstract state makes that object frozen before the call, so ranges
 // must discard the conditional mutation there while retaining it for the otherwise identical
 // unfrozen object. This prevents the fix from becoming a broad zero-argument-method exemption.
-func TestMemoFreezeRefinesAnUnknownMethodMutation(t *testing.T) {
-	t.Parallel()
+func TestMemoFreezeRefinesAnUnknownMethodMutation(test *testing.T) {
+	test.Parallel()
 
 	build := func(frozen bool) (*Function, Place, *Instruction, *Instruction) {
 		function := NewFunction(nil, "f", FunctionKindOther)
@@ -317,7 +317,7 @@ func TestMemoFreezeRefinesAnUnknownMethodMutation(t *testing.T) {
 		property := place("callback")
 		function.AddInstruction(block, &Instruction{
 			LValue: property,
-			Value:  &Primitive{Value: "callback"},
+			Value:  &Primitive{Value: PrimitiveString("callback")},
 		})
 		result := place("")
 		call := &Instruction{
@@ -337,7 +337,7 @@ func TestMemoFreezeRefinesAnUnknownMethodMutation(t *testing.T) {
 				return
 			}
 		}
-		t.Fatal("the unknown method control produced no conditional mutation")
+		test.Fatal("the unknown method control produced no conditional mutation")
 	}
 
 	frozen, frozenObject, frozenDefinition, frozenCall := build(true)
@@ -348,11 +348,11 @@ func TestMemoFreezeRefinesAnUnknownMethodMutation(t *testing.T) {
 	frozenRange := InferMutableRanges(frozen).Get(frozenObject.Identifier)
 	unfrozenRange := InferMutableRanges(unfrozen).Get(unfrozenObject.Identifier)
 	if frozenRange.End != frozenDefinition.Order+1 {
-		t.Fatalf("a memo-frozen object widened past its definition: range=%v definition=%d call=%d",
+		test.Fatalf("a memo-frozen object widened past its definition: range=%v definition=%d call=%d",
 			frozenRange, frozenDefinition.Order, frozenCall.Order)
 	}
 	if unfrozenRange.End != unfrozenCall.Order+1 {
-		t.Fatalf("the unfrozen unknown method stopped widening its receiver: range=%v call=%d",
+		test.Fatalf("the unfrozen unknown method stopped widening its receiver: range=%v call=%d",
 			unfrozenRange, unfrozenCall.Order)
 	}
 }
@@ -363,8 +363,8 @@ func TestMemoFreezeRefinesAnUnknownMethodMutation(t *testing.T) {
 // InstructionValue. Freezing either name later therefore freezes aliases created before the
 // marker. CreateFrom copies the current kind into a fresh value, while Capture and MaybeAlias are
 // information-flow edges; none of those three share identity under the same ordering.
-func TestFreezeFollowsOnlySharedAssignIdentity(t *testing.T) {
-	t.Parallel()
+func TestFreezeFollowsOnlySharedAssignIdentity(test *testing.T) {
+	test.Parallel()
 
 	tests := []struct {
 		name       string
@@ -378,8 +378,8 @@ func TestFreezeFollowsOnlySharedAssignIdentity(t *testing.T) {
 	}
 
 	for _, testCase := range tests {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			function := NewFunction(nil, "f", FunctionKindOther)
 			block := function.NewBlock(BlockKindBlock)
 			function.Entry = block.Id
@@ -393,7 +393,7 @@ func TestFreezeFollowsOnlySharedAssignIdentity(t *testing.T) {
 			function.AddInstruction(block, sourceInstruction)
 
 			alias := newPlace("alias")
-			aliasInstruction := &Instruction{LValue: alias, Value: &Primitive{}}
+			aliasInstruction := &Instruction{LValue: alias, Value: &Primitive{Value: PrimitiveUndefined{}}}
 			function.AddInstruction(block, aliasInstruction)
 
 			freezeInstruction := &Instruction{
@@ -403,7 +403,7 @@ func TestFreezeFollowsOnlySharedAssignIdentity(t *testing.T) {
 			function.AddInstruction(block, freezeInstruction)
 
 			callResult := newPlace("")
-			callInstruction := &Instruction{LValue: callResult, Value: &Primitive{}}
+			callInstruction := &Instruction{LValue: callResult, Value: &Primitive{Value: PrimitiveUndefined{}}}
 			function.AddInstruction(block, callInstruction)
 			block.Terminal = &Return{Value: callResult}
 			Finalize(function)
@@ -411,20 +411,29 @@ func TestFreezeFollowsOnlySharedAssignIdentity(t *testing.T) {
 			relationEffects := []AliasingEffect{}
 			if testCase.relation == mutation_aliasing.AliasingEffectCapture ||
 				testCase.relation == mutation_aliasing.AliasingEffectMaybeAlias {
-				relationEffects = append(relationEffects, mutation_aliasing.CreateEffect(alias, mutation_aliasing.EffectValueMutable))
+				relationEffects = append(
+					relationEffects,
+					mutation_aliasing.CreateEffect(alias, mutation_aliasing.EffectValueMutable),
+				)
 			}
 			relationEffects = append(relationEffects, mutation_aliasing.FlowEffect(testCase.relation, source, alias))
 			effects := &AliasingEffects{byInstruction: map[InstructionId][]AliasingEffect{
 				sourceInstruction.Id: {mutation_aliasing.CreateEffect(source, mutation_aliasing.EffectValueMutable)},
 				aliasInstruction.Id:  relationEffects,
 				freezeInstruction.Id: effectsForInstruction(function, newCalleeProducers(function), freezeInstruction),
-				callInstruction.Id:   {mutation_aliasing.CreateEffect(callResult, mutation_aliasing.EffectValueMutable), mutation_aliasing.MutationEffect(mutation_aliasing.AliasingEffectMutateTransitiveConditionally, alias)},
+				callInstruction.Id: {
+					mutation_aliasing.CreateEffect(callResult, mutation_aliasing.EffectValueMutable),
+					mutation_aliasing.MutationEffect(
+						mutation_aliasing.AliasingEffectMutateTransitiveConditionally,
+						alias,
+					),
+				},
 			}}
 
 			ranges := InferMutableRangesWithEffects(function, effects)
 			gotFrozen := !ranges.Contains(alias.Identifier, callInstruction.Order)
 			if gotFrozen != testCase.wantFrozen {
-				t.Errorf("alias frozen before later conditional mutation = %v, want %v; range=%v call=%d",
+				test.Errorf("alias frozen before later conditional mutation = %v, want %v; range=%v call=%d",
 					gotFrozen, testCase.wantFrozen, ranges.Get(alias.Identifier), callInstruction.Order)
 			}
 		})
@@ -434,11 +443,11 @@ func TestFreezeFollowsOnlySharedAssignIdentity(t *testing.T) {
 // TestFreezeTraversesPhiValuesAndFunctionCaptures covers the two abstract values that denote more
 // than one directly-created value. A phi denotes the union of its operands, and a frozen function
 // recursively freezes its captured context. Neither relationship is an ordinary range Capture.
-func TestFreezeTraversesPhiValuesAndFunctionCaptures(t *testing.T) {
-	t.Parallel()
+func TestFreezeTraversesPhiValuesAndFunctionCaptures(test *testing.T) {
+	test.Parallel()
 
-	t.Run("phi operands", func(t *testing.T) {
-		t.Parallel()
+	test.Run("phi operands", func(test *testing.T) {
+		test.Parallel()
 		function := NewFunction(nil, "f", FunctionKindOther)
 		entry := function.NewBlock(BlockKindBlock)
 		consequent := function.NewBlock(BlockKindValue)
@@ -449,7 +458,7 @@ func TestFreezeTraversesPhiValuesAndFunctionCaptures(t *testing.T) {
 			return Place{Identifier: function.NewIdentifier(name, nil, 0).Id}
 		}
 		condition := newPlace("condition")
-		function.Params = []Place{condition}
+		function.Parameters = []Place{condition}
 		function.Returns = newPlace("")
 		entry.Terminal = &Branch{
 			Test: condition, Consequent: consequent.Id, Alternate: alternate.Id, Fallthrough: join.Id,
@@ -475,16 +484,20 @@ func TestFreezeTraversesPhiValuesAndFunctionCaptures(t *testing.T) {
 		join.Terminal = &Return{Value: selected}
 		Finalize(function)
 
-		aliasingGraph := mutation_aliasing.BuildAliasingGraph(newRangeGraph(function, InferAliasingEffects(function)), function, mutation_aliasing.Options{})
+		aliasingGraph := mutation_aliasing.BuildAliasingGraph(
+			newRangeGraph(function, InferAliasingEffects(function)),
+			function,
+			mutation_aliasing.Options{},
+		)
 		for name, place := range map[string]Place{"left": left, "right": right, "phi": selected} {
 			if aliasingGraph.Kind(place.Identifier) == mutation_aliasing.EffectValueMutable {
-				t.Errorf("Freeze(phi) left %s mutable", name)
+				test.Errorf("Freeze(phi) left %s mutable", name)
 			}
 		}
 	})
 
-	t.Run("function captures through an alias", func(t *testing.T) {
-		t.Parallel()
+	test.Run("function captures through an alias", func(test *testing.T) {
+		test.Parallel()
 		function := NewFunction(nil, "f", FunctionKindOther)
 		block := function.NewBlock(BlockKindBlock)
 		function.Entry = block.Id
@@ -492,7 +505,7 @@ func TestFreezeTraversesPhiValuesAndFunctionCaptures(t *testing.T) {
 			return Place{Identifier: function.NewIdentifier(name, nil, 0).Id}
 		}
 		captured := newPlace("captured")
-		function.Params = []Place{captured}
+		function.Parameters = []Place{captured}
 		function.Returns = newPlace("")
 
 		closure := newPlace("closure")
@@ -509,9 +522,13 @@ func TestFreezeTraversesPhiValuesAndFunctionCaptures(t *testing.T) {
 		block.Terminal = &Return{Value: alias}
 		Finalize(function)
 
-		aliasingGraph := mutation_aliasing.BuildAliasingGraph(newRangeGraph(function, InferAliasingEffects(function)), function, mutation_aliasing.Options{})
+		aliasingGraph := mutation_aliasing.BuildAliasingGraph(
+			newRangeGraph(function, InferAliasingEffects(function)),
+			function,
+			mutation_aliasing.Options{},
+		)
 		if aliasingGraph.Kind(captured.Identifier) == mutation_aliasing.EffectValueMutable {
-			t.Error("freezing a function alias did not recursively freeze its capture")
+			test.Error("freezing a function alias did not recursively freeze its capture")
 		}
 	})
 }
@@ -523,8 +540,8 @@ func TestFreezeTraversesPhiValuesAndFunctionCaptures(t *testing.T) {
 // is relevant to this reduced model because an instruction shape the effect pass does not yet
 // initialize can still appear as a marker operand; treating the marker as its allocation site
 // would suppress an otherwise conservative unknown-call mutation.
-func TestStartMemoizeFreezeRequiresAnInitializedAbstractValue(t *testing.T) {
-	t.Parallel()
+func TestStartMemoizeFreezeRequiresAnInitializedAbstractValue(test *testing.T) {
+	test.Parallel()
 
 	build := func(initialized bool) (*Function, *Instruction, *Instruction) {
 		function := NewFunction(nil, "f", FunctionKindOther)
@@ -555,7 +572,7 @@ func TestStartMemoizeFreezeRequiresAnInitializedAbstractValue(t *testing.T) {
 		property := place("")
 		function.AddInstruction(block, &Instruction{
 			LValue: property,
-			Value:  &Primitive{Value: "method"},
+			Value:  &Primitive{Value: PrimitiveString("method")},
 		})
 		result := place("")
 		call := &Instruction{
@@ -571,14 +588,14 @@ func TestStartMemoizeFreezeRequiresAnInitializedAbstractValue(t *testing.T) {
 	initialized, initializedLoad, initializedCall := build(true)
 	initializedRange := InferMutableRanges(initialized).Get(initializedLoad.LValue.Identifier)
 	if initializedRange.End != initializedLoad.Order+1 {
-		t.Fatalf("initialized memo dependency was not frozen: range=%v load=%d call=%d",
+		test.Fatalf("initialized memo dependency was not frozen: range=%v load=%d call=%d",
 			initializedRange, initializedLoad.Order, initializedCall.Order)
 	}
 
 	unresolved, unresolvedLoad, unresolvedCall := build(false)
 	unresolvedRange := InferMutableRanges(unresolved).Get(unresolvedLoad.LValue.Identifier)
 	if unresolvedRange.End != unresolvedCall.Order+1 {
-		t.Fatalf("freeze created state for an unresolved dependency: range=%v load=%d call=%d",
+		test.Fatalf("freeze created state for an unresolved dependency: range=%v load=%d call=%d",
 			unresolvedRange, unresolvedLoad.Order, unresolvedCall.Order)
 	}
 }
@@ -586,17 +603,17 @@ func TestStartMemoizeFreezeRequiresAnInitializedAbstractValue(t *testing.T) {
 // TestPropertyStoreMutatesItsObject is the single most load-bearing fact this pass produces.
 //
 // `o.a = 1` mutates `o`. Everything downstream -- a mutable range's extension, a frozen-value
-// violation, an escape verdict -- reads this one effect. Asserted on the SPECIFIC place rather than
+// violation, an escape verdict -- reads this one effect. Asserted on the specific place rather than
 // on a count, because the brief records a phi mutant that survived a name-keyed assertion while the
 // merge rule was dead.
-func TestPropertyStoreMutatesItsObject(t *testing.T) {
-	t.Parallel()
+func TestPropertyStoreMutatesItsObject(test *testing.T) {
+	test.Parallel()
 
-	function, table := effectsFor(t, `function f() { const o = { a: 0 }; o.a = 1; return o; }`)
+	function, table := effectsFor(test, `function f() { const o = { a: 0 }; o.a = 1; return o; }`)
 
 	effects := effectsOn(function, table, "o")
 	if !hasEffect(effects, "mutate:into") {
-		t.Fatalf("a property store must record a mutation of its object; got %v", effects)
+		test.Fatalf("a property store must record a mutation of its object; got %v", effects)
 	}
 }
 
@@ -604,47 +621,47 @@ func TestPropertyStoreMutatesItsObject(t *testing.T) {
 //
 // `o.a = v` does not only mutate `o`, it records that `o` now holds `v`. Without that edge an
 // escape analysis cannot follow a value into a structure, which is the whole point of the pass.
-func TestPropertyStoreCapturesTheStoredValue(t *testing.T) {
-	t.Parallel()
+func TestPropertyStoreCapturesTheStoredValue(test *testing.T) {
+	test.Parallel()
 
-	function, table := effectsFor(t, `function f(v: object) { const o = { a: {} }; o.a = v; return o; }`)
+	function, table := effectsFor(test, `function f(v: object) { const o = { a: {} }; o.a = v; return o; }`)
 
 	effects := effectsOn(function, table, "v")
 	if !hasEffect(effects, "capture:from") {
-		t.Fatalf("storing v into o must record a capture FROM v; got %v", effects)
+		test.Fatalf("storing v into o must record a capture FROM v; got %v", effects)
 	}
 }
 
 // TestUnknownCallConservativelyMutatesItsArguments is the 85.4% path and the safety property.
 //
 // A call with no signature must be assumed to mutate what it is handed. The direction matters more
-// than the specific variant: an unknown call that recorded NO mutation would make every consumer
+// than the specific variant: an unknown call that recorded no mutation would make every consumer
 // under-report, and an under-reporting escape analysis is unsound in the dangerous direction.
-func TestUnknownCallConservativelyMutatesItsArguments(t *testing.T) {
-	t.Parallel()
+func TestUnknownCallConservativelyMutatesItsArguments(test *testing.T) {
+	test.Parallel()
 
-	function, table := effectsFor(t, `function f() { const o = { a: 0 }; unknownFunction(o); return o; }`)
+	function, table := effectsFor(test, `function f() { const o = { a: 0 }; unknownFunction(o); return o; }`)
 
 	effects := effectsOn(function, table, "o")
 	if !hasEffect(effects, "mutate-transitive-conditionally:into") {
-		t.Fatalf("an unknown callee must be assumed to mutate its argument; got %v", effects)
+		test.Fatalf("an unknown callee must be assumed to mutate its argument; got %v", effects)
 	}
 }
 
 // TestKnownReadOnlySignatureDoesNotMutate is the other side of the same measurement.
 //
 // Two-sided against the test above: `includes` carries Effect::Read on its receiver upstream, so it
-// must NOT produce a mutation, while `unknownFunction` must. If the signature table were dead, both
+// must not produce a mutation, while `unknownFunction` must. If the signature table were dead, both
 // tests would still describe real behaviour and only this one would fail, which is why it exists
 // rather than a bare assertion that some call produced some effect.
-func TestKnownReadOnlySignatureDoesNotMutate(t *testing.T) {
-	t.Parallel()
+func TestKnownReadOnlySignatureDoesNotMutate(test *testing.T) {
+	test.Parallel()
 
-	function, table := effectsFor(t, `function f(list: number[]) { const found = list.includes(1); return found; }`)
+	function, table := effectsFor(test, `function f(list: number[]) { const found = list.includes(1); return found; }`)
 
 	effects := effectsOn(function, table, "list")
 	if hasEffect(effects, "mutate:into") || hasEffect(effects, "mutate-transitive-conditionally:into") {
-		t.Fatalf("includes is Effect::Read on its receiver upstream and must not mutate it; got %v", effects)
+		test.Fatalf("includes is Effect::Read on its receiver upstream and must not mutate it; got %v", effects)
 	}
 }
 
@@ -653,14 +670,14 @@ func TestKnownReadOnlySignatureDoesNotMutate(t *testing.T) {
 // `push` carries Effect::Store upstream and is the single most common mutating method on Kirk's
 // tree at 2,202 call sites. Measured against React's executable: a frozen array's `push` reports
 // while `sort` on the same array is clean, because `sort` is absent from upstream's table.
-func TestKnownMutatingSignatureMutatesItsReceiver(t *testing.T) {
-	t.Parallel()
+func TestKnownMutatingSignatureMutatesItsReceiver(test *testing.T) {
+	test.Parallel()
 
-	function, table := effectsFor(t, `function f() { const list: number[] = []; list.push(1); return list; }`)
+	function, table := effectsFor(test, `function f() { const list: number[] = []; list.push(1); return list; }`)
 
 	effects := effectsOn(function, table, "list")
 	if !hasEffect(effects, "mutate:into") {
-		t.Fatalf("push carries Effect::Store upstream and must mutate its receiver; got %v", effects)
+		test.Fatalf("push carries Effect::Store upstream and must mutate its receiver; got %v", effects)
 	}
 }
 
@@ -668,21 +685,21 @@ func TestKnownMutatingSignatureMutatesItsReceiver(t *testing.T) {
 //
 // `sort` mutates its receiver in fact, and React does not report it, because it is not in
 // `globals.rs`. Measured on React's executable with a control in the same batch: a frozen array's
-// `push` REPORTS and the same array's `sort` is CLEAN.
+// `push` reports and the same array's `sort` is clean.
 //
 // This is the "do not silently improve on upstream" rule from the brief, pinned as a test so a
 // later reader who adds `sort` to the table sees this go red and reads why rather than discovering
 // the divergence from a differential run.
-func TestSortIsSilentBecauseUpstreamHasNoSignatureForIt(t *testing.T) {
-	t.Parallel()
+func TestSortIsSilentBecauseUpstreamHasNoSignatureForIt(test *testing.T) {
+	test.Parallel()
 
 	if _, found := effectSignatures["sort"]; found {
-		t.Fatal("sort was added to the signature table; upstream has no entry for it and React " +
+		test.Fatal("sort was added to the signature table; upstream has no entry for it and React " +
 			"is measurably silent on a frozen array's sort, so adding it is a divergence that " +
 			"needs recording rather than a fix")
 	}
 	if _, found := effectSignatures["push"]; !found {
-		t.Fatal("the control failed: push must be in the table, or the assertion above is " +
+		test.Fatal("the control failed: push must be in the table, or the assertion above is " +
 			"satisfied by an empty table rather than by a deliberate omission")
 	}
 }
@@ -692,14 +709,14 @@ func TestSortIsSilentBecauseUpstreamHasNoSignatureForIt(t *testing.T) {
 // A value read into JSX is frozen from that point. `immutability.go` reports on exactly this, and
 // its own doc comment records the ordering pair that proves freezing is a dataflow fact rather than
 // a property of a value's origin.
-func TestJsxFreezesWhatItInterpolates(t *testing.T) {
-	t.Parallel()
+func TestJsxFreezesWhatItInterpolates(test *testing.T) {
+	test.Parallel()
 
-	function, table := effectsFor(t, `function C() { const o = { a: 0 }; return <div>{o}</div>; }`)
+	function, table := effectsFor(test, `function C() { const o = { a: 0 }; return <div>{o}</div>; }`)
 
 	effects := effectsOn(function, table, "o")
 	if !hasEffect(effects, "freeze:into") {
-		t.Fatalf("a value interpolated into JSX must be frozen; got %v", effects)
+		test.Fatalf("a value interpolated into JSX must be frozen; got %v", effects)
 	}
 }
 
@@ -707,14 +724,14 @@ func TestJsxFreezesWhatItInterpolates(t *testing.T) {
 //
 // This is the effect a rule asking "was this object mutated after crossing an async boundary" would
 // read, and it is named in the dispatch as one of the things this substrate makes possible.
-func TestAwaitConditionallyMutatesTheAwaitedValue(t *testing.T) {
-	t.Parallel()
+func TestAwaitConditionallyMutatesTheAwaitedValue(test *testing.T) {
+	test.Parallel()
 
-	function, table := effectsFor(t, `async function f(p: Promise<object>) { const v = await p; return v; }`)
+	function, table := effectsFor(test, `async function f(p: Promise<object>) { const v = await p; return v; }`)
 
 	effects := effectsOn(function, table, "p")
 	if !hasEffect(effects, "mutate-transitive-conditionally:into") {
-		t.Fatalf("an await must record that anything may have mutated the value; got %v", effects)
+		test.Fatalf("an await must record that anything may have mutated the value; got %v", effects)
 	}
 }
 
@@ -724,11 +741,11 @@ func TestAwaitConditionallyMutatesTheAwaitedValue(t *testing.T) {
 // one of the 766 is an `UnsupportedNode`, which lowering documents as syntax it does not model. So
 // coverage is total over every shape the representation actually produces.
 //
-// The assertion is on the SHAPE rather than on the count, because a count would drift with the
+// The assertion is on the shape rather than on the count, because a count would drift with the
 // corpus while the invariant does not: any instruction value other than UnsupportedNode that
 // produces no effect is a hole in the switch.
-func TestEveryInstructionShapeProducesEffects(t *testing.T) {
-	t.Parallel()
+func TestEveryInstructionShapeProducesEffects(test *testing.T) {
+	test.Parallel()
 
 	source := `
 function f(a: number[], o: { x: number }, p: Promise<number>, fn: (n: number) => number) {
@@ -753,7 +770,7 @@ function f(a: number[], o: { x: number }, p: Promise<number>, fn: (n: number) =>
 	for (const item of a) { counter += item; }
 	return { sum, neg, text, object, array, read, computed, called, method, made, closure, cast, counter };
 }`
-	function, table := effectsFor(t, source)
+	function, table := effectsFor(test, source)
 
 	uncovered := map[string]int{}
 	for _, instruction := range function.Instructions {
@@ -769,13 +786,13 @@ function f(a: number[], o: { x: number }, p: Promise<number>, fn: (n: number) =>
 		uncovered[strings.TrimPrefix(typeName(instruction.Value), "*hir.")]++
 	}
 	if len(uncovered) > 0 {
-		t.Fatalf("these instruction shapes produced no effects and are not UnsupportedNode: %v", uncovered)
+		test.Fatalf("these instruction shapes produced no effects and are not UnsupportedNode: %v", uncovered)
 	}
 
 	// The control. Without it this test is satisfied by a pass that produces nothing at all, for
 	// every shape, since a table with no entries has no uncovered shapes either.
-	if table.Len() == 0 {
-		t.Fatal("the control failed: no instruction produced any effect, so the assertion above " +
+	if table.Length() == 0 {
+		test.Fatal("the control failed: no instruction produced any effect, so the assertion above " +
 			"passed vacuously")
 	}
 }
@@ -786,8 +803,8 @@ function f(a: number[], o: { x: number }, p: Promise<number>, fn: (n: number) =>
 // so that a later addition which brings in an order varying between runs fails here rather than
 // producing a message that names a different value between runs, which is a defect this tree has
 // already shipped once in `static_components.go`.
-func TestEffectsAreDeterministic(t *testing.T) {
-	t.Parallel()
+func TestEffectsAreDeterministic(test *testing.T) {
+	test.Parallel()
 
 	source := `
 function f(c: boolean, a: object, b: object) {
@@ -798,7 +815,7 @@ function f(c: boolean, a: object, b: object) {
 }
 declare function use(v: object): void;`
 
-	function, first := effectsFor(t, source)
+	function, first := effectsFor(test, source)
 	second := InferAliasingEffects(function)
 
 	render := func(table *AliasingEffects) string {
@@ -817,25 +834,25 @@ declare function use(v: object): void;`
 	}
 
 	if render(first) != render(second) {
-		t.Fatal("two runs of the pass over one function disagreed, so something in it reads a map")
+		test.Fatal("two runs of the pass over one function disagreed, so something in it reads a map")
 	}
 	if render(first) == "" {
-		t.Fatal("the control failed: both runs produced nothing, so the comparison was vacuous")
+		test.Fatal("the control failed: both runs produced nothing, so the comparison was vacuous")
 	}
 }
 
 // TestProjectEffectsNeedsRangesToDistinguishCaptureFromRead pins the reason Place.Effect is not
 // written by this pass.
 //
-// The five aliasing variants all resolve their SOURCE to either Capture or Read, and the only
+// The five aliasing variants all resolve their source to either Capture or Read, and the only
 // discriminator is whether the target is still mutable after this point -- a fact that lives in the
 // mutable-range table, which Stage 2 owns. With a nil range table every aliasing edge reads as
 // Read, which under-approximates escape.
 //
 // This is the test that would go red if someone decided the projection could be done without
 // ranges, which is the specific wrong turn the package comment argues against.
-func TestProjectEffectsNeedsRangesToDistinguishCaptureFromRead(t *testing.T) {
-	t.Parallel()
+func TestProjectEffectsNeedsRangesToDistinguishCaptureFromRead(test *testing.T) {
+	test.Parallel()
 
 	from := Place{Identifier: static_single_assignment.IdentifierId(1)}
 	into := Place{Identifier: static_single_assignment.IdentifierId(2)}
@@ -843,22 +860,25 @@ func TestProjectEffectsNeedsRangesToDistinguishCaptureFromRead(t *testing.T) {
 
 	withoutRanges := ProjectEffects(effects, nil, static_single_assignment.EvaluationOrder(5))
 	if withoutRanges[from.Identifier] != EffectRead {
-		t.Fatalf("with no range table an aliasing source must under-approximate to Read, got %v",
+		test.Fatalf("with no range table an aliasing source must under-approximate to Read, got %v",
 			withoutRanges[from.Identifier])
 	}
 
 	ranges := &mutation_aliasing.MutableRanges{}
-	ranges.Set(into.Identifier, mutation_aliasing.MutableRange{Start: static_single_assignment.EvaluationOrder(1), End: static_single_assignment.EvaluationOrder(9)})
+	ranges.Set(into.Identifier, mutation_aliasing.MutableRange{
+		Start: static_single_assignment.EvaluationOrder(1),
+		End:   static_single_assignment.EvaluationOrder(9),
+	})
 	withRanges := ProjectEffects(effects, ranges, static_single_assignment.EvaluationOrder(5))
 	if withRanges[from.Identifier] != EffectCapture {
-		t.Fatalf("a source flowing into a still-mutable target must be Capture, got %v",
+		test.Fatalf("a source flowing into a still-mutable target must be Capture, got %v",
 			withRanges[from.Identifier])
 	}
 
 	// Both directions asserted, so a projection that ignored ranges entirely fails one of them
 	// rather than satisfying both by always answering the same thing.
 	if withoutRanges[into.Identifier] != EffectStore || withRanges[into.Identifier] != EffectStore {
-		t.Fatal("the target of an aliasing edge is Store regardless of the range test")
+		test.Fatal("the target of an aliasing edge is Store regardless of the range test")
 	}
 }
 
@@ -869,25 +889,25 @@ func TestProjectEffectsNeedsRangesToDistinguishCaptureFromRead(t *testing.T) {
 // default. So the gaps are enumerable rather than only described, the way `ReactiveGaps` and
 // `RangeGaps` already are.
 //
-// This test goes RED if a gap is ever closed, which is deliberate: closing one should be a
+// This test goes red if a gap is ever closed, which is deliberate: closing one should be a
 // deliberate edit here rather than a silent change in what a consumer can trust.
-func TestEffectGapsAreNamedInTheApi(t *testing.T) {
-	t.Parallel()
+func TestEffectGapsAreNamedInTheApi(test *testing.T) {
+	test.Parallel()
 
 	gaps := EffectGaps()
 	if len(gaps) != 3 {
-		t.Fatalf("EffectGaps changed; if a gap was closed, update the consumers that ask. got %v", gaps)
+		test.Fatalf("EffectGaps changed; if a gap was closed, update the consumers that ask. got %v", gaps)
 	}
 	seen := map[string]bool{}
 	for _, gap := range gaps {
 		if gap.String() == "<unknown>" {
-			t.Fatalf("a gap has no name, so a caller enumerating them learns nothing: %d", gap)
+			test.Fatalf("a gap has no name, so a caller enumerating them learns nothing: %d", gap)
 		}
 		seen[gap.String()] = true
 	}
 	for _, want := range []string{"interprocedural-parameters", "signature-table", "type-directed-shapes"} {
 		if !seen[want] {
-			t.Fatalf("the %q gap is no longer named; see the package comment before removing it", want)
+			test.Fatalf("the %q gap is no longer named; see the package comment before removing it", want)
 		}
 	}
 }
@@ -895,17 +915,17 @@ func TestEffectGapsAreNamedInTheApi(t *testing.T) {
 // TestInterproceduralParametersAreNotInferred states the largest gap as a test rather than a hope.
 //
 // A local function that mutates its parameter is invisible to this pass. Measured against React's
-// executable, React is ALSO silent on the same input when the callee is reached by name --
-// `function m(x){x.a=1;} m(frozen)` is CLEAN upstream -- so the observable divergence on React's
+// executable, React is also silent on the same input when the callee is reached by name --
+// `function m(x){x.a=1;} m(frozen)` is clean upstream -- so the observable divergence on React's
 // own diagnostics is narrow even though the general capability is missing entirely.
 //
 // Pinned so that implementing it is a deliberate act: this test goes red the moment the effects of
 // a named local callee start reaching its call site, which is exactly when every consumer's
 // assumptions change.
-func TestInterproceduralParametersAreNotInferred(t *testing.T) {
-	t.Parallel()
+func TestInterproceduralParametersAreNotInferred(test *testing.T) {
+	test.Parallel()
 
-	function, table := effectsFor(t, `
+	function, table := effectsFor(test, `
 function outer() {
 	function inner(target: { a: number }) { target.a = 1; }
 	const value = { a: 0 };
@@ -916,13 +936,13 @@ function outer() {
 	effects := effectsOn(function, table, "value")
 
 	// The conservative default still records a mutation, which is the safe direction. What is
-	// missing is the PRECISE one: upstream would record `Mutate` from inner's own body, and this
+	// missing is the precise one: upstream would record `Mutate` from inner's own body, and this
 	// records only the unknown-callee `MutateTransitiveConditionally`.
 	if !hasEffect(effects, "mutate-transitive-conditionally:into") {
-		t.Fatalf("the conservative default must still fire for an un-inferred callee; got %v", effects)
+		test.Fatalf("the conservative default must still fire for an un-inferred callee; got %v", effects)
 	}
 	if hasEffect(effects, "mutate:into") {
-		t.Fatal("a precise Mutate reached the call site, which means interprocedural parameter " +
+		test.Fatal("a precise Mutate reached the call site, which means interprocedural parameter " +
 			"inference now works; remove EffectGapInterproceduralParameters and update the " +
 			"package comment, which currently tells consumers it is missing")
 	}
@@ -946,33 +966,33 @@ func typeName(value InstructionValue) string {
 
 // TestCaptureReceiverIsAliasedExactlyOnce pins upstream's receiver-alias guard.
 //
-// `compute_effects_for_legacy_signature` aliases the receiver into the result UNLESS the receiver's
+// `compute_effects_for_legacy_signature` aliases the receiver into the result unless the receiver's
 // own signature effect is Capture. That is not "a Capture receiver is never aliased": it is
 // deduplication. A Capture receiver lands in the `captures` list and the reconciliation at the end
 // of the function emits `Alias{capture -> lvalue}` for it, so emitting the branch alias as well
-// would record the same edge TWICE.
+// would record the same edge twice.
 //
 // Added for a surviving mutant that inverted the guard, and the first fixture written for it was
-// WRONG even though the mutant was real: it asserted that a Capture receiver produces no Alias at
+// wrong even though the mutant was real: it asserted that a Capture receiver produces no Alias at
 // all, and the pass produces exactly one, from the reconciliation. The brief's rule applied
 // literally -- a fixture written for a survivor is a hypothesis, and a failing one means the
 // hypothesis needs replacing rather than the code.
 //
-// So the property is the COUNT. `map` has a Capture receiver and must yield exactly one Alias;
+// So the property is the count. `map` has a Capture receiver and must yield exactly one Alias;
 // `includes` has a Read receiver, never enters the captures list, and must also yield exactly one,
 // from the branch instead. The inverted mutant gives `map` two and `includes` zero.
-func TestCaptureReceiverIsAliasedExactlyOnce(t *testing.T) {
-	t.Parallel()
+func TestCaptureReceiverIsAliasedExactlyOnce(test *testing.T) {
+	test.Parallel()
 
 	if effectSignatures["map"].Receiver != EffectCapture {
-		t.Fatal("the control failed: map must carry a Capture receiver or this test measures nothing")
+		test.Fatal("the control failed: map must carry a Capture receiver or this test measures nothing")
 	}
 	if effectSignatures["includes"].Receiver != EffectRead {
-		t.Fatal("the control failed: includes must carry a Read receiver")
+		test.Fatal("the control failed: includes must carry a Read receiver")
 	}
 
 	countAliases := func(source string) int {
-		function, table := effectsFor(t, source)
+		function, table := effectsFor(test, source)
 		total := 0
 		for _, instruction := range function.Instructions {
 			if instruction == nil {
@@ -991,31 +1011,31 @@ func TestCaptureReceiverIsAliasedExactlyOnce(t *testing.T) {
 	}
 
 	if got := countAliases(`function f(list: number[]) { const mapped = list.map(n => n); return mapped; }`); got != 1 {
-		t.Fatalf("a Capture receiver must be aliased exactly once, through the capture "+
+		test.Fatalf("a Capture receiver must be aliased exactly once, through the capture "+
 			"reconciliation rather than through the branch; got %d", got)
 	}
 	if got := countAliases(`function g(list: number[]) { const found = list.includes(1); return found; }`); got != 1 {
-		t.Fatalf("a Read receiver must be aliased exactly once, through the branch; got %d", got)
+		test.Fatalf("a Read receiver must be aliased exactly once, through the branch; got %d", got)
 	}
 }
 
 // TestAnUnknownMethodCallDoesNotMutateTheMethodItself pins the mutatesCallee guard.
 //
-// Upstream's default path skips the mutation for an operand that IS the callee when the call does
+// Upstream's default path skips the mutation for an operand that is the callee when the call does
 // not mutate its function -- true for a method call and a construction, false for a plain call
 // (`infer_mutation_aliasing_effects.rs:1841-1848`). So `lib.doThing(v)` conservatively mutates
-// `lib` and `v`, and does NOT record that calling `doThing` mutated `doThing`.
+// `lib` and `v`, and does not record that calling `doThing` mutated `doThing`.
 //
-// Added for a surviving mutant that inverted the guard, and the distinguishing input is a METHOD
+// Added for a surviving mutant that inverted the guard, and the distinguishing input is a method
 // call specifically: for a plain call the receiver and the callee are one identifier and
 // mutatesCallee is true, so the guard never fires and both versions agree. The first hypothesis
 // reached for a plain call and would have been a fixture that could not see the mutation, which is
 // the brief's "name the input on which the two versions produce different output" catching a wrong
 // guess one step before it became a test.
-func TestAnUnknownMethodCallDoesNotMutateTheMethodItself(t *testing.T) {
-	t.Parallel()
+func TestAnUnknownMethodCallDoesNotMutateTheMethodItself(test *testing.T) {
+	test.Parallel()
 
-	function, table := effectsFor(t, `
+	function, table := effectsFor(test, `
 function f(lib: { doThing(v: object): void }, v: object) { lib.doThing(v); return 1; }`)
 
 	var call *Instruction
@@ -1030,7 +1050,7 @@ function f(lib: { doThing(v: object): void }, v: object) { lib.doThing(v); retur
 		}
 	}
 	if call == nil {
-		t.Fatal("the control failed: no method call was lowered, so nothing below is measured")
+		test.Fatal("the control failed: no method call was lowered, so nothing below is measured")
 	}
 
 	mutatedProperty := false
@@ -1046,11 +1066,11 @@ function f(lib: { doThing(v: object): void }, v: object) { lib.doThing(v); retur
 	}
 
 	if !mutatedAnything {
-		t.Fatal("the control failed: the unknown-callee default recorded no mutation at all, so " +
+		test.Fatal("the control failed: the unknown-callee default recorded no mutation at all, so " +
 			"the assertion below is satisfied by a dead default rather than by the guard")
 	}
 	if mutatedProperty {
-		t.Fatal("calling a method must not record that the method itself was mutated; " +
+		test.Fatal("calling a method must not record that the method itself was mutated; " +
 			"mutatesCallee is false for a MethodCall")
 	}
 }

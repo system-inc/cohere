@@ -20,7 +20,7 @@ import (
 // This is the refusal guard, and it is the single reason autofix can be trusted at all. A rule
 // proposes bytes; nothing about a byte range guarantees the result is a program. A range computed
 // one token off, a replacement missing a closing brace, two fixes that are individually fine and
-// jointly nonsense — all of them produce text that looks plausible in a diff and does not compile.
+// jointly nonsense: all of them produce text that looks plausible in a diff and does not compile.
 // Parsing before writing turns every one of those into a refusal instead of a corrupted file.
 //
 // The check is syntax only, deliberately. A fix that leaves the file parseable but ill-typed is a
@@ -102,7 +102,10 @@ func reasonOf(diagnostics []*ast.Diagnostic) string {
 // Those are all the parser reads besides the module-indicator options, which set a property of the file and
 // no node or diagnostic, so the seed's parse diagnostics are the guard's.
 func seedFor(fileName string, text string, seed *ast.SourceFile) bool {
-	return seed != nil && TypeScriptParsable(fileName) && seed.Text() == text && seed.ScriptKind == guardScriptKind(fileName) &&
+	return seed != nil &&
+		TypeScriptParsable(fileName) &&
+		seed.Text() == text &&
+		seed.ScriptKind == guardScriptKind(fileName) &&
 		tspath.IsDeclarationFileName(seed.FileName().AsString()) == tspath.IsDeclarationFileName(fileName)
 }
 
@@ -155,7 +158,7 @@ func guardScriptKind(fileName string) core.ScriptKind {
 // be on a different filesystem, where rename degrades to copy-and-delete and the atomicity is
 // silently lost.
 //
-// Five agents work in this tree at once, and a half-written file is worse than an unfixed one — an
+// Five agents work in this tree at once, and a half-written file is worse than an unfixed one: an
 // unfixed file still compiles. The failure this prevents is not theoretical here: a half-written
 // file failing to build and then healing two minutes later was observed in this repo tonight.
 //
@@ -165,26 +168,28 @@ func WriteAtomically(fileName string, text string) error {
 	directory := filepath.Dir(fileName)
 
 	mode := os.FileMode(0o644)
-	if info, err := os.Stat(fileName); err == nil {
+	if info, statError := os.Stat(fileName); statError == nil {
 		mode = info.Mode().Perm()
 	}
 
-	temporary, err := os.CreateTemp(directory, "."+filepath.Base(fileName)+".cohere-*")
-	if err != nil {
-		return fmt.Errorf("creating a temp file beside %s: %w", fileName, err)
+	temporary, temporaryFileError := os.CreateTemp(directory, "."+filepath.Base(fileName)+".cohere-*")
+	if temporaryFileError != nil {
+		return fmt.Errorf("creating a temp file beside %s: %w", fileName, temporaryFileError)
 	}
 	temporaryName := temporary.Name()
 
 	// Any failure from here leaves a temp file behind unless it is removed, and a stale dotfile in
 	// a source directory is its own small mess.
 	cleanup := func() {
+		// Ignored: the write already failed and its error is the one returned; the file is abandoned unread.
 		temporary.Close()
+		// Ignored: the failure that brought us here is the one returned, and a leftover dotfile must not mask it.
 		os.Remove(temporaryName)
 	}
 
-	if _, err := temporary.WriteString(text); err != nil {
+	if _, writeStringError := temporary.WriteString(text); writeStringError != nil {
 		cleanup()
-		return fmt.Errorf("writing %s: %w", temporaryName, err)
+		return fmt.Errorf("writing %s: %w", temporaryName, writeStringError)
 	}
 
 	// Sync before rename. Without it the rename can be durable while the contents are not, which on
@@ -192,27 +197,30 @@ func WriteAtomically(fileName string, text string) error {
 	//
 	// This is the one guard in this package with no fixture behind it, and it is called out rather
 	// than left quiet. Removing this call passes every test here, because the failure it prevents
-	// needs the machine to lose power between the rename and the writeback — which no in-process
+	// needs the machine to lose power between the rename and the writeback, which no in-process
 	// test can induce. Every other guard was verified by deliberately breaking it and watching a
 	// fixture go red; this one rests on the argument alone. Treat it accordingly: it is load-bearing
 	// and unverified, so do not remove it because the tests stay green.
-	if err := temporary.Sync(); err != nil {
+	if syncError := temporary.Sync(); syncError != nil {
 		cleanup()
-		return fmt.Errorf("syncing %s: %w", temporaryName, err)
+		return fmt.Errorf("syncing %s: %w", temporaryName, syncError)
 	}
-	if err := temporary.Close(); err != nil {
+	if closeError := temporary.Close(); closeError != nil {
+		// Ignored: the failure that brought us here is the one returned, and a leftover dotfile must not mask it.
 		os.Remove(temporaryName)
-		return fmt.Errorf("closing %s: %w", temporaryName, err)
+		return fmt.Errorf("closing %s: %w", temporaryName, closeError)
 	}
-	if err := os.Chmod(temporaryName, mode); err != nil {
+	if changeModeError := os.Chmod(temporaryName, mode); changeModeError != nil {
+		// Ignored: the failure that brought us here is the one returned, and a leftover dotfile must not mask it.
 		os.Remove(temporaryName)
-		return fmt.Errorf("setting the mode on %s: %w", temporaryName, err)
+		return fmt.Errorf("setting the mode on %s: %w", temporaryName, changeModeError)
 	}
 	// replace.File rather than os.Rename: on Windows a rename over a file another process is reading is
 	// refused for as long as the read takes, and is retried through that.
-	if err := replace.File(temporaryName, fileName); err != nil {
+	if fileError := replace.File(temporaryName, fileName); fileError != nil {
+		// Ignored: the failure that brought us here is the one returned, and a leftover dotfile must not mask it.
 		os.Remove(temporaryName)
-		return fmt.Errorf("renaming %s over %s: %w", temporaryName, fileName, err)
+		return fmt.Errorf("renaming %s over %s: %w", temporaryName, fileName, fileError)
 	}
 
 	return nil

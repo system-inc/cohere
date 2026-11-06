@@ -17,30 +17,30 @@ var javaScriptWhitespace = []rune{
 	0xFEFF,
 }
 
-func TestIsWhitespaceMatchesJavaScript(t *testing.T) {
-	t.Parallel()
+func TestIsWhitespaceMatchesJavaScript(test *testing.T) {
+	test.Parallel()
 
 	// Every code point, so a character added or dropped anywhere fails by name.
 	matched := 0
 	for character := rune(0); character <= unicode.MaxRune; character++ {
 		want := slices.Contains(javaScriptWhitespace, character)
 		if IsWhitespace(character) != want {
-			t.Errorf("IsWhitespace(U+%04X) = %v, want %v", character, !want, want)
+			test.Errorf("IsWhitespace(U+%04X) = %v, want %v", character, !want, want)
 		}
 		if want {
 			matched++
 		}
 	}
 	if matched != 25 {
-		t.Fatalf("the scan matched %d code points, want JavaScript's 25", matched)
+		test.Fatalf("the scan matched %d code points, want JavaScript's 25", matched)
 	}
 }
 
 // TestGoSpaceDiffersFromJavaScriptOnTwoCharacters records why the helper exists: Go's set and
 // JavaScript's differ on exactly the next-line character and the byte order mark. If Go's set ever
 // changes, this says so rather than leaving the helper's doc comment quietly wrong.
-func TestGoSpaceDiffersFromJavaScriptOnTwoCharacters(t *testing.T) {
-	t.Parallel()
+func TestGoSpaceDiffersFromJavaScriptOnTwoCharacters(test *testing.T) {
+	test.Parallel()
 
 	var differences []rune
 	for character := rune(0); character <= unicode.MaxRune; character++ {
@@ -49,12 +49,12 @@ func TestGoSpaceDiffersFromJavaScriptOnTwoCharacters(t *testing.T) {
 		}
 	}
 	if !slices.Equal(differences, []rune{0x0085, 0xFEFF}) {
-		t.Fatalf("Go and JavaScript whitespace differ on %U, want U+0085 and U+FEFF", differences)
+		test.Fatalf("Go and JavaScript whitespace differ on %U, want U+0085 and U+FEFF", differences)
 	}
 }
 
-func TestTrimWhitespace(t *testing.T) {
-	t.Parallel()
+func TestTrimWhitespace(test *testing.T) {
+	test.Parallel()
 
 	cases := map[string]struct{ value, want string }{
 		"spaces and tabs":                                              {" \tvalue\t ", "value"},
@@ -67,17 +67,17 @@ func TestTrimWhitespace(t *testing.T) {
 		"empty":                                                        {"", ""},
 	}
 	for name, testCase := range cases {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
 			if got := TrimWhitespace(testCase.value); got != testCase.want {
-				t.Errorf("TrimWhitespace(%q) = %q, want %q", testCase.value, got, testCase.want)
+				test.Errorf("TrimWhitespace(%q) = %q, want %q", testCase.value, got, testCase.want)
 			}
 		})
 	}
 }
 
-func TestWhitespaceFields(t *testing.T) {
-	t.Parallel()
+func TestWhitespaceFields(test *testing.T) {
+	test.Parallel()
 
 	cases := map[string]struct {
 		value string
@@ -89,10 +89,10 @@ func TestWhitespaceFields(t *testing.T) {
 		"nothing but space":                    {" \u00a0 ", []string{}},
 	}
 	for name, testCase := range cases {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
 			if got := WhitespaceFields(testCase.value); !slices.Equal(got, testCase.want) {
-				t.Errorf("WhitespaceFields(%q) = %q, want %q", testCase.value, got, testCase.want)
+				test.Errorf("WhitespaceFields(%q) = %q, want %q", testCase.value, got, testCase.want)
 			}
 		})
 	}

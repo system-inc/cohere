@@ -2,6 +2,7 @@ package javascript
 
 import (
 	"errors"
+	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -31,7 +32,7 @@ type embedPrinter struct {
 // embedPrinters is upstream's printers list, in its order: the first whose test passes prints.
 var embedPrinters = []embedPrinter{
 	{test: isEmbedCss, print: printEmbedCss},
-	{test: isEmbedGraphQL, print: printEmbedGraphQL},
+	{test: isEmbedGraphQl, print: printEmbedGraphQl},
 	{test: isEmbedHtml, print: printEmbedUnsupported("html")},
 	{test: isAngularComponentTemplate, print: printEmbedUnsupported("angular")},
 	{test: isEmbedMarkdown, print: printEmbedUnsupported("markdown")},
@@ -59,7 +60,9 @@ func embed(path *Path, options *Options) embedPrint {
 	}
 
 	// Special case: whitespace-only template literals
-	if quasis := current.List("quasis"); len(quasis) == 1 && estree.TrimJavaScript(templateElementRaw(quasis[0])) == "" {
+	if quasis := current.List(
+		"quasis",
+	); len(quasis) == 1 && estree.TrimJavaScript(templateElementRaw(quasis[0])) == "" {
 		return func(printing.TextToDoc, PrintFunc, *Path, *Options) (Doc, error) { return doc.Text("``"), nil }
 	}
 
@@ -82,7 +85,7 @@ func holdsTemplateLiteral(node *estree.Node) bool {
 			if holdsTemplateLiteral(child) {
 				return true
 			}
-		case []*estree.Node:
+		case estree.Nodes:
 			for _, element := range child {
 				if holdsTemplateLiteral(element) {
 					return true
@@ -97,9 +100,9 @@ func holdsTemplateLiteral(node *estree.Node) bool {
 // an embed, which print/call-arguments.js and print/arrow-function.js read.
 func createTemplateLiteralPrint(print embedPrint) embedPrint {
 	return func(textToDoc printing.TextToDoc, printFunction PrintFunc, path *Path, options *Options) (Doc, error) {
-		printed, err := print(textToDoc, printFunction, path, options)
-		if err != nil || printed == nil {
-			return nil, err
+		printed, printError := print(textToDoc, printFunction, path, options)
+		if printError != nil || printed == nil {
+			return nil, printError
 		}
 		return label("embed", printed), nil
 	}
@@ -118,22 +121,15 @@ func hasInvalidCookedValue(node Node) bool {
 // template prints as written, as upstream does when an embedded format throws.
 func printEmbedUnsupported(language string) embedPrint {
 	return func(textToDoc printing.TextToDoc, _ PrintFunc, _ *Path, _ *Options) (Doc, error) {
-		return nil, errUnsupportedEmbed(language)
+		return nil, unsupportedEmbedError(language)
 	}
-}
-
-type errUnsupportedEmbed string
-
-func (language errUnsupportedEmbed) Error() string {
-	return "no native printer embeds " + string(language) + " in a template literal yet"
 }
 
 // predicate adapts a (node, key) test to the print core's path.match predicate.
 func predicate(test func(node Node, name string) bool) printing.Predicate[Node] {
-	return func(value any, name any, _ int, _ bool) bool {
-		current, _ := value.(Node)
-		key, _ := name.(string)
-		return current != nil && test(current, key)
+	return func(value PathValue, name string, _ int, _ bool) bool {
+		current, _ := value.Node()
+		return current != nil && test(current, name)
 	}
 }
 
@@ -211,6 +207,8 @@ func isAsConstExpression(node Node) bool {
 
 // embed/css.js
 
+var errorCouldNotInsertExpressions = errors.New("couldn't insert all the expressions")
+
 // printEmbedCss is upstream's printEmbedCss: the template with each expression replaced by a
 // placeholder, formatted as scss, and the expressions put back.
 func printEmbedCss(textToDoc printing.TextToDoc, print PrintFunc, path *Path, options *Options) (Doc, error) {
@@ -224,19 +222,17 @@ func printEmbedCss(textToDoc printing.TextToDoc, print PrintFunc, path *Path, op
 		}
 		text.WriteString(templateElementRaw(quasi))
 	}
-	quasisDoc, err := textToDoc(text.String(), "scss")
-	if err != nil {
-		return nil, err
+	quasisDoc, textToDocError := textToDoc(text.String(), "scss")
+	if textToDocError != nil {
+		return nil, textToDocError
 	}
 	expressionDocs := printTemplateExpressions(path, options, print)
 	newDoc := replacePlaceholders(quasisDoc, expressionDocs)
 	if newDoc == nil {
-		return nil, errCouldNotInsertExpressions
+		return nil, errorCouldNotInsertExpressions
 	}
-	return concatIn(path, "`", indentIn(path, concatIn(path, hardline, newDoc)), softline, "`"), nil
+	return concatIn(path, doc.Text("`"), indentIn(path, concatIn(path, hardline, newDoc)), softline, doc.Text("`")), nil
 }
-
-var errCouldNotInsertExpressions = errors.New("Couldn't insert all the expressions")
 
 var placeholderPattern = regexp.MustCompile(`@prettier-placeholder-(\d+)-id`)
 
@@ -262,9 +258,11 @@ func replacePlaceholders(quasisDoc Doc, expressionDocs []Doc) Doc {
 		position := 0
 		for _, match := range placeholderPattern.FindAllStringSubmatchIndex(string(text), -1) {
 			parts = append(parts, replaceEndOfLine(string(text)[position:match[0]]))
-			number, _ := strconv.Atoi(string(text)[match[2]:match[3]])
+			number, numberError := strconv.Atoi(string(text)[match[2]:match[3]])
 			replaceCounter++
-			if number < len(expressionDocs) {
+			// The pattern matches only digits, so the one error is a number too large for an int, which is past
+			// every expression too.
+			if numberError == nil && number < len(expressionDocs) {
 				parts = append(parts, expressionDocs[number])
 			} else {
 				// expressionDocs[component] is undefined upstream, and the doc printer throws on it.
@@ -293,10 +291,15 @@ func isStyledJsx(path *Path) bool {
 	) ||
 		path.Match(
 			nil,
-			predicate(func(node Node, key string) bool { return key == "expression" && node.Is("JSXExpressionContainer") }),
+			predicate(
+				func(node Node, key string) bool { return key == "expression" && node.Is("JSXExpressionContainer") },
+			),
 			predicate(func(node Node, key string) bool {
 				name := node.Child("openingElement").Child("name")
-				if key != "children" || !node.Is("JSXElement") || !name.Is("JSXIdentifier") || name.String("name") != "style" {
+				if key != "children" ||
+					!node.Is("JSXElement") ||
+					!name.Is("JSXIdentifier") ||
+					name.String("name") != "style" {
 					return false
 				}
 				for _, attribute := range node.Child("openingElement").List("attributes") {
@@ -317,7 +320,8 @@ func isStyledIdentifier(node Node) bool {
 var leadingUppercase = regexp.MustCompile(`^[A-Z]`)
 
 func isStyledExtend(node Node) bool {
-	return leadingUppercase.MatchString(node.Child("object").String("name")) && node.Child("property").String("name") == "extend"
+	return leadingUppercase.MatchString(node.Child("object").String("name")) &&
+		node.Child("property").String("name") == "extend"
 }
 
 // isStyledComponents is upstream's isStyledComponents: styled-components template literals.
@@ -340,9 +344,11 @@ func isStyledComponents(path *Path) bool {
 			callee.Is("MemberExpression") &&
 				(callee.Child("object").Is("MemberExpression") &&
 					// styled.foo.attrs({})`` or Component.extend.attrs({})``
-					(isStyledIdentifier(callee.Child("object").Child("object")) || isStyledExtend(callee.Child("object"))) ||
+					(isStyledIdentifier(callee.Child("object").Child("object")) ||
+						isStyledExtend(callee.Child("object"))) ||
 					// styled(Component).attrs({})``
-					callee.Child("object").Is("CallExpression") && isStyledIdentifier(callee.Child("object").Child("callee")))
+					callee.Child("object").Is("CallExpression") &&
+						isStyledIdentifier(callee.Child("object").Child("callee")))
 	case "Identifier":
 		// css``
 		return tag.String("name") == "css"
@@ -350,15 +356,15 @@ func isStyledComponents(path *Path) bool {
 	return false
 }
 
-// isCssProp is upstream's isCssProp: the css={`...`} JSX attribute.
-func isCssProp(path *Path) bool {
+// isCssProperty is upstream's isCssProperty: the css={`...`} JSX attribute.
+func isCssProperty(path *Path) bool {
 	parent, grandparent := parentOf(path), grandparentOf(path)
 	return grandparent.Is("JSXAttribute") && parent.Is("JSXExpressionContainer") &&
 		grandparent.Child("name").Is("JSXIdentifier") && grandparent.Child("name").String("name") == "css"
 }
 
 func isEmbedCss(path *Path) bool {
-	return isStyledJsx(path) || isStyledComponents(path) || isCssProp(path) || isAngularComponentStyles(path)
+	return isStyledJsx(path) || isStyledComponents(path) || isCssProperty(path) || isAngularComponentStyles(path)
 }
 
 // embed/html.js's test.
@@ -383,32 +389,47 @@ func isEmbedMarkdown(path *Path) bool {
 
 // embed/graphql.js
 
-// printEmbedGraphQL is upstream's printEmbedGraphQL.
-func printEmbedGraphQL(textToDoc printing.TextToDoc, print PrintFunc, path *Path, options *Options) (Doc, error) {
+// commentAtLineEnd is upstream's /#[^\n\r]*$/ over one line.
+var commentAtLineEnd = regexp.MustCompile(`#[^\n\r]*$`)
+
+// printEmbedGraphQl is upstream's printEmbedGraphQl.
+func printEmbedGraphQl(textToDoc printing.TextToDoc, print PrintFunc, path *Path, options *Options) (Doc, error) {
 	current := node(path)
 	quasis := current.List("quasis")
-	numQuasis := len(quasis)
+	quasiCount := len(quasis)
 
 	expressionDocs := printTemplateExpressions(path, options, print)
 	parts := []Doc{}
 
-	for index := 0; index < numQuasis; index++ {
+	for index := 0; index < quasiCount; index++ {
 		templateElement := quasis[index]
 		isFirst := index == 0
-		isLast := index == numQuasis-1
-		text := *templateElement.Get("value").(*estree.TemplateValue).Cooked
+		isLast := index == quasiCount-1
+		value, isTemplateValue := templateElement.Get("value").(*estree.TemplateValue)
+		if !isTemplateValue || value == nil || value.Cooked == nil {
+			// embed sends no template here whose hasInvalidCookedValue holds, so a miss is a tree that broke
+			// that; failing the embed prints the template as written.
+			return nil, fmt.Errorf(
+				"reading quasi %d of a graphql template: its value is a %T with no cooked text",
+				index,
+				templateElement.Get("value"),
+			)
+		}
+		text := *value.Cooked
 
 		lines := strings.Split(text, "\n")
-		numLines := len(lines)
+		lineCount := len(lines)
 
 		// Bail out if an interpolation occurs within a comment.
-		if !isLast && commentAtLineEnd.MatchString(lines[numLines-1]) {
+		if !isLast && commentAtLineEnd.MatchString(lines[lineCount-1]) {
 			return nil, nil
 		}
 
-		startsWithBlankLine := numLines > 2 && estree.TrimJavaScript(lines[0]) == "" && estree.TrimJavaScript(lines[1]) == ""
-		endsWithBlankLine := numLines > 2 && estree.TrimJavaScript(lines[numLines-1]) == "" &&
-			estree.TrimJavaScript(lines[numLines-2]) == ""
+		startsWithBlankLine := lineCount > 2 &&
+			estree.TrimJavaScript(lines[0]) == "" &&
+			estree.TrimJavaScript(lines[1]) == ""
+		endsWithBlankLine := lineCount > 2 && estree.TrimJavaScript(lines[lineCount-1]) == "" &&
+			estree.TrimJavaScript(lines[lineCount-2]) == ""
 
 		commentsAndWhitespaceOnly := true
 		for _, line := range lines {
@@ -422,9 +443,9 @@ func printEmbedGraphQL(textToDoc printing.TextToDoc, print PrintFunc, path *Path
 		if commentsAndWhitespaceOnly {
 			printed = printGraphqlComments(lines)
 		} else {
-			var err error
-			if printed, err = textToDoc(text, "graphql"); err != nil {
-				return nil, err
+			var textToDocError error
+			if printed, textToDocError = textToDoc(text, "graphql"); textToDocError != nil {
+				return nil, textToDocError
 			}
 		}
 
@@ -446,11 +467,14 @@ func printEmbedGraphQL(textToDoc printing.TextToDoc, print PrintFunc, path *Path
 		}
 	}
 
-	return concatIn(path, "`", indentIn(path, concatIn(path, hardline, join(hardline, parts))), hardline, "`"), nil
+	return concatIn(
+		path,
+		doc.Text("`"),
+		indentIn(path, concatIn(path, hardline, join(hardline, parts))),
+		hardline,
+		doc.Text("`"),
+	), nil
 }
-
-// commentAtLineEnd is upstream's /#[^\n\r]*$/ over one line.
-var commentAtLineEnd = regexp.MustCompile(`#[^\n\r]*$`)
 
 // isCommentOrWhitespaceLine is upstream's /^\s*(?:#[^\n\r]*)?$/ over one line. JavaScript's \s reaches
 // past ASCII, so the leading whitespace is trimmed with its definition rather than RE2's.
@@ -479,7 +503,7 @@ func printGraphqlComments(lines []string) Doc {
 		if index > 0 && trimmed[index-1] == "" && seenComment {
 			// If a non-first comment is preceded by a blank (whitespace only) line,
 			// add in a blank line.
-			parts = append(parts, concat(hardline, textLine))
+			parts = append(parts, concat(hardline, textDoc(textLine)))
 		} else {
 			parts = append(parts, doc.Text(textLine))
 		}
@@ -494,7 +518,7 @@ func printGraphqlComments(lines []string) Doc {
 	return join(hardline, parts)
 }
 
-// isEmbedGraphQL is upstream's isEmbedGraphQL:
+// isEmbedGraphQl is upstream's isEmbedGraphQl:
 //
 //	react-relay and graphql-tag
 //	graphql`...`
@@ -504,7 +528,7 @@ func printGraphqlComments(lines []string) Doc {
 //
 // This intentionally excludes Relay Classic tags, as Prettier does not
 // support Relay Classic formatting.
-func isEmbedGraphQL(path *Path) bool {
+func isEmbedGraphQl(path *Path) bool {
 	parent := parentOf(path)
 	if hasLanguageComment(path, "GraphQL") {
 		return true

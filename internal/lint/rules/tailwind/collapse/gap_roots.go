@@ -198,7 +198,10 @@ var GapRootDescriptions = map[string]*FunctionalUtilityDescription{
 		StaticValueNames: map[string]bool{"none": true, "inherit": true},
 	},
 	"inset-shadow": {
-		Arms:             []FunctionalUtilityArm{themeArm("--inset-shadow"), colorArm("--inset-shadow-color", "--color")},
+		Arms: []FunctionalUtilityArm{
+			themeArm("--inset-shadow"),
+			colorArm("--inset-shadow-color", "--color"),
+		},
 		StaticValueNames: map[string]bool{"none": true, "inherit": true},
 	},
 	"text-shadow": {
@@ -214,7 +217,9 @@ var GapRootDescriptions = map[string]*FunctionalUtilityDescription{
 	// `duration` resolves through one namespace and appends `ms` to a bare integer, and answers
 	// `initial` directly.
 	"duration": {
-		Arms:             []FunctionalUtilityArm{{ThemeKeys: []string{"--transition-duration"}, BareValue: BareValuePositiveInteger, BareValueSuffix: "ms"}},
+		Arms: []FunctionalUtilityArm{
+			{ThemeKeys: []string{"--transition-duration"}, BareValue: BareValuePositiveInteger, BareValueSuffix: "ms"},
+		},
 		StaticValueNames: map[string]bool{"initial": true},
 	},
 
@@ -266,11 +271,25 @@ var GapRootDescriptions = map[string]*FunctionalUtilityDescription{
 	// The negative spellings. Upstream registers each as a second root whose resolved value is
 	// negated, and the description is the positive root's with the flag set, which is what
 	// `SupportsNegative` means everywhere else in this port.
-	"-scale":    {SupportsNegative: true, Arms: []FunctionalUtilityArm{{ThemeKeys: []string{"--scale"}, BareValue: BareValuePositiveInteger}}},
-	"scale":     {Arms: []FunctionalUtilityArm{{ThemeKeys: []string{"--scale"}, BareValue: BareValuePositiveInteger}}},
-	"-rotate":   {SupportsNegative: true, Arms: []FunctionalUtilityArm{{ThemeKeys: []string{"--rotate"}, BareValue: BareValuePositiveInteger, BareValueSuffix: "deg"}}},
-	"rotate":    {Arms: []FunctionalUtilityArm{{ThemeKeys: []string{"--rotate"}, BareValue: BareValuePositiveInteger, BareValueSuffix: "deg"}}},
-	"-bg-conic": {SupportsNegative: true, DefaultValue: "in oklab", DefaultValuePresent: true, Arms: []FunctionalUtilityArm{{ThemeKeys: []string{"--conic"}, BareValue: BareValuePositiveInteger}}},
+	"-scale": {
+		SupportsNegative: true,
+		Arms:             []FunctionalUtilityArm{{ThemeKeys: []string{"--scale"}, BareValue: BareValuePositiveInteger}},
+	},
+	"scale": {Arms: []FunctionalUtilityArm{{ThemeKeys: []string{"--scale"}, BareValue: BareValuePositiveInteger}}},
+	"-rotate": {SupportsNegative: true, Arms: []FunctionalUtilityArm{
+		{ThemeKeys: []string{"--rotate"}, BareValue: BareValuePositiveInteger, BareValueSuffix: "deg"},
+	}},
+	"rotate": {Arms: []FunctionalUtilityArm{
+		{ThemeKeys: []string{"--rotate"}, BareValue: BareValuePositiveInteger, BareValueSuffix: "deg"},
+	}},
+	"-bg-conic": {
+		SupportsNegative:    true,
+		DefaultValue:        "in oklab",
+		DefaultValuePresent: true,
+		Arms: []FunctionalUtilityArm{
+			{ThemeKeys: []string{"--conic"}, BareValue: BareValuePositiveInteger},
+		},
+	},
 }
 
 // ClassValueResolvesIn reports whether a parsed class resolves to a value the engine would compile.

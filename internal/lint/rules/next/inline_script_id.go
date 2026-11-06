@@ -114,14 +114,14 @@ var messageInlineScriptId = rule.Message{
 // the whole JsxElement, and that is a disagreement in which oxc is the port target.
 //
 // No fix. Upstream ships none, and the repair is a name only the author can choose.
-var InlineScriptId = rule.Rule{
+var InlineScriptId = rule.Rule[rule.NoOptions]{
 	// No namespace prefix. The config writes `nextjs/inline-script-id` and the parity guard strips
 	// the namespace on a `/` boundary, so a prefixed name would match no inventory entry and lint no
 	// files while every fixture in this package stayed green.
 	Name: "@next/next/inline-script-id",
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		scriptNames := defaultImportNamesOf(ctx.SourceFile, "next/script")
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		scriptNames := defaultImportNamesOf(ruleContext.SourceFile, "next/script")
 		if len(scriptNames) == 0 {
 			// Nothing in this file binds the framework's script component, so no element can
 			// report. Upstream reaches the same conclusion by finding no import specifier to
@@ -155,14 +155,14 @@ var InlineScriptId = rule.Rule{
 					childCount = len(element.Children.Nodes)
 				}
 				reportInlineScriptWithoutId(
-					ctx, scriptNames, opening.TagName, opening.Attributes, childCount > 0,
+					ruleContext, scriptNames, opening.TagName, opening.Attributes, childCount > 0,
 				)
 			},
 
 			ast.KindJsxSelfClosingElement: func(node *ast.Node) {
 				element := node.AsJsxSelfClosingElement()
 				reportInlineScriptWithoutId(
-					ctx, scriptNames, element.TagName, element.Attributes, false,
+					ruleContext, scriptNames, element.TagName, element.Attributes, false,
 				)
 			},
 		}
@@ -177,7 +177,7 @@ var InlineScriptId = rule.Rule{
 // observable, but it would also stop reading like the original, which is the thing a later reader
 // checks this against.
 func reportInlineScriptWithoutId(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	scriptNames map[string]bool,
 	tagName *ast.Node,
 	attributes *ast.Node,
@@ -203,7 +203,7 @@ func reportInlineScriptWithoutId(
 	if !hasChildren && !attributeNames["dangerouslySetInnerHTML"] {
 		return
 	}
-	ctx.ReportNode(tagName, messageInlineScriptId)
+	ruleContext.ReportNode(tagName, messageInlineScriptId)
 }
 
 // attributeNamesIncludingObjectSpreads returns the attribute names an element writes, reading the
@@ -263,6 +263,8 @@ func attributeNamesIncludingObjectSpreads(attributes *ast.Node) (map[string]bool
 // `ast.TryGetTextOfPropertyName` resolves the string and computed forms and is not used for exactly
 // that reason. Reaching for it would silence inputs upstream reports, which reads as a correctness
 // improvement and is a divergence.
+//
+// Mutates: names the keys of each object literal join one set, so every spread adds to the same answer
 func collectStaticIdentifierKeys(objectLiteral *ast.Node, names map[string]bool) {
 	properties := objectLiteral.AsObjectLiteralExpression().Properties
 	if properties == nil {

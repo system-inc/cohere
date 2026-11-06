@@ -12,13 +12,13 @@ import (
 // A pass that prunes everything and a pass that prunes nothing both satisfy any assertion phrased
 // only about the pruned side. Both directions are asserted first, on real source, so the cases below
 // are known to be discriminating rather than assumed to be.
-func TestPruneUnusedScopesPrunesSomethingAndKeepsSomething(t *testing.T) {
-	t.Parallel()
+func TestPruneUnusedScopesPrunesSomethingAndKeepsSomething(test *testing.T) {
+	test.Parallel()
 
 	functions, scopes, pruned, kept := 0, 0, 0, 0
 
-	forEachCorpusFunctionWithChecker(t, 200, func(function *Function, checker *shimchecker.Checker) {
-		tree, dependencies := prunableTree(t, function, checker)
+	forEachCorpusFunctionWithChecker(test, 200, func(function *Function, checker *shimchecker.Checker) {
+		tree, dependencies := prunableTree(test, function, checker)
 		if tree == nil {
 			return
 		}
@@ -37,22 +37,22 @@ func TestPruneUnusedScopesPrunesSomethingAndKeepsSomething(t *testing.T) {
 	})
 
 	if functions < 50 {
-		t.Fatalf("only %d functions reached the pass; the corpus walk is not reaching real source",
+		test.Fatalf("only %d functions reached the pass; the corpus walk is not reaching real source",
 			functions)
 	}
 	if scopes == 0 {
-		t.Fatal("the corpus produced no scopes, so pruning none proves nothing")
+		test.Fatal("the corpus produced no scopes, so pruning none proves nothing")
 	}
 	if pruned == 0 {
-		t.Error("no scope was pruned across the whole corpus; the rule reads the pruned set and " +
+		test.Error("no scope was pruned across the whole corpus; the rule reads the pruned set and " +
 			"would see every scope as live")
 	}
 	if kept == 0 {
-		t.Error("every scope was pruned; a pass that prunes unconditionally passes any assertion " +
+		test.Error("every scope was pruned; a pass that prunes unconditionally passes any assertion " +
 			"phrased about the pruned side alone")
 	}
 
-	t.Logf("functions=%d scopes=%d pruned=%d kept=%d", functions, scopes, pruned, kept)
+	test.Logf("functions=%d scopes=%d pruned=%d kept=%d", functions, scopes, pruned, kept)
 }
 
 // TestPruneUnusedScopesKeepsScopesHoldingAReturn pins the condition that is not obvious.
@@ -61,8 +61,8 @@ func TestPruneUnusedScopesPrunesSomethingAndKeepsSomething(t *testing.T) {
 // memoized is early-returned from inside it and `propagateEarlyReturns` rewrites that shape later.
 // Pruning it here would delete a scope a downstream pass still needs, and nothing about the
 // resulting tree would look wrong.
-func TestPruneUnusedScopesKeepsScopesHoldingAReturn(t *testing.T) {
-	t.Parallel()
+func TestPruneUnusedScopesKeepsScopesHoldingAReturn(test *testing.T) {
+	test.Parallel()
 
 	// A scope with no declarations at all, so only the return condition can keep it.
 	withReturn := &ReactiveScopeBlock{Scope: 1, Instructions: ReactiveBlock{
@@ -70,11 +70,11 @@ func TestPruneUnusedScopesKeepsScopesHoldingAReturn(t *testing.T) {
 	}}
 	tree := &ReactiveFunction{Body: ReactiveBlock{withReturn}}
 	if PruneUnusedScopes(tree, &ScopeDependencies{}) != 0 {
-		t.Error("a scope holding a return was pruned; the memoized value is early-returned from " +
+		test.Error("a scope holding a return was pruned; the memoized value is early-returned from " +
 			"inside it and propagateEarlyReturns needs the scope standing")
 	}
 	if withReturn.Pruned {
-		t.Error("the scope was marked pruned")
+		test.Error("the scope was marked pruned")
 	}
 
 	// The control: the same scope without the return must prune, or the case above passes for the
@@ -82,7 +82,7 @@ func TestPruneUnusedScopesKeepsScopesHoldingAReturn(t *testing.T) {
 	withoutReturn := &ReactiveScopeBlock{Scope: 1}
 	control := &ReactiveFunction{Body: ReactiveBlock{withoutReturn}}
 	if PruneUnusedScopes(control, &ScopeDependencies{}) != 1 {
-		t.Fatal("the control scope, identical but for the return, was not pruned; the case above " +
+		test.Fatal("the control scope, identical but for the return, was not pruned; the case above " +
 			"is therefore not testing the return condition")
 	}
 
@@ -96,7 +96,7 @@ func TestPruneUnusedScopesKeepsScopesHoldingAReturn(t *testing.T) {
 	}}
 	nestedTree := &ReactiveFunction{Body: ReactiveBlock{nested}}
 	if PruneUnusedScopes(nestedTree, &ScopeDependencies{}) != 0 {
-		t.Error("a scope whose return sits inside an if was pruned; the walk is not descending " +
+		test.Error("a scope whose return sits inside an if was pruned; the walk is not descending " +
 			"into terminals")
 	}
 }
@@ -106,8 +106,8 @@ func TestPruneUnusedScopesKeepsScopesHoldingAReturn(t *testing.T) {
 // The distinction that matters is between a declaration a scope produced and one that bubbled up
 // from a scope nested inside it. Only the first keeps the scope, and telling them apart is the
 // entire reason `ScopeDependencies` records an origin.
-func TestPruneUnusedScopesKeepsScopesWithOwnDeclarations(t *testing.T) {
-	t.Parallel()
+func TestPruneUnusedScopesKeepsScopesWithOwnDeclarations(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name        string
@@ -119,8 +119,8 @@ func TestPruneUnusedScopesKeepsScopesWithOwnDeclarations(t *testing.T) {
 		{name: "declaration bubbled up from within", origin: 2, originKnown: true, wantPruned: true},
 		{name: "origin unknown keeps the scope", originKnown: false, wantPruned: false},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			dependencies := &ScopeDependencies{
 				declarations: map[ScopeId][]static_single_assignment.IdentifierId{1: {7}},
 			}
@@ -133,7 +133,7 @@ func TestPruneUnusedScopesKeepsScopesWithOwnDeclarations(t *testing.T) {
 			PruneUnusedScopes(tree, dependencies)
 
 			if scope.Pruned != testCase.wantPruned {
-				t.Errorf("pruned=%t, want %t", scope.Pruned, testCase.wantPruned)
+				test.Errorf("pruned=%t, want %t", scope.Pruned, testCase.wantPruned)
 			}
 		})
 	}
@@ -142,8 +142,8 @@ func TestPruneUnusedScopesKeepsScopesWithOwnDeclarations(t *testing.T) {
 // TestPruneUnusedScopesKeepsScopesWithReassignments covers the arm the corpus barely exercises.
 //
 // Only 2 of 1,576 corpus scopes carry a reassignment, so corpus coverage says almost nothing here.
-func TestPruneUnusedScopesKeepsScopesWithReassignments(t *testing.T) {
-	t.Parallel()
+func TestPruneUnusedScopesKeepsScopesWithReassignments(test *testing.T) {
+	test.Parallel()
 
 	dependencies := &ScopeDependencies{
 		reassignments: map[ScopeId][]static_single_assignment.IdentifierId{1: {7}},
@@ -152,21 +152,21 @@ func TestPruneUnusedScopesKeepsScopesWithReassignments(t *testing.T) {
 	tree := &ReactiveFunction{Body: ReactiveBlock{scope}}
 
 	if PruneUnusedScopes(tree, dependencies) != 0 {
-		t.Error("a scope carrying a reassignment was pruned")
+		test.Error("a scope carrying a reassignment was pruned")
 	}
 
 	// The control, so this is known to be the reassignment doing the work.
 	bare := &ReactiveScopeBlock{Scope: 1}
 	control := &ReactiveFunction{Body: ReactiveBlock{bare}}
 	if PruneUnusedScopes(control, &ScopeDependencies{}) != 1 {
-		t.Fatal("the control scope was not pruned, so the case above is not testing reassignments")
+		test.Fatal("the control scope was not pruned, so the case above is not testing reassignments")
 	}
 }
 
 // prunableTree builds the tree this pass runs on, at the pipeline stage that delivers it.
-func prunableTree(t *testing.T, function *Function,
+func prunableTree(test *testing.T, function *Function,
 	checker *shimchecker.Checker) (*ReactiveFunction, *ScopeDependencies) {
-	t.Helper()
+	test.Helper()
 
 	ranges := InferMutableRanges(function)
 	set := FindDisjointMutableValuesWithRanges(function, ranges)

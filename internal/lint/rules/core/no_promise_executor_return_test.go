@@ -17,17 +17,17 @@ const promiseExecutorFile = "/repository/source/PromiseExecutor.ts"
 // decoder rather than building the struct directly.
 //
 // An empty string means the rule is configured as bare "error", which is what the live config
-// does and what hands the rule nil.
-func decodedPromiseExecutorOptions(t *testing.T, raw string) any {
-	t.Helper()
+// does and what runs the rule unconfigured.
+func decodedPromiseExecutorOptions(test *testing.T, raw string) rule.Given[NoPromiseExecutorReturnOptions] {
+	test.Helper()
 	if raw == "" {
-		return nil
+		return rule.Given[NoPromiseExecutorReturnOptions]{}
 	}
-	options, err := DecodeNoPromiseExecutorReturnOptions(json.RawMessage(raw))
-	if err != nil {
-		t.Fatalf("the decoder refused %s: %v", raw, err)
+	options, decodeNoPromiseExecutorReturnOptionsError := DecodeNoPromiseExecutorReturnOptions(json.RawMessage(raw))
+	if decodeNoPromiseExecutorReturnOptionsError != nil {
+		test.Fatalf("the decoder refused %s: %v", raw, decodeNoPromiseExecutorReturnOptionsError)
 	}
-	return options
+	return rule.Configured(options)
 }
 
 // The corpus is ESLint's own, at `tests/lib/rules/no-promise-executor-return.js`, extracted
@@ -37,8 +37,8 @@ func decodedPromiseExecutorOptions(t *testing.T, raw string) any {
 // 66 clean cases upstream, of which 59 are here. The other seven need a globals or a commonjs
 // global-return surface this harness does not have; they are recorded in
 // `TestNoPromiseExecutorReturnCasesThisHarnessCannotExpress` rather than deleted or greened.
-func TestNoPromiseExecutorReturnStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoPromiseExecutorReturnStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -93,7 +93,10 @@ func TestNoPromiseExecutorReturnStaysSilent(t *testing.T) {
 		{"new Promise(function (resolve, reject) { () => { return 1; } });", ""},
 		{"new Promise((resolve, reject) => { () => 1 });", ""},
 		{"function foo() { return new Promise(function (resolve, reject) { resolve(bar); }) };", ""},
-		{"foo => new Promise((resolve, reject) => { bar(foo, (err, data) => { if (err) { reject(err); return; } resolve(data); })});", ""},
+		{
+			"foo => new Promise((resolve, reject) => { bar(foo, (err, data) => { if (err) { reject(err); return; } resolve(data); })});",
+			"",
+		},
 		{"new Promise(function (resolve, reject) {}); function foo() { return 1; }", ""},
 		{"new Promise((resolve, reject) => {}); (function () { return 1; });", ""},
 		{"new Promise(function (resolve, reject) {}); () => { return 1; };", ""},
@@ -106,10 +109,10 @@ func TestNoPromiseExecutorReturnStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoPromiseExecutorReturn,
-				promiseExecutorFile, testCase.sourceText, decodedPromiseExecutorOptions(t, testCase.options)))
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTypedGiven(test, NoPromiseExecutorReturn,
+				promiseExecutorFile, testCase.sourceText, decodedPromiseExecutorOptions(test, testCase.options)))
 		})
 	}
 }
@@ -120,8 +123,8 @@ func TestNoPromiseExecutorReturnStaysSilent(t *testing.T) {
 // means the rule offers nothing, and the empty list means it considered offering and declined,
 // which happens for an unnamed function or class body that braces would make invalid syntax.
 // Both arrive here as a zero-length want, and the distinction is recorded in the rule.
-func TestNoPromiseExecutorReturnFires(t *testing.T) {
-	t.Parallel()
+func TestNoPromiseExecutorReturnFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText  string
@@ -129,7 +132,11 @@ func TestNoPromiseExecutorReturnFires(t *testing.T) {
 		wantSuggest []string
 	}{
 		{"new Promise(function (resolve, reject) { return 1; })", "", nil},
-		{"new Promise((resolve, reject) => resolve(1))", "{\"allowVoid\": true}", []string{"prependVoid", "wrapBraces"}},
+		{
+			"new Promise((resolve, reject) => resolve(1))",
+			"{\"allowVoid\": true}",
+			[]string{"prependVoid", "wrapBraces"},
+		},
 		{"new Promise((resolve, reject) => { return 1 })", "{\"allowVoid\": true}", []string{"prependVoid"}},
 		{"new Promise(r => 1)", "{\"allowVoid\": true}", []string{"prependVoid", "wrapBraces"}},
 		{"new Promise(r => 1 ? 2 : 3)", "{\"allowVoid\": true}", []string{"prependVoid", "wrapBraces"}},
@@ -191,17 +198,17 @@ func TestNoPromiseExecutorReturnFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoPromiseExecutorReturn,
-				promiseExecutorFile, testCase.sourceText, decodedPromiseExecutorOptions(t, testCase.options))
-			rule_testing.ExpectFindings(t, result, "returnsValue")
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedGiven(test, NoPromiseExecutorReturn,
+				promiseExecutorFile, testCase.sourceText, decodedPromiseExecutorOptions(test, testCase.options))
+			rule_testing.ExpectFindings(test, result, "returnsValue")
 			got := []string{}
 			for _, suggestion := range result.Diagnostics[0].Suggestions {
 				got = append(got, suggestion.Message.Id)
 			}
 			if strings.Join(got, ",") != strings.Join(testCase.wantSuggest, ",") {
-				t.Errorf("offered suggestions %v, want %v", got, testCase.wantSuggest)
+				test.Errorf("offered suggestions %v, want %v", got, testCase.wantSuggest)
 			}
 		})
 	}
@@ -217,11 +224,11 @@ func TestNoPromiseExecutorReturnFires(t *testing.T) {
 // so reporting the body node directly would span `(1)`. `((1))` unwraps all the way down to `1`,
 // which is why the rule unwraps in a loop rather than one step.
 //
-// The FIX anchors run the OTHER way. `wrapBraces` on `new Promise(r => (1))` writes `{(1)}`, so
+// The fix anchors run the other way. `wrapBraces` on `new Promise(r => (1))` writes `{(1)}`, so
 // the braces sit outside the parentheses the span excludes. One node, two answers, and only a
 // span assertion beside a suggestion-output assertion records which is which.
-func TestNoPromiseExecutorReturnSpans(t *testing.T) {
-	t.Parallel()
+func TestNoPromiseExecutorReturnSpans(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText   string
@@ -240,17 +247,17 @@ func TestNoPromiseExecutorReturnSpans(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoPromiseExecutorReturn,
-				promiseExecutorFile, testCase.sourceText, decodedPromiseExecutorOptions(t, testCase.options))
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedGiven(test, NoPromiseExecutorReturn,
+				promiseExecutorFile, testCase.sourceText, decodedPromiseExecutorOptions(test, testCase.options))
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("want one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("want one finding, got %d", len(result.Diagnostics))
 			}
 			source := result.SourceFile.Text()
 			reported := source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 			if reported != testCase.wantReported {
-				t.Errorf("the finding points at %q, want %q", reported, testCase.wantReported)
+				test.Errorf("the finding points at %q, want %q", reported, testCase.wantReported)
 			}
 		})
 	}
@@ -265,47 +272,59 @@ func TestNoPromiseExecutorReturnSpans(t *testing.T) {
 // module is legal; our harness parses TypeScript modules where a bare top-level return is a syntax
 // error rather than a construct the rule declines.
 //
-// The directive-comment one is worth naming separately because it is the case that FAILED rather
+// The directive-comment one is worth naming separately because it is the case that failed rather
 // than merely being unexpressible: this port reports it, because `Promise` there does resolve to the
 // standard library and nothing reads the comment. Reproducing upstream's silence needs a
 // configured-globals layer, which cohere does not carry.
 //
 // Both are facts about the harness rather than about the rule, so hiding them inside a relaxed
-// rule would turn them into facts about the rule. What IS asserted here is the part that does not
+// rule would turn them into facts about the rule. What is asserted here is the part that does not
 // depend on the missing surface: each input reaches the rule and the rule does not crash on it.
-func TestNoPromiseExecutorReturnCasesThisHarnessCannotExpress(t *testing.T) {
-	t.Parallel()
+func TestNoPromiseExecutorReturnCasesThisHarnessCannotExpress(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
 		reason     string
 	}{
 		{"new Promise((resolve, reject) => { return 1; });", "needs a configured-globals surface"},
-		{"/* globals Promise:off */ new Promise(function (resolve, reject) { return 1; });", "needs a directive-comment globals surface"},
+		{
+			"/* globals Promise:off */ new Promise(function (resolve, reject) { return 1; });",
+			"needs a directive-comment globals surface",
+		},
 		{"return 1;", "needs commonjs or globalReturn, where a top-level return is legal"},
 		{"return 1;", "needs commonjs or globalReturn, where a top-level return is legal"},
-		{"return 1; function foo(){ return 1; } return 1;", "needs commonjs or globalReturn, where a top-level return is legal"},
-		{"function foo(){} return 1; var bar = function*(){ return 1; }; return 1; var baz = () => {}; return 1;", "needs commonjs or globalReturn, where a top-level return is legal"},
-		{"new Promise(function (resolve, reject) {}); return 1;", "needs commonjs or globalReturn, where a top-level return is legal"},
+		{
+			"return 1; function foo(){ return 1; } return 1;",
+			"needs commonjs or globalReturn, where a top-level return is legal",
+		},
+		{
+			"function foo(){} return 1; var bar = function*(){ return 1; }; return 1; var baz = () => {}; return 1;",
+			"needs commonjs or globalReturn, where a top-level return is legal",
+		},
+		{
+			"new Promise(function (resolve, reject) {}); return 1;",
+			"needs commonjs or globalReturn, where a top-level return is legal",
+		},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
 			// Not asserted clean, because the surface that makes them clean upstream is absent here.
 			// Asserted only to run, so a later crash on one of these shapes fails loudly.
-			rule_testing.RunTypedWithOptions(t, NoPromiseExecutorReturn, promiseExecutorFile,
-				testCase.sourceText, nil)
-			t.Logf("upstream holds this clean, and reproducing that %s", testCase.reason)
+			rule_testing.RunTyped(test, NoPromiseExecutorReturn, promiseExecutorFile,
+				testCase.sourceText)
+			test.Logf("upstream holds this clean, and reproducing that %s", testCase.reason)
 		})
 	}
 }
 
-// The decoder is the line with no upstream counterpart. `allowVoid` defaults to FALSE, so the
+// The decoder is the line with no upstream counterpart. `allowVoid` defaults to false, so the
 // zero value happens to be right, and the fallback is written out anyway so a later default change
 // cannot invert the rule silently.
-func TestDecodeNoPromiseExecutorReturnOptions(t *testing.T) {
-	t.Parallel()
+func TestDecodeNoPromiseExecutorReturnOptions(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name string
@@ -319,41 +338,39 @@ func TestDecodeNoPromiseExecutorReturnOptions(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			decoded, err := DecodeNoPromiseExecutorReturnOptions(json.RawMessage(testCase.raw))
-			if err != nil {
-				t.Fatalf("the decoder refused %q: %v", testCase.raw, err)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			decoded, decodeNoPromiseExecutorReturnOptionsError := DecodeNoPromiseExecutorReturnOptions(
+				json.RawMessage(testCase.raw),
+			)
+			if decodeNoPromiseExecutorReturnOptionsError != nil {
+				test.Fatalf("the decoder refused %q: %v", testCase.raw, decodeNoPromiseExecutorReturnOptionsError)
 			}
-			options, isOptions := decoded.(NoPromiseExecutorReturnOptions)
-			if !isOptions {
-				t.Fatalf("the decoder returned %T rather than NoPromiseExecutorReturnOptions", decoded)
-			}
-			got := options.AllowVoid != nil && *options.AllowVoid
+			got := decoded.AllowVoid != nil && *decoded.AllowVoid
 			if got != testCase.want {
-				t.Errorf("allowVoid decodes to %v, want %v", got, testCase.want)
+				test.Errorf("allowVoid decodes to %v, want %v", got, testCase.want)
 			}
 		})
 	}
 }
 
-// A rule configured as bare "error" reaches Run with nil rather than with an options struct. No
+// A rule configured as bare "error" reaches Run with no options rather than an options struct. No
 // fixture routed through the decoder can see that path.
-func TestNoPromiseExecutorReturnWithNilOptionsDefaultsToDisallowingVoid(t *testing.T) {
-	t.Parallel()
+func TestNoPromiseExecutorReturnWithNilOptionsDefaultsToDisallowingVoid(test *testing.T) {
+	test.Parallel()
 
 	// Under the default, `return void 0` still reports: allowVoid is what exempts it.
-	rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, NoPromiseExecutorReturn,
-		promiseExecutorFile, "new Promise(() => { return void 1; })", nil), "returnsValue")
-	rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoPromiseExecutorReturn,
-		promiseExecutorFile, "new Promise(function (resolve, reject) { return; })", nil))
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoPromiseExecutorReturn,
+		promiseExecutorFile, "new Promise(() => { return void 1; })"), "returnsValue")
+	rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoPromiseExecutorReturn,
+		promiseExecutorFile, "new Promise(function (resolve, reject) { return; })"))
 }
 
 // The rule declares NeedsTypeChecker, so the plain harness hands it a nil checker and the guard
 // makes it go completely silent. That is the more dangerous of the two failure modes, because
 // every clean case would then pass vacuously.
-func TestNoPromiseExecutorReturnRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestNoPromiseExecutorReturnRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	// Both listeners, because they guard separately and a test covering only one leaves the other's
 	// guard unmeasured. A mutation removing the arrow listener's guard survived a version of this
@@ -363,12 +380,12 @@ func TestNoPromiseExecutorReturnRequiresTheTypedHarness(t *testing.T) {
 		"new Promise(() => 1)",
 	}
 	for _, sourceText := range cases {
-		t.Run(sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, NoPromiseExecutorReturn,
-				promiseExecutorFile, sourceText, nil), "returnsValue")
-			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoPromiseExecutorReturn,
-				promiseExecutorFile, sourceText, nil))
+		test.Run(sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoPromiseExecutorReturn,
+				promiseExecutorFile, sourceText), "returnsValue")
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoPromiseExecutorReturn,
+				promiseExecutorFile, sourceText))
 		})
 	}
 }
@@ -376,38 +393,41 @@ func TestNoPromiseExecutorReturnRequiresTheTypedHarness(t *testing.T) {
 // The message text is asserted against a literal typed here rather than against the rule's own
 // constant, because comparing a diagnostic to the constant it was built from moves both sides
 // together under mutation and asserts nothing.
-func TestNoPromiseExecutorReturnMessages(t *testing.T) {
-	t.Parallel()
+func TestNoPromiseExecutorReturnMessages(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTypedWithOptions(t, NoPromiseExecutorReturn, promiseExecutorFile,
-		"new Promise(r => 1)", decodedPromiseExecutorOptions(t, `{"allowVoid": true}`))
+	result := rule_testing.RunTypedGiven(test, NoPromiseExecutorReturn, promiseExecutorFile,
+		"new Promise(r => 1)", decodedPromiseExecutorOptions(test, `{"allowVoid": true}`))
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("want one finding, got %d", len(result.Diagnostics))
+		test.Fatalf("want one finding, got %d", len(result.Diagnostics))
 	}
 	if got := result.Diagnostics[0].Message.Id; got != "returnsValue" {
-		t.Errorf("message id is %q, want %q", got, "returnsValue")
+		test.Errorf("message id is %q, want %q", got, "returnsValue")
 	}
-	if got := result.Diagnostics[0].Message.Description; !strings.HasPrefix(got, "This returns a value from a promise executor") {
-		t.Errorf("message description starts %q, which is not the sentence this rule reports", got)
+	if got := result.Diagnostics[0].Message.Description; !strings.HasPrefix(
+		got,
+		"This returns a value from a promise executor",
+	) {
+		test.Errorf("message description starts %q, which is not the sentence this rule reports", got)
 	}
 	wantSuggestionIds := []string{"prependVoid", "wrapBraces"}
 	for index, suggestion := range result.Diagnostics[0].Suggestions {
 		if suggestion.Message.Id != wantSuggestionIds[index] {
-			t.Errorf("suggestion %d is %q, want %q", index, suggestion.Message.Id, wantSuggestionIds[index])
+			test.Errorf("suggestion %d is %q, want %q", index, suggestion.Message.Id, wantSuggestionIds[index])
 		}
 	}
 }
 
 // The 41 suggestion outputs upstream asserts, byte for byte.
 //
-// `rule_testing` can apply a FIX but not a SUGGESTION, so the applier below is hand-rolled. That
+// `rule_testing` can apply a fix but not a suggestion, so the applier below is hand-rolled. That
 // is not optional coverage: a suggestion writing the right text over the wrong span passes any
 // assertion that only compares the text, and this rule's two suggestions are built from two
 // separate insertions each, so the span is most of what can go wrong.
 //
 // Every `output` here is upstream's own, extracted from its corpus rather than retyped.
-func TestNoPromiseExecutorReturnSuggestionOutputs(t *testing.T) {
-	t.Parallel()
+func TestNoPromiseExecutorReturnSuggestionOutputs(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -416,14 +436,44 @@ func TestNoPromiseExecutorReturnSuggestionOutputs(t *testing.T) {
 		wantId     string
 		wantOutput string
 	}{
-		{"new Promise((resolve, reject) => resolve(1))", "{\"allowVoid\": true}", 0, "prependVoid", "new Promise((resolve, reject) => void resolve(1))"},
-		{"new Promise((resolve, reject) => resolve(1))", "{\"allowVoid\": true}", 1, "wrapBraces", "new Promise((resolve, reject) => {resolve(1)})"},
-		{"new Promise((resolve, reject) => { return 1 })", "{\"allowVoid\": true}", 0, "prependVoid", "new Promise((resolve, reject) => { return void 1 })"},
+		{
+			"new Promise((resolve, reject) => resolve(1))",
+			"{\"allowVoid\": true}",
+			0,
+			"prependVoid",
+			"new Promise((resolve, reject) => void resolve(1))",
+		},
+		{
+			"new Promise((resolve, reject) => resolve(1))",
+			"{\"allowVoid\": true}",
+			1,
+			"wrapBraces",
+			"new Promise((resolve, reject) => {resolve(1)})",
+		},
+		{
+			"new Promise((resolve, reject) => { return 1 })",
+			"{\"allowVoid\": true}",
+			0,
+			"prependVoid",
+			"new Promise((resolve, reject) => { return void 1 })",
+		},
 		{"new Promise(r => 1)", "{\"allowVoid\": true}", 0, "prependVoid", "new Promise(r => void 1)"},
 		{"new Promise(r => 1)", "{\"allowVoid\": true}", 1, "wrapBraces", "new Promise(r => {1})"},
-		{"new Promise(r => 1 ? 2 : 3)", "{\"allowVoid\": true}", 0, "prependVoid", "new Promise(r => void (1 ? 2 : 3))"},
+		{
+			"new Promise(r => 1 ? 2 : 3)",
+			"{\"allowVoid\": true}",
+			0,
+			"prependVoid",
+			"new Promise(r => void (1 ? 2 : 3))",
+		},
 		{"new Promise(r => 1 ? 2 : 3)", "{\"allowVoid\": true}", 1, "wrapBraces", "new Promise(r => {1 ? 2 : 3})"},
-		{"new Promise(r => (1 ? 2 : 3))", "{\"allowVoid\": true}", 0, "prependVoid", "new Promise(r => void (1 ? 2 : 3))"},
+		{
+			"new Promise(r => (1 ? 2 : 3))",
+			"{\"allowVoid\": true}",
+			0,
+			"prependVoid",
+			"new Promise(r => void (1 ? 2 : 3))",
+		},
 		{"new Promise(r => (1 ? 2 : 3))", "{\"allowVoid\": true}", 1, "wrapBraces", "new Promise(r => {(1 ? 2 : 3)})"},
 		{"new Promise(r => (1))", "{\"allowVoid\": true}", 0, "prependVoid", "new Promise(r => void (1))"},
 		{"new Promise(r => (1))", "{\"allowVoid\": true}", 1, "wrapBraces", "new Promise(r => {(1)})"},
@@ -435,17 +485,59 @@ func TestNoPromiseExecutorReturnSuggestionOutputs(t *testing.T) {
 		{"new Promise(r => /*hi*/ ~0)", "{\"allowVoid\": true}", 0, "prependVoid", "new Promise(r => /*hi*/ void ~0)"},
 		{"new Promise(r => /*hi*/ ~0)", "{\"allowVoid\": true}", 1, "wrapBraces", "new Promise(r => /*hi*/ {~0})"},
 		{"new Promise(r => /*hi*/ ~0)", "{\"allowVoid\": false}", 0, "wrapBraces", "new Promise(r => /*hi*/ {~0})"},
-		{"new Promise(r => { return 0 })", "{\"allowVoid\": true}", 0, "prependVoid", "new Promise(r => { return void 0 })"},
-		{"new Promise(r => { if (foo) { return void 0 } return 0 })", "{\"allowVoid\": true}", 0, "prependVoid", "new Promise(r => { if (foo) { return void 0 } return void 0 })"},
-		{"new Promise(resolve => { return (foo = resolve(1)); })", "{\"allowVoid\": true}", 0, "prependVoid", "new Promise(resolve => { return void (foo = resolve(1)); })"},
-		{"new Promise(resolve => r = resolve)", "{\"allowVoid\": true}", 0, "prependVoid", "new Promise(resolve => void (r = resolve))"},
-		{"new Promise(resolve => r = resolve)", "{\"allowVoid\": true}", 1, "wrapBraces", "new Promise(resolve => {r = resolve})"},
-		{"new Promise(r => { return(1) })", "{\"allowVoid\": true}", 0, "prependVoid", "new Promise(r => { return void (1) })"},
+		{
+			"new Promise(r => { return 0 })",
+			"{\"allowVoid\": true}",
+			0,
+			"prependVoid",
+			"new Promise(r => { return void 0 })",
+		},
+		{
+			"new Promise(r => { if (foo) { return void 0 } return 0 })",
+			"{\"allowVoid\": true}",
+			0,
+			"prependVoid",
+			"new Promise(r => { if (foo) { return void 0 } return void 0 })",
+		},
+		{
+			"new Promise(resolve => { return (foo = resolve(1)); })",
+			"{\"allowVoid\": true}",
+			0,
+			"prependVoid",
+			"new Promise(resolve => { return void (foo = resolve(1)); })",
+		},
+		{
+			"new Promise(resolve => r = resolve)",
+			"{\"allowVoid\": true}",
+			0,
+			"prependVoid",
+			"new Promise(resolve => void (r = resolve))",
+		},
+		{
+			"new Promise(resolve => r = resolve)",
+			"{\"allowVoid\": true}",
+			1,
+			"wrapBraces",
+			"new Promise(resolve => {r = resolve})",
+		},
+		{
+			"new Promise(r => { return(1) })",
+			"{\"allowVoid\": true}",
+			0,
+			"prependVoid",
+			"new Promise(r => { return void (1) })",
+		},
 		{"new Promise(r =>1)", "{\"allowVoid\": true}", 0, "prependVoid", "new Promise(r =>void 1)"},
 		{"new Promise(r =>1)", "{\"allowVoid\": true}", 1, "wrapBraces", "new Promise(r =>{1})"},
 		{"new Promise(r => ((1)))", "{\"allowVoid\": true}", 0, "prependVoid", "new Promise(r => void ((1)))"},
 		{"new Promise(r => ((1)))", "{\"allowVoid\": true}", 1, "wrapBraces", "new Promise(r => {((1))})"},
-		{"new Promise((resolve, reject) => resolve)", "", 0, "wrapBraces", "new Promise((resolve, reject) => {resolve})"},
+		{
+			"new Promise((resolve, reject) => resolve)",
+			"",
+			0,
+			"wrapBraces",
+			"new Promise((resolve, reject) => {resolve})",
+		},
 		{"new Promise((resolve, reject) => null)", "", 0, "wrapBraces", "new Promise((resolve, reject) => {null})"},
 		{"new Promise((resolve, reject) => x + y)", "", 0, "wrapBraces", "new Promise((resolve, reject) => {x + y})"},
 		{"new Promise(() => (1))", "", 0, "wrapBraces", "new Promise(() => {(1)})"},
@@ -454,26 +546,32 @@ func TestNoPromiseExecutorReturnSuggestionOutputs(t *testing.T) {
 		{"() => new Promise(() => 1);", "", 0, "wrapBraces", "() => new Promise(() => {1});"},
 		{"() => new Promise(() => () => 1);", "", 0, "wrapBraces", "() => new Promise(() => {() => 1});"},
 		{"() => new Promise(() => async () => 1);", "", 0, "wrapBraces", "() => new Promise(() => {async () => 1});"},
-		{"() => new Promise(() => function foo() {});", "", 0, "wrapBraces", "() => new Promise(() => {function foo() {}});"},
+		{
+			"() => new Promise(() => function foo() {});",
+			"",
+			0,
+			"wrapBraces",
+			"() => new Promise(() => {function foo() {}});",
+		},
 		{"() => new Promise(() => class Foo {});", "", 0, "wrapBraces", "() => new Promise(() => {class Foo {}});"},
 		{"() => new Promise(() => []);", "", 0, "wrapBraces", "() => new Promise(() => {[]});"},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText+"/"+testCase.wantId, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoPromiseExecutorReturn,
-				promiseExecutorFile, testCase.sourceText, decodedPromiseExecutorOptions(t, testCase.options))
+		test.Run(testCase.sourceText+"/"+testCase.wantId, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedGiven(test, NoPromiseExecutorReturn,
+				promiseExecutorFile, testCase.sourceText, decodedPromiseExecutorOptions(test, testCase.options))
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("want one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("want one finding, got %d", len(result.Diagnostics))
 			}
 			suggestions := result.Diagnostics[0].Suggestions
 			if testCase.index >= len(suggestions) {
-				t.Fatalf("want a suggestion at index %d, got %d suggestions", testCase.index, len(suggestions))
+				test.Fatalf("want a suggestion at index %d, got %d suggestions", testCase.index, len(suggestions))
 			}
 			suggestion := suggestions[testCase.index]
 			if suggestion.Message.Id != testCase.wantId {
-				t.Fatalf("suggestion %d is %q, want %q", testCase.index, suggestion.Message.Id, testCase.wantId)
+				test.Fatalf("suggestion %d is %q, want %q", testCase.index, suggestion.Message.Id, testCase.wantId)
 			}
 			// The harness applies fixes and not suggestions, so this replays the suggestion's own
 			// fixes the way the engine would: back to front, so an earlier edit cannot move the
@@ -485,8 +583,8 @@ func TestNoPromiseExecutorReturnSuggestionOutputs(t *testing.T) {
 			// newline that upstream's `output` does not carry, and five byte-correct repairs failed
 			// on it before this line existed.
 			wantOutput := strings.TrimSpace(testCase.wantOutput) + "\n"
-			if got := applySuggestion(t, result.SourceFile.Text(), suggestion); got != wantOutput {
-				t.Errorf("applying %q produced:\n  %q\nwant:\n  %q", testCase.wantId, got, wantOutput)
+			if got := applySuggestion(test, result.SourceFile.Text(), suggestion); got != wantOutput {
+				test.Errorf("applying %q produced:\n  %q\nwant:\n  %q", testCase.wantId, got, wantOutput)
 			}
 		})
 	}
@@ -497,24 +595,25 @@ func TestNoPromiseExecutorReturnSuggestionOutputs(t *testing.T) {
 // Same ordering the fix engine and `rule_testing.ExpectFixedSource` use, and for the same reason.
 // Written here rather than in the harness because it is the only rule in this batch that needs it
 // and the harness has no suggestion support at all; if a second rule wants it, it belongs there.
-func applySuggestion(t *testing.T, source string, suggestion rule.Suggestion) string {
-	t.Helper()
+func applySuggestion(test *testing.T, source string, suggestion rule.Suggestion) string {
+	test.Helper()
 	if len(suggestion.Fixes) == 0 {
-		t.Fatalf("suggestion %q carries no fixes, so there is nothing to apply", suggestion.Message.Id)
+		test.Fatalf("suggestion %q carries no fixes, so there is nothing to apply", suggestion.Message.Id)
 	}
 	ordered := make([]rule.Fix, len(suggestion.Fixes))
 	copy(ordered, suggestion.Fixes)
 	sort.Slice(ordered, func(first, second int) bool {
 		return ordered[first].Range.Pos() > ordered[second].Range.Pos()
 	})
+	fixed := source
 	for _, fix := range ordered {
-		if fix.Range.Pos() < 0 || fix.Range.End() > len(source) || fix.Range.Pos() > fix.Range.End() {
-			t.Fatalf("fix range [%d,%d) is outside the source, which is a defect in the rule",
+		if fix.Range.Pos() < 0 || fix.Range.End() > len(fixed) || fix.Range.Pos() > fix.Range.End() {
+			test.Fatalf("fix range [%d,%d) is outside the source, which is a defect in the rule",
 				fix.Range.Pos(), fix.Range.End())
 		}
-		source = source[:fix.Range.Pos()] + fix.Text + source[fix.Range.End():]
+		fixed = fixed[:fix.Range.Pos()] + fix.Text + fixed[fix.Range.End():]
 	}
-	return source
+	return fixed
 }
 
 // Other global constructors called with `new` and a function first argument.
@@ -526,8 +625,8 @@ func applySuggestion(t *testing.T, source string, suggestion rule.Suggestion) st
 // in the name, which is what separates the two tests.
 //
 // All five measured clean against the installed eslint at 10.8.1.
-func TestNoPromiseExecutorReturnStaysSilentOnOtherGlobalConstructors(t *testing.T) {
-	t.Parallel()
+func TestNoPromiseExecutorReturnStaysSilentOnOtherGlobalConstructors(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		"new Array(function (resolve, reject) { return 1; });",
@@ -538,10 +637,10 @@ func TestNoPromiseExecutorReturnStaysSilentOnOtherGlobalConstructors(t *testing.
 	}
 
 	for _, sourceText := range cases {
-		t.Run(sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoPromiseExecutorReturn,
-				promiseExecutorFile, sourceText, nil))
+		test.Run(sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoPromiseExecutorReturn,
+				promiseExecutorFile, sourceText))
 		})
 	}
 }

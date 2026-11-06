@@ -85,15 +85,15 @@ var messageNoDocumentImportInPage = rule.Message{
 // `import` keyword and excludes the leading trivia. `ctx.ReportNode` routes through `TokenRange`
 // and does the same, so the shelf's `imports.SpecifierNode` is not needed to avoid the
 // leading-trivia anchor it exists to solve.
-var NoDocumentImportInPage = rule.Rule{
+var NoDocumentImportInPage = rule.Rule[rule.NoOptions]{
 	// No family prefix. The config writes `nextjs/no-document-import-in-page` and matching strips
 	// the namespace on a `/` boundary, so a prefixed name matches nothing and runs on no files.
 	Name: "@next/next/no-document-import-in-page",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// The document file is allowed to import the module it exists to implement, so it registers
 		// no listener at all rather than being filtered per import. Upstream spells this the same
 		// way, in `should_run`.
-		if nextjs.IsDocumentPage(ctx.SourceFile.FileName().AsString()) {
+		if nextjs.IsDocumentPage(ruleContext.SourceFile.FileName().AsString()) {
 			return nil
 		}
 
@@ -113,7 +113,7 @@ var NoDocumentImportInPage = rule.Rule{
 				if declaration.ModuleSpecifier.Text() != "next/document" {
 					return
 				}
-				ctx.ReportNode(node, messageNoDocumentImportInPage)
+				ruleContext.ReportNode(node, messageNoDocumentImportInPage)
 			},
 		}
 	},

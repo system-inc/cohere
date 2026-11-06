@@ -31,30 +31,29 @@ const forbidForeignPropTypesFile = "/repository/source/ForbidForeignPropTypes.ts
 //
 // Two invalid cases carry upstream's `no-ts` marker, which says its own TypeScript parsers fail
 // them. Ours parses both, and both are imported as reporting, which is upstream's verdict under the
-// parser that can read them. Their marker is a TODO in upstream's file rather than a statement
+// parser that can read them. Their marker is a `TODO` in upstream's file rather than a statement
 // about the rule.
 
 // forbidForeignPropTypesOptions decodes a raw option body the way the config layer does.
 //
 // Fixtures route through the registered decoder rather than building the struct, so the decode path
-// is under test rather than assumed. An empty body is the nil-options case: the decoder errors, the
-// config turns that into nil for a non-required rule, and the rule's type assertion yields the zero
-// struct.
-func forbidForeignPropTypesOptions(t *testing.T, raw string) any {
-	t.Helper()
+// is under test rather than assumed. An empty body is the unconfigured case: the decoder errors on it, so
+// a rule configured as a bare severity is handed no options, and the rule reads its zero struct.
+func forbidForeignPropTypesOptions(test *testing.T, raw string) rule.Given[ForbidForeignPropTypesOptions] {
+	test.Helper()
 	if raw == "" {
-		return nil
+		return rule.Given[ForbidForeignPropTypesOptions]{}
 	}
-	decoded, err := rule.DecodeOptionsInto[ForbidForeignPropTypesOptions]()([]byte(raw))
-	if err != nil {
-		t.Fatalf("decoding %q: %v", raw, err)
+	decoded, decodeOptionsError := rule.DecodeOptionsInto[ForbidForeignPropTypesOptions]()([]byte(raw))
+	if decodeOptionsError != nil {
+		test.Fatalf("decoding %q: %v", raw, decodeOptionsError)
 	}
-	return decoded
+	return rule.Configured(decoded)
 }
 
 // TestForbidForeignPropTypesFires runs the eight failing cases from upstream.
-func TestForbidForeignPropTypesFires(t *testing.T) {
-	t.Parallel()
+func TestForbidForeignPropTypesFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -133,23 +132,23 @@ func TestForbidForeignPropTypesFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(
-				t,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunGiven(
+				test,
 				ForbidForeignPropTypes,
 				forbidForeignPropTypesFile,
 				testCase.sourceText,
-				forbidForeignPropTypesOptions(t, testCase.rawOptions),
+				forbidForeignPropTypesOptions(test, testCase.rawOptions),
 			)
-			rule_testing.ExpectFindings(t, result, "forbiddenPropType")
+			rule_testing.ExpectFindings(test, result, "forbiddenPropType")
 		})
 	}
 }
 
 // TestForbidForeignPropTypesStaysSilent runs the twelve passing cases from upstream.
-func TestForbidForeignPropTypesStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestForbidForeignPropTypesStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -164,7 +163,7 @@ func TestForbidForeignPropTypesStaysSilent(t *testing.T) {
 		{"valid 3 a bare identifier as an argument", `foo(propTypes)`, ""},
 		{"valid 4 a bare identifier in an operand", `foo + propTypes`, ""},
 		{"valid 5 a bare identifier in an array", `const foo = [propTypes]`, ""},
-		// An object LITERAL is not an object PATTERN, and only the pattern arm exists.
+		// An object literal is not an object pattern, and only the pattern arm exists.
 		{"valid 6 a shorthand in an object literal", `const foo = { propTypes }`, ""},
 		{"valid 7 a plain member as an assignment target", `Foo.propTypes = propTypes`, ""},
 		{"valid 8 a computed member as an assignment target", `Foo["propTypes"] = propTypes`, ""},
@@ -190,16 +189,16 @@ func TestForbidForeignPropTypesStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(
-				t,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunGiven(
+				test,
 				ForbidForeignPropTypes,
 				forbidForeignPropTypesFile,
 				testCase.sourceText,
-				forbidForeignPropTypesOptions(t, testCase.rawOptions),
+				forbidForeignPropTypesOptions(test, testCase.rawOptions),
 			)
-			rule_testing.ExpectClean(t, result)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -215,19 +214,19 @@ func TestForbidForeignPropTypesStaysSilent(t *testing.T) {
 // typed program's tsconfig includes only TypeScript extensions. This rule needs no checker, so the
 // untyped harness runs it under any name, but the two suffixes that decide the question are the two
 // here.
-func TestForbidForeignPropTypesHasNoFileSuffixGate(t *testing.T) {
-	t.Parallel()
+func TestForbidForeignPropTypesHasNoFileSuffixGate(test *testing.T) {
+	test.Parallel()
 
 	for _, suffix := range []string{".tsx", ".ts", ".jsx", ".js"} {
-		t.Run(suffix, func(t *testing.T) {
-			t.Parallel()
+		test.Run(suffix, func(test *testing.T) {
+			test.Parallel()
 			result := rule_testing.Run(
-				t,
+				test,
 				ForbidForeignPropTypes,
 				"/repository/source/SuffixProbe"+suffix,
 				`const x = Foo.propTypes;`,
 			)
-			rule_testing.ExpectFindings(t, result, "forbiddenPropType")
+			rule_testing.ExpectFindings(test, result, "forbiddenPropType")
 		})
 	}
 }
@@ -235,11 +234,11 @@ func TestForbidForeignPropTypesHasNoFileSuffixGate(t *testing.T) {
 // TestForbidForeignPropTypesAnchorsOnTheProperty asserts where each finding points.
 //
 // The corpus asserts message ids only, so nothing in it can see a rule reporting the right judgment
-// in the wrong place. Upstream anchors on the PROPERTY node for a member access and on the whole
+// in the wrong place. Upstream anchors on the property node for a member access and on the whole
 // matched property for a destructuring, which are two different choices in one rule, and both were
 // read from upstream's reported columns rather than from its source.
-func TestForbidForeignPropTypesAnchorsOnTheProperty(t *testing.T) {
-	t.Parallel()
+func TestForbidForeignPropTypesAnchorsOnTheProperty(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -258,19 +257,19 @@ func TestForbidForeignPropTypesAnchorsOnTheProperty(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			// The untyped harness does not trim, so the literal and the bytes on disk agree. The
 			// transform is applied anyway so the slice cannot drift if that ever changes.
 			onDisk := testCase.sourceText
-			result := rule_testing.Run(t, ForbidForeignPropTypes, forbidForeignPropTypesFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "forbiddenPropType")
+			result := rule_testing.Run(test, ForbidForeignPropTypes, forbidForeignPropTypesFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "forbiddenPropType")
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
+				test.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
 			}
 			got := onDisk[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 			if got != testCase.wantText {
-				t.Errorf("finding spans %q, want %q", got, testCase.wantText)
+				test.Errorf("finding spans %q, want %q", got, testCase.wantText)
 			}
 		})
 	}
@@ -281,8 +280,8 @@ func TestForbidForeignPropTypesAnchorsOnTheProperty(t *testing.T) {
 // The corpus writes two clean assignment targets and nothing else in this family, so the boundary
 // of the exemption is entirely unasserted by it. Every case here was measured against the installed
 // build, and two of them are upstream reporting on code that plainly writes rather than reads.
-func TestForbidForeignPropTypesExemptsOnlyAssignmentTargets(t *testing.T) {
-	t.Parallel()
+func TestForbidForeignPropTypesExemptsOnlyAssignmentTargets(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -294,7 +293,7 @@ func TestForbidForeignPropTypesExemptsOnlyAssignmentTargets(t *testing.T) {
 		// exempt for the same reason. `ast.IsAssignmentExpression(node, false)` is what reproduces
 		// that; passing true would report here and diverge.
 		{"a compound assignment target is exempt", `Foo.propTypes += 1;`, nil},
-		// An update expression is NOT an AssignmentExpression, so upstream reports on a write.
+		// An update expression is not an AssignmentExpression, so upstream reports on a write.
 		// Reproduced rather than corrected.
 		{"an update expression is not exempt", `Foo.propTypes++;`, []string{"forbiddenPropType"}},
 		{"a delete is not exempt", `delete Foo.propTypes;`, []string{"forbiddenPropType"}},
@@ -302,14 +301,14 @@ func TestForbidForeignPropTypesExemptsOnlyAssignmentTargets(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ForbidForeignPropTypes, forbidForeignPropTypesFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ForbidForeignPropTypes, forbidForeignPropTypesFile, testCase.sourceText)
 			if len(testCase.wantIds) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -317,13 +316,13 @@ func TestForbidForeignPropTypesExemptsOnlyAssignmentTargets(t *testing.T) {
 // TestForbidForeignPropTypesUnwrapsParentheses covers the parser difference, in the direction that
 // costs a false positive.
 //
-// `(Foo.propTypes) = {}` is CLEAN upstream, measured. Its parser folds the parenthesis away so the
-// member access IS the assignment's left. Ours keeps a `KindParenthesizedExpression` between them,
+// `(Foo.propTypes) = {}` is clean upstream, measured. Its parser folds the parenthesis away so the
+// member access is the assignment's left. Ours keeps a `KindParenthesizedExpression` between them,
 // so a naive parent test sees a parenthesis instead of an assignment, concludes the access is not a
 // target, and reports where upstream is silent. No imported fixture can express this: upstream's
 // corpus cannot write the shape, because its parser deleted the node before any test existed.
-func TestForbidForeignPropTypesUnwrapsParentheses(t *testing.T) {
-	t.Parallel()
+func TestForbidForeignPropTypesUnwrapsParentheses(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -335,18 +334,22 @@ func TestForbidForeignPropTypesUnwrapsParentheses(t *testing.T) {
 		{"a doubly parenthesized target is exempt", `((Foo.propTypes)) = {};`, nil},
 		{"a parenthesized receiver still reports", `const x = (Foo).propTypes;`, []string{"forbiddenPropType"}},
 		{"a parenthesized read still reports", `const x = (Foo.propTypes);`, []string{"forbiddenPropType"}},
-		{"a doubly parenthesized receiver still reports", `const x = ((Foo)).propTypes;`, []string{"forbiddenPropType"}},
+		{
+			"a doubly parenthesized receiver still reports",
+			`const x = ((Foo)).propTypes;`,
+			[]string{"forbiddenPropType"},
+		},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ForbidForeignPropTypes, forbidForeignPropTypesFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ForbidForeignPropTypes, forbidForeignPropTypesFile, testCase.sourceText)
 			if len(testCase.wantIds) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -355,8 +358,8 @@ func TestForbidForeignPropTypesUnwrapsParentheses(t *testing.T) {
 //
 // The corpus carries the reporting computed-string case and the declining computed-identifier one,
 // and nothing else in this family. The rest were measured against the installed build.
-func TestForbidForeignPropTypesReadsOnlyLiteralKeys(t *testing.T) {
-	t.Parallel()
+func TestForbidForeignPropTypesReadsOnlyLiteralKeys(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -373,22 +376,30 @@ func TestForbidForeignPropTypesReadsOnlyLiteralKeys(t *testing.T) {
 		{"a string literal pattern key declines", `const { "propTypes": p } = Foo;`, nil},
 		{"a pattern without the key declines", `const { other } = Foo;`, nil},
 		{"a rest only pattern declines", `const { ...rest } = Foo;`, nil},
-		// Upstream uses `properties.find`, so a pattern naming the key twice reports ONCE. A loop
+		// Upstream uses `properties.find`, so a pattern naming the key twice reports once. A loop
 		// that did not stop would report twice, and nothing in the corpus writes the shape.
-		{"a pattern naming it twice reports once", `const { propTypes, propTypes: q } = Foo;`, []string{"forbiddenPropType"}},
-		{"any object pattern counts, including a parameter", `function f({ propTypes }) {}`, []string{"forbiddenPropType"}},
+		{
+			"a pattern naming it twice reports once",
+			`const { propTypes, propTypes: q } = Foo;`,
+			[]string{"forbiddenPropType"},
+		},
+		{
+			"any object pattern counts, including a parameter",
+			`function f({ propTypes }) {}`,
+			[]string{"forbiddenPropType"},
+		},
 		{"a nested pattern counts", `const { a: { propTypes } } = Foo;`, []string{"forbiddenPropType"}},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ForbidForeignPropTypes, forbidForeignPropTypesFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ForbidForeignPropTypes, forbidForeignPropTypesFile, testCase.sourceText)
 			if len(testCase.wantIds) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -398,8 +409,8 @@ func TestForbidForeignPropTypesReadsOnlyLiteralKeys(t *testing.T) {
 // Both are unbounded up to the file, which is what lets the exemption reach through nesting and
 // through a closure. The corpus writes one case per walk at one level of nesting, so the depth, the
 // negative case, and the two key-shape declines are all measured rather than imported.
-func TestForbidForeignPropTypesAllowInPropTypesReachesUpward(t *testing.T) {
-	t.Parallel()
+func TestForbidForeignPropTypesAllowInPropTypesReachesUpward(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -408,30 +419,38 @@ func TestForbidForeignPropTypesAllowInPropTypesReachesUpward(t *testing.T) {
 	}{
 		{"an assignment exempts through two levels of nesting", `Foo.propTypes = { a: { b: Bar.propTypes.c } };`, nil},
 		{"a class field exempts through a closure", `class C { static propTypes = { a: () => Q.propTypes.c }; }`, nil},
-		// The assignment walk tests the LEFT's property name, so assigning into anything else does
+		// The assignment walk tests the left's property name, so assigning into anything else does
 		// not exempt. This is the case that makes the walk a discrimination rather than a blanket.
-		{"assigning into another property does not exempt", `Foo.other = Bar.propTypes;`, []string{"forbiddenPropType"}},
+		{
+			"assigning into another property does not exempt",
+			`Foo.other = Bar.propTypes;`,
+			[]string{"forbiddenPropType"},
+		},
 		// Upstream does not test `static`, measured, so an instance field exempts too.
 		{"a non static class field exempts", `class C { propTypes = { a: Q.propTypes.b }; }`, nil},
 		// Upstream reads `classProperty.key.name`, which a computed key does not have.
-		{"a computed class key does not exempt", `class C { static ["propTypes"] = { a: Q.propTypes.b }; }`, []string{"forbiddenPropType"}},
+		{
+			"a computed class key does not exempt",
+			`class C { static ["propTypes"] = { a: Q.propTypes.b }; }`,
+			[]string{"forbiddenPropType"},
+		},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(
-				t,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunGiven(
+				test,
 				ForbidForeignPropTypes,
 				forbidForeignPropTypesFile,
 				testCase.sourceText,
-				forbidForeignPropTypesOptions(t, `{"allowInPropTypes":true}`),
+				forbidForeignPropTypesOptions(test, `{"allowInPropTypes":true}`),
 			)
 			if len(testCase.wantIds) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -443,53 +462,53 @@ func TestForbidForeignPropTypesAllowInPropTypesReachesUpward(t *testing.T) {
 // is visible in the source rather than measured. So a destructuring inside a `propTypes` assignment
 // still reports even with the option on, and a port that threaded the option through both arms
 // would silence a case upstream reports.
-func TestForbidForeignPropTypesDoesNotApplyTheOptionToPatterns(t *testing.T) {
-	t.Parallel()
+func TestForbidForeignPropTypesDoesNotApplyTheOptionToPatterns(test *testing.T) {
+	test.Parallel()
 
 	source := `Foo.propTypes = (function () { const { propTypes } = Bar; return propTypes; })();`
-	result := rule_testing.RunWithOptions(
-		t,
+	result := rule_testing.RunGiven(
+		test,
 		ForbidForeignPropTypes,
 		forbidForeignPropTypesFile,
 		source,
-		forbidForeignPropTypesOptions(t, `{"allowInPropTypes":true}`),
+		forbidForeignPropTypesOptions(test, `{"allowInPropTypes":true}`),
 	)
-	rule_testing.ExpectFindings(t, result, "forbiddenPropType")
+	rule_testing.ExpectFindings(test, result, "forbiddenPropType")
 }
 
-// TestForbidForeignPropTypesDefaultsWithoutADecoder pins the nil-options path.
+// TestForbidForeignPropTypesDefaultsWithoutADecoder pins the unconfigured path.
 //
-// A rule configured as a bare severity is handed nil rather than a decoded struct, so the rule's
-// type assertion yields the zero value. For this option surface the zero value is upstream's
+// A rule configured as a bare severity is handed the zero `rule.Given` rather than a decoded struct, so
+// its `Read` returns false and the zero value. For this option surface the zero value is upstream's
 // default of false, and this asserts that directly rather than through the decoder, which is the
 // one path a fixture routed through the decoder cannot reach.
-func TestForbidForeignPropTypesDefaultsWithoutADecoder(t *testing.T) {
-	t.Parallel()
+func TestForbidForeignPropTypesDefaultsWithoutADecoder(test *testing.T) {
+	test.Parallel()
 
 	source := `Foo.propTypes = { a: Bar.propTypes.b };`
 
-	withoutOptions := rule_testing.RunWithOptions(t, ForbidForeignPropTypes, forbidForeignPropTypesFile, source, nil)
-	rule_testing.ExpectFindings(t, withoutOptions, "forbiddenPropType")
+	withoutOptions := rule_testing.Run(test, ForbidForeignPropTypes, forbidForeignPropTypesFile, source)
+	rule_testing.ExpectFindings(test, withoutOptions, "forbiddenPropType")
 
-	withExplicitFalse := rule_testing.RunWithOptions(
-		t,
+	withExplicitFalse := rule_testing.RunGiven(
+		test,
 		ForbidForeignPropTypes,
 		forbidForeignPropTypesFile,
 		source,
-		forbidForeignPropTypesOptions(t, `{"allowInPropTypes":false}`),
+		forbidForeignPropTypesOptions(test, `{"allowInPropTypes":false}`),
 	)
-	rule_testing.ExpectFindings(t, withExplicitFalse, "forbiddenPropType")
+	rule_testing.ExpectFindings(test, withExplicitFalse, "forbiddenPropType")
 
 	// The option is what moves the verdict, which is what makes the two above a measurement rather
 	// than a coincidence.
-	withTrue := rule_testing.RunWithOptions(
-		t,
+	withTrue := rule_testing.RunGiven(
+		test,
 		ForbidForeignPropTypes,
 		forbidForeignPropTypesFile,
 		source,
-		forbidForeignPropTypesOptions(t, `{"allowInPropTypes":true}`),
+		forbidForeignPropTypesOptions(test, `{"allowInPropTypes":true}`),
 	)
-	rule_testing.ExpectClean(t, withTrue)
+	rule_testing.ExpectClean(test, withTrue)
 }
 
 // TestForbidForeignPropTypesMessageNamesTheProductionFailure asserts the rendered text.
@@ -499,19 +518,19 @@ func TestForbidForeignPropTypesDefaultsWithoutADecoder(t *testing.T) {
 // mechanism rather than restating the rule name, because that is the sentence a reader acts on.
 // Asserted against a literal typed here rather than against the rule's own constant, so both sides
 // cannot move together under mutation.
-func TestForbidForeignPropTypesMessageNamesTheProductionFailure(t *testing.T) {
-	t.Parallel()
+func TestForbidForeignPropTypesMessageNamesTheProductionFailure(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, ForbidForeignPropTypes, forbidForeignPropTypesFile, `const x = Foo.propTypes;`)
-	rule_testing.ExpectFindings(t, result, "forbiddenPropType")
+	result := rule_testing.Run(test, ForbidForeignPropTypes, forbidForeignPropTypesFile, `const x = Foo.propTypes;`)
+	rule_testing.ExpectFindings(test, result, "forbiddenPropType")
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
+		test.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
 	}
 	message := result.Diagnostics[0].Message
 	if message.Id != "forbiddenPropType" {
-		t.Errorf("message id is %q", message.Id)
+		test.Errorf("message id is %q", message.Id)
 	}
 	if !strings.HasPrefix(message.Description, "Reading another component's `propTypes` breaks in production.") {
-		t.Errorf("description does not open on the production failure: %q", message.Description)
+		test.Errorf("description does not open on the production failure: %q", message.Description)
 	}
 }

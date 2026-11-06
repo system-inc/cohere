@@ -40,11 +40,11 @@ import (
 //
 // sourceIndex is in bytes into params, where the library's is in UTF-16 units. Node ranges are [0, 0]:
 // the library records only a start, and the glue computes Prettier's positions.
-func Parse(params string) (*estree.Node, error) {
-	nodes, err := parseMediaList(params)
-	if err != nil {
-		return nil, printing.Syntax(err)
+func Parse(parameters string) (*estree.Node, error) {
+	nodes, parseMediaListError := parseMediaList(parameters)
+	if parseMediaListError != nil {
+		return nil, printing.Syntax(parseMediaListError)
 	}
 	// after, before and sourceIndex are undefined in the options, so Container derives them.
-	return newContainer(nil, nil, "media-query-list", trim(params), nil, nodes), nil
+	return newRootContainer("media-query-list", trim(parameters), nodes), nil
 }

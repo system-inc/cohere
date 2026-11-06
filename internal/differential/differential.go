@@ -20,7 +20,6 @@ package differential
 
 import (
 	"fmt"
-	"io"
 	"sort"
 	"strings"
 )
@@ -35,40 +34,17 @@ const (
 	SideGate Side = "gate"
 )
 
-// Finding is one report from one gate, reduced to the parts both gates can express.
-//
-// Column is deliberately absent from the key. The two gates locate a finding at different offsets
-// within the same line often enough that keying on column would report a difference for every
-// finding they agree about, drowning the real disagreements in noise. Line is the granularity a
-// person acts on.
-type Finding struct {
-	File string
-	Line int
-	// Column is carried for the reader and never compared, for the reason stated above. It is the
-	// difference between "go look at this" and "go find this", and a harness whose output cannot be
-	// navigated to is a harness people stop running.
-	Column  int
-	Rule    string
-	Message string
-	Side    Side
-}
-
-// Key is the identity two findings must share to be called the same finding.
-func (finding Finding) Key() string {
-	return fmt.Sprintf("%s:%d:%s", finding.File, finding.Line, finding.Rule)
-}
-
 // NormalizeRuleName strips the decoration each gate puts around a rule name.
 //
 // The two formats decorate in opposite directions. The gate prints `structure(rule-name)` or
 // `nexus(rule-name)`, putting the plugin outside. cohere prints `rule-name/messageId`, putting the
 // message identifier after. Neither decoration is part of the rule's identity, and comparing
-// decorated names would report every single rule as a disagreement — a total mismatch that still
+// decorated names would report every single rule as a disagreement: a total mismatch that still
 // looks like well-formed output, which is the failure this whole package is built to refuse.
 func NormalizeRuleName(raw string) string {
 	name := strings.TrimSpace(raw)
 
-	// `plugin(rule-name)` — take what is inside the parentheses.
+	// `plugin(rule-name)`: take what is inside the parentheses.
 	if open := strings.IndexByte(name, '('); open >= 0 && strings.HasSuffix(name, ")") {
 		name = name[open+1 : len(name)-1]
 	}
@@ -146,20 +122,6 @@ type Difference struct {
 	Planted bool
 }
 
-// printAcknowledgedCaveat states that a green verdict rested on an acknowledgement.
-//
-// Factored out because there is more than one way to pass, and a caveat attached to only some of
-// them is worse than none: it reads as absent on exactly the paths nobody checked. That is the same
-// failure the scoped verdict above exists to prevent, arriving through the fix for it.
-func printAcknowledgedCaveat(out io.Writer, byClassification map[Classification]int) {
-	if acknowledgedCount := byClassification[ClassificationAcknowledged]; acknowledgedCount > 0 {
-		fmt.Fprintf(out,
-			"  %d differences were acknowledged rather than absent, each with a recorded reason\n",
-			acknowledgedCount,
-		)
-	}
-}
-
 // Classification is the mechanical part of "why do these disagree."
 //
 // It is deliberately coarse. Most differences are configuration rather than correctness, and the
@@ -192,82 +154,18 @@ const (
 	ClassificationUnclassified Classification = "unclassified"
 )
 
-// RuleAgreement is the verdict for one rule across the whole tree.
-type RuleAgreement struct {
-	Rule           string
-	Shared         int
-	OnlyCohere     int
-	OnlyGate       int
-	Classification Classification
-}
-
-// Agrees reports whether the two gates said the same thing about this rule everywhere.
-func (agreement RuleAgreement) Agrees() bool {
-	return agreement.OnlyCohere == 0 && agreement.OnlyGate == 0
-}
-
-// Report is a whole comparison: what differed, per rule, over what population.
-type Report struct {
-	CoherePopulation Population
-	GatePopulation   Population
-	Differences      []Difference
-	Agreements       []RuleAgreement
-	// Comparable is false when a side reported no coverage, which makes the diff meaningless
-	// regardless of how it looks. An empty Differences with Comparable false is the vacuous case.
-	Comparable bool
-	// NotComparableReason states which side had nothing and is empty when Comparable is true.
-	NotComparableReason string
-	// ComparedRules and ConfiguredRules are how many rules the comparison could speak about and
-	// how many the config enables. When they differ, the verdict covers a subset of the gate and
-	// must say so.
-	ComparedRules   int
-	ConfiguredRules int
-	// StaleAcknowledgements match no current difference, and AmbiguousAcknowledgements match more
-	// than one. Either fails the run: a stale entry is an excuse waiting for whatever lands on its
-	// site next, and an ambiguous one would excuse more than its reason was written about, so the
-	// table is out of date until someone removes or re-anchors them.
-	StaleAcknowledgements     []AcknowledgedDifference
-	AmbiguousAcknowledgements []AcknowledgedDifference
-	// Provenance is what actually ran, and whether the harness was ever shown able to detect a
-	// difference at all.
-	//
-	// This does not overlap Comparable and neither substitutes for the other, which is the reason
-	// both are here. Comparable answers "did both sides report coverage" — a property of this run's
-	// population. Provenance answers "has this instrument been demonstrated to work" — a property
-	// of the instrument, which a healthy population says nothing about. A run over 3,407 files by a
-	// harness that parses one side's format wrong is perfectly Comparable and completely blind.
-	Provenance Provenance
-}
-
-// Agreed reports whether every rule active on both sides agreed.
+// printAcknowledgedCaveat states that a green verdict rested on an acknowledgement.
 //
-// Rules the migration has not reached yet do not count against agreement, because a rule cohere
-// has never claimed to implement cannot disagree with anything. Only ClassificationBothActive does.
-// Both guards are asked before the findings are, and in this order, because each one describes a
-// way the finding list can be empty for a reason that has nothing to do with the code being clean.
-func (report Report) Agreed() bool {
-	if !report.Comparable {
-		return false
+// Factored out because there is more than one way to pass, and a caveat attached to only some of
+// them is worse than none: it reads as absent on exactly the paths nobody checked. That is the same
+// failure the scoped verdict above exists to prevent, arriving through the fix for it.
+func printAcknowledgedCaveat(out *strings.Builder, byClassification map[Classification]int) {
+	if acknowledgedCount := byClassification[ClassificationAcknowledged]; acknowledgedCount > 0 {
+		fmt.Fprintf(out,
+			"  %d differences were acknowledged rather than absent, each with a recorded reason\n",
+			acknowledgedCount,
+		)
 	}
-	// A run whose population is real but whose controls never fired has not been shown able to
-	// report a difference, so its silence is not evidence. This is the guard that four vacuous
-	// probes in one night got past: every one of them had a plausible population.
-	if trustworthy, _ := report.Provenance.Trustworthy(); !trustworthy {
-		return false
-	}
-	if len(report.StaleAcknowledgements) > 0 || len(report.AmbiguousAcknowledgements) > 0 {
-		return false
-	}
-	// Observed only. A planted control is a difference this run caused on purpose, and counting it
-	// against agreement would mean the harness could never agree with itself: proving detection
-	// requires creating a difference, so a control that classified both-active would fail the very
-	// run that demonstrated the instrument works.
-	for _, difference := range report.ObservedDifferences() {
-		if difference.Classification == ClassificationBothActive {
-			return false
-		}
-	}
-	return true
 }
 
 // Inputs is everything Compare needs that it cannot derive from the findings themselves.
@@ -399,7 +297,8 @@ func Compare(inputs Inputs) Report {
 		// A rule whose every difference was acknowledged is acknowledged, not both-active. Leaving
 		// it both-active would print the rule as an unresolved defect beside a per-finding line
 		// saying it is resolved, and a reader trusts the summary over the detail.
-		if differences := differencesForRule[ruleName]; differences != nil && differences.total == differences.acknowledged {
+		if differences := differencesForRule[ruleName]; differences != nil &&
+			differences.total == differences.acknowledged {
 			agreement.Classification = ClassificationAcknowledged
 		}
 		report.Agreements = append(report.Agreements, *agreement)
@@ -428,7 +327,7 @@ func classify(ruleName string, onlyOn Side, inputs Inputs) Classification {
 	configured := inputs.ConfiguredRules[ruleName]
 
 	// A nil map means the caller never read the lint config, which is not the same as a config that
-	// enables nothing — and Go cannot tell them apart, because reading any key of a nil map returns
+	// enables nothing, and Go cannot tell them apart, because reading any key of a nil map returns
 	// false. Without this the not-configured branch would swallow every rule and quietly excuse
 	// every genuine disagreement, producing a clean tree with maximum confidence. So absent
 	// knowledge degrades to the two-way split, which is honest about what the caller actually has.
@@ -503,8 +402,13 @@ func Write(out *strings.Builder, report Report) {
 	}
 
 	plantedCount := len(report.Differences) - len(observed)
-	fmt.Fprintf(out, "\ndifferences: %d observed, %d planted by this harness — %d both-active, %d not-ported, %d not-configured, %d unclassified\n",
-		len(observed), plantedCount,
+	fmt.Fprintf(
+		out,
+		// The dash is written as its escape, the same bytes, so the line prints exactly what it always has.
+		"\ndifferences: %d observed, %d planted by this harness \u2014 %d both-active, %d not-ported, "+
+			"%d not-configured, %d unclassified\n",
+		len(observed),
+		plantedCount,
 		byClassification[ClassificationBothActive],
 		byClassification[ClassificationNotPorted],
 		byClassification[ClassificationNotConfigured],
@@ -533,7 +437,11 @@ func Write(out *strings.Builder, report Report) {
 	if len(report.StaleAcknowledgements) > 0 || len(report.AmbiguousAcknowledgements) > 0 {
 		fmt.Fprintf(out, "\nacknowledgements that excuse no single current difference:\n")
 		for _, stale := range report.StaleAcknowledgements {
-			fmt.Fprintf(out, "  stale      %s  (matches none: remove it, or re-anchor it if its site moved)\n", stale.Key())
+			fmt.Fprintf(
+				out,
+				"  stale      %s  (matches none: remove it, or re-anchor it if its site moved)\n",
+				stale.Key(),
+			)
 		}
 		for _, ambiguous := range report.AmbiguousAcknowledgements {
 			fmt.Fprintf(out, "  ambiguous  %s  (matches several: narrow its anchor to one)\n", ambiguous.Key())
@@ -559,7 +467,7 @@ func Write(out *strings.Builder, report Report) {
 		// compared. Silence about them reads as coverage.
 		//
 		// This matters more than it looks. Every finding the gate produces on this tree today comes
-		// from a rule cohere already has, and the 138 unported rules find nothing — not because
+		// from a rule cohere already has, and the 138 unported rules find nothing: not because
 		// they are worthless, but because the gate has been enforcing them for months and the tree
 		// is clean of what they prevent. A clean diff therefore cannot be the signal to remove the
 		// old tool: it would keep reading clean right up until somebody wrote a violation of an

@@ -17,11 +17,11 @@ import (
 //
 // If cohere ever grows a type-provider channel and these start reporting, this fails and the
 // divergence entries have to be revisited deliberately.
-func TestConfigFixturesNeedAModuleTypeProvider(t *testing.T) {
-	t.Parallel()
-	fixtures, err := react_conformance.Load(fixtureRoot)
-	if err != nil {
-		t.Fatalf("loading the corpus: %v", err)
+func TestConfigFixturesNeedAModuleTypeProvider(test *testing.T) {
+	test.Parallel()
+	fixtures, loadError := react_conformance.Load(fixtureRoot)
+	if loadError != nil {
+		test.Fatalf("loading the corpus: %v", loadError)
 	}
 
 	// The modules upstream's `shared-runtime-type-provider.ts` invents. Nothing resolves them.
@@ -29,7 +29,7 @@ func TestConfigFixturesNeedAModuleTypeProvider(t *testing.T) {
 
 	selected := SelectFixtures(fixtures, "config")
 	if len(selected) != 4 {
-		t.Fatalf("selected %d config fixtures, want 4", len(selected))
+		test.Fatalf("selected %d config fixtures, want 4", len(selected))
 	}
 	for _, fixture := range selected {
 		found := false
@@ -39,10 +39,10 @@ func TestConfigFixturesNeedAModuleTypeProvider(t *testing.T) {
 			}
 		}
 		if !found {
-			t.Errorf("%s imports no harness-only module, so the stated divergence does not explain it", fixture.Name)
+			test.Errorf("%s imports no harness-only module, so the stated divergence does not explain it", fixture.Name)
 		}
 		if _, recorded := react_conformance.StatedDivergenceNames()[fixture.Name]; !recorded {
-			t.Errorf("%s is a config fixture with no statedDivergences entry", fixture.Name)
+			test.Errorf("%s is a config fixture with no statedDivergences entry", fixture.Name)
 		}
 	}
 }
@@ -50,17 +50,17 @@ func TestConfigFixturesNeedAModuleTypeProvider(t *testing.T) {
 // TestOptInPragmaFixturesAreEnumerated holds the feature-flag divergences in place.
 //
 // Three goldens in the wired set were recorded under an upstream flag defaulting to false. The
-// assertion is the ENUMERATION rather than a count: if a fourth such fixture appears, or one of
+// assertion is the enumeration rather than a count: if a fourth such fixture appears, or one of
 // these loses its pragma, this fails rather than the score quietly absorbing it.
 //
 // The defaults were read from React's own unminified bundle
 // (`eslint-plugin-react-hooks/cjs/eslint-plugin-react-hooks.development.js`), not inferred from the
 // corpus, because inferring "this flag must be off" from "upstream reported something" is circular.
-func TestOptInPragmaFixturesAreEnumerated(t *testing.T) {
-	t.Parallel()
-	fixtures, err := react_conformance.Load(fixtureRoot)
-	if err != nil {
-		t.Fatalf("loading the corpus: %v", err)
+func TestOptInPragmaFixturesAreEnumerated(test *testing.T) {
+	test.Parallel()
+	fixtures, loadError := react_conformance.Load(fixtureRoot)
+	if loadError != nil {
+		test.Fatalf("loading the corpus: %v", loadError)
 	}
 
 	// Measured as `z.boolean().default(false)` in React 7.1.1.
@@ -88,12 +88,15 @@ func TestOptInPragmaFixturesAreEnumerated(t *testing.T) {
 
 	for name := range want {
 		if !got[name] {
-			t.Errorf("%s no longer carries an opt-in pragma; its stated divergence may be stale", name)
+			test.Errorf("%s no longer carries an opt-in pragma; its stated divergence may be stale", name)
 		}
 	}
 	for name := range got {
 		if !want[name] {
-			t.Errorf("%s carries an opt-in pragma and is not enumerated; it needs a divergence entry or a decision", name)
+			test.Errorf(
+				"%s carries an opt-in pragma and is not enumerated; it needs a divergence entry or a decision",
+				name,
+			)
 		}
 	}
 }

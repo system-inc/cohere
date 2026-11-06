@@ -11,7 +11,7 @@ import (
 
 // NoExtraneousClassOptions is the rule's option surface.
 //
-// All four default to FALSE, so the generic decoder would happen to produce the right zero value for
+// All four default to false, so the generic decoder would happen to produce the right zero value for
 // every one of them. The decoder below is hand-rolled anyway: a decoder that silently dropped all
 // four would be indistinguishable from a correct one on every input, and the next key added here may
 // default to true.
@@ -44,27 +44,41 @@ type noExtraneousClassRawOptions struct {
 //
 // cohere's config layer strips ESLint's `[severity, options]` tuple before dispatch, so what arrives
 // is the bare object rather than upstream's one-element array.
-func DecodeNoExtraneousClassOptions(raw []byte) (any, error) {
-	decoded, err := rule.DecodeOptionsInto[noExtraneousClassRawOptions]()(raw)
-	if err != nil {
-		return DefaultNoExtraneousClassSettings(), err
+func DecodeNoExtraneousClassOptions(raw []byte) (NoExtraneousClassOptions, error) {
+	decoded, decodeOptionsError := rule.DecodeOptionsInto[noExtraneousClassRawOptions]()(raw)
+	if decodeOptionsError != nil {
+		return DefaultNoExtraneousClassSettings(), decodeOptionsError
 	}
 
-	wire, _ := decoded.(noExtraneousClassRawOptions)
 	options := DefaultNoExtraneousClassSettings()
-	if wire.AllowConstructorOnly != nil {
-		options.AllowConstructorOnly = *wire.AllowConstructorOnly
+	if decoded.AllowConstructorOnly != nil {
+		options.AllowConstructorOnly = *decoded.AllowConstructorOnly
 	}
-	if wire.AllowEmpty != nil {
-		options.AllowEmpty = *wire.AllowEmpty
+	if decoded.AllowEmpty != nil {
+		options.AllowEmpty = *decoded.AllowEmpty
 	}
-	if wire.AllowStaticOnly != nil {
-		options.AllowStaticOnly = *wire.AllowStaticOnly
+	if decoded.AllowStaticOnly != nil {
+		options.AllowStaticOnly = *decoded.AllowStaticOnly
 	}
-	if wire.AllowWithDecorator != nil {
-		options.AllowWithDecorator = *wire.AllowWithDecorator
+	if decoded.AllowWithDecorator != nil {
+		options.AllowWithDecorator = *decoded.AllowWithDecorator
 	}
 	return options, nil
+}
+
+var noExtraneousClassEmptyMessage = rule.Message{
+	Id:          "empty",
+	Description: "Unexpected empty class.",
+}
+
+var noExtraneousClassOnlyConstructorMessage = rule.Message{
+	Id:          "onlyConstructor",
+	Description: "Unexpected class with only a constructor.",
+}
+
+var noExtraneousClassOnlyStaticMessage = rule.Message{
+	Id:          "onlyStatic",
+	Description: "Unexpected class with only static properties.",
 }
 
 // NoExtraneousClass flags a class that exists only to be a namespace.
@@ -95,14 +109,14 @@ func DecodeNoExtraneousClassOptions(raw []byte) (any, error) {
 // # A superclass exempts unconditionally and a decorator does not
 //
 // `parent.superClass` short-circuits with no option behind it, because a subclass inherits behavior
-// and is not a namespace whatever its own body holds. An `implements` clause is NOT a superclass and
+// and is not a namespace whatever its own body holds. An `implements` clause is not a superclass and
 // does not exempt, which our tree spells as a different heritage token rather than a different
 // field, so the check reads the token instead of asking whether a heritage clause exists.
 //
 // # Where our parser spells things differently, and it is most of the member classification
 //
-// Upstream reads ESTree node TYPES to classify a member. Our parser puts the same information in
-// MODIFIERS on two node kinds, so the mapping is not one to one:
+// Upstream reads ESTree node types to classify a member. Our parser puts the same information in
+// modifiers on two node kinds, so the mapping is not one to one:
 //
 //	upstream                          ours
 //	AccessorProperty                  KindPropertyDeclaration + accessor modifier
@@ -121,7 +135,7 @@ func DecodeNoExtraneousClassOptions(raw []byte) (any, error) {
 // `static abstract` and produces a member carrying both modifiers, so the arm is reachable and
 // removing it makes this rule report where upstream is silent.
 //
-// # The finding anchors on the class NAME, or on the whole class when there is none
+// # The finding anchors on the class name, or on the whole class when there is none
 //
 // `parent.id` when the parent is a declaration with a name, and the parent itself otherwise. That
 // second case is reachable: `export default class { static hello() {} }` has no name and is reported
@@ -131,7 +145,7 @@ func DecodeNoExtraneousClassOptions(raw []byte) (any, error) {
 //
 // One listener on each class kind, both rare, and the member walk breaks as soon as neither
 // classification can still hold. No checker, no program, no per-file state.
-var NoExtraneousClass = rule.Rule{
+var NoExtraneousClass = rule.Rule[NoExtraneousClassOptions]{
 	Name: "@typescript-eslint/no-extraneous-class",
 
 	// The checker answers only the load-bearing-empty-class question (see
@@ -140,14 +154,14 @@ var NoExtraneousClass = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, isSettings := rule.OptionsAs[NoExtraneousClassOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[NoExtraneousClassOptions]) rule.Listeners {
+		settings, isSettings := options.Read()
 		if !isSettings {
 			settings = DefaultNoExtraneousClassSettings()
 		}
 
 		// judge is shared by the two class kinds, which differ only in whether a name is required.
-		// Upstream anchors on the class BODY and reads its parent; ours has no body node, so the
+		// Upstream anchors on the class body and reads its parent; ours has no body node, so the
 		// listener is on the class itself and the members are read directly.
 		judge := func(node *ast.Node, name *ast.Node, members *ast.NodeList, heritageClauses *ast.NodeList) {
 			if members == nil {
@@ -163,26 +177,26 @@ var NoExtraneousClass = rule.Rule{
 
 			// Upstream's `parent.type === ClassDeclaration && parent.id ? parent.id : parent`.
 			//
-			// Both halves of that test matter and the second is easy to drop. A class EXPRESSION is
+			// Both halves of that test matter and the second is easy to drop. A class expression is
 			// reported on the whole class even when it has a name, because the type test excludes it
 			// before the name is consulted, so `const Foo = class Named { static x() {} }` reports
 			// across the entire expression rather than on `Named`. Measured against the installed
 			// build and confirmed in its parser's own output, which calls that node a ClassExpression
 			// carrying an id. Upstream's corpus writes no named class expression at all, so nothing
 			// imported can see a port that reads the name here.
-			reportRange := classAnchorRange(ctx, node)
+			reportRange := classAnchorRange(ruleContext, node)
 			if node.Kind == ast.KindClassDeclaration && name != nil {
-				reportRange = rule.TokenRange(ctx.SourceFile, name)
+				reportRange = rule.TokenRange(ruleContext.SourceFile, name)
 			}
 
 			if len(members.Nodes) == 0 {
 				if settings.AllowEmpty {
 					return
 				}
-				if noExtraneousClassEmptyClassIsLoadBearing(ctx, node, name) {
+				if noExtraneousClassEmptyClassIsLoadBearing(ruleContext, node, name) {
 					return
 				}
-				ctx.ReportRange(reportRange, noExtraneousClassEmptyMessage)
+				ruleContext.ReportRange(reportRange, noExtraneousClassEmptyMessage)
 				return
 			}
 
@@ -220,12 +234,12 @@ var NoExtraneousClass = rule.Rule{
 
 			if onlyConstructor {
 				if !settings.AllowConstructorOnly {
-					ctx.ReportRange(reportRange, noExtraneousClassOnlyConstructorMessage)
+					ruleContext.ReportRange(reportRange, noExtraneousClassOnlyConstructorMessage)
 				}
 				return
 			}
 			if onlyStatic && !settings.AllowStaticOnly {
-				ctx.ReportRange(reportRange, noExtraneousClassOnlyStaticMessage)
+				ruleContext.ReportRange(reportRange, noExtraneousClassOnlyStaticMessage)
 			}
 		}
 
@@ -258,11 +272,11 @@ var NoExtraneousClass = rule.Rule{
 // A deliberate divergence from typescript-eslint, which has no notion of either shape: the second
 // needs type information, and the first is a case upstream simply reports. In cohere's favor, since
 // each exempt class is load-bearing.
-func noExtraneousClassEmptyIsLoadBearing(ctx rule.Context, exportHolder *ast.Node, name *ast.Node) bool {
-	if ctx.TypeChecker == nil || noExtraneousClassIsExported(exportHolder) {
+func noExtraneousClassEmptyIsLoadBearing(ruleContext rule.Context, exportHolder *ast.Node, name *ast.Node) bool {
+	if ruleContext.TypeChecker == nil || noExtraneousClassIsExported(exportHolder) {
 		return false
 	}
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(name)
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(name)
 	if symbol == nil {
 		return false
 	}
@@ -291,7 +305,7 @@ func noExtraneousClassEmptyIsLoadBearing(ctx rule.Context, exportHolder *ast.Nod
 			}
 		}
 		if ast.IsIdentifier(node) && node != name && node.Text() == name.Text() &&
-			ctx.TypeChecker.GetSymbolAtLocation(node) == symbol {
+			ruleContext.TypeChecker.GetSymbolAtLocation(node) == symbol {
 			switch {
 			case ast.IsExportAssignment(node.Parent):
 				escapes = true
@@ -304,7 +318,7 @@ func noExtraneousClassEmptyIsLoadBearing(ctx rule.Context, exportHolder *ast.Nod
 			case ast.IsPartOfTypeNode(node):
 			default:
 				valueUses++
-				if noExtraneousClassIsConstructorSlot(ctx, node) {
+				if noExtraneousClassIsConstructorSlot(ruleContext, node) {
 					constructorSlots++
 				}
 			}
@@ -312,7 +326,7 @@ func noExtraneousClassEmptyIsLoadBearing(ctx rule.Context, exportHolder *ast.Nod
 		node.ForEachChild(visit)
 		return escapes
 	}
-	ctx.SourceFile.ForEachChild(visit)
+	ruleContext.SourceFile.ForEachChild(visit)
 
 	if escapes {
 		return false
@@ -324,15 +338,15 @@ func noExtraneousClassEmptyIsLoadBearing(ctx rule.Context, exportHolder *ast.Nod
 // empty class has. A declaration is its own binding. A class expression bound to a variable is judged by
 // that binding's uses, exactly as a declaration is: `const token = class Token {}` handed only to
 // constructor slots is the same load-bearing token. A `let` needs no rule of its own: reassigning it is a
-// use that wants no constructor, so a reassigned one is reported, and one never reassigned is a const. Any other class expression has no binding to follow,
-// so its own position decides: `{ target: class Target {} }` in a property typed as a constructor.
-// Found by api's Base pass, where five such tokens came back after the declaration form landed.
-func noExtraneousClassEmptyClassIsLoadBearing(ctx rule.Context, classNode *ast.Node, name *ast.Node) bool {
-	if ctx.TypeChecker == nil {
+// use that wants no constructor, so a reassigned one is reported, and one never reassigned is a const. Any other class
+// expression has no binding to follow, so its own position decides: `{ target: class Target {} }` in a property typed
+// as a constructor. Found by api's Base pass, where five such tokens came back after the declaration form landed.
+func noExtraneousClassEmptyClassIsLoadBearing(ruleContext rule.Context, classNode *ast.Node, name *ast.Node) bool {
+	if ruleContext.TypeChecker == nil {
 		return false
 	}
 	if classNode.Kind == ast.KindClassDeclaration {
-		return name != nil && noExtraneousClassEmptyIsLoadBearing(ctx, classNode, name)
+		return name != nil && noExtraneousClassEmptyIsLoadBearing(ruleContext, classNode, name)
 	}
 	parent := classNode.Parent
 	for parent != nil && parent.Kind == ast.KindParenthesizedExpression {
@@ -345,9 +359,9 @@ func noExtraneousClassEmptyClassIsLoadBearing(ctx rule.Context, classNode *ast.N
 		if binding == nil || !ast.IsIdentifier(binding) || list == nil || list.Parent == nil {
 			return false
 		}
-		return noExtraneousClassEmptyIsLoadBearing(ctx, list.Parent, binding)
+		return noExtraneousClassEmptyIsLoadBearing(ruleContext, list.Parent, binding)
 	}
-	return noExtraneousClassIsConstructorSlot(ctx, classNode)
+	return noExtraneousClassIsConstructorSlot(ruleContext, classNode)
 }
 
 // noExtraneousClassIsExported reports whether the class carries an `export` modifier.
@@ -367,37 +381,22 @@ func noExtraneousClassIsExported(classNode *ast.Node) bool {
 // noExtraneousClassIsConstructorSlot reports whether a reference sits where the compiler expects a
 // constructor: its contextual type, or any member of it when it is a union, has a construct signature.
 // A generic parameter is never counted, because its contextual type is inferred from the argument.
-func noExtraneousClassIsConstructorSlot(ctx rule.Context, reference *ast.Node) bool {
-	contextual := checker.Checker_getContextualType(ctx.TypeChecker, reference, checker.ContextFlagsNone)
+func noExtraneousClassIsConstructorSlot(ruleContext rule.Context, reference *ast.Node) bool {
+	contextual := checker.Checker_getContextualType(ruleContext.TypeChecker, reference, checker.ContextFlagsNone)
 	// A generic parameter's contextual type is inferred from the argument itself, so `<T>(o: T)` hands
 	// back the class's own constructor type and would read as a slot whatever the function wants. A
 	// contextual type identical to the reference's own type proves nothing, so it doesn't count. A
 	// generic constrained to a constructor is reported too, which is the safe direction. Found by api's
 	// Base pass: Object.defineProperty(token, 'name', ...) read as a constructor slot.
-	if contextual == nil || contextual == ctx.TypeChecker.GetTypeAtLocation(reference) {
+	if contextual == nil || contextual == ruleContext.TypeChecker.GetTypeAtLocation(reference) {
 		return false
 	}
-	for part := range type_checking.UnionTypePartsSeq(contextual) {
-		if len(type_checking.GetConstructSignatures(ctx.TypeChecker, part)) > 0 {
+	for part := range type_checking.UnionTypePartsSequence(contextual) {
+		if len(type_checking.GetConstructSignatures(ruleContext.TypeChecker, part)) > 0 {
 			return true
 		}
 	}
 	return false
-}
-
-var noExtraneousClassEmptyMessage = rule.Message{
-	Id:          "empty",
-	Description: "Unexpected empty class.",
-}
-
-var noExtraneousClassOnlyConstructorMessage = rule.Message{
-	Id:          "onlyConstructor",
-	Description: "Unexpected class with only a constructor.",
-}
-
-var noExtraneousClassOnlyStaticMessage = rule.Message{
-	Id:          "onlyStatic",
-	Description: "Unexpected class with only static properties.",
 }
 
 // classAnchorRange is the span upstream reports when a class has no name to report on.
@@ -412,19 +411,19 @@ var noExtraneousClassOnlyStaticMessage = rule.Message{
 //
 // The same correction covers a decorator, which our parser also files as a modifier, though no
 // upstream case exercises that combination because a decorated class in the corpus always has a name.
-func classAnchorRange(ctx rule.Context, node *ast.Node) core.TextRange {
+func classAnchorRange(ruleContext rule.Context, node *ast.Node) core.TextRange {
 	modifiers := node.Modifiers()
 	if modifiers == nil || len(modifiers.Nodes) == 0 {
-		return rule.TokenRange(ctx.SourceFile, node)
+		return rule.TokenRange(ruleContext.SourceFile, node)
 	}
-	keyword := scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, modifiers.End())
+	keyword := scanner.GetRangeOfTokenAtPosition(ruleContext.SourceFile, modifiers.End())
 	return keyword.WithEnd(node.End())
 }
 
 // hasSuperclass is upstream's `parent.superClass`.
 //
 // ESTree carries a superclass in its own field, so upstream reads one property. Ours puts both
-// `extends` and `implements` in the same heritage list and separates them by TOKEN, so the token is
+// `extends` and `implements` in the same heritage list and separates them by token, so the token is
 // what has to be read: an `implements` clause is not a superclass and does not exempt, and a check
 // that merely asked whether a heritage list existed would silently exempt every class implementing
 // an interface.
@@ -462,7 +461,7 @@ func hasDecorator(node *ast.Node) bool {
 //
 // ESTree wraps a parameter carrying an accessibility or readonly modifier in its own node type. Ours
 // leaves it a plain parameter and puts the modifier on it, so the question becomes whether the
-// parameter has any of the modifiers that make it a property. A decorator on a parameter does NOT
+// parameter has any of the modifiers that make it a property. A decorator on a parameter does not
 // make one, which is why this names the modifiers rather than asking whether the list is non-empty.
 func constructorDeclaresParameterProperty(constructor *ast.Node) bool {
 	parameters := constructor.AsConstructorDeclaration().Parameters
@@ -506,7 +505,7 @@ func isInstanceLevelClassMember(member *ast.Node) bool {
 		// abstract node types separately only because it cannot express them through its own static
 		// test, and our static test above would cover them on its own.
 		//
-		// It is not dead, and a mutation sweep is what asked the question. Our parser RECOVERS from
+		// It is not dead, and a mutation sweep is what asked the question. Our parser recovers from
 		// the illegal source rather than refusing the member, and hands back a property carrying both
 		// modifiers, in either written order, for properties, methods and accessors alike. Measured
 		// over five parses. Upstream is silent on all of those and reports on a legal static member in

@@ -32,18 +32,18 @@ var messagePreferObjectHasOwn = rule.Message{
 //
 // A call whose callee is a member access reading `call`, whose own object is a member access
 // reading `hasOwnProperty`, whose own object is one of three things: the identifier `Object`, a
-// member access reading `prototype` on the identifier `Object`, or an EMPTY object literal. That
+// member access reading `prototype` on the identifier `Object`, or an empty object literal. That
 // last one is why `({ foo }.hasOwnProperty.call(obj, prop))` is clean and `({}.hasOwnProperty.call
 // (obj, prop))` is not: a literal with properties in it might be shadowing the very method being
 // reached for, so upstream declines to reason about it.
 //
-// Both property names are read as STATIC names, so the bracket spellings count: `Object
+// Both property names are read as static names, so the bracket spellings count: `Object
 // ['hasOwnProperty']['call']` and the template-literal form both report and both fix. A computed
 // name that is an identifier does not, because its value is not settled by the syntax.
 //
 // # The scope guard, and what it is actually asking
 //
-// Upstream resolves `Object` in scope and requires the binding it finds to be the GLOBAL one, so a
+// Upstream resolves `Object` in scope and requires the binding it finds to be the global one, so a
 // parameter or local named `Object` makes the whole thing clean. Three of upstream's valid cases
 // are exactly that shadow, one for each of the three left-hand shapes.
 //
@@ -54,7 +54,7 @@ var messagePreferObjectHasOwn = rule.Message{
 // declaration in the source file being linted.
 //
 // That is a narrower question than upstream's `variable.scope.type === "global"`, and the
-// difference has a live consequence this port does NOT reproduce. Upstream's guard also fails when
+// difference has a live consequence this port does not reproduce. Upstream's guard also fails when
 // the global is turned off, which its corpus writes as `/* global Object: off */`. Our
 // configuration has no such directive and the checker has nothing to answer it with, so that case
 // is recorded as reporting rather than silently made clean. It is in the fixtures, marked, with the
@@ -73,17 +73,17 @@ var messagePreferObjectHasOwn = rule.Message{
 //	                                `returnObject.hasOwn`, which is a different program. Upstream
 //	                                inserts a leading space; so does this.
 //
-// The second decline has a companion that is easy to get backwards. A COMMENT before the callee
+// The second decline has a companion that is easy to get backwards. A comment before the callee
 // already separates the tokens, so `return/*comment*/{}.hasOwnProperty.call(a, b)` needs no space
 // and upstream does not add one. Four of its cases pair the two spellings for that comparison.
-var PreferObjectHasOwn = rule.Rule{
+var PreferObjectHasOwn = rule.Rule[rule.NoOptions]{
 	Name:             "prefer-object-has-own",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 				callee := preferObjectHasOwnUnwrap(node.AsCallExpression().Expression)
@@ -103,15 +103,15 @@ var PreferObjectHasOwn = rule.Rule{
 					name != "hasOwnProperty" {
 					return
 				}
-				if !preferObjectHasOwnHasLeftHandObject(ctx, calleeObject) {
+				if !preferObjectHasOwnHasLeftHandObject(ruleContext, calleeObject) {
 					return
 				}
 
-				if fix, canFix := preferObjectHasOwnFix(ctx, callee); canFix {
-					ctx.ReportNodeWithFixes(node, messagePreferObjectHasOwn, fix)
+				if fix, canFix := preferObjectHasOwnFix(ruleContext, callee); canFix {
+					ruleContext.ReportNodeWithFixes(node, messagePreferObjectHasOwn, fix)
 					return
 				}
-				ctx.ReportNode(node, messagePreferObjectHasOwn)
+				ruleContext.ReportNode(node, messagePreferObjectHasOwn)
 			},
 		}
 	},
@@ -124,7 +124,7 @@ func preferObjectHasOwnIsMemberAccess(node *ast.Node) bool {
 		node.Kind == ast.KindElementAccessExpression)
 }
 
-// preferObjectHasOwnAccessedObject returns what a member access reads FROM, or nil.
+// preferObjectHasOwnAccessedObject returns what a member access reads from, or nil.
 func preferObjectHasOwnAccessedObject(node *ast.Node) *ast.Node {
 	if node == nil {
 		return nil
@@ -145,7 +145,7 @@ func preferObjectHasOwnAccessedObject(node *ast.Node) *ast.Node {
 // them away, so `(( Object )).prototype.hasOwnProperty.call(a, b)` reaches its check as a bare
 // identifier already. Six of its invalid cases write exactly that shape, so without the unwrap this
 // port would go silent on inputs the corpus asserts. `((x))` nests, which is why this is a loop.
-func preferObjectHasOwnHasLeftHandObject(ctx rule.Context, memberAccess *ast.Node) bool {
+func preferObjectHasOwnHasLeftHandObject(ruleContext rule.Context, memberAccess *ast.Node) bool {
 	objectNode := preferObjectHasOwnAccessedObject(memberAccess)
 	for objectNode != nil && objectNode.Kind == ast.KindParenthesizedExpression {
 		objectNode = objectNode.AsParenthesizedExpression().Expression
@@ -154,20 +154,20 @@ func preferObjectHasOwnHasLeftHandObject(ctx rule.Context, memberAccess *ast.Nod
 		return false
 	}
 
-	// An EMPTY object literal. A literal with properties is declined, because one of them could be
+	// An empty object literal. A literal with properties is declined, because one of them could be
 	// a `hasOwnProperty` of its own and upstream will not reason about that.
 	//
 	// This arm still has to answer the scope question, and it is the arm where forgetting to is
 	// most tempting: there is no `Object` identifier anywhere in `({}).hasOwnProperty.call(a, b)`,
 	// so it reads as though scope cannot be relevant. Upstream checks it for all three shapes and
-	// writes a passing case for exactly this one, because the FIX writes `Object.hasOwn` and under
+	// writes a passing case for exactly this one, because the fix writes `Object.hasOwn` and under
 	// a shadow that names something else entirely. Answered by resolving the name the repair would
 	// introduce, at the position it would be introduced.
 	if objectNode.Kind == ast.KindObjectLiteralExpression {
 		if len(objectNode.AsObjectLiteralExpression().Properties.Nodes) != 0 {
 			return false
 		}
-		return preferObjectHasOwnGlobalObjectIsInScopeAt(ctx, objectNode)
+		return preferObjectHasOwnGlobalObjectIsInScopeAt(ruleContext, objectNode)
 	}
 
 	// `Object.prototype`, in either spelling, unwraps one more level to the `Object` beneath it.
@@ -186,7 +186,7 @@ func preferObjectHasOwnHasLeftHandObject(ctx rule.Context, memberAccess *ast.Nod
 		nodeToCheck.Text() != "Object" {
 		return false
 	}
-	return preferObjectHasOwnResolvesToTheGlobalObject(ctx, nodeToCheck)
+	return preferObjectHasOwnResolvesToTheGlobalObject(ruleContext, nodeToCheck)
 }
 
 // preferObjectHasOwnUnwrap strips parentheses in a loop.
@@ -199,42 +199,45 @@ func preferObjectHasOwnHasLeftHandObject(ctx rule.Context, memberAccess *ast.Nod
 // Written out rather than using ast.SkipParentheses, which dereferences its argument and would
 // panic on the optional nodes this is handed.
 func preferObjectHasOwnUnwrap(node *ast.Node) *ast.Node {
-	for node != nil && node.Kind == ast.KindParenthesizedExpression {
-		node = node.AsParenthesizedExpression().Expression
+	current := node
+	for current != nil && current.Kind == ast.KindParenthesizedExpression {
+		current = current.AsParenthesizedExpression().Expression
 	}
-	return node
+	return current
 }
 
 // preferObjectHasOwnGlobalObjectIsInScopeAt answers whether the name `Object` at this position
 // resolves to the global, for the empty-literal shape where no such identifier is written.
 //
-// The question is about the code the FIX would produce rather than the code that is there, so it is
+// The question is about the code the fix would produce rather than the code that is there, so it is
 // asked by resolving the name at the site the replacement would occupy.
-func preferObjectHasOwnGlobalObjectIsInScopeAt(ctx rule.Context, at *ast.Node) bool {
-	return rule.IsDeclaredOnlyInDeclarationFiles(ctx.TypeChecker.ResolveName("Object", at, ast.SymbolFlagsValue, false))
+func preferObjectHasOwnGlobalObjectIsInScopeAt(ruleContext rule.Context, at *ast.Node) bool {
+	return rule.IsDeclaredOnlyInDeclarationFiles(
+		ruleContext.TypeChecker.ResolveName("Object", at, ast.SymbolFlagsValue, false),
+	)
 }
 
 // preferObjectHasOwnResolvesToTheGlobalObject answers upstream's scope question through the
 // checker: is this `Object` the global one, or a binding shadowing it?
 //
-// A declaration in a declaration file is the global. Deliberately NOT written as
+// A declaration in a declaration file is the global. Deliberately not written as
 // `resolvesToAGlobal`'s complement, because that helper is the shipped exemplar for this question
 // and its shape is what is wanted here: a name with zero declarations is not something this rule
 // should report on, since `Object` always has declarations when the library is loaded.
-func preferObjectHasOwnResolvesToTheGlobalObject(ctx rule.Context, identifier *ast.Node) bool {
-	return rule.IsDeclaredOnlyInDeclarationFiles(ctx.TypeChecker.GetSymbolAtLocation(identifier))
+func preferObjectHasOwnResolvesToTheGlobalObject(ruleContext rule.Context, identifier *ast.Node) bool {
+	return rule.IsDeclaredOnlyInDeclarationFiles(ruleContext.TypeChecker.GetSymbolAtLocation(identifier))
 }
 
 // preferObjectHasOwnFix builds the repair, or declines.
 //
 // The replacement text is the whole callee rather than a surgical edit, because the six accepted
 // spellings share no common structure and all collapse to the same eleven characters.
-func preferObjectHasOwnFix(ctx rule.Context, callee *ast.Node) (rule.Fix, bool) {
-	calleeRange := rule.TokenRange(ctx.SourceFile, callee)
+func preferObjectHasOwnFix(ruleContext rule.Context, callee *ast.Node) (rule.Fix, bool) {
+	calleeRange := rule.TokenRange(ruleContext.SourceFile, callee)
 
 	// A comment inside the callee would be deleted by the replacement, so upstream declines. This
 	// is its only `output: null` case and the decline is the port rather than a detail.
-	for _, comment := range comments.ForFile(ctx) {
+	for _, comment := range comments.ForFile(ruleContext) {
 		if comment.Range.Pos() >= calleeRange.Pos() && comment.Range.End() <= calleeRange.End() {
 			return rule.Fix{}, false
 		}
@@ -250,7 +253,7 @@ func preferObjectHasOwnFix(ctx rule.Context, callee *ast.Node) (rule.Fix, bool) 
 	// would absorb.
 	replacement := "Object.hasOwn"
 	if calleeRange.Pos() > 0 {
-		previous := ctx.SourceFile.Text()[calleeRange.Pos()-1]
+		previous := ruleContext.SourceFile.Text()[calleeRange.Pos()-1]
 		if scanner.IsIdentifierPart(rune(previous)) {
 			replacement = " " + replacement
 		}

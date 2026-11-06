@@ -31,27 +31,79 @@ const jsxNoConstructedContextValuesFile = "/repository/source/Providers.tsx"
 // passes an inline function to a provider. The measured cases below cover it.
 
 // TestJsxNoConstructedContextValuesFires runs the twenty-three failing cases from upstream.
-func TestJsxNoConstructedContextValuesFires(t *testing.T) {
-	t.Parallel()
+func TestJsxNoConstructedContextValuesFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
 		sourceText string
 		wantIds    []string
 	}{
-		{"invalid 0 an object held in a const", `function Component() { const foo = {}; return (<Context.Provider value={foo}></Context.Provider>) }`, []string{"withIdentifierMsg"}},
-		{"invalid 1 an array held in a const", `function Component() { const foo = []; return (<Context.Provider value={foo}></Context.Provider>) }`, []string{"withIdentifierMsg"}},
-		{"invalid 2 an arrow held in a const", `function Component() { const foo = () => {}; return (<Context.Provider value={foo}></Context.Provider>)}`, []string{"withIdentifierMsgFunc"}},
-		{"invalid 3 a named function expression held in a const", `function Component() { const foo = function bar(){}; return (<Context.Provider value={foo}></Context.Provider>)}`, []string{"withIdentifierMsgFunc"}},
-		{"invalid 4 a class expression held in a const", `function Component() { const foo = class SomeClass{}; return (<Context.Provider value={foo}></Context.Provider>)}`, []string{"withIdentifierMsg"}},
-		{"invalid 5 a new expression held in a const", `function Component() { const foo = new SomeClass(); return (<Context.Provider value={foo}></Context.Provider>)}`, []string{"withIdentifierMsg"}},
-		{"invalid 6 a function declaration", `function Component() { function foo() {}; return (<Context.Provider value={foo}></Context.Provider>)}`, []string{"withIdentifierMsgFunc"}},
-		{"invalid 7 a conditional whose consequent constructs", `function Component() { const foo = true ? {} : "fine"; return (<Context.Provider value={foo}></Context.Provider>)}`, []string{"withIdentifierMsg"}},
-		{"invalid 8 a logical or whose right side constructs", `function Component() { const foo = bar || {}; return (<Context.Provider value={foo}></Context.Provider>)}`, []string{"withIdentifierMsg"}},
-		{"invalid 9 a logical and whose right side constructs", `function Component() { const foo = bar && {}; return (<Context.Provider value={foo}></Context.Provider>)}`, []string{"withIdentifierMsg"}},
-		{"invalid 10 a nested conditional", `function Component() { const foo = bar ? baz ? {} : null : null; return (<Context.Provider value={foo}></Context.Provider>)}`, []string{"withIdentifierMsg"}},
-		{"invalid 11 an object held in a let", `function Component() { let foo = {}; return (<Context.Provider value={foo}></Context.Provider>) }`, []string{"withIdentifierMsg"}},
-		{"invalid 12 an object held in a var", `function Component() { var foo = {}; return (<Context.Provider value={foo}></Context.Provider>)}`, []string{"withIdentifierMsg"}},
+		{
+			"invalid 0 an object held in a const",
+			`function Component() { const foo = {}; return (<Context.Provider value={foo}></Context.Provider>) }`,
+			[]string{"withIdentifierMsg"},
+		},
+		{
+			"invalid 1 an array held in a const",
+			`function Component() { const foo = []; return (<Context.Provider value={foo}></Context.Provider>) }`,
+			[]string{"withIdentifierMsg"},
+		},
+		{
+			"invalid 2 an arrow held in a const",
+			`function Component() { const foo = () => {}; return (<Context.Provider value={foo}></Context.Provider>)}`,
+			[]string{"withIdentifierMsgFunc"},
+		},
+		{
+			"invalid 3 a named function expression held in a const",
+			`function Component() { const foo = function bar(){}; return (<Context.Provider value={foo}></Context.Provider>)}`,
+			[]string{"withIdentifierMsgFunc"},
+		},
+		{
+			"invalid 4 a class expression held in a const",
+			`function Component() { const foo = class SomeClass{}; return (<Context.Provider value={foo}></Context.Provider>)}`,
+			[]string{"withIdentifierMsg"},
+		},
+		{
+			"invalid 5 a new expression held in a const",
+			`function Component() { const foo = new SomeClass(); return (<Context.Provider value={foo}></Context.Provider>)}`,
+			[]string{"withIdentifierMsg"},
+		},
+		{
+			"invalid 6 a function declaration",
+			`function Component() { function foo() {}; return (<Context.Provider value={foo}></Context.Provider>)}`,
+			[]string{"withIdentifierMsgFunc"},
+		},
+		{
+			"invalid 7 a conditional whose consequent constructs",
+			`function Component() { const foo = true ? {} : "fine"; return (<Context.Provider value={foo}></Context.Provider>)}`,
+			[]string{"withIdentifierMsg"},
+		},
+		{
+			"invalid 8 a logical or whose right side constructs",
+			`function Component() { const foo = bar || {}; return (<Context.Provider value={foo}></Context.Provider>)}`,
+			[]string{"withIdentifierMsg"},
+		},
+		{
+			"invalid 9 a logical and whose right side constructs",
+			`function Component() { const foo = bar && {}; return (<Context.Provider value={foo}></Context.Provider>)}`,
+			[]string{"withIdentifierMsg"},
+		},
+		{
+			"invalid 10 a nested conditional",
+			`function Component() { const foo = bar ? baz ? {} : null : null; return (<Context.Provider value={foo}></Context.Provider>)}`,
+			[]string{"withIdentifierMsg"},
+		},
+		{
+			"invalid 11 an object held in a let",
+			`function Component() { let foo = {}; return (<Context.Provider value={foo}></Context.Provider>) }`,
+			[]string{"withIdentifierMsg"},
+		},
+		{
+			"invalid 12 an object held in a var",
+			`function Component() { var foo = {}; return (<Context.Provider value={foo}></Context.Provider>)}`,
+			[]string{"withIdentifierMsg"},
+		},
 		{"invalid 13 a let that is reassigned to a number", `
         function Component() {
           let a = {};
@@ -72,9 +124,21 @@ func TestJsxNoConstructedContextValuesFires(t *testing.T) {
           return (<Context.Provider value={bar}></Context.Provider>);
         }
       `, []string{"withIdentifierMsg"}},
-		{"invalid 16 an object written inline", `function Component() { return (<Context.Provider value={{foo: "bar"}}></Context.Provider>);}`, []string{"defaultMsg"}},
-		{"invalid 17 a jsx element held in a const", `function Component() { const Wrapper = (<SomeComp />); return (<Context.Provider value={Wrapper}></Context.Provider>);}`, []string{"withIdentifierMsg"}},
-		{"invalid 18 a regular expression held in a const", `function Component() { const someRegex = /HelloWorld/; return (<Context.Provider value={someRegex}></Context.Provider>);}`, []string{"withIdentifierMsg"}},
+		{
+			"invalid 16 an object written inline",
+			`function Component() { return (<Context.Provider value={{foo: "bar"}}></Context.Provider>);}`,
+			[]string{"defaultMsg"},
+		},
+		{
+			"invalid 17 a jsx element held in a const",
+			`function Component() { const Wrapper = (<SomeComp />); return (<Context.Provider value={Wrapper}></Context.Provider>);}`,
+			[]string{"withIdentifierMsg"},
+		},
+		{
+			"invalid 18 a regular expression held in a const",
+			`function Component() { const someRegex = /HelloWorld/; return (<Context.Provider value={someRegex}></Context.Provider>);}`,
+			[]string{"withIdentifierMsg"},
+		},
 		{"invalid 19 a chained assignment to an arrow", `
         function Component() {
           let foo = null;
@@ -102,11 +166,11 @@ func TestJsxNoConstructedContextValuesFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, JsxNoConstructedContextValues,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, JsxNoConstructedContextValues,
 				jsxNoConstructedContextValuesFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -116,8 +180,8 @@ func TestJsxNoConstructedContextValuesFires(t *testing.T) {
 // Two of these carry upstream's own comment saying why they pass, and both are gaps rather than
 // judgments: the rule does not look through a JSX spread attribute, and it cannot statically check
 // a default parameter value. Reproduced as silence rather than improved on.
-func TestJsxNoConstructedContextValuesStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestJsxNoConstructedContextValuesStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -125,8 +189,14 @@ func TestJsxNoConstructedContextValuesStaysSilent(t *testing.T) {
 	}{
 		{"valid 0 a props identifier", `const Component = () => <Context.Provider value={props}></Context.Provider>`},
 		{"valid 1 a number literal", `const Component = () => <Context.Provider value={100}></Context.Provider>`},
-		{"valid 2 a string attribute", `const Component = () => <Context.Provider value="Some string"></Context.Provider>`},
-		{"valid 3 a memoized object", `function Component() { const foo = useMemo(() => { return {} }, []); return (<Context.Provider value={foo}></Context.Provider>)}`},
+		{
+			"valid 2 a string attribute",
+			`const Component = () => <Context.Provider value="Some string"></Context.Provider>`,
+		},
+		{
+			"valid 3 a memoized object",
+			`function Component() { const foo = useMemo(() => { return {} }, []); return (<Context.Provider value={foo}></Context.Provider>)}`,
+		},
 		{"valid 4 a destructured prop", `
         function Component({oneProp, twoProp, redProp, blueProp,}) {
           return (
@@ -242,11 +312,11 @@ func TestJsxNoConstructedContextValuesStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, JsxNoConstructedContextValues,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, JsxNoConstructedContextValues,
 				jsxNoConstructedContextValuesFile, testCase.sourceText)
-			rule_testing.ExpectClean(t, result)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -256,19 +326,19 @@ func TestJsxNoConstructedContextValuesStaysSilent(t *testing.T) {
 // Every listener guards on a nil checker, so the plain harness makes the rule completely silent
 // rather than crashing. That is the more dangerous of the two failure modes: a StaysSilent case
 // would pass vacuously under a later revert of the declaration and nothing else here would notice.
-func TestJsxNoConstructedContextValuesRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestJsxNoConstructedContextValuesRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	source := "const MyContext = createContext();\n" +
 		"function Component() { return <MyContext value={{a: 1}} />; }\n"
 
-	typed := rule_testing.RunTyped(t, JsxNoConstructedContextValues,
+	typed := rule_testing.RunTyped(test, JsxNoConstructedContextValues,
 		jsxNoConstructedContextValuesFile, source)
-	rule_testing.ExpectFindings(t, typed, "defaultMsg")
+	rule_testing.ExpectFindings(test, typed, "defaultMsg")
 
-	untyped := rule_testing.Run(t, JsxNoConstructedContextValues,
+	untyped := rule_testing.Run(test, JsxNoConstructedContextValues,
 		jsxNoConstructedContextValuesFile, source)
-	rule_testing.ExpectClean(t, untyped)
+	rule_testing.ExpectClean(test, untyped)
 }
 
 // TestJsxNoConstructedContextValuesHasNoFileSuffixGate pins the absence of a gate three rules in
@@ -291,24 +361,24 @@ func TestJsxNoConstructedContextValuesRequiresTheTypedHarness(t *testing.T) {
 // What is left is one positive row confirming the rule does not decline a file for its name. The
 // absence of a gate is pinned instead by there being no filename test anywhere in the rule, which a
 // mutation over the classifier cannot fake.
-func TestJsxNoConstructedContextValuesHasNoFileSuffixGate(t *testing.T) {
-	t.Parallel()
+func TestJsxNoConstructedContextValuesHasNoFileSuffixGate(test *testing.T) {
+	test.Parallel()
 
 	source := "function Component() { return <Ctx.Provider value={{a: 1}} />; }\n"
-	result := rule_testing.RunTyped(t, JsxNoConstructedContextValues,
+	result := rule_testing.RunTyped(test, JsxNoConstructedContextValues,
 		"/repository/source/Suffix.tsx", source)
-	rule_testing.ExpectFindings(t, result, "defaultMsg")
+	rule_testing.ExpectFindings(test, result, "defaultMsg")
 }
 
 // TestJsxNoConstructedContextValuesProviderShapes pins which tag names count, and the two paths are
 // not symmetric.
 //
-// A qualified name only has to END in `Provider`; the object is never examined, so an arbitrary
+// A qualified name only has to end in `Provider`; the object is never examined, so an arbitrary
 // receiver qualifies. A bare identifier has to resolve to a `createContext` call. The corpus writes
 // `Context.Provider` almost throughout and never tests an arbitrary receiver, so every row here was
 // measured against the installed build.
-func TestJsxNoConstructedContextValuesProviderShapes(t *testing.T) {
-	t.Parallel()
+func TestJsxNoConstructedContextValuesProviderShapes(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -368,11 +438,11 @@ func TestJsxNoConstructedContextValuesProviderShapes(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, JsxNoConstructedContextValues,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, JsxNoConstructedContextValues,
 				jsxNoConstructedContextValuesFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -380,8 +450,8 @@ func TestJsxNoConstructedContextValuesProviderShapes(t *testing.T) {
 // TestJsxNoConstructedContextValuesValueAttributeShapes pins the three ways a value prop declines.
 //
 // All three measured silent on the installed build, and none is in the corpus as a distinct case.
-func TestJsxNoConstructedContextValuesValueAttributeShapes(t *testing.T) {
-	t.Parallel()
+func TestJsxNoConstructedContextValuesValueAttributeShapes(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -404,11 +474,11 @@ func TestJsxNoConstructedContextValuesValueAttributeShapes(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, JsxNoConstructedContextValues,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, JsxNoConstructedContextValues,
 				jsxNoConstructedContextValuesFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -419,8 +489,8 @@ func TestJsxNoConstructedContextValuesValueAttributeShapes(t *testing.T) {
 // separate the arms from the identifier-following path. Every verdict measured against the
 // installed build, including the four silent rows, which are the false positives a wider switch
 // would ship.
-func TestJsxNoConstructedContextValuesConstructionKinds(t *testing.T) {
-	t.Parallel()
+func TestJsxNoConstructedContextValuesConstructionKinds(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name    string
@@ -470,26 +540,26 @@ func TestJsxNoConstructedContextValuesConstructionKinds(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			source := "declare const c: any;\ndeclare const x: any;\ndeclare const a: any;\n" +
 				"declare const b: any;\ndeclare const rest: any;\ndeclare const Foo: any;\n" +
 				"declare function makeIt(): any;\n" +
 				"function Component() { return <Ctx.Provider value={" + testCase.value + "} />; }\n"
-			result := rule_testing.RunTyped(t, JsxNoConstructedContextValues,
+			result := rule_testing.RunTyped(test, JsxNoConstructedContextValues,
 				jsxNoConstructedContextValuesFile, source)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
 
 // TestJsxNoConstructedContextValuesIdentifierFollowing pins the indirection path.
 //
-// Upstream resolves the identifier to its binding, takes the LAST definition, and bails out unless
+// Upstream resolves the identifier to its binding, takes the last definition, and bails out unless
 // it is a variable or a function name. A parameter is what that bail-out is for, and it is the row
 // that separates this from a rule that reports every identifier.
-func TestJsxNoConstructedContextValuesIdentifierFollowing(t *testing.T) {
-	t.Parallel()
+func TestJsxNoConstructedContextValuesIdentifierFollowing(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name    string
@@ -503,18 +573,22 @@ func TestJsxNoConstructedContextValuesIdentifierFollowing(t *testing.T) {
 		{"a const holding an arrow", "const v = () => {};", []string{"withIdentifierMsgFunc"}},
 		{"a const aliasing another const", "const inner = {a: 1}; const v = inner;", []string{"withIdentifierMsg"}},
 		{"a const with no initializer", "let v;", nil},
-		{"a member access off a constructed object", "const o = {a: {b: 1}}; const v = o.a;", []string{"withIdentifierMsg"}},
+		{
+			"a member access off a constructed object",
+			"const o = {a: {b: 1}}; const v = o.a;",
+			[]string{"withIdentifierMsg"},
+		},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			source := "declare function makeIt(): any;\n" +
 				"function Component() {\n  " + testCase.body +
 				"\n  return <Ctx.Provider value={v} />;\n}\n"
-			result := rule_testing.RunTyped(t, JsxNoConstructedContextValues,
+			result := rule_testing.RunTyped(test, JsxNoConstructedContextValues,
 				jsxNoConstructedContextValuesFile, source)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -525,13 +599,13 @@ func TestJsxNoConstructedContextValuesIdentifierFollowing(t *testing.T) {
 // A parameter is not a variable or a function name, so upstream declines it. Without that decline
 // this rule would report every provider handed a prop, which is the single largest false-positive
 // class available to it.
-func TestJsxNoConstructedContextValuesParameterIsSilent(t *testing.T) {
-	t.Parallel()
+func TestJsxNoConstructedContextValuesParameterIsSilent(test *testing.T) {
+	test.Parallel()
 
 	source := "function Component(v: any) { return <Ctx.Provider value={v} />; }\n"
-	result := rule_testing.RunTyped(t, JsxNoConstructedContextValues,
+	result := rule_testing.RunTyped(test, JsxNoConstructedContextValues,
 		jsxNoConstructedContextValuesFile, source)
-	rule_testing.ExpectClean(t, result)
+	rule_testing.ExpectClean(test, result)
 }
 
 // TestJsxNoConstructedContextValuesEnclosingComponent pins the classifier, row for row.
@@ -541,13 +615,13 @@ func TestJsxNoConstructedContextValuesParameterIsSilent(t *testing.T) {
 // question the detector would ask about whether a function returns JSX is settled before it is
 // asked. What remains is the name and the class heritage.
 //
-// All twenty rows were measured against the installed build BEFORE the classifier was written, in a
+// All twenty rows were measured against the installed build before the classifier was written, in a
 // throwaway probe package that compared a candidate implementation against them and was deleted.
 // Two rows are where the shelf disagrees and this rule cannot delegate: `scope.NameOf` prefers a
 // function expression's own name over its binding, and it answers a method's name where the class
 // is what decides.
-func TestJsxNoConstructedContextValuesEnclosingComponent(t *testing.T) {
-	t.Parallel()
+func TestJsxNoConstructedContextValuesEnclosingComponent(test *testing.T) {
+	test.Parallel()
 
 	const provider = "<Ctx.Provider value={{a: 1}} />"
 	cases := []struct {
@@ -555,10 +629,14 @@ func TestJsxNoConstructedContextValuesEnclosingComponent(t *testing.T) {
 		sourceText string
 		wantIds    []string
 	}{
-		{"a capitalized function declaration", "function Component() { return " + provider + "; }\n", []string{"defaultMsg"}},
+		{
+			"a capitalized function declaration",
+			"function Component() { return " + provider + "; }\n",
+			[]string{"defaultMsg"},
+		},
 		{"a lowercase function declaration", "function component() { return " + provider + "; }\n", nil},
 
-		// The walk stops at the FIRST function, so an inner lowercase helper hides a provider that
+		// The walk stops at the first function, so an inner lowercase helper hides a provider that
 		// an outer component would otherwise expose, and an inner component exposes one an outer
 		// helper would hide. Both measured.
 		{
@@ -581,7 +659,7 @@ func TestJsxNoConstructedContextValuesEnclosingComponent(t *testing.T) {
 		{"an arrow bound to a capitalized name", "const Component = () => " + provider + ";\n", []string{"defaultMsg"}},
 		{"an arrow bound to a lowercase name", "const component = () => " + provider + ";\n", nil},
 
-		// And the BINDING wins over the function expression's own name, in both directions. This is
+		// And the binding wins over the function expression's own name, in both directions. This is
 		// the pair the shelf helper gets backwards.
 		{
 			"a capitalized function expression bound to a lowercase name",
@@ -653,11 +731,11 @@ func TestJsxNoConstructedContextValuesEnclosingComponent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, JsxNoConstructedContextValues,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, JsxNoConstructedContextValues,
 				jsxNoConstructedContextValuesFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -665,7 +743,7 @@ func TestJsxNoConstructedContextValuesEnclosingComponent(t *testing.T) {
 // TestJsxNoConstructedContextValuesSpans asserts where each finding points, and it is not where a
 // reader would first guess.
 //
-// Every finding is anchored on the CONSTRUCTION rather than on the value expression, so an indirect
+// Every finding is anchored on the construction rather than on the value expression, so an indirect
 // case reports somewhere else entirely: a const declared two lines above the provider reports on
 // its initializer, not on the identifier in the value prop. Measured by slicing the reported range
 // on the installed build across twenty-six inputs. `ExpectFindings` cannot see any of this and the
@@ -673,8 +751,8 @@ func TestJsxNoConstructedContextValuesEnclosingComponent(t *testing.T) {
 //
 // `RunTyped` writes `strings.TrimSpace(source) + "\n"` to disk, so the expectation is sliced from
 // the same transform rather than from the Go literal, which would be one byte off.
-func TestJsxNoConstructedContextValuesSpans(t *testing.T) {
-	t.Parallel()
+func TestJsxNoConstructedContextValuesSpans(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -714,7 +792,7 @@ func TestJsxNoConstructedContextValuesSpans(t *testing.T) {
 			"{b: 2}",
 		},
 		{
-			// When BOTH branches construct, the left one wins. The message id is identical either
+			// When both branches construct, the left one wins. The message id is identical either
 			// way, so only the span records which side was tried first: a mutant swapping the two
 			// recursions survived every id fixture in this file. Measured on the installed build,
 			// which underlines `{a: 1}`.
@@ -732,19 +810,19 @@ func TestJsxNoConstructedContextValuesSpans(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, JsxNoConstructedContextValues,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, JsxNoConstructedContextValues,
 				jsxNoConstructedContextValuesFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted exactly one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted exactly one finding, got %d", len(result.Diagnostics))
 			}
 			// The harness trims, so slice what it actually wrote.
 			written := strings.TrimSpace(testCase.sourceText) + "\n"
 			diagnostic := result.Diagnostics[0]
 			got := written[diagnostic.Range.Pos():diagnostic.Range.End()]
 			if got != testCase.wantText {
-				t.Errorf("span text = %q, wanted %q", got, testCase.wantText)
+				test.Errorf("span text = %q, wanted %q", got, testCase.wantText)
 			}
 		})
 	}
@@ -759,67 +837,67 @@ func TestJsxNoConstructedContextValuesSpans(t *testing.T) {
 //
 // Asserted by equality against a literal typed here rather than against the rule's own constants,
 // which would move on both sides under mutation and could not fail.
-func TestJsxNoConstructedContextValuesMessageText(t *testing.T) {
-	t.Parallel()
+func TestJsxNoConstructedContextValuesMessageText(test *testing.T) {
+	test.Parallel()
 
-	t.Run("the default message names the construction line", func(t *testing.T) {
-		t.Parallel()
+	test.Run("the default message names the construction line", func(test *testing.T) {
+		test.Parallel()
 		source := "function Component() {\n  return <Ctx.Provider value={{a: 1}} />;\n}\n"
-		result := rule_testing.RunTyped(t, JsxNoConstructedContextValues,
+		result := rule_testing.RunTyped(test, JsxNoConstructedContextValues,
 			jsxNoConstructedContextValuesFile, source)
-		rule_testing.ExpectFindings(t, result, "defaultMsg")
+		rule_testing.ExpectFindings(test, result, "defaultMsg")
 		want := "The object passed as the value prop to the Context provider (at line 2) changes " +
 			"every render, so every consumer of this context re-renders on every render of this " +
 			"component even when nothing it reads has changed. Wrap it in a useMemo hook so the " +
 			"identity is stable between renders."
 		if got := result.Diagnostics[0].Message.Description; got != want {
-			t.Errorf("message =\n%q\nwanted\n%q", got, want)
+			test.Errorf("message =\n%q\nwanted\n%q", got, want)
 		}
 	})
 
-	t.Run("the identifier message names both lines and the variable", func(t *testing.T) {
-		t.Parallel()
+	test.Run("the identifier message names both lines and the variable", func(test *testing.T) {
+		test.Parallel()
 		source := "function Component() {\n  const v = {a: 1};\n  return <Ctx.Provider value={v} />;\n}\n"
-		result := rule_testing.RunTyped(t, JsxNoConstructedContextValues,
+		result := rule_testing.RunTyped(test, JsxNoConstructedContextValues,
 			jsxNoConstructedContextValuesFile, source)
-		rule_testing.ExpectFindings(t, result, "withIdentifierMsg")
+		rule_testing.ExpectFindings(test, result, "withIdentifierMsg")
 		want := "The \"v\" object (at line 2) passed as the value prop to the Context provider " +
 			"(at line 3) changes every render, so every consumer of this context re-renders on " +
 			"every render of this component even when nothing it reads has changed. Wrap it in a " +
 			"useMemo hook so the identity is stable between renders."
 		if got := result.Diagnostics[0].Message.Description; got != want {
-			t.Errorf("message =\n%q\nwanted\n%q", got, want)
+			test.Errorf("message =\n%q\nwanted\n%q", got, want)
 		}
 	})
 
-	t.Run("a function construction asks for useCallback", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a function construction asks for useCallback", func(test *testing.T) {
+		test.Parallel()
 		source := "function Component() {\n  function v() {}\n  return <Ctx.Provider value={v} />;\n}\n"
-		result := rule_testing.RunTyped(t, JsxNoConstructedContextValues,
+		result := rule_testing.RunTyped(test, JsxNoConstructedContextValues,
 			jsxNoConstructedContextValuesFile, source)
-		rule_testing.ExpectFindings(t, result, "withIdentifierMsgFunc")
+		rule_testing.ExpectFindings(test, result, "withIdentifierMsgFunc")
 		want := "The \"v\" function declaration (at line 2) passed as the value prop to the " +
 			"Context provider (at line 3) changes every render, so every consumer of this " +
 			"context re-renders on every render of this component even when nothing it reads has " +
 			"changed. Wrap it in a useCallback hook so the identity is stable between renders."
 		if got := result.Diagnostics[0].Message.Description; got != want {
-			t.Errorf("message =\n%q\nwanted\n%q", got, want)
+			test.Errorf("message =\n%q\nwanted\n%q", got, want)
 		}
 	})
 
-	t.Run("an inline function asks for useCallback with no variable name", func(t *testing.T) {
-		t.Parallel()
+	test.Run("an inline function asks for useCallback with no variable name", func(test *testing.T) {
+		test.Parallel()
 		// This is the fourth message id, which upstream's own corpus never exercises.
 		source := "function Component() {\n  return <Ctx.Provider value={() => {}} />;\n}\n"
-		result := rule_testing.RunTyped(t, JsxNoConstructedContextValues,
+		result := rule_testing.RunTyped(test, JsxNoConstructedContextValues,
 			jsxNoConstructedContextValuesFile, source)
-		rule_testing.ExpectFindings(t, result, "defaultMsgFunc")
+		rule_testing.ExpectFindings(test, result, "defaultMsgFunc")
 		want := "The function expression passed as the value prop to the Context provider (at " +
 			"line 2) changes every render, so every consumer of this context re-renders on every " +
 			"render of this component even when nothing it reads has changed. Wrap it in a " +
 			"useCallback hook so the identity is stable between renders."
 		if got := result.Diagnostics[0].Message.Description; got != want {
-			t.Errorf("message =\n%q\nwanted\n%q", got, want)
+			test.Errorf("message =\n%q\nwanted\n%q", got, want)
 		}
 	})
 }
@@ -828,15 +906,15 @@ func TestJsxNoConstructedContextValuesMessageText(t *testing.T) {
 // assertions structurally could not see.
 //
 // A node's `Pos()` includes its leading trivia, so a construction preceded by a comment or a blank
-// line reports the line the TRIVIA starts on. `ctx.ReportNode` already routes through
+// line reports the line the trivia starts on. `ctx.ReportNode` already routes through
 // `rule.TokenRange`, so the finding pointed at the right place the whole time and every span
 // fixture stayed green; only the line number interpolated into the message was wrong, which no
 // message-id assertion and no span assertion can reach.
 //
 // Measured against the installed build: upstream renders line 4 for the construction here, and the
 // port rendered line 2 before the line numbers were routed through TokenRange as well.
-func TestJsxNoConstructedContextValuesLineNumbersSkipTrivia(t *testing.T) {
-	t.Parallel()
+func TestJsxNoConstructedContextValuesLineNumbersSkipTrivia(test *testing.T) {
+	test.Parallel()
 
 	source := "function Component() {\n" +
 		"  // a comment that occupies the line above the construction\n" +
@@ -844,23 +922,23 @@ func TestJsxNoConstructedContextValuesLineNumbersSkipTrivia(t *testing.T) {
 		"  const v = {a: 1};\n" +
 		"  return <Ctx.Provider value={v} />;\n" +
 		"}\n"
-	result := rule_testing.RunTyped(t, JsxNoConstructedContextValues,
+	result := rule_testing.RunTyped(test, JsxNoConstructedContextValues,
 		jsxNoConstructedContextValuesFile, source)
-	rule_testing.ExpectFindings(t, result, "withIdentifierMsg")
+	rule_testing.ExpectFindings(test, result, "withIdentifierMsg")
 
 	want := "The \"v\" object (at line 4) passed as the value prop to the Context provider (at " +
 		"line 5) changes every render, so every consumer of this context re-renders on every " +
 		"render of this component even when nothing it reads has changed. Wrap it in a useMemo " +
 		"hook so the identity is stable between renders."
 	if got := result.Diagnostics[0].Message.Description; got != want {
-		t.Errorf("message =\n%q\nwanted\n%q", got, want)
+		test.Errorf("message =\n%q\nwanted\n%q", got, want)
 	}
 }
 
 // TestJsxNoConstructedContextValuesTakesTheLastDeclaration pins which declaration decides when a
 // name has more than one.
 //
-// Upstream reads `defs[defs.length - 1]`, the LAST definition rather than the first. Nothing in the
+// Upstream reads `defs[defs.length - 1]`, the last definition rather than the first. Nothing in the
 // corpus redeclares a name, so a mutation swapping the index survived the entire imported set. The
 // first two rows below have opposite verdicts from declaration order alone, which is the cheapest
 // possible distinguishing pair, and every row was measured against the installed build before it
@@ -869,8 +947,8 @@ func TestJsxNoConstructedContextValuesLineNumbersSkipTrivia(t *testing.T) {
 // Whether our checker orders `symbol.Declarations` the same way as upstream's scope analysis is not
 // assumed: these fixtures are the measurement. A `var` is used because it is the only binding form
 // that legally redeclares.
-func TestJsxNoConstructedContextValuesTakesTheLastDeclaration(t *testing.T) {
-	t.Parallel()
+func TestJsxNoConstructedContextValuesTakesTheLastDeclaration(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name    string
@@ -886,12 +964,16 @@ func TestJsxNoConstructedContextValuesTakesTheLastDeclaration(t *testing.T) {
 
 		// The kind is read off the last declaration too, not just whether one exists.
 		{"an object then an arrow", "  var v = {a: 1};\n  var v = () => {};", []string{"withIdentifierMsgFunc"}},
-		{"an object then a function declaration", "  var v = {a: 1};\n  function v() {}", []string{"withIdentifierMsgFunc"}},
+		{
+			"an object then a function declaration",
+			"  var v = {a: 1};\n  function v() {}",
+			[]string{"withIdentifierMsgFunc"},
+		},
 
-		// A measured divergence, and it is in the CHECKER rather than in the index.
+		// A measured divergence, and it is in the checker rather than in the index.
 		//
 		// Upstream reports "object" here, taking the var as its last definition. Our checker
-		// returns a declaration list of length ONE for a var-and-function pair, holding only the
+		// returns a declaration list of length one for a var-and-function pair, holding only the
 		// function declaration, whichever order they are written in. Probed directly: both
 		// orderings answer `count=1 [0=KindFunctionDeclaration]`, while two vars answer `count=2`
 		// ordered by source position, which is the ordering upstream's scope analysis also
@@ -902,17 +984,21 @@ func TestJsxNoConstructedContextValuesTakesTheLastDeclaration(t *testing.T) {
 		// around: reaching for the function's own symbol to recover the var would diverge on the
 		// far more common single-declaration case, and this shape requires redeclaring a name as
 		// both a var and a function in one scope.
-		{"a function declaration then an object", "  function v() {}\n  var v = {a: 1};", []string{"withIdentifierMsgFunc"}},
+		{
+			"a function declaration then an object",
+			"  function v() {}\n  var v = {a: 1};",
+			[]string{"withIdentifierMsgFunc"},
+		},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			source := "function Component() {\n" + testCase.body +
 				"\n  return <Ctx.Provider value={v} />;\n}\n"
-			result := rule_testing.RunTyped(t, JsxNoConstructedContextValues,
+			result := rule_testing.RunTyped(test, JsxNoConstructedContextValues,
 				jsxNoConstructedContextValuesFile, source)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -920,16 +1006,16 @@ func TestJsxNoConstructedContextValuesTakesTheLastDeclaration(t *testing.T) {
 // TestJsxNoConstructedContextValuesMemberUsageIsTheObject pins which node a member access records
 // as its usage.
 //
-// Upstream sets the usage to the member expression's OBJECT rather than to the whole member
+// Upstream sets the usage to the member expression's object rather than to the whole member
 // expression. Both choices produce the same message id and the same span, because the span comes
 // from the construction and not from the usage, so a mutant swapping them survived every other
 // fixture in this file. The usage is only observable through the message, and only through its
-// usage LINE, since a member expression carries no name for the other slot.
+// usage line, since a member expression carries no name for the other slot.
 //
 // So the distinguishing input has to split the member access across two lines. Measured against the
 // installed build: it renders line 4, the line the object sits on, not line 5.
-func TestJsxNoConstructedContextValuesMemberUsageIsTheObject(t *testing.T) {
-	t.Parallel()
+func TestJsxNoConstructedContextValuesMemberUsageIsTheObject(test *testing.T) {
+	test.Parallel()
 
 	source := "function Component() {\n" +
 		"  const o = {a: {b: 1}};\n" +
@@ -937,15 +1023,15 @@ func TestJsxNoConstructedContextValuesMemberUsageIsTheObject(t *testing.T) {
 		"    o\n" +
 		"    .a} />;\n" +
 		"}\n"
-	result := rule_testing.RunTyped(t, JsxNoConstructedContextValues,
+	result := rule_testing.RunTyped(test, JsxNoConstructedContextValues,
 		jsxNoConstructedContextValuesFile, source)
-	rule_testing.ExpectFindings(t, result, "withIdentifierMsg")
+	rule_testing.ExpectFindings(test, result, "withIdentifierMsg")
 
 	want := "The \"o\" object (at line 2) passed as the value prop to the Context provider (at " +
 		"line 4) changes every render, so every consumer of this context re-renders on every " +
 		"render of this component even when nothing it reads has changed. Wrap it in a useMemo " +
 		"hook so the identity is stable between renders."
 	if got := result.Diagnostics[0].Message.Description; got != want {
-		t.Errorf("message =\n%q\nwanted\n%q", got, want)
+		test.Errorf("message =\n%q\nwanted\n%q", got, want)
 	}
 }

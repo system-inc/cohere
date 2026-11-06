@@ -11,7 +11,10 @@ import (
 
 // correctnessRequireOptionalRelationText is the rule's message, whose wording lives in
 // `policy/messages/correctness-require-optional-relation.json`.
-var correctnessRequireOptionalRelationText = policy.MessageOf("base/correctness-require-optional-relation", "mustBeOptional")
+var correctnessRequireOptionalRelationText = policy.MessageOf(
+	"base/correctness-require-optional-relation",
+	"mustBeOptional",
+)
 
 // relationDecorators is the source rule's `RelationDecorators` set.
 //
@@ -46,10 +49,10 @@ var relationDecorators = map[string]struct{}{
 //
 // Measured against the source rule across sixteen shapes rather than inferred. `| null` reports;
 // `| null | undefined` does not; `any` and `unknown` are silent because they erase the distinction
-// rather than answer it; and `void` REPORTS, which is the one that reads as a surprise and is
+// rather than answer it; and `void` reports, which is the one that reads as a surprise and is
 // deliberate, since void is absent from the narrow mask.
 //
-// # The decorator must be CALLED, and that is a real discrimination
+// # The decorator must be called, and that is a real discrimination
 //
 // The source's `hasDecoratorInSet` requires a call expression with an identifier callee, so
 // `@OrmManyToOne()` matches and a bare `@OrmManyToOne` does not. Measured: the bare form is silent.
@@ -60,7 +63,7 @@ var relationDecorators = map[string]struct{}{
 //
 // One listener on a property declaration, and the type is asked for only after a relation decorator
 // is found, which is a rare shape.
-var CorrectnessRequireOptionalRelation = rule.Rule{
+var CorrectnessRequireOptionalRelation = rule.Rule[rule.NoOptions]{
 	Name: "base/correctness-require-optional-relation",
 
 	// The finding is decided by whether the property's type admits undefined, so there is no
@@ -68,16 +71,16 @@ var CorrectnessRequireOptionalRelation = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindPropertyDeclaration: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 				// The shelf's HasDecoratorInSet, which was measured to agree with the source's
 				// `hasDecoratorInSet` exactly: both require a call expression with a bare identifier
 				// callee, so `@OrmManyToOne()` matches while `@OrmManyToOne` and `@Orm.ManyToOne()`
-				// do not. The sibling rule in this package deliberately does NOT use it, for the
+				// do not. The sibling rule in this package deliberately does not use it, for the
 				// reason recorded there.
 				if !decorators.HasDecoratorInSet(node, relationDecorators) {
 					return
@@ -91,7 +94,7 @@ var CorrectnessRequireOptionalRelation = rule.Rule{
 					return
 				}
 
-				propertyType := ctx.TypeChecker.GetTypeAtLocation(name)
+				propertyType := ruleContext.TypeChecker.GetTypeAtLocation(name)
 				if propertyType == nil {
 					return
 				}
@@ -99,11 +102,11 @@ var CorrectnessRequireOptionalRelation = rule.Rule{
 					return
 				}
 
-				ctx.ReportNode(name, rule.Message{
+				ruleContext.ReportNode(name, rule.Message{
 					Id: correctnessRequireOptionalRelationText.Id,
 					Description: correctnessRequireOptionalRelationText.Render(map[string]string{
 						"propertyName": name.AsIdentifier().Text,
-						"propertyType": ctx.TypeChecker.TypeToString(propertyType),
+						"propertyType": ruleContext.TypeChecker.TypeToString(propertyType),
 					}),
 				})
 			},
@@ -122,7 +125,7 @@ func typeIncludesUndefined(subjectType *checker.Type) bool {
 		return true
 	}
 	if type_checking.IsUnionType(subjectType) {
-		for part := range type_checking.UnionTypePartsSeq(subjectType) {
+		for part := range type_checking.UnionTypePartsSequence(subjectType) {
 			if typeIncludesUndefined(part) {
 				return true
 			}

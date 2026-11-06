@@ -19,13 +19,13 @@ import (
 func FindModuleDirectory() (string, error) {
 	candidates := []string{}
 
-	if executable, err := os.Executable(); err == nil {
-		if resolved, err := filepath.EvalSymlinks(executable); err == nil {
+	if executable, executableError := os.Executable(); executableError == nil {
+		if resolved, resolveSymlinksError := filepath.EvalSymlinks(executable); resolveSymlinksError == nil {
 			executable = resolved
 		}
 		candidates = append(candidates, filepath.Dir(executable))
 	}
-	if workingDirectory, err := os.Getwd(); err == nil {
+	if workingDirectory, workingDirectoryError := os.Getwd(); workingDirectoryError == nil {
 		candidates = append(candidates, workingDirectory)
 	}
 
@@ -35,15 +35,17 @@ func FindModuleDirectory() (string, error) {
 		}
 	}
 
-	return "", errors.New("could not find the cohere module: no go.mod declaring github.com/system-inc/cohere in any parent of this binary or the working directory")
+	return "", errors.New(
+		"finding the cohere module: no go.mod declaring github.com/system-inc/cohere in any parent of this binary or the working directory",
+	)
 }
 
 // walkUpForModule climbs toward the filesystem root looking for the cohere module's go.mod.
 func walkUpForModule(start string) (string, bool) {
 	directory := start
 	for {
-		contents, err := os.ReadFile(filepath.Join(directory, "go.mod"))
-		if err == nil && isCohereModule(contents) {
+		contents, readError := os.ReadFile(filepath.Join(directory, "go.mod"))
+		if readError == nil && isCohereModule(contents) {
 			return directory, true
 		}
 

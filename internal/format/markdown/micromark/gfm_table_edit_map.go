@@ -50,8 +50,8 @@ func (editMap *gfmTableEditMap) add(at int, remove int, add []Event) {
 // which the caller stores where the array lived.
 func (editMap *gfmTableEditMap) consume(events []Event) []Event {
 	// Upstream's sort is stable; `add` merges changes at one index, so the keys are unique anyway.
-	slices.SortStableFunc(editMap.changes, func(a gfmTableEditMapChange, b gfmTableEditMapChange) int {
-		return a.at - b.at
+	slices.SortStableFunc(editMap.changes, func(left gfmTableEditMapChange, right gfmTableEditMapChange) int {
+		return left.at - right.at
 	})
 
 	if len(editMap.changes) == 0 {
@@ -63,18 +63,20 @@ func (editMap *gfmTableEditMap) consume(events []Event) []Event {
 
 	index := len(editMap.changes)
 	var vecs [][]Event
+	// remainingEvents is the head of events not yet split off, truncated at each change walking back.
+	remainingEvents := events
 	for index > 0 {
 		index--
 		change := editMap.changes[index]
 		// `events.slice(at + remove)`: past the end is an empty slice.
-		from := min(change.at+change.remove, len(events))
-		vecs = append(vecs, events[from:], change.add)
+		from := min(change.at+change.remove, len(remainingEvents))
+		vecs = append(vecs, remainingEvents[from:], change.add)
 
 		// Truncate rest. A change is never past the end: the furthest is the table end, one past the
 		// last event.
-		events = events[:min(change.at, len(events))]
+		remainingEvents = remainingEvents[:min(change.at, len(remainingEvents))]
 	}
-	vecs = append(vecs, events)
+	vecs = append(vecs, remainingEvents)
 
 	var result []Event
 	for slice := len(vecs) - 1; slice >= 0; slice-- {

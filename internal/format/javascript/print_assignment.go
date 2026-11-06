@@ -8,14 +8,14 @@ import (
 // print/assignment.js. experimentalTernaries is always false, so the branches that read it keep only
 // the false side.
 
-// printAssignment is upstream's printAssignment. operator is `any` because upstream passes both a
-// string (" =", ":") and an array ([" ", node.operator]). An absent rightPropertyName is "".
+// printAssignment is upstream's printAssignment. Upstream passes operator as a string (" =", ":") or an
+// array ([" ", node.operator]); here either is a Doc. An absent rightPropertyName is "".
 func printAssignment(
 	path *Path,
 	options *Options,
 	print PrintFunc,
 	leftDoc Doc,
-	operator any,
+	operator Doc,
 	rightPropertyName string,
 ) Doc {
 	layout := chooseLayout(path, options, print, leftDoc, rightPropertyName)
@@ -28,24 +28,29 @@ func printAssignment(
 	switch layout {
 	// First break after operator, then the sides are broken independently on their own lines
 	case "break-after-operator":
-		return groupIn(path, concatIn(path, groupIn(path, leftDoc), operator, groupIn(path, indentIn(path, concatIn(path, line, rightDoc)))))
+		return groupIn(path, concatIn(
+			path,
+			groupIn(path, leftDoc),
+			operator,
+			groupIn(path, indentIn(path, concatIn(path, line, rightDoc))),
+		))
 
 	// First break right-hand side, then left-hand side
 	case "never-break-after-operator":
-		return groupIn(path, concatIn(path, groupIn(path, leftDoc), operator, " ", rightDoc))
+		return groupIn(path, concatIn(path, groupIn(path, leftDoc), operator, doc.Text(" "), rightDoc))
 
 	// First break right-hand side, then after operator
 	case "fluid":
-		groupID := newGroupID("assignment")
+		groupId := newGroupId("assignment")
 		return groupIn(path, concatIn(path, groupIn(path, leftDoc),
 			operator,
-			groupWithIn(path, indentIn(path, line), doc.GroupOptions{ID: groupID}),
+			groupWithIn(path, indentIn(path, line), doc.GroupOptions{Id: groupId}),
 			lineSuffixBoundary,
-			indentIfBreak(rightDoc, groupID, false),
+			indentIfBreak(rightDoc, groupId, false),
 		))
 
 	case "break-lhs":
-		return groupIn(path, concatIn(path, leftDoc, operator, " ", groupIn(path, rightDoc)))
+		return groupIn(path, concatIn(path, leftDoc, operator, doc.Text(" "), groupIn(path, rightDoc)))
 
 	// Parts of assignment chains aren't wrapped in groups.
 	// Once one of them breaks, the chain breaks too.
@@ -61,7 +66,8 @@ func printAssignment(
 	case "only-left":
 		return leftDoc
 	}
-	// Upstream falls off the switch and returns undefined; chooseLayout never returns another layout.
+	// Upstream falls off the switch and returns undefined.
+	// Invariant: chooseLayout returns only the layouts this switch handles.
 	panic("javascript: unknown assignment layout " + layout)
 }
 
@@ -73,14 +79,14 @@ func printAssignmentExpression(path *Path, options *Options, print PrintFunc) Do
 		options,
 		print,
 		print("left", nil),
-		concatIn(path, " ", current.String("operator")),
+		concatIn(path, doc.Text(" "), textDoc(current.String("operator"))),
 		"right",
 	)
 }
 
 // printVariableDeclarator is upstream's printVariableDeclarator.
 func printVariableDeclarator(path *Path, options *Options, print PrintFunc) Doc {
-	return printAssignment(path, options, print, print("id", nil), " =", "init")
+	return printAssignment(path, options, print, print("id", nil), doc.Text(" ="), "init")
 }
 
 // chooseLayout is upstream's chooseLayout.
@@ -95,22 +101,22 @@ func chooseLayout(path *Path, options *Options, print PrintFunc, leftDoc Doc, ri
 		return "only-left"
 	}
 
-	// Short assignment chains (only 2 segments) are NOT formatted as chains.
+	// Short assignment chains (only 2 segments) are not formatted as chains.
 	//   1) a = b = c; (expression statements)
 	//   2) var/let/const a = b = c;
 
 	isTail := !isAssignment(rightNode)
 	shouldUseChainFormatting := path.Match(
-		func(value any, _ any, _ int, _ bool) bool {
-			matched, _ := value.(Node)
+		func(value PathValue, _ string, _ int, _ bool) bool {
+			matched, _ := value.Node()
 			return isAssignment(matched)
 		},
-		func(value any, _ any, _ int, _ bool) bool {
-			matched, _ := value.(Node)
+		func(value PathValue, _ string, _ int, _ bool) bool {
+			matched, _ := value.Node()
 			return isAssignmentOrVariableDeclarator(matched)
 		},
-		func(value any, _ any, _ int, _ bool) bool {
-			matched, _ := value.(Node)
+		func(value PathValue, _ string, _ int, _ bool) bool {
+			matched, _ := value.Node()
 			return !isTail ||
 				(!matched.Is("ExpressionStatement") &&
 					!matched.Is("VariableDeclaration"))
@@ -161,7 +167,7 @@ func chooseLayout(path *Path, options *Options, print PrintFunc, leftDoc Doc, ri
 		return "break-after-operator"
 	}
 
-	if isComplexTypeAliasParams(current) {
+	if isComplexTypeAliasParameters(current) {
 		return "break-lhs"
 	}
 
@@ -208,7 +214,7 @@ func shouldBreakAfterOperator(path *Path, options *Options, print PrintFunc, has
 	}
 
 	current := rightNode
-	var propertiesForPath []any
+	var propertiesForPath []string
 	for {
 		if current.Is("UnaryExpression") ||
 			current.Is("AwaitExpression") ||
@@ -270,17 +276,17 @@ func isAssignmentOrVariableDeclarator(current Node) bool {
 	return isAssignment(current) || current.Is("VariableDeclarator")
 }
 
-// isComplexTypeAliasParams is upstream's isComplexTypeAliasParams.
-func isComplexTypeAliasParams(current Node) bool {
-	typeParams := getTypeParametersFromTypeAlias(current)
-	if len(typeParams) > 0 {
+// isComplexTypeAliasParameters is upstream's isComplexTypeAliasParameters.
+func isComplexTypeAliasParameters(current Node) bool {
+	typeParameters := getTypeParametersFromTypeAlias(current)
+	if len(typeParameters) > 0 {
 		constraintPropertyName := "bound"
 		if current.Is("TSTypeAliasDeclaration") {
 			constraintPropertyName = "constraint"
 		}
-		if len(typeParams) > 1 {
-			for _, param := range typeParams {
-				if param.Child(constraintPropertyName) != nil || param.Child("default") != nil {
+		if len(typeParameters) > 1 {
+			for _, parameter := range typeParameters {
+				if parameter.Child(constraintPropertyName) != nil || parameter.Child("default") != nil {
 					return true
 				}
 			}
@@ -306,12 +312,12 @@ func hasComplexTypeAnnotation(current Node) bool {
 	if typeAnnotation == nil || typeAnnotation.Child("typeAnnotation") == nil {
 		return false
 	}
-	typeParams := getTypeParametersFromTypeReference(typeAnnotation.Child("typeAnnotation"))
-	if len(typeParams) <= 1 {
+	typeParameters := getTypeParametersFromTypeReference(typeAnnotation.Child("typeAnnotation"))
+	if len(typeParameters) <= 1 {
 		return false
 	}
-	for _, param := range typeParams {
-		if len(getTypeParametersFromTypeReference(param)) > 0 || param.Is("TSConditionalType") {
+	for _, parameter := range typeParameters {
+		if len(getTypeParametersFromTypeReference(parameter)) > 0 || parameter.Is("TSConditionalType") {
 			return true
 		}
 	}
@@ -357,9 +363,9 @@ func isPoorlyBreakableMemberOrCallChain(path *Path, options *Options, print Prin
 			return false
 		}
 
-		args := getCallArguments(current)
-		isPoorlyBreakableCall := len(args) == 0 ||
-			(len(args) == 1 && isLoneShortArgument(args[0], options))
+		arguments := getCallArguments(current)
+		isPoorlyBreakableCall := len(arguments) == 0 ||
+			(len(arguments) == 1 && isLoneShortArgument(arguments[0], options))
 		if !isPoorlyBreakableCall {
 			return false
 		}
@@ -383,11 +389,10 @@ func isObjectPropertyWithShortKey(current Node, keyDoc Doc, options *Options) bo
 	if !isObjectProperty(current) {
 		return false
 	}
-	// TODO: for performance, it might make sense to use a more lightweight
-	// version of cleanDoc, such that it would stop once it detects that
-	// the doc can't be reduced to a string.
-	keyDoc = doc.CleanDoc(keyDoc)
-	const minOverlapForBreak = 3
+	// Upstream notes that a lighter cleanDoc, one that stops once it sees the doc can't be reduced to a
+	// string, might be faster.
+	cleanedKeyDoc := doc.CleanDoc(keyDoc)
+	const minimumOverlapForBreak = 3
 	//   ↓↓ - insufficient overlap for a line break
 	// key1: longValue1,
 	//   ↓↓↓↓↓↓ - overlap is long enough to break
@@ -395,24 +400,24 @@ func isObjectPropertyWithShortKey(current Node, keyDoc Doc, options *Options) bo
 	//   longValue2
 	//
 	// Upstream's `typeof keyDoc === "string"`; getStringWidth is doc.StringWidth.
-	text, isText := keyDoc.(doc.Text)
+	text, isText := cleanedKeyDoc.(doc.Text)
 	return isText &&
-		doc.StringWidth(string(text)) < settingsOf(options).TabWidth+minOverlapForBreak
+		doc.StringWidth(string(text)) < settingsOf(options).TabWidth+minimumOverlapForBreak
 }
 
 // isCallExpressionWithComplexTypeArguments is upstream's isCallExpressionWithComplexTypeArguments.
 func isCallExpressionWithComplexTypeArguments(current Node, print PrintFunc) bool {
-	typeArgs := current.Child("typeArguments").List("params")
-	if len(typeArgs) > 0 {
-		if len(typeArgs) > 1 {
+	typeArguments := current.Child("typeArguments").List("params")
+	if len(typeArguments) > 0 {
+		if len(typeArguments) > 1 {
 			return true
 		}
-		if len(typeArgs) == 1 {
-			firstArg := typeArgs[0]
-			if isUnionType(firstArg) ||
-				isIntersectionType(firstArg) ||
-				firstArg.Is("TSTypeLiteral") ||
-				firstArg.Is("ObjectTypeAnnotation") {
+		if len(typeArguments) == 1 {
+			firstArgument := typeArguments[0]
+			if isUnionType(firstArgument) ||
+				isIntersectionType(firstArgument) ||
+				firstArgument.Is("TSTypeLiteral") ||
+				firstArgument.Is("ObjectTypeAnnotation") {
 				return true
 			}
 		}

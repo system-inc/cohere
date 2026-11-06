@@ -9,7 +9,7 @@ import (
 
 // TestConsistencyOrganizeImportsClassification is the differential against the TypeScript rule.
 //
-// Each row is one import statement and the group the LIVE original put it in, harvested by running
+// Each row is one import statement and the group the live original put it in, harvested by running
 // that rule's own fixer through ESLint's Linter API and reading back the header it emitted. No row
 // here was reasoned about: the table is a recording, and it is the only thing standing between this
 // port and a classifier that agrees with its own author.
@@ -17,8 +17,8 @@ import (
 // The verdict is read the same way round, by asking this rule whether a file holding that one import
 // under that one header is organized. A header naming the right group is silent and any other header
 // reports, so a disagreement about classification surfaces as a finding rather than as silence.
-func TestConsistencyOrganizeImportsClassification(t *testing.T) {
-	t.Parallel()
+func TestConsistencyOrganizeImportsClassification(test *testing.T) {
+	test.Parallel()
 
 	testCases := []struct {
 		importLine string
@@ -164,8 +164,8 @@ func TestConsistencyOrganizeImportsClassification(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.importLine+" -> "+testCase.group, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.importLine+" -> "+testCase.group, func(test *testing.T) {
+			test.Parallel()
 			source := strings.Join([]string{
 				"// Dependencies - " + testCase.group,
 				testCase.importLine,
@@ -173,8 +173,8 @@ func TestConsistencyOrganizeImportsClassification(t *testing.T) {
 				"export const X = 1;",
 				"",
 			}, "\n")
-			result := rule_testing.Run(t, ConsistencyRequireOrganizedImports, "/repository/app/Thing.tsx", source)
-			rule_testing.ExpectClean(t, result)
+			result := rule_testing.Run(test, ConsistencyRequireOrganizedImports, "/repository/app/Thing.tsx", source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }

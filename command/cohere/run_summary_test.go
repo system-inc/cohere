@@ -18,7 +18,9 @@ var coveredSkipCases = []struct {
 		name: "covered, and its cover ran",
 		skip: ruleSkip{Rule: "nexus/correctness-no-implicit-return", CoveredBy: "types"},
 		phases: []phaseRecord{
-			{Name: phaseFix, Outcome: outcomeRan}, {Name: phaseTypes, Outcome: outcomeRan}, {Name: phaseLint, Outcome: outcomeRan},
+			{Name: phaseFix, Outcome: outcomeRan},
+			{Name: phaseTypes, Outcome: outcomeRan},
+			{Name: phaseLint, Outcome: outcomeRan},
 		},
 		want: 0,
 	},
@@ -26,7 +28,8 @@ var coveredSkipCases = []struct {
 		name: "covered, under --lint, so the types phase did not run",
 		skip: ruleSkip{Rule: "nexus/correctness-no-implicit-return", CoveredBy: "types"},
 		phases: []phaseRecord{
-			{Name: phaseFix, Outcome: outcomeSkipped}, {Name: phaseTypes, Outcome: outcomeSkipped, Detail: "not requested"},
+			{Name: phaseFix, Outcome: outcomeSkipped},
+			{Name: phaseTypes, Outcome: outcomeSkipped, Detail: "not requested"},
 			{Name: phaseLint, Outcome: outcomeRan},
 		},
 		want: 1,
@@ -44,17 +47,19 @@ var coveredSkipCases = []struct {
 		name: "uncovered, on a run where every phase ran",
 		skip: ruleSkip{Rule: "typescript/no-useless-default-assignment", Reason: "strictNullChecks is off"},
 		phases: []phaseRecord{
-			{Name: phaseFix, Outcome: outcomeRan}, {Name: phaseTypes, Outcome: outcomeRan}, {Name: phaseLint, Outcome: outcomeRan},
+			{Name: phaseFix, Outcome: outcomeRan},
+			{Name: phaseTypes, Outcome: outcomeRan},
+			{Name: phaseLint, Outcome: outcomeRan},
 		},
 		want: 1,
 	},
 }
 
-func TestACoveredSkipIsAGapOnlyWhenItsCoverDidNotRun(t *testing.T) {
-	t.Parallel()
+func TestACoveredSkipIsAGapOnlyWhenItsCoverDidNotRun(test *testing.T) {
+	test.Parallel()
 	if wrong := wrongCoveredSkipVerdicts(runSummary.uncoveredSkips); len(wrong) > 0 {
 		for _, failure := range wrong {
-			t.Error(failure)
+			test.Error(failure)
 		}
 	}
 
@@ -70,20 +75,22 @@ func TestACoveredSkipIsAGapOnlyWhenItsCoverDidNotRun(t *testing.T) {
 		return count
 	}
 	if len(wrongCoveredSkipVerdicts(ignoresWhetherTheCoverRan)) == 0 {
-		t.Error("an implementation that ignores whether the cover ran passed every case, so the cases do not test it")
+		test.Error(
+			"an implementation that ignores whether the cover ran passed every case, so the cases do not test it",
+		)
 	}
 }
 
 // The footer marks the gap the count decides, and only then.
-func TestACoveredSkipIsMarkedOnlyAsAGap(t *testing.T) {
-	t.Parallel()
+func TestACoveredSkipIsMarkedOnlyAsAGap(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range coveredSkipCases {
 		summary := cleanSummary()
 		summary.Phases, summary.Skips = testCase.phases, []ruleSkip{testCase.skip}
 		summary.Gaps.RulesSkippingEverything = summary.uncoveredSkips()
 		marked := carriesMarker(footer(summary, plain, footerOptions{}), "⚠ 1 rule skipped every file") == nil
 		if marked != (testCase.want == 1) {
-			t.Errorf("%s: marked %t, want %t", testCase.name, marked, testCase.want == 1)
+			test.Errorf("%s: marked %t, want %t", testCase.name, marked, testCase.want == 1)
 		}
 	}
 }

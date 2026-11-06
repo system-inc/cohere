@@ -8,8 +8,8 @@ import (
 
 const forDirectionFile = "/repository/source/Loop.ts"
 
-func TestForDirectionFires(t *testing.T) {
-	t.Parallel()
+func TestForDirectionFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -38,7 +38,10 @@ func TestForDirectionFires(t *testing.T) {
 		{"minus-equals with true", "export function run() { for(let i = 0; i < 10; i -= true) {} }\n"},
 
 		// A single modification wrapped in a sequence is still a single modification.
-		{"a sequence with one modification", "export function run() { let x = 0; for(let i = 0; i < 10; x++, i--) {} }\n"},
+		{
+			"a sequence with one modification",
+			"export function run() { let x = 0; for(let i = 0; i < 10; x++, i--) {} }\n",
+		},
 
 		// A nonzero mantissa with an exponent does move the counter, so this must fire. Pairs with
 		// the silent 0e5 case above: together they pin that the mantissa decides, not the exponent.
@@ -47,16 +50,19 @@ func TestForDirectionFires(t *testing.T) {
 		{"a parenthesized condition", "export function run() { for(let i = 0; (i < 10); i--) {} }\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.Run(t, ForDirection, forDirectionFile, testCase.sourceText),
-				"incorrectDirection")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(
+				test,
+				rule_testing.Run(test, ForDirection, forDirectionFile, testCase.sourceText),
+				"incorrectDirection",
+			)
 		})
 	}
 }
 
-func TestForDirectionStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestForDirectionStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -75,8 +81,14 @@ func TestForDirectionStaysSilent(t *testing.T) {
 		{"two decrements on an ascending loop", "export function run() { for(let i = 0; i < 10; i--, i--) {} }\n"},
 
 		// An unknown sign is silence. Reporting these would flag correct loops.
-		{"plus-equals with a variable step", "export function run() { let step = -1; for(let i = 0; i < 10; i += step) {} }\n"},
-		{"plus-equals with a call result", "export function run() { declare function step(): number; for(let i = 0; i < 10; i += step()) {} }\n"},
+		{
+			"plus-equals with a variable step",
+			"export function run() { let step = -1; for(let i = 0; i < 10; i += step) {} }\n",
+		},
+		{
+			"plus-equals with a call result",
+			"export function run() { declare function step(): number; for(let i = 0; i < 10; i += step()) {} }\n",
+		},
 		{"plus-equals with zero", "export function run() { for(let i = 0; i < 10; i -= 0) {} }\n"},
 		// Number(false) is 0, so this is no movement and stays silent. Pairs with the true case in
 		// the firing table to pin both halves of the boolean arm.
@@ -84,7 +96,10 @@ func TestForDirectionStaysSilent(t *testing.T) {
 		{"plus-equals with a zero in another base", "export function run() { for(let i = 0; i < 10; i -= 0x0) {} }\n"},
 		// A zero mantissa stays zero whatever the exponent, so this is still no movement and still
 		// silence. Found by treating an exponent as nonzero and watching the suite stay green.
-		{"plus-equals with a zero mantissa and an exponent", "export function run() { for(let i = 0; i < 10; i -= 0e5) {} }\n"},
+		{
+			"plus-equals with a zero mantissa and an exponent",
+			"export function run() { for(let i = 0; i < 10; i -= 0e5) {} }\n",
+		},
 		{"plus-equals with a zero decimal", "export function run() { for(let i = 0; i < 10; i -= 0.0) {} }\n"},
 
 		// Assignment operators that carry no direction.
@@ -96,7 +111,10 @@ func TestForDirectionStaysSilent(t *testing.T) {
 
 		// Conditions the rule has no opinion about.
 		{"an equality condition", "export function run() { for(let i = 0; i !== 10; i--) {} }\n"},
-		{"a non-binary condition", "export function run() { declare const going: boolean; for(let i = 0; going; i--) {} }\n"},
+		{
+			"a non-binary condition",
+			"export function run() { declare const going: boolean; for(let i = 0; going; i--) {} }\n",
+		},
 		{"neither operand an identifier", "export function run() { for(let i = 0; 0 < 10; i--) {} }\n"},
 
 		// Loops with a missing clause cannot be judged, and must not crash.
@@ -107,9 +125,9 @@ func TestForDirectionStaysSilent(t *testing.T) {
 		{"a while loop is not this rule's business", "export function run() { let i = 0; while(i < 10) { i--; } }\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, ForDirection, forDirectionFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, ForDirection, forDirectionFile, testCase.sourceText))
 		})
 	}
 }
@@ -134,29 +152,29 @@ func TestForDirectionStaysSilent(t *testing.T) {
 //
 // The return is kept: it makes the single-report behavior local rather than a property a reader
 // has to reconstruct, and one line is cheaper than this comment.
-func TestForDirectionReportsOncePerLoop(t *testing.T) {
-	t.Parallel()
+func TestForDirectionReportsOncePerLoop(test *testing.T) {
+	test.Parallel()
 
 	// The same counter on both sides. Qualifies on the left only, since the wrong direction
 	// differs by side and one update cannot be both.
-	rule_testing.ExpectFindings(t, rule_testing.Run(t, ForDirection, forDirectionFile,
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, ForDirection, forDirectionFile,
 		"export function run() { for(let i = 0; i < i; i--) {} }\n"), "incorrectDirection")
 
 	// Different counters, one modified. Qualifies on the left only.
-	rule_testing.ExpectFindings(t, rule_testing.Run(t, ForDirection, forDirectionFile,
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, ForDirection, forDirectionFile,
 		"export function run() { let j = 0; for(let i = 0; i < j; i--) {} }\n"), "incorrectDirection")
 
 	// Both counters modified, still one finding. The right-hand operand does not qualify: for
 	// `i < j` the wrong direction on the right is an increment, and `j--` is a decrement.
-	rule_testing.ExpectFindings(t, rule_testing.Run(t, ForDirection, forDirectionFile,
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, ForDirection, forDirectionFile,
 		"export function run() { let j = 0; for(let i = 0; i < j; i--, j--) {} }\n"), "incorrectDirection")
 
 	// The right-hand operand in isolation, which is what pins the direction mapping rather than
 	// leaving it inferred from the case above.
-	rule_testing.ExpectClean(t, rule_testing.Run(t, ForDirection, forDirectionFile,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, ForDirection, forDirectionFile,
 		"export function run() { let j = 0; for(let i = 0; i < j; j--) {} }\n"))
 
 	// And the shape that does qualify on the right, so the mapping is pinned in both directions.
-	rule_testing.ExpectFindings(t, rule_testing.Run(t, ForDirection, forDirectionFile,
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, ForDirection, forDirectionFile,
 		"export function run() { let j = 0; for(let i = 0; i < j; j++) {} }\n"), "incorrectDirection")
 }

@@ -1,6 +1,6 @@
 package control_flow_graph
 
-// This file is a LOCAL ADDITION, not vendored. See the change list in cfg.go's header.
+// This file is a local addition, not vendored. See the change list in builder.go's header.
 //
 // It is the monotone dataflow framework the graph never had. `no-useless-assignment` wrote its own
 // lattice, meet, and transfer inline and unexported inside `package core`, and two class rules
@@ -18,21 +18,6 @@ const (
 	// used again" question.
 	Backward
 )
-
-// Solution is the settled boundary values of one dataflow, indexed by Block.Index.
-type Solution[V any, E any] struct {
-
-	// entry[i] is the value flowing INTO block i in the analysis's own direction: on entry to the
-	// block for a Forward analysis, on exit from it for a Backward one.
-	entry []V
-
-	// exit[i] is the value flowing OUT of block i in the analysis's own direction, which is
-	// Transfer applied to entry[i].
-	exit []V
-
-	reachable []bool
-	rounds    int
-}
 
 // maximumRounds bounds the fixed-point iteration.
 //
@@ -58,21 +43,21 @@ const maximumRounds = 10000
 // must be monotone: a higher input never produces a lower output. Together those are what make the
 // fixed point exist and be unique, and `Solve` cannot check any of them.
 //
-// What it CAN check is termination, and it does. A lattice whose values keep changing forever — the
+// What it can check is termination, and it does. A lattice whose values keep changing forever (the
 // usual causes are a Meet that is not idempotent, or an Equal comparing pointers where it should
-// compare contents — would make `Solve` iterate without end, so `Solve` bounds its rounds and
+// compare contents) would make `Solve` iterate without end, so `Solve` bounds its rounds and
 // panics instead. A linter that stops and says why is debuggable; one that spins on one file in a
 // build is not. The bound is stated at `maximumRounds`.
 type LatticeOf[V any, E any] interface {
 	// Bottom is the value a block starts at before anything has flowed into it. For a "must"
-	// analysis whose meet is intersection this is the TOP of the lattice rather than its bottom,
+	// analysis whose meet is intersection this is the top of the lattice rather than its bottom,
 	// which is the standard confusion; what the framework needs is only that it is the identity for
 	// Meet, so meeting it with anything yields that thing.
 	Bottom() V
 
 	// Entry is the value at the boundary the analysis starts from: the graph entry for a Forward
 	// analysis, each exit block for a Backward one. It is where the analysis's assumptions about the
-	// world outside this code path root live — a liveness pass says nothing is live at an exit, a
+	// world outside this code path root live: a liveness pass says nothing is live at an exit, a
 	// reaching-definitions pass says the parameters are already defined.
 	Entry() V
 
@@ -83,7 +68,7 @@ type LatticeOf[V any, E any] interface {
 
 	// Transfer computes the value leaving a block from the value entering it. The block is handed
 	// over whole rather than event by event, so the implementation reads its Events in whatever
-	// order its own direction wants — forward for a Forward analysis, backward for a Backward one.
+	// order its own direction wants: forward for a Forward analysis, backward for a Backward one.
 	//
 	// It must not mutate the incoming value. `Solve` holds that as the block's settled boundary and
 	// compares against it to decide whether anything moved.
@@ -101,7 +86,7 @@ type LatticeOf[V any, E any] interface {
 // # Why this exists rather than each analysis writing its own loop
 //
 // `no-useless-assignment` wrote one, and its own doc comment names two things it settled for: it
-// iterates blocks by DESCENDING INDEX rather than reverse postorder, and it rebuilds each block's
+// iterates blocks by descending index rather than reverse postorder, and it rebuilds each block's
 // successor union from scratch every round. Both are consequences of the graph not exposing an
 // order or predecessor edges, and both are fixed here for every consumer at once rather than in
 // one rule.
@@ -109,8 +94,8 @@ type LatticeOf[V any, E any] interface {
 // Descending index is not reverse postorder. It happens to be close for a graph laid out in
 // construction order and it is not the same thing: a `finally` block is laid out twice, and a loop's
 // incrementor is laid out after its body, so the index order crosses back edges in places the
-// postorder does not. It still converges — a fixed point does not care what order it is reached in
-// — but it takes more rounds, and the number of extra rounds is the loop nesting depth.
+// postorder does not. It still converges (a fixed point does not care what order it is reached in),
+// but it takes more rounds, and the number of extra rounds is the loop nesting depth.
 //
 // # Unreachable blocks
 //
@@ -121,7 +106,7 @@ type LatticeOf[V any, E any] interface {
 //
 // A Backward analysis seeds from FinalBlocks and ThrownBlocks both. Measured on this substrate,
 // those two sets cover every reachable terminal block, including the `finally` duplicate laid out on
-// the abrupt path — the shape that looks like it would escape them. The measurement is recorded at
+// the abrupt path, the shape that looks like it would escape them. The measurement is recorded at
 // the seeding code below, because it is a property of the builder rather than of this file.
 func Solve[V any, E any](graph *Graph[E], direction Direction, lattice LatticeOf[V, E]) *Solution[V, E] {
 	solution := &Solution[V, E]{rounds: 0}
@@ -174,7 +159,7 @@ func Solve[V any, E any](graph *Graph[E], direction Direction, lattice LatticeOf
 		//
 		// It does. Probed over `try { return 1; } finally {}`, the same with a `throw`, the same
 		// with a conditional return, a generator yielding inside a `try`, `try/catch/finally` with a
-		// return, and `for (;;)`, and every one reports ZERO reachable terminal blocks outside
+		// return, and `for (;;)`, and every one reports zero reachable terminal blocks outside
 		// FinalBlocks ∪ ThrownBlocks. `markFinal`/`markThrown` are called on the abrupt-path copy,
 		// which is what puts it in.
 		//
@@ -189,7 +174,14 @@ func Solve[V any, E any](graph *Graph[E], direction Direction, lattice LatticeOf
 		changed = false
 		solution.rounds++
 		if solution.rounds > maximumRounds {
-			panic("controlflow: dataflow did not converge — the lattice's Meet is probably not idempotent, or Equal disagrees with it")
+			// Invariant: a monotone lattice of the small height this framework is built for converges
+			// far inside maximumRounds, so reaching it means a broken Meet or Equal, a bug in the
+			// analysis rather than anything a source file can cause.
+			panic(
+				// The dash is written as its escape, the same bytes, so the message reads as it always has.
+				"controlflow: dataflow did not converge \u2014 the lattice's Meet is probably not idempotent, " +
+					"or Equal disagrees with it",
+			)
 		}
 		for _, block := range order {
 			index := block.Index()
@@ -224,37 +216,4 @@ func Solve[V any, E any](graph *Graph[E], direction Direction, lattice LatticeOf
 	}
 
 	return solution
-}
-
-// In returns the value flowing into block in the analysis's direction: on entry for a Forward
-// analysis, on exit for a Backward one. The second result is false for an unreachable block.
-func (s *Solution[V, E]) In(block *Block[E]) (V, bool) {
-	var zero V
-	if s == nil || block == nil || block.Index() >= len(s.entry) || !s.reachable[block.Index()] {
-		return zero, false
-	}
-	return s.entry[block.Index()], true
-}
-
-// Out returns the value flowing out of block in the analysis's direction. The second result is
-// false for an unreachable block.
-func (s *Solution[V, E]) Out(block *Block[E]) (V, bool) {
-	var zero V
-	if s == nil || block == nil || block.Index() >= len(s.exit) || !s.reachable[block.Index()] {
-		return zero, false
-	}
-	return s.exit[block.Index()], true
-}
-
-// Rounds reports how many times the solver swept every block before nothing moved.
-//
-// It is exposed because it is the measurement that says whether the iteration order is doing its
-// job. A Forward analysis over an acyclic graph in reverse postorder settles in two rounds, one to
-// propagate and one to observe nothing moved; more than that means back edges, and a lot more than
-// that means the order is wrong or the lattice is taller than it looks.
-func (s *Solution[V, E]) Rounds() int {
-	if s == nil {
-		return 0
-	}
-	return s.rounds
 }

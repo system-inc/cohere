@@ -21,7 +21,7 @@ var messageNoUselessReturn = rule.Message{
 type noUselessReturnEvent struct {
 	node *ast.Node
 
-	// enclosingTry is the `try` statement whose TRY BLOCK contains this node, or nil. See the
+	// enclosingTry is the `try` statement whose try block contains this node, or nil. See the
 	// rule doc comment: it is the boundary that decides whether a later statement counts.
 	enclosingTry *ast.Node
 
@@ -54,7 +54,7 @@ type noUselessReturnEvent struct {
 //
 // # What counts as a statement that rescues a return
 //
-// Upstream registers its "mark as used" handler on every statement kind EXCEPT `BlockStatement`,
+// Upstream registers its "mark as used" handler on every statement kind except `BlockStatement`,
 // `FunctionDeclaration` and `BreakStatement`, and separately on a `ReturnStatement` only when that
 // return carries a value. Both halves of that last distinction are load-bearing and each moves
 // cases in a different direction:
@@ -67,7 +67,7 @@ type noUselessReturnEvent struct {
 //
 // # Two exemptions taken from the syntax rather than from the graph
 //
-// A return inside a LOOP is never reported: it exits the loop early, which is a real effect
+// A return inside a loop is never reported: it exits the loop early, which is a real effect
 // whatever follows. A return inside a `finally` is never reported either, because it overrides the
 // value the `try` was going to return, which upstream's own corpus writes with a comment saying so.
 //
@@ -84,7 +84,7 @@ type noUselessReturnEvent struct {
 // an expression statement rather than a return, so a test applied at every hop stops one block
 // short of the `qux()` that makes the return legitimate.
 //
-// **A return inside a `try` is rescued only by code after the WHOLE statement.** Measured against
+// **A return inside a `try` is rescued only by code after the whole statement.** Measured against
 // the installed build at 10.8.1, both directions:
 //
 //	try { foo(); return; } catch (e) { qux(); }        REPORTS, though qux() is ordinary code
@@ -94,23 +94,23 @@ type noUselessReturnEvent struct {
 // the finally runs on every exit including this return's own. The first case rules out asking
 // whether a statement merely follows; the second rules out asking whether it is contained in the
 // try. What answers both is comparing the statement's position against the try statement's end.
-var NoUselessReturn = rule.Rule{
+var NoUselessReturn = rule.Rule[rule.NoOptions]{
 	Name:             "no-useless-return",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
 				// One code path per root, as upstream runs one per function. A nested function's
 				// returns belong to the nested path: `try { return 5; } finally { function bar() {
-				// return; } }` reports the INNER return and not the outer one.
+				// return; } }` reports the inner return and not the outer one.
 				//
 				// Only a root whose own code holds a bare `return;` can report, so only those are
 				// built. On a cold ahra run that is 4.4% of roots and 13% of the blocks every root
 				// used to cost (#tmn9n27).
-				for _, root := range codePathRoots(ctx, node) {
+				for _, root := range codePathRoots(ruleContext, node) {
 					if root.BareReturn {
-						noUselessReturnCheckRoot(ctx, root.Node)
+						noUselessReturnCheckRoot(ruleContext, root.Node)
 					} else if CheckCodePathGates {
 						noUselessReturnCheckSkipped(root.Node)
 					}
@@ -121,7 +121,7 @@ var NoUselessReturn = rule.Rule{
 }
 
 // noUselessReturnCheckRoot runs the judgment over one code-path root.
-func noUselessReturnCheckRoot(ctx rule.Context, root *ast.Node) {
+func noUselessReturnCheckRoot(ruleContext rule.Context, root *ast.Node) {
 	graph := control_flow_graph.Build(root, control_flow_graph.Hooks[noUselessReturnEvent]{
 		Statement: func(builder *control_flow_graph.Builder[noUselessReturnEvent], node *ast.Node) {
 			builder.Emit(noUselessReturnEvent{
@@ -151,15 +151,15 @@ func noUselessReturnCheckRoot(ctx rule.Context, root *ast.Node) {
 			if noUselessReturnSomethingRunsAfter(block, index, event.enclosingTry) {
 				continue
 			}
-			if noUselessReturnTheCompilerRequiresIt(ctx, root, candidate) {
+			if noUselessReturnTheCompilerRequiresIt(ruleContext, root, candidate) {
 				continue
 			}
 
-			if fix, canFix := noUselessReturnFix(ctx, candidate); canFix {
-				ctx.ReportNodeWithFixes(candidate, messageNoUselessReturn, fix)
+			if fix, canFix := noUselessReturnFix(ruleContext, candidate); canFix {
+				ruleContext.ReportNodeWithFixes(candidate, messageNoUselessReturn, fix)
 				continue
 			}
-			ctx.ReportNode(candidate, messageNoUselessReturn)
+			ruleContext.ReportNode(candidate, messageNoUselessReturn)
 		}
 	}
 }
@@ -170,6 +170,8 @@ func noUselessReturnCheckSkipped(root *ast.Node) {
 	control_flow_graph.Build(root, control_flow_graph.Hooks[struct{}]{
 		Statement: func(builder *control_flow_graph.Builder[struct{}], node *ast.Node) {
 			if node.Kind == ast.KindReturnStatement && node.AsReturnStatement().Expression == nil {
+				// Invariant: the root index records every bare return in a root's own code, the code this graph
+				// lays out, and the tests turn CheckCodePathGates on to hold the two to agreeing.
 				panic("no-useless-return skipped a root whose graph holds a bare return")
 			}
 		},
@@ -189,6 +191,8 @@ func noUselessReturnSomethingRunsAfter(block *control_flow_graph.Block[noUseless
 }
 
 // noUselessReturnWalk follows the successors, including the dead tail the return itself created.
+//
+// Mutates: seen the walk marks every block it enters, so one set stops the whole recursion revisiting
 func noUselessReturnWalk(from *control_flow_graph.Block[noUselessReturnEvent],
 	seen map[*control_flow_graph.Block[noUselessReturnEvent]]bool, enclosingTry *ast.Node) bool {
 	for _, successor := range from.Successors {
@@ -205,7 +209,7 @@ func noUselessReturnWalk(from *control_flow_graph.Block[noUselessReturnEvent],
 		// the graph alone.
 		//
 		// The first: in `case 1: if (a) { doSomething(); return; } break;` the break's block has an
-		// unreachable successor leading into the NEXT case. That successor is the fall-through that
+		// unreachable successor leading into the next case. That successor is the fall-through that
 		// would exist if the break were not written, so it is not this return's continuation.
 		// Following it finds the next case's code, rescues the return, and goes silent on an input
 		// upstream reports.
@@ -234,10 +238,10 @@ func noUselessReturnWalk(from *control_flow_graph.Block[noUselessReturnEvent],
 	return false
 }
 
-// noUselessReturnInsideTry answers whether a statement lies in the CATCH or FINALLY of the try
+// noUselessReturnInsideTry answers whether a statement lies in the `catch` or `finally` of the try
 // statement the candidate return sits in, and therefore cannot rescue it.
 //
-// The boundary is the try BLOCK's end rather than the try statement's, and getting that wrong is a
+// The boundary is the try block's end rather than the try statement's, and getting that wrong is a
 // real false positive rather than a detail: an early exit followed by more work inside the same
 // `try` is the ordinary shape of guarded code, and it appeared 51 times on this tree before this
 // was corrected. Measured against the installed build at 10.8.1, all six directions:
@@ -325,7 +329,7 @@ func noUselessReturnInFinally(node *ast.Node, root *ast.Node) bool {
 	return false
 }
 
-// noUselessReturnEnclosingTryBlock returns the innermost try statement whose TRY BLOCK contains the
+// noUselessReturnEnclosingTryBlock returns the innermost try statement whose try block contains the
 // node, or nil.
 func noUselessReturnEnclosingTryBlock(node *ast.Node, root *ast.Node) *ast.Node {
 	for current := node; current != nil && current.Parent != nil && current != root; current = current.Parent {
@@ -362,7 +366,7 @@ func noUselessReturnEnclosingTryBlock(node *ast.Node, root *ast.Node) *ast.Node 
 // A generator with an annotated return type declines without a type question. The checker unwraps
 // its return type through the generator's own type arguments, which is not ported, and staying
 // silent costs a missed report where guessing costs a broken build.
-func noUselessReturnTheCompilerRequiresIt(ctx rule.Context, root *ast.Node, candidate *ast.Node) bool {
+func noUselessReturnTheCompilerRequiresIt(ruleContext rule.Context, root *ast.Node, candidate *ast.Node) bool {
 	if !ast.IsFunctionLikeDeclaration(root) || !noUselessReturnIsTheOnlyReturn(root, candidate) {
 		return false
 	}
@@ -376,9 +380,9 @@ func noUselessReturnTheCompilerRequiresIt(ctx rule.Context, root *ast.Node, cand
 	if flags&ast.FunctionFlagsGenerator != 0 {
 		return true
 	}
-	declared := ctx.TypeChecker.GetTypeFromTypeNode(root.Type())
+	declared := ruleContext.TypeChecker.GetTypeFromTypeNode(root.Type())
 	if flags&ast.FunctionFlagsAsync != 0 {
-		declared = ctx.TypeChecker.GetPromisedTypeOfPromise(declared)
+		declared = ruleContext.TypeChecker.GetPromisedTypeOfPromise(declared)
 	}
 	if declared == nil {
 		return true
@@ -413,12 +417,12 @@ func noUselessReturnIsTheOnlyReturn(root *ast.Node, candidate *ast.Node) bool {
 
 // noUselessReturnMaybeTypeOfKind is the checker's `maybeTypeOfKind`: the type has the flag, or a
 // union or intersection member does.
-func noUselessReturnMaybeTypeOfKind(t *checker.Type, kind checker.TypeFlags) bool {
-	if t.Flags()&kind != 0 {
+func noUselessReturnMaybeTypeOfKind(checkedType *checker.Type, kind checker.TypeFlags) bool {
+	if checkedType.Flags()&kind != 0 {
 		return true
 	}
-	if t.Flags()&checker.TypeFlagsUnionOrIntersection != 0 {
-		for _, member := range t.Types() {
+	if checkedType.Flags()&checker.TypeFlagsUnionOrIntersection != 0 {
+		for _, member := range checkedType.Types() {
 			if noUselessReturnMaybeTypeOfKind(member, kind) {
 				return true
 			}
@@ -459,23 +463,23 @@ func noUselessReturnMaybeTypeOfKind(t *checker.Type, kind checker.TypeFlags) boo
 // surrounding whitespace alone. That matters for a deletion fixer in this tree specifically: a span
 // built from `Pos()` would eat the preceding trivia, and a span built from a neighbouring node's
 // offset is how a sibling rule stranded TypeScript type annotations across eight files.
-func noUselessReturnFix(ctx rule.Context, node *ast.Node) (rule.Fix, bool) {
+func noUselessReturnFix(ruleContext rule.Context, node *ast.Node) (rule.Fix, bool) {
 	if !noUselessReturnIsRemovable(node) {
 		return rule.Fix{}, false
 	}
 
-	nodeRange := rule.TokenRange(ctx.SourceFile, node)
-	if noUselessReturnHasCommentInside(ctx.SourceFile.Text(), nodeRange.Pos(), nodeRange.End()) {
+	nodeRange := rule.TokenRange(ruleContext.SourceFile, node)
+	if noUselessReturnHasCommentInside(ruleContext.SourceFile.Text(), nodeRange.Pos(), nodeRange.End()) {
 		return rule.Fix{}, false
 	}
 
-	return ctx.RemoveNode(node), true
+	return ruleContext.RemoveNode(node), true
 }
 
 // noUselessReturnHasCommentInside scans the statement's own text for a comment.
 //
 // The shelf's `comments.ForFile` is the obvious tool and it is the wrong one here, which was
-// measured rather than assumed. It collects LEADING and TRAILING trivia around nodes, so a comment
+// measured rather than assumed. It collects leading and trailing trivia around nodes, so a comment
 // between the `return` keyword and its semicolon belongs to no node's trivia and it reports zero:
 //
 //	function foo() { bar(); return/**/; }        comments.All finds 0

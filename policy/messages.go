@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io/fs"
 	"path"
-	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -46,10 +45,19 @@ var messageFiles embed.FS
 const (
 	MessageLanguageTypeScript = "TypeScript"
 	MessageLanguageSwift      = "Swift"
+	MessageLanguageGo         = "Go"
 )
 
 // messageLanguages are the languages a file may name.
-var messageLanguages = map[string]bool{MessageLanguageTypeScript: true, MessageLanguageSwift: true}
+var messageLanguages = map[string]bool{
+	MessageLanguageTypeScript: true,
+	MessageLanguageSwift:      true,
+	MessageLanguageGo:         true,
+}
+
+// messageLanguagesNamingTheFile is the order a file's idea is read from its rules: the TypeScript rule, the
+// original, then Swift's, then Go's, so a twin file keeps the name it had before Go joined it.
+var messageLanguagesNamingTheFile = []string{MessageLanguageTypeScript, MessageLanguageSwift, MessageLanguageGo}
 
 // messageFile is one file under messages/, as written.
 type messageFile struct {
@@ -67,26 +75,11 @@ type messageFileMessage struct {
 	Languages []string `json:"languages"`
 }
 
-// MessageCatalog is every message file, read and checked, with each rule's text resolved for its
-// language.
-type MessageCatalog struct {
-	// templates holds each rule's messages by id.
-	templates map[string]map[string]messageTemplate
-	// languages holds each rule's language.
-	languages map[string]string
-}
-
 // messageTemplate is one message for one rule, its terms and string phrases resolved. Its object
 // phrases are left as `<<name>>` slots, with their options here, filled when the rule reports.
 type messageTemplate struct {
 	text    string
 	options map[string]map[string]string
-}
-
-// MessageHandle is a rule's claim on one of its messages, taken when the rule's package initializes.
-type MessageHandle struct {
-	Rule string
-	Id   string
 }
 
 // MessageOption is a rule's claim on one option of an object phrase its message uses, taken when the
@@ -115,17 +108,21 @@ var Messages = mustLoadEmbeddedMessages()
 
 // MessageFiles is the embedded messages directory, its files at the root, for a test that edits one.
 func MessageFiles() fs.FS {
-	files, err := fs.Sub(messageFiles, "messages")
-	if err != nil {
-		panic(fmt.Sprintf("policy/messages: %v", err))
+	files, subError := fs.Sub(messageFiles, "messages")
+	if subError != nil {
+		// Invariant: fs.Sub fails only on an invalid path, and "messages" is a valid one, embedded by the
+		// go:embed above.
+		panic(fmt.Sprintf("policy/messages: %v", subError))
 	}
 	return files
 }
 
 func mustLoadEmbeddedMessages() *MessageCatalog {
-	catalog, err := LoadMessages(MessageFiles())
-	if err != nil {
-		panic(fmt.Sprintf("policy/messages: %v", err))
+	catalog, loadMessagesError := LoadMessages(MessageFiles())
+	if loadMessagesError != nil {
+		// Invariant: the files are embedded at build and read when the package initializes, so an invalid one
+		// fails every test binary that links this package, and no build that passed its tests reaches here.
+		panic(fmt.Sprintf("policy/messages: %v", loadMessagesError))
 	}
 	currentMessages.Store(catalog)
 	return catalog
@@ -136,9 +133,9 @@ func mustLoadEmbeddedMessages() *MessageCatalog {
 // an id that is not camelCase, a placeholder that is malformed or names nothing, a term missing a
 // language or given one the file does not speak for, a term no text uses, and a term on a lone rule.
 func LoadMessages(files fs.FS) (*MessageCatalog, error) {
-	names, err := fs.Glob(files, "*.json")
-	if err != nil {
-		return nil, err
+	names, globError := fs.Glob(files, "*.json")
+	if globError != nil {
+		return nil, globError
 	}
 	if len(names) == 0 {
 		return nil, fmt.Errorf("no message files, so no house rule could render a finding")
@@ -148,125 +145,15 @@ func LoadMessages(files fs.FS) (*MessageCatalog, error) {
 		languages: map[string]string{},
 	}
 	for _, name := range names {
-		data, err := fs.ReadFile(files, name)
-		if err != nil {
-			return nil, err
+		data, readFileError := fs.ReadFile(files, name)
+		if readFileError != nil {
+			return nil, readFileError
 		}
-		if err := catalog.add(strings.TrimSuffix(path.Base(name), ".json"), data); err != nil {
-			return nil, fmt.Errorf("%s: %w", name, err)
+		if addError := catalog.add(strings.TrimSuffix(path.Base(name), ".json"), data); addError != nil {
+			return nil, fmt.Errorf("%s: %w", name, addError)
 		}
 	}
 	return catalog, nil
-}
-
-// add reads one file into the catalog.
-func (catalog *MessageCatalog) add(idea string, data []byte) error {
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-	var file messageFile
-	if err := decoder.Decode(&file); err != nil {
-		return err
-	}
-	if len(file.Rules) == 0 {
-		return fmt.Errorf("names no rule, so nothing renders its messages")
-	}
-	if len(file.Messages) == 0 {
-		return fmt.Errorf("holds no message")
-	}
-	for language, ruleName := range file.Rules {
-		if !messageLanguages[language] {
-			return fmt.Errorf("rules: %q is not %q or %q", language, MessageLanguageTypeScript, MessageLanguageSwift)
-		}
-		if _, leaf, found := strings.Cut(ruleName, "/"); !found || leaf == "" {
-			return fmt.Errorf("rules: %q is not a namespaced rule name", ruleName)
-		}
-		if _, taken := catalog.languages[ruleName]; taken {
-			return fmt.Errorf("rules: %q is named by another message file too", ruleName)
-		}
-	}
-	// The file is named for its idea: the TypeScript rule's name after its namespace, the original, or
-	// the Swift rule's when there is no TypeScript one.
-	namedFor := file.Rules[MessageLanguageTypeScript]
-	if namedFor == "" {
-		namedFor = file.Rules[MessageLanguageSwift]
-	}
-	if _, leaf, _ := strings.Cut(namedFor, "/"); leaf != idea {
-		return fmt.Errorf("is named %q, and its idea is %q", idea, leaf)
-	}
-
-	stringPhrases, objectPhrases, err := readPhrases(file.Phrases, file.Rules)
-	if err != nil {
-		return err
-	}
-	// The messages naming each phrase, so a phrase no message names, and a string phrase only one
-	// message names, are refused once every message is read.
-	phraseUsers := map[string]map[string]bool{}
-
-	for id, message := range file.Messages {
-		if !isCamelCaseName(id) {
-			return fmt.Errorf("message %q: an id is a camelCase noun phrase", id)
-		}
-		if strings.TrimSpace(message.Text) == "" {
-			return fmt.Errorf("message %q has no text", id)
-		}
-		languages, err := messageLanguagesOf(message, file.Rules)
-		if err != nil {
-			return fmt.Errorf("message %q: %w", id, err)
-		}
-		if len(message.Terms) > 0 && len(languages) == 1 {
-			return fmt.Errorf("message %q: one language has nothing to vary, so it carries no terms", id)
-		}
-		usedTerms := map[string]bool{}
-		for _, language := range languages {
-			ruleName := file.Rules[language]
-			text, err := resolveTerms(message.Text, message.Terms, language, usedTerms)
-			if err != nil {
-				return fmt.Errorf("message %q, %s: %w", id, language, err)
-			}
-			template, err := resolvePhrases(text, stringPhrases, objectPhrases, language)
-			if err != nil {
-				return fmt.Errorf("message %q, %s: %w", id, language, err)
-			}
-			if _, err := placeholderNames(template.text, "{{", "}}"); err != nil {
-				return fmt.Errorf("message %q, %s: %w", id, language, err)
-			}
-			names, _ := placeholderNames(text, "<<", ">>")
-			for _, name := range names {
-				if phraseUsers[name] == nil {
-					phraseUsers[name] = map[string]bool{}
-				}
-				phraseUsers[name][id] = true
-			}
-			if catalog.templates[ruleName] == nil {
-				catalog.templates[ruleName] = map[string]messageTemplate{}
-			}
-			catalog.templates[ruleName][id] = template
-		}
-		for term, byLanguage := range message.Terms {
-			if !usedTerms[term] {
-				return fmt.Errorf("message %q: the term %q is in no text", id, term)
-			}
-			for language := range byLanguage {
-				if !slices.Contains(languages, language) {
-					return fmt.Errorf("message %q: the term %q gives %s, which the message is not rendered in", id, term, language)
-				}
-			}
-		}
-	}
-	for name := range stringPhrases {
-		if len(phraseUsers[name]) < 2 {
-			return fmt.Errorf("the string phrase %q is in %d message, and one shared by fewer than two stays inline", name, len(phraseUsers[name]))
-		}
-	}
-	for name := range objectPhrases {
-		if len(phraseUsers[name]) == 0 {
-			return fmt.Errorf("the phrase %q is in no message", name)
-		}
-	}
-	for language, ruleName := range file.Rules {
-		catalog.languages[ruleName] = language
-	}
-	return nil
 }
 
 // messageLanguagesOf is the languages a message is rendered in: its own list, every one a language the
@@ -304,7 +191,10 @@ type objectPhrase map[string]map[string]string
 // is not camelCase, an object with no option or an option name that is not, an option giving its text
 // by language for no language or for one the file names no rule for, and a phrase holding a phrase or
 // a term.
-func readPhrases(raw map[string]json.RawMessage, rules map[string]string) (map[string]string, map[string]objectPhrase, error) {
+func readPhrases(
+	raw map[string]json.RawMessage,
+	rules map[string]string,
+) (map[string]string, map[string]objectPhrase, error) {
 	stringPhrases := map[string]string{}
 	objectPhrases := map[string]objectPhrase{}
 	for name, value := range raw {
@@ -313,12 +203,12 @@ func readPhrases(raw map[string]json.RawMessage, rules map[string]string) (map[s
 		}
 		var text string
 		var texts []string
-		if err := strictUnmarshal(value, &text); err == nil {
+		if strictUnmarshalError := strictUnmarshal(value, &text); strictUnmarshalError == nil {
 			stringPhrases[name] = text
 			texts = append(texts, text)
 		} else {
 			var options map[string]json.RawMessage
-			if err := strictUnmarshal(value, &options); err != nil {
+			if strictUnmarshalError := strictUnmarshal(value, &options); strictUnmarshalError != nil {
 				return nil, nil, fmt.Errorf("phrase %q is neither text nor named options of text", name)
 			}
 			if len(options) == 0 {
@@ -329,9 +219,9 @@ func readPhrases(raw map[string]json.RawMessage, rules map[string]string) (map[s
 				if !isCamelCaseName(option) {
 					return nil, nil, fmt.Errorf("phrase %q: the option %q is not camelCase", name, option)
 				}
-				byLanguage, err := readOptionText(optionValue, rules)
-				if err != nil {
-					return nil, nil, fmt.Errorf("phrase %q, option %q: %w", name, option, err)
+				byLanguage, readOptionTextError := readOptionText(optionValue, rules)
+				if readOptionTextError != nil {
+					return nil, nil, fmt.Errorf("phrase %q, option %q: %w", name, option, readOptionTextError)
 				}
 				for _, optionText := range byLanguage {
 					texts = append(texts, optionText)
@@ -341,11 +231,14 @@ func readPhrases(raw map[string]json.RawMessage, rules map[string]string) (map[s
 			objectPhrases[name] = phrase
 		}
 		for _, text := range texts {
-			if strings.Contains(text, "<<") || strings.Contains(text, ">>") || strings.Contains(text, "[[") || strings.Contains(text, "]]") {
+			if strings.Contains(text, "<<") ||
+				strings.Contains(text, ">>") ||
+				strings.Contains(text, "[[") ||
+				strings.Contains(text, "]]") {
 				return nil, nil, fmt.Errorf("phrase %q holds a phrase or a term, and nothing nests", name)
 			}
-			if _, err := placeholderNames(text, "{{", "}}"); err != nil {
-				return nil, nil, fmt.Errorf("phrase %q: %w", name, err)
+			if _, placeholderNamesError := placeholderNames(text, "{{", "}}"); placeholderNamesError != nil {
+				return nil, nil, fmt.Errorf("phrase %q: %w", name, placeholderNamesError)
 			}
 		}
 	}
@@ -356,11 +249,11 @@ func readPhrases(raw map[string]json.RawMessage, rules map[string]string) (map[s
 // text by language, which only the languages it names render.
 func readOptionText(value json.RawMessage, rules map[string]string) (map[string]string, error) {
 	var text string
-	if err := strictUnmarshal(value, &text); err == nil {
+	if strictUnmarshalError := strictUnmarshal(value, &text); strictUnmarshalError == nil {
 		return map[string]string{"": text}, nil
 	}
 	var byLanguage map[string]string
-	if err := strictUnmarshal(value, &byLanguage); err != nil {
+	if strictUnmarshalError := strictUnmarshal(value, &byLanguage); strictUnmarshalError != nil {
 		return nil, fmt.Errorf("is neither text nor text by language")
 	}
 	if len(byLanguage) == 0 {
@@ -375,7 +268,7 @@ func readOptionText(value json.RawMessage, rules map[string]string) (map[string]
 }
 
 // strictUnmarshal decodes JSON into target, refusing a value of another shape.
-func strictUnmarshal(data []byte, target any) error {
+func strictUnmarshal[Target any](data []byte, target *Target) error {
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.DisallowUnknownFields()
 	return decoder.Decode(target)
@@ -384,10 +277,15 @@ func strictUnmarshal(data []byte, target any) error {
 // resolvePhrases puts each string phrase into text, and keeps each object phrase as a slot with the
 // options that have text for language, refusing a `<<name>>` the file does not define and an object
 // phrase with no option for the language the text is rendered in.
-func resolvePhrases(text string, stringPhrases map[string]string, objectPhrases map[string]objectPhrase, language string) (messageTemplate, error) {
-	names, err := placeholderNames(text, "<<", ">>")
-	if err != nil {
-		return messageTemplate{}, err
+func resolvePhrases(
+	text string,
+	stringPhrases map[string]string,
+	objectPhrases map[string]objectPhrase,
+	language string,
+) (messageTemplate, error) {
+	names, placeholderNamesError := placeholderNames(text, "<<", ">>")
+	if placeholderNamesError != nil {
+		return messageTemplate{}, placeholderNamesError
 	}
 	template := messageTemplate{text: text}
 	for _, name := range names {
@@ -419,23 +317,35 @@ func resolvePhrases(text string, stringPhrases map[string]string, objectPhrases 
 }
 
 // resolveTerms puts each `[[term]]` in text in its words for language, recording the terms it used.
-func resolveTerms(text string, terms map[string]map[string]string, language string, used map[string]bool) (string, error) {
-	names, err := placeholderNames(text, "[[", "]]")
-	if err != nil {
-		return "", err
+//
+// Mutates: used is the caller's record of the terms any language's text used, so a term in no text is refused
+// once every language is read
+func resolveTerms(
+	text string,
+	terms map[string]map[string]string,
+	language string,
+	used map[string]bool,
+) (string, error) {
+	names, placeholderNamesError := placeholderNames(text, "[[", "]]")
+	if placeholderNamesError != nil {
+		return "", placeholderNamesError
 	}
+	resolved := text
 	for _, name := range names {
 		words, defined := terms[name][language]
 		if !defined {
 			return "", fmt.Errorf("the term %q has no words for %s", name, language)
 		}
-		if strings.Contains(words, "[[") || strings.Contains(words, "]]") || strings.Contains(words, "<<") || strings.Contains(words, ">>") {
+		if strings.Contains(words, "[[") ||
+			strings.Contains(words, "]]") ||
+			strings.Contains(words, "<<") ||
+			strings.Contains(words, ">>") {
 			return "", fmt.Errorf("the term %q holds a term or a phrase, and nothing nests", name)
 		}
-		text = strings.ReplaceAll(text, "[["+name+"]]", words)
+		resolved = strings.ReplaceAll(resolved, "[["+name+"]]", words)
 		used[name] = true
 	}
-	return text, nil
+	return resolved, nil
 }
 
 // placeholderNames returns the names between each open and close in text, sorted and once each,
@@ -480,7 +390,9 @@ func isCamelCaseName(text string) bool {
 		return false
 	}
 	for _, character := range text {
-		if (character < 'a' || character > 'z') && (character < 'A' || character > 'Z') && (character < '0' || character > '9') {
+		if (character < 'a' || character > 'z') &&
+			(character < 'A' || character > 'Z') &&
+			(character < '0' || character > '9') {
 			return false
 		}
 	}
@@ -491,6 +403,8 @@ func isCamelCaseName(text string) bool {
 // panics when the package initializes and every test binary that links the rule fails at once.
 func MessageOf(ruleName string, id string) MessageHandle {
 	if _, found := currentMessages.Load().templates[ruleName][id]; !found {
+		// Invariant: handles are taken in package-level vars, so a missing message fails every test binary
+		// that links the rule when it initializes, and no build that passed its tests reaches here.
 		panic(fmt.Sprintf("policy/messages: %s has no message %q", ruleName, id))
 	}
 	handle := MessageHandle{Rule: ruleName, Id: id}
@@ -500,70 +414,6 @@ func MessageOf(ruleName string, id string) MessageHandle {
 	return handle
 }
 
-// Option is a rule's claim on one option of an object phrase this message uses, taken in a
-// package-level var like the handle. An option the catalog does not hold for this message panics.
-func (handle MessageHandle) Option(phrase string, name string) MessageOption {
-	return currentMessages.Load().Option(handle, phrase, name)
-}
-
-// Option is handle.Option against this catalog rather than the current one, so a test can claim an option
-// of a catalog it built without swapping the one every other test renders from.
-func (catalog *MessageCatalog) Option(handle MessageHandle, phrase string, name string) MessageOption {
-	template, found := catalog.templates[handle.Rule][handle.Id]
-	if _, held := template.options[phrase][name]; !found || !held {
-		panic(fmt.Sprintf("policy/messages: %s %q has no option %q of the phrase %q", handle.Rule, handle.Id, name, phrase))
-	}
-	option := MessageOption{Rule: handle.Rule, Id: handle.Id, Phrase: phrase, Name: name}
-	requestedMessages.Lock()
-	requestedMessages.options[option] = true
-	requestedMessages.Unlock()
-	return option
-}
-
-// Render is the message's text for its rule's language, with one option chosen for each object phrase
-// and values put in. It reads the current catalog, so a test that swapped in an edited copy sees the
-// edit. A missing or extra option, or a value the text does not use or uses and was not given, panics:
-// a finding reading `{{constructor}}` or `<<reason>>` is the silent version.
-func (handle MessageHandle) Render(values map[string]string, options ...MessageOption) string {
-	return currentMessages.Load().Render(handle, values, options...)
-}
-
-// Render is handle.Render against this catalog rather than the current one. A test of the catalog itself
-// renders through this and swaps nothing, so it runs in parallel with every test that renders the real
-// messages: swapping the global under t.Parallel was a race, and one test read another's catalog
-// (#hzxspf5).
-func (catalog *MessageCatalog) Render(handle MessageHandle, values map[string]string, options ...MessageOption) string {
-	template, found := catalog.templates[handle.Rule][handle.Id]
-	if !found {
-		panic(fmt.Sprintf("policy/messages: %s has no message %q", handle.Rule, handle.Id))
-	}
-	text := template.text
-	chosen := map[string]bool{}
-	for _, option := range options {
-		optionText, held := template.options[option.Phrase][option.Name]
-		if option.Rule != handle.Rule || option.Id != handle.Id || !held || chosen[option.Phrase] {
-			panic(fmt.Sprintf("policy/messages: %s %q was given the option %q of %q, which it does not take", handle.Rule, handle.Id, option.Name, option.Phrase))
-		}
-		chosen[option.Phrase] = true
-		text = strings.ReplaceAll(text, "<<"+option.Phrase+">>", optionText)
-	}
-	if len(chosen) != len(template.options) {
-		panic(fmt.Sprintf("policy/messages: %s %q picks from %d phrases, and was given %d options", handle.Rule, handle.Id, len(template.options), len(chosen)))
-	}
-	needed, _ := placeholderNames(text, "{{", "}}")
-	if len(values) != len(needed) {
-		panic(fmt.Sprintf("policy/messages: %s %q uses the values %v, and was given %d", handle.Rule, handle.Id, needed, len(values)))
-	}
-	for _, name := range needed {
-		value, given := values[name]
-		if !given {
-			panic(fmt.Sprintf("policy/messages: %s %q uses the value %q, and was not given it", handle.Rule, handle.Id, name))
-		}
-		text = strings.ReplaceAll(text, "{{"+name+"}}", value)
-	}
-	return text
-}
-
 // UseMessages makes catalog the one handles render from until restore is called. It exists for the
 // test that edits an entry and expects the edit in a rule's finding, which renders inside the rule and so
 // cannot be handed a catalog; a test calling it must not run in parallel with others that render. A test
@@ -571,42 +421,6 @@ func (catalog *MessageCatalog) Render(handle MessageHandle, values map[string]st
 func UseMessages(catalog *MessageCatalog) (restore func()) {
 	previous := currentMessages.Swap(catalog)
 	return func() { currentMessages.Store(previous) }
-}
-
-// MessagesFor lists every message the catalog holds for rules of one language, sorted.
-func (catalog *MessageCatalog) MessagesFor(language string) []MessageHandle {
-	var handles []MessageHandle
-	for ruleName, templates := range catalog.templates {
-		if catalog.languages[ruleName] != language {
-			continue
-		}
-		for id := range templates {
-			handles = append(handles, MessageHandle{Rule: ruleName, Id: id})
-		}
-	}
-	sortMessageHandles(handles)
-	return handles
-}
-
-// OptionsFor lists every object-phrase option the catalog holds for rules of one language, sorted.
-func (catalog *MessageCatalog) OptionsFor(language string) []MessageOption {
-	var options []MessageOption
-	for ruleName, templates := range catalog.templates {
-		if catalog.languages[ruleName] != language {
-			continue
-		}
-		for id, template := range templates {
-			for phrase, byName := range template.options {
-				for name := range byName {
-					options = append(options, MessageOption{Rule: ruleName, Id: id, Phrase: phrase, Name: name})
-				}
-			}
-		}
-	}
-	sort.Slice(options, func(left, right int) bool {
-		return fmt.Sprint(options[left]) < fmt.Sprint(options[right])
-	})
-	return options
 }
 
 // RequestedOptions lists every option a rule has claimed.

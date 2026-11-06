@@ -32,7 +32,7 @@ var noUnusedClassComponentMethodsLifecycle = map[string]bool{
 
 // noUnusedClassComponentMethodsEs6Lifecycle is exempt only in a class component.
 //
-// Upstream's `ES6_LIFECYCLE`. `state` is the class field React reads directly, and it is NOT exempt
+// Upstream's `ES6_LIFECYCLE`. `state` is the class field React reads directly, and it is not exempt
 // in a `createReactClass` object, where the equivalent is `getInitialState`.
 var noUnusedClassComponentMethodsEs6Lifecycle = map[string]bool{
 	"state": true,
@@ -41,7 +41,7 @@ var noUnusedClassComponentMethodsEs6Lifecycle = map[string]bool{
 // noUnusedClassComponentMethodsEs5Lifecycle is exempt only in a createReactClass object.
 //
 // Upstream's `ES5_LIFECYCLE`, and the mirror of the set above: `getInitialState` in a class
-// component REPORTS, because a class has no such hook. Measured on the installed build.
+// component reports, because a class has no such hook. Measured on the installed build.
 var noUnusedClassComponentMethodsEs5Lifecycle = map[string]bool{
 	"getInitialState": true,
 	"getDefaultProps": true,
@@ -60,7 +60,7 @@ var noUnusedClassComponentMethodsEs5Lifecycle = map[string]bool{
 // that defined it. Its 36 clean and 22 reporting cases were extracted mechanically from the clone by
 // stubbing its `RuleTester`, then all 58 were run against the installed build, 7.37.5, through the
 // ESLint Linter API with the TypeScript parser. The two authorities agreed on all 58, compared on
-// the RENDERED message text rather than on message ids, because the corpus states raw text and both
+// the rendered message text rather than on message ids, because the corpus states raw text and both
 // ids interpolate.
 //
 // # Two ids, and which one fires depends on whether the class has a name
@@ -95,13 +95,13 @@ var noUnusedClassComponentMethodsEs5Lifecycle = map[string]bool{
 // a flag that makes every `this` member access inside it invisible, on the reasoning that `this` in
 // a static method is the constructor rather than the instance.
 //
-// # A class EXPRESSION is silent
+// # A class expression is silent
 //
 // Upstream listens on `ClassDeclaration` only, so `var Foo = class extends React.Component { ... }`
 // reports nothing however unused its members are. Measured, and reproduced rather than widened.
-var NoUnusedClassComponentMethods = rule.Rule{
+var NoUnusedClassComponentMethods = rule.Rule[rule.NoOptions]{
 	Name: "react/no-unused-class-component-methods",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindSourceFile: func(sourceFile *ast.Node) {
 				var walk func(node *ast.Node)
@@ -111,10 +111,10 @@ var NoUnusedClassComponentMethods = rule.Rule{
 					}
 					switch {
 					case node.Kind == ast.KindClassDeclaration && reactUtilities.IsEs6ComponentClass(node):
-						noUnusedClassComponentMethodsCheckClass(ctx, node)
+						noUnusedClassComponentMethodsCheckClass(ruleContext, node)
 					case node.Kind == ast.KindObjectLiteralExpression &&
 						noUnusedClassComponentMethodsIsEs5Specification(node):
-						noUnusedClassComponentMethodsCheckObject(ctx, node)
+						noUnusedClassComponentMethodsCheckObject(ruleContext, node)
 					}
 					node.ForEachChild(func(child *ast.Node) bool {
 						walk(child)
@@ -129,7 +129,7 @@ var NoUnusedClassComponentMethods = rule.Rule{
 
 // noUnusedClassComponentMethodsIsEs5Specification reports whether an object is a component body.
 //
-// Upstream's `isES5Component` looks at the object's PARENT call, requiring the callee to be the
+// Upstream's `isES5Component` looks at the object's parent call, requiring the callee to be the
 // createClass pragma. With no React settings read here that pragma is `createReactClass`, and the
 // namespaced `React.createClass` fails upstream's property test for the same reason. Written inline
 // rather than through the shelf's `react.IsEs5ComponentCall`, which accepts `createClass` and the
@@ -141,16 +141,16 @@ func noUnusedClassComponentMethodsIsEs5Specification(object *ast.Node) bool {
 	}
 	call := parent.AsCallExpression()
 	callee := call.Expression
-	// The ARGUMENT POSITION is deliberately not checked, and this port had it wrong at first.
-	// Upstream's `isES5Component` looks only at `node.parent.callee`, so an object in ANY argument
+	// The argument position is deliberately not checked, and this port had it wrong at first.
+	// Upstream's `isES5Component` looks only at `node.parent.callee`, so an object in any argument
 	// slot counts. A mutant dropping a first-argument test survived every fixture and probing the
-	// installed build settled it: `createReactClass(other, { handleClick() {} })` REPORTS. A nested
+	// installed build settled it: `createReactClass(other, { handleClick() {} })` reports. A nested
 	// object is still not a component, because its parent is a property rather than the call.
 	return callee != nil && callee.Kind == ast.KindIdentifier && callee.Text() == "createReactClass"
 }
 
 // noUnusedClassComponentMethodsCheckClass gathers and reports for one class component.
-func noUnusedClassComponentMethodsCheckClass(ctx rule.Context, class *ast.Node) {
+func noUnusedClassComponentMethodsCheckClass(ruleContext rule.Context, class *ast.Node) {
 	className := ""
 	if name := class.AsClassDeclaration().Name(); name != nil && name.Kind == ast.KindIdentifier {
 		className = name.Text()
@@ -161,7 +161,7 @@ func noUnusedClassComponentMethodsCheckClass(ctx rule.Context, class *ast.Node) 
 	members := class.AsClassDeclaration().Members
 	if members != nil {
 		for _, member := range members.Nodes {
-			// A static member contributes no definition and, crucially, no USES either: upstream
+			// A static member contributes no definition and, crucially, no uses either: upstream
 			// sets a flag on entry that makes every `this` access inside invisible.
 			if noUnusedClassComponentMethodsIsStatic(member) {
 				continue
@@ -173,13 +173,13 @@ func noUnusedClassComponentMethodsCheckClass(ctx rule.Context, class *ast.Node) 
 		}
 	}
 
-	state.report(ctx, className, noUnusedClassComponentMethodsEs6Lifecycle)
+	state.report(ruleContext, className, noUnusedClassComponentMethodsEs6Lifecycle)
 }
 
 // noUnusedClassComponentMethodsCheckObject gathers and reports for one createReactClass object.
 //
 // The object has no name, so every finding here uses the `unused` id.
-func noUnusedClassComponentMethodsCheckObject(ctx rule.Context, object *ast.Node) {
+func noUnusedClassComponentMethodsCheckObject(ruleContext rule.Context, object *ast.Node) {
 	state := &noUnusedClassComponentMethodsState{used: map[string]bool{}}
 
 	properties := object.AsObjectLiteralExpression().Properties
@@ -192,95 +192,7 @@ func noUnusedClassComponentMethodsCheckObject(ctx rule.Context, object *ast.Node
 		}
 	}
 
-	state.report(ctx, "", noUnusedClassComponentMethodsEs5Lifecycle)
-}
-
-// noUnusedClassComponentMethodsState is one component's gathered definitions and uses.
-type noUnusedClassComponentMethodsState struct {
-	// definitions holds the KEY node of each declaration, which is also the reported span.
-	definitions []*ast.Node
-	used        map[string]bool
-}
-
-// collect walks one member's body recording uses and assignment definitions.
-//
-// A nested class is NOT skipped, which matches upstream: its `classInfo` is replaced when the inner
-// class declaration is entered and never restored, so the outer class stops collecting at that
-// point. That is a defect rather than a design, and reproducing it exactly would mean modelling a
-// single mutable slot; measured, the observable difference is that an inner component's members are
-// judged and the outer class's remaining members are not. This walk judges each component
-// separately and therefore judges MORE than upstream on a class containing a nested component.
-//
-// The divergence is stated rather than hidden because it is the one place this port is deliberately
-// wider. A class declaring a component inside one of its methods is rare, and the alternative is
-// reproducing a bug that silently drops findings. `TestNoUnusedClassComponentMethodsNestedClass`
-// records both verdicts.
-func (s *noUnusedClassComponentMethodsState) collect(node *ast.Node) {
-	if node == nil {
-		return
-	}
-
-	if node.Kind == ast.KindPropertyAccessExpression || node.Kind == ast.KindElementAccessExpression {
-		if object, property := noUnusedClassComponentMethodsAccessParts(node); isThisExpression(object) {
-			if name, ok := noUnusedClassComponentMethodsStaticName(node, property); ok {
-				if noUnusedClassComponentMethodsIsAssignmentTarget(node) {
-					s.definitions = append(s.definitions, property)
-				} else {
-					s.used[name] = true
-				}
-			}
-		}
-	}
-
-	if node.Kind == ast.KindVariableDeclaration {
-		declaration := node.AsVariableDeclaration()
-		if isThisExpression(declaration.Initializer) && declaration.Name() != nil &&
-			declaration.Name().Kind == ast.KindObjectBindingPattern {
-			for _, element := range declaration.Name().AsBindingPattern().Elements.Nodes {
-				if element.Kind != ast.KindBindingElement {
-					continue
-				}
-				binding := element.AsBindingElement()
-				key := binding.PropertyName
-				if key == nil {
-					key = binding.Name()
-				}
-				if name, ok := noUnusedClassComponentMethodsLiteralName(key); ok {
-					s.used[name] = true
-				}
-			}
-		}
-	}
-
-	node.ForEachChild(func(child *ast.Node) bool {
-		s.collect(child)
-		return false
-	})
-}
-
-// report emits one finding per definition whose name nothing used.
-func (s *noUnusedClassComponentMethodsState) report(ctx rule.Context, className string, lifecycle map[string]bool) {
-	for _, key := range s.definitions {
-		name, ok := noUnusedClassComponentMethodsLiteralName(key)
-		if !ok {
-			continue
-		}
-		if s.used[name] || noUnusedClassComponentMethodsLifecycle[name] || lifecycle[name] {
-			continue
-		}
-
-		if className == "" {
-			ctx.ReportNode(key, rule.Message{
-				Id:          "unused",
-				Description: noUnusedClassComponentMethodsDescription(name, ""),
-			})
-			continue
-		}
-		ctx.ReportNode(key, rule.Message{
-			Id:          "unusedWithClass",
-			Description: noUnusedClassComponentMethodsDescription(name, className),
-		})
-	}
+	state.report(ruleContext, "", noUnusedClassComponentMethodsEs5Lifecycle)
 }
 
 // noUnusedClassComponentMethodsDescription renders both message texts.
@@ -316,7 +228,7 @@ func noUnusedClassComponentMethodsIsStatic(member *ast.Node) bool {
 // noUnusedClassComponentMethodsKeyNode returns a declaration's key when the key is literal-like.
 //
 // Upstream's `isKeyLiteralLike` accepts a Literal, a template with no substitutions, and an
-// Identifier that is NOT computed. A computed identifier (`[someVariable]() {}`) is a name only
+// Identifier that is not computed. A computed identifier (`[someVariable]() {}`) is a name only
 // known at run time, so it contributes nothing. A private name (`#secret`) has its own node kind and
 // is invisible to upstream, which is why it never reports; measured.
 func noUnusedClassComponentMethodsKeyNode(member *ast.Node) (*ast.Node, bool) {
@@ -336,7 +248,7 @@ func noUnusedClassComponentMethodsKeyNode(member *ast.Node) (*ast.Node, bool) {
 		if inner == nil {
 			return nil, false
 		}
-		// A computed key counts only when what is inside is a LITERAL. Upstream's
+		// A computed key counts only when what is inside is a literal. Upstream's
 		// `isKeyLiteralLike` is three arms and the identifier arm requires `node.computed === false`,
 		// so `['handleClick']() {}` counts and `[foo]() {}` does not: the second names something
 		// known only at run time.
@@ -405,7 +317,7 @@ func noUnusedClassComponentMethodsStaticName(access *ast.Node, property *ast.Nod
 //
 // Upstream tests `parent.type === 'AssignmentExpression' && parent.left === node`, which is true for
 // `=` and for every compound operator, and false for an update expression. So `this.foo += 1` is a
-// DEFINITION and `this.foo++` is a USE, which reads backwards and is what upstream does. Both
+// definition and `this.foo++` is a use, which reads backwards and is what upstream does. Both
 // measured on the installed build and both pinned by fixture.
 func noUnusedClassComponentMethodsIsAssignmentTarget(access *ast.Node) bool {
 	parent := access.Parent

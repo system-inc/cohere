@@ -10,11 +10,11 @@ import (
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
-// blockScopedVarFile is where the fixtures pretend to live.
-const blockScopedVarFile = "/repository/source/BlockScopedVar.ts"
+// blockScopedVariableFile is where the fixtures pretend to live.
+const blockScopedVariableFile = "/repository/source/BlockScopedVar.ts"
 
-// blockScopedVarCase is one imported corpus row.
-type blockScopedVarCase struct {
+// blockScopedVariableCase is one imported corpus row.
+type blockScopedVariableCase struct {
 	sourceText string
 	wantIds    []string
 }
@@ -22,14 +22,14 @@ type blockScopedVarCase struct {
 // The corpus is ESLint's own, extracted mechanically rather than retyped.
 //
 // `tests/lib/rules/block-scoped-var.js` was loaded with its RuleTester stubbed so every case came
-// out as data, then each was replayed against the INSTALLED rule in `node_modules` to record how
+// out as data, then each was replayed against the installed rule in `node_modules` to record how
 // many findings it produces. All 106 reproduced, so the counts below are measurements. Four cases
 // were byte-identical duplicates of another row and are dropped, leaving 102.
 //
 // The rule takes no options at all -- `schema: []` upstream -- so there is no option surface here
 // and nothing to route through a decoder.
-func blockScopedVarFiresCases() []blockScopedVarCase {
-	return []blockScopedVarCase{
+func blockScopedVariableFiresCases() []blockScopedVariableCase {
+	return []blockScopedVariableCase{
 		{"function f(){ x; { var x; } }", []string{"outOfScope"}},
 		{"function f(){ { var x; } x; }", []string{"outOfScope"}},
 		{"function f() { var a; { var b = 0; } a = b; }", []string{"outOfScope"}},
@@ -47,12 +47,15 @@ func blockScopedVarFiresCases() []blockScopedVarCase {
 		{"class C { static { if (bar) { var foo; } foo; } }", []string{"outOfScope"}},
 		{"{ var foo,\n  bar; } bar;", []string{"outOfScope"}},
 		{"{ var { foo,\n  bar } = baz; } bar;", []string{"outOfScope"}},
-		{"if (foo) { var a = 1; } else if (bar) { var a = 2; } else { var a = 3; }", []string{"outOfScope", "outOfScope", "outOfScope", "outOfScope", "outOfScope", "outOfScope"}},
+		{
+			"if (foo) { var a = 1; } else if (bar) { var a = 2; } else { var a = 3; }",
+			[]string{"outOfScope", "outOfScope", "outOfScope", "outOfScope", "outOfScope", "outOfScope"},
+		},
 	}
 }
 
-func blockScopedVarSilentCases() []blockScopedVarCase {
-	return []blockScopedVarCase{
+func blockScopedVariableSilentCases() []blockScopedVariableCase {
+	return []blockScopedVariableCase{
 		{"function f() { } f(); var exports = { f: f };", []string{}},
 		{"var f = () => {}; f(); var exports = { f: f };", []string{}},
 		{"!function f(){ f; }", []string{}},
@@ -125,10 +128,16 @@ func blockScopedVarSilentCases() []blockScopedVarCase {
 		{"function z(){var b;}; var a = b;", []string{}},
 		{"function f(){ try{}catch(e){} e }", []string{}},
 		{"a:b;", []string{}},
-		{"/*global React*/ let {PropTypes, addons: {PureRenderMixin}} = React; let Test = React.createClass({mixins: [PureRenderMixin]});", []string{}},
+		{
+			"/*global React*/ let {PropTypes, addons: {PureRenderMixin}} = React; let Test = React.createClass({mixins: [PureRenderMixin]});",
+			[]string{},
+		},
 		{"/*global prevState*/ const { virtualSize: prevVirtualSize = 0 } = prevState;", []string{}},
 		{"const { dummy: { data, isLoading }, auth: { isLoggedIn } } = this.props;", []string{}},
-		{"function a(n) { return n > 0 ? b(n - 1) : \"a\"; } function b(n) { return n > 0 ? a(n - 1) : \"b\"; }", []string{}},
+		{
+			"function a(n) { return n > 0 ? b(n - 1) : \"a\"; } function b(n) { return n > 0 ? a(n - 1) : \"b\"; }",
+			[]string{},
+		},
 		{"(function () { foo(); })(); function foo() {}", []string{}},
 		{"class C { static { var foo; foo; } }", []string{}},
 		{"class C { static { foo; var foo; } }", []string{}},
@@ -140,43 +149,43 @@ func blockScopedVarSilentCases() []blockScopedVarCase {
 	}
 }
 
-func TestBlockScopedVarFires(t *testing.T) {
-	t.Parallel()
+func TestBlockScopedVariableFires(test *testing.T) {
+	test.Parallel()
 
-	for _, testCase := range blockScopedVarFiresCases() {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, BlockScopedVar,
-				blockScopedVarFile, testCase.sourceText), testCase.wantIds...)
+	for _, testCase := range blockScopedVariableFiresCases() {
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, BlockScopedVariable,
+				blockScopedVariableFile, testCase.sourceText), testCase.wantIds...)
 		})
 	}
 }
 
-func TestBlockScopedVarStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestBlockScopedVariableStaysSilent(test *testing.T) {
+	test.Parallel()
 
-	for _, testCase := range blockScopedVarSilentCases() {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, BlockScopedVar,
-				blockScopedVarFile, testCase.sourceText))
+	for _, testCase := range blockScopedVariableSilentCases() {
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, BlockScopedVariable,
+				blockScopedVariableFile, testCase.sourceText))
 		})
 	}
 }
 
 // Which identifier the finding points at, and which declaration it names.
 //
-// The message-id fixtures above see neither. This rule reports the USE, not the declaration, and
+// The message-id fixtures above see neither. This rule reports the use, not the declaration, and
 // the message names the declaration by line and column, so a port pointing at the declaration and
 // naming the use would satisfy every count above while inverting the whole finding.
 //
 // Every expected span and every line/column pair was read off the installed rule's own output.
-func TestBlockScopedVarPointsAtTheUseAndNamesTheDeclaration(t *testing.T) {
-	t.Parallel()
+func TestBlockScopedVariablePointsAtTheUseAndNamesTheDeclaration(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
-		// The 1-based column each finding must POINT at. Columns rather than the spelled text,
+		// The 1-based column each finding must point at. Columns rather than the spelled text,
 		// because every identifier in these cases spells the same one or two letters: a test
 		// comparing text passes just as happily when the finding points at the declaration
 		// instead of the use, which is the exact inversion this test exists to refuse. A mutant
@@ -202,12 +211,12 @@ func TestBlockScopedVarPointsAtTheUseAndNamesTheDeclaration(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, BlockScopedVar, blockScopedVarFile,
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, BlockScopedVariable, blockScopedVariableFile,
 				testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.wantColumns) {
-				t.Fatalf("wanted %d findings, got %d", len(testCase.wantColumns),
+				test.Fatalf("wanted %d findings, got %d", len(testCase.wantColumns),
 					len(result.Diagnostics))
 			}
 			for index, wantColumn := range testCase.wantColumns {
@@ -217,7 +226,7 @@ func TestBlockScopedVarPointsAtTheUseAndNamesTheDeclaration(t *testing.T) {
 				// literal would be off by one on any case with leading whitespace.
 				_, column := scanner.GetLineAndCharacterOfPosition(result.SourceFile, span.Pos())
 				if column+1 != wantColumn {
-					t.Errorf("finding %d pointed at column %d, wanted %d", index, column+1,
+					test.Errorf("finding %d pointed at column %d, wanted %d", index, column+1,
 						wantColumn)
 				}
 				line, column := testCase.wantDeclarations[index][0],
@@ -227,7 +236,7 @@ func TestBlockScopedVarPointsAtTheUseAndNamesTheDeclaration(t *testing.T) {
 				wantFragment := fmt.Sprintf("on line %d column %d", line, column)
 				if got := result.Diagnostics[index].Message.Description; !strings.Contains(got,
 					wantFragment) {
-					t.Errorf("finding %d rendered\n  %q\nwhich does not carry %q", index, got,
+					test.Errorf("finding %d rendered\n  %q\nwhich does not carry %q", index, got,
 						wantFragment)
 				}
 			}
@@ -241,12 +250,12 @@ func TestBlockScopedVarPointsAtTheUseAndNamesTheDeclaration(t *testing.T) {
 // predicate than the property it guards and would stay green if the rest of the sentence were
 // wrong. This closes that: one case, compared against a literal typed here rather than against the
 // rule's own constant, since a comparison to the constant moves with the code under mutation.
-func TestBlockScopedVarRendersTheWholeMessage(t *testing.T) {
-	t.Parallel()
+func TestBlockScopedVariableRendersTheWholeMessage(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTyped(t, BlockScopedVar, blockScopedVarFile, "{ var a = 0; } a;")
+	result := rule_testing.RunTyped(test, BlockScopedVariable, blockScopedVariableFile, "{ var a = 0; } a;")
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
+		test.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
 	}
 	want := "`a` is declared with `var` inside a block on line 1 column 7, and used here, " +
 		"outside it. That works because `var` is function-scoped rather than block-scoped, so " +
@@ -254,10 +263,10 @@ func TestBlockScopedVarRendersTheWholeMessage(t *testing.T) {
 		"it with `let` in the scope that actually needs it, or move the declaration out to where " +
 		"it is used."
 	if got := result.Diagnostics[0].Message.Description; got != want {
-		t.Errorf("rendered\n  %q\nwanted\n  %q", got, want)
+		test.Errorf("rendered\n  %q\nwanted\n  %q", got, want)
 	}
 	if got := result.Diagnostics[0].Message.Id; got != "outOfScope" {
-		t.Errorf("message id was %q, wanted outOfScope", got)
+		test.Errorf("message id was %q, wanted outOfScope", got)
 	}
 }
 
@@ -266,13 +275,13 @@ func TestBlockScopedVarRendersTheWholeMessage(t *testing.T) {
 // `GetSymbolAtLocation` on a nil checker returns nil rather than crashing, so this rule would find
 // no references at all and every silent fixture would pass vacuously while every firing one failed.
 // The guard at the top of the listener makes that explicit, and this pins it.
-func TestBlockScopedVarNeedsTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestBlockScopedVariableNeedsTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	source := "{ var a = 0; } a;"
-	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, BlockScopedVar, blockScopedVarFile,
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, BlockScopedVariable, blockScopedVariableFile,
 		source), "outOfScope")
-	rule_testing.ExpectClean(t, rule_testing.Run(t, BlockScopedVar, blockScopedVarFile, source))
+	rule_testing.ExpectClean(test, rule_testing.Run(test, BlockScopedVariable, blockScopedVariableFile, source))
 }
 
 // `let` and `const` are already block-scoped, so nothing about them is out of scope.
@@ -287,10 +296,10 @@ func TestBlockScopedVarNeedsTheTypedHarness(t *testing.T) {
 // wrong reason -- a parse failure, a shape the container walk does not recognise -- fails its
 // partner rather than passing quietly as coverage. Every verdict was measured against the installed
 // rule.
-func TestBlockScopedVarIgnoresBlockScopedDeclarations(t *testing.T) {
-	t.Parallel()
+func TestBlockScopedVariableIgnoresBlockScopedDeclarations(test *testing.T) {
+	test.Parallel()
 
-	cases := []blockScopedVarCase{
+	cases := []blockScopedVariableCase{
 		{"function f(){ { let a = 1; } a; }", []string{}},
 		{"function f(){ { var a = 1; } a; }", []string{"outOfScope"}},
 		{"function f(){ { const a = 1; } a; }", []string{}},
@@ -300,15 +309,15 @@ func TestBlockScopedVarIgnoresBlockScopedDeclarations(t *testing.T) {
 		{"if (true) { var a; } a;", []string{"outOfScope"}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, BlockScopedVar, blockScopedVarFile,
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, BlockScopedVariable, blockScopedVariableFile,
 				testCase.sourceText)
 			if len(testCase.wantIds) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }

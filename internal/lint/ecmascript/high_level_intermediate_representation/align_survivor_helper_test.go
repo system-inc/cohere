@@ -5,16 +5,16 @@ import (
 	"sort"
 )
 
-// mergeWithReversedEndOrder is the merge sweep with `sortByEndDescending` INVERTED.
+// mergeWithReversedEndOrder is the merge sweep with `sortByEndDescending` inverted.
 //
 // A local reimplementation rather than a flag on `mergeSweepState`, so that the committed pass is
 // not edited to host a counterfactual. It tracks `merge_scopes.go` and the only line that differs is
 // the one marked below; `TestAlignReversedMergeTracksTheRealOne` asserts the two agree on the
-// unaligned table, which is what makes a difference on the ALIGNED table attributable to the
+// unaligned table, which is what makes a difference on the aligned table attributable to the
 // comparator rather than to this copy having drifted.
 func mergeWithReversedEndOrder(function *Function, scopes *ReactiveScopes) *MergedScopes {
 	result := &MergedScopes{}
-	if function == nil || scopes == nil || scopes.Len() == 0 {
+	if function == nil || scopes == nil || scopes.Length() == 0 {
 		return result
 	}
 	state := &mergeSweepState{rangeOf: scopes.RangeOf}
@@ -43,13 +43,13 @@ func mergeWithReversedEndOrder(function *Function, scopes *ReactiveScopes) *Merg
 			top := state.starts[len(state.starts)-1]
 			state.starts = state.starts[:len(state.starts)-1]
 			opening := append([]ScopeId(nil), top.scopes...)
-			// THE ONE DIFFERING LINE: ascending rather than descending by end.
-			sort.SliceStable(opening, func(i, j int) bool {
-				return state.rangeOf(opening[i]).End < state.rangeOf(opening[j]).End
+			// The one differing line: ascending rather than descending by end.
+			sort.SliceStable(opening, func(left, right int) bool {
+				return state.rangeOf(opening[left]).End < state.rangeOf(opening[right]).End
 			})
 			state.activeScopes = append(state.activeScopes, opening...)
-			for i := 1; i < len(opening); i++ {
-				previous, current := opening[i-1], opening[i]
+			for index := 1; index < len(opening); index++ {
+				previous, current := opening[index-1], opening[index]
 				if state.rangeOf(previous).End == state.rangeOf(current).End {
 					state.joined.union([]ScopeId{previous, current})
 				}

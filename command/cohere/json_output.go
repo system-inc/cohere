@@ -1,9 +1,15 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
-	"io"
+	"fmt"
+	"os"
 	"sort"
+	"time"
+
+	"github.com/system-inc/cohere/internal/sentence"
+	"github.com/system-inc/cohere/internal/streams"
 )
 
 // `--json` is the run for a program to read: newline-delimited JSON, one object per line, each with a
@@ -25,28 +31,28 @@ import (
 // a field removed or renamed or a meaning changed, raises it; a new optional field does not.
 const outputSchemaVersion = 1
 
-// findingJSON is one finding's line: the finding's own fields beside its kind.
-type findingJSON struct {
+// findingJson is one finding's line: the finding's own fields beside its kind.
+type findingJson struct {
 	Kind string `json:"kind"`
 	runFinding
 }
 
-func findingAsJSON(finding runFinding) findingJSON {
-	return findingJSON{Kind: "finding", runFinding: finding}
+func findingAsJson(finding runFinding) findingJson {
+	return findingJson{Kind: "finding", runFinding: finding}
 }
 
-// changedFileJSON is one file the run rewrote, by fixing or by formatting.
-type changedFileJSON struct {
+// changedFileJson is one file the run rewrote, by fixing or by formatting.
+type changedFileJson struct {
 	Kind string `json:"kind"`
 	Path string `json:"path"`
 	// Rules are the rules whose fixes were applied, for a fixed file, each once.
 	Rules []string `json:"rules,omitempty"`
 }
 
-// changedFilesAsJSON is a line per kind of rewrite: a file both fixed and formatted is a `fixed` line and
+// changedFilesAsJson is a line per kind of rewrite: a file both fixed and formatted is a `fixed` line and
 // a `formatted` line, so a reader counting either kind counts it.
-func changedFilesAsJSON(files []changedFile) []changedFileJSON {
-	lines := make([]changedFileJSON, 0, len(files))
+func changedFilesAsJson(files []changedFile) []changedFileJson {
+	lines := make([]changedFileJson, 0, len(files))
 	for _, file := range files {
 		if file.Fixed {
 			rules := make([]string, 0, len(file.FixedBy))
@@ -54,17 +60,17 @@ func changedFilesAsJSON(files []changedFile) []changedFileJSON {
 				rules = append(rules, rule)
 			}
 			sort.Strings(rules)
-			lines = append(lines, changedFileJSON{Kind: "fixed", Path: file.Path, Rules: rules})
+			lines = append(lines, changedFileJson{Kind: "fixed", Path: file.Path, Rules: rules})
 		}
 		if file.Formatted {
-			lines = append(lines, changedFileJSON{Kind: "formatted", Path: file.Path})
+			lines = append(lines, changedFileJson{Kind: "formatted", Path: file.Path})
 		}
 	}
 	return lines
 }
 
-// summaryJSON is runSummary as the last line. Durations are seconds, as a reader would compare them.
-type summaryJSON struct {
+// summaryJson is runSummary as the last line. Durations are seconds, as a reader would compare them.
+type summaryJson struct {
 	Kind          string      `json:"kind"`
 	SchemaVersion int         `json:"schemaVersion"`
 	Label         string      `json:"label,omitempty"`
@@ -72,7 +78,7 @@ type summaryJSON struct {
 	Seconds       float64     `json:"seconds"`
 	GraphSeconds  float64     `json:"graphSeconds"`
 	Rules         int         `json:"rules"`
-	Phases        []phaseJSON `json:"phases"`
+	Phases        []phaseJson `json:"phases"`
 	// FormattingSeconds is the part of the fix phase's seconds with a format in flight, absent when no
 	// formatter ran.
 	FormattingSeconds float64  `json:"formattingSeconds,omitempty"`
@@ -94,18 +100,21 @@ type summaryJSON struct {
 	// Adamic is the run's readiness, present only under --adamic-readiness (#9tgm3dq). A run that asked and
 	// did not lint says not measured, and why, so a reader who asked never takes its absence for a pass.
 	Adamic *readinessSummary `json:"adamic,omitempty"`
+	// Error is why the run stopped before it could judge anything, in the words the human view prints, as
+	// a tsconfig that does not load (#9zqayzh). Present only then, and the verdict is fail.
+	Error string `json:"error,omitempty"`
 }
 
-// phaseJSON is one phase's outcome.
-type phaseJSON struct {
+// phaseJson is one phase's outcome.
+type phaseJson struct {
 	Name    string  `json:"name"`
 	Outcome string  `json:"outcome"`
 	Seconds float64 `json:"seconds"`
 	Detail  string  `json:"detail,omitempty"`
 }
 
-// summaryAsJSON is the summary's last line.
-func summaryAsJSON(summary runSummary) summaryJSON {
+// summaryAsJson is the summary's last line.
+func summaryAsJson(summary runSummary) summaryJson {
 	verdict := "pass"
 	if summary.failed() {
 		verdict = "fail"
@@ -114,16 +123,16 @@ func summaryAsJSON(summary runSummary) summaryJSON {
 	if adamic == nil && summary.AdamicRequested {
 		adamic = notMeasured("lint did not run")
 	}
-	phases := make([]phaseJSON, 0, len(summary.Phases))
+	phases := make([]phaseJson, 0, len(summary.Phases))
 	for _, record := range summary.Phases {
-		phases = append(phases, phaseJSON{
+		phases = append(phases, phaseJson{
 			Name:    string(record.Name),
 			Outcome: string(record.Outcome),
 			Seconds: record.Elapsed.Seconds(),
 			Detail:  record.Detail,
 		})
 	}
-	return summaryJSON{
+	return summaryJson{
 		Kind:              "summary",
 		SchemaVersion:     outputSchemaVersion,
 		Label:             summary.Label,
@@ -149,12 +158,55 @@ func summaryAsJSON(summary runSummary) summaryJSON {
 	}
 }
 
-// writeJSONLine writes one object as one line.
-func writeJSONLine(out io.Writer, value any) error {
-	line, err := json.Marshal(value)
-	if err != nil {
-		return err
+// summaryWritten is whether this run printed its summary line under `--json`, so a run that then fails
+// prints no second one. See writeFailedRunSummary.
+var summaryWritten bool
+
+// summaryJsonLine is the summary as the last line, newline included, and notes that the run printed it.
+func summaryJsonLine(summary summaryJson) string {
+	summaryWritten = true
+	return jsonLine(summary)
+}
+
+// writeSummaryLine prints the summary as the last line and notes that it did.
+func writeSummaryLine(out *bufio.Writer, summary summaryJson) {
+	fmt.Fprint(out, summaryJsonLine(summary))
+}
+
+// writeFailedRunSummary ends a run that stopped on an error with a summary line of its own under `--json`:
+// verdict fail, the error as the sentence the human view prints, and the project's label in a repository with
+// several. Every run ends on a summary, so a reader that saw none would read the stream as cut off, and one that
+// counted the lines it did see would read a project that never loaded as one with nothing wrong (#9zqayzh). A
+// run that already printed its summary prints nothing more, and the human views print nothing here: the error
+// line on stderr is theirs.
+func writeFailedRunSummary(out *bufio.Writer, runError error) {
+	if activeOutput.Mode != outputJson || summaryWritten {
+		return
 	}
-	_, err = out.Write(append(line, '\n'))
-	return err
+	summary := activeSummary
+	summary.Total = time.Since(processStart)
+	if label := os.Getenv(projectLabelVariable); label != "" {
+		summary.Label = label
+	}
+	line := summaryAsJson(summary)
+	line.Verdict = "fail"
+	line.Error = sentence.FromError(runError)
+	writeSummaryLine(out, line)
+}
+
+// writeJsonLine writes one object as one line.
+func writeJsonLine[Value any](out *bufio.Writer, value Value) {
+	fmt.Fprint(out, jsonLine(value))
+}
+
+// jsonLine is one object as one line, newline included. A value that does not encode is a line the reader never
+// gets, so it is reported to package streams, and the run exits nonzero saying so, rather than printing a
+// stream with a record missing; the line is then empty.
+func jsonLine[Value any](value Value) string {
+	line, marshalError := json.Marshal(value)
+	if marshalError != nil {
+		streams.Report(fmt.Errorf("encoding a line of --json: %w", marshalError))
+		return ""
+	}
+	return string(line) + "\n"
 }

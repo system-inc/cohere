@@ -67,125 +67,8 @@ func UtilitySignature(nodes []*Node, theme *Theme, features SignatureFeatures) (
 	return printed.String(), canonicalizer.exact
 }
 
-// signatureCanonicalizer carries canonicalizeAst's inputs, and whether anything it did was something
-// it could not be sure matched upstream.
-type signatureCanonicalizer struct {
-	theme    *Theme
-	features SignatureFeatures
-	exact    bool
-}
-
-// canonicalize is upstream's walk over one node list, with its enter and exit hooks.
-//
-// The walk's Replace semantics are kept: a node an enter hook replaces is spliced out, and the
-// replacements are entered in its place, which is how an expanded shorthand's longhands get their
-// variables resolved. The siblings an enter hook compares against are the list as it stands, earlier
-// nodes already rewritten and later ones not yet, as upstream's are.
-func (canonicalizer *signatureCanonicalizer) canonicalize(nodes []*Node) []*Node {
-	for index := 0; index < len(nodes); {
-		node := nodes[index]
-		if replacement, replaced := canonicalizer.enter(node, nodes); replaced {
-			nodes = append(nodes[:index:index], append(replacement, nodes[index+1:]...)...)
-			continue
-		}
-		if node.IsContainer() && len(node.Nodes) > 0 {
-			node.Nodes = canonicalizer.canonicalize(node.Nodes)
-		}
-		canonicalizer.exit(node)
-		index++
-	}
-	return nodes
-}
-
-// enter is canonicalizeAst's enter hook. It returns the nodes to put in this one's place, or false to
-// keep it and descend.
-func (canonicalizer *signatureCanonicalizer) enter(node *Node, siblings []*Node) ([]*Node, bool) {
-	switch node.Kind {
-	case KindDeclaration:
-		if !node.ValuePresent || node.Property == "--tw-sort" {
-			return nil, true
-		}
-
-		// A `--tw-{property}` is noise when a sibling that is not a `--tw-*` declaration carries the same
-		// value with the same importance.
-		if strings.HasPrefix(node.Property, "--tw-") {
-			for _, sibling := range siblings {
-				if sibling.Kind == KindDeclaration && sibling.ValuePresent && sibling.Value == node.Value &&
-					sibling.Important == node.Important && !strings.HasPrefix(sibling.Property, "--tw-") {
-					return nil, true
-				}
-			}
-		}
-
-		if canonicalizer.features&SignatureExpandProperties != 0 {
-			if expanded := expandSignatureDeclaration(node, canonicalizer.features); expanded != nil {
-				return expanded, true
-			}
-		}
-
-		if strings.Contains(node.Value, "var(") {
-			node.Value = resolveVariablesInValue(node.Value, canonicalizer.theme)
-		}
-
-		// `rem` is upstream's option for rootFontSize, which this port does not read, so it is always
-		// absent, as it is for the plugin when rootFontSize is unset.
-		folded, foldedValue := constantFoldDeclarationAst(ParseValue(node.Value), nil, true)
-		normalized, canonicalValue := canonicalizeCalcExpressionsAst(foldedValue)
-		if folded || normalized {
-			node.Value = ValueToCss(canonicalValue)
-		}
-		node.Value = printArbitraryValue(node.Value)
-		return nil, false
-
-	case KindContext, KindAtRoot:
-		return node.Nodes, true
-
-	case KindComment:
-		return nil, true
-
-	case KindAtRule:
-		if node.Name == "@property" {
-			return nil, true
-		}
-	}
-	return nil, false
-}
-
 // signatureHexColor is upstream's HEX_REGEX, the four hex colour lengths, longest first.
 var signatureHexColor = regexp.MustCompile(`(?i)#(?:[a-f0-9]{8}|[a-f0-9]{6}|[a-f0-9]{4}|[a-f0-9]{3})`)
-
-// exit is canonicalizeAst's exit hook: a rule's declarations deduplicated, last one winning, and sorted
-// by property, and a declaration's hex colours lowercased unless it is a custom property.
-func (canonicalizer *signatureCanonicalizer) exit(node *Node) {
-	switch node.Kind {
-	case KindRule, KindAtRule:
-		if len(node.Nodes) > 1 {
-			seen := map[string]bool{}
-			for index := len(node.Nodes) - 1; index >= 0; index-- {
-				child := node.Nodes[index]
-				if child.Kind != KindDeclaration || !child.ValuePresent {
-					continue
-				}
-				if seen[child.Property] {
-					node.Nodes = append(node.Nodes[:index:index], node.Nodes[index+1:]...)
-				}
-				seen[child.Property] = true
-			}
-		}
-		for _, child := range node.Nodes {
-			if child.Kind == KindDeclaration && !isByteCollatedProperty(child.Property) {
-				canonicalizer.exact = false
-			}
-		}
-		sortLikeJavaScript(node.Nodes, compareSignatureNodes)
-
-	case KindDeclaration:
-		if !node.ValuePresent || strings.HasPrefix(node.Property, "--") {
-			return
-		}
-		node.Value = signatureHexColor.ReplaceAllStringFunc(node.Value, strings.ToLower)
-	}
-}
 
 // compareSignatureNodes is upstream's sort comparator: declarations by property, and zero whenever
 // either side is anything else. The zero makes the order depend on the sort algorithm as well as the
@@ -221,6 +104,8 @@ func isByteCollatedProperty(property string) bool {
 //
 // A list of 64 or more would be merged in runs upstream. No signature holds one, so it falls back to a
 // stable insertion sort, which agrees whenever the comparator is consistent.
+//
+// Mutates: nodes the caller's slice is reordered in place, as Array.prototype.sort reorders its array
 func sortLikeJavaScript(nodes []*Node, compare func(left *Node, right *Node) int) {
 	length := len(nodes)
 	if length < 2 {
@@ -280,12 +165,12 @@ func printSignatureCss(printed *strings.Builder, node *Node, depth int) {
 		printed.WriteString(indent + "}\n")
 	case KindAtRule:
 		if len(node.Nodes) == 0 {
-			printed.WriteString(indent + node.Name + " " + node.Params + ";\n")
+			printed.WriteString(indent + node.Name + " " + node.Parameters + ";\n")
 			return
 		}
 		printed.WriteString(indent + node.Name)
-		if node.Params != "" {
-			printed.WriteString(" " + node.Params + " ")
+		if node.Parameters != "" {
+			printed.WriteString(" " + node.Parameters + " ")
 		} else {
 			printed.WriteString(" ")
 		}
@@ -309,11 +194,14 @@ func resolveVariablesInValue(value string, theme *Theme) string {
 	seen := map[string]bool{}
 	var walk func(nodes []ValueNode) []ValueNode
 	walk = func(nodes []ValueNode) []ValueNode {
-		for index := 0; index < len(nodes); {
-			node := &nodes[index]
-			if node.Kind == ValueNodeKindFunction && node.Value == "var" && (len(node.Nodes) == 1 || len(node.Nodes) >= 3) {
+		spliced := nodes
+		for index := 0; index < len(spliced); {
+			node := &spliced[index]
+			if node.Kind == ValueNodeKindFunction &&
+				node.Value == "var" &&
+				(len(node.Nodes) == 1 || len(node.Nodes) >= 3) {
 				if replacement, replaced := resolveVariableNode(node, theme, seen, &changed); replaced {
-					nodes = append(nodes[:index:index], append(replacement, nodes[index+1:]...)...)
+					spliced = append(spliced[:index:index], append(replacement, spliced[index+1:]...)...)
 					continue
 				}
 			}
@@ -322,7 +210,7 @@ func resolveVariablesInValue(value string, theme *Theme) string {
 			}
 			index++
 		}
-		return nodes
+		return spliced
 	}
 	nodes := walk(ParseValue(value))
 	if !changed {
@@ -332,6 +220,10 @@ func resolveVariablesInValue(value string, theme *Theme) string {
 }
 
 // resolveVariableNode is the walk's body for one `var()`, returning its replacement when it has one.
+//
+// Mutates: node a lone `var(--key)` gains the key's value as its fallback in place
+// Mutates: seen each variable is marked once read, so a key is resolved once per value
+// Mutates: changed set when the value gains a fallback or is replaced, so the caller knows to reprint it
 func resolveVariableNode(node *ValueNode, theme *Theme, seen map[string]bool, changed *bool) ([]ValueNode, bool) {
 	variable := node.Nodes[0].Value
 	// Upstream drops the prefix as `variable.slice(`--${prefix}-`.length)`, which drops the leading
@@ -373,14 +265,39 @@ func resolveThemeValue(path string, theme *Theme) (string, bool) {
 // value to each physical longhand.
 var (
 	signatureVariadicExpansions = map[string]map[int][]signatureLonghand{
-		"inset":               signatureQuad("top", "right", "bottom", "left"),
-		"margin":              signatureQuad("margin-top", "margin-right", "margin-bottom", "margin-left"),
-		"padding":             signatureQuad("padding-top", "padding-right", "padding-bottom", "padding-left"),
-		"scroll-margin":       signatureQuad("scroll-margin-top", "scroll-margin-right", "scroll-margin-bottom", "scroll-margin-left"),
-		"scroll-padding":      signatureQuad("scroll-padding-top", "scroll-padding-right", "scroll-padding-bottom", "scroll-padding-left"),
-		"border-width":        signatureQuad("border-top-width", "border-right-width", "border-bottom-width", "border-left-width"),
-		"border-style":        signatureQuad("border-top-style", "border-right-style", "border-bottom-style", "border-left-style"),
-		"border-color":        signatureQuad("border-top-color", "border-right-color", "border-bottom-color", "border-left-color"),
+		"inset":   signatureQuad("top", "right", "bottom", "left"),
+		"margin":  signatureQuad("margin-top", "margin-right", "margin-bottom", "margin-left"),
+		"padding": signatureQuad("padding-top", "padding-right", "padding-bottom", "padding-left"),
+		"scroll-margin": signatureQuad(
+			"scroll-margin-top",
+			"scroll-margin-right",
+			"scroll-margin-bottom",
+			"scroll-margin-left",
+		),
+		"scroll-padding": signatureQuad(
+			"scroll-padding-top",
+			"scroll-padding-right",
+			"scroll-padding-bottom",
+			"scroll-padding-left",
+		),
+		"border-width": signatureQuad(
+			"border-top-width",
+			"border-right-width",
+			"border-bottom-width",
+			"border-left-width",
+		),
+		"border-style": signatureQuad(
+			"border-top-style",
+			"border-right-style",
+			"border-bottom-style",
+			"border-left-style",
+		),
+		"border-color": signatureQuad(
+			"border-top-color",
+			"border-right-color",
+			"border-bottom-color",
+			"border-left-color",
+		),
 		"gap":                 signaturePair("row-gap", "column-gap"),
 		"overflow":            signaturePair("overflow-x", "overflow-y"),
 		"overscroll-behavior": signaturePair("overscroll-behavior-x", "overscroll-behavior-y"),
@@ -444,7 +361,13 @@ func expandSignatureDeclaration(node *Node, features SignatureFeatures) []*Node 
 		if longhands, isLogical := signatureLogicalExpansions[node.Property]; isLogical {
 			expanded := make([]*Node, 0, len(longhands))
 			for _, property := range longhands {
-				expanded = append(expanded, &Node{Kind: KindDeclaration, Property: property, Value: node.Value, ValuePresent: true, Important: node.Important})
+				expanded = append(expanded, &Node{
+					Kind:         KindDeclaration,
+					Property:     property,
+					Value:        node.Value,
+					ValuePresent: true,
+					Important:    node.Important,
+				})
 			}
 			return expanded
 		}

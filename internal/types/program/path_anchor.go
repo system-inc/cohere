@@ -36,7 +36,7 @@ const stablePrefix = "root:"
 // anchored at its spelling alone, which is what every run did before.
 func NewPathAnchor(root string) PathAnchor {
 	anchor := PathAnchor{spelled: filepath.Clean(root)}
-	if resolved, err := filepath.EvalSymlinks(root); err == nil {
+	if resolved, resolveSymlinksError := filepath.EvalSymlinks(root); resolveSymlinksError == nil {
 		anchor.resolved = filepath.Clean(resolved)
 	}
 	seen := map[string]bool{}
@@ -44,7 +44,11 @@ func NewPathAnchor(root string) PathAnchor {
 		if candidate == "" {
 			continue
 		}
-		for _, form := range []string{candidate, filepath.ToSlash(candidate), strings.ToLower(filepath.ToSlash(candidate))} {
+		for _, form := range []string{
+			candidate,
+			filepath.ToSlash(candidate),
+			strings.ToLower(filepath.ToSlash(candidate)),
+		} {
 			for _, separator := range []string{string(filepath.Separator), "/"} {
 				prefix := strings.TrimSuffix(form, separator) + separator
 				if !seen[prefix] {

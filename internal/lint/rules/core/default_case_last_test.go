@@ -16,8 +16,8 @@ const defaultCaseLastFile = "/repository/source/DefaultCaseLast.ts"
 // invalid ones, every invalid case naming exactly one `notLast` and asserting the column of its
 // `default` keyword. The cases below were rendered to Go literals by a script reading that file
 // through a stub RuleTester, so no case was retyped and no escape could be cooked on the way.
-func TestDefaultCaseLastStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestDefaultCaseLastStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -51,17 +51,17 @@ func TestDefaultCaseLastStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.Run(t, DefaultCaseLast, defaultCaseLastFile, testCase.sourceText))
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.Run(test, DefaultCaseLast, defaultCaseLastFile, testCase.sourceText))
 		})
 	}
 }
 
 // Every reporting case names one `notLast` and no more, which is upstream's own count per input.
-func TestDefaultCaseLastFires(t *testing.T) {
-	t.Parallel()
+func TestDefaultCaseLastFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -83,10 +83,10 @@ func TestDefaultCaseLastFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, DefaultCaseLast, defaultCaseLastFile, testCase.sourceText), "notLast")
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, DefaultCaseLast, defaultCaseLastFile, testCase.sourceText), "notLast")
 		})
 	}
 }
@@ -103,8 +103,8 @@ func TestDefaultCaseLastFires(t *testing.T) {
 // offset comparison is wrong in the same direction as the code that produced it. The prefix check
 // rather than equality is because the reported node is the whole clause, whose text runs to the end
 // of its body.
-func TestDefaultCaseLastReportsTheDefaultClause(t *testing.T) {
-	t.Parallel()
+func TestDefaultCaseLastReportsTheDefaultClause(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -116,19 +116,19 @@ func TestDefaultCaseLastReportsTheDefaultClause(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, DefaultCaseLast, defaultCaseLastFile, testCase.sourceText)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, DefaultCaseLast, defaultCaseLastFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 			}
 			reported := testCase.sourceText[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 			if !strings.HasPrefix(reported, "default") {
-				t.Fatalf("reported %q, wanted a span starting at the default keyword", reported)
+				test.Fatalf("reported %q, wanted a span starting at the default keyword", reported)
 			}
 			// Upstream's columns are one-based, so the offset it names is one less.
 			if got := result.Diagnostics[0].Range.Pos() + 1; got != testCase.wantColumn {
-				t.Fatalf("reported at column %d, upstream asserts %d", got, testCase.wantColumn)
+				test.Fatalf("reported at column %d, upstream asserts %d", got, testCase.wantColumn)
 			}
 		})
 	}
@@ -140,9 +140,9 @@ func TestDefaultCaseLastReportsTheDefaultClause(t *testing.T) {
 // the shape reaches the rule. Upstream's `findIndex` takes the first and stops, reporting once; a
 // port looping over every clause without returning reports twice. The imported corpus cannot see
 // this because upstream never wrote it.
-func TestDefaultCaseLastReportsOnceForTwoDefaults(t *testing.T) {
-	t.Parallel()
+func TestDefaultCaseLastReportsOnceForTwoDefaults(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectFindings(t, rule_testing.Run(t, DefaultCaseLast, defaultCaseLastFile,
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, DefaultCaseLast, defaultCaseLastFile,
 		"switch (foo) { default: break; default: break; case 1: break; }"), "notLast")
 }

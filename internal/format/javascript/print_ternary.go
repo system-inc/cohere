@@ -1,12 +1,14 @@
 package javascript
 
+import "github.com/system-inc/cohere/internal/format/doc"
+
 // print/ternary-old.js, and printTernary from print/ternary.js. experimentalTernaries is always false
 // in our configs, so printTernary goes straight to printTernaryOld and the experimental printer in
 // ternary.js is not ported.
 
 // printTernary is upstream's printTernary. The experimental-ternaries branch is dropped; args is only
 // read there, so it is unused here.
-func printTernary(path *Path, options *Options, print PrintFunc, args *printArguments) Doc {
+func printTernary(path *Path, options *Options, print PrintFunc, arguments *printArguments) Doc {
 	return printTernaryOld(path, options, print)
 }
 
@@ -101,7 +103,14 @@ func printTernaryTest(path *Path, options *Options, print PrintFunc) Doc {
 	if isConditionalExpression {
 		printed = print("test", nil)
 	} else {
-		printed = concatIn(path, print("checkType", nil), " ", "extends", " ", print("extendsType", nil))
+		printed = concatIn(
+			path,
+			print("checkType", nil),
+			doc.Text(" "),
+			doc.Text("extends"),
+			doc.Text(" "),
+			print("extendsType", nil),
+		)
 	}
 	/**
 	 *     a
@@ -194,7 +203,7 @@ func printTernaryOld(path *Path, options *Options, print PrintFunc) Doc {
 	}
 	consequentNode := current.Child(consequentNodePropertyName)
 	alternateNode := current.Child(alternateNodePropertyName)
-	var parts []any
+	var parts []Doc
 
 	// We print a ConditionalExpression in either "JSX mode" or "normal mode".
 	// See `tests/format/jsx/conditional-expression.js` for more info.
@@ -202,8 +211,8 @@ func printTernaryOld(path *Path, options *Options, print PrintFunc) Doc {
 	parent := parentOf(path)
 	isParentTest := false
 	if parent.Is(current.Type()) {
-		for _, prop := range testNodePropertyNames {
-			if parent.Child(prop) == current {
+		for _, property := range testNodePropertyNames {
+			if parent.Child(property) == current {
 				isParentTest = true
 				break
 			}
@@ -218,22 +227,22 @@ func printTernaryOld(path *Path, options *Options, print PrintFunc) Doc {
 	var previousParent Node
 	// upstream's `testNodePropertyNames.every((prop) => currentParent[prop] !== previousParent)`.
 	everyPropertyIsNot := func() bool {
-		for _, prop := range testNodePropertyNames {
-			if currentParent.Child(prop) == previousParent {
+		for _, property := range testNodePropertyNames {
+			if currentParent.Child(property) == previousParent {
 				return false
 			}
 		}
 		return true
 	}
-	i := 0
+	index := 0
 	// upstream's do { ... } while (...).
 	for {
 		previousParent = currentParent
 		if previousParent == nil {
 			previousParent = current
 		}
-		currentParent, _ = path.GetParentNode(i)
-		i++
+		currentParent, _ = path.GetParentNode(index)
+		index++
 		if !(currentParent != nil && currentParent.Is(current.Type()) &&
 			everyPropertyIsNot()) {
 			break
@@ -257,10 +266,10 @@ func printTernaryOld(path *Path, options *Options, print PrintFunc) Doc {
 		// parens when using ?: within JSX, because the parens are analogous to
 		// curly braces in an if statement.
 		wrap := func(document Doc) Doc {
-			return concatIn(path, ifBreak("(", ""),
+			return concatIn(path, ifBreak(doc.Text("("), doc.Text("")),
 				indentIn(path, concatIn(path, softline, document)),
 				softline,
-				ifBreak(")", ""),
+				ifBreak(doc.Text(")"), doc.Text("")),
 			)
 		}
 
@@ -290,9 +299,9 @@ func printTernaryOld(path *Path, options *Options, print PrintFunc) Doc {
 			printedAlternate = wrap(print(alternateNodePropertyName, nil))
 		}
 		parts = append(parts,
-			" ? ",
+			doc.Text(" ? "),
 			printedConsequent,
-			" : ",
+			doc.Text(" : "),
 			printedAlternate,
 		)
 	} else {
@@ -326,21 +335,22 @@ func printTernaryOld(path *Path, options *Options, print PrintFunc) Doc {
 		}
 		// normal mode
 		consequentIsTernary := consequentNode.Is(current.Type())
-		var openParen, closeParen Doc = emptyDoc, emptyDoc
+		var openParen Doc = emptyDoc
+		var closeParen Doc = emptyDoc
 		if consequentIsTernary {
-			openParen = ifBreak("", "(")
+			openParen = ifBreak(doc.Text(""), doc.Text("("))
 		}
 		printedConsequent := printBranch(consequentNodePropertyName)
 		if consequentIsTernary {
-			closeParen = ifBreak("", ")")
+			closeParen = ifBreak(doc.Text(""), doc.Text(")"))
 		}
 		part := concatIn(path, line,
-			"? ",
+			doc.Text("? "),
 			openParen,
 			printedConsequent,
 			closeParen,
 			line,
-			": ",
+			doc.Text(": "),
 			printBranch(alternateNodePropertyName),
 		)
 		if !parent.Is(current.Type()) ||

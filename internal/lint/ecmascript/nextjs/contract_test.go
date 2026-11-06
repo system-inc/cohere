@@ -4,17 +4,32 @@ import "testing"
 
 // The five phi web routes that lost prerendering are the first rows, by their real paths, because
 // they are the files this helper exists for.
-func TestIsRouteContractExport(t *testing.T) {
-	t.Parallel()
+func TestIsRouteContractExport(test *testing.T) {
+	test.Parallel()
 	cases := []struct {
 		name     string
 		filePath string
 		export   string
 		want     bool
 	}{
-		{"a dynamic blog page", "/www-phi-health/app/(main-layout)/blog/[slugWithId]/page.tsx", "generateStaticParams", true},
-		{"a catch-all inside route groups", "/www-phi-health/app/(main-layout)/(shop)/shop/(products)/axis/[[...variant]]/page.tsx", "generateStaticParams", true},
-		{"the near miss is not the contract", "/www-phi-health/app/(main-layout)/blog/[slugWithId]/page.tsx", "generateStaticParameters", false},
+		{
+			"a dynamic blog page",
+			"/www-phi-health/app/(main-layout)/blog/[slugWithId]/page.tsx",
+			"generateStaticParams",
+			true,
+		},
+		{
+			"a catch-all inside route groups",
+			"/www-phi-health/app/(main-layout)/(shop)/shop/(products)/axis/[[...variant]]/page.tsx",
+			"generateStaticParams",
+			true,
+		},
+		{
+			"the near miss is not the contract",
+			"/www-phi-health/app/(main-layout)/blog/[slugWithId]/page.tsx",
+			"generateStaticParameters",
+			false,
+		},
 
 		{"segment configuration on a layout", "/repository/app/layout.tsx", "revalidate", true},
 		{"the abbreviation gate's trap", "/repository/app/api/report/route.ts", "maxDuration", true},
@@ -42,10 +57,16 @@ func TestIsRouteContractExport(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			if got := IsRouteContractExport(testCase.filePath, testCase.export); got != testCase.want {
-				t.Errorf("IsRouteContractExport(%q, %q) = %v, want %v", testCase.filePath, testCase.export, got, testCase.want)
+				test.Errorf(
+					"IsRouteContractExport(%q, %q) = %v, want %v",
+					testCase.filePath,
+					testCase.export,
+					got,
+					testCase.want,
+				)
 			}
 		})
 	}

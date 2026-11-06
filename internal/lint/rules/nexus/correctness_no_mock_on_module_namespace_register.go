@@ -10,5 +10,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // No decoder: the rule takes no options. What it reports always throws, so there is nothing for a
 // configuration to tune.
 func init() {
-	rule.Register(rule.Registration{Rule: CorrectnessNoMockOnModuleNamespace})
+	rule.Register(rule.Registration[rule.NoOptions]{Rule: CorrectnessNoMockOnModuleNamespace})
 }

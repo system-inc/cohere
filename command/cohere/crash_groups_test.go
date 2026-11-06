@@ -22,87 +22,127 @@ import (
 // activeOutput holds.
 type crashEngine struct {
 	name   string
-	render func(t *testing.T, crashes []runCrash) string
+	render func(test *testing.T, crashes []runCrash) string
 	// directory and extension are where the engine's files live, so a case's paths look like its own.
 	directory, extension string
 	// ruleCrashes is whether the engine can report one rule crashing on a file apart from a whole file lost.
-	// The Swift contract carries only the second.
+	// The contract carries only the second.
 	ruleCrashes bool
-	// swiftEngine is whether a crash's cause is the engine's own sentence, which the Swift engine's always is.
-	swiftEngine bool
+	// engine names the contract engine whose crash's cause is its own sentence, as runCrash.Engine does, and
+	// is empty for TypeScript, whose crash is a panic.
+	engine string
 	// cause is a cause as the engine words one, and wantMessage the words every view must print for it.
 	cause, wantMessage string
 }
 
 // swiftCrashSentence is the Swift engine's crash, worded as swift/Sources/CohereSwift/Pipeline/Linter.swift
 // words it: never a panic, and it names what the file was not judged for.
-const swiftCrashSentence = "no index store described it, so the rules that read what its names resolve to could not judge it " +
-	"(cohere-swift/correctness-no-unused-declaration); every other rule ran on it"
+const swiftCrashSentence = "no index store described it, so the rules that read what its names resolve to " +
+	"could not judge it (cohere-swift/correctness-no-unused-declaration); every other rule ran on it"
+
+// goCrashSentence is the Go engine's crash, worded as internal/goengine/check's crashSentence words one: the
+// rule, and what failed. Every other rule ran on the package.
+const goCrashSentence = "cohere-go/correctness-no-ignored-error: analysis failed: unexpected node"
 
 var crashEngines = []crashEngine{
 	{
-		name: "TypeScript", render: renderTypeScriptCrashes, directory: "/project/source", extension: ".ts", ruleCrashes: true,
-		cause: "index out of range",
+		name:        "TypeScript",
+		render:      renderTypeScriptCrashes,
+		directory:   "/project/source",
+		extension:   ".ts",
+		ruleCrashes: true,
+		cause:       "index out of range",
 		wantMessage: "cohere crashed on this file (index out of range). This is a bug in cohere, not in your code: " +
-			"nothing in this file was checked. Please report it at " + reportBugsAt + " with the output of `cohere --version`, the rule, " +
+			"nothing in this file was checked. Please report it at " +
+			reportBugsAt +
+			" with the output of `cohere --version`, the rule, " +
 			"the code that crashed it, and this message.",
 	},
 	{
-		name: "Swift", render: renderSwiftCrashes, directory: "/project/Sources", extension: ".swift", swiftEngine: true,
+		name: "Swift", render: renderSwiftCrashes, directory: "/project/Sources", extension: ".swift", engine: "Swift",
 		cause:       swiftCrashSentence,
 		wantMessage: "the Swift engine could not finish this file: " + swiftCrashSentence,
+	},
+	{
+		name: "Go", render: renderGoCrashes, directory: "/project/internal", extension: ".go", engine: "Go",
+		cause:       goCrashSentence,
+		wantMessage: "the Go engine could not finish this file: " + goCrashSentence,
 	},
 }
 
 // renderTypeScriptCrashes runs the crashes through writeLintReport, as a walk's coverage names them.
-func renderTypeScriptCrashes(t *testing.T, crashes []runCrash) string {
-	t.Helper()
+func renderTypeScriptCrashes(test *testing.T, crashes []runCrash) string {
+	test.Helper()
 	coverage := program.Coverage{
 		RulesOffered:   map[string]int{"quiet-rule": 20},
 		RulesListening: map[string]int{"quiet-rule": 20},
 	}
 	for _, crash := range crashes {
 		if crash.Rule == "" {
-			coverage.FilesCrashed = append(coverage.FilesCrashed, program.FileCrash{FileName: crash.Path, Cause: errors.New(crash.Cause)})
+			coverage.FilesCrashed = append(
+				coverage.FilesCrashed,
+				program.FileCrash{FileName: crash.Path, Cause: errors.New(crash.Cause)},
+			)
 		} else {
-			coverage.RulesCrashed = append(coverage.RulesCrashed, program.RuleCrash{RuleName: crash.Rule, FileName: crash.Path, Cause: errors.New(crash.Cause)})
+			coverage.RulesCrashed = append(
+				coverage.RulesCrashed,
+				program.RuleCrash{RuleName: crash.Rule, FileName: crash.Path, Cause: errors.New(crash.Cause)},
+			)
 		}
 	}
-	return renderLintReport(lintReport{Result: program.Result{Coverage: coverage}, Rules: []rule.Rule{{Name: "quiet-rule"}}, WalkCost: "in 1s"})
+	return renderLintReport(lintReport{
+		Result:   program.Result{Coverage: coverage},
+		Rules:    []rule.Entry{{Traits: rule.Traits{Name: "quiet-rule"}}},
+		WalkCost: "in 1s",
+	})
 }
 
-// renderSwiftCrashes runs the crashes through the Swift record stream: the contract's lint-only fixture with
-// its lint record's crashes filled in, and its summary saying, as it must then, that the run is incomplete.
-func renderSwiftCrashes(t *testing.T, crashes []runCrash) string {
-	t.Helper()
+// renderSwiftCrashes runs the crashes through the Swift record stream.
+func renderSwiftCrashes(test *testing.T, crashes []runCrash) string {
+	test.Helper()
+	return renderContractCrashes(test, swiftLanguage, crashes)
+}
+
+// renderGoCrashes runs the crashes through the same records in the Go engine's words, since every engine that
+// speaks the contract reports a crash the same way.
+func renderGoCrashes(test *testing.T, crashes []runCrash) string {
+	test.Helper()
+	return renderContractCrashes(test, goLanguage("module"), crashes)
+}
+
+// renderContractCrashes runs the crashes through a contract engine's record stream, in language's words: the
+// contract's lint-only fixture with its lint record's crashes filled in, and its summary saying, as it must
+// then, that the run is incomplete.
+func renderContractCrashes(test *testing.T, language engineLanguage, crashes []runCrash) string {
+	test.Helper()
 	records := make([]map[string]string, 0, len(crashes))
 	for _, crash := range crashes {
 		records = append(records, map[string]string{"file": crash.Path, "error": crash.Cause})
 	}
-	encoded, err := json.Marshal(records)
-	if err != nil {
-		t.Fatal(err)
+	encoded, encodeError := json.Marshal(records)
+	if encodeError != nil {
+		test.Fatal(encodeError)
 	}
-	stream := contractFixture(t, "LintOnly.jsonl")
+	stream := contractFixture(test, "LintOnly.jsonl")
 	for index, line := range stream {
 		line = strings.Replace(line, `"crashes":[]`, `"crashes":`+string(encoded), 1)
 		stream[index] = strings.Replace(line, `"complete":true`, `"complete":false`, 1)
 	}
-	output, exitCode, err := renderRecords(t, swiftModeCheck, stream, 1)
-	if err != nil || exitCode != 1 {
-		t.Fatalf("exit %d, err %v\n%s", exitCode, err, output)
+	output, exitCode, renderRecordsInError := renderRecordsIn(test, language, engineModeCheck, stream, 1, nil)
+	if renderRecordsInError != nil || exitCode != 1 {
+		test.Fatalf("exit %d, err %v\n%s", exitCode, renderRecordsInError, output)
 	}
 	return output
 }
 
 // renderCrashesIn renders through the engine in the view asked for, from an empty summary, and returns what it
 // printed and the summary it left. Both package-level settings are restored after.
-func renderCrashesIn(t *testing.T, mode outputMode, engine crashEngine, crashes []runCrash) (string, runSummary) {
-	t.Helper()
+func renderCrashesIn(test *testing.T, mode outputMode, engine crashEngine, crashes []runCrash) (string, runSummary) {
+	test.Helper()
 	savedOutput, savedSummary := activeOutput, activeSummary
 	defer func() { activeOutput, activeSummary = savedOutput, savedSummary }()
 	activeOutput, activeSummary = outputSettings{Mode: mode}, runSummary{}
-	output := engine.render(t, crashes)
+	output := engine.render(test, crashes)
 	return output, activeSummary
 }
 
@@ -111,31 +151,42 @@ func crashedFilesOf(engine crashEngine, prefix string, count int, cause string) 
 	crashes := make([]runCrash, 0, count)
 	for index := range count {
 		crashes = append(crashes, runCrash{
-			Path: fmt.Sprintf("%s/%s%02d%s", engine.directory, prefix, index+1, engine.extension), Cause: cause, SwiftEngine: engine.swiftEngine,
+			Path:   fmt.Sprintf("%s/%s%02d%s", engine.directory, prefix, index+1, engine.extension),
+			Cause:  cause,
+			Engine: engine.engine,
 		})
 	}
 	return crashes
 }
 
 // Not parallel: its subtests swap the package-level activeOutput and activeSummary
-func TestADefaultRunNamesEachCrashGroupedByCause(t *testing.T) {
+func TestADefaultRunNamesEachCrashGroupedByCause(test *testing.T) {
 	for _, engine := range crashEngines {
 		// Not parallel: it swaps the package-level activeOutput and activeSummary
-		t.Run(engine.name+": one crash names its file and its cause", func(t *testing.T) {
-			crash := runCrash{Path: engine.directory + "/Broken" + engine.extension, Cause: engine.cause, SwiftEngine: engine.swiftEngine}
-			output, _ := renderCrashesIn(t, outputHuman, engine, []runCrash{crash})
+		test.Run(engine.name+": one crash names its file and its cause", func(test *testing.T) {
+			crash := runCrash{
+				Path:   engine.directory + "/Broken" + engine.extension,
+				Cause:  engine.cause,
+				Engine: engine.engine,
+			}
+			output, _ := renderCrashesIn(test, outputHuman, engine, []runCrash{crash})
 			want := "  crashed: " + crash.Path + ": " + engine.wantMessage + "\n"
 			if strings.Count(output, want) != 1 {
-				t.Errorf("the default view did not name the crash once as\n%s\nin:\n%s", want, output)
+				test.Errorf("the default view did not name the crash once as\n%s\nin:\n%s", want, output)
 			}
-			forbidLines(t, output, "files, each:", "cohere --verbose names them all")
+			forbidLines(test, output, "files, each:", "cohere --verbose names them all")
 		})
 
 		// Not parallel: it swaps the package-level activeOutput and activeSummary
-		t.Run(engine.name+": twelve of one cause name it once, five files, and count the rest", func(t *testing.T) {
+		test.Run(engine.name+
+			": twelve of one cause name it once, five files, and count the rest", func(test *testing.T) {
 			shared := crashedFilesOf(engine, "F", 12, "index out of range")
-			apart := runCrash{Path: engine.directory + "/Other" + engine.extension, Cause: "bad cast", SwiftEngine: engine.swiftEngine}
-			output, _ := renderCrashesIn(t, outputHuman, engine, append(append([]runCrash(nil), shared...), apart))
+			apart := runCrash{
+				Path:   engine.directory + "/Other" + engine.extension,
+				Cause:  "bad cast",
+				Engine: engine.engine,
+			}
+			output, _ := renderCrashesIn(test, outputHuman, engine, append(append([]runCrash(nil), shared...), apart))
 
 			sharedMessage := shared[0].message()
 			block := "  crashed: 12 files, each: " + sharedMessage + "\n"
@@ -145,17 +196,17 @@ func TestADefaultRunNamesEachCrashGroupedByCause(t *testing.T) {
 			block += "    and 7 more; cohere --verbose names them all\n" +
 				"  crashed: " + apart.Path + ": " + apart.message() + "\n"
 			if !strings.Contains(output, block) {
-				t.Errorf("the default view did not group the crashes as\n%s\nin:\n%s", block, output)
+				test.Errorf("the default view did not group the crashes as\n%s\nin:\n%s", block, output)
 			}
 			if count := strings.Count(output, sharedMessage); count != 1 {
-				t.Errorf("the shared cause printed %d times, want once:\n%s", count, output)
+				test.Errorf("the shared cause printed %d times, want once:\n%s", count, output)
 			}
 			for _, crash := range shared[5:] {
-				forbidLines(t, output, crash.Path)
+				forbidLines(test, output, crash.Path)
 			}
 			if engine.name == "TypeScript" && output != block {
 				// A TypeScript lint report prints nothing else in the default view, so the block is the whole of it.
-				t.Errorf("the default view printed more than the crashes:\n%s", output)
+				test.Errorf("the default view printed more than the crashes:\n%s", output)
 			}
 		})
 
@@ -163,21 +214,30 @@ func TestADefaultRunNamesEachCrashGroupedByCause(t *testing.T) {
 			continue
 		}
 		// Not parallel: it swaps the package-level activeOutput and activeSummary
-		t.Run(engine.name+": a rule's crash groups apart from the same panic losing a whole file", func(t *testing.T) {
+		test.Run(engine.name+
+			": a rule's crash groups apart from the same panic losing a whole file", func(test *testing.T) {
 			whole := crashedFilesOf(engine, "W", 2, "nil pointer")
 			ruled := []runCrash{
-				{Path: engine.directory + "/R01" + engine.extension, Rule: "prefer-arrow-callback", Cause: "nil pointer"},
-				{Path: engine.directory + "/R02" + engine.extension, Rule: "prefer-arrow-callback", Cause: "nil pointer"},
+				{
+					Path:  engine.directory + "/R01" + engine.extension,
+					Rule:  "prefer-arrow-callback",
+					Cause: "nil pointer",
+				},
+				{
+					Path:  engine.directory + "/R02" + engine.extension,
+					Rule:  "prefer-arrow-callback",
+					Cause: "nil pointer",
+				},
 			}
-			output, _ := renderCrashesIn(t, outputHuman, engine, append(append([]runCrash(nil), whole...), ruled...))
-			requireLines(t, output,
+			output, _ := renderCrashesIn(test, outputHuman, engine, append(append([]runCrash(nil), whole...), ruled...))
+			requireLines(test, output,
 				"  crashed: 2 files, each: "+whole[0].message()+"\n    "+whole[0].Path+"\n    "+whole[1].Path+"\n",
 				"  crashed: 2 files, each: "+ruled[0].message()+"\n    "+ruled[0].Path+"\n    "+ruled[1].Path+"\n",
 			)
 			if !strings.Contains(ruled[0].message(), "cohere's rule prefer-arrow-callback crashed") {
-				t.Errorf("a rule crash's cause does not name its rule: %s", ruled[0].message())
+				test.Errorf("a rule crash's cause does not name its rule: %s", ruled[0].message())
 			}
-			forbidLines(t, output, "more; cohere --verbose")
+			forbidLines(test, output, "more; cohere --verbose")
 		})
 	}
 }
@@ -185,22 +245,27 @@ func TestADefaultRunNamesEachCrashGroupedByCause(t *testing.T) {
 // A Swift crash is never a panic: the engine reports a file its typed rules had no index for, and its sentence
 // already says what that cost and that every other rule ran. So in both views it reads as the engine said it,
 // and never as cohere's crash, which would claim nothing in the file was checked and call it a bug to report.
-// A TypeScript crash is a panic, and keeps cohere's words.
+// A Go engine's crash is a rule that failed on a package while the others ran, and reads the same way. A
+// TypeScript crash is a panic, and keeps cohere's words.
 // Not parallel: its subtests swap the package-level activeOutput and activeSummary
-func TestASwiftCrashSaysTheEnginesWordsInEveryView(t *testing.T) {
+func TestASwiftCrashSaysTheEnginesWordsInEveryView(test *testing.T) {
 	cohereWords := []string{"bug in cohere", "nothing in this file was checked", reportBugsAt}
 	for _, engine := range crashEngines {
 		for _, mode := range []outputMode{outputHuman, outputVerbose} {
 			view := map[outputMode]string{outputHuman: "default", outputVerbose: "verbose"}[mode]
 			// Not parallel: it swaps the package-level activeOutput and activeSummary
-			t.Run(engine.name+" "+view, func(t *testing.T) {
-				crash := runCrash{Path: engine.directory + "/Broken" + engine.extension, Cause: engine.cause, SwiftEngine: engine.swiftEngine}
-				output, _ := renderCrashesIn(t, mode, engine, []runCrash{crash})
-				requireLines(t, output, "  crashed: "+crash.Path+": "+engine.wantMessage+"\n")
-				if engine.swiftEngine {
-					forbidLines(t, output, cohereWords...)
+			test.Run(engine.name+" "+view, func(test *testing.T) {
+				crash := runCrash{
+					Path:   engine.directory + "/Broken" + engine.extension,
+					Cause:  engine.cause,
+					Engine: engine.engine,
+				}
+				output, _ := renderCrashesIn(test, mode, engine, []runCrash{crash})
+				requireLines(test, output, "  crashed: "+crash.Path+": "+engine.wantMessage+"\n")
+				if engine.engine != "" {
+					forbidLines(test, output, cohereWords...)
 				} else {
-					requireLines(t, output, cohereWords...)
+					requireLines(test, output, cohereWords...)
 				}
 			})
 		}
@@ -208,38 +273,45 @@ func TestASwiftCrashSaysTheEnginesWordsInEveryView(t *testing.T) {
 }
 
 // Not parallel: its subtests swap the package-level activeOutput and activeSummary
-func TestVerboseNamesEveryCrashOnceAndNoGroup(t *testing.T) {
+func TestVerboseNamesEveryCrashOnceAndNoGroup(test *testing.T) {
 	for _, engine := range crashEngines {
 		// Not parallel: it swaps the package-level activeOutput and activeSummary
-		t.Run(engine.name, func(t *testing.T) {
+		test.Run(engine.name, func(test *testing.T) {
 			crashes := crashedFilesOf(engine, "F", 12, "index out of range")
-			output, _ := renderCrashesIn(t, outputVerbose, engine, crashes)
+			output, _ := renderCrashesIn(test, outputVerbose, engine, crashes)
 			for _, crash := range crashes {
 				line := "  crashed: " + crash.Path + ": " + crash.message() + "\n"
 				if count := strings.Count(output, line); count != 1 {
-					t.Errorf("--verbose named %s %d times, want once:\n%s", crash.Path, count, output)
+					test.Errorf("--verbose named %s %d times, want once:\n%s", crash.Path, count, output)
 				}
 			}
-			forbidLines(t, output, "files, each:", "cohere --verbose names them all")
+			forbidLines(test, output, "files, each:", "cohere --verbose names them all")
 		})
 	}
 }
 
 // Not parallel: its subtests swap the package-level activeOutput and activeSummary
-func TestJSONListsEveryCrashBesideTheCounts(t *testing.T) {
+func TestJsonListsEveryCrashBesideTheCounts(test *testing.T) {
 	for _, engine := range crashEngines {
 		// Not parallel: it swaps the package-level activeOutput and activeSummary
-		t.Run(engine.name, func(t *testing.T) {
-			crashes := append(crashedFilesOf(engine, "F", 7, "index out of range"), crashedFilesOf(engine, "G", 1, "bad cast")...)
+		test.Run(engine.name, func(test *testing.T) {
+			crashes := append(
+				crashedFilesOf(engine, "F", 7, "index out of range"),
+				crashedFilesOf(engine, "G", 1, "bad cast")...,
+			)
 			if engine.ruleCrashes {
-				crashes = append(crashes, runCrash{Path: engine.directory + "/R01" + engine.extension, Rule: "prefer-arrow-callback", Cause: "nil pointer"})
+				crashes = append(crashes, runCrash{
+					Path:  engine.directory + "/R01" + engine.extension,
+					Rule:  "prefer-arrow-callback",
+					Cause: "nil pointer",
+				})
 			}
-			output, summary := renderCrashesIn(t, outputJSON, engine, crashes)
-			forbidLines(t, output, "crashed: ")
+			output, summary := renderCrashesIn(test, outputJson, engine, crashes)
+			forbidLines(test, output, "crashed: ")
 
-			encoded, err := json.Marshal(summaryAsJSON(summary))
-			if err != nil {
-				t.Fatal(err)
+			encoded, encodeError := json.Marshal(summaryAsJson(summary))
+			if encodeError != nil {
+				test.Fatal(encodeError)
 			}
 			var decoded struct {
 				Gaps struct {
@@ -248,11 +320,11 @@ func TestJSONListsEveryCrashBesideTheCounts(t *testing.T) {
 					Crashes      []map[string]string `json:"crashes"`
 				} `json:"gaps"`
 			}
-			if err := json.Unmarshal(encoded, &decoded); err != nil {
-				t.Fatal(err)
+			if decodeError := json.Unmarshal(encoded, &decoded); decodeError != nil {
+				test.Fatal(decodeError)
 			}
 			if len(decoded.Gaps.Crashes) != decoded.Gaps.CrashedFiles+decoded.Gaps.RuleCrashes {
-				t.Errorf("--json lists %d crashes and counts %d crashed files and %d rule crashes:\n%s",
+				test.Errorf("--json lists %d crashes and counts %d crashed files and %d rule crashes:\n%s",
 					len(decoded.Gaps.Crashes), decoded.Gaps.CrashedFiles, decoded.Gaps.RuleCrashes, encoded)
 			}
 			want := make([]map[string]string, 0, len(crashes))
@@ -266,7 +338,7 @@ func TestJSONListsEveryCrashBesideTheCounts(t *testing.T) {
 			got := decoded.Gaps.Crashes
 			sort.Slice(got, func(first, second int) bool { return got[first]["path"] < got[second]["path"] })
 			if !reflect.DeepEqual(got, want) {
-				t.Errorf("--json lists the crashes as %v, want %v:\n%s", got, want, encoded)
+				test.Errorf("--json lists the crashes as %v, want %v:\n%s", got, want, encoded)
 			}
 		})
 	}

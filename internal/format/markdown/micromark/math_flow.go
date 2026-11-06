@@ -29,8 +29,16 @@ func tokenizeMathFenced(self *Self, effects *Effects, ok State, nok State) State
 	}
 	sizeOpen := 0
 
-	var start, sequenceOpen, metaBefore, meta, metaAfter, beforeNonLazyContinuation, contentStart,
-		beforeContentChunk, contentChunk, after State
+	var start State
+	var sequenceOpen State
+	var metaBefore State
+	var meta State
+	var metaAfter State
+	var beforeNonLazyContinuation State
+	var contentStart State
+	var beforeContentChunk State
+	var contentChunk State
+	var after State
 
 	// closingFence is the construct upstream builds inline, `{tokenize: tokenizeClosingFence, partial:
 	// true}`, declared inside tokenizeMathFenced because its tokenizer closes over `sizeOpen` and reads
@@ -38,7 +46,9 @@ func tokenizeMathFenced(self *Self, effects *Effects, ok State, nok State) State
 	closingFence := &Construct{Partial: true, Tokenize: func(_ *Self, effects *Effects, ok State, nok State) State {
 		size := 0
 
-		var beforeSequenceClose, sequenceClose, afterSequenceClose State
+		var beforeSequenceClose State
+		var sequenceClose State
+		var afterSequenceClose State
 
 		// In closing fence, after optional whitespace, at sequence.
 		//
@@ -96,11 +106,11 @@ func tokenizeMathFenced(self *Self, effects *Effects, ok State, nok State) State
 		//	    ^
 		//
 		// Upstream passes `undefined` (no limit) when codeIndented is disabled, else 4.
-		max := tabSize
+		maximum := tabSize
 		if slices.Contains(self.Parser.Constructs.Disable, "codeIndented") {
-			max = 0
+			maximum = 0
 		}
-		return factorySpace(effects, beforeSequenceClose, TypeLinePrefix, max)
+		return factorySpace(effects, beforeSequenceClose, TypeLinePrefix, maximum)
 	}}
 
 	// Start of math.
@@ -265,7 +275,8 @@ func tokenizeMathFenced(self *Self, effects *Effects, ok State, nok State) State
 }
 
 func tokenizeMathFlowNonLazyContinuation(self *Self, effects *Effects, ok State, nok State) State {
-	var start, lineStart State
+	var start State
+	var lineStart State
 
 	start = func(code Code) State {
 		if code == CodeEof {

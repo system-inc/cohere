@@ -153,7 +153,7 @@ var messageUnsupportedInlineClass = rule.Message{
 // The first version of this rule carried an `isReadReference` predicate excluding a property name,
 // a member access's name half, a declared binding's own identifier, an import specifier and a
 // class member, on the reasoning that none of those is a reference to the global. It read as
-// obviously load-bearing and a mutation disabling it entirely SURVIVED the whole fixture suite.
+// obviously load-bearing and a mutation disabling it entirely survived the whole fixture suite.
 //
 // Probed rather than patched with another fixture. Over six shapes, printing the guard's answer
 // and the symbol lookup's answer side by side, the two columns were identical everywhere: every
@@ -180,7 +180,7 @@ var messageUnsupportedInlineClass = rule.Message{
 // oxc could not reach it. The rule is therefore wider than oxlint on TypeScript input and exactly
 // as wide as React, which is the right side to land on.
 //
-// # An inline class is a DECLARATION, and the corpus says so
+// # An inline class is a declaration, and the corpus says so
 //
 // `oxc::Statement::ClassDeclaration` and React's `case 'ClassDeclaration'` both sit in the statement
 // dispatch, so a class **expression** is untouched: `const Foo = class {};` inside a component is
@@ -200,7 +200,7 @@ var messageUnsupportedInlineClass = rule.Message{
 // through 15 for `class Foo {}`. All three reproduce exactly through `ctx.ReportNode`, verified
 // against the source bytes before this rule was written, and asserted in the fixtures because a
 // message-id assertion cannot see a span.
-var UnsupportedSyntax = rule.Rule{
+var UnsupportedSyntax = rule.Rule[CompilerRuleOptions]{
 	// No namespace prefix. The config writes `react/unsupported-syntax`, and the parity guard
 	// strips the namespace on a `/` boundary, so `react-unsupported-syntax` would match no
 	// inventory entry while still passing every fixture in this package.
@@ -216,10 +216,10 @@ var UnsupportedSyntax = rule.Rule{
 	// Compiler options and the default library, through type_checking's builtin and specifier helpers.
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[CompilerRuleOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindIdentifier: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 				if node.Text() != "eval" {
@@ -231,17 +231,17 @@ var UnsupportedSyntax = rule.Rule{
 				if !utilsreact.IsInsideComponentOrHook(node) {
 					return
 				}
-				symbol := ctx.TypeChecker.GetSymbolAtLocation(node)
-				if !rule.IsSymbolFromDefaultLibrary(ctx.Program, symbol) {
+				symbol := ruleContext.TypeChecker.GetSymbolAtLocation(node)
+				if !rule.IsSymbolFromDefaultLibrary(ruleContext.Program, symbol) {
 					return
 				}
-				ctx.ReportNode(node, messageUnsupportedEval)
+				ruleContext.ReportNode(node, messageUnsupportedEval)
 			},
 			ast.KindWithStatement: func(node *ast.Node) {
 				if !utilsreact.IsInsideComponentOrHook(node) {
 					return
 				}
-				ctx.ReportNode(node, messageUnsupportedWith)
+				ruleContext.ReportNode(node, messageUnsupportedWith)
 			},
 			ast.KindClassDeclaration: func(node *ast.Node) {
 				// A class declaration whose parent is the source file is module scope, which is
@@ -251,7 +251,7 @@ var UnsupportedSyntax = rule.Rule{
 				if !utilsreact.IsInsideComponentOrHook(node) {
 					return
 				}
-				ctx.ReportNode(node, messageUnsupportedInlineClass)
+				ruleContext.ReportNode(node, messageUnsupportedInlineClass)
 			},
 		}
 	},

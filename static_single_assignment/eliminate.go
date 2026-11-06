@@ -50,19 +50,20 @@ func EliminateRedundantPhis[G Graph[F, B, P], F any, B comparable, P any](graph 
 		// end before rewriting. The chain is acyclic because a phi only collapses to a value that
 		// is not itself.
 		resolve := func(id IdentifierId) IdentifierId {
+			current := id
 			seen := 0
 			for {
-				next, ok := rewrites[id]
+				next, ok := rewrites[current]
 				if !ok {
-					return id
+					return current
 				}
-				id = next
+				current = next
 				seen++
 				if seen > len(rewrites) {
 					// Defensive: a cycle cannot arise from the redundancy test above, but a caller
 					// that hand-built phis could create one, and looping forever is the worst
 					// possible response.
-					return id
+					return current
 				}
 			}
 		}
@@ -101,7 +102,11 @@ func redundantPhiValue[G Graph[F, B, P], F any, B comparable, P any](graph G, ph
 }
 
 // applyRewrites rewrites every place in the function through resolve.
-func applyRewrites[G Graph[F, B, P], F any, B comparable, P any](graph G, function F, resolve func(IdentifierId) IdentifierId) {
+func applyRewrites[G Graph[F, B, P], F any, B comparable, P any](
+	graph G,
+	function F,
+	resolve func(IdentifierId) IdentifierId,
+) {
 	rewrite := func(place *P, role Role) {
 		*place = graph.WithIdentifier(*place, resolve(graph.IdentifierOf(*place)))
 	}
@@ -118,9 +123,9 @@ func applyRewrites[G Graph[F, B, P], F any, B comparable, P any](graph G, functi
 		}
 		graph.EachTerminalPlace(block, rewrite)
 	}
-	params := graph.Params(function)
-	for index := range params {
-		rewrite(&params[index], Define)
+	parameters := graph.Parameters(function)
+	for index := range parameters {
+		rewrite(&parameters[index], Define)
 	}
 	if returns := graph.Returns(function); returns != nil {
 		rewrite(returns, Use)

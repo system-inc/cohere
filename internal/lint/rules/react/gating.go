@@ -172,12 +172,12 @@ type GatingOptions struct {
 // `directive.value.value`, which is Babel's cooked value, and interpolates the same cooked value
 // into the message. So the finding text prints the cooked form on both sides. This is the one place
 // where the port brief's warning about cooked-versus-raw text resolves in favor of cooked.
-var Gating = rule.Rule{
+var Gating = rule.Rule[GatingOptions]{
 	// No namespace prefix. The config writes `react/gating`; the parity guard strips the namespace
 	// on a `/` boundary, so `react-gating` would match no inventory entry and lint nothing.
 	Name: "react-hooks/gating",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		gatingOptions, _ := rule.OptionsAs[GatingOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[GatingOptions]) rule.Listeners {
+		gatingOptions, _ := options.Read()
 		if gatingOptions.RequireDynamicGatingOption {
 			return nil
 		}
@@ -193,7 +193,7 @@ var Gating = rule.Rule{
 				}
 				if !isValidGatingCondition(condition) {
 					// Every invalid directive reports, matching upstream's collect-then-return.
-					ctx.ReportNode(statement, messageInvalidGatingDirective)
+					ruleContext.ReportNode(statement, messageInvalidGatingDirective)
 					invalid = true
 					continue
 				}
@@ -206,7 +206,7 @@ var Gating = rule.Rule{
 				return
 			}
 			// One finding for the body, anchored on the first directive.
-			ctx.ReportNode(matched[0], messageMultipleGatingDirectives)
+			ruleContext.ReportNode(matched[0], messageMultipleGatingDirectives)
 		}
 
 		return rule.Listeners{
@@ -291,6 +291,45 @@ func parseGatingDirective(value string) (string, bool) {
 	return condition, true
 }
 
+// gatingReservedWords is Babel's reserved set, which is also oxc's.
+//
+// Written out rather than asked of the shim, and the reason is measured. `scanner.StringToToken`
+// composed with `ast.IsKeywordKind` is the obvious shelf answer and it is **wrong in thirty-five
+// places**, because the shim's keyword set is TypeScript's: `type`, `string`, `number`, `async`,
+// `get`, `set`, `namespace`, `readonly` and twenty-seven more are keyword kinds there and perfectly
+// ordinary identifiers to Babel. A gating condition named `type` or `async` is entirely legal and a
+// port built on that helper would report it. Probed on all forty-six Babel words plus thirty-nine
+// TypeScript-only ones: every Babel word matched, and every mismatch was the shim reserving
+// something Babel does not.
+//
+// `scanner.IsValidIdentifier` is the even more inviting name and is worse. Probed directly, it
+// answers **true** for `"true"`: it is `isIdentifierName` with no reserved-word component at all,
+// so building on it would leave this rule silent on React's only error-named gating fixture, which
+// is precisely `'use memo if(true)'`.
+//
+// Two shelf helpers whose names match the question and whose bodies answer a different one, which
+// is why the set is here.
+//
+// Composition, from Babel's `isValidIdentifier`: `isKeyword` supplies the thirty-five reserved
+// words, `isStrictReservedWord` supplies the nine strict-mode ones plus `await` and `enum` (its
+// `inModule` argument is passed as true). `eval` and `arguments` are absent on purpose: Babel keeps
+// them in a `strictBind` list that `isValidIdentifier` never consults, so both are valid conditions.
+var gatingReservedWords = map[string]bool{
+	// isKeyword
+	"break": true, "case": true, "catch": true, "continue": true, "debugger": true,
+	"default": true, "do": true, "else": true, "finally": true, "for": true,
+	"function": true, "if": true, "return": true, "switch": true, "throw": true,
+	"try": true, "var": true, "const": true, "while": true, "with": true,
+	"new": true, "this": true, "super": true, "class": true, "extends": true,
+	"export": true, "import": true, "null": true, "true": true, "false": true,
+	"in": true, "instanceof": true, "typeof": true, "void": true, "delete": true,
+	// isStrictReservedWord, strict list
+	"implements": true, "interface": true, "let": true, "package": true, "private": true,
+	"protected": true, "public": true, "static": true, "yield": true,
+	// isReservedWord, with inModule true
+	"await": true, "enum": true,
+}
+
 // isValidGatingCondition reports whether a condition can be imported as a name.
 //
 // Babel's `isValidIdentifier` and oxc's `is_identifier_name && !is_reserved_keyword`, which were
@@ -329,43 +368,4 @@ func isIdentifierStartRune(character rune) bool {
 // isIdentifierPartRune reports whether a rune may continue an identifier.
 func isIdentifierPartRune(character rune) bool {
 	return scanner.IsIdentifierPart(character)
-}
-
-// gatingReservedWords is Babel's reserved set, which is also oxc's.
-//
-// Written out rather than asked of the shim, and the reason is measured. `scanner.StringToToken`
-// composed with `ast.IsKeywordKind` is the obvious shelf answer and it is **wrong in thirty-five
-// places**, because the shim's keyword set is TypeScript's: `type`, `string`, `number`, `async`,
-// `get`, `set`, `namespace`, `readonly` and twenty-seven more are keyword kinds there and perfectly
-// ordinary identifiers to Babel. A gating condition named `type` or `async` is entirely legal and a
-// port built on that helper would report it. Probed on all forty-six Babel words plus thirty-nine
-// TypeScript-only ones: every Babel word matched, and every mismatch was the shim reserving
-// something Babel does not.
-//
-// `scanner.IsValidIdentifier` is the even more inviting name and is worse. Probed directly, it
-// answers **true** for `"true"` — it is `isIdentifierName` with no reserved-word component at all,
-// so building on it would leave this rule silent on React's only error-named gating fixture, which
-// is precisely `'use memo if(true)'`.
-//
-// Two shelf helpers whose names match the question and whose bodies answer a different one, which
-// is why the set is here.
-//
-// Composition, from Babel's `isValidIdentifier`: `isKeyword` supplies the thirty-five reserved
-// words, `isStrictReservedWord` supplies the nine strict-mode ones plus `await` and `enum` (its
-// `inModule` argument is passed as true). `eval` and `arguments` are absent on purpose: Babel keeps
-// them in a `strictBind` list that `isValidIdentifier` never consults, so both are valid conditions.
-var gatingReservedWords = map[string]bool{
-	// isKeyword
-	"break": true, "case": true, "catch": true, "continue": true, "debugger": true,
-	"default": true, "do": true, "else": true, "finally": true, "for": true,
-	"function": true, "if": true, "return": true, "switch": true, "throw": true,
-	"try": true, "var": true, "const": true, "while": true, "with": true,
-	"new": true, "this": true, "super": true, "class": true, "extends": true,
-	"export": true, "import": true, "null": true, "true": true, "false": true,
-	"in": true, "instanceof": true, "typeof": true, "void": true, "delete": true,
-	// isStrictReservedWord, strict list
-	"implements": true, "interface": true, "let": true, "package": true, "private": true,
-	"protected": true, "public": true, "static": true, "yield": true,
-	// isReservedWord, with inModule true
-	"await": true, "enum": true,
 }

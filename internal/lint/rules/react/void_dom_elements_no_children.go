@@ -123,13 +123,13 @@ var messageVoidDomElementsNoChildren = rule.Message{
 // restating which three spellings are accepted. The helper is left alone: other rules in this
 // package depend on its current behavior, and this is a difference between callers rather than a
 // defect in it.
-var VoidDomElementsNoChildren = rule.Rule{
+var VoidDomElementsNoChildren = rule.Rule[rule.NoOptions]{
 	// No namespace prefix. The config writes `react/void-dom-elements-no-children` and the parity
 	// guard strips the namespace on a `/` boundary, so a rule named
 	// `react-void-dom-elements-no-children` would match no inventory entry and lint no files while
 	// passing every fixture in this file.
 	Name: "react/void-dom-elements-no-children",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// reportElement decides about one JSX element, given its own children list.
 		//
 		// Shared by both element kinds because upstream anchors on `JSXElement` and reads the
@@ -157,7 +157,7 @@ var VoidDomElementsNoChildren = rule.Rule{
 				return
 			}
 
-			ctx.ReportNode(tagName, voidDomElementMessage(elementName))
+			ruleContext.ReportNode(tagName, voidDomElementMessage(elementName))
 		}
 
 		return rule.Listeners{
@@ -234,7 +234,7 @@ var VoidDomElementsNoChildren = rule.Rule{
 					return
 				}
 
-				ctx.ReportNode(elementNameNode, voidDomElementMessage(elementName))
+				ruleContext.ReportNode(elementNameNode, voidDomElementMessage(elementName))
 			},
 		}
 	},

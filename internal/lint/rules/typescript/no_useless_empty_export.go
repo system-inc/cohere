@@ -35,24 +35,24 @@ var messageUselessEmptyExport = rule.Message{
 // top-level import or export", and every member of it below was measured against the release binary
 // rather than reasoned from the source. Four results are the opposite of the intuitive reading:
 //
-//	declare const a = 2; export {}          REPORTS NOT — an ambient declaration exports nothing
-//	declare module 'x' {} export {}         REPORTS NOT — likewise, and it is the corpus's first pass case
-//	interface I {} export {}                REPORTS NOT — a bare type declaration is local
-//	export = 3; export {}                   REPORTS NOT — see the export-assignment section below
+//	declare const a = 2; export {}          REPORTS NOT   an ambient declaration exports nothing
+//	declare module 'x' {} export {}         REPORTS NOT   likewise, and it is the corpus's first pass case
+//	interface I {} export {}                REPORTS NOT   a bare type declaration is local
+//	export = 3; export {}                   REPORTS NOT   see the export-assignment section below
 //
 // against the ones that do disarm it:
 //
-//	export const _ = {}; export {}          reports — an export modifier on any declaration
-//	export type A = 1; export {}            reports — a type-only export still exports a name
-//	export declare const a = 2; export {}   reports — `declare` does not cancel `export`
+//	export const _ = {}; export {}          reports   an export modifier on any declaration
+//	export type A = 1; export {}            reports   a type-only export still exports a name
+//	export declare const a = 2; export {}   reports   `declare` does not cancel `export`
 //	export namespace N {} export {}         reports
-//	const _ = {}; export { _ }; export {}   reports — a named export clause carrying specifiers
-//	export * from '_'; export {}            reports — a star re-export
+//	const _ = {}; export { _ }; export {}   reports   a named export clause carrying specifiers
+//	export * from '_'; export {}            reports   a star re-export
 //	export default 3; export {}             reports
-//	import '_'; export {}                   reports — even a bare side-effect import
+//	import '_'; export {}                   reports   even a bare side-effect import
 //	import type { A } from '_'; export {}   reports
-//	import _ = require('_'); export {}       reports — an external import-equals, top level only
-//	import x = ns.value; export {}          REPORTS NOT — an internal import-equals is not external
+//	import _ = require('_'); export {}       reports   an external import-equals, top level only
+//	import x = ns.value; export {}          REPORTS NOT   an internal import-equals is not external
 //
 // # `export default` and `export =` are one node kind here, and they fall opposite ways
 //
@@ -87,10 +87,10 @@ var messageUselessEmptyExport = rule.Message{
 // doing any work, and its second tester block is four inputs that all report as `.ts` and all stay
 // silent as `.d.ts`. Those four are the only thing pinning the gate, so they are kept here twice,
 // once per extension.
-var NoUselessEmptyExport = rule.Rule{
+var NoUselessEmptyExport = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/no-useless-empty-export",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -116,8 +116,8 @@ var NoUselessEmptyExport = rule.Rule{
 					return
 				}
 				for _, emptyExport := range emptyExports {
-					ctx.ReportNodeWithFixes(emptyExport, messageUselessEmptyExport,
-						ctx.RemoveNode(emptyExport))
+					ruleContext.ReportNodeWithFixes(emptyExport, messageUselessEmptyExport,
+						ruleContext.RemoveNode(emptyExport))
 				}
 			},
 		}

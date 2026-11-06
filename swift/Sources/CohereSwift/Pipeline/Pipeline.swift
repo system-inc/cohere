@@ -850,11 +850,12 @@ public struct Pipeline {
 
     /*
      Every build of this package that writes an index store and compile commands: for a package, the root's scratch
-     and each local package's that the types phase builds for its tests; for an Xcode root, the one xcodebuild's
-     derived data, which every target and linked package builds into.
+     and each local package's that the types phase builds for its tests; for an Xcode root, and for a package whose
+     platforms leave out macOS (`XcodePackageTypesPhase`), the one xcodebuild's derived data, which every target and
+     linked package builds into.
      */
     static func symbolLayouts(package: PackageModel, scratch: URL) -> [BuildLayout] {
-        guard package.projectKind == .swiftPackage else {
+        guard package.projectKind == .swiftPackage, !XcodePackageTypesPhase.leavesOutHost(package) else {
             return [.xcode(derivedData: XcodeTypesPhase.derivedData(scratchPath: scratch))]
         }
         let scratchPaths =

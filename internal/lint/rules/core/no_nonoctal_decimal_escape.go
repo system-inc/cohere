@@ -47,12 +47,12 @@ var messageNonoctalDecimalEscape = rule.Message{
 // things and only the author knows which was meant. `'\8'` may have been intended as the digit or
 // as a literal backslash before a digit, and an engine that picked one unattended would silently
 // change the string half the time.
-var NoNonoctalDecimalEscape = rule.Rule{
+var NoNonoctalDecimalEscape = rule.Rule[rule.NoOptions]{
 	Name: "no-nonoctal-decimal-escape",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		report := func(node *ast.Node) {
-			literalRange := rule.TokenRange(ctx.SourceFile, node)
-			raw := ctx.SourceFile.Text()[literalRange.Pos():literalRange.End()]
+			literalRange := rule.TokenRange(ruleContext.SourceFile, node)
+			raw := ruleContext.SourceFile.Text()[literalRange.Pos():literalRange.End()]
 
 			// The shortest literal that could hold one is `'\8'`: two quotes, a backslash, a digit.
 			if len(raw) < 4 {
@@ -129,7 +129,7 @@ var NoNonoctalDecimalEscape = rule.Rule{
 					}},
 				})
 
-				ctx.ReportRangeWithSuggestions(
+				ruleContext.ReportRangeWithSuggestions(
 					core.NewTextRange(escapeStart, escapeEnd),
 					messageNonoctalDecimalEscape,
 					suggestions...,

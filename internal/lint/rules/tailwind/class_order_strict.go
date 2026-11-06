@@ -35,13 +35,6 @@ func strictClassOrder(officially []string, system *tailwindengine.LoadedDesignSy
 	return root.order()
 }
 
-// strictVariantLevel is one level of the variant tree: each variant written at it, in JavaScript's
-// key order, with the classes that stop there and the level beneath.
-type strictVariantLevel struct {
-	names   []string
-	entries map[string]*strictVariantEntry
-}
-
 type strictVariantEntry struct {
 	classes []string
 	nested  *strictVariantLevel
@@ -49,34 +42,6 @@ type strictVariantEntry struct {
 
 func newStrictVariantLevel() *strictVariantLevel {
 	return &strictVariantLevel{entries: map[string]*strictVariantEntry{}}
-}
-
-func (level *strictVariantLevel) entry(variant string) *strictVariantEntry {
-	if existing, isPresent := level.entries[variant]; isPresent {
-		return existing
-	}
-	created := &strictVariantEntry{nested: newStrictVariantLevel()}
-	level.entries[variant] = created
-	level.names = append(level.names, variant)
-	return created
-}
-
-// order flattens a level: each variant's classes, then its nested level, with arbitrary variants
-// moved after the rest by a stable sort, as upstream's `getStrictOrder` does.
-func (level *strictVariantLevel) order() []string {
-	names := jsKeyOrder(level.names)
-	sort.SliceStable(names, func(left int, right int) bool {
-		return !isArbitraryVariant(names[left]) && isArbitraryVariant(names[right])
-	})
-	ordered := []string{}
-	for _, name := range names {
-		entry := level.entries[name]
-		ordered = append(ordered, entry.classes...)
-		if len(entry.nested.names) > 0 {
-			ordered = append(ordered, entry.nested.order()...)
-		}
-	}
-	return ordered
 }
 
 // isArbitraryVariant is upstream's test: a variant holding both brackets.
@@ -114,7 +79,8 @@ func strictVariantsOf(className string, system *tailwindengine.LoadedDesignSyste
 // rest in insertion order. A repeated key keeps its first position.
 func jsKeyOrder(keys []string) []string {
 	seen := make(map[string]bool, len(keys))
-	var indexes, rest []string
+	var indexes []string
+	var rest []string
 	for _, key := range keys {
 		if seen[key] {
 			continue
@@ -127,7 +93,9 @@ func jsKeyOrder(keys []string) []string {
 		}
 	}
 	sort.SliceStable(indexes, func(left int, right int) bool {
+		// Ignored: indexes holds only keys isArrayIndexKey already parsed as a uint below 2^32 - 1.
 		leftValue, _ := strconv.ParseUint(indexes[left], 10, 64)
+		// Ignored: the same keys, so this parse cannot fail either.
 		rightValue, _ := strconv.ParseUint(indexes[right], 10, 64)
 		return leftValue < rightValue
 	})
@@ -136,6 +104,6 @@ func jsKeyOrder(keys []string) []string {
 
 // isArrayIndexKey reports whether a JavaScript object would treat a key as an array index.
 func isArrayIndexKey(key string) bool {
-	value, err := strconv.ParseUint(key, 10, 64)
-	return err == nil && value < 1<<32-1 && strconv.FormatUint(value, 10) == key
+	value, parseError := strconv.ParseUint(key, 10, 64)
+	return parseError == nil && value < 1<<32-1 && strconv.FormatUint(value, 10) == key
 }

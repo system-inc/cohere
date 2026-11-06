@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -23,18 +24,18 @@ type requireImportsCase struct {
 
 // decodeRequireImportsOptions routes a case's options through the rule's own exported decoder
 // rather than building the struct, so that the string-to-regexp compilation and the `allowAsImport`
-// default are themselves under test. A case with no options is handed nil, which is what a rule
+// default are themselves under test. A case with no options is handed none, which is what a rule
 // configured as a bare "error" actually receives.
-func decodeRequireImportsOptions(t *testing.T, optionsText string) any {
-	t.Helper()
+func decodeRequireImportsOptions(test *testing.T, optionsText string) rule.Given[NoRequireImportsOptions] {
+	test.Helper()
 	if optionsText == "" {
-		return nil
+		return rule.Given[NoRequireImportsOptions]{}
 	}
-	decoded, err := DecodeNoRequireImportsOptions(json.RawMessage(optionsText))
-	if err != nil {
-		t.Fatalf("decoding the options %s: %v", optionsText, err)
+	decoded, decodeNoRequireImportsOptionsError := DecodeNoRequireImportsOptions(json.RawMessage(optionsText))
+	if decodeNoRequireImportsOptionsError != nil {
+		test.Fatalf("decoding the options %s: %v", optionsText, decodeNoRequireImportsOptionsError)
 	}
-	return decoded
+	return rule.Configured(decoded)
 }
 
 // The corpus is oxc's, copied rather than rewritten, from
@@ -44,52 +45,96 @@ func decodeRequireImportsOptions(t *testing.T, optionsText string) any {
 // doubled report: the two `lib5`/`lib6` cases hold two declarators with a `require` in each, and the
 // `configValidator` case holds two statements with a `require` in each. Every other input reports
 // once, recovered by aligning each snapshot entry on the source line it prints.
-func TestNoRequireImportsFires(t *testing.T) {
-	t.Parallel()
+func TestNoRequireImportsFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []requireImportsCase{
 		{sourceText: "var lib = require('lib');", options: "", findings: 1},
 		{sourceText: "let lib2 = require('lib2');", options: "", findings: 1},
-		{sourceText: "\n            var lib5 = require('lib5'),\n              lib6 = require('lib6');\n                  ", options: "", findings: 2},
+		{
+			sourceText: "\n            var lib5 = require('lib5'),\n              lib6 = require('lib6');\n                  ",
+			options:    "",
+			findings:   2,
+		},
 		{sourceText: "import lib8 = require('lib8');", options: "", findings: 1},
 		{sourceText: "var lib = require?.('lib');", options: "", findings: 1},
 		{sourceText: "let lib2 = require?.('lib2');", options: "", findings: 1},
-		{sourceText: "\n            var lib5 = require?.('lib5'),\n              lib6 = require?.('lib6');\n                  ", options: "", findings: 2},
+		{
+			sourceText: "\n            var lib5 = require?.('lib5'),\n              lib6 = require?.('lib6');\n                  ",
+			options:    "",
+			findings:   2,
+		},
 		{sourceText: "const pkg = require('./package.json');", options: "", findings: 1},
-		{sourceText: "const pkg = require('./package.jsonc');", options: "{ \"allow\": [\"/package\\\\.json$\"] }", findings: 1},
-		{sourceText: "const pkg = require(`./package.jsonc`);", options: "{ \"allow\": [\"/package\\\\.json$\"] }", findings: 1},
+		{
+			sourceText: "const pkg = require('./package.jsonc');",
+			options:    "{ \"allow\": [\"/package\\\\.json$\"] }",
+			findings:   1,
+		},
+		{
+			sourceText: "const pkg = require(`./package.jsonc`);",
+			options:    "{ \"allow\": [\"/package\\\\.json$\"] }",
+			findings:   1,
+		},
 		{sourceText: "import pkg = require('./package.json');", options: "", findings: 1},
-		{sourceText: "import pkg = require('./package.jsonc');", options: "{ \"allow\": [\"/package\\\\.json$\"] }", findings: 1},
-		{sourceText: "import pkg = require('./package.json');", options: "{ \"allow\": [\"^some-package$\"] }", findings: 1},
+		{
+			sourceText: "import pkg = require('./package.jsonc');",
+			options:    "{ \"allow\": [\"/package\\\\.json$\"] }",
+			findings:   1,
+		},
+		{
+			sourceText: "import pkg = require('./package.json');",
+			options:    "{ \"allow\": [\"^some-package$\"] }",
+			findings:   1,
+		},
 		{sourceText: "var foo = require?.('foo');", options: "{ \"allowAsImport\": true }", findings: 1},
 		{sourceText: "let foo = trick(require?.('foo'));", options: "{ \"allowAsImport\": true }", findings: 1},
 		{sourceText: "trick(require('foo'));", options: "{ \"allowAsImport\": true }", findings: 1},
 		{sourceText: "const foo = require('./foo.json') as Foo;", options: "{ \"allowAsImport\": true }", findings: 1},
-		{sourceText: "const foo: Foo = require('./foo.json').default;", options: "{ \"allowAsImport\": true }", findings: 1},
+		{
+			sourceText: "const foo: Foo = require('./foo.json').default;",
+			options:    "{ \"allowAsImport\": true }",
+			findings:   1,
+		},
 		{sourceText: "const foo = <Foo>require('./foo.json');", options: "{ \"allowAsImport\": true }", findings: 1},
-		{sourceText: "\n            const configValidator = new Validator(require('./a.json'));\n            configValidator.addSchema(require('./a.json'));\n                  ", options: "{ \"allowAsImport\": true }", findings: 2},
+		{
+			sourceText: "\n            const configValidator = new Validator(require('./a.json'));\n            configValidator.addSchema(require('./a.json'));\n                  ",
+			options:    "{ \"allowAsImport\": true }",
+			findings:   2,
+		},
 		{sourceText: "require('foo');", options: "{ \"allowAsImport\": true }", findings: 1},
 		{sourceText: "require?.('foo');", options: "{ \"allowAsImport\": true }", findings: 1},
 		{sourceText: "function foo() {\n            require('foo')\n            }", options: "", findings: 1},
 		{sourceText: "const m = require(someVariable);", options: "", findings: 1},
 		{sourceText: "const m = require(path.join(dir, file));", options: "", findings: 1},
-		{sourceText: "class Foo {\n            require(module: string) {\n                return require(module);\n            }\n            }", options: "", findings: 1},
-		{sourceText: "class Foo {\n            require(module: string) {\n                return require('foo');\n            }\n            }", options: "", findings: 1},
+		{
+			sourceText: "class Foo {\n            require(module: string) {\n                return require(module);\n            }\n            }",
+			options:    "",
+			findings:   1,
+		},
+		{
+			sourceText: "class Foo {\n            require(module: string) {\n                return require('foo');\n            }\n            }",
+			options:    "",
+			findings:   1,
+		},
 		// #7mztrdd: the control for the lookbehind rows in TestNoRequireImportsStaysSilent. In Node,
 		// new RegExp("(?<=/)package\\.json$", "u") tests false on "package.json", so the require still reports.
-		{sourceText: "const pkg = require('package.json');", options: "{ \"allow\": [\"(?<=/)package\\\\.json$\"] }", findings: 1},
+		{
+			sourceText: "const pkg = require('package.json');",
+			options:    "{ \"allow\": [\"(?<=/)package\\\\.json$\"] }",
+			findings:   1,
+		},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoRequireImports, requireImportsFile,
-				testCase.sourceText, decodeRequireImportsOptions(t, testCase.options))
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedGiven(test, NoRequireImports, requireImportsFile,
+				testCase.sourceText, decodeRequireImportsOptions(test, testCase.options))
 			expected := make([]string, testCase.findings)
 			for index := range expected {
 				expected[index] = "noRequireImports"
 			}
-			rule_testing.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(test, result, expected...)
 		})
 	}
 }
@@ -99,8 +144,8 @@ func TestNoRequireImportsFires(t *testing.T) {
 // qualified-name form of import-equals, which produces no external module reference node. The
 // `createRequire` and `let require = bazz` cases each declare a real local binding, which is the
 // only thing that makes a genuine `require` call silent. The remainder exercise the two options.
-func TestNoRequireImportsStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoRequireImportsStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []requireImportsCase{
 		{sourceText: "import { l } from 'lib';", options: ""},
@@ -110,41 +155,83 @@ func TestNoRequireImportsStaysSilent(t *testing.T) {
 		{sourceText: "import lib9 = lib2.anotherSubImport;", options: ""},
 		{sourceText: "import lib10 from 'lib10';", options: ""},
 		{sourceText: "var lib3 = load?.('not_an_import');", options: ""},
-		{sourceText: "\n            import { createRequire } from 'module';\n            const require = createRequire();\n            require(someModule);\n                ", options: ""},
-		{sourceText: "\n            function foo() {\n                let require = bazz;\n                require(someModule);\n            }\n                ", options: ""},
-		{sourceText: "\n            import { createRequire } from 'module';\n            const require = createRequire();\n            require('remark-preset-prettier');\n                ", options: ""},
+		{
+			sourceText: "\n            import { createRequire } from 'module';\n            const require = createRequire();\n            require(someModule);\n                ",
+			options:    "",
+		},
+		{
+			sourceText: "\n            function foo() {\n                let require = bazz;\n                require(someModule);\n            }\n                ",
+			options:    "",
+		},
+		{
+			sourceText: "\n            import { createRequire } from 'module';\n            const require = createRequire();\n            require('remark-preset-prettier');\n                ",
+			options:    "",
+		},
 		{sourceText: "const pkg = require('./package.json');", options: "{ \"allow\": [\"/package\\\\.json$\"] }"},
 		{sourceText: "const pkg = require('../package.json');", options: "{ \"allow\": [\"/package\\\\.json$\"] }"},
 		{sourceText: "const pkg = require(`./package.json`);", options: "{ \"allow\": [\"/package\\\\.json$\"] }"},
-		{sourceText: "const pkg = require('../packages/package.json');", options: "{ \"allow\": [\"/package\\\\.json$\"] }"},
-		{sourceText: "import pkg = require('../packages/package.json');", options: "{ \"allow\": [\"/package\\\\.json$\"] }"},
+		{
+			sourceText: "const pkg = require('../packages/package.json');",
+			options:    "{ \"allow\": [\"/package\\\\.json$\"] }",
+		},
+		{
+			sourceText: "import pkg = require('../packages/package.json');",
+			options:    "{ \"allow\": [\"/package\\\\.json$\"] }",
+		},
 		{sourceText: "import pkg = require('data.json');", options: "{ \"allow\": [\"\\\\.json$\"] }"},
 		{sourceText: "import pkg = require('some-package');", options: "{ \"allow\": [\"^some-package$\"] }"},
 		{sourceText: "import foo = require('foo');", options: "{ \"allowAsImport\": true }"},
-		{sourceText: "\n            let require = bazz;\n            trick(require('foo'));\n                  ", options: "{ \"allowAsImport\": true }"},
-		{sourceText: "\n            let require = bazz;\n            const foo = require('./foo.json') as Foo;\n                  ", options: "{ \"allowAsImport\": true }"},
-		{sourceText: "\n            let require = bazz;\n            const foo: Foo = require('./foo.json').default;\n                  ", options: "{ \"allowAsImport\": true }"},
-		{sourceText: "\n            let require = bazz;\n            const foo = <Foo>require('./foo.json');\n                  ", options: "{ \"allowAsImport\": true }"},
-		{sourceText: "\n            let require = bazz;\n            const configValidator = new Validator(require('./a.json'));\n            configValidator.addSchema(require('./a.json'));\n                  ", options: "{ \"allowAsImport\": true }"},
-		{sourceText: "\n            let require = bazz;\n            require('foo');\n                  ", options: "{ \"allowAsImport\": true }"},
-		{sourceText: "\n            let require = bazz;\n            require?.('foo');\n                  ", options: "{ \"allowAsImport\": true }"},
-		{sourceText: "\n            import { createRequire } from 'module';\n            const require = createRequire();\n            require('remark-preset-prettier');\n                  ", options: "{ \"allowAsImport\": true }"},
+		{
+			sourceText: "\n            let require = bazz;\n            trick(require('foo'));\n                  ",
+			options:    "{ \"allowAsImport\": true }",
+		},
+		{
+			sourceText: "\n            let require = bazz;\n            const foo = require('./foo.json') as Foo;\n                  ",
+			options:    "{ \"allowAsImport\": true }",
+		},
+		{
+			sourceText: "\n            let require = bazz;\n            const foo: Foo = require('./foo.json').default;\n                  ",
+			options:    "{ \"allowAsImport\": true }",
+		},
+		{
+			sourceText: "\n            let require = bazz;\n            const foo = <Foo>require('./foo.json');\n                  ",
+			options:    "{ \"allowAsImport\": true }",
+		},
+		{
+			sourceText: "\n            let require = bazz;\n            const configValidator = new Validator(require('./a.json'));\n            configValidator.addSchema(require('./a.json'));\n                  ",
+			options:    "{ \"allowAsImport\": true }",
+		},
+		{
+			sourceText: "\n            let require = bazz;\n            require('foo');\n                  ",
+			options:    "{ \"allowAsImport\": true }",
+		},
+		{
+			sourceText: "\n            let require = bazz;\n            require?.('foo');\n                  ",
+			options:    "{ \"allowAsImport\": true }",
+		},
+		{
+			sourceText: "\n            import { createRequire } from 'module';\n            const require = createRequire();\n            require('remark-preset-prettier');\n                  ",
+			options:    "{ \"allowAsImport\": true }",
+		},
 		// #7mztrdd: an allow pattern is read as JavaScript reads it, `new RegExp(pattern, 'u')`. RE2 refuses a
 		// lookbehind, so this pattern was dropped and permitted nothing. In Node,
 		// new RegExp("(?<=/)package\\.json$", "u") tests true on "./package.json".
 		{sourceText: "const pkg = require('./package.json');", options: "{ \"allow\": [\"(?<=/)package\\\\.json$\"] }"},
-		{sourceText: "import pkg = require('./package.json');", options: "{ \"allow\": [\"(?<=/)package\\\\.json$\"] }"},
+		{
+			sourceText: "import pkg = require('./package.json');",
+			options:    "{ \"allow\": [\"(?<=/)package\\\\.json$\"] }",
+		},
 		// #7mztrdd: JavaScript's `\s` takes U+00A0. In Node, new RegExp("^my\\smodule$", "u") tests true on
 		// "my\u00a0module".
 		{sourceText: "const m = require('my\u00a0module');", options: "{ \"allow\": [\"^my\\\\smodule$\"] }"},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoRequireImports,
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTypedGiven(test, NoRequireImports,
 				requireImportsFile, testCase.sourceText,
-				decodeRequireImportsOptions(t, testCase.options)))
+				decodeRequireImportsOptions(test, testCase.options)))
 		})
 	}
 }
@@ -156,8 +243,8 @@ func TestNoRequireImportsStaysSilent(t *testing.T) {
 // inner `TSExternalModuleReference`. Both carry the same message id, so every id fixture above stays
 // green over the wrong choice. The expected strings here are typed literals rather than anything
 // derived from the rule, so a mutation cannot move both sides together.
-func TestNoRequireImportsSpans(t *testing.T) {
-	t.Parallel()
+func TestNoRequireImportsSpans(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -198,17 +285,17 @@ func TestNoRequireImportsSpans(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoRequireImports, requireImportsFile,
-				testCase.sourceText, decodeRequireImportsOptions(t, testCase.options))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedGiven(test, NoRequireImports, requireImportsFile,
+				testCase.sourceText, decodeRequireImportsOptions(test, testCase.options))
 			if len(result.Diagnostics) != len(testCase.reported) {
-				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.reported))
+				test.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.reported))
 			}
 			for index, diagnostic := range result.Diagnostics {
 				got := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if got != testCase.reported[index] {
-					t.Errorf("finding %d points at %q, want %q", index, got, testCase.reported[index])
+					test.Errorf("finding %d points at %q, want %q", index, got, testCase.reported[index])
 				}
 			}
 		})
@@ -218,23 +305,23 @@ func TestNoRequireImportsSpans(t *testing.T) {
 // TestNoRequireImportsMessage asserts the message a reader sees, against literals typed here rather
 // than against the rule's own constant. Comparing to the constant is equality that looks correct and
 // moves with the rule under mutation, so it proves nothing.
-func TestNoRequireImportsMessage(t *testing.T) {
-	t.Parallel()
+func TestNoRequireImportsMessage(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTypedWithOptions(t, NoRequireImports, requireImportsFile,
-		"var lib = require('lib');", nil)
+	result := rule_testing.RunTyped(test, NoRequireImports, requireImportsFile,
+		"var lib = require('lib');")
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
+		test.Fatalf("got %d findings, want 1", len(result.Diagnostics))
 	}
 	if result.Diagnostics[0].Message.Id != "noRequireImports" {
-		t.Errorf("message id is %q, want %q", result.Diagnostics[0].Message.Id, "noRequireImports")
+		test.Errorf("message id is %q, want %q", result.Diagnostics[0].Message.Id, "noRequireImports")
 	}
 	if !strings.HasPrefix(result.Diagnostics[0].Message.Description,
 		"This loads a module with a CommonJS `require` call.") {
-		t.Errorf("message description begins %q", result.Diagnostics[0].Message.Description)
+		test.Errorf("message description begins %q", result.Diagnostics[0].Message.Description)
 	}
 	if len(result.Diagnostics[0].Fixes) != 0 || len(result.Diagnostics[0].Suggestions) != 0 {
-		t.Errorf("the rule offers a repair; upstream marks its fixer pending and ships none")
+		test.Errorf("the rule offers a repair; upstream marks its fixer pending and ships none")
 	}
 }
 
@@ -242,8 +329,8 @@ func TestNoRequireImportsMessage(t *testing.T) {
 // exercises, each pinned by running `oxlint` on the input rather than by reading oxc's source. The
 // corpus writes no parenthesized callee and no escaped path, so every one of these would have been a
 // silent divergence in either direction.
-func TestNoRequireImportsMeasuredAgainstTheReleaseBinary(t *testing.T) {
-	t.Parallel()
+func TestNoRequireImportsMeasuredAgainstTheReleaseBinary(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -366,12 +453,12 @@ func TestNoRequireImportsMeasuredAgainstTheReleaseBinary(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoRequireImports, requireImportsFile,
-				testCase.sourceText, decodeRequireImportsOptions(t, testCase.options))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedGiven(test, NoRequireImports, requireImportsFile,
+				testCase.sourceText, decodeRequireImportsOptions(test, testCase.options))
 			if len(result.Diagnostics) != testCase.findings {
-				t.Fatalf("got %d findings, want %d (%s)",
+				test.Fatalf("got %d findings, want %d (%s)",
 					len(result.Diagnostics), testCase.findings, testCase.reasoning)
 			}
 		})
@@ -381,107 +468,103 @@ func TestNoRequireImportsMeasuredAgainstTheReleaseBinary(t *testing.T) {
 // TestNoRequireImportsRequiresTheTypedHarness asserts that the rule genuinely declines when handed
 // no checker, so a later revert of the nil guard fails loudly rather than reporting on every
 // `require` in the file regardless of shadowing.
-func TestNoRequireImportsRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestNoRequireImportsRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	if !NoRequireImports.NeedsTypeChecker {
-		t.Fatal("the rule stopped declaring NeedsTypeChecker; the shadow test cannot work without it")
+		test.Fatal("the rule stopped declaring NeedsTypeChecker; the shadow test cannot work without it")
 	}
-	result := rule_testing.RunWithOptions(t, NoRequireImports, requireImportsFile,
-		"var lib = require('lib');", nil)
+	result := rule_testing.Run(test, NoRequireImports, requireImportsFile,
+		"var lib = require('lib');")
 	if len(result.Diagnostics) != 0 {
-		t.Errorf("the untyped harness produced %d findings; the nil-checker guard is missing",
+		test.Errorf("the untyped harness produced %d findings; the nil-checker guard is missing",
 			len(result.Diagnostics))
 	}
 }
 
 // TestDecodeNoRequireImportsOptions pins the decoder itself, which is where the default inversion
 // and the pattern compilation live and where upstream has no counterpart to compare against.
-func TestDecodeNoRequireImportsOptions(t *testing.T) {
-	t.Parallel()
+func TestDecodeNoRequireImportsOptions(test *testing.T) {
+	test.Parallel()
 
-	t.Run("an absent allowAsImport is false", func(t *testing.T) {
-		t.Parallel()
-		decoded, err := DecodeNoRequireImportsOptions(json.RawMessage(`{}`))
-		if err != nil {
-			t.Fatalf("decoding: %v", err)
+	test.Run("an absent allowAsImport is false", func(test *testing.T) {
+		test.Parallel()
+		decoded, decodeNoRequireImportsOptionsError := DecodeNoRequireImportsOptions(json.RawMessage(`{}`))
+		if decodeNoRequireImportsOptionsError != nil {
+			test.Fatalf("decoding: %v", decodeNoRequireImportsOptionsError)
 		}
-		options, _ := decoded.(NoRequireImportsOptions)
-		if options.AllowAsImport {
-			t.Error("allowAsImport defaulted to true; both upstreams default it to false")
+		if decoded.AllowAsImport {
+			test.Error("allowAsImport defaulted to true; both upstreams default it to false")
 		}
-		if len(options.Allow) != 0 {
-			t.Errorf("allow decoded %d patterns from an empty object", len(options.Allow))
+		if len(decoded.Allow) != 0 {
+			test.Errorf("allow decoded %d patterns from an empty object", len(decoded.Allow))
 		}
 	})
 
-	t.Run("patterns compile", func(t *testing.T) {
-		t.Parallel()
-		decoded, err := DecodeNoRequireImportsOptions(
+	test.Run("patterns compile", func(test *testing.T) {
+		test.Parallel()
+		decoded, decodeNoRequireImportsOptionsError := DecodeNoRequireImportsOptions(
 			json.RawMessage(`{ "allow": ["/package\\.json$", "^some-package$"] }`))
-		if err != nil {
-			t.Fatalf("decoding: %v", err)
+		if decodeNoRequireImportsOptionsError != nil {
+			test.Fatalf("decoding: %v", decodeNoRequireImportsOptionsError)
 		}
-		options, _ := decoded.(NoRequireImportsOptions)
-		if len(options.Allow) != 2 {
-			t.Fatalf("compiled %d patterns, want 2", len(options.Allow))
+		if len(decoded.Allow) != 2 {
+			test.Fatalf("compiled %d patterns, want 2", len(decoded.Allow))
 		}
-		if !options.Allow[0].Test("../packages/package.json") {
-			t.Error("the escaped-dot pattern did not match a path upstream permits")
+		if !decoded.Allow[0].Test("../packages/package.json") {
+			test.Error("the escaped-dot pattern did not match a path upstream permits")
 		}
-		if options.Allow[0].Test("./package.jsonc") {
-			t.Error("the anchored pattern matched a path upstream reports")
+		if decoded.Allow[0].Test("./package.jsonc") {
+			test.Error("the anchored pattern matched a path upstream reports")
 		}
 	})
 
 	// #7mztrdd: a lookbehind used to be the pattern dropped here, because RE2 refuses one. It is
 	// read as JavaScript reads it now, and in Node new RegExp("(?<=x)y", "u") tests true on "xy".
-	t.Run("a pattern RE2 refuses compiles as JavaScript", func(t *testing.T) {
-		t.Parallel()
-		decoded, err := DecodeNoRequireImportsOptions(
+	test.Run("a pattern RE2 refuses compiles as JavaScript", func(test *testing.T) {
+		test.Parallel()
+		decoded, decodeNoRequireImportsOptionsError := DecodeNoRequireImportsOptions(
 			json.RawMessage(`{ "allow": ["(?<=x)y"] }`))
-		if err != nil {
-			t.Fatalf("decoding: %v", err)
+		if decodeNoRequireImportsOptionsError != nil {
+			test.Fatalf("decoding: %v", decodeNoRequireImportsOptionsError)
 		}
-		options, _ := decoded.(NoRequireImportsOptions)
-		if len(options.Allow) != 1 {
-			t.Fatalf("kept %d patterns, want 1; JavaScript has lookbehind", len(options.Allow))
+		if len(decoded.Allow) != 1 {
+			test.Fatalf("kept %d patterns, want 1; JavaScript has lookbehind", len(decoded.Allow))
 		}
-		if !options.Allow[0].Test("xy") {
-			t.Error("the lookbehind did not match a path JavaScript matches")
+		if !decoded.Allow[0].Test("xy") {
+			test.Error("the lookbehind did not match a path JavaScript matches")
 		}
 	})
 
 	// In Node, new RegExp("(", "u") throws "Unterminated group", which is what upstream does at
 	// rule creation; here the entry is dropped.
-	t.Run("a pattern JavaScript cannot compile is dropped rather than failing the run", func(t *testing.T) {
-		t.Parallel()
-		decoded, err := DecodeNoRequireImportsOptions(
+	test.Run("a pattern JavaScript cannot compile is dropped rather than failing the run", func(test *testing.T) {
+		test.Parallel()
+		decoded, decodeNoRequireImportsOptionsError := DecodeNoRequireImportsOptions(
 			json.RawMessage(`{ "allow": ["(", "^ok$"] }`))
-		if err != nil {
-			t.Fatalf("decoding: %v", err)
+		if decodeNoRequireImportsOptionsError != nil {
+			test.Fatalf("decoding: %v", decodeNoRequireImportsOptionsError)
 		}
-		options, _ := decoded.(NoRequireImportsOptions)
-		if len(options.Allow) != 1 {
-			t.Fatalf("kept %d patterns, want 1; an unterminated group does not compile", len(options.Allow))
+		if len(decoded.Allow) != 1 {
+			test.Fatalf("kept %d patterns, want 1; an unterminated group does not compile", len(decoded.Allow))
 		}
-		if !options.Allow[0].Test("ok") {
-			t.Error("the surviving pattern is not the compilable one")
+		if !decoded.Allow[0].Test("ok") {
+			test.Error("the surviving pattern is not the compilable one")
 		}
 	})
 }
 
 // TestNoRequireImportsSurvivesMalformedImportEquals pins two guards that are crash protection
 // rather than behavioral filters, which no ExpectFindings fixture can see: a mutation sweep reports
-// SURVIVED whether such a guard matters or not, because a panic is not a finding.
+// survived whether such a guard matters or not, because a panic is not a finding.
 //
 // `import a = require(`lib`)` is a parse error in oxc, confirmed by running the release binary,
 // which prints `Unexpected token` and no rule diagnostic. Our parser recovers from it and hands the
 // arm a KindNoSubstitutionTemplateLiteral, so an unguarded AsStringLiteral is an unchecked interface
 // conversion that takes the whole linter down. Measured by removing the kind test and watching this
 // input panic with `ast.nodeData is *ast.NoSubstitutionTemplateLiteral, not *ast.StringLiteral`.
-func TestNoRequireImportsSurvivesMalformedImportEquals(t *testing.T) {
-	t.Parallel()
+func TestNoRequireImportsSurvivesMalformedImportEquals(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -511,12 +594,12 @@ func TestNoRequireImportsSurvivesMalformedImportEquals(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			// The assertion is that this returns at all. A panic here fails the test by crashing it,
 			// which is the only signal available for this class of guard.
-			rule_testing.RunTypedWithOptions(t, NoRequireImports, requireImportsFile,
-				testCase.sourceText, decodeRequireImportsOptions(t, testCase.options))
+			rule_testing.RunTypedGiven(test, NoRequireImports, requireImportsFile,
+				testCase.sourceText, decodeRequireImportsOptions(test, testCase.options))
 		})
 	}
 }
@@ -529,12 +612,12 @@ func TestNoRequireImportsSurvivesMalformedImportEquals(t *testing.T) {
 // exactly that, measured on the harness: two declarations, the ambient one first.
 //
 // It also pins a divergence that reading the code alone would have got backwards. A source
-// declaration is not automatically a shadow: measured on the release binary, upstream REPORTS the
-// call beside a `declare global` block and is SILENT beside a plain `function require(...)`, even
+// declaration is not automatically a shadow: measured on the release binary, upstream reports the
+// call beside a `declare global` block and is silent beside a plain `function require(...)`, even
 // though both put a declaration in a source file. An ambient declaration declares a name that
 // already exists rather than introducing a binding, and the ambient flag is what separates them.
-func TestNoRequireImportsAcrossDeclarationOrderings(t *testing.T) {
-	t.Parallel()
+func TestNoRequireImportsAcrossDeclarationOrderings(test *testing.T) {
+	test.Parallel()
 
 	const ambientTypes = "declare function require(id: string): any;\n"
 
@@ -616,11 +699,11 @@ func TestNoRequireImportsAcrossDeclarationOrderings(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedFiles(t, NoRequireImports, testCase.files, "Subject.ts")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedFiles(test, NoRequireImports, testCase.files, "Subject.ts")
 			if len(result.Diagnostics) != testCase.findings {
-				t.Fatalf("got %d findings, want %d (%s)",
+				test.Fatalf("got %d findings, want %d (%s)",
 					len(result.Diagnostics), testCase.findings, testCase.reasoning)
 			}
 		})

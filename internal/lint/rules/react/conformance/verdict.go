@@ -1,11 +1,5 @@
 package react_conformance
 
-import (
-	"fmt"
-	"sort"
-	"strings"
-)
-
 // This file is the aggregation layer: it turns "did this rule reproduce this golden" into a number
 // whose categories a reader can act on.
 //
@@ -45,10 +39,10 @@ const (
 
 	// VerdictUnreachableFixture means the fixture never reaches this validator upstream either.
 	//
-	// Measured, not assumed: the fixture's expected diagnostics belong to a DIFFERENT rule than the
+	// Measured, not assumed: the fixture's expected diagnostics belong to a different rule than the
 	// one being scored. React's pipeline aborts earlier, so the golden records the earlier
 	// diagnostic and the rule under test is never consulted. The three fixtures named for
-	// error-boundaries are the clearest case — all three expect a `Todo` from BuildHIR, because
+	// error-boundaries are the clearest case: all three expect a `Todo` from BuildHIR, because
 	// lowering aborts on a `try` with no `catch`.
 	VerdictUnreachableFixture Verdict = "declined: unreachable fixture"
 
@@ -79,10 +73,10 @@ const (
 
 	// VerdictNotScored means a rule cohere ships owns this fixture but no rule engine was run.
 	//
-	// This is the honest name for the state the harness is in today, and it is deliberately NOT
+	// This is the honest name for the state the harness is in today, and it is deliberately not
 	// folded into any decline. A decline says something about the fixture; this says something
 	// about the run. Collapsing it into `unreachable` would claim these fixtures cannot be scored,
-	// when in fact they are precisely the ones that can — and the addressable set going unmeasured
+	// when in fact they are precisely the ones that can, and the addressable set going unmeasured
 	// is the single thing a reader most needs to see.
 	VerdictNotScored Verdict = "not scored: no rule engine run"
 )
@@ -116,77 +110,4 @@ type FixtureVerdict struct {
 
 	Expected []ExpectedError
 	Reported []ReportedError
-}
-
-// Report is the whole aggregated run.
-type Report struct {
-	Considered int
-	Counts     map[Verdict]int
-	Fixtures   []FixtureVerdict
-}
-
-// Check verifies the categories partition the corpus.
-//
-// Same guard as `Score.Check`, and for the same reason: the arithmetic is the only thing that
-// notices a fixture counted twice or not at all.
-func (r Report) Check() error {
-	sum := 0
-	for _, verdict := range AllVerdicts {
-		sum += r.Counts[verdict]
-	}
-	if sum != r.Considered {
-		return fmt.Errorf("report does not partition the corpus: considered %d but categories sum to %d", r.Considered, sum)
-	}
-	if r.Considered != len(r.Fixtures) {
-		return fmt.Errorf("considered %d fixtures but recorded %d verdicts", r.Considered, len(r.Fixtures))
-	}
-	for _, fixtureVerdict := range r.Fixtures {
-		if fixtureVerdict.Verdict != VerdictPassed && fixtureVerdict.Reason == "" {
-			return fmt.Errorf("%s: %s with no reason; an unreasoned category is somewhere to hide a failure", fixtureVerdict.Name, fixtureVerdict.Verdict)
-		}
-	}
-	return nil
-}
-
-// Summary is the scoreboard, one line per category.
-//
-// It leads with the number and its denominator and then names every category, because the headline
-// alone is the thing this whole file exists to stop anyone quoting.
-func (r Report) Summary() string {
-	var builder strings.Builder
-	fmt.Fprintf(&builder, "%d / %d passed against facebook/react@%s\n", r.Counts[VerdictPassed], r.Considered, UpstreamSha[:12])
-	for _, verdict := range AllVerdicts {
-		fmt.Fprintf(&builder, "  %-30s %4d\n", verdict, r.Counts[verdict])
-	}
-	return builder.String()
-}
-
-// ByRule breaks the report down by the upstream rule each fixture belongs to.
-func (r Report) ByRule() map[string]map[Verdict]int {
-	breakdown := map[string]map[Verdict]int{}
-	for _, fixtureVerdict := range r.Fixtures {
-		for _, ruleName := range fixtureVerdict.Rules {
-			if breakdown[ruleName] == nil {
-				breakdown[ruleName] = map[Verdict]int{}
-			}
-			breakdown[ruleName][fixtureVerdict.Verdict]++
-		}
-	}
-	return breakdown
-}
-
-// RuleNames returns the rules in the breakdown, sorted.
-func (r Report) RuleNames() []string {
-	names := map[string]bool{}
-	for _, fixtureVerdict := range r.Fixtures {
-		for _, ruleName := range fixtureVerdict.Rules {
-			names[ruleName] = true
-		}
-	}
-	sorted := make([]string, 0, len(names))
-	for name := range names {
-		sorted = append(sorted, name)
-	}
-	sort.Strings(sorted)
-	return sorted
 }

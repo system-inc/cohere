@@ -4,6 +4,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/system-inc/cohere/internal/format/estree"
 	"github.com/system-inc/cohere/internal/format/printing"
 )
 
@@ -47,7 +48,10 @@ func needsParentheses(path *Path, options *Options) bool {
 		if arrowFunctionBody != nil &&
 			!arrowFunctionBody.Is("SequenceExpression") && // these have parens added anyway
 			!arrowFunctionBody.Is("AssignmentExpression") &&
-			startsWithNoLookaheadToken(arrowFunctionBody, func(leftmostNode Node) bool { return leftmostNode == current }) {
+			startsWithNoLookaheadToken(
+				arrowFunctionBody,
+				func(leftmostNode Node) bool { return leftmostNode == current },
+			) {
 			return true
 		}
 	}
@@ -248,8 +252,8 @@ func needsParentheses(path *Path, options *Options) bool {
 
 	case "TSFunctionType":
 		if path.Match(
-			func(value any, _ any, _ int, _ bool) bool {
-				node, _ := value.(Node)
+			func(value PathValue, _ string, _ int, _ bool) bool {
+				node, _ := value.Node()
 				return node.Is("TSFunctionType")
 			},
 			keyIsType("typeAnnotation", "TSTypeAnnotation"),
@@ -415,8 +419,8 @@ func needsParentheses(path *Path, options *Options) bool {
 		return key == "objectType" && parent.Is("IndexedAccessType")
 
 	case "StringLiteral", "NumericLiteral", "Literal":
-		_, valueIsString := current.Get("value").(string)
-		_, directiveIsString := parent.Get("directive").(string)
+		_, valueIsString := current.Get("value").(estree.String)
+		_, directiveIsString := parent.Get("directive").(estree.String)
 		if valueIsString && parent.Is("ExpressionStatement") && !directiveIsString {
 			// To avoid becoming a directive
 			grandParent := grandparentOf(path)
@@ -444,8 +448,8 @@ func needsParentheses(path *Path, options *Options) bool {
 		}
 
 		if key == "expressions" && parent.Is("SequenceExpression") &&
-			path.Match(nil, nil, func(value any, name any, _ int, _ bool) bool {
-				node, _ := value.(Node)
+			path.Match(nil, nil, func(value PathValue, name string, _ int, _ bool) bool {
+				node, _ := value.Node()
 				return (name == "init" || name == "update") && node.Is("ForStatement")
 			}) {
 			return false
@@ -478,7 +482,7 @@ func needsParentheses(path *Path, options *Options) bool {
 			return key == "callee"
 
 		case "ConditionalExpression":
-			// TODO remove this case entirely once we've removed this flag.
+			// Upstream keeps this case only until it removes the experimentalTernaries flag.
 			// options.experimentalTernaries is always false here: formatoptions.Options does not carry it.
 			return key == "test"
 
@@ -620,8 +624,8 @@ func needsParentheses(path *Path, options *Options) bool {
 // keyIsType is the path.match predicate upstream writes inline as
 // `(node, key) => key === name && node.type === type`.
 func keyIsType(name string, nodeType string) printing.Predicate[Node] {
-	return func(value any, key any, _ int, _ bool) bool {
-		node, _ := value.(Node)
+	return func(value PathValue, key string, _ int, _ bool) bool {
+		node, _ := value.Node()
 		return key == name && node.Is(nodeType)
 	}
 }

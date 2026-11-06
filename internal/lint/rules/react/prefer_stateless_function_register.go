@@ -7,7 +7,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // The generic helper errors on empty input, and a rule configured as a bare severity is handed nil.
 // Answering the documented default explicitly makes the unconfigured path a decision.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[PreferStatelessFunctionOptions]{
 		Rule:   PreferStatelessFunction,
 		Decode: DecodePreferStatelessFunctionOptions,
 	})

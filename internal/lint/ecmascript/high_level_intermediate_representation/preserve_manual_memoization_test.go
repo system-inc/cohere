@@ -15,8 +15,8 @@ import (
 // phrased about a single side. This one has a further trap: its inputs are markers constructed by a
 // pass that produced zero of them until recently, so a silent run is the expected shape of a broken
 // setup rather than of a clean program.
-func TestValidatePreservedManualMemoizationFiresAndStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestValidatePreservedManualMemoizationFiresAndStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	scopes := &ReactiveScopes{byIdentifier: map[static_single_assignment.IdentifierId]ScopeId{1: 7}}
 
@@ -27,11 +27,11 @@ func TestValidatePreservedManualMemoizationFiresAndStaysSilent(t *testing.T) {
 	}}
 	findings := ValidatePreservedManualMemoization(lost, &Function{}, scopes)
 	if len(findings) != 1 {
-		t.Fatalf("got %d findings, want 1; a value whose scope did not survive is the headline "+
+		test.Fatalf("got %d findings, want 1; a value whose scope did not survive is the headline "+
 			"case this rule exists for", len(findings))
 	}
 	if findings[0].Kind != PreserveManualMemoizationValueUnmemoized {
-		t.Errorf("finding kind is %s, want the unmemoized-value condition", findings[0].Kind)
+		test.Errorf("finding kind is %s, want the unmemoized-value condition", findings[0].Kind)
 	}
 
 	// The same program with the scope surviving must be silent, or the case above passes on a rule
@@ -42,7 +42,7 @@ func TestValidatePreservedManualMemoizationFiresAndStaysSilent(t *testing.T) {
 		memoStatement(2, &FinishMemoize{ManualMemoId: 1, Value: Place{Identifier: 1}}),
 	}}
 	if findings := ValidatePreservedManualMemoization(preserved, &Function{}, scopes); len(findings) != 0 {
-		t.Errorf("got %d findings on a program whose scope survived, want 0", len(findings))
+		test.Errorf("got %d findings on a program whose scope survived, want 0", len(findings))
 	}
 }
 
@@ -50,12 +50,12 @@ func TestValidatePreservedManualMemoizationFiresAndStaysSilent(t *testing.T) {
 // final clean-corpus false positive. The optional join is evaluated before the allocating call's
 // singleton scope, so its intermediate `.x` store is not a dependency and the written `.x.y` path
 // remains valid.
-func TestConditionalOptionalArgumentPreservesManualMemoization(t *testing.T) {
-	t.Parallel()
+func TestConditionalOptionalArgumentPreservesManualMemoization(test *testing.T) {
+	test.Parallel()
 
-	t.Run("matching dependency", func(t *testing.T) {
-		t.Parallel()
-		findings, lowered := findingsForSource(t, `
+	test.Run("matching dependency", func(test *testing.T) {
+		test.Parallel()
+		findings, lowered := findingsForSource(test, `
 			// @validatePreserveExistingMemoizationGuarantees
 			import {useMemo} from 'react';
 			import {identity} from 'shared-runtime';
@@ -67,10 +67,10 @@ func TestConditionalOptionalArgumentPreservesManualMemoization(t *testing.T) {
 			}
 		`)
 		if !lowered {
-			t.Fatal("optional allocation fixture did not lower")
+			test.Fatal("optional allocation fixture did not lower")
 		}
 		if len(findings) != 0 {
-			t.Fatalf("optional allocation produced %d preserved-memoization findings, want 0: %+v",
+			test.Fatalf("optional allocation produced %d preserved-memoization findings, want 0: %+v",
 				len(findings), findings)
 		}
 	})
@@ -78,9 +78,9 @@ func TestConditionalOptionalArgumentPreservesManualMemoization(t *testing.T) {
 	// The negative assertion above would also pass if memo markers disappeared, every reactive scope
 	// was pruned, or validation stopped walking scope dependencies. Pair it with an upstream error
 	// shape through the same harness and require the scope-exit dependency finding specifically.
-	t.Run("property call control", func(t *testing.T) {
-		t.Parallel()
-		findings, lowered := findingsForSource(t, `
+	test.Run("property call control", func(test *testing.T) {
+		test.Parallel()
+		findings, lowered := findingsForSource(test, `
 			// @validatePreserveExistingMemoizationGuarantees @validateExhaustiveMemoizationDependencies:false
 			import {useMemo} from 'react';
 			function Component({propA}) {
@@ -88,16 +88,16 @@ func TestConditionalOptionalArgumentPreservesManualMemoization(t *testing.T) {
 			}
 		`)
 		if !lowered {
-			t.Fatal("property-call control did not lower")
+			test.Fatal("property-call control did not lower")
 		}
 		if len(findings) != 1 {
-			t.Fatalf("property-call control produced %d findings, want 1: %+v", len(findings), findings)
+			test.Fatalf("property-call control produced %d findings, want 1: %+v", len(findings), findings)
 		}
 		if findings[0].Kind != PreserveManualMemoizationValueUnmemoized {
-			t.Errorf("property-call control finding is %s, want dependency mismatch", findings[0].Kind)
+			test.Errorf("property-call control finding is %s, want dependency mismatch", findings[0].Kind)
 		}
 		if findings[0].Order != 0 {
-			t.Errorf("property-call control finding has order %d, want 0 from scope-exit dependency comparison",
+			test.Errorf("property-call control finding has order %d, want 0 from scope-exit dependency comparison",
 				findings[0].Order)
 		}
 	})
@@ -108,8 +108,8 @@ func TestConditionalOptionalArgumentPreservesManualMemoization(t *testing.T) {
 // A scope absorbed by a merge survived under its survivor's identity. Reading only the survivor's
 // own id would report every value that was in an absorbed scope -- a false positive on exactly the
 // programs the merge improved.
-func TestValidatePreservedManualMemoizationAcceptsAMergedScope(t *testing.T) {
-	t.Parallel()
+func TestValidatePreservedManualMemoizationAcceptsAMergedScope(test *testing.T) {
+	test.Parallel()
 
 	scopes := &ReactiveScopes{byIdentifier: map[static_single_assignment.IdentifierId]ScopeId{1: 8}}
 
@@ -120,7 +120,7 @@ func TestValidatePreservedManualMemoizationAcceptsAMergedScope(t *testing.T) {
 		memoStatement(2, &FinishMemoize{ManualMemoId: 1, Value: Place{Identifier: 1}}),
 	}}
 	if findings := ValidatePreservedManualMemoization(tree, &Function{}, scopes); len(findings) != 0 {
-		t.Errorf("got %d findings; the value's scope was absorbed by a surviving scope, so its "+
+		test.Errorf("got %d findings; the value's scope was absorbed by a surviving scope, so its "+
 			"memoization was preserved under the survivor's identity", len(findings))
 	}
 
@@ -132,7 +132,7 @@ func TestValidatePreservedManualMemoizationAcceptsAMergedScope(t *testing.T) {
 		memoStatement(2, &FinishMemoize{ManualMemoId: 1, Value: Place{Identifier: 1}}),
 	}}
 	if findings := ValidatePreservedManualMemoization(unmerged, &Function{}, scopes); len(findings) != 1 {
-		t.Fatalf("the control returned %d findings, want 1; the case above is not testing the "+
+		test.Fatalf("the control returned %d findings, want 1; the case above is not testing the "+
 			"merged-scope acceptance", len(findings))
 	}
 }
@@ -143,8 +143,8 @@ func TestValidatePreservedManualMemoizationAcceptsAMergedScope(t *testing.T) {
 // form a simple stack in instruction order. Pairing by proximity lets an inner finish close an outer
 // block, and the outer block's own finish is then dropped as unopened -- so its value is never
 // checked and a real lost memoization goes unreported.
-func TestValidatePreservedManualMemoizationPairsMarkersById(t *testing.T) {
-	t.Parallel()
+func TestValidatePreservedManualMemoizationPairsMarkersById(test *testing.T) {
+	test.Parallel()
 
 	scopes := &ReactiveScopes{byIdentifier: map[static_single_assignment.IdentifierId]ScopeId{
 		1: 7, // outer value, scope did not survive
@@ -161,7 +161,7 @@ func TestValidatePreservedManualMemoizationPairsMarkersById(t *testing.T) {
 
 	findings := ValidatePreservedManualMemoization(tree, &Function{}, scopes)
 	if len(findings) != 2 {
-		t.Errorf("got %d findings, want 2; a boolean open-block flag lets the inner finish close "+
+		test.Errorf("got %d findings, want 2; a boolean open-block flag lets the inner finish close "+
 			"the outer block, so the outer value is never checked", len(findings))
 	}
 }
@@ -171,8 +171,8 @@ func TestValidatePreservedManualMemoizationPairsMarkersById(t *testing.T) {
 // A pruned memo block was deliberately discarded, so there is nothing to preserve. A finish with no
 // matching start belongs to a block whose dependencies were invalid, which upstream records no state
 // for -- validating it would report against a block that was never opened.
-func TestValidatePreservedManualMemoizationSkipsPrunedAndUnopened(t *testing.T) {
-	t.Parallel()
+func TestValidatePreservedManualMemoizationSkipsPrunedAndUnopened(test *testing.T) {
+	test.Parallel()
 
 	scopes := &ReactiveScopes{byIdentifier: map[static_single_assignment.IdentifierId]ScopeId{1: 7}}
 
@@ -181,14 +181,14 @@ func TestValidatePreservedManualMemoizationSkipsPrunedAndUnopened(t *testing.T) 
 		memoStatement(2, &FinishMemoize{ManualMemoId: 1, Value: Place{Identifier: 1}, Pruned: true}),
 	}}
 	if findings := ValidatePreservedManualMemoization(pruned, &Function{}, scopes); len(findings) != 0 {
-		t.Errorf("got %d findings on a pruned memo block, want 0", len(findings))
+		test.Errorf("got %d findings on a pruned memo block, want 0", len(findings))
 	}
 
 	unopened := &ReactiveFunction{Body: ReactiveBlock{
 		memoStatement(1, &FinishMemoize{ManualMemoId: 1, Value: Place{Identifier: 1}}),
 	}}
 	if findings := ValidatePreservedManualMemoization(unopened, &Function{}, scopes); len(findings) != 0 {
-		t.Errorf("got %d findings on a finish with no start, want 0", len(findings))
+		test.Errorf("got %d findings on a finish with no start, want 0", len(findings))
 	}
 }
 
@@ -197,8 +197,8 @@ func TestValidatePreservedManualMemoizationSkipsPrunedAndUnopened(t *testing.T) 
 // An identifier with no scope is upstream's proxy for a primitive, a global, or another guaranteed
 // non-allocating value. Those need no memoization, so a rule reporting them would fire on every
 // `useMemo` returning a number.
-func TestValidatePreservedManualMemoizationIgnoresUnscopedValues(t *testing.T) {
-	t.Parallel()
+func TestValidatePreservedManualMemoizationIgnoresUnscopedValues(test *testing.T) {
+	test.Parallel()
 
 	// No entry for identifier 1, so ScopeOf answers zero.
 	scopes := &ReactiveScopes{byIdentifier: map[static_single_assignment.IdentifierId]ScopeId{}}
@@ -208,15 +208,15 @@ func TestValidatePreservedManualMemoizationIgnoresUnscopedValues(t *testing.T) {
 		memoStatement(2, &FinishMemoize{ManualMemoId: 1, Value: Place{Identifier: 1}}),
 	}}
 	if findings := ValidatePreservedManualMemoization(tree, &Function{}, scopes); len(findings) != 0 {
-		t.Errorf("got %d findings for an unscoped value; no scope is the proxy for a "+
+		test.Errorf("got %d findings for an unscoped value; no scope is the proxy for a "+
 			"non-allocating value, which needs no memoization", len(findings))
 	}
 
 	if findings := ValidatePreservedManualMemoization(tree, &Function{}, nil); len(findings) != 0 {
-		t.Errorf("got %d findings with no scope table at all, want 0", len(findings))
+		test.Errorf("got %d findings with no scope table at all, want 0", len(findings))
 	}
 	if findings := ValidatePreservedManualMemoization(nil, &Function{}, scopes); findings != nil {
-		t.Error("a nil tree produced findings")
+		test.Error("a nil tree produced findings")
 	}
 }
 
@@ -233,9 +233,9 @@ func memoStatement(order static_single_assignment.EvaluationOrder, value Instruc
 //
 // The comparison and its normalization are exercised here rather than left dark, because a pass with
 // no caller and no test is the shape this package keeps finding declared and never constructed. What
-// is asserted is the state of the INPUT, since that is what the decision rests on.
-func TestInferredDependencyComparisonIsBuiltAndGatedOnTruncation(t *testing.T) {
-	t.Parallel()
+// is asserted is the state of the input, since that is what the decision rests on.
+func TestInferredDependencyComparisonIsBuiltAndGatedOnTruncation(test *testing.T) {
+	test.Parallel()
 
 	const source = `
 		import {useMemo} from 'react';
@@ -246,9 +246,9 @@ func TestInferredDependencyComparisonIsBuiltAndGatedOnTruncation(t *testing.T) {
 		}
 	`
 
-	withPath, withoutPath, comparisons := inferredDependencyShapes(t, source)
+	withPath, withoutPath, comparisons := inferredDependencyShapes(test, source)
 	if withPath+withoutPath == 0 {
-		t.Fatal("no scope dependency was collected, so this test asserts nothing about path depth; " +
+		test.Fatal("no scope dependency was collected, so this test asserts nothing about path depth; " +
 			"the fixture stopped exercising the collector rather than the collector being correct")
 	}
 
@@ -268,7 +268,7 @@ func TestInferredDependencyComparisonIsBuiltAndGatedOnTruncation(t *testing.T) {
 	// The floor is what the assertion became. A drop back to zero would mean truncation returned,
 	// which is the state this test was built to make visible.
 	if withPath == 0 {
-		t.Error("no inferred dependency carries a path on a fixture that writes `propA.x` and " +
+		test.Error("no inferred dependency carries a path on a fixture that writes `propA.x` and " +
 			"`propB.x.y`; path depth was recovered here and losing it again is the regression " +
 			"this test exists to catch")
 	}
@@ -276,32 +276,32 @@ func TestInferredDependencyComparisonIsBuiltAndGatedOnTruncation(t *testing.T) {
 	// The comparison runs and disagrees, which is the correct answer for a truncated input and is
 	// what makes turning it on a regression rather than a fix.
 	if comparisons == 0 {
-		t.Error("the comparison was never reached, so its wiring is dead rather than gated")
+		test.Error("the comparison was never reached, so its wiring is dead rather than gated")
 	}
-	t.Logf("inferred dependencies: %d with a path, %d truncated; %d comparisons made",
+	test.Logf("inferred dependencies: %d with a path, %d truncated; %d comparisons made",
 		withPath, withoutPath, comparisons)
 }
 
 // inferredDependencyShapes reports the path depth of every inferred dependency, and how many
 // comparisons against a written dependency the validator would make.
-func inferredDependencyShapes(t *testing.T, source string) (withPath, withoutPath, comparisons int) {
-	t.Helper()
-	probe := rule.Rule{
+func inferredDependencyShapes(test *testing.T, source string) (withPath, withoutPath, comparisons int) {
+	test.Helper()
+	probe := rule.Rule[rule.NoOptions]{
 		Name:             "inferred-dependency-shapes",
 		NeedsTypeChecker: true,
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
-					if ctx.TypeChecker == nil {
+					if ruleContext.TypeChecker == nil {
 						return
 					}
 					forEachFunctionLike(node, func(functionNode *ast.Node) {
-						function := Lower(functionNode, ctx.TypeChecker)
+						function := Lower(functionNode, ruleContext.TypeChecker)
 						if function == nil {
 							return
 						}
 						Construct(function)
-						InferReactive(function, ctx.TypeChecker)
+						InferReactive(function, ruleContext.TypeChecker)
 						DropManualMemoization(function)
 						ranges := InferMutableRanges(function)
 						disjoint := FindDisjointMutableValuesWithRanges(function, ranges)
@@ -345,7 +345,7 @@ func inferredDependencyShapes(t *testing.T, source string) (withPath, withoutPat
 			}
 		},
 	}
-	rule_testing.RunTypedFiles(t, probe, map[string]string{
+	rule_testing.RunTypedFiles(test, probe, map[string]string{
 		"/react.d.ts":  reactiveDeclarations,
 		"/fixture.tsx": source,
 	}, "/fixture.tsx")

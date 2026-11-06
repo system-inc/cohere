@@ -20,13 +20,13 @@ type CompilerRuleOptions struct{}
 //
 // An empty object is accepted and honoured, since it sets nothing. An object with keys is refused,
 // naming them: it is compiler configuration, and accepting it would be an option read and ignored.
-func DecodeCompilerRuleOptions(raw []byte) (any, error) {
+func DecodeCompilerRuleOptions(raw []byte) (CompilerRuleOptions, error) {
 	options := CompilerRuleOptions{}
 	if len(raw) == 0 {
 		return options, nil
 	}
 	var object map[string]json.RawMessage
-	if err := json.Unmarshal(raw, &object); err != nil || object == nil {
+	if decodeError := json.Unmarshal(raw, &object); decodeError != nil || object == nil {
 		return options, fmt.Errorf("expected an options object, got %s", raw)
 	}
 	if len(object) == 0 {

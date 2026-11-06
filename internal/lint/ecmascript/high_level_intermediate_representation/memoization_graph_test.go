@@ -11,8 +11,8 @@ import (
 // Upstream's own example: `a` is independently memoizable but does not escape, so a naive pass drops
 // it -- and dropping it breaks the caching of `b`, which does escape, because `a` is one of its
 // inputs. The four-level lattice exists for exactly this.
-func TestComputeMemoizedWalksFromEscapingRoots(t *testing.T) {
-	t.Parallel()
+func TestComputeMemoizedWalksFromEscapingRoots(test *testing.T) {
+	test.Parallel()
 
 	graph := NewMemoizationGraph()
 
@@ -25,14 +25,14 @@ func TestComputeMemoizedWalksFromEscapingRoots(t *testing.T) {
 	memoized := graph.ComputeMemoized()
 
 	if !memoized[3] {
-		t.Error("the returned value was not memoized; it is the escaping root")
+		test.Error("the returned value was not memoized; it is the escaping root")
 	}
 	if !memoized[2] {
-		t.Error("a value the escaping root depends on was not memoized; that is the whole " +
+		test.Error("a value the escaping root depends on was not memoized; that is the whole " +
 			"propagation this pass performs")
 	}
 	if memoized[1] {
-		t.Error("a value nothing reachable from a root depends on was memoized; the pass exists " +
+		test.Error("a value nothing reachable from a root depends on was memoized; the pass exists " +
 			"to prune those")
 	}
 }
@@ -42,8 +42,8 @@ func TestComputeMemoizedWalksFromEscapingRoots(t *testing.T) {
 // Values whose mutations interleave share one scope. If any output of that scope is memoized, every
 // dependency of the scope must be too -- otherwise the scope invalidates more often than necessary
 // and breaks the memoization downstream of it. Upstream's second worked example.
-func TestComputeMemoizedForcesScopeDependencies(t *testing.T) {
-	t.Parallel()
+func TestComputeMemoizedForcesScopeDependencies(test *testing.T) {
+	test.Parallel()
 
 	graph := NewMemoizationGraph()
 
@@ -56,21 +56,21 @@ func TestComputeMemoizedForcesScopeDependencies(t *testing.T) {
 	memoized := graph.ComputeMemoized()
 
 	if !memoized[2] {
-		t.Fatal("the escaping value was not memoized, so the forcing below cannot be tested")
+		test.Fatal("the escaping value was not memoized, so the forcing below cannot be tested")
 	}
 	if !memoized[10] {
-		t.Error("a scope dependency was not forced; a memoized output means every dependency of " +
+		test.Error("a scope dependency was not forced; a memoized output means every dependency of " +
 			"its scope must be held or the scope invalidates more often than necessary")
 	}
 
-	// The control: the same dependency with no scope association must NOT be memoized, or the case
+	// The control: the same dependency with no scope association must not be memoized, or the case
 	// above passes because Conditional values are held unconditionally.
 	control := NewMemoizationGraph()
 	control.Record(2, MemoizationMemoized, nil)
 	control.Record(10, MemoizationConditional, nil)
 	control.MarkEscaping(2)
 	if control.ComputeMemoized()[10] {
-		t.Fatal("an unassociated Conditional value was memoized anyway, so the case above is not " +
+		test.Fatal("an unassociated Conditional value was memoized anyway, so the case above is not " +
 			"testing scope forcing")
 	}
 }
@@ -79,8 +79,8 @@ func TestComputeMemoizedForcesScopeDependencies(t *testing.T) {
 //
 // One escaping root depending on one value, varying only that value's level. A two-state model
 // cannot produce these four answers.
-func TestComputeMemoizedRespectsTheLevels(t *testing.T) {
-	t.Parallel()
+func TestComputeMemoizedRespectsTheLevels(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name  string
@@ -92,20 +92,20 @@ func TestComputeMemoizedRespectsTheLevels(t *testing.T) {
 		{name: "unmemoized is held only under forcing", level: MemoizationUnmemoized, want: false},
 		{name: "never is not held", level: MemoizationNever, want: false},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			graph := NewMemoizationGraph()
 			graph.Record(1, MemoizationMemoized, []static_single_assignment.DeclarationId{2})
 			graph.Record(2, testCase.level, nil)
 			graph.MarkEscaping(1)
 
 			if got := graph.ComputeMemoized()[2]; got != testCase.want {
-				t.Errorf("level %s: memoized=%t, want %t", testCase.level, got, testCase.want)
+				test.Errorf("level %s: memoized=%t, want %t", testCase.level, got, testCase.want)
 			}
 		})
 	}
 
-	// Conditional WITH a memoized dependency is the arm the table above cannot show, since it
+	// Conditional with a memoized dependency is the arm the table above cannot show, since it
 	// varies the leaf rather than the middle.
 	graph := NewMemoizationGraph()
 	graph.Record(1, MemoizationConditional, []static_single_assignment.DeclarationId{2})
@@ -113,11 +113,11 @@ func TestComputeMemoizedRespectsTheLevels(t *testing.T) {
 	graph.MarkEscaping(1)
 	memoized := graph.ComputeMemoized()
 	if !memoized[1] {
-		t.Error("a Conditional root with a memoized dependency was not held; that is what " +
+		test.Error("a Conditional root with a memoized dependency was not held; that is what " +
 			"Conditional means")
 	}
 	if !memoized[2] {
-		t.Error("its memoized dependency was not held")
+		test.Error("its memoized dependency was not held")
 	}
 }
 
@@ -126,8 +126,8 @@ func TestComputeMemoizedRespectsTheLevels(t *testing.T) {
 // A depth-first walk over a graph with a cycle recurses forever without it. The guard answers false
 // for a node already on the stack, which is a temporary lie corrected on the way back up -- so the
 // test asserts both that it terminates and that the answer is still right.
-func TestComputeMemoizedTerminatesOnCycles(t *testing.T) {
-	t.Parallel()
+func TestComputeMemoizedTerminatesOnCycles(test *testing.T) {
+	test.Parallel()
 
 	graph := NewMemoizationGraph()
 	// 1 -> 2 -> 3 -> 1, with 1 escaping and 3 memoized.
@@ -139,10 +139,10 @@ func TestComputeMemoizedTerminatesOnCycles(t *testing.T) {
 	memoized := graph.ComputeMemoized()
 
 	if !memoized[3] {
-		t.Error("the Memoized node in the cycle was not held; its level does not depend on the walk")
+		test.Error("the Memoized node in the cycle was not held; its level does not depend on the walk")
 	}
 	if !memoized[2] {
-		t.Error("a Conditional node with a memoized dependency in a cycle was not held")
+		test.Error("a Conditional node with a memoized dependency in a cycle was not held")
 	}
 }
 
@@ -151,8 +151,8 @@ func TestComputeMemoizedTerminatesOnCycles(t *testing.T) {
 // `seen` and `memoized` live on the nodes, so a second walk over the same graph would answer from
 // the first walk's leftovers if they were not cleared. That would make the pass order-dependent in a
 // way no single-run test can see.
-func TestComputeMemoizedIsRepeatable(t *testing.T) {
-	t.Parallel()
+func TestComputeMemoizedIsRepeatable(test *testing.T) {
+	test.Parallel()
 
 	graph := NewMemoizationGraph()
 	graph.Record(1, MemoizationMemoized, []static_single_assignment.DeclarationId{2})
@@ -163,15 +163,15 @@ func TestComputeMemoizedIsRepeatable(t *testing.T) {
 	second := graph.ComputeMemoized()
 
 	if len(first) == 0 {
-		t.Fatal("the first walk memoized nothing, so comparing the two proves nothing")
+		test.Fatal("the first walk memoized nothing, so comparing the two proves nothing")
 	}
 	if len(first) != len(second) {
-		t.Errorf("the first walk memoized %d and the second %d; traversal state is not being reset",
+		test.Errorf("the first walk memoized %d and the second %d; traversal state is not being reset",
 			len(first), len(second))
 	}
 	for declaration := range first {
 		if !second[declaration] {
-			t.Errorf("declaration %d was memoized on the first walk and not the second", declaration)
+			test.Errorf("declaration %d was memoized on the first walk and not the second", declaration)
 		}
 	}
 }
@@ -181,8 +181,8 @@ func TestComputeMemoizedIsRepeatable(t *testing.T) {
 // Upstream raises an invariant for a declaration with no node. A linter cannot, and answering true
 // would hold a value nothing recorded anything about. False costs granularity; true would be a
 // claim the graph does not support.
-func TestComputeMemoizedHandlesUnknownDeclarations(t *testing.T) {
-	t.Parallel()
+func TestComputeMemoizedHandlesUnknownDeclarations(test *testing.T) {
+	test.Parallel()
 
 	graph := NewMemoizationGraph()
 	graph.Record(1, MemoizationConditional, []static_single_assignment.DeclarationId{99})
@@ -190,15 +190,15 @@ func TestComputeMemoizedHandlesUnknownDeclarations(t *testing.T) {
 
 	memoized := graph.ComputeMemoized()
 	if memoized[99] {
-		t.Error("an unrecorded declaration was memoized")
+		test.Error("an unrecorded declaration was memoized")
 	}
 	if memoized[1] {
-		t.Error("a Conditional value was held on the strength of an unrecorded dependency")
+		test.Error("a Conditional value was held on the strength of an unrecorded dependency")
 	}
 
 	var nilGraph *MemoizationGraph
 	if len(nilGraph.ComputeMemoized()) != 0 {
-		t.Error("a nil graph memoized something")
+		test.Error("a nil graph memoized something")
 	}
 }
 
@@ -211,11 +211,11 @@ func TestComputeMemoizedHandlesUnknownDeclarations(t *testing.T) {
 // Every other test in this file records each declaration exactly once, where join and assign are
 // the same function. A mutation replacing the join with an assignment survived all of them.
 //
-// Order matters to the assertion: assigning is only visibly wrong when the WEAKER level is recorded
+// Order matters to the assertion: assigning is only visibly wrong when the weaker level is recorded
 // second, because assigning a stronger level over a weaker one happens to agree with joining. So
 // both orders are checked and the answer must be the same.
-func TestRecordJoinsRatherThanAssigns(t *testing.T) {
-	t.Parallel()
+func TestRecordJoinsRatherThanAssigns(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name   string
@@ -234,8 +234,8 @@ func TestRecordJoinsRatherThanAssigns(t *testing.T) {
 			levels: []MemoizationLevel{MemoizationConditional, MemoizationNever},
 		},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			graph := NewMemoizationGraph()
 			graph.Record(1, MemoizationConditional, []static_single_assignment.DeclarationId{2})
 			for _, level := range testCase.levels {
@@ -252,7 +252,7 @@ func TestRecordJoinsRatherThanAssigns(t *testing.T) {
 			}
 			memoized := graph.ComputeMemoized()
 			if got := memoized[2]; got != (want == MemoizationMemoized) {
-				t.Errorf("recording levels %v left memoized=%t; the joined level is %s, so the "+
+				test.Errorf("recording levels %v left memoized=%t; the joined level is %s, so the "+
 					"level is being assigned rather than joined", testCase.levels, got, want)
 			}
 		})

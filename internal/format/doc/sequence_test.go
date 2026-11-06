@@ -1,6 +1,7 @@
 package doc
 
 import (
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -15,8 +16,8 @@ import (
 // TestASequenceIsTheConcatOfItsParts builds each random spec twice, once with every array a Concat and once
 // with every array a *Sequence, and asks every walk the same question of both: printing, cleaning, mapping,
 // stripping and the break predicates must not be able to tell them apart (#fyw36kf).
-func TestASequenceIsTheConcatOfItsParts(t *testing.T) {
-	t.Parallel()
+func TestASequenceIsTheConcatOfItsParts(test *testing.T) {
+	test.Parallel()
 	random := rand.New(rand.NewSource(20261005))
 	withArrays := 0
 	for index := range 3000 {
@@ -26,7 +27,7 @@ func TestASequenceIsTheConcatOfItsParts(t *testing.T) {
 		concats := func() Doc { return buildSpecAs(spec, false) }
 		sequences := func() Doc { return buildSpecAs(spec, true) }
 		if showDoc(concats()) != showDoc(sequences()) {
-			t.Fatalf("case %d: the two builds show differently", index)
+			test.Fatalf("case %d: the two builds show differently", index)
 		}
 		if holdsConcat(spec) {
 			withArrays++
@@ -38,7 +39,7 @@ func TestASequenceIsTheConcatOfItsParts(t *testing.T) {
 		}{
 			{"Print", func(document Doc) string { return Print(document, options) }},
 			{"CleanDoc", func(document Doc) string { return showDoc(CleanDoc(document)) }},
-			{"MapDoc", func(document Doc) string { return showDoc(MapDoc(document, cleanDocFn)) }},
+			{"MapDoc", func(document Doc) string { return showDoc(MapDoc(document, cleanDoc)) }},
 			{"StripTrailingHardline", func(document Doc) string { return showDoc(StripTrailingHardline(document)) }},
 			{"RemoveLines", func(document Doc) string { return showDoc(RemoveLines(document)) }},
 			{"WillBreak", func(document Doc) string { return boolText(WillBreak(document)) }},
@@ -47,13 +48,19 @@ func TestASequenceIsTheConcatOfItsParts(t *testing.T) {
 		}
 		for _, question := range questions {
 			if got, want := question.ask(sequences()), question.ask(concats()); got != want {
-				t.Fatalf("case %d: %s of the sequences is\n%s\nand of the concats\n%s", index, question.name, got, want)
+				test.Fatalf(
+					"case %d: %s of the sequences is\n%s\nand of the concats\n%s",
+					index,
+					question.name,
+					got,
+					want,
+				)
 			}
 		}
 	}
 	// The comparison can only fail if the specs hold arrays to build as sequences.
 	if withArrays < 1000 {
-		t.Fatalf("only %d of 3000 specs held an array", withArrays)
+		test.Fatalf("only %d of 3000 specs held an array", withArrays)
 	}
 }
 
@@ -82,8 +89,8 @@ func boolText(value bool) string {
 // assertion or type switch case naming Concat or Sequence anywhere but Parts. A walk that asks for one and
 // not the other would treat a *Sequence as some other doc on exactly the path the corpus may not reach,
 // so every walk asks Parts, which knows both.
-func TestOnlyPartsAsksWhetherADocIsAnArray(t *testing.T) {
-	t.Parallel()
+func TestOnlyPartsAsksWhetherADocIsAnArray(test *testing.T) {
+	test.Parallel()
 
 	planted := `package javascript
 
@@ -94,42 +101,42 @@ func f(d doc.Doc) {
 	}
 }
 `
-	if found := arrayTypeChecks(t, "planted.go", planted); len(found) != 2 {
-		t.Fatalf("the check found %d of the 2 planted checks: %v", len(found), found)
+	if found := arrayTypeChecks(test, "planted.go", planted); len(found) != 2 {
+		test.Fatalf("the check found %d of the 2 planted checks: %v", len(found), found)
 	}
 
 	// The test runs in internal/format/doc, so its parent is internal/format.
 	var found []string
-	err := filepath.WalkDir("..", func(path string, entry fs.DirEntry, err error) error {
-		if err != nil {
-			return err
+	walkError := filepath.WalkDir("..", func(path string, entry fs.DirEntry, pathError error) error {
+		if pathError != nil {
+			return pathError
 		}
 		if entry.IsDir() || !strings.HasSuffix(path, ".go") {
 			return nil
 		}
-		source, err := os.ReadFile(path)
-		if err != nil {
-			return err
+		source, readError := os.ReadFile(path)
+		if readError != nil {
+			return readError
 		}
-		found = append(found, arrayTypeChecks(t, path, string(source))...)
+		found = append(found, arrayTypeChecks(test, path, string(source))...)
 		return nil
 	})
-	if err != nil {
-		t.Fatal(err)
+	if walkError != nil {
+		test.Fatal(walkError)
 	}
 	if len(found) > 0 {
-		t.Fatalf("ask doc.Parts instead of naming Concat or Sequence:\n%s", strings.Join(found, "\n"))
+		test.Fatalf("ask doc.Parts instead of naming Concat or Sequence:\n%s", strings.Join(found, "\n"))
 	}
 }
 
 // arrayTypeChecks is the positions in source where a type assertion or type switch case names Concat or
 // Sequence, outside the function Parts.
-func arrayTypeChecks(t *testing.T, path string, source string) []string {
-	t.Helper()
+func arrayTypeChecks(test *testing.T, path string, source string) []string {
+	test.Helper()
 	files := token.NewFileSet()
-	file, err := parser.ParseFile(files, path, source, 0)
-	if err != nil {
-		t.Fatalf("%s: %v", path, err)
+	file, parseFileError := parser.ParseFile(files, path, source, 0)
+	if parseFileError != nil {
+		test.Fatalf("%s: %v", path, parseFileError)
 	}
 	var found []string
 	report := func(expression ast.Expr) {
@@ -138,7 +145,10 @@ func arrayTypeChecks(t *testing.T, path string, source string) []string {
 		}
 	}
 	for _, declaration := range file.Decls {
-		if function, isFunction := declaration.(*ast.FuncDecl); isFunction && function.Recv == nil && function.Name.Name == "Parts" && file.Name.Name == "doc" {
+		if function, isFunction := declaration.(*ast.FuncDecl); isFunction &&
+			function.Recv == nil &&
+			function.Name.Name == "Parts" &&
+			file.Name.Name == "doc" {
 			continue
 		}
 		ast.Inspect(declaration, func(node ast.Node) bool {
@@ -149,7 +159,12 @@ func arrayTypeChecks(t *testing.T, path string, source string) []string {
 				}
 			case *ast.TypeSwitchStmt:
 				for _, statement := range typed.Body.List {
-					for _, listed := range statement.(*ast.CaseClause).List {
+					clause, isClause := statement.(*ast.CaseClause)
+					if !isClause {
+						// Invariant: go/ast gives a type switch's body only case clauses, one per case.
+						panic(fmt.Sprintf("%s: a type switch body holds a %T", path, statement))
+					}
+					for _, listed := range clause.List {
 						report(listed)
 					}
 				}
@@ -162,11 +177,12 @@ func arrayTypeChecks(t *testing.T, path string, source string) []string {
 
 // namesArrayType is whether expression is Concat or Sequence, bare or as doc.Concat, behind a pointer or not.
 func namesArrayType(expression ast.Expr) bool {
+	peeledExpression := expression
 	if star, isStar := expression.(*ast.StarExpr); isStar {
-		expression = star.X
+		peeledExpression = star.X
 	}
 	var name string
-	switch typed := expression.(type) {
+	switch typed := peeledExpression.(type) {
 	case *ast.Ident:
 		name = typed.Name
 	case *ast.SelectorExpr:

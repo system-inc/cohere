@@ -10,5 +10,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // No decoder: the rule takes no options. Each of its four checks reports only what the default
 // library's types decide, so there is nothing for a configuration to widen or narrow.
 func init() {
-	rule.Register(rule.Registration{Rule: CorrectnessNoCollectionMisuse})
+	rule.Register(rule.Registration[rule.NoOptions]{Rule: CorrectnessNoCollectionMisuse})
 }

@@ -14,7 +14,7 @@
 // `Identifier.Node` carries the real TypeScript node -- when measured, 60,819 of 61,738 corpus
 // identifiers had one, 98.5% -- and cohere runs the checker in the same process. So the question goes to
 // `GetTypeAtLocation` and comes back with the answer the compiler actually computed, through
-// imports and generics, which no amount of local inference recovers. `reactive.go` established this
+// imports and generics, which no amount of local inference recovers. `reactivity.go` established this
 // pattern; this is its second consumer.
 //
 // # What the checker reports, measured before this was written
@@ -26,7 +26,7 @@
 //	const str = "s"       flags=StringLiteral                         callSignatures=0
 //
 // The four invalidating shapes are separable and the primitives are separable from all of them,
-// which is the whole requirement. The two internal symbol names are deliberately NOT matched on:
+// which is the whole requirement. The two internal symbol names are deliberately not matched on:
 // `\xfeobject` and `\xfefunction` are the checker's own anonymous-type placeholders and are not a
 // documented surface. Object-ness is read from the type flag and function-ness from the presence of
 // a call signature, both of which are stable API.
@@ -59,8 +59,8 @@ func IsAlwaysInvalidatingType(function *Function, id static_single_assignment.Id
 	if identifier == nil || identifier.Node == nil {
 		// Not defensive: `GetTypeAtLocation` dereferences the node and segfaults on nil. Measured
 		// by deleting this guard, which crashes the corpus test rather than returning a wrong
-		// answer. When measured, 645 of 40,241 corpus identifiers had no node -- the values `high_level_intermediate_representation.go`
-		// documents as having no direct syntactic source.
+		// answer. When measured, 645 of 40,241 corpus identifiers had no node -- the values
+		// `high_level_intermediate_representation.go` documents as having no direct syntactic source.
 		return false
 	}
 	valueType := typeChecker.GetTypeAtLocation(identifier.Node)
@@ -71,7 +71,7 @@ func IsAlwaysInvalidatingType(function *Function, id static_single_assignment.Id
 	// # One flag answers all four shapes, and the function arm upstream needs is redundant here
 	//
 	// Upstream tests `type.kind === 'Function'` separately from its four object shapes, because its
-	// registry models functions as their own kind. In TypeScript's type system a function IS an
+	// registry models functions as their own kind. In TypeScript's type system a function is an
 	// object type: measured across an arrow, a function declaration, a type-alias callback, a
 	// callable interface and an overloaded signature, every one reports the Object flag set, with
 	// call signature counts of 1, 1, 1, 1 and 2. A separate call-signature arm was written first

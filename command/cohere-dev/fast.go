@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/system-inc/cohere/internal/corpus"
+	"github.com/system-inc/cohere/internal/streams"
 )
 
 // The fast tier is the edit loop (#nxgt2ca, ruled by @system_cohere on Kirk's two-tier call):
@@ -27,7 +28,7 @@ import (
 // alone runs can skip itself. The corpus walks in high_level_intermediate_representation read it.
 const fastTierVariable = "COHERE_FAST_TIER"
 
-// fastBudgetCPUSeconds is what a package, or part of one, must cost in CPU, user plus system, measured alone
+// fastBudgetCpuSeconds is what a package, or part of one, must cost in CPU, user plus system, measured alone
 // with -count=1 and its test binary already built, to join landingGateOnly. Anything at or under it stays
 // in the edit loop. TestEveryLandingGateOnlyEntryStillEarnsItsPlace holds every entry's recorded cost above
 // it.
@@ -41,15 +42,15 @@ const fastTierVariable = "COHERE_FAST_TIER"
 // command/cohere read 926 to 933s of CPU at load 105 to 166 against 49.4s at load about 10, and
 // crosscompile 36 to 41s against 26. Every change load made was upward, so a reading at low load is the
 // low one.
-const fastBudgetCPUSeconds = 15
+const fastBudgetCpuSeconds = 15
 
-// fastEvictionCPUSeconds is what an entry, measured again now, must fall to before
+// fastEvictionCpuSeconds is what an entry, measured again now, must fall to before
 // TestEveryLandingGateOnlyEntryStillEarnsItsPlace sends it back to the edit loop: a third under the budget
 // to join, because a live measurement scatters and one threshold judged both ways flips on the scatter.
 // hir's corpus walks, a difference of two runs, read 14.9s in one of build's land runs, 18.5s at load 10
 // and 24.8s at load 13 to 50, all on 2026-10-05, and failed build's land at 14.9 against a single bar of
 // 15. Under 10 is a change in what the tests do, not in who else is running.
-const fastEvictionCPUSeconds = 10
+const fastEvictionCpuSeconds = 10
 
 // landingGateEntry is one thing the fast tier leaves to the full gate.
 type landingGateEntry struct {
@@ -103,18 +104,24 @@ var landingGateOnly = []landingGateEntry{
 
 // fastTest runs the fast tier in the environment given and returns go test's exit code.
 func fastTest(base []string, arguments []string) int {
-	fmt.Fprintf(os.Stderr, "cohere-dev: fast tier, at load %s\n", machineLoad())
+	fmt.Fprintf(streams.Errors, "cohere-dev: fast tier, at load %s\n", machineLoad())
+	// Listing the module's packages takes a moment, and a person watches for the run to begin.
+	streams.Show(streams.Errors)
 
-	packages, err := modulePackages(base)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "cohere-dev: %v\n", err)
+	packages, modulePackagesError := modulePackages(base)
+	if modulePackagesError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", modulePackagesError)
 		return 1
 	}
 	skippedPackages := map[string]bool{}
 	for _, entry := range landingGateOnly {
 		if !packages[entry.pattern] {
-			fmt.Fprintf(os.Stderr, "cohere-dev: the fast tier's landing-gate list names %s, which is not a package of this "+
-				"module; fix landingGateOnly in command/cohere-dev/fast.go\n", entry.pattern)
+			fmt.Fprintf(
+				streams.Errors,
+				"cohere-dev: the fast tier's landing-gate list names %s, which is not a package of this "+
+					"module; fix landingGateOnly in command/cohere-dev/fast.go\n",
+				entry.pattern,
+			)
 			return 2
 		}
 		if entry.skippedBy == "" {
@@ -130,34 +137,40 @@ func fastTest(base []string, arguments []string) int {
 	}
 	sort.Strings(selected)
 
-	environment, uncovered, err := testEnvironment(base)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "cohere-dev: %v\n", err)
+	environment, uncovered, testEnvironmentError := testEnvironment(base)
+	if testEnvironmentError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", testEnvironmentError)
 		return 2
 	}
 	command := exec.Command("go", append(append([]string{"test"}, arguments...), selected...)...)
 	command.Env = append(environment, fastTierVariable+"=1")
 	command.Stdin, command.Stdout, command.Stderr = os.Stdin, os.Stdout, os.Stderr
+	// go test writes to the terminal itself, so what this run said first is delivered first.
+	streams.Show(streams.Output)
+	streams.Show(streams.Errors)
 	code := 0
-	if err := command.Run(); err != nil {
-		exited, ok := err.(*exec.ExitError)
+	if runError := command.Run(); runError != nil {
+		exited, ok := runError.(*exec.ExitError)
 		if !ok {
-			fmt.Fprintf(os.Stderr, "cohere-dev: running go test: %v\n", err)
+			fmt.Fprintf(streams.Errors, "cohere-dev: running go test: %v\n", runError)
 			return 1
 		}
 		code = exited.ExitCode()
 	}
 
-	fmt.Fprintln(os.Stderr, "cohere-dev: the fast tier left these to the landing gate:")
+	fmt.Fprintln(streams.Errors, "cohere-dev: the fast tier left these to the landing gate:")
 	for _, entry := range landingGateOnly {
 		what := entry.pattern
 		if entry.skippedBy != "" {
 			what += "'s corpus walks"
 		}
-		fmt.Fprintf(os.Stderr, "  %s (%.1fs alone): %s\n", what, entry.wallSeconds, entry.reason)
+		fmt.Fprintf(streams.Errors, "  %s (%.1fs alone): %s\n", what, entry.wallSeconds, entry.reason)
 	}
-	printUncovered(os.Stderr, uncovered)
-	fmt.Fprintln(os.Stderr, "fast tier: not the landing gate. Run cohere-dev test ./... through the lock before landing on main.")
+	printUncovered(streams.Errors, uncovered)
+	fmt.Fprintln(
+		streams.Errors,
+		"fast tier: not the landing gate. Run cohere-dev test ./... through the lock before landing on main.",
+	)
 	return code
 }
 
@@ -177,12 +190,16 @@ func modulePackagesIn(root string, environment []string) (map[string]bool, error
 	command := exec.Command("go", "list", "-f", "{{.ImportPath}} {{.Module.Path}}", "./...")
 	command.Dir = root
 	command.Env = environment
-	output, err := command.Output()
-	if err != nil {
-		if exited, ok := err.(*exec.ExitError); ok && len(exited.Stderr) > 0 {
-			return nil, fmt.Errorf("listing the module's packages: %w\n%s", err, strings.TrimSpace(string(exited.Stderr)))
+	output, outputError := command.Output()
+	if outputError != nil {
+		if exited, ok := outputError.(*exec.ExitError); ok && len(exited.Stderr) > 0 {
+			return nil, fmt.Errorf(
+				"listing the module's packages: %w\n%s",
+				outputError,
+				strings.TrimSpace(string(exited.Stderr)),
+			)
 		}
-		return nil, fmt.Errorf("listing the module's packages: %w", err)
+		return nil, fmt.Errorf("listing the module's packages: %w", outputError)
 	}
 	packages := map[string]bool{}
 	for _, line := range strings.Split(strings.TrimSpace(string(output)), "\n") {
@@ -198,8 +215,8 @@ func modulePackagesIn(root string, environment []string) (map[string]bool, error
 
 // machineLoad is the one-minute load average, or "unknown" where it cannot be read.
 func machineLoad() string {
-	output, err := exec.Command("sysctl", "-n", "vm.loadavg").Output()
-	if err != nil {
+	output, outputError := exec.Command("sysctl", "-n", "vm.loadavg").Output()
+	if outputError != nil {
 		if contents, readError := os.ReadFile("/proc/loadavg"); readError == nil {
 			if fields := strings.Fields(string(contents)); len(fields) > 0 {
 				return fields[0]

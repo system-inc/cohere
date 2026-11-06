@@ -72,9 +72,9 @@ var messageUnusedLabel = rule.Message{
 // pre-order and a source-file listener fires before its children, so a listener collecting labels
 // and a separate one reading them would see an empty list. Gathering and judging therefore happen in
 // the same place, which is what an exit hook would otherwise buy.
-var NoUnusedLabels = rule.Rule{
+var NoUnusedLabels = rule.Rule[rule.NoOptions]{
 	Name: "no-unused-labels",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
 				labeledStatements := []*ast.Node{}
@@ -105,11 +105,11 @@ var NoUnusedLabels = rule.Rule{
 					if statement == nil || statement.Label == nil {
 						continue
 					}
-					if removal, ok := labelRemovalFix(ctx, labeled, statement); ok {
-						ctx.ReportNodeWithFixes(statement.Label, messageUnusedLabel, removal)
+					if removal, ok := labelRemovalFix(ruleContext, labeled, statement); ok {
+						ruleContext.ReportNodeWithFixes(statement.Label, messageUnusedLabel, removal)
 						continue
 					}
-					ctx.ReportNode(statement.Label, messageUnusedLabel)
+					ruleContext.ReportNode(statement.Label, messageUnusedLabel)
 				}
 			},
 		}
@@ -123,6 +123,8 @@ var NoUnusedLabels = rule.Rule{
 // or class boundary, since a jump cannot name a label outside the function holding it: without that
 // stop, the inner `label` in `label: while (true) { (() => { label: while (false) {} })(); }` would
 // mark the outer one and the rule would report one finding where upstream reports two.
+//
+// Mutates: usedLabels the walk records each jump's label in it, so one set gathers every jump in the file
 func markTargetLabelUsed(jump *ast.Node, label *ast.Node, usedLabels map[int]bool) {
 	if label == nil {
 		return
@@ -149,17 +151,17 @@ func markTargetLabelUsed(jump *ast.Node, label *ast.Node, usedLabels map[int]boo
 // the name and the colon while leaving the body untouched. Token starts rather than Pos(), because
 // Pos() sits before leading trivia: for the inner label of `A: B: 'foo'` the raw Pos() covers the
 // space before `B`, and a fix built from it eats whitespace that belongs to nobody.
-func labelRemovalFix(ctx rule.Context, labeled *ast.Node, statement *ast.LabeledStatement) (rule.Fix, bool) {
-	labelStart := scanner.GetTokenPosOfNode(statement.Label, ctx.SourceFile, false)
-	bodyStart := scanner.GetTokenPosOfNode(statement.Statement, ctx.SourceFile, false)
+func labelRemovalFix(ruleContext rule.Context, labeled *ast.Node, statement *ast.LabeledStatement) (rule.Fix, bool) {
+	labelStart := scanner.GetTokenPosOfNode(statement.Label, ruleContext.SourceFile, false)
+	bodyStart := scanner.GetTokenPosOfNode(statement.Statement, ruleContext.SourceFile, false)
 
-	if commentLiesBetween(ctx, labelStart, bodyStart) {
+	if commentLiesBetween(ruleContext, labelStart, bodyStart) {
 		return rule.Fix{}, false
 	}
 	if wouldBecomeADirective(labeled, statement) {
 		return rule.Fix{}, false
 	}
-	if wouldRejoinWithThePreviousLine(ctx, labelStart, bodyStart) {
+	if wouldRejoinWithThePreviousLine(ruleContext, labelStart, bodyStart) {
 		return rule.Fix{}, false
 	}
 
@@ -175,8 +177,8 @@ func labelRemovalFix(ctx rule.Context, labeled *ast.Node, statement *ast.Labeled
 //
 // The comment cache is shared per file, so this costs one scan across every label in a file rather
 // than one per label.
-func commentLiesBetween(ctx rule.Context, start int, end int) bool {
-	for _, comment := range comments.ForFile(ctx) {
+func commentLiesBetween(ruleContext rule.Context, start int, end int) bool {
+	for _, comment := range comments.ForFile(ruleContext) {
 		if comment.Range.Pos() < end && comment.Range.End() > start {
 			return true
 		}
@@ -193,7 +195,8 @@ func commentLiesBetween(ctx rule.Context, start int, end int) bool {
 //
 // That changes which programs are legal rather than only how they read, which is why it disqualifies
 // a fix rather than merely looking untidy. A parenthesized string is not a directive under any
-// circumstances, so `A: ("use strict")` is refused for the ASI reason below rather than this one.
+// circumstances, so `A: ("use strict")` is refused for the automatic semicolon insertion reason below
+// rather than this one.
 func wouldBecomeADirective(labeled *ast.Node, statement *ast.LabeledStatement) bool {
 	// The immediate body, deliberately not the bottom of a label chain.
 	//
@@ -236,7 +239,8 @@ func wouldBecomeADirective(labeled *ast.Node, statement *ast.LabeledStatement) b
 	return ast.IsBlock(parent) && parent.Parent != nil && ast.IsFunctionLikeDeclaration(parent.Parent)
 }
 
-// wouldRejoinWithThePreviousLine says whether removing the label creates an ASI hazard.
+// wouldRejoinWithThePreviousLine says whether removing the label creates an automatic semicolon
+// insertion hazard.
 //
 // `foo()\nLABEL: [1].forEach(x => x)` becomes `foo()\n[1].forEach(x => x)`, which parses as
 // `foo()[1]` rather than as two statements: the label was the only thing keeping them apart. The
@@ -245,8 +249,8 @@ func wouldBecomeADirective(labeled *ast.Node, statement *ast.LabeledStatement) b
 // The test is upstream's and it is deliberately about text rather than about the tree. If the token
 // before the label already terminates a statement then nothing can rejoin, and otherwise a body
 // opening with one of the continuation characters would bind to it.
-func wouldRejoinWithThePreviousLine(ctx rule.Context, labelStart int, bodyStart int) bool {
-	source := ctx.SourceFile.Text()
+func wouldRejoinWithThePreviousLine(ruleContext rule.Context, labelStart int, bodyStart int) bool {
+	source := ruleContext.SourceFile.Text()
 	if bodyStart >= len(source) {
 		return false
 	}

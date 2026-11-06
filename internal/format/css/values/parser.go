@@ -68,8 +68,14 @@ func (parser *parser) sourceIndex(index int) int {
 }
 
 // tokenSource is the { start, end } most node kinds take straight from their token.
-func tokenSource(token *token) map[string]any {
-	return source(position(token.startLine, token.startColumn), position(token.endLine, token.endColumnValue()))
+func tokenSource(token *token) sourceSpan {
+	return sourceSpan{
+		startLine:      token.startLine,
+		startColumn:    token.startColumn,
+		endLine:        token.endLine,
+		endColumn:      token.endColumn,
+		endColumnIsNaN: token.endColumnIsNaN,
+	}
 }
 
 func (parser *parser) colon() {
@@ -108,7 +114,8 @@ func (parser *parser) comment() {
 func commentDelimiters(value string) string {
 	var builder strings.Builder
 	for index := 0; index < len(value); index++ {
-		if index+1 < len(value) && ((value[index] == '/' && value[index+1] == '*') || (value[index] == '*' && value[index+1] == '/')) {
+		if index+1 < len(value) &&
+			((value[index] == '/' && value[index+1] == '*') || (value[index] == '*' && value[index+1] == '/')) {
 			index++
 			continue
 		}
@@ -118,7 +125,12 @@ func commentDelimiters(value string) string {
 }
 
 func (parser *parser) error(message string, token *token) {
-	panic(&Error{Name: "ParserError", Message: message + " at line: " + itoa(token.startLine) + ", column " + itoa(token.startColumn)})
+	// Invariant: this is upstream's throw of a ParserError, which malformed input reaches; Parse
+	// recovers every *Error and returns it as a syntax error, so the panic never leaves the package.
+	panic(&Error{
+		Name:    "ParserError",
+		Message: message + " at line: " + itoa(token.startLine) + ", column " + itoa(token.startColumn),
+	})
 }
 
 func (parser *parser) loop() *estree.Node {
@@ -140,22 +152,23 @@ func (parser *parser) loop() *estree.Node {
 func (parser *parser) operator() {
 	// if a +|- operator is followed by a non-word character (. is allowed) and
 	// is preceded by a non-word character. (5+5)
-	char := decode(parser.currToken().value)
+	character := decode(parser.currToken().value)
 
-	if char == "+" || char == "-" {
+	if character == "+" || character == "-" {
 		// only inspect if the operator is not the first token, and we're only
 		// within a calc() function: the only spec-valid place for math expressions
 		if !parser.options.Loose {
 			if parser.position > 0 {
 				if parser.current.Is("func") && parser.current.String("value") == "calc" {
 					// allow operators to be proceeded by spaces and opening parens
-					if kind(parser.prevToken()) != "space" && kind(parser.prevToken()) != "(" {
+					if kind(parser.previousToken()) != "space" && kind(parser.previousToken()) != "(" {
 						parser.error("Syntax Error", parser.currToken())
 					} else if kind(parser.nextToken()) != "space" && kind(parser.nextToken()) != "word" {
 						// valid: calc(1 - +2)
 						// invalid: calc(1 -+2)
 						parser.error("Syntax Error", parser.currToken())
-					} else if kind(parser.nextToken()) == "word" && property(last(parser.current), "type") != "operator" &&
+					} else if kind(parser.nextToken()) == "word" &&
+						property(last(parser.current), "type") != "operator" &&
 						property(last(parser.current), "value") != "(" {
 						// valid: calc(1 - +2)
 						// valid: calc(-0.5 + 2)
@@ -164,7 +177,7 @@ func (parser *parser) operator() {
 					}
 				} else if kind(parser.nextToken()) == "space" ||
 					kind(parser.nextToken()) == "operator" ||
-					kind(parser.prevToken()) == "operator" {
+					kind(parser.previousToken()) == "operator" {
 					// if we're not in a function and someone has doubled up on operators,
 					// or they're trying to perform a calc outside of a calc
 					// eg. +-4px or 5+ 5, throw an error
@@ -180,7 +193,8 @@ func (parser *parser) operator() {
 			}
 		} else {
 			currentLast := last(parser.current)
-			if (len(parser.current.List("nodes")) == 0 || (currentLast != nil && currentLast.Is("operator"))) && kind(parser.nextToken()) == "word" {
+			if (len(parser.current.List("nodes")) == 0 || (currentLast != nil && currentLast.Is("operator"))) &&
+				kind(parser.nextToken()) == "word" {
 				parser.word()
 				return
 			}
@@ -190,7 +204,17 @@ func (parser *parser) operator() {
 	token := parser.currToken()
 	// Upstream ends the operator where it starts, and takes its sourceIndex from token[4], which is
 	// the end line rather than the index. Prettier reads it as an index, so it converts like one.
-	node := leaf("operator", decode(token.value), source(position(token.startLine, token.startColumn), position(token.startLine, token.startColumn)), parser.sourceIndex(token.endLine))
+	node := leaf(
+		"operator",
+		decode(token.value),
+		sourceSpan{
+			startLine:   token.startLine,
+			startColumn: token.startColumn,
+			endLine:     token.startLine,
+			endColumn:   token.startColumn,
+		},
+		parser.sourceIndex(token.endLine),
+	)
 
 	parser.position++
 
@@ -226,12 +250,12 @@ func (parser *parser) parseTokens() {
 
 func (parser *parser) parenOpen() {
 	unbalancedCount := 1
-	pos := parser.position + 1
+	nextPosition := parser.position + 1
 	token := parser.currToken()
 
 	// check for balanced parens
-	for pos < len(parser.tokens) && unbalancedCount != 0 {
-		tkn := &parser.tokens[pos]
+	for nextPosition < len(parser.tokens) && unbalancedCount != 0 {
+		tkn := &parser.tokens[nextPosition]
 
 		if tkn.kind == "(" {
 			unbalancedCount++
@@ -239,7 +263,7 @@ func (parser *parser) parenOpen() {
 		if tkn.kind == ")" {
 			unbalancedCount--
 		}
-		pos++
+		nextPosition++
 	}
 
 	if unbalancedCount != 0 {
@@ -268,7 +292,7 @@ func (parser *parser) parenOpen() {
 		kind(parser.currToken()) != ")" && !parser.options.Loose {
 		nextToken := parser.nextToken()
 		value := decode(parser.currToken().value)
-		start := position(parser.currToken().startLine, parser.currToken().startColumn)
+		startToken := parser.currToken()
 
 		for nextToken != nil && nextToken.kind != ")" && unbalanced(parser.current) != 0 {
 			parser.position++
@@ -281,7 +305,18 @@ func (parser *parser) parenOpen() {
 			parser.position++
 
 			// Constructed directly, so unlike splitWord's words it carries no isHex or isColor.
-			parser.newNode(leaf("word", value, source(start, position(parser.currToken().endLine, parser.currToken().endColumnValue())), parser.sourceIndex(parser.currToken().index)))
+			parser.newNode(leaf(
+				"word",
+				value,
+				sourceSpan{
+					startLine:      startToken.startLine,
+					startColumn:    startToken.startColumn,
+					endLine:        parser.currToken().endLine,
+					endColumn:      parser.currToken().endColumn,
+					endColumnIsNaN: parser.currToken().endColumnIsNaN,
+				},
+				parser.sourceIndex(parser.currToken().index),
+			))
 		}
 	}
 }
@@ -317,6 +352,9 @@ func (parser *parser) space() {
 	if parser.position == len(parser.tokens)-1 || kind(parser.nextToken()) == "," || kind(parser.nextToken()) == ")" {
 		currentLast := last(parser.current)
 		if currentLast == nil {
+			// Invariant: this is upstream's TypeError reading the raws of a missing last node, which a
+			// value of only whitespace reaches; Parse recovers every *Error and returns it as a syntax
+			// error, so the panic never leaves the package.
 			panic(typeError("raws"))
 		}
 		appendRaw(currentLast, "after", decode(token.value))
@@ -377,12 +415,17 @@ func rNoFollow(word []uint16) bool {
 	if len(word) == 0 || (word[0] != '#' && word[0] != '{' && word[0] != '}') {
 		return false
 	}
-	return !(word[0] == '#' && len(word) > 1 && alphaNum(word[1]))
+	return !(word[0] == '#' && len(word) > 1 && alphanumeric(word[1]))
 }
 
 // isHex is /^#(.+)/: '#' and at least one character that is not a line terminator.
 func isHex(value []uint16) bool {
-	return len(value) > 1 && value[0] == '#' && value[1] != '\n' && value[1] != '\r' && value[1] != 0x2028 && value[1] != 0x2029
+	return len(value) > 1 &&
+		value[0] == '#' &&
+		value[1] != '\n' &&
+		value[1] != '\r' &&
+		value[1] != 0x2028 &&
+		value[1] != 0x2029
 }
 
 // isColor is /^#([0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i, ASCII only as above.
@@ -437,16 +480,21 @@ func (parser *parser) splitWord() {
 	}
 
 	currToken := parser.currToken()
-	for i, ind := range indices {
+	for indexIndex, ind := range indices {
 		index := len(word)
-		if i+1 < len(indices) && indices[i+1] != 0 {
-			index = indices[i+1]
+		if indexIndex+1 < len(indices) && indices[indexIndex+1] != 0 {
+			index = indices[indexIndex+1]
 		}
 		value := word[ind:index]
 		var node *estree.Node
 
-		nodeSource := source(position(currToken.startLine, currToken.startColumn+ind), position(currToken.endLine, currToken.startColumn+(index-1)))
-		nodeSourceIndex := parser.sourceIndex(currToken.index + indices[i])
+		nodeSource := sourceSpan{
+			startLine:   currToken.startLine,
+			startColumn: currToken.startColumn + ind,
+			endLine:     currToken.endLine,
+			endColumn:   currToken.startColumn + (index - 1),
+		}
+		nodeSourceIndex := parser.sourceIndex(currToken.index + indices[indexIndex])
 
 		if containsIndex(hasAt, ind) {
 			node = newAtWord(decode(value[1:]), nodeSource, nodeSourceIndex)
@@ -459,15 +507,13 @@ func (parser *parser) splitWord() {
 
 			// value.replace(unit, ''): the first occurrence, which is not always the suffix.
 			node = newNumber(strings.Replace(text, unit, "", 1), nodeSource, nodeSourceIndex, unit)
+		} else if nextToken != nil && nextToken.kind == "(" {
+			node = newFunc(decode(value), nodeSource, nodeSourceIndex)
+			parser.cache = append(parser.cache, parser.current)
 		} else {
-			if nextToken != nil && nextToken.kind == "(" {
-				node = newFunc(decode(value), nodeSource, nodeSourceIndex)
-				parser.cache = append(parser.cache, parser.current)
-			} else {
-				node = leaf("word", decode(value), nodeSource, nodeSourceIndex)
-				node.Set("isHex", isHex(value))
-				node.Set("isColor", isColor(value))
-			}
+			node = leaf("word", decode(value), nodeSource, nodeSourceIndex)
+			node.Set("isHex", estree.Boolean(isHex(value)))
+			node.Set("isColor", estree.Boolean(isColor(value)))
 		}
 
 		parser.newNode(node)
@@ -501,7 +547,7 @@ func (parser *parser) string() {
 
 	node := newString(decode(value), tokenSource(token), parser.sourceIndex(token.index), quoted)
 
-	raws(node)["quote"] = quote
+	setRaw(node, "quote", quote)
 
 	parser.newNode(node)
 	parser.position++
@@ -524,7 +570,7 @@ func (parser *parser) currToken() *token { return parser.tokenAt(parser.position
 
 func (parser *parser) nextToken() *token { return parser.tokenAt(parser.position + 1) }
 
-func (parser *parser) prevToken() *token { return parser.tokenAt(parser.position - 1) }
+func (parser *parser) previousToken() *token { return parser.tokenAt(parser.position - 1) }
 
 func (parser *parser) tokenAt(index int) *token {
 	if index < 0 || index >= len(parser.tokens) {
@@ -536,6 +582,9 @@ func (parser *parser) tokenAt(index int) *token {
 // kind is token[0], which throws when the token is undefined.
 func kind(token *token) string {
 	if token == nil {
+		// Invariant: this is upstream's TypeError reading a token past either end, which an operator
+		// with nothing after it reaches; Parse recovers every *Error and returns it as a syntax error, so
+		// the panic never leaves the package.
 		panic(typeError("0"))
 	}
 	return token.kind
@@ -544,6 +593,9 @@ func kind(token *token) string {
 // property is node.type or node.value, which throws when the node is undefined.
 func property(node *estree.Node, key string) string {
 	if node == nil {
+		// Invariant: this is upstream's TypeError reading a property of a missing node, which malformed
+		// input can reach; Parse recovers every *Error and returns it as a syntax error, so the panic
+		// never leaves the package.
 		panic(typeError(key))
 	}
 	if key == "type" {

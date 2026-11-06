@@ -50,7 +50,7 @@ type record struct {
 
 // Golden is one test's recorded answers.
 type Golden struct {
-	t       testing.TB
+	test    testing.TB
 	path    string
 	digest  string
 	update  bool
@@ -60,26 +60,31 @@ type Golden struct {
 
 // Open reads the golden at testdata/oracle/<name>.json.gz for the bundles this build embeds. When recording,
 // it starts empty and writes what the test asked for when the test ends.
-func Open(t testing.TB, name string) *Golden {
-	t.Helper()
-	digest, err := BundlesDigest()
-	if err != nil {
-		t.Fatal(err)
+func Open(test testing.TB, name string) *Golden {
+	test.Helper()
+	digest, bundlesDigestError := BundlesDigest()
+	if bundlesDigestError != nil {
+		test.Fatal(bundlesDigestError)
 	}
 	golden := &Golden{
-		t:       t,
+		test:    test,
 		path:    filepath.Join("testdata", "oracle", name+".json.gz"),
 		digest:  digest,
 		update:  os.Getenv(UpdateVariable) != "",
 		answers: map[string]Answer{},
 	}
 	if golden.update {
-		t.Cleanup(golden.write)
+		test.Cleanup(golden.write)
 		return golden
 	}
-	answers, err := read(golden.path, digest)
-	if err != nil {
-		t.Fatalf("%v: record them with %s=1 go test -run '^%s$' in this package", err, UpdateVariable, t.Name())
+	answers, readError := read(golden.path, digest)
+	if readError != nil {
+		test.Fatalf(
+			"%v: record them with %s=1 go test -run '^%s$' in this package",
+			readError,
+			UpdateVariable,
+			test.Name(),
+		)
 	}
 	golden.answers = answers
 	return golden
@@ -87,21 +92,27 @@ func Open(t testing.TB, name string) *Golden {
 
 // read is a golden's answers, refused when the bundles that recorded them are not these.
 func read(path string, digest string) (map[string]Answer, error) {
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, fmt.Errorf("%s holds no recorded oracle answers (%v)", path, err)
+	file, openError := os.Open(path)
+	if openError != nil {
+		return nil, fmt.Errorf("%s holds no recorded oracle answers (%w)", path, openError)
 	}
+	// Ignored: the golden is only read, so a failed close loses nothing already decoded.
 	defer file.Close()
-	unzipped, err := gzip.NewReader(file)
-	if err != nil {
-		return nil, fmt.Errorf("%s is not a golden: %v", path, err)
+	unzipped, gzipError := gzip.NewReader(file)
+	if gzipError != nil {
+		return nil, fmt.Errorf("%s is not a golden: %w", path, gzipError)
 	}
 	var contents record
-	if err := json.NewDecoder(unzipped).Decode(&contents); err != nil {
-		return nil, fmt.Errorf("%s is not a golden: %v", path, err)
+	if decodeError := json.NewDecoder(unzipped).Decode(&contents); decodeError != nil {
+		return nil, fmt.Errorf("%s is not a golden: %w", path, decodeError)
 	}
 	if contents.Digest != digest {
-		return nil, fmt.Errorf("%s was recorded from Prettier bundles %s, and this build embeds %s", path, contents.Digest, digest)
+		return nil, fmt.Errorf(
+			"%s was recorded from Prettier bundles %s, and this build embeds %s",
+			path,
+			contents.Digest,
+			digest,
+		)
 	}
 	return contents.Answers, nil
 }
@@ -109,32 +120,41 @@ func read(path string, digest string) (map[string]Answer, error) {
 // write saves what this run recorded. Keys are sorted by the encoder, so recording twice from the same
 // bundles writes the same bytes.
 func (golden *Golden) write() {
-	if golden.t.Failed() {
-		golden.t.Logf("not recording %s, since the test failed", golden.path)
+	if golden.test.Failed() {
+		golden.test.Logf("not recording %s, since the test failed", golden.path)
 		return
 	}
-	if err := os.MkdirAll(filepath.Dir(golden.path), 0o755); err != nil {
-		golden.t.Errorf("recording %s: %v", golden.path, err)
+	if createDirectoryError := os.MkdirAll(filepath.Dir(golden.path), 0o755); createDirectoryError != nil {
+		golden.test.Errorf("recording %s: %v", golden.path, createDirectoryError)
 		return
 	}
-	file, err := os.Create(golden.path)
-	if err != nil {
-		golden.t.Errorf("recording %s: %v", golden.path, err)
+	file, createError := os.Create(golden.path)
+	if createError != nil {
+		golden.test.Errorf("recording %s: %v", golden.path, createError)
 		return
 	}
-	defer file.Close()
-	zipped, _ := gzip.NewWriterLevel(file, gzip.BestCompression)
+	// The close is checked, since a golden whose last bytes never landed would read as truncated next run.
+	defer func() {
+		if fileCloseError := file.Close(); fileCloseError != nil {
+			golden.test.Errorf("recording %s: %v", golden.path, fileCloseError)
+		}
+	}()
+	zipped, newWriterError := gzip.NewWriterLevel(file, gzip.BestCompression)
+	if newWriterError != nil {
+		golden.test.Errorf("recording %s: %v", golden.path, newWriterError)
+		return
+	}
 	encoder := json.NewEncoder(zipped)
 	encoder.SetIndent("", " ")
-	if err := encoder.Encode(record{Digest: golden.digest, Answers: golden.answers}); err != nil {
-		golden.t.Errorf("recording %s: %v", golden.path, err)
+	if encodeError := encoder.Encode(record{Digest: golden.digest, Answers: golden.answers}); encodeError != nil {
+		golden.test.Errorf("recording %s: %v", golden.path, encodeError)
 		return
 	}
-	if err := zipped.Close(); err != nil {
-		golden.t.Errorf("recording %s: %v", golden.path, err)
+	if closeError := zipped.Close(); closeError != nil {
+		golden.test.Errorf("recording %s: %v", golden.path, closeError)
 		return
 	}
-	golden.t.Logf("recorded %d oracle answers in %s", len(golden.answers), golden.path)
+	golden.test.Logf("recorded %d oracle answers in %s", len(golden.answers), golden.path)
 }
 
 // Key is an answer's key: every input it depends on, each prefixed with its length so no two inputs can
@@ -151,22 +171,25 @@ func Key(parts ...string) string {
 // error and all. An answer the golden never recorded fails the test and returns ErrNotRecorded.
 func (golden *Golden) Answer(key string, compute func() (string, error)) (string, error) {
 	if golden.update {
-		output, err := compute()
+		output, computeError := compute()
 		answer := Answer{Output: output}
-		if err != nil {
-			answer = Answer{Error: err.Error()}
+		if computeError != nil {
+			answer = Answer{Error: computeError.Error()}
 		}
 		golden.mutex.Lock()
 		golden.answers[key] = answer
 		golden.mutex.Unlock()
-		return output, err
+		return output, computeError
 	}
 	golden.mutex.Lock()
 	answer, recorded := golden.answers[key]
 	golden.mutex.Unlock()
 	if !recorded {
-		golden.t.Errorf("an oracle answer %s never recorded was asked for, so the fixtures changed: record them again with %s=1",
-			golden.path, UpdateVariable)
+		golden.test.Errorf(
+			"an oracle answer %s never recorded was asked for, so the fixtures changed: record them again with %s=1",
+			golden.path,
+			UpdateVariable,
+		)
 		return "", ErrNotRecorded
 	}
 	if answer.Error != "" {
@@ -181,41 +204,21 @@ func (golden *Golden) Engine(options formatoptions.Options) *Engine {
 	return &Engine{golden: golden, options: options}
 }
 
-// Engine is a prettier.Engine's Format, answered from a golden.
-type Engine struct {
-	golden  *Golden
-	options formatoptions.Options
-	once    sync.Once
-	engine  *prettier.Engine
-	err     error
-}
-
-// Format is the answer prettier.Engine.Format gives for fileName and text under the engine's options.
-func (engine *Engine) Format(fileName string, text string) (string, error) {
-	return engine.golden.Answer(Key("engine", fmt.Sprintf("%+v", engine.options), fileName, text), func() (string, error) {
-		engine.once.Do(func() { engine.engine, engine.err = prettier.New(engine.options) })
-		if engine.err != nil {
-			return "", engine.err
-		}
-		return engine.engine.Format(fileName, text)
-	})
-}
-
 var bundlesDigest struct {
-	once   sync.Once
-	digest string
-	err    error
+	once        sync.Once
+	digest      string
+	digestError error
 }
 
 // BundlesDigest is the digest of the Prettier bundles this build embeds, read once.
 func BundlesDigest() (string, error) {
 	bundlesDigest.once.Do(func() {
-		bundles, err := prettier.Bundles()
-		if err != nil {
-			bundlesDigest.err = err
+		bundles, bundlesError := prettier.Bundles()
+		if bundlesError != nil {
+			bundlesDigest.digestError = bundlesError
 			return
 		}
-		bundlesDigest.digest, bundlesDigest.err = prettier.DigestBundles(bundles.Files)
+		bundlesDigest.digest, bundlesDigest.digestError = prettier.DigestBundles(bundles.Files)
 	})
-	return bundlesDigest.digest, bundlesDigest.err
+	return bundlesDigest.digest, bundlesDigest.digestError
 }

@@ -11,5 +11,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // doc comment, and an option naming more would let a configuration point at a type nobody has read,
 // or at one whose every arm is a success.
 func init() {
-	rule.Register(rule.Registration{Rule: CorrectnessNoDiscardedOutcome})
+	rule.Register(rule.Registration[rule.NoOptions]{Rule: CorrectnessNoDiscardedOutcome})
 }

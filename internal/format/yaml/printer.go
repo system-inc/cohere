@@ -23,8 +23,9 @@ import (
 
 type (
 	unistNode = unist.Node
-	astPath   = printing.AstPath[*unist.Node]
-	options   = printing.Options[*unist.Node]
+	astPath   = printing.AstPath[*unist.Node, *settings]
+	options   = printing.Options[*unist.Node, *settings, printing.NoArguments]
+	printFunc = printing.PrintFunc[printing.NoArguments]
 )
 
 // settings are the Prettier options the YAML printer reads, carried on options.Settings, and the
@@ -44,7 +45,7 @@ type settings struct {
 	isNextEmptyLinePrinted map[int]bool
 }
 
-func settingsOf(options *options) *settings { return options.Settings.(*settings) }
+func settingsOf(options *options) *settings { return options.Settings }
 
 func currentNode(path *astPath) *unist.Node {
 	node, _ := path.Node()
@@ -61,10 +62,14 @@ func nextNode(path *astPath) *unist.Node {
 	return node
 }
 
-// mapPrint is upstream's path.map(print, name): print receives each element's index as its args, as
-// upstream's map passes (path, index, value) to print, so these prints are not cached.
-func mapPrint(path *astPath, print printing.PrintFunc, names ...any) []doc.Doc {
-	return printing.Map(path, func(_ *astPath, index int, _ any) doc.Doc { return print(nil, index) }, names...)
+// uncachedPrint is the args mapPrint gives print. Upstream's map passes (path, index, value) to print,
+// so print sees args and does not cache; the printer never reads them, so one shared non-nil value does
+// what the index did, without making one per element.
+var uncachedPrint = &printing.NoArguments{}
+
+// mapPrint is upstream's path.map(print, name), whose prints are not cached.
+func mapPrint(path *astPath, print printFunc, names ...string) []doc.Doc {
+	return printing.Map(path, func(*astPath, int) doc.Doc { return print("", uncachedPrint) }, names...)
 }
 
 // fillWords is fill(join(line, words)).
@@ -80,7 +85,7 @@ func fillWords(words []string) doc.Doc {
 }
 
 // yamlPrinter is the printer object printer-yaml.js exports.
-var yamlPrinter = &printing.Printer[*unist.Node]{
+var yamlPrinter = &printing.Printer[*unist.Node, *settings, printing.NoArguments]{
 	Print:            genericPrint,
 	LocStart:         locStart,
 	LocEnd:           locEnd,
@@ -104,34 +109,59 @@ func Print(root *unist.Node, text string, options formatoptions.Options, textToD
 // PrintDoc is Print's doc, before layout: what markdown's front matter embeds. The trailing hardline is
 // still there; upstream's textToDoc strips it with stripTrailingHardline (doc.StripTrailingHardline),
 // and the caller is expected to do the same.
-func PrintDoc(root *unist.Node, text string, options formatoptions.Options, textToDoc printing.TextToDoc) (doc.Doc, error) {
+func PrintDoc(
+	root *unist.Node,
+	text string,
+	options formatoptions.Options,
+	textToDoc printing.TextToDoc,
+) (doc.Doc, error) {
 	return PrintDocFile("", root, text, options, textToDoc)
 }
 
 // PrintFile is Print for a named file. The name is upstream's options.filepath: a .prettierrc,
 // .stylelintrc or .lintstagedrc is printed as JSON when textToDoc can format it as JSON.
-func PrintFile(fileName string, root *unist.Node, text string, options formatoptions.Options, textToDoc printing.TextToDoc) (string, error) {
+func PrintFile(
+	fileName string,
+	root *unist.Node,
+	text string,
+	options formatoptions.Options,
+	textToDoc printing.TextToDoc,
+) (string, error) {
 	return printFile(fileName, root, text, options, "preserve", textToDoc, 0)
 }
 
 // PrintDocFile is PrintDoc for a named file.
-func PrintDocFile(fileName string, root *unist.Node, text string, options formatoptions.Options, textToDoc printing.TextToDoc) (doc.Doc, error) {
+func PrintDocFile(
+	fileName string,
+	root *unist.Node,
+	text string,
+	options formatoptions.Options,
+	textToDoc printing.TextToDoc,
+) (doc.Doc, error) {
 	return printDocFile(fileName, root, text, options, "preserve", textToDoc, 0)
 }
 
 // printFile is PrintFile with proseWrap given. None of our repositories sets it, and formatoptions.Options
 // does not carry it, so only the tests reach always and never. nodeCount is how many nodes the tree holds,
 // zero when unknown, for printing.Options.NodeCount.
-func printFile(fileName string, root *unist.Node, text string, prettierOptions formatoptions.Options, proseWrap string, textToDoc printing.TextToDoc, nodeCount int) (string, error) {
+func printFile(
+	fileName string,
+	root *unist.Node,
+	text string,
+	prettierOptions formatoptions.Options,
+	proseWrap string,
+	textToDoc printing.TextToDoc,
+	nodeCount int,
+) (string, error) {
 	// src/main/core.js, coreFormat: a file that is empty or only whitespace formats to "" without being
 	// printed. The doc entry has no such check, as upstream's textToDoc has none.
 	if trim(text) == "" {
 		return "", nil
 	}
 
-	document, err := printDocFile(fileName, root, text, prettierOptions, proseWrap, textToDoc, nodeCount)
-	if err != nil {
-		return "", err
+	document, printDocFileError := printDocFile(fileName, root, text, prettierOptions, proseWrap, textToDoc, nodeCount)
+	if printDocFileError != nil {
+		return "", printDocFileError
 	}
 	formatted := doc.Print(document, doc.Options{
 		PrintWidth: prettierOptions.PrintWidth,
@@ -148,10 +178,18 @@ func printFile(fileName string, root *unist.Node, text string, prettierOptions f
 	return formatted, nil
 }
 
-func printDocFile(fileName string, root *unist.Node, text string, prettierOptions formatoptions.Options, proseWrap string, textToDoc printing.TextToDoc, nodeCount int) (document doc.Doc, err error) {
+func printDocFile(
+	fileName string,
+	root *unist.Node,
+	text string,
+	prettierOptions formatoptions.Options,
+	proseWrap string,
+	textToDoc printing.TextToDoc,
+	nodeCount int,
+) (document doc.Doc, printDocFileError error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
-			document, err = nil, fmt.Errorf("yaml: %v", recovered)
+			document, printDocFileError = nil, fmt.Errorf("yaml: %v", recovered)
 		}
 	}()
 
@@ -176,7 +214,7 @@ func printDocFile(fileName string, root *unist.Node, text string, prettierOption
 }
 
 // genericPrint is upstream's genericPrint: a node's comments, tag and anchor around printNode.
-func genericPrint(path *astPath, options *options, print printing.PrintFunc, _ any) doc.Doc {
+func genericPrint(path *astPath, options *options, print printFunc, _ *printing.NoArguments) doc.Doc {
 	node := currentNode(path)
 	settings := settingsOf(options)
 
@@ -185,7 +223,10 @@ func genericPrint(path *astPath, options *options, print printing.PrintFunc, _ a
 	parts := make(doc.Concat, 0, 4)
 
 	if node.NodeType != "mappingValue" && hasLeadingComments(node) {
-		parts = append(parts, doc.Concat{doc.Join(doc.Hardline, mapPrint(path, print, "leadingComments")), doc.Hardline})
+		parts = append(
+			parts,
+			doc.Concat{doc.Join(doc.Hardline, mapPrint(path, print, "leadingComments")), doc.Hardline},
+		)
 	}
 
 	tag, anchor := node.Tag, node.Anchor
@@ -243,7 +284,9 @@ func genericPrint(path *astPath, options *options, print printing.PrintFunc, _ a
 		var breakParent = doc.BreakParent
 		if parent := parentNode(path); parent.NodeType == "mappingKey" {
 			// path.getParentNode(2): the mapping item's parent.
-			if greatGrandparent, _ := path.GetParentNode(2); greatGrandparent.NodeType == "mapping" && isInlineNode(node) {
+			if greatGrandparent, _ := path.GetParentNode(
+				2,
+			); greatGrandparent.NodeType == "mapping" && isInlineNode(node) {
 				breakParent = doc.Text("")
 			}
 		}
@@ -255,12 +298,12 @@ func genericPrint(path *astPath, options *options, print printing.PrintFunc, _ a
 		if node.NodeType == "sequenceItem" {
 			width = 2
 		}
-		endComments := printing.Map(path, func(path *astPath, _ int, _ any) doc.Doc {
+		endComments := printing.Map(path, func(path *astPath, _ int) doc.Doc {
 			var emptyLine doc.Doc = doc.Text("")
 			if printing.IsPreviousLineEmpty(options.OriginalText, locStart(currentNode(path))) {
 				emptyLine = doc.Hardline
 			}
-			return doc.Concat{emptyLine, print(nil, nil)}
+			return doc.Concat{emptyLine, print("", nil)}
 		}, "endComments")
 		parts = append(parts, alignWithSpaces(width, doc.Concat{doc.Hardline, doc.Join(doc.Hardline, endComments)}))
 	}
@@ -269,7 +312,7 @@ func genericPrint(path *astPath, options *options, print printing.PrintFunc, _ a
 }
 
 // printNode is upstream's printNode: the node itself, by type.
-func printNode(path *astPath, options *options, print printing.PrintFunc) doc.Doc {
+func printNode(path *astPath, options *options, print printFunc) doc.Doc {
 	node := currentNode(path)
 	settings := settingsOf(options)
 	switch node.NodeType {
@@ -278,12 +321,12 @@ func printNode(path *astPath, options *options, print printing.PrintFunc) doc.Do
 		shouldPrintHardline := !(isNode(lastDescendantNode, "blockLiteral", "blockFolded") &&
 			lastDescendantNode.Chomping == "keep")
 		parts := doc.Concat{}
-		path.Each(func(path *astPath, _ int, _ any) {
+		path.Each(func(path *astPath, _ int) {
 			document := currentNode(path)
 			if !path.IsFirst() {
 				parts = append(parts, doc.Hardline)
 			}
-			parts = append(parts, print(nil, nil))
+			parts = append(parts, print("", nil))
 			if shouldPrintDocumentEndMarker(path) {
 				if shouldPrintHardline {
 					parts = append(parts, doc.Hardline)
@@ -310,7 +353,12 @@ func printNode(path *astPath, options *options, print printing.PrintFunc) doc.Do
 			}
 
 			if hasTrailingComment(head) {
-				parts = append(parts, doc.Concat{doc.Text("---"), doc.Text(" "), print([]string{"head", "trailingComment"}, nil)})
+				parts = append(
+					parts,
+					doc.Concat{doc.Text("---"), doc.Text(" "), printing.Call(path, func(*astPath) doc.Doc {
+						return print("", nil)
+					}, "head", "trailingComment")},
+				)
 			} else {
 				parts = append(parts, doc.Text("---"))
 			}
@@ -402,7 +450,11 @@ func printNode(path *astPath, options *options, print printing.PrintFunc) doc.Do
 			content := raw
 			if node.NodeType == "quoteDouble" {
 				// double quote needs to be escaped by backslash in quoteDouble
-				content = strings.ReplaceAll(strings.ReplaceAll(raw, `\"`, doubleQuote), "'", strings.Repeat(singleQuote, 2))
+				content = strings.ReplaceAll(
+					strings.ReplaceAll(raw, `\"`, doubleQuote),
+					"'",
+					strings.Repeat(singleQuote, 2),
+				)
 			}
 			return doc.Concat{
 				doc.Text(singleQuote),
@@ -453,6 +505,8 @@ func printNode(path *astPath, options *options, print printing.PrintFunc) doc.Do
 	case "flowSequenceItem":
 		return print("content", nil)
 	default:
+		// Invariant: unist's transform builds only the node types above, and getVisitorKeys has already
+		// stopped any other on the walk here. printDocFile recovers this into an error, as upstream throws.
 		panic(fmt.Sprintf("Unexpected node type %q in YAML", node.NodeType))
 	}
 }
@@ -496,7 +550,7 @@ func shouldPrintDocumentEndMarker(path *astPath) bool {
 	nextDocument := nextNode(path)
 	nextHead := childAt(nextDocument, 0)
 
-	return len(nextHead.Children) > 0 || // ... %DIRECTIVE ---
+	return len(nextHead.Children) > 0 || // ... `%DIRECTIVE` ---
 		hasEndComments(nextHead) // ... # endComment ---
 }
 
@@ -505,7 +559,7 @@ func shouldPrintDocumentHeadEndMarker(path *astPath) bool {
 	document := currentNode(path)
 	head := childAt(document, 0)
 	return document.DirectivesEndMarker || // --- preserve the first document head end marker
-		len(head.Children) > 0 || // %DIRECTIVE ---
+		len(head.Children) > 0 || // `%DIRECTIVE` ---
 		hasEndComments(head) || // # end comment ---
 		hasTrailingComment(head) // --- # trailing comment
 }
@@ -578,19 +632,24 @@ func preprocess(ast *unist.Node, _ *options) *unist.Node { return ast }
 var prettierRcPattern = regexp.MustCompile(`(?:[/\\]|^)\.(?:prettier|stylelint|lintstaged)rc$`)
 
 // embedPrint is what an embed returns: the function that prints the node as another language.
-type embedPrint = func(printing.TextToDoc, printing.PrintFunc, *astPath, *options) (doc.Doc, error)
+type embedPrint = func(printing.TextToDoc, printFunc, *astPath, *options) (doc.Doc, error)
 
 // embed is embed.js: try to format `.prettierrc`, `.stylelintrc` and `.lintstagedrc` as JSON first.
 // When that fails, the core drops the embed and the file prints as YAML.
 func embed(path *astPath, options *options) embedPrint {
 	node := currentNode(path)
-	settings := settingsOf(options)
 
-	if node.NodeType == "root" && settings.filePath != "" && prettierRcPattern.MatchString(settings.filePath) {
-		return func(textToDoc printing.TextToDoc, _ printing.PrintFunc, _ *astPath, _ *printing.Options[*unist.Node]) (doc.Doc, error) {
-			embedded, err := textToDoc(options.OriginalText, "json")
-			if err != nil {
-				return nil, err
+	if node.NodeType == "root" && settingsOf(options).filePath != "" &&
+		prettierRcPattern.MatchString(settingsOf(options).filePath) {
+		return func(
+			textToDoc printing.TextToDoc,
+			_ printFunc,
+			_ *astPath,
+			_ *printing.Options[*unist.Node, *settings, printing.NoArguments],
+		) (doc.Doc, error) {
+			embedded, textToDocError := textToDoc(options.OriginalText, "json")
+			if textToDocError != nil {
+				return nil, textToDocError
 			}
 			// doc ? [doc, hardline] : undefined
 			if text, isText := embedded.(doc.Text); embedded == nil || (isText && text == "") {

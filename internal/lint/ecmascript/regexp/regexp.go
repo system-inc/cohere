@@ -15,7 +15,7 @@
 //     alone where JavaScript breaks on all four line terminators; ignoring
 //     case folds by Unicode's rules rather than JavaScript's; `\b` is drawn
 //     over .NET's Unicode word set where ECMAScript keeps it to ASCII; an
-//     escape .NET reads for itself — `\A`, `\a`, `\e` — is a plain character
+//     escape .NET reads for itself (`\A`, `\a`, `\e`) is a plain character
 //     to JavaScript, and one .NET does not know at all makes it refuse a
 //     pattern JavaScript accepts; and `y` says where a match may start, which
 //     regexp2 has no flag for.
@@ -32,8 +32,8 @@
 //   - Comparing a backreference without regard to case. JavaScript uses the same
 //     canonicalization as for literals; the fallback uses regexp2's case-insensitivity.
 //   - Exhaustive syntax validation under `u`. The `u` flag makes JavaScript
-//     reject constructs it otherwise tolerates — a bare `]` outside a class is
-//     the usual one — and those still compile here. Every pattern JavaScript
+//     reject constructs it otherwise tolerates (a bare `]` outside a class is
+//     the usual one) and those still compile here. Every pattern JavaScript
 //     accepts is read correctly; some it rejects are read rather than refused.
 package regexp
 
@@ -47,8 +47,8 @@ import (
 )
 
 // MatchTimeout bounds how long one subject may spend in one pattern. A pattern
-// written by a user can backtrack exponentially — `(a|aa)+$` against a long
-// run of `a` is the shape of it — and a linter that hangs on a config typo is
+// written by a user can backtrack exponentially (`(a|aa)+$` against a long
+// run of `a` is the shape of it) and a linter that hangs on a config typo is
 // worse than one that answers no. A pattern that matches settles in
 // microseconds, so a match still running after this has found nothing.
 const MatchTimeout = time.Second
@@ -112,30 +112,30 @@ func parseFlags(flags string) (flagSet, error) {
 // Compile compiles source under the given JavaScript flags, as
 // `new RegExp(source, flags)` would. Pass "" for no flags.
 func Compile(source string, flags string) (*RegExp, error) {
-	set, err := parseFlags(flags)
-	if err != nil {
-		return nil, err
+	set, parseFlagsError := parseFlags(flags)
+	if parseFlagsError != nil {
+		return nil, parseFlagsError
 	}
 
-	rewritten, exact, err := rewrite(source, rewriteOptions{
+	rewritten, exact, rewriteError := rewrite(source, rewriteOptions{
 		multiline:  set.multiline,
 		dotAll:     set.dotAll,
 		ignoreCase: set.ignoreCase,
 		unicode:    set.unicode,
 	})
-	if err != nil {
-		return nil, err
+	if rewriteError != nil {
+		return nil, rewriteError
 	}
 	if set.sticky {
 		// A sticky regexp matches only at `lastIndex`, which is 0 for one just
 		// compiled and never moves here, since nothing this package exposes
-		// advances it. So it anchors at the start — around the whole pattern,
+		// advances it. So it anchors at the start: around the whole pattern,
 		// or a top-level `|` would anchor only its first branch.
 		rewritten = inputStart + `(?:` + rewritten + `)`
 	}
 
 	// Multiline, Singleline and IgnoreCase are all handled by the rewrite, so
-	// regexp2 is never told about them — being told twice would undo the work.
+	// regexp2 is never told about them: being told twice would undo the work.
 	options := regexp2.RegexOptions(regexp2.ECMAScript)
 	if set.unicode {
 		options |= regexp2.Unicode
@@ -144,12 +144,12 @@ func Compile(source string, flags string) (*RegExp, error) {
 		options |= regexp2.IgnoreCase
 	}
 
-	re, err := regexp2.Compile(rewritten, options)
-	if err != nil {
+	re, compileError := regexp2.Compile(rewritten, options)
+	if compileError != nil {
 		// regexp2 quotes back the pattern it was handed, which is the
 		// rewritten one. A message naming `[Oo][Kk]` where its author wrote
 		// `ok` is no help, so the source goes back in as written.
-		return nil, errors.New(strings.ReplaceAll(err.Error(), rewritten, source))
+		return nil, errors.New(strings.ReplaceAll(compileError.Error(), rewritten, source))
 	}
 	re.MatchTimeout = MatchTimeout
 
@@ -159,25 +159,27 @@ func Compile(source string, flags string) (*RegExp, error) {
 // MustCompile is Compile for a pattern written in this repository rather than
 // read from a user, and panics rather than returning an error.
 func MustCompile(source string, flags string) *RegExp {
-	re, err := Compile(source, flags)
-	if err != nil {
-		panic(fmt.Sprintf("esregexp: cannot compile /%s/%s: %v", source, flags, err))
+	re, compileError := Compile(source, flags)
+	if compileError != nil {
+		// Invariant: every caller passes a pattern literal written in this repository, compiled when its
+		// package initializes, so a failure stops the first test run and is never a user's input.
+		panic(fmt.Sprintf("esregexp: cannot compile /%s/%s: %v", source, flags, compileError))
 	}
 	return re
 }
 
-// Test reports whether the regexp matches anywhere in s, as
+// Test reports whether the regexp matches anywhere in `text`, as
 // `RegExp.prototype.test` does.
 //
 // A match that overruns MatchTimeout counts as no match: the alternative is
 // making every caller handle an error that only ever means "this pattern is
 // pathological", and a lint rule has nothing better to do with that than skip.
-func (r *RegExp) Test(s string) bool {
-	if r == nil || r.re == nil {
+func (exp *RegExp) Test(text string) bool {
+	if exp == nil || exp.re == nil {
 		return false
 	}
-	matched, err := r.re.MatchString(s)
-	return err == nil && matched
+	matched, matchStringError := exp.re.MatchString(text)
+	return matchStringError == nil && matched
 }
 
 // TestOrTimeout is Test for a caller whose no answer is what produces a
@@ -185,37 +187,37 @@ func (r *RegExp) Test(s string) bool {
 // match. Reading a bound match as no match would turn a skipped report into a
 // false positive there, so a match that overruns MatchTimeout counts as a
 // match and the report is skipped.
-func (r *RegExp) TestOrTimeout(s string) bool {
-	matched, err := r.TestOrError(s)
-	return matched || err != nil
+func (exp *RegExp) TestOrTimeout(text string) bool {
+	matched, testOrError := exp.TestOrError(text)
+	return matched || testOrError != nil
 }
 
 // TestOrError is Test for a caller that has to tell "no match" apart from "the
 // match ran into MatchTimeout", and that has somewhere other than a match to
 // send the second answer.
-func (r *RegExp) TestOrError(s string) (bool, error) {
-	if r == nil || r.re == nil {
+func (exp *RegExp) TestOrError(text string) (bool, error) {
+	if exp == nil || exp.re == nil {
 		return false, nil
 	}
-	return r.re.MatchString(s)
+	return exp.re.MatchString(text)
 }
 
 // Source returns the pattern as it was written, the way `RegExp.prototype
-// .source` does — not the rewritten form handed to regexp2.
-func (r *RegExp) Source() string { return r.source }
+// .source` does, not the rewritten form handed to regexp2.
+func (exp *RegExp) Source() string { return exp.source }
 
 // Flags returns the flags as they were written.
-func (r *RegExp) Flags() string { return r.flags }
+func (exp *RegExp) Flags() string { return exp.flags }
 
 // String renders the regexp the way JavaScript writes a regexp literal.
-func (r *RegExp) String() string { return "/" + r.source + "/" + r.flags }
+func (exp *RegExp) String() string { return "/" + exp.source + "/" + exp.flags }
 
 // Unwrap returns the compiled regexp2 pattern, for a caller that needs
 // capture groups or replacement. The pattern it holds is the rewritten one, so
 // its own String does not match Source.
-func (r *RegExp) Unwrap() *regexp2.Regexp {
-	if r == nil {
+func (exp *RegExp) Unwrap() *regexp2.Regexp {
+	if exp == nil {
 		return nil
 	}
-	return r.re
+	return exp.re
 }

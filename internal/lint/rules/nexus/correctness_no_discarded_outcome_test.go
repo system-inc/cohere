@@ -80,13 +80,13 @@ func correctnessNoDiscardedOutcomeSource(lines ...string) string {
 	return correctnessNoDiscardedOutcomePrelude + strings.Join(lines, "\n") + "\n"
 }
 
-func correctnessNoDiscardedOutcomeRun(t *testing.T, sourceText string) rule_testing.Result {
-	t.Helper()
+func correctnessNoDiscardedOutcomeRun(test *testing.T, sourceText string) rule_testing.Result {
+	test.Helper()
 	files := map[string]string{correctnessNoDiscardedOutcomeFile: sourceText}
 	for fileName, fileText := range correctnessNoDiscardedOutcomeNexusFiles {
 		files[fileName] = fileText
 	}
-	return rule_testing.RunTypedFiles(t, CorrectnessNoDiscardedOutcome, files, correctnessNoDiscardedOutcomeFile)
+	return rule_testing.RunTypedFiles(test, CorrectnessNoDiscardedOutcome, files, correctnessNoDiscardedOutcomeFile)
 }
 
 // correctnessNoDiscardedOutcomeFinding is one finding as the outcome type its message names and the
@@ -98,8 +98,12 @@ type correctnessNoDiscardedOutcomeFinding struct {
 
 // correctnessNoDiscardedOutcomeExpect asserts the findings in source order. The harness trims the
 // subject file before writing it, so spans are read from the program's own text.
-func correctnessNoDiscardedOutcomeExpect(t *testing.T, result rule_testing.Result, want []correctnessNoDiscardedOutcomeFinding) {
-	t.Helper()
+func correctnessNoDiscardedOutcomeExpect(
+	test *testing.T,
+	result rule_testing.Result,
+	want []correctnessNoDiscardedOutcomeFinding,
+) {
+	test.Helper()
 	diagnostics := append(result.Diagnostics[:0:0], result.Diagnostics...)
 	sort.SliceStable(diagnostics, func(left int, right int) bool {
 		return diagnostics[left].Range.Pos() < diagnostics[right].Range.Pos()
@@ -110,12 +114,16 @@ func correctnessNoDiscardedOutcomeExpect(t *testing.T, result rule_testing.Resul
 	for range want {
 		wantIds = append(wantIds, correctnessNoDiscardedOutcomeId)
 	}
-	rule_testing.ExpectFindings(t, sorted, wantIds...)
+	rule_testing.ExpectFindings(test, sorted, wantIds...)
 	text := result.SourceFile.Text()
 	var got []correctnessNoDiscardedOutcomeFinding
 	for _, diagnostic := range diagnostics {
 		if len(diagnostic.Fixes) != 0 || len(diagnostic.Suggestions) != 0 {
-			t.Fatalf("expected no fix and no suggestion, got %d and %d", len(diagnostic.Fixes), len(diagnostic.Suggestions))
+			test.Fatalf(
+				"expected no fix and no suggestion, got %d and %d",
+				len(diagnostic.Fixes),
+				len(diagnostic.Suggestions),
+			)
 		}
 		typeName := ""
 		for _, known := range correctnessNoDiscardedOutcomeDeclarations {
@@ -123,11 +131,14 @@ func correctnessNoDiscardedOutcomeExpect(t *testing.T, result rule_testing.Resul
 				typeName = known.typeName
 			}
 		}
-		got = append(got, correctnessNoDiscardedOutcomeFinding{typeName, strings.TrimSpace(text[diagnostic.Range.Pos():diagnostic.Range.End()])})
+		got = append(got, correctnessNoDiscardedOutcomeFinding{
+			typeName,
+			strings.TrimSpace(text[diagnostic.Range.Pos():diagnostic.Range.End()]),
+		})
 	}
 	for index := range want {
 		if got[index] != want[index] {
-			t.Fatalf("finding %d is %v, want %v (all: %v)", index, got[index], want[index], got)
+			test.Fatalf("finding %d is %v, want %v (all: %v)", index, got[index], want[index], got)
 		}
 	}
 }
@@ -244,15 +255,15 @@ var correctnessNoDiscardedOutcomeRealSites = []struct {
 }
 
 // The four real sites before their fix: each bare write is reported, and nothing else is.
-func TestCorrectnessNoDiscardedOutcomeFiresOnTheRealSites(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoDiscardedOutcomeFiresOnTheRealSites(test *testing.T) {
+	test.Parallel()
 
 	for _, site := range correctnessNoDiscardedOutcomeRealSites {
-		t.Run(site.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(site.name, func(test *testing.T) {
+			test.Parallel()
 
-			result := correctnessNoDiscardedOutcomeRun(t, correctnessNoDiscardedOutcomeSource(site.before...))
-			correctnessNoDiscardedOutcomeExpect(t, result, []correctnessNoDiscardedOutcomeFinding{
+			result := correctnessNoDiscardedOutcomeRun(test, correctnessNoDiscardedOutcomeSource(site.before...))
+			correctnessNoDiscardedOutcomeExpect(test, result, []correctnessNoDiscardedOutcomeFinding{
 				correctnessNoDiscardedOutcomeWrite(site.finding),
 			})
 		})
@@ -260,20 +271,23 @@ func TestCorrectnessNoDiscardedOutcomeFiresOnTheRealSites(t *testing.T) {
 }
 
 // The same four after their fix: the outcome is kept and its failure arm handled.
-func TestCorrectnessNoDiscardedOutcomeStaysSilentOnTheFixedSites(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoDiscardedOutcomeStaysSilentOnTheFixedSites(test *testing.T) {
+	test.Parallel()
 
 	for _, site := range correctnessNoDiscardedOutcomeRealSites {
-		t.Run(site.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(site.name, func(test *testing.T) {
+			test.Parallel()
 
-			rule_testing.ExpectClean(t, correctnessNoDiscardedOutcomeRun(t, correctnessNoDiscardedOutcomeSource(site.after...)))
+			rule_testing.ExpectClean(
+				test,
+				correctnessNoDiscardedOutcomeRun(test, correctnessNoDiscardedOutcomeSource(site.after...)),
+			)
 		})
 	}
 }
 
-func TestCorrectnessNoDiscardedOutcomeFires(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoDiscardedOutcomeFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name  string
@@ -285,16 +299,25 @@ func TestCorrectnessNoDiscardedOutcomeFires(t *testing.T) {
 			"    parseJson(text, 'webhook payload');",
 			"}",
 		}, []correctnessNoDiscardedOutcomeFinding{{"JsonParseOutcomeType", "parseJson(text, 'webhook payload');"}}},
-		{"a JSONC parse dropped", []string{
-			"export function check() {",
-			"    parseJsonc(text, 'ProjectSecrets.jsonc');",
-			"}",
-		}, []correctnessNoDiscardedOutcomeFinding{{"JsoncParseOutcomeType", "parseJsonc(text, 'ProjectSecrets.jsonc');"}}},
+		{
+			"a JSONC parse dropped",
+			[]string{
+				"export function check() {",
+				"    parseJsonc(text, 'ProjectSecrets.jsonc');",
+				"}",
+			},
+			[]correctnessNoDiscardedOutcomeFinding{
+				{"JsoncParseOutcomeType", "parseJsonc(text, 'ProjectSecrets.jsonc');"},
+			},
+		},
 		{"a file read dropped, instantiated with a type argument", []string{
 			"export function check() {",
 			"    readJsonFile<{ lastSeen: Record<string, string> }>(statePath, 'meta polling state');",
 			"}",
-		}, []correctnessNoDiscardedOutcomeFinding{{"JsonFileReadOutcomeType", "readJsonFile<{ lastSeen: Record<string, string> }>(statePath, 'meta polling state');"}}},
+		}, []correctnessNoDiscardedOutcomeFinding{{
+			"JsonFileReadOutcomeType",
+			"readJsonFile<{ lastSeen: Record<string, string> }>(statePath, 'meta polling state');",
+		}}},
 		{"a package.json read dropped", []string{
 			"export function check() {",
 			"    readPackageJson('package.json');",
@@ -304,7 +327,9 @@ func TestCorrectnessNoDiscardedOutcomeFires(t *testing.T) {
 			"export function save() {",
 			"    (writeJsonFile(statePath, state, 'plaid pending links', { mode: 0o600 }));",
 			"}",
-		}, []correctnessNoDiscardedOutcomeFinding{correctnessNoDiscardedOutcomeWrite("(writeJsonFile(statePath, state, 'plaid pending links', { mode: 0o600 }));")}},
+		}, []correctnessNoDiscardedOutcomeFinding{correctnessNoDiscardedOutcomeWrite(
+			"(writeJsonFile(statePath, state, 'plaid pending links', { mode: 0o600 }));",
+		)}},
 		{"a project wrapper with an inferred return type", []string{
 			"function saveState() {",
 			"    return writeJsonFile(statePath, state, 'meta polling state');",
@@ -357,21 +382,23 @@ func TestCorrectnessNoDiscardedOutcomeFires(t *testing.T) {
 		}},
 		{"a write at module level", []string{
 			"writeJsonFile(statePath, state, 'meta polling state');",
-		}, []correctnessNoDiscardedOutcomeFinding{correctnessNoDiscardedOutcomeWrite("writeJsonFile(statePath, state, 'meta polling state');")}},
+		}, []correctnessNoDiscardedOutcomeFinding{
+			correctnessNoDiscardedOutcomeWrite("writeJsonFile(statePath, state, 'meta polling state');"),
+		}},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 
-			result := correctnessNoDiscardedOutcomeRun(t, correctnessNoDiscardedOutcomeSource(testCase.lines...))
-			correctnessNoDiscardedOutcomeExpect(t, result, testCase.want)
+			result := correctnessNoDiscardedOutcomeRun(test, correctnessNoDiscardedOutcomeSource(testCase.lines...))
+			correctnessNoDiscardedOutcomeExpect(test, result, testCase.want)
 		})
 	}
 }
 
-func TestCorrectnessNoDiscardedOutcomeStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoDiscardedOutcomeStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name  string
@@ -437,18 +464,21 @@ func TestCorrectnessNoDiscardedOutcomeStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 
-			rule_testing.ExpectClean(t, correctnessNoDiscardedOutcomeRun(t, correctnessNoDiscardedOutcomeSource(testCase.lines...)))
+			rule_testing.ExpectClean(
+				test,
+				correctnessNoDiscardedOutcomeRun(test, correctnessNoDiscardedOutcomeSource(testCase.lines...)),
+			)
 		})
 	}
 }
 
 // The same alias, name and arms, declared by a file that is not Nexus's. The declaring file is half
 // of what makes a type ours, so the call stays silent; the Nexus write beside it is the control.
-func TestCorrectnessNoDiscardedOutcomeIgnoresTheSameAliasOutsideNexus(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoDiscardedOutcomeIgnoresTheSameAliasOutsideNexus(test *testing.T) {
+	test.Parallel()
 
 	lookalike := strings.Join([]string{
 		"export type JsonFileWriteOutcomeType =",
@@ -471,8 +501,8 @@ func TestCorrectnessNoDiscardedOutcomeIgnoresTheSameAliasOutsideNexus(t *testing
 	for fileName, fileText := range correctnessNoDiscardedOutcomeNexusFiles {
 		files[fileName] = fileText
 	}
-	result := rule_testing.RunTypedFiles(t, CorrectnessNoDiscardedOutcome, files, "/repository/source/save/Save.ts")
-	correctnessNoDiscardedOutcomeExpect(t, result, []correctnessNoDiscardedOutcomeFinding{
+	result := rule_testing.RunTypedFiles(test, CorrectnessNoDiscardedOutcome, files, "/repository/source/save/Save.ts")
+	correctnessNoDiscardedOutcomeExpect(test, result, []correctnessNoDiscardedOutcomeFinding{
 		correctnessNoDiscardedOutcomeWrite("writeNexusJsonFile(path, {}, 'nexus');"),
 	})
 }

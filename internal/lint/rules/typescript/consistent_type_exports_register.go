@@ -13,7 +13,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // decoder keeps an absent key distinguishable from an explicit one, which is what would matter if
 // the default ever moved.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[ConsistentTypeExportsOptions]{
 		Rule:   ConsistentTypeExports,
 		Decode: DecodeConsistentTypeExportsOptions,
 	})

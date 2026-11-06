@@ -1,8 +1,6 @@
 package typescript
 
 import (
-	"encoding/json"
-
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
@@ -17,13 +15,14 @@ type NoFloatingPromisesOptions struct {
 	AllowForKnownSafePromises       []type_checking.TypeOrValueSpecifier
 	AllowForKnownSafePromisesInline []string
 	CheckThenables                  *bool
-	IgnoreIIFE                      *bool
+	IgnoreIife                      *bool `json:"IgnoreIIFE"`
 	IgnoreVoid                      *bool
 }
 
 var noFloatingPromisesMessageBase = "Promises must be awaited, end with a call to .catch, or end with a call to .then with a rejection handler."
 
-var noFloatingPromisesMessageBaseVoid = "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler" +
+var noFloatingPromisesMessageBaseVoid = "Promises must be awaited, end with a call to .catch, " +
+	"end with a call to .then with a rejection handler" +
 	" or be explicitly marked as ignored with the `void` operator."
 
 var noFloatingPromisesMessageRejectionHandler = "A rejection handler that is not a function will be ignored."
@@ -59,7 +58,8 @@ func buildFloatingPromiseArrayMessage() rule.Message {
 func buildFloatingPromiseArrayVoidMessage() rule.Message {
 	return rule.Message{
 		Id: "floatingPromiseArrayVoid",
-		Description: "An array of Promises may be unintentional. Consider handling the promises' fulfillment or rejection with Promise.all or similar," +
+		Description: "An array of Promises may be unintentional. " +
+			"Consider handling the promises' fulfillment or rejection with Promise.all or similar," +
 			" or explicitly marking the expression as ignored with the `void` operator.",
 	}
 }
@@ -116,32 +116,32 @@ func buildFloatingVoidMessage() rule.Message {
 // one.
 //
 // oxc declares this rule `(tsgolint)` and carries no algorithm and no corpus, so the behavior
-// oxlint exhibits IS tsgolint's: the release binary shells out to a `tsgolint` executable and
+// oxlint exhibits is tsgolint's: the release binary shells out to a `tsgolint` executable and
 // refuses to run the rule when that binary is absent, which is what it does on this machine. That
 // refusal is itself the proof, so oxlint cannot serve as ground truth here and tsgolint's own test
 // file is the corpus instead: seventy-two clean cases, ninety-seven reporting a hundred and
 // forty-six findings, and two hundred and thirty-two exact suggestion outputs.
 //
-// # The option surface is FIVE keys, and a captured inventory said none
+// # The option surface is five keys, and a captured inventory said none
 //
 // A rule catalog recorded `"options": "no"` for this rule. It has five, and both references
 // agree on all of them: `allowForKnownSafeCalls`, `allowForKnownSafePromises`, `checkThenables`,
 // `ignoreIIFE`, `ignoreVoid`. Counted from tsgolint's option struct and confirmed against the
 // plugin's `meta.schema` rather than taken from the inventory.
 //
-// `ignoreVoid` defaults to TRUE, which is the load-bearing default: it decides which of two message
+// `ignoreVoid` defaults to true, which is the load-bearing default: it decides which of two message
 // families a finding lands in and whether the void suggestion is offered at all. An unconfigured
 // run therefore reports `floatingVoid` rather than `floating`, and the decoder keeps all three
 // booleans as pointers end to end so that absent stays distinguishable from an explicit false.
 //
-// The two allowlists take TYPE SPECIFIERS, which is why `typecheck/specifier.go` is
+// The two allowlists take type specifiers, which is why `typecheck/specifier.go` is
 // load-bearing here. Each entry is either a bare string matched against the type's own name, or an
 // object whose `from` is `file`, `lib` or `package`. Those are two different fields in the struct
 // the rule reads, so `DecodeNoFloatingPromisesOptions` below is hand-written rather than a
 // `rule.DecodeOptionsInto` binding.
 //
 // A `from: file` specifier carrying a `path` compares that path, resolved against the program's
-// current directory, to the DECLARING file's absolute name. That makes one upstream case depend on
+// current directory, to the declaring file's absolute name. That makes one upstream case depend on
 // what upstream named its fixture, and the test file says how that is reproduced.
 //
 // # What counts as handled, measured rather than reasoned about
@@ -174,9 +174,9 @@ func buildFloatingVoidMessage() rule.Message {
 // because the message text invites the opposite reading: the arity guard is `>= 1`, so a `catch`
 // with no arguments never reaches the handler test and falls through to "unhandled" instead.
 //
-// # An array of promises reports ONCE, and the reason is structural
+// # An array of promises reports once, and the reason is structural
 //
-// Probed with a TRIPLE rather than a pair, reading every position rather than the count:
+// Probed with a triple rather than a pair, reading every position rather than the count:
 //
 //	[a, b, c];      ONE finding, floatingPromiseArrayVoid, pointing at the whole statement
 //	a; b; c;        THREE findings, one per statement, each pointing at its own statement
@@ -187,7 +187,7 @@ func buildFloatingVoidMessage() rule.Message {
 // `Promise.all` row is the one that could mislead: it is not a promise array at all, because the
 // array is consumed by the call and what floats is the call's own promise.
 //
-// The promise-array findings carry NO suggestions, which is the one report path that uses plain
+// The promise-array findings carry no suggestions, which is the one report path that uses plain
 // `ReportNode`. Neither `await` nor `void` is a correct repair for an array, so upstream offers
 // nothing rather than offering something wrong.
 //
@@ -196,7 +196,7 @@ func buildFloatingVoidMessage() rule.Message {
 // Fifty-three inputs were run through this rule and through `@typescript-eslint`'s version driven
 // by ESLint's flat-config Linter API, one fresh directory per case so the plugin's program is
 // rebuilt each time, with a negative control to prove a non-zero was data rather than a
-// config-resolution error. Fifty-one agree. Both sides register exactly ONE listener
+// config-resolution error. Fifty-one agree. Both sides register exactly one listener
 // (`ExpressionStatement`), carry the same eight message ids, and ship suggestions rather than
 // fixes; there is no equivalent here of the fourth arm `await-thenable` has on one side only.
 //
@@ -211,11 +211,11 @@ func buildFloatingVoidMessage() rule.Message {
 // enhancement" and that it lacks tests. The checker resolves the enum member to `'catch'`, so the
 // promise reads as handled; the plugin reads only literal keys and does not.
 //
-// The second is the paren axis, and it falls the OPPOSITE way from `no-implied-eval`, where
+// The second is the paren axis, and it falls the opposite way from `no-implied-eval`, where
 // tsgolint is the silent one. The cause is the same structural difference in both rules and the
 // direction is reversed by where the parens sit. This rule runs `ast.SkipParentheses` over the
 // statement's expression, so `(p.catch(() => {}))` is transparent and silent on both sides. It does
-// not skip again during the descent, so a parenthesized CALLEE leaves `ast.IsAccessExpression`
+// not skip again during the descent, so a parenthesized callee leaves `ast.IsAccessExpression`
 // declining and the handler test never runs. ESTree has no parenthesized-expression node, so the
 // plugin never sees the parens at all. Three positions, three answers, in one rule:
 //
@@ -227,12 +227,12 @@ func buildFloatingVoidMessage() rule.Message {
 // oxlint. The corpus writes no parenthesized form anywhere, so this whole axis is invisible to the
 // imported fixtures and is pinned by measured cases in the test file instead.
 //
-// # The library pinning does NOT bite here, and that was measured
+// # The library pinning does not bite here, and that was measured
 //
 // The fixture tsconfig pins `lib: ["ES2022"]` with no way to raise it, which inverted three
 // `await-thenable` cases and moved nothing on `no-implied-eval`. It is a per-rule question and the
 // answer is not predictable from the rule's shape, so it was run rather than inherited: ten shapes,
-// each once bare and once with a second file merging onto the global scope. NO VERDICT MOVED.
+// each once bare and once with a second file merging onto the global scope. No verdict moved.
 // `Promise` and `PromiseLike` are declared in the ES2015 library that ES2022 includes, so the
 // globals this rule cares about resolve properly under the pinning. That is the opposite of
 // `Disposable`, which resolves to the error type and reports flags of `any`.
@@ -258,7 +258,7 @@ func buildFloatingVoidMessage() rule.Message {
 // `GetSymbolAtLocation` return nil rather than panicking, so a checker-less run would not blow up:
 // `isPromiseLike` would answer false for everything and the rule would go completely silent.
 // Ninety-seven reporting fixtures would fail in a way that reads like a rule defect while
-// seventy-two clean ones passed VACUOUSLY. A test pins the declaration and the decline together, so
+// seventy-two clean ones passed vacuously. A test pins the declaration and the decline together, so
 // a later revert fails loudly.
 //
 // # Cost
@@ -268,7 +268,7 @@ func buildFloatingVoidMessage() rule.Message {
 // ask for a type. `isPromiseArray` runs before `isPromiseLike` and walks union parts asking for
 // apparent types, so a statement whose expression is not a promise still costs one type read. That
 // is upstream's ordering and it is kept.
-var NoFloatingPromises = rule.Rule{
+var NoFloatingPromises = rule.Rule[NoFloatingPromisesOptions]{
 	Name: "@typescript-eslint/no-floating-promises",
 
 	NeedsTypeChecker: true,
@@ -278,24 +278,24 @@ var NoFloatingPromises = rule.Rule{
 	// Compiler options and the default library, through type_checking's builtin and specifier helpers.
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		opts, ok := rule.OptionsAs[NoFloatingPromisesOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[NoFloatingPromisesOptions]) rule.Listeners {
+		settings, ok := options.Read()
 		if !ok {
-			opts = NoFloatingPromisesOptions{
+			settings = NoFloatingPromisesOptions{
 				AllowForKnownSafeCalls:          []type_checking.TypeOrValueSpecifier{},
 				AllowForKnownSafeCallsInline:    []string{},
 				AllowForKnownSafePromises:       []type_checking.TypeOrValueSpecifier{},
 				AllowForKnownSafePromisesInline: []string{},
 			}
 		}
-		if opts.CheckThenables == nil {
-			opts.CheckThenables = type_checking.Ref(false)
+		if settings.CheckThenables == nil {
+			settings.CheckThenables = type_checking.Reference(false)
 		}
-		if opts.IgnoreIIFE == nil {
-			opts.IgnoreIIFE = type_checking.Ref(false)
+		if settings.IgnoreIife == nil {
+			settings.IgnoreIife = type_checking.Reference(false)
 		}
-		if opts.IgnoreVoid == nil {
-			opts.IgnoreVoid = type_checking.Ref(true)
+		if settings.IgnoreVoid == nil {
+			settings.IgnoreVoid = type_checking.Reference(true)
 		}
 
 		isHigherPrecedenceThanUnary := func(node *ast.Node) bool {
@@ -312,24 +312,24 @@ var NoFloatingPromises = rule.Rule{
 			node *ast.ExpressionStatement,
 		) []rule.Fix {
 			if ast.IsVoidExpression(expression) {
-				voidTokenRange := scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, expression.Pos())
+				voidTokenRange := scanner.GetRangeOfTokenAtPosition(ruleContext.SourceFile, expression.Pos())
 				return []rule.Fix{rule.ReplaceRange(voidTokenRange, "await")}
 			}
 			if isHigherPrecedenceThanUnary(node.Expression) {
-				return []rule.Fix{ctx.InsertBefore(&node.Node, "await ")}
+				return []rule.Fix{ruleContext.InsertBefore(&node.Node, "await ")}
 			}
 			return []rule.Fix{
-				ctx.InsertBefore(&node.Node, "await ("),
-				ctx.InsertAfter(expression, ")"),
+				ruleContext.InsertBefore(&node.Node, "await ("),
+				ruleContext.InsertAfter(expression, ")"),
 			}
 		}
 
 		hasMatchingSignature := func(
-			t *checker.Type,
+			subjectType *checker.Type,
 			matcher func(signature *checker.Signature) bool,
 		) bool {
-			for part := range type_checking.UnionTypePartsSeq(t) {
-				if type_checking.Some(type_checking.GetCallSignatures(ctx.TypeChecker, part), matcher) {
+			for part := range type_checking.UnionTypePartsSequence(subjectType) {
+				if type_checking.Some(type_checking.GetCallSignatures(ruleContext.TypeChecker, part), matcher) {
 					return true
 				}
 			}
@@ -337,45 +337,52 @@ var NoFloatingPromises = rule.Rule{
 			return false
 		}
 
-		isFunctionParam := func(
-			param *ast.Symbol,
+		isFunctionParameter := func(
+			parameter *ast.Symbol,
 			node *ast.Node,
 		) bool {
-			t := checker.Checker_getApparentType(ctx.TypeChecker, ctx.TypeChecker.GetTypeOfSymbolAtLocation(param, node))
+			subjectType := checker.Checker_getApparentType(
+				ruleContext.TypeChecker,
+				ruleContext.TypeChecker.GetTypeOfSymbolAtLocation(parameter, node),
+			)
 
-			for part := range type_checking.UnionTypePartsSeq(t) {
-				if len(type_checking.GetCallSignatures(ctx.TypeChecker, part)) != 0 {
+			for part := range type_checking.UnionTypePartsSequence(subjectType) {
+				if len(type_checking.GetCallSignatures(ruleContext.TypeChecker, part)) != 0 {
 					return true
 				}
 			}
 			return false
 		}
 
-		isPromiseLike := func(node *ast.Node, t *checker.Type) bool {
-			if t == nil {
-				t = ctx.TypeChecker.GetTypeAtLocation(node)
+		isPromiseLike := func(node *ast.Node, subjectType *checker.Type) bool {
+			// A caller without the type at hand passes nil, and the type is read at the node.
+			candidateType := subjectType
+			if candidateType == nil {
+				candidateType = ruleContext.TypeChecker.GetTypeAtLocation(node)
 			}
 
 			// The highest priority is to allow anything allowlisted
 			if type_checking.TypeMatchesSomeSpecifier(
-				t,
-				opts.AllowForKnownSafePromises,
-				opts.AllowForKnownSafePromisesInline,
-				ctx.Program,
+				candidateType,
+				settings.AllowForKnownSafePromises,
+				settings.AllowForKnownSafePromisesInline,
+				ruleContext.Program,
 			) {
 				return false
 			}
 
 			// Otherwise, we always consider the built-in Promise to be Promise-like...
-			typeParts := type_checking.UnionTypeParts(checker.Checker_getApparentType(ctx.TypeChecker, t))
+			typeParts := type_checking.UnionTypeParts(
+				checker.Checker_getApparentType(ruleContext.TypeChecker, candidateType),
+			)
 			if type_checking.Some(typeParts, func(typePart *checker.Type) bool {
-				return type_checking.IsPromiseLike(ctx.Program, ctx.TypeChecker, typePart)
+				return type_checking.IsPromiseLike(ruleContext.Program, ruleContext.TypeChecker, typePart)
 			}) {
 				return true
 			}
 
 			// ...and only check all Thenables if explicitly told to
-			if !*opts.CheckThenables {
+			if !*settings.CheckThenables {
 				return false
 			}
 
@@ -384,17 +391,19 @@ var NoFloatingPromises = rule.Rule{
 			//
 			//   https://github.com/ajafff/tsutils/blob/49d0d31050b44b81e918eae4fbaf1dfe7b7286af/util/type.ts#L95-L125
 			for _, typePart := range typeParts {
-				then := checker.Checker_getPropertyOfType(ctx.TypeChecker, typePart, "then")
+				then := checker.Checker_getPropertyOfType(ruleContext.TypeChecker, typePart, "then")
 				if then == nil {
 					continue
 				}
 
-				thenType := ctx.TypeChecker.GetTypeOfSymbolAtLocation(then, node)
+				thenType := ruleContext.TypeChecker.GetTypeOfSymbolAtLocation(then, node)
 				if hasMatchingSignature(
 					thenType,
 					func(signature *checker.Signature) bool {
-						params := checker.Signature_parameters(signature)
-						return len(params) >= 2 && isFunctionParam(params[0], node) && isFunctionParam(params[1], node)
+						parameters := checker.Signature_parameters(signature)
+						return len(parameters) >= 2 &&
+							isFunctionParameter(parameters[0], node) &&
+							isFunctionParameter(parameters[1], node)
 					}) {
 					return true
 				}
@@ -403,19 +412,22 @@ var NoFloatingPromises = rule.Rule{
 		}
 
 		isPromiseArray := func(node *ast.Node) bool {
-			t := ctx.TypeChecker.GetTypeAtLocation(node)
-			for typePart := range type_checking.UnionTypePartsSeq(t) {
-				apparent := checker.Checker_getApparentType(ctx.TypeChecker, typePart)
+			subjectType := ruleContext.TypeChecker.GetTypeAtLocation(node)
+			for typePart := range type_checking.UnionTypePartsSequence(subjectType) {
+				apparent := checker.Checker_getApparentType(ruleContext.TypeChecker, typePart)
 
-				if checker.Checker_isArrayType(ctx.TypeChecker, apparent) {
-					arrayType := checker.Checker_getTypeArguments(ctx.TypeChecker, apparent)[0]
+				if checker.Checker_isArrayType(ruleContext.TypeChecker, apparent) {
+					arrayType := checker.Checker_getTypeArguments(ruleContext.TypeChecker, apparent)[0]
 					if isPromiseLike(node, arrayType) {
 						return true
 					}
 				}
 
 				if checker.IsTupleType(apparent) {
-					for _, tupleElementType := range checker.Checker_getTypeArguments(ctx.TypeChecker, apparent) {
+					for _, tupleElementType := range checker.Checker_getTypeArguments(
+						ruleContext.TypeChecker,
+						apparent,
+					) {
 						if isPromiseLike(node, tupleElementType) {
 							return true
 						}
@@ -430,13 +442,13 @@ var NoFloatingPromises = rule.Rule{
 				return false
 			}
 
-			t := ctx.TypeChecker.GetTypeAtLocation(node.AsCallExpression().Expression)
+			subjectType := ruleContext.TypeChecker.GetTypeAtLocation(node.AsCallExpression().Expression)
 
 			return type_checking.TypeMatchesSomeSpecifier(
-				t,
-				opts.AllowForKnownSafeCalls,
-				opts.AllowForKnownSafeCallsInline,
-				ctx.Program,
+				subjectType,
+				settings.AllowForKnownSafeCalls,
+				settings.AllowForKnownSafeCallsInline,
+				ruleContext.Program,
 			)
 		}
 
@@ -451,7 +463,10 @@ var NoFloatingPromises = rule.Rule{
 		}
 
 		isValidRejectionHandler := func(rejectionHandler *ast.Node) bool {
-			return len(type_checking.GetCallSignatures(ctx.TypeChecker, ctx.TypeChecker.GetTypeAtLocation(rejectionHandler))) > 0
+			return len(type_checking.GetCallSignatures(
+				ruleContext.TypeChecker,
+				ruleContext.TypeChecker.GetTypeAtLocation(rejectionHandler),
+			)) > 0
 		}
 
 		var isUnhandledPromise func(
@@ -485,7 +500,7 @@ var NoFloatingPromises = rule.Rule{
 				return isUnhandledPromise(expr.Right)
 			}
 
-			if !*opts.IgnoreVoid && ast.IsVoidExpression(node) {
+			if !*settings.IgnoreVoid && ast.IsVoidExpression(node) {
 				// Similarly, a `void` expression always returns undefined, so we need to
 				// see what's inside it without checking the type of the overall expression.
 				return isUnhandledPromise(node.Expression())
@@ -518,10 +533,11 @@ var NoFloatingPromises = rule.Rule{
 				callExpr := node.AsCallExpression()
 				callee := callExpr.Expression
 				if ast.IsAccessExpression(callee) {
-					// TODO(port): getStaticMemberAccessValue -> GetAccessedPropertyName is an
-					// enhancement, we should probably add tests for it
-					// const methodName = getStaticMemberAccessValue(callee, context);
-					methodName, _ := checker.Checker_getAccessedPropertyName(ctx.TypeChecker, callee)
+					// Upstream reads the name with `getStaticMemberAccessValue`. This port reads it with
+					// `Checker_getAccessedPropertyName`, which the Go port it came from called an enhancement
+					// it had no tests for; the rule's doc names the input where the two disagree, and a test
+					// pins it.
+					methodName, _ := checker.Checker_getAccessedPropertyName(ruleContext.TypeChecker, callee)
 
 					if methodName == "catch" && len(callExpr.Arguments.Nodes) >= 1 {
 						if isValidRejectionHandler(callExpr.Arguments.Nodes[0]) {
@@ -572,13 +588,13 @@ var NoFloatingPromises = rule.Rule{
 
 		return rule.Listeners{
 			ast.KindExpressionStatement: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 
 				exprStatement := node.AsExpressionStatement()
 
-				if *opts.IgnoreIIFE && isAsyncIife(exprStatement) {
+				if *settings.IgnoreIife && isAsyncIife(exprStatement) {
 					return
 				}
 
@@ -594,30 +610,30 @@ var NoFloatingPromises = rule.Rule{
 					return
 				}
 				if promiseArray {
-					var msg rule.Message
-					if *opts.IgnoreVoid {
-						msg = buildFloatingPromiseArrayVoidMessage()
+					var message rule.Message
+					if *settings.IgnoreVoid {
+						message = buildFloatingPromiseArrayVoidMessage()
 					} else {
-						msg = buildFloatingPromiseArrayMessage()
+						message = buildFloatingPromiseArrayMessage()
 					}
-					ctx.ReportNode(node, msg)
-				} else if *opts.IgnoreVoid {
-					var msg rule.Message
+					ruleContext.ReportNode(node, message)
+				} else if *settings.IgnoreVoid {
+					var message rule.Message
 					if nonFunctionHandler {
-						msg = buildFloatingUselessRejectionHandlerVoidMessage()
+						message = buildFloatingUselessRejectionHandlerVoidMessage()
 					} else {
-						msg = buildFloatingVoidMessage()
+						message = buildFloatingVoidMessage()
 					}
 
-					ctx.ReportNodeWithSuggestions(node, msg, rule.Suggestion{
+					ruleContext.ReportNodeWithSuggestions(node, message, rule.Suggestion{
 						Message: buildFloatingFixVoidMessage(),
 						Fixes: (func() []rule.Fix {
 							if isHigherPrecedenceThanUnary(exprStatement.Expression) {
-								return []rule.Fix{ctx.InsertBefore(node, "void ")}
+								return []rule.Fix{ruleContext.InsertBefore(node, "void ")}
 							}
 							return []rule.Fix{
-								ctx.InsertBefore(node, "void ("),
-								ctx.InsertAfter(expression, ")"),
+								ruleContext.InsertBefore(node, "void ("),
+								ruleContext.InsertAfter(expression, ")"),
 							}
 						})(),
 					}, rule.Suggestion{
@@ -625,13 +641,13 @@ var NoFloatingPromises = rule.Rule{
 						Fixes:   addAwait(expression, exprStatement),
 					})
 				} else {
-					var msg rule.Message
+					var message rule.Message
 					if nonFunctionHandler {
-						msg = buildFloatingUselessRejectionHandlerMessage()
+						message = buildFloatingUselessRejectionHandlerMessage()
 					} else {
-						msg = buildFloatingMessage()
+						message = buildFloatingMessage()
 					}
-					ctx.ReportNodeWithSuggestions(node, msg, rule.Suggestion{
+					ruleContext.ReportNodeWithSuggestions(node, message, rule.Suggestion{
 						Message: buildFloatingFixAwaitMessage(),
 						Fixes:   addAwait(expression, exprStatement),
 					})
@@ -652,56 +668,8 @@ type noFloatingPromisesRawOptions struct {
 	AllowForKnownSafeCalls    []noFloatingPromisesRawSpecifier `json:"allowForKnownSafeCalls"`
 	AllowForKnownSafePromises []noFloatingPromisesRawSpecifier `json:"allowForKnownSafePromises"`
 	CheckThenables            *bool                            `json:"checkThenables"`
-	IgnoreIIFE                *bool                            `json:"ignoreIIFE"`
+	IgnoreIife                *bool                            `json:"ignoreIIFE"`
 	IgnoreVoid                *bool                            `json:"ignoreVoid"`
-}
-
-// noFloatingPromisesRawSpecifier is one entry of either allowlist, in either of its two wire forms.
-type noFloatingPromisesRawSpecifier struct {
-	inline string
-
-	From    string
-	Name    []string
-	Path    string
-	Package string
-}
-
-// UnmarshalJSON accepts both wire forms: a bare string, or the object the schema describes.
-//
-// `name` is itself two shapes, a string or an array of strings, and it is required on the object
-// form. An unrecognized `from` is left as the zero value rather than erroring, which matches how
-// the rest of this config treats a value it cannot use: the specifier then matches nothing instead
-// of failing the run.
-func (s *noFloatingPromisesRawSpecifier) UnmarshalJSON(raw []byte) error {
-	var asString string
-	if err := json.Unmarshal(raw, &asString); err == nil {
-		*s = noFloatingPromisesRawSpecifier{inline: asString}
-		return nil
-	}
-
-	var object struct {
-		From    string          `json:"from"`
-		Name    json.RawMessage `json:"name"`
-		Path    string          `json:"path"`
-		Package string          `json:"package"`
-	}
-	if err := rule.UnmarshalOptions(raw, &object); err != nil {
-		return err
-	}
-
-	*s = noFloatingPromisesRawSpecifier{From: object.From, Path: object.Path, Package: object.Package}
-
-	var names []string
-	if err := json.Unmarshal(object.Name, &names); err == nil {
-		s.Name = names
-		return nil
-	}
-	var name string
-	if err := json.Unmarshal(object.Name, &name); err != nil {
-		return err
-	}
-	s.Name = []string{name}
-	return nil
 }
 
 // specifiersFrom splits one wire allowlist into the two fields the rule reads.
@@ -739,23 +707,25 @@ func specifiersFrom(raw []noFloatingPromisesRawSpecifier) ([]type_checking.TypeO
 // heterogeneous array and leave as two typed fields, and because `from` is a string on the wire and
 // an integer enum in the struct. The three boolean keys stay pointers all the way through, so that
 // "absent" is distinguishable from "false" and the rule's own defaulting is what fills them in.
-// That matters most for `ignoreVoid`, whose default is TRUE: binding it to a plain bool would make
+// That matters most for `ignoreVoid`, whose default is true: binding it to a plain bool would make
 // an unconfigured rule behave as though it had been explicitly turned off.
-func DecodeNoFloatingPromisesOptions(raw []byte) (any, error) {
-	decoded, err := rule.DecodeOptionsInto[noFloatingPromisesRawOptions]()(raw)
-	if err != nil {
-		return NoFloatingPromisesOptions{}, err
+func DecodeNoFloatingPromisesOptions(raw []byte) (NoFloatingPromisesOptions, error) {
+	decoded, decodeOptionsError := rule.DecodeOptionsInto[noFloatingPromisesRawOptions]()(raw)
+	if decodeOptionsError != nil {
+		return NoFloatingPromisesOptions{}, decodeOptionsError
 	}
-
-	wire, _ := decoded.(noFloatingPromisesRawOptions)
 
 	options := NoFloatingPromisesOptions{
-		CheckThenables: wire.CheckThenables,
-		IgnoreIIFE:     wire.IgnoreIIFE,
-		IgnoreVoid:     wire.IgnoreVoid,
+		CheckThenables: decoded.CheckThenables,
+		IgnoreIife:     decoded.IgnoreIife,
+		IgnoreVoid:     decoded.IgnoreVoid,
 	}
-	options.AllowForKnownSafeCalls, options.AllowForKnownSafeCallsInline = specifiersFrom(wire.AllowForKnownSafeCalls)
-	options.AllowForKnownSafePromises, options.AllowForKnownSafePromisesInline = specifiersFrom(wire.AllowForKnownSafePromises)
+	options.AllowForKnownSafeCalls, options.AllowForKnownSafeCallsInline = specifiersFrom(
+		decoded.AllowForKnownSafeCalls,
+	)
+	options.AllowForKnownSafePromises, options.AllowForKnownSafePromisesInline = specifiersFrom(
+		decoded.AllowForKnownSafePromises,
+	)
 
 	return options, nil
 }

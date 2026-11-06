@@ -34,53 +34,6 @@ const javaScriptSpaceText = "\t\n\v\f\r \u00a0\u1680\u2000\u2001\u2002\u2003\u20
 // relocation maps a Swift build leaves in .build).
 const oracleSizeLimit = 1 << 20
 
-// yamlCandidate is the port, measured two ways. The full stack is Format: the Go parser and the printer,
-// from the text. The tree loader prints the trees the real parser built, parsed by Node in batches before
-// the comparison starts, so the printer is measured apart from the parser; Format then checks it is
-// printing the text the tree was parsed from.
-type yamlCandidate struct {
-	options   formatoptions.Options
-	fullStack bool
-	texts     map[string]string
-	trees     map[string]parsed
-}
-
-func (candidate yamlCandidate) Handles(fileName string) bool {
-	extension := strings.ToLower(filepath.Ext(fileName))
-	return extension == ".yaml" || extension == ".yml"
-}
-
-func (candidate yamlCandidate) Format(fileName string, text string) (string, error) {
-	if candidate.fullStack {
-		return formatFullStack(fileName, text, candidate.options, "preserve", nil)
-	}
-	normalized, hasByteOrderMark := normalizeInput(text)
-	if candidate.texts[fileName] != normalized {
-		return "", fmt.Errorf("the file changed after it was parsed")
-	}
-	return formatParsed(fileName, candidate.trees[fileName], normalized, hasByteOrderMark, candidate.options, "preserve", nil)
-}
-
-// frontMatterOracle formats a markdown file with Prettier and keeps the front matter block of the
-// output: the first line through the first later line that is the end delimiter ("---", or "..." as
-// pandoc allows).
-type frontMatterOracle struct{ engine *prettier.Engine }
-
-func (oracle frontMatterOracle) Handles(fileName string) bool { return oracle.engine.Handles(fileName) }
-
-func (oracle frontMatterOracle) Format(fileName string, text string) (string, error) {
-	formatted, err := oracle.engine.Format(fileName, text)
-	if err != nil {
-		return "", err
-	}
-	normalized, _ := normalizeInput(text)
-	frontMatter, _ := mdast.ParseFrontMatter(normalized)
-	if frontMatter == nil {
-		return "", fmt.Errorf("no front matter")
-	}
-	return frontMatterBlock(formatted, frontMatter.EndDelimiter), nil
-}
-
 func frontMatterBlock(formatted string, endDelimiter string) string {
 	lines := strings.SplitAfter(formatted, "\n")
 	length := 0
@@ -112,18 +65,18 @@ func (candidate frontMatterCandidate) Handles(fileName string) bool {
 func (candidate frontMatterCandidate) Format(fileName string, _ string) (string, error) {
 	frontMatter := candidate.frontMatters[fileName]
 	var embedded doc.Doc
-	var err error
+	var formatError error
 	if candidate.fullStack {
-		embedded, err = FormatDoc(candidate.values[fileName], candidate.options, nil)
+		embedded, formatError = FormatDoc(candidate.values[fileName], candidate.options, nil)
 	} else {
 		tree := candidate.trees[fileName]
-		if tree.err != "" {
-			return "", fmt.Errorf("the parser failed: %s", tree.err)
+		if tree.parseFailure != "" {
+			return "", fmt.Errorf("the parser failed: %s", tree.parseFailure)
 		}
-		embedded, err = PrintDoc(tree.root, candidate.values[fileName], candidate.options, nil)
+		embedded, formatError = PrintDoc(tree.root, candidate.values[fileName], candidate.options, nil)
 	}
-	if err != nil {
-		return "", err
+	if formatError != nil {
+		return "", formatError
 	}
 	explicitLanguage := ""
 	if frontMatter.ExplicitLanguage != nil {
@@ -136,7 +89,11 @@ func (candidate frontMatterCandidate) Format(fileName string, _ string) (string,
 		doc.StripTrailingHardline(embedded),
 		doc.Hardline,
 		doc.Text(frontMatter.EndDelimiter),
-	}), doc.Options{PrintWidth: candidate.options.PrintWidth, TabWidth: candidate.options.TabWidth, UseTabs: candidate.options.UseTabs})
+	}), doc.Options{
+		PrintWidth: candidate.options.PrintWidth,
+		TabWidth:   candidate.options.TabWidth,
+		UseTabs:    candidate.options.UseTabs,
+	})
 	// The markdown printer follows the front matter with a newline whatever comes after it.
 	return printed + "\n", nil
 }
@@ -153,11 +110,11 @@ type yamlCorpus struct {
 // into each nested repository as a corpus of its own, with its own config. So the files measured are
 // the ones the formatter would be given, and not, say, the debug-symbol YAML a Swift build leaves in
 // .build, which no repository formats and the oracle's goja runtime overflows its stack on.
-func yamlCorpora(t *testing.T, roots string) []yamlCorpus {
-	t.Helper()
-	enumerator, err := prettier.New(formatoptions.Default())
-	if err != nil {
-		t.Fatal(err)
+func yamlCorpora(test *testing.T, roots string) []yamlCorpus {
+	test.Helper()
+	enumerator, newPrettierError := prettier.New(formatoptions.Default())
+	if newPrettierError != nil {
+		test.Fatal(newPrettierError)
 	}
 	var corpora []yamlCorpus
 	pending := strings.Split(roots, ":")
@@ -166,7 +123,10 @@ func yamlCorpora(t *testing.T, roots string) []yamlCorpus {
 		root := strings.TrimSpace(pending[0])
 		pending = pending[1:]
 		if strings.HasPrefix(root, "~/") {
-			home, _ := os.UserHomeDir()
+			home, homeError := os.UserHomeDir()
+			if homeError != nil {
+				test.Fatalf("finding the home directory for %s: %v", root, homeError)
+			}
 			root = filepath.Join(home, root[2:])
 		}
 		if root == "" || seen[root] {
@@ -176,21 +136,21 @@ func yamlCorpora(t *testing.T, roots string) []yamlCorpus {
 
 		// Nested repositories regardless of root's own ignore lists, as the differential finds them
 		// (#k6vebep): a repository under a path root never formats is still a corpus.
-		nestedRepositories, err := formatfiles.NestedRepositoriesBelow(root)
-		if err != nil {
-			t.Fatalf("finding the repositories nested in %s: %v", root, err)
+		nestedRepositories, nestedRepositoriesBelowError := formatfiles.NestedRepositoriesBelow(root)
+		if nestedRepositoriesBelowError != nil {
+			test.Fatalf("finding the repositories nested in %s: %v", root, nestedRepositoriesBelowError)
 		}
 		for _, nested := range nestedRepositories {
 			pending = append(pending, filepath.Join(root, nested))
 		}
 
-		enumeration, err := enumerator.Enumerate(root)
-		if errors.Is(err, formatoptions.ErrPrettierConfigRemains) {
-			t.Logf("skipping %s, not yet adopted: %v", root, err)
+		enumeration, enumerateError := enumerator.Enumerate(root)
+		if errors.Is(enumerateError, formatoptions.ErrPrettierConfigRemains) {
+			test.Logf("skipping %s, not yet adopted: %v", root, enumerateError)
 			continue
 		}
-		if err != nil {
-			t.Fatalf("enumerating %s: %v", root, err)
+		if enumerateError != nil {
+			test.Fatalf("enumerating %s: %v", root, enumerateError)
 		}
 		corpus := yamlCorpus{root: root}
 		for _, file := range enumeration.Files {
@@ -211,8 +171,8 @@ func yamlCorpora(t *testing.T, roots string) []yamlCorpus {
 		// Both sides format with the same options, so a config cohere refuses (one naming an option
 		// only JavaScript reads) measures the printer just as well under the defaults.
 		corpus.options = formatoptions.Default()
-		if resolution, err := formatoptions.Resolve(root); err != nil {
-			t.Logf("%s: formatting with the default options: %v", root, err)
+		if resolution, resolveError := formatoptions.Resolve(root); resolveError != nil {
+			test.Logf("%s: formatting with the default options: %v", root, resolveError)
 		} else {
 			corpus.options = resolution.Options
 		}
@@ -221,60 +181,73 @@ func yamlCorpora(t *testing.T, roots string) []yamlCorpus {
 	// Every corpus measured, in one line, so a run that reaches fewer repositories says so.
 	var measured []string
 	for _, corpus := range corpora {
-		measured = append(measured, fmt.Sprintf("%s (%d yaml, %d md)", corpus.root, len(corpus.yamlFiles), len(corpus.markdownFiles)))
+		measured = append(
+			measured,
+			fmt.Sprintf("%s (%d yaml, %d md)", corpus.root, len(corpus.yamlFiles), len(corpus.markdownFiles)),
+		)
 	}
-	t.Logf("yaml corpora: %d\n  %s", len(corpora), strings.Join(measured, "\n  "))
+	test.Logf("yaml corpora: %d\n  %s", len(corpora), strings.Join(measured, "\n  "))
 	return corpora
 }
 
-func TestCorpusFormatMatchesOracle(t *testing.T) {
-	t.Parallel()
+func TestCorpusFormatMatchesOracle(test *testing.T) {
+	test.Parallel()
 	roots := os.Getenv("COHERE_YAML_CORPUS")
 	if roots == "" {
-		t.Skip("set COHERE_YAML_CORPUS to measure; this is a measuring run, not a unit test")
+		test.Skip("set COHERE_YAML_CORPUS to measure; this is a measuring run, not a unit test")
 	}
 
-	bundles, err := prettier.Bundles()
-	if err != nil {
-		t.Fatal(err)
+	bundles, bundlesError := prettier.Bundles()
+	if bundlesError != nil {
+		test.Fatal(bundlesError)
 	}
-	digest, err := prettier.DigestBundles(bundles.Files)
-	if err != nil {
-		t.Fatal(err)
+	digest, digestBundlesError := prettier.DigestBundles(bundles.Files)
+	if digestBundlesError != nil {
+		test.Fatal(digestBundlesError)
 	}
 	directory := os.Getenv("COHERE_FORMAT_CACHE")
 	if directory == "" {
-		base, err := os.UserCacheDir()
-		if err != nil {
-			t.Fatal(err)
+		base, userCacheDirectoryError := os.UserCacheDir()
+		if userCacheDirectoryError != nil {
+			test.Fatal(userCacheDirectoryError)
 		}
 		directory = filepath.Join(base, "cohere", "prettier-oracle")
 	}
 
 	type tally struct{ identical, measured, rewriteIdentical, rewriteTotal, refused, oracleFailed int }
-	measures := []string{"yaml files, full stack", "yaml files, tree loader", "front matter, full stack", "front matter, tree loader"}
+	measures := []string{
+		"yaml files, full stack",
+		"yaml files, tree loader",
+		"front matter, full stack",
+		"front matter, tree loader",
+	}
 	totals := map[string]*tally{}
 	for _, name := range measures {
 		totals[name] = &tally{}
 	}
 	syntaxErrors, tooLarge, parseDisagreements := 0, 0, 0
 	var report strings.Builder
-	for _, corpus := range yamlCorpora(t, roots) {
+	for _, corpus := range yamlCorpora(test, roots) {
 		options := corpus.options
 		newEngine := func() (*prettier.Engine, error) { return prettier.New(options) }
 
 		// The YAML files.
 		candidate := yamlCandidate{options: options, texts: map[string]string{}, trees: map[string]parsed{}}
 		fullStack := yamlCandidate{options: options, fullStack: true}
-		var texts, yamlFiles []string
+		var texts []string
+		var yamlFiles []string
 		for _, path := range corpus.yamlFiles {
-			source, err := os.ReadFile(path)
-			if err != nil {
-				t.Fatal(err)
+			source, readError := os.ReadFile(path)
+			if readError != nil {
+				test.Fatal(readError)
 			}
 			if len(source) > oracleSizeLimit {
 				tooLarge++
-				report.WriteString(fmt.Sprintf("yaml files: too large for the oracle, not measured: %s: %d bytes\n", path, len(source)))
+				report.WriteString(fmt.Sprintf(
+					"yaml files: too large for the oracle, not measured: %s: %d bytes\n",
+					path,
+					len(source),
+				))
 				continue
 			}
 			yamlFiles = append(yamlFiles, path)
@@ -282,33 +255,42 @@ func TestCorpusFormatMatchesOracle(t *testing.T) {
 			candidate.texts[path] = normalized
 			texts = append(texts, normalized)
 		}
-		for index, tree := range parseTrees(t, texts) {
+		for index, tree := range parseTrees(test, texts) {
 			candidate.trees[yamlFiles[index]] = tree
 		}
 		// TestCorpora's identity, character for character, so both share one cache.
-		yamlCache := &differential.OracleCache{Directory: directory, Identity: digest + "|" + string(bundles.Origin) + "|filepath|" + fmt.Sprintf("%+v", options)}
-		yamlReport, err := differential.Compare(corpus.root, yamlFiles,
+		yamlCache := &differential.OracleCache{
+			Directory: directory,
+			Identity:  digest + "|" + string(bundles.Origin) + "|filepath|" + fmt.Sprintf("%+v", options),
+		}
+		yamlReport, compareError := differential.Compare(corpus.root, yamlFiles,
 			func() (differential.Formatter, error) { return newEngine() },
 			func() (differential.Formatter, error) { return candidate, nil },
 			runtime.NumCPU(), yamlCache)
-		if err != nil {
-			t.Fatalf("comparing %s: %v", corpus.root, err)
+		if compareError != nil {
+			test.Fatalf("comparing %s: %v", corpus.root, compareError)
 		}
-		yamlFullStackReport, err := differential.Compare(corpus.root, yamlFiles,
+		yamlFullStackReport, compareError := differential.Compare(corpus.root, yamlFiles,
 			func() (differential.Formatter, error) { return newEngine() },
 			func() (differential.Formatter, error) { return fullStack, nil },
 			runtime.NumCPU(), yamlCache)
-		if err != nil {
-			t.Fatalf("comparing %s: %v", corpus.root, err)
+		if compareError != nil {
+			test.Fatalf("comparing %s: %v", corpus.root, compareError)
 		}
 
 		// The front matter of the markdown files: yaml, with a value left once trimmed.
-		frontMatters := frontMatterCandidate{options: options, frontMatters: map[string]*mdast.FrontMatter{}, values: map[string]string{}, trees: map[string]parsed{}}
-		var frontMatterFiles, values []string
+		frontMatters := frontMatterCandidate{
+			options:      options,
+			frontMatters: map[string]*mdast.FrontMatter{},
+			values:       map[string]string{},
+			trees:        map[string]parsed{},
+		}
+		var frontMatterFiles []string
+		var values []string
 		for _, path := range corpus.markdownFiles {
-			source, err := os.ReadFile(path)
-			if err != nil {
-				t.Fatal(err)
+			source, readError := os.ReadFile(path)
+			if readError != nil {
+				test.Fatal(readError)
 			}
 			normalized, _ := normalizeInput(string(source))
 			frontMatter, _ := mdast.ParseFrontMatter(normalized)
@@ -325,39 +307,67 @@ func TestCorpusFormatMatchesOracle(t *testing.T) {
 			values = append(values, value)
 		}
 		var measuredFrontMatterFiles []string
-		for index, tree := range parseTrees(t, values) {
+		for index, tree := range parseTrees(test, values) {
 			frontMatters.trees[frontMatterFiles[index]] = tree
 			// The Go parser must refuse exactly the values the real one refuses.
-			if _, err := parse(values[index], nil); (err != nil) != (tree.err != "") {
+			if _, parseError := parse(values[index], nil); (parseError != nil) != (tree.parseFailure != "") {
 				parseDisagreements++
-				report.WriteString(fmt.Sprintf("front matter: the Go parser disagrees (real: %q, Go: %v): %s\n", tree.err, err, frontMatterFiles[index]))
+				report.WriteString(fmt.Sprintf(
+					"front matter: the Go parser disagrees (real: %q, Go: %v): %s\n",
+					tree.parseFailure,
+					parseError,
+					frontMatterFiles[index],
+				))
 			}
-			if tree.err != "" {
+			if tree.parseFailure != "" {
 				// Prettier prints such front matter as written, since the embed fails; there is no
 				// YAML output to compare.
 				syntaxErrors++
-				report.WriteString(fmt.Sprintf("front matter: YAML syntax error, not measured: %s: %s\n", frontMatterFiles[index], tree.err))
+				report.WriteString(fmt.Sprintf(
+					"front matter: YAML syntax error, not measured: %s: %s\n",
+					frontMatterFiles[index],
+					tree.parseFailure,
+				))
 				continue
 			}
 			measuredFrontMatterFiles = append(measuredFrontMatterFiles, frontMatterFiles[index])
 		}
 		// Its own identity: this oracle keeps only the front matter of the output.
-		frontMatterCache := &differential.OracleCache{Directory: directory, Identity: digest + "|" + string(bundles.Origin) + "|yaml-front-matter-block|" + fmt.Sprintf("%+v", options)}
-		newFrontMatterOracle := func() (differential.Formatter, error) {
-			engine, err := newEngine()
-			return frontMatterOracle{engine: engine}, err
+		frontMatterCache := &differential.OracleCache{
+			Directory: directory,
+			Identity: digest +
+				"|" +
+				string(bundles.Origin) +
+				"|yaml-front-matter-block|" +
+				fmt.Sprintf("%+v", options),
 		}
-		frontMatterReport, err := differential.Compare(corpus.root, measuredFrontMatterFiles, newFrontMatterOracle,
-			func() (differential.Formatter, error) { return frontMatters, nil }, runtime.NumCPU(), frontMatterCache)
-		if err != nil {
-			t.Fatalf("comparing %s: %v", corpus.root, err)
+		newFrontMatterOracle := func() (differential.Formatter, error) {
+			engine, newEngineError := newEngine()
+			return frontMatterOracle{engine: engine}, newEngineError
+		}
+		frontMatterReport, compareError := differential.Compare(
+			corpus.root,
+			measuredFrontMatterFiles,
+			newFrontMatterOracle,
+			func() (differential.Formatter, error) { return frontMatters, nil },
+			runtime.NumCPU(),
+			frontMatterCache,
+		)
+		if compareError != nil {
+			test.Fatalf("comparing %s: %v", corpus.root, compareError)
 		}
 		frontMatterFullStack := frontMatters
 		frontMatterFullStack.fullStack = true
-		frontMatterFullStackReport, err := differential.Compare(corpus.root, measuredFrontMatterFiles, newFrontMatterOracle,
-			func() (differential.Formatter, error) { return frontMatterFullStack, nil }, runtime.NumCPU(), frontMatterCache)
-		if err != nil {
-			t.Fatalf("comparing %s: %v", corpus.root, err)
+		frontMatterFullStackReport, compareError := differential.Compare(
+			corpus.root,
+			measuredFrontMatterFiles,
+			newFrontMatterOracle,
+			func() (differential.Formatter, error) { return frontMatterFullStack, nil },
+			runtime.NumCPU(),
+			frontMatterCache,
+		)
+		if compareError != nil {
+			test.Fatalf("comparing %s: %v", corpus.root, compareError)
 		}
 
 		for _, named := range []struct {
@@ -393,26 +403,34 @@ func TestCorpusFormatMatchesOracle(t *testing.T) {
 	}
 	for _, name := range measures {
 		counts := totals[name]
-		t.Logf("%s: %d/%d identical (%.2f%%), rewrite subset %d/%d (%.2f%%), refused %d, oracle failed %d",
+		test.Logf("%s: %d/%d identical (%.2f%%), rewrite subset %d/%d (%.2f%%), refused %d, oracle failed %d",
 			name, counts.identical, counts.measured, percent(counts.identical, counts.measured),
 			counts.rewriteIdentical, counts.rewriteTotal, percent(counts.rewriteIdentical, counts.rewriteTotal),
 			counts.refused, counts.oracleFailed)
 	}
-	t.Logf("front matter not measured, a YAML syntax error: %d (the Go parser disagrees on %d); yaml files not measured, over %d bytes: %d",
-		syntaxErrors, parseDisagreements, oracleSizeLimit, tooLarge)
+	test.Logf(
+		"front matter not measured, a YAML syntax error: %d (the Go parser disagrees on %d); yaml files not measured, over %d bytes: %d",
+		syntaxErrors,
+		parseDisagreements,
+		oracleSizeLimit,
+		tooLarge,
+	)
 	if parseDisagreements > 0 {
-		t.Errorf("the Go parser and the real one disagree on whether %d front matter values parse", parseDisagreements)
+		test.Errorf(
+			"the Go parser and the real one disagree on whether %d front matter values parse",
+			parseDisagreements,
+		)
 	}
 	for index, line := range strings.SplitAfter(report.String(), "\n") {
 		if index == 30 || line == "" {
 			break
 		}
-		t.Log(strings.TrimSpace(line))
+		test.Log(strings.TrimSpace(line))
 	}
 
 	if path := os.Getenv("COHERE_YAML_REPORT"); path != "" {
-		if err := os.WriteFile(path, []byte(report.String()), 0o644); err != nil {
-			t.Fatal(err)
+		if writeError := os.WriteFile(path, []byte(report.String()), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 	}
 }

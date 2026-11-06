@@ -38,14 +38,17 @@ type Resolving struct {
 // config cohere refuses, stops the run before any phase does work, rather than failing on the first
 // file after the fix phase has begun.
 func NewResolving(startDirectory string) (*Resolving, error) {
-	resolving := &Resolving{engines: map[formatoptions.Options]*Engine{}, byDirectory: map[string]formatoptions.Resolution{}}
-	resolution, err := resolving.resolve(startDirectory)
-	if err != nil {
-		return nil, err
+	resolving := &Resolving{
+		engines:     map[formatoptions.Options]*Engine{},
+		byDirectory: map[string]formatoptions.Resolution{},
 	}
-	engine, err := resolving.engineFor(resolution.Options)
-	if err != nil {
-		return nil, err
+	resolution, resolveError := resolving.resolve(startDirectory)
+	if resolveError != nil {
+		return nil, resolveError
+	}
+	engine, engineForError := resolving.engineFor(resolution.Options)
+	if engineForError != nil {
+		return nil, engineForError
 	}
 	resolving.first = engine
 	return resolving, nil
@@ -68,21 +71,21 @@ func (resolving *Resolving) Enumerate(root string) (formatfiles.Enumeration, err
 
 // Format formats one file with the options its own directory resolves to.
 func (resolving *Resolving) Format(fileName string, text string) (string, error) {
-	resolution, err := resolving.resolve(filepath.Dir(fileName))
-	if err != nil {
-		return "", fmt.Errorf("resolving the Prettier config for %s: %w", fileName, err)
+	resolution, resolveError := resolving.resolve(filepath.Dir(fileName))
+	if resolveError != nil {
+		return "", fmt.Errorf("resolving the Prettier config for %s: %w", fileName, resolveError)
 	}
-	engine, err := resolving.engineFor(resolution.Options)
-	if err != nil {
-		return "", err
+	engine, engineForError := resolving.engineFor(resolution.Options)
+	if engineForError != nil {
+		return "", engineForError
 	}
 	return engine.Format(fileName, text)
 }
 
 func (resolving *Resolving) resolve(directory string) (formatoptions.Resolution, error) {
-	absolute, err := filepath.Abs(directory)
-	if err != nil {
-		return formatoptions.Resolution{}, err
+	absolute, absolutePathError := filepath.Abs(directory)
+	if absolutePathError != nil {
+		return formatoptions.Resolution{}, absolutePathError
 	}
 	resolving.mutex.Lock()
 	cached, present := resolving.byDirectory[absolute]
@@ -91,9 +94,9 @@ func (resolving *Resolving) resolve(directory string) (formatoptions.Resolution,
 		return cached, nil
 	}
 
-	resolution, err := formatoptions.Resolve(absolute)
-	if err != nil {
-		return formatoptions.Resolution{}, err
+	resolution, resolveError := formatoptions.Resolve(absolute)
+	if resolveError != nil {
+		return formatoptions.Resolution{}, resolveError
 	}
 	resolving.mutex.Lock()
 	resolving.byDirectory[absolute] = resolution
@@ -107,9 +110,9 @@ func (resolving *Resolving) engineFor(options formatoptions.Options) (*Engine, e
 	if engine, present := resolving.engines[options]; present {
 		return engine, nil
 	}
-	engine, err := New(options)
-	if err != nil {
-		return nil, err
+	engine, newPrettierError := New(options)
+	if newPrettierError != nil {
+		return nil, newPrettierError
 	}
 	resolving.engines[options] = engine
 	return engine, nil

@@ -55,18 +55,18 @@ func printClassWithoutDecorators(path *Path, options *Options, print PrintFunc) 
 		keyword = "record"
 	}
 
-	parts := []any{printDeclareToken(path), printAbstractToken(path), keyword}
+	parts := []Doc{printDeclareToken(path), printAbstractToken(path), textDoc(keyword)}
 
 	// Keep old behaviour of extends in same line
 	// If there is only on extends and there are not comments
 	groupMode := shouldPrintClassInGroupMode(path)
 
-	var partsGroup []any
-	var extendsParts []any
+	var partsGroup []Doc
+	var extendsParts []Doc
 
 	if !current.Is("InterfaceTypeAnnotation") {
 		if current.Child("id") != nil {
-			partsGroup = append(partsGroup, " ")
+			partsGroup = append(partsGroup, doc.Text(" "))
 		}
 
 		for _, property := range []string{"id", "typeParameters"} {
@@ -86,12 +86,12 @@ func printClassWithoutDecorators(path *Path, options *Options, print PrintFunc) 
 			print("superTypeArguments", nil),
 		)
 		printedWithComments := call(path, func(path *Path) Doc {
-			return concatIn(path, "extends ", printing.PrintComments(path, printed, options, nil))
+			return concatIn(path, doc.Text("extends "), printing.PrintComments(path, printed, options, nil))
 		}, "superClass")
 		if groupMode {
 			extendsParts = append(extendsParts, line, groupIn(path, printedWithComments))
 		} else {
-			extendsParts = append(extendsParts, " ", printedWithComments)
+			extendsParts = append(extendsParts, doc.Text(" "), printedWithComments)
 		}
 	} else {
 		extendsParts = append(extendsParts, printHeritageClauses(path, options, print, "extends"))
@@ -102,11 +102,15 @@ func printClassWithoutDecorators(path *Path, options *Options, print PrintFunc) 
 		printHeritageClauses(path, options, print, "implements"),
 	)
 
-	var heritageGroupId *doc.GroupID
+	var heritageGroupId *doc.GroupId
 	if groupMode {
 		heritageGroupId = getHeritageGroupId(options, current)
 		parts = append(parts,
-			groupWithIn(path, concatIn(path, append(partsGroup, indentIn(path, concatIn(path, extendsParts...)))...), doc.GroupOptions{ID: heritageGroupId}),
+			groupWithIn(
+				path,
+				concatIn(path, append(partsGroup, indentIn(path, concatIn(path, extendsParts...)))...),
+				doc.GroupOptions{Id: heritageGroupId},
+			),
 		)
 	} else {
 		parts = append(parts, partsGroup...)
@@ -122,9 +126,9 @@ func printClassWithoutDecorators(path *Path, options *Options, print PrintFunc) 
 	  https://github.com/prettier/prettier/issues/18115
 	*/
 	if !isPrintingInterface && groupMode && isNonEmptyClassBody(current.Child("body")) {
-		parts = append(parts, ifBreakWithGroup(hardline, " ", heritageGroupId))
+		parts = append(parts, ifBreakWithGroup(hardline, doc.Text(" "), heritageGroupId))
 	} else {
-		parts = append(parts, " ")
+		parts = append(parts, doc.Text(" "))
 	}
 
 	parts = append(parts, print("body", nil))
@@ -207,18 +211,18 @@ func printHeritageClauses(path *Path, options *Options, print PrintFunc, listNam
 		Marker: listName,
 	})
 
-	heritageClausesDoc := join(concatIn(path, ",", line), printAll(path, print, listName))
+	heritageClausesDoc := join(concatIn(path, doc.Text(","), line), printAll(path, print, listName))
 
 	// Make it print like `superClass`
 	if !hasMultipleHeritage(current) {
-		printed := concatIn(path, listName+" ",
+		printed := concatIn(path, textDoc(listName+" "),
 			printedLeadingComments,
 			heritageClausesDoc,
 		)
 		if shouldPrintClassInGroupMode(path) {
 			return concatIn(path, line, groupIn(path, printed))
 		}
-		return concatIn(path, " ", printed)
+		return concatIn(path, doc.Text(" "), printed)
 	}
 
 	// upstream's `printedLeadingComments && hardline`
@@ -230,7 +234,7 @@ func printHeritageClauses(path *Path, options *Options, print PrintFunc, listNam
 	return concatIn(path, line,
 		printedLeadingComments,
 		leadingCommentsBreak,
-		listName,
+		textDoc(listName),
 		groupIn(path, indentIn(path, concatIn(path, line, heritageClausesDoc))),
 	)
 }
@@ -240,7 +244,19 @@ func printSuperClass(path *Path, options *Options, print PrintFunc) Doc {
 	printed := print("superClass", nil)
 	parent := parentOf(path)
 	if parent.Is("AssignmentExpression") {
-		return groupIn(path, ifBreak(concatIn(path, "(", indentIn(path, concatIn(path, softline, printed)), softline, ")"), printed))
+		return groupIn(
+			path,
+			ifBreak(
+				concatIn(
+					path,
+					doc.Text("("),
+					indentIn(path, concatIn(path, softline, printed)),
+					softline,
+					doc.Text(")"),
+				),
+				printed,
+			),
+		)
 	}
 	return printed
 }
@@ -248,7 +264,7 @@ func printSuperClass(path *Path, options *Options, print PrintFunc) Doc {
 // printClassMethod is upstream's printClassMethod.
 func printClassMethod(path *Path, options *Options, print PrintFunc) Doc {
 	current := node(path)
-	var parts []any
+	var parts []Doc
 
 	if len(current.List("decorators")) > 0 {
 		parts = append(parts, printClassMemberDecorators(path, options, print))
@@ -257,13 +273,13 @@ func printClassMethod(path *Path, options *Options, print PrintFunc) Doc {
 	parts = append(parts, printTypeScriptAccessibilityToken(current))
 
 	if current.Truthy("static") {
-		parts = append(parts, "static ")
+		parts = append(parts, doc.Text("static "))
 	}
 
 	parts = append(parts, printAbstractToken(path))
 
 	if current.Truthy("override") {
-		parts = append(parts, "override ")
+		parts = append(parts, doc.Text("override "))
 	}
 
 	parts = append(parts, printMethod(path, options, print))
@@ -284,7 +300,7 @@ func printClassMethod(path *Path, options *Options, print PrintFunc) Doc {
 // dropped with the Flow parsers that produce it.
 func printClassProperty(path *Path, options *Options, print PrintFunc) Doc {
 	current := node(path)
-	var parts []any
+	var parts []Doc
 
 	if len(current.List("decorators")) > 0 {
 		parts = append(parts, printClassMemberDecorators(path, options, print))
@@ -293,19 +309,19 @@ func printClassProperty(path *Path, options *Options, print PrintFunc) Doc {
 	parts = append(parts, printDeclareToken(path), printTypeScriptAccessibilityToken(current))
 
 	if current.Truthy("static") {
-		parts = append(parts, "static ")
+		parts = append(parts, doc.Text("static "))
 	}
 
 	parts = append(parts, printAbstractToken(path))
 
 	if current.Truthy("override") {
-		parts = append(parts, "override ")
+		parts = append(parts, doc.Text("override "))
 	}
 	if current.Truthy("readonly") {
-		parts = append(parts, "readonly ")
+		parts = append(parts, doc.Text("readonly "))
 	}
 	if current.Is("ClassAccessorProperty", "AccessorProperty", "TSAbstractAccessorProperty") {
-		parts = append(parts, "accessor ")
+		parts = append(parts, doc.Text("accessor "))
 	}
 	parts = append(parts,
 		printKey(path, options, print),
@@ -327,7 +343,7 @@ func printClassProperty(path *Path, options *Options, print PrintFunc) Doc {
 		options,
 		print,
 		concatIn(path, parts...),
-		" =",
+		doc.Text(" ="),
 		rightPropertyName,
 	),
 		printSemicolon(options),

@@ -13,7 +13,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // hand-rolled decoder is used anyway: relying on that coincidence leaves the next person to add a
 // default-true key here inheriting a decoder that silently inverts their rule.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[NoExtraneousClassOptions]{
 		Rule:   NoExtraneousClass,
 		Decode: DecodeNoExtraneousClassOptions,
 	})

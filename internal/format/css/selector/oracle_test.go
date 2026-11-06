@@ -7,11 +7,13 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"math"
 	"math/rand/v2"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -20,6 +22,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/corpus"
 	"github.com/system-inc/cohere/internal/format/estree"
+	"github.com/system-inc/cohere/internal/json_value"
 )
 
 // selectorParseScript is the oracle: postcss-selector-parser 2.2.3 from the fork's node_modules, called
@@ -307,6 +310,15 @@ var selectorFixtures = []selectorFixture{
 	{name: "bracket only in a string", text: "[a=\"]\"", malformed: true},
 }
 
+// prettierRefusedFixtures are the vendored fixtures Prettier's own parse refuses, front matter stripped as
+// parser-postcss.js strips it, so they hold no selectors to compare: the path under testdata/prettier/css,
+// and why. @system_adamic_integration's guard on the same fixtures names the same three (#cr45gcp).
+var prettierRefusedFixtures = map[string]string{
+	"_errors_/less-syntax.css": "an error fixture by design: a Less mixin call, which the css parser refuses",
+	"_errors_/scss-syntax.css": "an error fixture by design: Sass interpolation, which the css parser refuses",
+	"range/issue2267.css":      "a range fixture: its <<<PRETTIER_RANGE_END>>> marker is stripped by Prettier's test harness, never by Prettier",
+}
+
 // TestParseAgreesWithPostcssSelectorParser is the parser's acceptance test: for every selector
 // Prettier would parse in the corpus's .css files, and every inline fixture, the Go tree must equal
 // postcss-selector-parser 2.2.3's, property for property, and a refusal must be a refusal on both sides
@@ -323,16 +335,16 @@ var selectorFixtures = []selectorFixture{
 // A corpus selector the library cannot parse is counted, and the test fails if that count passes a
 // tenth of the corpus: an oracle that rejects everything would otherwise read as perfect agreement.
 // The inline fixtures each say which way the library must go.
-func TestParseAgreesWithPostcssSelectorParser(t *testing.T) {
-	t.Parallel()
-	root := corpus.PrettierFork.Root(t)
+func TestParseAgreesWithPostcssSelectorParser(test *testing.T) {
+	test.Parallel()
+	root := corpus.PrettierFork.Root(test)
 
 	type input = oracleInput
 	var inputs []input
 	corpusFiles := 0
-	vendored, err := filepath.Abs(filepath.Join("..", "testdata", "prettier", "css"))
-	if err != nil {
-		t.Fatal(err)
+	vendored, absolutePathError := filepath.Abs(filepath.Join("..", "testdata", "prettier", "css"))
+	if absolutePathError != nil {
+		test.Fatal(absolutePathError)
 	}
 	for _, corpus := range append([]string{vendored}, strings.Split(os.Getenv("COHERE_CSS_CORPORA"), ":")...) {
 		corpus = strings.TrimSpace(corpus)
@@ -340,12 +352,15 @@ func TestParseAgreesWithPostcssSelectorParser(t *testing.T) {
 			continue
 		}
 		if strings.HasPrefix(corpus, "~/") {
-			home, _ := os.UserHomeDir()
+			home, homeError := os.UserHomeDir()
+			if homeError != nil {
+				test.Fatalf("reading %s: %v", corpus, homeError)
+			}
 			corpus = filepath.Join(home, corpus[2:])
 		}
-		err := filepath.WalkDir(corpus, func(path string, entry fs.DirEntry, err error) error {
-			if err != nil {
-				return err
+		walkError := filepath.WalkDir(corpus, func(path string, entry fs.DirEntry, pathError error) error {
+			if pathError != nil {
+				return pathError
 			}
 			if entry.IsDir() && (entry.Name() == "node_modules" || entry.Name() == ".git") {
 				return filepath.SkipDir
@@ -353,23 +368,23 @@ func TestParseAgreesWithPostcssSelectorParser(t *testing.T) {
 			if entry.IsDir() || filepath.Ext(path) != ".css" {
 				return nil
 			}
-			source, err := os.ReadFile(path)
-			if err != nil {
-				return err
+			source, readError := os.ReadFile(path)
+			if readError != nil {
+				return readError
 			}
 			if !utf8.Valid(source) {
 				return fmt.Errorf("%s is not UTF-8, which the comparison cannot carry through JSON", path)
 			}
-			inputs = append(inputs, input{Name: path, Text: string(source), CSS: true})
+			inputs = append(inputs, input{Name: path, Text: string(source), Css: true})
 			corpusFiles++
 			return nil
 		})
-		if err != nil {
-			t.Fatalf("walking %s: %v", corpus, err)
+		if walkError != nil {
+			test.Fatalf("walking %s: %v", corpus, walkError)
 		}
 	}
 	if corpusFiles == 0 {
-		t.Fatalf("no .css files under %s or COHERE_CSS_CORPORA", vendored)
+		test.Fatalf("no .css files under %s or COHERE_CSS_CORPORA", vendored)
 	}
 	malformed := map[string]bool{}
 	for _, fixture := range selectorFixtures {
@@ -378,7 +393,7 @@ func TestParseAgreesWithPostcssSelectorParser(t *testing.T) {
 		malformed[name] = fixture.malformed
 	}
 
-	records := runSelectorOracle(t, root, inputs)
+	records := runSelectorOracle(test, root, inputs)
 
 	seenFixtures := map[string]bool{}
 	seenCorpusText := map[string]bool{}
@@ -387,16 +402,16 @@ func TestParseAgreesWithPostcssSelectorParser(t *testing.T) {
 	fail := func(format string, arguments ...any) {
 		different++
 		if different <= 20 {
-			t.Errorf(format, arguments...)
+			test.Errorf(format, arguments...)
 		}
 	}
 	refusedFiles := map[string]string{}
 	for _, each := range records {
-		name, _ := each["name"].(string)
-		text, _ := each["text"].(string)
-		isCorpus, _ := each["corpus"].(bool)
-		if cssError, isRefusedFile := each["cssError"].(string); isRefusedFile {
-			refusedFiles[name] = cssError
+		name := each.Name
+		text := each.Text
+		isCorpus := each.Corpus
+		if each.CssError != nil {
+			refusedFiles[name] = *each.CssError
 			continue
 		}
 		if isCorpus {
@@ -409,16 +424,28 @@ func TestParseAgreesWithPostcssSelectorParser(t *testing.T) {
 		} else {
 			seenFixtures[name] = true
 		}
-		wantError, oracleRefused := each["error"].(string)
+		wantError, oracleRefused := each.refusal()
 		if expectMalformed, isFixture := malformed[name]; isFixture && expectMalformed != oracleRefused {
-			fail("%s: the fixture says malformed=%v and the library says %v", name, expectMalformed, each)
+			fail(
+				"%s: the fixture says malformed=%v and the library says error %q, tree %s",
+				name,
+				expectMalformed,
+				wantError,
+				each.Ast,
+			)
 			continue
 		}
-		got, err := dumpSelector(text)
+		got, dumpSelectorError := dumpSelector(text)
 		switch {
-		case oracleRefused && err != nil:
-			if err.Error() != wantError {
-				fail("%s %q: both refuse, with different messages:\n  library %s\n  Go      %s", name, text, wantError, err.Error())
+		case oracleRefused && dumpSelectorError != nil:
+			if dumpSelectorError.Error() != wantError {
+				fail(
+					"%s %q: both refuse, with different messages:\n  library %s\n  Go      %s",
+					name,
+					text,
+					wantError,
+					dumpSelectorError.Error(),
+				)
 				continue
 			}
 			refusedByBoth++
@@ -427,10 +454,15 @@ func TestParseAgreesWithPostcssSelectorParser(t *testing.T) {
 			}
 		case oracleRefused:
 			fail("%s %q: the library refuses it (%s) and Go parsed it", name, text, wantError)
-		case err != nil:
-			fail("%s %q: the library parses it and Go refused: %v", name, text, err)
+		case dumpSelectorError != nil:
+			fail("%s %q: the library parses it and Go refused: %v", name, text, dumpSelectorError)
 		default:
-			if difference := firstSelectorDifference(oracleInBytes(each["ast"], text), got, "root"); difference != "" {
+			want, treeError := json_value.Parse(each.Ast)
+			if treeError != nil {
+				fail("%s %q: the library's tree does not read as JSON: %v", name, text, treeError)
+				continue
+			}
+			if difference := firstSelectorDifference(oracleInBytes(want, text), got, "root"); difference != "" {
 				fail("%s %q: %s", name, text, difference)
 				continue
 			}
@@ -439,7 +471,7 @@ func TestParseAgreesWithPostcssSelectorParser(t *testing.T) {
 	}
 	for _, fixture := range selectorFixtures {
 		if !seenFixtures["fixture: "+fixture.name] {
-			t.Errorf("the oracle printed nothing for fixture %q", fixture.name)
+			test.Errorf("the oracle printed nothing for fixture %q", fixture.name)
 		}
 	}
 	for name, cssError := range refusedFiles {
@@ -448,31 +480,44 @@ func TestParseAgreesWithPostcssSelectorParser(t *testing.T) {
 			continue // a COHERE_CSS_CORPORA file Prettier refuses has no selectors, which is all it means
 		}
 		if _, named := prettierRefusedFixtures[filepath.ToSlash(relative)]; !named {
-			t.Errorf("%s: Prettier's parse refuses it (%s), and it isn't named in prettierRefusedFixtures", relative, cssError)
+			test.Errorf(
+				"%s: Prettier's parse refuses it (%s), and it isn't named in prettierRefusedFixtures",
+				relative,
+				cssError,
+			)
 		}
 	}
 	for relative, reason := range prettierRefusedFixtures {
 		if _, refused := refusedFiles[filepath.Join(vendored, filepath.FromSlash(relative))]; !refused {
-			t.Errorf("%s is named as refused by Prettier (%s), and Prettier's parse now accepts it: take it off the list", relative, reason)
+			test.Errorf(
+				"%s is named as refused by Prettier (%s), and Prettier's parse now accepts it: take it off the list",
+				relative,
+				reason,
+			)
 		}
 	}
-	t.Logf("%d corpus files (%d refused whole by Prettier's parse) gave %d distinct selectors (%d repeats skipped); with %d fixtures: %d identical, %d refused by both with the same message, %d different; %d corpus selectors refused",
-		corpusFiles, len(refusedFiles), corpusSelectors, corpusDuplicates, len(selectorFixtures), identical, refusedByBoth, different, corpusRefused)
+	test.Logf(
+		"%d corpus files (%d refused whole by Prettier's parse) gave %d distinct selectors (%d repeats skipped); with %d fixtures: %d identical, %d refused by both with the same message, %d different; %d corpus selectors refused",
+		corpusFiles,
+		len(refusedFiles),
+		corpusSelectors,
+		corpusDuplicates,
+		len(selectorFixtures),
+		identical,
+		refusedByBoth,
+		different,
+		corpusRefused,
+	)
 	if corpusSelectors == 0 {
-		t.Errorf("the corpus gave no selectors")
+		test.Errorf("the corpus gave no selectors")
 	}
 	if corpusRefused > corpusSelectors/10 {
-		t.Errorf("the library refused %d of %d corpus selectors; the comparison is thinner than it looks", corpusRefused, corpusSelectors)
+		test.Errorf(
+			"the library refused %d of %d corpus selectors; the comparison is thinner than it looks",
+			corpusRefused,
+			corpusSelectors,
+		)
 	}
-}
-
-// prettierRefusedFixtures are the vendored fixtures Prettier's own parse refuses, front matter stripped as
-// parser-postcss.js strips it, so they hold no selectors to compare: the path under testdata/prettier/css,
-// and why. @system_adamic_integration's guard on the same fixtures names the same three (#cr45gcp).
-var prettierRefusedFixtures = map[string]string{
-	"_errors_/less-syntax.css": "an error fixture by design: a Less mixin call, which the css parser refuses",
-	"_errors_/scss-syntax.css": "an error fixture by design: Sass interpolation, which the css parser refuses",
-	"range/issue2267.css":      "a range fixture: its <<<PRETTIER_RANGE_END>>> marker is stripped by Prettier's test harness, never by Prettier",
 }
 
 // oracleInput is one line of the oracle script's input: a selector, or with CSS a stylesheet whose
@@ -480,42 +525,62 @@ var prettierRefusedFixtures = map[string]string{
 type oracleInput struct {
 	Name string `json:"name"`
 	Text string `json:"text"`
-	CSS  bool   `json:"css,omitempty"`
+	Css  bool   `json:"css,omitempty"`
+}
+
+// oracleRecord is one line of the oracle script's output: a selector's tree or its error, or with
+// cssError a stylesheet Prettier's parse refuses whole. ast stays raw JSON until json_value reads it.
+type oracleRecord struct {
+	Name     string          `json:"name"`
+	Text     string          `json:"text"`
+	Corpus   bool            `json:"corpus"`
+	CssError *string         `json:"cssError"`
+	Error    *string         `json:"error"`
+	Ast      json.RawMessage `json:"ast"`
+}
+
+// refusal is the library's error message, and whether it refused the selector.
+func (record oracleRecord) refusal() (string, bool) {
+	if record.Error == nil {
+		return "", false
+	}
+	return *record.Error, true
 }
 
 // runSelectorOracle runs the oracle script on inputs and returns its records in order.
-func runSelectorOracle(t *testing.T, root string, inputs []oracleInput) []map[string]any {
-	t.Helper()
+func runSelectorOracle(test *testing.T, root string, inputs []oracleInput) []oracleRecord {
+	test.Helper()
 	var stdin bytes.Buffer
 	for _, each := range inputs {
-		encoded, err := json.Marshal(each)
-		if err != nil {
-			t.Fatal(err)
+		encoded, encodeError := json.Marshal(each)
+		if encodeError != nil {
+			test.Fatal(encodeError)
 		}
 		stdin.Write(encoded)
 		stdin.WriteByte('\n')
 	}
 	// The library hangs on some selectors (see ErrLoopsForever), so the oracle runs on a deadline.
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	timeoutContext, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
-	command := exec.CommandContext(ctx, "node", "--input-type=module", "-e", selectorParseScript)
+	command := exec.CommandContext(timeoutContext, "node", "--input-type=module", "-e", selectorParseScript)
 	command.Dir = root
 	command.Stdin = &stdin
-	var stdout, stderr bytes.Buffer
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
 	command.Stdout, command.Stderr = &stdout, &stderr
 	runError := command.Run()
 
-	var records []map[string]any
+	var records []oracleRecord
 	for _, line := range strings.Split(stdout.String(), "\n") {
 		if line == "" {
 			continue
 		}
-		var each map[string]any
-		if err := json.Unmarshal([]byte(line), &each); err != nil {
+		var each oracleRecord
+		if decodeError := json.Unmarshal([]byte(line), &each); decodeError != nil {
 			if runError != nil {
 				break // the last line a killed process was writing
 			}
-			t.Fatal(err)
+			test.Fatal(decodeError)
 		}
 		records = append(records, each)
 	}
@@ -523,15 +588,14 @@ func runSelectorOracle(t *testing.T, root string, inputs []oracleInput) []map[st
 		// Records come in input order, so the first input without one is where the library stopped.
 		answered := map[string]bool{}
 		for _, each := range records {
-			name, _ := each["name"].(string)
-			answered[strings.SplitN(name, " #", 2)[0]] = true
+			answered[strings.SplitN(each.Name, " #", 2)[0]] = true
 		}
 		for _, each := range inputs {
 			if !answered[each.Name] {
-				t.Fatalf("node: %v, stopping at %s %q\n%s", runError, each.Name, each.Text, stderr.String())
+				test.Fatalf("node: %v, stopping at %s %q\n%s", runError, each.Name, each.Text, stderr.String())
 			}
 		}
-		t.Fatalf("node: %v\n%s", runError, stderr.String())
+		test.Fatalf("node: %v\n%s", runError, stderr.String())
 	}
 	return records
 }
@@ -550,13 +614,13 @@ var randomSelectorPieces = []string{
 // COHERE_PRETTIER_FORK names the fork; COHERE_SELECTOR_RANDOM sets the count (default 20000). The seed is
 // fixed, so a failure reproduces. A selector Go refuses with ErrLoopsForever is not sent to the library,
 // which would hang on it; the run's deadline catches one Go wrongly lets through.
-func TestParseAgreesOnRandomSelectors(t *testing.T) {
-	t.Parallel()
-	root := corpus.PrettierFork.Root(t)
+func TestParseAgreesOnRandomSelectors(test *testing.T) {
+	test.Parallel()
+	root := corpus.PrettierFork.Root(test)
 	count := 20000
 	if value := os.Getenv("COHERE_SELECTOR_RANDOM"); value != "" {
-		if _, err := fmt.Sscan(value, &count); err != nil {
-			t.Fatalf("COHERE_SELECTOR_RANDOM: %v", err)
+		if _, scanError := fmt.Sscan(value, &count); scanError != nil {
+			test.Fatalf("COHERE_SELECTOR_RANDOM: %v", scanError)
 		}
 	}
 	random := rand.New(rand.NewPCG(2, 3))
@@ -572,40 +636,45 @@ func TestParseAgreesOnRandomSelectors(t *testing.T) {
 			continue
 		}
 		seen[text.String()] = true
-		if _, err := Parse(text.String()); errors.Is(err, ErrLoopsForever) {
+		if _, parseError := Parse(text.String()); errors.Is(parseError, ErrLoopsForever) {
 			loopsForever++
 			continue
 		}
 		inputs = append(inputs, oracleInput{Name: fmt.Sprint(len(inputs)), Text: text.String()})
 	}
-	records := runSelectorOracle(t, root, inputs)
+	records := runSelectorOracle(test, root, inputs)
 	if len(records) != len(inputs) {
-		t.Fatalf("%d inputs and %d records", len(inputs), len(records))
+		test.Fatalf("%d inputs and %d records", len(inputs), len(records))
 	}
 	parsed, refused, different := 0, 0, 0
 	messages := map[string]int{}
 	for index, each := range records {
 		text := inputs[index].Text
-		wantError, oracleRefused := each["error"].(string)
-		got, err := dumpSelector(text)
+		wantError, oracleRefused := each.refusal()
+		got, dumpSelectorError := dumpSelector(text)
 		difference := ""
 		switch {
-		case oracleRefused && err != nil:
-			if err.Error() != wantError {
-				difference = fmt.Sprintf("both refuse: library %q, Go %q", wantError, err.Error())
+		case oracleRefused && dumpSelectorError != nil:
+			if dumpSelectorError.Error() != wantError {
+				difference = fmt.Sprintf("both refuse: library %q, Go %q", wantError, dumpSelectorError.Error())
 			}
 			messages[wantError]++
 		case oracleRefused:
 			difference = fmt.Sprintf("the library refuses it (%s) and Go parsed it", wantError)
-		case err != nil:
-			difference = fmt.Sprintf("the library parses it and Go refused: %v", err)
+		case dumpSelectorError != nil:
+			difference = fmt.Sprintf("the library parses it and Go refused: %v", dumpSelectorError)
 		default:
-			difference = firstSelectorDifference(oracleInBytes(each["ast"], text), got, "root")
+			want, treeError := json_value.Parse(each.Ast)
+			if treeError != nil {
+				difference = fmt.Sprintf("the library's tree does not read as JSON: %v", treeError)
+				break
+			}
+			difference = firstSelectorDifference(oracleInBytes(want, text), got, "root")
 		}
 		if difference != "" {
 			different++
 			if different <= 20 {
-				t.Errorf("%q: %s", text, difference)
+				test.Errorf("%q: %s", text, difference)
 			}
 			continue
 		}
@@ -615,69 +684,79 @@ func TestParseAgreesOnRandomSelectors(t *testing.T) {
 			parsed++
 		}
 	}
-	t.Logf("%d random selectors (%d more skipped as ErrLoopsForever): %d parsed alike, %d refused alike, %d different", len(inputs), loopsForever, parsed, refused, different)
+	test.Logf(
+		"%d random selectors (%d more skipped as ErrLoopsForever): %d parsed alike, %d refused alike, %d different",
+		len(inputs),
+		loopsForever,
+		parsed,
+		refused,
+		different,
+	)
 	for message, times := range messages {
-		t.Logf("  %5d refused with %q", times, message)
+		test.Logf("  %5d refused with %q", times, message)
 	}
 	if parsed < len(inputs)/10 {
-		t.Errorf("only %d of %d random selectors parsed; the comparison is mostly of refusals", parsed, len(inputs))
+		test.Errorf("only %d of %d random selectors parsed; the comparison is mostly of refusals", parsed, len(inputs))
 	}
 }
 
-// dumpSelector parses one selector and renders it the way the oracle script does, through JSON, so
-// both sides compare as the same Go values. sourceIndex stays in bytes; oracleInBytes converts the
-// library's side.
-func dumpSelector(text string) (any, error) {
-	root, err := Parse(text)
-	if err != nil {
-		return nil, err
+// dumpSelector parses one selector and renders it the way the oracle script does, as the JSON value the
+// script prints. sourceIndex stays in bytes; oracleInBytes converts the library's side.
+func dumpSelector(text string) (json_value.Value, error) {
+	root, parseError := Parse(text)
+	if parseError != nil {
+		return nil, parseError
 	}
-	encoded, err := json.Marshal(dumpSelectorValue(root))
-	if err != nil {
-		return nil, err
-	}
-	var result any
-	err = json.Unmarshal(encoded, &result)
-	return result, err
+	return dumpSelectorValue(root), nil
 }
 
-func dumpSelectorValue(value any) any {
+// dumpSelectorValue is one value of the tree as JSON. Every string on the finished tree is well-formed
+// UTF-8 (see wellFormedTree), so it reads in JSON as it is. A float64 JSON cannot carry, which
+// json.Marshal would refuse, becomes a description no oracle prints, so the comparison still fails on it.
+func dumpSelectorValue(value estree.Value) json_value.Value {
 	switch typed := value.(type) {
 	case nil:
-		return "<undefined>"
+		return json_value.String("<undefined>")
 	case *estree.Node:
 		if typed.Range != [2]int{} {
-			return fmt.Sprintf("a %s with a Range, which the parser never sets", typed.Type())
+			return json_value.String(fmt.Sprintf("a %s with a Range, which the parser never sets", typed.Type()))
 		}
-		result := map[string]any{"type": typed.Type()}
+		result := json_value.Object{"type": json_value.String(typed.Type())}
 		for _, key := range typed.Keys() {
 			result[key] = dumpSelectorValue(typed.Get(key))
 		}
 		return result
-	case []*estree.Node:
+	case estree.Nodes:
 		if typed == nil {
-			return "a nil list, which no library field holds"
+			return json_value.String("a nil list, which no library field holds")
 		}
-		result := make([]any, len(typed))
+		result := make(json_value.Array, len(typed))
 		for index, child := range typed {
 			result[index] = dumpSelectorValue(child)
 		}
 		return result
-	case map[string]any:
-		result := map[string]any{}
+	case estree.Record:
+		result := json_value.Object{}
 		for key, each := range typed {
 			result[key] = dumpSelectorValue(each)
 		}
 		return result
-	case float64:
-		if typed != typed {
-			return nil // NaN, which JSON.stringify writes as null
+	case estree.Number:
+		if math.IsNaN(float64(typed)) {
+			return json_value.Null{} // NaN, which JSON.stringify writes as null
 		}
-		return typed
-	case string, bool, int:
-		return typed
+		if math.IsInf(float64(typed), 0) {
+			return json_value.String(fmt.Sprintf("a float64 of %v, which JSON cannot carry", float64(typed)))
+		}
+		return json_value.Number(strconv.FormatFloat(float64(typed), 'g', -1, 64))
+	case estree.String:
+		return json_value.String(typed)
+	case estree.Boolean:
+		return json_value.Boolean(typed)
+	case estree.Integer:
+		return json_value.Number(strconv.Itoa(int(typed)))
 	default:
-		return fmt.Sprintf("an unexpected %T", typed)
+		return json_value.String(fmt.Sprintf("an unexpected %T", typed))
 	}
 }
 
@@ -685,17 +764,19 @@ func dumpSelectorValue(value any) any {
 // byte offset Parse promises: the start of the character the index falls in (the middle of a surrogate
 // pair included, which splitWord can produce), and past the end by the same distance. It is written
 // apart from Parse's conversion so that a bug there cannot hide here.
-func oracleInBytes(value any, text string) any {
+func oracleInBytes(value json_value.Value, text string) json_value.Value {
 	switch typed := value.(type) {
-	case map[string]any:
+	case json_value.Object:
 		for key, each := range typed {
-			if index, isNumber := each.(float64); key == "sourceIndex" && isNumber {
-				typed[key] = float64(utf16IndexToByte(text, int(index)))
-				continue
+			if number, isNumber := each.(json_value.Number); key == "sourceIndex" && isNumber {
+				if index, parseError := json.Number(number).Float64(); parseError == nil {
+					typed[key] = json_value.Number(strconv.Itoa(utf16IndexToByte(text, int(index))))
+					continue
+				}
 			}
 			typed[key] = oracleInBytes(each, text)
 		}
-	case []any:
+	case json_value.Array:
 		for index, each := range typed {
 			typed[index] = oracleInBytes(each, text)
 		}
@@ -715,11 +796,11 @@ func utf16IndexToByte(text string, index int) int {
 	return len(text) + index - units
 }
 
-// firstSelectorDifference names the first path where two decoded JSON values differ, or "".
-func firstSelectorDifference(want any, got any, path string) string {
+// firstSelectorDifference names the first path where two JSON values differ, or "".
+func firstSelectorDifference(want json_value.Value, got json_value.Value, path string) string {
 	switch typed := want.(type) {
-	case map[string]any:
-		other, isMap := got.(map[string]any)
+	case json_value.Object:
+		other, isMap := got.(json_value.Object)
 		if !isMap {
 			return fmt.Sprintf("%s: want an object, got %v", path, got)
 		}
@@ -739,27 +820,59 @@ func firstSelectorDifference(want any, got any, path string) string {
 			wantValue, wantPresent := typed[key]
 			gotValue, gotPresent := other[key]
 			if wantPresent != gotPresent {
-				return fmt.Sprintf("%s.%s: present in the library %v, in Go %v (%v)", path, key, wantPresent, gotPresent, typed["type"])
+				return fmt.Sprintf(
+					"%s.%s: present in the library %v, in Go %v (%v)",
+					path,
+					key,
+					wantPresent,
+					gotPresent,
+					typed["type"],
+				)
 			}
 			if difference := firstSelectorDifference(wantValue, gotValue, path+"."+key); difference != "" {
 				return difference
 			}
 		}
 		return ""
-	case []any:
-		other, isList := got.([]any)
+	case json_value.Array:
+		other, isList := got.(json_value.Array)
 		if !isList || len(other) != len(typed) {
 			return fmt.Sprintf("%s: want %d elements, got %v", path, len(typed), got)
 		}
 		for index := range typed {
-			if difference := firstSelectorDifference(typed[index], other[index], fmt.Sprintf("%s[%d]", path, index)); difference != "" {
+			if difference := firstSelectorDifference(
+				typed[index],
+				other[index],
+				fmt.Sprintf("%s[%d]", path, index),
+			); difference != "" {
 				return difference
 			}
 		}
 		return ""
 	}
-	if fmt.Sprintf("%T %v", want, want) != fmt.Sprintf("%T %v", got, got) {
-		return fmt.Sprintf("%s: want %#v, got %#v", path, want, got)
+	if jsonLeafText(want) != jsonLeafText(got) {
+		return fmt.Sprintf("%s: want %s, got %s", path, jsonLeafText(want), jsonLeafText(got))
 	}
 	return ""
+}
+
+// jsonLeafText is a JSON value as Go's untyped decode would hold it, its type and its value, so two
+// leaves are equal exactly when they decode to the same thing: a number is read as a float64, so 1
+// and 1.0 are one number, as they are in JavaScript.
+func jsonLeafText(value json_value.Value) string {
+	switch typed := value.(type) {
+	case json_value.Number:
+		number, parseError := json.Number(typed).Float64()
+		if parseError != nil {
+			return fmt.Sprintf("a number that does not read as a float64, %q", string(typed))
+		}
+		return fmt.Sprintf("float64 %v", number)
+	case json_value.String:
+		return fmt.Sprintf("string %q", string(typed))
+	case json_value.Boolean:
+		return fmt.Sprintf("bool %v", bool(typed))
+	case json_value.Null:
+		return "null"
+	}
+	return fmt.Sprintf("%T %v", value, value)
 }

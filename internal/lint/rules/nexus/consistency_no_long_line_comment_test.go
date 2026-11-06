@@ -21,8 +21,8 @@ func lineCommentRun(count int) string {
 	return builder.String()
 }
 
-func TestConsistencyNoLongLineCommentFires(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoLongLineCommentFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -42,16 +42,16 @@ func TestConsistencyNoLongLineCommentFires(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ConsistencyNoLongLineComment, longCommentFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "longLineComment")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ConsistencyNoLongLineComment, longCommentFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "longLineComment")
 		})
 	}
 }
 
-func TestConsistencyNoLongLineCommentStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoLongLineCommentStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -102,10 +102,10 @@ func TestConsistencyNoLongLineCommentStaysSilent(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ConsistencyNoLongLineComment, testCase.fileName, testCase.sourceText)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ConsistencyNoLongLineComment, testCase.fileName, testCase.sourceText)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -115,66 +115,69 @@ func TestConsistencyNoLongLineCommentStaysSilent(t *testing.T) {
 // Generated code is held to the rule like hand-written code (Kirk's ruling on generated code, #c076xbg):
 // the generator writes a block comment, so a finding here is a defect in the generator. The rule used
 // to skip these files.
-func TestConsistencyNoLongLineCommentHoldsGeneratedFilesToTheRule(t *testing.T) {
-	t.Parallel()
-	for _, fileName := range []string{"/repository/source/generated/Thing.ts", "/repository/source/Thing.generated.ts"} {
-		result := rule_testing.Run(t, ConsistencyNoLongLineComment, fileName, lineCommentRun(9))
-		rule_testing.ExpectFindings(t, result, "longLineComment")
+func TestConsistencyNoLongLineCommentHoldsGeneratedFilesToTheRule(test *testing.T) {
+	test.Parallel()
+	for _, fileName := range []string{
+		"/repository/source/generated/Thing.ts",
+		"/repository/source/Thing.generated.ts",
+	} {
+		result := rule_testing.Run(test, ConsistencyNoLongLineComment, fileName, lineCommentRun(9))
+		rule_testing.ExpectFindings(test, result, "longLineComment")
 	}
 }
 
-func TestConsistencyNoLongLineCommentFixes(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoLongLineCommentFixes(test *testing.T) {
+	test.Parallel()
 
 	sourceText := "// one\n// two\n// three\n// four\n// five\nexport const value = 1;\n"
-	result := rule_testing.Run(t, ConsistencyNoLongLineComment, longCommentFile, sourceText)
-	rule_testing.ExpectFindings(t, result, "longLineComment")
+	result := rule_testing.Run(test, ConsistencyNoLongLineComment, longCommentFile, sourceText)
+	rule_testing.ExpectFindings(test, result, "longLineComment")
 
 	fixes := result.Diagnostics[0].Fixes
 	if len(fixes) != 1 {
-		t.Fatalf("expected 1 fix, got %d", len(fixes))
+		test.Fatalf("expected 1 fix, got %d", len(fixes))
 	}
 
 	wantText := "/*\n * one\n * two\n * three\n * four\n * five\n */"
 	if fixes[0].Text != wantText {
-		t.Fatalf("expected:\n%s\ngot:\n%s", wantText, fixes[0].Text)
+		test.Fatalf("expected:\n%s\ngot:\n%s", wantText, fixes[0].Text)
 	}
 
 	// The fix must replace exactly the run and nothing else, or it eats the code after it.
 	replaced := sourceText[fixes[0].Range.Pos():fixes[0].Range.End()]
 	wantReplaced := "// one\n// two\n// three\n// four\n// five"
 	if replaced != wantReplaced {
-		t.Fatalf("fix replaces %q, expected %q", replaced, wantReplaced)
+		test.Fatalf("fix replaces %q, expected %q", replaced, wantReplaced)
 	}
 }
 
 // TestConsistencyNoLongLineCommentFixPreservesIndentation checks the indented case separately,
 // since a fix that resets indentation reformats code it was not asked to touch.
-func TestConsistencyNoLongLineCommentFixPreservesIndentation(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoLongLineCommentFixPreservesIndentation(test *testing.T) {
+	test.Parallel()
 
 	sourceText := "export function thing() {\n" +
 		"    // one\n    // two\n    // three\n    // four\n    // five\n" +
 		"    return 1;\n}\n"
-	result := rule_testing.Run(t, ConsistencyNoLongLineComment, longCommentFile, sourceText)
-	rule_testing.ExpectFindings(t, result, "longLineComment")
+	result := rule_testing.Run(test, ConsistencyNoLongLineComment, longCommentFile, sourceText)
+	rule_testing.ExpectFindings(test, result, "longLineComment")
 
 	wantText := "/*\n     * one\n     * two\n     * three\n     * four\n     * five\n     */"
 	if result.Diagnostics[0].Fixes[0].Text != wantText {
-		t.Fatalf("expected:\n%s\ngot:\n%s", wantText, result.Diagnostics[0].Fixes[0].Text)
+		test.Fatalf("expected:\n%s\ngot:\n%s", wantText, result.Diagnostics[0].Fixes[0].Text)
 	}
 }
 
 // TestConsistencyNoLongLineCommentWithholdsUnsafeFix covers the one case the fix must refuse: a
 // star-slash in the text would close the block early and change what the rest of the run means.
-func TestConsistencyNoLongLineCommentWithholdsUnsafeFix(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoLongLineCommentWithholdsUnsafeFix(test *testing.T) {
+	test.Parallel()
 
 	sourceText := "// one\n// two\n// a */ sequence\n// four\n// five\nexport const value = 1;\n"
-	result := rule_testing.Run(t, ConsistencyNoLongLineComment, longCommentFile, sourceText)
-	rule_testing.ExpectFindings(t, result, "longLineComment")
+	result := rule_testing.Run(test, ConsistencyNoLongLineComment, longCommentFile, sourceText)
+	rule_testing.ExpectFindings(test, result, "longLineComment")
 
 	if len(result.Diagnostics[0].Fixes) != 0 {
-		t.Fatalf("expected no fix, got %d", len(result.Diagnostics[0].Fixes))
+		test.Fatalf("expected no fix, got %d", len(result.Diagnostics[0].Fixes))
 	}
 }

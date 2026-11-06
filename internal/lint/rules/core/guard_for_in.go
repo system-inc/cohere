@@ -32,7 +32,7 @@ var messageGuardForIn = rule.Message{
 // # The predicate is structural, and deliberately shallow
 //
 // Upstream does not ask whether the body actually calls `hasOwnProperty`; it asks whether the body
-// has the SHAPE of a guarded loop. Any `if` will do, whatever it tests. That is a real decision
+// has the shape of a guarded loop. Any `if` will do, whatever it tests. That is a real decision
 // rather than an approximation, and reproducing it means not improving on it: a rule checking for a
 // `hasOwnProperty` call specifically would report every loop guarded by `if (!o[k]) continue;` or
 // by a type test, which upstream accepts.
@@ -53,21 +53,21 @@ var messageGuardForIn = rule.Message{
 //
 // Both hold a `continue` inside the leading `if`, and neither is the idiom, because `f()` runs on
 // the unfiltered key in the first and the block is not a bare skip in the second. Upstream requires
-// the consequent to be a `continue` outright, or a block whose ONLY statement is a `continue`, and
+// the consequent to be a `continue` outright, or a block whose only statement is a `continue`, and
 // a port testing "does the consequent contain a continue" reports neither of these two while
 // upstream reports both.
 //
 // Note the asymmetry the corpus pins: the fourth exemption accepts a block whose only statement is
-// an `if` with ANY consequent, while the fifth accepts a longer block only when the leading `if`
+// an `if` with any consequent, while the fifth accepts a longer block only when the leading `if`
 // skips. `{ if (x) { f(); } }` is clean and `{ if (x) { f(); } g(); }` reports, and the difference
 // is entirely the trailing `g()`.
 //
 // No fix. The repair is a guard, and which guard depends on what the loop meant: `hasOwnProperty`,
 // a key filter, or a rewrite to `Object.keys`. The rule cannot know which, and each changes what
 // the loop does.
-var GuardForIn = rule.Rule{
+var GuardForIn = rule.Rule[rule.NoOptions]{
 	Name: "guard-for-in",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			// `for-of` is deliberately absent. It iterates values through the iteration protocol
 			// and never walks the prototype chain, so it has nothing to guard. The two share
@@ -77,7 +77,7 @@ var GuardForIn = rule.Rule{
 				if bodyGuardsForIn(node.AsForInOrOfStatement().Statement) {
 					return
 				}
-				ctx.ReportNode(node, messageGuardForIn)
+				ruleContext.ReportNode(node, messageGuardForIn)
 			},
 		}
 	},

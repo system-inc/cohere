@@ -222,10 +222,22 @@
     "reason": null
   },
   {
+    "typeScriptRule": "nexus/consistency-no-warning-comment",
+    "verdict": "Ported",
+    "swiftRule": "cohere-swift/todo",
+    "reason": null
+  },
+  {
     "typeScriptRule": "nexus/consistency-require-constant-casing",
     "verdict": "NotApplicable",
     "swiftRule": null,
     "reason": "Swift's convention, enforced by cohere-swift/always-use-lower-camel-case, spells every value lowerCamelCase and lets access control state scope, so porting the PascalCase-export rule would contradict it on about 1,470 static lets; the other side is that the scope-signalling idea is Kirk's and could override Swift's convention by ruling."
+  },
+  {
+    "typeScriptRule": "nexus/consistency-require-identifier-casing",
+    "verdict": "Ported",
+    "swiftRule": "cohere-swift/always-use-lower-camel-case",
+    "reason": null
   },
   {
     "typeScriptRule": "nexus/consistency-require-matching-return-type",

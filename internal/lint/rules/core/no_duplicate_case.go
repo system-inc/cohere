@@ -44,10 +44,10 @@ var messageDuplicateCase = rule.Message{
 //
 // No fix. Which arm is the mistake and what its test should have been is the author's knowledge,
 // and deleting the wrong one deletes a body that was meant to run.
-var NoDuplicateCase = rule.Rule{
+var NoDuplicateCase = rule.Rule[rule.NoOptions]{
 	Name: "no-duplicate-case",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -75,14 +75,14 @@ var NoDuplicateCase = rule.Rule{
 						continue
 					}
 
-					signature := tokenSignature(ctx.SourceFile, clause.Expression)
+					signature := tokenSignature(ruleContext.SourceFile, clause.Expression)
 					if seenTests[signature] {
 						// Report the later arm. The first one is the one that runs, so it is the
 						// one that is probably right.
-						ctx.Report(rule.Diagnostic{
-							Range:      rule.TokenRange(ctx.SourceFile, clause.Expression),
+						ruleContext.Report(rule.Diagnostic{
+							Range:      rule.TokenRange(ruleContext.SourceFile, clause.Expression),
 							Message:    messageDuplicateCase,
-							SourceFile: ctx.SourceFile,
+							SourceFile: ruleContext.SourceFile,
 						})
 						continue
 					}

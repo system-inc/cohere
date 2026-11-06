@@ -34,7 +34,7 @@ var messageIncompatibleLibrary = rule.Message{
 // correct and the conclusion drawn from them is not, which matters because it decides whether this
 // rule can ever fire on this tree.
 //
-// The distinction is against `configuration.go`, which really is the shape that measurement describes.
+// The distinction is against `config.go`, which really is the shape that measurement describes.
 // That rule's default table is *self-consistent at every entry*, so it is structurally unable to
 // report without a user-supplied provider cohere has no channel for. This one is the opposite:
 // every one of the three default entries carries a live `knownIncompatible` message, and the
@@ -101,7 +101,7 @@ var messageIncompatibleLibrary = rule.Message{
 // table. What is not handled is an arbitrary chain of re-assignments between the hook call and the
 // property access, which needs the binding-resolution pass this rule deliberately does not build.
 //
-// Deliberately NOT reproduced: with a JavaScript-only parser, ESLint reads `import type {x}` as a
+// Deliberately not reproduced: with a JavaScript-only parser, ESLint reads `import type {x}` as a
 // default import named `type` and reports at the specifier with an empty span. That is an artifact
 // of parsing TypeScript syntax without a TypeScript parser, not a judgment about the code, and our
 // parser gets the shape right. Measured and declined rather than ported.
@@ -115,12 +115,12 @@ var messageIncompatibleLibrary = rule.Message{
 // information for this decision, and the module specifier is compared as a *string* at both
 // upstreams. Declaring the checker would make every fixture need the typed harness to answer a
 // question no type is consulted for.
-var IncompatibleLibrary = rule.Rule{
+var IncompatibleLibrary = rule.Rule[CompilerRuleOptions]{
 	// Bare name, no namespace prefix. The inventory writes `react/incompatible-library` and the
 	// parity guard tries an exact match before stripping the namespace, so the slash spelling would
 	// also match while being the wrong thing to write.
 	Name: "react-hooks/incompatible-library",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[CompilerRuleOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
 				// A source-file pre-pass rather than a call-expression listener, because the
@@ -131,7 +131,7 @@ var IncompatibleLibrary = rule.Rule{
 				if len(incompatible.direct) == 0 && len(incompatible.indirect) == 0 {
 					return
 				}
-				incompatibleLibraryReport(ctx, node, incompatible)
+				incompatibleLibraryReport(ruleContext, node, incompatible)
 			},
 		}
 	},
@@ -152,11 +152,11 @@ type incompatibleLibraryEntry struct {
 
 // incompatibleLibraryTable is the module table, and the seam a test can substitute at.
 //
-// A variable rather than a direct call for the same reason `configuration.go` has one, though the reason
+// A variable rather than a direct call for the same reason `config.go` has one, though the reason
 // is weaker here and the difference is worth stating so a reader does not copy the wrong lesson.
 // There, the seam is the *only* way to make the rule report at all. Here the shipped table fires on
-// its own, and the seam exists so upstream's three fixtures — which import a module registered by a
-// test harness rather than a real package — can be run as written rather than rewritten against a
+// its own, and the seam exists so upstream's three fixtures (which import a module registered by a
+// test harness rather than a real package) can be run as written rather than rewritten against a
 // different library. Both proofs are then available: the shipped table reporting on real names, and
 // upstream's own corpus reporting on its synthetic one.
 var incompatibleLibraryTable = defaultIncompatibleLibraryTable
@@ -169,7 +169,7 @@ var incompatibleLibraryTable = defaultIncompatibleLibraryTable
 // per-finding text, so a reworded copy is a visible divergence.
 //
 // The module name is compared **exactly**, and that is measured rather than assumed. Unlike
-// `isKnownReactModule` in `configuration.go`, which lowercases before comparing, this comparison is
+// `isKnownReactModule` in `config.go`, which lowercases before comparing, this comparison is
 // case-sensitive and does not accept subpaths: `@TanStack/React-Table` and
 // `@tanstack/react-table/core` are both silent at React 7.1.1. A lowercasing or prefix-matching
 // version of this function would report where upstream does not.
@@ -186,11 +186,15 @@ func defaultIncompatibleLibraryTable(moduleName string) (map[string]incompatible
 		}, true
 	case "@tanstack/react-table":
 		return map[string]incompatibleLibraryEntry{
-			"useReactTable": {message: "TanStack Table's `useReactTable()` API returns functions that cannot be memoized safely"},
+			"useReactTable": {
+				message: "TanStack Table's `useReactTable()` API returns functions that cannot be memoized safely",
+			},
 		}, true
 	case "@tanstack/react-virtual":
 		return map[string]incompatibleLibraryEntry{
-			"useVirtualizer": {message: "TanStack Virtual's `useVirtualizer()` API returns functions that cannot be memoized safely"},
+			"useVirtualizer": {
+				message: "TanStack Virtual's `useVirtualizer()` API returns functions that cannot be memoized safely",
+			},
 		}, true
 	}
 	return nil, false
@@ -259,7 +263,7 @@ func incompatibleLibraryBindings(sourceFile *ast.Node) incompatibleLibraryLocals
 // the enclosing function, so a second offending call in the same function never runs. Keyed by the
 // enclosing function node rather than by a single flag, because two sibling components in one file
 // each report their own first call.
-func incompatibleLibraryReport(ctx rule.Context, sourceFile *ast.Node, locals incompatibleLibraryLocals) {
+func incompatibleLibraryReport(ruleContext rule.Context, sourceFile *ast.Node, locals incompatibleLibraryLocals) {
 	reported := map[*ast.Node]bool{}
 
 	// Property accesses reached through a destructure of an incompatible hook's result, keyed by
@@ -271,7 +275,7 @@ func incompatibleLibraryReport(ctx rule.Context, sourceFile *ast.Node, locals in
 	// Locals bound to an incompatible hook's whole result, keyed by the local name, carrying that
 	// hook's property table. This is the `const form = useForm()` half, and it is a different map
 	// from `destructured` because the finding lands at a different node: here the call is
-	// `form.watch()` and upstream's span is the OBJECT, while a destructured property is called
+	// `form.watch()` and upstream's span is the object, while a destructured property is called
 	// bare and the span is the property's own local.
 	results := map[string]map[string]string{}
 
@@ -281,11 +285,16 @@ func incompatibleLibraryReport(ctx rule.Context, sourceFile *ast.Node, locals in
 			incompatibleLibraryCollectDestructure(node, locals, destructured, results)
 		}
 		if node.Kind == ast.KindCallExpression {
-			if span, message, offending := incompatibleLibraryCallMessage(node, locals, destructured, results); offending {
+			if span, message, offending := incompatibleLibraryCallMessage(
+				node,
+				locals,
+				destructured,
+				results,
+			); offending {
 				enclosing := incompatibleLibraryEnclosingRoot(node)
 				if enclosing != nil && !reported[enclosing] {
 					reported[enclosing] = true
-					ctx.ReportNode(span, rule.Message{
+					ruleContext.ReportNode(span, rule.Message{
 						Id:          messageIncompatibleLibrary.Id,
 						Description: messageIncompatibleLibrary.Description + " " + message,
 					})
@@ -305,7 +314,15 @@ func incompatibleLibraryReport(ctx rule.Context, sourceFile *ast.Node, locals in
 // property under a different local, so the *property* name decides the lookup and the *local* name
 // is what the call site will spell. Measured at React 7.1.1: the renamed form reports, with the span
 // on the renamed local.
-func incompatibleLibraryCollectDestructure(declaration *ast.Node, locals incompatibleLibraryLocals, destructured map[string]string, results map[string]map[string]string) {
+//
+// Mutates: destructured gains each destructured local, keyed to the message its property carries
+// Mutates: results gains each whole-result binding, keyed to its library's property table for a later member call
+func incompatibleLibraryCollectDestructure(
+	declaration *ast.Node,
+	locals incompatibleLibraryLocals,
+	destructured map[string]string,
+	results map[string]map[string]string,
+) {
 	node := declaration.AsVariableDeclaration()
 	if node == nil || node.Initializer == nil || node.Name() == nil {
 		return
@@ -448,7 +465,7 @@ func incompatibleLibraryLocalName(specifier *ast.Node) string {
 
 // incompatibleLibraryModuleName reads the specifier text of an import declaration.
 //
-// The kind check is CRASH PROTECTION rather than a behavioral filter, and the distinction was
+// The kind check is crash protection rather than a behavioral filter, and the distinction was
 // established by a surviving mutant rather than by reading. Deleting it survives the whole suite,
 // because no fixture asserting findings can see a panic. Probed over the shapes our parser produces
 // for a malformed specifier, three of them take the linter down on `Text()`:

@@ -112,9 +112,9 @@ func NormalizeIdentifier(value string) string {
 
 // decodeNumericCharacterReference is micromark-util-decode-numeric-character-reference.
 func decodeNumericCharacterReference(value string, base int) string {
-	parsed, err := strconv.ParseInt(value, base, 64)
+	parsed, parseError := strconv.ParseInt(value, base, 64)
 	code := int(parsed)
-	if err != nil {
+	if parseError != nil {
 		// Number.parseInt of a too-long run is still a large number; every caller bounds the digits, so
 		// an error here is only overflow, which upstream's last clause replaces.
 		code = 0x110000
@@ -132,11 +132,6 @@ func decodeNumericCharacterReference(value string, base int) string {
 	}
 
 	return string(rune(code))
-}
-
-// sliceUnits converts code units to a Go string.
-func unitsToString(units []uint16) string {
-	return string(utf16.Decode(units))
 }
 
 // utf16Length is JavaScript's String.length.

@@ -28,35 +28,43 @@ var compilerRuleNames = []string{
 
 // TestCompilerRulesAcceptOnlyTheEmptyObject pins ruling 2 on #e06zm4b for every one of the fifteen,
 // through the decoder each one registers rather than the shared function, so a rule left
-// unregistered or registered with another decoder fails by name.
-func TestCompilerRulesAcceptOnlyTheEmptyObject(t *testing.T) {
-	t.Parallel()
+// unregistered or registered with another decoder fails by name. An entry's Bind runs that decoder and
+// returns its error, which is all this reads.
+func TestCompilerRulesAcceptOnlyTheEmptyObject(test *testing.T) {
+	test.Parallel()
 
-	decoders := map[string]func([]byte) (any, error){}
-	for _, registration := range rule.Registered() {
-		decoders[registration.Rule.Name] = registration.Decode
+	binders := map[string]func(raw []byte, base rule.OptionsBase) (rule.Bound, error){}
+	for _, entry := range rule.Registered() {
+		// The rows below are single option elements, which only a rule registered with Decode is handed,
+		// so a rule registered with another arity reads as having no decoder for them.
+		if entry.Arity == rule.OptionArityOne {
+			binders[entry.Name] = entry.Bind
+		}
 	}
 
 	for _, name := range compilerRuleNames {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			decode := decoders[name]
-			if decode == nil {
-				t.Fatalf("%s registers no decoder, so the config refuses the {} ESLint writes", name)
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+			bind := binders[name]
+			if bind == nil {
+				test.Fatalf("%s registers no decoder, so the config refuses the {} ESLint writes", name)
 			}
 			for _, raw := range []string{``, `{}`, ` { } `} {
-				if _, err := decode([]byte(raw)); err != nil {
-					t.Errorf("%q was refused: %v", raw, err)
+				if _, bindError := bind([]byte(raw), rule.OptionsBase{}); bindError != nil {
+					test.Errorf("%q was refused: %v", raw, bindError)
 				}
 			}
-			_, err := decode([]byte(`{"environment": {"validateRefAccessDuringRender": false}}`))
-			if err == nil || !strings.Contains(err.Error(), "environment") ||
-				!strings.Contains(err.Error(), "React Compiler configuration") {
-				t.Errorf("compiler configuration was not refused with its reason: %v", err)
+			_, bindError := bind(
+				[]byte(`{"environment": {"validateRefAccessDuringRender": false}}`),
+				rule.OptionsBase{},
+			)
+			if bindError == nil || !strings.Contains(bindError.Error(), "environment") ||
+				!strings.Contains(bindError.Error(), "React Compiler configuration") {
+				test.Errorf("compiler configuration was not refused with its reason: %v", bindError)
 			}
 			for _, raw := range []string{`null`, `[]`, `"strict"`, `true`} {
-				if _, err := decode([]byte(raw)); err == nil {
-					t.Errorf("%s decoded; upstream's schema takes an object", raw)
+				if _, bindError := bind([]byte(raw), rule.OptionsBase{}); bindError == nil {
+					test.Errorf("%s decoded; upstream's schema takes an object", raw)
 				}
 			}
 		})

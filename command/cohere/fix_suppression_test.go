@@ -5,6 +5,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/rules/core"
+	"github.com/system-inc/cohere/internal/lint/testing"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
@@ -38,8 +39,8 @@ import (
  * A repair that withheld every fix, or that failed to build the index and returned nothing, would
  * satisfy a table written only from the suppressed cases.
  */
-func TestFixPathHonoursADisableComment(t *testing.T) {
-	t.Parallel()
+func TestFixPathHonoursADisableComment(test *testing.T) {
+	test.Parallel()
 
 	const body = "function f() {\n    debugger;\n}\n"
 
@@ -66,15 +67,15 @@ func TestFixPathHonoursADisableComment(t *testing.T) {
 			wantProposals: true,
 		},
 	} {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			proposals, err := proposalsForText("/Probe.ts", testCase.text, &program.Graph{},
-				[]rule.Rule{core.NoDebugger})
-			if err != nil {
-				t.Fatalf("proposalsForText: %v", err)
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+			proposals, proposalsForTextError := proposalsForText("/Probe.ts", testCase.text, &program.Graph{},
+				[]rule.Entry{rule_testing.EntryOf(test, core.NoDebugger)})
+			if proposalsForTextError != nil {
+				test.Fatalf("proposalsForText: %v", proposalsForTextError)
 			}
 			if got := len(proposals) > 0; got != testCase.wantProposals {
-				t.Errorf("proposals = %d, want %s", len(proposals),
+				test.Errorf("proposals = %d, want %s", len(proposals),
 					map[bool]string{true: "at least one", false: "none"}[testCase.wantProposals])
 			}
 		})

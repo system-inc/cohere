@@ -121,6 +121,7 @@ func showDoc(document Doc) string {
 		var buffer bytes.Buffer
 		encoder := json.NewEncoder(&buffer)
 		encoder.SetEscapeHTML(false)
+		// Ignored: a string always has a JSON form, and a bytes.Buffer never fails a write.
 		_ = encoder.Encode(text)
 		return strings.TrimSuffix(buffer.String(), "\n")
 	}
@@ -131,7 +132,7 @@ func showDoc(document Doc) string {
 		}
 		return strings.Join(shown, ",")
 	}
-	idName := func(id *GroupID) string {
+	idName := func(id *GroupId) string {
 		if id == nil {
 			return ""
 		}
@@ -143,7 +144,7 @@ func showDoc(document Doc) string {
 	case Text:
 		return quote(string(typed))
 	case *Group:
-		result := "group(" + idName(typed.ID) + "," + fmt.Sprint(typed.Break) + "," + showDoc(typed.Contents)
+		result := "group(" + idName(typed.Id) + "," + fmt.Sprint(typed.Break) + "," + showDoc(typed.Contents)
 		if typed.ExpandedStates != nil {
 			result += ",states[" + list(typed.ExpandedStates) + "]"
 		}
@@ -151,24 +152,36 @@ func showDoc(document Doc) string {
 	case *Fill:
 		return "fill[" + list(typed.Parts) + "]"
 	case *IfBreak:
-		return "ifBreak(" + idName(typed.GroupID) + "," + showDoc(typed.BreakContents) + "," + showDoc(typed.FlatContents) + ")"
+		return "ifBreak(" +
+			idName(typed.GroupId) +
+			"," +
+			showDoc(typed.BreakContents) +
+			"," +
+			showDoc(typed.FlatContents) +
+			")"
 	case *Indent:
 		return "indent(" + showDoc(typed.Contents) + ")"
 	case *Align:
-		var n string
+		var argument string
 		switch typed.Kind {
 		case AlignWidth:
-			n = fmt.Sprint(typed.Width)
+			argument = fmt.Sprint(typed.Width)
 		case AlignString:
-			n = quote(typed.String)
+			argument = quote(typed.String)
 		case AlignRoot:
-			n = "markRoot"
+			argument = "markRoot"
 		case AlignDedentToRoot:
-			n = "root"
+			argument = "root"
 		}
-		return "align(" + n + "," + showDoc(typed.Contents) + ")"
+		return "align(" + argument + "," + showDoc(typed.Contents) + ")"
 	case *IndentIfBreak:
-		return "indentIfBreak(" + idName(typed.GroupID) + "," + fmt.Sprint(typed.Negate) + "," + showDoc(typed.Contents) + ")"
+		return "indentIfBreak(" +
+			idName(typed.GroupId) +
+			"," +
+			fmt.Sprint(typed.Negate) +
+			"," +
+			showDoc(typed.Contents) +
+			")"
 	case *LineSuffix:
 		return "lineSuffix(" + showDoc(typed.Contents) + ")"
 	case lineSuffixBoundaryDoc:
@@ -189,9 +202,9 @@ func showDoc(document Doc) string {
 }
 
 // TestUtilitiesAgreeWithUpstream is the differential. Off unless COHERE_PRETTIER_FORK names the fork.
-func TestUtilitiesAgreeWithUpstream(t *testing.T) {
-	t.Parallel()
-	root := corpus.PrettierFork.Root(t)
+func TestUtilitiesAgreeWithUpstream(test *testing.T) {
+	test.Parallel()
+	root := corpus.PrettierFork.Root(test)
 	const count = 3000
 	random := rand.New(rand.NewSource(20261002))
 	cases := make([]printCase, count)
@@ -199,21 +212,22 @@ func TestUtilitiesAgreeWithUpstream(t *testing.T) {
 		generator := &specGenerator{random: random}
 		cases[index] = printCase{Spec: generator.node()}
 	}
-	encoded, err := json.Marshal(cases)
-	if err != nil {
-		t.Fatal(err)
+	encoded, encodeError := json.Marshal(cases)
+	if encodeError != nil {
+		test.Fatal(encodeError)
 	}
 	command := exec.Command("node", "--input-type=module", "-e", utilitiesScript)
 	command.Dir = root
 	command.Stdin = bytes.NewReader(encoded)
-	var stdout, stderr bytes.Buffer
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
 	command.Stdout, command.Stderr = &stdout, &stderr
-	if err := command.Run(); err != nil {
-		t.Fatalf("node: %v\n%s", err, stderr.String())
+	if runError := command.Run(); runError != nil {
+		test.Fatalf("node: %v\n%s", runError, stderr.String())
 	}
 	var upstream []utilitiesOutcome
-	if err := json.Unmarshal(stdout.Bytes(), &upstream); err != nil {
-		t.Fatal(err)
+	if decodeError := json.Unmarshal(stdout.Bytes(), &upstream); decodeError != nil {
+		test.Fatal(decodeError)
 	}
 
 	print := func(document Doc) (result string) {
@@ -226,11 +240,14 @@ func TestUtilitiesAgreeWithUpstream(t *testing.T) {
 	}
 
 	mismatches, upstreamErrors := 0, 0
-	report := func(index int, what string, want any, got any) {
+	report := func(index int, what string, want string, got string) {
 		mismatches++
 		if mismatches <= 8 {
-			specJSON, _ := json.Marshal(cases[index].Spec)
-			t.Errorf("case %d %s\nspec %s\nwant %v\ngot  %v", index, what, specJSON, want, got)
+			specJson, marshalError := json.Marshal(cases[index].Spec)
+			if marshalError != nil {
+				test.Fatalf("encoding case %d's spec: %v", index, marshalError)
+			}
+			test.Errorf("case %d %s\nspec %s\nwant %v\ngot  %v", index, what, specJson, want, got)
 		}
 	}
 	for index, testCase := range cases {
@@ -240,14 +257,14 @@ func TestUtilitiesAgreeWithUpstream(t *testing.T) {
 			continue
 		}
 		if got := WillBreak(buildSpec(testCase.Spec)); got != want.WillBreak {
-			report(index, "willBreak", want.WillBreak, got)
+			report(index, "willBreak", fmt.Sprint(want.WillBreak), fmt.Sprint(got))
 		}
 		if got := CanBreak(buildSpec(testCase.Spec)); got != want.CanBreak {
-			report(index, "canBreak", want.CanBreak, got)
+			report(index, "canBreak", fmt.Sprint(want.CanBreak), fmt.Sprint(got))
 		}
 		if want.IsEmpty != nil {
 			if got := IsEmptyDoc(buildSpec(testCase.Spec)); got != *want.IsEmpty {
-				report(index, "isEmptyDoc", *want.IsEmpty, got)
+				report(index, "isEmptyDoc", fmt.Sprint(*want.IsEmpty), fmt.Sprint(got))
 			}
 		}
 		cleaned := CleanDoc(buildSpec(testCase.Spec))
@@ -269,8 +286,8 @@ func TestUtilitiesAgreeWithUpstream(t *testing.T) {
 			report(index, "removeLines", want.Removed, got)
 		}
 	}
-	t.Logf("%d docs, %d upstream refused, %d mismatches", len(cases), upstreamErrors, mismatches)
+	test.Logf("%d docs, %d upstream refused, %d mismatches", len(cases), upstreamErrors, mismatches)
 	if upstreamErrors > count/10 {
-		t.Errorf("upstream refused %d of %d docs; the comparison is thinner than it looks", upstreamErrors, count)
+		test.Errorf("upstream refused %d of %d docs; the comparison is thinner than it looks", upstreamErrors, count)
 	}
 }

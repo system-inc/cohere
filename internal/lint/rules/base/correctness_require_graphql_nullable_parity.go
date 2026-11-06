@@ -60,7 +60,7 @@ var graphQlNullableParityInputClassDecorators = map[string]struct{}{
 // # An absent flag means false, and a non-boolean flag means skip
 //
 // Three outcomes rather than two, and the difference decides real cases. A decorator with no
-// `nullable` key is checked AS `nullable: false`, so `@GraphQlField() name?: string` reports: the
+// `nullable` key is checked as `nullable: false`, so `@GraphQlField() name?: string` reports: the
 // schema defaults to non-null and the type is optional. A decorator whose `nullable` is not a
 // boolean literal is skipped entirely, which is what makes `nullable: 'items'` and
 // `nullable: 'itemsAndList'` out of scope: those declare list-element nullability, a different
@@ -69,12 +69,12 @@ var graphQlNullableParityInputClassDecorators = map[string]struct{}{
 // # Where the type comes from differs by decorator, and the method arm is easy to miss
 //
 // An argument decorator reads its parameter's type. A field decorator on a property reads the
-// property's. A field decorator on a METHOD reads the method's call-signature return type, because
+// property's. A field decorator on a method reads the method's call-signature return type, because
 // the underlying field decorator is valid on a getter or a method as well as a property, and a port
 // handling only the property shape goes silent on every computed field. The three operation
 // decorators always read a return type.
 //
-// A GETTER is reached and then declines, in both implementations, because a getter has no call
+// A getter is reached and then declines, in both implementations, because a getter has no call
 // signature to read a return type from. That is measured rather than assumed and it is recorded at
 // the arm.
 //
@@ -109,14 +109,14 @@ var graphQlNullableParityInputClassDecorators = map[string]struct{}{
 // The original ships none. Both ways to satisfy the rule change behaviour: editing the flag changes
 // the schema clients see, editing the type changes the code. Which is right is not recoverable from
 // the source.
-var GraphQlNullableParity = rule.Rule{
+var GraphQlNullableParity = rule.Rule[rule.NoOptions]{
 	Name: "base/correctness-require-graphql-nullable-parity",
 
 	// One side of every comparison is a TypeScript type.
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// checkNullability is the shared comparison: report when the declared flag and the type
 		// disagree, in whichever direction, and on an input, when a nullable type admits undefined
 		// but not the null a client can send.
@@ -128,38 +128,38 @@ var GraphQlNullableParity = rule.Rule{
 			typeIsNullable := decorators.IsNullableType(actualType)
 			if declaredNullable == typeIsNullable {
 				if isInput && declaredNullable && !typeIncludesNull(actualType) {
-					ctx.ReportNode(reportNode, buildDecoratorNullableButInputExcludesNullMessage(
-						ctx.TypeChecker.TypeToString(actualType)))
+					ruleContext.ReportNode(reportNode, buildDecoratorNullableButInputExcludesNullMessage(
+						ruleContext.TypeChecker.TypeToString(actualType)))
 				}
 				return
 			}
 
-			typeText := ctx.TypeChecker.TypeToString(actualType)
+			typeText := ruleContext.TypeChecker.TypeToString(actualType)
 			if declaredNullable {
-				ctx.ReportNode(reportNode, buildDecoratorNullableButTypeNotMessage(typeText))
+				ruleContext.ReportNode(reportNode, buildDecoratorNullableButTypeNotMessage(typeText))
 				return
 			}
-			ctx.ReportNode(reportNode, buildTypeNullableButDecoratorNotMessage(typeText))
+			ruleContext.ReportNode(reportNode, buildTypeNullableButDecoratorNotMessage(typeText))
 		}
 
 		// returnTypeOf reads a method's call-signature return type, with one Promise unwrap.
 		returnTypeOf := func(methodLike *ast.Node) *checker.Type {
-			methodType := ctx.TypeChecker.GetTypeAtLocation(methodLike)
+			methodType := ruleContext.TypeChecker.GetTypeAtLocation(methodLike)
 			if methodType == nil {
 				return nil
 			}
-			signatures := checker.Checker_getSignaturesOfType(ctx.TypeChecker, methodType,
+			signatures := checker.Checker_getSignaturesOfType(ruleContext.TypeChecker, methodType,
 				checker.SignatureKindCall)
 			if len(signatures) == 0 {
 				return nil
 			}
-			returnType := checker.Checker_getReturnTypeOfSignature(ctx.TypeChecker, signatures[0])
-			return unwrapPromiseOnce(ctx, returnType)
+			returnType := checker.Checker_getReturnTypeOfSignature(ruleContext.TypeChecker, signatures[0])
+			return unwrapPromiseOnce(ruleContext, returnType)
 		}
 
 		return rule.Listeners{
 			ast.KindDecorator: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 
@@ -191,13 +191,13 @@ var GraphQlNullableParity = rule.Rule{
 					if owner.Kind != ast.KindParameter {
 						return
 					}
-					// Read at the parameter NODE, which is where the original reads it and which
+					// Read at the parameter node, which is where the original reads it and which
 					// is also where the report points. Reading at the parameter's name instead is
-					// EQUIVALENT, measured across a plain, an optional and a defaulted parameter:
+					// equivalent, measured across a plain, an optional and a defaulted parameter:
 					// the checker answers the same type at both locations for all three, so a
 					// mutant swapping them survives every fixture and no input can separate them.
 					checkNullability(owner, declaredNullable,
-						ctx.TypeChecker.GetTypeAtLocation(owner), true)
+						ruleContext.TypeChecker.GetTypeAtLocation(owner), true)
 					return
 				}
 
@@ -213,7 +213,7 @@ var GraphQlNullableParity = rule.Rule{
 						// A property's class decides whether a client sends it. A field on a
 						// method or getter is computed for output, so only this arm asks.
 						checkNullability(owner.Name(), declaredNullable,
-							ctx.TypeChecker.GetTypeAtLocation(owner.Name()),
+							ruleContext.TypeChecker.GetTypeAtLocation(owner.Name()),
 							decorators.HasDecoratorInSet(owner.Parent,
 								graphQlNullableParityInputClassDecorators))
 					case ast.KindMethodDeclaration, ast.KindGetAccessor:
@@ -221,7 +221,7 @@ var GraphQlNullableParity = rule.Rule{
 						// property, so a port handling only the property shape goes silent on
 						// every computed field.
 						//
-						// The get accessor arm is reached and then declines, which MATCHES the
+						// The get accessor arm is reached and then declines, which matches the
 						// original and is worth stating because it looks like a defect. A getter
 						// has no call signature: the type at the node is already the property
 						// type, so `returnTypeOf` finds no signature and answers nil, and
@@ -254,7 +254,7 @@ var GraphQlNullableParity = rule.Rule{
 // recursive unwrap its sibling rule uses. This rule asks whether the resolved value can be absent,
 // and one level is what an async method produces; a nested promise is not a shape anyone writes and
 // unwrapping further would start answering a different question.
-func unwrapPromiseOnce(ctx rule.Context, subject *checker.Type) *checker.Type {
+func unwrapPromiseOnce(ruleContext rule.Context, subject *checker.Type) *checker.Type {
 	if subject == nil {
 		return nil
 	}
@@ -262,7 +262,7 @@ func unwrapPromiseOnce(ctx rule.Context, subject *checker.Type) *checker.Type {
 	if symbol == nil || symbol.Name != "Promise" {
 		return subject
 	}
-	typeArguments := checker.Checker_getTypeArguments(ctx.TypeChecker, subject)
+	typeArguments := checker.Checker_getTypeArguments(ruleContext.TypeChecker, subject)
 	if len(typeArguments) == 0 {
 		return subject
 	}
@@ -292,28 +292,43 @@ func typeIncludesNull(subjectType *checker.Type) bool {
 
 // The rule's messages, whose wording lives in `policy/messages/correctness-require-graphql-nullable-parity.json`.
 var (
-	graphQlNullableParityDecoratorNullableButInputExcludesNullText = policy.MessageOf("base/correctness-require-graphql-nullable-parity", "decoratorNullableButInputExcludesNull")
-	graphQlNullableParityDecoratorNullableButTypeNotText           = policy.MessageOf("base/correctness-require-graphql-nullable-parity", "decoratorNullableButTypeNot")
-	graphQlNullableParityTypeNullableButDecoratorNotText           = policy.MessageOf("base/correctness-require-graphql-nullable-parity", "typeNullableButDecoratorNot")
+	graphQlNullableParityDecoratorNullableButInputExcludesNullText = policy.MessageOf(
+		"base/correctness-require-graphql-nullable-parity",
+		"decoratorNullableButInputExcludesNull",
+	)
+	graphQlNullableParityDecoratorNullableButTypeNotText = policy.MessageOf(
+		"base/correctness-require-graphql-nullable-parity",
+		"decoratorNullableButTypeNot",
+	)
+	graphQlNullableParityTypeNullableButDecoratorNotText = policy.MessageOf(
+		"base/correctness-require-graphql-nullable-parity",
+		"typeNullableButDecoratorNot",
+	)
 )
 
 func buildDecoratorNullableButInputExcludesNullMessage(typeText string) rule.Message {
 	return rule.Message{
-		Id:          graphQlNullableParityDecoratorNullableButInputExcludesNullText.Id,
-		Description: graphQlNullableParityDecoratorNullableButInputExcludesNullText.Render(map[string]string{"typeText": typeText}),
+		Id: graphQlNullableParityDecoratorNullableButInputExcludesNullText.Id,
+		Description: graphQlNullableParityDecoratorNullableButInputExcludesNullText.Render(
+			map[string]string{"typeText": typeText},
+		),
 	}
 }
 
 func buildDecoratorNullableButTypeNotMessage(typeText string) rule.Message {
 	return rule.Message{
-		Id:          graphQlNullableParityDecoratorNullableButTypeNotText.Id,
-		Description: graphQlNullableParityDecoratorNullableButTypeNotText.Render(map[string]string{"typeText": typeText}),
+		Id: graphQlNullableParityDecoratorNullableButTypeNotText.Id,
+		Description: graphQlNullableParityDecoratorNullableButTypeNotText.Render(
+			map[string]string{"typeText": typeText},
+		),
 	}
 }
 
 func buildTypeNullableButDecoratorNotMessage(typeText string) rule.Message {
 	return rule.Message{
-		Id:          graphQlNullableParityTypeNullableButDecoratorNotText.Id,
-		Description: graphQlNullableParityTypeNullableButDecoratorNotText.Render(map[string]string{"typeText": typeText}),
+		Id: graphQlNullableParityTypeNullableButDecoratorNotText.Id,
+		Description: graphQlNullableParityTypeNullableButDecoratorNotText.Render(
+			map[string]string{"typeText": typeText},
+		),
 	}
 }

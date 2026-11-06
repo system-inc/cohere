@@ -7,7 +7,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // every option's zero value is its default -- but the two shapes should not be told apart by whether
 // the decoder happened to run.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[NoParamReassignOptions]{
 		Rule:   NoParamReassign,
 		Decode: DecodeNoParamReassignOptions,
 	})

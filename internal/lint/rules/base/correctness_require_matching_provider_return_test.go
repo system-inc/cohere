@@ -35,12 +35,12 @@ declare namespace Namespace {
 }
 `
 
-// These fixtures are WRITTEN rather than imported, which inverts the usual advice.
+// These fixtures are written rather than imported, which inverts the usual advice.
 //
 // This is one of our own base rules, so there is no upstream corpus, and a fixture written beside
 // the port carries the same beliefs the port does. The mitigation is that the source repository is a
 // real oracle, and for this rule the oracle is unusually strong: the check ran against
-// api-phi-health's ACTUAL `Provider` decorator and `TypedInjectionKey` rather than a synthetic
+// api-phi-health's actual `Provider` decorator and `TypedInjectionKey` rather than a synthetic
 // stand-in, on a file seeded inside that project's tsconfig include. The original and this port
 // agreed on two reporting shapes and three clean ones, and the rendered types matched character for
 // character, including `string | ObjectFactory<string> | undefined`.
@@ -48,8 +48,8 @@ declare namespace Namespace {
 // The whole api-phi-health tree reports zero for this rule, which is a real property of that tree
 // rather than a broken instrument: the same run linted 2310 files and reported 44 findings from
 // other rules. A clean tree cannot validate a port, which is why the seeded file exists.
-func TestProviderReturnMatchesTokenFires(t *testing.T) {
-	t.Parallel()
+func TestProviderReturnMatchesTokenFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -66,9 +66,9 @@ func TestProviderReturnMatchesTokenFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, CorrectnessRequireMatchingProviderReturn,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, CorrectnessRequireMatchingProviderReturn,
 				providerReturnFile,
 				providerReturnPreamble+"class C { "+testCase.method+" }"), "mismatch")
 		})
@@ -85,8 +85,8 @@ func TestProviderReturnMatchesTokenFires(t *testing.T) {
 //
 // The any and unknown rows pin the other skip: a brand whose type argument is not concrete carries
 // no contract, and checking it would be theatre because assignability answers yes for everything.
-func TestProviderReturnMatchesTokenStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestProviderReturnMatchesTokenStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -108,9 +108,9 @@ func TestProviderReturnMatchesTokenStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, CorrectnessRequireMatchingProviderReturn,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, CorrectnessRequireMatchingProviderReturn,
 				providerReturnFile,
 				providerReturnPreamble+"class C { "+testCase.method+" }"))
 		})
@@ -122,8 +122,8 @@ func TestProviderReturnMatchesTokenStaysSilent(t *testing.T) {
 // A decorator can sit on a class, a property, an accessor or a parameter, and all of those reach
 // this listener. The original requires a MethodDefinition parent and so does this. Each of these
 // carries a real brand, so they would report if the parent test were dropped.
-func TestProviderReturnMatchesTokenOnlyJudgesMethods(t *testing.T) {
-	t.Parallel()
+func TestProviderReturnMatchesTokenOnlyJudgesMethods(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name        string
@@ -135,11 +135,11 @@ func TestProviderReturnMatchesTokenOnlyJudgesMethods(t *testing.T) {
 		// The row that actually proves the parent guard, and the only one that does.
 		//
 		// Written for a surviving mutant, and the first hypothesis about that survivor was wrong.
-		// The three rows above pass with OR without the guard: a property, a getter and a setter
+		// The three rows above pass with or without the guard: a property, a getter and a setter
 		// have no call signature, so the rule exits at the return-type lookup rather than at the
 		// parent test, and dropping the guard changes nothing for them.
 		//
-		// A property whose TYPE is a function does have a call signature, so it is the one shape
+		// A property whose type is a function does have a call signature, so it is the one shape
 		// that separates the two versions: with the guard it is clean, without it, it reports.
 		// Measured against the original on a seeded file inside api-phi-health's tsconfig, using
 		// the real Provider decorator: it reports the equivalent real method and stays silent on
@@ -149,9 +149,9 @@ func TestProviderReturnMatchesTokenOnlyJudgesMethods(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, CorrectnessRequireMatchingProviderReturn,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, CorrectnessRequireMatchingProviderReturn,
 				providerReturnFile,
 				providerReturnPreamble+"class C { "+testCase.classMember+" }"))
 		})
@@ -162,17 +162,17 @@ func TestProviderReturnMatchesTokenOnlyJudgesMethods(t *testing.T) {
 //
 // A message-id assertion cannot see anything the format string does, and this one interpolates three
 // values, so a slot filled from the wrong variable reads as a correct finding. The rendered strings
-// here were taken from the ORIGINAL rule's output on the seeded file rather than derived: it printed
+// here were taken from the original rule's output on the seeded file rather than derived: it printed
 // `string | ObjectFactory<string> | undefined` and `number` for the same input.
 //
 // Asserted against literals typed here rather than against the rule's own constant, since comparing
 // to the constant moves both sides together under mutation.
-func TestProviderReturnMatchesTokenRendersBothTypes(t *testing.T) {
-	t.Parallel()
+func TestProviderReturnMatchesTokenRendersBothTypes(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTyped(t, CorrectnessRequireMatchingProviderReturn, providerReturnFile,
+	result := rule_testing.RunTyped(test, CorrectnessRequireMatchingProviderReturn, providerReturnFile,
 		providerReturnPreamble+"class C { @Provider(stringToken) bad(): number { return 1; } }")
-	rule_testing.ExpectFindings(t, result, "mismatch")
+	rule_testing.ExpectFindings(test, result, "mismatch")
 
 	rendered := result.Diagnostics[0].Message.Description
 	for _, want := range []string{
@@ -181,7 +181,7 @@ func TestProviderReturnMatchesTokenRendersBothTypes(t *testing.T) {
 		"`number`",
 	} {
 		if !strings.Contains(rendered, want) {
-			t.Errorf("expected the message to carry %s, got %q", want, rendered)
+			test.Errorf("expected the message to carry %s, got %q", want, rendered)
 		}
 	}
 	// The order matters as much as the presence: a message naming the two types the wrong way round
@@ -189,14 +189,14 @@ func TestProviderReturnMatchesTokenRendersBothTypes(t *testing.T) {
 	expectedIndex := strings.Index(rendered, "`string | ObjectFactory<string> | undefined`")
 	returnIndex := strings.Index(rendered, "`number`")
 	if expectedIndex > returnIndex {
-		t.Errorf("expected the contract before the actual return type, got %q", rendered)
+		test.Errorf("expected the contract before the actual return type, got %q", rendered)
 	}
 
-	namespaced := rule_testing.RunTyped(t, CorrectnessRequireMatchingProviderReturn, providerReturnFile,
+	namespaced := rule_testing.RunTyped(test, CorrectnessRequireMatchingProviderReturn, providerReturnFile,
 		providerReturnPreamble+"class C { @Namespace.Strict() m(): number { return 1; } }")
-	rule_testing.ExpectFindings(t, namespaced, "mismatch")
+	rule_testing.ExpectFindings(test, namespaced, "mismatch")
 	if !strings.Contains(namespaced.Diagnostics[0].Message.Description, "@Strict") {
-		t.Errorf("expected a namespaced decorator to render its property name, got %q",
+		test.Errorf("expected a namespaced decorator to render its property name, got %q",
 			namespaced.Diagnostics[0].Message.Description)
 	}
 }
@@ -205,21 +205,21 @@ func TestProviderReturnMatchesTokenRendersBothTypes(t *testing.T) {
 //
 // The original reports the method's value node, which is the function carrying the return type the
 // author has to change. Every assertion above is satisfied by a rule reporting the decorator
-// instead, and pointing at the decorator would show the reader the line they must NOT edit.
-func TestProviderReturnMatchesTokenPointsAtTheMethod(t *testing.T) {
-	t.Parallel()
+// instead, and pointing at the decorator would show the reader the line they must not edit.
+func TestProviderReturnMatchesTokenPointsAtTheMethod(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTyped(t, CorrectnessRequireMatchingProviderReturn, providerReturnFile,
+	result := rule_testing.RunTyped(test, CorrectnessRequireMatchingProviderReturn, providerReturnFile,
 		providerReturnPreamble+"class C { @Strict() m(): number { return 1; } }")
-	rule_testing.ExpectFindings(t, result, "mismatch")
+	rule_testing.ExpectFindings(test, result, "mismatch")
 
 	source := result.SourceFile.Text()
 	reported := source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 	if !strings.HasPrefix(reported, "@Strict() m(): number") {
-		t.Errorf("expected the finding on the method declaration, pointed at %q", reported)
+		test.Errorf("expected the finding on the method declaration, pointed at %q", reported)
 	}
 	if !strings.Contains(reported, "number") {
-		t.Errorf("expected the reported span to include the return type the author must change, "+
+		test.Errorf("expected the reported span to include the return type the author must change, "+
 			"pointed at %q", reported)
 	}
 }
@@ -230,16 +230,16 @@ func TestProviderReturnMatchesTokenPointsAtTheMethod(t *testing.T) {
 // the rule goes completely silent. That is a vacuous green rather than an obvious crash, which is
 // the more dangerous of the two failure modes: a later revert to rule_testing.Run would leave every
 // Fires case above passing for no reason. This asserts the guard is doing what its comment says.
-func TestProviderReturnMatchesTokenNeedsTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestProviderReturnMatchesTokenNeedsTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	source := providerReturnPreamble + "class C { @Strict() m(): number { return 1; } }"
 
-	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, CorrectnessRequireMatchingProviderReturn,
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, CorrectnessRequireMatchingProviderReturn,
 		providerReturnFile, source), "mismatch")
 
 	// The same input through the untyped harness reports nothing, because the rule declines when it
 	// has no checker rather than dereferencing one.
-	rule_testing.ExpectClean(t, rule_testing.Run(t, CorrectnessRequireMatchingProviderReturn,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, CorrectnessRequireMatchingProviderReturn,
 		providerReturnFile, source))
 }

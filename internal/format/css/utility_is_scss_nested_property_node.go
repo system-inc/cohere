@@ -20,7 +20,7 @@ func isScssNestedPropertyNode(node *estree.Node, options *parseOptions) bool {
 		return false
 	}
 
-	selector, isString := node.Get("selector").(string)
+	selector, isString := asString(node.Get("selector"))
 	if !isString || selector == "" {
 		return false
 	}

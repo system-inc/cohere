@@ -20,7 +20,7 @@ type defaultCaseCase struct {
 	// source is upstream's `code`, byte for byte.
 	source string
 
-	// options is the RAW JSON of upstream's options object, routed through the rule's own
+	// options is the raw JSON of upstream's options object, routed through the rule's own
 	// exported decoder rather than built as a struct, so the decoder's defaults and its
 	// empty-input path are under test.
 	options string
@@ -195,42 +195,42 @@ var defaultCaseSilentCases = []defaultCaseCase{
 }
 
 // decodedDefaultCase routes a row's raw JSON through the rule's own exported decoder.
-func decodedDefaultCase(t *testing.T, raw string) any {
-	t.Helper()
-	decoded, err := DecodeDefaultCaseOptions([]byte(raw))
-	if err != nil {
-		t.Fatalf("decoding options %q: %v", raw, err)
+func decodedDefaultCase(test *testing.T, raw string) DefaultCaseOptions {
+	test.Helper()
+	decoded, decodeDefaultCaseOptionsError := DecodeDefaultCaseOptions([]byte(raw))
+	if decodeDefaultCaseOptionsError != nil {
+		test.Fatalf("decoding options %q: %v", raw, decodeDefaultCaseOptionsError)
 	}
 	return decoded
 }
 
-func TestDefaultCaseFires(t *testing.T) {
-	t.Parallel()
+func TestDefaultCaseFires(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range defaultCaseFiresCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, DefaultCase, defaultCaseFile, testCase.source,
-				decodedDefaultCase(t, testCase.options))
-			rule_testing.ExpectFindings(t, result, testCase.ids...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, DefaultCase, defaultCaseFile, testCase.source,
+				decodedDefaultCase(test, testCase.options))
+			rule_testing.ExpectFindings(test, result, testCase.ids...)
 		})
 	}
 }
 
-func TestDefaultCaseStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestDefaultCaseStaysSilent(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range defaultCaseSilentCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, DefaultCase, defaultCaseFile, testCase.source,
-				decodedDefaultCase(t, testCase.options))
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, DefaultCase, defaultCaseFile, testCase.source,
+				decodedDefaultCase(test, testCase.options))
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
 
 // TestDefaultCaseCommentPatternIsAnchored covers a discrimination upstream's corpus cannot see.
 //
-// The default pattern is `/^no default$/iu`, anchored at both ends. Removing the anchors SURVIVES
+// The default pattern is `/^no default$/iu`, anchored at both ends. Removing the anchors survives
 // the whole 23-case corpus: every case that exercises the default pattern writes the comment
 // exactly, and the two cases carrying a near-miss comment supply their own `commentPattern` option,
 // under which both spellings match either way.
@@ -238,8 +238,8 @@ func TestDefaultCaseStaysSilent(t *testing.T) {
 // Measured on the installed rule with a control that fires: `// no default` excuses the switch,
 // while `// no default here` and `// say no default` both report. So an unanchored pattern would
 // silently excuse two shapes upstream flags, in the direction that hides findings.
-func TestDefaultCaseCommentPatternIsAnchored(t *testing.T) {
-	t.Parallel()
+func TestDefaultCaseCommentPatternIsAnchored(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name    string
@@ -256,15 +256,15 @@ func TestDefaultCaseCommentPatternIsAnchored(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, DefaultCase, defaultCaseFile, testCase.source,
-				decodedDefaultCase(t, ""))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, DefaultCase, defaultCaseFile, testCase.source,
+				decodedDefaultCase(test, ""))
 			if testCase.reports {
-				rule_testing.ExpectFindings(t, result, "missingDefaultCase")
+				rule_testing.ExpectFindings(test, result, "missingDefaultCase")
 				return
 			}
-			rule_testing.ExpectClean(t, result)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }

@@ -21,11 +21,11 @@ type outputBlock struct {
 // file extending another may not carry one (the loader refuses it there, since this reads only here), and
 // a key the block does not know is refused, naming the file, rather than ignored.
 func readOutputBlock(settingsPath string) (outputBlock, error) {
-	contents, err := configuration.SourceContents(settingsPath)
-	if errors.Is(err, fs.ErrNotExist) {
+	contents, sourceContentsError := configuration.SourceContents(settingsPath)
+	if errors.Is(sourceContentsError, fs.ErrNotExist) {
 		return outputBlock{}, nil
 	}
-	if err != nil {
+	if sourceContentsError != nil {
 		return outputBlock{}, nil // The lint config's own read reports a file it cannot read.
 	}
 	var keyed map[string]json.RawMessage
@@ -39,8 +39,12 @@ func readOutputBlock(settingsPath string) (outputBlock, error) {
 	var block outputBlock
 	decoder := json.NewDecoder(bytes.NewReader(raw))
 	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&block); err != nil {
-		return outputBlock{}, fmt.Errorf("the \"output\" block in %s: %w; the only key it takes is \"phases\"", settingsPath, err)
+	if decodeError := decoder.Decode(&block); decodeError != nil {
+		return outputBlock{}, fmt.Errorf(
+			"the \"output\" block in %s: %w; the only key it takes is \"phases\"",
+			settingsPath,
+			decodeError,
+		)
 	}
 	return block, nil
 }

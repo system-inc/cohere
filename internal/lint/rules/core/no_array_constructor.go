@@ -115,7 +115,7 @@ var messageUseAnArrayLiteral = rule.Message{
 // output parses, so no syntax guard fires, and the meaning changed anyway. So the rewrite is offered
 // as a suggestion a human accepts rather than a fix applied unattended. That is not caution about
 // the common case, where `[]` is plainly right; it is that the rule cannot tell the common case from
-// the ASI case without asking what precedes the statement, and a rewrite that is right except when
+// the semicolon-insertion case without asking what precedes the statement, and a rewrite that is right except when
 // it silently is not belongs on the human side of that line.
 //
 // The replaced span runs from the first argument to one character before the call's end, which
@@ -126,10 +126,10 @@ var messageUseAnArrayLiteral = rule.Message{
 // hold only comments, `Array(/*a*/ /*b*/)`, has an empty argument list because comments are trivia,
 // so it takes the no-arguments branch and becomes `[]`. And a comment between the callee and the
 // open paren, `Array/*a*/()`, sits outside any span anchored on the first argument. Upstream loses
-// both as well and carries the pairs commented out under "TODO: Preserve comments around callee".
+// both as well and carries the pairs commented out under `TODO: Preserve comments around callee`.
 // Acceptable only because this is a suggestion a human reads before accepting; it would be a defect
 // in a fix.
-var NoArrayConstructor = rule.Rule{
+var NoArrayConstructor = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/no-array-constructor",
 
 	// See the doc above: a local binding named `Array` makes the reported shapes correct code, and
@@ -137,7 +137,7 @@ var NoArrayConstructor = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		report := func(node *ast.Node) {
 			callee, arguments, typeArguments, isOptionalCall := arrayConstructorCallParts(node)
 
@@ -158,7 +158,7 @@ var NoArrayConstructor = rule.Rule{
 			}
 
 			// `Array?.(1, 2, 3)`. Upstream carries every optional form as a pass case and marks them
-			// "TODO: Catch optional chaining cases", so this is upstream declining to judge them,
+			// `TODO: Catch optional chaining cases`, so this is upstream declining to judge them,
 			// not upstream judging them safe. Reproduced rather than improved on, because the brief
 			// asks for upstream's behavior and a silent divergence here would be invisible.
 			if isOptionalCall {
@@ -202,14 +202,14 @@ var NoArrayConstructor = rule.Rule{
 			// guard reads each rule file for a `.TypeChecker` selector, and this rule's only read
 			// would otherwise sit in `resolvesToAGlobal` one file over, so the rule would declare a
 			// need the guard could not confirm.
-			if ctx.TypeChecker == nil || !resolvesToAGlobal(ctx, callee) {
+			if ruleContext.TypeChecker == nil || !resolvesToAGlobal(ruleContext, callee) {
 				return
 			}
 
-			ctx.ReportNodeWithSuggestions(node, messageNoArrayConstructor, rule.Suggestion{
+			ruleContext.ReportNodeWithSuggestions(node, messageNoArrayConstructor, rule.Suggestion{
 				Message: messageUseAnArrayLiteral,
 				Fixes: []rule.Fix{
-					ctx.ReplaceNode(node, arrayLiteralReplacing(ctx, node, arguments)),
+					ruleContext.ReplaceNode(node, arrayLiteralReplacing(ruleContext, node, arguments)),
 				},
 			})
 		}
@@ -252,9 +252,9 @@ func arrayConstructorCallParts(node *ast.Node) (
 // `new Array` with no parentheses parses with a nil argument list rather than an empty one, which is
 // a distinct shape from `new Array()` and reaches the same empty answer here. A port reading the
 // list without that guard panics on the shortest input in the corpus.
-func arrayLiteralReplacing(ctx rule.Context, node *ast.Node, arguments *ast.NodeList) string {
+func arrayLiteralReplacing(ruleContext rule.Context, node *ast.Node, arguments *ast.NodeList) string {
 	if arguments == nil || len(arguments.Nodes) == 0 {
 		return "[]"
 	}
-	return "[" + ctx.SourceFile.Text()[arguments.Nodes[0].Pos():node.End()-1] + "]"
+	return "[" + ruleContext.SourceFile.Text()[arguments.Nodes[0].Pos():node.End()-1] + "]"
 }

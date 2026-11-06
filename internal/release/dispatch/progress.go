@@ -12,7 +12,7 @@ import (
 // A default run ends in one footer line, and the launcher's lines would print above it, so each kind says
 // only as much as the caller needs:
 //
-//   - A step, such as building HEAD, extracting the compiler or building the Swift engine, takes seconds
+//   - A step, such as building `HEAD`, extracting the compiler or building the Swift engine, takes seconds
 //     to minutes, and silence through that would look hung. On a terminal it is one dim line, rewritten by
 //     the next step and cleared before cohere prints, and to a pipe or a file it is nothing.
 //   - A note, such as what a prune or a trim removed, is housekeeping already written to the prune log.
@@ -58,6 +58,7 @@ func (progress *Progress) Step(format string, arguments ...any) {
 	switch {
 	case progress.verbose:
 		progress.clearLocked()
+		// Ignored: progress has nowhere left to say a failed write, and no run's result rests on it.
 		fmt.Fprintln(progress.out, text)
 	case progress.terminal:
 		if utf8.RuneCountInString(text) > stepWidth {
@@ -67,6 +68,7 @@ func (progress *Progress) Step(format string, arguments ...any) {
 		if progress.color {
 			text = "\x1b[2m" + text + "\x1b[22m"
 		}
+		// Ignored: progress has nowhere left to say a failed write, and no run's result rests on it.
 		fmt.Fprint(progress.out, "\r\x1b[2K"+text)
 		progress.showing = true
 	}
@@ -78,6 +80,7 @@ func (progress *Progress) Note(format string, arguments ...any) {
 	defer progress.lock.Unlock()
 	if progress.verbose {
 		progress.clearLocked()
+		// Ignored: progress has nowhere left to say a failed write, and no run's result rests on it.
 		fmt.Fprintf(progress.out, format+"\n", arguments...)
 	}
 }
@@ -87,6 +90,8 @@ func (progress *Progress) Fail(format string, arguments ...any) {
 	progress.lock.Lock()
 	defer progress.lock.Unlock()
 	progress.clearLocked()
+	// Ignored: stderr is the last place left to say it, and a failure that ends the run is said again by its exit
+	// code whether or not this lands.
 	fmt.Fprintf(progress.out, format+"\n", arguments...)
 }
 
@@ -112,6 +117,7 @@ func (progress *Progress) Clear() {
 
 func (progress *Progress) clearLocked() {
 	if progress.showing {
+		// Ignored: progress has nowhere left to say a failed write, and no run's result rests on it.
 		fmt.Fprint(progress.out, "\r\x1b[2K")
 		progress.showing = false
 	}
@@ -119,6 +125,6 @@ func (progress *Progress) clearLocked() {
 
 // isTerminal reports whether a stream is a terminal rather than a pipe or a file.
 func isTerminal(stream *os.File) bool {
-	information, err := stream.Stat()
-	return err == nil && information.Mode()&os.ModeCharDevice != 0
+	information, statError := stream.Stat()
+	return statError == nil && information.Mode()&os.ModeCharDevice != 0
 }

@@ -18,8 +18,8 @@ import (
 // them in each way a collapse has to agree on (value, variant, sign, marker, or a missing side), adds
 // near misses and written-out classes, and requires the two matchers to return the same collapses in
 // the same order. The draw is seeded, so a disagreement reproduces.
-func TestShorthandMatcherAgreesWithTheExpressions(t *testing.T) {
-	t.Parallel()
+func TestShorthandMatcherAgreesWithTheExpressions(test *testing.T) {
+	test.Parallel()
 	random := rand.New(rand.NewSource(20261004))
 
 	var roots []string
@@ -54,16 +54,17 @@ func TestShorthandMatcherAgreesWithTheExpressions(t *testing.T) {
 
 	// A decoration a collapse has to agree on: variants, sign, marker.
 	decorate := func(className string, variant string, negative bool, marker int) string {
+		decorated := className
 		switch marker {
 		case 1:
-			className = "!" + className
+			decorated = "!" + decorated
 		case 2:
-			className += "!"
+			decorated += "!"
 		}
 		if negative {
-			className = "-" + className
+			decorated = "-" + decorated
 		}
-		return variant + className
+		return variant + decorated
 	}
 
 	collapsing := 0
@@ -101,13 +102,13 @@ func TestShorthandMatcherAgreesWithTheExpressions(t *testing.T) {
 			perturbed := random.Intn(len(classNames))
 			switch random.Intn(8) {
 			case 0:
-				classNames[perturbed] = classNames[perturbed] + "0"
+				classNames[perturbed] += "0"
 			case 1:
 				classNames[perturbed] = "focus:" + classNames[perturbed]
 			case 2:
 				classNames[perturbed] = "-" + classNames[perturbed]
 			case 3:
-				classNames[perturbed] = classNames[perturbed] + "!"
+				classNames[perturbed] += "!"
 			case 4:
 				classNames = append(classNames[:perturbed], classNames[perturbed+1:]...)
 			}
@@ -128,22 +129,22 @@ func TestShorthandMatcherAgreesWithTheExpressions(t *testing.T) {
 				classNames[index] = draw()
 			}
 		}
-		if expectShorthandMatchersAgree(t, classNames) {
+		if expectShorthandMatchersAgree(test, classNames) {
 			collapsing++
 		}
 	}
 	// Proof the draw reached the cases that matter: an agreement made only of empty answers would
 	// pass against a matcher that never finds anything.
 	if collapsing < 10_000 {
-		t.Fatalf("only %d of 60,000 draws collapsed, too few to say the matchers agree on collapses", collapsing)
+		test.Fatalf("only %d of 60,000 draws collapsed, too few to say the matchers agree on collapses", collapsing)
 	}
 }
 
 // TestShorthandMatcherAgreesOnTheFixtureCorpus runs the two matchers over the class lists the rule's
 // fixtures and the migration's corpus name, where a disagreement would be a real finding gained or
 // lost.
-func TestShorthandMatcherAgreesOnTheFixtureCorpus(t *testing.T) {
-	t.Parallel()
+func TestShorthandMatcherAgreesOnTheFixtureCorpus(test *testing.T) {
+	test.Parallel()
 	for _, classes := range []string{
 		"ps-4 pe-4", "pt-2 pb-2", "ml-1 mr-1 mt-1 mb-1", "w-4 h-4", "top-0 right-0 bottom-0 left-0",
 		"hover:ps-4 hover:pe-4", "-mt-2 -mb-2", "!pt-2 !pb-2", "pt-2! pb-2!", "ps-[2px] pe-[2px]",
@@ -160,21 +161,26 @@ func TestShorthandMatcherAgreesOnTheFixtureCorpus(t *testing.T) {
 		// A class matching nothing still puts its variant first, which decides which group reports.
 		"justify-x-2 [&_button]:items-2 [&_button]:justify-items-2 items-4 justify-items-4",
 	} {
-		expectShorthandMatchersAgree(t, strings.Fields(classes))
+		expectShorthandMatchersAgree(test, strings.Fields(classes))
 	}
 }
 
 // expectShorthandMatchersAgree fails when the two matchers answer one class list differently, and
 // reports whether the list collapsed.
-func expectShorthandMatchersAgree(t *testing.T, classNames []string) bool {
-	t.Helper()
+func expectShorthandMatchersAgree(test *testing.T, classNames []string) bool {
+	test.Helper()
 	expected := regexShorthandCollapses(classNames)
 	actual := shorthandCollapses(classNames)
 	if len(expected) == 0 && len(actual) == 0 {
 		return false
 	}
 	if !reflect.DeepEqual(expected, actual) {
-		t.Fatalf("the matchers disagree on %q:\n  expressions: %+v\n  plain text:  %+v", classNames, expected, actual)
+		test.Fatalf(
+			"the matchers disagree on %q:\n  expressions: %+v\n  plain text:  %+v",
+			classNames,
+			expected,
+			actual,
+		)
 	}
 	return true
 }
@@ -359,7 +365,7 @@ func regexMatchWithinVariantGroup(shorthand shorthandRule, classes []shorthandDi
 // preference. A lazily-filled map was the first version and it crashed the whole run with "concurrent
 // map read and map write": `Graph.Walk` dispatches files across goroutines, so every rule's listener
 // body runs in parallel with itself on different files. It failed one run in five, which is the
-// worst rate to have — often enough to be real, rare enough to look like someone else's flake.
+// worst rate to have: often enough to be real, rare enough to look like someone else's flake.
 //
 // The table is a package-level constant of 48 rules, so there is nothing to defer: compiling it at
 // init costs one pass over a fixed list and removes the shared mutable state entirely, which is a

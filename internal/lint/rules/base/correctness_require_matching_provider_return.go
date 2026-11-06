@@ -9,7 +9,10 @@ import (
 
 // correctnessRequireMatchingProviderReturnText is the rule's message, whose wording lives in
 // `policy/messages/correctness-require-matching-provider-return.json`.
-var correctnessRequireMatchingProviderReturnText = policy.MessageOf("base/correctness-require-matching-provider-return", "mismatch")
+var correctnessRequireMatchingProviderReturnText = policy.MessageOf(
+	"base/correctness-require-matching-provider-return",
+	"mismatch",
+)
 
 // expectedReturnTypeBrand is the phantom property a typed method decorator carries.
 //
@@ -36,12 +39,12 @@ const expectedReturnTypeBrand = "__expectedReturnType"
 // The brand is never a runtime value. Everything here happens in the type checker, which is why this
 // rule declares NeedsTypeChecker and why a syntax-only port of it would be silent on every input.
 //
-// # Undefined is NOT stripped here, and that is the difference from its sibling
+// # Undefined is not stripped here, and that is the difference from its sibling
 //
 // `api-phi-health` has two brand readers with deliberately different undefined handling.
 // `CorrectnessRequireMatchingInjectType` reads `__resolvedType` and strips `undefined`, because the brand
 // field is declared optional and the `undefined` in its type is an artifact of that declaration.
-// This rule reads `__expectedReturnType` and does NOT strip, because `Provider<T>`'s contract
+// This rule reads `__expectedReturnType` and does not strip, because `Provider<T>`'s contract
 // intrinsically includes `undefined` through its opt-out path. Stripping it would reject every valid
 // provider returning `X | undefined`, which is most of them.
 //
@@ -56,7 +59,7 @@ const expectedReturnTypeBrand = "__expectedReturnType"
 // # Where this port reads the return type
 //
 // The original resolves the `MethodDefinition`'s `value`, a FunctionExpression, and reads the return
-// type off its call signature. Our parser has no separate value node: a method declaration IS the
+// type off its call signature. Our parser has no separate value node: a method declaration is the
 // function, so the type at the method declaration carries the call signature directly. Measured, a
 // method declaration yields exactly one signature and its return type is what the method declares.
 // This is fidelity to the decision rather than to the tree shape, the same way the pagination rule's
@@ -66,7 +69,7 @@ const expectedReturnTypeBrand = "__expectedReturnType"
 //
 // A mismatch means reconciling the method with the token's contract, which is a judgment about what
 // the method should return rather than a spelling change.
-var CorrectnessRequireMatchingProviderReturn = rule.Rule{
+var CorrectnessRequireMatchingProviderReturn = rule.Rule[rule.NoOptions]{
 	Name: "base/correctness-require-matching-provider-return",
 
 	// Every judgment in this rule is a question for the checker: what type the decorator has, what
@@ -74,20 +77,20 @@ var CorrectnessRequireMatchingProviderReturn = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindDecorator: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
-				checkProviderReturn(ctx, node)
+				checkProviderReturn(ruleContext, node)
 			},
 		}
 	},
 }
 
 // checkProviderReturn judges one decorator against the method it sits on.
-func checkProviderReturn(ctx rule.Context, node *ast.Node) {
+func checkProviderReturn(ruleContext rule.Context, node *ast.Node) {
 	// A method decorator only. The original resolves the decorator's parent and requires a
 	// MethodDefinition; a decorator on a class, a property, an accessor or a parameter reaches this
 	// listener too and none of them is this rule's business.
@@ -104,24 +107,24 @@ func checkProviderReturn(ctx rule.Context, node *ast.Node) {
 	// The type of the decorator value being applied. For `@Provider(token)` that is the factory's
 	// return type; for a bare `@Foo` it is `Foo` itself. Both are read the same way, which is what
 	// makes the brand the whole opt-in mechanism rather than a naming convention.
-	decoratorType := ctx.TypeChecker.GetTypeAtLocation(decorator.Expression)
+	decoratorType := ruleContext.TypeChecker.GetTypeAtLocation(decorator.Expression)
 	if decoratorType == nil {
 		return
 	}
 
-	brandSymbol := ctx.TypeChecker.GetPropertyOfType(decoratorType, expectedReturnTypeBrand)
+	brandSymbol := ruleContext.TypeChecker.GetPropertyOfType(decoratorType, expectedReturnTypeBrand)
 	if brandSymbol == nil {
 		// Not a branded decorator, so it declared no contract and there is nothing to check.
 		return
 	}
-	expectedType := ctx.TypeChecker.GetTypeOfSymbol(brandSymbol)
+	expectedType := ruleContext.TypeChecker.GetTypeOfSymbol(brandSymbol)
 	if expectedType == nil {
 		return
 	}
 
 	// A brand whose type argument is any or unknown carries no real contract.
 	//
-	// SUBSUMED rather than load bearing, and kept because it is the original's own line and it
+	// Subsumed rather than load bearing, and kept because it is the original's own line and it
 	// states the intent where a reader looks for it. Every type is assignable to `any` and to
 	// `unknown`, so `IsTypeAssignableTo` below already answers yes and this guard cannot change a
 	// verdict. Measured over six shapes under both spellings, including `void` and `never`, which
@@ -135,21 +138,21 @@ func checkProviderReturn(ctx rule.Context, node *ast.Node) {
 		return
 	}
 
-	returnType := declaredReturnTypeOfMethod(ctx, method)
+	returnType := declaredReturnTypeOfMethod(ruleContext, method)
 	if returnType == nil {
 		return
 	}
 
-	if ctx.TypeChecker.IsTypeAssignableTo(returnType, expectedType) {
+	if ruleContext.TypeChecker.IsTypeAssignableTo(returnType, expectedType) {
 		return
 	}
 
-	ctx.ReportNode(method, rule.Message{
+	ruleContext.ReportNode(method, rule.Message{
 		Id: correctnessRequireMatchingProviderReturnText.Id,
 		Description: correctnessRequireMatchingProviderReturnText.Render(map[string]string{
 			"decoratorName": decoratorNameOf(decorator),
-			"expectedType":  ctx.TypeChecker.TypeToString(expectedType),
-			"returnType":    ctx.TypeChecker.TypeToString(returnType),
+			"expectedType":  ruleContext.TypeChecker.TypeToString(expectedType),
+			"returnType":    ruleContext.TypeChecker.TypeToString(returnType),
 		}),
 	})
 }
@@ -159,16 +162,16 @@ func checkProviderReturn(ctx rule.Context, node *ast.Node) {
 // The original reaches the FunctionExpression a MethodDefinition carries and takes the first call
 // signature. Our parser has no separate value node, so the type at the method declaration carries
 // the signature directly; measured, a method declaration yields exactly one.
-func declaredReturnTypeOfMethod(ctx rule.Context, method *ast.Node) *checker.Type {
-	methodType := ctx.TypeChecker.GetTypeAtLocation(method)
+func declaredReturnTypeOfMethod(ruleContext rule.Context, method *ast.Node) *checker.Type {
+	methodType := ruleContext.TypeChecker.GetTypeAtLocation(method)
 	if methodType == nil {
 		return nil
 	}
-	signatures := ctx.TypeChecker.GetSignaturesOfType(methodType, checker.SignatureKindCall)
+	signatures := ruleContext.TypeChecker.GetSignaturesOfType(methodType, checker.SignatureKindCall)
 	if len(signatures) == 0 {
 		return nil
 	}
-	return ctx.TypeChecker.GetReturnTypeOfSignature(signatures[0])
+	return ruleContext.TypeChecker.GetReturnTypeOfSignature(signatures[0])
 }
 
 // decoratorNameOf gives a printable name for a decorator, for the message.
@@ -178,7 +181,7 @@ func declaredReturnTypeOfMethod(ctx rule.Context, method *ast.Node) *checker.Typ
 // still renders. Both are reproduced.
 //
 // Every branch checks the node kind before reading text. `Text()` panics on a property access, and
-// the walk recovers per FILE rather than per rule, so one such call costs every rule in this package
+// the walk recovers per file rather than per rule, so one such call costs every rule in this package
 // every finding in that file while the run still prints a plausible summary.
 func decoratorNameOf(decorator *ast.Decorator) string {
 	expression := decorator.Expression

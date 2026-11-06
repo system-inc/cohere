@@ -1,8 +1,8 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
-	"io"
 	"path/filepath"
 	"strings"
 
@@ -19,7 +19,7 @@ import (
 // Rules that did nothing are printed rather than omitted, which is the whole reason this exists. A
 // rule absent from the output and a rule that looked and found nothing are indistinguishable, and
 // four rules in the gate this tool replaces were silently dead for months underneath exactly that.
-func printExplanation(out io.Writer, explanation *program.Explanation) {
+func printExplanation(out *bufio.Writer, explanation *program.Explanation) {
 	fmt.Fprintf(out, "\nexplain: %s\n", explanation.FileName)
 
 	if explanation.FileIgnored {
@@ -33,10 +33,10 @@ func printExplanation(out io.Writer, explanation *program.Explanation) {
 		return
 	}
 
-	listened, declinedBySelf, declinedByConfig := partitionAccounts(explanation.Accounts)
+	listened, declinedBySelf, declinedByConfiguration := partitionAccounts(explanation.Accounts)
 
-	fmt.Fprintf(out, "  %d rules listened, %d declined the file, %d were off by config — %s total\n",
-		len(listened), len(declinedBySelf), len(declinedByConfig), formatMilliseconds(explanation.TotalDuration))
+	fmt.Fprintf(out, "  %d rules listened, %d declined the file, %d were off by config, %s total\n",
+		len(listened), len(declinedBySelf), len(declinedByConfiguration), formatMilliseconds(explanation.TotalDuration))
 
 	for _, account := range listened {
 		fmt.Fprintf(out, "\n  %s  %s, %d nodes\n",
@@ -68,25 +68,27 @@ func printExplanation(out io.Writer, explanation *program.Explanation) {
 
 	// Config declines are separated and each carries its reason, because "somebody turned this off
 	// here" and "nobody has said whether this should run" are different facts.
-	for _, account := range declinedByConfig {
+	for _, account := range declinedByConfiguration {
 		fmt.Fprintf(out, "  %s did not run: %s\n", account.Name, account.DeclinedBecause)
 	}
 }
 
 // partitionAccounts splits rules by what happened to them, keeping the three cases apart because
 // they are three different answers to "why did this rule not report anything".
-func partitionAccounts(accounts []program.RuleAccount) (listened, declinedBySelf, declinedByConfig []program.RuleAccount) {
+func partitionAccounts(
+	accounts []program.RuleAccount,
+) (listened, declinedBySelf, declinedByConfiguration []program.RuleAccount) {
 	for _, account := range accounts {
 		switch {
 		case account.DeclinedBecause != "":
-			declinedByConfig = append(declinedByConfig, account)
+			declinedByConfiguration = append(declinedByConfiguration, account)
 		case account.Listened:
 			listened = append(listened, account)
 		default:
 			declinedBySelf = append(declinedBySelf, account)
 		}
 	}
-	return listened, declinedBySelf, declinedByConfig
+	return listened, declinedBySelf, declinedByConfiguration
 }
 
 func namesOf(accounts []program.RuleAccount) []string {

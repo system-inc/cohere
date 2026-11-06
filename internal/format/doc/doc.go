@@ -96,20 +96,20 @@ type trimDoc struct{}
 //
 // Always used as *Group: identity is the pointer, and propagateBreaks writes Break in place.
 type Group struct {
-	ID             *GroupID
+	Id             *GroupId
 	Contents       Doc
 	Break          bool
 	ExpandedStates []Doc
 }
 
-// GroupID names a group so IfBreak and IndentIfBreak can ask how it was printed.
+// GroupId names a group so IfBreak and IndentIfBreak can ask how it was printed.
 //
 // A pointer to an empty struct, so two ids are equal only if they are the same id, the way two
 // JavaScript Symbols are.
-type GroupID struct{ name string }
+type GroupId struct{ name string }
 
-// NewGroupID mints an id. The name is for debugging only and never compared.
-func NewGroupID(name string) *GroupID { return &GroupID{name: name} }
+// NewGroupId mints an id. The name is for debugging only and never compared.
+func NewGroupId(name string) *GroupId { return &GroupId{name: name} }
 
 // Fill packs content onto lines as tightly as it fits. Parts alternate content and separator.
 type Fill struct{ Parts []Doc }
@@ -118,13 +118,13 @@ type Fill struct{ Parts []Doc }
 type IfBreak struct {
 	BreakContents Doc
 	FlatContents  Doc
-	GroupID       *GroupID
+	GroupId       *GroupId
 }
 
 // IndentIfBreak indents its contents only when the named group broke, or only when it did not.
 type IndentIfBreak struct {
 	Contents Doc
-	GroupID  *GroupID
+	GroupId  *GroupId
 	Negate   bool
 }
 
@@ -191,14 +191,19 @@ var (
 
 // GroupOptions are upstream's group options.
 type GroupOptions struct {
-	ID             *GroupID
+	Id             *GroupId
 	ShouldBreak    bool
 	ExpandedStates []Doc
 }
 
 // NewGroup is upstream's group().
 func NewGroup(contents Doc, options GroupOptions) *Group {
-	return &Group{ID: options.ID, Contents: contents, Break: options.ShouldBreak, ExpandedStates: options.ExpandedStates}
+	return &Group{
+		Id:             options.Id,
+		Contents:       contents,
+		Break:          options.ShouldBreak,
+		ExpandedStates: options.ExpandedStates,
+	}
 }
 
 // ConditionalGroup is upstream's conditionalGroup(): the first state is the contents.
@@ -233,16 +238,17 @@ func MarkAsRoot(contents Doc) Doc { return &Align{Kind: AlignRoot, Contents: con
 func NewFill(parts []Doc) Doc { return &Fill{Parts: parts} }
 
 // NewIfBreak is upstream's ifBreak(). Upstream defaults flatContents to "", and so does a nil here.
-func NewIfBreak(breakContents Doc, flatContents Doc, groupID *GroupID) Doc {
+func NewIfBreak(breakContents Doc, flatContents Doc, groupId *GroupId) Doc {
+	flatOrEmpty := flatContents
 	if flatContents == nil {
-		flatContents = Text("")
+		flatOrEmpty = Text("")
 	}
-	return &IfBreak{BreakContents: breakContents, FlatContents: flatContents, GroupID: groupID}
+	return &IfBreak{BreakContents: breakContents, FlatContents: flatOrEmpty, GroupId: groupId}
 }
 
 // NewIndentIfBreak is upstream's indentIfBreak().
-func NewIndentIfBreak(contents Doc, groupID *GroupID, negate bool) Doc {
-	return &IndentIfBreak{Contents: contents, GroupID: groupID, Negate: negate}
+func NewIndentIfBreak(contents Doc, groupId *GroupId, negate bool) Doc {
+	return &IndentIfBreak{Contents: contents, GroupId: groupId, Negate: negate}
 }
 
 // NewLineSuffix is upstream's lineSuffix().

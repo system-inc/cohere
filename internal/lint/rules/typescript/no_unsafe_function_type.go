@@ -14,7 +14,7 @@
 // tests passes, because a fixture exercises the rule directly and never reads the configuration.
 //
 // The first rule in the `next` package shipped with that defect and was inert until a planted
-// violation failed to fire. `TestEveryRegisteredRuleIsReachableFromTheLiveConfig` catches it now,
+// violation failed to fire. `TestEveryRegisteredRuleIsReachableFromTheLiveConfiguration` catches it now,
 // but reading the config costs ten seconds and does not depend on remembering that the guard exists.
 package typescript
 
@@ -46,23 +46,23 @@ var messageBannedFunctionType = rule.Message{
 //
 // The original guards the identifier with `isReferenceToGlobalFunction`, so a locally declared
 // `Function` is not flagged. That guard needs symbol resolution, which our checker shim does not
-// expose yet — see the note at the reference below. Rather than silently drop it, the syntactic
+// expose yet (see the note at the reference below). Rather than silently drop it, the syntactic
 // approximation here is narrowed in the one direction that matters: a file that declares its own
 // `Function` type or interface is skipped entirely, so a local declaration cannot be flagged. The
 // remaining divergence from the original is an import of a non-global `Function`, which shadows the
 // global without declaring it locally. That is rare enough to be worth naming rather than worth
 // blocking the rule on, and the clean fixtures pin the behavior either way.
-var NoUnsafeFunctionType = rule.Rule{
+var NoUnsafeFunctionType = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/no-unsafe-function-type",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
 		// One pass over the file's own statements, before any node is visited, to learn whether the
 		// name is shadowed here. Declining costs this scan; being wrong costs a false positive on a
 		// type the author defined themselves.
-		if module.DeclaresTypeNamed(ctx.SourceFile, "Function") {
+		if module.DeclaresTypeNamed(ruleContext.SourceFile, "Function") {
 			return nil
 		}
 
@@ -70,7 +70,7 @@ var NoUnsafeFunctionType = rule.Rule{
 			if node == nil || node.Kind != ast.KindIdentifier || node.Text() != "Function" {
 				return
 			}
-			ctx.ReportNode(node, messageBannedFunctionType)
+			ruleContext.ReportNode(node, messageBannedFunctionType)
 		}
 
 		// One listener covers all three positions, which is a real difference from the original and

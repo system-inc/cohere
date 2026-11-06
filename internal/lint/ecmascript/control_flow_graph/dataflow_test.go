@@ -48,46 +48,6 @@ func (reachingNames) Equal(left, right map[string]bool) bool {
 	return true
 }
 
-// mustReachNames is the "must" counterpart: the names seen on EVERY path to this point. Meet is
-// intersection, so Bottom has to be the universe rather than the empty set, which is the case the
-// LatticeOf doc warns reads backward.
-type mustReachNames struct{ universe map[string]bool }
-
-func (m mustReachNames) Bottom() map[string]bool {
-	all := make(map[string]bool, len(m.universe))
-	for name := range m.universe {
-		all[name] = true
-	}
-	return all
-}
-
-func (mustReachNames) Entry() map[string]bool { return map[string]bool{} }
-
-func (mustReachNames) Meet(left, right map[string]bool) map[string]bool {
-	merged := map[string]bool{}
-	for name := range left {
-		if right[name] {
-			merged[name] = true
-		}
-	}
-	return merged
-}
-
-func (mustReachNames) Transfer(block *Block[string], incoming map[string]bool) map[string]bool {
-	outgoing := make(map[string]bool, len(incoming)+len(block.Events))
-	for name := range incoming {
-		outgoing[name] = true
-	}
-	for _, event := range block.Events {
-		outgoing[event] = true
-	}
-	return outgoing
-}
-
-func (mustReachNames) Equal(left, right map[string]bool) bool {
-	return reachingNames{}.Equal(left, right)
-}
-
 func sortedNames(set map[string]bool) string {
 	names := make([]string, 0, len(set))
 	for name := range set {
@@ -99,8 +59,8 @@ func sortedNames(set map[string]bool) string {
 
 // TestForwardMayAnalysis checks that a union-meet forward dataflow reaches the answer a reader gets
 // from the source.
-func TestForwardMayAnalysis(t *testing.T) {
-	t.Parallel()
+func TestForwardMayAnalysis(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range []struct {
 		name string
 		code string
@@ -135,19 +95,19 @@ func TestForwardMayAnalysis(t *testing.T) {
 			want: "markBody,markFirst",
 		},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			graph, locations := buildPathTestGraph(t, testCase.code)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			graph, locations := buildPathTestGraph(test, testCase.code)
 			solution := Solve[map[string]bool, string](graph, Forward, reachingNames{})
 			block := locations[testCase.at][0]
 			incoming, ok := solution.In(block)
 			if !ok {
-				t.Fatalf("block holding %q is not in the solution", testCase.at)
+				test.Fatalf("block holding %q is not in the solution", testCase.at)
 			}
 			// The block's own events are in Out, not In, so the event named by `at` is expected to
 			// be absent from In unless a back edge brings it round.
 			if got := sortedNames(incoming); got != testCase.want {
-				t.Errorf("names reaching %q = %q, want %q", testCase.at, got, testCase.want)
+				test.Errorf("names reaching %q = %q, want %q", testCase.at, got, testCase.want)
 			}
 		})
 	}
@@ -156,8 +116,8 @@ func TestForwardMayAnalysis(t *testing.T) {
 // TestForwardMustAnalysis checks the intersection-meet direction, which is the shape
 // `constructor-super` and `no-this-before-super` describe in their doc comments: has `super()`
 // definitely been called on every path to here.
-func TestForwardMustAnalysis(t *testing.T) {
-	t.Parallel()
+func TestForwardMustAnalysis(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range []struct {
 		name string
 		code string
@@ -189,9 +149,9 @@ func TestForwardMustAnalysis(t *testing.T) {
 			want: "markSuper",
 		},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			graph, locations := buildPathTestGraph(t, testCase.code)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			graph, locations := buildPathTestGraph(test, testCase.code)
 			universe := map[string]bool{}
 			for _, block := range graph.Blocks {
 				for _, event := range block.Events {
@@ -202,46 +162,19 @@ func TestForwardMustAnalysis(t *testing.T) {
 			block := locations[testCase.at][0]
 			incoming, ok := solution.In(block)
 			if !ok {
-				t.Fatalf("block holding %q is not in the solution", testCase.at)
+				test.Fatalf("block holding %q is not in the solution", testCase.at)
 			}
 			if got := sortedNames(incoming); got != testCase.want {
-				t.Errorf("names definitely reaching %q = %q, want %q", testCase.at, got, testCase.want)
+				test.Errorf("names definitely reaching %q = %q, want %q", testCase.at, got, testCase.want)
 			}
 		})
 	}
 }
 
-// liveNames is a Backward "may" analysis: the set of event names that appear anywhere later on some
-// path. It is the shape of liveness with the symbol table replaced by names, so it exercises the
-// backward direction and the exit seeding without dragging in a checker.
-type liveNames struct{}
-
-func (liveNames) Bottom() map[string]bool { return map[string]bool{} }
-func (liveNames) Entry() map[string]bool  { return map[string]bool{} }
-
-func (liveNames) Meet(left, right map[string]bool) map[string]bool {
-	return reachingNames{}.Meet(left, right)
-}
-
-func (liveNames) Transfer(block *Block[string], incoming map[string]bool) map[string]bool {
-	outgoing := make(map[string]bool, len(incoming)+len(block.Events))
-	for name := range incoming {
-		outgoing[name] = true
-	}
-	for _, event := range block.Events {
-		outgoing[event] = true
-	}
-	return outgoing
-}
-
-func (liveNames) Equal(left, right map[string]bool) bool {
-	return reachingNames{}.Equal(left, right)
-}
-
 // TestBackwardAnalysis checks the backward direction, including that the exit seeding reaches every
 // terminal block.
-func TestBackwardAnalysis(t *testing.T) {
-	t.Parallel()
+func TestBackwardAnalysis(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range []struct {
 		name string
 		code string
@@ -267,18 +200,18 @@ func TestBackwardAnalysis(t *testing.T) {
 			want: "markBody",
 		},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			graph, locations := buildPathTestGraph(t, testCase.code)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			graph, locations := buildPathTestGraph(test, testCase.code)
 			solution := Solve[map[string]bool, string](graph, Backward, liveNames{})
 			block := locations[testCase.at][0]
-			// For a Backward analysis, In is the value on EXIT from the block: what is live after it.
+			// For a Backward analysis, In is the value on exit from the block: what is live after it.
 			outgoing, ok := solution.In(block)
 			if !ok {
-				t.Fatalf("block holding %q is not in the solution", testCase.at)
+				test.Fatalf("block holding %q is not in the solution", testCase.at)
 			}
 			if got := sortedNames(outgoing); got != testCase.want {
-				t.Errorf("names live after %q = %q, want %q", testCase.at, got, testCase.want)
+				test.Errorf("names live after %q = %q, want %q", testCase.at, got, testCase.want)
 			}
 		})
 	}
@@ -287,47 +220,47 @@ func TestBackwardAnalysis(t *testing.T) {
 // TestSolveExcludesUnreachableBlocks pins the exclusion every existing consumer already wanted, and
 // which `no-useless-assignment`'s doc comment explains in its own terms: an unreachable block's
 // events are the same source positions laid out a second time.
-func TestSolveExcludesUnreachableBlocks(t *testing.T) {
-	t.Parallel()
-	graph, locations := buildPathTestGraph(t, `function f() { markLive(); return; markDead(); }`)
+func TestSolveExcludesUnreachableBlocks(test *testing.T) {
+	test.Parallel()
+	graph, locations := buildPathTestGraph(test, `function f() { markLive(); return; markDead(); }`)
 	solution := Solve[map[string]bool, string](graph, Forward, reachingNames{})
 
 	dead := locations["markDead"][0]
 	if dead.Reachable {
-		t.Fatal("the statement after a return should be laid out unreachable")
+		test.Fatal("the statement after a return should be laid out unreachable")
 	}
 	if _, ok := solution.In(dead); ok {
-		t.Error("an unreachable block must not appear in the solution")
+		test.Error("an unreachable block must not appear in the solution")
 	}
 	if _, ok := solution.Out(dead); ok {
-		t.Error("an unreachable block must not appear in the solution")
+		test.Error("an unreachable block must not appear in the solution")
 	}
 
 	live := locations["markLive"][0]
 	outgoing, ok := solution.Out(live)
 	if !ok {
-		t.Fatal("a reachable block must appear in the solution")
+		test.Fatal("a reachable block must appear in the solution")
 	}
 	if outgoing["markDead"] {
-		t.Error("an unreachable block's events must not contribute to a reachable block's value")
+		test.Error("an unreachable block's events must not contribute to a reachable block's value")
 	}
 }
 
 // TestSolveSeedsEveryTerminalBlockBackward pins the property `Solve`'s backward seeding rests on.
 //
-// `try { return 1; } finally { beta(); }` lays the `finally` out TWICE. One copy sits on the normal
-// path; the other sits on the abrupt path and is a TERMINAL block with no reachable successors. If
+// `try { return 1; } finally { beta(); }` lays the `finally` out twice. One copy sits on the normal
+// path; the other sits on the abrupt path and is a terminal block with no reachable successors. If
 // that copy were in neither FinalBlocks nor ThrownBlocks, a backward analysis seeding only from
 // those two sets would start it at Bottom rather than Entry and propagate a value nothing
 // established.
 //
-// Measured: it IS in an exit set, on this shape and on five others probed alongside it, so the
+// Measured: it is in an exit set, on this shape and on five others probed alongside it, so the
 // seeding is complete without a third clause. This asserts that rather than assuming it, because it
-// is a property of the BUILDER — if `markFinal`/`markThrown` ever stop being called on the abrupt
+// is a property of the builder: if `markFinal`/`markThrown` ever stop being called on the abrupt
 // copy, the gap opens silently in `Solve` and is named here instead.
-func TestSolveSeedsEveryTerminalBlockBackward(t *testing.T) {
-	t.Parallel()
-	graph, locations := buildPathTestGraph(t, `
+func TestSolveSeedsEveryTerminalBlockBackward(test *testing.T) {
+	test.Parallel()
+	graph, locations := buildPathTestGraph(test, `
 		function f() {
 			try { markTry(); return 1; } finally { markFinally(); }
 		}
@@ -335,7 +268,7 @@ func TestSolveSeedsEveryTerminalBlockBackward(t *testing.T) {
 
 	copies := locations["markFinally"]
 	if len(copies) < 2 {
-		t.Fatalf("the finally block should be laid out twice, got %d copies", len(copies))
+		test.Fatalf("the finally block should be laid out twice, got %d copies", len(copies))
 	}
 
 	inExitSet := map[int]bool{}
@@ -362,13 +295,15 @@ func TestSolveSeedsEveryTerminalBlockBackward(t *testing.T) {
 		if !hasSuccessor {
 			terminals++
 			if !inExitSet[block.Index()] {
-				t.Errorf("reachable terminal block %d is in neither FinalBlocks nor ThrownBlocks, so a backward analysis would not seed it",
-					block.Index())
+				test.Errorf(
+					"reachable terminal block %d is in neither FinalBlocks nor ThrownBlocks, so a backward analysis would not seed it",
+					block.Index(),
+				)
 			}
 		}
 	}
 	if terminals == 0 {
-		t.Fatal("this shape has no reachable terminal block; it is testing nothing")
+		test.Fatal("this shape has no reachable terminal block; it is testing nothing")
 	}
 
 	// And every reachable block, terminal or not, has a value.
@@ -378,29 +313,29 @@ func TestSolveSeedsEveryTerminalBlockBackward(t *testing.T) {
 			continue
 		}
 		if _, ok := solution.In(block); !ok {
-			t.Errorf("reachable block %d has no backward solution value", block.Index())
+			test.Errorf("reachable block %d has no backward solution value", block.Index())
 		}
 	}
 }
 
 // TestSolveConvergesInFewRoundsOnAcyclicGraphs is the measurement that says the reverse-postorder
-// iteration is doing its job, in BOTH directions.
+// iteration is doing its job, in both directions.
 //
 // A forward analysis over an acyclic graph in reverse postorder settles in exactly two rounds: one
 // to propagate everything, one to observe nothing moved. A backward analysis over the same graph
-// settles in two rounds only if the order is reverse postorder REVERSED; walking it forward instead
+// settles in two rounds only if the order is reverse postorder reversed; walking it forward instead
 // still converges, because a fixed point does not depend on the order it is reached in, but it takes
 // an extra round per level of depth.
 //
-// The backward half is here because a mutation reversing that reversal SURVIVED every value
+// The backward half is here because a mutation reversing that reversal survived every value
 // assertion in this file. Measured: with the order un-reversed, `markBefore(); if (x) ... ` goes
 // 2 rounds to 3, `markBefore(); while (x) ...` goes 3 to 4, and a doubly-nested loop goes 4 to 6,
 // while the settled live sets are bit-for-bit identical in all three. The answer is genuinely
 // unchanged, so no value assertion can ever see it, and the round count is the only observable that
 // separates the two versions. That makes this a real test rather than a performance nicety.
-func TestSolveConvergesInFewRoundsOnAcyclicGraphs(t *testing.T) {
-	t.Parallel()
-	graph, _ := buildPathTestGraph(t, `
+func TestSolveConvergesInFewRoundsOnAcyclicGraphs(test *testing.T) {
+	test.Parallel()
+	graph, _ := buildPathTestGraph(test, `
 		function f(a, b, c) {
 			if (a) markOne(); else markTwo();
 			if (b) markThree(); else markFour();
@@ -409,13 +344,16 @@ func TestSolveConvergesInFewRoundsOnAcyclicGraphs(t *testing.T) {
 		}
 	`)
 	if len(graph.Blocks) < 8 {
-		t.Fatalf("this shape has only %d blocks; 2 rounds would be unremarkable", len(graph.Blocks))
+		test.Fatalf("this shape has only %d blocks; 2 rounds would be unremarkable", len(graph.Blocks))
 	}
 	if rounds := Solve[map[string]bool, string](graph, Forward, reachingNames{}).Rounds(); rounds != 2 {
-		t.Errorf("an acyclic forward analysis in reverse postorder should settle in 2 rounds, got %d", rounds)
+		test.Errorf("an acyclic forward analysis in reverse postorder should settle in 2 rounds, got %d", rounds)
 	}
 	if rounds := Solve[map[string]bool, string](graph, Backward, liveNames{}).Rounds(); rounds != 2 {
-		t.Errorf("an acyclic backward analysis in reversed reverse postorder should settle in 2 rounds, got %d", rounds)
+		test.Errorf(
+			"an acyclic backward analysis in reversed reverse postorder should settle in 2 rounds, got %d",
+			rounds,
+		)
 	}
 }
 
@@ -423,9 +361,9 @@ func TestSolveConvergesInFewRoundsOnAcyclicGraphs(t *testing.T) {
 // diverge most, which is where a future change to the ordering would show up first.
 //
 // The values are asserted alongside the counts, so this fails loudly in the one direction that would
-// matter — an ordering change that also moved an answer — rather than only in the cheap one.
-func TestSolveBackwardOrderIsReversed(t *testing.T) {
-	t.Parallel()
+// matter (an ordering change that also moved an answer) rather than only in the cheap one.
+func TestSolveBackwardOrderIsReversed(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range []struct {
 		code       string
 		wantRounds int
@@ -436,13 +374,16 @@ func TestSolveBackwardOrderIsReversed(t *testing.T) {
 			wantRounds: 4,
 		},
 	} {
-		t.Run(testCase.code, func(t *testing.T) {
-			t.Parallel()
-			graph, _ := buildPathTestGraph(t, testCase.code)
+		test.Run(testCase.code, func(test *testing.T) {
+			test.Parallel()
+			graph, _ := buildPathTestGraph(test, testCase.code)
 			solution := Solve[map[string]bool, string](graph, Backward, liveNames{})
 			if rounds := solution.Rounds(); rounds != testCase.wantRounds {
-				t.Errorf("backward analysis settled in %d rounds, want %d; the iteration order is not reversed reverse postorder",
-					rounds, testCase.wantRounds)
+				test.Errorf(
+					"backward analysis settled in %d rounds, want %d; the iteration order is not reversed reverse postorder",
+					rounds,
+					testCase.wantRounds,
+				)
 			}
 			// Every reachable block still has a value, so a wrong count is not being read off a
 			// solver that quietly stopped early.
@@ -451,7 +392,7 @@ func TestSolveBackwardOrderIsReversed(t *testing.T) {
 					continue
 				}
 				if _, ok := solution.In(block); !ok {
-					t.Errorf("reachable block %d has no value", block.Index())
+					test.Errorf("reachable block %d has no value", block.Index())
 				}
 			}
 		})

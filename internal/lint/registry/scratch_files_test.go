@@ -54,8 +54,8 @@ var scratchFileExemptions = []string{"internal/astprobe"}
 // Measured when this was written: one match across `internal`, `tools` and `cmd`, and that match is
 // the exempted shipped package. The control is 343 real test files found by the same walk, so a
 // clean result here is a measurement rather than a search that examined nothing.
-func TestNoScratchFilesRemain(t *testing.T) {
-	t.Parallel()
+func TestNoScratchFilesRemain(test *testing.T) {
+	test.Parallel()
 	// Skipped unless asked for, and that is a deliberate weakening rather than an oversight.
 	//
 	// The first version ran always, and within a minute of being written it went red on two live
@@ -70,7 +70,7 @@ func TestNoScratchFilesRemain(t *testing.T) {
 	// the commit path sets it. Everywhere else it says why it did not run, so a reader never mistakes
 	// a skip for a pass.
 	if os.Getenv("COHERE_CHECK_SCRATCH") == "" {
-		t.Skip("set COHERE_CHECK_SCRATCH=1 to run; skipped during ordinary work because a live " +
+		test.Skip("set COHERE_CHECK_SCRATCH=1 to run; skipped during ordinary work because a live " +
 			"agent's probe is a legitimate mid-measurement file, and a guard that fires on normal " +
 			"work stops being read")
 	}
@@ -79,9 +79,9 @@ func TestNoScratchFilesRemain(t *testing.T) {
 
 	examined := 0
 	for _, root := range roots {
-		err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
-			if err != nil {
-				return err
+		walkError := filepath.WalkDir(root, func(path string, entry os.DirEntry, pathError error) error {
+			if pathError != nil {
+				return pathError
 			}
 			if entry.IsDir() {
 				return nil
@@ -114,14 +114,14 @@ func TestNoScratchFilesRemain(t *testing.T) {
 				return nil
 			}
 
-			t.Errorf("%s looks like a throwaway probe left inside a shipped package; delete it by "+
+			test.Errorf("%s looks like a throwaway probe left inside a shipped package; delete it by "+
 				"name before committing. The package guard cannot see this: it globs directories "+
 				"under internal/rules, so a stray file in a real package is invisible to it and so "+
 				"is every tree outside internal/rules", normalized)
 			return nil
 		})
-		if err != nil {
-			t.Fatalf("walking %s: %v", root, err)
+		if walkError != nil {
+			test.Fatalf("walking %s: %v", root, walkError)
 		}
 	}
 
@@ -129,7 +129,7 @@ func TestNoScratchFilesRemain(t *testing.T) {
 	// it guards against. The floor is deliberately far below the real count so ordinary growth or
 	// deletion never trips it.
 	if examined < 200 {
-		t.Fatalf("examined only %d Go files across internal, tools and cmd, so this test looked at "+
+		test.Fatalf("examined only %d Go files across internal, tools and cmd, so this test looked at "+
 			"almost nothing and its silence means nothing", examined)
 	}
 }

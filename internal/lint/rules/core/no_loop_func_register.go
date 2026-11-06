@@ -9,5 +9,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 //
 // No `Decode`: upstream's `meta.schema` is `[]`, so the rule takes no options.
 func init() {
-	rule.Register(rule.Registration{Rule: NoLoopFunc})
+	rule.Register(rule.Registration[rule.NoOptions]{Rule: NoLoopFunc})
 }

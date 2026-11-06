@@ -24,8 +24,8 @@ type Resolving struct {
 // before any phase does work rather than on the first file after fixes have begun.
 func NewResolving(startDirectory string) (*Resolving, error) {
 	resolving := &Resolving{resolver: formatoptions.NewResolver()}
-	if _, err := resolving.resolver.Resolve(startDirectory); err != nil {
-		return nil, err
+	if _, resolveError := resolving.resolver.Resolve(startDirectory); resolveError != nil {
+		return nil, resolveError
 	}
 	return resolving, nil
 }
@@ -54,9 +54,9 @@ func (resolving *Resolving) Format(fileName string, text string) (string, error)
 
 // FormatParsed is Format with a tree of the text someone already parsed, or nil (Formatter.FormatParsed).
 func (resolving *Resolving) FormatParsed(fileName string, text string, parsed *ast.SourceFile) (string, error) {
-	resolution, err := resolving.resolver.Resolve(filepath.Dir(fileName))
-	if err != nil {
-		return "", fmt.Errorf("resolving the format options for %s: %w", fileName, err)
+	resolution, resolveError := resolving.resolver.Resolve(filepath.Dir(fileName))
+	if resolveError != nil {
+		return "", fmt.Errorf("resolving the format options for %s: %w", fileName, resolveError)
 	}
 	return Formatter{Options: resolution.Options}.FormatParsed(fileName, text, parsed)
 }
@@ -64,9 +64,9 @@ func (resolving *Resolving) FormatParsed(fileName string, text string, parsed *a
 // OptionsFingerprint names the options a file formats with: every field, by name, so two resolutions
 // that differ anywhere print differently.
 func (resolving *Resolving) OptionsFingerprint(fileName string) (string, error) {
-	resolution, err := resolving.resolver.Resolve(filepath.Dir(fileName))
-	if err != nil {
-		return "", fmt.Errorf("resolving the format options for %s: %w", fileName, err)
+	resolution, resolveError := resolving.resolver.Resolve(filepath.Dir(fileName))
+	if resolveError != nil {
+		return "", fmt.Errorf("resolving the format options for %s: %w", fileName, resolveError)
 	}
 	return fmt.Sprintf("%+v", resolution.Options), nil
 }

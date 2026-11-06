@@ -17,8 +17,8 @@ const newFile = "/repository/source/New.ts"
 // and nothing that separates "the statement's expression is a new" from "a new appears in the
 // statement". Every additional case below was driven through the installed eslint 10.8.1 build
 // first, and the verdict recorded here is the one that build gave.
-func TestNoNewFires(t *testing.T) {
-	t.Parallel()
+func TestNoNewFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -28,16 +28,16 @@ func TestNoNewFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoNew, newFile, testCase.sourceText), "noNewStatement")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, NoNew, newFile, testCase.sourceText), "noNewStatement")
 		})
 	}
 }
 
-func TestNoNewStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoNewStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -48,9 +48,9 @@ func TestNoNewStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoNew, newFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoNew, newFile, testCase.sourceText))
 		})
 	}
 }
@@ -64,8 +64,8 @@ func TestNoNewStaysSilent(t *testing.T) {
 //
 // The nesting row pins that `new new Foo();` is one finding rather than two: only the outer `new` is
 // the statement's expression.
-func TestNoNewFiresOnShapesTheCorpusOmits(t *testing.T) {
-	t.Parallel()
+func TestNoNewFiresOnShapesTheCorpusOmits(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -89,10 +89,10 @@ func TestNoNewFiresOnShapesTheCorpusOmits(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoNew, newFile, testCase.sourceText), "noNewStatement")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, NoNew, newFile, testCase.sourceText), "noNewStatement")
 		})
 	}
 }
@@ -102,8 +102,8 @@ func TestNoNewFiresOnShapesTheCorpusOmits(t *testing.T) {
 // The comma row is the one worth naming: `new Date(), new Foo();` reports nothing on eslint 10.8.1,
 // because the statement's expression is the comma rather than either `new`. That reads like a gap in
 // the rule and it is upstream's, reproduced here rather than improved on.
-func TestNoNewDeclinesShapesTheCorpusOmits(t *testing.T) {
-	t.Parallel()
+func TestNoNewDeclinesShapesTheCorpusOmits(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -119,9 +119,9 @@ func TestNoNewDeclinesShapesTheCorpusOmits(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoNew, newFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoNew, newFile, testCase.sourceText))
 		})
 	}
 }
@@ -134,13 +134,13 @@ func TestNoNewDeclinesShapesTheCorpusOmits(t *testing.T) {
 //
 // A port anchored on the `new` expression instead passes every message-id fixture in this file and
 // is wrong on every row here.
-func TestNoNewReportsTheWholeStatement(t *testing.T) {
-	t.Parallel()
+func TestNoNewReportsTheWholeStatement(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
-		sourceText string
-		wantPos    int
-		wantEnd    int
+		sourceText   string
+		wantPosition int
+		wantEnd      int
 	}{
 		{"new Date()", 0, 10},
 		{"new Date;", 0, 9},
@@ -151,37 +151,37 @@ func TestNoNewReportsTheWholeStatement(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoNew, newFile, testCase.sourceText)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoNew, newFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 			}
 			got := result.Diagnostics[0].Range
-			if got.Pos() != testCase.wantPos || got.End() != testCase.wantEnd {
-				t.Fatalf("reported [%d:%d) which is %q, wanted [%d:%d) which is %q",
+			if got.Pos() != testCase.wantPosition || got.End() != testCase.wantEnd {
+				test.Fatalf("reported [%d:%d) which is %q, wanted [%d:%d) which is %q",
 					got.Pos(), got.End(),
 					testCase.sourceText[got.Pos():got.End()],
-					testCase.wantPos, testCase.wantEnd,
-					testCase.sourceText[testCase.wantPos:testCase.wantEnd])
+					testCase.wantPosition, testCase.wantEnd,
+					testCase.sourceText[testCase.wantPosition:testCase.wantEnd])
 			}
 		})
 	}
 }
 
 // The message, asserted against literals typed here rather than the rule's own constants.
-func TestNoNewReportsWhyItMatters(t *testing.T) {
-	t.Parallel()
+func TestNoNewReportsWhyItMatters(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, NoNew, newFile, "new Date()")
+	result := rule_testing.Run(test, NoNew, newFile, "new Date()")
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
+		test.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 	}
 	if got := result.Diagnostics[0].Message.Id; got != "noNewStatement" {
-		t.Fatalf("message id was %q", got)
+		test.Fatalf("message id was %q", got)
 	}
 	const wantPrefix = "This constructs an object and then throws it away"
 	if got := result.Diagnostics[0].Message.Description; !strings.HasPrefix(got, wantPrefix) {
-		t.Fatalf("description was %q", got)
+		test.Fatalf("description was %q", got)
 	}
 }

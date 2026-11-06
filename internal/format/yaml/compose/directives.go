@@ -10,8 +10,8 @@ import (
 	"unicode/utf8"
 )
 
-// DirectivesYAML is the %YAML directive's state.
-type DirectivesYAML struct {
+// DirectivesYaml is the %YAML directive's state.
+type DirectivesYaml struct {
 	Explicit bool
 	Version  string
 }
@@ -22,8 +22,8 @@ type Directives struct {
 	DocStart bool
 	// DocEnd is the doc-end marker ...
 	DocEnd bool
-	YAML   DirectivesYAML
-	// Tags maps each %TAG handle to its prefix.
+	Yaml   DirectivesYaml
+	// Tags maps each `%TAG` handle to its prefix.
 	Tags map[string]string
 
 	atNextDocument bool
@@ -35,22 +35,22 @@ func defaultTags() map[string]string {
 }
 
 // newDirectives is `new Directives(yaml, tags)`: Object.assign over the defaults, so both are copies.
-func newDirectives(yaml DirectivesYAML, tags map[string]string) *Directives {
+func newDirectives(yaml DirectivesYaml, tags map[string]string) *Directives {
 	merged := defaultTags()
 	maps.Copy(merged, tags)
-	return &Directives{YAML: yaml, Tags: merged}
+	return &Directives{Yaml: yaml, Tags: merged}
 }
 
 // atDocument is upstream's: during parsing, get a Directives instance for the current document and
 // update the stream state according to the current version's spec.
 func (directives *Directives) atDocument() *Directives {
-	result := newDirectives(directives.YAML, directives.Tags)
-	switch directives.YAML.Version {
+	result := newDirectives(directives.Yaml, directives.Tags)
+	switch directives.Yaml.Version {
 	case "1.1":
 		directives.atNextDocument = true
 	case "1.2":
 		directives.atNextDocument = false
-		directives.YAML = DirectivesYAML{Explicit: false, Version: "1.2"}
+		directives.Yaml = DirectivesYaml{Explicit: false, Version: "1.2"}
 		directives.Tags = defaultTags()
 	}
 	return result
@@ -62,7 +62,7 @@ var versionPattern = regexp.MustCompile(`^\d+\.\d+$`)
 // success.
 func (directives *Directives) add(line []uint16, onError func(offset int, message string, warning bool)) bool {
 	if directives.atNextDocument {
-		directives.YAML = DirectivesYAML{Explicit: false, Version: "1.1"}
+		directives.Yaml = DirectivesYaml{Explicit: false, Version: "1.1"}
 		directives.Tags = defaultTags()
 		directives.atNextDocument = false
 	}
@@ -70,7 +70,7 @@ func (directives *Directives) add(line []uint16, onError func(offset int, messag
 	name := parts[0]
 	parts = parts[1:]
 	switch {
-	case equalsASCII(name, "%TAG"):
+	case equalsAscii(name, "%TAG"):
 		if len(parts) != 2 {
 			onError(0, "%TAG directive should contain exactly two parts", false)
 			if len(parts) < 2 {
@@ -80,15 +80,15 @@ func (directives *Directives) add(line []uint16, onError func(offset int, messag
 		handle, prefix := parts[0], parts[1]
 		directives.Tags[unitsToString(handle)] = unitsToString(prefix)
 		return true
-	case equalsASCII(name, "%YAML"):
-		directives.YAML.Explicit = true
+	case equalsAscii(name, "%YAML"):
+		directives.Yaml.Explicit = true
 		if len(parts) != 1 {
 			onError(0, "%YAML directive should contain exactly one part", false)
 			return false
 		}
 		version := parts[0]
-		if equalsASCII(version, "1.1") || equalsASCII(version, "1.2") {
-			directives.YAML.Version = unitsToString(version)
+		if equalsAscii(version, "1.1") || equalsAscii(version, "1.2") {
+			directives.Yaml.Version = unitsToString(version)
 			return true
 		}
 		isValid := versionPattern.MatchString(asciiView(version))
@@ -104,25 +104,25 @@ func (directives *Directives) add(line []uint16, onError func(offset int, messag
 func splitSpaceOrTab(text []uint16) [][]uint16 {
 	parts := [][]uint16{}
 	start := 0
-	for i := 0; i < len(text); {
-		if text[i] == ' ' || text[i] == '\t' {
-			parts = append(parts, text[start:i:i])
-			for i < len(text) && (text[i] == ' ' || text[i] == '\t') {
-				i++
+	for index := 0; index < len(text); {
+		if text[index] == ' ' || text[index] == '\t' {
+			parts = append(parts, text[start:index:index])
+			for index < len(text) && (text[index] == ' ' || text[index] == '\t') {
+				index++
 			}
-			start = i
+			start = index
 			continue
 		}
-		i++
+		index++
 	}
 	return append(parts, text[start:len(text):len(text)])
 }
 
-// tagName resolves a tag, matching handles to those defined in %TAG directives. It returns the resolved
+// tagName resolves a tag, matching handles to those defined in `%TAG` directives. It returns the resolved
 // tag, which may also be the non-specific tag '!' or a '!local' tag, or "" where upstream returns null
 // (unresolvable). Upstream can also return the empty string, for !<>; every caller treats the two alike.
 func (directives *Directives) tagName(source []uint16, onError func(message string)) string {
-	if equalsASCII(source, "!") {
+	if equalsAscii(source, "!") {
 		return "!" // non-specific tag
 	}
 	if characterAt(source, 0) != '!' {
@@ -131,7 +131,7 @@ func (directives *Directives) tagName(source []uint16, onError func(message stri
 	}
 	if characterAt(source, 1) == '<' {
 		verbatim := slice(source, 2, -1)
-		if equalsASCII(verbatim, "!") || equalsASCII(verbatim, "!!") {
+		if equalsAscii(verbatim, "!") || equalsAscii(verbatim, "!!") {
 			onError("Verbatim tags aren't resolved, so " + unitsToString(source) + " is invalid.")
 			return ""
 		}
@@ -153,68 +153,70 @@ func (directives *Directives) tagName(source []uint16, onError func(message stri
 	}
 	prefix := directives.Tags[unitsToString(handle)]
 	if prefix != "" {
-		decoded, ok := decodeURIComponent(suffix)
+		decoded, ok := decodeUriComponent(suffix)
 		if !ok {
 			onError("URIError: URI malformed")
 			return ""
 		}
 		return prefix + unitsToString(decoded)
 	}
-	if equalsASCII(handle, "!") {
+	if equalsAscii(handle, "!") {
 		return unitsToString(source) // local tag
 	}
 	onError("Could not resolve tag: " + unitsToString(source))
 	return ""
 }
 
-// decodeURIComponent is upstream's global, ECMAScript's Decode with an empty reserved set: each %XX
+// decodeUriComponent is upstream's global, ECMAScript's Decode with an empty reserved set: each %XX
 // escape is a UTF-8 byte, and a malformed escape or byte sequence is a URIError (ok false).
-func decodeURIComponent(text []uint16) (decoded []uint16, ok bool) {
+//
+// It ports JavaScript's decodeURIComponent.
+func decodeUriComponent(text []uint16) (decoded []uint16, ok bool) {
 	decoded = make([]uint16, 0, len(text))
 	hexByte := func(index int) (byte, bool) {
 		if index+2 >= len(text) || text[index] != '%' {
 			return 0, false
 		}
-		high, highOK := hexDigit(text[index+1])
-		low, lowOK := hexDigit(text[index+2])
-		if !highOK || !lowOK {
+		high, highOk := hexDigit(text[index+1])
+		low, lowOk := hexDigit(text[index+2])
+		if !highOk || !lowOk {
 			return 0, false
 		}
 		return high<<4 | low, true
 	}
-	for k := 0; k < len(text); k++ {
-		if text[k] != '%' {
-			decoded = append(decoded, text[k])
+	for index := 0; index < len(text); index++ {
+		if text[index] != '%' {
+			decoded = append(decoded, text[index])
 			continue
 		}
-		first, isByte := hexByte(k)
+		first, isByte := hexByte(index)
 		if !isByte {
 			return nil, false
 		}
-		k += 2
+		index += 2
 		if first < 0x80 {
 			decoded = append(decoded, uint16(first))
 			continue
 		}
 		// The number of leading 1 bits is the sequence's length; 1 or more than 4 is malformed.
-		n := 0
-		for first<<n&0x80 != 0 {
-			n++
+		count := 0
+		for first<<count&0x80 != 0 {
+			count++
 		}
-		if n == 1 || n > 4 {
+		if count == 1 || count > 4 {
 			return nil, false
 		}
 		octets := []byte{first}
-		if k+3*(n-1) >= len(text) {
+		if index+3*(count-1) >= len(text) {
 			return nil, false
 		}
-		for j := 1; j < n; j++ {
-			k++
-			octet, isOctet := hexByte(k)
+		for continuation := 1; continuation < count; continuation++ {
+			index++
+			octet, isOctet := hexByte(index)
 			if !isOctet || octet&0xC0 != 0x80 {
 				return nil, false
 			}
-			k += 2
+			index += 2
 			octets = append(octets, octet)
 		}
 		character, size := utf8.DecodeRune(octets)

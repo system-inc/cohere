@@ -41,11 +41,11 @@ func noUnsafeAssignmentOnDisk(sourceText string) string {
 // shell or a keyboard on the way here. Every one was additionally run through the installed 8.67.0
 // build over a real program, which reported nothing on all thirty-six.
 //
-// These carry most of the rule's judgment. An inferred variable is silent because its type IS the
+// These carry most of the rule's judgment. An inferred variable is silent because its type is the
 // value's, `unknown` is silent because absorbing an `any` is what `unknown` is for, and a generic
 // whose argument matches is silent because nothing disagrees.
-func TestNoUnsafeAssignmentStaysSilentOnUpstreamPassCases(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeAssignmentStaysSilentOnUpstreamPassCases(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -197,9 +197,9 @@ func TestNoUnsafeAssignmentStaysSilentOnUpstreamPassCases(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(noUnsafeAssignmentCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoUnsafeAssignment,
+		test.Run(noUnsafeAssignmentCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoUnsafeAssignment,
 				noUnsafeAssignmentFileFor(testCase.isJsx), testCase.sourceText))
 		})
 	}
@@ -213,8 +213,8 @@ func TestNoUnsafeAssignmentStaysSilentOnUpstreamPassCases(t *testing.T) {
 // each finding points, which for a destructured element is the element rather than the statement.
 // And the rendered text is asserted exactly, because two of the seven messages interpolate a type
 // name and one interpolates two, and a message-id assertion cannot see any of that.
-func TestNoUnsafeAssignmentFiresOnUpstreamFailCases(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeAssignmentFiresOnUpstreamFailCases(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -284,7 +284,10 @@ func TestNoUnsafeAssignmentFiresOnUpstreamFailCases(t *testing.T) {
 			isJsx:      false,
 			wantIds:    []string{"unsafeObjectPattern", "anyAssignment"},
 			wantSpans:  []string{"{ y: z }", "x: spooky"},
-			wantTexts:  []string{"Unsafe object destructuring of a property with an error typed value.", "Unsafe assignment of an error typed value."},
+			wantTexts: []string{
+				"Unsafe object destructuring of a property with an error typed value.",
+				"Unsafe assignment of an error typed value.",
+			},
 		},
 		{
 			sourceText: "\nlet value: number;\n\nvalue = spooky;\n      ",
@@ -319,7 +322,9 @@ func TestNoUnsafeAssignmentFiresOnUpstreamFailCases(t *testing.T) {
 			isJsx:      true,
 			wantIds:    []string{"unsafeAssignment"},
 			wantSpans:  []string{"x: Map<string, string> = new Map<string, any>()"},
-			wantTexts:  []string{"Unsafe assignment of type `Map<string, any>` to a variable of type `Map<string, string>`."},
+			wantTexts: []string{
+				"Unsafe assignment of type `Map<string, any>` to a variable of type `Map<string, string>`.",
+			},
 		},
 		{
 			sourceText: "const x: Set<string[]> = new Set<any[]>();",
@@ -333,7 +338,9 @@ func TestNoUnsafeAssignmentFiresOnUpstreamFailCases(t *testing.T) {
 			isJsx:      true,
 			wantIds:    []string{"unsafeAssignment"},
 			wantSpans:  []string{"x: Set<Set<Set<string>>> = new Set<Set<Set<any>>>()"},
-			wantTexts:  []string{"Unsafe assignment of type `Set<Set<Set<any>>>` to a variable of type `Set<Set<Set<string>>>`."},
+			wantTexts: []string{
+				"Unsafe assignment of type `Set<Set<Set<any>>>` to a variable of type `Set<Set<Set<string>>>`.",
+			},
 		},
 		{
 			sourceText: "const [x] = [1] as [any];",
@@ -578,7 +585,9 @@ func TestNoUnsafeAssignmentFiresOnUpstreamFailCases(t *testing.T) {
 			isJsx:      true,
 			wantIds:    []string{"unsafeAssignment"},
 			wantSpans:  []string{"y: new Set<Set<Set<any>>>()"},
-			wantTexts:  []string{"Unsafe assignment of type `Set<Set<Set<any>>>` to a variable of type `Set<Set<Set<string>>>`."},
+			wantTexts: []string{
+				"Unsafe assignment of type `Set<Set<Set<any>>>` to a variable of type `Set<Set<Set<string>>>`.",
+			},
 		},
 		{
 			sourceText: "const x = { ...(1 as any) };",
@@ -617,20 +626,20 @@ func TestNoUnsafeAssignmentFiresOnUpstreamFailCases(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(noUnsafeAssignmentCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoUnsafeAssignment,
+		test.Run(noUnsafeAssignmentCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoUnsafeAssignment,
 				noUnsafeAssignmentFileFor(testCase.isJsx), testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 
 			onDisk := noUnsafeAssignmentOnDisk(testCase.sourceText)
 			for index, wantSpan := range testCase.wantSpans {
 				reported := onDisk[result.Diagnostics[index].Range.Pos():result.Diagnostics[index].Range.End()]
 				if reported != wantSpan {
-					t.Errorf("finding %d covers %q, want %q", index, reported, wantSpan)
+					test.Errorf("finding %d covers %q, want %q", index, reported, wantSpan)
 				}
 				if result.Diagnostics[index].Message.Description != testCase.wantTexts[index] {
-					t.Errorf("finding %d reads %q, want %q", index,
+					test.Errorf("finding %d reads %q, want %q", index,
 						result.Diagnostics[index].Message.Description, testCase.wantTexts[index])
 				}
 			}
@@ -652,8 +661,8 @@ func TestNoUnsafeAssignmentFiresOnUpstreamFailCases(t *testing.T) {
 // The tuple guard is what stops the element walk on a plain array: `string[]` has no per-position
 // types to compare, so upstream returns before the loop. Both verdicts measured on the installed
 // 8.67.0 build, each with the control that separates the guard from the shape.
-func TestNoUnsafeAssignmentDiscriminatesOnCasesUpstreamDoesNotWrite(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeAssignmentDiscriminatesOnCasesUpstreamDoesNotWrite(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -691,7 +700,7 @@ func TestNoUnsafeAssignmentDiscriminatesOnCasesUpstreamDoesNotWrite(t *testing.T
 			reason:     "the control: a tuple of the same length does report",
 		},
 		{
-			// The spread anchor's parent test. A spread in a CALL is `no-unsafe-argument`'s
+			// The spread anchor's parent test. A spread in a call is `no-unsafe-argument`'s
 			// question rather than this rule's, and without the test this reports there too.
 			sourceText: "declare const a: any[];\ndeclare function f(...xs: string[]): void;\nf(...a);",
 			wantIds:    nil,
@@ -728,11 +737,11 @@ func TestNoUnsafeAssignmentDiscriminatesOnCasesUpstreamDoesNotWrite(t *testing.T
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(noUnsafeAssignmentCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoUnsafeAssignment,
+		test.Run(noUnsafeAssignmentCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoUnsafeAssignment,
 				noUnsafeAssignmentFileFor(false), testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -742,13 +751,13 @@ func TestNoUnsafeAssignmentDiscriminatesOnCasesUpstreamDoesNotWrite(t *testing.T
 // A typed rule handed the plain harness gets a nil checker, and the guard at the top of each
 // listener turns that into silence rather than a panic. Silence is the more dangerous failure: every
 // clean case passes vacuously and every reporting case fails in a way that reads as a rule bug.
-func TestNoUnsafeAssignmentRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeAssignmentRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	source := "const x: string = 1 as any;"
-	rule_testing.ExpectClean(t, rule_testing.Run(t, NoUnsafeAssignment,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, NoUnsafeAssignment,
 		noUnsafeAssignmentFileFor(false), source))
-	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoUnsafeAssignment,
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoUnsafeAssignment,
 		noUnsafeAssignmentFileFor(false), source), "anyAssignment")
 }
 
@@ -757,13 +766,13 @@ func TestNoUnsafeAssignmentRequiresTheTypedHarness(t *testing.T) {
 // Two hazards meet in this rule. `Elements()` and `Properties()` panic on a kind that has neither,
 // and the shelf's `IsTypeAnyArrayType` indexes `getTypeArguments(t)[0]` with no length test, so an
 // array type carrying no arguments panics one call in. Both are guarded, and the walk recovers per
-// FILE rather than per rule, so either would cost every rule in the package every finding in that
+// file rather than per rule, so either would cost every rule in the package every finding in that
 // file while the run still printed a plausible summary.
 //
 // There is no finding to assert; the assertion is that the run completes. Upstream cannot reach most
 // of these because its parser refuses the file outright.
-func TestNoUnsafeAssignmentSurvivesShapesTheParserRecoversFrom(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeAssignmentSurvivesShapesTheParserRecoversFrom(test *testing.T) {
+	test.Parallel()
 
 	for name, sourceText := range map[string]string{
 		"emptyArrayPattern":  "declare const a: any[];\nconst [] = a;",
@@ -778,9 +787,9 @@ func TestNoUnsafeAssignmentSurvivesShapesTheParserRecoversFrom(t *testing.T) {
 		"spreadNothing":      "const a = [...];",
 		"deepNesting":        "declare const a: [[[any]]];\nconst [[[x]]] = a;",
 	} {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.RunTyped(t, NoUnsafeAssignment,
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.RunTyped(test, NoUnsafeAssignment,
 				noUnsafeAssignmentFileFor(false), sourceText)
 		})
 	}

@@ -13,8 +13,8 @@ import (
 // TestIdentifiersNamedIsTheWholeFileWalk holds the index to the walk it replaced in prefer-const: for
 // every name in the file, the identifiers a ForEachChild walk from the source file reaches with that
 // text, in the order it reaches them. Order matters, since a caller takes the first write it finds.
-func TestIdentifiersNamedIsTheWholeFileWalk(t *testing.T) {
-	t.Parallel()
+func TestIdentifiersNamedIsTheWholeFileWalk(test *testing.T) {
+	test.Parallel()
 
 	source := `let a = 1, b;
 function f(a) { b = a; return () => { let a; a = b; return a; }; }
@@ -27,9 +27,9 @@ const jsx = <a.b a={a}>{a}</a.b>;
 `
 	var mismatches []string
 	compared := 0
-	rule_testing.Run(t, rule.Rule{
+	rule_testing.Run(test, rule.Rule[rule.NoOptions]{
 		Name: "identifiers-probe",
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
 					walked := map[string][]*ast.Node{}
@@ -46,7 +46,7 @@ const jsx = <a.b a={a}>{a}</a.b>;
 					visit(node)
 					for name, want := range walked {
 						compared++
-						got := reference.IdentifiersNamed(ctx, name)
+						got := reference.IdentifiersNamed(ruleContext, name)
 						if !slices.Equal(got, want) {
 							mismatches = append(mismatches, name)
 						}
@@ -56,11 +56,11 @@ const jsx = <a.b a={a}>{a}</a.b>;
 							mismatches = append(mismatches, name+" (uncapped)")
 						}
 					}
-					if got := reference.IdentifiersNamed(ctx, "absent"); got != nil {
+					if got := reference.IdentifiersNamed(ruleContext, "absent"); got != nil {
 						mismatches = append(mismatches, "absent")
 					}
-					if fills := ctx.FileCache.Fills()["reference.identifiersByName"]; fills != 1 {
-						t.Errorf("the index was built %d times for one file, want once", fills)
+					if fills := ruleContext.FileCache.Fills()["reference.identifiersByName"]; fills != 1 {
+						test.Errorf("the index was built %d times for one file, want once", fills)
 					}
 				},
 			}
@@ -68,9 +68,9 @@ const jsx = <a.b a={a}>{a}</a.b>;
 	}, "probe.tsx", source)
 
 	if compared < 10 {
-		t.Fatalf("compared only %d names, so this proved little", compared)
+		test.Fatalf("compared only %d names, so this proved little", compared)
 	}
 	if len(mismatches) > 0 {
-		t.Errorf("the index disagrees with the whole-file walk for %v", mismatches)
+		test.Errorf("the index disagrees with the whole-file walk for %v", mismatches)
 	}
 }

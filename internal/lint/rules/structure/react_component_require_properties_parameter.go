@@ -6,19 +6,30 @@ import (
 	"github.com/system-inc/cohere/policy"
 )
 
-// messageUsePropertiesNotPropsText is the rule's `usePropertiesNotProps` message, whose wording
+// messageUsePropertiesParameterText is the rule's `usePropertiesNotProps` message, whose wording
 // lives in `policy/messages/react-component-require-properties-parameter.json`.
-var messageUsePropertiesNotPropsText = policy.MessageOf("structure/react-component-require-properties-parameter", "usePropertiesNotProps")
+var messageUsePropertiesParameterText = policy.MessageOf(
+	"structure/react-component-require-properties-parameter",
+	"usePropertiesNotProps",
+)
 
-// messageUsePropertiesNotProps is the finding, rendered when it is reported so the text comes from
+// messageUsePropertiesParameter is the finding, rendered when it is reported so the text comes from
 // the current catalog.
-func messageUsePropertiesNotProps() rule.Message {
-	return rule.Message{Id: messageUsePropertiesNotPropsText.Id, Description: messageUsePropertiesNotPropsText.Render(nil)}
+//
+// It asks for `properties` where a component's parameter is named `props`.
+func messageUsePropertiesParameter() rule.Message {
+	return rule.Message{
+		Id:          messageUsePropertiesParameterText.Id,
+		Description: messageUsePropertiesParameterText.Render(nil),
+	}
 }
 
 // messageRenameToPropertiesText is the rule's `renameToProperties` message, whose wording lives in
 // `policy/messages/react-component-require-properties-parameter.json`.
-var messageRenameToPropertiesText = policy.MessageOf("structure/react-component-require-properties-parameter", "renameToProperties")
+var messageRenameToPropertiesText = policy.MessageOf(
+	"structure/react-component-require-properties-parameter",
+	"renameToProperties",
+)
 
 // messageRenameToProperties is the suggestion, rendered when it is reported so the text comes from
 // the current catalog.
@@ -50,10 +61,10 @@ func messageRenameToProperties() rule.Message {
 //
 // So the break stays and the automation goes. The author is shown the rename, and is the one who
 // then updates the body, which is the work only they can do correctly anyway.
-var ReactComponentRequirePropertiesParameter = rule.Rule{
+var ReactComponentRequirePropertiesParameter = rule.Rule[rule.NoOptions]{
 	Name: "structure/react-component-require-properties-parameter",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if !FileContextFor(ctx.SourceFile.FileName().AsString()).IsReactFile {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		if !FileContextFor(ruleContext.SourceFile.FileName().AsString()).IsReactFile {
 			return nil
 		}
 
@@ -71,9 +82,9 @@ var ReactComponentRequirePropertiesParameter = rule.Rule{
 			if name == nil || name.Kind != ast.KindIdentifier || name.Text() != "props" {
 				return
 			}
-			ctx.ReportNodeWithSuggestions(name, messageUsePropertiesNotProps(), rule.Suggestion{
+			ruleContext.ReportNodeWithSuggestions(name, messageUsePropertiesParameter(), rule.Suggestion{
 				Message: messageRenameToProperties(),
-				Fixes:   []rule.Fix{ctx.ReplaceNode(name, "properties")},
+				Fixes:   []rule.Fix{ruleContext.ReplaceNode(name, "properties")},
 			})
 		}
 

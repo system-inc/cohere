@@ -7,13 +7,13 @@
 //
 // # What this pass does, and why it is a rewrite rather than an annotation
 //
-// Every pass before this one records scopes in a SIDE TABLE: `scopes.go` assigns them,
-// `align_scopes.go` widens them to block boundaries, `merge_scopes.go` unions the overlapping ones.
+// Every pass before this one records scopes in a side table: `scopes.go` assigns them,
+// `align_sweep_state.go` widens them to block boundaries, `merge_scopes.go` unions the overlapping ones.
 // After all three, a scope is still only a pair of evaluation-order positions with a member list.
 // Nothing in the control-flow graph knows a scope exists.
 //
 // The consumer that needs them does not read the table. `propagate_scope_dependencies_hir` recovers
-// scopes by WALKING BLOCKS FOR A SCOPE TERMINAL -- React's `keyByScopeId` is six lines of
+// scopes by walking blocks for a scope terminal -- React's `keyByScopeId` is six lines of
 // `if (block.terminal.kind === 'scope')`, and oxc's entrypoint matches `Terminal::Scope { .. }`
 // identically. Measured before this file was written, over 400 corpus files and 677 functions:
 //
@@ -22,14 +22,14 @@
 //	scopes reachable from a CFG terminal             0
 //
 // That zero is the denominator, not a gap to widen later. A dependency pass ported onto a graph with
-// no scope terminals would run, terminate, pass its fixtures, and produce zero dependencies BY
-// CONSTRUCTION, because its visitors are gated on a non-empty scope stack that nothing ever pushes.
+// no scope terminals would run, terminate, pass its fixtures, and produce zero dependencies by
+// construction, because its visitors are gated on a non-empty scope stack that nothing ever pushes.
 // This pass is what moves that zero.
 //
 // # The rewrite, which splits blocks
 //
 // For each scope, two positions matter: `range.start`, where the scope begins, and `range.end`,
-// where it ends. At each, the block containing that position is SPLIT, and a terminal is inserted:
+// where it ends. At each, the block containing that position is split, and a terminal is inserted:
 //
 //	at range.start   a Scope terminal, whose Block is the scope body and whose Fallthrough is
 //	                 where control resumes after the scope completes
@@ -39,17 +39,17 @@
 // A block containing several scope boundaries splits several times; the rewrites are applied in one
 // left-to-right sweep per block, each carving off the instructions before it.
 //
-// # Nesting is a PRECONDITION, and it is enforced upstream by an assertion
+// # Nesting is a precondition, and it is enforced upstream by an assertion
 //
 // `recursivelyTraverseItems` -- which this pass uses to visit scopes in nesting order -- carries a
 // hard `CompilerError.invariant(disjoint || nested)`. It is not a filter; upstream stops. React
-// calls `assertValidBlockNesting(hir)` on the line IMMEDIATELY BEFORE this pass (bundle 50213/50214)
+// calls `assertValidBlockNesting(hir)` on the line immediately before this pass (bundle 50213/50214)
 // and oxc does the same (`pipeline.rs:293/295`), independently, which is upstream telling you the
 // precondition rather than leaving it to be discovered.
 //
 // Three stages exist because of that assertion. Measured on this corpus, scope-versus-scope
-// non-nesting was 40 before `merge_scopes.go` and 0 after; the FULL assertion, which also compares
-// every block's fallthrough subtree, was 249 before `align_scopes.go` and 8 after on the current
+// non-nesting was 40 before `merge_scopes.go` and 0 after; the full assertion, which also compares
+// every block's fallthrough subtree, was 249 before `align_sweep_state.go` and 8 after on the current
 // live corpus. All eight are scope-involving residues in plain helper functions; components and
 // hooks are at zero. The former block-against-block residue disappeared when reverse postorder began
 // matching React's traversal. `ScopeTerminalsPrecondition` reports whether a function satisfies the
@@ -74,14 +74,14 @@
 // `markInstructionIds`; `Finalize` here is exactly that trio in that order, and this pass calls it.
 //
 // Phi operands are the fourth, and they are the one a reader does not expect. A phi names its
-// operands BY PREDECESSOR BLOCK ID. When a block is split, the predecessor that reaches a successor
-// is no longer the original block but the LAST block carved out of it, so every phi operand keyed by
+// operands by predecessor block ID. When a block is split, the predecessor that reaches a successor
+// is no longer the original block but the last block carved out of it, so every phi operand keyed by
 // the original id has to be rekeyed to the final one. React does this explicitly after swapping the
 // block table, and omitting it produces a phi reading from a block that no longer flows there --
 // wrong values, no crash, and nothing in a well-formedness check that would notice.
 //
-// `Construct` is NOT re-run. It is not idempotent: running it twice on the same function moved 1 phi
-// to 2 while `VerifySSA` reported zero violations. This pass therefore runs AFTER single-assignment
+// `Construct` is not re-run. It is not idempotent: running it twice on the same function moved 1 phi
+// to 2 while `VerifySsa` reported zero violations. This pass therefore runs after single-assignment
 // construction and repairs the phis in place rather than rebuilding them, which is also what
 // upstream does.
 package high_level_intermediate_representation
@@ -96,16 +96,16 @@ import (
 //
 // # Why this exists, and the defect it was written to fix
 //
-// A value's scope id comes from `ReactiveScopes.ScopeOf`, which is the PRE-MERGE table.
+// A value's scope id comes from `ReactiveScopes.ScopeOf`, which is the pre-merge table.
 // `merge_scopes.go` then unions overlapping scopes, so several pre-merge ids can name one surviving
-// scope, and `align_scopes.go` widens the ranges under both. A pass that keys on the pre-merge id
-// while reading the merged RANGE gets a coherent-looking wrong answer: every scope has a plausible
+// scope, and `align_sweep_state.go` widens the ranges under both. A pass that keys on the pre-merge id
+// while reading the merged range gets a coherent-looking wrong answer: every scope has a plausible
 // range, so nothing is empty, nothing is inverted, and the nesting precondition still passes.
 //
 // Measured on this corpus, that mistake builds 3,286 terminals for 2,874 scopes -- 412 duplicates,
 // each a second terminal wrapping a range another terminal already owns. `propagate_scope_dependencies`
 // keys its output by scope id, so the duplicates would collide and the surviving entry would depend
-// on map order. The tell was that the built count EXCEEDED the control, which is why the control is
+// on map order. The tell was that the built count exceeded the control, which is why the control is
 // measured alongside the headline rather than after it.
 //
 // Threading the resolver rather than taking `*MergedScopes` directly keeps this pass testable
@@ -116,42 +116,6 @@ type ScopeIdentity interface {
 	GroupOf(scope ScopeId) ScopeId
 	// RangeOf gives the surviving scope's final range, after alignment and merging.
 	RangeOf(scope ScopeId) mutation_aliasing.MutableRange
-}
-
-// MergedScopeIdentity resolves scope identity through an align-then-merge result.
-//
-// This is what a caller holding the output of `AlignThenMergeReactiveScopes` passes.
-type MergedScopeIdentity struct {
-	Aligned *AlignedScopes
-	Merged  *MergedScopes
-}
-
-// GroupOf returns the merged group a pre-merge scope belongs to, or the scope itself when the merge
-// left it alone.
-func (m MergedScopeIdentity) GroupOf(scope ScopeId) ScopeId {
-	if scope == 0 {
-		return 0
-	}
-	if m.Merged != nil {
-		if group := m.Merged.GroupOf(scope); group != 0 {
-			return group
-		}
-	}
-	return scope
-}
-
-// RangeOf returns the surviving scope's range, preferring the merged table and falling back to the
-// aligned one for a scope the merge did not touch.
-func (m MergedScopeIdentity) RangeOf(scope ScopeId) mutation_aliasing.MutableRange {
-	if m.Merged != nil {
-		if bounds := m.Merged.RangeOf(scope); bounds.Start != bounds.End {
-			return bounds
-		}
-	}
-	if m.Aligned != nil {
-		return m.Aligned.RangeOf(scope)
-	}
-	return mutation_aliasing.MutableRange{}
 }
 
 // ScopeTerminalsGap names a rule this pass cannot apply, for a caller that needs to know.
@@ -225,7 +189,7 @@ type scopeRewrite struct {
 //
 // This compares scopes to each other only. Upstream's `assertValidBlockNesting` additionally folds
 // in every block's fallthrough subtree; that check belongs with the pass that aligns them and lives
-// in `align_scopes.go`.
+// in `align_sweep_state.go`.
 func ScopeTerminalsPrecondition(function *Function, scopes *ReactiveScopes,
 	identity ScopeIdentity) int {
 	items := scopeItemsInNestingOrder(function, scopes, identity)
@@ -266,25 +230,25 @@ type scopeItem struct {
 // this corpus and not a reason to drop the filter, since a scope whose members are all eliminated by
 // a future pass would produce exactly the shape it exists to catch.
 //
-// The comparator is start ASCENDING then end DESCENDING, which puts a parent immediately before the
+// The comparator is start ascending then end descending, which puts a parent immediately before the
 // children it contains and is what makes the single-stack traversal correct.
 //
-// # The end-descending clause is INERT on this corpus, and is kept anyway
+// # The end-descending clause is inert on this corpus, and is kept anyway
 //
 // That second clause only decides when two scopes share a start position. Measured over 400 files
-// and 677 functions, ZERO of the 2,874 post-merge scopes share a start with another, and zero share
-// one in the pre-merge table either. The control alongside that zero is shared END positions, which
+// and 677 functions, zero of the 2,874 post-merge scopes share a start with another, and zero share
+// one in the pre-merge table either. The control alongside that zero is shared end positions, which
 // is 1, so the measurement can see a collision when one exists.
 //
 // A mutant flipping the clause to ascending therefore survives the sweep, and it is neither a
 // fixture blind spot nor an equivalent mutation: the branch is reachable in the code and
 // unreachable through this input. It is kept rather than deleted because it is upstream's
 // `rangePreOrderComparator` verbatim, because merging is what removes shared starts and a future
-// pass that widens scopes could reintroduce them, and because a parent sorted AFTER its child would
+// pass that widens scopes could reintroduce them, and because a parent sorted after its child would
 // invert the nesting the traversal depends on -- a silent corruption rather than a crash.
 //
 // The verdict names its inputs: it holds for scopes produced by `AlignThenMergeReactiveScopes` on
-// this corpus. It EXPIRES if a pass lands that can give two scopes the same start.
+// this corpus. It expires if a pass lands that can give two scopes the same start.
 func scopeItemsInNestingOrder(function *Function, scopes *ReactiveScopes,
 	identity ScopeIdentity) []scopeItem {
 	if function == nil || scopes == nil {
@@ -313,11 +277,11 @@ func scopeItemsInNestingOrder(function *Function, scopes *ReactiveScopes,
 		}
 		EachTerminalPlace(block.Terminal, visit)
 	}
-	sort.SliceStable(items, func(a, b int) bool {
-		if items[a].start != items[b].start {
-			return items[a].start < items[b].start
+	sort.SliceStable(items, func(left, right int) bool {
+		if items[left].start != items[right].start {
+			return items[left].start < items[right].start
 		}
-		return items[a].end > items[b].end
+		return items[left].end > items[right].end
 	})
 	return items
 }
@@ -326,7 +290,7 @@ func scopeItemsInNestingOrder(function *Function, scopes *ReactiveScopes,
 // carried by a Scope terminal rather than only by the side table.
 //
 // Requires scopes that have been aligned and merged: pass the output of
-// `AlignThenMergeReactiveScopes`, and read ranges through `rangeOf` so this reads the FINAL range
+// `AlignThenMergeReactiveScopes`, and read ranges through `rangeOf` so this reads the final range
 // rather than the pre-alignment one. Declines and returns a zero result when the nesting
 // precondition is violated; see `ScopeTerminalsPrecondition`.
 //
@@ -334,7 +298,7 @@ func scopeItemsInNestingOrder(function *Function, scopes *ReactiveScopes,
 // operand keys that block-splitting invalidates. See the package comment.
 func BuildReactiveScopeTerminals(function *Function, scopes *ReactiveScopes,
 	identity ScopeIdentity) ScopeTerminals {
-	if function == nil || scopes == nil || scopes.Len() == 0 {
+	if function == nil || scopes == nil || scopes.Length() == 0 {
 		return ScopeTerminals{}
 	}
 	items := scopeItemsInNestingOrder(function, scopes, identity)
@@ -372,7 +336,7 @@ func BuildReactiveScopeTerminals(function *Function, scopes *ReactiveScopes,
 // Three other mappings were built and measured wrong before this one was read at the source, and
 // each failed for a reason worth keeping.
 //
-// Taking the span from the minimum to the maximum member order WIDENS a merged scope, because a
+// Taking the span from the minimum to the maximum member order widens a merged scope, because a
 // merge folds scattered scopes into one survivor and the span then covers everything between. It
 // produced a nesting-containment violation and moved the dependency production count from 151 to
 // 158.
@@ -445,7 +409,7 @@ func fixScopeRanges(function *Function, scopes *ReactiveScopes, identity ScopeId
 // a later scope proves it finished, which is the moment a candidate's start is at or past the
 // active scope's end. Everything still active at the walk's end is exited in reverse.
 //
-// Blocks for the body and the fallthrough are minted at ENTER, so a nested scope's blocks are minted
+// Blocks for the body and the fallthrough are minted at enter, so a nested scope's blocks are minted
 // after its parent's, which keeps ids ascending with nesting depth. The end rewrite reuses the
 // fallthrough its start recorded -- that pairing is the whole reason the stack exists.
 func queueScopeRewrites(function *Function, items []scopeItem) []scopeRewrite {
@@ -496,15 +460,15 @@ func queueScopeRewrites(function *Function, items []scopeItem) []scopeRewrite {
 		exit(active[index])
 	}
 
-	// Reverse, so the block sweep can consume from the END of the slice. This is upstream's
-	// `queuedRewrites.reverse()` followed by its `.at(-1)` loop, and it is deliberately NOT a sort.
+	// Reverse, so the block sweep can consume from the end of the slice. This is upstream's
+	// `queuedRewrites.reverse()` followed by its `.at(-1)` loop, and it is deliberately not a sort.
 	//
 	// An earlier draft here sorted by position with a start-versus-end tiebreak, which looked like a
-	// safe normalisation and is a real divergence. The traversal ALREADY emits rewrites in the order
+	// safe normalisation and is a real divergence. The traversal already emits rewrites in the order
 	// the sweep needs, because the stack discipline that produces them is the same one that
 	// establishes the nesting: a scope is exited before any scope disjoint from it is entered, and a
 	// nested scope is entered while its parent is still open. Position alone cannot reconstruct
-	// that. Two scopes meeting at a point -- one ending at 7, the next starting at 7 -- are DISJOINT,
+	// that. Two scopes meeting at a point -- one ending at 7, the next starting at 7 -- are disjoint,
 	// so the traversal emits the end before the start with no tiebreak involved, and a comparator
 	// choosing between them is deciding something the traversal had already decided correctly.
 	//
@@ -523,6 +487,8 @@ func queueScopeRewrites(function *Function, items []scopeItem) []scopeRewrite {
 // every rewrite landing at or before the current position is applied, carving off the instructions
 // seen so far into a new block terminated by the rewrite's terminal. Whatever remains becomes the
 // final block, which keeps the original block's own terminal.
+//
+// Mutates: function the splitting rebuilds the caller's graph in place, its block list among it
 func applyScopeRewrites(function *Function, rewrites []scopeRewrite) ScopeTerminals {
 	result := ScopeTerminals{}
 	original := function.Blocks
@@ -540,6 +506,8 @@ func applyScopeRewrites(function *Function, rewrites []scopeRewrite) ScopeTermin
 	// the block that now reaches whatever the original reached. Phi operands are rekeyed through it.
 	finalBlockOf := map[static_single_assignment.BlockId]static_single_assignment.BlockId{}
 
+	// The rewrites still to apply, popped from the end as the sweep passes each one's order.
+	pending := rewrites
 	for _, block := range original {
 		if block.Terminal == nil {
 			// A block minted for a scope body or fallthrough, not yet filled. Emitted by the sweep
@@ -558,9 +526,9 @@ func applyScopeRewrites(function *Function, rewrites []scopeRewrite) ScopeTermin
 			} else {
 				order = TerminalOrder(block.Terminal)
 			}
-			for len(rewrites) > 0 && rewrites[len(rewrites)-1].order <= order {
-				rewrite := rewrites[len(rewrites)-1]
-				rewrites = rewrites[:len(rewrites)-1]
+			for len(pending) > 0 && pending[len(pending)-1].order <= order {
+				rewrite := pending[len(pending)-1]
+				pending = pending[:len(pending)-1]
 
 				var terminal Terminal
 				if rewrite.isStart {
@@ -613,7 +581,7 @@ func applyScopeRewrites(function *Function, rewrites []scopeRewrite) ScopeTermin
 	_ = originalCount
 
 	function.Blocks = rebuilt
-	// `blocksById` maps an id to a POINTER, and the carved blocks are new pointers reusing the
+	// `blocksById` maps an id to a pointer, and the carved blocks are new pointers reusing the
 	// original ids. Repoint every entry before Finalize, which resolves successors through this
 	// index: a stale pointer would leave the walk reading the pre-split block and silently rebuild
 	// the graph it was meant to replace.
@@ -641,20 +609,9 @@ func applyScopeRewrites(function *Function, rewrites []scopeRewrite) ScopeTermin
 	return result
 }
 
-// reindexBlocks rebuilds the id-to-block index from Function.Blocks.
-//
-// Lives here rather than in high_level_intermediate_representation.go because this is the only pass that replaces the block slice
-// wholesale; lowering appends through `NewBlock`, which maintains the index as it goes.
-func (f *Function) reindexBlocks() {
-	f.blocksById = make(map[static_single_assignment.BlockId]*BasicBlock, len(f.Blocks))
-	for _, block := range f.Blocks {
-		f.blocksById[block.Id] = block
-	}
-}
-
 // phisFor gives the first block carved out of an original its phis and every later one none.
 //
-// A phi belongs at the point control MERGES, which is the top of the original block. The blocks
+// A phi belongs at the point control merges, which is the top of the original block. The blocks
 // carved after it have exactly one predecessor -- the carve before them -- so a phi there would name
 // a single operand and mean nothing. Upstream does the same with
 // `phis: context.rewrites.length === 0 ? context.source.phis : new Set()`.

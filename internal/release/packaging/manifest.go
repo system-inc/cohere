@@ -54,10 +54,10 @@ const FullCommandName = "cohere"
 // for it.
 const launcherRelativePath = "bin/" + FullCommandName
 
-// RepositoryURL is where the source lives, recorded in every published package. In npm's own form,
+// RepositoryUrl is where the source lives, recorded in every published package. In npm's own form,
 // git+https with .git, because npm rewrites any other spelling at publish time and warns about it on
 // every package, which buries the warnings that matter.
-const RepositoryURL = "git+https://github.com/system-inc/cohere.git"
+const RepositoryUrl = "git+https://github.com/system-inc/cohere.git"
 
 // PlatformManifest is the package.json for one platform's binary package.
 //
@@ -73,7 +73,7 @@ func PlatformManifest(target Target, version string) ([]byte, error) {
 		"description": fmt.Sprintf("The cohere binary for %s.", target),
 		"license":     LicenseExpression,
 		"author":      CopyrightHolder,
-		"repository":  map[string]string{"type": "git", "url": RepositoryURL},
+		"repository":  map[string]string{"type": "git", "url": RepositoryUrl},
 
 		"os":  []string{NpmOperatingSystem(target.GoOperatingSystem)},
 		"cpu": []string{NpmArchitecture(target.GoArchitecture)},
@@ -92,7 +92,7 @@ func PlatformManifest(target Target, version string) ([]byte, error) {
 // DispatcherManifest is the package.json for the package a consumer installs.
 //
 // Every platform package is an optional dependency. That is what makes an install on an unsupported
-// platform succeed with a missing binary rather than fail outright — which sounds worse and is
+// platform succeed with a missing binary rather than fail outright, which sounds worse and is
 // better, because the failure then happens at `cohere --version` with a message naming the
 // platform, instead of inside a package manager's dependency resolution where it says nothing
 // useful. The loud failure is the dispatcher's job and it is a better place to fail from.
@@ -111,7 +111,7 @@ func DispatcherManifest(version string) ([]byte, error) {
 		"description": "Type-check, lint, fix, and format a TypeScript codebase in one process.",
 		"license":     LicenseExpression,
 		"author":      CopyrightHolder,
-		"repository":  map[string]string{"type": "git", "url": RepositoryURL},
+		"repository":  map[string]string{"type": "git", "url": RepositoryUrl},
 
 		"bin": map[string]string{
 			ShortCommandName: launcherRelativePath,
@@ -133,10 +133,10 @@ func DispatcherManifest(version string) ([]byte, error) {
 // Two-space indentation and a trailing newline, because these files are committed in staged
 // releases and read in diffs. A manifest that reformats on every generation makes every release
 // diff look like a rewrite.
-func marshalManifest(manifest map[string]any) ([]byte, error) {
-	encoded, err := json.MarshalIndent(manifest, "", "  ")
-	if err != nil {
-		return nil, fmt.Errorf("rendering the package manifest: %w", err)
+func marshalManifest[Manifest any](manifest Manifest) ([]byte, error) {
+	encoded, encodeError := json.MarshalIndent(manifest, "", "  ")
+	if encodeError != nil {
+		return nil, fmt.Errorf("rendering the package manifest: %w", encodeError)
 	}
 	return append(encoded, '\n'), nil
 }

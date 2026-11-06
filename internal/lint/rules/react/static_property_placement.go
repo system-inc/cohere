@@ -34,7 +34,7 @@ type StaticPropertyPlacementOptions struct {
 // staticPropertyPlacementProperties is the fixed set of names this rule judges, in upstream's own
 // declaration order.
 //
-// The order is load-bearing rather than cosmetic. Upstream finds the FIRST matching name and
+// The order is load-bearing rather than cosmetic. Upstream finds the first matching name and
 // reports under it, and `props` with a type annotation matches `propTypes` while `context` with one
 // matches `contextTypes`, so a node could in principle answer two predicates. Keeping the order
 // keeps the reported name the same as upstream's.
@@ -59,7 +59,7 @@ func DefaultStaticPropertyPlacementOptions() StaticPropertyPlacementOptions {
 
 // DecodeStaticPropertyPlacementOptions reads upstream's option list off the config.
 //
-// Upstream's option surface is POSITIONAL, `[default, overrides]`, and the rule registers with
+// Upstream's option surface is positional, `[default, overrides]`, and the rule registers with
 // `DecodeOptionList` so both slots arrive:
 //
 //	nothing                                                    a static public field everywhere
@@ -71,15 +71,15 @@ func DefaultStaticPropertyPlacementOptions() StaticPropertyPlacementOptions {
 // instead, which is a configured value read and then ignored. Each is refused now, as is a third
 // element. The bare-string spelling this decoder accepted while the config layer delivered one
 // element is refused too: it was never upstream's.
-func DecodeStaticPropertyPlacementOptions(list []byte) (any, error) {
+func DecodeStaticPropertyPlacementOptions(list []byte) (StaticPropertyPlacementOptions, error) {
 	options := DefaultStaticPropertyPlacementOptions()
-	slots, err := rule.OptionElements(list, 2)
-	if err != nil || len(slots) == 0 {
-		return options, err
+	slots, optionElementsError := rule.OptionElements(list, 2)
+	if optionElementsError != nil || len(slots) == 0 {
+		return options, optionElementsError
 	}
 
 	var defaultSpelling string
-	if err := json.Unmarshal(slots[0], &defaultSpelling); err != nil {
+	if decodeError := json.Unmarshal(slots[0], &defaultSpelling); decodeError != nil {
 		return options, fmt.Errorf("static-property-placement element 1 takes a position string, got %s", slots[0])
 	}
 	position, recognised := staticPropertyPlacementPositionFor(defaultSpelling)
@@ -95,8 +95,8 @@ func DecodeStaticPropertyPlacementOptions(list []byte) (any, error) {
 	}
 
 	var overrides map[string]string
-	if err := json.Unmarshal(slots[1], &overrides); err != nil {
-		return options, fmt.Errorf("static-property-placement element 2: %w", err)
+	if decodeError := json.Unmarshal(slots[1], &overrides); decodeError != nil {
+		return options, fmt.Errorf("static-property-placement element 2: %w", decodeError)
 	}
 	for property, spelling := range overrides {
 		if _, isKnown := options.Positions[property]; !isKnown {
@@ -174,7 +174,7 @@ func messageStaticPropertyPlacement(
 // # The six properties, and why the order they are listed in matters
 //
 // `propTypes`, `defaultProps`, `childContextTypes`, `contextTypes`, `contextType`, `displayName`.
-// Upstream finds the FIRST name whose predicate matches and reports under that name, and two of the
+// Upstream finds the first name whose predicate matches and reports under that name, and two of the
 // predicates accept a second spelling: a class field named `props` carrying a type annotation counts
 // as `propTypes`, and one named `context` carrying one counts as `contextTypes`. Keeping upstream's
 // order keeps the reported name identical.
@@ -186,8 +186,8 @@ func messageStaticPropertyPlacement(
 // position the one I am", and additionally, for the two in-class positions, whether the member is
 // actually `static`.
 //
-// The getter arm is narrower than it looks: upstream requires BOTH `static` and `kind === 'get'`
-// before checking anything, so a NON-static getter is silent under every configuration. Measured
+// The getter arm is narrower than it looks: upstream requires both `static` and `kind === 'get'`
+// before checking anything, so a non-static getter is silent under every configuration. Measured
 // against the installed build. That is a gap rather than a decision, and it is reproduced.
 //
 // # Which assignments count
@@ -203,7 +203,7 @@ func messageStaticPropertyPlacement(
 //	class C extends Other {}; C.propTypes = {}               SILENT, not a React class
 //	function C(){}; C.propTypes = {}                         SILENT, not an ES6 class
 //
-// An assignment written INSIDE a class body is skipped entirely, which is upstream's
+// An assignment written inside a class body is skipped entirely, which is upstream's
 // `isContextInClass` walking the scope chain for an enclosing class. Measured silent.
 //
 // # No fix
@@ -212,23 +212,23 @@ func messageStaticPropertyPlacement(
 // spelling: a class field and a getter differ in when the value is evaluated, and an assignment
 // after the class is a different statement entirely. None of the three rewrites is behaviour
 // preserving in general, so none is offered here either.
-var StaticPropertyPlacement = rule.Rule{
+var StaticPropertyPlacement = rule.Rule[StaticPropertyPlacementOptions]{
 	Name:             "react/static-property-placement",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[StaticPropertyPlacementOptions]) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
 		settings := DefaultStaticPropertyPlacementOptions()
-		if configured, isConfigured := rule.OptionsAs[StaticPropertyPlacementOptions](options); isConfigured &&
+		if configured, isConfigured := options.Read(); isConfigured &&
 			configured.Positions != nil {
 			settings = configured
 		}
 
 		// judge is upstream's `reportNodeIncorrectlyPositioned`. The node reports when the
-		// configured position differs from the one this arm represents, OR when the configured
+		// configured position differs from the one this arm represents, or when the configured
 		// position is one of the two in-class ones and the member is not actually static.
 		judge := func(node *ast.Node, propertyName string, arm StaticPropertyPlacementPosition, isStatic bool) {
 			expected, isJudged := settings.Positions[propertyName]
@@ -241,12 +241,12 @@ var StaticPropertyPlacement = rule.Rule{
 			if !mismatched && !notStaticEnough {
 				return
 			}
-			ctx.ReportNode(node, messageStaticPropertyPlacement(expected, propertyName))
+			ruleContext.ReportNode(node, messageStaticPropertyPlacement(expected, propertyName))
 		}
 
 		return rule.Listeners{
 			ast.KindPropertyDeclaration: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 				if !staticPropertyPlacementInReactClass(node) {
@@ -260,10 +260,10 @@ var StaticPropertyPlacement = rule.Rule{
 			},
 
 			ast.KindGetAccessor: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
-				// Upstream requires static AND a getter before it looks at the name at all, so a
+				// Upstream requires static and a getter before it looks at the name at all, so a
 				// non-static getter is silent under every configuration. Measured; reproduced.
 				if !staticPropertyPlacementIsStatic(node) {
 					return
@@ -279,7 +279,7 @@ var StaticPropertyPlacement = rule.Rule{
 			},
 
 			ast.KindBinaryExpression: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 				expression := node.AsBinaryExpression()
@@ -300,7 +300,10 @@ var StaticPropertyPlacement = rule.Rule{
 				if !named {
 					return
 				}
-				if !staticPropertyPlacementReceiverIsReactClass(ctx, target.AsPropertyAccessExpression().Expression) {
+				if !staticPropertyPlacementReceiverIsReactClass(
+					ruleContext,
+					target.AsPropertyAccessExpression().Expression,
+				) {
 					return
 				}
 				// An assignment is never `static`, and upstream passes `node.static` as undefined
@@ -372,7 +375,7 @@ func staticPropertyPlacementInReactClass(member *ast.Node) bool {
 
 // staticPropertyPlacementInsideAClass reports whether a node sits anywhere inside a class body.
 //
-// Upstream's `isContextInClass` walks the SCOPE chain looking for a block that is a class
+// Upstream's `isContextInClass` walks the scope chain looking for a block that is a class
 // declaration, which reaches through nested functions, so an assignment inside a method of a class
 // is skipped. Walking parents reaches the same answer for the same inputs and does not need a scope
 // table.
@@ -399,11 +402,11 @@ func staticPropertyPlacementInsideAClass(node *ast.Node) bool {
 //
 // The loop over declarations rather than an index is the standing hazard in this tree: a merged
 // declaration can put the class at a position other than zero.
-func staticPropertyPlacementReceiverIsReactClass(ctx rule.Context, receiver *ast.Node) bool {
+func staticPropertyPlacementReceiverIsReactClass(ruleContext rule.Context, receiver *ast.Node) bool {
 	if receiver == nil {
 		return false
 	}
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(receiver)
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(receiver)
 	if symbol == nil {
 		return false
 	}

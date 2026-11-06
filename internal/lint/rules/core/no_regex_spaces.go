@@ -33,7 +33,7 @@ var messageRegexSpaces = rule.Message{
 //
 // Three things about this rule are easy to get backwards, and each is a real defect if you do.
 //
-// **At most one finding per regex, and it is the FIRST qualifying run, not the last.** Upstream's
+// **At most one finding per regex, and it is the first qualifying run, not the last.** Upstream's
 // accumulator is named `last_space_span` and does not hold the last run: once a run of two or more
 // has latched, every later run is discarded, and the single space bookkeeping exists only to step
 // past lone spaces on the way to the first real one. So `/  foo   /` reports the leading pair and
@@ -46,7 +46,7 @@ var messageRegexSpaces = rule.Message{
 // one space repeated and `/[  ]/` is a set that happens to name the space twice. The walk carries
 // both depths so this rule can skip either, which is the case `regexpattern` was built for.
 //
-// **The constructor path parses the COOKED string but reports RAW offsets, and it needs both.** For
+// **The constructor path parses the cooked string but reports raw offsets, and it needs both.** For
 // a regex literal the two texts are the same and none of this arises. For the constructor they are
 // not, and each half is load bearing in a different direction.
 //
@@ -85,9 +85,9 @@ var messageRegexSpaces = rule.Message{
 // A pattern the scanner cannot make sense of is skipped rather than reported, matching upstream and
 // for the same reason as the sibling regex rules: an unterminated construct is a syntax error the
 // parser has already refused, so a second complaint here is noise on a file that does not compile.
-var NoRegexSpaces = rule.Rule{
+var NoRegexSpaces = rule.Rule[rule.NoOptions]{
 	Name: "no-regex-spaces",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// reportLiteral walks a regex literal's pattern and reports its first unquantified,
 		// unclassed run of two or more spaces. A literal's source text and the pattern the engine
 		// receives are the same bytes, so no cooking or offset mapping is involved here; the
@@ -106,18 +106,18 @@ var NoRegexSpaces = rule.Rule{
 			}
 
 			runRange := core.NewTextRange(patternStart+start, patternStart+end)
-			ctx.ReportRangeWithFixes(runRange, messageRegexSpaces,
+			ruleContext.ReportRangeWithFixes(runRange, messageRegexSpaces,
 				rule.ReplaceRange(runRange, " {"+strconv.Itoa(end-start)+"}"))
 		}
 
 		// checkConstructor handles both `RegExp(...)` and `new RegExp(...)`, which upstream treats
 		// identically and which differ here only in which node carries the arguments.
 		checkConstructor := func(callee *ast.Node, arguments *ast.NodeList) {
-			callee = ast.SkipParentheses(callee)
-			if callee == nil || callee.Kind != ast.KindIdentifier {
+			unwrapped := ast.SkipParentheses(callee)
+			if unwrapped == nil || unwrapped.Kind != ast.KindIdentifier {
 				return
 			}
-			if callee.AsIdentifier().Text != "RegExp" {
+			if unwrapped.AsIdentifier().Text != "RegExp" {
 				return
 			}
 			if arguments == nil || len(arguments.Nodes) == 0 {
@@ -145,8 +145,8 @@ var NoRegexSpaces = rule.Rule{
 
 			// TokenRange rather than Loc, because Loc starts before leading trivia and would put
 			// both the finding and its fix into whatever precedes the literal.
-			literalRange := rule.TokenRange(ctx.SourceFile, patternNode)
-			raw := ctx.SourceFile.Text()[literalRange.Pos():literalRange.End()]
+			literalRange := rule.TokenRange(ruleContext.SourceFile, patternNode)
+			raw := ruleContext.SourceFile.Text()[literalRange.Pos():literalRange.End()]
 			// The quotes are the literal's delimiters rather than part of the pattern. Anything
 			// shorter than two characters has no body to strip them from.
 			if len(raw) < 2 {
@@ -155,7 +155,7 @@ var NoRegexSpaces = rule.Rule{
 			rawBody := raw[1 : len(raw)-1]
 			cooked := patternNode.AsStringLiteral().Text
 
-			// The gate runs on the RAW body, so a pattern whose adjacent spaces are only spelled
+			// The gate runs on the raw body, so a pattern whose adjacent spaces are only spelled
 			// out never reaches the parse. See the doc comment.
 			if !strings.Contains(rawBody, "  ") {
 				return
@@ -174,7 +174,7 @@ var NoRegexSpaces = rule.Rule{
 			runRange := core.NewTextRange(
 				literalRange.Pos()+1+offsets[start],
 				literalRange.Pos()+1+offsets[end])
-			ctx.ReportRangeWithFixes(runRange, messageRegexSpaces,
+			ruleContext.ReportRangeWithFixes(runRange, messageRegexSpaces,
 				rule.ReplaceRange(runRange, " {"+strconv.Itoa(end-start)+"}"))
 		}
 

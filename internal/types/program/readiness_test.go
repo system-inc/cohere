@@ -11,6 +11,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/lint/testing"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
@@ -23,65 +24,71 @@ import (
 //     fix never reaches anything that could apply it;
 //   - test-set-skips skips b.ts for a missing precondition, which leaves b.ts unmeasured, not ready;
 //   - test-other is no set rule: it reports and is never counted.
-func TestReadinessCountsEverySetRuleAndReportsOnlyTheChainsOwn(t *testing.T) {
-	t.Parallel()
-	directory := writeProject(t, map[string]string{
-		"tsconfig.json":       minimalConfig,
+func TestReadinessCountsEverySetRuleAndReportsOnlyTheChainsOwn(test *testing.T) {
+	test.Parallel()
+	directory := writeProject(test, map[string]string{
+		"tsconfig.json":       minimalConfiguration,
 		"CohereSettings.json": `{"rules": {"test-set-enabled": "error", "test-set-off": "off", "test-set-skips": "error", "test-other": "error"}}`,
 		"a.ts":                "// cohere-disable-next-line test-set-enabled -- suppressed, still counted\nexport const first = 1;\nexport const second = 2;\n",
 		"b.ts":                "export const third = 3;\n",
 	})
-	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory, SingleThreaded: true})
-	if err != nil {
-		t.Fatalf("building: %v", err)
+	graph, buildError := program.Build(
+		program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory, SingleThreaded: true},
+	)
+	if buildError != nil {
+		test.Fatalf("building: %v", buildError)
 	}
-	graph.LintConfig, err = configuration.Load(filepath.Join(directory, "CohereSettings.json"))
-	if err != nil {
-		t.Fatalf("loading the config: %v", err)
+	var loadError error
+	graph.LintConfiguration, loadError = configuration.Load(filepath.Join(directory, "CohereSettings.json"))
+	if loadError != nil {
+		test.Fatalf("loading the config: %v", loadError)
 	}
 	graph.Readiness = &program.Readiness{Options: map[string][]json.RawMessage{
 		"test-set-enabled": nil, "test-set-off": nil, "test-set-skips": nil,
 	}}
 
-	eachConstant := func(id string, fix bool) func(ctx rule.Context, options any) rule.Listeners {
-		return func(ctx rule.Context, options any) rule.Listeners {
+	eachConstant := func(id string, fix bool) func(rule.Context, rule.Given[rule.NoOptions]) rule.Listeners {
+		return func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {
 				message := rule.Message{Id: id, Description: id}
 				if fix {
-					ctx.ReportNodeWithFixes(node, message, ctx.RemoveNode(node))
+					ruleContext.ReportNodeWithFixes(node, message, ruleContext.RemoveNode(node))
 					return
 				}
-				ctx.ReportNode(node, message)
+				ruleContext.ReportNode(node, message)
 			}}
 		}
 	}
-	rules := []rule.Rule{
+	rules := []rule.Rule[rule.NoOptions]{
 		{Name: "test-other", Run: eachConstant("other", false)},
 		{Name: "test-set-enabled", Run: eachConstant("enabled", false)},
 		{Name: "test-set-off", Run: eachConstant("off", true)},
-		{Name: "test-set-skips", Run: func(ctx rule.Context, options any) rule.Listeners {
-			if filepath.Base(ctx.SourceFile.FileName().AsString()) == "b.ts" {
-				ctx.Skip("b.ts lacks what this rule needs")
+		{Name: "test-set-skips", Run: func(ruleContext rule.Context, _ rule.Given[rule.NoOptions]) rule.Listeners {
+			if filepath.Base(ruleContext.SourceFile.FileName().AsString()) == "b.ts" {
+				ruleContext.Skip("b.ts lacks what this rule needs")
 				return nil
 			}
 			return nil
 		}, NoListener: rule.NoListenerAnswersInRun},
 	}
-	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), rules)
-	if err != nil {
-		t.Fatalf("walking: %v", err)
+	result, walkError := graph.Walk(context.Background(), graph.ProjectFiles(), rule_testing.EntriesOf(test, rules...))
+	if walkError != nil {
+		test.Fatalf("walking: %v", walkError)
 	}
 
 	reported := map[string]int{}
 	for _, diagnostic := range result.Diagnostics {
 		reported[diagnostic.RuleName]++
 		if diagnostic.RuleName == "test-set-off" {
-			t.Errorf("a measure-only rule reported %q, which a reader would see and a fix phase could apply", diagnostic.Message.Id)
+			test.Errorf(
+				"a measure-only rule reported %q, which a reader would see and a fix phase could apply",
+				diagnostic.Message.Id,
+			)
 		}
 	}
 	// a.ts's first constant is suppressed for test-set-enabled, so the chain sees one of a.ts's two and b.ts's one.
 	if want := map[string]int{"test-other": 3, "test-set-enabled": 2}; !reflect.DeepEqual(reported, want) {
-		t.Errorf("reported %v, want %v", reported, want)
+		test.Errorf("reported %v, want %v", reported, want)
 	}
 
 	records := map[string]*program.AdamicRecord{}
@@ -89,100 +96,137 @@ func TestReadinessCountsEverySetRuleAndReportsOnlyTheChainsOwn(t *testing.T) {
 		records[filepath.Base(fileName)] = record
 	}
 	want := map[string]*program.AdamicRecord{
-		"a.ts": {Counts: []program.AdamicCount{{Rule: "test-set-enabled", Findings: 2}, {Rule: "test-set-off", Findings: 2}, {Rule: "test-set-skips", Findings: 0}}},
-		"b.ts": {Counts: []program.AdamicCount{{Rule: "test-set-enabled", Findings: 1}, {Rule: "test-set-off", Findings: 1}, {Rule: "test-set-skips", Findings: 0}},
+		"a.ts": {Counts: []program.AdamicCount{
+			{Rule: "test-set-enabled", Findings: 2},
+			{Rule: "test-set-off", Findings: 2},
+			{Rule: "test-set-skips", Findings: 0},
+		}},
+		"b.ts": {Counts: []program.AdamicCount{
+			{Rule: "test-set-enabled", Findings: 1},
+			{Rule: "test-set-off", Findings: 1},
+			{Rule: "test-set-skips", Findings: 0},
+		},
 			Skipped: []string{"test-set-skips"}},
 	}
 	if !reflect.DeepEqual(records, want) {
+		// Ignored: the records are plain structs of strings, numbers and slices, which always marshal.
 		got, _ := json.Marshal(records)
+		// Ignored: the records are plain structs of strings, numbers and slices, which always marshal.
 		expected, _ := json.Marshal(want)
-		t.Errorf("readiness records\n got %s\nwant %s", got, expected)
+		test.Errorf("readiness records\n got %s\nwant %s", got, expected)
 	}
 	if records["b.ts"].Measured() || !records["a.ts"].Measured() {
-		t.Error("a file a set rule skipped must read unmeasured, and one every set rule ran on measured")
+		test.Error("a file a set rule skipped must read unmeasured, and one every set rule ran on measured")
 	}
 	if records["a.ts"].Findings() != 4 {
-		t.Errorf("a.ts totals %d findings, want 4", records["a.ts"].Findings())
+		test.Errorf("a.ts totals %d findings, want 4", records["a.ts"].Findings())
 	}
 	// The measure-only rule's notes stay out of the run's, and its skip-free note set is empty.
 	for fileName, notes := range result.Notes {
 		if _, present := notes["test-set-off"]; present {
-			t.Errorf("%s carries a measure-only rule's notes into the run's", fileName)
+			test.Errorf("%s carries a measure-only rule's notes into the run's", fileName)
 		}
 	}
 }
 
 // TestReadinessOffMeasuresNothing: without Readiness the walk records no measurement and runs no rule
 // the chain leaves off, which is every run before readiness existed.
-func TestReadinessOffMeasuresNothing(t *testing.T) {
-	t.Parallel()
-	directory := writeProject(t, map[string]string{
-		"tsconfig.json":       minimalConfig,
+func TestReadinessOffMeasuresNothing(test *testing.T) {
+	test.Parallel()
+	directory := writeProject(test, map[string]string{
+		"tsconfig.json":       minimalConfiguration,
 		"CohereSettings.json": `{"rules": {"test-set-off": "off", "test-other": "error"}}`,
 		"a.ts":                "export const first = 1;\n",
 	})
-	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory, SingleThreaded: true})
-	if err != nil {
-		t.Fatalf("building: %v", err)
+	graph, buildError := program.Build(
+		program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory, SingleThreaded: true},
+	)
+	if buildError != nil {
+		test.Fatalf("building: %v", buildError)
 	}
-	graph.LintConfig, err = configuration.Load(filepath.Join(directory, "CohereSettings.json"))
-	if err != nil {
-		t.Fatalf("loading the config: %v", err)
+	var loadError error
+	graph.LintConfiguration, loadError = configuration.Load(filepath.Join(directory, "CohereSettings.json"))
+	if loadError != nil {
+		test.Fatalf("loading the config: %v", loadError)
 	}
 	ran := false
-	rules := []rule.Rule{
-		{Name: "test-other", Run: func(ctx rule.Context, options any) rule.Listeners { return nil }, NoListener: rule.NoListenerAnswersInRun},
-		{Name: "test-set-off", Run: func(ctx rule.Context, options any) rule.Listeners { ran = true; return nil }, NoListener: rule.NoListenerAnswersInRun},
+	rules := []rule.Rule[rule.NoOptions]{
+		{
+			Name:       "test-other",
+			Run:        func(rule.Context, rule.Given[rule.NoOptions]) rule.Listeners { return nil },
+			NoListener: rule.NoListenerAnswersInRun,
+		},
+		{
+			Name: "test-set-off",
+			Run: func(rule.Context, rule.Given[rule.NoOptions]) rule.Listeners {
+				ran = true
+				return nil
+			},
+			NoListener: rule.NoListenerAnswersInRun,
+		},
 	}
-	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), rules)
-	if err != nil {
-		t.Fatalf("walking: %v", err)
+	result, walkError := graph.Walk(context.Background(), graph.ProjectFiles(), rule_testing.EntriesOf(test, rules...))
+	if walkError != nil {
+		test.Fatalf("walking: %v", walkError)
 	}
 	if result.Adamic != nil || ran {
-		t.Errorf("with readiness off the walk recorded %v and ran the off rule: %t", result.Adamic, ran)
+		test.Errorf("with readiness off the walk recorded %v and ran the off rule: %t", result.Adamic, ran)
 	}
 }
 
 // TestReadinessRunsATierEnabledSetRuleOncePerFile: a set rule the chain already runs is counted as it
 // reports, never run a second time to measure, so readiness adds nothing to a rule the tier has on (#drbrp8c).
-func TestReadinessRunsATierEnabledSetRuleOncePerFile(t *testing.T) {
-	t.Parallel()
-	directory := writeProject(t, map[string]string{
-		"tsconfig.json":       minimalConfig,
+func TestReadinessRunsATierEnabledSetRuleOncePerFile(test *testing.T) {
+	test.Parallel()
+	directory := writeProject(test, map[string]string{
+		"tsconfig.json":       minimalConfiguration,
 		"CohereSettings.json": `{"rules": {"test-set-enabled": "error"}}`,
 		"a.ts":                "export const first = 1;\n",
 		"b.ts":                "export const second = 2;\n",
 	})
-	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory, SingleThreaded: true})
-	if err != nil {
-		t.Fatalf("building: %v", err)
+	graph, buildError := program.Build(
+		program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory, SingleThreaded: true},
+	)
+	if buildError != nil {
+		test.Fatalf("building: %v", buildError)
 	}
-	graph.LintConfig, err = configuration.Load(filepath.Join(directory, "CohereSettings.json"))
-	if err != nil {
-		t.Fatalf("loading the config: %v", err)
+	var loadError error
+	graph.LintConfiguration, loadError = configuration.Load(filepath.Join(directory, "CohereSettings.json"))
+	if loadError != nil {
+		test.Fatalf("loading the config: %v", loadError)
 	}
 	graph.Readiness = &program.Readiness{Options: map[string][]json.RawMessage{"test-set-enabled": nil}}
 
 	var runs atomic.Int32
-	rules := []rule.Rule{{Name: "test-set-enabled", Run: func(ctx rule.Context, options any) rule.Listeners {
+	rules := []rule.Rule[rule.NoOptions]{{Name: "test-set-enabled", Run: func(
+		ruleContext rule.Context,
+		_ rule.Given[rule.NoOptions],
+	) rule.Listeners {
 		runs.Add(1)
 		return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {
-			ctx.ReportNode(node, rule.Message{Id: "enabled", Description: "enabled"})
+			ruleContext.ReportNode(node, rule.Message{Id: "enabled", Description: "enabled"})
 		}}
 	}}}
-	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), rules)
-	if err != nil {
-		t.Fatalf("walking: %v", err)
+	result, walkError := graph.Walk(context.Background(), graph.ProjectFiles(), rule_testing.EntriesOf(test, rules...))
+	if walkError != nil {
+		test.Fatalf("walking: %v", walkError)
 	}
 	if got := runs.Load(); got != 2 {
-		t.Errorf("the tier-enabled set rule ran %d times over 2 files, want once per file", got)
+		test.Errorf("the tier-enabled set rule ran %d times over 2 files, want once per file", got)
 	}
 	if len(result.Diagnostics) != 2 {
-		t.Errorf("reported %d findings, want each file's one", len(result.Diagnostics))
+		test.Errorf("reported %d findings, want each file's one", len(result.Diagnostics))
 	}
 	for fileName, record := range result.Adamic {
-		if want := []program.AdamicCount{{Rule: "test-set-enabled", Findings: 1}}; !reflect.DeepEqual(record.Counts, want) {
-			t.Errorf("%s counts %v, want %v: the one run's finding, counted", filepath.Base(fileName), record.Counts, want)
+		if want := []program.AdamicCount{
+			{Rule: "test-set-enabled", Findings: 1},
+		}; !reflect.DeepEqual(record.Counts, want) {
+			test.Errorf(
+				"%s counts %v, want %v: the one run's finding, counted",
+				filepath.Base(fileName),
+				record.Counts,
+				want,
+			)
 		}
 	}
 }
@@ -194,47 +238,54 @@ func TestReadinessRunsATierEnabledSetRuleOncePerFile(t *testing.T) {
 // c.ts carries a directive that silences one of its findings. Replayed whole, it is dispatched with no rule to
 // walk so its directive is tallied, and its record must still be the recorded one: an empty walked part read as
 // unmeasured would leave every directive file out of readiness (#kdee854).
-func TestAWarmReplayRunsNoRuleForReadiness(t *testing.T) {
-	t.Parallel()
-	typeAware := typeAwareRule(t)
-	root := writeProject(t, map[string]string{
-		"tsconfig.json":       minimalConfig,
-		"CohereSettings.json": `{"rules": {"test-set-enabled": "error", "test-set-off": "off", "` + typeAware.Name + `": "off"}}`,
-		"a.ts":                "export const first = 1;\nexport const negated = -first;\n",
-		"b.ts":                "export const second = 2;\n",
-		"c.ts":                "// cohere-disable-next-line test-set-enabled -- the directive file\nexport const third = 3;\n",
+func TestAWarmReplayRunsNoRuleForReadiness(test *testing.T) {
+	test.Parallel()
+	typeAware := typeAwareRule(test)
+	root := writeProject(test, map[string]string{
+		"tsconfig.json": minimalConfiguration,
+		"CohereSettings.json": `{"rules": {"test-set-enabled": "error", "test-set-off": "off", "` +
+			typeAware.Name +
+			`": "off"}}`,
+		"a.ts": "export const first = 1;\nexport const negated = -first;\n",
+		"b.ts": "export const second = 2;\n",
+		"c.ts": "// cohere-disable-next-line test-set-enabled -- the directive file\nexport const third = 3;\n",
 	})
 
 	var runs atomic.Int32
-	counted := func(subject rule.Rule) rule.Rule {
-		run := subject.Run
-		subject.Run = func(ctx rule.Context, options any) rule.Listeners {
+	// Counts the runs of a rule's Unconfigured, which is what this walk runs: the config gives no rule options.
+	counted := func(subject rule.Entry) rule.Entry {
+		run := subject.Unconfigured.Run
+		subject.Unconfigured.Run = func(ruleContext rule.Context) rule.Listeners {
 			runs.Add(1)
-			return run(ctx, options)
+			return run(ruleContext)
 		}
 		return subject
 	}
-	eachConstant := func(id string) func(ctx rule.Context, options any) rule.Listeners {
-		return func(ctx rule.Context, options any) rule.Listeners {
+	eachConstant := func(id string) func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		return func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {
-				ctx.ReportNode(node, rule.Message{Id: id, Description: id})
+				ruleContext.ReportNode(node, rule.Message{Id: id, Description: id})
 			}}
 		}
 	}
-	rules := []rule.Rule{
-		counted(rule.Rule{Name: "test-set-enabled", Run: eachConstant("enabled")}),
-		counted(rule.Rule{Name: "test-set-off", Run: eachConstant("off")}),
+	rules := []rule.Entry{
+		counted(rule_testing.EntryOf(test, rule.Rule[rule.NoOptions]{
+			Name: "test-set-enabled",
+			Run:  eachConstant("enabled"),
+		})),
+		counted(rule_testing.EntryOf(test, rule.Rule[rule.NoOptions]{Name: "test-set-off", Run: eachConstant("off")})),
 		counted(typeAware),
 	}
 
 	walk := func(previous *program.LintCache) (program.Result, *program.LintCache) {
-		graph, err := program.Build(program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json")})
-		if err != nil {
-			t.Fatalf("building: %v", err)
+		graph, buildError := program.Build(program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json")})
+		if buildError != nil {
+			test.Fatalf("building: %v", buildError)
 		}
-		graph.LintConfig, err = configuration.Load(filepath.Join(root, "CohereSettings.json"))
-		if err != nil {
-			t.Fatalf("loading the config: %v", err)
+		var loadError error
+		graph.LintConfiguration, loadError = configuration.Load(filepath.Join(root, "CohereSettings.json"))
+		if loadError != nil {
+			test.Fatalf("loading the config: %v", loadError)
 		}
 		graph.Readiness = &program.Readiness{Options: map[string][]json.RawMessage{
 			"test-set-enabled": nil, "test-set-off": nil, typeAware.Name: nil,
@@ -242,9 +293,9 @@ func TestAWarmReplayRunsNoRuleForReadiness(t *testing.T) {
 		reuse := program.NewFindingsReuse(program.HashRuleSet([]string{"fixture"}), previous, program.PathAnchor{})
 		reuse.MeasureReadiness()
 		graph.FindingsReuse = reuse
-		result, err := graph.Walk(context.Background(), graph.ProjectFiles(), rules)
-		if err != nil {
-			t.Fatalf("walking: %v", err)
+		result, walkError := graph.Walk(context.Background(), graph.ProjectFiles(), rules)
+		if walkError != nil {
+			test.Fatalf("walking: %v", walkError)
 		}
 		return result, reuse.Recorded()
 	}
@@ -258,7 +309,7 @@ func TestAWarmReplayRunsNoRuleForReadiness(t *testing.T) {
 
 	cold, recorded := walk(nil)
 	if runs.Load() == 0 {
-		t.Fatal("the recording walk ran no rule, so a warm walk running none proves nothing")
+		test.Fatal("the recording walk ran no rule, so a warm walk running none proves nothing")
 	}
 	measureOnly := false
 	for _, record := range cold.Adamic {
@@ -267,24 +318,29 @@ func TestAWarmReplayRunsNoRuleForReadiness(t *testing.T) {
 		}
 	}
 	if !measureOnly {
-		t.Fatal("the measure-only rule counted nothing on the recording walk, so its replay is untested here")
+		test.Fatal("the measure-only rule counted nothing on the recording walk, so its replay is untested here")
 	}
 
 	runs.Store(0)
 	warm, _ := walk(recorded)
 	if got := runs.Load(); got != 0 {
-		t.Errorf("the warm walk ran rules %d times; readiness rides the findings cache and should run none", got)
+		test.Errorf("the warm walk ran rules %d times; readiness rides the findings cache and should run none", got)
 	}
 	if warm.FilesReplayed != 3 {
-		t.Errorf("the warm walk replayed %d of 3 files; every file's record should serve a run that measures", warm.FilesReplayed)
+		test.Errorf(
+			"the warm walk replayed %d of 3 files; every file's record should serve a run that measures",
+			warm.FilesReplayed,
+		)
 	}
 	if warm.Coverage.Suppressed != cold.Coverage.Suppressed || cold.Coverage.Suppressed == 0 {
-		t.Errorf("c.ts's directive withheld %d findings warm and %d cold; it should withhold one either way",
+		test.Errorf("c.ts's directive withheld %d findings warm and %d cold; it should withhold one either way",
 			warm.Coverage.Suppressed, cold.Coverage.Suppressed)
 	}
 	if !reflect.DeepEqual(recordsOf(cold), recordsOf(warm)) {
+		// Ignored: the records are plain structs of strings, numbers and slices, which always marshal.
 		got, _ := json.Marshal(recordsOf(warm))
+		// Ignored: the records are plain structs of strings, numbers and slices, which always marshal.
 		want, _ := json.Marshal(recordsOf(cold))
-		t.Errorf("the warm walk's records\n got %s\nwant %s", got, want)
+		test.Errorf("the warm walk's records\n got %s\nwant %s", got, want)
 	}
 }

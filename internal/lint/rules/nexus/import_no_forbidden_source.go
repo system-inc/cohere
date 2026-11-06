@@ -69,9 +69,9 @@ var forbiddenSources = []forbiddenSource{
 // module's export shape from inside a rule that cannot see it. Rewriting the string is the part
 // that is always correct; if the bindings also need to change, the compiler says so immediately and
 // a human makes that call with the module in front of them.
-var ImportNoForbiddenSource = rule.Rule{
+var ImportNoForbiddenSource = rule.Rule[rule.NoOptions]{
 	Name: "nexus/import-no-forbidden-source",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// The finding is anchored on the specifier, which is both the thing that gets rewritten and
 		// the thing a reader has to change.
 		//
@@ -83,10 +83,10 @@ var ImportNoForbiddenSource = rule.Rule{
 		// only match the line after itself, so the finding was unreachable by any suppression that
 		// could be written, and it reads as a real finding in every count. Report the node the
 		// original reports.
-		if ctx.SourceFile == nil {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
-		fileName := strings.ReplaceAll(ctx.SourceFile.FileName().AsString(), `\`, "/")
+		fileName := strings.ReplaceAll(ruleContext.SourceFile.FileName().AsString(), `\`, "/")
 		report := func(specifierNode *ast.Node, source string) {
 			for _, forbidden := range forbiddenSources {
 				if source != forbidden.Specifier {
@@ -97,10 +97,10 @@ var ImportNoForbiddenSource = rule.Rule{
 						return
 					}
 				}
-				ctx.ReportNodeWithFixes(
+				ruleContext.ReportNodeWithFixes(
 					specifierNode,
 					rule.Message{Id: forbidden.Message.Id, Description: forbidden.Message.Render(nil)},
-					ctx.ReplaceNode(specifierNode, "'"+forbidden.Replacement+"'"),
+					ruleContext.ReplaceNode(specifierNode, "'"+forbidden.Replacement+"'"),
 				)
 				return
 			}

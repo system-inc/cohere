@@ -35,7 +35,7 @@ const (
 //
 // A bare severity decodes to the zero mode. The rule ignores the mode either way, so there is no
 // default to get wrong.
-func DecodeRadixOptions(raw []byte) (any, error) {
+func DecodeRadixOptions(raw []byte) (RadixMode, error) {
 	if len(raw) == 0 {
 		return RadixMode(""), nil
 	}
@@ -106,16 +106,16 @@ var messageRadixAddRadixParameter10 = rule.Message{
 // # A spread before the radix abandons the call
 //
 // `parseInt(...args)` could be any number of arguments, so nothing can be said about where the radix
-// is, and upstream declines. A spread AFTER the first two positions does not hide anything, which is
+// is, and upstream declines. A spread after the first two positions does not hide anything, which is
 // why `parseInt("10", 1, ...args)` still reports an invalid radix. The index test is upstream's and
 // the boundary is exact.
 //
 // # Shadowing, and where this port is more precise than upstream
 //
 // A local `parseInt` is not the global one, so the rule has nothing to say about it. Upstream asks
-// eslint-scope for the PROGRAM scope's variable and checks whether anything defines it, which makes
+// eslint-scope for the program scope's variable and checks whether anything defines it, which makes
 // its answer whole-file: measured against the installed rule, `{ let parseInt; } parseInt("10");`
-// is CLEAN upstream even though the block-scoped binding cannot reach the call.
+// is clean upstream even though the block-scoped binding cannot reach the call.
 //
 // This port resolves each call site instead, through `resolvesToAGlobal`, so that input reports
 // here. The divergence is deliberate and it is in the direction of reporting a real defect that
@@ -146,27 +146,27 @@ var messageRadixAddRadixParameter10 = rule.Message{
 // radix, and `parseInt("10")` reports `missingRadix` under `"as-needed"` as it does under
 // `"always"`. Both values are accepted here by `DecodeRadixOptions` and ignored the same way, since
 // refusing them would stop a whole run over a config ESLint accepts.
-var Radix = rule.Rule{
+var Radix = rule.Rule[RadixMode]{
 	Name: "radix",
 
 	// The shadow question is which file declares the name, which only resolution can answer.
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[RadixMode]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 				call := node.AsCallExpression()
 				if call == nil || call.Expression == nil {
 					return
 				}
-				if !isAParseIntCallee(ctx, call.Expression) {
+				if !isAParseIntCallee(ruleContext, call.Expression) {
 					return
 				}
-				checkRadixArguments(ctx, node, call)
+				checkRadixArguments(ruleContext, node, call)
 			},
 		}
 	},
@@ -177,28 +177,29 @@ var Radix = rule.Rule{
 // Both spellings of the member form are accepted, since `Number["parseInt"]` and Number[`parseInt`]
 // are the same call and upstream reports all three. A computed access whose key is not a literal
 // string is not, which is what keeps `Number[parseInt]()` clean.
-func isAParseIntCallee(ctx rule.Context, callee *ast.Node) bool {
+func isAParseIntCallee(ruleContext rule.Context, callee *ast.Node) bool {
 	// The optional-call form `parseInt?.()` and the optional-member form `Number?.parseInt()` reach
 	// here as the same node kinds, so nothing special is needed for them. A parenthesized callee
 	// does need unwrapping: `(Number?.parseInt)("10")` is one of upstream's failing cases, and our
 	// parser keeps the parentheses that upstream's folds away.
-	for callee != nil && callee.Kind == ast.KindParenthesizedExpression {
-		callee = callee.AsParenthesizedExpression().Expression
+	unwrapped := callee
+	for unwrapped != nil && unwrapped.Kind == ast.KindParenthesizedExpression {
+		unwrapped = unwrapped.AsParenthesizedExpression().Expression
 	}
-	if callee == nil {
+	if unwrapped == nil {
 		return false
 	}
 
-	switch callee.Kind {
+	switch unwrapped.Kind {
 	case ast.KindIdentifier:
-		return callee.Text() == "parseInt" && resolvesToAGlobal(ctx, callee)
+		return unwrapped.Text() == "parseInt" && resolvesToAGlobal(ruleContext, unwrapped)
 
 	case ast.KindPropertyAccessExpression:
-		access := callee.AsPropertyAccessExpression()
+		access := unwrapped.AsPropertyAccessExpression()
 		// A private name is not a property of `Number`, and `Number.#parseInt()` is one of
 		// upstream's passing cases.
 		//
-		// The KIND half of this guard is EQUIVALENT rather than load bearing, and it is kept
+		// The kind half of this guard is equivalent rather than load bearing, and it is kept
 		// because it states the intent where a reader looks for it and because it does not depend
 		// on how a private name renders. Our parser gives a private identifier a Text() of
 		// `#parseInt`, hash included, so the string comparison below already declines every one of
@@ -208,29 +209,30 @@ func isAParseIntCallee(ctx rule.Context, callee *ast.Node) bool {
 		if access.Name() == nil || access.Name().Kind != ast.KindIdentifier {
 			return false
 		}
-		return access.Name().Text() == "parseInt" && isTheGlobalNumber(ctx, access.Expression)
+		return access.Name().Text() == "parseInt" && isTheGlobalNumber(ruleContext, access.Expression)
 
 	case ast.KindElementAccessExpression:
-		access := callee.AsElementAccessExpression()
+		access := unwrapped.AsElementAccessExpression()
 		return isTheLiteralText(access.ArgumentExpression, "parseInt") &&
-			isTheGlobalNumber(ctx, access.Expression)
+			isTheGlobalNumber(ruleContext, access.Expression)
 	}
 	return false
 }
 
 // isTheGlobalNumber says whether a receiver is the global `Number` rather than something shadowing.
-func isTheGlobalNumber(ctx rule.Context, receiver *ast.Node) bool {
-	for receiver != nil && receiver.Kind == ast.KindParenthesizedExpression {
-		receiver = receiver.AsParenthesizedExpression().Expression
+func isTheGlobalNumber(ruleContext rule.Context, receiver *ast.Node) bool {
+	unwrapped := receiver
+	for unwrapped != nil && unwrapped.Kind == ast.KindParenthesizedExpression {
+		unwrapped = unwrapped.AsParenthesizedExpression().Expression
 	}
-	return receiver != nil && receiver.Kind == ast.KindIdentifier &&
-		receiver.Text() == "Number" && resolvesToAGlobal(ctx, receiver)
+	return unwrapped != nil && unwrapped.Kind == ast.KindIdentifier &&
+		unwrapped.Text() == "Number" && resolvesToAGlobal(ruleContext, unwrapped)
 }
 
 // isTheLiteralText says whether a computed key is a string literal spelling the given name.
 //
 // A template with no substitutions counts, because Number[`parseInt`] is the same call and upstream
-// treats it as one. A template WITH substitutions does not, since its value is not known here.
+// treats it as one. A template with substitutions does not, since its value is not known here.
 func isTheLiteralText(key *ast.Node, name string) bool {
 	if key == nil {
 		return false
@@ -243,7 +245,7 @@ func isTheLiteralText(key *ast.Node, name string) bool {
 }
 
 // checkRadixArguments applies the three judgments in upstream's own order.
-func checkRadixArguments(ctx rule.Context, node *ast.Node, call *ast.CallExpression) {
+func checkRadixArguments(ruleContext rule.Context, node *ast.Node, call *ast.CallExpression) {
 	arguments := []*ast.Node{}
 	if call.Arguments != nil {
 		arguments = call.Arguments.Nodes
@@ -260,14 +262,14 @@ func checkRadixArguments(ctx rule.Context, node *ast.Node, call *ast.CallExpress
 
 	switch {
 	case len(arguments) == 0:
-		ctx.ReportNode(node, messageRadixMissingParameters)
+		ruleContext.ReportNode(node, messageRadixMissingParameters)
 
 	case len(arguments) == 1:
-		ctx.ReportNodeWithSuggestions(node, messageRadixMissingRadix,
-			addRadixSuggestion(ctx, node))
+		ruleContext.ReportNodeWithSuggestions(node, messageRadixMissingRadix,
+			addRadixSuggestion(ruleContext, node))
 
-	case !isAValidRadix(ctx, arguments[1]):
-		ctx.ReportNode(node, messageRadixInvalidRadix)
+	case !isAValidRadix(ruleContext, arguments[1]):
+		ruleContext.ReportNode(node, messageRadixInvalidRadix)
 	}
 }
 
@@ -276,7 +278,7 @@ func checkRadixArguments(ctx rule.Context, node *ast.Node, call *ast.CallExpress
 // Deliberately narrow, matching upstream. Only a literal is judged, plus a numeric literal carrying
 // a leading sign, and a bare `undefined` that resolves to the global. Everything else is accepted,
 // because a rule guessing at a computed value would report correct code.
-func isAValidRadix(ctx rule.Context, radix *ast.Node) bool {
+func isAValidRadix(ruleContext rule.Context, radix *ast.Node) bool {
 	if radix == nil {
 		return true
 	}
@@ -317,18 +319,18 @@ func isAValidRadix(ctx rule.Context, radix *ast.Node) bool {
 		// really is the global one rather than a shadowing parameter. Its own passing case
 		// `function foo(undefined) { parseInt("10", undefined); }` is what says so.
 		//
-		// `resolvesToAGlobal` is deliberately NOT used, and this is the one place in this file
+		// `resolvesToAGlobal` is deliberately not used, and this is the one place in this file
 		// where it would be wrong. It answers false when a symbol carries zero declarations, and
 		// the real global `undefined` has exactly that shape, so it answers false on every input
 		// this arm must report. Probed: a bare `undefined` resolves to a symbol with 0
 		// declarations, while the shadowing parameter resolves to a symbol with 1, declared in
 		// source.
 		//
-		// So the predicate is the complement -- ask whether the name is declared in SOURCE, and
+		// So the predicate is the complement -- ask whether the name is declared in source, and
 		// treat "not declared in source" as the global. Written this way round, a name with no
 		// symbol at all also reads as the global, which is the correct answer for `undefined` in a
 		// file the checker cannot fully resolve.
-		return radix.Text() != "undefined" || isDeclaredInSource(ctx, radix)
+		return radix.Text() != "undefined" || isDeclaredInSource(ruleContext, radix)
 	}
 
 	// Anything else is a value this rule cannot evaluate, and upstream accepts every one of them.
@@ -369,8 +371,8 @@ func integerRadixValue(text string) (int, bool) {
 // The text depends on whether a trailing comma is already there. `parseInt("10",)` becomes
 // `parseInt("10", 10,)` rather than `parseInt("10",, 10)`, which is why the comma is read rather
 // than assumed. Both spellings are in upstream's corpus.
-func addRadixSuggestion(ctx rule.Context, node *ast.Node) rule.Suggestion {
-	source := ctx.SourceFile.Text()
+func addRadixSuggestion(ruleContext rule.Context, node *ast.Node) rule.Suggestion {
+	source := ruleContext.SourceFile.Text()
 
 	// The closing parenthesis, found by walking back from the call's end over trivia. The node's
 	// End() sits just past it.
@@ -407,11 +409,11 @@ func addRadixSuggestion(ctx rule.Context, node *ast.Node) rule.Suggestion {
 // answers false when a symbol carries no declarations, which is the shape of the real `undefined`
 // global, so it answers false on exactly the inputs a rule about `undefined` must report. Asking the
 // question the other way round makes a zero-declaration symbol read as the global, which is right.
-func isDeclaredInSource(ctx rule.Context, identifier *ast.Node) bool {
-	if ctx.TypeChecker == nil {
+func isDeclaredInSource(ruleContext rule.Context, identifier *ast.Node) bool {
+	if ruleContext.TypeChecker == nil {
 		return false
 	}
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(identifier)
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(identifier)
 	if symbol == nil {
 		return false
 	}

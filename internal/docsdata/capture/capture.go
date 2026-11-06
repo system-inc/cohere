@@ -72,22 +72,26 @@ func Write(record Record) error {
 	if directory == "" {
 		return nil
 	}
-	encoded, err := json.Marshal(record)
-	if err != nil {
-		return err
+	encoded, encodeError := json.Marshal(record)
+	if encodeError != nil {
+		return encodeError
 	}
 	writeMutex.Lock()
 	defer writeMutex.Unlock()
 	if output == nil {
-		if err := os.MkdirAll(directory, 0o755); err != nil {
-			return err
+		if createDirectoryError := os.MkdirAll(directory, 0o755); createDirectoryError != nil {
+			return createDirectoryError
 		}
-		file, err := os.OpenFile(filepath.Join(directory, fmt.Sprintf("capture-%d.jsonl", os.Getpid())), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
-		if err != nil {
-			return err
+		file, openError := os.OpenFile(
+			filepath.Join(directory, fmt.Sprintf("capture-%d.jsonl", os.Getpid())),
+			os.O_CREATE|os.O_APPEND|os.O_WRONLY,
+			0o644,
+		)
+		if openError != nil {
+			return openError
 		}
 		output = file
 	}
-	_, err = output.Write(append(encoded, '\n'))
-	return err
+	_, writeError := output.Write(append(encoded, '\n'))
+	return writeError
 }

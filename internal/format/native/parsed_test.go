@@ -24,18 +24,18 @@ const parsedCorpusVariable = "COHERE_PARSE_FROM_CORPUS"
 // @system_cohere_lint_fix in review. Every TypeScript file of the fixtures and of any tree the variable names is
 // formatted twice, with the tree the engine hands its transform and with none, and the outputs, or the errors,
 // must be equal. A tree of other bytes is offered too, and must be refused, printing what no tree prints.
-func TestFormattingFromTheGuardsTreePrintsWhatParsingAgainPrints(t *testing.T) {
-	t.Parallel()
-	roots := []string{moduleRootOf(t)}
+func TestFormattingFromTheGuardsTreePrintsWhatParsingAgainPrints(test *testing.T) {
+	test.Parallel()
+	roots := []string{moduleRootOf(test)}
 	if extra := os.Getenv(parsedCorpusVariable); extra != "" {
 		roots = append(roots, filepath.SplitList(extra)...)
 	}
 	formatter := Formatter{Options: formatoptions.Default()}
 	compared := 0
 	for _, fileName := range typeScriptFilesUnder(roots) {
-		contents, err := os.ReadFile(fileName)
-		if err != nil {
-			t.Fatal(err)
+		contents, readError := os.ReadFile(fileName)
+		if readError != nil {
+			test.Fatal(readError)
 		}
 		text := string(contents)
 
@@ -45,7 +45,13 @@ func TestFormattingFromTheGuardsTreePrintsWhatParsingAgainPrints(t *testing.T) {
 			return given, nil
 		}
 		noProposals := func(string, string) ([]edit.Proposal, error) { return nil, nil }
-		if _, err := edit.FixAndTransformText(fileName, text, noProposals, capture, 1); err != nil || guards == nil {
+		if _, fixAndTransformTextError := edit.FixAndTransformText(
+			fileName,
+			text,
+			noProposals,
+			capture,
+			1,
+		); fixAndTransformTextError != nil || guards == nil {
 			// A file the guard refuses never reaches the formatter.
 			continue
 		}
@@ -53,42 +59,42 @@ func TestFormattingFromTheGuardsTreePrintsWhatParsingAgainPrints(t *testing.T) {
 		reparsed, reparseError := formatter.Format(fileName, text)
 		fromTree, treeError := formatter.FormatParsed(fileName, text, guards)
 		if fromTree != reparsed || errorText(treeError) != errorText(reparseError) {
-			t.Errorf("%s: formatting from the guard's tree printed another result than parsing again", fileName)
+			test.Errorf("%s: formatting from the guard's tree printed another result than parsing again", fileName)
 		}
 		mutant := estree.ParseSourceFile(fileName, " "+text)
 		if fromMutant, mutantError := formatter.FormatParsed(fileName, text, mutant); fromMutant != reparsed ||
 			errorText(mutantError) != errorText(reparseError) {
-			t.Errorf("%s: a tree of other bytes was not refused", fileName)
+			test.Errorf("%s: a tree of other bytes was not refused", fileName)
 		}
 		compared++
 	}
-	t.Logf("%d TypeScript files formatted from the guard's tree and from a parse of their own", compared)
+	test.Logf("%d TypeScript files formatted from the guard's tree and from a parse of their own", compared)
 	if compared < 50 {
-		t.Fatalf("only %d files were compared, too few for agreement to mean anything", compared)
+		test.Fatalf("only %d files were compared, too few for agreement to mean anything", compared)
 	}
 }
 
-func errorText(err error) string {
-	if err == nil {
+func errorText(sourceError error) string {
+	if sourceError == nil {
 		return ""
 	}
-	return err.Error()
+	return sourceError.Error()
 }
 
 // moduleRootOf is the module's root, where the fixtures are.
-func moduleRootOf(t *testing.T) string {
-	t.Helper()
-	directory, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
+func moduleRootOf(test *testing.T) string {
+	test.Helper()
+	directory, workingDirectoryError := os.Getwd()
+	if workingDirectoryError != nil {
+		test.Fatal(workingDirectoryError)
 	}
 	for {
-		if _, err := os.Stat(filepath.Join(directory, "go.mod")); err == nil {
+		if _, statError := os.Stat(filepath.Join(directory, "go.mod")); statError == nil {
 			return directory
 		}
 		parent := filepath.Dir(directory)
 		if parent == directory {
-			t.Fatal("no go.mod above the test's directory")
+			test.Fatal("no go.mod above the test's directory")
 		}
 		directory = parent
 	}
@@ -97,11 +103,20 @@ func moduleRootOf(t *testing.T) string {
 // typeScriptFilesUnder is every .ts and .tsx file under roots, the extensions with a printer that takes a tree,
 // outside dependency, build and cache directories and the TypeScript checkout.
 func typeScriptFilesUnder(roots []string) []string {
-	skipped := map[string]bool{"node_modules": true, ".git": true, ".cache": true, ".next": true, "dist": true, "TypeScript": true}
+	skipped := map[string]bool{
+		"node_modules": true,
+		".git":         true,
+		".cache":       true,
+		".next":        true,
+		"dist":         true,
+		"TypeScript":   true,
+	}
 	var files []string
 	for _, root := range roots {
-		filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
-			if err != nil {
+		// Ignored: the walk skips every path it cannot read and returns only nil or SkipDir, so WalkDir has no
+		// error left to report, and a root that is missing contributes no files.
+		filepath.WalkDir(root, func(path string, entry fs.DirEntry, pathError error) error {
+			if pathError != nil {
 				return nil
 			}
 			if entry.IsDir() {

@@ -1,10 +1,13 @@
 package javascript
 
 import (
+	"fmt"
 	"regexp"
 	"strconv"
 	"unicode"
 
+	"github.com/system-inc/cohere/internal/format/doc"
+	"github.com/system-inc/cohere/internal/format/estree"
 	"github.com/system-inc/cohere/internal/format/printing"
 )
 
@@ -15,12 +18,24 @@ import (
 // set in our configurations, so its branch is not taken.
 func printReturnOrThrowArgument(path *Path, options *Options, print PrintFunc) Doc {
 	current := node(path)
-	argumentDoc := print(nil, nil)
+	argumentDoc := print("", nil)
 	if returnArgumentHasLeadingComment(current, options) {
-		return concatIn(path, "(", indentIn(path, concatIn(path, hardline, argumentDoc)), hardline, ")")
+		return concatIn(
+			path,
+			doc.Text("("),
+			indentIn(path, concatIn(path, hardline, argumentDoc)),
+			hardline,
+			doc.Text(")"),
+		)
 	}
 	if isBinaryish(current) {
-		return groupIn(path, concatIn(path, ifBreak("(", ""), indentIn(path, concatIn(path, softline, argumentDoc)), softline, ifBreak(")", "")))
+		return groupIn(path, concatIn(
+			path,
+			ifBreak(doc.Text("("), doc.Text("")),
+			indentIn(path, concatIn(path, softline, argumentDoc)),
+			softline,
+			ifBreak(doc.Text(")"), doc.Text("")),
+		))
 	}
 	return argumentDoc
 }
@@ -35,11 +50,11 @@ func printReturnOrThrowStatement(path *Path, options *Options, print PrintFunc) 
 	}
 	var argument Doc = emptyDoc
 	if current.Child("argument") != nil {
-		argument = concatIn(path, " ", call(path, func(path *Path) Doc {
+		argument = concatIn(path, doc.Text(" "), call(path, func(path *Path) Doc {
 			return printReturnOrThrowArgument(path, options, print)
 		}, "argument"))
 	}
-	return concatIn(path, keyword, argument, printSemicolon(options))
+	return concatIn(path, textDoc(keyword), argument, printSemicolon(options))
 }
 
 func printReturnStatement(path *Path, options *Options, print PrintFunc) Doc {
@@ -77,22 +92,22 @@ func printVariableDeclaration(path *Path, options *Options, print PrintFunc) Doc
 
 	var first Doc = emptyDoc
 	if firstVariable != nil {
-		first = concatIn(path, " ", firstVariable)
+		first = concatIn(path, doc.Text(" "), firstVariable)
 	}
-	rest := make([]any, 0, len(printed))
+	rest := make([]Doc, 0, len(printed))
 	for _, declaration := range printed[min(1, len(printed)):] {
 		separator := line
 		if hasValue && !isForXStatementInitializer {
 			separator = hardline
 		}
-		rest = append(rest, concatIn(path, ",", separator, declaration))
+		rest = append(rest, concatIn(path, doc.Text(","), separator, declaration))
 	}
 	var semicolon Doc = emptyDoc
 	if !isForXStatementInitializer {
 		semicolon = printSemicolon(options)
 	}
 	return groupIn(path, concatIn(path, printDeclareToken(path),
-		current.String("kind"),
+		textDoc(current.String("kind")),
 		first,
 		indentIn(path, concatIn(path, rest...)),
 		semicolon,
@@ -113,17 +128,17 @@ func shouldIndentSequenceExpression(path *Path, options *Options) bool {
 func printSequenceExpression(path *Path, options *Options, print PrintFunc) Doc {
 	parent := parentOf(path)
 	if parent.Is("ExpressionStatement", "ForStatement") {
-		var parts []any
+		var parts []Doc
 		each(path, func(path *Path, _ int) {
 			if path.IsFirst() {
-				parts = append(parts, print(nil, nil))
+				parts = append(parts, print("", nil))
 			} else {
-				parts = append(parts, ",", indentIn(path, concatIn(path, line, print(nil, nil))))
+				parts = append(parts, doc.Text(","), indentIn(path, concatIn(path, line, print("", nil))))
 			}
 		}, "expressions")
 		return groupIn(path, concatIn(path, parts...))
 	}
-	parts := join(concatIn(path, ",", line), printAll(path, print, "expressions"))
+	parts := join(concatIn(path, doc.Text(","), line), printAll(path, print, "expressions"))
 	if shouldIndentSequenceExpression(path, options) {
 		return groupIn(path, ifBreak(concatIn(path, indentIn(path, concatIn(path, softline, parts)), softline), parts))
 	}
@@ -133,13 +148,13 @@ func printSequenceExpression(path *Path, options *Options, print PrintFunc) Doc 
 // printAwaitExpression is upstream's printAwaitExpression.
 func printAwaitExpression(path *Path, options *Options, print PrintFunc) Doc {
 	current := node(path)
-	parts := []any{"await"}
+	parts := []Doc{doc.Text("await")}
 	if current.Child("argument") != nil {
-		parts = append(parts, " ", print("argument", nil))
+		parts = append(parts, doc.Text(" "), print("argument", nil))
 		parent := parentOf(path)
 		if isCallExpression(parent) && parent.Child("callee") == current ||
 			isMemberExpression(parent) && parent.Child("object") == current {
-			parts = []any{indentIn(path, concatIn(path, append([]any{softline}, parts...)...)), softline}
+			parts = []Doc{indentIn(path, concatIn(path, append([]Doc{softline}, parts...)...)), softline}
 			// avoid printing `await (await` on one line
 			parentAwaitOrBlock, _ := path.FindAncestor(func(node Node) bool {
 				return node.Is("AwaitExpression", "BlockStatement")
@@ -158,7 +173,7 @@ func printAwaitExpression(path *Path, options *Options, print PrintFunc) Doc {
 // printRestOrSpreadElement is upstream's printRestOrSpreadElement, exported upstream as
 // printRestElement and printSpreadElement.
 func printRestOrSpreadElement(path *Path, print PrintFunc) Doc {
-	return concatIn(path, "...", print("argument", nil), printTypeAnnotationProperty(path, print))
+	return concatIn(path, doc.Text("..."), print("argument", nil), printTypeAnnotationProperty(path, print))
 }
 
 func printRestElement(path *Path, print PrintFunc) Doc { return printRestOrSpreadElement(path, print) }
@@ -172,7 +187,7 @@ func printProperty(path *Path, options *Options, print PrintFunc) Doc {
 	if current.Bool("shorthand") {
 		return print("value", nil)
 	}
-	return printAssignment(path, options, print, printKey(path, options, print), ":", "value")
+	return printAssignment(path, options, print, printKey(path, options, print), doc.Text(":"), "value")
 }
 
 // print/key.js. Our parsers are "typescript", "babel" and the JSON ones, and quoteProps is always "as-needed".
@@ -213,8 +228,13 @@ func isKeySafeToQuote(node Node, options *Options) bool {
 		return false
 	}
 	printedNumber := printNumber(getRaw(key))
+	value, isNumber := key.Get("value").(estree.Number)
+	if !isNumber {
+		// Invariant: isNumericLiteral just held, and estree builds every numeric literal with a Number value.
+		panic(fmt.Sprintf("javascript: a numeric literal key's value is a %T, not a Number", key.Get("value")))
+	}
 	// Avoid converting 999999999999999999999 to 1e+21, 0.99999999999999999 to 1 and 1.0 to 1.
-	return javaScriptNumberString(key.Get("value").(float64)) == printedNumber && isSimpleNumber(printedNumber)
+	return javaScriptNumberString(float64(value)) == printedNumber && isSimpleNumber(printedNumber)
 }
 
 // isKeySafeToUnquote is upstream's isKeySafeToUnquote. Of its parsers, ours are "typescript", "babel"
@@ -244,7 +264,12 @@ func isKeySafeToUnquote(node Node, options *Options) bool {
 	// Note: It's also not safe for TypeScript as mentioned above
 	// https://github.com/prettier/prettier/pull/8508
 	if settingsOf(options).Parser == "babel" && !node.Is("ImportAttribute") && isSimpleNumber(value) {
-		number, _ := strconv.ParseFloat(value, 64)
+		number, parseError := strconv.ParseFloat(value, 64)
+		// isSimpleNumber leaves ParseFloat only a range error, a number past float64, where upstream's Number
+		// gives Infinity, which never equals value.
+		if parseError != nil {
+			return false
+		}
 		return javaScriptNumberString(number) == value
 	}
 	return false
@@ -272,7 +297,7 @@ func printKey(path *Path, options *Options, print PrintFunc) Doc {
 	current := node(path)
 	property := getKeyProperty(current)
 	if isComputedKey(current) {
-		return concatIn(path, "[", print(property, nil), "]")
+		return concatIn(path, doc.Text("["), print(property, nil), doc.Text("]"))
 	}
 	if shouldQuoteKey(path, options) {
 		// a -> "a"
@@ -281,10 +306,22 @@ func printKey(path *Path, options *Options, print PrintFunc) Doc {
 		key := getKey(current)
 		name := key.String("name")
 		if !key.Is("Identifier") {
-			name = javaScriptNumberString(key.Get("value").(float64))
+			value, isNumber := key.Get("value").(estree.Number)
+			if !isNumber {
+				// Invariant: shouldQuoteKey held, so isKeySafeToQuote found the key an Identifier or a numeric
+				// literal, and estree builds every numeric literal with a Number value.
+				panic(fmt.Sprintf("javascript: a quoted key's value is a %T, not a Number", key.Get("value")))
+			}
+			name = javaScriptNumberString(float64(value))
 		}
 		printed := printString(jsonStringify(name), options)
-		return call(path, func(path *Path) Doc { return printing.PrintComments(path, concatIn(path, printed), options, nil) }, property)
+		return call(
+			path,
+			func(path *Path) Doc {
+				return printing.PrintComments(path, concatIn(path, textDoc(printed)), options, nil)
+			},
+			property,
+		)
 	}
 	if shouldUnquoteKey(path, options) {
 		value := getKey(current).String("value")
@@ -292,7 +329,13 @@ func printKey(path *Path, options *Options, print PrintFunc) Doc {
 		if leadingDigit.MatchString(value) {
 			printed = printNumber(value)
 		}
-		return call(path, func(path *Path) Doc { return printing.PrintComments(path, concatIn(path, printed), options, nil) }, property)
+		return call(
+			path,
+			func(path *Path) Doc {
+				return printing.PrintComments(path, concatIn(path, textDoc(printed)), options, nil)
+			},
+			property,
+		)
 	}
 	return print(property, nil)
 }
@@ -305,7 +348,10 @@ func isEs5IdentifierName(value string) bool {
 		return false
 	}
 	for index, character := range value {
-		isStart := character == '$' || character == '_' || unicode.IsLetter(character) || unicode.Is(unicode.Nl, character)
+		isStart := character == '$' ||
+			character == '_' ||
+			unicode.IsLetter(character) ||
+			unicode.Is(unicode.Nl, character)
 		if index == 0 {
 			if !isStart {
 				return false

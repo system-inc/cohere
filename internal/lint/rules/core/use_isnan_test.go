@@ -8,8 +8,8 @@ import (
 
 const isNaNFile = "/repository/source/Thing.ts"
 
-func TestUseIsNaNFires(t *testing.T) {
-	t.Parallel()
+func TestUseIsNaNFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -28,9 +28,9 @@ func TestUseIsNaNFires(t *testing.T) {
 		{"parenthesized", "declare const value: number;\nexport const Bad = value === (NaN);\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, UseIsNaN, isNaNFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, UseIsNaN, isNaNFile, testCase.sourceText),
 				"comparisonWithNaN")
 		})
 	}
@@ -42,8 +42,8 @@ func TestUseIsNaNFires(t *testing.T) {
 // Found by applying a finding from no-var to this rule: enumerate the shapes a construct takes
 // before writing the listener. A NaN comparison reaches the tree as a binary expression and as a
 // switch, and the binary listener alone is silent on the second.
-func TestUseIsNaNFiresOnSwitches(t *testing.T) {
-	t.Parallel()
+func TestUseIsNaNFiresOnSwitches(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -69,33 +69,37 @@ func TestUseIsNaNFiresOnSwitches(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, UseIsNaN, isNaNFile, testCase.sourceText), testCase.wantId)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(
+				test,
+				rule_testing.RunTyped(test, UseIsNaN, isNaNFile, testCase.sourceText),
+				testCase.wantId,
+			)
 		})
 	}
 }
 
 // The option is read rather than ignored, in both directions.
-func TestUseIsNaNSwitchOption(t *testing.T) {
-	t.Parallel()
+func TestUseIsNaNSwitchOption(test *testing.T) {
+	test.Parallel()
 
 	source := "declare const value: number;\nexport function run() {\n    switch(value) {\n        case NaN: return 1;\n    }\n    return 0;\n}\n"
 
 	// Default is on, so a config that says nothing gets the rule rather than half of it.
-	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, UseIsNaN, isNaNFile, source), "caseWithNaN")
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, UseIsNaN, isNaNFile, source), "caseWithNaN")
 
 	disabled := false
-	rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, UseIsNaN, isNaNFile, source,
+	rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, UseIsNaN, isNaNFile, source,
 		UseIsNaNOptions{EnforceForSwitchCase: &disabled}))
 
 	enabled := true
-	rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, UseIsNaN, isNaNFile, source,
+	rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, UseIsNaN, isNaNFile, source,
 		UseIsNaNOptions{EnforceForSwitchCase: &enabled}), "caseWithNaN")
 }
 
-func TestUseIsNaNStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestUseIsNaNStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -105,7 +109,10 @@ func TestUseIsNaNStaysSilent(t *testing.T) {
 		// The decision boundary is "does an operand name NaN", and the way to get it wrong is to
 		// match the letters. Each of these contains them and none is the value.
 		{"a similarly named binding", "declare const isNaNLike: boolean;\nexport const Ok = isNaNLike === true;\n"},
-		{"a property named NaN on something else", "declare const table: { NaN: number };\ndeclare const value: number;\nexport const Ok = value === table.NaN;\n"},
+		{
+			"a property named NaN on something else",
+			"declare const table: { NaN: number };\ndeclare const value: number;\nexport const Ok = value === table.NaN;\n",
+		},
 		{"the letters in a string", "declare const value: string;\nexport const Ok = value === 'NaN';\n"},
 		// Not a comparison. Arithmetic with NaN is legal and produces NaN, which is not this
 		// rule's business; only comparisons are always-constant.
@@ -113,20 +120,35 @@ func TestUseIsNaNStaysSilent(t *testing.T) {
 		{"a plain comparison", "declare const value: number;\nexport const Ok = value === 0;\n"},
 		// A switch with no NaN anywhere. The boundary for the switch half is "does a label or the
 		// discriminant name NaN", not "is this a switch".
-		{"a switch without NaN", "declare const value: number;\nexport function run() {\n    switch(value) {\n        case 0: return 1;\n    }\n    return 0;\n}\n"},
-		{"a default clause", "declare const value: number;\nexport function run() {\n    switch(value) {\n        default: return 1;\n    }\n}\n"},
+		{
+			"a switch without NaN",
+			"declare const value: number;\nexport function run() {\n    switch(value) {\n        case 0: return 1;\n    }\n    return 0;\n}\n",
+		},
+		{
+			"a default clause",
+			"declare const value: number;\nexport function run() {\n    switch(value) {\n        default: return 1;\n    }\n}\n",
+		},
 		// A local named NaN or Number is not the global, and upstream is silent on each (#9g0v4j6).
 		// This rule matched by spelling and reported them until it asked the checker, which is why
 		// these run through the typed harness: without a checker the answer is the global.
 		{"a local NaN", "declare const value: number;\nconst NaN = 1;\nexport const Ok = value === NaN;\n"},
-		{"a parameter named NaN", "declare const value: number;\nexport function run(NaN: number) {\n    return value === NaN;\n}\n"},
-		{"a parameter named Number", "declare const value: number;\nexport function run(Number: { NaN: number }) {\n    return value === Number.NaN;\n}\n"},
-		{"a parameter named Number, read in brackets", "declare const value: number;\nexport function run(Number: Record<string, number>) {\n    return value === Number['NaN'];\n}\n"},
+		{
+			"a parameter named NaN",
+			"declare const value: number;\nexport function run(NaN: number) {\n    return value === NaN;\n}\n",
+		},
+		{
+			"a parameter named Number",
+			"declare const value: number;\nexport function run(Number: { NaN: number }) {\n    return value === Number.NaN;\n}\n",
+		},
+		{
+			"a parameter named Number, read in brackets",
+			"declare const value: number;\nexport function run(Number: Record<string, number>) {\n    return value === Number['NaN'];\n}\n",
+		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, UseIsNaN, isNaNFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, UseIsNaN, isNaNFile, testCase.sourceText))
 		})
 	}
 }

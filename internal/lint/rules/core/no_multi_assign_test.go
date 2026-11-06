@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -16,17 +17,17 @@ const multiAssignFile = "/repository/source/MultiAssign.ts"
 //
 // The decoder is the line most likely to have no upstream counterpart, and handing
 // `RunWithOptions` a struct leaves it untested. An empty string means the rule is configured as
-// bare "error", which is what the live config does and what hands the rule nil.
-func decodedMultiAssignOptions(t *testing.T, raw string) any {
-	t.Helper()
+// bare "error", which is what the live config does and what runs the rule unconfigured.
+func decodedMultiAssignOptions(test *testing.T, raw string) rule.Given[NoMultiAssignOptions] {
+	test.Helper()
 	if raw == "" {
-		return nil
+		return rule.Given[NoMultiAssignOptions]{}
 	}
-	options, err := DecodeNoMultiAssignOptions(json.RawMessage(raw))
-	if err != nil {
-		t.Fatalf("the decoder refused %s: %v", raw, err)
+	options, decodeNoMultiAssignOptionsError := DecodeNoMultiAssignOptions(json.RawMessage(raw))
+	if decodeNoMultiAssignOptionsError != nil {
+		test.Fatalf("the decoder refused %s: %v", raw, decodeNoMultiAssignOptionsError)
 	}
-	return options
+	return rule.Configured(options)
 }
 
 // The corpus is ESLint's own, at `tests/lib/rules/no-multi-assign.js`, copied rather than
@@ -38,8 +39,8 @@ func decodedMultiAssignOptions(t *testing.T, raw string) any {
 //
 // Every case string was verified byte against byte against the upstream file by script, and every
 // verdict was reproduced by driving the installed eslint at 10.8.1 before being written here.
-func TestNoMultiAssignFires(t *testing.T) {
-	t.Parallel()
+func TestNoMultiAssignFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -59,23 +60,33 @@ func TestNoMultiAssignFires(t *testing.T) {
 		{"parentheses across lines", "var a =\n((b))\n = (c)", "", 1},
 		{"a string containing an equals sign", "a = b = '=' + c + 'foo';", "", 1},
 		{"an arithmetic right-hand side, bare", "a = b = 7 * 12 + 5;", "", 1},
-		{"a member assignment in a declarator under ignoreNonDeclaration", "const x = {};\nconst y = x.one = 1;", "{\"ignoreNonDeclaration\": true}", 1},
+		{
+			"a member assignment in a declarator under ignoreNonDeclaration",
+			"const x = {};\nconst y = x.one = 1;",
+			"{\"ignoreNonDeclaration\": true}",
+			1,
+		},
 		{"a bare chain under empty options", "let a, b;a = b = 1", "{}", 1},
 		{"a bare chain under an explicit false", "let x, y;x = y = 'baz'", "{\"ignoreNonDeclaration\": false}", 1},
 		{"a declarator chain under ignoreNonDeclaration", "const a = b = 1", "{\"ignoreNonDeclaration\": true}", 1},
 		{"a class field chain", "class C { field = foo = 0 }", "", 1},
-		{"a class field chain under ignoreNonDeclaration", "class C { field = foo = 0 }", "{\"ignoreNonDeclaration\": true}", 1},
+		{
+			"a class field chain under ignoreNonDeclaration",
+			"class C { field = foo = 0 }",
+			"{\"ignoreNonDeclaration\": true}",
+			1,
+		},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			wantIds := make([]string, testCase.wantCount)
 			for index := range wantIds {
 				wantIds[index] = "unexpectedChain"
 			}
-			rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoMultiAssign,
-				multiAssignFile, testCase.sourceText, decodedMultiAssignOptions(t, testCase.options)), wantIds...)
+			rule_testing.ExpectFindings(test, rule_testing.RunGiven(test, NoMultiAssign,
+				multiAssignFile, testCase.sourceText, decodedMultiAssignOptions(test, testCase.options)), wantIds...)
 		})
 	}
 }
@@ -86,8 +97,8 @@ func TestNoMultiAssignFires(t *testing.T) {
 // The last is the sharpest and would be a false positive for any rule anchored on the assignment
 // rather than on its parent: `class C { [foo = 0] = 0 }` holds an assignment whose parent is the
 // computed key rather than the field, so it is not an initializer at all.
-func TestNoMultiAssignStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoMultiAssignStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -104,16 +115,20 @@ func TestNoMultiAssignStaysSilent(t *testing.T) {
 		{"two const declarators in a for head", "for(const a = 0, b = 0;;){}", ""},
 		{"an export with no initializer", "export let a, b;", ""},
 		{"an export with one initializer", "export let a,\n b = 0;", ""},
-		{"member chain under ignoreNonDeclaration", "const x = {};const y = {};x.one = y.one = 1;", "{\"ignoreNonDeclaration\": true}"},
+		{
+			"member chain under ignoreNonDeclaration",
+			"const x = {};const y = {};x.one = y.one = 1;",
+			"{\"ignoreNonDeclaration\": true}",
+		},
 		{"a bare chain under ignoreNonDeclaration", "let a, b;a = b = 1", "{\"ignoreNonDeclaration\": true}"},
 		{"an assignment inside a computed key", "class C { [foo = 0] = 0 }", ""},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoMultiAssign,
-				multiAssignFile, testCase.sourceText, decodedMultiAssignOptions(t, testCase.options)))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunGiven(test, NoMultiAssign,
+				multiAssignFile, testCase.sourceText, decodedMultiAssignOptions(test, testCase.options)))
 		})
 	}
 }
@@ -129,8 +144,8 @@ func TestNoMultiAssignStaysSilent(t *testing.T) {
 // The two parenthesized cases run the opposite way to how the upstream source reads: `.init` and
 // `.right` look like direct field reads that must decline a parenthesized operand, and espree
 // gives parentheses no node so they already see through them.
-func TestNoMultiAssignFiresOnCasesBeyondTheCorpus(t *testing.T) {
-	t.Parallel()
+func TestNoMultiAssignFiresOnCasesBeyondTheCorpus(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -160,22 +175,22 @@ func TestNoMultiAssignFiresOnCasesBeyondTheCorpus(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoMultiAssign,
-				multiAssignFile, testCase.sourceText, nil), "unexpectedChain")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.Run(test, NoMultiAssign,
+				multiAssignFile, testCase.sourceText), "unexpectedChain")
 		})
 	}
 }
 
 // The clean cases beyond the corpus pin the two tests the corpus cannot reach: that the slot is
-// decided by which FIELD of the parent holds the node, and that the OUTER expression has to be
+// decided by which field of the parent holds the node, and that the outer expression has to be
 // an assignment too.
 //
 // `a, b = c` and `a || (b = c)` are both binary expressions holding an assignment, and a rule
 // testing only the parent's kind reports both.
-func TestNoMultiAssignStaysSilentOnCasesBeyondTheCorpus(t *testing.T) {
-	t.Parallel()
+func TestNoMultiAssignStaysSilentOnCasesBeyondTheCorpus(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -191,10 +206,10 @@ func TestNoMultiAssignStaysSilentOnCasesBeyondTheCorpus(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoMultiAssign,
-				multiAssignFile, testCase.sourceText, nil))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoMultiAssign,
+				multiAssignFile, testCase.sourceText))
 		})
 	}
 }
@@ -205,8 +220,8 @@ func TestNoMultiAssignStaysSilentOnCasesBeyondTheCorpus(t *testing.T) {
 //
 // The corpus covers this for two inputs. These four widen it across the compound operators and
 // through the parenthesis skip, both of which sit on the arm the option removes.
-func TestNoMultiAssignIgnoreNonDeclarationDropsOnlyTheBareChain(t *testing.T) {
-	t.Parallel()
+func TestNoMultiAssignIgnoreNonDeclarationDropsOnlyTheBareChain(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -219,12 +234,16 @@ func TestNoMultiAssignIgnoreNonDeclarationDropsOnlyTheBareChain(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoMultiAssign, multiAssignFile,
-				testCase.sourceText, decodedMultiAssignOptions(t, `{"ignoreNonDeclaration": false}`)), "unexpectedChain")
-			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoMultiAssign, multiAssignFile,
-				testCase.sourceText, decodedMultiAssignOptions(t, `{"ignoreNonDeclaration": true}`)))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(
+				test,
+				rule_testing.RunGiven(test, NoMultiAssign, multiAssignFile,
+					testCase.sourceText, decodedMultiAssignOptions(test, `{"ignoreNonDeclaration": false}`)),
+				"unexpectedChain",
+			)
+			rule_testing.ExpectClean(test, rule_testing.RunGiven(test, NoMultiAssign, multiAssignFile,
+				testCase.sourceText, decodedMultiAssignOptions(test, `{"ignoreNonDeclaration": true}`)))
 		})
 	}
 }
@@ -234,13 +253,13 @@ func TestNoMultiAssignIgnoreNonDeclarationDropsOnlyTheBareChain(t *testing.T) {
 // slice the finding names.
 //
 // The parenthesized rows are the reason this test is not optional. `var a = (b) = (((c)))` reports
-// at column 9, which is the `(` of `(b)`, so those parentheses are INSIDE the reported span; and
-// `var a = (b = c);` reports at column 10, which is the `b`, so THOSE parentheses are outside it.
+// at column 9, which is the `(` of `(b)`, so those parentheses are inside the reported span; and
+// `var a = (b = c);` reports at column 10, which is the `b`, so those parentheses are outside it.
 // One rule, two answers, decided by whether the parenthesis belongs to the assignment's operand or
 // wraps the assignment itself. Both fall out of reporting the assignment node, and neither is
 // visible to a message-id assertion.
-func TestNoMultiAssignSpansTheInnerAssignment(t *testing.T) {
-	t.Parallel()
+func TestNoMultiAssignSpansTheInnerAssignment(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name         string
@@ -256,16 +275,17 @@ func TestNoMultiAssignSpansTheInnerAssignment(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoMultiAssign, multiAssignFile, testCase.sourceText, nil)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoMultiAssign, multiAssignFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.wantReported) {
-				t.Fatalf("want %d findings, got %d", len(testCase.wantReported), len(result.Diagnostics))
+				test.Fatalf("want %d findings, got %d", len(testCase.wantReported), len(result.Diagnostics))
 			}
 			for index, want := range testCase.wantReported {
-				reported := testCase.sourceText[result.Diagnostics[index].Range.Pos():result.Diagnostics[index].Range.End()]
+				diagnostic := result.Diagnostics[index]
+				reported := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if reported != want {
-					t.Errorf("finding %d points at %q, want %q", index, reported, want)
+					test.Errorf("finding %d points at %q, want %q", index, reported, want)
 				}
 			}
 		})
@@ -275,12 +295,12 @@ func TestNoMultiAssignSpansTheInnerAssignment(t *testing.T) {
 // The decoder is the line with no upstream counterpart, so it is tested directly rather than only
 // through the fixtures that route past it.
 //
-// The nil row is the one that matters. A rule configured as bare "error" is handed nil options, so
-// the type assertion in the rule yields the zero value. For this rule that happens to be correct,
+// The empty-input row is the one that matters. A rule configured as bare "error" is handed no
+// options, so the rule reads the zero value. For this rule that happens to be correct,
 // because the option defaults to false; the assertion exists so that a later default change fails
 // here rather than silently switching the bare-chain arm off across the whole tree.
-func TestDecodeNoMultiAssignOptions(t *testing.T) {
-	t.Parallel()
+func TestDecodeNoMultiAssignOptions(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name string
@@ -294,53 +314,53 @@ func TestDecodeNoMultiAssignOptions(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			decoded, err := DecodeNoMultiAssignOptions(json.RawMessage(testCase.raw))
-			if err != nil {
-				t.Fatalf("the decoder refused %q: %v", testCase.raw, err)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			decoded, decodeNoMultiAssignOptionsError := DecodeNoMultiAssignOptions(json.RawMessage(testCase.raw))
+			if decodeNoMultiAssignOptionsError != nil {
+				test.Fatalf("the decoder refused %q: %v", testCase.raw, decodeNoMultiAssignOptionsError)
 			}
-			options, isOptions := decoded.(NoMultiAssignOptions)
-			if !isOptions {
-				t.Fatalf("the decoder returned %T rather than NoMultiAssignOptions", decoded)
-			}
-			got := options.IgnoreNonDeclaration != nil && *options.IgnoreNonDeclaration
+			got := decoded.IgnoreNonDeclaration != nil && *decoded.IgnoreNonDeclaration
 			if got != testCase.want {
-				t.Errorf("ignoreNonDeclaration decodes to %v, want %v", got, testCase.want)
+				test.Errorf("ignoreNonDeclaration decodes to %v, want %v", got, testCase.want)
 			}
 		})
 	}
 }
 
-// A rule configured as bare "error" reaches Run with nil rather than with an options struct, and
-// every fixture above that passes nil already exercises that path. This asserts it once explicitly,
-// so the reason is written down: nil must behave as the default rather than as "everything off".
-func TestNoMultiAssignWithNilOptionsUsesTheDefault(t *testing.T) {
-	t.Parallel()
+// A rule configured as bare "error" reaches Run with no options rather than with an options struct,
+// and every fixture above that runs it unconfigured already exercises that path. This asserts it once
+// explicitly, so the reason is written down: no options must behave as the default rather than as
+// "everything off".
+func TestNoMultiAssignWithNilOptionsUsesTheDefault(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectFindings(t,
-		rule_testing.RunWithOptions(t, NoMultiAssign, multiAssignFile, "a = b = c", nil), "unexpectedChain")
+	rule_testing.ExpectFindings(test,
+		rule_testing.Run(test, NoMultiAssign, multiAssignFile, "a = b = c"), "unexpectedChain")
 }
 
 // The message text is asserted against a literal typed here rather than against the rule's own
 // constant, because comparing a diagnostic to the constant it was built from moves both sides
 // together under mutation and asserts nothing.
-func TestNoMultiAssignMessage(t *testing.T) {
-	t.Parallel()
+func TestNoMultiAssignMessage(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunWithOptions(t, NoMultiAssign, multiAssignFile, "var a = b = c;", nil)
+	result := rule_testing.Run(test, NoMultiAssign, multiAssignFile, "var a = b = c;")
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("want one finding, got %d", len(result.Diagnostics))
+		test.Fatalf("want one finding, got %d", len(result.Diagnostics))
 	}
 	if got := result.Diagnostics[0].Message.Id; got != "unexpectedChain" {
-		t.Errorf("message id is %q, want %q", got, "unexpectedChain")
+		test.Errorf("message id is %q, want %q", got, "unexpectedChain")
 	}
-	if got := result.Diagnostics[0].Message.Description; !strings.HasPrefix(got, "This chains one assignment inside another") {
-		t.Errorf("message description starts %q, which is not the sentence this rule reports", got)
+	if got := result.Diagnostics[0].Message.Description; !strings.HasPrefix(
+		got,
+		"This chains one assignment inside another",
+	) {
+		test.Errorf("message description starts %q, which is not the sentence this rule reports", got)
 	}
 }
 
-// An assignment on the LEFT of another assignment, which espree cannot parse at all.
+// An assignment on the left of another assignment, which espree cannot parse at all.
 //
 // `(a = b) = c` is a fatal parse error upstream, invalid assignment target, so eslint reports
 // nothing and the input is not expressible in its corpus. typescript-go recovers and hands back the
@@ -351,8 +371,8 @@ func TestNoMultiAssignMessage(t *testing.T) {
 // `.right` in upstream's selector says even though nothing upstream can exercise it. Recorded as a
 // fixture rather than as a comment because a mutation dropping the right-side test survived every
 // other case in this file: this is the only input that separates them.
-func TestNoMultiAssignStaysSilentOnAnAssignmentTargetTheParserRecovered(t *testing.T) {
-	t.Parallel()
+func TestNoMultiAssignStaysSilentOnAnAssignmentTargetTheParserRecovered(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -363,10 +383,10 @@ func TestNoMultiAssignStaysSilentOnAnAssignmentTargetTheParserRecovered(t *testi
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoMultiAssign,
-				multiAssignFile, testCase.sourceText, nil))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoMultiAssign,
+				multiAssignFile, testCase.sourceText))
 		})
 	}
 }

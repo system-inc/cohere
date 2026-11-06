@@ -1,0 +1,24 @@
+{
+    "rule": "nexus/consistency-no-warning-comment",
+    "firing": {
+        "file": "/project/source/Thing.ts",
+        "source": "// TODO: fix this\nexport const Value = 1;\n",
+        "findings": [
+            {
+                "line": 1,
+                "column": 4,
+                "endLine": 1,
+                "endColumn": 8,
+                "messageId": "warningComment",
+                "message": "\"TODO\" in a comment marks work left for later, and a comment is where that work goes to rot: nothing reminds anyone it is there, and the code around it reads as finished to everyone not looking at this line. Put the task where tasks are tracked, so it is seen and done, and let the comment say only what the code does now. If the word is a mention rather than a task, put it in backticks."
+            }
+        ]
+    },
+    "clean": {
+        "file": "/project/source/Thing.ts",
+        "source": "export const Block = `/* XXX the cache */`;\n"
+    },
+    "assertedMessageIds": [
+        "warningComment"
+    ]
+}

@@ -7,7 +7,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
-// Upstream carries twenty-two message ids for this rule, and every one of them is a PAIR: the same
+// Upstream carries twenty-two message ids for this rule, and every one of them is a pair: the same
 // sentence with and without the project's own `message` appended. The suffix is what varies, never
 // the reasoning, so each builder below takes the custom message and picks between the two ids.
 //

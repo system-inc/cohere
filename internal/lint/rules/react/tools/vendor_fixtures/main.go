@@ -10,8 +10,8 @@
 //
 // The research pass this corpus comes from reported 221 error fixtures. The real number is 325. The
 // cause was a grep anchored at the fixture root, which excluded the nine subdirectories that hold
-// 103 of them — wrong by a third, and it read exactly like a clean result. It was caught only
-// because a parallel investigation returned a different number.
+// 103 of them. It was wrong by a third, and it read exactly like a clean result. It was caught
+// only because a parallel investigation returned a different number.
 //
 // So this tool does not filter by path prefix at any point. It walks the full tree, keys fixtures
 // by their path relative to the fixture root, and reports the top-level and nested split separately
@@ -24,7 +24,8 @@
 // `recursive=1` reports `truncated`, and this tool refuses to proceed when it is true. That check
 // is the difference between a measurement and a guess.
 //
-//	go run ./internal/lint/rules/react/tools/vendor_fixtures -sha <commit> -out internal/react_conformance/testdata/fixtures
+//	go run ./internal/lint/rules/react/tools/vendor_fixtures -sha <commit> \
+//		-out internal/react_conformance/testdata/fixtures
 //
 // Pass -dry-run to report the counts without writing.
 package main
@@ -86,7 +87,11 @@ func main() {
 	out := flag.String("out", "", "directory to write the fixture pairs into (required unless -dry-run)")
 	dryRun := flag.Bool("dry-run", false, "report the counts without writing")
 	expect := flag.Int("expect", expectedFixtureCount, "fixture pairs a correct run finds; a mismatch aborts")
-	expectClean := flag.Int("expect-clean", expectedCleanFixtureCount, "clean fixture pairs a correct run finds; a mismatch aborts")
+	expectClean := flag.Int(
+		"expect-clean",
+		expectedCleanFixtureCount,
+		"clean fixture pairs a correct run finds; a mismatch aborts",
+	)
 	flag.Parse()
 
 	if *sha == "" {
@@ -96,9 +101,9 @@ func main() {
 		fail("-out is required unless -dry-run")
 	}
 
-	names, err := errorFixtureNames(*sha)
-	if err != nil {
-		fail("listing the tree: %v", err)
+	names, errorFixtureNamesError := errorFixtureNames(*sha)
+	if errorFixtureNamesError != nil {
+		fail("listing the tree: %v", errorFixtureNamesError)
 	}
 
 	topLevel, nested := 0, 0
@@ -112,26 +117,36 @@ func main() {
 		subdirectories[path.Dir(name)]++
 	}
 
+	// Ignored: the counts are a report to the terminal, and a failed print changes nothing this tool writes.
 	fmt.Printf("sha              %s\n", *sha)
+	// Ignored: the counts are a report to the terminal, and a failed print changes nothing this tool writes.
 	fmt.Printf("error fixtures   %d  (%d top-level, %d across %d subdirectories)\n",
 		len(names), topLevel, nested, len(subdirectories))
 	for _, directory := range sortedKeys(subdirectories) {
+		// Ignored: the counts are a report to the terminal, and a failed print changes nothing this tool writes.
 		fmt.Printf("                   %-40s %d\n", directory, subdirectories[directory])
 	}
 
 	// A run that found nothing nested is the exact shape of the depth-anchored defect, and it would
 	// otherwise write a corpus two thirds the size and report success.
 	if nested == 0 {
-		fail("found no fixtures in subdirectories at all, which is the signature of a path-anchored filter rather than an empty tree")
+		fail(
+			"found no fixtures in subdirectories at all, which is the signature of a path-anchored filter rather than an empty tree",
+		)
 	}
 	if len(names) != *expect {
-		fail("found %d error fixtures, expected %d; if upstream really changed, read the diff and pass -expect", len(names), *expect)
+		fail(
+			"found %d error fixtures, expected %d; if upstream really changed, read the diff and pass -expect",
+			len(names),
+			*expect,
+		)
 	}
 
-	clean, err := cleanFixtureNames(*sha)
-	if err != nil {
-		fail("listing the clean fixtures: %v", err)
+	clean, cleanFixtureNamesError := cleanFixtureNames(*sha)
+	if cleanFixtureNamesError != nil {
+		fail("listing the clean fixtures: %v", cleanFixtureNamesError)
 	}
+	// Ignored: the counts are a report to the terminal, and a failed print changes nothing this tool writes.
 	fmt.Printf("clean fixtures   %d  (carry %s and expect no error)\n", len(clean), preserveMemoizationPragma)
 
 	// Asserted exactly rather than as a floor. A run collecting zero clean fixtures restores the
@@ -144,24 +159,27 @@ func main() {
 	}
 
 	if *dryRun {
+		// Ignored: the counts are a report to the terminal, and a failed print changes nothing this tool writes.
 		fmt.Println("dry run, nothing written")
 		return
 	}
 
-	written, err := writeFixtures(*sha, append(append([]string(nil), names...), clean...), *out)
-	if err != nil {
-		fail("writing fixtures: %v", err)
+	written, writeFixturesError := writeFixtures(*sha, append(append([]string(nil), names...), clean...), *out)
+	if writeFixturesError != nil {
+		fail("writing fixtures: %v", writeFixturesError)
 	}
+	// Ignored: the counts are a report to the terminal, and a failed print changes nothing this tool writes.
 	fmt.Printf("wrote            %d files (%d pairs) into %s\n", written, written/2, *out)
 }
 
 // errorFixtureNames returns the error-named inputs, relative to the fixture root.
 func errorFixtureNames(sha string) ([]string, error) {
 	url := fmt.Sprintf("https://api.github.com/repos/facebook/react/git/trees/%s?recursive=1", sha)
-	body, err := get(url)
-	if err != nil {
-		return nil, err
+	body, getError := get(url)
+	if getError != nil {
+		return nil, getError
 	}
+	// Ignored: the body was only read, so a failed close loses nothing.
 	defer body.Close()
 
 	var tree struct {
@@ -171,15 +189,17 @@ func errorFixtureNames(sha string) ([]string, error) {
 			Type string `json:"type"`
 		} `json:"tree"`
 	}
-	if err := json.NewDecoder(body).Decode(&tree); err != nil {
-		return nil, err
+	if decodeError := json.NewDecoder(body).Decode(&tree); decodeError != nil {
+		return nil, decodeError
 	}
 
 	// The contents API silently repeats pages when it caps; the tree API says so instead. A
 	// truncated tree is missing files with no way to know which, so this refuses rather than
 	// vendoring a corpus of unknown completeness.
 	if tree.Truncated {
-		return nil, fmt.Errorf("the git tree came back truncated, so the listing is incomplete and any count from it is wrong")
+		return nil, fmt.Errorf(
+			"the git tree came back truncated, so the listing is incomplete and any count from it is wrong",
+		)
 	}
 
 	var names []string
@@ -207,9 +227,9 @@ func errorFixtureNames(sha string) ([]string, error) {
 // and an expectation's error block is in its pair's. Neither question can be answered from a list of
 // paths, which is why this population was invisible to a tool built to filter on names.
 func cleanFixtureNames(sha string) ([]string, error) {
-	contents, err := fixtureContents(sha)
-	if err != nil {
-		return nil, err
+	contents, fixtureContentsError := fixtureContents(sha)
+	if fixtureContentsError != nil {
+		return nil, fixtureContentsError
 	}
 
 	var names []string
@@ -247,27 +267,29 @@ func fixtureContents(sha string) (map[string][]byte, error) {
 		return fixtureContentsCache, nil
 	}
 
-	body, err := get(fmt.Sprintf("https://api.github.com/repos/facebook/react/tarball/%s", sha))
-	if err != nil {
-		return nil, err
+	body, getError := get(fmt.Sprintf("https://api.github.com/repos/facebook/react/tarball/%s", sha))
+	if getError != nil {
+		return nil, getError
 	}
+	// Ignored: the body was only read, so a failed close loses nothing.
 	defer body.Close()
 
-	gzipReader, err := gzip.NewReader(body)
-	if err != nil {
-		return nil, err
+	gzipReader, gzipError := gzip.NewReader(body)
+	if gzipError != nil {
+		return nil, gzipError
 	}
+	// Ignored: the gzip stream was only read, so a failed close loses nothing.
 	defer gzipReader.Close()
 
 	contents := map[string][]byte{}
 	tarReader := tar.NewReader(gzipReader)
 	for {
-		header, err := tarReader.Next()
-		if err == io.EOF {
+		header, nextError := tarReader.Next()
+		if nextError == io.EOF {
 			break
 		}
-		if err != nil {
-			return nil, err
+		if nextError != nil {
+			return nil, nextError
 		}
 		if header.Typeflag != tar.TypeReg {
 			continue
@@ -283,9 +305,9 @@ func fixtureContents(sha string) (map[string][]byte, error) {
 		if !under {
 			continue
 		}
-		file, err := io.ReadAll(tarReader)
-		if err != nil {
-			return nil, err
+		file, readError := io.ReadAll(tarReader)
+		if readError != nil {
+			return nil, readError
 		}
 		contents[name] = file
 	}
@@ -305,9 +327,9 @@ func writeFixtures(sha string, names []string, out string) (int, error) {
 		wanted[strings.TrimSuffix(name, filepath.Ext(name))+".expect.md"] = true
 	}
 
-	contents, err := fixtureContents(sha)
-	if err != nil {
-		return 0, err
+	contents, fixtureContentsError := fixtureContents(sha)
+	if fixtureContentsError != nil {
+		return 0, fixtureContentsError
 	}
 
 	found := map[string]bool{}
@@ -318,11 +340,11 @@ func writeFixtures(sha string, names []string, out string) (int, error) {
 			continue
 		}
 		destination := filepath.Join(out, filepath.FromSlash(name))
-		if err := os.MkdirAll(filepath.Dir(destination), 0o755); err != nil {
-			return written, err
+		if createDirectoryError := os.MkdirAll(filepath.Dir(destination), 0o755); createDirectoryError != nil {
+			return written, createDirectoryError
 		}
-		if err := os.WriteFile(destination, file, 0o644); err != nil {
-			return written, err
+		if writeError := os.WriteFile(destination, file, 0o644); writeError != nil {
+			return written, writeError
 		}
 		found[name] = true
 		written++
@@ -346,9 +368,9 @@ func writeFixtures(sha string, names []string, out string) (int, error) {
 }
 
 func get(url string) (io.ReadCloser, error) {
-	request, err := http.NewRequest(http.MethodGet, url, nil)
-	if err != nil {
-		return nil, err
+	request, newRequestError := http.NewRequest(http.MethodGet, url, nil)
+	if newRequestError != nil {
+		return nil, newRequestError
 	}
 	request.Header.Set("Accept", "application/vnd.github+json")
 	// Unauthenticated GitHub allows 60 requests an hour, which two runs of this tool can exhaust.
@@ -356,11 +378,12 @@ func get(url string) (io.ReadCloser, error) {
 		request.Header.Set("Authorization", "Bearer "+token)
 	}
 
-	response, err := http.DefaultClient.Do(request)
-	if err != nil {
-		return nil, err
+	response, requestError := http.DefaultClient.Do(request)
+	if requestError != nil {
+		return nil, requestError
 	}
 	if response.StatusCode != http.StatusOK {
+		// Ignored: the body is dropped unread for the status error below, so a failed close loses nothing.
 		response.Body.Close()
 		return nil, fmt.Errorf("%s: %s", url, response.Status)
 	}
@@ -377,6 +400,7 @@ func sortedKeys(counts map[string]int) []string {
 }
 
 func fail(format string, arguments ...any) {
+	// Ignored: the process exits next, so a failed write to standard error has nowhere left to be reported.
 	fmt.Fprintf(os.Stderr, "react/vendor_fixtures: "+format+"\n", arguments...)
 	os.Exit(1)
 }

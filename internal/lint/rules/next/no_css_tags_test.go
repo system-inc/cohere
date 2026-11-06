@@ -6,8 +6,8 @@ import (
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
-func TestNoCssTagsReports(t *testing.T) {
-	t.Parallel()
+func TestNoCssTagsReports(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -40,16 +40,16 @@ func TestNoCssTagsReports(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoCssTags, "Component.tsx", testCase.source)
-			rule_testing.ExpectFindings(t, result, messageNoCssTags.Id)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoCssTags, "Component.tsx", testCase.source)
+			rule_testing.ExpectFindings(test, result, messageNoCssTags.Id)
 		})
 	}
 }
 
-func TestNoCssTagsIsSilent(t *testing.T) {
-	t.Parallel()
+func TestNoCssTagsIsSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -96,36 +96,44 @@ func TestNoCssTagsIsSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoCssTags, "Component.tsx", testCase.source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoCssTags, "Component.tsx", testCase.source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
 
-// TestNoCssTagsDecodesEntities reads its attribute as ESLint does, with HTML entities decoded: typescript-estree decodes a
-// JSX attribute string before any rule sees it. Each row's verdict is the installed
+// TestNoCssTagsDecodesEntities reads its attribute as ESLint does, with HTML entities decoded: typescript-estree
+// decodes a JSX attribute string before any rule sees it. Each row's verdict is the installed
 // @next/eslint-plugin-next 16.3.1's under the typescript-eslint parser (#51y9jh2).
-func TestNoCssTagsDecodesEntities(t *testing.T) {
-	t.Parallel()
+func TestNoCssTagsDecodesEntities(test *testing.T) {
+	test.Parallel()
 
 	for _, row := range []struct {
 		name   string
 		source string
 		ids    []string
 	}{
-		{`an encoded letter in rel`, `export const C = () => <link rel="style&#115;heet" href="/a.css" />;`, []string{messageNoCssTags.Id}},
-		{`encoded slashes in an absolute href`, `export const C = () => <link rel="stylesheet" href="https:&#47;&#47;example.com/a.css" />;`, []string{}},
+		{
+			`an encoded letter in rel`,
+			`export const C = () => <link rel="style&#115;heet" href="/a.css" />;`,
+			[]string{messageNoCssTags.Id},
+		},
+		{
+			`encoded slashes in an absolute href`,
+			`export const C = () => <link rel="stylesheet" href="https:&#47;&#47;example.com/a.css" />;`,
+			[]string{},
+		},
 	} {
-		t.Run(row.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoCssTags, "Component.tsx", row.source)
+		test.Run(row.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoCssTags, "Component.tsx", row.source)
 			if len(row.ids) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, row.ids...)
+			rule_testing.ExpectFindings(test, result, row.ids...)
 		})
 	}
 }

@@ -9,44 +9,44 @@ import (
 )
 
 // writeTree makes files under root, creating their directories. A name ending in "/" is a directory.
-func writeTree(t *testing.T, root string, files map[string]string) {
-	t.Helper()
+func writeTree(test *testing.T, root string, files map[string]string) {
+	test.Helper()
 	for name, contents := range files {
 		full := filepath.Join(root, filepath.FromSlash(name))
 		if strings.HasSuffix(name, "/") {
-			if err := os.MkdirAll(full, 0o755); err != nil {
-				t.Fatal(err)
+			if createDirectoryError := os.MkdirAll(full, 0o755); createDirectoryError != nil {
+				test.Fatal(createDirectoryError)
 			}
 			continue
 		}
-		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
-			t.Fatal(err)
+		if createDirectoryError := os.MkdirAll(filepath.Dir(full), 0o755); createDirectoryError != nil {
+			test.Fatal(createDirectoryError)
 		}
-		if err := os.WriteFile(full, []byte(contents), 0o644); err != nil {
-			t.Fatal(err)
+		if writeError := os.WriteFile(full, []byte(contents), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 	}
 }
 
 // decide asks the matcher about one path, entering its directory first.
-func decide(t *testing.T, matcher *Matcher, relativePath string, isDirectory bool) (bool, Source) {
-	t.Helper()
+func decide(test *testing.T, matcher *Matcher, relativePath string, isDirectory bool) (bool, Source) {
+	test.Helper()
 	directory := filepath.ToSlash(filepath.Dir(relativePath))
 	if directory == "." {
 		directory = ""
 	}
-	scope, err := matcher.Enter(directory)
-	if err != nil {
-		t.Fatalf("entering %q: %v", directory, err)
+	scope, enterError := matcher.Enter(directory)
+	if enterError != nil {
+		test.Fatalf("entering %q: %v", directory, enterError)
 	}
 	return scope.Ignored(relativePath, isDirectory)
 }
 
 // Each rule gitignore(5) states, decided on one small tree, with the deciding line named.
-func TestTheMatcherFollowsGitignoreSemantics(t *testing.T) {
-	t.Parallel()
-	root := t.TempDir()
-	writeTree(t, root, map[string]string{
+func TestTheMatcherFollowsGitignoreSemantics(test *testing.T) {
+	test.Parallel()
+	root := test.TempDir()
+	writeTree(test, root, map[string]string{
 		".git/info/exclude": "# a comment\nper-repo\nkept-by-gitignore\n",
 		".gitignore": strings.Join([]string{
 			"*.log",
@@ -71,9 +71,9 @@ func TestTheMatcherFollowsGitignoreSemantics(t *testing.T) {
 		"docs/":                "",
 		"sub/inner/":           "",
 	})
-	matcher, err := New(root)
-	if err != nil {
-		t.Fatal(err)
+	matcher, newGitignoreError := New(root)
+	if newGitignoreError != nil {
+		test.Fatal(newGitignoreError)
 	}
 
 	cases := []struct {
@@ -110,84 +110,88 @@ func TestTheMatcherFollowsGitignoreSemantics(t *testing.T) {
 		{"kept-by-gitignore", false, false, ".gitignore:13:!kept-by-gitignore"},
 	}
 	for _, testCase := range cases {
-		ignored, source := decide(t, matcher, testCase.path, testCase.directory)
+		ignored, source := decide(test, matcher, testCase.path, testCase.directory)
 		gotSource := ""
 		if !source.IsZero() {
 			gotSource = source.String()
 		}
 		if ignored != testCase.wantIgnored || gotSource != testCase.wantSource {
-			t.Errorf("%s (directory %v): got %v by %q, want %v by %q",
+			test.Errorf("%s (directory %v): got %v by %q, want %v by %q",
 				testCase.path, testCase.directory, ignored, gotSource, testCase.wantIgnored, testCase.wantSource)
 		}
 	}
 }
 
 // A file's byte order mark and each line's carriage return are not part of a pattern.
-func TestAByteOrderMarkAndCarriageReturnsAreNotPatternText(t *testing.T) {
-	t.Parallel()
-	root := t.TempDir()
-	writeTree(t, root, map[string]string{".gitignore": "\xEF\xBB\xBFfirst\r\nsecond\r\n"})
-	matcher, err := New(root)
-	if err != nil {
-		t.Fatal(err)
+func TestAByteOrderMarkAndCarriageReturnsAreNotPatternText(test *testing.T) {
+	test.Parallel()
+	root := test.TempDir()
+	writeTree(test, root, map[string]string{".gitignore": "\xEF\xBB\xBFfirst\r\nsecond\r\n"})
+	matcher, newGitignoreError := New(root)
+	if newGitignoreError != nil {
+		test.Fatal(newGitignoreError)
 	}
 	for _, name := range []string{"first", "second"} {
 		if ignored, _ := matcher.Ignored(name, false); !ignored {
-			t.Errorf("%s is not ignored", name)
+			test.Errorf("%s is not ignored", name)
 		}
 	}
 }
 
 // What cannot be read faithfully is refused by name, never skipped.
-func TestAnIgnoreFileThatCannotBeReadIsRefused(t *testing.T) {
-	t.Parallel()
-	t.Run("a symbolic link in the tree", func(t *testing.T) {
-		t.Parallel()
-		root := t.TempDir()
-		writeTree(t, root, map[string]string{"patterns": "x\n", "sub/": ""})
-		if err := os.Symlink("../patterns", filepath.Join(root, "sub", ".gitignore")); err != nil {
-			t.Fatal(err)
+func TestAnIgnoreFileThatCannotBeReadIsRefused(test *testing.T) {
+	test.Parallel()
+	test.Run("a symbolic link in the tree", func(test *testing.T) {
+		test.Parallel()
+		root := test.TempDir()
+		writeTree(test, root, map[string]string{"patterns": "x\n", "sub/": ""})
+		if symlinkError := os.Symlink("../patterns", filepath.Join(root, "sub", ".gitignore")); symlinkError != nil {
+			test.Fatal(symlinkError)
 		}
-		matcher, err := New(root)
-		if err != nil {
-			t.Fatal(err)
+		matcher, newGitignoreError := New(root)
+		if newGitignoreError != nil {
+			test.Fatal(newGitignoreError)
 		}
-		if _, err := matcher.Enter("sub"); err == nil || !strings.Contains(err.Error(), "symbolic link") {
-			t.Fatalf("entering a directory whose .gitignore is a link: %v", err)
-		}
-	})
-	t.Run("a NUL byte", func(t *testing.T) {
-		t.Parallel()
-		root := t.TempDir()
-		writeTree(t, root, map[string]string{".gitignore": "a\x00b\n"})
-		if _, err := New(root); err == nil || !strings.Contains(err.Error(), ".gitignore:1") {
-			t.Fatalf("a NUL byte: %v", err)
+		if _, enterError := matcher.Enter(
+			"sub",
+		); enterError == nil || !strings.Contains(enterError.Error(), "symbolic link") {
+			test.Fatalf("entering a directory whose .gitignore is a link: %v", enterError)
 		}
 	})
-	t.Run("a nested repository", func(t *testing.T) {
-		t.Parallel()
-		root := t.TempDir()
-		writeTree(t, root, map[string]string{"nested/.git/HEAD": "ref: refs/heads/main\n"})
-		matcher, err := New(root)
-		if err != nil {
-			t.Fatal(err)
+	test.Run("a NUL byte", func(test *testing.T) {
+		test.Parallel()
+		root := test.TempDir()
+		writeTree(test, root, map[string]string{".gitignore": "a\x00b\n"})
+		if _, newGitignoreError := New(
+			root,
+		); newGitignoreError == nil || !strings.Contains(newGitignoreError.Error(), ".gitignore:1") {
+			test.Fatalf("a NUL byte: %v", newGitignoreError)
 		}
-		if _, err := matcher.Enter("nested"); !errors.Is(err, ErrNestedRepository) {
-			t.Fatalf("entering a nested repository: %v", err)
+	})
+	test.Run("a nested repository", func(test *testing.T) {
+		test.Parallel()
+		root := test.TempDir()
+		writeTree(test, root, map[string]string{"nested/.git/HEAD": "ref: refs/heads/main\n"})
+		matcher, newGitignoreError := New(root)
+		if newGitignoreError != nil {
+			test.Fatal(newGitignoreError)
+		}
+		if _, enterError := matcher.Enter("nested"); !errors.Is(enterError, ErrNestedRepository) {
+			test.Fatalf("entering a nested repository: %v", enterError)
 		}
 	})
 }
 
 // Asking through the wrong directory's matcher would silently leave out the ignore files between.
-func TestAskingOutsideTheMatchersDirectoryPanics(t *testing.T) {
-	t.Parallel()
-	matcher, err := New(t.TempDir())
-	if err != nil {
-		t.Fatal(err)
+func TestAskingOutsideTheMatchersDirectoryPanics(test *testing.T) {
+	test.Parallel()
+	matcher, newGitignoreError := New(test.TempDir())
+	if newGitignoreError != nil {
+		test.Fatal(newGitignoreError)
 	}
 	defer func() {
 		if recover() == nil {
-			t.Fatal("asking about a/b through the root's matcher did not panic")
+			test.Fatal("asking about a/b through the root's matcher did not panic")
 		}
 	}()
 	matcher.Ignored("a/b", false)
@@ -197,10 +201,10 @@ func TestAskingOutsideTheMatchersDirectoryPanics(t *testing.T) {
 // whose listing holds no `.gitignore` or `.git` is entered without asking the disk, and one whose listing
 // names either is read from the disk as before. The disk here disagrees with the listing on purpose, so each
 // answer shows which of the two was read.
-func TestAListingAnswersOnlyForWhatItShowsAbsent(t *testing.T) {
-	t.Parallel()
-	root := t.TempDir()
-	writeTree(t, root, map[string]string{
+func TestAListingAnswersOnlyForWhatItShowsAbsent(test *testing.T) {
+	test.Parallel()
+	root := test.TempDir()
+	writeTree(test, root, map[string]string{
 		"source/.gitignore":     "generated/\n",
 		"vendor/.git/HEAD":      "ref: refs/heads/main\n",
 		"plain/.gitignore":      "built/\n",
@@ -209,9 +213,9 @@ func TestAListingAnswersOnlyForWhatItShowsAbsent(t *testing.T) {
 	})
 	listings := map[string][]os.DirEntry{}
 	for _, directory := range []string{"source", "vendor", "plain"} {
-		entries, err := os.ReadDir(filepath.Join(root, directory))
-		if err != nil {
-			t.Fatal(err)
+		entries, readDirectoryError := os.ReadDir(filepath.Join(root, directory))
+		if readDirectoryError != nil {
+			test.Fatal(readDirectoryError)
 		}
 		listings[filepath.Join(root, directory)] = entries
 	}
@@ -220,39 +224,42 @@ func TestAListingAnswersOnlyForWhatItShowsAbsent(t *testing.T) {
 	listings[filepath.Join(root, "source")] = nil
 	listings[filepath.Join(root, "vendor")] = nil
 	listings[filepath.Join(root, "plain", "deep")] = nil
-	plain, err := New(root)
-	if err != nil {
-		t.Fatal(err)
+	plain, newGitignoreError := New(root)
+	if newGitignoreError != nil {
+		test.Fatal(newGitignoreError)
 	}
 	listed := plain.WithListing(func(directory string) ([]os.DirEntry, bool) {
 		entries, present := listings[directory]
 		return entries, present
 	})
 
-	if ignored, _ := decide(t, plain, "source/generated", true); !ignored {
-		t.Fatal("the fixture's source/.gitignore does not ignore source/generated on disk")
+	if ignored, _ := decide(test, plain, "source/generated", true); !ignored {
+		test.Fatal("the fixture's source/.gitignore does not ignore source/generated on disk")
 	}
-	if ignored, _ := decide(t, listed, "source/generated", true); ignored {
-		t.Error("a listing showing source holds no .gitignore was not read: its patterns were applied")
+	if ignored, _ := decide(test, listed, "source/generated", true); ignored {
+		test.Error("a listing showing source holds no .gitignore was not read: its patterns were applied")
 	}
-	if _, err := plain.Enter("vendor"); !errors.Is(err, ErrNestedRepository) {
-		t.Fatalf("the fixture's vendor is not refused on disk: %v", err)
+	if _, enterError := plain.Enter("vendor"); !errors.Is(enterError, ErrNestedRepository) {
+		test.Fatalf("the fixture's vendor is not refused on disk: %v", enterError)
 	}
-	if _, err := listed.Enter("vendor"); err != nil {
-		t.Errorf("a listing showing vendor holds no .git was not read: %v", err)
+	if _, enterError := listed.Enter("vendor"); enterError != nil {
+		test.Errorf("a listing showing vendor holds no .git was not read: %v", enterError)
 	}
 	// Named in its listing, or not listed at all: the disk is asked, as without a listing.
 	for _, path := range []string{"plain/built", "unlisted/cache"} {
-		if ignored, _ := decide(t, listed, path, true); !ignored {
-			t.Errorf("%s: a .gitignore the listing names, or in a directory it does not hold, was not read from the disk", path)
+		if ignored, _ := decide(test, listed, path, true); !ignored {
+			test.Errorf(
+				"%s: a .gitignore the listing names, or in a directory it does not hold, was not read from the disk",
+				path,
+			)
 		}
 	}
 	// A matcher Enter makes keeps the listing: plain/deep's `.gitignore` is on disk, and its listing shows none.
-	scope, err := listed.Enter("plain")
-	if err != nil {
-		t.Fatal(err)
+	scope, enterError := listed.Enter("plain")
+	if enterError != nil {
+		test.Fatal(enterError)
 	}
-	if ignored, _ := decide(t, scope, "plain/deep/x", true); ignored {
-		t.Error("a matcher Enter made dropped the listing: plain/deep/.gitignore was read from the disk")
+	if ignored, _ := decide(test, scope, "plain/deep/x", true); ignored {
+		test.Error("a matcher Enter made dropped the listing: plain/deep/.gitignore was read from the disk")
 	}
 }

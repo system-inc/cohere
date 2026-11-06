@@ -18,8 +18,8 @@ import (
  * it was built.
  */
 
-func TestNoMisusedPromisesConditionalsUpstreamCorpus(t *testing.T) {
-	t.Parallel()
+func TestNoMisusedPromisesConditionalsUpstreamCorpus(test *testing.T) {
+	test.Parallel()
 
 	valid, invalid := 0, 0
 	for _, row := range noMisusedPromisesConditionalsCorpus {
@@ -32,9 +32,15 @@ func TestNoMisusedPromisesConditionalsUpstreamCorpus(t *testing.T) {
 			invalid++
 		}
 	}
-	if valid != noMisusedPromisesConditionalsCorpusUpstreamValid || invalid != noMisusedPromisesConditionalsCorpusUpstreamInvalid {
-		t.Fatalf("the corpus holds %d valid and %d invalid upstream rows, and upstream has %d and %d",
-			valid, invalid, noMisusedPromisesConditionalsCorpusUpstreamValid, noMisusedPromisesConditionalsCorpusUpstreamInvalid)
+	if valid != noMisusedPromisesConditionalsCorpusUpstreamValid ||
+		invalid != noMisusedPromisesConditionalsCorpusUpstreamInvalid {
+		test.Fatalf(
+			"the corpus holds %d valid and %d invalid upstream rows, and upstream has %d and %d",
+			valid,
+			invalid,
+			noMisusedPromisesConditionalsCorpusUpstreamValid,
+			noMisusedPromisesConditionalsCorpusUpstreamInvalid,
+		)
 	}
 
 	decode := rule.DecodeOptionsInto[NoMisusedPromisesOptions]()
@@ -43,16 +49,22 @@ func TestNoMisusedPromisesConditionalsUpstreamCorpus(t *testing.T) {
 		if row.edge != "" {
 			name = row.edge
 		}
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			options, err := decode([]byte(row.options))
-			if err != nil {
-				t.Fatalf("decoding %q: %v", row.options, err)
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+			options, decodeError := decode([]byte(row.options))
+			if decodeError != nil {
+				test.Fatalf("decoding %q: %v", row.options, decodeError)
 			}
-			result := rule_testing.RunTypedFilesWithSetupAndOptions(t, NoMisusedPromises, map[string]string{"file.ts": row.source}, "file.ts", options,
+			result := rule_testing.RunTypedFilesWithSetupAndOptions(test, NoMisusedPromises, map[string]string{
+				"file.ts": row.source,
+			}, "file.ts", options,
 				func(directory string) {
-					if err := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(noMisusedPromisesConditionalsCorpusTsconfig), 0o644); err != nil {
-						t.Fatal(err)
+					if writeError := os.WriteFile(
+						filepath.Join(directory, "tsconfig.json"),
+						[]byte(noMisusedPromisesConditionalsCorpusTsconfig),
+						0o644,
+					); writeError != nil {
+						test.Fatal(writeError)
 					}
 				})
 
@@ -68,17 +80,17 @@ func TestNoMisusedPromisesConditionalsUpstreamCorpus(t *testing.T) {
 				})
 			}
 			if fmt.Sprint(reported) != fmt.Sprint(row.findings) {
-				t.Fatalf("the rule reports %q, and typescript-eslint 8.71.0 reports %q", reported, row.findings)
+				test.Fatalf("the rule reports %q, and typescript-eslint 8.71.0 reports %q", reported, row.findings)
 			}
-			rule_testing.RecordAssertedCase(t, result)
+			rule_testing.RecordAssertedCase(test, result)
 		})
 	}
 }
 
 // The object spelling refuses what upstream's schema refuses, before any run: an unknown flagUnions
 // value, and a key beside flagUnions.
-func TestNoMisusedPromisesConditionalsObjectRefusesOtherShapes(t *testing.T) {
-	t.Parallel()
+func TestNoMisusedPromisesConditionalsObjectRefusesOtherShapes(test *testing.T) {
+	test.Parallel()
 
 	decode := rule.DecodeOptionsInto[NoMisusedPromisesOptions]()
 	for _, raw := range []string{
@@ -86,8 +98,8 @@ func TestNoMisusedPromisesConditionalsObjectRefusesOtherShapes(t *testing.T) {
 		`{"checksConditionals": {"flagUnion": "all"}}`,
 		`{"checksConditionals": "all"}`,
 	} {
-		if _, err := decode([]byte(raw)); err == nil {
-			t.Errorf("%s decoded, and upstream's schema refuses it", raw)
+		if _, decodeError := decode([]byte(raw)); decodeError == nil {
+			test.Errorf("%s decoded, and upstream's schema refuses it", raw)
 		}
 	}
 }

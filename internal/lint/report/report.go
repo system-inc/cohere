@@ -10,7 +10,6 @@ package report
 
 import (
 	"fmt"
-	"io"
 	"sort"
 	"strings"
 	"time"
@@ -18,34 +17,11 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
-// Coverage is what a run actually did, as distinct from what it found.
-type Coverage struct {
-	FilesInProgram int
-	FilesChecked   int
-	RulesRun       int
-	GraphWarm      bool
-	Elapsed        time.Duration
-}
-
-// String renders the coverage summary that follows every verdict.
-func (c Coverage) String() string {
-	graph := "graph cold"
-	if c.GraphWarm {
-		graph = "graph warm"
-	}
-	return fmt.Sprintf("%s · %s · %s · %s",
-		formatDuration(c.Elapsed),
-		pluralize(c.FilesChecked, "file", "files"),
-		pluralize(c.RulesRun, "rule", "rules"),
-		graph,
-	)
-}
-
 // Write renders a whole run: every finding, then the verdict and what was covered.
 //
 // It returns whether the run passed, so the caller sets an exit code from the same value the
 // reader sees rather than recomputing it and risking the two disagreeing.
-func Write(out io.Writer, diagnostics []rule.Diagnostic, coverage Coverage) bool {
+func Write(out *strings.Builder, diagnostics []rule.Diagnostic, coverage Coverage) bool {
 	sorted := make([]rule.Diagnostic, len(diagnostics))
 	copy(sorted, diagnostics)
 	sort.SliceStable(sorted, func(first, second int) bool {
@@ -83,7 +59,7 @@ func Write(out io.Writer, diagnostics []rule.Diagnostic, coverage Coverage) bool
 //
 // This is deliberately not a clean result. A tool that cannot check must say so in the same breath
 // it would have said "clean", because the two are otherwise identical from outside.
-func WriteNothingChecked(out io.Writer, reason string) {
+func WriteNothingChecked(out *strings.Builder, reason string) {
 	fmt.Fprintf(out, "✗ cohere checked nothing: %s\n", reason)
 }
 

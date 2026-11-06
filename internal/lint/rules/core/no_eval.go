@@ -104,7 +104,7 @@ var messageNoEval = rule.Message{
 // The cost of that choice is a false positive on a local variable named `window` with an unrelated
 // `eval` property, which nothing in the corpus exercises and which the computed-subscript cases
 // already show the rule declining where the property is not statically `eval`.
-var NoEval = rule.Rule{
+var NoEval = rule.Rule[NoEvalOptions]{
 	Name: "no-eval",
 
 	// See the doc above: the bare-identifier arm's whole discrimination is whether `eval` names the
@@ -112,14 +112,14 @@ var NoEval = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoEvalOptions]) rule.Listeners {
 		allowIndirect := false
-		if typed, ok := rule.OptionsAs[NoEvalOptions](options); ok {
+		if typed, ok := options.Read(); ok {
 			allowIndirect = typed.AllowIndirect
 		}
 
 		report := func(node *ast.Node) {
-			ctx.ReportNode(node, messageNoEval)
+			ruleContext.ReportNode(node, messageNoEval)
 		}
 
 		listeners := rule.Listeners{
@@ -162,7 +162,7 @@ var NoEval = rule.Rule{
 			if !isValueReference(node) {
 				return
 			}
-			if !resolvesToAGlobal(ctx, node) {
+			if !resolvesToAGlobal(ruleContext, node) {
 				return
 			}
 			report(node)
@@ -212,22 +212,23 @@ func isEvalCallee(callee *ast.Node) bool {
 // identity test: `(eval)('foo')` is a direct eval. The span stays on the outer node because that is
 // what upstream's snapshot records for `eval!` and `(eval as any)`.
 func skipCalleeWrappers(node *ast.Node) *ast.Node {
-	for node != nil {
-		switch node.Kind {
+	current := node
+	for current != nil {
+		switch current.Kind {
 		case ast.KindParenthesizedExpression:
-			node = node.AsParenthesizedExpression().Expression
+			current = current.AsParenthesizedExpression().Expression
 		case ast.KindNonNullExpression:
-			node = node.AsNonNullExpression().Expression
+			current = current.AsNonNullExpression().Expression
 		case ast.KindAsExpression:
-			node = node.AsAsExpression().Expression
+			current = current.AsAsExpression().Expression
 		case ast.KindSatisfiesExpression:
-			node = node.AsSatisfiesExpression().Expression
+			current = current.AsSatisfiesExpression().Expression
 		case ast.KindTypeAssertionExpression:
-			node = node.AsTypeAssertion().Expression
+			current = current.AsTypeAssertion().Expression
 		case ast.KindExpressionWithTypeArguments:
-			node = node.AsExpressionWithTypeArguments().Expression
+			current = current.AsExpressionWithTypeArguments().Expression
 		default:
-			return node
+			return current
 		}
 	}
 	return nil

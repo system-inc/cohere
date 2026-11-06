@@ -17,7 +17,7 @@ func graphQlOperationContextCaseName(index int) string {
 // graphQlOperationContextPreamble declares the decorators and the context class the rule keys on.
 //
 // Every fixture needs them, and they have to be real declarations rather than `any`: the rule reads
-// the parameter type's SYMBOL NAME, so a context typed through an unresolved import becomes an error
+// the parameter type's symbol name, so a context typed through an unresolved import becomes an error
 // type whose symbol is not `GraphQlOperationContext`, and every case would report wrongBaseType for
 // a reason that has nothing to do with what it was written to test.
 //
@@ -37,11 +37,11 @@ const graphQlOperationContextPreamble = "declare class GraphQlOperationContext<K
 // TestGraphQlOperationContextMatchesReturnStaysSilent covers the shapes that must not report.
 //
 // There is no upstream corpus for this rule: it is ours, and the TypeScript implementation is the
-// spec. So these cases were written from that source and then CHECKED against it, by driving the
+// spec. So these cases were written from that source and then checked against it, by driving the
 // real ESLint rule over api-phi-health and over seeded files. Where a case's verdict here disagreed
 // with that run, the run won.
-func TestGraphQlOperationContextMatchesReturnStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestGraphQlOperationContextMatchesReturnStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		// The matching shape, which is what the one real call site in api-phi-health looks like.
@@ -53,7 +53,7 @@ func TestGraphQlOperationContextMatchesReturnStaysSilent(t *testing.T) {
 		"class R {\n  @GraphQlQuery(() => ThingOne)\n  async find(@InjectGraphQlOperationContext() c: GraphQlOperationContext<ThingOne>): Promise<Readonly<ThingOne[]>> {\n    void c;\n    return [];\n  }\n}\n",
 		"class R {\n  @GraphQlQuery(() => ThingOne)\n  async find(@InjectGraphQlOperationContext() c: GraphQlOperationContext<ThingOne>): Promise<ThingOne | null> {\n    void c;\n    return null;\n  }\n}\n",
 
-		// The unwrap runs on BOTH sides, so a wrapper on the parameter generic is stripped too.
+		// The unwrap runs on both sides, so a wrapper on the parameter generic is stripped too.
 		"class R {\n  @GraphQlQuery(() => ThingOne)\n  async find(@InjectGraphQlOperationContext() c: GraphQlOperationContext<ThingOne[]>): Promise<ThingOne> {\n    void c;\n    return new ThingOne();\n  }\n}\n",
 
 		// The scope gate. A method carrying no GraphQL operation decorator is out of this rule's
@@ -69,21 +69,21 @@ func TestGraphQlOperationContextMatchesReturnStaysSilent(t *testing.T) {
 		// because there is no generic to compare and guessing one would invent a finding.
 		"class R {\n  @GraphQlQuery(() => ThingOne)\n  async find(@InjectGraphQlOperationContext() c: GraphQlOperationContext<never>): Promise<never> {\n    void c;\n    throw new Error('x');\n  }\n}\n",
 
-		// `Readonly<T>` over a NON-array, which is the only shape that keeps the alias symbol and so
+		// `Readonly<T>` over a non-array, which is the only shape that keeps the alias symbol and so
 		// the only shape that reaches the alias arm of the unwrap. Probed directly: the checker
-		// resolves `Readonly<T[]>` to `ReadonlyArray<T>` with symbol `ReadonlyArray` and NO alias at
+		// resolves `Readonly<T[]>` to `ReadonlyArray<T>` with symbol `ReadonlyArray` and no alias at
 		// all, so the array arm handles it and the readonly fixture above never exercised the arm it
 		// was written for. A mutant deleting that arm survived until these two cases existed.
 		"class R {\n  @GraphQlQuery(() => ThingOne)\n  async find(@InjectGraphQlOperationContext() c: GraphQlOperationContext<ThingOne>): Promise<Readonly<ThingOne>> {\n    void c;\n    return new ThingOne();\n  }\n}\n",
 		"class R {\n  @GraphQlQuery(() => ThingOne)\n  async find(@InjectGraphQlOperationContext() c: GraphQlOperationContext<Readonly<ThingOne>>): Promise<ThingOne> {\n    void c;\n    return new ThingOne();\n  }\n}\n",
 
-		// A union of two non-nullish members on BOTH sides. The union arm collapses only when
+		// A union of two non-nullish members on both sides. The union arm collapses only when
 		// exactly one member survives the nullish filter, so a real two-member union is left intact
 		// and compares equal to itself. Its asymmetric sibling reports and is in the fires list; the
 		// pair is what pins the `== 1` rather than `>= 1`.
 		"class R {\n  @GraphQlQuery(() => ThingOne)\n  async find(@InjectGraphQlOperationContext() c: GraphQlOperationContext<ThingOne | ThingTwo>): Promise<ThingOne | ThingTwo> {\n    void c;\n    return new ThingOne();\n  }\n}\n",
 
-		// The decorator on something that is NOT a parameter, inside a local class declared in an
+		// The decorator on something that is not a parameter, inside a local class declared in an
 		// operation method. This is the one shape that reaches past the enclosing-method walk with a
 		// non-parameter owner, and it is what makes the parameter kind guard load-bearing rather
 		// than defensive.
@@ -91,7 +91,7 @@ func TestGraphQlOperationContextMatchesReturnStaysSilent(t *testing.T) {
 		// The obvious placements do not test it. A decorator on a class, a method, a property or an
 		// accessor at the top level all reach this listener with a non-parameter parent, measured,
 		// and all four are then declined by the enclosing-method walk because a class member has no
-		// enclosing method. Only a local class INSIDE a method finds one, and without the guard the
+		// enclosing method. Only a local class inside a method finds one, and without the guard the
 		// rule reports a bogus mismatch on its property and a bogus wrongBaseType on its method.
 		//
 		// Silent upstream, measured: the original's resolveDecoratedParameterNode answers null for
@@ -100,9 +100,9 @@ func TestGraphQlOperationContextMatchesReturnStaysSilent(t *testing.T) {
 		"class R {\n  @GraphQlQuery(() => ThingOne)\n  async find(): Promise<ThingOne> {\n    class Inner {\n      @InjectGraphQlOperationContext()\n      m(): GraphQlOperationContext<ThingTwo> {\n        return null as never;\n      }\n    }\n    void Inner;\n    return new ThingOne();\n  }\n}\n",
 	}
 	for index, sourceText := range cases {
-		t.Run(graphQlOperationContextCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, GraphQlOperationContextMatchesReturn,
+		test.Run(graphQlOperationContextCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, GraphQlOperationContextMatchesReturn,
 				graphQlOperationContextFile, graphQlOperationContextPreamble+sourceText))
 		})
 	}
@@ -113,8 +113,8 @@ func TestGraphQlOperationContextMatchesReturnStaysSilent(t *testing.T) {
 //
 // Both messages interpolate a type name through the checker and the mismatch message interpolates
 // two, so a substring predicate could not tell a correct finding from one naming the wrong types.
-func TestGraphQlOperationContextMatchesReturnFires(t *testing.T) {
-	t.Parallel()
+func TestGraphQlOperationContextMatchesReturnFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText  string
@@ -131,7 +131,7 @@ func TestGraphQlOperationContextMatchesReturnFires(t *testing.T) {
 			wantSpan:    "@InjectGraphQlOperationContext() c: GraphQlOperationContext<ThingTwo>",
 		},
 
-		// A SUBTYPE, which is why the comparison is bidirectional. `Derived` is assignable to
+		// A subtype, which is why the comparison is bidirectional. `Derived` is assignable to
 		// `ThingOne` but not the reverse, so one direction alone would let this through, and a
 		// resolver reading a Derived selection set while returning a ThingOne is the defect.
 		{
@@ -183,8 +183,8 @@ func TestGraphQlOperationContextMatchesReturnFires(t *testing.T) {
 			wantSpan:    "@InjectGraphQlOperationContext() c: GraphQlOperationContext<ThingTwo>",
 		},
 
-		// A two-member union against a single type. Taking the FIRST non-nullish member rather than
-		// requiring the ONLY one would collapse this union to `ThingOne` and call it a match, which
+		// A two-member union against a single type. Taking the first non-nullish member rather than
+		// requiring the only one would collapse this union to `ThingOne` and call it a match, which
 		// is a real selection-set difference reported as agreement. Measured against the ESLint rule
 		// on a seeded file: same finding, same rendered text.
 		{
@@ -195,25 +195,25 @@ func TestGraphQlOperationContextMatchesReturnFires(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(graphQlOperationContextCaseName(index), func(t *testing.T) {
-			t.Parallel()
+		test.Run(graphQlOperationContextCaseName(index), func(test *testing.T) {
+			test.Parallel()
 			sourceText := graphQlOperationContextPreamble + testCase.sourceText
-			result := rule_testing.RunTyped(t, GraphQlOperationContextMatchesReturn,
+			result := rule_testing.RunTyped(test, GraphQlOperationContextMatchesReturn,
 				graphQlOperationContextFile, sourceText)
 
-			rule_testing.ExpectFindings(t, result, testCase.wantId)
+			rule_testing.ExpectFindings(test, result, testCase.wantId)
 
 			// RunTyped writes the fixture trimmed, so the span slice is against that text.
 			onDisk := strings.TrimSpace(sourceText) + "\n"
 			diagnostic := result.Diagnostics[0]
 
 			if diagnostic.Message.Description != testCase.wantMessage {
-				t.Fatalf("message: expected %q, got %q", testCase.wantMessage,
+				test.Fatalf("message: expected %q, got %q", testCase.wantMessage,
 					diagnostic.Message.Description)
 			}
 			gotSpan := onDisk[diagnostic.Range.Pos():diagnostic.Range.End()]
 			if gotSpan != testCase.wantSpan {
-				t.Fatalf("span: expected %q, got %q", testCase.wantSpan, gotSpan)
+				test.Fatalf("span: expected %q, got %q", testCase.wantSpan, gotSpan)
 			}
 		})
 	}
@@ -221,20 +221,20 @@ func TestGraphQlOperationContextMatchesReturnFires(t *testing.T) {
 
 // TestGraphQlOperationContextMatchesReturnRequiresTheTypedHarness pins that the rule declines rather
 // than crashing without a checker, which no other test here can reach.
-func TestGraphQlOperationContextMatchesReturnRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestGraphQlOperationContextMatchesReturnRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	if !GraphQlOperationContextMatchesReturn.NeedsTypeChecker {
-		t.Fatal("the rule must declare NeedsTypeChecker: both sides of its comparison are types")
+		test.Fatal("the rule must declare NeedsTypeChecker: both sides of its comparison are types")
 	}
 
 	sourceText := graphQlOperationContextPreamble +
 		"class R {\n  @GraphQlQuery(() => ThingOne)\n  async find(@InjectGraphQlOperationContext() c: GraphQlOperationContext<ThingTwo>): Promise<ThingOne> {\n    void c;\n    return new ThingOne();\n  }\n}\n"
 
-	rule_testing.ExpectClean(t, rule_testing.Run(t, GraphQlOperationContextMatchesReturn,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, GraphQlOperationContextMatchesReturn,
 		graphQlOperationContextFile, sourceText))
 
 	// The control, so the silence above is the guard declining rather than the rule being blind.
-	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, GraphQlOperationContextMatchesReturn,
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, GraphQlOperationContextMatchesReturn,
 		graphQlOperationContextFile, sourceText), "mismatch")
 }

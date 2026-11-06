@@ -17,14 +17,14 @@ var indexedAccessWriteText = policy.MessageOf("adamic/no-indexed-access-write", 
 // tsc 6.0.3 / Node 24 probe instantiates 1, stores 2, and throws reading names[one].
 // This is a separate rule: a readonly primitive slot has no mutable container to widen.
 // The wider ruling about all parameter-retaining relations awaits a Node probe per shape.
-var NoIndexedAccessWrite = rule.Rule{
+var NoIndexedAccessWrite = rule.Rule[rule.NoOptions]{
 	Name:             "adamic/no-indexed-access-write",
 	NeedsTypeChecker: true,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.TypeChecker == nil || ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		if ruleContext.TypeChecker == nil || ruleContext.SourceFile == nil {
 			return nil
 		}
-		walker := flow.WalkerFor(ctx)
+		walker := flow.WalkerFor(ruleContext)
 		var sourceRoot *checker.Type
 		judge := func(pair flow.Pair) (bool, bool) {
 			if !flow.IsTypeParameterIndexedAccess(pair.Target) {
@@ -33,19 +33,19 @@ var NoIndexedAccessWrite = rule.Rule{
 			if pair.Source.Flags()&checker.TypeFlagsNever != 0 {
 				return false, false
 			}
-			if projectsIndexedAccess(ctx.TypeChecker, sourceRoot, pair.Target, pair.Path) ||
-				returnsIndexedAccess(ctx.TypeChecker, sourceRoot, pair.Target, pair.Path) {
+			if projectsIndexedAccess(ruleContext.TypeChecker, sourceRoot, pair.Target, pair.Path) ||
+				returnsIndexedAccess(ruleContext.TypeChecker, sourceRoot, pair.Target, pair.Path) {
 				return false, false
 			}
 			same := pair.Source.Flags()&checker.TypeFlagsIndexedAccess != 0 &&
-				checker.Checker_isTypeIdenticalTo(ctx.TypeChecker, pair.Source, pair.Target)
+				checker.Checker_isTypeIdenticalTo(ruleContext.TypeChecker, pair.Source, pair.Target)
 			return !same, false
 		}
 		return walker.Listeners(func(site flow.Site) {
 			// Spreads can copy a concrete property into T[K]; contextual methods can
 			// return one or accept one through a bivariant parameter. Their Node probes
 			// are spread.ts, method-return.ts and method-argument.ts (#xzpba0r).
-			if readsIndexedAccess(ctx.TypeChecker, site.Node, site.Target) {
+			if readsIndexedAccess(ruleContext.TypeChecker, site.Node, site.Target) {
 				return
 			}
 			sourceRoot = site.Source
@@ -53,16 +53,16 @@ var NoIndexedAccessWrite = rule.Rule{
 			if !wrong {
 				return
 			}
-			constraint := checker.Checker_getBaseConstraintOfType(ctx.TypeChecker, found.Target)
+			constraint := checker.Checker_getBaseConstraintOfType(ruleContext.TypeChecker, found.Target)
 			constraintText := "unknown"
 			if constraint != nil {
-				constraintText = type_checking.StableTypeText(ctx.TypeChecker, constraint)
+				constraintText = type_checking.StableTypeText(ruleContext.TypeChecker, constraint)
 			}
-			ctx.ReportNode(site.Node, rule.Message{
+			ruleContext.ReportNode(site.Node, rule.Message{
 				Id: "indexedAccessWrite",
 				Description: indexedAccessWriteText.Render(map[string]string{
-					"slot":       type_checking.StableTypeText(ctx.TypeChecker, found.Target),
-					"source":     type_checking.StableTypeText(ctx.TypeChecker, found.Source),
+					"slot":       type_checking.StableTypeText(ruleContext.TypeChecker, found.Target),
+					"source":     type_checking.StableTypeText(ruleContext.TypeChecker, found.Source),
 					"constraint": constraintText,
 				}),
 			})
@@ -78,27 +78,35 @@ func readsIndexedAccess(typeChecker *checker.Checker, node *ast.Node, target *ch
 	if node == nil || !flow.IsTypeParameterIndexedAccess(target) {
 		return false
 	}
-	node = ast.SkipParentheses(node)
+	unwrapped := ast.SkipParentheses(node)
 	access := target.AsIndexedAccessType()
 	var receiver *ast.Node
-	switch node.Kind {
+	switch unwrapped.Kind {
 	case ast.KindPropertyAccessExpression:
-		property := node.AsPropertyAccessExpression()
+		property := unwrapped.AsPropertyAccessExpression()
 		key := access.IndexType()
 		if key.Flags()&checker.TypeFlagsStringLiteral == 0 || key.AsLiteralType().Value() != property.Name().Text() {
 			return false
 		}
 		receiver = property.Expression
 	case ast.KindElementAccessExpression:
-		element := node.AsElementAccessExpression()
-		if !checker.Checker_isTypeIdenticalTo(typeChecker, typeChecker.GetTypeAtLocation(element.ArgumentExpression), access.IndexType()) {
+		element := unwrapped.AsElementAccessExpression()
+		if !checker.Checker_isTypeIdenticalTo(
+			typeChecker,
+			typeChecker.GetTypeAtLocation(element.ArgumentExpression),
+			access.IndexType(),
+		) {
 			return false
 		}
 		receiver = element.Expression
 	default:
 		return false
 	}
-	return checker.Checker_isTypeIdenticalTo(typeChecker, typeChecker.GetTypeAtLocation(receiver), access.ObjectType()) ||
+	return checker.Checker_isTypeIdenticalTo(
+		typeChecker,
+		typeChecker.GetTypeAtLocation(receiver),
+		access.ObjectType(),
+	) ||
 		readsIndexedAccess(typeChecker, receiver, access.ObjectType())
 }
 
@@ -109,18 +117,19 @@ func projectsIndexedAccess(typeChecker *checker.Checker, source, target *checker
 	if source == nil || len(path) == 0 {
 		return false
 	}
-	for i := len(path) - 1; i >= 0; i-- {
-		if target.Flags()&checker.TypeFlagsIndexedAccess == 0 || path[i].Kind != flow.StepProperty {
+	walked := target
+	for index := len(path) - 1; index >= 0; index-- {
+		if walked.Flags()&checker.TypeFlagsIndexedAccess == 0 || path[index].Kind != flow.StepProperty {
 			return false
 		}
-		access := target.AsIndexedAccessType()
+		access := walked.AsIndexedAccessType()
 		key := access.IndexType()
-		if key.Flags()&checker.TypeFlagsStringLiteral == 0 || key.AsLiteralType().Value() != path[i].Name {
+		if key.Flags()&checker.TypeFlagsStringLiteral == 0 || key.AsLiteralType().Value() != path[index].Name {
 			return false
 		}
-		target = access.ObjectType()
+		walked = access.ObjectType()
 	}
-	return checker.Checker_isTypeIdenticalTo(typeChecker, source, target)
+	return checker.Checker_isTypeIdenticalTo(typeChecker, source, walked)
 }
 
 // An inferred function returning source.value has a number return type in tsgo,
@@ -130,17 +139,18 @@ func returnsIndexedAccess(typeChecker *checker.Checker, source, target *checker.
 	if source == nil || len(path) == 0 || path[len(path)-1].Kind != flow.StepReturn {
 		return false
 	}
+	walked := source
 	for _, step := range path[:len(path)-1] {
 		if step.Kind != flow.StepProperty {
 			return false
 		}
-		property := checker.Checker_getPropertyOfType(typeChecker, source, step.Name)
+		property := checker.Checker_getPropertyOfType(typeChecker, walked, step.Name)
 		if property == nil {
 			return false
 		}
-		source = checker.Checker_getTypeOfSymbol(typeChecker, property)
+		walked = checker.Checker_getTypeOfSymbol(typeChecker, property)
 	}
-	signatures := checker.Checker_getSignaturesOfType(typeChecker, source, checker.SignatureKindCall)
+	signatures := checker.Checker_getSignaturesOfType(typeChecker, walked, checker.SignatureKindCall)
 	if len(signatures) != 1 {
 		return false
 	}
@@ -154,7 +164,8 @@ func returnsIndexedAccess(typeChecker *checker.Checker, source, target *checker.
 		}
 		own := typeChecker.GetTypeAtLocation(expression)
 		return own != nil && (own.Flags()&checker.TypeFlagsNever != 0 ||
-			checker.Checker_isTypeIdenticalTo(typeChecker, own, target) || readsIndexedAccess(typeChecker, expression, target))
+			checker.Checker_isTypeIdenticalTo(typeChecker, own, target) ||
+			readsIndexedAccess(typeChecker, expression, target))
 	}
 	// An expression-bodied arrow has exactly one return: its body expression.
 	if !ast.IsBlock(declaration.Body()) {

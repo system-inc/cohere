@@ -13,29 +13,6 @@ package selector
 
 import "unicode/utf16"
 
-// token is upstream's token array. kind is token[0], value token[1], and rest holds token[2:], whose
-// meaning depends on the kind: [line, column, pos] for a space, combinator or single character, and
-// [line, column, endLine, endColumn, pos] for a string, at-word, word or comment.
-type token struct {
-	kind  string
-	value string
-	rest  []int
-}
-
-// at is token[index] for index 2 and up, the way the parser reads it.
-func (token *token) at(index int) int { return token.rest[index-2] }
-
-// loose is token[index] where the token may be shorter than the parser assumes, nil standing for
-// undefined. splitWord can leave currToken on a space token (a word ending in an escaped space, with
-// nothing word-like after it), and upstream then reads that token's [4] (its pos), [5] and [6]
-// (undefined) as if it were a word's.
-func (token *token) loose(index int) any {
-	if index-2 < len(token.rest) {
-		return token.rest[index-2]
-	}
-	return nil
-}
-
 const (
 	singleQuote  = 39
 	doubleQuote  = 34
@@ -73,18 +50,18 @@ func atEnd(code int) bool {
 
 // wordEnd is /[ \n\t\r\(\)\*:;@!&'"\+\|~>,\[\]\\]|\/(?=\*)/g, tested at index.
 func wordEnd(css []uint16, index int) bool {
-	switch charCodeAt(css, index) {
+	switch characterCodeAt(css, index) {
 	case space, newline, tab, cr, openBracket, closeBracket, asterisk, colon, semicolon, at, '!', ampersand,
 		singleQuote, doubleQuote, plus, pipe, tilde, gt, comma, openSq, closeSq, backslash:
 		return true
 	case slash:
-		return charCodeAt(css, index+1) == asterisk
+		return characterCodeAt(css, index+1) == asterisk
 	}
 	return false
 }
 
-// charCodeAt is css.charCodeAt(index), with -1 for the NaN past either end.
-func charCodeAt(css []uint16, index int) int {
+// characterCodeAt is css.charCodeAt(index), with -1 for the NaN past either end.
+func characterCodeAt(css []uint16, index int) int {
 	if index < 0 || index >= len(css) {
 		return -1
 	}
@@ -93,22 +70,17 @@ func charCodeAt(css []uint16, index int) int {
 
 // slice is css.slice(start, end), as WTF-8 (see wtf8.go): it can cut a surrogate pair after a backslash.
 func slice(css []uint16, start int, end int) string {
-	if end > len(css) {
-		end = len(css)
-	}
-	if start >= end {
+	clampedEnd := min(end, len(css))
+	if start >= clampedEnd {
 		return ""
 	}
-	return unitsToWTF8(css[start:end])
+	return unitsToWtf8(css[start:clampedEnd])
 }
 
 // indexOf is css.indexOf(search, from).
 func indexOf(css []uint16, search string, from int) int {
 	units := utf16.Encode([]rune(search))
-	if from < 0 {
-		from = 0
-	}
-	for index := from; index+len(units) <= len(css); index++ {
+	for index := max(from, 0); index+len(units) <= len(css); index++ {
 		matched := true
 		for offset, unit := range units {
 			if css[index+offset] != unit {
@@ -126,34 +98,40 @@ func indexOf(css []uint16, search string, from int) int {
 func tokenize(css []uint16) []*token {
 	tokens := []*token{}
 
-	var code, next, nextLine, nextOffset, escapePos int
-	var quote, content string
-	var escape, escaped bool
+	var code int
+	var next int
+	var nextLine int
+	var nextOffset int
+	var escapePosition int
+	var quote string
+	var content string
+	var escape bool
+	var escaped bool
 
 	length := len(css)
 	offset := -1
 	line := 1
-	pos := 0
+	position := 0
 
 	// Prettier's processor never sets input.safe, so an unclosed quote or comment always throws.
 	unclosed := func(what string) {
 		throwError("Unclosed " + what)
 	}
 
-	for pos < length {
-		code = charCodeAt(css, pos)
+	for position < length {
+		code = characterCodeAt(css, position)
 
 		if code == newline {
-			offset = pos
+			offset = position
 			line += 1
 		}
 
 		switch code {
 		case newline, space, tab, cr, feed:
-			next = pos
+			next = position
 			for {
 				next += 1
-				code = charCodeAt(css, next)
+				code = characterCodeAt(css, next)
 				if code == newline {
 					offset = next
 					line += 1
@@ -163,47 +141,53 @@ func tokenize(css []uint16) []*token {
 				}
 			}
 
-			tokens = append(tokens, &token{"space", slice(css, pos, next), []int{line, pos - offset, pos}})
-			pos = next - 1
+			tokens = append(
+				tokens,
+				&token{"space", slice(css, position, next), []int{line, position - offset, position}},
+			)
+			position = next - 1
 
 		case plus, gt, tilde, pipe:
-			next = pos
+			next = position
 			for {
 				next += 1
-				code = charCodeAt(css, next)
+				code = characterCodeAt(css, next)
 				if !(code == plus || code == gt || code == tilde || code == pipe) {
 					break
 				}
 			}
-			tokens = append(tokens, &token{"combinator", slice(css, pos, next), []int{line, pos - offset, pos}})
-			pos = next - 1
+			tokens = append(
+				tokens,
+				&token{"combinator", slice(css, position, next), []int{line, position - offset, position}},
+			)
+			position = next - 1
 
 		case asterisk:
-			tokens = append(tokens, &token{"*", "*", []int{line, pos - offset, pos}})
+			tokens = append(tokens, &token{"*", "*", []int{line, position - offset, position}})
 
 		case ampersand:
-			tokens = append(tokens, &token{"&", "&", []int{line, pos - offset, pos}})
+			tokens = append(tokens, &token{"&", "&", []int{line, position - offset, position}})
 
 		case comma:
-			tokens = append(tokens, &token{",", ",", []int{line, pos - offset, pos}})
+			tokens = append(tokens, &token{",", ",", []int{line, position - offset, position}})
 
 		case openSq:
-			tokens = append(tokens, &token{"[", "[", []int{line, pos - offset, pos}})
+			tokens = append(tokens, &token{"[", "[", []int{line, position - offset, position}})
 
 		case closeSq:
-			tokens = append(tokens, &token{"]", "]", []int{line, pos - offset, pos}})
+			tokens = append(tokens, &token{"]", "]", []int{line, position - offset, position}})
 
 		case colon:
-			tokens = append(tokens, &token{":", ":", []int{line, pos - offset, pos}})
+			tokens = append(tokens, &token{":", ":", []int{line, position - offset, position}})
 
 		case semicolon:
-			tokens = append(tokens, &token{";", ";", []int{line, pos - offset, pos}})
+			tokens = append(tokens, &token{";", ";", []int{line, position - offset, position}})
 
 		case openBracket:
-			tokens = append(tokens, &token{"(", "(", []int{line, pos - offset, pos}})
+			tokens = append(tokens, &token{"(", "(", []int{line, position - offset, position}})
 
 		case closeBracket:
-			tokens = append(tokens, &token{")", ")", []int{line, pos - offset, pos}})
+			tokens = append(tokens, &token{")", ")", []int{line, position - offset, position}})
 
 		case singleQuote, doubleQuote:
 			if code == singleQuote {
@@ -211,16 +195,16 @@ func tokenize(css []uint16) []*token {
 			} else {
 				quote = "\""
 			}
-			next = pos
+			next = position
 			for {
 				escaped = false
 				next = indexOf(css, quote, next+1)
 				if next == -1 {
 					unclosed("quote")
 				}
-				escapePos = next
-				for charCodeAt(css, escapePos-1) == backslash {
-					escapePos -= 1
+				escapePosition = next
+				for characterCodeAt(css, escapePosition-1) == backslash {
+					escapePosition -= 1
 					escaped = !escaped
 				}
 				if !escaped {
@@ -228,14 +212,18 @@ func tokenize(css []uint16) []*token {
 				}
 			}
 
-			tokens = append(tokens, &token{"string", slice(css, pos, next+1), []int{line, pos - offset, line, next - offset, pos}})
-			pos = next
+			tokens = append(tokens, &token{
+				"string",
+				slice(css, position, next+1),
+				[]int{line, position - offset, line, next - offset, position},
+			})
+			position = next
 
 		case at:
 			// atEnd.lastIndex = pos + 1; atEnd.test(css): lastIndex is the match's end, or 0 on a miss.
 			lastIndex := 0
-			for index := pos + 1; index < length; index++ {
-				if atEnd(charCodeAt(css, index)) {
+			for index := position + 1; index < length; index++ {
+				if atEnd(characterCodeAt(css, index)) {
 					lastIndex = index + 1
 					break
 				}
@@ -245,35 +233,49 @@ func tokenize(css []uint16) []*token {
 			} else {
 				next = lastIndex - 2
 			}
-			tokens = append(tokens, &token{"at-word", slice(css, pos, next+1), []int{line, pos - offset, line, next - offset, pos}})
-			pos = next
+			tokens = append(tokens, &token{
+				"at-word",
+				slice(css, position, next+1),
+				[]int{line, position - offset, line, next - offset, position},
+			})
+			position = next
 
 		case backslash:
-			next = pos
+			next = position
 			escape = true
-			for charCodeAt(css, next+1) == backslash {
+			for characterCodeAt(css, next+1) == backslash {
 				next += 1
 				escape = !escape
 			}
-			code = charCodeAt(css, next+1)
-			if escape && code != slash && code != space && code != newline && code != tab && code != cr && code != feed {
+			code = characterCodeAt(css, next+1)
+			if escape &&
+				code != slash &&
+				code != space &&
+				code != newline &&
+				code != tab &&
+				code != cr &&
+				code != feed {
 				next += 1
 			}
-			tokens = append(tokens, &token{"word", slice(css, pos, next+1), []int{line, pos - offset, line, next - offset, pos}})
-			pos = next
+			tokens = append(tokens, &token{
+				"word",
+				slice(css, position, next+1),
+				[]int{line, position - offset, line, next - offset, position},
+			})
+			position = next
 
 		default:
-			if code == slash && charCodeAt(css, pos+1) == asterisk {
-				next = indexOf(css, "*/", pos+2) + 1
+			if code == slash && characterCodeAt(css, position+1) == asterisk {
+				next = indexOf(css, "*/", position+2) + 1
 				if next == 0 {
 					unclosed("comment")
 				}
 
-				content = slice(css, pos, next+1)
+				content = slice(css, position, next+1)
 				// lines = content.split('\n'); last = lines.length - 1; lines[last].length, in UTF-16 units.
 				last := 0
-				lastLineStart := pos
-				for index := pos; index <= next && index < length; index++ {
+				lastLineStart := position
+				for index := position; index <= next && index < length; index++ {
 					if css[index] == newline {
 						last++
 						lastLineStart = index + 1
@@ -289,15 +291,18 @@ func tokenize(css []uint16) []*token {
 					nextOffset = offset
 				}
 
-				tokens = append(tokens, &token{"comment", content, []int{line, pos - offset, nextLine, next - nextOffset, pos}})
+				tokens = append(
+					tokens,
+					&token{"comment", content, []int{line, position - offset, nextLine, next - nextOffset, position}},
+				)
 
 				offset = nextOffset
 				line = nextLine
-				pos = next
+				position = next
 			} else {
 				// wordEnd.lastIndex = pos + 1; wordEnd.test(css), as for atEnd above.
 				lastIndex := 0
-				for index := pos + 1; index < length; index++ {
+				for index := position + 1; index < length; index++ {
 					if wordEnd(css, index) {
 						lastIndex = index + 1
 						break
@@ -309,12 +314,16 @@ func tokenize(css []uint16) []*token {
 					next = lastIndex - 2
 				}
 
-				tokens = append(tokens, &token{"word", slice(css, pos, next+1), []int{line, pos - offset, line, next - offset, pos}})
-				pos = next
+				tokens = append(tokens, &token{
+					"word",
+					slice(css, position, next+1),
+					[]int{line, position - offset, line, next - offset, position},
+				})
+				position = next
 			}
 		}
 
-		pos++
+		position++
 	}
 
 	return tokens

@@ -13,5 +13,8 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // booleans would bind straight through, but they all default to false, so a rule handed nil options
 // already behaves correctly without them.
 func init() {
-	rule.Register(rule.Registration{Rule: PreferPromiseRejectErrors, Decode: DecodePreferPromiseRejectErrorsOptions})
+	rule.Register(rule.Registration[PreferPromiseRejectErrorsOptions]{
+		Rule:   PreferPromiseRejectErrors,
+		Decode: DecodePreferPromiseRejectErrorsOptions,
+	})
 }

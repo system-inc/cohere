@@ -1,7 +1,7 @@
 // Package tailwind decides which class names could possibly collapse, so that almost none of them
 // have to be asked about.
 //
-// Tailwind's collapse logic — the thing that knows `px-4 py-4` is `p-4` and `w-8 h-8` is `size-8` —
+// Tailwind's collapse logic (the thing that knows `px-4 py-4` is `p-4` and `w-8 h-8` is `size-8`)
 // is a signature-equivalence search sitting on the whole Tailwind compiler. It is JavaScript, it is
 // eight to ten thousand lines, and it changes every Tailwind minor. cohere is Go. That boundary is
 // the one place in this tool where the answer is not "delete the boundary."
@@ -61,7 +61,7 @@
 //     `overflow-y-hidden` and stops reporting `overflow-hidden`.
 //   - Requiring two classes to declare the same CSS property family cuts engine calls by an order
 //     of magnitude and stops reporting `w-8 h-8` into `size-8`, because a shorthand can absorb
-//     properties that share no name — `width` and `height` become `size`, `column-gap` and
+//     properties that share no name: `width` and `height` become `size`, `column-gap` and
 //     `row-gap` become `gap`.
 //
 // Every one was caught by a fixture and none by review. So this package errs toward asking, always,
@@ -136,7 +136,7 @@ type Variant struct {
 // this package ports resolves it by silently taking the first reading without recording why. That
 // made it worth checking rather than inheriting: over all 4,375 candidate pairs in the corpus, of
 // which 75 collapse, keying on the first reading loses none, and the order is stable across calls.
-// So the choice is safe — but it was verified against the engine, not assumed from the source it
+// So the choice is safe, but it was verified against the engine, not assumed from the source it
 // was ported from. See DeclaredValues for the static case.
 type Candidate struct {
 	Kind      CandidateKind
@@ -205,24 +205,24 @@ const (
 // Two classes can only merge when this key matches. The key is derived from a real parse rather than
 // from string surgery on the class name, which is the difference between reporting `border-x` and
 // silently not.
-func (g *Gate) GroupKey(className string) string {
-	if cached, isCached := g.groupKeyByClassName[className]; isCached {
+func (gate *Gate) GroupKey(className string) string {
+	if cached, isCached := gate.groupKeyByClassName[className]; isCached {
 		return cached
 	}
 
-	key := g.computeGroupKey(className)
-	g.groupKeyByClassName[className] = key
+	key := gate.computeGroupKey(className)
+	gate.groupKeyByClassName[className] = key
 	return key
 }
 
-func (g *Gate) computeGroupKey(className string) string {
-	candidates := g.parser.ParseCandidates(className)
+func (gate *Gate) computeGroupKey(className string) string {
+	candidates := gate.parser.ParseCandidates(className)
 	if len(candidates) == 0 {
 		return unparsedKeyPrefix + className
 	}
 
 	// The first reading, deliberately. Tailwind returns readings in a stable order and the first is
-	// the one that preserves every collapse the engine finds — measured over all 4,375 candidate
+	// the one that preserves every collapse the engine finds, measured over all 4,375 candidate
 	// pairs in the real corpus, of which 75 collapse, with zero lost to this choice.
 	candidate := candidates[0]
 
@@ -232,10 +232,14 @@ func (g *Gate) computeGroupKey(className string) string {
 
 	case CandidateKindStatic:
 		// Statics bucket by what they declare, not by their name and not by their properties.
-		return staticKeyPrefix + g.declaredValuesKey(className)
+		return staticKeyPrefix + gate.declaredValuesKey(className)
 
 	default:
-		return variantsKey(candidate.Variants) + "|" + importanceKey(candidate.Important) + "|" + valueKey(candidate.Value)
+		return variantsKey(candidate.Variants) +
+			"|" +
+			importanceKey(candidate.Important) +
+			"|" +
+			valueKey(candidate.Value)
 	}
 }
 
@@ -244,8 +248,8 @@ func (g *Gate) computeGroupKey(className string) string {
 // A class that declares nothing gets a key carrying its own name rather than the empty string.
 // Without that, every class the compiler could not read would collide under one key and send each
 // other to the engine forever.
-func (g *Gate) declaredValuesKey(className string) string {
-	values := g.parser.DeclaredValues(className)
+func (gate *Gate) declaredValuesKey(className string) string {
+	values := gate.parser.DeclaredValues(className)
 	if len(values) == 0 {
 		return uncompiledPrefix + className
 	}
@@ -283,19 +287,19 @@ func importanceKey(important bool) string {
 //
 // The brackets around an arbitrary value are part of the key rather than decoration: they are also
 // what CouldRewriteAlone reads to decide that `z-[1]` is worth asking about while `px-4` is not.
-func valueKey(value Value) string {
-	switch value.Kind {
+func valueKey(candidateValue Value) string {
+	switch candidateValue.Kind {
 	case ValueKindNone:
 		return ""
 
 	case ValueKindArbitrary:
-		return "[" + value.Value + "]"
+		return "[" + candidateValue.Value + "]"
 
 	default:
-		if value.Fraction != "" {
-			return value.Value + "/" + value.Fraction
+		if candidateValue.Fraction != "" {
+			return candidateValue.Value + "/" + candidateValue.Fraction
 		}
-		return value.Value
+		return candidateValue.Value
 	}
 }
 
@@ -306,11 +310,11 @@ func valueKey(value Value) string {
 // theme name: `z-[1]` is `z-1`, `w-[100%]` is `w-full`. A static can be renamed outright, which
 // Tailwind keeps in a table: `order-none` is `order-0`, `break-words` is `wrap-break-word`.
 //
-// Functional candidates with a named value — `px-4`, `rounded-md`, `text-sm`, the overwhelming
-// majority — never rewrite alone, because a named value is already the theme's own spelling. Those
+// Functional candidates with a named value (`px-4`, `rounded-md`, `text-sm`, the overwhelming
+// majority) never rewrite alone, because a named value is already the theme's own spelling. Those
 // are the ones worth never asking about.
-func (g *Gate) CouldRewriteAlone(className string) bool {
-	key := g.GroupKey(className)
+func (gate *Gate) CouldRewriteAlone(className string) bool {
+	key := gate.GroupKey(className)
 
 	if strings.HasPrefix(key, staticKeyPrefix) {
 		return true
@@ -326,9 +330,9 @@ func (g *Gate) CouldRewriteAlone(className string) bool {
 // The gate can see that `z-[1]` is worth asking about; only the engine can say that it is actually
 // `z-1`. Feeding the verdict back means a class is asked about once per process rather than once per
 // literal that contains it.
-func (g *Gate) RecordSingleRewrites(classNames []string) {
+func (gate *Gate) RecordSingleRewrites(classNames []string) {
 	for _, className := range classNames {
-		g.singlesThatRewrite[className] = true
+		gate.singlesThatRewrite[className] = true
 	}
 }
 
@@ -337,13 +341,13 @@ func (g *Gate) RecordSingleRewrites(classNames []string) {
 //
 // Returned rather than acted on, so the caller keeps its own record of what it has paid for and the
 // gate stays free of the boundary it exists to avoid.
-func (g *Gate) SingleClassesWorthChecking(classNames []string, alreadyChecked map[string]bool) []string {
+func (gate *Gate) SingleClassesWorthChecking(classNames []string, alreadyChecked map[string]bool) []string {
 	worthChecking := make([]string, 0, len(classNames))
 	for _, className := range classNames {
 		if alreadyChecked[className] {
 			continue
 		}
-		if g.CouldRewriteAlone(className) {
+		if gate.CouldRewriteAlone(className) {
 			worthChecking = append(worthChecking, className)
 		}
 	}
@@ -358,16 +362,16 @@ func (g *Gate) SingleClassesWorthChecking(classNames []string, alreadyChecked ma
 // The asymmetry is the whole design. A false here costs one engine call. A true here that should
 // have been false loses a finding on a tree that then looks clean, which is the failure this package
 // exists to prevent, so every doubtful case resolves to false.
-func (g *Gate) CannotCollapse(classNames []string) bool {
+func (gate *Gate) CannotCollapse(classNames []string) bool {
 	for _, className := range classNames {
-		if g.singlesThatRewrite[className] {
+		if gate.singlesThatRewrite[className] {
 			return false
 		}
 	}
 
 	seenGroups := make(map[string]bool, len(classNames))
 	for _, className := range classNames {
-		key := g.GroupKey(className)
+		key := gate.GroupKey(className)
 		if seenGroups[key] {
 			return false
 		}
@@ -384,9 +388,10 @@ func (g *Gate) CannotCollapse(classNames []string) bool {
 // two classes in a shared bucket and no rewritable single never pays that at all.
 //
 // alreadyChecked carries singles the caller has resolved in this process; pass nil on a first call.
-func (g *Gate) NeedsEngine(classNames []string, alreadyChecked map[string]bool) bool {
-	if alreadyChecked == nil {
-		alreadyChecked = map[string]bool{}
+func (gate *Gate) NeedsEngine(classNames []string, alreadyChecked map[string]bool) bool {
+	checked := alreadyChecked
+	if checked == nil {
+		checked = map[string]bool{}
 	}
 
 	distinct := distinctPreservingOrder(classNames)
@@ -394,7 +399,7 @@ func (g *Gate) NeedsEngine(classNames []string, alreadyChecked map[string]bool) 
 		return false
 	}
 
-	if g.CannotCollapse(distinct) && len(g.SingleClassesWorthChecking(distinct, alreadyChecked)) == 0 {
+	if gate.CannotCollapse(distinct) && len(gate.SingleClassesWorthChecking(distinct, checked)) == 0 {
 		return false
 	}
 	return true

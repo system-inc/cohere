@@ -7,7 +7,10 @@ func tokenizeThematicBreak(self *Self, effects *Effects, ok State, nok State) St
 	size := 0
 	var marker Code
 
-	var start, before, atBreak, sequence State
+	var start State
+	var before State
+	var atBreak State
+	var sequence State
 
 	start = func(code Code) State {
 		effects.Enter(TypeThematicBreak, nil)
@@ -26,7 +29,7 @@ func tokenizeThematicBreak(self *Self, effects *Effects, ok State, nok State) St
 			return sequence(code)
 		}
 
-		if size >= thematicBreakMarkerCountMin && (code == CodeEof || markdownLineEnding(code)) {
+		if size >= thematicBreakMarkerCountMinimum && (code == CodeEof || markdownLineEnding(code)) {
 			effects.Exit(TypeThematicBreak)
 			return ok(code)
 		}

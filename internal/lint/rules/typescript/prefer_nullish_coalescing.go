@@ -15,7 +15,7 @@ import (
 // PreferNullishCoalescingPrimitives says which primitive types are exempt.
 //
 // Upstream's `ignorePrimitives` is a `oneOf`: this object, or the bare literal `true`. `IgnoreAll`
-// carries the second spelling rather than expanding it into four trues, because the two are NOT
+// carries the second spelling rather than expanding it into four trues, because the two are not
 // interchangeable at the config surface even though they behave identically once decoded, and
 // collapsing them would lose the ability to refuse what upstream refuses. See the decoder.
 type PreferNullishCoalescingPrimitives struct {
@@ -28,7 +28,7 @@ type PreferNullishCoalescingPrimitives struct {
 
 // PreferNullishCoalescingOptions is the decoded option surface.
 //
-// # Every default here was PROVED by a moving verdict, not read off upstream's defaultOptions block
+// # Every default here was proved by a moving verdict, not read off upstream's defaultOptions block
 //
 // A default read from a source block is a claim about what upstream wrote; a default proved by
 // driving the installed rule with the key absent, explicitly false, and explicitly true is a fact
@@ -42,7 +42,7 @@ type PreferNullishCoalescingPrimitives struct {
 //	ignoreBooleanCoercion           reports  reports          silent          false
 //	ignoreIfStatements              reports  reports          silent          false
 //
-// `ignoreConditionalTests` defaulting TRUE is the one that matters, and it is the second non-zero
+// `ignoreConditionalTests` defaulting true is the one that matters, and it is the second non-zero
 // default found in two batches. A port assuming Go's zero value reports on every `if (a || b)` in
 // the tree, which is plausible enough that nobody would question the count.
 type PreferNullishCoalescingOptions struct {
@@ -50,7 +50,7 @@ type PreferNullishCoalescingOptions struct {
 	AllowWithoutStrictNullChecks bool
 	// IgnoreBooleanCoercion exempts arguments to the `Boolean` constructor.
 	IgnoreBooleanCoercion bool
-	// IgnoreConditionalTests exempts a `||` inside a conditional test. Defaults TRUE.
+	// IgnoreConditionalTests exempts a `||` inside a conditional test. Defaults true.
 	IgnoreConditionalTests bool
 	// IgnoreIfStatements exempts an `if` that could become `??=`.
 	IgnoreIfStatements bool
@@ -60,7 +60,7 @@ type PreferNullishCoalescingOptions struct {
 	IgnorePrimitives PreferNullishCoalescingPrimitives
 	// IgnoreTernaryTests exempts a ternary that could become `??`.
 	IgnoreTernaryTests bool
-	// ReactCompiler is ours, not upstream's, and defaults to TRUE: the if-statement check is silent
+	// ReactCompiler is ours, not upstream's, and defaults to true: the if-statement check is silent
 	// inside a function React Compiler compiles, because the `??=` it suggests is a shorthand the
 	// compiler refuses. It is `logical-assignment-operators`' option of the same name, for the same
 	// reason; see preferNullishCoalescingJudgeIf.
@@ -88,9 +88,9 @@ type preferNullishCoalescingWire struct {
 
 // DecodePreferNullishCoalescingOptions reads the option object off the config.
 //
-// # `ignorePrimitives` is a oneOf, and BOTH spellings were pinned before this was written
+// # `ignorePrimitives` is a oneOf, and both spellings were pinned before this was written
 //
-// The schema is an object of four booleans OR the bare literal `true`. Driving the installed rule
+// The schema is an object of four booleans or the bare literal `true`. Driving the installed rule
 // across every spelling, on one nullable union per primitive:
 //
 //	spelling            string  number  boolean  bigint
@@ -103,22 +103,22 @@ type preferNullishCoalescingWire struct {
 //	all four true          0       0       0        0
 //
 // Three of those rows are invisible to the corpus. `{}` and `all four true` bracket the object form
-// from both ends; `false` is REFUSED BY THE SCHEMA rather than treated as "ignore nothing", which is
+// from both ends; `false` is refused by the schema rather than treated as "ignore nothing", which is
 // the row a decoder would most naturally get wrong by accepting it and doing something reasonable.
 // Reproduced as a refusal, because silently accepting a spelling upstream rejects means a config
 // that loads here and fails there.
 //
 // The corpus splits 110 object-form against 25 bare-`true`, so a decoder handling only the object
 // form still passes 110 cases. That is why this was measured first rather than tested afterwards.
-func DecodePreferNullishCoalescingOptions(raw []byte) (any, error) {
+func DecodePreferNullishCoalescingOptions(raw []byte) (PreferNullishCoalescingOptions, error) {
 	options := DefaultPreferNullishCoalescingOptions()
 	if len(raw) == 0 {
 		return options, nil
 	}
 
 	var wire preferNullishCoalescingWire
-	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &wire); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 
 	if wire.AllowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing != nil {
@@ -143,20 +143,22 @@ func DecodePreferNullishCoalescingOptions(raw []byte) (any, error) {
 		options.ReactCompiler = *wire.ReactCompiler
 	}
 
-	primitives, err := decodePreferNullishCoalescingPrimitives(wire.IgnorePrimitives)
-	if err != nil {
-		return options, err
+	primitives, decodePreferNullishCoalescingPrimitivesError := decodePreferNullishCoalescingPrimitives(
+		wire.IgnorePrimitives,
+	)
+	if decodePreferNullishCoalescingPrimitivesError != nil {
+		return options, decodePreferNullishCoalescingPrimitivesError
 	}
 	options.IgnorePrimitives = primitives
 	return options, nil
 }
 
-// errPreferNullishCoalescingPrimitivesFalse names the one boolean upstream's schema refuses.
+// errorPreferNullishCoalescingPrimitivesFalse names the one boolean upstream's schema refuses.
 //
 // `ignorePrimitives` is `oneOf(object, {type: boolean, enum: [true]})`, so `true` is legal and
 // `false` is not. Measured: ESLint rejects `{"ignorePrimitives": false}` at config load with
 // "Value false should match exactly one schema in oneOf".
-var errPreferNullishCoalescingPrimitivesFalse = errors.New(
+var errorPreferNullishCoalescingPrimitivesFalse = errors.New(
 	"prefer-nullish-coalescing: ignorePrimitives accepts an object or the literal true; " +
 		"false is not a legal value, and upstream refuses it at config load")
 
@@ -175,7 +177,7 @@ func decodePreferNullishCoalescingPrimitives(raw json.RawMessage) (
 	var asBool bool
 	if json.Unmarshal(raw, &asBool) == nil {
 		if !asBool {
-			return primitives, errPreferNullishCoalescingPrimitivesFalse
+			return primitives, errorPreferNullishCoalescingPrimitivesFalse
 		}
 		primitives.IgnoreAll = true
 		return primitives, nil
@@ -189,8 +191,8 @@ func decodePreferNullishCoalescingPrimitives(raw json.RawMessage) (
 		Number  *bool `json:"number"`
 		String  *bool `json:"string"`
 	}
-	if err := rule.UnmarshalOptions(raw, &asObject); err != nil {
-		return primitives, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &asObject); unmarshalOptionsError != nil {
+		return primitives, unmarshalOptionsError
 	}
 	primitives.Bigint = asObject.Bigint != nil && *asObject.Bigint
 	primitives.Boolean = asObject.Boolean != nil && *asObject.Boolean
@@ -199,7 +201,7 @@ func decodePreferNullishCoalescingPrimitives(raw json.RawMessage) (
 	return primitives, nil
 }
 
-// messagePreferNullishOverOr is the one message id this rule reports, and it renders TWO ways.
+// messagePreferNullishOverOr is the one message id this rule reports, and it renders two ways.
 //
 // Upstream's text interpolates `{{description}}` and `{{equals}}`:
 //
@@ -207,7 +209,7 @@ func decodePreferNullishCoalescingPrimitives(raw json.RawMessage) (
 //	a ||= b    "...(`??=`) instead of a logical assignment (`||=`)..."
 //
 // One id, two renderings, and a fixture asserting only the id cannot tell them apart. That is
-// section 3c exactly, and it is sharpest here because BOTH arms also propose different repair text
+// section 3c exactly, and it is sharpest here because both arms also propose different repair text
 // (`??` against `??=`), so a rule that rendered one arm's message while writing the other arm's fix
 // would pass every message-id assertion in the corpus.
 //
@@ -263,7 +265,7 @@ func preferNullishCoalescingSuggestion(replacement string) string {
 // The `noStrictNullCheck` whole-file complaint is still absent: it needs a program compiled without
 // strictNullChecks, which no tree we lint has.
 //
-// # The type gate is upstream's `isNullableType`, and the shelf's IsTypeFlagSet is the WRONG helper
+// # The type gate is upstream's `isNullableType`, and the shelf's IsTypeFlagSet is the wrong helper
 //
 // This is the same trap as `consistent-return`'s, in a far worse form. Upstream imports two
 // different functions both spelled `isTypeFlagSet`:
@@ -272,12 +274,12 @@ func preferNullishCoalescingSuggestion(replacement string) string {
 //	tsutils.isTypeFlagSet(type, ...)  ts-api-utils', which reads the type's OWN flags
 //
 // `checking.IsTypeFlagSet` is the second reading. It is correct for the two `ignorePrimitives` call
-// sites and wrong for this gate, so which spelling a call site wants is a PER-CALL-SITE question
+// sites and wrong for this gate, so which spelling a call site wants is a per-call-site question
 // rather than a per-rule one. Reading the import once and applying the answer throughout is the
 // natural shortcut and it is exactly wrong here.
 //
-// The cost is not a few cases, it is the whole rule. `isNullableType` is the FIRST gate, and every
-// shape this rule fires on is a nullable UNION, which carries the Union flag rather than its
+// The cost is not a few cases, it is the whole rule. `isNullableType` is the first gate, and every
+// shape this rule fires on is a nullable union, which carries the Union flag rather than its
 // constituents'. Measured across eight shapes, then scored as a consequence with a control:
 //
 //	string | null          shelf false   upstream true    DIVERGE
@@ -290,11 +292,11 @@ func preferNullishCoalescingSuggestion(replacement string) string {
 //
 //	on the rule's own target shapes:  upstream 4/4 nullable, shelf 0/4
 //
-// A port built on the shelf helper reports zero on every real file AND is green, because an author
+// A port built on the shelf helper reports zero on every real file and is green, because an author
 // who misread the helper writes fixtures matching what their code does. No mutation sweep and no
 // span assertion can vote on that. Hence the local helper below, with a fixture on each of the four.
 //
-// # The span is the OPERATOR token, which is also why optional chaining costs nothing here
+// # The span is the operator token, which is also why optional chaining costs nothing here
 //
 // Upstream reports `barBarOperator`, the `||` token itself, rather than the expression. Measured
 // against the installed 8.67.0 build: `a || b` reports columns 13 to 15 for a left operand ending at
@@ -304,28 +306,28 @@ func preferNullishCoalescingSuggestion(replacement string) string {
 // reports exactly like `a || c`, because the rule looks at the operator and not at the member
 // access. Predicted as a divergence, measured as a non-divergence, and stated here so the next
 // reader does not re-derive the worry.
-var PreferNullishCoalescing = rule.Rule{
+var PreferNullishCoalescing = rule.Rule[PreferNullishCoalescingOptions]{
 	Name:             "@typescript-eslint/prefer-nullish-coalescing",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 	// Compiler options and the default library, through type_checking's builtin and specifier helpers.
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, ok := rule.OptionsAs[PreferNullishCoalescingOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[PreferNullishCoalescingOptions]) rule.Listeners {
+		settings, ok := options.Read()
 		if !ok {
 			settings = DefaultPreferNullishCoalescingOptions()
 		}
 
 		// One listener over the whole file, rather than one per binary expression, so findings can be
-		// emitted in SOURCE order.
+		// emitted in source order.
 		//
-		// `||` is left-associative, so `a || b || c` parses with the OUTER node holding the LATER
+		// `||` is left-associative, so `a || b || c` parses with the outer node holding the later
 		// operator, and a pre-order walk reaches that outer node first. Reported as visited, the
 		// findings come out right-to-left.
 		//
 		// No fixture in the imported corpus can see this: the corpus asserts message ids and counts,
 		// and a reordered list of identical ids is the same list. It surfaced only once the spans and
-		// the per-finding suggestion texts were pinned, where consecutive findings carry DIFFERENT
+		// the per-finding suggestion texts were pinned, where consecutive findings carry different
 		// repairs and swapping them is visible. `consistent-return` needed the same treatment for
 		// the same reason.
 		return rule.Listeners{
@@ -338,11 +340,11 @@ var PreferNullishCoalescing = rule.Rule{
 					reports := false
 					switch current.Kind {
 					case ast.KindBinaryExpression:
-						finding, reports = preferNullishCoalescingJudge(ctx, current, settings)
+						finding, reports = preferNullishCoalescingJudge(ruleContext, current, settings)
 					case ast.KindConditionalExpression:
-						finding, reports = preferNullishCoalescingJudgeTernary(ctx, current, settings)
+						finding, reports = preferNullishCoalescingJudgeTernary(ruleContext, current, settings)
 					case ast.KindIfStatement:
-						finding, reports = preferNullishCoalescingJudgeIf(ctx, current, settings)
+						finding, reports = preferNullishCoalescingJudgeIf(ruleContext, current, settings)
 					}
 					if reports {
 						pending = append(pending, finding)
@@ -356,7 +358,7 @@ var PreferNullishCoalescing = rule.Rule{
 					return pending[left].reportRange.Pos() < pending[right].reportRange.Pos()
 				})
 				for _, finding := range pending {
-					ctx.ReportRangeWithSuggestions(finding.reportRange, finding.message,
+					ruleContext.ReportRangeWithSuggestions(finding.reportRange, finding.message,
 						rule.Suggestion{Message: finding.suggestion, Fixes: finding.fixes})
 				}
 			},
@@ -381,11 +383,13 @@ type preferNullishCoalescingFinding struct {
 // `AssignmentExpression[operator="||="]`, both calling the same check. Our parser makes both a
 // KindBinaryExpression, so they are separated here by the operator token. The `||=` half is 32 of
 // the 123 preferNullishOverOr cases, so omitting it is not a rounding error.
-func preferNullishCoalescingJudge(ctx rule.Context, node *ast.Node,
+func preferNullishCoalescingJudge(ruleContext rule.Context, node *ast.Node,
 	settings PreferNullishCoalescingOptions) (preferNullishCoalescingFinding, bool) {
 
 	expression := node.AsBinaryExpression()
-	var operator, replacement, kind string
+	var operator string
+	var replacement string
+	var kind string
 	switch expression.OperatorToken.Kind {
 	case ast.KindBarBarToken:
 		operator, replacement, kind = "||", "??", "or"
@@ -397,14 +401,14 @@ func preferNullishCoalescingJudge(ctx rule.Context, node *ast.Node,
 		return preferNullishCoalescingFinding{}, false
 	}
 
-	if !preferNullishCoalescingEligible(ctx, node, expression.Left, settings) {
+	if !preferNullishCoalescingEligible(ruleContext, node, expression.Left, settings) {
 		return preferNullishCoalescingFinding{}, false
 	}
 	if settings.IgnoreMixedLogicalExpressions && preferNullishCoalescingIsMixed(node) {
 		return preferNullishCoalescingFinding{}, false
 	}
 
-	operatorRange := rule.TokenRange(ctx.SourceFile, expression.OperatorToken)
+	operatorRange := rule.TokenRange(ruleContext.SourceFile, expression.OperatorToken)
 	return preferNullishCoalescingFinding{
 		reportRange: operatorRange,
 		message: rule.Message{
@@ -415,7 +419,7 @@ func preferNullishCoalescingJudge(ctx rule.Context, node *ast.Node,
 			Id:          messagePreferNullishSuggest.Id,
 			Description: preferNullishCoalescingSuggestion(replacement),
 		},
-		fixes: preferNullishCoalescingRepair(ctx, node, operatorRange, replacement),
+		fixes: preferNullishCoalescingRepair(ruleContext, node, operatorRange, replacement),
 	}, true
 }
 
@@ -425,7 +429,7 @@ func preferNullishCoalescingJudge(ctx rule.Context, node *ast.Node,
 //
 // `??` may not sit beside `||` or `&&` without parentheses -- `a ?? b || c` is a syntax error -- so
 // upstream does not replace the operator when the expression has a logical parent. It replaces the
-// whole LEFT-HAND expression with a parenthesised nullish form. Measured against the installed
+// whole left-hand expression with a parenthesised nullish form. Measured against the installed
 // 8.67.0 build, reading the suggestion text rather than the message:
 //
 //	a || b                 one finding,   suggests `??`
@@ -434,9 +438,9 @@ func preferNullishCoalescingJudge(ctx rule.Context, node *ast.Node,
 //	a || b || c || d       three findings, `(a ?? b)`, `(b ?? c)`, then `??`
 //	(a || b) && d          one finding,   suggests `??`
 //
-// The pattern is per-finding rather than per-expression: a `||` whose PARENT is also a `||` gets the
+// The pattern is per-finding rather than per-expression: a `||` whose parent is also a `||` gets the
 // parenthesised form, and the outermost one gets the plain operator swap. `(a || b) && d` is the row
-// that shows the test is on the parent being a logical OR specifically, not on being any logical
+// that shows the test is on the parent being a logical or specifically, not on being any logical
 // operator, since that one is silenced only by ignoreMixedLogicalExpressions and still suggests the
 // plain swap.
 //
@@ -444,7 +448,7 @@ func preferNullishCoalescingJudge(ctx rule.Context, node *ast.Node,
 // id and this rule has exactly one id for both arms. A port writing `??` everywhere passes all 398
 // cases and proposes a syntax error on every chained expression it touches. Found by reading the
 // suggestion text out of the installed rule while measuring spans, not by the corpus.
-func preferNullishCoalescingRepair(ctx rule.Context, node *ast.Node, operatorRange core.TextRange,
+func preferNullishCoalescingRepair(ruleContext rule.Context, node *ast.Node, operatorRange core.TextRange,
 	replacement string) []rule.Fix {
 
 	parent := node.Parent
@@ -462,7 +466,7 @@ func preferNullishCoalescingRepair(ctx rule.Context, node *ast.Node, operatorRan
 	// The expression becomes `(left ?? right)`, so the parenthesis carries the precedence the bare
 	// swap would have broken.
 	//
-	// For a LEFT operand that is itself a `||` chain, upstream renders only its immediate RIGHT
+	// For a left operand that is itself a `||` chain, upstream renders only its immediate right
 	// operand rather than the whole subtree. Measured on `a || b || c || d`, whose middle finding
 	// suggests `(b ?? c)` and not `(a || b ?? c)`: each finding in a chain is an independent repair
 	// describing what that one finding would write if applied alone, rather than a step in a shared
@@ -481,9 +485,9 @@ func preferNullishCoalescingRepair(ctx rule.Context, node *ast.Node, operatorRan
 		leftNode = unwrapped.AsBinaryExpression().Right
 	}
 
-	text := ctx.SourceFile.Text()
-	leftRange := rule.TokenRange(ctx.SourceFile, leftNode)
-	rightRange := rule.TokenRange(ctx.SourceFile, expression.Right)
+	text := ruleContext.SourceFile.Text()
+	leftRange := rule.TokenRange(ruleContext.SourceFile, leftNode)
+	rightRange := rule.TokenRange(ruleContext.SourceFile, expression.Right)
 	return []rule.Fix{rule.ReplaceRange(
 		core.NewTextRange(leftRange.Pos(), rightRange.End()),
 		"("+text[leftRange.Pos():leftRange.End()]+" "+replacement+" "+
@@ -491,7 +495,7 @@ func preferNullishCoalescingRepair(ctx rule.Context, node *ast.Node, operatorRan
 }
 
 // preferNullishCoalescingEligible is upstream's `isTruthinessCheckEligibleForPreferNullish`.
-func preferNullishCoalescingEligible(ctx rule.Context, node *ast.Node, testNode *ast.Node,
+func preferNullishCoalescingEligible(ruleContext rule.Context, node *ast.Node, testNode *ast.Node,
 	settings PreferNullishCoalescingOptions) bool {
 
 	if settings.IgnoreConditionalTests && preferNullishCoalescingIsConditionalTest(node) {
@@ -500,24 +504,24 @@ func preferNullishCoalescingEligible(ctx rule.Context, node *ast.Node, testNode 
 	// A ternary passed straight to `Boolean(...)` is still reported: upstream exempts the coercion
 	// context everywhere except there, since `Boolean(a ? a : b)` and `Boolean(a ?? b)` can differ
 	// when `a` is a falsy non-nullish value. Measured, and pinned by upstream's own corpus.
-	if settings.IgnoreBooleanCoercion && preferNullishCoalescingInBooleanCall(ctx, node) &&
+	if settings.IgnoreBooleanCoercion && preferNullishCoalescingInBooleanCall(ruleContext, node) &&
 		!(node.Kind == ast.KindConditionalExpression &&
 			preferNullishCoalescingParentSkippingParentheses(node) != nil &&
 			preferNullishCoalescingParentSkippingParentheses(node).Kind == ast.KindCallExpression) {
 		return false
 	}
-	if ctx.TypeChecker == nil || testNode == nil {
+	if ruleContext.TypeChecker == nil || testNode == nil {
 		return false
 	}
-	return preferNullishCoalescingTypeEligible(ctx,
-		ctx.TypeChecker.GetTypeAtLocation(testNode), settings)
+	return preferNullishCoalescingTypeEligible(ruleContext,
+		ruleContext.TypeChecker.GetTypeAtLocation(testNode), settings)
 }
 
 // preferNullishCoalescingTypeEligible is upstream's `isTypeEligibleForPreferNullish`.
 //
 // The order is upstream's and it matters: nullable first, then the `any`/`unknown` bail, then the
 // per-primitive exemptions. A type that is not nullable is never reported, whatever else is true.
-func preferNullishCoalescingTypeEligible(ctx rule.Context, subject *checker.Type,
+func preferNullishCoalescingTypeEligible(ruleContext rule.Context, subject *checker.Type,
 	settings PreferNullishCoalescingOptions) bool {
 
 	if !preferNullishCoalescingIsNullable(subject) {
@@ -530,13 +534,13 @@ func preferNullishCoalescingTypeEligible(ctx rule.Context, subject *checker.Type
 	}
 
 	// `any` and `unknown` could be any primitive at runtime even though the flags are not set, so
-	// upstream declines them once ANY primitive is being ignored. This one reads the type's own
+	// upstream declines them once any primitive is being ignored. This one reads the type's own
 	// flags, which is ts-api-utils' spelling and is what `checking.IsTypeFlagSet` provides.
 	if type_checking.IsTypeFlagSet(subject, checker.TypeFlagsAny|checker.TypeFlagsUnknown) {
 		return false
 	}
 
-	for part := range type_checking.UnionTypePartsSeq(subject) {
+	for part := range type_checking.UnionTypePartsSequence(subject) {
 		for _, intersected := range type_checking.IntersectionTypeParts(part) {
 			if type_checking.IsTypeFlagSet(intersected, ignorable) {
 				return false
@@ -548,7 +552,7 @@ func preferNullishCoalescingTypeEligible(ctx rule.Context, subject *checker.Type
 
 // preferNullishCoalescingIsNullable is upstream's `isNullableType`, which decomposes the union.
 //
-// NOT `checking.IsTypeFlagSet`. See the rule's doc comment for the measurement: the shelf helper
+// Not `checking.IsTypeFlagSet`. See the rule's doc comment for the measurement: the shelf helper
 // answers false for every nullable union, which is every shape this rule reports on.
 //
 // Written local rather than added to the shelf, because `checking.IsTypeFlagSet` is not wrong -- it
@@ -561,14 +565,14 @@ func preferNullishCoalescingIsNullable(subject *checker.Type) bool {
 	return preferNullishCoalescingUnionFlagSet(subject, nullish)
 }
 
-// preferNullishCoalescingUnionFlagSet is typescript-eslint's `getTypeFlags`: OR every union
+// preferNullishCoalescingUnionFlagSet is typescript-eslint's `getTypeFlags`: or every union
 // constituent's flags before masking.
 func preferNullishCoalescingUnionFlagSet(subject *checker.Type, flags checker.TypeFlags) bool {
 	if subject == nil {
 		return false
 	}
 	var combined checker.TypeFlags
-	for part := range type_checking.UnionTypePartsSeq(subject) {
+	for part := range type_checking.UnionTypePartsSequence(subject) {
 		if part != nil {
 			combined |= checker.Type_flags(part)
 		}
@@ -607,14 +611,14 @@ func preferNullishCoalescingIgnorableFlags(
 // conditional-test walk, since a value reaches the call through them: a logical expression, either
 // branch of a ternary, and the last element of a sequence.
 //
-// # The callee must be the GLOBAL Boolean, and the checker answers that better than upstream can
+// # The callee must be the global Boolean, and the checker answers that better than upstream can
 //
 // Upstream resolves the callee through eslint-scope and accepts it when `variable == null ||
 // variable.defs.length === 0`, which is "unresolvable, or declared nowhere in source" -- what a
 // global looks like from a scope manager that cannot see `lib.es5.d.ts`.
 //
 // A first draft skipped this check and documented the gap as narrow and one-directional. Running the
-// corpus disproved that: upstream's `invalid[297]` shadows `Boolean` with a local arrow and REPORTS,
+// corpus disproved that: upstream's `invalid[297]` shadows `Boolean` with a local arrow and reports,
 // and the draft was silent on it. The gap was real and the note was wrong about it being acceptable.
 //
 // The checker answers the question directly, and better: it resolves the symbol and says where it
@@ -626,7 +630,7 @@ func preferNullishCoalescingIgnorableFlags(
 //
 // `rule.IsSymbolFromDefaultLibrary` is the shelf's existing question for exactly this, so this
 // is a caller rather than a reimplementation, and it needs no scope resolver at all.
-func preferNullishCoalescingInBooleanCall(ctx rule.Context, node *ast.Node) bool {
+func preferNullishCoalescingInBooleanCall(ruleContext rule.Context, node *ast.Node) bool {
 	for current := node; current != nil; {
 		parent := current.Parent
 		if parent == nil {
@@ -639,14 +643,14 @@ func preferNullishCoalescingInBooleanCall(ctx rule.Context, node *ast.Node) bool
 				call.Expression.Text() != "Boolean" {
 				return false
 			}
-			if ctx.TypeChecker == nil || ctx.Program == nil {
+			if ruleContext.TypeChecker == nil || ruleContext.Program == nil {
 				return false
 			}
-			if !rule.IsSymbolFromDefaultLibrary(ctx.Program,
-				ctx.TypeChecker.GetSymbolAtLocation(call.Expression)) {
+			if !rule.IsSymbolFromDefaultLibrary(ruleContext.Program,
+				ruleContext.TypeChecker.GetSymbolAtLocation(call.Expression)) {
 				return false
 			}
-			// Only the FIRST argument is coerced; `Boolean(x, y)` reads y for its side effects.
+			// Only the first argument is coerced; `Boolean(x, y)` reads y for its side effects.
 			//
 			// The argument is unwrapped because upstream's parser folds parentheses away, so
 			// `Boolean(((a = b), b || c))` presents its sequence directly. Without the unwrap the
@@ -654,7 +658,7 @@ func preferNullishCoalescingInBooleanCall(ctx rule.Context, node *ast.Node) bool
 			if call.Arguments == nil || len(call.Arguments.Nodes) == 0 {
 				return false
 			}
-			// BOTH sides are unwrapped, and that took a probe to get right. The walk arrives here
+			// Both sides are unwrapped, and that took a probe to get right. The walk arrives here
 			// holding whatever node it last stepped to, which for `Boolean(((a = b), b || c))` is
 			// the KindParenthesizedExpression wrapping the sequence, while the argument list holds
 			// that same parenthesized node. Unwrapping only the argument compares a bare sequence
@@ -777,10 +781,11 @@ func preferNullishCoalescingParentSkippingParentheses(node *ast.Node) *ast.Node 
 // A loop, because `((a))` nests. Not `ast.SkipParentheses`, which dereferences its argument and is
 // how this project lost 167 files to a nil panic; every caller here holds an optional node.
 func preferNullishCoalescingUnwrap(node *ast.Node) *ast.Node {
-	for node != nil && node.Kind == ast.KindParenthesizedExpression {
-		node = node.AsParenthesizedExpression().Expression
+	unwrapped := node
+	for unwrapped != nil && unwrapped.Kind == ast.KindParenthesizedExpression {
+		unwrapped = unwrapped.AsParenthesizedExpression().Expression
 	}
-	return node
+	return unwrapped
 }
 
 // preferNullishCoalescingIsMixed is upstream's `isMixedLogicalExpression`.

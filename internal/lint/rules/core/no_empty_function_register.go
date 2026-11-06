@@ -9,7 +9,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // last: in the gap between the two, `TestEveryRuleIsRegistered` fails for the whole package and
 // names this rule to every sibling agent, which is indistinguishable from an abandoned port.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[NoEmptyFunctionOptions]{
 		Rule:   NoEmptyFunction,
 		Decode: DecodeNoEmptyFunctionOptions,
 	})

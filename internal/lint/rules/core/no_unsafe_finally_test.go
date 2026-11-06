@@ -9,8 +9,8 @@ import (
 // TestNoUnsafeFinallyReportsEscapingControlFlow is the fixture that must fire.
 //
 // All four statement kinds, each in the position where its jump actually leaves the finally block.
-func TestNoUnsafeFinallyReportsEscapingControlFlow(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeFinallyReportsEscapingControlFlow(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		source string
@@ -18,7 +18,10 @@ func TestNoUnsafeFinallyReportsEscapingControlFlow(t *testing.T) {
 	}{
 		{"var foo = function() { try { return 1; } catch (err) { return 2; } finally { return 3; } };", "unsafeReturn"},
 		{"var foo = function() { try { return 1; } finally { return 3; } };", "unsafeReturn"},
-		{"var foo = function() { try { return 1; } catch (err) { return 2; } finally { throw new Error(); } };", "unsafeThrow"},
+		{
+			"var foo = function() { try { return 1; } catch (err) { return 2; } finally { throw new Error(); } };",
+			"unsafeThrow",
+		},
 		{"var foo = function() { try {} finally { throw new Error(); } };", "unsafeThrow"},
 		{"while (true) try {} finally { break; }", "unsafeBreak"},
 		{"while (true) try {} finally { continue; }", "unsafeContinue"},
@@ -27,8 +30,8 @@ func TestNoUnsafeFinallyReportsEscapingControlFlow(t *testing.T) {
 		{"for (var x of arr) try {} finally { break; }", "unsafeBreak"},
 		{"do { try {} finally { break; } } while (true);", "unsafeBreak"},
 	} {
-		result := rule_testing.Run(t, NoUnsafeFinally, "finally.ts", testCase.source)
-		rule_testing.ExpectFindings(t, result, testCase.wantId)
+		result := rule_testing.Run(test, NoUnsafeFinally, "finally.ts", testCase.source)
+		rule_testing.ExpectFindings(test, result, testCase.wantId)
 	}
 }
 
@@ -38,8 +41,8 @@ func TestNoUnsafeFinallyReportsEscapingControlFlow(t *testing.T) {
 // A `return` inside a loop inside finally still escapes, because a loop absorbs a break and not a
 // return. A rule that stopped at any enclosing statement rather than at the ones that actually
 // absorb this kind of jump would go silent on every one of these.
-func TestNoUnsafeFinallyReportsThroughNestedStatements(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeFinallyReportsThroughNestedStatements(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		source string
@@ -51,8 +54,8 @@ func TestNoUnsafeFinallyReportsThroughNestedStatements(t *testing.T) {
 		{"var foo = function() { try {} finally { { throw new Error(); } } };", "unsafeThrow"},
 		{"var foo = function() { try {} finally { try {} catch (e) { return 1; } } };", "unsafeReturn"},
 	} {
-		result := rule_testing.Run(t, NoUnsafeFinally, "nested.ts", testCase.source)
-		rule_testing.ExpectFindings(t, result, testCase.wantId)
+		result := rule_testing.Run(test, NoUnsafeFinally, "nested.ts", testCase.source)
+		rule_testing.ExpectFindings(test, result, testCase.wantId)
 	}
 }
 
@@ -60,8 +63,8 @@ func TestNoUnsafeFinallyReportsThroughNestedStatements(t *testing.T) {
 //
 // A labeled break is absorbed by the labeled statement it names, so whether it escapes depends
 // entirely on where that label sits. Here every label is outside the finally block.
-func TestNoUnsafeFinallyReportsLabeledJumpsLeavingFinally(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeFinallyReportsLabeledJumpsLeavingFinally(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		source string
@@ -74,8 +77,8 @@ func TestNoUnsafeFinallyReportsLabeledJumpsLeavingFinally(t *testing.T) {
 		{"label: for (;;) try {} finally { continue label; }", "unsafeContinue"},
 		{"label: while (true) { try {} finally { while (true) { break label; } } }", "unsafeBreak"},
 	} {
-		result := rule_testing.Run(t, NoUnsafeFinally, "labeled.ts", testCase.source)
-		rule_testing.ExpectFindings(t, result, testCase.wantId)
+		result := rule_testing.Run(test, NoUnsafeFinally, "labeled.ts", testCase.source)
+		rule_testing.ExpectFindings(test, result, testCase.wantId)
 	}
 }
 
@@ -85,12 +88,12 @@ func TestNoUnsafeFinallyReportsLabeledJumpsLeavingFinally(t *testing.T) {
 // a legal target for `break` and not for `continue`, so a switch written inside the finally block
 // absorbs one and not the other. A rule that used one stopping set for both would go silent here
 // while every other fixture stayed green.
-func TestNoUnsafeFinallyReportsContinueThroughSwitch(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeFinallyReportsContinueThroughSwitch(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, NoUnsafeFinally, "switch.ts",
+	result := rule_testing.Run(test, NoUnsafeFinally, "switch.ts",
 		"while (true) try {} finally { switch (true) { case true: continue; } }")
-	rule_testing.ExpectFindings(t, result, "unsafeContinue")
+	rule_testing.ExpectFindings(test, result, "unsafeContinue")
 }
 
 // TestNoUnsafeFinallyStaysSilentWhenTheJumpIsAbsorbed is the half that catches a rule firing on
@@ -99,8 +102,8 @@ func TestNoUnsafeFinallyReportsContinueThroughSwitch(t *testing.T) {
 // The function-boundary cases are the bulk of it, and they are the reason the rule cannot simply ask
 // whether a statement sits inside a finally block: a callback defined in finally is its own control
 // flow, and its `return` belongs to it.
-func TestNoUnsafeFinallyStaysSilentWhenTheJumpIsAbsorbed(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeFinallyStaysSilentWhenTheJumpIsAbsorbed(test *testing.T) {
+	test.Parallel()
 
 	for _, source := range []string{
 		`var foo = function() { try { return 1; } catch (err) { return 2; } finally { console.log("done"); } };`,
@@ -155,7 +158,7 @@ func TestNoUnsafeFinallyStaysSilentWhenTheJumpIsAbsorbed(t *testing.T) {
 		"var foo = function() { try {} finally { while (true) { (function() { return 1; })(); break; } } };",
 		"var foo = function() { try {} finally { (function() { class C { method() { return (() => { return 1; })(); } } })(); } };",
 	} {
-		result := rule_testing.Run(t, NoUnsafeFinally, "clean.ts", source)
-		rule_testing.ExpectClean(t, result)
+		result := rule_testing.Run(test, NoUnsafeFinally, "clean.ts", source)
+		rule_testing.ExpectClean(test, result)
 	}
 }

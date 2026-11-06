@@ -13,5 +13,8 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // zero value, so a generic decode would hand the rule an empty style matching neither arm. The rule
 // would then register on every file and report nothing while every fixture stayed green.
 func init() {
-	rule.Register(rule.Registration{Rule: ClassLiteralPropertyStyle, Decode: DecodeClassLiteralPropertyStyleOptions})
+	rule.Register(rule.Registration[ClassLiteralPropertyStyleOptions]{
+		Rule:   ClassLiteralPropertyStyle,
+		Decode: DecodeClassLiteralPropertyStyleOptions,
+	})
 }

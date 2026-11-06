@@ -48,9 +48,9 @@ var messageEmptyCharacterClass = rule.Message{
 // A pattern the scanner cannot make sense of is skipped rather than reported. An unterminated class
 // is a syntax error that the parser has already refused, so a second complaint here would be noise
 // on a file that does not compile.
-var NoEmptyCharacterClass = rule.Rule{
+var NoEmptyCharacterClass = rule.Rule[rule.NoOptions]{
 	Name: "no-empty-character-class",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindRegularExpressionLiteral: func(node *ast.Node) {
 				text := node.Text()
@@ -82,7 +82,7 @@ var NoEmptyCharacterClass = rule.Rule{
 					if !classIsEmpty(start, end) {
 						return
 					}
-					ctx.ReportRange(
+					ruleContext.ReportRange(
 						core.NewTextRange(patternStart+start, patternStart+end),
 						messageEmptyCharacterClass,
 					)

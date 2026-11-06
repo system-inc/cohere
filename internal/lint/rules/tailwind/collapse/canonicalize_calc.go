@@ -51,7 +51,13 @@ func canonicalizeCalcExpressionsAst(nodes []ValueNode) (bool, []ValueNode) {
 		return ValueNode{
 			Kind:  ValueNodeKindFunction,
 			Value: valueNode.Value,
-			Nodes: []ValueNode{valueNode.Nodes[4], valueNode.Nodes[1], valueNode.Nodes[2], valueNode.Nodes[3], valueNode.Nodes[0]},
+			Nodes: []ValueNode{
+				valueNode.Nodes[4],
+				valueNode.Nodes[1],
+				valueNode.Nodes[2],
+				valueNode.Nodes[3],
+				valueNode.Nodes[0],
+			},
 		}, true
 	})
 

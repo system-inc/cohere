@@ -21,8 +21,8 @@ import (
 //
 // The distinguishing shape is the second segment: a message id is camelCase and therefore never
 // hyphenated, so a hyphen after the slash means the config's `plugin/rule-name` form.
-func TestNormalizeRuleName(t *testing.T) {
-	t.Parallel()
+func TestNormalizeRuleName(test *testing.T) {
+	test.Parallel()
 	cases := []struct {
 		name  string
 		raw   string
@@ -45,20 +45,24 @@ func TestNormalizeRuleName(t *testing.T) {
 		},
 		{name: "short rule and message id", raw: "no-enum/enumDeclared", want: "no-enum"},
 		{name: "bare name", raw: "no-debugger", want: "no-debugger"},
-		{name: "parenthesized plugin", raw: "structure(react-component-no-multiple-primary)", want: "react-component-no-multiple-primary"},
+		{
+			name: "parenthesized plugin",
+			raw:  "structure(react-component-no-multiple-primary)",
+			want: "react-component-no-multiple-primary",
+		},
 		{name: "surrounding space", raw: "  no-debugger  ", want: "no-debugger"},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			got := differential.NormalizeRuleName(testCase.raw)
 			if got != testCase.want {
 				message := "normalizing %q gave %q, wanted %q"
 				if testCase.notes != "" {
 					message += " (" + testCase.notes + ")"
 				}
-				t.Errorf(message, testCase.raw, got, testCase.want)
+				test.Errorf(message, testCase.raw, got, testCase.want)
 			}
 		})
 	}

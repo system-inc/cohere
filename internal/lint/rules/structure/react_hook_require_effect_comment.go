@@ -13,12 +13,18 @@ import (
 
 // reactHookRequireEffectCommentText is the rule's message, whose wording lives in
 // `policy/messages/react-hook-require-effect-comment.json`.
-var reactHookRequireEffectCommentText = policy.MessageOf("structure/react-hook-require-effect-comment", "missingEffectComment")
+var reactHookRequireEffectCommentText = policy.MessageOf(
+	"structure/react-hook-require-effect-comment",
+	"missingEffectComment",
+)
 
 // messageMissingEffectComment is the finding, rendered when it is reported so the text comes from
 // the current catalog.
 func messageMissingEffectComment() rule.Message {
-	return rule.Message{Id: reactHookRequireEffectCommentText.Id, Description: reactHookRequireEffectCommentText.Render(nil)}
+	return rule.Message{
+		Id:          reactHookRequireEffectCommentText.Id,
+		Description: reactHookRequireEffectCommentText.Render(nil),
+	}
 }
 
 // effectCommentPrefix is what the first line of the comment must start with.
@@ -44,10 +50,10 @@ const effectCommentPrefix = "Effect to"
 // The comment is looked up on the enclosing statement rather than the call. Comments attach to
 // statements, so asking at the call expression finds nothing for the ordinary
 // `React.useEffect(...)` written as its own statement.
-var ReactHookRequireEffectComment = rule.Rule{
+var ReactHookRequireEffectComment = rule.Rule[rule.NoOptions]{
 	Name: "structure/react-hook-require-effect-comment",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if !FileContextFor(ctx.SourceFile.FileName().AsString()).IsReactFile {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		if !FileContextFor(ruleContext.SourceFile.FileName().AsString()).IsReactFile {
 			// An effect outside a React file is not a component's effect. Declining here also skips
 			// the comment scan entirely on the majority of files.
 			return nil
@@ -63,8 +69,8 @@ var ReactHookRequireEffectComment = rule.Rule{
 					return
 				}
 
-				if !hasEffectCommentAbove(ctx, node) {
-					ctx.ReportNode(callee, messageMissingEffectComment())
+				if !hasEffectCommentAbove(ruleContext, node) {
+					ruleContext.ReportNode(callee, messageMissingEffectComment())
 				}
 			},
 		}
@@ -82,12 +88,12 @@ var ReactHookRequireEffectComment = rule.Rule{
 // scanned the file itself for every `React.useEffect` call before that existed, which is the cost
 // the shared scan was built to remove: three rules calling a well-factored scan directly each
 // rescanned the file, measured at 807ms, 619ms and 601ms while visiting one node per file.
-func hasEffectCommentAbove(ctx rule.Context, call *ast.Node) bool {
+func hasEffectCommentAbove(ruleContext rule.Context, call *ast.Node) bool {
 	statement := enclosingStatement(call)
 	if statement == nil {
 		return false
 	}
-	run := comments.LeadingRunFor(ctx, statement)
+	run := comments.LeadingRunFor(ruleContext, statement)
 	if len(run) == 0 {
 		return false
 	}

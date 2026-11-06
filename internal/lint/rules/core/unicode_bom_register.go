@@ -13,7 +13,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // matches neither arm and reports nothing at all. That is the live config's own shape, so the
 // fallback is the ordinary path here rather than a defensive one.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[UnicodeBomOptions]{
 		Rule:   UnicodeBom,
 		Decode: DecodeUnicodeBomOptions,
 	})

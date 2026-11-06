@@ -1,7 +1,11 @@
 package micromark
 
 // headingAtx is micromark-core-commonmark/lib/heading-atx.js.
-var headingAtx = &Construct{Name: "headingAtx", Resolve: &Resolver{Resolve: resolveHeadingAtx}, Tokenize: tokenizeHeadingAtx}
+var headingAtx = &Construct{
+	Name:     "headingAtx",
+	Resolve:  &Resolver{Resolve: resolveHeadingAtx},
+	Tokenize: tokenizeHeadingAtx,
+}
 
 func resolveHeadingAtx(events []Event, context *TokenizeContext) []Event {
 	contentEnd := len(events) - 2
@@ -42,7 +46,7 @@ func resolveHeadingAtx(events []Event, context *TokenizeContext) []Event {
 			ContentType: ContentTypeText,
 		}
 
-		events = splice(events, contentStart, contentEnd-contentStart+1, []Event{
+		return splice(events, contentStart, contentEnd-contentStart+1, []Event{
 			{Enter: true, Token: content, Context: context},
 			{Enter: true, Token: text, Context: context},
 			{Enter: false, Token: text, Context: context},
@@ -56,7 +60,12 @@ func resolveHeadingAtx(events []Event, context *TokenizeContext) []Event {
 func tokenizeHeadingAtx(self *Self, effects *Effects, ok State, nok State) State {
 	size := 0
 
-	var start, before, sequenceOpen, atBreak, sequenceFurther, data State
+	var start State
+	var before State
+	var sequenceOpen State
+	var atBreak State
+	var sequenceFurther State
+	var data State
 
 	start = func(code Code) State {
 		// To do: parse indent like `markdown-rs`.
@@ -73,7 +82,7 @@ func tokenizeHeadingAtx(self *Self, effects *Effects, ok State, nok State) State
 		if code == CodeNumberSign {
 			// `size++ < atxHeadingOpeningFenceSizeMax`: the increment happens whether or not the
 			// comparison passes.
-			below := size < atxHeadingOpeningFenceSizeMax
+			below := size < atxHeadingOpeningFenceSizeMaximum
 			size++
 			if below {
 				effects.Consume(code)

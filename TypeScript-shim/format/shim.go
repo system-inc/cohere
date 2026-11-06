@@ -38,8 +38,12 @@ const (
 )
 
 // WithFormatCodeSettings puts settings on a context, which is how the formatter reads them.
-func WithFormatCodeSettings(ctx context.Context, settings FormatCodeSettings, newLine string) context.Context {
-	return format.WithFormatCodeSettings(ctx, settings, newLine)
+func WithFormatCodeSettings(
+	callerContext context.Context,
+	settings FormatCodeSettings,
+	newLine string,
+) context.Context {
+	return format.WithFormatCodeSettings(callerContext, settings, newLine)
 }
 
 // GetDefaultFormatCodeSettings returns TypeScript's own defaults.
@@ -51,6 +55,6 @@ func GetDefaultFormatCodeSettings() FormatCodeSettings {
 }
 
 // FormatDocument returns the text changes that would format a whole file.
-func FormatDocument(ctx context.Context, sourceFile *ast.SourceFile) []core.TextChange {
-	return format.FormatDocument(ctx, sourceFile)
+func FormatDocument(callerContext context.Context, sourceFile *ast.SourceFile) []core.TextChange {
+	return format.FormatDocument(callerContext, sourceFile)
 }

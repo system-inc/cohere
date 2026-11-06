@@ -31,6 +31,13 @@ type EnforceConsistentImportantPositionOptions struct {
 	Position string `json:"position"`
 }
 
+const (
+	// importantPositionRecommended is v4's trailing marker: `flex!`.
+	importantPositionRecommended = "recommended"
+	// importantPositionLegacy is v3's leading marker: `!flex`.
+	importantPositionLegacy = "legacy"
+)
+
 // EnforceConsistentImportantPosition reports an important marker on the wrong side of a utility.
 //
 //	valid:   <div className="text-red-500!" />
@@ -57,7 +64,7 @@ type EnforceConsistentImportantPositionOptions struct {
 //
 // The negative sign is handled as upstream handles it, which is a case a reader would get wrong:
 // `-!mt-4` and `!-mt-4` both report, and both correct to `-mt-4!`. Upstream strips the leading `-`
-// FIRST and looks for `!` after it, so a marker written on either side of the sign is found, and the
+// first and looks for `!` after it, so a marker written on either side of the sign is found, and the
 // rebuild always puts the sign outside. That is why the two spellings collapse onto one answer.
 //
 // A class carrying the marker on both ends is left alone, because the trailing one already
@@ -73,23 +80,23 @@ type EnforceConsistentImportantPositionOptions struct {
 //
 // Not fixable, for the reason its siblings are not: a class literal here wraps across lines with
 // indentation that carries intent, and a fixer would be the first thing to reflow it.
-var EnforceConsistentImportantPosition = rule.Rule{
+var EnforceConsistentImportantPosition = rule.Rule[EnforceConsistentImportantPositionOptions]{
 	Name: "better-tailwindcss/enforce-consistent-important-position",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[EnforceConsistentImportantPositionOptions]) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
 		surfaces := DefaultClassLiteralSurfaces()
 		position := importantPositionRecommended
-		if configured, isConfigured := rule.OptionsAs[EnforceConsistentImportantPositionOptions](options); isConfigured {
+		if configured, isConfigured := options.Read(); isConfigured {
 			surfaces = configured.ClassLiteralSurfaces()
 			if configured.Position == importantPositionLegacy {
 				position = importantPositionLegacy
 			}
 		}
 
-		reader := surfaces.ReaderFor(ctx.FileCache)
+		reader := surfaces.ReaderFor(ruleContext.FileCache)
 
 		report := func(node *ast.Node) {
 			for _, literal := range reader.ClassLiteralsIn(node) {
@@ -98,7 +105,7 @@ var EnforceConsistentImportantPosition = rule.Rule{
 					if !isMisplaced {
 						continue
 					}
-					ctx.ReportRange(literal.Range, messageImportantPosition(className, corrected))
+					ruleContext.ReportRange(literal.Range, messageImportantPosition(className, corrected))
 				}
 			}
 		}
@@ -110,13 +117,6 @@ var EnforceConsistentImportantPosition = rule.Rule{
 		return listeners
 	},
 }
-
-const (
-	// importantPositionRecommended is v4's trailing marker: `flex!`.
-	importantPositionRecommended = "recommended"
-	// importantPositionLegacy is v3's leading marker: `!flex`.
-	importantPositionLegacy = "legacy"
-)
 
 // correctedImportantPosition returns the class with its marker on the configured side.
 //
@@ -164,7 +164,7 @@ func correctedImportantPosition(className string, position string) (string, bool
 	if position == importantPositionLegacy {
 		rebuilt = "!" + rebuilt
 	} else {
-		rebuilt = rebuilt + "!"
+		rebuilt += "!"
 	}
 
 	if prefix != "" {

@@ -24,10 +24,10 @@ import (
 // The first spelling of this test used `result.Instructions` as the denominator and failed at 10 of
 // 12 on the for-of case, which is exactly the residue `eachTerminalValue`'s comment already
 // describes. That was the test being wrong about the tree, not the walk being wrong about the tree.
-// The property that actually matters is stated instead: every `ReactiveInstruction` NODE in the
+// The property that actually matters is stated instead: every `ReactiveInstruction` node in the
 // tree is reached, counted by an independent walk rather than by the builder.
-func TestReactiveVisitorReachesEveryInstruction(t *testing.T) {
-	t.Parallel()
+func TestReactiveVisitorReachesEveryInstruction(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name   string
@@ -39,15 +39,15 @@ func TestReactiveVisitorReachesEveryInstruction(t *testing.T) {
 		{name: "try catch", source: `function f(a) { try { return a.b; } catch (e) { return 0; } }`},
 		{name: "switch", source: `function f(a) { switch (a) { case 1: return 1; default: return 2; } }`},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			function, _ := rangesFor(t, testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			function, _ := rangesFor(test, testCase.source)
 			if function == nil {
-				t.Fatal("the source did not lower, so every assertion below would pass vacuously")
+				test.Fatal("the source did not lower, so every assertion below would pass vacuously")
 			}
 			tree, result := BuildReactiveFunction(function)
 			if tree == nil {
-				t.Fatal("no tree was built")
+				test.Fatal("no tree was built")
 			}
 
 			walked := 0
@@ -60,17 +60,17 @@ func TestReactiveVisitorReachesEveryInstruction(t *testing.T) {
 
 			nodes := countReactiveInstructionNodes(tree.Body)
 			if nodes == 0 {
-				t.Fatal("the tree holds no instruction nodes, so the walk reaching none proves nothing")
+				test.Fatal("the tree holds no instruction nodes, so the walk reaching none proves nothing")
 			}
 			if walked != nodes {
-				t.Errorf("the tree holds %d instruction nodes and the walk reached %d; a consuming "+
+				test.Errorf("the tree holds %d instruction nodes and the walk reached %d; a consuming "+
 					"pass is blind wherever the walk does not go", nodes, walked)
 			}
 			// The builder's own count is higher by the collapsed value blocks described above. It is
-			// asserted as an upper bound rather than ignored, so a walk somehow reaching MORE nodes
+			// asserted as an upper bound rather than ignored, so a walk somehow reaching more nodes
 			// than exist would still fail.
 			if walked > result.Instructions {
-				t.Errorf("the walk reached %d instruction nodes but the builder measured only %d "+
+				test.Errorf("the walk reached %d instruction nodes but the builder measured only %d "+
 					"instructions in the whole tree", walked, result.Instructions)
 			}
 		})
@@ -83,13 +83,13 @@ func TestReactiveVisitorReachesEveryInstruction(t *testing.T) {
 // Every consuming pass depends on it: `pruneNonEscapingScopes` decides a scope does not escape and
 // then declines to descend. If a non-nil hook recursed anyway, the pass would still compile, still
 // pass a shape test, and quietly do nothing -- so the pruning is asserted directly.
-func TestReactiveVisitorPrunesWhenTraverseIsNotCalled(t *testing.T) {
-	t.Parallel()
+func TestReactiveVisitorPrunesWhenTraverseIsNotCalled(test *testing.T) {
+	test.Parallel()
 
-	function, _ := rangesFor(t, `function f(xs) { let t = 0; for (const x of xs) { t = t + x; } return t; }`)
+	function, _ := rangesFor(test, `function f(xs) { let t = 0; for (const x of xs) { t = t + x; } return t; }`)
 	tree, _ := BuildReactiveFunction(function)
 	if tree == nil {
-		t.Fatal("no tree was built")
+		test.Fatal("no tree was built")
 	}
 
 	descended, pruned := 0, 0
@@ -113,17 +113,17 @@ func TestReactiveVisitorPrunesWhenTraverseIsNotCalled(t *testing.T) {
 	})
 
 	if descended == 0 {
-		t.Fatal("the descending walk reached no instruction, so the comparison below is vacuous")
+		test.Fatal("the descending walk reached no instruction, so the comparison below is vacuous")
 	}
 	if pruned >= descended {
-		t.Errorf("declining to traverse reached %d instructions and descending reached %d; not "+
+		test.Errorf("declining to traverse reached %d instructions and descending reached %d; not "+
 			"calling traverse must prune the subtree or every pruning pass is a no-op",
 			pruned, descended)
 	}
 
 	// # Why the comparison above is not sufficient on its own
 	//
-	// A walk that calls the hook and then descends REGARDLESS -- the single-character change of
+	// A walk that calls the hook and then descends regardless -- the single-character change of
 	// dropping the `return` after the hook -- raises both counts by the same amount and leaves the
 	// inequality holding. A mutation sweep found exactly that: the two-walk comparison scored it as
 	// caught when it was not.
@@ -138,30 +138,30 @@ func TestReactiveVisitorPrunesWhenTraverseIsNotCalled(t *testing.T) {
 		}
 	}
 	if pruned != topLevel {
-		t.Errorf("with the terminal hook declining to traverse, the walk reached %d instructions "+
+		test.Errorf("with the terminal hook declining to traverse, the walk reached %d instructions "+
 			"but only %d sit outside any terminal; the walk is descending into a subtree the hook "+
 			"declined", pruned, topLevel)
 	}
 	if topLevel >= descended {
-		t.Fatalf("this source puts %d of its %d instructions at the top level, so pruning the "+
+		test.Fatalf("this source puts %d of its %d instructions at the top level, so pruning the "+
 			"terminals removes nothing and the assertion above is vacuous", topLevel, descended)
 	}
 }
 
 // TestReactiveVisitorSeesSequenceInstructions covers the one nesting a value-only walk would miss.
 //
-// A `ReactiveSequenceValue` carries instructions INSIDE a value, and upstream visits them as
+// A `ReactiveSequenceValue` carries instructions inside a value, and upstream visits them as
 // instructions rather than as values. A walk that only recursed through values would skip them, and
 // this package has already paid for that exact omission once: the first spelling of `valueOf`
 // dropped everything but a block's last instruction and cost 27 functions.
-func TestReactiveVisitorSeesSequenceInstructions(t *testing.T) {
-	t.Parallel()
+func TestReactiveVisitorSeesSequenceInstructions(test *testing.T) {
+	test.Parallel()
 
 	// A for-of loop's Test and Init are value blocks, which is what produces sequence values here.
-	function, _ := rangesFor(t, `function f(xs) { let t = 0; for (const x of xs) { t = t + x; } return t; }`)
+	function, _ := rangesFor(test, `function f(xs) { let t = 0; for (const x of xs) { t = t + x; } return t; }`)
 	tree, result := BuildReactiveFunction(function)
 	if tree == nil {
-		t.Fatal("no tree was built")
+		test.Fatal("no tree was built")
 	}
 
 	sequences, instructionsInSequences := 0, 0
@@ -176,15 +176,15 @@ func TestReactiveVisitorSeesSequenceInstructions(t *testing.T) {
 	})
 
 	if sequences == 0 {
-		t.Skip("this source produced no sequence value, so there is nothing to assert; the loop " +
+		test.Skip("this source produced no sequence value, so there is nothing to assert; the loop " +
 			"arms this case relies on are built by valueOf and may have moved")
 	}
 	if instructionsInSequences == 0 {
-		t.Errorf("%d sequence value(s) carry zero instructions, which is the wrapper being built "+
+		test.Errorf("%d sequence value(s) carry zero instructions, which is the wrapper being built "+
 			"where it is not needed", sequences)
 	}
 	if result.Instructions == 0 {
-		t.Error("the tree reports no instructions at all")
+		test.Error("the tree reports no instructions at all")
 	}
 }
 
@@ -193,12 +193,16 @@ func TestReactiveVisitorSeesSequenceInstructions(t *testing.T) {
 // The cases above prove the property on constructs written to exercise it. This proves it did not
 // stop holding on code nobody wrote for this test, which is the only thing that would catch a
 // terminal variant no hand-written case happens to produce.
-func TestReactiveVisitorCorpus(t *testing.T) {
-	t.Parallel()
+func TestReactiveVisitorCorpus(test *testing.T) {
+	test.Parallel()
 
 	converted, mismatched, treeInstructions, walkedTotal := 0, 0, 0, 0
 
-	forEachCorpusFunction(t, 400, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
+	forEachCorpusFunction(test, 400, func(
+		function *Function,
+		ranges *mutation_aliasing.MutableRanges,
+		scopes *ReactiveScopes,
+	) {
 		aligned, merged := AlignThenMergeReactiveScopes(function, scopes)
 		BuildReactiveScopeTerminals(function, scopes, MergedScopeIdentity{Aligned: aligned, Merged: merged})
 
@@ -225,18 +229,18 @@ func TestReactiveVisitorCorpus(t *testing.T) {
 	})
 
 	if converted < 100 {
-		t.Fatalf("only %d functions converted; the corpus walk is not reaching real source", converted)
+		test.Fatalf("only %d functions converted; the corpus walk is not reaching real source", converted)
 	}
 	if treeInstructions == 0 {
-		t.Fatal("the corpus produced no tree instructions, so a matching walk proves nothing")
+		test.Fatal("the corpus produced no tree instructions, so a matching walk proves nothing")
 	}
 	if mismatched != 0 {
-		t.Errorf("%d of %d functions had a walk that did not reach every tree instruction "+
+		test.Errorf("%d of %d functions had a walk that did not reach every tree instruction "+
 			"(%d reached against %d in the trees); a consuming pass is blind wherever it does not go",
 			mismatched, converted, walkedTotal, treeInstructions)
 	}
 
-	t.Logf("converted=%d treeInstructions=%d walked=%d mismatched=%d",
+	test.Logf("converted=%d treeInstructions=%d walked=%d mismatched=%d",
 		converted, treeInstructions, walkedTotal, mismatched)
 }
 

@@ -49,7 +49,7 @@ import (
 // load; a resolver that wants to ignore an unresolvable import must return a path to an empty file
 // rather than an error, so that "ignored" is a decision the caller made rather than a failure the
 // loader swallowed.
-type StylesheetResolver func(specifier, base string) (path string, err error)
+type StylesheetResolver func(specifier, base string) (path string, resolveError error)
 
 // NodeStylesheetResolver resolves `@import` the way a bundler does, given the root of an installed
 // tailwindcss package.
@@ -85,8 +85,8 @@ func NodeStylesheetResolver(tailwindPackageRoot string) StylesheetResolver {
 type SkippedDirective struct {
 	// Name is the at-rule name, including its `@`.
 	Name string
-	// Params is the at-rule's parameters.
-	Params string
+	// Parameters is the at-rule's parameters.
+	Parameters string
 	// Path is the stylesheet it appeared in.
 	Path string
 }
@@ -101,8 +101,8 @@ func LoadThemeFromFile(path string, resolve StylesheetResolver) (*Theme, []Skipp
 		resolve:  resolve,
 		visiting: make(map[string]bool),
 	}
-	if err := loader.loadFile(path); err != nil {
-		return nil, nil, err
+	if loadFileError := loader.loadFile(path); loadFileError != nil {
+		return nil, nil, loadFileError
 	}
 	return loader.theme, loader.skipped, nil
 }
@@ -122,9 +122,9 @@ type themeLoader struct {
 }
 
 func (loader *themeLoader) loadFile(path string) error {
-	absolutePath, err := filepath.Abs(path)
-	if err != nil {
-		return fmt.Errorf("resolve %s: %w", path, err)
+	absolutePath, absolutePathError := filepath.Abs(path)
+	if absolutePathError != nil {
+		return fmt.Errorf("resolve %s: %w", path, absolutePathError)
 	}
 
 	if loader.visiting[absolutePath] {
@@ -133,14 +133,14 @@ func (loader *themeLoader) loadFile(path string) error {
 	loader.visiting[absolutePath] = true
 	defer delete(loader.visiting, absolutePath)
 
-	content, err := os.ReadFile(absolutePath)
-	if err != nil {
-		return fmt.Errorf("read %s: %w", absolutePath, err)
+	content, readError := os.ReadFile(absolutePath)
+	if readError != nil {
+		return fmt.Errorf("read %s: %w", absolutePath, readError)
 	}
 
-	nodes, err := ParseCSS(string(content))
-	if err != nil {
-		return fmt.Errorf("parse %s: %w", absolutePath, err)
+	nodes, parseCssError := ParseCss(string(content))
+	if parseCssError != nil {
+		return fmt.Errorf("parse %s: %w", absolutePath, parseCssError)
 	}
 
 	return loader.ingest(nodes, absolutePath)
@@ -158,27 +158,27 @@ func (loader *themeLoader) ingest(nodes []*Node, path string) error {
 	for _, node := range nodes {
 		switch {
 		case node.Kind == KindAtRule && node.Name == "@import":
-			if err := loader.followImport(node, path); err != nil {
-				return err
+			if followImportError := loader.followImport(node, path); followImportError != nil {
+				return followImportError
 			}
 
 		case node.Kind == KindAtRule && node.Name == "@theme":
-			if err := loader.ingestThemeBlock(node, path); err != nil {
-				return err
+			if ingestThemeBlockError := loader.ingestThemeBlock(node, path); ingestThemeBlockError != nil {
+				return ingestThemeBlockError
 			}
 
 		case node.Kind == KindAtRule && (node.Name == "@config" || node.Name == "@plugin"):
 			loader.skipped = append(loader.skipped, SkippedDirective{
-				Name:   node.Name,
-				Params: node.Params,
-				Path:   path,
+				Name:       node.Name,
+				Parameters: node.Parameters,
+				Path:       path,
 			})
 
 		case node.IsContainer():
 			// `@layer theme { @theme default { ... } }` is how the framework's own index.css is
 			// written, so descending into container at-rules is required rather than defensive.
-			if err := loader.ingest(node.Nodes, path); err != nil {
-				return err
+			if ingestError := loader.ingest(node.Nodes, path); ingestError != nil {
+				return ingestError
 			}
 		}
 	}
@@ -194,7 +194,7 @@ func (loader *themeLoader) ingest(nodes []*Node, path string) error {
 // as a plain one produces a theme whose entries all lack ThemeOptionReference, which is a wrong
 // answer that looks exactly like a right one.
 func (loader *themeLoader) followImport(node *Node, path string) error {
-	parts := segment(text.TrimWhitespace(node.Params), ' ')
+	parts := segment(text.TrimWhitespace(node.Parameters), ' ')
 	if len(parts) == 0 || parts[0] == "" {
 		return fmt.Errorf("%s: @import with no specifier", path)
 	}
@@ -217,9 +217,9 @@ func (loader *themeLoader) followImport(node *Node, path string) error {
 		)
 	}
 
-	resolved, err := loader.resolve(specifier, filepath.Dir(path))
-	if err != nil {
-		return fmt.Errorf("%s: resolve @import %q: %w", path, specifier, err)
+	resolved, resolveError := loader.resolve(specifier, filepath.Dir(path))
+	if resolveError != nil {
+		return fmt.Errorf("%s: resolve @import %q: %w", path, specifier, resolveError)
 	}
 	return loader.loadFile(resolved)
 }
@@ -235,7 +235,7 @@ func (loader *themeLoader) followImport(node *Node, path string) error {
 // is reproduced: a stylesheet the engine rejects must not quietly produce a theme here, since any
 // theme built from input the engine refuses is one no repository can actually be using.
 func (loader *themeLoader) ingestThemeBlock(node *Node, path string) error {
-	options, prefix := parseThemeOptions(node.Params)
+	options, prefix := parseThemeOptions(node.Parameters)
 
 	if prefix != "" {
 		if !isValidThemePrefix(prefix) {
@@ -247,7 +247,7 @@ func (loader *themeLoader) ingestThemeBlock(node *Node, path string) error {
 		loader.theme.Prefix = prefix
 	}
 
-	var walkErr error
+	var walkError error
 	Walk(node.Nodes, func(child *Node) WalkAction {
 		if child.Kind == KindAtRule && child.Name == "@keyframes" {
 			// Upstream collects these to re-emit; cohere emits no CSS. See theme.go.
@@ -261,8 +261,12 @@ func (loader *themeLoader) ingestThemeBlock(node *Node, path string) error {
 		if child.Kind == KindDeclaration && strings.HasPrefix(child.Property, "--") {
 			// The property is unescaped on the way in, so `--color-a\/b` is stored as
 			// `--color-a/b`. GetOptions and MarkUsedVariable unescape their arguments to match.
-			if err := loader.theme.Add(unescapeCSSIdentifier(child.Property), child.Value, options); err != nil {
-				walkErr = fmt.Errorf("%s: %w", path, err)
+			if addError := loader.theme.Add(
+				unescapeCssIdentifier(child.Property),
+				child.Value,
+				options,
+			); addError != nil {
+				walkError = fmt.Errorf("%s: %w", path, addError)
 				return WalkStop
 			}
 			return WalkContinue
@@ -275,14 +279,14 @@ func (loader *themeLoader) ingestThemeBlock(node *Node, path string) error {
 			return WalkContinue
 		}
 
-		walkErr = fmt.Errorf(
+		walkError = fmt.Errorf(
 			"%s: `@theme` blocks must only contain custom properties or `@keyframes`, found %s %q",
 			path, child.Kind, child.Property,
 		)
 		return WalkStop
 	})
 
-	return walkErr
+	return walkError
 }
 
 // parseThemeOptions reads an `@theme` block's params, and is upstream's `parseThemeOptions`.
@@ -290,11 +294,11 @@ func (loader *themeLoader) ingestThemeBlock(node *Node, path string) error {
 // The options are a space-separated set of bare words plus an optional `prefix(ident)`. An
 // unrecognized word is ignored, matching upstream, which tests for each known option and falls
 // through silently otherwise.
-func parseThemeOptions(params string) (ThemeOptions, string) {
+func parseThemeOptions(parameters string) (ThemeOptions, string) {
 	options := ThemeOptionNone
 	prefix := ""
 
-	for _, option := range segment(text.TrimWhitespace(params), ' ') {
+	for _, option := range segment(text.TrimWhitespace(parameters), ' ') {
 		switch {
 		case option == "reference":
 			options |= ThemeOptionReference

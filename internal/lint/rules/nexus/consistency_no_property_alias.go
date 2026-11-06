@@ -81,13 +81,13 @@ var consistencyNoPropertyAliasText = policy.MessageOf("nexus/consistency-no-prop
 // **An annotation that does work.** `const value: unknown = event.data` over a DOM `any`, or a
 // `readonly` view of a mutable list, gives the local a type the reach does not have. Exempt when the
 // local's annotated type differs from its initializer's (3 sites).
-var ConsistencyNoPropertyAlias = rule.Rule{
+var ConsistencyNoPropertyAlias = rule.Rule[rule.NoOptions]{
 	Name: "nexus/consistency-no-property-alias",
 	// Asked whether a link is a getter, what a link's declared and narrowed types are, and what an
 	// annotation names. The getter question reads an imported declaration, so the findings key on the
 	// closure's contents, the default; the release guard refuses a shapes claim here.
 	NeedsTypeChecker: true,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindVariableDeclaration: func(node *ast.Node) {
 				declaration := node.AsVariableDeclaration()
@@ -143,15 +143,15 @@ var ConsistencyNoPropertyAlias = rule.Rule{
 					return
 				}
 
-				if isReadInsideHookDependencyArray(ctx, enclosing, localName, name) {
+				if isReadInsideHookDependencyArray(ruleContext, enclosing, localName, name) {
 					return
 				}
 
-				if isWrittenAfterItsDeclaration(ctx, enclosing, localName, name) {
+				if isWrittenAfterItsDeclaration(ruleContext, enclosing, localName, name) {
 					return
 				}
 
-				if isSnapshotTakenBeforeItsSourceIsWritten(ctx, enclosing, node, localName, name, initializer) {
+				if isSnapshotTakenBeforeItsSourceIsWritten(ruleContext, enclosing, node, localName, name, initializer) {
 					return
 				}
 
@@ -159,28 +159,33 @@ var ConsistencyNoPropertyAlias = rule.Rule{
 					return
 				}
 
-				if ctx.TypeChecker != nil {
-					if chainReadsAGetter(ctx, initializer) {
+				if ruleContext.TypeChecker != nil {
+					if chainReadsAGetter(ruleContext, initializer) {
 						return
 					}
-					if isReadInsideANestedFunction(ctx, enclosing, localName, name) && chainIsNarrowed(ctx, initializer) {
+					if isReadInsideANestedFunction(ruleContext, enclosing, localName, name) &&
+						chainIsNarrowed(ruleContext, initializer) {
 						return
 					}
-					if isNarrowedWhereAClosureReadsIt(ctx, enclosing, localName, name) {
+					if isNarrowedWhereAClosureReadsIt(ruleContext, enclosing, localName, name) {
 						return
 					}
 					if declaration.Type != nil &&
-						ctx.TypeChecker.GetTypeFromTypeNode(declaration.Type) != ctx.TypeChecker.GetTypeAtLocation(initializer) {
+						ruleContext.TypeChecker.GetTypeFromTypeNode(
+							declaration.Type,
+						) != ruleContext.TypeChecker.GetTypeAtLocation(initializer) {
 						return
 					}
 				}
 
-				sourceText := rule.TokenRange(ctx.SourceFile, access.Expression)
-				objectText := ctx.SourceFile.Text()[sourceText.Pos():sourceText.End()]
+				sourceText := rule.TokenRange(ruleContext.SourceFile, access.Expression)
+				objectText := ruleContext.SourceFile.Text()[sourceText.Pos():sourceText.End()]
 
-				ctx.ReportNode(node, rule.Message{
-					Id:          consistencyNoPropertyAliasText.Id,
-					Description: consistencyNoPropertyAliasText.Render(map[string]string{"name": localName, "object": objectText}),
+				ruleContext.ReportNode(node, rule.Message{
+					Id: consistencyNoPropertyAliasText.Id,
+					Description: consistencyNoPropertyAliasText.Render(
+						map[string]string{"name": localName, "object": objectText},
+					),
 				})
 			},
 		}
@@ -252,7 +257,12 @@ func chainContainsCall(expression *ast.Node) bool {
 // The whole function is searched rather than the statements near the declaration, because the array
 // that justifies the alias is usually several lines below it. The declaration's own name node is
 // excluded, since the binding is not a read of itself.
-func isReadInsideHookDependencyArray(ctx rule.Context, enclosing *ast.Node, localName string, declarationName *ast.Node) bool {
+func isReadInsideHookDependencyArray(
+	ruleContext rule.Context,
+	enclosing *ast.Node,
+	localName string,
+	declarationName *ast.Node,
+) bool {
 	found := false
 
 	var walk func(node *ast.Node) bool
@@ -273,7 +283,7 @@ func isReadInsideHookDependencyArray(ctx rule.Context, enclosing *ast.Node, loca
 					if index == 0 || argument.Kind != ast.KindArrayLiteralExpression {
 						continue
 					}
-					if arrayMentions(ctx, argument, localName, declarationName) {
+					if arrayMentions(ruleContext, argument, localName, declarationName) {
 						found = true
 						return true
 					}
@@ -293,7 +303,7 @@ func isReadInsideHookDependencyArray(ctx rule.Context, enclosing *ast.Node, loca
 // An entry may be the bare identifier or the head of a longer reach (`value.property`), so the walk
 // descends rather than comparing top-level elements. The declaration's own name node is skipped
 // because a binding is not a read.
-func arrayMentions(ctx rule.Context, array *ast.Node, localName string, declarationName *ast.Node) bool {
+func arrayMentions(ruleContext rule.Context, array *ast.Node, localName string, declarationName *ast.Node) bool {
 	mentioned := false
 
 	var walk func(node *ast.Node) bool
@@ -301,7 +311,7 @@ func arrayMentions(ctx rule.Context, array *ast.Node, localName string, declarat
 		if node == nil || mentioned {
 			return false
 		}
-		if referencesTheLocal(ctx, node, localName, declarationName) {
+		if referencesTheLocal(ruleContext, node, localName, declarationName) {
 			mentioned = true
 			return true
 		}
@@ -315,14 +325,19 @@ func arrayMentions(ctx rule.Context, array *ast.Node, localName string, declarat
 
 // isWrittenAfterItsDeclaration reports whether anything in the enclosing function writes the local's
 // name again: an assignment, a compound assignment, an update, or a destructuring target.
-func isWrittenAfterItsDeclaration(ctx rule.Context, enclosing *ast.Node, localName string, declarationName *ast.Node) bool {
+func isWrittenAfterItsDeclaration(
+	ruleContext rule.Context,
+	enclosing *ast.Node,
+	localName string,
+	declarationName *ast.Node,
+) bool {
 	written := false
 	var walk func(node *ast.Node) bool
 	walk = func(node *ast.Node) bool {
 		if node == nil || written {
 			return false
 		}
-		if referencesTheLocal(ctx, node, localName, declarationName) && reference.WritesToBinding(node) {
+		if referencesTheLocal(ruleContext, node, localName, declarationName) && reference.WritesToBinding(node) {
 			written = true
 			return true
 		}
@@ -340,14 +355,21 @@ func isWrittenAfterItsDeclaration(ctx rule.Context, enclosing *ast.Node, localNa
 // `const value = state.inner.value`, a write to `state.inner.value`, to `state.inner` or to `state`
 // each changes what a reach at the read would see. A write is an assignment of any operator, an
 // update, or a `delete`.
-func isSnapshotTakenBeforeItsSourceIsWritten(ctx rule.Context, enclosing *ast.Node, declaration *ast.Node, localName string, declarationName *ast.Node, initializer *ast.Node) bool {
+func isSnapshotTakenBeforeItsSourceIsWritten(
+	ruleContext rule.Context,
+	enclosing *ast.Node,
+	declaration *ast.Node,
+	localName string,
+	declarationName *ast.Node,
+	initializer *ast.Node,
+) bool {
 	lastRead := -1
 	var findLastRead func(node *ast.Node) bool
 	findLastRead = func(node *ast.Node) bool {
 		if node == nil {
 			return false
 		}
-		if referencesTheLocal(ctx, node, localName, declarationName) && !reference.WritesToBinding(node) &&
+		if referencesTheLocal(ruleContext, node, localName, declarationName) && !reference.WritesToBinding(node) &&
 			node.End() > lastRead {
 			lastRead = node.End()
 		}
@@ -417,13 +439,14 @@ func writeTarget(node *ast.Node) *ast.Node {
 // unwrapReach sees through what does not change which value an expression reaches: parentheses, a
 // non-null assertion, and a type assertion.
 func unwrapReach(node *ast.Node) *ast.Node {
-	for node != nil {
-		switch node.Kind {
+	current := node
+	for current != nil {
+		switch current.Kind {
 		case ast.KindParenthesizedExpression, ast.KindNonNullExpression, ast.KindAsExpression,
 			ast.KindSatisfiesExpression, ast.KindTypeAssertionExpression:
-			node = node.Expression()
+			current = current.Expression()
 		default:
-			return node
+			return current
 		}
 	}
 	return nil
@@ -432,19 +455,20 @@ func unwrapReach(node *ast.Node) *ast.Node {
 // sameReach reports whether two expressions name the same place by spelling: the same identifier,
 // `this`, or the same property of the same reach.
 func sameReach(first *ast.Node, second *ast.Node) bool {
-	first, second = unwrapReach(first), unwrapReach(second)
-	if first == nil || second == nil || first.Kind != second.Kind {
+	firstReach, secondReach := unwrapReach(first), unwrapReach(second)
+	if firstReach == nil || secondReach == nil || firstReach.Kind != secondReach.Kind {
 		return false
 	}
-	switch first.Kind {
+	switch firstReach.Kind {
 	case ast.KindIdentifier:
-		return first.Text() == second.Text()
+		return firstReach.Text() == secondReach.Text()
 	case ast.KindThisKeyword:
 		return true
 	case ast.KindPropertyAccessExpression:
-		firstName, secondName := first.AsPropertyAccessExpression().Name(), second.AsPropertyAccessExpression().Name()
+		firstAccess, secondAccess := firstReach.AsPropertyAccessExpression(), secondReach.AsPropertyAccessExpression()
+		firstName, secondName := firstAccess.Name(), secondAccess.Name()
 		return firstName != nil && secondName != nil && firstName.Text() == secondName.Text() &&
-			sameReach(first.AsPropertyAccessExpression().Expression, second.AsPropertyAccessExpression().Expression)
+			sameReach(firstAccess.Expression, secondAccess.Expression)
 	}
 	return false
 }
@@ -481,9 +505,9 @@ func propertyLinks(initializer *ast.Node) []*ast.Node {
 }
 
 // chainReadsAGetter reports whether a property link of the reach resolves to a get accessor.
-func chainReadsAGetter(ctx rule.Context, initializer *ast.Node) bool {
+func chainReadsAGetter(ruleContext rule.Context, initializer *ast.Node) bool {
 	for _, link := range propertyLinks(initializer) {
-		symbol := ctx.TypeChecker.GetSymbolAtLocation(link.AsPropertyAccessExpression().Name())
+		symbol := ruleContext.TypeChecker.GetSymbolAtLocation(link.AsPropertyAccessExpression().Name())
 		if symbol == nil {
 			continue
 		}
@@ -501,13 +525,13 @@ func chainReadsAGetter(ctx rule.Context, initializer *ast.Node) bool {
 
 // chainIsNarrowed reports whether a property link of the reach has a type at the declaration other
 // than its declared type, which is a narrowing a closure reading the link would not see.
-func chainIsNarrowed(ctx rule.Context, initializer *ast.Node) bool {
+func chainIsNarrowed(ruleContext rule.Context, initializer *ast.Node) bool {
 	for _, link := range propertyLinks(initializer) {
-		symbol := ctx.TypeChecker.GetSymbolAtLocation(link.AsPropertyAccessExpression().Name())
+		symbol := ruleContext.TypeChecker.GetSymbolAtLocation(link.AsPropertyAccessExpression().Name())
 		if symbol == nil {
 			continue
 		}
-		if ctx.TypeChecker.GetTypeOfSymbol(symbol) != ctx.TypeChecker.GetTypeAtLocation(link) {
+		if ruleContext.TypeChecker.GetTypeOfSymbol(symbol) != ruleContext.TypeChecker.GetTypeAtLocation(link) {
 			return true
 		}
 	}
@@ -516,14 +540,19 @@ func chainIsNarrowed(ctx rule.Context, initializer *ast.Node) bool {
 
 // isReadInsideANestedFunction reports whether the local is read inside a function within the one
 // that declares it.
-func isReadInsideANestedFunction(ctx rule.Context, enclosing *ast.Node, localName string, declarationName *ast.Node) bool {
+func isReadInsideANestedFunction(
+	ruleContext rule.Context,
+	enclosing *ast.Node,
+	localName string,
+	declarationName *ast.Node,
+) bool {
 	found := false
 	var walk func(node *ast.Node) bool
 	walk = func(node *ast.Node) bool {
 		if node == nil || found {
 			return false
 		}
-		if referencesTheLocal(ctx, node, localName, declarationName) && !reference.WritesToBinding(node) &&
+		if referencesTheLocal(ruleContext, node, localName, declarationName) && !reference.WritesToBinding(node) &&
 			scope.EnclosingFunctionLike(node) != enclosing {
 			found = true
 			return true
@@ -542,7 +571,7 @@ func isReadInsideANestedFunction(ctx rule.Context, enclosing *ast.Node, localNam
 // Production declares NeedsTypeChecker, so compare symbols to exclude shadowing parameters and
 // other same-named bindings in every exemption walk. Without a checker, retain the syntactic,
 // name-only match for untyped rule execution, where binding identity is unavailable.
-func referencesTheLocal(ctx rule.Context, node *ast.Node, localName string, declarationName *ast.Node) bool {
+func referencesTheLocal(ruleContext rule.Context, node *ast.Node, localName string, declarationName *ast.Node) bool {
 	if node.Kind != ast.KindIdentifier || node == declarationName || node.Text() != localName {
 		return false
 	}
@@ -555,11 +584,11 @@ func referencesTheLocal(ctx rule.Context, node *ast.Node, localName string, decl
 			return false
 		}
 	}
-	if ctx.TypeChecker != nil {
-		symbol := ctx.TypeChecker.GetSymbolAtLocation(declarationName)
+	if ruleContext.TypeChecker != nil {
+		symbol := ruleContext.TypeChecker.GetSymbolAtLocation(declarationName)
 		// ReadSymbol uses GetSymbolAtLocation for ordinary identifiers and resolves a
 		// shorthand to its value binding rather than the object literal's property symbol.
-		return symbol != nil && reference.ReadSymbol(ctx.TypeChecker, node) == symbol
+		return symbol != nil && reference.ReadSymbol(ruleContext.TypeChecker, node) == symbol
 	}
 	return true
 }
@@ -567,20 +596,27 @@ func referencesTheLocal(ctx rule.Context, node *ast.Node, localName string, decl
 // isNarrowedWhereAClosureReadsIt reports whether the local is read inside a nested function at a type
 // other than its declared one, which is a narrowing of the local the closure keeps and a reach of the
 // property path inside that closure would lose.
-func isNarrowedWhereAClosureReadsIt(ctx rule.Context, enclosing *ast.Node, localName string, declarationName *ast.Node) bool {
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(declarationName)
+func isNarrowedWhereAClosureReadsIt(
+	ruleContext rule.Context,
+	enclosing *ast.Node,
+	localName string,
+	declarationName *ast.Node,
+) bool {
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(declarationName)
 	if symbol == nil {
 		return false
 	}
-	declared := ctx.TypeChecker.GetTypeOfSymbol(symbol)
+	declared := ruleContext.TypeChecker.GetTypeOfSymbol(symbol)
 	found := false
 	var walk func(node *ast.Node) bool
 	walk = func(node *ast.Node) bool {
 		if node == nil || found {
 			return false
 		}
-		if referencesTheLocal(ctx, node, localName, declarationName) && !reference.WritesToBinding(node) &&
-			scope.EnclosingFunctionLike(node) != enclosing && ctx.TypeChecker.GetTypeAtLocation(node) != declared {
+		if referencesTheLocal(ruleContext, node, localName, declarationName) &&
+			!reference.WritesToBinding(node) &&
+			scope.EnclosingFunctionLike(node) != enclosing &&
+			ruleContext.TypeChecker.GetTypeAtLocation(node) != declared {
 			found = true
 			return true
 		}

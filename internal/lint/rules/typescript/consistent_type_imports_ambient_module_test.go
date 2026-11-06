@@ -11,8 +11,8 @@ import (
 // ESLint 10.8.1 with typescript-eslint 8.71.0 reports and writes for the same source: the
 // findings' spans and the fixed text both. Upstream's own corpus has no declare-module rows to
 // replay, so the release binary is the authority here.
-func TestConsistentTypeImportsReachesAmbientModuleBodies(t *testing.T) {
-	t.Parallel()
+func TestConsistentTypeImportsReachesAmbientModuleBodies(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name     string
@@ -58,31 +58,31 @@ func TestConsistentTypeImportsReachesAmbientModuleBodies(t *testing.T) {
 				"  const component: DefineComponent\n  export default component\n}\n",
 		},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, ConsistentTypeImports, testCase.fileName, testCase.source,
-				decodeConsistentTypeImportsFixtureOptions(t, testCase.options))
-			rule_testing.ExpectFindings(t, result, testCase.ids...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, ConsistentTypeImports, testCase.fileName, testCase.source,
+				decodeConsistentTypeImportsFixtureOptions(test, testCase.options))
+			rule_testing.ExpectFindings(test, result, testCase.ids...)
 			for position, diagnostic := range result.Diagnostics {
 				if position >= len(testCase.spans) {
 					break
 				}
 				covered := result.SourceFile.Text()[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if covered != testCase.spans[position] {
-					t.Errorf("finding %d covers %q, want %q", position, covered, testCase.spans[position])
+					test.Errorf("finding %d covers %q, want %q", position, covered, testCase.spans[position])
 				}
 			}
-			rule_testing.ExpectFixedSource(t, result, testCase.fixed)
+			rule_testing.ExpectFixedSource(test, result, testCase.fixed)
 		})
 	}
 }
 
 // A binding the module body uses as a value stays a value import, inside the body as at the top.
-func TestConsistentTypeImportsLeavesAmbientValueImports(t *testing.T) {
-	t.Parallel()
+func TestConsistentTypeImportsLeavesAmbientValueImports(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTypedWithOptions(t, ConsistentTypeImports, "value-use.d.ts",
+	result := rule_testing.RunTypedWithOptions(test, ConsistentTypeImports, "value-use.d.ts",
 		"declare module 'made' {\n  import { thing } from 'x'\n  export default thing\n}\n",
 		DefaultConsistentTypeImportsOptions())
-	rule_testing.ExpectClean(t, result)
+	rule_testing.ExpectClean(test, result)
 }

@@ -8,8 +8,8 @@ import (
 
 const separateExportFile = "/repository/source/components/Button.tsx"
 
-func TestReactComponentNoSeparateNamedExportFires(t *testing.T) {
-	t.Parallel()
+func TestReactComponentNoSeparateNamedExportFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -37,21 +37,22 @@ func TestReactComponentNoSeparateNamedExportFires(t *testing.T) {
 		// A component detected by its hook calls rather than by JSX.
 		{
 			"a component that calls hooks and returns nothing",
-			"import React from 'react';\nfunction Button() {\n    React.useEffect(() => {}, []);\n    return null;\n}\n" +
+			"import React from 'react';\nfunction Button() {\n" +
+				"    React.useEffect(() => {}, []);\n    return null;\n}\n" +
 				"export { Button };\n",
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.Run(t, ReactComponentNoSeparateNamedExport,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.Run(test, ReactComponentNoSeparateNamedExport,
 				separateExportFile, testCase.sourceText), "noSeparateNamedExport")
 		})
 	}
 }
 
-func TestReactComponentNoSeparateNamedExportStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestReactComponentNoSeparateNamedExportStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -153,7 +154,8 @@ func TestReactComponentNoSeparateNamedExportStaysSilent(t *testing.T) {
 		{
 			"a component-shaped export in a ts file",
 			"/repository/source/api/Thing.ts",
-			"import React from 'react';\nfunction Button() {\n    React.useEffect(() => {}, []);\n    return null;\n}\n" +
+			"import React from 'react';\nfunction Button() {\n" +
+				"    React.useEffect(() => {}, []);\n    return null;\n}\n" +
 				"export { Button };\n",
 		},
 		{
@@ -163,9 +165,9 @@ func TestReactComponentNoSeparateNamedExportStaysSilent(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, ReactComponentNoSeparateNamedExport,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, ReactComponentNoSeparateNamedExport,
 				testCase.fileName, testCase.sourceText))
 		})
 	}
@@ -186,13 +188,13 @@ func TestReactComponentNoSeparateNamedExportStaysSilent(t *testing.T) {
 // otherwise, on the first fixable rule I have written since it existed. An id-only fixture would
 // have agreed with me.
 //
-// This test used to assert the DEFECT. Its expected outputs were the source with the list deleted
+// This test used to assert the defect. Its expected outputs were the source with the list deleted
 // and no `export` anywhere, so every component the fixer touched was unexported and the suite
 // stayed green, because the fixture recorded what the fixer did rather than what the file needed.
 // The outputs below carry the export onto each declaration, which is the only rewrite that leaves
 // every importer resolving.
-func TestReactComponentNoSeparateNamedExportFixMovesTheExportOntoTheDeclaration(t *testing.T) {
-	t.Parallel()
+func TestReactComponentNoSeparateNamedExportFixMovesTheExportOntoTheDeclaration(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -229,7 +231,7 @@ func TestReactComponentNoSeparateNamedExportFixMovesTheExportOntoTheDeclaration(
 			"const Button = () => <button />;\nexport { Button };\n",
 			"export const Button = () => <button />;\n\n",
 		},
-		// A list written ABOVE the declaration it names, which hoisting makes legal.
+		// A list written above the declaration it names, which hoisting makes legal.
 		{
 			"a list before its declaration",
 			"export { Button };\nfunction Button() {\n    return <button />;\n}\n",
@@ -237,17 +239,22 @@ func TestReactComponentNoSeparateNamedExportFixMovesTheExportOntoTheDeclaration(
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ReactComponentNoSeparateNamedExport, separateExportFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "noSeparateNamedExport")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(
+				test,
+				ReactComponentNoSeparateNamedExport,
+				separateExportFile,
+				testCase.sourceText,
+			)
+			rule_testing.ExpectFindings(test, result, "noSeparateNamedExport")
 			if len(result.Diagnostics[0].Fixes) != 1 {
 				// One edit, not a deletion plus insertions. The engine applies a diagnostic's fixes
 				// independently, and a deletion landing without its insertion is the original
 				// defect.
-				t.Fatalf("expected the repair as one edit, got %d", len(result.Diagnostics[0].Fixes))
+				test.Fatalf("expected the repair as one edit, got %d", len(result.Diagnostics[0].Fixes))
 			}
-			rule_testing.ExpectFixedSource(t, result, testCase.wantFixed)
+			rule_testing.ExpectFixedSource(test, result, testCase.wantFixed)
 		})
 	}
 }
@@ -257,8 +264,8 @@ func TestReactComponentNoSeparateNamedExportFixMovesTheExportOntoTheDeclaration(
 // Each is reported, because the list is still the shape the rule exists to flag, and none carries a
 // repair, because moving the export would change what the module offers. The first row is the one
 // the deleting fixer got most wrong: it unexported `value`, a name the rule has no opinion on.
-func TestReactComponentNoSeparateNamedExportDeclinesWhereTheExportCannotMove(t *testing.T) {
-	t.Parallel()
+func TestReactComponentNoSeparateNamedExportDeclinesWhereTheExportCannotMove(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -282,13 +289,18 @@ func TestReactComponentNoSeparateNamedExportDeclinesWhereTheExportCannotMove(t *
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ReactComponentNoSeparateNamedExport, separateExportFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "noSeparateNamedExport")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(
+				test,
+				ReactComponentNoSeparateNamedExport,
+				separateExportFile,
+				testCase.sourceText,
+			)
+			rule_testing.ExpectFindings(test, result, "noSeparateNamedExport")
 			diagnostic := result.Diagnostics[0]
 			if len(diagnostic.Fixes) != 0 || len(diagnostic.Suggestions) != 0 {
-				t.Fatalf("expected no repair, got %d fixes and %d suggestions",
+				test.Fatalf("expected no repair, got %d fixes and %d suggestions",
 					len(diagnostic.Fixes), len(diagnostic.Suggestions))
 			}
 		})

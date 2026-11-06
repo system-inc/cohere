@@ -1,0 +1,7 @@
+{
+	"go": {
+		"rules": {
+			"cohere-go/correctness-report-limit": ["error", {"nope": true}]
+		}
+	}
+}

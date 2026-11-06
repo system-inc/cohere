@@ -42,7 +42,7 @@ func DefaultIdMatchSettings() IdMatchSettings {
 
 // idMatchRawOptions is the wire shape of the second tuple element.
 //
-// Every field is a plain bool rather than a pointer because every default is FALSE, so a zero value
+// Every field is a plain bool rather than a pointer because every default is `false`, so a zero value
 // and an absent key mean the same thing. That is the opposite of `no-invalid-this`, whose one
 // option defaults true and therefore needs pointers to tell absent from false.
 type idMatchRawOptions struct {
@@ -78,22 +78,22 @@ type idMatchRawOptions struct {
 // would throw at `new RegExp(pattern, "u")`, and a rule that quietly matched everything instead
 // would be inert while looking configured, which is the worst of the two failures. So is a flag key
 // upstream's schema does not declare, which `additionalProperties: false` refuses there.
-func DecodeIdMatchOptions(list []byte) (any, error) {
+func DecodeIdMatchOptions(list []byte) (IdMatchSettings, error) {
 	settings := DefaultIdMatchSettings()
-	elements, err := rule.OptionElements(list, 2)
-	if err != nil || len(elements) == 0 {
-		return settings, err
+	elements, optionElementsError := rule.OptionElements(list, 2)
+	if optionElementsError != nil || len(elements) == 0 {
+		return settings, optionElementsError
 	}
 
 	var patternText string
-	if err := json.Unmarshal(elements[0], &patternText); err != nil {
+	if decodeError := json.Unmarshal(elements[0], &patternText); decodeError != nil {
 		return settings, fmt.Errorf("id-match element 1 takes a pattern string, got %s", elements[0])
 	}
 
 	if len(elements) > 1 {
 		var flags idMatchRawOptions
-		if err := rule.UnmarshalOptions(elements[1], &flags); err != nil {
-			return settings, fmt.Errorf("id-match element 2: %w", err)
+		if unmarshalOptionsError := rule.UnmarshalOptions(elements[1], &flags); unmarshalOptionsError != nil {
+			return settings, fmt.Errorf("id-match element 2: %w", unmarshalOptionsError)
 		}
 		settings.CheckProperties = flags.Properties
 		settings.CheckClassFields = flags.ClassFields
@@ -107,9 +107,9 @@ func DecodeIdMatchOptions(list []byte) (any, error) {
 
 	// Upstream's `new RegExp(pattern, "u")`, read as JavaScript reads it: RE2 refuses a lookaround or
 	// a backreference its user wrote, and reads `\s` and `\b` differently (#7mztrdd).
-	compiled, err := esregexp.Compile(patternText, "u")
-	if err != nil {
-		return settings, fmt.Errorf("id-match pattern %q does not compile: %w", patternText, err)
+	compiled, compileError := esregexp.Compile(patternText, "u")
+	if compileError != nil {
+		return settings, fmt.Errorf("id-match pattern %q does not compile: %w", patternText, compileError)
 	}
 	settings.Pattern = compiled
 	settings.PatternText = patternText
@@ -117,8 +117,8 @@ func DecodeIdMatchOptions(list []byte) (any, error) {
 }
 
 // idMatchSettingsFrom recovers the settings from whatever the config layer handed over.
-func idMatchSettingsFrom(options any) IdMatchSettings {
-	if settings, ok := rule.OptionsAs[IdMatchSettings](options); ok {
+func idMatchSettingsFrom(options rule.Given[IdMatchSettings]) IdMatchSettings {
+	if settings, ok := options.Read(); ok {
 		return settings
 	}
 	return DefaultIdMatchSettings()
@@ -160,7 +160,7 @@ var messageIdMatchNotMatchPrivate = rule.Message{
 //
 // A sibling port in this batch found `react/prefer-exact-props` carrying the same audit verdict as
 // this rule -- "Yes, violations: none" -- while being structurally incapable of firing here: its
-// only reporting path reads `settings.propWrapperFunctions`, a SHARED ESLint setting that
+// only reporting path reads `settings.propWrapperFunctions`, a shared ESLint setting that
 // `rule.Context` has no path to and that ahra configures nowhere. The ruling is at
 // `internal/lint/rules/react/forbid_prop_types.go:158-183`. So the audit's zero cannot by itself
 // tell a clean tree from a rule that cannot report at all, and both readings had to be separated
@@ -179,7 +179,7 @@ var messageIdMatchNotMatchPrivate = rule.Message{
 //
 // The last is the one that settles it, and it carries its own control: the same harness runs
 // `react/prefer-exact-props` on a reporting case from its own corpus and measures 0 findings
-// without settings against 1 with, so the probe demonstrably CAN detect a settings dependency and
+// without settings against 1 with, so the probe demonstrably can detect a settings dependency and
 // refuses to report if that control stays flat. This rule's zero is therefore "nothing is
 // configured yet", which a pattern fixes, rather than "nothing can be".
 // # Four options, and each one gates a different arm rather than narrowing one filter
@@ -206,13 +206,13 @@ var messageIdMatchNotMatchPrivate = rule.Message{
 // Upstream's whole destructuring branch keys on `parent.type === "Property"` with
 // `parent.parent.type === "ObjectPattern"`, reading `parent.key`, `parent.value` and
 // `parent.shorthand`. This tree spells the same source two different ways depending on whether it
-// DECLARES bindings, and both had to be handled:
+// declares bindings, and both had to be handled:
 //
 //	let { a: b } = x        KindBindingElement inside KindObjectBindingPattern
 //	({ a: b } = x)          KindPropertyAssignment inside KindObjectLiteralExpression
 //
 // The binding form is the friendlier of the two, and it collapses upstream's three fields into
-// two slots on one node: `PropertyName` is upstream's key when a rename happened and is ABSENT for
+// two slots on one node: `PropertyName` is upstream's key when a rename happened and is absent for
 // a shorthand, and `Name()` is always the binding that comes into scope. So upstream's
 // `parent.key.name === parent.value.name` test, which asks whether a rename happened, is here just
 // "is PropertyName nil", and the shorthand flag needs no separate field at all.
@@ -226,9 +226,9 @@ var messageIdMatchNotMatchPrivate = rule.Message{
 //	an assignment whose right side is not itself
 //	  a member access                             foo.bar = baz  checks bar
 //
-// The third is why `foo.no_under = boom.bam_pow` reports only ONCE, on `no_under`, while
+// The third is why `foo.no_under = boom.bam_pow` reports only once, on `no_under`, while
 // `foo.no_under = 2` also reports once: the right-hand `bam_pow` is the property of a member access
-// being READ, and reading a property we may not own is not our naming decision. That distinction
+// being read, and reading a property we may not own is not our naming decision. That distinction
 // is reproduced rather than simplified, because collapsing it reports every property read in the
 // tree the moment `properties` is on.
 //
@@ -241,7 +241,7 @@ var messageIdMatchNotMatchPrivate = rule.Message{
 //	node .../globalcount.cjs id-match id-match.json
 //	  -> id-match: the global exemption changes 2/100 corpus verdicts
 //
-// Unlike `id-denylist`, whose corpus leans on ESLint's `globals` CONFIG for nine cases, id-match's
+// Unlike `id-denylist`, whose corpus leans on ESLint's `globals` config for nine cases, id-match's
 // corpus carries no `globals` languageOption and no `/* global */` directive at all, so both cases
 // are real lib globals the checker resolves by itself. This port therefore reproduces the whole
 // exemption with no divergence, through `idDenylistIsReferenceToGlobalVariable`, whose four
@@ -252,14 +252,14 @@ var messageIdMatchNotMatchPrivate = rule.Message{
 // Upstream offers none, and none is possible: the repair is to rename, and nothing here knows what
 // the author meant. Renaming would also have to reach every reference, which is a refactor rather
 // than a lint fix.
-var IdMatch = rule.Rule{
+var IdMatch = rule.Rule[IdMatchSettings]{
 	Name: "id-match",
 
 	// Telling a global reference from a name the source declared is name resolution.
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[IdMatchSettings]) rule.Listeners {
 		settings := idMatchSettingsFrom(options)
 		if settings.Pattern == nil {
 			// Upstream's default pattern `^.+$` matches every non-empty name, so an unconfigured
@@ -269,10 +269,10 @@ var IdMatch = rule.Rule{
 
 		return rule.Listeners{
 			ast.KindIdentifier: func(node *ast.Node) {
-				checkIdMatchIdentifier(ctx, node, settings)
+				checkIdMatchIdentifier(ruleContext, node, settings)
 			},
 			ast.KindPrivateIdentifier: func(node *ast.Node) {
-				checkIdMatchPrivateIdentifier(ctx, node, settings)
+				checkIdMatchPrivateIdentifier(ruleContext, node, settings)
 			},
 		}
 	},
@@ -285,18 +285,18 @@ func idMatchIsInvalid(settings IdMatchSettings, name string) bool {
 }
 
 // reportIdMatch emits the finding, rendering the name and the pattern the way upstream does.
-func reportIdMatch(ctx rule.Context, node *ast.Node, settings IdMatchSettings) {
+func reportIdMatch(ruleContext rule.Context, node *ast.Node, settings IdMatchSettings) {
 	name := node.Text()
 	if node.Kind == ast.KindPrivateIdentifier {
 		// `Text()` already carries the `#`, and upstream renders it too, from a name that does not.
-		ctx.ReportNode(node, rule.Message{
+		ruleContext.ReportNode(node, rule.Message{
 			Id: messageIdMatchNotMatchPrivate.Id,
 			Description: fmt.Sprintf("Identifier '%s' does not match the pattern '%s'. %s",
 				name, settings.PatternText, messageIdMatchNotMatchPrivate.Description),
 		})
 		return
 	}
-	ctx.ReportNode(node, rule.Message{
+	ruleContext.ReportNode(node, rule.Message{
 		Id: messageIdMatchNotMatch.Id,
 		Description: fmt.Sprintf("Identifier '%s' does not match the pattern '%s'. %s",
 			name, settings.PatternText, messageIdMatchNotMatch.Description),
@@ -307,20 +307,20 @@ func reportIdMatch(ctx rule.Context, node *ast.Node, settings IdMatchSettings) {
 //
 // A private name is only ever a class member, so the only question is whether class fields are
 // being checked at all. Upstream gates on `PropertyDefinition` specifically, which means a private
-// METHOD is checked regardless of the `classFields` option, and a private FIELD only when it is on.
+// method is checked regardless of the `classFields` option, and a private field only when it is on.
 // Measured: `class C { #no_under() {} }` reports with classFields off and
 // `class C { #no_under = 1; }` does not.
-func checkIdMatchPrivateIdentifier(ctx rule.Context, node *ast.Node, settings IdMatchSettings) {
+func checkIdMatchPrivateIdentifier(ruleContext rule.Context, node *ast.Node, settings IdMatchSettings) {
 	if node.Parent != nil && node.Parent.Kind == ast.KindPropertyDeclaration && !settings.CheckClassFields {
 		return
 	}
-	// The pattern is matched against the name WITHOUT the hash, which is upstream's `node.name`.
+	// The pattern is matched against the name without the hash, which is upstream's `node.name`.
 	name := node.Text()
 	if len(name) > 0 && name[0] == '#' {
 		name = name[1:]
 	}
 	if idMatchIsInvalid(settings, name) {
-		reportIdMatch(ctx, node, settings)
+		reportIdMatch(ruleContext, node, settings)
 	}
 }
 
@@ -328,7 +328,7 @@ func checkIdMatchPrivateIdentifier(ctx rule.Context, node *ast.Node, settings Id
 //
 // The order matters: the arms are a chain of `else if`, so the first one whose shape matches wins
 // and the rest never run. Reordering them changes verdicts.
-func checkIdMatchIdentifier(ctx rule.Context, node *ast.Node, settings IdMatchSettings) {
+func checkIdMatchIdentifier(ruleContext rule.Context, node *ast.Node, settings IdMatchSettings) {
 	parent := node.Parent
 	if parent == nil {
 		return
@@ -336,7 +336,7 @@ func checkIdMatchIdentifier(ctx rule.Context, node *ast.Node, settings IdMatchSe
 	name := node.Text()
 
 	// Upstream's three unconditional exits, in its order.
-	if idDenylistIsReferenceToGlobalVariable(ctx, node) {
+	if idDenylistIsReferenceToGlobalVariable(ruleContext, node) {
 		return
 	}
 	if idDenylistIsImportAttributeKey(node) {
@@ -349,11 +349,11 @@ func checkIdMatchIdentifier(ctx rule.Context, node *ast.Node, settings IdMatchSe
 	switch {
 	// The member-access arm. A computed access is `KindElementAccessExpression`, a separate kind
 	// here, and upstream's MemberExpression covers both spellings; but every one of its three arms
-	// tests a NON-computed shape (`parent.object`, `effectiveParent.left.property.name`), so only
+	// tests a non-computed shape (`parent.object`, `effectiveParent.left.property.name`), so only
 	// the property-access kind can satisfy them and the element-access kind falls through to the
 	// default arm exactly as a computed member does upstream.
 	case parent.Kind == ast.KindPropertyAccessExpression:
-		checkIdMatchMemberAccess(ctx, node, parent, name, settings)
+		checkIdMatchMemberAccess(ruleContext, node, parent, name, settings)
 
 	// An object literal's own key, which upstream separated out for eslint/eslint#15123 so that a
 	// key is governed by `properties` alone rather than by the destructuring logic below.
@@ -362,16 +362,16 @@ func checkIdMatchIdentifier(ctx rule.Context, node *ast.Node, settings IdMatchSe
 		parent.AsPropertyAssignment() != nil && parent.AsPropertyAssignment().Name() == node &&
 		!idDenylistIsDestructuringTarget(parent.Parent):
 		if settings.CheckProperties && idMatchIsInvalid(settings, name) {
-			reportIdMatch(ctx, node, settings)
+			reportIdMatch(ruleContext, node, settings)
 		}
 
 	// The destructuring arms, in the two spellings this tree has for them.
 	case parent.Kind == ast.KindBindingElement:
-		checkIdMatchBindingElement(ctx, node, parent, name, settings)
+		checkIdMatchBindingElement(ruleContext, node, parent, name, settings)
 
 	// The assignment-destructuring spelling. The guard is the destructuring test rather than the
 	// node kind alone, because an ordinary object literal uses the same kinds: without it, a
-	// property VALUE such as the `no_under` in `var obj = {key: no_under}` reaches this arm, finds
+	// property value such as the `no_under` in `var obj = {key: no_under}` reaches this arm, finds
 	// no pattern, and returns silently instead of falling through to the default arm that should
 	// judge it. That cost two upstream cases on the first fixture run and neither was a count
 	// anybody could have read as a shape problem.
@@ -379,33 +379,33 @@ func checkIdMatchIdentifier(ctx rule.Context, node *ast.Node, settings IdMatchSe
 		parent.Kind == ast.KindPropertyAssignment) &&
 		parent.Parent != nil && parent.Parent.Kind == ast.KindObjectLiteralExpression &&
 		idDenylistIsDestructuringTarget(parent.Parent):
-		checkIdMatchAssignmentPattern(ctx, node, parent, name, settings)
+		checkIdMatchAssignmentPattern(ruleContext, node, parent, name, settings)
 
-	// An import binding. Only the LOCAL name is ours; the exported name on the far side of an `as`
+	// An import binding. Only the local name is ours; the exported name on the far side of an `as`
 	// was chosen by the module we import from.
 	case parent.Kind == ast.KindImportSpecifier || parent.Kind == ast.KindImportClause ||
 		parent.Kind == ast.KindNamespaceImport:
 		if idMatchIsLocalImportBinding(node, parent) && idMatchIsInvalid(settings, name) {
-			reportIdMatch(ctx, node, settings)
+			reportIdMatch(ruleContext, node, settings)
 		}
 
 	// A class field's name, public. The private spelling is a different node kind and has its own
 	// listener above.
 	case parent.Kind == ast.KindPropertyDeclaration:
 		if settings.CheckClassFields && idMatchIsInvalid(settings, name) {
-			reportIdMatch(ctx, node, settings)
+			reportIdMatch(ruleContext, node, settings)
 		}
 
 	// Everything else, gated by `onlyDeclarations` and by the callee exclusion.
 	default:
 		if idMatchShouldReport(idMatchEffectiveParentOf(node), name, settings) {
-			reportIdMatch(ctx, node, settings)
+			reportIdMatch(ruleContext, node, settings)
 		}
 	}
 }
 
 // idMatchEffectiveParentOf is upstream's `effectiveParent`: for an identifier inside a member
-// access, the node ABOVE the access, and otherwise the immediate parent.
+// access, the node above the access, and otherwise the immediate parent.
 //
 // It exists so that `foo.bar = 1` can be judged by the assignment rather than by the access.
 func idMatchEffectiveParentOf(node *ast.Node) *ast.Node {
@@ -446,7 +446,7 @@ func idMatchIsAllowedParent(node *ast.Node) bool {
 }
 
 // checkIdMatchMemberAccess is upstream's MemberExpression branch, all three arms.
-func checkIdMatchMemberAccess(ctx rule.Context, node *ast.Node, access *ast.Node, name string,
+func checkIdMatchMemberAccess(ruleContext rule.Context, node *ast.Node, access *ast.Node, name string,
 	settings IdMatchSettings) {
 
 	if !settings.CheckProperties {
@@ -458,16 +458,16 @@ func checkIdMatchMemberAccess(ctx rule.Context, node *ast.Node, access *ast.Node
 		return
 	}
 
-	// Arm one: the OBJECT of the access is always checked, because it is a plain reference to a
+	// Arm one: the object of the access is always checked, because it is a plain reference to a
 	// name and nothing about the access makes it a property. Upstream spells this
 	// `parent.object.type === "Identifier" && parent.object.name === name`, which is a name
-	// comparison rather than a node identity one, so `foo.foo` satisfies it for BOTH identifiers.
+	// comparison rather than a node identity one, so `foo.foo` satisfies it for both identifiers.
 	// That looks like a bug and is upstream's behaviour, so it is reproduced: measured on
 	// `no_under.no_under` with properties on, the installed rule reports twice.
 	if expression.Expression != nil && expression.Expression.Kind == ast.KindIdentifier &&
 		expression.Expression.Text() == name {
 		if idMatchIsInvalid(settings, name) {
-			reportIdMatch(ctx, node, settings)
+			reportIdMatch(ruleContext, node, settings)
 		}
 		return
 	}
@@ -481,29 +481,29 @@ func checkIdMatchMemberAccess(ctx rule.Context, node *ast.Node, access *ast.Node
 		return
 	}
 
-	// Arm two: the property on the LEFT of an assignment, which is a write and therefore names
+	// Arm two: the property on the left of an assignment, which is a write and therefore names
 	// something we are creating.
 	if assignment.Left != nil && assignment.Left.Kind == ast.KindPropertyAccessExpression {
 		if left := assignment.Left.AsPropertyAccessExpression(); left != nil &&
 			left.Name() != nil && left.Name().Text() == name {
 			if idMatchIsInvalid(settings, name) {
-				reportIdMatch(ctx, node, settings)
+				reportIdMatch(ruleContext, node, settings)
 			}
 			return
 		}
 	}
 
-	// Arm three: an assignment whose RIGHT side is not itself a member access. This is what stops
+	// Arm three: an assignment whose right side is not itself a member access. This is what stops
 	// `foo.no_under = boom.bam_pow` from reporting `bam_pow`: reading a property off an object we
 	// may not own is not our naming decision.
 	if assignment.Right != nil && assignment.Right.Kind != ast.KindPropertyAccessExpression {
 		if idMatchIsInvalid(settings, name) {
-			reportIdMatch(ctx, node, settings)
+			reportIdMatch(ruleContext, node, settings)
 		}
 	}
 }
 
-// checkIdMatchBindingElement judges a name inside a DECLARATION destructuring, which is upstream's
+// checkIdMatchBindingElement judges a name inside a declaration destructuring, which is upstream's
 // `Property` inside an `ObjectPattern` and also its `AssignmentPattern`.
 //
 // One `KindBindingElement` carries what ESTree splits over three fields:
@@ -515,7 +515,7 @@ func checkIdMatchMemberAccess(ctx rule.Context, node *ast.Node, access *ast.Node
 //
 // So "did this pattern coin a new name", which is what `ignoreDestructuring` turns on, is exactly
 // "does this element rename or spread".
-func checkIdMatchBindingElement(ctx rule.Context, node *ast.Node, element *ast.Node, name string,
+func checkIdMatchBindingElement(ruleContext rule.Context, node *ast.Node, element *ast.Node, name string,
 	settings IdMatchSettings) {
 
 	binding := element.AsBindingElement()
@@ -523,7 +523,7 @@ func checkIdMatchBindingElement(ctx rule.Context, node *ast.Node, element *ast.N
 		return
 	}
 
-	// Only the BINDING is ours. In `let { a: b } = x` the key `a` is the source object's own
+	// Only the binding is ours. In `let { a: b } = x` the key `a` is the source object's own
 	// property name and we did not choose it, so it is never checked even when it fails the
 	// pattern -- measured against the installed rule, `var { bad_key: goodName } = q` is clean.
 	//
@@ -540,19 +540,19 @@ func checkIdMatchBindingElement(ctx rule.Context, node *ast.Node, element *ast.N
 	// and upstream reaches them through its default arm rather than its Property branch.
 	if element.Parent != nil && element.Parent.Kind == ast.KindArrayBindingPattern {
 		if idMatchShouldReport(idMatchEffectiveParentOf(node), name, settings) {
-			reportIdMatch(ctx, node, settings)
+			reportIdMatch(ruleContext, node, settings)
 		}
 		return
 	}
 
 	if settings.IgnoreDestructuring {
-		// A rename or a rest element invents a name, and inventing is what the option does NOT
+		// A rename or a rest element invents a name, and inventing is what the option does not
 		// excuse. A plain shorthand merely re-uses the object's own key, which it does.
 		//
-		// "Renamed" is a comparison of the two NAMES rather than of the two slots, which is
+		// "Renamed" is a comparison of the two names rather than of the two slots, which is
 		// upstream's `parent.key.name === parent.value.name`. The distinguishing case is in the
 		// corpus: `let { category_id: category_id } = query` writes the key out longhand while
-		// coining nothing, and it is CLEAN under this option. A port testing only whether
+		// coining nothing, and it is clean under this option. A port testing only whether
 		// PropertyName is present reports it, and the fixture that catches that is the only one in
 		// a hundred that can.
 		coinsANewName := binding.DotDotDotToken != nil ||
@@ -574,7 +574,7 @@ func checkIdMatchBindingElement(ctx rule.Context, node *ast.Node, element *ast.N
 		return
 	}
 	if idMatchIsInvalid(settings, name) {
-		reportIdMatch(ctx, node, settings)
+		reportIdMatch(ruleContext, node, settings)
 	}
 }
 
@@ -593,12 +593,12 @@ func idMatchEnclosingDeclarationOf(element *ast.Node) *ast.Node {
 	return nil
 }
 
-// checkIdMatchAssignmentPattern judges a name inside an ASSIGNMENT destructuring, which our parser
+// checkIdMatchAssignmentPattern judges a name inside an assignment destructuring, which our parser
 // spells with object-literal nodes rather than binding nodes.
 //
 //	({ a } = x)       KindShorthandPropertyAssignment
 //	({ a: b } = x)    KindPropertyAssignment, name a, initializer b
-func checkIdMatchAssignmentPattern(ctx rule.Context, node *ast.Node, property *ast.Node, name string,
+func checkIdMatchAssignmentPattern(ruleContext rule.Context, node *ast.Node, property *ast.Node, name string,
 	settings IdMatchSettings) {
 
 	objectLiteral := property.Parent
@@ -621,7 +621,7 @@ func checkIdMatchAssignmentPattern(ctx rule.Context, node *ast.Node, property *a
 		if assignment.Initializer != node {
 			return
 		}
-		// Upstream's `assignmentKeyEqualsValue` compares the two NAMES, so writing the key out
+		// Upstream's `assignmentKeyEqualsValue` compares the two names, so writing the key out
 		// longhand with the same spelling coins nothing. See the binding-element arm for the
 		// corpus case that pins this.
 		renamed = assignment.Name() == nil || assignment.Name().Kind != ast.KindIdentifier ||
@@ -638,7 +638,7 @@ func checkIdMatchAssignmentPattern(ctx rule.Context, node *ast.Node, property *a
 		return
 	}
 
-	// No `properties` gate and no `onlyDeclarations` gate, and both absences were MEASURED rather
+	// No `properties` gate and no `onlyDeclarations` gate, and both absences were measured rather
 	// than reasoned. An earlier draft carried both, on the strength of the binding-declaration arm
 	// carrying them, and it was wrong on four shapes at once. Against the installed rule:
 	//
@@ -648,12 +648,12 @@ func checkIdMatchAssignmentPattern(ctx rule.Context, node *ast.Node, property *a
 	//	({ no_under } = bar)   ignoreDestructuring: true  clean
 	//
 	// The reason is in upstream's control flow rather than in its intent. Its `checkProperties`
-	// and `onlyDeclarations` gates sit AFTER the ObjectPattern block, and that block reports and
+	// and `onlyDeclarations` gates sit after the ObjectPattern block, and that block reports and
 	// falls through rather than returning, so a name reported there has already been reported by
 	// the time either gate is consulted. Reproducing the gates here reproduced a structure upstream
 	// does not have.
 	if idMatchIsInvalid(settings, name) {
-		reportIdMatch(ctx, node, settings)
+		reportIdMatch(ruleContext, node, settings)
 	}
 }
 

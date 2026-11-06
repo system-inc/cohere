@@ -10,5 +10,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // No decoder: the rule takes no options. Which timer shapes count as a plain wait is the rule's
 // judgment, and an option to exempt one would be an allowance.
 func init() {
-	rule.Register(rule.Registration{Rule: ConsistencyNoHandRolledDelay})
+	rule.Register(rule.Registration[rule.NoOptions]{Rule: ConsistencyNoHandRolledDelay})
 }

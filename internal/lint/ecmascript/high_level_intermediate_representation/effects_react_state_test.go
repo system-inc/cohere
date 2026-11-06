@@ -10,8 +10,8 @@ import (
 	"github.com/system-inc/cohere/mutation_aliasing"
 )
 
-func TestStateEffectsFollowImportOrigin(t *testing.T) {
-	t.Parallel()
+func TestStateEffectsFollowImportOrigin(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range []struct {
 		name   string
 		prefix string
@@ -33,63 +33,86 @@ func TestStateEffectsFollowImportOrigin(t *testing.T) {
 		{"wrong package", `import {useState} from './other';`, "useState", false},
 		{"overridden star export", `import {useState} from './overridden';`, "useState", false},
 		{"mutable alias", `import {useState} from 'react'; let state = useState;`, "state", false},
-		{"typed impostor", `import {useState as real} from 'react'; const useState: typeof real = value => [value, () => {}];`, "useState", false},
+		{
+			"typed impostor",
+			`import {useState as real} from 'react'; const useState: typeof real = value => [value, () => {}];`,
+			"useState",
+			false,
+		},
 		{"unresolved", "", "useState", false},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			parameters := ""
 			if testCase.name == "local shadow" {
 				parameters = "useState: (value: unknown) => unknown"
 			} else if testCase.name == "namespace shadow" {
 				parameters = "React: {useState(value: unknown): unknown}"
 			}
-			source := testCase.prefix + ` function Component(` + parameters + `) { return ` + testCase.callee + `({value: 0}); }`
+			source := testCase.prefix +
+				` function Component(` +
+				parameters +
+				`) { return ` +
+				testCase.callee +
+				`({value: 0}); }`
 			visited := 0
-			probe := rule.Rule{Name: "state-effects-origin", NeedsTypeChecker: true, Run: func(ctx rule.Context, options any) rule.Listeners {
-				return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
-					forEachFunctionLike(node, func(node *ast.Node) {
-						if node.Name() == nil || node.Name().Text() != "Component" {
-							return
-						}
-						function := Lower(node, ctx.TypeChecker)
-						Construct(function)
-						effects := InferAliasingEffects(function)
-						for _, instruction := range function.Instructions {
-							switch instruction.Value.(type) {
-							case *CallExpression, *MethodCall:
-							default:
-								continue
+			probe := rule.Rule[rule.NoOptions]{
+				Name:             "state-effects-origin",
+				NeedsTypeChecker: true,
+				Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+					return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
+						forEachFunctionLike(node, func(node *ast.Node) {
+							if node.Name() == nil || node.Name().Text() != "Component" {
+								return
 							}
-							visited++
-							var origin ModuleExportOrigin
-							switch call := instruction.Value.(type) {
-							case *CallExpression:
-								origin = call.CalleeOrigin
-							case *MethodCall:
-								origin = call.CalleeOrigin
-							}
-							if (origin.Module == "react" && origin.Export == "useState") != testCase.frozen {
-								t.Errorf("origin=%+v; want React state=%t", origin, testCase.frozen)
-							}
-							wantFrozen := testCase.frozen || testCase.name == "wrong package" ||
-								testCase.name == "overridden star export" || testCase.name == "typed impostor"
-							var frozenResult, frozenArgument bool
-							for _, effect := range effects.Get(instruction.Id) {
-								if effect.Kind == mutation_aliasing.AliasingEffectCreate && effect.Into.Identifier == instruction.LValue.Identifier {
-									frozenResult = effect.Value == mutation_aliasing.EffectValueFrozen
+							function := Lower(node, ruleContext.TypeChecker)
+							Construct(function)
+							effects := InferAliasingEffects(function)
+							for _, instruction := range function.Instructions {
+								switch instruction.Value.(type) {
+								case *CallExpression, *MethodCall:
+								default:
+									continue
 								}
-								frozenArgument = frozenArgument || effect.Kind == mutation_aliasing.AliasingEffectFreeze
+								visited++
+								var origin ModuleExportOrigin
+								switch call := instruction.Value.(type) {
+								case *CallExpression:
+									origin = call.CalleeOrigin
+								case *MethodCall:
+									origin = call.CalleeOrigin
+								}
+								if (origin.Module == "react" && origin.Export == "useState") != testCase.frozen {
+									test.Errorf("origin=%+v; want React state=%t", origin, testCase.frozen)
+								}
+								wantFrozen := testCase.frozen || testCase.name == "wrong package" ||
+									testCase.name == "overridden star export" || testCase.name == "typed impostor"
+								var frozenResult bool
+								var frozenArgument bool
+								for _, effect := range effects.Get(instruction.Id) {
+									if effect.Kind == mutation_aliasing.AliasingEffectCreate &&
+										effect.Into.Identifier == instruction.LValue.Identifier {
+										frozenResult = effect.Value == mutation_aliasing.EffectValueFrozen
+									}
+									frozenArgument = frozenArgument ||
+										effect.Kind == mutation_aliasing.AliasingEffectFreeze
+								}
+								if frozenResult != wantFrozen || frozenArgument != wantFrozen {
+									test.Errorf(
+										"result frozen=%t, argument frozen=%t; want both %t",
+										frozenResult,
+										frozenArgument,
+										wantFrozen,
+									)
+								}
 							}
-							if frozenResult != wantFrozen || frozenArgument != wantFrozen {
-								t.Errorf("result frozen=%t, argument frozen=%t; want both %t", frozenResult, frozenArgument, wantFrozen)
-							}
-						}
-					})
-				}}
-			}}
-			rule_testing.RunTypedFiles(t, probe, map[string]string{
-				"/react.d.ts":    reactiveDeclarations + `declare module 'react' { const React: {useState: typeof useState}; export default React; }`,
+						})
+					}}
+				},
+			}
+			rule_testing.RunTypedFiles(test, probe, map[string]string{
+				"/react.d.ts": reactiveDeclarations +
+					`declare module 'react' { const React: {useState: typeof useState}; export default React; }`,
 				"/named.ts":      `export {useState as state} from 'react';`,
 				"/star.ts":       `export * from 'react';`,
 				"/other.ts":      `export function useState(value: unknown) { return [value]; }`,
@@ -97,14 +120,14 @@ func TestStateEffectsFollowImportOrigin(t *testing.T) {
 				"/fixture.tsx":   source,
 			}, "/fixture.tsx")
 			if visited != 1 {
-				t.Fatalf("visited %d calls, want exactly one", visited)
+				test.Fatalf("visited %d calls, want exactly one", visited)
 			}
 		})
 	}
 }
 
-func TestStateMethodCallDoesNotMakeSetterReactive(t *testing.T) {
-	t.Parallel()
+func TestStateMethodCallDoesNotMakeSetterReactive(test *testing.T) {
+	test.Parallel()
 	const source = `import * as React from 'react';
 export function PD(properties: {ids: string[]; suggested?: {personId: string}}) {
 const [selectedValue] = React.useState<string>(properties.suggested ? properties.suggested.personId : 'new');
@@ -124,42 +147,57 @@ return <div onClick={() => toggle('a')}>{canGo ? 'y' : 'n'}</div>;
 		{"method read", source, false},
 		{"property read", strings.ReplaceAll(source, "newName.trim().length", "newName.length"), false},
 		{"default import method read", strings.ReplaceAll(source, "import * as React", "import React"), false},
-		{"unpreserved property call", `import {useMemo} from 'react'; function Component({propA}) { return useMemo(() => propA.x(), [propA.x]); }`, true},
+		{
+			"unpreserved property call",
+			`import {useMemo} from 'react'; function Component({propA}) { return useMemo(() => propA.x(), [propA.x]); }`,
+			true,
+		},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			var findings, markers int
-			probe := rule.Rule{Name: "state-method-memoization", NeedsTypeChecker: true, Run: func(ctx rule.Context, options any) rule.Listeners {
-				return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
-					forEachFunctionLike(node, func(node *ast.Node) {
-						function := Lower(node, ctx.TypeChecker)
-						Construct(function)
-						findings += len(AnalyzePreservedManualMemoization(function, ctx.TypeChecker))
-						for _, instruction := range function.Instructions {
-							if _, found := instruction.Value.(*StartMemoize); found {
-								markers++
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			var findings int
+			var markers int
+			probe := rule.Rule[rule.NoOptions]{
+				Name:             "state-method-memoization",
+				NeedsTypeChecker: true,
+				Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+					return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
+						forEachFunctionLike(node, func(node *ast.Node) {
+							function := Lower(node, ruleContext.TypeChecker)
+							Construct(function)
+							findings += len(AnalyzePreservedManualMemoization(function, ruleContext.TypeChecker))
+							for _, instruction := range function.Instructions {
+								if _, found := instruction.Value.(*StartMemoize); found {
+									markers++
+								}
 							}
-						}
-					})
-				}}
-			}}
-			declarations := strings.ReplaceAll(reactiveDeclarations, "initial?: S", "initial?: S | (() => S)") + `declare module 'react' {
+						})
+					}}
+				},
+			}
+			declarations := strings.ReplaceAll(reactiveDeclarations, "initial?: S", "initial?: S | (() => S)") +
+				`declare module 'react' {
 export function useCallback<T extends (...args: any[]) => any>(callback: T, deps: unknown[]): T;
 const React: {useState: typeof useState; useCallback: typeof useCallback}; export default React;
 }`
-			rule_testing.RunTypedFiles(t, probe, map[string]string{"/react.d.ts": declarations, "/fixture.tsx": testCase.source}, "/fixture.tsx")
+			rule_testing.RunTypedFiles(
+				test,
+				probe,
+				map[string]string{"/react.d.ts": declarations, "/fixture.tsx": testCase.source},
+				"/fixture.tsx",
+			)
 			if markers == 0 {
-				t.Fatal("the fixture did not exercise a memo marker")
+				test.Fatal("the fixture did not exercise a memo marker")
 			}
 			if (findings != 0) != testCase.fires {
-				t.Fatalf("findings=%d, want fires=%t", findings, testCase.fires)
+				test.Fatalf("findings=%d, want fires=%t", findings, testCase.fires)
 			}
 		})
 	}
 }
 
-func TestStateSetterDependencyIsPrunedAfterScopeSeparation(t *testing.T) {
-	t.Parallel()
+func TestStateSetterDependencyIsPrunedAfterScopeSeparation(test *testing.T) {
+	test.Parallel()
 	const source = `import {useCallback, useEffect, useState} from 'react';
 let someGlobal = {};
 function Component() {
@@ -170,58 +208,62 @@ useEffect(() => { setState(someGlobal.value); }, [someGlobal]);
 return <div>{String(state)}</div>;
 }`
 	visited := 0
-	probe := rule.Rule{Name: "state-setter-dependency-pruning", NeedsTypeChecker: true, Run: func(ctx rule.Context, options any) rule.Listeners {
-		return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
-			forEachFunctionLike(node, func(node *ast.Node) {
-				function := Lower(node, ctx.TypeChecker)
-				Construct(function)
-				OutlineFunctions(function)
-				InferReactive(function, ctx.TypeChecker)
-				DropManualMemoization(function)
-				if InlineImmediatelyInvokedFunctionExpressionsIncludingMemoCallbacks(function) > 0 {
-					MergeConsecutiveBlocks(function)
-				}
-				EliminateDeadCode(function)
-				ranges := InferMutableRanges(function)
-				disjoint := FindDisjointMutableValuesWithRanges(function, ranges)
-				scopes := AssignReactiveScopesWithSets(function, ranges, disjoint)
-				aligned, merged := AlignThenMergeReactiveScopes(function, scopes)
-				identity := MergedScopeIdentity{Aligned: aligned, Merged: merged}
-				BuildReactiveScopeTerminals(function, scopes, identity)
-				flattened := FlattenReactiveLoops(function)
-				dependencies := CollectScopeDependenciesWithHoistable(function, scopes, identity, ranges)
-				setterDependencies := func() int {
-					count := 0
-					for _, scope := range dependencies.Ids() {
-						for _, dependency := range dependencies.DependenciesOf(scope) {
-							if identifierName(function, dependency.Identifier) == "setState" {
-								count++
+	probe := rule.Rule[rule.NoOptions]{
+		Name:             "state-setter-dependency-pruning",
+		NeedsTypeChecker: true,
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+			return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
+				forEachFunctionLike(node, func(node *ast.Node) {
+					function := Lower(node, ruleContext.TypeChecker)
+					Construct(function)
+					OutlineFunctions(function)
+					InferReactive(function, ruleContext.TypeChecker)
+					DropManualMemoization(function)
+					if InlineImmediatelyInvokedFunctionExpressionsIncludingMemoCallbacks(function) > 0 {
+						MergeConsecutiveBlocks(function)
+					}
+					EliminateDeadCode(function)
+					ranges := InferMutableRanges(function)
+					disjoint := FindDisjointMutableValuesWithRanges(function, ranges)
+					scopes := AssignReactiveScopesWithSets(function, ranges, disjoint)
+					aligned, merged := AlignThenMergeReactiveScopes(function, scopes)
+					identity := MergedScopeIdentity{Aligned: aligned, Merged: merged}
+					BuildReactiveScopeTerminals(function, scopes, identity)
+					flattened := FlattenReactiveLoops(function)
+					dependencies := CollectScopeDependenciesWithHoistable(function, scopes, identity, ranges)
+					setterDependencies := func() int {
+						count := 0
+						for _, scope := range dependencies.Ids() {
+							for _, dependency := range dependencies.DependenciesOf(scope) {
+								if identifierName(function, dependency.Identifier) == "setState" {
+									count++
+								}
 							}
 						}
+						return count
 					}
-					return count
-				}
-				if count := setterDependencies(); count != 1 {
-					t.Errorf("raw setter dependencies=%d, want one outside the state scope", count)
-				}
-				tree, _ := BuildReactiveFunctionWithFlattenedScopes(function, flattened)
-				MergeReactiveScopesThatInvalidateTogether(tree, function, dependencies, ctx.TypeChecker)
-				PruneNonEscapingScopesWithScopes(tree, function, dependencies, scopes, ctx.TypeChecker)
-				PruneUnusedScopes(tree, dependencies)
-				PruneAlwaysInvalidatingScopes(tree, function, dependencies)
-				PruneNonReactiveDependencies(tree, function, dependencies)
-				if count := setterDependencies(); count != 0 {
-					t.Errorf("final setter dependencies=%d, want zero for a stable setter", count)
-				}
-				visited++
-			})
-		}}
-	}}
-	rule_testing.RunTypedFiles(t, probe, map[string]string{
+					if count := setterDependencies(); count != 1 {
+						test.Errorf("raw setter dependencies=%d, want one outside the state scope", count)
+					}
+					tree, _ := BuildReactiveFunctionWithFlattenedScopes(function, flattened)
+					MergeReactiveScopesThatInvalidateTogether(tree, function, dependencies, ruleContext.TypeChecker)
+					PruneNonEscapingScopesWithScopes(tree, function, dependencies, scopes, ruleContext.TypeChecker)
+					PruneUnusedScopes(tree, dependencies)
+					PruneAlwaysInvalidatingScopes(tree, function, dependencies)
+					PruneNonReactiveDependencies(tree, function, dependencies)
+					if count := setterDependencies(); count != 0 {
+						test.Errorf("final setter dependencies=%d, want zero for a stable setter", count)
+					}
+					visited++
+				})
+			}}
+		},
+	}
+	rule_testing.RunTypedFiles(test, probe, map[string]string{
 		"/react.d.ts":  reactiveDeclarations,
 		"/fixture.tsx": source,
 	}, "/fixture.tsx")
 	if visited != 1 {
-		t.Fatalf("visited %d functions, want one", visited)
+		test.Fatalf("visited %d functions, want one", visited)
 	}
 }

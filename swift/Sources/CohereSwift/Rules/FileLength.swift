@@ -1,4 +1,5 @@
 import Foundation
+import SwiftSyntax
 
 /*
  A file holds at most 2,000 lines.
@@ -16,10 +17,13 @@ import Foundation
  a number.
 
  Lines are counted the way SwiftLint's `file_length` counts them in its default configuration: every line,
- comments and blank lines included, with a final newline ending the last line rather than starting another.
- A comment is part of what a reader has to hold, and a count that skipped comments would reward moving
- explanation out of the file, the opposite of what the house wants. SwiftLint reports at the last line; this
- rule reports once at line 1, column 1, zero width, because the file as a whole is what is too long.
+ comments and blank lines included, with a final line break ending the last line rather than starting another.
+ A line ends where Swift's grammar ends one, at a line feed, a carriage return and line feed, or a lone carriage
+ return. A comment is part of what a reader has to hold, and a count that skipped comments would reward moving
+ explanation out of the file, the opposite of what the house wants.
+
+ The finding covers the excess, from the first line past the limit to the end of the file, the span every engine
+ gives in the text rules corpus (#4b337jk, family `long-file`; #7aa7d3y). SwiftLint reports at the last line.
  */
 public struct FileLength: FileRule {
     public let name = "cohere-swift/file-length"
@@ -39,16 +43,19 @@ public struct FileLength: FileRule {
     public func findings(in file: ParsedFile) -> [FindingRecord] {
         /* Kirk's convention (2026-10-03), shared with TypeScript: a generated file is named `*.generated.swift`, gets every other rule and the formatter, and is exempt from this one alone, because its length is the generator's, not a reader's. */
         guard !file.url.lastPathComponent.hasSuffix(".generated.swift") else { return [] }
+        let starts = Self.lineStarts(of: file.source)
         let lines = Self.lineCount(of: file.source)
         guard lines > maximum else { return [] }
+        let start = file.locations.location(for: AbsolutePosition(utf8Offset: starts[maximum]))
+        let end = file.locations.location(for: AbsolutePosition(utf8Offset: file.source.utf8.count))
         return [
             FindingRecord(
                 source: .rule,
                 file: file.url.path,
-                line: 1,
-                column: 1,
-                endLine: 1,
-                endColumn: 1,
+                line: start.line,
+                column: start.column,
+                endLine: end.line,
+                endColumn: end.column,
                 severity: .error,
                 rule: name,
                 messageId: "tooManyLines",
@@ -58,14 +65,30 @@ public struct FileLength: FileRule {
         ]
     }
 
-    /* Line feeds, plus one for a last line that does not end in one. `\r\n` ends a line once. */
+    /* The lines of the source: one per line break, plus one for a last line that does not end in one. */
     static func lineCount(of source: String) -> Int {
-        let utf8 = source.utf8
-        let lineFeeds = utf8.reduce(into: 0) { count, byte in
-            if byte == UInt8(ascii: "\n") {
-                count += 1
+        let starts = lineStarts(of: source)
+        return starts.last == source.utf8.count ? starts.count - 1 : starts.count
+    }
+
+    /*
+     The byte offset each line starts at, the first at 0. A line feed, a carriage return and line feed, and a lone
+     carriage return each end a line once, as Swift's grammar reads them, so the offset after the last break is
+     listed even when the source ends there.
+     */
+    static func lineStarts(of source: String) -> [Int] {
+        let bytes = Array(source.utf8)
+        var starts = [0]
+        var index = 0
+        while index < bytes.count {
+            if bytes[index] == UInt8(ascii: "\r"), index + 1 < bytes.count, bytes[index + 1] == UInt8(ascii: "\n") {
+                index += 1
             }
+            if bytes[index] == UInt8(ascii: "\n") || bytes[index] == UInt8(ascii: "\r") {
+                starts.append(index + 1)
+            }
+            index += 1
         }
-        return lineFeeds + (utf8.last.map { $0 == UInt8(ascii: "\n") ? 0 : 1 } ?? 0)
+        return starts
     }
 }

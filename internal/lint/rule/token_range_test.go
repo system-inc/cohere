@@ -22,38 +22,60 @@ import (
 //
 // Each source must hold at least one zero-width node with trivia after it, or this test could pass on a
 // shape that cannot fail.
-func TestTokenRangeOfAZeroWidthNodeIsEmptyWhereItSits(t *testing.T) {
-	t.Parallel()
+func TestTokenRangeOfAZeroWidthNodeIsEmptyWhereItSits(test *testing.T) {
+	test.Parallel()
 	for _, source := range []struct {
 		name, fileName, text string
 		kind                 core.ScriptKind
 	}{
 		{"self-closing element with a space", "/repository/source/Element.tsx", "<a />>0", core.ScriptKindTSX},
-		{"opening element with a space", "/repository/source/Opening.tsx", "const node = <a ></a>;", core.ScriptKindTSX},
-		{"upstream's comparison", "/repository/source/Render.tsx", "ReactDOM.render(<div />, x) === null;", core.ScriptKindTSX},
-		{"a comment after the tag name", "/repository/source/Comment.tsx", "const node = <a/* note */ />;", core.ScriptKindTSX},
+		{
+			"opening element with a space",
+			"/repository/source/Opening.tsx",
+			"const node = <a ></a>;",
+			core.ScriptKindTSX,
+		},
+		{
+			"upstream's comparison",
+			"/repository/source/Render.tsx",
+			"ReactDOM.render(<div />, x) === null;",
+			core.ScriptKindTSX,
+		},
+		{
+			"a comment after the tag name",
+			"/repository/source/Comment.tsx",
+			"const node = <a/* note */ />;",
+			core.ScriptKindTSX,
+		},
 		{"a missing condition in recovery", "/repository/source/Recovery.ts", "if ( ) {}", core.ScriptKindTS},
 	} {
-		t.Run(source.name, func(t *testing.T) {
-			t.Parallel()
-			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: tspath.RootedFilePath(source.fileName),
-				PathKey: tspath.PathKey(source.fileName)}, source.text, source.kind)
+		test.Run(source.name, func(test *testing.T) {
+			test.Parallel()
+			sourceFile := parser.ParseSourceFile(
+				ast.SourceFileParseOptions{FileName: tspath.RootedFilePath(source.fileName),
+					PathKey: tspath.PathKey(source.fileName)},
+				source.text,
+				source.kind,
+			)
 			problems, zeroWidthBeforeTrivia := zeroWidthRangeProblems(sourceFile, TokenRange)
 			for _, problem := range problems {
-				t.Error(problem)
+				test.Error(problem)
 			}
 			if zeroWidthBeforeTrivia == 0 {
-				t.Fatalf("%q holds no zero-width node followed by trivia, so this case could not fail", source.text)
+				test.Fatalf("%q holds no zero-width node followed by trivia, so this case could not fail", source.text)
 			}
 			// The mutant: the scanner's start cut at the node's end, which TokenRange returned before the fix.
-			inverted, _ := zeroWidthRangeProblems(sourceFile, func(sourceFile *ast.SourceFile, node *ast.Node) core.TextRange {
+			inverted, _ := zeroWidthRangeProblems(sourceFile, func(
+				sourceFile *ast.SourceFile,
+				node *ast.Node,
+			) core.TextRange {
 				if ast.NodeIsMissing(node) {
 					return scanner.GetRangeOfTokenAtPosition(sourceFile, node.Pos()).WithEnd(node.End())
 				}
 				return TokenRange(sourceFile, node)
 			})
 			if len(inverted) == 0 {
-				t.Errorf("%q: the inverted range passed, so this case could not have failed", source.text)
+				test.Errorf("%q: the inverted range passed, so this case could not have failed", source.text)
 			}
 		})
 	}
@@ -62,7 +84,10 @@ func TestTokenRangeOfAZeroWidthNodeIsEmptyWhereItSits(t *testing.T) {
 // zeroWidthRangeProblems walks every node of sourceFile and names each range that starts past its end, and
 // each zero-width node whose range is not the empty one where it sits. It also counts the zero-width nodes
 // followed by trivia, the shape that inverted the range.
-func zeroWidthRangeProblems(sourceFile *ast.SourceFile, rangeOf func(*ast.SourceFile, *ast.Node) core.TextRange) ([]string, int) {
+func zeroWidthRangeProblems(
+	sourceFile *ast.SourceFile,
+	rangeOf func(*ast.SourceFile, *ast.Node) core.TextRange,
+) ([]string, int) {
 	text := sourceFile.Text()
 	var problems []string
 	zeroWidthBeforeTrivia := 0
@@ -70,11 +95,24 @@ func zeroWidthRangeProblems(sourceFile *ast.SourceFile, rangeOf func(*ast.Source
 	visit = func(node *ast.Node) bool {
 		span := rangeOf(sourceFile, node)
 		if span.Pos() > span.End() {
-			problems = append(problems, fmt.Sprintf("%s at %d..%d: range %d..%d starts past its end", node.Kind, node.Pos(), node.End(), span.Pos(), span.End()))
+			problems = append(problems, fmt.Sprintf(
+				"%s at %d..%d: range %d..%d starts past its end",
+				node.Kind,
+				node.Pos(),
+				node.End(),
+				span.Pos(),
+				span.End(),
+			))
 		}
 		if node.Pos() == node.End() {
 			if span != node.Loc {
-				problems = append(problems, fmt.Sprintf("zero-width %s at %d: range %d..%d, want the empty range where it sits", node.Kind, node.Pos(), span.Pos(), span.End()))
+				problems = append(problems, fmt.Sprintf(
+					"zero-width %s at %d: range %d..%d, want the empty range where it sits",
+					node.Kind,
+					node.Pos(),
+					span.Pos(),
+					span.End(),
+				))
 			}
 			if node.End() < len(text) && (text[node.End()] == ' ' || text[node.End()] == '/') {
 				zeroWidthBeforeTrivia++

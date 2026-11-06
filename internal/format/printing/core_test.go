@@ -24,33 +24,6 @@ import (
  * trailing or dangling, and on which node). The second localizes a failure the first only reports.
  */
 
-type toyNode struct {
-	Kind                    string     `json:"type"`
-	From                    int        `json:"start"`
-	To                      int        `json:"end"`
-	Value                   string     `json:"value,omitempty"`
-	Label                   *toyNode   `json:"label,omitempty"`
-	Children                []*toyNode `json:"children,omitempty"`
-	CommentFields[*toyNode] `json:"-"`
-}
-
-func (node *toyNode) Type() string { return node.Kind }
-func (node *toyNode) Field(name string) any {
-	switch name {
-	case "children":
-		return node.Children
-	case "label":
-		if node.Label == nil {
-			return nil
-		}
-		return node.Label
-	case "comments":
-		return node.Comments
-	}
-	return nil
-}
-func (node *toyNode) CommentData() *CommentFields[*toyNode] { return &node.CommentFields }
-
 // toySource builds text and AST together, so positions are exact by construction.
 type toySource struct {
 	random   *rand.Rand
@@ -141,8 +114,11 @@ func toyProgram(random *rand.Rand) (*toyNode, []*toyNode, string) {
 	return program, source.comments, source.text.String()
 }
 
-func toyPrinter() *Printer[*toyNode] {
-	printer := &Printer[*toyNode]{}
+// toySettings is the toy language's per-print state, which it has none of.
+type toySettings struct{}
+
+func toyPrinter() *Printer[*toyNode, toySettings, NoArguments] {
+	printer := &Printer[*toyNode, toySettings, NoArguments]{}
 	printer.LocStart = func(node *toyNode) int { return node.From }
 	printer.LocEnd = func(node *toyNode) int { return node.To }
 	printer.VisitorKeys = func(node *toyNode) []string {
@@ -154,36 +130,58 @@ func toyPrinter() *Printer[*toyNode] {
 		}
 		return nil
 	}
-	printer.CanAttachComment = func(node *toyNode, _ []*toyNode) bool { return node.Kind == "Atom" || node.Kind == "List" }
+	printer.CanAttachComment = func(
+		node *toyNode,
+		_ []*toyNode,
+	) bool {
+		return node.Kind == "Atom" || node.Kind == "List"
+	}
 	printer.IsBlockComment = func(comment *toyNode) bool { return comment.Kind == "Block" }
 	// A handler, so the hooks are exercised and placement is observable: an end-of-line block comment
 	// inside a list dangles on that list. Without one, a mutation that misclassified end-of-line comments
 	// survived, because default attachment sends both placements to the same node; the JavaScript
 	// handlers branch on placement, so the toy has to as well.
-	printer.HandleComments.EndOfLine = func(context *CommentContext[*toyNode]) bool {
+	printer.HandleComments.EndOfLine = func(context *CommentContext[*toyNode, toySettings, NoArguments]) bool {
 		if context.HasEnclosing && context.Enclosing.Kind == "List" && context.Comment.Kind == "Block" {
 			AddDanglingComment(context.Enclosing, context.Comment, "")
 			return true
 		}
 		return false
 	}
-	printer.PrintComment = func(path *AstPath[*toyNode], options *Options[*toyNode]) doc.Doc {
+	printer.PrintComment = func(
+		path *AstPath[*toyNode, toySettings],
+		options *Options[*toyNode, toySettings, NoArguments],
+	) doc.Doc {
 		comment, _ := path.Node()
 		return doc.Text(options.OriginalText[comment.From:comment.To])
 	}
-	printer.Print = func(path *AstPath[*toyNode], options *Options[*toyNode], print PrintFunc, _ any) doc.Doc {
+	printer.Print = func(
+		path *AstPath[*toyNode, toySettings],
+		options *Options[*toyNode, toySettings, NoArguments],
+		print PrintFunc[NoArguments],
+		_ *NoArguments,
+	) doc.Doc {
 		node, _ := path.Node()
-		children := Map(path, func(*AstPath[*toyNode], int, any) doc.Doc { return print(nil, nil) }, "children")
+		children := Map(path, func(*AstPath[*toyNode, toySettings], int) doc.Doc { return print("", nil) }, "children")
 		switch node.Kind {
 		case "Program":
-			return doc.Concat{doc.Join(doc.Hardline, children), PrintDanglingComments(path, options, DanglingOptions[*toyNode]{}), doc.Hardline}
+			return doc.Concat{
+				doc.Join(doc.Hardline, children),
+				PrintDanglingComments(path, options, DanglingOptions[*toyNode]{}),
+				doc.Hardline,
+			}
 		case "List":
 			var label doc.Doc = doc.Text("")
 			if node.Label != nil {
 				label = doc.Concat{print("label", nil), doc.Text(" ")}
 			}
 			if len(children) == 0 {
-				return doc.Concat{doc.Text("("), label, PrintDanglingComments(path, options, DanglingOptions[*toyNode]{}), doc.Text(")")}
+				return doc.Concat{
+					doc.Text("("),
+					label,
+					PrintDanglingComments(path, options, DanglingOptions[*toyNode]{}),
+					doc.Text(")"),
+				}
 			}
 			return doc.NewGroup(doc.Concat{
 				doc.Text("("), label,
@@ -270,15 +268,15 @@ type toyCase struct {
 }
 
 type toyResult struct {
-	Formatted string  `json:"formatted"`
-	Attached  [][]any `json:"attached"`
-	Error     string  `json:"error"`
+	Formatted string       `json:"formatted"`
+	Attached  []attachment `json:"attached"`
+	Error     string       `json:"error"`
 }
 
-func attachedSummary(root *toyNode) [][]any {
+func attachedSummary(root *toyNode) []attachment {
 	// Empty, not nil: a nil slice encodes as null and upstream's empty array as [], and every comment-free
 	// program read as a mismatch until this said so.
-	attached := [][]any{}
+	attached := []attachment{}
 	var walk func(*toyNode)
 	walk = func(node *toyNode) {
 		for _, comment := range node.Comments {
@@ -288,7 +286,12 @@ func attachedSummary(root *toyNode) [][]any {
 			} else if comment.Trailing {
 				kind = "trailing"
 			}
-			attached = append(attached, []any{float64(comment.From), kind, node.Kind, float64(node.From)})
+			attached = append(attached, attachment{
+				CommentStart: comment.From,
+				Kind:         kind,
+				NodeType:     node.Kind,
+				NodeStart:    node.From,
+			})
 		}
 		if node.Label != nil {
 			walk(node.Label)
@@ -299,7 +302,7 @@ func attachedSummary(root *toyNode) [][]any {
 	}
 	walk(root)
 	for left := 1; left < len(attached); left++ {
-		for right := left; right > 0 && attached[right][0].(float64) < attached[right-1][0].(float64); right-- {
+		for right := left; right > 0 && attached[right].CommentStart < attached[right-1].CommentStart; right-- {
 			attached[right], attached[right-1] = attached[right-1], attached[right]
 		}
 	}
@@ -307,9 +310,9 @@ func attachedSummary(root *toyNode) [][]any {
 }
 
 // TestCoreAgreesWithUpstream is the differential. Off unless COHERE_PRETTIER_FORK names the fork.
-func TestCoreAgreesWithUpstream(t *testing.T) {
-	t.Parallel()
-	root := corpus.PrettierFork.Root(t)
+func TestCoreAgreesWithUpstream(test *testing.T) {
+	test.Parallel()
+	root := corpus.PrettierFork.Root(test)
 	const count = 3000
 	random := rand.New(rand.NewSource(20261002))
 	cases := make([]toyCase, count)
@@ -317,29 +320,30 @@ func TestCoreAgreesWithUpstream(t *testing.T) {
 		ast, comments, text := toyProgram(random)
 		cases[index] = toyCase{Ast: ast, Comments: comments, Text: text, Width: 6 + random.Intn(30)}
 	}
-	encoded, err := json.Marshal(cases)
-	if err != nil {
-		t.Fatal(err)
+	encoded, encodeError := json.Marshal(cases)
+	if encodeError != nil {
+		test.Fatal(encodeError)
 	}
 
 	command := exec.Command("node", "--input-type=module", "-e", toyUpstreamScript)
 	command.Dir = root
 	command.Stdin = bytes.NewReader(encoded)
-	var stdout, stderr bytes.Buffer
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
 	command.Stdout, command.Stderr = &stdout, &stderr
-	if err := command.Run(); err != nil {
-		t.Fatalf("node: %v\n%s", err, stderr.String())
+	if runError := command.Run(); runError != nil {
+		test.Fatalf("node: %v\n%s", runError, stderr.String())
 	}
 	var upstream []toyResult
-	if err := json.Unmarshal(stdout.Bytes(), &upstream); err != nil {
-		t.Fatal(err)
+	if decodeError := json.Unmarshal(stdout.Bytes(), &upstream); decodeError != nil {
+		test.Fatal(decodeError)
 	}
 
 	// The Go side gets fresh ASTs, decoded from the same JSON, so neither side sees the other's
 	// attachment state.
 	var fresh []toyCase
-	if err := json.Unmarshal(encoded, &fresh); err != nil {
-		t.Fatal(err)
+	if decodeError := json.Unmarshal(encoded, &fresh); decodeError != nil {
+		test.Fatal(decodeError)
 	}
 
 	commentsTotal, upstreamErrors, textMismatches, attachMismatches := 0, 0, 0, 0
@@ -348,36 +352,62 @@ func TestCoreAgreesWithUpstream(t *testing.T) {
 		if upstream[index].Error != "" {
 			upstreamErrors++
 			if upstreamErrors <= 3 {
-				t.Logf("upstream refused case %d: %s", index, upstream[index].Error)
+				test.Logf("upstream refused case %d: %s", index, upstream[index].Error)
 			}
 			continue
 		}
-		options := &Options[*toyNode]{Printer: toyPrinter(), OriginalText: testCase.Text, EmbeddedLanguageFormatting: "off"}
-		printed, err := PrintAstToDoc(testCase.Ast, testCase.Comments, options)
-		if err != nil {
-			t.Errorf("case %d: %v\ntext %q", index, err, testCase.Text)
+		options := &Options[*toyNode, toySettings, NoArguments]{
+			Printer:                    toyPrinter(),
+			OriginalText:               testCase.Text,
+			EmbeddedLanguageFormatting: "off",
+		}
+		printed, printAstToDocError := PrintAstToDoc(testCase.Ast, testCase.Comments, options)
+		if printAstToDocError != nil {
+			test.Errorf("case %d: %v\ntext %q", index, printAstToDocError, testCase.Text)
 			continue
 		}
 		formatted := doc.Print(printed, doc.Options{PrintWidth: testCase.Width, TabWidth: 2})
 
-		attachedGo, _ := json.Marshal(attachedSummary(testCase.Ast))
-		attachedUpstream, _ := json.Marshal(upstream[index].Attached)
+		attachedGo, attachedGoError := json.Marshal(attachedSummary(testCase.Ast))
+		if attachedGoError != nil {
+			test.Fatalf("case %d: encoding Go's attachment: %v", index, attachedGoError)
+		}
+		attachedUpstream, attachedUpstreamError := json.Marshal(upstream[index].Attached)
+		if attachedUpstreamError != nil {
+			test.Fatalf("case %d: encoding upstream's attachment: %v", index, attachedUpstreamError)
+		}
 		if string(attachedGo) != string(attachedUpstream) {
 			attachMismatches++
 			if attachMismatches <= 3 {
-				t.Errorf("case %d attachment\ntext %q\nwant %s\ngot  %s", index, testCase.Text, attachedUpstream, attachedGo)
+				test.Errorf(
+					"case %d attachment\ntext %q\nwant %s\ngot  %s",
+					index,
+					testCase.Text,
+					attachedUpstream,
+					attachedGo,
+				)
 			}
 		}
 		if formatted != upstream[index].Formatted {
 			textMismatches++
 			if textMismatches <= 3 {
-				t.Errorf("case %d output\ntext %q\nwant %q\ngot  %q", index, testCase.Text, upstream[index].Formatted, formatted)
+				test.Errorf(
+					"case %d output\ntext %q\nwant %q\ngot  %q",
+					index,
+					testCase.Text,
+					upstream[index].Formatted,
+					formatted,
+				)
 			}
 		}
 	}
-	t.Logf("%d programs, %d comments, %d upstream refused, %d attachment mismatches, %d output mismatches",
+	test.Logf("%d programs, %d comments, %d upstream refused, %d attachment mismatches, %d output mismatches",
 		count, commentsTotal, upstreamErrors, attachMismatches, textMismatches)
 	if upstreamErrors > count/10 {
-		t.Errorf("upstream refused %d of %d programs, so the comparison is thinner than it looks", upstreamErrors, count)
+		test.Errorf(
+			"upstream refused %d of %d programs, so the comparison is thinner than it looks",
+			upstreamErrors,
+			count,
+		)
 	}
 }

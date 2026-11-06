@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -20,21 +21,21 @@ func methodSignatureStyleCaseName(index int) string {
 //
 // The decoder holds the only default in this rule and reads a bare JSON string rather than an
 // object, which is the one line with no upstream counterpart. An empty configuration is the bare
-// `"error"` case, which the config layer turns into nil options, and it reaches the rule the same
+// `"error"` case, which the config layer turns into no options, and it reaches the rule the same
 // way here.
-func decodeMethodSignatureStyleOptions(t *testing.T, configuration string) any {
-	t.Helper()
+func decodeMethodSignatureStyleOptions(test *testing.T, configuration string) rule.Given[MethodSignatureStyleOptions] {
+	test.Helper()
 
 	if configuration == "" {
-		// A rule configured as a bare `"error"` is handed nil, not an empty struct. Passing nil
-		// here is what puts the rule's own fallback under test rather than the decoder's.
-		return nil
+		// A rule configured as a bare `"error"` is handed no options, not an empty struct. Handing
+		// it none here is what puts the rule's own fallback under test rather than the decoder's.
+		return rule.Given[MethodSignatureStyleOptions]{}
 	}
-	options, err := DecodeMethodSignatureStyleOptions([]byte(configuration))
-	if err != nil {
-		t.Fatalf("could not decode %s: %v", configuration, err)
+	options, decodeMethodSignatureStyleOptionsError := DecodeMethodSignatureStyleOptions([]byte(configuration))
+	if decodeMethodSignatureStyleOptionsError != nil {
+		test.Fatalf("could not decode %s: %v", configuration, decodeMethodSignatureStyleOptionsError)
 	}
-	return options
+	return rule.Configured(options)
 }
 
 // TestMethodSignatureStyleStaysSilentOnUpstreamPassCases is the imported clean corpus.
@@ -43,8 +44,8 @@ func decodeMethodSignatureStyleOptions(t *testing.T, configuration string) any {
 // clone's test file by parsing it with the TypeScript compiler rather than by reading it, so no
 // escape sequence passed through a shell or a keyboard on the way here. Every one was additionally
 // run through the installed 8.67.0 build, which reported nothing on all twenty-four.
-func TestMethodSignatureStyleStaysSilentOnUpstreamPassCases(t *testing.T) {
-	t.Parallel()
+func TestMethodSignatureStyleStaysSilentOnUpstreamPassCases(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		configuration string
@@ -148,11 +149,11 @@ func TestMethodSignatureStyleStaysSilentOnUpstreamPassCases(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(methodSignatureStyleCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, MethodSignatureStyle,
+		test.Run(methodSignatureStyleCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunGiven(test, MethodSignatureStyle,
 				methodSignatureStyleFile, testCase.sourceText,
-				decodeMethodSignatureStyleOptions(t, testCase.configuration)))
+				decodeMethodSignatureStyleOptions(test, testCase.configuration)))
 		})
 	}
 }
@@ -167,8 +168,8 @@ func TestMethodSignatureStyleStaysSilentOnUpstreamPassCases(t *testing.T) {
 // points, which is the whole member. The applied source says what the edit engine will write
 // unattended. And the suggestion, where there is one, says what a human accepting it would get,
 // which is the only way to see a repair the engine never applies.
-func TestMethodSignatureStyleFiresOnUpstreamFailCases(t *testing.T) {
-	t.Parallel()
+func TestMethodSignatureStyleFiresOnUpstreamFailCases(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		configuration string
@@ -366,7 +367,11 @@ func TestMethodSignatureStyleFiresOnUpstreamFailCases(t *testing.T) {
 			configuration: "\"method\"",
 			sourceText:    "\ninterface Foo {\n  semi: (arg: string) => void;\n  comma: (arg: string) => void,\n  none: (arg: string) => void\n}\n      ",
 			wantIds:       []string{"errorProperty", "errorProperty", "errorProperty"},
-			wantSpans:     []string{"semi: (arg: string) => void;", "comma: (arg: string) => void,", "none: (arg: string) => void"},
+			wantSpans: []string{
+				"semi: (arg: string) => void;",
+				"comma: (arg: string) => void,",
+				"none: (arg: string) => void",
+			},
 			wantFixed:     "\ninterface Foo {\n  semi(arg: string): void;\n  comma(arg: string): void,\n  none(arg: string): void\n}\n      ",
 			wantSuggested: []string{"", "", ""},
 		},
@@ -374,7 +379,10 @@ func TestMethodSignatureStyleFiresOnUpstreamFailCases(t *testing.T) {
 			configuration: "",
 			sourceText:    "\ninterface Foo {\n  x(\n    args: Pick<\n      Bar,\n      'one' | 'two' | 'three'\n    >,\n  ): Baz;\n  y(\n    foo: string,\n    bar: number,\n  ): void;\n}\n      ",
 			wantIds:       []string{"errorMethod", "errorMethod"},
-			wantSpans:     []string{"x(\n    args: Pick<\n      Bar,\n      'one' | 'two' | 'three'\n    >,\n  ): Baz;", "y(\n    foo: string,\n    bar: number,\n  ): void;"},
+			wantSpans: []string{
+				"x(\n    args: Pick<\n      Bar,\n      'one' | 'two' | 'three'\n    >,\n  ): Baz;",
+				"y(\n    foo: string,\n    bar: number,\n  ): void;",
+			},
 			wantFixed:     "\ninterface Foo {\n  x: (\n    args: Pick<\n      Bar,\n      'one' | 'two' | 'three'\n    >,\n  ) => Baz;\n  y: (\n    foo: string,\n    bar: number,\n  ) => void;\n}\n      ",
 			wantSuggested: []string{"", ""},
 		},
@@ -398,7 +406,11 @@ func TestMethodSignatureStyleFiresOnUpstreamFailCases(t *testing.T) {
 			configuration: "",
 			sourceText:    "\ninterface Foo {\n  [foo](bar: string): one;\n  [foo](bar: number, baz: string): two;\n  [foo](): three;\n}\n      ",
 			wantIds:       []string{"errorMethod", "errorMethod", "errorMethod"},
-			wantSpans:     []string{"[foo](bar: string): one;", "[foo](bar: number, baz: string): two;", "[foo](): three;"},
+			wantSpans: []string{
+				"[foo](bar: string): one;",
+				"[foo](bar: number, baz: string): two;",
+				"[foo](): three;",
+			},
 			wantFixed:     "\ninterface Foo {\n  [foo]: ((bar: string) => one) & ((bar: number, baz: string) => two) & (() => three);\n}\n      ",
 			wantSuggested: []string{"", "", ""},
 		},
@@ -406,7 +418,13 @@ func TestMethodSignatureStyleFiresOnUpstreamFailCases(t *testing.T) {
 			configuration: "",
 			sourceText:    "\ninterface Foo {\n  [foo](bar: string): one;\n  [foo](bar: number, baz: string): two;\n  [foo](): three;\n  bar(arg: string): void;\n  bar(baz: number): Foo;\n}\n      ",
 			wantIds:       []string{"errorMethod", "errorMethod", "errorMethod", "errorMethod", "errorMethod"},
-			wantSpans:     []string{"[foo](bar: string): one;", "[foo](bar: number, baz: string): two;", "[foo](): three;", "bar(arg: string): void;", "bar(baz: number): Foo;"},
+			wantSpans: []string{
+				"[foo](bar: string): one;",
+				"[foo](bar: number, baz: string): two;",
+				"[foo](): three;",
+				"bar(arg: string): void;",
+				"bar(baz: number): Foo;",
+			},
 			wantFixed:     "\ninterface Foo {\n  [foo]: ((bar: string) => one) & ((bar: number, baz: string) => two) & (() => three);\n  bar: ((arg: string) => void) & ((baz: number) => Foo);\n}\n      ",
 			wantSuggested: []string{"", "", "", "", ""},
 		},
@@ -414,7 +432,10 @@ func TestMethodSignatureStyleFiresOnUpstreamFailCases(t *testing.T) {
 			configuration: "",
 			sourceText:    "\n        declare global {\n          namespace jest {\n            interface Matchers<R, T> {\n              // Add overloads specific to the DOM\n              toHaveProp<K extends keyof DomPropsOf<T>>(name: K, value?: DomPropsOf<T>[K]): R;\n              toHaveProps(props: Partial<DomPropsOf<T>>): R;\n            }\n          }\n        }\n      ",
 			wantIds:       []string{"errorMethod", "errorMethod"},
-			wantSpans:     []string{"toHaveProp<K extends keyof DomPropsOf<T>>(name: K, value?: DomPropsOf<T>[K]): R;", "toHaveProps(props: Partial<DomPropsOf<T>>): R;"},
+			wantSpans: []string{
+				"toHaveProp<K extends keyof DomPropsOf<T>>(name: K, value?: DomPropsOf<T>[K]): R;",
+				"toHaveProps(props: Partial<DomPropsOf<T>>): R;",
+			},
 			wantFixed:     "",
 			wantSuggested: []string{"", ""},
 		},
@@ -484,17 +505,18 @@ func TestMethodSignatureStyleFiresOnUpstreamFailCases(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(methodSignatureStyleCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, MethodSignatureStyle,
+		test.Run(methodSignatureStyleCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunGiven(test, MethodSignatureStyle,
 				methodSignatureStyleFile, testCase.sourceText,
-				decodeMethodSignatureStyleOptions(t, testCase.configuration))
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+				decodeMethodSignatureStyleOptions(test, testCase.configuration))
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 
 			for index, wantSpan := range testCase.wantSpans {
-				reported := testCase.sourceText[result.Diagnostics[index].Range.Pos():result.Diagnostics[index].Range.End()]
+				reported :=
+					testCase.sourceText[result.Diagnostics[index].Range.Pos():result.Diagnostics[index].Range.End()]
 				if reported != wantSpan {
-					t.Errorf("finding %d covers %q, want %q", index, reported, wantSpan)
+					test.Errorf("finding %d covers %q, want %q", index, reported, wantSpan)
 				}
 			}
 
@@ -502,19 +524,19 @@ func TestMethodSignatureStyleFiresOnUpstreamFailCases(t *testing.T) {
 				diagnostic := result.Diagnostics[index]
 				if wantSuggested == "" {
 					if len(diagnostic.Suggestions) != 0 {
-						t.Errorf("finding %d offers %d suggestions, want none",
+						test.Errorf("finding %d offers %d suggestions, want none",
 							index, len(diagnostic.Suggestions))
 					}
 					continue
 				}
 				if len(diagnostic.Suggestions) != 1 || len(diagnostic.Suggestions[0].Fixes) != 1 {
-					t.Fatalf("finding %d does not carry exactly one single-fix suggestion", index)
+					test.Fatalf("finding %d does not carry exactly one single-fix suggestion", index)
 				}
 				fix := diagnostic.Suggestions[0].Fixes[0]
 				rewritten := testCase.sourceText[:fix.Range.Pos()] + fix.Text +
 					testCase.sourceText[fix.Range.End():]
 				if rewritten != wantSuggested {
-					t.Errorf("finding %d's suggestion produces:\n  %q\nwant:\n  %q",
+					test.Errorf("finding %d's suggestion produces:\n  %q\nwant:\n  %q",
 						index, rewritten, wantSuggested)
 				}
 			}
@@ -522,13 +544,13 @@ func TestMethodSignatureStyleFiresOnUpstreamFailCases(t *testing.T) {
 			if testCase.wantFixed == "" {
 				for index, diagnostic := range result.Diagnostics {
 					if len(diagnostic.Fixes) != 0 {
-						t.Errorf("finding %d carries %d fixes, want none because upstream withholds the repair",
+						test.Errorf("finding %d carries %d fixes, want none because upstream withholds the repair",
 							index, len(diagnostic.Fixes))
 					}
 				}
 				return
 			}
-			rule_testing.ExpectFixedSource(t, result, testCase.wantFixed)
+			rule_testing.ExpectFixedSource(test, result, testCase.wantFixed)
 		})
 	}
 }
@@ -548,8 +570,8 @@ func TestMethodSignatureStyleFiresOnUpstreamFailCases(t *testing.T) {
 // Every expectation is what the installed 8.67.0 build produced, and each rewrite was additionally
 // checked through the TypeScript compiler to confirm the member's type is identical before and
 // after.
-func TestMethodSignatureStylePreservesEverythingInsideTheSignature(t *testing.T) {
-	t.Parallel()
+func TestMethodSignatureStylePreservesEverythingInsideTheSignature(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		configuration string
@@ -625,13 +647,13 @@ func TestMethodSignatureStylePreservesEverythingInsideTheSignature(t *testing.T)
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(methodSignatureStyleCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, MethodSignatureStyle,
+		test.Run(methodSignatureStyleCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunGiven(test, MethodSignatureStyle,
 				methodSignatureStyleFile, testCase.sourceText,
-				decodeMethodSignatureStyleOptions(t, testCase.configuration))
-			rule_testing.ExpectFindings(t, result, "errorMethod")
-			rule_testing.ExpectFixedSource(t, result, testCase.wantFixed)
+				decodeMethodSignatureStyleOptions(test, testCase.configuration))
+			rule_testing.ExpectFindings(test, result, "errorMethod")
+			rule_testing.ExpectFixedSource(test, result, testCase.wantFixed)
 		})
 	}
 }
@@ -640,8 +662,8 @@ func TestMethodSignatureStylePreservesEverythingInsideTheSignature(t *testing.T)
 //
 // Each row was run through the installed 8.67.0 build and carries the verdict that build produced,
 // so a row asserting silence asserts upstream's silence rather than this port's.
-func TestMethodSignatureStyleDiscriminatesOnCasesUpstreamDoesNotWrite(t *testing.T) {
-	t.Parallel()
+func TestMethodSignatureStyleDiscriminatesOnCasesUpstreamDoesNotWrite(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		configuration string
@@ -717,20 +739,20 @@ func TestMethodSignatureStyleDiscriminatesOnCasesUpstreamDoesNotWrite(t *testing
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(methodSignatureStyleCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, MethodSignatureStyle,
+		test.Run(methodSignatureStyleCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunGiven(test, MethodSignatureStyle,
 				methodSignatureStyleFile, testCase.sourceText,
-				decodeMethodSignatureStyleOptions(t, testCase.configuration))
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+				decodeMethodSignatureStyleOptions(test, testCase.configuration))
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
 
 // TestMethodSignatureStyleDecoderResolvesTheStyle puts the one line with no upstream counterpart
 // under test.
-func TestMethodSignatureStyleDecoderResolvesTheStyle(t *testing.T) {
-	t.Parallel()
+func TestMethodSignatureStyleDecoderResolvesTheStyle(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		configuration string
@@ -743,43 +765,41 @@ func TestMethodSignatureStyleDecoderResolvesTheStyle(t *testing.T) {
 		{"\"nonsense\"", MethodSignatureStyleProperty},
 	}
 	for index, testCase := range cases {
-		t.Run(methodSignatureStyleCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			decoded, err := DecodeMethodSignatureStyleOptions([]byte(testCase.configuration))
-			if err != nil {
-				t.Fatalf("decoding %s: %v", testCase.configuration, err)
+		test.Run(methodSignatureStyleCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			decoded, decodeMethodSignatureStyleOptionsError := DecodeMethodSignatureStyleOptions(
+				[]byte(testCase.configuration),
+			)
+			if decodeMethodSignatureStyleOptionsError != nil {
+				test.Fatalf("decoding %s: %v", testCase.configuration, decodeMethodSignatureStyleOptionsError)
 			}
-			options, ok := decoded.(MethodSignatureStyleOptions)
-			if !ok {
-				t.Fatalf("the decoder returned %T rather than MethodSignatureStyleOptions", decoded)
-			}
-			if options.Style != testCase.wantStyle {
-				t.Errorf("style resolved to %q, want %q", options.Style, testCase.wantStyle)
+			if decoded.Style != testCase.wantStyle {
+				test.Errorf("style resolved to %q, want %q", decoded.Style, testCase.wantStyle)
 			}
 		})
 	}
 }
 
 // TestMethodSignatureStyleNilOptionsFallsBackToUpstreamDefault bypasses the decoder entirely.
-func TestMethodSignatureStyleNilOptionsFallsBackToUpstreamDefault(t *testing.T) {
-	t.Parallel()
+func TestMethodSignatureStyleNilOptionsFallsBackToUpstreamDefault(test *testing.T) {
+	test.Parallel()
 
 	// `property` is the default, so a shorthand method reports and a function property does not.
-	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, MethodSignatureStyle,
-		methodSignatureStyleFile, "interface I { m(a: string): void; }", nil), "errorMethod")
-	rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, MethodSignatureStyle,
-		methodSignatureStyleFile, "interface I { m: (a: string) => void; }", nil))
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, MethodSignatureStyle,
+		methodSignatureStyleFile, "interface I { m(a: string): void; }"), "errorMethod")
+	rule_testing.ExpectClean(test, rule_testing.Run(test, MethodSignatureStyle,
+		methodSignatureStyleFile, "interface I { m: (a: string) => void; }"))
 }
 
 // TestMethodSignatureStyleSurvivesMalformedSignatures is a crash fixture.
 //
 // The repair scans the raw source backwards for a parameter list's opening parenthesis and forwards
 // for its closing one, and error recovery produces signatures with neither. The walk recovers per
-// FILE rather than per rule, so one panic would cost every rule that file rather than one finding.
+// file rather than per rule, so one panic would cost every rule that file rather than one finding.
 //
 // There is no finding to assert; the assertion is that the run completes.
-func TestMethodSignatureStyleSurvivesMalformedSignatures(t *testing.T) {
-	t.Parallel()
+func TestMethodSignatureStyleSurvivesMalformedSignatures(test *testing.T) {
+	test.Parallel()
 
 	for name, sourceText := range map[string]string{
 		"noParens":    "interface I { m: void; }",
@@ -792,12 +812,12 @@ func TestMethodSignatureStyleSurvivesMalformedSignatures(t *testing.T) {
 		"bareArrow":   "type T = { m: => void };",
 		"halfGeneric": "interface I { m<T(a: T): T; }",
 	} {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.RunWithOptions(t, MethodSignatureStyle, methodSignatureStyleFile,
-				sourceText, decodeMethodSignatureStyleOptions(t, "\"property\""))
-			rule_testing.RunWithOptions(t, MethodSignatureStyle, methodSignatureStyleFile,
-				sourceText, decodeMethodSignatureStyleOptions(t, "\"method\""))
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.RunGiven(test, MethodSignatureStyle, methodSignatureStyleFile,
+				sourceText, decodeMethodSignatureStyleOptions(test, "\"property\""))
+			rule_testing.RunGiven(test, MethodSignatureStyle, methodSignatureStyleFile,
+				sourceText, decodeMethodSignatureStyleOptions(test, "\"method\""))
 		})
 	}
 }

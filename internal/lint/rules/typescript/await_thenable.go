@@ -42,7 +42,7 @@ import (
 // `rule.TokenRange` both start at the node's first token and end at its end. No
 // predicate, no tri-state and no traversal was touched.
 //
-// The reported SPANS are unchanged, and that is the part worth naming. While this rule was adapted,
+// The reported spans are unchanged, and that is the part worth naming. While this rule was adapted,
 // `upstream.Adapt` wrapped every node report in `rule.TokenRange(SourceFile, node)` because
 // tsgolint's own runner does the same through `utils.TrimNodeTextRange`. Our native
 // `ctx.ReportNodeWithSuggestions` applies exactly that trim itself, so absorbing the rule preserves
@@ -56,13 +56,13 @@ import (
 //
 // oxc has no implementation. Its rule file declares `AwaitThenable(tsgolint)` and delegates, with
 // fifty seven lines carrying documentation and no algorithm. So the behavior oxlint exhibits for
-// this rule IS tsgolint's, literally: the release binary shells out to a `tsgolint` executable and
+// this rule is tsgolint's, literally: the release binary shells out to a `tsgolint` executable and
 // refuses to run the rule when that binary is absent, which is what it does on this machine. All
 // forty eight of tsgolint's own cases are replayed in the test file and all forty eight agree.
 //
 // # The aggregator arm, which tsgolint never had
 //
-// `@typescript-eslint` 8.67.0 carries a FOURTH listener that tsgolint has no counterpart for: a
+// `@typescript-eslint` 8.67.0 carries a fourth listener that tsgolint has no counterpart for: a
 // `CallExpression` arm reporting `invalidPromiseAggregatorInput` when `Promise.all`, `allSettled`,
 // `race` or `any` receives a value that is not a Thenable. tsgolint registers exactly three
 // listeners and predates the feature, so this file first reproduced its absence as silence, to keep
@@ -77,8 +77,8 @@ import (
 // TestAwaitThenableUpstreamCorpus.
 //
 // Two judgments with different quantifiers, both upstream's. An array literal's element reports
-// only when EVERY union part of its constrained type is never awaitable, so `number | Promise<number>`
-// is fine. Any other argument reports when it is iterable and SOME element type (a tuple's members,
+// only when every union part of its constrained type is never awaitable, so `number | Promise<number>`
+// is fine. Any other argument reports when it is iterable and some element type (a tuple's members,
 // an array-like's number index, an `Iterable<T>`'s first type argument) has a part that is never
 // awaitable, so `Promise.all(values)` over `(number | Promise<number>)[]` reports while the same
 // union written inline does not. The asymmetry is upstream's and is reproduced.
@@ -116,7 +116,7 @@ import (
 // The anchor is what to price, not the checker. `KindAwaitExpression` and `KindForOfStatement` are
 // uncommon nodes, and `KindVariableDeclarationList` is common but exits on the first line for
 // anything that is not `await using`. Measured on the real tree, see the test file's note.
-var AwaitThenable = rule.Rule{
+var AwaitThenable = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/await-thenable",
 
 	// All four listeners read ctx.TypeChecker unconditionally, so the checker is required.
@@ -126,28 +126,28 @@ var AwaitThenable = rule.Rule{
 	// Compiler options and the default library, through type_checking's builtin and specifier helpers.
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.TypeChecker == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		if ruleContext.TypeChecker == nil {
 			return nil
 		}
 
 		return rule.Listeners{
 			ast.KindAwaitExpression: func(node *ast.Node) {
 				awaitArgument := node.AsAwaitExpression().Expression
-				awaitArgumentType := ctx.TypeChecker.GetTypeAtLocation(awaitArgument)
-				certainty := type_checking.NeedsToBeAwaited(ctx.TypeChecker, awaitArgument, awaitArgumentType)
+				awaitArgumentType := ruleContext.TypeChecker.GetTypeAtLocation(awaitArgument)
+				certainty := type_checking.NeedsToBeAwaited(ruleContext.TypeChecker, awaitArgument, awaitArgumentType)
 
 				if certainty == type_checking.TypeAwaitableNever {
-					ctx.ReportNodeWithSuggestions(node, buildAwaitMessage(), rule.Suggestion{
+					ruleContext.ReportNodeWithSuggestions(node, buildAwaitMessage(), rule.Suggestion{
 						Message: buildRemoveAwaitMessage(),
 						Fixes: []rule.Fix{
-							rule.RemoveRange(scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, node.Pos())),
+							rule.RemoveRange(scanner.GetRangeOfTokenAtPosition(ruleContext.SourceFile, node.Pos())),
 						},
 					})
 				}
 			},
 			ast.KindCallExpression: func(node *ast.Node) {
-				if !awaitThenableIsPromiseAggregatorCall(ctx, node) {
+				if !awaitThenableIsPromiseAggregatorCall(ruleContext, node) {
 					return
 				}
 				arguments := node.Arguments()
@@ -167,17 +167,17 @@ var AwaitThenable = rule.Rule{
 							continue
 						}
 						element = ast.SkipParentheses(element)
-						elementType := type_checking.GetConstrainedTypeAtLocation(ctx.TypeChecker, element)
-						if awaitThenableIsAlwaysNonAwaitable(ctx, element, elementType) {
-							ctx.ReportNode(element, buildInvalidPromiseAggregatorInputMessage())
+						elementType := type_checking.GetConstrainedTypeAtLocation(ruleContext.TypeChecker, element)
+						if awaitThenableIsAlwaysNonAwaitable(ruleContext, element, elementType) {
+							ruleContext.ReportNode(element, buildInvalidPromiseAggregatorInputMessage())
 						}
 					}
 					return
 				}
 
-				argumentType := type_checking.GetConstrainedTypeAtLocation(ctx.TypeChecker, argument)
-				if awaitThenableIsInvalidAggregatorInput(ctx, argument, argumentType) {
-					ctx.ReportNode(argument, buildInvalidPromiseAggregatorInputMessage())
+				argumentType := type_checking.GetConstrainedTypeAtLocation(ruleContext.TypeChecker, argument)
+				if awaitThenableIsInvalidAggregatorInput(ruleContext, argument, argumentType) {
+					ruleContext.ReportNode(argument, buildInvalidPromiseAggregatorInputMessage())
 				}
 			},
 			ast.KindForOfStatement: func(node *ast.Node) {
@@ -186,26 +186,30 @@ var AwaitThenable = rule.Rule{
 					return
 				}
 
-				exprType := ctx.TypeChecker.GetTypeAtLocation(stmt.Expression)
+				exprType := ruleContext.TypeChecker.GetTypeAtLocation(stmt.Expression)
 				if type_checking.IsTypeAnyType(exprType) {
 					return
 				}
 
-				for typePart := range type_checking.UnionTypePartsSeq(exprType) {
-					if type_checking.GetWellKnownSymbolPropertyOfType(typePart, "asyncIterator", ctx.TypeChecker) != nil {
+				for typePart := range type_checking.UnionTypePartsSequence(exprType) {
+					if type_checking.GetWellKnownSymbolPropertyOfType(
+						typePart,
+						"asyncIterator",
+						ruleContext.TypeChecker,
+					) != nil {
 						return
 					}
 				}
 
-				ctx.ReportRangeWithSuggestions(
-					type_checking.GetForStatementHeadLoc(ctx.SourceFile, node),
+				ruleContext.ReportRangeWithSuggestions(
+					type_checking.GetForStatementHeadLoc(ruleContext.SourceFile, node),
 					buildForAwaitOfNonAsyncIterableMessage(),
 					// Note that this suggestion causes broken code for sync iterables
 					// of promises, since the loop variable is not awaited.
 					rule.Suggestion{
 						Message: buildConvertToOrdinaryForMessage(),
 						Fixes: []rule.Fix{
-							ctx.RemoveNode(stmt.AwaitModifier),
+							ruleContext.RemoveNode(stmt.AwaitModifier),
 						},
 					},
 				)
@@ -216,21 +220,18 @@ var AwaitThenable = rule.Rule{
 				}
 
 				declaration := node.AsVariableDeclarationList()
-			DeclaratorLoop:
 				for _, declarator := range declaration.Declarations.Nodes {
 					init := declarator.Initializer()
 					if init == nil {
 						continue
 					}
-					initType := ctx.TypeChecker.GetTypeAtLocation(init)
+					initType := ruleContext.TypeChecker.GetTypeAtLocation(init)
 					if type_checking.IsTypeAnyType(initType) {
 						continue
 					}
 
-					for typePart := range type_checking.UnionTypePartsSeq(initType) {
-						if type_checking.GetWellKnownSymbolPropertyOfType(typePart, "asyncDispose", ctx.TypeChecker) != nil {
-							continue DeclaratorLoop
-						}
+					if awaitThenableIsAsyncDisposable(ruleContext, initType) {
+						continue
 					}
 
 					var suggestions []rule.Suggestion
@@ -241,12 +242,16 @@ var AwaitThenable = rule.Rule{
 						suggestions = append(suggestions, rule.Suggestion{
 							Message: buildRemoveAwaitMessage(),
 							Fixes: []rule.Fix{
-								rule.RemoveRange(scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, node.Pos())),
+								rule.RemoveRange(scanner.GetRangeOfTokenAtPosition(ruleContext.SourceFile, node.Pos())),
 							},
 						})
 					}
 
-					ctx.ReportNodeWithSuggestions(init, buildAwaitUsingOfNonAsyncDisposableMessage(), suggestions...)
+					ruleContext.ReportNodeWithSuggestions(
+						init,
+						buildAwaitUsingOfNonAsyncDisposableMessage(),
+						suggestions...,
+					)
 				}
 			},
 		}
@@ -270,7 +275,7 @@ var awaitThenablePromiseAggregators = map[string]bool{
 // Upstream reads the name through `getStaticMemberAccessValue`, which also resolves a constant
 // variable inside brackets (`const key = 'all'; Promise[key]`). That form is not followed here and
 // stays silent; nothing in the corpus or the ahra tree writes it.
-func awaitThenableIsPromiseAggregatorCall(ctx rule.Context, call *ast.Node) bool {
+func awaitThenableIsPromiseAggregatorCall(ruleContext rule.Context, call *ast.Node) bool {
 	callee := ast.SkipParentheses(call.Expression())
 	var receiver *ast.Node
 	var name string
@@ -295,15 +300,15 @@ func awaitThenableIsPromiseAggregatorCall(ctx rule.Context, call *ast.Node) bool
 	if !awaitThenablePromiseAggregators[name] {
 		return false
 	}
-	receiverType := type_checking.GetConstrainedTypeAtLocation(ctx.TypeChecker, receiver)
-	return type_checking.IsPromiseConstructorLike(ctx.Program, ctx.TypeChecker, receiverType)
+	receiverType := type_checking.GetConstrainedTypeAtLocation(ruleContext.TypeChecker, receiver)
+	return type_checking.IsPromiseConstructorLike(ruleContext.Program, ruleContext.TypeChecker, receiverType)
 }
 
 // awaitThenableIsAlwaysNonAwaitable is upstream's `isAlwaysNonAwaitableType`: every union part is
 // never awaitable.
-func awaitThenableIsAlwaysNonAwaitable(ctx rule.Context, node *ast.Node, t *checker.Type) bool {
-	for part := range type_checking.UnionTypePartsSeq(t) {
-		if type_checking.NeedsToBeAwaited(ctx.TypeChecker, node, part) != type_checking.TypeAwaitableNever {
+func awaitThenableIsAlwaysNonAwaitable(ruleContext rule.Context, node *ast.Node, subjectType *checker.Type) bool {
+	for part := range type_checking.UnionTypePartsSequence(subjectType) {
+		if type_checking.NeedsToBeAwaited(ruleContext.TypeChecker, node, part) != type_checking.TypeAwaitableNever {
 			return false
 		}
 	}
@@ -312,9 +317,9 @@ func awaitThenableIsAlwaysNonAwaitable(ctx rule.Context, node *ast.Node, t *chec
 
 // awaitThenableContainsNonAwaitable is upstream's `containsNonAwaitableType`: some union part is
 // never awaitable.
-func awaitThenableContainsNonAwaitable(ctx rule.Context, node *ast.Node, t *checker.Type) bool {
-	for part := range type_checking.UnionTypePartsSeq(t) {
-		if type_checking.NeedsToBeAwaited(ctx.TypeChecker, node, part) == type_checking.TypeAwaitableNever {
+func awaitThenableContainsNonAwaitable(ruleContext rule.Context, node *ast.Node, subjectType *checker.Type) bool {
+	for part := range type_checking.UnionTypePartsSequence(subjectType) {
+		if type_checking.NeedsToBeAwaited(ruleContext.TypeChecker, node, part) == type_checking.TypeAwaitableNever {
 			return true
 		}
 	}
@@ -326,15 +331,15 @@ func awaitThenableContainsNonAwaitable(ctx rule.Context, node *ast.Node, t *chec
 //
 // A non-iterable argument is already a type error, so it is left to the checker. An iterable one
 // reports when any of its value types contains a part that is never awaitable.
-func awaitThenableIsInvalidAggregatorInput(ctx rule.Context, node *ast.Node, t *checker.Type) bool {
-	for part := range type_checking.UnionTypePartsSeq(t) {
-		if type_checking.GetWellKnownSymbolPropertyOfType(part, "iterator", ctx.TypeChecker) == nil {
+func awaitThenableIsInvalidAggregatorInput(ruleContext rule.Context, node *ast.Node, subjectType *checker.Type) bool {
+	for part := range type_checking.UnionTypePartsSequence(subjectType) {
+		if type_checking.GetWellKnownSymbolPropertyOfType(part, "iterator", ruleContext.TypeChecker) == nil {
 			return false
 		}
 	}
-	for part := range type_checking.UnionTypePartsSeq(t) {
-		for _, valueType := range awaitThenableValueTypesOfArrayLike(ctx, part) {
-			if awaitThenableContainsNonAwaitable(ctx, node, valueType) {
+	for part := range type_checking.UnionTypePartsSequence(subjectType) {
+		for _, valueType := range awaitThenableValueTypesOfArrayLike(ruleContext, part) {
+			if awaitThenableContainsNonAwaitable(ruleContext, node, valueType) {
 				return true
 			}
 		}
@@ -342,20 +347,31 @@ func awaitThenableIsInvalidAggregatorInput(ctx rule.Context, node *ast.Node, t *
 	return false
 }
 
+// awaitThenableIsAsyncDisposable answers whether some union part carries `Symbol.asyncDispose`, which
+// is what lets an `await using` declarator through.
+func awaitThenableIsAsyncDisposable(ruleContext rule.Context, initializerType *checker.Type) bool {
+	for part := range type_checking.UnionTypePartsSequence(initializerType) {
+		if type_checking.GetWellKnownSymbolPropertyOfType(part, "asyncDispose", ruleContext.TypeChecker) != nil {
+			return true
+		}
+	}
+	return false
+}
+
 // awaitThenableValueTypesOfArrayLike is upstream's `getValueTypesOfArrayLike`: a tuple's members, an
 // array-like's number index type, or an `Iterable<T>`'s first type argument.
-func awaitThenableValueTypesOfArrayLike(ctx rule.Context, t *checker.Type) []*checker.Type {
-	if checker.IsTupleType(t) {
-		return ctx.TypeChecker.GetTypeArguments(t)
+func awaitThenableValueTypesOfArrayLike(ruleContext rule.Context, subjectType *checker.Type) []*checker.Type {
+	if checker.IsTupleType(subjectType) {
+		return ruleContext.TypeChecker.GetTypeArguments(subjectType)
 	}
-	if ctx.TypeChecker.IsArrayLikeType(t) {
-		if indexType := ctx.TypeChecker.GetNumberIndexType(t); indexType != nil {
+	if ruleContext.TypeChecker.IsArrayLikeType(subjectType) {
+		if indexType := ruleContext.TypeChecker.GetNumberIndexType(subjectType); indexType != nil {
 			return []*checker.Type{indexType}
 		}
 		return nil
 	}
-	if checker.Type_objectFlags(t)&checker.ObjectFlagsReference != 0 {
-		typeArguments := ctx.TypeChecker.GetTypeArguments(t)
+	if checker.Type_objectFlags(subjectType)&checker.ObjectFlagsReference != 0 {
+		typeArguments := ruleContext.TypeChecker.GetTypeArguments(subjectType)
 		if len(typeArguments) > 1 {
 			typeArguments = typeArguments[:1]
 		}

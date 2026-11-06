@@ -8,5 +8,8 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // shared edit. The decoder is hand-written because the option is a bare list rather than an
 // object; see DecodeNoInvalidHtmlAttributeOptions.
 func init() {
-	rule.Register(rule.Registration{Rule: NoInvalidHtmlAttribute, Decode: DecodeNoInvalidHtmlAttributeOptions})
+	rule.Register(rule.Registration[NoInvalidHtmlAttributeOptions]{
+		Rule:   NoInvalidHtmlAttribute,
+		Decode: DecodeNoInvalidHtmlAttributeOptions,
+	})
 }

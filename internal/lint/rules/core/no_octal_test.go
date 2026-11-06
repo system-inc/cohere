@@ -45,8 +45,8 @@ const octalFile = "/repository/source/Octal.ts"
 // grammar production and are a syntax error in strict mode for the same reason the octals are. A
 // port that "corrects" this by checking the digits are octal-legal diverges from upstream silently
 // and is the single most likely way to get this rule wrong.
-func TestNoOctalFires(t *testing.T) {
-	t.Parallel()
+func TestNoOctalFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -64,10 +64,10 @@ func TestNoOctalFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoOctal, octalFile, testCase.sourceText), "noOctal")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, NoOctal, octalFile, testCase.sourceText), "noOctal")
 		})
 	}
 }
@@ -91,8 +91,8 @@ func TestNoOctalFires(t *testing.T) {
 //	the string  `"0755"` has the text but is not a numeric literal, and the rule keys on the node
 //	            being a number. A rule matching on source text reports it.
 //	the comment likewise, and a comment is not a node at all.
-func TestNoOctalStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoOctalStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -121,9 +121,9 @@ func TestNoOctalStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoOctal, octalFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoOctal, octalFile, testCase.sourceText))
 		})
 	}
 }
@@ -160,8 +160,8 @@ func TestNoOctalStaysSilent(t *testing.T) {
 // ESLint's own `/^0\d/u` against that string returns false. So declining is upstream-faithful and
 // not a gap, `tsc` catches the input separately as TS6188, and the case lives in the silent list
 // with the other declines. Written down because the failing fixture was the porter being wrong.
-func TestNoOctalOnSourceOurParserAcceptsAndESLintRejects(t *testing.T) {
-	t.Parallel()
+func TestNoOctalOnSourceOurParserAcceptsAndEsLintRejects(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -173,10 +173,10 @@ func TestNoOctalOnSourceOurParserAcceptsAndESLintRejects(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoOctal, octalFile, testCase.sourceText), "noOctal")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, NoOctal, octalFile, testCase.sourceText), "noOctal")
 		})
 	}
 }
@@ -193,8 +193,8 @@ func TestNoOctalOnSourceOurParserAcceptsAndESLintRejects(t *testing.T) {
 // columns 9 through 13, which is `0755` and not the declaration, not the initializer, and not the
 // statement. `-0755` reports at column 10, so the sign is outside the span, which is a consequence
 // of the parser making the minus a unary operator over a positive literal rather than part of it.
-func TestNoOctalReportsTheLiteralSpan(t *testing.T) {
-	t.Parallel()
+func TestNoOctalReportsTheLiteralSpan(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -211,13 +211,13 @@ func TestNoOctalReportsTheLiteralSpan(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoOctal, octalFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "noOctal")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoOctal, octalFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "noOctal")
 			reported := testCase.sourceText[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 			if reported != testCase.want {
-				t.Errorf("reported span = %q, want %q", reported, testCase.want)
+				test.Errorf("reported span = %q, want %q", reported, testCase.want)
 			}
 		})
 	}
@@ -234,28 +234,28 @@ func TestNoOctalReportsTheLiteralSpan(t *testing.T) {
 // The pairs below are chosen so the cooked spellings collide across the fire and clean cases: `0755`
 // and `0o755` both cook to `493`, so no rule reading cooked text can separate them, and one of them
 // is upstream's recommended fix. That is what makes this a discrimination rather than a restatement.
-func TestNoOctalReadsRawTextRatherThanTheCookedValue(t *testing.T) {
-	t.Parallel()
+func TestNoOctalReadsRawTextRatherThanTheCookedValue(test *testing.T) {
+	test.Parallel()
 
 	// Both cook to "493". The legacy spelling reports and the modern one must not.
-	rule_testing.ExpectFindings(t,
-		rule_testing.Run(t, NoOctal, octalFile, "var a = 0755;"), "noOctal")
-	rule_testing.ExpectClean(t,
-		rule_testing.Run(t, NoOctal, octalFile, "var a = 0o755;"))
+	rule_testing.ExpectFindings(test,
+		rule_testing.Run(test, NoOctal, octalFile, "var a = 0755;"), "noOctal")
+	rule_testing.ExpectClean(test,
+		rule_testing.Run(test, NoOctal, octalFile, "var a = 0o755;"))
 
 	// `07` cooks to "7", indistinguishable from a plain `7`, which must stay clean.
-	rule_testing.ExpectFindings(t,
-		rule_testing.Run(t, NoOctal, octalFile, "var a = 07;"), "noOctal")
-	rule_testing.ExpectClean(t,
-		rule_testing.Run(t, NoOctal, octalFile, "var a = 7;"))
+	rule_testing.ExpectFindings(test,
+		rule_testing.Run(test, NoOctal, octalFile, "var a = 07;"), "noOctal")
+	rule_testing.ExpectClean(test,
+		rule_testing.Run(test, NoOctal, octalFile, "var a = 7;"))
 
 	// `000` and `0e5` both cook to "0", as does a bare `0`. Only the first is the legacy form.
-	rule_testing.ExpectFindings(t,
-		rule_testing.Run(t, NoOctal, octalFile, "var a = 000;"), "noOctal")
-	rule_testing.ExpectClean(t,
-		rule_testing.Run(t, NoOctal, octalFile, "var a = 0e5;"))
-	rule_testing.ExpectClean(t,
-		rule_testing.Run(t, NoOctal, octalFile, "var a = 0;"))
+	rule_testing.ExpectFindings(test,
+		rule_testing.Run(test, NoOctal, octalFile, "var a = 000;"), "noOctal")
+	rule_testing.ExpectClean(test,
+		rule_testing.Run(test, NoOctal, octalFile, "var a = 0e5;"))
+	rule_testing.ExpectClean(test,
+		rule_testing.Run(test, NoOctal, octalFile, "var a = 0;"))
 }
 
 // Several literals in one file report several times, and each finding points at its own literal.
@@ -263,18 +263,18 @@ func TestNoOctalReadsRawTextRatherThanTheCookedValue(t *testing.T) {
 // Every other fixture here is a single-literal file, so a rule that reported once per file, or that
 // cached the first raw span it computed and reused it, would pass all of them. This is the case that
 // separates per-node work from per-file work.
-func TestNoOctalReportsEachLiteralSeparately(t *testing.T) {
-	t.Parallel()
+func TestNoOctalReportsEachLiteralSeparately(test *testing.T) {
+	test.Parallel()
 
 	source := "var a = 0755, b = 0o755, c = 07, d = 0, e = 08;"
-	result := rule_testing.Run(t, NoOctal, octalFile, source)
-	rule_testing.ExpectFindings(t, result, "noOctal", "noOctal", "noOctal")
+	result := rule_testing.Run(test, NoOctal, octalFile, source)
+	rule_testing.ExpectFindings(test, result, "noOctal", "noOctal", "noOctal")
 
 	want := []string{"0755", "07", "08"}
 	for index, diagnostic := range result.Diagnostics {
 		reported := source[diagnostic.Range.Pos():diagnostic.Range.End()]
 		if reported != want[index] {
-			t.Errorf("finding %d reported %q, want %q", index, reported, want[index])
+			test.Errorf("finding %d reported %q, want %q", index, reported, want[index])
 		}
 	}
 }

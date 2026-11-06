@@ -34,23 +34,23 @@ func messageNoDirectFetch() rule.Message {
 //
 // No fix. Replacing a fetch with a NetworkService call means choosing a method, a response shape,
 // and an error path, which is the work the rule is asking for rather than something to generate.
-var NetworkNoDirectFetch = rule.Rule{
+var NetworkNoDirectFetch = rule.Rule[rule.NoOptions]{
 	Name: "structure/network-no-direct-fetch",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
 		// The implementation is the one place the raw primitive is allowed, so it declines the file
 		// before any node is visited.
-		if FileContextFor(ctx.SourceFile.FileName().AsString()).IsNetworkServiceFile {
+		if FileContextFor(ruleContext.SourceFile.FileName().AsString()).IsNetworkServiceFile {
 			return nil
 		}
 
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				if isFetchCallee(node.AsCallExpression().Expression) {
-					ctx.ReportNode(node, messageNoDirectFetch())
+					ruleContext.ReportNode(node, messageNoDirectFetch())
 				}
 			},
 		}
@@ -66,17 +66,17 @@ var fetchGlobalObjects = map[string]bool{"window": true, "globalThis": true}
 // happens to share the name, and reading every `.fetch` as the primitive would flag the wrapper
 // calls this rule exists to encourage.
 func isFetchCallee(callee *ast.Node) bool {
-	callee = ast.SkipParentheses(callee)
-	if callee == nil {
+	unwrapped := ast.SkipParentheses(callee)
+	if unwrapped == nil {
 		return false
 	}
 
-	switch callee.Kind {
+	switch unwrapped.Kind {
 	case ast.KindIdentifier:
-		return callee.Text() == "fetch"
+		return unwrapped.Text() == "fetch"
 
 	case ast.KindPropertyAccessExpression:
-		access := callee.AsPropertyAccessExpression()
+		access := unwrapped.AsPropertyAccessExpression()
 		name := access.Name()
 		if name == nil || name.Text() != "fetch" {
 			return false

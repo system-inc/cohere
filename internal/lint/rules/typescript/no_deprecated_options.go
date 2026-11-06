@@ -1,8 +1,6 @@
 package typescript
 
 import (
-	"encoding/json"
-
 	"github.com/system-inc/cohere/internal/lint/checking"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
@@ -29,67 +27,18 @@ type noDeprecatedRawOptions struct {
 	Allow []noDeprecatedRawSpecifier `json:"allow"`
 }
 
-// noDeprecatedRawSpecifier is one allowlist entry, in either of its two wire forms.
-type noDeprecatedRawSpecifier struct {
-	inline string
-
-	From    string
-	Name    []string
-	Path    string
-	Package string
-}
-
-// UnmarshalJSON accepts a bare string or the specifier object, and `name` as a string or an array.
-//
-// An unrecognized `from` is dropped rather than erroring, matching `only-throw-error` and
-// `no-floating-promises`: the specifier then matches nothing, whereas keeping it would silently mean
-// `file`, which is the zero value of the enum.
-func (s *noDeprecatedRawSpecifier) UnmarshalJSON(raw []byte) error {
-	var asString string
-	if err := json.Unmarshal(raw, &asString); err == nil {
-		*s = noDeprecatedRawSpecifier{inline: asString}
-		return nil
-	}
-
-	var object struct {
-		From    string          `json:"from"`
-		Name    json.RawMessage `json:"name"`
-		Path    string          `json:"path"`
-		Package string          `json:"package"`
-	}
-	if err := rule.UnmarshalOptions(raw, &object); err != nil {
-		return err
-	}
-
-	*s = noDeprecatedRawSpecifier{From: object.From, Path: object.Path, Package: object.Package}
-
-	var names []string
-	if err := json.Unmarshal(object.Name, &names); err == nil {
-		s.Name = names
-		return nil
-	}
-	var name string
-	if err := json.Unmarshal(object.Name, &name); err != nil {
-		return err
-	}
-	s.Name = []string{name}
-	return nil
-}
-
 // DecodeNoDeprecatedOptions maps upstream's JSON onto the struct the rule reads.
 //
 // Hand-written rather than `rule.DecodeOptionsInto` because `allow` is one heterogeneous array whose
 // two forms land in two different fields, and because `from` is an enum rather than a string.
-func DecodeNoDeprecatedOptions(raw []byte) (any, error) {
-	decoded, err := rule.DecodeOptionsInto[noDeprecatedRawOptions]()(raw)
-	if err != nil {
-		return NoDeprecatedOptions{}, err
+func DecodeNoDeprecatedOptions(raw []byte) (NoDeprecatedOptions, error) {
+	decoded, decodeOptionsError := rule.DecodeOptionsInto[noDeprecatedRawOptions]()(raw)
+	if decodeOptionsError != nil {
+		return NoDeprecatedOptions{}, decodeOptionsError
 	}
 
-	wire, _ := decoded.(noDeprecatedRawOptions)
-
 	options := NoDeprecatedOptions{}
-	for _, entry := range wire.Allow {
+	for _, entry := range decoded.Allow {
 		if entry.inline != "" {
 			options.AllowInline = append(options.AllowInline, entry.inline)
 			continue

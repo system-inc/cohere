@@ -46,14 +46,14 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 )
 
-func UnionTypeParts(t *checker.Type) []*checker.Type {
-	if IsUnionType(t) {
-		return t.Types()
+func UnionTypeParts(subjectType *checker.Type) []*checker.Type {
+	if IsUnionType(subjectType) {
+		return subjectType.Types()
 	}
-	return []*checker.Type{t}
+	return []*checker.Type{subjectType}
 }
 
-// UnionTypePartsSeq yields what UnionTypeParts returns, for a caller that only loops over it, as
+// UnionTypePartsSequence yields what UnionTypeParts returns, for a caller that only loops over it, as
 // strings.SplitSeq does for strings.Split.
 //
 // UnionTypeParts builds a one-element slice for every type that is not a union, and that slice
@@ -61,89 +61,93 @@ func UnionTypeParts(t *checker.Type) []*checker.Type {
 // is most of it), so the compiler cannot see the caller drop it. That was 1.05M objects on a cold ahra
 // run, three quarters of them from strict-void-return (#rwsffzm). This one is small enough to inline,
 // so a range loop over it allocates nothing, which TestUnionTypePartsSeqAllocatesNothing holds.
-func UnionTypePartsSeq(t *checker.Type) iter.Seq[*checker.Type] {
+func UnionTypePartsSequence(subjectType *checker.Type) iter.Seq[*checker.Type] {
 	return func(yield func(*checker.Type) bool) {
-		if !IsUnionType(t) {
-			yield(t)
+		if !IsUnionType(subjectType) {
+			yield(subjectType)
 			return
 		}
-		for _, part := range t.Types() {
+		for _, part := range subjectType.Types() {
 			if !yield(part) {
 				return
 			}
 		}
 	}
 }
-func IntersectionTypeParts(t *checker.Type) []*checker.Type {
-	if IsIntersectionType(t) {
-		return t.Types()
+func IntersectionTypeParts(subjectType *checker.Type) []*checker.Type {
+	if IsIntersectionType(subjectType) {
+		return subjectType.Types()
 	}
-	return []*checker.Type{t}
+	return []*checker.Type{subjectType}
 }
 
-func IsTypeFlagSet(t *checker.Type, flags checker.TypeFlags) bool {
-	return t != nil && checker.Type_flags(t)&flags != 0
+func IsTypeFlagSet(subjectType *checker.Type, flags checker.TypeFlags) bool {
+	return subjectType != nil && checker.Type_flags(subjectType)&flags != 0
 }
 
-func IsIntrinsicType(t *checker.Type) bool {
-	return IsTypeFlagSet(t, checker.TypeFlagsIntrinsic)
+func IsIntrinsicType(subjectType *checker.Type) bool {
+	return IsTypeFlagSet(subjectType, checker.TypeFlagsIntrinsic)
 }
 
-func IsIntrinsicErrorType(t *checker.Type) bool {
-	return IsIntrinsicType(t) && t.AsIntrinsicType().IntrinsicName() == "error"
+func IsIntrinsicErrorType(subjectType *checker.Type) bool {
+	return IsIntrinsicType(subjectType) && subjectType.AsIntrinsicType().IntrinsicName() == "error"
 }
 
-func IsIntrinsicVoidType(t *checker.Type) bool {
-	return IsTypeFlagSet(t, checker.TypeFlagsVoid)
+func IsIntrinsicVoidType(subjectType *checker.Type) bool {
+	return IsTypeFlagSet(subjectType, checker.TypeFlagsVoid)
 }
 
-func IsUnionType(t *checker.Type) bool {
-	return IsTypeFlagSet(t, checker.TypeFlagsUnion)
+func IsUnionType(subjectType *checker.Type) bool {
+	return IsTypeFlagSet(subjectType, checker.TypeFlagsUnion)
 }
-func IsIntersectionType(t *checker.Type) bool {
-	return IsTypeFlagSet(t, checker.TypeFlagsIntersection)
+func IsIntersectionType(subjectType *checker.Type) bool {
+	return IsTypeFlagSet(subjectType, checker.TypeFlagsIntersection)
 }
-func IsTypeAnyType(t *checker.Type) bool {
-	return IsTypeFlagSet(t, checker.TypeFlagsAny)
+func IsTypeAnyType(subjectType *checker.Type) bool {
+	return IsTypeFlagSet(subjectType, checker.TypeFlagsAny)
 }
-func IsTypeUnknownType(t *checker.Type) bool {
-	return IsTypeFlagSet(t, checker.TypeFlagsUnknown)
+func IsTypeUnknownType(subjectType *checker.Type) bool {
+	return IsTypeFlagSet(subjectType, checker.TypeFlagsUnknown)
 }
-func IsObjectType(t *checker.Type) bool {
-	return IsTypeFlagSet(t, checker.TypeFlagsObject)
+func IsObjectType(subjectType *checker.Type) bool {
+	return IsTypeFlagSet(subjectType, checker.TypeFlagsObject)
 }
-func IsTypeParameter(t *checker.Type) bool {
-	return IsTypeFlagSet(t, checker.TypeFlagsTypeParameter)
+func IsTypeParameter(subjectType *checker.Type) bool {
+	return IsTypeFlagSet(subjectType, checker.TypeFlagsTypeParameter)
 }
-func IsBooleanLiteralType(t *checker.Type) bool {
-	return IsTypeFlagSet(t, checker.TypeFlagsBoolean)
+func IsBooleanLiteralType(subjectType *checker.Type) bool {
+	return IsTypeFlagSet(subjectType, checker.TypeFlagsBoolean)
 }
-func IsTrueLiteralType(t *checker.Type) bool {
-	return IsBooleanLiteralType(t) && IsIntrinsicType(t) && t.AsIntrinsicType().IntrinsicName() == "true"
+func IsTrueLiteralType(subjectType *checker.Type) bool {
+	return IsBooleanLiteralType(subjectType) &&
+		IsIntrinsicType(subjectType) &&
+		subjectType.AsIntrinsicType().IntrinsicName() == "true"
 }
-func IsFalseLiteralType(t *checker.Type) bool {
-	return IsBooleanLiteralType(t) && IsIntrinsicType(t) && t.AsIntrinsicType().IntrinsicName() == "false"
+func IsFalseLiteralType(subjectType *checker.Type) bool {
+	return IsBooleanLiteralType(subjectType) &&
+		IsIntrinsicType(subjectType) &&
+		subjectType.AsIntrinsicType().IntrinsicName() == "false"
 }
 
-func GetCallSignatures(typeChecker *checker.Checker, t *checker.Type) []*checker.Signature {
-	return checker.Checker_getSignaturesOfType(typeChecker, t, checker.SignatureKindCall)
+func GetCallSignatures(typeChecker *checker.Checker, subjectType *checker.Type) []*checker.Signature {
+	return checker.Checker_getSignaturesOfType(typeChecker, subjectType, checker.SignatureKindCall)
 }
-func GetConstructSignatures(typeChecker *checker.Checker, t *checker.Type) []*checker.Signature {
-	return checker.Checker_getSignaturesOfType(typeChecker, t, checker.SignatureKindConstruct)
+func GetConstructSignatures(typeChecker *checker.Checker, subjectType *checker.Type) []*checker.Signature {
+	return checker.Checker_getSignaturesOfType(typeChecker, subjectType, checker.SignatureKindConstruct)
 }
 
 // ex. getCallSignaturesOfType
-func CollectAllCallSignatures(typeChecker *checker.Checker, t *checker.Type) []*checker.Signature {
-	if IsUnionType(t) {
+func CollectAllCallSignatures(typeChecker *checker.Checker, subjectType *checker.Type) []*checker.Signature {
+	if IsUnionType(subjectType) {
 		signatures := []*checker.Signature{}
-		for _, subtype := range t.Types() {
+		for _, subtype := range subjectType.Types() {
 			signatures = append(signatures, GetCallSignatures(typeChecker, subtype)...)
 		}
 		return signatures
 	}
-	if IsIntersectionType(t) {
+	if IsIntersectionType(subjectType) {
 		var signatures []*checker.Signature
-		for _, subtype := range t.Types() {
+		for _, subtype := range subjectType.Types() {
 			sig := GetCallSignatures(typeChecker, subtype)
 			if len(sig) != 0 {
 				if signatures != nil {
@@ -157,7 +161,7 @@ func CollectAllCallSignatures(typeChecker *checker.Checker, t *checker.Type) []*
 		}
 		return signatures
 	}
-	return checker.Checker_getSignaturesOfType(typeChecker, t, checker.SignatureKindCall)
+	return checker.Checker_getSignaturesOfType(typeChecker, subjectType, checker.SignatureKindCall)
 }
 
 func IsSymbolFlagSet(symbol *ast.Symbol, flag ast.SymbolFlags) bool {
@@ -166,19 +170,25 @@ func IsSymbolFlagSet(symbol *ast.Symbol, flag ast.SymbolFlags) bool {
 
 func IsCallback(
 	typeChecker *checker.Checker,
-	param *ast.Symbol,
+	parameter *ast.Symbol,
 	node *ast.Node,
 ) bool {
-	t := checker.Checker_getApparentType(typeChecker, typeChecker.GetTypeOfSymbolAtLocation(param, node))
+	subjectType := checker.Checker_getApparentType(typeChecker, typeChecker.GetTypeOfSymbolAtLocation(parameter, node))
 
-	if param.ValueDeclaration != nil && ast.IsParameterDeclaration(param.ValueDeclaration) && param.ValueDeclaration.AsParameterDeclaration().DotDotDotToken != nil {
-		t = checker.Checker_getIndexTypeOfType(typeChecker, t, checker.Checker_numberType(typeChecker))
-		if t == nil {
+	if parameter.ValueDeclaration != nil &&
+		ast.IsParameterDeclaration(parameter.ValueDeclaration) &&
+		parameter.ValueDeclaration.AsParameterDeclaration().DotDotDotToken != nil {
+		subjectType = checker.Checker_getIndexTypeOfType(
+			typeChecker,
+			subjectType,
+			checker.Checker_numberType(typeChecker),
+		)
+		if subjectType == nil {
 			return false
 		}
 	}
 
-	for subType := range UnionTypePartsSeq(t) {
+	for subType := range UnionTypePartsSequence(subjectType) {
 		if len(GetCallSignatures(typeChecker, subType)) != 0 {
 			return true
 		}
@@ -187,16 +197,19 @@ func IsCallback(
 	return false
 }
 
-// TODO(note): why there is no IntersectionTypeParts
+// IsThenableType splits only a union into its parts, as tsutils' isThenableType does, so an intersection is
+// read whole, through its apparent type.
 func IsThenableType(
 	typeChecker *checker.Checker,
 	node *ast.Node,
-	t *checker.Type,
+	subjectType *checker.Type,
 ) bool {
-	if t == nil {
-		t = typeChecker.GetTypeAtLocation(node)
+	// The type passed in, or the node's own when none was.
+	thenableType := subjectType
+	if thenableType == nil {
+		thenableType = typeChecker.GetTypeAtLocation(node)
 	}
-	for typePart := range UnionTypePartsSeq(checker.Checker_getApparentType(typeChecker, t)) {
+	for typePart := range UnionTypePartsSequence(checker.Checker_getApparentType(typeChecker, thenableType)) {
 		then := checker.Checker_getPropertyOfType(typeChecker, typePart, "then")
 		if then == nil {
 			continue
@@ -204,9 +217,14 @@ func IsThenableType(
 
 		thenType := typeChecker.GetTypeOfSymbolAtLocation(then, node)
 
-		for subTypePart := range UnionTypePartsSeq(thenType) {
-			for _, signature := range checker.Checker_getSignaturesOfType(typeChecker, subTypePart, checker.SignatureKindCall) {
-				if len(checker.Signature_parameters(signature)) != 0 && IsCallback(typeChecker, checker.Signature_parameters(signature)[0], node) {
+		for subTypePart := range UnionTypePartsSequence(thenType) {
+			for _, signature := range checker.Checker_getSignaturesOfType(
+				typeChecker,
+				subTypePart,
+				checker.SignatureKindCall,
+			) {
+				if len(checker.Signature_parameters(signature)) != 0 &&
+					IsCallback(typeChecker, checker.Signature_parameters(signature)[0], node) {
 					return true
 				}
 			}
@@ -215,8 +233,16 @@ func IsThenableType(
 	return false
 }
 
-func GetWellKnownSymbolPropertyOfType(t *checker.Type, name string, typeChecker *checker.Checker) *ast.Symbol {
-	return checker.Checker_getPropertyOfType(typeChecker, t, checker.Checker_getPropertyNameForKnownSymbolName(typeChecker, name))
+func GetWellKnownSymbolPropertyOfType(
+	subjectType *checker.Type,
+	name string,
+	typeChecker *checker.Checker,
+) *ast.Symbol {
+	return checker.Checker_getPropertyOfType(
+		typeChecker,
+		subjectType,
+		checker.Checker_getPropertyNameForKnownSymbolName(typeChecker, name),
+	)
 }
 
 // IsStrictCompilerOptionEnabled reports whether a strict-family option is on, as the compiler resolves

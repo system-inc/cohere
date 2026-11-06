@@ -80,16 +80,16 @@ type NoFallthroughOptions struct {
 // whether every path leaves the *switch*, so both are, and a nested loop or switch swallows them.
 // Sharing one walk would need a mode flag threaded through every arm, and the arms that would then
 // differ are the majority.
-var NoFallthrough = rule.Rule{
+var NoFallthrough = rule.Rule[NoFallthroughOptions]{
 	Name: "no-fallthrough",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		parsed, _ := rule.OptionsAs[NoFallthroughOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[NoFallthroughOptions]) rule.Listeners {
+		parsed, _ := options.Read()
 		excusesFallthrough, namesFallthrough := fallthroughCommentMatchers(parsed.CommentPattern)
 
 		return rule.Listeners{
 			ast.KindSwitchStatement: func(node *ast.Node) {
 				clauses := node.AsSwitchStatement().CaseBlock.AsCaseBlock().Clauses.Nodes
-				sourceText := ctx.SourceFile.Text()
+				sourceText := ruleContext.SourceFile.Text()
 
 				for index := 0; index+1 < len(clauses); index++ {
 					clause := clauses[index]
@@ -101,16 +101,16 @@ var NoFallthrough = rule.Rule{
 					// test want is the next clause's first token, which is what `TokenRange` finds.
 					// This cost the first eighteen fixtures and is the single most load-bearing
 					// line in the rule.
-					nextClauseStart := rule.TokenRange(ctx.SourceFile, nextClause).Pos()
+					nextClauseStart := rule.TokenRange(ruleContext.SourceFile, nextClause).Pos()
 
 					if clauseAlwaysLeavesTheSwitch(clause) {
 						// The clause cannot fall through, so a comment saying it does is describing
 						// behavior the code does not have. Only reported when asked for, since a
 						// comment left behind by a later `break` is a nuisance rather than a bug.
 						if parsed.ReportUnusedFallthroughComment {
-							if commentRange, found := fallthroughCommentBetween(ctx, clause,
+							if commentRange, found := fallthroughCommentBetween(ruleContext, clause,
 								nextClauseStart, namesFallthrough); found {
-								ctx.ReportRange(commentRange, rule.Message{
+								ruleContext.ReportRange(commentRange, rule.Message{
 									Id: "unusedFallthroughComment",
 									Description: "This comment says the case falls through, but " +
 										"the case cannot fall through. Remove the comment, or " +
@@ -132,7 +132,7 @@ var NoFallthrough = rule.Rule{
 						}
 					}
 
-					if _, found := fallthroughCommentBetween(ctx, clause, nextClauseStart,
+					if _, found := fallthroughCommentBetween(ruleContext, clause, nextClauseStart,
 						excusesFallthrough); found {
 						continue
 					}
@@ -144,7 +144,7 @@ var NoFallthrough = rule.Rule{
 					if nextClause.Kind == ast.KindDefaultClause {
 						messageId = "default"
 					}
-					ctx.ReportNode(nextClause, rule.Message{
+					ruleContext.ReportNode(nextClause, rule.Message{
 						Id: messageId,
 						Description: "Control runs from the previous case into this one, which is " +
 							"almost always a missing break. Add a break, or say the fallthrough " +
@@ -201,10 +201,10 @@ func fallthroughCommentMatchers(pattern string) (excuses func(string) bool, name
 // `{ a(); /* falls through */ } /* comment */` from its failing
 // `/* no break */ /* todo: fix readability */`: in the first the matching comment is last in the
 // block window, in the second a non-matching comment follows it in the only window there is.
-func fallthroughCommentBetween(ctx rule.Context, clause *ast.Node, nextClauseStart int,
+func fallthroughCommentBetween(ruleContext rule.Context, clause *ast.Node, nextClauseStart int,
 	matches func(string) bool) (core.TextRange, bool) {
 	statements := clause.AsCaseOrDefaultClause().Statements.Nodes
-	fileComments := comments.ForFile(ctx)
+	fileComments := comments.ForFile(ruleContext)
 
 	// The window's start is the clause's end, which is also its last statement's end.
 	//

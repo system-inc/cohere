@@ -30,7 +30,7 @@ import (
 type listedPackage struct {
 	ImportPath string
 	Name       string
-	Dir        string
+	Directory  string `json:"Dir"`
 	Standard   bool
 	DepOnly    bool
 	GoFiles    []string
@@ -45,23 +45,29 @@ type listedPackage struct {
 	ImportMap  map[string]string
 	Deps       []string
 	Module     *listedModule
-	Error      *struct{ Err string }
-	DepsErrors []*struct{ Err string }
+	Error      *listedError
+	DepsErrors []*listedError
+}
+
+// listedError is an error go list reports for a package or one of its dependencies. go list names the text
+// Err, and the tag keeps that key.
+type listedError struct {
+	Message string `json:"Err"`
 }
 
 // listedModule is the module a listed package belongs to.
 type listedModule struct {
 	Path      string
 	Version   string
-	Dir       string
+	Directory string `json:"Dir"`
 	GoMod     string
 	GoVersion string
 	Replace   *listedModule
 }
 
 // listedFields are the fields asked of go list, so it computes nothing else.
-var listedFields = "ImportPath,Name,Dir,Standard,DepOnly,GoFiles,CgoFiles,Imports,ImportMap,Deps,Module,Error,DepsErrors," +
-	"TestGoFiles,XTestGoFiles,TestImports,XTestImports"
+var listedFields = "ImportPath,Name,Dir,Standard,DepOnly,GoFiles,CgoFiles,Imports,ImportMap,Deps,Module,Error," +
+	"DepsErrors,TestGoFiles,XTestGoFiles,TestImports,XTestImports"
 
 // listing is one `go list -deps -json` run: every package the patterns name and everything they import, in
 // the order go prints them, dependencies first.
@@ -76,15 +82,18 @@ var listings = struct {
 }{byRequest: map[string]*listingOnce{}}
 
 type listingOnce struct {
-	once    sync.Once
-	listing *listing
-	err     error
+	once      sync.Once
+	listing   *listing
+	listError error
 }
 
 // list runs go list once per directory, environment and patterns in this process: the tree does not change
 // while a test binary runs, and the guards ask for the same listing for each overlay they read.
 func list(directory string, environment []string, patterns []string) (*listing, error) {
-	request := strings.Join([]string{directory, strings.Join(environment, "\x00"), strings.Join(patterns, "\x00")}, "\x01")
+	request := strings.Join(
+		[]string{directory, strings.Join(environment, "\x00"), strings.Join(patterns, "\x00")},
+		"\x01",
+	)
 	listings.Lock()
 	entry := listings.byRequest[request]
 	if entry == nil {
@@ -92,24 +101,28 @@ func list(directory string, environment []string, patterns []string) (*listing, 
 		listings.byRequest[request] = entry
 	}
 	listings.Unlock()
-	entry.once.Do(func() { entry.listing, entry.err = runList(directory, environment, patterns) })
-	return entry.listing, entry.err
+	entry.once.Do(func() { entry.listing, entry.listError = runList(directory, environment, patterns) })
+	return entry.listing, entry.listError
 }
 
 func runList(directory string, environment []string, patterns []string) (*listing, error) {
 	// No "--" before the patterns: a runner's stand-in go refuses any flag it does not know, that one too.
-	output, err := goCommand(directory, environment, append([]string{"list", "-e", "-deps", "-json=" + listedFields}, patterns...)...)
-	if err != nil {
-		return nil, err
+	output, goCommandError := goCommand(
+		directory,
+		environment,
+		append([]string{"list", "-e", "-deps", "-json=" + listedFields}, patterns...)...,
+	)
+	if goCommandError != nil {
+		return nil, goCommandError
 	}
 	result := &listing{byPath: map[string]*listedPackage{}}
 	decoder := json.NewDecoder(bytes.NewReader(output))
 	for {
 		var listed listedPackage
-		if err := decoder.Decode(&listed); errors.Is(err, io.EOF) {
+		if decodeError := decoder.Decode(&listed); errors.Is(decodeError, io.EOF) {
 			break
-		} else if err != nil {
-			return nil, fmt.Errorf("reading go list's output: %w", err)
+		} else if decodeError != nil {
+			return nil, fmt.Errorf("reading go list's output: %w", decodeError)
 		}
 		result.packages = append(result.packages, &listed)
 		result.byPath[listed.ImportPath] = &listed
@@ -121,9 +134,9 @@ func runList(directory string, environment []string, patterns []string) (*listin
 }
 
 // goEnvironment is the environment every go command here runs in: this process's, with environment added
-// and without any -overlay in GOFLAGS. The loader reads an overlay itself, in place of the files it names,
+// and without any `-overlay` in `GOFLAGS`. The loader reads an overlay itself, in place of the files it names,
 // and an -overlay go saw would only make go list answer for files the loader reads anyway; a runner that
-// never builds refuses a go command whose GOFLAGS carries one.
+// never builds refuses a go command whose `GOFLAGS` carries one.
 func goEnvironment(environment []string) []string {
 	result := []string{}
 	for _, variable := range append(os.Environ(), environment...) {
@@ -144,9 +157,9 @@ func goEnvironment(environment []string) []string {
 // goCommand runs one go command in directory and returns its standard output, or an error carrying its
 // standard error.
 func goCommand(directory string, environment []string, arguments ...string) ([]byte, error) {
-	absolute, err := filepath.Abs(directory)
-	if err != nil {
-		return nil, err
+	absolute, absolutePathError := filepath.Abs(directory)
+	if absolutePathError != nil {
+		return nil, absolutePathError
 	}
 	command := exec.Command("go", arguments...)
 	command.Dir = absolute
@@ -155,26 +168,35 @@ func goCommand(directory string, environment []string, arguments ...string) ([]b
 	command.Env = append(goEnvironment(environment), "PWD="+absolute)
 	var standardError bytes.Buffer
 	command.Stderr = &standardError
-	output, err := command.Output()
-	if err != nil {
+	output, outputError := command.Output()
+	if outputError != nil {
 		shown := strings.Join(arguments, " ")
 		if len(shown) > 300 {
 			shown = shown[:300] + "..."
 		}
-		return nil, fmt.Errorf("go %s: %w\n%s", shown, err, strings.TrimSpace(standardError.String()))
+		return nil, fmt.Errorf("go %s: %w\n%s", shown, outputError, strings.TrimSpace(standardError.String()))
 	}
 	return output, nil
 }
 
 // goEnvironmentValues is what go env says of the values that change a package's types, under environment.
 func goEnvironmentValues(directory string, environment []string) (map[string]string, error) {
-	output, err := goCommand(directory, environment, "env", "-json", "GOVERSION", "GOOS", "GOARCH", "GOEXPERIMENT")
-	if err != nil {
-		return nil, err
+	output, goCommandError := goCommand(
+		directory,
+		environment,
+		"env",
+		"-json",
+		"GOVERSION",
+		"GOOS",
+		"GOARCH",
+		"GOEXPERIMENT",
+	)
+	if goCommandError != nil {
+		return nil, goCommandError
 	}
 	values := map[string]string{}
-	if err := json.Unmarshal(output, &values); err != nil {
-		return nil, fmt.Errorf("reading go env's output: %w", err)
+	if decodeError := json.Unmarshal(output, &values); decodeError != nil {
+		return nil, fmt.Errorf("reading go env's output: %w", decodeError)
 	}
 	if values["GOVERSION"] == "" || values["GOOS"] == "" || values["GOARCH"] == "" {
 		return nil, fmt.Errorf("go env named no GOVERSION, GOOS or GOARCH: %v", values)
@@ -183,14 +205,14 @@ func goEnvironmentValues(directory string, environment []string) (map[string]str
 }
 
 // moduleAt is the directory of the go.mod at or above directory and the module path it declares.
-func moduleAt(directory string) (root string, path string, err error) {
-	absolute, err := filepath.Abs(directory)
-	if err != nil {
-		return "", "", err
+func moduleAt(directory string) (root string, path string, moduleAtError error) {
+	absolute, absolutePathError := filepath.Abs(directory)
+	if absolutePathError != nil {
+		return "", "", absolutePathError
 	}
 	for current := absolute; ; current = filepath.Dir(current) {
-		content, err := os.ReadFile(filepath.Join(current, "go.mod"))
-		if err == nil {
+		content, readError := os.ReadFile(filepath.Join(current, "go.mod"))
+		if readError == nil {
 			for _, line := range strings.Split(string(content), "\n") {
 				if declared, found := strings.CutPrefix(strings.TrimSpace(line), "module "); found {
 					return current, strings.Trim(strings.TrimSpace(declared), `"`), nil

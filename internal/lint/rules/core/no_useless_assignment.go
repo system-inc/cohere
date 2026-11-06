@@ -101,8 +101,8 @@ var messageNoUselessAssignment = rule.Message{
 // rather than ours: a closure's body is its own code path root with no edge to or from the
 // enclosing one, so no ordering between a write and a captured read is available on either side.
 // Upstream sets `has_captured_read` from any cross-scope read with no ordering condition and
-// suppresses every write to that binding, and three of its clean cases exist to pin it. What DID
-// separate cleanly is the other direction: a cross-root WRITE silences only itself rather than the
+// suppresses every write to that binding, and three of its clean cases exist to pin it. What did
+// separate cleanly is the other direction: a cross-root write silences only itself rather than the
 // whole binding, which is upstream's `has_same_parent_variable_scope` tested per write. Collapsing
 // the two into one flag costs upstream's failing case 19, where a closure writes the variable and
 // never reads it.
@@ -112,7 +112,7 @@ var messageNoUselessAssignment = rule.Message{
 // repair is not meaning-preserving and cannot be applied unattended. Even as a suggestion it would
 // have to choose between deleting the statement and keeping the expression, and which one is right
 // depends on whether the call matters.
-var NoUselessAssignment = rule.Rule{
+var NoUselessAssignment = rule.Rule[rule.NoOptions]{
 	Name: "no-useless-assignment",
 
 	// Two separate needs. Symbol identity decides which occurrences name the same binding, so a
@@ -123,13 +123,13 @@ var NoUselessAssignment = rule.Rule{
 	// Reads only this file's declarations (rule.DeclarationsIn), so its findings key on imports' shapes.
 	TypeReach: rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindSourceFile: func(sourceFile *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
-				analyzeDeadStoresByLiveness(ctx, sourceFile)
+				analyzeDeadStoresByLiveness(ruleContext, sourceFile)
 			},
 		}
 	},
@@ -148,16 +148,17 @@ func isLocalVariableDeclaration(declaration *ast.Node) bool {
 	// `KindBindingElement` whose parent is a `KindArrayBindingPattern` and whose grandparent is the
 	// `KindVariableDeclaration`. Requiring the node's own kind declined every destructured binding,
 	// which cost the two diagnostics upstream reports on exactly that shape.
-	for declaration != nil && (declaration.Kind == ast.KindBindingElement ||
-		declaration.Kind == ast.KindObjectBindingPattern ||
-		declaration.Kind == ast.KindArrayBindingPattern) {
-		declaration = declaration.Parent
+	declarator := declaration
+	for declarator != nil && (declarator.Kind == ast.KindBindingElement ||
+		declarator.Kind == ast.KindObjectBindingPattern ||
+		declarator.Kind == ast.KindArrayBindingPattern) {
+		declarator = declarator.Parent
 	}
-	if declaration == nil || declaration.Kind != ast.KindVariableDeclaration {
+	if declarator == nil || declarator.Kind != ast.KindVariableDeclaration {
 		return false
 	}
 	// The declarator sits inside a declaration list that carries the let/const/var flag.
-	list := declaration.Parent
+	list := declarator.Parent
 	if list == nil || list.Kind != ast.KindVariableDeclarationList {
 		return false
 	}
@@ -258,13 +259,13 @@ func isInsideTryBlock(node *ast.Node) bool {
 // reported 50 findings in one file, and every one of them traced to
 // `let newStartTime: Date; switch (...) { ... newStartTime = ...; } return { newStartTime, ... }`.
 // Reading those findings is what surfaced it; the imported corpus was green throughout.
-func resolveOccurrence(ctx rule.Context, identifier *ast.Node) *ast.Symbol {
+func resolveOccurrence(ruleContext rule.Context, identifier *ast.Node) *ast.Symbol {
 	if parent := identifier.Parent; parent != nil && parent.Kind == ast.KindShorthandPropertyAssignment {
-		if symbol := ctx.TypeChecker.GetShorthandAssignmentValueSymbol(parent); symbol != nil {
+		if symbol := ruleContext.TypeChecker.GetShorthandAssignmentValueSymbol(parent); symbol != nil {
 			return symbol
 		}
 	}
-	return ctx.TypeChecker.GetSymbolAtLocation(identifier)
+	return ruleContext.TypeChecker.GetSymbolAtLocation(identifier)
 }
 
 // isNonReferenceIdentifier reports whether an identifier occurrence cannot be a reference to a local

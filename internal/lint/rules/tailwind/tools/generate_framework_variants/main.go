@@ -2,11 +2,12 @@
 //
 // Usage:
 //
-//	go run ./internal/lint/rules/tailwind/tools/generate_framework_variants -package-root <tailwindcss package> [-output <file.go>] [-check]
+//	go run ./internal/lint/rules/tailwind/tools/generate_framework_variants \
+//	    -package-root <tailwindcss package> [-output <file.go>] [-check]
 //
 // The table it writes is what lets `LoadDesignSystem` build a registry that knows `hover`. Without
-// it a run-scoped design system registers only the repository's own `@custom-variant` names —
-// measured on this repository, one registration against the engine's 88 — and the consequence is
+// it a run-scoped design system registers only the repository's own `@custom-variant` names:
+// measured on this repository, one registration against the engine's 88. And the consequence is
 // not degraded ranking but refusal to parse: `ParseVariant` returns nil for an unregistered root
 // and `ParseCandidate` then yields zero candidates for the whole class. Every rule reading it would
 // decline on every class carrying a variant, and a differential would score that as agreement
@@ -67,8 +68,8 @@
 //
 // `-check` regenerates and fails when the committed table disagrees, which is what makes a Tailwind
 // upgrade that registers a new variant show up as a failing gate rather than as a rule that quietly
-// stops parsing classes using it. Like the sibling internal/lint/rules/tailwind/tools/generate_* tools, nothing invokes it
-// automatically; it is a manual gate.
+// stops parsing classes using it. Like the sibling internal/lint/rules/tailwind/tools/generate_* tools, nothing invokes
+// it automatically; it is a manual gate.
 //
 // Node is required to run it and never to use the result.
 package main
@@ -106,10 +107,10 @@ type enumeration struct {
 // pathList collects a repeatable flag.
 type pathList []string
 
-func (p *pathList) String() string { return strings.Join(*p, ", ") }
+func (list *pathList) String() string { return strings.Join(*list, ", ") }
 
-func (p *pathList) Set(value string) error {
-	*p = append(*p, value)
+func (list *pathList) Set(value string) error {
+	*list = append(*list, value)
 	return nil
 }
 
@@ -140,11 +141,14 @@ func invarianceProvenance(verifiedAgainst []string) string {
 // header is a diff every other machine produces on regeneration, which makes `-check` fail for a
 // reason that has nothing to do with Tailwind.
 func portablePath(path string) string {
-	home, err := os.UserHomeDir()
-	if err != nil || home == "" {
+	home, homeDirectoryError := os.UserHomeDir()
+	if homeDirectoryError != nil || home == "" {
 		return path
 	}
-	if relative, err := filepath.Rel(home, path); err == nil && !strings.HasPrefix(relative, "..") {
+	if relative, relativePathError := filepath.Rel(
+		home,
+		path,
+	); relativePathError == nil && !strings.HasPrefix(relative, "..") {
 		return filepath.Join("~", relative)
 	}
 	return path
@@ -181,13 +185,31 @@ func registrationDifference(left, right []registryEntry) string {
 		rightEntry, inRightPresent := inRight[name]
 		switch {
 		case !inRightPresent:
-			return fmt.Sprintf("%q is registered at order %d in the first system and absent from the second", name, leftEntry.Order)
+			return fmt.Sprintf(
+				"%q is registered at order %d in the first system and absent from the second",
+				name,
+				leftEntry.Order,
+			)
 		case !inLeftPresent:
-			return fmt.Sprintf("%q is registered at order %d in the second system and absent from the first", name, rightEntry.Order)
+			return fmt.Sprintf(
+				"%q is registered at order %d in the second system and absent from the first",
+				name,
+				rightEntry.Order,
+			)
 		case leftEntry.Order != rightEntry.Order:
-			return fmt.Sprintf("%q is order %d in the first system and %d in the second", name, leftEntry.Order, rightEntry.Order)
+			return fmt.Sprintf(
+				"%q is order %d in the first system and %d in the second",
+				name,
+				leftEntry.Order,
+				rightEntry.Order,
+			)
 		case leftEntry.Kind != rightEntry.Kind:
-			return fmt.Sprintf("%q is kind %q in the first system and %q in the second", name, leftEntry.Kind, rightEntry.Kind)
+			return fmt.Sprintf(
+				"%q is kind %q in the first system and %q in the second",
+				name,
+				leftEntry.Kind,
+				rightEntry.Kind,
+			)
 		}
 	}
 	return ""
@@ -218,28 +240,51 @@ type groupedComparison struct {
 }
 
 func main() {
-	packageRoot := flag.String("package-root", "", "path to the tailwindcss package root (the directory holding package.json)")
-	designSystem := flag.String("design-system", "", "CSS entry point to read the registry from; defaults to a bare `@import \"tailwindcss\"`")
-	output := flag.String("output", filepath.Join("internal", "tailwind", "framework_variant_table.go"), "where to write the generated table")
+	packageRoot := flag.String(
+		"package-root",
+		"",
+		"path to the tailwindcss package root (the directory holding package.json)",
+	)
+	designSystem := flag.String(
+		"design-system",
+		"",
+		"CSS entry point to read the registry from; defaults to a bare `@import \"tailwindcss\"`",
+	)
+	output := flag.String(
+		"output",
+		filepath.Join("internal", "tailwind", "framework_variant_table.go"),
+		"where to write the generated table",
+	)
 	check := flag.Bool("check", false, "regenerate and fail if the committed table disagrees, instead of writing it")
 	var invarianceInputs pathList
-	flag.Var(&invarianceInputs, "verify-invariance-against", "a design system entry point whose registrations must match; repeatable")
+	flag.Var(
+		&invarianceInputs,
+		"verify-invariance-against",
+		"a design system entry point whose registrations must match; repeatable",
+	)
 	flag.Parse()
 
 	if *packageRoot == "" {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 		fmt.Fprintln(os.Stderr, "generate_framework_variants: -package-root is required")
-		fmt.Fprintln(os.Stderr, "  example: go run ./internal/lint/rules/tailwind/tools/generate_framework_variants -package-root ~/Projects/ahra/node_modules/tailwindcss")
+		// Ignored: the rest of the same message, and the same exit code says it either way.
+		fmt.Fprintln(
+			os.Stderr,
+			"  example: go run ./internal/lint/rules/tailwind/tools/generate_framework_variants -package-root ~/Projects/ahra/node_modules/tailwindcss",
+		)
 		os.Exit(2)
 	}
 
-	result, err := enumerate(*packageRoot, *designSystem)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "generate_framework_variants: %v\n", err)
+	result, enumerateError := enumerate(*packageRoot, *designSystem)
+	if enumerateError != nil {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
+		fmt.Fprintf(os.Stderr, "generate_framework_variants: %v\n", enumerateError)
 		os.Exit(1)
 	}
 
-	if err := validate(result); err != nil {
-		fmt.Fprintf(os.Stderr, "generate_framework_variants: %v\n", err)
+	if validateError := validate(result); validateError != nil {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
+		fmt.Fprintf(os.Stderr, "generate_framework_variants: %v\n", validateError)
 		os.Exit(1)
 	}
 
@@ -258,20 +303,34 @@ func main() {
 	// is caught.
 	verifiedAgainst := make([]string, 0, len(invarianceInputs))
 	for _, entryPoint := range invarianceInputs {
-		otherResult, err := enumerate(*packageRoot, entryPoint)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "generate_framework_variants: enumerating %s for the invariance check: %v\n", entryPoint, err)
+		otherResult, enumerateError := enumerate(*packageRoot, entryPoint)
+		if enumerateError != nil {
+			// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
+			fmt.Fprintf(
+				os.Stderr,
+				"generate_framework_variants: enumerating %s for the invariance check: %v\n",
+				entryPoint,
+				enumerateError,
+			)
 			os.Exit(1)
 		}
-		if err := validate(otherResult); err != nil {
-			fmt.Fprintf(os.Stderr, "generate_framework_variants: %s: %v\n", entryPoint, err)
+		if validateError := validate(otherResult); validateError != nil {
+			// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
+			fmt.Fprintf(os.Stderr, "generate_framework_variants: %s: %v\n", entryPoint, validateError)
 			os.Exit(1)
 		}
 
 		if difference := registrationDifference(result.Entries, otherResult.Entries); difference != "" {
+			// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 			fmt.Fprintln(os.Stderr, "generate_framework_variants: the registrations are NOT repository-invariant.")
+			// Ignored: the rest of the same message, and the same exit code says it either way.
 			fmt.Fprintf(os.Stderr, "  %s\n", difference)
-			fmt.Fprintln(os.Stderr, "  A repository that moves a framework registration cannot be linted from a baked table.")
+			// Ignored: the rest of the same message, and the same exit code says it either way.
+			fmt.Fprintln(
+				os.Stderr,
+				"  A repository that moves a framework registration cannot be linted from a baked table.",
+			)
+			// Ignored: the rest of the same message, and the same exit code says it either way.
 			fmt.Fprintln(os.Stderr, "  This finding is worth more than the confirmation.")
 			os.Exit(1)
 		}
@@ -279,31 +338,46 @@ func main() {
 	}
 	result.VerifiedAgainst = verifiedAgainst
 
-	rendered, err := render(result)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "generate_framework_variants: %v\n", err)
+	rendered, renderError := render(result)
+	if renderError != nil {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
+		fmt.Fprintf(os.Stderr, "generate_framework_variants: %v\n", renderError)
 		os.Exit(1)
 	}
 
 	if *check {
-		committed, err := os.ReadFile(*output)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "generate_framework_variants: cannot read %s to check it: %v\n", *output, err)
+		committed, readError := os.ReadFile(*output)
+		if readError != nil {
+			// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
+			fmt.Fprintf(os.Stderr, "generate_framework_variants: cannot read %s to check it: %v\n", *output, readError)
 			os.Exit(1)
 		}
 		if !bytes.Equal(committed, rendered) {
-			fmt.Fprintf(os.Stderr, "generate_framework_variants: %s is stale for Tailwind %s.\n", *output, result.TailwindVersion)
-			fmt.Fprintln(os.Stderr, "  The installed Tailwind registers a different set of variants, or registers them in a different order.")
+			// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
+			fmt.Fprintf(
+				os.Stderr,
+				"generate_framework_variants: %s is stale for Tailwind %s.\n",
+				*output,
+				result.TailwindVersion,
+			)
+			// Ignored: the rest of the same message, and the same exit code says it either way.
+			fmt.Fprintln(
+				os.Stderr,
+				"  The installed Tailwind registers a different set of variants, or registers them in a different order.",
+			)
+			// Ignored: the rest of the same message, and the same exit code says it either way.
 			fmt.Fprintln(os.Stderr, "  Regenerate it and read the diff: what changed is what this upgrade changed.")
 			os.Exit(1)
 		}
+		// Ignored: the check has passed, and the exit code says so whether or not this lands.
 		fmt.Fprintf(os.Stderr, "generate_framework_variants: %s is current for Tailwind %s (%d registrations).\n",
 			*output, result.TailwindVersion, len(result.Entries))
 		return
 	}
 
-	if err := os.WriteFile(*output, rendered, 0o644); err != nil {
-		fmt.Fprintf(os.Stderr, "generate_framework_variants: %v\n", err)
+	if writeError := os.WriteFile(*output, rendered, 0o644); writeError != nil {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
+		fmt.Fprintf(os.Stderr, "generate_framework_variants: %v\n", writeError)
 		os.Exit(1)
 	}
 
@@ -311,9 +385,10 @@ func main() {
 	for _, entry := range result.Entries {
 		distinct[entry.Order] = true
 	}
+	// Ignored: what it reports is already written, and a summary that cannot reach the terminal changes none of it.
 	fmt.Fprintf(
 		os.Stderr,
-		"generate_framework_variants: wrote %s — Tailwind %s, %d registrations over %d distinct orders, %d carrying a comparison.\n",
+		"generate_framework_variants: wrote %s \u2014 Tailwind %s, %d registrations over %d distinct orders, %d carrying a comparison.\n",
 		*output, result.TailwindVersion, len(result.Entries), len(distinct), len(result.Comparisons),
 	)
 	for _, comparison := range result.Comparisons {
@@ -321,8 +396,27 @@ func main() {
 		if comparison.Ascending != nil && *comparison.Ascending {
 			direction = "ascending"
 		}
-		fmt.Fprintf(os.Stderr, "  order %d %s: %s\n", comparison.Order, direction, strings.Join(comparison.Members, ", "))
+		// Ignored: the rest of the same summary, which changes nothing already written.
+		fmt.Fprintf(
+			os.Stderr,
+			"  order %d %s: %s\n",
+			comparison.Order,
+			direction,
+			strings.Join(comparison.Members, ", "),
+		)
 	}
+}
+
+// variantKindConstants maps the engine's kind strings onto the Go port's constants.
+//
+// Written out rather than derived by casing, because the mapping is a claim about two independent
+// vocabularies and a silent mismatch would render a table naming a constant that happens to exist
+// and mean something else.
+var variantKindConstants = map[string]string{
+	"static":     "ParsedVariantKindStatic",
+	"functional": "ParsedVariantKindFunctional",
+	"compound":   "ParsedVariantKindCompound",
+	"arbitrary":  "ParsedVariantKindArbitrary",
 }
 
 // validate refuses an enumeration that would render a plausible-looking wrong table.
@@ -377,7 +471,10 @@ func validate(result *enumeration) error {
 			)
 		}
 		if len(byOrder[comparison.Order]) == 0 {
-			return fmt.Errorf("order %d carries a comparison function but no registration holds that order", comparison.Order)
+			return fmt.Errorf(
+				"order %d carries a comparison function but no registration holds that order",
+				comparison.Order,
+			)
 		}
 	}
 
@@ -395,18 +492,6 @@ func validate(result *enumeration) error {
 		}
 	}
 	return nil
-}
-
-// variantKindConstants maps the engine's kind strings onto the Go port's constants.
-//
-// Written out rather than derived by casing, because the mapping is a claim about two independent
-// vocabularies and a silent mismatch would render a table naming a constant that happens to exist
-// and mean something else.
-var variantKindConstants = map[string]string{
-	"static":     "ParsedVariantKindStatic",
-	"functional": "ParsedVariantKindFunctional",
-	"compound":   "ParsedVariantKindCompound",
-	"arbitrary":  "ParsedVariantKindArbitrary",
 }
 
 // render produces the generated Go file.
@@ -445,7 +530,9 @@ func render(result *enumeration) ([]byte, error) {
 	}
 
 	var builder strings.Builder
-	fmt.Fprintf(&builder, `// Code generated by internal/lint/rules/tailwind/tools/generate_framework_variants. DO NOT EDIT.
+	fmt.Fprintf(
+		&builder,
+		`// Code generated by internal/lint/rules/tailwind/tools/generate_framework_variants. DO NOT EDIT.
 //
 // Regenerate with:
 //
@@ -477,9 +564,17 @@ func render(result *enumeration) ([]byte, error) {
 
 package tailwind
 
-`, result.TailwindVersion, len(entries), len(distinctOrders), sharedCount, len(comparisons), invarianceProvenance(result.VerifiedAgainst))
+`,
+		result.TailwindVersion,
+		len(entries),
+		len(distinctOrders),
+		sharedCount,
+		len(comparisons),
+		invarianceProvenance(result.VerifiedAgainst),
+	)
 
-	builder.WriteString(`// FrameworkVariantRegistration is one variant the framework registers, with the order number the
+	builder.WriteString(
+		`// FrameworkVariantRegistration is one variant the framework registers, with the order number the
 // engine assigned it.
 //
 // Order is carried rather than re-derived, and that is the whole reason this type exists alongside
@@ -488,7 +583,7 @@ package tailwind
 // order is where a comparison function gets to speak, and comparison is how the five breakpoints
 // order by their resolved widths instead of alphabetically.
 type FrameworkVariantRegistration struct {
-	// Name is the registered root, as written before the colon: ` + "`hover`" + `, ` + "`group`" + `, ` + "`@max`" + `.
+	// Name is the registered root, as written before the colon: ` + "`hover`, `group`, `@max`" + `.
 	Name string
 	// Order is the registration number Variants.set assigned. Shared across every root registered
 	// inside one Variants.group.
@@ -502,7 +597,7 @@ type FrameworkVariantRegistration struct {
 //
 // The function itself cannot be generated: upstream's is a closure over the design system's theme,
 // and reading a hardcoded breakpoint scale here would be the per-repository bug this port exists to
-// remove. Measured on the engine, redefining ` + "`--breakpoint-sm`" + ` to ` + "`200rem`" + ` moves ` + "`sm`" + ` from dense
+// remove. Measured on the engine, redefining ` + "`--breakpoint-sm` to `200rem` moves `sm`" + ` from dense
 // index 0 to index 4. So what is generated is the order number and the direction, and
 // LoadDesignSystem attaches CompareBreakpoints over the live theme.
 //
@@ -519,16 +614,20 @@ type FrameworkVariantComparisonGroup struct {
 	Members []string
 }
 
-`)
+`,
+	)
 
-	fmt.Fprintf(&builder, `// FrameworkVariantRegistrations is every variant the installed Tailwind registers, in registration
+	fmt.Fprintf(
+		&builder,
+		`// FrameworkVariantRegistrations is every variant the installed Tailwind registers, in registration
 // order.
 //
 // In order rather than sorted by name, so a reader sees the sequence the engine performed and an
 // upgrade's diff shows where a new variant was inserted. Registrations() sorts by name when a
 // caller needs that.
 var FrameworkVariantRegistrations = []FrameworkVariantRegistration{
-`)
+`,
+	)
 	for _, entry := range entries {
 		fmt.Fprintf(
 			&builder,
@@ -541,7 +640,7 @@ var FrameworkVariantRegistrations = []FrameworkVariantRegistration{
 	builder.WriteString(`// FrameworkVariantComparisonGroups is every order number that carries a comparison function.
 //
 // All four are breakpoint comparisons in a default build. Without them the six roots sharing order
-// 64 fall through to a root-name comparison, and ` + "`2xl`" + ` sorts before ` + "`sm`" + ` alphabetically, which
+// 64 fall through to a root-name comparison, and ` + "`2xl` sorts before `sm`" + ` alphabetically, which
 // reorders every responsive class in the tree.
 var FrameworkVariantComparisonGroups = []FrameworkVariantComparisonGroup{
 `)
@@ -558,9 +657,9 @@ var FrameworkVariantComparisonGroups = []FrameworkVariantComparisonGroup{
 	}
 	builder.WriteString("}\n")
 
-	formatted, err := format.Source([]byte(builder.String()))
-	if err != nil {
-		return nil, fmt.Errorf("formatting the generated table: %w", err)
+	formatted, sourceError := format.Source([]byte(builder.String()))
+	if sourceError != nil {
+		return nil, fmt.Errorf("formatting the generated table: %w", sourceError)
 	}
 	return formatted, nil
 }
@@ -570,21 +669,21 @@ var FrameworkVariantComparisonGroups = []FrameworkVariantComparisonGroup{
 // Node's stderr is passed through rather than captured, so a resolution failure inside the script
 // reaches the operator instead of being swallowed into a parse error about empty input.
 func enumerate(packageRoot string, designSystem string) (*enumeration, error) {
-	absolutePackageRoot, err := filepath.Abs(packageRoot)
-	if err != nil {
-		return nil, fmt.Errorf("resolving %s: %w", packageRoot, err)
+	absolutePackageRoot, absolutePathError := filepath.Abs(packageRoot)
+	if absolutePathError != nil {
+		return nil, fmt.Errorf("resolving %s: %w", packageRoot, absolutePathError)
 	}
-	if _, err := os.Stat(filepath.Join(absolutePackageRoot, "package.json")); err != nil {
-		return nil, fmt.Errorf("%s does not look like a tailwindcss package root: %w", absolutePackageRoot, err)
+	if _, statError := os.Stat(filepath.Join(absolutePackageRoot, "package.json")); statError != nil {
+		return nil, fmt.Errorf("%s does not look like a tailwindcss package root: %w", absolutePackageRoot, statError)
 	}
 
 	_, thisFile, _, ok := runtime.Caller(0)
 	if !ok {
 		return nil, fmt.Errorf("cannot locate this tool's directory, so enumerate.mjs cannot be found")
 	}
-	directory, err := tooldirectory.Of(thisFile)
-	if err != nil {
-		return nil, err
+	directory, toolDirectoryOfError := tooldirectory.Of(thisFile)
+	if toolDirectoryOfError != nil {
+		return nil, toolDirectoryOfError
 	}
 	script := filepath.Join(directory, "enumerate.mjs")
 
@@ -593,12 +692,12 @@ func enumerate(packageRoot string, designSystem string) (*enumeration, error) {
 	// measurable rather than asserted.
 	arguments := []string{script, absolutePackageRoot}
 	if designSystem != "" {
-		absoluteDesignSystem, err := filepath.Abs(designSystem)
-		if err != nil {
-			return nil, fmt.Errorf("resolving %s: %w", designSystem, err)
+		absoluteDesignSystem, absolutePathError := filepath.Abs(designSystem)
+		if absolutePathError != nil {
+			return nil, fmt.Errorf("resolving %s: %w", designSystem, absolutePathError)
 		}
-		if _, err := os.Stat(absoluteDesignSystem); err != nil {
-			return nil, fmt.Errorf("design system %s is not readable: %w", absoluteDesignSystem, err)
+		if _, statError := os.Stat(absoluteDesignSystem); statError != nil {
+			return nil, fmt.Errorf("design system %s is not readable: %w", absoluteDesignSystem, statError)
 		}
 		arguments = append(arguments, absoluteDesignSystem)
 	}
@@ -608,13 +707,13 @@ func enumerate(packageRoot string, designSystem string) (*enumeration, error) {
 	command.Stdout = &stdout
 	command.Stderr = os.Stderr
 
-	if err := command.Run(); err != nil {
-		return nil, fmt.Errorf("node %s: %w", script, err)
+	if runError := command.Run(); runError != nil {
+		return nil, fmt.Errorf("node %s: %w", script, runError)
 	}
 
 	var result enumeration
-	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
-		return nil, fmt.Errorf("parsing the enumeration: %w", err)
+	if decodeError := json.Unmarshal(stdout.Bytes(), &result); decodeError != nil {
+		return nil, fmt.Errorf("parsing the enumeration: %w", decodeError)
 	}
 	return &result, nil
 }

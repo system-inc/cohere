@@ -12,8 +12,8 @@ const hookDestructuringDeclarations = "declare function useQuery(): { data: unkn
 	"declare function useState(): [unknown, (value: unknown) => void];\n" +
 	"declare function subscribe(handler: () => void): void;\n"
 
-func TestReactHookNoDestructuringFires(t *testing.T) {
-	t.Parallel()
+func TestReactHookNoDestructuringFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -69,16 +69,16 @@ func TestReactHookNoDestructuringFires(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.Run(t, ReactHookNoDestructuring, hookDestructuringFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.Run(test, ReactHookNoDestructuring, hookDestructuringFile,
 				hookDestructuringDeclarations+testCase.sourceText), "noDestructuringInHook")
 		})
 	}
 }
 
-func TestReactHookNoDestructuringStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestReactHookNoDestructuringStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -141,9 +141,9 @@ func TestReactHookNoDestructuringStaysSilent(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, ReactHookNoDestructuring, hookDestructuringFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, ReactHookNoDestructuring, hookDestructuringFile,
 				hookDestructuringDeclarations+testCase.sourceText))
 		})
 	}

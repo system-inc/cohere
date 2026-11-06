@@ -2,9 +2,11 @@ package main
 
 import (
 	"fmt"
+	"maps"
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -13,10 +15,12 @@ import (
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
-// Discovery is how one cohere checks a repository that holds more than one project: TypeScript programs
-// and Swift packages side by side, or nested below one another (#f9nftxz). From the root it walks every
-// directory the repository keeps, and each tsconfig.json or Package.swift it meets is a project, run by
-// its own engine.
+// Discovery is how one cohere checks a repository that holds more than one project: TypeScript programs,
+// Swift packages and Go workspaces and modules side by side, or nested below one another (#f9nftxz). From
+// the root it walks every directory the repository keeps, and each tsconfig.json, Package.swift, go.work or
+// go.mod it meets is a project, run by its own engine. A directory holding a go.work and a go.mod is one Go
+// project, the workspace, and a go.mod whose directory a workspace's go.work uses is not a project of its
+// own: the workspace's run builds it, as go does.
 //
 // What the walk never enters is the whole of its correctness, since the markers are everywhere a
 // repository keeps other people's code:
@@ -50,7 +54,7 @@ import (
 // A file inside a package's directory that none of its targets compiles is not this walk's to judge: the
 // directory claims it, and the engine knows which files it checks. Its run lists the file as not checked, and
 // that list, less what the runs of the Swift projects below it account for, is the run's own gap (see
-// swiftRun.writeExcluded).
+// engineRun.writeExcluded).
 
 // neverDescended are the directory names discovery never enters, whatever any ignore file says.
 var neverDescended = map[string]bool{
@@ -60,6 +64,9 @@ var neverDescended = map[string]bool{
 	".git":         true,
 	"testdata":     true,
 }
+
+// discoveryParallelism is how many directories discovery reads at once.
+const discoveryParallelism = 16
 
 // discoveredProject is one project discovery found.
 type discoveredProject struct {
@@ -78,12 +85,20 @@ type discovery struct {
 	// Root is the absolute directory the walk started from.
 	Root string
 
-	// Projects are in walk order, the root's first, and a directory holding both markers is two projects,
-	// TypeScript's first.
+	// Projects are in walk order, the root's first, and a directory holding more than one engine's marker is
+	// a project for each, TypeScript's first, then Swift's, then Go's.
 	Projects []discoveredProject
 
 	// Refused are markers the root's ignorePatterns match, relative to Root.
 	Refused []string
+
+	// UnusedModules are Go modules below a discovered workspace whose go.work does not use them, each run as
+	// a module of its own, for the notes to say why.
+	UnusedModules []unusedModule
+
+	// BrokenWorkspaces are Go workspaces whose go.work does not parse. Each still runs, and fails on it, while
+	// the modules below it run on their own, so one bad file fails its own project and nothing else.
+	BrokenWorkspaces []brokenWorkspace
 
 	// NestedRepositories are directories holding an independent repository of their own, relative to Root,
 	// not entered, and Submodules counts the submodules, part of the program above them, not entered either.
@@ -109,6 +124,22 @@ type discovery struct {
 	// Listings are every directory listing the walk read, for the build to serve its tsconfig's include
 	// enumeration from rather than listing the same directories again (#bjv0tg4).
 	Listings *program.DirectoryListings
+}
+
+// unusedModule is a Go module that runs on its own though a workspace sits above it, which a reader who
+// expected the workspace to build it would want named.
+type unusedModule struct {
+	// Directory is the module's, and Workspace the nearest discovered workspace's above it, both relative to
+	// the discovery root and slash-separated.
+	Directory string
+	Workspace string
+}
+
+// brokenWorkspace is a Go workspace whose go.work discovery could not read, and why.
+type brokenWorkspace struct {
+	// Directory is the workspace's, relative to the discovery root and slash-separated.
+	Directory string
+	Reason    string
 }
 
 // ignoreScope is what discovery asks of the gitignore matcher for one directory: internal/gitignore's
@@ -148,23 +179,9 @@ func discoveryRoot(location projectLocation, locateError error, workingDirectory
 func enclosingRepository(start string) string {
 	directory := filepath.Clean(start)
 	for {
-		if information, err := os.Stat(filepath.Join(directory, ".git")); err == nil && information.IsDir() {
-			return directory
-		}
-		parent := filepath.Dir(directory)
-		if parent == directory {
-			return ""
-		}
-		directory = parent
-	}
-}
-
-// nearestRepository is the nearest directory at or above start that is a repository's root of either kind,
-// a clone or a submodule, whose ignore files are the ones that govern start, or "" when there is none.
-func nearestRepository(start string) string {
-	directory := filepath.Clean(start)
-	for {
-		if repositoryKind(directory) != noRepository {
+		if information, statError := os.Stat(
+			filepath.Join(directory, ".git"),
+		); statError == nil && information.IsDir() {
 			return directory
 		}
 		parent := filepath.Dir(directory)
@@ -188,10 +205,26 @@ const (
 	linkedRepository
 )
 
+// nearestRepository is the nearest directory at or above start that is a repository's root of either kind,
+// a clone or a submodule, whose ignore files are the ones that govern start, or "" when there is none.
+func nearestRepository(start string) string {
+	directory := filepath.Clean(start)
+	for {
+		if repositoryKind(directory) != noRepository {
+			return directory
+		}
+		parent := filepath.Dir(directory)
+		if parent == directory {
+			return ""
+		}
+		directory = parent
+	}
+}
+
 func repositoryKind(directory string) nestedRepository {
-	information, err := os.Lstat(filepath.Join(directory, ".git"))
+	information, statError := os.Lstat(filepath.Join(directory, ".git"))
 	switch {
-	case err != nil:
+	case statError != nil:
 		return noRepository
 	case information.IsDir():
 		return cloneRepository
@@ -211,11 +244,13 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 	if repository == "" {
 		repository = root
 	}
-	rootScope, err := newIgnoreScope(repository)
-	if err != nil {
-		return discovery{}, err
+	rootScope, newIgnoreScopeError := newIgnoreScope(repository)
+	if newIgnoreScopeError != nil {
+		return discovery{}, newIgnoreScopeError
 	}
 	fromRepository := func(relative string) string {
+		// Ignored: repository is root or a directory above it, both absolute, and Rel fails only between paths
+		// with no relative way from one to the other.
 		inRepository, _ := filepath.Rel(repository, filepath.Join(root, relative))
 		inRepository = filepath.ToSlash(inRepository)
 		if inRepository == "." {
@@ -224,30 +259,30 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 		return inRepository
 	}
 	if prefix := fromRepository("."); prefix != "" {
-		if rootScope, err = rootScope.Enter(prefix); err != nil {
-			return discovery{}, err
+		var enterError error
+		if rootScope, enterError = rootScope.Enter(prefix); enterError != nil {
+			return discovery{}, enterError
 		}
 	}
 
 	// Directories are read in parallel, since the walk is reading directories and little else: on ahra,
 	// 3,138 of them cost 42ms one at a time. Each carries its own ignore scope, which is immutable, and the
 	// lock guards found.
-	var (
-		lock       sync.Mutex
-		group      sync.WaitGroup
-		reading    = make(chan struct{}, discoveryParallelism)
-		firstError error
-		// swiftFiles counts the .swift files in each directory that holds any, by directory relative to root.
-		swiftFiles = map[string]int{}
-		// xcodeCandidates are the directories that could be an Xcode project's root, relative to root. The
-		// claim after the walk decides which are projects.
-		xcodeCandidates = map[string]bool{}
-	)
-	fail := func(err error) {
+	var lock sync.Mutex
+	var group sync.WaitGroup
+	reading := make(chan struct{}, discoveryParallelism)
+	var firstError error
+	var workspaces []string
+	// swiftFiles counts the .swift files in each directory that holds any, by directory relative to root.
+	swiftFiles := map[string]int{}
+	// xcodeCandidates are the directories that could be an Xcode project's root, relative to root. The claim
+	// after the walk decides which are projects.
+	xcodeCandidates := map[string]bool{}
+	fail := func(sourceError error) {
 		lock.Lock()
 		defer lock.Unlock()
 		if firstError == nil {
-			firstError = err
+			firstError = sourceError
 		}
 	}
 	// visit reads one directory. Below the root, a directory holding a .git is a repository of its own and
@@ -257,10 +292,10 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 	visit = func(relative string, scope ignoreScope) {
 		defer group.Done()
 		reading <- struct{}{}
-		entries, err := os.ReadDir(filepath.Join(root, relative))
+		entries, readDirectoryError := os.ReadDir(filepath.Join(root, relative))
 		<-reading
-		if err != nil {
-			fail(fmt.Errorf("reading %s: %w", filepath.Join(root, relative), err))
+		if readDirectoryError != nil {
+			fail(fmt.Errorf("reading %s: %w", filepath.Join(root, relative), readDirectoryError))
 			return
 		}
 		found.Listings.Add(filepath.Join(root, relative), entries)
@@ -283,9 +318,11 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 				names[entry.Name()] = true
 			}
 		}
+		directoryScope := scope
 		if relative != "." {
-			if scope, err = scope.Enter(fromRepository(relative)); err != nil {
-				fail(err)
+			var enterError error
+			if directoryScope, enterError = scope.Enter(fromRepository(relative)); enterError != nil {
+				fail(enterError)
 				return
 			}
 		}
@@ -298,7 +335,8 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 				continue
 			}
 			filePath := path.Join(relative, entry.Name())
-			if scope.Ignored(fromRepository(filePath), false) || configuration.MatchAny(ignorePatterns, filePath) {
+			if directoryScope.Ignored(fromRepository(filePath), false) ||
+				configuration.MatchAny(ignorePatterns, filePath) {
 				continue
 			}
 			swiftFileCount++
@@ -307,11 +345,18 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 		if swiftFileCount > 0 {
 			swiftFiles[relative] = swiftFileCount
 		}
+		// A go.work found here makes the directory's go.mod part of its project rather than one of its own.
+		workspaceHere := false
 		for _, marker := range []struct {
 			name   string
 			engine projectEngine
-		}{{projectMarker, engineTypeScript}, {swiftProjectMarker, engineSwift}} {
-			if !names[marker.name] {
+		}{
+			{projectMarker, engineTypeScript},
+			{swiftProjectMarker, engineSwift},
+			{goWorkspaceMarker, engineGo},
+			{goModuleMarker, engineGo},
+		} {
+			if !names[marker.name] || (marker.name == goModuleMarker && workspaceHere) {
 				continue
 			}
 			markerPath := path.Join(relative, marker.name)
@@ -320,6 +365,10 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 				continue
 			}
 			found.Projects = append(found.Projects, discoveredProject{Directory: relative, Engine: marker.engine})
+			if marker.name == goWorkspaceMarker {
+				workspaceHere = true
+				workspaces = append(workspaces, relative)
+			}
 		}
 		if marker := xcodeMarker(entries, names); marker != "" {
 			markerPath := path.Join(relative, marker)
@@ -343,7 +392,7 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 				}
 				continue
 			}
-			if scope.Ignored(fromRepository(child), true) {
+			if directoryScope.Ignored(fromRepository(child), true) {
 				found.Ignored++
 				continue
 			}
@@ -353,7 +402,7 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 
 		for _, child := range candidates {
 			group.Add(1)
-			go visit(child, scope)
+			go visit(child, directoryScope)
 		}
 	}
 	group.Add(1)
@@ -369,7 +418,76 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 	found.sortProjects()
 	sort.Strings(found.Refused)
 	sort.Strings(found.NestedRepositories)
+	found.claimWorkspaceModules(workspaces)
 	return found, nil
+}
+
+// claimWorkspaceModules removes from Projects each Go module a discovered workspace's go.work uses, since the
+// workspace's run builds it, and keeps, for the notes, each module left below a workspace that does not use
+// it. workspaces are the Go workspace projects' directories, relative to Root.
+//
+// Each use resolves against its workspace's directory. One outside the root names nothing discovery found,
+// and so does one inside a submodule or a nested repository, since the walk never enters them, so neither
+// claims anything. A use naming another workspace claims nothing either: go builds that one by its own go.work.
+// A go.work that does not parse claims nothing and is kept in BrokenWorkspaces, so it fails its own project's
+// run rather than the discovery every other project depends on.
+func (found *discovery) claimWorkspaceModules(workspaces []string) {
+	if len(workspaces) == 0 {
+		return
+	}
+	isWorkspace := map[string]bool{}
+	claimed := map[string]bool{}
+	broken := map[string]bool{}
+	for _, workspace := range workspaces {
+		isWorkspace[workspace] = true
+		uses, readError := workspaceUses(filepath.Join(found.Root, filepath.FromSlash(workspace)))
+		if readError != nil {
+			// Not a failure of discovery: a TypeScript or Swift project beside it has nothing to do with it. The
+			// workspace's own run fails on the file, and it claims nothing, so its modules are still checked.
+			found.BrokenWorkspaces = append(found.BrokenWorkspaces,
+				brokenWorkspace{Directory: workspace, Reason: readError.Error()})
+			broken[workspace] = true
+			continue
+		}
+		for _, use := range uses {
+			module := path.Join(workspace, use)
+			if module == ".." || strings.HasPrefix(module, "../") {
+				continue
+			}
+			claimed[module] = true
+		}
+	}
+	running := found.Projects[:0:0]
+	for _, project := range found.Projects {
+		if project.Engine == engineGo && !isWorkspace[project.Directory] {
+			// Any workspace that uses a module claims it, the nearest or not: that workspace's run builds the
+			// module through the use, so running the module alone as well would check its files twice. The walk
+			// up from inside such a module can still stop at the module (goModuleRoot), because go standing
+			// there reads the nearer go.work, which does not use it; both builds are ones go itself would run.
+			if claimed[project.Directory] {
+				continue
+			}
+			// A module below a workspace that could not be read is named by that workspace's note instead.
+			if workspace, below := nearestWorkspace(project.Directory, workspaces); below && !broken[workspace] {
+				found.UnusedModules = append(found.UnusedModules,
+					unusedModule{Directory: project.Directory, Workspace: workspace})
+			}
+		}
+		running = append(running, project)
+	}
+	found.Projects = running
+}
+
+// nearestWorkspace is the deepest of the workspaces' directories that holds a directory, and whether there is
+// one: the go.work go would read there.
+func nearestWorkspace(directory string, workspaces []string) (string, bool) {
+	nearest, below := "", false
+	for _, workspace := range workspaces {
+		if isBelow(directory, workspace) && (!below || isBelow(workspace, nearest)) {
+			nearest, below = workspace, true
+		}
+	}
+	return nearest, below
 }
 
 // xcodeProjectSpecification is the xcodegen spec whose directory may be an Xcode project's root.
@@ -424,7 +542,11 @@ type unclaimedSwiftDirectory struct {
 // The top directory of unclaimed files is a path's first segment: no marker is at or above them, so none is
 // at that directory, and it is the shallowest one holding them. So CapturePhone/Sources/App and
 // CapturePhone/Tests are both CapturePhone/.
-func claimSwiftFiles(swiftFiles map[string]int, projects []discoveredProject, xcodeCandidates map[string]bool) ([]discoveredProject, []unclaimedSwiftDirectory) {
+func claimSwiftFiles(
+	swiftFiles map[string]int,
+	projects []discoveredProject,
+	xcodeCandidates map[string]bool,
+) ([]discoveredProject, []unclaimedSwiftDirectory) {
 	packages := map[string]bool{}
 	for _, project := range projects {
 		if project.Engine == engineSwift {
@@ -453,7 +575,10 @@ func claimSwiftFiles(swiftFiles map[string]int, projects []discoveredProject, xc
 	}
 	// In path order, the root's first, so the report reads the same on every run.
 	sort.Slice(unclaimed, func(left, right int) bool {
-		return pathBefore(strings.TrimSuffix(unclaimed[left].Directory, "/"), strings.TrimSuffix(unclaimed[right].Directory, "/"))
+		return pathBefore(
+			strings.TrimSuffix(unclaimed[left].Directory, "/"),
+			strings.TrimSuffix(unclaimed[right].Directory, "/"),
+		)
 	})
 	xcodeProjects := make([]discoveredProject, 0, len(claiming))
 	for directory := range claiming {
@@ -465,24 +590,29 @@ func claimSwiftFiles(swiftFiles map[string]int, projects []discoveredProject, xc
 // nearestSwiftMarker is the nearest directory at or above a slash directory holding a Swift marker, whether it
 // is an Xcode candidate rather than a package, and whether there is one at all. No directory holds both, since
 // a Package.swift makes its directory no candidate.
-func nearestSwiftMarker(directory string, packages map[string]bool, xcodeCandidates map[string]bool) (string, bool, bool) {
+func nearestSwiftMarker(
+	directory string,
+	packages map[string]bool,
+	xcodeCandidates map[string]bool,
+) (string, bool, bool) {
+	current := directory
 	for {
-		if packages[directory] {
-			return directory, false, true
+		if packages[current] {
+			return current, false, true
 		}
-		if xcodeCandidates[directory] {
-			return directory, true, true
+		if xcodeCandidates[current] {
+			return current, true, true
 		}
-		if directory == "." {
+		if current == "." {
 			return "", false, false
 		}
-		directory = path.Dir(directory)
+		current = path.Dir(current)
 	}
 }
 
-// sortProjects puts parents before children, TypeScript before Swift in one directory, and a directory's
-// tsconfig.json before its other tsconfigs, whatever order the reads finished in, so the report reads the
-// same on every run.
+// sortProjects puts parents before children, TypeScript, then Swift, then Go in one directory, and a
+// directory's tsconfig.json before its other tsconfigs, whatever order the reads finished in, so the report
+// reads the same on every run.
 func (found *discovery) sortProjects() {
 	sort.SliceStable(found.Projects, func(left, right int) bool {
 		leftProject, rightProject := found.Projects[left], found.Projects[right]
@@ -490,14 +620,26 @@ func (found *discovery) sortProjects() {
 			return pathBefore(leftProject.Directory, rightProject.Directory)
 		}
 		if leftProject.Engine != rightProject.Engine {
-			return leftProject.Engine == engineTypeScript
+			return engineRank(leftProject.Engine) < engineRank(rightProject.Engine)
 		}
 		return leftProject.ConfigFile < rightProject.ConfigFile
 	})
 }
 
-// discoveryParallelism is how many directories discovery reads at once.
-const discoveryParallelism = 16
+// engineRank is where an engine's project comes among the projects of one directory, the order engineAt
+// reads the markers in, so the report lists them the way a single run would choose between them.
+func engineRank(engine projectEngine) int {
+	switch engine {
+	case engineTypeScript:
+		return 0
+	case engineSwift:
+		return 1
+	case engineGo:
+		return 2
+	default:
+		return 3
+	}
+}
 
 // pathBefore orders slash paths segment by segment, so "." comes first and a directory comes before
 // everything inside it.
@@ -522,4 +664,149 @@ func rootIgnorePatterns(root string) ([]string, error) {
 		return nil, nil
 	}
 	return configuration.IgnorePatternsOf(settings)
+}
+
+// isTheLocatedProject reports whether discovery found exactly the one project the walk up located, which
+// a run then checks in this process, the way it always did.
+func (found discovery) isTheLocatedProject(location projectLocation, locateError error) bool {
+	if locateError != nil || len(found.Projects) != 1 {
+		return false
+	}
+	project := found.Projects[0]
+	return project.Engine == location.Engine && project.ConfigFile == "" &&
+		filepath.Clean(filepath.Join(found.Root, project.Directory)) == filepath.Clean(location.Root)
+}
+
+// notes are the lines a run carries about markers discovery found and did not run, which a reader could have
+// expected checked: those the root's ignorePatterns refuse, solution roots, projects left with no file of
+// their own, and Swift packages another package's run covers. So is a Go module that runs on its own below a
+// workspace, which a reader could have expected the workspace to build. Ignored and dependency directories are
+// not named, since skipping them is what everyone expects, and neither is a nested repository: one inside a
+// program, such as Structure or Base, is checked as part of it, its drift reported read-only, as it always was.
+// They are counted on the summary line. A Swift coverage query that failed is named too, since its packages may
+// then be checked twice, and so is each directory of Swift files no package holds, since nothing checks them.
+func (found discovery) notes() []string {
+	var lines []string
+	for _, marker := range found.Refused {
+		lines = append(lines, fmt.Sprintf("%s not checked: the root's ignorePatterns match it", marker))
+	}
+	for _, label := range found.Ownership.Solutions {
+		lines = append(lines, fmt.Sprintf(
+			"%s not run: a solution tsconfig, which includes no file and references the projects checked instead",
+			label,
+		))
+	}
+	for _, label := range found.Ownership.Yielding {
+		lines = append(lines, fmt.Sprintf("%s not run: every file it includes belongs to a nearer tsconfig", label))
+	}
+	for _, label := range slices.Sorted(maps.Keys(found.Ownership.Unloaded)) {
+		lines = append(lines, fmt.Sprintf(
+			"%s: its tsconfig did not load, so the %s under it that another tsconfig includes are judged by no "+
+				"run, and its own run fails naming why",
+			label,
+			counted(found.Ownership.Unloaded[label], "file", "files"),
+		))
+	}
+	for _, workspace := range found.BrokenWorkspaces {
+		lines = append(lines, fmt.Sprintf("%s claims no module, so each module below it runs on its own: %s",
+			path.Join(workspace.Directory, goWorkspaceMarker), workspace.Reason))
+	}
+	for _, module := range found.UnusedModules {
+		lines = append(lines, fmt.Sprintf("%s runs as its own module: %s does not use it",
+			path.Join(module.Directory, goModuleMarker), path.Join(module.Workspace, goWorkspaceMarker)))
+	}
+	for _, covered := range found.SwiftCoverage.Covered {
+		if covered.Vendored {
+			lines = append(lines, fmt.Sprintf(
+				"%s not run: vendored in %s, whose run lists it as not checked",
+				covered.Label,
+				covered.CoveredBy,
+			))
+			continue
+		}
+		lines = append(lines, fmt.Sprintf("%s not run: checked as part of %s", covered.Label, covered.CoveredBy))
+	}
+	for _, failed := range found.SwiftCoverage.FailedQueries {
+		lines = append(lines, fmt.Sprintf(
+			"%s: the Swift coverage query failed, so every package it might check runs as its own project too: %s",
+			failed.Label,
+			failed.Reason,
+		))
+	}
+	for _, unclaimed := range found.UnclaimedSwift {
+		lines = append(lines, fmt.Sprintf(
+			"%s: %s no Swift package checks",
+			unclaimed.Directory,
+			counted(unclaimed.Files, "Swift file", "Swift files"),
+		))
+	}
+	// Last, since only these are sorted: a map has no order of its own.
+	for label := range found.Ownership.SharedDirectory {
+		lines = append(lines, fmt.Sprintf(
+			"%s ran with the cache off: another tsconfig's run keeps its cache in the same directory",
+			label,
+		))
+	}
+	sort.Strings(lines[len(lines)-len(found.Ownership.SharedDirectory):])
+	return lines
+}
+
+// swiftYield is what a Swift project's run leaves to others: the directories of the other running Swift
+// projects strictly below it, absolute, each checked by its own run. A nested package that runs on its own and
+// an Xcode project inside a package's directory are both there, and the run's not-checked notes leave their
+// files out, since those runs account for them. A package another run covers is not, since the covering run
+// checks its files itself, and found.Projects holds only the projects that run.
+func (found discovery) swiftYield(project discoveredProject) projectYield {
+	yield := projectYield{}
+	for _, other := range found.Projects {
+		if other.Engine == engineSwift && isBelow(other.Directory, project.Directory) {
+			yield.Directories = append(
+				yield.Directories,
+				filepath.Join(found.Root, filepath.FromSlash(other.Directory)),
+			)
+		}
+	}
+	sort.Strings(yield.Directories)
+	return yield
+}
+
+// configurationPath is the absolute path of a TypeScript project's tsconfig.
+func (found discovery) configurationPath(project discoveredProject) string {
+	name := project.ConfigFile
+	if name == "" {
+		name = projectMarker
+	}
+	return filepath.Join(found.Root, filepath.FromSlash(project.Directory), name)
+}
+
+// projectAt is the project a referenced tsconfig defines, and whether it lies in the repository discovery
+// walked and outside what it never enters: a dependency, build or cache directory, a repository of its
+// own, or a marker the root's ignorePatterns refused.
+func (found discovery) projectAt(configurationFile string) (discoveredProject, bool) {
+	relative, relativePathError := filepath.Rel(found.Root, configurationFile)
+	if relativePathError != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+		return discoveredProject{}, false
+	}
+	relative = filepath.ToSlash(relative)
+	for _, segment := range strings.Split(path.Dir(relative), "/") {
+		if neverDescended[segment] {
+			return discoveredProject{}, false
+		}
+	}
+	for _, repository := range found.NestedRepositories {
+		if isBelow(path.Dir(relative), repository) || path.Dir(relative) == repository {
+			return discoveredProject{}, false
+		}
+	}
+	if slices.Contains(found.Refused, relative) {
+		return discoveredProject{}, false
+	}
+	if !isRegularFile(configurationFile) {
+		return discoveredProject{}, false
+	}
+	project := discoveredProject{Directory: path.Dir(relative), Engine: engineTypeScript}
+	if name := path.Base(relative); name != projectMarker {
+		project.ConfigFile = name
+	}
+	return project, true
 }

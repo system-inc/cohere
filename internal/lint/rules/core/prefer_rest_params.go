@@ -5,7 +5,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
-// PreferRestParams flags reads of the implicit `arguments` object inside a function.
+// PreferRestParameters flags reads of the implicit `arguments` object inside a function.
 //
 //	valid:   function foo(...args) { args; }
 //	valid:   function foo(arguments) { arguments; }
@@ -65,7 +65,7 @@ import (
 // parameter to the enclosing function and rewrite every use, which changes the signature, is not a
 // single-span edit, and has to pick a parameter name. Under this tree's rule that is not even a
 // suggestion: it is a change of meaning at a site the rule does not own.
-var PreferRestParams = rule.Rule{
+var PreferRestParameters = rule.Rule[rule.NoOptions]{
 	Name: "prefer-rest-params",
 
 	// See the doc above: telling the implicit binding from a declared one is name resolution, and
@@ -73,20 +73,20 @@ var PreferRestParams = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindIdentifier: func(node *ast.Node) {
 				if node.Text() != "arguments" {
 					return
 				}
-				if !isImplicitArgumentsBinding(ctx, node) {
+				if !isImplicitArgumentsBinding(ruleContext, node) {
 					return
 				}
 				if isNormalMemberAccess(node) {
 					return
 				}
 
-				ctx.ReportNode(node, rule.Message{
+				ruleContext.ReportNode(node, rule.Message{
 					Id: "preferRestParams",
 					Description: "This reads the implicit `arguments` object, which is array-like " +
 						"rather than an array and carries none of `Array.prototype`, so iterating " +
@@ -107,11 +107,11 @@ var PreferRestParams = rule.Rule{
 // in the standard library declares it. An identifier the checker cannot resolve at all answers
 // false: that is `arguments` with no enclosing non-arrow function to supply it, which is not a
 // finding.
-func isImplicitArgumentsBinding(ctx rule.Context, identifier *ast.Node) bool {
-	if ctx.TypeChecker == nil {
+func isImplicitArgumentsBinding(ruleContext rule.Context, identifier *ast.Node) bool {
+	if ruleContext.TypeChecker == nil {
 		return false
 	}
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(identifier)
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(identifier)
 	if symbol == nil {
 		return false
 	}

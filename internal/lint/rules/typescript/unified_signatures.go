@@ -2,7 +2,6 @@ package typescript
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	shimcore "github.com/microsoft/TypeScript/tsc/shim/core"
@@ -22,7 +21,7 @@ import (
 // differs in at most one place: one parameter's type (report a union), or one trailing parameter
 // that could be optional or rest.
 //
-// # The rule compares types as SOURCE TEXT, not through the checker
+// # The rule compares types as source text, not through the checker
 //
 // Upstream's `typesAreEqual` is `sourceCode.getText(a) === sourceCode.getText(b)`, and the rule
 // makes zero `getTypeAtLocation` calls. That is a deliberate choice upstream, not an oversight: it
@@ -69,17 +68,17 @@ import (
 // One map per scope, holding the signatures seen in it, and a pairwise comparison within each key's
 // group. A group of n signatures costs n(n-1)/2 comparisons, and n is the number of overloads
 // sharing one name, which is small in practice.
-var UnifiedSignatures = rule.Rule{
+var UnifiedSignatures = rule.Rule[UnifiedSignaturesOptions]{
 	Name: "@typescript-eslint/unified-signatures",
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[UnifiedSignaturesOptions]) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 		// The value type, because that is what `DecodeOptionsInto` hands over. This line asserted a
 		// pointer once, the comma-ok form swallowed the mismatch, and both options read false for
 		// every configuration; `TestUnifiedSignaturesOptionsArriveThroughTheDecoder` holds it.
-		settings, _ := rule.OptionsAs[UnifiedSignaturesOptions](options)
+		settings, _ := options.Read()
 
 		// One listener that walks the file itself, rather than a listener per scope kind with an
 		// exit hook. Upstream pairs each `X` with an `X:exit` and checks a scope when it closes;
@@ -88,7 +87,7 @@ var UnifiedSignatures = rule.Rule{
 		// exactly the signatures among its own members and nesting is containment.
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
-				checker := &unifiedSignaturesChecker{ctx: ctx, settings: settings}
+				checker := &unifiedSignaturesChecker{ruleContext: ruleContext, settings: settings}
 				checker.checkScope(node, nil)
 			},
 		}
@@ -105,58 +104,6 @@ type UnifiedSignaturesOptions struct {
 	// IgnoreOverloadsWithDifferentJsDoc treats two overloads carrying different block comments as
 	// different, on the reading that the prose documents a distinction the types do not carry.
 	IgnoreOverloadsWithDifferentJsDoc bool `json:"ignoreOverloadsWithDifferentJSDoc"`
-}
-
-// unifiedSignaturesChecker carries what every helper needs: the context for reporting and reading
-// source text, and the two options.
-type unifiedSignaturesChecker struct {
-	ctx      rule.Context
-	settings UnifiedSignaturesOptions
-}
-
-// checkScope groups the signatures directly inside one scope, compares each group pairwise, and
-// then recurses into the scopes nested within it.
-//
-// `outerTypeParameters` is the set of type parameter names in scope from ENCLOSING declarations, not
-// from the signatures themselves. Upstream's comment is precise about the distinction: in
-// `interface I<T> { m<U>(x: U): T }` only `T` is outer. Two signatures where one mentions an outer
-// type parameter and the other does not cannot be unified, because the union would erase the link
-// between the parameter and the declaration's type argument.
-func (checker *unifiedSignaturesChecker) checkScope(scope *ast.Node, outerTypeParameters map[string]bool) {
-	groups := map[string][]*ast.Node{}
-	var order []string
-
-	for _, member := range unifiedSignaturesScopeMembers(scope) {
-		if !unifiedSignaturesIsOverload(member) {
-			continue
-		}
-		key := unifiedSignaturesOverloadKey(checker.ctx, member)
-		if _, seen := groups[key]; !seen {
-			order = append(order, key)
-		}
-		groups[key] = append(groups[key], member)
-	}
-
-	// Iterated in first-seen order rather than over the map, so findings come out in source order.
-	//
-	// Go randomises map iteration, so iterating `groups` directly would emit two groups' findings in
-	// a different order between runs. Measured: over 200 iterations of a two-key map the order
-	// reversed 22 times. A fixture asserting two findings therefore CATCHES that mutation, but only
-	// about 8% of the time, which is a flaky test rather than a guard. The determinism lives here so
-	// the fixture can be an ordinary assertion.
-	for _, key := range order {
-		overloads := groups[key]
-		for indexA := 0; indexA < len(overloads); indexA++ {
-			for indexB := indexA + 1; indexB < len(overloads); indexB++ {
-				checker.compare(overloads[indexA], overloads[indexB], len(overloads) == 2,
-					outerTypeParameters)
-			}
-		}
-	}
-
-	for _, nested := range unifiedSignaturesNestedScopes(scope) {
-		checker.checkScope(nested, unifiedSignaturesTypeParameterNames(nested, outerTypeParameters))
-	}
 }
 
 // unifiedSignaturesScopeMembers returns the declarations directly inside a scope.
@@ -196,7 +143,7 @@ func unifiedSignaturesScopeMembers(scope *ast.Node) []*ast.Node {
 
 // unifiedSignaturesIsOverload is upstream's collection filter.
 //
-// A method or function with a BODY is an implementation rather than an overload signature, and
+// A method or function with a body is an implementation rather than an overload signature, and
 // upstream skips it: `if (!node.value.body ...)`. Getters and setters need no filter here, unlike
 // upstream, because our parser gives them their own kinds and they never reach this switch.
 func unifiedSignaturesIsOverload(node *ast.Node) bool {
@@ -224,8 +171,7 @@ func unifiedSignaturesIsOverload(node *ast.Node) bool {
 // of each other.
 func unifiedSignaturesNestedScopes(scope *ast.Node) []*ast.Node {
 	var found []*ast.Node
-	var visit func(node *ast.Node) bool
-	visit = func(node *ast.Node) bool {
+	visit := func(node *ast.Node) bool {
 		switch node.Kind {
 		case ast.KindClassDeclaration, ast.KindClassExpression, ast.KindInterfaceDeclaration,
 			ast.KindTypeLiteral, ast.KindModuleBlock:
@@ -259,10 +205,10 @@ func unifiedSignaturesForEachDescendant(node *ast.Node, visit func(*ast.Node) bo
 // with a plain one of the same name and a static method never groups with an instance method. A
 // call signature and a construct signature get fixed keys of their own.
 //
-// The name is read as SOURCE TEXT for anything that is not a plain identifier, which is upstream's
+// The name is read as source text for anything that is not a plain identifier, which is upstream's
 // `key.raw`. That keeps `'f'` and `f` in separate groups, matching upstream, and it is why the
 // corpus's quoted-name case reports the way it does.
-func unifiedSignaturesOverloadKey(ctx rule.Context, node *ast.Node) string {
+func unifiedSignaturesOverloadKey(ruleContext rule.Context, node *ast.Node) string {
 	switch node.Kind {
 	case ast.KindConstructSignature:
 		return "11constructor"
@@ -276,7 +222,7 @@ func unifiedSignaturesOverloadKey(ctx rule.Context, node *ast.Node) string {
 		return "11identifier_constructor"
 	}
 
-	// The computed digit is upstream's and is kept, but in OUR tree it is subsumed and a mutant
+	// The computed digit is upstream's and is kept, but in our tree it is subsumed and a mutant
 	// flipping it survives. Upstream's non-computed info is `identifier_<text>`, while a computed
 	// member's info is the source text of its `ComputedPropertyName`, which always begins with `[`.
 	// Those two strings can never be equal, so the members already land in different groups before
@@ -309,7 +255,7 @@ func unifiedSignaturesOverloadKey(ctx rule.Context, node *ast.Node) string {
 	case name.Kind == ast.KindPrivateIdentifier:
 		info = "private_identifier_" + name.AsPrivateIdentifier().Text
 	default:
-		info = unifiedSignaturesNodeText(ctx, name)
+		info = unifiedSignaturesNodeText(ruleContext, name)
 	}
 	return computed + staticness + info
 }
@@ -318,14 +264,14 @@ func unifiedSignaturesOverloadKey(ctx rule.Context, node *ast.Node) string {
 //
 // `rule.TokenRange` trims the leading trivia our parser includes in a node's start, so the text is
 // the node itself rather than the node plus whatever comments and whitespace preceded it. That
-// matters here because this text is compared for EQUALITY: without the trim, two identical types
+// matters here because this text is compared for equality: without the trim, two identical types
 // would differ whenever one of them happened to follow a comment.
-func unifiedSignaturesNodeText(ctx rule.Context, node *ast.Node) string {
+func unifiedSignaturesNodeText(ruleContext rule.Context, node *ast.Node) string {
 	if node == nil {
 		return ""
 	}
-	nodeRange := rule.TokenRange(ctx.SourceFile, node)
-	return ctx.SourceFile.Text()[nodeRange.Pos():nodeRange.End()]
+	nodeRange := rule.TokenRange(ruleContext.SourceFile, node)
+	return ruleContext.SourceFile.Text()[nodeRange.Pos():nodeRange.End()]
 }
 
 // unifiedSignaturesTypeParameterNames adds a scope's own type parameter names to the set inherited
@@ -357,68 +303,6 @@ func unifiedSignaturesTypeParameterNames(scope *ast.Node, inherited map[string]b
 		}
 	}
 	return combined
-}
-
-// compare is upstream's `compareSignatures` plus `addFailures`: decide whether two signatures
-// unify, and if so report the finding that says how.
-func (checker *unifiedSignaturesChecker) compare(
-	signatureA *ast.Node,
-	signatureB *ast.Node,
-	onlyTwo bool,
-	outerTypeParameters map[string]bool,
-) {
-	if !checker.canBeUnified(signatureA, signatureB, outerTypeParameters) {
-		return
-	}
-
-	parametersA := unifiedSignaturesParameters(signatureA)
-	parametersB := unifiedSignaturesParameters(signatureB)
-	if len(parametersA) == len(parametersB) {
-		checker.reportSameLength(signatureA, signatureB, parametersA, parametersB, onlyTwo)
-		return
-	}
-	checker.reportDifferentLength(signatureA, signatureB, parametersA, parametersB, onlyTwo)
-}
-
-// canBeUnified is upstream's `signaturesCanBeUnified`: the gate every pair must pass before the
-// shape of their difference is even examined.
-func (checker *unifiedSignaturesChecker) canBeUnified(
-	signatureA *ast.Node,
-	signatureB *ast.Node,
-	outerTypeParameters map[string]bool,
-) bool {
-	parametersA := unifiedSignaturesParameters(signatureA)
-	parametersB := unifiedSignaturesParameters(signatureB)
-
-	if checker.settings.IgnoreDifferentlyNamedParameters {
-		common := min(len(parametersA), len(parametersB))
-		for index := 0; index < common; index++ {
-			nameA, gotA := unifiedSignaturesStaticParameterName(parametersA[index])
-			nameB, gotB := unifiedSignaturesStaticParameterName(parametersB[index])
-			// Upstream gates this on the two parameters having the same NODE TYPE first, which in
-			// our tree is the same question as both yielding a static name: a destructured parameter
-			// has no static name and is skipped either way.
-			if gotA && gotB && nameA != nameB {
-				return false
-			}
-		}
-	}
-
-	if checker.settings.IgnoreOverloadsWithDifferentJsDoc {
-		if checker.blockCommentFor(signatureA) != checker.blockCommentFor(signatureB) {
-			return false
-		}
-	}
-
-	if !checker.typesAreEqual(unifiedSignaturesReturnType(signatureA),
-		unifiedSignaturesReturnType(signatureB)) {
-		return false
-	}
-	if !checker.typeParametersAreEqual(signatureA, signatureB) {
-		return false
-	}
-	return unifiedSignaturesUsesTypeParameter(signatureA, outerTypeParameters) ==
-		unifiedSignaturesUsesTypeParameter(signatureB, outerTypeParameters)
 }
 
 // unifiedSignaturesParameters returns a signature's parameter list.
@@ -467,7 +351,7 @@ func unifiedSignaturesReturnType(node *ast.Node) *ast.Node {
 	return nil
 }
 
-// unifiedSignaturesSignatureTypeParameters returns a signature's OWN type parameters, which are the
+// unifiedSignaturesSignatureTypeParameters returns a signature's own type parameters, which are the
 // ones written on the signature rather than inherited from an enclosing declaration.
 func unifiedSignaturesSignatureTypeParameters(node *ast.Node) []*ast.Node {
 	var list *ast.NodeList
@@ -518,7 +402,7 @@ func unifiedSignaturesIsOptional(parameter *ast.Node) bool {
 }
 
 // unifiedSignaturesStaticParameterName is upstream's `getStaticParameterName`: the name of a
-// parameter that HAS a static name, which a destructured parameter does not.
+// parameter that has a static name, which a destructured parameter does not.
 func unifiedSignaturesStaticParameterName(parameter *ast.Node) (string, bool) {
 	if parameter == nil || parameter.Kind != ast.KindParameter {
 		return "", false
@@ -530,202 +414,8 @@ func unifiedSignaturesStaticParameterName(parameter *ast.Node) (string, bool) {
 	return name.AsIdentifier().Text, true
 }
 
-// reportSameLength is upstream's `signaturesHaveSameAmountOfParameters`.
-//
-// Two outcomes: every parameter matches, so the signatures are identical and one is redundant; or
-// exactly one parameter differs and the pair can be written with a union at that position.
-func (checker *unifiedSignaturesChecker) reportSameLength(
-	signatureA *ast.Node,
-	signatureB *ast.Node,
-	parametersA []*ast.Node,
-	parametersB []*ast.Node,
-	onlyTwo bool,
-) {
-	// `this: void` is how a signature declares it must not be called as a method. Unifying it away
-	// would erase that, so upstream exempts the pair outright.
-	if unifiedSignaturesIsThisVoid(unifiedSignaturesAt(parametersA, 0)) ||
-		unifiedSignaturesIsThisVoid(unifiedSignaturesAt(parametersB, 0)) {
-		return
-	}
-
-	difference := -1
-	for index := 0; index < len(parametersA) && index < len(parametersB); index++ {
-		if !checker.parametersAreEqual(parametersA[index], parametersB[index]) {
-			difference = index
-			break
-		}
-	}
-
-	if difference == -1 {
-		checker.reportAllParametersAreSame(signatureA, signatureB, onlyTwo)
-		return
-	}
-
-	// Everything after the differing parameter must still match, or the pair differs in more than
-	// one place and no single union expresses it.
-	for index := difference + 1; index < len(parametersA) && index < len(parametersB); index++ {
-		if !checker.parametersAreEqual(parametersA[index], parametersB[index]) {
-			return
-		}
-	}
-
-	first := parametersA[difference]
-	second := parametersB[difference]
-
-	// `a?: string` and `b?: number` unify. `...a: string[]` and `...b: number[]` do NOT, because a
-	// rest parameter's type is the ARRAY, and `(string | number)[]` is a weaker claim than
-	// `string[] | number[]`. Upstream cites microsoft/TypeScript#5077 at this line.
-	if !unifiedSignaturesHaveEqualSigils(first, second) || unifiedSignaturesIsRest(first) {
-		return
-	}
-
-	checker.ctx.ReportNode(second, rule.Message{
-		Id: "singleParameterDifference",
-		Description: fmt.Sprintf("%s taking `%s`.",
-			unifiedSignaturesFailureStart(checker.ctx, onlyTwo, first),
-			checker.unifiedTypeText(unifiedSignaturesParameterType(first),
-				unifiedSignaturesParameterType(second))),
-	})
-}
-
-// reportDifferentLength is upstream's `signaturesDifferByOptionalOrRestParameter`.
-//
-// The longer signature carries parameters the shorter one lacks. They unify when every extra
-// parameter beyond the first could be missing anyway, and the shared prefix agrees.
-func (checker *unifiedSignaturesChecker) reportDifferentLength(
-	signatureA *ast.Node,
-	signatureB *ast.Node,
-	parametersA []*ast.Node,
-	parametersB []*ast.Node,
-	onlyTwo bool,
-) {
-	firstA := unifiedSignaturesAt(parametersA, 0)
-	firstB := unifiedSignaturesAt(parametersB, 0)
-
-	// One declares `this` and the other does not: they describe different call shapes.
-	if unifiedSignaturesIsThisParameter(firstA) != unifiedSignaturesIsThisParameter(firstB) {
-		return
-	}
-	if unifiedSignaturesIsThisVoid(firstA) || unifiedSignaturesIsThisVoid(firstB) {
-		return
-	}
-
-	longer, shorter := parametersA, parametersB
-	shorterSignature := signatureB
-	if len(parametersA) < len(parametersB) {
-		longer, shorter = parametersB, parametersA
-		shorterSignature = signatureA
-	}
-	minimum := len(shorter)
-
-	// Upstream starts this loop at `minLength + 1`, not `minLength`, which is deliberate: the FIRST
-	// extra parameter is the one being reported as newly optional, so it needs no sigil of its own.
-	// Every extra one after it must already be optional or rest.
-	for index := minimum + 1; index < len(longer); index++ {
-		if !unifiedSignaturesMayBeMissing(longer[index]) {
-			return
-		}
-	}
-
-	for index := 0; index < minimum; index++ {
-		if !checker.typesAreEqual(unifiedSignaturesParameterType(parametersA[index]),
-			unifiedSignaturesParameterType(parametersB[index])) {
-			return
-		}
-	}
-
-	// A shorter signature ending in a rest parameter already accepts everything the longer one does,
-	// so there is nothing to unify.
-	if minimum > 0 && unifiedSignaturesIsRest(shorter[minimum-1]) {
-		return
-	}
-
-	extra := longer[len(longer)-1]
-	messageId := "omittingSingleParameter"
-	description := "with an optional parameter."
-	if unifiedSignaturesIsRest(extra) {
-		messageId = "omittingRestParameter"
-		description = "with a rest parameter."
-	}
-	checker.ctx.ReportNode(extra, rule.Message{
-		Id: messageId,
-		Description: fmt.Sprintf("%s %s",
-			unifiedSignaturesFailureStart(checker.ctx, onlyTwo, shorterSignature), description),
-	})
-}
-
-// reportAllParametersAreSame reports two signatures that are identical in every parameter.
-//
-// This message does not exist in the installed 8.67.0 build; it is in the clone, which the brief
-// names as the source. Four corpus rows assert it, and they are the four the oracle cannot check.
-func (checker *unifiedSignaturesChecker) reportAllParametersAreSame(
-	signatureA *ast.Node,
-	signatureB *ast.Node,
-	onlyTwo bool,
-) {
-	checker.ctx.ReportRange(unifiedSignaturesValueRange(checker.ctx, signatureB), rule.Message{
-		Id: "allParametersAreSame",
-		Description: fmt.Sprintf("%s with identical parameters.",
-			unifiedSignaturesFailureStart(checker.ctx, onlyTwo, signatureA)),
-	})
-}
-
-// typesAreEqual is upstream's `typesAreEqual`: two type nodes are equal when their SOURCE TEXT
-// matches, which is the rule's whole notion of type identity.
-func (checker *unifiedSignaturesChecker) typesAreEqual(typeA *ast.Node, typeB *ast.Node) bool {
-	if typeA == typeB {
-		return true
-	}
-	if typeA == nil || typeB == nil {
-		return false
-	}
-	return unifiedSignaturesNodeText(checker.ctx, typeA) ==
-		unifiedSignaturesNodeText(checker.ctx, typeB)
-}
-
-// parametersAreEqual is upstream's `parametersAreEqual`: same sigils, same type text.
-func (checker *unifiedSignaturesChecker) parametersAreEqual(a *ast.Node, b *ast.Node) bool {
-	return unifiedSignaturesHaveEqualSigils(a, b) &&
-		checker.typesAreEqual(unifiedSignaturesParameterType(a), unifiedSignaturesParameterType(b))
-}
-
-// typeParametersAreEqual is upstream's `arraysAreEqual(aTypeParams, bTypeParams, ...)`.
-//
-// Two signatures must take the same type parameters to unify, compared by name and by constraint.
-// Upstream's `constraintsAreEqual` compares the constraint's NODE TYPE rather than its text, which
-// is weaker than it looks: `T extends string` and `T extends number` are both type references and
-// compare equal. Ported as-is, because it is upstream's decision about how much a constraint counts.
-func (checker *unifiedSignaturesChecker) typeParametersAreEqual(
-	signatureA *ast.Node,
-	signatureB *ast.Node,
-) bool {
-	parametersA := unifiedSignaturesSignatureTypeParameters(signatureA)
-	parametersB := unifiedSignaturesSignatureTypeParameters(signatureB)
-	if len(parametersA) != len(parametersB) {
-		return false
-	}
-	for index := range parametersA {
-		nameA := parametersA[index].Name()
-		nameB := parametersB[index].Name()
-		if nameA == nil || nameB == nil || nameA.Kind != ast.KindIdentifier ||
-			nameB.Kind != ast.KindIdentifier ||
-			nameA.AsIdentifier().Text != nameB.AsIdentifier().Text {
-			return false
-		}
-		constraintA := parametersA[index].AsTypeParameterDeclaration().Constraint
-		constraintB := parametersB[index].AsTypeParameterDeclaration().Constraint
-		if constraintA == constraintB {
-			continue
-		}
-		if constraintA == nil || constraintB == nil || constraintA.Kind != constraintB.Kind {
-			return false
-		}
-	}
-	return true
-}
-
 // unifiedSignaturesUsesTypeParameter is upstream's `signatureUsesTypeParameter`: does any parameter's
-// type mention a type parameter declared by an ENCLOSING scope?
+// type mention a type parameter declared by an enclosing scope?
 //
 // Upstream walks only `typeAnnotation` and `elementType`, so it sees `T` and `T[]` but not `Foo<T>`.
 // This walks every child instead, which is a strictly wider net over the same question, and the
@@ -803,82 +493,38 @@ func unifiedSignaturesMayBeMissing(parameter *ast.Node) bool {
 
 // unifiedSignaturesHaveEqualSigils is upstream's `parametersHaveEqualSigils`: two parameters agree
 // on rest-ness and on optional-ness. One of each cannot be unified with the other.
-func unifiedSignaturesHaveEqualSigils(a *ast.Node, b *ast.Node) bool {
-	return unifiedSignaturesIsRest(a) == unifiedSignaturesIsRest(b) &&
-		unifiedSignaturesIsOptional(a) == unifiedSignaturesIsOptional(b)
+func unifiedSignaturesHaveEqualSigils(left *ast.Node, right *ast.Node) bool {
+	return unifiedSignaturesIsRest(left) == unifiedSignaturesIsRest(right) &&
+		unifiedSignaturesIsOptional(left) == unifiedSignaturesIsOptional(right)
 }
 
 // unifiedSignaturesFailureStart is upstream's `failureStringStart`.
 //
 // With exactly two overloads in the group there is no ambiguity about which other one is meant, so
-// the message says "These overloads". With three or more it names the other one's LINE, which is why
+// the message says "These overloads". With three or more it names the other one's line, which is why
 // the other signature has to be threaded this far down.
-func unifiedSignaturesFailureStart(ctx rule.Context, onlyTwo bool, other *ast.Node) string {
+func unifiedSignaturesFailureStart(ruleContext rule.Context, onlyTwo bool, other *ast.Node) string {
 	if onlyTwo {
 		return "These overloads can be combined into one signature"
 	}
-	line := scanner.GetECMALineOfPosition(ctx.SourceFile, rule.TokenRange(ctx.SourceFile, other).Pos())
+	line := scanner.GetECMALineOfPosition(ruleContext.SourceFile, rule.TokenRange(ruleContext.SourceFile, other).Pos())
 	return fmt.Sprintf("This overload and the one on line %d can be combined into one signature",
 		line+1)
-}
-
-// unifiedTypeText is upstream's `getUnifiedTypeText`: the union the two parameters would become,
-// spelled with the author's own words.
-//
-// Duplicate members are dropped, so `string | number` against `string` reads `string | number`
-// rather than repeating. When one side has no annotation at all the other side's text stands alone,
-// which is upstream's `nullThrows` branch; here a missing pair yields the empty string rather than
-// panicking, because a rule must not take the file down.
-func (checker *unifiedSignaturesChecker) unifiedTypeText(typeA *ast.Node, typeB *ast.Node) string {
-	if typeA == nil || typeB == nil {
-		present := typeA
-		if present == nil {
-			present = typeB
-		}
-		if present == nil {
-			return ""
-		}
-		return checker.unionMemberText(present)
-	}
-
-	var members []*ast.Node
-	members = append(members, unifiedSignaturesUnionMembers(typeA)...)
-	members = append(members, unifiedSignaturesUnionMembers(typeB)...)
-
-	var unique []*ast.Node
-	for _, member := range members {
-		duplicate := false
-		for _, existing := range unique {
-			if checker.typesAreEqual(existing, member) {
-				duplicate = true
-				break
-			}
-		}
-		if !duplicate {
-			unique = append(unique, member)
-		}
-	}
-
-	texts := make([]string, 0, len(unique))
-	for _, member := range unique {
-		texts = append(texts, checker.unionMemberText(member))
-	}
-	return strings.Join(texts, " | ")
 }
 
 // unifiedSignaturesUnionMembers flattens a union type into its members, leaving anything else as a
 // single member.
 func unifiedSignaturesUnionMembers(node *ast.Node) []*ast.Node {
-	node = unifiedSignaturesWithoutParentheses(node)
-	if node == nil {
+	unparenthesized := unifiedSignaturesWithoutParentheses(node)
+	if unparenthesized == nil {
 		return nil
 	}
-	if node.Kind != ast.KindUnionType {
-		return []*ast.Node{node}
+	if unparenthesized.Kind != ast.KindUnionType {
+		return []*ast.Node{unparenthesized}
 	}
-	types := node.AsUnionTypeNode().Types
+	types := unparenthesized.AsUnionTypeNode().Types
 	if types == nil {
-		return []*ast.Node{node}
+		return []*ast.Node{unparenthesized}
 	}
 	var members []*ast.Node
 	for _, member := range types.Nodes {
@@ -887,58 +533,10 @@ func unifiedSignaturesUnionMembers(node *ast.Node) []*ast.Node {
 	return members
 }
 
-// unionMemberText is upstream's `getUnionMemberText`.
-//
-// Three type forms bind looser than `|` and have to be parenthesised or the printed union would
-// reassociate: a conditional, a constructor type, and a function type. `A | () => B` would parse as
-// a function returning `B` rather than as a union.
-func (checker *unifiedSignaturesChecker) unionMemberText(node *ast.Node) string {
-	text := unifiedSignaturesNodeText(checker.ctx, node)
-	switch node.Kind {
-	case ast.KindConditionalType, ast.KindConstructorType, ast.KindFunctionType:
-		return "(" + text + ")"
-	}
-	return text
-}
-
-// blockCommentFor is upstream's `getBlockCommentForNode`: the last block comment before a signature,
-// used only when `ignoreOverloadsWithDifferentJSDoc` is on.
-//
-// Returns the comment's TEXT rather than a node, since the only question asked of it is equality.
-// A signature with no preceding block comment yields the empty string, so two undocumented overloads
-// compare equal, which is upstream's behaviour when both lookups return undefined.
-func (checker *unifiedSignaturesChecker) blockCommentFor(signature *ast.Node) string {
-	sourceText := checker.ctx.SourceFile.Text()
-	start := rule.TokenRange(checker.ctx.SourceFile, signature).Pos()
-	// Scan backwards over the trivia between the previous token and this signature, taking the
-	// LAST block comment in it, which is upstream's `.reverse().find(...)`.
-	position := start
-	for position > 0 {
-		// Skip whitespace immediately before the current position.
-		for position > 0 && unifiedSignaturesIsSpace(sourceText[position-1]) {
-			position--
-		}
-		if position >= 2 && sourceText[position-2] == '*' && sourceText[position-1] == '/' {
-			opening := strings.LastIndex(sourceText[:position-2], "/*")
-			if opening < 0 {
-				return ""
-			}
-			return sourceText[opening+2 : position-2]
-		}
-		return ""
-	}
-	return ""
-}
-
-// unifiedSignaturesIsSpace reports whether a byte is source whitespace.
-func unifiedSignaturesIsSpace(character byte) bool {
-	return character == ' ' || character == '\t' || character == '\n' || character == '\r'
-}
-
 // unifiedSignaturesValueRange is upstream's `node.value ?? node`, expressed as a range.
 //
 // TSESTree splits a class method into a `MethodDefinition` holding the key and a `FunctionExpression`
-// holding the parameters and return type, and upstream reports the SECOND of those. Our parser has
+// holding the parameters and return type, and upstream reports the second of those. Our parser has
 // one node for both, so the equivalent range starts where the name ends: for
 // `f(a: number): void;` upstream's span covers `(a: number): void;`, which the corpus asserts at
 // column 4 rather than column 3.
@@ -946,8 +544,8 @@ func unifiedSignaturesIsSpace(character byte) bool {
 // Only a method declaration is unwrapped. A function declaration has no such split upstream and is
 // reported whole, which the corpus also asserts, so widening this to every kind would move three
 // spans that are currently correct.
-func unifiedSignaturesValueRange(ctx rule.Context, signature *ast.Node) shimcore.TextRange {
-	full := rule.TokenRange(ctx.SourceFile, signature)
+func unifiedSignaturesValueRange(ruleContext rule.Context, signature *ast.Node) shimcore.TextRange {
+	full := rule.TokenRange(ruleContext.SourceFile, signature)
 	if signature.Kind != ast.KindMethodDeclaration {
 		return full
 	}
@@ -962,17 +560,18 @@ func unifiedSignaturesValueRange(ctx rule.Context, signature *ast.Node) shimcore
 //
 // TSESTree has no node for a parenthesised type: the parser folds it away, so upstream never sees
 // one. Our parser keeps `KindParenthesizedType`, which changes two answers if left alone. The union
-// text would carry the author's parentheses AND any comments inside them, so
+// text would carry the author's parentheses and any comments inside them, so
 // `(/* before */ string /* after */)` printed as itself rather than as `string`; and a parenthesised
-// union would count as ONE member instead of being flattened into its parts, so
+// union would count as one member instead of being flattened into its parts, so
 // `(string | boolean)` against `number` printed `number | (string | boolean)` where upstream prints
 // `number | string | boolean`.
 //
 // Both measured against the installed build over four shapes, including a nested `((string))`, which
 // is why this loops rather than unwrapping once.
 func unifiedSignaturesWithoutParentheses(node *ast.Node) *ast.Node {
-	for node != nil && node.Kind == ast.KindParenthesizedType {
-		node = node.AsParenthesizedTypeNode().Type
+	unwrapped := node
+	for unwrapped != nil && unwrapped.Kind == ast.KindParenthesizedType {
+		unwrapped = unwrapped.AsParenthesizedTypeNode().Type
 	}
-	return node
+	return unwrapped
 }

@@ -13,21 +13,28 @@ import (
 
 // trackedIn runs the tracker over a typed program and renders what it found as "Usage path text", in
 // the order it returned them.
-func trackedIn(t *testing.T, code string, traceMap map[string]*reference.TraceMap) []string {
-	t.Helper()
+func trackedIn(test *testing.T, code string, traceMap map[string]*reference.TraceMap) []string {
+	test.Helper()
 	var rendered []string
-	rule_testing.RunTyped(t, rule.Rule{
+	rule_testing.RunTyped(test, rule.Rule[rule.NoOptions]{
 		Name:             "tracker-probe",
 		NeedsTypeChecker: true,
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
-					tracker := reference.NewTracker(ctx.SourceFile, ctx.TypeChecker, nil)
-					source := ctx.SourceFile.Text()
+					tracker := reference.NewTracker(ruleContext.SourceFile, ruleContext.TypeChecker, nil)
+					source := ruleContext.SourceFile.Text()
 					for _, tracked := range tracker.GlobalReferences(traceMap) {
-						span := rule.TokenRange(ctx.SourceFile, tracked.Node)
-						usage := map[reference.Usage]string{reference.Read: "Read", reference.Call: "Call", reference.Construct: "Construct"}[tracked.Usage]
-						rendered = append(rendered, usage+" "+strings.Join(tracked.Path, ".")+" "+source[span.Pos():span.End()])
+						span := rule.TokenRange(ruleContext.SourceFile, tracked.Node)
+						usage := map[reference.Usage]string{
+							reference.Read:      "Read",
+							reference.Call:      "Call",
+							reference.Construct: "Construct",
+						}[tracked.Usage]
+						rendered = append(
+							rendered,
+							usage+" "+strings.Join(tracked.Path, ".")+" "+source[span.Pos():span.End()],
+						)
 					}
 				},
 			}
@@ -37,25 +44,25 @@ func trackedIn(t *testing.T, code string, traceMap map[string]*reference.TraceMa
 }
 
 // decodeTraceMap reads a trace map written as JSON, with `$read`, `$call` and `$construct` standing
-// for eslint-utils' READ, CALL and CONSTRUCT symbols.
-func decodeTraceMap(t *testing.T, raw string) map[string]*reference.TraceMap {
-	t.Helper()
+// for eslint-utils' read, call and construct symbols.
+func decodeTraceMap(test *testing.T, raw string) map[string]*reference.TraceMap {
+	test.Helper()
 	var decoded map[string]json.RawMessage
-	if err := json.Unmarshal([]byte(raw), &decoded); err != nil {
-		t.Fatalf("trace map %s: %v", raw, err)
+	if decodeError := json.Unmarshal([]byte(raw), &decoded); decodeError != nil {
+		test.Fatalf("trace map %s: %v", raw, decodeError)
 	}
 	members := map[string]*reference.TraceMap{}
 	for key, value := range decoded {
-		members[key] = decodeTraceNode(t, value)
+		members[key] = decodeTraceNode(test, value)
 	}
 	return members
 }
 
-func decodeTraceNode(t *testing.T, raw json.RawMessage) *reference.TraceMap {
-	t.Helper()
+func decodeTraceNode(test *testing.T, raw json.RawMessage) *reference.TraceMap {
+	test.Helper()
 	var decoded map[string]json.RawMessage
-	if err := json.Unmarshal(raw, &decoded); err != nil {
-		t.Fatalf("trace node %s: %v", raw, err)
+	if decodeError := json.Unmarshal(raw, &decoded); decodeError != nil {
+		test.Fatalf("trace node %s: %v", raw, decodeError)
 	}
 	node := &reference.TraceMap{Members: map[string]*reference.TraceMap{}}
 	for key, value := range decoded {
@@ -67,7 +74,7 @@ func decodeTraceNode(t *testing.T, raw json.RawMessage) *reference.TraceMap {
 		case "$construct":
 			node.Construct = true
 		default:
-			node.Members[key] = decodeTraceNode(t, value)
+			node.Members[key] = decodeTraceNode(test, value)
 		}
 	}
 	return node
@@ -88,8 +95,8 @@ func decodeTraceNode(t *testing.T, raw json.RawMessage) *reference.TraceMap {
  * or Node types, so the name resolves to nothing, which reads as the global for the reason the
  * tracker's own doc gives.
  */
-func TestTrackerAgreesWithEslintUtils(t *testing.T) {
-	t.Parallel()
+func TestTrackerAgreesWithEslintUtils(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		description string
@@ -107,13 +114,25 @@ func TestTrackerAgreesWithEslintUtils(t *testing.T) {
 			description: "should iterate the member references of a given global variable, with MemberExpression",
 			code:        "Object.a; Object.a(); new Object.a();\nObject.b; Object.b(); new Object.b();\nObject.c; Object.c(); new Object.c();",
 			traceMap:    "{\"Object\":{\"a\":{\"$read\":true},\"b\":{\"$call\":true},\"c\":{\"$construct\":true}}}",
-			want:        []string{"Read Object.a Object.a", "Read Object.a Object.a", "Read Object.a Object.a", "Call Object.b Object.b()", "Construct Object.c new Object.c()"},
+			want: []string{
+				"Read Object.a Object.a",
+				"Read Object.a Object.a",
+				"Read Object.a Object.a",
+				"Call Object.b Object.b()",
+				"Construct Object.c new Object.c()",
+			},
 		},
 		{
 			description: "should iterate the member references of a given global variable, with VariableDeclarator",
 			code:        "var x = Object;\nx.a; x.a(); new x.a();\nx.b; x.b(); new x.b();\nx.c; x.c(); new x.c();",
 			traceMap:    "{\"Object\":{\"a\":{\"$read\":true},\"b\":{\"$call\":true},\"c\":{\"$construct\":true}}}",
-			want:        []string{"Read Object.a x.a", "Read Object.a x.a", "Read Object.a x.a", "Call Object.b x.b()", "Construct Object.c new x.c()"},
+			want: []string{
+				"Read Object.a x.a",
+				"Read Object.a x.a",
+				"Read Object.a x.a",
+				"Call Object.b x.b()",
+				"Construct Object.c new x.c()",
+			},
 		},
 		{
 			description: "should iterate the member references of a given global variable, with VariableDeclarator 2",
@@ -149,25 +168,41 @@ func TestTrackerAgreesWithEslintUtils(t *testing.T) {
 			description: "should iterate the member references of a given global variable, with 'global'.",
 			code:        "/*global global */\nglobal.Object.a;\nglobal.Object.b; global.Object.b(); new global.Object.b();\nglobal.Object.c; global.Object.c(); new global.Object.c();",
 			traceMap:    "{\"Object\":{\"a\":{\"$read\":true},\"b\":{\"$call\":true},\"c\":{\"$construct\":true}}}",
-			want:        []string{"Read Object.a global.Object.a", "Call Object.b global.Object.b()", "Construct Object.c new global.Object.c()"},
+			want: []string{
+				"Read Object.a global.Object.a",
+				"Call Object.b global.Object.b()",
+				"Construct Object.c new global.Object.c()",
+			},
 		},
 		{
 			description: "should iterate the member references of a given global variable, with 'globalThis'.",
 			code:        "/*global globalThis */\nglobalThis.Object.a;\nglobalThis.Object.b; globalThis.Object.b(); new globalThis.Object.b();\nglobalThis.Object.c; globalThis.Object.c(); new globalThis.Object.c();",
 			traceMap:    "{\"Object\":{\"a\":{\"$read\":true},\"b\":{\"$call\":true},\"c\":{\"$construct\":true}}}",
-			want:        []string{"Read Object.a globalThis.Object.a", "Call Object.b globalThis.Object.b()", "Construct Object.c new globalThis.Object.c()"},
+			want: []string{
+				"Read Object.a globalThis.Object.a",
+				"Call Object.b globalThis.Object.b()",
+				"Construct Object.c new globalThis.Object.c()",
+			},
 		},
 		{
 			description: "should iterate the member references of a given global variable, with 'self'.",
 			code:        "/*global self */\nself.Object.a;\nself.Object.b; self.Object.b(); new self.Object.b();\nself.Object.c; self.Object.c(); new self.Object.c();",
 			traceMap:    "{\"Object\":{\"a\":{\"$read\":true},\"b\":{\"$call\":true},\"c\":{\"$construct\":true}}}",
-			want:        []string{"Read Object.a self.Object.a", "Call Object.b self.Object.b()", "Construct Object.c new self.Object.c()"},
+			want: []string{
+				"Read Object.a self.Object.a",
+				"Call Object.b self.Object.b()",
+				"Construct Object.c new self.Object.c()",
+			},
 		},
 		{
 			description: "should iterate the member references of a given global variable, with 'window'.",
 			code:        "/*global window */\nwindow.Object.a;\nwindow.Object.b; window.Object.b(); new window.Object.b();\nwindow.Object.c; window.Object.c(); new window.Object.c();",
 			traceMap:    "{\"Object\":{\"a\":{\"$read\":true},\"b\":{\"$call\":true},\"c\":{\"$construct\":true}}}",
-			want:        []string{"Read Object.a window.Object.a", "Call Object.b window.Object.b()", "Construct Object.c new window.Object.c()"},
+			want: []string{
+				"Read Object.a window.Object.a",
+				"Call Object.b window.Object.b()",
+				"Construct Object.c new window.Object.c()",
+			},
 		},
 		{
 			description: "should not iterate the references of a given global variable if it's modified.",
@@ -190,9 +225,9 @@ func TestTrackerAgreesWithEslintUtils(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		got := trackedIn(t, testCase.code, decodeTraceMap(t, testCase.traceMap))
+		got := trackedIn(test, testCase.code, decodeTraceMap(test, testCase.traceMap))
 		if strings.Join(got, "\n") != strings.Join(testCase.want, "\n") {
-			t.Errorf("%s\n%s\n got: %q\nwant: %q", testCase.description, testCase.code, got, testCase.want)
+			test.Errorf("%s\n%s\n got: %q\nwant: %q", testCase.description, testCase.code, got, testCase.want)
 		}
 	}
 }
@@ -201,18 +236,23 @@ func TestTrackerAgreesWithEslintUtils(t *testing.T) {
 // eslint-utils. `x += JSON` leaves x a string, so x is not JSON; eslint-utils follows it anyway, and
 // the installed no-obj-calls reports `x()` as a call of JSON. The logical assignments do keep the
 // value, and so does a plain one.
-func TestTrackerFollowsOnlyAssignmentsThatKeepTheValue(t *testing.T) {
-	t.Parallel()
+func TestTrackerFollowsOnlyAssignmentsThatKeepTheValue(test *testing.T) {
+	test.Parallel()
 
 	traceMap := map[string]*reference.TraceMap{"JSON": {Call: true}}
 	for _, code := range []string{"let x; x += JSON; x();", "let x = 1; x *= JSON; x();"} {
-		if got := trackedIn(t, code, traceMap); len(got) != 0 {
-			t.Errorf("%s: an arithmetic assignment does not make x hold JSON, got %q", code, got)
+		if got := trackedIn(test, code, traceMap); len(got) != 0 {
+			test.Errorf("%s: an arithmetic assignment does not make x hold JSON, got %q", code, got)
 		}
 	}
-	for _, code := range []string{"let x; x = JSON; x();", "let x; x ||= JSON; x();", "let x; x ??= JSON; x();", "let x; x &&= JSON; x();"} {
-		if got := trackedIn(t, code, traceMap); len(got) != 1 {
-			t.Errorf("%s: x may hold JSON, so its call is one, got %q", code, got)
+	for _, code := range []string{
+		"let x; x = JSON; x();",
+		"let x; x ||= JSON; x();",
+		"let x; x ??= JSON; x();",
+		"let x; x &&= JSON; x();",
+	} {
+		if got := trackedIn(test, code, traceMap); len(got) != 1 {
+			test.Errorf("%s: x may hold JSON, so its call is one, got %q", code, got)
 		}
 	}
 }
@@ -220,8 +260,8 @@ func TestTrackerFollowsOnlyAssignmentsThatKeepTheValue(t *testing.T) {
 // TestTrackerTerminatesOnACycle pins the guard that keeps a binding's reads from being followed into
 // themselves, which is eslint-utils' variableStack. Without it each of these recurses until the stack
 // runs out.
-func TestTrackerTerminatesOnACycle(t *testing.T) {
-	t.Parallel()
+func TestTrackerTerminatesOnACycle(test *testing.T) {
+	test.Parallel()
 
 	traceMap := map[string]*reference.TraceMap{"JSON": {Call: true}}
 	cases := map[string][]string{
@@ -230,8 +270,8 @@ func TestTrackerTerminatesOnACycle(t *testing.T) {
 		"export const getConfig = getConfig; getConfig();": nil,
 	}
 	for code, want := range cases {
-		if got := trackedIn(t, code, traceMap); strings.Join(got, "\n") != strings.Join(want, "\n") {
-			t.Errorf("%s: got %q, want %q", code, got, want)
+		if got := trackedIn(test, code, traceMap); strings.Join(got, "\n") != strings.Join(want, "\n") {
+			test.Errorf("%s: got %q, want %q", code, got, want)
 		}
 	}
 }
@@ -239,8 +279,8 @@ func TestTrackerTerminatesOnACycle(t *testing.T) {
 // TestTrackerDoesNotFollowAWrittenGlobal pins isModifiedGlobal: a global this file writes to is not
 // followed anywhere in it, and neither is a global object it writes to. Writing a member of the global
 // object is not writing the global object.
-func TestTrackerDoesNotFollowAWrittenGlobal(t *testing.T) {
-	t.Parallel()
+func TestTrackerDoesNotFollowAWrittenGlobal(test *testing.T) {
+	test.Parallel()
 
 	traceMap := map[string]*reference.TraceMap{"JSON": {Call: true}}
 	cases := map[string]int{
@@ -252,16 +292,16 @@ func TestTrackerDoesNotFollowAWrittenGlobal(t *testing.T) {
 		"function f(JSON) { JSON(); } JSON();":    1,
 	}
 	for code, want := range cases {
-		if got := trackedIn(t, code, traceMap); len(got) != want {
-			t.Errorf("%s: got %q, want %d", code, got, want)
+		if got := trackedIn(test, code, traceMap); len(got) != want {
+			test.Errorf("%s: got %q, want %d", code, got, want)
 		}
 	}
 }
 
 // TestConstantString pins the folding a computed key gets, which is getStringIfConstant's without a
 // scope.
-func TestConstantString(t *testing.T) {
-	t.Parallel()
+func TestConstantString(test *testing.T) {
+	test.Parallel()
 
 	cases := map[string]string{
 		`x["JSON"]`:        "JSON",
@@ -279,9 +319,9 @@ func TestConstantString(t *testing.T) {
 	for code, want := range cases {
 		var got string
 		var settled bool
-		rule_testing.Run(t, rule.Rule{
+		rule_testing.Run(test, rule.Rule[rule.NoOptions]{
 			Name: "constant-probe",
-			Run: func(ctx rule.Context, options any) rule.Listeners {
+			Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 				return rule.Listeners{
 					ast.KindElementAccessExpression: func(node *ast.Node) {
 						got, settled = reference.ConstantString(node.AsElementAccessExpression().ArgumentExpression)
@@ -290,10 +330,10 @@ func TestConstantString(t *testing.T) {
 			},
 		}, "input.ts", code+";")
 		if want == "" && settled {
-			t.Errorf("%s folded to %q, and it is not constant without a scope", code, got)
+			test.Errorf("%s folded to %q, and it is not constant without a scope", code, got)
 		}
 		if want != "" && (!settled || got != want) {
-			t.Errorf("%s folded to %q (%v), want %q", code, got, settled, want)
+			test.Errorf("%s folded to %q (%v), want %q", code, got, settled, want)
 		}
 	}
 }
@@ -302,8 +342,8 @@ func TestConstantString(t *testing.T) {
 // declaration naming it alone, and is `const` or never written after its initializer. Each case
 // evaluates the argument of `probe(...)`, and every answer is the installed eslint-utils 4.10.1's,
 // read by running its getStringIfConstant with the scope over the same code under @typescript-eslint/parser.
-func TestConstantStringIn(t *testing.T) {
-	t.Parallel()
+func TestConstantStringIn(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		code     string
@@ -331,31 +371,38 @@ func TestConstantStringIn(t *testing.T) {
 	for _, testCase := range cases {
 		var got string
 		var constant bool
-		rule_testing.RunTyped(t, rule.Rule{
+		rule_testing.RunTyped(test, rule.Rule[rule.NoOptions]{
 			Name:             "constant-in-probe",
 			NeedsTypeChecker: true,
-			Run: func(ctx rule.Context, options any) rule.Listeners {
+			Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 				return rule.Listeners{
 					ast.KindCallExpression: func(node *ast.Node) {
 						call := node.AsCallExpression()
 						if call.Expression.Text() != "probe" {
 							return
 						}
-						got, constant = reference.ConstantStringIn(ctx, call.Arguments.Nodes[0])
+						got, constant = reference.ConstantStringIn(ruleContext, call.Arguments.Nodes[0])
 					},
 				}
 			},
 		}, "input.ts", testCase.code)
 		if constant != testCase.constant || got != testCase.want {
-			t.Errorf("%s evaluated to %q (%v), want %q (%v)", testCase.code, got, constant, testCase.want, testCase.constant)
+			test.Errorf(
+				"%s evaluated to %q (%v), want %q (%v)",
+				testCase.code,
+				got,
+				constant,
+				testCase.want,
+				testCase.constant,
+			)
 		}
 	}
 }
 
 // TestIsConstantRegExpIn pins which arguments hold a RegExp object rather than a string: a regex
 // literal, or a constant binding initialized with one, through any number of such bindings.
-func TestIsConstantRegExpIn(t *testing.T) {
-	t.Parallel()
+func TestIsConstantRegExpIn(test *testing.T) {
+	test.Parallel()
 
 	cases := map[string]bool{
 		`probe(/x/);`:                           true,
@@ -372,22 +419,22 @@ func TestIsConstantRegExpIn(t *testing.T) {
 	}
 	for code, want := range cases {
 		var got bool
-		rule_testing.RunTyped(t, rule.Rule{
+		rule_testing.RunTyped(test, rule.Rule[rule.NoOptions]{
 			Name:             "constant-regexp-probe",
 			NeedsTypeChecker: true,
-			Run: func(ctx rule.Context, options any) rule.Listeners {
+			Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 				return rule.Listeners{
 					ast.KindCallExpression: func(node *ast.Node) {
 						call := node.AsCallExpression()
 						if call.Expression.Text() == "probe" {
-							got = reference.IsConstantRegExpIn(ctx, call.Arguments.Nodes[0])
+							got = reference.IsConstantRegExpIn(ruleContext, call.Arguments.Nodes[0])
 						}
 					},
 				}
 			},
 		}, "input.ts", code)
 		if got != want {
-			t.Errorf("%s: IsConstantRegExpIn is %v, want %v", code, got, want)
+			test.Errorf("%s: IsConstantRegExpIn is %v, want %v", code, got, want)
 		}
 	}
 }

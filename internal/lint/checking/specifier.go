@@ -33,13 +33,13 @@ type TypeOrValueSpecifier struct {
 }
 
 func typeMatchesStringSpecifier(
-	t *checker.Type,
+	subjectType *checker.Type,
 	names []string,
 ) bool {
-	alias := checker.Type_alias(t)
+	alias := checker.Type_alias(subjectType)
 	var symbol *ast.Symbol
 	if alias == nil {
-		symbol = checker.Type_symbol(t)
+		symbol = checker.Type_symbol(subjectType)
 	} else {
 		symbol = alias.Symbol()
 	}
@@ -48,7 +48,7 @@ func typeMatchesStringSpecifier(
 		return true
 	}
 
-	if IsIntrinsicType(t) && slices.Contains(names, t.AsIntrinsicType().IntrinsicName()) {
+	if IsIntrinsicType(subjectType) && slices.Contains(names, subjectType.AsIntrinsicType().IntrinsicName()) {
 		return true
 	}
 
@@ -62,13 +62,13 @@ func typeDeclaredInFile(
 ) bool {
 	cwd := program.GetCurrentDirectory()
 	if relativePath == "" {
-		return Some(declarationFiles, func(f *ast.SourceFile) bool {
-			return strings.HasPrefix(f.FileName().AsString(), cwd)
+		return Some(declarationFiles, func(declarationFile *ast.SourceFile) bool {
+			return strings.HasPrefix(declarationFile.FileName().AsString(), cwd)
 		})
 	}
 	absPath := tspath.GetNormalizedAbsolutePath(relativePath, tspath.RootedDirectoryPath(cwd))
-	return Some(declarationFiles, func(f *ast.SourceFile) bool {
-		return f.FileName().AsString() == absPath
+	return Some(declarationFiles, func(declarationFile *ast.SourceFile) bool {
+		return declarationFile.FileName().AsString() == absPath
 	})
 }
 
@@ -82,8 +82,8 @@ func typeDeclaredInLib(
 	if len(declarationFiles) == 0 {
 		return true
 	}
-	return Some(declarationFiles, func(d *ast.SourceFile) bool {
-		return rule.IsSourceFileDefaultLibrary(program, d)
+	return Some(declarationFiles, func(declarationFile *ast.SourceFile) bool {
+		return rule.IsSourceFileDefaultLibrary(program, declarationFile)
 	})
 }
 
@@ -108,8 +108,8 @@ func typeDeclaredInDeclareModule(
 	packageName string,
 	declarations []*ast.Node,
 ) bool {
-	return Some(declarations, func(d *ast.Node) bool {
-		parentModule := findParentModuleDeclaration(d)
+	return Some(declarations, func(declaration *ast.Node) bool {
+		parentModule := findParentModuleDeclaration(declaration)
 		return parentModule != nil && parentModule.Name().Text() == packageName
 	})
 }
@@ -126,9 +126,8 @@ func typeDeclaredInDeclarationFile(
 	// 	typesPackageName = packageName[1:slashIndex] + "__" + packageName[slashIndex+1:]
 	// }
 
-	// TODO(port): there is no sourceFileToPackageName anymore
-	// it looks like there is no other way to know sourceFile2PackageName,
-	// other than set package name for ast.SourceFile in resolver
+	// tsgo keeps no map from a source file to the package it came from, so a declaration file cannot be
+	// traced to its package here, and the answer is no.
 
 	return false
 
@@ -154,11 +153,11 @@ func typeDeclaredInPackageDeclarationFile(
 }
 
 func typeMatchesSpecifier(
-	t *checker.Type,
+	subjectType *checker.Type,
 	specifier TypeOrValueSpecifier,
 	program rule.Program,
 ) bool {
-	// A UNION matches only when EVERY member matches, and an INTERSECTION when ANY member does.
+	// A union matches only when every member matches, and an intersection when any member does.
 	//
 	// Both recursions are upstream's (`TypeOrValueSpecifier.ts`) and neither was here: this file
 	// was ported from a tsgolint revision that predates them, so a specifier tested against a
@@ -176,18 +175,18 @@ func typeMatchesSpecifier(
 	//
 	// The last row is the intersection arm, and it is `some` rather than `every`, which is the
 	// asymmetry a reader would most likely collapse.
-	if IsUnionType(t) {
-		return Every(t.Types(), func(part *checker.Type) bool {
+	if IsUnionType(subjectType) {
+		return Every(subjectType.Types(), func(part *checker.Type) bool {
 			return typeMatchesSpecifier(part, specifier, program)
 		})
 	}
 
-	if wholeTypeMatchesSpecifier(t, specifier, program) {
+	if wholeTypeMatchesSpecifier(subjectType, specifier, program) {
 		return true
 	}
 
-	if IsIntersectionType(t) {
-		return Some(t.Types(), func(part *checker.Type) bool {
+	if IsIntersectionType(subjectType) {
+		return Some(subjectType.Types(), func(part *checker.Type) bool {
 			return typeMatchesSpecifier(part, specifier, program)
 		})
 	}
@@ -195,30 +194,30 @@ func typeMatchesSpecifier(
 	return false
 }
 
-// wholeTypeMatchesSpecifier tests ONE type, without descending into a union or an intersection.
+// wholeTypeMatchesSpecifier tests one type, without descending into a union or an intersection.
 //
 // Upstream writes this as an immediately-invoked closure inside `typeMatchesSpecifier`; it is a
 // named function here because Go has no such expression and because the caller reads better with
 // the three cases separated.
 func wholeTypeMatchesSpecifier(
-	t *checker.Type,
+	subjectType *checker.Type,
 	specifier TypeOrValueSpecifier,
 	program rule.Program,
 ) bool {
 	// The error type has a symbol whose name can incidentally match a specifier, so upstream
 	// declines it before any name comparison. `TypeMatchesSomeSpecifier` also skips it, but only
 	// for the top-level type, and this recursion can now reach one in a constituent.
-	if IsIntrinsicErrorType(t) {
+	if IsIntrinsicErrorType(subjectType) {
 		return false
 	}
 
-	if !typeMatchesStringSpecifier(t, specifier.Name) {
+	if !typeMatchesStringSpecifier(subjectType, specifier.Name) {
 		return false
 	}
 
-	symbol := checker.Type_symbol(t)
+	symbol := checker.Type_symbol(subjectType)
 	if symbol == nil {
-		alias := checker.Type_alias(t)
+		alias := checker.Type_alias(subjectType)
 		if alias != nil {
 			symbol = alias.Symbol()
 		}
@@ -227,8 +226,8 @@ func wholeTypeMatchesSpecifier(
 	if symbol != nil {
 		declarations = symbol.Declarations
 	}
-	declarationFiles := Map(declarations, func(d *ast.Node) *ast.SourceFile {
-		return ast.GetSourceFileOfNode(d)
+	declarationFiles := Map(declarations, func(declaration *ast.Node) *ast.SourceFile {
+		return ast.GetSourceFileOfNode(declaration)
 	})
 
 	switch specifier.From {
@@ -239,27 +238,29 @@ func wholeTypeMatchesSpecifier(
 	case TypeOrValueSpecifierFromPackage:
 		return typeDeclaredInPackageDeclarationFile(specifier.Package, declarations, declarationFiles, program)
 	default:
+		// Invariant: every specifier is built by a rule that maps its option's `from` to one of the three
+		// constants above, and the zero value is the first of them.
 		panic(fmt.Sprintf("unknown type specifier from: %v", specifier.From))
 	}
 }
 
 func TypeMatchesSomeSpecifier(
-	t *checker.Type,
+	subjectType *checker.Type,
 	specifiers []TypeOrValueSpecifier,
 	inlineSpecifiers []string,
 	program rule.Program,
 ) bool {
-	if Some(specifiers, func(s TypeOrValueSpecifier) bool {
-		return typeMatchesSpecifier(t, s, program)
+	if Some(specifiers, func(specifier TypeOrValueSpecifier) bool {
+		return typeMatchesSpecifier(subjectType, specifier, program)
 	}) {
 		return true
 	}
 	return Some(inlineSpecifiers, func(name string) bool {
-		return typeMatchesInlineSpecifier(t, name)
+		return typeMatchesInlineSpecifier(subjectType, name)
 	})
 }
 
-// typeMatchesInlineSpecifier tests the bare-string specifier form, which matches on NAME alone.
+// typeMatchesInlineSpecifier tests the bare-string specifier form, which matches on name alone.
 //
 // Upstream expresses this as one branch of `typeMatchesSpecifier`, whose parameter is
 // `string | TypeOrValueSpecifier`, so the union and intersection recursions above it apply to the
@@ -267,22 +268,22 @@ func TypeMatchesSomeSpecifier(
 // inline form is a separate function and the two recursions have to be written here too.
 //
 // Getting that wrong is invisible from the object form's tests. `only-throw-error` valid case 36
-// is `allow: ["Promise"]` over `Promise<T1> | Promise<T2>`, which is the INLINE form over a union:
+// is `allow: ["Promise"]` over `Promise<T1> | Promise<T2>`, which is the inline form over a union:
 // without the `every` recursion here the case reports, and no fixture using the object form can
 // see it.
-func typeMatchesInlineSpecifier(t *checker.Type, name string) bool {
-	if IsUnionType(t) {
-		return Every(t.Types(), func(part *checker.Type) bool {
+func typeMatchesInlineSpecifier(subjectType *checker.Type, name string) bool {
+	if IsUnionType(subjectType) {
+		return Every(subjectType.Types(), func(part *checker.Type) bool {
 			return typeMatchesInlineSpecifier(part, name)
 		})
 	}
 
-	if !IsIntrinsicErrorType(t) && typeMatchesStringSpecifier(t, []string{name}) {
+	if !IsIntrinsicErrorType(subjectType) && typeMatchesStringSpecifier(subjectType, []string{name}) {
 		return true
 	}
 
-	if IsIntersectionType(t) {
-		return Some(t.Types(), func(part *checker.Type) bool {
+	if IsIntersectionType(subjectType) {
+		return Some(subjectType.Types(), func(part *checker.Type) bool {
 			return typeMatchesInlineSpecifier(part, name)
 		})
 	}
@@ -313,10 +314,10 @@ func staticNameOfNode(node *ast.Node) (string, bool) {
 	return "", false
 }
 
-// valueMatchesSpecifier tests ONE specifier against the value at a node.
+// valueMatchesSpecifier tests one specifier against the value at a node.
 //
 // This is the value half of the option surface, and it asks a different question from the type half
-// above. `typeMatchesSpecifier` asks where a TYPE was declared; this asks whether the NAME written
+// above. `typeMatchesSpecifier` asks where a type was declared; this asks whether the name written
 // at this node is on the list, and then, for a package specifier, whether the thing that name refers
 // to came from that package.
 //
@@ -344,7 +345,7 @@ func valueMatchesSpecifier(
 		return false
 	}
 	// Upstream is `type.getSymbol() ?? type.aliasSymbol`, so the type's own symbol wins and the
-	// alias is the fallback. The two functions above this one ask alias FIRST, because each needs a
+	// alias is the fallback. The two functions above this one ask alias first, because each needs a
 	// different value in the else branch; the order only matters for an aliased type that also
 	// carries its own symbol, and this reproduces upstream's.
 	//
@@ -387,7 +388,7 @@ func ValueMatchesSomeSpecifier(
 	if slices.Contains(inlineSpecifiers, staticName) {
 		return true
 	}
-	return Some(specifiers, func(s TypeOrValueSpecifier) bool {
-		return valueMatchesSpecifier(node, s, program, subject)
+	return Some(specifiers, func(specifier TypeOrValueSpecifier) bool {
+		return valueMatchesSpecifier(node, specifier, program, subject)
 	})
 }

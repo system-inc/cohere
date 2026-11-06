@@ -35,14 +35,14 @@ type noConfusingVoidExpressionWire struct {
 }
 
 // DecodeNoConfusingVoidExpressionOptions reads the option object off the config.
-func DecodeNoConfusingVoidExpressionOptions(raw []byte) (any, error) {
+func DecodeNoConfusingVoidExpressionOptions(raw []byte) (NoConfusingVoidExpressionSettings, error) {
 	settings := DefaultNoConfusingVoidExpressionSettings()
 	if len(raw) == 0 {
 		return settings, nil
 	}
 	var wire noConfusingVoidExpressionWire
-	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
-		return settings, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &wire); unmarshalOptionsError != nil {
+		return settings, unmarshalOptionsError
 	}
 	if wire.IgnoreArrowShorthand != nil {
 		settings.IgnoreArrowShorthand = *wire.IgnoreArrowShorthand
@@ -113,7 +113,7 @@ var messageInvalidVoidExprWrapVoid = rule.Message{
 // # The judgment is "walk up until the position is decided"
 //
 // Upstream's `findInvalidAncestor` climbs from the void expression through the parents that are
-// TRANSPARENT to this question and stops at the first one that decides it. A statement position is
+// transparent to this question and stops at the first one that decides it. A statement position is
 // valid; anything else is not. Three parents are transparent, and each is transparent for its own
 // reason:
 //
@@ -121,7 +121,7 @@ var messageInvalidVoidExprWrapVoid = rule.Message{
 //	either arm of a conditional          `cond ? f() : f()` likewise
 //	a non-final sequence element         `f(), g()` discards f()'s value by construction
 //
-// The left of a logical operator is NOT transparent, and that asymmetry is real rather than an
+// The left of a logical operator is not transparent, and that asymmetry is real rather than an
 // oversight: `f() && cond` uses the void value as a condition. Measured against the installed rule,
 // which reports it.
 //
@@ -149,18 +149,18 @@ var messageInvalidVoidExprWrapVoid = rule.Message{
 //
 // # The fixes, and the one this port declines
 //
-// Upstream ships a fix on the arrow arm and on both return arms, and a SUGGESTION on the generic
+// Upstream ships a fix on the arrow arm and on both return arms, and a suggestion on the generic
 // arm under `ignoreVoidOperator`. Two of the three fixes are reproduced here and the third is
 // declined; see `noConfusingVoidExpressionReturnFix` for which and why.
-var NoConfusingVoidExpression = rule.Rule{
+var NoConfusingVoidExpression = rule.Rule[NoConfusingVoidExpressionSettings]{
 	Name: "@typescript-eslint/no-confusing-void-expression",
 
 	// Every judgment is a question about a type, so the checker is not optional here.
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, ok := rule.OptionsAs[NoConfusingVoidExpressionSettings](options)
+	Run: func(ruleContext rule.Context, options rule.Given[NoConfusingVoidExpressionSettings]) rule.Listeners {
+		settings, ok := options.Read()
 		if !ok {
 			settings = DefaultNoConfusingVoidExpressionSettings()
 		}
@@ -170,7 +170,7 @@ var NoConfusingVoidExpression = rule.Rule{
 		repairedArrows := map[*ast.Node]bool{}
 
 		check := func(node *ast.Node) {
-			checkConfusingVoidExpression(ctx, node, settings, repairedArrows)
+			checkConfusingVoidExpression(ruleContext, node, settings, repairedArrows)
 		}
 
 		return rule.Listeners{
@@ -182,10 +182,12 @@ var NoConfusingVoidExpression = rule.Rule{
 }
 
 // checkConfusingVoidExpression judges one void-capable expression.
-func checkConfusingVoidExpression(ctx rule.Context, node *ast.Node,
+//
+// Mutates: repairedArrows the run tracks across every check which arrows already carry their repair
+func checkConfusingVoidExpression(ruleContext rule.Context, node *ast.Node,
 	settings NoConfusingVoidExpressionSettings, repairedArrows map[*ast.Node]bool) {
 
-	if ctx.TypeChecker == nil || ctx.SourceFile == nil {
+	if ruleContext.TypeChecker == nil || ruleContext.SourceFile == nil {
 		return
 	}
 
@@ -194,90 +196,90 @@ func checkConfusingVoidExpression(ctx rule.Context, node *ast.Node,
 		return
 	}
 
-	// The type test comes AFTER the ancestor walk, matching upstream's order. It matters for cost
+	// The type test comes after the ancestor walk, matching upstream's order. It matters for cost
 	// rather than for verdicts: the walk is a few pointer hops and the type query is not, so
 	// asking the cheap question first keeps the checker out of the common case.
 	//
-	// Deliberately quieter than upstream, which tests `TypeFlags.VoidLike` (void OR undefined) and so
+	// Deliberately quieter than upstream, which tests `TypeFlags.VoidLike` (void or undefined) and so
 	// reports an `undefined` value as though it were nothing. `void` says there is no result;
 	// `undefined` is a value somebody returned on purpose, and the rule's name and every message are
 	// about void. Upstream's corpus writes no undefined-typed expression, so no imported case moves.
 	// The real sites were `Random.test.ts:6` and `TrackedPromise.test.ts:132` in ahra; see
 	// TestNoConfusingVoidExpressionJudgesVoidNotUndefined. The fixers' own `canFix` guards below keep
 	// VoidLike, because they are upstream's rewrite-safety test and only run once this one has passed.
-	nodeType := type_checking.GetConstrainedTypeAtLocation(ctx.TypeChecker, node)
+	nodeType := type_checking.GetConstrainedTypeAtLocation(ruleContext.TypeChecker, node)
 	if !type_checking.IsTypeFlagSet(nodeType, checker.TypeFlagsVoid) {
 		return
 	}
 
 	if invalidAncestor.Kind == ast.KindArrowFunction {
 		if settings.IgnoreVoidReturningFunctions &&
-			isConfusingVoidReturningFunction(ctx, invalidAncestor) {
+			isConfusingVoidReturningFunction(ruleContext, invalidAncestor) {
 			return
 		}
 		if settings.IgnoreVoidOperator {
-			ctx.ReportNodeWithFixes(node, messageInvalidVoidExprArrowWrapVoid,
-				noConfusingVoidExpressionWrapFix(ctx, node))
+			ruleContext.ReportNodeWithFixes(node, messageInvalidVoidExprArrowWrapVoid,
+				noConfusingVoidExpressionWrapFix(ruleContext, node))
 			return
 		}
-		// Two void expressions inside one arrow body report twice and would each propose the SAME
+		// Two void expressions inside one arrow body report twice and would each propose the same
 		// repair, which this engine reads as an overlap rather than deduplicating. Upstream's own
 		// vector for `foo => (foo ? a : b)` is a single rewrite against two findings, so the fix
 		// is attached to the first finding for a given arrow and withheld from the rest.
-		fix, fixable := noConfusingVoidExpressionArrowFix(ctx, invalidAncestor)
+		fix, fixable := noConfusingVoidExpressionArrowFix(ruleContext, invalidAncestor)
 		if !fixable || repairedArrows[invalidAncestor] {
-			ctx.ReportNode(node, messageInvalidVoidExprArrow)
+			ruleContext.ReportNode(node, messageInvalidVoidExprArrow)
 			return
 		}
 		repairedArrows[invalidAncestor] = true
-		ctx.ReportNodeWithFixes(node, messageInvalidVoidExprArrow, fix...)
+		ruleContext.ReportNodeWithFixes(node, messageInvalidVoidExprArrow, fix...)
 		return
 	}
 
 	if invalidAncestor.Kind == ast.KindReturnStatement {
 		if settings.IgnoreVoidReturningFunctions {
 			if function := confusingVoidParentFunction(invalidAncestor); function != nil &&
-				isConfusingVoidReturningFunction(ctx, function) {
+				isConfusingVoidReturningFunction(ruleContext, function) {
 				return
 			}
 		}
 		if settings.IgnoreVoidOperator {
-			ctx.ReportNodeWithFixes(node, messageInvalidVoidExprReturnWrapVoid,
-				noConfusingVoidExpressionWrapFix(ctx, node))
+			ruleContext.ReportNodeWithFixes(node, messageInvalidVoidExprReturnWrapVoid,
+				noConfusingVoidExpressionWrapFix(ruleContext, node))
 			return
 		}
 		if isConfusingVoidFinalReturn(invalidAncestor) {
-			fix, fixable := noConfusingVoidExpressionReturnFix(ctx, invalidAncestor, true)
+			fix, fixable := noConfusingVoidExpressionReturnFix(ruleContext, invalidAncestor, true)
 			if !fixable {
-				ctx.ReportNode(node, messageInvalidVoidExprReturnLast)
+				ruleContext.ReportNode(node, messageInvalidVoidExprReturnLast)
 				return
 			}
-			ctx.ReportNodeWithFixes(node, messageInvalidVoidExprReturnLast, fix)
+			ruleContext.ReportNodeWithFixes(node, messageInvalidVoidExprReturnLast, fix)
 			return
 		}
-		fix, fixable := noConfusingVoidExpressionReturnFix(ctx, invalidAncestor, false)
+		fix, fixable := noConfusingVoidExpressionReturnFix(ruleContext, invalidAncestor, false)
 		if !fixable {
-			ctx.ReportNode(node, messageInvalidVoidExprReturn)
+			ruleContext.ReportNode(node, messageInvalidVoidExprReturn)
 			return
 		}
-		ctx.ReportNodeWithFixes(node, messageInvalidVoidExprReturn, fix)
+		ruleContext.ReportNodeWithFixes(node, messageInvalidVoidExprReturn, fix)
 		return
 	}
 
 	if settings.IgnoreVoidOperator {
-		// A SUGGESTION rather than a fix upstream, and the distinction is the port: wrapping in
+		// A suggestion rather than a fix upstream, and the distinction is the port: wrapping in
 		// `void` changes what the expression means to a reader, so a human chooses it.
-		ctx.ReportNodeWithSuggestions(node, messageInvalidVoidExprWrapVoid, rule.Suggestion{
+		ruleContext.ReportNodeWithSuggestions(node, messageInvalidVoidExprWrapVoid, rule.Suggestion{
 			Message: rule.Message{
 				Id:          "voidExprWrapVoid",
 				Description: "Mark with an explicit `void` operator.",
 			},
-			Fixes: []rule.Fix{noConfusingVoidExpressionWrapFix(ctx, node)},
+			Fixes: []rule.Fix{noConfusingVoidExpressionWrapFix(ruleContext, node)},
 		})
 		return
 	}
 
-	ctx.ReportNode(node, messageInvalidVoidExpr)
+	ruleContext.ReportNode(node, messageInvalidVoidExpr)
 }
 
 // findConfusingVoidInvalidAncestor climbs to the first ancestor that decides the position, or nil
@@ -304,9 +306,9 @@ func findConfusingVoidInvalidAncestor(node *ast.Node,
 		}
 		switch binary.OperatorToken.Kind {
 		case ast.KindCommaToken:
-			// Upstream's SequenceExpression arm, and it is NOT transparent. A non-final element's
+			// Upstream's SequenceExpression arm, and it is not transparent. A non-final element's
 			// value is discarded by the operator itself, so that position is valid and the walk
-			// stops with nil. The FINAL element falls through to "any other parent is invalid",
+			// stops with nil. The final element falls through to "any other parent is invalid",
 			// which means the comma expression itself is the deciding ancestor rather than
 			// whatever encloses it.
 			//
@@ -317,10 +319,10 @@ func findConfusingVoidInvalidAncestor(node *ast.Node,
 			// installed rule as well as read from the corpus.
 			//
 			// "The last element" cannot be answered by looking one level up, and that is the
-			// difference our parser forces. ESTree gives a comma chain ONE SequenceExpression node
+			// difference our parser forces. ESTree gives a comma chain one SequenceExpression node
 			// with a flat `expressions` array, so upstream compares against its last entry. Ours
-			// nests left-associatively, so `(s, f(), s)` makes the call the RIGHT operand of the
-			// inner comma while that inner comma is the LEFT operand of the outer one.
+			// nests left-associatively, so `(s, f(), s)` makes the call the right operand of the
+			// inner comma while that inner comma is the left operand of the outer one.
 			//
 			// Measured on exactly that shape, which is one of upstream's clean cases. Testing only
 			// the immediate parent reports it, because the call looks final from one level up.
@@ -330,7 +332,7 @@ func findConfusingVoidInvalidAncestor(node *ast.Node,
 			return parent
 
 		case ast.KindAmpersandAmpersandToken, ast.KindBarBarToken, ast.KindQuestionQuestionToken:
-			// Upstream's LogicalExpression arm, and only the RIGHT operand is transparent. The
+			// Upstream's LogicalExpression arm, and only the right operand is transparent. The
 			// left is the condition, so a void value there is used rather than discarded, and
 			// upstream reports it. Measured against the installed rule.
 			if binary.Right == node {
@@ -436,15 +438,15 @@ func confusingVoidParentFunction(node *ast.Node) *ast.Node {
 // noConfusingVoidExpressionWrapFix prepends the `void` operator to the expression.
 //
 // Safe by construction and it is worth saying why, because this is the family that has destroyed
-// type information twice in this tree. The fix INSERTS text before a span rather than replacing
+// type information twice in this tree. The fix inserts text before a span rather than replacing
 // one: the expression's own bytes are untouched, so a type assertion, a `satisfies`, a non-null
 // `!`, type arguments and any comment inside it all survive because nothing rewrites them.
 //
 // `TokenRange` rather than the node's own Pos, which includes leading trivia: inserting at the
 // untrimmed position would put `void ` before a comment written above the expression rather than
 // before the expression.
-func noConfusingVoidExpressionWrapFix(ctx rule.Context, node *ast.Node) rule.Fix {
-	span := rule.TokenRange(ctx.SourceFile, node)
+func noConfusingVoidExpressionWrapFix(ruleContext rule.Context, node *ast.Node) rule.Fix {
+	span := rule.TokenRange(ruleContext.SourceFile, node)
 	return rule.ReplaceRange(span.WithEnd(span.Pos()), "void ")
 }
 
@@ -452,13 +454,13 @@ func noConfusingVoidExpressionWrapFix(ctx rule.Context, node *ast.Node) rule.Fix
 //
 // Two edits rather than one replacement, and that is the whole safety argument. Upstream replaces
 // the gap between the arrow token and the body with ` { `, and the gap after the body with `; }`.
-// The BODY ITSELF is never in either range, so nothing inside it can be lost -- the edits touch
+// The body itself is never in either range, so nothing inside it can be lost -- the edits touch
 // only whitespace on each side of it.
 //
 // Declines when the body's own type is not void-like, which is upstream's `canFix`. The case that
 // needs it is a body whose type came from somewhere other than the reported expression, where
 // wrapping in braces would change the arrow's return type from that value to undefined.
-func noConfusingVoidExpressionArrowFix(ctx rule.Context, arrow *ast.Node) ([]rule.Fix, bool) {
+func noConfusingVoidExpressionArrowFix(ruleContext rule.Context, arrow *ast.Node) ([]rule.Fix, bool) {
 	arrowFunction := arrow.AsArrowFunction()
 	if arrowFunction == nil || arrowFunction.Body == nil {
 		return nil, false
@@ -470,7 +472,7 @@ func noConfusingVoidExpressionArrowFix(ctx rule.Context, arrow *ast.Node) ([]rul
 	}
 	// Our parser keeps a parenthesis node upstream's folds away, so the body of
 	// `foo => (foo ? a : b)` is a KindParenthesizedExpression here and the conditional itself
-	// upstream. Unwrapping matters for the OUTPUT rather than for the verdict: upstream's own
+	// upstream. Unwrapping matters for the output rather than for the verdict: upstream's own
 	// vector for that case is `foo => { foo ? a : b; }`, with the parentheses gone, and wrapping
 	// the parenthesized node instead writes `{ (foo ? a : b); }`.
 	//
@@ -486,10 +488,10 @@ func noConfusingVoidExpressionArrowFix(ctx rule.Context, arrow *ast.Node) ([]rul
 		}
 		body = inner
 	}
-	if ctx.TypeChecker == nil {
+	if ruleContext.TypeChecker == nil {
 		return nil, false
 	}
-	bodyType := type_checking.GetConstrainedTypeAtLocation(ctx.TypeChecker, body)
+	bodyType := type_checking.GetConstrainedTypeAtLocation(ruleContext.TypeChecker, body)
 	if !type_checking.IsTypeFlagSet(bodyType, checker.TypeFlagsVoidLike) {
 		return nil, false
 	}
@@ -498,10 +500,10 @@ func noConfusingVoidExpressionArrowFix(ctx rule.Context, arrow *ast.Node) ([]rul
 	if arrowToken == nil {
 		return nil, false
 	}
-	bodySpan := rule.TokenRange(ctx.SourceFile, body)
-	wrappedSpan := rule.TokenRange(ctx.SourceFile, wrappedBody)
-	arrowSpan := rule.TokenRange(ctx.SourceFile, arrowToken)
-	functionSpan := rule.TokenRange(ctx.SourceFile, arrow)
+	bodySpan := rule.TokenRange(ruleContext.SourceFile, body)
+	wrappedSpan := rule.TokenRange(ruleContext.SourceFile, wrappedBody)
+	arrowSpan := rule.TokenRange(ruleContext.SourceFile, arrowToken)
+	functionSpan := rule.TokenRange(ruleContext.SourceFile, arrow)
 	if arrowSpan.End() > wrappedSpan.Pos() || wrappedSpan.End() > functionSpan.End() ||
 		bodySpan.Pos() < wrappedSpan.Pos() || bodySpan.End() > wrappedSpan.End() {
 		return nil, false
@@ -512,14 +514,14 @@ func noConfusingVoidExpressionArrowFix(ctx rule.Context, arrow *ast.Node) ([]rul
 	// a fixer withholds rather than silently removing what it was not asked to remove. Upstream
 	// does replace those gaps unconditionally, so this is a deliberate narrowing and it costs a
 	// repair upstream would offer rather than producing a different one.
-	source := ctx.SourceFile.Text()
+	source := ruleContext.SourceFile.Text()
 	if confusingVoidGapHoldsComment(source[arrowSpan.End():wrappedSpan.Pos()]) ||
 		confusingVoidGapHoldsComment(source[wrappedSpan.End():functionSpan.End()]) {
 		return nil, false
 	}
 
 	return []rule.Fix{
-		// The edits replace the gaps around the WRAPPED body, so a parenthesis pair is removed
+		// The edits replace the gaps around the wrapped body, so a parenthesis pair is removed
 		// along with them, which is what upstream's own vector for `foo => (a ? b : c)` shows.
 		// The body's own bytes are in neither range, so nothing inside it can be lost.
 		rule.ReplaceRange(arrowSpan.WithPos(arrowSpan.End()).WithEnd(bodySpan.Pos()), " { "),
@@ -544,23 +546,23 @@ func confusingVoidGapHoldsComment(gap string) bool {
 // under `ignoreVoidReturningFunctions`.
 //
 // Two routes, in upstream's order. An explicit return annotation is read directly and answers on
-// its own. Failing that, and only for a function EXPRESSION or an arrow, the contextual type is
+// its own. Failing that, and only for a function expression or an arrow, the contextual type is
 // consulted, so `const handler: () => void = () => f()` is exempt while a function declaration
 // with no annotation is not.
-func isConfusingVoidReturningFunction(ctx rule.Context, function *ast.Node) bool {
-	if ctx.TypeChecker == nil {
+func isConfusingVoidReturningFunction(ruleContext rule.Context, function *ast.Node) bool {
+	if ruleContext.TypeChecker == nil {
 		return false
 	}
 
 	if returnType := confusingVoidReturnTypeNode(function); returnType != nil {
-		return confusingVoidTypeIncludesVoid(ctx.TypeChecker.GetTypeFromTypeNode(returnType))
+		return confusingVoidTypeIncludesVoid(ruleContext.TypeChecker.GetTypeFromTypeNode(returnType))
 	}
 
 	if function.Kind == ast.KindFunctionDeclaration {
 		return false
 	}
 
-	// The CHECKER's own contextual type, not the shelf's `type_checking.GetContextualType`.
+	// The checker's own contextual type, not the shelf's `type_checking.GetContextualType`.
 	//
 	// That shelf helper is a hand-rolled approximation covering the call-argument case and a few
 	// declaration shapes, and it answers nil for every shape upstream's corpus uses here: an arrow
@@ -570,13 +572,13 @@ func isConfusingVoidReturningFunction(ctx rule.Context, function *ast.Node) bool
 	//
 	// Named as a divergence rather than a fix to the shelf, because the shelf helper has other
 	// callers whose expectations were not measured here.
-	contextualType := checker.Checker_getContextualType(ctx.TypeChecker, function, checker.ContextFlagsNone)
+	contextualType := checker.Checker_getContextualType(ruleContext.TypeChecker, function, checker.ContextFlagsNone)
 	if contextualType == nil {
 		return false
 	}
-	for part := range type_checking.UnionTypePartsSeq(contextualType) {
-		for _, signature := range ctx.TypeChecker.GetSignaturesOfType(part, checker.SignatureKindCall) {
-			if confusingVoidTypeIncludesVoid(ctx.TypeChecker.GetReturnTypeOfSignature(signature)) {
+	for part := range type_checking.UnionTypePartsSequence(contextualType) {
+		for _, signature := range ruleContext.TypeChecker.GetSignaturesOfType(part, checker.SignatureKindCall) {
+			if confusingVoidTypeIncludesVoid(ruleContext.TypeChecker.GetReturnTypeOfSignature(signature)) {
 				return true
 			}
 		}
@@ -587,7 +589,7 @@ func isConfusingVoidReturningFunction(ctx rule.Context, function *ast.Node) bool
 // confusingVoidReturnTypeNode returns a function's explicit return annotation, or nil.
 //
 // The method and accessor kinds are here because of a parser difference rather than a widening.
-// ESTree gives a class method or an object-literal method a `FunctionExpression` VALUE, so
+// ESTree gives a class method or an object-literal method a `FunctionExpression` value, so
 // upstream's three-type walk finds one and reads its annotation. Our parser has no such inner
 // node: `test(): void {}` is a single `KindMethodDeclaration` carrying the annotation itself.
 // Measured: without these arms, upstream's two clean cases for a void-annotated method both
@@ -619,7 +621,7 @@ func confusingVoidTypeIncludesVoid(subject *checker.Type) bool {
 	if subject == nil {
 		return false
 	}
-	for part := range type_checking.UnionTypePartsSeq(subject) {
+	for part := range type_checking.UnionTypePartsSequence(subject) {
 		if type_checking.IsIntrinsicVoidType(part) {
 			return true
 		}
@@ -635,10 +637,10 @@ func confusingVoidTypeIncludesVoid(subject *checker.Type) bool {
 //
 // # Why constructing a span is safe here
 //
-// The replaced span is the whole return STATEMENT, and the text written back contains the
+// The replaced span is the whole return statement, and the text written back contains the
 // argument's own source copied byte for byte. Nothing is rebuilt from node properties, so a type
 // assertion, a `satisfies`, a non-null `!`, type arguments and any comment inside the argument all
-// survive. What does NOT survive is anything between the `return` keyword and the argument, or
+// survive. What does not survive is anything between the `return` keyword and the argument, or
 // between the argument and the semicolon, which is why a comment there declines the repair below.
 //
 // # The semicolon that goes in front
@@ -652,7 +654,7 @@ func confusingVoidTypeIncludesVoid(subject *checker.Type) bool {
 //
 // A non-final return that is not directly inside a block, `if (cond) return f();`, becomes two
 // statements and therefore needs braces. Upstream adds them and so does this.
-func noConfusingVoidExpressionReturnFix(ctx rule.Context, returnStatement *ast.Node,
+func noConfusingVoidExpressionReturnFix(ruleContext rule.Context, returnStatement *ast.Node,
 	final bool) (rule.Fix, bool) {
 
 	statement := returnStatement.AsReturnStatement()
@@ -661,20 +663,20 @@ func noConfusingVoidExpressionReturnFix(ctx rule.Context, returnStatement *ast.N
 	}
 	argument := statement.Expression
 
-	// Upstream's `canFix`: the ARGUMENT's own type must be void-like. On a final return the
+	// Upstream's `canFix`: the argument's own type must be void-like. On a final return the
 	// argument is what remains, and on a non-final one it becomes its own statement, so a
 	// non-void argument would have its value silently discarded.
-	if ctx.TypeChecker == nil {
+	if ruleContext.TypeChecker == nil {
 		return rule.Fix{}, false
 	}
-	argumentType := type_checking.GetConstrainedTypeAtLocation(ctx.TypeChecker, argument)
+	argumentType := type_checking.GetConstrainedTypeAtLocation(ruleContext.TypeChecker, argument)
 	if !type_checking.IsTypeFlagSet(argumentType, checker.TypeFlagsVoidLike) {
 		return rule.Fix{}, false
 	}
 
-	source := ctx.SourceFile.Text()
-	statementSpan := rule.TokenRange(ctx.SourceFile, returnStatement)
-	argumentSpan := rule.TokenRange(ctx.SourceFile, argument)
+	source := ruleContext.SourceFile.Text()
+	statementSpan := rule.TokenRange(ruleContext.SourceFile, returnStatement)
+	argumentSpan := rule.TokenRange(ruleContext.SourceFile, argument)
 	if statementSpan.Pos() > argumentSpan.Pos() || argumentSpan.End() > statementSpan.End() {
 		return rule.Fix{}, false
 	}

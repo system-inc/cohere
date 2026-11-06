@@ -1,14 +1,12 @@
 package configuration
 
 import (
-	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 )
 
@@ -64,26 +62,17 @@ type houseVariant struct {
 	next  bool
 }
 
-// houseSets is a zero-config configuration's per-file dispatch.
-type houseSets struct {
-	detection HouseDetection
-	variants  map[houseVariant]*Config
-	applied   []AppliedSet
-	// gatedReasons is why each rule a per-file set turns on is off where that set does not apply.
-	gatedReasons map[string]OffReason
-}
-
-// IsZeroConfig reports whether the configuration at path takes the house stack: there is no file
+// IsZeroConfiguration reports whether the configuration at path takes the house stack: there is no file
 // there, or its chain names no set cohere carries.
 //
 // A chain that names any `cohere:` set chose its sets, and is loaded as written.
-func IsZeroConfig(path string) (bool, error) {
-	if _, err := os.Stat(path); errors.Is(err, fs.ErrNotExist) {
+func IsZeroConfiguration(path string) (bool, error) {
+	if _, statError := os.Stat(path); errors.Is(statError, fs.ErrNotExist) {
 		return true, nil
 	}
-	sources, err := SourcesOf(path)
-	if err != nil {
-		return false, err
+	sources, sourcesOfError := SourcesOf(path)
+	if sourcesOfError != nil {
+		return false, sourcesOfError
 	}
 	for _, source := range sources {
 		if IsSet(source) {
@@ -98,10 +87,10 @@ func IsZeroConfig(path string) (bool, error) {
 // reads these, so an edit to the project's file still changes the key.
 func HouseSources(path string) ([]string, error) {
 	sources := []string{}
-	if _, err := os.Stat(path); err == nil {
-		own, err := SourcesOf(path)
-		if err != nil {
-			return nil, err
+	if _, statError := os.Stat(path); statError == nil {
+		own, sourcesOfError := SourcesOf(path)
+		if sourcesOfError != nil {
+			return nil, sourcesOfError
 		}
 		sources = append(sources, own...)
 	}
@@ -111,12 +100,12 @@ func HouseSources(path string) ([]string, error) {
 // OwnSettingsOf returns the `settings` the project's own file at path writes, which zero config's
 // detection reads before LoadHouse runs, or nil when there is no file or it writes none.
 func OwnSettingsOf(path string) (map[string]json.RawMessage, error) {
-	if _, err := os.Stat(path); err != nil {
+	if _, statError := os.Stat(path); statError != nil {
 		return nil, nil
 	}
-	layers, err := readConfigLayers(path, nil)
-	if err != nil {
-		return nil, err
+	layers, readConfigurationLayersError := readConfigLayers(path, nil)
+	if readConfigurationLayersError != nil {
+		return nil, readConfigurationLayersError
 	}
 	return layers[len(layers)-1].raw.Settings, nil
 }
@@ -127,33 +116,40 @@ func OwnSettingsOf(path string) (map[string]json.RawMessage, error) {
 // The returned configuration is the whole house stack: its rules are every rule any set asks for,
 // which is what parity, coverage and selector validation read. Resolve answers per file from the
 // variant that file gets.
-func LoadHouse(path string, registeredNames []string, detection HouseDetection) (*Config, error) {
-	root, err := filepath.Abs(filepath.Dir(path))
-	if err != nil {
-		return nil, fmt.Errorf("resolving the config directory for %s: %w", path, err)
+func LoadHouse(path string, registeredNames []string, detection HouseDetection) (*Configuration, error) {
+	root, absolutePathError := filepath.Abs(filepath.Dir(path))
+	if absolutePathError != nil {
+		return nil, fmt.Errorf("resolving the config directory for %s: %w", path, absolutePathError)
 	}
-	var ownLayers []configLayer
-	if _, err := os.Stat(path); err == nil {
-		ownLayers, err = readConfigLayers(path, nil)
-		if err != nil {
-			return nil, err
+	var ownLayers []configurationLayer
+	if _, statError := os.Stat(path); statError == nil {
+		var readConfigurationLayersError error
+		ownLayers, readConfigurationLayersError = readConfigLayers(path, nil)
+		if readConfigurationLayersError != nil {
+			return nil, readConfigurationLayersError
 		}
 	}
 
 	tailwind := detection.TailwindEntryPoint != ""
-	whole, err := loadHouseVariant(ownLayers, root, registeredNames, houseVariant{react: true, next: true}, true)
-	if err != nil {
-		return nil, err
+	whole, loadHouseVariantError := loadHouseVariant(
+		ownLayers,
+		root,
+		registeredNames,
+		houseVariant{react: true, next: true},
+		true,
+	)
+	if loadHouseVariantError != nil {
+		return nil, loadHouseVariantError
 	}
 	house := &houseSets{
 		detection:    detection,
-		variants:     map[houseVariant]*Config{},
+		variants:     map[houseVariant]*Configuration{},
 		gatedReasons: map[string]OffReason{},
 	}
 	for _, variant := range []houseVariant{{}, {react: true}, {next: true}, {react: true, next: true}} {
-		loaded, err := loadHouseVariant(ownLayers, root, registeredNames, variant, tailwind)
-		if err != nil {
-			return nil, err
+		loaded, loadHouseVariantError := loadHouseVariant(ownLayers, root, registeredNames, variant, tailwind)
+		if loadHouseVariantError != nil {
+			return nil, loadHouseVariantError
 		}
 		// The house ignores what it ignores for every file, whichever set wrote the pattern.
 		loaded.IgnorePatterns = whole.IgnorePatterns
@@ -167,7 +163,9 @@ func LoadHouse(path string, registeredNames []string, detection HouseDetection) 
 	}
 	if tailwind {
 		house.applied = append(house.applied, AppliedSet{Name: TailwindSetName, Applied: true,
-			Evidence: "every file, since " + relativeTo(root, detection.TailwindEntryPoint) + " is a Tailwind stylesheet"})
+			Evidence: "every file, since " +
+				relativeTo(root, detection.TailwindEntryPoint) +
+				" is a Tailwind stylesheet"})
 	} else {
 		house.applied = append(house.applied, AppliedSet{Name: TailwindSetName, Evidence: detection.TailwindSkipped})
 	}
@@ -191,7 +189,10 @@ func LoadHouse(path string, registeredNames []string, detection HouseDetection) 
 			}
 			variant.Rules[key] = RuleSetting{Severity: SeverityOff}
 			if _, reasoned := house.gatedReasons[key]; !reasoned {
-				house.gatedReasons[key] = OffReason{File: whole.ruleWriters[key], Reason: setReasons[whole.ruleWriters[key]]}
+				house.gatedReasons[key] = OffReason{
+					File:   whole.ruleWriters[key],
+					Reason: setReasons[whole.ruleWriters[key]],
+				}
 			}
 		}
 	}
@@ -207,7 +208,11 @@ func perFileSet(name string, files int, evidence string) AppliedSet {
 	if files == 1 {
 		noun = "file that"
 	}
-	return AppliedSet{Name: name, Applied: true, Evidence: fmt.Sprintf("%d %s %s", files, noun, singularVerb(files, evidence))}
+	return AppliedSet{
+		Name:     name,
+		Applied:  true,
+		Evidence: fmt.Sprintf("%d %s %s", files, noun, singularVerb(files, evidence)),
+	}
 }
 
 // singularVerb turns "import react or contain JSX" into "imports react or contains JSX" for one file.
@@ -219,7 +224,10 @@ func singularVerb(files int, evidence string) string {
 }
 
 func relativeTo(root string, path string) string {
-	if relative, err := filepath.Rel(root, path); err == nil && !strings.HasPrefix(relative, "..") {
+	if relative, relativePathError := filepath.Rel(
+		root,
+		path,
+	); relativePathError == nil && !strings.HasPrefix(relative, "..") {
 		return filepath.ToSlash(relative)
 	}
 	return path
@@ -228,7 +236,13 @@ func relativeTo(root string, path string) string {
 // loadHouseVariant loads cohere:typescript, the per-file sets variant names, cohere:tailwind when
 // tailwind is true, and the project's own layers on top, each of which extends every set so a rule it
 // writes replaces the set's ruling rather than colliding with it.
-func loadHouseVariant(ownLayers []configLayer, root string, registeredNames []string, variant houseVariant, tailwind bool) (*Config, error) {
+func loadHouseVariant(
+	ownLayers []configurationLayer,
+	root string,
+	registeredNames []string,
+	variant houseVariant,
+	tailwind bool,
+) (*Configuration, error) {
 	sets := []string{TypeScriptSetName}
 	if variant.react {
 		sets = append(sets, ReactSetName)
@@ -239,12 +253,12 @@ func loadHouseVariant(ownLayers []configLayer, root string, registeredNames []st
 	if tailwind {
 		sets = append(sets, TailwindSetName)
 	}
-	var layers []configLayer
+	var layers []configurationLayer
 	read := map[string]bool{}
 	for _, set := range sets {
-		setLayers, err := readConfigLayers(set, nil)
-		if err != nil {
-			return nil, err
+		setLayers, readConfigurationLayersError := readConfigLayers(set, nil)
+		if readConfigurationLayersError != nil {
+			return nil, readConfigurationLayersError
 		}
 		for _, setLayer := range setLayers {
 			if !read[setLayer.path] {
@@ -258,56 +272,4 @@ func loadHouseVariant(ownLayers []configLayer, root string, registeredNames []st
 		layers = append(layers, ownLayer)
 	}
 	return loadLayers(layers, root, registeredNames)
-}
-
-// Applied is the house sets a zero-config run applied, and the ones it looked for and did not, with
-// the evidence for each. Nil for a configuration that names its sets.
-func (c *Config) Applied() []AppliedSet {
-	if c == nil || c.house == nil {
-		return nil
-	}
-	return c.house.applied
-}
-
-// SetsLine is the run's first line under zero config: each house set and why it applies or does not.
-// Empty for a configuration that names its own sets, since its file already says.
-func (c *Config) SetsLine() string {
-	applied := c.Applied()
-	if len(applied) == 0 {
-		return ""
-	}
-	terms := make([]string, 0, len(applied))
-	for _, set := range applied {
-		if set.Applied {
-			terms = append(terms, set.Name+" on "+set.Evidence)
-			continue
-		}
-		terms = append(terms, set.Name+" not applied, "+set.Evidence)
-	}
-	return "sets: " + strings.Join(terms, "; ")
-}
-
-// DetectionFingerprint is a digest of which files each per-file set applied to and the Tailwind entry,
-// for a cache keyed on what decides which rules run: a file can change sets without its own bytes
-// changing, when another file starts importing next. Empty for a configuration that names its sets.
-func (c *Config) DetectionFingerprint() string {
-	if c == nil || c.house == nil {
-		return ""
-	}
-	digest := sha256.New()
-	for _, files := range []map[string]bool{c.house.detection.ReactFiles, c.house.detection.NextFiles} {
-		names := make([]string, 0, len(files))
-		for name := range files {
-			names = append(names, name)
-		}
-		sort.Strings(names)
-		fmt.Fprintf(digest, "%d\n%s\n", len(names), strings.Join(names, "\n"))
-	}
-	fmt.Fprintf(digest, "tailwind %s\n", c.house.detection.TailwindEntryPoint)
-	return fmt.Sprintf("%x", digest.Sum(nil))
-}
-
-// variantFor is the configuration a file resolves through under zero config.
-func (house *houseSets) variantFor(path string) *Config {
-	return house.variants[houseVariant{react: house.detection.ReactFiles[path], next: house.detection.NextFiles[path]}]
 }

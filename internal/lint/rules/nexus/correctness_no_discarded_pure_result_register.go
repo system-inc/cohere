@@ -11,5 +11,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // effect-free methods, read one by one, and an option adding to them would let a configuration name
 // one that is not.
 func init() {
-	rule.Register(rule.Registration{Rule: CorrectnessNoDiscardedPureResult})
+	rule.Register(rule.Registration[rule.NoOptions]{Rule: CorrectnessNoDiscardedPureResult})
 }

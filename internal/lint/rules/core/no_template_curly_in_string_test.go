@@ -20,8 +20,8 @@ const templateCurlyInStringFile = "/repository/source/TemplateCurlyInString.ts"
 //
 // Copied because a fixture a porter invents encodes the same belief as the port, and the case that
 // catches a bug is the one nobody would think to write.
-func TestNoTemplateCurlyInStringFires(t *testing.T) {
-	t.Parallel()
+func TestNoTemplateCurlyInStringFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -37,10 +37,10 @@ func TestNoTemplateCurlyInStringFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoTemplateCurlyInString, templateCurlyInStringFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, NoTemplateCurlyInString, templateCurlyInStringFile, testCase.sourceText),
 				"unexpectedTemplateExpression")
 		})
 	}
@@ -58,8 +58,8 @@ func TestNoTemplateCurlyInStringFires(t *testing.T) {
 // pattern a different way. `'$2'` has a dollar with no brace. `'${'` opens and never closes.
 // `'$}'` closes without opening. `'{foo}'` has braces without a dollar. Those four are why the
 // scan cannot be a search for `$` or for `{`.
-func TestNoTemplateCurlyInStringStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoTemplateCurlyInStringStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -83,10 +83,10 @@ func TestNoTemplateCurlyInStringStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.Run(t, NoTemplateCurlyInString, templateCurlyInStringFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.Run(test, NoTemplateCurlyInString, templateCurlyInStringFile, testCase.sourceText))
 		})
 	}
 }
@@ -105,8 +105,8 @@ func TestNoTemplateCurlyInStringStaysSilent(t *testing.T) {
 // The expected text is the whole literal including its quotes, checked by slicing the source with
 // the finding's own range, so a span short by one on either side slices to something that is not a
 // complete literal.
-func TestNoTemplateCurlyInStringReportsTheWholeLiteral(t *testing.T) {
-	t.Parallel()
+func TestNoTemplateCurlyInStringReportsTheWholeLiteral(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -122,15 +122,15 @@ func TestNoTemplateCurlyInStringReportsTheWholeLiteral(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoTemplateCurlyInString, templateCurlyInStringFile, testCase.sourceText)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoTemplateCurlyInString, templateCurlyInStringFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
+				test.Fatalf("got %d findings, want 1", len(result.Diagnostics))
 			}
 			reported := testCase.sourceText[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 			if result.Diagnostics[0].Range.Pos() != testCase.wantStart || reported != testCase.wantText {
-				t.Errorf("finding at [%d,%d) = %q, want start %d and %q",
+				test.Errorf("finding at [%d,%d) = %q, want start %d and %q",
 					result.Diagnostics[0].Range.Pos(), result.Diagnostics[0].Range.End(),
 					reported, testCase.wantStart, testCase.wantText)
 			}
@@ -149,8 +149,8 @@ func TestNoTemplateCurlyInStringReportsTheWholeLiteral(t *testing.T) {
 //
 // The second pair is the same property across separate literals: two strings in one file are two
 // findings, which is what distinguishes "once per literal" from "once per file".
-func TestNoTemplateCurlyInStringReportsOncePerLiteral(t *testing.T) {
-	t.Parallel()
+func TestNoTemplateCurlyInStringReportsOncePerLiteral(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name         string
@@ -164,11 +164,11 @@ func TestNoTemplateCurlyInStringReportsOncePerLiteral(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoTemplateCurlyInString, templateCurlyInStringFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoTemplateCurlyInString, templateCurlyInStringFile, testCase.sourceText)
 			if len(result.Diagnostics) != testCase.wantFindings {
-				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), testCase.wantFindings)
+				test.Fatalf("got %d findings, want %d", len(result.Diagnostics), testCase.wantFindings)
 			}
 		})
 	}
@@ -192,8 +192,8 @@ func TestNoTemplateCurlyInStringReportsOncePerLiteral(t *testing.T) {
 // leaving as an absence: a raw `${` that cooks away would need an escape that erases characters,
 // and the only one is a line continuation, which cannot sit between the dollar and the brace and
 // still leave them adjacent in the value.
-func TestNoTemplateCurlyInStringMatchesTheCookedValue(t *testing.T) {
-	t.Parallel()
+func TestNoTemplateCurlyInStringMatchesTheCookedValue(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name string
@@ -205,10 +205,10 @@ func TestNoTemplateCurlyInStringMatchesTheCookedValue(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoTemplateCurlyInString, templateCurlyInStringFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, NoTemplateCurlyInString, templateCurlyInStringFile, testCase.sourceText),
 				"unexpectedTemplateExpression")
 		})
 	}
@@ -228,8 +228,8 @@ func TestNoTemplateCurlyInStringMatchesTheCookedValue(t *testing.T) {
 // The last two are the backtracking cases. An opening that fails to close does not end the search,
 // because a later opening may succeed, and a scan that gave up at the first failure would be silent
 // on both.
-func TestNoTemplateCurlyInStringPatternEdges(t *testing.T) {
-	t.Parallel()
+func TestNoTemplateCurlyInStringPatternEdges(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -247,13 +247,13 @@ func TestNoTemplateCurlyInStringPatternEdges(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoTemplateCurlyInString, templateCurlyInStringFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoTemplateCurlyInString, templateCurlyInStringFile, testCase.sourceText)
 			if testCase.wantFires {
-				rule_testing.ExpectFindings(t, result, "unexpectedTemplateExpression")
+				rule_testing.ExpectFindings(test, result, "unexpectedTemplateExpression")
 			} else {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 			}
 		})
 	}
@@ -269,8 +269,8 @@ func TestNoTemplateCurlyInStringPatternEdges(t *testing.T) {
 //
 // The template cases matter most: a template is where a placeholder belongs, so reporting one would
 // be a false positive on correct code rather than a missed finding.
-func TestNoTemplateCurlyInStringDeclinesOtherLiteralKinds(t *testing.T) {
-	t.Parallel()
+func TestNoTemplateCurlyInStringDeclinesOtherLiteralKinds(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -284,10 +284,10 @@ func TestNoTemplateCurlyInStringDeclinesOtherLiteralKinds(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.Run(t, NoTemplateCurlyInString, templateCurlyInStringFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.Run(test, NoTemplateCurlyInString, templateCurlyInStringFile, testCase.sourceText))
 		})
 	}
 }
@@ -300,17 +300,17 @@ func TestNoTemplateCurlyInStringDeclinesOtherLiteralKinds(t *testing.T) {
 // pass the id they expect straight through, so an id renamed in both places at once stays green.
 // The literal below is typed here rather than read from the rule's own constant, so both sides
 // cannot move together.
-func TestNoTemplateCurlyInStringMessage(t *testing.T) {
-	t.Parallel()
+func TestNoTemplateCurlyInStringMessage(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, NoTemplateCurlyInString, templateCurlyInStringFile, "'${a}'")
+	result := rule_testing.Run(test, NoTemplateCurlyInString, templateCurlyInStringFile, "'${a}'")
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
+		test.Fatalf("got %d findings, want 1", len(result.Diagnostics))
 	}
 	if got := result.Diagnostics[0].Message.Id; got != "unexpectedTemplateExpression" {
-		t.Errorf("message id = %q, want %q", got, "unexpectedTemplateExpression")
+		test.Errorf("message id = %q, want %q", got, "unexpectedTemplateExpression")
 	}
 	if result.Diagnostics[0].Message.Description == "" {
-		t.Error("the message carries no description, so the finding says nothing about why")
+		test.Error("the message carries no description, so the finding says nothing about why")
 	}
 }

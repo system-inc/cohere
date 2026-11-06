@@ -49,9 +49,9 @@ var messageMissingYield = rule.Message{
 //
 // No fix. The two repairs are removing the asterisk and adding a yield, and those produce different
 // functions.
-var RequireYield = rule.Rule{
+var RequireYield = rule.Rule[rule.NoOptions]{
 	Name: "require-yield",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		check := func(node *ast.Node, asteriskToken *ast.Node, body *ast.Node) {
 			if asteriskToken == nil || body == nil {
 				return
@@ -67,7 +67,7 @@ var RequireYield = rule.Rule{
 			if bodyContainsYield(body) {
 				return
 			}
-			ctx.ReportNode(node, messageMissingYield)
+			ruleContext.ReportNode(node, messageMissingYield)
 		}
 
 		return rule.Listeners{

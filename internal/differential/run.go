@@ -3,7 +3,7 @@
 // Everything else in this package is pure: findings in, report out, easy to test and easy to trust.
 // This file is where the harness touches the world, and it is therefore where the interesting lies
 // live. A subprocess that fails to launch, a working directory that is not the tree, a config that
-// was never read, a regex that stopped matching after an output format moved — every one of them
+// was never read, a regex that stopped matching after an output format moved: every one of them
 // produces a smaller finding list, and a smaller finding list on both sides is indistinguishable
 // from agreement.
 //
@@ -17,6 +17,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -24,24 +25,6 @@ import (
 	"strconv"
 	"strings"
 )
-
-// GateCommand is how to invoke one side.
-type GateCommand struct {
-	// Name is what appears in the report.
-	Name string
-	// Program and Arguments are the exact invocation.
-	Program   string
-	Arguments []string
-	// Directory is the working directory, which for both gates is the tree being linted. Getting
-	// this wrong is the single most likely way to produce a confident empty result: both gates
-	// resolve their config and their file list from here.
-	Directory string
-}
-
-// String renders the invocation so a reader can rerun it verbatim.
-func (command GateCommand) String() string {
-	return strings.TrimSpace(command.Program + " " + strings.Join(command.Arguments, " "))
-}
 
 // RunOptions is everything Run needs to compare the two gates over one tree.
 type RunOptions struct {
@@ -57,7 +40,7 @@ type RunOptions struct {
 	ConfiguredRules map[string]bool
 	// Controls are the planted violations that prove the pipeline can carry a difference. Running
 	// with none is allowed and produces a report that says, in as many words, that it proved
-	// nothing — rather than a clean one.
+	// nothing, rather than a clean one.
 	Controls []Control
 	// ExtraCohereRuleSettings are rules to enable for cohere's run only, merged over the tree's own
 	// lint config and handed to cohere with `-lint-config`. The gate always runs against the
@@ -73,7 +56,13 @@ type RunOptions struct {
 	// implementation. So the asymmetry is confined to rules the gate cannot express at all, where
 	// there is no shared setting to diverge from, and every finding it produces is classified
 	// not-ported rather than counted against agreement.
-	ExtraCohereRuleSettings map[string]any
+	//
+	// Each setting is the rule's JSON as the config file would hold it, carried through unread.
+	ExtraCohereRuleSettings map[string]json.RawMessage
+	// Diagnostics is where cleanup says what it could not undo: a planted control or an extended
+	// config it failed to remove, or a directory it left because something else landed in it. Nil
+	// discards them.
+	Diagnostics io.Writer
 }
 
 // Control is a violation planted where the harness knows in advance what should happen to it.
@@ -124,40 +113,40 @@ type Control struct {
 //
 // The order is deliberate: controls are planted first so that both gates see them in the same
 // single run. Running the gates twice, once clean and once planted, would double the cost and
-// introduce a window in which the tree changed underneath the two runs — and on a tree with several
+// introduce a window in which the tree changed underneath the two runs. And on a tree with several
 // authors in it, that window is not theoretical.
-func Run(ctx context.Context, options RunOptions) (Report, error) {
-	planted, cleanup, err := plantControls(options)
+func Run(callerContext context.Context, options RunOptions) (Report, error) {
+	planted, cleanup, plantControlsError := plantControls(options)
 	// cleanup is deferred before the error check on purpose: plantControls may have written some
 	// files before failing, and leaving a planted violation behind in a shared tree would be a
 	// defect handed to whoever runs the gate next.
 	defer cleanup()
-	if err != nil {
-		return Report{}, err
+	if plantControlsError != nil {
+		return Report{}, plantControlsError
 	}
 
-	cohereCommand, removeConfig, err := cohereCommandWithExtraRules(options)
-	defer removeConfig()
-	if err != nil {
-		return Report{}, err
+	cohereCommand, removeConfiguration, cohereCommandWithExtraRulesError := cohereCommandWithExtraRules(options)
+	defer removeConfiguration()
+	if cohereCommandWithExtraRulesError != nil {
+		return Report{}, cohereCommandWithExtraRulesError
 	}
 
-	verifyOutput, cohereErr := runGate(ctx, cohereCommand)
-	if cohereErr != nil {
-		return Report{}, fmt.Errorf("running cohere: %w", cohereErr)
+	verifyOutput, cohereError := runGate(callerContext, cohereCommand)
+	if cohereError != nil {
+		return Report{}, fmt.Errorf("running cohere: %w", cohereError)
 	}
-	gateOutput, gateErr := runGate(ctx, options.Gate)
-	if gateErr != nil {
-		return Report{}, fmt.Errorf("running the gate: %w", gateErr)
+	gateOutput, gateError := runGate(callerContext, options.Gate)
+	if gateError != nil {
+		return Report{}, fmt.Errorf("running the gate: %w", gateError)
 	}
 
-	cohereParsed, err := ParseCohere(verifyOutput, options.Root)
-	if err != nil {
-		return Report{}, fmt.Errorf("parsing cohere output: %w", err)
+	cohereParsed, parseCohereError := ParseCohere(verifyOutput, options.Root)
+	if parseCohereError != nil {
+		return Report{}, fmt.Errorf("parsing cohere output: %w", parseCohereError)
 	}
-	gateParsed, err := ParseGate(gateOutput, options.Root)
-	if err != nil {
-		return Report{}, fmt.Errorf("parsing gate output: %w", err)
+	gateParsed, parseGateError := ParseGate(gateOutput, options.Root)
+	if parseGateError != nil {
+		return Report{}, fmt.Errorf("parsing gate output: %w", parseGateError)
 	}
 
 	// An unparsed line is a finding the diff cannot see, so it is a hard failure rather than a
@@ -184,12 +173,16 @@ func Run(ctx context.Context, options RunOptions) (Report, error) {
 	gateFilesWalked := cohereFilesWalked
 
 	report := Compare(Inputs{
-		CohereFindings:   cohereParsed.Findings,
-		GateFindings:     gateParsed.Findings,
-		CoherePopulation: Population{Findings: len(cohereParsed.Findings), FilesWalked: cohereFilesWalked, Rules: cohereRulesRun},
-		GatePopulation:   Population{Findings: len(gateParsed.Findings), FilesWalked: gateFilesWalked},
-		CohereRules:      options.CohereRules,
-		ConfiguredRules:  options.ConfiguredRules,
+		CohereFindings: cohereParsed.Findings,
+		GateFindings:   gateParsed.Findings,
+		CoherePopulation: Population{
+			Findings:    len(cohereParsed.Findings),
+			FilesWalked: cohereFilesWalked,
+			Rules:       cohereRulesRun,
+		},
+		GatePopulation:  Population{Findings: len(gateParsed.Findings), FilesWalked: gateFilesWalked},
+		CohereRules:     options.CohereRules,
+		ConfiguredRules: options.ConfiguredRules,
 		// The known gate defects are compiled in rather than passed at the command line: an
 		// acknowledgement that can be supplied per-run can be supplied by whoever wants a green
 		// result, and this list is reviewed like any other code.
@@ -203,7 +196,7 @@ func Run(ctx context.Context, options RunOptions) (Report, error) {
 		CohereRulesRun:    cohereRulesRun,
 		GateRulesRun:      len(options.ConfiguredRules),
 		CohereCommand:     options.Cohere.String(),
-		CohereVersion:     cohereVersionOf(ctx, options.Cohere),
+		CohereVersion:     cohereVersionOf(callerContext, options.Cohere),
 		GateCommand:       options.Gate.String(),
 		ControlsRun:       checkControls(planted, report, cohereParsed.Findings, gateParsed.Findings),
 	}
@@ -249,7 +242,11 @@ func checkControls(planted []Control, report Report, cohereFindings []Finding, g
 				continue
 			}
 			if difference.OnlyOn != control.ExpectedSide {
-				result.Detail = fmt.Sprintf("found, but attributed to %s rather than %s", difference.OnlyOn, control.ExpectedSide)
+				result.Detail = fmt.Sprintf(
+					"found, but attributed to %s rather than %s",
+					difference.OnlyOn,
+					control.ExpectedSide,
+				)
 				break
 			}
 			result.Detected = true
@@ -270,8 +267,13 @@ func checkControls(planted []Control, report Report, cohereFindings []Finding, g
 // It reads the raw per-side findings rather than the comparison's output, because the property
 // being tested is that the finding survived each side's parse and normalization and then matched.
 // Asking the difference list could only ever say the control was absent from it, which is true both
-// when both sides saw it and when neither did — the two outcomes this control exists to separate.
-func checkSharedControl(control Control, result ControlResult, cohereFindings []Finding, gateFindings []Finding) ControlResult {
+// when both sides saw it and when neither did: the two outcomes this control exists to separate.
+func checkSharedControl(
+	control Control,
+	result ControlResult,
+	cohereFindings []Finding,
+	gateFindings []Finding,
+) ControlResult {
 	seenByCohere := false
 	for _, finding := range cohereFindings {
 		if controlMatches(control, finding) {
@@ -291,11 +293,23 @@ func checkSharedControl(control Control, result ControlResult, cohereFindings []
 	case seenByCohere && seenByGate:
 		result.Detected = true
 	case !seenByCohere && !seenByGate:
-		result.Detail = fmt.Sprintf("neither gate reported %s in %s, so the plant never reached either one", control.Rule, control.RelativePath)
+		result.Detail = fmt.Sprintf(
+			"neither gate reported %s in %s, so the plant never reached either one",
+			control.Rule,
+			control.RelativePath,
+		)
 	case seenByCohere:
-		result.Detail = fmt.Sprintf("only cohere reported %s in %s, and both were expected to", control.Rule, control.RelativePath)
+		result.Detail = fmt.Sprintf(
+			"only cohere reported %s in %s, and both were expected to",
+			control.Rule,
+			control.RelativePath,
+		)
 	default:
-		result.Detail = fmt.Sprintf("only the gate reported %s in %s, and both were expected to", control.Rule, control.RelativePath)
+		result.Detail = fmt.Sprintf(
+			"only the gate reported %s in %s, and both were expected to",
+			control.Rule,
+			control.RelativePath,
+		)
 	}
 	return result
 }
@@ -338,43 +352,61 @@ func plantControls(options RunOptions) ([]Control, func(), error) {
 	// `git status` as an unexplained empty directory. An earlier run of this harness did precisely
 	// that and the leftover was found by someone else.
 	createdDirectories := make([]string, 0, len(options.Controls))
+	diagnostics := diagnosticsOf(options)
 
 	cleanup := func() {
 		for _, path := range written {
 			// A control left behind would be linted by the next person to run either gate, so a
 			// failure to remove one is worth saying out loud rather than swallowing.
-			if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
-				fmt.Fprintf(os.Stderr, "differential: could not remove planted control %s: %v\n", path, err)
+			if removeError := os.Remove(path); removeError != nil && !os.IsNotExist(removeError) {
+				// Ignored: the diagnostics writer is the only place cleanup can say this, so a note
+				// that fails to land has nowhere left to go.
+				fmt.Fprintf(diagnostics, "differential: could not remove planted control %s: %v\n", path, removeError)
 			}
 		}
 		// Deepest first, and only the ones this plant created. Remove refuses on a non-empty
 		// directory, which is the guard that matters: if anything else landed in there while the
 		// gates ran, it stays and so does the directory.
 		for index := len(createdDirectories) - 1; index >= 0; index-- {
-			if err := os.Remove(createdDirectories[index]); err != nil && !os.IsNotExist(err) {
-				fmt.Fprintf(os.Stderr, "differential: left the directory %s in place: %v\n", createdDirectories[index], err)
+			if removeError := os.Remove(createdDirectories[index]); removeError != nil && !os.IsNotExist(removeError) {
+				// Ignored: the diagnostics writer is the only place cleanup can say this, so a note
+				// that fails to land has nowhere left to go.
+				fmt.Fprintf(
+					diagnostics,
+					"differential: left the directory %s in place: %v\n",
+					createdDirectories[index],
+					removeError,
+				)
 			}
 		}
 	}
 
 	for _, control := range options.Controls {
 		absolutePath := filepath.Join(options.Root, control.RelativePath)
-		if _, err := os.Stat(absolutePath); err == nil {
+		if _, statError := os.Stat(absolutePath); statError == nil {
 			return planted, cleanup, fmt.Errorf(
 				"control %q would overwrite the existing file %s; choose a path that does not exist",
 				control.Name, control.RelativePath,
 			)
 		}
-		missing, err := missingDirectories(filepath.Dir(absolutePath), options.Root)
-		if err != nil {
-			return planted, cleanup, fmt.Errorf("planning the directory for control %q: %w", control.Name, err)
+		missing, missingDirectoriesError := missingDirectories(filepath.Dir(absolutePath), options.Root)
+		if missingDirectoriesError != nil {
+			return planted, cleanup, fmt.Errorf(
+				"planning the directory for control %q: %w",
+				control.Name,
+				missingDirectoriesError,
+			)
 		}
-		if err := os.MkdirAll(filepath.Dir(absolutePath), 0o755); err != nil {
-			return planted, cleanup, fmt.Errorf("creating the directory for control %q: %w", control.Name, err)
+		if createDirectoryError := os.MkdirAll(filepath.Dir(absolutePath), 0o755); createDirectoryError != nil {
+			return planted, cleanup, fmt.Errorf(
+				"creating the directory for control %q: %w",
+				control.Name,
+				createDirectoryError,
+			)
 		}
 		createdDirectories = append(createdDirectories, missing...)
-		if err := os.WriteFile(absolutePath, []byte(control.Contents), 0o644); err != nil {
-			return planted, cleanup, fmt.Errorf("writing control %q: %w", control.Name, err)
+		if writeError := os.WriteFile(absolutePath, []byte(control.Contents), 0o644); writeError != nil {
+			return planted, cleanup, fmt.Errorf("writing control %q: %w", control.Name, writeError)
 		}
 		written = append(written, absolutePath)
 		planted = append(planted, control)
@@ -383,13 +415,21 @@ func plantControls(options RunOptions) ([]Control, func(), error) {
 	return planted, cleanup, nil
 }
 
+// diagnosticsOf is where a run's cleanup writes what it could not undo.
+func diagnosticsOf(options RunOptions) io.Writer {
+	if options.Diagnostics == nil {
+		return io.Discard
+	}
+	return options.Diagnostics
+}
+
 // runGate executes one side and returns its stdout.
 //
 // A non-zero exit is expected and is not an error: both gates exit 1 when they find something, which
-// is the common case. Only a failure to run at all is an error — and it must be one, because a gate
+// is the common case. Only a failure to run at all is an error, and it must be one, because a gate
 // that never launched produces empty output that reads exactly like a clean result.
-func runGate(ctx context.Context, command GateCommand) (string, error) {
-	execution := exec.CommandContext(ctx, command.Program, command.Arguments...)
+func runGate(callerContext context.Context, command GateCommand) (string, error) {
+	execution := exec.CommandContext(callerContext, command.Program, command.Arguments...)
 	execution.Dir = command.Directory
 
 	// Stderr is captured and surfaced rather than discarded. `exec.Output` drops it, and a gate
@@ -403,11 +443,11 @@ func runGate(ctx context.Context, command GateCommand) (string, error) {
 	var standardError strings.Builder
 	execution.Stderr = &standardError
 
-	output, err := execution.Output()
-	if err != nil {
+	output, outputError := execution.Output()
+	if outputError != nil {
 		var exitError *exec.ExitError
-		if !errors.As(err, &exitError) {
-			return "", fmt.Errorf("%s did not run: %w%s", command, err, stderrTail(standardError.String()))
+		if !errors.As(outputError, &exitError) {
+			return "", fmt.Errorf("%s did not run: %w%s", command, outputError, stderrTail(standardError.String()))
 		}
 
 		// It ran and exited non-zero, which is what a gate with findings does. But a gate that
@@ -423,6 +463,9 @@ func runGate(ctx context.Context, command GateCommand) (string, error) {
 	}
 	return string(output), nil
 }
+
+// maximumStderrLines is how much of a failed gate's stderr reaches the error message.
+const maximumStderrLines = 5
 
 // stderrTail renders a failed gate's stderr for an error message, or nothing when it stayed quiet.
 //
@@ -442,19 +485,21 @@ func stderrTail(text string) string {
 	return "; its stderr ended with: " + strings.Join(lines, " | ")
 }
 
-// maximumStderrLines is how much of a failed gate's stderr reaches the error message.
-const maximumStderrLines = 5
-
 // cohereCoverageLinePattern reads the population out of cohere's own coverage line:
 //
-//	lint: 1 findings — 23 rules over 3407 files, 2098302 nodes visited, in 813ms
-var cohereCoverageLinePattern = regexp.MustCompile(`^lint: \d+ findings? — (\d+) rules? over (\d+) files?`)
+//	lint: 1 findings <em-dash> 23 rules over 3407 files, 2098302 nodes visited, in 813ms
+//
+// where <em-dash> stands for the em-dash cohere prints there. The dash is cohere's own output, so the pattern holds
+// its exact bytes, spelled as an escape between the raw pieces because a raw string cannot hold one.
+var cohereCoverageLinePattern = regexp.MustCompile(
+	`^lint: \d+ findings? ` + "\u2014" + ` (\d+) rules? over (\d+) files?`,
+)
 
 // cohereCoverageFrom reads files-walked and rules-run out of cohere's summary lines.
 //
 // Returning zeros when the line is absent is deliberate and is not a fallback. A missing coverage
 // line means cohere did not finish its lint phase, and zero is precisely the value that makes the
-// vacuity guard refuse the comparison — which is the correct outcome for a run that did not
+// vacuity guard refuse the comparison, which is the correct outcome for a run that did not
 // complete. Defaulting to a plausible number here would be the vacuous pass this package exists to
 // prevent, introduced by the file that reports the evidence.
 func cohereCoverageFrom(summaryLines []string) (int, int) {
@@ -463,8 +508,13 @@ func cohereCoverageFrom(summaryLines []string) (int, int) {
 		if match == nil {
 			continue
 		}
-		rulesRun, _ := strconv.Atoi(match[1])
-		filesWalked, _ := strconv.Atoi(match[2])
+		// The pattern takes only digits, so a count fails to read only past an int's range. Such a line
+		// reads as no line at all, which leaves the zeros the vacuity guard refuses.
+		rulesRun, rulesError := strconv.Atoi(match[1])
+		filesWalked, filesError := strconv.Atoi(match[2])
+		if rulesError != nil || filesError != nil {
+			continue
+		}
 		return filesWalked, rulesRun
 	}
 	return 0, 0
@@ -479,18 +529,18 @@ func cohereCoverageFrom(summaryLines []string) (int, int) {
 // The walk stops at root and never above it, so a control cannot cause a directory outside the
 // tree being linted to be removed. Ordered shallowest first; the caller unwinds in reverse.
 func missingDirectories(directory string, root string) ([]string, error) {
-	absoluteRoot, err := filepath.Abs(root)
-	if err != nil {
-		return nil, err
+	absoluteRoot, absolutePathError := filepath.Abs(root)
+	if absolutePathError != nil {
+		return nil, absolutePathError
 	}
-	absoluteDirectory, err := filepath.Abs(directory)
-	if err != nil {
-		return nil, err
+	absoluteDirectory, absolutePathError := filepath.Abs(directory)
+	if absolutePathError != nil {
+		return nil, absolutePathError
 	}
 
 	var missing []string
 	for current := absoluteDirectory; strings.HasPrefix(current, absoluteRoot) && current != absoluteRoot; {
-		if _, err := os.Stat(current); err == nil {
+		if _, statError := os.Stat(current); statError == nil {
 			break
 		}
 		missing = append(missing, current)
@@ -518,7 +568,7 @@ func missingDirectories(directory string, root string) ([]string, error) {
 // With no extra rules this returns the command untouched, so the ordinary path allocates nothing
 // and writes nothing.
 func cohereCommandWithExtraRules(options RunOptions) (GateCommand, func(), error) {
-	noCleanup := func() {}
+	noCleanup := func() { /* The ordinary path wrote nothing, so there is nothing to remove. */ }
 	if len(options.ExtraCohereRuleSettings) == 0 {
 		return options.Cohere, noCleanup, nil
 	}
@@ -528,20 +578,30 @@ func cohereCommandWithExtraRules(options RunOptions) (GateCommand, func(), error
 	// reject ours: `CohereSettings.json` enables rules oxlint does not implement, `no-octal` among
 	// them, and an unknown rule name makes oxlint refuse to start rather than skip the line. The
 	// two files split for that reason and this side must keep pointing at oxlint's.
-	configPath := filepath.Join(options.Root, ".oxlintrc.json")
-	existing, err := os.ReadFile(configPath)
-	if err != nil {
-		return options.Cohere, noCleanup, fmt.Errorf("reading the lint config to extend it: %w", err)
+	configurationPath := filepath.Join(options.Root, ".oxlintrc.json")
+	existing, readError := os.ReadFile(configurationPath)
+	if readError != nil {
+		return options.Cohere, noCleanup, fmt.Errorf("reading the lint config to extend it: %w", readError)
 	}
 
-	var document map[string]any
-	if err := json.Unmarshal(existing, &document); err != nil {
-		return options.Cohere, noCleanup, fmt.Errorf("parsing the lint config to extend it: %w", err)
+	// Held as raw JSON, so every key but the rules, and every rule's setting, is written back as it was read.
+	var document map[string]json.RawMessage
+	if decodeError := json.Unmarshal(existing, &document); decodeError != nil {
+		return options.Cohere, noCleanup, fmt.Errorf("parsing the lint config to extend it: %w", decodeError)
 	}
 
-	rules, _ := document["rules"].(map[string]any)
-	if rules == nil {
-		rules = map[string]any{}
+	rules := map[string]json.RawMessage{}
+	if rulesJson, found := document["rules"]; found {
+		if decodeError := json.Unmarshal(rulesJson, &rules); decodeError != nil {
+			return options.Cohere, noCleanup, fmt.Errorf(
+				"parsing the lint config's rules to extend them: %w",
+				decodeError,
+			)
+		}
+		// A rules key of null decodes to a nil map, which takes no rule.
+		if rules == nil {
+			rules = map[string]json.RawMessage{}
+		}
 	}
 	for name, setting := range options.ExtraCohereRuleSettings {
 		// Refusing rather than overwriting. A rule the shared config already configures is one the
@@ -555,29 +615,37 @@ func cohereCommandWithExtraRules(options RunOptions) (GateCommand, func(), error
 		}
 		rules[name] = setting
 	}
-	document["rules"] = rules
+	rulesJson, encodeError := json.Marshal(rules)
+	if encodeError != nil {
+		return options.Cohere, noCleanup, fmt.Errorf("encoding the extended lint config's rules: %w", encodeError)
+	}
+	document["rules"] = rulesJson
 
-	extended, err := json.Marshal(document)
-	if err != nil {
-		return options.Cohere, noCleanup, fmt.Errorf("encoding the extended lint config: %w", err)
+	extended, encodeError := json.Marshal(document)
+	if encodeError != nil {
+		return options.Cohere, noCleanup, fmt.Errorf("encoding the extended lint config: %w", encodeError)
 	}
 
 	// Beside the original, because the config's own directory is what relative ignore patterns and
 	// override globs resolve against. A config in a temporary directory elsewhere would silently
 	// change which files those patterns match.
 	extendedPath := filepath.Join(options.Root, ".oxlintrc.differential.json")
-	if _, err := os.Stat(extendedPath); err == nil {
+	if _, statError := os.Stat(extendedPath); statError == nil {
 		return options.Cohere, noCleanup, fmt.Errorf(
-			"%s already exists, so a differential run is in flight or one was interrupted; not overwriting it", extendedPath,
+			"%s already exists, so a differential run is in flight or one was interrupted; not overwriting it",
+			extendedPath,
 		)
 	}
-	if err := os.WriteFile(extendedPath, extended, 0o644); err != nil {
-		return options.Cohere, noCleanup, fmt.Errorf("writing the extended lint config: %w", err)
+	if writeError := os.WriteFile(extendedPath, extended, 0o644); writeError != nil {
+		return options.Cohere, noCleanup, fmt.Errorf("writing the extended lint config: %w", writeError)
 	}
 
+	diagnostics := diagnosticsOf(options)
 	cleanup := func() {
-		if err := os.Remove(extendedPath); err != nil && !os.IsNotExist(err) {
-			fmt.Fprintf(os.Stderr, "differential: could not remove %s: %v\n", extendedPath, err)
+		if removeError := os.Remove(extendedPath); removeError != nil && !os.IsNotExist(removeError) {
+			// Ignored: the diagnostics writer is the only place cleanup can say this, so a note that
+			// fails to land has nowhere left to go.
+			fmt.Fprintf(diagnostics, "differential: could not remove %s: %v\n", extendedPath, removeError)
 		}
 	}
 
@@ -596,13 +664,13 @@ func cohereCommandWithExtraRules(options RunOptions) (GateCommand, func(), error
 // A failure here is recorded as unknown rather than raised. The version is context for a reader,
 // not an input to any verdict, and refusing to compare because a binary declined to introduce
 // itself would be the harness failing over something that changes nothing about the comparison.
-func cohereVersionOf(ctx context.Context, command GateCommand) string {
+func cohereVersionOf(callerContext context.Context, command GateCommand) string {
 	probe := command
 	probe.Arguments = []string{"-version"}
 
-	output, err := runGate(ctx, probe)
-	if err != nil {
-		return "version unknown: " + err.Error()
+	output, runGateError := runGate(callerContext, probe)
+	if runGateError != nil {
+		return "version unknown: " + runGateError.Error()
 	}
 
 	return versionLineFrom(output)
@@ -661,7 +729,9 @@ func versionLineFrom(output string) string {
 	}
 	if commit != "" {
 		if note != "" {
-			return commit + " — " + note
+			// The em-dash joining the commit and its note is the report's provenance format, kept byte for byte and
+			// spelled as its escape.
+			return commit + " \u2014 " + note
 		}
 		return commit
 	}
@@ -679,7 +749,7 @@ func versionLineFrom(output string) string {
 // markPlantedDifferences flags the differences this run caused rather than observed.
 //
 // Matched by file rather than by rule, and that distinction was a defect for one revision. Matching
-// on the control's declared rule leaves any OTHER rule that fires on the same planted file counted
+// on the control's declared rule leaves any other rule that fires on the same planted file counted
 // as observed, and one did: the cohere-only control's file trips the gate's import-ordering rule as
 // well as the rule it was written for, so the summary read "1 observed, 2 planted" when both were
 // this harness's own footprint.
@@ -704,18 +774,6 @@ func sharesPath(controlPath string, findingPath string) bool {
 	return strings.HasSuffix(filepath.ToSlash(findingPath), filepath.ToSlash(controlPath))
 }
 
-// ObservedDifferences returns the differences that are about the codebase rather than about the
-// harness, which is the number a reader means when they ask how far apart the two gates are.
-func (report Report) ObservedDifferences() []Difference {
-	observed := make([]Difference, 0, len(report.Differences))
-	for _, difference := range report.Differences {
-		if !difference.Planted {
-			observed = append(observed, difference)
-		}
-	}
-	return observed
-}
-
 // sourceLineReaderAt reads lines of files under a root, each file read once, which is how an
 // acknowledgement's anchor is checked against the finding it names.
 func sourceLineReaderAt(root string) SourceLineReader {
@@ -723,8 +781,8 @@ func sourceLineReaderAt(root string) SourceLineReader {
 	return func(file string, line int) (string, bool) {
 		lines, read := linesByFile[file]
 		if !read {
-			content, err := os.ReadFile(filepath.Join(root, file))
-			if err == nil {
+			content, readError := os.ReadFile(filepath.Join(root, file))
+			if readError == nil {
 				lines = strings.Split(string(content), "\n")
 			}
 			linesByFile[file] = lines

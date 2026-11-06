@@ -8,8 +8,8 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
 )
 
-func TestPathAnalysis(t *testing.T) {
-	t.Parallel()
+func TestPathAnalysis(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range []struct {
 		name          string
 		code          string
@@ -123,26 +123,26 @@ func TestPathAnalysis(t *testing.T) {
 			wantReachable: false,
 		},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			graph, locations := buildPathTestGraph(t, testCase.code)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			graph, locations := buildPathTestGraph(test, testCase.code)
 			analysis := AnalyzePaths(graph)
 			blocks := locations[testCase.event]
 			if len(blocks) != 1 {
-				t.Fatalf("event %q was laid out in %d blocks, want 1", testCase.event, len(blocks))
+				test.Fatalf("event %q was laid out in %d blocks, want 1", testCase.event, len(blocks))
 			}
 			block := blocks[0]
 			if got := block.Reachable; got != testCase.wantReachable {
-				t.Fatalf("reachable = %v, want %v", got, testCase.wantReachable)
+				test.Fatalf("reachable = %v, want %v", got, testCase.wantReachable)
 			}
 			if !block.Reachable {
 				return
 			}
 			if got := analysis.IsCyclic(block); got != testCase.wantCyclic {
-				t.Errorf("cyclic = %v, want %v", got, testCase.wantCyclic)
+				test.Errorf("cyclic = %v, want %v", got, testCase.wantCyclic)
 			}
 			if got := analysis.IsOnEveryFinalPath(block); got != testCase.wantEvery {
-				t.Errorf("on every final path = %v, want %v", got, testCase.wantEvery)
+				test.Errorf("on every final path = %v, want %v", got, testCase.wantEvery)
 			}
 			shortestFinal, hasFinal := analysis.ShortestExitPathFromStart()
 			shortestEvent, reachable := analysis.ShortestPathFromStart(block)
@@ -152,15 +152,21 @@ func TestPathAnalysis(t *testing.T) {
 			}
 			gotEarly = gotEarly && !analysis.IsOnEveryFinalPath(block)
 			if gotEarly != testCase.wantEarly {
-				t.Errorf("early final = %v (final=%d, event=%d), want %v", gotEarly, shortestFinal, shortestEvent, testCase.wantEarly)
+				test.Errorf(
+					"early final = %v (final=%d, event=%d), want %v",
+					gotEarly,
+					shortestFinal,
+					shortestEvent,
+					testCase.wantEarly,
+				)
 			}
 		})
 	}
 }
 
-func TestPossibleThrowThroughFinallyIsExcluded(t *testing.T) {
-	t.Parallel()
-	graph, locations := buildPathTestGraph(t, `
+func TestPossibleThrowThroughFinallyIsExcluded(test *testing.T) {
+	test.Parallel()
+	graph, locations := buildPathTestGraph(test, `
 		function f() {
 			try {
 				mayThrow();
@@ -173,16 +179,16 @@ func TestPossibleThrowThroughFinallyIsExcluded(t *testing.T) {
 	`)
 	analysis := AnalyzePaths(graph)
 	if !analysis.IsOnEveryFinalPath(locations["markInside"][0]) {
-		t.Fatal("the thrown path that bypasses markInside should not count as a final path")
+		test.Fatal("the thrown path that bypasses markInside should not count as a final path")
 	}
 	if !analysis.IsOnEveryFinalPath(locations["markAfter"][0]) {
-		t.Fatal("a possible throw through finally should rejoin before markAfter")
+		test.Fatal("a possible throw through finally should rejoin before markAfter")
 	}
 }
 
-func TestYieldDoesNotHideLoopBackEdge(t *testing.T) {
-	t.Parallel()
-	graph, locations := buildPathTestGraph(t, `
+func TestYieldDoesNotHideLoopBackEdge(test *testing.T) {
+	test.Parallel()
+	graph, locations := buildPathTestGraph(test, `
 		function* f(condition) {
 			while (condition) {
 				markHook();
@@ -192,12 +198,12 @@ func TestYieldDoesNotHideLoopBackEdge(t *testing.T) {
 	`)
 	block := locations["markHook"][0]
 	if analysis := AnalyzePaths(graph); !analysis.IsCyclic(block) {
-		t.Fatal("a resumable yield must not hide the loop back edge")
+		test.Fatal("a resumable yield must not hide the loop back edge")
 	}
 }
 
-func TestFinalPathCountSaturates(t *testing.T) {
-	t.Parallel()
+func TestFinalPathCountSaturates(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range []struct {
 		name string
 		code string
@@ -208,19 +214,19 @@ func TestFinalPathCountSaturates(t *testing.T) {
 		{name: "continue plus loop exit", code: `function f(x) { while (x) { continue; } }`, want: true},
 		{name: "break plus loop exit", code: `function f(x) { while (x) { break; } }`, want: false},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			graph, _ := buildPathTestGraph(t, testCase.code)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			graph, _ := buildPathTestGraph(test, testCase.code)
 			if got := AnalyzePaths(graph).HasSingleFinalPath(); got != testCase.want {
-				t.Fatalf("single final path = %v, want %v", got, testCase.want)
+				test.Fatalf("single final path = %v, want %v", got, testCase.want)
 			}
 		})
 	}
 }
 
-func TestPathAnalysisRejectsProvisionallyReachableLayout(t *testing.T) {
-	t.Parallel()
-	graph, locations := buildPathTestGraph(t, `
+func TestPathAnalysisRejectsProvisionallyReachableLayout(test *testing.T) {
+	test.Parallel()
+	graph, locations := buildPathTestGraph(test, `
 		function f(condition) {
 			for (; condition; markHook()) {
 				return;
@@ -229,15 +235,15 @@ func TestPathAnalysisRejectsProvisionallyReachableLayout(t *testing.T) {
 	`)
 	block := locations["markHook"][0]
 	if !block.Reachable {
-		t.Fatal("the incrementor should be provisionally reachable while it is laid out")
+		test.Fatal("the incrementor should be provisionally reachable while it is laid out")
 	}
 	if _, reachable := AnalyzePaths(graph).ShortestPathFromStart(block); reachable {
-		t.Fatal("the incrementor should have no actual path from the graph entry")
+		test.Fatal("the incrementor should have no actual path from the graph entry")
 	}
 }
 
-func buildPathTestGraph(t *testing.T, code string) (*Graph[string], map[string][]*Block[string]) {
-	t.Helper()
+func buildPathTestGraph(test *testing.T, code string) (*Graph[string], map[string][]*Block[string]) {
+	test.Helper()
 	source := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/test.ts",
 		PathKey:  "/test.ts",
@@ -251,7 +257,7 @@ func buildPathTestGraph(t *testing.T, code string) (*Graph[string], map[string][
 		return false
 	})
 	if root == nil {
-		t.Fatal("test source has no function root")
+		test.Fatal("test source has no function root")
 	}
 
 	graph := Build(root, Hooks[string]{
@@ -300,8 +306,8 @@ func buildPathTestGraph(t *testing.T, code string) (*Graph[string], map[string][
  * On the ahra tree this took `consistent-return` from 141 findings to 131, matching eslint exactly,
  * and moved no other rule that reads this graph.
  */
-func TestEndIsUnreachableWhenACatchRethrowsBesideAFinally(t *testing.T) {
-	t.Parallel()
+func TestEndIsUnreachableWhenACatchRethrowsBesideAFinally(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name string
@@ -343,14 +349,14 @@ func TestEndIsUnreachableWhenACatchRethrowsBesideAFinally(t *testing.T) {
 			want: true,
 		},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			graph, _ := buildPathTestGraph(t, testCase.code)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			graph, _ := buildPathTestGraph(test, testCase.code)
 			if graph == nil {
-				t.Fatal("no graph")
+				test.Fatal("no graph")
 			}
 			if graph.EndReachable != testCase.want {
-				t.Errorf("EndReachable = %v, want %v", graph.EndReachable, testCase.want)
+				test.Errorf("EndReachable = %v, want %v", graph.EndReachable, testCase.want)
 			}
 		})
 	}

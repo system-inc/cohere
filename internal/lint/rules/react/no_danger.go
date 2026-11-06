@@ -14,7 +14,7 @@ import (
 //
 // Upstream's `meta.schema` declares one object with one key, `customComponentNames`, an array of
 // unique strings with no default, checked against the installed build rather than taken from the
-// inventory column. Note the schema does NOT set `additionalProperties: false`, so an unknown key is
+// inventory column. Note the schema does not set `additionalProperties: false`, so an unknown key is
 // accepted and ignored upstream; decoding into a struct does the same thing here.
 type NoDangerOptions struct {
 	// CustomComponentNames holds glob patterns naming components to check in addition to the DOM
@@ -33,14 +33,14 @@ func DefaultNoDangerOptions() NoDangerOptions {
 
 // DecodeNoDangerOptions is hand-rolled rather than `rule.DecodeOptionsInto`.
 //
-// The generic decoder ERRORS on empty input, and a rule configured as a bare `"error"` is handed
+// The generic decoder errors on empty input, and a rule configured as a bare `"error"` is handed
 // nil options. For a non-required rule the config layer turns that error into nil, and the type
 // assertion on nil then yields the zero value, so the generic helper would happen to work here.
 // It works by accident rather than by design, and the accident is exactly the failure the port
 // brief describes costing a rule 3,407 inert registrations. Answering the default explicitly on
 // empty input makes the nil path a decision rather than a coincidence, and
 // `TestNoDangerDecodesOptions` exercises it directly.
-func DecodeNoDangerOptions(raw []byte) (any, error) {
+func DecodeNoDangerOptions(raw []byte) (NoDangerOptions, error) {
 	options := DefaultNoDangerOptions()
 	if len(raw) == 0 {
 		return options, nil
@@ -49,8 +49,8 @@ func DecodeNoDangerOptions(raw []byte) (any, error) {
 	// Lenient on purpose: eslint-plugin-react 7.37.5's schema leaves this object open (no
 	// `additionalProperties`), so ESLint loads an extra key and so must this.
 	var wire noDangerWireOptions
-	if err := json.Unmarshal(raw, &wire); err != nil {
-		return options, err
+	if decodeError := json.Unmarshal(raw, &wire); decodeError != nil {
+		return options, decodeError
 	}
 	options.CustomComponentNames = wire.CustomComponentNames
 	return options, nil
@@ -77,7 +77,7 @@ const dangerousPropertyName = "dangerouslySetInnerHTML"
 // Ported from `eslint-plugin-react`'s `no-danger.js`. `meta.fixable` is absent, and there is nothing
 // to write anyway: the repair is deciding whether the string is trusted, which no linter can do.
 //
-// # What counts as a DOM element, and it is a first-character test on a RENDERED name
+// # What counts as a DOM element, and it is a first-character test on a rendered name
 //
 // Upstream asks `jsxUtil.isDOMComponent`, which renders the tag through `jsx-ast-utils`'s
 // `elementType` and tests `/^[a-z]/` against the result. That is a test on the rendered string
@@ -109,7 +109,7 @@ const dangerousPropertyName = "dangerouslySetInnerHTML"
 // # customComponentNames, its glob dialect, and two upstream defects
 //
 // The option holds minimatch patterns compared against a name upstream builds itself, and that
-// name is NOT the one `elementType` renders. The rule computes
+// name is not the one `elementType` renders. The rule computes
 // `nodeName.name || nodeName.object.name + "." + nodeName.property.name`, which is a different and
 // shallower reading, and the difference produces two real bugs. Both were measured by reproducing
 // that expression against real parses and then confirmed against the running rule:
@@ -120,17 +120,17 @@ const dangerousPropertyName = "dangerouslySetInnerHTML"
 //	<ns:App />    -> the name NODE    DEFECT: not a string at all
 //
 // The third line is confirmed behaviorally: with `customComponentNames: ["A.B.C"]` the element
-// `<A.B.C dangerouslySetInnerHTML={...} />` is SILENT, and with `["undefined.C"]` it REPORTS.
+// `<A.B.C dangerouslySetInnerHTML={...} />` is silent, and with `["undefined.C"]` it reports.
 //
-// The fourth line CRASHES upstream. minimatch is handed an object, calls `.split` on it, and throws
+// The fourth line crashes upstream. minimatch is handed an object, calls `.split` on it, and throws
 // a TypeError that takes down the whole lint run for that file. Reproduced directly against the
 // installed build with `<Ns:App dangerouslySetInnerHTML={...} />` and any `customComponentNames`.
 //
-// The CAPITAL namespace is load-bearing and I had it wrong first; a fixture caught it. A lowercase
+// The capital namespace is load-bearing and I had it wrong first; a fixture caught it. A lowercase
 // `<ns:App />` renders as `ns:App`, whose first character is lowercase, so the DOM branch above
-// already accepts it and the option path is never reached. Measured: `<ns:App>` reports with NO
+// already accepts it and the option path is never reached. Measured: `<ns:App>` reports with no
 // options at all, and only `<Ns:App>` gets far enough to crash. So the crash needs a tag that is
-// namespaced AND capitalised, which is why it survived upstream long enough to find.
+// namespaced and capitalised, which is why it survived upstream long enough to find.
 //
 // Neither defect is reproduced here, and both declines are deliberate rather than silent:
 //
@@ -139,7 +139,7 @@ const dangerousPropertyName = "dangerouslySetInnerHTML"
 //
 // This is the brief's "a port is not obliged to carry a defect it can see", and the crash is the
 // clearest case of it available: reproducing a TypeError faithfully would mean taking a file away
-// from all 289 rules, since the walk recovers per FILE rather than per rule. The intuitive reading
+// from all 289 rules, since the walk recovers per file rather than per rule. The intuitive reading
 // and the measured one are both recorded so the next reader meets a stated decision. The cost is a
 // divergence on two shapes nobody writes, in the direction of reporting slightly more and crashing
 // never.
@@ -157,13 +157,13 @@ const dangerousPropertyName = "dangerouslySetInnerHTML"
 // `ok` while carrying disagreements. It was deleted after the measurement; the number is recorded
 // here because the table is the evidence and the count is what survives.
 //
-// One agreement worth naming, since it looks wrong: `MUI*` does NOT match `TextMUI`, and upstream's
-// corpus has exactly that pair in its VALID list. Both matchers say false for the same reason, and a
+// One agreement worth naming, since it looks wrong: `MUI*` does not match `TextMUI`, and upstream's
+// corpus has exactly that pair in its `valid` list. Both matchers say false for the same reason, and a
 // port that "fixed" it would break an imported clean case.
-var NoDanger = rule.Rule{
+var NoDanger = rule.Rule[NoDangerOptions]{
 	Name: "react/no-danger",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, ok := rule.OptionsAs[NoDangerOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[NoDangerOptions]) rule.Listeners {
+		settings, ok := options.Read()
 		if !ok {
 			// A rule configured as a bare severity reaches here with nil rather than with the
 			// struct. Falling back to the documented default keeps that path a decision.
@@ -188,7 +188,7 @@ var NoDanger = rule.Rule{
 			for _, property := range properties.Nodes {
 				// No kind test here, deliberately. A first version guarded on
 				// `KindJsxAttribute` before calling `jsx.AttributeName`, and a mutation
-				// neutralizing that guard SURVIVED. It is subsumed rather than unreached:
+				// neutralizing that guard survived. It is subsumed rather than unreached:
 				// `AttributeName`'s own first line rejects every kind but `KindJsxAttribute`, so
 				// the readable flag can only ever be true for one, and no input can distinguish the
 				// two versions. Deleted rather than covered by a fixture, since a fixture over a
@@ -203,7 +203,7 @@ var NoDanger = rule.Rule{
 				if !readable || name != dangerousPropertyName {
 					continue
 				}
-				ctx.ReportNode(property, rule.Message{
+				ruleContext.ReportNode(property, rule.Message{
 					Id: "dangerousProp",
 					Description: fmt.Sprintf(
 						"This element sets %s, which hands React a raw string and tells it to "+
@@ -230,7 +230,7 @@ var NoDanger = rule.Rule{
 
 // renderJsxTagName renders a tag the way `jsx-ast-utils`'s `elementType` does.
 //
-// A plain identifier is its own text. A member access joins its parts with `.`, RECURSING through
+// A plain identifier is its own text. A member access joins its parts with `.`, recursing through
 // the object, so `<A.B.C />` renders `A.B.C`. A namespaced name joins with `:`.
 //
 // The recursion is where this deliberately diverges from one of upstream's two readers. `elementType`
@@ -241,7 +241,7 @@ var NoDanger = rule.Rule{
 //
 // **`Text()` is never called on the tag node itself, deliberately.** `ast.Node.Text` has no case for
 // a PropertyAccessExpression and reaches its unhandled-case panic, measured with a probe, and the
-// walk recovers per FILE rather than per rule. The parts are read individually instead.
+// walk recovers per file rather than per rule. The parts are read individually instead.
 func renderJsxTagName(tagName *ast.Node) string {
 	switch tagName.Kind {
 	case ast.KindIdentifier:
@@ -276,7 +276,7 @@ func renderJsxTagName(tagName *ast.Node) string {
 
 // isDomElementName reproduces upstream's `COMPAT_TAG_REGEX`, which is `/^[a-z]/`.
 //
-// A first-character test on the RENDERED name, not a check for an intrinsic element. So `x-custom`,
+// A first-character test on the rendered name, not a check for an intrinsic element. So `x-custom`,
 // `a.b` and `div:ns` are all DOM elements to this rule, and all three are measured reporting
 // upstream. The comparison is ASCII rather than `unicode.IsLower`, matching the regex's own
 // character class: upstream's `[a-z]` does not accept a lowercase non-ASCII letter, so neither does
@@ -307,7 +307,7 @@ func matchesAnyPattern(patterns []string, rendered string) bool {
 	for _, pattern := range patterns {
 		// path.Match, which reads `\` as an escape on every platform. filepath.Match does not on
 		// Windows, so a pattern like `MUI\*` meant something else there than where it was measured.
-		if matched, err := path.Match(pattern, rendered); err == nil && matched {
+		if matched, matchError := path.Match(pattern, rendered); matchError == nil && matched {
 			return true
 		}
 	}

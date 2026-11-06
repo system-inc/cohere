@@ -71,15 +71,15 @@ var messageEmptySwitch = rule.Message{
 // No fix and no suggestion. Deleting an empty block changes control flow wherever the block is a
 // statement body, and adding an explanatory comment means knowing the intent that was never written
 // down. Both repairs are the author's.
-var NoEmpty = rule.Rule{
+var NoEmpty = rule.Rule[NoEmptyOptions]{
 	Name: "no-empty",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[NoEmptyOptions]) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
 		settings := NoEmptyOptions{}
-		if configured, isConfigured := rule.OptionsAs[NoEmptyOptions](options); isConfigured {
+		if configured, isConfigured := options.Read(); isConfigured {
 			settings = configured
 		}
 
@@ -103,11 +103,11 @@ var NoEmpty = rule.Rule{
 					return
 				}
 
-				if blockContainsComment(ctx.SourceFile, node) {
+				if blockContainsComment(ruleContext.SourceFile, node) {
 					return
 				}
 
-				ctx.ReportNode(node, messageEmptyBlock)
+				ruleContext.ReportNode(node, messageEmptyBlock)
 			},
 
 			ast.KindSwitchStatement: func(node *ast.Node) {
@@ -120,11 +120,11 @@ var NoEmpty = rule.Rule{
 					return
 				}
 
-				if blockContainsComment(ctx.SourceFile, switchStatement.CaseBlock) {
+				if blockContainsComment(ruleContext.SourceFile, switchStatement.CaseBlock) {
 					return
 				}
 
-				ctx.ReportNode(node, messageEmptySwitch)
+				ruleContext.ReportNode(node, messageEmptySwitch)
 			},
 		}
 	},

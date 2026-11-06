@@ -2,19 +2,19 @@
     "sourceNotes": {
         "category": "a house rule's name, split by the naming scheme's closed lists (policy/RuleNaming.json)",
         "fixKind": "whether the rule's own tests show a fix, a suggestion, or both (examples/<rule>.json)",
-        "language": "the registry the row comes from: the Go engine's for TypeScript, swift/Rules.json for Swift",
+        "language": "the registry the row comes from: the TypeScript engine's (internal/lint/registry), the Go engine's (internal/goengine/rules), swift/Rules.json for Swift",
         "messageIds": "the message ids the rule's own tests assert (examples/<rule>.json)",
         "name": "the rule registry (internal/lint/registry), as `cohere --rules` lists it",
         "namespace": "the registered name, before its last slash",
         "options": "the rule's registration: which decoder it carries and whether it requires options",
-        "origin": "for TypeScript, the registered namespace, and for a bare name the Go package that registers it; for Swift, the origin each rule declares (swift/Rules.json)",
+        "origin": "for TypeScript, the registered namespace, and for a bare name the Go package that registers it; for Swift, the origin each rule declares (swift/Rules.json); for Go, the origin each rule declares (internal/goengine/rules)",
         "sets": "each carried rule set as the loader resolves it, at warn or error, top-level rules only",
         "swift": "swift/HouseRuleVerdicts.json",
-        "typeAware": "the rule's NeedsTypeChecker declaration, or for Swift the typeAware swift/Rules.json declares",
+        "typeAware": "the rule's NeedsTypeChecker declaration, or for Swift the typeAware swift/Rules.json declares, or for Go the TypeAware its registration declares",
         "typeScriptRules": "swift/HouseRuleVerdicts.json, read from the Swift side: the TypeScript rules whose verdict names this rule",
-        "upstreamName": "for TypeScript, the registered name, for a rule ported from a plugin or ESLint core; for Swift, the id a ported rule declares (swift/Rules.json)"
+        "upstreamName": "for TypeScript, the registered name, for a rule ported from a plugin or ESLint core; for Swift, the id a ported rule declares (swift/Rules.json); for Go, the analyzer or check a ported rule names (internal/goengine/rules)"
     },
-    "count": 552,
+    "count": 784,
     "rules": [
         {
             "name": "@eslint-community/eslint-comments/require-description",
@@ -5596,6 +5596,1846 @@
             ]
         },
         {
+            "name": "cohere-go/S1000",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "S1000",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/S1001",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "S1001",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/S1002",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "S1002",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/S1003",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "S1003",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/S1004",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "S1004",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/S1005",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "S1005",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/S1006",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "S1006",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/S1007",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "S1007",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/S1008",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "S1008",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/S1009",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "S1009",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/S1010",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "S1010",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/S1011",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "S1011",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/S1012",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "S1012",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/S1016",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "S1016",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/S1017",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "S1017",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/S1018",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "S1018",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/S1019",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "S1019",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/S1020",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "S1020",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/S1021",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "S1021",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/S1023",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "S1023",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/S1024",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "S1024",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/S1025",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "S1025",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/S1028",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "S1028",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/S1029",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "S1029",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/S1030",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "S1030",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/S1031",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "S1031",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/S1032",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "S1032",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/S1033",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "S1033",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/S1034",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "S1034",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/S1035",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "S1035",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/S1036",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "S1036",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/S1037",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "S1037",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/S1038",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "S1038",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/S1039",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "S1039",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/S1040",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "S1040",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA1000",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA1000",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA1001",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA1001",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA1002",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA1002",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA1003",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA1003",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA1004",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA1004",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA1005",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA1005",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA1006",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA1006",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA1007",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA1007",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA1008",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA1008",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA1010",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA1010",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA1011",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA1011",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA1012",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA1012",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA1013",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA1013",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA1014",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA1014",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA1015",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA1015",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA1016",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA1016",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA1017",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA1017",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA1018",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA1018",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA1019",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA1019",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA1020",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA1020",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA1021",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA1021",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA1023",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA1023",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA1024",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA1024",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA1025",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA1025",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA1026",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA1026",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA1027",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA1027",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA1028",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA1028",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA1029",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA1029",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA1030",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA1030",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA1031",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA1031",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA1032",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA1032",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA2000",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA2000",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA2001",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA2001",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA2002",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA2002",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA2003",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA2003",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA3000",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA3000",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA3001",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA3001",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA4000",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA4000",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA4001",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA4001",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA4003",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA4003",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA4004",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA4004",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA4005",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA4005",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA4006",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA4006",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA4008",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA4008",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA4009",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA4009",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA4010",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA4010",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA4011",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA4011",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA4012",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA4012",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA4013",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA4013",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA4014",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA4014",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA4015",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA4015",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA4016",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA4016",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA4017",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA4017",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA4018",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA4018",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA4019",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA4019",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA4020",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA4020",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA4021",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA4021",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA4022",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA4022",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA4023",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA4023",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA4024",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA4024",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA4025",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA4025",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA4026",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA4026",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA4027",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA4027",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA4028",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA4028",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA4029",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA4029",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA4030",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA4030",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA4031",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA4031",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA4032",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA4032",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA5000",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA5000",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA5001",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA5001",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA5002",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA5002",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA5003",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA5003",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA5004",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA5004",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA5005",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA5005",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA5007",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA5007",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA5008",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA5008",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA5010",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA5010",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA5012",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA5012",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA6000",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA6000",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA6001",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA6001",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA6002",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA6002",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA6003",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA6003",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA6005",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA6005",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA6006",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA6006",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA9001",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA9001",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA9002",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA9002",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA9004",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA9004",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA9005",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA9005",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA9006",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA9006",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA9007",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA9007",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA9008",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA9008",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/SA9009",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA9009",
+            "typeAware": false
+        },
+        {
+            "name": "cohere-go/SA9010",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "SA9010",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/ST1001",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "ST1001",
+            "typeAware": false
+        },
+        {
+            "name": "cohere-go/ST1006",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "ST1006",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/ST1008",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "ST1008",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/ST1011",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "ST1011",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/ST1012",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "ST1012",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/ST1013",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "ST1013",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/ST1016",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "ST1016",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/ST1017",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "ST1017",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/ST1018",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "ST1018",
+            "typeAware": false
+        },
+        {
+            "name": "cohere-go/ST1019",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "ST1019",
+            "typeAware": false
+        },
+        {
+            "name": "cohere-go/U1000",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "staticcheck",
+            "upstreamName": "U1000",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/appends",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "vet",
+            "upstreamName": "appends",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/asmdecl",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "vet",
+            "upstreamName": "asmdecl",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/assign",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "vet",
+            "upstreamName": "assign",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/atomic",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "vet",
+            "upstreamName": "atomic",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/bools",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "vet",
+            "upstreamName": "bools",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/buildtag",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "vet",
+            "upstreamName": "buildtag",
+            "typeAware": false
+        },
+        {
+            "name": "cohere-go/cgocall",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "vet",
+            "upstreamName": "cgocall",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/composites",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "vet",
+            "upstreamName": "composites",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/concurrency-no-buffered-wait-delay",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "concurrency",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/concurrency-no-kill-by-name",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "concurrency",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/concurrency-require-escape-hatch-reason",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "concurrency",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/consistency-no-abbreviated-identifier",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/consistency-no-ambiguous-identifier",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/consistency-no-any",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/consistency-no-boolean-outcome",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/consistency-no-console",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/consistency-no-dash-punctuation",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": false
+        },
+        {
+            "name": "cohere-go/consistency-no-else-return",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/consistency-no-empty-function",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/consistency-no-grouped-var",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/consistency-no-label",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": false
+        },
+        {
+            "name": "cohere-go/consistency-no-lone-block",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": false
+        },
+        {
+            "name": "cohere-go/consistency-no-lonely-if",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": false
+        },
+        {
+            "name": "cohere-go/consistency-no-long-file",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": false
+        },
+        {
+            "name": "cohere-go/consistency-no-long-line",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": false
+        },
+        {
+            "name": "cohere-go/consistency-no-parameter-reassignment",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/consistency-no-property-alias",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/consistency-no-redundant-import-alias",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/consistency-no-screaming-snake-case",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/consistency-no-shouting",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": false
+        },
+        {
+            "name": "cohere-go/consistency-no-stuttering-name",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/consistency-no-undefined-initializer",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/consistency-no-uppercase-initialism",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/consistency-no-use-before-define",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/consistency-no-useless-concatenation",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": false
+        },
+        {
+            "name": "cohere-go/consistency-no-utils-folder",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": false
+        },
+        {
+            "name": "cohere-go/consistency-no-warning-comment",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": false
+        },
+        {
+            "name": "cohere-go/consistency-require-default-last",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": false
+        },
+        {
+            "name": "cohere-go/consistency-require-error-clause",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/consistency-require-matching-file-name",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/consistency-require-octal-prefix",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": false
+        },
+        {
+            "name": "cohere-go/consistency-require-one-type-per-file",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/consistency-require-operator-assignment",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/copylocks",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "vet",
+            "upstreamName": "copylocks",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/correctness-no-caller-data-mutation",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "correctness",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/correctness-no-identical-branches",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "correctness",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/correctness-no-process-exit-after-output",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "correctness",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/correctness-no-write-only-collection",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "correctness",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/correctness-require-checked-assertion",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "correctness",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/correctness-require-declared-walk",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "correctness",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/correctness-require-handled-error",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "correctness",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/correctness-require-invariant-reason",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "correctness",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/correctness-require-response-status-check",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "correctness",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/correctness-require-wrapped-error",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "correctness",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/defers",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "vet",
+            "upstreamName": "defers",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/directive",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "vet",
+            "upstreamName": "directive",
+            "typeAware": false
+        },
+        {
+            "name": "cohere-go/errorsas",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "vet",
+            "upstreamName": "errorsas",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/framepointer",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "vet",
+            "upstreamName": "framepointer",
+            "typeAware": false
+        },
+        {
+            "name": "cohere-go/hostport",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "vet",
+            "upstreamName": "hostport",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/httpresponse",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "vet",
+            "upstreamName": "httpresponse",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/ifaceassert",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "vet",
+            "upstreamName": "ifaceassert",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/loopclosure",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "vet",
+            "upstreamName": "loopclosure",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/lostcancel",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "vet",
+            "upstreamName": "lostcancel",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/nilfunc",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "vet",
+            "upstreamName": "nilfunc",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/nilness",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "tools",
+            "upstreamName": "nilness",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/printf",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "vet",
+            "upstreamName": "printf",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/scannererr",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "vet",
+            "upstreamName": "scannererr",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/security-no-interpolated-shell-command",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "security",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/security-no-interpolated-sql-string",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "security",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/shift",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "vet",
+            "upstreamName": "shift",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/sigchanyzer",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "vet",
+            "upstreamName": "sigchanyzer",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/slog",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "vet",
+            "upstreamName": "slog",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/sqlrowserr",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "vet",
+            "upstreamName": "sqlrowserr",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/stdmethods",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "vet",
+            "upstreamName": "stdmethods",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/stdversion",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "vet",
+            "upstreamName": "stdversion",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/stringintconv",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "vet",
+            "upstreamName": "stringintconv",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/structtag",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "vet",
+            "upstreamName": "structtag",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/testing-no-machine-path",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "testing",
+            "typeAware": false
+        },
+        {
+            "name": "cohere-go/testing-no-timing-assertion",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "testing",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/testing-no-uncached-run",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "testing",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/testing-require-failure-path",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "testing",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/testing-require-parallel",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "testing",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/testinggoroutine",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "vet",
+            "upstreamName": "testinggoroutine",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/tests",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "vet",
+            "upstreamName": "tests",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/timeformat",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "vet",
+            "upstreamName": "timeformat",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/unmarshal",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "vet",
+            "upstreamName": "unmarshal",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/unreachable",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "vet",
+            "upstreamName": "unreachable",
+            "typeAware": false
+        },
+        {
+            "name": "cohere-go/unsafeptr",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "vet",
+            "upstreamName": "unsafeptr",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/unusedresult",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "vet",
+            "upstreamName": "unusedresult",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/unusedwrite",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "tools",
+            "upstreamName": "unusedwrite",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/waitgroup",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "vet",
+            "upstreamName": "waitgroup",
+            "typeAware": true
+        },
+        {
             "name": "cohere-swift/always-use-lower-camel-case",
             "language": "Swift",
             "namespace": "cohere-swift",
@@ -5603,7 +7443,8 @@
             "upstreamName": "AlwaysUseLowerCamelCase",
             "typeAware": false,
             "typeScriptRules": [
-                "nexus/consistency-no-screaming-snake-case"
+                "nexus/consistency-no-screaming-snake-case",
+                "nexus/consistency-require-identifier-casing"
             ]
         },
         {
@@ -6046,7 +7887,10 @@
             "namespace": "cohere-swift",
             "origin": "swiftlint",
             "upstreamName": "todo",
-            "typeAware": false
+            "typeAware": false,
+            "typeScriptRules": [
+                "nexus/consistency-no-warning-comment"
+            ]
         },
         {
             "name": "cohere-swift/toolchain-require-strict-memory-safety",
@@ -6971,8 +8815,7 @@
             "typeAware": false,
             "messageIds": [
                 "noAmbiguousE",
-                "noSingleLetter",
-                "noUnderscore"
+                "noSingleLetter"
             ],
             "sets": [
                 {
@@ -7617,6 +9460,10 @@
             "origin": "house",
             "category": "consistency",
             "typeAware": false,
+            "options": {
+                "elements": "one",
+                "anchorsPaths": true
+            },
             "messageIds": [
                 "noUnderscoreUtils",
                 "noUtils"
@@ -7657,6 +9504,51 @@
             }
         },
         {
+            "name": "nexus/consistency-no-warning-comment",
+            "language": "TypeScript",
+            "namespace": "nexus",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": false,
+            "messageIds": [
+                "warningComment"
+            ],
+            "sets": [
+                {
+                    "set": "cohere:next",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:react",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:style",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:system-inc/base",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:system-inc/structure",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:tailwind",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:typescript",
+                    "severity": "error"
+                }
+            ],
+            "swift": {
+                "verdict": "Ported",
+                "swiftRule": "cohere-swift/todo"
+            }
+        },
+        {
             "name": "nexus/consistency-require-constant-casing",
             "language": "TypeScript",
             "namespace": "nexus",
@@ -7686,6 +9578,34 @@
             ],
             "swift": {
                 "verdict": "NotApplicable"
+            }
+        },
+        {
+            "name": "nexus/consistency-require-identifier-casing",
+            "language": "TypeScript",
+            "namespace": "nexus",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": true,
+            "messageIds": [
+                "requireLowerCamelCaseValue",
+                "requireUpperCamelCaseCapital",
+                "requireUpperCamelCaseType"
+            ],
+            "fixKind": "fix",
+            "sets": [
+                {
+                    "set": "cohere:system-inc/base",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:system-inc/structure",
+                    "severity": "error"
+                }
+            ],
+            "swift": {
+                "verdict": "Ported",
+                "swiftRule": "cohere-swift/always-use-lower-camel-case"
             }
         },
         {
@@ -12882,36 +14802,6 @@
             },
             "messageIds": [
                 "unexpectedComment"
-            ],
-            "sets": [
-                {
-                    "set": "cohere:next",
-                    "severity": "error"
-                },
-                {
-                    "set": "cohere:react",
-                    "severity": "error"
-                },
-                {
-                    "set": "cohere:style",
-                    "severity": "error"
-                },
-                {
-                    "set": "cohere:system-inc/base",
-                    "severity": "error"
-                },
-                {
-                    "set": "cohere:system-inc/structure",
-                    "severity": "error"
-                },
-                {
-                    "set": "cohere:tailwind",
-                    "severity": "error"
-                },
-                {
-                    "set": "cohere:typescript",
-                    "severity": "error"
-                }
             ]
         },
         {

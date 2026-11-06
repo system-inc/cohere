@@ -33,23 +33,23 @@ const upstreamEvalFixture = `function Component(props) {
 // One fixture, which is the whole imported reporting corpus. React ships no fixture writing a
 // `with` statement or an inline class declaration inside a component, checked by grepping the
 // full 1,835-input fixture list at the pinned sha rather than only the 453 vendored here.
-func TestUnsupportedSyntaxFiresOnUpstreamCorpus(t *testing.T) {
-	t.Parallel()
+func TestUnsupportedSyntaxFiresOnUpstreamCorpus(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTyped(t, UnsupportedSyntax, unsupportedSyntaxFile, upstreamEvalFixture)
-	rule_testing.ExpectFindings(t, result, "unsupportedEval")
+	result := rule_testing.RunTyped(test, UnsupportedSyntax, unsupportedSyntaxFile, upstreamEvalFixture)
+	rule_testing.ExpectFindings(test, result, "unsupportedEval")
 
 	// The span is asserted against a literal typed here rather than against the rule's own
 	// message constant, so a mutation moving both sides together cannot stay green.
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("want 1 diagnostic, got %d", len(result.Diagnostics))
+		test.Fatalf("want 1 diagnostic, got %d", len(result.Diagnostics))
 	}
 	reported := upstreamEvalFixture[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 	if reported != "eval" {
-		t.Errorf("finding points at %q, want %q", reported, "eval")
+		test.Errorf("finding points at %q, want %q", reported, "eval")
 	}
 	if result.Diagnostics[0].Message.Id != "unsupportedEval" {
-		t.Errorf("message id is %q, want %q", result.Diagnostics[0].Message.Id, "unsupportedEval")
+		test.Errorf("message id is %q, want %q", result.Diagnostics[0].Message.Id, "unsupportedEval")
 	}
 }
 
@@ -66,20 +66,23 @@ func TestUnsupportedSyntaxFiresOnUpstreamCorpus(t *testing.T) {
 // template literals and escape sequences, and the port brief's rule is that the tool writing a
 // fixture can cook an escape without anything going red. Reading the bytes removes the
 // transcription step instead of verifying it.
-func TestUnsupportedSyntaxStaysSilentOnUpstreamCorpus(t *testing.T) {
-	t.Parallel()
+func TestUnsupportedSyntaxStaysSilentOnUpstreamCorpus(test *testing.T) {
+	test.Parallel()
 
 	path := filepath.Join("conformance", "testdata", "fixtures", "error.todo-kitchensink.js")
-	sourceBytes, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("reading the vendored fixture: %v", err)
+	sourceBytes, readError := os.ReadFile(path)
+	if readError != nil {
+		test.Fatalf("reading the vendored fixture: %v", readError)
 	}
 	// A control alongside the zero this asserts: the fixture must actually contain the
 	// declaration, or the clean verdict is about an empty file rather than about the gate.
 	if !strings.Contains(string(sourceBytes), "class Bar {") {
-		t.Fatal("the vendored kitchensink fixture no longer declares an inline class, so this case tests nothing")
+		test.Fatal("the vendored kitchensink fixture no longer declares an inline class, so this case tests nothing")
 	}
-	rule_testing.ExpectClean(t, rule_testing.RunTyped(t, UnsupportedSyntax, unsupportedSyntaxFile, string(sourceBytes)))
+	rule_testing.ExpectClean(
+		test,
+		rule_testing.RunTyped(test, UnsupportedSyntax, unsupportedSyntaxFile, string(sourceBytes)),
+	)
 }
 
 // TestUnsupportedSyntaxFires covers the reporting cases upstream does not ship.
@@ -88,8 +91,8 @@ func TestUnsupportedSyntaxStaysSilentOnUpstreamCorpus(t *testing.T) {
 // Linter API before being written here, and the expected findings are that run's output rather
 // than a prediction from reading the bundle. Three of them contradicted what the source alone
 // suggested, and those are called out at the case.
-func TestUnsupportedSyntaxFires(t *testing.T) {
-	t.Parallel()
+func TestUnsupportedSyntaxFires(test *testing.T) {
+	test.Parallel()
 
 	testCases := []struct {
 		name       string
@@ -223,7 +226,7 @@ func TestUnsupportedSyntaxFires(t *testing.T) {
 			wantIds: []string{"unsupportedEval"},
 		},
 		{
-			// A plain function may sit BETWEEN the compilation root and the finding. `Outer` is the
+			// A plain function may sit between the compilation root and the finding. `Outer` is the
 			// root, `mid` is simply part of what it lowers, and the eval inside the innermost arrow
 			// still reports. This is the case that rules out a "every enclosing function must
 			// qualify" formulation of the gate, which an earlier version of this rule used.
@@ -272,7 +275,7 @@ func TestUnsupportedSyntaxFires(t *testing.T) {
 			// A redundant parenthesis around the arrow. Our parser keeps a KindParenthesizedExpression
 			// between the declarator and the function where Babel's tree has already dropped it, so
 			// the name lookup has to walk out through it. Measured on React's rule, this reports,
-			// and it was the ONE disagreement in a 111-input differential run before the skip was
+			// and it was the one disagreement in a 111-input differential run before the skip was
 			// added in both directions.
 			name: "parenthesizedArrowComponent",
 			sourceText: `const Component = ((props) => {
@@ -283,7 +286,7 @@ func TestUnsupportedSyntaxFires(t *testing.T) {
 			wantIds: []string{"unsupportedEval"},
 		},
 		{
-			// A type reference is a VALID props annotation, which is what makes the disqualifying
+			// A type reference is a valid props annotation, which is what makes the disqualifying
 			// list a list rather than an "is it an object type" test. Paired with the annotation
 			// cases in the silent suite, this is the half proving the list is not simply
 			// rejecting everything annotated.
@@ -301,7 +304,7 @@ function Component(props: Props) {
 		{
 			// The hook branch ignores parameter shape entirely, which upstream gets by asking
 			// isValidComponentParams only inside the component branch. A rest parameter, three
-			// parameters, and a primitive-annotated first parameter each disqualify a COMPONENT
+			// parameters, and a primitive-annotated first parameter each disqualify a component
 			// and none of them disqualifies a hook. A mutation adding the parameter test to the
 			// hook branch survived the whole suite until these four cases were added.
 			name: "hookWithRestParameter",
@@ -390,7 +393,7 @@ function Component(props: Props) {
 		},
 		{
 			// The inner arrow is not named through a path this port recognizes, and the finding still
-			// appears because the OUTER function qualifies and the walk goes outward until something
+			// appears because the outer function qualifies and the walk goes outward until something
 			// does. Without the outward walk this would be a false negative.
 			name: "nestedComponentInsideComponent",
 			sourceText: `function Outer(props) {
@@ -406,10 +409,10 @@ function Component(props: Props) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.RunTyped(t, UnsupportedSyntax, unsupportedSyntaxFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.RunTyped(test, UnsupportedSyntax, unsupportedSyntaxFile, testCase.sourceText),
 				testCase.wantIds...)
 		})
 	}
@@ -421,8 +424,8 @@ function Component(props: Props) {
 // The three diagnostics are trivial to detect and the gate deciding whether to look at all is
 // the entire rule, so most of these assert the gate rather than the diagnostics. Each was run
 // through React's own rule and came back silent.
-func TestUnsupportedSyntaxStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestUnsupportedSyntaxStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	testCases := []struct {
 		name       string
@@ -483,7 +486,7 @@ func TestUnsupportedSyntaxStaysSilent(t *testing.T) {
 		},
 		{
 			// The gate on the `with` arm specifically. Every other clean case here reaches the gate
-			// through the eval arm, so a mutation removing the gate from THIS arm survived the
+			// through the eval arm, so a mutation removing the gate from this arm survived the
 			// whole suite until this case was added. Measured silent under React's own rule.
 			name: "withInPlainFunction",
 			sourceText: `function helper(props) {
@@ -611,7 +614,7 @@ func TestUnsupportedSyntaxStaysSilent(t *testing.T) {
 `,
 		},
 		{
-			// Both upstreams dispatch on the STATEMENT, so a class expression is untouched. This is the
+			// Both upstreams dispatch on the statement, so a class expression is untouched. This is the
 			// pass case that separates the declaration arm from a naive `class` keyword search.
 			name: "classExpressionInComponent",
 			sourceText: `function Component(props) {
@@ -763,10 +766,10 @@ func TestUnsupportedSyntaxStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.RunTyped(t, UnsupportedSyntax, unsupportedSyntaxFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.RunTyped(test, UnsupportedSyntax, unsupportedSyntaxFile, testCase.sourceText))
 		})
 	}
 }
@@ -780,16 +783,16 @@ func TestUnsupportedSyntaxStaysSilent(t *testing.T) {
 // The comparison is possible at all only because the corpus is vendored into this repository. A
 // rule whose upstream fixtures were fetched at write time would have nothing to compare against
 // later, which is the argument for the vendoring rather than an incidental convenience of it.
-func TestUnsupportedSyntaxTranscriptionMatchesTheVendoredCorpus(t *testing.T) {
-	t.Parallel()
+func TestUnsupportedSyntaxTranscriptionMatchesTheVendoredCorpus(test *testing.T) {
+	test.Parallel()
 
 	path := filepath.Join("conformance", "testdata", "fixtures", "error.invalid-eval-unsupported.js")
-	sourceBytes, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("reading the vendored fixture: %v", err)
+	sourceBytes, readError := os.ReadFile(path)
+	if readError != nil {
+		test.Fatalf("reading the vendored fixture: %v", readError)
 	}
 	if string(sourceBytes) != upstreamEvalFixture {
-		t.Errorf("transcription drifted from the vendored corpus\n vendored: %q\n     here: %q",
+		test.Errorf("transcription drifted from the vendored corpus\n vendored: %q\n     here: %q",
 			string(sourceBytes), upstreamEvalFixture)
 	}
 }
@@ -805,19 +808,19 @@ func TestUnsupportedSyntaxTranscriptionMatchesTheVendoredCorpus(t *testing.T) {
 // The `with` and inline-class arms are deliberately not covered by this: neither consults the
 // checker, so both still report under the plain harness, and asserting silence for them would
 // assert the opposite of the truth.
-func TestUnsupportedSyntaxRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestUnsupportedSyntaxRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	// The control first. Under the typed harness this input reports, which is what makes the
 	// silence below a measurement of the harness rather than of the input.
-	typed := rule_testing.RunTyped(t, UnsupportedSyntax, unsupportedSyntaxFile, upstreamEvalFixture)
+	typed := rule_testing.RunTyped(test, UnsupportedSyntax, unsupportedSyntaxFile, upstreamEvalFixture)
 	if len(typed.Diagnostics) != 1 {
-		t.Fatalf("typed harness: want 1 diagnostic, got %d", len(typed.Diagnostics))
+		test.Fatalf("typed harness: want 1 diagnostic, got %d", len(typed.Diagnostics))
 	}
 
-	untyped := rule_testing.Run(t, UnsupportedSyntax, unsupportedSyntaxFile, upstreamEvalFixture)
+	untyped := rule_testing.Run(test, UnsupportedSyntax, unsupportedSyntaxFile, upstreamEvalFixture)
 	if len(untyped.Diagnostics) != 0 {
-		t.Errorf("plain harness: want 0 diagnostics from the guarded eval arm, got %d",
+		test.Errorf("plain harness: want 0 diagnostics from the guarded eval arm, got %d",
 			len(untyped.Diagnostics))
 	}
 }
@@ -836,8 +839,8 @@ func TestUnsupportedSyntaxRequiresTheTypedHarness(t *testing.T) {
 // The three spans reproduce upstream exactly. React's own golden for the eval case draws four
 // carets under `eval`, and running React's rule on the other two reports columns 3 through 18 for
 // `with (props) {}` and 3 through 15 for `class Foo {}`, which are the two spans below.
-func TestUnsupportedSyntaxPointsAtTheRightNode(t *testing.T) {
-	t.Parallel()
+func TestUnsupportedSyntaxPointsAtTheRightNode(test *testing.T) {
+	test.Parallel()
 
 	testCases := []struct {
 		name       string
@@ -874,15 +877,15 @@ func TestUnsupportedSyntaxPointsAtTheRightNode(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, UnsupportedSyntax, unsupportedSyntaxFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, UnsupportedSyntax, unsupportedSyntaxFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("want 1 diagnostic, got %d", len(result.Diagnostics))
+				test.Fatalf("want 1 diagnostic, got %d", len(result.Diagnostics))
 			}
 			reported := testCase.sourceText[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 			if reported != testCase.wantText {
-				t.Errorf("finding points at %q, want %q", reported, testCase.wantText)
+				test.Errorf("finding points at %q, want %q", reported, testCase.wantText)
 			}
 		})
 	}
@@ -893,19 +896,19 @@ func TestUnsupportedSyntaxPointsAtTheRightNode(t *testing.T) {
 //
 // A `rule.Message` is `{Id, Description}` with no interpolation layer, so there is no rendered text
 // to guard and nothing a format string can get wrong. What is still worth pinning is that the three
-// arms report three DIFFERENT messages: a mutation routing all three to one message would leave
+// arms report three different messages: a mutation routing all three to one message would leave
 // every count assertion green while telling a reader the wrong thing about their code.
-func TestUnsupportedSyntaxMessagesAreDistinct(t *testing.T) {
-	t.Parallel()
+func TestUnsupportedSyntaxMessagesAreDistinct(test *testing.T) {
+	test.Parallel()
 
 	if messageUnsupportedEval.Id != "unsupportedEval" {
-		t.Errorf("eval message id is %q", messageUnsupportedEval.Id)
+		test.Errorf("eval message id is %q", messageUnsupportedEval.Id)
 	}
 	if messageUnsupportedWith.Id != "unsupportedWith" {
-		t.Errorf("with message id is %q", messageUnsupportedWith.Id)
+		test.Errorf("with message id is %q", messageUnsupportedWith.Id)
 	}
 	if messageUnsupportedInlineClass.Id != "unsupportedInlineClass" {
-		t.Errorf("inline class message id is %q", messageUnsupportedInlineClass.Id)
+		test.Errorf("inline class message id is %q", messageUnsupportedInlineClass.Id)
 	}
 
 	descriptions := map[string]bool{
@@ -914,15 +917,15 @@ func TestUnsupportedSyntaxMessagesAreDistinct(t *testing.T) {
 		messageUnsupportedInlineClass.Description: true,
 	}
 	if len(descriptions) != 3 {
-		t.Error("two of the three messages share a description, so a reader cannot tell which syntax was found")
+		test.Error("two of the three messages share a description, so a reader cannot tell which syntax was found")
 	}
 	if !strings.Contains(messageUnsupportedEval.Description, "eval") {
-		t.Error("the eval message does not name eval")
+		test.Error("the eval message does not name eval")
 	}
 	if !strings.Contains(messageUnsupportedWith.Description, "with") {
-		t.Error("the with message does not name with")
+		test.Error("the with message does not name with")
 	}
 	if !strings.Contains(messageUnsupportedInlineClass.Description, "class") {
-		t.Error("the inline class message does not name class")
+		test.Error("the inline class message does not name class")
 	}
 }

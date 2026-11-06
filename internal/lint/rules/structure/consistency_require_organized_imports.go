@@ -10,7 +10,10 @@ import (
 
 // consistencyRequireOrganizedImportsText is the rule's message, whose wording lives in
 // `policy/messages/consistency-require-organized-imports.json`.
-var consistencyRequireOrganizedImportsText = policy.MessageOf("structure/consistency-require-organized-imports", "importsNotOrganized")
+var consistencyRequireOrganizedImportsText = policy.MessageOf(
+	"structure/consistency-require-organized-imports",
+	"importsNotOrganized",
+)
 
 // messageImportsNotOrganized is the finding, rendered when it is reported so the text comes from the current catalog.
 func messageImportsNotOrganized() rule.Message {
@@ -83,12 +86,12 @@ func messageImportsNotOrganized() rule.Message {
 // including the ones where the import that is out of place is somewhere else entirely, and
 // including the `'use client'` cases where the thing that is wrong is the directive's comment. The
 // span is that declaration's own text.
-var ConsistencyRequireOrganizedImports = rule.Rule{
+var ConsistencyRequireOrganizedImports = rule.Rule[rule.NoOptions]{
 	Name: "structure/consistency-require-organized-imports",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
-				checkImportOrganization(ctx, node)
+				checkImportOrganization(ruleContext, node)
 			},
 		}
 	},
@@ -99,7 +102,7 @@ var ConsistencyRequireOrganizedImports = rule.Rule{
 // A KindSourceFile listener rather than a per-import one, because the judgment is about the section
 // as a whole: no single import is wrong on its own, and reporting per-import would produce one
 // finding per file times however many imports it holds.
-func checkImportOrganization(ctx rule.Context, sourceFile *ast.Node) {
+func checkImportOrganization(ruleContext rule.Context, sourceFile *ast.Node) {
 	statements := sourceFile.AsSourceFile().Statements
 	if statements == nil {
 		return
@@ -118,9 +121,9 @@ func checkImportOrganization(ctx rule.Context, sourceFile *ast.Node) {
 		return
 	}
 
-	sourceFileNode := ctx.SourceFile
+	sourceFileNode := ruleContext.SourceFile
 	sourceText := sourceFileNode.Text()
-	fileComments := comments.ForFile(ctx)
+	fileComments := comments.ForFile(ruleContext)
 
 	directive, directiveNode := leadingDirective(statements)
 
@@ -128,9 +131,23 @@ func checkImportOrganization(ctx rule.Context, sourceFile *ast.Node) {
 
 	descriptionBlock := fileDescriptionBlock(sourceFileNode, fileComments, importDeclarations[0], directiveNode)
 
-	classified := classifyDeclarations(sourceFileNode, sourceText, fileComments, importDeclarations, sectionStart, descriptionBlock)
+	classified := classifyDeclarations(
+		sourceFileNode,
+		sourceText,
+		fileComments,
+		importDeclarations,
+		sectionStart,
+		descriptionBlock,
+	)
 
-	interleaved, sectionEnd := interleavedStatements(sourceFileNode, sourceText, fileComments, statements, importDeclarations, sectionStart)
+	interleaved, sectionEnd := interleavedStatements(
+		sourceFileNode,
+		sourceText,
+		fileComments,
+		statements,
+		importDeclarations,
+		sectionStart,
+	)
 
 	expected := renderSection(directive, descriptionBlock, classified, interleaved)
 
@@ -154,10 +171,10 @@ func checkImportOrganization(ctx rule.Context, sourceFile *ast.Node) {
 	 * being reordered. Those files are reported without a fix.
 	 */
 	if !canRenderSafely(interleaved) || suppressionPrecedesSection(sourceText, fileComments, sectionStart) {
-		ctx.ReportNode(importDeclarations[0], messageImportsNotOrganized())
+		ruleContext.ReportNode(importDeclarations[0], messageImportsNotOrganized())
 		return
 	}
 
-	ctx.ReportNodeWithFixes(importDeclarations[0], messageImportsNotOrganized(),
+	ruleContext.ReportNodeWithFixes(importDeclarations[0], messageImportsNotOrganized(),
 		rule.ReplaceRange(core.NewTextRange(sectionStart, sectionEnd), expected))
 }

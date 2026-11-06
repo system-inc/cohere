@@ -10,8 +10,8 @@ import (
 //
 // Enables are the half most likely to be dropped, because the index does not otherwise keep them,
 // and ESLint 10.8.1 reports an unknown name in `eslint-enable` exactly as it does in a disable.
-func TestRuleReferencesNameEveryRuleEveryDirectiveWrote(t *testing.T) {
-	t.Parallel()
+func TestRuleReferencesNameEveryRuleEveryDirectiveWrote(test *testing.T) {
+	test.Parallel()
 	lines := []string{
 		"// eslint-disable-next-line no-unused-var -- why",
 		"const a = 1; // eslint-disable-line no-consol, no-console",
@@ -28,7 +28,7 @@ func TestRuleReferencesNameEveryRuleEveryDirectiveWrote(t *testing.T) {
 
 	got := []string{}
 	for _, reference := range Build(source).RuleReferences() {
-		got = append(got, reference.Name+"="+source[reference.Pos:reference.End])
+		got = append(got, reference.Name+"="+source[reference.Position:reference.End])
 	}
 	want := []string{
 		"no-unused-var=" + lines[0],
@@ -38,6 +38,6 @@ func TestRuleReferencesNameEveryRuleEveryDirectiveWrote(t *testing.T) {
 		"no-such-rule=" + lines[3],
 	}
 	if strings.Join(got, "\n") != strings.Join(want, "\n") {
-		t.Fatalf("rule references\n got: %q\nwant: %q", got, want)
+		test.Fatalf("rule references\n got: %q\nwant: %q", got, want)
 	}
 }

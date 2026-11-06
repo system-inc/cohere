@@ -29,8 +29,8 @@ const noAdjacentInlineElementsFile = "/repository/source/NoAdjacentInlineElement
 // single most misleading thing in this corpus.
 
 // TestNoAdjacentInlineElementsFires runs the three failing cases from upstream.
-func TestNoAdjacentInlineElementsFires(t *testing.T) {
-	t.Parallel()
+func TestNoAdjacentInlineElementsFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -38,21 +38,29 @@ func TestNoAdjacentInlineElementsFires(t *testing.T) {
 	}{
 		{"invalid 0 two identical anchors", `<div><a></a><a></a></div>;`},
 		{"invalid 1 an anchor and a span", `<div><a></a><span></span></div>;`},
-		{"invalid 2 two createElement children in an array", `React.createElement("div", undefined, [React.createElement("a"), React.createElement("span")]);`},
+		{
+			"invalid 2 two createElement children in an array",
+			`React.createElement("div", undefined, [React.createElement("a"), React.createElement("span")]);`,
+		},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoAdjacentInlineElements, noAdjacentInlineElementsFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "inlineElement")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(
+				test,
+				NoAdjacentInlineElements,
+				noAdjacentInlineElementsFile,
+				testCase.sourceText,
+			)
+			rule_testing.ExpectFindings(test, result, "inlineElement")
 		})
 	}
 }
 
 // TestNoAdjacentInlineElementsStaysSilent runs the fourteen passing cases from upstream.
-func TestNoAdjacentInlineElementsStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoAdjacentInlineElementsStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -74,16 +82,27 @@ func TestNoAdjacentInlineElementsStaysSilent(t *testing.T) {
 		{"valid 8 anchors nested in separate list items", `<div><ul><li><a></a></li><li><a></a></li></ul></div>;`},
 		{"valid 9 text between anchors", `<div><a></a> some text <a></a></div>;`},
 		{"valid 10 a createElement call with only text", `React.createElement("div", null, "some text");`},
-		{"valid 11 a padded string between two createElement children", `React.createElement("div", undefined, [React.createElement("a"), " some text ", React.createElement("a")]);`},
-		{"valid 12 a single space between two createElement children", `React.createElement("div", undefined, [React.createElement("a"), " ", React.createElement("a")]);`},
+		{
+			"valid 11 a padded string between two createElement children",
+			`React.createElement("div", undefined, [React.createElement("a"), " some text ", React.createElement("a")]);`,
+		},
+		{
+			"valid 12 a single space between two createElement children",
+			`React.createElement("div", undefined, [React.createElement("a"), " ", React.createElement("a")]);`,
+		},
 		{"valid 13 a createElement call with no children argument", `React.createElement(a, b);`},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoAdjacentInlineElements, noAdjacentInlineElementsFile, testCase.sourceText)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(
+				test,
+				NoAdjacentInlineElements,
+				noAdjacentInlineElementsFile,
+				testCase.sourceText,
+			)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -95,19 +114,19 @@ func TestNoAdjacentInlineElementsStaysSilent(t *testing.T) {
 //
 // `.jsx` and `.js` are not covered because the typed program's tsconfig includes only TypeScript
 // extensions, which is a fact about the harness rather than about the rule.
-func TestNoAdjacentInlineElementsHasNoFileSuffixGate(t *testing.T) {
-	t.Parallel()
+func TestNoAdjacentInlineElementsHasNoFileSuffixGate(test *testing.T) {
+	test.Parallel()
 
 	for _, suffix := range []string{".tsx", ".ts"} {
-		t.Run(suffix, func(t *testing.T) {
-			t.Parallel()
+		test.Run(suffix, func(test *testing.T) {
+			test.Parallel()
 			result := rule_testing.RunTyped(
-				t,
+				test,
 				NoAdjacentInlineElements,
 				"/repository/source/SuffixProbe"+suffix,
 				`React.createElement("div", undefined, [React.createElement("a"), React.createElement("span")]);`,
 			)
-			rule_testing.ExpectFindings(t, result, "inlineElement")
+			rule_testing.ExpectFindings(test, result, "inlineElement")
 		})
 	}
 }
@@ -116,15 +135,15 @@ func TestNoAdjacentInlineElementsHasNoFileSuffixGate(t *testing.T) {
 //
 // Six of upstream's passing cases separate two anchors with whitespace, so they read as a whitespace
 // test. Applying the discipline of changing the one thing the shape suggests matters, the verdict
-// does NOT move: a single non-space character is just as clean. Text written inside a tag is
+// does not move: a single non-space character is just as clean. Text written inside a tag is
 // `JSXText` in the tree upstream walks, its `isInline` names no such arm, so it falls through to
 // false and breaks the adjacency run whatever it holds.
 //
 // A port that read those six cases as a whitespace test would pass all seventeen imported cases and
 // be wrong about the whole JSX arm. That is the exact failure the corpus cannot catch, because every
 // fixture that could distinguish the two readings happens to use whitespace.
-func TestNoAdjacentInlineElementsIgnoresWhitespaceInJsx(t *testing.T) {
-	t.Parallel()
+func TestNoAdjacentInlineElementsIgnoresWhitespaceInJsx(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -143,14 +162,19 @@ func TestNoAdjacentInlineElementsIgnoresWhitespaceInJsx(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoAdjacentInlineElements, noAdjacentInlineElementsFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(
+				test,
+				NoAdjacentInlineElements,
+				noAdjacentInlineElementsFile,
+				testCase.sourceText,
+			)
 			if len(testCase.wantIds) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -158,36 +182,65 @@ func TestNoAdjacentInlineElementsIgnoresWhitespaceInJsx(t *testing.T) {
 // TestNoAdjacentInlineElementsWhitespaceMattersInCreateElement covers the arm where the regex is
 // reachable.
 //
-// In a children array a string IS a Literal, so `/(?:^\s|\s$)/` decides. The corpus writes two of
+// In a children array a string is a Literal, so `/(?:^\s|\s$)/` decides. The corpus writes two of
 // these and the rest were measured, including the empty string, which is the sharp one: it has no
 // whitespace to find, so it counts as inline and adjacency holds.
-func TestNoAdjacentInlineElementsWhitespaceMattersInCreateElement(t *testing.T) {
-	t.Parallel()
+func TestNoAdjacentInlineElementsWhitespaceMattersInCreateElement(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
 		sourceText string
 		wantIds    []string
 	}{
-		{"a single space separates", `React.createElement("div", undefined, [React.createElement("a"), " ", React.createElement("a")]);`, nil},
-		{"trailing whitespace is enough", `React.createElement("div", undefined, [React.createElement("a"), "x ", React.createElement("a")]);`, nil},
-		{"leading whitespace is enough", `React.createElement("div", undefined, [React.createElement("a"), " x", React.createElement("a")]);`, nil},
-		{"a bare word does not separate", `React.createElement("div", undefined, [React.createElement("a"), "x", React.createElement("a")]);`, []string{"inlineElement"}},
+		{
+			"a single space separates",
+			`React.createElement("div", undefined, [React.createElement("a"), " ", React.createElement("a")]);`,
+			nil,
+		},
+		{
+			"trailing whitespace is enough",
+			`React.createElement("div", undefined, [React.createElement("a"), "x ", React.createElement("a")]);`,
+			nil,
+		},
+		{
+			"leading whitespace is enough",
+			`React.createElement("div", undefined, [React.createElement("a"), " x", React.createElement("a")]);`,
+			nil,
+		},
+		{
+			"a bare word does not separate",
+			`React.createElement("div", undefined, [React.createElement("a"), "x", React.createElement("a")]);`,
+			[]string{"inlineElement"},
+		},
 		// An empty string has no edge whitespace, so it is itself inline and the run continues.
-		{"an empty string does not separate", `React.createElement("div", undefined, [React.createElement("a"), "", React.createElement("a")]);`, []string{"inlineElement"}},
+		{
+			"an empty string does not separate",
+			`React.createElement("div", undefined, [React.createElement("a"), "", React.createElement("a")]);`,
+			[]string{"inlineElement"},
+		},
 		// A number stringifies to something with no whitespace, so it counts as inline too.
-		{"a number is inline", `React.createElement("div", undefined, [1, React.createElement("a")]);`, []string{"inlineElement"}},
+		{
+			"a number is inline",
+			`React.createElement("div", undefined, [1, React.createElement("a")]);`,
+			[]string{"inlineElement"},
+		},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoAdjacentInlineElements, noAdjacentInlineElementsFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(
+				test,
+				NoAdjacentInlineElements,
+				noAdjacentInlineElementsFile,
+				testCase.sourceText,
+			)
 			if len(testCase.wantIds) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -201,47 +254,64 @@ func TestNoAdjacentInlineElementsWhitespaceMattersInCreateElement(t *testing.T) 
 //
 // This port guards and reaches the verdict upstream would have reached: a call with no arguments is
 // not inline. Reproducing the crash would cost far more than the divergence, because the walk
-// recovers per FILE rather than per rule, so one panic takes every rule's findings for that file.
+// recovers per file rather than per rule, so one panic takes every rule's findings for that file.
 //
 // The crash is unreachable from the JSX arm, where a call only appears inside an expression
 // container, which upstream never inspects. The third case pins that.
-func TestNoAdjacentInlineElementsDoesNotCrashWhereUpstreamDoes(t *testing.T) {
-	t.Parallel()
+func TestNoAdjacentInlineElementsDoesNotCrashWhereUpstreamDoes(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
 		sourceText string
 		wantIds    []string
 	}{
-		{"a no argument call before an inline child", `React.createElement("div", undefined, [foo(), React.createElement("a")]);`, nil},
-		{"a no argument call after an inline child", `React.createElement("div", undefined, [React.createElement("a"), bar()]);`, nil},
-		{"a call inside a jsx expression container is not a child upstream reads", `<div><a></a>{foo()}<a></a></div>;`, nil},
+		{
+			"a no argument call before an inline child",
+			`React.createElement("div", undefined, [foo(), React.createElement("a")]);`,
+			nil,
+		},
+		{
+			"a no argument call after an inline child",
+			`React.createElement("div", undefined, [React.createElement("a"), bar()]);`,
+			nil,
+		},
+		{
+			"a call inside a jsx expression container is not a child upstream reads",
+			`<div><a></a>{foo()}<a></a></div>;`,
+			nil,
+		},
 		// Two no-argument calls in a row are both non-inline, so nothing reports for that reason
 		// too, which keeps the guard from being a blanket silence.
 		{"two guarded calls still report nothing", `React.createElement("div", undefined, [foo(), bar()]);`, nil},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoAdjacentInlineElements, noAdjacentInlineElementsFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(
+				test,
+				NoAdjacentInlineElements,
+				noAdjacentInlineElementsFile,
+				testCase.sourceText,
+			)
 			if len(testCase.wantIds) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
 
 // TestNoAdjacentInlineElementsReportsOncePerContainer pins upstream's early return.
 //
-// `validate` returns as soon as it reports, so a run of three inline elements yields ONE finding and
+// `validate` returns as soon as it reports, so a run of three inline elements yields one finding and
 // a container holding two separated pairs also yields one. Both measured. A loop that kept going
 // would report twice on inputs upstream reports once, and the corpus's longest failing case holds a
 // single pair, so nothing in it could see the difference.
-func TestNoAdjacentInlineElementsReportsOncePerContainer(t *testing.T) {
-	t.Parallel()
+func TestNoAdjacentInlineElementsReportsOncePerContainer(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -252,10 +322,15 @@ func TestNoAdjacentInlineElementsReportsOncePerContainer(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoAdjacentInlineElements, noAdjacentInlineElementsFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "inlineElement")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(
+				test,
+				NoAdjacentInlineElements,
+				noAdjacentInlineElementsFile,
+				testCase.sourceText,
+			)
+			rule_testing.ExpectFindings(test, result, "inlineElement")
 		})
 	}
 }
@@ -264,8 +339,8 @@ func TestNoAdjacentInlineElementsReportsOncePerContainer(t *testing.T) {
 //
 // The list holds lowercase HTML names, so a component reference is a different name whatever it
 // renders, and a member-named tag has no plain name to compare at all. Both measured.
-func TestNoAdjacentInlineElementsNameMatching(t *testing.T) {
-	t.Parallel()
+func TestNoAdjacentInlineElementsNameMatching(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -288,14 +363,19 @@ func TestNoAdjacentInlineElementsNameMatching(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoAdjacentInlineElements, noAdjacentInlineElementsFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(
+				test,
+				NoAdjacentInlineElements,
+				noAdjacentInlineElementsFile,
+				testCase.sourceText,
+			)
 			if len(testCase.wantIds) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -303,47 +383,76 @@ func TestNoAdjacentInlineElementsNameMatching(t *testing.T) {
 // TestNoAdjacentInlineElementsCreateElementShapes covers the outer call's gates.
 //
 // The outer call must be a createElement call and its third argument must be an array. Neither is
-// stated by the corpus beyond one case, and the asymmetry with the INNER children is the surprising
+// stated by the corpus beyond one case, and the asymmetry with the inner children is the surprising
 // part: upstream gates the outer call and never checks the inner ones at all.
-func TestNoAdjacentInlineElementsCreateElementShapes(t *testing.T) {
-	t.Parallel()
+func TestNoAdjacentInlineElementsCreateElementShapes(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
 		sourceText string
 		wantIds    []string
 	}{
-		{"a foreign outer namespace declines", `NotReact.createElement("div", undefined, [NotReact.createElement("a"), NotReact.createElement("span")]);`, nil},
-		{"a bare outer call with no import declines", `createElement("div", undefined, [createElement("a"), createElement("span")]);`, nil},
-		{"a destructured react import reports", "import {createElement} from 'react';\ncreateElement(\"div\", undefined, [createElement(\"a\"), createElement(\"span\")]);", []string{"inlineElement"}},
-		{"a third argument that is not an array yields no children", `React.createElement("div", undefined, React.createElement("a"));`, nil},
+		{
+			"a foreign outer namespace declines",
+			`NotReact.createElement("div", undefined, [NotReact.createElement("a"), NotReact.createElement("span")]);`,
+			nil,
+		},
+		{
+			"a bare outer call with no import declines",
+			`createElement("div", undefined, [createElement("a"), createElement("span")]);`,
+			nil,
+		},
+		{
+			"a destructured react import reports",
+			"import {createElement} from 'react';\ncreateElement(\"div\", undefined, [createElement(\"a\"), createElement(\"span\")]);",
+			[]string{"inlineElement"},
+		},
+		{
+			"a third argument that is not an array yields no children",
+			`React.createElement("div", undefined, React.createElement("a"));`,
+			nil,
+		},
 		{"only two arguments yields no children", `React.createElement("div", undefined);`, nil},
 		// The asymmetry: the outer gate is the only place the callee is checked, so a foreign inner
 		// call still counts as inline once the outer call has qualified.
-		{"foreign inner calls still count as inline", `React.createElement("div", undefined, [Whatever.createElement("a"), Other.createElement("span")]);`, []string{"inlineElement"}},
-		{"an inner call whose tag is an identifier is not inline", `React.createElement("div", undefined, [React.createElement(Foo), React.createElement("a")]);`, nil},
+		{
+			"foreign inner calls still count as inline",
+			`React.createElement("div", undefined, [Whatever.createElement("a"), Other.createElement("span")]);`,
+			[]string{"inlineElement"},
+		},
+		{
+			"an inner call whose tag is an identifier is not inline",
+			`React.createElement("div", undefined, [React.createElement(Foo), React.createElement("a")]);`,
+			nil,
+		},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoAdjacentInlineElements, noAdjacentInlineElementsFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(
+				test,
+				NoAdjacentInlineElements,
+				noAdjacentInlineElementsFile,
+				testCase.sourceText,
+			)
 			if len(testCase.wantIds) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
 
 // TestNoAdjacentInlineElementsAnchorsOnTheContainer asserts where the finding points.
 //
-// The corpus asserts message ids only. Upstream reports on the CONTAINER rather than on either of
+// The corpus asserts message ids only. Upstream reports on the container rather than on either of
 // the two adjacent children, which is a real choice: the reader is being told about a relationship,
 // and neither child is wrong on its own.
-func TestNoAdjacentInlineElementsAnchorsOnTheContainer(t *testing.T) {
-	t.Parallel()
+func TestNoAdjacentInlineElementsAnchorsOnTheContainer(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -351,21 +460,30 @@ func TestNoAdjacentInlineElementsAnchorsOnTheContainer(t *testing.T) {
 		wantText   string
 	}{
 		{"the jsx container, not either child", `<div><a></a><a></a></div>;`, `<div><a></a><a></a></div>`},
-		{"the whole createElement call", `React.createElement("div", undefined, [React.createElement("a"), React.createElement("span")]);`, `React.createElement("div", undefined, [React.createElement("a"), React.createElement("span")])`},
+		{
+			"the whole createElement call",
+			`React.createElement("div", undefined, [React.createElement("a"), React.createElement("span")]);`,
+			`React.createElement("div", undefined, [React.createElement("a"), React.createElement("span")])`,
+		},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			onDisk := strings.TrimSpace(testCase.sourceText) + "\n"
-			result := rule_testing.RunTyped(t, NoAdjacentInlineElements, noAdjacentInlineElementsFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "inlineElement")
+			result := rule_testing.RunTyped(
+				test,
+				NoAdjacentInlineElements,
+				noAdjacentInlineElementsFile,
+				testCase.sourceText,
+			)
+			rule_testing.ExpectFindings(test, result, "inlineElement")
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
+				test.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
 			}
 			got := onDisk[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 			if got != testCase.wantText {
-				t.Errorf("finding spans %q, want %q", got, testCase.wantText)
+				test.Errorf("finding spans %q, want %q", got, testCase.wantText)
 			}
 		})
 	}
@@ -376,19 +494,24 @@ func TestNoAdjacentInlineElementsAnchorsOnTheContainer(t *testing.T) {
 // The bare-identifier branch of the createElement resolution asks the checker, so under the plain
 // harness that arm guards and goes silent while the JSX arm keeps reporting. A later revert of
 // `NeedsTypeChecker` fails here rather than producing a vacuous green.
-func TestNoAdjacentInlineElementsRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestNoAdjacentInlineElementsRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	source := "import {createElement} from 'react';\ncreateElement(\"div\", undefined, [createElement(\"a\"), createElement(\"span\")]);"
 
-	untyped := rule_testing.Run(t, NoAdjacentInlineElements, noAdjacentInlineElementsFile, source)
-	rule_testing.ExpectClean(t, untyped)
+	untyped := rule_testing.Run(test, NoAdjacentInlineElements, noAdjacentInlineElementsFile, source)
+	rule_testing.ExpectClean(test, untyped)
 
-	typed := rule_testing.RunTyped(t, NoAdjacentInlineElements, noAdjacentInlineElementsFile, source)
-	rule_testing.ExpectFindings(t, typed, "inlineElement")
+	typed := rule_testing.RunTyped(test, NoAdjacentInlineElements, noAdjacentInlineElementsFile, source)
+	rule_testing.ExpectFindings(test, typed, "inlineElement")
 
-	jsxUntyped := rule_testing.Run(t, NoAdjacentInlineElements, noAdjacentInlineElementsFile, `<div><a></a><a></a></div>;`)
-	rule_testing.ExpectFindings(t, jsxUntyped, "inlineElement")
+	jsxUntyped := rule_testing.Run(
+		test,
+		NoAdjacentInlineElements,
+		noAdjacentInlineElementsFile,
+		`<div><a></a><a></a></div>;`,
+	)
+	rule_testing.ExpectFindings(test, jsxUntyped, "inlineElement")
 }
 
 // TestNoAdjacentInlineElementsMessageExplainsTheRendering asserts the rendered text.
@@ -397,16 +520,21 @@ func TestNoAdjacentInlineElementsRequiresTheTypedHarness(t *testing.T) {
 // that the description explains what the reader sees on the page rather than restating the rule
 // name. Asserted against a literal typed here rather than against the rule's own constant, so both
 // sides cannot move together under mutation.
-func TestNoAdjacentInlineElementsMessageExplainsTheRendering(t *testing.T) {
-	t.Parallel()
+func TestNoAdjacentInlineElementsMessageExplainsTheRendering(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTyped(t, NoAdjacentInlineElements, noAdjacentInlineElementsFile, `<div><a></a><a></a></div>;`)
-	rule_testing.ExpectFindings(t, result, "inlineElement")
+	result := rule_testing.RunTyped(
+		test,
+		NoAdjacentInlineElements,
+		noAdjacentInlineElementsFile,
+		`<div><a></a><a></a></div>;`,
+	)
+	rule_testing.ExpectFindings(test, result, "inlineElement")
 	message := result.Diagnostics[0].Message
 	if message.Id != "inlineElement" {
-		t.Errorf("message id is %q", message.Id)
+		test.Errorf("message id is %q", message.Id)
 	}
 	if !strings.HasPrefix(message.Description, "These two inline elements sit directly against each other") {
-		t.Errorf("description does not open on the rendering: %q", message.Description)
+		test.Errorf("description does not open on the rendering: %q", message.Description)
 	}
 }

@@ -24,11 +24,11 @@ func noUnsafeArgumentCaseName(index int) string {
 // Several of them are the false positives a plausible port ships. A call to an undeclared function
 // and a call on a non-function are both silent because the callee cannot resolve, and reproducing
 // that costs nothing only because the signature lookup declines. Passing an `any` to a parameter
-// typed `any` or `unknown` is silent because assignment INTO those is not unsafe, which lives in
+// typed `any` or `unknown` is silent because assignment into those is not unsafe, which lives in
 // the shared assignment predicate rather than here. `acceptsMap(new Map())` is silent because of a
 // special case inside that predicate for Map's empty constructor, which is typed `Map<any, any>`.
-func TestNoUnsafeArgumentStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeArgumentStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		"doesNotExist(1 as any);\n",
@@ -68,9 +68,9 @@ func TestNoUnsafeArgumentStaysSilent(t *testing.T) {
 		"declare function foo(a: string, b: string, c: number): void;\ndeclare const x: [string, ...string[]];\nfoo(...x, 1 as any, 2 as any);\n",
 	}
 	for index, sourceText := range cases {
-		t.Run(noUnsafeArgumentCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoUnsafeArgument,
+		test.Run(noUnsafeArgumentCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoUnsafeArgument,
 				noUnsafeArgumentFile, sourceText))
 		})
 	}
@@ -93,8 +93,8 @@ type noUnsafeArgumentFinding struct {
 // id, rendered text, and span taken from the installed 8.67.0 build rather than from the corpus's
 // own `errors` array. The corpus states ids and sometimes columns; it does not state the rendered
 // text, and the rendered text is where the signature walk shows itself.
-func TestNoUnsafeArgumentFires(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeArgumentFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText   string
@@ -348,7 +348,7 @@ func TestNoUnsafeArgumentFires(t *testing.T) {
 
 		{
 			// The other half of the pair above, and the reason it is not enough to assert the three
-			// silences. A FIXED tuple carries no variable element, so nothing is consumed and the
+			// silences. A fixed tuple carries no variable element, so nothing is consumed and the
 			// trailing argument does get its parameter. A port that simply always consumed after a
 			// tuple spread would pass all three silent rows and fail this one.
 			sourceText: "declare function foo(a: number, b: string): void;\ndeclare const x: [number];\nfoo(...x, 1 as any);\n",
@@ -362,16 +362,16 @@ func TestNoUnsafeArgumentFires(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(noUnsafeArgumentCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoUnsafeArgument, noUnsafeArgumentFile,
+		test.Run(noUnsafeArgumentCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoUnsafeArgument, noUnsafeArgumentFile,
 				testCase.sourceText)
 
 			wantIds := make([]string, len(testCase.wantFindings))
 			for position, want := range testCase.wantFindings {
 				wantIds[position] = want.wantId
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 
 			// The harness writes the fixture trimmed, so the span slices are against that text
 			// rather than the Go literal above. The captured spans were taken from a file written
@@ -382,14 +382,14 @@ func TestNoUnsafeArgumentFires(t *testing.T) {
 
 				gotSpan := onDisk[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if gotSpan != want.wantSpan {
-					t.Fatalf("finding %d span: expected %q, got %q", position, want.wantSpan, gotSpan)
+					test.Fatalf("finding %d span: expected %q, got %q", position, want.wantSpan, gotSpan)
 				}
 				if diagnostic.Message.Id != want.wantId {
-					t.Fatalf("finding %d id: expected %q, got %q", position, want.wantId,
+					test.Fatalf("finding %d id: expected %q, got %q", position, want.wantId,
 						diagnostic.Message.Id)
 				}
 				if diagnostic.Message.Description != want.wantMessage {
-					t.Fatalf("finding %d message: expected %q, got %q", position, want.wantMessage,
+					test.Fatalf("finding %d message: expected %q, got %q", position, want.wantMessage,
 						diagnostic.Message.Description)
 				}
 			}

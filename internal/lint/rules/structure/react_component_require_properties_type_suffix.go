@@ -13,17 +13,26 @@ import (
 
 // messageUseComponentPropertyTypeSuffixText is the rule's `useComponentPropertyTypeSuffix` message,
 // whose wording lives in `policy/messages/react-component-require-properties-type-suffix.json`.
-var messageUseComponentPropertyTypeSuffixText = policy.MessageOf("structure/react-component-require-properties-type-suffix", "useComponentPropertyTypeSuffix")
+var messageUseComponentPropertyTypeSuffixText = policy.MessageOf(
+	"structure/react-component-require-properties-type-suffix",
+	"useComponentPropertyTypeSuffix",
+)
 
 // messageUseComponentPropertyTypeSuffix is the finding, rendered when it is reported so the text
 // comes from the current catalog.
 func messageUseComponentPropertyTypeSuffix() rule.Message {
-	return rule.Message{Id: messageUseComponentPropertyTypeSuffixText.Id, Description: messageUseComponentPropertyTypeSuffixText.Render(nil)}
+	return rule.Message{
+		Id:          messageUseComponentPropertyTypeSuffixText.Id,
+		Description: messageUseComponentPropertyTypeSuffixText.Render(nil),
+	}
 }
 
 // messageUseInterfaceSuffixText is the rule's `useInterfaceSuffix` message, whose wording lives in
 // `policy/messages/react-component-require-properties-type-suffix.json`.
-var messageUseInterfaceSuffixText = policy.MessageOf("structure/react-component-require-properties-type-suffix", "useInterfaceSuffix")
+var messageUseInterfaceSuffixText = policy.MessageOf(
+	"structure/react-component-require-properties-type-suffix",
+	"useInterfaceSuffix",
+)
 
 // messageUseInterfaceSuffix is the finding, rendered when it is reported so the text comes from the
 // current catalog.
@@ -33,7 +42,10 @@ func messageUseInterfaceSuffix() rule.Message {
 
 // messageUseTypeAliasSuffixText is the rule's `useTypeAliasSuffix` message, whose wording lives in
 // `policy/messages/react-component-require-properties-type-suffix.json`.
-var messageUseTypeAliasSuffixText = policy.MessageOf("structure/react-component-require-properties-type-suffix", "useTypeAliasSuffix")
+var messageUseTypeAliasSuffixText = policy.MessageOf(
+	"structure/react-component-require-properties-type-suffix",
+	"useTypeAliasSuffix",
+)
 
 // messageUseTypeAliasSuffix is the finding, rendered when it is reported so the text comes from the
 // current catalog.
@@ -67,11 +79,11 @@ func messageUseTypeAliasSuffix() rule.Message {
 // `PageProperties<'/x'>`, a name nothing declares, so the fix broke type checking. Ownership is decided
 // by where the type is declared rather than how it is spelled, which takes the checker. Without one the
 // rule cannot establish ownership and leaves the name alone.
-var ReactComponentRequirePropertiesTypeSuffix = rule.Rule{
+var ReactComponentRequirePropertiesTypeSuffix = rule.Rule[rule.NoOptions]{
 	Name:             "structure/react-component-require-properties-type-suffix",
 	NeedsTypeChecker: true,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if !FileContextFor(ctx.SourceFile.FileName().AsString()).IsReactFile {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		if !FileContextFor(ruleContext.SourceFile.FileName().AsString()).IsReactFile {
 			return nil
 		}
 
@@ -107,7 +119,7 @@ var ReactComponentRequirePropertiesTypeSuffix = rule.Rule{
 			if typeName == "" || strings.HasSuffix(typeName, "Properties") {
 				return
 			}
-			if isUnownedPropertyType(ctx, parameterTypeNode(parameters[0])) {
+			if isUnownedPropertyType(ruleContext, parameterTypeNode(parameters[0])) {
 				return
 			}
 
@@ -120,13 +132,13 @@ var ReactComponentRequirePropertiesTypeSuffix = rule.Rule{
 				// The target name is taken, so renaming onto it would break the file. Reported
 				// without a fix rather than silenced: the name still violates the convention and
 				// the author is the one who can decide which of the two survives.
-				ctx.ReportNode(typeNode.AsTypeReferenceNode().TypeName,
+				ruleContext.ReportNode(typeNode.AsTypeReferenceNode().TypeName,
 					messageUseComponentPropertyTypeSuffix())
 				return
 			}
-			ctx.ReportNodeWithFixes(typeNode.AsTypeReferenceNode().TypeName,
+			ruleContext.ReportNodeWithFixes(typeNode.AsTypeReferenceNode().TypeName,
 				messageUseComponentPropertyTypeSuffix(),
-				ctx.ReplaceNode(typeNode.AsTypeReferenceNode().TypeName, propertiesTypeNameFor(typeName)))
+				ruleContext.ReplaceNode(typeNode.AsTypeReferenceNode().TypeName, propertiesTypeNameFor(typeName)))
 		}
 
 		reportDeclaration := func(name *ast.Node, message rule.Message) {
@@ -137,10 +149,14 @@ var ReactComponentRequirePropertiesTypeSuffix = rule.Rule{
 				return
 			}
 			if declaredTypeNames[propertiesTypeNameFor(name.Text())] {
-				ctx.ReportNode(name, message)
+				ruleContext.ReportNode(name, message)
 				return
 			}
-			ctx.ReportNodeWithFixes(name, message, ctx.ReplaceNode(name, propertiesTypeNameFor(name.Text())))
+			ruleContext.ReportNodeWithFixes(
+				name,
+				message,
+				ruleContext.ReplaceNode(name, propertiesTypeNameFor(name.Text())),
+			)
 		}
 
 		return rule.Listeners{
@@ -163,10 +179,10 @@ var ReactComponentRequirePropertiesTypeSuffix = rule.Rule{
 				// already taken. The four declaration kinds are the shelf's, which counts an enum
 				// as well: an enum declares a type as much as a value, and renaming onto one
 				// produces a duplicate identifier exactly as renaming onto an interface does.
-				for name := range module.AllDeclaredTypeNames(ctx.SourceFile) {
+				for name := range module.AllDeclaredTypeNames(ruleContext.SourceFile) {
 					declaredTypeNames[name] = true
 				}
-				collectComponentPropertyTypeNames(ctx, node, componentPropertyTypes)
+				collectComponentPropertyTypeNames(ruleContext, node, componentPropertyTypes)
 			},
 
 			ast.KindFunctionDeclaration: func(node *ast.Node) {
@@ -221,7 +237,9 @@ var ReactComponentRequirePropertiesTypeSuffix = rule.Rule{
 //
 // A dependency's type is left out, so a declaration of ours that happens to share its name is not
 // renamed on its account.
-func collectComponentPropertyTypeNames(ctx rule.Context, sourceFile *ast.Node, into map[string]bool) {
+//
+// Mutates: into the walk adds each property type name it finds, so the listener's one set holds the whole file
+func collectComponentPropertyTypeNames(ruleContext rule.Context, sourceFile *ast.Node, into map[string]bool) {
 	var visit func(*ast.Node)
 	visit = func(node *ast.Node) {
 		if node == nil {
@@ -258,7 +276,8 @@ func collectComponentPropertyTypeNames(ctx rule.Context, sourceFile *ast.Node, i
 		if name != nil && name.Kind == ast.KindIdentifier &&
 			react.IsLikelyComponentName(name.Text()) && len(parameters) == 1 {
 			if typeName := typeReferenceName(parameterTypeNode(parameters[0])); typeName != "" &&
-				!strings.HasSuffix(typeName, "Properties") && !isUnownedPropertyType(ctx, parameterTypeNode(parameters[0])) {
+				!strings.HasSuffix(typeName, "Properties") &&
+				!isUnownedPropertyType(ruleContext, parameterTypeNode(parameters[0])) {
 				into[typeName] = true
 			}
 		}
@@ -273,16 +292,16 @@ func collectComponentPropertyTypeNames(ctx rule.Context, sourceFile *ast.Node, i
 
 // isUnownedPropertyType excludes both dependency types and names with no resolved
 // declaration. Missing Next typegen output is a compiler error, not a type we own.
-func isUnownedPropertyType(ctx rule.Context, typeNode *ast.Node) bool {
-	if ctx.TypeChecker == nil || typeNode == nil || typeNode.Kind != ast.KindTypeReference {
+func isUnownedPropertyType(ruleContext rule.Context, typeNode *ast.Node) bool {
+	if ruleContext.TypeChecker == nil || typeNode == nil || typeNode.Kind != ast.KindTypeReference {
 		return true
 	}
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(typeNode.AsTypeReferenceNode().TypeName)
-	if !rule.IsResolvedSymbol(ctx.TypeChecker, symbol) {
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(typeNode.AsTypeReferenceNode().TypeName)
+	if !rule.IsResolvedSymbol(ruleContext.TypeChecker, symbol) {
 		return true
 	}
 	if symbol.Flags&ast.SymbolFlagsAlias != 0 {
-		symbol = checker.SkipAlias(symbol, ctx.TypeChecker)
+		symbol = checker.SkipAlias(symbol, ruleContext.TypeChecker)
 	}
 	return rule.IsDeclaredByADependency(symbol)
 }

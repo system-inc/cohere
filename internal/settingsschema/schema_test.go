@@ -10,22 +10,24 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/format/formatoptions"
+	"github.com/system-inc/cohere/internal/goengine/settings"
 	"github.com/system-inc/cohere/internal/lint/configuration"
+	"github.com/system-inc/cohere/internal/lint/optionschema"
 	"github.com/system-inc/cohere/internal/lint/registry"
 )
 
 // moduleRoot is the directory the generated paths are relative to: go test runs in the package's own
 // directory, two below it.
-func moduleRoot(t *testing.T) string {
-	t.Helper()
+func moduleRoot(test *testing.T) string {
+	test.Helper()
 	return filepath.Join("..", "..")
 }
 
-func built(t *testing.T) map[string][]byte {
-	t.Helper()
-	files, err := Build(registry.Names())
-	if err != nil {
-		t.Fatal(err)
+func built(test *testing.T) map[string][]byte {
+	test.Helper()
+	files, buildError := Build(registry.Names())
+	if buildError != nil {
+		test.Fatal(buildError)
 	}
 	return files
 }
@@ -33,30 +35,30 @@ func built(t *testing.T) map[string][]byte {
 // TestTheCommittedFilesAreCurrent: the schemas and the reference in schema/ are what Build produces now.
 // A rule renamed, a key added to the loader, a format option added: each changes Build's output, and the
 // committed files must follow.
-func TestTheCommittedFilesAreCurrent(t *testing.T) {
-	t.Parallel()
-	for path, contents := range built(t) {
-		committed, err := os.ReadFile(filepath.Join(moduleRoot(t), path))
-		if err != nil {
-			t.Fatalf("%s: %v; run go run ./internal/settingsschema/tools/generate", path, err)
+func TestTheCommittedFilesAreCurrent(test *testing.T) {
+	test.Parallel()
+	for path, contents := range built(test) {
+		committed, readError := os.ReadFile(filepath.Join(moduleRoot(test), path))
+		if readError != nil {
+			test.Fatalf("%s: %v; run go run ./internal/settingsschema/tools/generate", path, readError)
 		}
 		if !bytes.Equal(committed, contents) {
-			t.Errorf("%s is stale; run go run ./internal/settingsschema/tools/generate", path)
+			test.Errorf("%s is stale; run go run ./internal/settingsschema/tools/generate", path)
 		}
 	}
 }
 
 // writeSettings writes files into a fresh directory and returns the path of its CohereSettings.json.
-func writeSettings(t *testing.T, files map[string]string) string {
-	t.Helper()
-	root := t.TempDir()
+func writeSettings(test *testing.T, files map[string]string) string {
+	test.Helper()
+	root := test.TempDir()
 	for name, contents := range files {
 		path := filepath.Join(root, name)
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			t.Fatal(err)
+		if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
+			test.Fatal(createDirectoryError)
 		}
-		if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
-			t.Fatal(err)
+		if writeError := os.WriteFile(path, []byte(contents), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 	}
 	return filepath.Join(root, "CohereSettings.json")
@@ -65,20 +67,34 @@ func writeSettings(t *testing.T, files map[string]string) string {
 // keyFixtures is a settings file using each top-level key, valid as the loader reads it. departures needs
 // a base the rule departs from, and extends one to extend.
 var keyFixtures = map[string]map[string]string{
-	"$schema":        {"CohereSettings.json": `{"$schema": "./schema/CohereSettings.schema.json"}`},
-	"extends":        {"Base.json": `{"rules": {}}`, "CohereSettings.json": `{"extends": ["cohere:typescript", "./Base.json"]}`},
-	"rules":          {"CohereSettings.json": `{"rules": {"no-debugger": "error", "eqeqeq": ["error", "always"]}}`},
-	"departures":     {"Base.json": `{"rules": {"no-debugger": "warn"}}`, "CohereSettings.json": `{"extends": "./Base.json", "rules": {"no-debugger": "error"}, "departures": {"no-debugger": "A debugger statement never ships here."}}`},
-	"reasons":        {"CohereSettings.json": `{"rules": {"no-continue": "off"}, "reasons": {"no-continue": "Style, with no bug class behind it."}}`},
-	"overrides":      {"CohereSettings.json": `{"overrides": [{"files": ["**/*.test.ts"], "rules": {"no-debugger": "off"}, "reason": "fixtures"}]}`},
+	"$schema": {"CohereSettings.json": `{"$schema": "./schema/CohereSettings.schema.json"}`},
+	"extends": {
+		"Base.json":           `{"rules": {}}`,
+		"CohereSettings.json": `{"extends": ["cohere:typescript", "./Base.json"]}`,
+	},
+	"rules": {"CohereSettings.json": `{"rules": {"no-debugger": "error", "eqeqeq": ["error", "always"]}}`},
+	"departures": {
+		"Base.json":           `{"rules": {"no-debugger": "warn"}}`,
+		"CohereSettings.json": `{"extends": "./Base.json", "rules": {"no-debugger": "error"}, "departures": {"no-debugger": "A debugger statement never ships here."}}`,
+	},
+	"reasons": {
+		"CohereSettings.json": `{"rules": {"no-continue": "off"}, "reasons": {"no-continue": "Style, with no bug class behind it."}}`,
+	},
+	"overrides": {
+		"CohereSettings.json": `{"overrides": [{"files": ["**/*.test.ts"], "rules": {"no-debugger": "off"}, "reason": "fixtures"}]}`,
+	},
 	"ignorePatterns": {"CohereSettings.json": `{"ignorePatterns": ["dist/**"]}`},
 	"cohere":         {"CohereSettings.json": `{"cohere": "^1.0.0"}`},
 	"plugins":        {"CohereSettings.json": `{"plugins": ["react"]}`},
 	"jsPlugins":      {"CohereSettings.json": `{"jsPlugins": ["./rules.js"]}`},
 	"settings":       {"CohereSettings.json": `{"settings": {"better-tailwindcss": {"callees": ["cn"]}}}`},
 	"output":         {"CohereSettings.json": `{"output": {"phases": true}}`},
+	"go":             {"CohereSettings.json": `{"go": ` + examples["go"] + `}`},
 	FormatKey:        {"CohereSettings.json": `{"format": {"tabWidth": 4}}`},
-	SwiftKey:         {"Package.swift": "// swift-tools-version:6.0\n", "CohereSettings.json": `{"swift": {"rules": {"cohere-swift/file-length": "error"}}}`},
+	SwiftKey: {
+		"Package.swift":       "// swift-tools-version:6.0\n",
+		"CohereSettings.json": `{"swift": {"rules": {"cohere-swift/file-length": "error"}}}`,
+	},
 }
 
 // TestTheSchemaHasExactlyTheKeysTheLoaderAccepts is the test the schema exists for, in both directions,
@@ -86,34 +102,36 @@ var keyFixtures = map[string]map[string]string{
 // lacks is refused; the project schema names the same keys. Its `format` is optional and decides outside
 // our tiers, and in a chain extending a cohere:system-inc set the formatter refuses it, which a schema
 // cannot see, so the description says so.
-func TestTheSchemaHasExactlyTheKeysTheLoaderAccepts(t *testing.T) {
-	t.Parallel()
-	files := built(t)
-	nexusKeys, err := SchemaKeys(files[NexusSchemaPath])
-	if err != nil {
-		t.Fatal(err)
+func TestTheSchemaHasExactlyTheKeysTheLoaderAccepts(test *testing.T) {
+	test.Parallel()
+	files := built(test)
+	nexusKeys, schemaKeysError := SchemaKeys(files[NexusSchemaPath])
+	if schemaKeysError != nil {
+		test.Fatal(schemaKeysError)
 	}
-	projectKeys, err := SchemaKeys(files[ProjectSchemaPath])
-	if err != nil {
-		t.Fatal(err)
+	projectKeys, schemaKeysError := SchemaKeys(files[ProjectSchemaPath])
+	if schemaKeysError != nil {
+		test.Fatal(schemaKeysError)
 	}
 
 	for _, key := range nexusKeys {
 		fixture, present := keyFixtures[key]
 		if !present {
-			t.Errorf("the schema names %q and the test has no settings file using it; add one to keyFixtures", key)
+			test.Errorf("the schema names %q and the test has no settings file using it; add one to keyFixtures", key)
 			continue
 		}
-		if _, err := configuration.Load(writeSettings(t, fixture)); err != nil {
-			t.Errorf("the schema names %q and the loader refuses a file using it: %v", key, err)
+		if _, loadError := configuration.Load(writeSettings(test, fixture)); loadError != nil {
+			test.Errorf("the schema names %q and the loader refuses a file using it: %v", key, loadError)
 		}
 	}
 
 	// The reverse: a key no schema names is refused, and every key the loader's own tables accept is in
 	// the Nexus schema.
 	for _, unknown := range []string{"env", "globals", "excludedFiles", "formatting"} {
-		if _, err := configuration.Load(writeSettings(t, map[string]string{"CohereSettings.json": `{"` + unknown + `": {}}`})); err == nil {
-			t.Errorf("the loader accepts %q, which no schema names", unknown)
+		if _, loadError := configuration.Load(
+			writeSettings(test, map[string]string{"CohereSettings.json": `{"` + unknown + `": {}}`}),
+		); loadError == nil {
+			test.Errorf("the loader accepts %q, which no schema names", unknown)
 		}
 	}
 	var loaderKeys []string
@@ -121,27 +139,195 @@ func TestTheSchemaHasExactlyTheKeysTheLoaderAccepts(t *testing.T) {
 		loaderKeys = append(loaderKeys, key.Name)
 	}
 	if strings.Join(loaderKeys, ",") != strings.Join(nexusKeys, ",") {
-		t.Errorf("loader keys %v, Nexus schema keys %v", loaderKeys, nexusKeys)
+		test.Errorf("loader keys %v, Nexus schema keys %v", loaderKeys, nexusKeys)
 	}
 
 	if strings.Join(projectKeys, ",") != strings.Join(nexusKeys, ",") {
-		t.Errorf("project schema keys %v, want the Nexus schema's: %v", projectKeys, nexusKeys)
+		test.Errorf("project schema keys %v, want the Nexus schema's: %v", projectKeys, nexusKeys)
 	}
-	outsider := filepath.Dir(writeSettings(t, map[string]string{"CohereSettings.json": `{"format": {"tabWidth": 2}}`}))
-	if resolution, err := formatoptions.Resolve(outsider); err != nil || resolution.Options.TabWidth != 2 {
-		t.Errorf("an outsider's format block did not decide (%+v, %v), so the project schema is wrong to name format", resolution.Options, err)
+	outsider := filepath.Dir(
+		writeSettings(test, map[string]string{"CohereSettings.json": `{"format": {"tabWidth": 2}}`}),
+	)
+	if resolution, resolveError := formatoptions.Resolve(
+		outsider,
+	); resolveError != nil || resolution.Options.TabWidth != 2 {
+		test.Errorf(
+			"an outsider's format block did not decide (%+v, %v), so the project schema is wrong to name format",
+			resolution.Options,
+			resolveError,
+		)
 	}
-	ours := filepath.Dir(writeSettings(t, map[string]string{"CohereSettings.json": `{"extends": "cohere:system-inc/structure", "format": {"tabWidth": 2}}`}))
-	if _, err := formatoptions.Resolve(ours); err == nil {
-		t.Error("a format block in a chain extending cohere:system-inc/structure resolved, so the description is wrong to say it is refused")
+	ours := filepath.Dir(writeSettings(test, map[string]string{
+		"CohereSettings.json": `{"extends": "cohere:system-inc/structure", "format": {"tabWidth": 2}}`,
+	}))
+	if _, resolveError := formatoptions.Resolve(ours); resolveError == nil {
+		test.Error(
+			"a format block in a chain extending cohere:system-inc/structure resolved, so the description is wrong to say it is refused",
+		)
 	}
 }
 
+// TestTheGoExampleLoadsInTheGoEngine: the TypeScript loader only leaves the go block alone, so the block the
+// reference documents is held to the loader that reads it, knowing the rule the example names.
+func TestTheGoExampleLoadsInTheGoEngine(test *testing.T) {
+	test.Parallel()
+	path := writeSettings(test, keyFixtures["go"])
+	knownRules := []string{"cohere-go/performance-require-parallel-test"}
+	if _, loadError := settings.Load(filepath.Dir(path), path, knownRules); loadError != nil {
+		test.Errorf("the reference's go example is refused by the Go engine: %v", loadError)
+	}
+}
+
+// goBlockRule is the one rule the go blocks below name, and the one the Go engine is told it knows.
+const goBlockRule = "cohere-go/performance-require-parallel-test"
+
+// goBlocks are go blocks of every shape the Go engine accepts and every shape it refuses. Each is judged by
+// both the engine and the published schema, and neither verdict is written here, so the list needs no
+// upkeep beyond a new shape. A rule name the engine does not know is left out on purpose: the schema leaves
+// names open, since the Go engine's registry is not the one this package lists, and the engine refuses them.
+var goBlocks = []string{
+	`{"rules": {}}`,
+	`{"rules": {"` + goBlockRule + `": "error"}}`,
+	`{"rules": {"` + goBlockRule + `": "warn"}}`,
+	`{"rules": {"` + goBlockRule + `": "warning"}}`,
+	`{"rules": {"` + goBlockRule + `": "off"}}`,
+	`{"rules": {"` + goBlockRule + `": ["error"]}}`,
+	`{"rules": {"` + goBlockRule + `": ["warn", {}]}}`,
+	`{"rules": {"` + goBlockRule + `": ["off", {"limit": 3}]}}`,
+
+	`{}`,
+	`[]`,
+	`null`,
+	`"error"`,
+	`{"format": {}, "rules": {}}`,
+	`{"rules": {}, "severity": "error"}`,
+	`{"rules": []}`,
+	`{"rules": null}`,
+	`{"rules": {"` + goBlockRule + `": "fatal"}}`,
+	`{"rules": {"` + goBlockRule + `": "Error"}}`,
+	`{"rules": {"` + goBlockRule + `": "allow"}}`,
+	`{"rules": {"` + goBlockRule + `": "deny"}}`,
+	`{"rules": {"` + goBlockRule + `": ["deny"]}}`,
+	`{"rules": {"` + goBlockRule + `": [2]}}`,
+	`{"rules": {"` + goBlockRule + `": 2}}`,
+	`{"rules": {"` + goBlockRule + `": true}}`,
+	`{"rules": {"` + goBlockRule + `": null}}`,
+	`{"rules": {"` + goBlockRule + `": {}}}`,
+	`{"rules": {"` + goBlockRule + `": []}}`,
+	`{"rules": {"` + goBlockRule + `": ["error", {}, {}]}}`,
+	`{"rules": {"` + goBlockRule + `": ["error", "always"]}}`,
+	`{"rules": {"` + goBlockRule + `": ["error", null]}}`,
+	`{"rules": {"` + goBlockRule + `": ["error", [{}]]}}`,
+}
+
+// TestTheGoSchemaAcceptsExactlyWhatTheGoEngineAccepts: every go block above is read by
+// internal/goengine/settings and validated against the go block of the published schema, and the two
+// verdicts must agree in both directions, so an editor never passes a block the engine refuses (`{}` once
+// did, before the schema required rules) or flags one it reads.
+func TestTheGoSchemaAcceptsExactlyWhatTheGoEngineAccepts(test *testing.T) {
+	test.Parallel()
+	goSchema := compiledGoSchema(test)
+	for _, block := range goBlocks {
+		path := writeSettings(test, map[string]string{"CohereSettings.json": `{"go": ` + block + `}`})
+		_, engineError := settings.Load(filepath.Dir(path), path, []string{goBlockRule})
+		schemaError := goSchema.Validate([]json.RawMessage{json.RawMessage(block)})
+		switch {
+		case engineError != nil && schemaError == nil:
+			test.Errorf("the schema accepts the go block %s, and the engine refuses it: %v", block, engineError)
+		case engineError == nil && schemaError != nil:
+			test.Errorf("the schema refuses the go block %s, and the engine reads it: %v", block, schemaError)
+		}
+	}
+}
+
+// compiledGoSchema compiles the published project schema's go block with internal/lint/optionschema, the
+// repository's in-process validator. That validator is a draft-04 subset held to ajv 6, and the published
+// schema is 2020-12, so one keyword is translated: prefixItems becomes draft-04's tuple, items as a list,
+// which means the same thing. The validator ignores a keyword it does not know, and an untranslated one
+// reads as permissive, so a keyword this misses fails the refusal half of the test above rather than
+// hiding there. The block is wrapped as the one element of a list, since Validate checks an option list.
+func compiledGoSchema(test *testing.T) *optionschema.Schema {
+	test.Helper()
+	var published struct {
+		Properties map[string]json.RawMessage `json:"properties"`
+	}
+	if decodeError := json.Unmarshal(built(test)[ProjectSchemaPath], &published); decodeError != nil {
+		test.Fatal(decodeError)
+	}
+	goBlock, present := published.Properties["go"]
+	if !present {
+		test.Fatal("the project schema has no go block")
+	}
+	wrapped, encodeError := json.Marshal(map[string]any{
+		"type":            "array",
+		"items":           []any{draftFourTuples(test, goBlock)},
+		"additionalItems": false,
+	})
+	if encodeError != nil {
+		test.Fatal(encodeError)
+	}
+	compiled, compileError := optionschema.Compile(wrapped)
+	if compileError != nil {
+		test.Fatalf("compiling the go block of the published schema: %v", compileError)
+	}
+	return compiled
+}
+
+// draftFourTuples rewrites every prefixItems in a 2020-12 schema as draft-04's items list. The schema is read as
+// raw text, so each object and array is decoded only as far as its members, and a decode that fails fails the
+// test. A schema that also writes items beside prefixItems means something draft-04 says differently, so it stops.
+func draftFourTuples(test *testing.T, value json.RawMessage) json.RawMessage {
+	test.Helper()
+	trimmed := bytes.TrimSpace(value)
+	if len(trimmed) == 0 {
+		return value
+	}
+	switch trimmed[0] {
+	case '{':
+		members := map[string]json.RawMessage{}
+		if decodeError := json.Unmarshal(trimmed, &members); decodeError != nil {
+			test.Fatalf("reading a schema node's members: %v\n%s", decodeError, trimmed)
+		}
+		_, hasPrefixItems := members["prefixItems"]
+		if _, hasItems := members["items"]; hasPrefixItems && hasItems {
+			test.Fatalf("a schema node writes both prefixItems and items, which this translation does not "+
+				"carry over: %s", trimmed)
+		}
+		translated := make(map[string]json.RawMessage, len(members))
+		for key, member := range members {
+			if key == "prefixItems" {
+				key = "items"
+			}
+			translated[key] = draftFourTuples(test, member)
+		}
+		encoded, encodeError := json.Marshal(translated)
+		if encodeError != nil {
+			test.Fatal(encodeError)
+		}
+		return encoded
+	case '[':
+		var elements []json.RawMessage
+		if decodeError := json.Unmarshal(trimmed, &elements); decodeError != nil {
+			test.Fatalf("reading a schema list's elements: %v\n%s", decodeError, trimmed)
+		}
+		translated := make([]json.RawMessage, len(elements))
+		for index, element := range elements {
+			translated[index] = draftFourTuples(test, element)
+		}
+		encoded, encodeError := json.Marshal(translated)
+		if encodeError != nil {
+			test.Fatal(encodeError)
+		}
+		return encoded
+	}
+	return value
+}
+
 // TestTheLoaderTablesAgreeWithItsTypes: parsedTopLevelKeys and overrideKeys are the loader's refusal
-// lists, and rawConfig and rawOverride are what it decodes; the schema reads the types, so the lists must
+// lists, and rawConfiguration and rawOverride are what it decodes; the schema reads the types, so the lists must
 // name the same keys.
-func TestTheLoaderTablesAgreeWithItsTypes(t *testing.T) {
-	t.Parallel()
+func TestTheLoaderTablesAgreeWithItsTypes(test *testing.T) {
+	test.Parallel()
 	var decoded []string
 	for _, key := range configuration.TopLevelKeys() {
 		if key.Field != nil {
@@ -150,7 +336,11 @@ func TestTheLoaderTablesAgreeWithItsTypes(t *testing.T) {
 	}
 	sort.Strings(decoded)
 	if strings.Join(decoded, ",") != strings.Join(configuration.ParsedTopLevelKeyNames(), ",") {
-		t.Errorf("rawConfig decodes %v, parsedTopLevelKeys names %v", decoded, configuration.ParsedTopLevelKeyNames())
+		test.Errorf(
+			"rawConfiguration decodes %v, parsedTopLevelKeys names %v",
+			decoded,
+			configuration.ParsedTopLevelKeyNames(),
+		)
 	}
 	var overrideFields []string
 	for _, field := range configuration.OverrideFields() {
@@ -158,14 +348,14 @@ func TestTheLoaderTablesAgreeWithItsTypes(t *testing.T) {
 	}
 	sort.Strings(overrideFields)
 	if strings.Join(overrideFields, ",") != strings.Join(configuration.OverrideKeyNames(), ",") {
-		t.Errorf("rawOverride decodes %v, overrideKeys names %v", overrideFields, configuration.OverrideKeyNames())
+		test.Errorf("rawOverride decodes %v, overrideKeys names %v", overrideFields, configuration.OverrideKeyNames())
 	}
 }
 
 // TestTheOverrideSchemaHasExactlyTheKeysTheLoaderAccepts: each override key the schema names loads, and
 // one it lacks is refused.
-func TestTheOverrideSchemaHasExactlyTheKeysTheLoaderAccepts(t *testing.T) {
-	t.Parallel()
+func TestTheOverrideSchemaHasExactlyTheKeysTheLoaderAccepts(test *testing.T) {
+	test.Parallel()
 	var schema struct {
 		Defs struct {
 			Override struct {
@@ -173,36 +363,49 @@ func TestTheOverrideSchemaHasExactlyTheKeysTheLoaderAccepts(t *testing.T) {
 			} `json:"override"`
 		} `json:"$defs"`
 	}
-	if err := json.Unmarshal(built(t)[ProjectSchemaPath], &schema); err != nil {
-		t.Fatal(err)
+	if decodeError := json.Unmarshal(built(test)[ProjectSchemaPath], &schema); decodeError != nil {
+		test.Fatal(decodeError)
 	}
-	fixtures := map[string]string{"files": `"files": ["**/*.ts"]`, "rules": `"rules": {"no-debugger": "off"}`, "reason": `"reason": "why"`}
+	fixtures := map[string]string{
+		"files":  `"files": ["**/*.ts"]`,
+		"rules":  `"rules": {"no-debugger": "off"}`,
+		"reason": `"reason": "why"`,
+	}
 	for key := range schema.Defs.Override.Properties {
 		fixture, present := fixtures[key]
 		if !present {
-			t.Errorf("the override schema names %q and the test has no block using it", key)
+			test.Errorf("the override schema names %q and the test has no block using it", key)
 			continue
 		}
 		block := `{` + fixture + `}`
 		if key != "files" {
 			block = `{"files": ["**/*.ts"], ` + fixture + `}`
 		}
-		if _, err := configuration.Load(writeSettings(t, map[string]string{"CohereSettings.json": `{"overrides": [` + block + `]}`})); err != nil {
-			t.Errorf("the override schema names %q and the loader refuses it: %v", key, err)
+		if _, loadError := configuration.Load(
+			writeSettings(test, map[string]string{"CohereSettings.json": `{"overrides": [` + block + `]}`}),
+		); loadError != nil {
+			test.Errorf("the override schema names %q and the loader refuses it: %v", key, loadError)
 		}
 	}
 	if len(schema.Defs.Override.Properties) != len(fixtures) {
-		t.Errorf("the override schema names %d keys, the test knows %d", len(schema.Defs.Override.Properties), len(fixtures))
+		test.Errorf(
+			"the override schema names %d keys, the test knows %d",
+			len(schema.Defs.Override.Properties),
+			len(fixtures),
+		)
 	}
-	if _, err := configuration.Load(writeSettings(t, map[string]string{"CohereSettings.json": `{"overrides": [{"files": ["**/*.ts"], "excludedFiles": ["x.ts"]}]}`})); err == nil {
-		t.Error("the loader accepts an override's excludedFiles, which the schema does not name")
+	if _, loadError := configuration.Load(writeSettings(
+		test,
+		map[string]string{"CohereSettings.json": `{"overrides": [{"files": ["**/*.ts"], "excludedFiles": ["x.ts"]}]}`},
+	)); loadError == nil {
+		test.Error("the loader accepts an override's excludedFiles, which the schema does not name")
 	}
 }
 
 // TestTheFormatSchemaHasExactlyTheKeysTheFormatterAccepts: every format option the Nexus schema names
 // resolves in a Nexus tier, and one it lacks is refused.
-func TestTheFormatSchemaHasExactlyTheKeysTheFormatterAccepts(t *testing.T) {
-	t.Parallel()
+func TestTheFormatSchemaHasExactlyTheKeysTheFormatterAccepts(test *testing.T) {
+	test.Parallel()
 	var schema struct {
 		Properties map[string]struct {
 			Properties map[string]struct {
@@ -211,12 +414,16 @@ func TestTheFormatSchemaHasExactlyTheKeysTheFormatterAccepts(t *testing.T) {
 			} `json:"properties"`
 		} `json:"properties"`
 	}
-	if err := json.Unmarshal(built(t)[NexusSchemaPath], &schema); err != nil {
-		t.Fatal(err)
+	if decodeError := json.Unmarshal(built(test)[NexusSchemaPath], &schema); decodeError != nil {
+		test.Fatal(decodeError)
 	}
 	options := schema.Properties[FormatKey].Properties
 	if len(options) != len(formatoptions.BlockKeys) {
-		t.Errorf("the format schema names %d options, the formatter's table %d", len(options), len(formatoptions.BlockKeys))
+		test.Errorf(
+			"the format schema names %d options, the formatter's table %d",
+			len(options),
+			len(formatoptions.BlockKeys),
+		)
 	}
 	for name, option := range options {
 		value := map[string]string{"integer": `4`, "boolean": `true`, "array": `["pnpm-lock.yaml"]`}[option.Type]
@@ -226,27 +433,27 @@ func TestTheFormatSchemaHasExactlyTheKeysTheFormatterAccepts(t *testing.T) {
 				value = `"` + option.Enum[0] + `"`
 			}
 		}
-		root := filepath.Dir(writeSettings(t, map[string]string{
+		root := filepath.Dir(writeSettings(test, map[string]string{
 			"NexusCohereSettings.json": `{"format": {"` + name + `": ` + value + `}}`,
 			"CohereSettings.json":      `{"extends": "./NexusCohereSettings.json"}`,
 		}))
-		if _, err := formatoptions.Resolve(root); err != nil {
-			t.Errorf("the format schema names %q and the formatter refuses it: %v", name, err)
+		if _, resolveError := formatoptions.Resolve(root); resolveError != nil {
+			test.Errorf("the format schema names %q and the formatter refuses it: %v", name, resolveError)
 		}
 	}
-	root := filepath.Dir(writeSettings(t, map[string]string{
+	root := filepath.Dir(writeSettings(test, map[string]string{
 		"NexusCohereSettings.json": `{"format": {"quoteProps": "as-needed"}}`,
 		"CohereSettings.json":      `{"extends": "./NexusCohereSettings.json"}`,
 	}))
-	if _, err := formatoptions.Resolve(root); err == nil {
-		t.Error("the formatter accepts quoteProps, which the format schema does not name")
+	if _, resolveError := formatoptions.Resolve(root); resolveError == nil {
+		test.Error("the formatter accepts quoteProps, which the format schema does not name")
 	}
 }
 
 // TestTheRulesAreTheRegistrys: the schema offers exactly the registered rule names, so a rename under
 // the registry reaches editors at the next generation rather than never.
-func TestTheRulesAreTheRegistrys(t *testing.T) {
-	t.Parallel()
+func TestTheRulesAreTheRegistrys(test *testing.T) {
+	test.Parallel()
 	var schema struct {
 		Defs struct {
 			Rules struct {
@@ -254,8 +461,8 @@ func TestTheRulesAreTheRegistrys(t *testing.T) {
 			} `json:"rules"`
 		} `json:"$defs"`
 	}
-	if err := json.Unmarshal(built(t)[ProjectSchemaPath], &schema); err != nil {
-		t.Fatal(err)
+	if decodeError := json.Unmarshal(built(test)[ProjectSchemaPath], &schema); decodeError != nil {
+		test.Fatal(decodeError)
 	}
 	var offered []string
 	for name := range schema.Defs.Rules.Properties {
@@ -265,56 +472,60 @@ func TestTheRulesAreTheRegistrys(t *testing.T) {
 	registered := append([]string(nil), registry.Names()...)
 	sort.Strings(registered)
 	if strings.Join(offered, ",") != strings.Join(registered, ",") {
-		t.Errorf("the schema offers %d rules, the registry has %d", len(offered), len(registered))
+		test.Errorf("the schema offers %d rules, the registry has %d", len(offered), len(registered))
 	}
 }
 
 // TestTheSeveritiesAreTheLoaders: each spelling the schema allows is one parseSeverity accepts, in any
 // case, and a spelling outside them is refused.
-func TestTheSeveritiesAreTheLoaders(t *testing.T) {
-	t.Parallel()
+func TestTheSeveritiesAreTheLoaders(test *testing.T) {
+	test.Parallel()
 	for _, spelling := range configuration.SeveritySpellings {
-		for _, variant := range []string{spelling, strings.ToUpper(spelling), strings.ToUpper(spelling[:1]) + spelling[1:]} {
-			if err := configuration.ParseSeverity(variant); err != nil {
-				t.Errorf("the schema allows %q and the loader refuses it: %v", variant, err)
+		for _, variant := range []string{
+			spelling,
+			strings.ToUpper(spelling),
+			strings.ToUpper(spelling[:1]) + spelling[1:],
+		} {
+			if parseSeverityError := configuration.ParseSeverity(variant); parseSeverityError != nil {
+				test.Errorf("the schema allows %q and the loader refuses it: %v", variant, parseSeverityError)
 			}
 		}
 	}
 	for _, refused := range []string{"fatal", "on", "0", "2", "errors"} {
-		if err := configuration.ParseSeverity(refused); err == nil {
-			t.Errorf("the loader accepts %q, which the schema does not allow", refused)
+		if parseSeverityError := configuration.ParseSeverity(refused); parseSeverityError == nil {
+			test.Errorf("the loader accepts %q, which the schema does not allow", refused)
 		}
 	}
 }
 
-// TestEveryExampleIsJSON: the reference's examples are copied into real files, so each must parse.
-func TestEveryExampleIsJSON(t *testing.T) {
-	t.Parallel()
+// TestEveryExampleIsJson: the reference's examples are copied into real files, so each must parse.
+func TestEveryExampleIsJson(test *testing.T) {
+	test.Parallel()
 	for _, key := range configuration.TopLevelKeys() {
 		example, present := examples[key.Name]
 		if !present {
-			t.Errorf("the reference has no example for %q", key.Name)
+			test.Errorf("the reference has no example for %q", key.Name)
 			continue
 		}
 		if !json.Valid([]byte(example)) {
-			t.Errorf("the example for %q is not JSON: %s", key.Name, example)
+			test.Errorf("the example for %q is not JSON: %s", key.Name, example)
 		}
 	}
 	if len(examples) != len(configuration.TopLevelKeys()) {
-		t.Errorf("%d examples for %d keys", len(examples), len(configuration.TopLevelKeys()))
+		test.Errorf("%d examples for %d keys", len(examples), len(configuration.TopLevelKeys()))
 	}
 }
 
 // TestEveryDescriptionNamesAKeyThatExists: prose for a key the loader no longer accepts is refused too.
-func TestEveryDescriptionNamesAKeyThatExists(t *testing.T) {
-	t.Parallel()
+func TestEveryDescriptionNamesAKeyThatExists(test *testing.T) {
+	test.Parallel()
 	accepted := map[string]bool{}
 	for _, key := range configuration.TopLevelKeys() {
 		accepted[key.Name] = true
 	}
 	for key := range topLevelDescriptions {
 		if !accepted[key] {
-			t.Errorf("topLevelDescriptions describes %q, which the loader does not accept", key)
+			test.Errorf("topLevelDescriptions describes %q, which the loader does not accept", key)
 		}
 	}
 	fields := map[string]bool{}
@@ -323,19 +534,19 @@ func TestEveryDescriptionNamesAKeyThatExists(t *testing.T) {
 	}
 	for key := range overrideDescriptions {
 		if !fields[key] {
-			t.Errorf("overrideDescriptions describes %q, which an override does not accept", key)
+			test.Errorf("overrideDescriptions describes %q, which an override does not accept", key)
 		}
 	}
 	options := map[string]bool{}
 	for _, option := range formatoptions.BlockKeys {
 		options[option.Name] = true
 		if formatDescriptions[option.Name] == "" {
-			t.Errorf("format option %q has no description", option.Name)
+			test.Errorf("format option %q has no description", option.Name)
 		}
 	}
 	for key := range formatDescriptions {
 		if !options[key] {
-			t.Errorf("formatDescriptions describes %q, which the format block does not accept", key)
+			test.Errorf("formatDescriptions describes %q, which the format block does not accept", key)
 		}
 	}
 }
@@ -343,11 +554,17 @@ func TestEveryDescriptionNamesAKeyThatExists(t *testing.T) {
 // TestEveryCarriedSetFitsTheSchema: the rule sets cohere carries are settings files too. Each names only
 // keys the project schema allows, except the Nexus tier's set, which holds the format block and fits the
 // Nexus schema.
-func TestEveryCarriedSetFitsTheSchema(t *testing.T) {
-	t.Parallel()
-	files := built(t)
-	nexusKeys, _ := SchemaKeys(files[NexusSchemaPath])
-	projectKeys, _ := SchemaKeys(files[ProjectSchemaPath])
+func TestEveryCarriedSetFitsTheSchema(test *testing.T) {
+	test.Parallel()
+	files := built(test)
+	nexusKeys, nexusKeysError := SchemaKeys(files[NexusSchemaPath])
+	if nexusKeysError != nil {
+		test.Fatal(nexusKeysError)
+	}
+	projectKeys, projectKeysError := SchemaKeys(files[ProjectSchemaPath])
+	if projectKeysError != nil {
+		test.Fatal(projectKeysError)
+	}
 	allowed := func(keys []string) map[string]bool {
 		set := map[string]bool{}
 		for _, key := range keys {
@@ -356,24 +573,24 @@ func TestEveryCarriedSetFitsTheSchema(t *testing.T) {
 		return set
 	}
 	for _, name := range configuration.SetNames() {
-		contents, err := configuration.SourceContents(name)
-		if err != nil {
-			t.Fatal(err)
+		contents, sourceContentsError := configuration.SourceContents(name)
+		if sourceContentsError != nil {
+			test.Fatal(sourceContentsError)
 		}
 		var keys map[string]json.RawMessage
-		if err := json.Unmarshal(contents, &keys); err != nil {
-			t.Fatalf("%s: %v", name, err)
+		if decodeError := json.Unmarshal(contents, &keys); decodeError != nil {
+			test.Fatalf("%s: %v", name, decodeError)
 		}
 		schemaKeys := allowed(projectKeys)
 		if name == formatoptions.NexusTierSetName {
 			schemaKeys = allowed(nexusKeys)
 			if _, present := keys[FormatKey]; !present {
-				t.Errorf("%s is the Nexus tier and holds no format block", name)
+				test.Errorf("%s is the Nexus tier and holds no format block", name)
 			}
 		}
 		for key := range keys {
 			if !schemaKeys[key] {
-				t.Errorf("%s names %q, which its schema does not allow", name, key)
+				test.Errorf("%s names %q, which its schema does not allow", name, key)
 			}
 		}
 	}
@@ -381,23 +598,27 @@ func TestEveryCarriedSetFitsTheSchema(t *testing.T) {
 
 // TestTheDocumentedSetupsWork: the reference opens with two setups, the carried set alone and a tier of
 // one's own. Both must load and say how to format, or the first thing a reader copies fails.
-func TestTheDocumentedSetupsWork(t *testing.T) {
-	t.Parallel()
+func TestTheDocumentedSetupsWork(test *testing.T) {
+	test.Parallel()
 	for name, files := range map[string]map[string]string{
 		"the carried set": {
-			"CohereSettings.json": `{"extends": "` + formatoptions.NexusTierSetName + `", "rules": {"no-debugger": "error"}, "ignorePatterns": ["dist/**"]}`,
+			"CohereSettings.json": `{"extends": "` +
+				formatoptions.NexusTierSetName +
+				`", "rules": {"no-debugger": "error"}, "ignorePatterns": ["dist/**"]}`,
 		},
 		"a tier of one's own": {
-			"CohereSettings.json":           `{"extends": "./` + formatoptions.NexusTierFileName + `", "rules": {"no-debugger": "error"}}`,
+			"CohereSettings.json": `{"extends": "./` +
+				formatoptions.NexusTierFileName +
+				`", "rules": {"no-debugger": "error"}}`,
 			formatoptions.NexusTierFileName: `{"format": ` + examples[FormatKey] + `}`,
 		},
 	} {
-		path := writeSettings(t, files)
-		if _, err := configuration.Load(path); err != nil {
-			t.Errorf("%s: the loader refuses it: %v", name, err)
+		path := writeSettings(test, files)
+		if _, loadError := configuration.Load(path); loadError != nil {
+			test.Errorf("%s: the loader refuses it: %v", name, loadError)
 		}
-		if _, err := formatoptions.Resolve(filepath.Dir(path)); err != nil {
-			t.Errorf("%s: the formatter refuses it: %v", name, err)
+		if _, resolveError := formatoptions.Resolve(filepath.Dir(path)); resolveError != nil {
+			test.Errorf("%s: the formatter refuses it: %v", name, resolveError)
 		}
 	}
 }

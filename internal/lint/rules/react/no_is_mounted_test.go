@@ -23,8 +23,8 @@ const isMountedFile = "/repository/source/IsMounted.tsx"
 // `if (!this.isMounted()) { return; }` inside a method. So upstream protects this port barely at
 // all, and every discrimination the rule actually makes is pinned by an invented case below
 // instead. Each of those says why it exists and what measurement produced it.
-func TestNoIsMountedFires(t *testing.T) {
-	t.Parallel()
+func TestNoIsMountedFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -69,10 +69,10 @@ func TestNoIsMountedFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoIsMounted, isMountedFile, testCase.sourceText), "noIsMounted")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, NoIsMounted, isMountedFile, testCase.sourceText), "noIsMounted")
 		})
 	}
 }
@@ -83,8 +83,8 @@ func TestNoIsMountedFires(t *testing.T) {
 // `this.isMounted` without calling it, so a rule matching the member access rather than the call
 // reports it. The third calls a differently-named method, catching a rule that matched on a
 // substring or on the object alone.
-func TestNoIsMountedStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoIsMountedStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -117,9 +117,9 @@ func TestNoIsMountedStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoIsMounted, isMountedFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoIsMounted, isMountedFile, testCase.sourceText))
 		})
 	}
 }
@@ -131,8 +131,8 @@ func TestNoIsMountedStaysSilent(t *testing.T) {
 // measured upstream behavior rather than a belief about one. The imported corpus writes all three
 // of its findings inside a real React component, which means the single most likely way to get this
 // rule wrong, gating it on component membership, passes the entire import.
-func TestNoIsMountedFiresOnCasesUpstreamDoesNotShip(t *testing.T) {
-	t.Parallel()
+func TestNoIsMountedFiresOnCasesUpstreamDoesNotShip(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -181,17 +181,17 @@ func TestNoIsMountedFiresOnCasesUpstreamDoesNotShip(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoIsMounted, isMountedFile, testCase.sourceText), "noIsMounted")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, NoIsMounted, isMountedFile, testCase.sourceText), "noIsMounted")
 		})
 	}
 }
 
 // Clean cases upstream does not ship, each pinning a boundary the import leaves open.
-func TestNoIsMountedStaysSilentOnCasesUpstreamDoesNotShip(t *testing.T) {
-	t.Parallel()
+func TestNoIsMountedStaysSilentOnCasesUpstreamDoesNotShip(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -252,9 +252,9 @@ func TestNoIsMountedStaysSilentOnCasesUpstreamDoesNotShip(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoIsMounted, isMountedFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoIsMounted, isMountedFile, testCase.sourceText))
 		})
 	}
 }
@@ -266,8 +266,8 @@ func TestNoIsMountedStaysSilentOnCasesUpstreamDoesNotShip(t *testing.T) {
 // `this.isMounted()` with the parentheses. Measured on oxlint for the first source below: offset
 // 23, length 16. Following ESLint here would pass every assertion above while underlining the
 // wrong text on every finding in the tree.
-func TestNoIsMountedReportsTheWholeCall(t *testing.T) {
-	t.Parallel()
+func TestNoIsMountedReportsTheWholeCall(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -281,16 +281,16 @@ func TestNoIsMountedReportsTheWholeCall(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoIsMounted, isMountedFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "noIsMounted")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoIsMounted, isMountedFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "noIsMounted")
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("want 1 diagnostic, got %d", len(result.Diagnostics))
+				test.Fatalf("want 1 diagnostic, got %d", len(result.Diagnostics))
 			}
 			reported := testCase.sourceText[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 			if reported != testCase.want {
-				t.Fatalf("reported span = %q, want %q", reported, testCase.want)
+				test.Fatalf("reported span = %q, want %q", reported, testCase.want)
 			}
 		})
 	}
@@ -299,37 +299,37 @@ func TestNoIsMountedReportsTheWholeCall(t *testing.T) {
 // A single input carrying several violations reports once each, and each finding points at its own
 // call. The import has exactly one finding per file, so nothing there can catch a rule that reports
 // the first violation and stops, or one that reports the enclosing method rather than the call.
-func TestNoIsMountedReportsEachCallSeparately(t *testing.T) {
-	t.Parallel()
+func TestNoIsMountedReportsEachCallSeparately(test *testing.T) {
+	test.Parallel()
 
 	const sourceText = `class W {
                 a() { this.isMounted(); }
                 b() { this.isMounted(); }
             }`
 
-	result := rule_testing.Run(t, NoIsMounted, isMountedFile, sourceText)
-	rule_testing.ExpectFindings(t, result, "noIsMounted", "noIsMounted")
+	result := rule_testing.Run(test, NoIsMounted, isMountedFile, sourceText)
+	rule_testing.ExpectFindings(test, result, "noIsMounted", "noIsMounted")
 	for index, diagnostic := range result.Diagnostics {
 		reported := sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
 		if reported != "this.isMounted()" {
-			t.Fatalf("finding %d reported %q, want %q", index, reported, "this.isMounted()")
+			test.Fatalf("finding %d reported %q, want %q", index, reported, "this.isMounted()")
 		}
 	}
 }
 
 // The rendered message is asserted exactly rather than by substring, because a fixture whose
 // predicate is weaker than the property it guards is not a guard.
-func TestNoIsMountedMessageText(t *testing.T) {
-	t.Parallel()
+func TestNoIsMountedMessageText(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, NoIsMounted, isMountedFile, "class W { m() { this.isMounted(); } }")
+	result := rule_testing.Run(test, NoIsMounted, isMountedFile, "class W { m() { this.isMounted(); } }")
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("want 1 diagnostic, got %d", len(result.Diagnostics))
+		test.Fatalf("want 1 diagnostic, got %d", len(result.Diagnostics))
 	}
 	if got := result.Diagnostics[0].Message.Id; got != "noIsMounted" {
-		t.Fatalf("message id = %q, want %q", got, "noIsMounted")
+		test.Fatalf("message id = %q, want %q", got, "noIsMounted")
 	}
 	if got := result.Diagnostics[0].Message.Description; got != messageNoIsMounted.Description {
-		t.Fatalf("message description = %q, want %q", got, messageNoIsMounted.Description)
+		test.Fatalf("message description = %q, want %q", got, messageNoIsMounted.Description)
 	}
 }

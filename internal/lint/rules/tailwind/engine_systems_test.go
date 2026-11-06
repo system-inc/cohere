@@ -5,7 +5,7 @@ import "testing"
 // engineSystem is one design system an assertion about the engine runs on.
 type engineSystem struct {
 	name string
-	load func(t *testing.T) DesignSystemResult
+	load func(test *testing.T) DesignSystemResult
 }
 
 // engineSystems are the design systems every assertion about the engine runs on (#f598zk0).
@@ -21,20 +21,20 @@ var engineSystems = []engineSystem{
 
 // forEachEngineSystem runs an engine assertion once per design system, each as its own subtest, so a
 // machine without the ahra corpus skips that subtest by name and still runs the public one.
-func forEachEngineSystem(t *testing.T, run func(t *testing.T, designSystem DesignSystemResult)) {
-	t.Helper()
+func forEachEngineSystem(test *testing.T, run func(test *testing.T, designSystem DesignSystemResult)) {
+	test.Helper()
 	for _, system := range engineSystems {
-		t.Run(system.name, func(t *testing.T) {
-			t.Parallel()
-			run(t, system.load(t))
+		test.Run(system.name, func(test *testing.T) {
+			test.Parallel()
+			run(test, system.load(test))
 		})
 	}
 }
 
 // publicDesignSystem is the independent theme's design system, with its table, in the shape the live
 // helpers return.
-func publicDesignSystem(t *testing.T) DesignSystemResult {
-	t.Helper()
-	system := independentLiveSystem(t)
+func publicDesignSystem(test *testing.T) DesignSystemResult {
+	test.Helper()
+	system := independentLiveSystem(test)
 	return loadedDesignSystemResult(system, "")
 }

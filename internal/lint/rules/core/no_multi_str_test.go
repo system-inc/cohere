@@ -27,8 +27,8 @@ const multiStrJsxFile = "/repository/source/MultiStr.tsx"
 // tested nothing.
 //
 // The two clean cases are split out below, because one of them has to parse as JSX.
-func TestNoMultiStrFires(t *testing.T) {
-	t.Parallel()
+func TestNoMultiStrFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		"var x = 'Line 1 \\\n Line 2'",
@@ -39,10 +39,10 @@ func TestNoMultiStrFires(t *testing.T) {
 	}
 
 	for _, sourceText := range cases {
-		t.Run(sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoMultiStr, multiStrFile, sourceText), "multilineString")
+		test.Run(sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, NoMultiString, multiStrFile, sourceText), "multilineString")
 		})
 	}
 }
@@ -54,19 +54,19 @@ func TestNoMultiStrFires(t *testing.T) {
 // string literal, so no string literal in it has a line break and it would stay clean even with the
 // JSX exemption removed. That is why the exemption gets its own test below rather than resting on
 // this case.
-func TestNoMultiStrStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoMultiStrStaysSilent(test *testing.T) {
+	test.Parallel()
 
-	t.Run("a string on one line", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectClean(t,
-			rule_testing.Run(t, NoMultiStr, multiStrFile, "var a = 'Line 1 Line 2';"))
+	test.Run("a string on one line", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectClean(test,
+			rule_testing.Run(test, NoMultiString, multiStrFile, "var a = 'Line 1 Line 2';"))
 	})
 
-	t.Run("a JSX element whose text spans lines", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectClean(t,
-			rule_testing.Run(t, NoMultiStr, multiStrJsxFile, "var a = <div>\n<h1>Wat</h1>\n</div>;"))
+	test.Run("a JSX element whose text spans lines", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectClean(test,
+			rule_testing.Run(test, NoMultiString, multiStrJsxFile, "var a = <div>\n<h1>Wat</h1>\n</div>;"))
 	})
 }
 
@@ -91,8 +91,8 @@ func TestNoMultiStrStaysSilent(t *testing.T) {
 //
 // Without the exemption this rule would report every multiline attribute value in every component
 // file in the tree, which is a false-positive class no imported fixture can see.
-func TestNoMultiStrJsxExemption(t *testing.T) {
-	t.Parallel()
+func TestNoMultiStrJsxExemption(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -103,7 +103,7 @@ func TestNoMultiStrJsxExemption(t *testing.T) {
 		{"a multiline string in attribute braces", "var a = <div attr={'Line 1 \\\n Line 2'} />;", false},
 		{"a multiline string in element braces", "var a = <div>{'Line 1 \\\n Line 2'}</div>;", false},
 		{"a multiline string in a spread object", "var a = <div {...{a: 'Line 1 \\\n Line 2'}} />;", true},
-		// A string spread DIRECTLY as attributes, whose parent is the spread attribute itself rather
+		// A string spread directly as attributes, whose parent is the spread attribute itself rather
 		// than an object literal inside it. Upstream is silent; measured on the installed build.
 		// This case was found by a surviving mutant: narrowing the kind enumeration to the two
 		// parents that everyday well-formed JSX produces passed every other fixture here, and
@@ -113,13 +113,13 @@ func TestNoMultiStrJsxExemption(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoMultiStr, multiStrJsxFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoMultiString, multiStrJsxFile, testCase.sourceText)
 			if testCase.wantFires {
-				rule_testing.ExpectFindings(t, result, "multilineString")
+				rule_testing.ExpectFindings(test, result, "multilineString")
 			} else {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 			}
 		})
 	}
@@ -132,11 +132,11 @@ func TestNoMultiStrJsxExemption(t *testing.T) {
 // against the installed build. A port reading the cooked value reports the escape, which is the
 // ordinary correct way to write a newline, and would fire on a large fraction of every real tree.
 //
-// The last case is the sharpest: a string whose VALUE contains a newline because of an escape,
-// sitting on one source line, is clean, while a string whose value contains NO newline because the
+// The last case is the sharpest: a string whose value contains a newline because of an escape,
+// sitting on one source line, is clean, while a string whose value contains no newline because the
 // continuation swallows it does report. The rule is about the source, not the string.
-func TestNoMultiStrDistinguishesEscapesFromContinuations(t *testing.T) {
-	t.Parallel()
+func TestNoMultiStrDistinguishesEscapesFromContinuations(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -150,13 +150,13 @@ func TestNoMultiStrDistinguishesEscapesFromContinuations(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoMultiStr, multiStrFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoMultiString, multiStrFile, testCase.sourceText)
 			if testCase.wantFires {
-				rule_testing.ExpectFindings(t, result, "multilineString")
+				rule_testing.ExpectFindings(test, result, "multilineString")
 			} else {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 			}
 		})
 	}
@@ -168,8 +168,8 @@ func TestNoMultiStrDistinguishesEscapesFromContinuations(t *testing.T) {
 // different node in ESTree that never reaches upstream's handler. Measured: a multiline template is
 // clean on the installed build. Here that falls out of the listener map, and a port adding the
 // template kind to it would report on every multiline template in the tree.
-func TestNoMultiStrDeclinesOtherLiteralKinds(t *testing.T) {
-	t.Parallel()
+func TestNoMultiStrDeclinesOtherLiteralKinds(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -182,9 +182,9 @@ func TestNoMultiStrDeclinesOtherLiteralKinds(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoMultiStr, multiStrFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoMultiString, multiStrFile, testCase.sourceText))
 		})
 	}
 }
@@ -200,8 +200,8 @@ func TestNoMultiStrDeclinesOtherLiteralKinds(t *testing.T) {
 // Slicing the source with the finding's own range is what makes this an assertion about the span
 // rather than about the line number, and a span that stopped at the line break would slice to
 // something with no closing quote.
-func TestNoMultiStrReportsTheWholeLiteral(t *testing.T) {
-	t.Parallel()
+func TestNoMultiStrReportsTheWholeLiteral(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -214,15 +214,15 @@ func TestNoMultiStrReportsTheWholeLiteral(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoMultiStr, multiStrFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoMultiString, multiStrFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
+				test.Fatalf("got %d findings, want 1", len(result.Diagnostics))
 			}
 			reported := testCase.sourceText[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 			if result.Diagnostics[0].Range.Pos() != testCase.wantStart || reported != testCase.wantText {
-				t.Errorf("finding at [%d,%d) = %q, want start %d and %q",
+				test.Errorf("finding at [%d,%d) = %q, want start %d and %q",
 					result.Diagnostics[0].Range.Pos(), result.Diagnostics[0].Range.End(),
 					reported, testCase.wantStart, testCase.wantText)
 			}
@@ -234,17 +234,17 @@ func TestNoMultiStrReportsTheWholeLiteral(t *testing.T) {
 //
 // The id literal is typed here rather than read from the rule's own constant, so a rename cannot
 // move both sides at once and stay green.
-func TestNoMultiStrMessage(t *testing.T) {
-	t.Parallel()
+func TestNoMultiStrMessage(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, NoMultiStr, multiStrFile, "var x = 'Line 1 \\\n Line 2'")
+	result := rule_testing.Run(test, NoMultiString, multiStrFile, "var x = 'Line 1 \\\n Line 2'")
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
+		test.Fatalf("got %d findings, want 1", len(result.Diagnostics))
 	}
 	if got := result.Diagnostics[0].Message.Id; got != "multilineString" {
-		t.Errorf("message id = %q, want %q", got, "multilineString")
+		test.Errorf("message id = %q, want %q", got, "multilineString")
 	}
 	if result.Diagnostics[0].Message.Description == "" {
-		t.Error("the message carries no description, so the finding says nothing about why")
+		test.Error("the message carries no description, so the finding says nothing about why")
 	}
 }

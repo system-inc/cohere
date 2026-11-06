@@ -12,7 +12,7 @@ import (
 // BooleanPropNamingOptions configures the rule.
 //
 // Upstream's schema declares a `default` for `rule` and `validateNested`, and ESLint applies a
-// schema default only when the options OBJECT is present. With no options at all,
+// schema default only when the options object is present. With no options at all,
 // `context.options[0]` is undefined, `config.rule` is null, and every listener early-returns: the
 // rule is completely inert. Measured on the installed build, one input three ways: no options
 // reports zero, `{}` reports one, and an explicit rule reports one.
@@ -57,30 +57,39 @@ func DefaultBooleanPropNamingOptions() BooleanPropNamingOptions {
 	}
 }
 
+// errorBooleanPropertyNamingNeedsOptions is returned for an absent options object.
+//
+// The text names the pattern because that is the key somebody has to write, and a configuration
+// error a reader cannot act on is barely better than silence.
+var errorBooleanPropertyNamingNeedsOptions = errors.New(
+	"needs an options object, because upstream reads its pattern from the options and is inert " +
+		"without one; write {\"rule\": \"" + DefaultBooleanPropNamingRulePattern + "\"} to get " +
+		"upstream's documented default")
+
 // DecodeBooleanPropNamingOptions reads this rule's configuration from the config layer.
 //
 // Hand-rolled rather than `rule.DecodeOptionsInto` because two keys carry non-zero defaults that
 // the generic helper would leave empty: an absent `rule` has to become the documented pattern
 // rather than the empty string, and an absent `propTypeNames` has to become `["bool"]` rather than
 // an empty list. Both zero values silence the rule rather than merely narrowing it.
-func DecodeBooleanPropNamingOptions(raw []byte) (any, error) {
+func DecodeBooleanPropNamingOptions(raw []byte) (BooleanPropNamingOptions, error) {
 	options := DefaultBooleanPropNamingOptions()
 	if len(raw) == 0 {
 		// Refusing empty input is what makes `RequiresOptions` mean anything. That field only
-		// changes behaviour when the DECODER errors: `OptionsRegistry.Decode` swallows a decode
+		// changes behaviour when the decoder errors: `OptionsRegistry.Decode` swallows a decode
 		// error on empty input for a rule that is not required, and propagates it for one that is.
 		// A decoder returning defaults here would make the flag inert, which an earlier draft did,
 		// and the rule then ran tree-wide on a bare `"error"` exactly as upstream does not.
-		return options, errBooleanPropNamingNeedsOptions
+		return options, errorBooleanPropertyNamingNeedsOptions
 	}
 
 	// Decoded into a wire struct with pointer-free fields, then defaulted, so an explicitly empty
 	// list is distinguishable from an absent key only where that distinction matters. Upstream
-	// reads `config.propTypeNames || ['bool']`, so an explicitly empty array ALSO falls back, which
+	// reads `config.propTypeNames || ['bool']`, so an explicitly empty array also falls back, which
 	// this reproduces by testing length rather than nil.
 	var wire BooleanPropNamingOptions
-	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &wire); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 	if wire.Rule != "" {
 		options.Rule = wire.Rule
@@ -93,8 +102,8 @@ func DecodeBooleanPropNamingOptions(raw []byte) (any, error) {
 
 	// Upstream's `new RegExp(config.rule)`, with no flags, read as JavaScript reads it: RE2 refuses a
 	// lookaround or a backreference its user wrote, and reads `\s` and `\b` differently (#7mztrdd).
-	if _, err := esregexp.Compile(options.Rule, ""); err != nil {
-		return options, err
+	if _, compileError := esregexp.Compile(options.Rule, ""); compileError != nil {
+		return options, compileError
 	}
 	return options, nil
 }
@@ -106,7 +115,7 @@ func DecodeBooleanPropNamingOptions(raw []byte) (any, error) {
 // twice had to clean up. A straight apostrophe here would diverge from every other tool's output for
 // the same finding.
 //
-// An earlier draft carried this same comment above a LITERAL curly apostrophe, which is the exact
+// An earlier draft carried this same comment above a literal curly apostrophe, which is the exact
 // shape of claiming something in a comment and citing the comment back as evidence. The byte scan
 // is what caught it.
 func messageBooleanPropNaming(propertyName string, pattern string, override string) rule.Message {
@@ -138,7 +147,7 @@ func messageBooleanPropNaming(propertyName string, pattern string, override stri
 //	invalid: C.propTypes = { enabled: PropTypes.bool }
 //	invalid: interface Props { enabled: boolean }
 //
-// The regex is the easy half. The work is knowing which props are BOOLEAN, and upstream reads that
+// The regex is the easy half. The work is knowing which props are boolean, and upstream reads that
 // from three independent sources: a `propTypes` object, a TypeScript props type, and the prop-type
 // member names in `propTypeNames`.
 //
@@ -146,7 +155,7 @@ func messageBooleanPropNaming(propertyName string, pattern string, override stri
 //
 // Registered with `RequiresOptions` because upstream is inert without an options object; see
 // BooleanPropNamingOptions. A bare `"error"` here would be a rule that lints nothing.
-var BooleanPropNaming = rule.Rule{
+var BooleanPropNaming = rule.Rule[BooleanPropNamingOptions]{
 	Name: "react/boolean-prop-naming",
 
 	// The TypeScript half resolves a props type reference to its declaration, which is what lets
@@ -154,18 +163,18 @@ var BooleanPropNaming = rule.Rule{
 	// resolution answers the same question without being fooled by a shadowing declaration.
 	NeedsTypeChecker: true,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[BooleanPropNamingOptions]) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 		// Declared once per file rather than once per listener. `NeedsTypeChecker` governs the
 		// registration path and says nothing about the harness path, where a Context is built by
 		// hand and the checker can be nil.
-		if ctx.TypeChecker == nil {
+		if ruleContext.TypeChecker == nil {
 			return nil
 		}
 
-		settings, hasSettings := rule.OptionsAs[BooleanPropNamingOptions](options)
+		settings, hasSettings := options.Read()
 		if !hasSettings {
 			// RequiresOptions means the config layer declines the file before this, so reaching
 			// here without options is a harness path. Declining matches upstream's own behaviour
@@ -183,14 +192,14 @@ var BooleanPropNaming = rule.Rule{
 			return nil
 		}
 		// Compiled as the decoder validated it, `new RegExp(config.rule)` with no flags (#7mztrdd).
-		pattern, err := esregexp.Compile(settings.Rule, "")
-		if err != nil {
+		pattern, compileError := esregexp.Compile(settings.Rule, "")
+		if compileError != nil {
 			return nil
 		}
 
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
-				checkBooleanPropNaming(ctx, node, settings, pattern)
+				checkBooleanPropNaming(ruleContext, node, settings, pattern)
 			},
 		}
 	},
@@ -203,7 +212,7 @@ var BooleanPropNaming = rule.Rule{
 // file. Our walk is pre-order, so a source-file listener fires before its children and the
 // gathering has to happen here.
 func checkBooleanPropNaming(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	sourceFile *ast.Node,
 	settings BooleanPropNamingOptions,
 	pattern *esregexp.RegExp,
@@ -216,7 +225,7 @@ func checkBooleanPropNaming(
 			return
 		}
 		reported[property] = true
-		ctx.ReportNode(property, messageBooleanPropNaming(name, settings.Rule, settings.Message))
+		ruleContext.ReportNode(property, messageBooleanPropNaming(name, settings.Rule, settings.Message))
 	}
 
 	var visit func(*ast.Node)
@@ -228,7 +237,7 @@ func checkBooleanPropNaming(
 			if !isPropTypesName(declaration.Name()) {
 				break
 			}
-			checkPropTypesValue(ctx, declaration.Initializer, settings, pattern, report)
+			checkPropTypesValue(ruleContext, declaration.Initializer, settings, pattern, report)
 
 		case ast.KindBinaryExpression:
 			// `C.propTypes = {...}` written after the class or function.
@@ -243,14 +252,14 @@ func checkBooleanPropNaming(
 			if !isPropTypesName(target.AsPropertyAccessExpression().Name()) {
 				break
 			}
-			checkPropTypesValue(ctx, binary.Right, settings, pattern, report)
+			checkPropTypesValue(ruleContext, binary.Right, settings, pattern, report)
 
 		case ast.KindPropertyAssignment:
 			// `{ propTypes: {...} }` inside an object passed to the ES5 factory.
 			if !isPropTypesName(node.AsPropertyAssignment().Name()) {
 				break
 			}
-			checkPropTypesValue(ctx, node.AsPropertyAssignment().Initializer, settings, pattern, report)
+			checkPropTypesValue(ruleContext, node.AsPropertyAssignment().Initializer, settings, pattern, report)
 		}
 
 		node.ForEachChild(func(child *ast.Node) bool {
@@ -263,12 +272,12 @@ func checkBooleanPropNaming(
 	// The TypeScript half. Every detected component's first parameter type is resolved and its
 	// members judged, which is what reaches `function C(p: Props)` through an interface declared
 	// elsewhere in the file.
-	for _, component := range collectDetectedComponents(ctx, sourceFile) {
+	for _, component := range collectDetectedComponents(ruleContext, sourceFile) {
 		propertiesType := componentPropsTypeNode(component.node)
 		if propertiesType == nil {
 			continue
 		}
-		for _, member := range collectTypeMembers(ctx, propertiesType, map[*ast.Node]bool{}) {
+		for _, member := range collectTypeMembers(ruleContext, propertiesType, map[*ast.Node]bool{}) {
 			checkTypeMember(member, pattern, report)
 		}
 	}
@@ -292,35 +301,35 @@ func isPropTypesName(name *ast.Node) bool {
 
 // checkPropTypesValue judges the object literal a `propTypes` declaration holds.
 //
-// # A wrapper call is deliberately NOT unwrapped
+// # A wrapper call is deliberately not unwrapped
 //
 // Upstream also accepts `propTypes = forbidExtraProps({...})`, but only when the callee is named in
 // `settings.react.propWrapperFunctions`. That list is a settings surface we do not have, and with it
-// unconfigured upstream unwraps NOTHING: measured on the installed build with no settings,
+// unconfigured upstream unwraps nothing at all: measured on the installed build with no settings,
 // `wrap({...})`, `forbidExtraProps({...})` and `merge({}, x, {...})` all report zero while the same
 // props in a bare object report one. Configuring `forbidExtraProps` flips only that one to one.
 //
-// So declining every call form is not a narrowing of upstream, it IS upstream in the only
+// So declining every call form is not a narrowing of upstream, it is upstream in the only
 // configuration we can express. An earlier draft unwrapped calls unconditionally on the reasoning
 // that a missing gate should fail open; that reported on two of upstream's own passing cases, both
 // of which write a wrapper the corpus deliberately leaves unconfigured.
 func checkPropTypesValue(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	value *ast.Node,
 	settings BooleanPropNamingOptions,
 	pattern *esregexp.RegExp,
 	report func(*ast.Node, string),
 ) {
-	value = skipParenthesesOptional(value)
-	if value == nil || value.Kind != ast.KindObjectLiteralExpression {
+	unwrapped := skipParenthesesOptional(value)
+	if unwrapped == nil || unwrapped.Kind != ast.KindObjectLiteralExpression {
 		return
 	}
-	runBooleanPropCheck(value.AsObjectLiteralExpression().Properties, settings, pattern, report)
+	runBooleanPropCheck(unwrapped.AsObjectLiteralExpression().Properties, settings, pattern, report)
 }
 
 // runBooleanPropCheck walks one propTypes object's own properties.
 //
-// Upstream recurses only when `validateNested` is set AND the property's value is a call, which is
+// Upstream recurses only when `validateNested` is set and also the property's value is a call, which is
 // how `PropTypes.shape({...})` is reached. Both halves are load bearing and measured: the same
 // shape input reports zero under the default and one with the option on.
 func runBooleanPropCheck(
@@ -356,7 +365,7 @@ func runBooleanPropCheck(
 		if !isBooleanPropTypeValue(assignment.Initializer, settings.PropTypeNames) {
 			continue
 		}
-		name, hasName := propTypesKeyName(assignment.Name())
+		name, hasName := propertyTypesKeyName(assignment.Name())
 		// A match that overruns the time bound passes too: no answer here is a report.
 		if pattern.TestOrTimeout(name) && hasName {
 			continue
@@ -368,12 +377,12 @@ func runBooleanPropCheck(
 // isNestedPropTypesCall reports whether a prop's declared type is a call, which is upstream's
 // `nestedPropTypes` test and is what `PropTypes.shape({...})` matches.
 //
-// Upstream tests only that the value IS a call, not that the callee is `shape`, so
+// Upstream tests only that the value is a call, not that the callee is `shape`, so
 // `PropTypes.oneOfType([...])` and any other call reach the recursion too. Reproduced rather than
 // narrowed: the corpus writes `shape` and `arrayOf` both.
 func isNestedPropTypesCall(value *ast.Node) bool {
-	value = skipParenthesesOptional(value)
-	return value != nil && value.Kind == ast.KindCallExpression
+	unwrapped := skipParenthesesOptional(value)
+	return unwrapped != nil && unwrapped.Kind == ast.KindCallExpression
 }
 
 // isBooleanPropTypeValue reports whether a declared prop type names one of the boolean prop-type
@@ -388,19 +397,19 @@ func isNestedPropTypesCall(value *ast.Node) bool {
 //
 // The `isRequired` peel is one level only, matching upstream: it reads `node.value.object.property`
 // and stops, so `PropTypes.bool.isRequired.isRequired` yields nothing and is silent.
-func isBooleanPropTypeValue(value *ast.Node, propTypeNames []string) bool {
-	value = skipParenthesesOptional(value)
-	if value == nil {
+func isBooleanPropTypeValue(value *ast.Node, propertyTypeNames []string) bool {
+	unwrapped := skipParenthesesOptional(value)
+	if unwrapped == nil {
 		return false
 	}
 
 	name := ""
-	switch value.Kind {
+	switch unwrapped.Kind {
 	case ast.KindIdentifier:
-		name = value.Text()
+		name = unwrapped.Text()
 
 	case ast.KindPropertyAccessExpression:
-		access := value.AsPropertyAccessExpression()
+		access := unwrapped.AsPropertyAccessExpression()
 		property := access.Name()
 		if property == nil || property.Kind != ast.KindIdentifier {
 			return false
@@ -423,7 +432,7 @@ func isBooleanPropTypeValue(value *ast.Node, propTypeNames []string) bool {
 		return false
 	}
 
-	for _, wanted := range propTypeNames {
+	for _, wanted := range propertyTypeNames {
 		if name == wanted {
 			return true
 		}
@@ -431,11 +440,11 @@ func isBooleanPropTypeValue(value *ast.Node, propTypeNames []string) bool {
 	return false
 }
 
-// propTypesKeyName reads the name upstream would read from a propTypes property key.
+// propertyTypesKeyName reads the name upstream would read from a propTypes property key.
 //
 // # An upstream defect, reproduced deliberately
 //
-// Upstream reads `node.key.name`, which exists only on an identifier key. A QUOTED key such as
+// Upstream reads `node.key.name`, which exists only on an identifier key. A quoted key such as
 // `'isEnabled'` and a numeric key both yield undefined, the regex is tested against the string
 // "undefined", and the prop reports no matter what it is called. Measured against the installed
 // build on 2026-08-28: `'enabled'`, `'isEnabled'` and `1` all report, and the message for each
@@ -446,9 +455,9 @@ func isBooleanPropTypeValue(value *ast.Node, propTypeNames []string) bool {
 // disagree with every other tool on the same file. The second return says whether a real name was
 // read, so the caller can report even when the pattern happens to match the placeholder text.
 //
-// A computed key is different and is NOT a defect: upstream reads `node.key.name` and a computed
+// A computed key is different and is not a defect: upstream reads `node.key.name` and a computed
 // `[k]` has an identifier `k` underneath, so it renders `k` and is judged against it. Measured.
-func propTypesKeyName(key *ast.Node) (string, bool) {
+func propertyTypesKeyName(key *ast.Node) (string, bool) {
 	if key == nil {
 		return "undefined", false
 	}
@@ -471,7 +480,7 @@ func propTypesKeyName(key *ast.Node) (string, bool) {
 
 // componentPropsTypeNode returns the type node of a component's first parameter, or nil.
 //
-// Upstream also handles a props type reached through a generic annotation on the BINDING, as in
+// Upstream also handles a props type reached through a generic annotation on the binding, as in
 // `const C: React.FC<Props> = ...`, by reading the type argument list. That form is handled here
 // too, because it is the common modern spelling and the corpus writes it.
 func componentPropsTypeNode(component *ast.Node) *ast.Node {
@@ -514,7 +523,7 @@ func componentPropsTypeNode(component *ast.Node) *ast.Node {
 //	                      there is no body node to step through.
 //	ObjectTypeAnnotation  ABSENT. That is Flow, and this parser produces no Flow nodes.
 //
-// One that reads as vestigial is LIVE and would have been dropped by a port that only followed
+// One that reads as vestigial is live and would have been dropped by a port that only followed
 // upstream's estree shapes:
 //
 //	TSParenthesizedType   PRESENT, at depth two. `type Props = ({ a: boolean } & { b: boolean })`
@@ -527,7 +536,9 @@ func componentPropsTypeNode(component *ast.Node) *ast.Node {
 //
 // The visited set breaks reference cycles: `interface A { self: A }` resolves back to itself and
 // would otherwise recurse forever.
-func collectTypeMembers(ctx rule.Context, typeNode *ast.Node, visited map[*ast.Node]bool) []*ast.Node {
+//
+// Mutates: visited marks each type node the walk enters, so a reference cycle is walked once
+func collectTypeMembers(ruleContext rule.Context, typeNode *ast.Node, visited map[*ast.Node]bool) []*ast.Node {
 	if typeNode == nil || visited[typeNode] {
 		return nil
 	}
@@ -535,7 +546,7 @@ func collectTypeMembers(ctx rule.Context, typeNode *ast.Node, visited map[*ast.N
 
 	switch typeNode.Kind {
 	case ast.KindParenthesizedType:
-		return collectTypeMembers(ctx, typeNode.AsParenthesizedTypeNode().Type, visited)
+		return collectTypeMembers(ruleContext, typeNode.AsParenthesizedTypeNode().Type, visited)
 
 	case ast.KindTypeLiteral:
 		return typeNode.AsTypeLiteralNode().Members.Nodes
@@ -548,7 +559,7 @@ func collectTypeMembers(ctx rule.Context, typeNode *ast.Node, visited map[*ast.N
 	case ast.KindIntersectionType:
 		var members []*ast.Node
 		for _, constituent := range typeNode.AsIntersectionTypeNode().Types.Nodes {
-			members = append(members, collectTypeMembers(ctx, constituent, visited)...)
+			members = append(members, collectTypeMembers(ruleContext, constituent, visited)...)
 		}
 		return members
 
@@ -558,14 +569,14 @@ func collectTypeMembers(ctx rule.Context, typeNode *ast.Node, visited map[*ast.N
 		// shapes is an unusual thing to write.
 		var members []*ast.Node
 		for _, constituent := range typeNode.AsUnionTypeNode().Types.Nodes {
-			members = append(members, collectTypeMembers(ctx, constituent, visited)...)
+			members = append(members, collectTypeMembers(ruleContext, constituent, visited)...)
 		}
 		return members
 
 	case ast.KindTypeReference:
 		// A named props type. Upstream keeps its own map from name to declaration; resolution
 		// answers the same question and is not fooled by a shadowing declaration of the same name.
-		return collectTypeMembers(ctx, resolvedTypeDeclarationBody(ctx, typeNode), visited)
+		return collectTypeMembers(ruleContext, resolvedTypeDeclarationBody(ruleContext, typeNode), visited)
 	}
 	return nil
 }
@@ -575,12 +586,12 @@ func collectTypeMembers(ctx rule.Context, typeNode *ast.Node, visited map[*ast.N
 // An interface resolves to the declaration itself, because our parser hangs members directly off it
 // with no body wrapper. A type alias resolves to whatever it aliases, which is then walked by the
 // caller and may itself be a parenthesized intersection.
-func resolvedTypeDeclarationBody(ctx rule.Context, reference *ast.Node) *ast.Node {
+func resolvedTypeDeclarationBody(ruleContext rule.Context, reference *ast.Node) *ast.Node {
 	typeName := reference.AsTypeReferenceNode().TypeName
 	if typeName == nil || typeName.Kind != ast.KindIdentifier {
 		return nil
 	}
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(typeName)
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(typeName)
 	if symbol == nil {
 		return nil
 	}
@@ -614,7 +625,7 @@ func checkTypeMember(member *ast.Node, pattern *esregexp.RegExp, report func(*as
 		return
 	}
 
-	name, hasName := propTypesKeyName(signature.Name())
+	name, hasName := propertyTypesKeyName(signature.Name())
 	// A match that overruns the time bound passes too: no answer here is a report.
 	if pattern.TestOrTimeout(name) && hasName {
 		return
@@ -639,12 +650,3 @@ func interpolateMessage(template string, values map[string]string) string {
 		return match
 	})
 }
-
-// errBooleanPropNamingNeedsOptions is returned for an absent options object.
-//
-// The text names the pattern because that is the key somebody has to write, and a configuration
-// error a reader cannot act on is barely better than silence.
-var errBooleanPropNamingNeedsOptions = errors.New(
-	"needs an options object, because upstream reads its pattern from the options and is inert " +
-		"without one; write {\"rule\": \"" + DefaultBooleanPropNamingRulePattern + "\"} to get " +
-		"upstream's documented default")

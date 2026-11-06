@@ -23,9 +23,9 @@ import (
 // The corpus cannot substitute for this file. ahra and www-connected-app vendor the same Structure
 // submodule, so a fact they agree on may be a fact about the submodule, which is how five generated
 // tables carried one repository's tokens as framework facts for as long as they did.
-func TestTheUnseenRepositorysRootsAreAnswered(t *testing.T) {
-	t.Parallel()
-	system := unseenDesignSystem(t)
+func TestTheUnseenRepositorysRootsAreAnswered(test *testing.T) {
+	test.Parallel()
+	system := unseenDesignSystem(test)
 
 	// The two `@utility` roots the file declares. Spelled with a value for the functional one,
 	// because a functional root without one is a different question.
@@ -37,14 +37,14 @@ func TestTheUnseenRepositorysRootsAreAnswered(t *testing.T) {
 	for className, wantAnswered := range answers {
 		candidates := ParseCandidate(className, system)
 		if len(candidates) == 0 {
-			t.Errorf("%s does not parse against the system that declares it", className)
+			test.Errorf("%s does not parse against the system that declares it", className)
 			continue
 		}
 		if got := ClassValueResolvesIn(&candidates[0], system); got != wantAnswered {
-			t.Errorf("%s: the unseen system declares it and the port answers %v", className, got)
+			test.Errorf("%s: the unseen system declares it and the port answers %v", className, got)
 		}
 	}
-	t.Logf("the two roots #twany measured as invisible: %d of %d answered", len(answers), len(answers))
+	test.Logf("the two roots #twany measured as invisible: %d of %d answered", len(answers), len(answers))
 }
 
 // A framework class resolves against a theme the port has never seen, and a typo does not.
@@ -53,9 +53,9 @@ func TestTheUnseenRepositorysRootsAreAnswered(t *testing.T) {
 // so this asserts the other direction on the same system: `text-nonsense` and `bg-weird` name
 // framework roots whose values this file's theme does not hold, and `--color-weird` is deliberately
 // a namespace no framework root consumes.
-func TestTheUnseenRepositorySeparatesClassesFromTypos(t *testing.T) {
-	t.Parallel()
-	system := unseenDesignSystem(t)
+func TestTheUnseenRepositorySeparatesClassesFromTypos(test *testing.T) {
+	test.Parallel()
+	system := unseenDesignSystem(test)
 
 	answers := map[string]bool{
 		"text-lg":       true,
@@ -66,16 +66,17 @@ func TestTheUnseenRepositorySeparatesClassesFromTypos(t *testing.T) {
 		"bg-weird":      false,
 	}
 
-	var resolved, refused int
+	var resolved int
+	var refused int
 	for className, wantResolves := range answers {
 		candidates := ParseCandidate(className, system)
 		if len(candidates) == 0 {
-			t.Errorf("%s does not parse", className)
+			test.Errorf("%s does not parse", className)
 			continue
 		}
 		got := ClassValueResolvesIn(&candidates[0], system)
 		if got != wantResolves {
-			t.Errorf("%s: want resolves=%v against the unseen system, got %v", className, wantResolves, got)
+			test.Errorf("%s: want resolves=%v against the unseen system, got %v", className, wantResolves, got)
 			continue
 		}
 		if got {
@@ -85,9 +86,9 @@ func TestTheUnseenRepositorySeparatesClassesFromTypos(t *testing.T) {
 		}
 	}
 
-	t.Logf("unseen system: %d framework classes resolved, %d typos refused", resolved, refused)
+	test.Logf("unseen system: %d framework classes resolved, %d typos refused", resolved, refused)
 	if resolved == 0 || refused == 0 {
-		t.Fatal("one side of the comparison was empty, so this test measured nothing")
+		test.Fatal("one side of the comparison was empty, so this test measured nothing")
 	}
 }
 
@@ -101,44 +102,48 @@ func TestTheUnseenRepositorySeparatesClassesFromTypos(t *testing.T) {
 //
 // Pinned because it is the difference between a known limit and a silent wrong answer, and because a
 // future change that made the table answer these would need to delete this deliberately.
-func TestTheUnseenRepositorysFunctionalRootIsDeclinedByTheTable(t *testing.T) {
-	t.Parallel()
-	system := unseenDesignSystem(t)
+func TestTheUnseenRepositorysFunctionalRootIsDeclinedByTheTable(test *testing.T) {
+	test.Parallel()
+	system := unseenDesignSystem(test)
 	table := NewTable(system)
 
 	candidates := ParseCandidate("synthetic-fn-small", system)
 	if len(candidates) == 0 {
-		t.Fatal("synthetic-fn-small does not parse against the system that declares it")
+		test.Fatal("synthetic-fn-small does not parse against the system that declares it")
 	}
 
 	if _, answered := table.Lookup(&candidates[0]); answered {
-		t.Error("the table now answers a repository functional root, which the closing claim in " +
+		test.Error("the table now answers a repository functional root, which the closing claim in " +
 			"descriptor_base_table.go says it cannot; that claim needs re-measuring rather than this " +
 			"assertion being deleted")
 	}
 	if !ClassValueResolvesIn(&candidates[0], system) {
-		t.Error("the evaluator's half must still answer it, or the decline above is a real gap")
+		test.Error("the evaluator's half must still answer it, or the decline above is a real gap")
 	}
 }
 
 // unseenDesignSystem loads the design system that shares nothing with the corpus.
-func unseenDesignSystem(t *testing.T) *LoadedDesignSystem {
-	t.Helper()
+func unseenDesignSystem(test *testing.T) *LoadedDesignSystem {
+	test.Helper()
 
-	entryPoint, err := filepath.Abs(filepath.Join("..", "tools", "generate_descriptor_base", "testdata", "independent_theme.css"))
-	if err != nil {
-		t.Fatalf("resolving the unseen system's path: %v", err)
+	entryPoint, absolutePathError := filepath.Abs(
+		filepath.Join("..", "tools", "generate_descriptor_base", "testdata", "independent_theme.css"),
+	)
+	if absolutePathError != nil {
+		test.Fatalf("resolving the unseen system's path: %v", absolutePathError)
 	}
-	if _, err := os.Stat(entryPoint); err != nil {
-		t.Skipf("the unseen design system is not present at %s", entryPoint)
+	if _, statError := os.Stat(entryPoint); statError != nil {
+		test.Skipf("the unseen design system is not present at %s", entryPoint)
 	}
 
 	// The vendored snapshot of tailwindcss, so the unseen system resolves on any machine (#sycrdr6).
-	packageRoot := vendored.TailwindPackageRoot()
+	packageRoot := vendored.TailwindPackageRootForTest(test)
 
-	system, err := LoadDesignSystem(LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot})
-	if err != nil {
-		t.Fatalf("loading the unseen design system: %v", err)
+	system, loadDesignSystemError := LoadDesignSystem(
+		LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot},
+	)
+	if loadDesignSystemError != nil {
+		test.Fatalf("loading the unseen design system: %v", loadDesignSystemError)
 	}
 	return system
 }
@@ -156,11 +161,11 @@ func unseenDesignSystem(t *testing.T) *LoadedDesignSystem {
 // that nothing could answer.
 //
 // Asserted on the live system rather than a list, so a repository adding such a pair joins this test.
-func TestARootDeclaredBothWaysKeepsBothKinds(t *testing.T) {
-	t.Parallel()
-	system, _ := liveTableFor(t, corpusRepositories[0].spelling)
+func TestARootDeclaredBothWaysKeepsBothKinds(test *testing.T) {
+	test.Parallel()
+	system, _ := liveTableFor(test, corpusRepositories[0].spelling)
 	if system == nil {
-		t.Skip("no design system loaded")
+		test.Skip("no design system loaded")
 	}
 
 	var bothKinds int
@@ -169,15 +174,20 @@ func TestARootDeclaredBothWaysKeepsBothKinds(t *testing.T) {
 		functionalForm := system.HasUtility(root, UtilityKindFunctional)
 
 		if !staticForm || !functionalForm {
-			t.Errorf("`@utility %s` and `@utility %s-*` are both declared and the system reports static=%v functional=%v",
-				root, root, staticForm, functionalForm)
+			test.Errorf(
+				"`@utility %s` and `@utility %s-*` are both declared and the system reports static=%v functional=%v",
+				root,
+				root,
+				staticForm,
+				functionalForm,
+			)
 			continue
 		}
 		bothKinds++
 	}
 
-	t.Logf("roots declared both ways: %d checked", bothKinds)
+	test.Logf("roots declared both ways: %d checked", bothKinds)
 	if bothKinds == 0 {
-		t.Skip("this repository declares no root both ways")
+		test.Skip("this repository declares no root both ways")
 	}
 }

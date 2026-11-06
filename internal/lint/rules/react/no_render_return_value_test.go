@@ -25,8 +25,8 @@ const renderReturnValueFile = "/repository/source/RenderReturnValue.tsx"
 // else, so a port implementing only the parent-kind check passes all eight fail cases and all nine
 // pass cases while being silent on a whole second rule the upstream ships. That second rule is the
 // arrow-expression-body scope check, and the input distinguishing it appears nowhere upstream.
-func TestNoRenderReturnValueFires(t *testing.T) {
-	t.Parallel()
+func TestNoRenderReturnValueFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -34,8 +34,14 @@ func TestNoRenderReturnValueFires(t *testing.T) {
 	}{
 		// The eight upstream fail cases, verbatim.
 		{"a variable declarator", "var Hello = ReactDOM.render(<div />, document.body);"},
-		{"an object property", "\n                    var o = {\n                      inst: ReactDOM.render(<div />, document.body)\n                    };\n                  "},
-		{"a return statement", "\n                    function render () {\n                      return ReactDOM.render(<div />, document.body)\n                    }\n                  "},
+		{
+			"an object property",
+			"\n                    var o = {\n                      inst: ReactDOM.render(<div />, document.body)\n                    };\n                  ",
+		},
+		{
+			"a return statement",
+			"\n                    function render () {\n                      return ReactDOM.render(<div />, document.body)\n                    }\n                  ",
+		},
 		{"an arrow expression body with parameters", "var render = (a, b) => ReactDOM.render(a, b)"},
 		{"assignment to a member", "this.o = ReactDOM.render(<div />, document.body);"},
 		{"assignment to a variable", "var v; v = ReactDOM.render(<div />, document.body);"},
@@ -73,10 +79,10 @@ func TestNoRenderReturnValueFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoRenderReturnValue, renderReturnValueFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "noRenderReturnValue")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoRenderReturnValue, renderReturnValueFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "noRenderReturnValue")
 		})
 	}
 }
@@ -88,8 +94,8 @@ func TestNoRenderReturnValueFires(t *testing.T) {
 // the return value used". Every one of them uses the return value in a way any reader would call a
 // use, and upstream reports none of them, because the rule is a fixed list of parent kinds rather
 // than a use analysis. Measured on oxlint: all silent.
-func TestNoRenderReturnValueStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoRenderReturnValueStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -98,14 +104,23 @@ func TestNoRenderReturnValueStaysSilent(t *testing.T) {
 		// The nine upstream pass cases, verbatim. Two are byte-identical duplicates upstream, kept
 		// as written rather than deduplicated.
 		{"a bare call statement", "ReactDOM.render(<div />, document.body);"},
-		{"a ref callback assigning a local", "\n                    let node;\n                    ReactDOM.render(<div ref={ref => node = ref}/>, document.body);\n                  "},
+		{
+			"a ref callback assigning a local",
+			"\n                    let node;\n                    ReactDOM.render(<div ref={ref => node = ref}/>, document.body);\n                  ",
+		},
 		{"a ref callback assigning a member", "ReactDOM.render(<div ref={ref => this.node = ref}/>, document.body);"},
 		{"React.render rather than ReactDOM", "React.render(<div ref={ref => this.node = ref}/>, document.body);"},
-		{"React.render rather than ReactDOM, again", "React.render(<div ref={ref => this.node = ref}/>, document.body);"},
+		{
+			"React.render rather than ReactDOM, again",
+			"React.render(<div ref={ref => this.node = ref}/>, document.body);",
+		},
 		{"React.render assigned", "var foo = React.render(<div />, root);"},
 		{"a bare render call assigned", "var foo = render(<div />, root)"},
 		{"a misspelled property on a similar name", "var foo = ReactDom.renderder(<div />, root)"},
-		{"an unrelated ReactDOM method", "export const foo = () => ({ destroy: ({ dom }) => { ReactDOM.unmountComponentAtNode(dom); } });"},
+		{
+			"an unrelated ReactDOM method",
+			"export const foo = () => ({ destroy: ({ dom }) => { ReactDOM.unmountComponentAtNode(dom); } });",
+		},
 
 		// Invented. These four are genuine uses of the return value that upstream does not report,
 		// and they are the whole answer to what this rule decides. A port that inferred its parent
@@ -135,14 +150,17 @@ func TestNoRenderReturnValueStaysSilent(t *testing.T) {
 		// it is a genuine miss rather than a case upstream thinks is fine. Measured silent on
 		// oxlint, in a file that imports react-dom and reports on the unaliased call two lines
 		// above. Reproduced rather than improved on; see the checker note on the rule.
-		{"an aliased receiver", "import ReactDOM from 'react-dom';\nvar RD = ReactDOM;\nvar b = RD.render(<div />, x);"},
+		{
+			"an aliased receiver",
+			"import ReactDOM from 'react-dom';\nvar RD = ReactDOM;\nvar b = RD.render(<div />, x);",
+		},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoRenderReturnValue, renderReturnValueFile, testCase.sourceText)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoRenderReturnValue, renderReturnValueFile, testCase.sourceText)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -158,12 +176,12 @@ func TestNoRenderReturnValueStaysSilent(t *testing.T) {
 // reproduced rather than deduplicated because a differential run against oxlint is what this port
 // has to survive, and collapsing it to one finding would read as a difference on real code. Measured
 // on oxlint: two findings, both at column 21 of the same line.
-func TestNoRenderReturnValueReportsTwiceInsideANestedArrow(t *testing.T) {
-	t.Parallel()
+func TestNoRenderReturnValueReportsTwiceInsideANestedArrow(test *testing.T) {
+	test.Parallel()
 
 	const sourceText = "var f = () => () => ReactDOM.render(<div />, x);"
-	result := rule_testing.Run(t, NoRenderReturnValue, renderReturnValueFile, sourceText)
-	rule_testing.ExpectFindings(t, result, "noRenderReturnValue", "noRenderReturnValue")
+	result := rule_testing.Run(test, NoRenderReturnValue, renderReturnValueFile, sourceText)
+	rule_testing.ExpectFindings(test, result, "noRenderReturnValue", "noRenderReturnValue")
 }
 
 // TestNoRenderReturnValueReachesAnywhereInsideAnArrowExpressionBody is the second half of the rule.
@@ -176,8 +194,8 @@ func TestNoRenderReturnValueReportsTwiceInsideANestedArrow(t *testing.T) {
 // This is the discrimination the imported corpus cannot see at all, and a port built only from the
 // parent-kind list is silent on all of it while passing all seventeen upstream cases. Measured on
 // oxlint, one finding each.
-func TestNoRenderReturnValueReachesAnywhereInsideAnArrowExpressionBody(t *testing.T) {
-	t.Parallel()
+func TestNoRenderReturnValueReachesAnywhereInsideAnArrowExpressionBody(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -193,10 +211,10 @@ func TestNoRenderReturnValueReachesAnywhereInsideAnArrowExpressionBody(t *testin
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoRenderReturnValue, renderReturnValueFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "noRenderReturnValue")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoRenderReturnValue, renderReturnValueFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "noRenderReturnValue")
 		})
 	}
 }
@@ -211,8 +229,8 @@ func TestNoRenderReturnValueReachesAnywhereInsideAnArrowExpressionBody(t *testin
 // The subscript case is the one that pins the merge rather than a text length: `ReactDOM['render']`
 // is 18 bytes where `ReactDOM.render` is 15, and both are measured from the oxlint snapshot rather
 // than counted by hand.
-func TestNoRenderReturnValueSpan(t *testing.T) {
-	t.Parallel()
+func TestNoRenderReturnValueSpan(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -224,16 +242,17 @@ func TestNoRenderReturnValueSpan(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoRenderReturnValue, renderReturnValueFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "noRenderReturnValue")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoRenderReturnValue, renderReturnValueFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "noRenderReturnValue")
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("got %d diagnostics, want 1", len(result.Diagnostics))
+				test.Fatalf("got %d diagnostics, want 1", len(result.Diagnostics))
 			}
 			diagnostic := result.Diagnostics[0]
-			if reported := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]; reported != testCase.want {
-				t.Errorf("finding covers %q, want %q", reported, testCase.want)
+			if reported := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]; reported !=
+				testCase.want {
+				test.Errorf("finding covers %q, want %q", reported, testCase.want)
 			}
 		})
 	}

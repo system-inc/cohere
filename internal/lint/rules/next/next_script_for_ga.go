@@ -16,6 +16,24 @@ var messageNextScriptForGa = rule.Message{
 		"from `next/script`, which picks a strategy and injects the tag once.",
 }
 
+// googleAnalyticsSourceMarkers is oxc's SUPPORTED_SRCS, matched as plain substrings of a `src`.
+//
+// `gtag/js` appears here and not in the inline list. The two lists differ by one entry each and the
+// asymmetry is upstream's; see the rule's doc comment for the measurement.
+var googleAnalyticsSourceMarkers = []string{
+	"www.google-analytics.com/analytics.js",
+	"www.googletagmanager.com/gtag/js",
+}
+
+// googleAnalyticsInlineMarkers is oxc's SUPPORTED_HTML_CONTENT_URLS, matched as plain substrings of
+// an inline template literal's first chunk.
+//
+// `gtm.js` appears here and not in the source list.
+var googleAnalyticsInlineMarkers = []string{
+	"www.google-analytics.com/analytics.js",
+	"www.googletagmanager.com/gtm.js",
+}
+
 // NextScriptForGa flags a plain <script> that loads Google Analytics.
 //
 //	valid:   import Script from 'next/script'; <Script src="https://www.googletagmanager.com/gtag/js?id=X" />
@@ -111,12 +129,12 @@ var messageNextScriptForGa = rule.Message{
 // The finding points at the tag name, six characters of `script`, taken from the snapshot's caret.
 // No fix: the repair is an import plus a component plus a strategy choice, which upstream does not
 // attempt either.
-var NextScriptForGa = rule.Rule{
+var NextScriptForGa = rule.Rule[rule.NoOptions]{
 	// No namespace prefix. The config writes `nextjs/next-script-for-ga` and the parity guard strips
 	// the namespace on a `/` boundary, so a prefixed name would match no inventory entry and lint no
 	// files while every fixture in this package stayed green.
 	Name: "@next/next/next-script-for-ga",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		report := func(node *ast.Node) {
 			tagName, attributes := jsx.ElementParts(node)
 			// The tag is compared case-sensitively to the lowercase intrinsic, unlike the two
@@ -129,7 +147,7 @@ var NextScriptForGa = rule.Rule{
 			if source, found := jsx.StringAttributeValue(attributes, "src", jsx.MatchIgnoringCase); found {
 				for _, marker := range googleAnalyticsSourceMarkers {
 					if strings.Contains(source, marker) {
-						ctx.ReportNode(tagName, messageNextScriptForGa)
+						ruleContext.ReportNode(tagName, messageNextScriptForGa)
 						// Upstream returns here, so a matching src suppresses the inline test on
 						// the same element rather than adding a second finding. Measured.
 						return
@@ -138,13 +156,13 @@ var NextScriptForGa = rule.Rule{
 			}
 
 			// The inline bootstrap, which loads Google Analytics from a string of code.
-			inlineHtml, found := firstTemplateHeadRawText(ctx, dangerouslySetInnerHtmlValue(attributes))
+			inlineHtml, found := firstTemplateHeadRawText(ruleContext, dangerouslySetInnerHtmlValue(attributes))
 			if !found {
 				return
 			}
 			for _, marker := range googleAnalyticsInlineMarkers {
 				if strings.Contains(inlineHtml, marker) {
-					ctx.ReportNode(tagName, messageNextScriptForGa)
+					ruleContext.ReportNode(tagName, messageNextScriptForGa)
 					return
 				}
 			}
@@ -155,24 +173,6 @@ var NextScriptForGa = rule.Rule{
 			ast.KindJsxSelfClosingElement: report,
 		}
 	},
-}
-
-// googleAnalyticsSourceMarkers is oxc's SUPPORTED_SRCS, matched as plain substrings of a `src`.
-//
-// `gtag/js` appears here and not in the inline list. The two lists differ by one entry each and the
-// asymmetry is upstream's; see the doc comment above for the measurement.
-var googleAnalyticsSourceMarkers = []string{
-	"www.google-analytics.com/analytics.js",
-	"www.googletagmanager.com/gtag/js",
-}
-
-// googleAnalyticsInlineMarkers is oxc's SUPPORTED_HTML_CONTENT_URLS, matched as plain substrings of
-// an inline template literal's first chunk.
-//
-// `gtm.js` appears here and not in the source list.
-var googleAnalyticsInlineMarkers = []string{
-	"www.google-analytics.com/analytics.js",
-	"www.googletagmanager.com/gtm.js",
 }
 
 // dangerouslySetInnerHtmlValue returns the expression assigned to a `__html` key inside the object
@@ -256,7 +256,7 @@ func dangerouslySetInnerHtmlValue(attributes *ast.Node) *ast.Node {
 // shim exposes no `RawText`, and typescript-go's own accessor panics on the no-substitution kind, so
 // the node's range over the source text is the route. The delimiters are trimmed off the ends: a
 // leading backtick always, and a trailing backtick or `${` depending on which shape it is.
-func firstTemplateHeadRawText(ctx rule.Context, value *ast.Node) (string, bool) {
+func firstTemplateHeadRawText(ruleContext rule.Context, value *ast.Node) (string, bool) {
 	if value == nil {
 		return "", false
 	}
@@ -273,7 +273,7 @@ func firstTemplateHeadRawText(ctx rule.Context, value *ast.Node) (string, bool) 
 		return "", false
 	}
 
-	sourceText := ctx.SourceFile.Text()
+	sourceText := ruleContext.SourceFile.Text()
 	start, end := chunk.Pos(), chunk.End()
 	if start < 0 || end > len(sourceText) || start >= end {
 		return "", false
@@ -285,7 +285,7 @@ func firstTemplateHeadRawText(ctx rule.Context, value *ast.Node) (string, bool) 
 	// before the value, `` \u0020`abc` `` with one, and `   /*c*/ `abc`` with a comment, so the
 	// offset genuinely varies.
 	//
-	// Replacing this search with a constant zero is an EQUIVALENT mutation and survives the whole
+	// Replacing this search with a constant zero is an equivalent mutation and survives the whole
 	// suite, which is recorded here so the next reader does not chase it as a blind spot. Retaining
 	// trivia only prepends text in front of the body, and every marker is a plain URL substring
 	// containing no backtick, so no prefix can break a `Contains`. Shifting the offset the other way

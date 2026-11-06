@@ -51,14 +51,14 @@ var pageStateHookNames = map[string]bool{
 // Recorded rather than left implicit, because every other rule ported tonight had a real population
 // behind its zero and this one does not. The fixtures and a planted control through the real binary
 // are the whole of the evidence for it.
-var NextNoPageState = rule.Rule{
+var NextNoPageState = rule.Rule[rule.NoOptions]{
 	Name: "structure/next-no-page-state",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// IsReactFile is redundant here and kept for symmetry with the original, which tests both.
 		// IsPageFile already requires a .tsx or .jsx suffix, so no file can satisfy it and fail the
 		// React test. A mutation sweep cannot kill the first half, which is what a check subsumed
 		// by the one beside it looks like from inside a green suite.
-		fileContext := FileContextFor(ctx.SourceFile.FileName().AsString())
+		fileContext := FileContextFor(ruleContext.SourceFile.FileName().AsString())
 		if !fileContext.IsReactFile || !fileContext.IsPageFile {
 			return nil
 		}
@@ -73,7 +73,7 @@ var NextNoPageState = rule.Rule{
 				switch callee.Kind {
 				case ast.KindIdentifier:
 					if pageStateHookNames[callee.Text()] {
-						ctx.ReportNode(callee, messagePageStateRemounts())
+						ruleContext.ReportNode(callee, messagePageStateRemounts())
 					}
 
 				case ast.KindPropertyAccessExpression:
@@ -84,7 +84,7 @@ var NextNoPageState = rule.Rule{
 					// The receiver must be React. `Store.useState` is somebody's own accessor and
 					// has nothing to do with the App Router's remounting.
 					if react.IsNamespacedMember(callee, func(name string) bool { return pageStateHookNames[name] }) {
-						ctx.ReportNode(callee, messagePageStateRemounts())
+						ruleContext.ReportNode(callee, messagePageStateRemounts())
 					}
 				}
 			},

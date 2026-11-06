@@ -11,12 +11,12 @@ import (
 // both kinds side by side, so each pairing finds its English. Both siblings present is a guess, so it
 // is reported and nothing is compared; neither present is reported as missing, naming en.a first
 // (#techtr1).
-func TestAnAdamicTranslationFileFindsItsEnglishSibling(t *testing.T) {
-	t.Parallel()
+func TestAnAdamicTranslationFileFindsItsEnglishSibling(test *testing.T) {
+	test.Parallel()
 	english := "export default { Greeting: 'Hello there' };\n"
 	copied := "export default { Greeting: 'Hello there' };\n"
 
-	control := runOnTranslations(t, map[string]string{
+	control := runOnTranslations(test, map[string]string{
 		"_translations/en.ts": english,
 		"_translations/fr.ts": copied,
 	}, "_translations/fr.ts")
@@ -28,44 +28,48 @@ func TestAnAdamicTranslationFileFindsItsEnglishSibling(t *testing.T) {
 		{"en.a beside fr.a", map[string]string{"_translations/en.a": english, "_translations/fr.a": copied}},
 		{"en.ts beside fr.a", map[string]string{"_translations/en.ts": english, "_translations/fr.a": copied}},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectSameFindings(t, control, runOnTranslations(t, testCase.files, "_translations/fr.a"))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectSameFindings(
+				test,
+				control,
+				runOnTranslations(test, testCase.files, "_translations/fr.a"),
+			)
 		})
 	}
 
-	t.Run("en.a beside fr.ts", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectSameFindings(t, control, runOnTranslations(t, map[string]string{
+	test.Run("en.a beside fr.ts", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectSameFindings(test, control, runOnTranslations(test, map[string]string{
 			"_translations/en.a":  english,
 			"_translations/fr.ts": copied,
 		}, "_translations/fr.ts"))
 	})
 
-	t.Run("both en.ts and en.a", func(t *testing.T) {
-		t.Parallel()
-		result := runOnTranslations(t, map[string]string{
+	test.Run("both en.ts and en.a", func(test *testing.T) {
+		test.Parallel()
+		result := runOnTranslations(test, map[string]string{
 			"_translations/en.ts": english,
 			"_translations/en.a":  english,
 			"_translations/fr.a":  copied,
 		}, "_translations/fr.a")
-		rule_testing.ExpectFindings(t, result, "ambiguousEnglishSibling")
+		rule_testing.ExpectFindings(test, result, "ambiguousEnglishSibling")
 	})
 
-	t.Run("neither en.ts nor en.a", func(t *testing.T) {
-		t.Parallel()
-		result := runOnTranslations(t, map[string]string{
+	test.Run("neither en.ts nor en.a", func(test *testing.T) {
+		test.Parallel()
+		result := runOnTranslations(test, map[string]string{
 			"_translations/de.ts": english,
 			"_translations/fr.a":  copied,
 		}, "_translations/fr.a")
-		rule_testing.ExpectFindings(t, result, "missingEnglishSibling")
-		expectMissingSiblingNames(t, result, "en.a", "en.ts")
+		rule_testing.ExpectFindings(test, result, "missingEnglishSibling")
+		expectMissingSiblingNames(test, result, "en.a", "en.ts")
 	})
 
 	// en.a is English, not a locale to check, as en.ts is.
-	t.Run("en.a itself", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectClean(t, runOnTranslations(t, map[string]string{
+	test.Run("en.a itself", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectClean(test, runOnTranslations(test, map[string]string{
 			"_translations/en.ts": english,
 			"_translations/en.a":  copied,
 		}, "_translations/en.a"))

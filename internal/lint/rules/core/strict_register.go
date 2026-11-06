@@ -11,7 +11,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // string equality, so `rule.DecodeOptionsInto` leaving an unrecognized string in the field would
 // pick a silent fifth behaviour of reporting nothing rather than producing an error.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[StrictMode]{
 		Rule:   Strict,
 		Decode: DecodeStrictOptions,
 	})

@@ -14,8 +14,8 @@ const lossOfPrecisionFile = "/repository/source/Numbers.ts"
 // One Tester block, 89 pass and 56 fail, and the snapshot records 56 diagnostics from 56 fail
 // inputs. One finding per input holds throughout, which is unusual enough to be worth stating: no
 // input here reports twice, so every fail case asserts exactly one message id.
-func TestNoLossOfPrecisionFires(t *testing.T) {
-	t.Parallel()
+func TestNoLossOfPrecisionFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -48,11 +48,20 @@ func TestNoLossOfPrecisionFires(t *testing.T) {
 		{"-5123000000000000000000000000001", "var x = -5123000000000000000000000000001"},
 		{"1230000000000000000000000.0", "var x = 1230000000000000000000000.0"},
 		{"1.0000000000000000000000123", "var x = 1.0000000000000000000000123"},
-		{"1749800579826409539498001781694097092282535...", "var x = 17498005798264095394980017816940970922825355447145699491406164851279623993595007385788105416184430592"},
+		{
+			"1749800579826409539498001781694097092282535...",
+			"var x = 17498005798264095394980017816940970922825355447145699491406164851279623993595007385788105416184430592",
+		},
 		{"2e999", "var x = 2e999"},
 		{".1230000000000000000000000", "var x = .1230000000000000000000000"},
-		{"0b10000000000000000000000000000000000000000...", "var x = 0b100000000000000000000000000000000000000000000000000001"},
-		{"0B10000000000000000000000000000000000000000...", "var x = 0B100000000000000000000000000000000000000000000000000001"},
+		{
+			"0b10000000000000000000000000000000000000000...",
+			"var x = 0b100000000000000000000000000000000000000000000000000001",
+		},
+		{
+			"0B10000000000000000000000000000000000000000...",
+			"var x = 0B100000000000000000000000000000000000000000000000000001",
+		},
 		{"0o400000000000000001", "var x = 0o400000000000000001"},
 		{"0O400000000000000001", "var x = 0O400000000000000001"},
 		{"0400000000000000001", "var x = 0400000000000000001"},
@@ -62,11 +71,20 @@ func TestNoLossOfPrecisionFires(t *testing.T) {
 		{"-5_12300000000000000000000_0000001", "var x = -5_12300000000000000000000_0000001"},
 		{"123_00000000000000000000_00.0_0", "var x = 123_00000000000000000000_00.0_0"},
 		{"1.0_00000000000000000_0000123", "var x = 1.0_00000000000000000_0000123"},
-		{"174_980057982_640953949800178169_4097092282...", "var x = 174_980057982_640953949800178169_409709228253554471456994_914061648512796239935950073857881054_1618443059_2"},
+		{
+			"174_980057982_640953949800178169_4097092282...",
+			"var x = 174_980057982_640953949800178169_409709228253554471456994_914061648512796239935950073857881054_1618443059_2",
+		},
 		{"2e9_99", "var x = 2e9_99"},
 		{".1_23000000000000_00000_0000_0", "var x = .1_23000000000000_00000_0000_0"},
-		{"0b1_000000000000000000000000000000000000000...", "var x = 0b1_0000000000000000000000000000000000000000000000000000_1"},
-		{"0B10000000000_0000000000000000000000000000_...", "var x = 0B10000000000_0000000000000000000000000000_000000000000001"},
+		{
+			"0b1_000000000000000000000000000000000000000...",
+			"var x = 0b1_0000000000000000000000000000000000000000000000000000_1",
+		},
+		{
+			"0B10000000000_0000000000000000000000000000_...",
+			"var x = 0B10000000000_0000000000000000000000000000_000000000000001",
+		},
 		{"0o4_00000000000000_001", "var x = 0o4_00000000000000_001"},
 		{"0O4_0000000000000000_1", "var x = 0O4_0000000000000000_1"},
 		{"0x2_0000000000001", "var x = 0x2_0000000000001"},
@@ -74,16 +92,19 @@ func TestNoLossOfPrecisionFires(t *testing.T) {
 		{"9007199254740993 #2", "const x = 9007199254740993;"},
 		{"9_007_199_254_740_993", "const x = 9_007_199_254_740_993;"},
 		{"9_007_199_254_740.993e3", "const x = 9_007_199_254_740.993e3;"},
-		{"0b100_000_000_000_000_000_000_000_000_000_0...", "const x = 0b100_000_000_000_000_000_000_000_000_000_000_000_000_000_000_000_000_001;"},
+		{
+			"0b100_000_000_000_000_000_000_000_000_000_0...",
+			"const x = 0b100_000_000_000_000_000_000_000_000_000_000_000_000_000_000_000_000_001;",
+		},
 		{"1e18_446_744_073_709_551_615", "var x = 1e18_446_744_073_709_551_615"},
 		{"96215808661.52751e-84", "var x = 96215808661.52751e-84"},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoLossOfPrecision, lossOfPrecisionFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, NoLossOfPrecision, lossOfPrecisionFile, testCase.sourceText),
 				"noLossOfPrecision")
 		})
 	}
@@ -99,8 +120,8 @@ func TestNoLossOfPrecisionFires(t *testing.T) {
 // its neighbour `0x20000000000001` is the first hex value that does not fit. And `3e-308` is
 // subnormal territory, where a formatter with a fixed fractional width runs out of digits before it
 // reaches a significant one.
-func TestNoLossOfPrecisionStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoLossOfPrecisionStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -126,7 +147,10 @@ func TestNoLossOfPrecisionStaysSilent(t *testing.T) {
 		{"9007199254740991", "var x = 9007199254740991"},
 		{"0", "var x = 0"},
 		{"0.0", "var x = 0.0"},
-		{"0.00000000000000000000000000000000000000000...", "var x = 0.000000000000000000000000000000000000000000000000000000000000000000000000000000"},
+		{
+			"0.00000000000000000000000000000000000000000...",
+			"var x = 0.000000000000000000000000000000000000000000000000000000000000000000000000000000",
+		},
 		{"-0", "var x = -0"},
 		{"123.0000000000000000000000", "var x = 123.0000000000000000000000"},
 		{"9.00e2", "var x = 9.00e2"},
@@ -158,10 +182,22 @@ func TestNoLossOfPrecisionStaysSilent(t *testing.T) {
 		{"0.0_00_000000000_000000000_00123", "var x = 0.0_00_000000000_000000000_00123"},
 		{"-0.0_00_000000000_000000000_00123", "var x = -0.0_00_000000000_000000000_00123"},
 		{"0e5_3", "var x = 0e5_3"},
-		{"0b11111111111111111111111111111111111111111...", "var x = 0b11111111111111111111111111111111111111111111111111111"},
-		{"0b111_111_111_111_1111_11111_111_11111_1111...", "var x = 0b111_111_111_111_1111_11111_111_11111_1111111111_11111111_111_111"},
-		{"0B11111111111111111111111111111111111111111...", "var x = 0B11111111111111111111111111111111111111111111111111111"},
-		{"0B111_111_111_111_1111_11111_111_11111_1111...", "var x = 0B111_111_111_111_1111_11111_111_11111_1111111111_11111111_111_111"},
+		{
+			"0b11111111111111111111111111111111111111111...",
+			"var x = 0b11111111111111111111111111111111111111111111111111111",
+		},
+		{
+			"0b111_111_111_111_1111_11111_111_11111_1111...",
+			"var x = 0b111_111_111_111_1111_11111_111_11111_1111111111_11111111_111_111",
+		},
+		{
+			"0B11111111111111111111111111111111111111111...",
+			"var x = 0B11111111111111111111111111111111111111111111111111111",
+		},
+		{
+			"0B111_111_111_111_1111_11111_111_11111_1111...",
+			"var x = 0B111_111_111_111_1111_11111_111_11111_1111111111_11111111_111_111",
+		},
 		{"0o377777777777777777", "var x = 0o377777777777777777"},
 		{"0o3_77_777_777_777_777_777", "var x = 0o3_77_777_777_777_777_777"},
 		{"0O377777777777777777", "var x = 0O377777777777777777"},
@@ -198,10 +234,10 @@ func TestNoLossOfPrecisionStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.Run(t, NoLossOfPrecision, lossOfPrecisionFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.Run(test, NoLossOfPrecision, lossOfPrecisionFile, testCase.sourceText))
 		})
 	}
 }
@@ -213,8 +249,8 @@ func TestNoLossOfPrecisionStaysSilent(t *testing.T) {
 // its decimal value, so this rule reads the raw span out of the source file. These cases pin that
 // decision: each one is a literal whose normalized text and source text differ, and a rule reading
 // `.Text` reports the wrong answer on all of them.
-func TestNoLossOfPrecisionReadsRawSourceText(t *testing.T) {
-	t.Parallel()
+func TestNoLossOfPrecisionReadsRawSourceText(test *testing.T) {
+	test.Parallel()
 
 	fires := []struct {
 		name       string
@@ -226,10 +262,10 @@ func TestNoLossOfPrecisionReadsRawSourceText(t *testing.T) {
 		{"hex whose normalized text is decimal", "var x = 0x20000000000001"},
 	}
 	for _, testCase := range fires {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoLossOfPrecision, lossOfPrecisionFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, NoLossOfPrecision, lossOfPrecisionFile, testCase.sourceText),
 				"noLossOfPrecision")
 		})
 	}
@@ -258,13 +294,16 @@ func TestNoLossOfPrecisionReadsRawSourceText(t *testing.T) {
 		// gets all three wrong while staying green on oxc's corpus.
 		{"hex over 53 bits whose low bits are zero", "var x = 0x40000000000004"},
 		{"octal over 53 bits whose low bits are zero", "var x = 0o1000000000000000000"},
-		{"binary over 53 bits whose low bits are zero", "var x = 0b1100000000000000000000000000000000000000000000000000000"},
+		{
+			"binary over 53 bits whose low bits are zero",
+			"var x = 0b1100000000000000000000000000000000000000000000000000000",
+		},
 	}
 	for _, testCase := range silent {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.Run(t, NoLossOfPrecision, lossOfPrecisionFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.Run(test, NoLossOfPrecision, lossOfPrecisionFile, testCase.sourceText))
 		})
 	}
 }

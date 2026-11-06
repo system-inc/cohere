@@ -29,10 +29,10 @@ func gfmAutolinkLiteralFromMarkdown() extension {
 		exit: map[string]handle{
 			"literalAutolink": func(context *compileContext, token *micromark.Token) { context.exit(token, nil) },
 			"literalAutolinkEmail": func(context *compileContext, token *micromark.Token) {
-				context.config.exit["autolinkEmail"](context, token)
+				context.configuration.exit["autolinkEmail"](context, token)
 			},
 			"literalAutolinkHttp": func(context *compileContext, token *micromark.Token) {
-				context.config.exit["autolinkProtocol"](context, token)
+				context.configuration.exit["autolinkProtocol"](context, token)
 			},
 			"literalAutolinkWww": exitLiteralAutolinkWww,
 		},
@@ -40,12 +40,12 @@ func gfmAutolinkLiteralFromMarkdown() extension {
 }
 
 func enterLiteralAutolinkValue(context *compileContext, token *micromark.Token) {
-	context.config.enter["autolinkProtocol"](context, token)
+	context.configuration.enter["autolinkProtocol"](context, token)
 }
 
 func exitLiteralAutolinkWww(context *compileContext, token *micromark.Token) {
-	context.config.exit["data"](context, token)
-	context.top().URL = "http://" + context.sliceSerialize(token)
+	context.configuration.exit["data"](context, token)
+	context.top().Url = "http://" + context.sliceSerialize(token)
 }
 
 // gfmFootnoteFromMarkdown is mdast-util-gfm-footnote's.
@@ -60,14 +60,26 @@ func gfmFootnoteFromMarkdown() extension {
 			"gfmFootnoteDefinitionLabelString": buffer,
 			"gfmFootnoteDefinition": func(context *compileContext, token *micromark.Token) {
 				empty := ""
-				context.enter(context.nodes.New(Node{NodeType: "footnoteDefinition", Label: &empty, IsParent: true, Children: []*Node{}}), token, nil)
+				context.enter(context.nodes.New(
+					Node{NodeType: "footnoteDefinition", Label: &empty, IsParent: true, Children: []*Node{}},
+				), token, nil)
 			},
 		},
 		exit: map[string]handle{
-			"gfmFootnoteCallString":            exitFootnoteLabelString,
-			"gfmFootnoteCall":                  func(context *compileContext, token *micromark.Token) { context.exit(token, nil) },
+			"gfmFootnoteCallString": exitFootnoteLabelString,
+			"gfmFootnoteCall": func(
+				context *compileContext,
+				token *micromark.Token,
+			) {
+				context.exit(token, nil)
+			},
 			"gfmFootnoteDefinitionLabelString": exitFootnoteLabelString,
-			"gfmFootnoteDefinition":            func(context *compileContext, token *micromark.Token) { context.exit(token, nil) },
+			"gfmFootnoteDefinition": func(
+				context *compileContext,
+				token *micromark.Token,
+			) {
+				context.exit(token, nil)
+			},
 		},
 	}
 }
@@ -85,7 +97,11 @@ func gfmStrikethroughFromMarkdown() extension {
 		canContainEols: []string{"delete"},
 		enter: map[string]handle{
 			"strikethrough": func(context *compileContext, token *micromark.Token) {
-				context.enter(context.nodes.New(Node{NodeType: "delete", IsParent: true, Children: []*Node{}}), token, nil)
+				context.enter(
+					context.nodes.New(Node{NodeType: "delete", IsParent: true, Children: []*Node{}}),
+					token,
+					nil,
+				)
 			},
 		},
 		exit: map[string]handle{
@@ -109,13 +125,21 @@ func gfmTableFromMarkdown() extension {
 						align[index] = value
 					}
 				}
-				context.enter(context.nodes.New(Node{NodeType: "table", Align: align, IsParent: true, Children: []*Node{}}), token, nil)
+				context.enter(
+					context.nodes.New(Node{NodeType: "table", Align: align, IsParent: true, Children: []*Node{}}),
+					token,
+					nil,
+				)
 				context.data.inTable = true
 			},
 			"tableData":   enterCell,
 			"tableHeader": enterCell,
 			"tableRow": func(context *compileContext, token *micromark.Token) {
-				context.enter(context.nodes.New(Node{NodeType: "tableRow", IsParent: true, Children: []*Node{}}), token, nil)
+				context.enter(
+					context.nodes.New(Node{NodeType: "tableRow", IsParent: true, Children: []*Node{}}),
+					token,
+					nil,
+				)
 			},
 		},
 		exit: map[string]handle{
@@ -223,8 +247,8 @@ func sliceOneUnit(value string) string {
 // mathFromMarkdown is mdast-util-math's. The hast data it attaches is for HTML output and not kept.
 func mathFromMarkdown() extension {
 	exitMathData := func(context *compileContext, token *micromark.Token) {
-		context.config.enter["data"](context, token)
-		context.config.exit["data"](context, token)
+		context.configuration.enter["data"](context, token)
+		context.configuration.exit["data"](context, token)
 	}
 	return extension{
 		enter: map[string]handle{
@@ -274,7 +298,11 @@ func wikiLinkFromMarkdown() extension {
 	return extension{
 		enter: map[string]handle{
 			"wikiLink": func(context *compileContext, token *micromark.Token) {
-				context.enter(context.nodes.New(Node{NodeType: "wikiLink", IsLiteral: true, ValueNull: true}), token, nil)
+				context.enter(
+					context.nodes.New(Node{NodeType: "wikiLink", IsLiteral: true, ValueNull: true}),
+					token,
+					nil,
+				)
 			},
 		},
 		exit: map[string]handle{
@@ -283,8 +311,11 @@ func wikiLinkFromMarkdown() extension {
 				node.Value = context.sliceSerialize(token)
 				node.ValueNull = false
 			},
-			"wikiLinkAlias": func(*compileContext, *micromark.Token) {},
-			"wikiLink":      func(context *compileContext, token *micromark.Token) { context.exit(token, nil) },
+			"wikiLinkAlias": func(*compileContext, *micromark.Token) {
+				// Upstream keeps the alias in data for HTML, which this port does not keep, and the fork's
+				// divider never matches, so no alias token is ever made.
+			},
+			"wikiLink": func(context *compileContext, token *micromark.Token) { context.exit(token, nil) },
 		},
 	}
 }

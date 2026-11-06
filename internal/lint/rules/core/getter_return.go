@@ -101,20 +101,21 @@ type GetterReturnOptions struct {
 // returns from itself. Upstream fails `get bar() { ~function () { return true; }() }` and so does
 // this. Conversely `return` inside a nested function must not credit the outer getter, which is why
 // the walk stops at every function boundary.
-var GetterReturn = rule.Rule{
+var GetterReturn = rule.Rule[GetterReturnOptions]{
 	Name: "getter-return",
 
 	// Whether the `Object` or `Reflect` of a descriptor call is the global
 	NeedsTypeChecker: true,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[GetterReturnOptions]) rule.Listeners {
 		allowImplicit := false
-		if parsed, isParsed := rule.OptionsAs[GetterReturnOptions](options); isParsed {
+		if parsed, isParsed := options.Read(); isParsed {
 			allowImplicit = parsed.AllowImplicit
 		}
 
 		isGlobal := func(identifier *ast.Node) bool {
-			return ctx.TypeChecker != nil && rule.IsDeclaredOnlyInDeclarationFiles(ctx.TypeChecker.GetSymbolAtLocation(identifier))
+			return ruleContext.TypeChecker != nil &&
+				rule.IsDeclaredOnlyInDeclarationFiles(ruleContext.TypeChecker.GetSymbolAtLocation(identifier))
 		}
 
 		check := func(node *ast.Node, body *ast.Node) {
@@ -130,14 +131,14 @@ var GetterReturn = rule.Rule{
 			// ESLint's two ids: `expected` for a getter that never returns, `expectedAlways` for one
 			// that returns on some paths and falls off the end on another
 			if returnsAnywhere(body) {
-				ctx.ReportRange(getterHeadRange(ctx.SourceFile, node), rule.Message{
+				ruleContext.ReportRange(getterHeadRange(ruleContext.SourceFile, node), rule.Message{
 					Id: "expectedAlways",
 					Description: "This getter returns a value on some paths and falls off the end on " +
 						"another, where reading the property yields undefined. Return a value from every path.",
 				})
 				return
 			}
-			ctx.ReportRange(getterHeadRange(ctx.SourceFile, node), rule.Message{
+			ruleContext.ReportRange(getterHeadRange(ruleContext.SourceFile, node), rule.Message{
 				Id: "expected",
 				Description: "This getter never returns a value, so reading the property yields " +
 					"undefined. Return the value it stands for.",
@@ -151,10 +152,13 @@ var GetterReturn = rule.Rule{
 					return
 				}
 				function := ast.FindAncestor(node.Parent, ast.IsFunctionLike)
-				if function == nil || function.Body() == nil || function.Body().Kind != ast.KindBlock || !isGetterFunction(function, isGlobal) {
+				if function == nil ||
+					function.Body() == nil ||
+					function.Body().Kind != ast.KindBlock ||
+					!isGetterFunction(function, isGlobal) {
 					return
 				}
-				ctx.ReportNode(node, rule.Message{
+				ruleContext.ReportNode(node, rule.Message{
 					Id: "expected",
 					Description: "This bare return leaves the getter with undefined, so reading the " +
 						"property yields nothing. Return the value it stands for.",

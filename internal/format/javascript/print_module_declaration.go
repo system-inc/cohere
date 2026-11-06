@@ -1,5 +1,7 @@
 package javascript
 
+import "github.com/system-inc/cohere/internal/format/doc"
+
 // print/module-declaration.js.
 
 /*
@@ -15,12 +17,12 @@ func printModuleDeclaration(path *Path, options *Options, print PrintFunc) Doc {
 	}
 	var body Doc
 	if current.Child("body") != nil {
-		body = concatIn(path, " ", groupIn(path, print("body", nil)))
+		body = concatIn(path, doc.Text(" "), groupIn(path, print("body", nil)))
 	} else {
 		body = printSemicolon(options)
 	}
 	return concatIn(path, printDeclareToken(path),
-		kind,
+		textDoc(kind),
 		print("id", nil),
 		body,
 	)

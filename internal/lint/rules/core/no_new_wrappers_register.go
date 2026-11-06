@@ -10,5 +10,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 //
 // No `Decode`, because upstream's `meta.schema` is `[]` and the rule reads no options.
 func init() {
-	rule.Register(rule.Registration{Rule: NoNewWrappers})
+	rule.Register(rule.Registration[rule.NoOptions]{Rule: NoNewWrappers})
 }

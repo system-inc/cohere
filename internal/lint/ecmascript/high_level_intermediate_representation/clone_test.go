@@ -22,8 +22,8 @@ import (
 // The source holds what reaches the copy's edge cases: phis from a branch and a loop, a try, nested
 // functions with captures, a memo callback that gets inlined, a hook call with a callback nested in
 // its scope, and a finding upstream reports.
-func TestCloneFunctionSharesNothingAPassWrites(t *testing.T) {
-	t.Parallel()
+func TestCloneFunctionSharesNothingAPassWrites(test *testing.T) {
+	test.Parallel()
 	const source = `import * as React from 'react';
 declare function makeArray(): unknown[];
 declare const store: { subscribe: (listener: () => void) => () => void; get: () => number };
@@ -44,45 +44,57 @@ function useEverything(properties: { items: number[]; flag: boolean }) {
   return [value, x, doubled, properties.flag ? total : 0];
 }`
 	visited := 0
-	probe := rule.Rule{Name: "clone", NeedsTypeChecker: true, Run: func(ctx rule.Context, options any) rule.Listeners {
-		return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
-			forEachFunctionLike(node, func(node *ast.Node) {
-				original := Lower(node, ctx.TypeChecker)
-				if original == nil {
-					return
-				}
-				Construct(original)
-				untouched := Lower(node, ctx.TypeChecker)
-				Construct(untouched)
-				forgetIdentifierSlabs(original)
-				forgetIdentifierSlabs(untouched)
-				if !reflect.DeepEqual(original, untouched) {
-					t.Fatal("two lowerings of one function differ, so this test cannot tell a shared write from noise")
-				}
+	probe := rule.Rule[rule.NoOptions]{
+		Name:             "clone",
+		NeedsTypeChecker: true,
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+			return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
+				forEachFunctionLike(node, func(node *ast.Node) {
+					original := Lower(node, ruleContext.TypeChecker)
+					if original == nil {
+						return
+					}
+					Construct(original)
+					untouched := Lower(node, ruleContext.TypeChecker)
+					Construct(untouched)
+					forgetIdentifierSlabs(original)
+					forgetIdentifierSlabs(untouched)
+					if !reflect.DeepEqual(original, untouched) {
+						test.Fatal(
+							"two lowerings of one function differ, so this test cannot tell a shared write from noise",
+						)
+					}
 
-				clone := CloneFunction(original)
-				if !reflect.DeepEqual(clone, original) {
-					t.Fatal("the copy differs from the function it copies")
-				}
-				fromClone := AnalyzePreservedManualMemoization(clone, ctx.TypeChecker)
+					clone := CloneFunction(original)
+					if !reflect.DeepEqual(clone, original) {
+						test.Fatal("the copy differs from the function it copies")
+					}
+					fromClone := AnalyzePreservedManualMemoization(clone, ruleContext.TypeChecker)
 
-				if !reflect.DeepEqual(original, untouched) {
-					t.Error("the pipeline run over the copy changed the original")
-				}
-				direct := Lower(node, ctx.TypeChecker)
-				Construct(direct)
-				fromLowering := AnalyzePreservedManualMemoization(direct, ctx.TypeChecker)
-				if len(fromLowering) == 0 {
-					t.Error("the fixture produced no finding, so the comparison below proves nothing about the copy")
-				}
-				if !reflect.DeepEqual(fromClone, fromLowering) {
-					t.Errorf("findings from the copy %v differ from a fresh lowering's %v", fromClone, fromLowering)
-				}
-				visited++
-			})
-		}}
-	}}
-	rule_testing.RunTypedFiles(t, probe, map[string]string{
+					if !reflect.DeepEqual(original, untouched) {
+						test.Error("the pipeline run over the copy changed the original")
+					}
+					direct := Lower(node, ruleContext.TypeChecker)
+					Construct(direct)
+					fromLowering := AnalyzePreservedManualMemoization(direct, ruleContext.TypeChecker)
+					if len(fromLowering) == 0 {
+						test.Error(
+							"the fixture produced no finding, so the comparison below proves nothing about the copy",
+						)
+					}
+					if !reflect.DeepEqual(fromClone, fromLowering) {
+						test.Errorf(
+							"findings from the copy %v differ from a fresh lowering's %v",
+							fromClone,
+							fromLowering,
+						)
+					}
+					visited++
+				})
+			}}
+		},
+	}
+	rule_testing.RunTypedFiles(test, probe, map[string]string{
 		"/react.d.ts": reactiveDeclarations + `
 declare module 'react' {
 export function useCallback<T extends (...args: any[]) => any>(callback: T, deps: unknown[]): T;
@@ -91,7 +103,7 @@ export function useSyncExternalStore<T>(subscribe: (onStoreChange: () => void) =
 		"/fixture.tsx": source,
 	}, "/fixture.tsx")
 	if visited != 1 {
-		t.Fatalf("visited %d functions, want one", visited)
+		test.Fatalf("visited %d functions, want one", visited)
 	}
 }
 
@@ -100,6 +112,8 @@ export function useSyncExternalStore<T>(subscribe: (onStoreChange: () => void) =
 // The chunk is where identifiers are allocated, not part of the graph: a copy starts without one, and
 // comparing it would report a difference no pass can see. The identifiers themselves stay where they
 // are, so the graph compares exactly as before.
+//
+// Mutates: function the chunk is dropped in place, so the graph the caller compares no longer holds one
 func forgetIdentifierSlabs(function *Function) {
 	function.identifierSlab = nil
 	for _, nested := range function.Functions {

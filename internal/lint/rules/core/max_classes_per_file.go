@@ -14,13 +14,13 @@ import (
 // report and nothing a reader could compare a diagnostic against by identity.
 const messageMaxClassesPerFileId = "maximumExceeded"
 
-// maxClassesPerFileMessage renders the finding.
+// maximumClassesPerFileMessage renders the finding.
 //
 // Upstream's template is `File has too many classes ({{ classCount }}). Maximum allowed is {{ max
 // }}.` and both values move, which is why this is a function and why the tests assert the rendered
 // string rather than only the id. A message-id fixture cannot see the two arguments being passed in
 // the wrong order, and that swap renders as a grammatical sentence.
-func maxClassesPerFileMessage(classCount int, maximum int) rule.Message {
+func maximumClassesPerFileMessage(classCount int, maximum int) rule.Message {
 	return rule.Message{
 		Id: messageMaxClassesPerFileId,
 		Description: fmt.Sprintf("File has too many classes (%d). Maximum allowed is %d. "+
@@ -41,7 +41,7 @@ type MaxClassesPerFileOptions struct {
 	// Maximum is how many classes a file may hold. Upstream defaults it to 1.
 	Maximum *int
 
-	// IgnoreExpressions drops class EXPRESSIONS from the count, leaving only declarations.
+	// IgnoreExpressions drops class expressions from the count, leaving only declarations.
 	IgnoreExpressions *bool
 }
 
@@ -52,10 +52,10 @@ func DefaultMaxClassesPerFileSettings() MaxClassesPerFileOptions {
 	return MaxClassesPerFileOptions{Maximum: &maximum, IgnoreExpressions: &ignoreExpressions}
 }
 
-// maxClassesPerFileObjectShape is the object arm of upstream's `oneOf`, named so the decoder can try
+// maximumClassesPerFileObjectShape is the object arm of upstream's `oneOf`, named so the decoder can try
 // it after the integer arm fails.
-type maxClassesPerFileObjectShape struct {
-	Max               *int  `json:"max"`
+type maximumClassesPerFileObjectShape struct {
+	Maximum           *int  `json:"max"`
 	IgnoreExpressions *bool `json:"ignoreExpressions"`
 }
 
@@ -65,10 +65,10 @@ type maxClassesPerFileObjectShape struct {
 // default is not the zero value. Three things have to be right and none of them falls out of a
 // struct tag:
 //
-// The value may be a bare INTEGER. cohere's config layer strips the severity tuple, so a config
+// The value may be a bare integer. cohere's config layer strips the severity tuple, so a config
 // writing `["error", 2]` hands this the JSON `2`, which no struct can unmarshal.
 //
-// An ABSENT value must mean 1 rather than 0. The generic helper errors on empty input and the config
+// An absent value must mean 1 rather than 0. The generic helper errors on empty input and the config
 // layer turns that into nil, which a plain int field would read as 0, a maximum of zero, reporting
 // every file with a single class in it. That is the live config's own shape for a rule configured as
 // a bare severity, so it is the ordinary path rather than a corner.
@@ -80,7 +80,7 @@ type maxClassesPerFileObjectShape struct {
 // A maximum below 1 is refused, which is upstream's `minimum: 1` in the schema. Measured: eslint
 // rejects both `0` and `{max: 0}` at configuration load rather than at lint time, so refusing here
 // is the same decision arriving through the only surface this port has.
-func DecodeMaxClassesPerFileOptions(raw []byte) (any, error) {
+func DecodeMaxClassesPerFileOptions(raw []byte) (MaxClassesPerFileOptions, error) {
 	if len(raw) == 0 {
 		return DefaultMaxClassesPerFileSettings(), nil
 	}
@@ -90,7 +90,7 @@ func DecodeMaxClassesPerFileOptions(raw []byte) (any, error) {
 	// The integer arm first, because it is the narrower shape: a JSON number cannot also decode as
 	// an object, so trying it first cannot swallow a case belonging to the other arm.
 	var configuredMaximum int
-	if err := json.Unmarshal(raw, &configuredMaximum); err == nil {
+	if decodeError := json.Unmarshal(raw, &configuredMaximum); decodeError == nil {
 		if configuredMaximum < 1 {
 			return DefaultMaxClassesPerFileSettings(), fmt.Errorf(
 				"max-classes-per-file takes a maximum of at least 1, got %d", configuredMaximum)
@@ -99,17 +99,17 @@ func DecodeMaxClassesPerFileOptions(raw []byte) (any, error) {
 		return settings, nil
 	}
 
-	var object maxClassesPerFileObjectShape
-	if err := rule.UnmarshalOptions(raw, &object); err != nil {
-		return DefaultMaxClassesPerFileSettings(), err
+	var object maximumClassesPerFileObjectShape
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &object); unmarshalOptionsError != nil {
+		return DefaultMaxClassesPerFileSettings(), unmarshalOptionsError
 	}
 	// A nil Max is upstream's `option.max || 1` and stays at the default rather than becoming zero.
-	if object.Max != nil {
-		if *object.Max < 1 {
+	if object.Maximum != nil {
+		if *object.Maximum < 1 {
 			return DefaultMaxClassesPerFileSettings(), fmt.Errorf(
-				"max-classes-per-file takes a maximum of at least 1, got %d", *object.Max)
+				"max-classes-per-file takes a maximum of at least 1, got %d", *object.Maximum)
 		}
-		settings.Maximum = object.Max
+		settings.Maximum = object.Maximum
 	}
 	if object.IgnoreExpressions != nil {
 		settings.IgnoreExpressions = object.IgnoreExpressions
@@ -140,13 +140,13 @@ func DecodeMaxClassesPerFileOptions(raw []byte) (any, error) {
 // Upstream's own `ignoreExpressions` is the other half of the ruling, and it is configuration rather
 // than code here: ahra sets it, and so does the ESLint side, so expressions need no divergence.
 //
-// A class EXPRESSION counts too, and that is the half `ignoreExpressions` exists to turn off. The
+// A class expression counts too, and that is the half `ignoreExpressions` exists to turn off. The
 // option drops expressions from the count while leaving declarations, rather than lowering the
 // limit.
 //
 // # Where the finding points, which is not the node it is reported on
 //
-// Upstream reports on the program while overriding the location to span the program's BODY: the
+// Upstream reports on the program while overriding the location to span the program's body: the
 // start of the first statement to the end of the last. The difference is trivia. A file opening with
 // a comment has a program starting at position zero and a first statement starting after the
 // comment, and upstream's own last corpus case pins that distinction by asserting line 2 column 1
@@ -164,13 +164,13 @@ func DecodeMaxClassesPerFileOptions(raw []byte) (any, error) {
 //
 // Upstream declares none, and the repair is a human decision: which class moves, to which file, and
 // what the new file is called. The audit measured 18 sites in this tree for exactly that reason.
-var MaxClassesPerFile = rule.Rule{
+var MaxClassesPerFile = rule.Rule[MaxClassesPerFileOptions]{
 	Name: "max-classes-per-file",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[MaxClassesPerFileOptions]) rule.Listeners {
 		// A rule configured as a bare severity is handed nil, which the assertion turns into a zero
 		// struct whose pointers are nil. Falling back matters more here than usual: a nil Maximum
 		// read as 0 would report every file holding one class.
-		settings, _ := rule.OptionsAs[MaxClassesPerFileOptions](options)
+		settings, _ := options.Read()
 		defaults := DefaultMaxClassesPerFileSettings()
 		if settings.Maximum == nil {
 			settings.Maximum = defaults.Maximum
@@ -233,12 +233,12 @@ var MaxClassesPerFile = rule.Rule{
 				// and it is reached only through the count test above. A second caller, or a change
 				// letting the count rise without a statement, voids the argument and the guard has
 				// to come back.
-				statements := ctx.SourceFile.Statements.Nodes
-				first := rule.TokenRange(ctx.SourceFile, statements[0])
+				statements := ruleContext.SourceFile.Statements.Nodes
+				first := rule.TokenRange(ruleContext.SourceFile, statements[0])
 				last := statements[len(statements)-1]
 
-				ctx.ReportRange(core.NewTextRange(first.Pos(), last.End()),
-					maxClassesPerFileMessage(classCount, maximum))
+				ruleContext.ReportRange(core.NewTextRange(first.Pos(), last.End()),
+					maximumClassesPerFileMessage(classCount, maximum))
 			},
 		}
 	},

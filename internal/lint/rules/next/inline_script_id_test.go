@@ -11,8 +11,8 @@ import (
 // most likely to get wrong, and one of those passes for a reason its shape does not show: the
 // opaque-spread case also carries an id, so it cannot isolate the abandonment it is really
 // testing. The invented case below supplies that half.
-func TestInlineScriptIdIsSilentOnUpstreamPassCases(t *testing.T) {
-	t.Parallel()
+func TestInlineScriptIdIsSilentOnUpstreamPassCases(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -53,10 +53,10 @@ func TestInlineScriptIdIsSilentOnUpstreamPassCases(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, InlineScriptId, "pages/index.tsx", testCase.source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, InlineScriptId, "pages/index.tsx", testCase.source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -64,8 +64,8 @@ func TestInlineScriptIdIsSilentOnUpstreamPassCases(t *testing.T) {
 // The four failing cases from oxc's corpus. The snapshot carries exactly four diagnostics against
 // four inputs, so one finding each, and the extractor reports no discrepancy. The four are the two
 // by two of children against dangerouslySetInnerHTML crossed with the plain and renamed imports.
-func TestInlineScriptIdFiresOnUpstreamFailCases(t *testing.T) {
-	t.Parallel()
+func TestInlineScriptIdFiresOnUpstreamFailCases(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -90,10 +90,10 @@ func TestInlineScriptIdFiresOnUpstreamFailCases(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, InlineScriptId, "pages/index.tsx", testCase.source)
-			rule_testing.ExpectFindings(t, result, "inlineScriptId")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, InlineScriptId, "pages/index.tsx", testCase.source)
+			rule_testing.ExpectFindings(test, result, "inlineScriptId")
 		})
 	}
 }
@@ -102,8 +102,8 @@ func TestInlineScriptIdFiresOnUpstreamFailCases(t *testing.T) {
 // written down. The corpus tests the import gate only broken open: all twelve of its cases import
 // from next/script, so a port that skipped resolution entirely and matched the bare word Script
 // would pass every one of them. The first six here are that missing half.
-func TestInlineScriptIdIsSilentOnCasesUpstreamDoesNotWrite(t *testing.T) {
-	t.Parallel()
+func TestInlineScriptIdIsSilentOnCasesUpstreamDoesNotWrite(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -160,10 +160,10 @@ func TestInlineScriptIdIsSilentOnCasesUpstreamDoesNotWrite(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, InlineScriptId, "pages/index.tsx", testCase.source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, InlineScriptId, "pages/index.tsx", testCase.source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -172,8 +172,8 @@ func TestInlineScriptIdIsSilentOnCasesUpstreamDoesNotWrite(t *testing.T) {
 // exempt and upstream reports: a src attribute, whitespace-only children, and the two object keys
 // that spell id without being a static identifier. Each was run against the release binary rather
 // than reasoned about, because each reads as though it should fall the other way.
-func TestInlineScriptIdFiresOnCasesUpstreamDoesNotWrite(t *testing.T) {
-	t.Parallel()
+func TestInlineScriptIdFiresOnCasesUpstreamDoesNotWrite(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -214,10 +214,10 @@ func TestInlineScriptIdFiresOnCasesUpstreamDoesNotWrite(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, InlineScriptId, "pages/index.tsx", testCase.source)
-			rule_testing.ExpectFindings(t, result, "inlineScriptId")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, InlineScriptId, "pages/index.tsx", testCase.source)
+			rule_testing.ExpectFindings(test, result, "inlineScriptId")
 		})
 	}
 }
@@ -231,8 +231,8 @@ func TestInlineScriptIdFiresOnCasesUpstreamDoesNotWrite(t *testing.T) {
 // The expected text is a literal typed here rather than a reference to the rule's own message
 // constant. Comparing a finding against the constant it was reported with is an equality that both
 // sides of a mutation move together, so it looks correct and guards nothing.
-func TestInlineScriptIdPointsAtTheTagName(t *testing.T) {
-	t.Parallel()
+func TestInlineScriptIdPointsAtTheTagName(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name         string
@@ -262,15 +262,15 @@ func TestInlineScriptIdPointsAtTheTagName(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, InlineScriptId, "pages/index.tsx", testCase.source)
-			rule_testing.ExpectFindings(t, result, "inlineScriptId")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, InlineScriptId, "pages/index.tsx", testCase.source)
+			rule_testing.ExpectFindings(test, result, "inlineScriptId")
 
 			diagnostic := result.Diagnostics[0]
 			reported := testCase.source[diagnostic.Range.Pos():diagnostic.Range.End()]
 			if reported != testCase.wantReported {
-				t.Fatalf("reported span: want %q, got %q", testCase.wantReported, reported)
+				test.Fatalf("reported span: want %q, got %q", testCase.wantReported, reported)
 			}
 		})
 	}
@@ -279,12 +279,12 @@ func TestInlineScriptIdPointsAtTheTagName(t *testing.T) {
 // The message text asserted exactly rather than by substring. A predicate weaker than the property
 // it guards is not a guard: a rule rendering a doubled word or a stray placeholder still contains
 // any needle short enough to look right.
-func TestInlineScriptIdRendersItsMessageExactly(t *testing.T) {
-	t.Parallel()
+func TestInlineScriptIdRendersItsMessageExactly(test *testing.T) {
+	test.Parallel()
 
 	source := "import Script from 'next/script';\nexport default function TestPage() {\n  return (<Script>{`console.log('x');`}</Script>)\n}\n"
-	result := rule_testing.Run(t, InlineScriptId, "pages/index.tsx", source)
-	rule_testing.ExpectFindings(t, result, "inlineScriptId")
+	result := rule_testing.Run(test, InlineScriptId, "pages/index.tsx", source)
+	rule_testing.ExpectFindings(test, result, "inlineScriptId")
 
 	wantMessage := "This renders a next/script component with inline content but no id attribute. " +
 		"The framework deduplicates inline scripts by that id, so without one the same script is " +
@@ -292,7 +292,7 @@ func TestInlineScriptIdRendersItsMessageExactly(t *testing.T) {
 		"up as doubled analytics events or global state clobbered after a client transition. Give " +
 		"the script a stable id attribute."
 	if got := result.Diagnostics[0].Message.Description; got != wantMessage {
-		t.Fatalf("message: want %q, got %q", wantMessage, got)
+		test.Fatalf("message: want %q, got %q", wantMessage, got)
 	}
 }
 
@@ -301,17 +301,17 @@ func TestInlineScriptIdRendersItsMessageExactly(t *testing.T) {
 // the eslint original keeps one module-scoped variable and would track only the second import, so
 // this fixture records which upstream was ported. It is also the case that a single-name
 // implementation passes every other fixture in this file while getting wrong.
-func TestInlineScriptIdArmsOnEveryDefaultImportRatherThanTheLastOne(t *testing.T) {
-	t.Parallel()
+func TestInlineScriptIdArmsOnEveryDefaultImportRatherThanTheLastOne(test *testing.T) {
+	test.Parallel()
 
 	source := "import Script from 'next/script';\nimport Other from 'next/script';\nexport default function TestPage() {\n  return (<div><Script>{`a`}</Script><Other>{`b`}</Other></div>)\n}\n"
-	result := rule_testing.Run(t, InlineScriptId, "pages/index.tsx", source)
-	rule_testing.ExpectFindings(t, result, "inlineScriptId", "inlineScriptId")
+	result := rule_testing.Run(test, InlineScriptId, "pages/index.tsx", source)
+	rule_testing.ExpectFindings(test, result, "inlineScriptId", "inlineScriptId")
 
 	firstReported := source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 	secondReported := source[result.Diagnostics[1].Range.Pos():result.Diagnostics[1].Range.End()]
 	if firstReported != "Script" || secondReported != "Other" {
-		t.Fatalf("reported spans: want \"Script\" and \"Other\", got %q and %q", firstReported, secondReported)
+		test.Fatalf("reported spans: want \"Script\" and \"Other\", got %q and %q", firstReported, secondReported)
 	}
 }
 
@@ -319,15 +319,15 @@ func TestInlineScriptIdArmsOnEveryDefaultImportRatherThanTheLastOne(t *testing.T
 // oxc reads a whole-file module record that does not care about position; our walk is single pass
 // and ordered, so a listener on KindImportDeclaration setting a variable would answer differently.
 // This fixture is what fails if the scan is ever moved out of Run into a listener.
-func TestInlineScriptIdSeesAnImportWrittenAfterTheJsx(t *testing.T) {
-	t.Parallel()
+func TestInlineScriptIdSeesAnImportWrittenAfterTheJsx(test *testing.T) {
+	test.Parallel()
 
 	source := "export default function TestPage() {\n  return (<Script>{`console.log('x');`}</Script>)\n}\nimport Script from 'next/script';\n"
-	result := rule_testing.Run(t, InlineScriptId, "pages/index.tsx", source)
-	rule_testing.ExpectFindings(t, result, "inlineScriptId")
+	result := rule_testing.Run(test, InlineScriptId, "pages/index.tsx", source)
+	rule_testing.ExpectFindings(test, result, "inlineScriptId")
 }
 
-// A parenthesized object spread that does NOT supply an id, which is the only shape that separates
+// A parenthesized object spread that does not supply an id, which is the only shape that separates
 // reading through the parentheses from treating them as opaque.
 //
 // The obvious fixture for `without_parentheses` is a parenthesized spread that supplies the id, and
@@ -339,10 +339,10 @@ func TestInlineScriptIdSeesAnImportWrittenAfterTheJsx(t *testing.T) {
 // Our parser keeps the parenthesis as a real KindParenthesizedExpression node where oxc's has
 // already dropped it, probed rather than assumed, so the skip is load bearing here in a way the Rust
 // does not make obvious.
-func TestInlineScriptIdReadsThroughParenthesesRatherThanAbandoningTheElement(t *testing.T) {
-	t.Parallel()
+func TestInlineScriptIdReadsThroughParenthesesRatherThanAbandoningTheElement(test *testing.T) {
+	test.Parallel()
 
 	source := "import Script from 'next/script';\nexport default function TestPage() {\n  return (<Script {...({ strategy: \"lazyOnload\" })}>{`console.log('x');`}</Script>)\n}\n"
-	result := rule_testing.Run(t, InlineScriptId, "pages/index.tsx", source)
-	rule_testing.ExpectFindings(t, result, "inlineScriptId")
+	result := rule_testing.Run(test, InlineScriptId, "pages/index.tsx", source)
+	rule_testing.ExpectFindings(test, result, "inlineScriptId")
 }

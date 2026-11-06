@@ -1,12 +1,10 @@
 package react
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/imports"
-	reactUtilities "github.com/system-inc/cohere/internal/lint/ecmascript/react"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -41,7 +39,7 @@ var noTyposInstanceLifecycleMethods = []string{
 //
 // One name, and it carries two separate judgments: written without `static` it reports
 // `staticLifecycleMethod`, and written with the wrong casing it reports `typoLifecycleMethod` like
-// any other. A method spelled `getderivedstatefromprops` without `static` reports BOTH.
+// any other. A method spelled `getderivedstatefromprops` without `static` reports both.
 var noTyposStaticLifecycleMethods = []string{"getDerivedStateFromProps"}
 
 // noTyposPropTypeNames is `Object.keys(require('prop-types'))`, verbatim from version 15.8.1.
@@ -97,119 +95,26 @@ var noTyposPropTypeNames = []string{
 // the shelf answers. The fourth, the member-assignment arm, also accepts a non-class whose body
 // returns JSX, which is upstream's `utils.isReturningJSX`. That predicate is narrow and is
 // implemented directly here rather than reached for: measured against the installed build, it asks
-// only whether a `return` in the function's OWN body returns JSX. There is no name gate, `null` does
+// only whether a `return` in the function's own body returns JSX. There is no name gate, `null` does
 // not count, and JSX inside a nested callback does not count. Every row is pinned by fixture.
 //
 // This is the difference from `default-props-match-prop-types`, which I stopped on in the same
 // batch: that rule needs the registry's resolved `declaredPropTypes`, and this one needs a
 // three-line predicate.
-var NoTypos = rule.Rule{
+var NoTypos = rule.Rule[rule.NoOptions]{
 	Name: "react/no-typos",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// The two import bindings, tracked across the whole file. Upstream keeps them as closure
 		// state and its listeners run in source order, so an import below a usage does not name the
 		// package for that usage. Reproduced by walking the file once from the source node, in
 		// order, rather than by registering per-kind listeners whose relative order is not stated.
 		return rule.Listeners{
 			ast.KindSourceFile: func(sourceFile *ast.Node) {
-				state := &noTyposState{ctx: ctx}
+				state := &noTyposState{ruleContext: ruleContext}
 				state.walk(sourceFile)
 			},
 		}
 	},
-}
-
-// noTyposState carries the two import bindings while the file is walked.
-type noTyposState struct {
-	ctx rule.Context
-
-	// propTypesPackageName is the local name `prop-types` was imported under, or the name a
-	// `PropTypes` specifier from `react` was bound to.
-	propTypesPackageName string
-
-	// reactPackageName is the local name `react` was imported under.
-	reactPackageName string
-}
-
-// walk visits the file in source order, updating the bindings and checking each node.
-//
-// Source order matters and is not incidental: upstream's `ImportDeclaration` listener sets the
-// binding as ESLint reaches it, so a `propTypes` object written ABOVE the import sees no binding and
-// its prop-type arms stay silent. Pinned by fixture.
-func (s *noTyposState) walk(node *ast.Node) {
-	if node == nil {
-		return
-	}
-
-	switch node.Kind {
-	case ast.KindImportDeclaration:
-		s.recordImport(node)
-
-	case ast.KindPropertyDeclaration:
-		s.checkStaticClassProperty(node)
-
-	case ast.KindMethodDeclaration:
-		s.checkClassMethod(node)
-
-	case ast.KindPropertyAccessExpression:
-		s.checkMemberAssignment(node)
-
-	case ast.KindObjectLiteralExpression:
-		s.checkEs5Specification(node)
-	}
-
-	node.ForEachChild(func(child *ast.Node) bool {
-		s.walk(child)
-		return false
-	})
-}
-
-// recordImport updates the package bindings from one import declaration.
-//
-// Upstream reads `node.specifiers[0].local.name` for both packages, which is the FIRST specifier
-// whatever its kind, and then separately looks for a named `PropTypes` specifier in a react import.
-// A side-effect import with no specifiers is the reporting case for both packages.
-func (s *noTyposState) recordImport(node *ast.Node) {
-	declaration := node.AsImportDeclaration()
-	moduleSpecifier := declaration.ModuleSpecifier
-	if moduleSpecifier == nil || moduleSpecifier.Kind != ast.KindStringLiteral {
-		return
-	}
-
-	specifiers := noTyposImportSpecifiers(node)
-
-	switch moduleSpecifier.Text() {
-	case "prop-types":
-		if len(specifiers) == 0 {
-			s.ctx.ReportNode(node, rule.Message{
-				Id: "noPropTypesBinding",
-				Description: "This imports `prop-types` for its side effects and never names it, " +
-					"so nothing in the file can reference a prop type. The package has no side " +
-					"effects worth importing for; write `import PropTypes from 'prop-types'`.",
-			})
-			return
-		}
-		s.propTypesPackageName = specifiers[0].localName
-
-	case "react":
-		if len(specifiers) == 0 {
-			s.ctx.ReportNode(node, rule.Message{
-				Id: "noReactBinding",
-				Description: "This imports `react` for its side effects and never names it, so " +
-					"nothing in the file can reference React. Write " +
-					"`import React from 'react'`, or drop the import if it is genuinely unused.",
-			})
-			return
-		}
-		s.reactPackageName = specifiers[0].localName
-		// A `PropTypes` named specifier from react binds the prop-types package too, which is the
-		// pre-15.5 spelling `import { PropTypes } from 'react'`.
-		for _, specifier := range specifiers {
-			if specifier.importedName == "PropTypes" {
-				s.propTypesPackageName = specifier.localName
-			}
-		}
-	}
 }
 
 // noTyposImportSpecifier is one imported binding, with the name it was imported and bound under.
@@ -224,7 +129,7 @@ type noTyposImportSpecifier struct {
 // noTyposImportSpecifiers flattens an import declaration into upstream's flat specifier list.
 //
 // Upstream's ESTree gives one array holding the default specifier, the namespace specifier and every
-// named specifier together, and this rule reads `specifiers[0]` and searches the rest, so the ORDER
+// named specifier together, and this rule reads `specifiers[0]` and searches the rest, so the order
 // matters and the flattening is this rule's business rather than the shelf's. Our parser splits the
 // three shapes across separate fields, which `imports.BindingsOf` reads; this reassembles them in
 // upstream's order, default first and then namespace or named.
@@ -262,122 +167,6 @@ func noTyposImportSpecifiers(declaration *ast.Node) []noTyposImportSpecifier {
 			noTyposImportSpecifier{importedName: imported, localName: local.Text()})
 	}
 	return specifiers
-}
-
-// checkStaticClassProperty answers upstream's `ClassProperty, PropertyDefinition` listener.
-//
-// Static only, and only on a class the shelf calls a component.
-func (s *noTyposState) checkStaticClassProperty(node *ast.Node) {
-	if !noTyposIsStatic(node) {
-		return
-	}
-	class := noTyposEnclosingClass(node)
-	if class == nil || !reactUtilities.IsEs6ComponentClass(class) {
-		return
-	}
-	s.reportCasingTypo(node.AsPropertyDeclaration().Initializer, node.Name(), true)
-}
-
-// checkClassMethod answers upstream's `MethodDefinition` listener.
-func (s *noTyposState) checkClassMethod(node *ast.Node) {
-	class := noTyposEnclosingClass(node)
-	if class == nil || !reactUtilities.IsEs6ComponentClass(class) {
-		return
-	}
-	s.reportLifecycleCasingTypo(node, node.Name(), noTyposIsStatic(node))
-}
-
-// checkMemberAssignment answers upstream's `MemberExpression` listener.
-//
-// This is the widest arm and the only one that accepts a non-class. It fires on `Foo.PropTypes = {}`
-// where `Foo` is a class component OR a function whose body returns JSX.
-func (s *noTyposState) checkMemberAssignment(node *ast.Node) {
-	access := node.AsPropertyAccessExpression()
-	property := access.Name()
-	if property == nil || property.Kind != ast.KindIdentifier {
-		return
-	}
-	if !noTyposMatchesStaticClassPropertyIgnoringCase(property.Text()) {
-		return
-	}
-
-	// Upstream tests `node.parent.type === 'AssignmentExpression' && node.parent.right`, and that is
-	// ALL it tests. There is no left-side check and no operator check, which reads as an oversight
-	// and is what the rule does. Measured on the installed build, and this port had both extra
-	// checks at first with a surviving mutant for each:
-	//
-	//	Foo.PropTypes = {}        reports, the ordinary case
-	//	target = Foo.PropTypes    REPORTS, the member is on the RIGHT
-	//	Foo.PropTypes ||= {}      REPORTS, a compound operator
-	//	Foo.PropTypes             silent, no assignment at all
-	//	doThing(Foo.PropTypes)    silent, likewise
-	//	if (Foo.PropTypes === 1)  silent, a comparison is not an assignment
-	//
-	// The second row is the surprising one: reading a mis-cased property reports as if it had been
-	// written. Reproduced rather than narrowed, because narrowing would silence inputs upstream
-	// reports and the two mutants prove no fixture would have noticed.
-	//
-	// The `Right` value passed on is upstream's `node.parent.right` whichever side the member sits
-	// on, so for the right-hand row it is the member itself, and `checkPropObject` declines it for
-	// not being an object literal.
-	//
-	// The nil test on `Right` is EQUIVALENT rather than discriminating, measured rather than argued
-	// after a mutant dropping it survived: our parser's error recovery synthesizes a missing
-	// identifier rather than leaving the slot empty, probed over five shapes including
-	// `Foo.PropTypes =`, `Foo.PropTypes = ;` and `Foo.PropTypes ||=`, all of which came back with a
-	// KindIdentifier. It is kept because upstream tests it, because it costs nothing, and because
-	// what it guards is a nil dereference one call later, which the walk would turn into a lost file
-	// rather than a lost finding.
-	parent := node.Parent
-	if parent == nil || parent.Kind != ast.KindBinaryExpression {
-		return
-	}
-	binary := parent.AsBinaryExpression()
-	if !ast.IsAssignmentOperator(binary.OperatorToken.Kind) || binary.Right == nil {
-		return
-	}
-
-	target := access.Expression
-	if target == nil || target.Kind != ast.KindIdentifier {
-		return
-	}
-	if !s.namesAComponent(node, target.Text()) {
-		return
-	}
-
-	s.reportCasingTypo(binary.Right, property, true)
-}
-
-// namesAComponent reports whether an identifier names something this rule treats as a component.
-//
-// Upstream calls `utils.getRelatedComponent`, which resolves the name through its registry, and then
-// accepts it when it is an ES6 component class OR a non-class whose body returns JSX. Resolution is
-// done here by searching the file for a declaration of that name, which is what the registry is
-// doing for this shape: the assignment and the declaration are both in the file by construction,
-// since a name declared elsewhere has no `Foo.propTypes = ...` here to check.
-//
-// The JSX test is upstream's `isReturningJSX` and it is narrower than it sounds. Measured against
-// the installed build:
-//
-//	function Foo() { return <div/>; }         counts
-//	const Foo = () => <div/>;                 counts, an implicit return
-//	function Foo() { return null; }           does NOT count
-//	function Foo() { return 'x'; }            does NOT count
-//	function Foo() { }                        does NOT count
-//	function foo() { return <div/>; }         counts, there is no name gate
-//	function Foo() { items.map(() => <div/>); return null; }   does NOT count
-//
-// The last row is the one a port is most likely to get wrong: JSX inside a nested function belongs
-// to that function, not to this one.
-func (s *noTyposState) namesAComponent(from *ast.Node, name string) bool {
-	declaration := noTyposFindDeclaration(from, name)
-	if declaration == nil {
-		return false
-	}
-	if declaration.Kind == ast.KindClassDeclaration {
-		return reactUtilities.IsEs6ComponentClass(declaration)
-	}
-	return noTyposReturnsJsx(declaration)
 }
 
 // noTyposFindDeclaration searches the file for a declaration binding this name.
@@ -432,7 +221,7 @@ func noTyposFindDeclaration(from *ast.Node, name string) *ast.Node {
 	return found
 }
 
-// noTyposReturnsJsx reports whether a function's OWN body returns JSX.
+// noTyposReturnsJsx reports whether a function's own body returns JSX.
 //
 // A concise arrow body counts when it is JSX directly. Otherwise every `return` in the body counts,
 // except those inside a nested function, which belong to that function instead. Reproduces
@@ -497,52 +286,25 @@ func noTyposReturnsJsx(node *ast.Node) bool {
 // Written as a loop rather than with `ast.SkipParentheses`, which dereferences its argument, and the
 // thing being unwrapped here is a return argument that is legitimately absent for a bare `return;`.
 func noTyposIsJsxExpression(expression *ast.Node) bool {
-	for expression != nil && expression.Kind == ast.KindParenthesizedExpression {
-		expression = expression.AsParenthesizedExpression().Expression
+	unwrapped := expression
+	for unwrapped != nil && unwrapped.Kind == ast.KindParenthesizedExpression {
+		unwrapped = unwrapped.AsParenthesizedExpression().Expression
 	}
-	if expression == nil {
+	if unwrapped == nil {
 		return false
 	}
-	switch expression.Kind {
+	switch unwrapped.Kind {
 	case ast.KindJsxElement, ast.KindJsxSelfClosingElement, ast.KindJsxFragment:
 		return true
 	}
 	return false
 }
 
-// checkEs5Specification answers upstream's `ObjectExpression` listener.
-//
-// Every property of a `createReactClass` object is checked for both a casing typo and a lifecycle
-// typo, and a spread contributes neither.
-func (s *noTyposState) checkEs5Specification(node *ast.Node) {
-	if !noTyposIsCreateReactClassSpecification(node) {
-		return
-	}
-	properties := node.AsObjectLiteralExpression().Properties
-	if properties == nil {
-		return
-	}
-	for _, property := range properties.Nodes {
-		// Upstream filters spreads out here. The skip is SUBSUMED by `noTyposKeyName`, which
-		// declines any key that is not an identifier, a string or a number, and a spread has no key
-		// node at all: a mutant removing this line survived the whole suite, and so did one removing
-		// it while ALSO teaching the key reader to answer for a spread, because the name it answers
-		// matches no canonical name either way. Kept because upstream writes it and because it says
-		// what the loop is doing; the equivalence rests on a second function's behavior rather than
-		// on anything visible here.
-		if property.Kind == ast.KindSpreadAssignment {
-			continue
-		}
-		s.reportCasingTypo(noTyposPropertyValue(property), property.Name(), false)
-		s.reportLifecycleCasingTypo(property, property.Name(), false)
-	}
-}
-
 // noTyposIsCreateReactClassSpecification reports whether an object is a createReactClass body.
 //
 // Written inline rather than through the shelf's `react.IsEs5ComponentCall`, which accepts
 // `createClass` in both spellings. Upstream's `isES5Component` compares the callee against the
-// createClass PRAGMA, which is `createReactClass` with no React settings read here to change it, so
+// createClass pragma, which is `createReactClass` with no React settings read here to change it, so
 // `createClass` fails in either spelling. Measured on the installed build, all five:
 //
 //	createReactClass({...})          counts
@@ -590,242 +352,6 @@ func noTyposPropertyValue(property *ast.Node) *ast.Node {
 		return nil
 	}
 	return nil
-}
-
-// reportCasingTypo answers upstream's `reportErrorIfPropertyCasingTypo`.
-//
-// Two things happen here and they are independent. A property NAMED exactly `propTypes`,
-// `contextTypes` or `childContextTypes` has its object value walked for prop-type typos. And any
-// property whose lowercased name matches one of the four static names while differing in case is
-// itself a casing typo.
-func (s *noTyposState) reportCasingTypo(value *ast.Node, key *ast.Node, isClassProperty bool) {
-	name, ok := noTyposKeyName(key)
-	if !ok {
-		return
-	}
-
-	if name == "propTypes" || name == "contextTypes" || name == "childContextTypes" {
-		s.checkPropObject(value)
-	}
-
-	for _, canonical := range noTyposStaticClassProperties {
-		if strings.EqualFold(canonical, name) && canonical != name {
-			if isClassProperty {
-				s.ctx.ReportNode(key, rule.Message{
-					Id: "typoStaticClassProp",
-					Description: "This static property is spelled with the wrong casing, so React " +
-						"never reads it. React matches these names exactly, which means the " +
-						"declaration sits there looking like configuration and does nothing.",
-				})
-				return
-			}
-			s.ctx.ReportNode(key, rule.Message{
-				Id: "typoPropDeclaration",
-				Description: "This property is spelled with the wrong casing, so React never " +
-					"reads it. React matches these names exactly, which means the declaration " +
-					"sits there looking like configuration and does nothing.",
-			})
-			return
-		}
-	}
-}
-
-// reportLifecycleCasingTypo answers upstream's `reportErrorIfLifecycleMethodCasingTypo`.
-//
-// Two independent judgments again. A name matching the ONE static lifecycle method case-insensitively
-// and written without `static` reports `staticLifecycleMethod`. And a name matching any lifecycle
-// method case-insensitively while differing in case reports `typoLifecycleMethod`. A name can trip
-// both, which upstream reports as two findings in that order.
-func (s *noTyposState) reportLifecycleCasingTypo(node *ast.Node, key *ast.Node, isStatic bool) {
-	name, ok := noTyposKeyName(key)
-	if !ok {
-		return
-	}
-
-	for _, method := range noTyposStaticLifecycleMethods {
-		if !isStatic && strings.EqualFold(name, method) {
-			s.ctx.ReportNode(node, rule.Message{
-				Id: "staticLifecycleMethod",
-				Description: fmt.Sprintf(
-					"`%s` is a static lifecycle method and this one is not declared `static`, so "+
-						"React never calls it. Add `static`.", name),
-			})
-		}
-	}
-
-	for _, method := range append(append([]string{}, noTyposInstanceLifecycleMethods...),
-		noTyposStaticLifecycleMethods...) {
-		if strings.EqualFold(method, name) && method != name {
-			s.ctx.ReportNode(node, rule.Message{
-				Id: "typoLifecycleMethod",
-				Description: fmt.Sprintf(
-					"`%s` is spelled with the wrong casing and React calls `%s`, so this method "+
-						"never runs. React matches lifecycle names exactly.", name, method),
-			})
-		}
-	}
-}
-
-// checkPropObject walks a propTypes object looking for prop-type typos.
-func (s *noTyposState) checkPropObject(node *ast.Node) {
-	if node == nil || node.Kind != ast.KindObjectLiteralExpression {
-		return
-	}
-	properties := node.AsObjectLiteralExpression().Properties
-	if properties == nil {
-		return
-	}
-	for _, property := range properties.Nodes {
-		s.checkProp(noTyposPropertyValue(property))
-	}
-}
-
-// checkProp answers upstream's `checkValidProp`, including its recursion through shape and oneOfType.
-//
-// The leading guard is upstream's and it is load-bearing: with NEITHER package name known, every
-// prop-type arm is silent, so a file that imports nothing produces no typo findings however
-// misspelled it is.
-func (s *noTyposState) checkProp(node *ast.Node) {
-	if s.propTypesPackageName == "" && s.reactPackageName == "" {
-		return
-	}
-	if node == nil {
-		return
-	}
-
-	if node.Kind == ast.KindPropertyAccessExpression {
-		access := node.AsPropertyAccessExpression()
-		object := access.Expression
-		property := access.Name()
-		if object == nil || property == nil {
-			return
-		}
-
-		if object.Kind == ast.KindPropertyAccessExpression {
-			inner := object.AsPropertyAccessExpression()
-			if s.isPropTypesPackage(inner.Expression) {
-				// `PropTypes.myProp.isRequired`
-				s.checkPropTypeName(inner.Name())
-				s.checkPropTypeQualifier(property)
-				return
-			}
-		}
-
-		if s.isPropTypesPackage(object) {
-			// `PropTypes.myProp`, unless the property IS the qualifier.
-			if property.Kind == ast.KindIdentifier && property.Text() == "isRequired" {
-				return
-			}
-			s.checkPropTypeName(property)
-			return
-		}
-
-		if object.Kind == ast.KindCallExpression {
-			s.checkPropTypeQualifier(property)
-			s.checkPropCall(object)
-		}
-		return
-	}
-
-	if node.Kind == ast.KindCallExpression {
-		s.checkPropCall(node)
-	}
-}
-
-// checkPropCall answers upstream's `checkValidCallExpression`.
-//
-// `shape(...)` recurses into the object literal, `oneOfType([...])` recurses into each element, and
-// every other call is left alone.
-func (s *noTyposState) checkPropCall(node *ast.Node) {
-	call := node.AsCallExpression()
-	callee := call.Expression
-	if callee == nil || callee.Kind != ast.KindPropertyAccessExpression {
-		return
-	}
-	name := callee.AsPropertyAccessExpression().Name()
-	if name == nil || name.Kind != ast.KindIdentifier {
-		return
-	}
-	if call.Arguments == nil || len(call.Arguments.Nodes) == 0 {
-		return
-	}
-	first := call.Arguments.Nodes[0]
-
-	switch name.Text() {
-	case "shape":
-		s.checkPropObject(first)
-
-	case "oneOfType":
-		if first.Kind != ast.KindArrayLiteralExpression {
-			return
-		}
-		elements := first.AsArrayLiteralExpression().Elements
-		if elements == nil {
-			return
-		}
-		for _, element := range elements.Nodes {
-			s.checkProp(element)
-		}
-	}
-}
-
-// isPropTypesPackage reports whether an expression names the prop-types package.
-//
-// Either the bare local binding, or `<react binding>.PropTypes`, which is the pre-15.5 spelling.
-func (s *noTyposState) isPropTypesPackage(node *ast.Node) bool {
-	if node == nil {
-		return false
-	}
-	if node.Kind == ast.KindIdentifier {
-		return s.propTypesPackageName != "" && node.Text() == s.propTypesPackageName
-	}
-	if node.Kind == ast.KindPropertyAccessExpression {
-		access := node.AsPropertyAccessExpression()
-		name := access.Name()
-		object := access.Expression
-		return name != nil && name.Kind == ast.KindIdentifier && name.Text() == "PropTypes" &&
-			object != nil && object.Kind == ast.KindIdentifier &&
-			s.reactPackageName != "" && object.Text() == s.reactPackageName
-	}
-	return false
-}
-
-// checkPropTypeName reports a prop type the package does not export.
-func (s *noTyposState) checkPropTypeName(node *ast.Node) {
-	if node == nil || node.Kind != ast.KindIdentifier {
-		return
-	}
-	name := node.Text()
-	if name == "" {
-		return
-	}
-	for _, known := range noTyposPropTypeNames {
-		if known == name {
-			return
-		}
-	}
-	s.ctx.ReportNode(node, rule.Message{
-		Id: "typoPropType",
-		Description: fmt.Sprintf(
-			"`%s` is not a prop type the `prop-types` package exports, so this validator is "+
-				"`undefined` and React validates nothing for the prop.", name),
-	})
-}
-
-// checkPropTypeQualifier reports a chain qualifier that is not `isRequired`.
-func (s *noTyposState) checkPropTypeQualifier(node *ast.Node) {
-	if node == nil || node.Kind != ast.KindIdentifier {
-		return
-	}
-	if node.Text() == "isRequired" {
-		return
-	}
-	s.ctx.ReportNode(node, rule.Message{
-		Id: "typoPropTypeChain",
-		Description: fmt.Sprintf(
-			"`isRequired` is the only qualifier a prop type chain accepts, and `%s` is not it, so "+
-				"this reads as `undefined` and validates nothing.", node.Text()),
-	})
 }
 
 // noTyposKeyName renders a property key when it has a static name.

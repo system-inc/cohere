@@ -197,57 +197,57 @@ var htmlTextFixtures = []string{
 	"a\\\n<b> c",
 }
 
-func TestHtmlTextEvents(t *testing.T) {
-	t.Parallel()
-	compareEventsWithoutHtmlTextOverride(t, htmlTextFixtures)
+func TestHtmlTextEvents(test *testing.T) {
+	test.Parallel()
+	compareEventsWithoutHtmlTextOverride(test, htmlTextFixtures)
 }
 
 // compareEventsWithoutHtmlTextOverride is compareEvents with the fork's html-text override left out of
 // both sides, so core htmlText is the construct that runs on `<` after autolink.
-func compareEventsWithoutHtmlTextOverride(t *testing.T, inputs []string) {
-	t.Helper()
+func compareEventsWithoutHtmlTextOverride(test *testing.T, inputs []string) {
+	test.Helper()
 	script := strings.Replace(oracleScript, "    overrideHtmlTextSyntax(),\n", "", 1)
 	if script == oracleScript {
-		t.Fatal("the oracle script no longer lists overrideHtmlTextSyntax() where this test removes it")
+		test.Fatal("the oracle script no longer lists overrideHtmlTextSyntax() where this test removes it")
 	}
-	expected := htmlTextUpstreamEvents(t, script, inputs)
+	expected := htmlTextUpstreamEvents(test, script, inputs)
 	extensions := []*Extension{gfmExtension(), mathExtension(), wikiLinkExtension(), liquidExtension()}
 	for index, input := range inputs {
 		actual := htmlTextPortEvents(input, extensions)
 		if difference := firstEventDifference(expected[index], actual); difference != "" {
-			t.Errorf("input %q: %s", truncateInput(input), difference)
+			test.Errorf("input %q: %s", truncateInput(input), difference)
 		}
 	}
 }
 
 // htmlTextUpstreamEvents is oracle_test.go's upstreamEvents with the script as a parameter.
-func htmlTextUpstreamEvents(t *testing.T, script string, inputs []string) [][]string {
-	t.Helper()
-	if _, err := exec.LookPath("node"); err != nil {
-		t.Skip("node is not installed; the event oracle needs it")
+func htmlTextUpstreamEvents(test *testing.T, script string, inputs []string) [][]string {
+	test.Helper()
+	if _, lookPathError := exec.LookPath("node"); lookPathError != nil {
+		test.Skip("node is not installed; the event oracle needs it")
 	}
-	root := forkRoot(t)
+	root := forkRoot(test)
 
-	path := filepath.Join(t.TempDir(), "oracle.mjs")
-	if err := os.WriteFile(path, []byte(strings.ReplaceAll(script, "FORK", root)), 0o644); err != nil {
-		t.Fatal(err)
+	path := filepath.Join(test.TempDir(), "oracle.mjs")
+	if writeError := os.WriteFile(path, []byte(strings.ReplaceAll(script, "FORK", root)), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
-	encoded, err := json.Marshal(inputs)
-	if err != nil {
-		t.Fatal(err)
+	encoded, encodeError := json.Marshal(inputs)
+	if encodeError != nil {
+		test.Fatal(encodeError)
 	}
 	command := exec.Command("node", path)
 	command.Stdin = strings.NewReader(string(encoded))
-	output, err := command.Output()
-	if err != nil {
-		if exitError, isExit := err.(*exec.ExitError); isExit {
-			t.Fatalf("the event oracle failed: %v\n%s", err, exitError.Stderr)
+	output, outputError := command.Output()
+	if outputError != nil {
+		if exitError, isExit := outputError.(*exec.ExitError); isExit {
+			test.Fatalf("the event oracle failed: %v\n%s", outputError, exitError.Stderr)
 		}
-		t.Fatal(err)
+		test.Fatal(outputError)
 	}
 	var outputs [][]string
-	if err := json.Unmarshal(output, &outputs); err != nil {
-		t.Fatal(err)
+	if decodeError := json.Unmarshal(output, &outputs); decodeError != nil {
+		test.Fatal(decodeError)
 	}
 	return outputs
 }

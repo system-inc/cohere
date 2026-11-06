@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"strings"
 	"time"
 )
 
@@ -14,8 +13,8 @@ type runFinding struct {
 	Column   int    `json:"column"`
 	Severity string `json:"severity"`
 	Rule     string `json:"rule"`
-	// MessageID names which of a rule's messages this is. Empty for a type error.
-	MessageID string `json:"messageId,omitempty"`
+	// MessageId names which of a rule's messages this is. Empty for a type error.
+	MessageId string `json:"messageId,omitempty"`
 	Message   string `json:"message"`
 }
 
@@ -163,38 +162,6 @@ func (summary runSummary) filesFormatted() int {
 	return count
 }
 
-// cacheUse is what the run took from the cache.
-type cacheUse struct {
-	// Replayed is a run answered whole from the run cache, which ran no phase.
-	Replayed bool `json:"replayed"`
-	// FilesReplayed is the files whose findings came from the cache: in a run that computed the rest, those it
-	// did not, and in a whole replay, every file in scope.
-	FilesReplayed int `json:"filesReplayed"`
-	// Off is `--no-cache`: nothing read, nothing written.
-	Off bool `json:"off"`
-
-	// MissReason is why a run the cache could have answered whole was not, and FindingsMissReason why its
-	// files' findings were not replayed: nothing on record, a key whose named part moved, or files with no
-	// entry or with changed bytes. Empty when there is nothing to explain (#547dhjz).
-	MissReason         string `json:"missReason,omitempty"`
-	FindingsMissReason string `json:"findingsMissReason,omitempty"`
-}
-
-// missLine is the --verbose line that says why the cache did not answer, empty when there is nothing to say.
-func (cache cacheUse) missLine() string {
-	var parts []string
-	if cache.MissReason != "" {
-		parts = append(parts, "not replayed whole: "+cache.MissReason)
-	}
-	if cache.FindingsMissReason != "" {
-		parts = append(parts, "findings: "+cache.FindingsMissReason)
-	}
-	if len(parts) == 0 {
-		return ""
-	}
-	return "cache: " + strings.Join(parts, "; ")
-}
-
 // runGaps is every way a run fell short of checking everything. Each is said in the footer even when
 // the run is green.
 type runGaps struct {
@@ -205,8 +172,9 @@ type runGaps struct {
 	// file it fails the run: see runCrash.
 	RuleCrashes int `json:"ruleCrashes"`
 	// Crashes is each crash the two counts above count, named: the file, the rule for a rule crash, and the
-	// panic. A count with no reason is a gap nobody can act on, so the list is always as long as the two
-	// counts together, and it is the same record `--json` prints as a `crash` line.
+	// cause, a panic in a TypeScript run and the engine's own sentence in an engine's. A count with no reason
+	// is a gap nobody can act on, so the list is always as long as the two counts together, and it is the
+	// same record `--json` prints as a `crash` line.
 	Crashes []runCrash `json:"crashes,omitempty"`
 	// RulesSkippingEverything is the rules that declined every file they were offered.
 	RulesSkippingEverything int  `json:"rulesSkippingEverything"`
@@ -234,6 +202,16 @@ type runGaps struct {
 	// them, less those the runs of the Swift projects below it account for (#ybspptb). A gap, not a failure.
 	// Each is named, never only counted: a gap nobody can find is half a gap.
 	UncheckedSwift []uncheckedSwiftFile `json:"uncheckedSwift,omitempty"`
+	// WithheldInDependencyCgo is each file of a dependency with cgo files whose type errors a Go run withheld,
+	// since no cgo tool ran and the faked package "C" is what they are about, sorted by file as the engine sends
+	// them. A gap, not a failure: they are a dependency's, not the project's to fix. Each is named, never only
+	// counted, with its package and how many errors it held, so a reader can find what went unsaid.
+	WithheldInDependencyCgo []withheldCgoFile `json:"withheldInDependencyCgo,omitempty"`
+	// WithheldDependencyCgoDeclarations counts the declarations of dependencies with cgo files that every rule
+	// was given without their bodies or initial values, since no cgo tool ran. A gap, not a failure, as the
+	// files above are. Counted and not named because the engine counts them and names none: they are spread
+	// over whole packages, and the count is what says the rules saw less of those dependencies than all of it.
+	WithheldDependencyCgoDeclarations int `json:"withheldDependencyCgoDeclarations,omitempty"`
 }
 
 // uncheckedSwiftFile is one Swift file of a run's gap: the file as the engine names it, and the engine's reason
@@ -241,6 +219,15 @@ type runGaps struct {
 type uncheckedSwiftFile struct {
 	File   string `json:"file"`
 	Reason string `json:"reason"`
+}
+
+// withheldCgoFile is one file of a dependency with cgo files whose type errors a Go run withheld: its package,
+// the file as the engine names it, and how many errors it held. The same fields the Go engine's types record
+// writes (internal/goengine/contract.WithheldFile), so the record decodes into it and `--json` writes it as is.
+type withheldCgoFile struct {
+	Package string `json:"package"`
+	File    string `json:"file"`
+	Errors  int    `json:"errors"`
 }
 
 // failed is whether errors, required rewrites, crashes or a missing generated file fail the run. Warnings

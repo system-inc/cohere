@@ -51,9 +51,9 @@ var noArrowFunctionLifecycleInstanceMethods = map[string]bool{
 
 // noArrowFunctionLifecycleStaticMethods is upstream's static list, verbatim.
 //
-// One name, and the split is load-bearing rather than tidy. A STATIC class field is checked against
-// this list alone, so `static render = () => {}` is CLEAN and `static getDerivedStateFromProps =
-// () => {}` reports. An INSTANCE field is checked against the other list alone, so the two verdicts
+// One name, and the split is load-bearing rather than tidy. A static class field is checked against
+// this list alone, so `static render = () => {}` is clean and `static getDerivedStateFromProps =
+// () => {}` reports. An instance field is checked against the other list alone, so the two verdicts
 // invert. Both measured on the installed build; upstream's corpus states the reporting half only.
 var noArrowFunctionLifecycleStaticMethods = map[string]bool{
 	"getDerivedStateFromProps": true,
@@ -61,12 +61,12 @@ var noArrowFunctionLifecycleStaticMethods = map[string]bool{
 
 // noArrowFunctionLifecycleIsEs5ComponentCall reports whether a call is `createReactClass(...)`.
 //
-// Deliberately NOT `react.IsEs5ComponentCall`, and this is a measured divergence rather than a
+// Deliberately not `react.IsEs5ComponentCall`, and this is a measured divergence rather than a
 // preference. That shelf helper also accepts the name `createClass`, both bare and on the React
 // object, and its doc comment presents the wider set as a correctness feature. Upstream resolves
 // the factory name through `getCreateClass`, which defaults to `createReactClass` and nothing else.
 // Measured on the installed build: `createClass({render: () => <div/>})` and
-// `React.createClass({...})` are both CLEAN, and only `createReactClass` reports. Reaching for the
+// `React.createClass({...})` are both clean, and only `createReactClass` reports. Reaching for the
 // shelf here would report on two shapes upstream ignores.
 //
 // The member form is kept because upstream keeps it: `React.createReactClass` would match its
@@ -100,7 +100,7 @@ func noArrowFunctionLifecycleIsEs5ComponentCall(node *ast.Node) bool {
 // noArrowFunctionLifecyclePropertyName returns the plain name a property is written with.
 //
 // Upstream's `getPropertyName` returns nothing useful for a computed key, and the rule's membership
-// test then misses, so `['render'] = () => {}` is CLEAN. Measured. The second return separates "no
+// test then misses, so `['render'] = () => {}` is clean. Measured. The second return separates "no
 // readable name" from a name that happens to be empty.
 //
 // A string-literal key is a readable name upstream, since its `key.value` is the string. Both
@@ -114,7 +114,7 @@ func noArrowFunctionLifecycleIsEs5ComponentCall(node *ast.Node) bool {
 //
 // The omission is also crash protection, which is the half a survival verdict cannot see.
 // `Text()` panics on a `ComputedPropertyName` rather than returning anything, and the walk recovers
-// per FILE, so calling it would cost every rule in the package every finding in that file. Probed
+// per file, so calling it would cost every rule in the package every finding in that file. Probed
 // directly: a rule reading `Name().Text()` on `['render'] = () => <div />` panics with
 // `Unhandled case in Node.Text`. Widening this switch is therefore not a false-positive risk, it is
 // an outage.
@@ -131,7 +131,7 @@ func noArrowFunctionLifecyclePropertyName(key *ast.Node) (string, bool) {
 
 // noArrowFunctionLifecycleParameterNames renders an arrow's parameters for the repair.
 //
-// Upstream maps each parameter to `p.name`, which is the identifier's name and is UNDEFINED for
+// Upstream maps each parameter to `p.name`, which is the identifier's name and is `undefined` for
 // every destructuring or defaulted parameter, so its own fixer writes the literal text `undefined`
 // into the source for those. That is a defect rather than a decision, and it is why this port
 // declines the fix on any parameter that is not a plain identifier. See the rule doc comment.
@@ -182,7 +182,7 @@ func noArrowFunctionLifecycleParameterNames(parameters *ast.NodeList) (string, b
 //
 // The ES6 side uses `react.IsEs6ComponentClass`, which agrees with upstream on every shape the
 // corpus and the probes write. Its documented parenthesis skip is not a divergence here:
-// `class H extends (React.Component)` REPORTS on the installed build, so skipping is what
+// `class H extends (React.Component)` reports on the installed build, so skipping is what
 // reproduces upstream rather than what improves on it. Measured.
 //
 // # The static and instance lists are separate, and the split inverts two verdicts
@@ -199,7 +199,7 @@ func noArrowFunctionLifecycleParameterNames(parameters *ast.NodeList) (string, b
 // combined list would pass every imported case and report two shapes upstream ignores.
 //
 // An ES5 object property is never static in this sense, so it always uses the instance list. That
-// is why `createReactClass({getDerivedStateFromProps: () => {}})` is CLEAN while the class field of
+// is why `createReactClass({getDerivedStateFromProps: () => {}})` is clean while the class field of
 // the same name reports. Measured.
 //
 // # This port declines the fix on parameters upstream renders wrongly
@@ -222,14 +222,14 @@ func noArrowFunctionLifecycleParameterNames(parameters *ast.NodeList) (string, b
 // to cover them, and adds one character when the body is an object literal to account for the
 // wrapping parenthesis. Both behaviours are reproduced, and both are asserted by upstream's own
 // output vectors.
-var NoArrowFunctionLifecycle = rule.Rule{
+var NoArrowFunctionLifecycle = rule.Rule[rule.NoOptions]{
 	Name: "react/no-arrow-function-lifecycle",
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		sourceText := ctx.SourceFile.Text()
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		sourceText := ruleContext.SourceFile.Text()
 
 		textOf := func(node *ast.Node) string {
-			span := rule.TokenRange(ctx.SourceFile, node)
+			span := rule.TokenRange(ruleContext.SourceFile, node)
 			if span.Pos() < 0 || span.End() > len(sourceText) || span.Pos() > span.End() {
 				return ""
 			}
@@ -262,7 +262,7 @@ var NoArrowFunctionLifecycle = rule.Rule{
 			arrow := value.AsArrowFunction()
 			body := arrow.Body
 			if body == nil {
-				ctx.ReportNode(property, noArrowFunctionLifecycleMessage(propertyName))
+				ruleContext.ReportNode(property, noArrowFunctionLifecycleMessage(propertyName))
 				return
 			}
 
@@ -270,7 +270,7 @@ var NoArrowFunctionLifecycle = rule.Rule{
 			if !renderable {
 				// Reported without a repair. See the doc comment: upstream would write the literal
 				// text `undefined` here, and a wrong fix applied unattended is worse than none.
-				ctx.ReportNode(property, noArrowFunctionLifecycleMessage(propertyName))
+				ruleContext.ReportNode(property, noArrowFunctionLifecycleMessage(propertyName))
 				return
 			}
 
@@ -282,7 +282,7 @@ var NoArrowFunctionLifecycle = rule.Rule{
 			// JavaScript. Declining matches what this rule already does for a typed parameter:
 			// report the arrow, leave the repair to a human who can see the type.
 			if arrow.Type != nil {
-				ctx.ReportNode(property, noArrowFunctionLifecycleMessage(propertyName))
+				ruleContext.ReportNode(property, noArrowFunctionLifecycleMessage(propertyName))
 				return
 			}
 
@@ -305,14 +305,14 @@ var NoArrowFunctionLifecycle = rule.Rule{
 			// A comment in the head itself, before the `=>`, is declined rather than dropped.
 			// Upstream's head range swallows it, so its output parses and the comment is gone; a fix
 			// runs unattended, and deleting what someone wrote is not a spelling change.
-			bodyStart := rule.TokenRange(ctx.SourceFile, body).Pos()
+			bodyStart := rule.TokenRange(ruleContext.SourceFile, body).Pos()
 			if arrow.EqualsGreaterThanToken == nil {
-				ctx.ReportNode(property, noArrowFunctionLifecycleMessage(propertyName))
+				ruleContext.ReportNode(property, noArrowFunctionLifecycleMessage(propertyName))
 				return
 			}
-			arrowEnd := rule.TokenRange(ctx.SourceFile, arrow.EqualsGreaterThanToken).End()
+			arrowEnd := rule.TokenRange(ruleContext.SourceFile, arrow.EqualsGreaterThanToken).End()
 			if len(commentsBetween(sourceText, key.End(), arrowEnd)) > 0 {
-				ctx.ReportNode(property, noArrowFunctionLifecycleMessage(propertyName))
+				ruleContext.ReportNode(property, noArrowFunctionLifecycleMessage(propertyName))
 				return
 			}
 			leading := commentsBetween(sourceText, arrowEnd, bodyStart)
@@ -323,7 +323,7 @@ var NoArrowFunctionLifecycle = rule.Rule{
 			headRange := core.NewTextRange(key.End(), headEnd)
 
 			if body.Kind == ast.KindBlock {
-				ctx.ReportNodeWithFixes(property, noArrowFunctionLifecycleMessage(propertyName),
+				ruleContext.ReportNodeWithFixes(property, noArrowFunctionLifecycleMessage(propertyName),
 					rule.ReplaceRange(headRange, head))
 				return
 			}
@@ -344,7 +344,7 @@ var NoArrowFunctionLifecycle = rule.Rule{
 					bodyText = body
 				}
 			}
-			// The comment scan runs to the end of the LINE holding the body rather than to the end
+			// The comment scan runs to the end of the line holding the body rather than to the end
 			// of the property. A trailing comment written after a concise body sits outside the
 			// property's own span, since the property ends at the expression, so bounding the scan
 			// by the property would miss it. Corpus case `invalid 34` asserts the comment survives.
@@ -369,7 +369,7 @@ var NoArrowFunctionLifecycle = rule.Rule{
 				trailingText += sourceText[comment.start:comment.end]
 			}
 
-			ctx.ReportNodeWithFixes(property, noArrowFunctionLifecycleMessage(propertyName),
+			ruleContext.ReportNodeWithFixes(property, noArrowFunctionLifecycleMessage(propertyName),
 				rule.ReplaceRange(headRange, head),
 				rule.ReplaceRange(
 					core.NewTextRange(leadingStart(leading, bodyStart), replacedEnd),
@@ -492,7 +492,7 @@ func leadingStart(leading []noArrowFunctionLifecycleComment, bodyStart int) int 
 
 // endOfLineAt returns the offset of the newline ending the line that contains an offset.
 //
-// A trailing comment written after a concise arrow body sits OUTSIDE the property's own span,
+// A trailing comment written after a concise arrow body sits outside the property's own span,
 // because the property ends where the expression does. Bounding the comment scan by the property
 // therefore misses it, which cost one of upstream's own fix vectors. The line is the right bound:
 // upstream reaches the same comment through `getCommentsAfter`, which stops at the next token.

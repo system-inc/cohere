@@ -22,6 +22,11 @@ var messagePreferObjectSpreadUseLiteral = rule.Message{
 		"an object literal into a fresh object achieves nothing the literal did not already do.",
 }
 
+// objectAssignCallTraceMap asks the tracker for every call of the global Object's assign.
+var objectAssignCallTraceMap = map[string]*reference.TraceMap{
+	"Object": {Members: map[string]*reference.TraceMap{"assign": {Call: true}}},
+}
+
 // PreferObjectSpread flags `Object.assign` called with an object literal first argument.
 //
 //	valid:   Object.assign(foo, bar)          (first argument is not a literal, so it mutates foo)
@@ -38,17 +43,17 @@ var messagePreferObjectSpreadUseLiteral = rule.Message{
 //
 // # Three declines, and each rules out a shape spread cannot express
 //
-// An ARRAY SPREAD argument, `Object.assign({}, ...foo)`, has no object-spread equivalent: the call
+// An array spread argument, `Object.assign({}, ...foo)`, has no object-spread equivalent: the call
 // spreads a list of sources and `{ ...foo }` would spread the array itself.
 //
-// An ACCESSOR in any object-literal argument, when there are two or more arguments. Object spread
-// evaluates a getter and copies its RESULT, while `Object.assign` also invokes it but the
+// An accessor in any object-literal argument, when there are two or more arguments. Object spread
+// evaluates a getter and copies its result, while `Object.assign` also invokes it but the
 // difference shows when the accessor is on a later source being merged onto an earlier one.
 // Upstream declines only for the multi-argument case, so a lone `Object.assign({ get a() {} })`
 // still reports. Measured against the installed rule, which reports the single-argument form and
 // is silent on both two-argument forms.
 //
-// A SHADOWED `Object`. The calls come from the shelf's port of eslint-utils' ReferenceTracker, as
+// A shadowed `Object`. The calls come from the shelf's port of eslint-utils' ReferenceTracker, as
 // ESLint finds them, so a parameter, a local binding or an import named `Object` is not the global
 // and the call is not this rule's business, while an alias such as `const { assign } = Object` is
 // (#jjfa7qb). A file that writes `Object` anywhere is not followed at all: the tracker declines a
@@ -61,42 +66,37 @@ var messagePreferObjectSpreadUseLiteral = rule.Message{
 // the call's callee, its parentheses, and the braces of literal arguments. Nothing inside an
 // argument is rebuilt, so a type assertion, a template literal or a comment survives.
 //
-// The parenthesization is upstream's and it defaults to WRAPPING, which is the safe direction. An
+// The parenthesization is upstream's and it defaults to wrapping, which is the safe direction. An
 // arrow body is the case that makes it load bearing: `() => Object.assign({}, foo)` must become
 // `() => ({ ...foo})` and not `() => { ...foo}`, which parses as a block and returns nothing.
 // Measured against the installed rule.
-var PreferObjectSpread = rule.Rule{
+var PreferObjectSpread = rule.Rule[rule.NoOptions]{
 	Name: "prefer-object-spread",
 
 	// Telling the global `Object` from a shadow is name resolution, which the tracker asks the
 	// checker for.
 	NeedsTypeChecker: true,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
 				// Every trace starts at a reference to Object, so a file that never spells it has
 				// nothing to follow, and the tracker's index is never built.
-				if ctx.TypeChecker == nil || !strings.Contains(ctx.SourceFile.Text(), "Object") {
+				if ruleContext.TypeChecker == nil || !strings.Contains(ruleContext.SourceFile.Text(), "Object") {
 					return
 				}
-				tracker := reference.NewTracker(ctx.SourceFile, ctx.TypeChecker, nil)
+				tracker := reference.NewTracker(ruleContext.SourceFile, ruleContext.TypeChecker, nil)
 				for _, tracked := range tracker.GlobalReferences(objectAssignCallTraceMap) {
-					checkPreferObjectSpread(ctx, tracked.Node)
+					checkPreferObjectSpread(ruleContext, tracked.Node)
 				}
 			},
 		}
 	},
 }
 
-// objectAssignCallTraceMap asks the tracker for every call of the global Object's assign.
-var objectAssignCallTraceMap = map[string]*reference.TraceMap{
-	"Object": {Members: map[string]*reference.TraceMap{"assign": {Call: true}}},
-}
-
 // checkPreferObjectSpread judges one call expression.
-func checkPreferObjectSpread(ctx rule.Context, node *ast.Node) {
-	if ctx.TypeChecker == nil || ctx.SourceFile == nil {
+func checkPreferObjectSpread(ruleContext rule.Context, node *ast.Node) {
+	if ruleContext.TypeChecker == nil || ruleContext.SourceFile == nil {
 		return
 	}
 
@@ -110,10 +110,10 @@ func checkPreferObjectSpread(ctx rule.Context, node *ast.Node) {
 	// The first argument must be an object literal. `Object.assign(foo, bar)` mutates `foo`, which
 	// is a different operation entirely rather than a longer spelling of one.
 	//
-	// Unwrapped for the JUDGMENT, because our parser keeps a KindParenthesizedExpression where
+	// Unwrapped for the judgment, because our parser keeps a KindParenthesizedExpression where
 	// upstream's folds it away: `Object.assign(({ a: 1 }), (foo))` is a plain object literal there
 	// and a wrapper here, and without this the rule goes silent on one of upstream's own firing
-	// cases. The FIX still reads the wrapped node, since upstream removes those parentheses too.
+	// cases. The fix still reads the wrapped node, since upstream removes those parentheses too.
 	if preferObjectSpreadUnwrap(arguments[0]).Kind != ast.KindObjectLiteralExpression {
 		return
 	}
@@ -135,12 +135,12 @@ func checkPreferObjectSpread(ctx rule.Context, node *ast.Node) {
 		message = messagePreferObjectSpreadUseLiteral
 	}
 
-	fixes, fixable := preferObjectSpreadFix(ctx, node, call)
+	fixes, fixable := preferObjectSpreadFix(ruleContext, node, call)
 	if !fixable {
-		ctx.ReportNode(node, message)
+		ruleContext.ReportNode(node, message)
 		return
 	}
-	ctx.ReportNodeWithFixes(node, message, fixes...)
+	ruleContext.ReportNodeWithFixes(node, message, fixes...)
 }
 
 // preferObjectSpreadHasArgumentWithAccessors is upstream's `hasArgumentsWithAccessors`.
@@ -174,16 +174,16 @@ func preferObjectSpreadHasArgumentWithAccessors(arguments []*ast.Node) bool {
 // Upstream finds the parentheses with token queries against a token stream this tree does not
 // expose the same way, and its arithmetic reads `node.range[0]` to `leftParen.range[0]` for the
 // callee removal. Reproducing that offset blindly is the failure this brief warns about, so the
-// opening parenthesis is found by scanning forward from the CALLEE's end rather than by assuming
+// opening parenthesis is found by scanning forward from the callee's end rather than by assuming
 // it is adjacent. Measured: it is adjacent for `Object.assign(`, two characters later for
 // `Object.assign  (`, and five later for `Object.assign<Foo>(`, and the last of those is the one
 // an offset assumption would corrupt.
-func preferObjectSpreadFix(ctx rule.Context, node *ast.Node,
+func preferObjectSpreadFix(ruleContext rule.Context, node *ast.Node,
 	call *ast.CallExpression) ([]rule.Fix, bool) {
 
-	source := ctx.SourceFile.Text()
-	nodeSpan := rule.TokenRange(ctx.SourceFile, node)
-	calleeSpan := rule.TokenRange(ctx.SourceFile, call.Expression)
+	source := ruleContext.SourceFile.Text()
+	nodeSpan := rule.TokenRange(ruleContext.SourceFile, node)
+	calleeSpan := rule.TokenRange(ruleContext.SourceFile, call.Expression)
 
 	// The opening parenthesis of the argument list, found by scanning rather than assumed. Anything
 	// between the callee and it -- whitespace, type arguments -- is removed with the callee, which
@@ -204,10 +204,10 @@ func preferObjectSpreadFix(ctx rule.Context, node *ast.Node,
 	// a brace over something that is not a parenthesis. Measured on the corpus's HTML-comment case,
 	// which TypeScript does not parse: the span ends on the `d` of `weird`.
 	//
-	// This guard is REDUNDANT with the argument-span check further down, and that took a paired
-	// mutation to establish. Neutralising either alone SURVIVES every fixture, because the other
+	// This guard is redundant with the argument-span check further down, and that took a paired
+	// mutation to establish. Neutralising either alone survives every fixture, because the other
 	// declines the same input: with a malformed span the second argument extends past this wrong
-	// `rightParen` and the argument check refuses. Neutralising BOTH fails 4 lines. Kept because
+	// `rightParen` and the argument check refuses. Neutralising both fails 4 lines. Kept because
 	// declining at the earliest point that can tell is cheaper than declining after building
 	// per-argument edits, and because the two ask different questions of the same bad parse.
 	rightParen := nodeSpan.End() - 1
@@ -219,9 +219,9 @@ func preferObjectSpreadFix(ctx rule.Context, node *ast.Node,
 		rule.RemoveRange(core.NewTextRange(nodeSpan.Pos(), leftParen)),
 	}
 
-	if preferObjectSpreadNeedsParens(ctx, node) {
+	if preferObjectSpreadNeedsParens(ruleContext, node) {
 		prefix := "({"
-		if preferObjectSpreadNeedsPrecedingSemicolon(ctx, node, nodeSpan) {
+		if preferObjectSpreadNeedsPrecedingSemicolon(ruleContext, node, nodeSpan) {
 			prefix = ";({"
 		}
 		fixes = append(fixes,
@@ -234,7 +234,7 @@ func preferObjectSpreadFix(ctx rule.Context, node *ast.Node,
 	}
 
 	for _, argument := range call.Arguments.Nodes {
-		argumentFixes, ok := preferObjectSpreadArgumentFix(ctx, argument, leftParen, rightParen)
+		argumentFixes, ok := preferObjectSpreadArgumentFix(ruleContext, argument, leftParen, rightParen)
 		if !ok {
 			return nil, false
 		}
@@ -248,10 +248,10 @@ func preferObjectSpreadFix(ctx rule.Context, node *ast.Node,
 //
 // An object literal loses its braces and the whitespace just inside them; anything else gains a
 // `...` prefix, wrapped in parentheses when the argument binds looser than spread.
-func preferObjectSpreadArgumentFix(ctx rule.Context, argument *ast.Node,
+func preferObjectSpreadArgumentFix(ruleContext rule.Context, argument *ast.Node,
 	leftParen int, rightParen int) ([]rule.Fix, bool) {
 
-	source := ctx.SourceFile.Text()
+	source := ruleContext.SourceFile.Text()
 
 	// The outermost parentheses wrapping this argument, if any. Upstream walks tokens outward while
 	// they pair up and stops at the argument list's own parenthesis; our parser gives them to us as
@@ -268,19 +268,19 @@ func preferObjectSpreadArgumentFix(ctx rule.Context, argument *ast.Node,
 		inner = next
 	}
 
-	outerSpan := rule.TokenRange(ctx.SourceFile, outer)
+	outerSpan := rule.TokenRange(ruleContext.SourceFile, outer)
 	if outerSpan.Pos() <= leftParen || outerSpan.End() > rightParen {
 		return nil, false
 	}
 
 	if inner.Kind == ast.KindObjectLiteralExpression {
-		// Upstream collects the braces AND every wrapping parenthesis into one sorted list, takes
-		// the OUTERMOST pair as `left`/`right`, removes the inner ones bare, and strips whitespace
+		// Upstream collects the braces and every wrapping parenthesis into one sorted list, takes
+		// the outermost pair as `left`/`right`, removes the inner ones bare, and strips whitespace
 		// around the outermost pair only. The order matters: stripping around the braces instead
 		// eats the indentation that upstream keeps, which is a one-case difference in output and
 		// exactly what the corpus's multi-line parenthesized argument pins.
 		var fixes []rule.Fix
-		innerSpan := rule.TokenRange(ctx.SourceFile, inner)
+		innerSpan := rule.TokenRange(ruleContext.SourceFile, inner)
 
 		openBrace := innerSpan.Pos()
 		closeBrace := innerSpan.End() - 1
@@ -292,7 +292,7 @@ func preferObjectSpreadArgumentFix(ctx rule.Context, argument *ast.Node,
 		// braces otherwise. Every bracket strictly inside it is removed bare.
 		outermostOpen, outermostClose := openBrace, closeBrace
 		if len(wrappers) > 0 {
-			outerWrapperSpan := rule.TokenRange(ctx.SourceFile, wrappers[0])
+			outerWrapperSpan := rule.TokenRange(ruleContext.SourceFile, wrappers[0])
 			outermostOpen = outerWrapperSpan.Pos()
 			outermostClose = outerWrapperSpan.End() - 1
 			// The braces are now inner brackets, removed bare.
@@ -301,7 +301,7 @@ func preferObjectSpreadArgumentFix(ctx rule.Context, argument *ast.Node,
 				rule.RemoveRange(core.NewTextRange(closeBrace, closeBrace+1)))
 			// So is every wrapper except the outermost.
 			for _, wrapper := range wrappers[1:] {
-				wrapperSpan := rule.TokenRange(ctx.SourceFile, wrapper)
+				wrapperSpan := rule.TokenRange(ruleContext.SourceFile, wrapper)
 				fixes = append(fixes,
 					rule.RemoveRange(core.NewTextRange(wrapperSpan.Pos(), wrapperSpan.Pos()+1)),
 					rule.RemoveRange(core.NewTextRange(wrapperSpan.End()-1, wrapperSpan.End())))
@@ -309,12 +309,12 @@ func preferObjectSpreadArgumentFix(ctx rule.Context, argument *ast.Node,
 		}
 		openBrace, closeBrace = outermostOpen, outermostClose
 
-		// Upstream removes the brace AND the whitespace just inside it, which is what turns
+		// Upstream removes the brace and the whitespace just inside it, which is what turns
 		// `{ a: 1 }` into `a: 1` rather than ` a: 1 `. It declines to eat leading whitespace when a
 		// line comment precedes the brace, since doing so would pull the brace's line onto the
 		// comment's and comment out the code.
 		leftEnd := preferObjectSpreadEndWithSpaces(source, openBrace+1)
-		rightStart := preferObjectSpreadStartWithSpaces(ctx, source, closeBrace)
+		rightStart := preferObjectSpreadStartWithSpaces(ruleContext, source, closeBrace)
 		if rightStart < leftEnd {
 			rightStart = leftEnd
 		}
@@ -323,7 +323,7 @@ func preferObjectSpreadArgumentFix(ctx rule.Context, argument *ast.Node,
 			rule.RemoveRange(core.NewTextRange(rightStart, closeBrace+1)))
 
 		// Remove the comma that separated this argument from the next, when keeping it would
-		// double up. Two shapes need it and upstream names both: an EMPTY literal, which leaves
+		// double up. Two shapes need it and upstream names both: an empty literal, which leaves
 		// nothing before the comma at all and produces `({, ...foo})`, and a literal that already
 		// ends in a trailing comma, which would produce `({a: 1,, ...foo})`.
 		//
@@ -354,8 +354,8 @@ func preferObjectSpreadArgumentFix(ctx rule.Context, argument *ast.Node,
 
 // preferObjectSpreadNeedsParens says whether the resulting object literal must be wrapped.
 //
-// The default is to WRAP, and that direction is the safety property rather than a preference: an
-// unwrapped `{ ... }` in expression position parses as a BLOCK, which either fails to parse or,
+// The default is to wrap, and that direction is the safety property rather than a preference: an
+// unwrapped `{ ... }` in expression position parses as a block, which either fails to parse or,
 // worse, parses as a block that returns nothing. `() => Object.assign({}, foo)` becoming
 // `() => { ...foo}` is the case that makes it concrete, and it is the same class of meaning-changing
 // repair this tree has shipped twice before.
@@ -364,7 +364,7 @@ func preferObjectSpreadArgumentFix(ctx rule.Context, argument *ast.Node,
 // list is upstream's verbatim; measured against the installed rule, a variable declarator, an array
 // element, a return argument, a call argument and a property value all repair without parentheses,
 // while an arrow body and a bare expression statement are wrapped.
-func preferObjectSpreadNeedsParens(ctx rule.Context, node *ast.Node) bool {
+func preferObjectSpreadNeedsParens(ruleContext rule.Context, node *ast.Node) bool {
 	parent := node.Parent
 	if parent == nil {
 		return true
@@ -381,7 +381,7 @@ func preferObjectSpreadNeedsParens(ctx rule.Context, node *ast.Node) bool {
 		if binary != nil && binary.OperatorToken != nil &&
 			binary.OperatorToken.Kind == ast.KindEqualsToken {
 			// Upstream's AssignmentExpression arm: `parent.left === node && !isParenthesised`.
-			// The RIGHT side needs no wrap at all, since a brace there is unambiguously a literal.
+			// The right side needs no wrap at all, since a brace there is unambiguously a literal.
 			// Measured: `eventData = Object.assign({}, eventData, {a:1})` repairs to
 			// `eventData = { ... }` with no parentheses.
 			if binary.Left != node {
@@ -409,13 +409,13 @@ func preferObjectSpreadIsParenthesised(node *ast.Node) bool {
 // starting a new one when that line had no semicolon. Upstream inserts `;` in front for exactly
 // that case, and its own corpus writes `const x = 1\nObject.assign({}, foo)` to pin it.
 //
-// Asked only when the call IS the whole expression statement, since that is the only position where
+// Asked only when the call is the whole expression statement, since that is the only position where
 // a leading `(` can be misread.
-func preferObjectSpreadNeedsPrecedingSemicolon(ctx rule.Context, node *ast.Node,
+func preferObjectSpreadNeedsPrecedingSemicolon(ruleContext rule.Context, node *ast.Node,
 	nodeSpan core.TextRange) bool {
 	_ = nodeSpan
 
-	// Upstream asks `isStartOfExpressionStatement`, which is whether the node BEGINS an expression
+	// Upstream asks `isStartOfExpressionStatement`, which is whether the node begins an expression
 	// statement rather than whether it is the whole of one. The difference is real and the corpus
 	// pins it: `foo\nObject.assign({}, bar).doSomething()` and `foo\nObject.assign({}, bar), 2`
 	// both need the semicolon, and in neither is the call the statement's own expression.
@@ -423,7 +423,7 @@ func preferObjectSpreadNeedsPrecedingSemicolon(ctx rule.Context, node *ast.Node,
 	// Walk up while this node is the leftmost part of its parent, which is what "starts" means.
 	statement := node
 	for statement.Parent != nil && statement.Parent.Kind != ast.KindExpressionStatement {
-		if !preferObjectSpreadStartsParent(ctx, statement) {
+		if !preferObjectSpreadStartsParent(ruleContext, statement) {
 			return false
 		}
 		statement = statement.Parent
@@ -432,12 +432,12 @@ func preferObjectSpreadNeedsPrecedingSemicolon(ctx rule.Context, node *ast.Node,
 	if parent == nil || parent.Kind != ast.KindExpressionStatement {
 		return false
 	}
-	source := ctx.SourceFile.Text()
+	source := ruleContext.SourceFile.Text()
 
 	// Walk back over whitespace to the previous non-space character. A semicolon or an opening
 	// brace already terminates the statement; anything else, and the automatic semicolon would not
 	// have been inserted, so one is written.
-	index := rule.TokenRange(ctx.SourceFile, parent).Pos() - 1
+	index := rule.TokenRange(ruleContext.SourceFile, parent).Pos() - 1
 	for index >= 0 && preferObjectSpreadIsSpace(source[index]) {
 		index--
 	}
@@ -462,10 +462,10 @@ func preferObjectSpreadEndWithSpaces(source string, start int) int {
 
 // preferObjectSpreadStartWithSpaces returns the offset of the whitespace run ending at `end`.
 //
-// Upstream refuses to walk back over whitespace when the token before is a LINE comment, because
+// Upstream refuses to walk back over whitespace when the token before is a line comment, because
 // pulling the closing brace up onto that line would comment it out. Reproduced by scanning for a
 // line comment in the whitespace being crossed rather than by asking a token stream.
-func preferObjectSpreadStartWithSpaces(ctx rule.Context, source string, end int) int {
+func preferObjectSpreadStartWithSpaces(ruleContext rule.Context, source string, end int) int {
 	start := end
 	for start > 0 && preferObjectSpreadIsSpace(source[start-1]) {
 		start--
@@ -554,8 +554,8 @@ func preferObjectSpreadIsAssignmentOperator(kind ast.Kind) bool {
 }
 
 // preferObjectSpreadIsSpace says whether a byte is whitespace.
-func preferObjectSpreadIsSpace(b byte) bool {
-	switch b {
+func preferObjectSpreadIsSpace(character byte) bool {
+	switch character {
 	case ' ', '\t', '\n', '\r', '\v', '\f':
 		return true
 	}
@@ -603,13 +603,13 @@ func preferObjectSpreadCommaAfter(source string, from int, rightParen int) int {
 //
 // Compared on trimmed token ranges rather than raw positions, since a node's own Pos includes
 // leading trivia and two nodes sharing a start would then disagree over a comment.
-func preferObjectSpreadStartsParent(ctx rule.Context, node *ast.Node) bool {
+func preferObjectSpreadStartsParent(ruleContext rule.Context, node *ast.Node) bool {
 	parent := node.Parent
 	if parent == nil {
 		return false
 	}
-	return rule.TokenRange(ctx.SourceFile, parent).Pos() ==
-		rule.TokenRange(ctx.SourceFile, node).Pos()
+	return rule.TokenRange(ruleContext.SourceFile, parent).Pos() ==
+		rule.TokenRange(ruleContext.SourceFile, node).Pos()
 }
 
 // preferObjectSpreadUnwrap removes the parenthesis nodes our parser keeps and upstream's folds away.
@@ -618,12 +618,13 @@ func preferObjectSpreadStartsParent(ctx rule.Context, node *ast.Node) bool {
 // `ast.SkipParentheses`, which dereferences its argument and would panic on a recovered parse whose
 // parenthesized expression has no inner expression.
 func preferObjectSpreadUnwrap(node *ast.Node) *ast.Node {
-	for node != nil && node.Kind == ast.KindParenthesizedExpression {
-		inner := node.AsParenthesizedExpression().Expression
+	current := node
+	for current != nil && current.Kind == ast.KindParenthesizedExpression {
+		inner := current.AsParenthesizedExpression().Expression
 		if inner == nil {
-			return node
+			return current
 		}
-		node = inner
+		current = inner
 	}
-	return node
+	return current
 }

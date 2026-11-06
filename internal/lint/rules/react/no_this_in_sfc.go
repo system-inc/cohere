@@ -33,7 +33,7 @@ var messageNoThisInSfc = rule.Message{
 // this rule takes no options, and oxc deserializes nothing, so the two agree and this takes none.
 //
 // The two implementations differ in a way worth stating, and oxc wins because oxc is what the
-// differential gate runs. ESLint anchors on `MemberExpression` and reports the WHOLE member
+// differential gate runs. ESLint anchors on `MemberExpression` and reports the whole member
 // expression, routing the component question through its `Components` detector, which tracks
 // returned JSX and would recognize a `memo` or `forwardRef` wrapper. oxc anchors on the
 // `ThisExpression` and reports just the four characters of `this`, and its component test is purely
@@ -44,7 +44,7 @@ var messageNoThisInSfc = rule.Message{
 //
 // This is where a port of this rule goes wrong, so it is measured on the release oxlint binary
 // rather than reasoned about. The test is syntactic and much narrower than the name suggests.
-// A function qualifies when, and only when, a NAME can be read off it whose first character is
+// A function qualifies when, and only when, a name can be read off it whose first character is
 // ASCII-uppercase, and the name is read from exactly two places:
 //
 //	function Foo(p) { ... }                REPORTS   a function's own id
@@ -62,7 +62,7 @@ var messageNoThisInSfc = rule.Message{
 // reports with no JSX anywhere in it, and upstream's own failing corpus contains such a case. A
 // port that gated on "returns JSX" would pass most fixtures and silence this one.
 //
-// **No wrapper is recognized.** All three of these are SILENT on the release binary, because the
+// **No wrapper is recognized.** All three of these are silent on the release binary, because the
 // arrow's parent is a call argument rather than a variable declarator, so no name can be read:
 //
 //	const Foo = memo((props) => this.props.a)
@@ -79,7 +79,7 @@ var messageNoThisInSfc = rule.Message{
 // `internal/utilities/react.IsLikelyComponentName` is exactly the shape this reaches for and is wrong
 // for it. Its body is `unicode.IsUpper(runes[0])`, which is Unicode-wide; oxc's
 // `is_react_component_name` is `c.is_ascii_uppercase()`. Measured on the release binary, all three
-// of `function Фoo`, `function Λoo` and `function Éoo` reading `this.props.a` are SILENT upstream,
+// of `function Фoo`, `function Λoo` and `function Éoo` reading `this.props.a` are silent upstream,
 // while the shelf helper answers true for every one of them and would report all three. The
 // predicate below is ASCII-only for that reason. Read the body, not the name.
 //
@@ -91,7 +91,7 @@ var messageNoThisInSfc = rule.Message{
 //
 // The first is the ancestor walk. It runs from the `this` outward and stops at the first function
 // it meets. A `Function` ancestor ends the walk unconditionally, answering with itself only when it
-// is component-named. An arrow ancestor that is NOT component-named is stepped over and the walk
+// is component-named. An arrow ancestor that is not component-named is stepped over and the walk
 // continues upward, which is what lets an anonymous callback inside a component still belong to
 // that component. Measured:
 //
@@ -101,7 +101,7 @@ var messageNoThisInSfc = rule.Message{
 //	function Foo(p) { const Cb = () => this.props.a; }    REPORTS   the inner arrow is the component
 //	function Foo(p) { return { m() { return this.props.a; } }; }   SILENT   a method is a Function
 //
-// The second is a separate exemption pass over the ancestors BETWEEN the `this` and the component
+// The second is a separate exemption pass over the ancestors between the `this` and the component
 // that was found, which exempts a `Function`, a method, a property definition, and an accessor
 // property whose value contains the `this`. The two overlap on nested functions and disagree
 // nowhere the corpus reaches, but both are reproduced because each catches cases the other does
@@ -135,8 +135,8 @@ var messageNoThisInSfc = rule.Message{
 // `internal/utilities/react.IsEs5ComponentCall` accepts `createClass` and `React.createClass` as well
 // as `createReactClass`, while oxc keys both arms of `is_es5_component` on the single constant
 // `CREATE_CLASS = "createReactClass"`. Measured on the release binary, an arrow component holding a
-// `this` read inside `createReactClass({...})` is SILENT while the same thing inside
-// `createClass({...})` and inside `React.createClass({...})` both REPORT. Following the shelf
+// `this` read inside `createReactClass({...})` is silent while the same thing inside
+// `createClass({...})` and inside `React.createClass({...})` both report. Following the shelf
 // helper's name instead of its body would silence two cases upstream reports, and no imported
 // fixture could see it because the corpus never nests a component inside an ES5 factory. This
 // calls `isEs5ComponentCallStrict` in `no_did_mount_set_state.go`, which is that same narrowing
@@ -144,7 +144,7 @@ var messageNoThisInSfc = rule.Message{
 //
 // Upstream's own passing corpus contains `const Foo = React.createClass({ render: function () {
 // return <div>{this.props.foo}</div>; } });`, which looks like it is passing because of this
-// exemption and is not. It passes because `render: function ()` is an ANONYMOUS function
+// exemption and is not. It passes because `render: function ()` is an anonymous function
 // expression, so no name can be read, the walk ends at the `Function` arm and answers nothing. The
 // case would pass identically with the factory removed, which was measured. A port that read that
 // fixture as evidence about the factory name would draw exactly the wrong conclusion, which is why
@@ -167,12 +167,12 @@ var messageNoThisInSfc = rule.Message{
 // oxc does, confirmed by dumping the ancestor chain for both forms, so a plain parent-kind check
 // with no `SkipParentheses` reproduces all seven rows. Adding the paren-skip that usually reads as
 // a free correctness improvement would report two cases oxlint is silent on. All are pinned below.
-var NoThisInSfc = rule.Rule{
+var NoThisInSfc = rule.Rule[rule.NoOptions]{
 	// No namespace prefix. The config writes `react/no-this-in-sfc` and the parity guard strips the
 	// namespace on a `/` boundary, so `react-no-this-in-sfc` would match no inventory entry, lint
 	// no files, and still pass every fixture in this package.
 	Name: "react/no-this-in-sfc",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// No file gate. oxc gated this on `source_type().is_jsx()` and that gate came along with the
 		// port from oxc, but the authority here is eslint-plugin-react, which does not gate on the
 		// file name at all. React code in a `.ts` file is ordinary and legal, and the gate made this
@@ -191,7 +191,7 @@ var NoThisInSfc = rule.Rule{
 					return
 				}
 				// A member expression's parent is also its object rather than its property name, so
-				// `foo.this` cannot arise, but `a[this]` can: there the `this` is the ARGUMENT of an
+				// `foo.this` cannot arise, but `a[this]` can: there the `this` is the argument of an
 				// element access and upstream's `is_member_expression_kind` on the parent answers
 				// true for it just the same. Reproduced rather than narrowed, and pinned by a
 				// fixture, because the check upstream makes is on the parent's kind alone.
@@ -211,7 +211,7 @@ var NoThisInSfc = rule.Rule{
 					return
 				}
 
-				ctx.ReportNode(node, messageNoThisInSfc)
+				ruleContext.ReportNode(node, messageNoThisInSfc)
 			},
 		}
 	},
@@ -220,10 +220,10 @@ var NoThisInSfc = rule.Rule{
 // parentComponentOf walks outward from a `this` to the function component that owns it.
 //
 // This is oxc's `get_parent_component`, and its asymmetry between the two function kinds is the
-// load-bearing part rather than an implementation detail. A `Function` ancestor RETURNS on sight,
+// load-bearing part rather than an implementation detail. A `Function` ancestor returns on sight,
 // answering with itself only when it is component-named and answering nothing otherwise, which is
 // how a nested function declaration or an anonymous function expression exempts its whole body. An
-// arrow ancestor that is not component-named is stepped OVER and the walk continues, which is how
+// arrow ancestor that is not component-named is stepped over and the walk continues, which is how
 // an anonymous callback inside a component still belongs to that component.
 //
 // A class static block returns nothing, matching upstream's explicit `StaticBlock` arm. Without it
@@ -248,7 +248,7 @@ func parentComponentOf(node *ast.Node) *ast.Node {
 			if isPotentialReactComponent(current) {
 				return current
 			}
-			// This `return nil` is SUBSUMED rather than load-bearing, and the mutation sweep
+			// This `return nil` is subsumed rather than load-bearing, and the mutation sweep
 			// proved it: rewriting it to `continue`, so the walk steps over a non-component
 			// function the way it steps over a non-component arrow, survives the whole fixture
 			// set. No input distinguishes the two, and the reason is one sentence: the `this` is
@@ -383,7 +383,7 @@ func isInNestedThisContext(this *ast.Node, component *ast.Node) bool {
 //
 // `ancestor` is included, so a node is a descendant of itself. That matches
 // `span.contains_inclusive`, which is what upstream asks, and the `this` is never the initializer
-// itself in any case because the initializer of an accessor property that IS a bare `this` would
+// itself in any case because the initializer of an accessor property that is a bare `this` would
 // have no member parent and would have been declined at the anchor.
 func isDescendantOf(node *ast.Node, ancestor *ast.Node) bool {
 	for current := node; current != nil; current = current.Parent {

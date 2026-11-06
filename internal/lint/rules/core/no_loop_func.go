@@ -51,7 +51,7 @@ var messageNoLoopFunc = rule.Message{
 // `a = 1` after the loop is not. The variable is captured either way; what differs is whether
 // anything can still change it.
 //
-// # The border, and why it is the OUTERMOST loop
+// # The border, and why it is the outermost loop
 //
 // `getTopLoopNode` climbs from the containing loop through every enclosing loop and takes the
 // outermost one's start position, stopping at the declaration when the binding is a `let`. A write
@@ -86,11 +86,11 @@ var messageNoLoopFunc = rule.Message{
 //
 // A function called where it is made cannot outlive the iteration, so upstream skips it. The skip
 // is conditional twice over: it applies only to a function that is neither `async` nor a generator,
-// and a NAMED function expression whose own name is referenced from the escaping set is not
+// and a named function expression whose own name is referenced from the escaping set is not
 // skipped, because the name being reachable means something else can hold onto it.
 //
 // The skip also feeds back into the walk: a skipped function is recorded, and `getContainingLoopNode`
-// then climbs THROUGH it when judging a function nested inside it. That is what makes
+// then climbs through it when judging a function nested inside it. That is what makes
 // `arr.push((f => f)((() => i)()));` clean, and it is why the recording is a set on the rule rather
 // than a local. Our walk visits parents outward, so the same set is consulted while climbing.
 //
@@ -100,7 +100,7 @@ var messageNoLoopFunc = rule.Message{
 // `for...in` / `for...of` evaluate their right-hand side once for the same reason. Both are corpus
 // cases: `for (var i=0, a=function() { i; }; i<l; i++) { }` and
 // `for (var x in xs.filter(function(x) { return x != upper; })) { }` are clean. The test and the
-// update of a `for` are NOT outside; upstream returns the loop for them, and
+// update of a `for` are not outside; upstream returns the loop for them, and
 // `for (var i=0; (function() { i; })(), i<l; i++) { }` is clean only because it is an immediately
 // invoked function.
 //
@@ -157,7 +157,7 @@ var messageNoLoopFunc = rule.Message{
 // The repair is either changing a `var` to `let`, which changes the binding's scope and is not
 // always what was meant, or restructuring to pass the value in. Both are judgment, and upstream
 // ships no fixer either.
-var NoLoopFunc = rule.Rule{
+var NoLoopFunc = rule.Rule[rule.NoOptions]{
 	Name: "no-loop-func",
 
 	// The whole discrimination is name resolution. Four clean cases write a name spelled exactly
@@ -166,7 +166,7 @@ var NoLoopFunc = rule.Rule{
 	// Reads only this file's declarations (rule.DeclarationsIn), so its findings key on imports' shapes.
 	TypeReach: rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// Recorded across the file, because a skipped immediately-invoked function has to stay
 		// transparent to the loop search of every function nested inside it. Upstream keeps the
 		// same set for the same reason.
@@ -179,7 +179,7 @@ var NoLoopFunc = rule.Rule{
 		var referencesByDeclaration map[*ast.Node][]*ast.Node
 
 		check := func(node *ast.Node) {
-			if ctx.TypeChecker == nil {
+			if ruleContext.TypeChecker == nil {
 				return
 			}
 			loopNode := loopFuncContainingLoop(node, skippedImmediatelyInvoked)
@@ -187,9 +187,9 @@ var NoLoopFunc = rule.Rule{
 				return
 			}
 			if referencesByDeclaration == nil {
-				referencesByDeclaration = loopFuncReferenceIndex(ctx)
+				referencesByDeclaration = loopFuncReferenceIndex(ruleContext)
 			}
-			checkLoopFunc(ctx, node, loopNode, skippedImmediatelyInvoked, referencesByDeclaration)
+			checkLoopFunc(ruleContext, node, loopNode, skippedImmediatelyInvoked, referencesByDeclaration)
 		}
 
 		// Every kind whose ESTree counterpart is a FunctionExpression, which is what upstream's
@@ -207,14 +207,16 @@ var NoLoopFunc = rule.Rule{
 }
 
 // checkLoopFunc judges one function, which sits in loopNode.
+//
+// Mutates: skippedImmediatelyInvoked the set is shared across the file, so a skip here is seen by later judgements
 func checkLoopFunc(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	node *ast.Node,
 	loopNode *ast.Node,
 	skippedImmediatelyInvoked map[*ast.Node]bool,
 	referencesByDeclaration map[*ast.Node][]*ast.Node,
 ) {
-	escaping := loopFuncEscapingReferences(ctx, node)
+	escaping := loopFuncEscapingReferences(ruleContext, node)
 
 	// A function invoked where it is created cannot outlive the iteration. Upstream applies this
 	// only to a function that is neither async nor a generator, so an async immediately-invoked
@@ -231,12 +233,12 @@ func checkLoopFunc(
 	unsafeNames := []string{}
 	seen := map[string]bool{}
 	for _, identifier := range escaping {
-		declaration := loopFuncDeclarationFor(ctx, identifier)
+		declaration := loopFuncDeclarationFor(ruleContext, identifier)
 		if declaration == nil {
 			// Upstream requires `r.resolved`: an undeclared name is no-undef's business, not this
 			// rule's, and six corpus cases turn on it.
 			//
-			// Kept although a sweep shows it SUBSUMED rather than load-bearing. Deleting it leaves
+			// Kept although a sweep shows it subsumed rather than load-bearing. Deleting it leaves
 			// every fixture green, because an unresolved name reaches `loopFuncReferenceIsSafe`
 			// with a nil declaration, `loopFuncReferenceIndex` never stores a nil key, and the
 			// empty reference list makes the write loop answer safe. The verdict arrives by
@@ -244,12 +246,18 @@ func checkLoopFunc(
 			//
 			// It stays because it is also the guard that stops a nil declaration reaching
 			// `loopFuncDeclarationStatement` and `loopFuncVariableScope`. Both tolerate nil today;
-			// neither is required to, and the walk recovers per FILE rather than per rule, so a nil
+			// neither is required to, and the walk recovers per file rather than per rule, so a nil
 			// dereference here would cost every rule its verdict on this file rather than only
 			// this one.
 			continue
 		}
-		if loopFuncReferenceIsSafe(ctx, loopNode, declaration, referencesByDeclaration, skippedImmediatelyInvoked) {
+		if loopFuncReferenceIsSafe(
+			ruleContext,
+			loopNode,
+			declaration,
+			referencesByDeclaration,
+			skippedImmediatelyInvoked,
+		) {
 			continue
 		}
 		name := identifier.Text()
@@ -264,7 +272,7 @@ func checkLoopFunc(
 		return
 	}
 
-	ctx.ReportNode(node, rule.Message{
+	ruleContext.ReportNode(node, rule.Message{
 		Id: messageNoLoopFunc.Id,
 		Description: fmt.Sprintf("%s The unsafe reference is to '%s'.",
 			messageNoLoopFunc.Description, strings.Join(unsafeNames, "', '")),
@@ -310,7 +318,7 @@ func loopFuncContainingLoop(node *ast.Node, skippedImmediatelyInvoked map[*ast.N
 // loopFuncTopLoop returns the outermost loop containing the given loop, without passing a position
 // the caller wants excluded.
 //
-// Upstream's `getTopLoopNode`. The border is the excluded node's END, so a `let` declared inside the
+// Upstream's `getTopLoopNode`. The border is the excluded node's end, so a `let` declared inside the
 // loop stops the climb at the loop that declares it: an outer iteration cannot reach a binding that
 // does not exist yet.
 func loopFuncTopLoop(loopNode *ast.Node, excluded *ast.Node, skippedImmediatelyInvoked map[*ast.Node]bool) *ast.Node {
@@ -326,9 +334,20 @@ func loopFuncTopLoop(loopNode *ast.Node, excluded *ast.Node, skippedImmediatelyI
 	return result
 }
 
+// loopFuncBindingKind is the three-way classification upstream reads off the declaration's kind.
+type loopFuncBinding int
+
+const (
+	// loopFuncBindingOther is `var`, a parameter, a function, a class, an import: anything whose
+	// binding is neither block-scoped-per-iteration nor immutable.
+	loopFuncBindingOther loopFuncBinding = iota
+	loopFuncBindingLet
+	loopFuncBindingConstant
+)
+
 // loopFuncReferenceIsSafe answers upstream's `isSafe` for one resolved binding.
 func loopFuncReferenceIsSafe(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	loopNode *ast.Node,
 	declaration *ast.Node,
 	referencesByDeclaration map[*ast.Node][]*ast.Node,
@@ -358,7 +377,7 @@ func loopFuncReferenceIsSafe(
 	border := loopFuncTopLoop(loopNode, excluded, skippedImmediatelyInvoked).Pos()
 
 	// Safe only if every reference to the binding is either a read, or a write that happens before
-	// the border AND in the same function the variable itself belongs to.
+	// the border and in the same function the variable itself belongs to.
 	declarationScope := loopFuncVariableScope(declaration)
 	for _, occurrence := range referencesByDeclaration[declaration] {
 		if !loopFuncWritesTo(occurrence) {
@@ -375,7 +394,7 @@ func loopFuncReferenceIsSafe(
 // loopFuncWritesTo reports whether an occurrence of a name stores a value into its binding.
 //
 // `reference.WritesToBinding` is the shelf's answer and it covers the assignment forms, but
-// eslint-scope counts three DECLARATION positions as writes too, and this rule reads the write set
+// eslint-scope counts three declaration positions as writes too, and this rule reads the write set
 // rather than the assignment set. Measured by walking eslint-scope's own reference list, which is
 // the surface upstream reads:
 //
@@ -449,17 +468,6 @@ func loopFuncDeclarationBinding(identifier *ast.Node) *ast.Node {
 	return nil
 }
 
-// loopFuncBindingKind is the three-way classification upstream reads off the declaration's kind.
-type loopFuncBinding int
-
-const (
-	// loopFuncBindingOther is `var`, a parameter, a function, a class, an import: anything whose
-	// binding is neither block-scoped-per-iteration nor immutable.
-	loopFuncBindingOther loopFuncBinding = iota
-	loopFuncBindingLet
-	loopFuncBindingConstant
-)
-
 // loopFuncBindingKindOf classifies a declaration node.
 //
 // Upstream reads `declaration.kind` off the enclosing VariableDeclaration, and anything that is not
@@ -517,7 +525,7 @@ func loopFuncDeclarationListFor(declaration *ast.Node) *ast.Node {
 // does. A `for (let i = 0; ...)` head has a list with no statement above it, which is the shape
 // that has to keep working.
 //
-// # The lift is EQUIVALENT under measurement, and it is upstream's shape rather than ours
+// # The lift is equivalent under measurement, and it is upstream's shape rather than ours
 //
 // A mutant returning the list and never lifting survived the corpus and a fixture written for it.
 // The two nodes differ by the trailing semicolon at the end and by any modifier at the start
@@ -570,7 +578,7 @@ func loopFuncVariableScope(node *ast.Node) *ast.Node {
 // # A named function expression's own name escapes, and it does not look like it should
 //
 // `declaration == node` is the exception and it is not decoration. eslint-scope puts a named
-// function expression's name in a scope of its own that WRAPS the function scope, so a body
+// function expression's name in a scope of its own that wraps the function scope, so a body
 // referencing that name resolves outward and the reference lands in `through`. Our checker resolves
 // the same name to the function node itself, which is under the function, so the containment test
 // alone drops it.
@@ -579,7 +587,7 @@ func loopFuncVariableScope(node *ast.Node) *ast.Node {
 // `(function a(){ i; a; })()`: both `i` and `a` are there. Five corpus cases depend on it, because
 // the immediately-invoked skip is declined exactly when the name is reachable, and without this the
 // name is never seen and every one of them goes silent.
-func loopFuncEscapingReferences(ctx rule.Context, node *ast.Node) []*ast.Node {
+func loopFuncEscapingReferences(ruleContext rule.Context, node *ast.Node) []*ast.Node {
 	escaping := []*ast.Node{}
 	body := node.Body()
 	if body == nil {
@@ -593,7 +601,7 @@ func loopFuncEscapingReferences(ctx rule.Context, node *ast.Node) []*ast.Node {
 		}
 		if current.Kind == ast.KindIdentifier {
 			if loopFuncIsReadableReference(current) {
-				declaration := loopFuncDeclarationFor(ctx, current)
+				declaration := loopFuncDeclarationFor(ruleContext, current)
 				if declaration == nil || !loopFuncIsUnder(declaration, node) ||
 					declaration == node {
 					escaping = append(escaping, current)
@@ -622,7 +630,7 @@ func loopFuncEscapingReferences(ctx rule.Context, node *ast.Node) []*ast.Node {
 // binding at all: a property name, a member access's name side, a label, an import or export
 // specifier's wire name.
 //
-// # Every arm here is EQUIVALENT for this rule, and it is kept anyway
+// # Every arm here is equivalent for this rule, and it is kept anyway
 //
 // A sweep neutralising the property-access arm survived the whole corpus and survived two rounds of
 // fixtures written for it, which is the signal to stop writing fixtures and go read. Measured, the
@@ -676,13 +684,13 @@ func loopFuncIsUnder(node *ast.Node, ancestor *ast.Node) bool {
 //
 // `LocalSymbol` is the fallback an exported declaration needs: the checker hands an exported
 // declaration its own truncated symbol while the merged list lives there instead.
-func loopFuncDeclarationFor(ctx rule.Context, identifier *ast.Node) *ast.Node {
-	if ctx.TypeChecker == nil {
+func loopFuncDeclarationFor(ruleContext rule.Context, identifier *ast.Node) *ast.Node {
+	if ruleContext.TypeChecker == nil {
 		return nil
 	}
 	// This file's declarations only: a position is compared below, and positions in two files do not
 	// compare.
-	declarations := rule.DeclarationsIn(ctx.SourceFile, ctx.TypeChecker.GetSymbolAtLocation(identifier))
+	declarations := rule.DeclarationsIn(ruleContext.SourceFile, ruleContext.TypeChecker.GetSymbolAtLocation(identifier))
 	if len(declarations) == 0 {
 		return nil
 	}
@@ -690,7 +698,7 @@ func loopFuncDeclarationFor(ctx rule.Context, identifier *ast.Node) *ast.Node {
 	// names it regardless of how the symbol's list happens to be ordered. Never index zero: a
 	// symbol can carry several declarations and their order is not guaranteed to be source order.
 	//
-	// # Why choosing the earliest is EQUIVALENT here, and why it is still written
+	// # Why choosing the earliest is equivalent here, and why it is still written
 	//
 	// A mutant taking the latest instead survived the whole corpus and survived a fixture written
 	// for it. The reason is that this function's answer is used two ways and only one of them can
@@ -724,14 +732,14 @@ func loopFuncDeclarationFor(ctx rule.Context, identifier *ast.Node) *ast.Node {
 // shared through the file cache with no-unmodified-loop-condition, which reads the same index. Two
 // rules each building it cost 29 MB in 394K objects on a cold ahra run (#942rdnn). Neither rule
 // writes to it.
-func loopFuncReferenceIndex(ctx rule.Context) map[*ast.Node][]*ast.Node {
-	return rule.Cached(ctx.FileCache, "core.loopFuncReferenceIndex", func() map[*ast.Node][]*ast.Node {
-		return buildLoopFuncReferenceIndex(ctx)
+func loopFuncReferenceIndex(ruleContext rule.Context) map[*ast.Node][]*ast.Node {
+	return rule.Cached(ruleContext.FileCache, "core.loopFuncReferenceIndex", func() map[*ast.Node][]*ast.Node {
+		return buildLoopFuncReferenceIndex(ruleContext)
 	})
 }
 
 // buildLoopFuncReferenceIndex is loopFuncReferenceIndex's fill.
-func buildLoopFuncReferenceIndex(ctx rule.Context) map[*ast.Node][]*ast.Node {
+func buildLoopFuncReferenceIndex(ruleContext rule.Context) map[*ast.Node][]*ast.Node {
 	index := map[*ast.Node][]*ast.Node{}
 	var walk func(node *ast.Node)
 	walk = func(node *ast.Node) {
@@ -740,7 +748,7 @@ func buildLoopFuncReferenceIndex(ctx rule.Context) map[*ast.Node][]*ast.Node {
 		}
 		if node.Kind == ast.KindIdentifier {
 			if loopFuncIsReadableReference(node) {
-				if declaration := loopFuncDeclarationFor(ctx, node); declaration != nil {
+				if declaration := loopFuncDeclarationFor(ruleContext, node); declaration != nil {
 					index[declaration] = append(index[declaration], node)
 				}
 			}
@@ -751,7 +759,7 @@ func buildLoopFuncReferenceIndex(ctx rule.Context) map[*ast.Node][]*ast.Node {
 			return false
 		})
 	}
-	walk(ctx.SourceFile.AsNode())
+	walk(ruleContext.SourceFile.AsNode())
 	return index
 }
 

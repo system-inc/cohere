@@ -11,7 +11,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // upstream's defaults instead of an error. Both defaults happen to match Go's zero values here, and
 // the decoder exists to make that explicit rather than accidental.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[NoUnknownPropertyOptions]{
 		Rule:   NoUnknownProperty,
 		Decode: DecodeNoUnknownPropertyOptions,
 	})

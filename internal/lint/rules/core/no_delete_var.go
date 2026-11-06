@@ -5,7 +5,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
-var messageUnexpectedDeleteVar = rule.Message{
+var messageUnexpectedDeleteVariable = rule.Message{
 	Id: "unexpectedDeleteVar",
 	Description: "`delete` removes a property from an object; it cannot remove a variable. " +
 		"Applied to a bare name this does nothing in strict mode and throws a SyntaxError where " +
@@ -14,7 +14,7 @@ var messageUnexpectedDeleteVar = rule.Message{
 		"reference, assign undefined; to remove a property, delete the property.",
 }
 
-// NoDeleteVar flags `delete` applied to a bare identifier.
+// NoDeleteVariable flags `delete` applied to a bare identifier.
 //
 //	valid:   delete object.property
 //	valid:   delete object['property']
@@ -32,16 +32,16 @@ var messageUnexpectedDeleteVar = rule.Message{
 // No fix. The two repairs are opposite in meaning: assigning undefined keeps the binding and clears
 // the value, while deleting a property removes the key. The rule cannot know which the author meant,
 // and guessing wrong changes what the code does rather than how it reads.
-var NoDeleteVar = rule.Rule{
+var NoDeleteVariable = rule.Rule[rule.NoOptions]{
 	Name: "no-delete-var",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindDeleteExpression: func(node *ast.Node) {
 				target := ast.SkipParentheses(node.AsDeleteExpression().Expression)
 				if target == nil || target.Kind != ast.KindIdentifier {
 					return
 				}
-				ctx.ReportNode(node, messageUnexpectedDeleteVar)
+				ruleContext.ReportNode(node, messageUnexpectedDeleteVariable)
 			},
 		}
 	},

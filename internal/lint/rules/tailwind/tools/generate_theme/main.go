@@ -4,7 +4,8 @@
 //
 // Usage:
 //
-//	go run ./internal/lint/rules/tailwind/tools/generate_theme -package-root <tailwindcss package> [-stylesheets <corpus.json>] [-output <file.json>] [-check]
+//	go run ./internal/lint/rules/tailwind/tools/generate_theme \
+//	    -package-root <tailwindcss package> [-stylesheets <corpus.json>] [-output <file.json>] [-check]
 //
 // The distinction this tool enforces is the one generate_data_type and generate_css_parser
 // enforce, and for this component it lands on the ignored-key map. Reading the source suggests
@@ -23,8 +24,8 @@
 //
 // `-check` regenerates and fails when the committed fixture disagrees, which is what makes a
 // Tailwind upgrade that changes theme resolution show up as a failing gate instead of a silent
-// behavior change. Like the other internal/lint/rules/tailwind/tools/generate_* tools, nothing invokes it automatically; it is a
-// manual gate.
+// behavior change. Like the other internal/lint/rules/tailwind/tools/generate_* tools, nothing invokes it
+// automatically; it is a manual gate.
 //
 // Node is required to run it and never to use the result.
 package main
@@ -40,40 +41,62 @@ import (
 )
 
 func main() {
-	packageRoot := flag.String("package-root", "", "path to the tailwindcss package root (the directory holding package.json)")
-	stylesheets := flag.String("stylesheets", "", "path to a JSON array of {name, path} naming real repository stylesheets to include")
-	output := flag.String("output", filepath.Join("internal", "tailwind", "testdata", "theme_fixtures.json"), "where to write the fixture")
+	packageRoot := flag.String(
+		"package-root",
+		"",
+		"path to the tailwindcss package root (the directory holding package.json)",
+	)
+	stylesheets := flag.String(
+		"stylesheets",
+		"",
+		"path to a JSON array of {name, path} naming real repository stylesheets to include",
+	)
+	output := flag.String(
+		"output",
+		filepath.Join("internal", "tailwind", "testdata", "theme_fixtures.json"),
+		"where to write the fixture",
+	)
 	check := flag.Bool("check", false, "regenerate and fail if the committed fixture disagrees")
 	flag.Parse()
 
 	if *packageRoot == "" {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 		fmt.Fprintln(os.Stderr, "-package-root is required")
 		os.Exit(2)
 	}
 
-	generated, err := enumerate(*packageRoot, *stylesheets)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "enumerate: %v\n", err)
+	generated, enumerateError := enumerate(*packageRoot, *stylesheets)
+	if enumerateError != nil {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
+		fmt.Fprintf(os.Stderr, "enumerate: %v\n", enumerateError)
 		os.Exit(1)
 	}
 
 	if *check {
-		committed, err := os.ReadFile(*output)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "read committed fixture: %v\n", err)
+		committed, readError := os.ReadFile(*output)
+		if readError != nil {
+			// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
+			fmt.Fprintf(os.Stderr, "read committed fixture: %v\n", readError)
 			os.Exit(1)
 		}
 		// Go whitespace: this tool comparing its own committed fixture with its own output.
 		if !bytes.Equal(bytes.TrimSpace(committed), bytes.TrimSpace(generated)) {
-			fmt.Fprintf(os.Stderr, "%s is stale: the engine now resolves a different theme. Re-run without -check and read the diff.\n", *output)
+			// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
+			fmt.Fprintf(
+				os.Stderr,
+				"%s is stale: the engine now resolves a different theme. Re-run without -check and read the diff.\n",
+				*output,
+			)
 			os.Exit(1)
 		}
+		// Ignored: the check has passed, and the exit code says so whether or not this lands.
 		fmt.Fprintf(os.Stderr, "%s matches the engine\n", *output)
 		return
 	}
 
-	if err := os.WriteFile(*output, generated, 0o644); err != nil {
-		fmt.Fprintf(os.Stderr, "write %s: %v\n", *output, err)
+	if writeError := os.WriteFile(*output, generated, 0o644); writeError != nil {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
+		fmt.Fprintf(os.Stderr, "write %s: %v\n", *output, writeError)
 		os.Exit(1)
 	}
 
@@ -94,14 +117,16 @@ func main() {
 			} `json:"theme"`
 		} `json:"cases"`
 	}
-	if err := json.Unmarshal(generated, &summary); err != nil {
-		fmt.Fprintf(os.Stderr, "summarize: %v\n", err)
+	if decodeError := json.Unmarshal(generated, &summary); decodeError != nil {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
+		fmt.Fprintf(os.Stderr, "summarize: %v\n", decodeError)
 		os.Exit(1)
 	}
 
 	// The per-repository line is the measurement the whole port argues from, so it is printed
 	// rather than folded into a total: two numbers that differ say more than one number that does
 	// not.
+	// Ignored: what it reports is already written, and a summary that cannot reach the terminal changes none of it.
 	fmt.Fprintf(
 		os.Stderr,
 		"wrote %s: tailwind %s, %d synthetic and %d repository cases\n",
@@ -111,6 +136,7 @@ func main() {
 		if aCase.Source != "repository" {
 			continue
 		}
+		// Ignored: the rest of the same summary, which changes nothing already written.
 		fmt.Fprintf(
 			os.Stderr,
 			"  %s: %d theme entries, %d namespaces, %d resolutions, %d resolveWith answers\n",
@@ -129,9 +155,9 @@ func main() {
 // boundary is here, at generation time, and never at lint time: the committed fixture is what the
 // test reads.
 func enumerate(packageRoot, stylesheets string) ([]byte, error) {
-	directory, err := toolDirectory()
-	if err != nil {
-		return nil, err
+	directory, toolDirectoryError := toolDirectory()
+	if toolDirectoryError != nil {
+		return nil, toolDirectoryError
 	}
 	script := filepath.Join(directory, "enumerate.mjs")
 
@@ -141,12 +167,13 @@ func enumerate(packageRoot, stylesheets string) ([]byte, error) {
 	}
 
 	command := exec.Command("node", arguments...)
-	var stdout, stderr bytes.Buffer
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
 	command.Stdout = &stdout
 	command.Stderr = &stderr
 
-	if err := command.Run(); err != nil {
-		return nil, fmt.Errorf("node %s: %w\n%s", script, err, stderr.String())
+	if runError := command.Run(); runError != nil {
+		return nil, fmt.Errorf("node %s: %w\n%s", script, runError, stderr.String())
 	}
 	return stdout.Bytes(), nil
 }

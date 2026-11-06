@@ -67,27 +67,31 @@ type ImportRequirePathAliasOptions struct {
 // directory of the config that wrote it, and an absent one is the project root. Whatever comes out
 // must be a directory that exists. A root that names nothing, or that this decoder has no base to
 // resolve, is refused by name, because refusing here is the only alternative to the silence.
-func decodeImportRequirePathAliasOptions(raw []byte, base rule.OptionsBase) (any, error) {
-	decoded, err := rule.DecodeOptionsInto[ImportRequirePathAliasOptions]()(raw)
-	if err != nil {
-		return nil, err
+func decodeImportRequirePathAliasOptions(raw []byte, base rule.OptionsBase) (ImportRequirePathAliasOptions, error) {
+	settings, decodeOptionsError := rule.DecodeOptionsInto[ImportRequirePathAliasOptions]()(raw)
+	if decodeOptionsError != nil {
+		return ImportRequirePathAliasOptions{}, decodeOptionsError
 	}
-	settings := decoded.(ImportRequirePathAliasOptions)
 
 	root := settings.RepositoryRoot
 	switch {
 	case root == "":
 		if base.ProjectRoot == "" {
-			return nil, fmt.Errorf("repositoryRoot is absent and no project root is known to default it to, " +
-				"so the rule could not tell which files its aliases describe. Write repositoryRoot, relative " +
-				"to the config file, such as \".\"")
+			return ImportRequirePathAliasOptions{}, fmt.Errorf(
+				"repositoryRoot is absent and no project root is known to default it to, " +
+					"so the rule could not tell which files its aliases describe. Write repositoryRoot, relative " +
+					"to the config file, such as \".\"",
+			)
 		}
 		root = base.ProjectRoot
 
 	case !filepath.IsAbs(root):
 		if base.ConfigDirectory == "" {
-			return nil, fmt.Errorf("repositoryRoot %q is relative and the config's directory is not known, "+
-				"so there is nothing to resolve it against", root)
+			return ImportRequirePathAliasOptions{}, fmt.Errorf(
+				"repositoryRoot %q is relative and the config's directory is not known, "+
+					"so there is nothing to resolve it against",
+				root,
+			)
 		}
 		root = filepath.Join(base.ConfigDirectory, root)
 	}
@@ -95,12 +99,21 @@ func decodeImportRequirePathAliasOptions(raw []byte, base rule.OptionsBase) (any
 
 	information, statError := os.Stat(root)
 	if statError != nil {
-		return nil, fmt.Errorf("repositoryRoot %q resolves to %s, which cannot be read (%v), so no file "+
-			"would be inside it and the rule would report nothing", settings.RepositoryRoot, root, statError)
+		return ImportRequirePathAliasOptions{}, fmt.Errorf(
+			"repositoryRoot %q resolves to %s, which cannot be read (%w), so no file "+
+				"would be inside it and the rule would report nothing",
+			settings.RepositoryRoot,
+			root,
+			statError,
+		)
 	}
 	if !information.IsDir() {
-		return nil, fmt.Errorf("repositoryRoot %q resolves to %s, which is a file rather than a directory, "+
-			"so no file would be inside it and the rule would report nothing", settings.RepositoryRoot, root)
+		return ImportRequirePathAliasOptions{}, fmt.Errorf(
+			"repositoryRoot %q resolves to %s, which is a file rather than a directory, "+
+				"so no file would be inside it and the rule would report nothing",
+			settings.RepositoryRoot,
+			root,
+		)
 	}
 
 	// Existing is not enough, and the worktree is why. In an ahra worktree the pinned
@@ -108,10 +121,15 @@ func decodeImportRequirePathAliasOptions(raw []byte, base rule.OptionsBase) (any
 	// checks is under it. A root is useful only if it holds the project or sits inside it; a root
 	// beside the project makes the rule inert for every file it is handed.
 	if base.ProjectRoot != "" && !pathsNest(root, base.ProjectRoot) {
-		return nil, fmt.Errorf("repositoryRoot %q resolves to %s, which neither holds nor sits inside the "+
-			"project at %s, so no file checked here would be inside it and the rule would report nothing. "+
-			"A path pinned on one machine is another checkout in a worktree; write it relative to the "+
-			"config file, such as \".\"", settings.RepositoryRoot, root, base.ProjectRoot)
+		return ImportRequirePathAliasOptions{}, fmt.Errorf(
+			"repositoryRoot %q resolves to %s, which neither holds nor sits inside the "+
+				"project at %s, so no file checked here would be inside it and the rule would report nothing. "+
+				"A path pinned on one machine is another checkout in a worktree; write it relative to the "+
+				"config file, such as \".\"",
+			settings.RepositoryRoot,
+			root,
+			base.ProjectRoot,
+		)
 	}
 
 	settings.RepositoryRoot = root
@@ -125,8 +143,10 @@ func decodeImportRequirePathAliasOptions(raw []byte, base rule.OptionsBase) (any
 // and refusing a root over a spelling would be a false alarm on a correct config.
 func pathsNest(first string, second string) bool {
 	nests := func(outer string, inner string) bool {
-		relative, err := filepath.Rel(outer, inner)
-		return err == nil && relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator))
+		relative, relativePathError := filepath.Rel(outer, inner)
+		return relativePathError == nil &&
+			relative != ".." &&
+			!strings.HasPrefix(relative, ".."+string(filepath.Separator))
 	}
 	if nests(first, second) || nests(second, first) {
 		return true
@@ -156,7 +176,10 @@ func messageUseAlias(importPath string, levels int, suggestion string) rule.Mess
 
 // importRequirePathAliasUseAliasInStrictRootText is the rule's `useAliasInStrictRoot` message,
 // whose wording lives in `policy/messages/import-require-path-alias.json`.
-var importRequirePathAliasUseAliasInStrictRootText = policy.MessageOf("nexus/import-require-path-alias", "useAliasInStrictRoot")
+var importRequirePathAliasUseAliasInStrictRootText = policy.MessageOf(
+	"nexus/import-require-path-alias",
+	"useAliasInStrictRoot",
+)
 
 func messageUseAliasInStrictRoot(importPath string, root string, suggestion string) rule.Message {
 	return rule.Message{
@@ -192,17 +215,17 @@ func messageUseAliasInStrictRoot(importPath string, root string, suggestion stri
 //
 // The fix rewrites the specifier to the suggestion. An alias derived from the tsconfig's `paths`
 // resolves by construction; one written in Aliases is exactly as right as the list it came from.
-var ImportRequirePathAlias = rule.Rule{
+var ImportRequirePathAlias = rule.Rule[ImportRequirePathAliasOptions]{
 	Name: "nexus/import-require-path-alias",
 	// The tsconfig's `paths` and the directory they resolve against, read only when
 	// aliasesFromTsconfigPaths asks for them.
 	ProgramReads: rule.ReadsCompilerOptions,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[ImportRequirePathAliasOptions]) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
-		settings, hasSettings := rule.OptionsAs[ImportRequirePathAliasOptions](options)
+		settings, hasSettings := options.Read()
 		if !hasSettings || settings.RepositoryRoot == "" {
 			// Without a root nothing can be made repository-relative. Declining is the honest
 			// answer, and it keeps a misconfigured rule from guessing.
@@ -213,9 +236,13 @@ var ImportRequirePathAlias = rule.Rule{
 		// Written first, so a written alias wins a tie with a derived one on the same directory: the
 		// sort below is stable.
 		configured := append([]PathAlias{}, settings.Aliases...)
-		if settings.AliasesFromTsconfigPaths && ctx.Program != nil {
+		if settings.AliasesFromTsconfigPaths && ruleContext.Program != nil {
 			configured = append(configured,
-				aliasesFromCompilerPaths(ctx.Program.Options(), ctx.Program.GetCurrentDirectory(), repositoryRoot)...)
+				aliasesFromCompilerPaths(
+					ruleContext.Program.Options(),
+					ruleContext.Program.GetCurrentDirectory(),
+					repositoryRoot,
+				)...)
 		}
 		if len(configured) == 0 {
 			// Nothing to suggest, so nothing to report.
@@ -239,7 +266,7 @@ var ImportRequirePathAlias = rule.Rule{
 			strictRoots = append(strictRoots, normalizeConfiguredDirectory(root))
 		}
 
-		importingFile := imports.NormalizedFileName(ctx.SourceFile)
+		importingFile := imports.NormalizedFileName(ruleContext.SourceFile)
 		importingRelative, isInsideRepository := repositoryRelative(repositoryRoot, importingFile)
 		if !isInsideRepository {
 			return nil
@@ -267,13 +294,13 @@ var ImportRequirePathAlias = rule.Rule{
 				return
 			}
 
-			specifierRange := rule.TokenRange(ctx.SourceFile, specifierNode)
-			specifierText := ctx.SourceFile.Text()[specifierRange.Pos():specifierRange.End()]
-			fix := ctx.ReplaceNode(specifierNode, quotedLike(specifierText, suggestion))
+			specifierRange := rule.TokenRange(ruleContext.SourceFile, specifierNode)
+			specifierText := ruleContext.SourceFile.Text()[specifierRange.Pos():specifierRange.End()]
+			fix := ruleContext.ReplaceNode(specifierNode, quotedLike(specifierText, suggestion))
 
 			for _, root := range strictRoots {
 				if directoryContains(root, importingRelative) {
-					ctx.ReportNodeWithFixes(specifierNode,
+					ruleContext.ReportNodeWithFixes(specifierNode,
 						messageUseAliasInStrictRoot(importPath, root, suggestion), fix)
 					return
 				}
@@ -281,7 +308,7 @@ var ImportRequirePathAlias = rule.Rule{
 
 			levels := strings.Count(importPath, "../")
 			if levels >= 2 {
-				ctx.ReportNodeWithFixes(specifierNode, messageUseAlias(importPath, levels, suggestion), fix)
+				ruleContext.ReportNodeWithFixes(specifierNode, messageUseAlias(importPath, levels, suggestion), fix)
 			}
 		}
 
@@ -333,7 +360,11 @@ var ImportRequirePathAlias = rule.Rule{
 // reads them. Structure writes its aliases in a config two directories down that every project
 // extends, so resolving against the project's own tsconfig instead would put every alias two levels
 // above the repository.
-func aliasesFromCompilerPaths(options *core.CompilerOptions, currentDirectory string, repositoryRoot string) []PathAlias {
+func aliasesFromCompilerPaths(
+	options *core.CompilerOptions,
+	currentDirectory string,
+	repositoryRoot string,
+) []PathAlias {
 	if options == nil || options.Paths.Size() == 0 {
 		return nil
 	}

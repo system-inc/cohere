@@ -24,7 +24,7 @@ var messageNoNegatedCondition = rule.Message{
 // # A negation alone is not the finding, and this is the whole rule
 //
 // `if (!a) {}` is clean. The complaint is a negated test paired with an else that the reader must
-// hold in their head as "the positive case", which is why the else has to be UNCONDITIONAL: an
+// hold in their head as "the positive case", which is why the else has to be unconditional: an
 // `else if` starts a new question rather than closing this one, so `if (!a) {} else if (b) {}` is
 // clean and `if (!a) {} else {}` is not. Upstream's `hasElseWithoutCondition` is exactly that test,
 // and its corpus writes both directions.
@@ -37,7 +37,7 @@ var messageNoNegatedCondition = rule.Message{
 // `!x`, `x != y`, `x !== y`. Upstream names them literally, and the omissions matter more than the
 // inclusions: `==` and `===` are clean, and so is any other operator. There is no attempt to see
 // through a negation written some other way, so `if (a === false)` and `if (!(a && b))`... the
-// second of those IS a `!` and does report, which is worth stating because it reads as a compound
+// second of those is a `!` and does report, which is worth stating because it reads as a compound
 // condition rather than as a negated one.
 //
 // # The span is the whole statement, not the test
@@ -52,9 +52,9 @@ var messageNoNegatedCondition = rule.Message{
 // what the code says rather than to how it is spelled, and the repair is not even mechanical: the
 // negation has to be removed correctly, which for `!(a && b)` means either double-negating or
 // applying De Morgan.
-var NoNegatedCondition = rule.Rule{
+var NoNegatedCondition = rule.Rule[rule.NoOptions]{
 	Name: "no-negated-condition",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindIfStatement: func(node *ast.Node) {
 				statement := node.AsIfStatement()
@@ -62,12 +62,12 @@ var NoNegatedCondition = rule.Rule{
 					return
 				}
 				if noNegatedConditionIsNegated(statement.Expression) {
-					ctx.ReportNode(node, messageNoNegatedCondition)
+					ruleContext.ReportNode(node, messageNoNegatedCondition)
 				}
 			},
 			ast.KindConditionalExpression: func(node *ast.Node) {
 				if noNegatedConditionIsNegated(node.AsConditionalExpression().Condition) {
-					ctx.ReportNode(node, messageNoNegatedCondition)
+					ruleContext.ReportNode(node, messageNoNegatedCondition)
 				}
 			},
 		}
@@ -91,7 +91,7 @@ func noNegatedConditionHasElseWithoutCondition(statement *ast.IfStatement) bool 
 // Upstream's parser folds parentheses away, so `if ((!a))` arrives at its test as a bare unary.
 // Ours keeps a `KindParenthesizedExpression`, so a port without this loop declines every
 // parenthesized form and loses the finding silently. Measured against the installed 10.8.1 build,
-// all four of these REPORT upstream:
+// all four of these report upstream:
 //
 //	if ((!a)) { f(); } else { g(); }          columns 1 to 33
 //	if ((a !== b)) { f(); } else { g(); }     columns 1 to 38
@@ -108,17 +108,18 @@ func noNegatedConditionIsNegated(test *ast.Node) bool {
 	if test == nil {
 		return false
 	}
-	for test.Kind == ast.KindParenthesizedExpression {
-		test = test.AsParenthesizedExpression().Expression
-		if test == nil {
+	unwrapped := test
+	for unwrapped.Kind == ast.KindParenthesizedExpression {
+		unwrapped = unwrapped.AsParenthesizedExpression().Expression
+		if unwrapped == nil {
 			return false
 		}
 	}
-	if test.Kind == ast.KindPrefixUnaryExpression {
-		return test.AsPrefixUnaryExpression().Operator == ast.KindExclamationToken
+	if unwrapped.Kind == ast.KindPrefixUnaryExpression {
+		return unwrapped.AsPrefixUnaryExpression().Operator == ast.KindExclamationToken
 	}
-	if test.Kind == ast.KindBinaryExpression {
-		switch test.AsBinaryExpression().OperatorToken.Kind {
+	if unwrapped.Kind == ast.KindBinaryExpression {
+		switch unwrapped.AsBinaryExpression().OperatorToken.Kind {
 		case ast.KindExclamationEqualsToken, ast.KindExclamationEqualsEqualsToken:
 			return true
 		}

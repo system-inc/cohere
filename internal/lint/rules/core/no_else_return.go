@@ -15,7 +15,7 @@ var messageNoElseReturn = rule.Message{
 
 // NoElseReturnSettings is the decoded option surface.
 //
-// `allowElseIf` defaults to TRUE, which is the trap in this rule's configuration. The generic
+// `allowElseIf` defaults to `true`, which is the trap in this rule's configuration. The generic
 // decoder would hand back a zero-value struct with it false, and false is not a no-op here: it
 // switches the rule from checking an `if` chain's whole consequent list to checking a single
 // consequent, which reports `else if` chains upstream deliberately leaves alone.
@@ -39,14 +39,14 @@ type noElseReturnWireShape struct {
 // distinguishable. That is not decoration: the default is true, so a decoder falling back to the
 // zero value inverts the rule rather than disabling it, and every fixture routed through a struct
 // built by hand would pass anyway.
-func DecodeNoElseReturnOptions(raw []byte) (any, error) {
+func DecodeNoElseReturnOptions(raw []byte) (NoElseReturnSettings, error) {
 	if len(raw) == 0 {
 		return DefaultNoElseReturnSettings(), nil
 	}
 
 	var wire noElseReturnWireShape
-	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
-		return DefaultNoElseReturnSettings(), err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &wire); unmarshalOptionsError != nil {
+		return DefaultNoElseReturnSettings(), unmarshalOptionsError
 	}
 
 	settings := DefaultNoElseReturnSettings()
@@ -69,7 +69,7 @@ func DecodeNoElseReturnOptions(raw []byte) (any, error) {
 // list, and which has an `else`. The repair unwraps that `else` into the enclosing scope, and
 // unwrapping can change what the code means in three separate ways. Upstream declines in all three
 // and its corpus asserts every one with `output: null`: 46 of its 78 failing cases are declines
-// against 32 fix vectors, so refusing correctly IS this port rather than a detail of it.
+// against 32 fix vectors, so refusing correctly is this port rather than a detail of it.
 //
 // # Decline one, a name collision
 //
@@ -100,7 +100,7 @@ func DecodeNoElseReturnOptions(raw []byte) (any, error) {
 // what follows starts with one of the continuation characters, or simply sits on the same line, the
 // two rejoin. `function foo() { if (foo) return bar; else { baz() } qaz() }` is upstream's case.
 //
-// # Where the fix is deliberately NOT ported
+// # Where the fix is deliberately not ported
 //
 // Upstream wraps its replacement in a `FixTracker` that extends the edited range to the whole
 // enclosing function, to avoid conflicting with `no-useless-return` and with a second `else` block
@@ -118,29 +118,29 @@ func DecodeNoElseReturnOptions(raw []byte) (any, error) {
 // inside the block is carried through unchanged rather than reconstructed. Fixtures below assert
 // exactly that on annotated declarations, a generic, and a satisfies expression, and the guard was
 // mutated to confirm they fail without it.
-var NoElseReturn = rule.Rule{
+var NoElseReturn = rule.Rule[NoElseReturnSettings]{
 	Name: "no-else-return",
 
 	// The collision check asks what names are already in scope at the `if`, which only resolution
 	// can answer. The rule reports without it, and declines to repair.
 	NeedsTypeChecker: true,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, ok := rule.OptionsAs[NoElseReturnSettings](options)
+	Run: func(ruleContext rule.Context, options rule.Given[NoElseReturnSettings]) rule.Listeners {
+		settings, ok := options.Read()
 		if !ok {
 			settings = DefaultNoElseReturnSettings()
 		}
 
 		return rule.Listeners{
 			ast.KindIfStatement: func(node *ast.Node) {
-				checkNoElseReturn(ctx, node, settings.AllowElseIf)
+				checkNoElseReturn(ruleContext, node, settings.AllowElseIf)
 			},
 		}
 	},
 }
 
 // checkNoElseReturn decides one if statement.
-func checkNoElseReturn(ctx rule.Context, node *ast.Node, allowElseIf bool) {
+func checkNoElseReturn(ruleContext rule.Context, node *ast.Node, allowElseIf bool) {
 	// Fixing this would mean splitting one statement into two, so an `if` somewhere only a single
 	// statement is legal is left alone. Upstream words this as a check against its statement-list
 	// parent set; asking whether the parent holds a statement list is the same question.
@@ -156,13 +156,13 @@ func checkNoElseReturn(ctx rule.Context, node *ast.Node, allowElseIf bool) {
 	if allowElseIf {
 		// The whole `else if` chain is one judgment: every consequent must return before the final
 		// alternate is reported, and an `if` with no final `else` is left alone. That is what
-		// ALLOWING `else if` means, which reads backwards until you see it: permitting `else if`
+		// allowing `else if` means, which reads backwards until you see it: permitting `else if`
 		// is permitting the chain, so the rule waits for the chain to end before judging it.
 		//
 		// Upstream spells this as `allowElseIf ? checkIfWithoutElse : checkIfWithElse`, and this
 		// port had the two branches swapped until the corpus caught it. Nothing but the option
 		// fixtures could: `function foo19() { if (true) { return x; } else if (false) { return y; } }`
-		// appears in upstream's VALID list under allowElseIf true and in its INVALID list under
+		// appears in upstream's `valid` list under allowElseIf true and in its `invalid` list under
 		// false, the same bytes with opposite verdicts.
 		alternate := statement.ElseStatement
 		for current := node; current.Kind == ast.KindIfStatement; {
@@ -176,14 +176,14 @@ func checkNoElseReturn(ctx rule.Context, node *ast.Node, allowElseIf bool) {
 			alternate = currentStatement.ElseStatement
 			current = currentStatement.ElseStatement
 		}
-		reportElse(ctx, node, alternate)
+		reportElse(ruleContext, node, alternate)
 		return
 	}
 
 	// With `else if` disallowed, only this one consequent is judged, so an `else if` after a
 	// returning branch reports immediately rather than waiting for the chain to end.
 	if alwaysReturns(statement.ThenStatement) {
-		reportElse(ctx, node, statement.ElseStatement)
+		reportElse(ruleContext, node, statement.ElseStatement)
 	}
 }
 
@@ -206,7 +206,7 @@ func holdsAStatementList(parent *ast.Node) bool {
 
 // alwaysReturns says whether a branch returns on every path.
 //
-// Upstream's naive check, reproduced including its naivety: a block returns when ANY of its
+// Upstream's naive check, reproduced including its naivety: a block returns when any of its
 // statements is a return or a fully-returning if, rather than when control provably cannot fall
 // through. A more careful analysis would report cases upstream does not, which is a divergence in
 // the reporting direction and the one this rule cannot afford.
@@ -242,7 +242,7 @@ func returnsOrFullyReturningIf(node *ast.Node) bool {
 
 // naiveHasReturn is upstream's last-statement-only check.
 //
-// Deliberately only the LAST statement of a block, where alwaysReturns scans all of them. The
+// Deliberately only the last statement of a block, where alwaysReturns scans all of them. The
 // asymmetry is upstream's and reproducing it matters: a block whose return is not last counts for
 // one question and not the other.
 func naiveHasReturn(node *ast.Node) bool {
@@ -260,36 +260,36 @@ func naiveHasReturn(node *ast.Node) bool {
 }
 
 // reportElse reports the else and offers the repair when it can be shown safe.
-func reportElse(ctx rule.Context, ifStatement *ast.Node, alternate *ast.Node) {
-	if repair, ok := elseUnwrapFix(ctx, ifStatement, alternate); ok {
-		ctx.ReportNodeWithFixes(alternate, messageNoElseReturn, repair)
+func reportElse(ruleContext rule.Context, ifStatement *ast.Node, alternate *ast.Node) {
+	if repair, ok := elseUnwrapFix(ruleContext, ifStatement, alternate); ok {
+		ruleContext.ReportNodeWithFixes(alternate, messageNoElseReturn, repair)
 		return
 	}
-	ctx.ReportNode(alternate, messageNoElseReturn)
+	ruleContext.ReportNode(alternate, messageNoElseReturn)
 }
 
 // elseUnwrapFix builds the repair that removes an else, or declines to.
 //
 // Three independent declines, each reproducing one of upstream's. See the rule's doc comment for
 // why each exists; the order here is upstream's and is cheapest-first only by accident.
-func elseUnwrapFix(ctx rule.Context, ifStatement *ast.Node, alternate *ast.Node) (rule.Fix, bool) {
-	if !isSafeFromNameCollisions(ctx, ifStatement, alternate) {
+func elseUnwrapFix(ruleContext rule.Context, ifStatement *ast.Node, alternate *ast.Node) (rule.Fix, bool) {
+	if !isSafeFromNameCollisions(ruleContext, ifStatement, alternate) {
 		return rule.Fix{}, false
 	}
 
-	source := ctx.SourceFile.Text()
+	source := ruleContext.SourceFile.Text()
 	elseKeyword := elseKeywordOffset(source, ifStatement, alternate)
 	if elseKeyword < 0 {
 		return rule.Fix{}, false
 	}
 
 	// The text the unwrap keeps: the block's inner text, or the whole statement when there are no
-	// braces. Taken as SOURCE TEXT rather than reconstructed, which is what carries a type
+	// braces. Taken as source text rather than reconstructed, which is what carries a type
 	// annotation, a generic argument or a satisfies expression through untouched.
 	// TokenRange rather than Pos(): Pos() reaches back over the whitespace between `else` and the
 	// statement, and the removal already covers that span, so keeping it too writes a double space.
 	// `if (true) return x; else return y;` came out as `... return x;  return y;` until this line.
-	keptStart, keptEnd := rule.TokenRange(ctx.SourceFile, alternate).Pos(), alternate.End()
+	keptStart, keptEnd := rule.TokenRange(ruleContext.SourceFile, alternate).Pos(), alternate.End()
 	if alternate.Kind == ast.KindBlock {
 		keptStart, keptEnd = alternate.Pos()+1, alternate.End()-1
 		if openBrace := indexOfByteFrom(source, '{', alternate.Pos(), alternate.End()); openBrace >= 0 {
@@ -303,7 +303,7 @@ func elseUnwrapFix(ctx rule.Context, ifStatement *ast.Node, alternate *ast.Node)
 		return rule.Fix{}, false
 	}
 
-	if rejoinsAtTheFront(ctx, ifStatement, source, keptStart, keptEnd) {
+	if rejoinsAtTheFront(ruleContext, ifStatement, source, keptStart, keptEnd) {
 		return rule.Fix{}, false
 	}
 	if rejoinsAtTheBack(source, alternate, keptStart, keptEnd) {
@@ -321,7 +321,7 @@ func elseUnwrapFix(ctx rule.Context, ifStatement *ast.Node, alternate *ast.Node)
 // Only `let`, `const` and `class` matter: a `var` or a function declaration is already function
 // scoped, so unwrapping moves nothing.
 //
-// Upstream reads eslint-scope; this asks resolution what names are in scope AT the if statement and
+// Upstream reads eslint-scope; this asks resolution what names are in scope at the if statement and
 // whether any of them is declared in source rather than in the standard library. Measured before
 // being built on, across eight of upstream's nine collision shapes: a parameter, a defaulted
 // parameter, a rest parameter, a catch binding, a var, a let, a class, and a var hoisted out of a
@@ -330,14 +330,14 @@ func elseUnwrapFix(ctx rule.Context, ifStatement *ast.Node, alternate *ast.Node)
 //
 // A conditional function declaration is refused outright, matching upstream: its scoping and
 // hoisting differ between engines, so no analysis here would be worth trusting.
-func isSafeFromNameCollisions(ctx rule.Context, ifStatement *ast.Node, alternate *ast.Node) bool {
+func isSafeFromNameCollisions(ruleContext rule.Context, ifStatement *ast.Node, alternate *ast.Node) bool {
 	if alternate.Kind == ast.KindFunctionDeclaration {
 		return false
 	}
 	if alternate.Kind != ast.KindBlock {
 		return true
 	}
-	if ctx.TypeChecker == nil {
+	if ruleContext.TypeChecker == nil {
 		// No checker means the collision question cannot be asked, so the repair is withheld rather
 		// than guessed at. The finding still fires.
 		return false
@@ -351,7 +351,7 @@ func isSafeFromNameCollisions(ctx rule.Context, ifStatement *ast.Node, alternate
 	// Everything visible at the `if`, which is where the unwrapped declarations would land.
 	//
 	// One narrow divergence lives here, and it runs toward declining rather than toward repairing.
-	// `GetSymbolsInScope` reports a HOISTED function declaration as visible at the `if` even when
+	// `GetSymbolsInScope` reports a hoisted function declaration as visible at the `if` even when
 	// that function belongs to a scope one block further out, so an else block nested inside another
 	// block reads as colliding with it. Upstream distinguishes the two levels through eslint-scope
 	// and repairs that case.
@@ -369,13 +369,13 @@ func isSafeFromNameCollisions(ctx rule.Context, ifStatement *ast.Node, alternate
 	// a scope where the name is taken and changes what the program means, and the edit engine's
 	// parse check cannot refuse that because the result parses. The finding still fires either way,
 	// so nothing is missed, only the automatic repair on one shape.
-	for _, symbol := range ctx.TypeChecker.GetSymbolsInScope(ifStatement, ^ast.SymbolFlags(0)) {
+	for _, symbol := range ruleContext.TypeChecker.GetSymbolsInScope(ifStatement, ^ast.SymbolFlags(0)) {
 		if !names[symbol.Name] {
 			continue
 		}
 		for _, declaration := range symbol.Declarations {
 			// A declaration in the standard library is not a collision: shadowing a global is legal
-			// and is what most of this tree's code does. Only a name declared in SOURCE collides.
+			// and is what most of this tree's code does. Only a name declared in source collides.
 			file := ast.GetSourceFileOfNode(declaration)
 			if file == nil || file.IsDeclarationFile {
 				continue
@@ -389,7 +389,7 @@ func isSafeFromNameCollisions(ctx rule.Context, ifStatement *ast.Node, alternate
 		}
 	}
 
-	// A name REFERENCED after the if statement, but declared nowhere the checker can see, would be
+	// A name referenced after the if statement, but declared nowhere the checker can see, would be
 	// captured by the lifted declaration and stop resolving to whatever it resolved to before.
 	// Upstream asks eslint-scope for `scope.through`, the names reaching out of this scope; asking
 	// whether the enclosing function mentions the name outside the else block is the same question
@@ -397,7 +397,7 @@ func isSafeFromNameCollisions(ctx rule.Context, ifStatement *ast.Node, alternate
 	//
 	// Measured against the installed rule: `function foo() { if (bar) { return true; } else { let a;
 	// } a; }` is declined and the same input without the trailing `a;` is fixed.
-	if mentionsAnyNameOutside(ctx, ifStatement, alternate, names) {
+	if mentionsAnyNameOutside(ruleContext, ifStatement, alternate, names) {
 		return false
 	}
 
@@ -409,9 +409,9 @@ func isSafeFromNameCollisions(ctx rule.Context, ifStatement *ast.Node, alternate
 // Only identifiers outside the else block count, since a mention inside it already refers to the
 // declaration being moved. The search is bounded by the nearest enclosing function or the file,
 // because a name mentioned beyond that cannot be captured by a declaration landing here.
-func mentionsAnyNameOutside(ctx rule.Context, ifStatement *ast.Node, alternate *ast.Node,
+func mentionsAnyNameOutside(ruleContext rule.Context, ifStatement *ast.Node, alternate *ast.Node,
 	names map[string]bool) bool {
-	// The block the unwrapped declarations LAND in, which is the if statement's own parent, and
+	// The block the unwrapped declarations land in, which is the if statement's own parent, and
 	// nothing wider. A name mentioned further out belongs to a scope the lifted declaration never
 	// reaches, so it is not captured.
 	//
@@ -451,9 +451,9 @@ func mentionsAnyNameOutside(ctx rule.Context, ifStatement *ast.Node, alternate *
 // isAReadOfTheName says whether an identifier reads a binding rather than naming a new one.
 //
 // The distinction is load bearing and this port had it wrong first. Upstream's `scope.through` is
-// the names REACHING OUT of a scope, so a sibling declaration of the same name is not one of them:
+// the names reaching out of a scope, so a sibling declaration of the same name is not one of them:
 // `function foo() { if (bar) { if (baz) { return true; } else { let a; } } function a(){} }` is
-// FIXED upstream, and treating that `function a` as a mention withheld the repair.
+// fixed upstream, and treating that `function a` as a mention withheld the repair.
 //
 // So a declaration's own name is not a read, and neither is a property name, since `x.a` does not
 // resolve `a` as a binding.
@@ -509,9 +509,9 @@ func blockScopedNamesDeclaredIn(block *ast.Node) map[string]bool {
 			}
 
 		case ast.KindFunctionDeclaration:
-			// A function declaration inside a block IS block scoped in strict mode, so lifting one
+			// A function declaration inside a block is block scoped in strict mode, so lifting one
 			// can collide exactly as a `let` does. Upstream reaches the same conclusion from the
-			// other side, refusing outright when the whole else IS a function declaration; a
+			// other side, refusing outright when the whole else is a function declaration; a
 			// function declaration among other statements inside a braced else is this case.
 			// Measured against the installed rule: `function foo() { let a; if (bar) { return true;
 			// } else { function a(){} } }` is declined and the same input without the outer `let a`
@@ -525,6 +525,8 @@ func blockScopedNamesDeclaredIn(block *ast.Node) map[string]bool {
 }
 
 // collectBindingNames records every name a binding introduces, walking patterns.
+//
+// Mutates: into the walk records every name it finds, so one set gathers a whole pattern
 func collectBindingNames(name *ast.Node, into map[string]bool) {
 	if name == nil {
 		return
@@ -550,7 +552,7 @@ func collectBindingNames(name *ast.Node, into map[string]bool) {
 //
 // Upstream's test is deliberately textual and both halves are needed: a braced consequent cannot
 // rejoin, and neither can one already ending in a semicolon.
-func rejoinsAtTheFront(ctx rule.Context, ifStatement *ast.Node, source string,
+func rejoinsAtTheFront(ruleContext rule.Context, ifStatement *ast.Node, source string,
 	keptStart int, keptEnd int) bool {
 	consequent := ifStatement.AsIfStatement().ThenStatement
 	if consequent == nil || consequent.Kind == ast.KindBlock {
@@ -656,11 +658,11 @@ func anyNewlineBetween(source string, start int, end int) bool {
 // as a child. The search is bounded by the consequent's end and the alternate's start, so it cannot
 // wander into either.
 func elseKeywordOffset(source string, ifStatement *ast.Node, alternate *ast.Node) int {
-	// The `else` immediately before the ALTERNATE being reported, not the first one in the chain.
+	// The `else` immediately before the alternate being reported, not the first one in the chain.
 	//
 	// In `if (x) {...} else if (y) {...} else {...}` under allowElseIf, the reported alternate is
 	// the final block and only its own `else` is removed. Searching forward from the outermost
-	// consequent finds the chain's FIRST `else` and swallows the whole `else if`, which is what this
+	// consequent finds the chain's first `else` and swallows the whole `else if`, which is what this
 	// port did until upstream's own output for foo9 said otherwise.
 	//
 	// Searching backward from the alternate is what pins it to the right one, and the search is

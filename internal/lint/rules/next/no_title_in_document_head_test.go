@@ -18,8 +18,8 @@ const (
 	upstreamFail = "\n\t\t\t      import { Head } from \"next/document\";\n\n\t\t\t      class Test {\n\t\t\t        render() {\n\t\t\t          return (\n\t\t\t            <Head>\n\t\t\t              <title>My page title</title>\n\t\t\t            </Head>\n\t\t\t          );\n\t\t\t        }\n\t\t\t      }"
 )
 
-func TestNoTitleInDocumentHeadReports(t *testing.T) {
-	t.Parallel()
+func TestNoTitleInDocumentHeadReports(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -63,7 +63,7 @@ func TestNoTitleInDocumentHeadReports(t *testing.T) {
 			want:   2,
 		},
 		{
-			// Only the FIRST named specifier of a declaration is watched, so two declarations each
+			// Only the first named specifier of a declaration is watched, so two declarations each
 			// contribute their own. Measured reporting.
 			name:   "a second declaration brings its own first specifier",
 			source: "import { Html } from \"next/document\";\nimport { Head } from \"next/document\";\nexport const C = () => <Head><title>x</title></Head>;",
@@ -72,7 +72,7 @@ func TestNoTitleInDocumentHeadReports(t *testing.T) {
 		{
 			// The first named specifier is the one watched even when a default precedes it in the
 			// same declaration, because the default is a different specifier arm and is skipped
-			// rather than counted. Measured reporting on `<Html>`, the first NAMED name.
+			// rather than counted. Measured reporting on `<Html>`, the first named name.
 			name:   "a default before the first named specifier does not consume the slot",
 			source: "import Document, { Html, Head } from \"next/document\";\nexport const C = () => <Html><title>x</title></Html>;",
 			want:   1,
@@ -85,20 +85,20 @@ func TestNoTitleInDocumentHeadReports(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoTitleInDocumentHead, "pages/_document.tsx", testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoTitleInDocumentHead, "pages/_document.tsx", testCase.source)
 			ids := make([]string, testCase.want)
 			for index := range ids {
 				ids[index] = messageNoTitleInDocumentHead.Id
 			}
-			rule_testing.ExpectFindings(t, result, ids...)
+			rule_testing.ExpectFindings(test, result, ids...)
 		})
 	}
 }
 
-func TestNoTitleInDocumentHeadIsSilent(t *testing.T) {
-	t.Parallel()
+func TestNoTitleInDocumentHeadIsSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -119,7 +119,7 @@ func TestNoTitleInDocumentHeadIsSilent(t *testing.T) {
 			source: upstreamPassEmptyHead,
 		},
 		{
-			// The half of pass 1 that is about the specifier arm. A default import from the RIGHT
+			// The half of pass 1 that is about the specifier arm. A default import from the right
 			// module is still silent, because the rule matches only the named arm. This is the one
 			// fixture that separates the two reasons pass 1 is clean, and a port accepting the
 			// default arm passes all three upstream cases without it. Measured silent.
@@ -144,7 +144,7 @@ func TestNoTitleInDocumentHeadIsSilent(t *testing.T) {
 			source: "import { A, Head, C } from \"next/document\";\nexport const C2 = () => <Head><title>x</title></Head>;",
 		},
 		{
-			// Only DIRECT children are scanned. A title one level down is silent. Measured silent.
+			// Only direct children are scanned. A title one level down is silent. Measured silent.
 			name:   "a title nested below a direct child",
 			source: "import { Head } from \"next/document\";\nexport const C = () => <Head><div><title>x</title></div></Head>;",
 		},
@@ -161,7 +161,7 @@ func TestNoTitleInDocumentHeadIsSilent(t *testing.T) {
 			source: "import * as Doc from \"next/document\";\nexport const C = () => <Doc.Head><title>x</title></Doc.Head>;",
 		},
 		{
-			// The binding used as the OBJECT of a member-expression tag is not the tag itself, so
+			// The binding used as the object of a member-expression tag is not the tag itself, so
 			// the reference's parent is not a JSX opening element. Measured silent.
 			name:   "the binding as the object of a member expression tag",
 			source: "import { Head } from \"next/document\";\nexport const C = () => <Head.Sub><title>x</title></Head.Sub>;",
@@ -214,10 +214,10 @@ func TestNoTitleInDocumentHeadIsSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoTitleInDocumentHead, "pages/_document.tsx", testCase.source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoTitleInDocumentHead, "pages/_document.tsx", testCase.source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -226,30 +226,30 @@ func TestNoTitleInDocumentHeadIsSilent(t *testing.T) {
 // `jsx_opening_element.name.span()` rather than the `<title>` that eslint blames. A message-id
 // assertion cannot see where a finding lands, and pointing at the title instead would satisfy every
 // case above.
-func TestNoTitleInDocumentHeadPointsAtTheTagName(t *testing.T) {
-	t.Parallel()
+func TestNoTitleInDocumentHeadPointsAtTheTagName(test *testing.T) {
+	test.Parallel()
 
 	source := "import { Head as PageHead } from \"next/document\";\nexport const C = () => <PageHead><title>x</title></PageHead>;"
 
-	result := rule_testing.RunTyped(t, NoTitleInDocumentHead, "pages/_document.tsx", source)
-	rule_testing.ExpectFindings(t, result, messageNoTitleInDocumentHead.Id)
+	result := rule_testing.RunTyped(test, NoTitleInDocumentHead, "pages/_document.tsx", source)
+	rule_testing.ExpectFindings(test, result, messageNoTitleInDocumentHead.Id)
 
 	diagnostic := result.Diagnostics[0]
 	reported := source[diagnostic.Range.Pos():diagnostic.Range.End()]
 	if reported != "PageHead" {
-		t.Fatalf("want the tag name %q, got %q", "PageHead", reported)
+		test.Fatalf("want the tag name %q, got %q", "PageHead", reported)
 	}
 }
 
 // The message is asserted whole rather than by substring, because a substring predicate is weaker
 // than the property it guards and has gone green over a wrong message in this tree before.
-func TestNoTitleInDocumentHeadMessageText(t *testing.T) {
-	t.Parallel()
+func TestNoTitleInDocumentHeadMessageText(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTyped(t, NoTitleInDocumentHead, "pages/_document.tsx", upstreamFail)
-	rule_testing.ExpectFindings(t, result, messageNoTitleInDocumentHead.Id)
+	result := rule_testing.RunTyped(test, NoTitleInDocumentHead, "pages/_document.tsx", upstreamFail)
+	rule_testing.ExpectFindings(test, result, messageNoTitleInDocumentHead.Id)
 
 	if !strings.HasPrefix(messageNoTitleInDocumentHead.Description, "A <title> here is emitted") {
-		t.Fatalf("message description changed shape: %q", messageNoTitleInDocumentHead.Description)
+		test.Fatalf("message description changed shape: %q", messageNoTitleInDocumentHead.Description)
 	}
 }

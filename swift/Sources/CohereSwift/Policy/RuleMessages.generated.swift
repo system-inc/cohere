@@ -10,11 +10,12 @@ enum RuleMessages {
     }
 
     /* SHA-256 of the messages that reach Swift, resolved, which a test recomputes from policy/messages/ on disk. */
-    static let sourceDigest = "d93e1c1a6e46bd73b4fa5cd2a5990410dd97c91443738e967bd2406f2b118a03"
+    static let sourceDigest = "8d46e6ac620f698cdf75c8d4ba873ec5b1325a630a764ed1c69d1a9d35379b89"
 
     /* Every message here, as `Rule.id`, for the test that fails on one no rule renders. */
     static let all = [
         "AlwaysUseLowerCamelCase.alwaysUseLowerCamelCase",
+        "AlwaysUseLowerCamelCase.alwaysUseUpperCamelCaseForType",
         "AlwaysUseLowerCamelCase.incumbentFailed",
         "ConcurrencyNoCheckThenWrite.checkThenWrite",
         "ConcurrencyNoLostUpdate.lostUpdate",
@@ -66,6 +67,14 @@ enum RuleMessages {
                 id: "alwaysUseLowerCamelCase",
                 text:
                     #"\#(swiftFormatFinding). Swift spells values in lowerCamelCase and types in UpperCamelCase, so a reader tells which is which at a glance, and an underscore inside a name is a word boundary camel case already marks."#,
+            )
+        }
+
+        static func alwaysUseUpperCamelCaseForType(declaration: String, name: String) -> Message {
+            Message(
+                id: "alwaysUseUpperCamelCaseForType",
+                text:
+                    #"Rename the \#(declaration) '\#(name)' using UpperCamelCase. Swift spells values in lowerCamelCase and types in UpperCamelCase, so a reader tells which is which at a glance, and an underscore inside a name is a word boundary camel case already marks."#,
             )
         }
 
@@ -138,11 +147,11 @@ enum RuleMessages {
             )
         }
 
-        static func abbreviatedWordSegment(name: String, word: String, suggestion: String) -> Message {
+        static func abbreviatedWordSegment(name: String, word: String, advice: String) -> Message {
             Message(
                 id: "abbreviatedWordSegment",
                 text:
-                    #"Identifier "\#(name)" abbreviates "\#(word)". Use "\#(suggestion)". A name is written once and read everywhere, so the letters saved at the declaration are paid back at every call site by a reader who has to expand the abbreviation themselves and hope they expanded it the way the author meant."#,
+                    #"Identifier "\#(name)" abbreviates "\#(word)". \#(advice) A name is written once and read everywhere, so the letters saved at the declaration are paid back at every call site by a reader who has to expand the abbreviation themselves and hope they expanded it the way the author meant."#,
             )
         }
 

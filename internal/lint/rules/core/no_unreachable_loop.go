@@ -72,7 +72,7 @@ var messageUnreachableLoop = rule.Message{
 // the event already names its loop. `Builder.Current().Reachable` is the reachability question, at
 // both the loop statement and the loop event.
 //
-// # The reachability gate on the loop EVENT is load-bearing, and it is ours rather than upstream's
+// # The reachability gate on the loop event is load-bearing, and it is ours rather than upstream's
 //
 // Upstream gets reachability filtering for free, because ESLint's code path analysis does not raise
 // a segment-loop event out of an unreachable segment at all. Our builder does: `statements.go`
@@ -88,7 +88,7 @@ var messageUnreachableLoop = rule.Message{
 // current block is unreachable, so an unreachable `continue` raises no event. The gate is written
 // once, at the hook, and covers both.
 //
-// # Why the loop STATEMENT is gated too, and what it buys
+// # Why the loop statement is gated too, and what it buys
 //
 // A loop standing in unreachable code is skipped, "to avoid unnecessary complexity in the
 // implementation, or false positives otherwise" in upstream's words. So `function foo() { return;
@@ -115,32 +115,32 @@ var messageUnreachableLoop = rule.Message{
 // the file's, and emitting as they are found would interleave roots. `for (a in b) { while (foo) {
 // if(baz) { break; } else { break; } } break; }` is the case that pins it: upstream reports the
 // outer loop then the inner one, and `ExpectFindings` asserts ids in order.
-var NoUnreachableLoop = rule.Rule{
+var NoUnreachableLoop = rule.Rule[NoUnreachableLoopOptions]{
 	Name: "no-unreachable-loop",
 
 	// No type information. Reachability is a control-flow question over the syntax tree, and
 	// upstream asks its scope analysis nothing here either.
 	NeedsTypeChecker: false,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoUnreachableLoopOptions]) rule.Listeners {
 		// A rule configured as a bare severity is handed nil, which `options.(T)` turns into the
 		// zero value. Upstream's default is `{ ignore: [] }`, so the zero value is right, and the
 		// fallback is still written out rather than relied on.
 		settings := NoUnreachableLoopOptions{}
-		if decoded, configured := rule.OptionsAs[NoUnreachableLoopOptions](options); configured {
+		if decoded, configured := options.Read(); configured {
 			settings = decoded
 		}
 
 		// Every loop kind ignored means the rule has nothing to say, which upstream expresses by
 		// returning an empty visitor when the selector it would build is empty.
 		//
-		// This is a COST decision here rather than a behavioral one, and the sweep says so: with
+		// This is a cost decision here rather than a behavioral one, and the sweep says so: with
 		// this arm deleted the whole suite stays green, because the per-loop `Ignore` filter below
 		// already declines every kind in `unreachableLoopKindNames` whenever this predicate is
 		// true, and that map is exactly the set the predicate checks. There is no input on which
 		// the two versions report differently.
 		//
-		// It is kept because the two versions differ in what they DO: without it, a file's every
+		// It is kept because the two versions differ in what they do: without it, a file's every
 		// code-path root is enumerated and a control-flow graph built for each, all to hand every
 		// result to a filter that rejects it. Upstream declines the same work for the same reason.
 		if unreachableLoopIgnoresEverything(settings.Ignore) {
@@ -149,7 +149,7 @@ var NoUnreachableLoop = rule.Rule{
 
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
-				reportUnreachableLoops(ctx, node, settings)
+				reportUnreachableLoops(ruleContext, node, settings)
 			},
 		}
 	},
@@ -170,7 +170,7 @@ var unreachableLoopKindNames = map[ast.Kind]string{
 
 // unreachableLoopIgnoresEverything reports whether the option leaves no loop kind to judge.
 //
-// Upstream builds a selector string from the kinds NOT ignored and returns `{}` when it is empty.
+// Upstream builds a selector string from the kinds not ignored and returns `{}` when it is empty.
 // The corpus asserts this with an `ignore` naming all five.
 func unreachableLoopIgnoresEverything(ignore []string) bool {
 	for _, name := range unreachableLoopKindNames {
@@ -182,7 +182,7 @@ func unreachableLoopIgnoresEverything(ignore []string) bool {
 }
 
 // reportUnreachableLoops judges every loop in the file, one code-path root at a time.
-func reportUnreachableLoops(ctx rule.Context, sourceFile *ast.Node, settings NoUnreachableLoopOptions) {
+func reportUnreachableLoops(ruleContext rule.Context, sourceFile *ast.Node, settings NoUnreachableLoopOptions) {
 	// Recorded per loop node: whether the loop statement was reached at a reachable position, and
 	// whether any reachable event flowed back into it.
 	type loopState struct {
@@ -204,7 +204,7 @@ func reportUnreachableLoops(ctx rule.Context, sourceFile *ast.Node, settings NoU
 	// Only a root whose own code holds a loop this rule judges can report, so only those are built.
 	// On a cold ahra run that is 7.6% of roots and 30% of the blocks every root used to cost
 	// (#tmn9n27).
-	for _, summary := range codePathRoots(ctx, sourceFile) {
+	for _, summary := range codePathRoots(ruleContext, sourceFile) {
 		root := summary.Node
 		if !unreachableLoopRootHoldsJudgedLoop(summary, settings.Ignore) {
 			if CheckCodePathGates {
@@ -218,7 +218,7 @@ func reportUnreachableLoops(ctx rule.Context, sourceFile *ast.Node, settings NoU
 				if !isLoop || slices.Contains(settings.Ignore, name) {
 					return
 				}
-				// No guard here that the loop belongs to THIS root, and the absence is measured
+				// No guard here that the loop belongs to this root, and the absence is measured
 				// rather than assumed.
 				//
 				// The obvious worry is that a loop inside a nested function would be visited by the
@@ -248,8 +248,8 @@ func reportUnreachableLoops(ctx rule.Context, sourceFile *ast.Node, settings NoU
 				// `reachable` true and `state.reachable` stops being able to decline anything.
 				//
 				// Measured, and this is why it is written out. Deleting the else branch left all
-				// 1,636 fixtures green. It also flipped the `state.reachable` mutant from CAUGHT by
-				// 8 lines to SURVIVED, which is the sweep reporting a discrimination that had
+				// 1,636 fixtures green. It also flipped the `state.reachable` mutant from caught by
+				// 8 lines to survived, which is the sweep reporting a discrimination that had
 				// stopped existing while nothing else changed.
 				if builder.Current().Reachable {
 					stateFor(node).reachable = true
@@ -281,7 +281,7 @@ func reportUnreachableLoops(ctx rule.Context, sourceFile *ast.Node, settings NoU
 	})
 
 	for _, loop := range invalid {
-		ctx.ReportNode(loop, messageUnreachableLoop)
+		ruleContext.ReportNode(loop, messageUnreachableLoop)
 	}
 }
 
@@ -302,6 +302,8 @@ func unreachableLoopCheckSkipped(root *ast.Node, ignore []string) {
 	control_flow_graph.Build(root, control_flow_graph.Hooks[struct{}]{
 		Statement: func(builder *control_flow_graph.Builder[struct{}], node *ast.Node) {
 			if name, isLoop := unreachableLoopKindNames[node.Kind]; isLoop && !slices.Contains(ignore, name) {
+				// Invariant: the root index records every loop kind in a root's own code, the code this graph
+				// lays out, and the tests turn CheckCodePathGates on to hold the two to agreeing.
 				panic("no-unreachable-loop skipped a root whose graph holds a judged loop")
 			}
 		},

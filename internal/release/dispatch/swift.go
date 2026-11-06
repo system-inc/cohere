@@ -27,25 +27,11 @@ import (
 // then come from a binary no hash vouches for.
 const SwiftEngineOverrideVariable = "COHERE_SWIFT_ENGINE"
 
-// SwiftEngineDirectory is where the Swift engine's package lives inside the cohere module.
-func (paths Paths) SwiftEngineDirectory() string {
-	return filepath.Join(paths.ModuleDirectory, "swift")
-}
-
-// SwiftBuildDirectory is the scratch path the engine is built in.
+// buildSwiftProduct builds the engine package at packageDirectory and copies the product to binaryPath.
 //
-// Its own, rather than the package's `.build`: that one belongs to whoever is developing the engine,
-// and a build here taking its lock, or replacing its products mid-test, would be one process breaking
-// another for no reason a reader of either could see.
-func (paths Paths) SwiftBuildDirectory() string {
-	return filepath.Join(paths.CacheDirectory, "swift-build")
-}
-
-// SwiftEngineBinaryPath is where the engine built from inputs with this hash lives, named the way
-// BinaryPath names cohere's, platform included.
-func (paths Paths) SwiftEngineBinaryPath(hash string) string {
-	return filepath.Join(paths.BinaryDirectory(), fmt.Sprintf("cohere-swift-%s-%s-%s", runtime.GOOS, runtime.GOARCH, hash))
-}
+// A variable so a test can stand in for SwiftPM: a cold build compiles swift-syntax and swift-format,
+// measured at 225s, and the decisions worth testing are which tree is built and when, not SwiftPM.
+var buildSwiftProduct = buildSwiftProductWithSwiftPm
 
 // ResolveSwiftEngine returns the path to a cohere-swift binary matching the engine's sources and the
 // installed toolchain, building it when there is none.
@@ -69,27 +55,31 @@ func (paths Paths) SwiftEngineBinaryPath(hash string) string {
 //
 // The returned boolean reports whether a build ran.
 func ResolveSwiftEngine(paths Paths, commit string, contract int) (string, bool, error) {
-	toolchain, err := swiftToolchain()
-	if err != nil {
-		return "", false, err
+	toolchain, swiftToolchainError := swiftToolchain()
+	if swiftToolchainError != nil {
+		return "", false, swiftToolchainError
 	}
 
 	if commit != "" {
 		return resolveCommittedSwiftEngine(paths, commit, toolchain, contract)
 	}
 
-	hash, err := swiftEngineHash(paths.SwiftEngineDirectory(), toolchain)
-	if err != nil {
-		return "", false, err
+	hash, swiftEngineHashError := swiftEngineHash(paths.SwiftEngineDirectory(), toolchain)
+	if swiftEngineHashError != nil {
+		return "", false, swiftEngineHashError
 	}
 
 	binaryPath := paths.SwiftEngineBinaryPath(hash)
-	if _, err := os.Stat(binaryPath); err == nil {
+	if _, statError := os.Stat(binaryPath); statError == nil {
 		return binaryPath, false, nil
 	}
 
-	if err := buildSwiftProduct(paths.SwiftEngineDirectory(), paths.SwiftBuildDirectory(), binaryPath); err != nil {
-		return "", false, err
+	if buildSwiftProductError := buildSwiftProduct(
+		paths.SwiftEngineDirectory(),
+		paths.SwiftBuildDirectory(),
+		binaryPath,
+	); buildSwiftProductError != nil {
+		return "", false, buildSwiftProductError
 	}
 	return binaryPath, true, nil
 }
@@ -100,13 +90,18 @@ func ResolveSwiftEngine(paths Paths, commit string, contract int) (string, bool,
 // engine cannot be built and could not read the compiler's diagnostics if it were, so there is no
 // engine to fall back to: only a run that checks nothing.
 func swiftToolchain() (string, error) {
-	output, err := exec.Command("swift", "--version").Output()
-	if err != nil {
-		return "", fmt.Errorf("no Swift toolchain answered `swift --version` (%w), so the Swift engine cannot be built and nothing was checked", err)
+	output, outputError := exec.Command("swift", "--version").Output()
+	if outputError != nil {
+		return "", fmt.Errorf(
+			"no Swift toolchain answered `swift --version` (%w), so the Swift engine cannot be built and nothing was checked",
+			outputError,
+		)
 	}
 	identity := strings.Join(strings.Fields(string(output)), " ")
 	if identity == "" {
-		return "", fmt.Errorf("`swift --version` printed nothing, so the toolchain the Swift engine would link against is unknown")
+		return "", fmt.Errorf(
+			"`swift --version` printed nothing, so the toolchain the Swift engine would link against is unknown",
+		)
 	}
 	return identity, nil
 }
@@ -123,17 +118,17 @@ func swiftEngineHash(engineDirectory string, toolchain string) (string, error) {
 	}
 
 	sources := filepath.Join(engineDirectory, "Sources")
-	walkErr := filepath.WalkDir(sources, func(path string, entry fs.DirEntry, err error) error {
-		if err != nil {
-			return err
+	walkError := filepath.WalkDir(sources, func(path string, entry fs.DirEntry, pathError error) error {
+		if pathError != nil {
+			return pathError
 		}
 		if entry.Type().IsRegular() {
 			files = append(files, path)
 		}
 		return nil
 	})
-	if walkErr != nil {
-		return "", fmt.Errorf("listing the Swift engine's sources under %s: %w", sources, walkErr)
+	if walkError != nil {
+		return "", fmt.Errorf("listing the Swift engine's sources under %s: %w", sources, walkError)
 	}
 	if len(files) == 2 {
 		// The same guard CollectInputs keeps: an empty source set hashes to a stable digest for a tree
@@ -146,28 +141,22 @@ func swiftEngineHash(engineDirectory string, toolchain string) (string, error) {
 	fmt.Fprintf(digest, "toolchain\x00%s\x00", toolchain)
 	fmt.Fprintf(digest, "platform\x00%s/%s\x00", runtime.GOOS, runtime.GOARCH)
 	for _, path := range files {
-		contents, err := os.ReadFile(path)
-		if err != nil {
-			return "", fmt.Errorf("reading Swift engine input %s: %w", path, err)
+		contents, readError := os.ReadFile(path)
+		if readError != nil {
+			return "", fmt.Errorf("reading Swift engine input %s: %w", path, readError)
 		}
 		// The path relative to the package, rather than the base name Inputs.Compute uses: two files
 		// named `Rule.swift` in different directories are different inputs, and moving one between
 		// targets changes the binary.
-		relative, err := filepath.Rel(engineDirectory, path)
-		if err != nil {
-			return "", err
+		relative, relativePathError := filepath.Rel(engineDirectory, path)
+		if relativePathError != nil {
+			return "", relativePathError
 		}
 		fmt.Fprintf(digest, "file\x00%s\x00%d\x00", filepath.ToSlash(relative), len(contents))
 		digest.Write(contents)
 	}
 	return hex.EncodeToString(digest.Sum(nil))[:hashLength], nil
 }
-
-// buildSwiftProduct builds the engine package at packageDirectory and copies the product to binaryPath.
-//
-// A variable so a test can stand in for SwiftPM: a cold build compiles swift-syntax and swift-format,
-// measured at 225s, and the decisions worth testing are which tree is built and when, not SwiftPM.
-var buildSwiftProduct = buildSwiftProductWithSwiftPM
 
 // lastLines is a tool's kept output for an error: its last count lines, on lines of their own after the
 // error's, or nothing when it printed nothing.
@@ -204,18 +193,21 @@ func runBuildTool(command *exec.Cmd) error {
 
 // runBuildToolUntil is runBuildTool with the signals given, so a test can send one without signaling
 // itself.
+//
+// Mutates: command its process group and wait delay are set here, before it starts, so the caller hands it
+// over unstarted
 func runBuildToolUntil(command *exec.Cmd, signals <-chan os.Signal) error {
 	startInOwnGroup(command)
 	command.WaitDelay = buildToolWaitDelay
-	if err := command.Start(); err != nil {
-		return err
+	if startError := command.Start(); startError != nil {
+		return startError
 	}
 	done := make(chan error, 1)
 	go func() { done <- command.Wait() }()
 
 	select {
-	case err := <-done:
-		return err
+	case waitError := <-done:
+		return waitError
 	case received := <-signals:
 		signalGroup(command, syscall.SIGTERM)
 		select {
@@ -228,7 +220,7 @@ func runBuildToolUntil(command *exec.Cmd, signals <-chan os.Signal) error {
 	}
 }
 
-// buildSwiftProductWithSwiftPM builds the engine in release mode and copies the product to binaryPath.
+// buildSwiftProductWithSwiftPm builds the engine in release mode and copies the product to binaryPath.
 //
 // A cold build compiles swift-syntax and swift-format and takes minutes, so it announces itself on
 // stderr before starting, whatever the verbosity: a command that is silent for three minutes reads as
@@ -236,13 +228,15 @@ func runBuildToolUntil(command *exec.Cmd, signals <-chan os.Signal) error {
 //
 // Copied rather than linked, because the next build replaces the product in place, and a link would
 // turn every hash-named binary into whichever engine was built last.
-func buildSwiftProductWithSwiftPM(packageDirectory string, scratchDirectory string, binaryPath string) error {
-	if err := os.MkdirAll(filepath.Dir(binaryPath), 0o755); err != nil {
-		return fmt.Errorf("creating the binary cache directory: %w", err)
+func buildSwiftProductWithSwiftPm(packageDirectory string, scratchDirectory string, binaryPath string) error {
+	if createDirectoryError := os.MkdirAll(filepath.Dir(binaryPath), 0o755); createDirectoryError != nil {
+		return fmt.Errorf("creating the binary cache directory: %w", createDirectoryError)
 	}
 
-	Report.Step("cohere: building the Swift engine from %s (its sources or the toolchain changed; a cold build takes minutes)",
-		packageDirectory)
+	Report.Step(
+		"cohere: building the Swift engine from %s (its sources or the toolchain changed; a cold build takes minutes)",
+		packageDirectory,
+	)
 
 	// `--manifest-cache none`, because the manifest reads the tree's git state into the engine's
 	// `sourceTreeModified`, and SwiftPM's shared manifest cache answers it from an earlier evaluation of
@@ -264,19 +258,28 @@ func buildSwiftProductWithSwiftPM(packageDirectory string, scratchDirectory stri
 	if stream := Report.ToolOutput(); stream != nil {
 		build.Stdout, build.Stderr = stream, stream
 	}
-	if err := runBuildTool(build); err != nil {
-		return fmt.Errorf("building the Swift engine (swift %s): %w%s", strings.Join(arguments, " "), err, lastLines(kept.String(), 40))
+	if runBuildToolError := runBuildTool(build); runBuildToolError != nil {
+		return fmt.Errorf(
+			"building the Swift engine (swift %s): %w%s",
+			strings.Join(arguments, " "),
+			runBuildToolError,
+			lastLines(kept.String(), 40),
+		)
 	}
 
-	binPath, err := exec.Command("swift", append(arguments, "--show-bin-path")...).Output()
-	if err != nil {
-		return fmt.Errorf("asking SwiftPM where it put the Swift engine: %w", err)
+	binPath, outputError := exec.Command("swift", append(arguments, "--show-bin-path")...).Output()
+	if outputError != nil {
+		return fmt.Errorf("asking SwiftPM where it put the Swift engine: %w", outputError)
 	}
 	product := filepath.Join(strings.TrimSpace(string(binPath)), "cohere-swift")
 
 	// The build said it worked; the file is what gets run. The same gap build() closes for cohere.
-	if err := copyExecutable(product, binaryPath); err != nil {
-		return fmt.Errorf("swift build reported success but the engine could not be taken from %s: %w", product, err)
+	if copyExecutableError := copyExecutable(product, binaryPath); copyExecutableError != nil {
+		return fmt.Errorf(
+			"swift build reported success but the engine could not be taken from %s: %w",
+			product,
+			copyExecutableError,
+		)
 	}
 	return nil
 }
@@ -284,30 +287,34 @@ func buildSwiftProductWithSwiftPM(packageDirectory string, scratchDirectory stri
 // copyExecutable copies a file to a new path through a temporary name in the same directory, so a
 // concurrent run never sees, and execs, a half-written binary.
 func copyExecutable(source string, destination string) error {
-	input, err := os.Open(source)
-	if err != nil {
-		return err
+	input, openError := os.Open(source)
+	if openError != nil {
+		return openError
 	}
-	defer input.Close()
+	defer input.Close() // Ignored: the source was only read, so a failed close loses nothing.
 
-	temporary, err := os.CreateTemp(filepath.Dir(destination), filepath.Base(destination)+".partial-*")
-	if err != nil {
-		return err
+	temporary, temporaryFileError := os.CreateTemp(filepath.Dir(destination), filepath.Base(destination)+".partial-*")
+	if temporaryFileError != nil {
+		return temporaryFileError
 	}
 	// Removed on every failure path below. After the rename the name no longer exists and the call
 	// does nothing.
+	// Ignored: after the rename it fails by design, and on a failure path the error returned is the one that says
+	// what went wrong.
 	defer os.Remove(temporary.Name())
 
-	if _, err := io.Copy(temporary, input); err != nil {
+	if _, copyError := io.Copy(temporary, input); copyError != nil {
+		// Ignored: the copy failed and its error is the one returned, and the partial file is removed above.
 		temporary.Close()
-		return err
+		return copyError
 	}
-	if err := temporary.Chmod(0o755); err != nil {
+	if chmodError := temporary.Chmod(0o755); chmodError != nil {
+		// Ignored: the chmod failed and its error is the one returned, and the partial file is removed above.
 		temporary.Close()
-		return err
+		return chmodError
 	}
-	if err := temporary.Close(); err != nil {
-		return err
+	if closeError := temporary.Close(); closeError != nil {
+		return closeError
 	}
 	return os.Rename(temporary.Name(), destination)
 }

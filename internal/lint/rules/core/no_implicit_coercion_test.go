@@ -15,20 +15,20 @@ const noImplicitCoercionFile = "/repository/source/NoImplicitCoercion.ts"
 
 // decodedNoImplicitCoercionOptions routes a fixture's options through the rule's own decoder.
 //
-// Three of the four booleans default to TRUE, so a struct built by hand in a fixture would carry
+// Three of the four booleans default to `true`, so a struct built by hand in a fixture would carry
 // non-nil pointers and every case would pass while the live config's bare "error" still handed the
 // rule a nil it read as three judgments switched off. An empty string here is that bare
-// configuration.
-func decodedNoImplicitCoercionOptions(t *testing.T, raw string) any {
-	t.Helper()
+// configuration, so the rule runs unconfigured.
+func decodedNoImplicitCoercionOptions(test *testing.T, raw string) rule.Given[NoImplicitCoercionOptions] {
+	test.Helper()
 	if raw == "" {
-		return nil
+		return rule.Given[NoImplicitCoercionOptions]{}
 	}
-	options, err := DecodeNoImplicitCoercionOptions(json.RawMessage(raw))
-	if err != nil {
-		t.Fatalf("the decoder refused %s: %v", raw, err)
+	options, decodeNoImplicitCoercionOptionsError := DecodeNoImplicitCoercionOptions(json.RawMessage(raw))
+	if decodeNoImplicitCoercionOptionsError != nil {
+		test.Fatalf("the decoder refused %s: %v", raw, decodeNoImplicitCoercionOptionsError)
 	}
-	return options
+	return rule.Configured(options)
 }
 
 // The corpus is ESLint's own, at `tests/lib/rules/no-implicit-coercion.js`, and it was not
@@ -38,7 +38,7 @@ func decodedNoImplicitCoercionOptions(t *testing.T, raw string) any {
 // id, on whether a fix is applicable, and on the fix text.
 //
 // One case is omitted and named here rather than dropped silently: upstream writes `!!(foo + bar)`
-// TWICE with opposite verdicts, separated only by `languageOptions.globals.Boolean = "off"`. The
+// twice with opposite verdicts, separated only by `languageOptions.globals.Boolean = "off"`. The
 // harness has no way to unset a global, so the second is inexpressible. It is the same judgment the
 // shadowing cases below cover from the other side, and the rule's own decision is pinned by
 // TestNoImplicitCoercionWithholdsTheFixWhenBooleanIsShadowed.
@@ -46,8 +46,8 @@ func decodedNoImplicitCoercionOptions(t *testing.T, raw string) any {
 // Of the 47 imported reporting cases, 4 carry an applicable fix and 39 offer a suggestion instead.
 // Asserting only the ids would leave both surfaces unchecked, so this asserts the repair on the
 // fixable cases, the suggested rewrite on the rest, and the rendered message text on all of them.
-func TestNoImplicitCoercionFires(t *testing.T) {
-	t.Parallel()
+func TestNoImplicitCoercionFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name             string
@@ -65,60 +65,303 @@ func TestNoImplicitCoercionFires(t *testing.T) {
 		{"+(a, b)", "", []string{"implicitCoercion"}, []string{"Number((a, b))"}, "", false, "Number((a, b))", true},
 		{"-(-(a, b))", "", []string{"implicitCoercion"}, []string{"Number((a, b))"}, "", false, "Number((a, b))", true},
 		{"(a, b) * 1", "", []string{"implicitCoercion"}, []string{"Number((a, b))"}, "", false, "Number((a, b))", true},
-		{"(a, b) + \"\"", "", []string{"implicitCoercion"}, []string{"String((a, b))"}, "", false, "String((a, b))", true},
-		{"`${(a, b)}`", "{\"disallowTemplateShorthand\": true}", []string{"implicitCoercion"}, []string{"String((a, b))"}, "", false, "String((a, b))", true},
-		{"!!(foo + bar)", "", []string{"implicitCoercion"}, []string{"Boolean(foo + bar)"}, "Boolean(foo + bar)", true, "", false},
-		{"!!(foo + bar); var Boolean = null", "", []string{"implicitCoercion"}, []string{"Boolean(foo + bar)"}, "", false, "Boolean(foo + bar); var Boolean = null", true},
+		{
+			"(a, b) + \"\"",
+			"",
+			[]string{"implicitCoercion"},
+			[]string{"String((a, b))"},
+			"",
+			false,
+			"String((a, b))",
+			true,
+		},
+		{
+			"`${(a, b)}`",
+			"{\"disallowTemplateShorthand\": true}",
+			[]string{"implicitCoercion"},
+			[]string{"String((a, b))"},
+			"",
+			false,
+			"String((a, b))",
+			true,
+		},
+		{
+			"!!(foo + bar)",
+			"",
+			[]string{"implicitCoercion"},
+			[]string{"Boolean(foo + bar)"},
+			"Boolean(foo + bar)",
+			true,
+			"",
+			false,
+		},
+		{
+			"!!(foo + bar); var Boolean = null",
+			"",
+			[]string{"implicitCoercion"},
+			[]string{"Boolean(foo + bar)"},
+			"",
+			false,
+			"Boolean(foo + bar); var Boolean = null",
+			true,
+		},
 		{"~foo.indexOf(1)", "", []string{"implicitCoercion"}, []string{"foo.indexOf(1) !== -1"}, "", false, "", false},
-		{"~foo.bar.indexOf(2)", "", []string{"implicitCoercion"}, []string{"foo.bar.indexOf(2) !== -1"}, "", false, "", false},
+		{
+			"~foo.bar.indexOf(2)",
+			"",
+			[]string{"implicitCoercion"},
+			[]string{"foo.bar.indexOf(2) !== -1"},
+			"",
+			false,
+			"",
+			false,
+		},
 		{"+foo", "", []string{"implicitCoercion"}, []string{"Number(foo)"}, "", false, "Number(foo)", true},
 		{"-(-foo)", "", []string{"implicitCoercion"}, []string{"Number(foo)"}, "", false, "Number(foo)", true},
 		{"+foo.bar", "", []string{"implicitCoercion"}, []string{"Number(foo.bar)"}, "", false, "Number(foo.bar)", true},
 		{"1*foo", "", []string{"implicitCoercion"}, []string{"Number(foo)"}, "", false, "Number(foo)", true},
 		{"foo*1", "", []string{"implicitCoercion"}, []string{"Number(foo)"}, "", false, "Number(foo)", true},
-		{"1*foo.bar", "", []string{"implicitCoercion"}, []string{"Number(foo.bar)"}, "", false, "Number(foo.bar)", true},
-		{"foo.bar-0", "", []string{"implicitCoercion"}, []string{"Number(foo.bar)"}, "", false, "Number(foo.bar)", true},
+		{
+			"1*foo.bar",
+			"",
+			[]string{"implicitCoercion"},
+			[]string{"Number(foo.bar)"},
+			"",
+			false,
+			"Number(foo.bar)",
+			true,
+		},
+		{
+			"foo.bar-0",
+			"",
+			[]string{"implicitCoercion"},
+			[]string{"Number(foo.bar)"},
+			"",
+			false,
+			"Number(foo.bar)",
+			true,
+		},
 		{"\"\"+foo", "", []string{"implicitCoercion"}, []string{"String(foo)"}, "", false, "String(foo)", true},
 		{"``+foo", "", []string{"implicitCoercion"}, []string{"String(foo)"}, "", false, "String(foo)", true},
 		{"foo+\"\"", "", []string{"implicitCoercion"}, []string{"String(foo)"}, "", false, "String(foo)", true},
 		{"foo+``", "", []string{"implicitCoercion"}, []string{"String(foo)"}, "", false, "String(foo)", true},
-		{"\"\"+foo.bar", "", []string{"implicitCoercion"}, []string{"String(foo.bar)"}, "", false, "String(foo.bar)", true},
-		{"``+foo.bar", "", []string{"implicitCoercion"}, []string{"String(foo.bar)"}, "", false, "String(foo.bar)", true},
-		{"foo.bar+\"\"", "", []string{"implicitCoercion"}, []string{"String(foo.bar)"}, "", false, "String(foo.bar)", true},
-		{"foo.bar+``", "", []string{"implicitCoercion"}, []string{"String(foo.bar)"}, "", false, "String(foo.bar)", true},
-		{"`${foo}`", "{\"disallowTemplateShorthand\": true}", []string{"implicitCoercion"}, []string{"String(foo)"}, "", false, "String(foo)", true},
-		{"`\\\n${foo}`", "{\"disallowTemplateShorthand\": true}", []string{"implicitCoercion"}, []string{"String(foo)"}, "", false, "String(foo)", true},
-		{"`${foo}\\\n`", "{\"disallowTemplateShorthand\": true}", []string{"implicitCoercion"}, []string{"String(foo)"}, "", false, "String(foo)", true},
-		{"foo += \"\"", "", []string{"implicitCoercion"}, []string{"foo = String(foo)"}, "", false, "foo = String(foo)", true},
-		{"foo += ``", "", []string{"implicitCoercion"}, []string{"foo = String(foo)"}, "", false, "foo = String(foo)", true},
-		{"var a = !!foo", "{\"boolean\": true, \"allow\": [\"~\"]}", []string{"implicitCoercion"}, []string{"Boolean(foo)"}, "var a = Boolean(foo)", true, "", false},
-		{"var a = ~foo.indexOf(1)", "{\"boolean\": true, \"allow\": [\"!!\"]}", []string{"implicitCoercion"}, []string{"foo.indexOf(1) !== -1"}, "", false, "", false},
-		{"var a = 1 * foo", "{\"boolean\": true, \"allow\": [\"+\"]}", []string{"implicitCoercion"}, []string{"Number(foo)"}, "", false, "var a = Number(foo)", true},
-		{"var a = +foo", "{\"boolean\": true, \"allow\": [\"*\"]}", []string{"implicitCoercion"}, []string{"Number(foo)"}, "", false, "var a = Number(foo)", true},
-		{"var a = \"\" + foo", "{\"boolean\": true, \"allow\": [\"*\"]}", []string{"implicitCoercion"}, []string{"String(foo)"}, "", false, "var a = String(foo)", true},
-		{"var a = `` + foo", "{\"boolean\": true, \"allow\": [\"*\"]}", []string{"implicitCoercion"}, []string{"String(foo)"}, "", false, "var a = String(foo)", true},
-		{"typeof+foo", "", []string{"implicitCoercion"}, []string{"Number(foo)"}, "", false, "typeof Number(foo)", true},
-		{"typeof +foo", "", []string{"implicitCoercion"}, []string{"Number(foo)"}, "", false, "typeof Number(foo)", true},
-		{"let x ='' + 1n;", "", []string{"implicitCoercion"}, []string{"String(1n)"}, "", false, "let x =String(1n);", true},
+		{
+			"\"\"+foo.bar",
+			"",
+			[]string{"implicitCoercion"},
+			[]string{"String(foo.bar)"},
+			"",
+			false,
+			"String(foo.bar)",
+			true,
+		},
+		{
+			"``+foo.bar",
+			"",
+			[]string{"implicitCoercion"},
+			[]string{"String(foo.bar)"},
+			"",
+			false,
+			"String(foo.bar)",
+			true,
+		},
+		{
+			"foo.bar+\"\"",
+			"",
+			[]string{"implicitCoercion"},
+			[]string{"String(foo.bar)"},
+			"",
+			false,
+			"String(foo.bar)",
+			true,
+		},
+		{
+			"foo.bar+``",
+			"",
+			[]string{"implicitCoercion"},
+			[]string{"String(foo.bar)"},
+			"",
+			false,
+			"String(foo.bar)",
+			true,
+		},
+		{
+			"`${foo}`",
+			"{\"disallowTemplateShorthand\": true}",
+			[]string{"implicitCoercion"},
+			[]string{"String(foo)"},
+			"",
+			false,
+			"String(foo)",
+			true,
+		},
+		{
+			"`\\\n${foo}`",
+			"{\"disallowTemplateShorthand\": true}",
+			[]string{"implicitCoercion"},
+			[]string{"String(foo)"},
+			"",
+			false,
+			"String(foo)",
+			true,
+		},
+		{
+			"`${foo}\\\n`",
+			"{\"disallowTemplateShorthand\": true}",
+			[]string{"implicitCoercion"},
+			[]string{"String(foo)"},
+			"",
+			false,
+			"String(foo)",
+			true,
+		},
+		{
+			"foo += \"\"",
+			"",
+			[]string{"implicitCoercion"},
+			[]string{"foo = String(foo)"},
+			"",
+			false,
+			"foo = String(foo)",
+			true,
+		},
+		{
+			"foo += ``",
+			"",
+			[]string{"implicitCoercion"},
+			[]string{"foo = String(foo)"},
+			"",
+			false,
+			"foo = String(foo)",
+			true,
+		},
+		{
+			"var a = !!foo",
+			"{\"boolean\": true, \"allow\": [\"~\"]}",
+			[]string{"implicitCoercion"},
+			[]string{"Boolean(foo)"},
+			"var a = Boolean(foo)",
+			true,
+			"",
+			false,
+		},
+		{
+			"var a = ~foo.indexOf(1)",
+			"{\"boolean\": true, \"allow\": [\"!!\"]}",
+			[]string{"implicitCoercion"},
+			[]string{"foo.indexOf(1) !== -1"},
+			"",
+			false,
+			"",
+			false,
+		},
+		{
+			"var a = 1 * foo",
+			"{\"boolean\": true, \"allow\": [\"+\"]}",
+			[]string{"implicitCoercion"},
+			[]string{"Number(foo)"},
+			"",
+			false,
+			"var a = Number(foo)",
+			true,
+		},
+		{
+			"var a = +foo",
+			"{\"boolean\": true, \"allow\": [\"*\"]}",
+			[]string{"implicitCoercion"},
+			[]string{"Number(foo)"},
+			"",
+			false,
+			"var a = Number(foo)",
+			true,
+		},
+		{
+			"var a = \"\" + foo",
+			"{\"boolean\": true, \"allow\": [\"*\"]}",
+			[]string{"implicitCoercion"},
+			[]string{"String(foo)"},
+			"",
+			false,
+			"var a = String(foo)",
+			true,
+		},
+		{
+			"var a = `` + foo",
+			"{\"boolean\": true, \"allow\": [\"*\"]}",
+			[]string{"implicitCoercion"},
+			[]string{"String(foo)"},
+			"",
+			false,
+			"var a = String(foo)",
+			true,
+		},
+		{
+			"typeof+foo",
+			"",
+			[]string{"implicitCoercion"},
+			[]string{"Number(foo)"},
+			"",
+			false,
+			"typeof Number(foo)",
+			true,
+		},
+		{
+			"typeof +foo",
+			"",
+			[]string{"implicitCoercion"},
+			[]string{"Number(foo)"},
+			"",
+			false,
+			"typeof Number(foo)",
+			true,
+		},
+		{
+			"let x ='' + 1n;",
+			"",
+			[]string{"implicitCoercion"},
+			[]string{"String(1n)"},
+			"",
+			false,
+			"let x =String(1n);",
+			true,
+		},
 		{"~foo?.indexOf(1)", "", []string{"implicitCoercion"}, []string{"foo?.indexOf(1) >= 0"}, "", false, "", false},
-		{"~(foo?.indexOf)(1)", "", []string{"implicitCoercion"}, []string{"(foo?.indexOf)(1) !== -1"}, "", false, "", false},
+		{
+			"~(foo?.indexOf)(1)",
+			"",
+			[]string{"implicitCoercion"},
+			[]string{"(foo?.indexOf)(1) !== -1"},
+			"",
+			false,
+			"",
+			false,
+		},
 		{"1 * a / 2", "", []string{"implicitCoercion"}, []string{"Number(a)"}, "", false, "Number(a) / 2", true},
 		{"(a * 1) / 2", "", []string{"implicitCoercion"}, []string{"Number(a)"}, "", false, "(Number(a)) / 2", true},
-		{"a * 1 / (b * 1)", "", []string{"implicitCoercion"}, []string{"Number(b)"}, "", false, "a * 1 / (Number(b))", true},
+		{
+			"a * 1 / (b * 1)",
+			"",
+			[]string{"implicitCoercion"},
+			[]string{"Number(b)"},
+			"",
+			false,
+			"a * 1 / (Number(b))",
+			true,
+		},
 		{"a * 1 + 2", "", []string{"implicitCoercion"}, []string{"Number(a)"}, "", false, "Number(a) + 2", true},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name+" ["+testCase.options+"]", func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoImplicitCoercion, noImplicitCoercionFile,
-				testCase.name, decodedNoImplicitCoercionOptions(t, testCase.options))
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name+" ["+testCase.options+"]", func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedGiven(test, NoImplicitCoercion, noImplicitCoercionFile,
+				testCase.name, decodedNoImplicitCoercionOptions(test, testCase.options))
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 
 			for index, diagnostic := range result.Diagnostics {
 				want := noImplicitCoercionMessage(testCase.wantRecommends[index]).Description
 				if got := diagnostic.Message.Description; got != want {
-					t.Fatalf("finding %d message:\n got %q\nwant %q", index, got, want)
+					test.Fatalf("finding %d message:\n got %q\nwant %q", index, got, want)
 				}
 			}
 
@@ -129,19 +372,19 @@ func TestNoImplicitCoercionFires(t *testing.T) {
 
 			if testCase.fixable {
 				if fixCount == 0 {
-					t.Fatalf("upstream fixes this case and the rule proposed no repair")
+					test.Fatalf("upstream fixes this case and the rule proposed no repair")
 				}
 				// The typed harness writes each fixture as `TrimSpace(source)+"\n"`
 				// (`internal/rule_testing/program.go:160`), and `ExpectFixedSource` compares the
-				// WHOLE rewritten file, so upstream's `output` has to be transformed the same way
+				// whole rewritten file, so upstream's `output` has to be transformed the same way
 				// the input was. Padding the rule to make the comparison line up would be the
 				// wrong repair.
-				rule_testing.ExpectFixedSource(t, result, strings.TrimSpace(testCase.wantFixed)+"\n")
+				rule_testing.ExpectFixedSource(test, result, strings.TrimSpace(testCase.wantFixed)+"\n")
 				return
 			}
 
 			if fixCount != 0 {
-				t.Fatalf("upstream declines to fix this case, but the rule proposed %d fix(es)", fixCount)
+				test.Fatalf("upstream declines to fix this case, but the rule proposed %d fix(es)", fixCount)
 			}
 
 			// The suggestion surface. `ExpectFixedSource` covers fixes only, so a suggestion's
@@ -149,22 +392,26 @@ func TestNoImplicitCoercionFires(t *testing.T) {
 			suggestions := result.Diagnostics[0].Suggestions
 			if !testCase.offersSuggestion {
 				if len(suggestions) != 0 {
-					t.Fatalf("upstream offers no suggestion here, got %d", len(suggestions))
+					test.Fatalf("upstream offers no suggestion here, got %d", len(suggestions))
 				}
 				return
 			}
 			if len(suggestions) != 1 {
-				t.Fatalf("expected one suggestion, got %d", len(suggestions))
+				test.Fatalf("expected one suggestion, got %d", len(suggestions))
 			}
 			// Same transform for the suggestion surface: the fixes are computed against the file
 			// the harness wrote, not against the Go literal.
 			applied := noImplicitCoercionApplyFixes(strings.TrimSpace(testCase.name)+"\n", suggestions[0].Fixes)
 			if applied != strings.TrimSpace(testCase.wantSuggested)+"\n" {
-				t.Fatalf("the suggested rewrite:\n got %q\nwant %q", applied, strings.TrimSpace(testCase.wantSuggested)+"\n")
+				test.Fatalf(
+					"the suggested rewrite:\n got %q\nwant %q",
+					applied,
+					strings.TrimSpace(testCase.wantSuggested)+"\n",
+				)
 			}
 			wantSuggestionMessage := noImplicitCoercionSuggestionMessage(testCase.wantRecommends[0]).Description
 			if got := suggestions[0].Message.Description; got != wantSuggestionMessage {
-				t.Fatalf("suggestion message:\n got %q\nwant %q", got, wantSuggestionMessage)
+				test.Fatalf("suggestion message:\n got %q\nwant %q", got, wantSuggestionMessage)
 			}
 		})
 	}
@@ -172,15 +419,16 @@ func TestNoImplicitCoercionFires(t *testing.T) {
 
 // noImplicitCoercionApplyFixes replays a suggestion's edits back to front.
 func noImplicitCoercionApplyFixes(source string, fixes []rule.Fix) string {
+	fixed := source
 	for index := len(fixes) - 1; index >= 0; index-- {
 		fix := fixes[index]
-		source = source[:fix.Range.Pos()] + fix.Text + source[fix.Range.End():]
+		fixed = fixed[:fix.Range.Pos()] + fix.Text + fixed[fix.Range.End():]
 	}
-	return source
+	return fixed
 }
 
-func TestNoImplicitCoercionStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoImplicitCoercionStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name    string
@@ -282,11 +530,11 @@ func TestNoImplicitCoercionStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name+" ["+testCase.options+"]", func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoImplicitCoercion, noImplicitCoercionFile,
-				testCase.name, decodedNoImplicitCoercionOptions(t, testCase.options))
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name+" ["+testCase.options+"]", func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedGiven(test, NoImplicitCoercion, noImplicitCoercionFile,
+				testCase.name, decodedNoImplicitCoercionOptions(test, testCase.options))
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -301,9 +549,9 @@ func TestNoImplicitCoercionStaysSilent(t *testing.T) {
 // and each was measured against the installed build at 10.8.1 before being written down.
 //
 // The last row is the one that separates a scope-aware answer from a textual one: a shadow in a
-// SIBLING function does not reach the expression, so the fix stands.
-func TestNoImplicitCoercionWithholdsTheFixWhenBooleanIsShadowed(t *testing.T) {
-	t.Parallel()
+// sibling function does not reach the expression, so the fix stands.
+func TestNoImplicitCoercionWithholdsTheFixWhenBooleanIsShadowed(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name       string
@@ -318,25 +566,25 @@ func TestNoImplicitCoercionWithholdsTheFixWhenBooleanIsShadowed(t *testing.T) {
 		{"a class shadow", "class Boolean {} var b = !!foo;", false},
 		{"a shadow in a sibling scope only", "function g(Boolean: any) {}\nvar b = !!foo;", true},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoImplicitCoercion, noImplicitCoercionFile,
-				testCase.sourceText, nil)
-			rule_testing.ExpectFindings(t, result, "implicitCoercion")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoImplicitCoercion, noImplicitCoercionFile,
+				testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "implicitCoercion")
 
 			fixes := len(result.Diagnostics[0].Fixes)
 			suggestions := len(result.Diagnostics[0].Suggestions)
 			if testCase.wantFix {
 				if fixes == 0 {
-					t.Fatalf("expected an applicable fix, got %d fixes and %d suggestions", fixes, suggestions)
+					test.Fatalf("expected an applicable fix, got %d fixes and %d suggestions", fixes, suggestions)
 				}
 				return
 			}
 			if fixes != 0 {
-				t.Fatalf("the fix must be withheld when Boolean is shadowed, got %d fixes", fixes)
+				test.Fatalf("the fix must be withheld when Boolean is shadowed, got %d fixes", fixes)
 			}
 			if suggestions != 1 {
-				t.Fatalf("expected the repair to be offered as a suggestion instead, got %d", suggestions)
+				test.Fatalf("expected the repair to be offered as a suggestion instead, got %d", suggestions)
 			}
 		})
 	}
@@ -350,10 +598,10 @@ func TestNoImplicitCoercionWithholdsTheFixWhenBooleanIsShadowed(t *testing.T) {
 // parentheses twice, as `Boolean((foo + bar))`.
 //
 // The last two rows are the sharp end and are not in upstream's corpus as a pair: parenthesizing a
-// CALLEE ends an optional chain, so the recommendation moves from `>= 0` back to `!== -1`. Measured
+// callee ends an optional chain, so the recommendation moves from `>= 0` back to `!== -1`. Measured
 // against the installed build, which recommends exactly that for each.
-func TestNoImplicitCoercionParenthesesShapes(t *testing.T) {
-	t.Parallel()
+func TestNoImplicitCoercionParenthesesShapes(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name           string
@@ -366,14 +614,14 @@ func TestNoImplicitCoercionParenthesesShapes(t *testing.T) {
 		{"a chained indexOf", "~foo?.indexOf(1)", "foo?.indexOf(1) >= 0"},
 		{"a chained indexOf whose callee is parenthesized", "~(foo?.indexOf)(1)", "(foo?.indexOf)(1) !== -1"},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoImplicitCoercion, noImplicitCoercionFile,
-				testCase.sourceText, nil)
-			rule_testing.ExpectFindings(t, result, "implicitCoercion")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoImplicitCoercion, noImplicitCoercionFile,
+				testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "implicitCoercion")
 			want := noImplicitCoercionMessage(testCase.wantRecommends).Description
 			if got := result.Diagnostics[0].Message.Description; got != want {
-				t.Fatalf("message:\n got %q\nwant %q", got, want)
+				test.Fatalf("message:\n got %q\nwant %q", got, want)
 			}
 		})
 	}
@@ -390,8 +638,8 @@ func TestNoImplicitCoercionParenthesesShapes(t *testing.T) {
 // The static-key rule is what separates the third row from the fourth: `foo['indexOf'](x)` names
 // the property statically and reports, while `foo[indexOf](x)` computes the name at runtime and
 // cannot be recognised.
-func TestNoImplicitCoercionIndexOfShapes(t *testing.T) {
-	t.Parallel()
+func TestNoImplicitCoercionIndexOfShapes(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name           string
@@ -407,26 +655,26 @@ func TestNoImplicitCoercionIndexOfShapes(t *testing.T) {
 		{"the property without a call", "~foo.indexOf", "", false},
 		{"a bare operand", "~foo", "", false},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoImplicitCoercion, noImplicitCoercionFile,
-				testCase.sourceText, nil)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoImplicitCoercion, noImplicitCoercionFile,
+				testCase.sourceText)
 			if !testCase.wantReport {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, "implicitCoercion")
+			rule_testing.ExpectFindings(test, result, "implicitCoercion")
 			want := noImplicitCoercionMessage(testCase.wantRecommends).Description
 			if got := result.Diagnostics[0].Message.Description; got != want {
-				t.Fatalf("message:\n got %q\nwant %q", got, want)
+				test.Fatalf("message:\n got %q\nwant %q", got, want)
 			}
 			// This arm offers neither a fix nor a suggestion: the reader has to choose the
 			// comparison, so upstream reports it bare.
 			if fixes := len(result.Diagnostics[0].Fixes); fixes != 0 {
-				t.Fatalf("the indexOf arm must not carry a fix, got %d", fixes)
+				test.Fatalf("the indexOf arm must not carry a fix, got %d", fixes)
 			}
 			if suggestions := len(result.Diagnostics[0].Suggestions); suggestions != 0 {
-				t.Fatalf("the indexOf arm must not carry a suggestion, got %d", suggestions)
+				test.Fatalf("the indexOf arm must not carry a suggestion, got %d", suggestions)
 			}
 		})
 	}
@@ -441,15 +689,15 @@ func TestNoImplicitCoercionIndexOfShapes(t *testing.T) {
 // this parser has one, since `&& || ??` are a `LogicalExpression` and the comma operator is a
 // `SequenceExpression`, neither of which upstream's test excludes.
 //
-// So a kind test alone is wrong in BOTH directions, and each direction cost a real defect. Without
+// So a kind test alone is wrong in both directions, and each direction cost a real defect. Without
 // the unwrap the rule reported `(index + 1) * 1.0` in modules/tasks, which the installed build
 // leaves alone; that one was found on the real tree rather than in the corpus, which writes no
 // parenthesized operand here. With the unwrap but without the operator test, `(a, b) * 1` went
-// silent, and that one IS in the corpus.
+// silent, and that one is in the corpus.
 //
 // Every row was measured against the installed build at 10.8.1.
-func TestNoImplicitCoercionMultiplyByOneOperandShapes(t *testing.T) {
-	t.Parallel()
+func TestNoImplicitCoercionMultiplyByOneOperandShapes(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name           string
@@ -465,24 +713,24 @@ func TestNoImplicitCoercionMultiplyByOneOperandShapes(t *testing.T) {
 		{"a parenthesized call reports", "(f()) * 1", "Number(f())", true},
 		{"the real-tree shape that started this", "const position = (index + 1) * 1.0;", "", false},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoImplicitCoercion, noImplicitCoercionFile,
-				testCase.sourceText, nil)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoImplicitCoercion, noImplicitCoercionFile,
+				testCase.sourceText)
 			if !testCase.wantReport {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, "implicitCoercion")
+			rule_testing.ExpectFindings(test, result, "implicitCoercion")
 			want := noImplicitCoercionMessage(testCase.wantRecommends).Description
 			if got := result.Diagnostics[0].Message.Description; got != want {
-				t.Fatalf("message:\n got %q\nwant %q", got, want)
+				test.Fatalf("message:\n got %q\nwant %q", got, want)
 			}
 		})
 	}
 }
 
-// TestNoImplicitCoercionMultilineOperand pins the shape whose RECOMMENDATION spans lines.
+// TestNoImplicitCoercionMultilineOperand pins the shape whose recommendation spans lines.
 //
 // Upstream writes every case on one line, so no imported fixture produces a recommendation
 // containing a newline. That matters beyond the rule: the message embeds the operand's own source
@@ -497,8 +745,8 @@ func TestNoImplicitCoercionMultiplyByOneOperandShapes(t *testing.T) {
 //
 // The fixtures below are the rule's half of that. Nothing here can catch an extraction bug, which
 // is the point worth remembering: the defect was never in the rule.
-func TestNoImplicitCoercionMultilineOperand(t *testing.T) {
-	t.Parallel()
+func TestNoImplicitCoercionMultilineOperand(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name           string
@@ -509,21 +757,21 @@ func TestNoImplicitCoercionMultilineOperand(t *testing.T) {
 		{"a newline after the opening parenthesis only", "var x = !!(\n\ta && b);", "Boolean(a && b)"},
 		{"a newline before the closing parenthesis only", "var x = !!(a && b\n);", "Boolean(a && b)"},
 		// The tree's shape at DialogRoot.tsx:175, with operands that are not already booleans. Its
-		// real operand, `b === undefined && c === undefined && !d`, IS a boolean, so the rule is now
+		// real operand, `b === undefined && c === undefined && !d`, is a boolean, so the rule is now
 		// silent there (#vsy2eym) and that shape lives in the nothing-is-coerced table instead.
 		{"the shape reported from the tree", "var x = a ?? !!(\n\tb &&\n\tc &&\n\td\n);", "Boolean(b &&\n\tc &&\n\td)"},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoImplicitCoercion, noImplicitCoercionFile,
-				testCase.sourceText, nil)
-			rule_testing.ExpectFindings(t, result, "implicitCoercion")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoImplicitCoercion, noImplicitCoercionFile,
+				testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "implicitCoercion")
 			want := noImplicitCoercionMessage(testCase.wantRecommends).Description
 			if got := result.Diagnostics[0].Message.Description; got != want {
-				t.Fatalf("message:\n got %q\nwant %q", got, want)
+				test.Fatalf("message:\n got %q\nwant %q", got, want)
 			}
 			// Note which rows carry a newline in the recommendation and which do not: a break
-			// INSIDE the operand survives into the message because the text is sliced from source,
+			// inside the operand survives into the message because the text is sliced from source,
 			// while a break between the parenthesis and the operand is trivia and does not. Both
 			// are asserted by the equality above rather than by a separate predicate, which is
 			// what an earlier version of this test got wrong.
@@ -534,12 +782,12 @@ func TestNoImplicitCoercionMultilineOperand(t *testing.T) {
 // TestNoImplicitCoercionTypeScriptShapes covers syntax upstream's corpus structurally cannot carry.
 //
 // Its tests are JavaScript, so no imported case puts a type assertion, a non-null operator or a
-// generic call inside a coerced operand. This rule's repairs are built by SLICING source text
+// generic call inside a coerced operand. This rule's repairs are built by slicing source text
 // rather than re-rendering the expression, which is what makes these safe, and that is a property
 // worth pinning: the natural way to write the recommendation is to rebuild it from parts, and that
 // is how this project lost type information twice.
-func TestNoImplicitCoercionTypeScriptShapes(t *testing.T) {
-	t.Parallel()
+func TestNoImplicitCoercionTypeScriptShapes(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name           string
@@ -549,16 +797,20 @@ func TestNoImplicitCoercionTypeScriptShapes(t *testing.T) {
 		{"a non-null assertion inside a double negation", "!!foo!", "Boolean(foo!)"},
 		{"an as-expression inside a double negation", "!!(foo as unknown)", "Boolean(foo as unknown)"},
 		{"a generic call under a unary plus", "+f<number>(1)", "Number(f<number>(1))"},
-		{"a satisfies expression added to an empty string", "'' + (foo satisfies string)", "String(foo satisfies string)"},
+		{
+			"a satisfies expression added to an empty string",
+			"'' + (foo satisfies string)",
+			"String(foo satisfies string)",
+		},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoImplicitCoercion, noImplicitCoercionFile,
-				testCase.sourceText, nil)
-			rule_testing.ExpectFindings(t, result, "implicitCoercion")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoImplicitCoercion, noImplicitCoercionFile,
+				testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "implicitCoercion")
 			want := noImplicitCoercionMessage(testCase.wantRecommends).Description
 			if got := result.Diagnostics[0].Message.Description; got != want {
-				t.Fatalf("message:\n got %q\nwant %q", got, want)
+				test.Fatalf("message:\n got %q\nwant %q", got, want)
 			}
 		})
 	}
@@ -566,58 +818,54 @@ func TestNoImplicitCoercionTypeScriptShapes(t *testing.T) {
 
 // TestDecodeNoImplicitCoercionOptions is where this rule's decoder is hard.
 //
-// Three of the four booleans default to TRUE, so an absent option read as a zero value would leave
+// Three of the four booleans default to `true`, so an absent option read as a zero value would leave
 // three of the four judgments switched off, and every fixture built from a struct rather than routed
 // through the decoder would pass anyway.
-func TestDecodeNoImplicitCoercionOptions(t *testing.T) {
-	t.Parallel()
+func TestDecodeNoImplicitCoercionOptions(test *testing.T) {
+	test.Parallel()
 
-	settingsFrom := func(t *testing.T, raw string) NoImplicitCoercionOptions {
-		t.Helper()
-		decoded, err := DecodeNoImplicitCoercionOptions(json.RawMessage(raw))
-		if err != nil {
-			t.Fatalf("the decoder refused %s: %v", raw, err)
+	settingsFrom := func(test *testing.T, raw string) NoImplicitCoercionOptions {
+		test.Helper()
+		decoded, decodeNoImplicitCoercionOptionsError := DecodeNoImplicitCoercionOptions(json.RawMessage(raw))
+		if decodeNoImplicitCoercionOptionsError != nil {
+			test.Fatalf("the decoder refused %s: %v", raw, decodeNoImplicitCoercionOptionsError)
 		}
-		options, isOptions := decoded.(NoImplicitCoercionOptions)
-		if !isOptions {
-			t.Fatalf("expected NoImplicitCoercionOptions, got %T", decoded)
-		}
-		return options
+		return decoded
 	}
 
-	t.Run("empty input enables the three default-true judgments", func(t *testing.T) {
-		t.Parallel()
-		options := settingsFrom(t, "")
+	test.Run("empty input enables the three default-true judgments", func(test *testing.T) {
+		test.Parallel()
+		options := settingsFrom(test, "")
 		for name, value := range map[string]*bool{
 			"boolean": options.Boolean, "number": options.Number, "string": options.String,
 		} {
 			if value == nil || !*value {
-				t.Fatalf("%s should default to true, got %v", name, value)
+				test.Fatalf("%s should default to true, got %v", name, value)
 			}
 		}
 		if options.DisallowTemplateShorthand == nil || *options.DisallowTemplateShorthand {
-			t.Fatalf("disallowTemplateShorthand should default to false, got %v", options.DisallowTemplateShorthand)
+			test.Fatalf("disallowTemplateShorthand should default to false, got %v", options.DisallowTemplateShorthand)
 		}
 	})
 
-	t.Run("an explicit false is kept", func(t *testing.T) {
-		t.Parallel()
-		options := settingsFrom(t, `{"boolean": false}`)
+	test.Run("an explicit false is kept", func(test *testing.T) {
+		test.Parallel()
+		options := settingsFrom(test, `{"boolean": false}`)
 		if options.Boolean == nil || *options.Boolean {
-			t.Fatalf("an explicit false must survive, got %v", options.Boolean)
+			test.Fatalf("an explicit false must survive, got %v", options.Boolean)
 		}
 		if options.Number == nil || !*options.Number {
-			t.Fatalf("an absent key must keep its default, got %v", options.Number)
+			test.Fatalf("an absent key must keep its default, got %v", options.Number)
 		}
 	})
 
-	t.Run("nil options reach the rule with the defaults", func(t *testing.T) {
-		t.Parallel()
-		// Past the decoder rather than through it: what a bare "error" produces after the config
-		// layer turns the decoder's error into nil. A zero-valued struct would go silent here.
-		result := rule_testing.RunTypedWithOptions(t, NoImplicitCoercion, noImplicitCoercionFile,
-			"var b = !!foo;", nil)
-		rule_testing.ExpectFindings(t, result, "implicitCoercion")
+	test.Run("no options reach the rule with the defaults", func(test *testing.T) {
+		test.Parallel()
+		// Past the decoder rather than through it: what a bare "error" produces, the rule run
+		// unconfigured. A zero-valued struct would go silent here.
+		result := rule_testing.RunTyped(test, NoImplicitCoercion, noImplicitCoercionFile,
+			"var b = !!foo;")
+		rule_testing.ExpectFindings(test, result, "implicitCoercion")
 	})
 }
 
@@ -637,8 +885,8 @@ func TestDecodeNoImplicitCoercionOptions(t *testing.T) {
 // The reporting rows keep the proof tight: a string, `number | undefined`, `any`, `unknown`, and a
 // bigint under `+`, `* 1` and `- 0` (each a compile error and a runtime TypeError, so still not
 // "already a number"), plus the string and boolean arms, which this change does not touch.
-func TestNoImplicitCoercionIsSilentWhenNothingIsCoerced(t *testing.T) {
-	t.Parallel()
+func TestNoImplicitCoercionIsSilentWhenNothingIsCoerced(test *testing.T) {
+	test.Parallel()
 
 	const declarations = "declare const zoom: number;\n" +
 		"declare const context: { lineWidth: number };\n" +
@@ -672,14 +920,21 @@ func TestNoImplicitCoercionIsSilentWhenNothingIsCoerced(t *testing.T) {
 		{name: "a branded number", sourceText: "const n = +branded;"},
 		{name: "a numeric enum", sourceText: "const n = 1 * size;"},
 		{name: "double negation on a bigint", sourceText: "const n = -(-big);"},
-		{name: "a constrained type parameter", sourceText: "function f<T extends number>(value: T) { return 1 * value; }"},
+		{
+			name:       "a constrained type parameter",
+			sourceText: "function f<T extends number>(value: T) { return 1 * value; }",
+		},
 		{name: "one times a non-null-asserted number", sourceText: "const n = 1 * maybe!;"},
 
 		{name: "one times a string", sourceText: "const n = 1 * text;", wantIds: []string{"implicitCoercion"}},
 		{name: "unary plus on a string", sourceText: "const n = +text;", wantIds: []string{"implicitCoercion"}},
 		{name: "double negation on a string", sourceText: "const n = -(-text);", wantIds: []string{"implicitCoercion"}},
 		{name: "a string minus zero", sourceText: "const n = text - 0;", wantIds: []string{"implicitCoercion"}},
-		{name: "unary plus on a possibly undefined number", sourceText: "const n = +maybe;", wantIds: []string{"implicitCoercion"}},
+		{
+			name:       "unary plus on a possibly undefined number",
+			sourceText: "const n = +maybe;",
+			wantIds:    []string{"implicitCoercion"},
+		},
 		{name: "one times any", sourceText: "const n = 1 * loose;", wantIds: []string{"implicitCoercion"}},
 		{name: "unary plus on unknown", sourceText: "const n = +opaque;", wantIds: []string{"implicitCoercion"}},
 		{name: "unary plus on a bigint", sourceText: "const n = +big;", wantIds: []string{"implicitCoercion"}},
@@ -694,25 +949,44 @@ func TestNoImplicitCoercionIsSilentWhenNothingIsCoerced(t *testing.T) {
 		{name: "a template literal type plus an empty string", sourceText: "const s = '' + label;"},
 		{name: "double not on a boolean", sourceText: "const b = !!flag;"},
 		{name: "double not on a boolean literal union", sourceText: "const b = !!yes;"},
-		{name: "DialogRoot.tsx:175, double not on a boolean expression", sourceText: "const b = loose ?? !!(\n\ttext === undefined &&\n\tflag === undefined &&\n\t!flag\n);"},
+		{
+			name:       "DialogRoot.tsx:175, double not on a boolean expression",
+			sourceText: "const b = loose ?? !!(\n\ttext === undefined &&\n\tflag === undefined &&\n\t!flag\n);",
+		},
 
-		{name: "an empty string plus a possibly undefined string", sourceText: "const s = '' + maybeText;", wantIds: []string{"implicitCoercion"}},
-		{name: "an empty string plus a number", sourceText: "const s = '' + zoom;", wantIds: []string{"implicitCoercion"}},
-		{name: "a number plus-equals an empty string", sourceText: "let n: number | string = zoom;\nn += '';", wantIds: []string{"implicitCoercion"}},
+		{
+			name:       "an empty string plus a possibly undefined string",
+			sourceText: "const s = '' + maybeText;",
+			wantIds:    []string{"implicitCoercion"},
+		},
+		{
+			name:       "an empty string plus a number",
+			sourceText: "const s = '' + zoom;",
+			wantIds:    []string{"implicitCoercion"},
+		},
+		{
+			name:       "a number plus-equals an empty string",
+			sourceText: "let n: number | string = zoom;\nn += '';",
+			wantIds:    []string{"implicitCoercion"},
+		},
 		{name: "an empty string plus any", sourceText: "const s = '' + loose;", wantIds: []string{"implicitCoercion"}},
-		{name: "double not on a nullable boolean", sourceText: "const b = !!maybeFlag;", wantIds: []string{"implicitCoercion"}},
+		{
+			name:       "double not on a nullable boolean",
+			sourceText: "const b = !!maybeFlag;",
+			wantIds:    []string{"implicitCoercion"},
+		},
 		{name: "double not on a string", sourceText: "const b = !!text;", wantIds: []string{"implicitCoercion"}},
 		{name: "double not on unknown", sourceText: "const b = !!opaque;", wantIds: []string{"implicitCoercion"}},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoImplicitCoercion, noImplicitCoercionFile,
-				declarations+testCase.sourceText, nil)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoImplicitCoercion, noImplicitCoercionFile,
+				declarations+testCase.sourceText)
 			if len(testCase.wantIds) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }

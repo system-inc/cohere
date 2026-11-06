@@ -1,27 +1,37 @@
 {
   "rules": {
     "TypeScript": "nexus/consistency-no-ambiguous-identifier",
-    "Swift": "cohere-swift/consistency-no-ambiguous-identifier"
+    "Swift": "cohere-swift/consistency-no-ambiguous-identifier",
+    "Go": "cohere-go/consistency-no-ambiguous-identifier"
   },
   "phrases": {
     "context": {
       "error": " (appears to be an error)",
-      "event": " (appears to be an event)",
+      "event": {
+        "TypeScript": " (appears to be an event)",
+        "Swift": " (appears to be an event)"
+      },
       "unclear": " (context unclear)"
     }
   },
   "messages": {
     "noAmbiguousE": {
-      "text": "Variable named \"e\" is too ambiguous<<context>>. It is the one name that could be an error or an event, and a reader has to find the declaration to learn which. Use \"{{suggestedName}}\" or a more descriptive name."
+      "text": "[[subject]] is too ambiguous<<context>>. [[reasonAndRepair]]",
+      "terms": {
+        "subject": {
+          "TypeScript": "Variable named \"e\"",
+          "Swift": "Variable named \"e\"",
+          "Go": "The name `e`"
+        },
+        "reasonAndRepair": {
+          "TypeScript": "It is the one name that could be an error or an event, and a reader has to find the declaration to learn which. Use \"{{suggestedName}}\" or a more descriptive name.",
+          "Swift": "It is the one name that could be an error or an event, and a reader has to find the declaration to learn which. Use \"{{suggestedName}}\" or a more descriptive name.",
+          "Go": "It reads as an error by habit, so a reader has to find the declaration to learn whether it holds one or something else. Rename it to {{suggestedName}}."
+        }
+      }
     },
     "noSingleLetter": {
       "text": "Single-letter identifier \"{{name}}\" is not descriptive enough. The name is read everywhere it is used and declared only once, so the saving is at the declaration and the cost is at every call site."
-    },
-    "noUnderscore": {
-      "text": "Identifier \"_\" is not descriptive enough. Name it explicitly, or prefix an underscore to a real name such as \"_event\" when the point is that the value is deliberately unused.",
-      "languages": [
-        "TypeScript"
-      ]
     }
   }
 }

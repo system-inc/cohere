@@ -11,8 +11,8 @@ import "testing"
 //
 // So the chain is written out here and every one of the sixteen pairs is compared against it. A
 // reordering of the constants fails this immediately rather than silently changing classifications.
-func TestJoinMemoizationLevelsMatchesUpstreamChain(t *testing.T) {
-	t.Parallel()
+func TestJoinMemoizationLevelsMatchesUpstreamChain(test *testing.T) {
+	test.Parallel()
 
 	// upstream's `joinAliases`, transcribed arm for arm rather than expressed as a max.
 	chain := func(first, second MemoizationLevel) MemoizationLevel {
@@ -37,17 +37,17 @@ func TestJoinMemoizationLevelsMatchesUpstreamChain(t *testing.T) {
 			compared++
 			want := chain(first, second)
 			if got := JoinMemoizationLevels(first, second); got != want {
-				t.Errorf("join(%s, %s) = %s, want %s", first, second, got, want)
+				test.Errorf("join(%s, %s) = %s, want %s", first, second, got, want)
 			}
 			// Commutativity, which upstream's chain has and a careless max-like function might not.
 			if got := JoinMemoizationLevels(second, first); got != want {
-				t.Errorf("join(%s, %s) = %s, want %s (join must be commutative)",
+				test.Errorf("join(%s, %s) = %s, want %s (join must be commutative)",
 					second, first, got, want)
 			}
 		}
 	}
 	if compared != 16 {
-		t.Fatalf("compared %d pairs, want 16; the level set changed and this test did not", compared)
+		test.Fatalf("compared %d pairs, want 16; the level set changed and this test did not", compared)
 	}
 }
 
@@ -57,13 +57,13 @@ func TestJoinMemoizationLevelsMatchesUpstreamChain(t *testing.T) {
 // order is part of the contract rather than an implementation detail. Written as an explicit
 // sequence so a reordering fails here with a clear message rather than in a downstream pass with an
 // obscure one.
-func TestMemoizationLevelOrderIsStrength(t *testing.T) {
-	t.Parallel()
+func TestMemoizationLevelOrderIsStrength(test *testing.T) {
+	test.Parallel()
 
 	if !(MemoizationNever < MemoizationUnmemoized &&
 		MemoizationUnmemoized < MemoizationConditional &&
 		MemoizationConditional < MemoizationMemoized) {
-		t.Fatalf("the levels are not ordered by strength: never=%d unmemoized=%d conditional=%d "+
+		test.Fatalf("the levels are not ordered by strength: never=%d unmemoized=%d conditional=%d "+
 			"memoized=%d; the join is a max over this order and every classification compares "+
 			"against it", MemoizationNever, MemoizationUnmemoized, MemoizationConditional,
 			MemoizationMemoized)
@@ -76,7 +76,7 @@ func TestMemoizationLevelOrderIsStrength(t *testing.T) {
 	} {
 		name := level.String()
 		if seen[name] {
-			t.Errorf("two levels print as %q", name)
+			test.Errorf("two levels print as %q", name)
 		}
 		seen[name] = true
 	}

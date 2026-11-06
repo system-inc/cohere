@@ -1,0 +1,29 @@
+{
+    "rule": "nexus/consistency-require-identifier-casing",
+    "firing": {
+        "file": "subject.ts",
+        "source": "export function limit() { let MAX_SIZE = 10; return MAX_SIZE * 2; }\n",
+        "findings": [
+            {
+                "line": 1,
+                "column": 31,
+                "endLine": 1,
+                "endColumn": 39,
+                "messageId": "requireLowerCamelCaseValue",
+                "message": "The variable \"MAX_SIZE\" is a value, so spell it in lowerCamelCase: \"maxSize\". Values are spelled in lowerCamelCase and types in UpperCamelCase, so a reader tells which is which at a glance, and an underscore inside a name marks a word boundary the camel case already marks.",
+                "fix": true
+            }
+        ],
+        "fixedSource": "export function limit() { let maxSize = 10; return maxSize * 2; }\n"
+    },
+    "clean": {
+        "file": "subject.tsx",
+        "source": "export function OrderList() { return <ul />; }\n"
+    },
+    "assertedMessageIds": [
+        "requireLowerCamelCaseValue",
+        "requireUpperCamelCaseCapital",
+        "requireUpperCamelCaseType"
+    ],
+    "assertsFix": true
+}

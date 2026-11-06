@@ -19,9 +19,18 @@ import (
 // `policy/messages/consistency-require-matching-file-name.json`, with the second rename as the
 // `alternative` phrase.
 var (
-	consistencyRequireMatchingFileNameText            = policy.MessageOf("structure/consistency-require-matching-file-name", "requireMatchingFileName")
-	consistencyRequireMatchingFileNameRenameComponent = consistencyRequireMatchingFileNameText.Option("alternative", "renameComponent")
-	consistencyRequireMatchingFileNameNoAlternative   = consistencyRequireMatchingFileNameText.Option("alternative", "none")
+	consistencyRequireMatchingFileNameText = policy.MessageOf(
+		"structure/consistency-require-matching-file-name",
+		"requireMatchingFileName",
+	)
+	consistencyRequireMatchingFileNameRenameComponent = consistencyRequireMatchingFileNameText.Option(
+		"alternative",
+		"renameComponent",
+	)
+	consistencyRequireMatchingFileNameNoAlternative = consistencyRequireMatchingFileNameText.Option(
+		"alternative",
+		"none",
+	)
 )
 
 func messageRequireMatchingFileName(componentName string, fileName string, fileBaseName string) rule.Message {
@@ -177,11 +186,11 @@ var companionFileSuffixes = []string{".test", ".spec", ".stories", ".story"}
 // The repair is renaming a file, which changes every import of it across the tree. That is a rename
 // with its own tooling and its own review, not a lint edit applied unattended to one file, and an
 // edit to one file cannot express it anyway.
-var ConsistencyRequireMatchingFileName = rule.Rule{
+var ConsistencyRequireMatchingFileName = rule.Rule[rule.NoOptions]{
 	Name:       "structure/consistency-require-matching-file-name",
 	NoListener: rule.NoListenerAnswersInRun,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -190,7 +199,7 @@ var ConsistencyRequireMatchingFileName = rule.Rule{
 		// harness alike, so a fold here could never change anything. Measured rather than assumed:
 		// a probe rule run on `C:\repository\source\Button.tsx` read `C:/repository/source/Button.tsx`,
 		// and a mutation deleting the fold survived a fixture written to catch it.
-		fileName := path.Base(ctx.SourceFile.FileName().AsString())
+		fileName := path.Base(ruleContext.SourceFile.FileName().AsString())
 		fileBaseName, isComponentFile := componentFileBaseName(fileName)
 		if !isComponentFile || isNextJsConventionFile(fileBaseName) || isCompanionFile(fileBaseName) {
 			return nil
@@ -198,7 +207,7 @@ var ConsistencyRequireMatchingFileName = rule.Rule{
 
 		// The decision is about the file rather than any node, so it is made once here over the
 		// top-level statements, and no listener is registered.
-		components := componentsNamingTheFile(ctx.SourceFile.AsNode())
+		components := componentsNamingTheFile(ruleContext.SourceFile.AsNode())
 		if len(components) != 1 {
 			return nil
 		}
@@ -209,7 +218,7 @@ var ConsistencyRequireMatchingFileName = rule.Rule{
 		if component.nameNode.Text() == fileBaseName {
 			return nil
 		}
-		ctx.ReportNode(component.nameNode,
+		ruleContext.ReportNode(component.nameNode,
 			messageRequireMatchingFileName(component.nameNode.Text(), fileName, fileBaseName))
 		return nil
 	},

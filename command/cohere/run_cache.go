@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -22,6 +21,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/registry"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/release/packaging"
+	"github.com/system-inc/cohere/internal/streams"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
@@ -55,139 +55,39 @@ import (
 // activeRunCache is the recording in progress, nil when this run is not being recorded.
 var activeRunCache *runCacheSession
 
-type runCacheSession struct {
-	// directory is where this root's cache table lives, invocation the name this run's record goes under
-	// in it, and table what was read from it when the run began: this invocation's run and the sections a
-	// walk reuses.
-	directory  string
-	invocation string
-	table      *program.CacheTable
+// runCacheClock is when the run began reading its inputs, the time a recording's inputs must not have changed
+// since. Set by startRunCacheClock.
+var runCacheClock time.Time
 
-	key      string
-	recorder *program.InputRecorder
+// pendingTypes is the types section of a run the run cache does not record, nil for every other run.
+var pendingTypes *typesRecord
 
-	// anchor is the project root, which the table names paths relative to and the recording names its
-	// output's root by, so every spelling of the root is one cache (#547dhjz). See program.PathAnchor.
-	anchor program.PathAnchor
+// invocationTag marks a line that is true of this invocation and false of any replay of it.
+//
+// A recorded report says "graph built in 436ms" and "types ran in 409ms". Replayed, those lines claim
+// a graph was built that was not, and durations this run did not spend. So each line describing the
+// invocation rather than the tree is printed through printInvocation, which tags it; the tee strips
+// the tag before the terminal and keeps the line out of what is replayed. The tag is a record
+// separator, which no line of cohere's output contains.
+var invocationTag = []byte("\x1ecohere-invocation\x1e")
 
-	// keyParts is key's parts, recorded with the run so a later one under another key can say which moved.
-	keyParts program.RunCacheKeyParts
-
-	// missed is why this run was not replayed whole, and findingsMissed why its files' findings were not, when
-	// the findings section as a whole was missing or under another key. Each is said in --verbose and --json, so
-	// a run that could have replayed and did not explains itself (#547dhjz).
-	missed         string
-	findingsMissed string
-
-	// findingsKeyParts is the findings key's parts, recorded with the section. See keyParts.
-	findingsKeyParts program.RunCacheKeyParts
-
-	// readSince is when the run began reading its inputs. An input changed after it keeps the run from
-	// being recorded.
-	readSince time.Time
-
-	// declared is set once the build succeeds and the inputs are known. A session that never declares
-	// is never recorded.
-	declared   bool
-	extraFiles []string
-
-	// extraDirectories is every directory a format walk listed, so a file added, removed or renamed in one
-	// moves an input. See declareFormatWalk.
-	extraDirectories []string
-
-	// extraAbsent is every file a format walk looked for and did not find, an ignore file a directory
-	// does not have, so one appearing moves an input. See declareFormatWalk.
-	extraAbsent []string
-
-	// declined is the reason this run must not be recorded, empty while it may be.
-	declined string
-
-	// findings is the findings cache this run consults and records, the run cache's second layer. Nil
-	// when the graph never reached a walk.
-	findings *program.FindingsReuse
-
-	// shapes is every project file's shape this run, recorded so the next computes only what changed. Nil
-	// when no rule is keyed on shapes, since then nothing reads them and computing them would be waste.
-	shapes map[string]program.SignatureEntry
-	// shapesGraph is the graph shapes describe, the one rebuilt after a fix rewrite when there was one, kept so
-	// the shapes still keyed on content can graduate after the verdict. See graduateSignatures.
-	shapesGraph *program.Graph
-
-	// types is the types phase's section, what the table held and what this run records. Nil when the
-	// graph never reached a walk.
-	types *program.TypeDiagnosticsReuse
-
-	// summary is the run's summary, encoded, which a replay renders its footer from. See recordRunSummary.
-	summary []byte
-
-	stdout, stderr teeStream
-}
+// provenanceTag marks a line that is true of the tree but was produced by a phase, so a replay prints it
+// with where it came from.
+//
+// "fix: 0 of 5 files rewritten, 5 not formatted" is true of an unchanged tree and its not-formatted count
+// is actionable, so a replay keeps it. Printed bare it would claim the fix phase ran on a run where
+// nothing ran, so it is replayed as "fix (from the cached run at 03:41): ...". Unlike invocationTag the
+// line stays in the recording, tagged, so the replay can find it without matching on its text.
+var provenanceTag = []byte("\x1ecohere-provenance\x1e")
 
 // recordRunSummary keeps the run's summary for the record, when this run is being recorded.
 func recordRunSummary(summary runSummary) {
 	if activeRunCache == nil {
 		return
 	}
-	if encoded, err := json.Marshal(summary); err == nil {
+	if encoded, encodeError := json.Marshal(summary); encodeError == nil {
 		activeRunCache.summary = encoded
 	}
-}
-
-// teeStream copies a standard stream to its real destination and to a buffer.
-type teeStream struct {
-	real   *os.File
-	writer *os.File
-	buffer bytes.Buffer
-	done   chan struct{}
-}
-
-func (t *teeStream) start(target **os.File) error {
-	reader, writer, err := os.Pipe()
-	if err != nil {
-		return err
-	}
-	t.real = *target
-	t.writer = writer
-	t.done = make(chan struct{})
-	go func() {
-		defer close(t.done)
-		defer reader.Close()
-		// Line by line, so a line tagged as describing this invocation reaches the terminal untagged
-		// and never reaches the replay. The tag travels in the stream itself because the tee is a pipe:
-		// noting the buffer's length at the moment of printing would read it before the pipe delivered.
-		lines := bufio.NewReader(reader)
-		for {
-			line, err := lines.ReadBytes('\n')
-			if len(line) > 0 {
-				if rest, tagged := bytes.CutPrefix(line, invocationTag); tagged {
-					t.real.Write(rest)
-				} else if rest, tagged := bytes.CutPrefix(line, provenanceTag); tagged {
-					// Kept tagged in the recording, so a replay knows to say where the line came from.
-					t.real.Write(rest)
-					t.buffer.Write(line)
-				} else {
-					t.real.Write(line)
-					t.buffer.Write(line)
-				}
-			}
-			if err != nil {
-				return
-			}
-		}
-	}()
-	*target = writer
-	return nil
-}
-
-// stop restores the stream and waits for everything written so far to reach both destinations.
-func (t *teeStream) stop(target **os.File) {
-	if t.writer == nil {
-		return
-	}
-	*target = t.real
-	t.writer.Close()
-	<-t.done
-	t.writer = nil
 }
 
 // runCacheEligible reports whether this invocation may use the run cache at all.
@@ -246,7 +146,7 @@ func beginRunCache(location projectLocation) *program.InputRecorder {
 	// The root resolved, and the files below it from it, so a run through another spelling of the same
 	// directory has the same key (#547dhjz).
 	anchor := program.NewPathAnchor(location.Root)
-	keyParts, err := program.RunCacheKeyPartsOf(os.Args[1:], anchor.Resolved(),
+	keyParts, runCacheKeyPartsOfError := program.RunCacheKeyPartsOf(os.Args[1:], anchor.Resolved(),
 		"root="+anchor.Resolved(),
 		"tsconfig="+anchor.Stable(location.ConfigFileName),
 		"lint-config="+anchor.Stable(location.LintConfigFileName),
@@ -255,7 +155,7 @@ func beginRunCache(location projectLocation) *program.InputRecorder {
 		// arguments do not show. See ownership.go.
 		"yield="+activeProjectYieldFingerprint(),
 	)
-	if err != nil {
+	if runCacheKeyPartsOfError != nil {
 		return nil
 	}
 	key := keyParts.Key()
@@ -271,7 +171,12 @@ func beginRunCache(location projectLocation) *program.InputRecorder {
 	// This invocation's run first and alone: a replay needs nothing else, and the run is a sixth of the
 	// table's bytes where the whole table was all of them (#45ekc65).
 	invocation := program.CacheTableInvocation(os.Args[1:])
-	table, err := program.ReadCacheTable(directory, identity, program.CacheTableSections{Runs: []string{invocation}}, anchor)
+	table, readCacheTableError := program.ReadCacheTable(
+		directory,
+		identity,
+		program.CacheTableSections{Runs: []string{invocation}},
+		anchor,
+	)
 	stored := table.Runs[invocation]
 	// Every input's stat is noted as it is checked, so a run that misses hands them to the content pack rather
 	// than statting each file again (#kdee854). See program.StatSnapshot.
@@ -285,11 +190,17 @@ func beginRunCache(location projectLocation) *program.InputRecorder {
 		program.CacheTableSections{Findings: true, Signatures: true, Types: true}, anchor)
 	release()
 	table.Findings, table.Signatures, table.Types = sections.Findings, sections.Signatures, sections.Types
-	for _, readError := range []error{err, sectionsError} {
-		if errors.Is(readError, program.ErrCacheTableUnreadable) || errors.Is(readError, program.ErrCacheTablePartlyKept) {
+	for _, readError := range []error{readCacheTableError, sectionsError} {
+		if errors.Is(readError, program.ErrCacheTableUnreadable) ||
+			errors.Is(readError, program.ErrCacheTablePartlyKept) {
 			// Said once, before the recording starts, so it reaches the terminal and never a replay. A table
 			// thrown away on every run would otherwise look like a cache that is merely cold.
-			fmt.Fprintf(accountOutput(os.Stderr), "note: %v; this run starts cold and writes what it drops anew\n", readError)
+			fmt.Fprintf(
+				accountOutput(streams.Errors),
+				"note: %v; this run starts cold and writes what it drops anew\n",
+				readError,
+			)
+			showWarning()
 		}
 	}
 
@@ -299,17 +210,17 @@ func beginRunCache(location projectLocation) *program.InputRecorder {
 		table:      table,
 		key:        key,
 		keyParts:   keyParts,
-		missed:     runCacheMiss(stored, checked, keyParts, err),
+		missed:     runCacheMiss(stored, checked, keyParts, readCacheTableError),
 		anchor:     anchor,
 		recorder:   program.NewInputRecorder(),
 		// See startRunCacheClock: before discovery reads anything, after the cache directory exists.
 		readSince: runCacheClock,
 	}
-	if err := session.stdout.start(&os.Stdout); err != nil {
+	if startError := session.stdout.start(&os.Stdout, streams.Output); startError != nil {
 		return nil
 	}
-	if err := session.stderr.start(&os.Stderr); err != nil {
-		session.stdout.stop(&os.Stdout)
+	if startError := session.stderr.start(&os.Stderr, streams.Errors); startError != nil {
+		session.stdout.stop(&os.Stdout, streams.Output)
 		return nil
 	}
 	activeRunCache = session
@@ -340,10 +251,6 @@ func cacheDirectory(root string) string {
 // to add is named so it is one edit away. What it must never be is a silent write into tracked space.
 var prepareCacheDirectoryOnce sync.Once
 
-// runCacheClock is when the run began reading its inputs, the time a recording's inputs must not have changed
-// since. Set by startRunCacheClock.
-var runCacheClock time.Time
-
 // startRunCacheClock starts the run cache's clock: after the cache directory exists, since creating it moves the
 // project root's time, and before discovery lists the tree. The clock was taken at the session's start, in
 // beginRunCache, until discovery's listings came to serve the build's enumeration (#bjv0tg4); discovery runs
@@ -364,18 +271,32 @@ func startRunCacheClock(location projectLocation, locateError error) {
 
 func prepareCacheDirectory(root string) {
 	prepareCacheDirectoryOnce.Do(func() {
-		if err := os.MkdirAll(cacheDirectory(root), 0o755); err != nil {
-			fmt.Fprintf(accountOutput(os.Stderr), "note: the cache directory %s could not be created: %v\n", cacheDirectory(root), firstLine(err.Error()))
+		if createDirectoryError := os.MkdirAll(cacheDirectory(root), 0o755); createDirectoryError != nil {
+			fmt.Fprintf(
+				accountOutput(streams.Errors),
+				"note: the cache directory %s could not be created: %v\n",
+				cacheDirectory(root),
+				firstLine(createDirectoryError.Error()),
+			)
+			showWarning()
 			return
 		}
 		ignoreFile := filepath.Join(root, gitignore.IgnoreFileName)
-		matcher, err := gitignore.New(root)
-		if err != nil {
+		matcher, newGitignoreError := gitignore.New(root)
+		if newGitignoreError != nil {
 			return
 		}
-		if ignored, _, err := matcher.IgnoredPath(".cache/cohere/findings.gob", false); err == nil && !ignored {
-			fmt.Fprintf(accountOutput(os.Stderr), "note: %s does not ignore .cache/, so cohere's cache in %s would be tracked: add the line `.cache/` to it\n",
-				ignoreFile, cacheDirectory(root))
+		if ignored, _, ignoredPathError := matcher.IgnoredPath(
+			".cache/cohere/findings.gob",
+			false,
+		); ignoredPathError == nil && !ignored {
+			fmt.Fprintf(
+				accountOutput(streams.Errors),
+				"note: %s does not ignore .cache/, so cohere's cache in %s would be tracked: add the line `.cache/` to it\n",
+				ignoreFile,
+				cacheDirectory(root),
+			)
+			showWarning()
 		}
 	})
 }
@@ -387,8 +308,14 @@ func readFormatSection(root string) *program.FormatSection {
 		return nil
 	}
 	release, _ := holdTableReadLock(cacheDirectory(root), tableWriterWait)
-	table, _ := program.ReadCacheTable(cacheDirectory(root), cacheTableIdentity(), program.CacheTableSections{Formatted: true},
-		program.NewPathAnchor(root))
+	// Ignored: a table missing or unreadable holds no format record, which is the nil this answers, and costs the
+	// run a format of files already formatted, never a skip; beginRunCache is where a discarded table is said.
+	table, _ := program.ReadCacheTable(
+		cacheDirectory(root),
+		cacheTableIdentity(),
+		program.CacheTableSections{Formatted: true},
+		program.NewPathAnchor(root),
+	)
 	release()
 	return table.Formatted
 }
@@ -414,19 +341,24 @@ func writeFormatSection(root string, section *program.FormatSection) error {
 func dumpCacheTable(location projectLocation) error {
 	directory := cacheDirectory(location.Root)
 	release, _ := holdTableReadLock(directory, tableWriterWait)
-	table, err := program.ReadCacheTable(directory, cacheTableIdentity(), program.EveryCacheTableSection, program.NewPathAnchor(location.Root))
+	table, readCacheTableError := program.ReadCacheTable(
+		directory,
+		cacheTableIdentity(),
+		program.EveryCacheTableSection,
+		program.NewPathAnchor(location.Root),
+	)
 	release()
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			fmt.Printf("no cache table for %s (looked in %s)\n", location.Root, directory)
+	if readCacheTableError != nil {
+		if errors.Is(readCacheTableError, os.ErrNotExist) {
+			fmt.Fprintf(streams.Output, "no cache table for %s (looked in %s)\n", location.Root, directory)
 			return nil
 		}
-		fmt.Printf("%v\n", err)
-		if !errors.Is(err, program.ErrCacheTablePartlyKept) {
+		fmt.Fprintf(streams.Output, "%v\n", readCacheTableError)
+		if !errors.Is(readCacheTableError, program.ErrCacheTablePartlyKept) {
 			return nil
 		}
 	}
-	program.DumpCacheTable(os.Stdout, directory, table, cacheTableIdentity())
+	program.DumpCacheTable(streams.Output, directory, table, cacheTableIdentity())
 	return nil
 }
 
@@ -466,14 +398,22 @@ func runCacheMiss(stored *program.RunCache, checked error, parts program.RunCach
 // exits with its exit code. Its paths are printed as this run spells the root (see recordedOutput).
 func replayRunCache(stored *program.RunCache, anchor program.PathAnchor) {
 	recorded := time.Unix(0, stored.RecordedUnixNanoseconds).Format("15:04:05")
-	account := accountOutput(os.Stdout)
+	account := accountOutput(streams.Output)
 	fmt.Fprintf(account,
 		"cached: no input has changed since the run at %s, so graph, types and lint did not run; its verdict follows\n",
 		recorded)
-	os.Stdout.Write(replayLines(spelledOutput(stored.Output, anchor), recorded))
-	os.Stderr.Write(spelledOutput(stored.Errors, anchor))
+	streams.Output.Write(replayLines(spelledOutput(stored.Output, anchor), recorded))
+	// The recording's stdout before its stderr, the order a replay always printed them in.
+	streams.Show(streams.Output)
+	streams.Errors.Write(spelledOutput(stored.Errors, anchor))
+	streams.Show(streams.Errors)
 	fmt.Fprintf(account, "phases: replayed the run at %s · fix, types and lint did not run\n", recorded)
-	fmt.Fprintf(account, "  this run: %s, after checking %d inputs\n", round(time.Since(processStart)), len(stored.Inputs))
+	fmt.Fprintf(
+		account,
+		"  this run: %s, after checking %d inputs\n",
+		round(time.Since(processStart)),
+		len(stored.Inputs),
+	)
 	fmt.Fprintf(account, "  %s\n", activeMemoryPolicy.line())
 
 	// The footer is this replay's, rendered from the recorded run's summary: its findings and its counts,
@@ -486,11 +426,17 @@ func replayRunCache(stored *program.RunCache, anchor program.PathAnchor) {
 		summary.Gaps.UnclaimedSwift = discoveredUnclaimedSwift
 		switch activeOutput.Mode {
 		case outputVerbose:
-			fmt.Fprintln(os.Stdout, footer(summary, activeOutput.Style, footerOptions{Phases: activeOutput.Phases, Verbose: true}))
-		case outputJSON:
-			writeJSONLine(os.Stdout, summaryAsJSON(summary))
+			fmt.Fprintln(
+				streams.Output,
+				footer(summary, activeOutput.Style, footerOptions{Phases: activeOutput.Phases, Verbose: true}),
+			)
+		case outputJson:
+			writeSummaryLine(streams.Output, summaryAsJson(summary))
 		default:
-			fmt.Fprintln(os.Stdout, footer(summary, activeOutput.Style, footerOptions{Phases: activeOutput.Phases}))
+			fmt.Fprintln(
+				streams.Output,
+				footer(summary, activeOutput.Style, footerOptions{Phases: activeOutput.Phases}),
+			)
 		}
 	}
 	exitProcess(stored.ExitCode)
@@ -539,7 +485,7 @@ func declareLintConfigInputs(path string) {
 		return
 	}
 	for _, source := range configuration.SourcesOnDisk(lintConfigSources(path)) {
-		if _, err := os.Stat(source); err == nil {
+		if _, statError := os.Stat(source); statError == nil {
 			session.extraFiles = append(session.extraFiles, source)
 		} else {
 			session.extraAbsent = append(session.extraAbsent, source)
@@ -567,7 +513,7 @@ func declareFormatWalk(enumeration formatfiles.Enumeration) {
 		return
 	}
 	for _, ignoreFile := range enumeration.IgnoreFiles {
-		if _, err := os.Stat(ignoreFile); err == nil {
+		if _, statError := os.Stat(ignoreFile); statError == nil {
 			session.extraFiles = append(session.extraFiles, ignoreFile)
 		} else {
 			session.extraAbsent = append(session.extraAbsent, ignoreFile)
@@ -582,9 +528,13 @@ func declareFormatWalk(enumeration formatfiles.Enumeration) {
 	}
 	// The settings the root itself resolves to can sit above it, in a directory the walk never listed, and so
 	// can the directories between: a settings file created in one of those would take over the options.
-	if resolution, err := formatoptions.Resolve(enumeration.Root); err == nil && resolution.Source != "" {
+	if resolution, resolveError := formatoptions.Resolve(
+		enumeration.Root,
+	); resolveError == nil && resolution.Source != "" {
 		read = append(read, resolution.Source)
-		for directory := filepath.Clean(enumeration.Root); directory != filepath.Dir(resolution.Source); directory = filepath.Dir(directory) {
+		for directory := filepath.Clean(
+			enumeration.Root,
+		); directory != filepath.Dir(resolution.Source); directory = filepath.Dir(directory) {
 			session.extraDirectories = append(session.extraDirectories, directory)
 			if parent := filepath.Dir(directory); parent == directory {
 				break
@@ -592,7 +542,7 @@ func declareFormatWalk(enumeration formatfiles.Enumeration) {
 		}
 	}
 	for _, path := range read {
-		if _, err := os.Stat(path); err != nil {
+		if _, statError := os.Stat(path); statError != nil {
 			continue
 		}
 		if filepath.Base(path) == formatoptions.SettingsFileName {
@@ -620,8 +570,8 @@ func abandonRunCache() {
 		return
 	}
 	activeRunCache = nil
-	session.stdout.stop(&os.Stdout)
-	session.stderr.stop(&os.Stderr)
+	session.stdout.stop(&os.Stdout, streams.Output)
+	session.stderr.stop(&os.Stderr, streams.Errors)
 }
 
 // finishRunCache ends a run whose exit is a verdict about the tree: it records the run if it may, then
@@ -632,13 +582,15 @@ func finishRunCache(exitCode int) {
 	session := activeRunCache
 	if session != nil {
 		activeRunCache = nil
-		session.stdout.stop(&os.Stdout)
-		session.stderr.stop(&os.Stderr)
+		session.stdout.stop(&os.Stdout, streams.Output)
+		session.stderr.stop(&os.Stderr, streams.Errors)
 		// The report is out, so the caller can have its answer while the run is recorded. See sendVerdict.
-		// The table's lock is taken first and held until the table is in place, so a run the caller starts
-		// next waits for this write rather than reading around it. See table_lock.go.
+		// The answer is the code the process will exit with, which is 1 when the report never reached the
+		// terminal, while the record keeps the tree's own code: a replay that prints it whole exits as the tree
+		// does. The table's lock is taken first and held until the table is in place, so a run the caller
+		// starts next waits for this write rather than reading around it. See table_lock.go.
 		release := holdTableLock(session.directory)
-		answered := sendVerdict(exitCode)
+		answered := sendVerdict(streams.Finish(exitCode))
 		var recorded *program.RunCache
 		if session.declared && session.declined == "" {
 			recorded = session.record(exitCode)
@@ -652,7 +604,7 @@ func finishRunCache(exitCode int) {
 		// A run nothing records still leaves the types section for the next, after its caller has the answer.
 		pendingTypes = nil
 		release := holdTableLock(record.directory)
-		if sendVerdict(exitCode) {
+		if sendVerdict(streams.Finish(exitCode)) {
 			record.computedShapes += graduateSignatures(record.directory, record.shapesGraph, record.shapes)
 		}
 		record.write()
@@ -676,99 +628,38 @@ func graduateSignatures(directory string, graph *program.Graph, shapes map[strin
 	if graph == nil || shapes == nil {
 		return 0
 	}
-	graduated, abandoned := graph.GraduateSignatures(shapes, time.Now().Add(signatureGraduationBudget), signatureGraduationBudget/2)
+	graduated, abandoned := graph.GraduateSignatures(
+		shapes,
+		time.Now().Add(signatureGraduationBudget),
+		signatureGraduationBudget/2,
+	)
 	if abandoned != "" {
-		cacheNote(directory, fmt.Sprintf("%s's declaration emit ran past %s, so its shape stays keyed on content until its bytes change",
-			abandoned, signatureGraduationBudget/2))
+		cacheNote(
+			directory,
+			fmt.Sprintf("%s's declaration emit ran past %s, so its shape stays keyed on content until its bytes change",
+				abandoned, signatureGraduationBudget/2),
+		)
 		return graduated + 1
 	}
 	return graduated
-}
-
-// record captures this run, or returns nil when it cannot.
-func (session *runCacheSession) record(exitCode int) *program.RunCache {
-	// A replay renders its footer from the summary, so a run that recorded none would replay a verdict with
-	// no footer. Refused here, once, rather than resting on every verdict path remembering writeRunEnd.
-	if session.summary == nil {
-		session.note("a run that recorded no summary is not recorded: its replay would print a verdict with no footer")
-		return nil
-	}
-	present, absent, probed := session.recorder.Inputs()
-	files := append(present, session.extraFiles...)
-	absent = append(absent, session.extraAbsent...)
-	cache, err := program.RecordRunCache(session.key, files, session.extraDirectories, absent, probed,
-		recordedOutput(session.stdout.buffer.Bytes(), session.anchor), exitCode, session.readSince)
-	if err != nil {
-		// Not recording is always safe. Said on stderr because a cache that silently never records is
-		// a saving that quietly never appears.
-		session.note(fmt.Sprintf("the run cache did not record this run: %v", firstLine(err.Error())))
-		return nil
-	}
-	cache.Errors = recordedOutput(session.stderr.buffer.Bytes(), session.anchor)
-	cache.KeyParts = session.keyParts
-	cache.RecordedUnixNanoseconds = time.Now().UnixNano()
-	cache.Summary = recordedOutput(session.summary, session.anchor)
-	return cache
-}
-
-// write puts this run's record, findings, shapes and types into the table, each into its own file, once.
-//
-// Only this run's files are written: its own invocation's run, and the sections it produced. Another
-// invocation's run is another file, so a bare run and `--no-fix` started together never erase each other's
-// record, and nothing has to be read back first to keep it. Two runs writing the same section is a race the
-// later one wins, which costs a miss; nothing here can make a stale entry match, since every entry carries
-// its own proof.
-//
-// The findings are saved even when the run itself was declined. Their entries are keyed on each file's
-// bytes, so a file the fix phase rewrote left an entry for bytes that no longer exist, which can never
-// match.
-func (session *runCacheSession) write(recorded *program.RunCache) {
-	table := program.NewCacheTable()
-	var sections program.CacheTableSections
-	if recorded != nil {
-		table.Runs[session.invocation] = recorded
-		sections.Runs = []string{session.invocation}
-	}
-	if session.findings != nil {
-		table.Findings = session.findings.Recorded()
-		table.Findings.KeyParts = session.findingsKeyParts
-		sections.Findings = true
-	}
-	if session.shapes != nil {
-		table.Signatures = session.shapes
-		sections.Signatures = true
-	}
-	if session.types != nil {
-		if recorded := session.types.Recorded(); recorded != nil {
-			table.Types = recorded
-			sections.Types = true
-		}
-	}
-	if err := program.WriteCacheTable(session.directory, table, cacheTableIdentity(), sections, session.anchor); err != nil {
-		session.note(fmt.Sprintf("the cache table could not be written: %v", firstLine(err.Error())))
-	}
-}
-
-// note says something about recording this run. Before the caller has its verdict it goes to stderr, as
-// it always did; after, the caller has moved on and its terminal may hold someone else's prompt, so it is
-// kept beside the table for the next run to say instead (printPreviousNotes).
-func (session *runCacheSession) note(text string) {
-	cacheNote(session.directory, text)
 }
 
 // cacheNote says something about the cache in directory: on stderr while the caller is still waiting, and to
 // the next run once it has its verdict.
 func cacheNote(directory string, text string) {
 	if !verdictSent {
-		fmt.Fprintf(accountOutput(os.Stderr), "note: %s\n", text)
+		fmt.Fprintf(accountOutput(streams.Errors), "note: %s\n", text)
+		showWarning()
 		return
 	}
-	file, err := os.OpenFile(previousNotesPath(directory), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
-	if err != nil {
+	file, openError := os.OpenFile(previousNotesPath(directory), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	if openError != nil {
 		return
 	}
-	fmt.Fprintln(file, text)
-	file.Close()
+	// Ignored: the caller has its verdict and its terminal may hold someone else's prompt, so a note that cannot be
+	// kept for the next run has nowhere left to be said, as one whose file cannot be opened above.
+	_, _ = fmt.Fprintln(file, text)
+	_ = file.Close() // Ignored: as the write's, above.
 }
 
 // previousNotesPath is where a run that answered its caller early keeps what it had to say afterward.
@@ -780,16 +671,19 @@ func previousNotesPath(directory string) string {
 // A cache write that failed in the background otherwise fails silently forever, the saving quietly gone.
 func printPreviousNotes(directory string) {
 	path := previousNotesPath(directory)
-	contents, err := os.ReadFile(path)
-	if err != nil {
+	contents, readError := os.ReadFile(path)
+	if readError != nil {
 		return
 	}
-	os.Remove(path)
+	// Ignored: notes that cannot be cleared are said again by the next run, which repeats what is true rather
+	// than losing it.
+	_ = os.Remove(path)
 	for line := range strings.SplitSeq(strings.TrimSpace(string(contents)), "\n") {
 		if line != "" {
-			fmt.Fprintf(accountOutput(os.Stderr), "note: after the last run returned, %s\n", line)
+			fmt.Fprintf(accountOutput(streams.Errors), "note: after the last run returned, %s\n", line)
 		}
 	}
+	showWarning()
 }
 
 func firstLine(text string) string {
@@ -799,71 +693,39 @@ func firstLine(text string) string {
 	return text
 }
 
-// invocationTag marks a line that is true of this invocation and false of any replay of it.
-//
-// A recorded report says "graph built in 436ms" and "types ran in 409ms". Replayed, those lines claim
-// a graph was built that was not, and durations this run did not spend. So each line describing the
-// invocation rather than the tree is written through invocationOutput, which tags it; the tee strips
-// the tag before the terminal and keeps the line out of what is replayed. The tag is a record
-// separator, which no line of cohere's output contains.
-var invocationTag = []byte("\x1ecohere-invocation\x1e")
-
-// invocationOutput returns where to write a line that describes this invocation rather than the tree.
-// Without a recording it is out itself, so a run that is not recorded prints exactly what it always did.
-func invocationOutput(out io.Writer) io.Writer {
-	if activeRunCache == nil {
-		return out
-	}
-	return &taggingWriter{out: out, tag: invocationTag, atLineStart: true}
+// printInvocation prints a line that describes this invocation rather than the tree. While a recording is in
+// progress each of its lines is tagged (see invocationTag); without one it prints exactly what it always did.
+func printInvocation(out *bufio.Writer, format string, arguments ...any) {
+	printTagged(out, invocationTag, fmt.Sprintf(format, arguments...))
 }
 
-// taggingWriter puts its tag at the start of every line it writes.
-type taggingWriter struct {
-	out         io.Writer
-	tag         []byte
-	atLineStart bool
+// printProvenance prints a line that is true of the tree and was produced by a phase, tagged while a recording
+// is in progress (see provenanceTag).
+func printProvenance(out *bufio.Writer, format string, arguments ...any) {
+	printTagged(out, provenanceTag, fmt.Sprintf(format, arguments...))
 }
 
-func (w *taggingWriter) Write(data []byte) (int, error) {
-	written := 0
-	for len(data) > 0 {
-		if w.atLineStart {
-			if _, err := w.out.Write(w.tag); err != nil {
-				return written, err
-			}
-			w.atLineStart = false
-		}
-		end := bytes.IndexByte(data, '\n')
-		chunk := data
-		if end >= 0 {
-			chunk = data[:end+1]
-			w.atLineStart = true
-		}
-		n, err := w.out.Write(chunk)
-		written += n
-		if err != nil {
-			return written, err
-		}
-		data = data[len(chunk):]
+// printTagged prints text, tagged when a recording is in progress. The text is whole before it is tagged, so every
+// line of it starts with the tag however the stream later splits its writes.
+func printTagged(out *bufio.Writer, tag []byte, text string) {
+	printed := text
+	if activeRunCache != nil {
+		printed = tagLines(text, tag)
 	}
-	return written, nil
+	fmt.Fprint(out, printed)
 }
 
-// provenanceTag marks a line that is true of the tree but was produced by a phase, so a replay prints it
-// with where it came from.
-//
-// "fix: 0 of 5 files rewritten, 5 not formatted" is true of an unchanged tree and its not-formatted count
-// is actionable, so a replay keeps it. Printed bare it would claim the fix phase ran on a run where
-// nothing ran, so it is replayed as "fix (from the cached run at 03:41): ...". Unlike invocationTag the
-// line stays in the recording, tagged, so the replay can find it without matching on its text.
-var provenanceTag = []byte("\x1ecohere-provenance\x1e")
-
-// provenanceOutput returns where to write such a line. Without a recording it is out itself.
-func provenanceOutput(out io.Writer) io.Writer {
-	if activeRunCache == nil {
-		return out
+// tagLines is text with tag at the start of every line. A text that ends without a newline ends on a tagged
+// line, and an empty one stays empty.
+func tagLines(text string, tag []byte) string {
+	var tagged strings.Builder
+	for line := range strings.SplitAfterSeq(text, "\n") {
+		if line != "" {
+			tagged.Write(tag)
+			tagged.WriteString(line)
+		}
 	}
-	return &taggingWriter{out: out, tag: provenanceTag, atLineStart: true}
+	return tagged.String()
 }
 
 // replayLines is a recording made printable: each provenance-tagged line "label: rest" becomes
@@ -895,13 +757,14 @@ var rootTag = []byte("\x1ecohere-root\x1e")
 // target, replaced by rootTag. Only a whole path component is replaced: a root of /work/app leaves
 // /work/application alone.
 func recordedOutput(output []byte, anchor program.PathAnchor) []byte {
+	recorded := output
 	for _, root := range []string{anchor.Root(), anchor.Resolved()} {
 		if root == "" {
 			continue
 		}
-		output = replaceRoot(output, []byte(root), rootTag)
+		recorded = replaceRoot(recorded, []byte(root), rootTag)
 	}
-	return output
+	return recorded
 }
 
 // spelledOutput is a recording's output with rootTag replaced by the root as this run spells it.
@@ -915,23 +778,24 @@ func spelledOutput(output []byte, anchor program.PathAnchor) []byte {
 // colon or a comma.
 func replaceRoot(output []byte, root []byte, replacement []byte) []byte {
 	var replaced bytes.Buffer
+	remaining := output
 	for {
-		position := bytes.Index(output, root)
+		position := bytes.Index(remaining, root)
 		if position < 0 {
-			replaced.Write(output)
+			replaced.Write(remaining)
 			return replaced.Bytes()
 		}
 		end := position + len(root)
-		if position > 0 && !endsEscape(output[:position]) &&
-			(output[position-1] == '/' || output[position-1] == '\\' || continuesName(output[position-1])) ||
-			end < len(output) && continuesName(output[end]) {
-			replaced.Write(output[:end])
-			output = output[end:]
+		if position > 0 && !endsEscape(remaining[:position]) &&
+			(remaining[position-1] == '/' || remaining[position-1] == '\\' || continuesName(remaining[position-1])) ||
+			end < len(remaining) && continuesName(remaining[end]) {
+			replaced.Write(remaining[:end])
+			remaining = remaining[end:]
 			continue
 		}
-		replaced.Write(output[:position])
+		replaced.Write(remaining[:position])
 		replaced.Write(replacement)
-		output = output[end:]
+		remaining = remaining[end:]
 	}
 }
 
@@ -940,12 +804,12 @@ func replaceRoot(output []byte, root []byte, replacement []byte) []byte {
 func endsEscape(text []byte) bool {
 	// A color sequence is a few bytes, so only the tail is searched: a report with thousands of paths and no
 	// color would otherwise be scanned back to its start for each one.
-	text = text[max(0, len(text)-16):]
-	start := bytes.LastIndexByte(text, 0x1b)
-	if start < 0 || len(text)-start < 3 || text[start+1] != '[' || text[len(text)-1] != 'm' {
+	tail := text[max(0, len(text)-16):]
+	start := bytes.LastIndexByte(tail, 0x1b)
+	if start < 0 || len(tail)-start < 3 || tail[start+1] != '[' || tail[len(tail)-1] != 'm' {
 		return false
 	}
-	for _, character := range text[start+2 : len(text)-1] {
+	for _, character := range tail[start+2 : len(tail)-1] {
 		if character != ';' && (character < '0' || character > '9') {
 			return false
 		}
@@ -964,13 +828,15 @@ func continuesName(next byte) bool {
 // findings and coverage, and only their uncacheable rules are walked. See program.FindingsReuse.
 //
 // Only a run being recorded gets one, so it is exactly as narrow as the run cache.
+//
+// Mutates: graph the caller's graph is what lints and checks, so the caches it reads are attached to it here
 func attachFindingsCache(graph *program.Graph, location projectLocation) {
 	session := activeRunCache
 	if session == nil || graph == nil {
 		return
 	}
-	parts, err := findingsCacheKey(graph, location)
-	if err != nil {
+	parts, findingsCacheKeyError := findingsCacheKey(graph, location)
+	if findingsCacheKeyError != nil {
 		// Without a key nothing can be proven unchanged, so nothing is replayed or recorded.
 		return
 	}
@@ -980,7 +846,8 @@ func attachFindingsCache(graph *program.Graph, location projectLocation) {
 	case previous == nil:
 		session.findingsMissed = "no findings are on record"
 	case previous.Key != key:
-		session.findingsMissed = "the findings on record were taken under another key: " + parts.Changed(previous.KeyParts)
+		session.findingsMissed = "the findings on record were taken under another key: " +
+			parts.Changed(previous.KeyParts)
 	}
 	session.findings = program.NewFindingsReuse(key, session.table.Findings, session.anchor)
 
@@ -998,7 +865,7 @@ func attachFindingsCache(graph *program.Graph, location projectLocation) {
 	if graph.Readiness != nil {
 		session.findings.MeasureReadiness()
 	}
-	if typesKey, err := typesCacheKey(graph, location); err == nil {
+	if typesKey, typesCacheKeyError := typesCacheKey(graph, location); typesCacheKeyError == nil {
 		session.types = program.NewTypeDiagnosticsReuse(session.table.Types, typesKey)
 	}
 }
@@ -1011,6 +878,8 @@ func attachFindingsCache(graph *program.Graph, location projectLocation) {
 // no findings cache, lint walked every rule over every file. Shapes are keyed per file on its bytes
 // (Graph.Signatures), so seeding from the replaced graph's recomputes exactly the rewritten files, and the
 // findings cache is per file on bytes and fingerprints, so the one cache serves both graphs.
+//
+// Mutates: rebuilt the graph the caller lints after the fix is handed the caches the replaced graph had
 func carryCaches(replaced *program.Graph, rebuilt *program.Graph) {
 	rebuilt.FindingsReuse = replaced.FindingsReuse
 	if replaced.Shapes == nil {
@@ -1039,73 +908,47 @@ func activeTypesReuse() *program.TypeDiagnosticsReuse {
 	return nil
 }
 
-// pendingTypes is the types section of a run the run cache does not record, nil for every other run.
-var pendingTypes *typesRecord
-
-// typesRecord is the types section's own reading and writing, for a run with no recording to carry it: any
-// flag, any named path, the editor's save of one file (#hfv0ae3). Those runs paid the full incremental
-// session, about 180ms reading the build info and 150ms rewriting it, whether they checked 84 files or
-// 3,889. The section is keyed per file on the shape fingerprint and on the compiler options, never on the
-// arguments, so a scoped run may replay what a bare run recorded and the other way round.
-type typesRecord struct {
-	directory string
-	anchor    program.PathAnchor
-	reuse     *program.TypeDiagnosticsReuse
-
-	// shapes is every project file's shape this run, kept for the next when computedShapes says any was
-	// computed rather than carried from the table.
-	shapes         map[string]program.SignatureEntry
-	computedShapes int
-	// shapesGraph is the graph shapes describe. See runCacheSession.shapesGraph.
-	shapesGraph *program.Graph
-}
-
 // attachTypesCache gives a run the run cache does not record the types section, and the shapes it is keyed
 // on. A recorded run already has both from attachFindingsCache.
+//
+// Mutates: graph the caller's graph is what checks, so the shapes the types section is keyed on are set on it
 func attachTypesCache(graph *program.Graph, location projectLocation) {
 	if cacheOff || activeRunCache != nil || graph == nil {
 		return
 	}
-	typesKey, err := typesCacheKey(graph, location)
-	if err != nil {
+	typesKey, typesCacheKeyError := typesCacheKey(graph, location)
+	if typesCacheKeyError != nil {
 		return
 	}
 	prepareCacheDirectory(location.Root)
 	directory := cacheDirectory(location.Root)
 	release, _ := holdTableReadLock(directory, tableWriterWait)
 	anchor := program.NewPathAnchor(location.Root)
-	table, _ := program.ReadCacheTable(directory, cacheTableIdentity(), program.CacheTableSections{Signatures: true, Types: true}, anchor)
+	// Ignored: a table missing or unreadable reads as empty, so the types section and the shapes start cold and are
+	// written whole; beginRunCache is where a discarded table is said.
+	table, _ := program.ReadCacheTable(
+		directory,
+		cacheTableIdentity(),
+		program.CacheTableSections{Signatures: true, Types: true},
+		anchor,
+	)
 	release()
-	record := &typesRecord{directory: directory, anchor: anchor, reuse: program.NewTypeDiagnosticsReuse(table.Types, typesKey)}
-	record.shapes, record.computedShapes = graph.Signatures(context.Background(), graph.SeedSignatures(table.Signatures))
+	record := &typesRecord{
+		directory: directory,
+		anchor:    anchor,
+		reuse:     program.NewTypeDiagnosticsReuse(table.Types, typesKey),
+	}
+	record.shapes, record.computedShapes = graph.Signatures(
+		context.Background(),
+		graph.SeedSignatures(table.Signatures),
+	)
 	record.shapesGraph = graph
 	graph.Shapes = record.shapes
 	pendingTypes = record
 }
 
-// write puts the section, and the shapes when any was computed, into their files, and writes nothing when
-// neither moved. The caller holds the table's lock.
-func (record *typesRecord) write() {
-	if record.reuse.Unchanged() && record.computedShapes == 0 {
-		return
-	}
-	table := program.NewCacheTable()
-	var sections program.CacheTableSections
-	if recorded := record.reuse.Recorded(); recorded != nil {
-		table.Types = recorded
-		sections.Types = true
-	}
-	if record.computedShapes > 0 {
-		table.Signatures = record.shapes
-		sections.Signatures = true
-	}
-	if err := program.WriteCacheTable(record.directory, table, cacheTableIdentity(), sections, record.anchor); err != nil {
-		cacheNote(record.directory, fmt.Sprintf("the cache table could not be written: %v", firstLine(err.Error())))
-	}
-}
-
 // anyRuleKeyedOnShapes reports whether any rule declares rule.TypeReachShapes.
-func anyRuleKeyedOnShapes(rules []rule.Rule) bool {
+func anyRuleKeyedOnShapes(rules []rule.Entry) bool {
 	for _, subject := range rules {
 		if subject.TypeReach == rule.TypeReachShapes {
 			return true
@@ -1129,20 +972,20 @@ func findingsCacheKey(graph *program.Graph, location projectLocation) (program.R
 	anchor := program.NewPathAnchor(location.Root)
 	// An embedded set is hashed by its text, read the way the loader reads it, as a file is.
 	for _, lintConfigFile := range lintConfigFiles {
-		contents, err := configuration.SourceContents(lintConfigFile)
-		if err != nil {
-			return program.RunCacheKeyParts{}, err
+		contents, sourceContentsError := configuration.SourceContents(lintConfigFile)
+		if sourceContentsError != nil {
+			return program.RunCacheKeyParts{}, sourceContentsError
 		}
 		facts = append(facts, fmt.Sprintf("lint-config %s=%x", anchor.Stable(lintConfigFile), sha256.Sum256(contents)))
 	}
 	// Under zero config which sets a file gets is decided by the whole program, so a file can change sets
 	// without its own bytes changing, when another file starts importing next.
-	if fingerprint := graph.LintConfig.DetectionFingerprint(); fingerprint != "" {
+	if fingerprint := graph.LintConfiguration.DetectionFingerprint(); fingerprint != "" {
 		facts = append(facts, "house-sets="+fingerprint)
 	}
-	compilerFacts, err := compilerOptionsFacts(graph, location)
-	if err != nil {
-		return program.RunCacheKeyParts{}, err
+	compilerFacts, compilerOptionsFactsError := compilerOptionsFacts(graph, location)
+	if compilerOptionsFactsError != nil {
+		return program.RunCacheKeyParts{}, compilerOptionsFactsError
 	}
 	facts = append(facts, compilerFacts...)
 	names := make([]string, 0, len(registry.All()))
@@ -1157,13 +1000,13 @@ func findingsCacheKey(graph *program.Graph, location projectLocation) (program.R
 // binary, the project root, and the compiler options, as the bytes of the tsconfig and every file it extends.
 // The lint config and the rules are left out, since the compiler reads neither.
 func typesCacheKey(graph *program.Graph, location projectLocation) ([sha256.Size]byte, error) {
-	facts, err := compilerOptionsFacts(graph, location)
-	if err != nil {
-		return [sha256.Size]byte{}, err
+	facts, compilerOptionsFactsError := compilerOptionsFacts(graph, location)
+	if compilerOptionsFactsError != nil {
+		return [sha256.Size]byte{}, compilerOptionsFactsError
 	}
-	key, err := program.RunCacheKey(nil, program.NewPathAnchor(location.Root).Resolved(), facts...)
-	if err != nil {
-		return [sha256.Size]byte{}, err
+	key, runCacheKeyError := program.RunCacheKey(nil, program.NewPathAnchor(location.Root).Resolved(), facts...)
+	if runCacheKeyError != nil {
+		return [sha256.Size]byte{}, runCacheKeyError
 	}
 	return sha256.Sum256([]byte(key)), nil
 }
@@ -1174,20 +1017,20 @@ func compilerOptionsFacts(graph *program.Graph, location projectLocation) ([]str
 	facts := []string{}
 	anchor := program.NewPathAnchor(location.Root)
 	fileFact := func(label string, path string) error {
-		contents, err := os.ReadFile(path)
-		if err != nil {
-			return err
+		contents, readError := os.ReadFile(path)
+		if readError != nil {
+			return readError
 		}
 		facts = append(facts, fmt.Sprintf("%s %s=%x", label, anchor.Stable(path), sha256.Sum256(contents)))
 		return nil
 	}
-	if err := fileFact("tsconfig", location.ConfigFileName); err != nil {
-		return nil, err
+	if fileFactError := fileFact("tsconfig", location.ConfigFileName); fileFactError != nil {
+		return nil, fileFactError
 	}
-	if graph.Config != nil {
-		for _, extended := range graph.Config.ExtendedSourceFiles() {
-			if err := fileFact("extends", extended.AsString()); err != nil {
-				return nil, err
+	if graph.Configuration != nil {
+		for _, extended := range graph.Configuration.ExtendedSourceFiles() {
+			if fileFactError := fileFact("extends", extended.AsString()); fileFactError != nil {
+				return nil, fileFactError
 			}
 		}
 	}

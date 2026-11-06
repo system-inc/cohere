@@ -2,9 +2,9 @@
 // the declarations that dropped, substituting resolved nodes into a parsed value, and the
 // registration-time normalization of `--value()` argument lists.
 //
-// Split out of utility.go because these are mechanics rather than semantics. The rules that decide
+// Split out of utility_evaluation.go because these are mechanics rather than semantics. The rules that decide
 // a reading live there; what is here is the tree surgery those rules ask for, and keeping them
-// apart is what lets utility.go read as the same sequence of branches upstream's `createCssUtility`
+// apart is what lets utility_evaluation.go read as the same sequence of branches upstream's `createCssUtility`
 // is.
 //
 // Ported from `src/utilities.ts` and `src/ast.ts` at Tailwind 4.3.3.
@@ -117,6 +117,9 @@ func unionNodeSets(left, right map[*Node]bool) map[*Node]bool {
 // Reprinting rather than restructuring is safe here because ValueToCss is the exact inverse of
 // ParseValue for every string these resolutions produce: theme references, numbers, and bracketed
 // values, none of which contain the unmatched `)` that is the only input that does not round-trip.
+//
+// Mutates: node the call becomes a word holding the reprinted replacement, which is how the splice
+// reaches the parent's list without a parent pointer
 func replaceValueNode(node *ValueNode, resolved []ValueNode) {
 	node.Kind = ValueNodeKindWord
 	node.Value = ValueToCss(resolved)
@@ -221,18 +224,19 @@ func normalizeValueFunctionNodes(nodes []ValueNode) {
 // it first would erase the space the join matches on and produce an argument that names no
 // namespace at all.
 func normalizeValueFunctionArgument(argument string) string {
-	argument = escapedStarPattern.ReplaceAllString(argument, "*")
-	argument = spacedNestedKeyPattern.ReplaceAllString(argument, "--$1-*--$2")
-	argument = whitespacePattern.ReplaceAllString(argument, "")
-	argument = repeatedStarSuffixPattern.ReplaceAllString(argument, "-*")
+	normalized := escapedStarPattern.ReplaceAllString(argument, "*")
+	normalized = spacedNestedKeyPattern.ReplaceAllString(normalized, "--$1-*--$2")
+	normalized = whitespacePattern.ReplaceAllString(normalized, "")
+	normalized = repeatedStarSuffixPattern.ReplaceAllString(normalized, "-*")
 
 	// A bare `--foo` argument gains the `-*` suffix that marks it as a namespace. The two guards
 	// are upstream's: an argument containing `(` is a call such as `--default(4)` and is left
 	// alone, and one already carrying `-*` anywhere is already in namespace form.
-	if strings.HasPrefix(argument, "--") && !strings.Contains(argument, "(") && !strings.Contains(argument, "-*") {
-		argument += "-*"
+	if strings.HasPrefix(normalized, "--") && !strings.Contains(normalized, "(") &&
+		!strings.Contains(normalized, "-*") {
+		normalized += "-*"
 	}
-	return argument
+	return normalized
 }
 
 // modFloat is JavaScript's `%` on two numbers.

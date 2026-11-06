@@ -2,9 +2,7 @@ package main
 
 import (
 	"fmt"
-	"math"
 	"os"
-	"runtime/debug"
 	"strconv"
 	"strings"
 	"testing"
@@ -39,19 +37,6 @@ func init() {
 	activeMemoryPolicy.apply()
 }
 
-// memoryPolicy is what this process decided about its collector, kept so the summary can say so.
-type memoryPolicy struct {
-	// environment names the variables that set the collector, when any did, and then nothing else applies.
-	environment string
-	// available is the memory free for this run when it started, ceiling the limit set from it.
-	available uint64
-	ceiling   uint64
-	// unreadable is why available memory could not be read, which leaves the runtime's defaults.
-	unreadable error
-	// testBinary is a `go test` process, which keeps the runtime's defaults.
-	testBinary bool
-}
-
 // memoryCeilingFraction is the share of available memory one run may take before collecting.
 const memoryCeilingFraction = 0.5
 
@@ -65,37 +50,14 @@ func decideMemoryPolicy(lookupEnvironment func(string) (string, bool), available
 	if len(set) > 0 {
 		return memoryPolicy{environment: strings.Join(set, " ")}
 	}
-	bytes, err := available()
-	if err != nil {
-		return memoryPolicy{unreadable: err}
+	bytes, availableError := available()
+	if availableError != nil {
+		return memoryPolicy{unreadable: availableError}
 	}
 	if bytes == 0 {
 		return memoryPolicy{unreadable: fmt.Errorf("it read as zero")}
 	}
 	return memoryPolicy{available: bytes, ceiling: uint64(float64(bytes) * memoryCeilingFraction)}
-}
-
-func (p memoryPolicy) apply() {
-	if p.ceiling == 0 {
-		return
-	}
-	// The limit first: with collection off and no limit, nothing would bound the heap for the instant
-	// between the two calls.
-	debug.SetMemoryLimit(int64(min(p.ceiling, math.MaxInt64)))
-	debug.SetGCPercent(-1)
-}
-
-// line is the summary's account of the collector, so a run's memory use is never a surprise.
-func (p memoryPolicy) line() string {
-	switch {
-	case p.testBinary:
-		return "memory: the collector runs at Go's default, since this is a test binary"
-	case p.environment != "":
-		return "memory: the environment sets the collector (" + p.environment + ")"
-	case p.unreadable != nil:
-		return fmt.Sprintf("memory: the collector runs at Go's default, since available memory could not be read (%v)", p.unreadable)
-	}
-	return fmt.Sprintf("memory: collector off, ceiling %s (half of %s available)", gigabytes(p.ceiling), gigabytes(p.available))
 }
 
 // darwinAvailableMemory is free pages, plus file-backed pages (the cache the kernel drops before anything
@@ -109,8 +71,8 @@ func darwinAvailableMemory(pageSize, free, fileBacked, purgeable uint64) uint64 
 // linuxCgroupMemory is what a cgroup says about this process's memory, each file's raw bytes, any of
 // them missing outside a container or under the other cgroup version.
 type linuxCgroupMemory struct {
-	v2Max, v2Current []byte // memory.max, memory.current
-	v1Limit, v1Usage []byte // memory/memory.limit_in_bytes, memory/memory.usage_in_bytes
+	v2Maximum, v2Current []byte // memory.max, memory.current
+	v1Limit, v1Usage     []byte // memory/memory.limit_in_bytes, memory/memory.usage_in_bytes
 }
 
 // linuxAvailableMemory is MemAvailable from /proc/meminfo, lowered to the room left under the cgroup's
@@ -124,9 +86,13 @@ func linuxAvailableMemory(meminfo []byte, cgroup linuxCgroupMemory) (uint64, err
 		if !ok {
 			continue
 		}
-		kilobytes, err := strconv.ParseUint(strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(rest), "kB")), 10, 64)
-		if err != nil {
-			return 0, fmt.Errorf("reading MemAvailable from /proc/meminfo: %w", err)
+		kilobytes, parseError := strconv.ParseUint(
+			strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(rest), "kB")),
+			10,
+			64,
+		)
+		if parseError != nil {
+			return 0, fmt.Errorf("reading MemAvailable from /proc/meminfo: %w", parseError)
 		}
 		available, found = kilobytes*1024, true
 		break
@@ -134,14 +100,14 @@ func linuxAvailableMemory(meminfo []byte, cgroup linuxCgroupMemory) (uint64, err
 	if !found {
 		return 0, fmt.Errorf("/proc/meminfo has no MemAvailable line")
 	}
-	for _, pair := range [][2][]byte{{cgroup.v2Max, cgroup.v2Current}, {cgroup.v1Limit, cgroup.v1Usage}} {
+	for _, pair := range [][2][]byte{{cgroup.v2Maximum, cgroup.v2Current}, {cgroup.v1Limit, cgroup.v1Usage}} {
 		// memory.max reads "max" when there is no limit, which fails the parse and so applies none.
-		limit, err := strconv.ParseUint(strings.TrimSpace(string(pair[0])), 10, 64)
-		if err != nil {
+		limit, parseError := strconv.ParseUint(strings.TrimSpace(string(pair[0])), 10, 64)
+		if parseError != nil {
 			continue
 		}
 		room := limit
-		if used, err := strconv.ParseUint(strings.TrimSpace(string(pair[1])), 10, 64); err == nil {
+		if used, parseError := strconv.ParseUint(strings.TrimSpace(string(pair[1])), 10, 64); parseError == nil {
 			room = 0
 			if used < limit {
 				room = limit - used

@@ -20,10 +20,10 @@ const radixFile = "/repository/source/Radix.ts"
 // Extracted by loading upstream's tester with a stubbed RuleTester and rendering these literals
 // from that JSON, so nothing was retyped. The generator refuses any byte outside printable ASCII.
 //
-// Run through the TYPED harness because the shadow question is resolution: a local parseInt is
+// Run through the typed harness because the shadow question is resolution: a local parseInt is
 // not the global one, and only the checker can say which a name is.
-func TestRadixFires(t *testing.T) {
-	t.Parallel()
+func TestRadixFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -75,9 +75,9 @@ func TestRadixFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, Radix, radixFile,
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, Radix, radixFile,
 				testCase.sourceText), testCase.messages...)
 		})
 	}
@@ -85,12 +85,12 @@ func TestRadixFires(t *testing.T) {
 
 // The clean cases, which carry most of this rule's discrimination.
 //
-// Four groups matter. A radix the rule cannot evaluate is ACCEPTED rather than guessed at, which
+// Four groups matter. A radix the rule cannot evaluate is accepted rather than guessed at, which
 // is why foo, +radix and ~1 are all here. A spread in either of the first two positions abandons
 // the call. A shadowed parseInt or Number is not the global one. And a private name or a computed
 // key that is not a literal string is not Number.parseInt at all.
-func TestRadixStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestRadixStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	for _, sourceText := range []string{
 		"parseInt(\"10\", 10);",
@@ -140,16 +140,16 @@ func TestRadixStaysSilent(t *testing.T) {
 		"parseInt(\"10\", foo);",
 		"parseInt(\"10\", foo);",
 	} {
-		t.Run(sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, Radix, radixFile, sourceText))
+		test.Run(sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, Radix, radixFile, sourceText))
 		})
 	}
 }
 
 // The suggestion vectors, which are upstream's own suggestion outputs.
 //
-// rule_testing can apply a FIX but not a SUGGESTION, so the repair is applied by hand here. That
+// rule_testing can apply a fix but not a suggestion, so the repair is applied by hand here. That
 // is required rather than optional: a suggestion writing the right text over the wrong span
 // passes every message-id assertion above, and this rule's insertion point is computed from the
 // source text rather than from a node, which is exactly where such a defect would live.
@@ -157,8 +157,8 @@ func TestRadixStaysSilent(t *testing.T) {
 // The trailing-comma rows are the reason the insertion reads the source at all: with a comma
 // already present upstream writes " 10," rather than ", 10", so parseInt("10",) becomes
 // parseInt("10", 10,) and not parseInt("10",, 10).
-func TestRadixSuggestsARadixOfTen(t *testing.T) {
-	t.Parallel()
+func TestRadixSuggestsARadixOfTen(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -182,31 +182,31 @@ func TestRadixSuggestsARadixOfTen(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, Radix, radixFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "missingRadix")
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, Radix, radixFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "missingRadix")
 			if len(result.Diagnostics[0].Suggestions) != 1 {
-				t.Fatalf("expected exactly one suggestion, got %d",
+				test.Fatalf("expected exactly one suggestion, got %d",
 					len(result.Diagnostics[0].Suggestions))
 			}
 			suggestion := result.Diagnostics[0].Suggestions[0]
 			if suggestion.Message.Id != "addRadixParameter10" {
-				t.Errorf("expected the message id addRadixParameter10, got %q",
+				test.Errorf("expected the message id addRadixParameter10, got %q",
 					suggestion.Message.Id)
 			}
 			// The typed harness writes strings.TrimSpace(source)+"\n", so the expectation is
 			// transformed the same way the input was rather than the rule being padded to match.
 			// Without this the applier looks broken on fifteen byte-correct repairs.
 			wantSource := strings.TrimSpace(testCase.wantSource) + "\n"
-			if applied := applyRadixSuggestion(t, result, suggestion); applied != wantSource {
-				t.Errorf("applying the suggestion gave\n  %q\nwant\n  %q", applied, wantSource)
+			if applied := applyRadixSuggestion(test, result, suggestion); applied != wantSource {
+				test.Errorf("applying the suggestion gave\n  %q\nwant\n  %q", applied, wantSource)
 			}
 			// The rule must not also propose an unattended fix. Upstream offers a suggestion
 			// precisely because adding a radix changes what the call returns, and shipping the
 			// same edit as a fix would have the engine apply it without anyone choosing it.
 			if len(result.Diagnostics[0].Fixes) != 0 {
-				t.Errorf("expected no unattended fix, got %d", len(result.Diagnostics[0].Fixes))
+				test.Errorf("expected no unattended fix, got %d", len(result.Diagnostics[0].Fixes))
 			}
 		})
 	}
@@ -217,9 +217,9 @@ func TestRadixSuggestsARadixOfTen(t *testing.T) {
 // Hand-rolled because rule_testing has no ExpectSuggestedSource. The source is read back off the
 // result rather than from the test literal, so the harness's own trimming cannot put this off by
 // one the way it does for a span sliced from a Go literal.
-func applyRadixSuggestion(t *testing.T, result rule_testing.Result,
+func applyRadixSuggestion(test *testing.T, result rule_testing.Result,
 	suggestion rule.Suggestion) string {
-	t.Helper()
+	test.Helper()
 
 	source := result.SourceFile.Text()
 	// Applied back to front so an earlier edit does not shift a later one's offsets.
@@ -228,7 +228,7 @@ func applyRadixSuggestion(t *testing.T, result rule_testing.Result,
 		fix := suggestion.Fixes[index]
 		start, end := fix.Range.Pos(), fix.Range.End()
 		if start < 0 || end > len(applied) || start > end {
-			t.Fatalf("the suggestion proposed a range [%d,%d) outside a %d byte source",
+			test.Fatalf("the suggestion proposed a range [%d,%d) outside a %d byte source",
 				start, end, len(applied))
 		}
 		applied = applied[:start] + fix.Text + applied[end:]
@@ -243,8 +243,8 @@ func applyRadixSuggestion(t *testing.T, result rule_testing.Result,
 // above is satisfied by a rule reporting only the callee, so this is what records which was ported,
 // and it matters here because the suggestion's insertion point is computed relative to the reported
 // node's end.
-func TestRadixPointsAtTheWholeCall(t *testing.T) {
-	t.Parallel()
+func TestRadixPointsAtTheWholeCall(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -255,14 +255,14 @@ func TestRadixPointsAtTheWholeCall(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, Radix, radixFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "missingRadix")
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, Radix, radixFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "missingRadix")
 			source := result.SourceFile.Text()
 			reported := source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 			if reported != testCase.want {
-				t.Errorf("expected the finding on %q, pointed at %q", testCase.want, reported)
+				test.Errorf("expected the finding on %q, pointed at %q", testCase.want, reported)
 			}
 		})
 	}
@@ -270,9 +270,9 @@ func TestRadixPointsAtTheWholeCall(t *testing.T) {
 
 // Shadowing is resolved per call site here, where upstream resolves it per file.
 //
-// Upstream asks eslint-scope for the PROGRAM scope's `parseInt` variable and reports only if
+// Upstream asks eslint-scope for the program scope's `parseInt` variable and reports only if
 // nothing defines it, which makes the answer whole-file. Measured against the installed rule,
-// `{ let parseInt; } parseInt("10");` is CLEAN upstream, even though the block-scoped binding cannot
+// `{ let parseInt; } parseInt("10");` is clean upstream, even though the block-scoped binding cannot
 // reach the call and the call really is the global `parseInt` missing a radix.
 //
 // This port resolves the identifier at the call site, so that input reports. The divergence is
@@ -282,8 +282,8 @@ func TestRadixPointsAtTheWholeCall(t *testing.T) {
 //
 // The rows around it pin the cases where the two agree, so this test would notice a port that had
 // simply stopped checking for shadows at all.
-func TestRadixResolvesShadowsPerCallSite(t *testing.T) {
-	t.Parallel()
+func TestRadixResolvesShadowsPerCallSite(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -300,9 +300,9 @@ func TestRadixResolvesShadowsPerCallSite(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, Radix, radixFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, Radix, radixFile,
 				testCase.sourceText), testCase.messages...)
 		})
 	}
@@ -319,8 +319,8 @@ func TestRadixResolvesShadowsPerCallSite(t *testing.T) {
 //
 // The options go through DecodeRadixOptions rather than being built by hand, so a decoder that
 // refused a value or decoded it into something the rule reacted to would fail here.
-func TestRadixIgnoresItsDeprecatedOption(t *testing.T) {
-	t.Parallel()
+func TestRadixIgnoresItsDeprecatedOption(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -336,14 +336,14 @@ func TestRadixIgnoresItsDeprecatedOption(t *testing.T) {
 	}
 
 	for _, raw := range []string{"", `"always"`, `"as-needed"`} {
-		options, err := DecodeRadixOptions([]byte(raw))
-		if err != nil {
-			t.Fatalf("the decoder refused %q: %v", raw, err)
+		options, decodeRadixOptionsError := DecodeRadixOptions([]byte(raw))
+		if decodeRadixOptionsError != nil {
+			test.Fatalf("the decoder refused %q: %v", raw, decodeRadixOptionsError)
 		}
 		for _, testCase := range cases {
-			t.Run(raw+" "+testCase.sourceText, func(t *testing.T) {
-				t.Parallel()
-				rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, Radix, radixFile,
+			test.Run(raw+" "+testCase.sourceText, func(test *testing.T) {
+				test.Parallel()
+				rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, Radix, radixFile,
 					testCase.sourceText, options), testCase.messages...)
 			})
 		}
@@ -355,30 +355,30 @@ func TestRadixIgnoresItsDeprecatedOption(t *testing.T) {
 // `null` is the case worth naming: it unmarshals into a Go string as the empty one without an
 // error, so it is the enum check rather than the JSON decode that turns it away. A list is refused
 // because the config layer hands Decode one element, never the list around it.
-func TestDecodeRadixOptionsRefusesWhatTheSchemaRefuses(t *testing.T) {
-	t.Parallel()
+func TestDecodeRadixOptionsRefusesWhatTheSchemaRefuses(test *testing.T) {
+	test.Parallel()
 
 	for _, raw := range []string{
 		`"never"`, `"Always"`, `"as_needed"`, `""`, `null`, `10`, `true`, `{}`,
 		`{"mode": "always"}`, `["always"]`,
 	} {
-		t.Run(raw, func(t *testing.T) {
-			t.Parallel()
-			if _, err := DecodeRadixOptions([]byte(raw)); err == nil {
-				t.Errorf("expected %s to be refused, it was accepted", raw)
+		test.Run(raw, func(test *testing.T) {
+			test.Parallel()
+			if _, decodeRadixOptionsError := DecodeRadixOptions([]byte(raw)); decodeRadixOptionsError == nil {
+				test.Errorf("expected %s to be refused, it was accepted", raw)
 			}
 		})
 	}
 
 	for raw, want := range map[string]RadixMode{`"always"`: RadixAlways, `"as-needed"`: RadixAsNeeded} {
-		t.Run(raw, func(t *testing.T) {
-			t.Parallel()
-			decoded, err := DecodeRadixOptions([]byte(raw))
-			if err != nil {
-				t.Fatalf("expected %s to be accepted, got %v", raw, err)
+		test.Run(raw, func(test *testing.T) {
+			test.Parallel()
+			decoded, decodeRadixOptionsError := DecodeRadixOptions([]byte(raw))
+			if decodeRadixOptionsError != nil {
+				test.Fatalf("expected %s to be accepted, got %v", raw, decodeRadixOptionsError)
 			}
 			if decoded != want {
-				t.Errorf("expected %s to decode to %q, got %#v", raw, want, decoded)
+				test.Errorf("expected %s to decode to %q, got %#v", raw, want, decoded)
 			}
 		})
 	}

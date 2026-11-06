@@ -22,31 +22,16 @@ func checkCoherePin(path string, versionRange VersionRange) error {
 	if version == "dev" {
 		return nil
 	}
-	admitted, err := versionRange.Admits(version)
-	if err != nil {
+	admitted, admitsError := versionRange.Admits(version)
+	if admitsError != nil {
 		return fmt.Errorf("lint config %s pins cohere to %q, and this binary's own version %q does not read as a "+
-			"release version: %w", path, versionRange.Text, version, err)
+			"release version: %w", path, versionRange.Text, version, admitsError)
 	}
 	if !admitted {
 		return fmt.Errorf("lint config %s pins cohere to %q, and this binary is cohere %s: install a release "+
 			"that %q admits, or change the pin", path, versionRange.Text, version, versionRange.Text)
 	}
 	return nil
-}
-
-// VersionRange is the "cohere" key of a project's settings: the cohere releases that project accepts,
-// written the way npm writes a dependency range ("^1.0.0", "~1.4.2", ">=1.2.0 <2.0.0", "1.3.0 || 1.4.0").
-//
-// A project pins cohere so a machine running a different release refuses rather than reporting a
-// verdict the project never agreed to. Rule names, options and sets are part of a release's contract,
-// so a binary outside the range can read the same file and mean something else by it.
-type VersionRange struct {
-	// Text is the range as the file wrote it, for messages.
-	Text string
-
-	// alternatives are the `||`-separated comparator sets; a version satisfies the range when it
-	// satisfies every comparator of any one set.
-	alternatives [][]versionComparator
 }
 
 type versionComparator struct {
@@ -71,7 +56,9 @@ func ParseVersionRange(text string) (VersionRange, error) {
 	// Go whitespace: the "cohere" pin in cohere's own settings, which no JavaScript tool reads.
 	trimmed := strings.TrimSpace(text)
 	if trimmed == "" {
-		return VersionRange{}, fmt.Errorf("the \"cohere\" range is empty: write the releases this project accepts, like \"^1.0.0\"")
+		return VersionRange{}, fmt.Errorf(
+			"the \"cohere\" range is empty: write the releases this project accepts, like \"^1.0.0\"",
+		)
 	}
 	parsed := VersionRange{Text: trimmed}
 	for _, alternative := range strings.Split(trimmed, "||") {
@@ -82,9 +69,9 @@ func ParseVersionRange(text string) (VersionRange, error) {
 		}
 		var comparators []versionComparator
 		for _, field := range fields {
-			expanded, err := parseComparator(field)
-			if err != nil {
-				return VersionRange{}, fmt.Errorf("the \"cohere\" range %q: %w", trimmed, err)
+			expanded, parseComparatorError := parseComparator(field)
+			if parseComparatorError != nil {
+				return VersionRange{}, fmt.Errorf("the \"cohere\" range %q: %w", trimmed, parseComparatorError)
 			}
 			comparators = append(comparators, expanded...)
 		}
@@ -96,29 +83,35 @@ func ParseVersionRange(text string) (VersionRange, error) {
 // parseComparator reads one comparator, expanding a caret or tilde into the bounds npm gives it.
 func parseComparator(field string) ([]versionComparator, error) {
 	if field == "-" || strings.ContainsAny(field, "xX*") && !strings.ContainsAny(field, "-+") {
-		return nil, fmt.Errorf("%q is a wildcard or hyphen range, which this reader does not take; write the bounds, like \">=1.2.0 <2.0.0\"", field)
+		return nil, fmt.Errorf(
+			"%q is a wildcard or hyphen range, which this reader does not take; write the bounds, like \">=1.2.0 <2.0.0\"",
+			field,
+		)
 	}
 	for _, operator := range []string{">=", "<=", ">", "<", "=", "^", "~"} {
 		rest, found := strings.CutPrefix(field, operator)
 		if !found {
 			continue
 		}
-		version, err := parseSemanticVersion(rest)
-		if err != nil {
-			return nil, err
+		version, parseSemanticVersionError := parseSemanticVersion(rest)
+		if parseSemanticVersionError != nil {
+			return nil, parseSemanticVersionError
 		}
 		switch operator {
 		case "^":
 			return []versionComparator{{">=", version}, {"<", caretCeiling(version)}}, nil
 		case "~":
-			return []versionComparator{{">=", version}, {"<", semanticVersion{version.major, version.minor + 1, 0, []string{"0"}}}}, nil
+			return []versionComparator{
+				{">=", version},
+				{"<", semanticVersion{version.major, version.minor + 1, 0, []string{"0"}}},
+			}, nil
 		default:
 			return []versionComparator{{operator, version}}, nil
 		}
 	}
-	version, err := parseSemanticVersion(field)
-	if err != nil {
-		return nil, err
+	version, parseSemanticVersionError := parseSemanticVersion(field)
+	if parseSemanticVersionError != nil {
+		return nil, parseSemanticVersionError
 	}
 	return []versionComparator{{"=", version}}, nil
 }
@@ -140,7 +133,7 @@ func caretCeiling(version semanticVersion) semanticVersion {
 	}
 }
 
-// parseSemanticVersion reads MAJOR.MINOR.PATCH with an optional prerelease and build, as semver.org
+// parseSemanticVersion reads `MAJOR.MINOR.PATCH` with an optional prerelease and build, as semver.org
 // defines them. Build metadata is read and dropped, because it does not order versions.
 func parseSemanticVersion(text string) (semanticVersion, error) {
 	core, _, _ := strings.Cut(text, "+")
@@ -151,9 +144,13 @@ func parseSemanticVersion(text string) (semanticVersion, error) {
 	}
 	numbers := make([]int, 3)
 	for index, part := range parts {
-		number, err := strconv.Atoi(part)
-		if err != nil || number < 0 || (len(part) > 1 && part[0] == '0') {
-			return semanticVersion{}, fmt.Errorf("%q is not a version: %q is not a whole number without leading zeros", text, part)
+		number, parseError := strconv.Atoi(part)
+		if parseError != nil || number < 0 || (len(part) > 1 && part[0] == '0') {
+			return semanticVersion{}, fmt.Errorf(
+				"%q is not a version: %q is not a whole number without leading zeros",
+				text,
+				part,
+			)
 		}
 		numbers[index] = number
 	}
@@ -165,24 +162,6 @@ func parseSemanticVersion(text string) (semanticVersion, error) {
 		version.prerelease = strings.Split(prerelease, ".")
 	}
 	return version, nil
-}
-
-// Admits reports whether a release version falls inside the range.
-//
-// It follows npm's rule for prereleases: a prerelease satisfies a set of comparators only when one of
-// them names the same major, minor and patch with a prerelease of its own. So `^1.0.0` does not admit
-// 1.1.0-beta.1, and `>=1.1.0-beta.0 <2.0.0` does. A project opts into prereleases by writing one.
-func (versionRange VersionRange) Admits(version string) (bool, error) {
-	candidate, err := parseSemanticVersion(version)
-	if err != nil {
-		return false, err
-	}
-	for _, comparators := range versionRange.alternatives {
-		if admitsAll(comparators, candidate) {
-			return true, nil
-		}
-	}
-	return false, nil
 }
 
 func admitsAll(comparators []versionComparator, candidate semanticVersion) bool {
@@ -247,14 +226,14 @@ func compareVersions(left semanticVersion, right semanticVersion) int {
 // compareIdentifiers orders prerelease identifiers: numeric ones numerically and below any
 // alphanumeric one, alphanumeric ones by ASCII.
 func compareIdentifiers(left string, right string) int {
-	leftNumber, leftErr := strconv.Atoi(left)
-	rightNumber, rightErr := strconv.Atoi(right)
+	leftNumber, leftError := strconv.Atoi(left)
+	rightNumber, rightError := strconv.Atoi(right)
 	switch {
-	case leftErr == nil && rightErr == nil:
+	case leftError == nil && rightError == nil:
 		return compareInts(leftNumber, rightNumber)
-	case leftErr == nil:
+	case leftError == nil:
 		return -1
-	case rightErr == nil:
+	case rightError == nil:
 		return 1
 	default:
 		return strings.Compare(left, right)

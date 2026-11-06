@@ -16,11 +16,11 @@ import (
 //	invalid: class A { foo: string; foo: string; }
 //
 // Upstream's wrapper is `baseRule.create(context)` with two filters laid over the member listener:
-// a member whose key is COMPUTED is skipped, and one whose value is a bodiless function expression
+// a member whose key is computed is skipped, and one whose value is a bodiless function expression
 // is skipped. Everything that reports comes from the core rule underneath, which is ported here as
 // `core.NoDupeClassMembers`, so this file carries the difference and nothing else.
 //
-// # Only ONE of upstream's two filters actually narrows anything, and it is not the obvious one
+// # Only one of upstream's two filters actually narrows anything, and it is not the obvious one
 //
 // The bodiless-function filter exists so a TypeScript overload signature is not read as a duplicate
 // of its implementation. Our core already declines those, and not by inheritance: a previous porter
@@ -32,7 +32,7 @@ import (
 //
 // The computed filter is the one that bites, and it bites in the direction that reads backwards.
 // `[x]()` twice is silent in both, since neither can know what `x` is. But `['foo']()` twice is a
-// resolvable key, and the CORE reports it while the WRAPPER does not:
+// resolvable key, and the core reports it while the wrapper does not:
 //
 //	['foo']() twice     core reports, wrapper silent
 //	['foo']() and foo() core reports, wrapper silent
@@ -52,10 +52,10 @@ import (
 //
 // One extra kind test per class member over the core rule, and only on members the core would
 // otherwise key.
-var NoDupeClassMembers = rule.Rule{
+var NoDupeClassMembers = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/no-dupe-class-members",
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// The core rule's own listeners, which is where every finding comes from. Wrapping rather
 		// than reimplementing is the point of an extension rule: re-deriving the collision logic
 		// would give the two rules two chances to disagree about the same question.
@@ -66,7 +66,7 @@ var NoDupeClassMembers = rule.Rule{
 		// only the difference.
 		coreCheck := func(members *ast.NodeList) {
 			classmembers.ForEachDuplicate(members, func(name *ast.Node, key classmembers.Key) {
-				ctx.ReportNode(name, rule.Message{
+				ruleContext.ReportNode(name, rule.Message{
 					Id: "noDupeClassMembers",
 					Description: fmt.Sprintf(
 						"This class already declares a member named %s. The later declaration wins "+
@@ -84,12 +84,12 @@ var NoDupeClassMembers = rule.Rule{
 			},
 		}
 
-		// A class carrying a computed member is handed to the core with those members REMOVED from
+		// A class carrying a computed member is handed to the core with those members removed from
 		// its list, rather than having the core's findings filtered afterwards.
 		//
 		// Filtering the output was tried first and is wrong, in a way worth recording because it
 		// looks right. Upstream skips a computed member before it is keyed, so the member never
-		// enters the collision map and cannot make a LATER member look like a duplicate. Dropping
+		// enters the collision map and cannot make a later member look like a duplicate. Dropping
 		// findings after the fact cannot express that: measured, `class A { ['foo']() {} foo() {} }`
 		// then reported on `foo`, whose own key is not computed, while upstream is silent. The
 		// distinction is which member seeds the collision, and only the input side knows.
@@ -97,7 +97,10 @@ var NoDupeClassMembers = rule.Rule{
 		// Nothing here fabricates an AST node. The list is a `NodeList` holding the class's own
 		// member nodes minus some, with the original list's own Loc, so every node the core sees is
 		// one the parser produced and every span it reports is real.
-		filtered := func(coreListener func(*ast.Node), setMembers func(*ast.Node, *ast.NodeList) func()) func(*ast.Node) {
+		filtered := func(
+			coreListener func(*ast.Node),
+			setMembers func(*ast.Node, *ast.NodeList) func(),
+		) func(*ast.Node) {
 			return func(node *ast.Node) {
 				restore := setMembers(node, nil)
 				if restore == nil {
@@ -139,6 +142,8 @@ var NoDupeClassMembers = rule.Rule{
 // can observe it: the walk is single-threaded per file and hands one node to one listener at a time.
 // That is the invariant this depends on, and it is written here rather than assumed because
 // widening it, running rules concurrently over one tree, would make this unsafe rather than slow.
+//
+// Mutates: members the swap is the caller's to ask for, and the restore it returns writes the original back
 func swapOutComputedClassMembers(members **ast.NodeList) func() {
 	original := *members
 	if original == nil {

@@ -36,18 +36,13 @@ import (
 	_ "github.com/system-inc/cohere/internal/lint/rules/typescript"
 )
 
-// All returns every rule, in a stable order.
+// All returns every rule, as the framework holds it, in a stable order.
 //
 // Order is stable so that two runs over the same tree report findings in the same sequence, which
 // is what makes a diff between them meaningful. `rule.Registered` sorts by name, so the order no
 // longer depends on how a human kept a list tidy, nor on the order Go happens to run `init`.
-func All() []rule.Rule {
-	registrations := rule.Registered()
-	rules := make([]rule.Rule, 0, len(registrations))
-	for _, registration := range registrations {
-		rules = append(rules, registration.Rule)
-	}
-	return rules
+func All() []rule.Entry {
+	return rule.Registered()
 }
 
 // Names returns every registered rule's name, in the order All returns them.
@@ -78,8 +73,9 @@ func Count() int {
 // caught it. Marking it required turns that silence into a failure.
 //
 // A rule that registers no decoder takes no options, which is the common case, and the config layer
-// refuses any option written for it. Which decoder a rule registers is its arity: Decode for one
-// option element, DecodeOptionList for upstream's multi-element `context.options`.
+// refuses any option written for it. Which decoder a rule registers is its arity (rule.Entry.Arity): Decode
+// for one option element, DecodeOptionList for upstream's multi-element `context.options`. Every rule has an
+// entry, so the config layer can hand back the rule's Unconfigured for a bare severity.
 //
 // This form knows no base, so a rule whose options name a place on disk can only take an absolute
 // path from it and refuses a relative or absent one by name. The command uses OptionsAt.
@@ -92,27 +88,19 @@ func Options() configuration.OptionsRegistry {
 // matching nothing.
 func OptionsAt(base rule.OptionsBase) configuration.OptionsRegistry {
 	options := configuration.OptionsRegistry{}
-	for _, registration := range rule.Registered() {
-		switch {
-		case registration.DecodeAt != nil:
-			decodeAt := registration.DecodeAt
-			options[registration.Rule.Name] = configuration.RuleOptions{
-				Decode:   func(raw json.RawMessage) (any, error) { return decodeAt(raw, base) },
-				Required: registration.RequiresOptions,
-			}
-		case registration.DecodeOptionList != nil:
-			decodeList := registration.DecodeOptionList
-			options[registration.Rule.Name] = configuration.RuleOptions{
-				DecodeList: func(raw json.RawMessage) (any, error) { return decodeList(raw) },
-				Required:   registration.RequiresOptions,
-			}
-		case registration.Decode != nil:
-			decode := registration.Decode
-			options[registration.Rule.Name] = configuration.RuleOptions{
-				Decode:   func(raw json.RawMessage) (any, error) { return decode(raw) },
-				Required: registration.RequiresOptions,
-			}
+	for _, entry := range rule.Registered() {
+		ruleOptions := configuration.RuleOptions{Required: entry.RequiresOptions, Unconfigured: entry.Unconfigured}
+		// Bind reads base only under OptionArityAt, so handing it to every arity changes nothing for the others.
+		decode := func(raw json.RawMessage) (rule.Bound, error) { return entry.Bind(raw, base) }
+		switch entry.Arity {
+		case rule.OptionArityOne, rule.OptionArityAt:
+			ruleOptions.Decode = decode
+		case rule.OptionArityList:
+			ruleOptions.DecodeList = decode
+		case rule.OptionArityNone:
+			// No decoder: the config layer refuses any option element and binds the rule as Unconfigured.
 		}
+		options[entry.Name] = ruleOptions
 	}
 	return options
 }

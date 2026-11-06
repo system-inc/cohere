@@ -10,7 +10,10 @@ const consistencyNoHandRolledDelayId = "handRolledDelay"
 
 // consistencyNoHandRolledDelayText is the rule's message, whose wording lives in
 // `policy/messages/consistency-no-hand-rolled-delay.json`.
-var consistencyNoHandRolledDelayText = policy.MessageOf("nexus/consistency-no-hand-rolled-delay", consistencyNoHandRolledDelayId)
+var consistencyNoHandRolledDelayText = policy.MessageOf(
+	"nexus/consistency-no-hand-rolled-delay",
+	consistencyNoHandRolledDelayId,
+)
 
 func consistencyNoHandRolledDelayMessage() rule.Message {
 	return rule.Message{Id: consistencyNoHandRolledDelayId, Description: consistencyNoHandRolledDelayText.Render(nil)}
@@ -67,7 +70,7 @@ func consistencyNoHandRolledDelayMessage() rule.Message {
 //
 // What this does not catch is a second definition of the primitive somewhere else (`function
 // sleep(ms) { return new Promise(...) }`), which is a duplicate helper rather than a hand-rolled
-// wait: its callers already read as a named wait. Measured on ahra at HEAD on 2026-10-01: the only
+// wait: its callers already read as a named wait. Measured on ahra at `HEAD` on 2026-10-01: the only
 // function of that shape is `delay` in `nexus/source/coordination/Delay.ts`.
 //
 // # No fix
@@ -76,10 +79,10 @@ func consistencyNoHandRolledDelayMessage() rule.Message {
 // itself imports it relatively), and the replacement is an expression that resolves `undefined`
 // where the original may be typed `Promise<unknown>` or used as a value. Both are easy for a person
 // and not certain for a rewrite, so the finding names the import and the author writes it.
-var ConsistencyNoHandRolledDelay = rule.Rule{
+var ConsistencyNoHandRolledDelay = rule.Rule[rule.NoOptions]{
 	Name: "nexus/consistency-no-hand-rolled-delay",
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindNewExpression: func(node *ast.Node) {
 				duration := consistencyNoHandRolledDelayDuration(node)
@@ -89,7 +92,7 @@ var ConsistencyNoHandRolledDelay = rule.Rule{
 				if consistencyNoHandRolledDelayIsDefinition(node, duration) {
 					return
 				}
-				ctx.ReportNode(node, consistencyNoHandRolledDelayMessage())
+				ruleContext.ReportNode(node, consistencyNoHandRolledDelayMessage())
 			},
 		}
 	},
@@ -215,14 +218,14 @@ func consistencyNoHandRolledDelaySoleExpression(body *ast.Node) *ast.Node {
 // consistencyNoHandRolledDelayIsTimer says whether a callee is the global `setTimeout`, bare or reached
 // through `globalThis` or `window`.
 func consistencyNoHandRolledDelayIsTimer(callee *ast.Node) bool {
-	callee = ast.SkipParentheses(callee)
-	if consistencyNoHandRolledDelayIsIdentifier(callee, "setTimeout") {
+	unwrapped := ast.SkipParentheses(callee)
+	if consistencyNoHandRolledDelayIsIdentifier(unwrapped, "setTimeout") {
 		return true
 	}
-	if callee.Kind != ast.KindPropertyAccessExpression {
+	if unwrapped.Kind != ast.KindPropertyAccessExpression {
 		return false
 	}
-	access := callee.AsPropertyAccessExpression()
+	access := unwrapped.AsPropertyAccessExpression()
 	if access.QuestionDotToken != nil || access.Name().Text() != "setTimeout" {
 		return false
 	}
@@ -233,17 +236,17 @@ func consistencyNoHandRolledDelayIsTimer(callee *ast.Node) bool {
 // consistencyNoHandRolledDelayResolvesWithNothing says whether the timer's callback resolves the
 // promise with no value: `resolve` itself, or a parameterless function whose whole body is `resolve()`.
 func consistencyNoHandRolledDelayResolvesWithNothing(callback *ast.Node, resolveName string) bool {
-	callback = ast.SkipParentheses(callback)
-	if consistencyNoHandRolledDelayIsIdentifier(callback, resolveName) {
+	unwrapped := ast.SkipParentheses(callback)
+	if consistencyNoHandRolledDelayIsIdentifier(unwrapped, resolveName) {
 		return true
 	}
-	if callback.Kind != ast.KindArrowFunction && callback.Kind != ast.KindFunctionExpression {
+	if unwrapped.Kind != ast.KindArrowFunction && unwrapped.Kind != ast.KindFunctionExpression {
 		return false
 	}
-	if len(callback.Parameters()) != 0 {
+	if len(unwrapped.Parameters()) != 0 {
 		return false
 	}
-	call := consistencyNoHandRolledDelaySoleExpression(callback.Body())
+	call := consistencyNoHandRolledDelaySoleExpression(unwrapped.Body())
 	if call == nil || call.Kind != ast.KindCallExpression {
 		return false
 	}

@@ -23,8 +23,8 @@ func noUnnecessaryTemplateExpressionCaseName(index int) string {
 //
 // Measured one file per program against the installed 8.67.0 build, using upstream's own fixture
 // compilerOptions verbatim. All sixty seven are clean.
-func TestNoUnnecessaryTemplateExpressionStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoUnnecessaryTemplateExpressionStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		"const string = 'a';\n",
@@ -96,9 +96,9 @@ func TestNoUnnecessaryTemplateExpressionStaysSilent(t *testing.T) {
 		"type T<A extends string> = `${A}`;\n",
 	}
 	for index, sourceText := range cases {
-		t.Run(noUnnecessaryTemplateExpressionCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoUnnecessaryTemplateExpression,
+		test.Run(noUnnecessaryTemplateExpressionCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoUnnecessaryTemplateExpression,
 				noUnnecessaryTemplateExpressionFile, sourceText))
 		})
 	}
@@ -107,7 +107,7 @@ func TestNoUnnecessaryTemplateExpressionStaysSilent(t *testing.T) {
 // TestNoUnnecessaryTemplateExpressionFires is upstream's one hundred seventeen reporting cases.
 //
 // Every row asserts the span and the count. The span carries more than usual here: the finding
-// covers `${x}` INCLUDING both delimiters, computed from our head-and-spans model rather than from
+// covers `${x}` including both delimiters, computed from our head-and-spans model rather than from
 // upstream's parallel quasi arrays, so an off-by-one in that mapping points the reader at the
 // wrong characters while every message id still passes.
 //
@@ -115,8 +115,8 @@ func TestNoUnnecessaryTemplateExpressionStaysSilent(t *testing.T) {
 // reports columns in UTF-16 code units, so a four-character emoji spans eight of them, and a
 // column-to-offset conversion counting characters ran the span four bytes long. Fixed in the
 // extractor; the row below holds the corrected span.
-func TestNoUnnecessaryTemplateExpressionFires(t *testing.T) {
-	t.Parallel()
+func TestNoUnnecessaryTemplateExpressionFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -440,7 +440,7 @@ func TestNoUnnecessaryTemplateExpressionFires(t *testing.T) {
 		},
 		{
 			sourceText: "` $${`${''}${`${``}`}`}${`{a}`} `;\n",
-			// The finding SET matches upstream exactly; only the emission ORDER differs, and the
+			// The finding set matches upstream exactly; only the emission order differs, and the
 			// cause is the walk rather than the rule. A template nested inside another
 			// interpolation is a separate node visit, so its findings arrive after every finding of
 			// the enclosing template, while upstream emits in ascending source position because
@@ -603,16 +603,16 @@ func TestNoUnnecessaryTemplateExpressionFires(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(noUnnecessaryTemplateExpressionCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoUnnecessaryTemplateExpression,
+		test.Run(noUnnecessaryTemplateExpressionCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoUnnecessaryTemplateExpression,
 				noUnnecessaryTemplateExpressionFile, testCase.sourceText)
 
 			wantIds := make([]string, len(testCase.wantSpans))
 			for position := range wantIds {
 				wantIds[position] = "noUnnecessaryTemplateExpression"
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 
 			// The harness writes the fixture trimmed, so span slices are against that text.
 			onDisk := strings.TrimSpace(testCase.sourceText) + "\n"
@@ -620,30 +620,30 @@ func TestNoUnnecessaryTemplateExpressionFires(t *testing.T) {
 				diagnostic := result.Diagnostics[position]
 				gotSpan := onDisk[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if gotSpan != want {
-					t.Fatalf("finding %d span: expected %q, got %q", position, want, gotSpan)
+					test.Fatalf("finding %d span: expected %q, got %q", position, want, gotSpan)
 				}
 				if diagnostic.Message.Description !=
 					"Template literal expression is unnecessary and can be simplified." {
-					t.Fatalf("finding %d message: got %q", position, diagnostic.Message.Description)
+					test.Fatalf("finding %d message: got %q", position, diagnostic.Message.Description)
 				}
 			}
 		})
 	}
 }
 
-// TestNoUnnecessaryTemplateExpressionFixes asserts the rewrite on every case where ONE pass of the
+// TestNoUnnecessaryTemplateExpressionFixes asserts the rewrite on every case where one pass of the
 // harness can express it.
 //
-// Twenty of upstream's cases record an ARRAY of outputs rather than a string, because the fixer's
+// Twenty of upstream's cases record an array of outputs rather than a string, because the fixer's
 // own result is reportable and ESLint re-runs it to convergence. `ExpectFixedSource` applies a
-// single pass and refuses overlapping edits, so the expectation here is the FIRST pass rather than
+// single pass and refuses overlapping edits, so the expectation here is the first pass rather than
 // the converged text. Asserting the converged text against a one-pass harness reads as a broken
 // fixer and is not.
 //
 // Four cases propose edits that overlap within one pass and are excluded, listed in the constant
 // below rather than silently dropped. They are covered for detection by the firing test above.
-func TestNoUnnecessaryTemplateExpressionFixes(t *testing.T) {
-	t.Parallel()
+func TestNoUnnecessaryTemplateExpressionFixes(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -1103,12 +1103,12 @@ func TestNoUnnecessaryTemplateExpressionFixes(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(noUnnecessaryTemplateExpressionCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoUnnecessaryTemplateExpression,
+		test.Run(noUnnecessaryTemplateExpressionCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoUnnecessaryTemplateExpression,
 				noUnnecessaryTemplateExpressionFile, testCase.sourceText)
 
-			rule_testing.ExpectFixedSource(t, result, strings.TrimSpace(testCase.wantFixed)+"\n")
+			rule_testing.ExpectFixedSource(test, result, strings.TrimSpace(testCase.wantFixed)+"\n")
 		})
 	}
 }

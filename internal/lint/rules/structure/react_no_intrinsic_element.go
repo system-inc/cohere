@@ -19,7 +19,10 @@ func messageNoAnchorElement() rule.Message {
 }
 
 func messageNoHorizontalRuleElement() rule.Message {
-	return rule.Message{Id: reactElementNoHorizontalRuleText.Id, Description: reactElementNoHorizontalRuleText.Render(nil)}
+	return rule.Message{
+		Id:          reactElementNoHorizontalRuleText.Id,
+		Description: reactElementNoHorizontalRuleText.Render(nil),
+	}
 }
 
 // ReactElementNoAnchor flags a raw <a> element outside the Link component's own implementation.
@@ -27,14 +30,14 @@ func messageNoHorizontalRuleElement() rule.Message {
 //	valid:   <Link href="/about">About</Link>
 //	valid:   an <a> inside components/navigation/Link.tsx
 //	invalid: <a href="/about">About</a>
-var ReactElementNoAnchor = rule.Rule{
+var ReactElementNoAnchor = rule.Rule[rule.NoOptions]{
 	Name: "structure/react-element-no-anchor",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		fileContext := FileContextFor(ctx.SourceFile.FileName().AsString())
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		fileContext := FileContextFor(ruleContext.SourceFile.FileName().AsString())
 		if fileContext.IsLinkComponentFile {
 			return nil
 		}
-		return intrinsicElementListeners(ctx, "a", messageNoAnchorElement())
+		return intrinsicElementListeners(ruleContext, "a", messageNoAnchorElement())
 	},
 }
 
@@ -43,14 +46,14 @@ var ReactElementNoAnchor = rule.Rule{
 //	valid:   <HorizontalRule />
 //	valid:   an <hr> inside components/layout/HorizontalRule.tsx
 //	invalid: <hr />
-var ReactElementNoHorizontalRule = rule.Rule{
+var ReactElementNoHorizontalRule = rule.Rule[rule.NoOptions]{
 	Name: "structure/react-element-no-horizontal-rule",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		fileContext := FileContextFor(ctx.SourceFile.FileName().AsString())
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		fileContext := FileContextFor(ruleContext.SourceFile.FileName().AsString())
 		if fileContext.IsHorizontalRuleComponentFile {
 			return nil
 		}
-		return intrinsicElementListeners(ctx, "hr", messageNoHorizontalRuleElement())
+		return intrinsicElementListeners(ruleContext, "hr", messageNoHorizontalRuleElement())
 	},
 }
 
@@ -64,7 +67,7 @@ var ReactElementNoHorizontalRule = rule.Rule{
 // Both JSX opening forms are listened to. A `<hr />` is a JsxSelfClosingElement and never produces
 // a JsxOpeningElement, so a rule listening only to the latter is silent on the shape `<hr>` is
 // almost always written in. That asymmetry is the same class of miss as no-var's loop forms.
-func intrinsicElementListeners(ctx rule.Context, tagName string, message rule.Message) rule.Listeners {
+func intrinsicElementListeners(ruleContext rule.Context, tagName string, message rule.Message) rule.Listeners {
 	report := func(node *ast.Node, name *ast.Node) {
 		// The name is compared as text and required to be a plain identifier. An intrinsic element
 		// is lowercase and unqualified by definition, so a member-expression name (`<Foo.a />`) or
@@ -73,7 +76,7 @@ func intrinsicElementListeners(ctx rule.Context, tagName string, message rule.Me
 		if name == nil || name.Kind != ast.KindIdentifier || name.Text() != tagName {
 			return
 		}
-		ctx.ReportNode(node, message)
+		ruleContext.ReportNode(node, message)
 	}
 
 	return rule.Listeners{

@@ -6,36 +6,12 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
-	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
 // Three rules judge comments rather than nodes, and a comment is not a node: it is trivia the
 // parser skips, recorded only as a range in the source text. So they cannot register a listener for
 // it, and each would otherwise write its own scan. This is that scan, written once.
-
-// Comment is one comment in a file: where it is, what kind it is, and its text.
-type Comment struct {
-	Range core.TextRange
-
-	// IsBlock distinguishes a slash-star comment from a double-slash one. JSDoc is a block comment
-	// whose text opens with an asterisk, so the two rules that care about JSDoc need this to tell
-	// the shapes apart.
-	IsBlock bool
-
-	// Text is the full source text of the comment, delimiters included. Rules that want the inner
-	// content strip the delimiters themselves, because what counts as content differs by rule: the
-	// JSDoc rule wants the asterisk-prefixed lines, the line-length rule wants the whole line.
-	Text string
-
-	// StartLine, StartColumn, and EndLine are zero-based positions. The run-detecting rule needs
-	// them to answer two questions no range can: whether two comments sit on adjacent lines, and
-	// whether they start at the same column, which is what separates a stacked passage from a
-	// trailing comment that happens to follow another.
-	StartLine   int
-	StartColumn int
-	EndLine     int
-}
 
 // All returns every comment in a file, in source order, without duplicates.
 //
@@ -204,9 +180,9 @@ func collectListInteriors(node *ast.Node, collectAt func(int)) {
 		if list == nil {
 			return
 		}
-		// A NON-EMPTY list names one position nothing else does: its `End()`, which sits past a
+		// A non-empty list names one position nothing else does: its `End()`, which sits past a
 		// trailing comma that the last element's own `End()` stops short of. So
-		// `['a', // one\n 'b', // two\n]` loses the SECOND comment, because nothing probes between
+		// `['a', // one\n 'b', // two\n]` loses the second comment, because nothing probes between
 		// the comma and the bracket.
 		//
 		// Measured, with a control: the same array written without a trailing comma on the last
@@ -277,9 +253,9 @@ func collectListInteriors(node *ast.Node, collectAt func(int)) {
 		// a comment -- but it is not a NodeList, so `offer` cannot express it. A JsxExpression with
 		// a nil Expression spans exactly `{` and `}`, so its interior begins one byte past `Pos()`.
 		//
-		// Measured before adding: the scanner returns ZERO comments for `<div>{/*c*/}</div>` in a
+		// Measured before adding: the scanner returns zero comments for `<div>{/*c*/}</div>` in a
 		// .tsx file, while the same comment written anywhere else in the same file is found. The
-		// container's `Pos()` sits ON the brace, and `GetTrailingCommentRanges` at `Pos()+1` returns
+		// container's `Pos()` sits on the brace, and `GetTrailingCommentRanges` at `Pos()+1` returns
 		// the comment, so this is a position nothing probed rather than trivia the scanner cannot
 		// classify. Controlled against an ordinary trailing comment through the same call, which
 		// returns 1.
@@ -298,6 +274,8 @@ func collectListInteriors(node *ast.Node, collectAt func(int)) {
 //
 // The walk reaches nodes in tree order, which is close to source order but not equal to it, and a
 // rule reporting findings out of order is a rule whose fixture assertions cannot be written down.
+//
+// Mutates: comments the sort is in place, so the slice the caller collected comes back in source order
 func sortByPosition(comments []Comment) {
 	for outerIndex := 1; outerIndex < len(comments); outerIndex++ {
 		current := comments[outerIndex]
@@ -308,34 +286,6 @@ func sortByPosition(comments []Comment) {
 		}
 		comments[innerIndex+1] = current
 	}
-}
-
-// IsJsDoc reports whether a block comment is JSDoc: slash-star-star rather than slash-star.
-func (c Comment) IsJsDoc() bool {
-	return c.IsBlock && strings.HasPrefix(c.Text, "/**")
-}
-
-// ContentLines returns a block comment's inner lines with the delimiters and the leading asterisk
-// of each line removed, dropping lines that hold nothing else.
-//
-// This is what "the comment says one thing" means for the JSDoc rules: the asterisks are furniture,
-// so a comment that is three lines of furniture around one line of prose is a one-line comment.
-func (c Comment) ContentLines() []string {
-	inner := c.Text
-	inner = strings.TrimPrefix(inner, "/**")
-	inner = strings.TrimPrefix(inner, "/*")
-	inner = strings.TrimSuffix(inner, "*/")
-
-	var lines []string
-	for _, line := range strings.Split(inner, "\n") {
-		line = text.TrimWhitespace(line)
-		line = strings.TrimPrefix(line, "*")
-		line = text.TrimWhitespace(line)
-		if line != "" {
-			lines = append(lines, line)
-		}
-	}
-	return lines
 }
 
 // canBeginAt reports whether a comment could begin at or just after a position.
@@ -461,12 +411,12 @@ func AllWithoutGuard(sourceFile *ast.SourceFile) []Comment {
 // run rather than once per node it asks about. That is not a micro-optimization: three rules calling
 // a well-factored scan directly each rescanned the file, measured at 807ms, 619ms and 601ms while
 // visiting exactly one node per file.
-func LeadingRunFor(ctx rule.Context, node *ast.Node) []Comment {
-	if node == nil || ctx.SourceFile == nil {
+func LeadingRunFor(ruleContext rule.Context, node *ast.Node) []Comment {
+	if node == nil || ruleContext.SourceFile == nil {
 		return nil
 	}
 
-	all := ForFile(ctx)
+	all := ForFile(ruleContext)
 	if len(all) == 0 {
 		return nil
 	}
@@ -474,7 +424,7 @@ func LeadingRunFor(ctx rule.Context, node *ast.Node) []Comment {
 	// The comments above the node are those ending at or before where its own text begins. The
 	// token position is used rather than Pos(), since Pos() sits before the leading trivia and would
 	// place the node before its own comments.
-	nodeStart := rule.TokenRange(ctx.SourceFile, node).Pos()
+	nodeStart := rule.TokenRange(ruleContext.SourceFile, node).Pos()
 
 	last := -1
 	for index, comment := range all {
@@ -490,7 +440,7 @@ func LeadingRunFor(ctx rule.Context, node *ast.Node) []Comment {
 
 	// Only a comment the node actually follows counts. A comment separated from it by code belongs
 	// to that code, and one separated by a blank line is a passage of its own.
-	text := ctx.SourceFile.Text()
+	text := ruleContext.SourceFile.Text()
 	if !isAdjacentGap(text, all[last].Range.End(), nodeStart) {
 		return nil
 	}

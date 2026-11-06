@@ -14,7 +14,7 @@ import (
 //
 // upstream deletes node.parent on the way; the Go trees have no parent links. A node whose type is ""
 // is one whose JavaScript type was undefined, which upstream leaves alone (typeof is not "string").
-func addTypePrefix(value any, prefix string, skipPrefix *regexp.Regexp) any {
+func addTypePrefix(value estree.Value, prefix string, skipPrefix *regexp.Regexp) estree.Value {
 	switch node := value.(type) {
 	case *estree.Node:
 		if node == nil {
@@ -28,22 +28,22 @@ func addTypePrefix(value any, prefix string, skipPrefix *regexp.Regexp) any {
 			(skipPrefix == nil || !skipPrefix.MatchString(node.Type())) {
 			node.SetType(prefix + node.Type())
 		}
-	case []*estree.Node:
+	case estree.Nodes:
 		for _, child := range node {
 			addTypePrefix(child, prefix, skipPrefix)
 		}
-	case map[string]any:
+	case estree.Record:
 		// A plain object (raws, spaces, source) is walked too, and a "type" string in it would be
 		// prefixed the same way; none of the libraries put one there.
 		for key, child := range node {
 			addTypePrefix(child, prefix, skipPrefix)
-			if text, isString := child.(string); key == "type" && isString &&
-				!strings.HasPrefix(text, prefix) &&
-				(skipPrefix == nil || !skipPrefix.MatchString(text)) {
-				node[key] = prefix + text
+			if text, isString := child.(estree.String); key == "type" && isString &&
+				!strings.HasPrefix(string(text), prefix) &&
+				(skipPrefix == nil || !skipPrefix.MatchString(string(text))) {
+				node[key] = estree.String(prefix) + text
 			}
 		}
-	case []any:
+	case estree.Values:
 		for _, child := range node {
 			addTypePrefix(child, prefix, skipPrefix)
 		}
@@ -52,7 +52,7 @@ func addTypePrefix(value any, prefix string, skipPrefix *regexp.Regexp) any {
 }
 
 // addMissingType gives a node that has a truthy value and no type the type "unknown", children first.
-func addMissingType(value any) any {
+func addMissingType(value estree.Value) estree.Value {
 	switch node := value.(type) {
 	case *estree.Node:
 		if node == nil {
@@ -64,7 +64,7 @@ func addMissingType(value any) any {
 		if node.Truthy("value") && node.Type() == "" {
 			node.SetType("unknown")
 		}
-	case []*estree.Node:
+	case estree.Nodes:
 		for _, child := range node {
 			addMissingType(child)
 		}
@@ -76,36 +76,44 @@ func addMissingType(value any) any {
 // access with typeof checks, which upstream writes inline.
 
 // sourceOf is node.source when it is an object.
-func sourceOf(node *estree.Node) map[string]any {
-	source, _ := node.Get("source").(map[string]any)
+func sourceOf(node *estree.Node) estree.Record {
+	source, _ := node.Get("source").(estree.Record)
 	return source
 }
 
 // ensureSource is `node.source ??= {}`.
-func ensureSource(node *estree.Node) map[string]any {
+func ensureSource(node *estree.Node) estree.Record {
 	source := sourceOf(node)
 	if source == nil {
-		source = map[string]any{}
+		source = estree.Record{}
 		node.Set("source", source)
 	}
 	return source
 }
 
-// rawsIn is node.raws when it is an object, or nil (which reads as an empty object).
-func rawsIn(node *estree.Node) map[string]any {
-	raws, _ := node.Get("raws").(map[string]any)
-	return raws
+// rawStringIn is node.raws[key] when node.raws is an object and the property a string. An absent raws
+// reads as an empty object.
+func rawStringIn(node *estree.Node, key string) (string, bool) {
+	raws, _ := node.Get("raws").(estree.Record)
+	text, isString := raws[key].(estree.String)
+	return string(text), isString
+}
+
+// isRawTruthy is whether node.raws[key] is truthy, false when node.raws is not an object.
+func isRawTruthy(node *estree.Node, key string) bool {
+	raws, _ := node.Get("raws").(estree.Record)
+	return estree.IsTruthy(raws[key])
 }
 
 // mapIn is object[key] when it is an object.
-func mapIn(object map[string]any, key string) map[string]any {
-	value, _ := object[key].(map[string]any)
+func mapIn(object estree.Record, key string) estree.Record {
+	value, _ := object[key].(estree.Record)
 	return value
 }
 
 // numberIn is object[key] when `typeof object[key] === "number"`. The libraries' offsets, lines and
-// columns are ints; a float64 is accepted the same way.
-func numberIn(object map[string]any, key string) (int, bool) {
+// columns are Integers; a Number is accepted the same way.
+func numberIn(object estree.Record, key string) (int, bool) {
 	return toNumber(object[key])
 }
 
@@ -120,11 +128,11 @@ func intProperty(node *estree.Node, key string) int {
 	return number
 }
 
-func toNumber(value any) (int, bool) {
+func toNumber(value estree.Value) (int, bool) {
 	switch number := value.(type) {
-	case int:
-		return number, true
-	case float64:
+	case estree.Integer:
+		return int(number), true
+	case estree.Number:
 		// NaN is a number to typeof. postcss-values-parser writes one as a paren's end column, which
 		// loc.js never reads (a paren's end comes from its sourceIndex); 0 keeps Go's conversion defined.
 		if number != number {
@@ -144,13 +152,13 @@ func hasStringType(node *estree.Node) bool {
 // the array, skipping holes and strings (a url() argument the value parser cannot handle is a string
 // among the groups). Plain objects (raws, spaces) are left out: upstream walks into them too, but they
 // hold no type, no source and no sourceIndex, so nothing happens there.
-func objectChildren(value any) []*estree.Node {
+func objectChildren(value estree.Value) []*estree.Node {
 	switch typed := value.(type) {
 	case *estree.Node:
 		if typed != nil {
 			return []*estree.Node{typed}
 		}
-	case []*estree.Node:
+	case estree.Nodes:
 		children := make([]*estree.Node, 0, len(typed))
 		for _, child := range typed {
 			if child != nil {
@@ -158,7 +166,7 @@ func objectChildren(value any) []*estree.Node {
 			}
 		}
 		return children
-	case []any:
+	case estree.Values:
 		children := make([]*estree.Node, 0, len(typed))
 		for _, child := range typed {
 			if node, isNode := child.(*estree.Node); isNode && node != nil {
@@ -171,21 +179,21 @@ func objectChildren(value any) []*estree.Node {
 }
 
 // isEmptyArray is `Array.isArray(value) && value.length === 0`.
-func isEmptyArray(value any) bool {
+func isEmptyArray(value estree.Value) bool {
 	switch typed := value.(type) {
-	case []*estree.Node:
+	case estree.Nodes:
 		return len(typed) == 0
-	case []any:
+	case estree.Values:
 		return len(typed) == 0
 	}
 	return false
 }
 
 // firstTruthyString is `a || b || ""` over values that are strings when truthy.
-func firstTruthyString(values ...any) string {
+func firstTruthyString(values ...estree.Value) string {
 	for _, value := range values {
-		if text, isString := value.(string); isString && text != "" {
-			return text
+		if text, isString := value.(estree.String); isString && text != "" {
+			return string(text)
 		}
 	}
 	return ""
@@ -194,14 +202,22 @@ func firstTruthyString(values ...any) string {
 // sliceJavaScript is text.slice(start, end): negative indexes count from the end, and both clamp.
 func sliceJavaScript(text string, start int, end int) string {
 	clamp := func(index int) int {
-		if index < 0 {
-			index += len(text)
+		position := index
+		if position < 0 {
+			position += len(text)
 		}
-		return max(0, min(index, len(text)))
+		return max(0, min(position, len(text)))
 	}
-	start, end = clamp(start), clamp(end)
-	if start >= end {
+	clampedStart := clamp(start)
+	clampedEnd := clamp(end)
+	if clampedStart >= clampedEnd {
 		return ""
 	}
-	return text[start:end]
+	return text[clampedStart:clampedEnd]
+}
+
+// asString is value as a Go string, and whether it is a String: upstream's `typeof value === "string"`.
+func asString(value estree.Value) (string, bool) {
+	text, isString := value.(estree.String)
+	return string(text), isString
 }

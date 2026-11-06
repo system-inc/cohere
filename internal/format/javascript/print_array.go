@@ -19,7 +19,7 @@ import (
 // printArray is upstream's printArray.
 func printArray(path *Path, options *Options, print PrintFunc) Doc {
 	current := node(path)
-	var parts []any
+	var parts []Doc
 
 	elementsProperty := "elements"
 	if isTupleType(current) {
@@ -27,7 +27,12 @@ func printArray(path *Path, options *Options, print PrintFunc) Doc {
 	}
 	elements := current.List(elementsProperty)
 	if len(elements) == 0 {
-		parts = append(parts, groupIn(path, concatIn(path, "[", printDanglingCommentsInList(path, options, nil), "]")))
+		parts = append(parts, groupIn(path, concatIn(
+			path,
+			doc.Text("["),
+			printDanglingCommentsInList(path, options, nil),
+			doc.Text("]"),
+		)))
 	} else {
 		lastElem := elements[len(elements)-1]
 		canHaveTrailingComma := !lastElem.Is("RestElement")
@@ -44,7 +49,7 @@ func printArray(path *Path, options *Options, print PrintFunc) Doc {
 		// we already check for an empty array just above so we are safe
 		needsForcedTrailingComma := lastElem == nil
 
-		groupID := newGroupID("array")
+		groupId := newGroupId("array")
 
 		shouldBreak := (!settingsOf(options).inJestEach &&
 			len(elements) > 1 &&
@@ -81,9 +86,9 @@ func printArray(path *Path, options *Options, print PrintFunc) Doc {
 		case !shouldPrintTrailingComma(options, "es5"):
 			trailingComma = emptyDoc
 		case shouldUseConciseFormatting:
-			trailingComma = ifBreakWithGroup(",", "", groupID)
+			trailingComma = ifBreakWithGroup(doc.Text(","), doc.Text(""), groupId)
 		default:
-			trailingComma = ifBreak(",", "")
+			trailingComma = ifBreak(doc.Text(","), doc.Text(""))
 		}
 
 		var elementsDoc Doc
@@ -95,15 +100,15 @@ func printArray(path *Path, options *Options, print PrintFunc) Doc {
 			)
 		}
 
-		parts = append(parts, groupWithIn(path, concatIn(path, "[",
+		parts = append(parts, groupWithIn(path, concatIn(path, doc.Text("["),
 			indentIn(path, concatIn(path, softline,
 				elementsDoc,
 				printing.PrintDanglingComments(path, options, printing.DanglingOptions[Node]{}),
 			)),
 			softline,
-			"]",
+			doc.Text("]"),
 		),
-			doc.GroupOptions{ShouldBreak: shouldBreak, ID: groupID},
+			doc.GroupOptions{ShouldBreak: shouldBreak, Id: groupId},
 		))
 	}
 
@@ -148,21 +153,21 @@ func isLineAfterElementEmpty(path *Path, options *Options) bool {
 	current := node(path)
 	text := options.OriginalText
 
-	currentIdx := locEnd(current)
-	if currentIdx == locStart(current) {
+	currentIndex := locEnd(current)
+	if currentIndex == locStart(current) {
 		return false
 	}
 
 	length := len(text)
-	for currentIdx < length {
-		if text[currentIdx] == ',' {
+	for currentIndex < length {
+		if text[currentIndex] == ',' {
 			break
 		}
 
-		currentIdx = printing.SkipInlineComment(text, printing.SkipTrailingComment(text, currentIdx+1))
+		currentIndex = printing.SkipInlineComment(text, printing.SkipTrailingComment(text, currentIndex+1))
 	}
 
-	return isNextLineEmpty(text, currentIdx)
+	return isNextLineEmpty(text, currentIndex)
 }
 
 // printArrayElements is upstream's printArrayElements, without the Flow-only `inexact` parameter.
@@ -172,7 +177,7 @@ func printArrayElements(path *Path, options *Options, print PrintFunc, elementsP
 	each(path, func(path *Path, _ int) {
 		current := node(path)
 		if current != nil {
-			parts = append(parts, groupIn(path, print(nil, nil)))
+			parts = append(parts, groupIn(path, print("", nil)))
 		} else {
 			parts = append(parts, emptyDoc)
 		}
@@ -182,7 +187,7 @@ func printArrayElements(path *Path, options *Options, print PrintFunc, elementsP
 			if current != nil && isLineAfterElementEmpty(path, options) {
 				separator = softline
 			}
-			parts = append(parts, concatIn(path, ",", line, separator))
+			parts = append(parts, concatIn(path, doc.Text(","), line, separator))
 		}
 	}, elementsProperty)
 
@@ -199,7 +204,7 @@ func printArrayElementsConcisely(path *Path, options *Options, print PrintFunc, 
 		if isLast {
 			separator = trailingComma
 		}
-		parts = append(parts, concatIn(path, print(nil, nil), separator))
+		parts = append(parts, concatIn(path, print("", nil), separator))
 
 		if !isLast {
 			switch {
@@ -230,8 +235,8 @@ func printNamedTupleMember(path *Path, options *Options, print PrintFunc) Doc {
 		optional = "?"
 	}
 	return concatIn(path, print("label", nil),
-		optional,
-		": ",
+		textDoc(optional),
+		doc.Text(": "),
 		print("elementType", nil),
 	)
 }
@@ -242,5 +247,5 @@ func printNamedTupleMember(path *Path, options *Options, print PrintFunc) Doc {
 
 // printArrayType is upstream's printArrayType, print/array-type.js.
 func printArrayType(print PrintFunc) Doc {
-	return concat(print("elementType", nil), "[]")
+	return concat(print("elementType", nil), doc.Text("[]"))
 }

@@ -78,7 +78,9 @@ func decodeEntity(item string) (string, bool) {
 		return string(rune(value)), true
 	}
 	for _, character := range item {
-		if !(character >= '0' && character <= '9' || character >= 'a' && character <= 'z' || character >= 'A' && character <= 'Z') {
+		if !(character >= '0' && character <= '9' ||
+			character >= 'a' && character <= 'z' ||
+			character >= 'A' && character <= 'Z') {
 			return "", false
 		}
 	}

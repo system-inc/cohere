@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/system-inc/cohere/internal/format/doc"
+	"github.com/system-inc/cohere/internal/format/estree"
 	"github.com/system-inc/cohere/internal/format/printing"
 	"github.com/system-inc/cohere/internal/types/sourcename"
 )
@@ -17,13 +18,14 @@ import (
 // shouldForceTrailingComma is upstream's shouldForceTrailingComma. Upstream tests the path against
 // /\.ts$/; the name is read through sourcename.TreatedAs, so an Adamic `.a` file drops the comma as the
 // same file named `.ts` does (#6mhafvb).
-func shouldForceTrailingComma(path *Path, options *Options, paramsKey string) bool {
+func shouldForceTrailingComma(path *Path, options *Options, parametersKey string) bool {
 	current := node(path)
 	return len(getFunctionParameters(current)) == 1 &&
 		strings.HasPrefix(current.Type(), "TS") &&
-		!current.List(paramsKey)[0].Truthy("constraint") &&
+		!current.List(parametersKey)[0].Truthy("constraint") &&
 		parentOf(path).Is("ArrowFunctionExpression") &&
-		!(settingsOf(options).FilePath != "" && strings.HasSuffix(sourcename.TreatedAs(settingsOf(options).FilePath), ".ts"))
+		!(settingsOf(options).FilePath != "" &&
+			strings.HasSuffix(sourcename.TreatedAs(settingsOf(options).FilePath), ".ts"))
 }
 
 /*
@@ -36,39 +38,39 @@ func shouldForceTrailingComma(path *Path, options *Options, paramsKey string) bo
 - `TSTypeReference` (TypeScript)
 */
 // printTypeParameters is upstream's printTypeParameters.
-func printTypeParameters(path *Path, options *Options, print PrintFunc, paramsKey string) Doc {
+func printTypeParameters(path *Path, options *Options, print PrintFunc, parametersKey string) Doc {
 	current := node(path)
 	// Upstream's `node[paramsKey]` is either an array or a single node; Go reads which with a type
 	// switch. An empty array is truthy upstream, so only a missing value returns "".
-	value := current.Get(paramsKey)
+	value := current.Get(parametersKey)
 
 	if value == nil {
 		return emptyDoc
 	}
 
 	// for TypeParameterDeclaration typeParameters is a single node
-	parameters, isArray := value.([]Node)
+	parameters, isArray := value.(estree.Nodes)
 	if !isArray {
-		return print(paramsKey, nil)
+		return print(parametersKey, nil)
 	}
 
 	isParameterInTestCall := isTestCall(grandparentOf(path), nil)
 
 	isArrowFunctionVariable := path.Match(
-		func(value any, _ any, _ int, _ bool) bool {
-			node, _ := value.(Node)
-			return !(len(node.List(paramsKey)) == 1 && isObjectType(node.List(paramsKey)[0]))
+		func(value PathValue, _ string, _ int, _ bool) bool {
+			node, _ := value.Node()
+			return !(len(node.List(parametersKey)) == 1 && isObjectType(node.List(parametersKey)[0]))
 		},
 		nil,
-		func(_ any, name any, _ int, _ bool) bool {
+		func(_ PathValue, name string, _ int, _ bool) bool {
 			return name == "typeAnnotation"
 		},
-		func(value any, _ any, _ int, _ bool) bool {
-			node, _ := value.(Node)
+		func(value PathValue, _ string, _ int, _ bool) bool {
+			node, _ := value.Node()
 			return node.Is("Identifier")
 		},
-		func(value any, _ any, _ int, _ bool) bool {
-			node, _ := value.(Node)
+		func(value PathValue, _ string, _ int, _ bool) bool {
+			node, _ := value.Node()
 			return isArrowFunctionVariableDeclarator(node)
 		},
 	)
@@ -95,27 +97,31 @@ func printTypeParameters(path *Path, options *Options, print PrintFunc, paramsKe
 			}))
 
 	if shouldInline {
-		return concatIn(path, "<",
-			join(", ", printAll(path, print, paramsKey)),
+		return concatIn(path, doc.Text("<"),
+			join(doc.Text(", "), printAll(path, print, parametersKey)),
 			printDanglingCommentsForInline(path, options),
-			">",
+			doc.Text(">"),
 		)
 	}
 
 	var trailingComma Doc
 	if current.Is("TSTypeParameterInstantiation") { // https://github.com/microsoft/TypeScript/issues/21984
 		trailingComma = emptyDoc
-	} else if shouldForceTrailingComma(path, options, paramsKey) {
-		trailingComma = toDoc(",")
+	} else if shouldForceTrailingComma(path, options, parametersKey) {
+		trailingComma = doc.Text(",")
 	} else {
 		trailingComma = printTrailingComma(options, "")
 	}
 
-	return groupIn(path, concatIn(path, "<",
-		indentIn(path, concatIn(path, softline, join(concatIn(path, ",", line), printAll(path, print, paramsKey)))),
+	return groupIn(path, concatIn(path, doc.Text("<"),
+		indentIn(path, concatIn(
+			path,
+			softline,
+			join(concatIn(path, doc.Text(","), line), printAll(path, print, parametersKey)),
+		)),
 		trailingComma,
 		softline,
-		">",
+		doc.Text(">"),
 	))
 }
 
@@ -145,13 +151,13 @@ func printTypeParameter(path *Path, options *Options, print PrintFunc) Doc {
 	if current.Truthy("const") {
 		constKeyword = "const "
 	}
-	parts := []any{constKeyword}
+	parts := []Doc{textDoc(constKeyword)}
 
-	var name any
+	var name Doc
 	if current.Is("TSTypeParameter") {
 		name = print("name", nil)
 	} else {
-		name = current.String("name")
+		name = textDoc(current.String("name"))
 	}
 
 	if current.Truthy("variance") {
@@ -159,11 +165,11 @@ func printTypeParameter(path *Path, options *Options, print PrintFunc) Doc {
 	}
 
 	if current.Truthy("in") {
-		parts = append(parts, "in ")
+		parts = append(parts, doc.Text("in "))
 	}
 
 	if current.Truthy("out") {
-		parts = append(parts, "out ")
+		parts = append(parts, doc.Text("out "))
 	}
 
 	parts = append(parts, name)
@@ -172,22 +178,22 @@ func printTypeParameter(path *Path, options *Options, print PrintFunc) Doc {
 	// print, "bound")) is dropped: `bound` is set only on Flow's TypeParameter.
 
 	if current.Truthy("constraint") {
-		groupID := newGroupID("constraint")
+		groupId := newGroupId("constraint")
 		parts = append(parts,
-			" extends",
-			groupWithIn(path, indentIn(path, line), doc.GroupOptions{ID: groupID}),
+			doc.Text(" extends"),
+			groupWithIn(path, indentIn(path, line), doc.GroupOptions{Id: groupId}),
 			lineSuffixBoundary,
-			indentIfBreak(print("constraint", nil), groupID, false),
+			indentIfBreak(print("constraint", nil), groupId, false),
 		)
 	}
 
 	if current.Truthy("default") {
-		groupID := newGroupID("default")
+		groupId := newGroupId("default")
 		parts = append(parts,
-			" =",
-			groupWithIn(path, indentIn(path, line), doc.GroupOptions{ID: groupID}),
+			doc.Text(" ="),
+			groupWithIn(path, indentIn(path, line), doc.GroupOptions{Id: groupId}),
 			lineSuffixBoundary,
-			indentIfBreak(print("default", nil), groupID, false),
+			indentIfBreak(print("default", nil), groupId, false),
 		)
 	}
 

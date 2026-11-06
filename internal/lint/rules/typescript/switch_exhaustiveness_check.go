@@ -13,6 +13,10 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
+// defaultCaseCommentPattern is typescript-eslint's DEFAULT_COMMENT_PATTERN, `/^no default$/iu`, compiled
+// with its own flags so it folds case as JavaScript does (#7mztrdd).
+var defaultCaseCommentPattern = esregexp.MustCompile(`^no default$`, "iu")
+
 // SwitchExhaustivenessCheck flags a switch over a union of literal types that does not handle every
 // member, and, under one option, a default case on a switch that already handles every member.
 //
@@ -39,10 +43,10 @@ import (
 // what changed is the interface it speaks: `rule.RuleContext` became `rule.Context`,
 // `RuleListeners` became `Listeners`, and `rule.RuleMessage` became `rule.Message`. No predicate,
 // no flag set, no defaulting block and no traversal was touched, and the options struct came across
-// field for field rather than being re-declared — see the note on its pointer fields below.
+// field for field rather than being re-declared (see the note on its pointer fields below).
 //
 // oxc declares this rule as `SwitchExhaustivenessCheck(tsgolint)` and carries no algorithm and no
-// corpus, so the behavior oxlint exhibits IS tsgolint's: the release binary shells out to a
+// corpus, so the behavior oxlint exhibits is tsgolint's: the release binary shells out to a
 // `tsgolint` executable and refuses to run the rule when that binary is absent, which is what it
 // does on this machine. That refusal is itself the proof, so oxlint cannot serve as ground truth
 // here and tsgolint's own test file is the corpus instead.
@@ -52,22 +56,22 @@ import (
 // The anchor is `KindSwitchStatement`, one listener, and every case runs all three checks against
 // one shared `SwitchMetadata` computed once. The metadata is three facts about the switch:
 //
-// MISSING LITERAL BRANCHES. The discriminant's type is resolved through
+// Missing literal branches. The discriminant's type is resolved through
 // `GetConstrainedTypeAtLocation` (so a type parameter walks to its base constraint) and then
 // recursed with `TypeRecurser`. A recursed member counts as missing when it is literal-like and is
 // not pointer-identical to any case expression's type. Literal-like means the flags
 // `Literal | Undefined | Null | UniqueESSymbol`, which is why `case undefined` and `case null` are
 // real branches here and why an enum member is one too.
 //
-// CONTAINS A NON-LITERAL TYPE. True when SOME union member has EVERY intersection member
+// Contains A non-literal type. True when some union member has every intersection member
 // non-literal-like. The nesting is the part a reader gets wrong: it is some-over-union of
 // every-over-intersection, so `'foo' & { bar: 1 }` contains a non-literal type because the
 // intersection is not wholly literal, while `'foo' | number` contains one because of the `number`
 // arm. This is what makes a default case never superfluous on a switch that admits `string`.
 //
-// THE DEFAULT CASE, or nil when there is none.
+// The default case, or nil when there is none.
 //
-// From those, three independent checks, and they can BOTH fire on one switch: four of upstream's
+// From those, three independent checks, and they can both fire on one switch: four of upstream's
 // invalid cases report twice on the same statement, once for a missing branch and once for the
 // missing default. A fixture asserting one id per input would have passed while dropping half the
 // findings, which is why the fixtures here assert an ordered id list rather than a set.
@@ -75,12 +79,12 @@ import (
 // # The undefined special case, which no amount of reading the message text would suggest
 //
 // `missing`, `optional` and `undefined` are three different runtime type objects that all carry
-// `TypeFlagsUndefined`. So once ANY case expression's type carries that flag, EVERY undefined-ish
+// `TypeFlagsUndefined`. So once any case expression's type carries that flag, every undefined-ish
 // member of the discriminant is treated as covered, rather than matching them pairwise. Without it,
 // `switch (x)` over `string | undefined` with `case undefined` would report the optional-flavored
 // undefined as still missing.
 //
-// # The option surface is THREE live options, and the inventory says zero
+// # The option surface is three live options, and the inventory says zero
 //
 // A captured rule inventory carried `"options": "no"` for this rule. That is wrong, and it is the
 // eighth inventory error found in this lane and the most consequential, because each of these
@@ -93,15 +97,15 @@ import (
 // Sixty-eight of tsgolint's own hundred and six cases set at least one of them, and the same source
 // text flips between reporting and silent depending only on which is set. The entry is corrected in
 // this commit. The parity guard reads only rule presence from that file and never the options
-// column, so the wrong value was inert rather than enforced — worth saying, because "the guard is
+// column, so the wrong value was inert rather than enforced. That is worth saying, because "the guard is
 // green" was not evidence the column was right.
 //
-// # And a FOURTH option, which tsgolint declared and never read, now implemented
+// # And a fourth option, which tsgolint declared and never read, now implemented
 //
 // `defaultCaseCommentPattern` makes a comment stand in for a default clause. tsgolint declared the
 // field and never read it, and all six of its `Skip: true` cases were the ones that needed it. A
 // config writing it decoded clean and changed nothing, and worse, typescript-eslint applies its
-// DEFAULT pattern `/^no default$/iu` with the option unset, so a codebase that adopted the
+// default pattern `/^no default$/iu` with the option unset, so a codebase that adopted the
 // `// no default` convention under typescript-eslint lit up here. Implemented in #6esg2nx from
 // 8.71's getCommentDefaultCase, found by the registry guard that fails on a decoded option nothing
 // reads; see defaultCaseComment for the shapes, each replayed through the installed 8.71.0.
@@ -113,18 +117,18 @@ import (
 //
 // # There are no fixes and no suggestions, and the brief expected some
 //
-// This rule is the one in the family that would ship a repair which WRITES NEW CODE — adding a
+// This rule is the one in the family that would ship a repair which writes new code: adding a
 // missing `case` clause, not deleting or rewriting an existing one. tsgolint ships neither. Every
-// one of the fifty-two expected suggestion outputs in upstream's corpus is COMMENTED OUT under
+// one of the fifty-two expected suggestion outputs in upstream's corpus is commented out under
 // `TODO(port): add support for suggestions`, and `checkSwitchNoUnionDefaultCase` carries its own
-// `// TODO(port): missing suggestion` at the site, which is carried across below.
+// `// TODO(port): missing suggestion` at the site, a gap stated as such where it falls below.
 //
 // So `addMissingCases` is not a message id this rule can emit, and there is nothing for `rule_testing`
 // to apply and nothing needing a hand-rolled suggestion applier. That is a real behavioral gap
 // against `@typescript-eslint`, and it is upstream's gap, reproduced rather than improved on.
 //
 // Upstream declares a `buildAddMissingCasesMessage` builder that nothing calls. It is the one thing
-// this absorption did NOT carry across, because a message builder no call site reaches is dead
+// this absorption did not carry across, because a message builder no call site reaches is dead
 // weight rather than behavior: keeping it would move zero findings and add a function a reader has
 // to chase to discover it is unreachable. If a later change implements the suggestion, the builder
 // comes back with the call site that needs it.
@@ -140,10 +144,10 @@ import (
 //
 // # Where the two references disagree, counted rather than assumed
 //
-// Both register exactly ONE listener, on the switch statement, so there is no missing-arm drift of
-// the kind `await-thenable` had — counted on both sides rather than assumed. Both carry the same
+// Both register exactly one listener, on the switch statement, so there is no missing-arm drift of
+// the kind `await-thenable` had, counted on both sides rather than assumed. Both carry the same
 // three message ids and the same four schema keys. The disagreements are all in what is
-// IMPLEMENTED behind them, and all three were measured by driving `@typescript-eslint`'s Linter API
+// implemented behind them, and all three were measured by driving `@typescript-eslint`'s Linter API
 // over a real program rather than by reading its source:
 //
 //	MESSAGE TEXT.  On `'a' | 'b' | 'c'` covering only 'a', it renders
@@ -158,7 +162,7 @@ import (
 //
 // The comment pattern was the sharpest of the three for a user, and it is closed (#6esg2nx); the
 // suggestion is still reproduced from tsgolint rather than repaired. It is a gap rather than a
-// contradiction: no input makes the two report a DIFFERENT id.
+// contradiction: no input makes the two report a different id.
 //
 // # The checker, and the nil guard that now lives here
 //
@@ -166,12 +170,12 @@ import (
 // use `RunTyped`. While this rule was adapted, the standing `if ctx.TypeChecker == nil { return }`
 // could not be written, because the listener was upstream's and editing it would have turned a
 // re-sync into a merge. `upstream.Adapt` set `NeedsTypeChecker` on every rule it wrapped, so the
-// nil case was unreachable through it. Absorbing the rule removes that constraint AND makes the nil
+// nil case was unreachable through it. Absorbing the rule removes that constraint and makes the nil
 // case reachable, so the guard is now written where the advice always wanted it, and it is the one
 // addition to the body.
 //
 // That direction matters here more than usual. Under a checker-less Context this rule does not
-// panic — the shim's type queries return nil rather than crashing — it goes SILENT, and silence
+// panic (the shim's type queries return nil rather than crashing): it goes silent, and silence
 // makes every clean fixture pass having proven nothing, which is forty-nine of this rule's
 // ninety-seven cases. A test in this package pins the declaration and the guard together so a later
 // revert fails loudly instead of going vacuously green.
@@ -183,7 +187,7 @@ import (
 // expression on every switch it sees. A switch with N cases costs N+1 type resolutions plus a
 // recursion over the discriminant's union. That is the honest price of the only question this rule
 // can ask.
-var SwitchExhaustivenessCheck = rule.Rule{
+var SwitchExhaustivenessCheck = rule.Rule[SwitchExhaustivenessCheckOptions]{
 	Name: "@typescript-eslint/switch-exhaustiveness-check",
 
 	// The listener consults the checker for the discriminant and for every case expression on every
@@ -191,19 +195,19 @@ var SwitchExhaustivenessCheck = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		opts, ok := rule.OptionsAs[SwitchExhaustivenessCheckOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[SwitchExhaustivenessCheckOptions]) rule.Listeners {
+		settings, ok := options.Read()
 		if !ok {
-			opts = SwitchExhaustivenessCheckOptions{}
+			settings = SwitchExhaustivenessCheckOptions{}
 		}
-		if opts.AllowDefaultCaseForExhaustiveSwitch == nil {
-			opts.AllowDefaultCaseForExhaustiveSwitch = type_checking.Ref(true)
+		if settings.AllowDefaultCaseForExhaustiveSwitch == nil {
+			settings.AllowDefaultCaseForExhaustiveSwitch = type_checking.Reference(true)
 		}
-		if opts.ConsiderDefaultExhaustiveForUnions == nil {
-			opts.ConsiderDefaultExhaustiveForUnions = type_checking.Ref(false)
+		if settings.ConsiderDefaultExhaustiveForUnions == nil {
+			settings.ConsiderDefaultExhaustiveForUnions = type_checking.Reference(false)
 		}
-		if opts.RequireDefaultForNonUnion == nil {
-			opts.RequireDefaultForNonUnion = type_checking.Ref(false)
+		if settings.RequireDefaultForNonUnion == nil {
+			settings.RequireDefaultForNonUnion = type_checking.Reference(false)
 		}
 		// Upstream compiles the pattern with `new RegExp(pattern, 'u')`, so an invalid one throws
 		// when the rule is created. Here it matches no comment, which leaves the real default clause
@@ -211,14 +215,16 @@ var SwitchExhaustivenessCheck = rule.Rule{
 		// read as JavaScript reads it, so a lookaround or a backreference its user wrote compiles, and
 		// `\s` and `\b` mean what they mean upstream (#7mztrdd).
 		commentPattern := defaultCaseCommentPattern
-		if opts.DefaultCaseCommentPattern != nil {
-			commentPattern, _ = esregexp.Compile(*opts.DefaultCaseCommentPattern, "u")
+		if settings.DefaultCaseCommentPattern != nil {
+			// Ignored: an invalid pattern compiles to nil, and a nil pattern matches no comment, as above.
+			commentPattern, _ = esregexp.Compile(*settings.DefaultCaseCommentPattern, "u")
 		}
 
-		isLiteralLikeType := func(t *checker.Type) bool {
+		isLiteralLikeType := func(subjectType *checker.Type) bool {
 			return type_checking.IsTypeFlagSet(
-				t,
-				checker.TypeFlagsLiteral|checker.TypeFlagsUndefined|checker.TypeFlagsNull|checker.TypeFlagsUniqueESSymbol,
+				subjectType,
+				checker.TypeFlagsLiteral|checker.TypeFlagsUndefined|
+					checker.TypeFlagsNull|checker.TypeFlagsUniqueESSymbol,
 			)
 		}
 
@@ -231,14 +237,14 @@ var SwitchExhaustivenessCheck = rule.Rule{
 		 *
 		 * Default cases are never superfluous in switches with non-literal types.
 		 */
-		doesTypeContainNonLiteralType := func(t *checker.Type) bool {
+		doesTypeContainNonLiteralType := func(subjectType *checker.Type) bool {
 			return type_checking.Some(
-				type_checking.UnionTypeParts(t),
-				func(t *checker.Type) bool {
+				type_checking.UnionTypeParts(subjectType),
+				func(part *checker.Type) bool {
 					return type_checking.Every(
-						type_checking.IntersectionTypeParts(t),
-						func(t *checker.Type) bool {
-							return !isLiteralLikeType(t)
+						type_checking.IntersectionTypeParts(part),
+						func(part *checker.Type) bool {
+							return !isLiteralLikeType(part)
 						},
 					)
 				},
@@ -255,34 +261,37 @@ var SwitchExhaustivenessCheck = rule.Rule{
 				defaultCase = cases[defaultCaseIndex].AsCaseOrDefaultClause()
 			}
 
-			discriminantType := type_checking.GetConstrainedTypeAtLocation(ctx.TypeChecker, node.Expression)
+			discriminantType := type_checking.GetConstrainedTypeAtLocation(ruleContext.TypeChecker, node.Expression)
 
 			caseTypes := make([]*checker.Type, 0, len(cases))
-			for _, c := range cases {
-				if c.Kind == ast.KindDefaultClause {
+			for _, node := range cases {
+				if node.Kind == ast.KindDefaultClause {
 					continue
 				}
 
-				caseTypes = append(caseTypes, type_checking.GetConstrainedTypeAtLocation(ctx.TypeChecker, c.AsCaseOrDefaultClause().Expression))
+				caseTypes = append(caseTypes, type_checking.GetConstrainedTypeAtLocation(
+					ruleContext.TypeChecker,
+					node.AsCaseOrDefaultClause().Expression,
+				))
 			}
 
 			containsNonLiteralType := doesTypeContainNonLiteralType(discriminantType)
 
 			missingLiteralBranchTypes := make([]*checker.Type, 0, 10)
-			type_checking.TypeRecurser(discriminantType, func(t *checker.Type) bool {
-				if slices.Contains(caseTypes, t) || !isLiteralLikeType(t) {
+			type_checking.TypeRecurser(discriminantType, func(subjectType *checker.Type) bool {
+				if slices.Contains(caseTypes, subjectType) || !isLiteralLikeType(subjectType) {
 					return false
 				}
 
 				// "missing", "optional" and "undefined" types are different runtime objects,
 				// but all of them have TypeFlags.Undefined type flag
-				if slices.ContainsFunc(caseTypes, func(t *checker.Type) bool {
-					return type_checking.IsTypeFlagSet(t, checker.TypeFlagsUndefined)
-				}) && type_checking.IsTypeFlagSet(t, checker.TypeFlagsUndefined) {
+				if slices.ContainsFunc(caseTypes, func(caseType *checker.Type) bool {
+					return type_checking.IsTypeFlagSet(caseType, checker.TypeFlagsUndefined)
+				}) && type_checking.IsTypeFlagSet(subjectType, checker.TypeFlagsUndefined) {
 					return false
 				}
 
-				missingLiteralBranchTypes = append(missingLiteralBranchTypes, t)
+				missingLiteralBranchTypes = append(missingLiteralBranchTypes, subjectType)
 
 				return false
 			})
@@ -293,7 +302,11 @@ var SwitchExhaustivenessCheck = rule.Rule{
 				MissingLiteralBranchTypes: missingLiteralBranchTypes,
 			}
 			if defaultCase == nil {
-				metadata.DefaultCaseComment, metadata.DefaultCaseCommentOverran = defaultCaseComment(ctx, node, commentPattern)
+				metadata.DefaultCaseComment, metadata.DefaultCaseCommentOverran = defaultCaseComment(
+					ruleContext,
+					node,
+					commentPattern,
+				)
 			}
 			return metadata
 		}
@@ -301,18 +314,18 @@ var SwitchExhaustivenessCheck = rule.Rule{
 		checkSwitchExhaustive := func(node *ast.SwitchStatement, metadata *switchMetadata) {
 			// If considerDefaultExhaustiveForUnions is enabled, the presence of a default case
 			// always makes the switch exhaustive.
-			if *opts.ConsiderDefaultExhaustiveForUnions && metadata.hasDefaultCase() {
+			if *settings.ConsiderDefaultExhaustiveForUnions && metadata.hasDefaultCase() {
 				return
 			}
 
 			if len(metadata.MissingLiteralBranchTypes) > 0 {
-				ctx.ReportNode(node.Expression, buildSwitchIsNotExhaustiveMessage(
-					renderMissingBranches(ctx.TypeChecker, metadata.MissingLiteralBranchTypes)))
+				ruleContext.ReportNode(node.Expression, buildSwitchIsNotExhaustiveMessage(
+					renderMissingBranches(ruleContext.TypeChecker, metadata.MissingLiteralBranchTypes)))
 			}
 		}
 
 		checkSwitchUnnecessaryDefaultCase := func(metadata *switchMetadata) {
-			if *opts.AllowDefaultCaseForExhaustiveSwitch {
+			if *settings.AllowDefaultCaseForExhaustiveSwitch {
 				return
 			}
 
@@ -320,28 +333,28 @@ var SwitchExhaustivenessCheck = rule.Rule{
 				metadata.hasDefaultCase() &&
 				!metadata.ContainsNonLiteralType {
 				if metadata.DefaultCase != nil {
-					ctx.ReportNode(&metadata.DefaultCase.Node, buildDangerousDefaultCaseMessage())
+					ruleContext.ReportNode(&metadata.DefaultCase.Node, buildDangerousDefaultCaseMessage())
 				} else if !metadata.DefaultCaseCommentOverran {
 					// A comment taken as the default only because its match overran is no answer, and no
 					// answer is not a report here.
-					ctx.ReportRange(metadata.DefaultCaseComment.Range, buildDangerousDefaultCaseMessage())
+					ruleContext.ReportRange(metadata.DefaultCaseComment.Range, buildDangerousDefaultCaseMessage())
 				}
 			}
 		}
 		checkSwitchNoUnionDefaultCase := func(node *ast.SwitchStatement, metadata *switchMetadata) {
-			if !*opts.RequireDefaultForNonUnion {
+			if !*settings.RequireDefaultForNonUnion {
 				return
 			}
 
 			if metadata.ContainsNonLiteralType && !metadata.hasDefaultCase() {
-				ctx.ReportNode(node.Expression, buildSwitchIsNotExhaustiveMessage("default"))
-				// TODO(port): missing suggestion
+				ruleContext.ReportNode(node.Expression, buildSwitchIsNotExhaustiveMessage("default"))
+				// Upstream offers no suggestion for this finding, and neither does this port.
 			}
 		}
 
 		return rule.Listeners{
 			ast.KindSwitchStatement: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 
@@ -356,40 +369,7 @@ var SwitchExhaustivenessCheck = rule.Rule{
 	},
 }
 
-// switchMetadata is the three facts about a switch that all three checks read, computed once per
-// statement.
-//
-// Upstream names this `SwitchMetadata` and exports it. Nothing outside the rule reads it, so it is
-// unexported here, and that forces the second half of the same rename: upstream's three check
-// closures each take a PARAMETER also named `switchMetadata`, shadowing the type inside their own
-// bodies, which compiles only while the type's name differs in case. Those parameters are `metadata`
-// here. Both renames are naming rather than behavior — no expression changed, only what it is
-// spelled — and they are the only edits in this file beyond the interface renames and the guard.
-type switchMetadata struct {
-	ContainsNonLiteralType bool
-	// nil if there is no default case
-	DefaultCase *ast.CaseOrDefaultClause
-	// DefaultCaseComment is the comment standing in for a default clause, when there is no clause and
-	// the last comment after the last case matches the pattern; nil otherwise.
-	DefaultCaseComment *comments.Comment
-	// DefaultCaseCommentOverran is a DefaultCaseComment taken because its pattern's match overran the time
-	// bound (esregexp.MatchTimeout) rather than matched: it spares a missing default, and is not reported.
-	DefaultCaseCommentOverran bool
-	MissingLiteralBranchTypes []*checker.Type
-	// TODO: add support for fixed (symbolname is used only for fixes)
-	// SymbolName string
-}
-
-// hasDefaultCase is upstream's `defaultCase != null`, which a matching comment satisfies too.
-func (metadata *switchMetadata) hasDefaultCase() bool {
-	return metadata.DefaultCase != nil || metadata.DefaultCaseComment != nil
-}
-
-// defaultCaseCommentPattern is typescript-eslint's DEFAULT_COMMENT_PATTERN, `/^no default$/iu`, compiled
-// with its own flags so it folds case as JavaScript does (#7mztrdd).
-var defaultCaseCommentPattern = esregexp.MustCompile(`^no default$`, "iu")
-
-// defaultCaseComment is upstream's getCommentDefaultCase: the LAST comment between the end of the last
+// defaultCaseComment is upstream's getCommentDefaultCase: the last comment between the end of the last
 // case clause and the switch's closing brace, when its text, delimiters stripped and trimmed, matches
 // the pattern. A nil pattern matches nothing.
 //
@@ -404,7 +384,11 @@ var defaultCaseCommentPattern = esregexp.MustCompile(`^no default$`, "iu")
 //	// no default here                        not          the default pattern is anchored at both ends
 //
 // An empty pattern matches every comment, as `new RegExp(”)` does upstream.
-func defaultCaseComment(ctx rule.Context, statement *ast.SwitchStatement, pattern *esregexp.RegExp) (*comments.Comment, bool) {
+func defaultCaseComment(
+	ruleContext rule.Context,
+	statement *ast.SwitchStatement,
+	pattern *esregexp.RegExp,
+) (*comments.Comment, bool) {
 	if pattern == nil {
 		return nil, false
 	}
@@ -415,7 +399,7 @@ func defaultCaseComment(ctx rule.Context, statement *ast.SwitchStatement, patter
 	}
 	after, closingBrace := clauses[len(clauses)-1].End(), caseBlock.End()-1
 	var last *comments.Comment
-	all := comments.ForFile(ctx)
+	all := comments.ForFile(ruleContext)
 	for index := range all {
 		if all[index].Range.Pos() >= after && all[index].Range.End() <= closingBrace {
 			last = &all[index]
@@ -448,8 +432,8 @@ func defaultCaseComment(ctx rule.Context, statement *ast.SwitchStatement, patter
 // config to it.
 //
 // The pointer fields are load-bearing and must not be flattened to plain bools. Two of the three
-// live options default to a value that is not the zero value — `allowDefaultCaseForExhaustiveSwitch`
-// defaults to TRUE — so a `bool` field could not tell "the user wrote false" from "the user wrote
+// live options default to a value that is not the zero value (`allowDefaultCaseForExhaustiveSwitch`
+// defaults to true), so a `bool` field could not tell "the user wrote false" from "the user wrote
 // nothing", and the defaulting block at the top of `Run` reads exactly that distinction.
 type SwitchExhaustivenessCheckOptions struct {
 	AllowDefaultCaseForExhaustiveSwitch *bool   `json:"allowDefaultCaseForExhaustiveSwitch"`

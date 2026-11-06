@@ -14,7 +14,10 @@ import (
 	ecmascripttext "github.com/system-inc/cohere/internal/lint/ecmascript/text"
 )
 
-func genericPrint(path *astPath, options *printerOptions, print printing.PrintFunc, _ any) doc.Doc {
+// escapeQuoteAndBackslash is upstream's replaceAll(/["\\]/g, String.raw`\$&`).
+var escapeQuoteAndBackslash = strings.NewReplacer(`"`, `\"`, `\`, `\\`)
+
+func genericPrint(path *astPath, options *printerOptions, print printFunc, _ *printing.NoArguments) doc.Doc {
 	node := currentNode(path)
 
 	switch node.Type() {
@@ -410,6 +413,8 @@ func genericPrint(path *astPath, options *printerOptions, print printing.PrintFu
 
 	default:
 		/* c8 ignore next */
+		// Invariant: the parser builds only the kinds this switch has an arm for, and the core prints
+		// only nodes of the tree; Format and PrintToDoc recover the panic into their error.
 		panic(fmt.Sprintf("Unexpected Graphql node kind: '%s'.", node.Type()))
 	}
 }
@@ -422,9 +427,6 @@ func choose(condition bool, value doc.Doc) doc.Doc {
 	return empty
 }
 
-// escapeQuoteAndBackslash is upstream's replaceAll(/["\\]/g, String.raw`\$&`).
-var escapeQuoteAndBackslash = strings.NewReplacer(`"`, `\"`, `\`, `\\`)
-
 func canAttachComment(node *estree.Node, _ []*estree.Node) bool {
 	return !node.Is("Comment")
 }
@@ -436,7 +438,10 @@ func printComment(path *astPath, _ *printerOptions) doc.Doc {
 	}
 
 	/* c8 ignore next */
+	// Ignored: json.Marshal of a string cannot fail, so there is no error to report.
 	encoded, _ := json.Marshal(comment.Type())
+	// Invariant: the core prints only the comments Parse collected, each a "Comment" node; Format and
+	// PrintToDoc recover the panic into their error.
 	panic("Not a comment: " + string(encoded))
 }
 
@@ -454,6 +459,6 @@ func hasPrettierIgnore(path *astPath) bool {
 }
 
 // trim and trimEnd are JavaScript's String.prototype.trim and trimEnd: they strip ECMAScript WhiteSpace
-// and LineTerminator, which is not the set Go's strings.TrimSpace strips (U+FEFF is in it, U+0085 not).
+// and LineTerminator, which is not the set Go's strings.TrimSpace strips (`U+FEFF` is in it, `U+0085` not).
 func trim(value string) string    { return strings.TrimFunc(value, ecmascripttext.IsWhitespace) }
 func trimEnd(value string) string { return strings.TrimRightFunc(value, ecmascripttext.IsWhitespace) }

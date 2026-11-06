@@ -10,8 +10,8 @@ const effectCommentFile = "/repository/source/components/Panel.tsx"
 
 const effectCommentDeclarations = "import React from 'react';\ndeclare const route: string;\n"
 
-func TestReactHookRequireEffectCommentFires(t *testing.T) {
-	t.Parallel()
+func TestReactHookRequireEffectCommentFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -77,16 +77,16 @@ func TestReactHookRequireEffectCommentFires(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.Run(t, ReactHookRequireEffectComment, effectCommentFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.Run(test, ReactHookRequireEffectComment, effectCommentFile,
 				effectCommentDeclarations+testCase.sourceText), "missingEffectComment")
 		})
 	}
 }
 
-func TestReactHookRequireEffectCommentStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestReactHookRequireEffectCommentStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -176,9 +176,9 @@ func TestReactHookRequireEffectCommentStaysSilent(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, ReactHookRequireEffectComment, testCase.fileName,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, ReactHookRequireEffectComment, testCase.fileName,
 				effectCommentDeclarations+testCase.sourceText))
 		})
 	}

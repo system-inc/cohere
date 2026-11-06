@@ -30,13 +30,13 @@ type consistentReturnWire struct {
 }
 
 // DecodeConsistentReturnOptions reads the option object off the config.
-func DecodeConsistentReturnOptions(raw []byte) (any, error) {
+func DecodeConsistentReturnOptions(raw []byte) (ConsistentReturnSettings, error) {
 	if len(raw) == 0 {
 		return DefaultConsistentReturnSettings(), nil
 	}
 	var wire consistentReturnWire
-	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
-		return DefaultConsistentReturnSettings(), err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &wire); unmarshalOptionsError != nil {
+		return DefaultConsistentReturnSettings(), unmarshalOptionsError
 	}
 	settings := DefaultConsistentReturnSettings()
 	if wire.TreatUndefinedAsUnspecified != nil {
@@ -74,7 +74,7 @@ var messageConsistentReturnUnexpectedReturnValue = rule.Message{
 //
 // # Two judgments, and the second is why this needs a control-flow graph
 //
-// The first is syntactic: within one function, the FIRST `return` sets the expectation and every
+// The first is syntactic: within one function, the first `return` sets the expectation and every
 // later one that disagrees is reported, at that return statement. The second asks whether a
 // function that returns a value anywhere can also run off its end, which is not a syntactic
 // question at all. `function foo() { if (a) return true; }` reports and
@@ -99,7 +99,7 @@ var messageConsistentReturnUnexpectedReturnValue = rule.Message{
 // # Constructors are exempt, and only some of them
 //
 // A class constructor is skipped because `return` in one is a language feature rather than a value
-// channel. An object literal's method NAMED `constructor` is not a constructor and is not exempt:
+// channel. An object literal's method named `constructor` is not a constructor and is not exempt:
 // measured against the installed rule, `({ constructor() { if (a) return true; } })` reports as
 // "method 'constructor'" while `class A { constructor() { if (a) return true; } }` is silent. The
 // corpus asserts both.
@@ -107,10 +107,10 @@ var messageConsistentReturnUnexpectedReturnValue = rule.Message{
 // Upstream also exempts an ES5 constructor, which is `astUtils.isES5Constructor`: a function
 // declaration or expression whose name begins with a capital letter. The corpus's
 // `function Foo() { if (!(this instanceof Foo)) return new Foo(); }` is clean for that reason and
-// for no other, and `class A { CapitalizedFunction() {...} }` REPORTS, which is what shows the
+// for no other, and `class A { CapitalizedFunction() {...} }` reports, which is what shows the
 // exemption is about the function's own name rather than about capitalisation anywhere.
 //
-// # What this does NOT ask
+// # What this does not ask
 //
 // Upstream never consults a type annotation, so `function foo(): number | undefined { if (a)
 // return true; }` reports even though the annotation makes the mixed return correct TypeScript.
@@ -118,10 +118,10 @@ var messageConsistentReturnUnexpectedReturnValue = rule.Message{
 // `@typescript-eslint/consistent-return` wraps this one and filters on the declared return type.
 // Reproduced as-is rather than improved on, because narrowing here would silently change what the
 // extension rule is a wrapper around.
-var ConsistentReturn = rule.Rule{
+var ConsistentReturn = rule.Rule[ConsistentReturnSettings]{
 	Name: "consistent-return",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, ok := rule.OptionsAs[ConsistentReturnSettings](options)
+	Run: func(ruleContext rule.Context, options rule.Given[ConsistentReturnSettings]) rule.Listeners {
+		settings, ok := options.Read()
 		if !ok {
 			settings = DefaultConsistentReturnSettings()
 		}
@@ -138,7 +138,7 @@ var ConsistentReturn = rule.Rule{
 						TreatUndefinedAsUnspecified: settings.TreatUndefinedAsUnspecified,
 					},
 					consistentreturn.Hooks{},
-					ConsistentReturnReporter(ctx),
+					ConsistentReturnReporter(ruleContext),
 					ConsistentReturnDescribe)
 			},
 		}
@@ -150,16 +150,16 @@ var ConsistentReturn = rule.Rule{
 // Exported so the typescript extension builds an identical one rather than writing its own: the
 // three spans this rule computes are the part a second implementation would most easily get wrong,
 // and they are already measured against the installed build here.
-func ConsistentReturnReporter(ctx rule.Context) consistentreturn.Reporter {
+func ConsistentReturnReporter(ruleContext rule.Context) consistentreturn.Reporter {
 	return consistentreturn.Reporter{
 		ReportNode: func(node *ast.Node, messageId string, description string) {
-			ctx.ReportNode(node, rule.Message{Id: messageId, Description: description})
+			ruleContext.ReportNode(node, rule.Message{Id: messageId, Description: description})
 		},
 		ReportRange: func(textRange core.TextRange, messageId string, description string) {
-			ctx.ReportRange(textRange, rule.Message{Id: messageId, Description: description})
+			ruleContext.ReportRange(textRange, rule.Message{Id: messageId, Description: description})
 		},
 		TokenRange: func(node *ast.Node) core.TextRange {
-			return rule.TokenRange(ctx.SourceFile, node)
+			return rule.TokenRange(ruleContext.SourceFile, node)
 		},
 	}
 }

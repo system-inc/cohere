@@ -126,8 +126,8 @@ var relationalOperators = map[ast.Kind]bool{
 // the middle of a chain, and such a link's operand is by construction the previous link of that same
 // chain and therefore never the outermost one. The anchor conjunction below already declines it. So
 // the two predicates are interchangeable *here* while the guard itself is not removable, and the
-// faithful one is kept because the equivalence rests on the anchor rather than on anything local. This distinction is the documented
-// trap in this tree, recorded at `internal/rules/typescript/no_extra_non_null_assertion.go`:
+// faithful one is kept because the equivalence rests on the anchor rather than on anything local. This distinction is
+// the documented trap in this tree, recorded at `internal/rules/typescript/no_extra_non_null_assertion.go`:
 // reading IsOptionalChain where the original reads `optional` over-reports, because it is true for
 // links with no `?.` of their own. Here it would make `obj?.foo.bar` look like a chain consumed by
 // an optional access, which is the right answer by accident, and `(obj?.foo).bar` look the same
@@ -138,23 +138,23 @@ var relationalOperators = map[ast.Kind]bool{
 // `(obj?.foo && obj?.baz).bar` reports twice. The short circuit propagates through both operands
 // of `&&`, so both chains reach the unsafe access and each is separately something the author
 // must fix. This is why upstream's 18 failing inputs produce 20 diagnostics.
-var NoUnsafeOptionalChaining = rule.Rule{
+var NoUnsafeOptionalChaining = rule.Rule[NoUnsafeOptionalChainingOptions]{
 	Name: "no-unsafe-optional-chaining",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[NoUnsafeOptionalChainingOptions]) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
 		disallowArithmeticOperators := false
-		if settings, hasSettings := rule.OptionsAs[NoUnsafeOptionalChainingOptions](options); hasSettings {
+		if settings, hasSettings := options.Read(); hasSettings {
 			disallowArithmeticOperators = settings.DisallowArithmeticOperators
 		}
 
 		reportUnsafeUsage := func(node *ast.Node) {
-			reportChainsReaching(ctx, node, messageUnsafeOptionalChain)
+			reportChainsReaching(ruleContext, node, messageUnsafeOptionalChain)
 		}
 		reportUnsafeArithmetic := func(node *ast.Node) {
-			reportChainsReaching(ctx, node, messageUnsafeArithmetic)
+			reportChainsReaching(ruleContext, node, messageUnsafeArithmetic)
 		}
 
 		listeners := rule.Listeners{
@@ -304,7 +304,7 @@ var NoUnsafeOptionalChaining = rule.Rule{
 // Anything else stops the descent, which is what makes the default arm a decision rather than an
 // oversight: reaching a call or a literal means whatever `undefined` was there has been consumed
 // by something that handled it.
-func reportChainsReaching(ctx rule.Context, node *ast.Node, message rule.Message) {
+func reportChainsReaching(ruleContext rule.Context, node *ast.Node, message rule.Message) {
 	if node == nil {
 		return
 	}
@@ -316,28 +316,28 @@ func reportChainsReaching(ctx rule.Context, node *ast.Node, message rule.Message
 	switch node.Kind {
 	case ast.KindParenthesizedExpression, ast.KindAsExpression, ast.KindSatisfiesExpression,
 		ast.KindTypeAssertionExpression, ast.KindNonNullExpression, ast.KindExpressionWithTypeArguments:
-		reportChainsReaching(ctx, node.Expression(), message)
+		reportChainsReaching(ruleContext, node.Expression(), message)
 		return
 	case ast.KindAwaitExpression:
-		reportChainsReaching(ctx, node.AsAwaitExpression().Expression, message)
+		reportChainsReaching(ruleContext, node.AsAwaitExpression().Expression, message)
 		return
 	case ast.KindConditionalExpression:
 		conditional := node.AsConditionalExpression()
-		reportChainsReaching(ctx, conditional.WhenTrue, message)
-		reportChainsReaching(ctx, conditional.WhenFalse, message)
+		reportChainsReaching(ruleContext, conditional.WhenTrue, message)
+		reportChainsReaching(ruleContext, conditional.WhenFalse, message)
 		return
 	case ast.KindBinaryExpression:
 		binary := node.AsBinaryExpression()
 		switch binary.OperatorToken.Kind {
 		case ast.KindBarBarToken, ast.KindQuestionQuestionToken:
-			reportChainsReaching(ctx, binary.Right, message)
+			reportChainsReaching(ruleContext, binary.Right, message)
 		case ast.KindAmpersandAmpersandToken:
-			reportChainsReaching(ctx, binary.Left, message)
-			reportChainsReaching(ctx, binary.Right, message)
+			reportChainsReaching(ruleContext, binary.Left, message)
+			reportChainsReaching(ruleContext, binary.Right, message)
 		case ast.KindCommaToken:
 			// The value of a comma expression is its right side; the left is evaluated and
 			// discarded, which is why `(foo?.bar, bar)()` is clean.
-			reportChainsReaching(ctx, binary.Right, message)
+			reportChainsReaching(ruleContext, binary.Right, message)
 		}
 		return
 	}
@@ -352,7 +352,7 @@ func reportChainsReaching(ctx rule.Context, node *ast.Node, message rule.Message
 	// `(obj?.foo ?? bar).baz`, both of which upstream marks clean, and it was upstream's clean
 	// cases rather than any invented fixture that caught it.
 	if ast.IsOptionalChain(node) && ast.IsOutermostOptionalChain(node) {
-		ctx.ReportNode(node, message)
+		ruleContext.ReportNode(node, message)
 	}
 }
 

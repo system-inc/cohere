@@ -58,7 +58,7 @@ they live here, in `internal/lint/rules/tools/` and beside the rules they hold.
   `internal/lint/ecmascript/control_flow_graph`: a basic-block control-flow graph with dominators, reachability, and
   correct `try`/`catch`/`finally` edges, built on the same typescript-go AST we use. Vendored rather
   than depended on, because it is a package rather than a library and we change it when we change a
-  shared decision. The header on `internal/lint/ecmascript/control_flow_graph/cfg.go` names the commit and what was
+  shared decision. The header on `internal/lint/ecmascript/control_flow_graph/builder.go` names the commit and what was
   changed.
 
 ## Development
@@ -69,8 +69,9 @@ go build ./...
 go run ./command/cohere
 ```
 
-`cohere` cannot cohere itself — it is a Go program and its phases check TypeScript. This repo is
-gated by Go's own toolchain: `gofmt -l .`, `go vet ./...`, `go test ./...`, `go build ./...`.
+`cohere` checks itself: a bare `cohere --no-fix` at the root runs the Go engine over this module and the
+Swift engine over `swift/`, and both read 0. Go's own toolchain gates it too: `gofmt -l .`,
+`go vet ./...`, `go test ./...`, `go build ./...`.
 
 Heavy Go work goes through `cohere-dev`, which takes a token from the machine's pool and runs with Go
 held to the token's share of the cores, niced (#qhg0ntb): `go run ./command/cohere-dev test ./...` for the
@@ -89,6 +90,16 @@ this way moves main during another's gate. A fast-forward of main by hand does, 
 mid-gate, land merges it and gates again. A merge that conflicts is undone and its files named. On a
 loaded morning a branch gated green eight times without landing, and every one of those gates compiled a
 merge that never existed again.
+
+Bisect main with `git bisect start --first-parent`. Main's first-parent chain is where a regression is
+traced to the unit that brought it. Commits off it are the inside of a unit's branch, and some never
+built alone: in cohere-go, 608feeca is the first half of a two-commit merge, and ff0a005e finishes it.
+History is never rewritten to fold them, since rewriting moves every later sha that tasks and commit
+messages cite, so a commit that doesn't build is skipped with `git bisect skip` instead. Before cohere-go
+landed, each of its 136 first-parent commits since main was vetted through the pool, packages and tests
+(#ry0vkmq), with 608feeca as the control that showed the check fails. 134 pass. Two don't, and the commit
+after each builds: bc0b576a (a merge that missed one argument to `load.Packages`, fixed by 2c807fdc) and
+bdc5c078 (format's doc builders taking `Doc` before their callers did, fixed by a612b6a6). Skip both.
 
 Work starts in a worktree from `go run ./command/cohere-dev worktree <name>`, which prints its path,
 `../cohere-wt-<name>` beside the checkout of main, and makes it at main the first time, TypeScript a

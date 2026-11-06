@@ -19,8 +19,8 @@ const mixedEnumsFile = "/repository/source/Enums.ts"
 // file in the program, so they run through RunTypedFiles in their own tests below rather than
 // being weakened into single-file approximations.
 
-func TestNoMixedEnumsStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoMixedEnumsStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		"\nenum Fruit {}\n    ",
@@ -54,15 +54,15 @@ func TestNoMixedEnumsStaysSilent(t *testing.T) {
 		"\nnamespace Outer {\n  namespace Test {\n    export enum Bar {\n      A = 1,\n    }\n  }\n}\nnamespace Different {\n  namespace Test {\n    export enum Bar {\n      B = 'B',\n    }\n  }\n}\n    ",
 	}
 	for index, sourceText := range cases {
-		t.Run(fmt.Sprintf("upstream valid %d", index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoMixedEnums, mixedEnumsFile, sourceText))
+		test.Run(fmt.Sprintf("upstream valid %d", index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoMixedEnums, mixedEnumsFile, sourceText))
 		})
 	}
 }
 
-func TestNoMixedEnumsFires(t *testing.T) {
-	t.Parallel()
+func TestNoMixedEnumsFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -85,19 +85,28 @@ func TestNoMixedEnumsFires(t *testing.T) {
 		{"\nenum Foo {\n  A,\n}\nenum Foo {\n  B = 'b',\n}\nenum Foo {\n  C,\n}\n      ", 1},
 		{"\nenum Foo {\n  A,\n}\nenum Foo {\n  B,\n}\nenum Foo {\n  C = 'c',\n}\n      ", 1},
 		{"\nenum Foo {\n  A = 1,\n}\nenum Foo {\n  B = 'B',\n}\n      ", 1},
-		{"\nnamespace Test {\n  export enum Bar {\n    A = 1,\n  }\n}\nnamespace Test {\n  export enum Bar {\n    B = 'B',\n  }\n}\n      ", 1},
-		{"\nnamespace Test {\n  export enum Bar {\n    A,\n  }\n}\nnamespace Test {\n  export enum Bar {\n    B = 'B',\n  }\n}\n      ", 1},
-		{"\nnamespace Outer {\n  export namespace Test {\n    export enum Bar {\n      A = 1,\n    }\n  }\n}\nnamespace Outer {\n  export namespace Test {\n    export enum Bar {\n      B = 'B',\n    }\n  }\n}\n      ", 1},
+		{
+			"\nnamespace Test {\n  export enum Bar {\n    A = 1,\n  }\n}\nnamespace Test {\n  export enum Bar {\n    B = 'B',\n  }\n}\n      ",
+			1,
+		},
+		{
+			"\nnamespace Test {\n  export enum Bar {\n    A,\n  }\n}\nnamespace Test {\n  export enum Bar {\n    B = 'B',\n  }\n}\n      ",
+			1,
+		},
+		{
+			"\nnamespace Outer {\n  export namespace Test {\n    export enum Bar {\n      A = 1,\n    }\n  }\n}\nnamespace Outer {\n  export namespace Test {\n    export enum Bar {\n      B = 'B',\n    }\n  }\n}\n      ",
+			1,
+		},
 	}
 	for index, testCase := range cases {
-		t.Run(fmt.Sprintf("upstream invalid %d", index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoMixedEnums, mixedEnumsFile, testCase.sourceText)
+		test.Run(fmt.Sprintf("upstream invalid %d", index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoMixedEnums, mixedEnumsFile, testCase.sourceText)
 			expected := make([]string, testCase.findings)
 			for position := range expected {
 				expected[position] = "mixed"
 			}
-			rule_testing.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(test, result, expected...)
 		})
 	}
 }
@@ -107,42 +116,50 @@ func TestNoMixedEnumsFires(t *testing.T) {
 // they would silently become tests of an unresolved import instead of tests of enum merging.
 const mixedEnumsDeclarationSource = "export enum Enum {\n  A = 'A',\n  B = 'B',\n}\n"
 
-func TestNoMixedEnumsAcrossFiles(t *testing.T) {
-	t.Parallel()
+func TestNoMixedEnumsAcrossFiles(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
 		sourceText string
 		findings   int
 	}{
-		{"upstream valid multi 0", "\nimport { Enum } from './mixed-enums-decl';\n\ndeclare module './mixed-enums-decl' {\n  enum Enum {\n    StringLike = 'StringLike',\n  }\n}\n    ", 0},
-		{"upstream invalid multi 0", "\nimport { Enum } from './mixed-enums-decl';\n\ndeclare module './mixed-enums-decl' {\n  enum Enum {\n    Numeric = 0,\n  }\n}\n      ", 1},
+		{
+			"upstream valid multi 0",
+			"\nimport { Enum } from './mixed-enums-decl';\n\ndeclare module './mixed-enums-decl' {\n  enum Enum {\n    StringLike = 'StringLike',\n  }\n}\n    ",
+			0,
+		},
+		{
+			"upstream invalid multi 0",
+			"\nimport { Enum } from './mixed-enums-decl';\n\ndeclare module './mixed-enums-decl' {\n  enum Enum {\n    Numeric = 0,\n  }\n}\n      ",
+			1,
+		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			files := map[string]string{
 				"/repository/source/Enums.ts":            testCase.sourceText,
 				"/repository/source/mixed-enums-decl.ts": mixedEnumsDeclarationSource,
 			}
-			result := rule_testing.RunTypedFiles(t, NoMixedEnums, files, "/repository/source/Enums.ts")
+			result := rule_testing.RunTypedFiles(test, NoMixedEnums, files, "/repository/source/Enums.ts")
 			expected := make([]string, testCase.findings)
 			for position := range expected {
 				expected[position] = "mixed"
 			}
-			rule_testing.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(test, result, expected...)
 		})
 	}
 }
 
-// TestNoMixedEnumsSpans pins WHERE the finding points, which ExpectFindings cannot see.
+// TestNoMixedEnumsSpans pins where the finding points, which ExpectFindings cannot see.
 //
 // The expected text is derived from upstream's own line and column numbers, and the source is
 // trimmed the same way rule_testing.RunTyped trims it before writing the fixture to disk. Without
 // that trim the leading newline every corpus case carries would shift every column by one and
 // the failure would read exactly like an off-by-one in the rule.
-func TestNoMixedEnumsSpans(t *testing.T) {
-	t.Parallel()
+func TestNoMixedEnumsSpans(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -159,18 +176,18 @@ func TestNoMixedEnumsSpans(t *testing.T) {
 		{"\nenum Foo {\n  A = 1,\n}\nenum Foo {\n  B = 'B',\n}\n      ", "'B'"},
 	}
 	for index, testCase := range cases {
-		t.Run(fmt.Sprintf("span %d", index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoMixedEnums, mixedEnumsFile, testCase.sourceText)
+		test.Run(fmt.Sprintf("span %d", index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoMixedEnums, mixedEnumsFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
+				test.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
 			}
-			// Slice the source the HARNESS wrote, not the Go literal.
+			// Slice the source the harness wrote, not the Go literal.
 			onDisk := strings.TrimSpace(testCase.sourceText) + "\n"
 			finding := result.Diagnostics[0]
 			got := onDisk[finding.Range.Pos():finding.Range.End()]
 			if got != testCase.wantText {
-				t.Fatalf("finding points at %q, want %q", got, testCase.wantText)
+				test.Fatalf("finding points at %q, want %q", got, testCase.wantText)
 			}
 		})
 	}
@@ -178,36 +195,36 @@ func TestNoMixedEnumsSpans(t *testing.T) {
 
 // TestNoMixedEnumsMessage asserts the reported id and description against literals typed here
 // rather than against the rule's own constant, which would move with any mutation to it.
-func TestNoMixedEnumsMessage(t *testing.T) {
-	t.Parallel()
+func TestNoMixedEnumsMessage(test *testing.T) {
+	test.Parallel()
 
 	message := buildNoMixedEnumsMessage()
 	if message.Id != "mixed" {
-		t.Fatalf("message id is %q, want %q", message.Id, "mixed")
+		test.Fatalf("message id is %q, want %q", message.Id, "mixed")
 	}
 	if !strings.Contains(message.Description, "both number members and string members") {
-		t.Fatalf("description does not say what is wrong: %q", message.Description)
+		test.Fatalf("description does not say what is wrong: %q", message.Description)
 	}
 }
 
 // TestNoMixedEnumsRequiresTheTypedHarness pins that this rule declares the checker and guards
 // on it. A typed rule run through the plain harness gets a nil checker; without the guard the
-// shim returns nil rather than panicking, so the failure would be SILENCE, and every
+// shim returns nil rather than panicking, so the failure would be silence, and every
 // StaysSilent case above would keep passing vacuously if the declaration were ever reverted.
-func TestNoMixedEnumsRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestNoMixedEnumsRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	if !NoMixedEnums.NeedsTypeChecker {
-		t.Fatal("rule must declare NeedsTypeChecker")
+		test.Fatal("rule must declare NeedsTypeChecker")
 	}
 	mixed := "enum E {\n  A = 1,\n  B = 'b',\n}\n"
-	typed := rule_testing.RunTyped(t, NoMixedEnums, mixedEnumsFile, mixed)
+	typed := rule_testing.RunTyped(test, NoMixedEnums, mixedEnumsFile, mixed)
 	if len(typed.Diagnostics) != 1 {
-		t.Fatalf("typed harness: want 1 finding, got %d", len(typed.Diagnostics))
+		test.Fatalf("typed harness: want 1 finding, got %d", len(typed.Diagnostics))
 	}
-	untyped := rule_testing.Run(t, NoMixedEnums, mixedEnumsFile, mixed)
+	untyped := rule_testing.Run(test, NoMixedEnums, mixedEnumsFile, mixed)
 	if len(untyped.Diagnostics) != 0 {
-		t.Fatalf("untyped harness: want 0 findings from the nil-checker guard, got %d", len(untyped.Diagnostics))
+		test.Fatalf("untyped harness: want 0 findings from the nil-checker guard, got %d", len(untyped.Diagnostics))
 	}
 }
 
@@ -221,21 +238,21 @@ func TestNoMixedEnumsRequiresTheTypedHarness(t *testing.T) {
 //
 // Each row was measured against the installed @typescript-eslint rule, and the bare forms are
 // carried alongside as controls so a row going silent for an unrelated reason is visible.
-func TestNoMixedEnumsParentheses(t *testing.T) {
-	t.Parallel()
+func TestNoMixedEnumsParentheses(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
 		sourceText string
 		findings   int
 	}{
-		// The parenthesized number still reports, and its SPAN excludes the parentheses. Verified
+		// The parenthesized number still reports, and its span excludes the parentheses. Verified
 		// against the parser directly: ESTree reports the range of the inner literal.
 		{"parenthesized number after string", "enum E {\n  A = 'a',\n  B = (1),\n}\n", 1},
 		{"bare number after string (control)", "enum E {\n  A = 'a',\n  B = 1,\n}\n", 1},
 
 		// The row that settles the whole question. If parentheses routed to the checker arm, a
-		// parenthesized boolean would classify as Number and this would REPORT. Upstream is
+		// parenthesized boolean would classify as Number and this would report. Upstream is
 		// silent, which is only possible if it sees the boolean literal through the wrapper.
 		{"parenthesized boolean after string", "enum E {\n  A = 'a',\n  B = (false),\n}\n", 0},
 		{"bare boolean after string (control)", "enum E {\n  A = 'a',\n  B = false,\n}\n", 0},
@@ -245,14 +262,14 @@ func TestNoMixedEnumsParentheses(t *testing.T) {
 		{"the same pair without the boolean (control)", "enum E {\n  A = 'a',\n  B = 1,\n}\n", 1},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoMixedEnums, mixedEnumsFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoMixedEnums, mixedEnumsFile, testCase.sourceText)
 			expected := make([]string, testCase.findings)
 			for position := range expected {
 				expected[position] = "mixed"
 			}
-			rule_testing.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(test, result, expected...)
 		})
 	}
 }
@@ -260,28 +277,28 @@ func TestNoMixedEnumsParentheses(t *testing.T) {
 // TestNoMixedEnumsParenthesizedSpanExcludesTheWrapper pins the span rather than the count, because
 // a finding anchored on the KindParenthesizedExpression would satisfy the count assertion above
 // while pointing at text upstream never highlights.
-func TestNoMixedEnumsParenthesizedSpanExcludesTheWrapper(t *testing.T) {
-	t.Parallel()
+func TestNoMixedEnumsParenthesizedSpanExcludesTheWrapper(test *testing.T) {
+	test.Parallel()
 
 	sourceText := "enum E {\n  A = 'a',\n  B = (1),\n}\n"
-	result := rule_testing.RunTyped(t, NoMixedEnums, mixedEnumsFile, sourceText)
+	result := rule_testing.RunTyped(test, NoMixedEnums, mixedEnumsFile, sourceText)
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
+		test.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
 	}
 	onDisk := strings.TrimSpace(sourceText) + "\n"
 	finding := result.Diagnostics[0]
 	got := onDisk[finding.Range.Pos():finding.Range.End()]
 	if got != "1" {
-		t.Fatalf("finding points at %q, want %q with the parentheses excluded", got, "1")
+		test.Fatalf("finding points at %q, want %q with the parentheses excluded", got, "1")
 	}
 }
 
-// TestNoMixedEnumsUnknownAborts pins that an Unknown member abandons the WHOLE declaration rather
+// TestNoMixedEnumsUnknownAborts pins that an Unknown member abandons the whole declaration rather
 // than being skipped over. The middle row is the one that costs a finding, and it is the reason
 // this is a separate test: reading the upstream source shows a `return` inside a loop and not what
 // that return is worth.
-func TestNoMixedEnumsUnknownAborts(t *testing.T) {
-	t.Parallel()
+func TestNoMixedEnumsUnknownAborts(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -293,70 +310,70 @@ func TestNoMixedEnumsUnknownAborts(t *testing.T) {
 		{"a boolean AFTER the disagreement is too late", "enum E {\n  A = 1,\n  C = 'c',\n  B = false,\n}\n", 1},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoMixedEnums, mixedEnumsFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoMixedEnums, mixedEnumsFile, testCase.sourceText)
 			expected := make([]string, testCase.findings)
 			for position := range expected {
 				expected[position] = "mixed"
 			}
-			rule_testing.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(test, result, expected...)
 		})
 	}
 }
 
 // TestNoMixedEnumsAdoptsNumberIntoAnUnsetDesiredType covers upstream's `desiredType ??= currentType`
-// line, which is only reachable when the FIRST member takes the checker arm and no merge case set a
+// line, which is only reachable when the first member takes the checker arm and no merge case set a
 // desired type. Without the adoption the scan reaches the string with nothing to compare against and
 // goes silent. Measured reporting upstream.
-func TestNoMixedEnumsAdoptsNumberIntoAnUnsetDesiredType(t *testing.T) {
-	t.Parallel()
+func TestNoMixedEnumsAdoptsNumberIntoAnUnsetDesiredType(test *testing.T) {
+	test.Parallel()
 
 	sourceText := "declare const f: () => any;\nenum E {\n  A = f(),\n  B = 1,\n  C = 'c',\n}\n"
-	result := rule_testing.RunTyped(t, NoMixedEnums, mixedEnumsFile, sourceText)
-	rule_testing.ExpectFindings(t, result, "mixed")
+	result := rule_testing.RunTyped(test, NoMixedEnums, mixedEnumsFile, sourceText)
+	rule_testing.ExpectFindings(test, result, "mixed")
 }
 
 // TestNoMixedEnumsMemberWithoutInitializerIsTheAnchor pins where the finding lands when the
 // offending member has no initializer to point at. Upstream reports on the member itself, spanning
 // only the name, and no imported fixture covers it because every invalid case in the corpus has an
 // initializer on the reported member.
-func TestNoMixedEnumsMemberWithoutInitializerIsTheAnchor(t *testing.T) {
-	t.Parallel()
+func TestNoMixedEnumsMemberWithoutInitializerIsTheAnchor(test *testing.T) {
+	test.Parallel()
 
 	sourceText := "enum E {\n  A = 'a',\n  B,\n}\n"
-	result := rule_testing.RunTyped(t, NoMixedEnums, mixedEnumsFile, sourceText)
+	result := rule_testing.RunTyped(test, NoMixedEnums, mixedEnumsFile, sourceText)
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
+		test.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
 	}
 	onDisk := strings.TrimSpace(sourceText) + "\n"
 	finding := result.Diagnostics[0]
 	got := onDisk[finding.Range.Pos():finding.Range.End()]
 	if got != "B" {
-		t.Fatalf("finding points at %q, want the member name %q", got, "B")
+		test.Fatalf("finding points at %q, want the member name %q", got, "B")
 	}
 }
 
-// TestNoMixedEnumsMergeOrdering pins that a third declaration is judged against the FIRST rather
+// TestNoMixedEnumsMergeOrdering pins that a third declaration is judged against the first rather
 // than against the one immediately before it. That is the observable consequence of upstream
 // breaking out of its scope scan on the earliest match, and it is not something a reader would
 // predict from the rule's description.
-func TestNoMixedEnumsMergeOrdering(t *testing.T) {
-	t.Parallel()
+func TestNoMixedEnumsMergeOrdering(test *testing.T) {
+	test.Parallel()
 
 	sourceText := "enum E {\n  A = 1,\n}\nenum E {\n  B = 'b',\n}\nenum E {\n  C = 2,\n}\n"
-	result := rule_testing.RunTyped(t, NoMixedEnums, mixedEnumsFile, sourceText)
-	// Only the middle declaration reports. The third agrees with the FIRST, so if it were judged
+	result := rule_testing.RunTyped(test, NoMixedEnums, mixedEnumsFile, sourceText)
+	// Only the middle declaration reports. The third agrees with the first, so if it were judged
 	// against the second there would be two findings here.
-	rule_testing.ExpectFindings(t, result, "mixed")
+	rule_testing.ExpectFindings(test, result, "mixed")
 }
 
 // TestNoMixedEnumsNamespaceMerging covers the exported/non-exported split. An exported enum inside a
 // namespace merges across blocks and is judged against its partner; a non-exported one does not
 // merge and is judged alone. The second row is the control: without it the first row's finding
 // could equally be explained by the two enums simply being in the same file.
-func TestNoMixedEnumsNamespaceMerging(t *testing.T) {
-	t.Parallel()
+func TestNoMixedEnumsNamespaceMerging(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -375,14 +392,14 @@ func TestNoMixedEnumsNamespaceMerging(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoMixedEnums, mixedEnumsFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoMixedEnums, mixedEnumsFile, testCase.sourceText)
 			expected := make([]string, testCase.findings)
 			for position := range expected {
 				expected[position] = "mixed"
 			}
-			rule_testing.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(test, result, expected...)
 		})
 	}
 }
@@ -390,18 +407,18 @@ func TestNoMixedEnumsNamespaceMerging(t *testing.T) {
 // TestNoMixedEnumsEmptyDeclarationIsNotAReference pins that an empty `enum E {}` does not become the
 // declaration a later one is judged against. Without the skip the later pair would be compared to a
 // declaration with no members, which has no kind at all.
-func TestNoMixedEnumsEmptyDeclarationIsNotAReference(t *testing.T) {
-	t.Parallel()
+func TestNoMixedEnumsEmptyDeclarationIsNotAReference(test *testing.T) {
+	test.Parallel()
 
 	sourceText := "enum E {}\nenum E {\n  A = 1,\n  B = 'b',\n}\n"
-	result := rule_testing.RunTyped(t, NoMixedEnums, mixedEnumsFile, sourceText)
-	rule_testing.ExpectFindings(t, result, "mixed")
+	result := rule_testing.RunTyped(test, NoMixedEnums, mixedEnumsFile, sourceText)
+	rule_testing.ExpectFindings(test, result, "mixed")
 }
 
 // TestNoMixedEnumsConstAndAmbientEnums pins that the rule reaches const and declared enums, which the
 // corpus never writes. Both were measured reporting upstream.
-func TestNoMixedEnumsConstAndAmbientEnums(t *testing.T) {
-	t.Parallel()
+func TestNoMixedEnumsConstAndAmbientEnums(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -411,10 +428,10 @@ func TestNoMixedEnumsConstAndAmbientEnums(t *testing.T) {
 		{"declare enum", "declare enum E {\n  A = 1,\n  B = 'b',\n}\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoMixedEnums, mixedEnumsFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "mixed")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoMixedEnums, mixedEnumsFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "mixed")
 		})
 	}
 }
@@ -425,10 +442,10 @@ func TestNoMixedEnumsConstAndAmbientEnums(t *testing.T) {
 // each row below was measured against the installed rule before it was written.
 //
 // The substitution row matters most. Upstream returns String from the node kind alone, so a template
-// interpolating a NUMBER is still a string member. Asking the checker would be more careful and
+// interpolating a number is still a string member. Asking the checker would be more careful and
 // would disagree with the rule being ported.
-func TestNoMixedEnumsTemplateLiteralsAreStrings(t *testing.T) {
-	t.Parallel()
+func TestNoMixedEnumsTemplateLiteralsAreStrings(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -438,18 +455,22 @@ func TestNoMixedEnumsTemplateLiteralsAreStrings(t *testing.T) {
 		{"number then template", "enum E {\n  A = 1,\n  B = `b`,\n}\n", 1},
 		{"number then plain string (control)", "enum E {\n  A = 1,\n  B = 'b',\n}\n", 1},
 		{"template then number", "enum E {\n  A = `a`,\n  B = 1,\n}\n", 1},
-		{"template with a numeric substitution is still a string", "declare const n: number;\nenum E {\n  A = 1,\n  B = `${n}`,\n}\n", 1},
+		{
+			"template with a numeric substitution is still a string",
+			"declare const n: number;\nenum E {\n  A = 1,\n  B = `${n}`,\n}\n",
+			1,
+		},
 		{"two templates agree", "enum E {\n  A = `a`,\n  B = `b`,\n}\n", 0},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoMixedEnums, mixedEnumsFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoMixedEnums, mixedEnumsFile, testCase.sourceText)
 			expected := make([]string, testCase.findings)
 			for position := range expected {
 				expected[position] = "mixed"
 			}
-			rule_testing.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(test, result, expected...)
 		})
 	}
 }
@@ -457,27 +478,39 @@ func TestNoMixedEnumsTemplateLiteralsAreStrings(t *testing.T) {
 // TestNoMixedEnumsCheckerArm pins the fallback that classifies anything the literal switch does not
 // name. The two clean rows are controls: without them a rule that classified every call as String
 // would still pass the reporting row.
-func TestNoMixedEnumsCheckerArm(t *testing.T) {
-	t.Parallel()
+func TestNoMixedEnumsCheckerArm(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
 		sourceText string
 		findings   int
 	}{
-		{"call returning string after number", "declare const f: () => string;\nenum E {\n  A = 1,\n  B = f(),\n}\n", 1},
-		{"call returning number after number (control)", "declare const g: () => number;\nenum E {\n  A = 1,\n  B = g(),\n}\n", 0},
-		{"call returning string after string (control)", "declare const f: () => string;\nenum E {\n  A = 'a',\n  B = f(),\n}\n", 0},
+		{
+			"call returning string after number",
+			"declare const f: () => string;\nenum E {\n  A = 1,\n  B = f(),\n}\n",
+			1,
+		},
+		{
+			"call returning number after number (control)",
+			"declare const g: () => number;\nenum E {\n  A = 1,\n  B = g(),\n}\n",
+			0,
+		},
+		{
+			"call returning string after string (control)",
+			"declare const f: () => string;\nenum E {\n  A = 'a',\n  B = f(),\n}\n",
+			0,
+		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoMixedEnums, mixedEnumsFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoMixedEnums, mixedEnumsFile, testCase.sourceText)
 			expected := make([]string, testCase.findings)
 			for position := range expected {
 				expected[position] = "mixed"
 			}
-			rule_testing.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(test, result, expected...)
 		})
 	}
 }
@@ -486,8 +519,8 @@ func TestNoMixedEnumsCheckerArm(t *testing.T) {
 // abandoning the declaration rather than classifying as either kind. Upstream reaches it through
 // `typeof null === 'object'` falling into its Literal switch's default arm. The second row is the
 // control proving the pair does disagree once the null is removed.
-func TestNoMixedEnumsNullAborts(t *testing.T) {
-	t.Parallel()
+func TestNoMixedEnumsNullAborts(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -498,19 +531,19 @@ func TestNoMixedEnumsNullAborts(t *testing.T) {
 		{"the same pair without the null (control)", "enum E {\n  A = 1,\n  C = 'c',\n}\n", 1},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoMixedEnums, mixedEnumsFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoMixedEnums, mixedEnumsFile, testCase.sourceText)
 			expected := make([]string, testCase.findings)
 			for position := range expected {
 				expected[position] = "mixed"
 			}
-			rule_testing.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(test, result, expected...)
 		})
 	}
 }
 
-// TestNoMixedEnumsUnknownFirstMemberSilencesEverything pins the inputs that reach for an UNSET
+// TestNoMixedEnumsUnknownFirstMemberSilencesEverything pins the inputs that reach for an unset
 // desired type. Every one of them is clean, and that is the measurement behind the equivalence
 // verdict recorded on the adoption line in the rule: there is no input where the scan continues
 // with no desired type, because every route to that state runs through an Unknown first member,
@@ -518,8 +551,8 @@ func TestNoMixedEnumsNullAborts(t *testing.T) {
 //
 // U2 is the control. Without it the four clean rows read as "this shape is just never reported",
 // which is the wrong conclusion: the same pair without the leading boolean does report.
-func TestNoMixedEnumsUnknownFirstMemberSilencesEverything(t *testing.T) {
-	t.Parallel()
+func TestNoMixedEnumsUnknownFirstMemberSilencesEverything(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -530,18 +563,26 @@ func TestNoMixedEnumsUnknownFirstMemberSilencesEverything(t *testing.T) {
 		{"the same without the leading boolean (control)", "enum E {\n  B = 1,\n  C = 'c',\n}\n", 1},
 		{"boolean first, then string, then number", "enum E {\n  A = false,\n  B = 'b',\n  C = 1,\n}\n", 0},
 		{"null first, then number, then string", "enum E {\n  A = null,\n  B = 1,\n  C = 'c',\n}\n", 0},
-		{"merged sibling whose first member is a boolean", "enum E {\n  Z = false,\n}\nenum E {\n  A = 1,\n  B = 'b',\n}\n", 0},
-		{"merged sibling with a boolean, then a string-first pair", "enum E {\n  Z = false,\n}\nenum E {\n  A = 'a',\n  B = 1,\n}\n", 0},
+		{
+			"merged sibling whose first member is a boolean",
+			"enum E {\n  Z = false,\n}\nenum E {\n  A = 1,\n  B = 'b',\n}\n",
+			0,
+		},
+		{
+			"merged sibling with a boolean, then a string-first pair",
+			"enum E {\n  Z = false,\n}\nenum E {\n  A = 'a',\n  B = 1,\n}\n",
+			0,
+		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoMixedEnums, mixedEnumsFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoMixedEnums, mixedEnumsFile, testCase.sourceText)
 			expected := make([]string, testCase.findings)
 			for position := range expected {
 				expected[position] = "mixed"
 			}
-			rule_testing.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(test, result, expected...)
 		})
 	}
 }

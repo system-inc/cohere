@@ -173,25 +173,34 @@ func securityNoInterpolatedSqlStringReported(result rule_testing.Result, sourceT
 	return reported
 }
 
-func securityNoInterpolatedSqlStringExpectSpans(t *testing.T, result rule_testing.Result, sourceText string, wantSpans []string) {
-	t.Helper()
+func securityNoInterpolatedSqlStringExpectSpans(
+	test *testing.T,
+	result rule_testing.Result,
+	sourceText string,
+	wantSpans []string,
+) {
+	test.Helper()
 	wantIds := make([]string, 0, len(wantSpans))
 	for range wantSpans {
 		wantIds = append(wantIds, securityNoInterpolatedSqlStringId)
 	}
-	rule_testing.ExpectFindings(t, result, wantIds...)
+	rule_testing.ExpectFindings(test, result, wantIds...)
 	reported := securityNoInterpolatedSqlStringReported(result, sourceText)
 	for index := range wantSpans {
 		if reported[index] != wantSpans[index] {
-			t.Fatalf("finding %d points at\n%s\nwant\n%s", index, reported[index], wantSpans[index])
+			test.Fatalf("finding %d points at\n%s\nwant\n%s", index, reported[index], wantSpans[index])
 		}
 	}
 	for _, diagnostic := range result.Diagnostics {
 		if diagnostic.Message.Description != securityNoInterpolatedSqlStringWording {
-			t.Fatalf("message is %q", diagnostic.Message.Description)
+			test.Fatalf("message is %q", diagnostic.Message.Description)
 		}
 		if len(diagnostic.Fixes) != 0 || len(diagnostic.Suggestions) != 0 {
-			t.Fatalf("expected no fix and no suggestion, got %d and %d", len(diagnostic.Fixes), len(diagnostic.Suggestions))
+			test.Fatalf(
+				"expected no fix and no suggestion, got %d and %d",
+				len(diagnostic.Fixes),
+				len(diagnostic.Suggestions),
+			)
 		}
 	}
 }
@@ -199,43 +208,67 @@ func securityNoInterpolatedSqlStringExpectSpans(t *testing.T, result rule_testin
 // The real contact search, before the fix: the three search-word conditions in the fragment, and the
 // phone digits in the full statement. The `sqlite3 "${databasePath}" "${query}"` command beside them
 // is not SQL and stays silent.
-func TestSecurityNoInterpolatedSqlStringFiresOnContactsApi(t *testing.T) {
-	t.Parallel()
+func TestSecurityNoInterpolatedSqlStringFiresOnContactsApi(test *testing.T) {
+	test.Parallel()
 
 	sourceText := securityNoInterpolatedSqlStringContactsApi()
-	result := rule_testing.RunTyped(t, SecurityNoInterpolatedSqlString, securityNoInterpolatedSqlStringFile, sourceText)
-	securityNoInterpolatedSqlStringExpectSpans(t, result, sourceText, []string{"word", "word", "word", "digits"})
+	result := rule_testing.RunTyped(
+		test,
+		SecurityNoInterpolatedSqlString,
+		securityNoInterpolatedSqlStringFile,
+		sourceText,
+	)
+	securityNoInterpolatedSqlStringExpectSpans(test, result, sourceText, []string{"word", "word", "word", "digits"})
 }
 
-func TestSecurityNoInterpolatedSqlStringStaysSilentOnBoundContactsApi(t *testing.T) {
-	t.Parallel()
+func TestSecurityNoInterpolatedSqlStringStaysSilentOnBoundContactsApi(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTyped(t, SecurityNoInterpolatedSqlString, securityNoInterpolatedSqlStringFile, securityNoInterpolatedSqlStringBoundContactsApi())
-	rule_testing.ExpectClean(t, result)
+	result := rule_testing.RunTyped(
+		test,
+		SecurityNoInterpolatedSqlString,
+		securityNoInterpolatedSqlStringFile,
+		securityNoInterpolatedSqlStringBoundContactsApi(),
+	)
+	rule_testing.ExpectClean(test, result)
 }
 
 // The real counter nerve, before the fix: quotes are doubled, backslashes are not, and the query runs
 // on MySQL. Both interpolations of the identifier fire.
-func TestSecurityNoInterpolatedSqlStringFiresOnQuoteOnlyEscape(t *testing.T) {
-	t.Parallel()
+func TestSecurityNoInterpolatedSqlStringFiresOnQuoteOnlyEscape(test *testing.T) {
+	test.Parallel()
 
-	sourceText := securityNoInterpolatedSqlStringAhraOsTriggers("        const viewIdentifier = String(parameters.viewIdentifier ?? '').replace(/'/g, \"''\");")
-	result := rule_testing.RunTyped(t, SecurityNoInterpolatedSqlString, securityNoInterpolatedSqlStringFile, sourceText)
-	securityNoInterpolatedSqlStringExpectSpans(t, result, sourceText, []string{"viewIdentifier", "viewIdentifier"})
+	sourceText := securityNoInterpolatedSqlStringAhraOsTriggers(
+		"        const viewIdentifier = String(parameters.viewIdentifier ?? '').replace(/'/g, \"''\");",
+	)
+	result := rule_testing.RunTyped(
+		test,
+		SecurityNoInterpolatedSqlString,
+		securityNoInterpolatedSqlStringFile,
+		sourceText,
+	)
+	securityNoInterpolatedSqlStringExpectSpans(test, result, sourceText, []string{"viewIdentifier", "viewIdentifier"})
 }
 
 // The same nerve with backslashes doubled before quotes: no input can close the string on any engine,
 // so the finding's claim would be false, and nothing fires.
-func TestSecurityNoInterpolatedSqlStringStaysSilentOnCompleteEscape(t *testing.T) {
-	t.Parallel()
+func TestSecurityNoInterpolatedSqlStringStaysSilentOnCompleteEscape(test *testing.T) {
+	test.Parallel()
 
-	sourceText := securityNoInterpolatedSqlStringAhraOsTriggers("        const viewIdentifier = String(parameters.viewIdentifier ?? '').replace(/\\\\/g, '\\\\\\\\').replace(/'/g, \"''\");")
-	result := rule_testing.RunTyped(t, SecurityNoInterpolatedSqlString, securityNoInterpolatedSqlStringFile, sourceText)
-	rule_testing.ExpectClean(t, result)
+	sourceText := securityNoInterpolatedSqlStringAhraOsTriggers(
+		"        const viewIdentifier = String(parameters.viewIdentifier ?? '').replace(/\\\\/g, '\\\\\\\\').replace(/'/g, \"''\");",
+	)
+	result := rule_testing.RunTyped(
+		test,
+		SecurityNoInterpolatedSqlString,
+		securityNoInterpolatedSqlStringFile,
+		sourceText,
+	)
+	rule_testing.ExpectClean(test, result)
 }
 
-func TestSecurityNoInterpolatedSqlStringFires(t *testing.T) {
-	t.Parallel()
+func TestSecurityNoInterpolatedSqlStringFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name      string
@@ -372,7 +405,8 @@ func TestSecurityNoInterpolatedSqlStringFires(t *testing.T) {
 			"    return `SELECT id FROM Contact WHERE name = '${name.replace(/\\\\/g, '\\\\\\\\').replace(/'/, \"''\")}'`;",
 			"}",
 		}, []string{"name.replace(/\\\\/g, '\\\\\\\\').replace(/'/, \"''\")"}},
-		// `iMessageApi.ts` in ahra: Python's triple quotes are not single quotes, so the `LIKE` string inside them is found.
+		// `iMessageApi.ts` in ahra: Python's triple quotes are not single quotes, so the `LIKE` string inside them is
+		// found.
 		{"SQL inside a Python script", []string{
 			"export function script(normalized: string, count: number) {",
 			"    return `",
@@ -394,17 +428,22 @@ func TestSecurityNoInterpolatedSqlStringFires(t *testing.T) {
 		}, []string{"word"}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			sourceText := securityNoInterpolatedSqlStringSource(testCase.lines...)
-			result := rule_testing.RunTyped(t, SecurityNoInterpolatedSqlString, securityNoInterpolatedSqlStringFile, sourceText)
-			securityNoInterpolatedSqlStringExpectSpans(t, result, sourceText, testCase.wantSpans)
+			result := rule_testing.RunTyped(
+				test,
+				SecurityNoInterpolatedSqlString,
+				securityNoInterpolatedSqlStringFile,
+				sourceText,
+			)
+			securityNoInterpolatedSqlStringExpectSpans(test, result, sourceText, testCase.wantSpans)
 		})
 	}
 }
 
-func TestSecurityNoInterpolatedSqlStringStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestSecurityNoInterpolatedSqlStringStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name  string
@@ -625,28 +664,37 @@ func TestSecurityNoInterpolatedSqlStringStaysSilent(t *testing.T) {
 		}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, SecurityNoInterpolatedSqlString, securityNoInterpolatedSqlStringFile, securityNoInterpolatedSqlStringSource(testCase.lines...))
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(
+				test,
+				SecurityNoInterpolatedSqlString,
+				securityNoInterpolatedSqlStringFile,
+				securityNoInterpolatedSqlStringSource(testCase.lines...),
+			)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
 
 // The rule declares the checker and declines a file without one, rather than reporting every number
 // and literal union.
-func TestSecurityNoInterpolatedSqlStringDeclinesWithoutAChecker(t *testing.T) {
-	t.Parallel()
+func TestSecurityNoInterpolatedSqlStringDeclinesWithoutAChecker(test *testing.T) {
+	test.Parallel()
 	if !SecurityNoInterpolatedSqlString.NeedsTypeChecker {
-		t.Fatal("the rule must declare NeedsTypeChecker")
+		test.Fatal("the rule must declare NeedsTypeChecker")
 	}
-	if listeners := SecurityNoInterpolatedSqlString.Run(rule.Context{}, nil); listeners != nil {
-		t.Errorf("with no checker the rule must register no listeners, got %d", len(listeners))
+	if listeners := SecurityNoInterpolatedSqlString.Run(
+		rule.Context{},
+		rule.Given[rule.NoOptions]{},
+	); listeners != nil {
+		test.Errorf("with no checker the rule must register no listeners, got %d", len(listeners))
 	}
 }
 
 // securityNoInterpolatedSqlValueWording is the bare-value message, written out here.
-const securityNoInterpolatedSqlValueWording = "This value is written into a SQL statement without quotes, right after a comparison, so it becomes " +
+const securityNoInterpolatedSqlValueWording = "This value is written into a SQL statement without quotes, " +
+	"right after a comparison, so it becomes " +
 	"part of the SQL rather than a value: a space, a keyword or a quote in it changes what the query does, " +
 	"and a crafted value runs as SQL. Quoting it does not help, since the value can close the quote. Pass it " +
 	"as a bound parameter (`WHERE id = ?` with the value beside the query). Where the query language has no " +
@@ -659,24 +707,29 @@ type securityNoInterpolatedSqlValueFinding struct {
 	span string
 }
 
-func securityNoInterpolatedSqlValueExpect(t *testing.T, result rule_testing.Result, sourceText string, want []securityNoInterpolatedSqlValueFinding) {
-	t.Helper()
+func securityNoInterpolatedSqlValueExpect(
+	test *testing.T,
+	result rule_testing.Result,
+	sourceText string,
+	want []securityNoInterpolatedSqlValueFinding,
+) {
+	test.Helper()
 	wantIds := make([]string, 0, len(want))
 	for _, finding := range want {
 		wantIds = append(wantIds, finding.id)
 	}
-	rule_testing.ExpectFindings(t, result, wantIds...)
+	rule_testing.ExpectFindings(test, result, wantIds...)
 	reported := securityNoInterpolatedSqlStringReported(result, sourceText)
 	for index, finding := range want {
 		if reported[index] != finding.span {
-			t.Fatalf("finding %d points at %q, want %q", index, reported[index], finding.span)
+			test.Fatalf("finding %d points at %q, want %q", index, reported[index], finding.span)
 		}
 		wording := securityNoInterpolatedSqlStringWording
 		if finding.id == securityNoInterpolatedSqlValueId {
 			wording = securityNoInterpolatedSqlValueWording
 		}
 		if got := result.Diagnostics[index].Message.Description; got != wording {
-			t.Fatalf("finding %d reads %q", index, got)
+			test.Fatalf("finding %d reads %q", index, got)
 		}
 	}
 }
@@ -684,8 +737,8 @@ func securityNoInterpolatedSqlValueExpect(t *testing.T, result rule_testing.Resu
 // The bare-value branch: an unquoted interpolation right after a comparison, in a confirmed statement,
 // whose type can hold any text. The first case is the GAQL lookup in ahra's
 // `modules/google/ads/GoogleAdsCampaignApi.ts` before #kx29bm3 typed its ids as numbers.
-func TestSecurityNoInterpolatedSqlValueFires(t *testing.T) {
-	t.Parallel()
+func TestSecurityNoInterpolatedSqlValueFires(test *testing.T) {
+	test.Parallel()
 
 	value := func(span string) securityNoInterpolatedSqlValueFinding {
 		return securityNoInterpolatedSqlValueFinding{securityNoInterpolatedSqlValueId, span}
@@ -704,7 +757,15 @@ func TestSecurityNoInterpolatedSqlValueFires(t *testing.T) {
 			"export function filter(a: string, b: string, c: string, d: string, e: string, f: string, g: string) {",
 			"    return `SELECT id FROM t WHERE a = ${a} AND b <> ${b} AND c != ${c} AND d < ${d} AND e > ${e} AND f <= ${f} AND g >= ${g}`;",
 			"}",
-		}, []securityNoInterpolatedSqlValueFinding{value("a"), value("b"), value("c"), value("d"), value("e"), value("f"), value("g")}},
+		}, []securityNoInterpolatedSqlValueFinding{
+			value("a"),
+			value("b"),
+			value("c"),
+			value("d"),
+			value("e"),
+			value("f"),
+			value("g"),
+		}},
 		{"a literal built by a helper that doubles only the quote", []string{
 			"declare function sqlLiteral(value: string): string;",
 			"export function count(table: string, watermark: string) {",
@@ -724,20 +785,25 @@ func TestSecurityNoInterpolatedSqlValueFires(t *testing.T) {
 		}, []securityNoInterpolatedSqlValueFinding{{securityNoInterpolatedSqlStringId, "name"}, value("identifier")}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 
 			sourceText := securityNoInterpolatedSqlStringSource(testCase.lines...)
-			result := rule_testing.RunTyped(t, SecurityNoInterpolatedSqlString, securityNoInterpolatedSqlStringFile, sourceText)
-			securityNoInterpolatedSqlValueExpect(t, result, sourceText, testCase.want)
+			result := rule_testing.RunTyped(
+				test,
+				SecurityNoInterpolatedSqlString,
+				securityNoInterpolatedSqlStringFile,
+				sourceText,
+			)
+			securityNoInterpolatedSqlValueExpect(test, result, sourceText, testCase.want)
 		})
 	}
 }
 
 // What the bare-value branch leaves alone: values that hold only fixed text, unquoted interpolations
 // that build SQL from code rather than compare a value, and templates that are not a statement.
-func TestSecurityNoInterpolatedSqlValueStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestSecurityNoInterpolatedSqlValueStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name  string
@@ -786,11 +852,16 @@ func TestSecurityNoInterpolatedSqlValueStaysSilent(t *testing.T) {
 		}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 
 			sourceText := securityNoInterpolatedSqlStringSource(testCase.lines...)
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, SecurityNoInterpolatedSqlString, securityNoInterpolatedSqlStringFile, sourceText))
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(
+				test,
+				SecurityNoInterpolatedSqlString,
+				securityNoInterpolatedSqlStringFile,
+				sourceText,
+			))
 		})
 	}
 }

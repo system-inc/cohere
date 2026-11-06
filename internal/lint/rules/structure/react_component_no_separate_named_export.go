@@ -12,12 +12,18 @@ import (
 
 // reactComponentNoSeparateNamedExportText is the rule's message, whose wording lives in
 // `policy/messages/react-component-no-separate-named-export.json`.
-var reactComponentNoSeparateNamedExportText = policy.MessageOf("structure/react-component-no-separate-named-export", "noSeparateNamedExport")
+var reactComponentNoSeparateNamedExportText = policy.MessageOf(
+	"structure/react-component-no-separate-named-export",
+	"noSeparateNamedExport",
+)
 
 // messageNoSeparateNamedExport is the finding, rendered when it is reported so the text comes from
 // the current catalog.
 func messageNoSeparateNamedExport() rule.Message {
-	return rule.Message{Id: reactComponentNoSeparateNamedExportText.Id, Description: reactComponentNoSeparateNamedExportText.Render(nil)}
+	return rule.Message{
+		Id:          reactComponentNoSeparateNamedExportText.Id,
+		Description: reactComponentNoSeparateNamedExportText.Render(nil),
+	}
 }
 
 // ReactComponentNoSeparateNamedExport flags a bare export list naming a component the file declares.
@@ -34,17 +40,17 @@ func messageNoSeparateNamedExport() rule.Message {
 // convention question that this rule has no opinion on, and reporting it would make the rule about
 // export style in general rather than about where a component announces itself.
 //
-// # The repair MOVES the export, it does not delete it
+// # The repair moves the export, it does not delete it
 //
 // The first version of this fixer deleted the statement and nothing else, on the belief that the
 // build would break loudly and the fixer's convergence check would catch it. Neither holds: the
-// engine checks that the rewritten file PARSES, and an unexported component parses perfectly. Every
+// engine checks that the rewritten file parses, and an unexported component parses perfectly. Every
 // file importing it then fails to resolve, which is the same loss that unexported six interfaces
 // across the structure library through `consistent-indexed-object-style`. Measured on
 // `function Thing() {...} const helper = 1; export { Thing, helper };`, which it rewrote with neither
 // name exported.
 //
-// So the repair now deletes the list AND puts `export ` on every declaration it named, as ONE edit.
+// So the repair now deletes the list and puts `export ` on every declaration it named, as one edit.
 // One edit rather than two because `edit.ProposalsFrom` treats a diagnostic's fixes independently,
 // and a half-applied pair whose deletion landed without its insertion is the original defect again.
 //
@@ -57,14 +63,14 @@ func messageNoSeparateNamedExport() rule.Message {
 //	a variable statement with several declarators    `export` would export its siblings too
 //	a name declared more than once (overloads)       every signature would need the modifier
 //	a declaration already carrying a modifier list   that includes `export` or `default`
-var ReactComponentNoSeparateNamedExport = rule.Rule{
+var ReactComponentNoSeparateNamedExport = rule.Rule[rule.NoOptions]{
 	Name: "structure/react-component-no-separate-named-export",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if !FileContextFor(ctx.SourceFile.FileName().AsString()).IsReactFile {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		if !FileContextFor(ruleContext.SourceFile.FileName().AsString()).IsReactFile {
 			return nil
 		}
 
-		declaredComponents, declarationStatements := componentNamesDeclaredIn(ctx.SourceFile.AsNode())
+		declaredComponents, declarationStatements := componentNamesDeclaredIn(ruleContext.SourceFile.AsNode())
 		if len(declaredComponents) == 0 {
 			return nil
 		}
@@ -98,13 +104,13 @@ var ReactComponentNoSeparateNamedExport = rule.Rule{
 					if declaredComponents[name.Text()] {
 						// Reported once per statement, not per specifier. The repair moves every
 						// name in the statement onto its declaration, as one edit.
-						fix, repairable := separateNamedExportRepair(ctx, node, declaredComponents,
+						fix, repairable := separateNamedExportRepair(ruleContext, node, declaredComponents,
 							declarationStatements)
 						if !repairable {
-							ctx.ReportNode(node, messageNoSeparateNamedExport())
+							ruleContext.ReportNode(node, messageNoSeparateNamedExport())
 							return
 						}
-						ctx.ReportNodeWithFixes(node, messageNoSeparateNamedExport(), fix)
+						ruleContext.ReportNodeWithFixes(node, messageNoSeparateNamedExport(), fix)
 						return
 					}
 				}
@@ -120,7 +126,7 @@ var ReactComponentNoSeparateNamedExport = rule.Rule{
 // The edit spans from the earliest insertion or deletion to the latest, and its text is that span
 // with the insertions made and the statement removed. The statement's own range is `RemoveNode`'s,
 // so the blank line it leaves is the same one the earlier fixer left.
-func separateNamedExportRepair(ctx rule.Context, exportNode *ast.Node, declaredComponents map[string]bool,
+func separateNamedExportRepair(ruleContext rule.Context, exportNode *ast.Node, declaredComponents map[string]bool,
 	declarationStatements map[string][]*ast.Node) (rule.Fix, bool) {
 	declaration := exportNode.AsExportDeclaration()
 	if declaration.IsTypeOnly {
@@ -131,7 +137,7 @@ func separateNamedExportRepair(ctx rule.Context, exportNode *ast.Node, declaredC
 		start, end int
 		text       string
 	}
-	removal := ctx.RemoveNode(exportNode)
+	removal := ruleContext.RemoveNode(exportNode)
 	edits := []edit{{start: removal.Range.Pos(), end: removal.Range.End(), text: ""}}
 
 	seen := map[*ast.Node]bool{}
@@ -166,7 +172,7 @@ func separateNamedExportRepair(ctx rule.Context, exportNode *ast.Node, declaredC
 				return rule.Fix{}, false
 			}
 		}
-		insertion := ctx.InsertBefore(statement, "export ")
+		insertion := ruleContext.InsertBefore(statement, "export ")
 		edits = append(edits, edit{start: insertion.Range.Pos(), end: insertion.Range.End(), text: insertion.Text})
 	}
 
@@ -182,7 +188,7 @@ func separateNamedExportRepair(ctx rule.Context, exportNode *ast.Node, declaredC
 
 	// Applied back to front within the span, so an earlier edit cannot move a later one's offsets.
 	sort.Slice(edits, func(first, second int) bool { return edits[first].start > edits[second].start })
-	text := ctx.SourceFile.Text()[spanStart:spanEnd]
+	text := ruleContext.SourceFile.Text()[spanStart:spanEnd]
 	for _, candidate := range edits {
 		text = text[:candidate.start-spanStart] + candidate.text + text[candidate.end-spanStart:]
 	}
@@ -194,7 +200,7 @@ func separateNamedExportRepair(ctx rule.Context, exportNode *ast.Node, declaredC
 // Only top-level declarations, since a component nested inside another function is not part of the
 // file's exported surface and could not be named in an export list anyway.
 //
-// The second return maps EVERY top-level declared name, component or not, to the statements that
+// The second return maps every top-level declared name, component or not, to the statements that
 // declare it. The repair needs the statement to put `export` on, and needs to see a name declared
 // twice, which is how overloads arrive, so it can decline rather than export one signature of many.
 func componentNamesDeclaredIn(sourceFile *ast.Node) (map[string]bool, map[string][]*ast.Node) {

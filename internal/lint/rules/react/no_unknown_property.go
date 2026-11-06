@@ -11,8 +11,8 @@ import (
 
 // noUnknownPropertyDomAttributeNames maps a lowercase DOM spelling to its React property name.
 //
-// Extracted mechanically from the CLONE at /tmp/lint-sources/eslint-plugin-react, by evaluating
-// the module's own constants and emitting Go. Nothing here was retyped: the casing IS the rule,
+// Extracted mechanically from the clone at /tmp/lint-sources/eslint-plugin-react, by evaluating
+// the module's own constants and emitting Go. Nothing here was retyped: the casing is the rule,
 // since `strokeWidth` and `stroke-width` are different answers, so a transcription slip would be
 // a silent behaviour change. All 783 distinct strings were verified present verbatim in the
 // clone source before this file was written.
@@ -117,21 +117,60 @@ var noUnknownPropertySvgDomAttributeNames = map[string]string{
 // is accepted outright, and present anywhere else it reports `invalidPropOnTag`. That is why the
 // lookup returns before the standard-name search below ever runs.
 var noUnknownPropertyAttributeTags = map[string][]string{
-	`abbr`:                     {`th`, `td`},
-	`charset`:                  {`meta`},
-	`checked`:                  {`input`},
-	`closedby`:                 {`dialog`},
-	`crossOrigin`:              {`script`, `img`, `video`, `audio`, `link`, `image`},
-	`displaystyle`:             {`math`},
-	`download`:                 {`a`, `area`},
-	`fill`:                     {`altGlyph`, `circle`, `ellipse`, `g`, `line`, `marker`, `mask`, `path`, `polygon`, `polyline`, `rect`, `svg`, `symbol`, `text`, `textPath`, `tref`, `tspan`, `use`, `animate`, `animateColor`, `animateMotion`, `animateTransform`, `set`},
-	`focusable`:                {`svg`},
-	`imageSizes`:               {`link`},
-	`imageSrcSet`:              {`link`},
-	`property`:                 {`meta`},
-	`viewBox`:                  {`marker`, `pattern`, `svg`, `symbol`, `view`},
-	`as`:                       {`link`},
-	`align`:                    {`applet`, `caption`, `col`, `colgroup`, `hr`, `iframe`, `img`, `table`, `tbody`, `td`, `tfoot`, `th`, `thead`, `tr`},
+	`abbr`:         {`th`, `td`},
+	`charset`:      {`meta`},
+	`checked`:      {`input`},
+	`closedby`:     {`dialog`},
+	`crossOrigin`:  {`script`, `img`, `video`, `audio`, `link`, `image`},
+	`displaystyle`: {`math`},
+	`download`:     {`a`, `area`},
+	`fill`: {
+		`altGlyph`,
+		`circle`,
+		`ellipse`,
+		`g`,
+		`line`,
+		`marker`,
+		`mask`,
+		`path`,
+		`polygon`,
+		`polyline`,
+		`rect`,
+		`svg`,
+		`symbol`,
+		`text`,
+		`textPath`,
+		`tref`,
+		`tspan`,
+		`use`,
+		`animate`,
+		`animateColor`,
+		`animateMotion`,
+		`animateTransform`,
+		`set`,
+	},
+	`focusable`:   {`svg`},
+	`imageSizes`:  {`link`},
+	`imageSrcSet`: {`link`},
+	`property`:    {`meta`},
+	`viewBox`:     {`marker`, `pattern`, `svg`, `symbol`, `view`},
+	`as`:          {`link`},
+	`align`: {
+		`applet`,
+		`caption`,
+		`col`,
+		`colgroup`,
+		`hr`,
+		`iframe`,
+		`img`,
+		`table`,
+		`tbody`,
+		`td`,
+		`tfoot`,
+		`th`,
+		`thead`,
+		`tr`,
+	},
 	`valign`:                   {`tr`, `td`, `th`, `thead`, `tbody`, `tfoot`, `colgroup`, `col`},
 	`noModule`:                 {`script`},
 	`onAbort`:                  {`audio`, `video`},
@@ -264,10 +303,10 @@ var noUnknownPropertyAriaProperties = map[string]bool{
 //
 // Upstream concatenates its two-word list, its one-word list, and version-gated additions, and
 // which additions apply depends on `settings.react.version`, a shared-settings surface cohere does
-// not have. So this list reproduces the answer upstream gives with NO settings, which was
+// not have. So this list reproduces the answer upstream gives with no settings, which was
 // established by bisection rather than by reading the source.
 //
-// Reading the source gave the WRONG answer here and it is worth recording why. The default version
+// Reading the source gave the wrong answer here and it is worth recording why. The default version
 // constant is `999.999.999`, which reads as "every gate passes", and this port was first written
 // that way. Measured with three names whose gates differ:
 //
@@ -277,7 +316,7 @@ var noUnknownPropertyAriaProperties = map[string]bool{
 //	precedence          >= 19       report   report   accept   report
 //
 // The no-settings column matches 18.0.0, not the latest: `onPointerDown` is accepted and
-// `precedence` is REPORTED. So the first two gates pass, the `>= 19` gate does NOT, and
+// `precedence` is reported. So the first two gates pass, the `>= 19` gate does not, and
 // `precedence` must be absent from this list. An earlier revision included it on the strength of
 // the source reading, and one of upstream's own corpus cases exposed the mistake.
 //
@@ -285,8 +324,8 @@ var noUnknownPropertyAriaProperties = map[string]bool{
 // filename accessor, a warning-text space and a Flow require, none of which touch the default, so
 // this measurement holds for both artifacts.
 //
-// The one name an older version would ADD, `allowTransparency`, is correctly absent. Upstream's
-// `valid 46` sets `version: 16.0.99` to accept it, and that case is carried as REPORTING with the
+// The one name an older version would add, `allowTransparency`, is correctly absent. Upstream's
+// `valid 46` sets `version: 16.0.99` to accept it, and that case is carried as reporting with the
 // reason at its row, because this port cannot express that setting.
 var noUnknownPropertyNames = []string{
 	`accessKey`,
@@ -890,7 +929,7 @@ func noUnknownPropertyUnknownPropWithStandardName(name string, standardName stri
 	}
 }
 
-func noUnknownPropertyUnknownProp(name string) rule.Message {
+func noUnknownPropertyUnknownProperty(name string) rule.Message {
 	return rule.Message{
 		Id:          "unknownProp",
 		Description: fmt.Sprintf("Unknown property '%s' found", name),
@@ -910,7 +949,7 @@ func noUnknownPropertyDataLowercaseRequired(name string, lowerCaseName string) r
 
 // NoUnknownPropertyOptions is the decoded option object.
 type NoUnknownPropertyOptions struct {
-	// Ignore names attributes the rule skips entirely, matched against the ACTUAL source spelling
+	// Ignore names attributes the rule skips entirely, matched against the actual source spelling
 	// before any case normalisation. Upstream tests `ignoreNames.indexOf(actualName)`, so an entry
 	// has to be written the way the attribute is written.
 	Ignore []string
@@ -935,14 +974,14 @@ type noUnknownPropertyWireOptions struct {
 // list and `requireDataLowercase` false. Both zero values happen to be correct here, which is worth
 // stating rather than relying on silently, because the sibling `jsx-no-target-blank` needed the
 // opposite and a zero-value struct would have inverted it.
-func DecodeNoUnknownPropertyOptions(raw []byte) (any, error) {
+func DecodeNoUnknownPropertyOptions(raw []byte) (NoUnknownPropertyOptions, error) {
 	options := NoUnknownPropertyOptions{}
 	if len(raw) == 0 {
 		return options, nil
 	}
 	var wire noUnknownPropertyWireOptions
-	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &wire); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 	options.Ignore = wire.Ignore
 	options.RequireDataLowercase = wire.RequireDataLowercase
@@ -1004,21 +1043,21 @@ func noUnknownPropertyStandardName(name string) (string, bool) {
 
 // noUnknownPropertyAttributeNameText returns a JSX attribute's name as written in source.
 //
-// Deliberately NOT `jsx.AttributeName`, and this is measured rather than a preference. That shelf
+// Deliberately not `jsx.AttributeName`, and this is measured rather than a preference. That shelf
 // helper declines a namespaced name by design, matching oxc, and upstream reads
-// `getText(context, node.name)`, which returns the source text of ANY name shape. Measured on the
+// `getText(context, node.name)`, which returns the source text of any name shape. Measured on the
 // installed build: `xlink:href` reports `unknownPropWithStandardName`, `xmlns:xlink` and a bogus
 // `foo:bar` both report `unknownProp`. Reaching for the shelf here would silently drop every
 // namespaced attribute, which is a false-negative class no imported fixture could see, because
-// upstream's corpus writes namespaced attributes as PASSING cases whose silence looks identical.
+// upstream's corpus writes namespaced attributes as passing cases whose silence looks identical.
 //
 // Probed for the panic hazard as well: `Text()` is safe on all four shapes this rule meets. A
-// hyphenated name such as `data-foo` or `aria-hidden` is a plain `KindIdentifier` here, NOT a
+// hyphenated name such as `data-foo` or `aria-hidden` is a plain `KindIdentifier` here, not a
 // namespaced node, and only a real colon produces `KindJsxNamespacedName`. That was the opposite of
 // the expectation this port started from, and it matters because `data-*` and `aria-*` are two of
 // the rule's four branches. The probe asserted the exact returned string for eight shapes and was
 // mutation-checked by expecting a wrong value and watching it go red.
-func noUnknownPropertyAttributeNameText(ctx rule.Context, node *ast.Node) (string, bool) {
+func noUnknownPropertyAttributeNameText(ruleContext rule.Context, node *ast.Node) (string, bool) {
 	if node == nil || node.Kind != ast.KindJsxAttribute {
 		return "", false
 	}
@@ -1029,8 +1068,8 @@ func noUnknownPropertyAttributeNameText(ctx rule.Context, node *ast.Node) (strin
 	// Source text rather than `Text()`, so a namespaced name arrives with its colon intact the way
 	// upstream's `getText` delivers it. The kinds are guarded above rather than here because the
 	// range read cannot panic on any node.
-	span := rule.TokenRange(ctx.SourceFile, name)
-	sourceText := ctx.SourceFile.Text()
+	span := rule.TokenRange(ruleContext.SourceFile, name)
+	sourceText := ruleContext.SourceFile.Text()
 	if span.Pos() < 0 || span.End() > len(sourceText) || span.Pos() > span.End() {
 		return "", false
 	}
@@ -1110,16 +1149,16 @@ func noUnknownPropertyTagOf(node *ast.Node) noUnknownPropertyTagInfo {
 // and `stroke-width` are different answers, so a transcription slip would be a silent behaviour
 // change that no fixture would obviously catch.
 //
-// # The tables come from the CLONE, which is ahead of the installed build on four entries
+// # The tables come from the clone, which is ahead of the installed build on four entries
 //
 // All 125 corpus cases were replayed against the installed build, version 7.37.5, and 121 agreed.
-// The four disagreements are table CONTENT rather than logic: the clone adds `onScrollEnd`,
+// The four disagreements are table content rather than logic: the clone adds `onScrollEnd`,
 // `onScrollEndCapture` and `closedby`, and widens `onLoad` to include `body`.
 //
 // This port takes the clone, and the reasoning is worth recording because the brief's usual
 // guidance points the other way. Both artifacts declare version 7.37.5: the clone is unreleased
 // commits on the same tag, not a newer release we lag, and its changelog carries all four under
-// "Unreleased". Every one is an `allow` or `add` entry, so the clone is a strict SUPERSET of the
+// "Unreleased". Every one is an `allow` or `add` entry, so the clone is a strict superset of the
 // installed table with no removals and no behaviour reversals, which was verified by diffing the
 // two extractions rather than assumed.
 //
@@ -1141,27 +1180,27 @@ func noUnknownPropertyTagOf(node *ast.Node) noUnknownPropertyTagInfo {
 // `settings.react.version`, which cohere has no surface for, so this port reproduces the
 // no-settings answer.
 //
-// That answer is NOT "every gate passes", though the source reads that way: the default constant is
+// That answer is not "every gate passes", though the source reads that way: the default constant is
 // `999.999.999`. Bisected against the running rule with three names whose gates differ, the
 // no-settings behaviour matches 18.0.0, so the first two gates pass and `>= 19` does not.
 // `precedence` is therefore absent from the property list, and an earlier revision of this port
 // included it on the strength of the reading until one of upstream's own corpus cases caught it.
 // The table above carries the measurement.
 //
-// The one name an OLDER version would add, `allowTransparency`, is correctly absent.
+// The one name an older version would add, `allowTransparency`, is correctly absent.
 //
 // # The decision order is load-bearing and each step was measured
 //
-// The ignore list is consulted against the ACTUAL spelling before normalisation; a member tag is
+// The ignore list is consulted against the actual spelling before normalisation; a member tag is
 // skipped whole; a data attribute short-circuits, reporting only under `requireDataLowercase`; a
 // known ARIA name passes; `fbt` and `fbs` tags are skipped; a non-HTML-like tag passes; the
 // tag-restricted table returns either way once matched; and only then does the standard-name search
 // run. Moving any step changes verdicts, which the fixtures pin.
-var NoUnknownProperty = rule.Rule{
+var NoUnknownProperty = rule.Rule[NoUnknownPropertyOptions]{
 	Name: "react/no-unknown-property",
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, _ := rule.OptionsAs[NoUnknownPropertyOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[NoUnknownPropertyOptions]) rule.Listeners {
+		settings, _ := options.Read()
 		ignored := make(map[string]bool, len(settings.Ignore))
 		for _, name := range settings.Ignore {
 			ignored[name] = true
@@ -1169,7 +1208,7 @@ var NoUnknownProperty = rule.Rule{
 
 		return rule.Listeners{
 			ast.KindJsxAttribute: func(node *ast.Node) {
-				actualName, readable := noUnknownPropertyAttributeNameText(ctx, node)
+				actualName, readable := noUnknownPropertyAttributeNameText(ruleContext, node)
 				if !readable {
 					return
 				}
@@ -1198,7 +1237,7 @@ var NoUnknownProperty = rule.Rule{
 					// writes and because the equivalence would end the moment a `data-` entry were
 					// added to that list.
 					if settings.RequireDataLowercase && strings.ToLower(name) != name {
-						ctx.ReportNode(node, noUnknownPropertyDataLowercaseRequired(
+						ruleContext.ReportNode(node, noUnknownPropertyDataLowercaseRequired(
 							actualName, strings.ToLower(actualName)))
 					}
 					return
@@ -1229,7 +1268,7 @@ var NoUnknownProperty = rule.Rule{
 							}
 						}
 						if !allowed {
-							ctx.ReportNode(node, noUnknownPropertyInvalidPropOnTag(
+							ruleContext.ReportNode(node, noUnknownPropertyInvalidPropOnTag(
 								actualName, tag.Name, allowedTags))
 						}
 						return
@@ -1245,13 +1284,13 @@ var NoUnknownProperty = rule.Rule{
 					// name is replaced in place. Upstream replaces `node.name`, which is the name
 					// node alone and not the whole attribute, so the value survives untouched.
 					nameNode := node.AsJsxAttribute().Name()
-					ctx.ReportNodeWithFixes(node,
+					ruleContext.ReportNodeWithFixes(node,
 						noUnknownPropertyUnknownPropWithStandardName(actualName, standardName),
-						rule.ReplaceRange(rule.TokenRange(ctx.SourceFile, nameNode), standardName))
+						rule.ReplaceRange(rule.TokenRange(ruleContext.SourceFile, nameNode), standardName))
 					return
 				}
 
-				ctx.ReportNode(node, noUnknownPropertyUnknownProp(actualName))
+				ruleContext.ReportNode(node, noUnknownPropertyUnknownProperty(actualName))
 			},
 		}
 	},

@@ -23,12 +23,12 @@ import (
 //
 // The returned slice is the index's own storage, capped at its length, so appending to it copies
 // rather than writing over the next name's identifiers.
-func IdentifiersNamed(ctx rule.Context, name string) []*ast.Node {
-	if ctx.SourceFile == nil {
+func IdentifiersNamed(ruleContext rule.Context, name string) []*ast.Node {
+	if ruleContext.SourceFile == nil {
 		return nil
 	}
-	index := rule.Cached(ctx.FileCache, "reference.identifiersByName", func() *identifierIndex {
-		return buildIdentifierIndex(ctx.SourceFile)
+	index := rule.Cached(ruleContext.FileCache, "reference.identifiersByName", func() *identifierIndex {
+		return buildIdentifierIndex(ruleContext.SourceFile)
 	})
 	position, found := index.positions[name]
 	if !found {
@@ -58,6 +58,9 @@ type identifierSpan struct {
 	end   int
 }
 
+// identifierScratchPool lends the walk buffers, one per build in flight.
+var identifierScratchPool = sync.Pool{New: func() any { return &identifierScratch{} }}
+
 // buildIdentifierIndex walks the file once, counting each name, then places each identifier in its
 // name's run.
 //
@@ -69,7 +72,12 @@ type identifierSpan struct {
 // The walk's two buffers are scratch, dropped once the identifiers are placed, so they come from a pool
 // rather than being made per file. Only ordered, spans and positions outlive the build.
 func buildIdentifierIndex(sourceFile *ast.SourceFile) *identifierIndex {
-	scratch := identifierScratchPool.Get().(*identifierScratch)
+	scratch, isScratch := identifierScratchPool.Get().(*identifierScratch)
+	if !isScratch {
+		// The pool holds only what its New makes and release puts back, both this type, so this does
+		// not happen; a fresh buffer is the harmless answer if it ever did.
+		scratch = &identifierScratch{}
+	}
 	defer scratch.release()
 	walked := scratch.walked[:0]
 	walkedPositions := scratch.positions[:0]
@@ -111,21 +119,4 @@ func buildIdentifierIndex(sourceFile *ast.SourceFile) *identifierIndex {
 	scratch.walked = walked
 	scratch.positions = walkedPositions
 	return &identifierIndex{ordered: ordered, positions: positions, spans: spans}
-}
-
-// identifierScratch is buildIdentifierIndex's walk buffers: every identifier in walk order, and each one's
-// name's place in spans.
-type identifierScratch struct {
-	walked    []*ast.Node
-	positions []int32
-}
-
-// identifierScratchPool lends the walk buffers, one per build in flight.
-var identifierScratchPool = sync.Pool{New: func() any { return &identifierScratch{} }}
-
-// release clears the node pointers, so a pooled buffer never keeps a file's tree alive, and returns the
-// buffers to the pool.
-func (scratch *identifierScratch) release() {
-	clear(scratch.walked)
-	identifierScratchPool.Put(scratch)
 }

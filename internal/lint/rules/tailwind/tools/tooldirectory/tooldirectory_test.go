@@ -11,11 +11,11 @@ import (
 //
 // The trimmed form is written out rather than taken from runtime.Caller, so the test covers it on a
 // machine that builds without -trimpath too, and the caller's own form covers whichever this build has.
-func TestOfFindsTheSourceDirectoryFromEitherForm(t *testing.T) {
-	t.Parallel()
-	want, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
+func TestOfFindsTheSourceDirectoryFromEitherForm(test *testing.T) {
+	test.Parallel()
+	want, workingDirectoryError := os.Getwd()
+	if workingDirectoryError != nil {
+		test.Fatal(workingDirectoryError)
 	}
 	_, callerPath, _, _ := runtime.Caller(0)
 	for _, form := range []string{
@@ -23,24 +23,26 @@ func TestOfFindsTheSourceDirectoryFromEitherForm(t *testing.T) {
 		filepath.Join(want, "tooldirectory_test.go"),
 		"github.com/system-inc/cohere/internal/lint/rules/tailwind/tools/tooldirectory/tooldirectory_test.go",
 	} {
-		got, err := Of(form)
-		if err != nil {
-			t.Fatalf("%s: %v", form, err)
+		got, toolDirectoryOfError := Of(form)
+		if toolDirectoryOfError != nil {
+			test.Fatalf("%s: %v", form, toolDirectoryOfError)
 		}
 		if got != want {
-			t.Errorf("%s resolved to %s, want %s", form, got, want)
+			test.Errorf("%s resolved to %s, want %s", form, got, want)
 		}
 	}
 }
 
 // A path naming a file that is not there is refused rather than answered with a directory nobody
 // chose, which is what filepath.Dir of a trimmed path used to be.
-func TestOfRefusesADirectoryWithoutTheFile(t *testing.T) {
-	t.Parallel()
-	if directory, err := Of(filepath.Join(t.TempDir(), "caller.go")); err == nil {
-		t.Errorf("a directory without the caller's file was accepted: %s", directory)
+func TestOfRefusesADirectoryWithoutTheFile(test *testing.T) {
+	test.Parallel()
+	if directory, toolDirectoryOfError := Of(filepath.Join(test.TempDir(), "caller.go")); toolDirectoryOfError == nil {
+		test.Errorf("a directory without the caller's file was accepted: %s", directory)
 	}
-	if directory, err := Of("github.com/system-inc/cohere/no/such/package/caller.go"); err == nil {
-		t.Errorf("an import path that resolves nowhere was accepted: %s", directory)
+	if directory, toolDirectoryOfError := Of(
+		"github.com/system-inc/cohere/no/such/package/caller.go",
+	); toolDirectoryOfError == nil {
+		test.Errorf("an import path that resolves nowhere was accepted: %s", directory)
 	}
 }

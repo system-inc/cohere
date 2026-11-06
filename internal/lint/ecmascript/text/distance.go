@@ -31,9 +31,9 @@ package text
 // built on it reports on clean code. The name is the closest match on any shelf here and the body is
 // the wrong answer, which is why this comment names it rather than leaving the next reader to find
 // out by shipping it.
-func MinimumEditDistance(a string, b string) int {
-	first := []rune(a)
-	second := []rune(b)
+func MinimumEditDistance(left string, right string) int {
+	first := []rune(left)
+	second := []rune(right)
 
 	// Keep the shorter string on the inner axis so the rows allocated are the smaller of the two.
 	// oxc spells this as a recursive swap on byte length; the effect is the same and the comparison
@@ -77,7 +77,7 @@ func MinimumEditDistance(a string, b string) int {
 // BestMatch returns the candidate nearest to needle within threshold, and whether one was found.
 //
 // **An exact match is not a match here.** A needle equal to some candidate returns false, because
-// every caller is asking "is this a near miss of one of these names", and a name that IS one of
+// every caller is asking "is this a near miss of one of these names", and a name that is one of
 // these names is correct rather than nearly correct. Getting this backwards turns the rule into one
 // that flags every correct spelling, which is the loudest possible failure and therefore the one
 // most likely to be caught; the quieter risk is a caller that expects a hit and reads the false as
@@ -89,7 +89,7 @@ func MinimumEditDistance(a string, b string) int {
 // candidate sets in use here no such pair exists, so it is reproduced for fidelity rather than
 // because a case reaches it.
 //
-// On a tie, the FIRST candidate in slice order wins, so the caller's ordering is part of its meaning.
+// On a tie, the first candidate in slice order wins, so the caller's ordering is part of its meaning.
 //
 // The length prefilter is oxc's and is preserved. It skips the distance computation when the lengths
 // alone put a candidate out of range, which is sound: a distance can never be less than the
@@ -102,9 +102,9 @@ func MinimumEditDistance(a string, b string) int {
 // alphabet, at thresholds 0 through 3, which is 7,086,244 comparisons, the filtered and unfiltered
 // searches agreed on every one. The exact-match decline is the case worth checking by hand, and it
 // is safe for a structural reason rather than a measured one: an exact match has zero length
-// difference, so the filter can never skip the candidate that would have triggered it. oxc compares byte lengths there while computing over runes, which for
-// non-ASCII input would prefilter away a candidate the distance would have accepted. Rune lengths
-// are used here on both sides instead. That is a deliberate narrow divergence toward internal
+// difference, so the filter can never skip the candidate that would have triggered it. oxc compares byte lengths there
+// while computing over runes, which for non-ASCII input would prefilter away a candidate the distance would have
+// accepted. Rune lengths are used here on both sides instead. That is a deliberate narrow divergence toward internal
 // consistency, and it cannot change an answer for any caller whose candidates are ASCII.
 func BestMatch(needle string, candidates []string, threshold int) (string, bool) {
 	needleLength := len([]rune(needle))

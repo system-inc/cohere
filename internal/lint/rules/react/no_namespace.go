@@ -37,7 +37,7 @@ var messageNoNamespace = rule.Message{
 // through `jsx-ast-utils`'s `elementType` and tests for a colon. The call arm asks
 // `isCreateElement(context, node)` and then reads a string first argument.
 //
-// **The call arm does NOT use the same createElement predicate the rest of this package does, and
+// **The call arm does not use the same createElement predicate the rest of this package does, and
 // the difference is the whole reason this rule does not call the shelf.** `react.IsCreateElementCall`
 // accepts a bare `createElement(...)`, accepts any object (`Preact.createElement`), and accepts a
 // computed member (`React["createElement"]`). Upstream's `util/isCreateElement.js` accepts none of
@@ -94,9 +94,9 @@ var messageNoNamespace = rule.Message{
 //	<TestComponent />         KindIdentifier
 //	<this.Foo />              KindPropertyAccessExpression whose object is KindThisKeyword
 //
-// **`node.Text()` PANICS on a property-access tag name.** `ast.Node.Text` has no case for
+// **`node.Text()` panics on a property-access tag name.** `ast.Node.Text` has no case for
 // `*ast.PropertyAccessExpression` and reaches its unhandled-case panic, which the walk recovers per
-// FILE rather than per rule, so one dotted tag name would cost every rule in this package every
+// file rather than per rule, so one dotted tag name would cost every rule in this package every
 // finding in that file. The first version of this probe hit it directly. That is why the JSX arm
 // reads the namespaced kind and never calls `Text()` on an arbitrary tag: the dotted forms are all
 // clean upstream anyway, so there is nothing to gain from rendering them and a whole file to lose.
@@ -107,13 +107,13 @@ var messageNoNamespace = rule.Message{
 // its own `KindJsxSelfClosingElement` with no opening element inside it, so a rule listening only on
 // `KindJsxOpeningElement` would be silent on all eight of them while every non-JSX fixture stayed
 // green. `jsx_props_no_spread_multi.go` established this here first.
-var NoNamespace = rule.Rule{
+var NoNamespace = rule.Rule[rule.NoOptions]{
 	Name: "react/no-namespace",
 	// Declared for the bare-call branch of `isPragmaCreateElementCall`, which asks the checker
 	// which binding `createElement` resolves to. The JSX arm needs nothing from it.
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		reportElement := func(node *ast.Node) {
 			// `jsx.ElementParts` rather than a switch over the two kinds. A first draft wrote the
 			// switch by hand and `TestRulePackagesDoNotReachPastWrappedAccessors` refused it,
@@ -127,7 +127,7 @@ var NoNamespace = rule.Rule{
 			if tagName == nil || tagName.Kind != ast.KindJsxNamespacedName {
 				return
 			}
-			ctx.ReportNode(node, messageNoNamespace)
+			ruleContext.ReportNode(node, messageNoNamespace)
 		}
 
 		return rule.Listeners{
@@ -138,11 +138,11 @@ var NoNamespace = rule.Rule{
 				// crashing on `GetSymbolAtLocation`, and a vacuous green is the more dangerous of
 				// the two failures. The JSX arm above needs no checker and deliberately sits
 				// outside this guard, so a nil checker costs only the bare-call spelling.
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 				call := node.AsCallExpression()
-				if !isPragmaCreateElementCall(ctx, node) {
+				if !isPragmaCreateElementCall(ruleContext, node) {
 					return
 				}
 				if call.Arguments == nil || len(call.Arguments.Nodes) == 0 {
@@ -158,7 +158,7 @@ var NoNamespace = rule.Rule{
 				if !strings.Contains(first.Text(), ":") {
 					return
 				}
-				ctx.ReportNode(node, messageNoNamespace)
+				ruleContext.ReportNode(node, messageNoNamespace)
 			},
 		}
 	},

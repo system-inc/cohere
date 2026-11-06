@@ -10,8 +10,8 @@ import (
 
 // The violation half. Each case is a class written twice, on one of the three surfaces the
 // configuration names.
-func TestNoDuplicateClassesReportsRepeats(t *testing.T) {
-	t.Parallel()
+func TestNoDuplicateClassesReportsRepeats(test *testing.T) {
+	test.Parallel()
 	testCases := []struct {
 		name     string
 		fileName string
@@ -95,10 +95,10 @@ func TestNoDuplicateClassesReportsRepeats(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoDuplicateClasses, testCase.fileName, testCase.source)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoDuplicateClasses, testCase.fileName, testCase.source)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -108,8 +108,8 @@ func TestNoDuplicateClassesReportsRepeats(t *testing.T) {
 // A rule with only violation fixtures has been shown to detect and never to discriminate, and the
 // defect it misses is the expensive one: a rule that fires on correct code gets disabled, and a
 // disabled rule enforces nothing.
-func TestNoDuplicateClassesStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoDuplicateClassesStaysSilent(test *testing.T) {
+	test.Parallel()
 	testCases := []struct {
 		name     string
 		fileName string
@@ -182,10 +182,10 @@ func TestNoDuplicateClassesStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoDuplicateClasses, testCase.fileName, testCase.source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoDuplicateClasses, testCase.fileName, testCase.source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -200,8 +200,8 @@ func TestNoDuplicateClassesStaysSilent(t *testing.T) {
 // Each repeat goes with the first byte of the separator before it and nothing more. The rest of a
 // long separator is `no-unnecessary-whitespace`'s, so on its own this rule leaves it, and the two
 // close the gap together in one pass (TestTailwindFixersComposeInOnePass).
-func TestNoDuplicateClassesFixIsCorrect(t *testing.T) {
-	t.Parallel()
+func TestNoDuplicateClassesFixIsCorrect(test *testing.T) {
+	test.Parallel()
 	testCases := []struct {
 		name   string
 		source string
@@ -235,10 +235,10 @@ func TestNoDuplicateClassesFixIsCorrect(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoDuplicateClasses, "Component.tsx", testCase.source)
-			rule_testing.ExpectFixedSource(t, result, testCase.want)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoDuplicateClasses, "Component.tsx", testCase.source)
+			rule_testing.ExpectFixedSource(test, result, testCase.want)
 		})
 	}
 }
@@ -248,8 +248,8 @@ func TestNoDuplicateClassesFixIsCorrect(t *testing.T) {
 //
 // The visible fragments genuinely repeat, so the finding is real. Rewriting from those fragments
 // would silently delete the interpolation, which is a fix that changes what the code means.
-func TestTemplateHoleIsReportedButNotFixed(t *testing.T) {
-	t.Parallel()
+func TestTemplateHoleIsReportedButNotFixed(test *testing.T) {
+	test.Parallel()
 	// A template literal is not read as a class literal at all today, so the guard is asserted
 	// directly against the reporting path rather than through the parser.
 	literal := ClassLiteral{
@@ -258,16 +258,16 @@ func TestTemplateHoleIsReportedButNotFixed(t *testing.T) {
 	}
 
 	var diagnostics []rule.Diagnostic
-	ctx := rule.Context{
+	ruleContext := rule.Context{
 		Report: func(diagnostic rule.Diagnostic) { diagnostics = append(diagnostics, diagnostic) },
 	}
-	reportDuplicates(ctx, literal)
+	reportDuplicates(ruleContext, literal)
 
 	if len(diagnostics) != 1 {
-		t.Fatalf("expected one finding for the repeated visible class, got %d", len(diagnostics))
+		test.Fatalf("expected one finding for the repeated visible class, got %d", len(diagnostics))
 	}
 	if len(diagnostics[0].Fixes) != 0 {
-		t.Fatal("a literal with a template hole must not be rewritten, because the fix would drop the interpolation")
+		test.Fatal("a literal with a template hole must not be rewritten, because the fix would drop the interpolation")
 	}
 }
 
@@ -280,8 +280,8 @@ func TestTemplateHoleIsReportedButNotFixed(t *testing.T) {
 //
 // So a deliberately narrowed reader runs against the same sources and is required to lose findings
 // that the real rule catches. A guard that has never returned a positive has not been shown to work.
-func TestAttributeOnlyReadingLosesFindings(t *testing.T) {
-	t.Parallel()
+func TestAttributeOnlyReadingLosesFindings(test *testing.T) {
+	test.Parallel()
 	sourcesOnlyNonAttributeSurfacesCatch := []string{
 		`const merged = cn('px-4 py-2 px-4');`,
 		`const className = 'rounded-md rounded-md';`,
@@ -300,20 +300,20 @@ func TestAttributeOnlyReadingLosesFindings(t *testing.T) {
 	lost := 0
 	for _, source := range sourcesOnlyNonAttributeSurfacesCatch {
 		// The real rule must find it.
-		result := rule_testing.Run(t, NoDuplicateClasses, "Component.tsx", source)
+		result := rule_testing.Run(test, NoDuplicateClasses, "Component.tsx", source)
 		if len(result.Diagnostics) == 0 {
-			t.Fatalf("the real rule missed %q, which this control depends on it catching", source)
+			test.Fatalf("the real rule missed %q, which this control depends on it catching", source)
 		}
 
 		// The narrowed reader must not, which is what makes it dangerous.
-		narrowed := rule_testing.Run(t, rule.Rule{
+		narrowed := rule_testing.Run(test, rule.Rule[rule.NoOptions]{
 			Name: "attribute-only-control",
-			Run: func(ctx rule.Context, _ any) rule.Listeners {
+			Run: func(ruleContext rule.Context, _ rule.Given[rule.NoOptions]) rule.Listeners {
 				listeners := rule.Listeners{}
 				for _, kind := range ListenerKinds() {
 					listeners[kind] = func(node *ast.Node) {
 						for _, literal := range attributeOnly.ClassLiteralsIn(node) {
-							reportDuplicates(ctx, literal)
+							reportDuplicates(ruleContext, literal)
 						}
 					}
 				}
@@ -327,11 +327,11 @@ func TestAttributeOnlyReadingLosesFindings(t *testing.T) {
 	}
 
 	if lost == 0 {
-		t.Fatal("the attribute-only reader lost nothing, so this corpus does not exercise the callee " +
+		test.Fatal("the attribute-only reader lost nothing, so this corpus does not exercise the callee " +
 			"and variable surfaces and the passing tests above prove less than they appear to")
 	}
 	if lost != len(sourcesOnlyNonAttributeSurfacesCatch) {
-		t.Errorf("expected the attribute-only reader to lose all %d, it lost %d",
+		test.Errorf("expected the attribute-only reader to lose all %d, it lost %d",
 			len(sourcesOnlyNonAttributeSurfacesCatch), lost)
 	}
 }
@@ -342,8 +342,8 @@ func TestAttributeOnlyReadingLosesFindings(t *testing.T) {
 // invisible, and the order rule, which leaves a run holding a repeat unordered, left it unordered
 // in silence. Each fixed case is quoted from what the plugin wrote for the same input. A glued
 // fragment such as `px-` is half a class the hole completes, and is never compared.
-func TestNoDuplicateClassesReadsTemplateRuns(t *testing.T) {
-	t.Parallel()
+func TestNoDuplicateClassesReadsTemplateRuns(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range []struct {
 		name, source, want string
 	}{
@@ -363,10 +363,10 @@ func TestNoDuplicateClassesReadsTemplateRuns(t *testing.T) {
 			want:   "const element = <div className={`${size} gap-2 block`} />;",
 		},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoDuplicateClasses, "Component.tsx", testCase.source)
-			rule_testing.ExpectFixedSource(t, result, testCase.want)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoDuplicateClasses, "Component.tsx", testCase.source)
+			rule_testing.ExpectFixedSource(test, result, testCase.want)
 		})
 	}
 }
@@ -376,23 +376,23 @@ func TestNoDuplicateClassesReadsTemplateRuns(t *testing.T) {
 // Both classes apply whatever the hole holds, so it is a real repeat. The plugin dedupes each run on
 // its own and leaves `flex ${size} flex` as written, so a fix would be the one rewrite of a class
 // string the plugin never makes. The finding is what keeps it from sitting there silently.
-func TestNoDuplicateClassesReportsARepeatAcrossAHoleWithoutAFix(t *testing.T) {
-	t.Parallel()
-	result := rule_testing.Run(t, NoDuplicateClasses, "Component.tsx", "const merged = cn(`flex ${size} flex`);")
-	rule_testing.ExpectFindings(t, result, "duplicateClass")
+func TestNoDuplicateClassesReportsARepeatAcrossAHoleWithoutAFix(test *testing.T) {
+	test.Parallel()
+	result := rule_testing.Run(test, NoDuplicateClasses, "Component.tsx", "const merged = cn(`flex ${size} flex`);")
+	rule_testing.ExpectFindings(test, result, "duplicateClass")
 	if len(result.Diagnostics[0].Fixes) != 0 {
-		t.Fatalf("a repeat across a hole must not be fixed, got %+v", result.Diagnostics[0].Fixes)
+		test.Fatalf("a repeat across a hole must not be fixed, got %+v", result.Diagnostics[0].Fixes)
 	}
 }
 
 // The template runs that hold no repeat, including glued fragments that look like one.
-func TestNoDuplicateClassesTemplateRunsStaySilent(t *testing.T) {
-	t.Parallel()
+func TestNoDuplicateClassesTemplateRunsStaySilent(test *testing.T) {
+	test.Parallel()
 	for _, source := range []string{
 		"const merged = cn(`flex ${size} block`);",
 		"const merged = cn(`px-${a} px-${b}`);",
 		"const merged = cn(`flex px-${a} flex-${b} block`);",
 	} {
-		rule_testing.ExpectClean(t, rule_testing.Run(t, NoDuplicateClasses, "Component.tsx", source))
+		rule_testing.ExpectClean(test, rule_testing.Run(test, NoDuplicateClasses, "Component.tsx", source))
 	}
 }

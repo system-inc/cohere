@@ -38,6 +38,17 @@ func messageMethodSignatureStyleConvertToMethod() rule.Message {
 	}
 }
 
+// MethodSignatureStyleSetting is upstream's one option, `'method' | 'property'`.
+type MethodSignatureStyleSetting string
+
+const (
+	// MethodSignatureStyleProperty is `"property"`, upstream's default: a shorthand method reports.
+	MethodSignatureStyleProperty MethodSignatureStyleSetting = "property"
+
+	// MethodSignatureStyleMethod is `"method"`: a property holding a function type reports.
+	MethodSignatureStyleMethod MethodSignatureStyleSetting = "method"
+)
+
 // MethodSignatureStyle requires one spelling for a signature, a shorthand method or a property.
 //
 //	valid (property): interface I { m: (a: string) => void; }
@@ -53,8 +64,8 @@ func messageMethodSignatureStyleConvertToMethod() rule.Message {
 // # The repair rebuilds a signature, and it is type-safe because it copies rather than re-renders
 //
 // This is the shape that lost type information twice in this project: a fixer that constructs a
-// replacement drops whatever it does not think to re-render. Upstream avoids it by splicing RAW
-// SOURCE for the two parts that can hold anything: the parameter list is copied from its opening
+// replacement drops whatever it does not think to re-render. Upstream avoids it by splicing raw
+// source for the two parts that can hold anything: the parameter list is copied from its opening
 // parenthesis to its closing one, and the type parameter list is copied whole. Only the key, the
 // arrow and the return type are assembled.
 //
@@ -72,7 +83,7 @@ func messageMethodSignatureStyleConvertToMethod() rule.Message {
 // # An absent return type becomes an explicit `any`, and that is not a widening
 //
 // `getMethodReturnType` returns the literal string `any` when there is no annotation, because a
-// method signature with no return type already IS `any` and the property form has nowhere to put an
+// method signature with no return type already is `any` and the property form has nowhere to put an
 // implicit one. Measured through the compiler: `m(a: string);` and `m: (a: string) => any;` are both
 // `(a: string) => any`. Reproduced rather than declined.
 //
@@ -82,7 +93,7 @@ func messageMethodSignatureStyleConvertToMethod() rule.Message {
 // else, so the finding fires and the repair is withheld. A member inside a module declaration is
 // reported without a repair, which upstream does not explain and which is reproduced rather than
 // improved. And a `readonly` function property converts to a method that is no longer readonly,
-// which is a behavior change, so upstream offers it as a SUGGESTION rather than a fix.
+// which is a behavior change, so upstream offers it as a suggestion rather than a fix.
 //
 // The `readonly` case is the one worth naming: it is the same judgment this project applies when it
 // declines a fixer that would drop a type, arrived at independently by upstream, and it is why this
@@ -94,10 +105,10 @@ func messageMethodSignatureStyleConvertToMethod() rule.Message {
 // property whose type is an intersection of function types and deletes the others. The finding still
 // fires once per signature, so a pair of overloads reports twice and the first repair does all the
 // work.
-var MethodSignatureStyle = rule.Rule{
+var MethodSignatureStyle = rule.Rule[MethodSignatureStyleOptions]{
 	Name: "@typescript-eslint/method-signature-style",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[MethodSignatureStyleOptions]) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -106,7 +117,7 @@ var MethodSignatureStyle = rule.Rule{
 		// errors on empty input and the config layer turns that into nil. A bare type assertion
 		// would then yield the empty string, matching neither arm, and the rule would register on
 		// every file and report nothing while every decoder-routed fixture stayed green.
-		parsed, decoded := rule.OptionsAs[MethodSignatureStyleOptions](options)
+		parsed, decoded := options.Read()
 		if !decoded {
 			parsed = DefaultMethodSignatureStyleOptions()
 		}
@@ -114,28 +125,28 @@ var MethodSignatureStyle = rule.Rule{
 		if parsed.Style == MethodSignatureStyleProperty {
 			return rule.Listeners{
 				ast.KindMethodSignature: func(node *ast.Node) {
-					reportMethodSignatureShouldBeProperty(ctx, node)
+					reportMethodSignatureShouldBeProperty(ruleContext, node)
 				},
 			}
 		}
 
 		return rule.Listeners{
 			ast.KindPropertySignature: func(node *ast.Node) {
-				reportMethodSignaturePropertyShouldBeMethod(ctx, node)
+				reportMethodSignaturePropertyShouldBeMethod(ruleContext, node)
 			},
 		}
 	},
 }
 
 // reportMethodSignatureShouldBeProperty is upstream's `TSMethodSignature` visitor under `property`.
-func reportMethodSignatureShouldBeProperty(ctx rule.Context, node *ast.Node) {
+func reportMethodSignatureShouldBeProperty(ruleContext rule.Context, node *ast.Node) {
 	signature := node.AsMethodSignatureDeclaration()
 
 	// A getter or setter signature is `kind !== 'method'` upstream and is not this rule's business.
 	// typescript-go gives those their own node kinds, so reaching this listener already excludes
 	// them and no test is written.
 
-	key, keyed := methodSignatureKeyText(ctx, node, signature.Name())
+	key, keyed := methodSignatureKeyText(ruleContext, node, signature.Name())
 	if !keyed {
 		return
 	}
@@ -147,7 +158,7 @@ func reportMethodSignatureShouldBeProperty(ctx rule.Context, node *ast.Node) {
 	// A member inside a module declaration is reported without a repair. Upstream gives no reason
 	// and this reproduces the decision rather than improving on it.
 	if methodSignatureIsInsideModule(node) {
-		ctx.ReportNode(node, messageMethodSignatureStyleErrorMethod())
+		ruleContext.ReportNode(node, messageMethodSignatureStyleErrorMethod())
 		return
 	}
 
@@ -157,7 +168,7 @@ func reportMethodSignatureShouldBeProperty(ctx rule.Context, node *ast.Node) {
 		if sibling == node || sibling.Kind != ast.KindMethodSignature {
 			continue
 		}
-		siblingKey, siblingKeyed := methodSignatureKeyText(ctx, sibling,
+		siblingKey, siblingKeyed := methodSignatureKeyText(ruleContext, sibling,
 			sibling.AsMethodSignatureDeclaration().Name())
 		if siblingKeyed && siblingKey == key {
 			duplicates = append(duplicates, sibling)
@@ -165,12 +176,12 @@ func reportMethodSignatureShouldBeProperty(ctx rule.Context, node *ast.Node) {
 	}
 
 	if skipFix {
-		ctx.ReportNode(node, messageMethodSignatureStyleErrorMethod())
+		ruleContext.ReportNode(node, messageMethodSignatureStyleErrorMethod())
 		return
 	}
 
 	if len(duplicates) > 0 {
-		// Every signature in the group reports, and only the FIRST one carries the repair.
+		// Every signature in the group reports, and only the first one carries the repair.
 		//
 		// Upstream attaches the same whole-group rewrite to every signature, so its two findings
 		// carry two overlapping fixes. That works there because ESLint applies one fix per pass and
@@ -189,39 +200,39 @@ func reportMethodSignatureShouldBeProperty(ctx rule.Context, node *ast.Node) {
 			}
 		}
 		if first != node {
-			ctx.ReportNode(node, messageMethodSignatureStyleErrorMethod())
+			ruleContext.ReportNode(node, messageMethodSignatureStyleErrorMethod())
 			return
 		}
 
-		fixes, buildable := methodSignatureOverloadFixes(ctx, node, duplicates, key)
+		fixes, buildable := methodSignatureOverloadFixes(ruleContext, node, duplicates, key)
 		if !buildable {
-			ctx.ReportNode(node, messageMethodSignatureStyleErrorMethod())
+			ruleContext.ReportNode(node, messageMethodSignatureStyleErrorMethod())
 			return
 		}
-		ctx.ReportNodeWithFixes(node, messageMethodSignatureStyleErrorMethod(), fixes...)
+		ruleContext.ReportNodeWithFixes(node, messageMethodSignatureStyleErrorMethod(), fixes...)
 		return
 	}
 
-	parameters, parametersReadable := methodSignatureParametersText(ctx, node,
+	parameters, parametersReadable := methodSignatureParametersText(ruleContext, node,
 		signature.Parameters, signature.TypeParameters)
 	if !parametersReadable {
-		ctx.ReportNode(node, messageMethodSignatureStyleErrorMethod())
+		ruleContext.ReportNode(node, messageMethodSignatureStyleErrorMethod())
 		return
 	}
-	returnType := methodSignatureReturnTypeText(ctx, signature.Type)
-	delimiter := methodSignatureDelimiterOf(ctx, node)
+	returnType := methodSignatureReturnTypeText(ruleContext, signature.Type)
+	delimiter := methodSignatureDelimiterOf(ruleContext, node)
 
-	ctx.ReportNodeWithFixes(node, messageMethodSignatureStyleErrorMethod(),
-		rule.ReplaceRange(rule.TokenRange(ctx.SourceFile, node),
+	ruleContext.ReportNodeWithFixes(node, messageMethodSignatureStyleErrorMethod(),
+		rule.ReplaceRange(rule.TokenRange(ruleContext.SourceFile, node),
 			key+": "+parameters+" => "+returnType+delimiter))
 }
 
 // methodSignatureOverloadFixes builds upstream's intersection repair for a duplicated key.
 //
-// Every signature sharing the key becomes one function type, joined with `&`, written at the FIRST
+// Every signature sharing the key becomes one function type, joined with `&`, written at the first
 // of them in source order, and the rest are deleted along with the whitespace that followed them.
 func methodSignatureOverloadFixes(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	node *ast.Node,
 	duplicates []*ast.Node,
 	key string,
@@ -244,7 +255,7 @@ func methodSignatureOverloadFixes(
 	var builder strings.Builder
 	for index, member := range ordered {
 		signature := member.AsMethodSignatureDeclaration()
-		parameters, readable := methodSignatureParametersText(ctx, member,
+		parameters, readable := methodSignatureParametersText(ruleContext, member,
 			signature.Parameters, signature.TypeParameters)
 		if !readable {
 			return nil, false
@@ -253,18 +264,18 @@ func methodSignatureOverloadFixes(
 			builder.WriteString(" & ")
 		}
 		// Upstream writes `(${params} => ${returnType})`, and `params` already carries its own
-		// parentheses, so the rendered constituent is `((a: string) => void)` from ONE pair written
+		// parentheses, so the rendered constituent is `((a: string) => void)` from one pair written
 		// here. Writing two produced `((( ... ` and left the parentheses unbalanced.
 		builder.WriteString("(")
 		builder.WriteString(parameters)
 		builder.WriteString(" => ")
-		builder.WriteString(methodSignatureReturnTypeText(ctx, signature.Type))
+		builder.WriteString(methodSignatureReturnTypeText(ruleContext, signature.Type))
 		builder.WriteString(")")
 	}
 
 	// One replacement over the whole group rather than a rewrite plus a removal per duplicate.
 	//
-	// Upstream emits exactly that pair, and ESLint then MERGES a finding's fixes into a single
+	// Upstream emits exactly that pair, and ESLint then merges a finding's fixes into a single
 	// range running from the first edit's start to the last edit's end, splicing the untouched text
 	// between them back in. Measured on a three-overload case: upstream's rule yields a rewrite and
 	// two removals, and the fix ESLint actually applies is one replacement of `[19,61)` whose text
@@ -275,20 +286,20 @@ func methodSignatureOverloadFixes(
 	// closing brace indented as if a member were still there. Writing the merged span directly is
 	// the same edit ESLint performs and it cannot half-apply.
 	last := ordered[len(ordered)-1]
-	groupStart := rule.TokenRange(ctx.SourceFile, ordered[0]).Pos()
+	groupStart := rule.TokenRange(ruleContext.SourceFile, ordered[0]).Pos()
 	groupEnd := last.End()
-	if groupStart > groupEnd || groupEnd > len(ctx.SourceFile.Text()) {
+	if groupStart > groupEnd || groupEnd > len(ruleContext.SourceFile.Text()) {
 		return nil, false
 	}
 
 	return []rule.Fix{
-		rule.ReplaceRange(ctx.SourceFile.AsNode().Loc.WithPos(groupStart).WithEnd(groupEnd),
-			key+": "+builder.String()+methodSignatureDelimiterOf(ctx, last)),
+		rule.ReplaceRange(ruleContext.SourceFile.AsNode().Loc.WithPos(groupStart).WithEnd(groupEnd),
+			key+": "+builder.String()+methodSignatureDelimiterOf(ruleContext, last)),
 	}, true
 }
 
 // reportMethodSignaturePropertyShouldBeMethod is upstream's `TSPropertySignature` visitor.
-func reportMethodSignaturePropertyShouldBeMethod(ctx rule.Context, node *ast.Node) {
+func reportMethodSignaturePropertyShouldBeMethod(ruleContext rule.Context, node *ast.Node) {
 	property := node.AsPropertySignatureDeclaration()
 
 	typeNode := property.Type
@@ -297,28 +308,28 @@ func reportMethodSignaturePropertyShouldBeMethod(ctx rule.Context, node *ast.Nod
 	}
 	functionType := typeNode.AsFunctionTypeNode()
 
-	key, keyed := methodSignatureKeyText(ctx, node, property.Name())
+	key, keyed := methodSignatureKeyText(ruleContext, node, property.Name())
 	if !keyed {
 		return
 	}
-	parameters, readable := methodSignatureParametersText(ctx, typeNode,
+	parameters, readable := methodSignatureParametersText(ruleContext, typeNode,
 		functionType.Parameters, functionType.TypeParameters)
 	if !readable {
-		ctx.ReportNode(node, messageMethodSignatureStyleErrorProperty())
+		ruleContext.ReportNode(node, messageMethodSignatureStyleErrorProperty())
 		return
 	}
-	returnType := methodSignatureReturnTypeText(ctx, functionType.Type)
-	delimiter := methodSignatureDelimiterOf(ctx, node)
+	returnType := methodSignatureReturnTypeText(ruleContext, functionType.Type)
+	delimiter := methodSignatureDelimiterOf(ruleContext, node)
 
 	replacement := key + parameters + ": " + returnType + delimiter
-	fix := rule.ReplaceRange(rule.TokenRange(ctx.SourceFile, node), replacement)
+	fix := rule.ReplaceRange(rule.TokenRange(ruleContext.SourceFile, node), replacement)
 
 	// There is no syntax for a readonly method signature, so the conversion drops the modifier and
 	// the member becomes reassignable. That is a behavior change rather than a spelling change, so
 	// upstream offers it as a suggestion a human chooses rather than as a fix the engine applies
 	// unattended. Reproducing the distinction is part of the port.
 	if methodSignatureHasModifier(node, ast.KindReadonlyKeyword) {
-		ctx.ReportNodeWithSuggestions(node, messageMethodSignatureStyleErrorProperty(),
+		ruleContext.ReportNodeWithSuggestions(node, messageMethodSignatureStyleErrorProperty(),
 			rule.Suggestion{
 				Message: messageMethodSignatureStyleConvertToMethod(),
 				Fixes:   []rule.Fix{fix},
@@ -326,17 +337,17 @@ func reportMethodSignaturePropertyShouldBeMethod(ctx rule.Context, node *ast.Nod
 		return
 	}
 
-	ctx.ReportNodeWithFixes(node, messageMethodSignatureStyleErrorProperty(), fix)
+	ruleContext.ReportNodeWithFixes(node, messageMethodSignatureStyleErrorProperty(), fix)
 }
 
 // methodSignatureKeyText is upstream's `getMethodKey`.
 //
 // The key's own source text, with the brackets already on it for a computed key, and a `?` appended
 // for an optional member. Upstream re-adds the brackets because TSESTree's `key` is the inner
-// expression; our `Name()` for a computed member IS the bracketed node, so its text already carries
+// expression; our `Name()` for a computed member is the bracketed node, so its text already carries
 // them and re-adding would double them.
-func methodSignatureKeyText(ctx rule.Context, member *ast.Node, name *ast.Node) (string, bool) {
-	text, readable := methodSignatureNodeText(ctx, name)
+func methodSignatureKeyText(ruleContext rule.Context, member *ast.Node, name *ast.Node) (string, bool) {
+	text, readable := methodSignatureNodeText(ruleContext, name)
 	if !readable {
 		return "", false
 	}
@@ -359,7 +370,7 @@ func methodSignatureQuestionTokenOf(member *ast.Node) *ast.Node {
 
 // methodSignatureParametersText is upstream's `getMethodParams`.
 //
-// The parameter list is copied as RAW SOURCE from its opening parenthesis to its closing one, and
+// The parameter list is copied as raw source from its opening parenthesis to its closing one, and
 // the type parameter list is copied whole and prepended. Nothing in either is re-rendered, which is
 // what makes an optional parameter, a rest parameter, a generic constraint, a default and a comment
 // all survive the rewrite. A fixer that enumerated those would lose whichever it forgot, which is
@@ -368,7 +379,7 @@ func methodSignatureQuestionTokenOf(member *ast.Node) *ast.Node {
 // An empty parameter list is written as `()` rather than sliced, matching upstream, because there is
 // no first parameter to scan back from.
 func methodSignatureParametersText(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	owner *ast.Node,
 	parameters *ast.NodeList,
 	typeParameters *ast.NodeList,
@@ -376,12 +387,12 @@ func methodSignatureParametersText(
 	rendered := "()"
 
 	if parameters != nil && len(parameters.Nodes) > 0 {
-		sourceText := ctx.SourceFile.Text()
-		first := rule.TokenRange(ctx.SourceFile, parameters.Nodes[0]).Pos()
+		sourceText := ruleContext.SourceFile.Text()
+		first := rule.TokenRange(ruleContext.SourceFile, parameters.Nodes[0]).Pos()
 		last := parameters.Nodes[len(parameters.Nodes)-1].End()
 
 		open := methodSignatureScanBackFor(sourceText, first,
-			rule.TokenRange(ctx.SourceFile, owner).Pos(), '(')
+			rule.TokenRange(ruleContext.SourceFile, owner).Pos(), '(')
 		closing := methodSignatureScanForwardFor(sourceText, last, owner.End(), ')')
 		if open < 0 || closing < 0 {
 			return "", false
@@ -390,12 +401,12 @@ func methodSignatureParametersText(
 	}
 
 	if typeParameters != nil && len(typeParameters.Nodes) > 0 {
-		sourceText := ctx.SourceFile.Text()
-		first := rule.TokenRange(ctx.SourceFile, typeParameters.Nodes[0]).Pos()
+		sourceText := ruleContext.SourceFile.Text()
+		first := rule.TokenRange(ruleContext.SourceFile, typeParameters.Nodes[0]).Pos()
 		last := typeParameters.Nodes[len(typeParameters.Nodes)-1].End()
 
 		open := methodSignatureScanBackFor(sourceText, first,
-			rule.TokenRange(ctx.SourceFile, owner).Pos(), '<')
+			rule.TokenRange(ruleContext.SourceFile, owner).Pos(), '<')
 		closing := methodSignatureScanForwardFor(sourceText, last, owner.End(), '>')
 		if open < 0 || closing < 0 {
 			return "", false
@@ -414,10 +425,8 @@ func methodSignatureParametersText(
 // for. The floor keeps the scan inside the member so a malformed signature cannot walk off into the
 // file.
 func methodSignatureScanBackFor(sourceText string, from int, floor int, want byte) int {
-	if from > len(sourceText) {
-		from = len(sourceText)
-	}
-	for offset := from - 1; offset >= floor && offset >= 0; offset-- {
+	clampedFrom := min(from, len(sourceText))
+	for offset := clampedFrom - 1; offset >= floor && offset >= 0; offset-- {
 		if sourceText[offset] == want {
 			return offset
 		}
@@ -427,10 +436,8 @@ func methodSignatureScanBackFor(sourceText string, from int, floor int, want byt
 
 // methodSignatureScanForwardFor finds the first occurrence of a byte at or after an offset, or -1.
 func methodSignatureScanForwardFor(sourceText string, from int, ceiling int, want byte) int {
-	if ceiling > len(sourceText) {
-		ceiling = len(sourceText)
-	}
-	for offset := from; offset < ceiling; offset++ {
+	clampedCeiling := min(ceiling, len(sourceText))
+	for offset := from; offset < clampedCeiling; offset++ {
 		if sourceText[offset] == want {
 			return offset
 		}
@@ -441,13 +448,13 @@ func methodSignatureScanForwardFor(sourceText string, from int, ceiling int, wan
 // methodSignatureReturnTypeText is upstream's `getMethodReturnType`.
 //
 // An absent annotation renders as the literal `any`, because a method signature with no return type
-// already IS `any` and the property form has nowhere to put an implicit one. Measured through the
+// already is `any` and the property form has nowhere to put an implicit one. Measured through the
 // compiler: `m(a: string);` and `m: (a: string) => any;` are the same type.
-func methodSignatureReturnTypeText(ctx rule.Context, returnType *ast.Node) string {
+func methodSignatureReturnTypeText(ruleContext rule.Context, returnType *ast.Node) string {
 	if returnType == nil {
 		return "any"
 	}
-	text, readable := methodSignatureNodeText(ctx, returnType)
+	text, readable := methodSignatureNodeText(ruleContext, returnType)
 	if !readable {
 		return "any"
 	}
@@ -459,8 +466,8 @@ func methodSignatureReturnTypeText(ctx rule.Context, returnType *ast.Node) strin
 // A member's trailing `;` or `,` is preserved, because a type literal written with commas would
 // otherwise lose one and stop parsing. The last token is read off the source rather than from a
 // token stream: the member's own end is past its delimiter when it has one.
-func methodSignatureDelimiterOf(ctx rule.Context, member *ast.Node) string {
-	sourceText := ctx.SourceFile.Text()
+func methodSignatureDelimiterOf(ruleContext rule.Context, member *ast.Node) string {
+	sourceText := ruleContext.SourceFile.Text()
 	end := member.End()
 	if end <= 0 || end > len(sourceText) {
 		return ""
@@ -521,8 +528,8 @@ func methodSignatureIsInsideModule(node *ast.Node) bool {
 
 // methodSignatureSiblingsOf returns the members of the interface or type literal holding a member.
 //
-// `Members()` PANICS on a kind with no member list, so the kinds are named rather than tried. The
-// walk recovers per FILE rather than per rule, so one panic would cost every rule that file.
+// `Members()` panics on a kind with no member list, so the kinds are named rather than tried. The
+// walk recovers per file rather than per rule, so one panic would cost every rule that file.
 func methodSignatureSiblingsOf(node *ast.Node) []*ast.Node {
 	parent := node.Parent
 	if parent == nil {
@@ -550,32 +557,21 @@ func methodSignatureHasModifier(node *ast.Node, keyword ast.Kind) bool {
 }
 
 // methodSignatureNodeText slices a node's own source text, trivia excluded.
-func methodSignatureNodeText(ctx rule.Context, node *ast.Node) (string, bool) {
+func methodSignatureNodeText(ruleContext rule.Context, node *ast.Node) (string, bool) {
 	if node == nil {
 		return "", false
 	}
-	trimmed := rule.TokenRange(ctx.SourceFile, node)
-	sourceText := ctx.SourceFile.Text()
+	trimmed := rule.TokenRange(ruleContext.SourceFile, node)
+	sourceText := ruleContext.SourceFile.Text()
 	if trimmed.Pos() < 0 || trimmed.End() > len(sourceText) || trimmed.Pos() > trimmed.End() {
 		return "", false
 	}
 	return sourceText[trimmed.Pos():trimmed.End()], true
 }
 
-// MethodSignatureStyleSetting is upstream's one option, `'method' | 'property'`.
-type MethodSignatureStyleSetting string
-
-const (
-	// MethodSignatureStyleProperty is `"property"`, upstream's default: a shorthand method reports.
-	MethodSignatureStyleProperty MethodSignatureStyleSetting = "property"
-
-	// MethodSignatureStyleMethod is `"method"`: a property holding a function type reports.
-	MethodSignatureStyleMethod MethodSignatureStyleSetting = "method"
-)
-
 // MethodSignatureStyleOptions is the rule's configuration.
 //
-// Upstream's schema is a bare STRING rather than an object, matching
+// Upstream's schema is a bare string rather than an object, matching
 // `class-literal-property-style` in this package, and `defaultOptions` is `['property']`.
 type MethodSignatureStyleOptions struct {
 	Style MethodSignatureStyleSetting
@@ -596,14 +592,13 @@ func DefaultMethodSignatureStyleOptions() MethodSignatureStyleOptions {
 // wire value is a JSON string rather than an object, and the default is `property` rather than a Go
 // zero value, so a generic decode would hand the rule an empty style that silences it while every
 // fixture stayed green.
-func DecodeMethodSignatureStyleOptions(raw []byte) (any, error) {
-	decoded, err := rule.DecodeOptionsInto[string]()(raw)
-	if err != nil {
-		return DefaultMethodSignatureStyleOptions(), err
+func DecodeMethodSignatureStyleOptions(raw []byte) (MethodSignatureStyleOptions, error) {
+	decoded, decodeOptionsError := rule.DecodeOptionsInto[string]()(raw)
+	if decodeOptionsError != nil {
+		return DefaultMethodSignatureStyleOptions(), decodeOptionsError
 	}
 
-	wire, _ := decoded.(string)
-	switch MethodSignatureStyleSetting(wire) {
+	switch MethodSignatureStyleSetting(decoded) {
 	case MethodSignatureStyleProperty:
 		return MethodSignatureStyleOptions{Style: MethodSignatureStyleProperty}, nil
 	case MethodSignatureStyleMethod:

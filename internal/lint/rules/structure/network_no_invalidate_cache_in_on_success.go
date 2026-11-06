@@ -11,9 +11,13 @@ import (
 
 // networkNoInvalidateCacheInOnSuccessText is the rule's message, whose wording lives in
 // `policy/messages/network-no-invalidate-cache-in-on-success.json`.
-var networkNoInvalidateCacheInOnSuccessText = policy.MessageOf("structure/network-no-invalidate-cache-in-on-success", "noInvalidateCacheInOnSuccess")
+var networkNoInvalidateCacheInOnSuccessText = policy.MessageOf(
+	"structure/network-no-invalidate-cache-in-on-success",
+	"noInvalidateCacheInOnSuccess",
+)
 
-// messageNoInvalidateCacheInOnSuccess is the finding, rendered when it is reported so the text comes from the current catalog.
+// messageNoInvalidateCacheInOnSuccess is the finding, rendered when it is reported so the text comes from the current
+// catalog.
 func messageNoInvalidateCacheInOnSuccess() rule.Message {
 	return rule.Message{
 		Id:          networkNoInvalidateCacheInOnSuccessText.Id,
@@ -41,9 +45,9 @@ func messageNoInvalidateCacheInOnSuccess() rule.Message {
 //
 // No fix. Moving an invalidation into the option means deciding which keys belong there and whether
 // anything else in the handler depended on running at that moment.
-var NetworkNoInvalidateCacheInOnSuccess = rule.Rule{
+var NetworkNoInvalidateCacheInOnSuccess = rule.Rule[rule.NoOptions]{
 	Name: "structure/network-no-invalidate-cache-in-on-success",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		reportInvalidations := func(body *ast.Node) {
 			if body == nil {
 				return
@@ -54,7 +58,7 @@ var NetworkNoInvalidateCacheInOnSuccess = rule.Rule{
 					return
 				}
 				if current.Kind == ast.KindCallExpression && isServiceCacheInvalidate(current) {
-					ctx.ReportNode(current, messageNoInvalidateCacheInOnSuccess())
+					ruleContext.ReportNode(current, messageNoInvalidateCacheInOnSuccess())
 				}
 				current.ForEachChild(func(child *ast.Node) bool {
 					visit(child)

@@ -19,31 +19,31 @@ import (
 // checker-less lowering never emits `StoreContext`, so every count taken through one is a fact about
 // the harness rather than about the code.
 //
-// Note that `forEachFunctionLike` visits only OUTERMOST function-likes, so nested functions are not
+// Note that `forEachFunctionLike` visits only outermost function-likes, so nested functions are not
 // walked. That is the same denominator every measurement in this package uses, and it is stated here
 // because a number taken from a different walk is not comparable to the ones in these comments.
-func forEachCorpusFunction(t *testing.T, limit int,
+func forEachCorpusFunction(test *testing.T, limit int,
 	visit func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes)) {
-	t.Helper()
+	test.Helper()
 
 	// Frozen, so a count asserted over it moves only when the analysis does. See pinnedCorpusFiles.
-	files, contentsOf := pinnedCorpusFiles(t, limit)
+	files, contentsOf := pinnedCorpusFiles(test, limit)
 
 	for _, path := range files {
 		contents := contentsOf[path]
 		fileName := "/corpus/" + filepath.Base(path)
-		probe := rule.Rule{
+		probe := rule.Rule[rule.NoOptions]{
 			Name:             "merge-corpus",
 			NeedsTypeChecker: true,
-			Run: func(ctx rule.Context, options any) rule.Listeners {
+			Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 				return rule.Listeners{
 					ast.KindSourceFile: func(node *ast.Node) {
-						if ctx.TypeChecker == nil {
-							t.Fatal("the typed harness handed this probe a nil checker, so every " +
+						if ruleContext.TypeChecker == nil {
+							test.Fatal("the typed harness handed this probe a nil checker, so every " +
 								"count below would be a fact about the harness rather than the code")
 						}
 						forEachFunctionLike(node, func(functionNode *ast.Node) {
-							function := Lower(functionNode, ctx.TypeChecker)
+							function := Lower(functionNode, ruleContext.TypeChecker)
 							if function == nil {
 								return
 							}
@@ -56,7 +56,7 @@ func forEachCorpusFunction(t *testing.T, limit int,
 				}
 			},
 		}
-		rule_testing.RunTypedFiles(t, probe, map[string]string{fileName: contents}, fileName)
+		rule_testing.RunTypedFiles(test, probe, map[string]string{fileName: contents}, fileName)
 	}
 }
 
@@ -72,7 +72,7 @@ func scopeNestingItems(ranges map[ScopeId]mutation_aliasing.MutableRange) []nest
 	for id := range ranges {
 		ids = append(ids, id)
 	}
-	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+	sort.Slice(ids, func(left, right int) bool { return ids[left] < ids[right] })
 
 	items := make([]nestingItem, 0, len(ids))
 	for _, id := range ids {
@@ -130,27 +130,27 @@ func blockNestingViolations(scopes, blocks []nestingItem) int {
 	items = append(items, scopes...)
 	items = append(items, blocks...)
 
-	// Upstream's `rangePreOrderComparator`: earlier start first, then the LONGER item first, so an
+	// Upstream's `rangePreOrderComparator`: earlier start first, then the longer item first, so an
 	// enclosing item is entered before the items it encloses.
-	sort.SliceStable(items, func(i, j int) bool {
-		if items[i].start != items[j].start {
-			return items[i].start < items[j].start
+	sort.SliceStable(items, func(left, right int) bool {
+		if items[left].start != items[right].start {
+			return items[left].start < items[right].start
 		}
-		return items[i].end > items[j].end
+		return items[left].end > items[right].end
 	})
 
 	violations := 0
 	var active []nestingItem
 	for _, current := range items {
-		for i := len(active) - 1; i >= 0; i-- {
-			parent := active[i]
+		for index := len(active) - 1; index >= 0; index-- {
+			parent := active[index]
 			disjoint := current.start >= parent.end
 			nested := current.end <= parent.end
 			if !disjoint && !nested {
 				violations++
 			}
 			if disjoint {
-				active = active[:i]
+				active = active[:index]
 			} else {
 				break
 			}

@@ -19,7 +19,8 @@ import (
 //
 //	T=internal/lint/rules/tailwind/tools/generate_signatures
 //	D=internal/lint/rules/tailwind/collapse/testdata
-//	node $T/signatures.mjs $D/public_theme/theme.css --resolve-root ahra: --targets $D/canonical_singles_public.json > $D/signatures_public.txt.gz
+//	node $T/signatures.mjs $D/public_theme/theme.css --resolve-root ahra: \
+//	    --targets $D/canonical_singles_public.json > $D/signatures_public.txt.gz
 //	node $T/signatures.mjs ahra:app/_theme/styles/theme.css --targets $D/canonical_singles.json > $D/signatures.txt.gz
 //	node $T/signatures.mjs connected:app/_theme/styles/theme.css > $D/signatures_connected.txt.gz
 var signatureOracles = []struct {
@@ -43,18 +44,19 @@ type signatureOracleEntry struct {
 
 // TestSignatureAgreesWithTailwind holds every signature this port calls exact to upstream's, under the
 // plugin's default options and with collapse off, and reports how many classes it leaves unknown.
-func TestSignatureAgreesWithTailwind(t *testing.T) {
-	t.Parallel()
+func TestSignatureAgreesWithTailwind(test *testing.T) {
+	test.Parallel()
 	for _, oracle := range signatureOracles {
-		t.Run(oracle.name, func(t *testing.T) {
-			t.Parallel()
-			entryPoint, entries := readSignatureOracle(t, oracle.file)
-			system := oracleSystem(t, entryPoint)
+		test.Run(oracle.name, func(test *testing.T) {
+			test.Parallel()
+			entryPoint, entries := readSignatureOracle(test, oracle.file)
+			system := oracleSystem(test, entryPoint)
 			compiler := NewSignatureCompiler(system)
 
 			collapsedFeatures := SignatureFeaturesFor(true, true)
 			uncollapsedFeatures := SignatureFeaturesFor(false, true)
-			var disagreements, outOfBound []string
+			var disagreements []string
+			var outOfBound []string
 			unknownByRoot := map[string]int{}
 			disagreeByRoot := map[string]int{}
 			outOfBoundByRoot := map[string]int{}
@@ -84,15 +86,25 @@ func TestSignatureAgreesWithTailwind(t *testing.T) {
 								for _, property := range strings.Fields(entry.properties) {
 									properties[property] = true
 								}
-								if bound := compiler.ClassSignatureBound(entry.className, side.features); !bound.Admits(properties) {
+								if bound := compiler.ClassSignatureBound(
+									entry.className,
+									side.features,
+								); !bound.Admits(properties) {
 									outOfBoundByRoot[signatureRootOf(entry.className)]++
-									outOfBound = append(outOfBound, entry.className+": upstream declares ["+entry.properties+"], bound "+describeBound(bound))
+									outOfBound = append(outOfBound, entry.className+
+										": upstream declares ["+
+										entry.properties+
+										"], bound "+
+										describeBound(bound))
 								}
 							}
 						}
 					case SignatureNone:
 						if side.expected != "-" {
-							disagreements = append(disagreements, entry.className+" ("+side.name+"): compiles here to nothing, upstream to a signature")
+							disagreements = append(
+								disagreements,
+								entry.className+" ("+side.name+"): compiles here to nothing, upstream to a signature",
+							)
 						}
 					case SignatureExact:
 						if side.name == "collapsed" {
@@ -102,7 +114,10 @@ func TestSignatureAgreesWithTailwind(t *testing.T) {
 							if side.name == "collapsed" {
 								disagreeByRoot[signatureRootOf(entry.className)]++
 							}
-							disagreements = append(disagreements, entry.className+" ("+side.name+"): "+strings.ReplaceAll(signature, "\n", " "))
+							disagreements = append(
+								disagreements,
+								entry.className+" ("+side.name+"): "+strings.ReplaceAll(signature, "\n", " "),
+							)
 						}
 					}
 				}
@@ -113,7 +128,11 @@ func TestSignatureAgreesWithTailwind(t *testing.T) {
 				if len(shown) > 40 {
 					shown = shown[:40]
 				}
-				t.Errorf("%d signatures called exact disagree with upstream's, starting with:\n  %s", len(disagreements), strings.Join(shown, "\n  "))
+				test.Errorf(
+					"%d signatures called exact disagree with upstream's, starting with:\n  %s",
+					len(disagreements),
+					strings.Join(shown, "\n  "),
+				)
 			}
 			sort.Strings(outOfBound)
 			if len(outOfBound) > 0 {
@@ -121,11 +140,21 @@ func TestSignatureAgreesWithTailwind(t *testing.T) {
 				if len(shown) > 40 {
 					shown = shown[:40]
 				}
-				t.Errorf("%d unknown signatures fall outside their bound, so the bail would miss them, starting with:\n  %s", len(outOfBound), strings.Join(shown, "\n  "))
+				test.Errorf(
+					"%d unknown signatures fall outside their bound, so the bail would miss them, starting with:\n  %s",
+					len(outOfBound),
+					strings.Join(shown, "\n  "),
+				)
 			}
-			t.Logf("%d classes: %d exact, %d unknown; unknown by root: %s", len(entries), exact, unknown, topCounts(unknownByRoot, 25))
-			t.Logf("disagreements by root: %s", topCounts(disagreeByRoot, 200))
-			t.Logf("out of bound by root: %s", topCounts(outOfBoundByRoot, 200))
+			test.Logf(
+				"%d classes: %d exact, %d unknown; unknown by root: %s",
+				len(entries),
+				exact,
+				unknown,
+				topCounts(unknownByRoot, 25),
+			)
+			test.Logf("disagreements by root: %s", topCounts(disagreeByRoot, 200))
+			test.Logf("out of bound by root: %s", topCounts(outOfBoundByRoot, 200))
 		})
 	}
 }
@@ -180,14 +209,14 @@ func signatureHash(signature string) string {
 
 // signatureRootOf is the part of a class before its last dash-separated value, for grouping a report.
 func signatureRootOf(className string) string {
-	className = strings.TrimPrefix(className, "-")
-	if index := strings.IndexAny(className, "/["); index > 0 {
-		className = className[:index]
+	root := strings.TrimPrefix(className, "-")
+	if index := strings.IndexAny(root, "/["); index > 0 {
+		root = root[:index]
 	}
-	if index := strings.LastIndex(className, "-"); index > 0 {
-		return className[:index]
+	if index := strings.LastIndex(root, "-"); index > 0 {
+		return root[:index]
 	}
-	return className
+	return root
 }
 
 // topCounts renders the largest counts of a map, largest first.
@@ -213,16 +242,17 @@ func topCounts(counts map[string]int, limit int) string {
 }
 
 // readSignatureOracle reads one capture: the entry point its header names and every class line.
-func readSignatureOracle(t *testing.T, name string) (string, []signatureOracleEntry) {
-	t.Helper()
-	file, err := os.Open(filepath.Join("testdata", name))
-	if err != nil {
-		t.Fatalf("open %s: %v", name, err)
+func readSignatureOracle(test *testing.T, name string) (string, []signatureOracleEntry) {
+	test.Helper()
+	file, openError := os.Open(filepath.Join("testdata", name))
+	if openError != nil {
+		test.Fatalf("open %s: %v", name, openError)
 	}
+	// Ignored: the file was only read, so a failed close loses nothing.
 	defer file.Close()
-	reader, err := gzip.NewReader(file)
-	if err != nil {
-		t.Fatalf("%s is not gzip: %v", name, err)
+	reader, gzipError := gzip.NewReader(file)
+	if gzipError != nil {
+		test.Fatalf("%s is not gzip: %v", name, gzipError)
 	}
 	scanner := bufio.NewScanner(reader)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
@@ -243,7 +273,7 @@ func readSignatureOracle(t *testing.T, name string) (string, []signatureOracleEn
 		}
 		fields := strings.SplitN(line, "\t", 4)
 		if len(fields) != 4 {
-			t.Fatalf("%s: malformed line %q", name, line)
+			test.Fatalf("%s: malformed line %q", name, line)
 		}
 		entries = append(entries, signatureOracleEntry{
 			className:   fields[0],
@@ -253,11 +283,11 @@ func readSignatureOracle(t *testing.T, name string) (string, []signatureOracleEn
 			isTarget:    isTarget,
 		})
 	}
-	if err := scanner.Err(); err != nil {
-		t.Fatalf("read %s: %v", name, err)
+	if scanError := scanner.Err(); scanError != nil {
+		test.Fatalf("read %s: %v", name, scanError)
 	}
 	if len(entries) == 0 {
-		t.Fatalf("%s holds no classes", name)
+		test.Fatalf("%s holds no classes", name)
 	}
 	return entryPoint, entries
 }

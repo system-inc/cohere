@@ -11,5 +11,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 //
 // No decoder: the rule takes no options.
 func init() {
-	rule.Register(rule.Registration{Rule: ConsistencyNoPropertyAlias})
+	rule.Register(rule.Registration[rule.NoOptions]{Rule: ConsistencyNoPropertyAlias})
 }

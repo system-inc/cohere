@@ -17,25 +17,25 @@ import (
 // as a global and never emits `StoreContext`, which is the one widening rule this pass can apply.
 // A plain harness would make `TestRangesWidenAStoreIntoACapturedBinding` pass vacuously; that is
 // measured rather than assumed, and the corpus probe that found it is recorded in the report.
-func rangesFor(t *testing.T, source string) (*Function, *mutation_aliasing.MutableRanges) {
-	t.Helper()
+func rangesFor(test *testing.T, source string) (*Function, *mutation_aliasing.MutableRanges) {
+	test.Helper()
 
 	var outermost *Function
-	probe := rule.Rule{
+	probe := rule.Rule[rule.NoOptions]{
 		Name:             "ranges-harness",
 		NeedsTypeChecker: true,
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
-					if ctx.TypeChecker == nil {
-						t.Fatal("the typed harness handed this probe a nil checker, so every " +
+					if ruleContext.TypeChecker == nil {
+						test.Fatal("the typed harness handed this probe a nil checker, so every " +
 							"assertion below would pass vacuously")
 					}
 					forEachFunctionLike(node, func(functionNode *ast.Node) {
 						if outermost != nil {
 							return
 						}
-						function := Lower(functionNode, ctx.TypeChecker)
+						function := Lower(functionNode, ruleContext.TypeChecker)
 						if function == nil {
 							return
 						}
@@ -46,20 +46,20 @@ func rangesFor(t *testing.T, source string) (*Function, *mutation_aliasing.Mutab
 			}
 		},
 	}
-	rule_testing.RunTypedFiles(t, probe, map[string]string{"fixture.ts": source}, "fixture.ts")
+	rule_testing.RunTypedFiles(test, probe, map[string]string{"fixture.ts": source}, "fixture.ts")
 	if outermost == nil {
-		t.Fatal("no function was lowered, so this test measured nothing")
+		test.Fatal("no function was lowered, so this test measured nothing")
 	}
 	return outermost, InferMutableRanges(outermost)
 }
 
-// rangeOfName returns the range of the value a named binding takes, choosing the LAST definition.
+// rangeOfName returns the range of the value a named binding takes, choosing the last definition.
 //
 // Single-assignment form gives one binding several identifiers, so a name alone is ambiguous. The
 // last one is chosen because these tests ask about a value after its final write, which is the
 // question a consumer asks.
-func rangeOfName(t *testing.T, function *Function, name string) mutation_aliasing.MutableRange {
-	t.Helper()
+func rangeOfName(test *testing.T, function *Function, name string) mutation_aliasing.MutableRange {
+	test.Helper()
 	ranges := InferMutableRanges(function)
 	var best mutation_aliasing.MutableRange
 	var found bool
@@ -67,42 +67,42 @@ func rangeOfName(t *testing.T, function *Function, name string) mutation_aliasin
 		if identifier == nil || identifier.Name != name {
 			continue
 		}
-		r := ranges.Get(identifier.Id)
-		if !r.IsSet() {
+		mutableRange := ranges.Get(identifier.Id)
+		if !mutableRange.IsSet() {
 			continue
 		}
-		if !found || r.Start > best.Start {
-			best = r
+		if !found || mutableRange.Start > best.Start {
+			best = mutableRange
 			found = true
 		}
 	}
 	if !found {
-		t.Fatalf("no value named %q carries a range; the lowering probably names it differently", name)
+		test.Fatalf("no value named %q carries a range; the lowering probably names it differently", name)
 	}
 	return best
 }
 
 // TestRangesOpenAtTheDefiningInstruction is the base case: a value's range starts where it is
 // defined and ends one past it, which is upstream's unconditional lvalue rule.
-func TestRangesOpenAtTheDefiningInstruction(t *testing.T) {
-	t.Parallel()
+func TestRangesOpenAtTheDefiningInstruction(test *testing.T) {
+	test.Parallel()
 
-	function, ranges := rangesFor(t, `
+	function, ranges := rangesFor(test, `
 export function f() {
   const a = 1;
   return a;
 }
 `)
-	if ranges.Len() == 0 {
-		t.Fatal("no value got a range, so this pass is inert rather than correctly silent")
+	if ranges.Length() == 0 {
+		test.Fatal("no value got a range, so this pass is inert rather than correctly silent")
 	}
-	r := rangeOfName(t, function, "a")
-	if !r.IsSet() {
-		t.Fatal("`a` has no range")
+	mutableRange := rangeOfName(test, function, "a")
+	if !mutableRange.IsSet() {
+		test.Fatal("`a` has no range")
 	}
-	if r.End != r.Start+1 {
-		t.Errorf("a value defined once and never mutated should span exactly one instruction, "+
-			"got [%d,%d)", r.Start, r.End)
+	if mutableRange.End != mutableRange.Start+1 {
+		test.Errorf("a value defined once and never mutated should span exactly one instruction, "+
+			"got [%d,%d)", mutableRange.Start, mutableRange.End)
 	}
 }
 
@@ -111,84 +111,84 @@ export function f() {
 // This is the property that separates an interval from a set of endpoints, and it is asserted
 // directly rather than through a consumer because every consumer would hide it behind its own
 // question.
-func TestRangesAreHalfOpen(t *testing.T) {
-	t.Parallel()
+func TestRangesAreHalfOpen(test *testing.T) {
+	test.Parallel()
 
-	r := mutation_aliasing.MutableRange{Start: 3, End: 6}
+	mutableRange := mutation_aliasing.MutableRange{Start: 3, End: 6}
 	for _, order := range []static_single_assignment.EvaluationOrder{3, 4, 5} {
-		if !r.Contains(order) {
-			t.Errorf("[3,6) should contain %d", order)
+		if !mutableRange.Contains(order) {
+			test.Errorf("[3,6) should contain %d", order)
 		}
 	}
 	for _, order := range []static_single_assignment.EvaluationOrder{2, 6, 7} {
-		if r.Contains(order) {
-			t.Errorf("[3,6) should not contain %d; the end is exclusive, which is React's inRange", order)
+		if mutableRange.Contains(order) {
+			test.Errorf("[3,6) should not contain %d; the end is exclusive, which is React's inRange", order)
 		}
 	}
 	if (mutation_aliasing.MutableRange{}).Contains(0) || (mutation_aliasing.MutableRange{}).Contains(5) {
-		t.Error("the unset range must contain nothing, so a caller need not check IsSet first")
+		test.Error("the unset range must contain nothing, so a caller need not check IsSet first")
 	}
 }
 
 // TestRangesSpanTheGapBetweenDisjointWrites is the interval-versus-set proof.
 //
-// A value written at two positions with untouched instructions between them has ONE interval
+// A value written at two positions with untouched instructions between them has one interval
 // covering both plus the gap, not two disjoint spans. Upstream's representation is `{start, end}`
 // and its membership test is a comparison, so the gap is inside the range by construction.
 //
 // This is asserted over a hand-built range rather than over lowered source, deliberately. The
 // widening that produces a two-write range is `AliasingState.mutate`, which needs effect facts this
 // tree does not have, so no source input can produce the shape today. Building it by hand is what
-// makes the REPRESENTATION testable independently of the pass that would populate it, and it is the
+// makes the representation testable independently of the pass that would populate it, and it is the
 // case that would silently pass under a set-of-indices implementation while answering upstream's
 // actual question wrongly.
-func TestRangesSpanTheGapBetweenDisjointWrites(t *testing.T) {
-	t.Parallel()
+func TestRangesSpanTheGapBetweenDisjointWrites(test *testing.T) {
+	test.Parallel()
 
 	// Written at 3, written again at 20, nothing between. Upstream's end is one past the last
 	// write.
-	r := mutation_aliasing.MutableRange{Start: 3, End: 21}
+	mutableRange := mutation_aliasing.MutableRange{Start: 3, End: 21}
 
-	if !r.Contains(10) {
-		t.Error("an instruction in the GAP between two writes must be inside the range: upstream " +
+	if !mutableRange.Contains(10) {
+		test.Error("an instruction in the GAP between two writes must be inside the range: upstream " +
 			"represents this as one interval, so a reactive scope covering the value covers " +
 			"everything between its writes. A set of write positions would answer false here and " +
 			"would pass every straight-line test in this file")
 	}
-	if !r.Contains(3) || !r.Contains(20) {
-		t.Error("both write positions must be inside the range")
+	if !mutableRange.Contains(3) || !mutableRange.Contains(20) {
+		test.Error("both write positions must be inside the range")
 	}
-	if r.Contains(21) {
-		t.Error("the end stays exclusive even for a widened range")
+	if mutableRange.Contains(21) {
+		test.Error("the end stays exclusive even for a widened range")
 	}
 }
 
 // TestRangesRejectAnInvalidInterval pins upstream's `validateMutableRange` invariant: a range is
 // either entirely unset or genuinely non-empty.
-func TestRangesRejectAnInvalidInterval(t *testing.T) {
-	t.Parallel()
+func TestRangesRejectAnInvalidInterval(test *testing.T) {
+	test.Parallel()
 
 	valid := []mutation_aliasing.MutableRange{{}, {Start: 1, End: 2}, {Start: 5, End: 100}}
-	for _, r := range valid {
-		if !r.IsValid() {
-			t.Errorf("[%d,%d) should be valid", r.Start, r.End)
+	for _, mutableRange := range valid {
+		if !mutableRange.IsValid() {
+			test.Errorf("[%d,%d) should be valid", mutableRange.Start, mutableRange.End)
 		}
 	}
 	invalid := []mutation_aliasing.MutableRange{{Start: 3, End: 3}, {Start: 5, End: 2}, {Start: 4, End: 0}}
-	for _, r := range invalid {
-		if r.IsValid() {
-			t.Errorf("[%d,%d) should be invalid: upstream asserts (start==0 && end==0) || end>start",
-				r.Start, r.End)
+	for _, mutableRange := range invalid {
+		if mutableRange.IsValid() {
+			test.Errorf("[%d,%d) should be invalid: upstream asserts (start==0 && end==0) || end>start",
+				mutableRange.Start, mutableRange.End)
 		}
 	}
 }
 
 // TestRangesProduceNoInvalidIntervalsOnRealCode runs the invariant over a function with branches,
 // a loop, and phis, which is where an off-by-one in the phi rule would show up.
-func TestRangesProduceNoInvalidIntervalsOnRealCode(t *testing.T) {
-	t.Parallel()
+func TestRangesProduceNoInvalidIntervalsOnRealCode(test *testing.T) {
+	test.Parallel()
 
-	function, ranges := rangesFor(t, `
+	function, ranges := rangesFor(test, `
 export function f(c: boolean, items: number[]) {
   let total = 0;
   for (const item of items) {
@@ -201,16 +201,16 @@ export function f(c: boolean, items: number[]) {
   return total;
 }
 `)
-	if ranges.Len() == 0 {
-		t.Fatal("no value got a range over a function with a loop and a branch; this is inert")
+	if ranges.Length() == 0 {
+		test.Fatal("no value got a range over a function with a loop and a branch; this is inert")
 	}
 	if invalid := mutation_aliasing.ValidateMutableRanges(ranges); len(invalid) != 0 {
-		t.Errorf("%d values carry an invalid range: %v", len(invalid), invalid)
+		test.Errorf("%d values carry an invalid range: %v", len(invalid), invalid)
 	}
 	_ = function
 }
 
-// TestRangesWidenAStoreIntoACapturedBinding pins the ONE widening rule that survives the absence of
+// TestRangesWidenAStoreIntoACapturedBinding pins the one widening rule that survives the absence of
 // effect facts.
 //
 // `n` is declared in `outer` and written from a nested arrow, which lowers to `StoreContext`. React
@@ -219,10 +219,10 @@ export function f(c: boolean, items: number[]) {
 //
 // This is also the test that catches a plain harness: with a nil checker `captureOf` cannot resolve
 // and no `StoreContext` is emitted at all, so the assertion below would have nothing to find.
-func TestRangesWidenAStoreIntoACapturedBinding(t *testing.T) {
-	t.Parallel()
+func TestRangesWidenAStoreIntoACapturedBinding(test *testing.T) {
+	test.Parallel()
 
-	function, _ := rangesFor(t, `
+	function, _ := rangesFor(test, `
 export function outer() {
   let n = 0;
   const bump = () => { n = 1; };
@@ -233,11 +233,11 @@ export function outer() {
 
 	var stores int
 	var walk func(*Function)
-	walk = func(f *Function) {
-		ranges := InferMutableRanges(f)
-		for _, block := range f.Blocks {
+	walk = func(function *Function) {
+		ranges := InferMutableRanges(function)
+		for _, block := range function.Blocks {
 			for _, instructionId := range block.Instructions {
-				instruction := f.Instructions[instructionId]
+				instruction := function.Instructions[instructionId]
 				if instruction == nil {
 					continue
 				}
@@ -246,22 +246,22 @@ export function outer() {
 					continue
 				}
 				stores++
-				r := ranges.Get(store.Value.Identifier)
-				if !r.Contains(instruction.Order) {
-					t.Errorf("the value stored into a captured binding at order %d is not inside "+
+				mutableRange := ranges.Get(store.Value.Identifier)
+				if !mutableRange.Contains(instruction.Order) {
+					test.Errorf("the value stored into a captured binding at order %d is not inside "+
 						"its own range [%d,%d); the StoreContext widening did not fire",
-						instruction.Order, r.Start, r.End)
+						instruction.Order, mutableRange.Start, mutableRange.End)
 				}
 			}
 		}
-		for _, nested := range f.Functions {
+		for _, nested := range function.Functions {
 			walk(nested)
 		}
 	}
 	walk(function)
 
 	if stores == 0 {
-		t.Fatal("no StoreContext was lowered, so this test measured nothing. That is what a " +
+		test.Fatal("no StoreContext was lowered, so this test measured nothing. That is what a " +
 			"checker-less harness produces, and it is why rangesFor asserts the checker is present")
 	}
 }
@@ -272,8 +272,8 @@ export function outer() {
 // A phi does not create a fresh mutable value. It names the union of its operand values, so an
 // unknown call's conditional mutation is discarded when every arm is already frozen or primitive.
 // One mutable arm is the control: it must keep the mutation and pull the phi into the call scope.
-func TestPhiNonMutabilityControlsUnknownCallScopes(t *testing.T) {
-	t.Parallel()
+func TestPhiNonMutabilityControlsUnknownCallScopes(test *testing.T) {
+	test.Parallel()
 
 	tests := []struct {
 		name           string
@@ -316,25 +316,25 @@ func TestPhiNonMutabilityControlsUnknownCallScopes(t *testing.T) {
 	}
 
 	for _, testCase := range tests {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			function, ranges := rangesFor(t, testCase.source)
-			call, phi := unknownCallAndArgumentPhi(t, function, "opaque")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			function, ranges := rangesFor(test, testCase.source)
+			call, phi := unknownCallAndArgumentPhi(test, function, "opaque")
 			set := FindDisjointMutableValuesWithRanges(function, ranges)
 			scopes := AssignReactiveScopesWithSets(function, ranges, set)
 			callScope := scopes.ScopeOf(call.LValue.Identifier)
 			if callScope == 0 {
-				t.Fatal("unknown call result received no allocation scope")
+				test.Fatal("unknown call result received no allocation scope")
 			}
 
 			phiScope := scopes.ScopeOf(phi.Place.Identifier)
 			if got := phiScope == callScope; got != testCase.wantPhiInScope {
-				t.Errorf("phi and call share scope = %v, want %v; phi range=%v call scope=%v",
+				test.Errorf("phi and call share scope = %v, want %v; phi range=%v call scope=%v",
 					got, testCase.wantPhiInScope, ranges.Get(phi.Place.Identifier),
 					scopes.RangeOf(callScope))
 			}
 			if got := ranges.Contains(phi.Place.Identifier, call.Order); got != testCase.wantPhiInScope {
-				t.Errorf("phi is mutable at call = %v, want %v", got, testCase.wantPhiInScope)
+				test.Errorf("phi is mutable at call = %v, want %v", got, testCase.wantPhiInScope)
 			}
 
 			if !testCase.wantPhiInScope {
@@ -346,16 +346,16 @@ func TestPhiNonMutabilityControlsUnknownCallScopes(t *testing.T) {
 					if block == nil || block.Kind != BlockKindValue {
 						continue
 					}
-					for _, instructionID := range block.Instructions {
-						instruction := function.Instructions[instructionID]
+					for _, instructionId := range block.Instructions {
+						instruction := function.Instructions[instructionId]
 						if instruction != nil && callMembers[instruction.LValue.Identifier] {
-							t.Errorf("call scope contains value-block instruction %d (%T); upstream starts "+
-								"the scope after the join", instructionID, instruction.Value)
+							test.Errorf("call scope contains value-block instruction %d (%T); upstream starts "+
+								"the scope after the join", instructionId, instruction.Value)
 						}
 					}
 				}
 				if got := scopes.RangeOf(callScope); got.Start != call.Order || got.End != call.Order+1 {
-					t.Errorf("call scope range=%v, want [%d,%d)", got, call.Order, call.Order+1)
+					test.Errorf("call scope range=%v, want [%d,%d)", got, call.Order, call.Order+1)
 				}
 			}
 		})
@@ -366,8 +366,8 @@ func TestPhiNonMutabilityControlsUnknownCallScopes(t *testing.T) {
 // argument lowering. A method receiver is evaluated before its arguments and retained on the
 // MethodCall after any argument join; Array.push's direct Mutate(receiver) must therefore end the
 // receiver range at call.Order+1 for straight-line, ternary, and optional-chain arguments alike.
-func TestMutatingMethodReceiverSurvivesArgumentControlFlow(t *testing.T) {
-	t.Parallel()
+func TestMutatingMethodReceiverSurvivesArgumentControlFlow(test *testing.T) {
+	test.Parallel()
 
 	tests := []struct {
 		name            string
@@ -409,9 +409,9 @@ func TestMutatingMethodReceiverSurvivesArgumentControlFlow(t *testing.T) {
 	}
 
 	for _, testCase := range tests {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			function, ranges := rangesFor(t, testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			function, ranges := rangesFor(test, testCase.source)
 			var call *Instruction
 			var method *MethodCall
 			for _, instruction := range function.Instructions {
@@ -427,7 +427,7 @@ func TestMutatingMethodReceiverSurvivesArgumentControlFlow(t *testing.T) {
 				break
 			}
 			if call == nil {
-				t.Fatal("no Array.push MethodCall was lowered")
+				test.Fatal("no Array.push MethodCall was lowered")
 			}
 
 			mutations := 0
@@ -438,15 +438,15 @@ func TestMutatingMethodReceiverSurvivesArgumentControlFlow(t *testing.T) {
 				}
 			}
 			if mutations != 1 {
-				t.Fatalf("push effects contain %d direct Mutate(receiver) entries, want exactly 1",
+				test.Fatalf("push effects contain %d direct Mutate(receiver) entries, want exactly 1",
 					mutations)
 			}
 
-			if len(method.Args) != 1 {
-				t.Fatalf("push has %d arguments, want 1", len(method.Args))
+			if len(method.Arguments) != 1 {
+				test.Fatalf("push has %d arguments, want 1", len(method.Arguments))
 			}
 			argumentIsPhi := false
-			argument := method.Args[0].Place.Identifier
+			argument := method.Arguments[0].Place.Identifier
 			for _, block := range function.Blocks {
 				if block == nil {
 					continue
@@ -458,11 +458,12 @@ func TestMutatingMethodReceiverSurvivesArgumentControlFlow(t *testing.T) {
 				}
 			}
 			if argumentIsPhi != testCase.wantArgumentPhi {
-				t.Errorf("push argument is phi = %v, want %v; the test stopped distinguishing argument CFG",
+				test.Errorf("push argument is phi = %v, want %v; the test stopped distinguishing argument CFG",
 					argumentIsPhi, testCase.wantArgumentPhi)
 			}
 
-			var initializer, storedX Place
+			var initializer Place
+			var storedX Place
 			foundStore := false
 			for _, instruction := range function.Instructions {
 				if instruction == nil {
@@ -482,7 +483,7 @@ func TestMutatingMethodReceiverSurvivesArgumentControlFlow(t *testing.T) {
 				break
 			}
 			if !foundStore {
-				t.Fatal("no StoreLocal connected the array initializer to x")
+				test.Fatal("no StoreLocal connected the array initializer to x")
 			}
 			receiverProducerFound := false
 			for _, instruction := range function.Instructions {
@@ -492,17 +493,17 @@ func TestMutatingMethodReceiverSurvivesArgumentControlFlow(t *testing.T) {
 				receiverProducerFound = true
 				load, ok := instruction.Value.(*LoadLocal)
 				if !ok {
-					t.Fatalf("MethodCall receiver %d is produced by %T, want LoadLocal",
+					test.Fatalf("MethodCall receiver %d is produced by %T, want LoadLocal",
 						method.Receiver.Identifier, instruction.Value)
 				}
 				if load.Place.Identifier != storedX.Identifier {
-					t.Fatalf("MethodCall receiver loads %d, want stored x %d",
+					test.Fatalf("MethodCall receiver loads %d, want stored x %d",
 						load.Place.Identifier, storedX.Identifier)
 				}
 				break
 			}
 			if !receiverProducerFound {
-				t.Fatalf("no instruction produces MethodCall receiver %d", method.Receiver.Identifier)
+				test.Fatalf("no instruction produces MethodCall receiver %d", method.Receiver.Identifier)
 			}
 			initializerIsArray := false
 			for _, instruction := range function.Instructions {
@@ -512,7 +513,7 @@ func TestMutatingMethodReceiverSurvivesArgumentControlFlow(t *testing.T) {
 				}
 			}
 			if !initializerIsArray {
-				t.Fatalf("x initializer %d is not produced by an ArrayExpression", initializer.Identifier)
+				test.Fatalf("x initializer %d is not produced by an ArrayExpression", initializer.Identifier)
 			}
 
 			for _, value := range []struct {
@@ -525,10 +526,10 @@ func TestMutatingMethodReceiverSurvivesArgumentControlFlow(t *testing.T) {
 			} {
 				got := ranges.Get(value.place.Identifier)
 				if got.Start == 0 || got.Start >= call.Order {
-					t.Errorf("%s range=%v does not begin before call order %d", value.name, got, call.Order)
+					test.Errorf("%s range=%v does not begin before call order %d", value.name, got, call.Order)
 				}
 				if got.End != call.Order+1 {
-					t.Errorf("%s range=%v, want end at push call + 1 (%d)", value.name, got, call.Order+1)
+					test.Errorf("%s range=%v, want end at push call + 1 (%d)", value.name, got, call.Order+1)
 				}
 			}
 		})
@@ -541,8 +542,8 @@ func TestMutatingMethodReceiverSurvivesArgumentControlFlow(t *testing.T) {
 // Alias is pruned for a frozen/primitive source or destination. MaybeAlias is deliberately
 // asymmetric: a frozen source is pruned, but a primitive source is retained. The latter is a
 // control against simplifying both variants to the same broad "immutable means no edge" rule.
-func TestAliasingRefinementMatchesAbstractKinds(t *testing.T) {
-	t.Parallel()
+func TestAliasingRefinementMatchesAbstractKinds(test *testing.T) {
+	test.Parallel()
 
 	tests := []struct {
 		name        string
@@ -551,30 +552,135 @@ func TestAliasingRefinementMatchesAbstractKinds(t *testing.T) {
 		intoKind    mutation_aliasing.EffectValueKind
 		wantWidened bool
 	}{
-		{name: "alias frozen source", edge: mutation_aliasing.AliasingEffectAlias, fromKind: mutation_aliasing.EffectValueFrozen, intoKind: mutation_aliasing.EffectValueMutable},
-		{name: "alias primitive source", edge: mutation_aliasing.AliasingEffectAlias, fromKind: mutation_aliasing.EffectValuePrimitive, intoKind: mutation_aliasing.EffectValueMutable},
-		{name: "alias frozen destination", edge: mutation_aliasing.AliasingEffectAlias, fromKind: mutation_aliasing.EffectValueMutable, intoKind: mutation_aliasing.EffectValueFrozen},
-		{name: "alias mutable values", edge: mutation_aliasing.AliasingEffectAlias, fromKind: mutation_aliasing.EffectValueMutable, intoKind: mutation_aliasing.EffectValueMutable, wantWidened: true},
-		{name: "maybe-alias frozen source", edge: mutation_aliasing.AliasingEffectMaybeAlias, fromKind: mutation_aliasing.EffectValueFrozen, intoKind: mutation_aliasing.EffectValueMutable},
-		{name: "maybe-alias primitive source", edge: mutation_aliasing.AliasingEffectMaybeAlias, fromKind: mutation_aliasing.EffectValuePrimitive, intoKind: mutation_aliasing.EffectValueMutable, wantWidened: true},
-		{name: "maybe-alias global source", edge: mutation_aliasing.AliasingEffectMaybeAlias, fromKind: mutation_aliasing.EffectValueGlobal, intoKind: mutation_aliasing.EffectValueMutable, wantWidened: true},
-		{name: "maybe-alias mixed source", edge: mutation_aliasing.AliasingEffectMaybeAlias, fromKind: mutation_aliasing.EffectValueMaybeFrozen, intoKind: mutation_aliasing.EffectValueMutable, wantWidened: true},
-		{name: "alias mixed source", edge: mutation_aliasing.AliasingEffectAlias, fromKind: mutation_aliasing.EffectValueMaybeFrozen, intoKind: mutation_aliasing.EffectValueMutable, wantWidened: true},
-		{name: "capture mixed source", edge: mutation_aliasing.AliasingEffectCapture, fromKind: mutation_aliasing.EffectValueMaybeFrozen, intoKind: mutation_aliasing.EffectValueMutable, wantWidened: true},
-		{name: "capture global source", edge: mutation_aliasing.AliasingEffectCapture, fromKind: mutation_aliasing.EffectValueGlobal, intoKind: mutation_aliasing.EffectValueMutable},
-		{name: "create-from mixed source", edge: mutation_aliasing.AliasingEffectCreateFrom, fromKind: mutation_aliasing.EffectValueMaybeFrozen, intoKind: mutation_aliasing.EffectValueMutable, wantWidened: true},
-		{name: "assign mixed source", edge: mutation_aliasing.AliasingEffectAssign, fromKind: mutation_aliasing.EffectValueMaybeFrozen, intoKind: mutation_aliasing.EffectValueMutable, wantWidened: true},
-		{name: "create-from frozen source", edge: mutation_aliasing.AliasingEffectCreateFrom, fromKind: mutation_aliasing.EffectValueFrozen, intoKind: mutation_aliasing.EffectValueMutable},
-		{name: "create-from primitive source", edge: mutation_aliasing.AliasingEffectCreateFrom, fromKind: mutation_aliasing.EffectValuePrimitive, intoKind: mutation_aliasing.EffectValueMutable},
-		{name: "create-from mutable source", edge: mutation_aliasing.AliasingEffectCreateFrom, fromKind: mutation_aliasing.EffectValueMutable, intoKind: mutation_aliasing.EffectValueMutable, wantWidened: true},
-		{name: "assign frozen source", edge: mutation_aliasing.AliasingEffectAssign, fromKind: mutation_aliasing.EffectValueFrozen, intoKind: mutation_aliasing.EffectValueMutable},
-		{name: "assign primitive source", edge: mutation_aliasing.AliasingEffectAssign, fromKind: mutation_aliasing.EffectValuePrimitive, intoKind: mutation_aliasing.EffectValueMutable},
-		{name: "assign mutable source", edge: mutation_aliasing.AliasingEffectAssign, fromKind: mutation_aliasing.EffectValueMutable, intoKind: mutation_aliasing.EffectValueMutable, wantWidened: true},
+		{
+			name:     "alias frozen source",
+			edge:     mutation_aliasing.AliasingEffectAlias,
+			fromKind: mutation_aliasing.EffectValueFrozen,
+			intoKind: mutation_aliasing.EffectValueMutable,
+		},
+		{
+			name:     "alias primitive source",
+			edge:     mutation_aliasing.AliasingEffectAlias,
+			fromKind: mutation_aliasing.EffectValuePrimitive,
+			intoKind: mutation_aliasing.EffectValueMutable,
+		},
+		{
+			name:     "alias frozen destination",
+			edge:     mutation_aliasing.AliasingEffectAlias,
+			fromKind: mutation_aliasing.EffectValueMutable,
+			intoKind: mutation_aliasing.EffectValueFrozen,
+		},
+		{
+			name:        "alias mutable values",
+			edge:        mutation_aliasing.AliasingEffectAlias,
+			fromKind:    mutation_aliasing.EffectValueMutable,
+			intoKind:    mutation_aliasing.EffectValueMutable,
+			wantWidened: true,
+		},
+		{
+			name:     "maybe-alias frozen source",
+			edge:     mutation_aliasing.AliasingEffectMaybeAlias,
+			fromKind: mutation_aliasing.EffectValueFrozen,
+			intoKind: mutation_aliasing.EffectValueMutable,
+		},
+		{
+			name:        "maybe-alias primitive source",
+			edge:        mutation_aliasing.AliasingEffectMaybeAlias,
+			fromKind:    mutation_aliasing.EffectValuePrimitive,
+			intoKind:    mutation_aliasing.EffectValueMutable,
+			wantWidened: true,
+		},
+		{
+			name:        "maybe-alias global source",
+			edge:        mutation_aliasing.AliasingEffectMaybeAlias,
+			fromKind:    mutation_aliasing.EffectValueGlobal,
+			intoKind:    mutation_aliasing.EffectValueMutable,
+			wantWidened: true,
+		},
+		{
+			name:        "maybe-alias mixed source",
+			edge:        mutation_aliasing.AliasingEffectMaybeAlias,
+			fromKind:    mutation_aliasing.EffectValueMaybeFrozen,
+			intoKind:    mutation_aliasing.EffectValueMutable,
+			wantWidened: true,
+		},
+		{
+			name:        "alias mixed source",
+			edge:        mutation_aliasing.AliasingEffectAlias,
+			fromKind:    mutation_aliasing.EffectValueMaybeFrozen,
+			intoKind:    mutation_aliasing.EffectValueMutable,
+			wantWidened: true,
+		},
+		{
+			name:        "capture mixed source",
+			edge:        mutation_aliasing.AliasingEffectCapture,
+			fromKind:    mutation_aliasing.EffectValueMaybeFrozen,
+			intoKind:    mutation_aliasing.EffectValueMutable,
+			wantWidened: true,
+		},
+		{
+			name:     "capture global source",
+			edge:     mutation_aliasing.AliasingEffectCapture,
+			fromKind: mutation_aliasing.EffectValueGlobal,
+			intoKind: mutation_aliasing.EffectValueMutable,
+		},
+		{
+			name:        "create-from mixed source",
+			edge:        mutation_aliasing.AliasingEffectCreateFrom,
+			fromKind:    mutation_aliasing.EffectValueMaybeFrozen,
+			intoKind:    mutation_aliasing.EffectValueMutable,
+			wantWidened: true,
+		},
+		{
+			name:        "assign mixed source",
+			edge:        mutation_aliasing.AliasingEffectAssign,
+			fromKind:    mutation_aliasing.EffectValueMaybeFrozen,
+			intoKind:    mutation_aliasing.EffectValueMutable,
+			wantWidened: true,
+		},
+		{
+			name:     "create-from frozen source",
+			edge:     mutation_aliasing.AliasingEffectCreateFrom,
+			fromKind: mutation_aliasing.EffectValueFrozen,
+			intoKind: mutation_aliasing.EffectValueMutable,
+		},
+		{
+			name:     "create-from primitive source",
+			edge:     mutation_aliasing.AliasingEffectCreateFrom,
+			fromKind: mutation_aliasing.EffectValuePrimitive,
+			intoKind: mutation_aliasing.EffectValueMutable,
+		},
+		{
+			name:        "create-from mutable source",
+			edge:        mutation_aliasing.AliasingEffectCreateFrom,
+			fromKind:    mutation_aliasing.EffectValueMutable,
+			intoKind:    mutation_aliasing.EffectValueMutable,
+			wantWidened: true,
+		},
+		{
+			name:     "assign frozen source",
+			edge:     mutation_aliasing.AliasingEffectAssign,
+			fromKind: mutation_aliasing.EffectValueFrozen,
+			intoKind: mutation_aliasing.EffectValueMutable,
+		},
+		{
+			name:     "assign primitive source",
+			edge:     mutation_aliasing.AliasingEffectAssign,
+			fromKind: mutation_aliasing.EffectValuePrimitive,
+			intoKind: mutation_aliasing.EffectValueMutable,
+		},
+		{
+			name:        "assign mutable source",
+			edge:        mutation_aliasing.AliasingEffectAssign,
+			fromKind:    mutation_aliasing.EffectValueMutable,
+			intoKind:    mutation_aliasing.EffectValueMutable,
+			wantWidened: true,
+		},
 	}
 
 	for _, testCase := range tests {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			function := NewFunction(nil, "helper", FunctionKindOther)
 			block := function.NewBlock(BlockKindBlock)
 			function.Entry = block.Id
@@ -583,13 +689,13 @@ func TestAliasingRefinementMatchesAbstractKinds(t *testing.T) {
 			}
 
 			from := place()
-			fromInstruction := &Instruction{LValue: from, Value: &Primitive{Value: 1}}
+			fromInstruction := &Instruction{LValue: from, Value: &Primitive{Value: PrimitiveNumber("1")}}
 			function.AddInstruction(block, fromInstruction)
 			into := place()
 			edgeInstruction := &Instruction{LValue: into, Value: &ObjectExpression{}}
 			function.AddInstruction(block, edgeInstruction)
 			result := place()
-			mutationInstruction := &Instruction{LValue: result, Value: &Primitive{Value: 0}}
+			mutationInstruction := &Instruction{LValue: result, Value: &Primitive{Value: PrimitiveNumber("0")}}
 			function.AddInstruction(block, mutationInstruction)
 			function.Returns = result
 			block.Terminal = &Return{Value: result}
@@ -600,9 +706,15 @@ func TestAliasingRefinementMatchesAbstractKinds(t *testing.T) {
 				mutationKind = mutation_aliasing.AliasingEffectMutateTransitive
 			}
 			effects := &AliasingEffects{byInstruction: map[InstructionId][]AliasingEffect{
-				fromInstruction.Id:     {mutation_aliasing.CreateEffect(from, testCase.fromKind)},
-				edgeInstruction.Id:     {mutation_aliasing.CreateEffect(into, testCase.intoKind), mutation_aliasing.FlowEffect(testCase.edge, from, into)},
-				mutationInstruction.Id: {mutation_aliasing.CreateEffect(result, mutation_aliasing.EffectValuePrimitive), mutation_aliasing.MutationEffect(mutationKind, into)},
+				fromInstruction.Id: {mutation_aliasing.CreateEffect(from, testCase.fromKind)},
+				edgeInstruction.Id: {
+					mutation_aliasing.CreateEffect(into, testCase.intoKind),
+					mutation_aliasing.FlowEffect(testCase.edge, from, into),
+				},
+				mutationInstruction.Id: {
+					mutation_aliasing.CreateEffect(result, mutation_aliasing.EffectValuePrimitive),
+					mutation_aliasing.MutationEffect(mutationKind, into),
+				},
 			}}
 			ranges := InferMutableRangesWithEffects(function, effects)
 
@@ -611,16 +723,16 @@ func TestAliasingRefinementMatchesAbstractKinds(t *testing.T) {
 				wantEnd = mutationInstruction.Order + 1
 			}
 			if got := ranges.Get(from.Identifier); got.End != wantEnd {
-				t.Errorf("source range=%v, want end %d (edge=%s from=%s into=%s)", got,
+				test.Errorf("source range=%v, want end %d (edge=%s from=%s into=%s)", got,
 					wantEnd, testCase.edge, testCase.fromKind, testCase.intoKind)
 			}
 		})
 	}
 }
 
-func unknownCallAndArgumentPhi(t *testing.T, function *Function,
+func unknownCallAndArgumentPhi(test *testing.T, function *Function,
 	name string) (*Instruction, *Phi) {
-	t.Helper()
+	test.Helper()
 	var call *Instruction
 	var argument static_single_assignment.IdentifierId
 	for _, instruction := range function.Instructions {
@@ -628,15 +740,15 @@ func unknownCallAndArgumentPhi(t *testing.T, function *Function,
 			continue
 		}
 		value, ok := instruction.Value.(*CallExpression)
-		if !ok || calleeName(function, instruction, value.Callee) != name || len(value.Args) != 1 {
+		if !ok || calleeName(function, instruction, value.Callee) != name || len(value.Arguments) != 1 {
 			continue
 		}
 		call = instruction
-		argument = value.Args[0].Place.Identifier
+		argument = value.Arguments[0].Place.Identifier
 		break
 	}
 	if call == nil {
-		t.Fatalf("no one-argument call to %s", name)
+		test.Fatalf("no one-argument call to %s", name)
 	}
 	for _, block := range function.Blocks {
 		if block == nil {
@@ -648,36 +760,36 @@ func unknownCallAndArgumentPhi(t *testing.T, function *Function,
 			}
 		}
 	}
-	t.Fatalf("call argument %d is not a phi", argument)
+	test.Fatalf("call argument %d is not a phi", argument)
 	return nil, nil
 }
 
 // TestRangesAreIdempotent pins that a second run produces an equal table.
 //
-// `Construct` is famously NOT idempotent in this package, and a pass built beside it inherits the
+// `Construct` is famously not idempotent in this package, and a pass built beside it inherits the
 // suspicion. Every guard here tests the range this pass itself wrote, so a second run reads what
 // the first wrote and changes nothing.
-func TestRangesAreIdempotent(t *testing.T) {
-	t.Parallel()
+func TestRangesAreIdempotent(test *testing.T) {
+	test.Parallel()
 
-	function, first := rangesFor(t, `
+	function, first := rangesFor(test, `
 export function f(c: boolean) {
   let v = 1;
   if (c) { v = 2; }
   return v;
 }
 `)
-	if first.Len() == 0 {
-		t.Fatal("the first run produced no ranges, so idempotence here is vacuous")
+	if first.Length() == 0 {
+		test.Fatal("the first run produced no ranges, so idempotence here is vacuous")
 	}
 	second := InferMutableRanges(function)
-	if second.Len() != first.Len() {
-		t.Fatalf("a second run produced %d ranges against %d", second.Len(), first.Len())
+	if second.Length() != first.Length() {
+		test.Fatalf("a second run produced %d ranges against %d", second.Length(), first.Length())
 	}
 	for _, identifier := range function.Identifiers {
 		id, want := identifier.Id, first.Get(identifier.Id)
 		if got := second.Get(id); got != want {
-			t.Errorf("value %d moved from [%d,%d) to [%d,%d) on a second run",
+			test.Errorf("value %d moved from [%d,%d) to [%d,%d) on a second run",
 				id, want.Start, want.End, got.Start, got.End)
 		}
 	}
@@ -686,20 +798,20 @@ export function f(c: boolean) {
 // TestRangesRequireEvaluationOrder pins that an unnumbered graph yields nothing rather than
 // nonsense.
 //
-// Opening a range at order zero would write the UNSET value, which reads back as "no range" — a
+// Opening a range at order zero would write the unset value, which reads back as "no range": a
 // wrong answer wearing the shape of a right one. The pass skips instead, so a caller who forgot
 // `Finalize` gets an empty table they can notice.
-func TestRangesRequireEvaluationOrder(t *testing.T) {
-	t.Parallel()
+func TestRangesRequireEvaluationOrder(test *testing.T) {
+	test.Parallel()
 
-	function, ranges := rangesFor(t, `
+	function, ranges := rangesFor(test, `
 export function f() {
   const a = 1;
   return a;
 }
 `)
-	if ranges.Len() == 0 {
-		t.Fatal("the numbered control produced nothing, so the comparison below is meaningless")
+	if ranges.Length() == 0 {
+		test.Fatal("the numbered control produced nothing, so the comparison below is meaningless")
 	}
 
 	for _, instruction := range function.Instructions {
@@ -708,10 +820,10 @@ export function f() {
 		}
 	}
 	unnumbered := InferMutableRanges(function)
-	if unnumbered.Len() != 0 {
-		t.Errorf("an unnumbered graph produced %d ranges; opening at order zero writes the unset "+
+	if unnumbered.Length() != 0 {
+		test.Errorf("an unnumbered graph produced %d ranges; opening at order zero writes the unset "+
 			"value and reads back as absent, which is a wrong answer that looks right",
-			unnumbered.Len())
+			unnumbered.Length())
 	}
 }
 
@@ -720,15 +832,15 @@ export function f() {
 // It worked. Stage 2 declared mutation-extension and alias-propagation gaps, and this test failed
 // when Stage 2.5 closed both. It failed again when property loads and destructuring began emitting
 // CreateFrom, forcing that input gap out of the API too.
-func TestRangeGapsAreNamed(t *testing.T) {
-	t.Parallel()
+func TestRangeGapsAreNamed(test *testing.T) {
+	test.Parallel()
 
 	gaps := mutation_aliasing.RangeGaps()
 	if len(gaps) != 1 {
-		t.Fatalf("expected exactly the one declared gap, got %d", len(gaps))
+		test.Fatalf("expected exactly the one declared gap, got %d", len(gaps))
 	}
 	if gaps[0] != mutation_aliasing.RangeGapLoopCarriedInversion {
-		t.Errorf("the declared gaps changed; if one was closed, update the package comment and the "+
+		test.Errorf("the declared gaps changed; if one was closed, update the package comment and the "+
 			"RangeGap constants together, got %v", gaps)
 	}
 }
@@ -737,8 +849,8 @@ func TestRangeGapsAreNamed(t *testing.T) {
 // CreateFrom gap. A direct mutation of the derived value must reach both its source and a value the
 // source captured; reaching only the source would pass if createdFrom incorrectly preserved the
 // mutation's non-transitive kind.
-func TestCreateFromMutationPropagatesTransitively(t *testing.T) {
-	t.Parallel()
+func TestCreateFromMutationPropagatesTransitively(test *testing.T) {
+	test.Parallel()
 
 	function := NewFunction(nil, "helper", FunctionKindOther)
 	block := function.NewBlock(BlockKindBlock)
@@ -757,17 +869,25 @@ func TestCreateFromMutationPropagatesTransitively(t *testing.T) {
 	derivedInstruction := &Instruction{LValue: derived, Value: &PropertyLoad{Object: source, Property: "value"}}
 	function.AddInstruction(block, derivedInstruction)
 	result := place()
-	mutationInstruction := &Instruction{LValue: result, Value: &Primitive{Value: 0}}
+	mutationInstruction := &Instruction{LValue: result, Value: &Primitive{Value: PrimitiveNumber("0")}}
 	function.AddInstruction(block, mutationInstruction)
 	function.Returns = result
 	block.Terminal = &Return{Value: result}
 	Finalize(function)
 
 	effects := &AliasingEffects{byInstruction: map[InstructionId][]AliasingEffect{
-		leafInstruction.Id:     {mutation_aliasing.CreateEffect(leaf, mutation_aliasing.EffectValueMutable)},
-		sourceInstruction.Id:   {mutation_aliasing.CreateEffect(source, mutation_aliasing.EffectValueMutable), mutation_aliasing.FlowEffect(mutation_aliasing.AliasingEffectCapture, leaf, source)},
-		derivedInstruction.Id:  {mutation_aliasing.FlowEffect(mutation_aliasing.AliasingEffectCreateFrom, source, derived)},
-		mutationInstruction.Id: {mutation_aliasing.CreateEffect(result, mutation_aliasing.EffectValuePrimitive), mutation_aliasing.MutationEffect(mutation_aliasing.AliasingEffectMutate, derived)},
+		leafInstruction.Id: {mutation_aliasing.CreateEffect(leaf, mutation_aliasing.EffectValueMutable)},
+		sourceInstruction.Id: {
+			mutation_aliasing.CreateEffect(source, mutation_aliasing.EffectValueMutable),
+			mutation_aliasing.FlowEffect(mutation_aliasing.AliasingEffectCapture, leaf, source),
+		},
+		derivedInstruction.Id: {
+			mutation_aliasing.FlowEffect(mutation_aliasing.AliasingEffectCreateFrom, source, derived),
+		},
+		mutationInstruction.Id: {
+			mutation_aliasing.CreateEffect(result, mutation_aliasing.EffectValuePrimitive),
+			mutation_aliasing.MutationEffect(mutation_aliasing.AliasingEffectMutate, derived),
+		},
 	}}
 	ranges := InferMutableRangesWithEffects(function, effects)
 
@@ -781,7 +901,7 @@ func TestCreateFromMutationPropagatesTransitively(t *testing.T) {
 		{name: "derived", place: derived},
 	} {
 		if got := ranges.Get(value.place.Identifier); got.End != wantEnd {
-			t.Errorf("%s range=%v, want end %d through transitive CreateFrom propagation", value.name,
+			test.Errorf("%s range=%v, want end %d through transitive CreateFrom propagation", value.name,
 				got, wantEnd)
 		}
 	}
@@ -790,7 +910,7 @@ func TestCreateFromMutationPropagatesTransitively(t *testing.T) {
 // TestRangesWidenToCoverAMutatingCall is the case Stage 2 wrote as an under-approximation and
 // Stage 2.5 turned positive.
 //
-// It was originally `TestRangesAreAnUnderApproximation`, asserting the SHORTER answer and carrying
+// It was originally `TestRangesAreAnUnderApproximation`, asserting the shorter answer and carrying
 // an error message instructing whoever made it fail to update the gap list and the package comment.
 // It failed on the first run of the widening, which is the event it existed to detect, and both were
 // updated. Kept as the positive assertion rather than deleted, because the input is the smallest one
@@ -799,10 +919,10 @@ func TestCreateFromMutationPropagatesTransitively(t *testing.T) {
 //
 // Upstream's answer, and now this one: `o` is defined at its literal and still being written at the
 // call, so the interval spans both rather than closing at the definition.
-func TestRangesWidenToCoverAMutatingCall(t *testing.T) {
-	t.Parallel()
+func TestRangesWidenToCoverAMutatingCall(test *testing.T) {
+	test.Parallel()
 
-	function, _ := rangesFor(t, `
+	function, _ := rangesFor(test, `
 declare function mutate(target: number[]): void;
 export function f() {
   const o: number[] = [];
@@ -810,29 +930,29 @@ export function f() {
   return o;
 }
 `)
-	r := rangeOfName(t, function, "o")
-	if !r.IsSet() {
-		t.Fatal("`o` has no range at all, so this measured nothing")
+	mutableRange := rangeOfName(test, function, "o")
+	if !mutableRange.IsSet() {
+		test.Fatal("`o` has no range at all, so this measured nothing")
 	}
-	if r.End <= r.Start+1 {
-		t.Errorf("`o`'s range is [%d,%d), which closes at its definition point. The call to "+
+	if mutableRange.End <= mutableRange.Start+1 {
+		test.Errorf("`o`'s range is [%d,%d), which closes at its definition point. The call to "+
 			"`mutate` carries a mutation effect naming `o`, so the widening should have extended "+
 			"the end past it; a range of width 1 here means the alias graph never reached the value",
-			r.Start, r.End)
+			mutableRange.Start, mutableRange.End)
 	}
 }
 
 // TestRangesDoNotWidenWithoutAMutation is the two-sided control for the test above.
 //
-// Without it, a widening that extended EVERY range to the end of the function would pass the
+// Without it, a widening that extended every range to the end of the function would pass the
 // positive assertion and read as correct.
 //
-// # The first version of this control was WRONG and the code was right
+// # The first version of this control was wrong and the code was right
 //
 // It was written as the same source with `mutate(o)` replaced by `read(o)`, on the assumption that a
 // call taking a `readonly` parameter would carry no mutation effect. It failed, and the failure was
 // the fixture rather than the widening: `read` appears in no signature table, so it takes the
-// DEFAULT path, which `effects.go` documents as `MutateTransitiveConditionally` on every operand
+// default path, which `effects.go` documents as `MutateTransitiveConditionally` on every operand
 // plus a capture into every other one. An unknown call is assumed to mutate everything handed to it,
 // which is the conservative direction and is upstream's behavior rather than ours.
 //
@@ -843,10 +963,10 @@ export function f() {
 // Recorded at length because the failing version looked exactly like a defect in the widening and
 // the brief's rule -- when a probe says shipped code is broken, the probe is wrong until a control
 // says otherwise -- is what produced the right diagnosis.
-func TestRangesDoNotWidenWithoutAMutation(t *testing.T) {
-	t.Parallel()
+func TestRangesDoNotWidenWithoutAMutation(test *testing.T) {
+	test.Parallel()
 
-	function, ranges := rangesFor(t, `
+	function, ranges := rangesFor(test, `
 export function f() {
   const o: number[] = [];
   const n = 1;
@@ -865,31 +985,31 @@ export function f() {
 		}
 	}
 	if mutations != 0 {
-		t.Fatalf("this control assumes the input carries no mutation effect and it carries %d; "+
+		test.Fatalf("this control assumes the input carries no mutation effect and it carries %d; "+
 			"the control is measuring something other than what it claims", mutations)
 	}
 	for _, identifier := range function.Identifiers {
 		if identifier == nil {
 			continue
 		}
-		r := ranges.Get(identifier.Id)
-		if !r.IsSet() {
+		mutableRange := ranges.Get(identifier.Id)
+		if !mutableRange.IsSet() {
 			continue
 		}
-		if r.End > r.Start+1 {
-			t.Errorf("value %d has range [%d,%d) but the function carries no mutation effect at "+
+		if mutableRange.End > mutableRange.Start+1 {
+			test.Errorf("value %d has range [%d,%d) but the function carries no mutation effect at "+
 				"all; a widening that fires here is firing on instruction shape rather than on an "+
-				"effect", identifier.Id, r.Start, r.End)
+				"effect", identifier.Id, mutableRange.Start, mutableRange.End)
 		}
 	}
 }
 
 // TestMutationSitesNamesWhatStageOneWouldWiden pins the seam, two-sided: the definite shapes are
 // found and an ordinary definition is not mistaken for one.
-func TestMutationSitesNamesWhatStageOneWouldWiden(t *testing.T) {
-	t.Parallel()
+func TestMutationSitesNamesWhatStageOneWouldWiden(test *testing.T) {
+	test.Parallel()
 
-	function, _ := rangesFor(t, `
+	function, _ := rangesFor(test, `
 declare function use(x: unknown): void;
 export function f(o: {a: number}, k: string) {
   o.a = 1;
@@ -904,19 +1024,19 @@ export function f(o: {a: number}, k: string) {
 		counts[site.Kind]++
 	}
 	if counts[MutationSitePropertyStore] == 0 {
-		t.Error("a property store was not named as a mutation site")
+		test.Error("a property store was not named as a mutation site")
 	}
 	if counts[MutationSiteComputedStore] == 0 {
-		t.Error("a computed store was not named as a mutation site")
+		test.Error("a computed store was not named as a mutation site")
 	}
 	if counts[MutationSiteCall] == 0 {
-		t.Error("a call was not named as a mutation site; calls are the CEILING half of the gap " +
+		test.Error("a call was not named as a mutation site; calls are the CEILING half of the gap " +
 			"and are counted separately rather than omitted")
 	}
 
 	// The two-sided half: a function that mutates nothing names no definite site. Without this a
 	// MutationSites that returned every instruction would pass the assertions above.
-	clean, _ := rangesFor(t, `
+	clean, _ := rangesFor(test, `
 export function g() {
   const a = 1;
   const b = a + 1;
@@ -925,35 +1045,35 @@ export function g() {
 `)
 	for _, site := range MutationSites(clean) {
 		if site.Kind != MutationSiteCall {
-			t.Errorf("a function with no stores named a %s site", site.Kind)
+			test.Errorf("a function with no stores named a %s site", site.Kind)
 		}
 	}
 }
 
 // TestRangesLeaveParametersUnset pins that a value this function did not define gets no range.
 //
-// Upstream opens a range only at an INSTRUCTION LVALUE. A parameter arrives already defined, so
+// Upstream opens a range only at an instruction lvalue. A parameter arrives already defined, so
 // nothing opens one for it, and `state.create` records it in the aliasing graph without touching
 // `mutableRange`. A pass that opened ranges at operand positions instead would give every parameter
-// a one-instruction range at its first USE, which is a different and wrong analysis: it would claim
+// a one-instruction range at its first use, which is a different and wrong analysis: it would claim
 // the parameter is still being written at the point it is merely read.
 //
 // This is the fixture a mutation sweep demanded. Inverting the `PlaceRoleDefine` filter in the
 // lvalue loop survived the whole suite, and the distinguishing input is exactly this shape:
 // measured, parameter `p` moves from unset to [1,2) under that mutant while every other assertion
-// in this file stays green, because every OTHER value is defined by an instruction before it is
+// in this file stays green, because every other value is defined by an instruction before it is
 // used and so its range is already open by the time the operand loop sees it.
-func TestRangesLeaveParametersUnset(t *testing.T) {
-	t.Parallel()
+func TestRangesLeaveParametersUnset(test *testing.T) {
+	test.Parallel()
 
-	function, ranges := rangesFor(t, `
+	function, ranges := rangesFor(test, `
 export function f(p: number) {
   const a = p + 1;
   return a;
 }
 `)
-	if ranges.Len() == 0 {
-		t.Fatal("no value got a range, so the negative assertion below is vacuous")
+	if ranges.Length() == 0 {
+		test.Fatal("no value got a range, so the negative assertion below is vacuous")
 	}
 
 	var checked int
@@ -962,18 +1082,18 @@ export function f(p: number) {
 			continue
 		}
 		checked++
-		if r := ranges.Get(identifier.Id); r.IsSet() {
-			t.Errorf("parameter `p` (value %d) carries range [%d,%d); upstream opens a range only "+
+		if mutableRange := ranges.Get(identifier.Id); mutableRange.IsSet() {
+			test.Errorf("parameter `p` (value %d) carries range [%d,%d); upstream opens a range only "+
 				"at an instruction lvalue, and a parameter is defined by the call rather than by "+
-				"any instruction in this function", identifier.Id, r.Start, r.End)
+				"any instruction in this function", identifier.Id, mutableRange.Start, mutableRange.End)
 		}
 	}
 	if checked == 0 {
-		t.Fatal("no value named `p` was found, so this test measured nothing")
+		test.Fatal("no value named `p` was found, so this test measured nothing")
 	}
 }
 
-// TestRangeIsSetTreatsEitherFieldAsSet pins that a range with only an end is SET.
+// TestRangeIsSetTreatsEitherFieldAsSet pins that a range with only an end is set.
 //
 // This is a unit assertion rather than one over lowered source, deliberately. The state it
 // describes - an end without a start - cannot be produced by this pass today: measured two-sided
@@ -984,29 +1104,29 @@ export function f(p: number) {
 // Asserting it now is what keeps `IsSet` honest through that change. A mutation reducing it to
 // `Start != 0` survived the whole suite, because nothing could construct the input that separates
 // the two spellings; the unit test can, and it costs one line.
-func TestRangeIsSetTreatsEitherFieldAsSet(t *testing.T) {
-	t.Parallel()
+func TestRangeIsSetTreatsEitherFieldAsSet(test *testing.T) {
+	test.Parallel()
 
 	if (mutation_aliasing.MutableRange{}).IsSet() {
-		t.Error("the zero range must not read as set")
+		test.Error("the zero range must not read as set")
 	}
 	if !(mutation_aliasing.MutableRange{Start: 3, End: 4}).IsSet() {
-		t.Error("a fully set range must read as set")
+		test.Error("a fully set range must read as set")
 	}
 	if !(mutation_aliasing.MutableRange{Start: 0, End: 4}).IsSet() {
-		t.Error("a range carrying only an END must read as set. Upstream's unset test is " +
+		test.Error("a range carrying only an END must read as set. Upstream's unset test is " +
 			"`start === 0 && end === 0`, both fields, and a spelling that reads only Start would " +
 			"report a value widened by Stage 1 as having no range at all")
 	}
 	if !(mutation_aliasing.MutableRange{Start: 3, End: 0}).IsSet() {
-		t.Error("a range carrying only a START must read as set")
+		test.Error("a range carrying only a START must read as set")
 	}
 }
 
 // TestBlockFirstOrderFallsBackToTheTerminal pins upstream's `?? block.terminal.id`.
 //
 // An empty block is common in this graph - measured, 4,546 of 28,335 blocks, and 1,198 of those
-// carry phis - so the fallback runs constantly. What it cannot yet change is an ANSWER, because the
+// carry phis - so the fallback runs constantly. What it cannot yet change is an answer, because the
 // only reader is `phiOpensBefore`, whose own precondition needs a widened end that Stage 1 has not
 // landed. A mutation replacing the fallback with zero therefore survived every fixture over lowered
 // source.
@@ -1015,8 +1135,8 @@ func TestRangeIsSetTreatsEitherFieldAsSet(t *testing.T) {
 // `phiOpensBefore` decline every phi in an empty block once Stage 1 makes it live, which is a
 // silent under-report in exactly the shape - a merge point with no instructions - that a loop
 // header most often has.
-func TestBlockFirstOrderFallsBackToTheTerminal(t *testing.T) {
-	t.Parallel()
+func TestBlockFirstOrderFallsBackToTheTerminal(test *testing.T) {
+	test.Parallel()
 
 	function := &Function{}
 	withInstruction := &BasicBlock{
@@ -1026,31 +1146,31 @@ func TestBlockFirstOrderFallsBackToTheTerminal(t *testing.T) {
 	}
 	function.Instructions = []*Instruction{{Id: 0, Order: 7}}
 	if got := mutation_aliasing.BlockFirstOrder(rangeGraph{}, function, withInstruction); got != 7 {
-		t.Errorf("a block with instructions must report its FIRST instruction's order, got %d", got)
+		test.Errorf("a block with instructions must report its FIRST instruction's order, got %d", got)
 	}
 
 	empty := &BasicBlock{Id: 2, Terminal: &Goto{Order: 42}}
 	if got := mutation_aliasing.BlockFirstOrder(rangeGraph{}, function, empty); got != 42 {
-		t.Errorf("an empty block must fall back to its TERMINAL's order, which is upstream's "+
+		test.Errorf("an empty block must fall back to its TERMINAL's order, which is upstream's "+
 			"`block.instructions.at(0)?.id ?? block.terminal.id`, got %d. Zero would read as "+
 			"unassigned and make phiOpensBefore decline every phi in a merge block", got)
 	}
 }
 
-// TestMutationSitesNameTheMutatedValueNotTheStoredOne pins WHICH value a site names.
+// TestMutationSitesNameTheMutatedValueNotTheStoredOne pins which value a site names.
 //
 // `o.a = v` mutates `o`, not `v`. Upstream's effect for it is `Mutate { value: object }`, and the
-// widening Stage 1 will apply extends the RECEIVER's range. A site naming the stored value instead
+// widening Stage 1 will apply extends the receiver's range. A site naming the stored value instead
 // would hand Stage 1 the wrong identifier and widen a range that was never mutated, which is the
 // unsafe direction: a value would look mutable past the point it settled.
 //
 // This exists because a mutation swapping `value.Object` for `value.Value` at the PropertyStore site
 // survived every other assertion in this file. The kind assertions could not see it, which is the
 // "fixtures assert the wrong layer" shape: they check that a site was found and never what it says.
-func TestMutationSitesNameTheMutatedValueNotTheStoredOne(t *testing.T) {
-	t.Parallel()
+func TestMutationSitesNameTheMutatedValueNotTheStoredOne(test *testing.T) {
+	test.Parallel()
 
-	function, _ := rangesFor(t, `
+	function, _ := rangesFor(test, `
 export function f(o: {a: number}) {
   const v = 1;
   o.a = v;
@@ -1066,28 +1186,28 @@ export function f(o: {a: number}) {
 		instruction := function.Instructions[site.Instruction]
 		store, ok := instruction.Value.(*PropertyStore)
 		if !ok {
-			t.Fatalf("a property-store site points at a %T", instruction.Value)
+			test.Fatalf("a property-store site points at a %T", instruction.Value)
 		}
 		checked++
 		if site.Target != store.Object.Identifier {
-			t.Errorf("the site names value %d; a property store mutates its RECEIVER (%d), not the "+
+			test.Errorf("the site names value %d; a property store mutates its RECEIVER (%d), not the "+
 				"value it stores (%d). Handing Stage 1 the stored value would widen the range of "+
 				"something that was never mutated",
 				site.Target, store.Object.Identifier, store.Value.Identifier)
 		}
 		if site.Target == store.Value.Identifier {
-			t.Error("the site names the STORED value, which is the mutant this test exists for")
+			test.Error("the site names the STORED value, which is the mutant this test exists for")
 		}
 	}
 	if checked == 0 {
-		t.Fatal("no property-store site was found, so this test measured nothing")
+		test.Fatal("no property-store site was found, so this test measured nothing")
 	}
 }
 
 // TestRangesStayValidAcrossALoopBackEdge pins the one divergence Stage 2.5 introduces.
 //
-// A loop-carried value is defined at a HIGH evaluation order by the back-edge store, while the
-// mutation that reaches it through the loop's phi happened at a LOWER one. Both upstreams then write
+// A loop-carried value is defined at a high evaluation order by the back-edge store, while the
+// mutation that reaches it through the loop's phi happened at a lower one. Both upstreams then write
 // `start` and `end` from independently-guarded branches and produce an interval whose end is at or
 // before its start, which React's own `validateMutableRange` declares invalid and which its config
 // does not check by default.
@@ -1096,10 +1216,10 @@ export function f(o: {a: number}) {
 // `i` came out as the empty interval [23,23), and 48 values across 400 corpus files were in that
 // state. The assertion is the invariant itself rather than a specific interval, because the exact
 // orders move whenever lowering changes and an assertion on them would fail for the wrong reason.
-func TestRangesStayValidAcrossALoopBackEdge(t *testing.T) {
-	t.Parallel()
+func TestRangesStayValidAcrossALoopBackEdge(test *testing.T) {
+	test.Parallel()
 
-	function, ranges := rangesFor(t, `
+	function, ranges := rangesFor(test, `
 declare function mutate(x: number[]): void;
 export function f(items: number[][]) {
   for (let i = 0; i < items.length; i++) {
@@ -1111,9 +1231,14 @@ export function f(items: number[][]) {
 `)
 	if invalid := mutation_aliasing.ValidateMutableRanges(ranges); len(invalid) != 0 {
 		for _, id := range invalid {
-			r := ranges.Get(id)
-			t.Errorf("value %d has the invalid range [%d,%d); a loop-carried value whose end was "+
-				"widened below its own definition point must still come out non-empty", id, r.Start, r.End)
+			mutableRange := ranges.Get(id)
+			test.Errorf(
+				"value %d has the invalid range [%d,%d); a loop-carried value whose end was "+
+					"widened below its own definition point must still come out non-empty",
+				id,
+				mutableRange.Start,
+				mutableRange.End,
+			)
 		}
 	}
 
@@ -1124,26 +1249,28 @@ export function f(items: number[][]) {
 		if identifier == nil {
 			continue
 		}
-		if r := ranges.Get(identifier.Id); r.IsSet() && r.End-r.Start > widest {
-			widest = r.End - r.Start
+		if mutableRange := ranges.Get(
+			identifier.Id,
+		); mutableRange.IsSet() && mutableRange.End-mutableRange.Start > widest {
+			widest = mutableRange.End - mutableRange.Start
 		}
 	}
 	if widest <= 1 {
-		t.Errorf("the widest range in this function is %d, so nothing was widened and the "+
+		test.Errorf("the widest range in this function is %d, so nothing was widened and the "+
 			"invariant assertion above passed vacuously", widest)
 	}
 
-	// # The loop counter's range must cross the whole loop, which is what pins the BACK-EDGE PHI
+	// # The loop counter's range must cross the whole loop, which is what pins the back-edge phi
 	//
 	// A phi operand whose predecessor block has not been walked yet is deferred to that block and
-	// applied there with the index recorded at DEFERRAL, which is how a back edge gets an index low
+	// applied there with the index recorded at deferral, which is how a back edge gets an index low
 	// enough for a mutation later in the loop to travel through it. Inverting that deferral test
 	// leaves the loop counter at [3,4) instead of [3,23): the widening never crosses the back edge,
 	// so every value defined before the loop reads as settled inside it.
 	//
-	// # Assert on the NARROWEST counter value, not the widest, and that distinction is the whole test
+	// # Assert on the narrowest counter value, not the widest, and that distinction is the whole test
 	//
-	// A first version of this assertion took the WIDEST range among the values named `i` and
+	// A first version of this assertion took the widest range among the values named `i` and
 	// survived the mutation, because single-assignment form gives the counter several identifiers
 	// and the mutant preserves the widest one. Measured on this input, base against mutant:
 	//
@@ -1151,7 +1278,7 @@ export function f(items: number[][]) {
 	//	id 26  `i`  base [4,23)   mutant [4,23)   the loop-header phi
 	//
 	// The phi keeps its widening either way, because the mutation inside the loop reaches it
-	// directly. What the back edge carries is the widening travelling BACK to the value the counter
+	// directly. What the back edge carries is the widening travelling back to the value the counter
 	// held before the loop, and only the initial value can see that. So the narrowest is the
 	// discriminating quantity and the widest is the one that cannot see the guard at all.
 	//
@@ -1168,20 +1295,20 @@ export function f(items: number[][]) {
 		if identifier == nil || identifier.Name != "i" {
 			continue
 		}
-		r := ranges.Get(identifier.Id)
-		if !r.IsSet() {
+		mutableRange := ranges.Get(identifier.Id)
+		if !mutableRange.IsSet() {
 			continue
 		}
 		sawCounter = true
-		if r.End-r.Start >= 10 {
+		if mutableRange.End-mutableRange.Start >= 10 {
 			wideCounters++
 		}
 	}
 	if !sawCounter {
-		t.Fatal("no value named `i` carries a range, so this measured nothing")
+		test.Fatal("no value named `i` carries a range, so this measured nothing")
 	}
 	if wideCounters < 2 {
-		t.Errorf("only %d of the values the loop counter `i` takes stay mutable across the loop, "+
+		test.Errorf("only %d of the values the loop counter `i` takes stay mutable across the loop, "+
 			"want at least 2. The loop-header phi learns it from the mutation directly; the value "+
 			"feeding that phi can only learn it through the BACK EDGE. A phi operand applied with "+
 			"a fresh index instead of its deferred one leaves exactly one", wideCounters)
@@ -1190,7 +1317,7 @@ export function f(items: number[][]) {
 
 // TestRangesThirdLoopOpensAWidenedOperand pins the loop Stage 2 omitted and Stage 2.5 restored.
 //
-// # Why this needs a PARAMETER specifically
+// # Why this needs a parameter specifically
 //
 // Stage 2 omitted upstream's third loop, over operands rather than lvalues, after measuring that no
 // value in the corpus reached the state it exists for -- `End > order && Start == 0`, a value whose
@@ -1202,16 +1329,16 @@ export function f(items: number[][]) {
 // A parameter is the clean case and the reason is structural. Every ordinary value is defined by an
 // instruction lvalue, so the lvalue loop opens its start and the third loop has nothing to do. A
 // parameter is never an lvalue of any instruction -- it arrives already defined -- so when a mutation
-// widens its end, NOTHING else can give it a start. Measured on this input: the widening alone
+// widens its end, nothing else can give it a start. Measured on this input: the widening alone
 // leaves `p` at [0,4), which `IsSet` reads as unset because both fields being zero is the unset
 // range, and the third loop is what turns it into [2,4).
 //
 // So the assertion is that `p` carries a range at all, plus that the range is genuinely wide. A
 // version of this test asserting only that some range exists would pass without the widening too.
-func TestRangesThirdLoopOpensAWidenedOperand(t *testing.T) {
-	t.Parallel()
+func TestRangesThirdLoopOpensAWidenedOperand(test *testing.T) {
+	test.Parallel()
 
-	function, ranges := rangesFor(t, `
+	function, ranges := rangesFor(test, `
 declare function mutate(x: number[]): void;
 export function f(p: number[]) {
   mutate(p);
@@ -1221,7 +1348,7 @@ export function f(p: number[]) {
 
 	var parameter static_single_assignment.IdentifierId
 	var found bool
-	for _, place := range function.Params {
+	for _, place := range function.Parameters {
 		for _, identifier := range function.Identifiers {
 			if identifier != nil && identifier.Id == place.Identifier && identifier.Name == "p" {
 				parameter = place.Identifier
@@ -1230,22 +1357,22 @@ export function f(p: number[]) {
 		}
 	}
 	if !found {
-		t.Fatal("the parameter `p` was not found among the function's params, so this measured nothing")
+		test.Fatal("the parameter `p` was not found among the function's params, so this measured nothing")
 	}
 
-	r := ranges.Get(parameter)
-	if !r.IsSet() {
-		t.Fatalf("the parameter `p` carries no range. Its end was widened by the mutation but only "+
+	mutableRange := ranges.Get(parameter)
+	if !mutableRange.IsSet() {
+		test.Fatalf("the parameter `p` carries no range. Its end was widened by the mutation but only "+
 			"the third loop can give a parameter a start, because a parameter is never an "+
-			"instruction lvalue; without that loop the range stays [0,%d) and reads as unset", r.End)
+			"instruction lvalue; without that loop the range stays [0,%d) and reads as unset", mutableRange.End)
 	}
-	if r.Start == 0 {
-		t.Errorf("`p`'s range is [%d,%d) with an unopened start, which is exactly the state the "+
-			"third loop exists to repair", r.Start, r.End)
+	if mutableRange.Start == 0 {
+		test.Errorf("`p`'s range is [%d,%d) with an unopened start, which is exactly the state the "+
+			"third loop exists to repair", mutableRange.Start, mutableRange.End)
 	}
-	if r.End <= r.Start+1 {
-		t.Errorf("`p`'s range is [%d,%d), so it was never widened and this test would pass without "+
-			"the third loop doing anything", r.Start, r.End)
+	if mutableRange.End <= mutableRange.Start+1 {
+		test.Errorf("`p`'s range is [%d,%d), so it was never widened and this test would pass without "+
+			"the third loop doing anything", mutableRange.Start, mutableRange.End)
 	}
 }
 
@@ -1256,20 +1383,20 @@ export function f(p: number[]) {
 // Every edge and every mutation is stamped with a monotonically increasing index as the graph is
 // built, and the walk refuses to traverse an edge whose index is at or after the mutation's own.
 // That is upstream's model of time: a mutation flows only through aliases that already existed when
-// it happened, so a value aliased AFTER being mutated is not retroactively widened.
+// it happened, so a value aliased after being mutated is not retroactively widened.
 //
-// Removing that test does not change any NAMED value's range on a small input. It widens two
+// Removing that test does not change any named value's range on a small input. It widens two
 // unnamed temporaries that the faithful walk leaves alone, which is invisible to `rangeOfName` and
 // is why a first version of this test, asserting on `inner` and `holder`, passed against the mutant.
-// The assertion is therefore on the SIZE of the widened set, which is the level at which the
+// The assertion is therefore on the size of the widened set, which is the level at which the
 // difference actually appears: ten values here, twelve without the guard.
 //
 // Measured on the corpus rather than argued: over 959 functions in 200 files, dropping this guard
 // changes 5,010 values, so it is load-bearing rather than an optimization.
-func TestRangesDoNotWidenThroughAnEdgeThatDidNotExistYet(t *testing.T) {
-	t.Parallel()
+func TestRangesDoNotWidenThroughAnEdgeThatDidNotExistYet(test *testing.T) {
+	test.Parallel()
 
-	function, _ := rangesFor(t, `
+	function, _ := rangesFor(test, `
 declare function deep(x: unknown): void;
 export function f() {
   const inner: number[] = [];
@@ -1280,7 +1407,9 @@ export function f() {
 `)
 	effects := InferAliasingEffects(function)
 	widened := &mutation_aliasing.MutableRanges{}
-	mutation_aliasing.BuildAliasingGraph(newRangeGraph(function, effects), function, mutation_aliasing.Options{}).Widen(widened)
+	mutation_aliasing.BuildAliasingGraph(newRangeGraph(function, effects), function, mutation_aliasing.Options{}).Widen(
+		widened,
+	)
 
 	// The count is what separates the faithful walk from one that ignores the index. It is asserted
 	// exactly rather than as a bound, because a bound would be satisfied by a walk that widened
@@ -1302,8 +1431,8 @@ export function f() {
 	// untouched: without it the count rises by two from whatever the baseline is, which is still
 	// what the assertion below catches.
 	const wantWidened = 8
-	if got := widened.Len(); got != wantWidened {
-		t.Errorf("the widening reached %d values, want %d. More than %d means the walk followed an "+
+	if got := widened.Length(); got != wantWidened {
+		test.Errorf("the widening reached %d values, want %d. More than %d means the walk followed an "+
 			"edge created after the mutation it is propagating, which is the sequence-index guard "+
 			"failing; fewer means it stopped early", got, wantWidened, wantWidened)
 	}
@@ -1314,8 +1443,8 @@ export function f() {
 // # The distinction the guard makes
 //
 // A capture edge records that information flowed from one value into another without aliasing them.
-// Mutating a container does NOT mutate what it holds, so a plain mutation must not walk a capture
-// edge backwards. A TRANSITIVE mutation does reach everything the value transitively holds, so it
+// Mutating a container does not mutate what it holds, so a plain mutation must not walk a capture
+// edge backwards. A transitive mutation does reach everything the value transitively holds, so it
 // must. Upstream gates the backward capture walk on `entry.transitive` for exactly that reason.
 //
 // # Finding an input that can see it took a signature-table method, and that is the point
@@ -1326,17 +1455,17 @@ export function f() {
 // operand, which makes the mutation transitive anyway and the guard vacuous.
 //
 // `Map.prototype.set` is in oxc's global signature table with a `Capture` effect, so it produces a
-// real capture edge alongside a NON-transitive mutation, which is the only shape on which the two
+// real capture edge alongside a non-transitive mutation, which is the only shape on which the two
 // walks disagree. Measured here: `seed` ends at 15 with the guard and at 21 without it, so dropping
 // the guard over-widens a captured parameter by six positions.
 //
 // Recorded at length because the brief's rule -- name the input on which the two versions produce
 // different output, before writing a fixture -- is what turned this from a survivor into a test. The
 // first four hypotheses about which shape would distinguish them were all wrong.
-func TestRangesFollowCapturesOnlyForATransitiveMutation(t *testing.T) {
-	t.Parallel()
+func TestRangesFollowCapturesOnlyForATransitiveMutation(test *testing.T) {
+	test.Parallel()
 
-	function, ranges := rangesFor(t, `
+	function, ranges := rangesFor(test, `
 export function f(seed: number[]) {
   const m = new Map<string, number[]>();
   m.set("k", seed);
@@ -1348,7 +1477,7 @@ export function f(seed: number[]) {
 
 	var seed static_single_assignment.IdentifierId
 	var found bool
-	for _, place := range function.Params {
+	for _, place := range function.Parameters {
 		for _, identifier := range function.Identifiers {
 			if identifier != nil && identifier.Id == place.Identifier && identifier.Name == "seed" {
 				seed, found = place.Identifier, true
@@ -1356,21 +1485,21 @@ export function f(seed: number[]) {
 		}
 	}
 	if !found {
-		t.Fatal("the parameter `seed` was not found, so this measured nothing")
+		test.Fatal("the parameter `seed` was not found, so this measured nothing")
 	}
 
-	r := ranges.Get(seed)
-	if !r.IsSet() {
-		t.Fatal("`seed` carries no range, so the capture edge never reached it and this test " +
+	mutableRange := ranges.Get(seed)
+	if !mutableRange.IsSet() {
+		test.Fatal("`seed` carries no range, so the capture edge never reached it and this test " +
 			"cannot see the guard it exists for")
 	}
 
-	// The later `arr.push` mutates a value `seed` was captured INTO, non-transitively. A walk that
+	// The later `arr.push` mutates a value `seed` was captured into, non-transitively. A walk that
 	// followed the capture edge backwards anyway would carry that mutation back to `seed`.
 	const wantEnd = 15
-	if r.End != wantEnd {
-		t.Errorf("`seed`'s range is [%d,%d), want an end of %d. A larger end means the walk "+
+	if mutableRange.End != wantEnd {
+		test.Errorf("`seed`'s range is [%d,%d), want an end of %d. A larger end means the walk "+
 			"followed a capture edge backwards for a NON-transitive mutation, which widens a "+
-			"contained value on a mutation of its container", r.Start, r.End, wantEnd)
+			"contained value on a mutation of its container", mutableRange.Start, mutableRange.End, wantEnd)
 	}
 }

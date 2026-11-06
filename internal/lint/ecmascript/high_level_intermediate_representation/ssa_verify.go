@@ -5,14 +5,14 @@
 // property is checked directly, over whatever function is handed in:
 //
 //  1. Every value is defined at most once.
-//  2. EVERY USE IS DOMINATED BY ITS DEFINITION.
+//  2. Every use is dominated by its definition.
 //
 // The second is the real one. It is what makes SSA worth having: a pass that sees a use can reach
 // the single definition and know it has already executed. A construction that places a phi at the
 // wrong block, or renames a use to a definition sitting on a sibling branch, breaks exactly this
 // and breaks nothing that a structural well-formedness check would notice.
 //
-// # Phi operands are checked against the PREDECESSOR, not the phi's own block
+// # Phi operands are checked against the predecessor, not the phi's own block
 //
 // A phi is not an ordinary instruction. Its operand for predecessor P is read on the edge from P,
 // so the definition must dominate P's exit, not the block holding the phi. Checking it the naive
@@ -38,26 +38,26 @@ package high_level_intermediate_representation
 
 import "github.com/system-inc/cohere/static_single_assignment"
 
-// VerifySSA checks that a function is in single static assignment form and returns every violation.
+// VerifySsa checks that a function is in single static assignment form and returns every violation.
 //
-// An empty result means the property holds. It does NOT mean the function was worth checking: a
+// An empty result means the property holds. It does not mean the function was worth checking: a
 // function whose variable references all lowered to `LoadGlobal` has almost nothing to cohere and
-// passes trivially. `SSAStats` is how a caller tells a real pass from a vacuous one.
+// passes trivially. `CollectSsaStats` is how a caller tells a real pass from a vacuous one.
 //
 // Nested functions are not descended into; call it per function.
-func VerifySSA(function *Function) []static_single_assignment.SSAViolation {
+func VerifySsa(function *Function) []static_single_assignment.StaticSingleAssignmentViolation {
 	if function == nil {
 		return nil
 	}
-	return static_single_assignment.VerifySSA(ssaGraph{}, function)
+	return static_single_assignment.VerifyStaticSingleAssignment(ssaGraph{}, function)
 }
 
-// CollectSSAStats measures one function.
-func CollectSSAStats(function *Function) static_single_assignment.SSAStats {
+// CollectSsaStats measures one function.
+func CollectSsaStats(function *Function) static_single_assignment.StaticSingleAssignmentStatistics {
 	if function == nil {
-		return static_single_assignment.SSAStats{}
+		return static_single_assignment.StaticSingleAssignmentStatistics{}
 	}
-	return static_single_assignment.CollectSSAStats(ssaGraph{}, function)
+	return static_single_assignment.CollectStaticSingleAssignmentStatistics(ssaGraph{}, function)
 }
 
 // computeDominance runs Cooper-Harvey-Kennedy over the function's blocks, which are already in

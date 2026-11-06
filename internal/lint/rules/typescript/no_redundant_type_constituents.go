@@ -25,8 +25,8 @@ import (
 //
 // # The absorption is directional, and the direction flips between the two containers
 //
-// In a UNION the wider type wins, so `'a' | string` is `string` and the LITERAL is reported. In an
-// INTERSECTION the narrower type wins, so `'a' & string` is `'a'` and the PRIMITIVE is reported.
+// In a union the wider type wins, so `'a' | string` is `string` and the literal is reported. In an
+// intersection the narrower type wins, so `'a' & string` is `'a'` and the primitive is reported.
 // Same pair of members, opposite finding. Getting this backwards names the wrong member while
 // reading entirely plausible, which is why the two arms are written separately below rather than
 // shared behind a flag.
@@ -45,7 +45,7 @@ import (
 // # Our parser inserts a node upstream never sees, and it changes the walk
 //
 // estree has no parenthesized type, so upstream's handler receives `(string | any) | number` as two
-// members whose first has a union TYPE. Ours inserts a `KindParenthesizedType` between, and without
+// members whose first has a union type. Ours inserts a `KindParenthesizedType` between, and without
 // unwrapping it the member reads as opaque and the finding is lost.
 //
 // Measured against the installed 8.67.0 build before this rule was written, because the corpus
@@ -59,7 +59,7 @@ import (
 //
 // The two findings in the first case come from two different listener calls: the outer union
 // reports the member whose type is a union, and the inner union reports `any` on its own. So the
-// unwrap is for member IDENTITY only and the spans fall out; a probe predicting exactly that agreed
+// unwrap is for member identity only and the spans fall out; a probe predicting exactly that agreed
 // with all five measured shapes, and disabling the unwrap took it to two of five.
 //
 // # `boolean` is stored as a union and must not be split
@@ -73,17 +73,17 @@ import (
 //
 // Two anchors, both uncommon outside type-heavy files, and each member's flags are cached per node
 // because a type reference resolving to a large union would otherwise be re-read once per sibling.
-var NoRedundantTypeConstituents = rule.Rule{
+var NoRedundantTypeConstituents = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/no-redundant-type-constituents",
 
 	// Every judgment is a type-flag question about a member the checker has already resolved.
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// The declaration governs registration; the harness can still build a Context by hand, and
 		// a nil dereference here costs every rule its verdict on the whole file.
-		if ctx.TypeChecker == nil {
+		if ruleContext.TypeChecker == nil {
 			return nil
 		}
 
@@ -91,10 +91,10 @@ var NoRedundantTypeConstituents = rule.Rule{
 
 		return rule.Listeners{
 			ast.KindUnionType: func(node *ast.Node) {
-				checkRedundantUnion(ctx, node, cache)
+				checkRedundantUnion(ruleContext, node, cache)
 			},
 			ast.KindIntersectionType: func(node *ast.Node) {
-				checkRedundantIntersection(ctx, node, cache)
+				checkRedundantIntersection(ruleContext, node, cache)
 			},
 		}
 	},
@@ -183,59 +183,65 @@ func redundantKeywordFlags(node *ast.Node) (checker.TypeFlags, bool) {
 //
 // Cached per node, because a member that is a type reference to a large union would otherwise be
 // re-resolved once for every sibling it is compared against.
-func typePartsOf(ctx rule.Context, node *ast.Node, cache map[*ast.Node][]redundantTypePart) []redundantTypePart {
+//
+// Mutates: cache the caller keeps one cache across every member it compares, so each resolves once
+func typePartsOf(
+	ruleContext rule.Context,
+	node *ast.Node,
+	cache map[*ast.Node][]redundantTypePart,
+) []redundantTypePart {
 	if existing, seen := cache[node]; seen {
 		return existing
 	}
-	computed := computeTypeParts(ctx, node)
+	computed := computeTypeParts(ruleContext, node)
 	cache[node] = computed
 	return computed
 }
 
 // computeTypeParts is upstream's getTypeNodeTypePartFlags.
-func computeTypeParts(ctx rule.Context, node *ast.Node) []redundantTypePart {
-	node = unwrapParenthesizedType(node)
-	if node == nil {
+func computeTypeParts(ruleContext rule.Context, node *ast.Node) []redundantTypePart {
+	unparenthesized := unwrapParenthesizedType(node)
+	if unparenthesized == nil {
 		return nil
 	}
 
-	if flags, isKeyword := redundantKeywordFlags(node); isKeyword {
-		return []redundantTypePart{{flags: flags, typeName: describeTypeNodeName(ctx, node)}}
+	if flags, isKeyword := redundantKeywordFlags(unparenthesized); isKeyword {
+		return []redundantTypePart{{flags: flags, typeName: describeTypeNodeName(ruleContext, unparenthesized)}}
 	}
 
 	// A nested union contributes every member, which is what makes `(a | b) | c` behave like
 	// `a | b | c` for absorption while still reporting at the inner node.
-	if node.Kind == ast.KindUnionType {
+	if unparenthesized.Kind == ast.KindUnionType {
 		parts := []redundantTypePart{}
-		for _, member := range node.AsUnionTypeNode().Types.Nodes {
-			parts = append(parts, computeTypeParts(ctx, member)...)
+		for _, member := range unparenthesized.AsUnionTypeNode().Types.Nodes {
+			parts = append(parts, computeTypeParts(ruleContext, member)...)
 		}
 		return parts
 	}
 
-	if node.Kind == ast.KindLiteralType {
-		literal := node.AsLiteralTypeNode().Literal
+	if unparenthesized.Kind == ast.KindLiteralType {
+		literal := unparenthesized.AsLiteralTypeNode().Literal
 		if literal != nil {
 			switch literal.Kind {
 			case ast.KindStringLiteral:
 				return []redundantTypePart{{flags: checker.TypeFlagsStringLiteral,
-					typeName: describeTypeNodeName(ctx, node)}}
+					typeName: describeTypeNodeName(ruleContext, unparenthesized)}}
 			case ast.KindNumericLiteral:
 				return []redundantTypePart{{flags: checker.TypeFlagsNumberLiteral,
-					typeName: describeTypeNodeName(ctx, node)}}
+					typeName: describeTypeNodeName(ruleContext, unparenthesized)}}
 			case ast.KindBigIntLiteral:
 				return []redundantTypePart{{flags: checker.TypeFlagsBigIntLiteral,
-					typeName: describeTypeNodeName(ctx, node)}}
+					typeName: describeTypeNodeName(ruleContext, unparenthesized)}}
 			case ast.KindTrueKeyword, ast.KindFalseKeyword:
 				return []redundantTypePart{{flags: checker.TypeFlagsBooleanLiteral,
-					typeName: describeTypeNodeName(ctx, node)}}
+					typeName: describeTypeNodeName(ruleContext, unparenthesized)}}
 			}
 		}
 	}
 
 	// Anything else is asked of the checker and split into its union members, except that `boolean`
 	// is stored as `false | true` and must stay whole.
-	resolved := ctx.TypeChecker.GetTypeAtLocation(node)
+	resolved := ruleContext.TypeChecker.GetTypeAtLocation(unparenthesized)
 	if resolved == nil {
 		return nil
 	}
@@ -243,7 +249,7 @@ func computeTypeParts(ctx rule.Context, node *ast.Node) []redundantTypePart {
 	for _, part := range unionPartsUnlessBoolean(resolved) {
 		parts = append(parts, redundantTypePart{
 			flags:    part.Flags(),
-			typeName: describeResolvedType(ctx, part),
+			typeName: describeResolvedType(ruleContext, part),
 		})
 	}
 	return parts
@@ -259,8 +265,8 @@ func unionPartsUnlessBoolean(subject *checker.Type) []*checker.Type {
 		return []*checker.Type{subject}
 	}
 	members := subject.Types()
-	// Matched by FLAG rather than through the shelf's true/false predicates. Those require an
-	// INTRINSIC type, and a boolean reached through an alias is not one: measured on
+	// Matched by flag rather than through the shelf's true/false predicates. Those require an
+	// intrinsic type, and a boolean reached through an alias is not one: measured on
 	// `type B = boolean; type T = B | false`, both members report the BooleanLiteral flag while
 	// IsFalseLiteralType answers false for each. With the predicate version the guard never fired,
 	// `B` split into two literals, no primitive was ever seen, and the case reported nothing.
@@ -281,7 +287,7 @@ func unionPartsUnlessBoolean(subject *checker.Type) []*checker.Type {
 //
 // A string literal is printed with double quotes whatever the source used, because upstream renders
 // through JSON stringification. `'a'` therefore appears in the message as `"a"`.
-func describeTypeNodeName(ctx rule.Context, node *ast.Node) string {
+func describeTypeNodeName(ruleContext rule.Context, node *ast.Node) string {
 	switch node.Kind {
 	case ast.KindAnyKeyword:
 		return "any"
@@ -304,8 +310,8 @@ func describeTypeNodeName(ctx rule.Context, node *ast.Node) string {
 		case ast.KindStringLiteral:
 			return quoteForMessage(literal.Text())
 		case ast.KindNumericLiteral, ast.KindBigIntLiteral:
-			nodeRange := rule.TokenRange(ctx.SourceFile, literal)
-			return ctx.SourceFile.Text()[nodeRange.Pos():nodeRange.End()]
+			nodeRange := rule.TokenRange(ruleContext.SourceFile, literal)
+			return ruleContext.SourceFile.Text()[nodeRange.Pos():nodeRange.End()]
 		case ast.KindTrueKeyword:
 			return "true"
 		case ast.KindFalseKeyword:
@@ -318,14 +324,14 @@ func describeTypeNodeName(ctx rule.Context, node *ast.Node) string {
 }
 
 // describeResolvedType renders a member the checker resolved, which is upstream's describeLiteralType.
-func describeResolvedType(ctx rule.Context, subject *checker.Type) string {
-	// The ERROR type first, and this ordering is load-bearing rather than tidy. An unresolvable
+func describeResolvedType(ruleContext rule.Context, subject *checker.Type) string {
+	// The error type first, and this ordering is load-bearing rather than tidy. An unresolvable
 	// name carries the `any` flag as well as being the error type, so an `IsTypeAnyType` test
 	// placed above this one answers "any" and the caller's `typeName != "any"` check never fires,
 	// which silently downgrades `errorTypeOverrides` to `overrides`. Measured on `NotKnown | 0`:
-	// any=true AND errorType=true on the same type.
+	// any=true and errorType=true on the same type.
 	if type_checking.IsIntrinsicErrorType(subject) {
-		return ctx.TypeChecker.TypeToString(subject)
+		return ruleContext.TypeChecker.TypeToString(subject)
 	}
 	if type_checking.IsTypeAnyType(subject) {
 		return "any"
@@ -339,19 +345,19 @@ func describeResolvedType(ctx rule.Context, subject *checker.Type) string {
 	if type_checking.IsTypeFlagSet(subject, checker.TypeFlagsTemplateLiteral) {
 		return "template literal type"
 	}
-	// A boolean literal is matched by FLAG rather than through the shelf's true/false predicates.
+	// A boolean literal is matched by flag rather than through the shelf's true/false predicates.
 	// Those require an intrinsic type, and one reached through an alias is not: measured on
 	// `type B = false; type T = B & boolean`, the member reports BooleanLiteral set while
 	// IsFalseLiteralType answers false, which sent the name to "literal type" and the message to
 	// "overridden by the literal type" instead of "by the false".
 	if type_checking.IsTypeFlagSet(subject, checker.TypeFlagsBooleanLiteral) {
-		return ctx.TypeChecker.TypeToString(subject)
+		return ruleContext.TypeChecker.TypeToString(subject)
 	}
 	if type_checking.IsTypeFlagSet(subject, checker.TypeFlagsStringLiteral|
 		checker.TypeFlagsNumberLiteral|checker.TypeFlagsBigIntLiteral) {
 		// The checker prints a string literal already quoted, and upstream re-quotes the raw value,
 		// so both land on the same double-quoted rendering.
-		return ctx.TypeChecker.TypeToString(subject)
+		return ruleContext.TypeChecker.TypeToString(subject)
 	}
 	return "literal type"
 }
@@ -386,7 +392,7 @@ func isInsideReturnType(node *ast.Node) bool {
 		return false
 	}
 	// A return annotation hangs directly off the function-like declaration, so the union's parent
-	// IS the function rather than a separate annotation node the way estree models it.
+	// is the function rather than a separate annotation node the way estree models it.
 	if !ast.IsFunctionLike(parent) {
 		return false
 	}
@@ -394,7 +400,7 @@ func isInsideReturnType(node *ast.Node) bool {
 }
 
 // checkRedundantUnion is upstream's TSUnionType handler.
-func checkRedundantUnion(ctx rule.Context, node *ast.Node, cache map[*ast.Node][]redundantTypePart) {
+func checkRedundantUnion(ruleContext rule.Context, node *ast.Node, cache map[*ast.Node][]redundantTypePart) {
 	members := node.AsUnionTypeNode().Types
 	if members == nil {
 		return
@@ -412,7 +418,7 @@ func checkRedundantUnion(ctx rule.Context, node *ast.Node, cache map[*ast.Node][
 		if member == nil {
 			continue
 		}
-		for _, part := range typePartsOf(ctx, member, cache) {
+		for _, part := range typePartsOf(ruleContext, member, cache) {
 			// `any` and `unknown` swallow a union outright.
 			if part.flags == checker.TypeFlagsAny || part.flags == checker.TypeFlagsUnknown {
 				messageId := "overrides"
@@ -421,12 +427,12 @@ func checkRedundantUnion(ctx rule.Context, node *ast.Node, cache map[*ast.Node][
 					// message sends the reader looking for an `any` nobody wrote.
 					messageId = "errorTypeOverrides"
 				}
-				ctx.ReportNode(member, redundantMessage(messageId, "union", part.typeName, "", ""))
+				ruleContext.ReportNode(member, redundantMessage(messageId, "union", part.typeName, "", ""))
 				continue
 			}
 			// `never` contributes nothing to a union, except in a return annotation.
 			if part.flags == checker.TypeFlagsNever && !isInsideReturnType(node) {
-				ctx.ReportNode(member, redundantMessage("overridden", "union", "never", "", ""))
+				ruleContext.ReportNode(member, redundantMessage("overridden", "union", "never", "", ""))
 				continue
 			}
 
@@ -478,11 +484,11 @@ func checkRedundantUnion(ctx rule.Context, node *ast.Node, cache map[*ast.Node][
 	}
 	// Grouped by type node so a node contributing several literals reports once per primitive, in
 	// the order the nodes appear rather than in map order.
-	sort.SliceStable(entries, func(a, b int) bool {
-		return entries[a].typeNode.Pos() < entries[b].typeNode.Pos()
+	sort.SliceStable(entries, func(left, right int) bool {
+		return entries[left].typeNode.Pos() < entries[right].typeNode.Pos()
 	})
 	for _, entry := range entries {
-		ctx.ReportNode(entry.typeNode, redundantMessage("literalOverridden", "union", "",
+		ruleContext.ReportNode(entry.typeNode, redundantMessage("literalOverridden", "union", "",
 			strings.Join(entry.names, " | "), redundantPrimitiveNames[entry.primitive]))
 	}
 }
@@ -491,7 +497,7 @@ func checkRedundantUnion(ctx rule.Context, node *ast.Node, cache map[*ast.Node][
 //
 // The absorption runs the other way here: the narrower type wins, so a primitive beside a literal of
 // the same kind is the redundant one.
-func checkRedundantIntersection(ctx rule.Context, node *ast.Node, cache map[*ast.Node][]redundantTypePart) {
+func checkRedundantIntersection(ruleContext rule.Context, node *ast.Node, cache map[*ast.Node][]redundantTypePart) {
 	members := node.AsIntersectionTypeNode().Types
 	if members == nil {
 		return
@@ -507,10 +513,10 @@ func checkRedundantIntersection(ctx rule.Context, node *ast.Node, cache map[*ast
 		if member == nil {
 			continue
 		}
-		parts := typePartsOf(ctx, member, cache)
+		parts := typePartsOf(ruleContext, member, cache)
 
 		for _, part := range parts {
-			// `any` and `never` swallow an intersection; `unknown` is swallowed BY it. That
+			// `any` and `never` swallow an intersection; `unknown` is swallowed by it. That
 			// asymmetry against the union arm is upstream's and is the reason the two arms are
 			// written out rather than shared.
 			handled := false
@@ -529,7 +535,7 @@ func checkRedundantIntersection(ctx rule.Context, node *ast.Node, cache map[*ast
 				if part.flags == checker.TypeFlagsAny && part.typeName != "any" {
 					messageId = "errorTypeOverrides"
 				}
-				ctx.ReportNode(member,
+				ruleContext.ReportNode(member,
 					redundantMessage(messageId, "intersection", part.typeName, "", ""))
 				handled = true
 				break
@@ -579,7 +585,7 @@ func checkRedundantIntersection(ctx rule.Context, node *ast.Node, cache map[*ast
 			for _, part := range unionParts[unionMember] {
 				names = append(names, part.typeName)
 			}
-			ctx.ReportNode(unionMember, redundantMessage("primitiveOverridden", "intersection", "",
+			ruleContext.ReportNode(unionMember, redundantMessage("primitiveOverridden", "intersection", "",
 				strings.Join(names, " | "), redundantPrimitiveNames[primitive]))
 		}
 		return
@@ -591,7 +597,7 @@ func checkRedundantIntersection(ctx rule.Context, node *ast.Node, cache map[*ast
 			continue
 		}
 		for _, typeNode := range seenPrimitives[primitiveFlag] {
-			ctx.ReportNode(typeNode, redundantMessage("primitiveOverridden", "intersection", "",
+			ruleContext.ReportNode(typeNode, redundantMessage("primitiveOverridden", "intersection", "",
 				strings.Join(literals, " | "), redundantPrimitiveNames[primitiveFlag]))
 		}
 	}

@@ -8,12 +8,12 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // shared edit.
 //
 // DecodeOptionList rather than Decode, and hand-rolled rather than `rule.DecodeOptionsInto`, because
-// upstream's option surface is POSITIONAL across two slots whose shapes differ:
+// upstream's option surface is positional across two slots whose shapes differ:
 // `["error", [{"name": "Foo", "props": ["to"]}], {"includeFromSettings": false}]`. The decoder also
 // has to answer an empty list with the built-in `a` to `href` pair rather than an error, since an
 // unconfigured rule still checks anchors.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[JsxNoScriptUrlOptions]{
 		Rule:             JsxNoScriptUrl,
 		DecodeOptionList: DecodeJsxNoScriptUrlOptions,
 	})

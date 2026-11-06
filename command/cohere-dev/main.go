@@ -34,37 +34,59 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/system-inc/cohere/internal/streams"
 )
 
+// main is the one way out: it exits with the code finishedExitCode returns, once that has run its deferred show.
 func main() {
+	os.Exit(finishedExitCode())
+}
+
+// finishedExitCode runs the command line and returns the code cohere-dev exits with: every verb returns its exit
+// code here, and streams.Finish delivers what was printed and turns a clean exit into 1 when it did not arrive.
+func finishedExitCode() int {
+	// Deferred calls run while a panic unwinds, though not on os.Exit, so this delivers what was written before
+	// the panic's own report, and main exits only after it has run.
+	defer func() {
+		streams.Show(streams.Errors)
+		streams.Show(streams.Output)
+	}()
+	return streams.Finish(runCommandLine())
+}
+
+// runCommandLine runs the verb the command line names and returns its exit code.
+func runCommandLine() int {
 	if len(os.Args) < 2 {
-		usage()
+		return usage()
 	}
 	switch os.Args[1] {
 	case "status":
-		os.Exit(status())
+		return status()
 	case trimCacheVerb:
-		os.Exit(trimCache())
+		return trimCache()
 	case "quiet":
-		os.Exit(quiet(os.Args[2:]))
+		return quiet(os.Args[2:])
 	case "worktree":
-		os.Exit(namedWorktree(os.Args[2:]))
+		return namedWorktree(os.Args[2:])
 	case "test", "build", "vet", "exec", "land":
-		os.Exit(run(os.Args[1], os.Args[2:]))
+		return run(os.Args[1], os.Args[2:])
 	}
-	usage()
+	return usage()
 }
 
-func usage() {
-	fmt.Fprintln(os.Stderr, "usage: cohere-dev test [--fast] [--full-priority] [go test flags] [packages]\n"+
+// usage says how cohere-dev is run, and returns the exit code of a command line it refused.
+func usage() int {
+	fmt.Fprintln(streams.Errors, "usage: cohere-dev test [--fast] [--full-priority] [go test flags] [packages]\n"+
 		"       cohere-dev build|vet [--full-priority] [go flags] [packages]\n"+
 		"       cohere-dev exec [--full-priority] -- <command> [arguments]\n"+
 		"       cohere-dev land\n"+
 		"       cohere-dev status\n"+
 		"       cohere-dev quiet [on [--for <duration>] [why] | off]\n"+
-		"       cohere-dev worktree <name> [--branch <branch>]   a name per hand, not per member: system_cohere_tools_1\n"+
+		"       cohere-dev worktree <name> [--branch <branch>]   "+
+		"a name per hand, not per member: system_cohere_tools_1\n"+
 		"       cohere-dev worktree remove <name>")
-	os.Exit(2)
+	return 2
 }
 
 // fullPriorityFlag keeps a run at the priority it was started with, for a timed measurement. Without it a
@@ -86,8 +108,8 @@ func niceness() (int, error) {
 	if value == "" {
 		return testNiceness, nil
 	}
-	parsed, err := strconv.Atoi(value)
-	if err != nil || parsed < 0 || parsed > 19 {
+	parsed, parseError := strconv.Atoi(value)
+	if parseError != nil || parsed < 0 || parsed > 19 {
 		return 0, fmt.Errorf("%s is %q, want a whole number from 0 to 19", nicenessVariable, value)
 	}
 	return parsed, nil
@@ -95,78 +117,84 @@ func niceness() (int, error) {
 
 // run runs a heavy command, niced, through a token: go test, go build, go vet, or any command with exec.
 func run(verb string, arguments []string) int {
-	arguments, fullPriority := withoutFlag(arguments, fullPriorityFlag)
+	commandArguments, fullPriority := withoutFlag(arguments, fullPriorityFlag)
 	if !fullPriority {
-		level, err := niceness()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "cohere-dev: %v\n", err)
+		level, nicenessError := niceness()
+		if nicenessError != nil {
+			fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", nicenessError)
 			return 2
 		}
-		if err := lowerPriority(level); err != nil {
-			fmt.Fprintf(os.Stderr, "cohere-dev: lowering this run's priority: %v\n", err)
+		if lowerPriorityError := lowerPriority(level); lowerPriorityError != nil {
+			fmt.Fprintf(streams.Errors, "cohere-dev: lowering this run's priority: %v\n", lowerPriorityError)
 			return 1
 		}
 	}
 
 	switch verb {
 	case "land":
-		return land(arguments)
+		return land(commandArguments)
 	case "exec":
-		if len(arguments) > 0 && arguments[0] == "--" {
-			arguments = arguments[1:]
+		commandLine := commandArguments
+		if len(commandArguments) > 0 && commandArguments[0] == "--" {
+			commandLine = commandArguments[1:]
 		}
-		if len(arguments) == 0 {
-			usage()
+		if len(commandLine) == 0 {
+			return usage()
 		}
-		return withToken(strings.Join(arguments, " "), func(environment []string) int {
-			return runCommand(environment, arguments[0], arguments[1:])
+		return withToken(strings.Join(commandLine, " "), func(environment []string) int {
+			return runCommand(environment, commandLine[0], commandLine[1:])
 		})
 	case "build":
-		return withToken("go build "+strings.Join(arguments, " "), func(environment []string) int {
-			return runCommand(environment, "go", append([]string{"build"}, arguments...))
+		return withToken("go build "+strings.Join(commandArguments, " "), func(environment []string) int {
+			return runCommand(environment, "go", append([]string{"build"}, commandArguments...))
 		})
 	case "vet":
-		return withToken("go vet "+strings.Join(arguments, " "), func(environment []string) int {
-			return runCommand(withoutVCSStamping(environment), "go", append([]string{"vet"}, arguments...))
+		return withToken("go vet "+strings.Join(commandArguments, " "), func(environment []string) int {
+			return runCommand(withoutVcsStamping(environment), "go", append([]string{"vet"}, commandArguments...))
 		})
 	}
 
-	fast := len(arguments) > 0 && arguments[0] == "--fast"
+	fast := len(commandArguments) > 0 && commandArguments[0] == "--fast"
+	unvettedArguments := commandArguments
 	if fast {
-		arguments = arguments[1:]
+		unvettedArguments = commandArguments[1:]
 	}
-	arguments = withEveryVetCheck(arguments)
+	testArguments := withEveryVetCheck(unvettedArguments)
 	if fast {
 		// The fast tier rests on Go's test cache, and runs nearly every package, so -count=1 here is the
 		// costliest run there is on a loaded machine (@system_cohere_build's catch).
-		if countsOnce(arguments) {
+		if countsOnce(testArguments) {
 			refuseCountOnce()
 			return 2
 		}
-		return withToken("go test --fast "+strings.Join(arguments, " "), func(environment []string) int {
-			return fastTest(withoutVCSStamping(environment), arguments)
+		return withToken("go test --fast "+strings.Join(testArguments, " "), func(environment []string) int {
+			return fastTest(withoutVcsStamping(environment), testArguments)
 		})
 	}
-	if wholeModule(arguments) && countsOnce(arguments) {
+	if wholeModule(testArguments) && countsOnce(testArguments) {
 		refuseCountOnce()
 		return 2
 	}
 	// A whole-module run from the root covers what the landing gate covers: every module go.work names
 	// outside a submodule (workspace.go).
-	if wholeModule(arguments) {
-		expanded, err := withWorkspaceModules(arguments)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "cohere-dev: reading the modules to test: %v\n", err)
+	if wholeModule(testArguments) {
+		if checkGitlinksError := checkRootGitlinks(); checkGitlinksError != nil {
+			fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", checkGitlinksError)
 			return 2
 		}
-		arguments = expanded
+		expanded, withWorkspaceModulesError := withWorkspaceModules(testArguments)
+		if withWorkspaceModulesError != nil {
+			fmt.Fprintf(streams.Errors, "cohere-dev: reading the modules to test: %v\n", withWorkspaceModulesError)
+			return 2
+		}
+		testArguments = expanded
 	}
-	return withToken("go test "+strings.Join(arguments, " "), func(environment []string) int {
-		return goTest(withoutVCSStamping(environment), arguments)
+	return withToken("go test "+strings.Join(testArguments, " "), func(environment []string) int {
+		return goTest(withoutVcsStamping(environment), testArguments)
 	})
 }
 
-// withoutVCSStamping adds -buildvcs=false to a test or vet run's GOFLAGS, unless the caller chose a -buildvcs
+// withoutVcsStamping adds -buildvcs=false to a test or vet run's `GOFLAGS`, unless the caller chose a -buildvcs
 // of their own. Most worktrees are made with TypeScript a symlink to another checkout's, git status refuses
 // that tree, and so every go build a test runs failed "error obtaining VCS status": four of
 // @system_cohere_go's Circles set it by hand on 2026-11-05. The landing gate has run with it since
@@ -175,7 +203,7 @@ func run(verb string, arguments []string) int {
 // Not for build or exec: a binary someone keeps is read for its stamp. packaging's version.go prints its
 // commit and whether its tree was modified, and the bench record marks a run dirty from it, so a build
 // without the stamp would read as clean.
-func withoutVCSStamping(environment []string) []string {
+func withoutVcsStamping(environment []string) []string {
 	stamped := make([]string, 0, len(environment)+1)
 	hasFlags := false
 	for _, variable := range environment {
@@ -205,7 +233,10 @@ func withoutVCSStamping(environment []string) []string {
 // unkeyed literals of another package's struct passed cohere-dev test and failed plain go vet (#kr2yp54).
 func withEveryVetCheck(arguments []string) []string {
 	for _, argument := range arguments {
-		if argument == "-vet" || argument == "--vet" || strings.HasPrefix(argument, "-vet=") || strings.HasPrefix(argument, "--vet=") {
+		if argument == "-vet" ||
+			argument == "--vet" ||
+			strings.HasPrefix(argument, "-vet=") ||
+			strings.HasPrefix(argument, "--vet=") {
 			return arguments
 		}
 	}
@@ -240,22 +271,22 @@ func wholeModule(arguments []string) bool {
 // withWorkspaceModules replaces a ./... run from the repository's root with the patterns of every module
 // the landing gate covers, saying which. From anywhere else ./... means that directory's tree, and stays.
 func withWorkspaceModules(arguments []string) ([]string, error) {
-	root, err := os.Getwd()
-	if err != nil {
-		return nil, err
+	root, workingDirectoryError := os.Getwd()
+	if workingDirectoryError != nil {
+		return nil, workingDirectoryError
 	}
-	if _, err := os.Stat(filepath.Join(root, "go.work")); err != nil {
+	if _, statError := os.Stat(filepath.Join(root, "go.work")); statError != nil {
 		return arguments, nil
 	}
-	covered, err := readWorkspace(root)
-	if err != nil {
-		return nil, err
+	covered, readGatedWorkspaceError := readGatedWorkspace(root)
+	if readGatedWorkspaceError != nil {
+		return nil, readGatedWorkspaceError
 	}
-	covered.report(os.Stderr)
-	expanded := make([]string, 0, len(arguments)+len(covered.gated))
+	reportWorkspace(covered, streams.Errors)
+	expanded := make([]string, 0, len(arguments)+len(covered.Modules))
 	for _, argument := range arguments {
 		if argument == "./..." {
-			expanded = append(expanded, covered.patterns()...)
+			expanded = append(expanded, covered.Patterns()...)
 			continue
 		}
 		expanded = append(expanded, argument)
@@ -263,11 +294,29 @@ func withWorkspaceModules(arguments []string) ([]string, error) {
 	return expanded, nil
 }
 
+// checkRootGitlinks runs the land gate's gitlink check (checkGitlinks) on the head of a whole-module run from a
+// repository's root, which is the gate the Square runs on every merge: a merge that records TypeScript as a
+// symlink passes its tests on a disk where the symlink resolves. A ./... anywhere else is that directory's tree,
+// and a root with no .git has no commit to read, so both run as they did.
+func checkRootGitlinks() error {
+	root, workingDirectoryError := os.Getwd()
+	if workingDirectoryError != nil {
+		return workingDirectoryError
+	}
+	if _, statError := os.Lstat(filepath.Join(root, ".git")); statError != nil {
+		if os.IsNotExist(statError) {
+			return nil
+		}
+		return fmt.Errorf("reading whether %s is a repository's root: %w", root, statError)
+	}
+	return checkGitlinks(root, "HEAD")
+}
+
 // refuseCountOnce says why a run of nearly every package, through the slot or the fast tier, never passes
 // -count=1.
 func refuseCountOnce() {
-	fmt.Fprintln(os.Stderr, "cohere-dev: a whole-module run never passes -count=1: it re-runs every package whose "+
-		"inputs did not change, which Go's test cache would have skipped. Fix a flaky test rather than re-run "+
+	fmt.Fprintln(streams.Errors, "cohere-dev: a whole-module run never passes -count=1: it re-runs every package "+
+		"whose inputs did not change, which Go's test cache would have skipped. Fix a flaky test rather than re-run "+
 		"around it, and name a package to re-run it alone: go test -count=1 ./its/package")
 }
 
@@ -286,20 +335,23 @@ func countsOnce(arguments []string) bool {
 
 // goTest runs go test with the caller's terminal and returns its exit code.
 func goTest(base []string, arguments []string) int {
-	environment, uncovered, err := testEnvironment(base)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "cohere-dev: %v\n", err)
+	environment, uncovered, testEnvironmentError := testEnvironment(base)
+	if testEnvironmentError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", testEnvironmentError)
 		return 2
 	}
 	command := exec.Command("go", append([]string{"test"}, arguments...)...)
 	command.Env = environment
 	command.Stdin, command.Stdout, command.Stderr = os.Stdin, os.Stdout, os.Stderr
-	defer printUncovered(os.Stderr, uncovered)
-	if err := command.Run(); err != nil {
-		if exited, ok := err.(*exec.ExitError); ok {
+	// go test writes to the terminal itself, so what this run said first is delivered first.
+	streams.Show(streams.Output)
+	streams.Show(streams.Errors)
+	defer printUncovered(streams.Errors, uncovered)
+	if runError := command.Run(); runError != nil {
+		if exited, ok := runError.(*exec.ExitError); ok {
 			return exited.ExitCode()
 		}
-		fmt.Fprintf(os.Stderr, "cohere-dev: running go test: %v\n", err)
+		fmt.Fprintf(streams.Errors, "cohere-dev: running go test: %v\n", runError)
 		return 1
 	}
 	return 0
@@ -310,11 +362,14 @@ func runCommand(environment []string, name string, arguments []string) int {
 	command := exec.Command(name, arguments...)
 	command.Env = environment
 	command.Stdin, command.Stdout, command.Stderr = os.Stdin, os.Stdout, os.Stderr
-	if err := command.Run(); err != nil {
-		if exited, ok := err.(*exec.ExitError); ok {
+	// The command writes to the terminal itself, so what this run said first is delivered first.
+	streams.Show(streams.Output)
+	streams.Show(streams.Errors)
+	if runError := command.Run(); runError != nil {
+		if exited, ok := runError.(*exec.ExitError); ok {
 			return exited.ExitCode()
 		}
-		fmt.Fprintf(os.Stderr, "cohere-dev: running %s: %v\n", name, err)
+		fmt.Fprintf(streams.Errors, "cohere-dev: running %s: %v\n", name, runError)
 		return 1
 	}
 	return 0
@@ -322,6 +377,8 @@ func runCommand(environment []string, name string, arguments []string) int {
 
 // holderLine describes the run holding a token: who, where, since when and what it runs.
 func holderLine(what string) string {
+	// Ignored: the line only tells a waiting run who holds the token; one whose directory can't be read still
+	// names its pid and what it runs, and the lock, not this line, is what holds the token.
 	directory, _ := os.Getwd()
 	return fmt.Sprintf("pid %d in %s since %s: %s", os.Getpid(), directory, time.Now().Format("15:04:05"), what)
 }
@@ -330,8 +387,8 @@ func holderLine(what string) string {
 func holders(directory string, slots int) []string {
 	lines := []string{}
 	for slot := 1; slot <= slots; slot++ {
-		contents, err := os.ReadFile(holderPath(directory, slot))
-		if err == nil && len(contents) > 0 {
+		contents, readError := os.ReadFile(holderPath(directory, slot))
+		if readError == nil && len(contents) > 0 {
 			lines = append(lines, strings.TrimSpace(string(contents)))
 		}
 	}
@@ -354,32 +411,36 @@ type heldSlot struct {
 }
 
 func (held *heldSlot) release() {
-	os.Remove(held.holder)
+	// Ignored: a holder file left behind names no one, since a token is held by its lock and heldBy reads the
+	// lock first, as it does for a run killed outright.
+	_ = os.Remove(held.holder)
 	unlockFile(held.lock)
-	held.lock.Close()
+	// Ignored: nothing was written through the lock file, so its close loses nothing, and the lock is gone with
+	// the descriptor, or with the process.
+	_ = held.lock.Close()
 }
 
 // takeSlot takes the first free token, or returns nil when every token is held.
 func takeSlot(directory string, slots int, what string) (*heldSlot, error) {
 	for slot := 1; slot <= slots; slot++ {
-		lock, err := os.OpenFile(lockPath(directory, slot), os.O_CREATE|os.O_RDWR, 0o644)
-		if err != nil {
-			return nil, err
+		lock, openError := os.OpenFile(lockPath(directory, slot), os.O_CREATE|os.O_RDWR, 0o644)
+		if openError != nil {
+			return nil, openError
 		}
-		taken, err := tryLockFile(lock)
-		if err != nil {
-			lock.Close()
-			return nil, err
+		taken, tryLockFileError := tryLockFile(lock)
+		if tryLockFileError != nil {
+			_ = lock.Close() // Ignored: never written, and the lock's error is the one returned.
+			return nil, tryLockFileError
 		}
 		if !taken {
-			lock.Close()
+			_ = lock.Close() // Ignored: never written, and never locked by this process.
 			continue
 		}
 		holder := holderPath(directory, slot)
-		if err := os.WriteFile(holder, []byte(holderLine(what)+"\n"), 0o644); err != nil {
+		if writeError := os.WriteFile(holder, []byte(holderLine(what)+"\n"), 0o644); writeError != nil {
 			unlockFile(lock)
-			lock.Close()
-			return nil, err
+			_ = lock.Close() // Ignored: never written, and the holder's write error is the one returned.
+			return nil, writeError
 		}
 		return &heldSlot{number: slot, lock: lock, holder: holder}, nil
 	}

@@ -1,6 +1,7 @@
 package gocache
 
 import (
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -21,37 +22,47 @@ const trimCaller = "command/cohere-dev"
 // One trim, one path, under the pool's lock (#cpxc2d7). The launcher also trimmed the default cache, holding
 // nothing, and on 2026-10-06 a trim holding the wrong pool deleted 83 GB from under running gates
 // (#d0x1fhp). So no code outside cohere-dev calls Trim. Tests are exempt: they trim caches of their own.
-func TestOnlyCohereDevTrims(t *testing.T) {
-	t.Parallel()
-	root, err := filepath.Abs(filepath.Join("..", "..", ".."))
-	if err != nil {
-		t.Fatal(err)
+func TestOnlyCohereDevTrims(test *testing.T) {
+	test.Parallel()
+	root, absolutePathError := filepath.Abs(filepath.Join("..", "..", ".."))
+	if absolutePathError != nil {
+		test.Fatal(absolutePathError)
 	}
 	callers := []string{}
 	files := token.NewFileSet()
-	err = filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
-		if err != nil {
-			return err
+	walkError := filepath.WalkDir(root, func(path string, entry fs.DirEntry, pathError error) error {
+		if pathError != nil {
+			return pathError
 		}
-		relative, _ := filepath.Rel(root, path)
-		relative = filepath.ToSlash(relative)
+		native, relativeError := filepath.Rel(root, path)
+		if relativeError != nil {
+			return relativeError
+		}
+		relative := filepath.ToSlash(native)
 		if entry.IsDir() {
 			// The vendored compiler, caches and fixtures hold no caller of ours.
-			if relative != "." && (strings.HasPrefix(entry.Name(), ".") || entry.Name() == "testdata" || relative == "TypeScript") {
+			if relative != "." &&
+				(strings.HasPrefix(entry.Name(), ".") || entry.Name() == "testdata" || relative == "TypeScript") {
 				return filepath.SkipDir
 			}
 			return nil
 		}
-		if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") || strings.HasPrefix(relative, trimCaller+"/") {
+		if !strings.HasSuffix(path, ".go") ||
+			strings.HasSuffix(path, "_test.go") ||
+			strings.HasPrefix(relative, trimCaller+"/") {
 			return nil
 		}
-		imports, err := parser.ParseFile(files, path, nil, parser.ImportsOnly)
-		if err != nil {
-			return err
+		imports, parseImportsError := parser.ParseFile(files, path, nil, parser.ImportsOnly)
+		if parseImportsError != nil {
+			return parseImportsError
 		}
 		name := ""
 		for _, spec := range imports.Imports {
-			if importPath, _ := strconv.Unquote(spec.Path.Value); importPath == gocacheImport {
+			importPath, unquoteError := strconv.Unquote(spec.Path.Value)
+			if unquoteError != nil {
+				return fmt.Errorf("reading an import path in %s: %w", path, unquoteError)
+			}
+			if importPath == gocacheImport {
 				name = "gocache"
 				if spec.Name != nil {
 					name = spec.Name.Name
@@ -61,9 +72,9 @@ func TestOnlyCohereDevTrims(t *testing.T) {
 		if name == "" {
 			return nil
 		}
-		parsed, err := parser.ParseFile(files, path, nil, 0)
-		if err != nil {
-			return err
+		parsed, parseError := parser.ParseFile(files, path, nil, 0)
+		if parseError != nil {
+			return parseError
 		}
 		ast.Inspect(parsed, func(node ast.Node) bool {
 			if selector, ok := node.(*ast.SelectorExpr); ok && selector.Sel.Name == "Trim" {
@@ -75,11 +86,15 @@ func TestOnlyCohereDevTrims(t *testing.T) {
 		})
 		return nil
 	})
-	if err != nil {
-		t.Fatal(err)
+	if walkError != nil {
+		test.Fatal(walkError)
 	}
 	for _, caller := range callers {
-		t.Errorf("%s calls gocache.Trim outside %s: only cohere-dev's trim may delete from a live Go cache, "+
-			"holding the pool's lock; ask it (cohere-dev trim-cache) rather than trim beside the builds", caller, trimCaller)
+		test.Errorf(
+			"%s calls gocache.Trim outside %s: only cohere-dev's trim may delete from a live Go cache, "+
+				"holding the pool's lock; ask it (cohere-dev trim-cache) rather than trim beside the builds",
+			caller,
+			trimCaller,
+		)
 	}
 }

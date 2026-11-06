@@ -64,8 +64,8 @@ func compileGlob(pattern string) glob {
 }
 
 // matches reports whether a path, already split by splitPath, matches any alternative.
-func (g glob) matches(segments []string) bool {
-	for _, alternative := range g {
+func (glob glob) matches(segments []string) bool {
+	for _, alternative := range glob {
 		if matchSegments(alternative, segments) {
 			return true
 		}
@@ -96,34 +96,37 @@ func splitPath(value string) []string {
 // The recursion is bounded by the path length rather than unbounded, because `**` consumes zero or
 // more whole segments and each recursive call consumes at least one when it advances.
 func matchSegments(pattern []string, path []string) bool {
-	for len(pattern) > 0 {
-		if pattern[0] == "**" {
+	// The segments not yet matched, which the loop advances as it consumes them.
+	remainingPattern := pattern
+	remainingPath := path
+	for len(remainingPattern) > 0 {
+		if remainingPattern[0] == "**" {
 			// A trailing `**` matches everything left, including nothing. This is what makes
 			// `node_modules/**` match the directory itself as well as its contents.
-			if len(pattern) == 1 {
+			if len(remainingPattern) == 1 {
 				return true
 			}
 			// Try consuming zero segments, then one, then two, and so on.
-			for index := 0; index <= len(path); index++ {
-				if matchSegments(pattern[1:], path[index:]) {
+			for index := 0; index <= len(remainingPath); index++ {
+				if matchSegments(remainingPattern[1:], remainingPath[index:]) {
 					return true
 				}
 			}
 			return false
 		}
 
-		if len(path) == 0 {
+		if len(remainingPath) == 0 {
 			return false
 		}
-		if !matchSegment(pattern[0], path[0]) {
+		if !matchSegment(remainingPattern[0], remainingPath[0]) {
 			return false
 		}
 
-		pattern = pattern[1:]
-		path = path[1:]
+		remainingPattern = remainingPattern[1:]
+		remainingPath = remainingPath[1:]
 	}
 
-	return len(path) == 0
+	return len(remainingPath) == 0
 }
 
 // matchSegment matches one path segment against one pattern segment, where `*` and `?` apply but
@@ -137,7 +140,8 @@ func matchSegment(pattern string, segment string) bool {
 
 	for segmentIndex < len(segment) {
 		switch {
-		case patternIndex < len(pattern) && (pattern[patternIndex] == '?' || pattern[patternIndex] == segment[segmentIndex]):
+		case patternIndex < len(pattern) &&
+			(pattern[patternIndex] == '?' || pattern[patternIndex] == segment[segmentIndex]):
 			patternIndex++
 			segmentIndex++
 		case patternIndex < len(pattern) && pattern[patternIndex] == '*':

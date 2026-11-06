@@ -25,8 +25,8 @@ func noRedundantTypeConstituentsCaseName(index int) string {
 // carries two boolean literals beside a string. `never` inside a return annotation is clean because
 // it says something there. And `string | number` is clean in both directions: two primitives do not
 // absorb each other at all.
-func TestNoRedundantTypeConstituentsStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoRedundantTypeConstituentsStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		"type T = any;\ntype U = T;\n",
@@ -86,9 +86,9 @@ func TestNoRedundantTypeConstituentsStaysSilent(t *testing.T) {
 		"declare function fn(): never | 'foo';\n",
 	}
 	for index, sourceText := range cases {
-		t.Run(noRedundantTypeConstituentsCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoRedundantTypeConstituents,
+		test.Run(noRedundantTypeConstituentsCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoRedundantTypeConstituents,
 				noRedundantTypeConstituentsFile, sourceText))
 		})
 	}
@@ -97,7 +97,7 @@ func TestNoRedundantTypeConstituentsStaysSilent(t *testing.T) {
 // noRedundantTypeConstituentsFinding is one expected finding with all three layers it can be wrong at.
 //
 // Five message ids describe five different judgments and every one interpolates. The id says which
-// absorption fired; the rendered text names WHICH member was swallowed and by what, which is where a
+// absorption fired; the rendered text names which member was swallowed and by what, which is where a
 // port that reversed the direction shows itself while satisfying every id; and the span says which
 // member the reader is being sent to.
 type noRedundantTypeConstituentsFinding struct {
@@ -109,8 +109,8 @@ type noRedundantTypeConstituentsFinding struct {
 // TestNoRedundantTypeConstituentsFires is upstream's forty-nine reporting cases verbatim, with every
 // finding's id, rendered text and span taken from the installed 8.67.0 build rather than from the
 // corpus's own `errors` array, which states ids but not the rendered text.
-func TestNoRedundantTypeConstituentsFires(t *testing.T) {
-	t.Parallel()
+func TestNoRedundantTypeConstituentsFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText   string
@@ -612,8 +612,8 @@ func TestNoRedundantTypeConstituentsFires(t *testing.T) {
 			},
 		},
 		{
-			// Measured, not imported. Two literals absorbed by one primitive, on DIFFERENT type
-			// nodes, which is the only shape that can see the report ORDER. The corpus never writes
+			// Measured, not imported. Two literals absorbed by one primitive, on different type
+			// nodes, which is the only shape that can see the report order. The corpus never writes
 			// it: a mutant reversing the sort survived all one hundred and four imported cases.
 			// Findings come out in source order, measured on the installed 8.67.0 build.
 			sourceText: "type T = 'a' | 'b' | string;\n",
@@ -631,7 +631,7 @@ func TestNoRedundantTypeConstituentsFires(t *testing.T) {
 			},
 		},
 		{
-			// The same with the primitive written BETWEEN the two literals, so source order and
+			// The same with the primitive written between the two literals, so source order and
 			// discovery order differ.
 			sourceText: "type T = 'a' | string | 'b';\n",
 			wantFindings: []noRedundantTypeConstituentsFinding{
@@ -666,16 +666,16 @@ func TestNoRedundantTypeConstituentsFires(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(noRedundantTypeConstituentsCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoRedundantTypeConstituents,
+		test.Run(noRedundantTypeConstituentsCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoRedundantTypeConstituents,
 				noRedundantTypeConstituentsFile, testCase.sourceText)
 
 			wantIds := make([]string, len(testCase.wantFindings))
 			for position, want := range testCase.wantFindings {
 				wantIds[position] = want.wantId
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 
 			// The harness writes the fixture trimmed, so the span slices are against that text
 			// rather than the Go literal above. The captured spans came from a file written the
@@ -686,14 +686,14 @@ func TestNoRedundantTypeConstituentsFires(t *testing.T) {
 
 				gotSpan := onDisk[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if gotSpan != want.wantSpan {
-					t.Fatalf("finding %d span: expected %q, got %q", position, want.wantSpan, gotSpan)
+					test.Fatalf("finding %d span: expected %q, got %q", position, want.wantSpan, gotSpan)
 				}
 				if diagnostic.Message.Id != want.wantId {
-					t.Fatalf("finding %d id: expected %q, got %q", position, want.wantId,
+					test.Fatalf("finding %d id: expected %q, got %q", position, want.wantId,
 						diagnostic.Message.Id)
 				}
 				if diagnostic.Message.Description != want.wantMessage {
-					t.Fatalf("finding %d message: expected %q, got %q", position, want.wantMessage,
+					test.Fatalf("finding %d message: expected %q, got %q", position, want.wantMessage,
 						diagnostic.Message.Description)
 				}
 			}
@@ -704,22 +704,22 @@ func TestNoRedundantTypeConstituentsFires(t *testing.T) {
 // TestNoRedundantTypeConstituentsRequiresTheTypedHarness pins the nil-checker guard.
 //
 // A mutant removing that guard survives every other fixture here, and structurally so: the guard
-// prevents a PANIC and no findings assertion can see one. It matters more than usual because the
-// walk recovers per FILE rather than per rule, so one nil dereference costs every rule its verdict
+// prevents a panic and no findings assertion can see one. It matters more than usual because the
+// walk recovers per file rather than per rule, so one nil dereference costs every rule its verdict
 // on that whole file rather than costing this rule one case.
 //
-// `NeedsTypeChecker` governs REGISTRATION only. The harness builds a Context by hand, which is what
+// `NeedsTypeChecker` governs registration only. The harness builds a Context by hand, which is what
 // the untyped run below does, so the declaration is not the guard and the two have to be tested
 // separately. The second half is the control: without something that fires, a rule which can never
 // report at all satisfies the first half.
-func TestNoRedundantTypeConstituentsRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestNoRedundantTypeConstituentsRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	const sourceText = "type T = string | any;\n"
 
-	rule_testing.ExpectClean(t, rule_testing.Run(t, NoRedundantTypeConstituents,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, NoRedundantTypeConstituents,
 		noRedundantTypeConstituentsFile, sourceText))
 
-	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoRedundantTypeConstituents,
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoRedundantTypeConstituents,
 		noRedundantTypeConstituentsFile, sourceText), "overrides")
 }

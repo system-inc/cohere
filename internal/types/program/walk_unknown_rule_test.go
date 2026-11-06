@@ -8,6 +8,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/lint/testing"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
@@ -18,8 +19,8 @@ import (
 // Two more properties are pinned because each is a way for the check to go quiet: a blanket
 // file-scope disable must not silence a finding about a directive that silences nothing, and with
 // no registry supplied the check is off rather than reporting every name.
-func TestWalkReportsADirectiveNamingAnUnknownRule(t *testing.T) {
-	t.Parallel()
+func TestWalkReportsADirectiveNamingAnUnknownRule(test *testing.T) {
+	test.Parallel()
 	source := strings.Join([]string{
 		"/* eslint-disable */",
 		"// eslint-disable-next-line no-unused-var -- why",
@@ -31,23 +32,29 @@ func TestWalkReportsADirectiveNamingAnUnknownRule(t *testing.T) {
 		"/* eslint-enable no-such-rule */",
 		"",
 	}, "\n")
-	directory := writeProject(t, map[string]string{"tsconfig.json": minimalConfig, "main.ts": source})
+	directory := writeProject(test, map[string]string{"tsconfig.json": minimalConfiguration, "main.ts": source})
 
-	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
-	if err != nil {
-		t.Fatalf("building: %v", err)
+	graph, buildError := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
+	if buildError != nil {
+		test.Fatalf("building: %v", buildError)
 	}
-	listening := rule.Rule{
+	listening := rule.Rule[rule.NoOptions]{
 		Name: "no-console",
-		Run: func(ctx rule.Context, options any) rule.Listeners {
-			return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {}}
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+			return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
+				// Listens and reports nothing, so the rule counts as run.
+			}}
 		},
 	}
 
 	walk := func() []string {
-		result, err := graph.Walk(context.Background(), graph.ProjectFiles(), []rule.Rule{listening})
-		if err != nil {
-			t.Fatalf("walking: %v", err)
+		result, walkError := graph.Walk(
+			context.Background(),
+			graph.ProjectFiles(),
+			rule_testing.EntriesOf(test, listening),
+		)
+		if walkError != nil {
+			test.Fatalf("walking: %v", walkError)
 		}
 		described := []string{}
 		for _, diagnostic := range result.Diagnostics {
@@ -61,7 +68,7 @@ func TestWalkReportsADirectiveNamingAnUnknownRule(t *testing.T) {
 	}
 
 	if got := walk(); len(got) != 0 {
-		t.Fatalf("with no registry supplied the check must be off, got %q", got)
+		test.Fatalf("with no registry supplied the check must be off, got %q", got)
 	}
 
 	graph.RegisteredRuleNames = []string{"no-console", "nexus/consistency-no-enum"}
@@ -72,17 +79,17 @@ func TestWalkReportsADirectiveNamingAnUnknownRule(t *testing.T) {
 		"no-such-rule/ruleNotFound /* eslint-enable no-such-rule */",
 	}
 	if !slices.Equal(got, want) {
-		t.Fatalf("unknown-rule findings\n got: %q\nwant: %q", got, want)
+		test.Fatalf("unknown-rule findings\n got: %q\nwant: %q", got, want)
 	}
 
-	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), []rule.Rule{listening})
-	if err != nil {
-		t.Fatalf("walking: %v", err)
+	result, walkError := graph.Walk(context.Background(), graph.ProjectFiles(), rule_testing.EntriesOf(test, listening))
+	if walkError != nil {
+		test.Fatalf("walking: %v", walkError)
 	}
 	for _, diagnostic := range result.Diagnostics {
 		if diagnostic.RuleName == "structure/consistency-no-enum" &&
 			!strings.Contains(diagnostic.Message.Description, "'nexus/consistency-no-enum'") {
-			t.Errorf("a stale prefix should be told the registered name, got: %s", diagnostic.Message.Description)
+			test.Errorf("a stale prefix should be told the registered name, got: %s", diagnostic.Message.Description)
 		}
 	}
 }

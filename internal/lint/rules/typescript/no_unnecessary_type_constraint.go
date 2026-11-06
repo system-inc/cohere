@@ -60,10 +60,10 @@ var suggestionRemoveTheConstraint = rule.Message{
 // parenthesis skip rather than to add one. This is written down because skipping parentheses reads
 // as a free correctness improvement and adding it here would ship a silent divergence upstream's
 // own corpus cannot see, since the corpus writes no parenthesized constraint at all.
-var NoUnnecessaryTypeConstraint = rule.Rule{
+var NoUnnecessaryTypeConstraint = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/no-unnecessary-type-constraint",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -95,12 +95,12 @@ var NoUnnecessaryTypeConstraint = rule.Rule{
 				// the `U`. The first parameter in a list has no leading trivia to swallow, so a
 				// range built from `Pos()` looks right on every single-parameter case and only the
 				// second parameter exposes it.
-				ctx.ReportNodeWithSuggestions(name, messageNoUnnecessaryTypeConstraint,
+				ruleContext.ReportNodeWithSuggestions(name, messageNoUnnecessaryTypeConstraint,
 					rule.Suggestion{
 						Message: suggestionRemoveTheConstraint,
 						Fixes: []rule.Fix{rule.ReplaceRange(
 							core.NewTextRange(name.End(), typeParameter.Constraint.End()),
-							trailingCommaForConstraintRemoval(ctx, node, typeParameter))},
+							trailingCommaForConstraintRemoval(ruleContext, node, typeParameter))},
 					})
 			},
 		}
@@ -144,7 +144,7 @@ var NoUnnecessaryTypeConstraint = rule.Rule{
 // repair owes. The release binary rewrites it to `const data = <T, /* , */>() => {};`, adding a
 // comma, and so does this.
 func trailingCommaForConstraintRemoval(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	node *ast.Node,
 	typeParameter *ast.TypeParameterDeclaration,
 ) string {
@@ -159,13 +159,13 @@ func trailingCommaForConstraintRemoval(
 	if typeParameters == nil || len(typeParameters.Nodes) != 1 {
 		return ""
 	}
-	if !fileNeedsGenericArrowDisambiguation(ctx.SourceFile.FileName().AsString()) {
+	if !fileNeedsGenericArrowDisambiguation(ruleContext.SourceFile.FileName().AsString()) {
 		return ""
 	}
 
 	// The text between this parameter and the end of the list. A trailing comma, if one was
 	// written, is the only thing that can be in here besides trivia.
-	tail := ctx.SourceFile.Text()[node.End():typeParameters.End()]
+	tail := ruleContext.SourceFile.Text()[node.End():typeParameters.End()]
 	if strings.Contains(tail, ",") {
 		return ""
 	}

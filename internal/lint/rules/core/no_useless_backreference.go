@@ -1,7 +1,6 @@
 package core
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -9,6 +8,9 @@ import (
 	"github.com/system-inc/cohere/internal/lint/ecmascript/regexsyntax"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
+
+// regExpCallTraceMap asks the tracker for every call and construction of the global RegExp.
+var regExpCallTraceMap = map[string]*reference.TraceMap{"RegExp": {Call: true, Construct: true}}
 
 // NoUselessBackreference flags a backreference that can never match the group it names.
 //
@@ -74,7 +76,7 @@ import (
 // read as getStringIfConstant reads them, through reference.ConstantStringIn: a constant binding's
 // value counts, and flags that are not constant read as none, as ESLint's `flags || ""` does. A
 // pattern that is not constant is not checked.
-var NoUselessBackreference = rule.Rule{
+var NoUselessBackreference = rule.Rule[rule.NoOptions]{
 	Name: "no-useless-backreference",
 
 	// The tracker tells the global `RegExp` from a local that shares its spelling by asking where its
@@ -82,48 +84,45 @@ var NoUselessBackreference = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindRegularExpressionLiteral: func(node *ast.Node) {
 				pattern, flags := regexsyntax.PatternAndFlags(node.Text())
 				if pattern == "" {
 					return
 				}
-				reportUselessBackreferences(ctx, node, pattern, flags)
+				reportUselessBackreferences(ruleContext, node, pattern, flags)
 			},
 			ast.KindSourceFile: func(node *ast.Node) {
 				// Every trace starts at a reference to `RegExp`, so a file that never spells it has
 				// nothing to follow, and the tracker's index is never built.
-				if ctx.TypeChecker == nil || !strings.Contains(ctx.SourceFile.Text(), "RegExp") {
+				if ruleContext.TypeChecker == nil || !strings.Contains(ruleContext.SourceFile.Text(), "RegExp") {
 					return
 				}
-				tracker := reference.NewTracker(ctx.SourceFile, ctx.TypeChecker, nil)
+				tracker := reference.NewTracker(ruleContext.SourceFile, ruleContext.TypeChecker, nil)
 				for _, tracked := range tracker.GlobalReferences(regExpCallTraceMap) {
-					checkBackreferencesInRegExpCall(ctx, tracked.Node)
+					checkBackreferencesInRegExpCall(ruleContext, tracked.Node)
 				}
 			},
 		}
 	},
 }
 
-// regExpCallTraceMap asks the tracker for every call and construction of the global RegExp.
-var regExpCallTraceMap = map[string]*reference.TraceMap{"RegExp": {Call: true, Construct: true}}
-
 // checkBackreferencesInRegExpCall checks a call or construction of RegExp whose pattern is a constant.
-func checkBackreferencesInRegExpCall(ctx rule.Context, call *ast.Node) {
+func checkBackreferencesInRegExpCall(ruleContext rule.Context, call *ast.Node) {
 	arguments := call.Arguments()
 	if len(arguments) == 0 {
 		return
 	}
-	pattern, isConstant := reference.ConstantStringIn(ctx, arguments[0])
+	pattern, isConstant := reference.ConstantStringIn(ruleContext, arguments[0])
 	if !isConstant {
 		return
 	}
 	flags := ""
 	if len(arguments) > 1 {
-		flags, _ = reference.ConstantStringIn(ctx, arguments[1])
+		flags, _ = reference.ConstantStringIn(ruleContext, arguments[1])
 	}
-	reportUselessBackreferences(ctx, call, pattern, flags)
+	reportUselessBackreferences(ruleContext, call, pattern, flags)
 }
 
 // regexNodeKind is what a node on a backreference's or group's enclosing path is.
@@ -177,9 +176,32 @@ type regexStructure struct {
 	backreferences []backreference
 }
 
+var (
+	problemInsideItsOwnGroup = backreferenceProblem{
+		id:     "nested",
+		reason: "encloses the reference and so has captured nothing yet when it is reached",
+	}
+	problemAnotherAlternative = backreferenceProblem{
+		id:     "disjunctive",
+		reason: "sits in a different branch of the same disjunction, and only one branch ever runs",
+	}
+	problemBeforeItsGroup = backreferenceProblem{
+		id:     "forward",
+		reason: "appears later in the pattern, and matching runs left to right",
+	}
+	problemAfterItsGroupInLookbehind = backreferenceProblem{
+		id:     "backward",
+		reason: "appears earlier in a lookbehind, which matches right to left",
+	}
+	problemIntoNegativeLookaround = backreferenceProblem{
+		id:     "intoNegativeLookaround",
+		reason: "sits in a negative lookaround, so it only runs on a path that then fails",
+	}
+)
+
 // reportUselessBackreferences scans one pattern and reports every backreference that cannot match, at
 // the node the pattern came from.
-func reportUselessBackreferences(ctx rule.Context, node *ast.Node, pattern string, flagsText string) {
+func reportUselessBackreferences(ruleContext rule.Context, node *ast.Node, pattern string, flagsText string) {
 	flags := regexsyntax.ParseRegexFlags(flagsText)
 
 	structure, ok := scanRegexStructure(pattern, flags)
@@ -218,7 +240,8 @@ func reportUselessBackreferences(ctx rule.Context, node *ast.Node, pattern strin
 			problem backreferenceProblem
 			group   capturingGroup
 		}
-		var all, sameDisjunction []judged
+		var all []judged
+		var sameDisjunction []judged
 		reachable := false
 		for _, group := range groups {
 			problem, ok := classifyBackreference(reference, group, structure.nodes)
@@ -239,7 +262,7 @@ func reportUselessBackreferences(ctx rule.Context, node *ast.Node, pattern strin
 			toReport = sameDisjunction
 		}
 		first := toReport[0]
-		ctx.ReportNode(node, rule.Message{
+		ruleContext.ReportNode(node, rule.Message{
 			Id: first.problem.id,
 			Description: first.problem.describe(pattern[reference.start:reference.end],
 				pattern[first.group.start:first.group.end], len(toReport)-1),
@@ -280,19 +303,19 @@ func patternIsWellFormed(pattern string, structure regexStructure, groupCount in
 					break
 				}
 			}
-			if !named && (hasNamedGroup || flags.UV()) {
+			if !named && (hasNamedGroup || flags.UnicodeMode()) {
 				return false
 			}
 			continue
 		}
 		// Under `u` or `v` a numeric escape with no such group is not a legacy octal, it is an
 		// error. Without the flag it is an octal and the rule is right to ignore it.
-		if flags.UV() && reference.index > groupCount {
+		if flags.UnicodeMode() && reference.index > groupCount {
 			return false
 		}
 	}
 
-	if flags.UV() && hasUnmatchedQuantifierBrace(pattern, flags) {
+	if flags.UnicodeMode() && hasUnmatchedQuantifierBrace(pattern, flags) {
 		return false
 	}
 	return true
@@ -347,49 +370,6 @@ func opensQuantifier(pattern string, index int) bool {
 	return cursor < len(pattern) && pattern[cursor] == '}'
 }
 
-// backreferenceProblem is one of the five ways a group cannot have run.
-type backreferenceProblem struct {
-	id     string
-	reason string
-}
-
-// describe builds the finding's sentence from the reference and the group it names.
-func (problem backreferenceProblem) describe(reference string, group string, otherGroups int) string {
-	also := ""
-	switch {
-	case otherGroups == 1:
-		also = " (and so does one other group of that name)"
-	case otherGroups > 1:
-		also = fmt.Sprintf(" (and so do %d other groups of that name)", otherGroups)
-	}
-	return fmt.Sprintf("The backreference %s can never match, because %s %s%s. It matches the empty "+
-		"string instead of failing, so the pattern quietly matches more than it looks like it does.",
-		reference, group, problem.reason, also)
-}
-
-var (
-	problemInsideItsOwnGroup = backreferenceProblem{
-		id:     "nested",
-		reason: "encloses the reference and so has captured nothing yet when it is reached",
-	}
-	problemAnotherAlternative = backreferenceProblem{
-		id:     "disjunctive",
-		reason: "sits in a different branch of the same disjunction, and only one branch ever runs",
-	}
-	problemBeforeItsGroup = backreferenceProblem{
-		id:     "forward",
-		reason: "appears later in the pattern, and matching runs left to right",
-	}
-	problemAfterItsGroupInLookbehind = backreferenceProblem{
-		id:     "backward",
-		reason: "appears earlier in a lookbehind, which matches right to left",
-	}
-	problemIntoNegativeLookaround = backreferenceProblem{
-		id:     "intoNegativeLookaround",
-		reason: "sits in a negative lookaround, so it only runs on a path that then fails",
-	}
-)
-
 // resolveBackreference finds the group a reference names.
 //
 // A numeric reference past the group count is not a reference at all but a legacy octal escape,
@@ -425,7 +405,11 @@ func resolveBackreference(reference backreference, groups []capturingGroup, grou
 // disjunction question. Direction decides between the two ordering problems, and the negative
 // lookaround check comes last because a group inside one can still be reachable in every other
 // respect.
-func classifyBackreference(reference backreference, group capturingGroup, nodes []regexNode) (backreferenceProblem, bool) {
+func classifyBackreference(
+	reference backreference,
+	group capturingGroup,
+	nodes []regexNode,
+) (backreferenceProblem, bool) {
 	if group.start <= reference.start && reference.end <= group.end {
 		return problemInsideItsOwnGroup, true
 	}
@@ -487,226 +471,4 @@ func scanRegexStructure(pattern string, flags regexsyntax.RegexFlags) (regexStru
 		return regexStructure{}, false
 	}
 	return scanner.structure, true
-}
-
-// regexStructureScanner walks a pattern once, keeping a stack of what encloses the current byte.
-type regexStructureScanner struct {
-	pattern   string
-	flags     regexsyntax.RegexFlags
-	structure regexStructure
-	// stack holds the indices of the currently open nodes, outermost first.
-	stack []int
-	// groupStack records, for each open `(`, the group index it opened or -1 for a non-capturing
-	// one, so the closing `)` can finish the right group's span.
-	groupStack []int
-	// alternativeStack records the alternative node index open inside each enclosing group, so a
-	// `|` can close one branch and open the next at the right level.
-	alternativeStack []int
-}
-
-// push adds a node and returns its index.
-func (scanner *regexStructureScanner) push(kind regexNodeKind, negative bool) int {
-	scanner.structure.nodes = append(scanner.structure.nodes, regexNode{kind: kind, negative: negative})
-	index := len(scanner.structure.nodes) - 1
-	scanner.stack = append(scanner.stack, index)
-	return index
-}
-
-// pop removes the innermost open node.
-func (scanner *regexStructureScanner) pop() {
-	if len(scanner.stack) > 0 {
-		scanner.stack = scanner.stack[:len(scanner.stack)-1]
-	}
-}
-
-// currentPath copies the open stack, which is what a group or reference records about itself.
-func (scanner *regexStructureScanner) currentPath() []int {
-	path := make([]int, len(scanner.stack))
-	copy(path, scanner.stack)
-	return path
-}
-
-func (scanner *regexStructureScanner) run() bool {
-	pattern := scanner.pattern
-
-	// The root node stands for the whole pattern, so every path shares index 0 and the walk that
-	// finds the lowest common ancestor always has somewhere to start.
-	scanner.push(regexNodeGroup, false)
-	scanner.openAlternative()
-
-	for index := 0; index < len(pattern); {
-		switch pattern[index] {
-		case '\\':
-			step, ok := scanner.readEscape(index)
-			if !ok {
-				return false
-			}
-			index += step
-
-		case '[':
-			// Everything inside a character class is a literal, which is the whole of
-			// `/^[\1](a)$/` being clean: the `\1` there matches a control character, not a group.
-			end, ok := regexsyntax.ClassEnd(pattern, index, scanner.flags)
-			if !ok {
-				return false
-			}
-			index = end
-
-		case '(':
-			index = scanner.openGroup(index)
-
-		case ')':
-			if !scanner.closeGroup(index) {
-				return false
-			}
-			index++
-
-		case '|':
-			scanner.closeAlternative()
-			scanner.openAlternative()
-			index++
-
-		default:
-			index++
-		}
-	}
-
-	// A pattern whose parentheses do not balance is a syntax error. The root group and its
-	// alternative are the only two nodes that should still be open.
-	return len(scanner.groupStack) == 0
-}
-
-// openAlternative starts a new branch at the current level.
-func (scanner *regexStructureScanner) openAlternative() {
-	index := scanner.push(regexNodeAlternative, false)
-	scanner.alternativeStack = append(scanner.alternativeStack, index)
-}
-
-// closeAlternative ends the branch at the current level.
-func (scanner *regexStructureScanner) closeAlternative() {
-	if len(scanner.alternativeStack) > 0 {
-		scanner.alternativeStack = scanner.alternativeStack[:len(scanner.alternativeStack)-1]
-	}
-	scanner.pop()
-}
-
-// openGroup handles a `(` and returns the index just past whatever prefix it consumed.
-func (scanner *regexStructureScanner) openGroup(index int) int {
-	pattern := scanner.pattern
-	kind := regexNodeCapturingGroup
-	negative := false
-	name := ""
-	next := index + 1
-
-	if next < len(pattern) && pattern[next] == '?' {
-		switch {
-		case next+1 < len(pattern) && pattern[next+1] == ':':
-			kind, next = regexNodeGroup, next+2
-		case next+1 < len(pattern) && pattern[next+1] == '=':
-			kind, next = regexNodeLookahead, next+2
-		case next+1 < len(pattern) && pattern[next+1] == '!':
-			kind, negative, next = regexNodeLookahead, true, next+2
-		case next+2 < len(pattern) && pattern[next+1] == '<' && pattern[next+2] == '=':
-			kind, next = regexNodeLookbehind, next+3
-		case next+2 < len(pattern) && pattern[next+1] == '<' && pattern[next+2] == '!':
-			kind, negative, next = regexNodeLookbehind, true, next+3
-		case next+1 < len(pattern) && pattern[next+1] == '<':
-			// `(?<name>` is the one `(?<` form that captures.
-			closing := strings.IndexByte(pattern[next+2:], '>')
-			if closing < 0 {
-				kind, next = regexNodeGroup, next+2
-			} else {
-				name = pattern[next+2 : next+2+closing]
-				next = next + 2 + closing + 1
-			}
-		default:
-			// A `(?` this scanner does not know is treated as a plain nesting group rather than
-			// guessed at, so the paths stay right even if the construct is exotic.
-			kind, next = regexNodeGroup, next+2
-		}
-	}
-
-	scanner.push(kind, negative)
-
-	if kind == regexNodeCapturingGroup {
-		scanner.structure.groups = append(scanner.structure.groups, capturingGroup{
-			name:  name,
-			start: index,
-			path:  scanner.currentPath(),
-		})
-		scanner.groupStack = append(scanner.groupStack, len(scanner.structure.groups)-1)
-	} else {
-		scanner.groupStack = append(scanner.groupStack, -1)
-	}
-
-	scanner.openAlternative()
-	return next
-}
-
-// closeGroup handles a `)`, finishing the group's span if it captured.
-func (scanner *regexStructureScanner) closeGroup(index int) bool {
-	if len(scanner.groupStack) == 0 {
-		return false
-	}
-	scanner.closeAlternative()
-
-	groupIndex := scanner.groupStack[len(scanner.groupStack)-1]
-	scanner.groupStack = scanner.groupStack[:len(scanner.groupStack)-1]
-	if groupIndex >= 0 {
-		scanner.structure.groups[groupIndex].end = index + 1
-	}
-	scanner.pop()
-	return true
-}
-
-// readEscape handles a `\` outside a character class and returns how many bytes it consumed.
-//
-// Two of them are backreferences and the rest are skipped by the shelf's own scanner, which already
-// knows the widths of `\x`, `\u{...}`, `\p{...}` and `\q{...}` under each flag.
-func (scanner *regexStructureScanner) readEscape(index int) (int, bool) {
-	pattern := scanner.pattern
-	if index+1 >= len(pattern) {
-		return 0, false
-	}
-
-	// `\1` through `\9...`: a numeric backreference, or a legacy octal when no such group exists.
-	// Which of the two it is cannot be decided here, because the group may be declared later in the
-	// pattern; the total is known only after the scan, so the decision is deferred to resolution.
-	if pattern[index+1] >= '1' && pattern[index+1] <= '9' {
-		end := index + 1
-		value := 0
-		for end < len(pattern) && pattern[end] >= '0' && pattern[end] <= '9' {
-			value = value*10 + int(pattern[end]-'0')
-			end++
-		}
-		scanner.structure.backreferences = append(scanner.structure.backreferences, backreference{
-			index: value,
-			start: index,
-			end:   end,
-			path:  scanner.currentPath(),
-		})
-		return end - index, true
-	}
-
-	// `\k<name>`: a named backreference. Bare `\k` with no angle bracket is an identity escape
-	// outside unicode mode, and the shelf's skip handles it.
-	if pattern[index+1] == 'k' && index+2 < len(pattern) && pattern[index+2] == '<' {
-		closing := strings.IndexByte(pattern[index+3:], '>')
-		if closing >= 0 {
-			end := index + 3 + closing + 1
-			scanner.structure.backreferences = append(scanner.structure.backreferences, backreference{
-				name:  pattern[index+3 : index+3+closing],
-				start: index,
-				end:   end,
-				path:  scanner.currentPath(),
-			})
-			return end - index, true
-		}
-	}
-
-	step, ok := regexsyntax.SkipPatternEscape(pattern, index, scanner.flags)
-	if !ok {
-		return 0, false
-	}
-	return step, true
 }

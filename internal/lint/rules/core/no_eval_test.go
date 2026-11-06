@@ -26,17 +26,17 @@ const evalFile = "/repository/source/Eval.ts"
 // below would then pass vacuously while the rule reported nothing at all. This asserts the
 // difference is observable: a direct call fires under the typed harness, and the whole rule goes
 // quiet without it.
-func TestNoEvalRequiresTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestNoEvalRequiresTypedHarness(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectFindings(t,
-		rule_testing.RunTyped(t, NoEval, evalFile, "var EVAL = eval; EVAL('foo')"), "noEval")
-	rule_testing.ExpectClean(t,
-		rule_testing.Run(t, NoEval, evalFile, "var EVAL = eval; EVAL('foo')"))
+	rule_testing.ExpectFindings(test,
+		rule_testing.RunTyped(test, NoEval, evalFile, "var EVAL = eval; EVAL('foo')"), "noEval")
+	rule_testing.ExpectClean(test,
+		rule_testing.Run(test, NoEval, evalFile, "var EVAL = eval; EVAL('foo')"))
 }
 
-func TestNoEvalFires(t *testing.T) {
-	t.Parallel()
+func TestNoEvalFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -55,7 +55,11 @@ func TestNoEvalFires(t *testing.T) {
 		{"the comma-sequence indirection", "(0, eval)('foo')", []string{"noEval"}},
 		{"an alias assignment", "var EVAL = eval; EVAL('foo')", []string{"noEval"}},
 		{"eval passed as an argument", "(function(exe){ exe('foo') })(eval);", []string{"noEval"}},
-		{"eval passed to a callback taker", "callbacks.findLastIndex(function (cb) { return cb(eval); }, this);", []string{"noEval"}},
+		{
+			"eval passed to a callback taker",
+			"callbacks.findLastIndex(function (cb) { return cb(eval); }, this);",
+			[]string{"noEval"},
+		},
 
 		// The global-object arm. Upstream gates these behind `env: { browser: true }` or
 		// `env: { node: true }`, which our configuration surface does not have; see the divergence
@@ -80,10 +84,10 @@ func TestNoEvalFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.RunTyped(t, NoEval, evalFile, testCase.sourceText), testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.RunTyped(test, NoEval, evalFile, testCase.sourceText), testCase.wantIds...)
 		})
 	}
 }
@@ -95,8 +99,8 @@ func TestNoEvalFires(t *testing.T) {
 // whether the rule resolves names or merely spells them: `function foo() { var eval = 'foo';
 // window[eval]('foo') }` subscripts with a *variable* holding the string, so the property read is
 // whatever that variable names and is not statically `eval`.
-func TestNoEvalStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoEvalStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -116,7 +120,10 @@ func TestNoEvalStaysSilent(t *testing.T) {
 		// property, whatever that variable happens to hold.
 		{"a window subscript through a shadowing variable", "function foo() { var eval = 'foo'; window[eval]('foo') }"},
 		{"a global subscript through a shadowing variable", "function foo() { var eval = 'foo'; global[eval]('foo') }"},
-		{"a globalThis subscript through a shadowing variable", "function foo() { var eval = 'foo'; globalThis[eval]('foo') }"},
+		{
+			"a globalThis subscript through a shadowing variable",
+			"function foo() { var eval = 'foo'; globalThis[eval]('foo') }",
+		},
 
 		// `this` inside a method, an object literal function, or a class body is not the global
 		// object, so `this.eval` there is a call on the receiver rather than global eval.
@@ -140,12 +147,24 @@ func TestNoEvalStaysSilent(t *testing.T) {
 
 		// A function passed a `thisArg` is invoked with that receiver, so `this.eval` inside it is
 		// not global eval. Upstream enumerates the standard-library methods that take one.
-		{"findLast with a thisArg", "array.findLast(function (x) { return this.eval.includes(x); }, { eval: ['foo', 'bar'] });"},
-		{"findLastIndex with this as thisArg", "callbacks.findLastIndex(function (cb) { return cb(this.eval); }, this);"},
+		{
+			"findLast with a thisArg",
+			"array.findLast(function (x) { return this.eval.includes(x); }, { eval: ['foo', 'bar'] });",
+		},
+		{
+			"findLastIndex with this as thisArg",
+			"callbacks.findLastIndex(function (cb) { return cb(this.eval); }, this);",
+		},
 		{"flatMap with a thisArg", "['1+1'].flatMap(function (str) { return this.eval(str); }, new Evaluator);"},
 		{"Array.from with a thisArg", "Array.from(values, function (value) { return this.eval(value); }, context);"},
-		{"Array.fromAsync with a thisArg", "Array.fromAsync(values, async function (value) { return this.eval(await value); }, context);"},
-		{"Uint8Array.from with a thisArg", "Uint8Array.from(values, function (value) { return this.eval(value); }, context);"},
+		{
+			"Array.fromAsync with a thisArg",
+			"Array.fromAsync(values, async function (value) { return this.eval(await value); }, context);",
+		},
+		{
+			"Uint8Array.from with a thisArg",
+			"Uint8Array.from(values, function (value) { return this.eval(value); }, context);",
+		},
 
 		// A top-level `this` in a module is undefined rather than the global object. Our tree is
 		// modules, so this is the shape a real file has and it must not fire.
@@ -153,9 +172,9 @@ func TestNoEvalStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoEval, evalFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoEval, evalFile, testCase.sourceText))
 		})
 	}
 }
@@ -166,8 +185,8 @@ func TestNoEvalStaysSilent(t *testing.T) {
 // With it on, only a *direct*, non-optional call to `eval` is reported. Every indirection is
 // permitted, because an indirect eval cannot reach the calling scope and so is a far smaller
 // hazard than the direct form.
-func TestNoEvalAllowIndirect(t *testing.T) {
-	t.Parallel()
+func TestNoEvalAllowIndirect(test *testing.T) {
+	test.Parallel()
 
 	allowed := []string{
 		"(0, eval)('foo')",
@@ -198,19 +217,19 @@ func TestNoEvalAllowIndirect(t *testing.T) {
 		"eval?.('foo')",
 	}
 	for _, sourceText := range allowed {
-		t.Run(sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(
-				t, NoEval, evalFile, sourceText, NoEvalOptions{AllowIndirect: true}))
+		test.Run(sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(
+				test, NoEval, evalFile, sourceText, NoEvalOptions{AllowIndirect: true}))
 		})
 	}
 
 	// The direct call is still reported with the option on. That is the whole point of the option
 	// being narrower than off.
-	t.Run("a direct call is still reported", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(
-			t, NoEval, evalFile, "eval('foo')", NoEvalOptions{AllowIndirect: true}), "noEval")
+	test.Run("a direct call is still reported", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(
+			test, NoEval, evalFile, "eval('foo')", NoEvalOptions{AllowIndirect: true}), "noEval")
 	})
 }
 
@@ -219,8 +238,8 @@ func TestNoEvalAllowIndirect(t *testing.T) {
 // This rule carries no repair, and the brief is explicit that the span still needs asserting: a rule
 // whose defect is where it points passes a complete fixture pair while being wrong. The spans below
 // are read off oxc's own snapshot, which prints the reported column for every diagnostic.
-func TestNoEvalSpans(t *testing.T) {
-	t.Parallel()
+func TestNoEvalSpans(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -248,16 +267,17 @@ func TestNoEvalSpans(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoEval, evalFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoEval, evalFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.want) {
-				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.want))
+				test.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.want))
 			}
 			for index, want := range testCase.want {
-				reported := testCase.sourceText[result.Diagnostics[index].Range.Pos():result.Diagnostics[index].Range.End()]
+				diagnostic := result.Diagnostics[index]
+				reported := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if reported != want {
-					t.Errorf("finding %d points at %q, want %q", index, reported, want)
+					test.Errorf("finding %d points at %q, want %q", index, reported, want)
 				}
 			}
 		})

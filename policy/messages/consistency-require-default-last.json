@@ -1,0 +1,10 @@
+{
+  "rules": {
+    "Go": "cohere-go/consistency-require-default-last"
+  },
+  "messages": {
+    "defaultNotLast": {
+      "text": "This `default` is not the last clause of its {{statement}}. Go picks the default only when no other clause matches, wherever it sits, so a reader looks for that fallback at the bottom, after every case it stands behind, and one placed higher makes them read the whole statement to be sure. Move it to the end, where the move changes nothing the program does and every {{statement}} reads the same way down."
+    }
+  }
+}

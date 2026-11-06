@@ -22,18 +22,35 @@ var (
 // The rule's messages, whose wording lives in `policy/messages/consistency-no-ambiguous-identifier.json`.
 // An `e` finding says which way the rule guessed, as one of the `context` phrase's options.
 var (
-	consistencyNoAmbiguousIdentifierAmbiguousEText   = policy.MessageOf("nexus/consistency-no-ambiguous-identifier", "noAmbiguousE")
-	consistencyNoAmbiguousIdentifierErrorContext     = consistencyNoAmbiguousIdentifierAmbiguousEText.Option("context", "error")
-	consistencyNoAmbiguousIdentifierEventContext     = consistencyNoAmbiguousIdentifierAmbiguousEText.Option("context", "event")
-	consistencyNoAmbiguousIdentifierUnclearContext   = consistencyNoAmbiguousIdentifierAmbiguousEText.Option("context", "unclear")
-	consistencyNoAmbiguousIdentifierSingleLetterText = policy.MessageOf("nexus/consistency-no-ambiguous-identifier", "noSingleLetter")
-	consistencyNoAmbiguousIdentifierUnderscoreText   = policy.MessageOf("nexus/consistency-no-ambiguous-identifier", "noUnderscore")
+	consistencyNoAmbiguousIdentifierAmbiguousEText = policy.MessageOf(
+		"nexus/consistency-no-ambiguous-identifier",
+		"noAmbiguousE",
+	)
+	consistencyNoAmbiguousIdentifierErrorContext = consistencyNoAmbiguousIdentifierAmbiguousEText.Option(
+		"context",
+		"error",
+	)
+	consistencyNoAmbiguousIdentifierEventContext = consistencyNoAmbiguousIdentifierAmbiguousEText.Option(
+		"context",
+		"event",
+	)
+	consistencyNoAmbiguousIdentifierUnclearContext = consistencyNoAmbiguousIdentifierAmbiguousEText.Option(
+		"context",
+		"unclear",
+	)
+	consistencyNoAmbiguousIdentifierSingleLetterText = policy.MessageOf(
+		"nexus/consistency-no-ambiguous-identifier",
+		"noSingleLetter",
+	)
 )
 
 func messageNoAmbiguousE(context policy.MessageOption, suggestedName string) rule.Message {
 	return rule.Message{
-		Id:          consistencyNoAmbiguousIdentifierAmbiguousEText.Id,
-		Description: consistencyNoAmbiguousIdentifierAmbiguousEText.Render(map[string]string{"suggestedName": suggestedName}, context),
+		Id: consistencyNoAmbiguousIdentifierAmbiguousEText.Id,
+		Description: consistencyNoAmbiguousIdentifierAmbiguousEText.Render(
+			map[string]string{"suggestedName": suggestedName},
+			context,
+		),
 	}
 }
 
@@ -44,21 +61,23 @@ func messageNoSingleLetter(name string) rule.Message {
 	}
 }
 
-func messageNoUnderscore() rule.Message {
-	return rule.Message{
-		Id:          consistencyNoAmbiguousIdentifierUnderscoreText.Id,
-		Description: consistencyNoAmbiguousIdentifierUnderscoreText.Render(nil),
-	}
-}
-
-// ConsistencyNoAmbiguousIdentifier bans single-letter identifiers and the bare underscore.
+// ConsistencyNoAmbiguousIdentifier bans single-letter names, judged where they are declared.
 //
 //	valid:   catch (error) { }
 //	valid:   const x = 1
 //	valid:   items.sort((a, b) => a - b)
+//	valid:   values.map((_, index) => index)
 //	invalid: catch (e) { }
 //	invalid: const n = 1
-//	invalid: const _ = 1
+//
+// A name is reported once, at its declaration, and never at its reads. The declaration is where the
+// name was chosen and the only place a rename starts, so a finding at every read repeated one defect
+// as many times as the name was used (`const n = 1; return n + n` was three findings), and gave a
+// catch-bound `e` two different pieces of advice: an error at the catch, an unclear context at the
+// read (#rb0ewgm, cases am01 and am06 in `conformance/textrules`).
+//
+// The bare `_` is not judged. It is the discard, a value deliberately left unnamed: Go and Swift make
+// it one by grammar, and TypeScript spells it the same way by convention (am02).
 //
 // The exemptions carry the judgment. Coordinates keep x, y, and z, where the single letter is the
 // conventional spelling. A sort comparator keeps a and b, because that is the shape everyone reads
@@ -75,16 +94,22 @@ func messageNoUnderscore() rule.Message {
 // into a broken file. It is the same trap import-require-node-namespace declines for the same
 // reason. The suggested name travels in the message instead, where a reader applies it with the
 // scope in front of them.
-var ConsistencyNoAmbiguousIdentifier = rule.Rule{
+var ConsistencyNoAmbiguousIdentifier = rule.Rule[rule.NoOptions]{
 	Name: "nexus/consistency-no-ambiguous-identifier",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindIdentifier: func(node *ast.Node) {
 				name := node.Text()
 
-				// Only single lowercase letters and the bare underscore are in scope. An uppercase
-				// single letter is a type parameter (T, K, V, R, E) and is left alone.
-				if name != "_" && !singleLowercaseLetter.MatchString(name) {
+				// Only single lowercase letters are in scope. An uppercase single letter is a type
+				// parameter (T, K, V, R, E) and is left alone, and the bare `_` is the discard, which
+				// names nothing for a reader to track.
+				if !singleLowercaseLetter.MatchString(name) {
+					return
+				}
+
+				// Judged where it is declared, and only there: its reads are the same defect again.
+				if !isAmbiguousDeclarationName(node) {
 					return
 				}
 
@@ -106,16 +131,12 @@ var ConsistencyNoAmbiguousIdentifier = rule.Rule{
 					return
 				}
 
-				if name == "_" {
-					ctx.ReportNode(node, messageNoUnderscore())
-					return
-				}
 				if alwaysAllowedSingleLetters[name] {
 					return
 				}
 				if name == "e" {
 					suggestedName, context := inferEventOrErrorContext(node)
-					ctx.ReportNode(node, messageNoAmbiguousE(context, suggestedName))
+					ruleContext.ReportNode(node, messageNoAmbiguousE(context, suggestedName))
 					return
 				}
 				// A sort comparator is the one place a and b read correctly.
@@ -123,10 +144,106 @@ var ConsistencyNoAmbiguousIdentifier = rule.Rule{
 					return
 				}
 
-				ctx.ReportNode(node, messageNoSingleLetter(name))
+				ruleContext.ReportNode(node, messageNoSingleLetter(name))
 			},
 		}
 	},
+}
+
+// isAmbiguousDeclarationName reports whether an identifier is where its name is declared, rather than a
+// read or a write of a name declared elsewhere.
+//
+// TypeScript's own answer is the base, the name of a declaration node, which covers every binding:
+// variables, parameters, destructured elements, functions, classes, members, enum members. It is
+// adjusted in three places, all by the shape of the syntax:
+//
+//	{ n }        a shorthand property, which TypeScript counts as declaring the key; for the binding
+//	             `n` it is a read, or a write in `({ n } = value)`, and `n` is declared elsewhere
+//	n: for ...   a label, which TypeScript does not count because it binds no symbol; the labeled
+//	             statement is where it is chosen, and `break n` and `continue n` are its reads
+//	this.n = 1   in a JavaScript class, the declaration of a property the class body never names;
+//	             see isFirstThisPropertyDeclaration
+func isAmbiguousDeclarationName(node *ast.Node) bool {
+	parent := node.Parent
+	if parent == nil {
+		return false
+	}
+	if parent.Kind == ast.KindShorthandPropertyAssignment {
+		return false
+	}
+	return ast.IsLabelOfLabeledStatement(node) || ast.IsDeclarationName(node) ||
+		isFirstThisPropertyDeclaration(node)
+}
+
+// isFirstThisPropertyDeclaration reports whether an identifier is `n` in a JavaScript class's first
+// `this.n = ...`, for a property `n` the class does not declare as a member.
+//
+// JavaScript has no field declaration it requires, so a class can create a property by assigning it,
+// and TypeScript's binder takes the assignment as the property's declaration. Without this, a
+// single-letter property made that way had no declaration to judge and went unreported anywhere,
+// where the rule caught it at its reads before it judged declarations only.
+//
+// The binder's own reading decides it, by syntax and without the checker:
+// `ast.GetAssignmentDeclarationKind` names the assignment a this-property declaration (only ever in a
+// JavaScript file, since TypeScript requires the member), and its `this` belongs to the class when its
+// container is one of the class's members, the containers `getThisClassAndSymbolTable` binds onto a
+// class. A static member's `this` is the class itself, so the static and instance properties are
+// separate names, as the binder keeps them in separate tables. Every such assignment declares the
+// property again, so only the first in source order reports, and a member the class declares is the
+// declaration instead, judged where it is written.
+func isFirstThisPropertyDeclaration(node *ast.Node) bool {
+	class, static, isThisPropertyDeclaration := thisPropertyDeclarationOwner(node)
+	if !isThisPropertyDeclaration {
+		return false
+	}
+	name := node.Text()
+	for _, member := range class.Members() {
+		memberName := member.Name()
+		if memberName == nil || (memberName.Kind != ast.KindIdentifier && memberName.Kind != ast.KindStringLiteral) {
+			continue
+		}
+		if memberName.Text() == name && ast.IsStatic(member) == static {
+			return false
+		}
+	}
+	var first *ast.Node
+	var visit func(current *ast.Node) bool
+	visit = func(current *ast.Node) bool {
+		if current.Kind == ast.KindIdentifier && current.Text() == name {
+			if owner, ownerStatic, declares := thisPropertyDeclarationOwner(current); declares &&
+				owner == class && ownerStatic == static {
+				first = current
+				return true
+			}
+		}
+		return current.ForEachChild(visit)
+	}
+	class.ForEachChild(visit)
+	return first == node
+}
+
+// thisPropertyDeclarationOwner answers, for the name in `this.name = ...`, the class whose property
+// the assignment declares and whether that property is static. It reports false for anything else.
+func thisPropertyDeclarationOwner(node *ast.Node) (*ast.Node, bool, bool) {
+	access := node.Parent
+	if access == nil || access.Kind != ast.KindPropertyAccessExpression || access.Name() != node {
+		return nil, false, false
+	}
+	assignment := access.Parent
+	if assignment == nil || assignment.Kind != ast.KindBinaryExpression ||
+		assignment.AsBinaryExpression().Left != access ||
+		ast.GetAssignmentDeclarationKind(assignment) != ast.JSDeclarationKindThisProperty {
+		return nil, false, false
+	}
+	container := ast.GetThisContainer(assignment, false, false)
+	switch container.Kind {
+	case ast.KindConstructor, ast.KindPropertyDeclaration, ast.KindMethodDeclaration, ast.KindGetAccessor,
+		ast.KindSetAccessor, ast.KindClassStaticBlockDeclaration:
+		if class := container.Parent; class != nil && ast.IsClassLike(class) {
+			return class, ast.IsStatic(container), true
+		}
+	}
+	return nil, false, false
 }
 
 // isInsideSortComparator reports whether an identifier sits in a function passed as the first

@@ -1,6 +1,9 @@
 package javascript
 
-import "github.com/system-inc/cohere/internal/format/printing"
+import (
+	"github.com/system-inc/cohere/internal/format/doc"
+	"github.com/system-inc/cohere/internal/format/printing"
+)
 
 // print/expression-statement.js and semicolon/semicolon.js. The Vue event binding and HTML inline
 // event handler paths answer false here: those hosts never run this printer.
@@ -38,7 +41,7 @@ func isSingleJsxExpressionStatementInMarkdown(path *Path, options *Options) bool
 
 // printExpressionStatement is upstream's printExpressionStatement.
 func printExpressionStatement(path *Path, options *Options, print PrintFunc) Doc {
-	parts := []any{print("expression", nil)}
+	parts := []Doc{print("expression", nil)}
 
 	if shouldExpressionStatementPrintLeadingSemicolon(path, options) {
 		if shouldExpressionStatementPrintOwnComments(path, options) {
@@ -50,12 +53,16 @@ func printExpressionStatement(path *Path, options *Options, print PrintFunc) Doc
 			typeCastCommentDoc := printing.PrintLeadingComments(path, options, func(comment Node) bool {
 				return comment == typeCastComment
 			})
-			return printing.PrintComments(path, concatIn(path, append([]any{";", typeCastCommentDoc}, parts...)...), options,
-				func(comment Node) bool { return comment != typeCastComment })
+			return printing.PrintComments(
+				path,
+				concatIn(path, append([]Doc{doc.Text(";"), typeCastCommentDoc}, parts...)...),
+				options,
+				func(comment Node) bool { return comment != typeCastComment },
+			)
 		}
-		parts = append([]any{";"}, parts...)
+		parts = append([]Doc{doc.Text(";")}, parts...)
 	} else if shouldPrintSemicolon(path, options) {
-		parts = append(parts, ";")
+		parts = append(parts, doc.Text(";"))
 	}
 	return concatIn(path, parts...)
 }
@@ -115,6 +122,6 @@ func expressionNeedsAsiProtection(path *Path, options *Options) bool {
 	if !hasNakedLeftSide(current) {
 		return false
 	}
-	return call(path, func(path *Path) bool { return expressionNeedsAsiProtection(path, options) },
-		getLeftSidePathName(current)...)
+	return callSelector(path, func(path *Path) bool { return expressionNeedsAsiProtection(path, options) },
+		getLeftSidePathName(current))
 }

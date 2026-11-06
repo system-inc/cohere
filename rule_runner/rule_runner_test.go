@@ -11,6 +11,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/rules/adamic"
 	"github.com/system-inc/cohere/internal/lint/rules/nexus"
+	"github.com/system-inc/cohere/internal/lint/testing"
 	"github.com/system-inc/cohere/internal/types/program"
 	"github.com/system-inc/cohere/rule_runner"
 )
@@ -30,42 +31,52 @@ var cycleProject = map[string]string{
 }
 
 // buildProject writes files to a directory of its own and builds cohere's program over it.
-func buildProject(t *testing.T, files map[string]string) *program.Graph {
-	t.Helper()
-	directory, err := filepath.EvalSymlinks(t.TempDir())
-	if err != nil {
-		t.Fatal(err)
+func buildProject(test *testing.T, files map[string]string) *program.Graph {
+	test.Helper()
+	directory, resolveSymlinksError := filepath.EvalSymlinks(test.TempDir())
+	if resolveSymlinksError != nil {
+		test.Fatal(resolveSymlinksError)
 	}
 	for name, contents := range files {
-		if err := os.WriteFile(filepath.Join(directory, name), []byte(contents), 0o644); err != nil {
-			t.Fatal(err)
+		if writeError := os.WriteFile(filepath.Join(directory, name), []byte(contents), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 	}
-	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
-	if err != nil {
-		t.Fatalf("building: %v", err)
+	graph, buildError := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
+	if buildError != nil {
+		test.Fatalf("building: %v", buildError)
 	}
 	return graph
 }
 
 // walkAndRun is subject's findings on files twice, through cohere's own walk and through RunRule, on one program,
 // each sorted by place. The walk is the reference because it is what every cohere run reports through.
-func walkAndRun(t *testing.T, files map[string]string, subject rule.Rule) (walked []rule_runner.Finding, ran []rule_runner.Finding) {
-	t.Helper()
-	graph := buildProject(t, files)
-	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), []rule.Rule{subject})
-	if err != nil {
-		t.Fatalf("walking: %v", err)
+func walkAndRun(
+	test *testing.T,
+	files map[string]string,
+	subject rule.Rule[rule.NoOptions],
+) (walked []rule_runner.Finding, ran []rule_runner.Finding) {
+	test.Helper()
+	graph := buildProject(test, files)
+	result, walkError := graph.Walk(context.Background(), graph.ProjectFiles(), rule_testing.EntriesOf(test, subject))
+	if walkError != nil {
+		test.Fatalf("walking: %v", walkError)
 	}
 	for _, diagnostic := range result.Diagnostics {
 		fileName, line, column := diagnostic.Location()
-		walked = append(walked, rule_runner.Finding{Rule: diagnostic.RuleName, File: fileName, Line: line, Column: column, Message: diagnostic.Message.Description})
+		walked = append(walked, rule_runner.Finding{
+			Rule:    diagnostic.RuleName,
+			File:    fileName,
+			Line:    line,
+			Column:  column,
+			Message: diagnostic.Message.Description,
+		})
 	}
 	typeChecker, done := graph.Program.GetTypeChecker(context.Background())
-	ran, err = rule_runner.RunRule(graph.Program, typeChecker, graph.ProjectFiles(), subject.Name)
+	ran, runRuleError := rule_runner.RunRule(graph.Program, typeChecker, graph.ProjectFiles(), subject.Name)
 	done()
-	if err != nil {
-		t.Fatalf("running: %v", err)
+	if runRuleError != nil {
+		test.Fatalf("running: %v", runRuleError)
 	}
 	byPlace := func(left rule_runner.Finding, right rule_runner.Finding) int {
 		if left.File != right.File {
@@ -83,32 +94,32 @@ func walkAndRun(t *testing.T, files map[string]string, subject rule.Rule) (walke
 
 // What RunRule returns is what cohere's own walk reports, finding for finding, on the same program: the rule,
 // the file, the line, the column and the message, each compared whole.
-func TestRunRuleFindsWhatTheWalkFinds(t *testing.T) {
-	t.Parallel()
-	want, got := walkAndRun(t, cycleProject, nexus.CorrectnessNoImportCycleLoadTimeRead)
+func TestRunRuleFindsWhatTheWalkFinds(test *testing.T) {
+	test.Parallel()
+	want, got := walkAndRun(test, cycleProject, nexus.CorrectnessNoImportCycleLoadTimeRead)
 
 	// The fixture is built to fire, so an empty pair can't pass as agreement: both cycle files read the other's
 	// binding at load, and the consumer, in no cycle, reads nothing early.
 	if len(want) != 2 {
-		t.Fatalf("the walk found %d findings, want 2 (one in each file of the cycle): %+v", len(want), want)
+		test.Fatalf("the walk found %d findings, want 2 (one in each file of the cycle): %+v", len(want), want)
 	}
 	if !slices.Equal(got, want) {
-		t.Errorf("RunRule found\n%+v\nthe walk found\n%+v", got, want)
+		test.Errorf("RunRule found\n%+v\nthe walk found\n%+v", got, want)
 	}
 	for _, finding := range got {
 		if filepath.Base(finding.File) == "Consumer.ts" {
-			t.Errorf("a file in no cycle was reported: %+v", finding)
+			test.Errorf("a file in no cycle was reported: %+v", finding)
 		}
 	}
 }
 
 // The relation rules Adamic runs in place of its own copies (#xjdce2d step 4) find through RunRule what the walk
 // finds, each on a program built to fire once and a sound neighbour that must stay quiet.
-func TestRunRuleFindsWhatTheWalkFindsForTheRelationRules(t *testing.T) {
-	t.Parallel()
+func TestRunRuleFindsWhatTheWalkFindsForTheRelationRules(test *testing.T) {
+	test.Parallel()
 	const configuration = `{"compilerOptions":{"strict":true,"exactOptionalPropertyTypes":true,"module":"esnext","target":"esnext","moduleResolution":"bundler"},"include":["*.ts"]}`
 	for _, testCase := range []struct {
-		subject rule.Rule
+		subject rule.Rule[rule.NoOptions]
 		source  string
 	}{
 		{
@@ -136,35 +147,53 @@ func TestRunRuleFindsWhatTheWalkFindsForTheRelationRules(t *testing.T) {
 				"}\n",
 		},
 	} {
-		t.Run(testCase.subject.Name, func(t *testing.T) {
-			t.Parallel()
-			want, got := walkAndRun(t, map[string]string{"tsconfig.json": configuration, "Main.ts": testCase.source}, testCase.subject)
+		test.Run(testCase.subject.Name, func(test *testing.T) {
+			test.Parallel()
+			want, got := walkAndRun(
+				test,
+				map[string]string{"tsconfig.json": configuration, "Main.ts": testCase.source},
+				testCase.subject,
+			)
 			if len(want) != 1 {
-				t.Fatalf("the walk found %d findings, want exactly 1 (the hole, not its sound neighbour): %+v", len(want), want)
+				test.Fatalf(
+					"the walk found %d findings, want exactly 1 (the hole, not its sound neighbour): %+v",
+					len(want),
+					want,
+				)
 			}
 			if !slices.Equal(got, want) {
-				t.Errorf("RunRule found\n%+v\nthe walk found\n%+v", got, want)
+				test.Errorf("RunRule found\n%+v\nthe walk found\n%+v", got, want)
 			}
 		})
 	}
 }
 
 // A rule off the allowlist is refused by name, whether cohere has it or not, before anything runs.
-func TestRunRuleRefusesARuleOffTheAllowlist(t *testing.T) {
-	t.Parallel()
-	graph := buildProject(t, cycleProject)
+func TestRunRuleRefusesARuleOffTheAllowlist(test *testing.T) {
+	test.Parallel()
+	graph := buildProject(test, cycleProject)
 	typeChecker, done := graph.Program.GetTypeChecker(context.Background())
 	defer done()
 
 	// Allowed first: a refusal that refused everything would pass both cases below.
-	if _, err := rule_runner.RunRule(graph.Program, typeChecker, graph.ProjectFiles(), nexus.CorrectnessNoImportCycleLoadTimeRead.Name); err != nil {
-		t.Fatalf("the allowed rule was refused: %v", err)
+	if _, runRuleError := rule_runner.RunRule(
+		graph.Program,
+		typeChecker,
+		graph.ProjectFiles(),
+		nexus.CorrectnessNoImportCycleLoadTimeRead.Name,
+	); runRuleError != nil {
+		test.Fatalf("the allowed rule was refused: %v", runRuleError)
 	}
 	for _, name := range []string{"no-console", "nexus/correctness-no-such-rule"} {
-		findings, err := rule_runner.RunRule(graph.Program, typeChecker, graph.ProjectFiles(), name)
+		findings, runRuleError := rule_runner.RunRule(graph.Program, typeChecker, graph.ProjectFiles(), name)
 		var notAllowed rule_runner.NotAllowedError
-		if !errors.As(err, &notAllowed) || notAllowed.Rule != name {
-			t.Errorf("%s: got findings %v and error %v, want NotAllowedError naming it", name, findings, err)
+		if !errors.As(runRuleError, &notAllowed) || notAllowed.Rule != name {
+			test.Errorf(
+				"%s: got findings %v and error %v, want NotAllowedError naming it",
+				name,
+				findings,
+				runRuleError,
+			)
 		}
 	}
 }

@@ -39,7 +39,7 @@ import (
 // `rule.RemoveRange`/`rule.ReplaceRange`. Those are the same constructors under different names, so
 // the three surgical ranges are unchanged. No predicate and no traversal was touched.
 //
-// The reported SPAN is unchanged too, and that is the part worth naming. While this rule was
+// The reported span is unchanged too, and that is the part worth naming. While this rule was
 // adapted, `upstream.Adapt` wrapped every node report in `rule.TokenRange(SourceFile, node)` because
 // tsgolint's own runner does the same through `utils.TrimNodeTextRange`. Our native
 // `ctx.ReportNodeWithSuggestions` applies exactly that trim itself, so absorbing the rule preserves
@@ -48,7 +48,7 @@ import (
 // package pins all eighteen positioned cases against it.
 //
 // oxc declares `NoArrayDelete(tsgolint)` and carries no algorithm and no corpus, so the behavior
-// oxlint exhibits for this rule IS tsgolint's: the release binary shells out to a `tsgolint`
+// oxlint exhibits for this rule is tsgolint's: the release binary shells out to a `tsgolint`
 // executable and refuses to run the rule when that binary is absent, which is what it does on this
 // machine. That refusal is itself the proof, so oxlint cannot serve as ground truth here and
 // tsgolint's own test file is the corpus instead. All thirty one of its cases are replayed in the
@@ -58,13 +58,13 @@ import (
 //
 // The anchor is `KindDeleteExpression`. The operand has its parentheses skipped, so
 // `delete ((a[b]))` reports, and it must then be an element access: `delete obj.a` is a property
-// access and is silent even when `obj` is an array. The type of the RECEIVER is then resolved
+// access and is silent even when `obj` is an array. The type of the receiver is then resolved
 // through `GetConstrainedTypeAtLocation`, which walks a type parameter to its base constraint, so
 // both `getArray<T extends number[]>(): T` and `getArray<T extends number>(): T[]` report.
 //
 // The array test is asymmetric between the two composite forms and the corpus pins both directions.
-// A union reports only when EVERY member is an array or a tuple, so `number[] | string[]` reports.
-// An intersection reports when ANY member is, so `number[] & unknown` and `string & Array<number>`
+// A union reports only when every member is an array or a tuple, so `number[] | string[]` reports.
+// An intersection reports when any member is, so `number[] & unknown` and `string & Array<number>`
 // both report. Reading the rule file alone would suggest one predicate; it is two.
 //
 // `any`, `unknown` and `never` are silent, and they are silent as a consequence of the array test
@@ -73,36 +73,36 @@ import (
 // library resolves to the error type whose flags report `any`. Nothing in this rule's corpus needs
 // a type outside ES2022, so no case here is at risk of that; `Array` and tuples are all in scope.
 //
-// # Where the two upstreams disagree, and it is the REPAIR
+// # Where the two upstreams disagree, and it is the repair
 //
-// Both implementations register exactly ONE listener, carry the same two messages, ship the repair
-// as a SUGGESTION rather than a fix, and compute `isUnderlyingTypeArray` identically, including the
+// Both implementations register exactly one listener, carry the same two messages, ship the repair
+// as a suggestion rather than a fix, and compute `isUnderlyingTypeArray` identically, including the
 // every/some asymmetry. Counted on both sides rather than assumed.
 //
 // They construct the repair completely differently, and the outputs differ observably.
 //
-// `@typescript-eslint` 8.x replaces the WHOLE node with a reconstructed string:
+// `@typescript-eslint` 8.x replaces the whole node with a reconstructed string:
 // it reads `object.getText()` and `property.getText()`, wraps the key in parentheses when it is a
 // sequence expression, then hoists every comment inside the node up in front of the replacement,
 // re-indented to the node's own column.
 //
-// tsgolint makes THREE surgical range edits instead: it removes the `delete` token, replaces the
+// tsgolint makes three surgical range edits instead: it removes the `delete` token, replaces the
 // `[` token with `.splice(`, and replaces the `]` token with `, 1)`. Nothing else in the span is
 // touched.
 //
 // Three consequences, all of them visible in the corpus and all of them reproduced here:
 //
-// A LEADING SPACE survives where `delete` was removed, because only the keyword token is taken and
+// A leading space survives where `delete` was removed, because only the keyword token is taken and
 // the space after it is not. Every one of upstream's twenty two expected outputs begins
 // ` arr.splice(...)` rather than `arr.splice(...)`, and a repair that also ate the space would
 // satisfy every message id while failing every output.
 //
-// COMMENTS STAY WHERE THEY WERE. Upstream's comment-heavy case keeps `/** multi line */` sitting
+// Comments stay where they were. Upstream's comment-heavy case keeps `/** multi line */` sitting
 // between the removed keyword and the receiver, and keeps `/* inline */` inside the index
 // expression, because those bytes were never in an edited range. The `@typescript-eslint` fixer
 // would have collected them and stacked them above the call.
 //
-// A SEQUENCE EXPRESSION KEEPS ITS OWN PARENTHESES rather than being given new ones.
+// A sequence expression keeps its own parentheses rather than being given new ones.
 // `delete arr[(doWork(), 1)]` becomes ` arr.splice((doWork(), 1), 1)` because the parentheses are
 // part of the untouched argument text, so tsgolint needs no special case where the other upstream
 // has one. The two agree on the output for this input and reach it by different routes.
@@ -133,14 +133,14 @@ import (
 // is not one, which matters because the trivia-trimming difference is a real defect this project has
 // already shipped once at the adapter.
 //
-// It cannot bite HERE. `rule.TokenRange` starts at the node's first token and ends at `n.End()`, so it
-// differs from `n.Loc` only in where the range STARTS. Both spellings end at `n.End()`. And this rule
+// It cannot bite here. `rule.TokenRange` starts at the node's first token and ends at `n.End()`, so it
+// differs from `n.Loc` only in where the range starts. Both spellings end at `n.End()`. And this rule
 // reads nothing but the end: `expressionRange` and `argumentRange` are each consumed exactly once, as
 // `.End()`, to locate the bracket tokens. No code path reads either `Pos()`, so no input can
 // distinguish the two versions.
 //
 // That claim is checked rather than asserted. The same mutation applied to the value actually read,
-// turning `expressionRange.End()` into `expressionRange.End() + 1`, is CAUGHT by twenty six failing
+// turning `expressionRange.End()` into `expressionRange.End() + 1`, is caught by twenty six failing
 // assertions, so the fixtures can see this range and the survival is about the mutation rather than
 // about the coverage.
 //
@@ -151,39 +151,39 @@ import (
 //
 // `KindDeleteExpression` is a rare anchor and the listener exits on the second line for anything
 // that is not an element access, so the checker is consulted only for a genuine `delete x[y]`.
-var NoArrayDelete = rule.Rule{
+var NoArrayDelete = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/no-array-delete",
 
 	// The listener resolves the receiver's type on every `delete x[y]`, so the checker is required.
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		isUnderlyingTypeArray := func(t *checker.Type) bool {
-			if type_checking.IsTypeFlagSet(t, checker.TypeFlagsUnion) {
-				for _, t := range t.Types() {
-					if !checker.Checker_isArrayOrTupleType(ctx.TypeChecker, t) {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		isUnderlyingTypeArray := func(subjectType *checker.Type) bool {
+			if type_checking.IsTypeFlagSet(subjectType, checker.TypeFlagsUnion) {
+				for _, memberType := range subjectType.Types() {
+					if !checker.Checker_isArrayOrTupleType(ruleContext.TypeChecker, memberType) {
 						return false
 					}
 				}
 				return true
 			}
 
-			if type_checking.IsTypeFlagSet(t, checker.TypeFlagsIntersection) {
-				for _, t := range t.Types() {
-					if checker.Checker_isArrayOrTupleType(ctx.TypeChecker, t) {
+			if type_checking.IsTypeFlagSet(subjectType, checker.TypeFlagsIntersection) {
+				for _, memberType := range subjectType.Types() {
+					if checker.Checker_isArrayOrTupleType(ruleContext.TypeChecker, memberType) {
 						return true
 					}
 				}
 				return false
 			}
 
-			return checker.Checker_isArrayOrTupleType(ctx.TypeChecker, t)
+			return checker.Checker_isArrayOrTupleType(ruleContext.TypeChecker, subjectType)
 		}
 
 		return rule.Listeners{
 			ast.KindDeleteExpression: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 
@@ -198,20 +198,26 @@ var NoArrayDelete = rule.Rule{
 
 				expression := deleteExpression.AsElementAccessExpression()
 
-				argType := type_checking.GetConstrainedTypeAtLocation(ctx.TypeChecker, expression.Expression)
+				argumentType := type_checking.GetConstrainedTypeAtLocation(
+					ruleContext.TypeChecker,
+					expression.Expression,
+				)
 
-				if !isUnderlyingTypeArray(argType) {
+				if !isUnderlyingTypeArray(argumentType) {
 					return
 				}
 
-				expressionRange := rule.TokenRange(ctx.SourceFile, expression.Expression)
-				argumentRange := rule.TokenRange(ctx.SourceFile, expression.ArgumentExpression)
+				expressionRange := rule.TokenRange(ruleContext.SourceFile, expression.Expression)
+				argumentRange := rule.TokenRange(ruleContext.SourceFile, expression.ArgumentExpression)
 
-				deleteTokenRange := scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, node.Pos())
-				leftBracketTokenRange := scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, expressionRange.End())
-				rightBracketTokenRange := scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, argumentRange.End())
+				deleteTokenRange := scanner.GetRangeOfTokenAtPosition(ruleContext.SourceFile, node.Pos())
+				leftBracketTokenRange := scanner.GetRangeOfTokenAtPosition(
+					ruleContext.SourceFile,
+					expressionRange.End(),
+				)
+				rightBracketTokenRange := scanner.GetRangeOfTokenAtPosition(ruleContext.SourceFile, argumentRange.End())
 
-				ctx.ReportNodeWithSuggestions(node, buildNoArrayDeleteMessage(), rule.Suggestion{
+				ruleContext.ReportNodeWithSuggestions(node, buildNoArrayDeleteMessage(), rule.Suggestion{
 					Message: buildUseSpliceMessage(),
 					Fixes: []rule.Fix{
 						rule.RemoveRange(deleteTokenRange),

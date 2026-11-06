@@ -36,13 +36,16 @@ var noTypePredicateText = policy.MessageOf("adamic/no-type-predicate", "typePred
  *
  * Removing the predicate changes how every caller narrows, which can break their compile.
  */
-var NoTypePredicate = rule.Rule{
+var NoTypePredicate = rule.Rule[rule.NoOptions]{
 	Name: "adamic/no-type-predicate",
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindTypePredicate: func(node *ast.Node) {
-				ctx.ReportNode(node, rule.Message{Id: "typePredicate", Description: noTypePredicateText.Render(nil)})
+				ruleContext.ReportNode(
+					node,
+					rule.Message{Id: "typePredicate", Description: noTypePredicateText.Render(nil)},
+				)
 			},
 		}
 	},

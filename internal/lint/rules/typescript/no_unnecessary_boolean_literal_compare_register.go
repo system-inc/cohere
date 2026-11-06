@@ -9,11 +9,11 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // changing.
 //
 // `Decode` names the rule's own hand-written decoder rather than `rule.DecodeOptionsInto`. Two of
-// this rule's three options default to TRUE, so the generic helper's zero-valued struct would turn
+// this rule's three options default to true, so the generic helper's zero-valued struct would turn
 // both allowances off and the rule would report two families of comparison upstream is silent on.
 // Every fixture built from a struct rather than routed through the decoder would pass anyway.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[NoUnnecessaryBooleanLiteralCompareOptions]{
 		Rule:   NoUnnecessaryBooleanLiteralCompare,
 		Decode: DecodeNoUnnecessaryBooleanLiteralCompareOptions,
 	})

@@ -9,8 +9,8 @@ import (
 // pattern would not have matched. The comments are built to sit on each edge the check reasons about,
 // and the test counts the matchers the check skipped, so a check that never skips cannot pass for
 // being harmless.
-func TestNoWarningCommentsLeadAnswersAsThePatternDoes(t *testing.T) {
-	t.Parallel()
+func TestNoWarningCommentsLeadAnswersAsThePatternDoes(test *testing.T) {
+	test.Parallel()
 
 	configurations := []struct {
 		name       string
@@ -20,11 +20,17 @@ func TestNoWarningCommentsLeadAnswersAsThePatternDoes(t *testing.T) {
 	}{
 		{"default", noWarningCommentsDefaultTerms, NoWarningCommentsStart, nil},
 		{"decorated", noWarningCommentsDefaultTerms, NoWarningCommentsStart, []string{"*", "/"}},
-		// `-` is escaped as upstream escapes it, so it is one more character and `+` between `*` and `/` is not skipped.
+		// `-` is escaped as upstream escapes it, so it is one more character and `+` between `*` and `/` is not
+		// skipped.
 		{"a range in the decoration", noWarningCommentsDefaultTerms, NoWarningCommentsStart, []string{"*", "-", "/"}},
 		// `k` folds to the Kelvin sign and `s` to the long s, so a decoration of either skips both cases.
 		{"a decoration that folds", noWarningCommentsDefaultTerms, NoWarningCommentsStart, []string{"k"}},
-		{"a term that opens with a skipped character", []string{"*todo", " fixme", "kelvin", "ſtop", "日本"}, NoWarningCommentsStart, []string{"*"}},
+		{
+			"a term that opens with a skipped character",
+			[]string{"*todo", " fixme", "kelvin", "ſtop", "日本"},
+			NoWarningCommentsStart,
+			[]string{"*"},
+		},
 		{"an empty term", []string{""}, NoWarningCommentsStart, nil},
 		{"anywhere", noWarningCommentsDefaultTerms, NoWarningCommentsAnywhere, nil},
 	}
@@ -49,13 +55,13 @@ func TestNoWarningCommentsLeadAnswersAsThePatternDoes(t *testing.T) {
 				}
 				skipped++
 				if matcher.Test(value) {
-					t.Errorf("%s: the check skips %q on %q, which its pattern %s matches",
+					test.Errorf("%s: the check skips %q on %q, which its pattern %s matches",
 						configuration.name, compiled.terms[index], value, matcher)
 				}
 			}
 		}
 	}
 	if skipped == 0 {
-		t.Fatal("the check skipped no matcher anywhere, so this test could not have failed")
+		test.Fatal("the check skipped no matcher anywhere, so this test could not have failed")
 	}
 }

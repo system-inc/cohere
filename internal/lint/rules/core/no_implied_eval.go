@@ -49,7 +49,7 @@ var impliedEvalGlobalObjectNames = map[string]bool{
 //
 // # What decides a report, and why the global test is the whole rule
 //
-// Two questions have to agree. The callee has to be one of three functions, and it has to be THE
+// Two questions have to agree. The callee has to be one of three functions, and it has to be the
 // global one rather than a local of the same name. The second question is not a detail: a helper
 // named `setTimeout` taking a string is ordinary code, and reporting it is a false positive on
 // something that never runs a string. Upstream answers it with `isGlobalReference` over
@@ -90,7 +90,7 @@ var impliedEvalGlobalObjectNames = map[string]bool{
 //
 // The checker is asked only after the callee's name has already matched one of three spellings, so
 // the question is asked on almost no files. The per-file lock is taken once rather than per node.
-var NoImpliedEval = rule.Rule{
+var NoImpliedEval = rule.Rule[rule.NoOptions]{
 	Name: "no-implied-eval",
 
 	// The rule's central discrimination is whether a name is the global or a local shadowing it,
@@ -99,15 +99,15 @@ var NoImpliedEval = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// Declared as well as needed. NeedsTypeChecker governs the registration path, so a
 		// Context built by hand still arrives with a nil checker, and every listener below reads
 		// it. Declining the file once here rather than per node.
 		//
-		// This guard and the one in impliedEvalResolvesToAGlobal are a PAIR, and neither is
+		// This guard and the one in impliedEvalResolvesToAGlobal are a pair, and neither is
 		// redundant even though each alone survives a mutation sweep. Scored three ways: neutering
 		// this one survives because the inner one still answers false for every name; neutering the
-		// inner one survives because this one has already declined the file; neutering BOTH is
+		// inner one survives because this one has already declined the file; neutering both is
 		// caught, on three lines. The single-site sweep structurally cannot see a guard whose
 		// partner is covering for it, so the pair is recorded here rather than left to be
 		// rediscovered.
@@ -115,7 +115,7 @@ var NoImpliedEval = rule.Rule{
 		// They are kept apart because they do different jobs. This one declines the file once
 		// instead of once per call expression. The inner one is what actually prevents the
 		// dereference, and it is the one that has to survive somebody moving this line.
-		if ctx.TypeChecker == nil {
+		if ruleContext.TypeChecker == nil {
 			return nil
 		}
 
@@ -126,7 +126,7 @@ var NoImpliedEval = rule.Rule{
 					return
 				}
 
-				name, isGlobalCall := impliedEvalCalleeName(ctx, callee)
+				name, isGlobalCall := impliedEvalCalleeName(ruleContext, callee)
 				if !isGlobalCall || !impliedEvalFunctionNames[name] {
 					return
 				}
@@ -138,7 +138,7 @@ var NoImpliedEval = rule.Rule{
 				// alone, so `execScript` gets its own sentence in both the bare and the member
 				// forms. The distinction is upstream's and it is reproduced rather than collapsed.
 				if name == "execScript" {
-					ctx.ReportNode(node, rule.Message{
+					ruleContext.ReportNode(node, rule.Message{
 						Id: "execScript",
 						Description: "This calls `execScript` with a string, which compiles and runs that " +
 							"text as code. It is `eval` under another name, and it is not standard. " +
@@ -147,7 +147,7 @@ var NoImpliedEval = rule.Rule{
 					return
 				}
 
-				ctx.ReportNode(node, rule.Message{
+				ruleContext.ReportNode(node, rule.Message{
 					Id: "impliedEval",
 					Description: "This passes a string where a function belongs, so the string is compiled " +
 						"and run when the timer fires. That is `eval` with a delay: the code loses the " +
@@ -173,30 +173,31 @@ var NoImpliedEval = rule.Rule{
 // and `global.global['execScript']` both report and both are in the corpus. The loop terminates
 // because each turn moves strictly outward through `Parent`, but it is written over the receiver
 // chain instead, which shrinks on every turn.
-func impliedEvalCalleeName(ctx rule.Context, callee *ast.Node) (string, bool) {
+func impliedEvalCalleeName(ruleContext rule.Context, callee *ast.Node) (string, bool) {
 	// A parenthesized callee is a node our parser keeps and upstream's deletes, so `(setTimeout)('s')`
 	// arrives here wrapped where upstream sees the identifier directly. Unwrapped in a loop because
 	// `((setTimeout))('s')` nests, and with the nil check written out rather than delegated to
 	// ast.SkipParentheses, which dereferences its argument.
-	for callee != nil && callee.Kind == ast.KindParenthesizedExpression {
-		callee = callee.AsParenthesizedExpression().Expression
+	unwrapped := callee
+	for unwrapped != nil && unwrapped.Kind == ast.KindParenthesizedExpression {
+		unwrapped = unwrapped.AsParenthesizedExpression().Expression
 	}
-	if callee == nil {
+	if unwrapped == nil {
 		return "", false
 	}
 
 	// The bare form. `setTimeout('s')` reports only when that name is the global one.
-	if callee.Kind == ast.KindIdentifier {
-		return callee.Text(), impliedEvalResolvesToAGlobal(ctx, callee)
+	if unwrapped.Kind == ast.KindIdentifier {
+		return unwrapped.Text(), impliedEvalResolvesToAGlobal(ruleContext, unwrapped)
 	}
 
 	// The member forms. Read the property being called, then walk the receiver.
-	functionName, settled := impliedEvalAccessedName(callee)
+	functionName, settled := impliedEvalAccessedName(unwrapped)
 	if !settled {
 		return "", false
 	}
 
-	receiver := impliedEvalAccessReceiver(callee)
+	receiver := impliedEvalAccessReceiver(unwrapped)
 	for {
 		for receiver != nil && receiver.Kind == ast.KindParenthesizedExpression {
 			receiver = receiver.AsParenthesizedExpression().Expression
@@ -211,7 +212,7 @@ func impliedEvalCalleeName(ctx rule.Context, callee *ast.Node) (string, bool) {
 			if !impliedEvalGlobalObjectNames[receiver.Text()] {
 				return "", false
 			}
-			return functionName, impliedEvalResolvesToAGlobal(ctx, receiver)
+			return functionName, impliedEvalResolvesToAGlobal(ruleContext, receiver)
 		}
 
 		// A longer chain is only walked through while each link names the global object again.
@@ -238,11 +239,11 @@ func impliedEvalCalleeName(ctx rule.Context, callee *ast.Node) (string, bool) {
 // key lives on `ArgumentExpression` instead. Probed rather than assumed, because reading both
 // through `Name()` compiles, passes every dotted fixture, and silently loses every bracketed one:
 //
-//	window.setTimeout('foo')      KindPropertyAccessExpression   Name() -> KindIdentifier
-//	window['setTimeout']('foo')   KindElementAccessExpression    Name() -> nil
-//	                                                             ArgumentExpression -> KindStringLiteral
-//	window[`setTimeout`]('foo')   KindElementAccessExpression    Name() -> nil
-//	                                                             ArgumentExpression -> KindNoSubstitutionTemplateLiteral
+//	window.setTimeout('foo')     KindPropertyAccessExpression  Name() -> KindIdentifier
+//	window['setTimeout']('foo')  KindElementAccessExpression   Name() -> nil
+//	                                                           ArgumentExpression -> KindStringLiteral
+//	window[`setTimeout`]('foo')  KindElementAccessExpression   Name() -> nil
+//	                                                           ArgumentExpression -> KindNoSubstitutionTemplateLiteral
 //
 // Upstream's corpus has 24 bracketed cases and all 24 went silent on the first version of this
 // function, which is what sent the probe after the node shape.
@@ -308,7 +309,7 @@ func impliedEvalAccessReceiver(access *ast.Node) *ast.Node {
 // function names fail a declaration-file test.
 //
 // So the question is inverted: rather than proving the name is the global, ask whether anything in
-// SOURCE declares it, and treat "nothing does" as the global. That answers all seven names above
+// source declares it, and treat "nothing does" as the global. That answers all seven names above
 // correctly, and it answers the shadows correctly too, which is the direction that matters, since a
 // shadow is by definition written in source.
 //
@@ -316,12 +317,12 @@ func impliedEvalAccessReceiver(access *ast.Node) *ast.Node {
 // unresolvable name answers "global" here, where the neighbour answers "not global". That is
 // upstream's behaviour: `execScript` resolves to nothing in any TypeScript program and upstream
 // reports it in twenty-one corpus cases, so declining an unresolved name would lose all of them.
-func impliedEvalResolvesToAGlobal(ctx rule.Context, identifier *ast.Node) bool {
-	if ctx.TypeChecker == nil {
+func impliedEvalResolvesToAGlobal(ruleContext rule.Context, identifier *ast.Node) bool {
+	if ruleContext.TypeChecker == nil {
 		return false
 	}
 
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(identifier)
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(identifier)
 	if symbol == nil {
 		// Nothing declares this name at all, and upstream declines it.
 		//
@@ -330,7 +331,7 @@ func impliedEvalResolvesToAGlobal(ctx rule.Context, identifier *ast.Node) bool {
 		// browser supplies `execScript` without any TypeScript library declaring it. Measured
 		// against the installed eslint 10.8.1, that is backwards: with nothing declared,
 		// `setTimeout("x")`, `execScript("x")`, `window.setTimeout("x")` and
-		// `global.setTimeout("x")` all report ZERO, and each reports once as soon as its own name
+		// `global.setTimeout("x")` all report zero, and each reports once as soon as its own name
 		// is added to the `globals` block. Upstream's gate is `isGlobalReference`, which asks
 		// whether the name resolves to a declared global variable, and an undeclared name resolves
 		// to no variable at all.
@@ -364,7 +365,7 @@ func impliedEvalResolvesToAGlobal(ctx rule.Context, identifier *ast.Node) bool {
 // impliedEvalFirstArgumentIsAString reports whether the call's first argument is evaluated as a
 // string.
 //
-// Upstream reports when EITHER its syntactic test or its constant evaluator says string. This
+// Upstream reports when either its syntactic test or its constant evaluator says string. This
 // carries the syntactic half; the doc on NoImpliedEval records what the other half would add and
 // what that was measured to cost.
 //
@@ -383,7 +384,7 @@ func impliedEvalFirstArgumentIsAString(call *ast.Node) bool {
 //	any template literal      `x = 1;` and `foo${bar}` alike
 //	a `+` with either side a string, recursively
 //
-// The `+` arm is an OR rather than an AND, and that is the load-bearing part: `'foo' + bar` is a
+// The `+` arm is an `OR` rather than an `AND`, and that is the load-bearing part: `'foo' + bar` is a
 // string whatever `bar` holds, because concatenation with a string coerces. Both operand orders are
 // in the corpus and so is `1 + ';' + 1`, which is a left-nested `+` whose string sits at the second
 // level down.
@@ -394,21 +395,22 @@ func impliedEvalFirstArgumentIsAString(call *ast.Node) bool {
 func impliedEvalIsEvaluatedString(node *ast.Node) bool {
 	// Our parser keeps parentheses that upstream's parser folds away, so `('foo' + bar)` arrives
 	// here wrapped. Unwrapped in a loop, since the wrapping nests.
-	for node != nil && node.Kind == ast.KindParenthesizedExpression {
-		node = node.AsParenthesizedExpression().Expression
+	unwrapped := node
+	for unwrapped != nil && unwrapped.Kind == ast.KindParenthesizedExpression {
+		unwrapped = unwrapped.AsParenthesizedExpression().Expression
 	}
-	if node == nil {
+	if unwrapped == nil {
 		return false
 	}
 
-	switch node.Kind {
+	switch unwrapped.Kind {
 	case ast.KindStringLiteral,
 		ast.KindNoSubstitutionTemplateLiteral,
 		ast.KindTemplateExpression:
 		return true
 
 	case ast.KindBinaryExpression:
-		binary := node.AsBinaryExpression()
+		binary := unwrapped.AsBinaryExpression()
 		if binary.OperatorToken == nil || binary.OperatorToken.Kind != ast.KindPlusToken {
 			return false
 		}

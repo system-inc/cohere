@@ -23,8 +23,8 @@ const duplicatePropsFile = "/repository/source/Duplicate.tsx"
 // no transcription step existed that could cook an escape. One Tester block, 12 pass and 9 fail,
 // and the snapshot records 9 diagnostics from those 9 inputs, so one finding per input is measured
 // here rather than assumed.
-func TestJsxNoDuplicatePropsFires(t *testing.T) {
-	t.Parallel()
+func TestJsxNoDuplicatePropsFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		"<App a a />;",
@@ -39,10 +39,10 @@ func TestJsxNoDuplicatePropsFires(t *testing.T) {
 	}
 
 	for _, sourceText := range cases {
-		t.Run(sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, JsxNoDuplicateProps, duplicatePropsFile, sourceText),
+		test.Run(sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, JsxNoDuplicateProperties, duplicatePropsFile, sourceText),
 				"jsxNoDuplicateProps")
 		})
 	}
@@ -61,8 +61,8 @@ func TestJsxNoDuplicatePropsFires(t *testing.T) {
 //
 // And `<App />` with no attributes at all checks the empty path, which is the one an
 // over-eager index would crash on rather than decline.
-func TestJsxNoDuplicatePropsStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestJsxNoDuplicatePropsStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		"<App />;",
@@ -80,10 +80,10 @@ func TestJsxNoDuplicatePropsStaysSilent(t *testing.T) {
 	}
 
 	for _, sourceText := range cases {
-		t.Run(sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.Run(t, JsxNoDuplicateProps, duplicatePropsFile, sourceText))
+		test.Run(sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.Run(test, JsxNoDuplicateProperties, duplicatePropsFile, sourceText))
 		})
 	}
 }
@@ -97,8 +97,8 @@ func TestJsxNoDuplicatePropsStaysSilent(t *testing.T) {
 // implementation than holding on to the one before it. oxc emits two labels and renders the earlier
 // one as the diagnostic's position, which is what the imported snapshot prints and what the release
 // oxlint binary prints for the same inputs.
-func TestJsxNoDuplicatePropsReportsEarlierOccurrence(t *testing.T) {
-	t.Parallel()
+func TestJsxNoDuplicatePropsReportsEarlierOccurrence(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -118,16 +118,16 @@ func TestJsxNoDuplicatePropsReportsEarlierOccurrence(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, JsxNoDuplicateProps, duplicatePropsFile, testCase.sourceText)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, JsxNoDuplicateProperties, duplicatePropsFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.wantOffsets) {
-				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.wantOffsets))
+				test.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.wantOffsets))
 			}
 			for index, want := range testCase.wantOffsets {
 				got := result.Diagnostics[index].Range.Pos()
 				if got != want {
-					t.Errorf("finding %d points at offset %d (%q), want offset %d (%q)",
+					test.Errorf("finding %d points at offset %d (%q), want offset %d (%q)",
 						index, got, testCase.sourceText[got:result.Diagnostics[index].Range.End()],
 						want, testCase.sourceText[want:want+1])
 				}
@@ -143,19 +143,19 @@ func TestJsxNoDuplicatePropsReportsEarlierOccurrence(t *testing.T) {
 // interpolates nothing, which is itself a divergence worth pinning: oxc writes the prop name into
 // the text and our harness renders a fixed Description, so a later change that started
 // interpolating would need to update this assertion rather than sliding past it.
-func TestJsxNoDuplicatePropsMessageText(t *testing.T) {
-	t.Parallel()
+func TestJsxNoDuplicatePropsMessageText(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, JsxNoDuplicateProps, duplicatePropsFile, "<App a a />;")
+	result := rule_testing.Run(test, JsxNoDuplicateProperties, duplicatePropsFile, "<App a a />;")
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
+		test.Fatalf("got %d findings, want 1", len(result.Diagnostics))
 	}
 	want := "This prop is written more than once on the same element. React builds the props " +
 		"object by assigning each attribute in order, so every earlier copy is overwritten and " +
 		"only the last one survives. The discarded values look like they are being passed and " +
 		"are not. Remove one of them, or rename them so each prop is distinct."
 	if got := result.Diagnostics[0].Message.Description; got != want {
-		t.Errorf("message text\n got %q\nwant %q", got, want)
+		test.Errorf("message text\n got %q\nwant %q", got, want)
 	}
 }
 
@@ -165,8 +165,8 @@ func TestJsxNoDuplicatePropsMessageText(t *testing.T) {
 // self-closing, so several distinct rules produce identical results on all nine. These inputs are
 // the ones that separate them, and each was measured against the release oxlint binary at
 // `~/Projects/system/oxc/target/release/oxlint` before being written down.
-func TestJsxNoDuplicatePropsBeyondUpstreamCorpus(t *testing.T) {
-	t.Parallel()
+func TestJsxNoDuplicatePropsBeyondUpstreamCorpus(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -236,15 +236,15 @@ func TestJsxNoDuplicatePropsBeyondUpstreamCorpus(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, JsxNoDuplicateProps, duplicatePropsFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, JsxNoDuplicateProperties, duplicatePropsFile, testCase.sourceText)
 			if len(result.Diagnostics) != testCase.wantCount {
 				for _, diagnostic := range result.Diagnostics {
-					t.Logf("  finding at %q",
+					test.Logf("  finding at %q",
 						testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()])
 				}
-				t.Errorf("%q got %d findings, want %d",
+				test.Errorf("%q got %d findings, want %d",
 					testCase.sourceText, len(result.Diagnostics), testCase.wantCount)
 			}
 		})
@@ -257,19 +257,19 @@ func TestJsxNoDuplicatePropsBeyondUpstreamCorpus(t *testing.T) {
 // one" as the map's value. Both report twice on `<App a a a />`, so a count check cannot tell them
 // apart; only the offsets can. Upstream rewrites the map entry on every insert, so the second
 // finding points at the second `a` rather than at the first again.
-func TestJsxNoDuplicatePropsThirdCopyComparesAgainstSecond(t *testing.T) {
-	t.Parallel()
+func TestJsxNoDuplicatePropsThirdCopyComparesAgainstSecond(test *testing.T) {
+	test.Parallel()
 
 	const sourceText = "<App a a a />;"
-	result := rule_testing.Run(t, JsxNoDuplicateProps, duplicatePropsFile, sourceText)
+	result := rule_testing.Run(test, JsxNoDuplicateProperties, duplicatePropsFile, sourceText)
 	if len(result.Diagnostics) != 2 {
-		t.Fatalf("got %d findings, want 2", len(result.Diagnostics))
+		test.Fatalf("got %d findings, want 2", len(result.Diagnostics))
 	}
 	// The three `a` characters sit at offsets 5, 7 and 9.
 	wantOffsets := []int{5, 7}
 	for index, want := range wantOffsets {
 		if got := result.Diagnostics[index].Range.Pos(); got != want {
-			t.Errorf("finding %d points at offset %d, want %d", index, got, want)
+			test.Errorf("finding %d points at offset %d, want %d", index, got, want)
 		}
 	}
 }
@@ -278,12 +278,12 @@ func TestJsxNoDuplicatePropsThirdCopyComparesAgainstSecond(t *testing.T) {
 //
 // The three failing ones are clean without the option, which the clean table above pins; under it
 // they report once each. The namespaced `a:b` stays clean under it, as upstream's clean case says.
-func TestJsxNoDuplicatePropsIgnoreCase(t *testing.T) {
-	t.Parallel()
+func TestJsxNoDuplicatePropsIgnoreCase(test *testing.T) {
+	test.Parallel()
 
-	decoded, err := rule.DecodeOptionsInto[JsxNoDuplicatePropsOptions]()([]byte(`{"ignoreCase": true}`))
-	if err != nil {
-		t.Fatalf("decoding ignoreCase: %v", err)
+	decoded, decodeOptionsError := rule.DecodeOptionsInto[JsxNoDuplicatePropsOptions]()([]byte(`{"ignoreCase": true}`))
+	if decodeOptionsError != nil {
+		test.Fatalf("decoding ignoreCase: %v", decodeOptionsError)
 	}
 	cases := []struct {
 		sourceText string
@@ -296,16 +296,24 @@ func TestJsxNoDuplicatePropsIgnoreCase(t *testing.T) {
 		{`<svg a:b="c" A:b="d" />;`, 0},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, JsxNoDuplicateProps, duplicatePropsFile, testCase.sourceText, decoded)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(
+				test,
+				JsxNoDuplicateProperties,
+				duplicatePropsFile,
+				testCase.sourceText,
+				decoded,
+			)
 			if len(result.Diagnostics) != testCase.wantCount {
-				t.Errorf("got %d findings, want %d", len(result.Diagnostics), testCase.wantCount)
+				test.Errorf("got %d findings, want %d", len(result.Diagnostics), testCase.wantCount)
 			}
 		})
 	}
 
-	if _, err := rule.DecodeOptionsInto[JsxNoDuplicatePropsOptions]()([]byte(`{"ignorecase": true}`)); err == nil {
-		t.Error("a misspelled ignoreCase decoded")
+	if _, decodeOptionsError := rule.DecodeOptionsInto[JsxNoDuplicatePropsOptions]()(
+		[]byte(`{"ignorecase": true}`),
+	); decodeOptionsError == nil {
+		test.Error("a misspelled ignoreCase decoded")
 	}
 }

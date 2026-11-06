@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -24,27 +25,31 @@ func settingsOf(namespaces map[string]string) rule.OptionsBase {
 	return rule.OptionsBase{ConfigDirectory: "/repo", Settings: settings}
 }
 
-func TestCheckSettingsAcceptsWhatTheRunReads(t *testing.T) {
-	t.Parallel()
+func TestCheckSettingsAcceptsWhatTheRunReads(test *testing.T) {
+	test.Parallel()
 	accepted := map[string]rule.OptionsBase{
-		"no settings":                    {ConfigDirectory: "/repo"},
-		"our repositories' block":        settingsOf(map[string]string{"better-tailwindcss": ourTailwindSettings}),
-		"upstream's other spelling":      settingsOf(map[string]string{"eslint-plugin-better-tailwindcss": `{"callees": ["cn"]}`}),
-		"a key only one rule reads":      settingsOf(map[string]string{"better-tailwindcss": `{"order": "desc"}`}),
-		"every location key":             settingsOf(map[string]string{"better-tailwindcss": `{"entryPoint": "a.css", "tailwindConfig": "b.css", "cwd": "web"}`}),
+		"no settings":             {ConfigDirectory: "/repo"},
+		"our repositories' block": settingsOf(map[string]string{"better-tailwindcss": ourTailwindSettings}),
+		"upstream's other spelling": settingsOf(
+			map[string]string{"eslint-plugin-better-tailwindcss": `{"callees": ["cn"]}`},
+		),
+		"a key only one rule reads": settingsOf(map[string]string{"better-tailwindcss": `{"order": "desc"}`}),
+		"every location key": settingsOf(
+			map[string]string{"better-tailwindcss": `{"entryPoint": "a.css", "tailwindConfig": "b.css", "cwd": "web"}`},
+		),
 		"an empty block":                 settingsOf(map[string]string{"better-tailwindcss": `{}`}),
 		"an empty list replacing a kind": settingsOf(map[string]string{"better-tailwindcss": `{"callees": []}`}),
 	}
 	for name, base := range accepted {
-		if err := CheckSettings(base); err != nil {
-			t.Errorf("%s was refused: %v", name, err)
+		if checkSettingsError := CheckSettings(base); checkSettingsError != nil {
+			test.Errorf("%s was refused: %v", name, checkSettingsError)
 		}
 	}
 }
 
 // Each refusal names what it refuses, so the fix is one edit.
-func TestCheckSettingsRefusesWhatWouldBeIgnored(t *testing.T) {
-	t.Parallel()
+func TestCheckSettingsRefusesWhatWouldBeIgnored(test *testing.T) {
+	test.Parallel()
 	refused := []struct {
 		name     string
 		base     rule.OptionsBase
@@ -56,26 +61,32 @@ func TestCheckSettingsRefusesWhatWouldBeIgnored(t *testing.T) {
 			"better-tailwindcss":               `{}`,
 			"eslint-plugin-better-tailwindcss": `{}`,
 		}), []string{"both", "keep one"}},
-		{"an upstream option not ported yet", settingsOf(map[string]string{"better-tailwindcss": `{"messageStyle": "compact"}`}),
-			[]string{`"messageStyle"`, "ignored"}},
+		{
+			"an upstream option not ported yet",
+			settingsOf(map[string]string{"better-tailwindcss": `{"messageStyle": "compact"}`}),
+			[]string{`"messageStyle"`, "ignored"},
+		},
 		{"a key no rule reads", settingsOf(map[string]string{"better-tailwindcss": `{"calees": ["cn"]}`}),
 			[]string{`"calees"`}},
 		{"a value of the wrong type", settingsOf(map[string]string{"better-tailwindcss": `{"callees": "cn"}`}),
 			[]string{"better-tailwindcss/", "callees"}},
-		{"a value upstream's schema refuses", settingsOf(map[string]string{"better-tailwindcss": `{"order": "sideways"}`}),
-			[]string{"better-tailwindcss/enforce-consistent-class-order", "order"}},
+		{
+			"a value upstream's schema refuses",
+			settingsOf(map[string]string{"better-tailwindcss": `{"order": "sideways"}`}),
+			[]string{"better-tailwindcss/enforce-consistent-class-order", "order"},
+		},
 		{"null", settingsOf(map[string]string{"better-tailwindcss": `{"collapse": null}`}),
 			[]string{"collapse"}},
 	}
 	for _, testCase := range refused {
-		err := CheckSettings(testCase.base)
-		if err == nil {
-			t.Errorf("%s loaded", testCase.name)
+		checkSettingsError := CheckSettings(testCase.base)
+		if checkSettingsError == nil {
+			test.Errorf("%s loaded", testCase.name)
 			continue
 		}
 		for _, mention := range testCase.mentions {
-			if !strings.Contains(err.Error(), mention) {
-				t.Errorf("%s: the refusal does not mention %s: %v", testCase.name, mention, err)
+			if !strings.Contains(checkSettingsError.Error(), mention) {
+				test.Errorf("%s: the refusal does not mention %s: %v", testCase.name, mention, checkSettingsError)
 			}
 		}
 	}
@@ -83,27 +94,39 @@ func TestCheckSettingsRefusesWhatWouldBeIgnored(t *testing.T) {
 
 // The settings reach a rule through the options registry the run builds, merged under the rule's own
 // element: the path a real config takes, not the decoder alone.
-func TestSettingsReachARuleThroughTheRunsOptions(t *testing.T) {
-	t.Parallel()
-	base := settingsOf(map[string]string{"better-tailwindcss": `{"order": "desc", "callees": ["mergeClassNames"]}`})
-	options := OptionsAt(base)
+//
+// The rule the registry binds holds its options out of sight, so each part of the merge is shown by what the
+// decode refuses beside an options element: a settings key the element leaves alone stays merged and is
+// refused when it is the wrong type, and an element's own key overrides settings' wrong one. The control
+// decodes the same shapes well typed, so each refusal is the wrong type and nothing else.
+//
+// A bare severity is not probed this way: the config layer runs a rule whose options only tune it as its
+// Unconfigured when its decode of nothing fails (configuration.OptionsRegistry.Decode), so a wrong settings
+// value there reads as no refusal. CheckSettings refuses that value before any rule decodes, which
+// TestCheckSettingsRefusesWhatWouldBeIgnored covers.
+func TestSettingsReachARuleThroughTheRunsOptions(test *testing.T) {
+	test.Parallel()
+	const ruleName = "better-tailwindcss/enforce-consistent-class-order"
+	ownOrder := []json.RawMessage{json.RawMessage(`{"order": "asc"}`)}
+	optionsWith := func(block string) configuration.OptionsRegistry {
+		return OptionsAt(settingsOf(map[string]string{"better-tailwindcss": block}))
+	}
 
-	bare, err := options.Decode("better-tailwindcss/enforce-consistent-class-order", nil)
-	if err != nil {
-		t.Fatal(err)
+	control := optionsWith(`{"order": "desc", "callees": ["mergeClassNames"]}`)
+	if _, decodeError := control.Decode(ruleName, nil); decodeError != nil {
+		test.Fatalf("well-typed settings were refused on a bare severity: %v", decodeError)
 	}
-	if encoded, _ := json.Marshal(bare); !strings.Contains(string(encoded), `"order":"desc"`) ||
-		!strings.Contains(string(encoded), `"callees":["mergeClassNames"]`) {
-		t.Fatalf("a bare severity decoded %s, want settings' order and callees", encoded)
+	if _, decodeError := control.Decode(ruleName, ownOrder); decodeError != nil {
+		test.Fatalf("well-typed settings were refused beside an options element: %v", decodeError)
 	}
 
-	overridden, err := options.Decode("better-tailwindcss/enforce-consistent-class-order",
-		[]json.RawMessage{json.RawMessage(`{"order": "asc"}`)})
-	if err != nil {
-		t.Fatal(err)
+	misordered := optionsWith(`{"order": 7, "callees": ["mergeClassNames"]}`)
+	if _, decodeError := misordered.Decode(ruleName, ownOrder); decodeError != nil {
+		test.Errorf("an options element's order did not override settings' order of 7: %v", decodeError)
 	}
-	if encoded, _ := json.Marshal(overridden); !strings.Contains(string(encoded), `"order":"asc"`) ||
-		!strings.Contains(string(encoded), `"callees":["mergeClassNames"]`) {
-		t.Fatalf("an options element decoded %s, want its own order over settings' and settings' callees kept", encoded)
+
+	miscalled := optionsWith(`{"order": "desc", "callees": 7}`)
+	if _, decodeError := miscalled.Decode(ruleName, ownOrder); decodeError == nil {
+		test.Error("an options element decoded beside settings' callees of 7, so settings' callees were not kept")
 	}
 }

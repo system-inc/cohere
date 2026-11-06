@@ -20,6 +20,7 @@
     { "name": "security", "definition": "Untrusted values reaching a shell, SQL, or other interpreter." },
     { "name": "storage", "definition": "Browser storage goes through its service." },
     { "name": "tailwind", "definition": "Tailwind class conventions." },
+    { "name": "testing", "definition": "How a test is written so its verdict can be trusted: parallel by default, able to fail, independent of the machine it runs on." },
     { "name": "toolchain", "definition": "Compiler, language mode and package settings every target must carry." }
   ],
   "namespaces": [

@@ -7,7 +7,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // A file of its own rather than a line in the package's shared `register.go`, so two authors landing
 // at once touch nothing in common.
 //
-// Registered and NOT enabled. `CohereSettings.json` already carries `"no-useless-rename": "off"`, a
+// Registered and not enabled. `CohereSettings.json` already carries `"no-useless-rename": "off"`, a
 // decision somebody made before the rule was ported, and running EnableRule.ts would reverse it
 // through the porting process rather than because anyone changed their mind. The port is here and
 // proven so that turning it on later is one config line.
@@ -16,7 +16,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // three options already default to false, so that costs nothing today and keeps the shape right if a
 // default ever moves.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[NoUselessRenameSettings]{
 		Rule:   NoUselessRename,
 		Decode: DecodeNoUselessRenameOptions,
 	})

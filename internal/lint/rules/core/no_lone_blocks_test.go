@@ -14,9 +14,9 @@ const noLoneBlocksFile = "/repository/source/NoLoneBlocks.ts"
 // Verbatim from `eslint/tests/lib/rules/no-lone-blocks.js`, extracted by loading that file with the
 // rule tester stubbed out. 23 valid and 27 invalid.
 //
-// # The one case that is NOT imported, and why
+// # The one case that is not imported, and why
 //
-// Upstream's corpus runs `{ function bar() {} }` twice, at the SAME ecmaVersion 6, and gets
+// Upstream's corpus runs `{ function bar() {} }` twice, at the same ecmaVersion 6, and gets
 // opposite verdicts. The discriminator is strictness, not the language version, and it is easy to
 // misread as the latter because the two rows differ in a nested `parserOptions` key:
 //
@@ -38,8 +38,8 @@ const noLoneBlocksFile = "/repository/source/NoLoneBlocks.ts"
 // The first three are blocks that belong to a statement rather than standing alone. The rest carry
 // a block-scoped binding -- `let`, `const`, a class, a function declaration, `using` -- which is
 // what the braces exist to contain. The static-block rows are the same question one scope in.
-func TestNoLoneBlocksStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoLoneBlocksStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		"if (foo) { if (bar) { baz(); } }",
@@ -68,20 +68,20 @@ func TestNoLoneBlocksStaysSilent(t *testing.T) {
 	}
 
 	for _, sourceText := range cases {
-		t.Run(sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoLoneBlocks, noLoneBlocksFile, sourceText))
+		test.Run(sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoLoneBlocks, noLoneBlocksFile, sourceText))
 		})
 	}
 }
 
 // The failing cases, with the exact ids the corpus names and in its order.
 //
-// Two messages, and which one fires is decided by the block's PARENT: a block sitting directly
+// Two messages, and which one fires is decided by the block's parent: a block sitting directly
 // inside another block or inside a static block is `redundantNestedBlock`, everything else is
 // `redundantBlock`. The three-finding case pins both the count and the interleaving.
-func TestNoLoneBlocksFires(t *testing.T) {
-	t.Parallel()
+func TestNoLoneBlocksFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -97,29 +97,77 @@ func TestNoLoneBlocksFires(t *testing.T) {
 		{"{var x = 1;}", []string{"redundantBlock"}},
 		{"{ \n{var x = 1;}\n let y = 2; } {let z = 1;}", []string{"redundantNestedBlock"}},
 		{"{ \n{let x = 1;}\n var y = 2; } {let z = 1;}", []string{"redundantBlock"}},
-		{"{ \n{var x = 1;}\n var y = 2; }\n {var z = 1;}", []string{"redundantBlock", "redundantNestedBlock", "redundantBlock"}},
-		{"\n              switch (foo) {\n                case 1:\n                    foo();\n                    {\n                        bar;\n                    }\n              }\n            ", []string{"redundantBlock"}},
-		{"\n              switch (foo) {\n                case 1:\n                {\n                    bar;\n                }\n                foo();\n              }\n            ", []string{"redundantBlock"}},
-		{"\n              function foo () {\n                {\n                  const x = 4;\n                }\n              }\n            ", []string{"redundantNestedBlock"}},
-		{"\n              function foo () {\n                {\n                  var x = 4;\n                }\n              }\n            ", []string{"redundantNestedBlock"}},
-		{"\n              class C {\n                static {\n                  if (foo) {\n                    {\n                        let block;\n                    }\n                  }\n                }\n              }\n            ", []string{"redundantNestedBlock"}},
-		{"\n              class C {\n                static {\n                  if (foo) {\n                    {\n                        block;\n                    }\n                    something;\n                  }\n                }\n              }\n            ", []string{"redundantNestedBlock"}},
-		{"\n              class C {\n                static {\n                  {\n                    block;\n                  }\n                }\n              }\n            ", []string{"redundantNestedBlock"}},
-		{"\n              class C {\n                static {\n                  {\n                    let block;\n                  }\n                }\n              }\n            ", []string{"redundantNestedBlock"}},
-		{"\n              class C {\n                static {\n                  {\n                    const block = 1;\n                  }\n                }\n              }\n            ", []string{"redundantNestedBlock"}},
-		{"\n              class C {\n                static {\n                  {\n                    function block() {}\n                  }\n                }\n              }\n            ", []string{"redundantNestedBlock"}},
-		{"\n              class C {\n                static {\n                  {\n                    class block {}\n                  }\n                }\n              }\n            ", []string{"redundantNestedBlock"}},
-		{"\n              class C {\n                static {\n                  {\n                    var block;\n                  }\n                  something;\n                }\n              }\n            ", []string{"redundantNestedBlock"}},
-		{"\n              class C {\n                static {\n                  something;\n                  {\n                    var block;\n                  }\n                }\n              }\n            ", []string{"redundantNestedBlock"}},
-		{"\n              class C {\n                static {\n                  {\n                    block;\n                  }\n                  something;\n                }\n              }\n            ", []string{"redundantNestedBlock"}},
-		{"\n              class C {\n                static {\n                  something;\n                  {\n                    block;\n                  }\n                }\n              }\n            ", []string{"redundantNestedBlock"}},
+		{
+			"{ \n{var x = 1;}\n var y = 2; }\n {var z = 1;}",
+			[]string{"redundantBlock", "redundantNestedBlock", "redundantBlock"},
+		},
+		{
+			"\n              switch (foo) {\n                case 1:\n                    foo();\n                    {\n                        bar;\n                    }\n              }\n            ",
+			[]string{"redundantBlock"},
+		},
+		{
+			"\n              switch (foo) {\n                case 1:\n                {\n                    bar;\n                }\n                foo();\n              }\n            ",
+			[]string{"redundantBlock"},
+		},
+		{
+			"\n              function foo () {\n                {\n                  const x = 4;\n                }\n              }\n            ",
+			[]string{"redundantNestedBlock"},
+		},
+		{
+			"\n              function foo () {\n                {\n                  var x = 4;\n                }\n              }\n            ",
+			[]string{"redundantNestedBlock"},
+		},
+		{
+			"\n              class C {\n                static {\n                  if (foo) {\n                    {\n                        let block;\n                    }\n                  }\n                }\n              }\n            ",
+			[]string{"redundantNestedBlock"},
+		},
+		{
+			"\n              class C {\n                static {\n                  if (foo) {\n                    {\n                        block;\n                    }\n                    something;\n                  }\n                }\n              }\n            ",
+			[]string{"redundantNestedBlock"},
+		},
+		{
+			"\n              class C {\n                static {\n                  {\n                    block;\n                  }\n                }\n              }\n            ",
+			[]string{"redundantNestedBlock"},
+		},
+		{
+			"\n              class C {\n                static {\n                  {\n                    let block;\n                  }\n                }\n              }\n            ",
+			[]string{"redundantNestedBlock"},
+		},
+		{
+			"\n              class C {\n                static {\n                  {\n                    const block = 1;\n                  }\n                }\n              }\n            ",
+			[]string{"redundantNestedBlock"},
+		},
+		{
+			"\n              class C {\n                static {\n                  {\n                    function block() {}\n                  }\n                }\n              }\n            ",
+			[]string{"redundantNestedBlock"},
+		},
+		{
+			"\n              class C {\n                static {\n                  {\n                    class block {}\n                  }\n                }\n              }\n            ",
+			[]string{"redundantNestedBlock"},
+		},
+		{
+			"\n              class C {\n                static {\n                  {\n                    var block;\n                  }\n                  something;\n                }\n              }\n            ",
+			[]string{"redundantNestedBlock"},
+		},
+		{
+			"\n              class C {\n                static {\n                  something;\n                  {\n                    var block;\n                  }\n                }\n              }\n            ",
+			[]string{"redundantNestedBlock"},
+		},
+		{
+			"\n              class C {\n                static {\n                  {\n                    block;\n                  }\n                  something;\n                }\n              }\n            ",
+			[]string{"redundantNestedBlock"},
+		},
+		{
+			"\n              class C {\n                static {\n                  something;\n                  {\n                    block;\n                  }\n                }\n              }\n            ",
+			[]string{"redundantNestedBlock"},
+		},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoLoneBlocks, noLoneBlocksFile, testCase.sourceText),
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, NoLoneBlocks, noLoneBlocksFile, testCase.sourceText),
 				testCase.wantIds...)
 		})
 	}
@@ -131,14 +179,14 @@ func TestNoLoneBlocksFires(t *testing.T) {
 // only in `impliedStrict`. Measured against the installed eslint 10.8.1 build: zero findings under
 // `sourceType: "module"`, one under `"script"`. A TypeScript file is a module and a module body is
 // always strict, so the block-scoped reading is the only reachable one and the block is clean.
-func TestNoLoneBlocksTreatsEveryFileAsStrict(t *testing.T) {
-	t.Parallel()
+func TestNoLoneBlocksTreatsEveryFileAsStrict(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectClean(t, rule_testing.Run(t, NoLoneBlocks, noLoneBlocksFile, "{ function bar() {} }"))
+	rule_testing.ExpectClean(test, rule_testing.Run(test, NoLoneBlocks, noLoneBlocksFile, "{ function bar() {} }"))
 
 	// The control, so the silence above is about the function declaration rather than about the
 	// rule declining every block: the same shape holding a `var` reports.
-	rule_testing.ExpectFindings(t, rule_testing.Run(t, NoLoneBlocks, noLoneBlocksFile,
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, NoLoneBlocks, noLoneBlocksFile,
 		"{ var bar = 1; }"), "redundantBlock")
 }
 
@@ -154,8 +202,8 @@ func TestNoLoneBlocksTreatsEveryFileAsStrict(t *testing.T) {
 //
 // `namespace` inside a block is TS1235 and not legal at all; it is exempted so a recovered parse
 // does not add a finding to source that is already broken.
-func TestNoLoneBlocksExemptsTypeScriptBlockScopedDeclarations(t *testing.T) {
-	t.Parallel()
+func TestNoLoneBlocksExemptsTypeScriptBlockScopedDeclarations(test *testing.T) {
+	test.Parallel()
 
 	for _, sourceText := range []string{
 		"{ enum E { A } }",
@@ -163,51 +211,51 @@ func TestNoLoneBlocksExemptsTypeScriptBlockScopedDeclarations(t *testing.T) {
 		"{ type T = number; }",
 		"{ namespace N {} }",
 	} {
-		t.Run(sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoLoneBlocks, noLoneBlocksFile, sourceText))
+		test.Run(sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoLoneBlocks, noLoneBlocksFile, sourceText))
 		})
 	}
 
 	// The control: a block holding only a statement still reports, so the exemptions above are
 	// about the declaration kinds rather than about the rule going quiet on this shape.
-	rule_testing.ExpectFindings(t, rule_testing.Run(t, NoLoneBlocks, noLoneBlocksFile,
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, NoLoneBlocks, noLoneBlocksFile,
 		"{ foo(); }"), "redundantBlock")
 }
 
-// A static block's own body is not a lone block, and this is a PARSER DIFFERENCE rather than a rule
+// A static block's own body is not a lone block, and this is a parser difference rather than a rule
 // decision.
 //
-// ESTree gives a `StaticBlock` node that IS the statement list, so upstream never sees a block in
+// ESTree gives a `StaticBlock` node that is the statement list, so upstream never sees a block in
 // that position. typescript-go gives a `ClassStaticBlockDeclaration` whose `Body` is a separate
 // `KindBlock`, which looks exactly like a redundant block inside a static block. Without the guard,
 // eight of upstream's clean cases reported and eleven of its failing ones reported twice.
 //
 // Kept here rather than only in the corpus table, because the corpus rows read as ordinary static
 // block cases and this names what they are actually protecting.
-func TestNoLoneBlocksDoesNotReportAStaticBlockBody(t *testing.T) {
-	t.Parallel()
+func TestNoLoneBlocksDoesNotReportAStaticBlockBody(test *testing.T) {
+	test.Parallel()
 
 	for _, sourceText := range []string{
 		"class C { static {} }",
 		"class C { static { foo; } }",
 		"class C { static { if (foo) { block; } } }",
 	} {
-		t.Run(sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoLoneBlocks, noLoneBlocksFile, sourceText))
+		test.Run(sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoLoneBlocks, noLoneBlocksFile, sourceText))
 		})
 	}
 
-	// A real block INSIDE a static block still reports, and as nested, which is what shows the
+	// A real block inside a static block still reports, and as nested, which is what shows the
 	// guard is about the body node rather than about static blocks generally.
-	rule_testing.ExpectFindings(t, rule_testing.Run(t, NoLoneBlocks, noLoneBlocksFile,
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, NoLoneBlocks, noLoneBlocksFile,
 		"class C { static { { block; } } }"), "redundantNestedBlock")
 }
 
 // Cases measured against the installed eslint 10.8.1 build that the corpus does not write.
-func TestNoLoneBlocksMatchesTheInstalledBuild(t *testing.T) {
-	t.Parallel()
+func TestNoLoneBlocksMatchesTheInstalledBuild(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -247,10 +295,10 @@ func TestNoLoneBlocksMatchesTheInstalledBuild(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoLoneBlocks, noLoneBlocksFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, NoLoneBlocks, noLoneBlocksFile, testCase.sourceText),
 				testCase.wantIds...)
 		})
 	}
@@ -261,34 +309,34 @@ func TestNoLoneBlocksMatchesTheInstalledBuild(t *testing.T) {
 // Upstream reports on the block node, so the finding covers the braces and everything between them.
 // The two-finding case is asserted because it is the one where a port could anchor the outer
 // finding on the inner block and still satisfy every id assertion.
-func TestNoLoneBlocksSpansTheBlock(t *testing.T) {
-	t.Parallel()
+func TestNoLoneBlocksSpansTheBlock(test *testing.T) {
+	test.Parallel()
 
 	const sourceText = "{ {let y = 1;} }"
 
-	result := rule_testing.Run(t, NoLoneBlocks, noLoneBlocksFile, sourceText)
+	result := rule_testing.Run(test, NoLoneBlocks, noLoneBlocksFile, sourceText)
 	if len(result.Diagnostics) != 2 {
-		t.Fatalf("wanted two diagnostics, got %d", len(result.Diagnostics))
+		test.Fatalf("wanted two diagnostics, got %d", len(result.Diagnostics))
 	}
 
 	outer := result.Diagnostics[0]
 	if got := sourceText[outer.Range.Pos():outer.Range.End()]; got != sourceText {
-		t.Fatalf("outer finding spans %q, wanted the whole block %q", got, sourceText)
+		test.Fatalf("outer finding spans %q, wanted the whole block %q", got, sourceText)
 	}
 	if outer.Message.Id != "redundantBlock" {
-		t.Fatalf("outer finding is %q, wanted redundantBlock", outer.Message.Id)
+		test.Fatalf("outer finding is %q, wanted redundantBlock", outer.Message.Id)
 	}
 
 	inner := result.Diagnostics[1]
 	if got := sourceText[inner.Range.Pos():inner.Range.End()]; got != "{let y = 1;}" {
-		t.Fatalf("inner finding spans %q, wanted %q", got, "{let y = 1;}")
+		test.Fatalf("inner finding spans %q, wanted %q", got, "{let y = 1;}")
 	}
 	if inner.Message.Id != "redundantNestedBlock" {
-		t.Fatalf("inner finding is %q, wanted redundantNestedBlock", inner.Message.Id)
+		test.Fatalf("inner finding is %q, wanted redundantNestedBlock", inner.Message.Id)
 	}
 }
 
-// The identity test in both arms: "the parent's only statement" means THIS block, not merely that
+// The identity test in both arms: "the parent's only statement" means this block, not merely that
 // the parent has one statement.
 //
 // Found as two surviving mutants, one per arm, both deleting `Nodes[0] == block` while keeping
@@ -301,13 +349,13 @@ func TestNoLoneBlocksSpansTheBlock(t *testing.T) {
 //
 // Without the identity test the consequent block satisfies "the only statement" and reports, which
 // would be a false positive on the block a construct requires. All four rows measured against the
-// installed eslint 10.8.1 build: the OUTER block reports once and the inner one never does.
+// installed eslint 10.8.1 build: the outer block reports once and the inner one never does.
 //
 // The switch rows are the same question in the clause arm, and they invert: a clause holding one
-// statement exempts the block only when the block IS that statement, so `case 1: if (a) { bar; }`
+// statement exempts the block only when the block is that statement, so `case 1: if (a) { bar; }`
 // is clean throughout while `case 1: { bar; }` is clean for a different reason.
-func TestNoLoneBlocksIdentityNotJustLength(t *testing.T) {
-	t.Parallel()
+func TestNoLoneBlocksIdentityNotJustLength(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -332,16 +380,16 @@ func TestNoLoneBlocksIdentityNotJustLength(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoLoneBlocks, noLoneBlocksFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, NoLoneBlocks, noLoneBlocksFile, testCase.sourceText),
 				testCase.wantIds...)
 		})
 	}
 }
 
-// A block-scoped block still reports when it is a function body's ONLY statement, and the
+// A block-scoped block still reports when it is a function body's only statement, and the
 // TypeScript exemption does not rescue it.
 //
 // Written after a seeded probe made this look like a defect in the TypeScript exemption. It is not:
@@ -353,22 +401,22 @@ func TestNoLoneBlocksIdentityNotJustLength(t *testing.T) {
 // The pair matters because the exemption and the second arm answer at different points, and only
 // the sibling statement separates them. Without the second row, a reader hitting the first would
 // reasonably conclude the exemption was broken.
-func TestNoLoneBlocksSecondArmOutranksTheBindingExemption(t *testing.T) {
-	t.Parallel()
+func TestNoLoneBlocksSecondArmOutranksTheBindingExemption(test *testing.T) {
+	test.Parallel()
 
 	// Sole statement of a function body: reports, bindings notwithstanding.
-	rule_testing.ExpectFindings(t, rule_testing.Run(t, NoLoneBlocks, noLoneBlocksFile,
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, NoLoneBlocks, noLoneBlocksFile,
 		"function f() { { let x = 1; void x; } }"), "redundantNestedBlock")
 
-	rule_testing.ExpectFindings(t, rule_testing.Run(t, NoLoneBlocks, noLoneBlocksFile,
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, NoLoneBlocks, noLoneBlocksFile,
 		"function f() { { type Local = number; const v: Local = 1; void v; } }"),
 		"redundantNestedBlock")
 
 	// One statement beside it, so the second arm no longer applies and the binding exemption is
 	// what decides. Both go clean.
-	rule_testing.ExpectClean(t, rule_testing.Run(t, NoLoneBlocks, noLoneBlocksFile,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, NoLoneBlocks, noLoneBlocksFile,
 		"function f() { { let x = 1; void x; } g(); }"))
 
-	rule_testing.ExpectClean(t, rule_testing.Run(t, NoLoneBlocks, noLoneBlocksFile,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, NoLoneBlocks, noLoneBlocksFile,
 		"function f() { g(); { type Local = number; const v: Local = 1; void v; } }"))
 }

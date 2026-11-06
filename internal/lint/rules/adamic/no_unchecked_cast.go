@@ -47,15 +47,15 @@ const CheckedDowncastNote = "checked downcast"
  *
  * The repair is where the value comes from, which the cast hides.
  */
-var NoUncheckedCast = rule.Rule{
+var NoUncheckedCast = rule.Rule[rule.NoOptions]{
 	Name:             "adamic/no-unchecked-cast",
 	NeedsTypeChecker: true,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.TypeChecker == nil || ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		if ruleContext.TypeChecker == nil || ruleContext.SourceFile == nil {
 			return nil
 		}
-		typeChecker := ctx.TypeChecker
+		typeChecker := ruleContext.TypeChecker
 		judge := func(node *ast.Node) {
 			typeNode := node.Type()
 			if typeNode == nil || ast.IsConstTypeReference(typeNode) {
@@ -74,13 +74,14 @@ var NoUncheckedCast = rule.Rule{
 					return
 				}
 				if checkedDowncast(typeChecker, source, target) {
-					ctx.Note(CheckedDowncastNote)
+					ruleContext.Note(CheckedDowncastNote)
 					return
 				}
-			} else if target.Flags()&(checker.TypeFlagsAny|checker.TypeFlagsUnknown) != 0 || type_checking.IsTypeUnknownArrayType(target, typeChecker) {
+			} else if target.Flags()&(checker.TypeFlagsAny|checker.TypeFlagsUnknown) != 0 ||
+				type_checking.IsTypeUnknownArrayType(target, typeChecker) {
 				return
 			}
-			ctx.ReportNode(node, rule.Message{
+			ruleContext.ReportNode(node, rule.Message{
 				Id: "uncheckedCast",
 				Description: noUncheckedCastText.Render(map[string]string{
 					"source": typeChecker.TypeToString(source),
@@ -104,7 +105,8 @@ func checkedDowncast(typeChecker *checker.Checker, source *checker.Type, target 
 	if target.Flags()&checker.TypeFlagsUnion != 0 {
 		targetMembers = target.Types()
 	}
-	var kept, dropped []*checker.Type
+	var kept []*checker.Type
+	var dropped []*checker.Type
 	for _, member := range source.Types() {
 		if containsIdentical(typeChecker, targetMembers, member) {
 			kept = append(kept, member)
@@ -145,7 +147,8 @@ func distinguishable(typeChecker *checker.Checker, left *checker.Type, right *ch
 		// Two members of one primitive class: literals of it, told apart by ===.
 		return isUnitLiteral(left) && isUnitLiteral(right)
 	}
-	if flow.IsClassInstance(left) && !flow.IsClassInstance(right) || !flow.IsClassInstance(left) && flow.IsClassInstance(right) {
+	if flow.IsClassInstance(left) && !flow.IsClassInstance(right) ||
+		!flow.IsClassInstance(left) && flow.IsClassInstance(right) {
 		return true
 	}
 	if flow.IsClassInstance(left) && flow.IsClassInstance(right) && classSymbol(left) != classSymbol(right) &&
@@ -169,8 +172,8 @@ func distinguishable(typeChecker *checker.Checker, left *checker.Type, right *ch
 }
 
 // typeofClass is what `typeof` would say of a value of the type, with null told apart from object.
-func typeofClass(t *checker.Type) string {
-	flags := t.Flags()
+func typeofClass(valueType *checker.Type) string {
+	flags := valueType.Flags()
 	switch {
 	case flags&checker.TypeFlagsStringLike != 0:
 		return "string"
@@ -190,7 +193,8 @@ func typeofClass(t *checker.Type) string {
 	return "object"
 }
 
-func isUnitLiteral(t *checker.Type) bool {
-	return t.Flags()&(checker.TypeFlagsStringLiteral|checker.TypeFlagsNumberLiteral|checker.TypeFlagsBooleanLiteral|
-		checker.TypeFlagsEnumLiteral|checker.TypeFlagsUndefined|checker.TypeFlagsNull) != 0
+func isUnitLiteral(valueType *checker.Type) bool {
+	return valueType.Flags()&(checker.TypeFlagsStringLiteral|checker.TypeFlagsNumberLiteral|
+		checker.TypeFlagsBooleanLiteral|checker.TypeFlagsEnumLiteral|checker.TypeFlagsUndefined|
+		checker.TypeFlagsNull) != 0
 }

@@ -1,6 +1,6 @@
 // The framework's variant registrations, attached to a design system over its live theme.
 //
-// `framework_variant_table.go` holds the static half — 88 names, the order numbers the engine
+// `framework_variant_table.go` holds the static half: 88 names, the order numbers the engine
 // assigned them, and which of those orders carry a comparison function. This file is the half that
 // cannot be generated: the comparison itself, which upstream closes over the design system's theme.
 //

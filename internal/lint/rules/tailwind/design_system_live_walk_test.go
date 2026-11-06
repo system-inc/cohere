@@ -8,6 +8,7 @@ import (
 	"github.com/system-inc/cohere/internal/corpus"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	tailwindengine "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
+	"github.com/system-inc/cohere/internal/lint/testing"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
@@ -40,27 +41,27 @@ import (
 // work in this package at once, and a helper whose name does not say which component owns it is a
 // collision waiting to happen.
 
-// liveWalkRules is every rule in this package, as the shipped run registers them.
+// liveWalkRules is every rule in this package, as the shipped run registers them, each run unconfigured.
 //
 // Listed rather than read back out of the catalog, because the catalog is global and another
 // package's rules landing in it would change what this test walks without anyone editing this file.
 // If a tenth Tailwind rule is added and not added here, this test keeps passing while covering less,
 // which `TestLiveWalkCoversEveryRegisteredTailwindRule` below turns into a failure.
-func liveWalkRules() []rule.Rule {
-	return []rule.Rule{
-		EnforceConsistentClassOrder,
-		EnforceConsistentVariantOrder,
-		EnforceConsistentImportantPosition,
-		EnforceConsistentVariableSyntax,
-		EnforceShorthandClasses,
-		EnforceCanonicalClasses,
-		NoConcatenatedClasses,
-		NoConflictingClasses,
-		NoDeprecatedClasses,
-		NoDuplicateClasses,
-		NoUnknownClasses,
-		NoUnnecessaryWhitespace,
-		NoPhysicalDirection,
+func liveWalkRules(test testing.TB) []rule.Entry {
+	return []rule.Entry{
+		rule_testing.EntryOf(test, EnforceConsistentClassOrder),
+		rule_testing.EntryOf(test, EnforceConsistentVariantOrder),
+		rule_testing.EntryOf(test, EnforceConsistentImportantPosition),
+		rule_testing.EntryOf(test, EnforceConsistentVariableSyntax),
+		rule_testing.EntryOf(test, EnforceShorthandClasses),
+		rule_testing.EntryOf(test, EnforceCanonicalClasses),
+		rule_testing.EntryOf(test, NoConcatenatedClasses),
+		rule_testing.EntryOf(test, NoConflictingClasses),
+		rule_testing.EntryOf(test, NoDeprecatedClasses),
+		rule_testing.EntryOf(test, NoDuplicateClasses),
+		rule_testing.EntryOf(test, NoUnknownClasses),
+		rule_testing.EntryOf(test, NoUnnecessaryWhitespace),
+		rule_testing.EntryOf(test, NoPhysicalDirection),
 	}
 }
 
@@ -89,22 +90,22 @@ const liveWalkMeasuredBuildCost = 1660 * time.Microsecond
 // The tree is ahra, the corpus the rest of the live suites in this package read. Without it the test
 // skips naming the variable, because what is under test is a property of the rules and not of the
 // machine.
-func TestDesignSystemIsBuiltOnceUnderTheRealWalk(t *testing.T) {
-	liveWalkRepository := corpus.Ahra.Root(t)
+func TestDesignSystemIsBuiltOnceUnderTheRealWalk(test *testing.T) {
+	liveWalkRepository := corpus.Ahra.Root(test)
 
 	resetDesignSystemCacheForTest()
 
-	graph, err := program.Build(program.Options{
+	graph, buildError := program.Build(program.Options{
 		ConfigFileName:   "tsconfig.json",
 		CurrentDirectory: liveWalkRepository,
 	})
-	if err != nil {
-		t.Fatalf("building a program over %s: %v", liveWalkRepository, err)
+	if buildError != nil {
+		test.Fatalf("building a program over %s: %v", liveWalkRepository, buildError)
 	}
 
 	files := graph.ProjectFiles()
 	if len(files) < 1000 {
-		t.Fatalf("the corpus repository yielded %d project files; this assertion is about a tree "+
+		test.Fatalf("the corpus repository yielded %d project files; this assertion is about a tree "+
 			"large enough to use the worker pool, and a number this small means the program was "+
 			"built over something other than the repository", len(files))
 	}
@@ -112,21 +113,21 @@ func TestDesignSystemIsBuiltOnceUnderTheRealWalk(t *testing.T) {
 	// The pool is asserted rather than assumed. A walk that silently ran single-threaded would pass
 	// every count below while proving nothing about the concurrency the cache's mutex exists for.
 	if workers := graph.Workers(); workers < 2 {
-		t.Fatalf("the walk would run with %d worker(s), so this test cannot observe a race between "+
+		test.Fatalf("the walk would run with %d worker(s), so this test cannot observe a race between "+
 			"two builds and the property it claims to prove would be untested", workers)
 	}
 
-	rules := liveWalkRules()
+	rules := liveWalkRules(test)
 	before := tailwindengine.BuildsSoFar()
-	if _, err := graph.Walk(context.Background(), files, rules); err != nil {
-		t.Fatalf("walking %s: %v", liveWalkRepository, err)
+	if _, walkError := graph.Walk(context.Background(), files, rules); walkError != nil {
+		test.Fatalf("walking %s: %v", liveWalkRepository, walkError)
 	}
 	built := tailwindengine.BuildsSoFar() - before
 
 	if built != 1 {
 		// The counterfactual is stated in the failure rather than left for the reader to compute,
 		// because the whole defect is that the number is invisible until someone multiplies it out.
-		t.Fatalf("the design system was built %d times across %d files by %d rules on %d workers; "+
+		test.Fatalf("the design system was built %d times across %d files by %d rules on %d workers; "+
 			"it must be built exactly once per run. At the measured %v per build on this "+
 			"repository, %d extra builds is roughly %v of pure waste, and nothing else would fail",
 			built, len(files), len(rules), graph.Workers(), liveWalkMeasuredBuildCost,
@@ -141,11 +142,11 @@ func TestDesignSystemIsBuiltOnceUnderTheRealWalk(t *testing.T) {
 // test that keeps passing while measuring less, which is the quietest way for a guard to stop
 // guarding. Counting the list against the package's own registrations turns it into a failure that
 // names the missing rule.
-func TestLiveWalkCoversEveryRegisteredTailwindRule(t *testing.T) {
-	t.Parallel()
+func TestLiveWalkCoversEveryRegisteredTailwindRule(test *testing.T) {
+	test.Parallel()
 	covered := make(map[string]bool)
-	for _, subject := range liveWalkRules() {
-		covered[subject.Name] = true
+	for _, entry := range liveWalkRules(test) {
+		covered[entry.Name] = true
 	}
 
 	// The catalog, which in this package's test binary holds this package's registrations and
@@ -156,16 +157,16 @@ func TestLiveWalkCoversEveryRegisteredTailwindRule(t *testing.T) {
 	// would make this test start demanding coverage of rules that are not this package's business,
 	// which is a failure that would read as this test being wrong rather than as the catalog moving.
 	registered := rule.Registered()
-	if len(registered) != len(liveWalkRules()) {
-		t.Fatalf("the catalog holds %d rules and liveWalkRules lists %d; either a Tailwind rule was "+
+	if len(registered) != len(liveWalkRules(test)) {
+		test.Fatalf("the catalog holds %d rules and liveWalkRules lists %d; either a Tailwind rule was "+
 			"added without being added to liveWalkRules, or another package's rules are now linked "+
 			"into this test binary and this comparison is measuring the wrong set",
-			len(registered), len(liveWalkRules()))
+			len(registered), len(liveWalkRules(test)))
 	}
-	for _, registration := range registered {
-		if !covered[registration.Rule.Name] {
-			t.Errorf("rule %q is registered by this package but is not in liveWalkRules, so the "+
-				"build-once assertion never walks it", registration.Rule.Name)
+	for _, entry := range registered {
+		if !covered[entry.Name] {
+			test.Errorf("rule %q is registered by this package but is not in liveWalkRules, so the "+
+				"build-once assertion never walks it", entry.Name)
 		}
 	}
 }

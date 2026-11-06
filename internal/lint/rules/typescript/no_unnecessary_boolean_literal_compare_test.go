@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -29,23 +30,28 @@ func noUnnecessaryBooleanLiteralCompareOnDisk(sourceText string) string {
 
 // decodeNoUnnecessaryBooleanLiteralCompareOptions runs a configuration through the real decoder.
 //
-// Two of this rule's three options default to TRUE, so a fixture building the options struct by hand
+// Two of this rule's three options default to true, so a fixture building the options struct by hand
 // would leave the one line most likely to be wrong untested: a zero-valued struct turns both
 // allowances off and makes the rule report two families upstream allows. An empty configuration is
-// the bare `"error"` case, which the config layer turns into nil options.
-func decodeNoUnnecessaryBooleanLiteralCompareOptions(t *testing.T, configuration string) any {
-	t.Helper()
+// the bare `"error"` case, which the config layer turns into no options.
+func decodeNoUnnecessaryBooleanLiteralCompareOptions(
+	test *testing.T,
+	configuration string,
+) rule.Given[NoUnnecessaryBooleanLiteralCompareOptions] {
+	test.Helper()
 
 	if configuration == "" {
-		// A rule configured as a bare `"error"` is handed nil, not an empty struct. Passing nil
+		// A rule configured as a bare `"error"` is handed no options, not an empty struct. Passing none
 		// here is what puts the rule's own fallback under test rather than the decoder's.
-		return nil
+		return rule.Given[NoUnnecessaryBooleanLiteralCompareOptions]{}
 	}
-	options, err := DecodeNoUnnecessaryBooleanLiteralCompareOptions([]byte(configuration))
-	if err != nil {
-		t.Fatalf("could not decode %s: %v", configuration, err)
+	options, decodeNoUnnecessaryBooleanLiteralCompareOptionsError := DecodeNoUnnecessaryBooleanLiteralCompareOptions(
+		[]byte(configuration),
+	)
+	if decodeNoUnnecessaryBooleanLiteralCompareOptionsError != nil {
+		test.Fatalf("could not decode %s: %v", configuration, decodeNoUnnecessaryBooleanLiteralCompareOptionsError)
 	}
-	return options
+	return rule.Configured(options)
 }
 
 // TestNoUnnecessaryBooleanLiteralCompareStaysSilentOnUpstreamPassCases is the imported clean corpus.
@@ -59,8 +65,8 @@ func decodeNoUnnecessaryBooleanLiteralCompareOptions(t *testing.T, configuration
 // of an `eslint-disable-next-line` comment, and `rule_testing` never consults the suppression layer.
 // Recording it as clean here would assert a property of a layer this test cannot reach. See
 // `TestNoUnnecessaryBooleanLiteralCompareSuppressionCaseIsDecidedAboveTheRule`.
-func TestNoUnnecessaryBooleanLiteralCompareStaysSilentOnUpstreamPassCases(t *testing.T) {
-	t.Parallel()
+func TestNoUnnecessaryBooleanLiteralCompareStaysSilentOnUpstreamPassCases(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		configuration string
@@ -152,12 +158,12 @@ func TestNoUnnecessaryBooleanLiteralCompareStaysSilentOnUpstreamPassCases(t *tes
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(noUnnecessaryBooleanLiteralCompareCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t,
+		test.Run(noUnnecessaryBooleanLiteralCompareCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTypedGiven(test,
 				NoUnnecessaryBooleanLiteralCompare, noUnnecessaryBooleanLiteralCompareFile,
 				testCase.sourceText,
-				decodeNoUnnecessaryBooleanLiteralCompareOptions(t, testCase.configuration)))
+				decodeNoUnnecessaryBooleanLiteralCompareOptions(test, testCase.configuration)))
 		})
 	}
 }
@@ -172,8 +178,8 @@ func TestNoUnnecessaryBooleanLiteralCompareStaysSilentOnUpstreamPassCases(t *tes
 // five arms ran, and they differ only in wording. The spans say where the finding points, which is
 // the whole comparison rather than the compared expression. And the applied source says what the
 // edit engine will write unattended, which no message-id assertion can see.
-func TestNoUnnecessaryBooleanLiteralCompareFiresOnUpstreamFailCases(t *testing.T) {
-	t.Parallel()
+func TestNoUnnecessaryBooleanLiteralCompareFiresOnUpstreamFailCases(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		configuration string
@@ -527,30 +533,30 @@ func TestNoUnnecessaryBooleanLiteralCompareFiresOnUpstreamFailCases(t *testing.T
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(noUnnecessaryBooleanLiteralCompareCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoUnnecessaryBooleanLiteralCompare,
+		test.Run(noUnnecessaryBooleanLiteralCompareCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedGiven(test, NoUnnecessaryBooleanLiteralCompare,
 				noUnnecessaryBooleanLiteralCompareFile, testCase.sourceText,
-				decodeNoUnnecessaryBooleanLiteralCompareOptions(t, testCase.configuration))
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+				decodeNoUnnecessaryBooleanLiteralCompareOptions(test, testCase.configuration))
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 
 			onDisk := noUnnecessaryBooleanLiteralCompareOnDisk(testCase.sourceText)
 			for index, wantSpan := range testCase.wantSpans {
 				reported := onDisk[result.Diagnostics[index].Range.Pos():result.Diagnostics[index].Range.End()]
 				if reported != wantSpan {
-					t.Errorf("finding %d covers %q, want %q", index, reported, wantSpan)
+					test.Errorf("finding %d covers %q, want %q", index, reported, wantSpan)
 				}
 			}
 
 			if testCase.wantFixed == "" {
 				for index, diagnostic := range result.Diagnostics {
 					if len(diagnostic.Fixes) != 0 {
-						t.Errorf("finding %d carries %d fixes, want none", index, len(diagnostic.Fixes))
+						test.Errorf("finding %d carries %d fixes, want none", index, len(diagnostic.Fixes))
 					}
 				}
 				return
 			}
-			rule_testing.ExpectFixedSource(t, result,
+			rule_testing.ExpectFixedSource(test, result,
 				noUnnecessaryBooleanLiteralCompareOnDisk(testCase.wantFixed))
 		})
 	}
@@ -563,15 +569,15 @@ func TestNoUnnecessaryBooleanLiteralCompareFiresOnUpstreamFailCases(t *testing.T
 // eight declarations, another dropped a return annotation it could not see.
 //
 // It is safe here for a structural reason rather than a careful one: the replacement is built from
-// the expression's OWN SOURCE TEXT, so nothing inside it is re-rendered and nothing inside it can be
+// the expression's own source text, so nothing inside it is re-rendered and nothing inside it can be
 // lost. The span being replaced holds only the comparison operator and the boolean literal.
 //
 // These rows are what proves it. Upstream's corpus is TypeScript and does carry some of these, but
 // not the generic call with two arguments, not the `satisfies`, and not the comment, and those are
 // exactly the shapes a re-rendering fixer would drop while every other fixture stayed green. Every
 // expectation is what the installed 8.67.0 build produced.
-func TestNoUnnecessaryBooleanLiteralCompareKeepsEverythingInTheExpression(t *testing.T) {
-	t.Parallel()
+func TestNoUnnecessaryBooleanLiteralCompareKeepsEverythingInTheExpression(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -615,12 +621,12 @@ func TestNoUnnecessaryBooleanLiteralCompareKeepsEverythingInTheExpression(t *tes
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(noUnnecessaryBooleanLiteralCompareCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoUnnecessaryBooleanLiteralCompare,
-				noUnnecessaryBooleanLiteralCompareFile, testCase.sourceText, nil)
-			rule_testing.ExpectFindings(t, result, "direct")
-			rule_testing.ExpectFixedSource(t, result,
+		test.Run(noUnnecessaryBooleanLiteralCompareCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoUnnecessaryBooleanLiteralCompare,
+				noUnnecessaryBooleanLiteralCompareFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "direct")
+			rule_testing.ExpectFixedSource(test, result,
 				noUnnecessaryBooleanLiteralCompareOnDisk(testCase.wantFixed))
 		})
 	}
@@ -635,8 +641,8 @@ func TestNoUnnecessaryBooleanLiteralCompareKeepsEverythingInTheExpression(t *tes
 //
 // Each row was run through the installed 8.67.0 build and carries the verdict that build produced,
 // so a row asserting silence asserts upstream's silence rather than this port's.
-func TestNoUnnecessaryBooleanLiteralCompareDiscriminatesOnCasesUpstreamDoesNotWrite(t *testing.T) {
-	t.Parallel()
+func TestNoUnnecessaryBooleanLiteralCompareDiscriminatesOnCasesUpstreamDoesNotWrite(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		configuration string
@@ -688,7 +694,7 @@ func TestNoUnnecessaryBooleanLiteralCompareDiscriminatesOnCasesUpstreamDoesNotWr
 			reason:        "a wholly nullish union has no non-nullish part",
 		},
 		{
-			// The same three shapes again with BOTH allowances turned off, which is what makes the
+			// The same three shapes again with both allowances turned off, which is what makes the
 			// union test decide them rather than the allowance check above it.
 			//
 			// With the default options every nullable comparison is allowed, so a mutant breaking
@@ -725,7 +731,7 @@ func TestNoUnnecessaryBooleanLiteralCompareDiscriminatesOnCasesUpstreamDoesNotWr
 		},
 		{
 			// The control for the four rows above: with the allowances off, a genuine nullable
-			// boolean DOES report, so their silence is the union test rather than the options.
+			// boolean does report, so their silence is the union test rather than the options.
 			configuration: "{\"allowComparingNullableBooleansToTrue\": false, \"allowComparingNullableBooleansToFalse\": false}",
 			sourceText:    "declare const b: boolean | undefined;\nconst z = b === true;",
 			wantIds:       []string{"comparingNullableToTrueDirect"},
@@ -783,14 +789,14 @@ func TestNoUnnecessaryBooleanLiteralCompareDiscriminatesOnCasesUpstreamDoesNotWr
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(noUnnecessaryBooleanLiteralCompareCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoUnnecessaryBooleanLiteralCompare,
+		test.Run(noUnnecessaryBooleanLiteralCompareCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedGiven(test, NoUnnecessaryBooleanLiteralCompare,
 				noUnnecessaryBooleanLiteralCompareFile, testCase.sourceText,
-				decodeNoUnnecessaryBooleanLiteralCompareOptions(t, testCase.configuration))
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+				decodeNoUnnecessaryBooleanLiteralCompareOptions(test, testCase.configuration))
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 			if testCase.wantFixed != "" {
-				rule_testing.ExpectFixedSource(t, result,
+				rule_testing.ExpectFixedSource(test, result,
 					noUnnecessaryBooleanLiteralCompareOnDisk(testCase.wantFixed))
 			}
 		})
@@ -799,13 +805,13 @@ func TestNoUnnecessaryBooleanLiteralCompareDiscriminatesOnCasesUpstreamDoesNotWr
 
 // TestNoUnnecessaryBooleanLiteralCompareDecoderKeepsTheDefaultsTrue is the option trap.
 //
-// Two of the three options default to TRUE. A generic decode over a non-pointer struct yields false
+// Two of the three options default to true. A generic decode over a non-pointer struct yields false
 // for every absent key, which turns both allowances off and makes the rule report two families of
 // comparison upstream allows by default. That inversion is invisible to any fixture that builds the
 // options struct directly, which is why every other test in this file routes through the decoder and
 // why this one asserts the decoder's own output.
-func TestNoUnnecessaryBooleanLiteralCompareDecoderKeepsTheDefaultsTrue(t *testing.T) {
-	t.Parallel()
+func TestNoUnnecessaryBooleanLiteralCompareDecoderKeepsTheDefaultsTrue(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		configuration string
@@ -816,34 +822,40 @@ func TestNoUnnecessaryBooleanLiteralCompareDecoderKeepsTheDefaultsTrue(t *testin
 		{"{}", true, true, false},
 		{"{\"allowComparingNullableBooleansToFalse\": false}", false, true, false},
 		{"{\"allowComparingNullableBooleansToTrue\": false}", true, false, false},
-		{"{\"allowComparingNullableBooleansToFalse\": false, \"allowComparingNullableBooleansToTrue\": false}", false, false, false},
+		{
+			"{\"allowComparingNullableBooleansToFalse\": false, \"allowComparingNullableBooleansToTrue\": false}",
+			false,
+			false,
+			false,
+		},
 		{"{\"allowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing\": true}", true, true, true},
 		// An explicit true is not distinguishable from the default in behavior, but it is what the
 		// pointer field exists to allow, so it is asserted rather than assumed.
 		{"{\"allowComparingNullableBooleansToFalse\": true}", true, true, false},
 	}
 	for index, testCase := range cases {
-		t.Run(noUnnecessaryBooleanLiteralCompareCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			decoded, err := DecodeNoUnnecessaryBooleanLiteralCompareOptions([]byte(testCase.configuration))
-			if err != nil {
-				t.Fatalf("decoding %s: %v", testCase.configuration, err)
+		test.Run(noUnnecessaryBooleanLiteralCompareCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			decoded, decodeNoUnnecessaryBooleanLiteralCompareOptionsError :=
+				DecodeNoUnnecessaryBooleanLiteralCompareOptions([]byte(testCase.configuration))
+			if decodeNoUnnecessaryBooleanLiteralCompareOptionsError != nil {
+				test.Fatalf(
+					"decoding %s: %v",
+					testCase.configuration,
+					decodeNoUnnecessaryBooleanLiteralCompareOptionsError,
+				)
 			}
-			options, ok := decoded.(NoUnnecessaryBooleanLiteralCompareOptions)
-			if !ok {
-				t.Fatalf("the decoder returned %T rather than the options struct", decoded)
+			if decoded.AllowComparingNullableBooleansToFalse != testCase.wantFalse {
+				test.Errorf("allowComparingNullableBooleansToFalse resolved to %v, want %v",
+					decoded.AllowComparingNullableBooleansToFalse, testCase.wantFalse)
 			}
-			if options.AllowComparingNullableBooleansToFalse != testCase.wantFalse {
-				t.Errorf("allowComparingNullableBooleansToFalse resolved to %v, want %v",
-					options.AllowComparingNullableBooleansToFalse, testCase.wantFalse)
+			if decoded.AllowComparingNullableBooleansToTrue != testCase.wantTrue {
+				test.Errorf("allowComparingNullableBooleansToTrue resolved to %v, want %v",
+					decoded.AllowComparingNullableBooleansToTrue, testCase.wantTrue)
 			}
-			if options.AllowComparingNullableBooleansToTrue != testCase.wantTrue {
-				t.Errorf("allowComparingNullableBooleansToTrue resolved to %v, want %v",
-					options.AllowComparingNullableBooleansToTrue, testCase.wantTrue)
-			}
-			if options.AllowRuleToRunWithoutStrictNullChecks != testCase.wantUnstrict {
-				t.Errorf("the strictNullChecks escape resolved to %v, want %v",
-					options.AllowRuleToRunWithoutStrictNullChecks, testCase.wantUnstrict)
+			if decoded.AllowRuleToRunWithoutStrictNullChecks != testCase.wantUnstrict {
+				test.Errorf("the strictNullChecks escape resolved to %v, want %v",
+					decoded.AllowRuleToRunWithoutStrictNullChecks, testCase.wantUnstrict)
 			}
 		})
 	}
@@ -852,25 +864,25 @@ func TestNoUnnecessaryBooleanLiteralCompareDecoderKeepsTheDefaultsTrue(t *testin
 // TestNoUnnecessaryBooleanLiteralCompareNilOptionsAllowsTheNullishFamilies bypasses the decoder.
 //
 // A rule configured as a bare `"error"` is handed nil, and a bare type assertion on nil yields the
-// zero value, which for this rule turns both allowances OFF rather than merely silencing the rule.
+// zero value, which for this rule turns both allowances off rather than merely silencing the rule.
 // That is worse than the usual inert shape: the rule would report where upstream is silent, and
 // every decoder-routed fixture would stay green.
-func TestNoUnnecessaryBooleanLiteralCompareNilOptionsAllowsTheNullishFamilies(t *testing.T) {
-	t.Parallel()
+func TestNoUnnecessaryBooleanLiteralCompareNilOptionsAllowsTheNullishFamilies(test *testing.T) {
+	test.Parallel()
 
 	// A plain boolean still reports on nil options.
-	rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t,
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test,
 		NoUnnecessaryBooleanLiteralCompare, noUnnecessaryBooleanLiteralCompareFile,
-		"declare const b: boolean;\nconst z = b === true;", nil), "direct")
+		"declare const b: boolean;\nconst z = b === true;"), "direct")
 
 	// Both nullish families are allowed by default, so these must be silent. A zero-valued options
 	// struct would report both.
-	rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t,
+	rule_testing.ExpectClean(test, rule_testing.RunTyped(test,
 		NoUnnecessaryBooleanLiteralCompare, noUnnecessaryBooleanLiteralCompareFile,
-		"declare const b: boolean | undefined;\nconst z = b === true;", nil))
-	rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t,
+		"declare const b: boolean | undefined;\nconst z = b === true;"))
+	rule_testing.ExpectClean(test, rule_testing.RunTyped(test,
 		NoUnnecessaryBooleanLiteralCompare, noUnnecessaryBooleanLiteralCompareFile,
-		"declare const b: boolean | undefined;\nconst z = b === false;", nil))
+		"declare const b: boolean | undefined;\nconst z = b === false;"))
 }
 
 // TestNoUnnecessaryBooleanLiteralCompareRequiresTheTypedHarness pins the checker declaration.
@@ -878,13 +890,13 @@ func TestNoUnnecessaryBooleanLiteralCompareNilOptionsAllowsTheNullishFamilies(t 
 // A typed rule handed the plain harness gets a nil checker, and the guard at the top of the listener
 // turns that into silence rather than a panic. Silence is the more dangerous failure: every clean
 // case passes vacuously and every reporting case fails in a way that reads as a rule bug.
-func TestNoUnnecessaryBooleanLiteralCompareRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestNoUnnecessaryBooleanLiteralCompareRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	source := "declare const b: boolean;\nconst z = b === true;"
-	rule_testing.ExpectClean(t, rule_testing.Run(t, NoUnnecessaryBooleanLiteralCompare,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, NoUnnecessaryBooleanLiteralCompare,
 		noUnnecessaryBooleanLiteralCompareFile, source))
-	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoUnnecessaryBooleanLiteralCompare,
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoUnnecessaryBooleanLiteralCompare,
 		noUnnecessaryBooleanLiteralCompareFile, source), "direct")
 }
 
@@ -893,18 +905,18 @@ func TestNoUnnecessaryBooleanLiteralCompareRequiresTheTypedHarness(t *testing.T)
 //
 // Upstream reports once per file when `strictNullChecks` is off and the escape option is not set.
 // That arm is reproduced in the rule and it cannot be reached through `rule_testing`: the harness
-// writes its own tsconfig AFTER the setup hook runs, so a fixture cannot turn the option off.
+// writes its own tsconfig after the setup hook runs, so a fixture cannot turn the option off.
 //
 // Probed directly rather than assumed. A hook writing `strict:false` and `strictNullChecks:false`
 // into the fixture directory produced a program whose resolved option was still true, identically to
 // the default path. So this is the brief's unreachable-through-the-harness category, and the honest
 // response is to pin the predicate rather than weaken the rule to make a fixture green.
 //
-// What IS asserted here is the resolution `GetStrictOptionValue` performs, which is the whole of the
+// What is asserted here is the resolution `GetStrictOptionValue` performs, which is the whole of the
 // decision: an explicit value wins, an unset one falls back to `strict`, and `strict: false` with no
 // explicit value resolves to off.
-func TestNoUnnecessaryBooleanLiteralCompareStrictNullChecksArmIsHarnessBlocked(t *testing.T) {
-	t.Parallel()
+func TestNoUnnecessaryBooleanLiteralCompareStrictNullChecksArmIsHarnessBlocked(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		strict           core.Tristate
@@ -919,14 +931,14 @@ func TestNoUnnecessaryBooleanLiteralCompareStrictNullChecksArmIsHarnessBlocked(t
 		{core.TSTrue, core.TSFalse, false, "an explicit false wins over strict on"},
 	}
 	for index, testCase := range cases {
-		t.Run(noUnnecessaryBooleanLiteralCompareCaseName(index), func(t *testing.T) {
-			t.Parallel()
+		test.Run(noUnnecessaryBooleanLiteralCompareCaseName(index), func(test *testing.T) {
+			test.Parallel()
 			options := core.CompilerOptions{
 				Strict:           testCase.strict,
 				StrictNullChecks: testCase.strictNullChecks,
 			}
 			if got := options.GetStrictOptionValue(options.StrictNullChecks); got != testCase.want {
-				t.Errorf("resolved to %v, want %v (%s)", got, testCase.want, testCase.reason)
+				test.Errorf("resolved to %v, want %v (%s)", got, testCase.want, testCase.reason)
 			}
 		})
 	}
@@ -934,37 +946,37 @@ func TestNoUnnecessaryBooleanLiteralCompareStrictNullChecksArmIsHarnessBlocked(t
 	// The harness cannot produce a program with the option off, which is why the rows above test the
 	// resolution rather than the rule. Asserted so the claim is a measurement rather than a comment:
 	// under the harness the rule is silent on this arm, because the option always resolves on.
-	rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t,
+	rule_testing.ExpectClean(test, rule_testing.RunTypedGiven(test,
 		NoUnnecessaryBooleanLiteralCompare, noUnnecessaryBooleanLiteralCompareFile,
 		"function foo(): boolean { return true; }",
-		decodeNoUnnecessaryBooleanLiteralCompareOptions(t,
+		decodeNoUnnecessaryBooleanLiteralCompareOptions(test,
 			"{\"allowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing\": false}")))
 }
 
 // TestNoUnnecessaryBooleanLiteralCompareSuppressionCaseIsDecidedAboveTheRule records the other
 // case the harness cannot reproduce.
 //
-// Upstream ships this as a PASSING case and it is silent there only because of the
+// Upstream ships this as a passing case and it is silent there only because of the
 // `eslint-disable-next-line` comment inside it. `rule_testing.Run` never consults
 // `internal/suppression`, so no rule test can reproduce that silence, and recording it in the clean
 // list would assert a property of a layer this test cannot reach.
 //
-// So it is pinned at the layer that actually decides it: the rule REPORTS, and the suppression layer
+// So it is pinned at the layer that actually decides it: the rule reports, and the suppression layer
 // is what makes it clean in a real run. Confirmed by removing the comment and watching the same
 // source report identically.
-func TestNoUnnecessaryBooleanLiteralCompareSuppressionCaseIsDecidedAboveTheRule(t *testing.T) {
-	t.Parallel()
+func TestNoUnnecessaryBooleanLiteralCompareSuppressionCaseIsDecidedAboveTheRule(test *testing.T) {
+	test.Parallel()
 
 	withComment := "function test(a?: boolean): boolean {\n  // eslint-disable-next-line\n  return a !== false;\n}"
 	withoutComment := "function test(a?: boolean): boolean {\n  return a !== false;\n}"
 
-	options := decodeNoUnnecessaryBooleanLiteralCompareOptions(t,
+	options := decodeNoUnnecessaryBooleanLiteralCompareOptions(test,
 		"{\"allowComparingNullableBooleansToFalse\": false}")
 
-	rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t,
+	rule_testing.ExpectFindings(test, rule_testing.RunTypedGiven(test,
 		NoUnnecessaryBooleanLiteralCompare, noUnnecessaryBooleanLiteralCompareFile,
 		withComment, options), "comparingNullableToFalse")
-	rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t,
+	rule_testing.ExpectFindings(test, rule_testing.RunTypedGiven(test,
 		NoUnnecessaryBooleanLiteralCompare, noUnnecessaryBooleanLiteralCompareFile,
 		withoutComment, options), "comparingNullableToFalse")
 }

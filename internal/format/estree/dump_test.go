@@ -2,18 +2,19 @@ package estree
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 	"unicode/utf16"
 	"unicode/utf8"
 
 	"github.com/system-inc/cohere/internal/corpus"
+	"github.com/system-inc/cohere/internal/json_value"
 )
 
 // prettierParseScript is the oracle: the fork's own parse (parser "typescript", with the file path, so
@@ -56,31 +57,34 @@ process.stdin.on("end", async () => {
 // A file the fork cannot parse has no answer to match and is skipped, but counted, and the test fails
 // if that count passes a tenth of the corpus: an oracle that rejects everything would otherwise read as
 // perfect agreement.
-func TestConvertAgreesWithPrettier(t *testing.T) {
-	t.Parallel()
+func TestConvertAgreesWithPrettier(test *testing.T) {
+	test.Parallel()
 	corpora := os.Getenv("COHERE_ESTREE_CORPORA")
 	if corpora == "" {
-		t.Skip("set COHERE_ESTREE_CORPORA to compare the converter against the fork")
+		test.Skip("set COHERE_ESTREE_CORPORA to compare the converter against the fork")
 	}
-	root := corpus.PrettierFork.Root(t)
+	root := corpus.PrettierFork.Root(test)
 	seen := map[string]bool{}
 	var files []string
 	for _, corpus := range strings.Split(corpora, ":") {
 		corpus = strings.TrimSpace(corpus)
 		if strings.HasPrefix(corpus, "~/") {
-			home, _ := os.UserHomeDir()
+			home, homeError := os.UserHomeDir()
+			if homeError != nil {
+				test.Fatalf("finding the home directory for %s: %v", corpus, homeError)
+			}
 			corpus = filepath.Join(home, corpus[2:])
 		}
-		listing, err := exec.Command("git", "-C", corpus, "ls-files", "--", "*.ts", "*.tsx").Output()
-		if err != nil {
-			t.Fatalf("listing %s: %v", corpus, err)
+		listing, outputError := exec.Command("git", "-C", corpus, "ls-files", "--", "*.ts", "*.tsx").Output()
+		if outputError != nil {
+			test.Fatalf("listing %s: %v", corpus, outputError)
 		}
 		for _, name := range strings.Split(string(listing), "\n") {
 			path := filepath.Join(corpus, name)
 			if name == "" || seen[path] {
 				continue
 			}
-			if _, err := os.Stat(path); err != nil {
+			if _, statError := os.Stat(path); statError != nil {
 				continue
 			}
 			seen[path] = true
@@ -91,92 +95,117 @@ func TestConvertAgreesWithPrettier(t *testing.T) {
 	command := exec.Command("node", "--input-type=module", "-e", prettierParseScript)
 	command.Dir = root
 	command.Stdin = strings.NewReader(strings.Join(files, "\n"))
-	var stdout, stderr bytes.Buffer
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
 	command.Stdout, command.Stderr = &stdout, &stderr
-	if err := command.Run(); err != nil {
-		t.Fatalf("node: %v\n%s", err, stderr.String())
+	if runError := command.Run(); runError != nil {
+		test.Fatalf("node: %v\n%s", runError, stderr.String())
 	}
-	oracle := map[string]map[string]any{}
+	oracle := map[string]json_value.Object{}
 	for _, line := range strings.Split(stdout.String(), "\n") {
 		if line == "" {
 			continue
 		}
-		var record map[string]any
-		if err := json.Unmarshal([]byte(line), &record); err != nil {
-			t.Fatal(err)
+		parsed, parseError := json_value.Parse([]byte(line))
+		if parseError != nil {
+			test.Fatal(parseError)
 		}
-		oracle[record["file"].(string)] = record
+		record, isObject := parsed.(json_value.Object)
+		if !isObject {
+			test.Fatalf("the oracle printed a line that is not an object: %s", line)
+		}
+		file, isString := record["file"].(json_value.String)
+		if !isString {
+			test.Fatalf("the oracle printed a record with no file name: %s", line)
+		}
+		oracle[string(file)] = record
 	}
 
 	identical, refused, different := 0, 0, 0
 	for _, path := range files {
 		want, present := oracle[path]
 		if !present {
-			t.Fatalf("the oracle printed nothing for %s", path)
+			test.Fatalf("the oracle printed nothing for %s", path)
 		}
 		if _, failed := want["error"]; failed {
 			refused++
 			continue
 		}
-		source, err := os.ReadFile(path)
-		if err != nil {
-			t.Fatal(err)
+		source, readError := os.ReadFile(path)
+		if readError != nil {
+			test.Fatal(readError)
 		}
-		got, err := dumpFile(path, string(source))
-		if err != nil {
+		got, dumpFileError := dumpFile(path, string(source))
+		if dumpFileError != nil {
 			different++
-			t.Errorf("%s: the fork parses it and the converter refused: %v", path, err)
+			test.Errorf("%s: the fork parses it and the converter refused: %v", path, dumpFileError)
 			continue
 		}
 		for _, key := range []string{"ast", "comments"} {
 			if difference := firstDifference(want[key], got[key], key); difference != "" {
 				different++
 				if different <= 10 {
-					t.Errorf("%s: %s", path, difference)
+					test.Errorf("%s: %s", path, difference)
 				}
 				break
 			}
 		}
-		if difference := firstDifference(want["ast"], got["ast"], "ast") + firstDifference(want["comments"], got["comments"], "comments"); difference == "" {
+		if difference := firstDifference(want["ast"], got["ast"], "ast") +
+			firstDifference(want["comments"], got["comments"], "comments"); difference == "" {
 			identical++
 		}
 	}
-	t.Logf("%d files, %d identical, %d different, %d the fork could not parse", len(files), identical, different, refused)
+	test.Logf(
+		"%d files, %d identical, %d different, %d the fork could not parse",
+		len(files),
+		identical,
+		different,
+		refused,
+	)
 	if refused > len(files)/10 {
-		t.Errorf("the fork refused %d of %d files; the comparison is thinner than it looks", refused, len(files))
+		test.Errorf("the fork refused %d of %d files; the comparison is thinner than it looks", refused, len(files))
 	}
 }
 
-// dumpFile converts one file and renders it the way the oracle script does, through JSON, so both sides
-// compare as the same Go values.
-func dumpFile(path string, text string) (map[string]any, error) {
-	program, comments, _, err := ParseTypeScript(path, text, nil)
-	if err != nil {
-		return nil, err
+// dumpFile converts one file and renders it the way the oracle script does, as the JSON values the oracle's
+// line parses to, so both sides compare as the same values.
+func dumpFile(path string, text string) (json_value.Object, error) {
+	program, comments, _, parseTypeScriptError := ParseTypeScript(path, text, nil)
+	if parseTypeScriptError != nil {
+		return nil, parseTypeScriptError
 	}
 	offsets := utf16Offsets(text)
-	dumped := make([]any, len(comments))
+	dumped := make(json_value.Array, len(comments))
 	for index, comment := range comments {
-		dumped[index] = map[string]any{
-			"type":  comment.Type(),
-			"range": []int{offsets[comment.Range[0]], offsets[comment.Range[1]]},
-			"value": comment.String("value"),
+		dumped[index] = json_value.Object{
+			"type": jsonString(comment.Type()),
+			"range": json_value.Array{
+				jsonInteger(offsets[comment.Range[0]]),
+				jsonInteger(offsets[comment.Range[1]]),
+			},
+			"value": jsonString(comment.String("value")),
 		}
 	}
-	encoded, err := json.Marshal(map[string]any{"ast": dumpValue(program, offsets), "comments": dumped})
-	if err != nil {
-		return nil, err
-	}
-	var result map[string]any
-	err = json.Unmarshal(encoded, &result)
-	return result, err
+	return json_value.Object{"ast": dumpValue(program, offsets), "comments": dumped}, nil
 }
 
-// firstDifference names the first path where two decoded JSON values differ, or "".
-func firstDifference(want any, got any, path string) string {
+// jsonString is a Go string as JSON carries it: encoding/json writes each byte that is not UTF-8 as U+FFFD,
+// and converting to runes replaces each such byte the same way, so the dump reads as the round trip through
+// JSON the oracle's side takes.
+func jsonString(text string) json_value.Value {
+	return json_value.String(string([]rune(text)))
+}
+
+// jsonInteger is an int as a JSON number.
+func jsonInteger(number int) json_value.Value {
+	return json_value.Number(strconv.Itoa(number))
+}
+
+// firstDifference names the first path where two JSON values differ, or "".
+func firstDifference(want json_value.Value, got json_value.Value, path string) string {
 	switch typed := want.(type) {
-	case map[string]any:
-		other, isMap := got.(map[string]any)
+	case json_value.Object:
+		other, isMap := got.(json_value.Object)
 		if !isMap {
 			return fmt.Sprintf("%s: want an object, got %v", path, got)
 		}
@@ -196,29 +225,63 @@ func firstDifference(want any, got any, path string) string {
 			wantValue, wantPresent := typed[key]
 			gotValue, gotPresent := other[key]
 			if wantPresent != gotPresent {
-				return fmt.Sprintf("%s.%s: present in the fork %v, in Go %v (%s)", path, key, wantPresent, gotPresent, typed["type"])
+				return fmt.Sprintf(
+					"%s.%s: present in the fork %v, in Go %v (%s)",
+					path,
+					key,
+					wantPresent,
+					gotPresent,
+					typed["type"],
+				)
 			}
 			if difference := firstDifference(wantValue, gotValue, path+"."+key); difference != "" {
 				return difference
 			}
 		}
 		return ""
-	case []any:
-		other, isList := got.([]any)
+	case json_value.Array:
+		other, isList := got.(json_value.Array)
 		if !isList || len(other) != len(typed) {
 			return fmt.Sprintf("%s: want %d elements, got %v", path, len(typed), got)
 		}
 		for index := range typed {
-			if difference := firstDifference(typed[index], other[index], fmt.Sprintf("%s[%d]", path, index)); difference != "" {
+			if difference := firstDifference(
+				typed[index],
+				other[index],
+				fmt.Sprintf("%s[%d]", path, index),
+			); difference != "" {
 				return difference
 			}
 		}
 		return ""
 	}
-	if fmt.Sprint(want) != fmt.Sprint(got) {
-		return fmt.Sprintf("%s: want %v, got %v", path, want, got)
+	if scalarText(want) != scalarText(got) {
+		return fmt.Sprintf("%s: want %v, got %v", path, scalarText(want), scalarText(got))
 	}
 	return ""
+}
+
+// scalarText is a JSON value as fmt prints the Go value encoding/json decodes it to, which is what the
+// comparison has always been: a number by its float64, so `1.0` and `1` agree, and null as `<nil>`.
+func scalarText(value json_value.Value) string {
+	switch typed := value.(type) {
+	case json_value.Null:
+		return "<nil>"
+	case json_value.Boolean:
+		return strconv.FormatBool(bool(typed))
+	case json_value.String:
+		return string(typed)
+	case json_value.Number:
+		// Ignored: a number out of float64's range parses to an infinity, which prints as one, and every
+		// Number here was a number literal.
+		number, _ := strconv.ParseFloat(string(typed), 64)
+		return fmt.Sprint(number)
+	case json_value.Object:
+		return fmt.Sprintf("an object %v", typed)
+	case json_value.Array:
+		return fmt.Sprintf("an array %v", typed)
+	}
+	return "<missing>"
 }
 
 // utf16Offsets maps every byte offset that starts a character (and the end) to its UTF-16 index.
@@ -237,17 +300,21 @@ func utf16Offsets(text string) []int {
 	return offsets
 }
 
-func dumpValue(value any, offsets []int) any {
+// dumpValue is a property's value in the shape the oracle script dumps it.
+func dumpValue(value Value, offsets []int) json_value.Value {
 	switch typed := value.(type) {
 	case nil:
-		return nil
+		return json_value.Null{}
 	case *Node:
 		if typed == nil {
-			return nil
+			return json_value.Null{}
 		}
-		result := map[string]any{"type": typed.Type(), "range": []int{offsets[typed.Range[0]], offsets[typed.Range[1]]}}
+		result := json_value.Object{
+			"type":  jsonString(typed.Type()),
+			"range": json_value.Array{jsonInteger(offsets[typed.Range[0]]), jsonInteger(offsets[typed.Range[1]])},
+		}
 		if typed.HasContentEnd {
-			result["__contentEnd"] = offsets[typed.ContentEnd]
+			result["__contentEnd"] = jsonInteger(offsets[typed.ContentEnd])
 		}
 		keys := typed.Keys()
 		sort.Strings(keys)
@@ -258,21 +325,43 @@ func dumpValue(value any, offsets []int) any {
 			result[key] = dumpValue(typed.Get(key), offsets)
 		}
 		return result
-	case []*Node:
-		result := make([]any, len(typed))
+	case Nodes:
+		result := make(json_value.Array, len(typed))
 		for index, child := range typed {
 			result[index] = dumpValue(child, offsets)
 		}
 		return result
-	case *TemplateValue:
-		var cooked any
-		if typed.Cooked != nil {
-			cooked = *typed.Cooked
+	case Values:
+		result := make(json_value.Array, len(typed))
+		for index, element := range typed {
+			result[index] = dumpValue(element, offsets)
 		}
-		return map[string]any{"cooked": cooked, "raw": typed.Raw}
+		return result
+	case Record:
+		result := make(json_value.Object, len(typed))
+		for key, member := range typed {
+			result[key] = dumpValue(member, offsets)
+		}
+		return result
+	case *TemplateValue:
+		var cooked json_value.Value = json_value.Null{}
+		if typed.Cooked != nil {
+			cooked = jsonString(*typed.Cooked)
+		}
+		return json_value.Object{"cooked": cooked, "raw": jsonString(typed.Raw)}
 	case *Regex:
-		return map[string]any{"flags": typed.Flags, "pattern": typed.Pattern}
-	default:
-		return typed
+		return json_value.Object{"flags": jsonString(typed.Flags), "pattern": jsonString(typed.Pattern)}
+	case String:
+		return jsonString(string(typed))
+	case Boolean:
+		return json_value.Boolean(typed)
+	case Number:
+		// NaN and the infinities have no JSON spelling; encoding/json refused them where this dump went
+		// through it, and json.Marshal still refuses this Number, so a convertedDump fails alike.
+		return json_value.Number(strconv.FormatFloat(float64(typed), 'g', -1, 64))
+	case Integer:
+		return jsonInteger(int(typed))
 	}
+	// Invariant: the cases above are every type that declares isValue, which only this package can.
+	panic(fmt.Sprintf("estree: a property value of type %T", value))
 }

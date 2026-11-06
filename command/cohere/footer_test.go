@@ -34,6 +34,8 @@ func cleanSummary() runSummary {
 }
 
 // warmSummary is a green warm run: three files edited and checked, the rest from the cache.
+//
+// Mutates: summary a case's summary func turns the clean summary it is handed into the run it names
 func warmSummary(summary *runSummary) {
 	summary.Total = 700 * time.Millisecond
 	summary.Graph = 200 * time.Millisecond
@@ -47,15 +49,22 @@ func warmSummary(summary *runSummary) {
 	summary.Nodes = 4_100
 }
 
+// replaySummary is a run replayed whole from the run cache.
+//
+// Mutates: summary a case's summary func turns the clean summary it is handed into the run it names
 func replaySummary(summary *runSummary) {
 	*summary = runSummary{
-		Total: 50 * time.Millisecond, Cache: cacheUse{Replayed: true}, Rules: 480, FilesInScope: 3926, FilesCached: 3926,
+		Total:        50 * time.Millisecond,
+		Cache:        cacheUse{Replayed: true},
+		Rules:        480,
+		FilesInScope: 3926,
+		FilesCached:  3926,
 	}
 }
 
 // The golden lines are Kirk's, from his final footer of 2026-10-04 12:55.
-func TestFooterGolden(t *testing.T) {
-	t.Parallel()
+func TestFooterGolden(test *testing.T) {
+	test.Parallel()
 	cases := []struct {
 		name    string
 		summary func(summary *runSummary)
@@ -64,7 +73,7 @@ func TestFooterGolden(t *testing.T) {
 	}{
 		{
 			name:    "cold: everything checked fresh",
-			summary: func(summary *runSummary) {},
+			summary: func(summary *runSummary) { /* The clean summary is this case as it stands. */ },
 			want:    "✓ 💎 2.4s (480 rules • 3,926 checked)",
 		},
 		{
@@ -116,7 +125,7 @@ func TestFooterGolden(t *testing.T) {
 		},
 		{
 			name:    "cold, with --phases",
-			summary: func(summary *runSummary) {},
+			summary: func(summary *runSummary) { /* The clean summary is this case as it stands. */ },
 			options: footerOptions{Phases: true},
 			want:    "✓ 💎 2.4s (🕸 0.9s • 🪄 0.4s • 💅 0.3s • 🔷 0.6s • 👑 1.1s • 480 rules • 3,926 checked)",
 		},
@@ -168,7 +177,11 @@ func TestFooterGolden(t *testing.T) {
 			name: "types bailed, so lint did not run",
 			summary: func(summary *runSummary) {
 				summary.TypeErrors = 2
-				summary.Phases[2] = phaseRecord{Name: phaseLint, Outcome: outcomeNotReached, Detail: "types bailed: 2 type errors"}
+				summary.Phases[2] = phaseRecord{
+					Name:    phaseLint,
+					Outcome: outcomeNotReached,
+					Detail:  "types bailed: 2 type errors",
+				}
 			},
 			want: "✗ ☠️ 2.4s • 2 type errors (480 rules • 3,926 checked) • ⚠ 👑 lint did not run",
 		},
@@ -179,15 +192,15 @@ func TestFooterGolden(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			summary := cleanSummary()
 			testCase.summary(&summary)
-			if err := summary.countsAgree(); err != nil {
-				t.Fatalf("the fixture itself is inconsistent: %v", err)
+			if countsAgreeError := summary.countsAgree(); countsAgreeError != nil {
+				test.Fatalf("the fixture itself is inconsistent: %v", countsAgreeError)
 			}
 			if got := footer(summary, plain, testCase.options); got != testCase.want {
-				t.Errorf("footer:\n got  %s\n want %s", got, testCase.want)
+				test.Errorf("footer:\n got  %s\n want %s", got, testCase.want)
 			}
 		})
 	}
@@ -195,55 +208,58 @@ func TestFooterGolden(t *testing.T) {
 
 // TestFooterColor pins the color on a terminal: the verdict and total bold, what was found red, the
 // parentheses dim. Without color there is not one escape code.
-func TestFooterColor(t *testing.T) {
-	t.Parallel()
+func TestFooterColor(test *testing.T) {
+	test.Parallel()
 	summary := cleanSummary()
 	warmSummary(&summary)
 	want := "\x1b[1m✓ 💎 0.7s\x1b[22m \x1b[2m(480 rules • 3 checked • 3,923 cached)\x1b[22m"
 	if got := footer(summary, colored, footerOptions{}); got != want {
-		t.Errorf("colored footer:\n got  %q\n want %q", got, want)
+		test.Errorf("colored footer:\n got  %q\n want %q", got, want)
 	}
 
 	summary.TypeErrors, summary.Findings = 1, 2
 	want = "\x1b[1m✗ ☠️ 0.7s\x1b[22m • \x1b[31m1 type error\x1b[39m • \x1b[31m2 findings\x1b[39m \x1b[2m(480 rules • 3 checked • 3,923 cached)\x1b[22m"
 	if got := footer(summary, colored, footerOptions{}); got != want {
-		t.Errorf("colored failing footer:\n got  %q\n want %q", got, want)
+		test.Errorf("colored failing footer:\n got  %q\n want %q", got, want)
 	}
 	for _, options := range []footerOptions{{}, {Phases: true}, {Verbose: true}} {
 		if got := footer(summary, plain, options); strings.Contains(got, "\x1b") {
-			t.Errorf("a footer without color carries an escape code: %q", got)
+			test.Errorf("a footer without color carries an escape code: %q", got)
 		}
 	}
 }
 
 // TestCheckedAndCachedAreEveryFileInScope is the first count invariant: the two add up to the files in
 // scope, and a summary where they do not is refused rather than printed.
-func TestCheckedAndCachedAreEveryFileInScope(t *testing.T) {
-	t.Parallel()
+func TestCheckedAndCachedAreEveryFileInScope(test *testing.T) {
+	test.Parallel()
 	summary := cleanSummary()
 	warmSummary(&summary)
-	if err := summary.countsAgree(); err != nil {
-		t.Fatalf("a consistent summary was refused: %v", err)
+	if countsAgreeError := summary.countsAgree(); countsAgreeError != nil {
+		test.Fatalf("a consistent summary was refused: %v", countsAgreeError)
 	}
 	summary.FilesCached--
 	if summary.countsAgree() == nil {
-		t.Error("checked and cached fall one short of the files in scope, and the summary was accepted")
+		test.Error("checked and cached fall one short of the files in scope, and the summary was accepted")
 	}
 }
 
 // TestCoheredIsTheListAboveTheFooter is the second count invariant: the cohered count in the footer is
 // the number of files the 🪄 and 💅 lines list, including those the cap leaves to `--verbose`.
-func TestCoheredIsTheListAboveTheFooter(t *testing.T) {
-	t.Parallel()
+func TestCoheredIsTheListAboveTheFooter(test *testing.T) {
+	test.Parallel()
 	for _, count := range []int{0, 1, 3, changedFilesShown, changedFilesShown + 7} {
 		summary := cleanSummary()
 		for index := range count {
-			summary.Changed = append(summary.Changed, changedFile{Path: fmt.Sprintf("file%03d.ts", index), Formatted: true})
+			summary.Changed = append(
+				summary.Changed,
+				changedFile{Path: fmt.Sprintf("file%03d.ts", index), Formatted: true},
+			)
 		}
 		listed := 0
 		for _, line := range changedFileLines(summary.Changed, plain) {
 			var more int
-			if _, err := fmt.Sscanf(line, "… %d more", &more); err == nil {
+			if _, scanError := fmt.Sscanf(line, "… %d more", &more); scanError == nil {
 				listed += more
 				continue
 			}
@@ -253,10 +269,18 @@ func TestCoheredIsTheListAboveTheFooter(t *testing.T) {
 		said := 0
 		if index := strings.Index(got, " cohered"); index >= 0 {
 			fields := strings.Fields(got[:index])
-			fmt.Sscanf(fields[len(fields)-1], "%d", &said)
+			if _, scanError := fmt.Sscanf(fields[len(fields)-1], "%d", &said); scanError != nil {
+				test.Errorf("the footer's cohered count is not a number (%v): %s", scanError, got)
+			}
 		}
 		if said != listed || said != count {
-			t.Errorf("%d files rewritten: the list accounts for %d and the footer says %d cohered (%s)", count, listed, said, got)
+			test.Errorf(
+				"%d files rewritten: the list accounts for %d and the footer says %d cohered (%s)",
+				count,
+				listed,
+				said,
+				got,
+			)
 		}
 	}
 }
@@ -312,6 +336,22 @@ var uncheckedConditions = []struct {
 		marker: "⚠ 1 file the compiler left no record for",
 	},
 	{
+		name: "a Go run withheld type errors and declarations for cgo",
+		plant: func(summary *runSummary) {
+			summary.Gaps.WithheldInDependencyCgo = []withheldCgoFile{
+				{Package: "net", File: "/goroot/src/net/cgo_unix.go", Errors: 1},
+				{Package: "os/user", File: "/goroot/src/os/user/cgo_lookup_unix.go", Errors: 2},
+			}
+			summary.Gaps.WithheldDependencyCgoDeclarations = 1
+		},
+		marker: "⚠ cgo withheld: 3 type errors in 2 dependency files, 1 declaration",
+	},
+	{
+		name:   "a Go run withheld only declarations for cgo",
+		plant:  func(summary *runSummary) { summary.Gaps.WithheldDependencyCgoDeclarations = 14 },
+		marker: "⚠ cgo withheld: 14 declarations",
+	},
+	{
 		name:   "the binary was built from a modified tree",
 		plant:  func(summary *runSummary) { summary.Gaps.ModifiedBuild = true },
 		marker: "⚠ built from a modified tree",
@@ -321,8 +361,8 @@ var uncheckedConditions = []struct {
 // TestACrashFailsTheFooterAndKeepsItsMarker is the gap a run cannot pass with (#v1ah2qq): a file nothing
 // checked, or a rule's verdict on a file lost, because cohere crashed. The run fails, so the footer turns
 // red, and it still says what was lost.
-func TestACrashFailsTheFooterAndKeepsItsMarker(t *testing.T) {
-	t.Parallel()
+func TestACrashFailsTheFooterAndKeepsItsMarker(test *testing.T) {
+	test.Parallel()
 	for _, crash := range []struct {
 		name   string
 		plant  func(summary *runSummary)
@@ -337,11 +377,11 @@ func TestACrashFailsTheFooterAndKeepsItsMarker(t *testing.T) {
 		summary := cleanSummary()
 		crash.plant(&summary)
 		if !summary.failed() {
-			t.Errorf("%s and the run did not fail", crash.name)
+			test.Errorf("%s and the run did not fail", crash.name)
 		}
 		got := footer(summary, plain, footerOptions{})
 		if !strings.HasPrefix(got, "✗ ☠️") || !strings.Contains(got, crash.marker) {
-			t.Errorf("%s: the footer is %q, want a failing verdict carrying %q", crash.name, got, crash.marker)
+			test.Errorf("%s: the footer is %q, want a failing verdict carrying %q", crash.name, got, crash.marker)
 		}
 	}
 }
@@ -349,35 +389,35 @@ func TestACrashFailsTheFooterAndKeepsItsMarker(t *testing.T) {
 // TestFooterSaysWhatWasNotChecked plants each condition on a clean, green run and requires its marker,
 // and then requires the check itself to catch a footer that drops the marker. Without the second half a
 // check that matched anything would pass, and a footer that went quiet about a gap would go unnoticed.
-func TestFooterSaysWhatWasNotChecked(t *testing.T) {
-	t.Parallel()
+func TestFooterSaysWhatWasNotChecked(test *testing.T) {
+	test.Parallel()
 	clean := footer(cleanSummary(), plain, footerOptions{})
 	if strings.Contains(clean, "⚠") || strings.Contains(clean, "not checked") {
-		t.Fatalf("a clean run's footer carries a marker it has no cause for: %s", clean)
+		test.Fatalf("a clean run's footer carries a marker it has no cause for: %s", clean)
 	}
 	for _, condition := range uncheckedConditions {
-		t.Run(condition.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(condition.name, func(test *testing.T) {
+			test.Parallel()
 			summary := cleanSummary()
 			condition.plant(&summary)
 			if summary.failed() {
-				t.Fatalf("the planted condition made the run fail, so it no longer tests a green footer")
+				test.Fatalf("the planted condition made the run fail, so it no longer tests a green footer")
 			}
 			got := footer(summary, plain, footerOptions{})
 			if !strings.HasPrefix(got, "✓ 💎") {
-				t.Errorf("planting %s turned the verdict: %s", condition.name, got)
+				test.Errorf("planting %s turned the verdict: %s", condition.name, got)
 			}
-			if err := carriesMarker(got, condition.marker); err != nil {
-				t.Error(err)
+			if carriesMarkerError := carriesMarker(got, condition.marker); carriesMarkerError != nil {
+				test.Error(carriesMarkerError)
 			}
 
 			// The mutant: the same run with the marker dropped from its footer. The check must fail on it.
 			mutant := strings.Replace(got, " • "+condition.marker, "", 1)
 			if mutant == got {
-				t.Fatalf("the mutant could not drop %q from %s", condition.marker, got)
+				test.Fatalf("the mutant could not drop %q from %s", condition.marker, got)
 			}
 			if carriesMarker(mutant, condition.marker) == nil {
-				t.Errorf("the check passed a footer with %q dropped: %s", condition.marker, mutant)
+				test.Errorf("the check passed a footer with %q dropped: %s", condition.marker, mutant)
 			}
 		})
 	}
@@ -392,33 +432,36 @@ func carriesMarker(footerLine, marker string) error {
 
 type missingMarker struct{ footer, marker string }
 
-func (m *missingMarker) Error() string {
-	return "the footer does not say " + m.marker + ": " + m.footer
+func (marker *missingMarker) Error() string {
+	return "the footer does not say " + marker.marker + ": " + marker.footer
 }
 
 // TestFooterGroupsCounts is Kirk's: a count is exact, its thousands grouped, never abbreviated.
-func TestFooterGroupsCounts(t *testing.T) {
-	t.Parallel()
+func TestFooterGroupsCounts(test *testing.T) {
+	test.Parallel()
 	for count, want := range map[int]string{
 		0: "0", 7: "7", 999: "999", 1000: "1,000", 3893: "3,893", 99_999: "99,999", 120_000: "120,000",
 		999_999: "999,999", 1_000_000: "1,000,000", 2_412_345: "2,412,345", 340_000_000: "340,000,000", -1234: "-1,234",
 	} {
 		if got := grouped(count); got != want {
-			t.Errorf("grouped(%d) = %s, want %s", count, got, want)
+			test.Errorf("grouped(%d) = %s, want %s", count, got, want)
 		}
 	}
 	for duration, want := range map[time.Duration]string{
-		4 * time.Millisecond: "0.004s", 50 * time.Millisecond: "0.05s", 400 * time.Millisecond: "0.4s", 2400 * time.Millisecond: "2.4s",
-		12 * time.Second: "12s",
+		4 * time.Millisecond:    "0.004s",
+		50 * time.Millisecond:   "0.05s",
+		400 * time.Millisecond:  "0.4s",
+		2400 * time.Millisecond: "2.4s",
+		12 * time.Second:        "12s",
 	} {
 		if got := footerSeconds(duration); got != want {
-			t.Errorf("footerSeconds(%s) = %s, want %s", duration, got, want)
+			test.Errorf("footerSeconds(%s) = %s, want %s", duration, got, want)
 		}
 	}
 }
 
-func TestOverallFooterGolden(t *testing.T) {
-	t.Parallel()
+func TestOverallFooterGolden(test *testing.T) {
+	test.Parallel()
 	engines := map[string]int{"TypeScript": 2, "Swift": 1}
 	cases := []struct {
 		name  string
@@ -436,9 +479,13 @@ func TestOverallFooterGolden(t *testing.T) {
 			want:  "✓ 💎 8.1s • 2 projects",
 		},
 		{
-			name:  "a project failed",
-			facts: overallFacts{Total: 8100 * time.Millisecond, ProjectsByEngine: engines, Failed: []string{"www (exit 1)"}},
-			want:  "✗ ☠️ 8.1s • 3 projects: 1 Swift, 2 TypeScript → ☠️ www (exit 1)",
+			name: "a project failed",
+			facts: overallFacts{
+				Total:            8100 * time.Millisecond,
+				ProjectsByEngine: engines,
+				Failed:           []string{"www (exit 1)"},
+			},
+			want: "✗ ☠️ 8.1s • 3 projects: 1 Swift, 2 TypeScript → ☠️ www (exit 1)",
 		},
 		{
 			// A project that did not finish checked nothing, so the run cannot be green.
@@ -448,10 +495,10 @@ func TestOverallFooterGolden(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			if got := overallFooter(testCase.facts, plain); got != testCase.want {
-				t.Errorf("overallFooter:\n got  %s\n want %s", got, testCase.want)
+				test.Errorf("overallFooter:\n got  %s\n want %s", got, testCase.want)
 			}
 		})
 	}

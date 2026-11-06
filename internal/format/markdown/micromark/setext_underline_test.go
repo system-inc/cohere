@@ -114,7 +114,7 @@ var setextUnderlineFixtures = []string{
 	"\\-\n---",
 }
 
-func TestSetextUnderlineEvents(t *testing.T) {
-	t.Parallel()
-	compareEvents(t, setextUnderlineFixtures)
+func TestSetextUnderlineEvents(test *testing.T) {
+	test.Parallel()
+	compareEvents(test, setextUnderlineFixtures)
 }

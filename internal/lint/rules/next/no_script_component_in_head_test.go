@@ -7,8 +7,8 @@ import (
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
-func TestNoScriptComponentInHeadReports(t *testing.T) {
-	t.Parallel()
+func TestNoScriptComponentInHeadReports(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -86,20 +86,20 @@ func TestNoScriptComponentInHeadReports(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoScriptComponentInHead, "Component.tsx", testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoScriptComponentInHead, "Component.tsx", testCase.source)
 			expected := make([]string, testCase.count)
 			for index := range expected {
 				expected[index] = messageNoScriptComponentInHead.Id
 			}
-			rule_testing.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(test, result, expected...)
 		})
 	}
 }
 
-func TestNoScriptComponentInHeadIsSilent(t *testing.T) {
-	t.Parallel()
+func TestNoScriptComponentInHeadIsSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -193,10 +193,10 @@ func TestNoScriptComponentInHeadIsSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoScriptComponentInHead, "Component.tsx", testCase.source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoScriptComponentInHead, "Component.tsx", testCase.source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -206,19 +206,19 @@ func TestNoScriptComponentInHeadIsSilent(t *testing.T) {
 // Message ids cannot see either. The snapshot puts the caret under `Head` for four columns, which is
 // the opening element's name node rather than the element and rather than the `<Script>` that caused
 // the finding, and a port pointing at any of the three satisfies every id assertion above.
-func TestNoScriptComponentInHeadPointsAtTheHeadName(t *testing.T) {
-	t.Parallel()
+func TestNoScriptComponentInHeadPointsAtTheHeadName(test *testing.T) {
+	test.Parallel()
 
 	source := "import Head from \"next/head\";\nimport Script from \"next/script\";\nexport default function Index() { return (<Head><Script></Script></Head>); }\n"
-	result := rule_testing.RunTyped(t, NoScriptComponentInHead, "Component.tsx", source)
+	result := rule_testing.RunTyped(test, NoScriptComponentInHead, "Component.tsx", source)
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("expected one finding, got %d", len(result.Diagnostics))
+		test.Fatalf("expected one finding, got %d", len(result.Diagnostics))
 	}
 
 	diagnostic := result.Diagnostics[0]
 	reported := source[diagnostic.Range.Pos():diagnostic.Range.End()]
 	if reported != "Head" {
-		t.Errorf("finding points at %q, want %q", reported, "Head")
+		test.Errorf("finding points at %q, want %q", reported, "Head")
 	}
 
 	// Equality against a literal rather than against the message value the rule reports with. A
@@ -232,10 +232,10 @@ func TestNoScriptComponentInHeadPointsAtTheHeadName(t *testing.T) {
 		"is dropped: nothing decides when the script runs and nothing tracks whether it already " +
 		"did. Move the <Script> outside of <Head> and let it sit in the page body."
 	if diagnostic.Message.Id != wantId {
-		t.Errorf("message id is %q, want %q", diagnostic.Message.Id, wantId)
+		test.Errorf("message id is %q, want %q", diagnostic.Message.Id, wantId)
 	}
 	if diagnostic.Message.Description != wantDescription {
-		t.Errorf("message text is %q, want %q", diagnostic.Message.Description, wantDescription)
+		test.Errorf("message text is %q, want %q", diagnostic.Message.Description, wantDescription)
 	}
 }
 
@@ -245,23 +245,23 @@ func TestNoScriptComponentInHeadPointsAtTheHeadName(t *testing.T) {
 // script. A rule reporting the outer would pass the count assertion in the table above while
 // pointing a reader at the wrong element. The release binary reports at column fifty, which is the
 // inner `Head`; the outer sits at forty four.
-func TestNoScriptComponentInHeadBlamesTheInnerHead(t *testing.T) {
-	t.Parallel()
+func TestNoScriptComponentInHeadBlamesTheInnerHead(test *testing.T) {
+	test.Parallel()
 
 	source := "import Head from \"next/head\";\nimport Script from \"next/script\";\nexport default function Index() { return (<Head><Head><Script></Script></Head></Head>); }\n"
-	result := rule_testing.RunTyped(t, NoScriptComponentInHead, "Component.tsx", source)
+	result := rule_testing.RunTyped(test, NoScriptComponentInHead, "Component.tsx", source)
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("expected one finding, got %d", len(result.Diagnostics))
+		test.Fatalf("expected one finding, got %d", len(result.Diagnostics))
 	}
 
 	position := result.Diagnostics[0].Range.Pos()
 	outer := strings.Index(source, "<Head>") + len("<")
 	inner := strings.Index(source[outer:], "<Head>") + outer + len("<")
 	if position == outer {
-		t.Errorf("finding blames the outer Head at %d, want the inner one at %d", position, inner)
+		test.Errorf("finding blames the outer Head at %d, want the inner one at %d", position, inner)
 	}
 	if position != inner {
-		t.Errorf("finding is at %d, want the inner Head at %d", position, inner)
+		test.Errorf("finding is at %d, want the inner Head at %d", position, inner)
 	}
 }
 
@@ -271,16 +271,16 @@ func TestNoScriptComponentInHeadBlamesTheInnerHead(t *testing.T) {
 // The plain harness hands a rule a nil checker, so this rule would go completely silent: every
 // silent fixture above would pass vacuously and every reporting one would fail in a way that reads
 // as a rule bug rather than as a harness mismatch. Asserting the silence directly names the cause.
-func TestNoScriptComponentInHeadRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestNoScriptComponentInHeadRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	if !NoScriptComponentInHead.NeedsTypeChecker {
-		t.Fatal("the rule resolves tags through the checker and must declare NeedsTypeChecker")
+		test.Fatal("the rule resolves tags through the checker and must declare NeedsTypeChecker")
 	}
 
 	source := "import Head from \"next/head\";\nimport Script from \"next/script\";\nexport default function Index() { return (<Head><Script></Script></Head>); }\n"
-	result := rule_testing.Run(t, NoScriptComponentInHead, "Component.tsx", source)
+	result := rule_testing.Run(test, NoScriptComponentInHead, "Component.tsx", source)
 	if len(result.Diagnostics) != 0 {
-		t.Fatalf("untyped harness produced %d findings, so the rule is no longer resolving", len(result.Diagnostics))
+		test.Fatalf("untyped harness produced %d findings, so the rule is no longer resolving", len(result.Diagnostics))
 	}
 }

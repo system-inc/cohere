@@ -10,5 +10,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // No decoder: the rule takes no options, because its shape has nothing a configuration could tune; the
 // producers are the default library's `Promise.race` and the global `setTimeout`, both fixed.
 func init() {
-	rule.Register(rule.Registration{Rule: CorrectnessNoUnclearedRaceTimeout})
+	rule.Register(rule.Registration[rule.NoOptions]{Rule: CorrectnessNoUnclearedRaceTimeout})
 }

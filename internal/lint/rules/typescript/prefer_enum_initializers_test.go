@@ -44,18 +44,19 @@ type preferEnumInitializersFinding struct {
 // Back to front so an earlier edit cannot move a later one's offsets, matching what the fix engine
 // does. Each suggestion here carries exactly one fix, so the ordering is not load-bearing today; it
 // is written correctly anyway rather than relying on that staying true.
-func applyPreferEnumInitializersSuggestion(t *testing.T, source string, suggestion rule.Suggestion) string {
-	t.Helper()
+func applyPreferEnumInitializersSuggestion(test *testing.T, source string, suggestion rule.Suggestion) string {
+	test.Helper()
 	fixes := append([]rule.Fix(nil), suggestion.Fixes...)
 	sort.Slice(fixes, func(first, second int) bool { return fixes[first].Range.Pos() > fixes[second].Range.Pos() })
+	edited := source
 	for _, fix := range fixes {
 		start, end := fix.Range.Pos(), fix.Range.End()
-		if start < 0 || end > len(source) || start > end {
-			t.Fatalf("the suggestion proposes an out-of-range edit [%d,%d) over %d bytes", start, end, len(source))
+		if start < 0 || end > len(edited) || start > end {
+			test.Fatalf("the suggestion proposes an out-of-range edit [%d,%d) over %d bytes", start, end, len(edited))
 		}
-		source = source[:start] + fix.Text + source[end:]
+		edited = edited[:start] + fix.Text + edited[end:]
 	}
-	return source
+	return edited
 }
 
 // TestPreferEnumInitializersStaysSilentOnUpstreamPassCases is the imported clean corpus, verbatim.
@@ -63,8 +64,8 @@ func applyPreferEnumInitializersSuggestion(t *testing.T, source string, suggesti
 // All four of upstream's passing inputs, extracted from the clone's test file by parsing it with the
 // TypeScript compiler rather than by reading it. Every one was additionally run through the
 // installed 8.x build, which reported nothing and produced no parse error on any of them.
-func TestPreferEnumInitializersStaysSilentOnUpstreamPassCases(t *testing.T) {
-	t.Parallel()
+func TestPreferEnumInitializersStaysSilentOnUpstreamPassCases(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		"\nenum Direction {}\n    ",
@@ -73,9 +74,9 @@ func TestPreferEnumInitializersStaysSilentOnUpstreamPassCases(t *testing.T) {
 		"\nenum Direction {\n  Up = 'Up',\n  Down = 'Down',\n}\n    ",
 	}
 	for index, sourceText := range cases {
-		t.Run(preferEnumInitializersCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, PreferEnumInitializers,
+		test.Run(preferEnumInitializersCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, PreferEnumInitializers,
 				preferEnumInitializersFile, sourceText))
 		})
 	}
@@ -94,8 +95,8 @@ func TestPreferEnumInitializersStaysSilentOnUpstreamPassCases(t *testing.T) {
 // All three assertion layers run on every row. A finding at the right span carrying a suggestion
 // that writes the wrong text passes a message-id check, and a suggestion naming the right value
 // while replacing the wrong range passes a description check.
-func TestPreferEnumInitializersFiresOnUpstreamFailCases(t *testing.T) {
-	t.Parallel()
+func TestPreferEnumInitializersFiresOnUpstreamFailCases(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText   string
@@ -124,16 +125,28 @@ func TestPreferEnumInitializersFiresOnUpstreamFailCases(t *testing.T) {
 					wantSuggestions: []preferEnumInitializersSuggestion{
 						{desc: "Can be fixed to Up = 0", applied: "\nenum Direction {\n  Up = 0,\n  Down,\n}\n      "},
 						{desc: "Can be fixed to Up = 1", applied: "\nenum Direction {\n  Up = 1,\n  Down,\n}\n      "},
-						{desc: "Can be fixed to Up = 'Up'", applied: "\nenum Direction {\n  Up = 'Up',\n  Down,\n}\n      "},
+						{
+							desc:    "Can be fixed to Up = 'Up'",
+							applied: "\nenum Direction {\n  Up = 'Up',\n  Down,\n}\n      ",
+						},
 					},
 				},
 				{
 					wantSpan:    "Down",
 					wantMessage: "The value of the member 'Down' should be explicitly defined.",
 					wantSuggestions: []preferEnumInitializersSuggestion{
-						{desc: "Can be fixed to Down = 1", applied: "\nenum Direction {\n  Up,\n  Down = 1,\n}\n      "},
-						{desc: "Can be fixed to Down = 2", applied: "\nenum Direction {\n  Up,\n  Down = 2,\n}\n      "},
-						{desc: "Can be fixed to Down = 'Down'", applied: "\nenum Direction {\n  Up,\n  Down = 'Down',\n}\n      "},
+						{
+							desc:    "Can be fixed to Down = 1",
+							applied: "\nenum Direction {\n  Up,\n  Down = 1,\n}\n      ",
+						},
+						{
+							desc:    "Can be fixed to Down = 2",
+							applied: "\nenum Direction {\n  Up,\n  Down = 2,\n}\n      ",
+						},
+						{
+							desc:    "Can be fixed to Down = 'Down'",
+							applied: "\nenum Direction {\n  Up,\n  Down = 'Down',\n}\n      ",
+						},
 					},
 				},
 			},
@@ -145,9 +158,18 @@ func TestPreferEnumInitializersFiresOnUpstreamFailCases(t *testing.T) {
 					wantSpan:    "Down",
 					wantMessage: "The value of the member 'Down' should be explicitly defined.",
 					wantSuggestions: []preferEnumInitializersSuggestion{
-						{desc: "Can be fixed to Down = 1", applied: "\nenum Direction {\n  Up = 'Up',\n  Down = 1,\n}\n      "},
-						{desc: "Can be fixed to Down = 2", applied: "\nenum Direction {\n  Up = 'Up',\n  Down = 2,\n}\n      "},
-						{desc: "Can be fixed to Down = 'Down'", applied: "\nenum Direction {\n  Up = 'Up',\n  Down = 'Down',\n}\n      "},
+						{
+							desc:    "Can be fixed to Down = 1",
+							applied: "\nenum Direction {\n  Up = 'Up',\n  Down = 1,\n}\n      ",
+						},
+						{
+							desc:    "Can be fixed to Down = 2",
+							applied: "\nenum Direction {\n  Up = 'Up',\n  Down = 2,\n}\n      ",
+						},
+						{
+							desc:    "Can be fixed to Down = 'Down'",
+							applied: "\nenum Direction {\n  Up = 'Up',\n  Down = 'Down',\n}\n      ",
+						},
 					},
 				},
 			},
@@ -159,62 +181,76 @@ func TestPreferEnumInitializersFiresOnUpstreamFailCases(t *testing.T) {
 					wantSpan:    "Up",
 					wantMessage: "The value of the member 'Up' should be explicitly defined.",
 					wantSuggestions: []preferEnumInitializersSuggestion{
-						{desc: "Can be fixed to Up = 0", applied: "\nenum Direction {\n  Up = 0,\n  Down = 'Down',\n}\n      "},
-						{desc: "Can be fixed to Up = 1", applied: "\nenum Direction {\n  Up = 1,\n  Down = 'Down',\n}\n      "},
-						{desc: "Can be fixed to Up = 'Up'", applied: "\nenum Direction {\n  Up = 'Up',\n  Down = 'Down',\n}\n      "},
+						{
+							desc:    "Can be fixed to Up = 0",
+							applied: "\nenum Direction {\n  Up = 0,\n  Down = 'Down',\n}\n      ",
+						},
+						{
+							desc:    "Can be fixed to Up = 1",
+							applied: "\nenum Direction {\n  Up = 1,\n  Down = 'Down',\n}\n      ",
+						},
+						{
+							desc:    "Can be fixed to Up = 'Up'",
+							applied: "\nenum Direction {\n  Up = 'Up',\n  Down = 'Down',\n}\n      ",
+						},
 					},
 				},
 			},
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(preferEnumInitializersCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, PreferEnumInitializers, preferEnumInitializersFile, testCase.sourceText)
+		test.Run(preferEnumInitializersCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, PreferEnumInitializers, preferEnumInitializersFile, testCase.sourceText)
 
 			wantIds := make([]string, len(testCase.wantFindings))
 			for position := range wantIds {
 				wantIds[position] = "defineInitializer"
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 
 			for position, want := range testCase.wantFindings {
 				diagnostic := result.Diagnostics[position]
 
 				gotSpan := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if gotSpan != want.wantSpan {
-					t.Fatalf("finding %d span: expected %q, got %q", position, want.wantSpan, gotSpan)
+					test.Fatalf("finding %d span: expected %q, got %q", position, want.wantSpan, gotSpan)
 				}
 				if diagnostic.Message.Description != want.wantMessage {
-					t.Fatalf("finding %d message: expected %q, got %q", position, want.wantMessage, diagnostic.Message.Description)
+					test.Fatalf(
+						"finding %d message: expected %q, got %q",
+						position,
+						want.wantMessage,
+						diagnostic.Message.Description,
+					)
 				}
 				if diagnostic.Message.Id != "defineInitializer" {
-					t.Fatalf("finding %d message id: got %q", position, diagnostic.Message.Id)
+					test.Fatalf("finding %d message id: got %q", position, diagnostic.Message.Id)
 				}
 
 				// The repair is offered, never applied. A rule shipping this as a fix would rewrite
 				// an enum value unattended, which is the one thing this rule exists to say nobody
 				// can guess.
 				if len(diagnostic.Fixes) != 0 {
-					t.Fatalf("finding %d proposes %d fixes; the repair must be suggestions only",
+					test.Fatalf("finding %d proposes %d fixes; the repair must be suggestions only",
 						position, len(diagnostic.Fixes))
 				}
 				if len(diagnostic.Suggestions) != len(want.wantSuggestions) {
-					t.Fatalf("finding %d: expected %d suggestions, got %d",
+					test.Fatalf("finding %d: expected %d suggestions, got %d",
 						position, len(want.wantSuggestions), len(diagnostic.Suggestions))
 				}
 				for order, wantSuggestion := range want.wantSuggestions {
 					got := diagnostic.Suggestions[order]
 					if got.Message.Description != wantSuggestion.desc {
-						t.Fatalf("finding %d suggestion %d: expected %q, got %q",
+						test.Fatalf("finding %d suggestion %d: expected %q, got %q",
 							position, order, wantSuggestion.desc, got.Message.Description)
 					}
 					if got.Message.Id != "defineInitializerSuggestion" {
-						t.Fatalf("finding %d suggestion %d id: got %q", position, order, got.Message.Id)
+						test.Fatalf("finding %d suggestion %d id: got %q", position, order, got.Message.Id)
 					}
-					applied := applyPreferEnumInitializersSuggestion(t, testCase.sourceText, got)
+					applied := applyPreferEnumInitializersSuggestion(test, testCase.sourceText, got)
 					if applied != wantSuggestion.applied {
-						t.Fatalf("finding %d suggestion %d applied: expected %q, got %q",
+						test.Fatalf("finding %d suggestion %d applied: expected %q, got %q",
 							position, order, wantSuggestion.applied, applied)
 					}
 				}
@@ -226,10 +262,10 @@ func TestPreferEnumInitializersFiresOnUpstreamFailCases(t *testing.T) {
 // TestPreferEnumInitializersStaysSilentOnShapesTheCorpusDoesNotWrite covers clean divergences.
 //
 // Upstream's corpus has four passing inputs and none of them carries a computed initializer, so
-// nothing in it establishes that the rule tests only whether an initializer is PRESENT rather than
+// nothing in it establishes that the rule tests only whether an initializer is present rather than
 // what it evaluates to. Both verdicts below were measured against the installed 8.x build.
-func TestPreferEnumInitializersStaysSilentOnShapesTheCorpusDoesNotWrite(t *testing.T) {
-	t.Parallel()
+func TestPreferEnumInitializersStaysSilentOnShapesTheCorpusDoesNotWrite(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -248,9 +284,9 @@ func TestPreferEnumInitializersStaysSilentOnShapesTheCorpusDoesNotWrite(t *testi
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(preferEnumInitializersCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, PreferEnumInitializers,
+		test.Run(preferEnumInitializersCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, PreferEnumInitializers,
 				preferEnumInitializersFile, testCase.sourceText))
 		})
 	}
@@ -259,7 +295,7 @@ func TestPreferEnumInitializersStaysSilentOnShapesTheCorpusDoesNotWrite(t *testi
 // TestPreferEnumInitializersFiresOnShapesTheCorpusDoesNotWrite covers reporting divergences.
 //
 // The corpus writes only plain identifier members inside a plain enum, so it cannot see three
-// things this rule has to get right: that the suggested number is the member's POSITION rather than
+// things this rule has to get right: that the suggested number is the member's position rather than
 // the value TypeScript computes for it, that a quoted key renders its quotes twice, and that const,
 // ambient, exported and nested enums are all reached.
 //
@@ -268,15 +304,17 @@ func TestPreferEnumInitializersStaysSilentOnShapesTheCorpusDoesNotWrite(t *testi
 // fixture and write a different edit than the corpus asserts.
 //
 // Every span, message and applied suggestion below was measured against the installed build.
-func TestPreferEnumInitializersFiresOnShapesTheCorpusDoesNotWrite(t *testing.T) {
-	t.Parallel()
+func TestPreferEnumInitializersFiresOnShapesTheCorpusDoesNotWrite(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText   string
 		wantFindings []preferEnumInitializersFinding
 	}{
 		{
-			// A quoted key: `getText(member)` includes the quotes, so upstream renders the name doubled in the message and emits a syntactically broken third suggestion. Reproduced rather than corrected; the differential compares the message text.
+			// A quoted key: `getText(member)` includes the quotes, so upstream renders the name doubled in the message
+			// and emits a syntactically broken third suggestion. Reproduced rather than corrected; the differential
+			// compares the message text.
 			sourceText: "enum D {\n  'quoted',\n}",
 			wantFindings: []preferEnumInitializersFinding{
 				{
@@ -285,7 +323,10 @@ func TestPreferEnumInitializersFiresOnShapesTheCorpusDoesNotWrite(t *testing.T) 
 					wantSuggestions: []preferEnumInitializersSuggestion{
 						{desc: "Can be fixed to 'quoted' = 0", applied: "enum D {\n  'quoted' = 0,\n}"},
 						{desc: "Can be fixed to 'quoted' = 1", applied: "enum D {\n  'quoted' = 1,\n}"},
-						{desc: "Can be fixed to 'quoted' = ''quoted''", applied: "enum D {\n  'quoted' = ''quoted'',\n}"},
+						{
+							desc:    "Can be fixed to 'quoted' = ''quoted''",
+							applied: "enum D {\n  'quoted' = ''quoted'',\n}",
+						},
 					},
 				},
 			},
@@ -330,13 +371,16 @@ func TestPreferEnumInitializersFiresOnShapesTheCorpusDoesNotWrite(t *testing.T) 
 					wantSuggestions: []preferEnumInitializersSuggestion{
 						{desc: "Can be fixed to Up = 0", applied: "namespace N {\n  enum D {\n    Up = 0,\n  }\n}"},
 						{desc: "Can be fixed to Up = 1", applied: "namespace N {\n  enum D {\n    Up = 1,\n  }\n}"},
-						{desc: "Can be fixed to Up = 'Up'", applied: "namespace N {\n  enum D {\n    Up = 'Up',\n  }\n}"},
+						{
+							desc:    "Can be fixed to Up = 'Up'",
+							applied: "namespace N {\n  enum D {\n    Up = 'Up',\n  }\n}",
+						},
 					},
 				},
 			},
 		},
 		{
-			// The suggested numbers are POSITIONS, not computed values. C is offered 2 and 3.
+			// The suggested numbers are positions, not computed values. C is offered 2 and 3.
 			sourceText: "enum D {\n  A,\n  B = 1,\n  C,\n}",
 			wantFindings: []preferEnumInitializersFinding{
 				{
@@ -360,7 +404,8 @@ func TestPreferEnumInitializersFiresOnShapesTheCorpusDoesNotWrite(t *testing.T) 
 			},
 		},
 		{
-			// The case that separates position from value: B's computed value is 2 and upstream offers 1, because index is the member's place in the list.
+			// The case that separates position from value: B's computed value is 2 and upstream offers 1, because index
+			// is the member's place in the list.
 			sourceText: "enum D {\n  A = 1,\n  B,\n  C,\n}",
 			wantFindings: []preferEnumInitializersFinding{
 				{
@@ -457,36 +502,58 @@ func TestPreferEnumInitializersFiresOnShapesTheCorpusDoesNotWrite(t *testing.T) 
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(preferEnumInitializersCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, PreferEnumInitializers, preferEnumInitializersFile, testCase.sourceText)
+		test.Run(preferEnumInitializersCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, PreferEnumInitializers, preferEnumInitializersFile, testCase.sourceText)
 
 			wantIds := make([]string, len(testCase.wantFindings))
 			for position := range wantIds {
 				wantIds[position] = "defineInitializer"
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 
 			for position, want := range testCase.wantFindings {
 				diagnostic := result.Diagnostics[position]
 				gotSpan := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if gotSpan != want.wantSpan {
-					t.Fatalf("finding %d span: expected %q, got %q", position, want.wantSpan, gotSpan)
+					test.Fatalf("finding %d span: expected %q, got %q", position, want.wantSpan, gotSpan)
 				}
 				if diagnostic.Message.Description != want.wantMessage {
-					t.Fatalf("finding %d message: expected %q, got %q", position, want.wantMessage, diagnostic.Message.Description)
+					test.Fatalf(
+						"finding %d message: expected %q, got %q",
+						position,
+						want.wantMessage,
+						diagnostic.Message.Description,
+					)
 				}
 				if len(diagnostic.Suggestions) != len(want.wantSuggestions) {
-					t.Fatalf("finding %d: expected %d suggestions, got %d", position, len(want.wantSuggestions), len(diagnostic.Suggestions))
+					test.Fatalf(
+						"finding %d: expected %d suggestions, got %d",
+						position,
+						len(want.wantSuggestions),
+						len(diagnostic.Suggestions),
+					)
 				}
 				for order, wantSuggestion := range want.wantSuggestions {
 					got := diagnostic.Suggestions[order]
 					if got.Message.Description != wantSuggestion.desc {
-						t.Fatalf("finding %d suggestion %d: expected %q, got %q", position, order, wantSuggestion.desc, got.Message.Description)
+						test.Fatalf(
+							"finding %d suggestion %d: expected %q, got %q",
+							position,
+							order,
+							wantSuggestion.desc,
+							got.Message.Description,
+						)
 					}
-					applied := applyPreferEnumInitializersSuggestion(t, testCase.sourceText, got)
+					applied := applyPreferEnumInitializersSuggestion(test, testCase.sourceText, got)
 					if applied != wantSuggestion.applied {
-						t.Fatalf("finding %d suggestion %d applied: expected %q, got %q", position, order, wantSuggestion.applied, applied)
+						test.Fatalf(
+							"finding %d suggestion %d applied: expected %q, got %q",
+							position,
+							order,
+							wantSuggestion.applied,
+							applied,
+						)
 					}
 				}
 			}
@@ -505,13 +572,14 @@ func TestPreferEnumInitializersFiresOnShapesTheCorpusDoesNotWrite(t *testing.T) 
 // the member's whole text as the name. The divergence is recorded here rather than papered over
 // with a computed-key skip, because a skip would be a judgment upstream never made and this input
 // cannot occur in source that compiles.
-func TestPreferEnumInitializersReportsAComputedKeyUpstreamCannotParse(t *testing.T) {
-	t.Parallel()
+func TestPreferEnumInitializersReportsAComputedKeyUpstreamCannotParse(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, PreferEnumInitializers, preferEnumInitializersFile,
+	result := rule_testing.Run(test, PreferEnumInitializers, preferEnumInitializersFile,
 		"enum D {\n  ['computed'],\n}")
-	rule_testing.ExpectFindings(t, result, "defineInitializer")
-	if got := result.Diagnostics[0].Message.Description; got != "The value of the member '['computed']' should be explicitly defined." {
-		t.Fatalf("message: got %q", got)
+	rule_testing.ExpectFindings(test, result, "defineInitializer")
+	if got := result.Diagnostics[0].Message.Description; got != "The value of the member '['computed']' "+
+		"should be explicitly defined." {
+		test.Fatalf("message: got %q", got)
 	}
 }

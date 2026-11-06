@@ -29,8 +29,8 @@ const verifyArrayDecoratorPreamble = "declare function VerifyIsArray(): Property
 //
 // Written rather than imported, since this is our own rule. Each case names which of the three
 // decorator sets it exercises, and the whole set was checked against the existing ESLint rule.
-func TestVerifyArrayParityFires(t *testing.T) {
-	t.Parallel()
+func TestVerifyArrayParityFires(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name     string
@@ -107,7 +107,7 @@ func TestVerifyArrayParityFires(t *testing.T) {
 			// it falls through all three branches: it neither arms the finding nor suppresses it,
 			// and a value-level rule beside it still reports. The fixture originally asserted the
 			// opposite, on the plausible reasoning that a custom rule might be array-level, and
-			// only driving the real ESLint rule settled it. An UNRECOGNISED name does suppress;
+			// only driving the real ESLint rule settled it. An unrecognised name does suppress;
 			// `VerifyBy` is recognised, and that is the whole difference between the two sets.
 			source:   "class Entity { @VerifyBy(() => true) @VerifyIsString() names: string[]; }",
 			reported: "names",
@@ -120,31 +120,36 @@ func TestVerifyArrayParityFires(t *testing.T) {
 			message:  "Array-typed property 'names' has value-level @Verify rules but no array-level rule.",
 		},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			source := verifyArrayDecoratorPreamble + testCase.source
-			result := rule_testing.RunTyped(t, CorrectnessRequireVerifyArrayParity, correctnessRequireVerifyArrayParityFile, source)
-			rule_testing.ExpectFindings(t, result, "missingArrayRule")
+			result := rule_testing.RunTyped(
+				test,
+				CorrectnessRequireVerifyArrayParity,
+				correctnessRequireVerifyArrayParityFile,
+				source,
+			)
+			rule_testing.ExpectFindings(test, result, "missingArrayRule")
 
-			// The span: the original reports the property's KEY, so a port pointing at the whole
+			// The span: the original reports the property's key, so a port pointing at the whole
 			// declaration would pass the id assertion and send the reader to the wrong column.
 			onDisk := strings.TrimSpace(source) + "\n"
 			reported := onDisk[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 			if reported != testCase.reported {
-				t.Errorf("finding should point at %q, got %q", testCase.reported, reported)
+				test.Errorf("finding should point at %q, got %q", testCase.reported, reported)
 			}
 
 			// The rendered text, which interpolates the property name.
 			if got := result.Diagnostics[0].Message.Description; !strings.HasPrefix(got, testCase.message) {
-				t.Errorf("message should begin %q, got %q", testCase.message, got)
+				test.Errorf("message should begin %q, got %q", testCase.message, got)
 			}
 		})
 	}
 }
 
 // TestVerifyArrayParityStaysSilent covers the inputs the rule must decline.
-func TestVerifyArrayParityStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestVerifyArrayParityStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name   string
@@ -221,9 +226,9 @@ func TestVerifyArrayParityStaysSilent(t *testing.T) {
 			reason: "The original guards on an Identifier key.",
 		},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, CorrectnessRequireVerifyArrayParity,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, CorrectnessRequireVerifyArrayParity,
 				correctnessRequireVerifyArrayParityFile, verifyArrayDecoratorPreamble+testCase.source))
 		})
 	}
@@ -231,14 +236,14 @@ func TestVerifyArrayParityStaysSilent(t *testing.T) {
 
 // TestVerifyArrayParityRequiresTheTypedHarness asserts the rule declines a nil checker, with a
 // control proving the same input reports through the typed harness.
-func TestVerifyArrayParityRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestVerifyArrayParityRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	const source = "class Entity { @VerifyIsString() names: string[]; }"
 
-	rule_testing.ExpectClean(t, rule_testing.Run(t, CorrectnessRequireVerifyArrayParity,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, CorrectnessRequireVerifyArrayParity,
 		correctnessRequireVerifyArrayParityFile, verifyArrayDecoratorPreamble+source))
 
-	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, CorrectnessRequireVerifyArrayParity,
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, CorrectnessRequireVerifyArrayParity,
 		correctnessRequireVerifyArrayParityFile, verifyArrayDecoratorPreamble+source), "missingArrayRule")
 }

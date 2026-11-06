@@ -5,7 +5,8 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
-var messageUnexpectedVar = rule.Message{
+// messageUnexpectedVariable is upstream's unexpectedVar message: a `var` declaration.
+var messageUnexpectedVariable = rule.Message{
 	Id: "unexpectedVar",
 	Description: "This is a `var` declaration, which is function-scoped and hoisted rather than " +
 		"block-scoped. The binding exists from the top of the enclosing function, so it is " +
@@ -16,7 +17,7 @@ var messageUnexpectedVar = rule.Message{
 		"reassigns it.",
 }
 
-// NoVar flags a var declaration, wherever one can appear.
+// NoVariable flags a var declaration, wherever one can appear.
 //
 //	valid:   const value = 1
 //	valid:   let value = 1
@@ -43,15 +44,15 @@ var messageUnexpectedVar = rule.Message{
 // declaration and never relied on outside its block, and both are questions about the whole enclosing
 // function rather than about this line. Changing scope silently is how a lint fix turns a working
 // program into a broken one.
-var NoVar = rule.Rule{
+var NoVariable = rule.Rule[rule.NoOptions]{
 	Name: "no-var",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// reportIfVar reports when a declaration list declares with `var`.
 		//
 		// let and const both carry a flag, and `var` is the absence of both. Reading it as an
 		// absence rather than as a keyword is what makes `using` and `await using` fall through
 		// correctly, since those carry their own flags.
-		reportIfVar := func(declarationList *ast.Node) {
+		reportIfVariable := func(declarationList *ast.Node) {
 			if declarationList == nil {
 				return
 			}
@@ -60,7 +61,7 @@ var NoVar = rule.Rule{
 			if declarationList.Flags&blockScoped != 0 {
 				return
 			}
-			ctx.ReportNode(declarationList, messageUnexpectedVar)
+			ruleContext.ReportNode(declarationList, messageUnexpectedVariable)
 		}
 
 		// loopInitializer returns a loop's initializer when it declares bindings rather than
@@ -88,19 +89,19 @@ var NoVar = rule.Rule{
 					parent.Parent != nil && ast.IsGlobalScopeAugmentation(parent.Parent) {
 					return
 				}
-				reportIfVar(node.AsVariableStatement().DeclarationList)
+				reportIfVariable(node.AsVariableStatement().DeclarationList)
 			},
 
 			ast.KindForStatement: func(node *ast.Node) {
-				reportIfVar(loopInitializer(node.AsForStatement().Initializer))
+				reportIfVariable(loopInitializer(node.AsForStatement().Initializer))
 			},
 
 			ast.KindForInStatement: func(node *ast.Node) {
-				reportIfVar(loopInitializer(node.AsForInOrOfStatement().Initializer))
+				reportIfVariable(loopInitializer(node.AsForInOrOfStatement().Initializer))
 			},
 
 			ast.KindForOfStatement: func(node *ast.Node) {
-				reportIfVar(loopInitializer(node.AsForInOrOfStatement().Initializer))
+				reportIfVariable(loopInitializer(node.AsForInOrOfStatement().Initializer))
 			},
 		}
 	},

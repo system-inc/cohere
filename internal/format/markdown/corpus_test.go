@@ -36,13 +36,13 @@ type markdownCandidate struct {
 // oracleTextToDoc formats embedded code with the embedded Prettier, standing in for native printers
 // that do not exist yet, so the embed plumbing (fences, front matter) is measured on its own. Set
 // COHERE_MARKDOWN_EMBED_ORACLE to use it.
-func oracleTextToDoc(t *testing.T, options formatoptions.Options) printing.TextToDoc {
+func oracleTextToDoc(test *testing.T, options formatoptions.Options) printing.TextToDoc {
 	if os.Getenv("COHERE_MARKDOWN_EMBED_ORACLE") == "" {
 		return nil
 	}
-	engine, err := prettier.New(options)
-	if err != nil {
-		t.Fatal(err)
+	engine, newPrettierError := prettier.New(options)
+	if newPrettierError != nil {
+		test.Fatal(newPrettierError)
 	}
 	fileNames := map[string]string{
 		"typescript": "embedded.tsx", "babel": "embedded.js", "json": "embedded.json", "json5": "embedded.json5",
@@ -54,9 +54,9 @@ func oracleTextToDoc(t *testing.T, options formatoptions.Options) printing.TextT
 		if !strings.Contains(parser, ".") {
 			fileName = fileNames[parser]
 		}
-		formatted, err := engine.Format(fileName, text)
-		if err != nil {
-			return nil, err
+		formatted, formatError := engine.Format(fileName, text)
+		if formatError != nil {
+			return nil, formatError
 		}
 		return doc.Text(strings.TrimSuffix(formatted, "\n")), nil
 	}
@@ -86,11 +86,11 @@ type markdownCorpus struct {
 
 // markdownCorpora enumerates the .md files of each root the way TestCorpora does: through the
 // engine's ignore layers, and into each nested repository as a corpus of its own, with its own config.
-func markdownCorpora(t *testing.T, roots string) []markdownCorpus {
-	t.Helper()
-	enumerator, err := prettier.New(formatoptions.Default())
-	if err != nil {
-		t.Fatal(err)
+func markdownCorpora(test *testing.T, roots string) []markdownCorpus {
+	test.Helper()
+	enumerator, newPrettierError := prettier.New(formatoptions.Default())
+	if newPrettierError != nil {
+		test.Fatal(newPrettierError)
 	}
 	var corpora []markdownCorpus
 	pending := strings.Split(roots, ":")
@@ -99,7 +99,10 @@ func markdownCorpora(t *testing.T, roots string) []markdownCorpus {
 		root := strings.TrimSpace(pending[0])
 		pending = pending[1:]
 		if strings.HasPrefix(root, "~/") {
-			home, _ := os.UserHomeDir()
+			home, homeError := os.UserHomeDir()
+			if homeError != nil {
+				test.Fatalf("finding the home directory for %s: %v", root, homeError)
+			}
 			root = filepath.Join(home, root[2:])
 		}
 		if root == "" || seen[root] {
@@ -109,21 +112,21 @@ func markdownCorpora(t *testing.T, roots string) []markdownCorpus {
 
 		// Nested repositories regardless of root's own ignore lists, as the differential finds them
 		// (#k6vebep): a repository under a path root never formats is still a corpus.
-		nestedRepositories, err := formatfiles.NestedRepositoriesBelow(root)
-		if err != nil {
-			t.Fatalf("finding the repositories nested in %s: %v", root, err)
+		nestedRepositories, nestedRepositoriesBelowError := formatfiles.NestedRepositoriesBelow(root)
+		if nestedRepositoriesBelowError != nil {
+			test.Fatalf("finding the repositories nested in %s: %v", root, nestedRepositoriesBelowError)
 		}
 		for _, nested := range nestedRepositories {
 			pending = append(pending, filepath.Join(root, nested))
 		}
 
-		enumeration, err := enumerator.Enumerate(root)
-		if errors.Is(err, formatoptions.ErrPrettierConfigRemains) {
-			t.Logf("skipping %s, not yet adopted: %v", root, err)
+		enumeration, enumerateError := enumerator.Enumerate(root)
+		if errors.Is(enumerateError, formatoptions.ErrPrettierConfigRemains) {
+			test.Logf("skipping %s, not yet adopted: %v", root, enumerateError)
 			continue
 		}
-		if err != nil {
-			t.Fatalf("enumerating %s: %v", root, err)
+		if enumerateError != nil {
+			test.Fatalf("enumerating %s: %v", root, enumerateError)
 		}
 		var files []string
 		for _, file := range enumeration.Files {
@@ -135,15 +138,15 @@ func markdownCorpora(t *testing.T, roots string) []markdownCorpus {
 			}
 		}
 
-		resolution, err := formatoptions.Resolve(root)
-		if errors.Is(err, formatoptions.ErrPrettierConfigRemains) {
+		resolution, resolveError := formatoptions.Resolve(root)
+		if errors.Is(resolveError, formatoptions.ErrPrettierConfigRemains) {
 			// A repository still carrying Prettier config, pinned to its own adoption (www-ahra-ai). The
 			// differential's TestCorpora refuses this for a named corpus; here it is named and skipped.
-			t.Logf("skipping %s, not yet adopted: %v", root, err)
+			test.Logf("skipping %s, not yet adopted: %v", root, resolveError)
 			continue
 		}
-		if err != nil {
-			t.Fatalf("resolving the format options for %s: %v", root, err)
+		if resolveError != nil {
+			test.Fatalf("resolving the format options for %s: %v", root, resolveError)
 		}
 		corpora = append(corpora, markdownCorpus{root: root, files: files, options: resolution.Options})
 	}
@@ -152,35 +155,35 @@ func markdownCorpora(t *testing.T, roots string) []markdownCorpus {
 	for _, corpus := range corpora {
 		measured = append(measured, fmt.Sprintf("%s (%d .md)", corpus.root, len(corpus.files)))
 	}
-	t.Logf("markdown corpora: %d\n  %s", len(corpora), strings.Join(measured, "\n  "))
+	test.Logf("markdown corpora: %d\n  %s", len(corpora), strings.Join(measured, "\n  "))
 	return corpora
 }
 
-func TestCorpusFormatMatchesOracle(t *testing.T) {
-	t.Parallel()
+func TestCorpusFormatMatchesOracle(test *testing.T) {
+	test.Parallel()
 	roots := os.Getenv("COHERE_MARKDOWN_CORPORA")
 	if roots == "" {
-		t.Skip("set COHERE_MARKDOWN_CORPORA to measure; this is a measuring run, not a unit test")
+		test.Skip("set COHERE_MARKDOWN_CORPORA to measure; this is a measuring run, not a unit test")
 	}
 
-	bundles, err := prettier.Bundles()
-	if err != nil {
-		t.Fatal(err)
+	bundles, bundlesError := prettier.Bundles()
+	if bundlesError != nil {
+		test.Fatal(bundlesError)
 	}
-	digest, err := prettier.DigestBundles(bundles.Files)
-	if err != nil {
-		t.Fatal(err)
+	digest, digestBundlesError := prettier.DigestBundles(bundles.Files)
+	if digestBundlesError != nil {
+		test.Fatal(digestBundlesError)
 	}
 	directory := os.Getenv("COHERE_FORMAT_CACHE")
 	if directory == "" {
-		base, err := os.UserCacheDir()
-		if err != nil {
-			t.Fatal(err)
+		base, userCacheDirectoryError := os.UserCacheDir()
+		if userCacheDirectoryError != nil {
+			test.Fatal(userCacheDirectoryError)
 		}
 		directory = filepath.Join(base, "cohere", "prettier-oracle")
 	}
 	var report strings.Builder
-	for _, corpus := range markdownCorpora(t, roots) {
+	for _, corpus := range markdownCorpora(test, roots) {
 		root, files, options := corpus.root, corpus.files, corpus.options
 		cache := &differential.OracleCache{
 			Directory: directory,
@@ -189,16 +192,17 @@ func TestCorpusFormatMatchesOracle(t *testing.T) {
 		}
 		newOracle := func() (differential.Formatter, error) { return prettier.New(options) }
 		newCandidate := func() (differential.Formatter, error) {
-			return markdownCandidate{options: options, textToDoc: oracleTextToDoc(t, options)}, nil
+			return markdownCandidate{options: options, textToDoc: oracleTextToDoc(test, options)}, nil
 		}
 
-		compared, err := differential.Compare(root, files, newOracle, newCandidate, runtime.NumCPU(), cache)
-		if err != nil {
-			t.Fatalf("comparing %s: %v", root, err)
+		compared, compareError := differential.Compare(root, files, newOracle, newCandidate, runtime.NumCPU(), cache)
+		if compareError != nil {
+			test.Fatalf("comparing %s: %v", root, compareError)
 		}
 
 		type count struct{ identical, measured, rewriteIdentical, rewriteTotal int }
-		var all, withoutEmbed count
+		var all count
+		var withoutEmbed count
 		differences := map[string]int{}
 		var different []differential.FileResult
 		for _, result := range compared.Files {
@@ -209,9 +213,9 @@ func TestCorpusFormatMatchesOracle(t *testing.T) {
 			if !filepath.IsAbs(path) {
 				path = filepath.Join(root, path)
 			}
-			source, err := os.ReadFile(path)
-			if err != nil {
-				t.Fatal(err)
+			source, readError := os.ReadFile(path)
+			if readError != nil {
+				test.Fatal(readError)
 			}
 			embedded := dependsOnEmbed(string(source))
 			for _, tally := range []*count{&all, &withoutEmbed} {
@@ -243,27 +247,34 @@ func TestCorpusFormatMatchesOracle(t *testing.T) {
 			}
 			return 100 * float64(part) / float64(whole)
 		}
-		t.Logf("%s: md %d/%d identical (%.2f%%), rewrite subset %d/%d (%.2f%%)",
+		test.Logf("%s: md %d/%d identical (%.2f%%), rewrite subset %d/%d (%.2f%%)",
 			root, all.identical, all.measured, percent(all.identical, all.measured),
 			all.rewriteIdentical, all.rewriteTotal, percent(all.rewriteIdentical, all.rewriteTotal))
-		t.Logf("%s without embedded-language files: md %d/%d identical (%.2f%%), rewrite subset %d/%d (%.2f%%); outcomes %v",
-			root, withoutEmbed.identical, withoutEmbed.measured, percent(withoutEmbed.identical, withoutEmbed.measured),
-			withoutEmbed.rewriteIdentical, withoutEmbed.rewriteTotal, percent(withoutEmbed.rewriteIdentical, withoutEmbed.rewriteTotal),
-			differences)
+		test.Logf(
+			"%s without embedded-language files: md %d/%d identical (%.2f%%), rewrite subset %d/%d (%.2f%%); outcomes %v",
+			root,
+			withoutEmbed.identical,
+			withoutEmbed.measured,
+			percent(withoutEmbed.identical, withoutEmbed.measured),
+			withoutEmbed.rewriteIdentical,
+			withoutEmbed.rewriteTotal,
+			percent(withoutEmbed.rewriteIdentical, withoutEmbed.rewriteTotal),
+			differences,
+		)
 
 		sort.Slice(different, func(left, right int) bool { return different[left].Path < different[right].Path })
 		for index, result := range different {
 			line := fmt.Sprintf("%s: %s: %s\n", result.Outcome, result.Path, result.Detail)
 			report.WriteString(line)
 			if index < 15 {
-				t.Log(strings.TrimSpace(line))
+				test.Log(strings.TrimSpace(line))
 			}
 		}
 	}
 
 	if path := os.Getenv("COHERE_MARKDOWN_REPORT"); path != "" {
-		if err := os.WriteFile(path, []byte(report.String()), 0o644); err != nil {
-			t.Fatal(err)
+		if writeError := os.WriteFile(path, []byte(report.String()), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 	}
 }

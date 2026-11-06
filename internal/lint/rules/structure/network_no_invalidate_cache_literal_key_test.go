@@ -9,8 +9,8 @@ import (
 const cacheKeyDeclarations = "declare const networkService: { cache: { invalidate(key: unknown): void } };\n" +
 	"declare const UserCacheKey: string;\ndeclare const PostCacheKey: string;\ndeclare const id: string;\n"
 
-func TestNetworkNoInvalidateCacheLiteralKeyFires(t *testing.T) {
-	t.Parallel()
+func TestNetworkNoInvalidateCacheLiteralKeyFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -62,23 +62,26 @@ func TestNetworkNoInvalidateCacheLiteralKeyFires(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.Run(t, NetworkNoInvalidateCacheLiteralKey, cacheFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.Run(test, NetworkNoInvalidateCacheLiteralKey, cacheFile,
 				cacheKeyDeclarations+testCase.sourceText), testCase.wantIds...)
 		})
 	}
 }
 
-func TestNetworkNoInvalidateCacheLiteralKeyStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNetworkNoInvalidateCacheLiteralKeyStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
 		sourceText string
 	}{
 		{"an imported key", "export function run() {\n    networkService.cache.invalidate(UserCacheKey);\n}\n"},
-		{"an array of imported keys", "export function run() {\n    networkService.cache.invalidate([UserCacheKey, PostCacheKey]);\n}\n"},
+		{
+			"an array of imported keys",
+			"export function run() {\n    networkService.cache.invalidate([UserCacheKey, PostCacheKey]);\n}\n",
+		},
 		{"an empty array", "export function run() {\n    networkService.cache.invalidate([]);\n}\n"},
 		{"a call with no arguments", "export function run() {\n    networkService.cache.invalidate(undefined);\n}\n"},
 		// The shape check is what these break, each in a different place.
@@ -95,13 +98,16 @@ func TestNetworkNoInvalidateCacheLiteralKeyStaysSilent(t *testing.T) {
 			"declare const svc: { cache: { clear(key: unknown): void } };\nexport function run() {\n    svc.cache.clear('users');\n}\n",
 		},
 		// A literal passed somewhere else entirely is not this rule's business.
-		{"a literal in an unrelated call", "declare function log(message: string): void;\nexport function run() {\n    log('users');\n}\n"},
+		{
+			"a literal in an unrelated call",
+			"declare function log(message: string): void;\nexport function run() {\n    log('users');\n}\n",
+		},
 		{"no calls at all", "export const Value = 1;\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NetworkNoInvalidateCacheLiteralKey, cacheFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NetworkNoInvalidateCacheLiteralKey, cacheFile,
 				cacheKeyDeclarations+testCase.sourceText))
 		})
 	}

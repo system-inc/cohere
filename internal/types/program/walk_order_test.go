@@ -9,6 +9,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/lint/testing"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
@@ -29,12 +30,12 @@ import (
 // The fixture is shaped so the unsorted walk fails deterministically rather than by scheduling luck:
 // one rule reports a file's declarations last to first from the file node, which no merge order can
 // put in position order, and the rule that sorts first by name is dispatched second.
-func TestWalkReturnsFindingsInFileThenPositionOrder(t *testing.T) {
-	t.Parallel()
+func TestWalkReturnsFindingsInFileThenPositionOrder(test *testing.T) {
+	test.Parallel()
 	const fileCount = 12
 	const declarationCount = 3
 
-	files := map[string]string{"tsconfig.json": minimalConfig}
+	files := map[string]string{"tsconfig.json": minimalConfiguration}
 	for fileIndex := range fileCount {
 		var text strings.Builder
 		for declarationIndex := range declarationCount {
@@ -42,11 +43,11 @@ func TestWalkReturnsFindingsInFileThenPositionOrder(t *testing.T) {
 		}
 		files[fmt.Sprintf("file%02d.ts", fileIndex)] = text.String()
 	}
-	directory := writeProject(t, files)
+	directory := writeProject(test, files)
 
-	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
-	if err != nil {
-		t.Fatalf("building: %v", err)
+	graph, buildError := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
+	if buildError != nil {
+		test.Fatalf("building: %v", buildError)
 	}
 
 	declarationName := func(node *ast.Node) string {
@@ -55,19 +56,19 @@ func TestWalkReturnsFindingsInFileThenPositionOrder(t *testing.T) {
 
 	// Dispatched first, sorts last: reports every declaration twice, message `b` before `a`, so the
 	// message id is the only thing separating the pair.
-	forward := rule.Rule{
+	forward := rule.Rule[rule.NoOptions]{
 		Name: "zeta-forward",
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {
-				ctx.ReportNode(node, rule.Message{Id: "b", Description: declarationName(node)})
-				ctx.ReportNode(node, rule.Message{Id: "a", Description: declarationName(node)})
+				ruleContext.ReportNode(node, rule.Message{Id: "b", Description: declarationName(node)})
+				ruleContext.ReportNode(node, rule.Message{Id: "a", Description: declarationName(node)})
 			}}
 		},
 	}
 	// Dispatched second, sorts first: reports from the file node, last declaration first.
-	reverse := rule.Rule{
+	reverse := rule.Rule[rule.NoOptions]{
 		Name: "alpha-reverse",
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
 				var declarations []*ast.Node
 				var collect func(*ast.Node)
@@ -83,7 +84,10 @@ func TestWalkReturnsFindingsInFileThenPositionOrder(t *testing.T) {
 				collect(node)
 				slices.Reverse(declarations)
 				for _, declaration := range declarations {
-					ctx.ReportNode(declaration, rule.Message{Id: "only", Description: declarationName(declaration)})
+					ruleContext.ReportNode(
+						declaration,
+						rule.Message{Id: "only", Description: declarationName(declaration)},
+					)
 				}
 			}}
 		},
@@ -113,9 +117,13 @@ func TestWalkReturnsFindingsInFileThenPositionOrder(t *testing.T) {
 
 	var first []string
 	for run := range 5 {
-		result, err := graph.Walk(context.Background(), graph.ProjectFiles(), []rule.Rule{forward, reverse})
-		if err != nil {
-			t.Fatalf("walking: %v", err)
+		result, walkError := graph.Walk(
+			context.Background(),
+			graph.ProjectFiles(),
+			rule_testing.EntriesOf(test, forward, reverse),
+		)
+		if walkError != nil {
+			test.Fatalf("walking: %v", walkError)
 		}
 		got := describe(result)
 
@@ -124,24 +132,24 @@ func TestWalkReturnsFindingsInFileThenPositionOrder(t *testing.T) {
 		slices.Sort(sortedGot)
 		slices.Sort(sortedWant)
 		if !slices.Equal(sortedGot, sortedWant) {
-			t.Fatalf("run %d returned %d findings, want the %d the fixture produces; the set changed, "+
+			test.Fatalf("run %d returned %d findings, want the %d the fixture produces; the set changed, "+
 				"which no ordering fix is allowed to do", run, len(got), len(want))
 		}
 
 		// Order: the stated order, not merely the same order twice.
 		if !slices.Equal(got, want) {
-			t.Fatalf("run %d returned findings out of file-then-position order\n got: %s\nwant: %s",
+			test.Fatalf("run %d returned findings out of file-then-position order\n got: %s\nwant: %s",
 				run, strings.Join(got[:min(len(got), 9)], " | "), strings.Join(want[:9], " | "))
 		}
 
 		// Reproducibility across runs, with its own vacuity control: two empty runs agree trivially.
 		if run == 0 {
 			if len(got) == 0 {
-				t.Fatal("the first run returned no findings, so comparing runs would prove nothing")
+				test.Fatal("the first run returned no findings, so comparing runs would prove nothing")
 			}
 			first = got
 		} else if !slices.Equal(got, first) {
-			t.Fatalf("run %d returned a different sequence from run 0", run)
+			test.Fatalf("run %d returned a different sequence from run 0", run)
 		}
 	}
 }

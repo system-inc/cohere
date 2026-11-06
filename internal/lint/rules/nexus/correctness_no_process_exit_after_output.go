@@ -1,12 +1,9 @@
 package nexus
 
 import (
-	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/control_flow_graph"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/property"
 	"github.com/system-inc/cohere/internal/lint/rule"
@@ -17,7 +14,10 @@ const correctnessNoProcessExitAfterOutputId = "exitAfterOutput"
 
 // correctnessNoProcessExitAfterOutputText is the rule's message, whose wording lives in
 // `policy/messages/correctness-no-process-exit-after-output.json`.
-var correctnessNoProcessExitAfterOutputText = policy.MessageOf("nexus/correctness-no-process-exit-after-output", correctnessNoProcessExitAfterOutputId)
+var correctnessNoProcessExitAfterOutputText = policy.MessageOf(
+	"nexus/correctness-no-process-exit-after-output",
+	correctnessNoProcessExitAfterOutputId,
+)
 
 func correctnessNoProcessExitAfterOutputMessage() rule.Message {
 	return rule.Message{
@@ -142,20 +142,20 @@ func correctnessNoProcessExitAfterOutputMessage() rule.Message {
 // an exit inside a loop or a nested block needs the function to leave from there, and an exit used as
 // `never` (`if(!value) { console.error(...); process.exit(1); } use(value);`) narrows a type that a
 // `return` has to keep narrowed. A fixer would get some of those wrong.
-var CorrectnessNoProcessExitAfterOutput = rule.Rule{
+var CorrectnessNoProcessExitAfterOutput = rule.Rule[rule.NoOptions]{
 	Name: "nexus/correctness-no-process-exit-after-output",
 
 	// Symbol identity is what tells the global `console` from a local one, `NodeJS.Process.exit` from
 	// any other `exit`, and the process's own `stdout` from any other stream with a `write`.
 	NeedsTypeChecker: true,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.TypeChecker == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		if ruleContext.TypeChecker == nil {
 			return nil
 		}
 		return rule.Listeners{
 			ast.KindSourceFile: func(sourceFile *ast.Node) {
-				correctnessNoProcessExitAfterOutputScanFile(ctx, sourceFile)
+				correctnessNoProcessExitAfterOutputScanFile(ruleContext, sourceFile)
 			},
 		}
 	},
@@ -192,8 +192,8 @@ type correctnessNoProcessExitAfterOutputRoot struct {
 	hasWrite bool
 }
 
-func correctnessNoProcessExitAfterOutputScanFile(ctx rule.Context, sourceFile *ast.Node) {
-	writers := correctnessNoProcessExitAfterOutputWriters{ctx: ctx, byDeclaration: map[*ast.Node]bool{}}
+func correctnessNoProcessExitAfterOutputScanFile(ruleContext rule.Context, sourceFile *ast.Node) {
+	writers := correctnessNoProcessExitAfterOutputWriters{ruleContext: ruleContext, byDeclaration: map[*ast.Node]bool{}}
 	rootsByNode := map[*ast.Node]*correctnessNoProcessExitAfterOutputRoot{}
 	var roots []*correctnessNoProcessExitAfterOutputRoot
 	rootFor := func(call *ast.Node) *correctnessNoProcessExitAfterOutputRoot {
@@ -215,7 +215,7 @@ func correctnessNoProcessExitAfterOutputScanFile(ctx rule.Context, sourceFile *a
 	// file took the rule's run on ahra from 2.5s to 4.2s.
 	var findExits func(node *ast.Node) bool
 	findExits = func(node *ast.Node) bool {
-		if node.Kind == ast.KindCallExpression && correctnessNoProcessExitAfterOutputIsExit(ctx, node) {
+		if node.Kind == ast.KindCallExpression && correctnessNoProcessExitAfterOutputIsExit(ruleContext, node) {
 			if root := rootFor(node); root != nil {
 				root.exits = append(root.exits, node)
 			}
@@ -231,7 +231,9 @@ func correctnessNoProcessExitAfterOutputScanFile(ctx rule.Context, sourceFile *a
 	var findWrites func(node *ast.Node) bool
 	findWrites = func(node *ast.Node) bool {
 		if node.Kind == ast.KindCallExpression {
-			if root := rootsByNode[control_flow_graph.RootOf(node)]; root != nil && !root.hasWrite && writers.writes(node) {
+			if root := rootsByNode[control_flow_graph.RootOf(
+				node,
+			)]; root != nil && !root.hasWrite && writers.writes(node) {
 				root.hasWrite = true
 			}
 		}
@@ -242,22 +244,22 @@ func correctnessNoProcessExitAfterOutputScanFile(ctx rule.Context, sourceFile *a
 
 	for _, root := range roots {
 		if len(root.exits) > 0 && root.hasWrite {
-			correctnessNoProcessExitAfterOutputAnalyzeRoot(ctx, root, writers)
+			correctnessNoProcessExitAfterOutputAnalyzeRoot(ruleContext, root, writers)
 		}
 	}
 }
 
 // correctnessNoProcessExitAfterOutputIsExit says whether a call is `NodeJS.Process.exit`, reached
 // through any receiver or an imported binding.
-func correctnessNoProcessExitAfterOutputIsExit(ctx rule.Context, call *ast.Node) bool {
+func correctnessNoProcessExitAfterOutputIsExit(ruleContext rule.Context, call *ast.Node) bool {
 	callee := ast.SkipParentheses(call.AsCallExpression().Expression)
 	name := correctnessNoProcessExitAfterOutputMemberName(callee)
-	return name != nil && name.Text() == "exit" && correctnessNoProcessExitAfterOutputIsProcessMember(ctx, name)
+	return name != nil && name.Text() == "exit" && correctnessNoProcessExitAfterOutputIsProcessMember(ruleContext, name)
 }
 
 // correctnessNoProcessExitAfterOutputIsWrite says whether a call writes to stdout or stderr: a
 // writing method of the global console, or `write` on the process's own `stdout` or `stderr`.
-func correctnessNoProcessExitAfterOutputIsWrite(ctx rule.Context, call *ast.Node) bool {
+func correctnessNoProcessExitAfterOutputIsWrite(ruleContext rule.Context, call *ast.Node) bool {
 	callee := ast.SkipParentheses(call.AsCallExpression().Expression)
 	if callee.Kind != ast.KindPropertyAccessExpression && callee.Kind != ast.KindElementAccessExpression {
 		return false
@@ -274,76 +276,16 @@ func correctnessNoProcessExitAfterOutputIsWrite(ctx rule.Context, call *ast.Node
 	}
 	if correctnessNoProcessExitAfterOutputConsoleMethods[member] && receiver.Kind == ast.KindIdentifier &&
 		receiver.Text() == "console" {
-		return correctnessNoProcessExitAfterOutputIsGlobalVariable(ctx.TypeChecker.GetSymbolAtLocation(receiver))
+		return correctnessNoProcessExitAfterOutputIsGlobalVariable(
+			ruleContext.TypeChecker.GetSymbolAtLocation(receiver),
+		)
 	}
 	if member != "write" {
 		return false
 	}
 	stream := correctnessNoProcessExitAfterOutputMemberName(receiver)
 	return stream != nil && (stream.Text() == "stdout" || stream.Text() == "stderr") &&
-		correctnessNoProcessExitAfterOutputIsProcessMember(ctx, stream)
-}
-
-// correctnessNoProcessExitAfterOutputWriters answers whether a call writes, directly or through one
-// callee, remembering each callee's answer for the file.
-type correctnessNoProcessExitAfterOutputWriters struct {
-	ctx           rule.Context
-	byDeclaration map[*ast.Node]bool
-}
-
-// writes says whether a call writes to stdout or stderr itself, or runs a callee whose own body does.
-func (writers correctnessNoProcessExitAfterOutputWriters) writes(call *ast.Node) bool {
-	if correctnessNoProcessExitAfterOutputIsWrite(writers.ctx, call) {
-		return true
-	}
-	callee := writers.followedCallee(call)
-	if callee == nil {
-		return false
-	}
-	answer, known := writers.byDeclaration[callee]
-	if !known {
-		answer = correctnessNoProcessExitAfterOutputBodyWrites(writers.ctx, callee)
-		writers.byDeclaration[callee] = answer
-	}
-	return answer
-}
-
-// followedCallee is the function a call runs, when the rule reads its body: see the rule's doc
-// comment for each refusal. Nil means the call is not followed.
-func (writers correctnessNoProcessExitAfterOutputWriters) followedCallee(call *ast.Node) *ast.Node {
-	signature := writers.ctx.TypeChecker.GetResolvedSignature(call)
-	if signature == nil {
-		return nil
-	}
-	declaration := signature.Declaration()
-	if declaration == nil {
-		return nil
-	}
-	switch declaration.Kind {
-	case ast.KindFunctionDeclaration, ast.KindFunctionExpression, ast.KindArrowFunction, ast.KindMethodDeclaration:
-	default:
-		return nil
-	}
-	if declaration.Body() == nil {
-		return nil
-	}
-	file := ast.GetSourceFileOfNode(declaration)
-	// A declaration file needs no test of its own: it has no bodies, so the check above refused it
-	if file == nil || (file != writers.ctx.SourceFile && !ast.IsExternalModule(file)) {
-		return nil
-	}
-	flags := ast.GetFunctionFlags(declaration)
-	if flags&ast.FunctionFlagsGenerator != 0 {
-		return nil
-	}
-	if flags&ast.FunctionFlagsAsync != 0 && !correctnessNoProcessExitAfterOutputIsAwaited(call) {
-		return nil
-	}
-	returnType := writers.ctx.TypeChecker.GetReturnTypeOfSignature(signature)
-	if returnType != nil && returnType.Flags()&checker.TypeFlagsNever != 0 {
-		return nil
-	}
-	return declaration
+		correctnessNoProcessExitAfterOutputIsProcessMember(ruleContext, stream)
 }
 
 // correctnessNoProcessExitAfterOutputIsAwaited says whether a call is the operand of an `await`,
@@ -359,7 +301,7 @@ func correctnessNoProcessExitAfterOutputIsAwaited(call *ast.Node) bool {
 // correctnessNoProcessExitAfterOutputBodyWrites says whether a function's own body, nested functions
 // aside, makes a write and never exits. A body that exits is not read as a write: the caller's exit
 // after it may never run.
-func correctnessNoProcessExitAfterOutputBodyWrites(ctx rule.Context, function *ast.Node) bool {
+func correctnessNoProcessExitAfterOutputBodyWrites(ruleContext rule.Context, function *ast.Node) bool {
 	wrote, exits := false, false
 	var visit func(node *ast.Node) bool
 	visit = func(node *ast.Node) bool {
@@ -367,11 +309,11 @@ func correctnessNoProcessExitAfterOutputBodyWrites(ctx rule.Context, function *a
 			return exits
 		}
 		if node.Kind == ast.KindCallExpression {
-			if correctnessNoProcessExitAfterOutputIsExit(ctx, node) {
+			if correctnessNoProcessExitAfterOutputIsExit(ruleContext, node) {
 				exits = true
 				return true
 			}
-			if correctnessNoProcessExitAfterOutputIsWrite(ctx, node) {
+			if correctnessNoProcessExitAfterOutputIsWrite(ruleContext, node) {
 				wrote = true
 			}
 		}
@@ -407,10 +349,10 @@ func correctnessNoProcessExitAfterOutputMemberName(expression *ast.Node) *ast.No
 // correctnessNoProcessExitAfterOutputIsProcessMember says whether a name resolves, through an import
 // alias when it is one, to a member declared on `NodeJS.Process` in a declaration file and nowhere
 // else: the interface `@types/node` gives the global `process`.
-func correctnessNoProcessExitAfterOutputIsProcessMember(ctx rule.Context, name *ast.Node) bool {
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(name)
+func correctnessNoProcessExitAfterOutputIsProcessMember(ruleContext rule.Context, name *ast.Node) bool {
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(name)
 	if symbol != nil && symbol.Flags&ast.SymbolFlagsAlias != 0 {
-		symbol = ctx.TypeChecker.GetAliasedSymbol(symbol)
+		symbol = ruleContext.TypeChecker.GetAliasedSymbol(symbol)
 	}
 	if symbol == nil || len(symbol.Declarations) == 0 || !rule.IsDeclaredOnlyInDeclarationFiles(symbol) {
 		return false
@@ -420,11 +362,17 @@ func correctnessNoProcessExitAfterOutputIsProcessMember(ctx rule.Context, name *
 			return false
 		}
 		owner := declaration.Parent
-		if owner == nil || owner.Kind != ast.KindInterfaceDeclaration || owner.Name() == nil || owner.Name().Text() != "Process" {
+		if owner == nil ||
+			owner.Kind != ast.KindInterfaceDeclaration ||
+			owner.Name() == nil ||
+			owner.Name().Text() != "Process" {
 			return false
 		}
 		block := owner.Parent
-		if block == nil || block.Kind != ast.KindModuleBlock || block.Parent == nil || block.Parent.Kind != ast.KindModuleDeclaration {
+		if block == nil ||
+			block.Kind != ast.KindModuleBlock ||
+			block.Parent == nil ||
+			block.Parent.Kind != ast.KindModuleDeclaration {
 			return false
 		}
 		namespace := block.Parent.Name()
@@ -458,7 +406,9 @@ func correctnessNoProcessExitAfterOutputIsGlobalVariable(symbol *ast.Symbol) boo
 			if ast.IsExternalModule(container.AsSourceFile()) {
 				return false
 			}
-		case container != nil && container.Kind == ast.KindModuleBlock && ast.IsGlobalScopeAugmentation(container.Parent):
+		case container != nil &&
+			container.Kind == ast.KindModuleBlock &&
+			ast.IsGlobalScopeAugmentation(container.Parent):
 		default:
 			return false
 		}
@@ -468,14 +418,14 @@ func correctnessNoProcessExitAfterOutputIsGlobalVariable(symbol *ast.Symbol) boo
 
 // correctnessNoProcessExitAfterOutputHoldsExit says whether an exit runs inside node, in the same
 // code path root: an exit inside a nested function runs when that function is called, not here.
-func correctnessNoProcessExitAfterOutputHoldsExit(ctx rule.Context, node *ast.Node) bool {
+func correctnessNoProcessExitAfterOutputHoldsExit(ruleContext rule.Context, node *ast.Node) bool {
 	held := false
 	var visit func(child *ast.Node) bool
 	visit = func(child *ast.Node) bool {
 		if held || control_flow_graph.IsRoot(child) {
 			return held
 		}
-		if child.Kind == ast.KindCallExpression && correctnessNoProcessExitAfterOutputIsExit(ctx, child) {
+		if child.Kind == ast.KindCallExpression && correctnessNoProcessExitAfterOutputIsExit(ruleContext, child) {
 			held = true
 			return true
 		}
@@ -502,29 +452,38 @@ func correctnessNoProcessExitAfterOutputInCatchBinding(node *ast.Node, root *ast
 // correctnessNoProcessExitAfterOutputAnalyzeRoot builds one root's graph, walks it from the entry,
 // and reports each exit some path reaches having written.
 func correctnessNoProcessExitAfterOutputAnalyzeRoot(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	root *correctnessNoProcessExitAfterOutputRoot,
 	writers correctnessNoProcessExitAfterOutputWriters,
 ) {
 	type builder = control_flow_graph.Builder[correctnessNoProcessExitAfterOutputEvent]
 	recorded := map[*ast.Node]bool{}
 	graph := control_flow_graph.Build(root.node, control_flow_graph.Hooks[correctnessNoProcessExitAfterOutputEvent]{
-		Expression: func(b *builder, node *ast.Node) {
-			if node.Kind != ast.KindCallExpression || correctnessNoProcessExitAfterOutputInCatchBinding(node, root.node) {
+		Expression: func(graphBuilder *builder, node *ast.Node) {
+			if node.Kind != ast.KindCallExpression ||
+				correctnessNoProcessExitAfterOutputInCatchBinding(node, root.node) {
 				return
 			}
-			if correctnessNoProcessExitAfterOutputIsExit(ctx, node) {
+			if correctnessNoProcessExitAfterOutputIsExit(ruleContext, node) {
 				recorded[node] = true
-				b.Emit(correctnessNoProcessExitAfterOutputEvent{kind: correctnessNoProcessExitAfterOutputExit, node: node})
+				graphBuilder.Emit(
+					correctnessNoProcessExitAfterOutputEvent{kind: correctnessNoProcessExitAfterOutputExit, node: node},
+				)
 				return
 			}
-			if writers.writes(node) && !correctnessNoProcessExitAfterOutputHoldsExit(ctx, node) {
-				b.Emit(correctnessNoProcessExitAfterOutputEvent{kind: correctnessNoProcessExitAfterOutputWrite, node: node})
+			if writers.writes(node) && !correctnessNoProcessExitAfterOutputHoldsExit(ruleContext, node) {
+				graphBuilder.Emit(correctnessNoProcessExitAfterOutputEvent{
+					kind: correctnessNoProcessExitAfterOutputWrite,
+					node: node,
+				})
 			}
 		},
-		Statement: func(b *builder, node *ast.Node) {
+		Statement: func(graphBuilder *builder, node *ast.Node) {
 			if node.Kind == ast.KindBlock && node.Parent != nil && node.Parent.Kind == ast.KindCatchClause {
-				b.Emit(correctnessNoProcessExitAfterOutputEvent{kind: correctnessNoProcessExitAfterOutputCatchEntered, node: node.Parent.Parent})
+				graphBuilder.Emit(correctnessNoProcessExitAfterOutputEvent{
+					kind: correctnessNoProcessExitAfterOutputCatchEntered,
+					node: node.Parent.Parent,
+				})
 			}
 		},
 	})
@@ -534,7 +493,11 @@ func correctnessNoProcessExitAfterOutputAnalyzeRoot(
 		}
 	}
 
-	walk := correctnessNoProcessExitAfterOutputWalk{root: root.node, chains: map[*ast.Node]string{}, tries: map[*ast.Node]int{}}
+	walk := correctnessNoProcessExitAfterOutputWalk{
+		root:   root.node,
+		chains: map[*ast.Node]string{},
+		tries:  map[*ast.Node]int{},
+	}
 	reported := map[*ast.Node]bool{}
 	type position struct {
 		block *control_flow_graph.Block[correctnessNoProcessExitAfterOutputEvent]
@@ -586,63 +549,10 @@ func correctnessNoProcessExitAfterOutputAnalyzeRoot(
 
 	for _, exit := range root.exits {
 		if reported[exit] {
-			ctx.ReportNode(exit, correctnessNoProcessExitAfterOutputMessage())
+			ruleContext.ReportNode(exit, correctnessNoProcessExitAfterOutputMessage())
 		}
 	}
 }
-
-// correctnessNoProcessExitAfterOutputWalk names the `try` statements of one root and the chain of
-// them each write sits in.
-type correctnessNoProcessExitAfterOutputWalk struct {
-	root   *ast.Node
-	chains map[*ast.Node]string
-	tries  map[*ast.Node]int
-}
-
-func (walk *correctnessNoProcessExitAfterOutputWalk) tryId(statement *ast.Node) int {
-	id, seen := walk.tries[statement]
-	if !seen {
-		id = len(walk.tries)
-		walk.tries[statement] = id
-	}
-	return id
-}
-
-// chainOf is the set of `try` statements, with a `catch`, whose `try` block holds the write: the
-// statements whose `catch` a path may enter with the write made or with the write the thing that
-// threw. It is written as sorted ids, `,`-separated, with a `,` at each end so a membership test is
-// a substring test.
-func (walk *correctnessNoProcessExitAfterOutputWalk) chainOf(write *ast.Node) string {
-	if chain, seen := walk.chains[write]; seen {
-		return chain
-	}
-	var ids []int
-	previous := write
-	for current := write.Parent; current != nil && current != walk.root; current = current.Parent {
-		if current.Kind == ast.KindTryStatement {
-			statement := current.AsTryStatement()
-			if statement.TryBlock == previous && statement.CatchClause != nil {
-				ids = append(ids, walk.tryId(current))
-			}
-		}
-		previous = current
-	}
-	sort.Ints(ids)
-	var chain strings.Builder
-	chain.WriteString(",")
-	for _, id := range ids {
-		chain.WriteString(strconv.Itoa(id))
-		chain.WriteString(",")
-	}
-	walk.chains[write] = chain.String()
-	return walk.chains[write]
-}
-
-// correctnessNoProcessExitAfterOutputState is what one path carries: the chains of the writes made on
-// it that a `catch` could still take back, kept minimal. A chain that is a subset of another is
-// forgotten by every `catch` the other is, so the larger one is dropped; the empty chain, `,`, is a
-// write no `catch` takes back, and once a path holds it the path has written for good.
-type correctnessNoProcessExitAfterOutputState []string
 
 func correctnessNoProcessExitAfterOutputChainHolds(outer string, inner string) bool {
 	for _, id := range strings.Split(strings.Trim(inner, ","), ",") {
@@ -651,35 +561,4 @@ func correctnessNoProcessExitAfterOutputChainHolds(outer string, inner string) b
 		}
 	}
 	return true
-}
-
-func (state correctnessNoProcessExitAfterOutputState) with(chain string) correctnessNoProcessExitAfterOutputState {
-	next := correctnessNoProcessExitAfterOutputState{}
-	for _, held := range state {
-		if correctnessNoProcessExitAfterOutputChainHolds(chain, held) {
-			// Something already held is forgotten only where this one is too.
-			return state
-		}
-		if !correctnessNoProcessExitAfterOutputChainHolds(held, chain) {
-			next = append(next, held)
-		}
-	}
-	next = append(next, chain)
-	sort.Strings(next)
-	return next
-}
-
-func (state correctnessNoProcessExitAfterOutputState) entering(try int) correctnessNoProcessExitAfterOutputState {
-	member := "," + strconv.Itoa(try) + ","
-	next := correctnessNoProcessExitAfterOutputState{}
-	for _, held := range state {
-		if !strings.Contains(held, member) {
-			next = append(next, held)
-		}
-	}
-	return next
-}
-
-func (state correctnessNoProcessExitAfterOutputState) key() string {
-	return strings.Join(state, "|")
 }

@@ -19,9 +19,9 @@ import (
 // emptiness is a whole-container check, so on an array-typed property it evaluates the array itself
 // and rejects `[]`. It therefore satisfies parity on its own.
 //
-// Its membership is REDUNDANT with the unknown-rule arm, and that took a paired mutation to see.
-// Removing the name from this set alone SURVIVES every fixture, because the name then falls through
-// to the unrecognised branch, which also suppresses. Removing it here AND adding it to the
+// Its membership is redundant with the unknown-rule arm, and that took a paired mutation to see.
+// Removing the name from this set alone survives every fixture, because the name then falls through
+// to the unrecognised branch, which also suppresses. Removing it here and adding it to the
 // known-non-value set fails 5 lines. So the two sites cover for each other, and the name is kept
 // here because this is where it belongs semantically rather than because only this placement works.
 var verifyArrayLevelDecorators = map[string]struct{}{
@@ -34,7 +34,7 @@ var verifyArrayLevelDecorators = map[string]struct{}{
 
 // verifyKnownValueLevelDecorators are the built-in rules that auto-iterate array elements.
 //
-// The rule reports only when one of THESE is present, which is a deliberate narrowing rather than a
+// The rule reports only when one of these is present, which is a deliberate narrowing rather than a
 // convenience: a custom `VerifyBy` rule's target cannot be read statically and may well be
 // array-level, so keying on a known list is what keeps it from producing a false positive.
 var verifyKnownValueLevelDecorators = map[string]struct{}{
@@ -68,7 +68,7 @@ var verifyKnownValueLevelDecorators = map[string]struct{}{
 // verifyKnownNonValueDecorators are the names that are known and are not value-level element rules:
 // every array-level rule, the optional sentinel, and the custom-rule factory.
 //
-// A `Verify*` name in NEITHER this set nor the value-level set is an unrecognised custom rule, and
+// A `Verify*` name in neither this set nor the value-level set is an unrecognised custom rule, and
 // the rule suppresses on it. That is the whole reason this third set exists rather than testing the
 // value-level set alone.
 var verifyKnownNonValueDecorators = func() map[string]struct{} {
@@ -81,7 +81,10 @@ var verifyKnownNonValueDecorators = func() map[string]struct{} {
 
 // correctnessRequireVerifyArrayParityText is the rule's message, whose wording lives in
 // `policy/messages/correctness-require-verify-array-parity.json`.
-var correctnessRequireVerifyArrayParityText = policy.MessageOf("base/correctness-require-verify-array-parity", "missingArrayRule")
+var correctnessRequireVerifyArrayParityText = policy.MessageOf(
+	"base/correctness-require-verify-array-parity",
+	"missingArrayRule",
+)
 
 // CorrectnessRequireVerifyArrayParity requires an array-typed property with value-level rules to declare an
 // array-level rule too.
@@ -95,7 +98,7 @@ var correctnessRequireVerifyArrayParityText = policy.MessageOf("base/correctness
 // # Three sets, and the third is what prevents a false positive
 //
 // A decorator is array-level, a known value-level rule, or neither. The first suppresses, the
-// second arms the finding, and the third ALSO suppresses: an unrecognised `Verify*` name is a
+// second arms the finding, and the third also suppresses: an unrecognised `Verify*` name is a
 // custom rule whose target cannot be read from the source, and it may itself be array-level.
 // Collapsing that third case into "ignore it" would report every property carrying a custom rule
 // alongside a built-in one.
@@ -119,7 +122,7 @@ var correctnessRequireVerifyArrayParityText = policy.MessageOf("base/correctness
 //
 // The original ships none and says why: which array-level decorator to add is a judgment call, and
 // `@VerifyIsArray()` is only the most common answer rather than the right one everywhere.
-var CorrectnessRequireVerifyArrayParity = rule.Rule{
+var CorrectnessRequireVerifyArrayParity = rule.Rule[rule.NoOptions]{
 	Name: "base/correctness-require-verify-array-parity",
 
 	// Whether the property is array-typed is a question only the checker can answer, since the
@@ -127,10 +130,10 @@ var CorrectnessRequireVerifyArrayParity = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindPropertyDeclaration: func(node *ast.Node) {
-				checkVerifyArrayParity(ctx, node, node.Name())
+				checkVerifyArrayParity(ruleContext, node, node.Name())
 			},
 			// A constructor parameter property. See isBaseParameterProperty for why the parameter
 			// kind carries both forms here where the original has a node kind of its own.
@@ -138,15 +141,15 @@ var CorrectnessRequireVerifyArrayParity = rule.Rule{
 				if !isBaseParameterProperty(node) {
 					return
 				}
-				checkVerifyArrayParity(ctx, node, node.Name())
+				checkVerifyArrayParity(ruleContext, node, node.Name())
 			},
 		}
 	},
 }
 
 // checkVerifyArrayParity judges one property or parameter property.
-func checkVerifyArrayParity(ctx rule.Context, node *ast.Node, key *ast.Node) {
-	if ctx.TypeChecker == nil || key == nil || !ast.IsIdentifier(key) {
+func checkVerifyArrayParity(ruleContext rule.Context, node *ast.Node, key *ast.Node) {
+	if ruleContext.TypeChecker == nil || key == nil || !ast.IsIdentifier(key) {
 		return
 	}
 
@@ -175,11 +178,11 @@ func checkVerifyArrayParity(ctx rule.Context, node *ast.Node, key *ast.Node) {
 		return
 	}
 
-	if !verifyTypeIsArray(ctx.TypeChecker, ctx.TypeChecker.GetTypeAtLocation(key)) {
+	if !verifyTypeIsArray(ruleContext.TypeChecker, ruleContext.TypeChecker.GetTypeAtLocation(key)) {
 		return
 	}
 
-	ctx.ReportNode(key, rule.Message{
+	ruleContext.ReportNode(key, rule.Message{
 		Id:          correctnessRequireVerifyArrayParityText.Id,
 		Description: correctnessRequireVerifyArrayParityText.Render(map[string]string{"propertyName": key.Text()}),
 	})
@@ -194,7 +197,7 @@ func verifyTypeIsArray(typeChecker *checker.Checker, subject *checker.Type) bool
 	if subject == nil {
 		return false
 	}
-	for part := range type_checking.UnionTypePartsSeq(subject) {
+	for part := range type_checking.UnionTypePartsSequence(subject) {
 		if checker.Checker_isArrayType(typeChecker, part) || checker.IsTupleType(part) {
 			return true
 		}

@@ -12,10 +12,10 @@ const preferNamespaceKeywordFile = "/repository/source/Namespaces.ts"
 // with the finding count recovered from the snapshot rather than assumed to be one per input.
 //
 // The snapshot carries six diagnostics across five inputs. The extra one is the brace-nested
-// case, which reports twice: nesting a module declaration inside another module BLOCK is not
+// case, which reports twice: nesting a module declaration inside another module block is not
 // exempt. Only the dotted form is, and the two look alike in source while parsing differently.
-func TestPreferNamespaceKeywordFires(t *testing.T) {
-	t.Parallel()
+func TestPreferNamespaceKeywordFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -25,18 +25,26 @@ func TestPreferNamespaceKeywordFires(t *testing.T) {
 		{"a bare module declaration", "module foo {}", 1},
 		{"a dotted module declaration reports once for the whole chain", "module A.B {}", 1},
 		{"an ambient module declaration with an identifier name", "declare module foo {}", 1},
-		{"a module nested in a module block reports for each", "\n        declare module foo {\n          module bar {}\n        }\n        ", 2},
-		{"a module inside a global augmentation", "\n        declare global {\n            module foo {}\n        }\n        ", 1},
+		{
+			"a module nested in a module block reports for each",
+			"\n        declare module foo {\n          module bar {}\n        }\n        ",
+			2,
+		},
+		{
+			"a module inside a global augmentation",
+			"\n        declare global {\n            module foo {}\n        }\n        ",
+			1,
+		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, PreferNamespaceKeyword, preferNamespaceKeywordFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, PreferNamespaceKeyword, preferNamespaceKeywordFile, testCase.sourceText)
 			expected := make([]string, testCase.count)
 			for index := range expected {
 				expected[index] = "preferNamespaceKeyword"
 			}
-			rule_testing.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(test, result, expected...)
 		})
 	}
 }
@@ -49,8 +57,8 @@ func TestPreferNamespaceKeywordFires(t *testing.T) {
 // types, so its rule never sees them and needs no guard. typescript-go folds all of it into one
 // KindModuleDeclaration, so every exemption oxc gets from its grammar is a test this rule has to
 // perform by hand. These five are the only fixtures standing over those hand-written guards.
-func TestPreferNamespaceKeywordStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestPreferNamespaceKeywordStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -80,15 +88,18 @@ func TestPreferNamespaceKeywordStaysSilent(t *testing.T) {
 		// `declare` cannot tell which of the two did the work.
 		{"a module with a quoted name and no declare modifier", "module \"foo\" {}"},
 
-		// `global` is a keyword form here, not a name. `module global {}` REPORTS upstream, so
+		// `global` is a keyword form here, not a name. `module global {}` reports upstream, so
 		// the exemption cannot be keyed on the identifier text.
-		{"a global augmentation with statements inside", "declare global {\n  interface Window {\n    x: string;\n  }\n}"},
+		{
+			"a global augmentation with statements inside",
+			"declare global {\n  interface Window {\n    x: string;\n  }\n}",
+		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, PreferNamespaceKeyword, preferNamespaceKeywordFile, testCase.sourceText)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, PreferNamespaceKeyword, preferNamespaceKeywordFile, testCase.sourceText)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -106,8 +117,8 @@ func TestPreferNamespaceKeywordStaysSilent(t *testing.T) {
 // `declare module X.Y.module { let x: 'module'; }` puts it in a name segment and a string after
 // it. A rule that rewrote the first hit would corrupt both while still producing a finding whose
 // id and span are correct.
-func TestPreferNamespaceKeywordFixesWriteWhatTheyClaim(t *testing.T) {
-	t.Parallel()
+func TestPreferNamespaceKeywordFixesWriteWhatTheyClaim(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -116,11 +127,31 @@ func TestPreferNamespaceKeywordFixesWriteWhatTheyClaim(t *testing.T) {
 	}{
 		{"a bare module declaration", "module foo {}", "namespace foo {}"},
 		{"a dotted module declaration rewrites only the leading keyword", "module A.B {}", "namespace A.B {}"},
-		{"nested module blocks each get their own keyword rewritten", "\n            module A {\n              module B {}\n            }\n            ", "\n            namespace A {\n              namespace B {}\n            }\n            "},
-		{"an ambient module declaration keeps its declare modifier", "declare module foo {}", "declare namespace foo {}"},
-		{"an ambient module with a nested module", "\n            declare module foo {\n              module bar {}\n            }\n            ", "\n            declare namespace foo {\n              namespace bar {}\n            }\n            "},
-		{"a comment holding the word module ahead of the keyword", "declare /* module */ module foo {}", "declare /* module */ namespace foo {}"},
-		{"a name segment and a string both holding the word module", "declare module X.Y.module { let x: 'module'; }", "declare namespace X.Y.module { let x: 'module'; }"},
+		{
+			"nested module blocks each get their own keyword rewritten",
+			"\n            module A {\n              module B {}\n            }\n            ",
+			"\n            namespace A {\n              namespace B {}\n            }\n            ",
+		},
+		{
+			"an ambient module declaration keeps its declare modifier",
+			"declare module foo {}",
+			"declare namespace foo {}",
+		},
+		{
+			"an ambient module with a nested module",
+			"\n            declare module foo {\n              module bar {}\n            }\n            ",
+			"\n            declare namespace foo {\n              namespace bar {}\n            }\n            ",
+		},
+		{
+			"a comment holding the word module ahead of the keyword",
+			"declare /* module */ module foo {}",
+			"declare /* module */ namespace foo {}",
+		},
+		{
+			"a name segment and a string both holding the word module",
+			"declare module X.Y.module { let x: 'module'; }",
+			"declare namespace X.Y.module { let x: 'module'; }",
+		},
 
 		// Ours. The export modifier is outside the reported span (measured on the release
 		// binary: `export module foo {}` reports at column 8, not column 1), but the fix still
@@ -133,10 +164,10 @@ func TestPreferNamespaceKeywordFixesWriteWhatTheyClaim(t *testing.T) {
 		{"a three-segment dotted module declaration", "module A.B.C {}", "namespace A.B.C {}"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, PreferNamespaceKeyword, preferNamespaceKeywordFile, testCase.sourceText)
-			rule_testing.ExpectFixedSource(t, result, testCase.wantSource)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, PreferNamespaceKeyword, preferNamespaceKeywordFile, testCase.sourceText)
+			rule_testing.ExpectFixedSource(test, result, testCase.wantSource)
 		})
 	}
 }
@@ -154,8 +185,8 @@ func TestPreferNamespaceKeywordFixesWriteWhatTheyClaim(t *testing.T) {
 // The message strings below are literals typed here rather than references to the rule's own
 // constants. Comparing a diagnostic against the constant it was reported with is an equality
 // that cannot fail, because a mutation moves both sides together.
-func TestPreferNamespaceKeywordReportsTheRightSpanAndText(t *testing.T) {
-	t.Parallel()
+func TestPreferNamespaceKeywordReportsTheRightSpanAndText(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -167,29 +198,33 @@ func TestPreferNamespaceKeywordReportsTheRightSpanAndText(t *testing.T) {
 		{"the export modifier is outside the span", "export module foo {}", []string{"module foo {}"}},
 		{"export is skipped and declare is kept", "export declare module foo {}", []string{"declare module foo {}"}},
 		{"a dotted declaration spans the whole chain once", "module A.B {}", []string{"module A.B {}"}},
-		{"a nested declaration points at the inner module", "declare module foo {\n  module bar {}\n}", []string{"declare module foo {\n  module bar {}\n}", "module bar {}"}},
+		{
+			"a nested declaration points at the inner module",
+			"declare module foo {\n  module bar {}\n}",
+			[]string{"declare module foo {\n  module bar {}\n}", "module bar {}"},
+		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, PreferNamespaceKeyword, preferNamespaceKeywordFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, PreferNamespaceKeyword, preferNamespaceKeywordFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
-				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.wantSpans))
+				test.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.wantSpans))
 			}
 			for index, want := range testCase.wantSpans {
 				diagnostic := result.Diagnostics[index]
 				got := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if got != want {
-					t.Errorf("finding %d spans %q, want %q", index, got, want)
+					test.Errorf("finding %d spans %q, want %q", index, got, want)
 				}
 				if diagnostic.Message.Id != "preferNamespaceKeyword" {
-					t.Errorf("finding %d has id %q", index, diagnostic.Message.Id)
+					test.Errorf("finding %d has id %q", index, diagnostic.Message.Id)
 				}
 				if diagnostic.Message.Description != "This declares a namespace with the `module` "+
 					"keyword, which TypeScript has deprecated and plans to make a parse error. It "+
 					"means the same thing as `namespace` and reads as an ECMAScript module, which "+
 					"it is not. Write `namespace` instead." {
-					t.Errorf("finding %d has description %q", index, diagnostic.Message.Description)
+					test.Errorf("finding %d has description %q", index, diagnostic.Message.Description)
 				}
 			}
 		})

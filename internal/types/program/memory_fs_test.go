@@ -40,11 +40,11 @@ func inMemory(root string, files map[string]string) map[string]string {
 
 // buildReport is what a build says: the files it holds, which it calls its own, and every diagnostic with
 // its file and position, sorted.
-func buildReport(t *testing.T, options program.Options) (files []string, ours []string, diagnostics []string) {
-	t.Helper()
-	graph, err := program.Build(options)
-	if err != nil {
-		t.Fatalf("building: %v", err)
+func buildReport(test *testing.T, options program.Options) (files []string, ours []string, diagnostics []string) {
+	test.Helper()
+	graph, buildError := program.Build(options)
+	if buildError != nil {
+		test.Fatalf("building: %v", buildError)
 	}
 	root := options.CurrentDirectory
 	relative := func(fileName string) string {
@@ -74,94 +74,125 @@ func buildReport(t *testing.T, options program.Options) (files []string, ours []
 // diagnostics at the same positions as the program built from the same files on disk. The control: a
 // MemoryFS missing the imported file reports differently, so the comparison is one that can fail, and the
 // fixture's two planted type errors are reported by both, so it compares real diagnostics.
-func TestAMemoryProgramReportsWhatTheDiskProgramDoes(t *testing.T) {
-	t.Parallel()
+func TestAMemoryProgramReportsWhatTheDiskProgramDoes(test *testing.T) {
+	test.Parallel()
 	// Resolved first: the compiler reads a node_modules package by its real path, and a temporary directory
 	// on macOS sits behind the /tmp symbolic link, which nothing in memory is.
-	directory, err := filepath.EvalSymlinks(writeProject(t, memoryFixture))
-	if err != nil {
-		t.Fatal(err)
+	directory, resolveSymlinksError := filepath.EvalSymlinks(writeProject(test, memoryFixture))
+	if resolveSymlinksError != nil {
+		test.Fatal(resolveSymlinksError)
 	}
-	diskFiles, diskOurs, diskDiagnostics := buildReport(t, program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
+	diskFiles, diskOurs, diskDiagnostics := buildReport(
+		test,
+		program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory},
+	)
 
 	// The memory build sits at the same absolute root, so every file name compares as it is; nothing is
 	// read from that directory, which a second root proves below.
-	memoryFiles, memoryOurs, memoryDiagnostics := buildReport(t, program.Options{
-		ConfigFileName: "tsconfig.json", CurrentDirectory: directory, FileSystem: program.NewMemoryFS(inMemory(directory, memoryFixture)),
+	memoryFiles, memoryOurs, memoryDiagnostics := buildReport(test, program.Options{
+		ConfigFileName:   "tsconfig.json",
+		CurrentDirectory: directory,
+		FileSystem:       program.NewMemoryFileSystem(inMemory(directory, memoryFixture)),
 	})
 	if !slices.Equal(diskFiles, memoryFiles) {
-		t.Fatalf("the memory program holds different files:\ndisk   %v\nmemory %v", diskFiles, memoryFiles)
+		test.Fatalf("the memory program holds different files:\ndisk   %v\nmemory %v", diskFiles, memoryFiles)
 	}
 	if !slices.Equal(diskOurs, memoryOurs) || !slices.Equal(diskOurs, []string{"src/main.ts", "src/nested/shared.ts"}) {
-		t.Fatalf("the programs' own files differ, or are not the two included:\ndisk   %v\nmemory %v", diskOurs, memoryOurs)
+		test.Fatalf(
+			"the programs' own files differ, or are not the two included:\ndisk   %v\nmemory %v",
+			diskOurs,
+			memoryOurs,
+		)
 	}
 	if !slices.Equal(diskDiagnostics, memoryDiagnostics) {
-		t.Fatalf("the memory program reports differently:\ndisk   %v\nmemory %v", diskDiagnostics, memoryDiagnostics)
+		test.Fatalf("the memory program reports differently:\ndisk   %v\nmemory %v", diskDiagnostics, memoryDiagnostics)
 	}
 	if want := 2; len(diskDiagnostics) != want {
-		t.Fatalf("the fixture's %d planted type errors came back as %v", want, diskDiagnostics)
+		test.Fatalf("the fixture's %d planted type errors came back as %v", want, diskDiagnostics)
 	}
 
 	// A root that exists only in memory builds the same report: the build read nothing from disk.
 	elsewhere := "/cohere-memory-fixture"
-	_, elsewhereOurs, elsewhereDiagnostics := buildReport(t, program.Options{
-		ConfigFileName: "tsconfig.json", CurrentDirectory: elsewhere, FileSystem: program.NewMemoryFS(inMemory(elsewhere, memoryFixture)),
+	_, elsewhereOurs, elsewhereDiagnostics := buildReport(test, program.Options{
+		ConfigFileName:   "tsconfig.json",
+		CurrentDirectory: elsewhere,
+		FileSystem:       program.NewMemoryFileSystem(inMemory(elsewhere, memoryFixture)),
 	})
 	if !slices.Equal(elsewhereOurs, diskOurs) || !slices.Equal(elsewhereDiagnostics, diskDiagnostics) {
-		t.Fatalf("a root only memory holds reports differently:\nown %v %v\ndisk %v %v", elsewhereOurs, elsewhereDiagnostics, diskOurs, diskDiagnostics)
+		test.Fatalf(
+			"a root only memory holds reports differently:\nown %v %v\ndisk %v %v",
+			elsewhereOurs,
+			elsewhereDiagnostics,
+			diskOurs,
+			diskDiagnostics,
+		)
 	}
 
 	missing := inMemory(directory, memoryFixture)
 	delete(missing, filepath.ToSlash(filepath.Join(directory, "src/nested/shared.ts")))
-	_, _, missingDiagnostics := buildReport(t, program.Options{
-		ConfigFileName: "tsconfig.json", CurrentDirectory: directory, FileSystem: program.NewMemoryFS(missing),
+	_, _, missingDiagnostics := buildReport(test, program.Options{
+		ConfigFileName: "tsconfig.json", CurrentDirectory: directory, FileSystem: program.NewMemoryFileSystem(missing),
 	})
 	if slices.Equal(missingDiagnostics, diskDiagnostics) {
-		t.Fatalf("control: a memory program missing an imported file reported what the whole one did: %v", missingDiagnostics)
+		test.Fatalf(
+			"control: a memory program missing an imported file reported what the whole one did: %v",
+			missingDiagnostics,
+		)
 	}
 }
 
 // A MemoryFS answers as a directory tree does: each directory lists its files and subdirectories once,
 // sorted, the root included, and nothing is there that was not given. Writes fail rather than vanish.
-func TestAMemoryFSListsItsTree(t *testing.T) {
-	t.Parallel()
-	memory := program.NewMemoryFS(map[string]string{
+func TestAMemoryFileSystemListsItsTree(test *testing.T) {
+	test.Parallel()
+	memory := program.NewMemoryFileSystem(map[string]string{
 		"/project/a.ts":          "a",
 		"/project/sub/b.ts":      "b",
 		"/project/sub/c.ts":      "c",
 		"/project/sub/deep/d.ts": "d",
 		"/top.ts":                "top",
 	})
-	if entries := memory.GetAccessibleEntries("/"); !slices.Equal(entries.Files, []string{"top.ts"}) || !slices.Equal(entries.Directories, []string{"project"}) {
-		t.Errorf("the root lists %+v", entries)
+	if entries := memory.GetAccessibleEntries(
+		"/",
+	); !slices.Equal(entries.Files, []string{"top.ts"}) || !slices.Equal(entries.Directories, []string{"project"}) {
+		test.Errorf("the root lists %+v", entries)
 	}
-	if entries := memory.GetAccessibleEntries("/project/sub"); !slices.Equal(entries.Files, []string{"b.ts", "c.ts"}) || !slices.Equal(entries.Directories, []string{"deep"}) {
-		t.Errorf("a directory with two files and a subdirectory lists %+v", entries)
+	if entries := memory.GetAccessibleEntries(
+		"/project/sub",
+	); !slices.Equal(entries.Files, []string{"b.ts", "c.ts"}) || !slices.Equal(entries.Directories, []string{"deep"}) {
+		test.Errorf("a directory with two files and a subdirectory lists %+v", entries)
 	}
-	if !memory.DirectoryExists("/project/sub/deep") || memory.DirectoryExists("/project/a.ts") || memory.FileExists("/project/sub") {
-		t.Error("a file and a directory were confused")
+	if !memory.DirectoryExists("/project/sub/deep") ||
+		memory.DirectoryExists("/project/a.ts") ||
+		memory.FileExists("/project/sub") {
+		test.Error("a file and a directory were confused")
 	}
 	if contents, found := memory.ReadFile("/project/sub/../a.ts"); !found || contents != "a" {
-		t.Errorf("an unclean path read %q, %t", contents, found)
+		test.Errorf("an unclean path read %q, %t", contents, found)
 	}
 	if _, found := memory.ReadFile("/project/missing.ts"); found || memory.Stat("/project/missing.ts") != nil {
-		t.Error("a file that was never given was found")
+		test.Error("a file that was never given was found")
 	}
-	if information := memory.Stat("/project/sub/b.ts"); information == nil || information.IsDir() || information.Size() != 1 {
-		t.Errorf("a file's stat is %+v", information)
+	if information := memory.Stat(
+		"/project/sub/b.ts",
+	); information == nil || information.IsDir() || information.Size() != 1 {
+		test.Errorf("a file's stat is %+v", information)
 	}
-	if err := memory.WriteFile("/project/new.ts", "x"); err == nil || memory.FileExists("/project/new.ts") {
-		t.Error("a write to the read-only filesystem succeeded")
+	if writeFileError := memory.WriteFile(
+		"/project/new.ts",
+		"x",
+	); writeFileError == nil || memory.FileExists("/project/new.ts") {
+		test.Error("a write to the read-only filesystem succeeded")
 	}
 }
 
 // MemoryFS reads a file's bytes as the disk does, case by case against osvfs, the filesystem every real build
 // reads. A fixture holds bytes as they would sit in a file, and the compiler must see what it would see
 // there, so the corpus rows about byte order marks and irregular whitespace mean the same from memory.
-func TestMemoryFSReadsBytesAsTheDiskDoes(t *testing.T) {
-	t.Parallel()
+func TestMemoryFileSystemReadsBytesAsTheDiskDoes(test *testing.T) {
+	test.Parallel()
 
-	directory := t.TempDir()
+	directory := test.TempDir()
 	for _, testCase := range []struct {
 		name  string
 		bytes string
@@ -175,16 +206,20 @@ func TestMemoryFSReadsBytesAsTheDiskDoes(t *testing.T) {
 		{"utf-16 with an odd trailing byte", "\xFF\xFEa\x00b"},
 		{"utf-16 with a lone surrogate", "\xFF\xFE\x00\xd8a\x00"},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			onDisk := filepath.ToSlash(filepath.Join(directory, strings.ReplaceAll(testCase.name, " ", "-")+".ts"))
-			if err := os.WriteFile(onDisk, []byte(testCase.bytes), 0o644); err != nil {
-				t.Fatal(err)
+			if writeError := os.WriteFile(onDisk, []byte(testCase.bytes), 0o644); writeError != nil {
+				test.Fatal(writeError)
 			}
 			fromDisk, diskOk := osvfs.FS().ReadFile(tspath.RootedFilePath(onDisk))
-			fromMemory, memoryOk := program.NewMemoryFS(map[string]string{"/fixture/a.ts": testCase.bytes}).ReadFile("/fixture/a.ts")
+			fromMemory, memoryOk := program.NewMemoryFileSystem(
+				map[string]string{"/fixture/a.ts": testCase.bytes},
+			).ReadFile(
+				"/fixture/a.ts",
+			)
 			if fromMemory != fromDisk || memoryOk != diskOk {
-				t.Fatalf("memory read %q (%v), the disk %q (%v)", fromMemory, memoryOk, fromDisk, diskOk)
+				test.Fatalf("memory read %q (%v), the disk %q (%v)", fromMemory, memoryOk, fromDisk, diskOk)
 			}
 		})
 	}

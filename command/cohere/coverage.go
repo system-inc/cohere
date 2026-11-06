@@ -1,8 +1,8 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
-	"io"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -34,15 +34,15 @@ import (
 type coverageCategory string
 
 const (
-	coverageFoundSomething     coverageCategory = "FoundSomething"
-	coverageRanOnPartOfTheTree coverageCategory = "RanOnPartOfTheTree"
-	coverageRanAndFoundNothing coverageCategory = "RanAndFoundNothing"
-	coverageNoListener         coverageCategory = "NoListener"
-	coverageListenedToNothing  coverageCategory = "ListenedToNothing"
-	coverageOffByTheConfig     coverageCategory = "OffByTheConfig"
-	coverageNotConfigured      coverageCategory = "NotConfigured"
-	coverageOfferedNoFiles     coverageCategory = "OfferedNoFiles"
-	coverageNotPorted          coverageCategory = "NotPorted"
+	coverageFoundSomething        coverageCategory = "FoundSomething"
+	coverageRanOnPartOfTheTree    coverageCategory = "RanOnPartOfTheTree"
+	coverageRanAndFoundNothing    coverageCategory = "RanAndFoundNothing"
+	coverageNoListener            coverageCategory = "NoListener"
+	coverageListenedToNothing     coverageCategory = "ListenedToNothing"
+	coverageOffByTheConfiguration coverageCategory = "OffByTheConfig"
+	coverageNotConfigured         coverageCategory = "NotConfigured"
+	coverageOfferedNoFiles        coverageCategory = "OfferedNoFiles"
+	coverageNotPorted             coverageCategory = "NotPorted"
 )
 
 // coverageCategoryOrder is the order the counts and the details print in: what ran first, then what
@@ -53,7 +53,7 @@ var coverageCategoryOrder = []coverageCategory{
 	coverageRanAndFoundNothing,
 	coverageNoListener,
 	coverageListenedToNothing,
-	coverageOffByTheConfig,
+	coverageOffByTheConfiguration,
 	coverageNotConfigured,
 	coverageOfferedNoFiles,
 	coverageNotPorted,
@@ -61,15 +61,15 @@ var coverageCategoryOrder = []coverageCategory{
 
 // coverageCategoryTerms is each category as a term in the counted line.
 var coverageCategoryTerms = map[coverageCategory]string{
-	coverageFoundSomething:     "found something",
-	coverageRanOnPartOfTheTree: "ran on part of the tree",
-	coverageRanAndFoundNothing: "ran and found nothing",
-	coverageNoListener:         "registered no listener",
-	coverageListenedToNothing:  "listened to no files",
-	coverageOffByTheConfig:     "off by the config",
-	coverageNotConfigured:      "nobody has configured",
-	coverageOfferedNoFiles:     "offered no files",
-	coverageNotPorted:          "not ported",
+	coverageFoundSomething:        "found something",
+	coverageRanOnPartOfTheTree:    "ran on part of the tree",
+	coverageRanAndFoundNothing:    "ran and found nothing",
+	coverageNoListener:            "registered no listener",
+	coverageListenedToNothing:     "listened to no files",
+	coverageOffByTheConfiguration: "off by the config",
+	coverageNotConfigured:         "nobody has configured",
+	coverageOfferedNoFiles:        "offered no files",
+	coverageNotPorted:             "not ported",
 }
 
 // coverageCategoryMeanings is what each category means, said once at its heading under `--coverage`
@@ -94,9 +94,9 @@ var coverageCategoryMeanings = map[coverageCategory]string{
 	// options leave inert (init-declarations with no mode) registers nothing anywhere. The first two
 	// are working and the third is dead, so each rule declares which it is (rule.NoListenerKind), and a
 	// rule declaring neither prints by default as having checked nothing.
-	coverageNoListener:        "offered files and registered no listener on any; each says whether it answers in Run, declines files it is not about, or declares neither and checked nothing",
-	coverageListenedToNothing: "nothing gave it a file, or it declined every one, so its silence says nothing about the tree",
-	coverageOffByTheConfig:    "the config turns it off for every file it would have run on",
+	coverageNoListener:            "offered files and registered no listener on any; each says whether it answers in Run, declines files it is not about, or declares neither and checked nothing",
+	coverageListenedToNothing:     "nothing gave it a file, or it declined every one, so its silence says nothing about the tree",
+	coverageOffByTheConfiguration: "the config turns it off for every file it would have run on",
 	// "Someone turned this rule off" and "nobody has said whether this rule should run" are different
 	// facts, and a rule newly added to the registry is a decision waiting to be made rather than one
 	// already made. Collapsing them would describe a brand-new rule as though it had been excluded.
@@ -150,49 +150,6 @@ type suppressionCoverage struct {
 	DeadSites []program.DeadSuppression
 }
 
-// coverageSummary is everything the coverage block says, built by each engine from its own records
-// and printed by one writer, so a Swift run and a TypeScript run say the same thing about the same
-// fact.
-type coverageSummary struct {
-	Entries []ruleCoverageEntry
-	// Unnamed counts rules a category holds that the engine's record does not name: the Swift record
-	// counts its quiet rules and names none. They count toward the total and print as a count.
-	Unnamed map[coverageCategory]int
-	// PartialFacts are facts about rules the record counts and does not name, said once by name under
-	// `--coverage`: a Swift rule counted as quiet that the record also names as off for some files.
-	PartialFacts []string
-	// Crashes is each file a rule could not finish, as the run names it in every view, so the coverage notes
-	// and the human view say the same words of it.
-	Crashes      []runCrash
-	RuleCrashes  []coverageRuleCrash
-	FilesIgnored int
-	Suppression  *suppressionCoverage
-	// Notes is what rules counted rather than reported (rule.Context.Note), summed across files: rule
-	// name to note key to count. Listed under `--coverage`, so an exemption reads as a number.
-	Notes map[string]map[string]int
-}
-
-// count is how many rules a category holds, named or not.
-func (s coverageSummary) count(category coverageCategory) int {
-	total := s.Unnamed[category]
-	for _, entry := range s.Entries {
-		if entry.Category == category {
-			total++
-		}
-	}
-	return total
-}
-
-// total is every rule the summary accounts for. It is the sum of the categories by construction, and
-// a test pins that the counted line says so.
-func (s coverageSummary) total() int {
-	total := len(s.Entries)
-	for _, count := range s.Unnamed {
-		total += count
-	}
-	return total
-}
-
 // noListenerReasons is how a declared reason reads beside a rule's name under `--coverage`.
 var noListenerReasons = map[rule.NoListenerKind]string{
 	rule.NoListenerAnswersInRun:            "answers in Run",
@@ -208,9 +165,9 @@ var noListenerReasons = map[rule.NoListenerKind]string{
 // nothing is described by why it was offered nothing, and the config's two reasons are told apart
 // there: a rule turned off and a rule nobody configured are different decisions.
 func classifyTypeScriptCoverage(
-	rules []rule.Rule,
+	rules []rule.Entry,
 	coverage program.Coverage,
-	lintConfig *configuration.Config,
+	lintConfiguration *configuration.Configuration,
 ) coverageSummary {
 	summary := coverageSummary{
 		FilesIgnored: coverage.FilesIgnored,
@@ -236,7 +193,10 @@ func classifyTypeScriptCoverage(
 			entry.Details = append(entry.Details, fmt.Sprintf("%d findings", coverage.RulesReporting[name]))
 		case coverage.RulesListening[name] > 0 && scopedOff+unconfigured > 0:
 			entry.Category = coverageRanOnPartOfTheTree
-			entry.Details = append(entry.Details, partOfTheTreeDetail(coverage.RulesListening[name], offered, scopedOff, unconfigured))
+			entry.Details = append(
+				entry.Details,
+				partOfTheTreeDetail(coverage.RulesListening[name], offered, scopedOff, unconfigured),
+			)
 		case coverage.RulesListening[name] > 0:
 			entry.Category = coverageRanAndFoundNothing
 		case offered > 0:
@@ -248,7 +208,7 @@ func classifyTypeScriptCoverage(
 				entry.NeedsAction = true
 			}
 		case scopedOff > 0:
-			entry.Category = coverageOffByTheConfig
+			entry.Category = coverageOffByTheConfiguration
 			entry.Details = append(entry.Details, fmt.Sprintf("%d files", scopedOff))
 		case unconfigured > 0:
 			entry.Category = coverageNotConfigured
@@ -268,16 +228,16 @@ func classifyTypeScriptCoverage(
 			if unconfigured > 0 {
 				entry.Details = append(entry.Details, fmt.Sprintf("not in the config for %d files", unconfigured))
 			}
-		} else if entry.Category == coverageOffByTheConfig && unconfigured > 0 {
+		} else if entry.Category == coverageOffByTheConfiguration && unconfigured > 0 {
 			entry.Details = append(entry.Details, fmt.Sprintf("not in the config for %d more", unconfigured))
 		}
 
 		// Why it is off, from the file that said so, so a reader judging an off reads the decision
 		// beside it rather than in a file the run never names.
-		if entry.Category == coverageOffByTheConfig {
-			if offReason, reasoned := lintConfig.OffReasonFor(name); reasoned {
+		if entry.Category == coverageOffByTheConfiguration {
+			if offReason, reasoned := lintConfiguration.OffReasonFor(name); reasoned {
 				entry.Details = append(entry.Details, "off because "+offReason.Reason)
-			} else if lintConfig.TurnsOffAtTopLevel(name) {
+			} else if lintConfiguration.TurnsOffAtTopLevel(name) {
 				entry.OffWithoutReason = true
 			}
 		}
@@ -285,7 +245,7 @@ func classifyTypeScriptCoverage(
 		summary.Entries = append(summary.Entries, entry)
 	}
 
-	for _, name := range unportedConfiguredRules(rules, lintConfig) {
+	for _, name := range unportedConfiguredRules(rules, lintConfiguration) {
 		summary.Entries = append(summary.Entries, ruleCoverageEntry{Name: name, Category: coverageNotPorted})
 	}
 
@@ -295,7 +255,10 @@ func classifyTypeScriptCoverage(
 		summary.Crashes = append(summary.Crashes, runCrash{Path: crash.FileName, Cause: fmt.Sprint(crash.Cause)})
 	}
 	for _, crash := range coverage.RulesCrashed {
-		summary.RuleCrashes = append(summary.RuleCrashes, coverageRuleCrash{Rule: crash.RuleName, File: crash.FileName, Cause: fmt.Sprint(crash.Cause)})
+		summary.RuleCrashes = append(
+			summary.RuleCrashes,
+			coverageRuleCrash{Rule: crash.RuleName, File: crash.FileName, Cause: fmt.Sprint(crash.Cause)},
+		)
 	}
 	sort.Slice(summary.RuleCrashes, func(first, second int) bool {
 		if summary.RuleCrashes[first].Rule != summary.RuleCrashes[second].Rule {
@@ -325,75 +288,12 @@ func partOfTheTreeDetail(listening, offered, scopedOff, unconfigured int) string
 	return strings.Join(terms, ", ")
 }
 
-// sortEntries orders the entries by category, then by name, so the details read in the counted
-// line's order and two runs can be diffed.
-func (s *coverageSummary) sortEntries() {
-	position := make(map[coverageCategory]int, len(coverageCategoryOrder))
-	for index, category := range coverageCategoryOrder {
-		position[category] = index
-	}
-	sort.SliceStable(s.Entries, func(first, second int) bool {
-		if s.Entries[first].Category != s.Entries[second].Category {
-			return position[s.Entries[first].Category] < position[s.Entries[second].Category]
-		}
-		return s.Entries[first].Name < s.Entries[second].Name
-	})
-}
-
-// coverageCountedLine is the line whose terms add up to the rule total, said as arithmetic so a reader
-// can check it: `coverage: 459 rules = 370 ran and found nothing + 14 registered no listener + ...`.
-// A category holding no rule is left out, and the sum still holds.
-func (s coverageSummary) coverageCountedLine() string {
-	terms := []string{}
-	for _, category := range coverageCategoryOrder {
-		if count := s.count(category); count > 0 {
-			terms = append(terms, fmt.Sprintf("%d %s", count, coverageCategoryTerms[category]))
-		}
-	}
-	line := fmt.Sprintf("coverage: %d rules", s.total())
-	if len(terms) > 0 {
-		line += " = " + strings.Join(terms, " + ")
-	}
-	return line
-}
-
-// coverageFilesLine is the second line: what happened to files and to findings rather than to rules,
-// so none of it is part of the rule arithmetic.
-//
-// The crash count prints when it is zero, because "0 files crashed" is the claim a clean run makes and
-// a reader should be able to see it made. The reasonless count prints every run rather than being
-// enforced: measured across the codebase cohere gates, 281 of 306 suppressions of our own rules stated
-// no reason, so requiring one would turn working code red for no defect, and printing it is what lets
-// the convention be tightened later from evidence rather than from a guess.
-func (s coverageSummary) coverageFilesLine(details bool) string {
-	terms := []string{fmt.Sprintf("%d files crashed", len(s.Crashes))}
-	if len(s.RuleCrashes) > 0 {
-		terms = append(terms, fmt.Sprintf("%d rule crashes, each costing one rule one file", len(s.RuleCrashes)))
-	}
-	if s.FilesIgnored > 0 {
-		terms = append(terms, fmt.Sprintf("%d files excluded by ignorePatterns", s.FilesIgnored))
-	}
-	if s.Suppression != nil {
-		terms = append(terms, fmt.Sprintf("%d findings suppressed, %d without a reason",
-			s.Suppression.Suppressed, s.Suppression.SuppressedWithoutReason))
-		// Keep the coverage count beside the walk's fixable unused-disable findings. The walk only
-		// reports names whose rules ran, so a filtered run preserves unselected names.
-		if s.Suppression.Dead > 0 {
-			terms = append(terms, fmt.Sprintf("%d disable comments silenced nothing while their rule ran", s.Suppression.Dead))
-		}
-	}
-	if !details {
-		terms = append(terms, "details: cohere --coverage")
-	}
-	return "  " + strings.Join(terms, " · ")
-}
-
 // writeCoverage prints the coverage block: the counted line, the files line, then everything that needs
 // action in full, and with details the per-rule listing.
 //
 // Each per-rule fact prints exactly once in either mode. A rule that needs action prints as its own
 // line by default and under its category with details, never both.
-func writeCoverage(out io.Writer, summary coverageSummary, details bool) {
+func writeCoverage(out *bufio.Writer, summary coverageSummary, details bool) {
 	fmt.Fprintln(out, summary.coverageCountedLine())
 	fmt.Fprintln(out, summary.coverageFilesLine(details))
 	writeCoverageNotes(out, summary, details)
@@ -401,7 +301,7 @@ func writeCoverage(out io.Writer, summary coverageSummary, details bool) {
 
 // writeCoverageDetails names every rule once, under the one category that describes it, with the
 // category's meaning said once at its heading.
-func writeCoverageDetails(out io.Writer, summary coverageSummary) {
+func writeCoverageDetails(out *bufio.Writer, summary coverageSummary) {
 	fmt.Fprintln(out, "  coverage details, each rule once:")
 	for _, category := range coverageCategoryOrder {
 		count := summary.count(category)
@@ -419,7 +319,10 @@ func writeCoverageDetails(out io.Writer, summary coverageSummary) {
 			line := "    " + entry.Name
 			details := entry.Details
 			if entry.NeedsAction {
-				details = append(append([]string(nil), details...), "declares no reason to register none, so it checked nothing")
+				details = append(
+					append([]string(nil), details...),
+					"declares no reason to register none, so it checked nothing",
+				)
 			}
 			if entry.OffWithoutReason {
 				details = append(append([]string(nil), details...), "off with no reason given")
@@ -434,8 +337,11 @@ func writeCoverageDetails(out io.Writer, summary coverageSummary) {
 		fmt.Fprintf(out, "  partly: %s\n", fact)
 	}
 	if summary.Suppression != nil && summary.Suppression.ForUnrunRules > 0 {
-		fmt.Fprintf(out, "  suppressions: %d unused disable comments name only rules cohere has not ported yet, so nothing looked and they are not dead\n",
-			summary.Suppression.ForUnrunRules)
+		fmt.Fprintf(
+			out,
+			"  suppressions: %d unused disable comments name only rules cohere has not ported yet, so nothing looked and they are not dead\n",
+			summary.Suppression.ForUnrunRules,
+		)
 	}
 	if summary.Suppression != nil && len(summary.Suppression.DeadSites) > 0 {
 		writeDeadSuppressions(out, summary.Suppression.DeadSites)
@@ -514,9 +420,13 @@ func skipLines(skips map[string]map[string]int) []string {
 // writeRuleSkips lists the rules that declined files because a compiler option or a missing precondition
 // left them unable to judge, each with how many files and why. A rule that skips reads exactly like one
 // that found nothing unless it is named here (#pa7k7zv).
-func writeRuleSkips(out io.Writer, skips map[string]map[string]int) {
+func writeRuleSkips(out *bufio.Writer, skips map[string]map[string]int) {
 	lines := skipLines(skips)
-	fmt.Fprintf(out, "  skipped (%d): rules that declined files on a compiler option or a missing precondition, so they checked nothing there\n", len(lines))
+	fmt.Fprintf(
+		out,
+		"  skipped (%d): rules that declined files on a compiler option or a missing precondition, so they checked nothing there\n",
+		len(lines),
+	)
 	for _, line := range lines {
 		fmt.Fprintf(out, "    %s\n", line)
 	}
@@ -538,33 +448,10 @@ func sumRuleNotes(notes map[string]program.RuleNotes) map[string]map[string]int 
 	return summed
 }
 
-// excuseRulesThatSkippedEveryFile clears the dead-rule signal from a rule whose skips cover every file it
-// was offered. A skip is a reason given at run time, as NoListener is one given at registration, and the
-// skipped line already names it, so the same rule must not also read as having checked nothing for no
-// reason: nexus/correctness-no-implicit-return stands down in every project that sets noImplicitReturns,
-// and printed both (#yj96emr). A rule that skipped some files and registered nothing on the rest still
-// needs action, since nothing explains the rest.
-func (summary *coverageSummary) excuseRulesThatSkippedEveryFile(coverage program.Coverage) {
-	skips, _ := splitRuleSkips(summary.Notes)
-	for index := range summary.Entries {
-		if !summary.Entries[index].NeedsAction {
-			continue
-		}
-		skipped := 0
-		for _, count := range skips[summary.Entries[index].Name] {
-			skipped += count
-		}
-		if skipped >= coverage.RulesOffered[summary.Entries[index].Name] {
-			summary.Entries[index].NeedsAction = false
-			summary.Entries[index].Details = append(summary.Entries[index].Details, "skipped every file it was offered")
-		}
-	}
-}
-
 // writeRuleNotes lists what each rule counted rather than reported, by rule and then by key, each with
 // its count over the run. A `@processState` tag lands here as the type and how many writes it exempted,
 // so a tag on a widely used type shows up as a number someone reads rather than as a silence.
-func writeRuleNotes(out io.Writer, notes map[string]map[string]int) {
+func writeRuleNotes(out *bufio.Writer, notes map[string]map[string]int) {
 	ruleNames := make([]string, 0, len(notes))
 	total := 0
 	for ruleName, counts := range notes {
@@ -591,7 +478,7 @@ func writeRuleNotes(out io.Writer, notes map[string]map[string]int) {
 // writeDeadSuppressions names each disable comment that silenced nothing while a rule it names ran,
 // one per line as file:line and the rules it names, so the count on the files line can be acted on
 // from a whole-program run rather than hunted for one file at a time.
-func writeDeadSuppressions(out io.Writer, sites []program.DeadSuppression) {
+func writeDeadSuppressions(out *bufio.Writer, sites []program.DeadSuppression) {
 	sorted := append([]program.DeadSuppression(nil), sites...)
 	sort.Slice(sorted, func(left, right int) bool {
 		if sorted[left].File != sorted[right].File {
@@ -613,7 +500,7 @@ func writeDeadSuppressions(out io.Writer, sites []program.DeadSuppression) {
 // writeCrashedNote names one file a rule could not finish, or one rule's verdict on it. Printed in full under
 // `--verbose` and before the details, because a file nothing checked needs action; the human view prints it
 // for a crash no other file shares (writeCrashGroups).
-func writeCrashedNote(out io.Writer, crash runCrash) {
+func writeCrashedNote(out *bufio.Writer, crash runCrash) {
 	fmt.Fprintf(out, "  crashed: %s: %s\n", crash.Path, crash.message())
 }
 
@@ -636,8 +523,8 @@ const namedRuleGapsSentence = "the notes above name the rules that could not fin
 // and named in no rules block; they are held in `configuration.PluginDefaultRules` and resolved into
 // the config's rules on load, so a denominator taken from the block alone would understate by exactly
 // the rules nobody wrote down.
-func unportedConfiguredRules(rules []rule.Rule, lintConfig *configuration.Config) []string {
-	if lintConfig == nil {
+func unportedConfiguredRules(rules []rule.Entry, lintConfiguration *configuration.Configuration) []string {
+	if lintConfiguration == nil {
 		return nil
 	}
 	implemented := make(map[string]bool, len(rules))
@@ -645,7 +532,7 @@ func unportedConfiguredRules(rules []rule.Rule, lintConfig *configuration.Config
 		implemented[registered.Name] = true
 	}
 	missing := []string{}
-	for name, setting := range lintConfig.Rules {
+	for name, setting := range lintConfiguration.Rules {
 		if name == configuration.UnusedDisable || setting.Severity == configuration.SeverityOff {
 			continue
 		}
@@ -658,9 +545,9 @@ func unportedConfiguredRules(rules []rule.Rule, lintConfig *configuration.Config
 }
 
 // wantedConfiguredRules counts the rules the config turns on, the parity line's denominator.
-func wantedConfiguredRules(lintConfig *configuration.Config) int {
+func wantedConfiguredRules(lintConfiguration *configuration.Configuration) int {
 	wanted := 0
-	for name, setting := range lintConfig.Rules {
+	for name, setting := range lintConfiguration.Rules {
 		if name != configuration.UnusedDisable && setting.Severity != configuration.SeverityOff {
 			wanted++
 		}
@@ -679,15 +566,15 @@ func wantedConfiguredRules(lintConfig *configuration.Config) int {
 // within weeks: the figures drift with every rule that lands, while the reason they matter does not.
 // The live numbers belong in the line this prints, which is derived, and not in a comment. This is
 // the same omission the differential harness carried until `7b590f6`.
-func writeParityCoverage(out io.Writer, rules []rule.Rule, lintConfig *configuration.Config) {
-	if lintConfig == nil {
+func writeParityCoverage(out *bufio.Writer, rules []rule.Entry, lintConfiguration *configuration.Configuration) {
+	if lintConfiguration == nil {
 		return
 	}
-	missing := len(unportedConfiguredRules(rules, lintConfig))
+	missing := len(unportedConfiguredRules(rules, lintConfiguration))
 	if missing == 0 {
 		return
 	}
-	wanted := wantedConfiguredRules(lintConfig)
+	wanted := wantedConfiguredRules(lintConfiguration)
 	fmt.Fprintf(out, "  parity: %d of %d rules the config asks for, so %d were not checked by anything here\n",
 		wanted-missing, wanted, missing)
 }
@@ -695,9 +582,9 @@ func writeParityCoverage(out io.Writer, rules []rule.Rule, lintConfig *configura
 // lintReport is what the lint phase prints, gathered so the whole report can be written to any writer
 // and every category a reader must act on can be tested to print by default.
 type lintReport struct {
-	Result     program.Result
-	Rules      []rule.Rule
-	LintConfig *configuration.Config
+	Result            program.Result
+	Rules             []rule.Entry
+	LintConfiguration *configuration.Configuration
 	// WalkCost says how the walk was paid for: `in 5.64s`, or which phase walked it.
 	WalkCost string
 	// Details is `--coverage`: name every rule once rather than only counting them.
@@ -710,9 +597,9 @@ type lintReport struct {
 // nothing must not be able to look like a run that found nothing, and the only way to guarantee that is
 // to make the population as visible as the findings. `--coverage` widens what is named; it never
 // decides whether the counts print.
-func writeLintReport(out io.Writer, report lintReport) {
+func writeLintReport(out *bufio.Writer, report lintReport) {
 	for _, diagnostic := range report.Result.Diagnostics {
-		printRuleDiagnostic(out, diagnostic, report.LintConfig)
+		printRuleDiagnostic(out, diagnostic, report.LintConfiguration)
 	}
 	coverage := report.Result.Coverage
 	crashes := crashesFrom(coverage)
@@ -722,22 +609,29 @@ func writeLintReport(out io.Writer, report lintReport) {
 	printCrashGroups(out, crashes)
 	// The account below is `--verbose`'s; the footer carries what a reader needs of it in every view.
 	account := accountOutput(out)
-	fmt.Fprintf(accountOutput(invocationOutput(out)),
-		"lint: %d findings — %d rules over %d files, %d nodes visited%s, %s%s\n",
-		len(report.Result.Diagnostics), coverage.RulesRun, coverage.FilesWalked, coverage.NodesVisited, nodesReplayedClause(coverage),
+	// The dash is escaped, not changed: internal/differential finds this line by it, and swift/Contract.md
+	// names it as the line both engines print.
+	printInvocation(
+		accountOutput(out),
+		"lint: %d findings \u2014 %d rules over %d files, %d nodes visited%s, %s%s\n",
+		len(report.Result.Diagnostics),
+		coverage.RulesRun,
+		coverage.FilesWalked,
+		coverage.NodesVisited,
+		nodesReplayedClause(coverage),
 		report.WalkCost,
 		replayedFromCache(report.Result),
 	)
 
-	summary := classifyTypeScriptCoverage(report.Rules, coverage, report.LintConfig)
+	summary := classifyTypeScriptCoverage(report.Rules, coverage, report.LintConfiguration)
 	summary.Notes = sumRuleNotes(report.Result.Notes)
 	summary.excuseRulesThatSkippedEveryFile(coverage)
 	fmt.Fprintln(account, summary.coverageCountedLine())
 	fmt.Fprintln(account, summary.coverageFilesLine(report.Details))
-	writeParityCoverage(account, report.Rules, report.LintConfig)
-	writeOrphanedConfigKeys(account, report.Rules, report.LintConfig)
-	writeDepartures(account, report.LintConfig)
-	writeOverrideReasons(account, report.LintConfig)
+	writeParityCoverage(account, report.Rules, report.LintConfiguration)
+	writeOrphanedConfigKeys(account, report.Rules, report.LintConfiguration)
+	writeDepartures(account, report.LintConfiguration)
+	writeOverrideReasons(account, report.LintConfiguration)
 	writeCoverageNotes(account, summary, report.Details)
 	writeUnrunRuleReferences(account, coverage.UnrunRuleReferences)
 
@@ -752,7 +646,7 @@ func writeLintReport(out io.Writer, report lintReport) {
 	activeSummary.FilesInScope = coverage.FilesWalked
 	activeSummary.Nodes = coverage.NodesVisited
 	activeSummary.Findings += len(report.Result.Diagnostics)
-	activeSummary.WarningFindings += lintWarningCount(report.Result.Diagnostics, report.LintConfig)
+	activeSummary.WarningFindings += lintWarningCount(report.Result.Diagnostics, report.LintConfiguration)
 	activeSummary.Gaps.CrashedFiles = len(summary.Crashes)
 	activeSummary.Gaps.RuleCrashes = len(summary.RuleCrashes)
 	activeSummary.Gaps.Crashes = crashes
@@ -763,7 +657,7 @@ func writeLintReport(out io.Writer, report lintReport) {
 // --verbose. They are real rules, a core rule cohere hasn't ported or another plugin's, so a directive
 // naming one is a note rather than a finding (#v1ah2qq): it silences nothing here, and a repository
 // written for ESLint carries many. Most named first, each with how many comments named it.
-func writeUnrunRuleReferences(out io.Writer, references map[string]int) {
+func writeUnrunRuleReferences(out *bufio.Writer, references map[string]int) {
 	if len(references) == 0 {
 		return
 	}
@@ -794,22 +688,31 @@ func writeUnrunRuleReferences(out io.Writer, references map[string]int) {
 // one with no reason; printing it is what stops a reasoned one becoming a quiet allowance, because a
 // reader of any run can see each place the project and the house disagree and judge whether the reason
 // still holds.
-func writeDepartures(out io.Writer, lintConfig *configuration.Config) {
-	if lintConfig == nil || len(lintConfig.Departures) == 0 {
+func writeDepartures(out *bufio.Writer, lintConfiguration *configuration.Configuration) {
+	if lintConfiguration == nil || len(lintConfiguration.Departures) == 0 {
 		return
 	}
-	names := make([]string, 0, len(lintConfig.Departures))
-	for name := range lintConfig.Departures {
+	names := make([]string, 0, len(lintConfiguration.Departures))
+	for name := range lintConfiguration.Departures {
 		names = append(names, name)
 	}
 	sort.Strings(names)
 	for _, name := range names {
-		departure := lintConfig.Departures[name]
+		departure := lintConfiguration.Departures[name]
 		file := departure.File
-		if relative, err := filepath.Rel(lintConfig.Root, departure.File); err == nil {
+		if relative, relativePathError := filepath.Rel(
+			lintConfiguration.Root,
+			departure.File,
+		); relativePathError == nil {
 			file = relative
 		}
-		fmt.Fprintf(out, "  departure: %s is set differently from the house ruling in %s: %s\n", name, file, departure.Reason)
+		fmt.Fprintf(
+			out,
+			"  departure: %s is set differently from the house ruling in %s: %s\n",
+			name,
+			file,
+			departure.Reason,
+		)
 	}
 }
 
@@ -817,16 +720,19 @@ func writeDepartures(out io.Writer, lintConfig *configuration.Config) {
 // on every run and by default. A scoped override needs no reason, so one that gives a reason is usually
 // standing in for unfinished work, and printing it keeps that work in front of whoever reads a run until
 // the override can go.
-func writeOverrideReasons(out io.Writer, lintConfig *configuration.Config) {
-	if lintConfig == nil {
+func writeOverrideReasons(out *bufio.Writer, lintConfiguration *configuration.Configuration) {
+	if lintConfiguration == nil {
 		return
 	}
-	for _, override := range lintConfig.Overrides {
+	for _, override := range lintConfiguration.Overrides {
 		if override.Reason == "" {
 			continue
 		}
 		file := override.File
-		if relative, err := filepath.Rel(lintConfig.Root, override.File); err == nil {
+		if relative, relativePathError := filepath.Rel(
+			lintConfiguration.Root,
+			override.File,
+		); relativePathError == nil {
 			file = relative
 		}
 		names := make([]string, 0, len(override.Rules))
@@ -839,20 +745,9 @@ func writeOverrideReasons(out io.Writer, lintConfig *configuration.Config) {
 	}
 }
 
-// offWithoutReasonCount is how many rules the settings turn off with no reason given.
-func (s coverageSummary) offWithoutReasonCount() int {
-	count := 0
-	for _, entry := range s.Entries {
-		if entry.OffWithoutReason {
-			count++
-		}
-	}
-	return count
-}
-
 // writeCoverageNotes is the part of the coverage block after the two counted lines: crashed files in
 // full, then the rules that need action by default or every rule once with details.
-func writeCoverageNotes(out io.Writer, summary coverageSummary, details bool) {
+func writeCoverageNotes(out *bufio.Writer, summary coverageSummary, details bool) {
 	for _, crash := range summary.Crashes {
 		writeCrashedNote(out, crash)
 	}
@@ -870,14 +765,23 @@ func writeCoverageNotes(out io.Writer, summary coverageSummary, details bool) {
 		fmt.Fprintf(out, "  skipped: %s\n", line)
 	}
 	if offWithoutReason := summary.offWithoutReasonCount(); offWithoutReason > 0 {
-		fmt.Fprintf(out, "  off with no reason: %d rule%s your settings turn off without saying why; cohere --coverage names them\n", offWithoutReason, plural(offWithoutReason))
+		fmt.Fprintf(
+			out,
+			"  off with no reason: %d rule%s your settings turn off without saying why; cohere --coverage names them\n",
+			offWithoutReason,
+			plural(offWithoutReason),
+		)
 	}
 	for _, entry := range summary.Entries {
 		if !entry.NeedsAction {
 			continue
 		}
-		fmt.Fprintf(out, "  no listener: rule %s was %s and registered no listener on any, and it declares no reason it may (answering in Run, or declining files it is not about), so it checked nothing\n",
-			entry.Name, strings.Join(entry.Details, ", "))
+		fmt.Fprintf(
+			out,
+			"  no listener: rule %s was %s and registered no listener on any, and it declares no reason it may (answering in Run, or declining files it is not about), so it checked nothing\n",
+			entry.Name,
+			strings.Join(entry.Details, ", "),
+		)
 	}
 }
 
@@ -902,7 +806,11 @@ func replayedFromCache(result program.Result) string {
 	}
 	replayed := fmt.Sprintf("; %d of %d files replayed from cache", result.FilesReplayed, result.Coverage.FilesWalked)
 	if result.TypeAwareRerun > 0 || result.ShapeKeyedRerun > 0 {
-		replayed += fmt.Sprintf(" (type-aware rules ran again on %d of them, shape-keyed on %d)", result.TypeAwareRerun, result.ShapeKeyedRerun)
+		replayed += fmt.Sprintf(
+			" (type-aware rules ran again on %d of them, shape-keyed on %d)",
+			result.TypeAwareRerun,
+			result.ShapeKeyedRerun,
+		)
 	}
 	if result.DesignSystemRerun > 0 {
 		replayed += fmt.Sprintf(" (design-system rules ran again on %d of them)", result.DesignSystemRerun)

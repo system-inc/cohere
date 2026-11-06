@@ -17,24 +17,24 @@ func restrictTemplateExpressionsCaseName(index int) string {
 // restrictTemplateExpressionsSettingsFor routes an option object through the rule's own decoder.
 //
 // Building the struct directly would leave the two lines most likely to be wrong untested: five of
-// the seven flags default to TRUE, so a decoder reading an absent key as false silently turns an
+// the seven flags default to true, so a decoder reading an absent key as false silently turns an
 // unconfigured rule into upstream's strict preset, and the `allow` default is upstream's three
 // standard-library types rather than an empty list.
 //
 // The empty string is the shape a bare `"error"` delivers: no bytes at all.
-func restrictTemplateExpressionsSettingsFor(t *testing.T, wire string) any {
-	t.Helper()
-	decoded, err := DecodeRestrictTemplateExpressionsOptions([]byte(wire))
-	if err != nil {
-		t.Fatalf("decoding %q: %v", wire, err)
+func restrictTemplateExpressionsSettingsFor(test *testing.T, wire string) RestrictTemplateExpressionsOptions {
+	test.Helper()
+	decoded, decodeRestrictTemplateExpressionsOptionsError := DecodeRestrictTemplateExpressionsOptions([]byte(wire))
+	if decodeRestrictTemplateExpressionsOptionsError != nil {
+		test.Fatalf("decoding %q: %v", wire, decodeRestrictTemplateExpressionsOptionsError)
 	}
 	return decoded
 }
 
 // TestRestrictTemplateExpressionsStaysSilent is upstream's sixty passing cases verbatim, across
 // every option setting its corpus exercises.
-func TestRestrictTemplateExpressionsStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestRestrictTemplateExpressionsStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -44,65 +44,191 @@ func TestRestrictTemplateExpressionsStaysSilent(t *testing.T) {
 		{sourceText: "\nconst arg = 'foo';\nconst msg = `arg = ${arg}`;\n    ", wire: ""},
 		{sourceText: "\nconst arg = 'foo';\nconst msg = `arg = ${arg || 'default'}`;\n    ", wire: ""},
 		{sourceText: "\nfunction test<T extends string>(arg: T) {\n  return `arg = ${arg}`;\n}\n    ", wire: ""},
-		{sourceText: "\nfunction test<T extends string & { _kind: 'MyBrandedString' }>(arg: T) {\n  return `arg = ${arg}`;\n}\n    ", wire: ""},
+		{
+			sourceText: "\nfunction test<T extends string & { _kind: 'MyBrandedString' }>(arg: T) {\n  return `arg = ${arg}`;\n}\n    ",
+			wire:       "",
+		},
 		{sourceText: "\ntag`arg = ${null}`;\n    ", wire: ""},
 		{sourceText: "\nconst arg = {};\ntag`arg = ${arg}`;\n    ", wire: ""},
 		{sourceText: "\nconst arg = 123;\nconst msg = `arg = ${arg}`;\n      ", wire: "{\"allowNumber\": true}"},
-		{sourceText: "\nconst arg = 123;\nconst msg = `arg = ${arg || 'default'}`;\n      ", wire: "{\"allowNumber\": true}"},
-		{sourceText: "\nconst arg = 123n;\nconst msg = `arg = ${arg || 'default'}`;\n      ", wire: "{\"allowNumber\": true}"},
-		{sourceText: "\nfunction test<T extends number>(arg: T) {\n  return `arg = ${arg}`;\n}\n      ", wire: "{\"allowNumber\": true}"},
-		{sourceText: "\nfunction test<T extends number & { _kind: 'MyBrandedNumber' }>(arg: T) {\n  return `arg = ${arg}`;\n}\n      ", wire: "{\"allowNumber\": true}"},
-		{sourceText: "\nfunction test<T extends bigint>(arg: T) {\n  return `arg = ${arg}`;\n}\n      ", wire: "{\"allowNumber\": true}"},
-		{sourceText: "\nfunction test<T extends string | number>(arg: T) {\n  return `arg = ${arg}`;\n}\n      ", wire: "{\"allowNumber\": true}"},
+		{
+			sourceText: "\nconst arg = 123;\nconst msg = `arg = ${arg || 'default'}`;\n      ",
+			wire:       "{\"allowNumber\": true}",
+		},
+		{
+			sourceText: "\nconst arg = 123n;\nconst msg = `arg = ${arg || 'default'}`;\n      ",
+			wire:       "{\"allowNumber\": true}",
+		},
+		{
+			sourceText: "\nfunction test<T extends number>(arg: T) {\n  return `arg = ${arg}`;\n}\n      ",
+			wire:       "{\"allowNumber\": true}",
+		},
+		{
+			sourceText: "\nfunction test<T extends number & { _kind: 'MyBrandedNumber' }>(arg: T) {\n  return `arg = ${arg}`;\n}\n      ",
+			wire:       "{\"allowNumber\": true}",
+		},
+		{
+			sourceText: "\nfunction test<T extends bigint>(arg: T) {\n  return `arg = ${arg}`;\n}\n      ",
+			wire:       "{\"allowNumber\": true}",
+		},
+		{
+			sourceText: "\nfunction test<T extends string | number>(arg: T) {\n  return `arg = ${arg}`;\n}\n      ",
+			wire:       "{\"allowNumber\": true}",
+		},
 		{sourceText: "\nconst arg = true;\nconst msg = `arg = ${arg}`;\n      ", wire: "{\"allowBoolean\": true}"},
-		{sourceText: "\nconst arg = true;\nconst msg = `arg = ${arg || 'default'}`;\n      ", wire: "{\"allowBoolean\": true}"},
-		{sourceText: "\nfunction test<T extends boolean>(arg: T) {\n  return `arg = ${arg}`;\n}\n      ", wire: "{\"allowBoolean\": true}"},
-		{sourceText: "\nfunction test<T extends string | boolean>(arg: T) {\n  return `arg = ${arg}`;\n}\n      ", wire: "{\"allowBoolean\": true}"},
+		{
+			sourceText: "\nconst arg = true;\nconst msg = `arg = ${arg || 'default'}`;\n      ",
+			wire:       "{\"allowBoolean\": true}",
+		},
+		{
+			sourceText: "\nfunction test<T extends boolean>(arg: T) {\n  return `arg = ${arg}`;\n}\n      ",
+			wire:       "{\"allowBoolean\": true}",
+		},
+		{
+			sourceText: "\nfunction test<T extends string | boolean>(arg: T) {\n  return `arg = ${arg}`;\n}\n      ",
+			wire:       "{\"allowBoolean\": true}",
+		},
 		{sourceText: "\nconst arg = [];\nconst msg = `arg = ${arg}`;\n      ", wire: "{\"allowArray\": true}"},
-		{sourceText: "\nconst arg = [];\nconst msg = `arg = ${arg || 'default'}`;\n      ", wire: "{\"allowArray\": true}"},
-		{sourceText: "\nfunction test<T extends string[]>(arg: T) {\n  return `arg = ${arg}`;\n}\n      ", wire: "{\"allowArray\": true}"},
-		{sourceText: "\ndeclare const arg: [number, string];\nconst msg = `arg = ${arg}`;\n      ", wire: "{\"allowArray\": true}"},
-		{sourceText: "\nconst arg = [1, 'a'] as const;\nconst msg = `arg = ${arg || 'default'}`;\n      ", wire: "{\"allowArray\": true}"},
-		{sourceText: "\nfunction test<T extends [string, string]>(arg: T) {\n  return `arg = ${arg}`;\n}\n      ", wire: "{\"allowArray\": true}"},
-		{sourceText: "\ndeclare const arg: [number | undefined, string];\nconst msg = `arg = ${arg}`;\n      ", wire: "{\"allowArray\": true, \"allowNullish\": true}"},
-		{sourceText: "\ndeclare const arg: string[][];\nconst msg = `arg = ${arg}`;\n      ", wire: "{\"allowArray\": true}"},
-		{sourceText: "\ndeclare const arg: never[];\nconst msg = `arg = ${arg}`;\n      ", wire: "{\"allowArray\": true, \"allowNever\": true}"},
-		{sourceText: "\ndeclare const arg: any[];\nconst msg = `arg = ${arg}`;\n      ", wire: "{\"allowAny\": true, \"allowArray\": true}"},
+		{
+			sourceText: "\nconst arg = [];\nconst msg = `arg = ${arg || 'default'}`;\n      ",
+			wire:       "{\"allowArray\": true}",
+		},
+		{
+			sourceText: "\nfunction test<T extends string[]>(arg: T) {\n  return `arg = ${arg}`;\n}\n      ",
+			wire:       "{\"allowArray\": true}",
+		},
+		{
+			sourceText: "\ndeclare const arg: [number, string];\nconst msg = `arg = ${arg}`;\n      ",
+			wire:       "{\"allowArray\": true}",
+		},
+		{
+			sourceText: "\nconst arg = [1, 'a'] as const;\nconst msg = `arg = ${arg || 'default'}`;\n      ",
+			wire:       "{\"allowArray\": true}",
+		},
+		{
+			sourceText: "\nfunction test<T extends [string, string]>(arg: T) {\n  return `arg = ${arg}`;\n}\n      ",
+			wire:       "{\"allowArray\": true}",
+		},
+		{
+			sourceText: "\ndeclare const arg: [number | undefined, string];\nconst msg = `arg = ${arg}`;\n      ",
+			wire:       "{\"allowArray\": true, \"allowNullish\": true}",
+		},
+		{
+			sourceText: "\ndeclare const arg: string[][];\nconst msg = `arg = ${arg}`;\n      ",
+			wire:       "{\"allowArray\": true}",
+		},
+		{
+			sourceText: "\ndeclare const arg: never[];\nconst msg = `arg = ${arg}`;\n      ",
+			wire:       "{\"allowArray\": true, \"allowNever\": true}",
+		},
+		{
+			sourceText: "\ndeclare const arg: any[];\nconst msg = `arg = ${arg}`;\n      ",
+			wire:       "{\"allowAny\": true, \"allowArray\": true}",
+		},
 		{sourceText: "\nconst arg: any = 123;\nconst msg = `arg = ${arg}`;\n      ", wire: "{\"allowAny\": true}"},
-		{sourceText: "\nconst arg: any = undefined;\nconst msg = `arg = ${arg || 'some-default'}`;\n      ", wire: "{\"allowAny\": true}"},
-		{sourceText: "\nconst user = JSON.parse('{ \"name\": \"foo\" }');\nconst msg = `arg = ${user.name}`;\n      ", wire: "{\"allowAny\": true}"},
-		{sourceText: "\nconst user = JSON.parse('{ \"name\": \"foo\" }');\nconst msg = `arg = ${user.name || 'the user with no name'}`;\n      ", wire: "{\"allowAny\": true}"},
+		{
+			sourceText: "\nconst arg: any = undefined;\nconst msg = `arg = ${arg || 'some-default'}`;\n      ",
+			wire:       "{\"allowAny\": true}",
+		},
+		{
+			sourceText: "\nconst user = JSON.parse('{ \"name\": \"foo\" }');\nconst msg = `arg = ${user.name}`;\n      ",
+			wire:       "{\"allowAny\": true}",
+		},
+		{
+			sourceText: "\nconst user = JSON.parse('{ \"name\": \"foo\" }');\nconst msg = `arg = ${user.name || 'the user with no name'}`;\n      ",
+			wire:       "{\"allowAny\": true}",
+		},
 		{sourceText: "\nconst arg = null;\nconst msg = `arg = ${arg}`;\n      ", wire: "{\"allowNullish\": true}"},
-		{sourceText: "\ndeclare const arg: string | null | undefined;\nconst msg = `arg = ${arg}`;\n      ", wire: "{\"allowNullish\": true}"},
-		{sourceText: "\nfunction test<T extends null | undefined>(arg: T) {\n  return `arg = ${arg}`;\n}\n      ", wire: "{\"allowNullish\": true}"},
-		{sourceText: "\nfunction test<T extends string | null>(arg: T) {\n  return `arg = ${arg}`;\n}\n      ", wire: "{\"allowNullish\": true}"},
-		{sourceText: "\nconst arg = new RegExp('foo');\nconst msg = `arg = ${arg}`;\n      ", wire: "{\"allowRegExp\": true}"},
+		{
+			sourceText: "\ndeclare const arg: string | null | undefined;\nconst msg = `arg = ${arg}`;\n      ",
+			wire:       "{\"allowNullish\": true}",
+		},
+		{
+			sourceText: "\nfunction test<T extends null | undefined>(arg: T) {\n  return `arg = ${arg}`;\n}\n      ",
+			wire:       "{\"allowNullish\": true}",
+		},
+		{
+			sourceText: "\nfunction test<T extends string | null>(arg: T) {\n  return `arg = ${arg}`;\n}\n      ",
+			wire:       "{\"allowNullish\": true}",
+		},
+		{
+			sourceText: "\nconst arg = new RegExp('foo');\nconst msg = `arg = ${arg}`;\n      ",
+			wire:       "{\"allowRegExp\": true}",
+		},
 		{sourceText: "\nconst arg = /foo/;\nconst msg = `arg = ${arg}`;\n      ", wire: "{\"allowRegExp\": true}"},
-		{sourceText: "\ndeclare const arg: string | RegExp;\nconst msg = `arg = ${arg}`;\n      ", wire: "{\"allowRegExp\": true}"},
-		{sourceText: "\nfunction test<T extends RegExp>(arg: T) {\n  return `arg = ${arg}`;\n}\n      ", wire: "{\"allowRegExp\": true}"},
-		{sourceText: "\nfunction test<T extends string | RegExp>(arg: T) {\n  return `arg = ${arg}`;\n}\n      ", wire: "{\"allowRegExp\": true}"},
-		{sourceText: "\ndeclare const value: never;\nconst stringy = `${value}`;\n      ", wire: "{\"allowNever\": true}"},
-		{sourceText: "\nconst arg = 'hello';\nconst msg = typeof arg === 'string' ? arg : `arg = ${arg}`;\n      ", wire: "{\"allowNever\": true}"},
-		{sourceText: "\nfunction test(arg: 'one' | 'two') {\n  switch (arg) {\n    case 'one':\n      return 1;\n    case 'two':\n      return 2;\n    default:\n      throw new Error(`Unrecognised arg: ${arg}`);\n  }\n}\n      ", wire: "{\"allowNever\": true}"},
-		{sourceText: "\n// more variants may be added to Foo in the future\ntype Foo = { type: 'a'; value: number };\n\nfunction checkFoosAreMatching(foo1: Foo, foo2: Foo) {\n  if (foo1.type !== foo2.type) {\n    // since Foo currently only has one variant, this code is never run, and `foo1.type` has type `never`.\n    throw new Error(`expected ${foo1.type}, found ${foo2.type}`);\n  }\n}\n      ", wire: "{\"allowNever\": true}"},
-		{sourceText: "\ntype All = string | number | boolean | null | undefined | RegExp | never;\nfunction test<T extends All>(arg: T) {\n  return `arg = ${arg}`;\n}\n      ", wire: "{\"allowBoolean\": true, \"allowNever\": true, \"allowNullish\": true, \"allowNumber\": true, \"allowRegExp\": true}"},
-		{sourceText: "const msg = `arg = ${Promise.resolve()}`;", wire: "{\"allow\": [{\"from\": \"lib\", \"name\": \"Promise\"}]}"},
+		{
+			sourceText: "\ndeclare const arg: string | RegExp;\nconst msg = `arg = ${arg}`;\n      ",
+			wire:       "{\"allowRegExp\": true}",
+		},
+		{
+			sourceText: "\nfunction test<T extends RegExp>(arg: T) {\n  return `arg = ${arg}`;\n}\n      ",
+			wire:       "{\"allowRegExp\": true}",
+		},
+		{
+			sourceText: "\nfunction test<T extends string | RegExp>(arg: T) {\n  return `arg = ${arg}`;\n}\n      ",
+			wire:       "{\"allowRegExp\": true}",
+		},
+		{
+			sourceText: "\ndeclare const value: never;\nconst stringy = `${value}`;\n      ",
+			wire:       "{\"allowNever\": true}",
+		},
+		{
+			sourceText: "\nconst arg = 'hello';\nconst msg = typeof arg === 'string' ? arg : `arg = ${arg}`;\n      ",
+			wire:       "{\"allowNever\": true}",
+		},
+		{
+			sourceText: "\nfunction test(arg: 'one' | 'two') {\n  switch (arg) {\n    case 'one':\n      return 1;\n    case 'two':\n      return 2;\n    default:\n      throw new Error(`Unrecognised arg: ${arg}`);\n  }\n}\n      ",
+			wire:       "{\"allowNever\": true}",
+		},
+		{
+			sourceText: "\n// more variants may be added to Foo in the future\ntype Foo = { type: 'a'; value: number };\n\nfunction checkFoosAreMatching(foo1: Foo, foo2: Foo) {\n  if (foo1.type !== foo2.type) {\n    // since Foo currently only has one variant, this code is never run, and `foo1.type` has type `never`.\n    throw new Error(`expected ${foo1.type}, found ${foo2.type}`);\n  }\n}\n      ",
+			wire:       "{\"allowNever\": true}",
+		},
+		{
+			sourceText: "\ntype All = string | number | boolean | null | undefined | RegExp | never;\nfunction test<T extends All>(arg: T) {\n  return `arg = ${arg}`;\n}\n      ",
+			wire:       "{\"allowBoolean\": true, \"allowNever\": true, \"allowNullish\": true, \"allowNumber\": true, \"allowRegExp\": true}",
+		},
+		{
+			sourceText: "const msg = `arg = ${Promise.resolve()}`;",
+			wire:       "{\"allow\": [{\"from\": \"lib\", \"name\": \"Promise\"}]}",
+		},
 		{sourceText: "const msg = `arg = ${new Error()}`;", wire: ""},
 		{sourceText: "const msg = `arg = ${false}`;", wire: ""},
 		{sourceText: "const msg = `arg = ${null}`;", wire: ""},
 		{sourceText: "const msg = `arg = ${undefined}`;", wire: ""},
 		{sourceText: "const msg = `arg = ${123}`;", wire: ""},
 		{sourceText: "const msg = `arg = ${'abc'}`;", wire: ""},
-		{sourceText: "\nclass Base {}\nclass Derived extends Base {}\nconst foo = new Base();\nconst bar = new Derived();\n`${foo}${bar}`;\n      ", wire: "{\"allow\": [{\"from\": \"file\", \"name\": \"Base\"}]}"},
-		{sourceText: "\nclass Base {}\nclass Derived extends Base {}\nclass DerivedTwice extends Derived {}\nconst value = new DerivedTwice();\n`${value}`;\n      ", wire: "{\"allow\": [{\"from\": \"file\", \"name\": \"Base\"}]}"},
-		{sourceText: "\ninterface Base {\n  value: string;\n}\ninterface Derived extends Base {\n  extra: number;\n}\ndeclare const obj: Derived;\n`${obj}`;\n      ", wire: "{\"allow\": [{\"from\": \"file\", \"name\": \"Base\"}]}"},
-		{sourceText: "\ninterface Base {\n  value: string;\n}\ninterface Other {\n  other: number;\n}\ninterface Derived extends Base, Other {\n  extra: boolean;\n}\ndeclare const obj: Derived;\n`${obj}`;\n      ", wire: "{\"allow\": [{\"from\": \"file\", \"name\": \"Base\"}]}"},
-		{sourceText: "\ninterface Base {\n  value: string;\n}\ninterface Other {\n  other: number;\n}\ninterface Derived extends Base, Other {\n  extra: boolean;\n}\ndeclare const obj: Derived;\n`${obj}`;\n      ", wire: "{\"allow\": [{\"from\": \"file\", \"name\": \"Other\"}]}"},
-		{sourceText: "\ninterface Root {\n  root: string;\n}\ninterface Another {\n  another: string;\n}\ninterface Base extends Root, Another {\n  value: string;\n}\ninterface Other {\n  other: number;\n}\ninterface Derived extends Base, Other {\n  extra: boolean;\n}\ndeclare const obj: Derived;\n`${obj}`;\n      ", wire: "{\"allow\": [{\"from\": \"file\", \"name\": \"Another\"}]}"},
-		{sourceText: "\ntype Custom = { value: string };\ndeclare const obj: Custom;\n`${obj}`;\n      ", wire: "{\"allow\": [{\"from\": \"file\", \"name\": \"Custom\"}]}"},
+		{
+			sourceText: "\nclass Base {}\nclass Derived extends Base {}\nconst foo = new Base();\nconst bar = new Derived();\n`${foo}${bar}`;\n      ",
+			wire:       "{\"allow\": [{\"from\": \"file\", \"name\": \"Base\"}]}",
+		},
+		{
+			sourceText: "\nclass Base {}\nclass Derived extends Base {}\nclass DerivedTwice extends Derived {}\nconst value = new DerivedTwice();\n`${value}`;\n      ",
+			wire:       "{\"allow\": [{\"from\": \"file\", \"name\": \"Base\"}]}",
+		},
+		{
+			sourceText: "\ninterface Base {\n  value: string;\n}\ninterface Derived extends Base {\n  extra: number;\n}\ndeclare const obj: Derived;\n`${obj}`;\n      ",
+			wire:       "{\"allow\": [{\"from\": \"file\", \"name\": \"Base\"}]}",
+		},
+		{
+			sourceText: "\ninterface Base {\n  value: string;\n}\ninterface Other {\n  other: number;\n}\ninterface Derived extends Base, Other {\n  extra: boolean;\n}\ndeclare const obj: Derived;\n`${obj}`;\n      ",
+			wire:       "{\"allow\": [{\"from\": \"file\", \"name\": \"Base\"}]}",
+		},
+		{
+			sourceText: "\ninterface Base {\n  value: string;\n}\ninterface Other {\n  other: number;\n}\ninterface Derived extends Base, Other {\n  extra: boolean;\n}\ndeclare const obj: Derived;\n`${obj}`;\n      ",
+			wire:       "{\"allow\": [{\"from\": \"file\", \"name\": \"Other\"}]}",
+		},
+		{
+			sourceText: "\ninterface Root {\n  root: string;\n}\ninterface Another {\n  another: string;\n}\ninterface Base extends Root, Another {\n  value: string;\n}\ninterface Other {\n  other: number;\n}\ninterface Derived extends Base, Other {\n  extra: boolean;\n}\ndeclare const obj: Derived;\n`${obj}`;\n      ",
+			wire:       "{\"allow\": [{\"from\": \"file\", \"name\": \"Another\"}]}",
+		},
+		{
+			sourceText: "\ntype Custom = { value: string };\ndeclare const obj: Custom;\n`${obj}`;\n      ",
+			wire:       "{\"allow\": [{\"from\": \"file\", \"name\": \"Custom\"}]}",
+		},
 
-		// A GENERIC class or interface extending an allowed base. The base types live on the type
-		// reference's TARGET rather than on the reference itself, so without that hop the allowlist
+		// A generic class or interface extending an allowed base. The base types live on the type
+		// reference's target rather than on the reference itself, so without that hop the allowlist
 		// never reaches `Base` and both of these report. Measured silent on the installed build,
 		// and a mutant removing the hop reports both while passing all eighty six imported cases:
 		// upstream's transitive-base cases are all non-generic, so nothing imported can see it.
@@ -116,11 +242,11 @@ func TestRestrictTemplateExpressionsStaysSilent(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(restrictTemplateExpressionsCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t,
+		test.Run(restrictTemplateExpressionsCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test,
 				RestrictTemplateExpressions, restrictTemplateExpressionsFile, testCase.sourceText,
-				restrictTemplateExpressionsSettingsFor(t, testCase.wire)))
+				restrictTemplateExpressionsSettingsFor(test, testCase.wire)))
 		})
 	}
 }
@@ -130,8 +256,8 @@ func TestRestrictTemplateExpressionsStaysSilent(t *testing.T) {
 //
 // The text is asserted by equality because the message interpolates a type name through the
 // checker, and that name is the only part of the output a reader uses to understand the finding.
-func TestRestrictTemplateExpressionsFires(t *testing.T) {
-	t.Parallel()
+func TestRestrictTemplateExpressionsFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText   string
@@ -533,8 +659,8 @@ func TestRestrictTemplateExpressionsFires(t *testing.T) {
 			},
 		},
 
-		// An array under the DEFAULT options, where allowArray is one of only two flags that default to
-		// FALSE. Every one of upstream's eleven array cases supplies allowArray explicitly, so nothing in
+		// An array under the default options, where allowArray is one of only two flags that default to
+		// false. Every one of upstream's eleven array cases supplies allowArray explicitly, so nothing in
 		// the imported corpus exercises the default, and a mutant flipping it to true survived the whole
 		// suite. These two are the pair that holds it: without them the rule could ship allowing arrays
 		// and every fixture would still pass.
@@ -554,7 +680,7 @@ func TestRestrictTemplateExpressionsFires(t *testing.T) {
 			},
 		},
 		// The same under a number element type, so the finding is about the array rather than about what
-		// is in it: allowNumber defaults ON and does not rescue this.
+		// is in it: allowNumber defaults on and does not rescue this.
 		{
 			sourceText: "declare const a: number[];\n`${a}`;\n",
 			wire:       "",
@@ -571,7 +697,7 @@ func TestRestrictTemplateExpressionsFires(t *testing.T) {
 			},
 		},
 
-		// `never` under the DEFAULT options, the other flag that defaults to FALSE. Upstream's four
+		// `never` under the default options, the other flag that defaults to false. Upstream's four
 		// never cases all supply allowNever explicitly, so a mutant flipping the default to true
 		// survived every imported case.
 		{
@@ -610,29 +736,29 @@ func TestRestrictTemplateExpressionsFires(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(restrictTemplateExpressionsCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, RestrictTemplateExpressions,
+		test.Run(restrictTemplateExpressionsCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, RestrictTemplateExpressions,
 				restrictTemplateExpressionsFile, testCase.sourceText,
-				restrictTemplateExpressionsSettingsFor(t, testCase.wire))
+				restrictTemplateExpressionsSettingsFor(test, testCase.wire))
 
 			wantIds := make([]string, 0, len(testCase.wantFindings))
 			for _, want := range testCase.wantFindings {
 				wantIds = append(wantIds, want.id)
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 
 			// RunTyped writes the fixture trimmed, so the span slice is against that text.
 			onDisk := strings.TrimSpace(testCase.sourceText) + "\n"
 			for findingIndex, want := range testCase.wantFindings {
 				diagnostic := result.Diagnostics[findingIndex]
 				if diagnostic.Message.Description != want.message {
-					t.Fatalf("finding %d message: expected %q, got %q", findingIndex, want.message,
+					test.Fatalf("finding %d message: expected %q, got %q", findingIndex, want.message,
 						diagnostic.Message.Description)
 				}
 				gotSpan := onDisk[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if gotSpan != want.span {
-					t.Fatalf("finding %d span: expected %q, got %q", findingIndex, want.span, gotSpan)
+					test.Fatalf("finding %d span: expected %q, got %q", findingIndex, want.span, gotSpan)
 				}
 			}
 		})
@@ -643,7 +769,7 @@ func TestRestrictTemplateExpressionsFires(t *testing.T) {
 // as a bare severity takes, which no fixture routed through the decoder can reach.
 //
 // This is the failure mode the brief describes as the expensive one: the config layer hands a
-// non-required rule nil options, the type assertion in Run fails, and a fallback to the ZERO VALUE
+// non-required rule nil options, the type assertion in Run fails, and a fallback to the zero value
 // gives every flag its false meaning. For this rule that is not merely inert, it is upstream's
 // `strict` preset, so a bare `"error"` would silently enforce a far stricter rule than upstream's
 // default while every fixture supplying options stayed green. A mutant replacing the fallback with
@@ -651,8 +777,8 @@ func TestRestrictTemplateExpressionsFires(t *testing.T) {
 //
 // The three inputs below are the three defaults that separate the two: a number, a boolean and an
 // interpolated `Error` are all allowed by default and all reported under the strict preset.
-func TestRestrictTemplateExpressionsReadsNilOptionsAsUpstreamsDefault(t *testing.T) {
-	t.Parallel()
+func TestRestrictTemplateExpressionsReadsNilOptionsAsUpstreamsDefault(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		"declare const n: number;\n`${n}`;\n",
@@ -660,70 +786,70 @@ func TestRestrictTemplateExpressionsReadsNilOptionsAsUpstreamsDefault(t *testing
 		"declare const e: Error;\n`${e}`;\n",
 	}
 	for index, sourceText := range cases {
-		t.Run(restrictTemplateExpressionsCaseName(index), func(t *testing.T) {
-			t.Parallel()
+		test.Run(restrictTemplateExpressionsCaseName(index), func(test *testing.T) {
+			test.Parallel()
 			// nil rather than a decoded struct, which is what the config layer delivers.
-			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t,
-				RestrictTemplateExpressions, restrictTemplateExpressionsFile, sourceText, nil))
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test,
+				RestrictTemplateExpressions, restrictTemplateExpressionsFile, sourceText))
 		})
 	}
 
 	// The control: something no default allows still reports through the same path, so the silence
 	// above is the defaults applying rather than the rule declining to run at all.
-	rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, RestrictTemplateExpressions,
-		restrictTemplateExpressionsFile, "declare const o: object;\n`${o}`;\n", nil), "invalidType")
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, RestrictTemplateExpressions,
+		restrictTemplateExpressionsFile, "declare const o: object;\n`${o}`;\n"), "invalidType")
 }
 
 // TestRestrictTemplateExpressionsRequiresTheTypedHarness pins that the rule cannot work without a
 // checker and declines rather than crashing when handed none.
 //
 // Unreachable from every other test here, because RunTyped always supplies a live checker.
-func TestRestrictTemplateExpressionsRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestRestrictTemplateExpressionsRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	if !RestrictTemplateExpressions.NeedsTypeChecker {
-		t.Fatal("the rule must declare NeedsTypeChecker: every judgment is about an interpolated value's type")
+		test.Fatal("the rule must declare NeedsTypeChecker: every judgment is about an interpolated value's type")
 	}
 
 	sourceText := "declare const o: object;\n`${o}`;\n"
 
-	rule_testing.ExpectClean(t, rule_testing.Run(t, RestrictTemplateExpressions,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, RestrictTemplateExpressions,
 		restrictTemplateExpressionsFile, sourceText))
 
 	// The control, so the silence above is the guard declining rather than the rule being blind to
 	// this shape.
-	rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, RestrictTemplateExpressions,
-		restrictTemplateExpressionsFile, sourceText, nil), "invalidType")
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, RestrictTemplateExpressions,
+		restrictTemplateExpressionsFile, sourceText), "invalidType")
 }
 
 // TestRestrictTemplateExpressionsAllowReplacesTheDefault pins how a configured `allow` interacts
 // with upstream's default list, which is a real decision and not a detail.
 //
 // Upstream's defaultOptions carries `allow: [{ name: ['Error', 'URL', 'URLSearchParams'], from:
-// 'lib' }]`, and ESLint merges defaults key by key, so supplying `allow` REPLACES that list rather
+// 'lib' }]`, and ESLint merges defaults key by key, so supplying `allow` replaces that list rather
 // than adding to it while supplying any other key leaves it alone. Measured on the installed build,
 // all three rows below, because the merge semantics are the sort of thing a port gets subtly wrong
 // in a way no imported case catches: every one of upstream's allow cases supplies a list, so the
 // interaction with the default is never exercised.
-func TestRestrictTemplateExpressionsAllowReplacesTheDefault(t *testing.T) {
-	t.Parallel()
+func TestRestrictTemplateExpressionsAllowReplacesTheDefault(test *testing.T) {
+	test.Parallel()
 
 	sourceText := "declare const e: Error;\n`${e}`;\n"
 
 	// An allow list naming something else drops Error, so this reports.
-	rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, RestrictTemplateExpressions,
+	rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, RestrictTemplateExpressions,
 		restrictTemplateExpressionsFile, sourceText,
-		restrictTemplateExpressionsSettingsFor(t, `{"allow":[{"from":"file","name":"Whatever"}]}`)),
+		restrictTemplateExpressionsSettingsFor(test, `{"allow":[{"from":"file","name":"Whatever"}]}`)),
 		"invalidType")
 
-	// An EMPTY allow list drops it too, which is the row that separates replace from merge: under
+	// An empty allow list drops it too, which is the row that separates replace from merge: under
 	// merge semantics an empty list would change nothing.
-	rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, RestrictTemplateExpressions,
+	rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, RestrictTemplateExpressions,
 		restrictTemplateExpressionsFile, sourceText,
-		restrictTemplateExpressionsSettingsFor(t, `{"allow":[]}`)), "invalidType")
+		restrictTemplateExpressionsSettingsFor(test, `{"allow":[]}`)), "invalidType")
 
 	// An options object with no allow key keeps the default, so this is silent.
-	rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, RestrictTemplateExpressions,
+	rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, RestrictTemplateExpressions,
 		restrictTemplateExpressionsFile, sourceText,
-		restrictTemplateExpressionsSettingsFor(t, `{"allowNumber":true}`)))
+		restrictTemplateExpressionsSettingsFor(test, `{"allowNumber":true}`)))
 }

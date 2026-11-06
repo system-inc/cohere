@@ -19,7 +19,10 @@ const (
 
 // correctnessNoCollectionMisuseInOnArrayText is one of the rule's messages, whose wording lives in
 // `policy/messages/correctness-no-collection-misuse.json`.
-var correctnessNoCollectionMisuseInOnArrayText = policy.MessageOf("nexus/correctness-no-collection-misuse", correctnessNoCollectionMisuseInOnArrayId)
+var correctnessNoCollectionMisuseInOnArrayText = policy.MessageOf(
+	"nexus/correctness-no-collection-misuse",
+	correctnessNoCollectionMisuseInOnArrayId,
+)
 
 func correctnessNoCollectionMisuseInOnArrayMessage() rule.Message {
 	return rule.Message{
@@ -30,7 +33,10 @@ func correctnessNoCollectionMisuseInOnArrayMessage() rule.Message {
 
 // correctnessNoCollectionMisuseSizeComparisonText is one of the rule's messages, whose wording lives in
 // `policy/messages/correctness-no-collection-misuse.json`.
-var correctnessNoCollectionMisuseSizeComparisonText = policy.MessageOf("nexus/correctness-no-collection-misuse", correctnessNoCollectionMisuseSizeComparisonId)
+var correctnessNoCollectionMisuseSizeComparisonText = policy.MessageOf(
+	"nexus/correctness-no-collection-misuse",
+	correctnessNoCollectionMisuseSizeComparisonId,
+)
 
 func correctnessNoCollectionMisuseSizeComparisonMessage() rule.Message {
 	return rule.Message{
@@ -41,7 +47,10 @@ func correctnessNoCollectionMisuseSizeComparisonMessage() rule.Message {
 
 // correctnessNoCollectionMisuseBracketAccessText is one of the rule's messages, whose wording lives in
 // `policy/messages/correctness-no-collection-misuse.json`.
-var correctnessNoCollectionMisuseBracketAccessText = policy.MessageOf("nexus/correctness-no-collection-misuse", correctnessNoCollectionMisuseBracketAccessId)
+var correctnessNoCollectionMisuseBracketAccessText = policy.MessageOf(
+	"nexus/correctness-no-collection-misuse",
+	correctnessNoCollectionMisuseBracketAccessId,
+)
 
 func correctnessNoCollectionMisuseBracketAccessMessage() rule.Message {
 	return rule.Message{
@@ -52,13 +61,21 @@ func correctnessNoCollectionMisuseBracketAccessMessage() rule.Message {
 
 // correctnessNoCollectionMisuseObjectMethodText is one of the rule's messages, whose wording lives in
 // `policy/messages/correctness-no-collection-misuse.json`.
-var correctnessNoCollectionMisuseObjectMethodText = policy.MessageOf("nexus/correctness-no-collection-misuse", correctnessNoCollectionMisuseObjectMethodId)
+var correctnessNoCollectionMisuseObjectMethodText = policy.MessageOf(
+	"nexus/correctness-no-collection-misuse",
+	correctnessNoCollectionMisuseObjectMethodId,
+)
 
 func correctnessNoCollectionMisuseObjectMethodMessage() rule.Message {
 	return rule.Message{
 		Id:          correctnessNoCollectionMisuseObjectMethodId,
 		Description: correctnessNoCollectionMisuseObjectMethodText.Render(nil),
 	}
+}
+
+// correctnessNoCollectionMisuseAnyCollection are the default library's keyed collections.
+var correctnessNoCollectionMisuseAnyCollection = map[string]bool{
+	"Map": true, "ReadonlyMap": true, "Set": true, "ReadonlySet": true, "WeakMap": true, "WeakSet": true,
 }
 
 // CorrectnessNoCollectionMisuse reports four ways of treating a built-in collection that cannot do
@@ -129,7 +146,7 @@ func correctnessNoCollectionMisuseObjectMethodMessage() rule.Message {
 //
 // Each repair changes what the code means (`.includes()` for `in`, `.get()` for brackets, which
 // comparison was intended), so each is the author's call.
-var CorrectnessNoCollectionMisuse = rule.Rule{
+var CorrectnessNoCollectionMisuse = rule.Rule[rule.NoOptions]{
 	Name: "nexus/correctness-no-collection-misuse",
 
 	// Every check rests on the type of an operand: an array, a string, a Map or Set.
@@ -141,45 +158,48 @@ var CorrectnessNoCollectionMisuse = rule.Rule{
 	// The rule reads types and the default library's declarations, never an imported body.
 	TypeReach: rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.TypeChecker == nil || ctx.Program == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		if ruleContext.TypeChecker == nil || ruleContext.Program == nil {
 			return nil
 		}
 		return rule.Listeners{
 			ast.KindBinaryExpression: func(node *ast.Node) {
 				binary := node.AsBinaryExpression()
 				if binary.OperatorToken.Kind == ast.KindInKeyword {
-					if correctnessNoCollectionMisuseIsInOnArray(ctx, binary) {
-						ctx.ReportNode(node, correctnessNoCollectionMisuseInOnArrayMessage())
+					if correctnessNoCollectionMisuseIsInOnArray(ruleContext, binary) {
+						ruleContext.ReportNode(node, correctnessNoCollectionMisuseInOnArrayMessage())
 					}
 					return
 				}
-				if correctnessNoCollectionMisuseIsImpossibleSizeComparison(ctx, binary) {
-					ctx.ReportNode(node, correctnessNoCollectionMisuseSizeComparisonMessage())
+				if correctnessNoCollectionMisuseIsImpossibleSizeComparison(ruleContext, binary) {
+					ruleContext.ReportNode(node, correctnessNoCollectionMisuseSizeComparisonMessage())
 				}
 			},
 			ast.KindElementAccessExpression: func(node *ast.Node) {
 				access := node.AsElementAccessExpression()
 				if access.ArgumentExpression == nil ||
-					!correctnessNoCollectionMisuseIsCollection(ctx, access.Expression, correctnessNoCollectionMisuseAnyCollection) {
+					!correctnessNoCollectionMisuseIsCollection(
+						ruleContext,
+						access.Expression,
+						correctnessNoCollectionMisuseAnyCollection,
+					) {
 					return
 				}
-				if correctnessNoCollectionMisuseKeyMissesEveryMember(ctx, access.Expression, access.ArgumentExpression) {
-					ctx.ReportNode(node, correctnessNoCollectionMisuseBracketAccessMessage())
+				if correctnessNoCollectionMisuseKeyMissesEveryMember(
+					ruleContext,
+					access.Expression,
+					access.ArgumentExpression,
+				) {
+					ruleContext.ReportNode(node, correctnessNoCollectionMisuseBracketAccessMessage())
 				}
 			},
 			ast.KindCallExpression: func(node *ast.Node) {
-				if correctnessNoCollectionMisuseIsObjectMethodOnCollection(ctx, node) {
-					ctx.ReportNode(node, correctnessNoCollectionMisuseObjectMethodMessage())
+				if correctnessNoCollectionMisuseIsObjectMethodOnCollection(ruleContext, node) {
+					ruleContext.ReportNode(node, correctnessNoCollectionMisuseObjectMethodMessage())
 				}
 			},
 		}
 	},
-}
-
-// correctnessNoCollectionMisuseAnyCollection are the default library's keyed collections.
-var correctnessNoCollectionMisuseAnyCollection = map[string]bool{
-	"Map": true, "ReadonlyMap": true, "Set": true, "ReadonlySet": true, "WeakMap": true, "WeakSet": true,
 }
 
 // correctnessNoCollectionMisuseSizedCollection are the collections with a `size`.
@@ -202,8 +222,8 @@ var correctnessNoCollectionMisuseObjectMethods = map[string]bool{
 
 // correctnessNoCollectionMisuseParts is the members of an expression's type, through a type
 // parameter's constraint. An empty answer means nothing can be said.
-func correctnessNoCollectionMisuseParts(ctx rule.Context, expression *ast.Node) []*checker.Type {
-	expressionType := type_checking.GetConstrainedTypeAtLocation(ctx.TypeChecker, expression)
+func correctnessNoCollectionMisuseParts(ruleContext rule.Context, expression *ast.Node) []*checker.Type {
+	expressionType := type_checking.GetConstrainedTypeAtLocation(ruleContext.TypeChecker, expression)
 	if expressionType == nil {
 		return nil
 	}
@@ -212,23 +232,31 @@ func correctnessNoCollectionMisuseParts(ctx rule.Context, expression *ast.Node) 
 
 // correctnessNoCollectionMisuseIsLibraryType says whether a type's own symbol is one of the named
 // default-library types, never a subclass or a project type of the same name.
-func correctnessNoCollectionMisuseIsLibraryType(ctx rule.Context, part *checker.Type, names map[string]bool) bool {
+func correctnessNoCollectionMisuseIsLibraryType(
+	ruleContext rule.Context,
+	part *checker.Type,
+	names map[string]bool,
+) bool {
 	symbol := checker.Type_symbol(part)
 	if symbol == nil {
 		return false
 	}
-	return names[symbol.Name] && rule.IsSymbolFromDefaultLibrary(ctx.Program, symbol)
+	return names[symbol.Name] && rule.IsSymbolFromDefaultLibrary(ruleContext.Program, symbol)
 }
 
 // correctnessNoCollectionMisuseIsCollection says whether every member of an expression's type is one
 // of the named default-library collections.
-func correctnessNoCollectionMisuseIsCollection(ctx rule.Context, expression *ast.Node, names map[string]bool) bool {
-	parts := correctnessNoCollectionMisuseParts(ctx, expression)
+func correctnessNoCollectionMisuseIsCollection(
+	ruleContext rule.Context,
+	expression *ast.Node,
+	names map[string]bool,
+) bool {
+	parts := correctnessNoCollectionMisuseParts(ruleContext, expression)
 	if len(parts) == 0 {
 		return false
 	}
 	for _, part := range parts {
-		if !correctnessNoCollectionMisuseIsLibraryType(ctx, part, names) {
+		if !correctnessNoCollectionMisuseIsLibraryType(ruleContext, part, names) {
 			return false
 		}
 	}
@@ -237,17 +265,17 @@ func correctnessNoCollectionMisuseIsCollection(ctx rule.Context, expression *ast
 
 // correctnessNoCollectionMisuseIsInOnArray says whether `left in right` asks an array or tuple for
 // a property no member of its type declares and no index can be.
-func correctnessNoCollectionMisuseIsInOnArray(ctx rule.Context, binary *ast.BinaryExpression) bool {
-	arrays := correctnessNoCollectionMisuseParts(ctx, binary.Right)
+func correctnessNoCollectionMisuseIsInOnArray(ruleContext rule.Context, binary *ast.BinaryExpression) bool {
+	arrays := correctnessNoCollectionMisuseParts(ruleContext, binary.Right)
 	if len(arrays) == 0 {
 		return false
 	}
 	for _, part := range arrays {
-		if !checker.Checker_isArrayOrTupleType(ctx.TypeChecker, part) {
+		if !checker.Checker_isArrayOrTupleType(ruleContext.TypeChecker, part) {
 			return false
 		}
 	}
-	names := correctnessNoCollectionMisuseParts(ctx, binary.Left)
+	names := correctnessNoCollectionMisuseParts(ruleContext, binary.Left)
 	if len(names) == 0 {
 		return false
 	}
@@ -260,7 +288,7 @@ func correctnessNoCollectionMisuseIsInOnArray(ctx rule.Context, binary *ast.Bina
 			return false
 		}
 		for _, array := range arrays {
-			if checker.Checker_getPropertyOfType(ctx.TypeChecker, array, name) != nil {
+			if checker.Checker_getPropertyOfType(ruleContext.TypeChecker, array, name) != nil {
 				return false
 			}
 		}
@@ -271,19 +299,22 @@ func correctnessNoCollectionMisuseIsInOnArray(ctx rule.Context, binary *ast.Bina
 // correctnessNoCollectionMisuseIsArrayIndex says whether a property name is a canonical array index:
 // the decimal spelling of an integer from 0 to 2^32 - 2, with no sign and no leading zero.
 func correctnessNoCollectionMisuseIsArrayIndex(name string) bool {
-	value, err := strconv.ParseUint(name, 10, 32)
-	return err == nil && value < 1<<32-1 && strconv.FormatUint(value, 10) == name
+	value, parseError := strconv.ParseUint(name, 10, 32)
+	return parseError == nil && value < 1<<32-1 && strconv.FormatUint(value, 10) == name
 }
 
 // correctnessNoCollectionMisuseIsImpossibleSizeComparison says whether a comparison sets a length
 // or size against a literal no value from 0 up can change the answer of.
-func correctnessNoCollectionMisuseIsImpossibleSizeComparison(ctx rule.Context, binary *ast.BinaryExpression) bool {
+func correctnessNoCollectionMisuseIsImpossibleSizeComparison(
+	ruleContext rule.Context,
+	binary *ast.BinaryExpression,
+) bool {
 	operator := binary.OperatorToken.Kind
 	switch {
-	case correctnessNoCollectionMisuseIsSize(ctx, binary.Left):
+	case correctnessNoCollectionMisuseIsSize(ruleContext, binary.Left):
 		value, isLiteral := correctnessNoCollectionMisuseNumericLiteral(binary.Right)
 		return isLiteral && correctnessNoCollectionMisuseIsDecided(operator, value)
-	case correctnessNoCollectionMisuseIsSize(ctx, binary.Right):
+	case correctnessNoCollectionMisuseIsSize(ruleContext, binary.Right):
 		value, isLiteral := correctnessNoCollectionMisuseNumericLiteral(binary.Left)
 		return isLiteral && correctnessNoCollectionMisuseIsDecided(correctnessNoCollectionMisuseMirror(operator), value)
 	}
@@ -323,21 +354,22 @@ func correctnessNoCollectionMisuseIsDecided(operator ast.Kind, value float64) bo
 // correctnessNoCollectionMisuseNumericLiteral reads a numeric literal, or one under a unary minus,
 // through parentheses. A literal's text is the canonical spelling of its value.
 func correctnessNoCollectionMisuseNumericLiteral(node *ast.Node) (float64, bool) {
-	node = ast.SkipParentheses(node)
+	// The operand narrows from the whole expression to the literal under a unary minus, if there is one.
+	operand := ast.SkipParentheses(node)
 	sign := 1.0
-	if node.Kind == ast.KindPrefixUnaryExpression {
-		unary := node.AsPrefixUnaryExpression()
+	if operand.Kind == ast.KindPrefixUnaryExpression {
+		unary := operand.AsPrefixUnaryExpression()
 		if unary.Operator != ast.KindMinusToken {
 			return 0, false
 		}
 		sign = -1
-		node = ast.SkipParentheses(unary.Operand)
+		operand = ast.SkipParentheses(unary.Operand)
 	}
-	if node.Kind != ast.KindNumericLiteral {
+	if operand.Kind != ast.KindNumericLiteral {
 		return 0, false
 	}
-	value, err := strconv.ParseFloat(node.Text(), 64)
-	if err != nil {
+	value, parseError := strconv.ParseFloat(operand.Text(), 64)
+	if parseError != nil {
 		return 0, false
 	}
 	return sign * value, true
@@ -346,32 +378,40 @@ func correctnessNoCollectionMisuseNumericLiteral(node *ast.Node) (float64, bool)
 // correctnessNoCollectionMisuseIsSize says whether an expression is `.length` of an array, tuple,
 // string or typed array, or `.size` of a Map or Set, with every member of the receiver's type one of
 // those, so a receiver that may be `undefined` (`items?.length`) is not.
-func correctnessNoCollectionMisuseIsSize(ctx rule.Context, expression *ast.Node) bool {
-	expression = ast.SkipParentheses(expression)
-	if expression.Kind != ast.KindPropertyAccessExpression {
+func correctnessNoCollectionMisuseIsSize(ruleContext rule.Context, expression *ast.Node) bool {
+	unwrapped := ast.SkipParentheses(expression)
+	if unwrapped.Kind != ast.KindPropertyAccessExpression {
 		return false
 	}
-	access := expression.AsPropertyAccessExpression()
+	access := unwrapped.AsPropertyAccessExpression()
 	if access.Name().Kind != ast.KindIdentifier {
 		return false
 	}
-	receivers := correctnessNoCollectionMisuseParts(ctx, access.Expression)
+	receivers := correctnessNoCollectionMisuseParts(ruleContext, access.Expression)
 	if len(receivers) == 0 {
 		return false
 	}
 	switch access.Name().Text() {
 	case "length":
 		for _, part := range receivers {
-			if !checker.Checker_isArrayOrTupleType(ctx.TypeChecker, part) &&
+			if !checker.Checker_isArrayOrTupleType(ruleContext.TypeChecker, part) &&
 				!type_checking.IsTypeFlagSet(part, checker.TypeFlagsStringLike) &&
-				!correctnessNoCollectionMisuseIsLibraryType(ctx, part, correctnessNoCollectionMisuseTypedArrays) {
+				!correctnessNoCollectionMisuseIsLibraryType(
+					ruleContext,
+					part,
+					correctnessNoCollectionMisuseTypedArrays,
+				) {
 				return false
 			}
 		}
 		return true
 	case "size":
 		for _, part := range receivers {
-			if !correctnessNoCollectionMisuseIsLibraryType(ctx, part, correctnessNoCollectionMisuseSizedCollection) {
+			if !correctnessNoCollectionMisuseIsLibraryType(
+				ruleContext,
+				part,
+				correctnessNoCollectionMisuseSizedCollection,
+			) {
 				return false
 			}
 		}
@@ -382,13 +422,17 @@ func correctnessNoCollectionMisuseIsSize(ctx rule.Context, expression *ast.Node)
 
 // correctnessNoCollectionMisuseKeyMissesEveryMember says whether every value a key's type allows
 // becomes a property name that no member of the collection's type declares.
-func correctnessNoCollectionMisuseKeyMissesEveryMember(ctx rule.Context, collection *ast.Node, key *ast.Node) bool {
-	keyType := ctx.TypeChecker.GetTypeAtLocation(key)
+func correctnessNoCollectionMisuseKeyMissesEveryMember(
+	ruleContext rule.Context,
+	collection *ast.Node,
+	key *ast.Node,
+) bool {
+	keyType := ruleContext.TypeChecker.GetTypeAtLocation(key)
 	if keyType == nil {
 		return false
 	}
-	collections := correctnessNoCollectionMisuseParts(ctx, collection)
-	for part := range type_checking.UnionTypePartsSeq(keyType) {
+	collections := correctnessNoCollectionMisuseParts(ruleContext, collection)
+	for part := range type_checking.UnionTypePartsSequence(keyType) {
 		switch {
 		case type_checking.IsTypeFlagSet(part, checker.TypeFlagsStringLiteral):
 			name, isString := part.AsLiteralType().Value().(string)
@@ -396,7 +440,7 @@ func correctnessNoCollectionMisuseKeyMissesEveryMember(ctx rule.Context, collect
 				return false
 			}
 			for _, collectionPart := range collections {
-				if checker.Checker_getPropertyOfType(ctx.TypeChecker, collectionPart, name) != nil {
+				if checker.Checker_getPropertyOfType(ruleContext.TypeChecker, collectionPart, name) != nil {
 					return false
 				}
 			}
@@ -411,7 +455,7 @@ func correctnessNoCollectionMisuseKeyMissesEveryMember(ctx rule.Context, collect
 
 // correctnessNoCollectionMisuseIsObjectMethodOnCollection says whether a call is the default
 // library's `Object.keys`, `values`, `entries` or `getOwnPropertyNames` on a Map or Set.
-func correctnessNoCollectionMisuseIsObjectMethodOnCollection(ctx rule.Context, node *ast.Node) bool {
+func correctnessNoCollectionMisuseIsObjectMethodOnCollection(ruleContext rule.Context, node *ast.Node) bool {
 	call := node.AsCallExpression()
 	if call.Arguments == nil || len(call.Arguments.Nodes) == 0 {
 		return false
@@ -426,9 +470,16 @@ func correctnessNoCollectionMisuseIsObjectMethodOnCollection(ctx rule.Context, n
 		object.Kind != ast.KindIdentifier || object.Text() != "Object" {
 		return false
 	}
-	if !rule.IsSymbolFromDefaultLibrary(ctx.Program, ctx.TypeChecker.GetSymbolAtLocation(object)) ||
-		!rule.IsSymbolFromDefaultLibrary(ctx.Program, ctx.TypeChecker.GetSymbolAtLocation(access.Name())) {
+	if !rule.IsSymbolFromDefaultLibrary(ruleContext.Program, ruleContext.TypeChecker.GetSymbolAtLocation(object)) ||
+		!rule.IsSymbolFromDefaultLibrary(
+			ruleContext.Program,
+			ruleContext.TypeChecker.GetSymbolAtLocation(access.Name()),
+		) {
 		return false
 	}
-	return correctnessNoCollectionMisuseIsCollection(ctx, call.Arguments.Nodes[0], correctnessNoCollectionMisuseAnyCollection)
+	return correctnessNoCollectionMisuseIsCollection(
+		ruleContext,
+		call.Arguments.Nodes[0],
+		correctnessNoCollectionMisuseAnyCollection,
+	)
 }

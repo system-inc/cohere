@@ -6,13 +6,15 @@ import (
 	goparser "go/parser"
 	"go/token"
 	"os"
+	"path/filepath"
 	"sort"
+	"strings"
 	"testing"
 )
 
 // TestEachPlaceCoversEveryInstructionValue is the exhaustiveness check Go's type switch cannot do.
 //
-// It parses THIS PACKAGE'S OWN SOURCE to find every type implementing InstructionValue, then reads
+// It parses this package's own source to find every type implementing InstructionValue, then reads
 // the case labels out of EachPlace's type switch and compares the two sets. A variant added without
 // a case appears as a missing name and the test names it.
 //
@@ -20,18 +22,18 @@ import (
 // approach needs a registry, and a variant whose author forgot the registry is exactly the variant
 // whose author forgot the visitor. The source cannot be forgotten to update, because the source is
 // where the variant was added.
-func TestEachPlaceCoversEveryInstructionValue(t *testing.T) {
-	t.Parallel()
+func TestEachPlaceCoversEveryInstructionValue(test *testing.T) {
+	test.Parallel()
 
-	declared := markerImplementers(t, "instructionValue")
+	declared := markerImplementers(test, "instructionValue")
 	if len(declared) < 40 {
-		t.Fatalf("found only %d instruction values, expected the full set; the source scan is broken", len(declared))
+		test.Fatalf("found only %d instruction values, expected the full set; the source scan is broken", len(declared))
 	}
-	covered := typeSwitchCases(t, "visitor.go", "EachPlace")
+	covered := typeSwitchCases(test, "visitor.go", "EachPlace")
 
 	for _, name := range declared {
 		if !covered[name] {
-			t.Errorf("EachPlace has no case for %s, so its places are invisible to every pass", name)
+			test.Errorf("EachPlace has no case for %s, so its places are invisible to every pass", name)
 		}
 	}
 }
@@ -41,18 +43,18 @@ func TestEachPlaceCoversEveryInstructionValue(t *testing.T) {
 // A terminal with no case yields no successors, which makes every block it leads to unreachable and
 // silently deletes them from the graph. That failure looks like a lowering bug rather than a
 // missing case, which is why this asserts rather than trusting review.
-func TestEachSuccessorCoversEveryTerminal(t *testing.T) {
-	t.Parallel()
+func TestEachSuccessorCoversEveryTerminal(test *testing.T) {
+	test.Parallel()
 
-	declared := markerImplementers(t, "terminal")
+	declared := markerImplementers(test, "terminal")
 	if len(declared) < 18 {
-		t.Fatalf("found only %d terminals, expected the full set; the source scan is broken", len(declared))
+		test.Fatalf("found only %d terminals, expected the full set; the source scan is broken", len(declared))
 	}
-	covered := typeSwitchCases(t, "visitor.go", "EachSuccessor")
+	covered := typeSwitchCases(test, "visitor.go", "EachSuccessor")
 
 	for _, name := range declared {
 		if !covered[name] {
-			t.Errorf("EachSuccessor has no case for %s, so blocks it leads to look unreachable", name)
+			test.Errorf("EachSuccessor has no case for %s, so blocks it leads to look unreachable", name)
 		}
 	}
 }
@@ -61,29 +63,29 @@ func TestEachSuccessorCoversEveryTerminal(t *testing.T) {
 //
 // A terminal with no case returns order zero, which reads as "before everything" to any pass
 // comparing positions, and is wrong in a way that produces plausible answers.
-func TestTerminalOrderCoversEveryTerminal(t *testing.T) {
-	t.Parallel()
+func TestTerminalOrderCoversEveryTerminal(test *testing.T) {
+	test.Parallel()
 
-	declared := markerImplementers(t, "terminal")
-	covered := typeSwitchCases(t, "visitor.go", "TerminalOrder")
+	declared := markerImplementers(test, "terminal")
+	covered := typeSwitchCases(test, "visitor.go", "TerminalOrder")
 
 	for _, name := range declared {
 		if !covered[name] {
-			t.Errorf("TerminalOrder has no case for %s, so it reports order zero", name)
+			test.Errorf("TerminalOrder has no case for %s, so it reports order zero", name)
 		}
 	}
 }
 
 // TestSetTerminalOrderCoversEveryTerminal guards the writer half of the same field.
-func TestSetTerminalOrderCoversEveryTerminal(t *testing.T) {
-	t.Parallel()
+func TestSetTerminalOrderCoversEveryTerminal(test *testing.T) {
+	test.Parallel()
 
-	declared := markerImplementers(t, "terminal")
-	covered := typeSwitchCases(t, "graph.go", "setTerminalOrder")
+	declared := markerImplementers(test, "terminal")
+	covered := typeSwitchCases(test, "graph.go", "setTerminalOrder")
 
 	for _, name := range declared {
 		if !covered[name] {
-			t.Errorf("setTerminalOrder has no case for %s, so it never receives an order", name)
+			test.Errorf("setTerminalOrder has no case for %s, so it never receives an order", name)
 		}
 	}
 }
@@ -93,29 +95,29 @@ func TestSetTerminalOrderCoversEveryTerminal(t *testing.T) {
 // Every lowering test in this package asserts against printed output, so a variant the printer
 // renders as "<unknown>" makes those tests unable to distinguish it from any other unprinted
 // variant. The printer is test infrastructure and this is what stops it silently degrading.
-func TestPrintValueCoversEveryInstructionValue(t *testing.T) {
-	t.Parallel()
+func TestPrintValueCoversEveryInstructionValue(test *testing.T) {
+	test.Parallel()
 
-	declared := markerImplementers(t, "instructionValue")
-	covered := typeSwitchCases(t, "print.go", "printValue")
+	declared := markerImplementers(test, "instructionValue")
+	covered := typeSwitchCases(test, "print.go", "printValue")
 
 	for _, name := range declared {
 		if !covered[name] {
-			t.Errorf("printValue has no case for %s, so it prints as <unknown>", name)
+			test.Errorf("printValue has no case for %s, so it prints as <unknown>", name)
 		}
 	}
 }
 
 // TestPrintTerminalCoversEveryTerminal is the same for terminals.
-func TestPrintTerminalCoversEveryTerminal(t *testing.T) {
-	t.Parallel()
+func TestPrintTerminalCoversEveryTerminal(test *testing.T) {
+	test.Parallel()
 
-	declared := markerImplementers(t, "terminal")
-	covered := typeSwitchCases(t, "print.go", "printTerminal")
+	declared := markerImplementers(test, "terminal")
+	covered := typeSwitchCases(test, "print.go", "printTerminal")
 
 	for _, name := range declared {
 		if !covered[name] {
-			t.Errorf("printTerminal has no case for %s, so it prints as <unknown terminal>", name)
+			test.Errorf("printTerminal has no case for %s, so it prints as <unknown terminal>", name)
 		}
 	}
 }
@@ -127,21 +129,21 @@ func TestPrintTerminalCoversEveryTerminal(t *testing.T) {
 // and 22 terminals of which 2 are React. If the sets drift without the reasoning being revisited,
 // the package comment becomes a claim about a program that no longer exists.
 //
-// The terminal count is 21 rather than upstream's 22 BY DESIGN: `PrunedScope` is deliberately
+// The terminal count is 21 rather than upstream's 22 by design: `PrunedScope` is deliberately
 // absent. `Scope` was absent for the same reason until `scope_terminals.go` landed to construct it,
 // and was added in that same commit -- which is what this guard is for. It went red, was read, and
 // the count was moved deliberately rather than by a compiler error. See the terminal.go header.
-func TestInstructionSetSizeIsWhatWeSaidItIs(t *testing.T) {
-	t.Parallel()
+func TestInstructionSetSizeIsWhatWeSaidItIs(test *testing.T) {
+	test.Parallel()
 
-	values := markerImplementers(t, "instructionValue")
+	values := markerImplementers(test, "instructionValue")
 	if len(values) != 43 {
-		t.Errorf("the instruction set holds %d variants, want 43 to match upstream: %v", len(values), values)
+		test.Errorf("the instruction set holds %d variants, want 43 to match upstream: %v", len(values), values)
 	}
 
-	terminals := markerImplementers(t, "terminal")
+	terminals := markerImplementers(test, "terminal")
 	if len(terminals) != 21 {
-		t.Errorf("the terminal set holds %d variants, want 21 (upstream's 22 minus PrunedScope): %v",
+		test.Errorf("the terminal set holds %d variants, want 21 (upstream's 22 minus PrunedScope): %v",
 			len(terminals), terminals)
 	}
 
@@ -149,20 +151,20 @@ func TestInstructionSetSizeIsWhatWeSaidItIs(t *testing.T) {
 	// present stops a later cleanup from removing them without reading why they are here.
 	for _, name := range []string{"JsxExpression", "JsxFragment", "JsxText", "StartMemoize", "FinishMemoize"} {
 		if !contains(values, name) {
-			t.Errorf("%s is missing from the instruction set; see the package comment on why it belongs here", name)
+			test.Errorf("%s is missing from the instruction set; see the package comment on why it belongs here", name)
 		}
 	}
 	// `Scope` is present because `scope_terminals.go` constructs it. Asserting it is present stops a
 	// later cleanup from removing the variant while its producer still builds one.
 	if !contains(terminals, "Scope") {
-		t.Error("Scope is missing from the terminal set, but scope_terminals.go constructs one")
+		test.Error("Scope is missing from the terminal set, but scope_terminals.go constructs one")
 	}
 	// `PrunedScope` is still deliberately absent. The four passes that construct it upstream are not
 	// ported, so adding it would put a variant in the set that nothing here produces -- the same
 	// shape as `Optional`, which this package already carries as a warning. A stage that ports one of
 	// those passes adds the variant in that commit and updates this line.
 	if contains(terminals, "PrunedScope") {
-		t.Error("PrunedScope was added to the terminal set but nothing in this tree constructs one; " +
+		test.Error("PrunedScope was added to the terminal set but nothing in this tree constructs one; " +
 			"see ScopeTerminalsGapPrunedScope")
 	}
 }
@@ -177,10 +179,10 @@ func contains(names []string, name string) bool {
 }
 
 // markerImplementers returns every type in this package with a method of the given name.
-func markerImplementers(t *testing.T, marker string) []string {
-	t.Helper()
+func markerImplementers(test *testing.T, marker string) []string {
+	test.Helper()
 	var names []string
-	forEachPackageFile(t, func(file *ast.File) {
+	forEachPackageFile(test, func(file *ast.File) {
 		for _, declaration := range file.Decls {
 			function, ok := declaration.(*ast.FuncDecl)
 			if !ok || function.Recv == nil || function.Name.Name != marker {
@@ -204,8 +206,8 @@ func markerImplementers(t *testing.T, marker string) []string {
 
 // typeSwitchCases returns the type names appearing as case labels in the named function's type
 // switches.
-func typeSwitchCases(t *testing.T, fileName, functionName string) map[string]bool {
-	t.Helper()
+func typeSwitchCases(test *testing.T, fileName, functionName string) map[string]bool {
+	test.Helper()
 	cases := map[string]bool{}
 	found := false
 
@@ -213,7 +215,7 @@ func typeSwitchCases(t *testing.T, fileName, functionName string) map[string]boo
 	// is unique across the package, so searching every file finds it and a move does not break this.
 	_ = fileName
 
-	forEachPackageFile(t, func(file *ast.File) {
+	forEachPackageFile(test, func(file *ast.File) {
 		for _, declaration := range file.Decls {
 			function, ok := declaration.(*ast.FuncDecl)
 			if !ok || function.Name.Name != functionName {
@@ -240,7 +242,7 @@ func typeSwitchCases(t *testing.T, fileName, functionName string) map[string]boo
 	})
 
 	if !found {
-		t.Fatalf("no function named %s was found; the source scan is looking in the wrong place", functionName)
+		test.Fatalf("no function named %s was found; the source scan is looking in the wrong place", functionName)
 	}
 	return cases
 }
@@ -250,28 +252,34 @@ func typeSwitchCases(t *testing.T, fileName, functionName string) map[string]boo
 // Located by the working directory, which `go test` sets to the package's directory under any flags.
 // It was runtime.Caller, whose path is the import path under -trimpath, so the scan opened a directory
 // that does not exist and every test built on it failed on a machine that builds with -trimpath.
-func forEachPackageFile(t *testing.T, visit func(*ast.File)) {
-	t.Helper()
-	directory, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("cannot locate the package source: %v", err)
+func forEachPackageFile(test *testing.T, visit func(*ast.File)) {
+	test.Helper()
+	directory, workingDirectoryError := os.Getwd()
+	if workingDirectoryError != nil {
+		test.Fatalf("cannot locate the package source: %v", workingDirectoryError)
 	}
 
-	fileSet := token.NewFileSet()
-	packages, err := goparser.ParseDir(fileSet, directory, nil, 0)
-	if err != nil {
-		t.Fatalf("parsing the package source: %v", err)
+	// Every `.go` file in the directory, test files among them, as go/parser's deprecated ParseDir read it.
+	entries, readError := os.ReadDir(directory)
+	if readError != nil {
+		test.Fatalf("reading the package source: %v", readError)
 	}
-	for _, pkg := range packages {
-		for _, file := range pkg.Files {
-			visit(file)
+	fileSet := token.NewFileSet()
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".go") {
+			continue
 		}
+		file, parseError := goparser.ParseFile(fileSet, filepath.Join(directory, entry.Name()), nil, 0)
+		if parseError != nil {
+			test.Fatalf("parsing the package source: %v", parseError)
+		}
+		visit(file)
 	}
 }
 
 // TestPlaceStringIsStableAcrossIdenticalValues is the property the whole IR exists to provide.
-func TestPlaceStringIsStableAcrossIdenticalValues(t *testing.T) {
-	t.Parallel()
+func TestPlaceStringIsStableAcrossIdenticalValues(test *testing.T) {
+	test.Parallel()
 
 	function := NewFunction(nil, "test", FunctionKindOther)
 	identifier := function.NewIdentifier("x", nil, 0)
@@ -279,16 +287,18 @@ func TestPlaceStringIsStableAcrossIdenticalValues(t *testing.T) {
 	second := Place{Identifier: identifier.Id, Effect: EffectMutate}
 
 	if function.PlaceString(first) != function.PlaceString(second) {
-		t.Error("two places naming one identifier must print alike; the effect is a property of the reference, not the value")
+		test.Error(
+			"two places naming one identifier must print alike; the effect is a property of the reference, not the value",
+		)
 	}
 	if first.Identifier != second.Identifier {
-		t.Error("places naming one value must share an identifier")
+		test.Error("places naming one value must share an identifier")
 	}
 }
 
 // TestEffectLatticeOrdering pins the order a join depends on.
-func TestEffectLatticeOrdering(t *testing.T) {
-	t.Parallel()
+func TestEffectLatticeOrdering(test *testing.T) {
+	test.Parallel()
 
 	mutable := []Effect{
 		EffectCapture, EffectStore, EffectConditionallyMutate,
@@ -296,18 +306,18 @@ func TestEffectLatticeOrdering(t *testing.T) {
 	}
 	for _, effect := range mutable {
 		if !effect.IsMutable() {
-			t.Errorf("%s must count as mutable", effect)
+			test.Errorf("%s must count as mutable", effect)
 		}
 	}
 	for _, effect := range []Effect{EffectUnknown, EffectFreeze, EffectRead} {
 		if effect.IsMutable() {
-			t.Errorf("%s must not count as mutable", effect)
+			test.Errorf("%s must not count as mutable", effect)
 		}
 	}
 }
 
-func TestClassifyFunction(t *testing.T) {
-	t.Parallel()
+func TestClassifyFunction(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name string
@@ -315,7 +325,7 @@ func TestClassifyFunction(t *testing.T) {
 	}{
 		{"Component", FunctionKindComponent},
 		{"useState", FunctionKindHook},
-		// React's own convention is `use` followed by a capital OR a digit, so `use2` is a hook.
+		// React's own convention is `use` followed by a capital or a digit, so `use2` is a hook.
 		// Asserting the digit case explicitly because it is the half a reimplementation forgets.
 		{"use2", FunctionKindHook},
 		{"useSomething", FunctionKindHook},
@@ -323,9 +333,9 @@ func TestClassifyFunction(t *testing.T) {
 		{"helper", FunctionKindOther},
 		{"", FunctionKindOther},
 	}
-	for _, test := range cases {
-		if got := classifyFunction(test.name); got != test.want {
-			t.Errorf("classifyFunction(%q) = %s, want %s", test.name, got, test.want)
+	for _, testCase := range cases {
+		if got := classifyFunction(testCase.name); got != testCase.want {
+			test.Errorf("classifyFunction(%q) = %s, want %s", testCase.name, got, testCase.want)
 		}
 	}
 }
@@ -337,19 +347,19 @@ func TestClassifyFunction(t *testing.T) {
 // different id space. That is the same failure mode `EachSuccessor` is guarded against, one step
 // worse, because a missed edge reads as unreachable while a missed rewrite reads as reachable and
 // wrong.
-func TestEachBlockReferencePointerCoversEveryTerminal(t *testing.T) {
-	t.Parallel()
+func TestEachBlockReferencePointerCoversEveryTerminal(test *testing.T) {
+	test.Parallel()
 
-	declared := markerImplementers(t, "terminal")
+	declared := markerImplementers(test, "terminal")
 	if len(declared) < 18 {
-		t.Fatalf("found only %d terminals, expected the full set; the source scan is broken",
+		test.Fatalf("found only %d terminals, expected the full set; the source scan is broken",
 			len(declared))
 	}
-	covered := typeSwitchCases(t, "visitor_mutate.go", "EachBlockReferencePointer")
+	covered := typeSwitchCases(test, "visitor_mutate.go", "EachBlockReferencePointer")
 
 	for _, name := range declared {
 		if !covered[name] {
-			t.Errorf("EachBlockReferencePointer has no case for %s, so a pass renaming blocks "+
+			test.Errorf("EachBlockReferencePointer has no case for %s, so a pass renaming blocks "+
 				"leaves it pointing into the old id space", name)
 		}
 	}
@@ -360,12 +370,12 @@ func TestEachBlockReferencePointerCoversEveryTerminal(t *testing.T) {
 // The arm list above is guarded against the declared terminals; this is guarded against what the
 // read-only walkers actually yield, which is the stronger question. A terminal can have a case here
 // and still miss one of its own fields.
-func TestEachBlockReferencePointerSeesEveryReadOnlyReference(t *testing.T) {
-	t.Parallel()
+func TestEachBlockReferencePointerSeesEveryReadOnlyReference(test *testing.T) {
+	test.Parallel()
 
-	terminals := everyTerminalSample(t)
+	terminals := everyTerminalSample(test)
 	if len(terminals) < 18 {
-		t.Fatalf("only %d terminal samples; the comparison below would not cover the set",
+		test.Fatalf("only %d terminal samples; the comparison below would not cover the set",
 			len(terminals))
 	}
 	for _, terminal := range terminals {
@@ -377,7 +387,7 @@ func TestEachBlockReferencePointerSeesEveryReadOnlyReference(t *testing.T) {
 
 		for block := range expected {
 			if !seen[block] {
-				t.Errorf("%T names block %d through the read-only walkers and "+
+				test.Errorf("%T names block %d through the read-only walkers and "+
 					"EachBlockReferencePointer does not reach it", terminal, block)
 			}
 		}
@@ -388,8 +398,8 @@ func TestEachBlockReferencePointerSeesEveryReadOnlyReference(t *testing.T) {
 //
 // Distinct ids are the whole point: a walker that reads `t.Consequent` twice instead of reading
 // `t.Alternate` passes any sample where the two are equal.
-func everyTerminalSample(t *testing.T) []Terminal {
-	t.Helper()
+func everyTerminalSample(test *testing.T) []Terminal {
+	test.Helper()
 	next := static_single_assignment.BlockId(0)
 	block := func() static_single_assignment.BlockId {
 		next++

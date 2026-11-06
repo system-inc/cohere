@@ -10,12 +10,18 @@ import (
 
 // reactComponentRequireNamedExportText is the rule's message, whose wording lives in
 // `policy/messages/react-component-require-named-export.json`.
-var reactComponentRequireNamedExportText = policy.MessageOf("structure/react-component-require-named-export", "componentRequiresNamedExport")
+var reactComponentRequireNamedExportText = policy.MessageOf(
+	"structure/react-component-require-named-export",
+	"componentRequiresNamedExport",
+)
 
 // messageComponentRequiresNamedExport is the finding, rendered when it is reported so the text
 // comes from the current catalog.
 func messageComponentRequiresNamedExport() rule.Message {
-	return rule.Message{Id: reactComponentRequireNamedExportText.Id, Description: reactComponentRequireNamedExportText.Render(nil)}
+	return rule.Message{
+		Id:          reactComponentRequireNamedExportText.Id,
+		Description: reactComponentRequireNamedExportText.Render(nil),
+	}
 }
 
 // ReactComponentRequireNamedExport flags a component file with no named export.
@@ -54,15 +60,15 @@ func messageComponentRequiresNamedExport() rule.Message {
 // would mean writing nesting detection the original does not have, which would make this rule
 // quieter than the gate on files the gate reports. So the flag is not ported, and the reason is
 // recorded here because a later reader comparing the two files will otherwise see a missing guard.
-var ReactComponentRequireNamedExport = rule.Rule{
+var ReactComponentRequireNamedExport = rule.Rule[rule.NoOptions]{
 	Name:       "structure/react-component-require-named-export",
 	NoListener: rule.NoListenerAnswersInRun,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
-		fileContext := FileContextFor(ctx.SourceFile.FileName().AsString())
+		fileContext := FileContextFor(ruleContext.SourceFile.FileName().AsString())
 		if !fileContext.IsReactFile || fileContext.IsSpecialNextJsFile {
 			return nil
 		}
@@ -70,7 +76,7 @@ var ReactComponentRequireNamedExport = rule.Rule{
 		// The decision is about the file rather than about any node in it, so it is made once here
 		// rather than in a listener. Returning nil listeners means the walk never enters this file
 		// on this rule's behalf, which is the cheapest a rule can be.
-		components := componentsDeclaredInFile(ctx.SourceFile.AsNode())
+		components := componentsDeclaredInFile(ruleContext.SourceFile.AsNode())
 		if len(components) == 0 {
 			return nil
 		}
@@ -83,7 +89,7 @@ var ReactComponentRequireNamedExport = rule.Rule{
 		// The first component declared, matching the original. A file with several components and no
 		// named export reports once, naming the first, because the fix is to export the one the file
 		// is about and the rest are its helpers.
-		ctx.ReportNode(components[0].nameNode, messageComponentRequiresNamedExport())
+		ruleContext.ReportNode(components[0].nameNode, messageComponentRequiresNamedExport())
 		return nil
 	},
 }

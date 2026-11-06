@@ -12,8 +12,14 @@ import (
 // The rule's messages, one handle per id, whose wording lives in
 // `policy/messages/network-require-hook-variables-type.json`.
 var (
-	networkRequireHookVariablesTypeInlineVariablesTypeText               = policy.MessageOf("structure/network-require-hook-variables-type", "inlineVariablesType")
-	networkRequireHookVariablesTypeUnnecessaryVariablesDestructuringText = policy.MessageOf("structure/network-require-hook-variables-type", "unnecessaryVariablesDestructuring")
+	networkRequireHookVariablesTypeInlineVariablesTypeText = policy.MessageOf(
+		"structure/network-require-hook-variables-type",
+		"inlineVariablesType",
+	)
+	networkRequireHookVariablesTypeUnnecessaryVariablesDestructuringText = policy.MessageOf(
+		"structure/network-require-hook-variables-type",
+		"unnecessaryVariablesDestructuring",
+	)
 )
 
 // messageInlineVariablesType is the finding, rendered when it is reported so the text comes from the current catalog.
@@ -24,7 +30,8 @@ func messageInlineVariablesType() rule.Message {
 	}
 }
 
-// messageUnnecessaryVariablesDestructuring is the finding, rendered when it is reported so the text comes from the current catalog.
+// messageUnnecessaryVariablesDestructuring is the finding, rendered when it is reported so the text comes from the
+// current catalog.
 func messageUnnecessaryVariablesDestructuring() rule.Message {
 	return rule.Message{
 		Id:          networkRequireHookVariablesTypeUnnecessaryVariablesDestructuringText.Id,
@@ -56,18 +63,18 @@ func messageUnnecessaryVariablesDestructuring() rule.Message {
 // every property is a same-named read off the variables parameter. `{ identifier: variables.slug }`
 // is a rename rather than a rebuild and is left alone, because collapsing it to the parameter would
 // change what the call sends.
-var NetworkRequireHookVariablesType = rule.Rule{
+var NetworkRequireHookVariablesType = rule.Rule[rule.NoOptions]{
 	Name:       "structure/network-require-hook-variables-type",
 	NoListener: rule.NoListenerAnswersInRun,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		analysis := NetworkFileAnalysisFor(ctx)
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		analysis := NetworkFileAnalysisFor(ruleContext)
 		if len(analysis.HookDeclarations) == 0 {
 			return nil
 		}
 
 		for _, hook := range analysis.HookDeclarations {
 			for _, call := range findNetworkServiceCalls(hook.Body) {
-				checkHookVariablesPattern(ctx, hook, call)
+				checkHookVariablesPattern(ruleContext, hook, call)
 			}
 		}
 		return nil
@@ -88,7 +95,7 @@ var graphQlLikePropertyNames = map[string]bool{
 }
 
 // checkHookVariablesPattern judges one hook against one of its NetworkService calls.
-func checkHookVariablesPattern(ctx rule.Context, hook NetworkHookDeclaration, call NetworkServiceCall) {
+func checkHookVariablesPattern(ruleContext rule.Context, hook NetworkHookDeclaration, call NetworkServiceCall) {
 	isQuery := call.MethodName == "useGraphQlQuery" || call.MethodName == "useSuspenseGraphQlQuery"
 	isMutation := call.MethodName == "useGraphQlMutation"
 	if !isQuery && !isMutation {
@@ -106,7 +113,7 @@ func checkHookVariablesPattern(ctx rule.Context, hook NetworkHookDeclaration, ca
 
 		if strings.Contains(name, "variable") || name == "input" {
 			if !hasGeneratedVariablesType(parameter) {
-				ctx.ReportNode(parameter, messageInlineVariablesType())
+				ruleContext.ReportNode(parameter, messageInlineVariablesType())
 			}
 			continue
 		}
@@ -115,12 +122,12 @@ func checkHookVariablesPattern(ctx rule.Context, hook NetworkHookDeclaration, ca
 		// shape of an inline type, since a named type here is very often a legitimate domain type
 		// that has nothing to do with this document.
 		if inlineTypeLooksLikeVariables(parameterTypeNode(parameter)) {
-			ctx.ReportNode(parameter, messageInlineVariablesType())
+			ruleContext.ReportNode(parameter, messageInlineVariablesType())
 		}
 	}
 
 	if isQuery {
-		checkVariablesRebuild(ctx, hook, call)
+		checkVariablesRebuild(ruleContext, hook, call)
 	}
 }
 
@@ -171,7 +178,7 @@ func inlineTypeLooksLikeVariables(typeNode *ast.Node) bool {
 }
 
 // checkVariablesRebuild flags a second argument that reassembles the variables parameter verbatim.
-func checkVariablesRebuild(ctx rule.Context, hook NetworkHookDeclaration, call NetworkServiceCall) {
+func checkVariablesRebuild(ruleContext rule.Context, hook NetworkHookDeclaration, call NetworkServiceCall) {
 	if len(call.Arguments) < 2 {
 		return
 	}
@@ -202,7 +209,7 @@ func checkVariablesRebuild(ctx rule.Context, hook NetworkHookDeclaration, call N
 		}
 	}
 
-	ctx.ReportNode(argument, messageUnnecessaryVariablesDestructuring())
+	ruleContext.ReportNode(argument, messageUnnecessaryVariablesDestructuring())
 }
 
 // isSameNamedReadOff reports `name: variables.name`, where the key and the property agree.

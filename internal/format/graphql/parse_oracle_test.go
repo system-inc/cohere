@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 	"unicode/utf16"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/corpus"
 	"github.com/system-inc/cohere/internal/format/estree"
+	"github.com/system-inc/cohere/internal/json_value"
 )
 
 // graphqlParseScript is the oracle: graphql-js 17.0.2 from the fork's node_modules, called the way
@@ -64,42 +66,99 @@ type parseFixture struct {
 var parseFixtures = []parseFixture{
 	// Executable definitions.
 	{name: "shorthand query", text: "{ a }"},
-	{name: "operations of every type", text: "query { a } mutation M { b } subscription S @live { c } query Q($a: Int, $b: [String!]! = [\"x\"] @d) @e { f }"},
-	{name: "fields", text: "{ alias: field(a: 1, b: \"two\", c: THREE, d: null, e: true, f: false, g: 1.5e3, h: $v, i: [1, 2], j: {k: 1, l: {m: 2}}) @include(if: $x) @skip(if: false) { nested { deeper } } }"},
-	{name: "fragments", text: "{ ...Spread @defer ... on Type { x } ... @include(if: true) { y } ... { z } }\nfragment Spread on Type @dir { a }"},
-	{name: "fragment arguments", text: "fragment F($a: Int = 1, $b: String @deprecated) on T @dir { f(a: $a) ...G(x: $a, y: {z: [$b]}) }\nquery { ...F(a: 2, b: \"x\") @skip(if: false) ...F }"},
-	{name: "descriptions on executable definitions and variables", text: "\"operation\" query Q(\"variable\" $a: Int, \"\"\"block variable\"\"\" $b: Int) { a }\n\"\"\"fragment\"\"\" fragment F on T { a }"},
-	{name: "values", text: "{ a(l: [], o: {}, n: {a: [{b: 1}], c: {}}, m: [[1], []], neg: -0, f1: 0.0, f2: 1E-3, f3: -12.5e+10, i: 1234567890123456789012) }"},
+	{
+		name: "operations of every type",
+		text: "query { a } mutation M { b } subscription S @live { c } query Q($a: Int, $b: [String!]! = [\"x\"] @d) @e { f }",
+	},
+	{
+		name: "fields",
+		text: "{ alias: field(a: 1, b: \"two\", c: THREE, d: null, e: true, f: false, g: 1.5e3, h: $v, i: [1, 2], j: {k: 1, l: {m: 2}}) @include(if: $x) @skip(if: false) { nested { deeper } } }",
+	},
+	{
+		name: "fragments",
+		text: "{ ...Spread @defer ... on Type { x } ... @include(if: true) { y } ... { z } }\nfragment Spread on Type @dir { a }",
+	},
+	{
+		name: "fragment arguments",
+		text: "fragment F($a: Int = 1, $b: String @deprecated) on T @dir { f(a: $a) ...G(x: $a, y: {z: [$b]}) }\nquery { ...F(a: 2, b: \"x\") @skip(if: false) ...F }",
+	},
+	{
+		name: "descriptions on executable definitions and variables",
+		text: "\"operation\" query Q(\"variable\" $a: Int, \"\"\"block variable\"\"\" $b: Int) { a }\n\"\"\"fragment\"\"\" fragment F on T { a }",
+	},
+	{
+		name: "values",
+		text: "{ a(l: [], o: {}, n: {a: [{b: 1}], c: {}}, m: [[1], []], neg: -0, f1: 0.0, f2: 1E-3, f3: -12.5e+10, i: 1234567890123456789012) }",
+	},
 	{name: "types", text: "query($a: [[Int!]!]!, $b: T, $c: [T]) { a }"},
 	{name: "commas and whitespace are ignored", text: ",,,{\ta,,b\t,c}\t,"},
 
 	// Type system definitions.
-	{name: "schema definition", text: "\"schema description\" schema @a { query: Query mutation: Mutation subscription: Subscription }"},
+	{
+		name: "schema definition",
+		text: "\"schema description\" schema @a { query: Query mutation: Mutation subscription: Subscription }",
+	},
 	{name: "scalar", text: "\"\"\"scalar\"\"\" scalar Date @specifiedBy(url: \"https://example.com\")"},
-	{name: "object type", text: "type Query implements A & B @key(fields: \"id\") { \"field\" field(\"argument\" a: Int = 1 @d, b: [String!]!): String! @deprecated(reason: \"no\") other: Int }\ntype Empty\ntype Leading implements & A & B { a: Int }"},
+	{
+		name: "object type",
+		text: "type Query implements A & B @key(fields: \"id\") { \"field\" field(\"argument\" a: Int = 1 @d, b: [String!]!): String! @deprecated(reason: \"no\") other: Int }\ntype Empty\ntype Leading implements & A & B { a: Int }",
+	},
 	{name: "interface implementing interfaces", text: "interface I implements J & K @d { a: Int }\ninterface Bare"},
 	{name: "union", text: "union U = | A | B\nunion V @d = A\nunion Lone"},
 	{name: "enum", text: "enum E { \"value\" A @h B C_D }\nenum Bare"},
 	{name: "input", text: "input In { a: Int = 1 b: In2! @f c: [In] = [{a: 1}] }"},
-	{name: "directive definition", text: "\"\"\"directive\"\"\" directive @dir(a: Int = 1, b: String) repeatable on | FIELD | FRAGMENT_SPREAD | INLINE_FRAGMENT\ndirective @plain on QUERY\ndirective @all @meta on FRAGMENT_VARIABLE_DEFINITION | VARIABLE_DEFINITION | SCHEMA | SCALAR | OBJECT | FIELD_DEFINITION | ARGUMENT_DEFINITION | INTERFACE | UNION | ENUM | ENUM_VALUE | INPUT_OBJECT | INPUT_FIELD_DEFINITION | DIRECTIVE_DEFINITION | MUTATION | SUBSCRIPTION | FRAGMENT_DEFINITION"},
-	{name: "every extension", text: "extend schema @b\nextend schema { query: Q }\nextend scalar Date @c\nextend type Query implements C { added: Int }\nextend type Query @e\nextend type Query implements D\nextend interface I @g { b: Int }\nextend interface I implements J\nextend union U = C\nextend union U @u\nextend enum E { C }\nextend enum E @x\nextend input In { c: String }\nextend input In @y\nextend directive @dir @i"},
-	{name: "keywords as names", text: "type type { query: query fragment(on: on): extend schema: scalar }\n{ on: on query mutation }"},
+	{
+		name: "directive definition",
+		text: "\"\"\"directive\"\"\" directive @dir(a: Int = 1, b: String) repeatable on | FIELD | FRAGMENT_SPREAD | INLINE_FRAGMENT\ndirective @plain on QUERY\ndirective @all @meta on FRAGMENT_VARIABLE_DEFINITION | VARIABLE_DEFINITION | SCHEMA | SCALAR | OBJECT | FIELD_DEFINITION | ARGUMENT_DEFINITION | INTERFACE | UNION | ENUM | ENUM_VALUE | INPUT_OBJECT | INPUT_FIELD_DEFINITION | DIRECTIVE_DEFINITION | MUTATION | SUBSCRIPTION | FRAGMENT_DEFINITION",
+	},
+	{
+		name: "every extension",
+		text: "extend schema @b\nextend schema { query: Q }\nextend scalar Date @c\nextend type Query implements C { added: Int }\nextend type Query @e\nextend type Query implements D\nextend interface I @g { b: Int }\nextend interface I implements J\nextend union U = C\nextend union U @u\nextend enum E { C }\nextend enum E @x\nextend input In { c: String }\nextend input In @y\nextend directive @dir @i",
+	},
+	{
+		name: "keywords as names",
+		text: "type type { query: query fragment(on: on): extend schema: scalar }\n{ on: on query mutation }",
+	},
 
 	// Strings.
 	{name: "string escapes", text: `{ a(s: "quote\" backslash\\ slash\/ b\b f\f n\n r\r t\t") }`},
-	{name: "unicode escapes", text: `{ a(fixed: "\u00e9\u0041\uFFFF", variable: "\u{1F600}\u{0}\u{10FFFF}\u{000041}", pair: "\uD83D\uDE00", lower: "\ud83d\ude00", mixed: "x\u{1f600}y") }`},
-	{name: "literal non-ASCII", text: "\"descripción ✓ 😀 日本語\" type T { \"emoji 😀 then more\" a(x: String = \"😀😀\"): Int } # comment 😀 after\n{ a(b: \"é\") }"},
-	{name: "block string indentation", text: "type T {\n  \"\"\"\n    first\n      indented\n\n    last\n  \"\"\"\n  a: Int\n}"},
+	{
+		name: "unicode escapes",
+		text: `{ a(fixed: "\u00e9\u0041\uFFFF", variable: "\u{1F600}\u{0}\u{10FFFF}\u{000041}", pair: "\uD83D\uDE00", lower: "\ud83d\ude00", mixed: "x\u{1f600}y") }`,
+	},
+	{
+		name: "literal non-ASCII",
+		text: "\"descripción ✓ 😀 日本語\" type T { \"emoji 😀 then more\" a(x: String = \"😀😀\"): Int } # comment 😀 after\n{ a(b: \"é\") }",
+	},
+	{
+		name: "block string indentation",
+		text: "type T {\n  \"\"\"\n    first\n      indented\n\n    last\n  \"\"\"\n  a: Int\n}",
+	},
 	{name: "block string first line kept", text: "{ a(s: \"\"\"  first line\n      second\n    third\n  \"\"\") }"},
-	{name: "block string escaped triple quote", text: "{ a(s: \"\"\"has \\\"\"\" triple and \\\"\"\"\"\"\") b(s: \"\"\"\\\"\"\"\"\"\") }"},
-	{name: "block string blank lines and tabs", text: "{ a(s: \"\"\"\n\n\t\tx\n\t  \n\t\ty\n\n   \n\"\"\") b(s: \"\"\"   \"\"\") c(s: \"\"\"\"\"\") d(s: \"\"\"\n\"\"\") }"},
-	{name: "block string with CRLF and CR", text: "{ a(s: \"\"\"\r\n  one\r\n  two\r  three\r\n\"\"\") }\r\n# comment\r\n{ b }"},
+	{
+		name: "block string escaped triple quote",
+		text: "{ a(s: \"\"\"has \\\"\"\" triple and \\\"\"\"\"\"\") b(s: \"\"\"\\\"\"\"\"\"\") }",
+	},
+	{
+		name: "block string blank lines and tabs",
+		text: "{ a(s: \"\"\"\n\n\t\tx\n\t  \n\t\ty\n\n   \n\"\"\") b(s: \"\"\"   \"\"\") c(s: \"\"\"\"\"\") d(s: \"\"\"\n\"\"\") }",
+	},
+	{
+		name: "block string with CRLF and CR",
+		text: "{ a(s: \"\"\"\r\n  one\r\n  two\r  three\r\n\"\"\") }\r\n# comment\r\n{ b }",
+	},
 	{name: "block string backslashes stay raw", text: "{ a(s: \"\"\"\\n \\u0041 \\\\ \\\"\"\" \"\"\") }"},
 	{name: "block string with non-ASCII", text: "\"\"\"\n  😀 first\n    é second\n\"\"\" scalar S"},
 
 	// Comments.
-	{name: "comments everywhere", text: "# leading\nquery # after keyword\nQ # after name\n( # in variables\n$a # after variable\n: # after colon\nInt # after type\n) # after variables\n{ # in selection\na # after field\n( # in arguments\nb: # after argument name\n1 # after value\n) # after arguments\n} # trailing\n# last"},
-	{name: "comments in type system", text: "# schema\ntype T # name\n{ # open\n  # before field\n  a: Int # after field\n  # before close\n} # after\nenum E { # e\n A # a\n}"},
+	{
+		name: "comments everywhere",
+		text: "# leading\nquery # after keyword\nQ # after name\n( # in variables\n$a # after variable\n: # after colon\nInt # after type\n) # after variables\n{ # in selection\na # after field\n( # in arguments\nb: # after argument name\n1 # after value\n) # after arguments\n} # trailing\n# last",
+	},
+	{
+		name: "comments in type system",
+		text: "# schema\ntype T # name\n{ # open\n  # before field\n  a: Int # after field\n  # before close\n} # after\nenum E { # e\n A # a\n}",
+	},
 	{name: "comment at end of file without newline", text: "{ a } #end"},
 	{name: "empty comment and comment only lines", text: "#\n{ a }\n#\n#\n"},
 	{name: "comment with a carriage return", text: "# one\r{ a }\r# two\r"},
@@ -178,13 +237,13 @@ var parseFixtures = []parseFixture{
 // A corpus file graphql-js cannot parse is counted, and the test fails if that count passes a tenth of
 // the corpus: an oracle that rejects everything would otherwise read as perfect agreement. The inline
 // fixtures each say which way graphql-js must go.
-func TestParseAgreesWithGraphqlJs(t *testing.T) {
-	t.Parallel()
+func TestParseAgreesWithGraphqlJs(test *testing.T) {
+	test.Parallel()
 	corpora := os.Getenv("COHERE_GRAPHQL_CORPORA")
 	if corpora == "" {
-		t.Skip("set COHERE_GRAPHQL_CORPORA to compare the parser against graphql-js")
+		test.Skip("set COHERE_GRAPHQL_CORPORA to compare the parser against graphql-js")
 	}
-	root := corpus.PrettierFork.Root(t)
+	root := corpus.PrettierFork.Root(test)
 
 	type input struct {
 		Name string `json:"name"`
@@ -196,12 +255,15 @@ func TestParseAgreesWithGraphqlJs(t *testing.T) {
 	for _, corpus := range strings.Split(corpora, ":") {
 		corpus = strings.TrimSpace(corpus)
 		if strings.HasPrefix(corpus, "~/") {
-			home, _ := os.UserHomeDir()
+			home, homeError := os.UserHomeDir()
+			if homeError != nil {
+				test.Fatalf("expanding %s: %v", corpus, homeError)
+			}
 			corpus = filepath.Join(home, corpus[2:])
 		}
-		err := filepath.WalkDir(corpus, func(path string, entry fs.DirEntry, err error) error {
-			if err != nil {
-				return err
+		walkError := filepath.WalkDir(corpus, func(path string, entry fs.DirEntry, pathError error) error {
+			if pathError != nil {
+				return pathError
 			}
 			if entry.IsDir() && (entry.Name() == "node_modules" || entry.Name() == ".git") {
 				return filepath.SkipDir
@@ -209,9 +271,9 @@ func TestParseAgreesWithGraphqlJs(t *testing.T) {
 			if entry.IsDir() || (filepath.Ext(path) != ".graphql" && filepath.Ext(path) != ".gql") {
 				return nil
 			}
-			source, err := os.ReadFile(path)
-			if err != nil {
-				return err
+			source, readError := os.ReadFile(path)
+			if readError != nil {
+				return readError
 			}
 			if !utf8.Valid(source) {
 				return fmt.Errorf("%s is not UTF-8, which the comparison cannot carry through JSON", path)
@@ -220,12 +282,12 @@ func TestParseAgreesWithGraphqlJs(t *testing.T) {
 			corpusFiles++
 			return nil
 		})
-		if err != nil {
-			t.Fatalf("walking %s: %v", corpus, err)
+		if walkError != nil {
+			test.Fatalf("walking %s: %v", corpus, walkError)
 		}
 	}
 	if corpusFiles == 0 {
-		t.Fatalf("no .graphql or .gql files under %s", corpora)
+		test.Fatalf("no .graphql or .gql files under %s", corpora)
 	}
 	for _, fixture := range parseFixtures {
 		name := "fixture: " + fixture.name
@@ -235,9 +297,9 @@ func TestParseAgreesWithGraphqlJs(t *testing.T) {
 
 	var stdin bytes.Buffer
 	for _, each := range inputs {
-		encoded, err := json.Marshal(each)
-		if err != nil {
-			t.Fatal(err)
+		encoded, encodeError := json.Marshal(each)
+		if encodeError != nil {
+			test.Fatal(encodeError)
 		}
 		stdin.Write(encoded)
 		stdin.WriteByte('\n')
@@ -245,45 +307,56 @@ func TestParseAgreesWithGraphqlJs(t *testing.T) {
 	command := exec.Command("node", "--input-type=module", "-e", graphqlParseScript)
 	command.Dir = root
 	command.Stdin = &stdin
-	var stdout, stderr bytes.Buffer
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
 	command.Stdout, command.Stderr = &stdout, &stderr
-	if err := command.Run(); err != nil {
-		t.Fatalf("node: %v\n%s", err, stderr.String())
+	if runError := command.Run(); runError != nil {
+		test.Fatalf("node: %v\n%s", runError, stderr.String())
 	}
-	oracle := map[string]map[string]any{}
+	oracle := map[string]oracleRecord{}
 	for _, line := range strings.Split(stdout.String(), "\n") {
 		if line == "" {
 			continue
 		}
-		var record map[string]any
-		if err := json.Unmarshal([]byte(line), &record); err != nil {
-			t.Fatal(err)
+		var record oracleRecord
+		if decodeError := json.Unmarshal([]byte(line), &record); decodeError != nil {
+			test.Fatal(decodeError)
 		}
-		oracle[record["name"].(string)] = record
+		oracle[record.Name] = record
 	}
 
 	identical, refusedByBoth, corpusRefused, different := 0, 0, 0, 0
 	fail := func(format string, arguments ...any) {
 		different++
 		if different <= 20 {
-			t.Errorf(format, arguments...)
+			test.Errorf(format, arguments...)
 		}
 	}
 	for _, each := range inputs {
 		want, present := oracle[each.Name]
 		if !present {
-			t.Fatalf("the oracle printed nothing for %s", each.Name)
+			test.Fatalf("the oracle printed nothing for %s", each.Name)
 		}
-		wantError, oracleRefused := want["error"].(string)
+		oracleRefused := want.Error != nil
 		if expectMalformed, isFixture := malformed[each.Name]; isFixture && expectMalformed != oracleRefused {
-			fail("%s: the fixture says malformed=%v and graphql-js says %v", each.Name, expectMalformed, want)
+			fail(
+				"%s: the fixture says malformed=%v and graphql-js says %s",
+				each.Name,
+				expectMalformed,
+				want.describe(),
+			)
 			continue
 		}
-		got, err := dumpParse(each.Text)
+		gotAst, gotComments, dumpParseError := dumpParse(each.Text)
 		switch {
-		case oracleRefused && err != nil:
-			if err.Error() != wantError {
-				fail("%s: both refuse, with different messages:\n  graphql-js %s\n  Go         %s", each.Name, wantError, err.Error())
+		case oracleRefused && dumpParseError != nil:
+			if dumpParseError.Error() != *want.Error {
+				fail(
+					"%s: both refuse, with different messages:\n  graphql-js %s\n  Go         %s",
+					each.Name,
+					*want.Error,
+					dumpParseError.Error(),
+				)
 				continue
 			}
 			refusedByBoth++
@@ -291,11 +364,18 @@ func TestParseAgreesWithGraphqlJs(t *testing.T) {
 				corpusRefused++
 			}
 		case oracleRefused:
-			fail("%s: graphql-js refuses it (%s) and Go parsed it", each.Name, wantError)
-		case err != nil:
-			fail("%s: graphql-js parses it and Go refused: %v", each.Name, err)
+			fail("%s: graphql-js refuses it (%s) and Go parsed it", each.Name, *want.Error)
+		case dumpParseError != nil:
+			fail("%s: graphql-js parses it and Go refused: %v", each.Name, dumpParseError)
 		default:
-			difference := firstParseDifference(want["ast"], got["ast"], "ast") + firstParseDifference(want["comments"], got["comments"], "comments")
+			wantAst, wantAstError := json_value.Parse(want.Ast)
+			wantComments, wantCommentsError := json_value.Parse(want.Comments)
+			if wantAstError != nil || wantCommentsError != nil {
+				fail("%s: graphql-js's dump does not read as JSON: %v, %v", each.Name, wantAstError, wantCommentsError)
+				continue
+			}
+			difference := firstParseDifference(wantAst, gotAst, "ast") +
+				firstParseDifference(wantComments, gotComments, "comments")
 			if difference != "" {
 				fail("%s: %s", each.Name, difference)
 				continue
@@ -303,64 +383,105 @@ func TestParseAgreesWithGraphqlJs(t *testing.T) {
 			identical++
 		}
 	}
-	t.Logf("%d compared (%d corpus files, %d fixtures): %d identical, %d refused by both with the same message, %d different; %d corpus files refused",
-		len(inputs), corpusFiles, len(parseFixtures), identical, refusedByBoth, different, corpusRefused)
+	test.Logf(
+		"%d compared (%d corpus files, %d fixtures): %d identical, %d refused by both with the same message, %d different; %d corpus files refused",
+		len(inputs),
+		corpusFiles,
+		len(parseFixtures),
+		identical,
+		refusedByBoth,
+		different,
+		corpusRefused,
+	)
 	if corpusRefused > corpusFiles/10 {
-		t.Errorf("graphql-js refused %d of %d corpus files; the comparison is thinner than it looks", corpusRefused, corpusFiles)
+		test.Errorf(
+			"graphql-js refused %d of %d corpus files; the comparison is thinner than it looks",
+			corpusRefused,
+			corpusFiles,
+		)
 	}
 }
 
-// dumpParse parses one text and renders it the way the oracle script does, through JSON, so both sides
-// compare as the same Go values.
-func dumpParse(text string) (map[string]any, error) {
-	document, comments, err := Parse(text)
-	if err != nil {
-		return nil, err
+// oracleRecord is what the oracle script prints for one input: the dumped tree and comment list for a
+// parse, or the message for a refusal. The dumps stay raw JSON until they are compared.
+type oracleRecord struct {
+	Name     string          `json:"name"`
+	Ast      json.RawMessage `json:"ast"`
+	Comments json.RawMessage `json:"comments"`
+	Error    *string         `json:"error"`
+}
+
+// describe is the record as a failure message shows it.
+func (record oracleRecord) describe() string {
+	if record.Error != nil {
+		return "it refuses it: " + *record.Error
+	}
+	return "it parses it to " + string(record.Ast)
+}
+
+// dumpParse parses one text and renders its tree and its comment list the way the oracle script does,
+// as the JSON values the script prints, with offsets converted to UTF-16.
+func dumpParse(text string) (json_value.Value, json_value.Value, error) {
+	document, comments, parseError := Parse(text)
+	if parseError != nil {
+		return nil, nil, parseError
 	}
 	offsets := utf16OffsetsOf(text)
-	dumped := make([]any, len(comments))
+	dumped := make(json_value.Array, len(comments))
 	for index, comment := range comments {
 		if comment.Type() != "Comment" {
-			return nil, fmt.Errorf("a comment of type %q", comment.Type())
+			return nil, nil, fmt.Errorf("a comment of type %q", comment.Type())
 		}
-		dumped[index] = map[string]any{
-			"loc":   []int{offsets[comment.Range[0]], offsets[comment.Range[1]]},
-			"value": comment.String("value"),
+		dumped[index] = json_value.Object{
+			"loc":   jsonRange(offsets, comment.Range),
+			"value": jsonString(comment.String("value")),
 		}
 	}
-	encoded, err := json.Marshal(map[string]any{"ast": dumpParseValue(document, offsets), "comments": dumped})
-	if err != nil {
-		return nil, err
-	}
-	var result map[string]any
-	err = json.Unmarshal(encoded, &result)
-	return result, err
+	return dumpParseValue(document, offsets), dumped, nil
 }
 
-func dumpParseValue(value any, offsets []int) any {
+// dumpParseValue is one of a node's properties as the JSON value the oracle script prints for it.
+func dumpParseValue(value estree.Value, offsets []int) json_value.Value {
 	switch typed := value.(type) {
 	case nil:
-		return "<undefined>"
+		return json_value.String("<undefined>")
 	case *estree.Node:
-		result := map[string]any{"kind": typed.Type(), "loc": []int{offsets[typed.Range[0]], offsets[typed.Range[1]]}}
+		result := json_value.Object{"kind": jsonString(typed.Type()), "loc": jsonRange(offsets, typed.Range)}
 		for _, key := range typed.Keys() {
 			result[key] = dumpParseValue(typed.Get(key), offsets)
 		}
 		return result
-	case []*estree.Node:
+	case estree.Nodes:
 		if typed == nil {
-			return "a nil list, which no graphql-js field holds"
+			return json_value.String("a nil list, which no graphql-js field holds")
 		}
-		result := make([]any, len(typed))
+		result := make(json_value.Array, len(typed))
 		for index, child := range typed {
 			result[index] = dumpParseValue(child, offsets)
 		}
 		return result
-	case string, bool:
-		return typed
+	case estree.String:
+		return jsonString(string(typed))
+	case estree.Boolean:
+		return json_value.Boolean(typed)
 	default:
-		return fmt.Sprintf("an unexpected %T", typed)
+		return json_value.String(fmt.Sprintf("an unexpected %T", typed))
 	}
+}
+
+// jsonRange is a byte range as the script's loc, its two ends in UTF-16 units.
+func jsonRange(offsets []int, byteRange [2]int) json_value.Array {
+	return json_value.Array{
+		json_value.Number(strconv.Itoa(offsets[byteRange[0]])),
+		json_value.Number(strconv.Itoa(offsets[byteRange[1]])),
+	}
+}
+
+// jsonString is text as it reads back from JSON. json.Marshal writes each byte that starts no UTF-8
+// character as U+FFFD, and converting to runes and back does the same, byte for byte, so the Go side
+// compares as it did when it reached the comparison through json.Marshal.
+func jsonString(text string) json_value.String {
+	return json_value.String(string([]rune(text)))
 }
 
 // utf16OffsetsOf maps every byte offset that starts a character (and the end) to its UTF-16 index.
@@ -381,11 +502,11 @@ func utf16OffsetsOf(text string) []int {
 	return offsets
 }
 
-// firstParseDifference names the first path where two decoded JSON values differ, or "".
-func firstParseDifference(want any, got any, path string) string {
+// firstParseDifference names the first path where two JSON values differ, or "".
+func firstParseDifference(want json_value.Value, got json_value.Value, path string) string {
 	switch typed := want.(type) {
-	case map[string]any:
-		other, isMap := got.(map[string]any)
+	case json_value.Object:
+		other, isMap := got.(json_value.Object)
 		if !isMap {
 			return fmt.Sprintf("%s: want an object, got %v", path, got)
 		}
@@ -405,27 +526,59 @@ func firstParseDifference(want any, got any, path string) string {
 			wantValue, wantPresent := typed[key]
 			gotValue, gotPresent := other[key]
 			if wantPresent != gotPresent {
-				return fmt.Sprintf("%s.%s: present in graphql-js %v, in Go %v (%v)", path, key, wantPresent, gotPresent, typed["kind"])
+				return fmt.Sprintf(
+					"%s.%s: present in graphql-js %v, in Go %v (%v)",
+					path,
+					key,
+					wantPresent,
+					gotPresent,
+					typed["kind"],
+				)
 			}
 			if difference := firstParseDifference(wantValue, gotValue, path+"."+key); difference != "" {
 				return difference
 			}
 		}
 		return ""
-	case []any:
-		other, isList := got.([]any)
+	case json_value.Array:
+		other, isList := got.(json_value.Array)
 		if !isList || len(other) != len(typed) {
 			return fmt.Sprintf("%s: want %d elements, got %v", path, len(typed), got)
 		}
 		for index := range typed {
-			if difference := firstParseDifference(typed[index], other[index], fmt.Sprintf("%s[%d]", path, index)); difference != "" {
+			if difference := firstParseDifference(
+				typed[index],
+				other[index],
+				fmt.Sprintf("%s[%d]", path, index),
+			); difference != "" {
 				return difference
 			}
 		}
 		return ""
 	}
-	if fmt.Sprintf("%T %v", want, want) != fmt.Sprintf("%T %v", got, got) {
-		return fmt.Sprintf("%s: want %#v, got %#v", path, want, got)
+	if jsonLeafText(want) != jsonLeafText(got) {
+		return fmt.Sprintf("%s: want %s, got %s", path, jsonLeafText(want), jsonLeafText(got))
 	}
 	return ""
+}
+
+// jsonLeafText is a JSON value as Go's untyped decode would hold it, its type and its value, so two
+// leaves are equal exactly when they decode to the same thing: a number is read as a float64, so 1
+// and 1.0 are one number, as they are in JavaScript.
+func jsonLeafText(value json_value.Value) string {
+	switch typed := value.(type) {
+	case json_value.Number:
+		number, parseError := json.Number(typed).Float64()
+		if parseError != nil {
+			return fmt.Sprintf("a number that does not read as a float64, %q", string(typed))
+		}
+		return fmt.Sprintf("float64 %v", number)
+	case json_value.String:
+		return fmt.Sprintf("string %q", string(typed))
+	case json_value.Boolean:
+		return fmt.Sprintf("bool %v", bool(typed))
+	case json_value.Null:
+		return "null"
+	}
+	return fmt.Sprintf("%T %v", value, value)
 }

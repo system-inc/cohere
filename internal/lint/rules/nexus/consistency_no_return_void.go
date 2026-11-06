@@ -69,10 +69,10 @@ func consistencyNoReturnVoidMessage() rule.Message {
 // The fix always writes `return;`. In a function whose type says it returns a value, that is the bare
 // return `nexus/consistency-require-matching-return-type` then rewrites to `return undefined;`, so the
 // two fixes converge on the right spelling in one run rather than this rule repeating that judgment.
-var ConsistencyNoReturnVoid = rule.Rule{
+var ConsistencyNoReturnVoid = rule.Rule[rule.NoOptions]{
 	Name: "nexus/consistency-no-return-void",
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindReturnStatement: func(node *ast.Node) {
 				expression := node.AsReturnStatement().Expression
@@ -84,12 +84,16 @@ var ConsistencyNoReturnVoid = rule.Rule{
 					return
 				}
 
-				replacement, fixable := consistencyNoReturnVoidReplacement(ctx, node, voidExpression)
+				replacement, fixable := consistencyNoReturnVoidReplacement(ruleContext, node, voidExpression)
 				if !fixable {
-					ctx.ReportNode(node, consistencyNoReturnVoidMessage())
+					ruleContext.ReportNode(node, consistencyNoReturnVoidMessage())
 					return
 				}
-				ctx.ReportNodeWithFixes(node, consistencyNoReturnVoidMessage(), ctx.ReplaceNode(node, replacement))
+				ruleContext.ReportNodeWithFixes(
+					node,
+					consistencyNoReturnVoidMessage(),
+					ruleContext.ReplaceNode(node, replacement),
+				)
 			},
 		}
 	},
@@ -104,17 +108,21 @@ var consistencyNoReturnVoidUnsafeLeadingWords = regexp.MustCompile(`^(function|c
 //
 // Parentheses around the `void` (`return (void f());`) need no check of their own: the statement text
 // then fails the canonical match below, and a mutant removing a separate check survived every fixture.
-func consistencyNoReturnVoidReplacement(ctx rule.Context, node *ast.Node, voidExpression *ast.Node) (string, bool) {
-	sourceText := ctx.SourceFile.Text()
-	statementRange := rule.TokenRange(ctx.SourceFile, node)
+func consistencyNoReturnVoidReplacement(
+	ruleContext rule.Context,
+	node *ast.Node,
+	voidExpression *ast.Node,
+) (string, bool) {
+	sourceText := ruleContext.SourceFile.Text()
+	statementRange := rule.TokenRange(ruleContext.SourceFile, node)
 	statementText := sourceText[statementRange.Pos():statementRange.End()]
 
 	operand := voidExpression.AsVoidExpression().Expression
-	operandRange := rule.TokenRange(ctx.SourceFile, operand)
+	operandRange := rule.TokenRange(ruleContext.SourceFile, operand)
 	operandText := sourceText[operandRange.Pos():operandRange.End()]
 
-	canonical := regexp.MustCompile(`^return\s+void\s+` + regexp.QuoteMeta(operandText) + `\s*;$`)
-	if !canonical.MatchString(statementText) {
+	canonical, compileError := regexp.Compile(`^return\s+void\s+` + regexp.QuoteMeta(operandText) + `\s*;$`)
+	if compileError != nil || !canonical.MatchString(statementText) {
 		return "", false
 	}
 	first := operandText[0]

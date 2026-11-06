@@ -10,5 +10,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // No `Decode`: the installed eslint 10.8.1 build's `meta.schema` is `[]`. The clone at 10.9.1 adds
 // `checkConditionalExpressions`, and the rule's doc comment records why this ports the former.
 func init() {
-	rule.Register(rule.Registration{Rule: NoUnmodifiedLoopCondition})
+	rule.Register(rule.Registration[rule.NoOptions]{Rule: NoUnmodifiedLoopCondition})
 }

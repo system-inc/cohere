@@ -11,7 +11,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // The Decode entry names the rule's own decoder, which cannot be the generic helper: upstream's
 // option is a bare enum string rather than an object, so there is no struct to decode into.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[ConsistentIndexedObjectStyleOptions]{
 		Rule:   ConsistentIndexedObjectStyle,
 		Decode: DecodeConsistentIndexedObjectStyleOptions,
 	})

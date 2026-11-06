@@ -13,7 +13,7 @@ import (
 // find the source file. oxc's linter tester carries only one of these plus one clean case, which
 // badly understates the corpus; the fixture directory is the real floor.
 //
-// The clean cases below the corpus are measured rather than invented. Upstream ships NO valid
+// The clean cases below the corpus are measured rather than invented. Upstream ships no valid
 // fixtures for this rule at all, so every pass case here was established by running the release
 // `oxlint` binary on the input and recording what it decided. That is the port brief's rule about
 // taking truth only from the corpus, applied where the corpus has a hole: a pass case written from
@@ -97,8 +97,8 @@ function Outer() {
 }
 `
 
-func TestStaticComponentsFires(t *testing.T) {
-	t.Parallel()
+func TestStaticComponentsFires(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name   string
@@ -127,7 +127,7 @@ func TestStaticComponentsFires(t *testing.T) {
 }
 `},
 
-		// A component created inside a NESTED function still reports, which is what makes the
+		// A component created inside a nested function still reports, which is what makes the
 		// recursion into `function.Functions` load-bearing rather than tidy. Measured: upstream
 		// reports at the inner `<Component />` on the arrow's own line, so each function is
 		// analysed as its own graph rather than the outer one being the only subject. Added after
@@ -141,15 +141,15 @@ func TestStaticComponentsFires(t *testing.T) {
 }
 `},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, StaticComponents, "component.tsx", testCase.source)
-			rule_testing.ExpectFindings(t, result, "staticComponents")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, StaticComponents, "component.tsx", testCase.source)
+			rule_testing.ExpectFindings(test, result, "staticComponents")
 		})
 	}
 }
 
-// A component declared inside a component is NOT a second compilation unit.
+// A component declared inside a component is not a second compilation unit.
 //
 // Upstream reports once here, at `<Inner />`, because `Inner` is a value created during `Outer`'s
 // render. It never reports the `<Component />` inside `Inner`, because `Inner` is lowered into
@@ -159,8 +159,8 @@ func TestStaticComponentsFires(t *testing.T) {
 // the rule obligingly produced two. Both were wrong. Running the release oxlint binary on this
 // exact input gave one finding at line 6, which is what it asserts now. It is the port brief's
 // warning about taking truth from anywhere but the corpus, caught by the dry run rather than here.
-func TestStaticComponentsTreatsTheOutermostComponentAsTheUnit(t *testing.T) {
-	t.Parallel()
+func TestStaticComponentsTreatsTheOutermostComponentAsTheUnit(test *testing.T) {
+	test.Parallel()
 
 	source := `function Outer() {
   function Inner() {
@@ -171,11 +171,11 @@ func TestStaticComponentsTreatsTheOutermostComponentAsTheUnit(t *testing.T) {
 }
 `
 	parsed := strings.TrimSpace(source) + "\n"
-	result := rule_testing.RunTyped(t, StaticComponents, "component.tsx", source)
-	rule_testing.ExpectFindings(t, result, "staticComponents")
+	result := rule_testing.RunTyped(test, StaticComponents, "component.tsx", source)
+	rule_testing.ExpectFindings(test, result, "staticComponents")
 	reported := parsed[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 	if reported != "Inner" {
-		t.Errorf("span points at %q, want %q", reported, "Inner")
+		test.Errorf("span points at %q, want %q", reported, "Inner")
 	}
 }
 
@@ -190,23 +190,23 @@ func TestStaticComponentsTreatsTheOutermostComponentAsTheUnit(t *testing.T) {
 // The general shape is the port brief's warning that a fixture whose predicate is weaker than the
 // property it guards is not a guard: every message-id assertion in this file stayed green while the
 // reporting layer was wrong.
-func TestStaticComponentsSpanSkipsTriviaBeforeTheTag(t *testing.T) {
-	t.Parallel()
+func TestStaticComponentsSpanSkipsTriviaBeforeTheTag(test *testing.T) {
+	test.Parallel()
 
 	source := "function O() {\n  const C = mk();\n  return < /*c*/ C />;\n}\n"
 	parsed := strings.TrimSpace(source) + "\n"
-	result := rule_testing.RunTyped(t, StaticComponents, "component.tsx", source)
+	result := rule_testing.RunTyped(test, StaticComponents, "component.tsx", source)
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("want 1 diagnostic, got %d", len(result.Diagnostics))
+		test.Fatalf("want 1 diagnostic, got %d", len(result.Diagnostics))
 	}
 	reported := parsed[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 	if reported != "C" {
-		t.Errorf("span points at %q, want %q", reported, "C")
+		test.Errorf("span points at %q, want %q", reported, "C")
 	}
 }
 
-func TestStaticComponentsStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestStaticComponentsStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name   string
@@ -271,7 +271,7 @@ function Outer() {
 		// The back edge. `C` is dynamic only on the loop's second and later iterations, and a
 		// single forward pass over blocks in reverse postorder cannot see taint that arrives on an
 		// edge it has already passed. Upstream has the identical limitation, confirmed by running
-		// it: taint written BEFORE the loop reports, taint written INSIDE reaching a use after the
+		// it: taint written before the loop reports, taint written inside reaching a use after the
 		// loop does not. This is fidelity, not a gap, and the fixture exists so a later reader who
 		// notices the silence does not helpfully repair it into a divergence.
 		{"loopBackEdge", `function Outer(items) {
@@ -297,10 +297,10 @@ function Outer() {
 }
 `},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, StaticComponents, "component.tsx", testCase.source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, StaticComponents, "component.tsx", testCase.source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -310,26 +310,26 @@ function Outer() {
 // one Range, so that detail moves into the message instead. Asserted on the sliced source rather
 // than on a line number, so a change to where the finding points fails here.
 //
-// # Slice what was PARSED, not what was passed
+// # Slice what was parsed, not what was passed
 //
 // `rule_testing.RunTyped` writes each fixture to disk as `strings.TrimSpace(contents)+"\n"`, so a case
-// carrying leading or trailing whitespace is parsed as a DIFFERENT string from the one handed to
+// carrying leading or trailing whitespace is parsed as a different string from the one handed to
 // it. oxc's tester writes every case with a leading newline and this file copies them verbatim, so
 // every diagnostic offset here is shifted one byte from the Go literal. Slicing the literal reports
 // `<Componen` for a finding that is correctly on `Component`, which reads exactly like an
 // off-by-one in the rule and is not one. `rule_testing.Run`, the untyped harness, does not trim, so the
 // trap is invisible to any rule that does not need the checker.
-func TestStaticComponentsSpan(t *testing.T) {
-	t.Parallel()
+func TestStaticComponentsSpan(test *testing.T) {
+	test.Parallel()
 
 	parsed := strings.TrimSpace(scTesterFail) + "\n"
-	result := rule_testing.RunTyped(t, StaticComponents, "component.tsx", scTesterFail)
+	result := rule_testing.RunTyped(test, StaticComponents, "component.tsx", scTesterFail)
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("want 1 diagnostic, got %d", len(result.Diagnostics))
+		test.Fatalf("want 1 diagnostic, got %d", len(result.Diagnostics))
 	}
 	reported := parsed[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 	if reported != "Component" {
-		t.Errorf("span points at %q, want %q", reported, "Component")
+		test.Errorf("span points at %q, want %q", reported, "Component")
 	}
 }
 
@@ -337,16 +337,16 @@ func TestStaticComponentsSpan(t *testing.T) {
 // puts in its secondary span. Asserted by equality on the rendered text rather than with
 // strings.Contains, because a Contains predicate is weaker than the property it guards and would
 // stay green through a wrong interpolation.
-func TestStaticComponentsMessageNamesCreationSite(t *testing.T) {
-	t.Parallel()
+func TestStaticComponentsMessageNamesCreationSite(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTyped(t, StaticComponents, "component.tsx", scTesterFail)
+	result := rule_testing.RunTyped(test, StaticComponents, "component.tsx", scTesterFail)
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("want 1 diagnostic, got %d", len(result.Diagnostics))
+		test.Fatalf("want 1 diagnostic, got %d", len(result.Diagnostics))
 	}
 	got := result.Diagnostics[0].Message.Description
 	if !strings.HasPrefix(got, "This component is created during render, at `createComponent`,") {
-		t.Errorf("message does not name the creation site, got %q", got)
+		test.Errorf("message does not name the creation site, got %q", got)
 	}
 }
 
@@ -355,14 +355,16 @@ func TestStaticComponentsMessageNamesCreationSite(t *testing.T) {
 // attach, and the rule goes silent on every input while looking healthy. This asserts the typed
 // harness is required, so a later revert to `rule_testing.Run` fails loudly here rather than turning
 // every fixture above into a vacuous pass.
-func TestStaticComponentsRequiresTypeChecker(t *testing.T) {
-	t.Parallel()
+func TestStaticComponentsRequiresTypeChecker(test *testing.T) {
+	test.Parallel()
 
 	if !StaticComponents.NeedsTypeChecker {
-		t.Fatal("rule must declare NeedsTypeChecker; lowering without one names no values and the rule silently reports nothing")
+		test.Fatal(
+			"rule must declare NeedsTypeChecker; lowering without one names no values and the rule silently reports nothing",
+		)
 	}
-	untyped := rule_testing.Run(t, StaticComponents, "component.tsx", scTesterFail)
+	untyped := rule_testing.Run(test, StaticComponents, "component.tsx", scTesterFail)
 	if len(untyped.Diagnostics) != 0 {
-		t.Fatalf("expected the untyped harness to produce nothing, got %d", len(untyped.Diagnostics))
+		test.Fatalf("expected the untyped harness to produce nothing, got %d", len(untyped.Diagnostics))
 	}
 }

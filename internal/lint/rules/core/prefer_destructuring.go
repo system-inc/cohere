@@ -11,17 +11,9 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
-// PreferDestructuringKindOptions is the per-node-kind pair of switches.
-type PreferDestructuringKindOptions struct {
-	// Array enables the array-index arm, e.g. `var foo = array[0]`.
-	Array *bool `json:"array"`
-	// Object enables the property arm, e.g. `var foo = object.foo`.
-	Object *bool `json:"object"`
-}
-
 // PreferDestructuringOptions is the decoded option surface.
 //
-// # Upstream's option surface is TWO schema elements, and both arrive
+// # Upstream's option surface is two schema elements, and both arrive
 //
 // `meta.schema` declares two entries: an enabling object, and a separate object carrying
 // `enforceForRenamedProperties`. ESLint's `context.options` is every element after the severity, so
@@ -50,7 +42,7 @@ type PreferDestructuringOptions struct {
 
 // preferDestructuringEnablingWire is upstream's first schema element.
 //
-// It carries BOTH arms of upstream's `oneOf` at once: an object with `VariableDeclarator` /
+// It carries both arms of upstream's `oneOf` at once: an object with `VariableDeclarator` /
 // `AssignmentExpression` keys, or a flat `{array, object}` pair that applies to both kinds. Which one
 // was written is decided by whether `array` or `object` is present at the top level, which is
 // upstream's own test.
@@ -72,25 +64,31 @@ type preferDestructuringRenamedWire struct {
 // Each element refuses keys its schema does not declare, which is upstream's
 // `additionalProperties: false` and is how a misplaced `enforceForRenamedProperties` in the first
 // element is caught rather than ignored. A third element is refused by `rule.OptionElements`.
-func DecodePreferDestructuringOptions(list []byte) (any, error) {
+func DecodePreferDestructuringOptions(list []byte) (PreferDestructuringOptions, error) {
 	enabled := true
 	options := PreferDestructuringOptions{
 		VariableDeclarator:   PreferDestructuringKindOptions{Array: &enabled, Object: &enabled},
 		AssignmentExpression: PreferDestructuringKindOptions{Array: &enabled, Object: &enabled},
 	}
-	elements, err := rule.OptionElements(list, 2)
-	if err != nil || len(elements) == 0 {
-		return options, err
+	elements, optionElementsError := rule.OptionElements(list, 2)
+	if optionElementsError != nil || len(elements) == 0 {
+		return options, optionElementsError
 	}
 
 	var enabling preferDestructuringEnablingWire
-	if err := preferDestructuringDecodeStrictly(elements[0], &enabling); err != nil {
-		return options, fmt.Errorf("prefer-destructuring element 1: %w", err)
+	if preferDestructuringDecodeStrictlyError := preferDestructuringDecodeStrictly(
+		elements[0],
+		&enabling,
+	); preferDestructuringDecodeStrictlyError != nil {
+		return options, fmt.Errorf("prefer-destructuring element 1: %w", preferDestructuringDecodeStrictlyError)
 	}
 	if len(elements) > 1 {
 		var renamed preferDestructuringRenamedWire
-		if err := preferDestructuringDecodeStrictly(elements[1], &renamed); err != nil {
-			return options, fmt.Errorf("prefer-destructuring element 2: %w", err)
+		if preferDestructuringDecodeStrictlyError := preferDestructuringDecodeStrictly(
+			elements[1],
+			&renamed,
+		); preferDestructuringDecodeStrictlyError != nil {
+			return options, fmt.Errorf("prefer-destructuring element 2: %w", preferDestructuringDecodeStrictlyError)
 		}
 		if renamed.EnforceForRenamedProperties != nil {
 			options.EnforceForRenamedProperties = *renamed.EnforceForRenamedProperties
@@ -98,7 +96,7 @@ func DecodePreferDestructuringOptions(list []byte) (any, error) {
 	}
 
 	// Upstream's normalisation, verbatim: a top-level `array` or `object` key means the flat
-	// spelling, which applies to BOTH node kinds. Otherwise the per-kind keys are used as written,
+	// spelling, which applies to both node kinds. Otherwise the per-kind keys are used as written,
 	// and a kind that is absent is entirely disabled rather than defaulted on -- upstream replaces
 	// `normalizedOptions` wholesale, so `{"VariableDeclarator": {...}}` leaves AssignmentExpression
 	// undefined and `shouldCheck` answers false for it.
@@ -120,7 +118,7 @@ func DecodePreferDestructuringOptions(list []byte) (any, error) {
 }
 
 // preferDestructuringDecodeStrictly decodes one element as an object and refuses unknown keys.
-func preferDestructuringDecodeStrictly(element json.RawMessage, into any) error {
+func preferDestructuringDecodeStrictly[Target any](element json.RawMessage, into *Target) error {
 	// Go whitespace: raw JSON bytes of the rule's options, whose whitespace is the same in both sets.
 	if bytes.Equal(bytes.TrimSpace(element), []byte("null")) {
 		return fmt.Errorf("takes an object, got null")
@@ -128,20 +126,6 @@ func preferDestructuringDecodeStrictly(element json.RawMessage, into any) error 
 	decoder := json.NewDecoder(bytes.NewReader(element))
 	decoder.DisallowUnknownFields()
 	return decoder.Decode(into)
-}
-
-// enabled reads one switch, where an absent switch means off.
-//
-// Upstream's `shouldCheck` is `normalizedOptions[nodeType][destructuringType]`, a plain truthiness
-// test, so an absent key is falsy and the arm is off. Only the wholly-default configuration turns
-// everything on, which the decoder builds explicitly.
-func (o PreferDestructuringKindOptions) enabled(array bool) bool {
-	switch {
-	case array:
-		return o.Array != nil && *o.Array
-	default:
-		return o.Object != nil && *o.Object
-	}
 }
 
 var messagePreferDestructuring = rule.Message{
@@ -160,7 +144,7 @@ var messagePreferDestructuring = rule.Message{
 //
 // # The fixer is deliberately narrow, and its declines are the specification
 //
-// Upstream's `shouldFix` repairs ONE shape: a variable declarator whose binding is a plain
+// Upstream's `shouldFix` repairs one shape: a variable declarator whose binding is a plain
 // identifier, whose initializer is a non-computed member access, and whose binding name equals the
 // property name. Everything else reports without a fix: an assignment expression, an array index, a
 // renamed property, a computed key. Those declines are reproduced rather than improved on, and
@@ -169,7 +153,7 @@ var messagePreferDestructuring = rule.Message{
 // # Comments are half the fixer's corpus and the whole of its subtlety
 //
 // Twenty-four of upstream's forty-eight reporting cases exist to pin what happens to comments, and
-// the rule is one comparison: the repair is DECLINED when the declarator holds more comments than
+// the rule is one comparison: the repair is declined when the declarator holds more comments than
 // the member access's object does, because only comments inside that object survive into the
 // replacement. So:
 //
@@ -178,7 +162,7 @@ var messagePreferDestructuring = rule.Message{
 //	var foo /* c */ = object.foo;      declined, the comment sits outside the object
 //	var foo = object.foo/* c */;       FIXED, the comment is after the replaced range entirely
 //
-// The last row is why the comparison counts comments inside the DECLARATOR rather than inside the
+// The last row is why the comparison counts comments inside the declarator rather than inside the
 // whole statement: a trailing comment is outside the declarator and never at risk.
 //
 // # A parenthesised receiver is re-parenthesised only below assignment precedence
@@ -192,10 +176,10 @@ var messagePreferDestructuring = rule.Message{
 //
 // Measured against the installed 10.8.1 build: `var foo = object.foo;` reports columns 5 to 21,
 // which is the declarator without `var`, and `foo = array[0];` reports columns 1 to 15.
-var PreferDestructuring = rule.Rule{
+var PreferDestructuring = rule.Rule[PreferDestructuringOptions]{
 	Name: "prefer-destructuring",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, ok := rule.OptionsAs[PreferDestructuringOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[PreferDestructuringOptions]) rule.Listeners {
+		settings, ok := options.Read()
 		if !ok {
 			enabled := true
 			settings = PreferDestructuringOptions{
@@ -211,10 +195,10 @@ var PreferDestructuring = rule.Rule{
 					kind, messagePreferDestructuring.Description),
 			}
 			if len(fixes) == 0 {
-				ctx.ReportNode(node, message)
+				ruleContext.ReportNode(node, message)
 				return
 			}
-			ctx.ReportNodeWithFixes(node, message, fixes...)
+			ruleContext.ReportNodeWithFixes(node, message, fixes...)
 		}
 
 		performCheck := func(left *ast.Node, right *ast.Node, reportNode *ast.Node,
@@ -230,7 +214,7 @@ var PreferDestructuring = rule.Rule{
 				return
 			}
 
-			// An array INDEX access, which upstream detects by the property being an integer.
+			// An array index access, which upstream detects by the property being an integer.
 			if computed && preferDestructuringIsArrayIndex(property) {
 				if kindOptions.enabled(true) {
 					report(reportNode, "array", nil)
@@ -244,7 +228,7 @@ var PreferDestructuring = rule.Rule{
 
 			var fixes []rule.Fix
 			if isDeclarator {
-				if fix, repairable := preferDestructuringFix(ctx, reportNode, right); repairable {
+				if fix, repairable := preferDestructuringFix(ruleContext, reportNode, right); repairable {
 					fixes = []rule.Fix{fix}
 				}
 			}
@@ -262,7 +246,7 @@ var PreferDestructuring = rule.Rule{
 			switch {
 			case computed && property.Kind == ast.KindStringLiteral:
 				// Upstream's `property.type === "Literal" && leftNode.name === property.value`,
-				// which has no `!computed` clause, so `object['foo']` DOES match when the names
+				// which has no `!computed` clause, so `object['foo']` does match when the names
 				// agree. Its corpus asserts that as a reporting case.
 				if property.Text() == left.Text() {
 					report(reportNode, "object", fixes)
@@ -287,7 +271,7 @@ var PreferDestructuring = rule.Rule{
 					return
 				}
 				// The initializer is unwrapped because upstream's parser folds parentheses away, so
-				// `var foo = (object.foo);` arrives there as a plain member access and REPORTS.
+				// `var foo = (object.foo);` arrives there as a plain member access and reports.
 				// Without this the whole check is skipped and two of upstream's reporting cases go
 				// silent.
 				performCheck(declaration.Name(), preferDestructuringUnwrap(declaration.Initializer),
@@ -312,10 +296,11 @@ var PreferDestructuring = rule.Rule{
 // A loop rather than one step, because `((x))` nests. `ast.SkipParentheses` is not used: it
 // dereferences its argument and every caller here holds an optional node.
 func preferDestructuringUnwrap(node *ast.Node) *ast.Node {
-	for node != nil && node.Kind == ast.KindParenthesizedExpression {
-		node = node.AsParenthesizedExpression().Expression
+	current := node
+	for current != nil && current.Kind == ast.KindParenthesizedExpression {
+		current = current.AsParenthesizedExpression().Expression
 	}
-	return node
+	return current
 }
 
 // preferDestructuringMemberParts returns the accessed property and whether the access is computed.
@@ -332,7 +317,7 @@ func preferDestructuringMemberParts(node *ast.Node) (*ast.Node, bool) {
 		access := node.AsPropertyAccessExpression()
 		// `object?.foo` is a different node in ESTree (ChainExpression wrapping the access), so
 		// upstream's `rightNode.type !== "MemberExpression"` guard declines it and both of its
-		// optional-chaining cases are VALID. Our parser keeps one node kind and marks the token, so
+		// optional-chaining cases are valid. Our parser keeps one node kind and marks the token, so
 		// the exclusion has to be explicit or this rule reports two of upstream's passing cases.
 		if access.QuestionDotToken != nil {
 			return nil, false
@@ -384,7 +369,7 @@ func preferDestructuringIsArrayIndex(property *ast.Node) bool {
 
 // preferDestructuringIsUsingDeclaration reports an explicit-resource-management declaration.
 //
-// # `NodeFlagsAwaitUsing` is a COMPOSITE and testing it disabled this rule on every `const`
+// # `NodeFlagsAwaitUsing` is a composite and testing it disabled this rule on every `const`
 //
 // A first draft wrote the obvious thing, `flags&NodeFlagsUsing != 0 || flags&NodeFlagsAwaitUsing !=
 // 0`, matching upstream's two-kind test. The second half is wrong here, and silently:
@@ -392,7 +377,7 @@ func preferDestructuringIsArrayIndex(property *ast.Node) bool {
 //	NodeFlagsAwaitUsing = NodeFlagsConst | NodeFlagsUsing        nodeflags.go:51
 //
 // It is a composite rather than a bit of its own, so `flags & NodeFlagsAwaitUsing` is non-zero for
-// EVERY `const` declaration, and the guard skipped all of them. The rule reported nothing on any
+// every `const` declaration, and the guard skipped all of them. The rule reported nothing on any
 // modern source file while passing all 103 imported fixtures, because upstream's corpus is written
 // in `var`.
 //
@@ -414,7 +399,7 @@ func preferDestructuringIsUsingDeclaration(node *ast.Node) bool {
 //
 // Two gates, and both are upstream's. `shouldFix` restricts the repair to the one simple shape, and
 // the comment comparison declines whenever the rewrite would delete a comment.
-func preferDestructuringFix(ctx rule.Context, declarator *ast.Node, right *ast.Node) (rule.Fix, bool) {
+func preferDestructuringFix(ruleContext rule.Context, declarator *ast.Node, right *ast.Node) (rule.Fix, bool) {
 	if right.Kind != ast.KindPropertyAccessExpression {
 		return rule.Fix{}, false
 	}
@@ -429,10 +414,10 @@ func preferDestructuringFix(ctx rule.Context, declarator *ast.Node, right *ast.N
 		return rule.Fix{}, false
 	}
 
-	// The OBJECT is unwrapped for the same reason, and it changes two things at once. Upstream's
+	// The object is unwrapped for the same reason, and it changes two things at once. Upstream's
 	// `getText(rightNode.object)` sees no parentheses, so `(f()).foo` becomes `var {foo} = f();`
 	// rather than `= (f());`, and its `getCommentsInside(rightNode.object)` likewise counts only
-	// what is inside the expression. A comment sitting BETWEEN the parenthesis and the expression --
+	// what is inside the expression. A comment sitting between the parenthesis and the expression --
 	// `(/* c */ object).foo` -- is therefore inside the declarator and outside the object, which is
 	// what makes upstream decline that repair. Counting against the parenthesized range instead
 	// includes the comment on both sides of the comparison and wrongly repairs it.
@@ -443,14 +428,14 @@ func preferDestructuringFix(ctx rule.Context, declarator *ast.Node, right *ast.N
 
 	// Upstream: decline when the declarator holds more comments than the object does, because only
 	// the object's own comments survive into the replacement text.
-	declaratorRange := rule.TokenRange(ctx.SourceFile, declarator)
-	objectRange := rule.TokenRange(ctx.SourceFile, object)
-	if preferDestructuringCommentsInside(ctx, declaratorRange) >
-		preferDestructuringCommentsInside(ctx, objectRange) {
+	declaratorRange := rule.TokenRange(ruleContext.SourceFile, declarator)
+	objectRange := rule.TokenRange(ruleContext.SourceFile, object)
+	if preferDestructuringCommentsInside(ruleContext, declaratorRange) >
+		preferDestructuringCommentsInside(ruleContext, objectRange) {
 		return rule.Fix{}, false
 	}
 
-	objectText := ctx.SourceFile.Text()[objectRange.Pos():objectRange.End()]
+	objectText := ruleContext.SourceFile.Text()[objectRange.Pos():objectRange.End()]
 	// Upstream re-parenthesises when the object's precedence is below an assignment expression's.
 	// A comma expression is the only thing that qualifies, which its corpus pins in adjacent cases:
 	// `(a, b).foo` keeps the parens and `(a = b).foo` loses them.
@@ -465,9 +450,9 @@ func preferDestructuringFix(ctx rule.Context, declarator *ast.Node, right *ast.N
 // preferDestructuringCommentsInside counts comments falling wholly inside a range.
 //
 // `comments.ForFile` is the shelf's cached per-file scan, which is upstream's `getCommentsInside`.
-func preferDestructuringCommentsInside(ctx rule.Context, textRange core.TextRange) int {
+func preferDestructuringCommentsInside(ruleContext rule.Context, textRange core.TextRange) int {
 	count := 0
-	for _, comment := range comments.ForFile(ctx) {
+	for _, comment := range comments.ForFile(ruleContext) {
 		if comment.Range.Pos() >= textRange.Pos() && comment.Range.End() <= textRange.End() {
 			count++
 		}

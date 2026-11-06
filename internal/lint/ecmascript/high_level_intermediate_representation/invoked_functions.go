@@ -89,7 +89,12 @@ func CollectAssumedInvokedFunctions(function *Function) AssumedInvokedFunctions 
 // Upstream's step 1, and its comment gives the reason it only matches `FunctionExpression`:
 // "conservatively only match function expressions which can have guaranteed ssa. ObjectMethods and
 // ObjectProperties do not". A value whose definition is not unique cannot be traced to one function.
-func collectInvokedCandidates(function *Function, candidates map[static_single_assignment.IdentifierId]*invokedCandidate) {
+//
+// Mutates: candidates each value that holds a nested function is recorded, so one map gathers a whole function
+func collectInvokedCandidates(
+	function *Function,
+	candidates map[static_single_assignment.IdentifierId]*invokedCandidate,
+) {
 	for _, block := range function.Blocks {
 		if block == nil {
 			continue
@@ -99,18 +104,18 @@ func collectInvokedCandidates(function *Function, candidates map[static_single_a
 			if instruction == nil {
 				continue
 			}
-			switch value := instruction.Value.(type) {
+			switch instructionValue := instruction.Value.(type) {
 			case *FunctionExpression:
 				candidates[instruction.LValue.Identifier] = &invokedCandidate{
-					function:  value.Function,
+					function:  instructionValue.Function,
 					mayInvoke: map[FunctionId]bool{},
 				}
 			case *StoreLocal:
-				if held, ok := candidates[value.Value.Identifier]; ok {
-					candidates[value.LValue.Identifier] = held
+				if held, ok := candidates[instructionValue.Value.Identifier]; ok {
+					candidates[instructionValue.LValue.Identifier] = held
 				}
 			case *LoadLocal:
-				if held, ok := candidates[value.Place.Identifier]; ok {
+				if held, ok := candidates[instructionValue.Place.Identifier]; ok {
 					candidates[instruction.LValue.Identifier] = held
 				}
 			}
@@ -119,6 +124,8 @@ func collectInvokedCandidates(function *Function, candidates map[static_single_a
 }
 
 // collectInvocations reads the call sites, upstream's step 2.
+//
+// Mutates: invoked each function a call site, a JSX prop or a return proves or assumes invoked is marked
 func collectInvocations(function *Function, candidates map[static_single_assignment.IdentifierId]*invokedCandidate,
 	invoked AssumedInvokedFunctions) {
 	for _, block := range function.Blocks {
@@ -144,7 +151,7 @@ func collectInvocations(function *Function, candidates map[static_single_assignm
 				// Upstream: "assume arguments to all hooks are safe to invoke". This is what makes
 				// `useMemo(() => ..., deps)` descend at all, since the callback is an argument
 				// rather than a callee.
-				for _, argument := range value.Args {
+				for _, argument := range value.Arguments {
 					if held, ok := candidates[argument.Place.Identifier]; ok {
 						invoked[held.function] = true
 					}
@@ -153,7 +160,7 @@ func collectInvocations(function *Function, candidates map[static_single_assignm
 			case *JsxExpression:
 				// Upstream: "assume JSX attributes and children are safe to invoke". A spread is
 				// skipped because the value it holds is not one identifiable place.
-				for _, attribute := range value.Props {
+				for _, attribute := range value.Properties {
 					if attribute.Spread {
 						continue
 					}
@@ -194,7 +201,7 @@ func collectInvocations(function *Function, candidates map[static_single_assignm
 	}
 }
 
-// invokedWithinNested reports which of THIS function's nested functions an inner one invokes.
+// invokedWithinNested reports which of this function's nested functions an inner one invokes.
 //
 // The inner function numbers its own children from zero, so its answer cannot be read directly in
 // the parent's space. What survives the boundary is a capture: a function the inner one calls, that

@@ -75,21 +75,26 @@ func main() {
 	flag.Parse()
 
 	if len(inputs) < 2 {
-		fail("at least two design systems are required: one extraction cannot tell a framework registration from a repository one, and a table built from a single system would ship that repository's utilities as framework facts")
+		fail(
+			"at least two design systems are required: one extraction cannot tell a framework registration from a repository one, and a table built from a single system would ship that repository's utilities as framework facts",
+		)
 	}
 
 	systems := make([]staticsFile, 0, len(inputs))
 	for _, path := range inputs {
-		raw, err := os.ReadFile(path)
-		if err != nil {
-			fail("read %s: %v", path, err)
+		raw, readError := os.ReadFile(path)
+		if readError != nil {
+			fail("read %s: %v", path, readError)
 		}
 		var file staticsFile
-		if err := json.Unmarshal(raw, &file); err != nil {
-			fail("parse %s: %v", path, err)
+		if decodeError := json.Unmarshal(raw, &file); decodeError != nil {
+			fail("parse %s: %v", path, decodeError)
 		}
 		if len(file.Statics) == 0 {
-			fail("%s holds no statics, so an intersection against it is empty for a reason that is not a measurement", path)
+			fail(
+				"%s holds no statics, so an intersection against it is empty for a reason that is not a measurement",
+				path,
+			)
 		}
 		systems = append(systems, file)
 	}
@@ -97,36 +102,52 @@ func main() {
 	// One Tailwind, or the comparison is between two different engines and proves nothing.
 	for index := 1; index < len(systems); index++ {
 		if systems[index].TailwindVersion != systems[0].TailwindVersion {
-			fail("inputs were generated against different Tailwind versions (%s and %s); a check run against a different engine than the table came from cannot detect a difference in the table",
-				systems[0].TailwindVersion, systems[index].TailwindVersion)
+			fail(
+				"inputs were generated against different Tailwind versions (%s and %s); a check run against a different engine than the table came from cannot detect a difference in the table",
+				systems[0].TailwindVersion,
+				systems[index].TailwindVersion,
+			)
 		}
 	}
 
 	shared, dropped := intersect(systems)
 	if len(shared) == 0 {
-		fail("no static utility is registered by every input system, which means the inputs describe unrelated design systems rather than one framework")
+		fail(
+			"no static utility is registered by every input system, which means the inputs describe unrelated design systems rather than one framework",
+		)
 	}
 
 	// The split has to be visible, not merely performed. A run where every system registers exactly
 	// the same names has not demonstrated that the intersection is doing anything, and that is the
 	// state two repositories vendoring one submodule are in.
 	if len(dropped) == 0 {
-		fail("every input system registers an identical name set, so the intersection removed nothing and the framework/repository split is unverified; include a design system that shares no stylesheet with the others")
+		fail(
+			"every input system registers an identical name set, so the intersection removed nothing and the framework/repository split is unverified; include a design system that shares no stylesheet with the others",
+		)
 	}
 
-	source, err := render(systems, shared, dropped)
-	if err != nil {
-		fail("render: %v", err)
+	source, renderError := render(systems, shared, dropped)
+	if renderError != nil {
+		fail("render: %v", renderError)
 	}
 
 	if *output == "" {
-		os.Stdout.Write(source)
-	} else if err := os.WriteFile(*output, source, 0o644); err != nil {
-		fail("write %s: %v", *output, err)
+		if _, writeError := os.Stdout.Write(source); writeError != nil {
+			fail("write stdout: %v", writeError)
+		}
+	} else if writeError := os.WriteFile(*output, source, 0o644); writeError != nil {
+		fail("write %s: %v", *output, writeError)
 	}
 
-	fmt.Fprintf(os.Stderr, "generate_statics: %d design systems, %d statics registered by all of them (%d dropped as repository-specific)\n",
-		len(systems), len(shared), len(dropped))
+	// Ignored: what it reports is already written, and a summary that cannot reach the terminal changes none of it.
+	fmt.Fprintf(
+		os.Stderr,
+		"generate_statics: %d design systems, %d statics registered by all of them (%d dropped as repository-specific)\n",
+		len(systems),
+		len(shared),
+		len(dropped),
+	)
+	// Ignored: the rest of the same summary, which changes nothing already written.
 	fmt.Fprintf(os.Stderr, "  dropped: %s\n", strings.Join(firstFew(dropped, 8), ", "))
 }
 
@@ -230,7 +251,7 @@ func render(systems []staticsFile, shared []staticEntry, dropped []string) ([]by
 //
 // `+"`getClassList()`"+` enumerates classes, so a utility advertising none is invisible to it. That
 // hid fourteen functional roots until 33e12df and 6347b07, and it hides 21 statics here: the
-// deprecated-but-registered ones such as `+"`bg-gradient-to-r`"+`, `+"`break-words`"+` and
+// deprecated-but-registered ones such as `+"`bg-gradient-to-r`, `break-words`"+` and
 // `+"`max-w-screen`"+`, which the base descriptor table never carried. enumerate.mjs reads
 // `+"`utilities.keys('static')`"+` instead.
 //
@@ -284,6 +305,7 @@ func firstFew(values []string, count int) []string {
 }
 
 func fail(format string, arguments ...any) {
+	// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 	fmt.Fprintf(os.Stderr, "generate_statics: "+format+"\n", arguments...)
 	os.Exit(1)
 }

@@ -153,8 +153,8 @@ func isFontStretchPercentage(value string) bool {
 	if !strings.HasSuffix(value, "%") {
 		return false
 	}
-	number, err := strconv.ParseFloat(strings.TrimSuffix(value, "%"), 64)
-	if err != nil {
+	number, parseError := strconv.ParseFloat(strings.TrimSuffix(value, "%"), 64)
+	if parseError != nil {
 		return false
 	}
 	if number != math.Trunc(number) || number < 50 || number > 200 {
@@ -174,84 +174,6 @@ type FrameworkStaticValue struct {
 	Value    string
 }
 
-// FrameworkFunctionalUtility is one single-declaration root.
-type FrameworkFunctionalUtility struct {
-	// Property is the declaration the root's handle body emits.
-	Property string
-	// ThemeKeys are the namespaces the root consults, in order.
-	ThemeKeys []string
-	// SupportsNegative registers a second root with a leading dash.
-	SupportsNegative bool
-	// DefaultValue is what a valueless candidate resolves to. Absent and empty differ, so the
-	// presence flag is separate rather than encoded as the empty string.
-	DefaultValue        string
-	DefaultValuePresent bool
-	// BareValue names the shared predicate this root uses, if any.
-	BareValue BareValueKind
-	// BareValueSuffix is appended to a bare value the predicate accepted.
-	//
-	// The second axis of the bare handler, and it is why 8 more roots are a table row rather than a
-	// port: `delay-150` is `150ms`, `outline-offset-2` is `2px`, `zoom-50` is `50%`, and the only
-	// difference between them and the pass-through roots is this string. Empty means pass through.
-	BareValueSuffix string
-	// StaticValues are the named values the root answers directly.
-	StaticValues []FrameworkStaticValue
-}
-
-// Description converts a table row into the shape ResolveFunctionalUtilityValue takes.
-//
-// The conversion is here rather than in the table so the table stays data. It is also where the
-// shared predicate becomes a closure, which is the one place a `BareValueKind` turns back into code.
-func (utility FrameworkFunctionalUtility) Description() *FunctionalUtilityDescription {
-	description := &FunctionalUtilityDescription{
-		ThemeKeys:           utility.ThemeKeys,
-		SupportsNegative:    utility.SupportsNegative,
-		DefaultValue:        utility.DefaultValue,
-		DefaultValuePresent: utility.DefaultValuePresent,
-	}
-
-	description.HandleBareValue = bareValueHandler(utility.BareValue, utility.BareValueSuffix)
-
-	if len(utility.StaticValues) > 0 {
-		description.StaticValueNames = make(map[string]bool, len(utility.StaticValues))
-		for _, static := range utility.StaticValues {
-			description.StaticValueNames[static.Name] = true
-		}
-	}
-	return description
-}
-
-// Reading returns what a candidate reads against this root, and whether it reads anything.
-//
-// Computed rather than named. The root's ported handle body emits declarations and `PropertySort`
-// reads them, which is the same two steps the engine takes, so the reading here is a consequence of
-// the emission rather than a second claim about it. That is what makes the acceptance test in
-// frameworkhandlers_test.go worth running: `Property` on the row and the emitter in
-// frameworkhandlers.go are two independent statements of the same fact, and this method uses only
-// one of them.
-//
-// The root name is a parameter because the emitters are keyed by root, the way the table is. It is
-// not derivable from the row: two roots can declare the same property, so a reverse lookup by
-// property would be ambiguous.
-//
-// An unported root emits nothing and reads nothing, rather than falling back to `Property`. A silent
-// fallback would make a missing emitter look like a working one at every call site and leave the
-// acceptance test as the only thing that could ever notice.
-func (utility FrameworkFunctionalUtility) Reading(root string, candidate *ParsedCandidate, theme *Theme, negative bool) (Reading, bool) {
-	resolved, produced := ResolveFunctionalUtilityValue(candidate, utility.Description(), theme, negative)
-	if !produced {
-		return Reading{}, false
-	}
-
-	nodes := utility.Emit(root, resolved)
-	if len(nodes) == 0 {
-		return Reading{}, false
-	}
-
-	sorted := PropertySort(nodes)
-	return Reading{Order: sorted.Order, Count: sorted.Count}, true
-}
-
 // FrameworkFunctionalUtilities is the table.
 //
 // Extracted from `utilities.ts` at 4.3.3 by matching the `handle: (value) => [decl(p, value)]` shape,
@@ -260,39 +182,183 @@ func (utility FrameworkFunctionalUtility) Reading(root string, candidate *Parsed
 // bare handler returns `${value}px`, which moved it and three others out of this table and into wave
 // 2. The count moved because of that correction rather than because the wave grew.
 var FrameworkFunctionalUtilities = map[string]FrameworkFunctionalUtility{
-	"align":              {Property: "vertical-align"},
-	"animate":            {Property: "animation", ThemeKeys: []string{"--animate"}, StaticValues: []FrameworkStaticValue{{Name: "none", Property: "animation", Value: "none"}}},
-	"bg-position":        {Property: "background-position"},
-	"bg-size":            {Property: "background-size"},
-	"col":                {Property: "grid-column", ThemeKeys: []string{"--grid-column"}, SupportsNegative: true, BareValue: BareValuePositiveInteger, StaticValues: []FrameworkStaticValue{{Name: "auto", Property: "grid-column", Value: "auto"}}},
-	"col-end":            {Property: "grid-column-end", ThemeKeys: []string{"--grid-column-end"}, SupportsNegative: true, BareValue: BareValuePositiveInteger, StaticValues: []FrameworkStaticValue{{Name: "auto", Property: "grid-column-end", Value: "auto"}}},
-	"col-start":          {Property: "grid-column-start", ThemeKeys: []string{"--grid-column-start"}, SupportsNegative: true, BareValue: BareValuePositiveInteger, StaticValues: []FrameworkStaticValue{{Name: "auto", Property: "grid-column-start", Value: "auto"}}},
-	"columns":            {Property: "columns", ThemeKeys: []string{"--columns", "--container"}, BareValue: BareValuePositiveInteger, StaticValues: []FrameworkStaticValue{{Name: "auto", Property: "columns", Value: "auto"}}},
-	"contain":            {Property: "contain"},
-	"cursor":             {Property: "cursor", ThemeKeys: []string{"--cursor"}},
-	"delay":              {Property: "transition-delay", ThemeKeys: []string{"--transition-delay"}, BareValue: BareValuePositiveInteger, BareValueSuffix: "ms"},
-	"font-features":      {Property: "font-feature-settings"},
-	"grow":               {Property: "flex-grow", DefaultValue: "1", DefaultValuePresent: true, BareValue: BareValuePositiveInteger},
-	"list":               {Property: "list-style-type", ThemeKeys: []string{"--list-style-type"}, StaticValues: []FrameworkStaticValue{{Name: "none", Property: "list-style-type", Value: "none"}, {Name: "disc", Property: "list-style-type", Value: "disc"}, {Name: "decimal", Property: "list-style-type", Value: "decimal"}}},
-	"list-image":         {Property: "list-style-image", ThemeKeys: []string{"--list-style-image"}, StaticValues: []FrameworkStaticValue{{Name: "none", Property: "list-style-image", Value: "none"}}},
-	"mask-position":      {Property: "mask-position"},
-	"mask-radial-at":     {Property: "--tw-mask-radial-position"},
-	"mask-size":          {Property: "mask-size"},
-	"object":             {Property: "object-position", ThemeKeys: []string{"--object-position"}, StaticValues: []FrameworkStaticValue{{Name: "top", Property: "object-position", Value: "top"}, {Name: "top-left", Property: "object-position", Value: "left top"}, {Name: "top-right", Property: "object-position", Value: "right top"}, {Name: "bottom", Property: "object-position", Value: "bottom"}, {Name: "bottom-left", Property: "object-position", Value: "left bottom"}, {Name: "bottom-right", Property: "object-position", Value: "right bottom"}, {Name: "left", Property: "object-position", Value: "left"}, {Name: "right", Property: "object-position", Value: "right"}, {Name: "center", Property: "object-position", Value: "center"}}},
-	"opacity":            {Property: "opacity", ThemeKeys: []string{"--opacity"}, BareValue: BareValueOpacity, BareValueSuffix: "%"},
-	"order":              {Property: "order", ThemeKeys: []string{"--order"}, SupportsNegative: true, BareValue: BareValuePositiveInteger, StaticValues: []FrameworkStaticValue{{Name: "first", Property: "order", Value: "-9999"}, {Name: "last", Property: "order", Value: "9999"}}},
-	"origin":             {Property: "transform-origin", ThemeKeys: []string{"--transform-origin"}, StaticValues: []FrameworkStaticValue{{Name: "center", Property: "transform-origin", Value: "center"}, {Name: "top", Property: "transform-origin", Value: "top"}, {Name: "top-right", Property: "transform-origin", Value: "100% 0"}, {Name: "right", Property: "transform-origin", Value: "100%"}, {Name: "bottom-right", Property: "transform-origin", Value: "100% 100%"}, {Name: "bottom", Property: "transform-origin", Value: "bottom"}, {Name: "bottom-left", Property: "transform-origin", Value: "0 100%"}, {Name: "left", Property: "transform-origin", Value: "0"}, {Name: "top-left", Property: "transform-origin", Value: "0 0"}}},
-	"outline-offset":     {Property: "outline-offset", ThemeKeys: []string{"--outline-offset"}, SupportsNegative: true, BareValue: BareValuePositiveInteger, BareValueSuffix: "px"},
-	"perspective":        {Property: "perspective", ThemeKeys: []string{"--perspective"}, StaticValues: []FrameworkStaticValue{{Name: "none", Property: "perspective", Value: "none"}}},
-	"perspective-origin": {Property: "perspective-origin", ThemeKeys: []string{"--perspective-origin"}, StaticValues: []FrameworkStaticValue{{Name: "center", Property: "perspective-origin", Value: "center"}, {Name: "top", Property: "perspective-origin", Value: "top"}, {Name: "top-right", Property: "perspective-origin", Value: "100% 0"}, {Name: "right", Property: "perspective-origin", Value: "100%"}, {Name: "bottom-right", Property: "perspective-origin", Value: "100% 100%"}, {Name: "bottom", Property: "perspective-origin", Value: "bottom"}, {Name: "bottom-left", Property: "perspective-origin", Value: "0 100%"}, {Name: "left", Property: "perspective-origin", Value: "0"}, {Name: "top-left", Property: "perspective-origin", Value: "0 0"}}},
-	"row":                {Property: "grid-row", ThemeKeys: []string{"--grid-row"}, SupportsNegative: true, BareValue: BareValuePositiveInteger, StaticValues: []FrameworkStaticValue{{Name: "auto", Property: "grid-row", Value: "auto"}}},
-	"row-end":            {Property: "grid-row-end", ThemeKeys: []string{"--grid-row-end"}, SupportsNegative: true, BareValue: BareValuePositiveInteger, StaticValues: []FrameworkStaticValue{{Name: "auto", Property: "grid-row-end", Value: "auto"}}},
-	"row-start":          {Property: "grid-row-start", ThemeKeys: []string{"--grid-row-start"}, SupportsNegative: true, BareValue: BareValuePositiveInteger, StaticValues: []FrameworkStaticValue{{Name: "auto", Property: "grid-row-start", Value: "auto"}}},
-	"shrink":             {Property: "flex-shrink", DefaultValue: "1", DefaultValuePresent: true, BareValue: BareValuePositiveInteger},
-	"tab":                {Property: "tab-size", BareValue: BareValuePositiveInteger},
-	"will-change":        {Property: "will-change"},
-	"z":                  {Property: "z-index", ThemeKeys: []string{"--z-index"}, SupportsNegative: true, BareValue: BareValuePositiveInteger, StaticValues: []FrameworkStaticValue{{Name: "auto", Property: "z-index", Value: "auto"}}},
-	"zoom":               {Property: "zoom", BareValue: BareValuePositiveInteger, BareValueSuffix: "%"},
+	"align": {Property: "vertical-align"},
+	"animate": {
+		Property:     "animation",
+		ThemeKeys:    []string{"--animate"},
+		StaticValues: []FrameworkStaticValue{{Name: "none", Property: "animation", Value: "none"}},
+	},
+	"bg-position": {Property: "background-position"},
+	"bg-size":     {Property: "background-size"},
+	"col": {
+		Property:         "grid-column",
+		ThemeKeys:        []string{"--grid-column"},
+		SupportsNegative: true,
+		BareValue:        BareValuePositiveInteger,
+		StaticValues:     []FrameworkStaticValue{{Name: "auto", Property: "grid-column", Value: "auto"}},
+	},
+	"col-end": {
+		Property:         "grid-column-end",
+		ThemeKeys:        []string{"--grid-column-end"},
+		SupportsNegative: true,
+		BareValue:        BareValuePositiveInteger,
+		StaticValues:     []FrameworkStaticValue{{Name: "auto", Property: "grid-column-end", Value: "auto"}},
+	},
+	"col-start": {
+		Property:         "grid-column-start",
+		ThemeKeys:        []string{"--grid-column-start"},
+		SupportsNegative: true,
+		BareValue:        BareValuePositiveInteger,
+		StaticValues:     []FrameworkStaticValue{{Name: "auto", Property: "grid-column-start", Value: "auto"}},
+	},
+	"columns": {
+		Property:     "columns",
+		ThemeKeys:    []string{"--columns", "--container"},
+		BareValue:    BareValuePositiveInteger,
+		StaticValues: []FrameworkStaticValue{{Name: "auto", Property: "columns", Value: "auto"}},
+	},
+	"contain": {Property: "contain"},
+	"cursor":  {Property: "cursor", ThemeKeys: []string{"--cursor"}},
+	"delay": {
+		Property:        "transition-delay",
+		ThemeKeys:       []string{"--transition-delay"},
+		BareValue:       BareValuePositiveInteger,
+		BareValueSuffix: "ms",
+	},
+	"font-features": {Property: "font-feature-settings"},
+	"grow": {
+		Property:            "flex-grow",
+		DefaultValue:        "1",
+		DefaultValuePresent: true,
+		BareValue:           BareValuePositiveInteger,
+	},
+	"list": {
+		Property:  "list-style-type",
+		ThemeKeys: []string{"--list-style-type"},
+		StaticValues: []FrameworkStaticValue{
+			{Name: "none", Property: "list-style-type", Value: "none"},
+			{Name: "disc", Property: "list-style-type", Value: "disc"},
+			{Name: "decimal", Property: "list-style-type", Value: "decimal"},
+		},
+	},
+	"list-image": {
+		Property:     "list-style-image",
+		ThemeKeys:    []string{"--list-style-image"},
+		StaticValues: []FrameworkStaticValue{{Name: "none", Property: "list-style-image", Value: "none"}},
+	},
+	"mask-position":  {Property: "mask-position"},
+	"mask-radial-at": {Property: "--tw-mask-radial-position"},
+	"mask-size":      {Property: "mask-size"},
+	"object": {
+		Property:  "object-position",
+		ThemeKeys: []string{"--object-position"},
+		StaticValues: []FrameworkStaticValue{
+			{Name: "top", Property: "object-position", Value: "top"},
+			{Name: "top-left", Property: "object-position", Value: "left top"},
+			{Name: "top-right", Property: "object-position", Value: "right top"},
+			{Name: "bottom", Property: "object-position", Value: "bottom"},
+			{Name: "bottom-left", Property: "object-position", Value: "left bottom"},
+			{Name: "bottom-right", Property: "object-position", Value: "right bottom"},
+			{Name: "left", Property: "object-position", Value: "left"},
+			{Name: "right", Property: "object-position", Value: "right"},
+			{Name: "center", Property: "object-position", Value: "center"},
+		},
+	},
+	"opacity": {
+		Property:        "opacity",
+		ThemeKeys:       []string{"--opacity"},
+		BareValue:       BareValueOpacity,
+		BareValueSuffix: "%",
+	},
+	"order": {
+		Property:         "order",
+		ThemeKeys:        []string{"--order"},
+		SupportsNegative: true,
+		BareValue:        BareValuePositiveInteger,
+		StaticValues: []FrameworkStaticValue{
+			{Name: "first", Property: "order", Value: "-9999"},
+			{Name: "last", Property: "order", Value: "9999"},
+		},
+	},
+	"origin": {
+		Property:  "transform-origin",
+		ThemeKeys: []string{"--transform-origin"},
+		StaticValues: []FrameworkStaticValue{
+			{Name: "center", Property: "transform-origin", Value: "center"},
+			{Name: "top", Property: "transform-origin", Value: "top"},
+			{Name: "top-right", Property: "transform-origin", Value: "100% 0"},
+			{Name: "right", Property: "transform-origin", Value: "100%"},
+			{Name: "bottom-right", Property: "transform-origin", Value: "100% 100%"},
+			{Name: "bottom", Property: "transform-origin", Value: "bottom"},
+			{Name: "bottom-left", Property: "transform-origin", Value: "0 100%"},
+			{Name: "left", Property: "transform-origin", Value: "0"},
+			{Name: "top-left", Property: "transform-origin", Value: "0 0"},
+		},
+	},
+	"outline-offset": {
+		Property:         "outline-offset",
+		ThemeKeys:        []string{"--outline-offset"},
+		SupportsNegative: true,
+		BareValue:        BareValuePositiveInteger,
+		BareValueSuffix:  "px",
+	},
+	"perspective": {
+		Property:     "perspective",
+		ThemeKeys:    []string{"--perspective"},
+		StaticValues: []FrameworkStaticValue{{Name: "none", Property: "perspective", Value: "none"}},
+	},
+	"perspective-origin": {
+		Property:  "perspective-origin",
+		ThemeKeys: []string{"--perspective-origin"},
+		StaticValues: []FrameworkStaticValue{
+			{Name: "center", Property: "perspective-origin", Value: "center"},
+			{Name: "top", Property: "perspective-origin", Value: "top"},
+			{Name: "top-right", Property: "perspective-origin", Value: "100% 0"},
+			{Name: "right", Property: "perspective-origin", Value: "100%"},
+			{Name: "bottom-right", Property: "perspective-origin", Value: "100% 100%"},
+			{Name: "bottom", Property: "perspective-origin", Value: "bottom"},
+			{Name: "bottom-left", Property: "perspective-origin", Value: "0 100%"},
+			{Name: "left", Property: "perspective-origin", Value: "0"},
+			{Name: "top-left", Property: "perspective-origin", Value: "0 0"},
+		},
+	},
+	"row": {
+		Property:         "grid-row",
+		ThemeKeys:        []string{"--grid-row"},
+		SupportsNegative: true,
+		BareValue:        BareValuePositiveInteger,
+		StaticValues:     []FrameworkStaticValue{{Name: "auto", Property: "grid-row", Value: "auto"}},
+	},
+	"row-end": {
+		Property:         "grid-row-end",
+		ThemeKeys:        []string{"--grid-row-end"},
+		SupportsNegative: true,
+		BareValue:        BareValuePositiveInteger,
+		StaticValues:     []FrameworkStaticValue{{Name: "auto", Property: "grid-row-end", Value: "auto"}},
+	},
+	"row-start": {
+		Property:         "grid-row-start",
+		ThemeKeys:        []string{"--grid-row-start"},
+		SupportsNegative: true,
+		BareValue:        BareValuePositiveInteger,
+		StaticValues:     []FrameworkStaticValue{{Name: "auto", Property: "grid-row-start", Value: "auto"}},
+	},
+	"shrink": {
+		Property:            "flex-shrink",
+		DefaultValue:        "1",
+		DefaultValuePresent: true,
+		BareValue:           BareValuePositiveInteger,
+	},
+	"tab":         {Property: "tab-size", BareValue: BareValuePositiveInteger},
+	"will-change": {Property: "will-change"},
+	"z": {
+		Property:         "z-index",
+		ThemeKeys:        []string{"--z-index"},
+		SupportsNegative: true,
+		BareValue:        BareValuePositiveInteger,
+		StaticValues:     []FrameworkStaticValue{{Name: "auto", Property: "z-index", Value: "auto"}},
+	},
+	"zoom": {Property: "zoom", BareValue: BareValuePositiveInteger, BareValueSuffix: "%"},
 }
 
 // bareValueHandler builds the bare-value closure a kind describes, or nil when there is none.
@@ -326,10 +392,10 @@ func bareValueHandler(kind BareValueKind, suffix string) func(*ParsedValue) (str
 	if predicate == nil {
 		return nil
 	}
-	return func(value *ParsedValue) (string, bool) {
-		if value == nil || !predicate(value.Value) {
+	return func(parsedValue *ParsedValue) (string, bool) {
+		if parsedValue == nil || !predicate(parsedValue.Value) {
 			return "", false
 		}
-		return bareValueTransform(kind, value.Value) + suffix, true
+		return bareValueTransform(kind, parsedValue.Value) + suffix, true
 	}
 }

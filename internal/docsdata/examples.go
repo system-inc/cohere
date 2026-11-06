@@ -62,31 +62,31 @@ func (examples Examples) FixKind() string {
 
 // ReadCaptures reads every record the harness wrote into directory.
 func ReadCaptures(directory string) ([]capture.Record, error) {
-	paths, err := filepath.Glob(filepath.Join(directory, "capture-*.jsonl"))
-	if err != nil {
-		return nil, err
+	paths, globError := filepath.Glob(filepath.Join(directory, "capture-*.jsonl"))
+	if globError != nil {
+		return nil, globError
 	}
 	sort.Strings(paths)
 	var records []capture.Record
 	for _, path := range paths {
-		file, err := os.Open(path)
-		if err != nil {
-			return nil, err
+		file, openError := os.Open(path)
+		if openError != nil {
+			return nil, openError
 		}
 		scanner := bufio.NewScanner(file)
 		scanner.Buffer(make([]byte, 0, 1<<20), 1<<28)
 		for scanner.Scan() {
 			var record capture.Record
-			if err := json.Unmarshal(scanner.Bytes(), &record); err != nil {
-				file.Close()
-				return nil, fmt.Errorf("docsdata: %s: %w", path, err)
+			if decodeError := json.Unmarshal(scanner.Bytes(), &record); decodeError != nil {
+				file.Close() // Ignored: the file was only read, and the decode error is the failure to report.
+				return nil, fmt.Errorf("docsdata: %s: %w", path, decodeError)
 			}
 			records = append(records, record)
 		}
-		err = scanner.Err()
-		file.Close()
-		if err != nil {
-			return nil, fmt.Errorf("docsdata: %s: %w", path, err)
+		scanError := scanner.Err()
+		file.Close() // Ignored: the file was only read, and everything it held was already scanned.
+		if scanError != nil {
+			return nil, fmt.Errorf("docsdata: %s: %w", path, scanError)
 		}
 	}
 	return records, nil
@@ -126,7 +126,9 @@ func PickExamples(records []capture.Record) (map[string]Examples, int) {
 	for name, cases := range byRule {
 		examples := Examples{Rule: name}
 		messageIds := map[string]bool{}
-		var firing, clean, fixed []capture.Record
+		var firing []capture.Record
+		var clean []capture.Record
+		var fixed []capture.Record
 		for _, record := range cases {
 			for _, finding := range record.Findings {
 				messageIds[finding.MessageId] = true
@@ -165,17 +167,17 @@ func shortest(candidates []capture.Record) *Example {
 		return nil
 	}
 	sort.Slice(candidates, func(left, right int) bool {
-		a, b := candidates[left], candidates[right]
-		if (a.OtherFiles > 0) != (b.OtherFiles > 0) {
-			return a.OtherFiles == 0
+		leftCandidate, rightCandidate := candidates[left], candidates[right]
+		if (leftCandidate.OtherFiles > 0) != (rightCandidate.OtherFiles > 0) {
+			return leftCandidate.OtherFiles == 0
 		}
-		if len(a.Source) != len(b.Source) {
-			return len(a.Source) < len(b.Source)
+		if len(leftCandidate.Source) != len(rightCandidate.Source) {
+			return len(leftCandidate.Source) < len(rightCandidate.Source)
 		}
-		if a.Source != b.Source {
-			return a.Source < b.Source
+		if leftCandidate.Source != rightCandidate.Source {
+			return leftCandidate.Source < rightCandidate.Source
 		}
-		return a.File < b.File
+		return leftCandidate.File < rightCandidate.File
 	})
 	best := candidates[0]
 	return &Example{
@@ -191,23 +193,23 @@ func shortest(candidates []capture.Record) *Example {
 func ReadCommittedExamples(root string) (map[string]Examples, error) {
 	examples := map[string]Examples{}
 	directory := filepath.Join(root, ExamplesDirectory)
-	err := filepath.WalkDir(directory, func(path string, entry os.DirEntry, err error) error {
-		if os.IsNotExist(err) && path == directory {
+	walkError := filepath.WalkDir(directory, func(path string, entry os.DirEntry, pathError error) error {
+		if os.IsNotExist(pathError) && path == directory {
 			return filepath.SkipDir
 		}
-		if err != nil || entry.IsDir() || !strings.HasSuffix(path, ".json") {
-			return err
+		if pathError != nil || entry.IsDir() || !strings.HasSuffix(path, ".json") {
+			return pathError
 		}
-		contents, err := os.ReadFile(path)
-		if err != nil {
-			return err
+		contents, readError := os.ReadFile(path)
+		if readError != nil {
+			return readError
 		}
 		var example Examples
-		if err := json.Unmarshal(contents, &example); err != nil {
-			return fmt.Errorf("docsdata: %s: %w", path, err)
+		if decodeError := json.Unmarshal(contents, &example); decodeError != nil {
+			return fmt.Errorf("docsdata: %s: %w", path, decodeError)
 		}
 		examples[example.Rule] = example
 		return nil
 	})
-	return examples, err
+	return examples, walkError
 }

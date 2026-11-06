@@ -6,6 +6,8 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+
+	"github.com/system-inc/cohere/internal/streams"
 )
 
 // replaceProcess runs the cohere binary and exits with its exit code, the nearest Windows has to exec:
@@ -18,12 +20,15 @@ import (
 func replaceProcess(binaryPath string, arguments []string) error {
 	command := exec.Command(binaryPath, arguments...)
 	command.Stdin, command.Stdout, command.Stderr = os.Stdin, os.Stdout, os.Stderr
+	// The binary writes to the console itself, so what this process said first is delivered first.
+	streams.Show(streams.Output)
+	streams.Show(streams.Errors)
 	signal.Ignore(os.Interrupt)
 	err := command.Run()
 	var exitError *exec.ExitError
 	if err != nil && !errors.As(err, &exitError) {
 		return fmt.Errorf("running %s: %w", binaryPath, err)
 	}
-	os.Exit(command.ProcessState.ExitCode())
+	os.Exit(streams.Finish(command.ProcessState.ExitCode()))
 	return nil
 }

@@ -16,9 +16,9 @@ import (
 // removed.
 func ParseMarkdown(text string, nodes *arena.Arena[Node]) (*Node, error) {
 	frontMatter, content := ParseFrontMatter(text)
-	root, err := FromMarkdown(content, text, nodes)
-	if err != nil {
-		return nil, err
+	root, fromMarkdownError := FromMarkdown(content, text, nodes)
+	if fromMarkdownError != nil {
+		return nil, fromMarkdownError
 	}
 
 	if frontMatter != nil {
@@ -149,7 +149,7 @@ func replaceNonLineBreaksWithSpace(text string) string {
 }
 
 // trimJavaScriptWhitespace is String#trim, whose whitespace is ECMAScript's WhiteSpace and
-// LineTerminator: Go's TrimSpace differs on U+FEFF (JavaScript trims it) and U+0085 (Go trims it).
+// LineTerminator: Go's TrimSpace differs on `U+FEFF` (JavaScript trims it) and `U+0085` (Go trims it).
 func trimJavaScriptWhitespace(text string) string {
 	return strings.TrimFunc(text, ecmascripttext.IsWhitespace)
 }

@@ -22,8 +22,8 @@ const unsafeOptionalChainingFile = "/repository/source/Chain.ts"
 // `(obj?.foo && obj?.baz).bar` and `(foo ? obj?.foo : obj?.bar).bar`, and both are in
 // TestNoUnsafeOptionalChainingReportsPerChain below rather than here, because this test asserts
 // one finding per input.
-func TestNoUnsafeOptionalChainingFires(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeOptionalChainingFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -49,10 +49,10 @@ func TestNoUnsafeOptionalChainingFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoUnsafeOptionalChaining, unsafeOptionalChainingFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, NoUnsafeOptionalChaining, unsafeOptionalChainingFile,
 					testCase.sourceText), "unsafeOptionalChain")
 		})
 	}
@@ -66,8 +66,8 @@ func TestNoUnsafeOptionalChainingFires(t *testing.T) {
 // holding a chain is separately unsafe, so the rule reports per chain rather than per unsafe use.
 // A port anchoring on the enclosing member expression would report each of these once and pass a
 // fixture that asserted one finding.
-func TestNoUnsafeOptionalChainingReportsPerChain(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeOptionalChainingReportsPerChain(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -78,10 +78,10 @@ func TestNoUnsafeOptionalChainingReportsPerChain(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoUnsafeOptionalChaining, unsafeOptionalChainingFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, NoUnsafeOptionalChaining, unsafeOptionalChainingFile,
 					testCase.sourceText), "unsafeOptionalChain", "unsafeOptionalChain")
 		})
 	}
@@ -93,8 +93,8 @@ func TestNoUnsafeOptionalChainingReportsPerChain(t *testing.T) {
 // result is consumed by another `?.` is safe, because the second link short-circuits too. A chain
 // behind `??` or `||` is safe on the right, because the operator supplies the fallback. Arithmetic
 // is safe under the default options, which is what the option exists to change.
-func TestNoUnsafeOptionalChainingStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeOptionalChainingStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -143,7 +143,10 @@ func TestNoUnsafeOptionalChainingStaysSilent(t *testing.T) {
 		{"a chain that is not the sequence result", "(foo?.bar, bar)();"},
 		{"a logical or fallback before access", "(obj?.foo || bar).baz;"},
 		{"a conditional with no chain in either branch", "(foo?.bar ? baz : qux)();"},
-		{"awaited chains in safe positions", "\n        async function func() {\n          await obj?.foo();\n          await obj?.foo?.();\n          (await obj?.foo)?.();\n          (await obj?.foo)?.bar;\n          await bar?.baz;\n          await (foo ?? obj?.foo.baz);\n          (await bar?.baz ?? bar).baz;\n          (await bar?.baz ?? await bar).baz;\n          await (foo?.bar ? baz : qux);\n        }\n        "},
+		{
+			"awaited chains in safe positions",
+			"\n        async function func() {\n          await obj?.foo();\n          await obj?.foo?.();\n          (await obj?.foo)?.();\n          (await obj?.foo)?.bar;\n          await bar?.baz;\n          await (foo ?? obj?.foo.baz);\n          (await bar?.baz ?? bar).baz;\n          (await bar?.baz ?? await bar).baz;\n          await (foo?.bar ? baz : qux);\n        }\n        ",
+		},
 		{"a chain of nullish fallbacks", "(obj?.foo ?? bar?.baz ?? qux)();"},
 		{"nullish inside logical or", "((obj?.foo ?? bar?.baz) || qux)();"},
 		{"logical or inside logical or", "((obj?.foo || bar?.baz) || qux)();"},
@@ -164,7 +167,10 @@ func TestNoUnsafeOptionalChainingStaysSilent(t *testing.T) {
 		{"exponentiation assignment", "bar **= obj?.foo;"},
 		{"multiplication assignment", "bar *= obj?.boo"},
 		{"division assignment", "bar /= obj?.boo"},
-		{"awaited arithmetic", "async function func() {\n            await obj?.foo + await obj?.bar;\n            await obj?.foo - await obj?.bar;\n            await obj?.foo * await obj?.bar;\n            +await obj?.foo;\n            -await obj?.foo;\n            bar += await obj?.foo;\n            bar -= await obj?.foo;\n            bar %= await obj?.foo;\n            bar **= await obj?.foo;\n            bar *= await obj?.boo;\n            bar /= await obj?.boo;\n        }\n        "},
+		{
+			"awaited arithmetic",
+			"async function func() {\n            await obj?.foo + await obj?.bar;\n            await obj?.foo - await obj?.bar;\n            await obj?.foo * await obj?.bar;\n            +await obj?.foo;\n            -await obj?.foo;\n            bar += await obj?.foo;\n            bar -= await obj?.foo;\n            bar %= await obj?.foo;\n            bar **= await obj?.foo;\n            bar *= await obj?.boo;\n            bar /= await obj?.boo;\n        }\n        ",
+		},
 		// Type arguments on a chain link. These parse only as TypeScript and each is a chain
 		// whose result is consumed inside the chain, so none is unsafe.
 		{"a typed optional call", "x?.f<T>();"},
@@ -175,10 +181,10 @@ func TestNoUnsafeOptionalChainingStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.Run(t, NoUnsafeOptionalChaining, unsafeOptionalChainingFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.Run(test, NoUnsafeOptionalChaining, unsafeOptionalChainingFile,
 					testCase.sourceText))
 		})
 	}
@@ -189,25 +195,25 @@ func TestNoUnsafeOptionalChainingStaysSilent(t *testing.T) {
 // Upstream carries the same source under an empty object and under an explicit false, which is
 // how it pins that an options object that omits the key still gets the default rather than the
 // zero value of whatever the decoder produced.
-func TestNoUnsafeOptionalChainingArithmeticOption(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeOptionalChainingArithmeticOption(test *testing.T) {
+	test.Parallel()
 
 	// Omitting the option entirely leaves arithmetic clean.
-	rule_testing.ExpectClean(t, rule_testing.Run(t, NoUnsafeOptionalChaining,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, NoUnsafeOptionalChaining,
 		unsafeOptionalChainingFile, "obj?.foo - bar;"))
 
 	// An options object that says nothing about it, upstream's `[{}]`.
-	rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoUnsafeOptionalChaining,
+	rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoUnsafeOptionalChaining,
 		unsafeOptionalChainingFile, "obj?.foo - bar;", NoUnsafeOptionalChainingOptions{}))
 
 	// Explicit false, upstream's `[{ "disallowArithmeticOperators": false }]`.
-	rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoUnsafeOptionalChaining,
+	rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoUnsafeOptionalChaining,
 		unsafeOptionalChainingFile, "obj?.foo - bar;",
 		NoUnsafeOptionalChainingOptions{DisallowArithmeticOperators: false}))
 
 	// Explicit true, upstream's only options-carrying fail case. Note the distinct message id:
 	// arithmetic on `undefined` yields NaN rather than throwing, so it is a different judgment.
-	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoUnsafeOptionalChaining,
+	rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoUnsafeOptionalChaining,
 		unsafeOptionalChainingFile, "bar + obj?.foo;",
 		NoUnsafeOptionalChainingOptions{DisallowArithmeticOperators: true}), "unsafeArithmetic")
 }
@@ -222,8 +228,8 @@ func TestNoUnsafeOptionalChainingArithmeticOption(t *testing.T) {
 // this port. Every one of the twenty diagnostics underlines the chain expression itself, never
 // the enclosing member access or call that made it unsafe. That is a real design decision: the
 // chain is the thing the author must change, and the enclosing operator is only the evidence.
-func TestNoUnsafeOptionalChainingReportsTheChainSpan(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeOptionalChainingReportsTheChainSpan(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -254,19 +260,19 @@ func TestNoUnsafeOptionalChainingReportsTheChainSpan(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoUnsafeOptionalChaining, unsafeOptionalChainingFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoUnsafeOptionalChaining, unsafeOptionalChainingFile,
 				testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.wantTexts) {
-				t.Fatalf("wanted %d diagnostics, got %d", len(testCase.wantTexts),
+				test.Fatalf("wanted %d diagnostics, got %d", len(testCase.wantTexts),
 					len(result.Diagnostics))
 			}
 			for index, wantText := range testCase.wantTexts {
 				diagnostic := result.Diagnostics[index]
 				reported := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if reported != wantText {
-					t.Fatalf("diagnostic %d underlined %q, wanted %q", index, reported, wantText)
+					test.Fatalf("diagnostic %d underlined %q, wanted %q", index, reported, wantText)
 				}
 			}
 		})
@@ -275,18 +281,18 @@ func TestNoUnsafeOptionalChainingReportsTheChainSpan(t *testing.T) {
 
 // The arithmetic finding's span, asserted separately because it is produced by a different arm
 // and could point at the operator or the whole binary expression without any fixture noticing.
-func TestNoUnsafeOptionalChainingReportsTheArithmeticSpan(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeOptionalChainingReportsTheArithmeticSpan(test *testing.T) {
+	test.Parallel()
 
 	source := "bar + obj?.foo;"
-	result := rule_testing.RunWithOptions(t, NoUnsafeOptionalChaining, unsafeOptionalChainingFile,
+	result := rule_testing.RunWithOptions(test, NoUnsafeOptionalChaining, unsafeOptionalChainingFile,
 		source, NoUnsafeOptionalChainingOptions{DisallowArithmeticOperators: true})
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
+		test.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 	}
 	reported := source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 	if reported != "obj?.foo" {
-		t.Fatalf("underlined %q, wanted %q", reported, "obj?.foo")
+		test.Fatalf("underlined %q, wanted %q", reported, "obj?.foo")
 	}
 }
 
@@ -298,8 +304,8 @@ func TestNoUnsafeOptionalChainingReportsTheArithmeticSpan(t *testing.T) {
 // not a call's spread, passes most of a 64-case clean corpus and reports nothing on the gap.
 // Upstream has a fail case for `in` but none for `instanceof`, none for a computed access, none
 // for a call argument's spread, and none for a class expression's heritage. Each is below.
-func TestNoUnsafeOptionalChainingCoversEveryUnsafeContext(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeOptionalChainingCoversEveryUnsafeContext(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -349,14 +355,14 @@ func TestNoUnsafeOptionalChainingCoversEveryUnsafeContext(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			// Every case runs with the option on, which changes nothing for the usage cases
 			// (their contexts are unsafe regardless) and enables the arithmetic ones.
-			result := rule_testing.RunWithOptions(t, NoUnsafeOptionalChaining,
+			result := rule_testing.RunWithOptions(test, NoUnsafeOptionalChaining,
 				unsafeOptionalChainingFile, testCase.sourceText,
 				NoUnsafeOptionalChainingOptions{DisallowArithmeticOperators: true})
-			rule_testing.ExpectFindings(t, result, testCase.wantId)
+			rule_testing.ExpectFindings(test, result, testCase.wantId)
 		})
 	}
 }
@@ -366,8 +372,8 @@ func TestNoUnsafeOptionalChainingCoversEveryUnsafeContext(t *testing.T) {
 // The sharpest is the object spread: `{...undefined}` is legal and yields an empty object, while
 // `[...undefined]` throws. A port that treats every spread alike reports this, and upstream's
 // two object-spread clean cases are the only thing pinning the distinction.
-func TestNoUnsafeOptionalChainingDeclinesSafeContextsUnderTheOption(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeOptionalChainingDeclinesSafeContextsUnderTheOption(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -392,9 +398,9 @@ func TestNoUnsafeOptionalChainingDeclinesSafeContextsUnderTheOption(t *testing.T
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoUnsafeOptionalChaining,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoUnsafeOptionalChaining,
 				unsafeOptionalChainingFile, testCase.sourceText,
 				NoUnsafeOptionalChainingOptions{DisallowArithmeticOperators: true}))
 		})
@@ -414,22 +420,22 @@ func TestNoUnsafeOptionalChainingDeclinesSafeContextsUnderTheOption(t *testing.T
 // The same distinction, from the other side: parentheses end a chain, so `(obj?.foo).bar` has a
 // genuinely non-optional access and does report. The pair is what makes the discrimination
 // visible; either case alone passes under the wrong predicate.
-func TestNoUnsafeOptionalChainingDistinguishesChainRootFromChainMembership(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeOptionalChainingDistinguishesChainRootFromChainMembership(test *testing.T) {
+	test.Parallel()
 
 	// Inside one chain: `.bar` short-circuits with the rest and is safe.
-	rule_testing.ExpectClean(t, rule_testing.Run(t, NoUnsafeOptionalChaining,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, NoUnsafeOptionalChaining,
 		unsafeOptionalChainingFile, "obj?.foo.bar;"))
-	rule_testing.ExpectClean(t, rule_testing.Run(t, NoUnsafeOptionalChaining,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, NoUnsafeOptionalChaining,
 		unsafeOptionalChainingFile, "obj?.foo.bar.baz;"))
-	rule_testing.ExpectClean(t, rule_testing.Run(t, NoUnsafeOptionalChaining,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, NoUnsafeOptionalChaining,
 		unsafeOptionalChainingFile, "obj?.[key].bar;"))
-	rule_testing.ExpectClean(t, rule_testing.Run(t, NoUnsafeOptionalChaining,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, NoUnsafeOptionalChaining,
 		unsafeOptionalChainingFile, "obj?.foo.bar();"))
 
 	// Parenthesized, which ends the chain: the same access is now unsafe.
-	rule_testing.ExpectFindings(t, rule_testing.Run(t, NoUnsafeOptionalChaining,
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, NoUnsafeOptionalChaining,
 		unsafeOptionalChainingFile, "(obj?.foo).bar;"), "unsafeOptionalChain")
-	rule_testing.ExpectFindings(t, rule_testing.Run(t, NoUnsafeOptionalChaining,
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, NoUnsafeOptionalChaining,
 		unsafeOptionalChainingFile, "(obj?.[key]).bar;"), "unsafeOptionalChain")
 }

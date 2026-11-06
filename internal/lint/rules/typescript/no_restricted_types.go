@@ -10,6 +10,25 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
+// noRestrictedTypesKeywordKinds is upstream's `TYPE_KEYWORDS`, mapping a configurable spelling onto
+// the node kind that spelling parses to.
+//
+// These are separate from the type-reference handler because a keyword is not a reference: `string`
+// parses as its own kind and has no name node to read.
+var noRestrictedTypesKeywordKinds = map[string]ast.Kind{
+	"bigint":    ast.KindBigIntKeyword,
+	"boolean":   ast.KindBooleanKeyword,
+	"never":     ast.KindNeverKeyword,
+	"null":      ast.KindNullKeyword,
+	"number":    ast.KindNumberKeyword,
+	"object":    ast.KindObjectKeyword,
+	"string":    ast.KindStringKeyword,
+	"symbol":    ast.KindSymbolKeyword,
+	"undefined": ast.KindUndefinedKeyword,
+	"unknown":   ast.KindUnknownKeyword,
+	"void":      ast.KindVoidKeyword,
+}
+
 // NoRestrictedTypes flags types a project has decided not to use, named in configuration.
 //
 //	valid:   let value: string;                       with no types configured
@@ -26,7 +45,7 @@ import (
 // # The name is the configured key with whitespace removed, and so is the type
 //
 // Both sides are stripped, so a key written `Foo<Bar>` matches source written `Foo<  Bar  >`. The
-// message names the STRIPPED form while the finding spans the raw text: measured on the installed
+// message names the stripped form while the finding spans the raw text: measured on the installed
 // 8.67.0 build, `let value: Foo<  Bar  >;` with `Foo<Bar>` banned underlines the whole raw
 // `Foo<  Bar  >` and says "Don't use `Foo<Bar>`".
 //
@@ -34,12 +53,12 @@ import (
 //
 // Upstream needs three separate handlers for a type reference, a class `implements` entry, and an
 // interface `extends` entry, because estree gives those three different node types. Probed here:
-// all three parse as `KindTypeReference`, so ONE handler covers them, and the heritage handlers
+// all three parse as `KindTypeReference`, so one handler covers them, and the heritage handlers
 // upstream writes would be duplicates rather than additions.
 //
 // That equivalence is not an assumption. Driven through the installed build on all four heritage
 // shapes: `implements Bar` and `extends Bar` each report once, on the name; `implements Bar<Baz>`
-// and `extends Bar<Baz>` each report TWICE, once on the name and once on the whole generic, in that
+// and `extends Bar<Baz>` each report twice, once on the name and once on the whole generic, in that
 // order. This port produces the same pairs in the same order from the single handler, because
 // upstream's own type-reference handler already does both halves.
 //
@@ -51,27 +70,27 @@ import (
 //
 // # A fix and a suggestion are different offers, and the configuration chooses
 //
-// `fixWith` produces a FIX, which the edit engine applies unattended. `suggest` produces
+// `fixWith` produces a fix, which the edit engine applies unattended. `suggest` produces
 // suggestions, which a human picks from. Reproducing that split is part of the port rather than a
 // detail: shipping a suggestion as a fix means the edit engine rewrites code upstream would only
 // have offered to rewrite.
 //
-// The two are NOT exclusive and an empty `fixWith` is not a fix, both measured rather than read.
-// Upstream's corpus asserts thirteen fixer outputs and ZERO suggestions, so nothing imported
+// The two are not exclusive and an empty `fixWith` is not a fix, both measured rather than read.
+// Upstream's corpus asserts thirteen fixer outputs and zero suggestions, so nothing imported
 // exercises that half at all, and the first version of this rule got both details wrong while every
 // imported case stayed green. Driven through the installed 8.67.0 build: an entry carrying both
-// produces one finding with a fix AND the suggestions, and `fixWith: ""` produces a finding with no
+// produces one finding with a fix and the suggestions, and `fixWith: ""` produces a finding with no
 // fix rather than one deleting the type.
 //
 // # Cost
 //
 // Every listener is registered only when the configuration bans something it could match, so a
 // project banning nothing registers nothing and the rule costs a map lookup per file.
-var NoRestrictedTypes = rule.Rule{
+var NoRestrictedTypes = rule.Rule[NoRestrictedTypesOptions]{
 	Name: "@typescript-eslint/no-restricted-types",
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, ok := rule.OptionsAs[NoRestrictedTypesOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[NoRestrictedTypesOptions]) rule.Listeners {
+		settings, ok := options.Read()
 		if !ok || len(settings.Types) == 0 {
 			// Configured nothing, so there is nothing to enforce. Upstream defaults `types` to an
 			// empty object and reaches the same silence one lookup later.
@@ -90,14 +109,14 @@ var NoRestrictedTypes = rule.Rule{
 				Description: "Don't use `" + name + "` as a type." + banned.customMessage(),
 			}
 
-			nodeRange := rule.TokenRange(ctx.SourceFile, node)
+			nodeRange := rule.TokenRange(ruleContext.SourceFile, node)
 
-			// A fix and suggestions are NOT exclusive, and the first version of this rule returned
+			// A fix and suggestions are not exclusive, and the first version of this rule returned
 			// after the fix and dropped them. Measured on the installed 8.67.0 build:
-			// `{fixWith: 'Bar', suggest: ['Baz']}` produces a finding carrying BOTH, so a reader who
+			// `{fixWith: 'Bar', suggest: ['Baz']}` produces a finding carrying both, so a reader who
 			// declines the automatic repair still gets the offer.
 			//
-			// An empty `fixWith` produces NO fix. Upstream writes `const fixWith = bannedType.fixWith`
+			// An empty `fixWith` produces no fix. Upstream writes `const fixWith = bannedType.fixWith`
 			// and then `fix: fixWith ? ... : null`, so the empty string is falsy and there is no
 			// repair. Measured: `{fixWith: ''}` reports with no fix rather than deleting the type.
 			// This is the reason the field can be a plain string rather than a pointer, and it is the
@@ -120,26 +139,26 @@ var NoRestrictedTypes = rule.Rule{
 
 			switch {
 			case len(fixes) > 0 && len(suggestions) > 0:
-				ctx.Report(rule.Diagnostic{
+				ruleContext.Report(rule.Diagnostic{
 					Range:       nodeRange,
 					Message:     message,
-					SourceFile:  ctx.SourceFile,
+					SourceFile:  ruleContext.SourceFile,
 					Fixes:       fixes,
 					Suggestions: suggestions,
 				})
 			case len(fixes) > 0:
-				ctx.ReportNodeWithFixes(node, message, fixes...)
+				ruleContext.ReportNodeWithFixes(node, message, fixes...)
 			case len(suggestions) > 0:
-				ctx.ReportNodeWithSuggestions(node, message, suggestions...)
+				ruleContext.ReportNodeWithSuggestions(node, message, suggestions...)
 			default:
-				ctx.ReportNode(node, message)
+				ruleContext.ReportNode(node, message)
 			}
 		}
 
 		// checkBannedNode is the same thing with the name read off the source text, which is what
 		// upstream's default parameter does.
 		checkBannedNode := func(node *ast.Node) {
-			checkBannedType(node, noRestrictedTypesNameOf(ctx, node))
+			checkBannedType(node, noRestrictedTypesNameOf(ruleContext, node))
 		}
 
 		listeners := rule.Listeners{}
@@ -148,7 +167,7 @@ var NoRestrictedTypes = rule.Rule{
 		// upstream's `keywordSelectors` reduction. The keyword's name is passed rather than read
 		// from source, because upstream passes the literal too.
 		//
-		// This registration test is a COST decision and not a correctness one, measured rather than
+		// This registration test is a cost decision and not a correctness one, measured rather than
 		// assumed: a mutant registering every keyword listener unconditionally survives the whole
 		// suite, and it survives because it is equivalent. The lookup inside `checkBannedType`
 		// declines any keyword the configuration did not name, so the extra listeners produce the
@@ -197,43 +216,24 @@ var NoRestrictedTypes = rule.Rule{
 	},
 }
 
-// noRestrictedTypesKeywordKinds is upstream's `TYPE_KEYWORDS`, mapping a configurable spelling onto
-// the node kind that spelling parses to.
-//
-// These are separate from the type-reference handler because a keyword is not a reference: `string`
-// parses as its own kind and has no name node to read.
-var noRestrictedTypesKeywordKinds = map[string]ast.Kind{
-	"bigint":    ast.KindBigIntKeyword,
-	"boolean":   ast.KindBooleanKeyword,
-	"never":     ast.KindNeverKeyword,
-	"null":      ast.KindNullKeyword,
-	"number":    ast.KindNumberKeyword,
-	"object":    ast.KindObjectKeyword,
-	"string":    ast.KindStringKeyword,
-	"symbol":    ast.KindSymbolKeyword,
-	"undefined": ast.KindUndefinedKeyword,
-	"unknown":   ast.KindUnknownKeyword,
-	"void":      ast.KindVoidKeyword,
-}
-
 // noRestrictedTypesNameOf reads a node's source text with every whitespace character removed.
 //
 // Upstream's `removeSpaces` uses the regular expression `\s`, which is Unicode-aware in JavaScript,
 // so `text.IsWhitespace`, JavaScript's set, is the matching predicate rather than a test against the
 // five ASCII ones or Go's `unicode.IsSpace`.
-func noRestrictedTypesNameOf(ctx rule.Context, node *ast.Node) string {
-	nodeRange := rule.TokenRange(ctx.SourceFile, node)
-	return noRestrictedTypesRemoveSpaces(ctx.SourceFile.Text()[nodeRange.Pos():nodeRange.End()])
+func noRestrictedTypesNameOf(ruleContext rule.Context, node *ast.Node) string {
+	nodeRange := rule.TokenRange(ruleContext.SourceFile, node)
+	return noRestrictedTypesRemoveSpaces(ruleContext.SourceFile.Text()[nodeRange.Pos():nodeRange.End()])
 }
 
 // noRestrictedTypesRemoveSpaces is upstream's `removeSpaces`, applied to both the configured key and
 // the source text so the two are compared in the same shape.
 func noRestrictedTypesRemoveSpaces(typeSpelling string) string {
-	return strings.Map(func(r rune) rune {
-		if text.IsWhitespace(r) {
+	return strings.Map(func(character rune) rune {
+		if text.IsWhitespace(character) {
 			return -1
 		}
-		return r
+		return character
 	}, typeSpelling)
 }
 
@@ -244,49 +244,6 @@ func noRestrictedTypesRemoveSpaces(typeSpelling string) string {
 type NoRestrictedTypesOptions struct {
 	// Types maps a whitespace-stripped type spelling onto what to say and offer about it.
 	Types map[string]NoRestrictedTypesBan
-}
-
-// NoRestrictedTypesBan is one entry's resolved meaning.
-type NoRestrictedTypesBan struct {
-	// Allowed records an entry the configuration wrote as `false` or `null`, meaning "not banned".
-	//
-	// Upstream's RULE tests `bannedType == null || bannedType === false` and declines, so the
-	// behavior is real in its source. Its SCHEMA rejects both spellings before the rule can see
-	// them: measured against the installed 8.67.0 build, `{"Foo": null}` and `{"Foo": false}` both
-	// fail configuration validation and the linter refuses to start. So this branch reproduces
-	// upstream's code and is unreachable through upstream's own configuration surface. It is kept
-	// because cohere has no schema layer rejecting those spellings, which means a config here CAN
-	// contain one, and silently banning a type somebody wrote `false` against would be the worst
-	// available reading.
-	Allowed bool
-
-	// Message is the text appended after the standard sentence, from either the string form or the
-	// object's `message` key.
-	Message string
-
-	// FixWith produces a FIX the edit engine applies unattended.
-	//
-	// A plain string rather than a pointer, deliberately, because upstream cannot distinguish an
-	// absent key from an empty one either: it tests the value's truthiness, so `fixWith: ""` means
-	// no repair rather than "replace with nothing". Measured on the installed 8.67.0 build, which
-	// reports that case with no fix attached. A pointer here would express a distinction upstream
-	// does not have and would delete the type.
-	FixWith string
-
-	// Suggest produces suggestions a human chooses between.
-	Suggest []string
-}
-
-// customMessage renders the trailing half of the finding.
-//
-// Upstream returns the empty string for a bare `true` and otherwise a SPACE followed by the message,
-// so the standard sentence and the custom one are separated by exactly one space and a bare ban ends
-// at the period.
-func (b NoRestrictedTypesBan) customMessage() string {
-	if b.Message == "" {
-		return ""
-	}
-	return " " + b.Message
 }
 
 // DefaultNoRestrictedTypesOptions is upstream's configured-nothing behavior: ban nothing.
@@ -309,21 +266,21 @@ type noRestrictedTypesRawOptions struct {
 // an object, and a generic decode into any single Go type discards two of the three. It also has to
 // distinguish three falsy-looking spellings that mean different things: `true` bans with no message,
 // `false` and `null` do not ban at all, and an object with no `message` bans with no message.
-func DecodeNoRestrictedTypesOptions(raw []byte) (any, error) {
+func DecodeNoRestrictedTypesOptions(raw []byte) (NoRestrictedTypesOptions, error) {
 	settings := DefaultNoRestrictedTypesOptions()
 	if len(raw) == 0 {
 		return settings, nil
 	}
 
 	var wire noRestrictedTypesRawOptions
-	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
-		return nil, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &wire); unmarshalOptionsError != nil {
+		return NoRestrictedTypesOptions{}, unmarshalOptionsError
 	}
 
 	for spelling, entry := range wire.Types {
-		ban, include, err := decodeNoRestrictedTypesBan(entry)
-		if err != nil {
-			return nil, fmt.Errorf("types[%q]: %w", spelling, err)
+		ban, include, decodeNoRestrictedTypesBanError := decodeNoRestrictedTypesBan(entry)
+		if decodeNoRestrictedTypesBanError != nil {
+			return NoRestrictedTypesOptions{}, fmt.Errorf("types[%q]: %w", spelling, decodeNoRestrictedTypesBanError)
 		}
 		if !include {
 			continue
@@ -354,13 +311,13 @@ func decodeNoRestrictedTypesBan(entry json.RawMessage) (NoRestrictedTypesBan, bo
 	}
 
 	var asBoolean bool
-	if err := json.Unmarshal(entry, &asBoolean); err == nil {
+	if decodeError := json.Unmarshal(entry, &asBoolean); decodeError == nil {
 		// `true` bans with the standard message; `false` explicitly does not ban.
 		return NoRestrictedTypesBan{Allowed: !asBoolean}, true, nil
 	}
 
 	var asString string
-	if err := json.Unmarshal(entry, &asString); err == nil {
+	if decodeError := json.Unmarshal(entry, &asString); decodeError == nil {
 		return NoRestrictedTypesBan{Message: asString}, true, nil
 	}
 
@@ -370,8 +327,8 @@ func decodeNoRestrictedTypesBan(entry json.RawMessage) (NoRestrictedTypesBan, bo
 		Suggest []string `json:"suggest"`
 	}
 	if strings.HasPrefix(trimmed, "{") {
-		if err := rule.UnmarshalOptions(entry, &asObject); err != nil {
-			return NoRestrictedTypesBan{}, false, err
+		if unmarshalOptionsError := rule.UnmarshalOptions(entry, &asObject); unmarshalOptionsError != nil {
+			return NoRestrictedTypesBan{}, false, unmarshalOptionsError
 		}
 		return NoRestrictedTypesBan{
 			Message: asObject.Message,

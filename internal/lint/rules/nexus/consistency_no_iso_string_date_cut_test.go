@@ -58,9 +58,9 @@ func consistencyNoIsoStringDateCutSource(lines ...string) string {
 	return consistencyNoIsoStringDateCutPrelude + strings.Join(lines, "\n") + "\n"
 }
 
-func consistencyNoIsoStringDateCutRun(t *testing.T, sourceText string) rule_testing.Result {
-	t.Helper()
-	return rule_testing.RunTypedFiles(t, ConsistencyNoIsoStringDateCut, map[string]string{
+func consistencyNoIsoStringDateCutRun(test *testing.T, sourceText string) rule_testing.Result {
+	test.Helper()
+	return rule_testing.RunTypedFiles(test, ConsistencyNoIsoStringDateCut, map[string]string{
 		consistencyNoIsoStringDateCutFile:           sourceText,
 		consistencyNoIsoStringDateCutFormatTimeFile: consistencyNoIsoStringDateCutFormatTime(true),
 		consistencyNoIsoStringDateCutTimeZonesFile:  consistencyNoIsoStringDateCutTimeZones,
@@ -69,8 +69,8 @@ func consistencyNoIsoStringDateCutRun(t *testing.T, sourceText string) rule_test
 
 // consistencyNoIsoStringDateCutExpect asserts the findings' spans in source order. The harness trims
 // the subject file before writing it, so spans are read from the program's own text.
-func consistencyNoIsoStringDateCutExpect(t *testing.T, result rule_testing.Result, want []string) {
-	t.Helper()
+func consistencyNoIsoStringDateCutExpect(test *testing.T, result rule_testing.Result, want []string) {
+	test.Helper()
 	diagnostics := append(result.Diagnostics[:0:0], result.Diagnostics...)
 	sort.SliceStable(diagnostics, func(left int, right int) bool {
 		return diagnostics[left].Range.Pos() < diagnostics[right].Range.Pos()
@@ -81,21 +81,25 @@ func consistencyNoIsoStringDateCutExpect(t *testing.T, result rule_testing.Resul
 	}
 	sorted := result
 	sorted.Diagnostics = diagnostics
-	rule_testing.ExpectFindings(t, sorted, wantIds...)
+	rule_testing.ExpectFindings(test, sorted, wantIds...)
 	text := result.SourceFile.Text()
 	var got []string
 	for _, diagnostic := range diagnostics {
 		got = append(got, text[diagnostic.Range.Pos():diagnostic.Range.End()])
 		if len(diagnostic.Fixes) != 0 || len(diagnostic.Suggestions) != 0 {
-			t.Fatalf("expected no fix and no suggestion, got %d and %d", len(diagnostic.Fixes), len(diagnostic.Suggestions))
+			test.Fatalf(
+				"expected no fix and no suggestion, got %d and %d",
+				len(diagnostic.Fixes),
+				len(diagnostic.Suggestions),
+			)
 		}
 	}
 	if len(got) != len(want) {
-		t.Fatalf("expected %d findings %v, got %d %v", len(want), want, len(got), got)
+		test.Fatalf("expected %d findings %v, got %d %v", len(want), want, len(got), got)
 	}
 	for index := range want {
 		if got[index] != want[index] {
-			t.Fatalf("finding %d is %q, want %q (all: %q)", index, got[index], want[index], got)
+			test.Fatalf("finding %d is %q, want %q (all: %q)", index, got[index], want[index], got)
 		}
 	}
 }
@@ -213,46 +217,53 @@ var consistencyNoIsoStringDateCutRealSites = []struct {
 	},
 }
 
-func TestConsistencyNoIsoStringDateCutFiresOnRealSites(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoIsoStringDateCutFiresOnRealSites(test *testing.T) {
+	test.Parallel()
 
 	for _, site := range consistencyNoIsoStringDateCutRealSites {
-		t.Run(site.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(site.name, func(test *testing.T) {
+			test.Parallel()
 
-			consistencyNoIsoStringDateCutExpect(t, consistencyNoIsoStringDateCutRun(t, consistencyNoIsoStringDateCutSource(site.broken...)), site.want)
+			consistencyNoIsoStringDateCutExpect(
+				test,
+				consistencyNoIsoStringDateCutRun(test, consistencyNoIsoStringDateCutSource(site.broken...)),
+				site.want,
+			)
 		})
 	}
 }
 
-func TestConsistencyNoIsoStringDateCutStaysSilentOnFixedRealSites(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoIsoStringDateCutStaysSilentOnFixedRealSites(test *testing.T) {
+	test.Parallel()
 
 	for _, site := range consistencyNoIsoStringDateCutRealSites {
-		t.Run(site.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(site.name, func(test *testing.T) {
+			test.Parallel()
 
-			rule_testing.ExpectClean(t, consistencyNoIsoStringDateCutRun(t, consistencyNoIsoStringDateCutSource(site.fixed...)))
+			rule_testing.ExpectClean(
+				test,
+				consistencyNoIsoStringDateCutRun(test, consistencyNoIsoStringDateCutSource(site.fixed...)),
+			)
 		})
 	}
 }
 
 // `dateIso8601` itself cuts the ISO string on its no-zone branch, and the rule reports it like any
 // other site; given the zone, the definition is clean.
-func TestConsistencyNoIsoStringDateCutReportsTheHelperDefinitionUntilItIsFixed(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoIsoStringDateCutReportsTheHelperDefinitionUntilItIsFixed(test *testing.T) {
+	test.Parallel()
 
 	run := func(fixed bool) rule_testing.Result {
-		return rule_testing.RunTypedFiles(t, ConsistencyNoIsoStringDateCut, map[string]string{
+		return rule_testing.RunTypedFiles(test, ConsistencyNoIsoStringDateCut, map[string]string{
 			consistencyNoIsoStringDateCutFormatTimeFile: consistencyNoIsoStringDateCutFormatTime(fixed),
 		}, consistencyNoIsoStringDateCutFormatTimeFile)
 	}
-	consistencyNoIsoStringDateCutExpect(t, run(false), []string{"date.toISOString().split('T')[0]"})
-	rule_testing.ExpectClean(t, run(true))
+	consistencyNoIsoStringDateCutExpect(test, run(false), []string{"date.toISOString().split('T')[0]"})
+	rule_testing.ExpectClean(test, run(true))
 }
 
-func TestConsistencyNoIsoStringDateCutFires(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoIsoStringDateCutFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name  string
@@ -290,16 +301,20 @@ func TestConsistencyNoIsoStringDateCutFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 
-			consistencyNoIsoStringDateCutExpect(t, consistencyNoIsoStringDateCutRun(t, consistencyNoIsoStringDateCutSource(testCase.lines...)), testCase.want)
+			consistencyNoIsoStringDateCutExpect(
+				test,
+				consistencyNoIsoStringDateCutRun(test, consistencyNoIsoStringDateCutSource(testCase.lines...)),
+				testCase.want,
+			)
 		})
 	}
 }
 
-func TestConsistencyNoIsoStringDateCutStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoIsoStringDateCutStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name  string
@@ -387,10 +402,13 @@ func TestConsistencyNoIsoStringDateCutStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 
-			rule_testing.ExpectClean(t, consistencyNoIsoStringDateCutRun(t, consistencyNoIsoStringDateCutSource(testCase.lines...)))
+			rule_testing.ExpectClean(
+				test,
+				consistencyNoIsoStringDateCutRun(test, consistencyNoIsoStringDateCutSource(testCase.lines...)),
+			)
 		})
 	}
 }
@@ -398,23 +416,40 @@ func TestConsistencyNoIsoStringDateCutStaysSilent(t *testing.T) {
 // Two global scripts share one scope, so a `const` ISO string can be declared in one file and cut in
 // another. The other file is never followed; the same cut with the `const` declared here reports, so
 // the silence is the file boundary and not a scope that failed to resolve.
-func TestConsistencyNoIsoStringDateCutFollowsOnlyThisFile(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoIsoStringDateCutFollowsOnlyThisFile(test *testing.T) {
+	test.Parallel()
 
 	// The harness forces every file to be a module; these two must be scripts to share a scope.
 	scripts := func(directory string) {
-		config := `{"compilerOptions": {"strict": true, "target": "ES2022", "lib": ["ES2022"], "types": []}, "include": ["**/*.ts"]}`
-		if err := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(config), 0o644); err != nil {
-			t.Fatalf("writing the tsconfig: %v", err)
+		configuration := `{"compilerOptions": {"strict": true, "target": "ES2022", "lib": ["ES2022"], "types": []}, "include": ["**/*.ts"]}`
+		if writeError := os.WriteFile(
+			filepath.Join(directory, "tsconfig.json"),
+			[]byte(configuration),
+			0o644,
+		); writeError != nil {
+			test.Fatalf("writing the tsconfig: %v", writeError)
 		}
 	}
 	files := map[string]string{
 		"/repository/source/Declaring.ts": "const startedIso = new Date().toISOString();",
 		"/repository/source/Reading.ts":   "const startedOn = startedIso.slice(0, 10);",
 	}
-	rule_testing.ExpectClean(t, rule_testing.RunTypedFilesWithSetup(t, ConsistencyNoIsoStringDateCut, files, "/repository/source/Reading.ts", scripts))
+	rule_testing.ExpectClean(test, rule_testing.RunTypedFilesWithSetup(
+		test,
+		ConsistencyNoIsoStringDateCut,
+		files,
+		"/repository/source/Reading.ts",
+		scripts,
+	))
 
-	files["/repository/source/Reading.ts"] = "const startedIsoHere = new Date().toISOString();\nconst startedOnHere = startedIsoHere.slice(0, 10);"
-	consistencyNoIsoStringDateCutExpect(t, rule_testing.RunTypedFilesWithSetup(t, ConsistencyNoIsoStringDateCut, files, "/repository/source/Reading.ts", scripts),
+	files["/repository/source/Reading.ts"] = "const startedIsoHere = new Date().toISOString();\n" +
+		"const startedOnHere = startedIsoHere.slice(0, 10);"
+	consistencyNoIsoStringDateCutExpect(test, rule_testing.RunTypedFilesWithSetup(
+		test,
+		ConsistencyNoIsoStringDateCut,
+		files,
+		"/repository/source/Reading.ts",
+		scripts,
+	),
 		[]string{"startedIsoHere.slice(0, 10)"})
 }

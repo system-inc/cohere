@@ -47,35 +47,38 @@ type valueParserCase struct {
 	Css string `json:"css"`
 }
 
-func loadValueParserCorpus(t *testing.T) valueParserCorpus {
-	t.Helper()
-	raw, err := os.ReadFile(filepath.Join("testdata", "valueparser_fixtures.json"))
-	if err != nil {
-		t.Fatalf("read fixtures: %v", err)
+func loadValueParserCorpus(test *testing.T) valueParserCorpus {
+	test.Helper()
+	raw, readError := os.ReadFile(filepath.Join("testdata", "valueparser_fixtures.json"))
+	if readError != nil {
+		test.Fatalf("read fixtures: %v", readError)
 	}
 	var corpus valueParserCorpus
-	if err := json.Unmarshal(raw, &corpus); err != nil {
-		t.Fatalf("parse fixtures: %v", err)
+	if decodeError := json.Unmarshal(raw, &corpus); decodeError != nil {
+		test.Fatalf("parse fixtures: %v", decodeError)
 	}
 	// A corpus that quietly shrank is the failure this approach exists to prevent, and it would
 	// otherwise read as a passing run.
 	if len(corpus.Cases) < 250 {
-		t.Fatalf("fixture holds only %d cases; expected several hundred shapes", len(corpus.Cases))
+		test.Fatalf("fixture holds only %d cases; expected several hundred shapes", len(corpus.Cases))
 	}
 	if corpus.ParseSymbol == "" {
-		t.Fatalf("fixture does not record which bundle symbol it was generated from")
+		test.Fatalf("fixture does not record which bundle symbol it was generated from")
 	}
 	if len(corpus.ExhaustiveCases) < 2000 {
-		t.Fatalf("fixture holds only %d exhaustive cases; the enumeration is meant to be thousands", len(corpus.ExhaustiveCases))
+		test.Fatalf(
+			"fixture holds only %d exhaustive cases; the enumeration is meant to be thousands",
+			len(corpus.ExhaustiveCases),
+		)
 	}
 	return corpus
 }
 
 // TestParseValueMatchesEngine is the whole point of this suite: every tree, for every shape,
 // compared node for node against what the shipped engine built.
-func TestParseValueMatchesEngine(t *testing.T) {
-	t.Parallel()
-	corpus := loadValueParserCorpus(t)
+func TestParseValueMatchesEngine(test *testing.T) {
+	test.Parallel()
+	corpus := loadValueParserCorpus(test)
 
 	comparedValues := 0
 	comparedNodes := 0
@@ -84,7 +87,7 @@ func TestParseValueMatchesEngine(t *testing.T) {
 	for _, testCase := range corpus.Cases {
 		got := ParseValue(testCase.Value)
 		if difference := diffValueNodes(got, testCase.Ast, ""); difference != "" {
-			t.Errorf("ParseValue(%q):\n  %s\n  got:    %s\n  engine: %s",
+			test.Errorf("ParseValue(%q):\n  %s\n  got:    %s\n  engine: %s",
 				testCase.Value, difference, renderValueNodes(got), renderValueNodes(testCase.Ast))
 		}
 		comparedValues++
@@ -97,13 +100,21 @@ func TestParseValueMatchesEngine(t *testing.T) {
 		// port's tree. Two ports agreeing on structure but disagreeing on printing would pass the
 		// check above and fail here.
 		if printed := ValueToCss(got); printed != testCase.Css {
-			t.Errorf("ValueToCss(ParseValue(%q)) = %q, engine prints %q", testCase.Value, printed, testCase.Css)
+			test.Errorf("ValueToCss(ParseValue(%q)) = %q, engine prints %q", testCase.Value, printed, testCase.Css)
 		}
 	}
 
-	t.Logf("compared %d parse trees (%d nodes, max depth %d) and %d reprints against Tailwind %s (%s, symbols %s/%s)",
-		comparedValues, comparedNodes, maximumDepth, comparedValues,
-		corpus.TailwindVersion, corpus.Bundle, corpus.ParseSymbol, corpus.ToCssSymbol)
+	test.Logf(
+		"compared %d parse trees (%d nodes, max depth %d) and %d reprints against Tailwind %s (%s, symbols %s/%s)",
+		comparedValues,
+		comparedNodes,
+		maximumDepth,
+		comparedValues,
+		corpus.TailwindVersion,
+		corpus.Bundle,
+		corpus.ParseSymbol,
+		corpus.ToCssSymbol,
+	)
 }
 
 // TestParseValueMatchesEngineExhaustively parses every string of length 1 to 3 over an alphabet of
@@ -116,9 +127,9 @@ func TestParseValueMatchesEngine(t *testing.T) {
 // value in the corpus, and both rules are correct only because a UTF-8 continuation byte can match
 // no separator, quote, or paren and so reaches the buffer either way. That is an argument; this is
 // the measurement behind it.
-func TestParseValueMatchesEngineExhaustively(t *testing.T) {
-	t.Parallel()
-	corpus := loadValueParserCorpus(t)
+func TestParseValueMatchesEngineExhaustively(test *testing.T) {
+	test.Parallel()
+	corpus := loadValueParserCorpus(test)
 
 	disagreements := 0
 	for _, testCase := range corpus.ExhaustiveCases {
@@ -127,23 +138,23 @@ func TestParseValueMatchesEngineExhaustively(t *testing.T) {
 			// Bounded output: a broken branch disagrees on hundreds of these at once, and the
 			// first handful name the shape as well as all of them would.
 			if disagreements < 10 {
-				t.Errorf("ParseValue(%q):\n  %s\n  got:    %s\n  engine: %s",
+				test.Errorf("ParseValue(%q):\n  %s\n  got:    %s\n  engine: %s",
 					testCase.Value, difference, renderValueNodes(got), renderValueNodes(testCase.Ast))
 			}
 			disagreements++
 		}
 		if printed := ValueToCss(got); printed != testCase.Css {
 			if disagreements < 10 {
-				t.Errorf("ValueToCss(ParseValue(%q)) = %q, engine prints %q", testCase.Value, printed, testCase.Css)
+				test.Errorf("ValueToCss(ParseValue(%q)) = %q, engine prints %q", testCase.Value, printed, testCase.Css)
 			}
 			disagreements++
 		}
 	}
 	if disagreements > 10 {
-		t.Errorf("%d disagreements in total; only the first were printed", disagreements)
+		test.Errorf("%d disagreements in total; only the first were printed", disagreements)
 	}
 
-	t.Logf("compared %d exhaustive inputs over the alphabet %q against Tailwind %s",
+	test.Logf("compared %d exhaustive inputs over the alphabet %q against Tailwind %s",
 		len(corpus.ExhaustiveCases), corpus.ExhaustiveAlphabet, corpus.TailwindVersion)
 }
 
@@ -152,9 +163,9 @@ func TestParseValueMatchesEngineExhaustively(t *testing.T) {
 // The bulk comparison above is only as good as what it covers, and coverage is the property most
 // likely to erode silently: a corpus can lose every unbalanced case and still report several
 // hundred green comparisons. These are the branches whose absence would not otherwise be visible.
-func TestCorpusExercisesEveryBranch(t *testing.T) {
-	t.Parallel()
-	corpus := loadValueParserCorpus(t)
+func TestCorpusExercisesEveryBranch(test *testing.T) {
+	test.Parallel()
+	corpus := loadValueParserCorpus(test)
 
 	kinds := map[ValueNodeKind]int{}
 	for _, testCase := range corpus.Cases {
@@ -162,7 +173,7 @@ func TestCorpusExercisesEveryBranch(t *testing.T) {
 	}
 	for _, kind := range []ValueNodeKind{ValueNodeKindWord, ValueNodeKindFunction, ValueNodeKindSeparator} {
 		if kinds[kind] < 10 {
-			t.Errorf("corpus produced only %d %s nodes; it is not exercising that branch", kinds[kind], kind)
+			test.Errorf("corpus produced only %d %s nodes; it is not exercising that branch", kinds[kind], kind)
 		}
 	}
 
@@ -176,11 +187,11 @@ func TestCorpusExercisesEveryBranch(t *testing.T) {
 		}
 	}
 	if lossy < 10 {
-		t.Errorf("corpus holds only %d values that do not round-trip; the malformed shapes are the point", lossy)
+		test.Errorf("corpus holds only %d values that do not round-trip; the malformed shapes are the point", lossy)
 	}
 
 	if valueNodeDepthAcross(corpus.Cases) < 4 {
-		t.Error("corpus never nests functions more than three deep; nested arguments are untested")
+		test.Error("corpus never nests functions more than three deep; nested arguments are untested")
 	}
 }
 
@@ -191,8 +202,8 @@ func TestCorpusExercisesEveryBranch(t *testing.T) {
 // empty, so the optional chain drops the word instead of emitting it. This is not a rounding error:
 // `foo\(bar)` parses to nothing at all, because the escaped paren never opened a function and the
 // close paren then discarded the entire buffer.
-func TestUnmatchedCloseParenDiscardsPendingText(t *testing.T) {
-	t.Parallel()
+func TestUnmatchedCloseParenDiscardsPendingText(test *testing.T) {
+	test.Parallel()
 	cases := []struct {
 		input string
 		want  []ValueNode
@@ -211,7 +222,7 @@ func TestUnmatchedCloseParenDiscardsPendingText(t *testing.T) {
 	for _, testCase := range cases {
 		got := ParseValue(testCase.input)
 		if difference := diffValueNodes(got, testCase.want, ""); difference != "" {
-			t.Errorf("ParseValue(%q) = %s, want %s (%s)",
+			test.Errorf("ParseValue(%q) = %s, want %s (%s)",
 				testCase.input, renderValueNodes(got), renderValueNodes(testCase.want), difference)
 		}
 	}
@@ -222,8 +233,8 @@ func TestUnmatchedCloseParenDiscardsPendingText(t *testing.T) {
 // `buffer += input[i] + input[i + 1]` on the last character indexes one past the end. JavaScript
 // yields `undefined` there, and string concatenation stringifies it, so the word really does carry
 // the ten characters `\undefined`.
-func TestTrailingBackslashReadsPastTheEnd(t *testing.T) {
-	t.Parallel()
+func TestTrailingBackslashReadsPastTheEnd(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range []struct{ input, want string }{
 		{`\`, `\undefined`},
 		{`a\`, `a\undefined`},
@@ -232,7 +243,7 @@ func TestTrailingBackslashReadsPastTheEnd(t *testing.T) {
 		got := ParseValue(testCase.input)
 		last := got[len(got)-1]
 		if last.Kind != ValueNodeKindWord || last.Value != testCase.want {
-			t.Errorf("ParseValue(%q) last node = %+v, want word %q", testCase.input, last, testCase.want)
+			test.Errorf("ParseValue(%q) last node = %+v, want word %q", testCase.input, last, testCase.want)
 		}
 	}
 }
@@ -242,36 +253,41 @@ func TestTrailingBackslashReadsPastTheEnd(t *testing.T) {
 // The final buffer flush pushes to `ast`, never to the still-open parent, so text that visually sits
 // inside an unclosed function ends up beside it. A port that flushed into the open function would
 // produce the tree a reader expects and disagree with the engine.
-func TestUnclosedFunctionKeepsRemainderAtTopLevel(t *testing.T) {
-	t.Parallel()
+func TestUnclosedFunctionKeepsRemainderAtTopLevel(test *testing.T) {
+	test.Parallel()
 	got := ParseValue("foo(bar")
 	want := []ValueNode{
 		{Kind: ValueNodeKindFunction, Value: "foo", Nodes: []ValueNode{}},
 		{Kind: ValueNodeKindWord, Value: "bar"},
 	}
 	if difference := diffValueNodes(got, want, ""); difference != "" {
-		t.Errorf("ParseValue(\"foo(bar\") = %s, want %s (%s)", renderValueNodes(got), renderValueNodes(want), difference)
+		test.Errorf(
+			"ParseValue(\"foo(bar\") = %s, want %s (%s)",
+			renderValueNodes(got),
+			renderValueNodes(want),
+			difference,
+		)
 	}
 
 	// Anything already separated lands inside, so only the trailing buffer escapes: the separator
 	// after `a` was pushed while the function was open.
 	got = ParseValue("foo(a b")
 	if len(got) != 2 || got[0].Kind != ValueNodeKindFunction || len(got[0].Nodes) != 2 {
-		t.Fatalf("ParseValue(\"foo(a b\") = %s", renderValueNodes(got))
+		test.Fatalf("ParseValue(\"foo(a b\") = %s", renderValueNodes(got))
 	}
 	if got[1].Kind != ValueNodeKindWord || got[1].Value != "b" {
-		t.Errorf("trailing word = %+v, want word \"b\" at top level", got[1])
+		test.Errorf("trailing word = %+v, want word \"b\" at top level", got[1])
 	}
 }
 
 // TestSlashIsItsOwnWord covers the branch that exists only for `theme(colors.red.500/10)`, where a
 // slash carries meaning without spaces around it. It is a word, never a separator, so a caller
 // filtering separators still sees it.
-func TestSlashIsItsOwnWord(t *testing.T) {
-	t.Parallel()
+func TestSlashIsItsOwnWord(test *testing.T) {
+	test.Parallel()
 	got := ParseValue("theme(colors.red.500/10)")
 	if len(got) != 1 || got[0].Kind != ValueNodeKindFunction {
-		t.Fatalf("got %s", renderValueNodes(got))
+		test.Fatalf("got %s", renderValueNodes(got))
 	}
 	want := []ValueNode{
 		{Kind: ValueNodeKindWord, Value: "colors.red.500"},
@@ -279,34 +295,39 @@ func TestSlashIsItsOwnWord(t *testing.T) {
 		{Kind: ValueNodeKindWord, Value: "10"},
 	}
 	if difference := diffValueNodes(got[0].Nodes, want, ""); difference != "" {
-		t.Errorf("theme() arguments = %s, want %s (%s)", renderValueNodes(got[0].Nodes), renderValueNodes(want), difference)
+		test.Errorf(
+			"theme() arguments = %s, want %s (%s)",
+			renderValueNodes(got[0].Nodes),
+			renderValueNodes(want),
+			difference,
+		)
 	}
 }
 
 // TestSeparatorRunsArePreservedVerbatim covers whitespace fidelity, which decides whether values
 // round-trip. A parser that normalised runs would agree on structure and disagree on every reprint.
-func TestSeparatorRunsArePreservedVerbatim(t *testing.T) {
-	t.Parallel()
+func TestSeparatorRunsArePreservedVerbatim(test *testing.T) {
+	test.Parallel()
 	for _, input := range []string{"a  b", "a, ,b", "foo(bar,  baz)", "a , b", "a\t\tb", "a,,b"} {
 		if printed := ValueToCss(ParseValue(input)); printed != input {
-			t.Errorf("round-trip of %q gave %q", input, printed)
+			test.Errorf("round-trip of %q gave %q", input, printed)
 		}
 	}
 
 	got := ParseValue("a, ,b")
 	if len(got) != 3 || got[1].Kind != ValueNodeKindSeparator || got[1].Value != ", ," {
-		t.Errorf("ParseValue(\"a, ,b\") = %s, want the whole run as one separator", renderValueNodes(got))
+		test.Errorf("ParseValue(\"a, ,b\") = %s, want the whole run as one separator", renderValueNodes(got))
 	}
 }
 
 // TestValueArgumentListsParseAsNodes covers the shape this port exists to serve: the `--value(...)`
 // argument lists the @utility evaluator reads. The arguments are nodes, and the separator between
 // them is a node too, so a caller walking the list sees the same tree the engine does.
-func TestValueArgumentListsParseAsNodes(t *testing.T) {
-	t.Parallel()
+func TestValueArgumentListsParseAsNodes(test *testing.T) {
+	test.Parallel()
 	got := ParseValue("--value(--percentage-*, [*])")
 	if len(got) != 1 || got[0].Kind != ValueNodeKindFunction || got[0].Value != "--value" {
-		t.Fatalf("got %s", renderValueNodes(got))
+		test.Fatalf("got %s", renderValueNodes(got))
 	}
 	want := []ValueNode{
 		{Kind: ValueNodeKindWord, Value: "--percentage-*"},
@@ -314,43 +335,43 @@ func TestValueArgumentListsParseAsNodes(t *testing.T) {
 		{Kind: ValueNodeKindWord, Value: "[*]"},
 	}
 	if difference := diffValueNodes(got[0].Nodes, want, ""); difference != "" {
-		t.Errorf("--value() arguments = %s (%s)", renderValueNodes(got[0].Nodes), difference)
+		test.Errorf("--value() arguments = %s (%s)", renderValueNodes(got[0].Nodes), difference)
 	}
 }
 
 // TestNestedFunctionsNestStructurally covers the case the top-level splitter in segment.go cannot
 // answer, and the reason this parser is not redundant with it.
-func TestNestedFunctionsNestStructurally(t *testing.T) {
-	t.Parallel()
+func TestNestedFunctionsNestStructurally(test *testing.T) {
+	test.Parallel()
 	got := ParseValue("calc(var(--a) * 2)")
 	if len(got) != 1 || got[0].Value != "calc" {
-		t.Fatalf("got %s", renderValueNodes(got))
+		test.Fatalf("got %s", renderValueNodes(got))
 	}
 	inner := got[0].Nodes
 	if len(inner) != 5 || inner[0].Kind != ValueNodeKindFunction || inner[0].Value != "var" {
-		t.Fatalf("calc arguments = %s", renderValueNodes(inner))
+		test.Fatalf("calc arguments = %s", renderValueNodes(inner))
 	}
 	if len(inner[0].Nodes) != 1 || inner[0].Nodes[0].Value != "--a" {
-		t.Errorf("var arguments = %s", renderValueNodes(inner[0].Nodes))
+		test.Errorf("var arguments = %s", renderValueNodes(inner[0].Nodes))
 	}
 
 	// A bare `(` is a function with an empty name, which is how upstream represents grouping.
 	grouped := ParseValue("((a))")
 	if len(grouped) != 1 || grouped[0].Kind != ValueNodeKindFunction || grouped[0].Value != "" {
-		t.Fatalf("ParseValue(\"((a))\") = %s", renderValueNodes(grouped))
+		test.Fatalf("ParseValue(\"((a))\") = %s", renderValueNodes(grouped))
 	}
 	if len(grouped[0].Nodes) != 1 || grouped[0].Nodes[0].Kind != ValueNodeKindFunction {
-		t.Errorf("nested group = %s", renderValueNodes(grouped[0].Nodes))
+		test.Errorf("nested group = %s", renderValueNodes(grouped[0].Nodes))
 	}
 }
 
 // TestQuotedStringsHoldTheirContents covers the branch that keeps a quoted font name intact, and
 // the boundary where a quote stops protecting anything.
-func TestQuotedStringsHoldTheirContents(t *testing.T) {
-	t.Parallel()
+func TestQuotedStringsHoldTheirContents(test *testing.T) {
+	test.Parallel()
 	got := ParseValue(`"Comic Sans, Bold", sans-serif`)
 	if len(got) != 3 || got[0].Value != `"Comic Sans, Bold"` {
-		t.Errorf("quoted family = %s", renderValueNodes(got))
+		test.Errorf("quoted family = %s", renderValueNodes(got))
 	}
 
 	// An unterminated quote consumes only itself: parsing resumes at the next character rather
@@ -382,7 +403,7 @@ func TestQuotedStringsHoldTheirContents(t *testing.T) {
 	} {
 		got := ParseValue(testCase.input)
 		if difference := diffValueNodes(got, testCase.want, ""); difference != "" {
-			t.Errorf("ParseValue(%q) = %s, want %s (%s)",
+			test.Errorf("ParseValue(%q) = %s, want %s (%s)",
 				testCase.input, renderValueNodes(got), renderValueNodes(testCase.want), difference)
 		}
 	}
@@ -401,31 +422,31 @@ func TestQuotedStringsHoldTheirContents(t *testing.T) {
 	} {
 		got := ParseValue(testCase.input)
 		if len(got) != 1 || got[0].Kind != ValueNodeKindWord || got[0].Value != testCase.want {
-			t.Errorf("ParseValue(%q) = %s, want one word %q", testCase.input, renderValueNodes(got), testCase.want)
+			test.Errorf("ParseValue(%q) = %s, want one word %q", testCase.input, renderValueNodes(got), testCase.want)
 		}
 	}
 }
 
 // TestCarriageReturnNewlineNormalises covers the first statement of the parser. A `\r\n` becomes a
 // one-character separator; a lone `\r` is not a separator at all and stays inside the word.
-func TestCarriageReturnNewlineNormalises(t *testing.T) {
-	t.Parallel()
+func TestCarriageReturnNewlineNormalises(test *testing.T) {
+	test.Parallel()
 	got := ParseValue("a\r\nb")
 	if len(got) != 3 || got[1].Kind != ValueNodeKindSeparator || got[1].Value != "\n" {
-		t.Errorf("ParseValue(\"a\\r\\nb\") = %s", renderValueNodes(got))
+		test.Errorf("ParseValue(\"a\\r\\nb\") = %s", renderValueNodes(got))
 	}
 
 	got = ParseValue("a\rb")
 	if len(got) != 1 || got[0].Kind != ValueNodeKindWord || got[0].Value != "a\rb" {
-		t.Errorf("ParseValue(\"a\\rb\") = %s, want a lone CR to stay inside the word", renderValueNodes(got))
+		test.Errorf("ParseValue(\"a\\rb\") = %s, want a lone CR to stay inside the word", renderValueNodes(got))
 	}
 }
 
 // TestParseValueAcceptsEveryInput covers totality. Real class strings contain arbitrary text, and
 // the parser must never panic on any of it.
-func TestParseValueAcceptsEveryInput(t *testing.T) {
-	t.Parallel()
-	corpus := loadValueParserCorpus(t)
+func TestParseValueAcceptsEveryInput(test *testing.T) {
+	test.Parallel()
+	corpus := loadValueParserCorpus(test)
 	for _, testCase := range corpus.Cases {
 		// Every prefix and suffix of every corpus value, which is a cheap way to reach truncations
 		// the corpus does not name: half a string literal, half an escape, a stack left open.

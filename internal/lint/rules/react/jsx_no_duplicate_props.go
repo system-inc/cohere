@@ -8,7 +8,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
-var messageJsxNoDuplicateProps = rule.Message{
+var messageJsxNoDuplicateProperties = rule.Message{
 	Id: "jsxNoDuplicateProps",
 	Description: "This prop is written more than once on the same element. React builds the " +
 		"props object by assigning each attribute in order, so every earlier copy is " +
@@ -22,7 +22,7 @@ type JsxNoDuplicatePropsOptions struct {
 	IgnoreCase bool `json:"ignoreCase"`
 }
 
-// JsxNoDuplicateProps flags a JSX element that writes the same prop name twice.
+// JsxNoDuplicateProperties flags a JSX element that writes the same prop name twice.
 //
 //	valid:   <App a b c />
 //	valid:   <App a b c A />
@@ -94,14 +94,14 @@ type JsxNoDuplicatePropsOptions struct {
 //
 // A dashed name is not the same case and does participate: `data-x` parses as a single identifier,
 // so `<App data-x data-x />` reports in both tools.
-var JsxNoDuplicateProps = rule.Rule{
+var JsxNoDuplicateProperties = rule.Rule[JsxNoDuplicatePropsOptions]{
 	// No namespace prefix. The config writes `react/jsx-no-duplicate-props` and the parity guard
 	// strips the namespace on a `/` boundary, so a rule named `react-jsx-no-duplicate-props` would
 	// match no inventory entry, lint no files, and still pass every fixture in this package.
 	Name: "react/jsx-no-duplicate-props",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[JsxNoDuplicatePropsOptions]) rule.Listeners {
 		// An unconfigured rule gets the zero value, which is upstream's case-sensitive default.
-		settings, _ := rule.OptionsAs[JsxNoDuplicatePropsOptions](options)
+		settings, _ := options.Read()
 
 		report := func(node *ast.Node) {
 			_, attributes := jsx.ElementParts(node)
@@ -131,7 +131,7 @@ var JsxNoDuplicateProps = rule.Rule{
 				}
 				nameNode := property.AsJsxAttribute().Name()
 				if earlier, duplicated := seen[name]; duplicated {
-					ctx.ReportNode(earlier, messageJsxNoDuplicateProps)
+					ruleContext.ReportNode(earlier, messageJsxNoDuplicateProperties)
 				}
 				seen[name] = nameNode
 			}

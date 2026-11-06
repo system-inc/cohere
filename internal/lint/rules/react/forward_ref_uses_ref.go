@@ -8,7 +8,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
-var messageForwardRefUsesRef = rule.Message{
+var messageForwardRefUsesReference = rule.Message{
 	Id: "forwardRefUsesRef",
 	Description: "A function wrapped in `forwardRef` takes only one parameter, so the ref React " +
 		"passes as the second one is dropped on the floor. Every consumer writing " +
@@ -28,7 +28,7 @@ var messageForwardRefRemoveWrapper = rule.Message{
 	Description: "Remove the `forwardRef` wrapper.",
 }
 
-// ForwardRefUsesRef flags a `forwardRef` call whose function takes exactly one parameter.
+// ForwardRefUsesReference flags a `forwardRef` call whose function takes exactly one parameter.
 //
 //	valid:   forwardRef((props, ref) => null)
 //	valid:   forwardRef(() => {})
@@ -135,9 +135,9 @@ var messageForwardRefRemoveWrapper = rule.Message{
 // parent node is. Nothing asks what an identifier binds to, so nothing declares `NeedsTypeChecker`,
 // and declaring it would not let the rule answer the aliased-import case anyway, because upstream
 // does not ask that question either.
-var ForwardRefUsesRef = rule.Rule{
+var ForwardRefUsesReference = rule.Rule[rule.NoOptions]{
 	Name: "react/forward-ref-uses-ref",
-	Run: func(ctx rule.Context, _ any) rule.Listeners {
+	Run: func(ruleContext rule.Context, _ rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				call := node.AsCallExpression()
@@ -170,8 +170,8 @@ var ForwardRefUsesRef = rule.Rule{
 					return
 				}
 
-				ctx.ReportNodeWithSuggestions(first, messageForwardRefUsesRef,
-					suggestionsFor(ctx, node, first, parameters)...)
+				ruleContext.ReportNodeWithSuggestions(first, messageForwardRefUsesReference,
+					suggestionsFor(ruleContext, node, first, parameters)...)
 			},
 		}
 	},
@@ -259,17 +259,17 @@ func hasExactlyOneCountedParameter(parameters []*ast.Node) bool {
 // choosing takes the first, and upstream's is the removal, so reversing them would silently change
 // what an unattended run writes.
 func suggestionsFor(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	call *ast.Node,
 	function *ast.Node,
 	parameters []*ast.Node,
 ) []rule.Suggestion {
-	addRef := rule.Suggestion{
+	addReference := rule.Suggestion{
 		Message: messageForwardRefAddRefParameter,
-		Fixes:   []rule.Fix{addRefParameterFix(ctx, function, parameters)},
+		Fixes:   []rule.Fix{addRefParameterFix(ruleContext, function, parameters)},
 	}
-	if !canRemoveForwardRef(function, call) {
-		return []rule.Suggestion{addRef}
+	if !canRemoveForwardReference(function, call) {
+		return []rule.Suggestion{addReference}
 	}
 	return []rule.Suggestion{
 		{
@@ -282,21 +282,21 @@ func suggestionsFor(
 				// trims it. The replacement text is sliced the same way for the same reason:
 				// the function's `Pos()` is just inside the call's `(`, so any space there
 				// would be carried into the unwrapped result.
-				ctx.ReplaceNode(call, functionSourceText(ctx, function)),
+				ruleContext.ReplaceNode(call, functionSourceText(ruleContext, function)),
 			},
 		},
-		addRef,
+		addReference,
 	}
 }
 
-// canRemoveForwardRef answers whether unwrapping would still parse.
+// canRemoveForwardReference answers whether unwrapping would still parse.
 //
 // Only one shape fails: an anonymous function expression directly inside an expression statement,
 // where the unwrapped `function (a) {}` would be read as a declaration missing its name. A named
 // function expression is *not* guarded upstream even though unwrapping turns it into a declaration,
 // which is reproduced deliberately. The walk to the parent skips parentheses, matching
 // `outermost_paren_parent`, so `(forwardRef(function (a) {}));` is still statement context.
-func canRemoveForwardRef(function *ast.Node, call *ast.Node) bool {
+func canRemoveForwardReference(function *ast.Node, call *ast.Node) bool {
 	if function.Kind != ast.KindFunctionExpression {
 		return true
 	}
@@ -323,9 +323,9 @@ func isInExpressionStatement(node *ast.Node) bool {
 // trailing comma with any whitespace after it, and a missing opening paren. `forwardRef(a => {})`
 // becoming `forwardRef((a, ref) => {})` needs all three, and `function(a, ) {}` needs the middle
 // one, which is why upstream ships fixture pairs for both.
-func addRefParameterFix(ctx rule.Context, function *ast.Node, parameters []*ast.Node) rule.Fix {
-	span := parameterListRange(ctx, function, parameters)
-	text := ctx.SourceFile.Text()[span.Pos():span.End()]
+func addRefParameterFix(ruleContext rule.Context, function *ast.Node, parameters []*ast.Node) rule.Fix {
+	span := parameterListRange(ruleContext, function, parameters)
+	text := ruleContext.SourceFile.Text()[span.Pos():span.End()]
 	text = strings.TrimSuffix(text, ")")
 	text = strings.TrimRight(text, " \t\r\n")
 	text = strings.TrimSuffix(text, ",")
@@ -343,8 +343,8 @@ func addRefParameterFix(ctx rule.Context, function *ast.Node, parameters []*ast.
 // from the function keeps `function Component(a)` from finding the paren-free stretch before the
 // name, and scanning forward from the last parameter to the next `)` is safe because a default
 // value or a type annotation is inside the last parameter's own range.
-func parameterListRange(ctx rule.Context, function *ast.Node, parameters []*ast.Node) core.TextRange {
-	text := ctx.SourceFile.Text()
+func parameterListRange(ruleContext rule.Context, function *ast.Node, parameters []*ast.Node) core.TextRange {
+	text := ruleContext.SourceFile.Text()
 
 	// `Pos()` on the first parameter starts at its leading trivia rather than at the parameter, so
 	// both branches below have to step over that whitespace rather than trusting it. Getting this
@@ -380,15 +380,15 @@ func parameterListRange(ctx rule.Context, function *ast.Node, parameters []*ast.
 	return core.NewTextRange(start, parameters[len(parameters)-1].End())
 }
 
-func isSpaceByte(b byte) bool {
-	return b == ' ' || b == '\t' || b == '\r' || b == '\n'
+func isSpaceByte(character byte) bool {
+	return character == ' ' || character == '\t' || character == '\r' || character == '\n'
 }
 
 // functionSourceText is the unwrapped function's own text, without leading trivia.
 //
 // Split out rather than inlined because the trivia trim has to match the one on the span being
 // replaced: a slice from `Pos()` would carry whatever whitespace sits after the call's `(`.
-func functionSourceText(ctx rule.Context, function *ast.Node) string {
-	span := rule.TokenRange(ctx.SourceFile, function)
-	return ctx.SourceFile.Text()[span.Pos():span.End()]
+func functionSourceText(ruleContext rule.Context, function *ast.Node) string {
+	span := rule.TokenRange(ruleContext.SourceFile, function)
+	return ruleContext.SourceFile.Text()[span.Pos():span.End()]
 }

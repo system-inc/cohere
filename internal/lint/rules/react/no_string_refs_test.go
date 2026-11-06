@@ -9,7 +9,7 @@ import (
 
 // stringRefsFile is where the fixtures pretend to live.
 //
-// A `.tsx` name because the corpus is JSX and needs a parser that reads it. It is NOT load-bearing
+// A `.tsx` name because the corpus is JSX and needs a parser that reads it. It is not load-bearing
 // the way the previous port's was: this rule has no file gate, and `TestNoStringRefsHasNoFileGate`
 // pins that by running the same source under four extensions.
 const stringRefsFile = "/repository/source/StringRefs.tsx"
@@ -33,8 +33,8 @@ const stringRefsFile = "/repository/source/StringRefs.tsx"
 //
 // That pair is the whole reason this rule grew a `checkThisRefs` option. Without it the corpus
 // cannot be expressed: two of its cases are the same bytes with opposite verdicts.
-func TestNoStringRefsFires(t *testing.T) {
-	t.Parallel()
+func TestNoStringRefsFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name               string
@@ -43,24 +43,66 @@ func TestNoStringRefsFires(t *testing.T) {
 		checkThisRefs      bool
 		findings           []string
 	}{
-		{"upstream invalid 0", "\n        var Hello = createReactClass({\n          componentDidMount: function() {\n            var component = this.refs.hello;\n          },\n          render: function() {\n            return <div>Hello {this.props.name}</div>;\n          }\n        });\n      ", false, true, []string{"thisRefsDeprecated"}},
-		{"upstream invalid 1", "\n        var Hello = createReactClass({\n          render: function() {\n            return <div ref=\"hello\">Hello {this.props.name}</div>;\n          }\n        });\n      ", false, true, []string{"stringInRefDeprecated"}},
-		{"upstream invalid 2", "\n        var Hello = createReactClass({\n          render: function() {\n            return <div ref={'hello'}>Hello {this.props.name}</div>;\n          }\n        });\n      ", false, true, []string{"stringInRefDeprecated"}},
-		{"upstream invalid 3", "\n        var Hello = createReactClass({\n          componentDidMount: function() {\n            var component = this.refs.hello;\n          },\n          render: function() {\n            return <div ref=\"hello\">Hello {this.props.name}</div>;\n          }\n        });\n      ", false, true, []string{"thisRefsDeprecated", "stringInRefDeprecated"}},
-		{"upstream invalid 4", "\n        var Hello = createReactClass({\n          componentDidMount: function() {\n          var component = this.refs.hello;\n          },\n          render: function() {\n            return <div ref={`hello`}>Hello {this.props.name}</div>;\n          }\n        });\n      ", true, true, []string{"thisRefsDeprecated", "stringInRefDeprecated"}},
-		{"upstream invalid 5", "\n        var Hello = createReactClass({\n          componentDidMount: function() {\n          var component = this.refs.hello;\n          },\n          render: function() {\n            return <div ref={`hello${index}`}>Hello {this.props.name}</div>;\n          }\n        });\n      ", true, true, []string{"thisRefsDeprecated", "stringInRefDeprecated"}},
-		{"upstream invalid 6", "\n        var Hello = createReactClass({\n          componentDidMount: function() {\n          var component = this.refs.hello;\n          },\n          render: function() {\n            return <div ref={`hello${index}`}>Hello {this.props.name}</div>;\n          }\n        });\n      ", true, false, []string{"stringInRefDeprecated"}},
+		{
+			"upstream invalid 0",
+			"\n        var Hello = createReactClass({\n          componentDidMount: function() {\n            var component = this.refs.hello;\n          },\n          render: function() {\n            return <div>Hello {this.props.name}</div>;\n          }\n        });\n      ",
+			false,
+			true,
+			[]string{"thisRefsDeprecated"},
+		},
+		{
+			"upstream invalid 1",
+			"\n        var Hello = createReactClass({\n          render: function() {\n            return <div ref=\"hello\">Hello {this.props.name}</div>;\n          }\n        });\n      ",
+			false,
+			true,
+			[]string{"stringInRefDeprecated"},
+		},
+		{
+			"upstream invalid 2",
+			"\n        var Hello = createReactClass({\n          render: function() {\n            return <div ref={'hello'}>Hello {this.props.name}</div>;\n          }\n        });\n      ",
+			false,
+			true,
+			[]string{"stringInRefDeprecated"},
+		},
+		{
+			"upstream invalid 3",
+			"\n        var Hello = createReactClass({\n          componentDidMount: function() {\n            var component = this.refs.hello;\n          },\n          render: function() {\n            return <div ref=\"hello\">Hello {this.props.name}</div>;\n          }\n        });\n      ",
+			false,
+			true,
+			[]string{"thisRefsDeprecated", "stringInRefDeprecated"},
+		},
+		{
+			"upstream invalid 4",
+			"\n        var Hello = createReactClass({\n          componentDidMount: function() {\n          var component = this.refs.hello;\n          },\n          render: function() {\n            return <div ref={`hello`}>Hello {this.props.name}</div>;\n          }\n        });\n      ",
+			true,
+			true,
+			[]string{"thisRefsDeprecated", "stringInRefDeprecated"},
+		},
+		{
+			"upstream invalid 5",
+			"\n        var Hello = createReactClass({\n          componentDidMount: function() {\n          var component = this.refs.hello;\n          },\n          render: function() {\n            return <div ref={`hello${index}`}>Hello {this.props.name}</div>;\n          }\n        });\n      ",
+			true,
+			true,
+			[]string{"thisRefsDeprecated", "stringInRefDeprecated"},
+		},
+		{
+			"upstream invalid 6",
+			"\n        var Hello = createReactClass({\n          componentDidMount: function() {\n          var component = this.refs.hello;\n          },\n          render: function() {\n            return <div ref={`hello${index}`}>Hello {this.props.name}</div>;\n          }\n        });\n      ",
+			true,
+			false,
+			[]string{"stringInRefDeprecated"},
+		},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoStringRefs, stringRefsFile, testCase.sourceText,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoStringRefs, stringRefsFile, testCase.sourceText,
 				NoStringRefsOptions{
 					NoTemplateLiterals: testCase.noTemplateLiterals,
 					CheckThisRefs:      testCase.checkThisRefs,
 				})
-			rule_testing.ExpectFindings(t, result, testCase.findings...)
+			rule_testing.ExpectFindings(test, result, testCase.findings...)
 		})
 	}
 }
@@ -71,8 +113,8 @@ func TestNoStringRefsFires(t *testing.T) {
 // write template refs with the option off, which is that option's entire subject. The fourth is the
 // version gate: byte-identical to the first firing case and clean only because upstream's
 // `18.3.0` setting turns the `this.refs` half off.
-func TestNoStringRefsStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoStringRefsStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name               string
@@ -80,16 +122,36 @@ func TestNoStringRefsStaysSilent(t *testing.T) {
 		noTemplateLiterals bool
 		checkThisRefs      bool
 	}{
-		{"upstream valid 0", "\n        var Hello = createReactClass({\n          componentDidMount: function() {\n            var component = this.hello;\n          },\n          render: function() {\n            return <div ref={c => this.hello = c}>Hello {this.props.name}</div>;\n          }\n        });\n      ", false, false},
-		{"upstream valid 1", "\n        var Hello = createReactClass({\n          render: function() {\n            return <div ref={`hello`}>Hello {this.props.name}</div>;\n          }\n        });\n      ", false, false},
-		{"upstream valid 2", "\n        var Hello = createReactClass({\n          render: function() {\n            return <div ref={`hello${index}`}>Hello {this.props.name}</div>;\n          }\n        });\n      ", false, false},
-		{"upstream valid 3", "\n        var Hello = createReactClass({\n          componentDidMount: function() {\n            var component = this.refs.hello;\n          },\n          render: function() {\n            return <div>Hello {this.props.name}</div>;\n          }\n        });\n      ", false, false},
+		{
+			"upstream valid 0",
+			"\n        var Hello = createReactClass({\n          componentDidMount: function() {\n            var component = this.hello;\n          },\n          render: function() {\n            return <div ref={c => this.hello = c}>Hello {this.props.name}</div>;\n          }\n        });\n      ",
+			false,
+			false,
+		},
+		{
+			"upstream valid 1",
+			"\n        var Hello = createReactClass({\n          render: function() {\n            return <div ref={`hello`}>Hello {this.props.name}</div>;\n          }\n        });\n      ",
+			false,
+			false,
+		},
+		{
+			"upstream valid 2",
+			"\n        var Hello = createReactClass({\n          render: function() {\n            return <div ref={`hello${index}`}>Hello {this.props.name}</div>;\n          }\n        });\n      ",
+			false,
+			false,
+		},
+		{
+			"upstream valid 3",
+			"\n        var Hello = createReactClass({\n          componentDidMount: function() {\n            var component = this.refs.hello;\n          },\n          render: function() {\n            return <div>Hello {this.props.name}</div>;\n          }\n        });\n      ",
+			false,
+			false,
+		},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoStringRefs, stringRefsFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoStringRefs, stringRefsFile,
 				testCase.sourceText, NoStringRefsOptions{
 					NoTemplateLiterals: testCase.noTemplateLiterals,
 					CheckThisRefs:      testCase.checkThisRefs,
@@ -103,8 +165,8 @@ func TestNoStringRefsStaysSilent(t *testing.T) {
 // Every shape here was run against the installed `eslint-plugin-react` build, version 7.37.5,
 // through the ESLint Linter API before being written down, so these assert measured upstream
 // behavior rather than a reading of the JavaScript. The reading was wrong about five of them.
-func TestNoStringRefsDiscriminationsUpstreamDoesNotCover(t *testing.T) {
-	t.Parallel()
+func TestNoStringRefsDiscriminationsUpstreamDoesNotCover(test *testing.T) {
+	test.Parallel()
 
 	fires := []struct {
 		name       string
@@ -135,10 +197,10 @@ func TestNoStringRefsDiscriminationsUpstreamDoesNotCover(t *testing.T) {
 	}
 
 	for _, testCase := range fires {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoStringRefs, stringRefsFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, NoStringRefs, stringRefsFile, testCase.sourceText),
 				testCase.findings...)
 		})
 	}
@@ -194,9 +256,9 @@ func TestNoStringRefsDiscriminationsUpstreamDoesNotCover(t *testing.T) {
 	}
 
 	for _, testCase := range silent {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoStringRefs, stringRefsFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoStringRefs, stringRefsFile, testCase.sourceText))
 		})
 	}
 }
@@ -212,8 +274,8 @@ func TestNoStringRefsDiscriminationsUpstreamDoesNotCover(t *testing.T) {
 // computed key unless that key is an identifier, and `computed` is never checked, so the four
 // spellings split in a way no reading of the rule name would predict. The previous port of this
 // rule had them exactly inverted.
-func TestNoStringRefsSpellingsOfTheRefsRead(t *testing.T) {
-	t.Parallel()
+func TestNoStringRefsSpellingsOfTheRefsRead(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -242,7 +304,7 @@ func TestNoStringRefsSpellingsOfTheRefsRead(t *testing.T) {
 			"class H extends React.Component { m() { return this[`refs`].x; } }\n",
 			nil,
 		},
-		// An IDENTIFIER key does have `.name`, and it is `refs`, and `computed` is never checked.
+		// An identifier key does have `.name`, and it is `refs`, and `computed` is never checked.
 		// So an unrelated variable named `refs` is read as the registry and reports. Measured on
 		// the installed build. This is an upstream defect, reproduced rather than corrected.
 		{
@@ -272,20 +334,20 @@ func TestNoStringRefsSpellingsOfTheRefsRead(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoStringRefs, stringRefsFile, testCase.sourceText,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoStringRefs, stringRefsFile, testCase.sourceText,
 				NoStringRefsOptions{CheckThisRefs: true})
 			if len(testCase.findings) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.findings...)
+			rule_testing.ExpectFindings(test, result, testCase.findings...)
 		})
 	}
 }
 
-// Which enclosing component counts, which is a SCOPE walk and not a parent-chain walk.
+// Which enclosing component counts, which is a scope walk and not a parent-chain walk.
 //
 // This is the group that the previous port got wrong in two directions, and neither was visible
 // from the imported corpus, which writes exactly one nesting shape. `getParentES6Component` stops
@@ -293,8 +355,8 @@ func TestNoStringRefsSpellingsOfTheRefsRead(t *testing.T) {
 // function scopes asking whether each one's block sits inside a factory call.
 //
 // Every case measured on the installed build at `settings.react.version` of `18.2.0`.
-func TestNoStringRefsEnclosingComponentIsAScopeWalk(t *testing.T) {
-	t.Parallel()
+func TestNoStringRefsEnclosingComponentIsAScopeWalk(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -309,7 +371,7 @@ func TestNoStringRefsEnclosingComponentIsAScopeWalk(t *testing.T) {
 			"class H extends React.Component { m() { class Inner { k() { return this.refs.x; } } } }\n",
 			false,
 		},
-		// The mirror image: the first class scope IS the component, so the plain class above it
+		// The mirror image: the first class scope is the component, so the plain class above it
 		// does not matter. Measured reporting.
 		{
 			"a component nested inside a plain class still counts",
@@ -450,15 +512,15 @@ func TestNoStringRefsEnclosingComponentIsAScopeWalk(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoStringRefs, stringRefsFile, testCase.sourceText,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoStringRefs, stringRefsFile, testCase.sourceText,
 				NoStringRefsOptions{CheckThisRefs: true})
 			if testCase.reports {
-				rule_testing.ExpectFindings(t, result, "thisRefsDeprecated")
+				rule_testing.ExpectFindings(test, result, "thisRefsDeprecated")
 				return
 			}
-			rule_testing.ExpectClean(t, result)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -472,8 +534,8 @@ func TestNoStringRefsEnclosingComponentIsAScopeWalk(t *testing.T) {
 //
 // The `this.refs` half rather than the attribute half, deliberately: a `.ts` file cannot hold a JSX
 // attribute at all, so gating on a ref attribute would pass whether or not a gate exists.
-func TestNoStringRefsHasNoFileGate(t *testing.T) {
-	t.Parallel()
+func TestNoStringRefsHasNoFileGate(test *testing.T) {
+	test.Parallel()
 
 	sourceText := "class Hello extends React.Component {\n" +
 		"  componentDidMount() {\n" +
@@ -487,10 +549,10 @@ func TestNoStringRefsHasNoFileGate(t *testing.T) {
 		"/repository/source/Hello.jsx",
 		"/repository/source/Hello.js",
 	} {
-		t.Run(fileName, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.RunWithOptions(t, NoStringRefs, fileName, sourceText,
+		test.Run(fileName, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.RunWithOptions(test, NoStringRefs, fileName, sourceText,
 					NoStringRefsOptions{CheckThisRefs: true}),
 				"thisRefsDeprecated")
 		})
@@ -502,8 +564,8 @@ func TestNoStringRefsHasNoFileGate(t *testing.T) {
 // Building the options struct directly leaves the decoder untested, and the decoder is where the
 // one non-upstream key lives. `checkThisRefs` has to be distinguishable as absent, so a struct
 // literal cannot exercise the branch that decides what absence means.
-func TestDecodeNoStringRefsOptions(t *testing.T) {
-	t.Parallel()
+func TestDecodeNoStringRefsOptions(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name string
@@ -522,24 +584,22 @@ func TestDecodeNoStringRefsOptions(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			decoded, err := DecodeNoStringRefsOptions([]byte(testCase.raw))
-			if err != nil {
-				t.Fatalf("decoding %q: %v", testCase.raw, err)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			decoded, decodeNoStringRefsOptionsError := DecodeNoStringRefsOptions([]byte(testCase.raw))
+			if decodeNoStringRefsOptionsError != nil {
+				test.Fatalf("decoding %q: %v", testCase.raw, decodeNoStringRefsOptionsError)
 			}
-			got, ok := decoded.(NoStringRefsOptions)
-			if !ok {
-				t.Fatalf("decoded %q to %T", testCase.raw, decoded)
-			}
-			if got != testCase.want {
-				t.Errorf("decoded %q to %+v, want %+v", testCase.raw, got, testCase.want)
+			if decoded != testCase.want {
+				test.Errorf("decoded %q to %+v, want %+v", testCase.raw, decoded, testCase.want)
 			}
 		})
 	}
 
-	if _, err := DecodeNoStringRefsOptions([]byte("not json")); err == nil {
-		t.Error("decoding malformed input returned no error")
+	if _, decodeNoStringRefsOptionsError := DecodeNoStringRefsOptions(
+		[]byte("not json"),
+	); decodeNoStringRefsOptionsError == nil {
+		test.Error("decoding malformed input returned no error")
 	}
 }
 
@@ -548,18 +608,18 @@ func TestDecodeNoStringRefsOptions(t *testing.T) {
 // The brief's measured failure here is a rule reporting registrations while finding nothing,
 // because a bare `"error"` in the config hands the rule nil and every fixture reached it through
 // the decoder. This bypasses the decoder entirely, which is the only way to see that.
-func TestNoStringRefsWithNilOptions(t *testing.T) {
-	t.Parallel()
+func TestNoStringRefsWithNilOptions(test *testing.T) {
+	test.Parallel()
 
 	// The template half is off, so a template ref is clean.
-	rule_testing.ExpectClean(t, rule_testing.Run(t, NoStringRefs, stringRefsFile,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, NoStringRefs, stringRefsFile,
 		"const a = <div ref={`hello`} />;\n"))
 	// The refs half is off, so a component's `this.refs` is clean.
-	rule_testing.ExpectClean(t, rule_testing.Run(t, NoStringRefs, stringRefsFile,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, NoStringRefs, stringRefsFile,
 		"class H extends React.Component { m() { return this.refs.x; } }\n"))
 	// The attribute half is on regardless, so a string ref still reports. Without this the two
 	// assertions above would pass on a rule that registered no listeners at all.
-	rule_testing.ExpectFindings(t, rule_testing.Run(t, NoStringRefs, stringRefsFile,
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, NoStringRefs, stringRefsFile,
 		"const a = <div ref=\"hello\" />;\n"), "stringInRefDeprecated")
 }
 
@@ -571,8 +631,8 @@ func TestNoStringRefsWithNilOptions(t *testing.T) {
 // attribute finding underlines the whole `ref="hello"` rather than the name span that
 // `no-children-prop` in this same package reports, so the two rules here disagree about where a JSX
 // attribute finding belongs and that disagreement is upstream's rather than ours.
-func TestNoStringRefsPointsAtTheRightNode(t *testing.T) {
-	t.Parallel()
+func TestNoStringRefsPointsAtTheRightNode(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -617,17 +677,17 @@ func TestNoStringRefsPointsAtTheRightNode(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoStringRefs, stringRefsFile, testCase.sourceText,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoStringRefs, stringRefsFile, testCase.sourceText,
 				NoStringRefsOptions{CheckThisRefs: true})
 			if len(result.Diagnostics) != len(testCase.reported) {
-				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.reported))
+				test.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.reported))
 			}
-			for i, want := range testCase.reported {
-				got := testCase.sourceText[result.Diagnostics[i].Range.Pos():result.Diagnostics[i].Range.End()]
+			for index, want := range testCase.reported {
+				got := testCase.sourceText[result.Diagnostics[index].Range.Pos():result.Diagnostics[index].Range.End()]
 				if got != want {
-					t.Errorf("finding %d underlines %q, want %q", i, got, want)
+					test.Errorf("finding %d underlines %q, want %q", index, got, want)
 				}
 			}
 		})
@@ -641,17 +701,17 @@ func TestNoStringRefsPointsAtTheRightNode(t *testing.T) {
 // than against the rule's own constants, which would move together under mutation. The two
 // descriptions also have to stay distinguishable, since this rule's whole structure rests on the
 // two judgments being separately named.
-func TestNoStringRefsMessagesReadCorrectly(t *testing.T) {
-	t.Parallel()
+func TestNoStringRefsMessagesReadCorrectly(test *testing.T) {
+	test.Parallel()
 
 	if messageThisRefsDeprecated.Id != "thisRefsDeprecated" {
-		t.Errorf("this.refs message id is %q", messageThisRefsDeprecated.Id)
+		test.Errorf("this.refs message id is %q", messageThisRefsDeprecated.Id)
 	}
 	if messageStringInRefDeprecated.Id != "stringInRefDeprecated" {
-		t.Errorf("string ref message id is %q", messageStringInRefDeprecated.Id)
+		test.Errorf("string ref message id is %q", messageStringInRefDeprecated.Id)
 	}
 	if messageThisRefsDeprecated.Description == messageStringInRefDeprecated.Description {
-		t.Error("the two judgments render the same description, so a reader cannot tell them apart")
+		test.Error("the two judgments render the same description, so a reader cannot tell them apart")
 	}
 	// The description says why the code is wrong rather than restating the rule name, so it must
 	// not simply be the rule name back again.
@@ -660,7 +720,7 @@ func TestNoStringRefsMessagesReadCorrectly(t *testing.T) {
 		messageStringInRefDeprecated.Description,
 	} {
 		if len(message) < 60 || !strings.Contains(message, "React 19") {
-			t.Errorf("description does not explain the removal: %q", message)
+			test.Errorf("description does not explain the removal: %q", message)
 		}
 	}
 }
@@ -669,18 +729,18 @@ func TestNoStringRefsMessagesReadCorrectly(t *testing.T) {
 //
 // `meta.schema` declares `additionalProperties: false`, which ESLint enforces by refusing the whole
 // configuration by name, and so does this now (#4a4yse4); an unknown key used to be ignored.
-func TestNoStringRefsRefusesUnknownOptionKeys(t *testing.T) {
-	t.Parallel()
+func TestNoStringRefsRefusesUnknownOptionKeys(test *testing.T) {
+	test.Parallel()
 
-	decoded, err := DecodeNoStringRefsOptions([]byte(`{"noTemplateLiterals":true}`))
-	if err != nil {
-		t.Fatalf("baseline: %v", err)
+	decoded, decodeNoStringRefsOptionsError := DecodeNoStringRefsOptions([]byte(`{"noTemplateLiterals":true}`))
+	if decodeNoStringRefsOptionsError != nil {
+		test.Fatalf("baseline: %v", decodeNoStringRefsOptionsError)
 	}
-	if got := decoded.(NoStringRefsOptions); got != (NoStringRefsOptions{NoTemplateLiterals: true}) {
-		t.Errorf("decoded to %+v", got)
+	if decoded != (NoStringRefsOptions{NoTemplateLiterals: true}) {
+		test.Errorf("decoded to %+v", decoded)
 	}
-	_, err = DecodeNoStringRefsOptions([]byte(`{"bogus":true,"noTemplateLiterals":true}`))
-	if err == nil || !strings.Contains(err.Error(), "bogus") {
-		t.Fatalf("want a refusal naming the unknown key, got %v", err)
+	_, decodeNoStringRefsOptionsError = DecodeNoStringRefsOptions([]byte(`{"bogus":true,"noTemplateLiterals":true}`))
+	if decodeNoStringRefsOptionsError == nil || !strings.Contains(decodeNoStringRefsOptionsError.Error(), "bogus") {
+		test.Fatalf("want a refusal naming the unknown key, got %v", decodeNoStringRefsOptionsError)
 	}
 }

@@ -9,5 +9,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // its registration makes `TestEveryRuleIsRegistered` name this rule to every other agent in the
 // tree.
 func init() {
-	rule.Register(rule.Registration{Rule: DisplayName, Decode: DecodeDisplayNameOptions})
+	rule.Register(rule.Registration[DisplayNameOptions]{Rule: DisplayName, Decode: DecodeDisplayNameOptions})
 }

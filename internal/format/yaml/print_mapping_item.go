@@ -11,7 +11,7 @@ import (
 // src/language-yaml/print/mapping-item.js.
 
 // printMappingItem is upstream's printMappingItem, for block and flow mapping items.
-func printMappingItem(path *astPath, options *options, print printing.PrintFunc) doc.Doc {
+func printMappingItem(path *astPath, options *options, print printFunc) doc.Doc {
 	node := currentNode(path)
 	parent := parentNode(path)
 	settings := settingsOf(options)
@@ -54,8 +54,8 @@ func printMappingItem(path *astPath, options *options, print printing.PrintFunc)
 	// force explicit Key
 	if hasLeadingComments(value) || !isInlineNode(contentOf(key)) {
 		parts := doc.Concat{doc.Text("? "), alignWithSpaces(2, printedKey), doc.Hardline}
-		for _, printed := range printing.Map(path, func(*astPath, int, any) doc.Doc {
-			return doc.Concat{print(nil, nil), doc.Hardline}
+		for _, printed := range printing.Map(path, func(*astPath, int) doc.Doc {
+			return doc.Concat{print("", nil), doc.Hardline}
 		}, "value", "leadingComments") {
 			parts = append(parts, printed)
 		}
@@ -76,10 +76,10 @@ func printMappingItem(path *astPath, options *options, print printing.PrintFunc)
 		return doc.Concat{printedKey, spaceBeforeColon, doc.Text(": "), printedValue}
 	}
 
-	groupID := doc.NewGroupID("mappingKey")
+	groupId := doc.NewGroupId("mappingKey")
 	groupedKey := doc.NewGroup(doc.Concat{
 		doc.NewIfBreak(doc.Text("? "), nil, nil),
-		doc.NewGroup(alignWithSpaces(2, printedKey), doc.GroupOptions{ID: groupID}),
+		doc.NewGroup(alignWithSpaces(2, printedKey), doc.GroupOptions{Id: groupId}),
 	}, doc.GroupOptions{})
 
 	// Construct both explicit and implicit mapping values.
@@ -133,7 +133,7 @@ func printMappingItem(path *astPath, options *options, print printing.PrintFunc)
 	return doc.ConditionalGroup([]doc.Doc{
 		doc.Concat{
 			groupedKey,
-			doc.NewIfBreak(explicitMappingValue, implicitMappingValue, groupID),
+			doc.NewIfBreak(explicitMappingValue, implicitMappingValue, groupId),
 		},
 	}, doc.GroupOptions{})
 }

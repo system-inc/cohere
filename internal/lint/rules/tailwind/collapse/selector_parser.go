@@ -318,7 +318,7 @@ type selectorParseContext struct {
 func parseSelectorTree(input string) []*selectorTreeNode {
 	// Upstream normalizes CRLF first, so a `\r\n` is one combinator character rather than two. A
 	// lone `\r` is untouched and falls through to the default branch as an ordinary character.
-	input = strings.ReplaceAll(input, "\r\n", "\n")
+	normalized := strings.ReplaceAll(input, "\r\n", "\n")
 
 	ast := []*selectorTreeNode{}
 
@@ -384,8 +384,8 @@ func parseSelectorTree(input string) []*selectorTreeNode {
 		buffer.Reset()
 	}
 
-	for index := 0; index < len(input); index++ {
-		character := input[index]
+	for index := 0; index < len(normalized); index++ {
+		character := normalized[index]
 
 		switch character {
 		// A comma ends one item of a selector list and starts the next.
@@ -394,8 +394,8 @@ func parseSelectorTree(input string) []*selectorTreeNode {
 
 			// Whitespace after the comma is skipped. Whitespace before it never reaches here: the
 			// combinator branch drops a whitespace run that a comma follows.
-			for ; index+1 < len(input); index++ {
-				peek := input[index+1]
+			for ; index+1 < len(normalized); index++ {
+				peek := normalized[index+1]
 				if peek != selectorNewline && peek != selectorSpace && peek != selectorTab {
 					break
 				}
@@ -427,20 +427,20 @@ func parseSelectorTree(input string) []*selectorTreeNode {
 
 			start := index
 			end := index + 1
-			for ; end < len(input); end++ {
-				if !isSelectorCombinatorCharacter(input[end]) {
+			for ; end < len(normalized); end++ {
+				if !isSelectorCombinatorCharacter(normalized[end]) {
 					break
 				}
 			}
 			index = end - 1
 
 			// Upstream trims with JavaScript's `trim`, which is text.TrimWhitespace.
-			value := text.TrimWhitespace(input[start:end])
+			value := text.TrimWhitespace(normalized[start:end])
 
 			// Whitespace alone is insignificant at the start, at the end of input, and in front of
 			// a comma. Not in front of a `)`, which is why `:is(.a )` keeps a trailing descendant
 			// combinator. An explicit combinator is kept everywhere, even at the start.
-			if value == "" && (len(*target) == 0 || end >= len(input) || input[end] == selectorComma) {
+			if value == "" && (len(*target) == 0 || end >= len(normalized) || normalized[end] == selectorComma) {
 				break
 			}
 
@@ -453,7 +453,11 @@ func parseSelectorTree(input string) []*selectorTreeNode {
 		// A `(` opens a function whose name is whatever the buffer held, which is empty for a bare
 		// `(`.
 		case selectorOpenParen:
-			node := &selectorTreeNode{kind: SelectorNodeKindFunction, value: buffer.String(), nodes: []*selectorTreeNode{}}
+			node := &selectorTreeNode{
+				kind:  SelectorNodeKindFunction,
+				value: buffer.String(),
+				nodes: []*selectorTreeNode{},
+			}
 			buffer.Reset()
 
 			// Only these four take a selector argument. Every other function's arguments are taken
@@ -463,8 +467,8 @@ func parseSelectorTree(input string) []*selectorTreeNode {
 				start := index + 1
 				nesting := 0
 
-				for scan := index + 1; scan < len(input); scan++ {
-					peek := input[scan]
+				for scan := index + 1; scan < len(normalized); scan++ {
+					peek := normalized[scan]
 					if peek == selectorOpenParen {
 						nesting++
 						continue
@@ -485,7 +489,7 @@ func parseSelectorTree(input string) []*selectorTreeNode {
 				// the argument is parsed as selectors beside the function.
 				contents := ""
 				if start <= end {
-					contents = input[start:end]
+					contents = normalized[start:end]
 				}
 
 				// `:nth-child(…)` and `:nth-last-child(…)` can carry an `of <selector-list>`
@@ -495,7 +499,10 @@ func parseSelectorTree(input string) []*selectorTreeNode {
 				// space specifically, so `of` followed by a tab or newline is not a clause.
 				if node.value == ":nth-child" || node.value == ":nth-last-child" {
 					if clause := strings.Index(contents, "of "); clause != -1 {
-						node.nodes = append(node.nodes, &selectorTreeNode{kind: SelectorNodeKindValue, value: contents[:clause+3]})
+						node.nodes = append(
+							node.nodes,
+							&selectorTreeNode{kind: SelectorNodeKindValue, value: contents[:clause+3]},
+						)
 						node.nodes = append(node.nodes, parseSelectorTree(contents[clause+3:])...)
 						index = end
 						appendNode(node)
@@ -571,8 +578,8 @@ func parseSelectorTree(input string) []*selectorTreeNode {
 			start := index
 			nesting := 0
 
-			for scan := index + 1; scan < len(input); scan++ {
-				peek := input[scan]
+			for scan := index + 1; scan < len(normalized); scan++ {
+				peek := normalized[scan]
 				if peek == selectorOpenBracket {
 					nesting++
 					continue
@@ -586,14 +593,14 @@ func parseSelectorTree(input string) []*selectorTreeNode {
 				}
 			}
 
-			appendNode(&selectorTreeNode{kind: SelectorNodeKindSelector, value: input[start : index+1]})
+			appendNode(&selectorTreeNode{kind: SelectorNodeKindSelector, value: normalized[start : index+1]})
 
 		// A quoted string is taken whole into the buffer, closing only on a matching quote, so a `'`
 		// inside a `"` string does not end it.
 		case selectorSingleQuote, selectorDoubleQuote:
 			start := index
-			for scan := index + 1; scan < len(input); scan++ {
-				peek := input[scan]
+			for scan := index + 1; scan < len(normalized); scan++ {
+				peek := normalized[scan]
 				if peek == selectorBackslash {
 					// The next character is escaped and cannot close the string.
 					scan++
@@ -605,7 +612,7 @@ func parseSelectorTree(input string) []*selectorTreeNode {
 			// An unterminated string leaves index untouched, so only the quote character itself is
 			// consumed and parsing resumes at the next character. `"a b` is therefore a complex
 			// selector of `"a` and `b`, not one string.
-			buffer.WriteString(input[start : index+1])
+			buffer.WriteString(normalized[start : index+1])
 
 		// The nesting selector `&` and the universal selector `*` are always selectors of their
 		// own, even directly against other text.
@@ -616,13 +623,13 @@ func parseSelectorTree(input string) []*selectorTreeNode {
 		// A `\` escapes the next character: both are consumed into the buffer, and neither is
 		// examined.
 		case selectorBackslash:
-			if index+1 < len(input) {
+			if index+1 < len(normalized) {
 				// One byte, not one rune, and the two are indistinguishable here. Upstream indexes by
 				// UTF-16 code unit, so for a character outside the BMP it consumes only the high
 				// surrogate and the low one reaches the default branch, which appends it. Byte-wise,
 				// the continuation bytes reach the default branch the same way. Either way the
 				// escaped character arrives in the buffer whole.
-				buffer.WriteString(input[index : index+2])
+				buffer.WriteString(normalized[index : index+2])
 			} else {
 				// A trailing backslash reads one past the end. In JavaScript that is `undefined`,
 				// and `'\\' + undefined` is the string `\undefined`. Reproduced literally, absurd as

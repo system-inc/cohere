@@ -9,14 +9,14 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
 )
 
-func parseDeclarationFile(t *testing.T, sourceText string) *ast.SourceFile {
-	t.Helper()
+func parseDeclarationFile(test *testing.T, sourceText string) *ast.SourceFile {
+	test.Helper()
 	file := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/repository/source/shims.d.ts",
 		PathKey:  "/repository/source/shims.d.ts",
 	}, sourceText, core.ScriptKindTS)
 	if file == nil {
-		t.Fatalf("no file parsed from %q", sourceText)
+		test.Fatalf("no file parsed from %q", sourceText)
 	}
 	return file
 }
@@ -30,8 +30,8 @@ func declarationSources(file *ast.SourceFile) []string {
 	return sources
 }
 
-func TestDeclarationsReachesAmbientModuleBodies(t *testing.T) {
-	t.Parallel()
+func TestDeclarationsReachesAmbientModuleBodies(test *testing.T) {
+	test.Parallel()
 	cases := []struct {
 		name        string
 		sourceText  string
@@ -60,19 +60,19 @@ func TestDeclarationsReachesAmbientModuleBodies(t *testing.T) {
 		{"a file with no imports", "export const value = 1;\n", []string{}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			got := declarationSources(parseDeclarationFile(t, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			got := declarationSources(parseDeclarationFile(test, testCase.sourceText))
 			if !slices.Equal(got, testCase.wantSources) {
-				t.Errorf("Declarations found imports from %q, want %q", got, testCase.wantSources)
+				test.Errorf("Declarations found imports from %q, want %q", got, testCase.wantSources)
 			}
 		})
 	}
 }
 
-func TestDeclarationsOfNoFile(t *testing.T) {
-	t.Parallel()
+func TestDeclarationsOfNoFile(test *testing.T) {
+	test.Parallel()
 	if declarations := Declarations(nil); declarations != nil {
-		t.Errorf("Declarations(nil) = %v, want nil", declarations)
+		test.Errorf("Declarations(nil) = %v, want nil", declarations)
 	}
 }

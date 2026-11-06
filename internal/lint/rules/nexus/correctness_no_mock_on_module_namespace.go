@@ -13,7 +13,10 @@ const correctnessNoMockOnModuleNamespaceId = "mockOnModuleNamespace"
 
 // correctnessNoMockOnModuleNamespaceText is the rule's message, whose wording lives in
 // `policy/messages/correctness-no-mock-on-module-namespace.json`.
-var correctnessNoMockOnModuleNamespaceText = policy.MessageOf("nexus/correctness-no-mock-on-module-namespace", correctnessNoMockOnModuleNamespaceId)
+var correctnessNoMockOnModuleNamespaceText = policy.MessageOf(
+	"nexus/correctness-no-mock-on-module-namespace",
+	correctnessNoMockOnModuleNamespaceId,
+)
 
 func correctnessNoMockOnModuleNamespaceMessage() rule.Message {
 	return rule.Message{
@@ -22,16 +25,26 @@ func correctnessNoMockOnModuleNamespaceMessage() rule.Message {
 	}
 }
 
+// correctnessNoMockOnModuleNamespaceMockMethods are the MockTracker methods that redefine a property
+// of the object they are given.
+var correctnessNoMockOnModuleNamespaceMockMethods = map[string]bool{
+	"method": true, "getter": true, "setter": true, "property": true,
+}
+
 // CorrectnessNoMockOnModuleNamespace reports node:test's `mock.method`, `mock.getter`, `mock.setter`
 // or `mock.property` called with an `import * as` namespace object as the object to patch, in a file
 // that runs as an ES module.
 //
-//	invalid: import * as NodeChildProcess from 'node:child_process'; test.mock.method(NodeChildProcess, 'execFileSync', fake);
+//	invalid: import * as NodeChildProcess from 'node:child_process';
+//	         test.mock.method(NodeChildProcess, 'execFileSync', fake);
 //	invalid: import * as Store from './Store.ts'; t.mock.method(Store, 'load');
 //	invalid: import * as NodeOs from 'node:os'; mock.property(NodeOs, 'EOL', '\r\n');
-//	valid:   const childProcess = NodeModule.createRequire(import.meta.url)('node:child_process') as typeof NodeChildProcess; test.mock.method(childProcess, 'execFileSync', fake);
-//	valid:   import * as NodeChildProcess from 'node:child_process'; test.mock.method(NodeChildProcess.default, 'execFileSync', fake);
-//	valid:   import NodeChildProcess from 'node:child_process'; test.mock.method(NodeChildProcess, 'execFileSync', fake);
+//	valid:   const childProcess = NodeModule.createRequire(import.meta.url)('node:child_process')
+//	         as typeof NodeChildProcess; test.mock.method(childProcess, 'execFileSync', fake);
+//	valid:   import * as NodeChildProcess from 'node:child_process';
+//	         test.mock.method(NodeChildProcess.default, 'execFileSync', fake);
+//	valid:   import NodeChildProcess from 'node:child_process';
+//	         test.mock.method(NodeChildProcess, 'execFileSync', fake);
 //	valid:   import * as Nonce from './Nonce'; jest.spyOn(Nonce, 'createNonce');
 //
 // # Where it came from
@@ -87,7 +100,7 @@ func correctnessNoMockOnModuleNamespaceMessage() rule.Message {
 //
 // The repair depends on what the module is: a builtin's CommonJS exports through `createRequire`, a
 // seam the code under test takes as a parameter, or `mock.module`. A fixer would have to pick one.
-var CorrectnessNoMockOnModuleNamespace = rule.Rule{
+var CorrectnessNoMockOnModuleNamespace = rule.Rule[rule.NoOptions]{
 	Name: "nexus/correctness-no-mock-on-module-namespace",
 
 	// The mock call is told from any other `method` by its resolved declaration, and the namespace
@@ -101,13 +114,16 @@ var CorrectnessNoMockOnModuleNamespace = rule.Rule{
 	// it resolves the argument to is declared in the file itself.
 	TypeReach: rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.TypeChecker == nil || ctx.Program == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		if ruleContext.TypeChecker == nil || ruleContext.Program == nil {
 			// Telling node:test's MockTracker from any other `method`, and a namespace import from a
 			// value of the same type, are questions for the checker.
 			return nil
 		}
-		if !correctnessNoMockOnModuleNamespaceRunsAsModule(ctx.SourceFile.FileName().AsString(), ctx.Program.Options()) {
+		if !correctnessNoMockOnModuleNamespaceRunsAsModule(
+			ruleContext.SourceFile.FileName().AsString(),
+			ruleContext.Program.Options(),
+		) {
 			return nil
 		}
 		return rule.Listeners{
@@ -125,22 +141,17 @@ var CorrectnessNoMockOnModuleNamespace = rule.Rule{
 					return
 				}
 				target := correctnessNoMockOnModuleNamespaceUnwrap(call.Arguments.Nodes[0])
-				if target.Kind != ast.KindIdentifier || !correctnessNoMockOnModuleNamespaceIsNamespace(ctx, target) {
+				if target.Kind != ast.KindIdentifier ||
+					!correctnessNoMockOnModuleNamespaceIsNamespace(ruleContext, target) {
 					return
 				}
-				if !correctnessNoMockOnModuleNamespaceIsMockTracker(ctx, node) {
+				if !correctnessNoMockOnModuleNamespaceIsMockTracker(ruleContext, node) {
 					return
 				}
-				ctx.ReportNode(node, correctnessNoMockOnModuleNamespaceMessage())
+				ruleContext.ReportNode(node, correctnessNoMockOnModuleNamespaceMessage())
 			},
 		}
 	},
-}
-
-// correctnessNoMockOnModuleNamespaceMockMethods are the MockTracker methods that redefine a property
-// of the object they are given.
-var correctnessNoMockOnModuleNamespaceMockMethods = map[string]bool{
-	"method": true, "getter": true, "setter": true, "property": true,
 }
 
 // correctnessNoMockOnModuleNamespaceRunsAsModule says whether a file runs as an ES module: always for
@@ -162,25 +173,26 @@ func correctnessNoMockOnModuleNamespaceRunsAsModule(fileName string, options *co
 // correctnessNoMockOnModuleNamespaceUnwrap looks through the wrappers that change an expression's type
 // and never its value.
 func correctnessNoMockOnModuleNamespaceUnwrap(expression *ast.Node) *ast.Node {
+	current := expression
 	for {
-		switch expression.Kind {
+		switch current.Kind {
 		case ast.KindParenthesizedExpression, ast.KindNonNullExpression, ast.KindAsExpression,
 			ast.KindSatisfiesExpression, ast.KindTypeAssertionExpression:
-			expression = expression.Expression()
+			current = current.Expression()
 			continue
 		}
-		return expression
+		return current
 	}
 }
 
 // correctnessNoMockOnModuleNamespaceIsNamespace says whether an identifier names the binding of an
 // `import * as` declaration in this file that is not type-only.
-func correctnessNoMockOnModuleNamespaceIsNamespace(ctx rule.Context, identifier *ast.Node) bool {
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(identifier)
+func correctnessNoMockOnModuleNamespaceIsNamespace(ruleContext rule.Context, identifier *ast.Node) bool {
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(identifier)
 	if symbol == nil || symbol.Flags&ast.SymbolFlagsAlias == 0 {
 		return false
 	}
-	declarations := rule.DeclarationsIn(ctx.SourceFile, symbol)
+	declarations := rule.DeclarationsIn(ruleContext.SourceFile, symbol)
 	if len(declarations) != 1 {
 		return false
 	}
@@ -190,13 +202,14 @@ func correctnessNoMockOnModuleNamespaceIsNamespace(ctx rule.Context, identifier 
 
 // correctnessNoMockOnModuleNamespaceIsMockTracker says whether a call resolves to a method declared on
 // `MockTracker` in `declare module "node:test"` (or `"test"`), at any depth of namespaces inside it.
-func correctnessNoMockOnModuleNamespaceIsMockTracker(ctx rule.Context, call *ast.Node) bool {
-	signature := ctx.TypeChecker.GetResolvedSignature(call)
+func correctnessNoMockOnModuleNamespaceIsMockTracker(ruleContext rule.Context, call *ast.Node) bool {
+	signature := ruleContext.TypeChecker.GetResolvedSignature(call)
 	if signature == nil {
 		return false
 	}
 	declaration := signature.Declaration()
-	if declaration == nil || (declaration.Kind != ast.KindMethodSignature && declaration.Kind != ast.KindMethodDeclaration) {
+	if declaration == nil ||
+		(declaration.Kind != ast.KindMethodSignature && declaration.Kind != ast.KindMethodDeclaration) {
 		return false
 	}
 	owner := declaration.Parent

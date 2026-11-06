@@ -38,7 +38,7 @@ func noImplicitCoercionSuggestionMessage(recommendation string) rule.Message {
 
 // NoImplicitCoercionOptions carries upstream's five options.
 //
-// Three of the four booleans default to TRUE, which is the trap this project has been bitten by:
+// Three of the four booleans default to `true`, which is the trap this project has been bitten by:
 // `rule.DecodeOptionsInto` on a default-true option yields a zero-value struct that silently turns
 // the rule off, and every fixture built from a struct rather than routed through the decoder passes
 // anyway. Pointers keep an absent key distinguishable from an explicit false.
@@ -70,15 +70,15 @@ func DefaultNoImplicitCoercionSettings() NoImplicitCoercionOptions {
 // rule reads nil as a zero-valued struct with every boolean false, which disables three of the four
 // judgments. That is the live config's own shape for a rule configured as a bare severity, so it is
 // the ordinary path rather than a corner.
-func DecodeNoImplicitCoercionOptions(raw []byte) (any, error) {
+func DecodeNoImplicitCoercionOptions(raw []byte) (NoImplicitCoercionOptions, error) {
 	settings := DefaultNoImplicitCoercionSettings()
 	if len(raw) == 0 {
 		return settings, nil
 	}
 
 	var configured NoImplicitCoercionOptions
-	if err := rule.UnmarshalOptions(raw, &configured); err != nil {
-		return settings, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &configured); unmarshalOptionsError != nil {
+		return settings, unmarshalOptionsError
 	}
 	if configured.Boolean != nil {
 		settings.Boolean = configured.Boolean
@@ -150,7 +150,7 @@ func noImplicitCoercionAllows(settings NoImplicitCoercionOptions, operator strin
 // Upstream asks its scope manager whether `Boolean` has any declaration in source, and withholds
 // the fix when it does, because `Boolean(foo)` would then call something else. Measured here
 // through `ResolveName`: a `var`, `let`, parameter, function or class named `Boolean` each withdraw
-// the fix, while a shadow in a SIBLING scope does not.
+// the fix, while a shadow in a sibling scope does not.
 //
 // Upstream's corpus writes the same input twice with opposite verdicts, separated only by
 // `languageOptions.globals.Boolean = "off"`, which is the same question asked from the other side:
@@ -161,19 +161,19 @@ func noImplicitCoercionAllows(settings NoImplicitCoercionOptions, operator strin
 //
 // `~n` is falsy exactly when `n` is `-1`, which is what makes `~foo.indexOf(bar)` a membership test.
 // The recommendation depends on whether the call is optionally chained, and this is not cosmetic:
-// `foo?.indexOf(bar)` yields `undefined` when `foo` is nullish, and `undefined !== -1` is TRUE,
+// `foo?.indexOf(bar)` yields `undefined` when `foo` is nullish, and `undefined !== -1` is `true`,
 // which would invert the test. So upstream recommends `>= 0` for the chained form and `!== -1`
 // otherwise, and offers neither as a fix nor as a suggestion because the reader has to choose.
 //
 // Measured: `~foo.indexOf(x)` and `~foo.lastIndexOf(x)` report, `~foo['indexOf'](x)` reports because
 // the key is static, and `~foo[indexOf](x)`, `~foo.someOther(x)`, `~foo` and `~foo.indexOf` are all
 // clean.
-var NoImplicitCoercion = rule.Rule{
+var NoImplicitCoercion = rule.Rule[NoImplicitCoercionOptions]{
 	Name:             "no-implicit-coercion",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, _ := rule.OptionsAs[NoImplicitCoercionOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[NoImplicitCoercionOptions]) rule.Listeners {
+		settings, _ := options.Read()
 		defaults := DefaultNoImplicitCoercionSettings()
 		if settings.Boolean == nil {
 			settings.Boolean = defaults.Boolean
@@ -190,13 +190,13 @@ var NoImplicitCoercion = rule.Rule{
 
 		return rule.Listeners{
 			ast.KindPrefixUnaryExpression: func(node *ast.Node) {
-				noImplicitCoercionCheckUnary(ctx, node, settings)
+				noImplicitCoercionCheckUnary(ruleContext, node, settings)
 			},
 			ast.KindBinaryExpression: func(node *ast.Node) {
-				noImplicitCoercionCheckBinary(ctx, node, settings)
+				noImplicitCoercionCheckBinary(ruleContext, node, settings)
 			},
 			ast.KindTemplateExpression: func(node *ast.Node) {
-				noImplicitCoercionCheckTemplate(ctx, node, settings)
+				noImplicitCoercionCheckTemplate(ruleContext, node, settings)
 			},
 		}
 	},
@@ -207,28 +207,28 @@ var NoImplicitCoercion = rule.Rule{
 // Upstream funnels every arm through one `report` taking two booleans, and this is the same shape:
 // `shouldFix` wins over `shouldSuggest`, so an arm never offers both.
 func noImplicitCoercionReport(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	node *ast.Node,
 	recommendation string,
 	shouldSuggest bool,
 	shouldFix bool,
 ) {
 	message := noImplicitCoercionMessage(recommendation)
-	replacement := noImplicitCoercionReplacementText(ctx, node, recommendation)
+	replacement := noImplicitCoercionReplacementText(ruleContext, node, recommendation)
 
 	switch {
 	case shouldFix:
-		ctx.ReportNodeWithFixes(node, message,
-			rule.ReplaceRange(rule.TokenRange(ctx.SourceFile, node).WithEnd(node.End()), replacement))
+		ruleContext.ReportNodeWithFixes(node, message,
+			rule.ReplaceRange(rule.TokenRange(ruleContext.SourceFile, node).WithEnd(node.End()), replacement))
 	case shouldSuggest:
-		ctx.ReportNodeWithSuggestions(node, message, rule.Suggestion{
+		ruleContext.ReportNodeWithSuggestions(node, message, rule.Suggestion{
 			Message: noImplicitCoercionSuggestionMessage(recommendation),
 			Fixes: []rule.Fix{
-				rule.ReplaceRange(rule.TokenRange(ctx.SourceFile, node).WithEnd(node.End()), replacement),
+				rule.ReplaceRange(rule.TokenRange(ruleContext.SourceFile, node).WithEnd(node.End()), replacement),
 			},
 		})
 	default:
-		ctx.ReportNode(node, message)
+		ruleContext.ReportNode(node, message)
 	}
 }
 
@@ -240,12 +240,12 @@ func noImplicitCoercionReport(
 // hazard is an identifier or keyword running into the replacement: `typeof+foo` becoming
 // `typeofNumber(foo)`. Testing whether the preceding character can continue an identifier covers
 // exactly that.
-func noImplicitCoercionReplacementText(ctx rule.Context, node *ast.Node, recommendation string) string {
-	start := rule.TokenRange(ctx.SourceFile, node).Pos()
+func noImplicitCoercionReplacementText(ruleContext rule.Context, node *ast.Node, recommendation string) string {
+	start := rule.TokenRange(ruleContext.SourceFile, node).Pos()
 	if start == 0 {
 		return recommendation
 	}
-	text := ctx.SourceFile.Text()
+	text := ruleContext.SourceFile.Text()
 	previous := text[start-1]
 	if noImplicitCoercionContinuesIdentifier(previous) && noImplicitCoercionContinuesIdentifier(recommendation[0]) {
 		return " " + recommendation
@@ -270,20 +270,20 @@ func noImplicitCoercionContinuesIdentifier(character byte) bool {
 // A sequence expression must be parenthesized or its commas would be read as argument separators,
 // turning `!!(a, b)` into `Boolean(a, b)`, which evaluates something else. Our parser gives a
 // sequence expression a comma-operator binary expression rather than its own kind.
-func noImplicitCoercionOperandText(ctx rule.Context, node *ast.Node) string {
+func noImplicitCoercionOperandText(ruleContext rule.Context, node *ast.Node) string {
 	// Unwrap first. Our parser keeps `KindParenthesizedExpression`, which ESTree folds away, so
 	// upstream's `getText(node)` on `!!(foo + bar)` yields `foo + bar` while ours yielded
 	// `(foo + bar)` and the recommendation came out as `Boolean((foo + bar))`. The loop rather
 	// than `ast.SkipParentheses` because `((x))` nests and that helper dereferences its argument.
-	node = noImplicitCoercionUnwrapParentheses(node)
-	if node == nil {
+	unwrapped := noImplicitCoercionUnwrapParentheses(node)
+	if unwrapped == nil {
 		return ""
 	}
-	text := ctx.SourceFile.Text()
-	span := rule.TokenRange(ctx.SourceFile, node)
-	source := text[span.Pos():node.End()]
-	if node.Kind == ast.KindBinaryExpression {
-		if operator := node.AsBinaryExpression().OperatorToken; operator != nil &&
+	text := ruleContext.SourceFile.Text()
+	span := rule.TokenRange(ruleContext.SourceFile, unwrapped)
+	source := text[span.Pos():unwrapped.End()]
+	if unwrapped.Kind == ast.KindBinaryExpression {
+		if operator := unwrapped.AsBinaryExpression().OperatorToken; operator != nil &&
 			operator.Kind == ast.KindCommaToken {
 			return "(" + source + ")"
 		}
@@ -303,11 +303,11 @@ func noImplicitCoercionOperandText(ctx rule.Context, node *ast.Node) string {
 // parameter, function or class named `Boolean` each answer not-global; and a shadow in a sibling
 // function does not suppress. Neutralizing the ambient test failed five of those and cutting the
 // resolution failed the other two, so the predicate is falsifiable in both directions.
-func noImplicitCoercionResolvesToTheGlobalBoolean(ctx rule.Context, at *ast.Node) bool {
-	if ctx.TypeChecker == nil {
+func noImplicitCoercionResolvesToTheGlobalBoolean(ruleContext rule.Context, at *ast.Node) bool {
+	if ruleContext.TypeChecker == nil {
 		return false
 	}
-	symbol := ctx.TypeChecker.ResolveName("Boolean", at, ast.SymbolFlagsValue, false)
+	symbol := ruleContext.TypeChecker.ResolveName("Boolean", at, ast.SymbolFlagsValue, false)
 	if symbol == nil || len(symbol.Declarations) == 0 {
 		return false
 	}
@@ -351,20 +351,24 @@ const (
 // undefined must be one no value of which is falsy, so removing the nullish ones is removing every
 // falsy value. A type also holding `0`, `false` or an empty string has no comparison that means `!!x`, and the
 // truthiness narrowing there is visible, so neither rewrite is safe and a person decides.
-func noImplicitCoercionNarrowingRewrite(ctx rule.Context, node *ast.Node, operand *ast.Node) (noImplicitCoercionRewrite, string) {
+func noImplicitCoercionNarrowingRewrite(
+	ruleContext rule.Context,
+	node *ast.Node,
+	operand *ast.Node,
+) (noImplicitCoercionRewrite, string) {
 	if !noImplicitCoercionIsNarrowableReference(operand) {
 		return noImplicitCoercionRewriteBoolean, ""
 	}
-	if ctx.TypeChecker == nil {
+	if ruleContext.TypeChecker == nil {
 		return noImplicitCoercionRewriteDecline, ""
 	}
-	operandType := ctx.TypeChecker.GetTypeAtLocation(operand)
+	operandType := ruleContext.TypeChecker.GetTypeAtLocation(operand)
 	if operandType == nil {
 		return noImplicitCoercionRewriteDecline, ""
 	}
 
 	hasNull, hasUndefined, hasPossiblyFalsy := false, false, false
-	for constituent := range type_checking.UnionTypePartsSeq(operandType) {
+	for constituent := range type_checking.UnionTypePartsSequence(operandType) {
 		switch {
 		case type_checking.IsTypeFlagSet(constituent, checker.TypeFlagsAny):
 			// `any` absorbs a union, and truthiness does not narrow it, so nothing can be lost.
@@ -395,7 +399,7 @@ func noImplicitCoercionNarrowingRewrite(ctx rule.Context, node *ast.Node, operan
 		return noImplicitCoercionRewriteDecline, ""
 	}
 
-	reference := noImplicitCoercionOperandText(ctx, operand)
+	reference := noImplicitCoercionOperandText(ruleContext, operand)
 	var comparison string
 	switch {
 	case hasNull && hasUndefined:
@@ -417,18 +421,19 @@ func noImplicitCoercionNarrowingRewrite(ctx rule.Context, node *ast.Node, operan
 // Anything else, a call above all, is evaluated fresh wherever it appears, so there is no narrowing
 // for `Boolean(x)` to lose and upstream's fix stands.
 func noImplicitCoercionIsNarrowableReference(node *ast.Node) bool {
-	for node != nil {
-		switch node.Kind {
+	current := node
+	for current != nil {
+		switch current.Kind {
 		case ast.KindIdentifier, ast.KindThisKeyword, ast.KindSuperKeyword:
 			return true
 		case ast.KindPropertyAccessExpression:
-			node = node.AsPropertyAccessExpression().Expression
+			current = current.AsPropertyAccessExpression().Expression
 		case ast.KindElementAccessExpression:
-			node = node.AsElementAccessExpression().Expression
+			current = current.AsElementAccessExpression().Expression
 		case ast.KindNonNullExpression:
-			node = node.AsNonNullExpression().Expression
+			current = current.AsNonNullExpression().Expression
 		case ast.KindParenthesizedExpression:
-			node = node.AsParenthesizedExpression().Expression
+			current = current.AsParenthesizedExpression().Expression
 		default:
 			return false
 		}
@@ -443,7 +448,10 @@ func noImplicitCoercionIsFalsyLiteral(candidate *checker.Type) bool {
 	switch {
 	case type_checking.IsTypeFlagSet(candidate, checker.TypeFlagsBigIntLiteral):
 		return true
-	case type_checking.IsTypeFlagSet(candidate, checker.TypeFlagsBooleanLiteral|checker.TypeFlagsStringLiteral|checker.TypeFlagsNumberLiteral):
+	case type_checking.IsTypeFlagSet(
+		candidate,
+		checker.TypeFlagsBooleanLiteral|checker.TypeFlagsStringLiteral|checker.TypeFlagsNumberLiteral,
+	):
 		switch value := candidate.AsLiteralType().Value().(type) {
 		case bool:
 			return !value
@@ -473,9 +481,15 @@ func noImplicitCoercionIsAlwaysTruthy(candidate *checker.Type) bool {
 		return true
 	}
 	switch {
-	case type_checking.IsTypeFlagSet(candidate, checker.TypeFlagsObject|checker.TypeFlagsNonPrimitive|checker.TypeFlagsESSymbolLike):
+	case type_checking.IsTypeFlagSet(
+		candidate,
+		checker.TypeFlagsObject|checker.TypeFlagsNonPrimitive|checker.TypeFlagsESSymbolLike,
+	):
 		return true
-	case type_checking.IsTypeFlagSet(candidate, checker.TypeFlagsBooleanLiteral|checker.TypeFlagsStringLiteral|checker.TypeFlagsNumberLiteral):
+	case type_checking.IsTypeFlagSet(
+		candidate,
+		checker.TypeFlagsBooleanLiteral|checker.TypeFlagsStringLiteral|checker.TypeFlagsNumberLiteral,
+	):
 		return !noImplicitCoercionIsFalsyLiteral(candidate)
 	}
 	return false
@@ -516,14 +530,15 @@ func noImplicitCoercionComparisonNeedsParentheses(node *ast.Node) bool {
 // Written as a loop with its own nil check rather than calling `ast.SkipParentheses`, which
 // dereferences its argument, and every operand reaching here can be nil from a recovered parse.
 func noImplicitCoercionUnwrapParentheses(node *ast.Node) *ast.Node {
-	for node != nil && node.Kind == ast.KindParenthesizedExpression {
-		node = node.AsParenthesizedExpression().Expression
+	current := node
+	for current != nil && current.Kind == ast.KindParenthesizedExpression {
+		current = current.AsParenthesizedExpression().Expression
 	}
-	return node
+	return current
 }
 
 // noImplicitCoercionCheckUnary handles the four prefix-operator arms.
-func noImplicitCoercionCheckUnary(ctx rule.Context, node *ast.Node, settings NoImplicitCoercionOptions) {
+func noImplicitCoercionCheckUnary(ruleContext rule.Context, node *ast.Node, settings NoImplicitCoercionOptions) {
 	unary := node.AsPrefixUnaryExpression()
 	operand := noImplicitCoercionUnwrapParentheses(unary.Operand)
 	if operand == nil {
@@ -537,19 +552,19 @@ func noImplicitCoercionCheckUnary(ctx rule.Context, node *ast.Node, settings NoI
 		operand.AsPrefixUnaryExpression().Operator == ast.KindExclamationToken {
 		inner := noImplicitCoercionUnwrapParentheses(operand.AsPrefixUnaryExpression().Operand)
 		// Already a boolean, `!!b` converts nothing and `Boolean(b)` is no better advice.
-		if inner != nil && !noImplicitCoercionIsAlready(ctx, inner, checker.TypeFlagsBooleanLike) {
-			recommendation := "Boolean(" + noImplicitCoercionOperandText(ctx, inner) + ")"
-			switch rewrite, comparison := noImplicitCoercionNarrowingRewrite(ctx, node, inner); rewrite {
+		if inner != nil && !noImplicitCoercionIsAlready(ruleContext, inner, checker.TypeFlagsBooleanLike) {
+			recommendation := "Boolean(" + noImplicitCoercionOperandText(ruleContext, inner) + ")"
+			switch rewrite, comparison := noImplicitCoercionNarrowingRewrite(ruleContext, node, inner); rewrite {
 			case noImplicitCoercionRewriteComparison:
-				noImplicitCoercionReport(ctx, node, comparison, true, true)
+				noImplicitCoercionReport(ruleContext, node, comparison, true, true)
 			case noImplicitCoercionRewriteBoolean:
 				// The fix is withheld when `Boolean` is not the global, because the rewrite would
 				// then call whatever the name binds to instead. The finding still fires, as a
 				// suggestion.
-				booleanIsGlobal := noImplicitCoercionResolvesToTheGlobalBoolean(ctx, node)
-				noImplicitCoercionReport(ctx, node, recommendation, true, booleanIsGlobal)
+				booleanIsGlobal := noImplicitCoercionResolvesToTheGlobalBoolean(ruleContext, node)
+				noImplicitCoercionReport(ruleContext, node, recommendation, true, booleanIsGlobal)
 			default:
-				noImplicitCoercionReport(ctx, node, recommendation, true, false)
+				noImplicitCoercionReport(ruleContext, node, recommendation, true, false)
 			}
 		}
 	}
@@ -564,17 +579,17 @@ func noImplicitCoercionCheckUnary(ctx rule.Context, node *ast.Node, settings NoI
 				// `undefined !== -1` is true, which would invert the membership test.
 				comparison = ">= 0"
 			}
-			recommendation := ctx.NodeText(call) + " " + comparison
-			noImplicitCoercionReport(ctx, node, recommendation, false, false)
+			recommendation := ruleContext.NodeText(call) + " " + comparison
+			noImplicitCoercionReport(ruleContext, node, recommendation, false, false)
 		}
 	}
 
 	// +foo
 	if *settings.Number && !noImplicitCoercionAllows(settings, "+") &&
 		unary.Operator == ast.KindPlusToken && !noImplicitCoercionIsNumeric(operand) &&
-		!noImplicitCoercionIsAlready(ctx, operand, checker.TypeFlagsNumberLike) {
-		recommendation := "Number(" + noImplicitCoercionOperandText(ctx, operand) + ")"
-		noImplicitCoercionReport(ctx, node, recommendation, true, false)
+		!noImplicitCoercionIsAlready(ruleContext, operand, checker.TypeFlagsNumberLike) {
+		recommendation := "Number(" + noImplicitCoercionOperandText(ruleContext, operand) + ")"
+		noImplicitCoercionReport(ruleContext, node, recommendation, true, false)
 	}
 
 	// -(-foo)
@@ -585,15 +600,15 @@ func noImplicitCoercionCheckUnary(ctx rule.Context, node *ast.Node, settings NoI
 		inner := noImplicitCoercionUnwrapParentheses(operand.AsPrefixUnaryExpression().Operand)
 		// A bigint too: `-(-x)` is an identity on a bigint, where `+x`, `1 * x` and `x - 0` throw.
 		if inner != nil && !noImplicitCoercionIsNumeric(inner) &&
-			!noImplicitCoercionIsAlready(ctx, inner, checker.TypeFlagsNumberLike|checker.TypeFlagsBigIntLike) {
-			recommendation := "Number(" + noImplicitCoercionOperandText(ctx, inner) + ")"
-			noImplicitCoercionReport(ctx, node, recommendation, true, false)
+			!noImplicitCoercionIsAlready(ruleContext, inner, checker.TypeFlagsNumberLike|checker.TypeFlagsBigIntLike) {
+			recommendation := "Number(" + noImplicitCoercionOperandText(ruleContext, inner) + ")"
+			noImplicitCoercionReport(ruleContext, node, recommendation, true, false)
 		}
 	}
 }
 
 // noImplicitCoercionCheckBinary handles the three binary arms and the compound assignment.
-func noImplicitCoercionCheckBinary(ctx rule.Context, node *ast.Node, settings NoImplicitCoercionOptions) {
+func noImplicitCoercionCheckBinary(ruleContext rule.Context, node *ast.Node, settings NoImplicitCoercionOptions) {
 	binary := node.AsBinaryExpression()
 	if binary.OperatorToken == nil {
 		return
@@ -608,9 +623,9 @@ func noImplicitCoercionCheckBinary(ctx rule.Context, node *ast.Node, settings No
 	if operator == ast.KindPlusEqualsToken {
 		if *settings.String && !noImplicitCoercionAllows(settings, "+") &&
 			noImplicitCoercionIsEmptyString(right) &&
-			!noImplicitCoercionIsAlready(ctx, left, checker.TypeFlagsStringLike) {
-			code := ctx.NodeText(left)
-			noImplicitCoercionReport(ctx, node, code+" = String("+code+")", true, false)
+			!noImplicitCoercionIsAlready(ruleContext, left, checker.TypeFlagsStringLike) {
+			code := ruleContext.NodeText(left)
+			noImplicitCoercionReport(ruleContext, node, code+" = String("+code+")", true, false)
 		}
 		return
 	}
@@ -621,9 +636,9 @@ func noImplicitCoercionCheckBinary(ctx rule.Context, node *ast.Node, settings No
 		noImplicitCoercionIsMultiplyByOne(binary) &&
 		!noImplicitCoercionIsMultiplyByFractionOfOne(node) {
 		if operand := noImplicitCoercionNonNumericOperand(binary); operand != nil &&
-			!noImplicitCoercionIsAlready(ctx, operand, checker.TypeFlagsNumberLike) {
-			recommendation := "Number(" + noImplicitCoercionOperandText(ctx, operand) + ")"
-			noImplicitCoercionReport(ctx, node, recommendation, true, false)
+			!noImplicitCoercionIsAlready(ruleContext, operand, checker.TypeFlagsNumberLike) {
+			recommendation := "Number(" + noImplicitCoercionOperandText(ruleContext, operand) + ")"
+			noImplicitCoercionReport(ruleContext, node, recommendation, true, false)
 		}
 	}
 
@@ -632,9 +647,9 @@ func noImplicitCoercionCheckBinary(ctx rule.Context, node *ast.Node, settings No
 		operator == ast.KindMinusToken &&
 		right.Kind == ast.KindNumericLiteral && right.Text() == "0" &&
 		!noImplicitCoercionIsNumeric(left) &&
-		!noImplicitCoercionIsAlready(ctx, left, checker.TypeFlagsNumberLike) {
-		recommendation := "Number(" + noImplicitCoercionOperandText(ctx, left) + ")"
-		noImplicitCoercionReport(ctx, node, recommendation, true, false)
+		!noImplicitCoercionIsAlready(ruleContext, left, checker.TypeFlagsNumberLike) {
+		recommendation := "Number(" + noImplicitCoercionOperandText(ruleContext, left) + ")"
+		noImplicitCoercionReport(ruleContext, node, recommendation, true, false)
 	}
 
 	// "" + foo
@@ -642,9 +657,9 @@ func noImplicitCoercionCheckBinary(ctx rule.Context, node *ast.Node, settings No
 		operator == ast.KindPlusToken &&
 		noImplicitCoercionIsConcatWithEmptyString(binary) {
 		operand := noImplicitCoercionNonEmptyOperand(binary)
-		if !noImplicitCoercionIsAlready(ctx, operand, checker.TypeFlagsStringLike) {
-			recommendation := "String(" + noImplicitCoercionOperandText(ctx, operand) + ")"
-			noImplicitCoercionReport(ctx, node, recommendation, true, false)
+		if !noImplicitCoercionIsAlready(ruleContext, operand, checker.TypeFlagsStringLike) {
+			recommendation := "String(" + noImplicitCoercionOperandText(ruleContext, operand) + ")"
+			noImplicitCoercionReport(ruleContext, node, recommendation, true, false)
 		}
 	}
 }
@@ -653,21 +668,19 @@ func noImplicitCoercionCheckBinary(ctx rule.Context, node *ast.Node, settings No
 // some receiver, and whether that call is optionally chained.
 //
 // Upstream's `isBinaryNegatingOfIndexOf` skips a chain expression and then asks
-// `isSpecificMemberAccess(callee, null, /^(?:i|lastI)ndexOf$/)`. The `null` receiver means ANY
+// `isSpecificMemberAccess(callee, null, /^(?:i|lastI)ndexOf$/)`. The `null` receiver means any
 // object, and the static-key requirement is why `foo['indexOf'](x)` reports and `foo[indexOf](x)`
 // does not.
 func noImplicitCoercionIndexOfCall(node *ast.Node) (call *ast.Node, chained bool, ok bool) {
-	for node != nil && node.Kind == ast.KindParenthesizedExpression {
-		node = node.AsParenthesizedExpression().Expression
-	}
-	if node == nil || node.Kind != ast.KindCallExpression {
+	unwrapped := noImplicitCoercionUnwrapParentheses(node)
+	if unwrapped == nil || unwrapped.Kind != ast.KindCallExpression {
 		return nil, false, false
 	}
-	// The chain flag is read from the callee BEFORE unwrapping, and the name after. Parenthesizing
+	// The chain flag is read from the callee before unwrapping, and the name after. Parenthesizing
 	// a callee ends the optional chain, so `(foo?.indexOf)(1)` is not short-circuited and upstream
 	// recommends `!== -1` for it while recommending `>= 0` for `foo?.indexOf(1)`. Measured against
 	// the installed build; the two spellings differ only by those parentheses.
-	rawCallee := node.AsCallExpression().Expression
+	rawCallee := unwrapped.AsCallExpression().Expression
 	if rawCallee == nil {
 		return nil, false, false
 	}
@@ -706,7 +719,7 @@ func noImplicitCoercionIndexOfCall(node *ast.Node) (call *ast.Node, chained bool
 	if parenthesizedCallee {
 		chained = false
 	}
-	return node, chained, true
+	return unwrapped, chained, true
 }
 
 // noImplicitCoercionIsNumeric is upstream's `isNumeric`.
@@ -748,15 +761,15 @@ func noImplicitCoercionIsNumeric(node *ast.Node) bool {
 // `unknown`, `number | undefined`, `string | undefined`, `boolean | null` and an error type all keep
 // reporting. The type is read through a
 // type parameter's constraint, since `T extends number` is a number at run time.
-func noImplicitCoercionIsAlready(ctx rule.Context, operand *ast.Node, kinds checker.TypeFlags) bool {
-	if ctx.TypeChecker == nil {
+func noImplicitCoercionIsAlready(ruleContext rule.Context, operand *ast.Node, kinds checker.TypeFlags) bool {
+	if ruleContext.TypeChecker == nil {
 		return false
 	}
-	operandType := type_checking.GetConstrainedTypeAtLocation(ctx.TypeChecker, operand)
+	operandType := type_checking.GetConstrainedTypeAtLocation(ruleContext.TypeChecker, operand)
 	if operandType == nil {
 		return false
 	}
-	for constituent := range type_checking.UnionTypePartsSeq(operandType) {
+	for constituent := range type_checking.UnionTypePartsSequence(operandType) {
 		if type_checking.IsTypeFlagSet(constituent, kinds) {
 			continue
 		}
@@ -779,7 +792,7 @@ func noImplicitCoercionIsAlready(ctx rule.Context, operand *ast.Node, kinds chec
 // noImplicitCoercionIsEmptyString is upstream's `isEmptyString`.
 //
 // An empty string literal, or a template literal with no substitutions and empty text. Upstream
-// tests the COOKED value, which `Text()` already holds.
+// tests the cooked value, which `Text()` already holds.
 func noImplicitCoercionIsEmptyString(node *ast.Node) bool {
 	if node == nil {
 		return false
@@ -855,13 +868,13 @@ func noImplicitCoercionIsMultiplyByFractionOfOne(node *ast.Node) bool {
 
 // noImplicitCoercionNonNumericOperand is upstream's `getNonNumericOperand`.
 //
-// Upstream checks the RIGHT operand first, which decides which one is named in the recommendation
+// Upstream checks the right operand first, which decides which one is named in the recommendation
 // when neither is numeric.
 func noImplicitCoercionNonNumericOperand(binary *ast.BinaryExpression) *ast.Node {
-	// Both operands are unwrapped before the KIND test, which is the parser difference rather than
+	// Both operands are unwrapped before the kind test, which is the parser difference rather than
 	// a convenience. Upstream skips an operand that is itself a `BinaryExpression`, because
 	// `a * b * 1` should name the whole product rather than one factor. ESTree folds parentheses
-	// away, so `(index + 1) * 1` reaches that test AS a binary expression and is declined; ours
+	// away, so `(index + 1) * 1` reaches that test as a binary expression and is declined; ours
 	// wraps it, so without the unwrap the kind test missed it and the rule reported a site the
 	// installed build leaves alone. Found on the real tree rather than in the corpus, which writes
 	// no parenthesized operand here.
@@ -881,7 +894,7 @@ func noImplicitCoercionNonNumericOperand(binary *ast.BinaryExpression) *ast.Node
 // Our parser puts three ESTree node types under one kind, and the difference decides this rule:
 // ESTree's `BinaryExpression` covers the arithmetic and comparison operators, while `&& || ??` are
 // a `LogicalExpression` and the comma operator is a `SequenceExpression`. Measured against the
-// installed build, `(a || b) * 1` and `(a, b) * 1` both REPORT while `(i + 1) * 1` is clean, so
+// installed build, `(a || b) * 1` and `(a, b) * 1` both report while `(i + 1) * 1` is clean, so
 // testing the kind alone is wrong in both directions.
 func noImplicitCoercionIsEstreeBinary(node *ast.Node) bool {
 	if node.Kind != ast.KindBinaryExpression {
@@ -910,7 +923,7 @@ func noImplicitCoercionIsEstreeBinary(node *ast.Node) bool {
 // Our parser splits a template into a head span and a list of `TemplateSpan`, each carrying an
 // expression and the literal text that follows it. Upstream reads `quasis[0]` and `quasis[1]`,
 // which are those two literal pieces.
-func noImplicitCoercionCheckTemplate(ctx rule.Context, node *ast.Node, settings NoImplicitCoercionOptions) {
+func noImplicitCoercionCheckTemplate(ruleContext rule.Context, node *ast.Node, settings NoImplicitCoercionOptions) {
 	if !*settings.DisallowTemplateShorthand {
 		return
 	}
@@ -935,6 +948,6 @@ func noImplicitCoercionCheckTemplate(ctx rule.Context, node *ast.Node, settings 
 	if expression == nil || noImplicitCoercionIsStringType(expression) {
 		return
 	}
-	recommendation := "String(" + noImplicitCoercionOperandText(ctx, expression) + ")"
-	noImplicitCoercionReport(ctx, node, recommendation, true, false)
+	recommendation := "String(" + noImplicitCoercionOperandText(ruleContext, expression) + ")"
+	noImplicitCoercionReport(ruleContext, node, recommendation, true, false)
 }

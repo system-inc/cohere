@@ -22,8 +22,8 @@ import (
 // disagreements: silence reads as agreement. `#4q5dsn3` was blocked over exactly that, on a
 // regression check that named a number without naming the population it had to be measured over.
 //
-// So every measurement here reports how many classes the rule actually PLACED — resolved to a root,
-// or to a property set, or to an existence answer — beside whatever else it reports. A rule that went
+// So every measurement here reports how many classes the rule actually placed (resolved to a root,
+// or to a property set, or to an existence answer) beside whatever else it reports. A rule that went
 // quiet fails on the denominator rather than passing on the rate.
 //
 // # The corpus
@@ -58,18 +58,18 @@ type livePlacementCorpus struct {
 // Grouped rather than flattened because a class's answer is a function of the repository it was
 // written in, which is the whole premise of the migration. Measuring www-connected-app's classes
 // against ahra's design system would be measuring the defect rather than the fix.
-func livePlacementLiterals(t *testing.T) map[string][][]string {
-	t.Helper()
+func livePlacementLiterals(test *testing.T) map[string][][]string {
+	test.Helper()
 
 	path := filepath.Join("collapse", "testdata", "variant_fixtures.json")
-	contents, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("read %s: %v", path, err)
+	contents, readError := os.ReadFile(path)
+	if readError != nil {
+		test.Fatalf("read %s: %v", path, readError)
 	}
 
 	var fixture livePlacementCorpus
-	if err := json.Unmarshal(contents, &fixture); err != nil {
-		t.Fatalf("parse %s: %v", path, err)
+	if decodeError := json.Unmarshal(contents, &fixture); decodeError != nil {
+		test.Fatalf("parse %s: %v", path, decodeError)
 	}
 
 	literals := map[string][][]string{}
@@ -87,7 +87,7 @@ func livePlacementLiterals(t *testing.T) map[string][][]string {
 		}
 	}
 	if len(literals) == 0 {
-		t.Fatal("the corpus yielded no multi-class literals, so every measurement below would be empty")
+		test.Fatal("the corpus yielded no multi-class literals, so every measurement below would be empty")
 	}
 	return literals
 }
@@ -97,20 +97,20 @@ func livePlacementLiterals(t *testing.T) map[string][][]string {
 // The fixture spells the entry point inside its corpus, so an unset corpus skips the test naming its
 // variable, and a corpus that is set but lacks the stylesheet fails. A stylesheet that is there but
 // will not load yields a result carrying its error, which the population floors then catch.
-func livePlacementSystem(t *testing.T, spelling string) DesignSystemResult {
-	t.Helper()
+func livePlacementSystem(test *testing.T, spelling string) DesignSystemResult {
+	test.Helper()
 
-	entryPoint := corpus.Resolve(t, spelling)
+	entryPoint := corpus.Resolve(test, spelling)
 	packageRoot := findTailwindPackageRoot(filepath.Dir(entryPoint), diskFileExists)
 	if packageRoot == "" {
-		return DesignSystemResult{Err: os.ErrNotExist}
+		return DesignSystemResult{Error: os.ErrNotExist}
 	}
-	system, err := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
+	system, loadDesignSystemError := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
 		EntryPoint:          entryPoint,
 		TailwindPackageRoot: packageRoot,
 	})
-	if err != nil {
-		return DesignSystemResult{Err: err}
+	if loadDesignSystemError != nil {
+		return DesignSystemResult{Error: loadDesignSystemError}
 	}
 	return loadedDesignSystemResult(system, entryPoint)
 }
@@ -123,19 +123,19 @@ func livePlacementSystem(t *testing.T, spelling string) DesignSystemResult {
 // a rule that answers "unknown" for everything reports the whole corpus.
 //
 // Before the migration this measured 11,431 classes with zero reported, on tables generated from
-// these same two repositories. That zero was not evidence the rule was right — it was evidence the
+// these same two repositories. That zero was not evidence the rule was right. It was evidence the
 // tables described the corpus, which is the thing the migration removes. The number to watch is that
 // it is still zero now that the answer comes from each repository's own stylesheet.
-func TestUnknownClassesPlacesEveryCorpusClass(t *testing.T) {
-	t.Parallel()
-	literals := livePlacementLiterals(t)
+func TestUnknownClassesPlacesEveryCorpusClass(test *testing.T) {
+	test.Parallel()
+	literals := livePlacementLiterals(test)
 
 	asked, unknown := 0, 0
 	unknownExamples := map[string]int{}
 
 	for entryPoint, lists := range literals {
-		designSystem := livePlacementSystem(t, entryPoint)
-		if designSystem.Err != nil {
+		designSystem := livePlacementSystem(test, entryPoint)
+		if designSystem.Error != nil {
 			continue
 		}
 		for _, classes := range lists {
@@ -150,15 +150,15 @@ func TestUnknownClassesPlacesEveryCorpusClass(t *testing.T) {
 		}
 	}
 
-	t.Logf("no-unknown-classes: asked about %d classes, reported %d as unknown", asked, unknown)
+	test.Logf("no-unknown-classes: asked about %d classes, reported %d as unknown", asked, unknown)
 	for _, example := range livePlacementTopKeys(unknownExamples, 20) {
-		t.Logf("  %4d  %s", unknownExamples[example], example)
+		test.Logf("  %4d  %s", unknownExamples[example], example)
 	}
 
 	// The population guard, first, because every assertion below it is satisfiable by a rule that was
 	// never asked anything.
 	if asked < 11000 {
-		t.Fatalf(
+		test.Fatalf(
 			"the rule was asked about %d classes and the corpus holds 11,314; a population that "+
 				"dropped this far means the corpus stopped loading, and the finding count below "+
 				"would be measuring an empty run",
@@ -170,7 +170,7 @@ func TestUnknownClassesPlacesEveryCorpusClass(t *testing.T) {
 	// makes zero the right answer here and what makes it worth asserting: a rule that reported on
 	// real code would be reporting classes that work.
 	if unknown != 0 {
-		t.Errorf(
+		test.Errorf(
 			"the rule reported %d of %d corpus classes as unknown. Every class here is one a real "+
 				"repository writes against the design system it was measured with, so a finding is a "+
 				"false positive rather than a defect found",
@@ -189,12 +189,12 @@ func TestUnknownClassesPlacesEveryCorpusClass(t *testing.T) {
 //
 // A placement drop of 2,141 with an unchanged finding count is exactly the shape that should be
 // distrusted, so it is decomposed here rather than asserted away. Every dropped class is one whose
-// FIRST engine reading is static, and a static has no root-plus-value structure for a collapse
+// first engine reading is static, and a static has no root-plus-value structure for a collapse
 // family to relate: `flex`, `block`, `border-dashed`, `cursor-pointer`. 135 distinct classes, 2,141
 // occurrences, zero unparseable and zero unexplained.
 //
 // The shipped prefix walk placed them because it forced a functional reading that the engine does not
-// take — it read `border-dashed` as root `border` with value `dashed`, when `parseCandidate` returns
+// take: it read `border-dashed` as root `border` with value `dashed`, when `parseCandidate` returns
 // `border-dashed` as a static first. Those placements never became findings, because a static's
 // bucket never matches a collapse family, so the rule's output is unchanged and 2,141 wasted lookups
 // are gone.
@@ -202,9 +202,9 @@ func TestUnknownClassesPlacesEveryCorpusClass(t *testing.T) {
 // `overflow-x-hidden overflow-y-hidden => overflow-hidden` is a real engine collapse between two
 // statics, and this rule reported it neither before nor after. It is a static collapse, which the
 // rule's own doc comment places out of scope alongside the single-class rewrites.
-func TestCanonicalClassesPlacementIsAccountedFor(t *testing.T) {
-	t.Parallel()
-	literals := livePlacementLiterals(t)
+func TestCanonicalClassesPlacementIsAccountedFor(test *testing.T) {
+	test.Parallel()
+	literals := livePlacementLiterals(test)
 
 	placed, asked, findings := 0, 0, 0
 	droppedStatics, droppedOther := 0, 0
@@ -212,8 +212,8 @@ func TestCanonicalClassesPlacementIsAccountedFor(t *testing.T) {
 	outputs := map[string]int{}
 
 	for entryPoint, lists := range literals {
-		designSystem := livePlacementSystem(t, entryPoint)
-		if designSystem.Err != nil {
+		designSystem := livePlacementSystem(test, entryPoint)
+		if designSystem.Error != nil {
 			continue
 		}
 		for _, classes := range lists {
@@ -273,17 +273,17 @@ func TestCanonicalClassesPlacementIsAccountedFor(t *testing.T) {
 		}
 	}
 
-	t.Logf("enforce-canonical-classes: asked about %d classes, placed %d, reported %d findings",
+	test.Logf("enforce-canonical-classes: asked about %d classes, placed %d, reported %d findings",
 		asked, placed, findings)
-	t.Logf("  declined: %d that read as static or arbitrary, %d other", droppedStatics, droppedOther)
+	test.Logf("  declined: %d that read as static or arbitrary, %d other", droppedStatics, droppedOther)
 	for _, output := range livePlacementTopKeys(outputs, 10) {
-		t.Logf("  %4d  => %s", outputs[output], output)
+		test.Logf("  %4d  => %s", outputs[output], output)
 	}
 
 	// The population guard. A rule that placed nothing reports nothing and would otherwise satisfy
 	// the finding assertion below.
 	if placed < 7000 {
-		t.Fatalf(
+		test.Fatalf(
 			"the rule placed %d classes and the corpus places 7,287; a population that dropped this "+
 				"far means a whole category of class stopped resolving to a root, and the finding "+
 				"count would be measuring that silence",
@@ -303,7 +303,7 @@ func TestCanonicalClassesPlacementIsAccountedFor(t *testing.T) {
 		if len(names) > 12 {
 			names = names[:12]
 		}
-		t.Errorf(
+		test.Errorf(
 			"%d classes were declined despite reading as functional utilities, so the placement drop "+
 				"is not fully explained by classes that have no root-plus-value structure: %s",
 			droppedOther, strings.Join(names, ", "),
@@ -313,7 +313,7 @@ func TestCanonicalClassesPlacementIsAccountedFor(t *testing.T) {
 	// The finding count is what the rule actually says, and it is the number that must not move. Two
 	// on this corpus, both `size-*`.
 	if findings != 2 {
-		t.Errorf(
+		test.Errorf(
 			"the rule reported %d findings and the shipped rule reported 2 on this same corpus "+
 				"(size-[20px] and size-[55%%]). A migration that changes what a rule says is a "+
 				"behaviour change rather than a portability fix",
@@ -326,7 +326,7 @@ func TestCanonicalClassesPlacementIsAccountedFor(t *testing.T) {
 //
 // Seven tables moved, the largest change of the three, so the population is the thing to watch. The
 // rule resolves a class to a property set, a selector shape, a variant string and a composition flag,
-// and a class it cannot resolve is skipped rather than reported — which is precisely how a migration
+// and a class it cannot resolve is skipped rather than reported, which is precisely how a migration
 // of this rule could go silent without a single test failing.
 //
 // Measured over the corpus, before and after:
@@ -339,7 +339,7 @@ func TestCanonicalClassesPlacementIsAccountedFor(t *testing.T) {
 //
 //   - `bg-linear-to-r`, `-to-b`, `-to-t`. The shipped prefix walk read these as root `bg` and gave
 //     them `background-color`. They are root `bg-linear`, which sets `background-image`, and
-//     `RootDeclaredProperties` has no entry for it — so the old answer was a wrong property set that
+//     `RootDeclaredProperties` has no entry for it, so the old answer was a wrong property set that
 //     would collide with any real `bg-*` color class on the same element.
 //   - `ring-inset`. Reads static first and `StaticDeclaredProperties` carries no entry, so declining
 //     is correct. The walk forced root `ring` and answered `box-shadow`; `ring` is a composing root,
@@ -347,16 +347,16 @@ func TestCanonicalClassesPlacementIsAccountedFor(t *testing.T) {
 //
 // Zero findings is the right answer on this corpus and it is asserted beside the population for the
 // reason the file comment gives: on its own it is satisfiable by a rule that resolved nothing.
-func TestConflictingClassesPlacementIsAccountedFor(t *testing.T) {
-	t.Parallel()
-	literals := livePlacementLiterals(t)
+func TestConflictingClassesPlacementIsAccountedFor(test *testing.T) {
+	test.Parallel()
+	literals := livePlacementLiterals(test)
 
 	asked, resolved, findings := 0, 0, 0
 	unresolvedExamples := map[string]int{}
 
 	for entryPoint, lists := range literals {
-		designSystem := livePlacementSystem(t, entryPoint)
-		if designSystem.Err != nil {
+		designSystem := livePlacementSystem(test, entryPoint)
+		if designSystem.Error != nil {
 			continue
 		}
 		for _, classes := range lists {
@@ -379,16 +379,16 @@ func TestConflictingClassesPlacementIsAccountedFor(t *testing.T) {
 		}
 	}
 
-	t.Logf("no-conflicting-classes: asked about %d classes, resolved %d, reported %d findings",
+	test.Logf("no-conflicting-classes: asked about %d classes, resolved %d, reported %d findings",
 		asked, resolved, findings)
 	for _, example := range livePlacementTopKeys(unresolvedExamples, 20) {
-		t.Logf("  %4d  %s", unresolvedExamples[example], example)
+		test.Logf("  %4d  %s", unresolvedExamples[example], example)
 	}
 
 	// The population guard, and this rule is the one it matters most for: seven tables moved at once,
 	// and a rule that resolved nothing would report nothing and look exactly like a clean corpus.
 	if resolved < 11000 {
-		t.Fatalf(
+		test.Fatalf(
 			"the rule resolved %d classes to a property set and the corpus resolves 11,389; a "+
 				"population that dropped this far means a whole category of class stopped resolving, "+
 				"and the finding count below would be measuring its silence",
@@ -397,7 +397,7 @@ func TestConflictingClassesPlacementIsAccountedFor(t *testing.T) {
 	}
 
 	if findings != 0 {
-		t.Errorf(
+		test.Errorf(
 			"the rule reported %d findings and the shipped rule reported 0 on this same corpus. "+
 				"Every literal here is one a real repository wrote, so a finding is a conflict "+
 				"between classes that work rather than a defect found",
@@ -440,16 +440,16 @@ func livePlacementTopKeys(counts map[string]int, limit int) []string {
 // Both halves moved up, which is the direction the change predicts: the deleted tables were generated
 // from a snapshot of one repository and were structurally blind to roots either repository added
 // afterwards, while the computed path reads each repository's own design system.
-func TestConflictingClassesPerRepositoryPlacement(t *testing.T) {
-	t.Parallel()
-	literals := livePlacementLiterals(t)
+func TestConflictingClassesPerRepositoryPlacement(test *testing.T) {
+	test.Parallel()
+	literals := livePlacementLiterals(test)
 
 	type placement struct{ asked, resolved, findings int }
 	byRepository := map[string]*placement{}
 
 	for entryPoint, lists := range literals {
-		designSystem := livePlacementSystem(t, entryPoint)
-		if designSystem.Err != nil {
+		designSystem := livePlacementSystem(test, entryPoint)
+		if designSystem.Error != nil {
 			continue
 		}
 		counts := byRepository[entryPoint]
@@ -477,7 +477,7 @@ func TestConflictingClassesPerRepositoryPlacement(t *testing.T) {
 
 	// An unset corpus has already skipped this test, so both are set and loading neither is a failure.
 	if len(byRepository) == 0 {
-		t.Fatal("both corpora are set and neither design system loaded, so there is nothing to measure")
+		test.Fatal("both corpora are set and neither design system loaded, so there is nothing to measure")
 	}
 
 	entryPoints := make([]string, 0, len(byRepository))
@@ -488,17 +488,17 @@ func TestConflictingClassesPerRepositoryPlacement(t *testing.T) {
 
 	for _, entryPoint := range entryPoints {
 		counts := byRepository[entryPoint]
-		t.Logf("%s: asked %d, resolved %d, %d findings", entryPoint, counts.asked, counts.resolved, counts.findings)
+		test.Logf("%s: asked %d, resolved %d, %d findings", entryPoint, counts.asked, counts.resolved, counts.findings)
 
 		// Per repository rather than in total, which is the point of this test. A repository whose
 		// half stopped resolving would be invisible in the aggregate if the other half grew.
 		if counts.resolved*10 < counts.asked*9 {
-			t.Errorf("%s resolved %d of %d classes; a repository resolving under nine tenths of what it "+
+			test.Errorf("%s resolved %d of %d classes; a repository resolving under nine tenths of what it "+
 				"was asked has had a whole category of class stop resolving, and its finding count "+
 				"below would be measuring that silence", entryPoint, counts.resolved, counts.asked)
 		}
 		if counts.findings != 0 {
-			t.Errorf("%s reported %d findings and every literal in this corpus is one that repository "+
+			test.Errorf("%s reported %d findings and every literal in this corpus is one that repository "+
 				"actually wrote, so a finding is a conflict between classes that work", entryPoint, counts.findings)
 		}
 	}
@@ -530,44 +530,45 @@ func TestConflictingClassesPerRepositoryPlacement(t *testing.T) {
 // Asserted against the live theme rather than a list, so a repository adding a colour joins this
 // test rather than needing to be added to it. The count is asserted non-zero because a theme that
 // resolved nothing would pass every comparison below without measuring anything.
-func TestRepositoryColorTokensReadAsColors(t *testing.T) {
-	t.Parallel()
-	var checkedRepositories, checkedTokens int
+func TestRepositoryColorTokensReadAsColors(test *testing.T) {
+	test.Parallel()
+	var checkedRepositories int
+	var checkedTokens int
 
-	for entryPoint := range livePlacementLiterals(t) {
-		designSystem := livePlacementSystem(t, entryPoint)
-		if designSystem.Err != nil {
+	for entryPoint := range livePlacementLiterals(test) {
+		designSystem := livePlacementSystem(test, entryPoint)
+		if designSystem.Error != nil {
 			continue
 		}
 		checkedRepositories++
 
 		for _, key := range designSystem.System.Theme().KeysInNamespaces([]string{"--color"}) {
 			if !valueIsColorIn("bg-"+key, "bg", designSystem.System) {
-				t.Errorf("%s declares --color-%s and `bg-%s` does not read as a colour", entryPoint, key, key)
+				test.Errorf("%s declares --color-%s and `bg-%s` does not read as a colour", entryPoint, key, key)
 			}
 			checkedTokens++
 		}
 	}
 
-	t.Logf("colour tokens read from live themes: %d across %d repositories", checkedTokens, checkedRepositories)
+	test.Logf("colour tokens read from live themes: %d across %d repositories", checkedTokens, checkedRepositories)
 
 	// An unset corpus has already skipped this test, so an empty count is a failure.
 	if checkedRepositories == 0 || checkedTokens == 0 {
-		t.Fatal("no design system loaded, so this test measured nothing")
+		test.Fatal("no design system loaded, so this test measured nothing")
 	}
 }
 
 // TestColorTokensReadAsColorsOnThePublicTheme is TestRepositoryColorTokensReadAsColors on the
 // independent theme, so it runs on every machine (#f598zk0): every `--color-*` key reads as a colour,
 // the framework palette's and the theme's own `--color-weird-*` alike.
-func TestColorTokensReadAsColorsOnThePublicTheme(t *testing.T) {
-	t.Parallel()
-	system := publicDesignSystem(t).System
+func TestColorTokensReadAsColorsOnThePublicTheme(test *testing.T) {
+	test.Parallel()
+	system := publicDesignSystem(test).System
 
 	checkedTokens, ownTokens := 0, 0
 	for _, key := range system.Theme().KeysInNamespaces([]string{"--color"}) {
 		if !valueIsColorIn("bg-"+key, "bg", system) {
-			t.Errorf("the public theme declares --color-%s and `bg-%s` does not read as a colour", key, key)
+			test.Errorf("the public theme declares --color-%s and `bg-%s` does not read as a colour", key, key)
 		}
 		checkedTokens++
 		if strings.HasPrefix(key, "weird-") {
@@ -577,7 +578,10 @@ func TestColorTokensReadAsColorsOnThePublicTheme(t *testing.T) {
 	// The theme's own keys are the ones no framework table could vouch for, so they must be among
 	// those checked, or the test proves only the palette.
 	if checkedTokens < 200 || ownTokens != 2 {
-		t.Fatalf("checked %d colour tokens, %d of them the theme's own; want the framework palette and both --color-weird keys",
-			checkedTokens, ownTokens)
+		test.Fatalf(
+			"checked %d colour tokens, %d of them the theme's own; want the framework palette and both --color-weird keys",
+			checkedTokens,
+			ownTokens,
+		)
 	}
 }

@@ -103,7 +103,7 @@ type NoGlobalAssignOptions struct {
 //
 // No fix. The repair is a new binding, which means choosing a name and deciding which later uses of
 // the old one meant the global.
-var NoGlobalAssign = rule.Rule{
+var NoGlobalAssign = rule.Rule[NoGlobalAssignOptions]{
 	Name: "no-global-assign",
 
 	// See the doc above: `Object = 1` and `function f(Object) { Object = 1; }` are textually
@@ -111,12 +111,12 @@ var NoGlobalAssign = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoGlobalAssignOptions]) rule.Listeners {
 		// An absent or malformed option block means no exceptions, which is upstream's default
 		// (`defaultOptions: [{ exceptions: [] }]`). A config typo must not silently exempt
 		// everything, so the failure direction here is "report as usual".
 		exempt := map[string]bool{}
-		if decoded, ok := rule.OptionsAs[NoGlobalAssignOptions](options); ok {
+		if decoded, ok := options.Read(); ok {
 			for _, name := range decoded.Exceptions {
 				exempt[name] = true
 			}
@@ -130,7 +130,7 @@ var NoGlobalAssign = rule.Rule{
 				// returns no symbol, so the rule goes silent either way. That is an implementation
 				// detail of a vendored compiler rather than a promise, so the guard stays and the
 				// rule does not depend on it. `no-class-assign` measured the same survivor.
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 				if exempt[node.Text()] {
@@ -141,11 +141,11 @@ var NoGlobalAssign = rule.Rule{
 				if !reference.WritesToBinding(node) {
 					return
 				}
-				if !resolvesToAGlobalThroughShorthand(ctx, node) {
+				if !resolvesToAGlobalThroughShorthand(ruleContext, node) {
 					return
 				}
 
-				ctx.ReportNode(node, rule.Message{
+				ruleContext.ReportNode(node, rule.Message{
 					Id: "noGlobalAssign",
 					Description: fmt.Sprintf(
 						"This assigns to `%s`, which is a read-only global that the whole program "+
@@ -172,11 +172,11 @@ var NoGlobalAssign = rule.Rule{
 // Delegating the file test rather than restating it keeps one answer to "is this a global" in the
 // package. `no-class-assign` reaches the same accessor for the same shape against a different
 // anchor.
-func resolvesToAGlobalThroughShorthand(ctx rule.Context, identifier *ast.Node) bool {
+func resolvesToAGlobalThroughShorthand(ruleContext rule.Context, identifier *ast.Node) bool {
 	if identifier.Parent == nil || identifier.Parent.Kind != ast.KindShorthandPropertyAssignment {
-		return resolvesToAGlobal(ctx, identifier)
+		return resolvesToAGlobal(ruleContext, identifier)
 	}
-	symbol := ctx.TypeChecker.GetShorthandAssignmentValueSymbol(identifier.Parent)
+	symbol := ruleContext.TypeChecker.GetShorthandAssignmentValueSymbol(identifier.Parent)
 	if symbol == nil || len(symbol.Declarations) == 0 {
 		return false
 	}

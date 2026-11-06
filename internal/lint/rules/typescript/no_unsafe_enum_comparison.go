@@ -38,7 +38,7 @@ var (
 // Ported from `@typescript-eslint/no-unsafe-enum-comparison`, read from the clone at
 // `packages/eslint-plugin/src/rules/no-unsafe-enum-comparison.ts` plus its judgment in
 // `src/rules/enum-utils/shared.ts`. No options (`schema: []`), two messages, `hasSuggestions: true`
-// and NO `fixable` key.
+// and no `fixable` key.
 //
 // The whole 85-case corpus was extracted from upstream's own tester and verified byte for byte
 // through a second independent extraction.
@@ -69,7 +69,7 @@ var (
 // neither side carrying an enum literal, which is the control that keeps the other three from being
 // vacuous.
 //
-// # The suggestion is NOT ported, and that is a stated decline
+// # The suggestion is not ported, and that is a stated decline
 //
 // `meta.hasSuggestions` is true and `meta.fixable` is absent, so upstream offers a repair a human
 // chooses rather than one the edit engine applies. 16 corpus cases carry one.
@@ -78,22 +78,22 @@ var (
 // `getEnumKeyForLiteral`: it matches a static value against each enum literal, then reconstructs a
 // source-level name from the member's declaration, with three spellings depending on whether the
 // member name is an identifier, a string literal, or a computed property. Reconstructing a
-// REFERENCE rather than editing a span is the shape this repository has repeatedly got wrong, and
+// reference rather than editing a span is the shape this repository has repeatedly got wrong, and
 // `ReportNodeWithSuggestions` would need each of those three spellings pinned separately.
 //
 // Reporting without the suggestion is the subset that can be shown correct. The finding is what
 // carries the value here; the suggestion is a convenience, and a wrong one rewrites a comparison
 // into a different comparison. Recorded rather than silently omitted, and the 16 cases are in the
 // corpus waiting if somebody wants it.
-var NoUnsafeEnumComparison = rule.Rule{
+var NoUnsafeEnumComparison = rule.Rule[rule.NoOptions]{
 	Name:             "@typescript-eslint/no-unsafe-enum-comparison",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		// Declared AND guarded. `NeedsTypeChecker` governs the registration path; the harness can
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		// Declared and guarded. `NeedsTypeChecker` governs the registration path; the harness can
 		// still build a `rule.Context` by hand, and `TestNoRegisteredRuleCrashesOnAbsentOptionalNodes`
 		// does exactly that. Guarding in `Run` declines the file once rather than once per node.
-		if ctx.TypeChecker == nil {
+		if ruleContext.TypeChecker == nil {
 			return nil
 		}
 
@@ -110,10 +110,10 @@ var NoUnsafeEnumComparison = rule.Rule{
 				if !noUnsafeEnumComparisonIsComparisonOperator(expression.OperatorToken.Kind) {
 					return
 				}
-				leftType := ctx.TypeChecker.GetTypeAtLocation(expression.Left)
-				rightType := ctx.TypeChecker.GetTypeAtLocation(expression.Right)
-				if noUnsafeEnumComparisonIsMismatched(ctx.TypeChecker, leftType, rightType) {
-					ctx.ReportNode(node, messageNoUnsafeEnumComparisonMismatchedCondition)
+				leftType := ruleContext.TypeChecker.GetTypeAtLocation(expression.Left)
+				rightType := ruleContext.TypeChecker.GetTypeAtLocation(expression.Right)
+				if noUnsafeEnumComparisonIsMismatched(ruleContext.TypeChecker, leftType, rightType) {
+					ruleContext.ReportNode(node, messageNoUnsafeEnumComparisonMismatchedCondition)
 				}
 			},
 
@@ -130,10 +130,10 @@ var NoUnsafeEnumComparison = rule.Rule{
 				if switchStatement == nil {
 					return
 				}
-				leftType := ctx.TypeChecker.GetTypeAtLocation(switchStatement.Expression)
-				rightType := ctx.TypeChecker.GetTypeAtLocation(clause.Expression)
-				if noUnsafeEnumComparisonIsMismatched(ctx.TypeChecker, leftType, rightType) {
-					ctx.ReportNode(node, messageNoUnsafeEnumComparisonMismatchedCase)
+				leftType := ruleContext.TypeChecker.GetTypeAtLocation(switchStatement.Expression)
+				rightType := ruleContext.TypeChecker.GetTypeAtLocation(clause.Expression)
+				if noUnsafeEnumComparisonIsMismatched(ruleContext.TypeChecker, leftType, rightType) {
+					ruleContext.ReportNode(node, messageNoUnsafeEnumComparisonMismatchedCase)
 				}
 			},
 		}
@@ -143,7 +143,7 @@ var NoUnsafeEnumComparison = rule.Rule{
 // noUnsafeEnumComparisonIsComparisonOperator answers upstream's operator selector.
 //
 // The selector is `[operator=/^[<>!=]?={0,2}$/]`, and the `{0,2}` is the part to read carefully:
-// the `=` group may be EMPTY, so a bare `<` and a bare `>` both match. An earlier version of this
+// the `=` group may be empty, so a bare `<` and a bare `>` both match. An earlier version of this
 // function excluded them, with a doc comment asserting they were not matched -- which was an
 // argument rather than a measurement, and it was wrong.
 //
@@ -211,7 +211,7 @@ func noUnsafeEnumComparisonIsMismatched(
 
 	// Gate two: the two sides share an enum type. `Fruit.Apple === Fruit.Banana`.
 	//
-	// Compared by POINTER identity, which is what upstream's `Set.has` does on `ts.Type` objects.
+	// Compared by pointer identity, which is what upstream's `Set.has` does on `ts.Type` objects.
 	// The checker interns one type object per enum per program, so identity is the right test and a
 	// structural comparison would be both slower and wrong for two enums with identical members.
 	rightEnumSet := map[*checker.Type]bool{}
@@ -238,16 +238,25 @@ func noUnsafeEnumComparisonIsMismatched(
 		}
 	}
 
-	// Gate four: the actual violation. One side carries an enum whose VALUE kind matches the other
+	// Gate four: the actual violation. One side carries an enum whose value kind matches the other
 	// side's primitive kind, which is what makes the comparison type-check while meaning nothing.
 	return noUnsafeEnumComparisonTypeViolates(leftTypeParts, rightType) ||
 		noUnsafeEnumComparisonTypeViolates(rightTypeParts, leftType)
 }
 
+// noUnsafeEnumValueKind is what an enum member's value is, if the type is an enum at all.
+type noUnsafeEnumValueKind int
+
+const (
+	noUnsafeEnumValueNone noUnsafeEnumValueKind = iota
+	noUnsafeEnumValueNumber
+	noUnsafeEnumValueString
+)
+
 // noUnsafeEnumComparisonTypeViolates answers upstream's `typeViolates`.
 //
 // A number-valued enum on one side against a number-like type on the other, or the string pair.
-// Note it is the enum's VALUE kind that matters rather than the enum itself: a string enum compared
+// Note it is the enum's value kind that matters rather than the enum itself: a string enum compared
 // against a number is not this rule's business, because TypeScript already rejects it.
 func noUnsafeEnumComparisonTypeViolates(leftTypeParts []*checker.Type, rightType *checker.Type) bool {
 	sawNumberEnum := false
@@ -269,7 +278,7 @@ func noUnsafeEnumComparisonTypeViolates(leftTypeParts []*checker.Type, rightType
 // noUnsafeEnumComparisonIsPrimitiveLike answers upstream's `isNumberLike` and `isStringLike`, which
 // differ only in the flag they carry.
 //
-// The shape is EVERY union constituent, SOME intersection constituent -- and testing the flag on
+// The shape is every union constituent, some intersection constituent -- and testing the flag on
 // the composite type instead is the defect this replaced. Two shapes make the difference visible,
 // and both are in the corpus:
 //
@@ -281,11 +290,11 @@ func noUnsafeEnumComparisonTypeViolates(leftTypeParts []*checker.Type, rightType
 //	                  StringLike. Corpus invalid[41] through invalid[43].
 //
 // The asymmetry between the two quantifiers is upstream's and is not arbitrary. A union is
-// number-like only if EVERY branch is, because any branch that is not gives the value a way to be
-// something else. An intersection is number-like if ANY constituent is, because an intersection is
+// number-like only if every branch is, because any branch that is not gives the value a way to be
+// something else. An intersection is number-like if any constituent is, because an intersection is
 // all of its parts at once and `number & {}` is still a number.
-func noUnsafeEnumComparisonIsPrimitiveLike(t *checker.Type, flag checker.TypeFlags) bool {
-	unionParts := type_checking.UnionTypeParts(t)
+func noUnsafeEnumComparisonIsPrimitiveLike(subjectType *checker.Type, flag checker.TypeFlags) bool {
+	unionParts := type_checking.UnionTypeParts(subjectType)
 	if len(unionParts) == 0 {
 		return false
 	}
@@ -308,25 +317,16 @@ func noUnsafeEnumComparisonIsPrimitiveLike(t *checker.Type, flag checker.TypeFla
 	return true
 }
 
-// noUnsafeEnumValueKind is what an enum member's value is, if the type is an enum at all.
-type noUnsafeEnumValueKind int
-
-const (
-	noUnsafeEnumValueNone noUnsafeEnumValueKind = iota
-	noUnsafeEnumValueNumber
-	noUnsafeEnumValueString
-)
-
 // noUnsafeEnumComparisonEnumValueKind answers upstream's `getEnumValueType`.
 //
 // Upstream returns `ts.TypeFlags.Number` or `ts.TypeFlags.String` and uses them as set members,
 // which reads as a flag test and is really a three-valued answer. Named as one here, because
 // returning a flag that is never tested as a flag invites the next reader to mask against it.
-func noUnsafeEnumComparisonEnumValueKind(t *checker.Type) noUnsafeEnumValueKind {
-	if !type_checking.IsTypeFlagSet(t, checker.TypeFlagsEnumLike) {
+func noUnsafeEnumComparisonEnumValueKind(subjectType *checker.Type) noUnsafeEnumValueKind {
+	if !type_checking.IsTypeFlagSet(subjectType, checker.TypeFlagsEnumLike) {
 		return noUnsafeEnumValueNone
 	}
-	if type_checking.IsTypeFlagSet(t, checker.TypeFlagsNumberLiteral) {
+	if type_checking.IsTypeFlagSet(subjectType, checker.TypeFlagsNumberLiteral) {
 		return noUnsafeEnumValueNumber
 	}
 	return noUnsafeEnumValueString
@@ -334,17 +334,17 @@ func noUnsafeEnumComparisonEnumValueKind(t *checker.Type) noUnsafeEnumValueKind 
 
 // noUnsafeEnumComparisonEnumTypes answers upstream's `getEnumTypes`.
 //
-// The enum literals in a type, mapped to the enums that DECLARE them. `Fruit.Apple` yields `Fruit`,
+// The enum literals in a type, mapped to the enums that declare them. `Fruit.Apple` yields `Fruit`,
 // which is what makes gate two work: two members of one enum share a base type and compare safely.
 //
 // # Which reading of `isTypeFlagSet` this needs, and why the answer differs by call site
 //
-// Upstream imports TWO functions of that name into `enum-utils/shared.ts` and uses each
+// Upstream imports two functions of that name into `enum-utils/shared.ts` and uses each
 // deliberately. `../../util`'s decomposes a union and ORs its constituents' flags; `tsutils`' reads
 // the type's own flags. `getEnumLiterals` uses the first, `getEnumValueType` uses the second, and
 // the file imports both on purpose.
 //
-// Our `type_checking.IsTypeFlagSet` is the own-flags reading, so reaching for it BY NAME at both
+// Our `type_checking.IsTypeFlagSet` is the own-flags reading, so reaching for it by name at both
 // sites would be wrong at one of them. Measured rather than reasoned, on `Fruit.Apple | Veg.Leek`:
 //
 //	whole type, own flags     false      <- what our helper answers on the union
@@ -353,15 +353,15 @@ func noUnsafeEnumComparisonEnumValueKind(t *checker.Type) noUnsafeEnumValueKind 
 //
 // The loop is what makes it correct here: iterating `UnionTypeParts` first and testing each part
 // reaches the same answer as upstream's union-decomposing helper, because decomposing is exactly
-// what the loop already does. And `noUnsafeEnumComparisonEnumValueKind` is only ever called ON a
+// what the loop already does. And `noUnsafeEnumComparisonEnumValueKind` is only ever called on a
 // constituent, from `typeViolates`, so the own-flags reading is the right one there and matches
 // upstream's deliberate `tsutils` call.
 //
 // So both sites agree with upstream for different reasons, and neither would if the helper were
 // swapped for the other reading. `TestNoUnsafeEnumComparisonReadsUnionsConstituentwise` pins it.
-func noUnsafeEnumComparisonEnumTypes(typeChecker *checker.Checker, t *checker.Type) []*checker.Type {
+func noUnsafeEnumComparisonEnumTypes(typeChecker *checker.Checker, subjectType *checker.Type) []*checker.Type {
 	var enumTypes []*checker.Type
-	for part := range type_checking.UnionTypePartsSeq(t) {
+	for part := range type_checking.UnionTypePartsSequence(subjectType) {
 		if !type_checking.IsTypeFlagSet(part, checker.TypeFlagsEnumLiteral) {
 			continue
 		}
@@ -372,21 +372,21 @@ func noUnsafeEnumComparisonEnumTypes(typeChecker *checker.Checker, t *checker.Ty
 
 // noUnsafeEnumComparisonBaseEnumType answers upstream's `getBaseEnumType`.
 //
-// Given an enum MEMBER type, returns the type of the enum that declares it; given anything else,
+// Given an enum member type, returns the type of the enum that declares it; given anything else,
 // returns it unchanged. Upstream asserts the symbol is non-null with a `!`; here the nil is checked,
-// because the walk recovers per FILE rather than per rule and one nil dereference costs every rule
+// because the walk recovers per file rather than per rule and one nil dereference costs every rule
 // its verdict on that file.
-func noUnsafeEnumComparisonBaseEnumType(typeChecker *checker.Checker, t *checker.Type) *checker.Type {
-	symbol := checker.Type_symbol(t)
+func noUnsafeEnumComparisonBaseEnumType(typeChecker *checker.Checker, subjectType *checker.Type) *checker.Type {
+	symbol := checker.Type_symbol(subjectType)
 	if symbol == nil {
-		return t
+		return subjectType
 	}
 	if !type_checking.IsSymbolFlagSet(symbol, ast.SymbolFlagsEnumMember) {
-		return t
+		return subjectType
 	}
 	declaration := symbol.ValueDeclaration
 	if declaration == nil || declaration.Parent == nil {
-		return t
+		return subjectType
 	}
 	return typeChecker.GetTypeAtLocation(declaration.Parent)
 }

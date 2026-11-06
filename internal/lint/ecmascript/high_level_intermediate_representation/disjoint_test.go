@@ -19,15 +19,20 @@ import (
 // Typed for the same reason `rangesFor` is: a checker-less lowering never emits `StoreContext`, and
 // this pass reads ranges that rule widens. A plain harness would make several assertions below pass
 // vacuously.
-func disjointFor(t *testing.T, source string) (*Function, *DisjointSet) {
-	t.Helper()
-	function, ranges := rangesFor(t, source)
+func disjointFor(test *testing.T, source string) (*Function, *DisjointSet) {
+	test.Helper()
+	function, ranges := rangesFor(test, source)
 	return function, FindDisjointMutableValuesWithRanges(function, ranges)
 }
 
-// classOfName returns the sorted class containing the LAST value a named binding takes.
-func classOfName(t *testing.T, function *Function, set *DisjointSet, name string) []static_single_assignment.IdentifierId {
-	t.Helper()
+// classOfName returns the sorted class containing the last value a named binding takes.
+func classOfName(
+	test *testing.T,
+	function *Function,
+	set *DisjointSet,
+	name string,
+) []static_single_assignment.IdentifierId {
+	test.Helper()
 	var target static_single_assignment.IdentifierId
 	found := false
 	for id, identifier := range function.Identifiers {
@@ -39,7 +44,7 @@ func classOfName(t *testing.T, function *Function, set *DisjointSet, name string
 		}
 	}
 	if !found {
-		t.Fatalf("no identifier named %q, so this test measured nothing", name)
+		test.Fatalf("no identifier named %q, so this test measured nothing", name)
 	}
 	for _, class := range set.Sets() {
 		for _, member := range class {
@@ -59,25 +64,23 @@ func classOfName(t *testing.T, function *Function, set *DisjointSet, name string
 //
 // These nine cases were not invented. They were run through React 7.1.1's own `DisjointSet`, reached
 // by copying the development bundle and appending an export inside its IIFE, and this table is the
-// output that produced. All nine agreed on the partition AND on the representative, which is the
+// output that produced. All nine agreed on the partition and on the representative, which is the
 // half that would otherwise differ silently: a union-find that picks a different root still answers
 // "are these two together" correctly while handing every consumer a different key.
 //
 // The cases are chosen to separate implementations rather than to confirm one. `twoRootsMerge` and
-// `longChainMerge` merge two ALREADY-ESTABLISHED classes, which is the only path that exercises the
+// `longChainMerge` merge two already-established classes, which is the only path that exercises the
 // chain-rewriting loop inside `Union`; a naive implementation that simply repoints the item and not
 // its ancestors passes every other case here.
-func TestDisjointSetMatchesReact(t *testing.T) {
-	t.Parallel()
+func TestDisjointSetMatchesReact(test *testing.T) {
+	test.Parallel()
 
-	const (
-		a static_single_assignment.IdentifierId = 1
-		b static_single_assignment.IdentifierId = 2
-		c static_single_assignment.IdentifierId = 3
-		d static_single_assignment.IdentifierId = 4
-		e static_single_assignment.IdentifierId = 5
-		f static_single_assignment.IdentifierId = 6
-	)
+	const itemA static_single_assignment.IdentifierId = 1
+	const itemB static_single_assignment.IdentifierId = 2
+	const itemC static_single_assignment.IdentifierId = 3
+	const itemD static_single_assignment.IdentifierId = 4
+	const itemE static_single_assignment.IdentifierId = 5
+	const itemF static_single_assignment.IdentifierId = 6
 
 	tests := []struct {
 		name     string
@@ -87,91 +90,138 @@ func TestDisjointSetMatchesReact(t *testing.T) {
 	}{
 		{
 			name:     "chain",
-			unions:   [][]static_single_assignment.IdentifierId{{a, b}, {b, c}, {c, d}},
-			wantSets: [][]static_single_assignment.IdentifierId{{a, b, c, d}},
-			wantRoot: map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{a: a, b: a, c: a, d: a},
+			unions:   [][]static_single_assignment.IdentifierId{{itemA, itemB}, {itemB, itemC}, {itemC, itemD}},
+			wantSets: [][]static_single_assignment.IdentifierId{{itemA, itemB, itemC, itemD}},
+			wantRoot: map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{
+				itemA: itemA,
+				itemB: itemA,
+				itemC: itemA,
+				itemD: itemA,
+			},
 		},
 		{
 			name:     "two established classes merge",
-			unions:   [][]static_single_assignment.IdentifierId{{a, b}, {c, d}, {a, c}},
-			wantSets: [][]static_single_assignment.IdentifierId{{a, b, c, d}},
-			wantRoot: map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{a: a, b: a, c: a, d: a},
+			unions:   [][]static_single_assignment.IdentifierId{{itemA, itemB}, {itemC, itemD}, {itemA, itemC}},
+			wantSets: [][]static_single_assignment.IdentifierId{{itemA, itemB, itemC, itemD}},
+			wantRoot: map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{
+				itemA: itemA,
+				itemB: itemA,
+				itemC: itemA,
+				itemD: itemA,
+			},
 		},
 		{
 			name:     "singleton",
-			unions:   [][]static_single_assignment.IdentifierId{{a}},
-			wantSets: [][]static_single_assignment.IdentifierId{{a}},
-			wantRoot: map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{a: a},
+			unions:   [][]static_single_assignment.IdentifierId{{itemA}},
+			wantSets: [][]static_single_assignment.IdentifierId{{itemA}},
+			wantRoot: map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{itemA: itemA},
 		},
 		{
 			name:     "repeated union is idempotent",
-			unions:   [][]static_single_assignment.IdentifierId{{a, b}, {a, b}},
-			wantSets: [][]static_single_assignment.IdentifierId{{a, b}},
-			wantRoot: map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{a: a, b: a},
+			unions:   [][]static_single_assignment.IdentifierId{{itemA, itemB}, {itemA, itemB}},
+			wantSets: [][]static_single_assignment.IdentifierId{{itemA, itemB}},
+			wantRoot: map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{
+				itemA: itemA,
+				itemB: itemA,
+			},
 		},
 		{
-			// The first element is already a NON-ROOT member of a class, so the root the union
+			// The first element is already a non-root member of a class, so the root the union
 			// adopts under is not the element passed first.
 			name:     "first element is not a root",
-			unions:   [][]static_single_assignment.IdentifierId{{a, b}, {c, d}, {b, d}},
-			wantSets: [][]static_single_assignment.IdentifierId{{a, b, c, d}},
-			wantRoot: map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{a: a, b: a, c: a, d: a},
+			unions:   [][]static_single_assignment.IdentifierId{{itemA, itemB}, {itemC, itemD}, {itemB, itemD}},
+			wantSets: [][]static_single_assignment.IdentifierId{{itemA, itemB, itemC, itemD}},
+			wantRoot: map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{
+				itemA: itemA,
+				itemB: itemA,
+				itemC: itemA,
+				itemD: itemA,
+			},
 		},
 		{
-			name:     "three way merge",
-			unions:   [][]static_single_assignment.IdentifierId{{a, b, c}, {d, e, f}, {c, d}},
-			wantSets: [][]static_single_assignment.IdentifierId{{a, b, c, d, e, f}},
-			wantRoot: map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{a: a, b: a, c: a, d: a, e: a, f: a},
+			name: "three way merge",
+			unions: [][]static_single_assignment.IdentifierId{
+				{itemA, itemB, itemC},
+				{itemD, itemE, itemF},
+				{itemC, itemD},
+			},
+			wantSets: [][]static_single_assignment.IdentifierId{{itemA, itemB, itemC, itemD, itemE, itemF}},
+			wantRoot: map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{
+				itemA: itemA,
+				itemB: itemA,
+				itemC: itemA,
+				itemD: itemA,
+				itemE: itemA,
+				itemF: itemA,
+			},
 		},
 		{
 			name:     "self union",
-			unions:   [][]static_single_assignment.IdentifierId{{a, a}},
-			wantSets: [][]static_single_assignment.IdentifierId{{a}},
-			wantRoot: map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{a: a},
+			unions:   [][]static_single_assignment.IdentifierId{{itemA, itemA}},
+			wantSets: [][]static_single_assignment.IdentifierId{{itemA}},
+			wantRoot: map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{itemA: itemA},
 		},
 		{
-			name:     "two chains merged at their tails",
-			unions:   [][]static_single_assignment.IdentifierId{{a, b}, {b, c}, {d, e}, {e, f}, {a, f}},
-			wantSets: [][]static_single_assignment.IdentifierId{{a, b, c, d, e, f}},
-			wantRoot: map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{a: a, b: a, c: a, d: a, e: a, f: a},
+			name: "two chains merged at their tails",
+			unions: [][]static_single_assignment.IdentifierId{
+				{itemA, itemB},
+				{itemB, itemC},
+				{itemD, itemE},
+				{itemE, itemF},
+				{itemA, itemF},
+			},
+			wantSets: [][]static_single_assignment.IdentifierId{{itemA, itemB, itemC, itemD, itemE, itemF}},
+			wantRoot: map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{
+				itemA: itemA,
+				itemB: itemA,
+				itemC: itemA,
+				itemD: itemA,
+				itemE: itemA,
+				itemF: itemA,
+			},
 		},
 		{
 			name:     "star",
-			unions:   [][]static_single_assignment.IdentifierId{{a, b}, {a, c}, {a, d}},
-			wantSets: [][]static_single_assignment.IdentifierId{{a, b, c, d}},
-			wantRoot: map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{a: a, b: a, c: a, d: a},
+			unions:   [][]static_single_assignment.IdentifierId{{itemA, itemB}, {itemA, itemC}, {itemA, itemD}},
+			wantSets: [][]static_single_assignment.IdentifierId{{itemA, itemB, itemC, itemD}},
+			wantRoot: map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{
+				itemA: itemA,
+				itemB: itemA,
+				itemC: itemA,
+				itemD: itemA,
+			},
 		},
 	}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
+	for _, testCase := range tests {
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			set := &DisjointSet{}
-			for _, union := range test.unions {
+			for _, union := range testCase.unions {
 				set.Union(union)
 			}
 
 			got := set.Sets()
-			if len(got) != len(test.wantSets) {
-				t.Fatalf("got %d classes, want %d: %v", len(got), len(test.wantSets), got)
+			if len(got) != len(testCase.wantSets) {
+				test.Fatalf("got %d classes, want %d: %v", len(got), len(testCase.wantSets), got)
 			}
-			for i, want := range test.wantSets {
-				if len(got[i]) != len(want) {
-					t.Fatalf("class %d is %v, want %v", i, got[i], want)
+			for wantSetIndex, want := range testCase.wantSets {
+				if len(got[wantSetIndex]) != len(want) {
+					test.Fatalf("class %d is %v, want %v", wantSetIndex, got[wantSetIndex], want)
 				}
-				for j := range want {
-					if got[i][j] != want[j] {
-						t.Fatalf("class %d is %v, want %v", i, got[i], want)
+				for index := range want {
+					if got[wantSetIndex][index] != want[index] {
+						test.Fatalf("class %d is %v, want %v", wantSetIndex, got[wantSetIndex], want)
 					}
 				}
 			}
-			for member, wantRoot := range test.wantRoot {
+			for member, wantRoot := range testCase.wantRoot {
 				root, ok := set.Find(member)
 				if !ok {
-					t.Fatalf("%d is absent from the set", member)
+					test.Fatalf("%d is absent from the set", member)
 				}
 				if root != wantRoot {
-					t.Errorf("representative of %d is %d, want %d (React picks %d)",
+					test.Errorf("representative of %d is %d, want %d (React picks %d)",
 						member, root, wantRoot, wantRoot)
 				}
 			}
@@ -183,23 +233,23 @@ func TestDisjointSetMatchesReact(t *testing.T) {
 //
 // `IdentifierId` zero is a usable value, so a `Find` returning only an id would make an absent value
 // indistinguishable from a member of class zero. Upstream returns null; the boolean is that null.
-func TestDisjointSetAbsentValueIsNotClassZero(t *testing.T) {
-	t.Parallel()
+func TestDisjointSetAbsentValueIsNotClassZero(test *testing.T) {
+	test.Parallel()
 
 	set := &DisjointSet{}
 	set.Union([]static_single_assignment.IdentifierId{0, 1})
 
 	if root, ok := set.Find(0); !ok || root != 0 {
-		t.Fatalf("value zero should be a member with root 0, got (%d, %v)", root, ok)
+		test.Fatalf("value zero should be a member with root 0, got (%d, %v)", root, ok)
 	}
 	if _, ok := set.Find(99); ok {
-		t.Fatal("value 99 was never unioned, so Find must report it absent")
+		test.Fatal("value 99 was never unioned, so Find must report it absent")
 	}
 	if got := set.RepresentativeOf(99); got != 99 {
-		t.Fatalf("RepresentativeOf(99) = %d, want 99: an unmerged value is its own representative", got)
+		test.Fatalf("RepresentativeOf(99) = %d, want 99: an unmerged value is its own representative", got)
 	}
 	if set.Has(99) {
-		t.Fatal("Has must agree with Find about membership")
+		test.Fatal("Has must agree with Find about membership")
 	}
 }
 
@@ -208,17 +258,17 @@ func TestDisjointSetAbsentValueIsNotClassZero(t *testing.T) {
 // React raises an invariant on an empty union. Every call site in this file builds the operand list
 // conditionally, so an empty list is the ordinary outcome for an instruction that entangles nothing
 // rather than a bug, and raising would turn the common case into a crash.
-func TestDisjointSetEmptyUnionIsANoOp(t *testing.T) {
-	t.Parallel()
+func TestDisjointSetEmptyUnionIsANoOp(test *testing.T) {
+	test.Parallel()
 
 	set := &DisjointSet{}
 	set.Union(nil)
 	set.Union([]static_single_assignment.IdentifierId{})
 	if set.Size() != 0 {
-		t.Fatalf("an empty union added %d members", set.Size())
+		test.Fatalf("an empty union added %d members", set.Size())
 	}
 	if set.Sets() != nil {
-		t.Fatal("an empty set has no classes")
+		test.Fatal("an empty set has no classes")
 	}
 }
 
@@ -228,15 +278,15 @@ func TestDisjointSetEmptyUnionIsANoOp(t *testing.T) {
 // and never writes to it. The difference is in the implementation rather than in what it decides,
 // and it is pinned so a later "optimization" that reuses a buffer cannot silently reintroduce the
 // aliasing hazard.
-func TestDisjointSetDoesNotMutateTheCallersSlice(t *testing.T) {
-	t.Parallel()
+func TestDisjointSetDoesNotMutateTheCallersSlice(test *testing.T) {
+	test.Parallel()
 
 	items := []static_single_assignment.IdentifierId{7, 8, 9}
 	set := &DisjointSet{}
 	set.Union(items)
 
 	if len(items) != 3 || items[0] != 7 || items[1] != 8 || items[2] != 9 {
-		t.Fatalf("Union modified the caller's slice: %v", items)
+		test.Fatalf("Union modified the caller's slice: %v", items)
 	}
 }
 
@@ -245,10 +295,10 @@ func TestDisjointSetDoesNotMutateTheCallersSlice(t *testing.T) {
 // A union-find whose path compression is wrong does not give a wrong answer, it exhausts the stack,
 // which is a silent-failure shape rather than a visible one. This builds a 10,000-long chain by
 // hand -- longer than any real function produces -- and requires the walk to return. It also asserts
-// compression actually happened, by requiring the SECOND walk to see a flat structure: without
+// compression actually happened, by requiring the second walk to see a flat structure: without
 // compression the chain would still be 10,000 deep on the way back.
-func TestDisjointFindTerminatesOnALongChain(t *testing.T) {
-	t.Parallel()
+func TestDisjointFindTerminatesOnALongChain(test *testing.T) {
+	test.Parallel()
 
 	const length = 10000
 	set := &DisjointSet{parent: map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{}}
@@ -257,20 +307,20 @@ func TestDisjointFindTerminatesOnALongChain(t *testing.T) {
 	// rather than through Union, because Union's own rewriting would flatten it and the point here
 	// is to hand Find the worst case.
 	set.parent[static_single_assignment.IdentifierId(length)] = static_single_assignment.IdentifierId(length)
-	for i := 1; i < length; i++ {
-		set.parent[static_single_assignment.IdentifierId(i)] = static_single_assignment.IdentifierId(i + 1)
+	for index := 1; index < length; index++ {
+		set.parent[static_single_assignment.IdentifierId(index)] = static_single_assignment.IdentifierId(index + 1)
 	}
 
 	root, ok := set.Find(1)
 	if !ok || root != static_single_assignment.IdentifierId(length) {
-		t.Fatalf("Find(1) = (%d, %v), want (%d, true)", root, ok, length)
+		test.Fatalf("Find(1) = (%d, %v), want (%d, true)", root, ok, length)
 	}
 
 	// Compression: every node on the walked path now points straight at the root.
-	for i := 1; i < length; i++ {
-		if set.parent[static_single_assignment.IdentifierId(i)] != static_single_assignment.IdentifierId(length) {
-			t.Fatalf("path compression left %d pointing at %d rather than the root %d",
-				i, set.parent[static_single_assignment.IdentifierId(i)], length)
+	for index := 1; index < length; index++ {
+		if set.parent[static_single_assignment.IdentifierId(index)] != static_single_assignment.IdentifierId(length) {
+			test.Fatalf("path compression left %d pointing at %d rather than the root %d",
+				index, set.parent[static_single_assignment.IdentifierId(index)], length)
 		}
 	}
 }
@@ -284,10 +334,10 @@ func TestDisjointFindTerminatesOnALongChain(t *testing.T) {
 // `items` is built, aliased into `alias`, and then mutated through the alias. The two names refer to
 // one object, so memoizing them independently would hand back a stale value, and upstream's answer
 // is to put them in one class.
-func TestDisjointUnifiesAMutatedObjectWithItsAlias(t *testing.T) {
-	t.Parallel()
+func TestDisjointUnifiesAMutatedObjectWithItsAlias(test *testing.T) {
+	test.Parallel()
 
-	function, set := disjointFor(t, `
+	function, set := disjointFor(test, `
 export function build(seed: number) {
   const items: number[] = [];
   const alias = items;
@@ -296,31 +346,31 @@ export function build(seed: number) {
 }
 `)
 
-	class := classOfName(t, function, set, "items")
+	class := classOfName(test, function, set, "items")
 	if len(class) < 2 {
-		t.Fatalf("items is in a class of %d, so nothing was unified with it: %v", len(class), class)
+		test.Fatalf("items is in a class of %d, so nothing was unified with it: %v", len(class), class)
 	}
 
-	aliasClass := classOfName(t, function, set, "alias")
+	aliasClass := classOfName(test, function, set, "alias")
 	if len(aliasClass) == 0 {
-		t.Fatal("alias is in no class at all")
+		test.Fatal("alias is in no class at all")
 	}
 	itemsRoot := set.RepresentativeOf(class[0])
 	aliasRoot := set.RepresentativeOf(aliasClass[0])
 	if itemsRoot != aliasRoot {
-		t.Errorf("items and alias have representatives %d and %d; a value mutated through its "+
+		test.Errorf("items and alias have representatives %d and %d; a value mutated through its "+
 			"alias must share one class with it", itemsRoot, aliasRoot)
 	}
 }
 
 // TestDisjointLeavesIndependentValuesApart is the two-sided half of the test above.
 //
-// Without this, a pass that unioned EVERYTHING would pass the aliasing test and read as correct. Two
+// Without this, a pass that unioned everything would pass the aliasing test and read as correct. Two
 // values that never meet must land in different classes.
-func TestDisjointLeavesIndependentValuesApart(t *testing.T) {
-	t.Parallel()
+func TestDisjointLeavesIndependentValuesApart(test *testing.T) {
+	test.Parallel()
 
-	function, set := disjointFor(t, `
+	function, set := disjointFor(test, `
 export function separate() {
   const left: number[] = [];
   left.push(1);
@@ -330,13 +380,13 @@ export function separate() {
 }
 `)
 
-	leftClass := classOfName(t, function, set, "left")
-	rightClass := classOfName(t, function, set, "right")
+	leftClass := classOfName(test, function, set, "left")
+	rightClass := classOfName(test, function, set, "right")
 	if len(leftClass) == 0 || len(rightClass) == 0 {
-		t.Fatal("one of the two values is in no class, so this test measured nothing")
+		test.Fatal("one of the two values is in no class, so this test measured nothing")
 	}
 	if set.RepresentativeOf(leftClass[0]) == set.RepresentativeOf(rightClass[0]) {
-		t.Error("left and right never alias, so they must not share a class")
+		test.Error("left and right never alias, so they must not share a class")
 	}
 }
 
@@ -346,7 +396,7 @@ export function separate() {
 // instruction: re-running `{}` produces a new identity and defeats every downstream comparison. The
 // range gate alone would leave it out, so this is what separates the two halves of that condition.
 //
-// # The allocation lands on the TEMPORARY, not on the named binding, and the first version of this
+// # The allocation lands on the temporary, not on the named binding, and the first version of this
 // # test asserted the wrong one
 //
 // Written first as "the class containing `value`", it failed, and the pass was right. Lowering emits
@@ -359,11 +409,11 @@ export function separate() {
 //
 // Asserting on the name would have been a fixture encoding the same wrong belief as a port that
 // looked for allocations on named bindings, and both would have agreed. So this anchors on the
-// instruction VALUE rather than on a name.
-func TestDisjointAllocationGetsItsOwnClass(t *testing.T) {
-	t.Parallel()
+// instruction value rather than on a name.
+func TestDisjointAllocationGetsItsOwnClass(test *testing.T) {
+	test.Parallel()
 
-	function, ranges := rangesFor(t, `
+	function, ranges := rangesFor(test, `
 export function make() {
   const value = {a: 1};
   return value;
@@ -383,22 +433,22 @@ export function make() {
 			}
 			allocations++
 
-			// The range is one wide, so the FIRST half of the gate is false here and only
+			// The range is one wide, so the first half of the gate is false here and only
 			// mayAllocate can put this value in a class. That is what makes this a test of the
 			// allocation half rather than of the range half.
 			lvalueRange := ranges.Get(instruction.LValue.Identifier)
 			if lvalueRange.End > lvalueRange.Start+1 {
-				t.Fatalf("this value's range is %+v, wider than one, so the range gate alone "+
+				test.Fatalf("this value's range is %+v, wider than one, so the range gate alone "+
 					"would admit it and this test no longer measures mayAllocate", lvalueRange)
 			}
 			if !set.Has(instruction.LValue.Identifier) {
-				t.Error("an object literal allocates, so mayAllocate must place its lvalue in a " +
+				test.Error("an object literal allocates, so mayAllocate must place its lvalue in a " +
 					"class even though its mutable range is one instruction wide")
 			}
 		}
 	}
 	if allocations == 0 {
-		t.Fatal("no ObjectExpression was lowered, so this test measured nothing")
+		test.Fatal("no ObjectExpression was lowered, so this test measured nothing")
 	}
 }
 
@@ -407,8 +457,8 @@ export function make() {
 // `mayAllocate` returns false for `Primitive`, so a plain number with a one-wide range joins no
 // class. Without this, a mayAllocate that returned true unconditionally would pass the allocation
 // test and read as correct.
-func TestDisjointPrimitiveDoesNotAllocate(t *testing.T) {
-	t.Parallel()
+func TestDisjointPrimitiveDoesNotAllocate(test *testing.T) {
+	test.Parallel()
 
 	source := `
 export function plain() {
@@ -416,7 +466,7 @@ export function plain() {
   return n;
 }
 `
-	function, ranges := rangesFor(t, source)
+	function, ranges := rangesFor(test, source)
 	set := FindDisjointMutableValuesWithRanges(function, ranges)
 
 	for _, block := range function.Blocks {
@@ -429,7 +479,7 @@ export function plain() {
 				continue
 			}
 			if mayAllocate(function, newCalleeProducers(function), instruction) {
-				t.Error("mayAllocate must be false for a Primitive; React returns false for it " +
+				test.Error("mayAllocate must be false for a Primitive; React returns false for it " +
 					"and a true here would union every constant in the function")
 			}
 			_ = set
@@ -442,8 +492,8 @@ export function plain() {
 // The expected values were produced by driving React 7.1.1's own `mayAllocate` with a synthetic
 // instruction per kind. The call cases here have no known signature, corresponding to an unresolved
 // inferred result type; represented primitive and mutable signatures are exercised separately.
-func TestDisjointMayAllocateMatchesReact(t *testing.T) {
-	t.Parallel()
+func TestDisjointMayAllocateMatchesReact(test *testing.T) {
+	test.Parallel()
 
 	tests := []struct {
 		name  string
@@ -463,7 +513,7 @@ func TestDisjointMayAllocateMatchesReact(t *testing.T) {
 		{"PropertyDelete", &PropertyDelete{}, false},
 		{"ComputedLoad", &ComputedLoad{}, false},
 		{"ComputedDelete", &ComputedDelete{}, false},
-		{"Primitive", &Primitive{}, false},
+		{"Primitive", &Primitive{Value: PrimitiveUndefined{}}, false},
 		{"TemplateLiteral", &TemplateLiteral{}, false},
 		{"JsxText", &JsxText{}, false},
 		{"UnaryExpression", &UnaryExpression{}, false},
@@ -499,11 +549,15 @@ func TestDisjointMayAllocateMatchesReact(t *testing.T) {
 		{"TaggedTemplateExpression", &TaggedTemplateExpression{}, true},
 	}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
-			if got := mayAllocate(nil, newCalleeProducers(nil), &Instruction{Value: test.value}); got != test.want {
-				t.Errorf("mayAllocate(%s) = %v, want %v", test.name, got, test.want)
+	for _, testCase := range tests {
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			if got := mayAllocate(
+				nil,
+				newCalleeProducers(nil),
+				&Instruction{Value: testCase.value},
+			); got != testCase.want {
+				test.Errorf("mayAllocate(%s) = %v, want %v", testCase.name, got, testCase.want)
 			}
 		})
 	}
@@ -513,10 +567,10 @@ func TestDisjointMayAllocateMatchesReact(t *testing.T) {
 // React scopes a call result unless type inference proves it primitive. The effect signature table
 // is the source of that same result-kind fact in this IR: method, global, and tagged primitive
 // results are excluded, while mutable and unresolved results allocate.
-func TestDisjointCallAllocationUsesTheEffectSignature(t *testing.T) {
-	t.Parallel()
+func TestDisjointCallAllocationUsesTheEffectSignature(test *testing.T) {
+	test.Parallel()
 
-	function, _ := rangesFor(t, `
+	function, _ := rangesFor(test, `
 export function classify(list: number[]) {
   const methodPrimitive = list.includes(1);
   const globalPrimitive = Number(list.length);
@@ -549,12 +603,12 @@ export function classify(list: number[]) {
 		}
 		seen[name] = true
 		if got := mayAllocate(function, newCalleeProducers(function), instruction); got != expected {
-			t.Errorf("mayAllocate(%s) = %v, want %v", name, got, expected)
+			test.Errorf("mayAllocate(%s) = %v, want %v", name, got, expected)
 		}
 	}
 	for name := range want {
 		if !seen[name] {
-			t.Errorf("fixture did not lower a %s call", name)
+			test.Errorf("fixture did not lower a %s call", name)
 		}
 	}
 }
@@ -564,8 +618,8 @@ export function classify(list: number[]) {
 // React's `mayAllocate` for a Destructure is `doesPatternContainSpreadElement`. Measured against the
 // real function: a plain object pattern is false, a pattern with a rest element is true. A rest
 // binding allocates a fresh object to hold the remainder; a plain binding only names existing values.
-func TestDisjointDestructureAllocatesOnlyWithSpread(t *testing.T) {
-	t.Parallel()
+func TestDisjointDestructureAllocatesOnlyWithSpread(test *testing.T) {
+	test.Parallel()
 
 	place := Place{Identifier: 1}
 
@@ -573,7 +627,7 @@ func TestDisjointDestructureAllocatesOnlyWithSpread(t *testing.T) {
 		Properties: []ObjectPatternProperty{{Key: "a", Value: &PlacePattern{Place: place}}},
 	}}
 	if mayAllocate(nil, newCalleeProducers(nil), &Instruction{Value: plain}) {
-		t.Error("a destructure with no rest element does not allocate")
+		test.Error("a destructure with no rest element does not allocate")
 	}
 
 	spread := &Destructure{Pattern: &ObjectPattern{
@@ -581,12 +635,12 @@ func TestDisjointDestructureAllocatesOnlyWithSpread(t *testing.T) {
 		Rest:       &place,
 	}}
 	if !mayAllocate(nil, newCalleeProducers(nil), &Instruction{Value: spread}) {
-		t.Error("a destructure with a rest element allocates the remainder object")
+		test.Error("a destructure with a rest element allocates the remainder object")
 	}
 
 	arraySpread := &Destructure{Pattern: &ArrayPattern{Rest: &place}}
 	if !mayAllocate(nil, newCalleeProducers(nil), &Instruction{Value: arraySpread}) {
-		t.Error("an array pattern with a rest element allocates too")
+		test.Error("an array pattern with a rest element allocates too")
 	}
 
 	// Nested, because `const {a: {...rest}} = o` allocates just as much as the flat form.
@@ -597,7 +651,7 @@ func TestDisjointDestructureAllocatesOnlyWithSpread(t *testing.T) {
 		}},
 	}}
 	if !mayAllocate(nil, newCalleeProducers(nil), &Instruction{Value: nested}) {
-		t.Error("a rest element nested inside a pattern still allocates")
+		test.Error("a rest element nested inside a pattern still allocates")
 	}
 }
 
@@ -606,10 +660,10 @@ func TestDisjointDestructureAllocatesOnlyWithSpread(t *testing.T) {
 // Every other operand joins a class only when its range says it is still mutable. A method call's
 // property joins on its identity alone, with no range test at all (React line 32411). It is the
 // single exception in the pass and a reader would otherwise assume the guard was forgotten.
-func TestDisjointMethodCallAddsThePropertyUnconditionally(t *testing.T) {
-	t.Parallel()
+func TestDisjointMethodCallAddsThePropertyUnconditionally(test *testing.T) {
+	test.Parallel()
 
-	function, ranges := rangesFor(t, `
+	function, ranges := rangesFor(test, `
 export function call(target: {run(): void}) {
   target.run();
 }
@@ -629,24 +683,24 @@ export function call(target: {run(): void}) {
 			}
 			properties++
 			if !set.Has(methodCall.Property.Identifier) {
-				t.Errorf("the property of a method call joins its class unconditionally, but %d "+
+				test.Errorf("the property of a method call joins its class unconditionally, but %d "+
 					"is absent from the set", methodCall.Property.Identifier)
 			}
 		}
 	}
 	if properties == 0 {
-		t.Fatal("no MethodCall was lowered, so this test measured nothing")
+		test.Fatal("no MethodCall was lowered, so this test measured nothing")
 	}
 }
 
 // TestDisjointPhiUsesReactsTwoTermTest pins the phi predicate and the divergence from oxc.
 //
 // React's test is `start + 1 !== end && end > firstInstr`. The first term is written that way rather
-// than as `end > start + 1` because on an UNSET range, both fields zero, `start + 1 !== end` is true
+// than as `end > start + 1` because on an unset range, both fields zero, `start + 1 !== end` is true
 // while `end > start + 1` is false; the second term is what rejects it. Transcribing the tidier form
 // would change which phis are considered, so both spellings are exercised here.
-func TestDisjointPhiUsesReactsTwoTermTest(t *testing.T) {
-	t.Parallel()
+func TestDisjointPhiUsesReactsTwoTermTest(test *testing.T) {
+	test.Parallel()
 
 	tests := []struct {
 		name       string
@@ -657,22 +711,27 @@ func TestDisjointPhiUsesReactsTwoTermTest(t *testing.T) {
 		{"unset range is rejected by the second term", mutation_aliasing.MutableRange{Start: 0, End: 0}, 5, false},
 		{"exactly one wide is rejected by the first term", mutation_aliasing.MutableRange{Start: 3, End: 4}, 1, false},
 		{"wider than one and ending after the block fires", mutation_aliasing.MutableRange{Start: 3, End: 9}, 5, true},
-		{"wider than one but ending before the block does not", mutation_aliasing.MutableRange{Start: 1, End: 3}, 5, false},
+		{
+			"wider than one but ending before the block does not",
+			mutation_aliasing.MutableRange{Start: 1, End: 3},
+			5,
+			false,
+		},
 		{"ending exactly at the first order does not fire", mutation_aliasing.MutableRange{Start: 1, End: 5}, 5, false},
 	}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
-			got := test.phiRange.Start+1 != test.phiRange.End && test.phiRange.End > test.firstOrder
-			if got != test.want {
-				t.Errorf("React's two-term test on %+v with first order %d = %v, want %v",
-					test.phiRange, test.firstOrder, got, test.want)
+	for _, testCase := range tests {
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			got := testCase.phiRange.Start+1 != testCase.phiRange.End && testCase.phiRange.End > testCase.firstOrder
+			if got != testCase.want {
+				test.Errorf("React's two-term test on %+v with first order %d = %v, want %v",
+					testCase.phiRange, testCase.firstOrder, got, testCase.want)
 			}
 			// The tidier spelling disagrees on the unset range, which is why upstream's is kept.
-			tidier := test.phiRange.End > test.phiRange.Start+1 && test.phiRange.End > test.firstOrder
-			if test.phiRange == (mutation_aliasing.MutableRange{Start: 0, End: 0}) && tidier == got {
-				t.Log("note: on this input both spellings agree only because the second term rejects")
+			tidier := testCase.phiRange.End > testCase.phiRange.Start+1 && testCase.phiRange.End > testCase.firstOrder
+			if testCase.phiRange == (mutation_aliasing.MutableRange{Start: 0, End: 0}) && tidier == got {
+				test.Log("note: on this input both spellings agree only because the second term rejects")
 			}
 		})
 	}
@@ -683,10 +742,10 @@ func TestDisjointPhiUsesReactsTwoTermTest(t *testing.T) {
 // A counter reassigned in a loop produces a phi whose operands are the pre-loop and post-loop
 // values. When the phi's range is wider than one and outlives its block, upstream unions the phi,
 // its declaration and every operand, so the loop's scope owns the whole variable rather than half.
-func TestDisjointUnifiesALoopCarriedPhi(t *testing.T) {
-	t.Parallel()
+func TestDisjointUnifiesALoopCarriedPhi(test *testing.T) {
+	test.Parallel()
 
-	function, ranges := rangesFor(t, `
+	function, ranges := rangesFor(test, `
 export function count(limit: number) {
   const seen: number[] = [];
   let total = 0;
@@ -699,7 +758,8 @@ export function count(limit: number) {
 `)
 	set := FindDisjointMutableValuesWithRanges(function, ranges)
 
-	var phis, fired int
+	var phis int
+	var fired int
 	for _, block := range function.Blocks {
 		firstOrder := mutation_aliasing.BlockFirstOrder(rangeGraph{}, function, block)
 		for _, phi := range block.Phis {
@@ -708,13 +768,13 @@ export function count(limit: number) {
 			if phiRange.Start+1 != phiRange.End && phiRange.End > firstOrder {
 				fired++
 				if !set.Has(phi.Place.Identifier) {
-					t.Errorf("phi %d satisfies React's test but is absent from the set",
+					test.Errorf("phi %d satisfies React's test but is absent from the set",
 						phi.Place.Identifier)
 				}
 				for _, blockId := range PhiOperandsInOrder(phi) {
 					operand := phi.Operands.At(blockId).Identifier
 					if set.RepresentativeOf(operand) != set.RepresentativeOf(phi.Place.Identifier) {
-						t.Errorf("phi %d and its operand %d must share a class",
+						test.Errorf("phi %d and its operand %d must share a class",
 							phi.Place.Identifier, operand)
 					}
 				}
@@ -722,10 +782,10 @@ export function count(limit: number) {
 		}
 	}
 	if phis == 0 {
-		t.Fatal("the loop produced no phis, so this test measured nothing")
+		test.Fatal("the loop produced no phis, so this test measured nothing")
 	}
 	if fired == 0 {
-		t.Fatal("no phi satisfied React's test, so the union branch was never exercised and this " +
+		test.Fatal("no phi satisfied React's test, so the union branch was never exercised and this " +
 			"test would pass over a pass that did nothing")
 	}
 }
@@ -734,25 +794,25 @@ export function count(limit: number) {
 //
 // `appendMutableOperand` is `isMutable(instr, operand) && operand.mutableRange.start > 0`, and a
 // mutation sweep found that neither half was pinned by any other test here. Both survived, and they
-// survived for OPPOSITE reasons, which is why they are separated below rather than covered by one
+// survived for opposite reasons, which is why they are separated below rather than covered by one
 // assertion.
 //
-// Dropping `Start > 0` is EQUIVALENT on this tree, measured rather than argued: the two halves
+// Dropping `Start > 0` is equivalent on this tree, measured rather than argued: the two halves
 // disagree in that direction on 0 of 26,006 operand reads across 200 corpus files, because `Contains`
 // is already false for an unset range and this lowering opens no range at order zero. It is kept
 // because upstream carries it and because a range legitimately starting at zero would separate them,
 // but no fixture can catch its removal and inventing one would be a test asserting nothing.
 //
-// Dropping `Contains` is NOT equivalent: the two disagree in that direction on 11,105 of the same
-// 26,006 reads, and it changes the answer. The check below is on the PARTITION rather than on any
+// Dropping `Contains` is not equivalent: the two disagree in that direction on 11,105 of the same
+// 26,006 reads, and it changes the answer. The check below is on the partition rather than on any
 // single membership, because that is the layer where the difference appears -- the loop fixture
 // above already reaches the mutation and cannot see it, since it asserts phi membership and never
 // the shape of the whole result. Measured on this input: the real pass produces 16 members in 2
 // classes and the Contains-free variant produces 24 in 6.
-func TestDisjointOperandGateNeedsBothHalves(t *testing.T) {
-	t.Parallel()
+func TestDisjointOperandGateNeedsBothHalves(test *testing.T) {
+	test.Parallel()
 
-	function, ranges := rangesFor(t, `
+	function, ranges := rangesFor(test, `
 export function loopy(limit: number) {
   const seen: number[] = [];
   let total = 0;
@@ -765,7 +825,7 @@ export function loopy(limit: number) {
 `)
 	set := FindDisjointMutableValuesWithRanges(function, ranges)
 
-	// An operand that is settled by this point must NOT be dragged into a class through this
+	// An operand that is settled by this point must not be dragged into a class through this
 	// instruction. Dropping `Contains` admits exactly those, which both inflates the member count
 	// and fragments the partition into more, smaller classes. React's reverse-postorder traversal
 	// puts loop bodies before their continuations. Immutable Assign refinement then leaves the two
@@ -773,12 +833,12 @@ export function loopy(limit: number) {
 	// mutant produces 22 in 7; IMMUTABLE_ALIAS_EDGES.md records the removed members.
 	classes := set.Sets()
 	if got := len(classes); got != 3 {
-		t.Errorf("this function forms %d classes, want 3. Dropping the `Contains` half of the "+
+		test.Errorf("this function forms %d classes, want 3. Dropping the `Contains` half of the "+
 			"operand gate produces 7, because every settled operand joins a class it has no "+
 			"business in: %v", got, classes)
 	}
 	if got := set.Size(); got != 12 {
-		t.Errorf("this function unifies %d values, want 12. Dropping the `Contains` half of the "+
+		test.Errorf("this function unifies %d values, want 12. Dropping the `Contains` half of the "+
 			"operand gate produces 22.", got)
 	}
 
@@ -792,28 +852,28 @@ export function loopy(limit: number) {
 		}
 	}
 	if !multiMember {
-		t.Errorf("all classes are singletons; the pass unified nothing: %v", classes)
+		test.Errorf("all classes are singletons; the pass unified nothing: %v", classes)
 	}
 }
 
 // TestDisjointPhiUnionIncludesTheDeclaration pins the declaration operand of the phi union.
 //
-// A firing phi unions itself, its operands, AND the value its source binding was first declared as
+// A firing phi unions itself, its operands, and the value its source binding was first declared as
 // (React line 32393). That third member is the one a reader is most likely to drop as redundant,
 // because the declaration is usually already pulled into the class through some other instruction.
 //
-// It is NOT always redundant, and the measurement is what pins that. A mutation removing it survived
+// It is not always redundant, and the measurement is what pins that. A mutation removing it survived
 // every other test here. Across 200 corpus files the branch is reached by 60 firing phis, and on
-// exactly ONE function of 343 the partition differs by the declaration member. That is a real
+// exactly one function of 343 the partition differs by the declaration member. That is a real
 // distinguishing case rather than an equivalence, and this reproduces its shape minimally: a
-// binding DECLARED without an initializer, assigned separately, then reassigned in a loop. The
+// binding declared without an initializer, assigned separately, then reassigned in a loop. The
 // declared value is a member no other path contributes.
 //
 // Assert that relationship directly rather than pinning the size of the whole partition. Call
 // allocation and alias refinement legitimately add or remove unrelated members; neither may make a
 // phi stop sharing a class with the first value of its declaration.
-func TestDisjointPhiUnionIncludesTheDeclaration(t *testing.T) {
-	t.Parallel()
+func TestDisjointPhiUnionIncludesTheDeclaration(test *testing.T) {
+	test.Parallel()
 
 	tests := []struct {
 		name    string
@@ -854,10 +914,10 @@ export function gather(limit: number) {
 		},
 	}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
-			function, ranges := rangesFor(t, test.source)
+	for _, testCase := range tests {
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			function, ranges := rangesFor(test, testCase.source)
 			set := FindDisjointMutableValuesWithRanges(function, ranges)
 
 			var declaration static_single_assignment.IdentifierId
@@ -871,14 +931,14 @@ export function gather(limit: number) {
 					continue
 				}
 				identifier := function.Identifiers[value.LValue.Identifier]
-				if identifier != nil && identifier.Name == test.binding {
+				if identifier != nil && identifier.Name == testCase.binding {
 					declaration = value.LValue.Identifier
 					declarationFound = true
 					break
 				}
 			}
 			if !declarationFound {
-				t.Fatalf("no DeclareLocal for %q", test.binding)
+				test.Fatalf("no DeclareLocal for %q", testCase.binding)
 			}
 
 			var phi static_single_assignment.IdentifierId
@@ -890,7 +950,7 @@ export function gather(limit: number) {
 				}
 				for _, candidate := range block.Phis {
 					identifier := function.Identifiers[candidate.Place.Identifier]
-					if identifier != nil && identifier.Name == test.binding {
+					if identifier != nil && identifier.Name == testCase.binding {
 						phi = candidate.Place.Identifier
 						phiFound = true
 						phiBlockFirstOrder = mutation_aliasing.BlockFirstOrder(rangeGraph{}, function, block)
@@ -902,25 +962,25 @@ export function gather(limit: number) {
 				}
 			}
 			if !phiFound {
-				t.Fatalf("no loop phi for %q", test.binding)
+				test.Fatalf("no loop phi for %q", testCase.binding)
 			}
 			phiRange := ranges.Get(phi)
 			if phiRange.Start+1 == phiRange.End || phiRange.End <= phiBlockFirstOrder {
-				t.Fatalf("phi %d for %q does not reach the declaration-union branch: range=%v "+
-					"blockFirstOrder=%d", phi, test.binding, phiRange, phiBlockFirstOrder)
+				test.Fatalf("phi %d for %q does not reach the declaration-union branch: range=%v "+
+					"blockFirstOrder=%d", phi, testCase.binding, phiRange, phiBlockFirstOrder)
 			}
 
 			if !set.Has(declaration) {
-				t.Errorf("declared value %d for %q is absent from every class; the firing phi must "+
-					"union the first value of its declaration", declaration, test.binding)
+				test.Errorf("declared value %d for %q is absent from every class; the firing phi must "+
+					"union the first value of its declaration", declaration, testCase.binding)
 			}
 			if !set.Has(phi) {
-				t.Errorf("phi %d for %q is absent from every class", phi, test.binding)
+				test.Errorf("phi %d for %q is absent from every class", phi, testCase.binding)
 			}
 			if declarationRoot, phiRoot := set.RepresentativeOf(declaration),
 				set.RepresentativeOf(phi); declarationRoot != phiRoot {
-				t.Errorf("declared value %d and phi %d for %q have representatives %d and %d; "+
-					"the phi union must include the declaration", declaration, phi, test.binding,
+				test.Errorf("declared value %d and phi %d for %q have representatives %d and %d; "+
+					"the phi union must include the declaration", declaration, phi, testCase.binding,
 					declarationRoot, phiRoot)
 			}
 		})
@@ -930,17 +990,17 @@ export function gather(limit: number) {
 // TestDisjointDeclarationKeepsTheFirstValue pins that the declarations map is first-writer-wins.
 //
 // `declareIdentifier` writes only when the key is absent (React line 32381), so a binding assigned
-// several times records the value it took FIRST. A mutation making it last-writer-wins survived
+// several times records the value it took first. A mutation making it last-writer-wins survived
 // every other test here, and it is reachable: across 200 corpus files the map sees 1,753 first
 // writes and 216 further attempts that the guard declines.
 //
 // The direction matters because the recorded value is what a firing phi unions in. Recording the
-// last value would union the phi with a value defined AFTER it in evaluation order, which is a
+// last value would union the phi with a value defined after it in evaluation order, which is a
 // different claim about what the scope owns than upstream makes.
-func TestDisjointDeclarationKeepsTheFirstValue(t *testing.T) {
-	t.Parallel()
+func TestDisjointDeclarationKeepsTheFirstValue(test *testing.T) {
+	test.Parallel()
 
-	function, ranges := rangesFor(t, `
+	function, ranges := rangesFor(test, `
 export function reassign(limit: number) {
   let acc;
   acc = [];
@@ -979,7 +1039,7 @@ export function reassign(limit: number) {
 			if existing, present := declarations[declaration]; present {
 				rewriteAttempts++
 				if existing > lvalue.Identifier {
-					t.Errorf("the map holds %d for declaration %d while %d was seen earlier; "+
+					test.Errorf("the map holds %d for declaration %d while %d was seen earlier; "+
 						"first-writer-wins must keep the lower id", existing, declaration,
 						lvalue.Identifier)
 				}
@@ -990,17 +1050,17 @@ export function reassign(limit: number) {
 	}
 
 	if rewriteAttempts == 0 {
-		t.Fatal("no binding was assigned twice, so the first-writer-wins guard was never " +
+		test.Fatal("no binding was assigned twice, so the first-writer-wins guard was never " +
 			"exercised and this test would pass over a pass that overwrote every entry")
 	}
 	if len(declarations) == 0 {
-		t.Fatal("no declaration was recorded, so this test measured nothing")
+		test.Fatal("no declaration was recorded, so this test measured nothing")
 	}
 
 	// And the pass itself still forms classes over this input.
 	set := FindDisjointMutableValuesWithRanges(function, ranges)
 	if set.Size() == 0 {
-		t.Fatal("no value joined a class")
+		test.Fatal("no value joined a class")
 	}
 }
 
@@ -1008,10 +1068,10 @@ export function reassign(limit: number) {
 //
 // Union-find is monotone, so a second pass over the same function must not merge anything further.
 // A pass that read its own output would drift, and the drift would be invisible to any single run.
-func TestDisjointIsIdempotent(t *testing.T) {
-	t.Parallel()
+func TestDisjointIsIdempotent(test *testing.T) {
+	test.Parallel()
 
-	function, ranges := rangesFor(t, `
+	function, ranges := rangesFor(test, `
 export function repeat(seed: number) {
   const values: number[] = [];
   values.push(seed);
@@ -1028,18 +1088,18 @@ export function repeat(seed: number) {
 
 	firstSets, secondSets := first.Sets(), second.Sets()
 	if len(firstSets) == 0 {
-		t.Fatal("no classes were formed, so this test measured nothing")
+		test.Fatal("no classes were formed, so this test measured nothing")
 	}
 	if len(firstSets) != len(secondSets) {
-		t.Fatalf("first run made %d classes, second made %d", len(firstSets), len(secondSets))
+		test.Fatalf("first run made %d classes, second made %d", len(firstSets), len(secondSets))
 	}
-	for i := range firstSets {
-		if len(firstSets[i]) != len(secondSets[i]) {
-			t.Fatalf("class %d: %v then %v", i, firstSets[i], secondSets[i])
+	for firstSetIndex := range firstSets {
+		if len(firstSets[firstSetIndex]) != len(secondSets[firstSetIndex]) {
+			test.Fatalf("class %d: %v then %v", firstSetIndex, firstSets[firstSetIndex], secondSets[firstSetIndex])
 		}
-		for j := range firstSets[i] {
-			if firstSets[i][j] != secondSets[i][j] {
-				t.Fatalf("class %d: %v then %v", i, firstSets[i], secondSets[i])
+		for index := range firstSets[firstSetIndex] {
+			if firstSets[firstSetIndex][index] != secondSets[firstSetIndex][index] {
+				test.Fatalf("class %d: %v then %v", firstSetIndex, firstSets[firstSetIndex], secondSets[firstSetIndex])
 			}
 		}
 	}
@@ -1047,12 +1107,12 @@ export function repeat(seed: number) {
 
 // TestDisjointIsDeterministic pins that the answer does not depend on Go's map iteration order.
 //
-// `DisjointSet.parent` is a Go map. The PARTITION is order-independent by construction, but the
+// `DisjointSet.parent` is a Go map. The partition is order-independent by construction, but the
 // representative and the ordering of `Sets` are not, and a consumer keying a table on the
 // representative would get a different table per run. Repeated here rather than argued, because a
 // randomised map is exactly the input that makes a single run look stable.
-func TestDisjointIsDeterministic(t *testing.T) {
-	t.Parallel()
+func TestDisjointIsDeterministic(test *testing.T) {
+	test.Parallel()
 
 	source := `
 export function shuffle(limit: number) {
@@ -1065,24 +1125,24 @@ export function shuffle(limit: number) {
   return [total, seen];
 }
 `
-	function, ranges := rangesFor(t, source)
+	function, ranges := rangesFor(test, source)
 
 	baseline := FindDisjointMutableValuesWithRanges(function, ranges).Sets()
 	if len(baseline) == 0 {
-		t.Fatal("no classes were formed, so this test measured nothing")
+		test.Fatal("no classes were formed, so this test measured nothing")
 	}
 	for run := 0; run < 25; run++ {
 		got := FindDisjointMutableValuesWithRanges(function, ranges).Sets()
 		if len(got) != len(baseline) {
-			t.Fatalf("run %d produced %d classes, baseline had %d", run, len(got), len(baseline))
+			test.Fatalf("run %d produced %d classes, baseline had %d", run, len(got), len(baseline))
 		}
-		for i := range baseline {
-			if len(got[i]) != len(baseline[i]) {
-				t.Fatalf("run %d class %d is %v, baseline %v", run, i, got[i], baseline[i])
+		for class := range baseline {
+			if len(got[class]) != len(baseline[class]) {
+				test.Fatalf("run %d class %d is %v, baseline %v", run, class, got[class], baseline[class])
 			}
-			for j := range baseline[i] {
-				if got[i][j] != baseline[i][j] {
-					t.Fatalf("run %d class %d is %v, baseline %v", run, i, got[i], baseline[i])
+			for member := range baseline[class] {
+				if got[class][member] != baseline[class][member] {
+					test.Fatalf("run %d class %d is %v, baseline %v", run, class, got[class], baseline[class])
 				}
 			}
 		}
@@ -1090,14 +1150,14 @@ export function shuffle(limit: number) {
 }
 
 // TestDisjointHandlesANilFunction pins the guard every entry point carries.
-func TestDisjointHandlesANilFunction(t *testing.T) {
-	t.Parallel()
+func TestDisjointHandlesANilFunction(test *testing.T) {
+	test.Parallel()
 
 	if set := FindDisjointMutableValues(nil); set == nil || set.Size() != 0 {
-		t.Fatal("a nil function must produce an empty set rather than a nil pointer")
+		test.Fatal("a nil function must produce an empty set rather than a nil pointer")
 	}
 	if set := FindDisjointMutableValuesWithRanges(nil, nil); set == nil || set.Size() != 0 {
-		t.Fatal("a nil function must produce an empty set rather than a nil pointer")
+		test.Fatal("a nil function must produce an empty set rather than a nil pointer")
 	}
 }
 
@@ -1105,12 +1165,12 @@ func TestDisjointHandlesANilFunction(t *testing.T) {
 //
 // A test reading this list fails when the set changes, which is what makes closing a gap a visible
 // event rather than a silent improvement. Same mechanism as `RangeGaps` and `ReactiveGaps`.
-func TestDisjointGapsAreDeclared(t *testing.T) {
-	t.Parallel()
+func TestDisjointGapsAreDeclared(test *testing.T) {
+	test.Parallel()
 
 	gaps := DisjointGaps()
 	if len(gaps) != 1 || gaps[0] != DisjointGapPrimitiveCallResult {
-		t.Fatalf("DisjointGaps() = %v; the only declared gap is the partial, name-keyed projection "+
+		test.Fatalf("DisjointGaps() = %v; the only declared gap is the partial, name-keyed projection "+
 			"of inferred call-result types. It closes when mayAllocate can read identifier types or "+
 			"a complete shape-directed signature lookup.", gaps)
 	}
@@ -1122,13 +1182,13 @@ func TestDisjointGapsAreDeclared(t *testing.T) {
 
 // TestDisjointClassSizesAreNotAllSingletons is this stage's headline, pinned as a test.
 //
-// Stage 3 was dispatched once before and DECLINED, correctly, on the measurement that the input was
+// Stage 3 was dispatched once before and declined, correctly, on the measurement that the input was
 // uniformly degenerate: every mutable range had width one, so every gate was false for a structural
 // reason and the pass produced 23,256 members in 23,256 singleton classes. That is an identity
 // function, and it would have compiled, passed every hand-written fixture above, and told every
 // consumer that nothing is entangled with anything.
 //
-// So the non-degeneracy is a TEST rather than a number in a report. If a future change to
+// So the non-degeneracy is a test rather than a number in a report. If a future change to
 // `InferMutableRanges` narrows ranges back toward width one, this fails and names what happened,
 // instead of the pass quietly reverting to an identity function that still passes its unit tests.
 //
@@ -1140,16 +1200,16 @@ func TestDisjointGapsAreDeclared(t *testing.T) {
 //	largest class                  527   in a 672-instruction hook
 //	mean class size               8.16
 //
-// The thresholds below are deliberately far looser than those numbers. This guards the SHAPE -- that
+// The thresholds below are deliberately far looser than those numbers. This guards the shape -- that
 // real multi-member classes are being formed -- not the exact corpus, which moves when the tree does.
-func TestDisjointClassSizesAreNotAllSingletons(t *testing.T) {
-	t.Parallel()
+func TestDisjointClassSizesAreNotAllSingletons(test *testing.T) {
+	test.Parallel()
 
-	skipWithoutCorpus(t)
+	skipWithoutCorpus(test)
 
 	var files []string
-	err := filepath.Walk(corpusRoot(t), func(path string, info os.FileInfo, err error) error {
-		if err != nil || info.IsDir() {
+	walkError := filepath.Walk(corpusRoot(test), func(path string, info os.FileInfo, pathError error) error {
+		if pathError != nil || info.IsDir() {
 			return nil
 		}
 		if strings.HasSuffix(path, ".ts") || strings.HasSuffix(path, ".tsx") {
@@ -1157,37 +1217,41 @@ func TestDisjointClassSizesAreNotAllSingletons(t *testing.T) {
 		}
 		return nil
 	})
-	if err != nil {
-		t.Fatalf("walking the corpus: %v", err)
+	if walkError != nil {
+		test.Fatalf("walking the corpus: %v", walkError)
 	}
 	sort.Strings(files)
 	if len(files) > 200 {
 		files = files[:200]
 	}
 	if len(files) < 10 {
-		t.Fatalf("the corpus holds only %d files; the path is probably wrong", len(files))
+		test.Fatalf("the corpus holds only %d files; the path is probably wrong", len(files))
 	}
 
-	var functions, members, classes, singletons, largest int
+	var functions int
+	var members int
+	var classes int
+	var singletons int
+	var largest int
 
 	for _, path := range files {
-		contents, err := os.ReadFile(path)
-		if err != nil {
+		contents, readError := os.ReadFile(path)
+		if readError != nil {
 			continue
 		}
 		fileName := "/corpus/" + filepath.Base(path)
-		probe := rule.Rule{
+		probe := rule.Rule[rule.NoOptions]{
 			Name:             "disjoint-corpus",
 			NeedsTypeChecker: true,
-			Run: func(ctx rule.Context, options any) rule.Listeners {
+			Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 				return rule.Listeners{
 					ast.KindSourceFile: func(node *ast.Node) {
-						if ctx.TypeChecker == nil {
-							t.Fatal("the typed harness handed this probe a nil checker, so every " +
+						if ruleContext.TypeChecker == nil {
+							test.Fatal("the typed harness handed this probe a nil checker, so every " +
 								"count below would be a fact about the harness rather than the code")
 						}
 						forEachFunctionLike(node, func(functionNode *ast.Node) {
-							function := Lower(functionNode, ctx.TypeChecker)
+							function := Lower(functionNode, ruleContext.TypeChecker)
 							if function == nil {
 								return
 							}
@@ -1209,30 +1273,30 @@ func TestDisjointClassSizesAreNotAllSingletons(t *testing.T) {
 				}
 			},
 		}
-		rule_testing.RunTypedFiles(t, probe, map[string]string{fileName: string(contents)}, fileName)
+		rule_testing.RunTypedFiles(test, probe, map[string]string{fileName: string(contents)}, fileName)
 	}
 
-	t.Logf("functions=%d members=%d classes=%d singletons=%d largest=%d",
+	test.Logf("functions=%d members=%d classes=%d singletons=%d largest=%d",
 		functions, members, classes, singletons, largest)
 
 	if functions < 100 {
-		t.Fatalf("only %d functions were lowered; this test measured almost nothing", functions)
+		test.Fatalf("only %d functions were lowered; this test measured almost nothing", functions)
 	}
 	if members == 0 {
-		t.Fatal("no value joined any class, so the pass is inert")
+		test.Fatal("no value joined any class, so the pass is inert")
 	}
 	if classes == singletons {
-		t.Fatal("every class is a singleton, which is the identity function this stage exists to " +
+		test.Fatal("every class is a singleton, which is the identity function this stage exists to " +
 			"avoid. The input has become degenerate for these predicates: check that " +
 			"InferMutableRanges still produces ranges wider than one.")
 	}
 	if largest < 5 {
-		t.Errorf("the largest class holds %d values; real code entangles more than that, so this "+
+		test.Errorf("the largest class holds %d values; real code entangles more than that, so this "+
 			"suggests the union is not propagating", largest)
 	}
 	// Two-sided: a pass that unioned everything would satisfy every check above.
 	if singletons == 0 {
-		t.Error("not one class is a singleton, which suggests over-merging: most values in real " +
+		test.Error("not one class is a singleton, which suggests over-merging: most values in real " +
 			"code are independent")
 	}
 }

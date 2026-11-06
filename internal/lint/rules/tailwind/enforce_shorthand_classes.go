@@ -65,17 +65,26 @@ var shorthandGroups = [][]shorthandRule{
 		{Longhands: []string{"pt-(.*)", "pb-(.*)"}, Shorthands: []string{"py-$1"}},
 	},
 	{
-		{Longhands: []string{"border-t-(.*)", "border-b-(.*)", "border-l-(.*)", "border-r-(.*)"}, Shorthands: []string{"border-$1"}},
+		{
+			Longhands:  []string{"border-t-(.*)", "border-b-(.*)", "border-l-(.*)", "border-r-(.*)"},
+			Shorthands: []string{"border-$1"},
+		},
 		{Longhands: []string{"border-x-(.*)", "border-y-(.*)"}, Shorthands: []string{"border-$1"}},
 		{Longhands: []string{"border-s-(.*)", "border-e-(.*)"}, Shorthands: []string{"border-x-$1"}},
 		{Longhands: []string{"border-l-(.*)", "border-r-(.*)"}, Shorthands: []string{"border-x-$1"}},
 		{Longhands: []string{"border-t-(.*)", "border-b-(.*)"}, Shorthands: []string{"border-y-$1"}},
 	},
 	{
-		{Longhands: []string{"border-spacing-x-(.*)", "border-spacing-y-(.*)"}, Shorthands: []string{"border-spacing-$1"}},
+		{
+			Longhands:  []string{"border-spacing-x-(.*)", "border-spacing-y-(.*)"},
+			Shorthands: []string{"border-spacing-$1"},
+		},
 	},
 	{
-		{Longhands: []string{"rounded-tl-(.*)", "rounded-tr-(.*)", "rounded-bl-(.*)", "rounded-br-(.*)"}, Shorthands: []string{"rounded-$1"}},
+		{
+			Longhands:  []string{"rounded-tl-(.*)", "rounded-tr-(.*)", "rounded-bl-(.*)", "rounded-br-(.*)"},
+			Shorthands: []string{"rounded-$1"},
+		},
 		{Longhands: []string{"rounded-t-(.*)", "rounded-b-(.*)"}, Shorthands: []string{"rounded-$1"}},
 		{Longhands: []string{"rounded-l-(.*)", "rounded-r-(.*)"}, Shorthands: []string{"rounded-$1"}},
 		{Longhands: []string{"rounded-tl-(.*)", "rounded-tr-(.*)"}, Shorthands: []string{"rounded-t-$1"}},
@@ -84,14 +93,20 @@ var shorthandGroups = [][]shorthandRule{
 		{Longhands: []string{"rounded-tr-(.*)", "rounded-br-(.*)"}, Shorthands: []string{"rounded-r-$1"}},
 	},
 	{
-		{Longhands: []string{"scroll-mt-(.*)", "scroll-mb-(.*)", "scroll-ml-(.*)", "scroll-mr-(.*)"}, Shorthands: []string{"scroll-m-$1"}},
+		{
+			Longhands:  []string{"scroll-mt-(.*)", "scroll-mb-(.*)", "scroll-ml-(.*)", "scroll-mr-(.*)"},
+			Shorthands: []string{"scroll-m-$1"},
+		},
 		{Longhands: []string{"scroll-mx-(.*)", "scroll-my-(.*)"}, Shorthands: []string{"scroll-m-$1"}},
 		{Longhands: []string{"scroll-ms-(.*)", "scroll-me-(.*)"}, Shorthands: []string{"scroll-mx-$1"}},
 		{Longhands: []string{"scroll-ml-(.*)", "scroll-mr-(.*)"}, Shorthands: []string{"scroll-mx-$1"}},
 		{Longhands: []string{"scroll-mt-(.*)", "scroll-mb-(.*)"}, Shorthands: []string{"scroll-my-$1"}},
 	},
 	{
-		{Longhands: []string{"scroll-pt-(.*)", "scroll-pb-(.*)", "scroll-pl-(.*)", "scroll-pr-(.*)"}, Shorthands: []string{"scroll-p-$1"}},
+		{
+			Longhands:  []string{"scroll-pt-(.*)", "scroll-pb-(.*)", "scroll-pl-(.*)", "scroll-pr-(.*)"},
+			Shorthands: []string{"scroll-p-$1"},
+		},
 		{Longhands: []string{"scroll-px-(.*)", "scroll-py-(.*)"}, Shorthands: []string{"scroll-p-$1"}},
 		{Longhands: []string{"scroll-pl-(.*)", "scroll-pr-(.*)"}, Shorthands: []string{"scroll-px-$1"}},
 		{Longhands: []string{"scroll-ps-(.*)", "scroll-pe-(.*)"}, Shorthands: []string{"scroll-px-$1"}},
@@ -120,7 +135,10 @@ var shorthandGroups = [][]shorthandRule{
 		{Longhands: []string{"skew-x-(.*)", "skew-y-(.*)"}, Shorthands: []string{"skew-$1"}},
 	},
 	{
-		{Longhands: []string{"scale-x-(.*)", "scale-y-(.*)", "scale-z-(.*)"}, Shorthands: []string{"scale-$1", "scale-3d"}},
+		{
+			Longhands:  []string{"scale-x-(.*)", "scale-y-(.*)", "scale-z-(.*)"},
+			Shorthands: []string{"scale-$1", "scale-3d"},
+		},
 		{Longhands: []string{"scale-x-(.*)", "scale-y-(.*)"}, Shorthands: []string{"scale-$1"}},
 	},
 	{
@@ -129,7 +147,10 @@ var shorthandGroups = [][]shorthandRule{
 		{Longhands: []string{"self-(.*)", "justify-self-(.*)"}, Shorthands: []string{"place-self-$1"}},
 	},
 	{
-		{Longhands: []string{"overflow-hidden", "text-ellipsis", "whitespace-nowrap"}, Shorthands: []string{"truncate"}},
+		{
+			Longhands:  []string{"overflow-hidden", "text-ellipsis", "whitespace-nowrap"},
+			Shorthands: []string{"truncate"},
+		},
 	},
 }
 
@@ -183,21 +204,24 @@ var shorthandGroups = [][]shorthandRule{
 // empty string. Measured on Kirk's tree, where its four findings are the same two sites. This rule
 // reports two, and the difference is entirely that second class of finding, which describes the
 // state upstream's fix passes through rather than anything in the source a reader wrote.
-var EnforceShorthandClasses = rule.Rule{
+var EnforceShorthandClasses = rule.Rule[EnforceShorthandClassesOptions]{
 	Name: "better-tailwindcss/enforce-shorthand-classes",
-	// The design system: its stylesheets, read through the recording file system (DesignSystemFS).
+	// The design system: its stylesheets, read through the recording file system (DesignSystemFileSystem).
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDesignSystem,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[EnforceShorthandClassesOptions]) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
-		configured, isConfigured := rule.OptionsAs[EnforceShorthandClassesOptions](options)
+		configured, isConfigured := options.Read()
 
 		// nil when there is no design system to ask, and classExistsIn answers true for nil.
 		var system *tailwindengine.LoadedDesignSystem
-		if ctx.Program != nil {
-			if designSystem := DesignSystemForProgramAt(ctx.Program, configured.Location()); designSystem.Err == nil {
+		if ruleContext.Program != nil {
+			if designSystem := DesignSystemForProgramAt(
+				ruleContext.Program,
+				configured.Location(),
+			); designSystem.Error == nil {
 				system = designSystem.System
 			}
 		}
@@ -207,7 +231,7 @@ var EnforceShorthandClasses = rule.Rule{
 			surfaces = configured.ClassLiteralSurfaces()
 		}
 
-		reader := surfaces.ReaderFor(ctx.FileCache)
+		reader := surfaces.ReaderFor(ruleContext.FileCache)
 
 		report := func(node *ast.Node) {
 			for _, literal := range reader.ClassLiteralsIn(node) {
@@ -215,7 +239,7 @@ var EnforceShorthandClasses = rule.Rule{
 					if !shorthandsExistIn(collapse.shorthands, system) {
 						continue
 					}
-					ctx.ReportRange(literal.Range, messageShorthandClasses(
+					ruleContext.ReportRange(literal.Range, messageShorthandClasses(
 						strings.Join(collapse.longhands, " "),
 						strings.Join(collapse.shorthands, " "),
 					))
@@ -247,44 +271,10 @@ type shorthandCollapse struct {
 	shorthands []string
 }
 
-// shorthandDissection is one class split into the parts a collapse has to match on.
-type shorthandDissection struct {
-	className string
-	variants  string
-	base      string
-	negative  bool
-	important bool
-	markerEnd bool
-	// matches is every table pattern the base matches, with what each captured.
-	matches []shorthandMatch
-}
-
 // shorthandMatch is one table pattern a class's base matches, and the value its `(.*)` captured.
 type shorthandMatch struct {
 	pattern int
 	capture string
-}
-
-// match reports whether this class matches one pattern, and what it captured.
-func (d shorthandDissection) match(pattern int) (string, bool) {
-	for _, candidate := range d.matches {
-		if candidate.pattern == pattern {
-			return candidate.capture, true
-		}
-	}
-	return "", false
-}
-
-// shorthandPatternSet is a set of pattern indexes, one bit each.
-type shorthandPatternSet [2]uint64
-
-func (s *shorthandPatternSet) add(pattern int) {
-	s[pattern/64] |= 1 << (pattern % 64)
-}
-
-// holds reports whether every pattern in needed is in this set.
-func (s shorthandPatternSet) holds(needed shorthandPatternSet) bool {
-	return s[0]&needed[0] == needed[0] && s[1]&needed[1] == needed[1]
 }
 
 // shorthandTablePattern is one longhand pattern of the table, read as the plain text it is.
@@ -361,6 +351,8 @@ func buildShorthandTable(groups [][]shorthandRule) shorthandTable {
 		table.families = append(table.families, family)
 	}
 	if len(table.patterns) > len(shorthandPatternSet{})*64 {
+		// Invariant: the only table built is shorthandGroups, a literal in this file read at init, which holds
+		// fewer patterns than the set has bits, so an edit that outgrew it fails every test in the package.
 		panic(fmt.Sprintf("enforce-shorthand-classes: %d table patterns outgrow the %d-bit pattern set",
 			len(table.patterns), len(shorthandPatternSet{})*64))
 	}
@@ -376,6 +368,8 @@ func readShorthandPattern(longhand string) shorthandTablePattern {
 	if regexp.QuoteMeta(longhand) == longhand {
 		return shorthandTablePattern{text: longhand}
 	}
+	// Invariant: every longhand comes from shorthandGroups, a literal in this file read at init, and each of
+	// its longhands is one of the two shapes, so an edit that brought in another fails every test in the package.
 	panic("enforce-shorthand-classes: the longhand " + strconv.Quote(longhand) +
 		" is neither a written-out class nor a dash-ended prefix followed by (.*), so it cannot be read as plain text")
 }

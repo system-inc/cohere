@@ -9,39 +9,40 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"slices"
 	"strings"
 	"testing"
 )
 
-// guardOverlay is the overlay the guards here read the rule packages through: the one GOFLAGS names, as
-// file path to contents, or nil when GOFLAGS names none.
+// guardOverlay is the overlay the guards here read the rule packages through: the one `GOFLAGS` names, as
+// file path to contents, or nil when `GOFLAGS` names none.
 //
 // The guards load the rule packages with internal/gotypes, which runs `go list` and then parses every
 // file itself, from disk. `go test -overlay x.json` reaches neither: the flag builds the test binary and
 // stops there, and nothing in the binary can see it (measured: no build setting records it, and the
 // environment is untouched). So a guard run that way checked the working tree while the command line
-// said it checked the overlay, and two wrong "dispatch green" claims went through on it. GOFLAGS is
+// said it checked the overlay, and two wrong "dispatch green" claims went through on it. `GOFLAGS` is
 // inherited by the test binary, so `GOFLAGS=-overlay=x.json` is the spelling it can read; this hands its
 // contents to the loader's own parser, which keeps the flag out of the go commands it runs, since go list
 // only answers for the files the loader reads anyway and a runner of prebuilt tests refuses it.
 //
 // The spelling that cannot work is refused rather than ignored, when it can be seen: on Unix the `go`
-// command that started this binary is asked for its arguments, and an -overlay there that GOFLAGS does
+// command that started this binary is asked for its arguments, and an -overlay there that `GOFLAGS` does
 // not carry fails the guard by name.
-func guardOverlay(t *testing.T) map[string][]byte {
-	t.Helper()
-	return guardOverlayFrom(t, os.Getenv("GOFLAGS"))
+func guardOverlay(test *testing.T) map[string][]byte {
+	test.Helper()
+	return guardOverlayFrom(test, os.Getenv("GOFLAGS"))
 }
 
-// guardOverlayFrom is guardOverlay reading goFlags in place of the environment's GOFLAGS, so the tests
-// that prove a named overlay is what the guards read can name one without t.Setenv, and run in parallel
+// guardOverlayFrom is guardOverlay reading goFlags in place of the environment's `GOFLAGS`, so the tests
+// that prove a named overlay is what the guards read can name one without test.Setenv, and run in parallel
 // (#nxgt2ca).
-func guardOverlayFrom(t *testing.T, goFlags string) map[string][]byte {
-	t.Helper()
+func guardOverlayFrom(test *testing.T, goFlags string) map[string][]byte {
+	test.Helper()
 
-	refuseUnreachableOverlayFlag(t)
+	refuseUnreachableOverlayFlag(test)
 
 	overlayFile := ""
 	for _, flag := range strings.Fields(goFlags) {
@@ -54,9 +55,9 @@ func guardOverlayFrom(t *testing.T, goFlags string) map[string][]byte {
 	if overlayFile == "" {
 		return nil
 	}
-	overlay, err := readOverlay(overlayFile)
-	if err != nil {
-		t.Fatalf("GOFLAGS names the overlay %s, and the guards cannot read it: %v", overlayFile, err)
+	overlay, readOverlayError := readOverlay(overlayFile)
+	if readOverlayError != nil {
+		test.Fatalf("GOFLAGS names the overlay %s, and the guards cannot read it: %v", overlayFile, readOverlayError)
 	}
 	return overlay
 }
@@ -71,15 +72,15 @@ func readOverlay(path string) (map[string][]byte, error) {
 	if !filepath.IsAbs(path) {
 		return nil, fmt.Errorf("the overlay path %s is relative; name it absolutely", path)
 	}
-	encoded, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
+	encoded, readError := os.ReadFile(path)
+	if readError != nil {
+		return nil, readError
 	}
 	var file struct {
 		Replace map[string]string
 	}
-	if err := json.Unmarshal(encoded, &file); err != nil {
-		return nil, fmt.Errorf("reading %s as an overlay: %w", path, err)
+	if decodeError := json.Unmarshal(encoded, &file); decodeError != nil {
+		return nil, fmt.Errorf("reading %s as an overlay: %w", path, decodeError)
 	}
 	overlay := map[string][]byte{}
 	for target, replacement := range file.Replace {
@@ -87,11 +88,14 @@ func readOverlay(path string) (map[string][]byte, error) {
 			return nil, fmt.Errorf("the overlay entry %s -> %s is relative; name both absolutely", target, replacement)
 		}
 		if replacement == "" {
-			return nil, fmt.Errorf("the overlay deletes %s, which the loader cannot express, so the guard would still read it", target)
+			return nil, fmt.Errorf(
+				"the overlay deletes %s, which the loader cannot express, so the guard would still read it",
+				target,
+			)
 		}
-		contents, err := os.ReadFile(replacement)
-		if err != nil {
-			return nil, fmt.Errorf("reading the overlay's replacement for %s: %w", target, err)
+		contents, readError := os.ReadFile(replacement)
+		if readError != nil {
+			return nil, fmt.Errorf("reading the overlay's replacement for %s: %w", target, readError)
 		}
 		overlay[target] = contents
 	}
@@ -99,31 +103,34 @@ func readOverlay(path string) (map[string][]byte, error) {
 }
 
 // refuseUnreachableOverlayFlag fails the guard when the `go test` that started this binary was given
-// -overlay on its command line rather than through GOFLAGS. Best effort: where the parent's arguments
+// -overlay on its command line rather than through `GOFLAGS`. Best effort: where the parent's arguments
 // cannot be read, nothing is refused.
-func refuseUnreachableOverlayFlag(t *testing.T) {
-	t.Helper()
+func refuseUnreachableOverlayFlag(test *testing.T) {
+	test.Helper()
 	if runtime.GOOS == "windows" {
 		return
 	}
-	output, err := exec.Command("ps", "-o", "args=", "-p", fmt.Sprint(os.Getppid())).Output()
-	if err != nil {
+	output, outputError := exec.Command("ps", "-o", "args=", "-p", fmt.Sprint(os.Getppid())).Output()
+	if outputError != nil {
 		return
 	}
 	if overlayFlagOutsideGoFlags(string(output), os.Getenv("GOFLAGS")) {
-		t.Fatalf("this guard was run by `%s`, whose -overlay builds the test binary and never reaches the guard, "+
+		test.Fatalf("this guard was run by `%s`, whose -overlay builds the test binary and never reaches the guard, "+
 			"so it would check the working tree; pass the overlay as GOFLAGS=-overlay=<absolute path> instead",
 			strings.TrimSpace(string(output)))
 	}
 }
 
-// overlayFlagOutsideGoFlags reports a go command line that carries -overlay when GOFLAGS does not.
+// overlayFlagOutsideGoFlags reports a go command line that carries -overlay when `GOFLAGS` does not.
 func overlayFlagOutsideGoFlags(arguments string, goFlags string) bool {
 	if strings.Contains(goFlags, "overlay") {
 		return false
 	}
 	for _, argument := range strings.Fields(arguments) {
-		if argument == "-overlay" || argument == "--overlay" || strings.HasPrefix(argument, "-overlay=") || strings.HasPrefix(argument, "--overlay=") {
+		if argument == "-overlay" ||
+			argument == "--overlay" ||
+			strings.HasPrefix(argument, "-overlay=") ||
+			strings.HasPrefix(argument, "--overlay=") {
 			return true
 		}
 	}
@@ -131,58 +138,58 @@ func overlayFlagOutsideGoFlags(arguments string, goFlags string) bool {
 }
 
 // writeOverlay writes an overlay file replacing target with contents, and returns the overlay file's path.
-func writeOverlay(t *testing.T, target string, contents string) string {
-	t.Helper()
-	directory := t.TempDir()
+func writeOverlay(test *testing.T, target string, contents string) string {
+	test.Helper()
+	directory := test.TempDir()
 	replacement := filepath.Join(directory, filepath.Base(target))
-	if err := os.WriteFile(replacement, []byte(contents), 0o644); err != nil {
-		t.Fatal(err)
+	if writeError := os.WriteFile(replacement, []byte(contents), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
-	encoded, err := json.Marshal(map[string]map[string]string{"Replace": {target: replacement}})
-	if err != nil {
-		t.Fatal(err)
+	encoded, encodeError := json.Marshal(map[string]map[string]string{"Replace": {target: replacement}})
+	if encodeError != nil {
+		test.Fatal(encodeError)
 	}
 	overlayFile := filepath.Join(directory, "overlay.json")
-	if err := os.WriteFile(overlayFile, encoded, 0o644); err != nil {
-		t.Fatal(err)
+	if writeError := os.WriteFile(overlayFile, encoded, 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 	return overlayFile
 }
 
-// The creating-getter guard reads an overlay GOFLAGS names: a GetLocals call that exists only in the
+// The creating-getter guard reads an overlay `GOFLAGS` names: a GetLocals call that exists only in the
 // overlay is caught, and the working tree, which has none, is not what was read.
-func TestTheCreatingGetterGuardReadsTheGoFlagsOverlay(t *testing.T) {
-	t.Parallel()
+func TestTheCreatingGetterGuardReadsTheGoFlagsOverlay(test *testing.T) {
+	test.Parallel()
 
-	root, err := filepath.Abs("../..")
-	if err != nil {
-		t.Fatal(err)
+	root, absolutePathError := filepath.Abs("../..")
+	if absolutePathError != nil {
+		test.Fatal(absolutePathError)
 	}
 	path := filepath.Join(root, "internal/lint/rules/typescript/no_shadow.go")
-	original, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
+	original, readError := os.ReadFile(path)
+	if readError != nil {
+		test.Fatal(readError)
 	}
 	planted := strings.Replace(string(original), "range node.Locals()", "range ast.GetLocals(node)", 1)
 	if planted == string(original) {
-		t.Fatal("no-shadow no longer ranges over node.Locals(), so the plant missed; update the probe")
+		test.Fatal("no-shadow no longer ranges over node.Locals(), so the plant missed; update the probe")
 	}
-	calls := creatingGetterCalls(t, guardOverlayFrom(t, "-overlay="+writeOverlay(t, path, planted)))
+	calls := creatingGetterCalls(test, guardOverlayFrom(test, "-overlay="+writeOverlay(test, path, planted)))
 	if len(calls) != 1 || !strings.Contains(calls[0], "no_shadow.go") || !strings.HasSuffix(calls[0], "GetLocals") {
-		t.Fatalf("a GetLocals call that exists only in the GOFLAGS overlay was not caught: %v", calls)
+		test.Fatalf("a GetLocals call that exists only in the GOFLAGS overlay was not caught: %v", calls)
 	}
 }
 
-// The TypeReach guard reads an overlay GOFLAGS names: a Shapes claim added only in the overlay, to a rule
+// The TypeReach guard reads an overlay `GOFLAGS` names: a Shapes claim added only in the overlay, to a rule
 // the scan already finds reading imported bodies, is caught.
-func TestTheTypeReachGuardReadsTheGoFlagsOverlay(t *testing.T) {
-	t.Parallel()
+func TestTheTypeReachGuardReadsTheGoFlagsOverlay(test *testing.T) {
+	test.Parallel()
 
-	root, err := filepath.Abs("../..")
-	if err != nil {
-		t.Fatal(err)
+	root, absolutePathError := filepath.Abs("../..")
+	if absolutePathError != nil {
+		test.Fatal(absolutePathError)
 	}
-	baseline := scanTypeReach(t, nil)
+	baseline := scanTypeReach(test, nil)
 	claimed := map[string]bool{}
 	for _, name := range baseline.claims {
 		claimed[name] = true
@@ -195,26 +202,26 @@ func TestTheTypeReachGuardReadsTheGoFlagsOverlay(t *testing.T) {
 		}
 	}
 	if len(candidates) == 0 {
-		t.Fatal("no rule reads imported bodies without claiming Shapes, so there is nothing to plant a claim in")
+		test.Fatal("no rule reads imported bodies without claiming Shapes, so there is nothing to plant a claim in")
 	}
 	slices.Sort(candidates)
 	target := candidates[0]
 	file := filepath.Join(root, "internal/lint/rules", baseline.reason[target])
-	original, err := os.ReadFile(file)
-	if err != nil {
-		t.Fatal(err)
+	original, readError := os.ReadFile(file)
+	if readError != nil {
+		test.Fatal(readError)
 	}
-	planted, err := plantShapesClaim(original)
-	if err != nil {
-		t.Fatalf("%s: %v", file, err)
+	planted, plantShapesClaimError := plantShapesClaim(original)
+	if plantShapesClaimError != nil {
+		test.Fatalf("%s: %v", file, plantShapesClaimError)
 	}
-	scan := scanTypeReach(t, guardOverlayFrom(t, "-overlay="+writeOverlay(t, file, string(planted))))
+	scan := scanTypeReach(test, guardOverlayFrom(test, "-overlay="+writeOverlay(test, file, string(planted))))
 	caught := false
 	for _, name := range scan.claims {
 		caught = caught || (name == target && scan.mayReadImportedBodies[name])
 	}
 	if !caught {
-		t.Fatalf("a Shapes claim on %s that exists only in the GOFLAGS overlay was not caught", target)
+		test.Fatalf("a Shapes claim on %s that exists only in the GOFLAGS overlay was not caught", target)
 	}
 }
 
@@ -223,9 +230,9 @@ func TestTheTypeReachGuardReadsTheGoFlagsOverlay(t *testing.T) {
 // a column-aligned `Name:` or any other spelling of the literal is planted the same way, and spelled with
 // the literal's own package qualifier.
 func plantShapesClaim(source []byte) ([]byte, error) {
-	file, err := parser.ParseFile(token.NewFileSet(), "", source, 0)
-	if err != nil {
-		return nil, err
+	file, parseFileError := parser.ParseFile(token.NewFileSet(), "", source, 0)
+	if parseFileError != nil {
+		return nil, parseFileError
 	}
 	var literal *ast.CompositeLit
 	var qualifier string
@@ -237,8 +244,8 @@ func plantShapesClaim(source []byte) ([]byte, error) {
 		if !ok {
 			return true
 		}
-		selector, ok := candidate.Type.(*ast.SelectorExpr)
-		if !ok || selector.Sel.Name != "Rule" {
+		selector, isRule := ruleLiteralSelector(candidate.Type)
+		if !isRule {
 			return true
 		}
 		if identifier, ok := selector.X.(*ast.Ident); ok && len(candidate.Elts) > 0 {
@@ -255,7 +262,11 @@ func plantShapesClaim(source []byte) ([]byte, error) {
 	for _, element := range literal.Elts {
 		pair, ok := element.(*ast.KeyValueExpr)
 		if key, isIdentifier := pair.Key.(*ast.Ident); ok && isIdentifier && key.Name == "TypeReach" {
-			return slices.Concat(source[:offset(pair.Value.Pos())], []byte(claim), source[offset(pair.Value.End()):]), nil
+			return slices.Concat(
+				source[:offset(pair.Value.Pos())],
+				[]byte(claim),
+				source[offset(pair.Value.End()):],
+			), nil
 		}
 	}
 	first := offset(literal.Elts[0].Pos())
@@ -264,57 +275,63 @@ func plantShapesClaim(source []byte) ([]byte, error) {
 
 // The plant works on every rule there is, read back the way the scan reads a claim, so the probe above
 // cannot miss on whichever rule it happens to pick.
-func TestAShapesClaimPlantsIntoEveryRuleFile(t *testing.T) {
-	t.Parallel()
+func TestAShapesClaimPlantsIntoEveryRuleFile(test *testing.T) {
+	test.Parallel()
 
-	root, err := filepath.Abs("../..")
-	if err != nil {
-		t.Fatal(err)
+	root, absolutePathError := filepath.Abs("../..")
+	if absolutePathError != nil {
+		test.Fatal(absolutePathError)
 	}
-	files, err := filepath.Glob(filepath.Join(root, "internal/lint/rules/*/*.go"))
-	if err != nil {
-		t.Fatal(err)
+	files, globError := filepath.Glob(filepath.Join(root, "internal/lint/rules/*/*.go"))
+	if globError != nil {
+		test.Fatal(globError)
 	}
 	planted := 0
 	for _, path := range files {
 		if strings.HasSuffix(path, "_test.go") {
 			continue
 		}
-		original, err := os.ReadFile(path)
-		if err != nil {
-			t.Fatal(err)
+		original, readError := os.ReadFile(path)
+		if readError != nil {
+			test.Fatal(readError)
 		}
-		parsed, err := parser.ParseFile(token.NewFileSet(), path, original, 0)
-		if err != nil {
-			t.Fatal(err)
+		parsed, parseFileError := parser.ParseFile(token.NewFileSet(), path, original, 0)
+		if parseFileError != nil {
+			test.Fatal(parseFileError)
 		}
 		name, _ := ruleLiteralTypeReach(parsed)
 		if name == "" {
 			continue
 		}
-		result, err := plantShapesClaim(original)
-		if err != nil {
-			t.Errorf("%s: %v", path, err)
+		result, plantShapesClaimError := plantShapesClaim(original)
+		if plantShapesClaimError != nil {
+			test.Errorf("%s: %v", path, plantShapesClaimError)
 			continue
 		}
-		reparsed, err := parser.ParseFile(token.NewFileSet(), path, result, 0)
-		if err != nil {
-			t.Errorf("%s: the planted file does not parse: %v", path, err)
+		reparsed, parseFileError := parser.ParseFile(token.NewFileSet(), path, result, 0)
+		if parseFileError != nil {
+			test.Errorf("%s: the planted file does not parse: %v", path, parseFileError)
 			continue
 		}
 		if plantedName, claims := ruleLiteralTypeReach(reparsed); plantedName != name || !claims {
-			t.Errorf("%s: planted, the rule reads as %q claiming Shapes %v, want %q claiming it", path, plantedName, claims, name)
+			test.Errorf(
+				"%s: planted, the rule reads as %q claiming Shapes %v, want %q claiming it",
+				path,
+				plantedName,
+				claims,
+				name,
+			)
 		}
 		planted++
 	}
 	if planted < 100 {
-		t.Fatalf("planted into %d rule files, too few to be every rule", planted)
+		test.Fatalf("planted into %d rule files, too few to be every rule", planted)
 	}
 }
 
-// The command line `go test -overlay` is refused, since it cannot reach the guard, and GOFLAGS is not.
-func TestAnOverlayFlagGoFlagsDoesNotCarryIsRefused(t *testing.T) {
-	t.Parallel()
+// The command line `go test -overlay` is refused, since it cannot reach the guard, and `GOFLAGS` is not.
+func TestAnOverlayFlagGoFlagsDoesNotCarryIsRefused(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		arguments string
@@ -328,42 +345,60 @@ func TestAnOverlayFlagGoFlagsDoesNotCarryIsRefused(t *testing.T) {
 		{"go test ./internal/guard", "", false},
 	} {
 		if got := overlayFlagOutsideGoFlags(testCase.arguments, testCase.goFlags); got != testCase.refused {
-			t.Errorf("%q with GOFLAGS %q: refused %v, want %v", testCase.arguments, testCase.goFlags, got, testCase.refused)
+			test.Errorf(
+				"%q with GOFLAGS %q: refused %v, want %v",
+				testCase.arguments,
+				testCase.goFlags,
+				got,
+				testCase.refused,
+			)
 		}
 	}
 }
 
+// reactPragmaOwnFileCall is the rule's own-file pragma call, matched whatever the rule names its context
+// parameter, so a rename of that parameter never breaks the fixture below.
+var reactPragmaOwnFileCall = regexp.MustCompile(`rule\.IsReactPragmaBinding\([A-Za-z_][A-Za-z0-9_]*\.SourceFile,`)
+
 // A pragma reader may inspect the home file's bodies only when home is the rule's own file. Runtime
 // identifier checks alone cannot establish that argument at a call site; the scan must check it too.
-func TestPragmaReaderTrustRequiresTheRulesOwnSourceFile(t *testing.T) {
-	t.Parallel()
-	root, err := filepath.Abs("../..")
-	if err != nil {
-		t.Fatal(err)
+func TestPragmaReaderTrustRequiresTheRulesOwnSourceFile(test *testing.T) {
+	test.Parallel()
+	root, absolutePathError := filepath.Abs("../..")
+	if absolutePathError != nil {
+		test.Fatal(absolutePathError)
 	}
 	target := filepath.Join(root, "internal/lint/rules/react/checked_requires_onchange_or_readonly.go")
-	original, err := os.ReadFile(target)
-	if err != nil {
-		t.Fatal(err)
+	original, readError := os.ReadFile(target)
+	if readError != nil {
+		test.Fatal(readError)
 	}
-	before := "rule.IsReactPragmaBinding(ctx.SourceFile,"
-	if strings.Count(string(original), before) != 1 {
-		t.Fatal("fixture must replace exactly one pragma call")
+	matches := reactPragmaOwnFileCall.FindAllString(string(original), -1)
+	if len(matches) != 1 {
+		test.Fatalf("fixture must replace exactly one pragma call, found %d", len(matches))
 	}
-	overlay := guardOverlay(t)
+	before := matches[0]
+	overlay := guardOverlay(test)
 	planted := make(map[string][]byte, len(overlay)+1)
 	for path, contents := range overlay {
 		planted[path] = contents
 	}
-	planted[target] = []byte(strings.Replace(string(original), before, "rule.IsReactPragmaBinding(ast.GetSourceFileOfNode(callee),", 1))
-	baseline := scanTypeReach(t, overlay)
-	unsafe := scanTypeReach(t, planted)
-	for _, name := range []string{"react/no-adjacent-inline-elements", "react/no-multi-comp", "react/no-object-type-as-default-prop", "react/no-unstable-nested-components"} {
+	planted[target] = []byte(
+		strings.Replace(string(original), before, "rule.IsReactPragmaBinding(ast.GetSourceFileOfNode(callee),", 1),
+	)
+	baseline := scanTypeReach(test, overlay)
+	unsafe := scanTypeReach(test, planted)
+	for _, name := range []string{
+		"react/no-adjacent-inline-elements",
+		"react/no-multi-comp",
+		"react/no-object-type-as-default-prop",
+		"react/no-unstable-nested-components",
+	} {
 		if baseline.mayReadImportedBodies[name] {
-			t.Errorf("%s: own-file pragma call refused", name)
+			test.Errorf("%s: own-file pragma call refused", name)
 		}
 		if !unsafe.mayReadImportedBodies[name] {
-			t.Errorf("%s: arbitrary-home pragma call trusted", name)
+			test.Errorf("%s: arbitrary-home pragma call trusted", name)
 		}
 	}
 }

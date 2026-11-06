@@ -55,7 +55,7 @@ func noHtmlLinkForPagesMessage(hrefPath string) rule.Message {
 //
 // # Declared reads, and how it is cached
 //
-// The page files are read through ctx.Program.FS(), declared ReadsOtherFiles, since creating or
+// The page files are read through ruleContext.Program.FileSystem(), declared ReadsOtherFiles, since creating or
 // deleting a page changes findings in files that did not change. The model is built once per run and
 // root, not per file. Its routes are the rule's program fingerprint (noHtmlLinkForPagesFingerprint),
 // so the findings cache replays a file's verdict while its bytes and the routes hold, and walks every
@@ -68,7 +68,7 @@ func noHtmlLinkForPagesMessage(hrefPath string) rule.Message {
 // Here a bare href has no route to match, so the anchor is silent, and a bare target is not
 // `_blank`, so it does not exempt. Two more are in the route model: a page name that is not a valid
 // regular expression, and a file named `pages`.
-var NoHtmlLinkForPages = rule.Rule{
+var NoHtmlLinkForPages = rule.Rule[NoHtmlLinkForPagesOptions]{
 	// No family prefix. The config writes `nextjs/no-html-link-for-pages` and matching strips the
 	// namespace on a `/` boundary, so a prefixed name matches nothing and runs on no files.
 	Name: "@next/next/no-html-link-for-pages",
@@ -76,14 +76,18 @@ var NoHtmlLinkForPages = rule.Rule{
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsOtherFiles,
 	// A file's verdict reads its own bytes and the route model, so the model is the whole fingerprint.
 	ProgramFingerprint: noHtmlLinkForPagesFingerprint,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, _ := rule.OptionsAs[NoHtmlLinkForPagesOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[NoHtmlLinkForPagesOptions]) rule.Listeners {
+		settings, _ := options.Read()
 		// A harness that builds its Context by hand has no program and so no disk to read, which is
 		// upstream's no-directory case: an empty visitor.
-		if ctx.Program == nil {
+		if ruleContext.Program == nil {
 			return nil
 		}
-		model := noHtmlLinkForPagesRouteModelFor(ctx.Program, ctx.Program.GetCurrentDirectory(), settings)
+		model := noHtmlLinkForPagesRouteModelFor(
+			ruleContext.Program,
+			ruleContext.Program.GetCurrentDirectory(),
+			settings,
+		)
 		if !model.found {
 			return nil
 		}
@@ -97,7 +101,11 @@ var NoHtmlLinkForPages = rule.Rule{
 			// Upstream's order: target, then href, then download. Each finds the first attribute
 			// by that exact name, as `attributes.find` does, and reads only a plain string value,
 			// so `target={"_blank"}` does not exempt and `href={"/about"}` is not read.
-			if target, found := jsx.StringAttributeValue(attributes, "target", jsx.MatchExactly); found && target == "_blank" {
+			if target, found := jsx.StringAttributeValue(
+				attributes,
+				"target",
+				jsx.MatchExactly,
+			); found && target == "_blank" {
 				return
 			}
 			href, found := jsx.StringAttributeValue(attributes, "href", jsx.MatchExactly)
@@ -110,12 +118,14 @@ var NoHtmlLinkForPages = rule.Rule{
 
 			// An empty href normalizes to nothing, and an href that was only a query or a fragment
 			// to the empty path, and every route begins with `/`, so neither can match.
-			hrefPath, defined := normalizeURL(href)
+			hrefPath, defined := normalizeUrl(href)
 			if !defined || hrefPath == "" {
 				return
 			}
 			// Outgoing links are ignored.
-			if strings.HasPrefix(hrefPath, "http://") || strings.HasPrefix(hrefPath, "https://") || strings.HasPrefix(hrefPath, "//") {
+			if strings.HasPrefix(hrefPath, "http://") ||
+				strings.HasPrefix(hrefPath, "https://") ||
+				strings.HasPrefix(hrefPath, "//") {
 				return
 			}
 
@@ -124,7 +134,7 @@ var NoHtmlLinkForPages = rule.Rule{
 			// it unchanged and is not repeated here.
 			for _, route := range model.routes {
 				if route.Test(hrefPath) {
-					ctx.ReportNode(node, noHtmlLinkForPagesMessage(hrefPath))
+					ruleContext.ReportNode(node, noHtmlLinkForPagesMessage(hrefPath))
 				}
 			}
 		}

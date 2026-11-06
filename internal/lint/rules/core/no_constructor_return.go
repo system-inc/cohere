@@ -87,10 +87,10 @@ import (
 // and the illegal modifier is already the compiler's finding rather than something silence here
 // would help with. The alternative, guarding on the async modifier, would be inventing a judgment
 // upstream never made in order to imitate a parser failure, which is not the same thing as fidelity.
-var NoConstructorReturn = rule.Rule{
+var NoConstructorReturn = rule.Rule[rule.NoOptions]{
 	Name: "no-constructor-return",
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindReturnStatement: func(node *ast.Node) {
 				statement := node.AsReturnStatement()
@@ -104,7 +104,7 @@ var NoConstructorReturn = rule.Rule{
 					return
 				}
 
-				ctx.ReportNode(node, rule.Message{
+				ruleContext.ReportNode(node, rule.Message{
 					Id: "noConstructorReturn",
 					Description: "This returns a value from a constructor, where it is either " +
 						"discarded or worse. `new C()` evaluates to the new instance and throws " +

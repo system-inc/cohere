@@ -45,7 +45,7 @@ var messageUnnecessaryBind = rule.Message{
 //
 // Then: a function expression is reported only if no `this` appears in its own scope. `this` inside
 // a nested function belongs to that function, so it does not save the outer bind, and `this` inside
-// a nested ARROW does, because an arrow takes `this` from where it is written. An arrow receiver
+// a nested arrow does, because an arrow takes `this` from where it is written. An arrow receiver
 // needs no such scan and is always reported, since binding cannot change its `this` either way.
 //
 // # Why this gathers over the file rather than tracking a stack
@@ -73,13 +73,13 @@ var messageUnnecessaryBind = rule.Message{
 // reasons, and reproducing the decline is the point: a fixer that repaired them would delete a
 // comment or a side effect unattended.
 //
-// A trailing comment AFTER the call survives, because it is outside both spans:
+// A trailing comment after the call survives, because it is outside both spans:
 // `function(){}.bind(b)/**/` becomes `function(){}/**/`. That falls out of the spans rather than
 // being handled, and it is stated because it looks like an oversight.
-var NoExtraBind = rule.Rule{
+var NoExtraBind = rule.Rule[rule.NoOptions]{
 	Name: "no-extra-bind",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -95,14 +95,14 @@ var NoExtraBind = rule.Rule{
 						// A function expression can only be reported when nothing in its own scope
 						// reads `this`, which is what upstream's stack is for.
 						if !mentionsOwnThis(current) {
-							reportIfBoundOnce(ctx, current)
+							reportIfBoundOnce(ruleContext, current)
 						}
 					case ast.KindArrowFunction:
 						// No scan. An arrow's `this` comes from where it was written, so `.bind()`
 						// cannot change it and the binding is pointless either way. Upstream has a
 						// separate listener for exactly this reason, and its corpus pins it with
 						// `(() => { return this; }).bind(b)`, which reports.
-						reportIfBoundOnce(ctx, current)
+						reportIfBoundOnce(ruleContext, current)
 					}
 					current.ForEachChild(func(child *ast.Node) bool {
 						visit(child)
@@ -127,7 +127,7 @@ var NoExtraBind = rule.Rule{
 //
 // The recursion stops at a nested function expression, a function declaration, and any accessor or
 // method, because each of those rebinds `this` and a `this` inside one says nothing about the
-// function being judged. It does NOT stop at an arrow function, which is the whole distinction: an
+// function being judged. It does not stop at an arrow function, which is the whole distinction: an
 // arrow takes `this` from where it is written, so `function() { return () => this; }` does read its
 // own `this` and upstream leaves it alone. Both halves are in the corpus, as a failing case with a
 // nested function and a passing case with a nested arrow.
@@ -177,7 +177,7 @@ type boundCall struct {
 	access *ast.Node
 
 	// property is the node the finding points at: the `bind` identifier for a dot access, or the
-	// string or template literal INCLUDING its quotes for a subscript. Measured against the
+	// string or template literal including its quotes for a subscript. Measured against the
 	// installed rule, which reports `['bind']` over six columns rather than four.
 	property *ast.Node
 
@@ -196,13 +196,13 @@ type boundCall struct {
 }
 
 // reportIfBoundOnce reports a function that is the receiver of a single-argument `.bind()`.
-func reportIfBoundOnce(ctx rule.Context, function *ast.Node) {
+func reportIfBoundOnce(ruleContext rule.Context, function *ast.Node) {
 	bound := boundCallFor(function)
 	if bound == nil {
 		return
 	}
-	ctx.ReportRangeWithFixes(rule.TokenRange(ctx.SourceFile, bound.property),
-		messageUnnecessaryBind, bindRemovalFixes(ctx, *bound)...)
+	ruleContext.ReportRangeWithFixes(rule.TokenRange(ruleContext.SourceFile, bound.property),
+		messageUnnecessaryBind, bindRemovalFixes(ruleContext, *bound)...)
 }
 
 // boundCallFor recognises `<function>.bind(<one argument>)` around a function node.
@@ -228,17 +228,17 @@ func boundCallFor(function *ast.Node) *boundCall {
 		return nil
 	}
 
-	// Both arms below check that the function is the RECEIVER of the access rather than some other
+	// Both arms below check that the function is the receiver of the access rather than some other
 	// child of it, and a mutant dropping either one survives every fixture. Both survivals were
 	// resolved by probe rather than by adding a case, and they survive for two different reasons.
 	//
-	// The property arm is UNREACHABLE. A property access has exactly two children, the receiver and
+	// The property arm is unreachable. A property access has exactly two children, the receiver and
 	// the name, and the name is always an identifier or a private name, so a function expression
 	// reaching here can only be the receiver. Probed over 11 shapes and nothing produced the other
 	// arrangement.
 	//
-	// The element arm IS reachable -- `o[function(){}](b)` puts the function in the subscript -- and
-	// is SUBSUMED by `isStaticallyBind` four lines below, which asks for a string or a bare template
+	// The element arm is reachable -- `o[function(){}](b)` puts the function in the subscript -- and
+	// is subsumed by `isStaticallyBind` four lines below, which asks for a string or a bare template
 	// and answers false for a function expression. So no input can distinguish the two versions.
 	//
 	// Both are kept because they say what the rule means, and because the subsumption is one edit
@@ -332,11 +332,11 @@ func isStaticallyBind(node *ast.Node) bool {
 // parenthesis between them. The first span runs from the end of the receiver to the end of the
 // property; the second from the end of the member access to the end of the call.
 //
-// Both spans start at a node END rather than at a token start, which is deliberate: the `.`, `?.`,
+// Both spans start at a node end rather than at a token start, which is deliberate: the `.`, `?.`,
 // `[` and `(` tokens are not nodes here, and anchoring on the neighbouring node's end sweeps them up
 // without having to find them. It also means the spans are contiguous with the text that stays, so
 // the rewrite cannot leave a stray separator behind.
-func bindRemovalFixes(ctx rule.Context, bound boundCall) []rule.Fix {
+func bindRemovalFixes(ruleContext rule.Context, bound boundCall) []rule.Fix {
 	// An argument that might do something is left alone, because removing the call would stop it
 	// happening. Upstream's set is literal, identifier, `this`, function expression, and its comment
 	// says the set is stricter than it needs to be, so an arrow argument is declined here too even
@@ -345,18 +345,18 @@ func bindRemovalFixes(ctx rule.Context, bound boundCall) []rule.Fix {
 		return nil
 	}
 
-	sourceText := ctx.SourceFile.Text()
+	sourceText := ruleContext.SourceFile.Text()
 
-	// Both spans begin at a TOKEN start rather than at the preceding node's end, and that is the
+	// Both spans begin at a token start rather than at the preceding node's end, and that is the
 	// whole reason this reaches for the scanner. `function(){}/**/.bind(b)` has a comment between
 	// the receiver and the dot, and upstream repairs it to `function(){}/**/` -- the comment is
-	// BEFORE the first token it removes, so it survives and does not trip the comment check either.
+	// before the first token it removes, so it survives and does not trip the comment check either.
 	// Anchoring the span on the receiver's end instead swallows that comment, which turns a case
 	// upstream repairs into one this declines, and turns three more into silent comment deletion.
 	// `scanner.SkipTrivia` advances past whitespace and comments to the next real token, which is
 	// upstream's `getTokenAfter(..., isNotClosingParenToken)` for the shapes that can occur here.
 	//
-	// The first span ends at the ACCESS end rather than at the property end, and the difference is
+	// The first span ends at the access end rather than at the property end, and the difference is
 	// the closing bracket of a computed access. Upstream takes "the property name or the `]` token",
 	// which is one token in the dotted case and a different one in the subscript case; here the
 	// access node's own end is both. Ending at the property leaves a stray `]` behind, and the
@@ -375,10 +375,10 @@ func bindRemovalFixes(ctx rule.Context, bound boundCall) []rule.Fix {
 		bound.call.End())
 
 	// A comment anywhere between the start of the first span and the end of the second is enough to
-	// decline, INCLUDING one in the gap the two spans leave alone. Upstream asks the same question
+	// decline, including one in the gap the two spans leave alone. Upstream asks the same question
 	// over the same outer bounds rather than per span, and `function(){}.bind/**/(b)` is the case
 	// that separates them: the comment sits between the spans and upstream declines.
-	if commentsExistBetween(ctx, firstRemoval.Pos(), secondRemoval.End()) {
+	if commentsExistBetween(ruleContext, firstRemoval.Pos(), secondRemoval.End()) {
 		return nil
 	}
 
@@ -402,11 +402,11 @@ func receiverOf(access *ast.Node) *ast.Node {
 //
 // The literal arm is the one that needs measuring rather than reading, because "literal" names a
 // different set of shapes in each tree. An estree `Literal` is a string, a number, a regular
-// expression, `null`, a boolean, or a bigint -- and NOT a template, which is its own node kind, nor
+// expression, `null`, a boolean, or a bigint -- and not a template, which is its own node kind, nor
 // a negative number, which is a unary expression over a literal. Both of those are inside the
 // intuitive reading of "literal" and outside upstream's, and both are reported-but-not-fixed there.
 // A no-substitution template was in this list first, on that intuitive reading; measured against the
-// installed rule, a bare-template argument reports and is NOT repaired. The corpus writes no literal
+// installed rule, a bare-template argument reports and is not repaired. The corpus writes no literal
 // argument at all, so nothing imported could have separated the two readings.
 func isSideEffectFreeArgument(node *ast.Node) bool {
 	if node == nil {
@@ -432,8 +432,8 @@ func isSideEffectFreeArgument(node *ast.Node) bool {
 //
 // Cached per file through the shelf's comment reader rather than rescanning, since this runs once
 // per finding and a file can hold many.
-func commentsExistBetween(ctx rule.Context, from int, to int) bool {
-	for _, comment := range comments.ForFile(ctx) {
+func commentsExistBetween(ruleContext rule.Context, from int, to int) bool {
+	for _, comment := range comments.ForFile(ruleContext) {
 		if comment.Range.Pos() >= from && comment.Range.Pos() < to {
 			return true
 		}

@@ -1,13 +1,23 @@
 package javascript
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/system-inc/cohere/internal/format/estree"
+)
 
 // utilities/node-types.js, utilities/literal.js, utilities/get-raw.js and the small type predicates
 // built on them. Flow and Babel type names stay in the lists, as upstream has them, so a list reads
 // against its source even though only the TypeScript and ESTree names occur here.
 
 func isBinaryCastExpression(node Node) bool {
-	return node.Is("TSAsExpression", "TSSatisfiesExpression", "AsExpression", "AsConstExpression", "SatisfiesExpression")
+	return node.Is(
+		"TSAsExpression",
+		"TSSatisfiesExpression",
+		"AsExpression",
+		"AsConstExpression",
+		"SatisfiesExpression",
+	)
 }
 func isSatisfiesExpression(node Node) bool {
 	return node.Is("SatisfiesExpression", "TSSatisfiesExpression")
@@ -62,17 +72,12 @@ func isTypeParameterInstantiation(node Node) bool {
 	return node.Is("TSTypeParameterInstantiation", "TypeParameterInstantiation")
 }
 
-// isBigIntLiteral is upstream's isBigIntLiteral.
-func isBigIntLiteral(node Node) bool {
-	return node.Is("BigIntLiteral") || node.Is("Literal") && node.Truthy("bigint")
-}
-
 // isBooleanLiteral is upstream's isBooleanLiteral.
 func isBooleanLiteral(node Node) bool {
 	if node.Is("BooleanLiteral") {
 		return true
 	}
-	_, isBool := node.Get("value").(bool)
+	_, isBool := node.Get("value").(estree.Boolean)
 	return node.Is("Literal") && isBool
 }
 
@@ -81,7 +86,7 @@ func isNumericLiteral(node Node) bool {
 	if node.Is("NumericLiteral") {
 		return true
 	}
-	_, isNumber := node.Get("value").(float64)
+	_, isNumber := node.Get("value").(estree.Number)
 	return node.Is("Literal") && isNumber
 }
 
@@ -95,7 +100,7 @@ func isStringLiteral(node Node) bool {
 	if node.Is("StringLiteral") {
 		return true
 	}
-	_, isString := node.Get("value").(string)
+	_, isString := node.Get("value").(estree.String)
 	return node.Is("Literal") && isString
 }
 
@@ -134,29 +139,30 @@ func isNodeMatches(node Node, nameOrPaths []string) bool {
 // is left before it, and second (index 1) when exactly one name is.
 func isNodeMatchesNameOrPath(node Node, nameOrPath string) bool {
 	rest := nameOrPath
+	current := node
 	for {
 		dot := strings.LastIndexByte(rest, '.')
 		name := rest[dot+1:]
 		if dot == -1 {
-			return node.Is("Identifier") && node.String("name") == name
+			return current.Is("Identifier") && current.String("name") == name
 		}
 		rest = rest[:dot]
 		isSecond := strings.IndexByte(rest, '.') == -1
-		if isSecond && node.Is("MetaProperty") && node.Child("property").Is("Identifier") &&
-			node.Child("property").String("name") == name {
-			node = node.Child("meta")
+		if isSecond && current.Is("MetaProperty") && current.Child("property").Is("Identifier") &&
+			current.Child("property").String("name") == name {
+			current = current.Child("meta")
 			continue
 		}
-		if node.Is("MemberExpression") && !node.Truthy("optional") && !node.Truthy("computed") &&
-			node.Child("property").Is("Identifier") && node.Child("property").String("name") == name {
-			node = node.Child("object")
+		if current.Is("MemberExpression") && !current.Truthy("optional") && !current.Truthy("computed") &&
+			current.Child("property").Is("Identifier") && current.Child("property").String("name") == name {
+			current = current.Child("object")
 			continue
 		}
 		return false
 	}
 }
 
-// precedence is upstream's PRECEDENCE, utilities/get-precedence.js.
+// precedence is upstream's precedence, utilities/get-precedence.js.
 var precedence = func() map[string]int {
 	table := map[string]int{}
 	for index, operators := range [][]string{
@@ -205,7 +211,9 @@ func shouldFlatten(parentOperator string, nodeOperator string) bool {
 		parentOperator == "%" && multiplicativeOperators[nodeOperator] {
 		return false
 	}
-	if nodeOperator != parentOperator && multiplicativeOperators[nodeOperator] && multiplicativeOperators[parentOperator] {
+	if nodeOperator != parentOperator &&
+		multiplicativeOperators[nodeOperator] &&
+		multiplicativeOperators[parentOperator] {
 		return false
 	}
 	if bitshiftOperators[parentOperator] && bitshiftOperators[nodeOperator] {

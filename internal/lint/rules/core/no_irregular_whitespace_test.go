@@ -12,7 +12,11 @@ import (
 const irregularWhitespaceFile = "/repository/source/IrregularWhitespace.tsx"
 
 // boolOf exists because the options are pointers and Go has no address-of for a literal.
-func boolOf(value bool) *bool { return &value }
+// The pointer is to a local copy, so nothing the caller passed is reachable through it.
+func boolOf(value bool) *bool {
+	held := value
+	return &held
+}
 
 // The corpus is oxc's, copied rather than rewritten, and it needed reconciling before it could be
 // copied at all.
@@ -37,266 +41,1600 @@ func boolOf(value bool) *bool { return &value }
 // a literal would be unreviewable in a diff, would not survive a copy and paste, and would trip this
 // very rule on the file that tests it.
 
-func TestNoIrregularWhitespaceFires(t *testing.T) {
-	t.Parallel()
+func TestNoIrregularWhitespaceFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
 		options    NoIrregularWhitespaceOptions
 		findings   int
 	}{
-		{"var any \x0b = 'thing';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}, 1},
-		{"var any \x0c = 'thing';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}, 1},
-		{"var any \u00a0 = 'thing';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}, 1},
-		{"var any \ufeff = 'thing';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}, 1},
-		{"var any \u2000 = 'thing';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}, 1},
-		{"var any \u2001 = 'thing';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}, 1},
-		{"var any \u2002 = 'thing';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}, 1},
-		{"var any \u2003 = 'thing';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}, 1},
-		{"var any \u2004 = 'thing';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}, 1},
-		{"var any \u2005 = 'thing';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}, 1},
-		{"var any \u2006 = 'thing';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}, 1},
-		{"var any \u2007 = 'thing';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}, 1},
-		{"var any \u2008 = 'thing';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}, 1},
-		{"var any \u2009 = 'thing';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}, 1},
-		{"var any \u200a = 'thing';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}, 1},
-		{"var any \u2028 = 'thing';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}, 1},
-		{"var any \u2029 = 'thing';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}, 1},
-		{"var any \u202f = 'thing';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}, 1},
-		{"var any \u205f = 'thing';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}, 1},
-		{"var any \u3000 = 'thing';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}, 1},
-		{"var a = 'b',\u2028c = 'd',\n            e = 'f'\u2028", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}, 2},
-		{"var any \u3000 = 'thing', other \u3000 = 'thing';\n            var third \u3000 = 'thing';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}, 3},
-		{"var any = '\u3000', other = '\x0b';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(false), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}, 2},
-		{"var any = `\u3000`, other = `\x0b`;", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(false), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}, 2},
-		{"`something ${\u3000 10} another thing`", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}, 1},
-		{"`something ${10\u3000} another thing`", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}, 1},
-		{"\u3000\n            `\u3000template`", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}, 1},
-		{"\u3000\n            `\u3000multiline\n            template`", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}, 1},
-		{"\u3000`\u3000template`", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}, 1},
-		{"\u3000`\u3000multiline\n            template`", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}, 1},
-		{"`\u3000template`\u3000", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}, 1},
-		{"`\u3000multiline\n            template`\u3000", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}, 1},
-		{"`\u3000template`\n            \u3000", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}, 1},
-		{"`\u3000multiline\n            template`\n            \u3000", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}, 1},
-		{"var foo = \x0b bar;", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}, 1},
-		{"var foo =\x0bbar;", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}, 1},
+		{"var any \x0b = 'thing';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}, 1},
+		{"var any \x0c = 'thing';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}, 1},
+		{"var any \u00a0 = 'thing';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}, 1},
+		{"var any \ufeff = 'thing';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}, 1},
+		{"var any \u2000 = 'thing';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}, 1},
+		{"var any \u2001 = 'thing';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}, 1},
+		{"var any \u2002 = 'thing';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}, 1},
+		{"var any \u2003 = 'thing';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}, 1},
+		{"var any \u2004 = 'thing';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}, 1},
+		{"var any \u2005 = 'thing';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}, 1},
+		{"var any \u2006 = 'thing';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}, 1},
+		{"var any \u2007 = 'thing';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}, 1},
+		{"var any \u2008 = 'thing';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}, 1},
+		{"var any \u2009 = 'thing';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}, 1},
+		{"var any \u200a = 'thing';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}, 1},
+		{"var any \u2028 = 'thing';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}, 1},
+		{"var any \u2029 = 'thing';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}, 1},
+		{"var any \u202f = 'thing';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}, 1},
+		{"var any \u205f = 'thing';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}, 1},
+		{"var any \u3000 = 'thing';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}, 1},
+		{"var a = 'b',\u2028c = 'd',\n            e = 'f'\u2028", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}, 2},
+		{
+			"var any \u3000 = 'thing', other \u3000 = 'thing';\n            var third \u3000 = 'thing';",
+			NoIrregularWhitespaceOptions{
+				SkipComments:  boolOf(false),
+				SkipStrings:   boolOf(true),
+				SkipTemplates: boolOf(true),
+				SkipRegExps:   boolOf(true),
+				SkipJsxText:   boolOf(true),
+			},
+			3,
+		},
+		{"var any = '\u3000', other = '\x0b';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(false),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}, 2},
+		{"var any = `\u3000`, other = `\x0b`;", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(false),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}, 2},
+		{"`something ${\u3000 10} another thing`", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}, 1},
+		{"`something ${10\u3000} another thing`", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}, 1},
+		{"\u3000\n            `\u3000template`", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}, 1},
+		{"\u3000\n            `\u3000multiline\n            template`", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}, 1},
+		{"\u3000`\u3000template`", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}, 1},
+		{"\u3000`\u3000multiline\n            template`", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}, 1},
+		{"`\u3000template`\u3000", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}, 1},
+		{"`\u3000multiline\n            template`\u3000", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}, 1},
+		{"`\u3000template`\n            \u3000", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}, 1},
+		{"`\u3000multiline\n            template`\n            \u3000", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}, 1},
+		{"var foo = \x0b bar;", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}, 1},
+		{"var foo =\x0bbar;", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}, 1},
 		// A run of irregular spaces on one line is one finding, as ESLint counts these four rows (#jjfa7qb)
-		{"var foo = \x0b\x0b bar;", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}, 1},
-		{"var foo = \x0b\x0c bar;", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}, 1},
-		{"var foo = \x0b \x0b bar;", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}, 2},
-		{"var foo = \x0bbar\x0b;", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}, 2},
-		{"\x0b", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}, 1},
-		{"\u00a0\u2002\u2003", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}, 1},
-		{"var foo = \x0b\n            bar;", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}, 1},
-		{"var foo =\x0b\n            \x0bbar;", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}, 2},
-		{"var foo = \x0c\x0b\n            \x0c\x0b\x0cbar\n            ;\x0b\x0c\n            ", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}, 3},
-		{"var foo = \u2028bar;", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}, 1},
-		{"var foo =\u2029 bar;", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}, 1},
-		{"var foo = bar;\u2028", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}, 1},
-		{"\u2029", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}, 1},
-		{"foo\u2028\u2028", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}, 2},
-		{"foo\u2029\u2028", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}, 2},
-		{"foo\u2028\n            \u2028", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}, 2},
-		{"foo\x0b\u2028\x0b", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}, 3},
-		{"// \u3000", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}, 1},
-		{"/* \u3000 */", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}, 1},
-		{"var any = /\u3000/, other = /\u200b/;", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(false), SkipJSXText: boolOf(true)}, 2},
-		{"var any = `\u3000`, other = `\u200b`;", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(false), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}, 2},
-		{"<div>\u3000</div>;", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(false)}, 1},
+		{"var foo = \x0b\x0b bar;", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}, 1},
+		{"var foo = \x0b\x0c bar;", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}, 1},
+		{"var foo = \x0b \x0b bar;", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}, 2},
+		{"var foo = \x0bbar\x0b;", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}, 2},
+		{"\x0b", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}, 1},
+		{"\u00a0\u2002\u2003", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}, 1},
+		{"var foo = \x0b\n            bar;", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}, 1},
+		{"var foo =\x0b\n            \x0bbar;", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}, 2},
+		{
+			"var foo = \x0c\x0b\n            \x0c\x0b\x0cbar\n            ;\x0b\x0c\n            ",
+			NoIrregularWhitespaceOptions{
+				SkipComments:  boolOf(false),
+				SkipStrings:   boolOf(true),
+				SkipTemplates: boolOf(true),
+				SkipRegExps:   boolOf(true),
+				SkipJsxText:   boolOf(true),
+			},
+			3,
+		},
+		{"var foo = \u2028bar;", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}, 1},
+		{"var foo =\u2029 bar;", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}, 1},
+		{"var foo = bar;\u2028", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}, 1},
+		{"\u2029", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}, 1},
+		{"foo\u2028\u2028", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}, 2},
+		{"foo\u2029\u2028", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}, 2},
+		{"foo\u2028\n            \u2028", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}, 2},
+		{"foo\x0b\u2028\x0b", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}, 3},
+		{"// \u3000", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}, 1},
+		{"/* \u3000 */", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}, 1},
+		{"var any = /\u3000/, other = /\u200b/;", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(false),
+			SkipJsxText:   boolOf(true),
+		}, 2},
+		{"var any = `\u3000`, other = `\u200b`;", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(false),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}, 2},
+		{"<div>\u3000</div>;", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(false),
+		}, 1},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoIrregularWhitespace,
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoIrregularWhitespace,
 				irregularWhitespaceFile, testCase.sourceText, testCase.options)
 
 			wanted := make([]string, testCase.findings)
 			for index := range wanted {
 				wanted[index] = "noIrregularWhitespace"
 			}
-			rule_testing.ExpectFindings(t, result, wanted...)
+			rule_testing.ExpectFindings(test, result, wanted...)
 		})
 	}
 }
 
-func TestNoIrregularWhitespaceStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoIrregularWhitespaceStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
 		options    NoIrregularWhitespaceOptions
 	}{
-		{"'\\u000B';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"'\\u000C';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"'\\u0085';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"'\\u00A0';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"'\\u180E';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"'\\ufeff';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"'\\u2000';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"'\\u2001';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"'\\u2002';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"'\\u2003';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"'\\u2004';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"'\\u2005';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"'\\u2006';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"'\\u2007';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"'\\u2008';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"'\\u2009';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"'\\u200A';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"'\\u200B';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"'\\u2028';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"'\\u2029';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"'\\u202F';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"'\\u205f';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"'\\u3000';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"'\x0b';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"'\x0c';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"'\u0085';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"'\u00a0';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"'\u180e';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"'\ufeff';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"'\u2000';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"'\u2001';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"'\u2002';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"'\u2003';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"'\u2004';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"'\u2005';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"'\u2006';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"'\u2007';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"'\u2008';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"'\u2009';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"'\u200a';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"'\u200b';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"'\\\u2028';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"'\\\u2029';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"'\u202f';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"'\u205f';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"'\u3000';", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"// \x0b", NoIrregularWhitespaceOptions{SkipComments: boolOf(true), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"// \x0c", NoIrregularWhitespaceOptions{SkipComments: boolOf(true), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"// \u0085", NoIrregularWhitespaceOptions{SkipComments: boolOf(true), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"// \u00a0", NoIrregularWhitespaceOptions{SkipComments: boolOf(true), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"// \u180e", NoIrregularWhitespaceOptions{SkipComments: boolOf(true), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"// \ufeff", NoIrregularWhitespaceOptions{SkipComments: boolOf(true), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"// \u2000", NoIrregularWhitespaceOptions{SkipComments: boolOf(true), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"// \u2001", NoIrregularWhitespaceOptions{SkipComments: boolOf(true), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"// \u2002", NoIrregularWhitespaceOptions{SkipComments: boolOf(true), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"// \u2003", NoIrregularWhitespaceOptions{SkipComments: boolOf(true), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"// \u2004", NoIrregularWhitespaceOptions{SkipComments: boolOf(true), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"// \u2005", NoIrregularWhitespaceOptions{SkipComments: boolOf(true), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"// \u2006", NoIrregularWhitespaceOptions{SkipComments: boolOf(true), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"// \u2007", NoIrregularWhitespaceOptions{SkipComments: boolOf(true), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"// \u2008", NoIrregularWhitespaceOptions{SkipComments: boolOf(true), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"// \u2009", NoIrregularWhitespaceOptions{SkipComments: boolOf(true), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"// \u200a", NoIrregularWhitespaceOptions{SkipComments: boolOf(true), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"// \u200b", NoIrregularWhitespaceOptions{SkipComments: boolOf(true), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"// \u202f", NoIrregularWhitespaceOptions{SkipComments: boolOf(true), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"// \u205f", NoIrregularWhitespaceOptions{SkipComments: boolOf(true), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"// \u3000", NoIrregularWhitespaceOptions{SkipComments: boolOf(true), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"/* \x0b */", NoIrregularWhitespaceOptions{SkipComments: boolOf(true), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"/* \x0c */", NoIrregularWhitespaceOptions{SkipComments: boolOf(true), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"/* \u0085 */", NoIrregularWhitespaceOptions{SkipComments: boolOf(true), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"/* \u00a0 */", NoIrregularWhitespaceOptions{SkipComments: boolOf(true), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"/* \u180e */", NoIrregularWhitespaceOptions{SkipComments: boolOf(true), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"/* \ufeff */", NoIrregularWhitespaceOptions{SkipComments: boolOf(true), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"/* \u2000 */", NoIrregularWhitespaceOptions{SkipComments: boolOf(true), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"/* \u2001 */", NoIrregularWhitespaceOptions{SkipComments: boolOf(true), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"/* \u2002 */", NoIrregularWhitespaceOptions{SkipComments: boolOf(true), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"/* \u2003 */", NoIrregularWhitespaceOptions{SkipComments: boolOf(true), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"/* \u2004 */", NoIrregularWhitespaceOptions{SkipComments: boolOf(true), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"/* \u2005 */", NoIrregularWhitespaceOptions{SkipComments: boolOf(true), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"/* \u2006 */", NoIrregularWhitespaceOptions{SkipComments: boolOf(true), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"/* \u2007 */", NoIrregularWhitespaceOptions{SkipComments: boolOf(true), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"/* \u2008 */", NoIrregularWhitespaceOptions{SkipComments: boolOf(true), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"/* \u2009 */", NoIrregularWhitespaceOptions{SkipComments: boolOf(true), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"/* \u200a */", NoIrregularWhitespaceOptions{SkipComments: boolOf(true), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"/* \u200b */", NoIrregularWhitespaceOptions{SkipComments: boolOf(true), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"/* \u2028 */", NoIrregularWhitespaceOptions{SkipComments: boolOf(true), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"/* \u2029 */", NoIrregularWhitespaceOptions{SkipComments: boolOf(true), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"/* \u202f */", NoIrregularWhitespaceOptions{SkipComments: boolOf(true), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"/* \u205f */", NoIrregularWhitespaceOptions{SkipComments: boolOf(true), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"/* \u3000 */", NoIrregularWhitespaceOptions{SkipComments: boolOf(true), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"#!/usr/bin/env\u200bnode", NoIrregularWhitespaceOptions{SkipComments: boolOf(true), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"/\x0b/", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"/\x0c/", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"/\u0085/", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"/\u00a0/", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"/\u180e/", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"/\ufeff/", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"/\u2000/", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"/\u2001/", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"/\u2002/", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"/\u2003/", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"/\u2004/", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"/\u2005/", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"/\u2006/", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"/\u2007/", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"/\u2008/", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"/\u2009/", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"/\u200a/", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"/\u200b/", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"/\u202f/", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"/\u205f/", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"/\u3000/", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"`\x0b`", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"`\x0c`", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"`\u0085`", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"`\u00a0`", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"`\u180e`", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"`\ufeff`", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"`\u2000`", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"`\u2001`", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"`\u2002`", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"`\u2003`", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"`\u2004`", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"`\u2005`", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"`\u2006`", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"`\u2007`", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"`\u2008`", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"`\u2009`", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"`\u200a`", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"`\u200b`", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"`\u202f`", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"`\u205f`", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"`\u3000`", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"`\u3000${foo}\u3000`", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"const error = ` \u3000 `;", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"const error = `\n            \u3000`;", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"const error = `\u3000\n            `;", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"const error = `\n            \u3000\n            `;", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"const error = `foo\u3000bar\n            foo\u3000bar`;", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"<div>\x0b</div>;", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"<div>\x0c</div>;", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"<div>\u0085</div>;", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"<div>\u00a0</div>;", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"<div>\u180e</div>;", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"<div>\ufeff</div>;", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"<div>\u2000</div>;", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"<div>\u2001</div>;", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"<div>\u2002</div>;", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"<div>\u2003</div>;", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"<div>\u2004</div>;", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"<div>\u2005</div>;", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"<div>\u2006</div>;", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"<div>\u2007</div>;", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"<div>\u2008</div>;", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"<div>\u2009</div>;", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"<div>\u200a</div>;", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"<div>\u200b</div>;", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"<div>\u202f</div>;", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"<div>\u205f</div>;", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"<div>\u3000</div>;", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"\ufeffconsole.log('hello BOM');", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"var any = /\u3000/, other = /\x0b/;", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
-		{"var any = `\u3000`, other = `\x0b`;", NoIrregularWhitespaceOptions{SkipComments: boolOf(false), SkipStrings: boolOf(true), SkipTemplates: boolOf(true), SkipRegExps: boolOf(true), SkipJSXText: boolOf(true)}},
+		{"'\\u000B';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"'\\u000C';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"'\\u0085';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"'\\u00A0';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"'\\u180E';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"'\\ufeff';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"'\\u2000';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"'\\u2001';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"'\\u2002';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"'\\u2003';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"'\\u2004';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"'\\u2005';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"'\\u2006';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"'\\u2007';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"'\\u2008';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"'\\u2009';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"'\\u200A';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"'\\u200B';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"'\\u2028';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"'\\u2029';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"'\\u202F';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"'\\u205f';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"'\\u3000';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"'\x0b';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"'\x0c';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"'\u0085';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"'\u00a0';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"'\u180e';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"'\ufeff';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"'\u2000';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"'\u2001';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"'\u2002';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"'\u2003';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"'\u2004';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"'\u2005';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"'\u2006';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"'\u2007';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"'\u2008';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"'\u2009';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"'\u200a';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"'\u200b';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"'\\\u2028';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"'\\\u2029';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"'\u202f';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"'\u205f';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"'\u3000';", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"// \x0b", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(true),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"// \x0c", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(true),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"// \u0085", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(true),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"// \u00a0", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(true),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"// \u180e", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(true),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"// \ufeff", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(true),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"// \u2000", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(true),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"// \u2001", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(true),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"// \u2002", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(true),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"// \u2003", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(true),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"// \u2004", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(true),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"// \u2005", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(true),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"// \u2006", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(true),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"// \u2007", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(true),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"// \u2008", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(true),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"// \u2009", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(true),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"// \u200a", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(true),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"// \u200b", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(true),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"// \u202f", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(true),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"// \u205f", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(true),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"// \u3000", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(true),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"/* \x0b */", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(true),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"/* \x0c */", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(true),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"/* \u0085 */", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(true),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"/* \u00a0 */", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(true),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"/* \u180e */", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(true),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"/* \ufeff */", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(true),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"/* \u2000 */", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(true),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"/* \u2001 */", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(true),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"/* \u2002 */", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(true),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"/* \u2003 */", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(true),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"/* \u2004 */", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(true),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"/* \u2005 */", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(true),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"/* \u2006 */", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(true),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"/* \u2007 */", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(true),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"/* \u2008 */", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(true),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"/* \u2009 */", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(true),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"/* \u200a */", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(true),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"/* \u200b */", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(true),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"/* \u2028 */", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(true),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"/* \u2029 */", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(true),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"/* \u202f */", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(true),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"/* \u205f */", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(true),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"/* \u3000 */", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(true),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"#!/usr/bin/env\u200bnode", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(true),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"/\x0b/", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"/\x0c/", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"/\u0085/", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"/\u00a0/", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"/\u180e/", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"/\ufeff/", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"/\u2000/", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"/\u2001/", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"/\u2002/", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"/\u2003/", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"/\u2004/", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"/\u2005/", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"/\u2006/", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"/\u2007/", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"/\u2008/", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"/\u2009/", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"/\u200a/", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"/\u200b/", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"/\u202f/", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"/\u205f/", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"/\u3000/", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"`\x0b`", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"`\x0c`", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"`\u0085`", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"`\u00a0`", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"`\u180e`", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"`\ufeff`", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"`\u2000`", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"`\u2001`", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"`\u2002`", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"`\u2003`", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"`\u2004`", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"`\u2005`", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"`\u2006`", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"`\u2007`", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"`\u2008`", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"`\u2009`", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"`\u200a`", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"`\u200b`", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"`\u202f`", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"`\u205f`", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"`\u3000`", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"`\u3000${foo}\u3000`", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"const error = ` \u3000 `;", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"const error = `\n            \u3000`;", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"const error = `\u3000\n            `;", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"const error = `\n            \u3000\n            `;", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"const error = `foo\u3000bar\n            foo\u3000bar`;", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"<div>\x0b</div>;", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"<div>\x0c</div>;", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"<div>\u0085</div>;", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"<div>\u00a0</div>;", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"<div>\u180e</div>;", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"<div>\ufeff</div>;", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"<div>\u2000</div>;", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"<div>\u2001</div>;", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"<div>\u2002</div>;", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"<div>\u2003</div>;", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"<div>\u2004</div>;", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"<div>\u2005</div>;", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"<div>\u2006</div>;", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"<div>\u2007</div>;", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"<div>\u2008</div>;", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"<div>\u2009</div>;", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"<div>\u200a</div>;", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"<div>\u200b</div>;", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"<div>\u202f</div>;", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"<div>\u205f</div>;", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"<div>\u3000</div>;", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"\ufeffconsole.log('hello BOM');", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"var any = /\u3000/, other = /\x0b/;", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
+		{"var any = `\u3000`, other = `\x0b`;", NoIrregularWhitespaceOptions{
+			SkipComments:  boolOf(false),
+			SkipStrings:   boolOf(true),
+			SkipTemplates: boolOf(true),
+			SkipRegExps:   boolOf(true),
+			SkipJsxText:   boolOf(true),
+		}},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoIrregularWhitespace,
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoIrregularWhitespace,
 				irregularWhitespaceFile, testCase.sourceText, testCase.options))
 		})
 	}
@@ -307,8 +1645,8 @@ func TestNoIrregularWhitespaceStaysSilent(t *testing.T) {
 // Both cases cover the two paths that carry no node: a zero width space inside a line comment, and
 // one inside a hashbang. Their diagnostic counts are stated nowhere upstream, so these two are read
 // from the code rather than from a snapshot, which is the reason the block exists at all.
-func TestNoIrregularWhitespaceCoversTheUnsnapshottedBlock(t *testing.T) {
-	t.Parallel()
+func TestNoIrregularWhitespaceCoversTheUnsnapshottedBlock(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -322,9 +1660,9 @@ func TestNoIrregularWhitespaceCoversTheUnsnapshottedBlock(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoIrregularWhitespace,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoIrregularWhitespace,
 				irregularWhitespaceFile, testCase.sourceText,
 				NoIrregularWhitespaceOptions{SkipComments: boolOf(false)}),
 				"noIrregularWhitespace")
@@ -343,8 +1681,8 @@ func TestNoIrregularWhitespaceCoversTheUnsnapshottedBlock(t *testing.T) {
 // The multi-byte cases carry the weight. An ideographic space is three bytes in UTF-8, so a span
 // built by counting characters rather than bytes points at a prefix of it, and a span of fixed width
 // one is wrong the same way. Byte offsets are what a range holds here.
-func TestNoIrregularWhitespaceReportsTheCharacterItself(t *testing.T) {
-	t.Parallel()
+func TestNoIrregularWhitespaceReportsTheCharacterItself(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -389,19 +1727,19 @@ func TestNoIrregularWhitespaceReportsTheCharacterItself(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoIrregularWhitespace,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoIrregularWhitespace,
 				irregularWhitespaceFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
-				t.Fatalf("wanted %d findings, got %d",
+				test.Fatalf("wanted %d findings, got %d",
 					len(testCase.wantSpans), len(result.Diagnostics))
 			}
 			for index, wantSpan := range testCase.wantSpans {
 				diagnostic := result.Diagnostics[index]
 				reported := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if reported != wantSpan {
-					t.Fatalf("finding %d reported %q, wanted %q", index, reported, wantSpan)
+					test.Fatalf("finding %d reported %q, wanted %q", index, reported, wantSpan)
 				}
 			}
 		})
@@ -417,8 +1755,8 @@ func TestNoIrregularWhitespaceReportsTheCharacterItself(t *testing.T) {
 // three from its set and still pass every imported case. U+180E is the sharpest: it is the character
 // oxc adds by hand on top of its parser predicate, and the one character the near-miss helper in
 // this tree omits, so taking the set from the wrong source drops it silently.
-func TestNoIrregularWhitespaceCoversCharactersUpstreamNeverFails(t *testing.T) {
-	t.Parallel()
+func TestNoIrregularWhitespaceCoversCharactersUpstreamNeverFails(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -433,10 +1771,10 @@ func TestNoIrregularWhitespaceCoversCharactersUpstreamNeverFails(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoIrregularWhitespace, irregularWhitespaceFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, NoIrregularWhitespace, irregularWhitespaceFile, testCase.sourceText),
 				"noIrregularWhitespace")
 		})
 	}
@@ -449,10 +1787,10 @@ func TestNoIrregularWhitespaceCoversCharactersUpstreamNeverFails(t *testing.T) {
 // every file. Nothing in the imported corpus fails if all four leak into the set, because upstream
 // never wrote a case for code containing an ordinary space; every clean case it does have would go
 // red, but only once somebody ran them.
-func TestNoIrregularWhitespaceAllowsOrdinaryWhitespace(t *testing.T) {
-	t.Parallel()
+func TestNoIrregularWhitespaceAllowsOrdinaryWhitespace(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectClean(t, rule_testing.Run(t, NoIrregularWhitespace, irregularWhitespaceFile,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, NoIrregularWhitespace, irregularWhitespaceFile,
 		"const first = 1;\n\tconst second = 2;\r\nconst third = 3;\n"))
 }
 
@@ -462,13 +1800,13 @@ func TestNoIrregularWhitespaceAllowsOrdinaryWhitespace(t *testing.T) {
 // failing half is the half a port gets wrong: a carve-out written as "skip U+FEFF" rather than "skip
 // U+FEFF at offset zero" passes the imported case and then silently stops reporting the character
 // everywhere else in the file.
-func TestNoIrregularWhitespaceExcusesOnlyTheLeadingByteOrderMark(t *testing.T) {
-	t.Parallel()
+func TestNoIrregularWhitespaceExcusesOnlyTheLeadingByteOrderMark(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectClean(t, rule_testing.Run(t, NoIrregularWhitespace, irregularWhitespaceFile,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, NoIrregularWhitespace, irregularWhitespaceFile,
 		"\ufeffconsole.log('hello BOM');"))
 
-	rule_testing.ExpectFindings(t, rule_testing.Run(t, NoIrregularWhitespace, irregularWhitespaceFile,
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, NoIrregularWhitespace, irregularWhitespaceFile,
 		"console.log('hello');\ufeff"), "noIrregularWhitespace")
 }
 
@@ -479,10 +1817,10 @@ func TestNoIrregularWhitespaceExcusesOnlyTheLeadingByteOrderMark(t *testing.T) {
 // ideographic space here stands in code position, before the string begins, and skipStrings must not
 // reach backwards over it. Upstream has no case for this because oxc never computes a skip region at
 // all, so nothing on that side could have caught it.
-func TestNoIrregularWhitespaceDoesNotExcuseTriviaBeforeASkippedLiteral(t *testing.T) {
-	t.Parallel()
+func TestNoIrregularWhitespaceDoesNotExcuseTriviaBeforeASkippedLiteral(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectFindings(t, rule_testing.Run(t, NoIrregularWhitespace, irregularWhitespaceFile,
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, NoIrregularWhitespace, irregularWhitespaceFile,
 		"const value =\u3000'text';"), "noIrregularWhitespace")
 }
 
@@ -492,16 +1830,16 @@ func TestNoIrregularWhitespaceDoesNotExcuseTriviaBeforeASkippedLiteral(t *testin
 // a case of our own because the two implementations reach it differently. oxc excuses the quasis one
 // at a time and never sees the template expression as a unit, while this walks the tree and could
 // excuse the whole span in a single line. That version passes every other template case here.
-func TestNoIrregularWhitespaceReportsInsideASkippedTemplatesInterpolation(t *testing.T) {
-	t.Parallel()
+func TestNoIrregularWhitespaceReportsInsideASkippedTemplatesInterpolation(test *testing.T) {
+	test.Parallel()
 
 	skipTemplates := NoIrregularWhitespaceOptions{SkipTemplates: boolOf(true)}
 
-	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoIrregularWhitespace,
+	rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoIrregularWhitespace,
 		irregularWhitespaceFile, "`before ${\u3000 value} after`", skipTemplates),
 		"noIrregularWhitespace")
 
-	rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoIrregularWhitespace,
+	rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoIrregularWhitespace,
 		irregularWhitespaceFile, "`before\u3000 ${value} after`", skipTemplates))
 }
 
@@ -511,11 +1849,11 @@ func TestNoIrregularWhitespaceReportsInsideASkippedTemplatesInterpolation(t *tes
 // options at all. Four of the five defaults are Go's zero value and would survive the options block
 // being deleted entirely; skipStrings is the one that would not, and it is the one where "the config
 // said false" and "the config said nothing" mean opposite things.
-func TestNoIrregularWhitespaceDefaults(t *testing.T) {
-	t.Parallel()
+func TestNoIrregularWhitespaceDefaults(test *testing.T) {
+	test.Parallel()
 
 	// skipStrings defaults to on, so a string stays quiet.
-	rule_testing.ExpectClean(t, rule_testing.Run(t, NoIrregularWhitespace, irregularWhitespaceFile,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, NoIrregularWhitespace, irregularWhitespaceFile,
 		"var any = '\u3000';"))
 
 	// The other four default to off, so each of these reports.
@@ -525,7 +1863,7 @@ func TestNoIrregularWhitespaceDefaults(t *testing.T) {
 		"var any = /\u3000/;",
 		"var any = <div>\u3000</div>;",
 	} {
-		rule_testing.ExpectFindings(t, rule_testing.Run(t, NoIrregularWhitespace,
+		rule_testing.ExpectFindings(test, rule_testing.Run(test, NoIrregularWhitespace,
 			irregularWhitespaceFile, sourceText), "noIrregularWhitespace")
 	}
 }
@@ -536,10 +1874,10 @@ func TestNoIrregularWhitespaceDefaults(t *testing.T) {
 // measured behavior of the shelf on this exact input is that it returns no comment at all, so the
 // ideographic space here is inside a string and nothing else. Under skipComments with skipStrings
 // off it must still report, which a rule finding its comments by scanning text would get wrong.
-func TestNoIrregularWhitespaceDoesNotTreatACommentOpenerInAStringAsAComment(t *testing.T) {
-	t.Parallel()
+func TestNoIrregularWhitespaceDoesNotTreatACommentOpenerInAStringAsAComment(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoIrregularWhitespace,
+	rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoIrregularWhitespace,
 		irregularWhitespaceFile, "var s = '// not a comment \u3000';",
 		NoIrregularWhitespaceOptions{SkipComments: boolOf(true), SkipStrings: boolOf(false)}),
 		"noIrregularWhitespace")
@@ -558,14 +1896,14 @@ func TestNoIrregularWhitespaceDoesNotTreatACommentOpenerInAStringAsAComment(t *t
 // an e-acute is two bytes and an ideographic space is three, so the irregular character begins
 // exactly at the byte an off-by-one guard skips. Every other case in this file puts ASCII in front
 // of its irregular character, where a mis-stepped index happens to land correctly.
-func TestNoIrregularWhitespaceFindsAnIrregularCharacterAbuttingAMultiByteOne(t *testing.T) {
-	t.Parallel()
+func TestNoIrregularWhitespaceFindsAnIrregularCharacterAbuttingAMultiByteOne(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectFindings(t, rule_testing.Run(t, NoIrregularWhitespace, irregularWhitespaceFile,
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, NoIrregularWhitespace, irregularWhitespaceFile,
 		"const \u00e9\u3000x = 1;"), "noIrregularWhitespace")
 
 	// A three-byte character abutting a three-byte one, so a guard mis-stepping by a different
 	// amount is caught too.
-	rule_testing.ExpectFindings(t, rule_testing.Run(t, NoIrregularWhitespace, irregularWhitespaceFile,
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, NoIrregularWhitespace, irregularWhitespaceFile,
 		"const \u4e2d\u3000x = 1;"), "noIrregularWhitespace")
 }

@@ -22,8 +22,8 @@ import (
 	"github.com/system-inc/cohere/internal/format/estree"
 )
 
-// unitsToWTF8 writes UTF-16 units as WTF-8: pairs as their character, lone surrogates as themselves.
-func unitsToWTF8(units []uint16) string {
+// unitsToWtf8 writes UTF-16 units as WTF-8: pairs as their character, lone surrogates as themselves.
+func unitsToWtf8(units []uint16) string {
 	buffer := make([]byte, 0, len(units))
 	for index := 0; index < len(units); index++ {
 		unit := rune(units[index])
@@ -76,11 +76,11 @@ func wellFormedTree(node *estree.Node) {
 	}
 }
 
-func wellFormedValue(value any) any {
+func wellFormedValue(value estree.Value) estree.Value {
 	switch typed := value.(type) {
-	case string:
-		return wellFormed(typed)
-	case map[string]any:
+	case estree.String:
+		return estree.String(wellFormed(string(typed)))
+	case estree.Record:
 		for key, each := range typed {
 			typed[key] = wellFormedValue(each)
 		}
@@ -88,7 +88,7 @@ func wellFormedValue(value any) any {
 	case *estree.Node:
 		wellFormedTree(typed)
 		return typed
-	case []*estree.Node:
+	case estree.Nodes:
 		for _, child := range typed {
 			wellFormedTree(child)
 		}

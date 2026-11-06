@@ -6,10 +6,10 @@ import (
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
-const deleteVarFile = "/repository/source/Thing.ts"
+const deleteVariableFile = "/repository/source/Thing.ts"
 
-func TestNoDeleteVarFires(t *testing.T) {
-	t.Parallel()
+func TestNoDeleteVariableFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -22,16 +22,19 @@ func TestNoDeleteVarFires(t *testing.T) {
 		{"a parameter", "export function run(value: number) {\n    delete value;\n}\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.Run(t, NoDeleteVar, deleteVarFile, testCase.sourceText),
-				"unexpectedDeleteVar")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(
+				test,
+				rule_testing.Run(test, NoDeleteVariable, deleteVariableFile, testCase.sourceText),
+				"unexpectedDeleteVar",
+			)
 		})
 	}
 }
 
-func TestNoDeleteVarStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoDeleteVariableStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -39,19 +42,37 @@ func TestNoDeleteVarStaysSilent(t *testing.T) {
 	}{
 		// The boundary is "bare name versus property access", and every legitimate use of delete
 		// is on the other side of it.
-		{"a dotted property", "declare const record: { key?: number };\nexport function run() {\n    delete record.key;\n}\n"},
-		{"a computed property with a literal", "declare const record: Record<string, number>;\nexport function run() {\n    delete record['key'];\n}\n"},
-		{"a computed property with a variable", "declare const record: Record<string, number>;\nexport function run(key: string) {\n    delete record[key];\n}\n"},
-		{"a nested property", "declare const outer: { inner: { key?: number } };\nexport function run() {\n    delete outer.inner.key;\n}\n"},
+		{
+			"a dotted property",
+			"declare const record: { key?: number };\nexport function run() {\n    delete record.key;\n}\n",
+		},
+		{
+			"a computed property with a literal",
+			"declare const record: Record<string, number>;\nexport function run() {\n    delete record['key'];\n}\n",
+		},
+		{
+			"a computed property with a variable",
+			"declare const record: Record<string, number>;\nexport function run(key: string) {\n    delete record[key];\n}\n",
+		},
+		{
+			"a nested property",
+			"declare const outer: { inner: { key?: number } };\nexport function run() {\n    delete outer.inner.key;\n}\n",
+		},
 		// A property access wrapped in parentheses is still a property access, so stripping the
 		// grouping must not turn it into a bare name.
-		{"a parenthesized property access", "declare const record: { key?: number };\nexport function run() {\n    delete (record.key);\n}\n"},
+		{
+			"a parenthesized property access",
+			"declare const record: { key?: number };\nexport function run() {\n    delete (record.key);\n}\n",
+		},
 		{"no delete at all", "export function run() {\n    return 1;\n}\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoDeleteVar, deleteVarFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(
+				test,
+				rule_testing.Run(test, NoDeleteVariable, deleteVariableFile, testCase.sourceText),
+			)
 		})
 	}
 }

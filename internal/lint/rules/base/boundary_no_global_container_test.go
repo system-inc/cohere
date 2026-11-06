@@ -19,18 +19,18 @@ func asTheNoGlobalContainerHarnessWroteIt(text string) string {
 	return strings.TrimSpace(text) + "\n"
 }
 
-// TestNoGlobalContainer measures this port against the SOURCE rule, shape by shape.
+// TestNoGlobalContainer measures this port against the source rule, shape by shape.
 //
 // These rules are ours rather than an upstream port, so there is no published corpus to import and
 // no fixture-provenance question. That inverts the usual guidance: a fixture invented here would
 // encode the same belief as the rule, and pass for exactly the reason the rule is wrong.
 //
-// So every row was measured by DRIVING the real rule from api-phi-health, loaded directly with its
+// So every row was measured by driving the real rule from api-phi-health, loaded directly with its
 // @nexus alias supplied by a loader hook, over the exact source text below. Two of them taught this
 // port something it would not have invented: a property key reports, and a locally declared
 // function of that name reports too.
-func TestNoGlobalContainer(t *testing.T) {
-	t.Parallel()
+func TestNoGlobalContainer(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -132,21 +132,26 @@ func TestNoGlobalContainer(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, BoundaryNoGlobalContainer, boundaryNoGlobalContainerFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(
+				test,
+				BoundaryNoGlobalContainer,
+				boundaryNoGlobalContainerFile,
+				testCase.sourceText,
+			)
 			// A row expecting nothing goes through ExpectClean rather than through ExpectFindings
 			// with an empty list. The two are the same assertion to a reader and not to the
 			// fixture-pair guard, which reads the call by name: a suite that only ever calls
 			// ExpectFindings proves the rule can detect and never that it can stay quiet, and a
 			// violation-only corpus is exactly what that guard exists to catch.
 			if len(testCase.wantIds) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
-				t.Fatalf("wanted %d findings, got %d, on the case that covers: %s",
+				test.Fatalf("wanted %d findings, got %d, on the case that covers: %s",
 					len(testCase.wantSpans), len(result.Diagnostics), testCase.why)
 			}
 			written := asTheNoGlobalContainerHarnessWroteIt(testCase.sourceText)
@@ -154,7 +159,7 @@ func TestNoGlobalContainer(t *testing.T) {
 				reported := result.Diagnostics[findingIndex]
 				gotSpan := written[reported.Range.Pos():reported.Range.End()]
 				if gotSpan != wantSpan {
-					t.Errorf("finding %d points at %q, wanted %q (%s)",
+					test.Errorf("finding %d points at %q, wanted %q (%s)",
 						findingIndex, gotSpan, wantSpan, testCase.why)
 				}
 			}
@@ -167,20 +172,20 @@ func TestNoGlobalContainer(t *testing.T) {
 // ExpectFindings compares ids and count and nothing else, so the text is asserted separately and
 // against a literal typed here rather than against the rule's own constant, which would move with
 // any mutation of it.
-func TestNoGlobalContainerRendersTheSourceRulesMessage(t *testing.T) {
-	t.Parallel()
+func TestNoGlobalContainerRendersTheSourceRulesMessage(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, BoundaryNoGlobalContainer, boundaryNoGlobalContainerFile,
+	result := rule_testing.Run(test, BoundaryNoGlobalContainer, boundaryNoGlobalContainerFile,
 		"const c = getGlobalContainer();\n")
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
+		test.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
 	}
 	reported := result.Diagnostics[0]
 	if reported.Message.Id != "boundaryNoGlobalContainer" {
-		t.Errorf("reported id %q, wanted %q", reported.Message.Id, "boundaryNoGlobalContainer")
+		test.Errorf("reported id %q, wanted %q", reported.Message.Id, "boundaryNoGlobalContainer")
 	}
 	const wantMessage = "Usage of 'getGlobalContainer' is not allowed."
 	if reported.Message.Description != wantMessage {
-		t.Errorf("reported message %q, wanted %q", reported.Message.Description, wantMessage)
+		test.Errorf("reported message %q, wanted %q", reported.Message.Description, wantMessage)
 	}
 }

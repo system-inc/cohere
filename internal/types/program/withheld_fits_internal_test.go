@@ -5,8 +5,8 @@ import "testing"
 // An entry whose withheld findings do not fit the file's directives is a miss, never repaired (#kdee854). The bytes
 // are the entry's, so a mismatch means the entry is wrong, and replaying it would mark a directive the walk would
 // not, or none. Each kind of doubt is a miss, and the entry that fits replays, so the misses are about the doubt.
-func TestAnEntryWhoseWithheldFindingsDoNotFitIsAMiss(t *testing.T) {
-	t.Parallel()
+func TestAnEntryWhoseWithheldFindingsDoNotFitIsAMiss(test *testing.T) {
+	test.Parallel()
 	text := "// cohere-disable-next-line no-var\nvar a = 1;\n// cohere-disable-next-line\nvar b = 2;\n"
 	entry := func(withheld ...LintCacheWithheld) LintCacheEntry {
 		return LintCacheEntry{
@@ -18,13 +18,15 @@ func TestAnEntryWhoseWithheldFindingsDoNotFitIsAMiss(t *testing.T) {
 		}
 	}
 	lookup := func(subject LintCacheEntry) bool {
-		t.Helper()
-		reuse, keys := adamicFixtureReuse(t, subject)
+		test.Helper()
+		reuse, keys := adamicFixtureReuse(test, subject)
 		_, hits := reuse.lookup(subject.Path, keys, text)
 		return hits.pure
 	}
-	if !lookup(entry(LintCacheWithheld{RuleName: "no-var", Directive: 0}, LintCacheWithheld{RuleName: "no-var", Directive: 1})) {
-		t.Fatal("an entry whose withheld findings fit missed, so the misses below prove nothing")
+	if !lookup(
+		entry(LintCacheWithheld{RuleName: "no-var", Directive: 0}, LintCacheWithheld{RuleName: "no-var", Directive: 1}),
+	) {
+		test.Fatal("an entry whose withheld findings fit missed, so the misses below prove nothing")
 	}
 	for _, doubt := range []struct {
 		name     string
@@ -36,7 +38,7 @@ func TestAnEntryWhoseWithheldFindingsDoNotFitIsAMiss(t *testing.T) {
 		{"a rule the entry did not run", LintCacheWithheld{RuleName: "no-empty", Directive: 1}},
 	} {
 		if lookup(entry(doubt.withheld)) {
-			t.Errorf("an entry with %s replayed", doubt.name)
+			test.Errorf("an entry with %s replayed", doubt.name)
 		}
 	}
 }

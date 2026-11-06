@@ -53,12 +53,20 @@ func swiftMessagesSource(catalog *MessageCatalog, digest string) ([]byte, error)
 	sort.Slice(rules, func(left, right int) bool { return rules[left].typeName < rules[right].typeName })
 
 	var source bytes.Buffer
-	source.WriteString("/*\n Generated from cohere's policy/messages/ by `go run ./policy/tools/generate`. Do not edit it here:\n")
-	source.WriteString(" edit the message files and run that again. While the two differ, a test in each engine fails.\n */\n")
+	source.WriteString(
+		"/*\n Generated from cohere's policy/messages/ by `go run ./policy/tools/generate`. Do not edit it here:\n",
+	)
+	source.WriteString(
+		" edit the message files and run that again. While the two differ, a test in each engine fails.\n */\n",
+	)
 	source.WriteString("enum RuleMessages {\n")
 	source.WriteString("    /* A finding's message: the id the catalog files it under, and its text. */\n")
-	source.WriteString("    struct Message: Equatable, Sendable {\n        let id: String\n        let text: String\n    }\n\n")
-	source.WriteString("    /* SHA-256 of the messages that reach Swift, resolved, which a test recomputes from policy/messages/ on disk. */\n")
+	source.WriteString(
+		"    struct Message: Equatable, Sendable {\n        let id: String\n        let text: String\n    }\n\n",
+	)
+	source.WriteString(
+		"    /* SHA-256 of the messages that reach Swift, resolved, which a test recomputes from policy/messages/ on disk. */\n",
+	)
 	fmt.Fprintf(&source, "    static let sourceDigest = \"%s\"\n\n", digest)
 	source.WriteString("    /* Every message here, as `Rule.id`, for the test that fails on one no rule renders. */\n")
 	var entries []string
@@ -83,8 +91,12 @@ func swiftMessagesSource(catalog *MessageCatalog, digest string) ([]byte, error)
 			if index > 0 {
 				source.WriteString("\n")
 			}
-			if err := writeSwiftMessage(&source, id, catalog.templates[each.name][id]); err != nil {
-				return nil, fmt.Errorf("%s %q: %w", each.name, id, err)
+			if writeSwiftMessageError := writeSwiftMessage(
+				&source,
+				id,
+				catalog.templates[each.name][id],
+			); writeSwiftMessageError != nil {
+				return nil, fmt.Errorf("%s %q: %w", each.name, id, writeSwiftMessageError)
 			}
 		}
 		source.WriteString("    }\n")
@@ -124,7 +136,12 @@ func writeSwiftMessage(source *bytes.Buffer, id string, template messageTemplate
 			values := valueSlots(options[name])
 			for _, value := range values {
 				if textValues[value] {
-					return fmt.Errorf("the value %q is in the text and in the option %q of %q, so it has no one place to be passed", value, name, phrase)
+					return fmt.Errorf(
+						"the value %q is in the text and in the option %q of %q, so it has no one place to be passed",
+						value,
+						name,
+						phrase,
+					)
 				}
 			}
 			if len(values) == 0 {
@@ -143,7 +160,11 @@ func writeSwiftMessage(source *bytes.Buffer, id string, template messageTemplate
 	// A signature past the house format's 120 columns takes one parameter to a line, as the format breaks it.
 	signature := fmt.Sprintf("        static func %s(%s) -> Message {", id, strings.Join(parameters, ", "))
 	if len(signature) > swiftLineLength {
-		signature = fmt.Sprintf("        static func %s(\n            %s,\n        ) -> Message {", id, strings.Join(parameters, ",\n            "))
+		signature = fmt.Sprintf(
+			"        static func %s(\n            %s,\n        ) -> Message {",
+			id,
+			strings.Join(parameters, ",\n            "),
+		)
 	}
 	source.WriteString(signature + "\n")
 	for _, phrase := range phraseNames {
@@ -158,9 +179,9 @@ func writeSwiftMessage(source *bytes.Buffer, id string, template messageTemplate
 		fmt.Fprintf(source, "            let %sText =\n                switch %s {\n", phrase, phrase)
 		for _, name := range optionNames {
 			values := valueSlots(options[name])
-			literal, err := swiftInterpolatedLiteral(options[name])
-			if err != nil {
-				return fmt.Errorf("the option %q of %q: %w", name, phrase, err)
+			literal, swiftInterpolatedLiteralError := swiftInterpolatedLiteral(options[name])
+			if swiftInterpolatedLiteralError != nil {
+				return fmt.Errorf("the option %q of %q: %w", name, phrase, swiftInterpolatedLiteralError)
 			}
 			if len(values) == 0 {
 				fmt.Fprintf(source, "                    case .%s:\n                        %s\n", name, literal)
@@ -170,7 +191,13 @@ func writeSwiftMessage(source *bytes.Buffer, id string, template messageTemplate
 			for index, value := range values {
 				bound[index] = "let " + value
 			}
-			fmt.Fprintf(source, "                    case .%s(%s):\n                        %s\n", name, strings.Join(bound, ", "), literal)
+			fmt.Fprintf(
+				source,
+				"                    case .%s(%s):\n                        %s\n",
+				name,
+				strings.Join(bound, ", "),
+				literal,
+			)
 		}
 		source.WriteString("                }\n")
 	}
@@ -178,9 +205,9 @@ func writeSwiftMessage(source *bytes.Buffer, id string, template messageTemplate
 	for _, phrase := range phraseNames {
 		text = strings.ReplaceAll(text, "<<"+phrase+">>", "{{"+phrase+"Text}}")
 	}
-	literal, err := swiftInterpolatedLiteral(text)
-	if err != nil {
-		return err
+	literal, swiftInterpolatedLiteralError := swiftInterpolatedLiteral(text)
+	if swiftInterpolatedLiteralError != nil {
+		return swiftInterpolatedLiteralError
 	}
 	// A function of one expression returns it, and one that first picks its options returns explicitly.
 	// The call is broken one argument to a line, the house format's shape for a call this long, which it
@@ -189,7 +216,13 @@ func writeSwiftMessage(source *bytes.Buffer, id string, template messageTemplate
 	if len(phraseNames) > 0 {
 		call = "return Message("
 	}
-	fmt.Fprintf(source, "            %s\n                id: \"%s\",\n                text:\n                    %s,\n            )\n", call, id, literal)
+	fmt.Fprintf(
+		source,
+		"            %s\n                id: \"%s\",\n                text:\n                    %s,\n            )\n",
+		call,
+		id,
+		literal,
+	)
 	source.WriteString("        }\n")
 	return nil
 }

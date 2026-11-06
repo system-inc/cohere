@@ -1,7 +1,8 @@
 {
   "rules": {
     "TypeScript": "nexus/correctness-require-response-status-check",
-    "Swift": "cohere-swift/correctness-require-response-status-check"
+    "Swift": "cohere-swift/correctness-require-response-status-check",
+    "Go": "cohere-go/correctness-require-response-status-check"
   },
   "messages": {
     "bodyReadWithoutStatusCheck": {
@@ -9,24 +10,32 @@
       "terms": {
         "response": {
           "TypeScript": "a fetch Response",
-          "Swift": "the response URLSession returned"
+          "Swift": "the response URLSession returned",
+          "Go": "the *http.Response net/http returned"
         },
         "statusUnread": {
           "TypeScript": "neither `.ok` nor `.status` is read",
-          "Swift": "its statusCode is never read"
+          "Swift": "its statusCode is never read",
+          "Go": "neither its StatusCode nor its Status is read"
         },
         "why": {
           "TypeScript": "fetch does not throw on an HTTP error, so a 401 or 500 body is parsed here and used as data (an error object returned as a task list, a failure cached as a success).",
-          "Swift": "URLSession does not throw on an HTTP error, so a 401 or 500 error page arrives here as data and is decoded, returned or kept as if the request had succeeded."
+          "Swift": "URLSession does not throw on an HTTP error, so a 401 or 500 error page arrives here as data and is decoded, returned or kept as if the request had succeeded.",
+          "Go": "net/http returns a nil error for every response that arrives, so a 401 or 500 error page is read here as data and decoded, returned or kept as if the request had succeeded."
         },
         "repair": {
           "TypeScript": "Check `response.ok` before trusting the body, and throw or return the failure when it is false.",
-          "Swift": "Cast the response to HTTPURLResponse and check statusCode before trusting the body, and throw or return the failure when it is not a success."
+          "Swift": "Cast the response to HTTPURLResponse and check statusCode before trusting the body, and throw or return the failure when it is not a success.",
+          "Go": "Check StatusCode before trusting the body, and return the failure as an error when it is not a success."
         }
       }
     },
     "responseDiscarded": {
       "text": "This [[taken]] and drops it. [[why]] [[repair]]",
+      "languages": [
+        "TypeScript",
+        "Swift"
+      ],
       "terms": {
         "taken": {
           "TypeScript": "awaits a fetch Response",

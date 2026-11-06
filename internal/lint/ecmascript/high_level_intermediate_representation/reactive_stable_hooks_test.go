@@ -22,8 +22,8 @@ import (
 // of, and the rule then reports it as a dependency of a memo the developer wrote as `[]`. Measured
 // before this landed: six of the twelve fixtures that ungating adds were exactly this, naming
 // `startTransition`, `addOptimistic`, `dispatchAction`, `start`, `start` and `setState`.
-func TestStableHookPositionsAreExemptedFromReactivity(t *testing.T) {
-	t.Parallel()
+func TestStableHookPositionsAreExemptedFromReactivity(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name   string
@@ -46,20 +46,20 @@ func TestStableHookPositionsAreExemptedFromReactivity(t *testing.T) {
 			stable: "dispatch",
 		},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			reactive := reactivityByName(t, testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			reactive := reactivityByName(test, testCase.source)
 			if len(reactive) == 0 {
-				t.Fatal("no identifier was named in the reactivity map, so this asserts nothing; " +
+				test.Fatal("no identifier was named in the reactivity map, so this asserts nothing; " +
 					"the fixture stopped lowering rather than the exemption being correct")
 			}
 			isReactive, seen := reactive[testCase.stable]
 			if !seen {
-				t.Fatalf("%q was never bound, so the fixture does not exercise the exemption",
+				test.Fatalf("%q was never bound, so the fixture does not exercise the exemption",
 					testCase.stable)
 			}
 			if isReactive {
-				t.Errorf("%q is reactive; React guarantees this position is identity-stable, and "+
+				test.Errorf("%q is reactive; React guarantees this position is identity-stable, and "+
 					"marking it makes the rule report it as a dependency of a memo written with []",
 					testCase.stable)
 			}
@@ -68,26 +68,26 @@ func TestStableHookPositionsAreExemptedFromReactivity(t *testing.T) {
 }
 
 // reactivityByName reports, per named binding, whether any place naming it is reactive.
-func reactivityByName(t *testing.T, source string) map[string]bool {
-	t.Helper()
+func reactivityByName(test *testing.T, source string) map[string]bool {
+	test.Helper()
 	result := map[string]bool{}
-	probe := rule.Rule{
+	probe := rule.Rule[rule.NoOptions]{
 		Name:             "stable-hook-positions",
 		NeedsTypeChecker: true,
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
-					if ctx.TypeChecker == nil {
-						t.Fatal("the typed harness handed this probe a nil checker, so every " +
+					if ruleContext.TypeChecker == nil {
+						test.Fatal("the typed harness handed this probe a nil checker, so every " +
 							"type lookup below would answer empty and the test would pass vacuously")
 					}
 					forEachFunctionLike(node, func(functionNode *ast.Node) {
-						function := Lower(functionNode, ctx.TypeChecker)
+						function := Lower(functionNode, ruleContext.TypeChecker)
 						if function == nil {
 							return
 						}
 						Construct(function)
-						InferReactive(function, ctx.TypeChecker)
+						InferReactive(function, ruleContext.TypeChecker)
 						for _, block := range function.Blocks {
 							if block == nil {
 								continue
@@ -113,7 +113,7 @@ func reactivityByName(t *testing.T, source string) map[string]bool {
 			}
 		},
 	}
-	rule_testing.RunTypedFiles(t, probe, map[string]string{
+	rule_testing.RunTypedFiles(test, probe, map[string]string{
 		"/react.d.ts":  reactiveDeclarations,
 		"/fixture.tsx": source,
 	}, "/fixture.tsx")

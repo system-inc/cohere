@@ -146,7 +146,14 @@ func classifyDeclarations(
 		isTypeOnly := isTypeOnlyImport(declaration)
 		localNames := localBindingNames(declaration)
 
-		preserved := preservedCommentsFor(sourceFile, sourceText, fileComments, declaration, sectionStart, descriptionBlock)
+		preserved := preservedCommentsFor(
+			sourceFile,
+			sourceText,
+			fileComments,
+			declaration,
+			sectionStart,
+			descriptionBlock,
+		)
 
 		importText := sourceText[tokenStart(sourceFile, declaration):declaration.End()]
 		if trailing, hasTrailing := trailingCommentFor(sourceText, fileComments, declaration); hasTrailing {
@@ -339,11 +346,11 @@ func interleavedStatements(
 // duplicate the comment. The verdict is unaffected, since the comparison uses the same span on both
 // sides.
 func extendPastNewline(sourceText string, offset int) int {
-	offset = skipTrailingComment(sourceText, offset)
-	if offset < len(sourceText) && sourceText[offset] == '\n' {
-		return offset + 1
+	pastComment := skipTrailingComment(sourceText, offset)
+	if pastComment < len(sourceText) && sourceText[pastComment] == '\n' {
+		return pastComment + 1
 	}
-	return offset
+	return pastComment
 }
 
 // skipTrailingComment advances past a comment written on the same line as what precedes it.
@@ -546,7 +553,7 @@ func localBindingNames(declaration *ast.Node) []string {
 		}
 	}
 	for _, element := range bindings.Named {
-		// The LOCAL name, which is what the original reads. `{ Thing as useThing }` contributes
+		// The local name, which is what the original reads. `{ Thing as useThing }` contributes
 		// `useThing` and classifies as Hooks; reading the imported name would answer `Thing`.
 		if name := element.Name(); name != nil && name.Kind == ast.KindIdentifier {
 			names = append(names, name.Text())

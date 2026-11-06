@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -15,7 +16,7 @@ const uselessComputedKeyFile = "/repository/source/UselessComputedKey.ts"
 //
 // `optionsJson` is the raw config text rather than a built struct, so every case is routed through
 // the rule's own decoder. That is the only thing that puts the default inversion under test: the
-// option defaults to TRUE, so a struct built by hand in a fixture would silently agree with a
+// option defaults to `true`, so a struct built by hand in a fixture would silently agree with a
 // decoder that had the default backwards.
 type noUselessComputedKeyCase struct {
 	source      string
@@ -24,23 +25,26 @@ type noUselessComputedKeyCase struct {
 	properties  []string
 }
 
-func stringPointer(value string) *string { return &value }
+func stringPointer(value string) *string { return new(value) }
 
 // decodeUselessComputedKeyOptionsForTest routes a case's options through the shipped decoder.
 //
-// A nil `optionsJson` is upstream writing no `options` at all, which reaches a rule configured as a
-// bare severity as nil, so it is passed through as nil rather than as an empty object. The two are
-// different inputs to the decoder and both have to work.
-func decodeUselessComputedKeyOptionsForTest(t *testing.T, optionsJson string) any {
-	t.Helper()
+// An empty `optionsJson` is upstream writing no `options` at all, which reaches a rule configured as a
+// bare severity as no options, so it is passed through unconfigured rather than as an empty object. The two
+// are different inputs to the decoder and both have to work.
+func decodeUselessComputedKeyOptionsForTest(
+	test *testing.T,
+	optionsJson string,
+) rule.Given[NoUselessComputedKeySettings] {
+	test.Helper()
 	if optionsJson == "" {
-		return nil
+		return rule.Given[NoUselessComputedKeySettings]{}
 	}
-	decoded, err := DecodeNoUselessComputedKeyOptions(json.RawMessage(optionsJson))
-	if err != nil {
-		t.Fatalf("decoding options %q: %v", optionsJson, err)
+	decoded, decodeNoUselessComputedKeyOptionsError := DecodeNoUselessComputedKeyOptions(json.RawMessage(optionsJson))
+	if decodeNoUselessComputedKeyOptionsError != nil {
+		test.Fatalf("decoding options %q: %v", optionsJson, decodeNoUselessComputedKeyOptionsError)
 	}
-	return decoded
+	return rule.Configured(decoded)
 }
 
 // The valid cases, verbatim from upstream. Extracted by evaluating the corpus against a stub
@@ -83,120 +87,435 @@ var noUselessComputedKeyCleanCases = []noUselessComputedKeyCase{
 // The invalid cases, verbatim from upstream, each carrying its own expected repair.
 // A nil fixedSource is upstream's `output: null`: reported, deliberately not fixed.
 var noUselessComputedKeyFiringCases = []noUselessComputedKeyCase{
-	{source: "({ ['0']: 0 })", optionsJson: "", fixedSource: stringPointer("({ '0': 0 })"), properties: []string{"'0'"}},
-	{source: "var { ['0']: a } = obj", optionsJson: "", fixedSource: stringPointer("var { '0': a } = obj"), properties: []string{"'0'"}},
-	{source: "({ ['0+1,234']: 0 })", optionsJson: "", fixedSource: stringPointer("({ '0+1,234': 0 })"), properties: []string{"'0+1,234'"}},
+	{
+		source:      "({ ['0']: 0 })",
+		optionsJson: "",
+		fixedSource: stringPointer("({ '0': 0 })"),
+		properties:  []string{"'0'"},
+	},
+	{
+		source:      "var { ['0']: a } = obj",
+		optionsJson: "",
+		fixedSource: stringPointer("var { '0': a } = obj"),
+		properties:  []string{"'0'"},
+	},
+	{
+		source:      "({ ['0+1,234']: 0 })",
+		optionsJson: "",
+		fixedSource: stringPointer("({ '0+1,234': 0 })"),
+		properties:  []string{"'0+1,234'"},
+	},
 	{source: "({ [0]: 0 })", optionsJson: "", fixedSource: stringPointer("({ 0: 0 })"), properties: []string{"0"}},
-	{source: "var { [0]: a } = obj", optionsJson: "", fixedSource: stringPointer("var { 0: a } = obj"), properties: []string{"0"}},
-	{source: "({ ['x']: 0 })", optionsJson: "", fixedSource: stringPointer("({ 'x': 0 })"), properties: []string{"'x'"}},
-	{source: "var { ['x']: a } = obj", optionsJson: "", fixedSource: stringPointer("var { 'x': a } = obj"), properties: []string{"'x'"}},
-	{source: "var { ['__proto__']: a } = obj", optionsJson: "", fixedSource: stringPointer("var { '__proto__': a } = obj"), properties: []string{"'__proto__'"}},
-	{source: "({ ['x']() {} })", optionsJson: "", fixedSource: stringPointer("({ 'x'() {} })"), properties: []string{"'x'"}},
-	{source: "({ [/* this comment prevents a fix */ 'x']: 0 })", optionsJson: "", fixedSource: nil, properties: []string{"'x'"}},
-	{source: "({ ['x' /* this comment also prevents a fix */]: 0 })", optionsJson: "", fixedSource: nil, properties: []string{"'x'"}},
-	{source: "({ [('x')]: 0 })", optionsJson: "", fixedSource: stringPointer("({ 'x': 0 })"), properties: []string{"'x'"}},
-	{source: "var { [('x')]: a } = obj", optionsJson: "", fixedSource: stringPointer("var { 'x': a } = obj"), properties: []string{"'x'"}},
-	{source: "({ *['x']() {} })", optionsJson: "", fixedSource: stringPointer("({ *'x'() {} })"), properties: []string{"'x'"}},
-	{source: "({ async ['x']() {} })", optionsJson: "", fixedSource: stringPointer("({ async 'x'() {} })"), properties: []string{"'x'"}},
-	{source: "({ get[.2]() {} })", optionsJson: "", fixedSource: stringPointer("({ get.2() {} })"), properties: []string{".2"}},
-	{source: "({ set[.2](value) {} })", optionsJson: "", fixedSource: stringPointer("({ set.2(value) {} })"), properties: []string{".2"}},
-	{source: "({ async[.2]() {} })", optionsJson: "", fixedSource: stringPointer("({ async.2() {} })"), properties: []string{".2"}},
+	{
+		source:      "var { [0]: a } = obj",
+		optionsJson: "",
+		fixedSource: stringPointer("var { 0: a } = obj"),
+		properties:  []string{"0"},
+	},
+	{
+		source:      "({ ['x']: 0 })",
+		optionsJson: "",
+		fixedSource: stringPointer("({ 'x': 0 })"),
+		properties:  []string{"'x'"},
+	},
+	{
+		source:      "var { ['x']: a } = obj",
+		optionsJson: "",
+		fixedSource: stringPointer("var { 'x': a } = obj"),
+		properties:  []string{"'x'"},
+	},
+	{
+		source:      "var { ['__proto__']: a } = obj",
+		optionsJson: "",
+		fixedSource: stringPointer("var { '__proto__': a } = obj"),
+		properties:  []string{"'__proto__'"},
+	},
+	{
+		source:      "({ ['x']() {} })",
+		optionsJson: "",
+		fixedSource: stringPointer("({ 'x'() {} })"),
+		properties:  []string{"'x'"},
+	},
+	{
+		source:      "({ [/* this comment prevents a fix */ 'x']: 0 })",
+		optionsJson: "",
+		fixedSource: nil,
+		properties:  []string{"'x'"},
+	},
+	{
+		source:      "({ ['x' /* this comment also prevents a fix */]: 0 })",
+		optionsJson: "",
+		fixedSource: nil,
+		properties:  []string{"'x'"},
+	},
+	{
+		source:      "({ [('x')]: 0 })",
+		optionsJson: "",
+		fixedSource: stringPointer("({ 'x': 0 })"),
+		properties:  []string{"'x'"},
+	},
+	{
+		source:      "var { [('x')]: a } = obj",
+		optionsJson: "",
+		fixedSource: stringPointer("var { 'x': a } = obj"),
+		properties:  []string{"'x'"},
+	},
+	{
+		source:      "({ *['x']() {} })",
+		optionsJson: "",
+		fixedSource: stringPointer("({ *'x'() {} })"),
+		properties:  []string{"'x'"},
+	},
+	{
+		source:      "({ async ['x']() {} })",
+		optionsJson: "",
+		fixedSource: stringPointer("({ async 'x'() {} })"),
+		properties:  []string{"'x'"},
+	},
+	{
+		source:      "({ get[.2]() {} })",
+		optionsJson: "",
+		fixedSource: stringPointer("({ get.2() {} })"),
+		properties:  []string{".2"},
+	},
+	{
+		source:      "({ set[.2](value) {} })",
+		optionsJson: "",
+		fixedSource: stringPointer("({ set.2(value) {} })"),
+		properties:  []string{".2"},
+	},
+	{
+		source:      "({ async[.2]() {} })",
+		optionsJson: "",
+		fixedSource: stringPointer("({ async.2() {} })"),
+		properties:  []string{".2"},
+	},
 	{source: "({ [2]() {} })", optionsJson: "", fixedSource: stringPointer("({ 2() {} })"), properties: []string{"2"}},
-	{source: "({ get [2]() {} })", optionsJson: "", fixedSource: stringPointer("({ get 2() {} })"), properties: []string{"2"}},
-	{source: "({ set [2](value) {} })", optionsJson: "", fixedSource: stringPointer("({ set 2(value) {} })"), properties: []string{"2"}},
-	{source: "({ async [2]() {} })", optionsJson: "", fixedSource: stringPointer("({ async 2() {} })"), properties: []string{"2"}},
-	{source: "({ get[2]() {} })", optionsJson: "", fixedSource: stringPointer("({ get 2() {} })"), properties: []string{"2"}},
-	{source: "({ set[2](value) {} })", optionsJson: "", fixedSource: stringPointer("({ set 2(value) {} })"), properties: []string{"2"}},
-	{source: "({ async[2]() {} })", optionsJson: "", fixedSource: stringPointer("({ async 2() {} })"), properties: []string{"2"}},
-	{source: "({ get['foo']() {} })", optionsJson: "", fixedSource: stringPointer("({ get'foo'() {} })"), properties: []string{"'foo'"}},
-	{source: "({ *[2]() {} })", optionsJson: "", fixedSource: stringPointer("({ *2() {} })"), properties: []string{"2"}},
-	{source: "({ async*[2]() {} })", optionsJson: "", fixedSource: stringPointer("({ async*2() {} })"), properties: []string{"2"}},
-	{source: "({ ['constructor']: 1 })", optionsJson: "", fixedSource: stringPointer("({ 'constructor': 1 })"), properties: []string{"'constructor'"}},
-	{source: "({ ['prototype']: 1 })", optionsJson: "", fixedSource: stringPointer("({ 'prototype': 1 })"), properties: []string{"'prototype'"}},
-	{source: "class Foo { ['0']() {} }", optionsJson: "{\"enforceForClassMembers\":true}", fixedSource: stringPointer("class Foo { '0'() {} }"), properties: []string{"'0'"}},
-	{source: "class Foo { ['0+1,234']() {} }", optionsJson: "{}", fixedSource: stringPointer("class Foo { '0+1,234'() {} }"), properties: []string{"'0+1,234'"}},
-	{source: "class Foo { ['x']() {} }", optionsJson: "{}", fixedSource: stringPointer("class Foo { 'x'() {} }"), properties: []string{"'x'"}},
-	{source: "class Foo { [/* this comment prevents a fix */ 'x']() {} }", optionsJson: "", fixedSource: nil, properties: []string{"'x'"}},
-	{source: "class Foo { ['x' /* this comment also prevents a fix */]() {} }", optionsJson: "", fixedSource: nil, properties: []string{"'x'"}},
-	{source: "class Foo { [('x')]() {} }", optionsJson: "", fixedSource: stringPointer("class Foo { 'x'() {} }"), properties: []string{"'x'"}},
-	{source: "class Foo { *['x']() {} }", optionsJson: "", fixedSource: stringPointer("class Foo { *'x'() {} }"), properties: []string{"'x'"}},
-	{source: "class Foo { async ['x']() {} }", optionsJson: "", fixedSource: stringPointer("class Foo { async 'x'() {} }"), properties: []string{"'x'"}},
-	{source: "class Foo { get[.2]() {} }", optionsJson: "", fixedSource: stringPointer("class Foo { get.2() {} }"), properties: []string{".2"}},
-	{source: "class Foo { set[.2](value) {} }", optionsJson: "", fixedSource: stringPointer("class Foo { set.2(value) {} }"), properties: []string{".2"}},
-	{source: "class Foo { async[.2]() {} }", optionsJson: "", fixedSource: stringPointer("class Foo { async.2() {} }"), properties: []string{".2"}},
-	{source: "class Foo { [2]() {} }", optionsJson: "", fixedSource: stringPointer("class Foo { 2() {} }"), properties: []string{"2"}},
-	{source: "class Foo { get [2]() {} }", optionsJson: "", fixedSource: stringPointer("class Foo { get 2() {} }"), properties: []string{"2"}},
-	{source: "class Foo { set [2](value) {} }", optionsJson: "", fixedSource: stringPointer("class Foo { set 2(value) {} }"), properties: []string{"2"}},
-	{source: "class Foo { async [2]() {} }", optionsJson: "", fixedSource: stringPointer("class Foo { async 2() {} }"), properties: []string{"2"}},
-	{source: "class Foo { get[2]() {} }", optionsJson: "", fixedSource: stringPointer("class Foo { get 2() {} }"), properties: []string{"2"}},
-	{source: "class Foo { set[2](value) {} }", optionsJson: "", fixedSource: stringPointer("class Foo { set 2(value) {} }"), properties: []string{"2"}},
-	{source: "class Foo { async[2]() {} }", optionsJson: "", fixedSource: stringPointer("class Foo { async 2() {} }"), properties: []string{"2"}},
-	{source: "class Foo { get['foo']() {} }", optionsJson: "", fixedSource: stringPointer("class Foo { get'foo'() {} }"), properties: []string{"'foo'"}},
-	{source: "class Foo { *[2]() {} }", optionsJson: "", fixedSource: stringPointer("class Foo { *2() {} }"), properties: []string{"2"}},
-	{source: "class Foo { async*[2]() {} }", optionsJson: "", fixedSource: stringPointer("class Foo { async*2() {} }"), properties: []string{"2"}},
-	{source: "class Foo { static ['constructor']() {} }", optionsJson: "", fixedSource: stringPointer("class Foo { static 'constructor'() {} }"), properties: []string{"'constructor'"}},
-	{source: "class Foo { ['prototype']() {} }", optionsJson: "", fixedSource: stringPointer("class Foo { 'prototype'() {} }"), properties: []string{"'prototype'"}},
-	{source: "(class { ['x']() {} })", optionsJson: "", fixedSource: stringPointer("(class { 'x'() {} })"), properties: []string{"'x'"}},
-	{source: "(class { ['__proto__']() {} })", optionsJson: "", fixedSource: stringPointer("(class { '__proto__'() {} })"), properties: []string{"'__proto__'"}},
-	{source: "(class { static ['__proto__']() {} })", optionsJson: "", fixedSource: stringPointer("(class { static '__proto__'() {} })"), properties: []string{"'__proto__'"}},
-	{source: "(class { static ['constructor']() {} })", optionsJson: "", fixedSource: stringPointer("(class { static 'constructor'() {} })"), properties: []string{"'constructor'"}},
-	{source: "(class { ['prototype']() {} })", optionsJson: "", fixedSource: stringPointer("(class { 'prototype'() {} })"), properties: []string{"'prototype'"}},
-	{source: "class Foo { ['0'] }", optionsJson: "", fixedSource: stringPointer("class Foo { '0' }"), properties: []string{"'0'"}},
-	{source: "class Foo { ['0'] = 0 }", optionsJson: "", fixedSource: stringPointer("class Foo { '0' = 0 }"), properties: []string{"'0'"}},
-	{source: "class Foo { static[0] }", optionsJson: "", fixedSource: stringPointer("class Foo { static 0 }"), properties: []string{"0"}},
-	{source: "class Foo { ['#foo'] }", optionsJson: "", fixedSource: stringPointer("class Foo { '#foo' }"), properties: []string{"'#foo'"}},
-	{source: "(class { ['__proto__'] })", optionsJson: "", fixedSource: stringPointer("(class { '__proto__' })"), properties: []string{"'__proto__'"}},
-	{source: "(class { static ['__proto__'] })", optionsJson: "", fixedSource: stringPointer("(class { static '__proto__' })"), properties: []string{"'__proto__'"}},
-	{source: "(class { ['prototype'] })", optionsJson: "", fixedSource: stringPointer("(class { 'prototype' })"), properties: []string{"'prototype'"}},
+	{
+		source:      "({ get [2]() {} })",
+		optionsJson: "",
+		fixedSource: stringPointer("({ get 2() {} })"),
+		properties:  []string{"2"},
+	},
+	{
+		source:      "({ set [2](value) {} })",
+		optionsJson: "",
+		fixedSource: stringPointer("({ set 2(value) {} })"),
+		properties:  []string{"2"},
+	},
+	{
+		source:      "({ async [2]() {} })",
+		optionsJson: "",
+		fixedSource: stringPointer("({ async 2() {} })"),
+		properties:  []string{"2"},
+	},
+	{
+		source:      "({ get[2]() {} })",
+		optionsJson: "",
+		fixedSource: stringPointer("({ get 2() {} })"),
+		properties:  []string{"2"},
+	},
+	{
+		source:      "({ set[2](value) {} })",
+		optionsJson: "",
+		fixedSource: stringPointer("({ set 2(value) {} })"),
+		properties:  []string{"2"},
+	},
+	{
+		source:      "({ async[2]() {} })",
+		optionsJson: "",
+		fixedSource: stringPointer("({ async 2() {} })"),
+		properties:  []string{"2"},
+	},
+	{
+		source:      "({ get['foo']() {} })",
+		optionsJson: "",
+		fixedSource: stringPointer("({ get'foo'() {} })"),
+		properties:  []string{"'foo'"},
+	},
+	{
+		source:      "({ *[2]() {} })",
+		optionsJson: "",
+		fixedSource: stringPointer("({ *2() {} })"),
+		properties:  []string{"2"},
+	},
+	{
+		source:      "({ async*[2]() {} })",
+		optionsJson: "",
+		fixedSource: stringPointer("({ async*2() {} })"),
+		properties:  []string{"2"},
+	},
+	{
+		source:      "({ ['constructor']: 1 })",
+		optionsJson: "",
+		fixedSource: stringPointer("({ 'constructor': 1 })"),
+		properties:  []string{"'constructor'"},
+	},
+	{
+		source:      "({ ['prototype']: 1 })",
+		optionsJson: "",
+		fixedSource: stringPointer("({ 'prototype': 1 })"),
+		properties:  []string{"'prototype'"},
+	},
+	{
+		source:      "class Foo { ['0']() {} }",
+		optionsJson: "{\"enforceForClassMembers\":true}",
+		fixedSource: stringPointer("class Foo { '0'() {} }"),
+		properties:  []string{"'0'"},
+	},
+	{
+		source:      "class Foo { ['0+1,234']() {} }",
+		optionsJson: "{}",
+		fixedSource: stringPointer("class Foo { '0+1,234'() {} }"),
+		properties:  []string{"'0+1,234'"},
+	},
+	{
+		source:      "class Foo { ['x']() {} }",
+		optionsJson: "{}",
+		fixedSource: stringPointer("class Foo { 'x'() {} }"),
+		properties:  []string{"'x'"},
+	},
+	{
+		source:      "class Foo { [/* this comment prevents a fix */ 'x']() {} }",
+		optionsJson: "",
+		fixedSource: nil,
+		properties:  []string{"'x'"},
+	},
+	{
+		source:      "class Foo { ['x' /* this comment also prevents a fix */]() {} }",
+		optionsJson: "",
+		fixedSource: nil,
+		properties:  []string{"'x'"},
+	},
+	{
+		source:      "class Foo { [('x')]() {} }",
+		optionsJson: "",
+		fixedSource: stringPointer("class Foo { 'x'() {} }"),
+		properties:  []string{"'x'"},
+	},
+	{
+		source:      "class Foo { *['x']() {} }",
+		optionsJson: "",
+		fixedSource: stringPointer("class Foo { *'x'() {} }"),
+		properties:  []string{"'x'"},
+	},
+	{
+		source:      "class Foo { async ['x']() {} }",
+		optionsJson: "",
+		fixedSource: stringPointer("class Foo { async 'x'() {} }"),
+		properties:  []string{"'x'"},
+	},
+	{
+		source:      "class Foo { get[.2]() {} }",
+		optionsJson: "",
+		fixedSource: stringPointer("class Foo { get.2() {} }"),
+		properties:  []string{".2"},
+	},
+	{
+		source:      "class Foo { set[.2](value) {} }",
+		optionsJson: "",
+		fixedSource: stringPointer("class Foo { set.2(value) {} }"),
+		properties:  []string{".2"},
+	},
+	{
+		source:      "class Foo { async[.2]() {} }",
+		optionsJson: "",
+		fixedSource: stringPointer("class Foo { async.2() {} }"),
+		properties:  []string{".2"},
+	},
+	{
+		source:      "class Foo { [2]() {} }",
+		optionsJson: "",
+		fixedSource: stringPointer("class Foo { 2() {} }"),
+		properties:  []string{"2"},
+	},
+	{
+		source:      "class Foo { get [2]() {} }",
+		optionsJson: "",
+		fixedSource: stringPointer("class Foo { get 2() {} }"),
+		properties:  []string{"2"},
+	},
+	{
+		source:      "class Foo { set [2](value) {} }",
+		optionsJson: "",
+		fixedSource: stringPointer("class Foo { set 2(value) {} }"),
+		properties:  []string{"2"},
+	},
+	{
+		source:      "class Foo { async [2]() {} }",
+		optionsJson: "",
+		fixedSource: stringPointer("class Foo { async 2() {} }"),
+		properties:  []string{"2"},
+	},
+	{
+		source:      "class Foo { get[2]() {} }",
+		optionsJson: "",
+		fixedSource: stringPointer("class Foo { get 2() {} }"),
+		properties:  []string{"2"},
+	},
+	{
+		source:      "class Foo { set[2](value) {} }",
+		optionsJson: "",
+		fixedSource: stringPointer("class Foo { set 2(value) {} }"),
+		properties:  []string{"2"},
+	},
+	{
+		source:      "class Foo { async[2]() {} }",
+		optionsJson: "",
+		fixedSource: stringPointer("class Foo { async 2() {} }"),
+		properties:  []string{"2"},
+	},
+	{
+		source:      "class Foo { get['foo']() {} }",
+		optionsJson: "",
+		fixedSource: stringPointer("class Foo { get'foo'() {} }"),
+		properties:  []string{"'foo'"},
+	},
+	{
+		source:      "class Foo { *[2]() {} }",
+		optionsJson: "",
+		fixedSource: stringPointer("class Foo { *2() {} }"),
+		properties:  []string{"2"},
+	},
+	{
+		source:      "class Foo { async*[2]() {} }",
+		optionsJson: "",
+		fixedSource: stringPointer("class Foo { async*2() {} }"),
+		properties:  []string{"2"},
+	},
+	{
+		source:      "class Foo { static ['constructor']() {} }",
+		optionsJson: "",
+		fixedSource: stringPointer("class Foo { static 'constructor'() {} }"),
+		properties:  []string{"'constructor'"},
+	},
+	{
+		source:      "class Foo { ['prototype']() {} }",
+		optionsJson: "",
+		fixedSource: stringPointer("class Foo { 'prototype'() {} }"),
+		properties:  []string{"'prototype'"},
+	},
+	{
+		source:      "(class { ['x']() {} })",
+		optionsJson: "",
+		fixedSource: stringPointer("(class { 'x'() {} })"),
+		properties:  []string{"'x'"},
+	},
+	{
+		source:      "(class { ['__proto__']() {} })",
+		optionsJson: "",
+		fixedSource: stringPointer("(class { '__proto__'() {} })"),
+		properties:  []string{"'__proto__'"},
+	},
+	{
+		source:      "(class { static ['__proto__']() {} })",
+		optionsJson: "",
+		fixedSource: stringPointer("(class { static '__proto__'() {} })"),
+		properties:  []string{"'__proto__'"},
+	},
+	{
+		source:      "(class { static ['constructor']() {} })",
+		optionsJson: "",
+		fixedSource: stringPointer("(class { static 'constructor'() {} })"),
+		properties:  []string{"'constructor'"},
+	},
+	{
+		source:      "(class { ['prototype']() {} })",
+		optionsJson: "",
+		fixedSource: stringPointer("(class { 'prototype'() {} })"),
+		properties:  []string{"'prototype'"},
+	},
+	{
+		source:      "class Foo { ['0'] }",
+		optionsJson: "",
+		fixedSource: stringPointer("class Foo { '0' }"),
+		properties:  []string{"'0'"},
+	},
+	{
+		source:      "class Foo { ['0'] = 0 }",
+		optionsJson: "",
+		fixedSource: stringPointer("class Foo { '0' = 0 }"),
+		properties:  []string{"'0'"},
+	},
+	{
+		source:      "class Foo { static[0] }",
+		optionsJson: "",
+		fixedSource: stringPointer("class Foo { static 0 }"),
+		properties:  []string{"0"},
+	},
+	{
+		source:      "class Foo { ['#foo'] }",
+		optionsJson: "",
+		fixedSource: stringPointer("class Foo { '#foo' }"),
+		properties:  []string{"'#foo'"},
+	},
+	{
+		source:      "(class { ['__proto__'] })",
+		optionsJson: "",
+		fixedSource: stringPointer("(class { '__proto__' })"),
+		properties:  []string{"'__proto__'"},
+	},
+	{
+		source:      "(class { static ['__proto__'] })",
+		optionsJson: "",
+		fixedSource: stringPointer("(class { static '__proto__' })"),
+		properties:  []string{"'__proto__'"},
+	},
+	{
+		source:      "(class { ['prototype'] })",
+		optionsJson: "",
+		fixedSource: stringPointer("(class { 'prototype' })"),
+		properties:  []string{"'prototype'"},
+	},
 }
 
 // TestNoUselessComputedKeyFires runs upstream's 65 invalid cases.
 //
 // Each asserts three things rather than one: that the finding appears, that its rendered message
-// carries the key's SOURCE text, and that the repair writes exactly what upstream's `output` says.
+// carries the key's source text, and that the repair writes exactly what upstream's `output` says.
 // The last two are what a message-id assertion cannot see, and this rule is precisely the shape
 // where that matters -- a fixer replacing a constructed span can be anchored correctly, report the
 // right id, and still write the wrong bytes.
-func TestNoUselessComputedKeyFires(t *testing.T) {
-	t.Parallel()
+func TestNoUselessComputedKeyFires(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range noUselessComputedKeyFiringCases {
-		t.Run(testCase.source, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoUselessComputedKey, uselessComputedKeyFile,
-				testCase.source, decodeUselessComputedKeyOptionsForTest(t, testCase.optionsJson))
+		test.Run(testCase.source, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunGiven(test, NoUselessComputedKey, uselessComputedKeyFile,
+				testCase.source, decodeUselessComputedKeyOptionsForTest(test, testCase.optionsJson))
 
 			wantIds := make([]string, len(testCase.properties))
-			for i := range wantIds {
-				wantIds[i] = "unnecessarilyComputedProperty"
+			for index := range wantIds {
+				wantIds[index] = "unnecessarilyComputedProperty"
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 
 			// Upstream asserts `data: { property }`, which renders into its message as
 			// `Unnecessarily computed property [{{property}}] found.`. Assert the rendered prefix
 			// exactly rather than with a substring test: a `strings.Contains` on an interpolated
 			// value stays green when the interpolation doubles a character, which is a defect this
 			// tree has actually shipped.
-			for i, property := range testCase.properties {
+			for index, property := range testCase.properties {
 				want := "Unnecessarily computed property [" + property + "] found."
-				got := result.Diagnostics[i].Message.Description
+				got := result.Diagnostics[index].Message.Description
 				if !strings.HasPrefix(got, want) {
-					t.Errorf("finding %d: message should begin %q, got %q", i, want, got)
+					test.Errorf("finding %d: message should begin %q, got %q", index, want, got)
 				}
 			}
 
 			if testCase.fixedSource == nil {
 				// Upstream's `output: null`: reported, deliberately not repaired. Reproducing the
 				// decline is the assertion.
-				for i, diagnostic := range result.Diagnostics {
+				for index, diagnostic := range result.Diagnostics {
 					if len(diagnostic.Fixes) != 0 {
-						t.Errorf("finding %d proposes %d fixes; upstream declines to fix this case",
-							i, len(diagnostic.Fixes))
+						test.Errorf("finding %d proposes %d fixes; upstream declines to fix this case",
+							index, len(diagnostic.Fixes))
 					}
 				}
 				return
 			}
-			rule_testing.ExpectFixedSource(t, result, *testCase.fixedSource)
+			rule_testing.ExpectFixedSource(test, result, *testCase.fixedSource)
 		})
 	}
 }
@@ -206,15 +525,15 @@ func TestNoUselessComputedKeyFires(t *testing.T) {
 // These are the false positives upstream already thought about, and several encode a distinction
 // nothing else would suggest: the four reserved names, the position dependence between a static and
 // an instance member, the bigint decline, and the plain `[x]` that computes something real.
-func TestNoUselessComputedKeyStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoUselessComputedKeyStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range noUselessComputedKeyCleanCases {
-		t.Run(testCase.source, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoUselessComputedKey,
+		test.Run(testCase.source, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunGiven(test, NoUselessComputedKey,
 				uselessComputedKeyFile, testCase.source,
-				decodeUselessComputedKeyOptionsForTest(t, testCase.optionsJson)))
+				decodeUselessComputedKeyOptionsForTest(test, testCase.optionsJson)))
 		})
 	}
 }
@@ -401,32 +720,32 @@ var noUselessComputedKeyAddedCases = []struct {
 }
 
 // TestNoUselessComputedKeyAddedCases covers what upstream's corpus structurally cannot.
-func TestNoUselessComputedKeyAddedCases(t *testing.T) {
-	t.Parallel()
+func TestNoUselessComputedKeyAddedCases(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range noUselessComputedKeyAddedCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoUselessComputedKey, uselessComputedKeyFile,
-				testCase.source, decodeUselessComputedKeyOptionsForTest(t, testCase.optionsJson))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunGiven(test, NoUselessComputedKey, uselessComputedKeyFile,
+				testCase.source, decodeUselessComputedKeyOptionsForTest(test, testCase.optionsJson))
 
 			if len(result.Diagnostics) != testCase.findings {
-				t.Fatalf("expected %d findings, got %d %v (%s)",
+				test.Fatalf("expected %d findings, got %d %v (%s)",
 					testCase.findings, len(result.Diagnostics), result.MessageIds(), testCase.reason)
 			}
 			if testCase.findings == 0 {
 				return
 			}
 			if testCase.fixedSource == "" {
-				for i, diagnostic := range result.Diagnostics {
+				for index, diagnostic := range result.Diagnostics {
 					if len(diagnostic.Fixes) != 0 {
-						t.Errorf("finding %d proposes a fix; upstream declines here (%s)",
-							i, testCase.reason)
+						test.Errorf("finding %d proposes a fix; upstream declines here (%s)",
+							index, testCase.reason)
 					}
 				}
 				return
 			}
-			rule_testing.ExpectFixedSource(t, result, testCase.fixedSource)
+			rule_testing.ExpectFixedSource(test, result, testCase.fixedSource)
 		})
 	}
 }
@@ -436,18 +755,18 @@ func TestNoUselessComputedKeyAddedCases(t *testing.T) {
 // Upstream reports the whole member rather than the key, so `({ ['x']: 0 })` points at
 // `['x']: 0` and not at `'x'`. A message-id fixture cannot see this, and the choice between the two
 // is exactly the kind that stays green over the wrong answer.
-func TestNoUselessComputedKeySpan(t *testing.T) {
-	t.Parallel()
+func TestNoUselessComputedKeySpan(test *testing.T) {
+	test.Parallel()
 
 	const source = "({ ['x']: 0 });"
-	result := rule_testing.Run(t, NoUselessComputedKey, uselessComputedKeyFile, source)
-	rule_testing.ExpectFindings(t, result, "unnecessarilyComputedProperty")
+	result := rule_testing.Run(test, NoUselessComputedKey, uselessComputedKeyFile, source)
+	rule_testing.ExpectFindings(test, result, "unnecessarilyComputedProperty")
 
 	// `Run` does not trim its input, so the literal above is what is on disk and can be sliced
 	// directly. `RunTyped` would trim, and this rule needs no checker.
 	reported := source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 	if reported != "['x']: 0" {
-		t.Errorf("finding should point at the whole member %q, got %q", "['x']: 0", reported)
+		test.Errorf("finding should point at the whole member %q, got %q", "['x']: 0", reported)
 	}
 }
 
@@ -457,28 +776,28 @@ func TestNoUselessComputedKeySpan(t *testing.T) {
 // written as an escape in both. Reading `key.Text()` instead would cook `A` into `A`, which
 // changes what the repair writes into the file and is invisible to every other assertion here:
 // the id is the same, the count is the same, and the span is the same.
-func TestNoUselessComputedKeyReportsRawTextNotCookedText(t *testing.T) {
-	t.Parallel()
+func TestNoUselessComputedKeyReportsRawTextNotCookedText(test *testing.T) {
+	test.Parallel()
 
 	const source = "({ ['\\u0041']: 0 });"
-	result := rule_testing.Run(t, NoUselessComputedKey, uselessComputedKeyFile, source)
-	rule_testing.ExpectFindings(t, result, "unnecessarilyComputedProperty")
+	result := rule_testing.Run(test, NoUselessComputedKey, uselessComputedKeyFile, source)
+	rule_testing.ExpectFindings(test, result, "unnecessarilyComputedProperty")
 
 	want := "Unnecessarily computed property ['\\u0041'] found."
 	if got := result.Diagnostics[0].Message.Description; !strings.HasPrefix(got, want) {
-		t.Errorf("message should begin %q, got %q", want, got)
+		test.Errorf("message should begin %q, got %q", want, got)
 	}
-	rule_testing.ExpectFixedSource(t, result, "({ '\\u0041': 0 });")
+	rule_testing.ExpectFixedSource(test, result, "({ '\\u0041': 0 });")
 }
 
 // TestNoUselessComputedKeyDecoderDefaultsToEnforcingClassMembers pins the default that a generic
 // decoder would invert.
 //
-// `enforceForClassMembers` defaults to TRUE, so nil options, an empty object, and an explicit true
+// `enforceForClassMembers` defaults to `true`, so nil options, an empty object, and an explicit true
 // must all enforce, while only an explicit false narrows. A `DecodeOptionsInto` would answer the
 // zero value for the first two and silently disagree with upstream on both.
-func TestNoUselessComputedKeyDecoderDefaultsToEnforcingClassMembers(t *testing.T) {
-	t.Parallel()
+func TestNoUselessComputedKeyDecoderDefaultsToEnforcingClassMembers(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name        string
@@ -490,20 +809,22 @@ func TestNoUselessComputedKeyDecoderDefaultsToEnforcingClassMembers(t *testing.T
 		{"an explicit true", `{"enforceForClassMembers":true}`, true},
 		{"an explicit false", `{"enforceForClassMembers":false}`, false},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			var settings NoUselessComputedKeySettings
 			if testCase.optionsJson == "" {
 				settings = DefaultNoUselessComputedKeySettings()
 			} else {
-				decoded, err := DecodeNoUselessComputedKeyOptions(json.RawMessage(testCase.optionsJson))
-				if err != nil {
-					t.Fatalf("decoding %q: %v", testCase.optionsJson, err)
+				decoded, decodeNoUselessComputedKeyOptionsError := DecodeNoUselessComputedKeyOptions(
+					json.RawMessage(testCase.optionsJson),
+				)
+				if decodeNoUselessComputedKeyOptionsError != nil {
+					test.Fatalf("decoding %q: %v", testCase.optionsJson, decodeNoUselessComputedKeyOptionsError)
 				}
-				settings = decoded.(NoUselessComputedKeySettings)
+				settings = decoded
 			}
 			if settings.EnforceForClassMembers != testCase.want {
-				t.Errorf("enforceForClassMembers should be %v, got %v",
+				test.Errorf("enforceForClassMembers should be %v, got %v",
 					testCase.want, settings.EnforceForClassMembers)
 			}
 		})
@@ -512,9 +833,8 @@ func TestNoUselessComputedKeyDecoderDefaultsToEnforcingClassMembers(t *testing.T
 	// A rule configured as a bare severity is handed nil options rather than a struct, and the
 	// zero value narrows the rule instead of disabling it. This is the nil-options fallback the
 	// brief calls for, asserted by bypassing the decoder entirely.
-	result := rule_testing.RunWithOptions(t, NoUselessComputedKey, uselessComputedKeyFile,
-		"class Foo { ['x']() {} }", nil)
-	rule_testing.ExpectFindings(t, result, "unnecessarilyComputedProperty")
+	result := rule_testing.Run(test, NoUselessComputedKey, uselessComputedKeyFile, "class Foo { ['x']() {} }")
+	rule_testing.ExpectFindings(test, result, "unnecessarilyComputedProperty")
 }
 
 // TestNoUselessComputedKeyDeclinesToRepairARecoveredParse pins the bracket sanity check.
@@ -522,7 +842,7 @@ func TestNoUselessComputedKeyDecoderDefaultsToEnforcingClassMembers(t *testing.T
 // The check reads as defensive coding and a mutation neutralising it survived every other fixture
 // here, so its reachability was probed rather than argued. Error recovery synthesizes an
 // unterminated computed name from source no well-formed file contains: across eleven malformed
-// inputs, seven produced a `KindComputedPropertyName` whose token range does NOT end in `]`, with
+// inputs, seven produced a `KindComputedPropertyName` whose token range does not end in `]`, with
 // spans like `[`, `['x'`, and `['x' ()`.
 //
 // That matters because this rule's repair replaces bracket to bracket. Handed a span whose last
@@ -531,23 +851,23 @@ func TestNoUselessComputedKeyDecoderDefaultsToEnforcingClassMembers(t *testing.T
 // the shape the brief calls for: report the finding, withhold the repair.
 //
 // No fixture asserting a message id can see this, because the id is identical either way. The
-// assertion has to be on what the finding OFFERS.
-func TestNoUselessComputedKeyDeclinesToRepairARecoveredParse(t *testing.T) {
-	t.Parallel()
+// assertion has to be on what the finding offers.
+func TestNoUselessComputedKeyDeclinesToRepairARecoveredParse(test *testing.T) {
+	test.Parallel()
 
 	for _, source := range []string{
 		"({ ['x' });",
 		"({ ['x': 0 });",
 	} {
-		t.Run(source, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoUselessComputedKey, uselessComputedKeyFile, source)
-			rule_testing.ExpectFindings(t, result, "unnecessarilyComputedProperty")
-			for i, diagnostic := range result.Diagnostics {
+		test.Run(source, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoUselessComputedKey, uselessComputedKeyFile, source)
+			rule_testing.ExpectFindings(test, result, "unnecessarilyComputedProperty")
+			for index, diagnostic := range result.Diagnostics {
 				if len(diagnostic.Fixes) != 0 {
-					t.Errorf("finding %d proposes %d fixes on a recovered parse; the bracket span "+
+					test.Errorf("finding %d proposes %d fixes on a recovered parse; the bracket span "+
 						"is not delimited by brackets, so any repair would corrupt the file",
-						i, len(diagnostic.Fixes))
+						index, len(diagnostic.Fixes))
 				}
 			}
 		})

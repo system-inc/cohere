@@ -16,8 +16,8 @@ import (
 //
 // Each case plants a repeat in exactly one position, so a finding there is proof that position is
 // read, and the fix is asserted so the range is proven to land on the right string.
-func TestNestedClassLiteralsAreRead(t *testing.T) {
-	t.Parallel()
+func TestNestedClassLiteralsAreRead(test *testing.T) {
+	test.Parallel()
 	testCases := []struct {
 		name, source, want string
 	}{
@@ -81,10 +81,10 @@ func TestNestedClassLiteralsAreRead(t *testing.T) {
 		},
 	}
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoDuplicateClasses, "Component.tsx", testCase.source)
-			rule_testing.ExpectFixedSource(t, result, testCase.want)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoDuplicateClasses, "Component.tsx", testCase.source)
+			rule_testing.ExpectFixedSource(test, result, testCase.want)
 		})
 	}
 }
@@ -95,8 +95,8 @@ func TestNestedClassLiteralsAreRead(t *testing.T) {
 // too, which costs it nothing because a single word sorts to itself. Reading those strings here
 // would send `'primary large'` from a comparison to `no-unknown-classes`, and a condition is not a
 // class list. Each source below holds a repeat that only a wrong reading would find.
-func TestNonValueStringsAreNotRead(t *testing.T) {
-	t.Parallel()
+func TestNonValueStringsAreNotRead(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range []struct {
 		name, source string
 	}{
@@ -127,10 +127,10 @@ func TestNonValueStringsAreNotRead(t *testing.T) {
 			source: `const element = <div title={open ? 'flex flex' : ''} />;`,
 		},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoDuplicateClasses, "Component.tsx", testCase.source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoDuplicateClasses, "Component.tsx", testCase.source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -142,38 +142,38 @@ func TestNonValueStringsAreNotRead(t *testing.T) {
 // The plugin's `canCollapseWhitespaceIn` decides from the same position and keeps it. The same
 // string outside a template is trimmed, which is the discrimination that makes the first case mean
 // something.
-func TestWhitespaceAtAHoleLiteralsEdgeIsASeparator(t *testing.T) {
-	t.Parallel()
-	t.Run("inside a hole, the edge keeps one character", func(t *testing.T) {
-		t.Parallel()
-		result := rule_testing.Run(t, NoUnnecessaryWhitespace, "Component.tsx",
+func TestWhitespaceAtAHoleLiteralsEdgeIsASeparator(test *testing.T) {
+	test.Parallel()
+	test.Run("inside a hole, the edge keeps one character", func(test *testing.T) {
+		test.Parallel()
+		result := rule_testing.Run(test, NoUnnecessaryWhitespace, "Component.tsx",
 			"const element = <div className={`flex${open ? '   hidden' : ''}`} />;")
-		rule_testing.ExpectFixedSource(t, result,
+		rule_testing.ExpectFixedSource(test, result,
 			"const element = <div className={`flex${open ? ' hidden' : ''}`} />;")
 	})
 
-	t.Run("inside a hole, a single edge space is no finding", func(t *testing.T) {
-		t.Parallel()
-		result := rule_testing.Run(t, NoUnnecessaryWhitespace, "Component.tsx",
+	test.Run("inside a hole, a single edge space is no finding", func(test *testing.T) {
+		test.Parallel()
+		result := rule_testing.Run(test, NoUnnecessaryWhitespace, "Component.tsx",
 			"const element = <div className={`flex${open ? ' hidden' : ''}`} />;")
-		rule_testing.ExpectClean(t, result)
+		rule_testing.ExpectClean(test, result)
 	})
 
-	t.Run("outside a template, the same edge is padding", func(t *testing.T) {
-		t.Parallel()
-		result := rule_testing.Run(t, NoUnnecessaryWhitespace, "Component.tsx",
+	test.Run("outside a template, the same edge is padding", func(test *testing.T) {
+		test.Parallel()
+		result := rule_testing.Run(test, NoUnnecessaryWhitespace, "Component.tsx",
 			"const element = <div className={open ? ' hidden' : ''} />;")
-		rule_testing.ExpectFixedSource(t, result,
+		rule_testing.ExpectFixedSource(test, result,
 			"const element = <div className={open ? 'hidden' : ''} />;")
 	})
 
 	// The hole's text still reads as segments when a hole holds a string. They used to be
 	// alternatives, and this doubled space was the casualty.
-	t.Run("the template's own text is still read", func(t *testing.T) {
-		t.Parallel()
-		result := rule_testing.Run(t, NoUnnecessaryWhitespace, "Component.tsx",
+	test.Run("the template's own text is still read", func(test *testing.T) {
+		test.Parallel()
+		result := rule_testing.Run(test, NoUnnecessaryWhitespace, "Component.tsx",
 			"const element = <div className={`flex  ${open ? 'hidden' : ''}`} />;")
-		rule_testing.ExpectFixedSource(t, result,
+		rule_testing.ExpectFixedSource(test, result,
 			"const element = <div className={`flex ${open ? 'hidden' : ''}`} />;")
 	})
 }
@@ -182,21 +182,21 @@ func TestWhitespaceAtAHoleLiteralsEdgeIsASeparator(t *testing.T) {
 //
 // `\“ decodes to a backtick, so writing the decoded classes back over the source would close the
 // template early, the file would stop parsing, and the engine would refuse every fix in it.
-func TestAnEscapedTemplateIsReportedWithoutAFix(t *testing.T) {
-	t.Parallel()
-	result := rule_testing.Run(t, NoDuplicateClasses, "Component.tsx",
+func TestAnEscapedTemplateIsReportedWithoutAFix(test *testing.T) {
+	test.Parallel()
+	result := rule_testing.Run(test, NoDuplicateClasses, "Component.tsx",
 		"const element = <div className={`flex flex content-['\\`']`} />;")
-	rule_testing.ExpectFindings(t, result, "duplicateClass")
+	rule_testing.ExpectFindings(test, result, "duplicateClass")
 	if len(result.Diagnostics[0].Fixes) != 0 {
-		t.Fatalf("expected no fix over an escape, got %+v", result.Diagnostics[0].Fixes)
+		test.Fatalf("expected no fix over an escape, got %+v", result.Diagnostics[0].Fixes)
 	}
 }
 
 // A template's runs are found at their tokens, so trivia in front of a delimiter does not shift
 // them. Before, a template after `? ` or a span after `${ x }` read as untokenizable, and every rule
 // that edits runs skipped it; the direct template, with nothing in front of its backtick, was fine.
-func TestTemplateRunsAfterTriviaAreFixed(t *testing.T) {
-	t.Parallel()
+func TestTemplateRunsAfterTriviaAreFixed(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range []struct {
 		name, source, want string
 	}{
@@ -211,10 +211,10 @@ func TestTemplateRunsAfterTriviaAreFixed(t *testing.T) {
 			want:   "const element = <div className={`flex ${ x } block gap-2`} />;",
 		},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoUnnecessaryWhitespace, "Component.tsx", testCase.source)
-			rule_testing.ExpectFixedSource(t, result, testCase.want)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoUnnecessaryWhitespace, "Component.tsx", testCase.source)
+			rule_testing.ExpectFixedSource(test, result, testCase.want)
 		})
 	}
 }
@@ -225,8 +225,8 @@ func TestTemplateRunsAfterTriviaAreFixed(t *testing.T) {
 // The trimmed cases are quoted from Prettier's Tailwind plugin on 2026-10-02. The kept cases are
 // where the plugin is wrong: it trims them too, so `flex${c ? '  block  ' : ”}` became
 // `flex${c ? 'block' : ”}` and two classes fused into `flexblock`. See holeEdges.
-func TestHoleStringEdgesTrimOnlyWhereTheTemplateSeparates(t *testing.T) {
-	t.Parallel()
+func TestHoleStringEdgesTrimOnlyWhereTheTemplateSeparates(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range []struct {
 		name, source, want string
 	}{
@@ -262,10 +262,10 @@ func TestHoleStringEdgesTrimOnlyWhereTheTemplateSeparates(t *testing.T) {
 			want:   "const element = <i className={`flex${c ? ' block' : ''} grid`} />;",
 		},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoUnnecessaryWhitespace, "Component.tsx", testCase.source)
-			rule_testing.ExpectFixedSource(t, result, testCase.want)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoUnnecessaryWhitespace, "Component.tsx", testCase.source)
+			rule_testing.ExpectFixedSource(test, result, testCase.want)
 		})
 	}
 
@@ -275,6 +275,6 @@ func TestHoleStringEdgesTrimOnlyWhereTheTemplateSeparates(t *testing.T) {
 		"const element = <i className={`flex${c ? ' block' : ''}`} />;",
 		"const element = <i className={`${c ? 'block ' : ''}flex`} />;",
 	} {
-		rule_testing.ExpectClean(t, rule_testing.Run(t, NoUnnecessaryWhitespace, "Component.tsx", source))
+		rule_testing.ExpectClean(test, rule_testing.Run(test, NoUnnecessaryWhitespace, "Component.tsx", source))
 	}
 }

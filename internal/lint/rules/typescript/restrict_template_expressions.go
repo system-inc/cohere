@@ -9,8 +9,8 @@ import (
 
 // RestrictTemplateExpressionsOptions configures which non-string types may be interpolated.
 //
-// Every boolean is a POINTER so that absent stays distinguishable from an explicit false. Five of
-// the six default to TRUE, so collapsing that distinction would turn an unconfigured rule into a
+// Every boolean is a pointer so that absent stays distinguishable from an explicit false. Five of
+// the six default to true, so collapsing that distinction would turn an unconfigured rule into a
 // far stricter one than upstream's default, which is the exact inversion the brief warns about for
 // a default-true option.
 type RestrictTemplateExpressionsOptions struct {
@@ -72,35 +72,34 @@ type restrictTemplateExpressionsRawOptions struct {
 // Hand-written rather than `rule.DecodeOptionsInto` for two reasons, and the second is the one that
 // would silently break the rule. `allow` is heterogeneous and leaves as two fields, reusing the
 // specifier decoder `only-throw-error` already ships for the identical wire shape. And the `allow`
-// DEFAULT is not the zero value: absent `allow` means upstream's three standard-library types
+// default is not the zero value: absent `allow` means upstream's three standard-library types
 // rather than an empty list, so a decoder returning nil there would report every interpolated
 // `Error` in the tree while every fixture built from an explicit struct still passed.
-func DecodeRestrictTemplateExpressionsOptions(raw []byte) (any, error) {
+func DecodeRestrictTemplateExpressionsOptions(raw []byte) (RestrictTemplateExpressionsOptions, error) {
 	options := RestrictTemplateExpressionsOptions{Allow: defaultAllowSpecifiers()}
 	if len(raw) == 0 {
 		return options, nil
 	}
 
-	decoded, err := rule.DecodeOptionsInto[restrictTemplateExpressionsRawOptions]()(raw)
-	if err != nil {
-		return options, err
+	decoded, decodeOptionsError := rule.DecodeOptionsInto[restrictTemplateExpressionsRawOptions]()(raw)
+	if decodeOptionsError != nil {
+		return options, decodeOptionsError
 	}
-	wire, _ := decoded.(restrictTemplateExpressionsRawOptions)
 
-	options.AllowAny = wire.AllowAny
-	options.AllowArray = wire.AllowArray
-	options.AllowBoolean = wire.AllowBoolean
-	options.AllowNever = wire.AllowNever
-	options.AllowNullish = wire.AllowNullish
-	options.AllowNumber = wire.AllowNumber
-	options.AllowRegExp = wire.AllowRegExp
+	options.AllowAny = decoded.AllowAny
+	options.AllowArray = decoded.AllowArray
+	options.AllowBoolean = decoded.AllowBoolean
+	options.AllowNever = decoded.AllowNever
+	options.AllowNullish = decoded.AllowNullish
+	options.AllowNumber = decoded.AllowNumber
+	options.AllowRegExp = decoded.AllowRegExp
 
-	// An explicitly configured `allow` REPLACES the default rather than adding to it, matching
+	// An explicitly configured `allow` replaces the default rather than adding to it, matching
 	// upstream, where `defaultOptions` is merged key by key and a supplied array wins outright.
-	if wire.Allow != nil {
+	if decoded.Allow != nil {
 		options.Allow = nil
 		options.AllowInline = nil
-		for _, entry := range wire.Allow {
+		for _, entry := range decoded.Allow {
 			if entry.inline != "" {
 				options.AllowInline = append(options.AllowInline, entry.inline)
 				continue
@@ -141,7 +140,7 @@ func DecodeRestrictTemplateExpressionsOptions(raw []byte) (any, error) {
 //
 // # Seven allowances, five of them on by default, and the defaults are the whole option surface
 //
-// `allowAny`, `allowBoolean`, `allowNullish`, `allowNumber` and `allowRegExp` default to TRUE;
+// `allowAny`, `allowBoolean`, `allowNullish`, `allowNumber` and `allowRegExp` default to true;
 // `allowArray` and `allowNever` default to false. So the rule as shipped reports objects, unknown,
 // arrays, never, and anything else without a sensible string form, and lets the rest through. The
 // options are pointers all the way through the decoder for exactly this reason: reading an absent
@@ -154,7 +153,7 @@ func DecodeRestrictTemplateExpressionsOptions(raw []byte) (any, error) {
 //
 // # The recursion, and why the two composite arms differ
 //
-// A union is allowed only if EVERY constituent is; an intersection if ANY constituent is. That
+// A union is allowed only if every constituent is; an intersection if any constituent is. That
 // asymmetry is correct rather than a typo: a union value could be any of its members at run time, so
 // all of them have to be printable, while an intersection value is all of its members at once, so
 // one printable facet is enough.
@@ -171,24 +170,25 @@ func DecodeRestrictTemplateExpressionsOptions(raw []byte) (any, error) {
 //
 // The anchor is a template literal, and the body exits immediately on one with no interpolations,
 // which is the common case for a template used only for its multi-line-ness.
-var RestrictTemplateExpressions = rule.Rule{
+var RestrictTemplateExpressions = rule.Rule[RestrictTemplateExpressionsOptions]{
 	Name: "@typescript-eslint/restrict-template-expressions",
 
-	// Every judgment is about the TYPE of an interpolated value.
+	// Every judgment is about the type of an interpolated value.
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
 	// Compiler options and the default library, through type_checking's builtin and specifier helpers.
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, isSettings := rule.OptionsAs[RestrictTemplateExpressionsOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[RestrictTemplateExpressionsOptions]) rule.Listeners {
+		settings, isSettings := options.Read()
 		if !isSettings {
 			// A rule configured as a bare severity reaches here with nil options, and the zero
-			// value of this struct is upstream's STRICT preset rather than its default. Routing
+			// value of this struct is upstream's strict preset rather than its default. Routing
 			// through the decoder keeps `"error"` meaning what upstream means by it.
+			// Ignored: empty input returns the defaults before any decoding, so it has no error to return.
 			decoded, _ := DecodeRestrictTemplateExpressionsOptions(nil)
-			settings, _ = decoded.(RestrictTemplateExpressionsOptions)
+			settings = decoded
 		}
 
 		allowAny := restrictTemplateExpressionsEnabled(settings.AllowAny, true)
@@ -233,7 +233,7 @@ var RestrictTemplateExpressions = rule.Rule{
 
 			// The configured allowlist, checked against the type and its base types so a subclass
 			// of an allowed type is allowed too. That is upstream's `matchesTypeOrBaseType`.
-			if matchesAllowedTypeOrBaseType(ctx, candidate, settings,
+			if matchesAllowedTypeOrBaseType(ruleContext, candidate, settings,
 				map[*checker.Type]struct{}{}) {
 				return true
 			}
@@ -252,7 +252,7 @@ var RestrictTemplateExpressions = rule.Rule{
 				checker.TypeFlagsNumberLike|checker.TypeFlagsBigIntLike) {
 				return true
 			}
-			if allowRegExp && type_checking.GetTypeName(ctx.TypeChecker, candidate) == "RegExp" {
+			if allowRegExp && type_checking.GetTypeName(ruleContext.TypeChecker, candidate) == "RegExp" {
 				return true
 			}
 			if allowNever && type_checking.IsTypeFlagSet(candidate, checker.TypeFlagsNever) {
@@ -261,9 +261,9 @@ var RestrictTemplateExpressions = rule.Rule{
 
 			// The array tester recurses through the number index type, which is what separates
 			// `string[]` from `object[]` under the same flag.
-			if allowArray && (checker.Checker_isArrayType(ctx.TypeChecker, candidate) ||
+			if allowArray && (checker.Checker_isArrayType(ruleContext.TypeChecker, candidate) ||
 				checker.IsTupleType(candidate)) {
-				return isAllowedType(type_checking.GetNumberIndexType(ctx.TypeChecker, candidate))
+				return isAllowedType(type_checking.GetNumberIndexType(ruleContext.TypeChecker, candidate))
 			}
 
 			return false
@@ -271,7 +271,7 @@ var RestrictTemplateExpressions = rule.Rule{
 
 		return rule.Listeners{
 			ast.KindTemplateExpression: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 
@@ -292,14 +292,14 @@ var RestrictTemplateExpressions = rule.Rule{
 						continue
 					}
 
-					expressionType := type_checking.GetConstrainedTypeAtLocation(ctx.TypeChecker,
+					expressionType := type_checking.GetConstrainedTypeAtLocation(ruleContext.TypeChecker,
 						expression)
 					if expressionType == nil || isAllowedType(expressionType) {
 						continue
 					}
 
-					ctx.ReportNode(expression, buildInvalidTypeMessage(
-						ctx.TypeChecker.TypeToString(expressionType)))
+					ruleContext.ReportNode(expression, buildInvalidTypeMessage(
+						ruleContext.TypeChecker.TypeToString(expressionType)))
 				}
 			},
 		}
@@ -308,7 +308,7 @@ var RestrictTemplateExpressions = rule.Rule{
 
 // matchesAllowedTypeOrBaseType answers upstream's `matchesTypeOrBaseType` over the allowlist.
 //
-// The type itself first, then its base types RECURSIVELY, so a class extending `Error` is allowed by
+// The type itself first, then its base types recursively, so a class extending `Error` is allowed by
 // the default specifier naming `Error` and so is a class extending that class. The recursion is not
 // optional and a single level is not enough: upstream's corpus pins the transitive case in both the
 // class and the interface direction, with `class DerivedTwice extends Derived extends Base` and an
@@ -317,7 +317,9 @@ var RestrictTemplateExpressions = rule.Rule{
 //
 // `seen` reproduces upstream's cycle guard rather than adding one. It is load-bearing on interfaces,
 // where a declaration-merged hierarchy can reach itself.
-func matchesAllowedTypeOrBaseType(ctx rule.Context, candidate *checker.Type,
+//
+// Mutates: seen the recursion shares one visited set down every base-type hop
+func matchesAllowedTypeOrBaseType(ruleContext rule.Context, candidate *checker.Type,
 	settings RestrictTemplateExpressionsOptions, seen map[*checker.Type]struct{}) bool {
 	if candidate == nil {
 		return false
@@ -328,12 +330,12 @@ func matchesAllowedTypeOrBaseType(ctx rule.Context, candidate *checker.Type,
 	seen[candidate] = struct{}{}
 
 	if type_checking.TypeMatchesSomeSpecifier(candidate, settings.Allow, settings.AllowInline,
-		ctx.Program) {
+		ruleContext.Program) {
 		return true
 	}
 
-	for _, baseType := range baseTypesOf(ctx, candidate) {
-		if matchesAllowedTypeOrBaseType(ctx, baseType, settings, seen) {
+	for _, baseType := range baseTypesOf(ruleContext, candidate) {
+		if matchesAllowedTypeOrBaseType(ruleContext, baseType, settings, seen) {
 			return true
 		}
 	}
@@ -342,10 +344,10 @@ func matchesAllowedTypeOrBaseType(ctx rule.Context, candidate *checker.Type,
 
 // baseTypesOf answers upstream's `getBaseTypesForType`.
 //
-// Two hops that are easy to skip and both matter. A generic type arrives as a type REFERENCE whose
+// Two hops that are easy to skip and both matter. A generic type arrives as a type reference whose
 // base types live on its target rather than on the reference, and `getBaseTypes` answers only for a
 // class or interface, so anything else returns nothing rather than being asked.
-func baseTypesOf(ctx rule.Context, candidate *checker.Type) []*checker.Type {
+func baseTypesOf(ruleContext rule.Context, candidate *checker.Type) []*checker.Type {
 	if !type_checking.IsObjectType(candidate) {
 		return nil
 	}
@@ -362,7 +364,7 @@ func baseTypesOf(ctx rule.Context, candidate *checker.Type) []*checker.Type {
 		return nil
 	}
 
-	return checker.Checker_getBaseTypes(ctx.TypeChecker, interfaceTarget)
+	return checker.Checker_getBaseTypes(ruleContext.TypeChecker, interfaceTarget)
 }
 
 func buildInvalidTypeMessage(typeName string) rule.Message {

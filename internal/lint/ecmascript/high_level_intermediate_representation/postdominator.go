@@ -2,22 +2,22 @@
 //
 // This is a port of React's `Dominator.ts` and `ComputeUnconditionalBlocks.ts`, transcribed by oxc
 // at `oxc_react_compiler/src/react_compiler_hir/dominator.rs`. Cooper, Harvey and Kennedy, "A
-// Simple, Fast Dominance Algorithm", run over the REVERSED graph with one synthetic exit.
+// Simple, Fast Dominance Algorithm", run over the reversed graph with one synthetic exit.
 //
 // # Why this is here rather than borrowed from internal/lint/ecmascript/control_flow_graph
 //
 // `controlflow` has both pieces and neither is reachable. `AnalyzeDominators` is generic over
 // `control_flow_graph.Graph[E]` and `control_flow_graph.Block[E]`, whose `index`, `final` and `thrown` fields are
-// unexported and set only by `control_flow_graph.Build`, so a caller holding a `high_level_intermediate_representation.Function` cannot
-// construct one. `PathAnalysis.IsOnEveryFinalPath` computes semantically the right thing over the
-// right kind of graph, and is likewise only obtainable from a graph this package does not produce.
-// `ssa.go`'s header states the general form of this: nothing in that package applies to this graph
+// unexported and set only by `control_flow_graph.Build`, so a caller holding a
+// `high_level_intermediate_representation.Function` cannot construct one. `PathAnalysis.IsOnEveryFinalPath` computes
+// semantically the right thing over the right kind of graph, and is likewise only obtainable from a graph this package
+// does not produce. `ssa.go`'s header states the general form of this: nothing in that package applies to this graph
 // without a conversion that does not exist.
 //
-// It is also NOT the same question `ssa_verify.go`'s `computeDominance` answers, and the difference
+// It is also not the same question `ssa_verify.go`'s `computeDominance` answers, and the difference
 // is the whole point rather than an implementation detail. That one is forward dominance: does
-// every path from the entry REACH this block. This is post-dominance: does every path from the
-// entry PASS THROUGH this block on its way to a return.
+// every path from the entry reach this block. This is post-dominance: does every path from the
+// entry pass through this block on its way to a return.
 //
 // Measured on React's own rule, which is why the distinction is recorded rather than asserted:
 //
@@ -36,6 +36,12 @@
 package high_level_intermediate_representation
 
 import "github.com/system-inc/cohere/static_single_assignment"
+
+// postDominatorExit is the synthetic block every return flows into.
+//
+// `InvalidBlock` is zero and lowering never mints block zero, so zero is free to mean the exit here
+// and cannot collide with a real id.
+const postDominatorExit static_single_assignment.BlockId = InvalidBlock
 
 // UnconditionalBlocks returns the blocks that execute on every non-throwing path through function.
 //
@@ -92,12 +98,6 @@ func UnconditionalBlocks(function *Function) map[static_single_assignment.BlockI
 	return unconditional
 }
 
-// postDominatorExit is the synthetic block every return flows into.
-//
-// `InvalidBlock` is zero and lowering never mints block zero, so zero is free to mean the exit here
-// and cannot collide with a real id.
-const postDominatorExit static_single_assignment.BlockId = InvalidBlock
-
 // postDominanceTree holds the immediate post-dominator of each block.
 //
 // A block absent from `immediate` reaches no return, so it post-dominates nothing and nothing
@@ -108,10 +108,10 @@ type postDominanceTree struct {
 
 // computePostDominance runs Cooper-Harvey-Kennedy over the reversed graph.
 //
-// The algorithm needs its nodes in reverse postorder OF THE GRAPH IT WALKS, and the graph it walks
+// The algorithm needs its nodes in reverse postorder of the graph it walks, and the graph it walks
 // here is the reverse of `Function.Blocks`' order rather than that order itself. So the traversal
 // below computes its own ordering from the exit backwards, instead of reusing `Function.Blocks`,
-// which is in reverse postorder of the FORWARD graph and is the wrong order for this.
+// which is in reverse postorder of the forward graph and is the wrong order for this.
 //
 // Getting that wrong does not fail loudly. Cooper-Harvey-Kennedy's `intersect` walks two pointers
 // toward each other by comparing ordering positions, so a wrong order makes it walk the wrong way
@@ -121,14 +121,15 @@ type postDominanceTree struct {
 func computePostDominance(function *Function) *postDominanceTree {
 	// Successors in the reversed graph are predecessors in the forward one, and vice versa. The
 	// exit is a successor of every returning block.
-	reverseSuccessors := make(map[static_single_assignment.BlockId][]static_single_assignment.BlockId, len(function.Blocks)+1)
+	reverseSuccessors := make(
+		map[static_single_assignment.BlockId][]static_single_assignment.BlockId,
+		len(function.Blocks)+1,
+	)
 	for _, block := range function.Blocks {
 		if _, isReturn := block.Terminal.(*Return); isReturn {
 			reverseSuccessors[postDominatorExit] = append(reverseSuccessors[postDominatorExit], block.Id)
 		}
-		for _, predecessorId := range block.Predecessors {
-			reverseSuccessors[block.Id] = append(reverseSuccessors[block.Id], predecessorId)
-		}
+		reverseSuccessors[block.Id] = append(reverseSuccessors[block.Id], block.Predecessors...)
 	}
 
 	order := reversePostorderFrom(postDominatorExit, reverseSuccessors)
@@ -141,7 +142,9 @@ func computePostDominance(function *Function) *postDominanceTree {
 	for index := range immediate {
 		immediate[index] = -1
 	}
-	tree := &postDominanceTree{immediate: make(map[static_single_assignment.BlockId]static_single_assignment.BlockId, len(order))}
+	tree := &postDominanceTree{
+		immediate: make(map[static_single_assignment.BlockId]static_single_assignment.BlockId, len(order)),
+	}
 	if len(order) == 0 {
 		return tree
 	}
@@ -149,22 +152,24 @@ func computePostDominance(function *Function) *postDominanceTree {
 
 	// The two pointers walk toward the root, which sits at position zero, so the larger position is
 	// always the one further from it and is the one that steps.
-	intersect := func(a, b int) int {
-		for a != b {
-			for a > b {
-				if immediate[a] == -1 || immediate[a] == a {
-					return b
+	intersect := func(left, right int) int {
+		// The pointers start at the two inputs and step from there, leaving the inputs as given.
+		x, y := left, right
+		for x != y {
+			for x > y {
+				if immediate[x] == -1 || immediate[x] == x {
+					return y
 				}
-				a = immediate[a]
+				x = immediate[x]
 			}
-			for b > a {
-				if immediate[b] == -1 || immediate[b] == b {
-					return a
+			for y > x {
+				if immediate[y] == -1 || immediate[y] == y {
+					return x
 				}
-				b = immediate[b]
+				y = immediate[y]
 			}
 		}
-		return a
+		return x
 	}
 
 	// Predecessors in the reversed graph, which the fixed point reads.
@@ -210,7 +215,10 @@ func computePostDominance(function *Function) *postDominanceTree {
 //
 // Iterative rather than recursive for the same reason `ReversePostorder` is: the depth is whatever
 // the source contains, and a linter must not be bounded by the goroutine stack.
-func reversePostorderFrom(root static_single_assignment.BlockId, successors map[static_single_assignment.BlockId][]static_single_assignment.BlockId) []static_single_assignment.BlockId {
+func reversePostorderFrom(
+	root static_single_assignment.BlockId,
+	successors map[static_single_assignment.BlockId][]static_single_assignment.BlockId,
+) []static_single_assignment.BlockId {
 	visited := make(map[static_single_assignment.BlockId]bool, len(successors))
 	postorder := make([]static_single_assignment.BlockId, 0, len(successors))
 
@@ -262,7 +270,10 @@ func reversePostorderFrom(root static_single_assignment.BlockId, successors map[
 //
 // Nil-safe: a nil function yields a predicate that answers false, which is the correct answer for a
 // function with no blocks rather than a special case.
-func ControlDominators(function *Function, isControlValue func(place Place) bool) func(block static_single_assignment.BlockId) bool {
+func ControlDominators(
+	function *Function,
+	isControlValue func(place Place) bool,
+) func(block static_single_assignment.BlockId) bool {
 	if function == nil || isControlValue == nil {
 		return func(static_single_assignment.BlockId) bool { return false }
 	}
@@ -322,13 +333,17 @@ func terminalTestSatisfies(terminal Terminal, isControlValue func(place Place) b
 // postDominatorFrontier is the set of blocks that decide whether target runs.
 //
 // Upstream's `postDominatorFrontier`. A predecessor of anything target post-dominates, which target
-// does NOT post-dominate, is a block where control could have gone elsewhere: that is exactly a
+// does not post-dominate, is a block where control could have gone elsewhere: that is exactly a
 // branch target depends on.
 //
 // The walk covers target itself as well as its post-dominated set, because a branch immediately
 // above target is a frontier block and target does not post-dominate itself in `postDominatorsOf`'s
 // result.
-func postDominatorFrontier(function *Function, tree *postDominanceTree, target static_single_assignment.BlockId) map[static_single_assignment.BlockId]bool {
+func postDominatorFrontier(
+	function *Function,
+	tree *postDominanceTree,
+	target static_single_assignment.BlockId,
+) map[static_single_assignment.BlockId]bool {
 	postDominated := postDominatorsOf(function, tree, target)
 
 	frontier := map[static_single_assignment.BlockId]bool{}
@@ -365,8 +380,12 @@ func postDominatorFrontier(function *Function, tree *postDominanceTree, target s
 // immediate post-dominator is target or is already known to be post-dominated by it. A block with no
 // entry in the tree reaches no return, and upstream falls back to the block itself there, which this
 // reproduces rather than skipping: the fallback makes such a block its own post-dominator, so it
-// joins the set only if it IS the target.
-func postDominatorsOf(function *Function, tree *postDominanceTree, target static_single_assignment.BlockId) map[static_single_assignment.BlockId]bool {
+// joins the set only if it is the target.
+func postDominatorsOf(
+	function *Function,
+	tree *postDominanceTree,
+	target static_single_assignment.BlockId,
+) map[static_single_assignment.BlockId]bool {
 	result := map[static_single_assignment.BlockId]bool{}
 	visited := map[static_single_assignment.BlockId]bool{}
 

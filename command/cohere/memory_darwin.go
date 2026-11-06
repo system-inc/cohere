@@ -10,10 +10,14 @@ import (
 // availableMemory reads the kernel's page counts. See darwinAvailableMemory for which pages count.
 func availableMemory() (uint64, error) {
 	var counts [3]uint64
-	for index, name := range []string{"vm.page_free_count", "vm.page_pageable_external_count", "vm.page_purgeable_count"} {
-		count, err := sysctlCount(name)
-		if err != nil {
-			return 0, fmt.Errorf("reading %s: %w", name, err)
+	for index, name := range []string{
+		"vm.page_free_count",
+		"vm.page_pageable_external_count",
+		"vm.page_purgeable_count",
+	} {
+		count, sysctlCountError := sysctlCount(name)
+		if sysctlCountError != nil {
+			return 0, fmt.Errorf("reading %s: %w", name, sysctlCountError)
 		}
 		counts[index] = count
 	}
@@ -25,9 +29,9 @@ func availableMemory() (uint64, error) {
 // trailing zero byte, so the value is zero-extended back to eight bytes, which is exact for a
 // little-endian integer of four or eight.
 func sysctlCount(name string) (uint64, error) {
-	value, err := syscall.Sysctl(name)
-	if err != nil {
-		return 0, err
+	value, sysctlError := syscall.Sysctl(name)
+	if sysctlError != nil {
+		return 0, sysctlError
 	}
 	if len(value) > 8 {
 		return 0, fmt.Errorf("%d bytes, wider than a counter", len(value))

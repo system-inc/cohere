@@ -9,20 +9,19 @@ import (
 
 	"github.com/system-inc/cohere/internal/format/doc"
 	"github.com/system-inc/cohere/internal/format/estree"
-	"github.com/system-inc/cohere/internal/format/printing"
 )
 
-func printCommaSeparatedValueGroup(path *astPath, options *printerOptions, print printing.PrintFunc) doc.Doc {
+func printCommaSeparatedValueGroup(path *astPath, options *printerOptions, print printFunc) doc.Doc {
 	node := currentNode(path)
 	parentNode, _ := path.Parent()
 	parentParentNode, _ := path.Grandparent()
-	declAncestorProp := getPropOfDeclNode(path)
-	isGridValue := declAncestorProp != "" &&
+	declAncestorProperty := getPropOfDeclNode(path)
+	isGridValue := declAncestorProperty != "" &&
 		parentNode.Type() == "value-value" &&
-		(declAncestorProp == "grid" ||
-			strings.HasPrefix(declAncestorProp, "grid-template"))
+		(declAncestorProperty == "grid" ||
+			strings.HasPrefix(declAncestorProperty, "grid-template"))
 	atRuleAncestorNode, _ := path.FindAncestor(func(node *estree.Node) bool { return node.Type() == "css-atrule" })
-	isControlDirective := atRuleAncestorNode != nil && isSCSSControlDirectiveNode(atRuleAncestorNode, options)
+	isControlDirective := atRuleAncestorNode != nil && isScssControlDirectiveNode(atRuleAncestorNode, options)
 	groups := node.List("groups")
 	hasInlineComment := someNode(groups, isInlineValueCommentNode)
 
@@ -39,9 +38,9 @@ func printCommaSeparatedValueGroup(path *astPath, options *printerOptions, print
 	appendToLast := func(document doc.Doc) {
 		parts[len(parts)-1] = doc.Concat{parts[len(parts)-1], document}
 	}
-	insideURLFunction := insideValueFunctionNode(path, "url")
+	insideUrlFunction := insideValueFunctionNode(path, "url")
 
-	insideSCSSInterpolationInString := false
+	insideScssInterpolationInString := false
 	didBreak := false
 
 	groupAt := func(index int) *estree.Node {
@@ -51,24 +50,24 @@ func printCommaSeparatedValueGroup(path *astPath, options *printerOptions, print
 		return groups[index]
 	}
 
-	for i := range groups {
-		iPrevNode := groupAt(i - 1)
-		iNode := groups[i]
-		iNextNode := groupAt(i + 1)
+	for index := range groups {
+		iPrevNode := groupAt(index - 1)
+		iNode := groups[index]
+		iNextNode := groupAt(index + 1)
 
 		// If the node is comment and last node print it in a line suffix
 		if isInlineValueCommentNode(iNode) && iNextNode == nil {
-			// TODO: Improve this part
+			// Upstream: `TODO: Improve this part`
 			// This `lineSuffix` should be done in `value-comment` print
 			// But since we add `line` to groups in `value-paren_group`,
 			// The format result looks bad for now
-			appendToLast(doc.NewLineSuffix(doc.Concat{doc.Text(" "), printed[i]}))
+			appendToLast(doc.NewLineSuffix(doc.Concat{doc.Text(" "), printed[index]}))
 			continue
 		}
 
-		appendToLast(printed[i])
+		appendToLast(printed[index])
 
-		if insideURLFunction {
+		if insideUrlFunction {
 			if (iNextNode != nil && isAdditionNode(iNextNode)) || isAdditionNode(iNode) {
 				appendToLast(doc.Text(" "))
 			}
@@ -87,7 +86,8 @@ func printCommaSeparatedValueGroup(path *astPath, options *printerOptions, print
 			continue
 		}
 
-		// Ignore Tailwind `@utility` directive ( https://tailwindcss.com/docs/adding-custom-styles#functional-utilities )
+		// Ignore Tailwind `@utility` directive ( https://tailwindcss.com/docs/adding-custom-styles#functional-utilities
+		// )
 		if insideAtRuleNode(path, "utility") &&
 			iNode.Type() == "value-word" &&
 			iNextNode != nil &&
@@ -108,10 +108,10 @@ func printCommaSeparatedValueGroup(path *astPath, options *printerOptions, print
 			iNextNode.String("value") == ";" &&
 			path.Match(
 				nil,
-				func(node any, key any, _ int, _ bool) bool {
+				func(node pathValue, key string, _ int, _ bool) bool {
 					return key == "groups" && asNode(node).Type() == "value-paren_group"
 				},
-				func(node any, key any, _ int, _ bool) bool {
+				func(node pathValue, key string, _ int, _ bool) bool {
 					return key == "group" && asNode(node).Type() == "value-func" && asNode(node).String("value") == "if"
 				},
 			) {
@@ -134,15 +134,15 @@ func printCommaSeparatedValueGroup(path *astPath, options *printerOptions, print
 			positionOfOpeningInterpolation := strings.LastIndex(iNode.String("value"), "#{")
 			positionOfClosingInterpolation := strings.LastIndex(iNode.String("value"), "}")
 			if positionOfOpeningInterpolation != -1 && positionOfClosingInterpolation != -1 {
-				insideSCSSInterpolationInString = positionOfOpeningInterpolation > positionOfClosingInterpolation
+				insideScssInterpolationInString = positionOfOpeningInterpolation > positionOfClosingInterpolation
 			} else if positionOfOpeningInterpolation != -1 {
-				insideSCSSInterpolationInString = true
+				insideScssInterpolationInString = true
 			} else if positionOfClosingInterpolation != -1 {
-				insideSCSSInterpolationInString = false
+				insideScssInterpolationInString = false
 			}
 		}
 
-		if insideSCSSInterpolationInString {
+		if insideScssInterpolationInString {
 			continue
 		}
 
@@ -199,7 +199,7 @@ func printCommaSeparatedValueGroup(path *astPath, options *printerOptions, print
 		}
 
 		// Ignore `$$` (i.e. `background-color: $$(style)Color;`)
-		if isPostcssSimpleVarNode(iNode, iNextNode) {
+		if isPostcssSimpleVariableNode(iNode, iNextNode) {
 			continue
 		}
 
@@ -268,12 +268,12 @@ func printCommaSeparatedValueGroup(path *astPath, options *printerOptions, print
 			continue
 		}
 
-		iNextNextNode := groupAt(i + 2)
+		iNextNextNode := groupAt(index + 2)
 
 		// Print spaces after `+` and `-` in color adjuster functions as is (e.g. `color(red l(+ 20%))`)
 		// Adjusters with signed numbers (e.g. `color(red l(+20%))`) output as-is.
 		isColorAdjusterNode := (isAdditionNode(iNode) || isSubtractionNode(iNode)) &&
-			i == 0 &&
+			index == 0 &&
 			(iNextNode.Type() == "value-number" || iNextNode.Truthy("isHex")) &&
 			parentParentNode != nil &&
 			isColorAdjusterFuncNode(parentParentNode) &&
@@ -299,7 +299,7 @@ func printCommaSeparatedValueGroup(path *astPath, options *printerOptions, print
 				isSubtractionNode(iNode)) &&
 			(hasEmptyRawBefore(iNextNode) ||
 				(isMathOperator &&
-					(iPrevNode == nil || (iPrevNode != nil && isMathOperatorNode(iPrevNode))))) {
+					(iPrevNode == nil || isMathOperatorNode(iPrevNode)))) {
 			continue
 		}
 
@@ -360,8 +360,8 @@ func printCommaSeparatedValueGroup(path *astPath, options *printerOptions, print
 		}
 
 		// Formatting `font` property
-		if declAncestorProp != "" &&
-			(declAncestorProp == "font" || strings.HasPrefix(declAncestorProp, "--")) {
+		if declAncestorProperty != "" &&
+			(declAncestorProperty == "font" || strings.HasPrefix(declAncestorProperty, "--")) {
 			if isDivisionNode(iNextNode) &&
 				hasEmptyRawBefore(iNextNode) &&
 				isPossibleFontSize(iNode) {
@@ -422,7 +422,7 @@ func printCommaSeparatedValueGroup(path *astPath, options *printerOptions, print
 		if atRuleAncestorNode == nil &&
 			iNode.Type() == "value-comment" &&
 			!iNode.Truthy("inline") &&
-			everyNode(groups[:i], func(group *estree.Node) bool { return group.Type() == "value-comment" }) {
+			everyNode(groups[:index], func(group *estree.Node) bool { return group.Type() == "value-comment" }) {
 			parts = append(parts, doc.Dedent(doc.LineDoc), doc.Text(""))
 			continue
 		}
@@ -447,7 +447,7 @@ func printCommaSeparatedValueGroup(path *astPath, options *printerOptions, print
 	// and node has two groups
 	// when type is value-comma_group
 	// example @import url("verylongurl") projection,tv
-	if insideURLFunctionInImportAtRuleNode(path) {
+	if insideUrlFunctionInImportAtRuleNode(path) {
 		return doc.NewGroup(doc.NewFill(parts), doc.GroupOptions{})
 	}
 

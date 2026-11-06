@@ -10,8 +10,8 @@ import "testing"
 // likely to be made, since bareRuleName is right there: `consistency-no-enum` against a registered
 // `nexus/consistency-no-enum` silences nothing (Covers needs the directive to be the more qualified
 // side), so it must not count as existing.
-func TestRuleNameCatalogExistsIsTheTestCoversApplies(t *testing.T) {
-	t.Parallel()
+func TestRuleNameCatalogExistsIsTheTestCoversApplies(test *testing.T) {
+	test.Parallel()
 	catalog := newRuleNameCatalog(
 		[]string{"no-console", "nexus/consistency-no-enum", "@typescript-eslint/no-explicit-any"},
 		[]string{"react-internal/not-ported-here"},
@@ -33,14 +33,14 @@ func TestRuleNameCatalogExistsIsTheTestCoversApplies(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		if got := catalog.exists(testCase.name); got != testCase.exists {
-			t.Errorf("exists(%q) = %v, want %v", testCase.name, got, testCase.exists)
+			test.Errorf("exists(%q) = %v, want %v", testCase.name, got, testCase.exists)
 		}
 	}
 
 	if got := catalog.registeredByBareName["consistency-no-enum"]; got != "nexus/consistency-no-enum" {
-		t.Errorf("the suggestion for a stale prefix should name the registered rule, got %q", got)
+		test.Errorf("the suggestion for a stale prefix should name the registered rule, got %q", got)
 	}
 	if newRuleNameCatalog(nil, []string{"anything"}) != nil {
-		t.Error("with no registry the catalog must be nil, or every name would read as unknown")
+		test.Error("with no registry the catalog must be nil, or every name would read as unknown")
 	}
 }

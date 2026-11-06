@@ -84,15 +84,15 @@ type NoUnsafeNegationOptions struct {
 // them by guessing is a rule that should not be choosing, so both are offered and a human ranks
 // them. ESLint reaches the same conclusion, declaring `fixable: null` with these same two
 // suggestions, one labelled as changing behaviour and one as preserving it.
-var NoUnsafeNegation = rule.Rule{
+var NoUnsafeNegation = rule.Rule[NoUnsafeNegationOptions]{
 	Name: "no-unsafe-negation",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[NoUnsafeNegationOptions]) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
 		enforceForOrderingRelations := false
-		if parsed, ok := rule.OptionsAs[NoUnsafeNegationOptions](options); ok {
+		if parsed, ok := options.Read(); ok {
 			enforceForOrderingRelations = parsed.EnforceForOrderingRelations
 		}
 
@@ -135,15 +135,15 @@ var NoUnsafeNegation = rule.Rule{
 				// `! a <= b` and the rewrite comes out as `!( a <= b)`. Same trimming ReplaceNode
 				// does, for the same reason, and the same reason a comment before the right operand
 				// would otherwise be moved inside the parentheses.
-				sourceText := ctx.SourceFile.Text()
-				operandRange := rule.TokenRange(ctx.SourceFile, prefixExpression.Operand)
-				rightRange := rule.TokenRange(ctx.SourceFile, binaryExpression.Right)
-				negationRange := rule.TokenRange(ctx.SourceFile, left)
+				sourceText := ruleContext.SourceFile.Text()
+				operandRange := rule.TokenRange(ruleContext.SourceFile, prefixExpression.Operand)
+				rightRange := rule.TokenRange(ruleContext.SourceFile, binaryExpression.Right)
+				negationRange := rule.TokenRange(ruleContext.SourceFile, left)
 				operandText := sourceText[operandRange.Pos():operandRange.End()]
 				rightText := sourceText[rightRange.Pos():rightRange.End()]
 				negationText := sourceText[negationRange.Pos():negationRange.End()]
 
-				ctx.ReportNodeWithSuggestions(left, rule.Message{
+				ruleContext.ReportNodeWithSuggestions(left, rule.Message{
 					Id:          "unexpected",
 					Description: describeUnsafeNegation(operatorText),
 				}, rule.Suggestion{
@@ -153,7 +153,7 @@ var NoUnsafeNegation = rule.Rule{
 							"what the parentheses in `!(a " + operatorText + " b)` say and is " +
 							"almost certainly the intent. This changes what the code does.",
 					},
-					Fixes: []rule.Fix{ctx.ReplaceNode(node,
+					Fixes: []rule.Fix{ruleContext.ReplaceNode(node,
 						"!("+operandText+" "+operatorText+" "+rightText+")")},
 				}, rule.Suggestion{
 					Message: rule.Message{
@@ -162,7 +162,7 @@ var NoUnsafeNegation = rule.Rule{
 							"apply to the left operand alone. This preserves what the code does " +
 							"today and only makes it explicit.",
 					},
-					Fixes: []rule.Fix{ctx.ReplaceNode(left, "("+negationText+")")},
+					Fixes: []rule.Fix{ruleContext.ReplaceNode(left, "("+negationText+")")},
 				})
 			},
 		}

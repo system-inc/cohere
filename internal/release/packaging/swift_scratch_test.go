@@ -8,18 +8,18 @@ import (
 
 // The Swift engine's build directory is never inside the output, which the release packs and uploads
 // whole, and a directory that only shares the output's name as a prefix is not inside it.
-func TestTheSwiftScratchIsNeverInsideTheOutput(t *testing.T) {
-	t.Parallel()
+func TestTheSwiftScratchIsNeverInsideTheOutput(test *testing.T) {
+	test.Parallel()
 
-	root := t.TempDir()
+	root := test.TempDir()
 	output := filepath.Join(root, "dist")
 
-	scratch, err := swiftScratchDirectory(Options{OutputDirectory: output})
-	if err != nil {
-		t.Fatalf("the default was refused: %v", err)
+	scratch, swiftScratchDirectoryError := swiftScratchDirectory(Options{OutputDirectory: output})
+	if swiftScratchDirectoryError != nil {
+		test.Fatalf("the default was refused: %v", swiftScratchDirectoryError)
 	}
 	if strings.HasPrefix(scratch, output+string(filepath.Separator)) {
-		t.Fatalf("the default %s is inside the output %s", scratch, output)
+		test.Fatalf("the default %s is inside the output %s", scratch, output)
 	}
 
 	for _, testCase := range []struct {
@@ -33,25 +33,33 @@ func TestTheSwiftScratchIsNeverInsideTheOutput(t *testing.T) {
 		{filepath.Join(root, "elsewhere"), true},
 		{root, true},
 	} {
-		_, err := swiftScratchDirectory(Options{OutputDirectory: output, SwiftScratchDirectory: testCase.scratch})
-		if (err == nil) != testCase.allowed {
-			t.Errorf("%s: allowed %v, want %v (%v)", testCase.scratch, err == nil, testCase.allowed, err)
+		_, swiftScratchDirectoryError := swiftScratchDirectory(
+			Options{OutputDirectory: output, SwiftScratchDirectory: testCase.scratch},
+		)
+		if (swiftScratchDirectoryError == nil) != testCase.allowed {
+			test.Errorf(
+				"%s: allowed %v, want %v (%v)",
+				testCase.scratch,
+				swiftScratchDirectoryError == nil,
+				testCase.allowed,
+				swiftScratchDirectoryError,
+			)
 		}
 	}
 }
 
 // Build holds the rule, before anything is compiled: a scratch inside the output is refused by name.
-func TestBuildRefusesASwiftScratchInsideTheOutput(t *testing.T) {
-	t.Parallel()
+func TestBuildRefusesASwiftScratchInsideTheOutput(test *testing.T) {
+	test.Parallel()
 
-	output := t.TempDir()
-	_, err := Build(Options{
+	output := test.TempDir()
+	_, buildError := Build(Options{
 		Version:               "1.0.0",
-		ModuleDirectory:       t.TempDir(),
+		ModuleDirectory:       test.TempDir(),
 		OutputDirectory:       output,
 		SwiftScratchDirectory: filepath.Join(output, ".swift-build"),
 	})
-	if err == nil || !strings.Contains(err.Error(), "is inside the output") {
-		t.Fatalf("Build accepted a Swift scratch inside its output: %v", err)
+	if buildError == nil || !strings.Contains(buildError.Error(), "is inside the output") {
+		test.Fatalf("Build accepted a Swift scratch inside its output: %v", buildError)
 	}
 }

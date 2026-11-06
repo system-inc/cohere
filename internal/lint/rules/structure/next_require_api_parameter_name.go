@@ -9,11 +9,18 @@ import (
 // The rule's messages, one handle per id, whose wording lives in
 // `policy/messages/next-require-api-parameter-name.json`.
 var (
-	nextRequireApiParameterNameUseParamsNotParametersText             = policy.MessageOf("structure/next-require-api-parameter-name", "useParamsNotParameters")
-	nextRequireApiParameterNameUseSearchParamsNotSearchParametersText = policy.MessageOf("structure/next-require-api-parameter-name", "useSearchParamsNotSearchParameters")
+	nextRequireApiParameterNameUseParamsNotParametersText = policy.MessageOf(
+		"structure/next-require-api-parameter-name",
+		"useParamsNotParameters",
+	)
+	nextRequireApiParameterNameUseSearchParamsNotSearchParametersText = policy.MessageOf(
+		"structure/next-require-api-parameter-name",
+		"useSearchParamsNotSearchParameters",
+	)
 )
 
-// messageUseParamsNotParameters is the finding, rendered when it is reported so the text comes from the current catalog.
+// messageUseParamsNotParameters is the finding, rendered when it is reported so the text comes from the current
+// catalog.
 func messageUseParamsNotParameters() rule.Message {
 	return rule.Message{
 		Id:          nextRequireApiParameterNameUseParamsNotParametersText.Id,
@@ -21,7 +28,8 @@ func messageUseParamsNotParameters() rule.Message {
 	}
 }
 
-// messageUseSearchParamsNotSearchParameters is the finding, rendered when it is reported so the text comes from the current catalog.
+// messageUseSearchParamsNotSearchParameters is the finding, rendered when it is reported so the text comes from the
+// current catalog.
 func messageUseSearchParamsNotSearchParameters() rule.Message {
 	return rule.Message{
 		Id:          nextRequireApiParameterNameUseSearchParamsNotSearchParametersText.Id,
@@ -57,10 +65,10 @@ var nextApiFunctionNames = map[string]bool{
 // what has to match. Renaming a binding would be a different rule.
 //
 // Fixable, since the repair is exactly one identifier and there is only one right answer.
-var NextRequireApiParameterName = rule.Rule{
+var NextRequireApiParameterName = rule.Rule[rule.NoOptions]{
 	Name: "structure/next-require-api-parameter-name",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		fileContext := FileContextFor(ctx.SourceFile.FileName().AsString())
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		fileContext := FileContextFor(ruleContext.SourceFile.FileName().AsString())
 		if !fileContext.IsPageFile && !fileContext.IsLayoutFile {
 			// Only the files Next calls these functions in. A helper module exporting a function
 			// named generateMetadata is not one the framework will ever call.
@@ -102,11 +110,11 @@ var NextRequireApiParameterName = rule.Rule{
 
 					switch key.Text() {
 					case "parameters":
-						ctx.ReportNodeWithFixes(key, messageUseParamsNotParameters(),
-							ctx.ReplaceNode(key, "params"))
+						ruleContext.ReportNodeWithFixes(key, messageUseParamsNotParameters(),
+							ruleContext.ReplaceNode(key, "params"))
 					case "searchParameters":
-						ctx.ReportNodeWithFixes(key, messageUseSearchParamsNotSearchParameters(),
-							ctx.ReplaceNode(key, "searchParams"))
+						ruleContext.ReportNodeWithFixes(key, messageUseSearchParamsNotSearchParameters(),
+							ruleContext.ReplaceNode(key, "searchParams"))
 					}
 				}
 			},

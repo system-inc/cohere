@@ -26,23 +26,23 @@ func initDeclarationsCaseName(index int) string {
 // store only the first element after the severity, so the first version of this decoder read a list,
 // every fixture passed, and it failed at run time on the first real configuration. The fixtures here
 // pass the list, which is now what the config layer delivers; the decoder test pins that it does.
-func decodeInitDeclarationsOptionsForTest(t *testing.T, raw string) any {
-	t.Helper()
-	decoded, err := DecodeInitDeclarationsOptions(json.RawMessage(raw))
-	if err != nil {
-		t.Fatalf("the decoder refused %s: %v", raw, err)
+func decodeInitDeclarationsOptionsForTest(test *testing.T, raw string) InitDeclarationsOptions {
+	test.Helper()
+	decoded, decodeInitDeclarationsOptionsError := DecodeInitDeclarationsOptions(json.RawMessage(raw))
+	if decodeInitDeclarationsOptionsError != nil {
+		test.Fatalf("the decoder refused %s: %v", raw, decodeInitDeclarationsOptionsError)
 	}
 	return decoded
 }
 
 // runInitDeclarations runs one case, with or without options.
-func runInitDeclarations(t *testing.T, sourceText string, options string) rule_testing.Result {
-	t.Helper()
+func runInitDeclarations(test *testing.T, sourceText string, options string) rule_testing.Result {
+	test.Helper()
 	if options == "" {
-		return rule_testing.Run(t, InitDeclarations, initDeclarationsFile, sourceText)
+		return rule_testing.Run(test, InitDeclarations, initDeclarationsFile, sourceText)
 	}
-	return rule_testing.RunWithOptions(t, InitDeclarations, initDeclarationsFile, sourceText,
-		decodeInitDeclarationsOptionsForTest(t, options))
+	return rule_testing.RunWithOptions(test, InitDeclarations, initDeclarationsFile, sourceText,
+		decodeInitDeclarationsOptionsForTest(test, options))
 }
 
 // TestInitDeclarationsStaysSilentOnUpstreamPassCases is the imported clean corpus, verbatim.
@@ -54,8 +54,8 @@ func runInitDeclarations(t *testing.T, sourceText string, options string) rule_t
 //
 // The same source appears in this list and in the failing one under the opposite mode, which is why
 // the options travel with each row rather than being set once for the file.
-func TestInitDeclarationsStaysSilentOnUpstreamPassCases(t *testing.T) {
-	t.Parallel()
+func TestInitDeclarationsStaysSilentOnUpstreamPassCases(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -72,51 +72,102 @@ func TestInitDeclarationsStaysSilentOnUpstreamPassCases(t *testing.T) {
 		{sourceText: "\nfor (var foo of []) {\n}\n      ", options: ""},
 		{sourceText: "let a = true;", options: "[\"always\"]"},
 		{sourceText: "const a = {};", options: "[\"always\"]"},
-		{sourceText: "\nfunction foo() {\n  let a = 1,\n    b = false;\n  if (a) {\n    let c = 3,\n      d = null;\n  }\n}\n      ", options: "[\"always\"]"},
-		{sourceText: "\nfunction foo() {\n  const a = 1,\n    b = true;\n  if (a) {\n    const c = 3,\n      d = null;\n  }\n}\n      ", options: "[\"always\"]"},
-		{sourceText: "\nfunction foo() {\n  let a = 1;\n  const b = false;\n  var c = true;\n}\n      ", options: "[\"always\"]"},
+		{
+			sourceText: "\nfunction foo() {\n  let a = 1,\n    b = false;\n  if (a) {\n    let c = 3,\n      d = null;\n  }\n}\n      ",
+			options:    "[\"always\"]",
+		},
+		{
+			sourceText: "\nfunction foo() {\n  const a = 1,\n    b = true;\n  if (a) {\n    const c = 3,\n      d = null;\n  }\n}\n      ",
+			options:    "[\"always\"]",
+		},
+		{
+			sourceText: "\nfunction foo() {\n  let a = 1;\n  const b = false;\n  var c = true;\n}\n      ",
+			options:    "[\"always\"]",
+		},
 		{sourceText: "var foo;", options: "[\"never\"]"},
 		{sourceText: "var foo, bar, baz;", options: "[\"never\"]"},
 		{sourceText: "\nfunction foo() {\n  var foo;\n  var bar;\n}\n      ", options: "[\"never\"]"},
 		{sourceText: "let a;", options: "[\"never\"]"},
 		{sourceText: "const a = 1;", options: "[\"never\"]"},
-		{sourceText: "\nfunction foo() {\n  let a, b;\n  if (a) {\n    let c, d;\n  }\n}\n      ", options: "[\"never\"]"},
-		{sourceText: "\nfunction foo() {\n  const a = 1,\n    b = true;\n  if (a) {\n    const c = 3,\n      d = null;\n  }\n}\n      ", options: "[\"never\"]"},
+		{
+			sourceText: "\nfunction foo() {\n  let a, b;\n  if (a) {\n    let c, d;\n  }\n}\n      ",
+			options:    "[\"never\"]",
+		},
+		{
+			sourceText: "\nfunction foo() {\n  const a = 1,\n    b = true;\n  if (a) {\n    const c = 3,\n      d = null;\n  }\n}\n      ",
+			options:    "[\"never\"]",
+		},
 		{sourceText: "\nfunction foo() {\n  let a;\n  const b = false;\n  var c;\n}\n      ", options: "[\"never\"]"},
 		{sourceText: "for (var i = 0; i < 1; i++) {}", options: "[\"never\", {\"ignoreForLoopInit\": true}]"},
 		{sourceText: "\nfor (var foo in []) {\n}\n      ", options: "[\"never\", {\"ignoreForLoopInit\": true}]"},
 		{sourceText: "\nfor (var foo of []) {\n}\n      ", options: "[\"never\", {\"ignoreForLoopInit\": true}]"},
-		{sourceText: "\nfunction foo() {\n  var bar = 1;\n  let baz = 2;\n  const qux = 3;\n}\n      ", options: "[\"always\"]"},
+		{
+			sourceText: "\nfunction foo() {\n  var bar = 1;\n  let baz = 2;\n  const qux = 3;\n}\n      ",
+			options:    "[\"always\"]",
+		},
 		{sourceText: "declare const foo: number;", options: "[\"always\"]"},
 		{sourceText: "declare const foo: number;", options: "[\"never\"]"},
-		{sourceText: "\ndeclare namespace myLib {\n  let numberOfGreetings: number;\n}\n      ", options: "[\"always\"]"},
-		{sourceText: "\ndeclare namespace myLib {\n  let numberOfGreetings: number;\n}\n      ", options: "[\"never\"]"},
-		{sourceText: "\ninterface GreetingSettings {\n  greeting: string;\n  duration?: number;\n  color?: string;\n}\n      ", options: ""},
-		{sourceText: "\ninterface GreetingSettings {\n  greeting: string;\n  duration?: number;\n  color?: string;\n}\n      ", options: "[\"never\"]"},
+		{
+			sourceText: "\ndeclare namespace myLib {\n  let numberOfGreetings: number;\n}\n      ",
+			options:    "[\"always\"]",
+		},
+		{
+			sourceText: "\ndeclare namespace myLib {\n  let numberOfGreetings: number;\n}\n      ",
+			options:    "[\"never\"]",
+		},
+		{
+			sourceText: "\ninterface GreetingSettings {\n  greeting: string;\n  duration?: number;\n  color?: string;\n}\n      ",
+			options:    "",
+		},
+		{
+			sourceText: "\ninterface GreetingSettings {\n  greeting: string;\n  duration?: number;\n  color?: string;\n}\n      ",
+			options:    "[\"never\"]",
+		},
 		{sourceText: "type GreetingLike = string | (() => string) | Greeter;", options: ""},
 		{sourceText: "type GreetingLike = string | (() => string) | Greeter;", options: "[\"never\"]"},
 		{sourceText: "\nfunction foo() {\n  var bar: string;\n}\n      ", options: "[\"never\"]"},
 		{sourceText: "var bar: string;", options: "[\"never\"]"},
-		{sourceText: "\nvar bar: string = function (): string {\n  return 'string';\n};\n      ", options: "[\"always\"]"},
-		{sourceText: "\nvar bar: string = function (arg1: string): string {\n  return 'string';\n};\n      ", options: "[\"always\"]"},
+		{
+			sourceText: "\nvar bar: string = function (): string {\n  return 'string';\n};\n      ",
+			options:    "[\"always\"]",
+		},
+		{
+			sourceText: "\nvar bar: string = function (arg1: string): string {\n  return 'string';\n};\n      ",
+			options:    "[\"always\"]",
+		},
 		{sourceText: "function foo(arg1: string = 'string'): void {}", options: "[\"never\"]"},
 		{sourceText: "const foo: string = 'hello';", options: "[\"never\"]"},
-		{sourceText: "\nconst class1 = class NAME {\n  constructor() {\n    var name1: string = 'hello';\n  }\n};\n      ", options: ""},
+		{
+			sourceText: "\nconst class1 = class NAME {\n  constructor() {\n    var name1: string = 'hello';\n  }\n};\n      ",
+			options:    "",
+		},
 		{sourceText: "\nconst class1 = class NAME {\n  static pi: number = 3.14;\n};\n      ", options: ""},
 		{sourceText: "\nconst class1 = class NAME {\n  static pi: number = 3.14;\n};\n      ", options: "[\"never\"]"},
-		{sourceText: "\ninterface IEmployee {\n  empCode: number;\n  empName: string;\n  getSalary: (number) => number; // arrow function\n  getManagerName(number): string;\n}\n      ", options: ""},
-		{sourceText: "\ninterface IEmployee {\n  empCode: number;\n  empName: string;\n  getSalary: (number) => number; // arrow function\n  getManagerName(number): string;\n}\n      ", options: "[\"never\"]"},
+		{
+			sourceText: "\ninterface IEmployee {\n  empCode: number;\n  empName: string;\n  getSalary: (number) => number; // arrow function\n  getManagerName(number): string;\n}\n      ",
+			options:    "",
+		},
+		{
+			sourceText: "\ninterface IEmployee {\n  empCode: number;\n  empName: string;\n  getSalary: (number) => number; // arrow function\n  getManagerName(number): string;\n}\n      ",
+			options:    "[\"never\"]",
+		},
 		{sourceText: "const foo: number = 'asd';", options: "[\"always\"]"},
 		{sourceText: "const foo: number;", options: "[\"never\"]"},
 		{sourceText: "\nnamespace myLib {\n  let numberOfGreetings: number;\n}\n      ", options: "[\"never\"]"},
 		{sourceText: "\nnamespace myLib {\n  let numberOfGreetings: number = 2;\n}\n      ", options: "[\"always\"]"},
-		{sourceText: "\ndeclare namespace myLib1 {\n  const foo: number;\n  namespace myLib2 {\n    let bar: string;\n    namespace myLib3 {\n      let baz: object;\n    }\n  }\n}\n      ", options: "[\"always\"]"},
-		{sourceText: "\ndeclare namespace myLib1 {\n  const foo: number;\n  namespace myLib2 {\n    let bar: string;\n    namespace myLib3 {\n      let baz: object;\n    }\n  }\n}\n      ", options: "[\"never\"]"},
+		{
+			sourceText: "\ndeclare namespace myLib1 {\n  const foo: number;\n  namespace myLib2 {\n    let bar: string;\n    namespace myLib3 {\n      let baz: object;\n    }\n  }\n}\n      ",
+			options:    "[\"always\"]",
+		},
+		{
+			sourceText: "\ndeclare namespace myLib1 {\n  const foo: number;\n  namespace myLib2 {\n    let bar: string;\n    namespace myLib3 {\n      let baz: object;\n    }\n  }\n}\n      ",
+			options:    "[\"never\"]",
+		},
 	}
 	for index, testCase := range cases {
-		t.Run(initDeclarationsCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, runInitDeclarations(t, testCase.sourceText, testCase.options))
+		test.Run(initDeclarationsCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, runInitDeclarations(test, testCase.sourceText, testCase.options))
 		})
 	}
 }
@@ -125,15 +176,15 @@ func TestInitDeclarationsStaysSilentOnUpstreamPassCases(t *testing.T) {
 // span and the rendered message of every finding asserted.
 //
 // The span is the whole reason this rule exists as a TypeScript wrapper rather than as the core rule
-// alone. Under "always" the finding covers the NAME only, so `let arr: string;` reports three
+// alone. Under "always" the finding covers the name only, so `let arr: string;` reports three
 // characters and leaves the annotation out; under "never" it covers the whole declarator including
 // the annotation and the initializer. Two spans from one rule, decided by the mode, and no message
 // id assertion can tell them apart.
 //
 // The message interpolates the variable name, so it is asserted as text too. That is the one place a
 // format string could be wrong while every id and every span stayed right.
-func TestInitDeclarationsFiresOnUpstreamFailCases(t *testing.T) {
-	t.Parallel()
+func TestInitDeclarationsFiresOnUpstreamFailCases(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText   string
@@ -157,11 +208,14 @@ func TestInitDeclarationsFiresOnUpstreamFailCases(t *testing.T) {
 			wantMessages: []string{"Variable 'foo' should be initialized on declaration."},
 		},
 		{
-			sourceText:   "\nvar foo,\n  bar = false,\n  baz;\n      ",
-			options:      "[\"always\"]",
-			wantIds:      []string{"initialized", "initialized"},
-			wantSpans:    []string{"foo", "baz"},
-			wantMessages: []string{"Variable 'foo' should be initialized on declaration.", "Variable 'baz' should be initialized on declaration."},
+			sourceText: "\nvar foo,\n  bar = false,\n  baz;\n      ",
+			options:    "[\"always\"]",
+			wantIds:    []string{"initialized", "initialized"},
+			wantSpans:  []string{"foo", "baz"},
+			wantMessages: []string{
+				"Variable 'foo' should be initialized on declaration.",
+				"Variable 'baz' should be initialized on declaration.",
+			},
 		},
 		{
 			sourceText:   "\nfunction foo() {\n  var foo = 0;\n  var bar;\n}\n      ",
@@ -192,11 +246,14 @@ func TestInitDeclarationsFiresOnUpstreamFailCases(t *testing.T) {
 			wantMessages: []string{"Variable 'b' should be initialized on declaration."},
 		},
 		{
-			sourceText:   "\nfunction foo() {\n  let a;\n  const b = false;\n  var c;\n}\n      ",
-			options:      "[\"always\"]",
-			wantIds:      []string{"initialized", "initialized"},
-			wantSpans:    []string{"a", "c"},
-			wantMessages: []string{"Variable 'a' should be initialized on declaration.", "Variable 'c' should be initialized on declaration."},
+			sourceText: "\nfunction foo() {\n  let a;\n  const b = false;\n  var c;\n}\n      ",
+			options:    "[\"always\"]",
+			wantIds:    []string{"initialized", "initialized"},
+			wantSpans:  []string{"a", "c"},
+			wantMessages: []string{
+				"Variable 'a' should be initialized on declaration.",
+				"Variable 'c' should be initialized on declaration.",
+			},
 		},
 		{
 			sourceText:   "var foo = (bar = 2);",
@@ -213,11 +270,14 @@ func TestInitDeclarationsFiresOnUpstreamFailCases(t *testing.T) {
 			wantMessages: []string{"Variable 'foo' should not be initialized on declaration."},
 		},
 		{
-			sourceText:   "\nvar foo,\n  bar = 5,\n  baz = 3;\n      ",
-			options:      "[\"never\"]",
-			wantIds:      []string{"notInitialized", "notInitialized"},
-			wantSpans:    []string{"bar = 5", "baz = 3"},
-			wantMessages: []string{"Variable 'bar' should not be initialized on declaration.", "Variable 'baz' should not be initialized on declaration."},
+			sourceText: "\nvar foo,\n  bar = 5,\n  baz = 3;\n      ",
+			options:    "[\"never\"]",
+			wantIds:    []string{"notInitialized", "notInitialized"},
+			wantSpans:  []string{"bar = 5", "baz = 3"},
+			wantMessages: []string{
+				"Variable 'bar' should not be initialized on declaration.",
+				"Variable 'baz' should not be initialized on declaration.",
+			},
 		},
 		{
 			sourceText:   "\nfunction foo() {\n  var foo;\n  var bar = foo;\n}\n      ",
@@ -318,29 +378,33 @@ func TestInitDeclarationsFiresOnUpstreamFailCases(t *testing.T) {
 			wantMessages: []string{"Variable 'numberOfGreetings' should not be initialized on declaration."},
 		},
 		{
-			sourceText:   "\nnamespace myLib1 {\n  const foo: number;\n  namespace myLib2 {\n    let bar: string;\n    namespace myLib3 {\n      let baz: object;\n    }\n  }\n}\n      ",
-			options:      "[\"always\"]",
-			wantIds:      []string{"initialized", "initialized", "initialized"},
-			wantSpans:    []string{"foo", "bar", "baz"},
-			wantMessages: []string{"Variable 'foo' should be initialized on declaration.", "Variable 'bar' should be initialized on declaration.", "Variable 'baz' should be initialized on declaration."},
+			sourceText: "\nnamespace myLib1 {\n  const foo: number;\n  namespace myLib2 {\n    let bar: string;\n    namespace myLib3 {\n      let baz: object;\n    }\n  }\n}\n      ",
+			options:    "[\"always\"]",
+			wantIds:    []string{"initialized", "initialized", "initialized"},
+			wantSpans:  []string{"foo", "bar", "baz"},
+			wantMessages: []string{
+				"Variable 'foo' should be initialized on declaration.",
+				"Variable 'bar' should be initialized on declaration.",
+				"Variable 'baz' should be initialized on declaration.",
+			},
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(initDeclarationsCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := runInitDeclarations(t, testCase.sourceText, testCase.options)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(initDeclarationsCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := runInitDeclarations(test, testCase.sourceText, testCase.options)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
-				t.Fatalf("wanted %d findings, got %d", len(testCase.wantSpans), len(result.Diagnostics))
+				test.Fatalf("wanted %d findings, got %d", len(testCase.wantSpans), len(result.Diagnostics))
 			}
 			for findingIndex, wantSpan := range testCase.wantSpans {
 				reported := result.Diagnostics[findingIndex]
 				gotSpan := testCase.sourceText[reported.Range.Pos():reported.Range.End()]
 				if gotSpan != wantSpan {
-					t.Errorf("finding %d points at %q, wanted %q", findingIndex, gotSpan, wantSpan)
+					test.Errorf("finding %d points at %q, wanted %q", findingIndex, gotSpan, wantSpan)
 				}
 				if reported.Message.Description != testCase.wantMessages[findingIndex] {
-					t.Errorf("finding %d reads %q, wanted %q", findingIndex,
+					test.Errorf("finding %d reads %q, wanted %q", findingIndex,
 						reported.Message.Description, testCase.wantMessages[findingIndex])
 				}
 			}
@@ -352,12 +416,12 @@ func TestInitDeclarationsFiresOnUpstreamFailCases(t *testing.T) {
 //
 // Upstream reports only on an identifier binding and says at the line that its span narrowing
 // depends on that, which is true here too: the narrowed span is the identifier's own text and a
-// pattern has none to take. But its corpus never writes a pattern WITHOUT an initializer, so the
+// pattern has none to take. But its corpus never writes a pattern without an initializer, so the
 // guard decides nothing there and a mutation removing it survives all seventy-seven imported rows.
 //
 // Measured against the installed 8.x build, with a reporting control for each mode in the same runs.
-func TestInitDeclarationsLeavesDestructuringPatternsAlone(t *testing.T) {
-	t.Parallel()
+func TestInitDeclarationsLeavesDestructuringPatternsAlone(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -425,19 +489,19 @@ func TestInitDeclarationsLeavesDestructuringPatternsAlone(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runInitDeclarations(t, testCase.sourceText, testCase.options)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runInitDeclarations(test, testCase.sourceText, testCase.options)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
-				t.Fatalf("wanted %d findings, got %d, on the case that covers: %s",
+				test.Fatalf("wanted %d findings, got %d, on the case that covers: %s",
 					len(testCase.wantSpans), len(result.Diagnostics), testCase.why)
 			}
 			for findingIndex, wantSpan := range testCase.wantSpans {
 				reported := result.Diagnostics[findingIndex]
 				gotSpan := testCase.sourceText[reported.Range.Pos():reported.Range.End()]
 				if gotSpan != wantSpan {
-					t.Errorf("finding %d points at %q, wanted %q (%s)",
+					test.Errorf("finding %d points at %q, wanted %q (%s)",
 						findingIndex, gotSpan, wantSpan, testCase.why)
 				}
 			}
@@ -455,8 +519,8 @@ func TestInitDeclarationsLeavesDestructuringPatternsAlone(t *testing.T) {
 // with a second bit set, which makes a naive flag test miss it specifically.
 //
 // Measured against the installed 8.x build with a reporting control in the same run.
-func TestInitDeclarationsExemptsEveryConstantBindingUnderNever(t *testing.T) {
-	t.Parallel()
+func TestInitDeclarationsExemptsEveryConstantBindingUnderNever(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -495,19 +559,19 @@ func TestInitDeclarationsExemptsEveryConstantBindingUnderNever(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runInitDeclarations(t, testCase.sourceText, `["never"]`)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runInitDeclarations(test, testCase.sourceText, `["never"]`)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
-				t.Fatalf("wanted %d findings, got %d, on the case that covers: %s",
+				test.Fatalf("wanted %d findings, got %d, on the case that covers: %s",
 					len(testCase.wantSpans), len(result.Diagnostics), testCase.why)
 			}
 			for findingIndex, wantSpan := range testCase.wantSpans {
 				reported := result.Diagnostics[findingIndex]
 				gotSpan := testCase.sourceText[reported.Range.Pos():reported.Range.End()]
 				if gotSpan != wantSpan {
-					t.Errorf("finding %d points at %q, wanted %q (%s)",
+					test.Errorf("finding %d points at %q, wanted %q (%s)",
 						findingIndex, gotSpan, wantSpan, testCase.why)
 				}
 			}
@@ -522,8 +586,8 @@ func TestInitDeclarationsExemptsEveryConstantBindingUnderNever(t *testing.T) {
 // second element is optional. Three of those lines decide something no rule fixture can see: an
 // empty list, a value outside the schema's enum, and an absent second element. Two mutations of
 // them survived the whole imported corpus, because every option row there names a mode explicitly.
-func TestInitDeclarationsDecoderReadsThePositionalArray(t *testing.T) {
-	t.Parallel()
+func TestInitDeclarationsDecoderReadsThePositionalArray(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		raw  string
@@ -545,15 +609,11 @@ func TestInitDeclarationsDecoderReadsThePositionalArray(t *testing.T) {
 		{raw: `["never", {}]`, want: InitDeclarationsOptions{Mode: InitDeclarationsNever}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.raw, func(t *testing.T) {
-			t.Parallel()
-			decoded := decodeInitDeclarationsOptionsForTest(t, testCase.raw)
-			settings, isSettings := decoded.(InitDeclarationsOptions)
-			if !isSettings {
-				t.Fatalf("the decoder returned %T rather than the rule's own options type", decoded)
-			}
-			if settings != testCase.want {
-				t.Errorf("decoded to %+v, wanted %+v", settings, testCase.want)
+		test.Run(testCase.raw, func(test *testing.T) {
+			test.Parallel()
+			decoded := decodeInitDeclarationsOptionsForTest(test, testCase.raw)
+			if decoded != testCase.want {
+				test.Errorf("decoded to %+v, wanted %+v", decoded, testCase.want)
 			}
 		})
 	}
@@ -561,12 +621,12 @@ func TestInitDeclarationsDecoderReadsThePositionalArray(t *testing.T) {
 
 // TestInitDeclarationsDecoderRefusesWhatUpstreamRefuses is the other half of the table above.
 //
-// A mode outside the schema's enum is a CONFIGURATION error upstream and never reaches the rule:
+// A mode outside the schema's enum is a configuration error upstream and never reaches the rule:
 // ESLint refuses the key outright rather than running with a fallback. Measured. This decoder used to
 // resolve it to the inert unconfigured mode, the closest spelling of "this rule never ran" it had,
 // which is silence; the config layer now surfaces a decoder error at startup, so it is refused.
-func TestInitDeclarationsDecoderRefusesWhatUpstreamRefuses(t *testing.T) {
-	t.Parallel()
+func TestInitDeclarationsDecoderRefusesWhatUpstreamRefuses(test *testing.T) {
+	test.Parallel()
 
 	for _, raw := range []string{
 		`["bogus"]`,
@@ -579,8 +639,10 @@ func TestInitDeclarationsDecoderRefusesWhatUpstreamRefuses(t *testing.T) {
 		`"never"`,
 		`{"mode": "never", "ignoreForLoopInit": true}`,
 	} {
-		if decoded, err := DecodeInitDeclarationsOptions(json.RawMessage(raw)); err == nil {
-			t.Errorf("%s decoded to %+v; it must be refused", raw, decoded)
+		if decoded, decodeInitDeclarationsOptionsError := DecodeInitDeclarationsOptions(
+			json.RawMessage(raw),
+		); decodeInitDeclarationsOptionsError == nil {
+			test.Errorf("%s decoded to %+v; it must be refused", raw, decoded)
 		}
 	}
 }
@@ -603,20 +665,19 @@ func TestInitDeclarationsDecoderRefusesWhatUpstreamRefuses(t *testing.T) {
 // mode, and it puts 512 findings on the real tree that the gate being replaced does not report. The
 // first version of this port did exactly that, and only the dry run disagreed.
 //
-// `EnableRule.ts` writes the bare severity spelling, so this IS how the rule is configured here.
-func TestInitDeclarationsIsInertWhenNamedWithoutAMode(t *testing.T) {
-	t.Parallel()
+// `EnableRule.ts` writes the bare severity spelling, so this is how the rule is configured here.
+func TestInitDeclarationsIsInertWhenNamedWithoutAMode(test *testing.T) {
+	test.Parallel()
 
 	const sourceText = "var foo;\nvar bar = 1;\n"
 
-	// Handed nil, which is what the config layer passes for a rule named as a bare severity.
-	rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, InitDeclarations,
-		initDeclarationsFile, sourceText, nil))
+	// Handed no options, which is what the config layer passes for a rule named as a bare severity.
+	rule_testing.ExpectClean(test, rule_testing.Run(test, InitDeclarations, initDeclarationsFile, sourceText))
 
 	// Handed an empty array, which is the other spelling of the same configuration.
-	rule_testing.ExpectClean(t, runInitDeclarations(t, sourceText, `[]`))
+	rule_testing.ExpectClean(test, runInitDeclarations(test, sourceText, `[]`))
 
 	// And the controls, so the three silences above are verdicts rather than a rule that never ran.
-	rule_testing.ExpectFindings(t, runInitDeclarations(t, sourceText, `["always"]`), "initialized")
-	rule_testing.ExpectFindings(t, runInitDeclarations(t, sourceText, `["never"]`), "notInitialized")
+	rule_testing.ExpectFindings(test, runInitDeclarations(test, sourceText, `["always"]`), "initialized")
+	rule_testing.ExpectFindings(test, runInitDeclarations(test, sourceText, `["never"]`), "notInitialized")
 }

@@ -80,9 +80,9 @@ func correctnessNoCallbackInParseTrySource(lines ...string) string {
 	return correctnessNoCallbackInParseTryPrelude + strings.Join(lines, "\n") + "\n"
 }
 
-func correctnessNoCallbackInParseTryRun(t *testing.T, sourceText string) rule_testing.Result {
-	t.Helper()
-	return rule_testing.RunTypedFiles(t, CorrectnessNoCallbackInParseTry, map[string]string{
+func correctnessNoCallbackInParseTryRun(test *testing.T, sourceText string) rule_testing.Result {
+	test.Helper()
+	return rule_testing.RunTypedFiles(test, CorrectnessNoCallbackInParseTry, map[string]string{
 		correctnessNoCallbackInParseTryFile:           sourceText,
 		correctnessNoCallbackInParseTryJsonFile:       correctnessNoCallbackInParseTryJson,
 		correctnessNoCallbackInParseTryLookalikeFile:  correctnessNoCallbackInParseTryLookalike,
@@ -93,8 +93,8 @@ func correctnessNoCallbackInParseTryRun(t *testing.T, sourceText string) rule_te
 // correctnessNoCallbackInParseTryExpect asserts the findings in source order, by the text each one
 // points at. The harness trims the subject file before writing it, so spans are read from the
 // program's own text.
-func correctnessNoCallbackInParseTryExpect(t *testing.T, result rule_testing.Result, want []string) {
-	t.Helper()
+func correctnessNoCallbackInParseTryExpect(test *testing.T, result rule_testing.Result, want []string) {
+	test.Helper()
 	diagnostics := append(result.Diagnostics[:0:0], result.Diagnostics...)
 	sort.SliceStable(diagnostics, func(left int, right int) bool {
 		return diagnostics[left].Range.Pos() < diagnostics[right].Range.Pos()
@@ -103,14 +103,18 @@ func correctnessNoCallbackInParseTryExpect(t *testing.T, result rule_testing.Res
 	for range want {
 		wantIds = append(wantIds, correctnessNoCallbackInParseTryId)
 	}
-	rule_testing.ExpectFindings(t, result, wantIds...)
+	rule_testing.ExpectFindings(test, result, wantIds...)
 	text := result.SourceFile.Text()
 	for index, diagnostic := range diagnostics {
 		if len(diagnostic.Fixes) != 0 || len(diagnostic.Suggestions) != 0 {
-			t.Fatalf("expected no fix and no suggestion, got %d and %d", len(diagnostic.Fixes), len(diagnostic.Suggestions))
+			test.Fatalf(
+				"expected no fix and no suggestion, got %d and %d",
+				len(diagnostic.Fixes),
+				len(diagnostic.Suggestions),
+			)
 		}
 		if got := text[diagnostic.Range.Pos():diagnostic.Range.End()]; got != want[index] {
-			t.Fatalf("finding %d is %q, want %q", index, got, want[index])
+			test.Fatalf("finding %d is %q, want %q", index, got, want[index])
 		}
 	}
 }
@@ -207,35 +211,41 @@ func correctnessNoCallbackInParseTryXStream(fixed bool) string {
 
 // The original, `#wv045mc`: the handler inside the parse try is reported, and the fallback in the
 // catch is not.
-func TestCorrectnessNoCallbackInParseTryFiresOnClaudeStream(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoCallbackInParseTryFiresOnClaudeStream(test *testing.T) {
+	test.Parallel()
 
-	result := correctnessNoCallbackInParseTryRun(t, correctnessNoCallbackInParseTryClaudeStream(false))
-	correctnessNoCallbackInParseTryExpect(t, result, []string{"onMessage(message)"})
+	result := correctnessNoCallbackInParseTryRun(test, correctnessNoCallbackInParseTryClaudeStream(false))
+	correctnessNoCallbackInParseTryExpect(test, result, []string{"onMessage(message)"})
 }
 
-func TestCorrectnessNoCallbackInParseTryStaysSilentOnFixedClaudeStream(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoCallbackInParseTryStaysSilentOnFixedClaudeStream(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectClean(t, correctnessNoCallbackInParseTryRun(t, correctnessNoCallbackInParseTryClaudeStream(true)))
+	rule_testing.ExpectClean(
+		test,
+		correctnessNoCallbackInParseTryRun(test, correctnessNoCallbackInParseTryClaudeStream(true)),
+	)
 }
 
 // The new copy at `XStreamApi.ts:45`, under an empty catch.
-func TestCorrectnessNoCallbackInParseTryFiresOnXStream(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoCallbackInParseTryFiresOnXStream(test *testing.T) {
+	test.Parallel()
 
-	result := correctnessNoCallbackInParseTryRun(t, correctnessNoCallbackInParseTryXStream(false))
-	correctnessNoCallbackInParseTryExpect(t, result, []string{"onEvent(parsed)"})
+	result := correctnessNoCallbackInParseTryRun(test, correctnessNoCallbackInParseTryXStream(false))
+	correctnessNoCallbackInParseTryExpect(test, result, []string{"onEvent(parsed)"})
 }
 
-func TestCorrectnessNoCallbackInParseTryStaysSilentOnFixedXStream(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoCallbackInParseTryStaysSilentOnFixedXStream(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectClean(t, correctnessNoCallbackInParseTryRun(t, correctnessNoCallbackInParseTryXStream(true)))
+	rule_testing.ExpectClean(
+		test,
+		correctnessNoCallbackInParseTryRun(test, correctnessNoCallbackInParseTryXStream(true)),
+	)
 }
 
-func TestCorrectnessNoCallbackInParseTryFires(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoCallbackInParseTryFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name  string
@@ -385,17 +395,17 @@ func TestCorrectnessNoCallbackInParseTryFires(t *testing.T) {
 		}, []string{"onMessage(JSON.parse(text))", "onDone()"}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 
-			result := correctnessNoCallbackInParseTryRun(t, correctnessNoCallbackInParseTrySource(testCase.lines...))
-			correctnessNoCallbackInParseTryExpect(t, result, testCase.want)
+			result := correctnessNoCallbackInParseTryRun(test, correctnessNoCallbackInParseTrySource(testCase.lines...))
+			correctnessNoCallbackInParseTryExpect(test, result, testCase.want)
 		})
 	}
 }
 
-func TestCorrectnessNoCallbackInParseTryStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoCallbackInParseTryStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name  string
@@ -601,10 +611,13 @@ func TestCorrectnessNoCallbackInParseTryStaysSilent(t *testing.T) {
 		}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 
-			rule_testing.ExpectClean(t, correctnessNoCallbackInParseTryRun(t, correctnessNoCallbackInParseTrySource(testCase.lines...)))
+			rule_testing.ExpectClean(
+				test,
+				correctnessNoCallbackInParseTryRun(test, correctnessNoCallbackInParseTrySource(testCase.lines...)),
+			)
 		})
 	}
 }

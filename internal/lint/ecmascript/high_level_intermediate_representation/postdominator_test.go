@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// The post-dominator tree is checked against the DEFINITION rather than against the algorithm.
+// The post-dominator tree is checked against the definition rather than against the algorithm.
 //
 // A block B post-dominates a block A when every path from A to a `Return` passes through B. That is
 // established here by deleting B from the graph and asking whether any `Return` is still reachable
@@ -77,7 +77,7 @@ func postDominates(tree *postDominanceTree, block, candidate static_single_assig
 //
 // `minimumPairs` is a vacuity guard, and it is not decoration. It fired on the first run here and
 // caught three cases checking nothing: `a(); b(); return c;`, a sequence expression, and an optional
-// chain all lower to a SINGLE block, so there is no ordered pair to ask about and every assertion
+// chain all lower to a single block, so there is no ordered pair to ask about and every assertion
 // over them passes for free. They were removed rather than given a zero threshold, because a case
 // kept at zero is the vacuity the guard exists to catch, written down and blessed. The same guard
 // caught two such cases on the first run of the forward dominator work.
@@ -96,32 +96,52 @@ var postDominatorShapes = []struct {
 	{name: "both arms return", code: `function f(p) { if (p) { return 1; } else { return 2; } }`, minimumPairs: 9},
 	{name: "nested if", code: `function f(p, q) { if (p) { if (q) { a(); } b(); } return c; }`, minimumPairs: 12},
 	{name: "while", code: `function f(p) { while (p) { a(); } return b; }`, minimumPairs: 12},
-	{name: "while with break", code: `function f(p) { while (p) { if (p) { break; } a(); } return b; }`, minimumPairs: 20},
+	{
+		name:         "while with break",
+		code:         `function f(p) { while (p) { if (p) { break; } a(); } return b; }`,
+		minimumPairs: 20,
+	},
 	{name: "for of", code: `function f(p) { for (const x of p) { a(x); } return b; }`, minimumPairs: 12},
 	{name: "for of empty body", code: `function f(p) { for (const x of p) {} return b; }`, minimumPairs: 12},
 	{name: "throw in one arm", code: `function f(p) { if (p) { throw new Error(); } a(); return b; }`, minimumPairs: 4},
-	{name: "loop with throw arm", code: `function f(p) { for (const x of p) { if (p) { break; } else { throw new Error(); } } return b; }`, minimumPairs: 12},
+	{
+		name:         "loop with throw arm",
+		code:         `function f(p) { for (const x of p) { if (p) { break; } else { throw new Error(); } } return b; }`,
+		minimumPairs: 12,
+	},
 	{name: "try catch", code: `function f() { try { a(); } catch (e) { b(); } return c; }`, minimumPairs: 6},
-	{name: "switch", code: `function f(p) { switch (p) { case 1: a(); break; default: b(); } return c; }`, minimumPairs: 12},
+	{
+		name:         "switch",
+		code:         `function f(p) { switch (p) { case 1: a(); break; default: b(); } return c; }`,
+		minimumPairs: 12,
+	},
 	{name: "ternary", code: `function f(p) { const x = p ? a() : b(); return x; }`, minimumPairs: 12},
 	{name: "logical and", code: `function f(p) { const x = p && a(); return x; }`, minimumPairs: 12},
 	{name: "do while", code: `function f(p) { do { a(); } while (p); return b; }`, minimumPairs: 12},
-	{name: "labelled break", code: `function f(p) { outer: for (const x of p) { break outer; } return b; }`, minimumPairs: 20},
+	{
+		name:         "labelled break",
+		code:         `function f(p) { outer: for (const x of p) { break outer; } return b; }`,
+		minimumPairs: 20,
+	},
 	{name: "two returns", code: `function f(p) { if (p) { return 1; } return 2; }`, minimumPairs: 6},
 	{name: "infinite loop", code: `function f() { while (true) { a(); } }`, minimumPairs: 12},
 	{name: "return inside loop", code: `function f(p) { while (p) { return 1; } return 2; }`, minimumPairs: 12},
-	{name: "nested loops", code: `function f(p, q) { for (const x of p) { for (const y of q) { a(); } } return b; }`, minimumPairs: 20},
+	{
+		name:         "nested loops",
+		code:         `function f(p, q) { for (const x of p) { for (const y of q) { a(); } } return b; }`,
+		minimumPairs: 20,
+	},
 }
 
 // TestPostDominatorsMatchTheDefinition checks every ordered pair of blocks in every shape against a
 // reachability walk that shares no code with the tree.
-func TestPostDominatorsMatchTheDefinition(t *testing.T) {
-	t.Parallel()
+func TestPostDominatorsMatchTheDefinition(test *testing.T) {
+	test.Parallel()
 
 	for _, shape := range postDominatorShapes {
-		t.Run(shape.name, func(t *testing.T) {
-			t.Parallel()
-			function := lowerSource(t, shape.code)
+		test.Run(shape.name, func(test *testing.T) {
+			test.Parallel()
+			function := lowerSource(test, shape.code)
 			tree := computePostDominance(function)
 
 			pairs := 0
@@ -140,15 +160,18 @@ func TestPostDominatorsMatchTheDefinition(t *testing.T) {
 					wanted := !reachesAReturnWithout(function, from.Id, candidate.Id)
 					got := postDominates(tree, from.Id, candidate.Id)
 					if got != wanted {
-						t.Errorf(
+						test.Errorf(
 							"bb%d post-dominated by bb%d: tree says %v, deleting bb%d and walking says %v\n%s",
 							from.Id, candidate.Id, got, candidate.Id, wanted, Print(function))
 					}
 				}
 			}
 			if pairs < shape.minimumPairs {
-				t.Fatalf("only %d ordered pairs checked, want at least %d; this shape is smaller than the case assumes and would pass vacuously",
-					pairs, shape.minimumPairs)
+				test.Fatalf(
+					"only %d ordered pairs checked, want at least %d; this shape is smaller than the case assumes and would pass vacuously",
+					pairs,
+					shape.minimumPairs,
+				)
 			}
 		})
 	}
@@ -163,12 +186,12 @@ func TestPostDominatorsMatchTheDefinition(t *testing.T) {
 // The corruption is chosen to be the kind a real bug produces: not a nil tree or an empty map,
 // which any assertion catches, but a plausible tree with one edge redirected, which is exactly what
 // a wrong node ordering in Cooper-Harvey-Kennedy yields.
-func TestPostDominatorDefinitionCheckCanFail(t *testing.T) {
-	t.Parallel()
+func TestPostDominatorDefinitionCheckCanFail(test *testing.T) {
+	test.Parallel()
 
 	// A corruption is only detectable where there was structure to destroy. Self-parenting a block
 	// removes every ancestor from its chain, so it changes an answer only when the chain held a
-	// REAL block; a block whose immediate post-dominator is already the synthetic exit has nothing
+	// real block; a block whose immediate post-dominator is already the synthetic exit has nothing
 	// above it and reparenting it is invisible.
 	//
 	// That is a true property of post-dominance rather than a weakness in the check, and it is why
@@ -182,8 +205,8 @@ func TestPostDominatorDefinitionCheckCanFail(t *testing.T) {
 	for _, shape := range postDominatorShapes {
 		// Not parallel: its subtests add to totals the test checks after them, and a parallel subtest would run
 		// only after the test had returned, so the check would pass on nothing.
-		t.Run(shape.name, func(t *testing.T) {
-			function := lowerSource(t, shape.code)
+		test.Run(shape.name, func(test *testing.T) {
+			function := lowerSource(test, shape.code)
 			pristine := computePostDominance(function)
 
 			withContent := 0
@@ -226,20 +249,24 @@ func TestPostDominatorDefinitionCheckCanFail(t *testing.T) {
 			if withContent == 0 {
 				// Legitimate for a multi-return shape. Recorded rather than failed, and the
 				// aggregate assertion below makes sure this is not every shape.
-				t.Logf("no block has a real post-dominator, so there is nothing to corrupt here")
+				test.Logf("no block has a real post-dominator, so there is nothing to corrupt here")
 				return
 			}
 			if detected != withContent {
-				t.Errorf("only %d of %d corruptions with real content were detected; the definition check is partly blind\n%s",
-					detected, withContent, Print(function))
+				test.Errorf(
+					"only %d of %d corruptions with real content were detected; the definition check is partly blind\n%s",
+					detected,
+					withContent,
+					Print(function),
+				)
 			}
 			shapesWithContent++
-			t.Logf("%d of %d corruptions detected", detected, withContent)
+			test.Logf("%d of %d corruptions detected", detected, withContent)
 		})
 	}
 
 	if shapesWithContent == 0 {
-		t.Fatal("no shape offered a corruptible post-dominator chain; the falsification check is inert")
+		test.Fatal("no shape offered a corruptible post-dominator chain; the falsification check is inert")
 	}
 }
 
@@ -249,44 +276,68 @@ func TestPostDominatorDefinitionCheckCanFail(t *testing.T) {
 // Each `want` below is the set of blocks holding an instruction React reports on, established by
 // running `eslint-plugin-react-hooks`'s `set-state-in-render` on the equivalent input. They are
 // recorded as membership questions about the block a call lands in, which is what the rule asks.
-func TestUnconditionalBlocksOnMeasuredShapes(t *testing.T) {
-	t.Parallel()
+func TestUnconditionalBlocksOnMeasuredShapes(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name string
 		code string
-		// wantUnconditional is whether the block holding the LAST call in the body runs on every
+		// wantUnconditional is whether the block holding the last call in the body runs on every
 		// path. That is the question the rule asks and the one React's verdict answers.
 		wantUnconditional bool
 	}{
 		// React reports: the call is in the entry block.
 		{name: "straight", code: `function f() { const s = g(); s(1); return 0; }`, wantUnconditional: true},
 		// React is clean: a conditional call.
-		{name: "conditional", code: `function f(p) { const s = g(); if (p) { s(1); } return 0; }`, wantUnconditional: false},
+		{
+			name:              "conditional",
+			code:              `function f(p) { const s = g(); if (p) { s(1); } return 0; }`,
+			wantUnconditional: false,
+		},
 		// React is clean: an early return means the tail is not on every path.
-		{name: "early return", code: `function f(p) { const s = g(); if (p) { return 1; } s(1); return 0; }`, wantUnconditional: false},
+		{
+			name:              "early return",
+			code:              `function f(p) { const s = g(); if (p) { return 1; } s(1); return 0; }`,
+			wantUnconditional: false,
+		},
 		// React reports: the loop always terminates into the tail.
-		{name: "after empty loop", code: `function f(p) { const s = g(); for (const x of p) {} s(1); return 0; }`, wantUnconditional: true},
+		{
+			name:              "after empty loop",
+			code:              `function f(p) { const s = g(); for (const x of p) {} s(1); return 0; }`,
+			wantUnconditional: true,
+		},
 		// React reports: the throwing arm is not an exit, so the break is the only way out.
-		{name: "after loop with throw arm", code: `function f(p) { const s = g(); for (const x of p) { if (p) { break; } else { throw new Error(); } } s(1); return 0; }`, wantUnconditional: true},
+		{
+			name:              "after loop with throw arm",
+			code:              `function f(p) { const s = g(); for (const x of p) { if (p) { break; } else { throw new Error(); } } s(1); return 0; }`,
+			wantUnconditional: true,
+		},
 		// React is clean: a loop body is conditional.
-		{name: "inside loop", code: `function f(p) { const s = g(); for (const x of p) { s(1); } return 0; }`, wantUnconditional: false},
+		{
+			name:              "inside loop",
+			code:              `function f(p) { const s = g(); for (const x of p) { s(1); } return 0; }`,
+			wantUnconditional: false,
+		},
 		// React is clean: a try body may not complete.
-		{name: "inside try", code: `function f() { const s = g(); try { s(1); } catch (e) {} return 0; }`, wantUnconditional: false},
+		{
+			name:              "inside try",
+			code:              `function f() { const s = g(); try { s(1); } catch (e) {} return 0; }`,
+			wantUnconditional: false,
+		},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			function := lowerSource(t, testCase.code)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			function := lowerSource(test, testCase.code)
 			unconditional := UnconditionalBlocks(function)
 
 			block, ok := blockHoldingLastCall(function)
 			if !ok {
-				t.Fatalf("no call instruction found, so this case asserts nothing\n%s", Print(function))
+				test.Fatalf("no call instruction found, so this case asserts nothing\n%s", Print(function))
 			}
 			if got := unconditional[block]; got != testCase.wantUnconditional {
-				t.Errorf("block bb%d holding the last call: unconditional = %v, want %v\n%s",
+				test.Errorf("block bb%d holding the last call: unconditional = %v, want %v\n%s",
 					block, got, testCase.wantUnconditional, Print(function))
 			}
 		})
@@ -320,16 +371,16 @@ func blockHoldingLastCall(function *Function) (static_single_assignment.BlockId,
 //
 // It is separate from the definition check because it is true even for a function with no return at
 // all, where the post-dominator tree is empty and every other question is vacuous.
-func TestUnconditionalBlocksAlwaysContainsTheEntry(t *testing.T) {
-	t.Parallel()
+func TestUnconditionalBlocksAlwaysContainsTheEntry(test *testing.T) {
+	test.Parallel()
 
 	for _, shape := range postDominatorShapes {
-		t.Run(shape.name, func(t *testing.T) {
-			t.Parallel()
-			function := lowerSource(t, shape.code)
+		test.Run(shape.name, func(test *testing.T) {
+			test.Parallel()
+			function := lowerSource(test, shape.code)
 			unconditional := UnconditionalBlocks(function)
 			if !unconditional[function.Entry] {
-				t.Errorf("the entry block bb%d is not unconditional\n%s", function.Entry, Print(function))
+				test.Errorf("the entry block bb%d is not unconditional\n%s", function.Entry, Print(function))
 			}
 		})
 	}
@@ -337,17 +388,17 @@ func TestUnconditionalBlocksAlwaysContainsTheEntry(t *testing.T) {
 
 // TestUnconditionalBlocksIsASubsetOfPostDominators states the relationship between the two
 // functions in this file, so a change to one that silently diverges from the other is caught.
-func TestUnconditionalBlocksIsASubsetOfPostDominators(t *testing.T) {
-	t.Parallel()
+func TestUnconditionalBlocksIsASubsetOfPostDominators(test *testing.T) {
+	test.Parallel()
 
 	for _, shape := range postDominatorShapes {
-		t.Run(shape.name, func(t *testing.T) {
-			t.Parallel()
-			function := lowerSource(t, shape.code)
+		test.Run(shape.name, func(test *testing.T) {
+			test.Parallel()
+			function := lowerSource(test, shape.code)
 			tree := computePostDominance(function)
 			for id := range UnconditionalBlocks(function) {
 				if !postDominates(tree, function.Entry, id) {
-					t.Errorf("bb%d is reported unconditional but does not post-dominate the entry bb%d\n%s",
+					test.Errorf("bb%d is reported unconditional but does not post-dominate the entry bb%d\n%s",
 						id, function.Entry, Print(function))
 				}
 			}
@@ -357,13 +408,13 @@ func TestUnconditionalBlocksIsASubsetOfPostDominators(t *testing.T) {
 
 // TestUnconditionalBlocksHandlesDegenerateInput checks the two shapes a caller can produce that are
 // not functions at all.
-func TestUnconditionalBlocksHandlesDegenerateInput(t *testing.T) {
-	t.Parallel()
+func TestUnconditionalBlocksHandlesDegenerateInput(test *testing.T) {
+	test.Parallel()
 
 	if got := UnconditionalBlocks(nil); got != nil {
-		t.Errorf("UnconditionalBlocks(nil) = %v, want nil", got)
+		test.Errorf("UnconditionalBlocks(nil) = %v, want nil", got)
 	}
 	if got := UnconditionalBlocks(&Function{}); got != nil {
-		t.Errorf("UnconditionalBlocks on a function with no blocks = %v, want nil", got)
+		test.Errorf("UnconditionalBlocks on a function with no blocks = %v, want nil", got)
 	}
 }

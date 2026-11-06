@@ -6,8 +6,8 @@ import (
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
-func TestGoogleFontDisplayReportsMissing(t *testing.T) {
-	t.Parallel()
+func TestGoogleFontDisplayReportsMissing(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -32,16 +32,16 @@ func TestGoogleFontDisplayReportsMissing(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, GoogleFontDisplay, "Component.tsx", testCase.source)
-			rule_testing.ExpectFindings(t, result, messageGoogleFontDisplayMissing.Id)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, GoogleFontDisplay, "Component.tsx", testCase.source)
+			rule_testing.ExpectFindings(test, result, messageGoogleFontDisplayMissing.Id)
 		})
 	}
 }
 
-func TestGoogleFontDisplayReportsNotRecommended(t *testing.T) {
-	t.Parallel()
+func TestGoogleFontDisplayReportsNotRecommended(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -64,16 +64,16 @@ func TestGoogleFontDisplayReportsNotRecommended(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, GoogleFontDisplay, "Component.tsx", testCase.source)
-			rule_testing.ExpectFindings(t, result, messageGoogleFontDisplayNotRecommended.Id)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, GoogleFontDisplay, "Component.tsx", testCase.source)
+			rule_testing.ExpectFindings(test, result, messageGoogleFontDisplayNotRecommended.Id)
 		})
 	}
 }
 
-func TestGoogleFontDisplayIsSilent(t *testing.T) {
-	t.Parallel()
+func TestGoogleFontDisplayIsSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -117,36 +117,44 @@ func TestGoogleFontDisplayIsSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, GoogleFontDisplay, "Component.tsx", testCase.source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, GoogleFontDisplay, "Component.tsx", testCase.source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
 
-// TestGoogleFontDisplayDecodesEntities reads its attribute as ESLint does, with HTML entities decoded: typescript-estree decodes a
-// JSX attribute string before any rule sees it. Each row's verdict is the installed
+// TestGoogleFontDisplayDecodesEntities reads its attribute as ESLint does, with HTML entities decoded:
+// typescript-estree decodes a JSX attribute string before any rule sees it. Each row's verdict is the installed
 // @next/eslint-plugin-next 16.3.1's under the typescript-eslint parser (#51y9jh2).
-func TestGoogleFontDisplayDecodesEntities(t *testing.T) {
-	t.Parallel()
+func TestGoogleFontDisplayDecodesEntities(test *testing.T) {
+	test.Parallel()
 
 	for _, row := range []struct {
 		name   string
 		source string
 		ids    []string
 	}{
-		{`an encoded ampersand before display=block`, `export const Test = () => <link href="https://fonts.googleapis.com/css2?family=Krona+One&amp;display=block" />;`, []string{messageGoogleFontDisplayNotRecommended.Id}},
-		{`an encoded ampersand before display=optional`, `export const Test = () => <link href="https://fonts.googleapis.com/css2?family=Krona+One&amp;display=optional" />;`, []string{}},
+		{
+			`an encoded ampersand before display=block`,
+			`export const Test = () => <link href="https://fonts.googleapis.com/css2?family=Krona+One&amp;display=block" />;`,
+			[]string{messageGoogleFontDisplayNotRecommended.Id},
+		},
+		{
+			`an encoded ampersand before display=optional`,
+			`export const Test = () => <link href="https://fonts.googleapis.com/css2?family=Krona+One&amp;display=optional" />;`,
+			[]string{},
+		},
 	} {
-		t.Run(row.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, GoogleFontDisplay, "Component.tsx", row.source)
+		test.Run(row.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, GoogleFontDisplay, "Component.tsx", row.source)
 			if len(row.ids) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, row.ids...)
+			rule_testing.ExpectFindings(test, result, row.ids...)
 		})
 	}
 }

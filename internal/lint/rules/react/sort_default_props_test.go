@@ -24,82 +24,216 @@ const sortDefaultPropsFile = "/repository/source/SortDefaultProps.tsx"
 // than an empty payload, so it is mapped to the empty payload the config layer would actually hand
 // a rule configured as a bare "error". Keeping the two distinguishable in the rows makes the
 // generated table readable; collapsing them here keeps the decoder receiving what it will see.
-func sortDefaultPropsDecode(t *testing.T, raw string) any {
-	t.Helper()
+func sortDefaultPropsDecode(test *testing.T, raw string) SortDefaultPropsOptions {
+	test.Helper()
+	payload := raw
 	if raw == `""` {
-		raw = ""
+		payload = ""
 	}
-	decoded, err := DecodeSortDefaultPropsOptions([]byte(raw))
-	if err != nil {
-		t.Fatalf("decoding %s returned %v", raw, err)
+	decoded, decodeSortDefaultPropertiesOptionsError := DecodeSortDefaultPropsOptions([]byte(payload))
+	if decodeSortDefaultPropertiesOptionsError != nil {
+		test.Fatalf("decoding %s returned %v", payload, decodeSortDefaultPropertiesOptionsError)
 	}
 	return decoded
 }
 
-func TestSortDefaultPropsStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestSortDefaultPropsStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct{ name, sourceText, rawOptions string }{
-		{"upstream valid 0", "\n        var First = createReactClass({\n          render: function() {\n            return <div />;\n          }\n        });\n      ", ""},
-		{"upstream valid 1", "\n        var First = createReactClass({\n          propTypes: {\n            A: PropTypes.any,\n            Z: PropTypes.string,\n            a: PropTypes.any,\n            z: PropTypes.string\n          },\n          getDefaultProps: function() {\n            return {\n              A: \"A\",\n              Z: \"Z\",\n              a: \"a\",\n              z: \"z\"\n            };\n          },\n          render: function() {\n            return <div />;\n          }\n        });\n      ", ""},
-		{"upstream valid 2", "\n        var First = createReactClass({\n          propTypes: {\n            a: PropTypes.any,\n            A: PropTypes.any,\n            z: PropTypes.string,\n            Z: PropTypes.string\n          },\n          getDefaultProps: function() {\n            return {\n              a: \"a\",\n              A: \"A\",\n              z: \"z\",\n              Z: \"Z\"\n            };\n          },\n          render: function() {\n            return <div />;\n          }\n        });\n      ", "{\"ignoreCase\": true}"},
-		{"upstream valid 3", "\n        var First = createReactClass({\n          propTypes: {\n            a: PropTypes.any,\n            z: PropTypes.string\n          },\n          getDefaultProps: function() {\n            return {\n              a: \"a\",\n              z: \"z\"\n            };\n          },\n          render: function() {\n            return <div />;\n          }\n        });\n        var Second = createReactClass({\n          propTypes: {\n            AA: PropTypes.any,\n            ZZ: PropTypes.string\n          },\n          getDefaultProps: function() {\n            return {\n              AA: \"AA\",\n              ZZ: \"ZZ\"\n            };\n          },\n          render: function() {\n            return <div />;\n          }\n        });\n      ", ""},
-		{"upstream valid 4", "\n        class First extends React.Component {\n          render() {\n            return <div />;\n          }\n        }\n        First.propTypes = {\n          a: PropTypes.string,\n          z: PropTypes.string\n        };\n        First.propTypes.justforcheck = PropTypes.string;\n        First.defaultProps = {\n          a: a,\n          z: z\n        };\n        First.defaultProps.justforcheck = \"justforcheck\";\n      ", ""},
-		{"upstream valid 5", "\n        class First extends React.Component {\n          render() {\n            return <div />;\n          }\n        }\n        First.propTypes = {\n          a: PropTypes.any,\n          A: PropTypes.any,\n          z: PropTypes.string,\n          Z: PropTypes.string\n        };\n        First.defaultProps = {\n          a: \"a\",\n          A: \"A\",\n          z: \"z\",\n          Z: \"Z\"\n        };\n      ", "{\"ignoreCase\": true}"},
-		{"upstream valid 6", "\n        class Component extends React.Component {\n          static propTypes = {\n            a: PropTypes.any,\n            b: PropTypes.any,\n            c: PropTypes.any\n          };\n          static defaultProps = {\n            a: \"a\",\n            b: \"b\",\n            c: \"c\"\n          };\n          render() {\n            return <div />;\n          }\n        }\n      ", ""},
-		{"upstream valid 7", "\n        class Hello extends React.Component {\n          render() {\n            return <div>Hello</div>;\n          }\n        }\n        Hello.propTypes = {\n          \"aria-controls\": PropTypes.string\n        };\n        Hello.defaultProps = {\n          \"aria-controls\": \"aria-controls\"\n        };\n      ", "{\"ignoreCase\": true}"},
-		{"upstream valid 8", "\n        var Hello = createReactClass({\n          render: function() {\n            let { a, ...b } = obj;\n            let c = { ...d };\n            return <div />;\n          }\n        });\n      ", ""},
-		{"upstream valid 9", "\n        var First = createReactClass({\n          propTypes: {\n            barRequired: PropTypes.func.isRequired,\n            onBar: PropTypes.func,\n            z: PropTypes.any\n          },\n          getDefaultProps: function() {\n            return {\n              barRequired: \"barRequired\",\n              onBar: \"onBar\",\n              z: \"z\"\n            };\n          },\n          render: function() {\n            return <div />;\n          }\n        });\n      ", ""},
-		{"upstream valid 10", "\n        export default class ClassWithSpreadInPropTypes extends BaseClass {\n          static propTypes = {\n            b: PropTypes.string,\n            ...c.propTypes,\n            a: PropTypes.string\n          }\n          static defaultProps = {\n            b: \"b\",\n            ...c.defaultProps,\n            a: \"a\"\n          }\n        }\n      ", ""},
-		{"upstream valid 11", "\n        export default class ClassWithSpreadInPropTypes extends BaseClass {\n          static propTypes = {\n            a: PropTypes.string,\n            b: PropTypes.string,\n            c: PropTypes.string,\n            d: PropTypes.string,\n            e: PropTypes.string,\n            f: PropTypes.string\n          }\n          static defaultProps = {\n            a: \"a\",\n            b: \"b\",\n            ...c.defaultProps,\n            e: \"e\",\n            f: \"f\",\n            ...d.defaultProps\n          }\n        }\n      ", ""},
-		{"upstream valid 12", "\n        const defaults = {\n          b: \"b\"\n        };\n        const types = {\n          a: PropTypes.string,\n          b: PropTypes.string,\n          c: PropTypes.string\n        };\n        function StatelessComponentWithSpreadInPropTypes({ a, b, c }) {\n          return <div>{a}{b}{c}</div>;\n        }\n        StatelessComponentWithSpreadInPropTypes.propTypes = types;\n        StatelessComponentWithSpreadInPropTypes.defaultProps = {\n          c: \"c\",\n          ...defaults,\n          a: \"a\"\n        };\n      ", ""},
-		{"upstream valid 13", "\n        const propTypes = require('./externalPropTypes')\n        const defaultProps = require('./externalDefaultProps')\n        const TextFieldLabel = (props) => {\n          return <div />;\n        };\n        TextFieldLabel.propTypes = propTypes;\n        TextFieldLabel.defaultProps = defaultProps;\n      ", ""},
-		{"upstream valid 14", "\n        const First = (props) => <div />;\n        export const propTypes = {\n            a: PropTypes.any,\n            z: PropTypes.string,\n        };\n        export const defaultProps = {\n            a: \"a\",\n            z: \"z\",\n        };\n        First.propTypes = propTypes;\n        First.defaultProps = defaultProps;\n      ", ""},
-		{"upstream valid 15", "\n        const defaults = {\n          b: \"b\"\n        };\n        const First = (props) => <div />;\n        export const propTypes = {\n            a: PropTypes.string,\n            b: PropTypes.string,\n            z: PropTypes.string,\n        };\n        export const defaultProps = {\n            ...defaults,\n            a: \"a\",\n            z: \"z\",\n        };\n        First.propTypes = propTypes;\n        First.defaultProps = defaultProps;\n      ", ""},
-		{"upstream valid 16", "\n        class First extends React.Component {\n          render() {\n            return <div />;\n          }\n        }\n\n        First.defaultProps = {\n            a: PropTypes.any,\n            onBar: PropTypes.func,\n            onFoo: PropTypes.func,\n            z: PropTypes.string,\n        };\n      ", ""},
+		{
+			"upstream valid 0",
+			"\n        var First = createReactClass({\n          render: function() {\n            return <div />;\n          }\n        });\n      ",
+			"",
+		},
+		{
+			"upstream valid 1",
+			"\n        var First = createReactClass({\n          propTypes: {\n            A: PropTypes.any,\n            Z: PropTypes.string,\n            a: PropTypes.any,\n            z: PropTypes.string\n          },\n          getDefaultProps: function() {\n            return {\n              A: \"A\",\n              Z: \"Z\",\n              a: \"a\",\n              z: \"z\"\n            };\n          },\n          render: function() {\n            return <div />;\n          }\n        });\n      ",
+			"",
+		},
+		{
+			"upstream valid 2",
+			"\n        var First = createReactClass({\n          propTypes: {\n            a: PropTypes.any,\n            A: PropTypes.any,\n            z: PropTypes.string,\n            Z: PropTypes.string\n          },\n          getDefaultProps: function() {\n            return {\n              a: \"a\",\n              A: \"A\",\n              z: \"z\",\n              Z: \"Z\"\n            };\n          },\n          render: function() {\n            return <div />;\n          }\n        });\n      ",
+			"{\"ignoreCase\": true}",
+		},
+		{
+			"upstream valid 3",
+			"\n        var First = createReactClass({\n          propTypes: {\n            a: PropTypes.any,\n            z: PropTypes.string\n          },\n          getDefaultProps: function() {\n            return {\n              a: \"a\",\n              z: \"z\"\n            };\n          },\n          render: function() {\n            return <div />;\n          }\n        });\n        var Second = createReactClass({\n          propTypes: {\n            AA: PropTypes.any,\n            ZZ: PropTypes.string\n          },\n          getDefaultProps: function() {\n            return {\n              AA: \"AA\",\n              ZZ: \"ZZ\"\n            };\n          },\n          render: function() {\n            return <div />;\n          }\n        });\n      ",
+			"",
+		},
+		{
+			"upstream valid 4",
+			"\n        class First extends React.Component {\n          render() {\n            return <div />;\n          }\n        }\n        First.propTypes = {\n          a: PropTypes.string,\n          z: PropTypes.string\n        };\n        First.propTypes.justforcheck = PropTypes.string;\n        First.defaultProps = {\n          a: a,\n          z: z\n        };\n        First.defaultProps.justforcheck = \"justforcheck\";\n      ",
+			"",
+		},
+		{
+			"upstream valid 5",
+			"\n        class First extends React.Component {\n          render() {\n            return <div />;\n          }\n        }\n        First.propTypes = {\n          a: PropTypes.any,\n          A: PropTypes.any,\n          z: PropTypes.string,\n          Z: PropTypes.string\n        };\n        First.defaultProps = {\n          a: \"a\",\n          A: \"A\",\n          z: \"z\",\n          Z: \"Z\"\n        };\n      ",
+			"{\"ignoreCase\": true}",
+		},
+		{
+			"upstream valid 6",
+			"\n        class Component extends React.Component {\n          static propTypes = {\n            a: PropTypes.any,\n            b: PropTypes.any,\n            c: PropTypes.any\n          };\n          static defaultProps = {\n            a: \"a\",\n            b: \"b\",\n            c: \"c\"\n          };\n          render() {\n            return <div />;\n          }\n        }\n      ",
+			"",
+		},
+		{
+			"upstream valid 7",
+			"\n        class Hello extends React.Component {\n          render() {\n            return <div>Hello</div>;\n          }\n        }\n        Hello.propTypes = {\n          \"aria-controls\": PropTypes.string\n        };\n        Hello.defaultProps = {\n          \"aria-controls\": \"aria-controls\"\n        };\n      ",
+			"{\"ignoreCase\": true}",
+		},
+		{
+			"upstream valid 8",
+			"\n        var Hello = createReactClass({\n          render: function() {\n            let { a, ...b } = obj;\n            let c = { ...d };\n            return <div />;\n          }\n        });\n      ",
+			"",
+		},
+		{
+			"upstream valid 9",
+			"\n        var First = createReactClass({\n          propTypes: {\n            barRequired: PropTypes.func.isRequired,\n            onBar: PropTypes.func,\n            z: PropTypes.any\n          },\n          getDefaultProps: function() {\n            return {\n              barRequired: \"barRequired\",\n              onBar: \"onBar\",\n              z: \"z\"\n            };\n          },\n          render: function() {\n            return <div />;\n          }\n        });\n      ",
+			"",
+		},
+		{
+			"upstream valid 10",
+			"\n        export default class ClassWithSpreadInPropTypes extends BaseClass {\n          static propTypes = {\n            b: PropTypes.string,\n            ...c.propTypes,\n            a: PropTypes.string\n          }\n          static defaultProps = {\n            b: \"b\",\n            ...c.defaultProps,\n            a: \"a\"\n          }\n        }\n      ",
+			"",
+		},
+		{
+			"upstream valid 11",
+			"\n        export default class ClassWithSpreadInPropTypes extends BaseClass {\n          static propTypes = {\n            a: PropTypes.string,\n            b: PropTypes.string,\n            c: PropTypes.string,\n            d: PropTypes.string,\n            e: PropTypes.string,\n            f: PropTypes.string\n          }\n          static defaultProps = {\n            a: \"a\",\n            b: \"b\",\n            ...c.defaultProps,\n            e: \"e\",\n            f: \"f\",\n            ...d.defaultProps\n          }\n        }\n      ",
+			"",
+		},
+		{
+			"upstream valid 12",
+			"\n        const defaults = {\n          b: \"b\"\n        };\n        const types = {\n          a: PropTypes.string,\n          b: PropTypes.string,\n          c: PropTypes.string\n        };\n        function StatelessComponentWithSpreadInPropTypes({ a, b, c }) {\n          return <div>{a}{b}{c}</div>;\n        }\n        StatelessComponentWithSpreadInPropTypes.propTypes = types;\n        StatelessComponentWithSpreadInPropTypes.defaultProps = {\n          c: \"c\",\n          ...defaults,\n          a: \"a\"\n        };\n      ",
+			"",
+		},
+		{
+			"upstream valid 13",
+			"\n        const propTypes = require('./externalPropTypes')\n        const defaultProps = require('./externalDefaultProps')\n        const TextFieldLabel = (props) => {\n          return <div />;\n        };\n        TextFieldLabel.propTypes = propTypes;\n        TextFieldLabel.defaultProps = defaultProps;\n      ",
+			"",
+		},
+		{
+			"upstream valid 14",
+			"\n        const First = (props) => <div />;\n        export const propTypes = {\n            a: PropTypes.any,\n            z: PropTypes.string,\n        };\n        export const defaultProps = {\n            a: \"a\",\n            z: \"z\",\n        };\n        First.propTypes = propTypes;\n        First.defaultProps = defaultProps;\n      ",
+			"",
+		},
+		{
+			"upstream valid 15",
+			"\n        const defaults = {\n          b: \"b\"\n        };\n        const First = (props) => <div />;\n        export const propTypes = {\n            a: PropTypes.string,\n            b: PropTypes.string,\n            z: PropTypes.string,\n        };\n        export const defaultProps = {\n            ...defaults,\n            a: \"a\",\n            z: \"z\",\n        };\n        First.propTypes = propTypes;\n        First.defaultProps = defaultProps;\n      ",
+			"",
+		},
+		{
+			"upstream valid 16",
+			"\n        class First extends React.Component {\n          render() {\n            return <div />;\n          }\n        }\n\n        First.defaultProps = {\n            a: PropTypes.any,\n            onBar: PropTypes.func,\n            onFoo: PropTypes.func,\n            z: PropTypes.string,\n        };\n      ",
+			"",
+		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, SortDefaultProps, sortDefaultPropsFile,
-				testCase.sourceText, sortDefaultPropsDecode(t, testCase.rawOptions))
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, SortDefaultProperties, sortDefaultPropsFile,
+				testCase.sourceText, sortDefaultPropsDecode(test, testCase.rawOptions))
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
 
-func TestSortDefaultPropsFires(t *testing.T) {
-	t.Parallel()
+func TestSortDefaultPropsFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name, sourceText, rawOptions string
 		messageIds                   []string
 	}{
-		{"upstream invalid 0", "\n        class Component extends React.Component {\n          static propTypes = {\n            a: PropTypes.any,\n            b: PropTypes.any,\n            c: PropTypes.any\n          };\n          static defaultProps = {\n            a: \"a\",\n            c: \"c\",\n            b: \"b\"\n          };\n          render() {\n            return <div />;\n          }\n        }\n      ", "", []string{"propsNotSorted"}},
-		{"upstream invalid 1", "\n        class Component extends React.Component {\n          static propTypes = {\n            a: PropTypes.any,\n            b: PropTypes.any,\n            c: PropTypes.any\n          };\n          static defaultProps = {\n            c: \"c\",\n            b: \"b\",\n            a: \"a\"\n          };\n          render() {\n            return <div />;\n          }\n        }\n      ", "", []string{"propsNotSorted", "propsNotSorted"}},
-		{"upstream invalid 2", "\n        class Component extends React.Component {\n          static propTypes = {\n            a: PropTypes.any,\n            b: PropTypes.any\n          };\n          static defaultProps = {\n            Z: \"Z\",\n            a: \"a\",\n          };\n          render() {\n            return <div />;\n          }\n        }\n      ", "{\"ignoreCase\": true}", []string{"propsNotSorted"}},
-		{"upstream invalid 3", "\n        class Component extends React.Component {\n          static propTypes = {\n            a: PropTypes.any,\n            z: PropTypes.any\n          };\n          static defaultProps = {\n            a: \"a\",\n            Z: \"Z\",\n          };\n          render() {\n            return <div />;\n          }\n        }\n      ", "", []string{"propsNotSorted"}},
-		{"upstream invalid 4", "\n        class Hello extends React.Component {\n          render() {\n            return <div>Hello</div>;\n          }\n        }\n        Hello.propTypes = {\n          \"a\": PropTypes.string,\n          \"b\": PropTypes.string\n        };\n        Hello.defaultProps = {\n          \"b\": \"b\",\n          \"a\": \"a\"\n        };\n      ", "", []string{"propsNotSorted"}},
-		{"upstream invalid 5", "\n        class Hello extends React.Component {\n          render() {\n            return <div>Hello</div>;\n          }\n        }\n        Hello.propTypes = {\n          \"a\": PropTypes.string,\n          \"b\": PropTypes.string,\n          \"c\": PropTypes.string\n        };\n        Hello.defaultProps = {\n          \"c\": \"c\",\n          \"b\": \"b\",\n          \"a\": \"a\"\n        };\n      ", "", []string{"propsNotSorted", "propsNotSorted"}},
-		{"upstream invalid 6", "\n        class Hello extends React.Component {\n          render() {\n            return <div>Hello</div>;\n          }\n        }\n        Hello.propTypes = {\n          \"a\": PropTypes.string,\n          \"B\": PropTypes.string,\n        };\n        Hello.defaultProps = {\n          \"a\": \"a\",\n          \"B\": \"B\",\n        };\n      ", "", []string{"propsNotSorted"}},
-		{"upstream invalid 7", "\n        class Hello extends React.Component {\n          render() {\n            return <div>Hello</div>;\n          }\n        }\n        Hello.propTypes = {\n          \"a\": PropTypes.string,\n          \"B\": PropTypes.string,\n        };\n        Hello.defaultProps = {\n          \"B\": \"B\",\n          \"a\": \"a\",\n        };\n      ", "{\"ignoreCase\": true}", []string{"propsNotSorted"}},
-		{"upstream invalid 8", "\n        const First = (props) => <div />;\n        const propTypes = {\n          z: PropTypes.string,\n          a: PropTypes.any,\n        };\n        const defaultProps = {\n          z: \"z\",\n          a: \"a\",\n        };\n        First.propTypes = propTypes;\n        First.defaultProps = defaultProps;\n      ", "", []string{"propsNotSorted"}},
-		{"upstream invalid 9", "\n        export default class ClassWithSpreadInPropTypes extends BaseClass {\n          static propTypes = {\n            b: PropTypes.string,\n            ...c.propTypes,\n            a: PropTypes.string\n          }\n          static defaultProps = {\n            b: \"b\",\n            a: \"a\",\n            ...c.defaultProps\n          }\n        }\n      ", "", []string{"propsNotSorted"}},
-		{"upstream invalid 10", "\n        export default class ClassWithSpreadInPropTypes extends BaseClass {\n          static propTypes = {\n            a: PropTypes.string,\n            b: PropTypes.string,\n            c: PropTypes.string,\n            d: PropTypes.string,\n            e: PropTypes.string,\n            f: PropTypes.string\n          }\n          static defaultProps = {\n            b: \"b\",\n            a: \"a\",\n            ...c.defaultProps,\n            f: \"f\",\n            e: \"e\",\n            ...d.defaultProps\n          }\n        }\n      ", "", []string{"propsNotSorted", "propsNotSorted"}},
-		{"upstream invalid 11", "\n        const defaults = {\n          b: \"b\"\n        };\n        const types = {\n          a: PropTypes.string,\n          b: PropTypes.string,\n          c: PropTypes.string\n        };\n        function StatelessComponentWithSpreadInPropTypes({ a, b, c }) {\n          return <div>{a}{b}{c}</div>;\n        }\n        StatelessComponentWithSpreadInPropTypes.propTypes = types;\n        StatelessComponentWithSpreadInPropTypes.defaultProps = {\n          c: \"c\",\n          a: \"a\",\n          ...defaults,\n        };\n      ", "", []string{"propsNotSorted"}},
-		{"upstream invalid 12", "\n        class First extends React.Component {\n          render() {\n            return <div />;\n          }\n        }\n\n        First.defaultProps = {\n            a: PropTypes.any,\n            z: PropTypes.string,\n            onFoo: PropTypes.func,\n            onBar: PropTypes.func,\n        };\n      ", "", []string{"propsNotSorted", "propsNotSorted"}},
+		{
+			"upstream invalid 0",
+			"\n        class Component extends React.Component {\n          static propTypes = {\n            a: PropTypes.any,\n            b: PropTypes.any,\n            c: PropTypes.any\n          };\n          static defaultProps = {\n            a: \"a\",\n            c: \"c\",\n            b: \"b\"\n          };\n          render() {\n            return <div />;\n          }\n        }\n      ",
+			"",
+			[]string{"propsNotSorted"},
+		},
+		{
+			"upstream invalid 1",
+			"\n        class Component extends React.Component {\n          static propTypes = {\n            a: PropTypes.any,\n            b: PropTypes.any,\n            c: PropTypes.any\n          };\n          static defaultProps = {\n            c: \"c\",\n            b: \"b\",\n            a: \"a\"\n          };\n          render() {\n            return <div />;\n          }\n        }\n      ",
+			"",
+			[]string{"propsNotSorted", "propsNotSorted"},
+		},
+		{
+			"upstream invalid 2",
+			"\n        class Component extends React.Component {\n          static propTypes = {\n            a: PropTypes.any,\n            b: PropTypes.any\n          };\n          static defaultProps = {\n            Z: \"Z\",\n            a: \"a\",\n          };\n          render() {\n            return <div />;\n          }\n        }\n      ",
+			"{\"ignoreCase\": true}",
+			[]string{"propsNotSorted"},
+		},
+		{
+			"upstream invalid 3",
+			"\n        class Component extends React.Component {\n          static propTypes = {\n            a: PropTypes.any,\n            z: PropTypes.any\n          };\n          static defaultProps = {\n            a: \"a\",\n            Z: \"Z\",\n          };\n          render() {\n            return <div />;\n          }\n        }\n      ",
+			"",
+			[]string{"propsNotSorted"},
+		},
+		{
+			"upstream invalid 4",
+			"\n        class Hello extends React.Component {\n          render() {\n            return <div>Hello</div>;\n          }\n        }\n        Hello.propTypes = {\n          \"a\": PropTypes.string,\n          \"b\": PropTypes.string\n        };\n        Hello.defaultProps = {\n          \"b\": \"b\",\n          \"a\": \"a\"\n        };\n      ",
+			"",
+			[]string{"propsNotSorted"},
+		},
+		{
+			"upstream invalid 5",
+			"\n        class Hello extends React.Component {\n          render() {\n            return <div>Hello</div>;\n          }\n        }\n        Hello.propTypes = {\n          \"a\": PropTypes.string,\n          \"b\": PropTypes.string,\n          \"c\": PropTypes.string\n        };\n        Hello.defaultProps = {\n          \"c\": \"c\",\n          \"b\": \"b\",\n          \"a\": \"a\"\n        };\n      ",
+			"",
+			[]string{"propsNotSorted", "propsNotSorted"},
+		},
+		{
+			"upstream invalid 6",
+			"\n        class Hello extends React.Component {\n          render() {\n            return <div>Hello</div>;\n          }\n        }\n        Hello.propTypes = {\n          \"a\": PropTypes.string,\n          \"B\": PropTypes.string,\n        };\n        Hello.defaultProps = {\n          \"a\": \"a\",\n          \"B\": \"B\",\n        };\n      ",
+			"",
+			[]string{"propsNotSorted"},
+		},
+		{
+			"upstream invalid 7",
+			"\n        class Hello extends React.Component {\n          render() {\n            return <div>Hello</div>;\n          }\n        }\n        Hello.propTypes = {\n          \"a\": PropTypes.string,\n          \"B\": PropTypes.string,\n        };\n        Hello.defaultProps = {\n          \"B\": \"B\",\n          \"a\": \"a\",\n        };\n      ",
+			"{\"ignoreCase\": true}",
+			[]string{"propsNotSorted"},
+		},
+		{
+			"upstream invalid 8",
+			"\n        const First = (props) => <div />;\n        const propTypes = {\n          z: PropTypes.string,\n          a: PropTypes.any,\n        };\n        const defaultProps = {\n          z: \"z\",\n          a: \"a\",\n        };\n        First.propTypes = propTypes;\n        First.defaultProps = defaultProps;\n      ",
+			"",
+			[]string{"propsNotSorted"},
+		},
+		{
+			"upstream invalid 9",
+			"\n        export default class ClassWithSpreadInPropTypes extends BaseClass {\n          static propTypes = {\n            b: PropTypes.string,\n            ...c.propTypes,\n            a: PropTypes.string\n          }\n          static defaultProps = {\n            b: \"b\",\n            a: \"a\",\n            ...c.defaultProps\n          }\n        }\n      ",
+			"",
+			[]string{"propsNotSorted"},
+		},
+		{
+			"upstream invalid 10",
+			"\n        export default class ClassWithSpreadInPropTypes extends BaseClass {\n          static propTypes = {\n            a: PropTypes.string,\n            b: PropTypes.string,\n            c: PropTypes.string,\n            d: PropTypes.string,\n            e: PropTypes.string,\n            f: PropTypes.string\n          }\n          static defaultProps = {\n            b: \"b\",\n            a: \"a\",\n            ...c.defaultProps,\n            f: \"f\",\n            e: \"e\",\n            ...d.defaultProps\n          }\n        }\n      ",
+			"",
+			[]string{"propsNotSorted", "propsNotSorted"},
+		},
+		{
+			"upstream invalid 11",
+			"\n        const defaults = {\n          b: \"b\"\n        };\n        const types = {\n          a: PropTypes.string,\n          b: PropTypes.string,\n          c: PropTypes.string\n        };\n        function StatelessComponentWithSpreadInPropTypes({ a, b, c }) {\n          return <div>{a}{b}{c}</div>;\n        }\n        StatelessComponentWithSpreadInPropTypes.propTypes = types;\n        StatelessComponentWithSpreadInPropTypes.defaultProps = {\n          c: \"c\",\n          a: \"a\",\n          ...defaults,\n        };\n      ",
+			"",
+			[]string{"propsNotSorted"},
+		},
+		{
+			"upstream invalid 12",
+			"\n        class First extends React.Component {\n          render() {\n            return <div />;\n          }\n        }\n\n        First.defaultProps = {\n            a: PropTypes.any,\n            z: PropTypes.string,\n            onFoo: PropTypes.func,\n            onBar: PropTypes.func,\n        };\n      ",
+			"",
+			[]string{"propsNotSorted", "propsNotSorted"},
+		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, SortDefaultProps, sortDefaultPropsFile,
-				testCase.sourceText, sortDefaultPropsDecode(t, testCase.rawOptions))
-			rule_testing.ExpectFindings(t, result, testCase.messageIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, SortDefaultProperties, sortDefaultPropsFile,
+				testCase.sourceText, sortDefaultPropsDecode(test, testCase.rawOptions))
+			rule_testing.ExpectFindings(test, result, testCase.messageIds...)
 		})
 	}
 }
 
-// TestSortDefaultPropsRawKeyTextComparison pins the comparison being on SOURCE TEXT.
+// TestSortDefaultPropsRawKeyTextComparison pins the comparison being on source text.
 //
 // Upstream's `getKey` calls `getText` on the key node, so quotes the author wrote are part of the
 // string being compared. The consequence is an ordering nobody would design, and all three rows
@@ -112,8 +246,8 @@ func TestSortDefaultPropsFires(t *testing.T) {
 // Upstream's corpus writes no mixed-quoting object, so nothing imported can distinguish a port
 // comparing raw text from one comparing resolved names. Reproduced rather than corrected, because
 // comparing resolved names would change the verdict on every quoted key in the tree.
-func TestSortDefaultPropsRawKeyTextComparison(t *testing.T) {
-	t.Parallel()
+func TestSortDefaultPropsRawKeyTextComparison(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name, sourceText string
@@ -131,7 +265,7 @@ func TestSortDefaultPropsRawKeyTextComparison(t *testing.T) {
 		},
 		{
 			// Four computed-key rows, because this is where the two trees disagree about what the
-			// key node IS. ESTree's `key` for `{[x]: 1}` is the inner expression `x`; our parser
+			// key node is. ESTree's `key` for `{[x]: 1}` is the inner expression `x`; our parser
 			// wraps it in a ComputedPropertyName carrying the brackets. Since `[` sorts between
 			// uppercase and lowercase, comparing the wrapper flips the verdict on two of these four
 			// and leaves the other two unchanged, which is exactly the shape that makes a wrong
@@ -152,27 +286,27 @@ func TestSortDefaultPropsRawKeyTextComparison(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, SortDefaultProps, sortDefaultPropsFile,
-				testCase.sourceText, sortDefaultPropsDecode(t, `""`))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, SortDefaultProperties, sortDefaultPropsFile,
+				testCase.sourceText, sortDefaultPropsDecode(test, `""`))
 			if testCase.findings == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, "propsNotSorted")
+			rule_testing.ExpectFindings(test, result, "propsNotSorted")
 		})
 	}
 }
 
 // TestSortDefaultPropsSpreadRestartsTheRun pins the spread behaviour.
 //
-// Upstream's reduce returns the element AFTER the spread rather than the spread itself, so that
+// Upstream's reduce returns the element after the spread rather than the spread itself, so that
 // element becomes the accumulator without being compared to anything. A spread therefore splits the
 // object into independently sorted runs rather than being skipped over. Measured: `{b, ...x, a}` is
 // clean while both `{...x, b, a}` and `{b, a, ...x}` report.
-func TestSortDefaultPropsSpreadRestartsTheRun(t *testing.T) {
-	t.Parallel()
+func TestSortDefaultPropsSpreadRestartsTheRun(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name, sourceText string
@@ -195,34 +329,34 @@ func TestSortDefaultPropsSpreadRestartsTheRun(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, SortDefaultProps, sortDefaultPropsFile,
-				testCase.sourceText, sortDefaultPropsDecode(t, `""`))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, SortDefaultProperties, sortDefaultPropsFile,
+				testCase.sourceText, sortDefaultPropsDecode(test, `""`))
 			if testCase.findings == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, "propsNotSorted")
+			rule_testing.ExpectFindings(test, result, "propsNotSorted")
 		})
 	}
 }
 
 // TestSortDefaultPropsAccumulatorDoesNotAdvanceOnAFinding pins how many findings one object yields.
 //
-// When a property is out of order upstream returns the PREVIOUS accumulator rather than advancing
+// When a property is out of order upstream returns the previous accumulator rather than advancing
 // past the offender, so `{c, b, a}` reports twice, both measured against the same `c`. A port that
 // resynced would report once and pass every imported case, because upstream's longest failing
 // object has a single inversion.
-func TestSortDefaultPropsAccumulatorDoesNotAdvanceOnAFinding(t *testing.T) {
-	t.Parallel()
+func TestSortDefaultPropsAccumulatorDoesNotAdvanceOnAFinding(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name, sourceText string
 		findings         int
 	}{
 		{
-			// This row does NOT distinguish the two designs and is kept for contrast: a descending
+			// This row does not distinguish the two designs and is kept for contrast: a descending
 			// run reports twice whether the accumulator holds or advances, which is why a mutation
 			// making it advance survived until the rows below existed.
 			"a fully descending run reports on each step either way",
@@ -248,46 +382,46 @@ func TestSortDefaultPropsAccumulatorDoesNotAdvanceOnAFinding(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, SortDefaultProps, sortDefaultPropsFile,
-				testCase.sourceText, sortDefaultPropsDecode(t, `""`))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, SortDefaultProperties, sortDefaultPropsFile,
+				testCase.sourceText, sortDefaultPropsDecode(test, `""`))
 			ids := make([]string, testCase.findings)
 			for index := range ids {
 				ids[index] = "propsNotSorted"
 			}
-			rule_testing.ExpectFindings(t, result, ids...)
+			rule_testing.ExpectFindings(test, result, ids...)
 		})
 	}
 }
 
 // TestSortDefaultPropsIgnoreCase pins the option, using the pair that inverts across it.
 //
-// `{B: 1, a: 2}` is SORTED by default, because uppercase letters sort before lowercase, and
-// UNSORTED once case is folded. Both measured. A pair that inverts is the only kind that can tell a
+// `{B: 1, a: 2}` is sorted by default, because uppercase letters sort before lowercase, and
+// unsorted once case is folded. Both measured. A pair that inverts is the only kind that can tell a
 // working option from one that is read and discarded.
-func TestSortDefaultPropsIgnoreCase(t *testing.T) {
-	t.Parallel()
+func TestSortDefaultPropsIgnoreCase(test *testing.T) {
+	test.Parallel()
 
-	sensitive := rule_testing.RunTypedWithOptions(t, SortDefaultProps, sortDefaultPropsFile,
+	sensitive := rule_testing.RunTypedWithOptions(test, SortDefaultProperties, sortDefaultPropsFile,
 		"class C extends React.Component { static defaultProps = { B: 1, a: 2 }; }",
-		sortDefaultPropsDecode(t, `""`))
-	rule_testing.ExpectClean(t, sensitive)
+		sortDefaultPropsDecode(test, `""`))
+	rule_testing.ExpectClean(test, sensitive)
 
-	folded := rule_testing.RunTypedWithOptions(t, SortDefaultProps, sortDefaultPropsFile,
+	folded := rule_testing.RunTypedWithOptions(test, SortDefaultProperties, sortDefaultPropsFile,
 		"class C extends React.Component { static defaultProps = { B: 1, a: 2 }; }",
-		sortDefaultPropsDecode(t, `{"ignoreCase": true}`))
-	rule_testing.ExpectFindings(t, folded, "propsNotSorted")
+		sortDefaultPropsDecode(test, `{"ignoreCase": true}`))
+	rule_testing.ExpectFindings(test, folded, "propsNotSorted")
 }
 
 // TestSortDefaultPropsWhichObjectsAreReached pins the two routes and three shapes that are not.
 //
-// The `getDefaultProps` METHOD row is the one worth reading twice: the name is one of the two this
+// The `getDefaultProps` method row is the one worth reading twice: the name is one of the two this
 // rule accepts, and the object is right there in the return, and it is still silent. Upstream looks
-// at the property's VALUE rather than at a return statement, so a method never reaches the check.
+// at the property's value rather than at a return statement, so a method never reaches the check.
 // Measured.
-func TestSortDefaultPropsWhichObjectsAreReached(t *testing.T) {
-	t.Parallel()
+func TestSortDefaultPropsWhichObjectsAreReached(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name, sourceText string
@@ -330,62 +464,62 @@ func TestSortDefaultPropsWhichObjectsAreReached(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, SortDefaultProps, sortDefaultPropsFile,
-				testCase.sourceText, sortDefaultPropsDecode(t, `""`))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, SortDefaultProperties, sortDefaultPropsFile,
+				testCase.sourceText, sortDefaultPropsDecode(test, `""`))
 			if testCase.findings == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, "propsNotSorted")
+			rule_testing.ExpectFindings(test, result, "propsNotSorted")
 		})
 	}
 }
 
 // TestSortDefaultPropsSpanAndMessage asserts where the finding points and what it says.
 //
-// The finding anchors on the offending PROPERTY rather than on the object or the declaration, so a
+// The finding anchors on the offending property rather than on the object or the declaration, so a
 // reader is shown the key that is in the wrong place. No message here interpolates, but the text is
 // asserted against a literal typed here rather than against the rule's own constant, which would
 // move both sides together under mutation.
-func TestSortDefaultPropsSpanAndMessage(t *testing.T) {
-	t.Parallel()
+func TestSortDefaultPropsSpanAndMessage(test *testing.T) {
+	test.Parallel()
 
 	source := "class C extends React.Component { static defaultProps = { b: 1, a: 2 }; }"
-	result := rule_testing.RunTypedWithOptions(t, SortDefaultProps, sortDefaultPropsFile, source,
-		sortDefaultPropsDecode(t, `""`))
+	result := rule_testing.RunTypedWithOptions(test, SortDefaultProperties, sortDefaultPropsFile, source,
+		sortDefaultPropsDecode(test, `""`))
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
+		test.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
 	}
 	onDisk := strings.TrimSpace(source) + "\n"
 	reported := onDisk[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 	if reported != "a: 2" {
-		t.Fatalf("finding points at %q, wanted %q", reported, "a: 2")
+		test.Fatalf("finding points at %q, wanted %q", reported, "a: 2")
 	}
 	want := "Default prop declarations should be sorted alphabetically. A sorted list is one a " +
 		"reader can scan for a name instead of reading end to end, and it keeps two people adding " +
 		"a default in the same week from colliding in the same spot."
 	if result.Diagnostics[0].Message.Description != want {
-		t.Fatalf("message is %q", result.Diagnostics[0].Message.Description)
+		test.Fatalf("message is %q", result.Diagnostics[0].Message.Description)
 	}
 	if result.Diagnostics[0].Message.Id != "propsNotSorted" {
-		t.Fatalf("id is %q", result.Diagnostics[0].Message.Id)
+		test.Fatalf("id is %q", result.Diagnostics[0].Message.Id)
 	}
 	// Upstream commented its fixer out along with `fixable: 'code'`, so there is no repair to port.
 	if len(result.Diagnostics[0].Fixes) != 0 || len(result.Diagnostics[0].Suggestions) != 0 {
-		t.Fatal("upstream ships no repair for this rule and neither does this port")
+		test.Fatal("upstream ships no repair for this rule and neither does this port")
 	}
 }
 
 // TestDecodeSortDefaultPropsOptions routes configuration through the exported decoder.
 //
 // The nil row is the one that matters: a rule configured as a bare "error" is handed empty input,
-// and this option defaults to FALSE so the zero value happens to be right. That is worth pinning
+// and this option defaults to `false` so the zero value happens to be right. That is worth pinning
 // rather than relying on, because the sibling rule in this package needed a pointer decoder for
 // exactly the opposite reason.
-func TestDecodeSortDefaultPropsOptions(t *testing.T) {
-	t.Parallel()
+func TestDecodeSortDefaultPropsOptions(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name, raw string
@@ -397,30 +531,26 @@ func TestDecodeSortDefaultPropsOptions(t *testing.T) {
 		{"an explicit true folds case", `{"ignoreCase": true}`, true},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			decoded, err := DecodeSortDefaultPropsOptions([]byte(testCase.raw))
-			if err != nil {
-				t.Fatalf("decode returned %v", err)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			decoded, decodeSortDefaultPropertiesOptionsError := DecodeSortDefaultPropsOptions([]byte(testCase.raw))
+			if decodeSortDefaultPropertiesOptionsError != nil {
+				test.Fatalf("decode returned %v", decodeSortDefaultPropertiesOptionsError)
 			}
-			options, isOptions := decoded.(SortDefaultPropsOptions)
-			if !isOptions {
-				t.Fatalf("decode returned %T", decoded)
-			}
-			if options.IgnoreCase != testCase.want {
-				t.Fatalf("ignoreCase is %v, wanted %v", options.IgnoreCase, testCase.want)
+			if decoded.IgnoreCase != testCase.want {
+				test.Fatalf("ignoreCase is %v, wanted %v", decoded.IgnoreCase, testCase.want)
 			}
 		})
 	}
 }
 
 // TestSortDefaultPropsNilOptionsUsesTheDefault bypasses the decoder entirely.
-func TestSortDefaultPropsNilOptionsUsesTheDefault(t *testing.T) {
-	t.Parallel()
+func TestSortDefaultPropsNilOptionsUsesTheDefault(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTyped(t, SortDefaultProps, sortDefaultPropsFile,
+	result := rule_testing.RunTyped(test, SortDefaultProperties, sortDefaultPropsFile,
 		"class C extends React.Component { static defaultProps = { b: 1, a: 2 }; }")
-	rule_testing.ExpectFindings(t, result, "propsNotSorted")
+	rule_testing.ExpectFindings(test, result, "propsNotSorted")
 }
 
 // TestSortDefaultPropsRequiresTheTypedHarness asserts the checker is genuinely needed.
@@ -428,27 +558,27 @@ func TestSortDefaultPropsNilOptionsUsesTheDefault(t *testing.T) {
 // Only the identifier route needs resolution, so the typed harness is asserted through that route
 // specifically: `GetSymbolAtLocation` on a nil checker returns nil rather than crashing, which
 // would make this rule quietly narrower rather than obviously broken.
-func TestSortDefaultPropsRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestSortDefaultPropsRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
-	if !SortDefaultProps.NeedsTypeChecker {
-		t.Fatal("the identifier route resolves through the checker and must declare it")
+	if !SortDefaultProperties.NeedsTypeChecker {
+		test.Fatal("the identifier route resolves through the checker and must declare it")
 	}
 	source := "const props = { b: 1, a: 2 };\nclass C extends React.Component {}\nC.defaultProps = props;"
-	untyped := rule_testing.RunWithOptions(t, SortDefaultProps, sortDefaultPropsFile, source,
+	untyped := rule_testing.RunWithOptions(test, SortDefaultProperties, sortDefaultPropsFile, source,
 		DefaultSortDefaultPropsOptions())
-	rule_testing.ExpectClean(t, untyped)
+	rule_testing.ExpectClean(test, untyped)
 
-	typed := rule_testing.RunTypedWithOptions(t, SortDefaultProps, sortDefaultPropsFile, source,
+	typed := rule_testing.RunTypedWithOptions(test, SortDefaultProperties, sortDefaultPropsFile, source,
 		DefaultSortDefaultPropsOptions())
-	rule_testing.ExpectFindings(t, typed, "propsNotSorted")
+	rule_testing.ExpectFindings(test, typed, "propsNotSorted")
 }
 
 // TestSortDefaultPropsLeadingTriviaIsNotPartOfTheKey guards a large false positive class.
 //
 // `Pos()` includes leading trivia here, so slicing a key node raw picks up the newline, indentation
 // and any comment written before it. Whitespace and `/` sort below every letter, so an untrimmed
-// key compares as less than almost anything and a correctly SORTED object reports.
+// key compares as less than almost anything and a correctly sorted object reports.
 //
 // Both rows are measured silent against the installed build, and both report without the trim. The
 // multiline row is the one that matters in practice: a defaults object written across lines is the
@@ -457,8 +587,8 @@ func TestSortDefaultPropsRequiresTheTypedHarness(t *testing.T) {
 //
 // Upstream cannot see this because its `getText(node)` returns a node's own text with trivia
 // already excluded; the hazard is entirely ours.
-func TestSortDefaultPropsLeadingTriviaIsNotPartOfTheKey(t *testing.T) {
-	t.Parallel()
+func TestSortDefaultPropsLeadingTriviaIsNotPartOfTheKey(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct{ name, sourceText string }{
 		{
@@ -471,11 +601,11 @@ func TestSortDefaultPropsLeadingTriviaIsNotPartOfTheKey(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, SortDefaultProps, sortDefaultPropsFile,
-				testCase.sourceText, sortDefaultPropsDecode(t, `""`))
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, SortDefaultProperties, sortDefaultPropsFile,
+				testCase.sourceText, sortDefaultPropsDecode(test, `""`))
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -483,10 +613,10 @@ func TestSortDefaultPropsLeadingTriviaIsNotPartOfTheKey(t *testing.T) {
 // TestSortDefaultPropsGetDefaultPropsSpelling pins the second accepted name.
 //
 // Upstream accepts `getDefaultProps` alongside `defaultProps` in both arms, and a mutation dropping
-// it survived because upstream's corpus writes the name only as a METHOD, which is silent for a
+// it survived because upstream's corpus writes the name only as a method, which is silent for a
 // different reason. As a field or an assignment it reports, both measured.
-func TestSortDefaultPropsGetDefaultPropsSpelling(t *testing.T) {
-	t.Parallel()
+func TestSortDefaultPropsGetDefaultPropsSpelling(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name, sourceText string
@@ -509,15 +639,15 @@ func TestSortDefaultPropsGetDefaultPropsSpelling(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, SortDefaultProps, sortDefaultPropsFile,
-				testCase.sourceText, sortDefaultPropsDecode(t, `""`))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, SortDefaultProperties, sortDefaultPropsFile,
+				testCase.sourceText, sortDefaultPropsDecode(test, `""`))
 			if testCase.findings == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, "propsNotSorted")
+			rule_testing.ExpectFindings(test, result, "propsNotSorted")
 		})
 	}
 }

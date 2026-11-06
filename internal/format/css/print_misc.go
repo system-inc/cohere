@@ -19,6 +19,9 @@ import (
 	ecmascripttext "github.com/system-inc/cohere/internal/lint/ecmascript/text"
 )
 
+// javaScriptWhitespaceClass is JavaScript's \s as a Go character class: WhiteSpace and LineTerminator.
+const javaScriptWhitespaceClass = `[\t\n\v\f\r \x{00A0}\x{1680}\x{2000}-\x{200A}\x{2028}\x{2029}\x{202F}\x{205F}\x{3000}\x{FEFF}]`
+
 func printUnit(unit string) string {
 	lowercased := toLowerCase(unit)
 	if canonical, present := cssUnits[lowercased]; present {
@@ -67,7 +70,9 @@ func adjustStrings(value string, options *printerOptions) string {
 }
 
 // attributeFlagPattern is /^(?<value>.+?)\s+(?<flag>[a-z])$/i with JavaScript's `.` and \s.
-var attributeFlagPattern = regexp.MustCompile(`(?i)^([^\n\r\x{2028}\x{2029}]+?)` + javaScriptWhitespaceClass + `+([a-z])$`)
+var attributeFlagPattern = regexp.MustCompile(
+	`(?i)^([^\n\r\x{2028}\x{2029}]+?)` + javaScriptWhitespaceClass + `+([a-z])$`,
+)
 
 func quoteAttributeValue(value string, options *printerOptions) string {
 	quote := `"`
@@ -80,13 +85,14 @@ func quoteAttributeValue(value string, options *printerOptions) string {
 	// To support future flags, we simply check if it's an alphabet letter
 	// https://github.com/prettier/prettier/pull/17865#discussion_r2332698101
 	flag := ""
+	withoutFlag := value
 	if match := attributeFlagPattern.FindStringSubmatch(value); match != nil {
-		value, flag = match[1], match[2]
+		withoutFlag, flag = match[1], match[2]
 	}
 
-	quoted := value
-	if !strings.Contains(value, `"`) && !strings.Contains(value, "'") {
-		quoted = quote + value + quote
+	quoted := withoutFlag
+	if !strings.Contains(withoutFlag, `"`) && !strings.Contains(withoutFlag, "'") {
+		quoted = quote + withoutFlag + quote
 	}
 	if flag != "" {
 		quoted += " " + flag
@@ -101,10 +107,11 @@ func isLetter(character byte) bool {
 }
 
 func skipDigits(value string, index int) int {
-	for index < len(value) && isDigit(value[index]) {
-		index++
+	end := index
+	for end < len(value) && isDigit(value[end]) {
+		end++
 	}
-	return index
+	return end
 }
 
 // matchNumberAt is NUMBER_REGEX, /(?:\d*\.\d+|\d+\.?)(?:e[+-]?\d+)?/i, anchored at start. The first
@@ -113,7 +120,10 @@ func skipDigits(value string, index int) int {
 func matchNumberAt(value string, start int) (int, bool) {
 	end := -1
 	integerEnd := skipDigits(value, start)
-	if integerEnd < len(value) && value[integerEnd] == '.' && integerEnd+1 < len(value) && isDigit(value[integerEnd+1]) {
+	if integerEnd < len(value) &&
+		value[integerEnd] == '.' &&
+		integerEnd+1 < len(value) &&
+		isDigit(value[integerEnd+1]) {
 		end = skipDigits(value, integerEnd+1)
 	} else if integerEnd > start {
 		end = integerEnd
@@ -393,9 +403,6 @@ func isNextLineEmpty(text string, startIndex int) bool {
 }
 
 // JavaScript's string semantics.
-
-// javaScriptWhitespaceClass is JavaScript's \s as a Go character class: WhiteSpace and LineTerminator.
-const javaScriptWhitespaceClass = `[\t\n\v\f\r \x{00A0}\x{1680}\x{2000}-\x{200A}\x{2028}\x{2029}\x{202F}\x{205F}\x{3000}\x{FEFF}]`
 
 // trim, trimStart and trimEnd are String.prototype.trim and its halves.
 func trim(value string) string      { return strings.TrimFunc(value, ecmascripttext.IsWhitespace) }

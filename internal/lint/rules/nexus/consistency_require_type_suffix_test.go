@@ -8,8 +8,8 @@ import (
 
 const suffixFile = "/repository/source/Thing.ts"
 
-func TestConsistencyRequireTypeSuffixFires(t *testing.T) {
-	t.Parallel()
+func TestConsistencyRequireTypeSuffixFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -27,16 +27,16 @@ func TestConsistencyRequireTypeSuffixFires(t *testing.T) {
 		{"single-property const enum", "export const Operator = { Add: 'Add' } as const;\n", "noConstEnumSuffix"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ConsistencyRequireTypeSuffix, suffixFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.wantId)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ConsistencyRequireTypeSuffix, suffixFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, testCase.wantId)
 		})
 	}
 }
 
-func TestConsistencyRequireTypeSuffixStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestConsistencyRequireTypeSuffixStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -54,9 +54,15 @@ func TestConsistencyRequireTypeSuffixStaysSilent(t *testing.T) {
 		// These are the discriminating cases for the const-enum detector. Each is structurally
 		// `{ ... } as const` and none is an enum, so a detector that keyed on the wrapper alone
 		// would ask for a rename that would be wrong.
-		{"lookup table with unrelated values", "export const ClassNames = { small: 'text-sm', large: 'text-lg' } as const;\n"},
+		{
+			"lookup table with unrelated values",
+			"export const ClassNames = { small: 'text-sm', large: 'text-lg' } as const;\n",
+		},
 		{"one entry that does not match", "export const Operator = { Add: 'Add', Sub: 'Subtract' } as const;\n"},
-		{"computed keys are a map over an existing kind", "export const Labels = { [OperatorKind.Add]: 'Add' } as const;\n"},
+		{
+			"computed keys are a map over an existing kind",
+			"export const Labels = { [OperatorKind.Add]: 'Add' } as const;\n",
+		},
 		{"empty object", "export const Empty = {} as const;\n"},
 		{"non-string values", "export const Sizes = { Small: 1, Large: 2 } as const;\n"},
 
@@ -66,10 +72,10 @@ func TestConsistencyRequireTypeSuffixStaysSilent(t *testing.T) {
 		{"no declarations", "export function run() {\n    return 1;\n}\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ConsistencyRequireTypeSuffix, suffixFile, testCase.sourceText)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ConsistencyRequireTypeSuffix, suffixFile, testCase.sourceText)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }

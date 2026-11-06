@@ -22,8 +22,8 @@ import (
 //	shrink-0                  silent
 //	flex items-center         silent
 
-func TestNoDeprecatedClassesReportsRenames(t *testing.T) {
-	t.Parallel()
+func TestNoDeprecatedClassesReportsRenames(test *testing.T) {
+	test.Parallel()
 	testCases := []struct {
 		name     string
 		fileName string
@@ -112,16 +112,16 @@ func TestNoDeprecatedClassesReportsRenames(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoDeprecatedClasses, testCase.fileName, testCase.source)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoDeprecatedClasses, testCase.fileName, testCase.source)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
 
-func TestNoDeprecatedClassesStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoDeprecatedClassesStaysSilent(test *testing.T) {
+	test.Parallel()
 	testCases := []struct {
 		name     string
 		fileName string
@@ -173,10 +173,10 @@ func TestNoDeprecatedClassesStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoDeprecatedClasses, testCase.fileName, testCase.source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoDeprecatedClasses, testCase.fileName, testCase.source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -187,8 +187,8 @@ func TestNoDeprecatedClassesStaysSilent(t *testing.T) {
 // The variant and importance cases are the ones worth pinning: the rule matches a stripped base and
 // has to put the prefix back, so a port that got the reassembly wrong would produce a class that
 // renders differently rather than one that fails to compile.
-func TestNoDeprecatedClassesFixMatchesUpstream(t *testing.T) {
-	t.Parallel()
+func TestNoDeprecatedClassesFixMatchesUpstream(test *testing.T) {
+	test.Parallel()
 	testCases := []struct {
 		name     string
 		source   string
@@ -240,11 +240,11 @@ func TestNoDeprecatedClassesFixMatchesUpstream(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoDeprecatedClasses, "Component.tsx", testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoDeprecatedClasses, "Component.tsx", testCase.source)
 			if len(result.Diagnostics) == 0 {
-				t.Fatal("expected a finding, got none")
+				test.Fatal("expected a finding, got none")
 			}
 			// The literal's contents after the fix, read back out of the rewritten source so the
 			// cases stay about class text rather than about the JSX around it.
@@ -252,7 +252,7 @@ func TestNoDeprecatedClassesFixMatchesUpstream(t *testing.T) {
 			start := strings.Index(testCase.source, opening) + len(opening)
 			end := strings.LastIndex(testCase.source, `"`)
 			want := testCase.source[:start] + testCase.wantText + testCase.source[end:]
-			rule_testing.ExpectFixedSource(t, result, want)
+			rule_testing.ExpectFixedSource(test, result, want)
 		})
 	}
 }
@@ -262,16 +262,16 @@ func TestNoDeprecatedClassesFixMatchesUpstream(t *testing.T) {
 // `bg-opacity-50` has no mechanical replacement: the opacity moved into the color, so the repair is
 // `bg-black/50` and requires knowing which color the author meant. A fix here would have to invent
 // one.
-func TestRemovedUtilitiesProposeNoFix(t *testing.T) {
-	t.Parallel()
-	result := rule_testing.Run(t, NoDeprecatedClasses, "Component.tsx",
+func TestRemovedUtilitiesProposeNoFix(test *testing.T) {
+	test.Parallel()
+	result := rule_testing.Run(test, NoDeprecatedClasses, "Component.tsx",
 		`const element = <div className="bg-opacity-50" />;`)
 
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("expected one finding, got %d", len(result.Diagnostics))
+		test.Fatalf("expected one finding, got %d", len(result.Diagnostics))
 	}
 	if len(result.Diagnostics[0].Fixes) != 0 {
-		t.Fatal("a removed utility has no mechanical replacement, so proposing a fix would invent one")
+		test.Fatal("a removed utility has no mechanical replacement, so proposing a fix would invent one")
 	}
 }
 
@@ -280,8 +280,8 @@ func TestRemovedUtilitiesProposeNoFix(t *testing.T) {
 // The obvious implementation matches the deprecation patterns against the class as written. It
 // passes every bare fixture and silently misses every prefixed one, which in real markup is most of
 // them. This asserts the real rule catches what that shortcut drops.
-func TestMatchingTheRawClassNameLosesFindings(t *testing.T) {
-	t.Parallel()
+func TestMatchingTheRawClassNameLosesFindings(test *testing.T) {
+	test.Parallel()
 	// Variant-prefixed only. `flex-shrink-0!` is deliberately absent: its `!` is swallowed by the
 	// `(.*)` capture, so the raw match happens to hit it and it would not demonstrate the defect.
 	// It would also produce a wrong replacement (`shrink-0!` via the capture rather than via
@@ -302,13 +302,13 @@ func TestMatchingTheRawClassNameLosesFindings(t *testing.T) {
 			}
 		}
 		if matchedRaw {
-			t.Fatalf("%q matched a deprecation pattern raw, so this control no longer demonstrates "+
+			test.Fatalf("%q matched a deprecation pattern raw, so this control no longer demonstrates "+
 				"the defect it exists to demonstrate", className)
 		}
 
 		// The real rule, which dissects first.
 		if _, isDeprecated := deprecationFor(className); !isDeprecated {
-			t.Errorf("the real rule missed %q, which is the prefixed case the raw match loses", className)
+			test.Errorf("the real rule missed %q, which is the prefixed case the raw match loses", className)
 		}
 	}
 }
@@ -319,7 +319,7 @@ func TestMatchingTheRawClassNameLosesFindings(t *testing.T) {
 // The gate is exercised by pinning the version rather than by installing another Tailwind.
 // Not parallel: it swaps the package variable tailwindVersionForDeprecations, which NoDeprecatedClasses
 // reads on every run, and restores it with a defer.
-func TestVersionGateHoldsDeprecationsBack(t *testing.T) {
+func TestVersionGateHoldsDeprecationsBack(test *testing.T) {
 	original := tailwindVersionForDeprecations
 	defer func() { tailwindVersionForDeprecations = original }()
 
@@ -327,17 +327,17 @@ func TestVersionGateHoldsDeprecationsBack(t *testing.T) {
 	tailwindVersionForDeprecations = func() string { return "4.0.0" }
 
 	if _, isDeprecated := deprecationFor("bg-left-top"); isDeprecated {
-		t.Error("a 4.1 rename should not be reported against Tailwind 4.0")
+		test.Error("a 4.1 rename should not be reported against Tailwind 4.0")
 	}
 	if _, isDeprecated := deprecationFor("flex-shrink-0"); !isDeprecated {
-		t.Error("a 4.0 rename should still be reported against Tailwind 4.0")
+		test.Error("a 4.0 rename should still be reported against Tailwind 4.0")
 	}
 
 	// An unreadable version disables every deprecation rather than enabling all of them, because
 	// silence is a gap someone notices on upgrade while false renames are noise on correct code.
 	tailwindVersionForDeprecations = func() string { return "not-a-version" }
 	if _, isDeprecated := deprecationFor("flex-shrink-0"); isDeprecated {
-		t.Error("an unreadable version should disable deprecations rather than enable them")
+		test.Error("an unreadable version should disable deprecations rather than enable them")
 	}
 }
 
@@ -352,23 +352,23 @@ func TestVersionGateHoldsDeprecationsBack(t *testing.T) {
 //
 // Asserting the dissection directly means a future change to the patterns cannot quietly start
 // relying on the capture to carry punctuation.
-func TestImportanceIsStrippedBeforeMatching(t *testing.T) {
-	t.Parallel()
+func TestImportanceIsStrippedBeforeMatching(test *testing.T) {
+	test.Parallel()
 	variants, base, important := dissectClass("sm:hover:flex-grow-2!")
 
 	if variants != "sm:hover:" {
-		t.Errorf("variants %q, want %q", variants, "sm:hover:")
+		test.Errorf("variants %q, want %q", variants, "sm:hover:")
 	}
 	if base != "flex-grow-2" {
-		t.Errorf("base %q, want %q — the deprecation patterns match the base, so punctuation left "+
+		test.Errorf("base %q, want %q \u2014 the deprecation patterns match the base, so punctuation left "+
 			"here would be carried into a capture", base, "flex-grow-2")
 	}
 	if !important {
-		t.Error("the importance marker was not recognised, so the fix would drop it")
+		test.Error("the importance marker was not recognised, so the fix would drop it")
 	}
 
 	if rebuilt := buildClass(variants, base, important); rebuilt != "sm:hover:flex-grow-2!" {
-		t.Errorf("reassembly produced %q, so a fix would rewrite the class into something the author "+
+		test.Errorf("reassembly produced %q, so a fix would rewrite the class into something the author "+
 			"did not write", rebuilt)
 	}
 }
@@ -379,7 +379,7 @@ func TestImportanceIsStrippedBeforeMatching(t *testing.T) {
 // TestParseTailwindVersionReadsTwoFieldsWithoutAllocating pins what the version parse answers and that
 // it answers without allocating, since it runs for every deprecation entry against every class the
 // rule reads (#smshtp5: 670K objects a cold ahra run when it split the string each time).
-func TestParseTailwindVersionReadsTwoFieldsWithoutAllocating(t *testing.T) {
+func TestParseTailwindVersionReadsTwoFieldsWithoutAllocating(test *testing.T) {
 	testCases := []struct {
 		version      string
 		major, minor int
@@ -397,11 +397,11 @@ func TestParseTailwindVersionReadsTwoFieldsWithoutAllocating(t *testing.T) {
 	for _, testCase := range testCases {
 		major, minor := parseTailwindVersion(testCase.version)
 		if major != testCase.major || minor != testCase.minor {
-			t.Errorf("%q: read %d.%d, want %d.%d", testCase.version, major, minor, testCase.major, testCase.minor)
+			test.Errorf("%q: read %d.%d, want %d.%d", testCase.version, major, minor, testCase.major, testCase.minor)
 		}
 	}
 
 	if allocations := testing.AllocsPerRun(100, func() { parseTailwindVersion("4.3.3") }); allocations != 0 {
-		t.Errorf("parsing a version allocated %.0f times per call, want 0", allocations)
+		test.Errorf("parsing a version allocated %.0f times per call, want 0", allocations)
 	}
 }

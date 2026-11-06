@@ -80,13 +80,13 @@ var messageNoSetStateInComponentDidUpdate = rule.Message{
 // `static_name()` and it resolves the same three shapes: an identifier, a string literal, and a
 // computed key holding one. All three measured reporting on the release binary, so a port matching
 // only the identifier spelling loses two real findings and crashes on a third input.
-var NoDidUpdateSetState = rule.Rule{
+var NoDidUpdateSetState = rule.Rule[NoMethodSetStateOptions]{
 	// No namespace prefix. The config writes `react/no-did-update-set-state` and the parity guard
 	// strips the namespace on a `/` boundary.
 	Name: "react/no-did-update-set-state",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoMethodSetStateOptions]) rule.Listeners {
 		// An unconfigured rule gets the zero value, which is upstream's permissive default.
-		settings, _ := rule.OptionsAs[NoMethodSetStateOptions](options)
+		settings, _ := options.Read()
 		reportInsideNestedFunctions := settings.DisallowInFunc
 
 		return rule.Listeners{
@@ -113,7 +113,7 @@ var NoDidUpdateSetState = rule.Rule{
 				// The callee, not the call. Upstream underlines thirteen characters for
 				// `this.setState({...})`, stopping before the parenthesis, on all eighteen of its
 				// snapshot diagnostics.
-				ctx.ReportNode(callee, messageNoSetStateInComponentDidUpdate)
+				ruleContext.ReportNode(callee, messageNoSetStateInComponentDidUpdate)
 			},
 		}
 	},
@@ -170,7 +170,7 @@ func didUpdateIsThisSetStateCallee(callee *ast.Node) bool {
 
 // didUpdateIsBareThisReceiver reports whether an expression is `this` written without parentheses.
 //
-// Parentheses are deliberately NOT skipped, which is the opposite of what the rest of this package
+// Parentheses are deliberately not skipped, which is the opposite of what the rest of this package
 // does and is measured rather than reasoned about: `(this).setState({})` inside a real
 // `componentDidUpdate` is silent on the release oxlint binary. oxc destructures
 // `Expression::ThisExpression` directly, so a parenthesized receiver is a different variant and
@@ -270,7 +270,7 @@ func didUpdateIsCountedFunction(node *ast.Node) bool {
 
 // didUpdateIsMethodLike reports whether a node carries its own function scope as one node.
 //
-// These are the kinds that latch the lifecycle name AND introduce a function, which in oxc are two
+// These are the kinds that latch the lifecycle name and introduce a function, which in oxc are two
 // nodes and here are one. A class property holding an arrow is absent on purpose: there the arrow is
 // a separate node passed by the walk before the property that names it, so counting the property
 // would double it. The corpus covers that shape directly, with `componentDidUpdate = () => {}` as a

@@ -20,11 +20,11 @@ func noUnsafeMemberAccessCaseName(index int) string {
 // The options text is the bare object rather than upstream's one-element array, because cohere's
 // config layer unwraps the severity tuple before a decoder ever sees it. Going through the decoder
 // is what puts the wire key name and the absent-versus-explicit-false handling under test.
-func noUnsafeMemberAccessDecoded(t *testing.T, optionsJson string) any {
-	t.Helper()
-	decoded, err := DecodeNoUnsafeMemberAccessOptions([]byte(optionsJson))
-	if err != nil {
-		t.Fatalf("decoding %s: %v", optionsJson, err)
+func noUnsafeMemberAccessDecoded(test *testing.T, optionsJson string) NoUnsafeMemberAccessOptions {
+	test.Helper()
+	decoded, decodeNoUnsafeMemberAccessOptionsError := DecodeNoUnsafeMemberAccessOptions([]byte(optionsJson))
+	if decodeNoUnsafeMemberAccessOptionsError != nil {
+		test.Fatalf("decoding %s: %v", optionsJson, decodeNoUnsafeMemberAccessOptionsError)
 	}
 	return decoded
 }
@@ -33,14 +33,14 @@ func noUnsafeMemberAccessDecoded(t *testing.T, optionsJson string) any {
 // case that is silent under our compiler options.
 //
 // Upstream runs this corpus with `noImplicitThis` off and our harness pins `strict: true`, so every
-// case was measured against the installed 8.67.0 build under BOTH settings. Thirty-five of
+// case was measured against the installed 8.67.0 build under both settings. Thirty-five of
 // thirty-six are identical either way. The exception is upstream's object-literal `this` case,
-// which reports three findings under its configuration and is COMPLETELY silent under ours, because
+// which reports three findings under its configuration and is completely silent under ours, because
 // `this` in an object literal is typed as the literal rather than `any` once the option is on. It
 // is pinned here at the verdict this harness can observe rather than deleted, with the other column
 // recorded in the rule's doc comment.
-func TestNoUnsafeMemberAccessStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeMemberAccessStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText  string
@@ -116,11 +116,11 @@ func TestNoUnsafeMemberAccessStaysSilent(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(noUnsafeMemberAccessCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoUnsafeMemberAccess,
+		test.Run(noUnsafeMemberAccessCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoUnsafeMemberAccess,
 				noUnsafeMemberAccessFile, testCase.sourceText,
-				noUnsafeMemberAccessDecoded(t, testCase.optionsJson)))
+				noUnsafeMemberAccessDecoded(test, testCase.optionsJson)))
 		})
 	}
 }
@@ -139,11 +139,11 @@ type noUnsafeMemberAccessFinding struct {
 // TestNoUnsafeMemberAccessFires is upstream's reporting cases verbatim, at the verdicts this harness
 // can observe, with every id, rendered text, and span taken from the installed 8.67.0 build.
 //
-// The span assertions carry more weight here than on most rules. A chain reports ONCE and on the
+// The span assertions carry more weight here than on most rules. A chain reports once and on the
 // innermost property, so `x.a.b.c` underlines `a`; a port without the memoized recursion reports
 // three times, and one recursing the wrong way underlines `c`. Both satisfy every id assertion.
-func TestNoUnsafeMemberAccessFires(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeMemberAccessFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText   string
@@ -294,7 +294,7 @@ func TestNoUnsafeMemberAccessFires(t *testing.T) {
 			},
 		},
 		{
-			// Upstream's corpus asserts TWO findings here and this harness produces a third, on
+			// Upstream's corpus asserts two findings here and this harness produces a third, on
 			// `console.log`. That is not a rule difference: probed with a control, `console` does
 			// not resolve in the program this harness builds, so its type is the checker's error
 			// type and `errorMemberExpression` is the correct verdict for it. Declaring `console`
@@ -327,8 +327,8 @@ func TestNoUnsafeMemberAccessFires(t *testing.T) {
 			// two findings, `pipe` before `subscribe`. Measured on the installed 8.67.0 build both
 			// ways, which reports the same two either way because its harness resolves `console`.
 			//
-			// This row is also what pins the ORDER through a call. The object of `.subscribe` is a
-			// CALL rather than a member access, so a recursion descending only through member
+			// This row is also what pins the order through a call. The object of `.subscribe` is a
+			// call rather than a member access, so a recursion descending only through member
 			// accesses never reaches `.pipe` and emits the two backwards. Every message id
 			// assertion passes over that.
 			sourceText:  "declare const console: { log(m: unknown): void };\nclass C {\n  getObs$: any;\n  getPopularDepartments(): void {\n    this.getObs$.pipe().subscribe(res => {\n      console.log(res);\n    });\n  }\n}\n",
@@ -365,7 +365,7 @@ func TestNoUnsafeMemberAccessFires(t *testing.T) {
 			},
 		},
 		{
-			// One link further, which pins that the call does NOT make the chain unsafe by
+			// One link further, which pins that the call does not make the chain unsafe by
 			// association: `.c` is suppressed by `.b` being unsafe, exactly as in a plain chain.
 			sourceText:  "declare const x: any;\nx.a().b.c;\n",
 			optionsJson: "{}",
@@ -444,17 +444,17 @@ func TestNoUnsafeMemberAccessFires(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(noUnsafeMemberAccessCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoUnsafeMemberAccess,
+		test.Run(noUnsafeMemberAccessCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, NoUnsafeMemberAccess,
 				noUnsafeMemberAccessFile, testCase.sourceText,
-				noUnsafeMemberAccessDecoded(t, testCase.optionsJson))
+				noUnsafeMemberAccessDecoded(test, testCase.optionsJson))
 
 			wantIds := make([]string, len(testCase.wantFindings))
 			for position, want := range testCase.wantFindings {
 				wantIds[position] = want.wantId
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 
 			onDisk := strings.TrimSpace(testCase.sourceText) + "\n"
 			for position, want := range testCase.wantFindings {
@@ -462,14 +462,14 @@ func TestNoUnsafeMemberAccessFires(t *testing.T) {
 
 				gotSpan := onDisk[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if gotSpan != want.wantSpan {
-					t.Fatalf("finding %d span: expected %q, got %q", position, want.wantSpan, gotSpan)
+					test.Fatalf("finding %d span: expected %q, got %q", position, want.wantSpan, gotSpan)
 				}
 				if diagnostic.Message.Id != want.wantId {
-					t.Fatalf("finding %d id: expected %q, got %q", position, want.wantId,
+					test.Fatalf("finding %d id: expected %q, got %q", position, want.wantId,
 						diagnostic.Message.Id)
 				}
 				if diagnostic.Message.Description != want.wantMessage {
-					t.Fatalf("finding %d message: expected %q, got %q", position, want.wantMessage,
+					test.Fatalf("finding %d message: expected %q, got %q", position, want.wantMessage,
 						diagnostic.Message.Description)
 				}
 			}
@@ -480,28 +480,28 @@ func TestNoUnsafeMemberAccessFires(t *testing.T) {
 // TestNoUnsafeMemberAccessRequiresTheTypedHarness pins the nil-checker guard.
 //
 // It exists because a mutant removing that guard survives every other fixture, and the reason is
-// structural rather than a coverage gap: the guard prevents a PANIC, and no ExpectFindings assertion
+// structural rather than a coverage gap: the guard prevents a panic, and no ExpectFindings assertion
 // can see one. This is also not hypothetical for this rule. Its first version was tested through
-// `rule_testing.RunWithOptions`, the UNTYPED harness, which hands the rule a nil checker; every
+// `rule_testing.RunWithOptions`, the untyped harness, which hands the rule a nil checker; every
 // silent case passed vacuously and every reporting case failed, which reads like a broken rule
 // rather than a broken harness.
 //
 // So this asserts the two halves separately. Under the untyped harness the rule must be silent and
 // must not panic, and under the typed one the same source must report. Without the guard the first
 // half takes the whole run down.
-func TestNoUnsafeMemberAccessRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeMemberAccessRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	const sourceText = "declare const x: any;\nx.a;\n"
 
 	// The untyped harness gives the rule no checker. Silence here is the guard working; a panic is
 	// what its absence produces, and a panic in one rule costs every rule its findings for the
 	// whole file.
-	rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoUnsafeMemberAccess,
-		noUnsafeMemberAccessFile, sourceText, noUnsafeMemberAccessDecoded(t, "{}")))
+	rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoUnsafeMemberAccess,
+		noUnsafeMemberAccessFile, sourceText, noUnsafeMemberAccessDecoded(test, "{}")))
 
 	// The control. Without it the row above is satisfied by a rule that can never report at all.
-	rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, NoUnsafeMemberAccess,
-		noUnsafeMemberAccessFile, sourceText, noUnsafeMemberAccessDecoded(t, "{}")),
+	rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, NoUnsafeMemberAccess,
+		noUnsafeMemberAccessFile, sourceText, noUnsafeMemberAccessDecoded(test, "{}")),
 		"unsafeMemberExpression")
 }

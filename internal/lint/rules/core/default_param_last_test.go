@@ -14,12 +14,12 @@ const defaultParamLastFile = "/repository/source/Parameters.ts"
 // producing 52 findings.
 //
 // Every case was replayed through the installed eslint build before it was written here, and all 96
-// corpus cases agreed with the corpus on count and on span. The expectations are the SPAN TEXT
+// corpus cases agreed with the corpus on count and on span. The expectations are the span text
 // rather than a message id, because a message id cannot see where a finding points and this rule
 // carries no repair to check instead. Each span was sliced out of the source by the same script that
 // extracted the case, from the columns the installed rule reported.
-func TestDefaultParamLastFires(t *testing.T) {
-	t.Parallel()
+func TestDefaultParamLastFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -153,7 +153,7 @@ func TestDefaultParamLastFires(t *testing.T) {
 			[]string{"a?: number"}},
 		// Cases the corpus does not write, pinning decisions measured against the installed build.
 		//
-		// A rest parameter before a required one is the ONE class where core and the shipped
+		// A rest parameter before a required one is the one class where core and the shipped
 		// @typescript-eslint sibling disagree. Core reports it; the sibling is silent. The source is
 		// illegal and reaches the rule only through parser error recovery.
 		{"a rest parameter before a required one reports",
@@ -165,7 +165,7 @@ func TestDefaultParamLastFires(t *testing.T) {
 		{"a default and a rest both report when a required parameter follows",
 			"function f(a = 1, ...b: number[], c: number) {}",
 			[]string{"a = 1", "...b: number[]"}},
-		// The accessor arms. A setter takes one parameter and a getter none in the GRAMMAR, but the
+		// The accessor arms. A setter takes one parameter and a getter none in the grammar, but the
 		// parser recovers from the illegal source and hands back the parameters anyway, and the
 		// installed build reports all four shapes.
 		{"a class setter with a recovered second parameter reports",
@@ -207,28 +207,28 @@ func TestDefaultParamLastFires(t *testing.T) {
 			"function f(a: number = 1, b: number) {}",
 			[]string{"a: number = 1"}},
 		// Findings come out in source order, which the corpus's multi-finding cases already pin.
-		// This one pins it across a wider gap, with a trailing default that must NOT report.
+		// This one pins it across a wider gap, with a trailing default that must not report.
 		{"three defaults straddling two required parameters, in source order",
 			"function f(a = 1, b: number, c = 2, d: number, e = 3) {}",
 			[]string{"a = 1", "c = 2"}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, DefaultParamLast, defaultParamLastFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, DefaultParamLast, defaultParamLastFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.wantTexts) {
-				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.wantTexts))
+				test.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.wantTexts))
 			}
 			messageIds := make([]string, len(result.Diagnostics))
 			for index := range result.Diagnostics {
 				messageIds[index] = "shouldBeLast"
 			}
-			rule_testing.ExpectFindings(t, result, messageIds...)
+			rule_testing.ExpectFindings(test, result, messageIds...)
 			for index, wantText := range testCase.wantTexts {
 				diagnostic := result.Diagnostics[index]
 				gotText := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if gotText != wantText {
-					t.Errorf("finding %d spans %q, want %q", index, gotText, wantText)
+					test.Errorf("finding %d spans %q, want %q", index, gotText, wantText)
 				}
 			}
 		})
@@ -238,8 +238,8 @@ func TestDefaultParamLastFires(t *testing.T) {
 // TestDefaultParamLastStaysSilent carries all 55 clean cases from the eslint corpus verbatim, plus
 // the bodyless shapes the corpus never writes. Every clean case upstream ships is a false positive
 // somebody already hit.
-func TestDefaultParamLastStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestDefaultParamLastStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -410,10 +410,10 @@ func TestDefaultParamLastStaysSilent(t *testing.T) {
 			"function f(a: number, ...{ length }: number[]) {}"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, DefaultParamLast, defaultParamLastFile, testCase.sourceText)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, DefaultParamLast, defaultParamLastFile, testCase.sourceText)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -424,21 +424,21 @@ func TestDefaultParamLastStaysSilent(t *testing.T) {
 //
 // The rule interpolates nothing, so there is no rendered text and no format string to guard; a
 // rule.Message is {Id, Description} and both halves are asserted directly.
-func TestDefaultParamLastMessageReadsAsWritten(t *testing.T) {
-	t.Parallel()
+func TestDefaultParamLastMessageReadsAsWritten(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, DefaultParamLast, defaultParamLastFile, "function f(a = 5, b) {}")
+	result := rule_testing.Run(test, DefaultParamLast, defaultParamLastFile, "function f(a = 5, b) {}")
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
+		test.Fatalf("got %d findings, want 1", len(result.Diagnostics))
 	}
 	message := result.Diagnostics[0].Message
 	if message.Id != "shouldBeLast" {
-		t.Errorf("message id is %q, want %q", message.Id, "shouldBeLast")
+		test.Errorf("message id is %q, want %q", message.Id, "shouldBeLast")
 	}
 	if message.Description != "A parameter carrying a default or an optional marker sits before a "+
 		"parameter without one, so the default can never be taken: reaching the later parameter "+
 		"obliges every caller to pass something here. Move it after the required parameters, "+
 		"where omitting it is what selects the default." {
-		t.Errorf("description reads %q", message.Description)
+		test.Errorf("description reads %q", message.Description)
 	}
 }

@@ -7,9 +7,9 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // A file of its own rather than a line in a shared register.go, so two authors landing in this new
 // package at once touch nothing in common.
 //
-// Registered but deliberately NOT enabled anywhere, for the same reason as its sibling: the rule
+// Registered but deliberately not enabled anywhere, for the same reason as its sibling: the rule
 // belongs to api-phi-health's base layer, which has no VerifySettings.json, and ahra's config
 // carries no base/ keys. Where it gets enabled is a decision for Kirk.
 func init() {
-	rule.Register(rule.Registration{Rule: CorrectnessRequireVerifyArrayParity})
+	rule.Register(rule.Registration[rule.NoOptions]{Rule: CorrectnessRequireVerifyArrayParity})
 }

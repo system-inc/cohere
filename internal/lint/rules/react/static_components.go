@@ -65,7 +65,7 @@ import (
 //     exemption, and it is reproduced rather than improved on.
 //
 //   - **A back edge is invisible.** `let C = Known; for (...) { C = makeIt(); } return <C />;` does
-//     NOT report, while moving the dynamic assignment above the loop does. The pass walks blocks
+//     not report, while moving the dynamic assignment above the loop does. The pass walks blocks
 //     once in reverse postorder, so taint arriving on an edge from a block it has already visited
 //     is never seen. This looked like a defect in our lowering; the representation turned out to
 //     place the loop phi correctly with its back edge, and running upstream showed identical
@@ -76,12 +76,12 @@ import (
 //
 // `const C = makeIt(); const render = () => <C />;` is silent, and upstream is silent on it too,
 // measured on the exact input. The mechanism is the compilation gate below: the tag lives in a
-// function that is not a unit, and the function that IS a unit does not contain the tag.
+// function that is not a unit, and the function that is a unit does not contain the tag.
 //
 // This comment previously said the silence came from `FunctionExpression.Captures` being empty, so
 // taint could not cross a function boundary at all. That was true when this rule was written and
 // stopped being true one commit later, when lowering learned to resolve a closed-over variable to
-// the binding it captures. Captures now populate and `LoadContext` is emitted. The BEHAVIOUR did
+// the binding it captures. Captures now populate and `LoadContext` is emitted. The behaviour did
 // not change and neither did the agreement with upstream; only the reason did. It is corrected
 // here rather than left, because a stale reason is worse than no reason: the next reader would
 // have gone looking for a substrate gap that no longer exists.
@@ -96,12 +96,12 @@ import (
 // `Diagnostic` carries a single `Range`, so the primary span is kept where upstream puts it and the
 // creation site moves into the message text. No information is dropped, but a reader comparing
 // against React's goldens should know the shape differs deliberately.
-var StaticComponents = rule.Rule{
+var StaticComponents = rule.Rule[CompilerRuleOptions]{
 	Name:             "react-hooks/static-components",
 	NeedsTypeChecker: true,
 	// Reads other files only through shape readers (rule.ExportNameIn), so its findings key on imports' shapes.
 	TypeReach: rule.TypeReachShapes,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[CompilerRuleOptions]) rule.Listeners {
 		return rule.Listeners{
 			// The whole file is taken at once rather than listening on each function kind, because
 			// lowering already descends into nested functions through the function arena. Listening
@@ -110,18 +110,18 @@ var StaticComponents = rule.Rule{
 			ast.KindSourceFile: func(node *ast.Node) {
 				// A file that cannot hold a component or a hook is not lowered at all; see
 				// high_level_intermediate_representation.MayHoldComponentOrHook for why that is exact.
-				if !high_level_intermediate_representation.MayHoldComponentOrHook(ctx) {
+				if !high_level_intermediate_representation.MayHoldComponentOrHook(ruleContext) {
 					return
 				}
 				forEachCompiledFunction(node, func(functionNode *ast.Node) {
-					// Shared with the other rules that lower this same function; see high_level_intermediate_representation.ForFunction.
-					// Construct runs inside the cached computation, because it mutates in place and is
-					// not idempotent.
-					lowered := high_level_intermediate_representation.ForFunction(ctx, functionNode)
+					// Shared with the other rules that lower this same function; see
+					// high_level_intermediate_representation.ForFunction. Construct runs inside the cached
+					// computation, because it mutates in place and is not idempotent.
+					lowered := high_level_intermediate_representation.ForFunction(ruleContext, functionNode)
 					if lowered == nil {
 						return
 					}
-					analyzeCompiledFunction(ctx, lowered)
+					analyzeCompiledFunction(ruleContext, lowered)
 				})
 			},
 		}
@@ -136,7 +136,7 @@ var StaticComponents = rule.Rule{
 //
 // A node that turns out not to be a component or a hook is still visited: the caller's gate
 // declines it, and lowering has already inlined whatever it contains into the graph of whichever
-// enclosing function IS a unit. The one shape that needs care is a non-component wrapper around a
+// enclosing function is a unit. The one shape that needs care is a non-component wrapper around a
 // component, `function outer() { function Widget() {...} }`, where the wrapper is not a unit and the
 // component inside it is. That is handled by lowering rather than here: `Lower` builds the nested
 // function into the parent's arena, and the gate walks that arena.
@@ -159,7 +159,7 @@ func forEachCompiledFunction(root *ast.Node, visit func(*ast.Node)) {
 //
 // `Blocks` is in reverse postorder, which is what makes a single forward walk correct for
 // everything except a back edge, and the back edge is upstream's limitation too.
-func reportDynamicComponents(ctx rule.Context, function *high_level_intermediate_representation.Function) {
+func reportDynamicComponents(ruleContext rule.Context, function *high_level_intermediate_representation.Function) {
 	if function == nil {
 		return
 	}
@@ -189,47 +189,47 @@ func reportDynamicComponents(ctx rule.Context, function *high_level_intermediate
 			}
 			target := instruction.LValue.Identifier
 
-			switch value := instruction.Value.(type) {
+			switch instructionValue := instruction.Value.(type) {
 			// Creating a function during render is the case the rule is named for. The other three
 			// are values whose identity this pass cannot prove stable: a call, a construction, or a
 			// method call could return anything, including a fresh component each time.
 			case *high_level_intermediate_representation.FunctionExpression:
 				dynamic[target] = target
 			case *high_level_intermediate_representation.CallExpression:
-				dynamic[target] = value.Callee.Identifier
+				dynamic[target] = instructionValue.Callee.Identifier
 			case *high_level_intermediate_representation.NewExpression:
-				dynamic[target] = value.Callee.Identifier
+				dynamic[target] = instructionValue.Callee.Identifier
 			case *high_level_intermediate_representation.MethodCall:
-				dynamic[target] = value.Property.Identifier
+				dynamic[target] = instructionValue.Property.Identifier
 
 			// Reading and writing carry taint along, which is what makes an alias chain of any
 			// length behave like the value at its head.
 			case *high_level_intermediate_representation.LoadLocal:
-				if creator, ok := dynamic[value.Place.Identifier]; ok {
+				if creator, ok := dynamic[instructionValue.Place.Identifier]; ok {
 					dynamic[target] = creator
 				}
 			case *high_level_intermediate_representation.StoreLocal:
-				if creator, ok := dynamic[value.Value.Identifier]; ok {
+				if creator, ok := dynamic[instructionValue.Value.Identifier]; ok {
 					dynamic[target] = creator
-					dynamic[value.LValue.Identifier] = creator
+					dynamic[instructionValue.LValue.Identifier] = creator
 				}
 
 			// A tag naming a value is the only shape that can carry taint. A host element such as
 			// `div` and a member expression such as `obj.Inner` both arrive with no Place, so both
 			// are silent regardless of what their names resolve to.
 			case *high_level_intermediate_representation.JsxExpression:
-				if value.Tag.Place == nil {
+				if instructionValue.Tag.Place == nil {
 					continue
 				}
-				creation, ok := dynamic[value.Tag.Place.Identifier]
+				creation, ok := dynamic[instructionValue.Tag.Place.Identifier]
 				if !ok {
 					continue
 				}
-				message := staticComponentsMessage(ctx, function, creation)
-				if tagNode := identifierNode(function, value.Tag.Place.Identifier); tagNode != nil {
-					ctx.ReportNode(tagNode, message)
+				message := staticComponentsMessage(ruleContext, function, creation)
+				if tagNode := identifierNode(function, instructionValue.Tag.Place.Identifier); tagNode != nil {
+					ruleContext.ReportNode(tagNode, message)
 				} else {
-					ctx.ReportRange(value.Tag.Place.Range, message)
+					ruleContext.ReportRange(instructionValue.Tag.Place.Range, message)
 				}
 			}
 		}
@@ -243,13 +243,13 @@ func reportDynamicComponents(ctx rule.Context, function *high_level_intermediate
 //
 // The React Compiler does not analyse every function. `getReactFunctionType` in its `Program.ts`,
 // transcribed by oxc at `react_compiler/entrypoint/program.rs`, admits a function only when its
-// name looks like a component or a hook AND its body actually creates JSX or calls a hook. Anything
+// name looks like a component or a hook and its body actually creates JSX or calls a hook. Anything
 // else is never a compilation unit, so the validator never runs over it; when such a function is
-// nested inside one that IS compiled, its body is analysed as part of the parent rather than on its
+// nested inside one that is compiled, its body is analysed as part of the parent rather than on its
 // own terms.
 //
 // Without this gate the rule analysed every function-like node in the file, and the difference is
-// not theoretical. A dry run over 3,407 files produced seven findings, and ALL SEVEN were the same
+// not theoretical. A dry run over 3,407 files produced seven findings, and all seven were the same
 // shape: a render callback defined inside a component, of the form
 //
 //	function Widget() {
@@ -269,7 +269,7 @@ func reportDynamicComponents(ctx rule.Context, function *high_level_intermediate
 // is what makes this divergence dangerous rather than obvious. Fidelity is the authority here, the
 // gate is upstream's, and improving on it silently would make our findings and oxc's disagree on
 // real code while both looked correct.
-func analyzeCompiledFunction(ctx rule.Context, function *high_level_intermediate_representation.Function) {
+func analyzeCompiledFunction(ruleContext rule.Context, function *high_level_intermediate_representation.Function) {
 	if function == nil {
 		return
 	}
@@ -278,16 +278,16 @@ func analyzeCompiledFunction(ctx rule.Context, function *high_level_intermediate
 	// the functions it contains, because one of those may be a unit even when its wrapper is not.
 	if !isCompilationUnit(function) {
 		for _, nested := range function.Functions {
-			analyzeCompiledFunction(ctx, nested)
+			analyzeCompiledFunction(ruleContext, nested)
 		}
 		return
 	}
 	// A unit found nested in a function that is not one is analyzed as React Compiler compiles it,
 	// on its own; see AsCompilationUnit.
-	function = high_level_intermediate_representation.AsCompilationUnit(ctx, function,
+	compilationUnit := high_level_intermediate_representation.AsCompilationUnit(ruleContext, function,
 		high_level_intermediate_representation.ForFunction)
 
-	// The OUTERMOST component or hook is the compilation unit, and the walk stops here. A function
+	// The outermost component or hook is the compilation unit, and the walk stops here. A function
 	// nested inside it is not a second subject: upstream lowers it into this graph and analyses it
 	// as part of this function, so descending would report its body twice.
 	//
@@ -295,28 +295,31 @@ func analyzeCompiledFunction(ctx rule.Context, function *high_level_intermediate
 	//
 	//	function Outer() { function Inner() { const C = mk(); return <C />; } return <Inner />; }
 	//
-	// upstream reports ONCE, at `<Inner />`, and never at the inner `<C />`. Descending into
+	// upstream reports once, at `<Inner />`, and never at the inner `<C />`. Descending into
 	// `Inner` as its own unit produced two findings where upstream gives one.
 	//
 	// The apparent counter-example resolves the same way. When the outer function returns `Inner`
 	// rather than JSX it is not a component at all, so nothing admits it, and the walk continues
 	// down to `Inner`, which is one. That is `forEachOutermostFunction` plus this gate agreeing,
 	// not an exception to either.
-	reportDynamicComponents(ctx, function)
+	reportDynamicComponents(ruleContext, compilationUnit)
 }
 
 // identifierNode returns the syntactic node a value came from, or nil for a pure temporary.
 //
 // This is the seam `Identifier.Node` exists for. Reporting through it rather than through
 // `Place.Range` is not a stylistic choice: a Place's range is the range of the node that produced
-// the INSTRUCTION, and for a JSX tag that node is the whole element, so `<Component />` yields a
+// the instruction, and for a JSX tag that node is the whole element, so `<Component />` yields a
 // span starting at the `<`. Handing the node to `ctx.ReportNode` routes through `rule.TokenRange`,
 // which trims leading trivia at the harness and is the mechanism every other rule here relies on.
 //
 // The defect this replaced was invisible in the obvious fixture: with no leading newline the
 // element's raw start coincides with the tag identifier's start, so the span read correctly. oxc's
 // tester writes its cases with a leading newline, which is the only reason it was caught.
-func identifierNode(function *high_level_intermediate_representation.Function, id static_single_assignment.IdentifierId) *ast.Node {
+func identifierNode(
+	function *high_level_intermediate_representation.Function,
+	id static_single_assignment.IdentifierId,
+) *ast.Node {
 	if function == nil || int(id) >= len(function.Identifiers) {
 		return nil
 	}
@@ -333,11 +336,15 @@ func identifierNode(function *high_level_intermediate_representation.Function, i
 // put, so it is quoted into the message instead. Read from the source text rather than rebuilt from
 // the representation, because the representation holds values rather than syntax and
 // `props.foo.bar()` has no readable spelling there.
-func staticComponentsMessage(ctx rule.Context, function *high_level_intermediate_representation.Function, creator static_single_assignment.IdentifierId) rule.Message {
+func staticComponentsMessage(
+	ruleContext rule.Context,
+	function *high_level_intermediate_representation.Function,
+	creator static_single_assignment.IdentifierId,
+) rule.Message {
 	created := ""
-	if node := identifierNode(function, creator); node != nil && ctx.SourceFile != nil {
-		span := rule.TokenRange(ctx.SourceFile, node)
-		sourceText := ctx.SourceFile.Text()
+	if node := identifierNode(function, creator); node != nil && ruleContext.SourceFile != nil {
+		span := rule.TokenRange(ruleContext.SourceFile, node)
+		sourceText := ruleContext.SourceFile.Text()
 		if span.Pos() >= 0 && span.End() <= len(sourceText) && span.Pos() < span.End() {
 			created = sourceText[span.Pos():span.End()]
 		}
@@ -367,9 +374,9 @@ func staticComponentsMessage(ctx rule.Context, function *high_level_intermediate
 // or call a hook. Measured: `function Widget() { const C = mk(); return C; }` is capitalized and is
 // still not compiled, because it returns a value rather than an element.
 //
-// The name half is deliberately taken from `high_level_intermediate_representation.Function.Kind` rather than recomputed, so this rule
-// and the representation cannot drift into disagreeing about what a component name is. Upstream's
-// test is `is_ascii_uppercase`, and `classifyFunction` is ASCII too, so they agree today.
+// The name half is deliberately taken from `high_level_intermediate_representation.Function.Kind` rather than
+// recomputed, so this rule and the representation cannot drift into disagreeing about what a component name is.
+// Upstream's test is `is_ascii_uppercase`, and `classifyFunction` is ASCII too, so they agree today.
 func isCompilationUnit(function *high_level_intermediate_representation.Function) bool {
 	if function == nil || function.Kind == high_level_intermediate_representation.FunctionKindOther {
 		return false
@@ -377,7 +384,7 @@ func isCompilationUnit(function *high_level_intermediate_representation.Function
 	return createsJsx(function.Node)
 }
 
-// createsJsx reports whether a function body creates JSX, WITHOUT descending into nested functions.
+// createsJsx reports whether a function body creates JSX, without descending into nested functions.
 //
 // The non-descent is the whole point rather than an optimization. A component whose body is only a
 // callback that returns JSX is not itself a component to upstream, which is what separates
@@ -390,11 +397,11 @@ func isCompilationUnit(function *high_level_intermediate_representation.Function
 //
 // # Why the hook half of upstream's test is absent, rather than forgotten
 //
-// `getReactFunctionType` admits a function that creates JSX OR calls a hook. Only the first half is
+// `getReactFunctionType` admits a function that creates JSX or calls a hook. Only the first half is
 // asked here, and a mutant deleting the hook half survived every fixture, which is the signal that
 // sent this back to the code rather than to another test.
 //
-// The branch is unreachable for THIS rule. A finding requires a JSX tag naming a tainted value, so
+// The branch is unreachable for this rule. A finding requires a JSX tag naming a tainted value, so
 // every reportable input contains JSX. The question is whether that JSX can be somewhere this walk
 // does not look, and the only such place is inside a nested function. A tag there is never reported
 // anyway: the enclosing function is not a compilation unit, so nothing analyses it, and the unit

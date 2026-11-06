@@ -15,7 +15,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // The same function is also where upstream's mode-dependent default lives: the null policy defaults
 // to Always under the Always mode and is forced to Ignore under Smart.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[EqeqeqOptions]{
 		Rule:             Eqeqeq,
 		DecodeOptionList: DecodeEqeqeqOptions,
 	})

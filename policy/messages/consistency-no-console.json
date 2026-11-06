@@ -1,7 +1,8 @@
 {
   "rules": {
     "TypeScript": "base/consistency-no-console",
-    "Swift": "cohere-swift/consistency-no-print"
+    "Swift": "cohere-swift/consistency-no-print",
+    "Go": "cohere-go/consistency-no-console"
   },
   "messages": {
     "consistencyNoConsole": {
@@ -9,11 +10,13 @@
       "terms": {
         "call": {
           "TypeScript": "console.{{methodName}}",
-          "Swift": "print"
+          "Swift": "print",
+          "Go": "{{call}}"
         },
         "repairAndWhy": {
           "TypeScript": "Reach the tier that owns this failure and call '.log.error(identifier, data, error)' or '.log.warning(...)' for a row, or '.log.debug(message)' for a line that never becomes one.",
-          "Swift": "In {{kind}} it writes to a stdout nobody reads. Log through os.Logger, so the message lands in the unified log with a subsystem, a category and a level."
+          "Swift": "In {{kind}} it writes to a stdout nobody reads. Log through os.Logger, so the message lands in the unified log with a subsystem, a category and a level.",
+          "Go": "Outside package main it writes to a standard output or error this package cannot know anyone reads. Return the text or an error to the caller, or write to an io.Writer the caller hands in, so the command that owns the process decides what reaches it."
         }
       }
     }

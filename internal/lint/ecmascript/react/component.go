@@ -238,8 +238,8 @@ func EnclosingComponent(node *ast.Node) *ast.Node {
 // Parentheses are skipped because `(React).createElement(...)` is the same call, and a check on the
 // raw node would decline it while looking correct.
 func isIdentifierNamed(expression *ast.Node, name string) bool {
-	expression = ast.SkipParentheses(expression)
-	return expression != nil && expression.Kind == ast.KindIdentifier && expression.Text() == name
+	unwrapped := ast.SkipParentheses(expression)
+	return unwrapped != nil && unwrapped.Kind == ast.KindIdentifier && unwrapped.Text() == name
 }
 
 // IsNamespacedMember reports whether a node is `React.<name>` where name satisfies the predicate.

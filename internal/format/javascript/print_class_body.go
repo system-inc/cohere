@@ -19,7 +19,7 @@ import (
 // printClassBody is upstream's printClassBody.
 func printClassBody(path *Path, options *Options, print PrintFunc) Doc {
 	current := node(path)
-	var parts []any
+	var parts []Doc
 	isObjectType := !isClassBody(path)
 	separator := hardline
 	if isObjectType {
@@ -39,12 +39,12 @@ func printClassBody(path *Path, options *Options, print PrintFunc) Doc {
 			firstMember = member
 		}
 		isEmpty = false
-		parts = append(parts, print(nil, nil))
+		parts = append(parts, print("", nil))
 
 		if !isObjectType &&
 			(shouldPrintSemicolonAfterClassProperty(member, next, options) ||
 				shouldPrintSemicolonAfterInterfaceProperty(member, next, options)) {
-			parts = append(parts, ";")
+			parts = append(parts, doc.Text(";"))
 		}
 
 		if !isLast {
@@ -78,10 +78,10 @@ func printClassBody(path *Path, options *Options, print PrintFunc) Doc {
 			if !settingsOf(options).BracketSpacing || (isEmpty && !shouldBreak) {
 				spacing = softline
 			}
-			content = concatIn(path, openingBrace,
-				indentIn(path, concatIn(path, append([]any{spacing}, parts...)...)),
+			content = concatIn(path, textDoc(openingBrace),
+				indentIn(path, concatIn(path, append([]Doc{spacing}, parts...)...)),
 				spacing,
-				closingBrace,
+				textDoc(closingBrace),
 			)
 		}
 
@@ -90,8 +90,8 @@ func printClassBody(path *Path, options *Options, print PrintFunc) Doc {
 		// type
 		if path.Match(
 			nil,
-			func(_ any, name any, _ int, _ bool) bool { return name == "typeAnnotation" },
-			func(_ any, name any, _ int, _ bool) bool { return name == "typeAnnotation" },
+			func(_ PathValue, name string, _ int, _ bool) bool { return name == "typeAnnotation" },
+			func(_ PathValue, name string, _ int, _ bool) bool { return name == "typeAnnotation" },
 			shouldHugTheOnlyParameterPredicate,
 		) {
 			return content
@@ -104,9 +104,9 @@ func printClassBody(path *Path, options *Options, print PrintFunc) Doc {
 	if len(parts) > 0 {
 		body = concatIn(path, indentIn(path, concatIn(path, hardline, concatIn(path, parts...))), hardline)
 	}
-	return concatIn(path, openingBrace,
+	return concatIn(path, textDoc(openingBrace),
 		body,
-		closingBrace,
+		textDoc(closingBrace),
 	)
 }
 
@@ -130,7 +130,7 @@ func printClassMemberSemicolon(path *Path, options *Options) Doc {
 	if parent.Is("TSTypeLiteral") {
 		if path.IsLast() {
 			if settingsOf(options).Semi {
-				return ifBreak(";", nil)
+				return ifBreak(doc.Text(";"), nil)
 			}
 			return emptyDoc
 		}
@@ -140,7 +140,7 @@ func printClassMemberSemicolon(path *Path, options *Options) Doc {
 			return doc.Text(";")
 		}
 
-		return ifBreak("", ";")
+		return ifBreak(doc.Text(""), doc.Text(";"))
 	}
 
 	return emptyDoc

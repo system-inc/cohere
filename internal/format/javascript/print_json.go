@@ -15,10 +15,10 @@ import (
 // The json parser does not come here. It prints with the JavaScript printer (estreePrinter), the way
 // upstream's createParser defaults its astFormat to estree.
 
-// estreeJSONPrinter is upstream's estree-json printer. The json-stringify parser refuses comments,
+// estreeJsonPrinter is upstream's estree-json printer. The json-stringify parser refuses comments,
 // so none of the comment hooks are needed.
-var estreeJSONPrinter = &printing.Printer[*estree.Node]{
-	Print:       printJSON,
+var estreeJsonPrinter = &printing.Printer[*estree.Node, *settings, printArguments]{
+	Print:       printJson,
 	LocStart:    estree.LocStart,
 	LocEnd:      estree.LocEnd,
 	VisitorKeys: jsonVisitorKeys,
@@ -43,8 +43,8 @@ func jsonVisitorKeys(node Node) []string {
 	return nil
 }
 
-// printJSON is upstream's printJson.
-func printJSON(path *Path, options *Options, print PrintFunc, _ any) Doc {
+// printJson is upstream's printJson.
+func printJson(path *Path, options *Options, print PrintFunc, _ *printArguments) Doc {
 	current := node(path)
 	switch current.Type() {
 	case "JsonRoot":
@@ -58,22 +58,35 @@ func printJSON(path *Path, options *Options, print PrintFunc, _ any) Doc {
 			if node(path) == nil {
 				return doc.Text("null")
 			}
-			return print(nil, nil)
+			return print("", nil)
 		}, "elements")
-		return concatIn(path, "[", indentIn(path, concatIn(path, hardline, join(concatIn(path, ",", hardline), printed))), hardline, "]")
+		return concatIn(
+			path,
+			doc.Text("["),
+			indentIn(path, concatIn(path, hardline, join(concatIn(path, doc.Text(","), hardline), printed))),
+			hardline,
+			doc.Text("]"),
+		)
 	case "ObjectExpression":
 		if len(current.List("properties")) == 0 {
 			return doc.Text("{}")
 		}
-		return concatIn(path, "{", indentIn(path, concatIn(path, hardline, join(concatIn(path, ",", hardline), printAll(path, print, "properties")))), hardline, "}")
+		return concatIn(path, doc.Text("{"), indentIn(
+			path,
+			concatIn(
+				path,
+				hardline,
+				join(concatIn(path, doc.Text(","), hardline), printAll(path, print, "properties")),
+			),
+		), hardline, doc.Text("}"))
 	case "ObjectProperty":
-		return concatIn(path, print("key", nil), ": ", print("value", nil))
+		return concatIn(path, print("key", nil), doc.Text(": "), print("value", nil))
 	case "UnaryExpression":
 		operator := current.String("operator")
 		if operator == "+" {
 			operator = ""
 		}
-		return concatIn(path, operator, print("argument", nil))
+		return concatIn(path, textDoc(operator), print("argument", nil))
 	case "NullLiteral":
 		return doc.Text("null")
 	case "BooleanLiteral":
@@ -89,25 +102,42 @@ func printJSON(path *Path, options *Options, print PrintFunc, _ any) Doc {
 		// Upstream compares String(Number(raw)) with raw. The literal's value stands in for Number(raw):
 		// the two differ only where raw has a numeric separator, and then neither string equals raw.
 		raw := getRaw(current)
-		if isJSONObjectKey(path) && javaScriptNumberString(current.Get("value").(float64)) == raw {
-			return doc.Text(`"` + raw + `"`)
+		if isJsonObjectKey(path) {
+			value, isNumber := current.Get("value").(estree.Number)
+			if !isNumber {
+				// Invariant: estree.ParseJSON builds every NumericLiteral with a Number value.
+				panic(fmt.Sprintf("javascript: a NumericLiteral's value is a %T, not a Number", current.Get("value")))
+			}
+			if javaScriptNumberString(float64(value)) == raw {
+				return doc.Text(`"` + raw + `"`)
+			}
 		}
 		return doc.Text(raw)
 	case "Identifier":
-		if isJSONObjectKey(path) {
+		if isJsonObjectKey(path) {
 			return doc.Text(jsonStringify(current.String("name")))
 		}
 		return doc.Text(current.String("name"))
 	case "TemplateLiteral":
 		// There is only one `TemplateElement`
-		return print([]any{"quasis", 0}, nil)
+		return callElement(path, func(*Path) Doc { return print("", nil) }, 0, "quasis")
 	case "TemplateElement":
-		return doc.Text(jsonStringify(*current.Get("value").(*estree.TemplateValue).Cooked))
+		value, isTemplateValue := current.Get("value").(*estree.TemplateValue)
+		if !isTemplateValue || value == nil || value.Cooked == nil {
+			// Invariant: estree.ParseJSON builds every TemplateElement with a TemplateValue whose cooked text is set.
+			panic(fmt.Sprintf(
+				"javascript: a JSON TemplateElement's value is a %T with no cooked text",
+				current.Get("value"),
+			))
+		}
+		return doc.Text(jsonStringify(*value.Cooked))
 	}
+	// Invariant: estree.ParseJSON builds no node type this switch misses, as Prettier's JSON printer assumes
+	// where it throws.
 	panic(fmt.Sprintf("unknown JSON node type %q", current.Type()))
 }
 
-// isJSONObjectKey is upstream's isObjectKey in print/json.js.
-func isJSONObjectKey(path *Path) bool {
+// isJsonObjectKey is upstream's isObjectKey in print/json.js.
+func isJsonObjectKey(path *Path) bool {
 	return keyOf(path) == "key" && parentOf(path).Is("ObjectProperty")
 }

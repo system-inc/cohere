@@ -6,7 +6,7 @@
 // The two traversals in this file visit in different orders, and that is faithful rather than
 // sloppy. Upstream `walk` is depth-first; upstream `getPropertySort` does not call `walk` at all,
 // it runs its own queue. Unifying them would be the tidier-looking port and would silently change
-// answers — see PropertySort.
+// answers (see PropertySort).
 package tailwind
 
 import "slices"
@@ -33,7 +33,7 @@ const (
 // not be modified during a walk.
 //
 // Descent is by IsContainer, so KindContext and KindAtRoot subtrees are visited. This is upstream's
-// behavior — its walk descends on the presence of a `nodes` array, not on a kind allowlist — and it
+// behavior (its walk descends on the presence of a `nodes` array, not on a kind allowlist), and it
 // is deliberately *not* what PropertySort does.
 func Walk(nodes []*Node, visit func(node *Node) WalkAction) {
 	walkNodes(nodes, visit)
@@ -77,7 +77,7 @@ type Sort struct {
 //
 // # It is breadth-first, and that is observable
 //
-// Upstream is a queue — shift from the front, push children to the back — not a call to `walk`.
+// Upstream is a queue (shift from the front, push children to the back), not a call to `walk`.
 // Substituting a depth-first traversal changes the visit order on 32 of the 23,286 candidates in
 // Tailwind's own class list (measured across the full list, all `bg-linear`/`bg-radial`/`bg-conic`
 // shapes, where a declaration sits beside an `@supports` block that redeclares it). Order is a

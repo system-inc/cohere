@@ -5,16 +5,15 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"flag"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"slices"
 	"sort"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -26,6 +25,8 @@ import (
 	"github.com/system-inc/cohere/internal/lint/registry"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/release/packaging"
+	"github.com/system-inc/cohere/internal/sentence"
+	"github.com/system-inc/cohere/internal/streams"
 	"github.com/system-inc/cohere/internal/types/program"
 	"github.com/system-inc/cohere/internal/unused_exports"
 )
@@ -40,14 +41,22 @@ var cacheOff bool
 var processStart = time.Now()
 
 func main() {
-	if err := run(); err != nil {
+	// The Go engine is this binary in a hidden mode, matched before anything reads the command line or starts
+	// a run cache, since an engine is neither a front door nor a run of its own.
+	if len(os.Args) > 1 && os.Args[1] == goEngineVerb {
+		os.Exit(streams.Finish(runGoEngineVerb(os.Args[2:], os.Stdout, os.Stderr)))
+	}
+	if runError := run(); runError != nil {
 		// A failure of the tool is never recorded by the run cache, and the recording stops before the
 		// error prints so the message reaches the terminal rather than a pipe nobody is reading.
 		abandonRunCache()
 		if activeOpen != nil {
 			activeOpen.Checked = false
 		}
-		fmt.Fprintf(os.Stderr, "cohere: %v\n", err)
+		// The chain is lowercase clauses until here, the one place a person reads it, where it becomes a
+		// sentence (see package sentence).
+		fmt.Fprintf(streams.Errors, "cohere: %s\n", sentence.FromError(runError))
+		writeFailedRunSummary(streams.Output, runError)
 		exitProcess(1)
 	}
 	finishRunCache(0)
@@ -66,19 +75,35 @@ func run() error {
 		return runRenameVerb(os.Args[2:])
 	}
 
-	configFileName := flag.String("tsconfig", projectMarker,
+	configurationFileName := flag.String("tsconfig", projectMarker,
 		"the tsconfig that defines the program, relative to --directory or else to where you typed it; unnamed, the file of this name in --directory, or else the nearest one at or above the working directory")
 	directory := flag.String("directory", "",
 		"the project root, which every relative path resolves against (default: the directory of the nearest tsconfig.json or Package.swift at or above the working directory)")
-	typesOnly := flag.Bool("types", false, "report TypeScript's own diagnostics only, running no rules and writing no fixes")
-	lintOnly := flag.Bool("lint", false, "run the lint rules only, reporting their findings without fixing them and without TypeScript's diagnostics")
-	openFiles := flag.Bool("open", false, "open files with remaining findings in code after the run (composes with --types and --lint)")
+	typesOnly := flag.Bool(
+		"types",
+		false,
+		"report TypeScript's own diagnostics only, running no rules and writing no fixes",
+	)
+	lintOnly := flag.Bool(
+		"lint",
+		false,
+		"run the lint rules only, reporting their findings without fixing them and without TypeScript's diagnostics",
+	)
+	openFiles := flag.Bool(
+		"open",
+		false,
+		"open files with remaining findings in code after the run (composes with --types and --lint)",
+	)
 	lintConfigFileName := flag.String("lint-config", "CohereSettings.json",
 		"the settings file that says which rules apply to which files, relative to --directory or else to where you typed it; unnamed, the file of this name at the project root")
 	singleThreaded := flag.Bool("single-threaded", false, "use one checker instead of several")
 	// The whole mutating phase, fixes and format (Kirk's ruling, 2026-10-04, reversing b617c98b's fix-only
 	// reading), narrowed from the rest of the run; --no-format leaves formatting out.
-	fixOnly := flag.Bool("fix", false, "apply fixes and format, running no other phase (--no-format to leave formatting out)")
+	fixOnly := flag.Bool(
+		"fix",
+		false,
+		"apply fixes and format, running no other phase (--no-format to leave formatting out)",
+	)
 	// The promise is about the project's source, and it is stated with its boundary because two writes sit
 	// outside it on purpose. cohere keeps its cache for the project in `<root>/.cache/cohere/`, which is its
 	// own and which `--no-cache` turns off. And the launcher rebuilds cohere itself when its rules
@@ -91,13 +116,17 @@ func run() error {
 	// The opt-out from formatting by default, for a run that wants fixes, types and lint alone.
 	noFormat := flag.Bool("no-format", false,
 		"leave formatting out of a bare run, --fix or --no-fix: fix, type-check and lint only")
-	formatAll := flag.Bool("format-all", false, "format every file, not only the ones not on record as formatted (implies --format)")
+	formatAll := flag.Bool(
+		"format-all",
+		false,
+		"format every file, not only the ones not on record as formatted (implies --format)",
+	)
 	// The fix phase narrowed to formatting, the way --types and --lint narrow the run to theirs, for a gate
 	// whose question is formatting alone: a lint finding has no say in its exit.
 	formatOnly := flag.Bool("format-only", false,
-		"format only, proposing no fixes and running no other phase (implies --format); with --no-fix, the commit gate's "+
-			"format check: every file formatting would change here or in a nested repository is a finding, and so is "+
-			"one the formatter could not read, and the exit is 0 only when there are none")
+		"format only, proposing no fixes and running no other phase (implies --format); with --no-fix, the commit "+
+			"gate's format check: every file formatting would change here or in a nested repository is a finding, and "+
+			"so is one the formatter could not read, and the exit is 0 only when there are none")
 	// A cold run on purpose: for measuring one, and for anyone who suspects a cache. Every cache cohere
 	// keeps for a project is named here, so a cold number cannot be read as a warm one: the cache table
 	// (the run replay, the per-file findings, the signatures, the format record) and the tsconfig's
@@ -107,8 +136,12 @@ func run() error {
 	// A binary that implements no rule and a binary whose rule found nothing produce the same empty
 	// finding list, and the differential harness cannot tell them apart from the outside. This is how
 	// it asks.
-	listRules := flag.Bool("rules", false, "print the rules this cohere implements for the project's language, one per line, and exit")
-	// `-rules` answers what the binary CAN run; this answers what it WILL. The two differ by every
+	listRules := flag.Bool(
+		"rules",
+		false,
+		"print the rules this cohere implements for the project's language, one per line, and exit",
+	)
+	// `-rules` answers what the binary can run; this answers what it will. The two differ by every
 	// rule the config never names, and that gap is invisible from the outside: a rule the config
 	// cannot resolve passes its own fixtures and lints nothing, which reads exactly like a rule that
 	// found nothing wrong.
@@ -119,32 +152,68 @@ func run() error {
 	// finally checked against the real resolver. ESLint has had `--print-config` for this reason.
 	listRulesEnabled := flag.Bool("rules-enabled", false,
 		"print the rules the lint config resolves for one file (the path given, else index.ts at the project root), with severity, and exit")
-	printConfig := flag.Bool("print-config", false,
+	printConfiguration := flag.Bool("print-config", false,
 		"print resolved rules, registered settings, language options and matching overrides as JSON for one file (the path given, else index.ts at the project root), and exit; globals name their TypeScript declaration files; ESLint plugin package versions, parser names and settings.react have no cohere meaning (settings.react is refused)")
 	// A bare run, --fix and --no-fix format by default, so naming --format there changes nothing. It is
 	// accepted rather than refused, so the commands written before the default still mean what they did.
-	format := flag.Bool("format", false, "format the files not on record as formatted, or the paths named; a bare run, "+
-		"--fix and --no-fix already do, so naming it there changes nothing")
-	maxFixPasses := flag.Int("fix-passes", edit.DefaultMaxPasses, "how many times a file may be re-linted while fixes keep landing")
+	format := flag.Bool(
+		"format",
+		false,
+		"format the files not on record as formatted, or the paths named; a bare run, "+
+			"--fix and --no-fix already do, so naming it there changes nothing",
+	)
+	maximumFixPasses := flag.Int(
+		"fix-passes",
+		edit.DefaultMaxPasses,
+		"how many times a file may be re-linted while fixes keep landing",
+	)
 	// Readiness is measured only when asked (#9tgm3dq): unasked, none of cohere:adamic's measure-only rules runs,
 	// so a default run pays nothing for it. The set's own findings report whenever a project enables it; this
 	// flag governs only the measurement.
 	adamicReadiness := flag.Bool("adamic-readiness", false,
 		"say what share of the files are Adamic-ready, measured with cohere:adamic at the set's own options, in the footer and in --json")
-	showTiming := flag.Bool("timing", false, "report what building the graph cost and the CPU each rule cost, most expensive rule first")
-	explainFile := flag.String("explain", "", "report what every rule did on one file, and why it did or did not run, writing nothing")
+	showTiming := flag.Bool(
+		"timing",
+		false,
+		"report what building the graph cost and the CPU each rule cost, most expensive rule first",
+	)
+	explainFile := flag.String(
+		"explain",
+		"",
+		"report what every rule did on one file, and why it did or did not run, writing nothing",
+	)
 	// The counts print on every run; this names every rule once under the one coverage fact that
 	// describes it. Behind a flag because 170 per-rule notes on a clean run buried the lines that need
 	// action, and in front of nobody's habit because the counts that add up stay on the default line.
-	showCoverage := flag.Bool("coverage", false, "name every rule once under the coverage fact that describes it, rather than only counting them")
-	unusedReport := flag.Bool("unused", false, "report code that was written and never used: unreferenced exports, and statements nothing can reach")
-	unusedAll := flag.Bool("unused-all", false, "list the unused findings already marked cohere-keep rather than only counting them (implies --unused)")
+	showCoverage := flag.Bool(
+		"coverage",
+		false,
+		"name every rule once under the coverage fact that describes it, rather than only counting them",
+	)
+	unusedReport := flag.Bool(
+		"unused",
+		false,
+		"report code that was written and never used: unreferenced exports, and statements nothing can reach",
+	)
+	unusedAll := flag.Bool(
+		"unused-all",
+		false,
+		"list the unused findings already marked cohere-keep rather than only counting them (implies --unused)",
+	)
 	// Opt-in on purpose. The closure's claim is strictly stronger than the flat one and it fails
 	// differently: a wrong root mis-reports one file in the flat view and cascades here, going dark
 	// across everything that was alive only through it. Keeping both means the two numbers can be
 	// read against each other before the bigger one is trusted.
-	unusedDeep := flag.Bool("unused-deep", false, "also compute the transitive closure of unused code and group it into islands (implies --unused)")
-	showVersion := flag.Bool("version", false, "print the version, what this binary was built from, and the Swift contract it speaks, and exit")
+	unusedDeep := flag.Bool(
+		"unused-deep",
+		false,
+		"also compute the transitive closure of unused code and group it into islands (implies --unused)",
+	)
+	showVersion := flag.Bool(
+		"version",
+		false,
+		"print the version, what this binary was built from, and the Swift contract it speaks, and exit",
+	)
 	cacheDump := flag.Bool("cache-dump", false, "print what the cache table for this project holds, and exit")
 	// The editor's save: the buffer arrives on stdin and what --fix (and --format) would write for this
 	// path leaves on stdout, with nothing written to disk. See stdin.go.
@@ -158,7 +227,11 @@ func run() error {
 	verbose := flag.Bool("verbose", false,
 		"print everything a run can say: each phase, the coverage summary, overrides, skips, notes, memory and the total")
 	showPhases := flag.Bool("phases", false, "put where the time went first in the footer's parentheses")
-	jsonOutput := flag.Bool("json", false, "print newline-delimited JSON for a program to read, described by schema/CohereOutput.schema.json")
+	jsonOutput := flag.Bool(
+		"json",
+		false,
+		"print newline-delimited JSON for a program to read, described by schema/CohereOutput.schema.json",
+	)
 	flag.Parse()
 	if *openFiles {
 		activeOpen = &openReport{}
@@ -166,7 +239,9 @@ func run() error {
 	}
 	cacheOff = *noCache
 	if *verbose && *jsonOutput {
-		return fmt.Errorf("--verbose and --json contradict each other: --verbose prints the human account in full, --json prints JSON for a program")
+		return fmt.Errorf(
+			"--verbose and --json contradict each other: --verbose prints the human account in full, --json prints JSON for a program",
+		)
 	}
 	adamicReadinessRequested = *adamicReadiness
 	activeSummary.AdamicRequested = *adamicReadiness
@@ -175,11 +250,11 @@ func run() error {
 	case *verbose:
 		activeOutput.Mode = outputVerbose
 	case *jsonOutput:
-		activeOutput = outputSettings{Mode: outputJSON}
+		activeOutput = outputSettings{Mode: outputJson}
 	}
 	if *profilePath != "" {
-		if err := startProfile(*profilePath); err != nil {
-			return err
+		if startProfileError := startProfile(*profilePath); startProfileError != nil {
+			return startProfileError
 		}
 	}
 
@@ -192,16 +267,16 @@ func run() error {
 	//
 	// Decided before the listings rather than after them, because inside a Swift package every one of
 	// them is the Swift engine's question: `cohere --rules` there lists the rules that would run there.
-	workingDirectory, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("resolving the working directory: %w", err)
+	workingDirectory, workingDirectoryError := os.Getwd()
+	if workingDirectoryError != nil {
+		return fmt.Errorf("resolving the working directory: %w", workingDirectoryError)
 	}
 	given := map[string]bool{}
 	flag.Visit(func(set *flag.Flag) { given[set.Name] = true })
 	location, locateError := locateProject(locationRequest{
 		WorkingDirectory:        workingDirectory,
 		Directory:               *directory,
-		ConfigFileName:          *configFileName,
+		ConfigFileName:          *configurationFileName,
 		ConfigFileNameGiven:     given["tsconfig"],
 		LintConfigFileName:      *lintConfigFileName,
 		LintConfigFileNameGiven: given["lint-config"],
@@ -213,13 +288,18 @@ func run() error {
 	// A root holding more than one project, TypeScript and Swift side by side or nested, checks each with
 	// its own engine and reports them as one (#f9nftxz). One project is checked here, as it always was.
 	if discoveryApplies(given, flag.Args()) {
-		namedLintConfig := ""
+		namedLintConfiguration := ""
 		if given["lint-config"] {
-			namedLintConfig = absoluteFrom(workingDirectory, *lintConfigFileName)
+			namedLintConfiguration = absoluteFrom(workingDirectory, *lintConfigFileName)
 		}
-		exitCode, checked, err := checkDiscoveredProjects(location, locateError, workingDirectory, namedLintConfig)
-		if err != nil {
-			return err
+		exitCode, checked, checkDiscoveredProjectsError := checkDiscoveredProjects(
+			location,
+			locateError,
+			workingDirectory,
+			namedLintConfiguration,
+		)
+		if checkDiscoveredProjectsError != nil {
+			return checkDiscoveredProjectsError
 		}
 		if checked {
 			exitProcess(exitCode)
@@ -232,16 +312,26 @@ func run() error {
 			if given, set := os.LookupEnv("COHERE_TEST_CREATE_AFTER_DISCOVERY_TEXT"); set {
 				text = given
 			}
-			if err := os.WriteFile(created, []byte(text), 0o644); err != nil {
-				return err
+			if writeError := os.WriteFile(created, []byte(text), 0o644); writeError != nil {
+				return writeError
 			}
 		}
 	}
 
 	if locateError == nil && location.Engine == engineSwift {
-		exitCode, err := runSwiftEngine(location, given, flag.Args())
-		if err != nil {
-			return err
+		exitCode, runSwiftEngineError := runSwiftEngine(location, given, flag.Args())
+		if runSwiftEngineError != nil {
+			return runSwiftEngineError
+		}
+		if exitCode != 0 {
+			exitProcess(exitCode)
+		}
+		return nil
+	}
+	if locateError == nil && location.Engine == engineGo {
+		exitCode, goEngineError := runGoEngine(location, given, flag.Args())
+		if goEngineError != nil {
+			return goEngineError
 		}
 		if exitCode != 0 {
 			exitProcess(exitCode)
@@ -258,7 +348,7 @@ func run() error {
 		}
 		sort.Strings(names)
 		for _, name := range names {
-			fmt.Println(name)
+			fmt.Fprintln(streams.Output, name)
 		}
 		// The provenance travels with the list rather than waiting behind `-version`.
 		//
@@ -271,12 +361,12 @@ func run() error {
 		//
 		// It goes to stderr so the rule list on stdout stays diffable between two binaries.
 		if provenance := release.Current(); provenance.IsDevelopment() {
-			fmt.Fprintln(os.Stderr, rulesProvenanceNote(provenance, len(names)))
+			fmt.Fprintln(streams.Errors, rulesProvenanceNote(provenance, len(names)))
 		}
 		return nil
 	}
 
-	if *listRulesEnabled || *printConfig {
+	if *listRulesEnabled || *printConfiguration {
 		lintConfigPath := location.LintConfigFileName
 		if locateError != nil {
 			if !given["lint-config"] {
@@ -285,11 +375,11 @@ func run() error {
 			lintConfigPath = absoluteFrom(absoluteFrom(workingDirectory, *directory), *lintConfigFileName)
 		}
 		if locateError == nil && usesHouseSets(location) {
-			return errHouseSetsPerFile
+			return errorHouseSetsPerFile
 		}
-		lintConfig, err := configuration.LoadFor(lintConfigPath, registeredRuleNames())
-		if err != nil {
-			return fmt.Errorf("reading %s: %w", lintConfigPath, err)
+		lintConfiguration, loadForError := configuration.LoadFor(lintConfigPath, registeredRuleNames())
+		if loadForError != nil {
+			return fmt.Errorf("reading %s: %w", lintConfigPath, loadForError)
 		}
 
 		// Resolution is per file, because an override can turn a rule off for one path and leave it
@@ -305,14 +395,14 @@ func run() error {
 		if arguments := flag.Args(); len(arguments) > 0 {
 			probePath = absoluteFrom(absoluteFrom(workingDirectory, *directory), arguments[0])
 		}
-		resolved := lintConfig.Resolve(probePath)
+		resolved := lintConfiguration.Resolve(probePath)
 		if resolved.Ignored {
-			fmt.Fprintf(os.Stderr, "note: %s is excluded by ignore pattern %q, so no rule applies to it\n",
+			fmt.Fprintf(streams.Errors, "note: %s is excluded by ignore pattern %q, so no rule applies to it\n",
 				probePath, resolved.IgnoredBy)
 			return nil
 		}
-		if *printConfig {
-			return writeResolvedConfig(os.Stdout, lintConfig, resolved, location, probePath)
+		if *printConfiguration {
+			return writeResolvedConfiguration(streams.Output, lintConfiguration, resolved, location, probePath)
 		}
 
 		// Only rules the binary actually implements. A config key naming a rule this build does not
@@ -343,13 +433,13 @@ func run() error {
 		}
 		sort.Slice(enabled, func(first, second int) bool { return enabled[first].name < enabled[second].name })
 		for _, rule := range enabled {
-			fmt.Printf("%s\t%s\n", rule.name, rule.severity)
+			fmt.Fprintf(streams.Output, "%s\t%s\n", rule.name, rule.severity)
 		}
 
-		fmt.Fprintf(os.Stderr, "note: %d rules enabled for %s, of %d implemented by this binary\n",
+		fmt.Fprintf(streams.Errors, "note: %d rules enabled for %s, of %d implemented by this binary\n",
 			len(enabled), probePath, len(implemented))
 		if unimplemented > 0 {
-			fmt.Fprintf(os.Stderr,
+			fmt.Fprintf(streams.Errors,
 				"note: %d config keys name a rule this binary does not implement, so their setting applies to nothing\n",
 				unimplemented)
 		}
@@ -360,7 +450,7 @@ func run() error {
 		// The full provenance rather than a bare number, because the number alone does not identify
 		// what ran: the pinned typescript-go commit is most of the code in this binary and moves
 		// independently of the version. A bug report that names all of it is reproducible.
-		fmt.Println(versionReport())
+		fmt.Fprintln(streams.Output, versionReport())
 		return nil
 	}
 
@@ -384,7 +474,7 @@ func run() error {
 	//
 	// Two separate things follow from that, and both are the point. It does not run unless named, so
 	// the gate people run constantly stays the correctness gate and nothing else. And naming it does
-	// not narrow the run the way `--lint` does — `cohere --unused` still fixes, type-checks, and
+	// not narrow the run the way `--lint` does: `cohere --unused` still fixes, type-checks, and
 	// lints, because unused leans on the type graph being sound and a narrowing flag would encourage
 	// running it against a tree whose symbols do not resolve.
 	//
@@ -405,7 +495,9 @@ func run() error {
 	// asked about (#sm79kfv). Naming it with `--fix`, which only writes, is refused by name.
 	if *explainFile != "" {
 		if *fixOnly {
-			return fmt.Errorf("--explain and --fix contradict each other: --explain reads the file as it stands and writes nothing, --fix only writes")
+			return fmt.Errorf(
+				"--explain and --fix contradict each other: --explain reads the file as it stands and writes nothing, --fix only writes",
+			)
 		}
 		*noFix = true
 	}
@@ -417,7 +509,11 @@ func run() error {
 			flag  string
 		}{{*format, "--format"}, {*formatAll, "--format-all"}, {*formatOnly, "--format-only"}} {
 			if other.named {
-				return fmt.Errorf("--no-format and %s contradict each other: --no-format leaves formatting out, and %s asks for it", other.flag, other.flag)
+				return fmt.Errorf(
+					"--no-format and %s contradict each other: --no-format leaves formatting out, and %s asks for it",
+					other.flag,
+					other.flag,
+				)
 			}
 		}
 	}
@@ -437,7 +533,12 @@ func run() error {
 			{*explainFile != "", "--explain", "explains what the rules did"},
 		} {
 			if other.named {
-				return fmt.Errorf("--format-only and %s contradict each other: --format-only runs formatting alone, and %s %s", other.flag, other.flag, other.asks)
+				return fmt.Errorf(
+					"--format-only and %s contradict each other: --format-only runs formatting alone, and %s %s",
+					other.flag,
+					other.flag,
+					other.asks,
+				)
 			}
 		}
 	}
@@ -450,10 +551,12 @@ func run() error {
 	if *noFix && *fixOnly {
 		// Naming both is a contradiction the user should hear about rather than have silently
 		// resolved, since one of the two was certainly not what they meant.
-		return fmt.Errorf("--fix and --no-fix contradict each other: --fix runs only the mutating phase, --no-fix mutates nothing")
+		return fmt.Errorf(
+			"--fix and --no-fix contradict each other: --fix runs only the mutating phase, --no-fix mutates nothing",
+		)
 	}
 
-	ctx := context.Background()
+	backgroundContext := context.Background()
 
 	// Everything from here checks a project, so standing outside one stops the run, naming where it
 	// looked.
@@ -466,22 +569,22 @@ func run() error {
 		// is the file's text. --fix is required rather than implied, so the command line says what the
 		// output means.
 		if !*fixOnly || *noFix || *typesOnly || *lintOnly || len(flag.Args()) > 0 {
-			return errStdinNeedsFix
+			return errorStdinNeedsFix
 		}
-		return runStdin(ctx, stdinRequest{
+		return runStdin(backgroundContext, stdinRequest{
 			Location:         location,
 			WorkingDirectory: workingDirectory,
 			FilePath:         *stdinFilePath,
 			NoFormat:         *noFormat,
-			MaxPasses:        *maxFixPasses,
+			MaxPasses:        *maximumFixPasses,
 			SingleThreaded:   *singleThreaded,
 		}, os.Stdin, os.Stdout)
 	}
 
 	// The repository's own way of printing, from its settings, under whatever the command line named.
-	block, err := readOutputBlock(location.LintConfigFileName)
-	if err != nil {
-		return err
+	block, readOutputBlockError := readOutputBlock(location.LintConfigFileName)
+	if readOutputBlockError != nil {
+		return readOutputBlockError
 	}
 	if block.Phases != nil && !given["phases"] {
 		activeOutput.Phases = *block.Phases
@@ -524,13 +627,13 @@ func run() error {
 		if !cacheOff {
 			earlyRecord = loadFormatRecord(repositoryRoot)
 		}
-		early = startEarlyFormat(formatter, earlyRecord, repositoryRoot, *maxFixPasses)
+		early = startEarlyFormat(formatter, earlyRecord, repositoryRoot, *maximumFixPasses)
 	}
 
 	// What this run leaves to nearer projects, when it is one project of several (see ownership.go).
-	yield, err := activeProjectYield()
-	if err != nil {
-		return err
+	yield, activeProjectYieldError := activeProjectYield()
+	if activeProjectYieldError != nil {
+		return activeProjectYieldError
 	}
 
 	// Under --timing the build says what it was made of, not only how long it took (#cazsft3).
@@ -543,7 +646,8 @@ func run() error {
 	// 250ms of every commit gate spent on a program nothing read. Without it graph stays nil and the
 	// project files empty, and every use below is on a path `--format-only` does not take.
 	var graph *program.Graph
-	var buildDuration, contentPackOpened time.Duration
+	var buildDuration time.Duration
+	var contentPackOpened time.Duration
 	// Read beside the build rather than after it, when the config needs nothing from the program. See
 	// lintConfigAhead.
 	var lintAhead *lintConfigAhead
@@ -559,7 +663,7 @@ func run() error {
 		buildStart := time.Now()
 		contentPack := openContentPack(location.Root)
 		contentPackOpened = time.Since(buildStart)
-		built, err := program.Build(program.Options{
+		built, buildError := program.Build(program.Options{
 			ConfigFileName:   location.ConfigFileName,
 			CurrentDirectory: location.Root,
 			SingleThreaded:   *singleThreaded,
@@ -570,11 +674,11 @@ func run() error {
 			Yielded:          yield.yieldedFiles(),
 			Listings:         discoveredListings,
 		})
-		if err != nil {
+		if buildError != nil {
 			// A program that fails to build is a loud failure and never an empty result. An empty file list
 			// is indistinguishable from a clean tree, and that confusion is what let the gate this replaces
 			// print green over zero files for days.
-			return fmt.Errorf("building the type graph: %w", err)
+			return fmt.Errorf("building the type graph: %w", buildError)
 		}
 		graph = built
 		buildDuration = time.Since(buildStart)
@@ -590,7 +694,7 @@ func run() error {
 		// them. Any phase that runs reads them.
 		if projectFiles := graph.ProjectFiles(); len(projectFiles) > 0 && (runFix || runTypes || runLint) {
 			go func() {
-				_, release := graph.Program.GetTypeCheckerForFile(ctx, projectFiles[0])
+				_, release := graph.Program.GetTypeCheckerForFile(backgroundContext, projectFiles[0])
 				release()
 			}()
 		}
@@ -628,9 +732,9 @@ func run() error {
 	writeScope := formatScope{Everything: true}
 
 	if len(flag.Args()) > 0 && !*listRules && !*listRulesEnabled {
-		scope, err := namedPathsScope(location.ArgumentBase, location.Root, flag.Args())
-		if err != nil {
-			return err
+		scope, namedPathsScopeError := namedPathsScope(location.ArgumentBase, location.Root, flag.Args())
+		if namedPathsScopeError != nil {
+			return namedPathsScopeError
 		}
 		writeScope = scope
 		if graph != nil {
@@ -640,10 +744,11 @@ func run() error {
 
 	switch {
 	case graph == nil:
-		fmt.Fprintln(accountOutput(invocationOutput(os.Stdout)), "graph not built: --format-only reads the disk, not the program")
+		printInvocation(accountOutput(streams.Output),
+			"graph not built: --format-only reads the disk, not the program\n")
 	case lintScope.Everything:
-		fmt.Fprintf(accountOutput(invocationOutput(os.Stdout)),
-			"graph built in %s — %d files in the program, %d of them ours\n",
+		printInvocation(accountOutput(streams.Output),
+			"graph built in %s: %d files in the program, %d of them ours\n",
 			round(buildDuration), len(graph.SourceFiles()), wholeProgramCount,
 		)
 	default:
@@ -658,14 +763,14 @@ func run() error {
 		// for one file and sees eleven checked should be told why without having to know that this
 		// binary walks imports at all.
 		if lintScope.DependentCount > 0 {
-			fmt.Fprintf(accountOutput(invocationOutput(os.Stdout)),
-				"graph built in %s — %d files in the program, %d of them ours, %d in scope (%s plus %d that import it)\n",
+			printInvocation(accountOutput(streams.Output),
+				"graph built in %s: %d files in the program, %d of them ours, %d in scope (%s plus %d that import it)\n",
 				round(buildDuration), len(graph.SourceFiles()), wholeProgramCount,
 				len(projectFiles), lintScope.RequestDescription, lintScope.DependentCount,
 			)
 		} else {
-			fmt.Fprintf(accountOutput(invocationOutput(os.Stdout)),
-				"graph built in %s — %d files in the program, %d of them ours, %d in scope (%s)\n",
+			printInvocation(accountOutput(streams.Output),
+				"graph built in %s: %d files in the program, %d of them ours, %d in scope (%s)\n",
 				round(buildDuration), len(graph.SourceFiles()), wholeProgramCount,
 				len(projectFiles), lintScope.RequestDescription,
 			)
@@ -675,12 +780,18 @@ func run() error {
 	// A file the tsconfig includes and a nearer one owns is that one's run's to report, so this one's count
 	// says where the rest went (see ownership.go).
 	if graph != nil && graph.YieldedFiles > 0 {
-		fmt.Fprintf(accountOutput(invocationOutput(os.Stdout)),
-			"left %d files the tsconfig includes to the nearer tsconfigs that own them, whose runs check them\n", graph.YieldedFiles)
+		printInvocation(
+			accountOutput(streams.Output),
+			"left %d files the tsconfig includes to the nearer tsconfigs that own them, whose runs check them\n",
+			graph.YieldedFiles,
+		)
 	}
 
+	// The graph's line is out before the fix phase's wait.
+	streams.Show(streams.Output)
+
 	if graphTiming != nil && graph != nil {
-		printGraphTiming(os.Stdout, graphTiming, buildDuration, contentPackOpened, graph.Workers())
+		printGraphTiming(streams.Output, graphTiming, buildDuration, contentPackOpened, graph.Workers())
 	}
 
 	findings := 0
@@ -715,7 +826,7 @@ func run() error {
 	//
 	// The lint config is loaded here because fixing needs to know which rules apply to which files,
 	// and loading it once serves both this phase and lint below.
-	var lintConfig *configuration.Config
+	var lintConfiguration *configuration.Configuration
 
 	// The fix phase's walk, kept when it is still valid for the lint phase to reuse.
 	//
@@ -726,12 +837,12 @@ func run() error {
 
 	// `--format-only` proposes no fixes, so it reads no rules and its verdict cannot hang on their config.
 	if (runFix && !*formatOnly) || runLint {
-		loaded, err := configureLint(graph, location, lintAhead)
-		if err != nil {
-			return err
+		loaded, configureLintError := configureLint(graph, location, lintAhead)
+		if configureLintError != nil {
+			return configureLintError
 		}
-		lintConfig = loaded
-		writeSetsLine(accountOutput(os.Stdout), lintConfig)
+		lintConfiguration = loaded
+		writeSetsLine(accountOutput(streams.Output), lintConfiguration)
 		// The run cache's second layer, attached once the config is known and before anything walks.
 		attachFindingsCache(graph, location)
 	}
@@ -754,7 +865,7 @@ func run() error {
 	case runTypes && runFix && cacheOff && activeTypesReuse() == nil && !*formatOnly && len(projectFiles) > 0:
 		graph.FusedCheck = program.NewFusedCheck()
 	case runTypes && runFix:
-		earlyTypeCheck = startTypeCheck(ctx, graph, !cacheOff)
+		earlyTypeCheck = startTypeCheck(backgroundContext, graph, !cacheOff)
 	}
 
 	switch {
@@ -875,7 +986,10 @@ func run() error {
 				if enumerateError != nil {
 					// A failed walk withholds formatting and says why, rather than falling back to a universe
 					// that would format the wrong set. Fixing still runs.
-					scope = formatScope{Description: fmt.Sprintf("nothing (could not enumerate the tree: %v)", enumerateError), failure: enumerateError}
+					scope = formatScope{
+						Description: fmt.Sprintf("nothing (could not enumerate the tree: %v)", enumerateError),
+						failure:     enumerateError,
+					}
 				} else {
 					scope = scope.narrowToEnumeration(enumeration)
 				}
@@ -909,8 +1023,13 @@ func run() error {
 					declineRunCache("the tsconfig says which .a files are source")
 					included, includedError := adamicIncluded(location.ConfigFileName)
 					if includedError != nil {
-						// Said rather than swallowed: the `.a` files stay out of the scope, and the reason is the run's.
-						fmt.Fprintf(os.Stderr, "⚠ the Adamic .a files were not formatted: reading the tsconfig to see which are source: %v\n", includedError)
+						// Said rather than swallowed: the `.a` files stay out of the scope, and the reason is the
+						// run's.
+						fmt.Fprintf(
+							streams.Errors,
+							"⚠ the Adamic .a files were not formatted: reading the tsconfig to see which are source: %v\n",
+							includedError,
+						)
 					}
 					held = included
 				}
@@ -919,7 +1038,8 @@ func run() error {
 				if recordUniverse != nil {
 					recordUniverse = slices.Concat(recordUniverse, claimedAdamic)
 				}
-				activeSummary.Gaps.AdamicIgnored = reportIgnoredAdamic(os.Stderr, repositoryRoot, held)
+				activeSummary.Gaps.AdamicIgnored = reportIgnoredAdamic(streams.Errors, repositoryRoot, held)
+				showWarning()
 			}
 		}
 		if early == nil {
@@ -955,15 +1075,17 @@ func run() error {
 		}
 		formatPlan := func() (edit.Transform, []string) {
 			drawScope()
-			return formatting.timing(scopedTransform(record.observe(formatTransform(formatter), optionsFingerprintOf(formatter)), scope)),
+			return formatting.timing(
+					scopedTransform(record.observe(formatTransform(formatter), optionsFingerprintOf(formatter)), scope),
+				),
 				scope.formatCandidates()
 		}
-		fixSummary, fixWalk, lineEndings, err := applyProposedFixes(
-			ctx, graph, fixFiles, fixRules,
+		fixSummary, fixWalk, lineEndings, applyProposedFixesError := applyProposedFixes(
+			backgroundContext, graph, fixFiles, fixRules,
 			formatPlan,
 			writeScope,
 			repositoryRoot,
-			*maxFixPasses,
+			*maximumFixPasses,
 			mutate,
 			early,
 		)
@@ -972,30 +1094,37 @@ func run() error {
 		if formatter != nil {
 			activeSummary.Formatting = formatting.Total()
 		}
-		if err != nil {
+		if applyProposedFixesError != nil {
 			// The bail condition here is a failure to produce valid output, never a finding. A fixer
 			// that cannot write a parseable file means the edit was malformed and everything after it
 			// is meaningless, so the pipeline stops and says which phases never ran.
 			report.record(phaseFix, outcomeRan, fixDuration, "")
-			report.markRemainingNotReachedFor(phaseFix, err.Error(), unusedRequest)
-			writeRunEnd(report, os.Stdout)
-			return fmt.Errorf("fix: %w", err)
+			report.markRemainingNotReachedFor(phaseFix, applyProposedFixesError.Error(), unusedRequest)
+			writeRunEnd(report, streams.Output)
+			return fmt.Errorf("fix: %w", applyProposedFixesError)
 		}
 		// True of the tree and actionable, so a replay keeps it, but it says which run produced it.
-		fmt.Fprintln(accountOutput(provenanceOutput(os.Stdout)), fixSummary)
+		printProvenance(accountOutput(streams.Output), "%v\n", fixSummary)
 		for _, refusal := range fixSummary.Refusals() {
-			fmt.Fprintln(accountOutput(provenanceOutput(os.Stdout)), "  "+refusal)
+			printProvenance(accountOutput(streams.Output), "%s\n", "  "+refusal)
 		}
 		// The files the fix phase rewrote, above the findings, in the views that list them.
 		if mutate {
 			activeSummary.Changed = changedFilesFrom(fixSummary.ChangedFiles, location.Root)
-			printChangedFiles(os.Stdout, activeSummary.Changed)
+			printChangedFiles(streams.Output, activeSummary.Changed)
 		}
+		// The fix phase's line is out before the format record's write.
+		streams.Show(streams.Output)
 
 		// Not writing the record costs the next run a format of files already formatted, never a skip,
 		// so it is a note rather than a failure.
-		if err := record.save(recordUniverse); err != nil {
-			fmt.Fprintf(accountOutput(os.Stderr), "note: the format record could not be written: %v\n", firstLine(err.Error()))
+		if saveError := record.save(recordUniverse); saveError != nil {
+			fmt.Fprintf(
+				accountOutput(streams.Errors),
+				"note: the format record could not be written: %v\n",
+				firstLine(saveError.Error()),
+			)
+			showWarning()
 		}
 
 		// A run that rewrote files must not be replayed. The run cache stats inputs when it records, which
@@ -1009,14 +1138,16 @@ func run() error {
 		// tree, and what is not on record as formatted are three different answers to "what was
 		// formatted", and a reader cannot tell which one they got from a number alone. It describes the run
 		// that drew the scope, record included, so a replay says which run that was.
-		fmt.Fprintf(accountOutput(provenanceOutput(os.Stdout)), "format scope: %s\n", scope.Description)
+		printProvenance(accountOutput(streams.Output), "format scope: %s\n", scope.Description)
+		// And its scope before the nested repositories' wait.
+		streams.Show(streams.Output)
 
 		// A run whose verdict is formatting alone counts every file it could not read: an empty scope from
 		// a failed walk, or a file the formatter declined because it does not parse, or broke on, would
 		// otherwise read as a clean tree. Other runs leave those to the phases that report them.
 		if *formatOnly {
 			unchecked := formatOnlyUnchecked(fixSummary, scope)
-			printUnchecked(os.Stdout, unchecked)
+			printUnchecked(streams.Output, unchecked)
 			findings += len(unchecked)
 			activeSummary.Findings += len(unchecked)
 		}
@@ -1025,7 +1156,7 @@ func run() error {
 		} else {
 			// Each file a writing run would change is a finding, and the count joins the verdict: a
 			// `--no-fix` run over a tree `--fix` would rewrite is not clean.
-			printWouldChange(os.Stdout, fixSummary.ChangedFiles, lineEndings)
+			printWouldChange(streams.Output, fixSummary.ChangedFiles, lineEndings)
 			findings += len(fixSummary.ChangedFiles)
 			activeSummary.WouldChange += len(fixSummary.ChangedFiles)
 
@@ -1035,25 +1166,26 @@ func run() error {
 				waitStart := time.Now()
 				answer := <-nestedCheck
 				fixDuration += time.Since(waitStart)
-				if answer.err != nil {
-					return fmt.Errorf("reading the nested repositories: %w", answer.err)
+				if answer.checkError != nil {
+					return fmt.Errorf("reading the nested repositories: %w", answer.checkError)
 				}
 				nested := answer.check
 				for _, walk := range nested.Walks {
 					declareFormatWalk(walk)
 				}
 				for _, note := range nested.Notes {
-					fmt.Fprintln(accountOutput(os.Stderr), note)
+					fmt.Fprintln(accountOutput(streams.Errors), note)
 				}
-				printNestedDrift(os.Stdout, nested)
+				showWarning()
+				printNestedDrift(streams.Output, nested)
 				findings += len(nested.Drift)
 				activeSummary.WouldChange += len(nested.Drift)
 				if *formatOnly {
-					printUnchecked(os.Stdout, nestedUnchecked(nested))
+					printUnchecked(streams.Output, nestedUnchecked(nested))
 					findings += len(nested.Unchecked)
 					activeSummary.Findings += len(nested.Unchecked)
 				}
-				fmt.Fprintln(accountOutput(provenanceOutput(os.Stdout)), nestedSummary(nested))
+				printProvenance(accountOutput(streams.Output), "%s\n", nestedSummary(nested))
 			}
 			report.recordChecked(phaseFix, fixDuration, len(fixSummary.ChangedFiles))
 		}
@@ -1068,14 +1200,24 @@ func run() error {
 
 		// Files were rewritten, so the graph built from the old bytes no longer describes the tree.
 		// Every phase after this must read the new text or it reports findings against source that no
-		// longer exists — which is the same stale-read corruption the edit engine refuses internally,
+		// longer exists, which is the same stale-read corruption the edit engine refuses internally,
 		// one level up.
 		if mutate && fixSummary.FilesChanged > 0 && (runTypes || runLint) {
-			rebuiltGraph, rebuildDuration, err := rebuildGraph(location.ConfigFileName, location.Root, *singleThreaded, lintConfig, yield.yieldedFiles())
-			if err != nil {
-				report.markRemainingNotReachedFor(phaseFix, fmt.Sprintf("the graph could not be rebuilt after fixing: %v", err), unusedRequest)
-				writeRunEnd(report, os.Stdout)
-				return fmt.Errorf("rebuilding the type graph after fixing: %w", err)
+			rebuiltGraph, rebuildDuration, rebuildGraphError := rebuildGraph(
+				location.ConfigFileName,
+				location.Root,
+				*singleThreaded,
+				lintConfiguration,
+				yield.yieldedFiles(),
+			)
+			if rebuildGraphError != nil {
+				report.markRemainingNotReachedFor(
+					phaseFix,
+					fmt.Sprintf("the graph could not be rebuilt after fixing: %v", rebuildGraphError),
+					unusedRequest,
+				)
+				writeRunEnd(report, streams.Output)
+				return fmt.Errorf("rebuilding the type graph after fixing: %w", rebuildGraphError)
 			}
 			// The early check was of the bytes the fixer just replaced. It is retired and left to finish
 			// rather than cancelled: the compiler's whole-program check panics when its context ends part
@@ -1091,17 +1233,28 @@ func run() error {
 			// in the program, with nothing saying the scope had been dropped.
 			rescoped, lost := rescopeAfterRebuild(graph.ProjectFiles(), projectFiles, lintScope.Everything)
 			for _, fileName := range lost {
-				fmt.Fprintf(accountOutput(os.Stderr), "note: %s was in scope and is not in the rebuilt program, so it is not checked\n", fileName)
+				fmt.Fprintf(
+					accountOutput(streams.Errors),
+					"note: %s was in scope and is not in the rebuilt program, so it is not checked\n",
+					fileName,
+				)
 			}
+			showWarning()
 			// The notes are --verbose's, so the footer says the gap they name.
 			if len(lost) > 0 && activeSummary.Gaps.Unread == "" {
-				activeSummary.Gaps.Unread = fmt.Sprintf("%d file%s in scope not in the rebuilt program", len(lost), plural(len(lost)))
+				activeSummary.Gaps.Unread = fmt.Sprintf(
+					"%d file%s in scope not in the rebuilt program",
+					len(lost),
+					plural(len(lost)),
+				)
 			}
 			projectFiles = rescoped
-			fmt.Fprintf(accountOutput(os.Stdout),
-				"graph rebuilt in %s — %d files changed, so every later phase reads the new text\n",
+			fmt.Fprintf(accountOutput(streams.Output),
+				"graph rebuilt in %s: %d files changed, so every later phase reads the new text\n",
 				round(rebuildDuration), fixSummary.FilesChanged,
 			)
+			// The rebuild's line is out before the types phase's wait.
+			streams.Show(streams.Output)
 		}
 
 		// The fix phase's walk is reusable by lint only when nothing was rewritten.
@@ -1140,9 +1293,9 @@ func run() error {
 		// mtime of ahra's tsconfig.tsbuildinfo moved across a `--no-fix` run.
 		check := earlyTypeCheck
 		if check == nil {
-			check = startTypeCheck(ctx, graph, !cacheOff)
+			check = startTypeCheck(backgroundContext, graph, !cacheOff)
 		}
-		typeDiagnostics := finishTypeCheck(ctx, check, projectFiles, !*noFix)
+		typeDiagnostics := finishTypeCheck(backgroundContext, check, projectFiles, !*noFix)
 		// The check's own time plus what finishing it took, rather than the wait here, which is nothing when the
 		// check ran alongside the walk. The phase line can then add up to more than the run, and says by how much.
 		finishing := check.finished
@@ -1168,13 +1321,19 @@ func run() error {
 		replayedClause := ""
 		if check.replayed > 0 {
 			if inScope := check.reuse.ReplayedAmong(projectFiles); inScope > 0 {
-				replayedClause = fmt.Sprintf("; %d of %d files' semantic diagnostics replayed from cache", inScope, len(projectFiles))
+				replayedClause = fmt.Sprintf(
+					"; %d of %d files' semantic diagnostics replayed from cache",
+					inScope,
+					len(projectFiles),
+				)
 			}
 		}
-		fmt.Fprintf(accountOutput(invocationOutput(os.Stdout)),
+		printInvocation(accountOutput(streams.Output),
 			"types: %d diagnostics over %d files in %s%s\n",
 			len(typeDiagnostics), len(projectFiles), round(typesDuration), replayedClause,
 		)
+		// The types phase's line is out before the lint phase's wait.
+		streams.Show(streams.Output)
 		report.record(phaseTypes, outcomeRan, typesDuration, "")
 
 		// Types gate lint. Rule findings against code whose semantics are wrong are noise the reader
@@ -1196,18 +1355,21 @@ func run() error {
 		if sourceDiagnostics > 0 && runLint {
 			report.markRemainingNotReachedFor(
 				phaseTypes,
-				fmt.Sprintf("%d type diagnostics — lint findings against wrong semantics are noise", sourceDiagnostics),
+				fmt.Sprintf("%d type diagnostics; lint findings against wrong semantics are noise", sourceDiagnostics),
 				unusedRequest,
 			)
 			// Lint will not report, but the fix phase walked the same rules, and its skips are the ones lint
 			// would have named. A skip the types phase covers is a gap here, since that phase stopped the run.
 			if reusableWalk != nil {
-				activeSummary.Skips = rulesSkippingEveryFile(sumRuleNotes(reusableWalk.Notes), reusableWalk.Coverage.RulesOffered)
+				activeSummary.Skips = rulesSkippingEveryFile(
+					sumRuleNotes(reusableWalk.Notes),
+					reusableWalk.Coverage.RulesOffered,
+				)
 			}
 			if adamicReadinessRequested {
 				activeSummary.Adamic = notMeasured("types bailed")
 			}
-			writeRunEnd(report, os.Stdout)
+			writeRunEnd(report, streams.Output)
 			finishRunCache(1)
 		}
 	}
@@ -1249,11 +1411,11 @@ func run() error {
 			// the walk's bare "the file set is empty", which could not say that the file was left out
 			// by the tsconfig or ignored by git. See explainNamedPathsOutsideProgram.
 			if len(projectFiles) == 0 && !lintScope.Everything && len(flag.Args()) > 0 {
-				return errNamedPathsOutsideProgram(location, flag.Args())
+				return namedPathsOutsideProgramError(location, flag.Args())
 			}
-			walked, err := graph.Walk(ctx, projectFiles, rules)
-			if err != nil {
-				return fmt.Errorf("running rules: %w", err)
+			walked, walkError := graph.Walk(backgroundContext, projectFiles, rules)
+			if walkError != nil {
+				return fmt.Errorf("running rules: %w", walkError)
 			}
 			result = walked
 			reportForeignCheckers(graph, walked, len(projectFiles))
@@ -1271,20 +1433,22 @@ func run() error {
 			lintWalkCost = "walked by the fix phase (nothing was rewritten, so its findings still hold)"
 		}
 
-		findings += len(result.Diagnostics) - lintWarningCount(result.Diagnostics, lintConfig)
+		findings += len(result.Diagnostics) - lintWarningCount(result.Diagnostics, lintConfiguration)
 		if adamicReadinessRequested {
 			activeSummary.Adamic = readinessOf(graph, result, runTypes, typeErrorFiles)
 		}
 
 		// The findings, the lint line, and the coverage block, which prints unconditionally. See
 		// writeLintReport.
-		writeLintReport(os.Stdout, lintReport{
-			Result:     result,
-			Rules:      rules,
-			LintConfig: lintConfig,
-			WalkCost:   lintWalkCost,
-			Details:    *showCoverage,
+		writeLintReport(streams.Output, lintReport{
+			Result:            result,
+			Rules:             rules,
+			LintConfiguration: lintConfiguration,
+			WalkCost:          lintWalkCost,
+			Details:           *showCoverage,
 		})
+		// The lint phase's line and its coverage are out before whatever runs next, the unused report among it.
+		streams.Show(streams.Output)
 
 		// Every phase ran and a file still went unchecked. The phase line cannot express that, so the
 		// closing warning names it rather than letting a run that lost a file to a panic end on a clean
@@ -1294,11 +1458,15 @@ func run() error {
 			report.incompleteBeyondPhases = namedGapsSentence
 		case len(result.Coverage.RulesCrashed) > 0:
 			report.incompleteBeyondPhases = namedRuleGapsSentence
-			activeSummary.Gaps.Unread = counted(len(result.Coverage.RulesCrashed), "rule crash left a file's verdict missing", "rule crashes left files' verdicts missing")
+			activeSummary.Gaps.Unread = counted(
+				len(result.Coverage.RulesCrashed),
+				"rule crash left a file's verdict missing",
+				"rule crashes left files' verdicts missing",
+			)
 		}
 
 		if *showTiming {
-			printTimings(os.Stdout, result.Timings, lintDuration)
+			printTimings(streams.Output, result.Timings, lintDuration)
 		}
 
 		if *explainFile != "" {
@@ -1316,13 +1484,17 @@ func run() error {
 			if subject == nil {
 				// Naming the file that was not found rather than explaining nothing, because an
 				// empty explanation reads as a file with nothing to say.
-				fmt.Printf("\nexplain: %s is not in the program, so there is nothing to explain\n", *explainFile)
+				fmt.Fprintf(
+					streams.Output,
+					"\nexplain: %s is not in the program, so there is nothing to explain\n",
+					*explainFile,
+				)
 			} else {
-				explanation, err := graph.Explain(ctx, subject, rules)
-				if err != nil {
-					return fmt.Errorf("explaining %s: %w", *explainFile, err)
+				explanation, explainError := graph.Explain(backgroundContext, subject, rules)
+				if explainError != nil {
+					return fmt.Errorf("explaining %s: %w", *explainFile, explainError)
 				}
-				printExplanation(os.Stdout, explanation)
+				printExplanation(streams.Output, explanation)
 			}
 		}
 
@@ -1337,7 +1509,8 @@ func run() error {
 
 	// Phase 5: unused. A report, run only when asked for, and never a reason to fail a build.
 	if !runUnused {
-		report.record(phaseUnused, outcomeSkipped, 0, "not requested — this is a report, ask for it with --unused")
+		// The dash is escaped, not changed: swift/Contract.md fixes this detail's spelling for both engines.
+		report.record(phaseUnused, outcomeSkipped, 0, "not requested \u2014 this is a report, ask for it with --unused")
 	} else {
 		unusedStart := time.Now()
 
@@ -1350,22 +1523,24 @@ func run() error {
 		// and is fully trustworthy either way, so refusing to run would withhold good findings over a
 		// caveat that only applies to the other half.
 		if !runTypes {
-			fmt.Printf(
-				"\nunused: types did not run, so the reference half of this report is UNRELIABLE — " +
-					"unresolved symbols look exactly like unreferenced ones. The unreachable half " +
+			fmt.Fprintf(streams.Output,
+				"\nunused: types did not run, so the reference half of this report is UNRELIABLE: "+
+					"unresolved symbols look exactly like unreferenced ones. The unreachable half "+
 					"below needs no types and is unaffected.\n",
 			)
 		}
 
-		unusedResult, err := unused_exports.Run(ctx, graph, projectFiles, *unusedDeep)
-		if err != nil {
-			return fmt.Errorf("running the unused report: %w", err)
+		unusedResult, runError := unused_exports.Run(backgroundContext, graph, projectFiles, *unusedDeep)
+		if runError != nil {
+			return fmt.Errorf("running the unused report: %w", runError)
 		}
 		unusedDuration := time.Since(unusedStart)
 
-		unused_exports.Write(os.Stdout, unusedResult, *unusedAll)
+		if writeError := unused_exports.Write(streams.Output, unusedResult, *unusedAll); writeError != nil {
+			return writeError
+		}
 
-		// Deliberately NOT added to `findings`. The exit code is the gate's verdict, and this phase
+		// Deliberately not added to `findings`. The exit code is the gate's verdict, and this phase
 		// is not part of the gate: an export held for an external consumer is unused and correct, so
 		// failing a build over it would make the report something people route around rather than
 		// read.
@@ -1375,7 +1550,7 @@ func run() error {
 	// The phase line prints on every run, success included. A run that checked nothing must not be
 	// able to print like a run that checked everything and found it clean, and a phase summary that
 	// only appeared on failure would reintroduce exactly that ambiguity for the successful case.
-	writeRunEnd(report, os.Stdout)
+	writeRunEnd(report, streams.Output)
 
 	// A crash fails the run as a finding does, though it is not one: see runCrash. So does a generated file
 	// the program asks for that does not exist, even with no type error after it, since what it declares
@@ -1390,33 +1565,33 @@ func run() error {
 // rebuildGraph reconstructs the type graph after files on disk have changed.
 //
 // The graph is a snapshot of the bytes as they were when it was built. Once the fix phase rewrites
-// a file, every later phase reading that graph is reading source that no longer exists — the same
+// a file, every later phase reading that graph is reading source that no longer exists: the same
 // stale-read corruption the edit engine refuses internally, one level up and with a wider blast
 // radius, because a type diagnostic against deleted text points at a line nobody can find.
 //
 // It costs a full rebuild, which is why it only happens when something actually changed.
 func rebuildGraph(
-	configFileName string,
+	configurationFileName string,
 	directory string,
 	singleThreaded bool,
-	lintConfig *configuration.Config,
+	lintConfiguration *configuration.Configuration,
 	yieldedFiles map[string]struct{},
 ) (*program.Graph, time.Duration, error) {
 	start := time.Now()
 	// The check's stats predate the rewrite. See distrustCheckStats.
 	distrustCheckStats()
-	rebuilt, err := program.Build(program.Options{
-		ConfigFileName:   configFileName,
+	rebuilt, buildError := program.Build(program.Options{
+		ConfigFileName:   configurationFileName,
 		CurrentDirectory: directory,
 		SingleThreaded:   singleThreaded,
 		ContentPack:      openContentPack(directory),
 		Yielded:          yieldedFiles,
 	})
-	if err != nil {
-		return nil, time.Since(start), err
+	if buildError != nil {
+		return nil, time.Since(start), buildError
 	}
-	rebuilt.LintConfig = lintConfig
-	rebuilt.RuleOptions = registry.OptionsAt(optionsBase(lintConfig, directory))
+	rebuilt.LintConfiguration = lintConfiguration
+	rebuilt.RuleOptions = registry.OptionsAt(optionsBase(lintConfiguration, directory))
 	rebuilt.RegisteredRuleNames = registry.Names()
 	rebuilt.Readiness = requestedReadiness()
 	return rebuilt, time.Since(start), nil
@@ -1435,27 +1610,35 @@ func rebuildGraph(
 //
 // ahead, when not nil, is the same config already read beside the graph build (lintConfigAhead), and its
 // load and settings check are taken from it rather than done again here.
-func configureLint(graph *program.Graph, location projectLocation, ahead *lintConfigAhead) (*configuration.Config, error) {
+//
+// Mutates: graph the caller's graph is what fixes and lints, so it is handed the config, options and rules here
+func configureLint(
+	graph *program.Graph,
+	location projectLocation,
+	ahead *lintConfigAhead,
+) (*configuration.Configuration, error) {
 	// A config that cannot be read is a hard failure and never a permissive default. Linting
 	// everything with nothing configured produces output indistinguishable from a clean run, and
 	// that exact confusion is what this tool exists to make impossible.
-	var lintConfig *configuration.Config
-	var err error
+	var lintConfiguration *configuration.Configuration
+	var loadError error
 	if ahead != nil {
 		<-ahead.done
-		lintConfig, err = ahead.config, ahead.loadError
+		lintConfiguration, loadError = ahead.configuration, ahead.loadError
 	} else {
-		lintConfig, err = loadLintConfig(graph, location)
+		lintConfiguration, loadError = loadLintConfiguration(graph, location)
 	}
-	if err != nil {
-		return nil, fmt.Errorf("loading the lint config: %w", err)
+	if loadError != nil {
+		return nil, fmt.Errorf("loading the lint config: %w", loadError)
 	}
 	// The project's own file, which discovery may not have read: a run naming a directory, a tsconfig or a
 	// path discovers nothing. A file the command line named is the Swift engine's to read wherever it sits
 	// (see configuration.CheckSwiftBlockHasAReader), and a missing one is zero config, with no block.
 	if !location.LintConfigFileNameGiven && isRegularFile(location.LintConfigFileName) {
-		if err := configuration.CheckSwiftBlockHasAReader(location.LintConfigFileName); err != nil {
-			return nil, fmt.Errorf("loading the lint config: %w", err)
+		if checkSwiftBlockHasAReaderError := configuration.CheckSwiftBlockHasAReader(
+			location.LintConfigFileName,
+		); checkSwiftBlockHasAReaderError != nil {
+			return nil, fmt.Errorf("loading the lint config: %w", checkSwiftBlockHasAReaderError)
 		}
 	}
 	// Validated against the whole program rather than against a narrowed scope. The question
@@ -1470,196 +1653,34 @@ func configureLint(graph *program.Graph, location projectLocation, ahead *lintCo
 	for _, projectFile := range wholeProgramFiles {
 		projectFileNames = append(projectFileNames, projectFile.FileName().AsString())
 	}
-	if err := lintConfig.ValidateSelectors(projectFileNames); err != nil {
-		return nil, fmt.Errorf("validating the lint config: %w", err)
+	if validateSelectorsError := lintConfiguration.ValidateSelectors(projectFileNames); validateSelectorsError != nil {
+		return nil, fmt.Errorf("validating the lint config: %w", validateSelectorsError)
 	}
-	base := optionsBase(lintConfig, location.Root)
+	base := optionsBase(lintConfiguration, location.Root)
 	if ahead != nil {
 		if ahead.settingsError != nil {
 			return nil, fmt.Errorf("validating the lint config: %w", ahead.settingsError)
 		}
 		graph.RuleOptions = ahead.options
 	} else {
-		if err := registry.CheckSettings(base); err != nil {
-			return nil, fmt.Errorf("validating the lint config: %w", err)
+		if checkSettingsError := registry.CheckSettings(base); checkSettingsError != nil {
+			return nil, fmt.Errorf("validating the lint config: %w", checkSettingsError)
 		}
 		graph.RuleOptions = registry.OptionsAt(base)
 	}
-	graph.LintConfig = lintConfig
+	graph.LintConfiguration = lintConfiguration
 	graph.RegisteredRuleNames = registry.Names()
 	graph.Readiness = requestedReadiness()
-	return lintConfig, nil
+	return lintConfiguration, nil
 }
 
-func optionsBase(lintConfig *configuration.Config, projectRoot string) rule.OptionsBase {
+func optionsBase(lintConfiguration *configuration.Configuration, projectRoot string) rule.OptionsBase {
 	base := rule.OptionsBase{ProjectRoot: projectRoot}
-	if lintConfig != nil {
-		base.ConfigDirectory = lintConfig.Root
-		base.Settings = lintConfig.Settings
+	if lintConfiguration != nil {
+		base.ConfigDirectory = lintConfiguration.Root
+		base.Settings = lintConfiguration.Settings
 	}
 	return base
-}
-
-// collectTypeDiagnostics gathers the compiler's own findings for our files.
-//
-// The program is checked as a whole and then filtered down, rather than asked file by file. That
-// ordering is load-bearing for speed and not at all for correctness: see Graph.AllDiagnostics. It
-// does mean the compiler also checks the 6,500 third-party declarations, which is unavoidable — they
-// have to be checked for our files to mean anything — and their findings are dropped here because
-// nobody working in this repo can act on them.
-//
-// When the tsconfig is incremental, the check runs warm: files whose contents have not changed
-// since the last run are not re-checked. Measured on the ahra tree, 1149ms cold against 380ms
-// warm, with the finding set identical in both directions. A tsconfig without `incremental`
-// falls back to the full pass, which is also what happens on the first run, after a toolchain
-// version change, and any time the build info cannot be read.
-//
-// The build info is written even when this run reports findings, and that is deliberate: it
-// records which files were checked, not whether they passed. A file that type-checked and
-// produced a diagnostic was still checked. Discarding that on failure would make the slow path
-// the one a person hits while iterating on an error, which is exactly the loop where the pause
-// costs most.
-//
-// incremental is false under `--no-cache`, and then the build info is neither read nor written: the
-// whole program is checked, as it is for a tsconfig that is not incremental.
-//
-// persist is false under `--no-fix`. The build info is still read, so the run is as warm as the last
-// writing run left it, and only the write is withheld. A `--no-fix` run is therefore warm against a
-// slightly older snapshot rather than cold, which costs it the files changed since then and nothing
-// else; reading costs nothing the promise forbids, and refusing to read would make every CI run cold
-// for no reason.
-func collectTypeDiagnostics(ctx context.Context, graph *program.Graph, files []*ast.SourceFile, incremental bool, persist bool) []*ast.Diagnostic {
-	return finishTypeCheck(ctx, startTypeCheck(ctx, graph, incremental), files, persist)
-}
-
-// typeCheck is TypeScript's own checking of a graph, under way or done.
-type typeCheck struct {
-	graph   *program.Graph
-	session *program.IncrementalSession
-	checked []*ast.Diagnostic
-	done    chan struct{}
-
-	// reuse is the types section of the run cache's table, nil when this run is not recorded. replayed is
-	// how many files' semantic diagnostics the check took from it rather than checking.
-	reuse    *program.TypeDiagnosticsReuse
-	replayed int
-
-	// elapsed is how long the checking itself took, and finished when it ended, both set as it finishes. The
-	// phase reports these rather than its wait, which is nothing when the check ran alongside the walk.
-	elapsed  time.Duration
-	finished time.Time
-}
-
-// startTypeCheck begins checking every file, and returns at once.
-//
-// It runs alongside the fix phase's walk rather than after it. Both use the same checkers, each file under
-// its own checker's lock, so on one checker the two take turns while different checkers go on in parallel:
-// the run ends when the slowest checker has done its walk and its check, rather than after the slowest
-// walk and then the whole check. Traced on ahra (#zqsdzbq), the check was a separate 0.1 to 0.2s after a
-// walk whose slowest checker set its end.
-//
-// Only the per-file checking starts early. What reads every checker at once, the global and config
-// diagnostics, waits for finishTypeCheck, when the walk has let go of them.
-//
-// Nothing ever cancels it. The compiler's whole-program check is not cancellable part way: a checker that
-// sees its context end marks itself cancelled and the compiler hands it the next file anyway, where it
-// panics on a goroutine nothing here can recover. A check whose graph is replaced is retired instead (see
-// program.Graph.Retire), left to finish, and its result dropped.
-func startTypeCheck(ctx context.Context, graph *program.Graph, incremental bool) *typeCheck {
-	checkContext := ctx
-	check := &typeCheck{graph: graph, done: make(chan struct{}), reuse: activeTypesReuse()}
-	// One session across check-then-write. The build info has to be emitted from the same
-	// incremental program that did the checking: that program's snapshot is what records which
-	// files were checked, and emitting from a second one writes a build info that skips nothing
-	// while looking correct. See program.IncrementalSession.
-	go func() {
-		// A test instrument: hold the check until the fix phase and any rebuild are over, so a test can put
-		// the rebuild ahead of the check every time rather than by luck. See releaseEarlyTypeCheck.
-		if os.Getenv("COHERE_TEST_HOLD_EARLY_CHECK") != "" {
-			<-earlyTypeCheckReleased
-		}
-		start := time.Now()
-		defer close(check.done)
-		defer func() { check.elapsed, check.finished = time.Since(start), time.Now() }()
-		// Begun here rather than before, since reading the build info and snapshotting the program is work
-		// too, and it overlaps the walk as well as the check does.
-		// Files whose shape fingerprint has not moved replay their semantic diagnostics, and only the rest are
-		// checked. See program.TypeDiagnosticsReuse.
-		if check.reuse != nil {
-			if parts, reused := graph.CheckReusing(checkContext, check.reuse); reused {
-				check.checked, check.replayed = parts.All(), check.reuse.Replayed()
-				return
-			}
-		}
-		if incremental {
-			check.session = graph.NewIncrementalSession()
-		}
-		var parts program.TypeDiagnosticParts
-		switch {
-		case graph.FusedCheck != nil && check.session == nil:
-			// The walk checked the files it visited, and this checks the rest.
-			parts = graph.FusedCheck.DiagnosticParts(checkContext, graph)
-		case check.session != nil:
-			parts = check.session.DiagnosticParts(checkContext)
-		default:
-			parts = graph.AllDiagnosticParts(checkContext)
-		}
-		check.checked = parts.All()
-		if check.reuse != nil {
-			graph.RecordFull(checkContext, check.reuse, parts)
-		}
-	}()
-	return check
-}
-
-// earlyTypeCheckReleased is closed once the fix phase and any rebuild are over, for COHERE_TEST_HOLD_EARLY_CHECK.
-var (
-	earlyTypeCheckReleased    = make(chan struct{})
-	releaseEarlyTypeCheckOnce sync.Once
-)
-
-// releaseEarlyTypeCheck lets a held check start. Called when the fix phase is over, whether or not anything
-// was held.
-func releaseEarlyTypeCheck() {
-	releaseEarlyTypeCheckOnce.Do(func() { close(earlyTypeCheckReleased) })
-}
-
-// finishTypeCheck waits for the check, writes the build info if asked, and returns the diagnostics that
-// belong to files, plus the program's own.
-func finishTypeCheck(ctx context.Context, check *typeCheck, files []*ast.SourceFile, persist bool) []*ast.Diagnostic {
-	<-check.done
-
-	// The read already happened when the session began; only the write is conditional.
-	if check.session != nil && persist {
-		if writeDiagnostics := check.session.Write(ctx); len(writeDiagnostics) > 0 {
-			// A failed build-info write must not pass silently. The next run would be cold while
-			// this one reported success, and the symptom is a saving that quietly never appears.
-			for _, diagnostic := range writeDiagnostics {
-				fmt.Fprintf(os.Stderr, "cohere: writing the incremental cache: %s\n",
-					diagnostic.MessageKey())
-			}
-		}
-	}
-
-	ours := make(map[*ast.SourceFile]struct{}, len(files))
-	for _, sourceFile := range files {
-		ours[sourceFile] = struct{}{}
-	}
-	diagnostics := check.graph.ConfigDiagnostics(ctx)
-	if check.reuse != nil {
-		check.reuse.FinishGlobals(len(check.graph.Program.GetGlobalDiagnostics(ctx)) == 0)
-	}
-	for _, diagnostic := range check.checked {
-		// A diagnostic with no file is about the program rather than about any one file, so it is ours
-		// by default: dropping it would hide exactly the configuration errors that matter most.
-		if sourceFile := diagnostic.File(); sourceFile != nil {
-			if _, isOurs := ours[sourceFile]; !isOurs {
-				continue
-			}
-		}
-		diagnostics = append(diagnostics, diagnostic)
-	}
-	return diagnostics
 }
 
 // printCompilerDiagnostic prints one of TypeScript's own findings, in the shape tsc uses so an
@@ -1667,12 +1688,16 @@ func finishTypeCheck(ctx context.Context, check *typeCheck, files []*ast.SourceF
 func printCompilerDiagnostic(diagnostic *ast.Diagnostic) {
 	sourceFile := diagnostic.File()
 	if sourceFile == nil {
-		printFinding(os.Stdout, compilerFinding(diagnostic), fmt.Sprintf("error TS%d: %s\n", diagnostic.Code(), diagnosticMessage(diagnostic)))
+		printFinding(
+			streams.Output,
+			compilerFinding(diagnostic),
+			fmt.Sprintf("error TS%d: %s\n", diagnostic.Code(), diagnosticMessage(diagnostic)),
+		)
 		return
 	}
 
 	line, character := scanner.GetECMALineAndByteOffsetOfPosition(sourceFile, diagnostic.Loc().Pos())
-	printFinding(os.Stdout, compilerFinding(diagnostic), fmt.Sprintf(
+	printFinding(streams.Output, compilerFinding(diagnostic), fmt.Sprintf(
 		"%s:%d:%d - error TS%d: %s\n",
 		sourceFile.FileName(), line+1, character+1, diagnostic.Code(), diagnosticMessage(diagnostic),
 	))
@@ -1705,11 +1730,19 @@ func singleLineDescription(description string) string {
 }
 
 // printRuleDiagnostic prints one rule finding in the same shape, with the rule name where the error
-// code goes — a reader should not have to learn two formats. The settings give it its severity.
-func printRuleDiagnostic(out io.Writer, diagnostic rule.Diagnostic, lintConfig *configuration.Config) {
+// code goes, since a reader should not have to learn two formats. The settings give it its severity.
+func printRuleDiagnostic(
+	out *bufio.Writer,
+	diagnostic rule.Diagnostic,
+	lintConfiguration *configuration.Configuration,
+) {
 	sourceFile := diagnostic.SourceFile
 	if sourceFile == nil {
-		printFinding(out, ruleFinding(diagnostic, lintConfig), fmt.Sprintf("error %s: %s\n", diagnostic.RuleName, diagnostic.Message.Description))
+		printFinding(
+			out,
+			ruleFinding(diagnostic, lintConfiguration),
+			fmt.Sprintf("error %s: %s\n", diagnostic.RuleName, diagnostic.Message.Description),
+		)
 		return
 	}
 
@@ -1719,7 +1752,7 @@ func printRuleDiagnostic(out io.Writer, diagnostic rule.Diagnostic, lintConfig *
 	//
 	// Two rules write a second paragraph into their description with an embedded newline, which put
 	// the rule tag on a line carrying no position. Any reader keyed on `position ... [rule]` then
-	// drops those findings silently, and it drops the LONGEST messages, which are the ones carrying
+	// drops those findings silently, and it drops the longest messages, which are the ones carrying
 	// advice. Four of 5,312 findings on the ahra tree wrapped that way, and an extractor that missed
 	// them sent me four hours into a rule that was working correctly.
 	//
@@ -1727,71 +1760,11 @@ func printRuleDiagnostic(out io.Writer, diagnostic rule.Diagnostic, lintConfig *
 	// paragraph: the message is the rule's to write and the line discipline is the printer's to keep.
 	description := singleLineDescription(diagnostic.Message.Description)
 
-	printFinding(out, ruleFinding(diagnostic, lintConfig), fmt.Sprintf(
+	printFinding(out, ruleFinding(diagnostic, lintConfiguration), fmt.Sprintf(
 		"%s:%d:%d - %s [%s/%s]\n",
 		sourceFile.FileName(), line+1, character+1,
 		description, diagnostic.RuleName, diagnostic.Message.Id,
 	))
-}
-
-// changedConfiguration names the configuration file in a changed-file scope, or empty when none is.
-//
-// Three kinds, and all three reach every file at once: the rule config, the tsconfig that built the
-// program, and every tsconfig that one extends. The extends chain matters here rather than being a
-// completeness gesture. On this tree the root tsconfig holds one line, `extends`, and every option
-// and every include pattern lives in the base it points at, so a guard checking only the root would
-// miss every real change to how the program is built.
-//
-// Dependencies are deliberately not a fourth kind, and the reason is worth stating because
-// `package.json` looks like the obvious next entry. It is a declaration; the checker reads
-// `node_modules`, and the two move independently: a version edited with no install changes nothing
-// the program can see, and an install changes every consumer of a package without touching a
-// tracked file. `node_modules` is gitignored, so git cannot report the change that actually
-// matters. A guard on `package.json` would fire on the edits that mean nothing and stay silent on
-// the ones that mean everything, which is worse than the gap it appears to close.
-//
-// So a dependency change is a real limit of `--changed` rather than a defect in it. The honest
-// answer after an install is a whole-tree run, and the coverage line saying how many files were
-// checked is what leaves that visible.
-//
-// Its own function so a fixture can hold the comparison rather than reconstruct it. The
-// reconstruction is what makes this untestable in place: asserting that `resolveLintConfigPath`
-// plus `Clean` matches an absolute scope entry is a true statement about two helpers and says
-// nothing about whether the call site passes them the right directory.
-//
-// It passed the wrong one first. `--directory` defaults to empty, so resolving against the flag
-// left a bare relative name that never matched an absolute scope entry, and the guard silently
-// never fired. Resolving against the graph's directory is what makes it fire.
-func changedConfiguration(scope formatScope, graph *program.Graph, lintConfigFileName string) string {
-	currentDirectory := ""
-	if graph.Config != nil {
-		currentDirectory = graph.Anchor.Root()
-	}
-
-	// The lint config resolves against the graph's directory when there is one, and against the
-	// tsconfig's own directory otherwise. Both are the tree root in practice, and falling back to the
-	// empty string would leave a relative path that matches nothing, which is how the first version
-	// of this guard was silently inert.
-	if currentDirectory == "" && graph.ConfigFileName != "" {
-		currentDirectory = filepath.Dir(graph.ConfigFileName)
-	}
-
-	candidates := append(configuration.SourcesOnDisk(lintConfigSources(resolveLintConfigPath(lintConfigFileName, currentDirectory))), graph.ConfigFileName)
-	if graph.Config != nil {
-		for _, extended := range graph.Config.ExtendedSourceFiles() {
-			candidates = append(candidates, extended.AsString())
-		}
-	}
-
-	for _, candidate := range candidates {
-		if candidate == "" {
-			continue
-		}
-		if scope.includes(filepath.Clean(candidate)) {
-			return candidate
-		}
-	}
-	return ""
 }
 
 // registeredRuleNames is every rule this binary runs, by name, which the config loader needs to tell a
@@ -1813,22 +1786,11 @@ func registeredRuleNames() []string {
 // so a run with an unreadable base is never recorded or replayed. It only keeps the callers here,
 // which name inputs, from naming none.
 func lintConfigSources(path string) []string {
-	sources, err := configuration.SourcesOf(path)
-	if err != nil || len(sources) == 0 {
+	sources, sourcesOfError := configuration.SourcesOf(path)
+	if sourcesOfError != nil || len(sources) == 0 {
 		return []string{path}
 	}
 	return sources
-}
-
-// resolveLintConfigPath finds the lint config relative to the directory paths resolve against.
-//
-// A relative config path resolved against the process's own working directory rather than the
-// project's would quietly find nothing, and "nothing" here means every rule runs everywhere.
-func resolveLintConfigPath(configPath string, directory string) string {
-	if filepath.IsAbs(configPath) || directory == "" {
-		return configPath
-	}
-	return filepath.Join(directory, configPath)
 }
 
 // writeOrphanedConfigKeys says which config entries name a rule that does not exist. Printed in full
@@ -1836,8 +1798,8 @@ func resolveLintConfigPath(configPath string, directory string) string {
 //
 // This is the inverse of the not-configured count, and it is the failure the rename of every
 // rule to its upstream spelling introduced. The resolver matches a config key exactly, or trims a
-// prefix off it on a `/` boundary, so a key that is LONGER than the rule name resolves and a key
-// that is SHORTER never can. `typescript/no-base-to-string` cannot reach a rule registered as
+// prefix off it on a `/` boundary, so a key that is longer than the rule name resolves and a key
+// that is shorter never can. `typescript/no-base-to-string` cannot reach a rule registered as
 // `@typescript-eslint/no-base-to-string`: there is no prefix to trim, only one to add.
 //
 // Left silent, this reads as the opposite of what happened. The rule reports "nobody has said
@@ -1848,8 +1810,8 @@ func resolveLintConfigPath(configPath string, directory string) string {
 // Keys naming a rule cohere has not ported yet are the expected case and not an error: a decision
 // recorded ahead of the rule is how this migration is supposed to work. They are counted and named
 // separately so the two are never confused.
-func writeOrphanedConfigKeys(out io.Writer, rules []rule.Rule, config *configuration.Config) {
-	if config == nil {
+func writeOrphanedConfigKeys(out *bufio.Writer, rules []rule.Entry, lintConfiguration *configuration.Configuration) {
+	if lintConfiguration == nil {
 		return
 	}
 
@@ -1874,7 +1836,7 @@ func writeOrphanedConfigKeys(out io.Writer, rules []rule.Rule, config *configura
 	}
 
 	orphaned := make([]string, 0)
-	for key := range config.Rules {
+	for key := range lintConfiguration.Rules {
 		if !resolves(key) {
 			orphaned = append(orphaned, key)
 		}
@@ -1882,9 +1844,9 @@ func writeOrphanedConfigKeys(out io.Writer, rules []rule.Rule, config *configura
 	sort.Strings(orphaned)
 
 	for _, key := range orphaned {
-		setting := config.Rules[key]
+		setting := lintConfiguration.Rules[key]
 		fmt.Fprintf(out,
-			"  config: key %q matches no registered rule, so its %s never applies — either the rule is not ported yet, or the key is spelled for an older name\n",
+			"  config: key %q matches no registered rule, so its %s never applies: either the rule is not ported yet, or the key is spelled for an older name\n",
 			key, setting.Severity,
 		)
 	}
@@ -1932,7 +1894,11 @@ func filterToScope(projectFiles []*ast.SourceFile, scope formatScope) []*ast.Sou
 //
 // A scoped file the rebuilt program no longer holds is returned by name rather than dropped, so a
 // file that left the scope says so instead of shrinking the count without a word.
-func rescopeAfterRebuild(rebuilt []*ast.SourceFile, scoped []*ast.SourceFile, everything bool) ([]*ast.SourceFile, []string) {
+func rescopeAfterRebuild(
+	rebuilt []*ast.SourceFile,
+	scoped []*ast.SourceFile,
+	everything bool,
+) ([]*ast.SourceFile, []string) {
 	if everything {
 		return rebuilt, nil
 	}
@@ -1984,9 +1950,10 @@ func narrowToClosure(
 	seeds := filterToScope(projectFiles, scope)
 	closure, within := graph.DependentClosure(seeds)
 	if !within {
-		fmt.Fprintf(accountOutput(os.Stderr),
+		fmt.Fprintf(accountOutput(streams.Errors),
 			"note: %s reaches more than %d files through imports, so the whole tree is checked\n",
 			scope.RequestDescription, program.DependentClosureLimit)
+		showWarning()
 		return formatScope{Everything: true}, projectFiles
 	}
 
@@ -1998,7 +1965,8 @@ func narrowToClosure(
 // a checker other than their own, so a test comparing the two runs can tell the instrument took effect.
 func reportForeignCheckers(graph *program.Graph, walked program.Result, files int) {
 	if graph.WalkOnForeignCheckers {
-		fmt.Fprintf(os.Stderr, "foreign checkers: %d of %d files walked on a checker other than their own\n",
+		fmt.Fprintf(streams.Errors, "foreign checkers: %d of %d files walked on a checker other than their own\n",
 			walked.FilesOnForeignCheckers, files)
+		showWarning()
 	}
 }

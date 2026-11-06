@@ -39,10 +39,10 @@ func asTheTypedPreferForOfHarnessWroteIt(text string) string {
 // false-positive surface, and upstream has thought about far more of them than a port would invent:
 // a second declarator, a non-zero start, a decrementing update, a call rather than a property named
 // length, an optional chain in the test, an index used arithmetically, and thirteen separate shapes
-// where the indexed element is being ASSIGNED rather than read, each of which makes a for-of
+// where the indexed element is being assigned rather than read, each of which makes a for-of
 // rewrite wrong rather than merely different.
-func TestPreferForOfStaysSilentOnUpstreamPassCases(t *testing.T) {
-	t.Parallel()
+func TestPreferForOfStaysSilentOnUpstreamPassCases(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		"\nfor (let i = 0; i < arr1.length; i++) {\n  const x = arr1[i] === arr2[i];\n}\n    ",
@@ -99,9 +99,9 @@ func TestPreferForOfStaysSilentOnUpstreamPassCases(t *testing.T) {
 		"\nfor (let i = 0; i < this.length; ++i) {\n  yield this[i];\n}\n    ",
 	}
 	for index, sourceText := range cases {
-		t.Run(preferForOfCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, PreferForOf,
+		test.Run(preferForOfCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, PreferForOf,
 				preferForOfFile, sourceText))
 		})
 	}
@@ -110,14 +110,14 @@ func TestPreferForOfStaysSilentOnUpstreamPassCases(t *testing.T) {
 // TestPreferForOfFiresOnUpstreamFailCases is the imported failing corpus, verbatim, with the span of
 // every finding asserted.
 //
-// The span is the WHOLE for statement, which is unusual enough to be worth pinning: it runs from the
+// The span is the whole for statement, which is unusual enough to be worth pinning: it runs from the
 // `for` keyword to the closing brace of the body, so a port anchoring on the initializer or on the
 // index name satisfies every message id here while pointing at a fraction of what it means.
 //
-// One row reports twice, on a loop nested inside a loop where the inner index SHADOWS the outer. It
+// One row reports twice, on a loop nested inside a loop where the inner index shadows the outer. It
 // is the case that separates resolving an identifier to its declaration from matching it by name.
-func TestPreferForOfFiresOnUpstreamFailCases(t *testing.T) {
-	t.Parallel()
+func TestPreferForOfFiresOnUpstreamFailCases(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -177,7 +177,10 @@ func TestPreferForOfFiresOnUpstreamFailCases(t *testing.T) {
 		{
 			sourceText: "\nfor (let shadow = 0; shadow < arr.length; shadow++) {\n  for (let shadow = 0; shadow < arr.length; shadow++) {}\n}\n      ",
 			wantIds:    []string{"preferForOf", "preferForOf"},
-			wantSpans:  []string{"for (let shadow = 0; shadow < arr.length; shadow++) {\n  for (let shadow = 0; shadow < arr.length; shadow++) {}\n}", "for (let shadow = 0; shadow < arr.length; shadow++) {}"},
+			wantSpans: []string{
+				"for (let shadow = 0; shadow < arr.length; shadow++) {\n  for (let shadow = 0; shadow < arr.length; shadow++) {}\n}",
+				"for (let shadow = 0; shadow < arr.length; shadow++) {}",
+			},
 		},
 		{
 			sourceText: "\nfor (let i = 0; i < arr.length; i++) {\n  obj[arr[i]] = 1;\n}\n      ",
@@ -216,19 +219,19 @@ func TestPreferForOfFiresOnUpstreamFailCases(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(preferForOfCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, PreferForOf, preferForOfFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(preferForOfCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, PreferForOf, preferForOfFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
-				t.Fatalf("wanted %d findings, got %d", len(testCase.wantSpans), len(result.Diagnostics))
+				test.Fatalf("wanted %d findings, got %d", len(testCase.wantSpans), len(result.Diagnostics))
 			}
 			written := asTheTypedPreferForOfHarnessWroteIt(testCase.sourceText)
 			for findingIndex, wantSpan := range testCase.wantSpans {
 				reported := result.Diagnostics[findingIndex]
 				gotSpan := written[reported.Range.Pos():reported.Range.End()]
 				if gotSpan != wantSpan {
-					t.Errorf("finding %d points at %q, wanted %q", findingIndex, gotSpan, wantSpan)
+					test.Errorf("finding %d points at %q, wanted %q", findingIndex, gotSpan, wantSpan)
 				}
 			}
 		})
@@ -240,7 +243,7 @@ func TestPreferForOfFiresOnUpstreamFailCases(t *testing.T) {
 //
 // Upstream has fifty-two passing cases and they are unusually thorough, so it is worth being precise
 // about what is missing. Nothing here is a shape upstream forgot. Each is a shape upstream writes
-// while ALSO tripping a second test, so removing the guard under examination leaves every one of the
+// while also tripping a second test, so removing the guard under examination leaves every one of the
 // seventy imported cases green. Its four optional-chain rows each additionally use two receivers,
 // assign to the element, or use the index directly; its two-declarator rows compare against the
 // second declarator rather than against a length; and it writes no const index at all.
@@ -248,8 +251,8 @@ func TestPreferForOfFiresOnUpstreamFailCases(t *testing.T) {
 // Found by mutation rather than by reading: three separate guards survived the whole imported
 // corpus. Every verdict below was then measured against the installed 8.x build, with a reporting
 // control in the same run.
-func TestPreferForOfOnShapesUpstreamsCorpusCannotSeparate(t *testing.T) {
-	t.Parallel()
+func TestPreferForOfOnShapesUpstreamsCorpusCannotSeparate(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -344,12 +347,12 @@ func TestPreferForOfOnShapesUpstreamsCorpusCannotSeparate(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, PreferForOf, preferForOfFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, PreferForOf, preferForOfFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
-				t.Fatalf("wanted %d findings, got %d, on the case that covers: %s",
+				test.Fatalf("wanted %d findings, got %d, on the case that covers: %s",
 					len(testCase.wantSpans), len(result.Diagnostics), testCase.why)
 			}
 			written := asTheTypedPreferForOfHarnessWroteIt(testCase.sourceText)
@@ -357,7 +360,7 @@ func TestPreferForOfOnShapesUpstreamsCorpusCannotSeparate(t *testing.T) {
 				reported := result.Diagnostics[findingIndex]
 				gotSpan := written[reported.Range.Pos():reported.Range.End()]
 				if gotSpan != wantSpan {
-					t.Errorf("finding %d points at %q, wanted %q (%s)",
+					test.Errorf("finding %d points at %q, wanted %q (%s)",
 						findingIndex, gotSpan, wantSpan, testCase.why)
 				}
 			}
@@ -368,20 +371,20 @@ func TestPreferForOfOnShapesUpstreamsCorpusCannotSeparate(t *testing.T) {
 // TestPreferForOfDoesNotMistakeAReadForAWrite covers the false positives our flatter assignment
 // spelling makes available and upstream's does not.
 //
-// The rule reports a loop only when every use of the index is a plain READ of one array element, so
+// The rule reports a loop only when every use of the index is a plain read of one array element, so
 // every one of these nine rows must report. They exist because upstream reads distinct node types
 // where our parser uses one kind plus an operator: AssignmentExpression against every other binary
 // operator, and UpdateExpression against every other prefix operator. Upstream literally cannot
 // confuse `arr[i] < 1` with `arr[i] = 1`, so its corpus never separates them, and four mutations
 // weakening those tests survived all seventy imported rows.
 //
-// A port failing any of these does not over-report, it goes SILENT on ordinary reading loops, which
+// A port failing any of these does not over-report, it goes silent on ordinary reading loops, which
 // is the failure a rule about readability can afford least and which no amount of clean-case
 // coverage would reveal.
 //
 // Measured against the installed 8.x build, all ten including the control reporting.
-func TestPreferForOfDoesNotMistakeAReadForAWrite(t *testing.T) {
-	t.Parallel()
+func TestPreferForOfDoesNotMistakeAReadForAWrite(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -483,12 +486,12 @@ func TestPreferForOfDoesNotMistakeAReadForAWrite(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, PreferForOf, preferForOfFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, PreferForOf, preferForOfFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
-				t.Fatalf("wanted %d findings, got %d, on the case that covers: %s",
+				test.Fatalf("wanted %d findings, got %d, on the case that covers: %s",
 					len(testCase.wantSpans), len(result.Diagnostics), testCase.why)
 			}
 			written := asTheTypedPreferForOfHarnessWroteIt(testCase.sourceText)
@@ -496,7 +499,7 @@ func TestPreferForOfDoesNotMistakeAReadForAWrite(t *testing.T) {
 				reported := result.Diagnostics[findingIndex]
 				gotSpan := written[reported.Range.Pos():reported.Range.End()]
 				if gotSpan != wantSpan {
-					t.Errorf("finding %d points at %q, wanted %q (%s)",
+					test.Errorf("finding %d points at %q, wanted %q (%s)",
 						findingIndex, gotSpan, wantSpan, testCase.why)
 				}
 			}
@@ -512,21 +515,21 @@ func TestPreferForOfDoesNotMistakeAReadForAWrite(t *testing.T) {
 // rewriting the description survived the whole suite until this existed. The wanted string is typed
 // as a literal rather than read from the rule's own constant, because a comparison against the
 // constant moves with any mutation of it.
-func TestPreferForOfRendersUpstreamsMessageText(t *testing.T) {
-	t.Parallel()
+func TestPreferForOfRendersUpstreamsMessageText(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTyped(t, PreferForOf, preferForOfFile,
+	result := rule_testing.RunTyped(test, PreferForOf, preferForOfFile,
 		"for (let i = 0; i < arr.length; i++) {\n  console.log(arr[i]);\n}\n")
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
+		test.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
 	}
 	reported := result.Diagnostics[0]
 	if reported.Message.Id != "preferForOf" {
-		t.Errorf("reported id %q, wanted %q", reported.Message.Id, "preferForOf")
+		test.Errorf("reported id %q, wanted %q", reported.Message.Id, "preferForOf")
 	}
 	const wantMessage = "Expected a `for-of` loop instead of a `for` loop with this simple iteration."
 	if reported.Message.Description != wantMessage {
-		t.Errorf("reported message %q, wanted %q", reported.Message.Description, wantMessage)
+		test.Errorf("reported message %q, wanted %q", reported.Message.Description, wantMessage)
 	}
 }
 
@@ -539,12 +542,12 @@ func TestPreferForOfRendersUpstreamsMessageText(t *testing.T) {
 //
 // This asserts the untyped harness produces nothing on an input the typed one reports, so a later
 // revert to rule_testing.Run fails loudly rather than quietly.
-func TestPreferForOfRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestPreferForOfRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	const sourceText = "for (let i = 0; i < arr.length; i++) {\n  console.log(arr[i]);\n}\n"
-	rule_testing.ExpectClean(t, rule_testing.Run(t, PreferForOf, preferForOfFile, sourceText))
-	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, PreferForOf,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, PreferForOf, preferForOfFile, sourceText))
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, PreferForOf,
 		preferForOfFile, sourceText), "preferForOf")
 }
 
@@ -552,9 +555,9 @@ func TestPreferForOfRequiresTheTypedHarness(t *testing.T) {
 // upstream and is reproduced rather than corrected.
 //
 // `isAssignee` requires the enclosing object be an `ObjectExpression`, and upstream's parser gives a
-// REAL destructuring target the distinct type `ObjectPattern`. So the arm fires on the spelling
+// real destructuring target the distinct type `ObjectPattern`. So the arm fires on the spelling
 // where the parentheses sit inside the assignment, which is not a destructuring at all, and does
-// NOT fire on the spelling that actually writes through the indexed element. Measured: with the
+// not fire on the spelling that actually writes through the indexed element. Measured: with the
 // parentheses around the whole assignment the loop reports, and with them around the object alone it
 // is silent, which is the opposite of what the two shapes do at runtime.
 //
@@ -562,8 +565,8 @@ func TestPreferForOfRequiresTheTypedHarness(t *testing.T) {
 // has to be read off the position instead. Upstream's corpus contains only one of the two, so
 // nothing imported can see this; it was found by measuring the other spelling and it changed the
 // port.
-func TestPreferForOfReproducesUpstreamsObjectPatternAsymmetry(t *testing.T) {
-	t.Parallel()
+func TestPreferForOfReproducesUpstreamsObjectPatternAsymmetry(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -616,12 +619,12 @@ func TestPreferForOfReproducesUpstreamsObjectPatternAsymmetry(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, PreferForOf, preferForOfFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, PreferForOf, preferForOfFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
-				t.Fatalf("wanted %d findings, got %d, on the case that covers: %s",
+				test.Fatalf("wanted %d findings, got %d, on the case that covers: %s",
 					len(testCase.wantSpans), len(result.Diagnostics), testCase.why)
 			}
 			written := asTheTypedPreferForOfHarnessWroteIt(testCase.sourceText)
@@ -629,7 +632,7 @@ func TestPreferForOfReproducesUpstreamsObjectPatternAsymmetry(t *testing.T) {
 				reported := result.Diagnostics[findingIndex]
 				gotSpan := written[reported.Range.Pos():reported.Range.End()]
 				if gotSpan != wantSpan {
-					t.Errorf("finding %d points at %q, wanted %q (%s)",
+					test.Errorf("finding %d points at %q, wanted %q (%s)",
 						findingIndex, gotSpan, wantSpan, testCase.why)
 				}
 			}

@@ -1,18 +1,18 @@
 package control_flow_graph
 
-// This file is a LOCAL ADDITION, not vendored. See the change list in cfg.go's header.
+// This file is a local addition, not vendored. See the change list in builder.go's header.
 //
 // It exposes two things the graph already computed and threw away: the predecessor edges that
 // `findFinalPathDominators` built into a scratch array, and the immediate-dominator array that
 // same function wrote and dropped after reading one chain out of it.
 //
-// # Why this is an addition rather than a rewrite of paths.go
+// # Why this is an addition rather than a rewrite of path_analysis.go
 //
 // `findFinalPathDominators` is a correct Cooper-Harvey-Kennedy implementation and it is load-
 // bearing for `PathAnalysis.IsOnEveryFinalPath`, which `rules_of_hooks` consumes. Editing it to
 // hand its array outward would put a second caller's requirements on a function whose current
 // caller needs one boolean per block, and the two want different graphs: it dominates over a graph
-// with ONE SYNTHETIC EXIT reached only by non-throwing final blocks, deliberately excluding thrown
+// with one synthetic exit reached only by non-throwing final blocks, deliberately excluding thrown
 // exits, because that is the question ESLint asks. A consumer asking "what dominates this block" in
 // general does not want thrown paths excluded.
 //
@@ -20,65 +20,6 @@ package control_flow_graph
 // pinned against each other by `TestDominatorsAgreeWithFinalPathDominators`. That test is the
 // reason duplicating it is safe rather than a divergence waiting to happen: if either drifts, it
 // goes red.
-
-// Predecessors returns the reachable blocks with an edge into block, in Blocks order.
-//
-// The graph stores only successors, because that is the direction the builder lays edges down in.
-// Every backward analysis needs the other direction, and every consumer that has needed it so far
-// has rebuilt it: `findFinalPathDominators` builds a counting-sorted predecessor array and discards
-// it, and the liveness solver in `no-useless-assignment` avoids needing one only by iterating every
-// block every round.
-//
-// The result is computed once by `AnalyzeDominators` and shared, so this is a slice read rather
-// than a walk. It is owned by the analysis and must not be mutated: two callers see the same slice.
-//
-// Unreachable blocks have no predecessors here even when a successor edge points at them. That
-// mirrors what every existing consumer already does — each one skips `!successor.Reachable` at its
-// own loop — and it is the definition dominance needs, since a block nothing arrives at cannot
-// dominate anything.
-func (d *DominatorAnalysis[E]) Predecessors(block *Block[E]) []*Block[E] {
-	if d == nil || block == nil || block.Index() >= len(d.predecessorStart)-1 {
-		return nil
-	}
-	start := d.predecessorStart[block.Index()]
-	end := d.predecessorStart[block.Index()+1]
-	return d.predecessors[start:end]
-}
-
-// DominatorAnalysis holds the dominator tree of one graph's reachable subgraph, plus the
-// predecessor edges it was computed from.
-//
-// It is separate from PathAnalysis rather than folded into it because the two answer different
-// questions over different graphs. PathAnalysis dominates over a graph with a synthetic exit and no
-// thrown edges, to answer "is this on every non-throwing final path". This dominates over the real
-// reachable successor graph, to answer "does control have to pass through A to reach B". A consumer
-// wanting the second and given the first would get thrown paths silently excluded.
-type DominatorAnalysis[E any] struct {
-	graph *Graph[E]
-
-	// immediate[i] is the block index of block i's immediate dominator, or -1 when block i is
-	// unreachable. The entry block is its own immediate dominator, which is the convention
-	// Cooper-Harvey-Kennedy uses as its fixed point and which `Dominates` accounts for.
-	immediate []int
-
-	// rpoPosition[i] is block i's index in reverse postorder, or -1 when unreachable. It is kept
-	// because `Dominates` walks the tree upward and needs no ordering, but `ReversePostOrder`
-	// hands it out and the intersect step needed it anyway.
-	rpoPosition []int
-
-	// reversePostOrder is the reachable blocks in reverse postorder: every block appears after at
-	// least one predecessor, except the entry and the targets of back edges. It is the iteration
-	// order a forward dataflow wants, and the order the liveness solver in `no-useless-assignment`
-	// documents itself as approximating with a descending-index walk.
-	reversePostOrder []*Block[E]
-
-	// predecessors is one flat array of every reachable in-edge, grouped by target block, with
-	// predecessorStart[i]..predecessorStart[i+1] delimiting block i's group. One allocation rather
-	// than one slice per block, which is the same counting-sort shape `findFinalPathDominators`
-	// already uses internally.
-	predecessors     []*Block[E]
-	predecessorStart []int
-}
 
 // AnalyzeDominators computes the dominator tree and predecessor edges of graph's reachable
 // subgraph.
@@ -104,7 +45,7 @@ func AnalyzeDominators[E any](graph *Graph[E]) *DominatorAnalysis[E] {
 	// Counting sort over in-degree, so the predecessor groups land in one array.
 	//
 	// The entry block's own reachability is not read from Blocks[0].Reachable. Every other block's
-	// is, but the entry is reachable by construction — `Build` sets it before laying anything out —
+	// is, but the entry is reachable by construction (`Build` sets it before laying anything out),
 	// and reading the field here would make this depend on a field the builder sets rather than on
 	// the definition.
 	counts := make([]int, blockCount+1)
@@ -184,15 +125,18 @@ func AnalyzeDominators[E any](graph *Graph[E]) *DominatorAnalysis[E] {
 	// until nothing moves.
 	analysis.immediate[0] = 0
 	intersect := func(left, right int) int {
-		for left != right {
-			for analysis.rpoPosition[left] > analysis.rpoPosition[right] {
-				left = analysis.immediate[left]
+		// Each finger climbs the dominator tree from its own block until the two meet.
+		leftFinger := left
+		rightFinger := right
+		for leftFinger != rightFinger {
+			for analysis.rpoPosition[leftFinger] > analysis.rpoPosition[rightFinger] {
+				leftFinger = analysis.immediate[leftFinger]
 			}
-			for analysis.rpoPosition[right] > analysis.rpoPosition[left] {
-				right = analysis.immediate[right]
+			for analysis.rpoPosition[rightFinger] > analysis.rpoPosition[leftFinger] {
+				rightFinger = analysis.immediate[rightFinger]
 			}
 		}
-		return left
+		return leftFinger
 	}
 	for changed := true; changed; {
 		changed = false
@@ -218,78 +162,4 @@ func AnalyzeDominators[E any](graph *Graph[E]) *DominatorAnalysis[E] {
 	}
 
 	return analysis
-}
-
-// IsReachable reports whether block participates in this analysis at all.
-//
-// Every other accessor answers false or nil for an unreachable block, and that answer is
-// indistinguishable from a real negative. This is how a caller tells the two apart.
-func (d *DominatorAnalysis[E]) IsReachable(block *Block[E]) bool {
-	if d == nil || block == nil || block.Index() >= len(d.immediate) {
-		return false
-	}
-	return d.immediate[block.Index()] != -1
-}
-
-// ImmediateDominator returns the block that immediately dominates block: the last block every path
-// from the entry to block passes through, other than block itself.
-//
-// The second result is false for an unreachable block and for the entry block, which has no
-// immediate dominator. Returning the entry as its own would make a caller walking the tree upward
-// loop forever, and callers do walk it upward.
-func (d *DominatorAnalysis[E]) ImmediateDominator(block *Block[E]) (*Block[E], bool) {
-	if !d.IsReachable(block) {
-		return nil, false
-	}
-	index := block.Index()
-	if index == 0 {
-		return nil, false
-	}
-	return d.graph.Blocks[d.immediate[index]], true
-}
-
-// Dominates reports whether every path from the graph entry to block passes through dominator.
-//
-// A block dominates itself, which is the standard convention and the one Cooper-Harvey-Kennedy's
-// fixed point produces. `StrictlyDominates` is the version that excludes it.
-//
-// Both blocks must be reachable. An unreachable block is dominated by nothing and dominates
-// nothing, so either being unreachable answers false.
-func (d *DominatorAnalysis[E]) Dominates(dominator, block *Block[E]) bool {
-	if !d.IsReachable(dominator) || !d.IsReachable(block) {
-		return false
-	}
-	target := dominator.Index()
-	// Walking the tree upward rather than comparing depth intervals. The chain is bounded by the
-	// tree's height and this is not on a hot path; a depth-interval encoding would need a second
-	// pass to build and would have to be kept honest against the tree.
-	for index := block.Index(); ; index = d.immediate[index] {
-		if index == target {
-			return true
-		}
-		if index == 0 {
-			return false
-		}
-	}
-}
-
-// StrictlyDominates reports whether dominator dominates block and is not block.
-func (d *DominatorAnalysis[E]) StrictlyDominates(dominator, block *Block[E]) bool {
-	return dominator != block && d.Dominates(dominator, block)
-}
-
-// ReversePostOrder returns the reachable blocks in reverse postorder, entry first.
-//
-// This is the iteration order a forward dataflow wants: every block appears after at least one of
-// its predecessors, except the entry and the targets of back edges, so one pass propagates as far
-// as the acyclic structure allows and the fixed point converges in the number of rounds the loop
-// nesting depth sets rather than the block count.
-//
-// A backward dataflow wants this reversed, which `Solve` does rather than making each caller
-// remember to.
-func (d *DominatorAnalysis[E]) ReversePostOrder() []*Block[E] {
-	if d == nil {
-		return nil
-	}
-	return d.reversePostOrder
 }

@@ -29,10 +29,10 @@ import (
 
 // forkRoot is the Prettier fork whose node_modules the oracle imports from (internal/corpus): a skip naming
 // COHERE_PRETTIER_FORK when it is unset, and a failure when it is set but lacks node_modules/yaml/dist/parse/parser.js.
-func forkRoot(t *testing.T) string {
-	t.Helper()
-	corpus.Resolve(t, "prettier-fork:node_modules/yaml/dist/parse/parser.js")
-	return corpus.PrettierFork.Root(t)
+func forkRoot(test *testing.T) string {
+	test.Helper()
+	corpus.Resolve(test, "prettier-fork:node_modules/yaml/dist/parse/parser.js")
+	return corpus.PrettierFork.Root(test)
 }
 
 const oracleScript = `
@@ -78,16 +78,20 @@ type oracleInput struct {
 }
 
 // upstreamOutputs runs the oracle over inputs, one Node process per batch of a few megabytes.
-func upstreamOutputs(t *testing.T, inputs []oracleInput) []string {
-	t.Helper()
-	if _, err := exec.LookPath("node"); err != nil {
-		t.Skip("node is not installed; the CST oracle needs it")
+func upstreamOutputs(test *testing.T, inputs []oracleInput) []string {
+	test.Helper()
+	if _, lookPathError := exec.LookPath("node"); lookPathError != nil {
+		test.Skip("node is not installed; the CST oracle needs it")
 	}
-	root := forkRoot(t)
-	directory := t.TempDir()
+	root := forkRoot(test)
+	directory := test.TempDir()
 	script := filepath.Join(directory, "oracle.mjs")
-	if err := os.WriteFile(script, []byte(strings.ReplaceAll(oracleScript, "FORK", root)), 0o644); err != nil {
-		t.Fatal(err)
+	if writeError := os.WriteFile(
+		script,
+		[]byte(strings.ReplaceAll(oracleScript, "FORK", root)),
+		0o644,
+	); writeError != nil {
+		test.Fatal(writeError)
 	}
 	var outputs []string
 	for start := 0; start < len(inputs); {
@@ -96,35 +100,35 @@ func upstreamOutputs(t *testing.T, inputs []oracleInput) []string {
 			size += len(inputs[end].Text)
 			end++
 		}
-		outputs = append(outputs, runOracle(t, script, inputs[start:end])...)
+		outputs = append(outputs, runOracle(test, script, inputs[start:end])...)
 		start = end
 	}
 	return outputs
 }
 
-func runOracle(t *testing.T, script string, inputs []oracleInput) []string {
-	t.Helper()
-	encoded, err := json.Marshal(inputs)
-	if err != nil {
-		t.Fatal(err)
+func runOracle(test *testing.T, script string, inputs []oracleInput) []string {
+	test.Helper()
+	encoded, encodeError := json.Marshal(inputs)
+	if encodeError != nil {
+		test.Fatal(encodeError)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	timeoutContext, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
-	command := exec.CommandContext(ctx, "node", script)
+	command := exec.CommandContext(timeoutContext, "node", script)
 	command.Stdin = strings.NewReader(string(encoded))
-	output, err := command.Output()
-	if err != nil {
-		if exitError, isExit := err.(*exec.ExitError); isExit {
-			t.Fatalf("the CST oracle failed: %v\n%s", err, exitError.Stderr)
+	output, outputError := command.Output()
+	if outputError != nil {
+		if exitError, isExit := outputError.(*exec.ExitError); isExit {
+			test.Fatalf("the CST oracle failed: %v\n%s", outputError, exitError.Stderr)
 		}
-		t.Fatal(err)
+		test.Fatal(outputError)
 	}
 	var outputs []string
-	if err := json.Unmarshal(output, &outputs); err != nil {
-		t.Fatal(err)
+	if decodeError := json.Unmarshal(output, &outputs); decodeError != nil {
+		test.Fatal(decodeError)
 	}
 	if len(outputs) != len(inputs) {
-		t.Fatalf("the CST oracle returned %d outputs for %d inputs", len(outputs), len(inputs))
+		test.Fatalf("the CST oracle returned %d outputs for %d inputs", len(outputs), len(inputs))
 	}
 	return outputs
 }
@@ -150,8 +154,8 @@ func portOutput(input oracleInput) (output string) {
 			tokens = append(tokens, token)
 		}
 	} else {
-		for i := 0; i < len(text); i += input.Chunk {
-			for token := range parser.Parse(slice(text, i, i+input.Chunk), true) {
+		for index := 0; index < len(text); index += input.Chunk {
+			for token := range parser.Parse(slice(text, index, index+input.Chunk), true) {
 				tokens = append(tokens, token)
 			}
 		}
@@ -241,9 +245,9 @@ func writeToken(builder *strings.Builder, token *Token) {
 	}
 	writer.key("offset")
 	builder.WriteString(strconv.Itoa(token.Offset))
-	if token.Type == "block-scalar" || token.Props != nil {
+	if token.Type == "block-scalar" || token.Properties != nil {
 		writer.key("props")
-		writeTokenList(builder, token.Props)
+		writeTokenList(builder, token.Properties)
 	}
 	if token.HasSource() {
 		writer.key("source")
@@ -297,8 +301,8 @@ func writeItem(builder *strings.Builder, item *CollectionItem) {
 // surrogates as \udxxx, everything else as itself.
 func writeString(builder *strings.Builder, units []uint16) {
 	builder.WriteByte('"')
-	for i := 0; i < len(units); i++ {
-		unit := units[i]
+	for index := 0; index < len(units); index++ {
+		unit := units[index]
 		switch {
 		case unit == '"':
 			builder.WriteString(`\"`)
@@ -316,9 +320,9 @@ func writeString(builder *strings.Builder, units []uint16) {
 			builder.WriteString(`\t`)
 		case unit < 0x20:
 			fmt.Fprintf(builder, `\u%04x`, unit)
-		case isHighSurrogate(unit) && i+1 < len(units) && isLowSurrogate(units[i+1]):
-			builder.WriteRune(utf16.DecodeRune(rune(unit), rune(units[i+1])))
-			i++
+		case isHighSurrogate(unit) && index+1 < len(units) && isLowSurrogate(units[index+1]):
+			builder.WriteRune(utf16.DecodeRune(rune(unit), rune(units[index+1])))
+			index++
 		case isHighSurrogate(unit) || isLowSurrogate(unit):
 			fmt.Fprintf(builder, `\u%04x`, unit)
 		default:
@@ -329,16 +333,16 @@ func writeString(builder *strings.Builder, units []uint16) {
 }
 
 // compareOutputs reports each input whose port output differs from upstream's, up to limit of them.
-func compareOutputs(t *testing.T, label string, inputs []oracleInput, limit int) (failures int) {
-	t.Helper()
-	expected := upstreamOutputs(t, inputs)
+func compareOutputs(test *testing.T, label string, inputs []oracleInput, limit int) (failures int) {
+	test.Helper()
+	expected := upstreamOutputs(test, inputs)
 	threw, errorTokens := 0, 0
 	for index, input := range inputs {
 		actual := portOutput(input)
 		if actual != expected[index] {
 			failures++
 			if failures <= limit {
-				t.Errorf("%s %q (chunk %d): %s", label, truncateInput(input.Text), input.Chunk,
+				test.Errorf("%s %q (chunk %d): %s", label, truncateInput(input.Text), input.Chunk,
 					firstDifference(expected[index], actual))
 			}
 		}
@@ -349,7 +353,7 @@ func compareOutputs(t *testing.T, label string, inputs []oracleInput, limit int)
 		}
 	}
 	// A parse that throws is compared only as having thrown, so say how many did.
-	t.Logf("%s: upstream threw on %d of %d and yielded error tokens on %d", label, threw, len(inputs), errorTokens)
+	test.Logf("%s: upstream threw on %d of %d and yielded error tokens on %d", label, threw, len(inputs), errorTokens)
 	return failures
 }
 
@@ -376,34 +380,34 @@ func normalize(text string) string {
 }
 
 // TestTokensMatchUpstream runs every fixture through both sides, whole.
-func TestTokensMatchUpstream(t *testing.T) {
-	t.Parallel()
+func TestTokensMatchUpstream(test *testing.T) {
+	test.Parallel()
 	inputs := make([]oracleInput, 0, len(fixtures))
 	for _, fixture := range fixtures {
 		inputs = append(inputs, oracleInput{Text: normalize(fixture)})
 	}
-	failures := compareOutputs(t, "fixture", inputs, 60)
-	t.Logf("%d of %d fixtures match upstream", len(inputs)-failures, len(inputs))
+	failures := compareOutputs(test, "fixture", inputs, 60)
+	test.Logf("%d of %d fixtures match upstream", len(inputs)-failures, len(inputs))
 }
 
 // TestChunkedTokensMatchUpstream feeds every fixture in chunks of 1, 2, 3, 5 and 8 code units, which
 // splits lines, tokens and surrogate pairs at every point the lexer has to buffer across.
-func TestChunkedTokensMatchUpstream(t *testing.T) {
-	t.Parallel()
+func TestChunkedTokensMatchUpstream(test *testing.T) {
+	test.Parallel()
 	var inputs []oracleInput
 	for _, fixture := range fixtures {
 		for _, chunk := range []int{1, 2, 3, 5, 8} {
 			inputs = append(inputs, oracleInput{Text: normalize(fixture), Chunk: chunk})
 		}
 	}
-	failures := compareOutputs(t, "fixture", inputs, 60)
-	t.Logf("%d of %d chunked parses match upstream", len(inputs)-failures, len(inputs))
+	failures := compareOutputs(test, "fixture", inputs, 60)
+	test.Logf("%d of %d chunked parses match upstream", len(inputs)-failures, len(inputs))
 }
 
 // TestGeneratedTokensMatchUpstream compares inputs drawn from YAML's indicator characters, spaces,
 // tabs, line breaks and a few letters, where the hand-written fixtures cannot reach every combination.
-func TestGeneratedTokensMatchUpstream(t *testing.T) {
-	t.Parallel()
+func TestGeneratedTokensMatchUpstream(test *testing.T) {
+	test.Parallel()
 	count := 20000
 	if testing.Short() {
 		count = 2000
@@ -412,96 +416,100 @@ func TestGeneratedTokensMatchUpstream(t *testing.T) {
 	for _, text := range generatedInputs(count) {
 		inputs = append(inputs, oracleInput{Text: text})
 	}
-	failures := compareOutputs(t, "generated", inputs, 40)
-	t.Logf("%d of %d generated inputs match upstream", len(inputs)-failures, len(inputs))
+	failures := compareOutputs(test, "generated", inputs, 40)
+	test.Logf("%d of %d generated inputs match upstream", len(inputs)-failures, len(inputs))
 }
 
 // TestOracleCanFail proves the comparison sees a difference: the tokens of one input compared against
 // upstream's for another must differ.
-func TestOracleCanFail(t *testing.T) {
-	t.Parallel()
-	expected := upstreamOutputs(t, []oracleInput{{Text: "a: b"}, {Text: "a: [b]"}})
+func TestOracleCanFail(test *testing.T) {
+	test.Parallel()
+	expected := upstreamOutputs(test, []oracleInput{{Text: "a: b"}, {Text: "a: [b]"}})
 	if portOutput(oracleInput{Text: "a:  b"}) == expected[0] {
-		t.Fatal("the comparison found no difference between the tokens of a: b and a:  b")
+		test.Fatal("the comparison found no difference between the tokens of a: b and a:  b")
 	}
 	if portOutput(oracleInput{Text: "a: [b,]"}) == expected[1] {
-		t.Fatal("the comparison found no difference between the tokens of a: [b] and a: [b,]")
+		test.Fatal("the comparison found no difference between the tokens of a: [b] and a: [b,]")
 	}
 }
 
 // TestYamlTestSuiteMatchesUpstream compares every case of the yaml-test-suite package in the fork, whole
 // and in chunks of 3.
-func TestYamlTestSuiteMatchesUpstream(t *testing.T) {
-	t.Parallel()
-	root := forkRoot(t)
+func TestYamlTestSuiteMatchesUpstream(test *testing.T) {
+	test.Parallel()
+	root := forkRoot(test)
 	suite := filepath.Join(root, "node_modules", "yaml-test-suite", "index.js")
-	if _, err := os.Stat(suite); err != nil {
-		t.Skip("the fork has no yaml-test-suite package")
+	if _, statError := os.Stat(suite); statError != nil {
+		test.Skip("the fork has no yaml-test-suite package")
 	}
-	script := filepath.Join(t.TempDir(), "suite.mjs")
+	script := filepath.Join(test.TempDir(), "suite.mjs")
 	source := `import suite from "SUITE";
 const inputs = [];
 for (const test of suite) for (const testCase of test.cases) if (typeof testCase.yaml === "string") inputs.push(testCase.yaml);
 process.stdout.write(JSON.stringify(inputs));`
-	if err := os.WriteFile(script, []byte(strings.ReplaceAll(source, "SUITE", suite)), 0o644); err != nil {
-		t.Fatal(err)
+	if writeError := os.WriteFile(
+		script,
+		[]byte(strings.ReplaceAll(source, "SUITE", suite)),
+		0o644,
+	); writeError != nil {
+		test.Fatal(writeError)
 	}
-	output, err := exec.Command("node", script).Output()
-	if err != nil {
-		t.Fatalf("listing the yaml-test-suite failed: %v", err)
+	output, outputError := exec.Command("node", script).Output()
+	if outputError != nil {
+		test.Fatalf("listing the yaml-test-suite failed: %v", outputError)
 	}
 	var texts []string
-	if err := json.Unmarshal(output, &texts); err != nil {
-		t.Fatal(err)
+	if decodeError := json.Unmarshal(output, &texts); decodeError != nil {
+		test.Fatal(decodeError)
 	}
 	var inputs []oracleInput
 	for _, text := range texts {
 		inputs = append(inputs, oracleInput{Text: text}, oracleInput{Text: text, Chunk: 3})
 	}
-	failures := compareOutputs(t, "suite", inputs, 40)
-	t.Logf("%d of %d yaml-test-suite parses (%d cases, whole and chunked) match upstream",
+	failures := compareOutputs(test, "suite", inputs, 40)
+	test.Logf("%d of %d yaml-test-suite parses (%d cases, whole and chunked) match upstream",
 		len(inputs)-failures, len(inputs), len(texts))
 }
 
 // TestCorpusMatchesUpstream compares every .yaml and .yml file under COHERE_YAML_CORPUS, a measuring run.
-func TestCorpusMatchesUpstream(t *testing.T) {
-	t.Parallel()
+func TestCorpusMatchesUpstream(test *testing.T) {
+	test.Parallel()
 	root := os.Getenv("COHERE_YAML_CORPUS")
 	if root == "" {
-		t.Skip("set COHERE_YAML_CORPUS to a directory to compare every .yaml and .yml file under it")
+		test.Skip("set COHERE_YAML_CORPUS to a directory to compare every .yaml and .yml file under it")
 	}
 	var paths []string
 	var inputs []oracleInput
-	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
-		if err != nil {
-			return err
+	walkError := filepath.WalkDir(root, func(path string, entry os.DirEntry, pathError error) error {
+		if pathError != nil {
+			return pathError
 		}
 		if entry.IsDir() && (entry.Name() == "node_modules" || entry.Name() == ".git") {
 			return filepath.SkipDir
 		}
 		extension := strings.ToLower(filepath.Ext(path))
 		if !entry.IsDir() && entry.Type().IsRegular() && (extension == ".yaml" || extension == ".yml") {
-			source, err := os.ReadFile(path)
-			if err != nil {
-				return err
+			source, readError := os.ReadFile(path)
+			if readError != nil {
+				return readError
 			}
 			paths = append(paths, path)
 			inputs = append(inputs, oracleInput{Text: normalize(string(source))})
 		}
 		return nil
 	})
-	if err != nil {
-		t.Fatal(err)
+	if walkError != nil {
+		test.Fatal(walkError)
 	}
-	expected := upstreamOutputs(t, inputs)
+	expected := upstreamOutputs(test, inputs)
 	failures := 0
 	for index, input := range inputs {
 		if actual := portOutput(input); actual != expected[index] {
 			failures++
 			if failures <= 40 {
-				t.Errorf("%s: %s", paths[index], firstDifference(expected[index], actual))
+				test.Errorf("%s: %s", paths[index], firstDifference(expected[index], actual))
 			}
 		}
 	}
-	t.Logf("%d of %d files match upstream's tokens", len(inputs)-failures, len(inputs))
+	test.Logf("%d of %d files match upstream's tokens", len(inputs)-failures, len(inputs))
 }

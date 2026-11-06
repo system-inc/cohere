@@ -40,10 +40,10 @@ var singleSpreadText = policy.MessageOf("adamic/single-spread", "laterSpread")
  *
  * The repair is a different construction of the object, and only the author knows which keys it needs.
  */
-var SingleSpread = rule.Rule{
+var SingleSpread = rule.Rule[rule.NoOptions]{
 	Name: "adamic/single-spread",
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindObjectLiteralExpression: func(node *ast.Node) {
 				// `({ x, ...rest } = point)` is a pattern: its rest collects, it copies over nothing.
@@ -65,7 +65,7 @@ var SingleSpread = rule.Rule{
 						continue
 					}
 					if before != "" {
-						ctx.ReportNode(member, rule.Message{
+						ruleContext.ReportNode(member, rule.Message{
 							Id:          "laterSpread",
 							Description: singleSpreadText.Render(map[string]string{"what": before}),
 						})
@@ -80,12 +80,12 @@ var SingleSpread = rule.Rule{
 
 // spreadsALiteral is an object literal, or a conditional whose branches both are, through parentheses.
 func spreadsALiteral(expression *ast.Node) bool {
-	expression = ast.SkipParentheses(expression)
-	switch expression.Kind {
+	unwrapped := ast.SkipParentheses(expression)
+	switch unwrapped.Kind {
 	case ast.KindObjectLiteralExpression:
 		return true
 	case ast.KindConditionalExpression:
-		conditional := expression.AsConditionalExpression()
+		conditional := unwrapped.AsConditionalExpression()
 		return spreadsALiteral(conditional.WhenTrue) && spreadsALiteral(conditional.WhenFalse)
 	}
 	return false

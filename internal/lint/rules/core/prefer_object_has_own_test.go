@@ -15,7 +15,7 @@ import (
 // One valid case is not here and its absence is deliberate. Upstream writes
 // `/* global Object: off */` above an otherwise-reporting input, which turns the global off in its
 // own configuration surface and makes the scope guard fail. Our configuration has no such
-// directive and the checker has nothing to answer it with, so that input REPORTS here. It is
+// directive and the checker has nothing to answer it with, so that input reports here. It is
 // carried below as a recorded divergence rather than dropped or quietly greened, because deleting
 // it would leave no trace that upstream calls it clean.
 //
@@ -23,8 +23,8 @@ import (
 // the same way the harness transforms the input. Padding the rule to make the comparison line up
 // would be the wrong repair.
 
-func TestPreferObjectHasOwnStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestPreferObjectHasOwnStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -64,7 +64,10 @@ func TestPreferObjectHasOwnStaysSilent(t *testing.T) {
 		{name: "valid31", source: "Object.hasOwnProperty.prototype.hasOwnProperty.call(a, b);"},
 		{name: "valid32", source: "Object.prototype[hasOwnProperty].call(obj, prop)"},
 		{name: "valid33", source: "Object.prototype.hasOwnProperty[call](obj, prop)"},
-		{name: "valid34", source: "class C { #hasOwnProperty; foo() { Object.prototype.#hasOwnProperty.call(obj, prop) } }"},
+		{
+			name:   "valid34",
+			source: "class C { #hasOwnProperty; foo() { Object.prototype.#hasOwnProperty.call(obj, prop) } }",
+		},
 		{name: "valid35", source: "class C { #call; foo() { Object.prototype.hasOwnProperty.#call(obj, prop) } }"},
 		{name: "valid36", source: "Object[prototype].hasOwnProperty.call(obj, prop)"},
 		{name: "valid37", source: "class C { #prototype; foo() { Object.#prototype.hasOwnProperty.call(obj, prop) } }"},
@@ -90,10 +93,10 @@ func TestPreferObjectHasOwnStaysSilent(t *testing.T) {
 		{name: "valid57", source: "const hasProperty = Object.hasOwn(object, property);"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.RunTyped(t, PreferObjectHasOwn, "file.ts", testCase.source))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.RunTyped(test, PreferObjectHasOwn, "file.ts", testCase.source))
 		})
 	}
 }
@@ -103,8 +106,8 @@ func TestPreferObjectHasOwnStaysSilent(t *testing.T) {
 // message-id fixture could see.
 const preferObjectHasOwnDeclinesToFix = "\x00declines"
 
-func TestPreferObjectHasOwnFires(t *testing.T) {
-	t.Parallel()
+func TestPreferObjectHasOwnFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name      string
@@ -112,52 +115,176 @@ func TestPreferObjectHasOwnFires(t *testing.T) {
 		wantFixed string
 	}{
 		{name: "invalid0", source: "Object.hasOwnProperty.call(obj, 'foo')", wantFixed: "Object.hasOwn(obj, 'foo')\n"},
-		{name: "invalid1", source: "Object.hasOwnProperty.call(obj, property)", wantFixed: "Object.hasOwn(obj, property)\n"},
-		{name: "invalid2", source: "Object.prototype.hasOwnProperty.call(obj, 'foo')", wantFixed: "Object.hasOwn(obj, 'foo')\n"},
+		{
+			name:      "invalid1",
+			source:    "Object.hasOwnProperty.call(obj, property)",
+			wantFixed: "Object.hasOwn(obj, property)\n",
+		},
+		{
+			name:      "invalid2",
+			source:    "Object.prototype.hasOwnProperty.call(obj, 'foo')",
+			wantFixed: "Object.hasOwn(obj, 'foo')\n",
+		},
 		{name: "invalid3", source: "({}).hasOwnProperty.call(obj, 'foo')", wantFixed: "Object.hasOwn(obj, 'foo')\n"},
-		{name: "invalid4", source: "Object/* comment */.prototype.hasOwnProperty.call(a, b);", wantFixed: preferObjectHasOwnDeclinesToFix},
-		{name: "invalid5", source: "const hasProperty = Object.prototype.hasOwnProperty.call(object, property);", wantFixed: "const hasProperty = Object.hasOwn(object, property);\n"},
-		{name: "invalid6", source: "const hasProperty = (( Object.prototype.hasOwnProperty.call(object, property) ));", wantFixed: "const hasProperty = (( Object.hasOwn(object, property) ));\n"},
-		{name: "invalid7", source: "const hasProperty = (( Object.prototype.hasOwnProperty.call ))(object, property);", wantFixed: "const hasProperty = (( Object.hasOwn ))(object, property);\n"},
-		{name: "invalid8", source: "const hasProperty = (( Object.prototype.hasOwnProperty )).call(object, property);", wantFixed: "const hasProperty = Object.hasOwn(object, property);\n"},
-		{name: "invalid9", source: "const hasProperty = (( Object.prototype )).hasOwnProperty.call(object, property);", wantFixed: "const hasProperty = Object.hasOwn(object, property);\n"},
-		{name: "invalid10", source: "const hasProperty = (( Object )).prototype.hasOwnProperty.call(object, property);", wantFixed: "const hasProperty = Object.hasOwn(object, property);\n"},
-		{name: "invalid11", source: "const hasProperty = {}.hasOwnProperty.call(object, property);", wantFixed: "const hasProperty = Object.hasOwn(object, property);\n"},
-		{name: "invalid12", source: "const hasProperty={}.hasOwnProperty.call(object, property);", wantFixed: "const hasProperty=Object.hasOwn(object, property);\n"},
-		{name: "invalid13", source: "const hasProperty = (( {}.hasOwnProperty.call(object, property) ));", wantFixed: "const hasProperty = (( Object.hasOwn(object, property) ));\n"},
-		{name: "invalid14", source: "const hasProperty = (( {}.hasOwnProperty.call ))(object, property);", wantFixed: "const hasProperty = (( Object.hasOwn ))(object, property);\n"},
-		{name: "invalid15", source: "const hasProperty = (( {}.hasOwnProperty )).call(object, property);", wantFixed: "const hasProperty = Object.hasOwn(object, property);\n"},
-		{name: "invalid16", source: "const hasProperty = (( {} )).hasOwnProperty.call(object, property);", wantFixed: "const hasProperty = Object.hasOwn(object, property);\n"},
-		{name: "invalid17", source: "function foo(){return {}.hasOwnProperty.call(object, property)}", wantFixed: "function foo(){return Object.hasOwn(object, property)}\n"},
-		{name: "invalid18", source: "function foo(){return{}.hasOwnProperty.call(object, property)}", wantFixed: "function foo(){return Object.hasOwn(object, property)}\n"},
-		{name: "invalid19", source: "function foo(){return/*comment*/{}.hasOwnProperty.call(object, property)}", wantFixed: "function foo(){return/*comment*/Object.hasOwn(object, property)}\n"},
-		{name: "invalid20", source: "async function foo(){return await{}.hasOwnProperty.call(object, property)}", wantFixed: "async function foo(){return await Object.hasOwn(object, property)}\n"},
-		{name: "invalid21", source: "async function foo(){return await/*comment*/{}.hasOwnProperty.call(object, property)}", wantFixed: "async function foo(){return await/*comment*/Object.hasOwn(object, property)}\n"},
-		{name: "invalid22", source: "for (const x of{}.hasOwnProperty.call(object, property).toString());", wantFixed: "for (const x of Object.hasOwn(object, property).toString());\n"},
-		{name: "invalid23", source: "for (const x of/*comment*/{}.hasOwnProperty.call(object, property).toString());", wantFixed: "for (const x of/*comment*/Object.hasOwn(object, property).toString());\n"},
-		{name: "invalid24", source: "for (const x in{}.hasOwnProperty.call(object, property).toString());", wantFixed: "for (const x in Object.hasOwn(object, property).toString());\n"},
-		{name: "invalid25", source: "for (const x in/*comment*/{}.hasOwnProperty.call(object, property).toString());", wantFixed: "for (const x in/*comment*/Object.hasOwn(object, property).toString());\n"},
-		{name: "invalid26", source: "function foo(){return({}.hasOwnProperty.call)(object, property)}", wantFixed: "function foo(){return(Object.hasOwn)(object, property)}\n"},
-		{name: "invalid27", source: "Object['prototype']['hasOwnProperty']['call'](object, property);", wantFixed: "Object.hasOwn(object, property);\n"},
-		{name: "invalid28", source: "Object[`prototype`][`hasOwnProperty`][`call`](object, property);", wantFixed: "Object.hasOwn(object, property);\n"},
-		{name: "invalid29", source: "Object['hasOwnProperty']['call'](object, property);", wantFixed: "Object.hasOwn(object, property);\n"},
-		{name: "invalid30", source: "Object[`hasOwnProperty`][`call`](object, property);", wantFixed: "Object.hasOwn(object, property);\n"},
-		{name: "invalid31", source: "({})['hasOwnProperty']['call'](object, property);", wantFixed: "Object.hasOwn(object, property);\n"},
-		{name: "invalid32", source: "({})[`hasOwnProperty`][`call`](object, property);", wantFixed: "Object.hasOwn(object, property);\n"},
+		{
+			name:      "invalid4",
+			source:    "Object/* comment */.prototype.hasOwnProperty.call(a, b);",
+			wantFixed: preferObjectHasOwnDeclinesToFix,
+		},
+		{
+			name:      "invalid5",
+			source:    "const hasProperty = Object.prototype.hasOwnProperty.call(object, property);",
+			wantFixed: "const hasProperty = Object.hasOwn(object, property);\n",
+		},
+		{
+			name:      "invalid6",
+			source:    "const hasProperty = (( Object.prototype.hasOwnProperty.call(object, property) ));",
+			wantFixed: "const hasProperty = (( Object.hasOwn(object, property) ));\n",
+		},
+		{
+			name:      "invalid7",
+			source:    "const hasProperty = (( Object.prototype.hasOwnProperty.call ))(object, property);",
+			wantFixed: "const hasProperty = (( Object.hasOwn ))(object, property);\n",
+		},
+		{
+			name:      "invalid8",
+			source:    "const hasProperty = (( Object.prototype.hasOwnProperty )).call(object, property);",
+			wantFixed: "const hasProperty = Object.hasOwn(object, property);\n",
+		},
+		{
+			name:      "invalid9",
+			source:    "const hasProperty = (( Object.prototype )).hasOwnProperty.call(object, property);",
+			wantFixed: "const hasProperty = Object.hasOwn(object, property);\n",
+		},
+		{
+			name:      "invalid10",
+			source:    "const hasProperty = (( Object )).prototype.hasOwnProperty.call(object, property);",
+			wantFixed: "const hasProperty = Object.hasOwn(object, property);\n",
+		},
+		{
+			name:      "invalid11",
+			source:    "const hasProperty = {}.hasOwnProperty.call(object, property);",
+			wantFixed: "const hasProperty = Object.hasOwn(object, property);\n",
+		},
+		{
+			name:      "invalid12",
+			source:    "const hasProperty={}.hasOwnProperty.call(object, property);",
+			wantFixed: "const hasProperty=Object.hasOwn(object, property);\n",
+		},
+		{
+			name:      "invalid13",
+			source:    "const hasProperty = (( {}.hasOwnProperty.call(object, property) ));",
+			wantFixed: "const hasProperty = (( Object.hasOwn(object, property) ));\n",
+		},
+		{
+			name:      "invalid14",
+			source:    "const hasProperty = (( {}.hasOwnProperty.call ))(object, property);",
+			wantFixed: "const hasProperty = (( Object.hasOwn ))(object, property);\n",
+		},
+		{
+			name:      "invalid15",
+			source:    "const hasProperty = (( {}.hasOwnProperty )).call(object, property);",
+			wantFixed: "const hasProperty = Object.hasOwn(object, property);\n",
+		},
+		{
+			name:      "invalid16",
+			source:    "const hasProperty = (( {} )).hasOwnProperty.call(object, property);",
+			wantFixed: "const hasProperty = Object.hasOwn(object, property);\n",
+		},
+		{
+			name:      "invalid17",
+			source:    "function foo(){return {}.hasOwnProperty.call(object, property)}",
+			wantFixed: "function foo(){return Object.hasOwn(object, property)}\n",
+		},
+		{
+			name:      "invalid18",
+			source:    "function foo(){return{}.hasOwnProperty.call(object, property)}",
+			wantFixed: "function foo(){return Object.hasOwn(object, property)}\n",
+		},
+		{
+			name:      "invalid19",
+			source:    "function foo(){return/*comment*/{}.hasOwnProperty.call(object, property)}",
+			wantFixed: "function foo(){return/*comment*/Object.hasOwn(object, property)}\n",
+		},
+		{
+			name:      "invalid20",
+			source:    "async function foo(){return await{}.hasOwnProperty.call(object, property)}",
+			wantFixed: "async function foo(){return await Object.hasOwn(object, property)}\n",
+		},
+		{
+			name:      "invalid21",
+			source:    "async function foo(){return await/*comment*/{}.hasOwnProperty.call(object, property)}",
+			wantFixed: "async function foo(){return await/*comment*/Object.hasOwn(object, property)}\n",
+		},
+		{
+			name:      "invalid22",
+			source:    "for (const x of{}.hasOwnProperty.call(object, property).toString());",
+			wantFixed: "for (const x of Object.hasOwn(object, property).toString());\n",
+		},
+		{
+			name:      "invalid23",
+			source:    "for (const x of/*comment*/{}.hasOwnProperty.call(object, property).toString());",
+			wantFixed: "for (const x of/*comment*/Object.hasOwn(object, property).toString());\n",
+		},
+		{
+			name:      "invalid24",
+			source:    "for (const x in{}.hasOwnProperty.call(object, property).toString());",
+			wantFixed: "for (const x in Object.hasOwn(object, property).toString());\n",
+		},
+		{
+			name:      "invalid25",
+			source:    "for (const x in/*comment*/{}.hasOwnProperty.call(object, property).toString());",
+			wantFixed: "for (const x in/*comment*/Object.hasOwn(object, property).toString());\n",
+		},
+		{
+			name:      "invalid26",
+			source:    "function foo(){return({}.hasOwnProperty.call)(object, property)}",
+			wantFixed: "function foo(){return(Object.hasOwn)(object, property)}\n",
+		},
+		{
+			name:      "invalid27",
+			source:    "Object['prototype']['hasOwnProperty']['call'](object, property);",
+			wantFixed: "Object.hasOwn(object, property);\n",
+		},
+		{
+			name:      "invalid28",
+			source:    "Object[`prototype`][`hasOwnProperty`][`call`](object, property);",
+			wantFixed: "Object.hasOwn(object, property);\n",
+		},
+		{
+			name:      "invalid29",
+			source:    "Object['hasOwnProperty']['call'](object, property);",
+			wantFixed: "Object.hasOwn(object, property);\n",
+		},
+		{
+			name:      "invalid30",
+			source:    "Object[`hasOwnProperty`][`call`](object, property);",
+			wantFixed: "Object.hasOwn(object, property);\n",
+		},
+		{
+			name:      "invalid31",
+			source:    "({})['hasOwnProperty']['call'](object, property);",
+			wantFixed: "Object.hasOwn(object, property);\n",
+		},
+		{
+			name:      "invalid32",
+			source:    "({})[`hasOwnProperty`][`call`](object, property);",
+			wantFixed: "Object.hasOwn(object, property);\n",
+		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, PreferObjectHasOwn, "file.ts", testCase.source)
-			rule_testing.ExpectFindings(t, result, "useHasOwn")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, PreferObjectHasOwn, "file.ts", testCase.source)
+			rule_testing.ExpectFindings(test, result, "useHasOwn")
 			if testCase.wantFixed == preferObjectHasOwnDeclinesToFix {
 				if len(result.Diagnostics) > 0 && len(result.Diagnostics[0].Fixes) > 0 {
-					t.Errorf("upstream declines to fix this case, and this offered %d fixes",
+					test.Errorf("upstream declines to fix this case, and this offered %d fixes",
 						len(result.Diagnostics[0].Fixes))
 				}
 				return
 			}
-			rule_testing.ExpectFixedSource(t, result, testCase.wantFixed)
+			rule_testing.ExpectFixedSource(test, result, testCase.wantFixed)
 		})
 	}
 }
@@ -165,8 +292,8 @@ func TestPreferObjectHasOwnFires(t *testing.T) {
 // The span, which ExpectFindings cannot see. Upstream reports the whole call expression rather than
 // the callee it replaces, and the two are different nodes: a finding on the callee would carry a
 // correct repair while pointing somewhere the reader was never shown.
-func TestPreferObjectHasOwnSpan(t *testing.T) {
-	t.Parallel()
+func TestPreferObjectHasOwnSpan(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name     string
@@ -180,24 +307,24 @@ func TestPreferObjectHasOwnSpan(t *testing.T) {
 		{"emptyLiteral", "({}).hasOwnProperty.call(obj, prop)", "({}).hasOwnProperty.call(obj, prop)"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, PreferObjectHasOwn, "file.ts", testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, PreferObjectHasOwn, "file.ts", testCase.source)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("expected 1 finding, got %d", len(result.Diagnostics))
+				test.Fatalf("expected 1 finding, got %d", len(result.Diagnostics))
 			}
 			finding := result.Diagnostics[0]
 			// The harness trimmed the source, so slice what it actually wrote.
 			written := strings.TrimSpace(testCase.source) + "\n"
 			if got := written[finding.Range.Pos():finding.Range.End()]; got != testCase.wantText {
-				t.Errorf("reported text: got %q, want %q", got, testCase.wantText)
+				test.Errorf("reported text: got %q, want %q", got, testCase.wantText)
 			}
 			if finding.Message.Id != "useHasOwn" {
-				t.Errorf("message id: got %q", finding.Message.Id)
+				test.Errorf("message id: got %q", finding.Message.Id)
 			}
 			wantPrefix := "Use 'Object.hasOwn()' instead of 'Object.prototype.hasOwnProperty.call()'. "
 			if got := finding.Message.Description; !strings.HasPrefix(got, wantPrefix) {
-				t.Errorf("message:\n got %q\nwant prefix %q", got, wantPrefix)
+				test.Errorf("message:\n got %q\nwant prefix %q", got, wantPrefix)
 			}
 		})
 	}
@@ -207,8 +334,8 @@ func TestPreferObjectHasOwnSpan(t *testing.T) {
 // asks a scope table whether `Object` resolves to the global binding; this asks the checker whether
 // every declaration of it is ambient. Both answers were probed on all four shapes before the rule
 // was built on either.
-func TestPreferObjectHasOwnScopeGuard(t *testing.T) {
-	t.Parallel()
+func TestPreferObjectHasOwnScopeGuard(test *testing.T) {
+	test.Parallel()
 
 	shadowed := []struct {
 		name   string
@@ -220,18 +347,18 @@ func TestPreferObjectHasOwnScopeGuard(t *testing.T) {
 		{"emptyLiteralUnderAShadow", "((Object: any) => ({}).hasOwnProperty.call(obj, prop))(null);"},
 	}
 	for _, testCase := range shadowed {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.RunTyped(t, PreferObjectHasOwn, "file.ts", testCase.source))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.RunTyped(test, PreferObjectHasOwn, "file.ts", testCase.source))
 		})
 	}
 
 	// A control, so the four clean verdicts above mean something. The same call with no shadow
 	// reports, which is the only thing that separates a working guard from a dead rule.
-	t.Run("controlWithNoShadowReports", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, PreferObjectHasOwn, "file.ts",
+	test.Run("controlWithNoShadowReports", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, PreferObjectHasOwn, "file.ts",
 			"Object.prototype.hasOwnProperty.call(obj, prop);"), "useHasOwn")
 	})
 }
@@ -245,12 +372,12 @@ func TestPreferObjectHasOwnScopeGuard(t *testing.T) {
 //
 // Pinned at the layer that decides it: this is a configuration-surface difference rather than a
 // rule difference, and a port bent to make it clean would be wrong about every other input.
-func TestPreferObjectHasOwnDivergesOnTheGlobalOffDirective(t *testing.T) {
-	t.Parallel()
+func TestPreferObjectHasOwnDivergesOnTheGlobalOffDirective(test *testing.T) {
+	test.Parallel()
 
 	source := "/* global Object: off */\n({}).hasOwnProperty.call(a, b);"
-	rule_testing.ExpectFindings(t,
-		rule_testing.RunTyped(t, PreferObjectHasOwn, "file.ts", source), "useHasOwn")
+	rule_testing.ExpectFindings(test,
+		rule_testing.RunTyped(test, PreferObjectHasOwn, "file.ts", source), "useHasOwn")
 }
 
 // Private names, where the shelf helper and upstream disagree and the disagreement is invisible in
@@ -260,15 +387,15 @@ func TestPreferObjectHasOwnDivergesOnTheGlobalOffDirective(t *testing.T) {
 // answers null for a private name. Neither string equals "call", so both reach the same silence on
 // upstream's four private-name cases, and no fixture over those cases could tell the two apart.
 // Recorded because building on the helper without knowing this would be building on a coincidence.
-func TestPreferObjectHasOwnPrivateNames(t *testing.T) {
-	t.Parallel()
+func TestPreferObjectHasOwnPrivateNames(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		"class C { #hasOwnProperty: any; foo() { (Object as any).#hasOwnProperty.call(obj, prop) } }",
 		"class C { #call: any; foo() { (Object as any).hasOwnProperty.#call(obj, prop) } }",
 	}
 	for _, source := range cases {
-		rule_testing.ExpectClean(t, rule_testing.RunTyped(t, PreferObjectHasOwn, "file.ts", source))
+		rule_testing.ExpectClean(test, rule_testing.RunTyped(test, PreferObjectHasOwn, "file.ts", source))
 	}
 }
 
@@ -282,8 +409,8 @@ func TestPreferObjectHasOwnPrivateNames(t *testing.T) {
 // Upstream gets this for free because it looks the name up rather than resolving a node, so its
 // corpus has no case for it: `foo.hasOwnProperty.call(obj, prop)` is the nearest, and `foo` is
 // undeclared, which our ambient check already declines for a different reason.
-func TestPreferObjectHasOwnRequiresTheNameObject(t *testing.T) {
-	t.Parallel()
+func TestPreferObjectHasOwnRequiresTheNameObject(test *testing.T) {
+	test.Parallel()
 
 	otherGlobals := []struct {
 		name   string
@@ -294,26 +421,26 @@ func TestPreferObjectHasOwnRequiresTheNameObject(t *testing.T) {
 		{"arrayThroughPrototype", "Array.prototype.hasOwnProperty.call(obj, prop);"},
 	}
 	for _, testCase := range otherGlobals {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.RunTyped(t, PreferObjectHasOwn, "file.ts", testCase.source))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.RunTyped(test, PreferObjectHasOwn, "file.ts", testCase.source))
 		})
 	}
 
 	// A control, because three clean verdicts prove nothing on their own.
-	t.Run("controlObjectStillReports", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, PreferObjectHasOwn, "file.ts",
+	test.Run("controlObjectStillReports", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, PreferObjectHasOwn, "file.ts",
 			"Object.hasOwnProperty.call(obj, prop);"), "useHasOwn")
 	})
 
-	// `globalThis` resolves to a symbol with ZERO declarations, which is the shape that crashed a
+	// `globalThis` resolves to a symbol with zero declarations, which is the shape that crashed a
 	// probe written for this measurement. The rule's length guard is what keeps that a decline
 	// rather than a panic, and no upstream case reaches it.
-	t.Run("globalThisHasNoDeclarationsAndDoesNotPanic", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectClean(t, rule_testing.RunTyped(t, PreferObjectHasOwn, "file.ts",
+	test.Run("globalThisHasNoDeclarationsAndDoesNotPanic", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectClean(test, rule_testing.RunTyped(test, PreferObjectHasOwn, "file.ts",
 			"globalThis.hasOwnProperty.call(obj, prop);"))
 	})
 }

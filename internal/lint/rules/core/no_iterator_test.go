@@ -15,8 +15,8 @@ const iteratorFile = "/repository/source/Iterator.ts"
 // 4 pass, 5 fail, and the snapshot records 5 diagnostics from those 5 inputs, so one finding per
 // input is right here rather than assumed. Copied because a fixture a porter invents encodes the
 // same belief as the port, and the case that catches a bug is the one nobody would think to write.
-func TestNoIteratorFires(t *testing.T) {
-	t.Parallel()
+func TestNoIteratorFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -30,10 +30,10 @@ func TestNoIteratorFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoIterator, iteratorFile, testCase.sourceText), "noIterator")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, NoIterator, iteratorFile, testCase.sourceText), "noIterator")
 		})
 	}
 }
@@ -44,8 +44,8 @@ func TestNoIteratorFires(t *testing.T) {
 // variable holds and is not this one. The second is a declaration rather than an access. The third
 // is a different key that merely starts the same. The fourth is the sharpest: its text does contain
 // `__iterator__`, followed by a newline, so any rule matching on source text reports it.
-func TestNoIteratorStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoIteratorStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -58,9 +58,9 @@ func TestNoIteratorStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoIterator, iteratorFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoIterator, iteratorFile, testCase.sourceText))
 		})
 	}
 }
@@ -70,10 +70,10 @@ func TestNoIteratorStaysSilent(t *testing.T) {
 // The imported corpus is a floor and not a ceiling: it exercises no substituting template, and a
 // port reading a template's cooked text without checking for substitutions would report this while
 // upstream does not. `staticPropertyName` declines it by kind, and this pins that.
-func TestNoIteratorDeclinesASubstitutingTemplate(t *testing.T) {
-	t.Parallel()
+func TestNoIteratorDeclinesASubstitutingTemplate(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectClean(t, rule_testing.Run(t, NoIterator, iteratorFile,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, NoIterator, iteratorFile,
 		"declare const part: string;\nexport const a = test[`__iterator${part}__`];\n"))
 }
 
@@ -85,8 +85,8 @@ func TestNoIteratorDeclinesASubstitutingTemplate(t *testing.T) {
 //
 // Asserted by applying the suggestion rather than by comparing offsets: offsets are the thing most
 // likely to be wrong in the same direction as the code that produced them.
-func TestNoIteratorSuggestsTheRightSpan(t *testing.T) {
-	t.Parallel()
+func TestNoIteratorSuggestsTheRightSpan(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -101,22 +101,22 @@ func TestNoIteratorSuggestsTheRightSpan(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoIterator, iteratorFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoIterator, iteratorFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 			}
 			suggestions := result.Diagnostics[0].Suggestions
 			if len(suggestions) != 1 || len(suggestions[0].Fixes) != 1 {
-				t.Fatalf("wanted one suggestion carrying one fix, got %d suggestions", len(suggestions))
+				test.Fatalf("wanted one suggestion carrying one fix, got %d suggestions", len(suggestions))
 			}
 
 			fix := suggestions[0].Fixes[0]
 			rewritten := testCase.sourceText[:fix.Range.Pos()] + fix.Text +
 				testCase.sourceText[fix.Range.End():]
 			if rewritten != testCase.wantSource {
-				t.Fatalf("applying the suggestion gave %q, wanted %q", rewritten, testCase.wantSource)
+				test.Fatalf("applying the suggestion gave %q, wanted %q", rewritten, testCase.wantSource)
 			}
 		})
 	}

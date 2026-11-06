@@ -1,9 +1,9 @@
 package main
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -40,11 +40,14 @@ import (
 // Only a boundary strictly inside the project counts. The project's own `.git` is its root, and a
 // project that is not a repository at all (a test fixture, a tarball) writes where it always did.
 func writeRepositoryRoot(start string, projectRoot string) string {
-	projectRoot = filepath.Clean(projectRoot)
+	cleanProjectRoot := filepath.Clean(projectRoot)
 	for directory := filepath.Clean(start); ; directory = filepath.Dir(directory) {
-		relative, err := filepath.Rel(projectRoot, directory)
-		if err != nil || relative == "." || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
-			return projectRoot
+		relative, relativePathError := filepath.Rel(cleanProjectRoot, directory)
+		if relativePathError != nil ||
+			relative == "." ||
+			relative == ".." ||
+			strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+			return cleanProjectRoot
 		}
 		if formatfiles.HasOwnRepository(directory) {
 			return directory
@@ -57,8 +60,8 @@ func writeRepositoryRoot(start string, projectRoot string) string {
 // outside X" when the file lies outside the root altogether, as the project's files do for a run inside
 // a library. Empty means the file is this run's to write.
 func unwritableRepository(repositoryRoot string, fileName string) string {
-	relative, err := filepath.Rel(filepath.Clean(repositoryRoot), filepath.Clean(fileName))
-	if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+	relative, relativePathError := filepath.Rel(filepath.Clean(repositoryRoot), filepath.Clean(fileName))
+	if relativePathError != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
 		return "the project outside " + repositoryRoot
 	}
 	if nested := formatfiles.NestedRepositoryContaining(repositoryRoot, fileName); nested != "" {
@@ -113,7 +116,7 @@ func nestedFormatRecord(repositoryRoot string) *formatRecord {
 	if cacheOff {
 		return formatRecordOff("the cache is off (--no-cache)")
 	}
-	if information, err := os.Stat(cacheDirectory(repositoryRoot)); err != nil || !information.IsDir() {
+	if information, statError := os.Stat(cacheDirectory(repositoryRoot)); statError != nil || !information.IsDir() {
 		return formatRecordOff("no cohere cache is kept in " + repositoryRoot)
 	}
 	return loadFormatRecord(repositoryRoot)
@@ -132,8 +135,8 @@ func nestedFormatRecord(repositoryRoot string) *formatRecord {
 // library. The record in it is the library's own, the one a run inside the library reads and writes, and an
 // entry still skips only bytes it proved are a fixed point, so drift in a library is reported as before.
 func prepareNestedCacheDirectories(root string) {
-	pending, err := declaredBelow(root, "")
-	if err != nil {
+	pending, declaredBelowError := declaredBelow(root, "")
+	if declaredBelowError != nil {
 		return
 	}
 	for len(pending) > 0 {
@@ -143,20 +146,23 @@ func prepareNestedCacheDirectories(root string) {
 		if !formatfiles.HasOwnRepository(repositoryRoot) {
 			continue
 		}
-		if inner, err := declaredBelow(root, relative); err == nil {
+		if inner, declaredBelowError := declaredBelow(root, relative); declaredBelowError == nil {
 			pending = append(pending, inner...)
 		}
-		if information, err := os.Stat(cacheDirectory(repositoryRoot)); err == nil && information.IsDir() {
+		if information, statError := os.Stat(cacheDirectory(repositoryRoot)); statError == nil && information.IsDir() {
 			continue
 		}
-		matcher, err := gitignore.New(repositoryRoot)
-		if err != nil {
+		matcher, newGitignoreError := gitignore.New(repositoryRoot)
+		if newGitignoreError != nil {
 			continue
 		}
-		if ignored, _, err := matcher.IgnoredPath(".cache/cohere/findings.gob", false); err != nil || !ignored {
+		if ignored, _, ignoredPathError := matcher.IgnoredPath(
+			".cache/cohere/findings.gob",
+			false,
+		); ignoredPathError != nil || !ignored {
 			continue
 		}
-		// A directory that could not be made costs this library what it cost before: a whole check.
+		// Ignored: a directory that could not be made costs this library what it cost before, a whole check.
 		_ = os.MkdirAll(cacheDirectory(repositoryRoot), 0o755)
 	}
 }
@@ -175,9 +181,9 @@ func prepareNestedCacheDirectories(root string) {
 func checkNestedRepositories(engine formatEngine, root string, formatAll bool) (nestedDriftCheck, error) {
 	var check nestedDriftCheck
 
-	pending, err := declaredBelow(root, "")
-	if err != nil {
-		return check, err
+	pending, declaredBelowError := declaredBelow(root, "")
+	if declaredBelowError != nil {
+		return check, declaredBelowError
 	}
 	for len(pending) > 0 {
 		relative := pending[0]
@@ -189,15 +195,15 @@ func checkNestedRepositories(engine formatEngine, root string, formatAll bool) (
 		}
 		check.Repositories++
 
-		inner, err := declaredBelow(root, relative)
-		if err != nil {
-			return check, err
+		inner, declaredBelowError := declaredBelow(root, relative)
+		if declaredBelowError != nil {
+			return check, declaredBelowError
 		}
 		pending = append(pending, inner...)
 
-		enumeration, err := engine.Enumerate(repositoryRoot)
-		if err != nil {
-			return check, fmt.Errorf("reading nested repository %s: %w", relative, err)
+		enumeration, enumerateError := engine.Enumerate(repositoryRoot)
+		if enumerateError != nil {
+			return check, fmt.Errorf("reading nested repository %s: %w", relative, enumerateError)
 		}
 		check.Walks = append(check.Walks, enumeration)
 		check.Files += len(enumeration.Files)
@@ -215,20 +221,32 @@ func checkNestedRepositories(engine formatEngine, root string, formatAll bool) (
 		}
 		check.Checked += len(unformatted)
 		for index, outcome := range formatNestedFiles(transform, unformatted) {
-			if outcome.err != nil {
-				return check, fmt.Errorf("formatting %s in nested repository %s: %w", unformatted[index], relative, outcome.err)
+			if outcome.fileError != nil {
+				return check, fmt.Errorf(
+					"formatting %s in nested repository %s: %w",
+					unformatted[index],
+					relative,
+					outcome.fileError,
+				)
 			}
 			if outcome.drifted {
 				check.Drift = append(check.Drift, nestedDrift{Repository: relative, FileName: unformatted[index]})
 			}
 			if outcome.unchecked != "" {
-				check.Unchecked = append(check.Unchecked, nestedDrift{Repository: relative, FileName: unformatted[index], Reason: outcome.unchecked})
+				check.Unchecked = append(
+					check.Unchecked,
+					nestedDrift{Repository: relative, FileName: unformatted[index], Reason: outcome.unchecked},
+				)
 			}
 		}
 
 		// Not writing it costs the next check a format of files already formatted, never a skip.
-		if err := record.saveChanged(enumeration.Files); err != nil {
-			check.Notes = append(check.Notes, fmt.Sprintf("note: the format record of nested repository %s could not be written: %v", relative, firstLine(err.Error())))
+		if saveChangedError := record.saveChanged(enumeration.Files); saveChangedError != nil {
+			check.Notes = append(check.Notes, fmt.Sprintf(
+				"note: the format record of nested repository %s could not be written: %v",
+				relative,
+				firstLine(saveChangedError.Error()),
+			))
 		}
 	}
 
@@ -243,8 +261,8 @@ func checkNestedRepositories(engine formatEngine, root string, formatAll bool) (
 
 // nestedCheckResult is checkNestedRepositories' answer, carried from the goroutine it ran on.
 type nestedCheckResult struct {
-	check nestedDriftCheck
-	err   error
+	check      nestedDriftCheck
+	checkError error
 }
 
 // startNestedCheck runs checkNestedRepositories beside the project's fix phase and hands back where its
@@ -254,8 +272,8 @@ type nestedCheckResult struct {
 func startNestedCheck(engine formatEngine, root string, formatAll bool) <-chan nestedCheckResult {
 	answer := make(chan nestedCheckResult, 1)
 	go func() {
-		check, err := checkNestedRepositories(engine, root, formatAll)
-		answer <- nestedCheckResult{check: check, err: err}
+		check, checkNestedRepositoriesError := checkNestedRepositories(engine, root, formatAll)
+		answer <- nestedCheckResult{check: check, checkError: checkNestedRepositoriesError}
 	}()
 	return answer
 }
@@ -263,8 +281,8 @@ func startNestedCheck(engine formatEngine, root string, formatAll bool) <-chan n
 // nestedOutcome is one nested file's answer from the formatter: whether its own run would rewrite it, or
 // why it could not be read or formatted.
 type nestedOutcome struct {
-	drifted bool
-	err     error
+	drifted   bool
+	fileError error
 
 	// unchecked is why the formatter declined the file, which for a file the walk offered it means the file
 	// could not be read as its language (see unparseableSkipReason).
@@ -288,17 +306,19 @@ func formatNestedFiles(transform edit.Transform, fileNames []string) []nestedOut
 		go func() {
 			defer workers.Done()
 			for index := range next {
-				contents, err := os.ReadFile(fileNames[index])
-				if err != nil {
-					outcomes[index] = nestedOutcome{err: err}
+				contents, readError := os.ReadFile(fileNames[index])
+				if readError != nil {
+					outcomes[index] = nestedOutcome{fileError: readError}
 					continue
 				}
-				formatted, err := transform(fileNames[index], string(contents), nil)
+				formatted, transformError := transform(fileNames[index], string(contents), nil)
 				switch {
-				case errors.Is(err, edit.ErrSkipped):
-					outcomes[index] = nestedOutcome{unchecked: strings.TrimPrefix(err.Error(), edit.ErrSkipped.Error()+": ")}
-				case err != nil:
-					outcomes[index] = nestedOutcome{err: err}
+				case errors.Is(transformError, edit.ErrSkipped):
+					outcomes[index] = nestedOutcome{
+						unchecked: strings.TrimPrefix(transformError.Error(), edit.ErrSkipped.Error()+": "),
+					}
+				case transformError != nil:
+					outcomes[index] = nestedOutcome{fileError: transformError}
 				default:
 					outcomes[index] = nestedOutcome{drifted: formatted != string(contents)}
 				}
@@ -312,9 +332,9 @@ func formatNestedFiles(transform edit.Transform, fileNames []string) []nestedOut
 // declaredBelow is the submodules the repository at root/relative declares, each relative to root,
 // sorted so the read and its report are in a stable order.
 func declaredBelow(root string, relative string) ([]string, error) {
-	declared, err := declaredSubmodules(filepath.Join(root, relative))
-	if err != nil {
-		return nil, err
+	declared, declaredSubmodulesError := declaredSubmodules(filepath.Join(root, relative))
+	if declaredSubmodulesError != nil {
+		return nil, declaredSubmodulesError
 	}
 	paths := make([]string, 0, len(declared))
 	for path := range declared {
@@ -333,12 +353,23 @@ func nestedSummary(check nestedDriftCheck) string {
 	onRecord := check.Files - check.Checked
 	switch {
 	case check.Checked == 0 && onRecord > 0:
-		line += fmt.Sprintf("none checked by the formatter, all %d taken on their record's word as formatted at their current bytes", onRecord)
+		line += fmt.Sprintf(
+			"none checked by the formatter, all %d taken on their record's word as formatted at their current bytes",
+			onRecord,
+		)
 	case onRecord == 0:
-		line += fmt.Sprintf("%d checked by the formatter, %d would change under their own run", check.Checked, len(check.Drift))
+		line += fmt.Sprintf(
+			"%d checked by the formatter, %d would change under their own run",
+			check.Checked,
+			len(check.Drift),
+		)
 	default:
-		line += fmt.Sprintf("%d checked by the formatter, %d would change under their own run; %d taken on their record's word as formatted at their current bytes",
-			check.Checked, len(check.Drift), onRecord)
+		line += fmt.Sprintf(
+			"%d checked by the formatter, %d would change under their own run; %d taken on their record's word as formatted at their current bytes",
+			check.Checked,
+			len(check.Drift),
+			onRecord,
+		)
 	}
 	if len(check.Unchecked) > 0 {
 		line += fmt.Sprintf("; %d the formatter could not read", len(check.Unchecked))
@@ -348,11 +379,22 @@ func nestedSummary(check nestedDriftCheck) string {
 
 // printNestedDrift reports each drifted file as a finding, in the shape every other finding prints,
 // naming the repository whose own run fixes it.
-func printNestedDrift(out io.Writer, check nestedDriftCheck) {
+func printNestedDrift(out *bufio.Writer, check nestedDriftCheck) {
 	for _, drift := range check.Drift {
-		message := fmt.Sprintf("the formatter would rewrite this file in nested repository %s, which a run here never writes: run cohere there", drift.Repository)
+		message := fmt.Sprintf(
+			"the formatter would rewrite this file in nested repository %s, which a run here never writes: run cohere there",
+			drift.Repository,
+		)
 		printFinding(out,
-			runFinding{Path: drift.FileName, Line: 1, Column: 1, Severity: "error", Rule: "format", MessageID: "nested-drift", Message: message},
+			runFinding{
+				Path:      drift.FileName,
+				Line:      1,
+				Column:    1,
+				Severity:  "error",
+				Rule:      "format",
+				MessageId: "nested-drift",
+				Message:   message,
+			},
 			fmt.Sprintf("%s:1:1 - %s [format/nested-drift]\n", drift.FileName, message))
 	}
 }

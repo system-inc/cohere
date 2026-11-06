@@ -24,7 +24,7 @@ import (
 //
 // Two conditions, and both are necessary. A function is a compilation root when it is
 // component-or-hook-like on its own merits, **and** its position is reachable: every step from it
-// out to the source file passes through either a component-or-hook-NAMED function or a construct
+// out to the source file passes through either a component-or-hook-named function or a construct
 // that forms no scope of its own. Once a root is chosen its whole subtree is lowered, so anything
 // nested inside it is judged whether or not the nested thing looks like a component.
 //
@@ -46,7 +46,7 @@ import (
 //	function use()      { ... same body ... }                                            silent
 //
 // The enclosing function has no evidence of its own in any of those, so it never qualifies as a
-// root itself. Its NAME still decides whether the traversal reaches the inner arrow. That is why
+// root itself. Its name still decides whether the traversal reaches the inner arrow. That is why
 // the position walk asks only the name question of ancestors while asking the full question of the
 // candidate itself.
 //
@@ -82,7 +82,7 @@ func IsInsideComponentOrHook(node *ast.Node) bool {
 // function-like node at all.
 //
 // Everything between the candidate and the source file must be either transparent, meaning it forms
-// no scope and is just how the function is written down, or a component-or-hook-NAMED function,
+// no scope and is just how the function is written down, or a component-or-hook-named function,
 // through which the traversal continues looking for roots.
 //
 // A name test rather than the full `IsComponentOrHookLike` on ancestors, for the reason measured at
@@ -190,7 +190,7 @@ func inferredFunctionName(node *ast.Node) (string, bool) {
 		}
 		return name.Text(), true
 	case ast.KindFunctionExpression, ast.KindArrowFunction:
-		// Parentheses are skipped on the way OUT to the declarator, and this direction was measured
+		// Parentheses are skipped on the way out to the declarator, and this direction was measured
 		// rather than assumed. Our parser keeps `const Component = ((props) => {...});` as a real
 		// KindParenthesizedExpression between the declaration and the arrow, where Babel's tree has
 		// already dropped it, so an unskipped walk finds a parenthesized expression as the parent
@@ -434,7 +434,7 @@ func hasComponentShapedParameters(node *ast.Node) bool {
 			return false
 		}
 		name := second.Text()
-		return containsRef(name)
+		return containsReference(name)
 	}
 	return false
 }
@@ -462,12 +462,12 @@ func isSpreadParameter(parameter *ast.Node) bool {
 	return parameter.AsParameterDeclaration().DotDotDotToken != nil
 }
 
-// containsRef answers upstream's `name.includes('ref') || name.includes('Ref')`.
+// containsReference answers upstream's `name.includes('ref') || name.includes('Ref')`.
 //
 // Written as two substring tests rather than as a case-insensitive comparison, because that is what
 // upstream does and the two differ: a parameter named `REF` contains neither spelling and is
 // therefore not a valid second parameter upstream, while a case-insensitive test would accept it.
-func containsRef(name string) bool {
+func containsReference(name string) bool {
 	return containsSubstring(name, "ref") || containsSubstring(name, "Ref")
 }
 

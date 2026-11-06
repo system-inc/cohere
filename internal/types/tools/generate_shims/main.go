@@ -24,6 +24,12 @@ import (
 
 const tsgoInternalPrefix = "github.com/microsoft/TypeScript/tsc/internal/"
 
+// deprecatedReexportSuppression goes on the line above a re-export of a deprecated upstream name, where the
+// re-export's own reference to that name is a use SA1019 would report. The re-export carries upstream's Deprecated
+// paragraph as its own doc, so SA1019 still reports every caller of the shim's name.
+const deprecatedReexportSuppression = "//cohere:ignore SA1019 the shim re-exports upstream whole; " +
+	"a caller of this name is judged where it uses it"
+
 type ExtraShim struct {
 	// ExtraFunctions and ExtraMethods name upstream's unexported functions and methods to re-export by
 	// `//go:linkname`, with no mirror, so the risk is the signature rather than a layout.
@@ -45,7 +51,7 @@ type ExtraShim struct {
 	// # Adding a name here obliges a row in TestShimFieldAccessorsReadTheFieldsTheyName
 	//
 	// A generated reader dereferences a mirror by field offset through `unsafe.Pointer`, so an
-	// accessor that reads the WRONG field compiles, runs, and returns a plausible value. The only
+	// accessor that reads the wrong field compiles, runs, and returns a plausible value. The only
 	// thing that catches it is `internal/types/program/shim_layout_test.go`, which compares each
 	// accessor's result against the checker's own name for what it should have returned.
 	//
@@ -70,11 +76,11 @@ type ExtraShim struct {
 	// vocabulary, and it drifts. Four were needed for the move from typescript-go to
 	// microsoft/TypeScript alone.
 	//
-	// PER-FIELD OFFSET IS THE CONTRACT. Identical size and alignment is the cheap proxy that catches
+	// The contract is each field's offset. Identical size and alignment is the cheap proxy that catches
 	// most violations of it, and verifyTypeSubstitutions below enforces that proxy, but the two are
-	// not the same claim: a stand-in of the right width whose fields are in the wrong ORDER passes
+	// not the same claim: a stand-in of the right width whose fields are in the wrong order passes
 	// every size comparison and still moves the fields that follow it. That was measured, not
-	// reasoned about — swapping two 8-byte pointer fields in a mirror survived a whole-struct size
+	// reasoned about: swapping two 8-byte pointer fields in a mirror survived a whole-struct size
 	// check while breaking the read. `reflect` can enumerate all 319 of Checker's fields with their
 	// names and offsets even though they are unexported, so a per-field guard is possible; it has
 	// not been built, and this comment is the record of that gap.
@@ -87,7 +93,7 @@ type ExtraShim struct {
 	// rule that depended on it went silent on every input. Anything mirroring a struct with more
 	// than one field needs ExtraDeclarations below rather than a bare rename.
 	//
-	// WHERE a substitution appears decides whether its width is load-bearing at all, and the four
+	// Where a substitution appears decides whether its width is load-bearing at all, and the four
 	// here are not four equal risks. Three of them are only ever reached inside a map type
 	// (`map[*ast.Symbol]int32`, `map[uint64][]*ast.Symbol`), and a Go map is one pointer word
 	// whatever its key and value widths are, so those three cannot shift an offset at any size.
@@ -121,30 +127,31 @@ func main() {
 	}
 
 	packagesToShimFullNames := make([]string, len(packagesToShim))
-	for i, pkg := range packagesToShim {
-		packagesToShimFullNames[i] = tsgoInternalPrefix + pkg
+	for index, packagePath := range packagesToShim {
+		packagesToShimFullNames[index] = tsgoInternalPrefix + packagePath
 	}
 
-	packages, err := packages.Load(&packages.Config{
-		// TODO: path relative to repo root
+	packages, loadError := packages.Load(&packages.Config{
+		// Relative to the directory the generator runs in, the repository root.
 		Dir:  "./TypeScript-shim/compiler",
 		Mode: packages.LoadSyntax,
 	}, packagesToShimFullNames...)
-	if err != nil {
-		log.Fatalf("Error loading package: %v", err)
+	if loadError != nil {
+		log.Fatalf("Error loading package: %v", loadError)
 	}
 
 	var shimHeaderBuilder strings.Builder
 	var shimBuilder strings.Builder
 	var tempBuffer bytes.Buffer
 
-	for _, pkg := range packages {
-		shimDirPath := path.Join("./TypeScript-shim/", strings.TrimPrefix(pkg.PkgPath, tsgoInternalPrefix))
+	for _, goPackage := range packages {
+		shimDirectoryPath := path.Join("./TypeScript-shim/", strings.TrimPrefix(goPackage.PkgPath, tsgoInternalPrefix))
 		var extraShim ExtraShim
-		extraShimFilePath := path.Join(shimDirPath, "extra-shim.json")
-		if data, err := os.ReadFile(extraShimFilePath); err == nil {
-			if err := json.Unmarshal(data, &extraShim); err != nil {
-				fmt.Printf("error parsing %v: %v", extraShimFilePath, err)
+		extraShimFilePath := path.Join(shimDirectoryPath, "extra-shim.json")
+		if data, readError := os.ReadFile(extraShimFilePath); readError == nil {
+			if decodeError := json.Unmarshal(data, &extraShim); decodeError != nil {
+				// Ignored: the generator runs by hand at a terminal, where a failed print has nowhere else to go.
+				fmt.Printf("error parsing %v: %v", extraShimFilePath, decodeError)
 				return
 			}
 		}
@@ -164,15 +171,17 @@ func main() {
 		// Refuse a bad substitution rather than emitting one. This runs before this package's own
 		// shim is written, so a mirror whose stand-ins are the wrong width never reaches the tree.
 		//
-		// The abort is not transactional across packages: shims for packages processed earlier in
-		// this loop are already on disk when it fires. That is deliberate rather than overlooked —
-		// making it atomic would mean buffering every package before writing any, and the failure
-		// it would prevent is a stale shim for an UNRELATED package, which the next successful run
+		// The abort is not transactional across packages: shims for packages processed earlier in this
+		// loop are already on disk when it fires. That is deliberate rather than overlooked: making it
+		// atomic would mean buffering every package before writing any, and the failure it would
+		// prevent is a stale shim for a package unrelated to the bad one, which the next successful run
 		// overwrites. What must never exist is the bad mirror itself, and that is what this stops.
-		if problems := verifyTypeSubstitutions(pkg, packages, extraShim); len(problems) > 0 {
+		if problems := verifyTypeSubstitutions(goPackage, packages, extraShim); len(problems) > 0 {
+			// Ignored: the generator runs by hand at a terminal, where a failed print has nowhere else to go.
 			fmt.Printf("ERROR: %v declares type substitutions that do not preserve layout.\n",
 				extraShimFilePath)
 			for _, problem := range problems {
+				// Ignored: the generator runs by hand at a terminal, where a failed print has nowhere else to go.
 				fmt.Printf("  - %v\n", problem)
 			}
 			os.Exit(1)
@@ -189,52 +198,52 @@ func main() {
 		// true if directly used, false otherwise
 		importedPackages := map[string]bool{}
 
-		importPackage := func(pkg string, directly bool) {
+		importPackage := func(packagePath string, directly bool) {
 			if directly {
-				importedPackages[pkg] = true
-			} else if _, ok := importedPackages[pkg]; !ok {
-				importedPackages[pkg] = false
+				importedPackages[packagePath] = true
+			} else if _, ok := importedPackages[packagePath]; !ok {
+				importedPackages[packagePath] = false
 			}
 		}
 
-		var qualifierOnlyPackageName types.Qualifier = func(p *types.Package) string {
-			importPackage(p.Path(), true)
-			return p.Name()
+		var qualifierOnlyPackageName types.Qualifier = func(typesPackage *types.Package) string {
+			importPackage(typesPackage.Path(), true)
+			return typesPackage.Name()
 		}
-		var qualifierEmptyPackageName types.Qualifier = func(p *types.Package) string {
+		var qualifierEmptyPackageName types.Qualifier = func(typesPackage *types.Package) string {
 			return ""
 		}
 
-		emitGoLinknameDirective := func(localName string, fn *types.Func) {
+		emitGoLinknameDirective := func(localName string, function *types.Func) {
 			// //go:linkname only allowed in Go files that import "unsafe"
 			importPackage("unsafe", false)
-			importPackage(pkg.Types.Path(), false)
+			importPackage(goPackage.Types.Path(), false)
 			shimBuilder.WriteString("//go:linkname ")
 			shimBuilder.WriteString(localName)
 			shimBuilder.WriteByte(' ')
-			shimBuilder.WriteString(fn.Pkg().Path())
+			shimBuilder.WriteString(function.Pkg().Path())
 			shimBuilder.WriteByte('.')
-			if recv := fn.Signature().Recv(); recv != nil {
+			if recv := function.Signature().Recv(); recv != nil {
 				shimBuilder.WriteByte('(')
 				shimBuilder.WriteString(types.TypeString(recv.Type(), qualifierEmptyPackageName))
 				shimBuilder.WriteByte(')')
 				shimBuilder.WriteByte('.')
 			}
-			shimBuilder.WriteString(fn.Name())
+			shimBuilder.WriteString(function.Name())
 			shimBuilder.WriteByte('\n')
 		}
 
-		emitLinkedFunction := func(fn *types.Func) bool {
-			if fn.Signature().TypeParams() != nil {
+		emitLinkedFunction := func(function *types.Func) bool {
+			if function.Signature().TypeParams() != nil {
 				// https://github.com/golang/go/issues/60425
 				// linking to functions with generics is not supported in go:linkname
 				return false
 			}
-			name := cases.Title(language.English, cases.NoLower).String(fn.Name())
-			emitGoLinknameDirective(name, fn)
+			name := cases.Title(language.English, cases.NoLower).String(function.Name())
+			emitGoLinknameDirective(name, function)
 			shimBuilder.WriteString("func ")
 			shimBuilder.WriteString(name)
-			types.WriteSignature(&tempBuffer, fn.Signature(), qualifierOnlyPackageName)
+			types.WriteSignature(&tempBuffer, function.Signature(), qualifierOnlyPackageName)
 			shimBuilder.Write(tempBuffer.Bytes())
 			tempBuffer.Reset()
 			shimBuilder.WriteString("\n")
@@ -257,13 +266,15 @@ func main() {
 			matchedExtraFields[name] = false
 		}
 
-		scope := pkg.Types.Scope()
+		deprecations := deprecatedDeclarations(goPackage.Syntax)
+
+		scope := goPackage.Types.Scope()
 		for _, name := range scope.Names() {
 			object := scope.Lookup(name)
 			if !object.Exported() {
-				fn, isFunc := object.(*types.Func)
+				function, isFunc := object.(*types.Func)
 				if _, exists := matchedExtraFunctions[name]; isFunc && exists {
-					if emitLinkedFunction(fn) {
+					if emitLinkedFunction(function) {
 						matchedExtraFunctions[name] = true
 					}
 				}
@@ -271,38 +282,49 @@ func main() {
 			}
 
 			printReexport := func(kind string) {
-				importPackage(pkg.Types.Path(), true)
+				importPackage(goPackage.Types.Path(), true)
 				shimBuilder.WriteString(kind)
 				shimBuilder.WriteString(" ")
 				shimBuilder.WriteString(name)
 				shimBuilder.WriteString(" = ")
-				shimBuilder.WriteString(pkg.Name)
+				shimBuilder.WriteString(goPackage.Name)
 				shimBuilder.WriteString(".")
 				shimBuilder.WriteString(name)
 				shimBuilder.WriteString("\n")
 			}
 
-			switch object.(type) {
+			// A linked function names upstream only inside its directive's text, which SA1019 does not read, so only
+			// a type, constant or variable re-export takes the deprecation and its suppression.
+			if deprecation, deprecated := deprecations[name]; deprecated {
+				if _, isFunction := object.(*types.Func); !isFunction {
+					shimBuilder.WriteString("// ")
+					shimBuilder.WriteString(deprecation)
+					shimBuilder.WriteString("\n")
+					shimBuilder.WriteString(deprecatedReexportSuppression)
+					shimBuilder.WriteString("\n")
+				}
+			}
+
+			switch typedObject := object.(type) {
 			case *types.TypeName:
-				typeName := object.(*types.TypeName)
-				t := typeName.Type()
-				named, isNamed := t.(*types.Named)
+				resolvedType := typedObject.Type()
+				named, isNamed := resolvedType.(*types.Named)
 				if isNamed {
-					_, nameWithTypeParams, _ := strings.Cut(types.TypeString(named, qualifierOnlyPackageName), ".")
-					importPackage(pkg.Types.Path(), true)
+					_, nameWithTypeParameters, _ := strings.Cut(types.TypeString(named, qualifierOnlyPackageName), ".")
+					importPackage(goPackage.Types.Path(), true)
 					shimBuilder.WriteString("type ")
-					shimBuilder.WriteString(nameWithTypeParams)
+					shimBuilder.WriteString(nameWithTypeParameters)
 					shimBuilder.WriteString(" = ")
-					shimBuilder.WriteString(pkg.Name)
+					shimBuilder.WriteString(goPackage.Name)
 					shimBuilder.WriteString(".")
 					shimBuilder.WriteString(name)
 
-					typeParams := slices.Collect(named.TypeParams().TypeParams())
-					if len(typeParams) > 0 {
+					typeParameters := slices.Collect(named.TypeParams().TypeParams())
+					if len(typeParameters) > 0 {
 						// (*typeWriter)typeList
 						shimBuilder.WriteByte('[')
-						for i, typ := range typeParams {
-							if i > 0 {
+						for index, typ := range typeParameters {
+							if index > 0 {
 								shimBuilder.WriteByte(',')
 							}
 							shimBuilder.WriteString(typ.String())
@@ -324,33 +346,33 @@ func main() {
 						extraMethods[methodName] = true
 						prefix := name + "_"
 						emitGoLinknameDirective(prefix+methodName, method)
-						funcDeclStr := types.ObjectString(method, qualifierOnlyPackageName)
+						funcDeclString := types.ObjectString(method, qualifierOnlyPackageName)
 						recvStart := 0
 						recvEnd := 0
-						paramsStart := 0
-						for i, s := range funcDeclStr {
-							if s == '(' {
+						parametersStart := 0
+						for index, character := range funcDeclString {
+							if character == '(' {
 								if recvStart == 0 {
-									recvStart = i + 1
+									recvStart = index + 1
 								}
 								if recvEnd != 0 {
-									paramsStart = i + 1
+									parametersStart = index + 1
 									break
 								}
 							}
-							if s == ')' && recvEnd == 0 {
-								recvEnd = i
+							if character == ')' && recvEnd == 0 {
+								recvEnd = index
 							}
 						}
 						shimBuilder.WriteString("func ")
 						shimBuilder.WriteString(prefix)
-						shimBuilder.WriteString(funcDeclStr[recvEnd+2 : paramsStart])
+						shimBuilder.WriteString(funcDeclString[recvEnd+2 : parametersStart])
 						shimBuilder.WriteString("recv ")
-						shimBuilder.WriteString(funcDeclStr[recvStart:recvEnd])
+						shimBuilder.WriteString(funcDeclString[recvStart:recvEnd])
 						if method.Signature().Params() != nil {
 							shimBuilder.WriteString(", ")
 						}
-						shimBuilder.WriteString(funcDeclStr[paramsStart:])
+						shimBuilder.WriteString(funcDeclString[parametersStart:])
 						shimBuilder.WriteString("\n")
 					}
 				}
@@ -359,13 +381,10 @@ func main() {
 					importPackage("unsafe", true)
 
 					matchedExtraFields[name] = true
-					if err != nil {
-						log.Fatalf("error formatting %v struct body: %v", name, err)
-					}
 					mirrorStructName := "extra_" + name
 
-					var emitExtraStruct func(name string, s *types.Struct)
-					emitExtraStruct = func(name string, s *types.Struct) {
+					var emitExtraStruct func(name string, structType *types.Struct)
+					emitExtraStruct = func(name string, structType *types.Struct) {
 						shimBuilder.WriteString("type extra_")
 						shimBuilder.WriteString(name)
 						shimBuilder.WriteString(" struct {")
@@ -374,7 +393,7 @@ func main() {
 							string
 							*types.Struct
 						}){}
-						for field := range s.Fields() {
+						for field := range structType.Fields() {
 							shimBuilder.WriteString("\n  ")
 							if !field.Embedded() {
 								shimBuilder.WriteString(field.Name())
@@ -387,13 +406,13 @@ func main() {
 								if ok && !named.Obj().Exported() {
 									strct, ok := named.Underlying().(*types.Struct)
 									if ok {
-										n := named.Obj().Name()
+										name := named.Obj().Name()
 										dependencies = append(dependencies, struct {
 											string
 											*types.Struct
-										}{n, strct})
+										}{name, strct})
 										shimBuilder.WriteString("extra_")
-										shimBuilder.WriteString(n)
+										shimBuilder.WriteString(name)
 										continue
 									}
 								}
@@ -430,16 +449,16 @@ func main() {
 						shimBuilder.WriteByte('_')
 						shimBuilder.WriteString(field)
 						shimBuilder.WriteString("(v *")
-						shimBuilder.WriteString(pkg.Name)
+						shimBuilder.WriteString(goPackage.Name)
 						shimBuilder.WriteByte('.')
 						shimBuilder.WriteString(name)
 						shimBuilder.WriteString(") ")
 
-						fieldVar, ok := mappedFieldTypes[field]
+						fieldVariable, ok := mappedFieldTypes[field]
 						if !ok {
 							log.Fatalf("expected struct %q to contain field %q", name, field)
 						}
-						shimBuilder.WriteString(types.TypeString(fieldVar.Type(), qualifierOnlyPackageName))
+						shimBuilder.WriteString(types.TypeString(fieldVariable.Type(), qualifierOnlyPackageName))
 						shimBuilder.WriteString(" {\n")
 						shimBuilder.WriteString("  return ((*")
 						shimBuilder.WriteString(mirrorStructName)
@@ -455,18 +474,18 @@ func main() {
 				printReexport("var")
 			case *types.Func:
 				if !slices.Contains(extraShim.IgnoreFunctions, name) {
-					funcType := object.(*types.Func)
-					emitLinkedFunction(funcType)
+					emitLinkedFunction(typedObject)
 				}
 			}
 		}
 
 		exit := false
-		for fnName, found := range matchedExtraFunctions {
+		for functionName, found := range matchedExtraFunctions {
 			if found {
 				continue
 			}
-			fmt.Printf("ERROR: couldn't find %v function\n", fnName)
+			// Ignored: the generator runs by hand at a terminal, where a failed print has nowhere else to go.
+			fmt.Printf("ERROR: couldn't find %v function\n", functionName)
 			exit = true
 		}
 		for name, methods := range matchedExtraMethods {
@@ -474,6 +493,7 @@ func main() {
 				if found {
 					continue
 				}
+				// Ignored: the generator runs by hand at a terminal, where a failed print has nowhere else to go.
 				fmt.Printf("ERROR: couldn't find %v.%v method\n", name, methodName)
 				exit = true
 			}
@@ -485,7 +505,7 @@ func main() {
 		// https://pkg.go.dev/cmd/go#hdr-Generate_Go_files_by_processing_source
 		shimHeaderBuilder.WriteString("\n// Code generated by internal/types/tools/generate_shims. DO NOT EDIT.\n\n")
 		shimHeaderBuilder.WriteString("package ")
-		shimHeaderBuilder.WriteString(pkg.Name)
+		shimHeaderBuilder.WriteString(goPackage.Name)
 		shimHeaderBuilder.WriteString("\n\n")
 		importsList := slices.Collect(maps.Keys(importedPackages))
 		slices.Sort(importsList)
@@ -505,18 +525,68 @@ func main() {
 		// and the files they wrote went unformatted into the tree, where a gofmt guard over it would fail on
 		// output nobody may edit by hand. A source that does not parse is refused rather than written: the
 		// printer cannot format it, and a shim that does not compile is worse than the stale one it replaces.
-		shimGoPath := path.Join(shimDirPath, "shim.go")
-		formatted, err := format.Source([]byte(shimHeaderBuilder.String() + shimBuilder.String()))
-		if err != nil {
-			log.Fatalf("error formatting %v, so it was not written: %v", shimGoPath, err)
+		shimGoPath := path.Join(shimDirectoryPath, "shim.go")
+		formatted, sourceError := format.Source([]byte(shimHeaderBuilder.String() + shimBuilder.String()))
+		if sourceError != nil {
+			log.Fatalf("error formatting %v, so it was not written: %v", shimGoPath, sourceError)
 		}
-		if err := os.WriteFile(shimGoPath, formatted, 0o644); err != nil {
-			log.Fatalf("error writing %v: %v", shimGoPath, err)
+		if writeError := os.WriteFile(shimGoPath, formatted, 0o644); writeError != nil {
+			log.Fatalf("error writing %v: %v", shimGoPath, writeError)
 		}
 
 		shimHeaderBuilder.Reset()
 		shimBuilder.Reset()
 	}
+}
+
+// deprecatedDeclarations maps each package-level name in files whose doc comment holds a Deprecated paragraph to
+// that paragraph, joined onto one line. A spec inside a parenthesized group has its own doc; an ungrouped one is
+// documented by its declaration's.
+func deprecatedDeclarations(files []*ast.File) map[string]string {
+	deprecations := map[string]string{}
+	record := func(name string, documentation *ast.CommentGroup) {
+		if documentation == nil {
+			return
+		}
+		for paragraph := range strings.SplitSeq(documentation.Text(), "\n\n") {
+			if strings.HasPrefix(paragraph, "Deprecated: ") {
+				deprecations[name] = strings.Join(strings.Fields(paragraph), " ")
+				return
+			}
+		}
+	}
+	for _, file := range files {
+		for _, declaration := range file.Decls {
+			switch typedDeclaration := declaration.(type) {
+			case *ast.FuncDecl:
+				if typedDeclaration.Recv == nil {
+					record(typedDeclaration.Name.Name, typedDeclaration.Doc)
+				}
+			case *ast.GenDecl:
+				for _, specification := range typedDeclaration.Specs {
+					documentation := typedDeclaration.Doc
+					if typedDeclaration.Lparen.IsValid() {
+						documentation = nil
+					}
+					switch typedSpecification := specification.(type) {
+					case *ast.ValueSpec:
+						if typedSpecification.Doc != nil {
+							documentation = typedSpecification.Doc
+						}
+						for _, identifier := range typedSpecification.Names {
+							record(identifier.Name, documentation)
+						}
+					case *ast.TypeSpec:
+						if typedSpecification.Doc != nil {
+							documentation = typedSpecification.Doc
+						}
+						record(typedSpecification.Name.Name, documentation)
+					}
+				}
+			}
+		}
+	}
+	return deprecations
 }
 
 // verifyTypeSubstitutions refuses to emit a mirror whose stand-in types do not match the size and
@@ -526,13 +596,13 @@ func main() {
 // mirror exists so `unsafe` can reach a field by offset, so a stand-in that is the wrong width
 // shifts every field declared after it, and the read then returns a perfectly valid value of the
 // right Go type that is simply not the field asked for. Nothing crashes and no test fails; the one
-// rule downstream of it goes silent. The comment on TypeSubstitutions above has said IDENTICAL SIZE
-// IS THE WHOLE CONTRACT since that defect was fixed, but a comment cannot enforce a contract, and
+// rule downstream of it goes silent. The comment on TypeSubstitutions above has said that identical
+// size is the whole contract since that defect was fixed, but a comment cannot enforce a contract, and
 // the substitution that violated it was accepted by this generator without a word.
 //
 // So this runs before anything is written. A check here is worth more than a check in a test
 // because it fails before the wrong code exists, and it covers substitutions no accessor reads
-// today — a field read added later inherits a layout that was already proven rather than one that
+// today: a field read added later inherits a layout that was already proven rather than one that
 // happened to be right.
 //
 // Alignment is checked alongside size because a stand-in can be the right width by accident and
@@ -602,8 +672,8 @@ func verifyTypeSubstitutions(
 			return base, nil
 		}
 		arguments := make([]types.Type, named.TypeParams().Len())
-		for i := range arguments {
-			arguments[i] = argument
+		for index := range arguments {
+			arguments[index] = argument
 		}
 		return types.Instantiate(nil, named, arguments, false)
 	}
@@ -631,16 +701,16 @@ func verifyTypeSubstitutions(
 		}
 
 		for _, argument := range probeArguments {
-			upstreamInstance, err := instantiate(upstreamType, argument)
-			if err != nil {
+			upstreamInstance, instantiateError := instantiate(upstreamType, argument)
+			if instantiateError != nil {
 				continue
 			}
-			standInInstance, err := instantiate(standInType, argument)
-			if err != nil {
+			standInInstance, instantiateError := instantiate(standInType, argument)
+			if instantiateError != nil {
 				problems = append(problems, fmt.Sprintf(
 					"substitution %q -> %q: the stand-in could not be instantiated at %s while the "+
 						"upstream type could, so their shapes differ: %v",
-					upstreamName, standInName, argument, err))
+					upstreamName, standInName, argument, instantiateError))
 				break
 			}
 
@@ -699,8 +769,8 @@ func typeCheckExtraDeclarations(
 	}
 
 	fileSet := token.NewFileSet()
-	parsed, err := parser.ParseFile(fileSet, "extra-declarations.go", sourceBuilder.String(), 0)
-	if err != nil {
+	parsed, parseFileError := parser.ParseFile(fileSet, "extra-declarations.go", sourceBuilder.String(), 0)
+	if parseFileError != nil {
 		return nil
 	}
 	configuration := types.Config{
@@ -715,8 +785,8 @@ func typeCheckExtraDeclarations(
 		// unused-import complaint would be noise rather than a layout problem.
 		DisableUnusedImportCheck: true,
 	}
-	checked, err := configuration.Check("extradeclarations", fileSet, []*ast.File{parsed}, nil)
-	if err != nil {
+	checked, checkError := configuration.Check("extradeclarations", fileSet, []*ast.File{parsed}, nil)
+	if checkError != nil {
 		return nil
 	}
 	return checked.Scope()
@@ -724,4 +794,4 @@ func typeCheckExtraDeclarations(
 
 type importerFromMap func(string) (*types.Package, error)
 
-func (i importerFromMap) Import(path string) (*types.Package, error) { return i(path) }
+func (importer importerFromMap) Import(path string) (*types.Package, error) { return importer(path) }

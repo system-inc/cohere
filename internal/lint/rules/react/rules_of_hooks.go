@@ -104,7 +104,7 @@ var (
 // Linter API runs from `~/Projects/ahra`, and the release oxlint binary is at
 // `~/Projects/system/oxc/target/release/oxlint`.
 //
-// # The three measured divergences between oxc HEAD and ESLint 7.1.1
+// # The three measured divergences between oxc `HEAD` and ESLint 7.1.1
 //
 // The dispatch that commissioned this port expected oxc to be pinned at 2024 and therefore behind.
 // It is not: `git log` on `rules_of_hooks.rs` shows its last change on 2026-08-14, ten days before
@@ -138,7 +138,7 @@ var (
 // oxc's `is_react_hook_name` tests the fourth character with `char::is_uppercase`, which is Unicode.
 // ESLint's is `/^use[A-Z0-9]/`, which is not. Reproduced as oxc, which means this rule's hook
 // predicate is Unicode-uppercase-or-ASCII-digit, and that is why it cannot use
-// `internal/utilities/react.IsHookName` — see below.
+// `internal/utilities/react.IsHookName` (see below).
 //
 // One more difference is cosmetic rather than behavioural and is recorded so nobody re-derives it:
 // for `Namespace.useThing()` oxc renders the hook name as `useThing` and ESLint renders it as
@@ -170,8 +170,8 @@ var (
 // scope references, and it resolves function names by inspecting the enclosing declarator through
 // scope analysis. We have a resident type checker and a whole-program graph and could answer both by
 // resolution. This port answers neither by resolution, and that is a fidelity decision rather than a
-// capability one: oxc's `get_declaration_identifier` reads the **syntactic** parent — a variable
-// declarator, an assignment target, an assignment pattern, an object property key — and never
+// capability one: oxc's `get_declaration_identifier` reads the **syntactic** parent (a variable
+// declarator, an assignment target, an assignment pattern, an object property key) and never
 // resolves anything. Resolving would report on shapes upstream is silent for. The rule therefore
 // declares no type checker, and the checker is not consulted anywhere.
 //
@@ -227,7 +227,7 @@ var (
 // missing branch of this one. The **inline**-escape arm is ported, because it needs only the call's
 // own parent. Stated rather than silently missing: a `useEffectEvent` result assigned to a variable
 // and then passed to a child is a finding this port gives up.
-var RulesOfHooks = rule.Rule{
+var RulesOfHooks = rule.Rule[RulesOfHooksOptions]{
 	Name: "react-hooks/rules-of-hooks",
 	Run:  runRulesOfHooks,
 }
@@ -245,7 +245,7 @@ type RulesOfHooksOptions struct {
 	AdditionalHooks string `json:"additionalHooks"`
 }
 
-func runRulesOfHooks(ctx rule.Context, options any) rule.Listeners {
+func runRulesOfHooks(ruleContext rule.Context, options rule.Given[RulesOfHooksOptions]) rule.Listeners {
 	// One graph per code path root per file, built lazily and only for roots that actually contain a
 	// Hook call. Most functions contain none, and building a graph for them would make this rule pay
 	// per function rather than per Hook.
@@ -266,22 +266,22 @@ func runRulesOfHooks(ctx rule.Context, options any) rule.Listeners {
 
 			enclosing := enclosingFunctionForHook(node)
 			if enclosing == nil {
-				ctx.ReportNode(node, messageRulesOfHooksTopLevel)
+				ruleContext.ReportNode(node, messageRulesOfHooksTopLevel)
 				return
 			}
 
 			if isReactFunctionCall(callee, "useEffectEvent") {
-				reportInlineEffectEventEscape(ctx, node)
+				reportInlineEffectEventEscape(ruleContext, node)
 			}
 
 			// A method, a static block, or a field initializer means the enclosing function is a
 			// class member, and a class never renders through the Hook dispatcher.
 			if isClassMemberFunction(enclosing) {
-				ctx.ReportNode(node, messageRulesOfHooksClassComponent)
+				ruleContext.ReportNode(node, messageRulesOfHooksClassComponent)
 				return
 			}
 
-			if reportEnclosingFunctionShape(ctx, node, callee, enclosing, isUse) {
+			if reportEnclosingFunctionShape(ruleContext, node, callee, enclosing, isUse) {
 				return
 			}
 
@@ -290,7 +290,7 @@ func runRulesOfHooks(ctx rule.Context, options any) rule.Listeners {
 			// suspends by throwing.
 			if isUse {
 				if isInsideTryStatement(node, enclosing) {
-					ctx.ReportNode(node, messageRulesOfHooksTryCatchUse)
+					ruleContext.ReportNode(node, messageRulesOfHooksTryCatchUse)
 				}
 				return
 			}
@@ -304,19 +304,19 @@ func runRulesOfHooks(ctx rule.Context, options any) rule.Listeners {
 				return
 			}
 
-			// `try` is answered syntactically and it is answered FIRST, ahead of every graph
+			// `try` is answered syntactically and it is answered first, ahead of every graph
 			// question including reachability. That ordering is upstream's and it is observable
 			// rather than incidental: `try { throw err; useState(); } catch {}` is upstream case 112
-			// and it REPORTS, while the same unreachable Hook with no `try` around it is upstream
-			// case 18 and is SILENT. Measured on the release binary both ways after this rule got it
+			// and it reports, while the same unreachable Hook with no `try` around it is upstream
+			// case 18 and is silent. Measured on the release binary both ways after this rule got it
 			// backwards on its first run. A cyclic Hook inside a `try` is still a loop rather than a
 			// condition, which is why the cycle test sits inside this arm as well.
 			if isInsideTryStatement(node, enclosing) {
 				if facts.analysis.IsCyclic(block) || isInsideDoWhileStatement(node, enclosing) {
-					ctx.ReportNode(node, messageRulesOfHooksLoop)
+					ruleContext.ReportNode(node, messageRulesOfHooksLoop)
 					return
 				}
-				ctx.ReportNode(node, messageRulesOfHooksConditional)
+				ruleContext.ReportNode(node, messageRulesOfHooksConditional)
 				return
 			}
 
@@ -329,12 +329,12 @@ func runRulesOfHooks(ctx rule.Context, options any) rule.Listeners {
 			}
 
 			if facts.analysis.IsCyclic(block) || isInsideDoWhileStatement(node, enclosing) {
-				ctx.ReportNode(node, messageRulesOfHooksLoop)
+				ruleContext.ReportNode(node, messageRulesOfHooksLoop)
 				return
 			}
 
 			if !facts.analysis.IsOnEveryFinalPath(block) {
-				ctx.ReportNode(node, messageRulesOfHooksConditional)
+				ruleContext.ReportNode(node, messageRulesOfHooksConditional)
 			}
 		},
 	}
@@ -346,18 +346,24 @@ func runRulesOfHooks(ctx rule.Context, options any) rule.Listeners {
 // The arms are ordered the way oxc orders them, because the order is observable: a named function
 // that is neither component nor Hook reports as `notComponent` even when it is also async, and a
 // callback inside a component reports as `callback` even when its own name would qualify.
-func reportEnclosingFunctionShape(ctx rule.Context, hook *ast.Node, callee *ast.Node, enclosing *ast.Node, isUse bool) bool {
+func reportEnclosingFunctionShape(
+	ruleContext rule.Context,
+	hook *ast.Node,
+	callee *ast.Node,
+	enclosing *ast.Node,
+	isUse bool,
+) bool {
 	// A function with its own name that is neither component-shaped nor Hook-shaped. This arm points
 	// at the callee rather than at the whole call, which is upstream's own choice and was measured
 	// on the release binary rather than read: for `useHook(1)` the label covers seven bytes here and
 	// ten in every other arm.
 	if name := ownFunctionName(enclosing); name != "" {
 		if !isComponentOrHookName(name) {
-			ctx.ReportNode(callee, messageRulesOfHooksNotComponent)
+			ruleContext.ReportNode(callee, messageRulesOfHooksNotComponent)
 			return true
 		}
 		if isAsyncFunction(enclosing) && isDirectlyInsideComponentOrHook(enclosing) {
-			ctx.ReportNode(hook, messageRulesOfHooksAsync)
+			ruleContext.ReportNode(hook, messageRulesOfHooksAsync)
 			return true
 		}
 		return false
@@ -368,21 +374,21 @@ func reportEnclosingFunctionShape(ctx rule.Context, hook *ast.Node, callee *ast.
 	// render, so they are not callbacks for this purpose.
 	if isNonReactFunctionArgument(enclosing) {
 		if !isUse && isSomewhereInsideComponentOrHook(enclosing) {
-			ctx.ReportNode(hook, messageRulesOfHooksCallback)
+			ruleContext.ReportNode(hook, messageRulesOfHooksCallback)
 		}
 		return true
 	}
 
 	async := isAsyncFunction(enclosing)
 	if async && isDirectlyInsideComponentOrHook(enclosing) {
-		ctx.ReportNode(hook, messageRulesOfHooksAsync)
+		ruleContext.ReportNode(hook, messageRulesOfHooksAsync)
 		return true
 	}
 
-	// An anonymous function whose surrounding syntax gives it a name — a declarator, an assignment,
+	// An anonymous function whose surrounding syntax gives it a name: a declarator, an assignment,
 	// an object property, a destructuring default. The name is read syntactically, never resolved.
 	if name, named := declarationIdentifierOf(enclosing); named && !isComponentOrHookName(name) {
-		ctx.ReportNode(callee, messageRulesOfHooksNotComponent)
+		ruleContext.ReportNode(callee, messageRulesOfHooksNotComponent)
 		return true
 	}
 
@@ -393,7 +399,7 @@ func reportEnclosingFunctionShape(ctx rule.Context, hook *ast.Node, callee *ast.
 // something else instead of being bound to a local first.
 //
 // A declarator and a bare expression statement are the two shapes upstream permits.
-func reportInlineEffectEventEscape(ctx rule.Context, call *ast.Node) {
+func reportInlineEffectEventEscape(ruleContext rule.Context, call *ast.Node) {
 	parent := call.Parent
 	if parent == nil {
 		return
@@ -402,30 +408,17 @@ func reportInlineEffectEventEscape(ctx rule.Context, call *ast.Node) {
 	case ast.KindVariableDeclaration, ast.KindExpressionStatement:
 		return
 	}
-	ctx.ReportNode(call, messageRulesOfHooksEffectEventEscape)
-}
-
-// hookPathFacts is one code path root's graph and the analysis over it, plus a map from a Hook call
-// to the block it was laid out in.
-//
-// Keyed by the call node's position rather than by the node pointer, for the reason
-// `internal/unused` found the hard way: the graph lays a `finally` block out twice and both copies
-// carry the same positions, so the first **reachable** block a position lands in is the one that
-// answers for it.
-type hookPathFacts struct {
-	analysis *control_flow_graph.PathAnalysis[hookEvent]
-	blocks   map[int]*control_flow_graph.Block[hookEvent]
+	ruleContext.ReportNode(call, messageRulesOfHooksEffectEventEscape)
 }
 
 type hookEvent struct {
 	position int
 }
 
-func (f *hookPathFacts) blockOf(call *ast.Node) (*control_flow_graph.Block[hookEvent], bool) {
-	block, found := f.blocks[call.Pos()]
-	return block, found
-}
-
+// factsForRoot is the Hook path facts for root's control-flow graph, built on the first call under root and
+// reused for every later one.
+//
+// Mutates: cache keeps the facts built for root, so the next Hook call under the same root reuses them.
 func factsForRoot(cache map[*ast.Node]*hookPathFacts, root *ast.Node) *hookPathFacts {
 	if existing, cached := cache[root]; cached {
 		return existing
@@ -442,7 +435,7 @@ func factsForRoot(cache map[*ast.Node]*hookPathFacts, root *ast.Node) *hookPathF
 				return
 			}
 			block, _ := builder.Emit(hookEvent{position: node.Pos()})
-			// Keyed by position rather than by node, and the LAST layout wins.
+			// Keyed by position rather than by node, and the last layout wins.
 			//
 			// The duplicate-layout trap is real and `internal/unused` was bitten by it: the graph
 			// lays a `finally` body out twice, once for normal completion and once for the path that
@@ -452,12 +445,12 @@ func factsForRoot(cache map[*ast.Node]*hookPathFacts, root *ast.Node) *hookPathF
 			//
 			// Measured on this substrate. `try { f(); } finally { useHook(); }` lays the Hook out in
 			// b4 (onEveryFinal=true) and then again in b1 (onEveryFinal=false), so which copy wins
-			// decides the verdict — and neither answer is ever read, because a `finally` body is
+			// decides the verdict, and neither answer is ever read, because a `finally` body is
 			// syntactically inside a `TryStatement` and `isInsideTryStatement` answers above the
 			// graph. Every shape that produces a duplicate layout is a `try` shape, so the
 			// preference has no reachable effect at all.
 			//
-			// A preference was written here first and a mutation flipping it SURVIVED the whole
+			// A preference was written here first and a mutation flipping it survived the whole
 			// fixture set. The survivor was not a fixture gap; the branch was subsumed by an earlier
 			// guard in the same function. Disabling the `try` check and re-running confirmed it: the
 			// verdict is unchanged either way. So the preference is gone rather than kept with a
@@ -573,29 +566,29 @@ func enclosingFunctionForHook(node *ast.Node) *ast.Node {
 // A constructor, an accessor and a static block only exist in a class, so their kind settles it. A
 // **method does not**, and that is the trap: `({ useHook() { ... } })` parses to the same
 // `KindMethodDeclaration` as a class method does, so a kind test alone reads an object literal as a
-// class and reports the wrong arm. Upstream's own corpus pins both sides of it — case 19 writes
+// class and reports the wrong arm. Upstream's own corpus pins both sides of it: case 19 writes
 // `({useHook() { useState(); }})` as a passing case and case 101 writes `({g() { useState(); }})` as
-// a `notComponent` failure — and this rule reported `classComponent` for both on its first run. The
+// a `notComponent` failure, and this rule reported `classComponent` for both on its first run. The
 // parent is what separates them.
 //
 // A field initializer is an ordinary function whose parent is a property declaration, and a class is
 // the only place a property declaration appears.
-func isClassMemberFunction(fn *ast.Node) bool {
-	switch fn.Kind {
+func isClassMemberFunction(function *ast.Node) bool {
+	switch function.Kind {
 	case ast.KindConstructor, ast.KindGetAccessor, ast.KindSetAccessor,
 		ast.KindClassStaticBlockDeclaration:
 		return true
 	case ast.KindMethodDeclaration:
-		parent := fn.Parent
+		parent := function.Parent
 		return parent != nil && parent.Kind == ast.KindClassDeclaration ||
 			parent != nil && parent.Kind == ast.KindClassExpression
 	}
-	parent := fn.Parent
+	parent := function.Parent
 	return parent != nil && parent.Kind == ast.KindPropertyDeclaration
 }
 
-func isAsyncFunction(fn *ast.Node) bool {
-	return ast.HasSyntacticModifier(fn, ast.ModifierFlagsAsync)
+func isAsyncFunction(function *ast.Node) bool {
+	return ast.HasSyntacticModifier(function, ast.ModifierFlagsAsync)
 }
 
 // ownFunctionName returns a function's own declared name, which is a function declaration's
@@ -603,10 +596,10 @@ func isAsyncFunction(fn *ast.Node) bool {
 //
 // Empty for an arrow and for an anonymous function expression, whose names come from the syntax
 // around them instead.
-func ownFunctionName(fn *ast.Node) string {
-	switch fn.Kind {
+func ownFunctionName(function *ast.Node) string {
+	switch function.Kind {
 	case ast.KindFunctionDeclaration, ast.KindFunctionExpression:
-		name := fn.Name()
+		name := function.Name()
 		if name != nil && name.Kind == ast.KindIdentifier {
 			return name.Text()
 		}
@@ -620,21 +613,21 @@ func ownFunctionName(fn *ast.Node) string {
 // than resolved. The second result separates "no name is available" from "a name is available and
 // it is empty", which matters because the caller's verdict differs between them: an unnamed default
 // export is silent and a lowercase-named arrow reports.
-func declarationIdentifierOf(fn *ast.Node) (string, bool) {
-	// An object-literal method is its OWN name-bearer rather than borrowing one from a parent: the
-	// function-like node IS the `KindMethodDeclaration`, and there is no anonymous function nested
+func declarationIdentifierOf(function *ast.Node) (string, bool) {
+	// An object-literal method is its own name-bearer rather than borrowing one from a parent: the
+	// function-like node is the `KindMethodDeclaration`, and there is no anonymous function nested
 	// inside it whose parent could be consulted. Every other shape below reads the parent, which is
 	// why this one has to be answered before the switch rather than inside it. Missed on the first
-	// pass, and upstream's case 101 hid it — that case reports nine findings and this rule reported
+	// pass, and upstream's case 101 hid it: that case reports nine findings and this rule reported
 	// nine, one of them from a different arm on a different line.
-	if fn.Kind == ast.KindMethodDeclaration {
-		if text, readable := ast.TryGetTextOfPropertyName(fn.Name()); readable {
+	if function.Kind == ast.KindMethodDeclaration {
+		if text, readable := ast.TryGetTextOfPropertyName(function.Name()); readable {
 			return text, true
 		}
 		return "", false
 	}
 
-	parent := fn.Parent
+	parent := function.Parent
 	if parent == nil {
 		return "", false
 	}
@@ -651,7 +644,7 @@ func declarationIdentifierOf(fn *ast.Node) (string, bool) {
 		if binary.OperatorToken == nil || binary.OperatorToken.Kind != ast.KindEqualsToken {
 			return "", false
 		}
-		if binary.Right != fn {
+		if binary.Right != function {
 			return "", false
 		}
 		left := binary.Left
@@ -669,7 +662,7 @@ func declarationIdentifierOf(fn *ast.Node) (string, bool) {
 	// looks like an oversight.
 	//
 	// Our parser reaches it from exactly one shape: an assignment-destructuring default,
-	// `({k = () => { useState(); }} = {})`. Upstream is SILENT on that, measured standalone on the
+	// `({k = () => { useState(); }} = {})`. Upstream is silent on that, measured standalone on the
 	// release binary against the binding-declaration spelling beside it:
 	//
 	//	const {j = () => { useState(); }} = {};    REPORTS
@@ -677,7 +670,7 @@ func declarationIdentifierOf(fn *ast.Node) (string, bool) {
 	//
 	// The two are one line apart in upstream case 101 and only nine of its ten statements report,
 	// which is the only place in the whole corpus that says so. oxc reaches that silence through a
-	// node kind rather than a decision: a destructuring default in an ASSIGNMENT is an
+	// node kind rather than a decision: a destructuring default in an assignment is an
 	// `AssignmentTargetWithDefault` there, which its `get_declaration_identifier` does not name, so
 	// no name is available and the caller declines. Our parser calls the same shape a shorthand
 	// property assignment, and reading a name off it would report where upstream does not.
@@ -696,8 +689,8 @@ func declarationIdentifierOf(fn *ast.Node) (string, bool) {
 
 // isNonReactFunctionArgument reports whether a function is being handed to something as a callback,
 // excluding the two callers React itself renders.
-func isNonReactFunctionArgument(fn *ast.Node) bool {
-	parent := fn.Parent
+func isNonReactFunctionArgument(function *ast.Node) bool {
+	parent := function.Parent
 	if parent == nil {
 		return false
 	}
@@ -716,8 +709,8 @@ func isNonReactFunctionArgument(fn *ast.Node) bool {
 //
 // Bare and namespaced spellings both count, and unlike isNonReactFunctionArgument this looks all the
 // way up rather than at the immediate parent, matching oxc's `is_memo_or_forward_ref_callback`.
-func isMemoOrForwardRefCallback(fn *ast.Node) bool {
-	for current := fn.Parent; current != nil; current = current.Parent {
+func isMemoOrForwardRefCallback(function *ast.Node) bool {
+	for current := function.Parent; current != nil; current = current.Parent {
 		if current.Kind != ast.KindCallExpression {
 			continue
 		}
@@ -750,25 +743,25 @@ func calleeAccessedName(callee *ast.Node) string {
 }
 
 // isDirectlyInsideComponentOrHook asks whether this one function is itself a component or a Hook.
-func isDirectlyInsideComponentOrHook(fn *ast.Node) bool {
-	if name := ownFunctionName(fn); name != "" {
+func isDirectlyInsideComponentOrHook(function *ast.Node) bool {
+	if name := ownFunctionName(function); name != "" {
 		if isComponentOrHookName(name) {
 			return true
 		}
-	} else if name, named := declarationIdentifierOf(fn); named && isComponentOrHookName(name) {
+	} else if name, named := declarationIdentifierOf(function); named && isComponentOrHookName(name) {
 		return true
 	}
-	return isMemoOrForwardRefCallback(fn)
+	return isMemoOrForwardRefCallback(function)
 }
 
 // isSomewhereInsideComponentOrHook asks whether this function or any function enclosing it is a
 // component or a Hook.
 //
 // This is what separates a Hook in a callback inside a component, which reports, from a Hook in a
-// callback inside a plain function, which is silent — upstream's judgment being that the second is
+// callback inside a plain function, which is silent, upstream's judgment being that the second is
 // somebody else's library code and not a React mistake.
-func isSomewhereInsideComponentOrHook(fn *ast.Node) bool {
-	for current := fn; current != nil; current = current.Parent {
+func isSomewhereInsideComponentOrHook(function *ast.Node) bool {
+	for current := function; current != nil; current = current.Parent {
 		if !ast.IsFunctionLike(current) {
 			continue
 		}

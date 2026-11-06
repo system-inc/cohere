@@ -15,9 +15,9 @@ const implicitGlobalsFile = "/repository/source/ImplicitGlobals.ts"
 // implicitGlobalsScript is the sloppy JavaScript script the leak half can still fire in.
 const implicitGlobalsScript = "/repository/source/ImplicitGlobals.js"
 
-// implicitGlobalsScriptTsConfig is the typed harness's project with TypeScript's own module detection
+// implicitGlobalsScriptTsConfiguration is the typed harness's project with TypeScript's own module detection
 // rather than `force`, so a file with no import or export is a script, and with JavaScript allowed.
-const implicitGlobalsScriptTsConfig = `{
+const implicitGlobalsScriptTsConfiguration = `{
 	"compilerOptions": {
 		"strict": true,
 		"target": "ES2022",
@@ -31,35 +31,44 @@ const implicitGlobalsScriptTsConfig = `{
 
 // runImplicitGlobalsAsAScript builds a typed program in which the fixture is a script: sloppy for a
 // .js file, and strict under alwaysStrict for a .ts one.
-func runImplicitGlobalsAsAScript(t *testing.T, fileName string, sourceText string, options any) rule_testing.Result {
-	t.Helper()
-	return rule_testing.RunTypedFilesWithSetupAndOptions(t, NoImplicitGlobals,
+func runImplicitGlobalsAsAScript(
+	test *testing.T,
+	fileName string,
+	sourceText string,
+	options NoImplicitGlobalsSettings,
+) rule_testing.Result {
+	test.Helper()
+	return rule_testing.RunTypedFilesWithSetupAndOptions(test, NoImplicitGlobals,
 		map[string]string{fileName: sourceText}, fileName, options, func(directory string) {
 			path := filepath.Join(directory, "tsconfig.json")
-			if err := os.WriteFile(path, []byte(implicitGlobalsScriptTsConfig), 0o644); err != nil {
-				t.Fatalf("writing the script tsconfig: %v", err)
+			if writeError := os.WriteFile(
+				path,
+				[]byte(implicitGlobalsScriptTsConfiguration),
+				0o644,
+			); writeError != nil {
+				test.Fatalf("writing the script tsconfig: %v", writeError)
 			}
 		})
 }
 
 // implicitGlobalsOptions routes the option through the rule's own exported decoder.
-func implicitGlobalsOptions(t *testing.T, lexicalBindings bool) any {
-	t.Helper()
-	raw, err := json.Marshal(map[string]bool{"lexicalBindings": lexicalBindings})
-	if err != nil {
-		t.Fatalf("could not marshal the option: %v", err)
+func implicitGlobalsOptions(test *testing.T, lexicalBindings bool) NoImplicitGlobalsSettings {
+	test.Helper()
+	raw, encodeError := json.Marshal(map[string]bool{"lexicalBindings": lexicalBindings})
+	if encodeError != nil {
+		test.Fatalf("could not marshal the option: %v", encodeError)
 	}
-	decoded, err := DecodeNoImplicitGlobalsOptions(raw)
-	if err != nil {
-		t.Fatalf("the decoder refused %s: %v", raw, err)
+	decoded, decodeNoImplicitGlobalsOptionsError := DecodeNoImplicitGlobalsOptions(raw)
+	if decodeNoImplicitGlobalsOptionsError != nil {
+		test.Fatalf("the decoder refused %s: %v", raw, decodeNoImplicitGlobalsOptionsError)
 	}
 	return decoded
 }
 
 // Each half is decided by what the file is, so the fixtures build each kind of file on purpose.
 //
-// The declaration halves fire only in a SCRIPT, since a module has no global scope. The leak half
-// fires only in SLOPPY code, since in strict code an assignment to an undeclared name throws, and it
+// The declaration halves fire only in a script, since a module has no global scope. The leak half
+// fires only in sloppy code, since in strict code an assignment to an undeclared name throws, and it
 // needs the checker to ask whether a name was ever declared. Three harnesses give three kinds of file:
 //
 //	the untyped harness               a script, with no checker, so only the declaration halves
@@ -84,8 +93,8 @@ func implicitGlobalsOptions(t *testing.T, lexicalBindings bool) any {
 // The cases were extracted by loading upstream's tester with a stubbed RuleTester and rendering
 // these literals from that JSON, so nothing was retyped. The generator refuses a case holding a
 // byte outside printable ASCII.
-func TestNoImplicitGlobalsFiresOnGlobalDeclarations(t *testing.T) {
-	t.Parallel()
+func TestNoImplicitGlobalsFiresOnGlobalDeclarations(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText      string
@@ -109,18 +118,30 @@ func TestNoImplicitGlobalsFiresOnGlobalDeclarations(t *testing.T) {
 		{"const a = 1; const b = 2;", true, []string{"globalLexicalBinding", "globalLexicalBinding"}},
 		{"const a = 1, b = 2;", true, []string{"globalLexicalBinding", "globalLexicalBinding"}},
 		{"let a, b = 1;", true, []string{"globalLexicalBinding", "globalLexicalBinding"}},
-		{"const a = 1; let b; class C {}", true, []string{"globalLexicalBinding", "globalLexicalBinding", "globalLexicalBinding"}},
-		{"const [a, b, ...c] = [];", true, []string{"globalLexicalBinding", "globalLexicalBinding", "globalLexicalBinding"}},
-		{"let { a, foo: b, bar: { c } } = {};", true, []string{"globalLexicalBinding", "globalLexicalBinding", "globalLexicalBinding"}},
+		{
+			"const a = 1; let b; class C {}",
+			true,
+			[]string{"globalLexicalBinding", "globalLexicalBinding", "globalLexicalBinding"},
+		},
+		{
+			"const [a, b, ...c] = [];",
+			true,
+			[]string{"globalLexicalBinding", "globalLexicalBinding", "globalLexicalBinding"},
+		},
+		{
+			"let { a, foo: b, bar: { c } } = {};",
+			true,
+			[]string{"globalLexicalBinding", "globalLexicalBinding", "globalLexicalBinding"},
+		},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
 			// The untyped harness, because a script is the only place these can fire.
-			result := rule_testing.RunWithOptions(t, NoImplicitGlobals, implicitGlobalsFile,
-				testCase.sourceText, implicitGlobalsOptions(t, testCase.lexicalBindings))
-			rule_testing.ExpectFindings(t, result, testCase.messages...)
+			result := rule_testing.RunWithOptions(test, NoImplicitGlobals, implicitGlobalsFile,
+				testCase.sourceText, implicitGlobalsOptions(test, testCase.lexicalBindings))
+			rule_testing.ExpectFindings(test, result, testCase.messages...)
 		})
 	}
 }
@@ -131,8 +152,8 @@ func TestNoImplicitGlobalsFiresOnGlobalDeclarations(t *testing.T) {
 // It is not gated on the assignment being at the top level, because a leak creates a global from a
 // function too. Upstream's window.foo = function() { bar = 1; } is the case that says so: the
 // assignment is inside a function and it still reports.
-func TestNoImplicitGlobalsFiresOnLeaks(t *testing.T) {
-	t.Parallel()
+func TestNoImplicitGlobalsFiresOnLeaks(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -152,19 +173,19 @@ func TestNoImplicitGlobalsFiresOnLeaks(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := runImplicitGlobalsAsAScript(t, implicitGlobalsScript, testCase.sourceText,
-				implicitGlobalsOptions(t, false))
-			rule_testing.ExpectFindings(t, result, testCase.messages...)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := runImplicitGlobalsAsAScript(test, implicitGlobalsScript, testCase.sourceText,
+				implicitGlobalsOptions(test, false))
+			rule_testing.ExpectFindings(test, result, testCase.messages...)
 		})
 	}
 }
 
 // Two upstream cases report from both halves at once, which a sloppy script shows in one run. The
 // declarations are reported first, since the declaration half runs first.
-func TestNoImplicitGlobalsFiresFromBothHalves(t *testing.T) {
-	t.Parallel()
+func TestNoImplicitGlobalsFiresFromBothHalves(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -175,10 +196,10 @@ func TestNoImplicitGlobalsFiresFromBothHalves(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, runImplicitGlobalsAsAScript(t, implicitGlobalsScript,
-				testCase.sourceText, implicitGlobalsOptions(t, true)), testCase.messages...)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, runImplicitGlobalsAsAScript(test, implicitGlobalsScript,
+				testCase.sourceText, implicitGlobalsOptions(test, true)), testCase.messages...)
 		})
 	}
 }
@@ -192,8 +213,8 @@ func TestNoImplicitGlobalsFiresFromBothHalves(t *testing.T) {
 //
 // Run through the untyped harness and a sloppy typed script, because a clean case must stay clean in
 // the one place both halves can fire. A case clean only where the rule cannot fire is not evidence.
-func TestNoImplicitGlobalsStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoImplicitGlobalsStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText      string
@@ -253,12 +274,12 @@ func TestNoImplicitGlobalsStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoImplicitGlobals,
-				implicitGlobalsFile, testCase.sourceText, implicitGlobalsOptions(t, testCase.lexicalBindings)))
-			rule_testing.ExpectClean(t, runImplicitGlobalsAsAScript(t, implicitGlobalsScript,
-				testCase.sourceText, implicitGlobalsOptions(t, testCase.lexicalBindings)))
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoImplicitGlobals,
+				implicitGlobalsFile, testCase.sourceText, implicitGlobalsOptions(test, testCase.lexicalBindings)))
+			rule_testing.ExpectClean(test, runImplicitGlobalsAsAScript(test, implicitGlobalsScript,
+				testCase.sourceText, implicitGlobalsOptions(test, testCase.lexicalBindings)))
 		})
 	}
 }
@@ -272,7 +293,7 @@ func TestNoImplicitGlobalsStaysSilent(t *testing.T) {
 // surface @typescript-eslint/no-redeclare's builtinGlobals reads since #e1zk9s0. This rule's two
 // messages were not revisited there.)
 //
-// The shape of the decline is an UPGRADE that does not happen, rather than a finding that goes
+// The shape of the decline is an upgrade that does not happen, rather than a finding that goes
 // missing, and that distinction is worth stating because it is much the smaller gap. Measured
 // against the installed rule:
 //
@@ -281,10 +302,10 @@ func TestNoImplicitGlobalsStaysSilent(t *testing.T) {
 //	var Array = 1; Array = 2;  upstream redeclarationOfReadonlyGlobal, here globalNonLexicalBinding
 //	var notABuiltin = 1        upstream globalNonLexicalBinding, here the same
 //
-// The two declaration rows still REPORT here, at the same place, under the message that would be
+// The two declaration rows still report here, at the same place, under the message that would be
 // correct if the name were not a builtin, so the gap there is only that the finding does not say the
 // stronger thing. The assignment row is the one genuinely lost finding: `Array` resolves to the
-// standard library's own declaration, so the leak check correctly answers that the name WAS declared
+// standard library's own declaration, so the leak check correctly answers that the name was declared
 // and stays silent. That is resolution working, and it is exactly why the readonly judgment needs a
 // configured-globals surface rather than the checker.
 //
@@ -292,8 +313,8 @@ func TestNoImplicitGlobalsStaysSilent(t *testing.T) {
 // should turn these rows into the upstream ids, and this test is what will notice. The count
 // assertion below is deliberately about the two declaration rows and is skipped where nothing is
 // reported at all.
-func TestNoImplicitGlobalsDeclinesReadonlyGlobals(t *testing.T) {
-	t.Parallel()
+func TestNoImplicitGlobalsDeclinesReadonlyGlobals(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -305,24 +326,29 @@ func TestNoImplicitGlobalsDeclinesReadonlyGlobals(t *testing.T) {
 	}{
 		{"Array = 1", []string{"assignmentToReadonlyGlobal"}, nil, true},
 		{"var Array = 1", []string{"redeclarationOfReadonlyGlobal"}, []string{"globalNonLexicalBinding"}, false},
-		{"var Array = 1; Array = 2;", []string{"redeclarationOfReadonlyGlobal"}, []string{"globalNonLexicalBinding"}, false},
+		{
+			"var Array = 1; Array = 2;",
+			[]string{"redeclarationOfReadonlyGlobal"},
+			[]string{"globalNonLexicalBinding"},
+			false,
+		},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
 			var result rule_testing.Result
 			if testCase.typed {
-				result = runImplicitGlobalsAsAScript(t, implicitGlobalsScript, testCase.sourceText,
-					implicitGlobalsOptions(t, true))
+				result = runImplicitGlobalsAsAScript(test, implicitGlobalsScript, testCase.sourceText,
+					implicitGlobalsOptions(test, true))
 			} else {
-				result = rule_testing.RunWithOptions(t, NoImplicitGlobals,
-					implicitGlobalsFile, testCase.sourceText, implicitGlobalsOptions(t, true))
+				result = rule_testing.RunWithOptions(test, NoImplicitGlobals,
+					implicitGlobalsFile, testCase.sourceText, implicitGlobalsOptions(test, true))
 			}
-			rule_testing.ExpectFindings(t, result, testCase.messages...)
+			rule_testing.ExpectFindings(test, result, testCase.messages...)
 			if len(testCase.messages) != 0 &&
 				len(testCase.messages) != len(testCase.upstreamMessages) {
-				t.Errorf("where this port still reports, the decline should change which message "+
+				test.Errorf("where this port still reports, the decline should change which message "+
 					"is reported and not how many, got %d against upstream's %d",
 					len(testCase.messages), len(testCase.upstreamMessages))
 			}
@@ -337,21 +363,43 @@ func TestNoImplicitGlobalsDeclinesReadonlyGlobals(t *testing.T) {
 // reports while its assignment to an undeclared name throws and leaks nothing (#hks3djf, #jjfa7qb).
 // A sloppy JavaScript script reports both. The untyped harness has no checker, so it shows only the
 // declaration half.
-func TestNoImplicitGlobalsReadsWhatTheFileIs(t *testing.T) {
-	t.Parallel()
+func TestNoImplicitGlobalsReadsWhatTheFileIs(test *testing.T) {
+	test.Parallel()
 
-	run := map[string]func(t *testing.T, sourceText string) rule_testing.Result{
-		"the untyped harness": func(t *testing.T, sourceText string) rule_testing.Result {
-			return rule_testing.RunWithOptions(t, NoImplicitGlobals, implicitGlobalsFile, sourceText, implicitGlobalsOptions(t, true))
+	run := map[string]func(test *testing.T, sourceText string) rule_testing.Result{
+		"the untyped harness": func(test *testing.T, sourceText string) rule_testing.Result {
+			return rule_testing.RunWithOptions(
+				test,
+				NoImplicitGlobals,
+				implicitGlobalsFile,
+				sourceText,
+				implicitGlobalsOptions(test, true),
+			)
 		},
-		"a module": func(t *testing.T, sourceText string) rule_testing.Result {
-			return rule_testing.RunTypedWithOptions(t, NoImplicitGlobals, implicitGlobalsFile, sourceText, implicitGlobalsOptions(t, true))
+		"a module": func(test *testing.T, sourceText string) rule_testing.Result {
+			return rule_testing.RunTypedWithOptions(
+				test,
+				NoImplicitGlobals,
+				implicitGlobalsFile,
+				sourceText,
+				implicitGlobalsOptions(test, true),
+			)
 		},
-		"a TypeScript script under alwaysStrict": func(t *testing.T, sourceText string) rule_testing.Result {
-			return runImplicitGlobalsAsAScript(t, implicitGlobalsFile, sourceText, implicitGlobalsOptions(t, true))
+		"a TypeScript script under alwaysStrict": func(test *testing.T, sourceText string) rule_testing.Result {
+			return runImplicitGlobalsAsAScript(
+				test,
+				implicitGlobalsFile,
+				sourceText,
+				implicitGlobalsOptions(test, true),
+			)
 		},
-		"a sloppy JavaScript script": func(t *testing.T, sourceText string) rule_testing.Result {
-			return runImplicitGlobalsAsAScript(t, implicitGlobalsScript, sourceText, implicitGlobalsOptions(t, true))
+		"a sloppy JavaScript script": func(test *testing.T, sourceText string) rule_testing.Result {
+			return runImplicitGlobalsAsAScript(
+				test,
+				implicitGlobalsScript,
+				sourceText,
+				implicitGlobalsOptions(test, true),
+			)
 		},
 	}
 	cases := []struct {
@@ -374,9 +422,9 @@ func TestNoImplicitGlobalsReadsWhatTheFileIs(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.file+": "+testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, run[testCase.file](t, testCase.sourceText), testCase.messages...)
+		test.Run(testCase.file+": "+testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, run[testCase.file](test, testCase.sourceText), testCase.messages...)
 		})
 	}
 }
@@ -391,8 +439,8 @@ func TestNoImplicitGlobalsReadsWhatTheFileIs(t *testing.T) {
 // The class row is the one most likely to be missed, since nothing in the source says "strict". It
 // was a live false positive in this port before these cases existed. Every expectation measured
 // against the installed rule.
-func TestNoImplicitGlobalsIsSilentInStrictMode(t *testing.T) {
-	t.Parallel()
+func TestNoImplicitGlobalsIsSilentInStrictMode(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -408,65 +456,67 @@ func TestNoImplicitGlobalsIsSilentInStrictMode(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, runImplicitGlobalsAsAScript(t, implicitGlobalsScript,
-				testCase.sourceText, implicitGlobalsOptions(t, false)), testCase.messages...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, runImplicitGlobalsAsAScript(test, implicitGlobalsScript,
+				testCase.sourceText, implicitGlobalsOptions(test, false)), testCase.messages...)
 		})
 	}
 }
 
 // The decoder's own shapes, which no source fixture can reach.
 //
-// Upstream's default for lexicalBindings is FALSE, so the zero value happens to be right here and
+// Upstream's default for lexicalBindings is `false`, so the zero value happens to be right here and
 // the usual default-inversion hazard does not apply. It is decoded through a pointer anyway so an
 // explicit false stays distinguishable from an absent key, and this test is what would notice if the
 // default ever moved and the pointer were dropped as redundant.
-func TestDecodeNoImplicitGlobalsOptions(t *testing.T) {
-	t.Parallel()
+func TestDecodeNoImplicitGlobalsOptions(test *testing.T) {
+	test.Parallel()
 
-	t.Run("an absent option leaves lexical bindings off", func(t *testing.T) {
-		t.Parallel()
-		decoded, err := DecodeNoImplicitGlobalsOptions(nil)
-		if err != nil {
-			t.Fatalf("the decoder refused an absent option: %v", err)
+	test.Run("an absent option leaves lexical bindings off", func(test *testing.T) {
+		test.Parallel()
+		decoded, decodeNoImplicitGlobalsOptionsError := DecodeNoImplicitGlobalsOptions(nil)
+		if decodeNoImplicitGlobalsOptionsError != nil {
+			test.Fatalf("the decoder refused an absent option: %v", decodeNoImplicitGlobalsOptionsError)
 		}
-		if decoded.(NoImplicitGlobalsSettings).LexicalBindings {
-			t.Error("expected lexicalBindings to default to false")
+		if decoded.LexicalBindings {
+			test.Error("expected lexicalBindings to default to false")
 		}
 	})
 
-	t.Run("an empty object leaves it off", func(t *testing.T) {
-		t.Parallel()
-		decoded, err := DecodeNoImplicitGlobalsOptions(json.RawMessage(`{}`))
-		if err != nil {
-			t.Fatalf("the decoder refused an empty object: %v", err)
+	test.Run("an empty object leaves it off", func(test *testing.T) {
+		test.Parallel()
+		decoded, decodeNoImplicitGlobalsOptionsError := DecodeNoImplicitGlobalsOptions(json.RawMessage(`{}`))
+		if decodeNoImplicitGlobalsOptionsError != nil {
+			test.Fatalf("the decoder refused an empty object: %v", decodeNoImplicitGlobalsOptionsError)
 		}
-		if decoded.(NoImplicitGlobalsSettings).LexicalBindings {
-			t.Error("expected lexicalBindings to stay false")
-		}
-	})
-
-	t.Run("an explicit true turns it on", func(t *testing.T) {
-		t.Parallel()
-		decoded, err := DecodeNoImplicitGlobalsOptions(json.RawMessage(`{"lexicalBindings":true}`))
-		if err != nil {
-			t.Fatalf("the decoder refused an explicit true: %v", err)
-		}
-		if !decoded.(NoImplicitGlobalsSettings).LexicalBindings {
-			t.Error("expected lexicalBindings to be true")
+		if decoded.LexicalBindings {
+			test.Error("expected lexicalBindings to stay false")
 		}
 	})
 
-	t.Run("a bare severity leaves the rule on its default", func(t *testing.T) {
-		t.Parallel()
-		// A rule configured as "error" is handed nil options, which arrives at Run as an untyped
-		// nil rather than as settings. Asserting through the rule covers the fallback inside Run,
+	test.Run("an explicit true turns it on", func(test *testing.T) {
+		test.Parallel()
+		decoded, decodeNoImplicitGlobalsOptionsError := DecodeNoImplicitGlobalsOptions(
+			json.RawMessage(`{"lexicalBindings":true}`),
+		)
+		if decodeNoImplicitGlobalsOptionsError != nil {
+			test.Fatalf("the decoder refused an explicit true: %v", decodeNoImplicitGlobalsOptionsError)
+		}
+		if !decoded.LexicalBindings {
+			test.Error("expected lexicalBindings to be true")
+		}
+	})
+
+	test.Run("a bare severity leaves the rule on its default", func(test *testing.T) {
+		test.Parallel()
+		// A rule configured as "error" is handed no options, which arrives at Run unconfigured
+		// rather than as settings. Asserting through the rule covers the fallback inside Run,
 		// which no decoder test can reach: a global const must stay clean.
-		rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoImplicitGlobals,
-			implicitGlobalsFile, "const a = 1;", nil))
-		rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoImplicitGlobals,
-			implicitGlobalsFile, "var a = 1;", nil), "globalNonLexicalBinding")
+		rule_testing.ExpectClean(test, rule_testing.Run(test, NoImplicitGlobals,
+			implicitGlobalsFile, "const a = 1;"))
+		rule_testing.ExpectFindings(test, rule_testing.Run(test, NoImplicitGlobals,
+			implicitGlobalsFile, "var a = 1;"), "globalNonLexicalBinding")
 	})
 }
 
@@ -475,23 +525,23 @@ func TestDecodeNoImplicitGlobalsOptions(t *testing.T) {
 // Upstream reports the VariableDeclarator and the FunctionDeclaration, so a var reports on
 // `foo = 1` rather than on `var foo = 1;`, and every ExpectFindings assertion above is satisfied by
 // either reading.
-func TestNoImplicitGlobalsPointsAtTheDeclaration(t *testing.T) {
-	t.Parallel()
+func TestNoImplicitGlobalsPointsAtTheDeclaration(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunWithOptions(t, NoImplicitGlobals, implicitGlobalsFile,
-		"var foo = 1;", implicitGlobalsOptions(t, false))
-	rule_testing.ExpectFindings(t, result, "globalNonLexicalBinding")
+	result := rule_testing.RunWithOptions(test, NoImplicitGlobals, implicitGlobalsFile,
+		"var foo = 1;", implicitGlobalsOptions(test, false))
+	rule_testing.ExpectFindings(test, result, "globalNonLexicalBinding")
 	source := result.SourceFile.Text()
 	reported := source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 	if reported != "foo = 1" {
-		t.Errorf("expected the finding on the whole declarator, pointed at %q", reported)
+		test.Errorf("expected the finding on the whole declarator, pointed at %q", reported)
 	}
 
-	leak := runImplicitGlobalsAsAScript(t, implicitGlobalsScript, "foo = 1", implicitGlobalsOptions(t, false))
-	rule_testing.ExpectFindings(t, leak, "globalVariableLeak")
+	leak := runImplicitGlobalsAsAScript(test, implicitGlobalsScript, "foo = 1", implicitGlobalsOptions(test, false))
+	rule_testing.ExpectFindings(test, leak, "globalVariableLeak")
 	leakSource := leak.SourceFile.Text()
 	leakReported := leakSource[leak.Diagnostics[0].Range.Pos():leak.Diagnostics[0].Range.End()]
 	if leakReported != "foo" {
-		t.Errorf("expected the leak finding on the assigned name, pointed at %q", leakReported)
+		test.Errorf("expected the leak finding on the assigned name, pointed at %q", leakReported)
 	}
 }

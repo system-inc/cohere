@@ -15,6 +15,11 @@ type stackItem struct {
 	state     *ContainerState
 }
 
+// initializeDocument starts the document tokenizer: it opens and continues containers and feeds the flow
+// inside them to a child tokenizer.
+//
+// Mutates: self its ContainerState and Events are the document's own, set and spliced here as upstream's
+// initializer does through `this`
 func initializeDocument(self *Self, effects *Effects) State {
 	var stack []stackItem
 	continued := 0
@@ -22,8 +27,15 @@ func initializeDocument(self *Self, effects *Effects) State {
 	var childToken *Token
 	var lineStartOffset int
 
-	var start, documentContinue, checkNewContainers, thereIsANewContainer, thereIsNoNewContainer,
-		documentContinued, containerContinue, flowStart, flowContinue State
+	var start State
+	var documentContinue State
+	var checkNewContainers State
+	var thereIsANewContainer State
+	var thereIsNoNewContainer State
+	var documentContinued State
+	var containerContinue State
+	var flowStart State
+	var flowContinue State
 	var writeToChild func(token *Token, endOfFile bool)
 	var exitContainers func(size int)
 	var closeFlow func()

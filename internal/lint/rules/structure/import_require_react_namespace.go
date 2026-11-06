@@ -13,10 +13,22 @@ import (
 // The rule's messages, one handle per id, whose wording lives in
 // `policy/messages/import-require-react-namespace.json`.
 var (
-	importRequireReactNamespaceNoNamedImportText                = policy.MessageOf("structure/import-require-react-namespace", "noNamedImport")
-	importRequireReactNamespaceNoDestructuringFromReactText     = policy.MessageOf("structure/import-require-react-namespace", "noDestructuringFromReact")
-	importRequireReactNamespaceNoCallWithoutPrefixText          = policy.MessageOf("structure/import-require-react-namespace", "noCallWithoutPrefix")
-	importRequireReactNamespaceNoTypeReferenceWithoutPrefixText = policy.MessageOf("structure/import-require-react-namespace", "noTypeReferenceWithoutPrefix")
+	importRequireReactNamespaceNoNamedImportText = policy.MessageOf(
+		"structure/import-require-react-namespace",
+		"noNamedImport",
+	)
+	importRequireReactNamespaceNoDestructuringFromReactText = policy.MessageOf(
+		"structure/import-require-react-namespace",
+		"noDestructuringFromReact",
+	)
+	importRequireReactNamespaceNoCallWithoutPrefixText = policy.MessageOf(
+		"structure/import-require-react-namespace",
+		"noCallWithoutPrefix",
+	)
+	importRequireReactNamespaceNoTypeReferenceWithoutPrefixText = policy.MessageOf(
+		"structure/import-require-react-namespace",
+		"noTypeReferenceWithoutPrefix",
+	)
 )
 
 // messageNoNamedImport is the finding, rendered when it is reported so the text comes from the current catalog.
@@ -27,7 +39,8 @@ func messageNoNamedImport() rule.Message {
 	}
 }
 
-// messageNoDestructuringFromReact is the finding, rendered when it is reported so the text comes from the current catalog.
+// messageNoDestructuringFromReact is the finding, rendered when it is reported so the text comes from the current
+// catalog.
 func messageNoDestructuringFromReact() rule.Message {
 	return rule.Message{
 		Id:          importRequireReactNamespaceNoDestructuringFromReactText.Id,
@@ -43,7 +56,8 @@ func messageNoCallWithoutPrefix() rule.Message {
 	}
 }
 
-// messageNoTypeReferenceWithoutPrefix is the finding, rendered when it is reported so the text comes from the current catalog.
+// messageNoTypeReferenceWithoutPrefix is the finding, rendered when it is reported so the text comes from the current
+// catalog.
 func messageNoTypeReferenceWithoutPrefix() rule.Message {
 	return rule.Message{
 		Id:          importRequireReactNamespaceNoTypeReferenceWithoutPrefixText.Id,
@@ -73,9 +87,9 @@ func messageNoTypeReferenceWithoutPrefix() rule.Message {
 // it is not treated as a type either. Both arms therefore stay silent on it, which is the
 // conservative direction, and reproducing the two spellings keeps our findings equal to the gate's
 // rather than adding one it does not have.
-var ImportRequireReactNamespace = rule.Rule{
+var ImportRequireReactNamespace = rule.Rule[rule.NoOptions]{
 	Name: "structure/import-require-react-namespace",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// Local names brought in by a named import from react, which is what a later bare use has
 		// to be checked against.
 		importedFromReact := map[string]bool{}
@@ -123,13 +137,13 @@ var ImportRequireReactNamespace = rule.Rule{
 					}
 
 					namedCount++
-					ctx.ReportNode(element, messageNoNamedImport())
+					ruleContext.ReportNode(element, messageNoNamedImport())
 				}
 
 				// A namespace import (`import * as React from 'react'`) provides the namespace and
 				// destructures nothing, so it is left alone.
 				if namedCount > 0 && !hasReactDefault {
-					ctx.ReportNode(node, messageNoDestructuringFromReact())
+					ruleContext.ReportNode(node, messageNoDestructuringFromReact())
 				}
 			},
 
@@ -144,7 +158,7 @@ var ImportRequireReactNamespace = rule.Rule{
 				// calls, so testing every imported name here would report on nothing real while
 				// risking a finding on an unrelated call.
 				if importedFromReact[name] && react.IsHookName(name) {
-					ctx.ReportNode(node, messageNoCallWithoutPrefix())
+					ruleContext.ReportNode(node, messageNoCallWithoutPrefix())
 				}
 			},
 
@@ -159,7 +173,7 @@ var ImportRequireReactNamespace = rule.Rule{
 				// The "use" prefix rather than react.IsHookName, matching the original. See the rule
 				// comment: the two arms deliberately spell the hook test differently.
 				if importedFromReact[name] && !strings.HasPrefix(name, "use") {
-					ctx.ReportNode(node, messageNoTypeReferenceWithoutPrefix())
+					ruleContext.ReportNode(node, messageNoTypeReferenceWithoutPrefix())
 				}
 			},
 		}

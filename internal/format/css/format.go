@@ -23,7 +23,7 @@ import (
 
 // postcssPrinter is the printer object as the core normalizes it (src/main/parser-and-printer.js): print
 // answers front matter itself, and both visitor-key functions give front matter none.
-var postcssPrinter = &printing.Printer[*estree.Node]{
+var postcssPrinter = &printing.Printer[*estree.Node, printSettings, printing.NoArguments]{
 	Print:            genericPrint,
 	LocStart:         locStart,
 	LocEnd:           locEnd,
@@ -58,13 +58,16 @@ var supportedEmbedFrontMatterLanguages = map[string]bool{"yaml": true, "toml": t
 // embed is embed.js, an empty function, behind the core's front matter embed
 // (src/main/front-matter/embed.js): yaml front matter is formatted by the yaml printer through textToDoc.
 // toml has no parser in Prettier, so inferParser finds none and it prints as written.
-func embed(path *astPath, _ *printerOptions) func(printing.TextToDoc, printing.PrintFunc, *astPath, *printerOptions) (doc.Doc, error) {
+func embed(
+	path *astPath,
+	_ *printerOptions,
+) func(printing.TextToDoc, printFunc, *astPath, *printerOptions) (doc.Doc, error) {
 	node := currentNode(path)
 	if !isFrontMatter(node) || !supportedEmbedFrontMatterLanguages[node.String("language")] {
 		return nil
 	}
 
-	return func(textToDoc printing.TextToDoc, _ printing.PrintFunc, _ *astPath, _ *printerOptions) (doc.Doc, error) {
+	return func(textToDoc printing.TextToDoc, _ printFunc, _ *astPath, _ *printerOptions) (doc.Doc, error) {
 		language := node.String("language")
 		value := trim(node.String("value"))
 
@@ -73,9 +76,9 @@ func embed(path *astPath, _ *printerOptions) func(printing.TextToDoc, printing.P
 			if language != "yaml" {
 				return nil, nil
 			}
-			formatted, err := textToDoc(value, language)
-			if err != nil {
-				return nil, err
+			formatted, textToDocError := textToDoc(value, language)
+			if textToDocError != nil {
+				return nil, textToDocError
 			}
 			embedded = formatted
 		}
@@ -101,12 +104,17 @@ type printSettings struct {
 
 // settingsOf is the resolved Prettier options a format carries in options.Settings.
 func settingsOf(options *printerOptions) formatoptions.Options {
-	return options.Settings.(printSettings).Options
+	return printSettingsOf(options).Options
 }
 
 // parserOf is options.parser.
 func parserOf(options *printerOptions) string {
-	return options.Settings.(printSettings).parser
+	return printSettingsOf(options).parser
+}
+
+// printSettingsOf is the printSettings a format carries in options.Settings.
+func printSettingsOf(options *printerOptions) printSettings {
+	return options.Settings
 }
 
 // Format is Prettier's format for a CSS file: parse, print to a doc, lay it out. Byte order marks and
@@ -115,22 +123,26 @@ func Format(text string, prettierOptions formatoptions.Options) (string, error) 
 	return formatWithParser(text, prettierOptions, "css")
 }
 
-// FormatSCSS is Prettier's format for an SCSS file, the parser "scss".
-func FormatSCSS(text string, prettierOptions formatoptions.Options) (string, error) {
+// FormatScss is Prettier's format for an SCSS file, the parser "scss".
+func FormatScss(text string, prettierOptions formatoptions.Options) (string, error) {
 	return formatWithParser(text, prettierOptions, "scss")
 }
 
 // formatWithParser is Format under the parser named, "css" or "scss".
-func formatWithParser(text string, prettierOptions formatoptions.Options, parser string) (formatted string, err error) {
+func formatWithParser(
+	text string,
+	prettierOptions formatoptions.Options,
+	parser string,
+) (formatted string, formatWithParserError error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
-			formatted, err = "", fmt.Errorf("%s: %v", parser, recovered)
+			formatted, formatWithParserError = "", fmt.Errorf("%s: %v", parser, recovered)
 		}
 	}()
 
-	document, err := printToDoc(text, prettierOptions, parser)
-	if err != nil {
-		return "", err
+	document, formatWithParserError := printToDoc(text, prettierOptions, parser)
+	if formatWithParserError != nil {
+		return "", formatWithParserError
 	}
 	return doc.Print(document, doc.Options{
 		PrintWidth:     prettierOptions.PrintWidth,
@@ -146,22 +158,26 @@ func PrintToDoc(text string, prettierOptions formatoptions.Options) (doc.Doc, er
 	return printToDocWithParser(text, prettierOptions, "css")
 }
 
-// PrintToDocSCSS is PrintToDoc for SCSS, the parser "scss".
-func PrintToDocSCSS(text string, prettierOptions formatoptions.Options) (doc.Doc, error) {
+// PrintToDocScss is PrintToDoc for SCSS, the parser "scss".
+func PrintToDocScss(text string, prettierOptions formatoptions.Options) (doc.Doc, error) {
 	return printToDocWithParser(text, prettierOptions, "scss")
 }
 
 // printToDocWithParser is PrintToDoc under the parser named, "css" or "scss".
-func printToDocWithParser(text string, prettierOptions formatoptions.Options, parser string) (document doc.Doc, err error) {
+func printToDocWithParser(
+	text string,
+	prettierOptions formatoptions.Options,
+	parser string,
+) (document doc.Doc, printToDocWithParserError error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
-			document, err = nil, fmt.Errorf("%s: %v", parser, recovered)
+			document, printToDocWithParserError = nil, fmt.Errorf("%s: %v", parser, recovered)
 		}
 	}()
 
-	document, err = printToDoc(text, prettierOptions, parser)
-	if err != nil {
-		return nil, err
+	document, printToDocWithParserError = printToDoc(text, prettierOptions, parser)
+	if printToDocWithParserError != nil {
+		return nil, printToDocWithParserError
 	}
 	return doc.StripTrailingHardline(document), nil
 }
@@ -169,18 +185,23 @@ func printToDocWithParser(text string, prettierOptions formatoptions.Options, pa
 // printToDoc is parser-postcss.js's parseCss (or parseScss) followed by printAstToDoc
 // (src/main/ast-to-doc.js).
 func printToDoc(text string, prettierOptions formatoptions.Options, parser string) (doc.Doc, error) {
-	root, err := parseWithParserName(text, parser)
-	if err != nil {
-		if !printing.IsSyntax(err) {
-			err = printing.Syntax(err)
+	root, parseError := parseWithParserName(text, parser)
+	if parseError != nil {
+		if !printing.IsSyntax(parseError) {
+			parseError = printing.Syntax(parseError)
 		}
-		return nil, err
+		return nil, parseError
 	}
 
 	// Format has no textToDoc to reach the yaml printer with, and the core would drop a failing embed
 	// and print the front matter as written, which is not what the fork prints. So it refuses instead.
-	if frontMatter := root.Child("frontMatter"); frontMatter.String("language") == "yaml" && trim(frontMatter.String("value")) != "" {
-		return nil, fmt.Errorf("%s: yaml front matter is formatted by the yaml printer, which css.Format cannot reach", parser)
+	if frontMatter := root.Child(
+		"frontMatter",
+	); frontMatter.String("language") == "yaml" && trim(frontMatter.String("value")) != "" {
+		return nil, fmt.Errorf(
+			"%s: yaml front matter is formatted by the yaml printer, which css.Format cannot reach",
+			parser,
+		)
 	}
 
 	printOptions := &printerOptions{

@@ -70,14 +70,14 @@ func DefaultNoShadowOptions() NoShadowOptions {
 //
 // Its own decoder rather than `rule.DecodeOptionsInto`, for no-redeclare's reason: two options default
 // to true, and the generic helper's zero value would turn both off for every bare configuration.
-func DecodeNoShadowOptions(raw []byte) (any, error) {
+func DecodeNoShadowOptions(raw []byte) (NoShadowOptions, error) {
 	options := DefaultNoShadowOptions()
 	if len(raw) == 0 {
 		return options, nil
 	}
 	var wire noShadowWire
-	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &wire); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 	options.Allow = wire.Allow
 	if wire.BuiltinGlobals != nil {
@@ -88,7 +88,10 @@ func DecodeNoShadowOptions(raw []byte) (any, error) {
 		case "all", "functions", "functions-and-types", "never", "types":
 			options.Hoist = *wire.Hoist
 		default:
-			return options, fmt.Errorf("hoist is %q, and upstream takes all, functions, functions-and-types, never or types", *wire.Hoist)
+			return options, fmt.Errorf(
+				"hoist is %q, and upstream takes all, functions, functions-and-types, never or types",
+				*wire.Hoist,
+			)
 		}
 	}
 	if wire.IgnoreFunctionTypeParameterNameValueShadow != nil {
@@ -128,7 +131,7 @@ func DecodeNoShadowOptions(raw []byte) (any, error) {
 //
 //   - builtinGlobals: when no enclosing binding has the name, a global ESLint or the program's lib
 //     declares is the shadowed one, reported as `noShadowGlobal`. The set is no-redeclare's
-//     (builtin_globals.go). A script's top level IS the global scope, which upstream never examines,
+//     (builtin_globals.go). A script's top level is the global scope, which upstream never examines,
 //     so its declarations are clean and only its nested scopes can shadow a builtin; ruled on #e1zk9s0
 //     for no-redeclare, and the same TypeScript notion of a script applies here. Upstream's rows that
 //     configure `globals` are pinned, since cohere carries no globals configuration.
@@ -151,11 +154,11 @@ func DecodeNoShadowOptions(raw []byte) (any, error) {
 //
 // Two consequences, both measured:
 //
-//   - The table is EMPTY under `rule_testing.Run` and populated under `RunTyped`, because the
-//     binder runs with the program. So this rule declares NeedsTypeChecker for BINDING, not because
+//   - The table is empty under `rule_testing.Run` and populated under `RunTyped`, because the
+//     binder runs with the program. So this rule declares NeedsTypeChecker for binding, not because
 //     it asks any type question. Declared false it would receive a nil checker and an empty table,
 //     and go silently, vacuously clean on every file.
-//   - `ast.GetLocals` PANICS on a node that is not a locals container rather than returning nil, and
+//   - `ast.GetLocals` panics on a node that is not a locals container rather than returning nil, and
 //     an enum declaration is a shape that reaches it. Every call here is guarded by
 //     `ast.IsLocalsContainer` first.
 //
@@ -163,33 +166,33 @@ func DecodeNoShadowOptions(raw []byte) (any, error) {
 //
 // **Declaration merging does the work of upstream's `isTypeValueShadow` and its namespace cases.**
 // In eslint-scope `const x = 1; type x = string;` is two variables in one scope and upstream needs
-// an option to stop reporting it. Here the binder MERGES them into a single symbol carrying
+// an option to stop reporting it. Here the binder merges them into a single symbol carrying
 // `0x80002` (BlockScopedVariable plus TypeAlias), so there is one entry in the table and no pair to
 // compare. Measured the same way for `class Foo {} namespace Foo {}` (`0x220`) and for
 // `class Foo {} interface Foo {}`. Those corpus cases come out clean without a carve-out, which is
 // why no ignoreTypeValueShadow logic appears below.
 //
-// **A function-expression or class-expression NAME is in no table at all.** Upstream gives each its
+// **A function-expression or class-expression name is in no table at all.** Upstream gives each its
 // own `functionExpressionName` scope holding exactly that name, and ten-plus corpus cases turn on
 // it. Measured here: for `(function a() {})`, `a` is absent from the expression's own locals and
 // from its parent's, and is reachable only as the symbol on the name node itself. So those bindings
-// are collected from AST SHAPE rather than from the scope tables, in collectExpressionNames below.
+// are collected from AST shape rather than from the scope tables, in collectExpressionNames below.
 //
-// **An interface declaration is NOT a locals container either, and this one is not in the probe
+// **An interface declaration is not a locals container either, and this one is not in the probe
 // package's map.** Its type parameters are therefore invisible to the walk the same way an enum's
-// members are, and they come off `InterfaceDeclaration.TypeParameters` instead. A type ALIAS *is* a
+// members are, and they come off `InterfaceDeclaration.TypeParameters` instead. A type alias *is* a
 // locals container and needs none of this, which is what makes the absence easy to miss: the two
 // read as the same construct and behave differently. Found by driving the installed rule over
 // shapes the corpus does not write, because upstream's defaults corpus contains no interface type
 // parameter anywhere.
 //
-// **An enum declaration is NOT a locals container.** `ast.IsLocalsContainer` answers false for it,
+// **An enum declaration is not a locals container.** `ast.IsLocalsContainer` answers false for it,
 // so the general walk cannot see its members at all. They live on the enum symbol's `Exports`
 // table instead, which is why the enum arm reads a different accessor from everything else.
 //
 // # hoist: which outer declarations are in scope before they are written
 //
-// An inner binding declared textually BEFORE the outer one it shadows is reported only when the
+// An inner binding declared textually before the outer one it shadows is reported only when the
 // outer declaration hoists under the setting. `functions-and-types`, the default, hoists a function
 // declaration with a body, an interface and a type alias; `functions` and `types` hoist one half;
 // `never` hoists nothing, and `all` reports every such shadow. An outer `var`, `let`, `const` or class
@@ -198,26 +201,26 @@ func DecodeNoShadowOptions(raw []byte) (any, error) {
 //	{ let a; } function a() {}   reports by default, the function hoists
 //	{ let a; } var a;            clean unless hoist is all
 //
-// A function hoists by its FIRST declaration, upstream's `defs[0]`, and the first of an overload set
+// A function hoists by its first declaration, upstream's `defs[0]`, and the first of an overload set
 // is a bodiless signature (upstream's TSDeclareFunction), which is not in either set.
-var NoShadow = rule.Rule{
+var NoShadow = rule.Rule[NoShadowOptions]{
 	Name: "@typescript-eslint/no-shadow",
 
-	// For BINDING rather than for types. See the doc comment above: the locals tables this rule
+	// For binding rather than for types. See the doc comment above: the locals tables this rule
 	// reads are populated by the binder, and the binder runs with the program.
 	NeedsTypeChecker: true,
 
 	// builtinGlobals asks whether a global's declarations live in a lib file.
 	ProgramReads: rule.ReadsDefaultLibrary,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoShadowOptions]) rule.Listeners {
 		// Declined once per file rather than once per node. NeedsTypeChecker governs the
 		// registration path only; a Context built by hand still arrives with a nil checker, and
 		// `TestNoRegisteredRuleCrashesOnAbsentOptionalNodes` builds exactly that.
-		if ctx.TypeChecker == nil {
+		if ruleContext.TypeChecker == nil {
 			return nil
 		}
-		settings, ok := rule.OptionsAs[NoShadowOptions](options)
+		settings, ok := options.Read()
 		if !ok {
 			// A bare "error" arrives as nil, whose zero value turns off both options that default to
 			// true; the real defaults are what a bare configuration means.
@@ -226,7 +229,7 @@ var NoShadow = rule.Rule{
 
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
-				checkFileForShadowing(ctx, node, settings)
+				checkFileForShadowing(ruleContext, node, settings)
 			},
 		}
 	},
@@ -243,8 +246,8 @@ type shadowBinding struct {
 	// identifier is where the finding points, and is the node whose position upstream compares.
 	identifier *ast.Node
 
-	// declaration is the node the binding was declared by, its FIRST declaration when the symbol
-	// merges several (upstream's `defs[0]`). Its KIND answers the hoisting question and its symbol
+	// declaration is the node the binding was declared by, its first declaration when the symbol
+	// merges several (upstream's `defs[0]`). Its kind answers the hoisting question and its symbol
 	// answers the enum question.
 	declaration *ast.Node
 
@@ -274,10 +277,10 @@ type shadowScope struct {
 // checkFileForShadowing collects every scope in the file and reports each shadowed binding.
 //
 // The whole rule runs inside the KindSourceFile listener rather than across several kind listeners,
-// because a shadowing judgment needs the ENCLOSING scopes and there is no rule.OnExit and no
+// because a shadowing judgment needs the enclosing scopes and there is no rule.OnExit and no
 // upward walk from a listener. KindSourceFile fires before its children, so the tree is walked
 // here directly and the answer is computed in one pass.
-func checkFileForShadowing(ctx rule.Context, sourceFile *ast.Node, settings NoShadowOptions) {
+func checkFileForShadowing(ruleContext rule.Context, sourceFile *ast.Node, settings NoShadowOptions) {
 	var scopes []shadowScope
 
 	// The chain of containers currently open, outermost first. A binding's enclosing scopes are
@@ -337,7 +340,7 @@ func checkFileForShadowing(ctx rule.Context, sourceFile *ast.Node, settings NoSh
 							identifier:   identifier,
 							declaration:  typeParameter,
 							declarations: []*ast.Node{typeParameter},
-							symbol:       ctx.TypeChecker.GetSymbolAtLocation(identifier),
+							symbol:       ruleContext.TypeChecker.GetSymbolAtLocation(identifier),
 						})
 					}
 				}
@@ -347,7 +350,7 @@ func checkFileForShadowing(ctx rule.Context, sourceFile *ast.Node, settings NoSh
 			opened = true
 		}
 
-		// A function or class EXPRESSION name is in no locals table, so it is collected from shape.
+		// A function or class expression name is in no locals table, so it is collected from shape.
 		// It behaves as a binding in a scope of its own between the expression and its parent, which
 		// is what upstream's functionExpressionName scope is, so it is recorded against the
 		// expression's own scope when the expression opened one and against the enclosing scope
@@ -365,22 +368,22 @@ func checkFileForShadowing(ctx rule.Context, sourceFile *ast.Node, settings NoSh
 
 		// An enum's members are not in any locals table, because an enum declaration is not a
 		// locals container. They live on the enum symbol's Exports table instead, and they belong in
-		// a scope of their OWN nested inside the enum rather than in the enclosing one: the enum's
+		// a scope of their own nested inside the enum rather than in the enclosing one: the enum's
 		// name is bound outside it and its members inside it, so `enum A { A }` is a member shadowing
 		// the enum name. Folding the members into the enclosing scope would make the two siblings,
 		// and the containment test that finds an enclosing binding would never fire.
-		// An interface declaration is NOT a locals container either, so its type parameters are
+		// An interface declaration is not a locals container either, so its type parameters are
 		// invisible to the walk the same way an enum's members are. They belong in a scope of
 		// their own covering the interface, because `type T = 1; interface I<T> {}` reports.
 		//
 		// This is a third gap of the same family as the enum and the expression name, and it was
 		// found by a wide sweep against the installed rule rather than by the imported corpus,
-		// which writes no interface type parameter anywhere. A type ALIAS is a locals container and
+		// which writes no interface type parameter anywhere. A type alias is a locals container and
 		// needs none of this, which is what made the absence easy to miss.
 		if node.Kind == ast.KindInterfaceDeclaration {
 			interfaceScope := shadowScope{container: node}
-			// TypeParameters is OPTIONAL and every interface without a `<T>` has it nil. The walk
-			// recovers per FILE rather than per rule, so dereferencing it would cost every rule in
+			// TypeParameters is optional and every interface without a `<T>` has it nil. The walk
+			// recovers per file rather than per rule, so dereferencing it would cost every rule in
 			// the package its verdict on any file holding a plain interface, which is most of them.
 			// Skipped rather than returned when absent: a bare return here would abandon the
 			// whole subtree, losing every binding nested inside the interface's members for the
@@ -396,7 +399,7 @@ func checkFileForShadowing(ctx rule.Context, sourceFile *ast.Node, settings NoSh
 						identifier:   identifier,
 						declaration:  typeParameter,
 						declarations: []*ast.Node{typeParameter},
-						symbol:       ctx.TypeChecker.GetSymbolAtLocation(identifier),
+						symbol:       ruleContext.TypeChecker.GetSymbolAtLocation(identifier),
 					})
 				}
 			}
@@ -407,7 +410,7 @@ func checkFileForShadowing(ctx rule.Context, sourceFile *ast.Node, settings NoSh
 
 		if node.Kind == ast.KindEnumDeclaration {
 			enumScope := shadowScope{container: node}
-			collectEnumMembers(ctx, node, &enumScope)
+			collectEnumMembers(ruleContext, node, &enumScope)
 			if len(enumScope.bindings) > 0 {
 				scopes = append(scopes, enumScope)
 			}
@@ -424,7 +427,7 @@ func checkFileForShadowing(ctx rule.Context, sourceFile *ast.Node, settings NoSh
 	}
 	visit(sourceFile)
 
-	// Report. A scope's enclosing scopes are the ones that CONTAIN its container, which is decided
+	// Report. A scope's enclosing scopes are the ones that contain its container, which is decided
 	// by node ranges rather than by a parent pointer walk, so a binding collected from AST shape
 	// participates on the same terms as one read out of a table.
 	for scopeIndex := range scopes {
@@ -433,13 +436,19 @@ func checkFileForShadowing(ctx rule.Context, sourceFile *ast.Node, settings NoSh
 			continue
 		}
 		for _, binding := range scope.bindings {
-			reportIfShadowing(ctx, settings, scopes, scopeIndex, binding)
+			reportIfShadowing(ruleContext, settings, scopes, scopeIndex, binding)
 		}
 	}
 }
 
 // reportIfShadowing finds the nearest enclosing binding of the same name and reports if one exists.
-func reportIfShadowing(ctx rule.Context, settings NoShadowOptions, scopes []shadowScope, scopeIndex int, binding shadowBinding) {
+func reportIfShadowing(
+	ruleContext rule.Context,
+	settings NoShadowOptions,
+	scopes []shadowScope,
+	scopeIndex int,
+	binding shadowBinding,
+) {
 	// A `this` parameter is a pseudo-parameter that cannot be shadowed. Upstream skips it by name
 	// and definition type; here the parameter's name node is the `this` keyword.
 	if binding.name == "this" {
@@ -450,12 +459,12 @@ func reportIfShadowing(ctx rule.Context, settings NoShadowOptions, scopes []shad
 		return
 	}
 
-	if bindingIsDeclaredInADefinitionFile(ctx, binding) {
+	if bindingIsDeclaredInADefinitionFile(ruleContext, binding) {
 		return
 	}
 
 	// `arguments` has no identifier of its own in eslint-scope, so upstream's
-	// `variable.identifiers.length === 0` skip covers it. Here a real `var arguments;` DOES have an
+	// `variable.identifiers.length === 0` skip covers it. Here a real `var arguments;` does have an
 	// identifier, and upstream's corpus keeps `var arguments; function bar() {}` clean for the same
 	// underlying reason: the implicit `arguments` it would shadow is not a declared binding.
 	// Nothing declares it in a table here either, so this case is clean without a carve-out and the
@@ -464,7 +473,7 @@ func reportIfShadowing(ctx rule.Context, settings NoShadowOptions, scopes []shad
 	shadowed, shadowedContainer, found := findEnclosingBinding(scopes, scopeIndex, binding)
 	if !found {
 		// No enclosing binding has the name, so under builtinGlobals the global scope is next, as
-		// upstream's findVariable reaches it. Not from a script's own top level, which IS the global
+		// upstream's findVariable reaches it. Not from a script's own top level, which is the global
 		// scope and is never examined; an expression name collected there sits in a scope of its own,
 		// so it still looks outward.
 		if !settings.BuiltinGlobals {
@@ -474,13 +483,13 @@ func reportIfShadowing(ctx rule.Context, settings NoShadowOptions, scopes []shad
 			!ast.IsExternalModule(container.AsSourceFile()) && binding.symbol != nil {
 			return
 		}
-		if !isBuiltinGlobal(ctx.TypeChecker, ctx.Program, binding.name) {
+		if !isBuiltinGlobal(ruleContext.TypeChecker, ruleContext.Program, binding.name) {
 			return
 		}
 		shadowed = shadowBinding{name: binding.name, global: true}
 	}
 
-	// There is deliberately NO self-comparison guard here, and the reason is the SEARCH BOUND
+	// There is deliberately no self-comparison guard here, and the reason is the search bound
 	// rather than any identity test. findEnclosingBinding searches candidateIndex < scopeIndex
 	// only, and no container appears twice in the walk, so a binding is never compared against a
 	// binding in its own scope through that path. Measured rather than argued: neutering a guard
@@ -491,7 +500,7 @@ func reportIfShadowing(ctx rule.Context, settings NoShadowOptions, scopes []shad
 	// A third search path, or one that widened the bound to include the scope itself, voids it.
 	//
 	// Upstream needs its equivalent skips (isDuplicatedClassNameVariable,
-	// isDuplicatedEnumNameVariable) because eslint-scope binds a class or enum name TWICE, once
+	// isDuplicatedEnumNameVariable) because eslint-scope binds a class or enum name twice, once
 	// outside the declaration and once inside its own scope. Our binder does not duplicate them,
 	// which is why neither has a counterpart in this rule.
 
@@ -502,10 +511,10 @@ func reportIfShadowing(ctx rule.Context, settings NoShadowOptions, scopes []shad
 		return
 	}
 
-	// ignoreFunctionTypeParameterNameValueShadow, default true: a parameter NAME inside a function
-	// TYPE is documentation rather than a binding. Nothing can read it, so it shadows nothing.
+	// ignoreFunctionTypeParameterNameValueShadow, default true: a parameter name inside a function
+	// type is documentation rather than a binding. Nothing can read it, so it shadows nothing.
 	if settings.IgnoreFunctionTypeParameterNameValueShadow &&
-		bindingIsAFunctionTypeParameterName(ctx, binding, shadowed) {
+		bindingIsAFunctionTypeParameterName(ruleContext, binding, shadowed) {
 		return
 	}
 
@@ -518,7 +527,7 @@ func reportIfShadowing(ctx rule.Context, settings NoShadowOptions, scopes []shad
 	// A type-only import of a name, augmented inside `declare module` naming that same module, is
 	// declaration merging rather than shadowing: the interface being declared is the very thing the
 	// import refers to.
-	if bindingIsExternalDeclarationMerging(ctx, scopes[scopeIndex].container, binding, shadowed) {
+	if bindingIsExternalDeclarationMerging(ruleContext, scopes[scopeIndex].container, binding, shadowed) {
 		return
 	}
 
@@ -533,7 +542,8 @@ func reportIfShadowing(ctx rule.Context, settings NoShadowOptions, scopes []shad
 		return
 	}
 
-	if settings.IgnoreOnInitialization && bindingIsInitializedThrough(ctx, binding, shadowed, shadowedContainer) {
+	if settings.IgnoreOnInitialization &&
+		bindingIsInitializedThrough(ruleContext, binding, shadowed, shadowedContainer) {
 		return
 	}
 
@@ -542,10 +552,10 @@ func reportIfShadowing(ctx rule.Context, settings NoShadowOptions, scopes []shad
 		return
 	}
 
-	reportRange := noShadowReportRange(ctx, binding.identifier)
+	reportRange := noShadowReportRange(ruleContext, binding.identifier)
 
 	if shadowed.global {
-		ctx.ReportRange(reportRange, rule.Message{
+		ruleContext.ReportRange(reportRange, rule.Message{
 			Id: messageNoShadowGlobal.Id,
 			Description: fmt.Sprintf("%s The name '%s' is already a global variable.",
 				messageNoShadowGlobal.Description, binding.name),
@@ -553,13 +563,13 @@ func reportIfShadowing(ctx rule.Context, settings NoShadowOptions, scopes []shad
 		return
 	}
 
-	shadowedLine, shadowedColumn := noShadowLineAndColumnOf(ctx, shadowed.identifier)
+	shadowedLine, shadowedColumn := noShadowLineAndColumnOf(ruleContext, shadowed.identifier)
 
 	// An enum member shadowing gets its own message, because the consequence is different: the
-	// member is added to the enum's scope, so a LATER member initializer naming it resolves to the
+	// member is added to the enum's scope, so a later member initializer naming it resolves to the
 	// member rather than to the outer binding.
 	if bindingIsAnEnumName(shadowed) {
-		ctx.ReportRange(reportRange, rule.Message{
+		ruleContext.ReportRange(reportRange, rule.Message{
 			Id: messageNoEnumShadow.Id,
 			Description: fmt.Sprintf("%s The name '%s' is already declared in the upper scope on "+
 				"line %d column %d.", messageNoEnumShadow.Description, binding.name,
@@ -568,7 +578,7 @@ func reportIfShadowing(ctx rule.Context, settings NoShadowOptions, scopes []shad
 		return
 	}
 
-	ctx.ReportRange(reportRange, rule.Message{
+	ruleContext.ReportRange(reportRange, rule.Message{
 		Id: messageNoShadow.Id,
 		Description: fmt.Sprintf("%s The name '%s' is already declared in the upper scope on "+
 			"line %d column %d.", messageNoShadow.Description, binding.name,
@@ -583,8 +593,8 @@ func reportIfShadowing(ctx rule.Context, settings NoShadowOptions, scopes []shad
 // upstream reports covers `a?: number` and `a!: number`. A rest parameter's annotation hangs on the
 // RestElement instead and a destructured name has none, so both report the name alone. Measured on the
 // installed rule; the edge rows named "span:" record each shape.
-func noShadowReportRange(ctx rule.Context, identifier *ast.Node) core.TextRange {
-	nameRange := rule.TokenRange(ctx.SourceFile, identifier)
+func noShadowReportRange(ruleContext rule.Context, identifier *ast.Node) core.TextRange {
+	nameRange := rule.TokenRange(ruleContext.SourceFile, identifier)
 	end := identifier.End()
 	switch declaration := identifier.Parent; declaration.Kind {
 	case ast.KindVariableDeclaration:
@@ -615,13 +625,17 @@ func noShadowReportRange(ctx rule.Context, identifier *ast.Node) core.TextRange 
 //
 // Upstream's `findVariable(scope.upper, name)` walks the scope chain from the parent upward and
 // returns the first match. Here containment is decided by range, and scopes were appended in
-// pre-order, so every candidate enclosing scope sits at a LOWER index and strictly contains this
+// pre-order, so every candidate enclosing scope sits at a lower index and strictly contains this
 // container. Searching from the nearest outward reproduces upstream's ordering.
 //
 // The container returned is the scope the shadowed binding was found in, which
 // ignoreOnInitialization compares against; nil for an expression name found in the binding's own
 // scope, which stands for a scope of its own that no container is.
-func findEnclosingBinding(scopes []shadowScope, scopeIndex int, binding shadowBinding) (shadowBinding, *ast.Node, bool) {
+func findEnclosingBinding(
+	scopes []shadowScope,
+	scopeIndex int,
+	binding shadowBinding,
+) (shadowBinding, *ast.Node, bool) {
 	inner := scopes[scopeIndex].container
 	for candidateIndex := scopeIndex - 1; candidateIndex >= 0; candidateIndex-- {
 		candidate := &scopes[candidateIndex]
@@ -640,27 +654,27 @@ func findEnclosingBinding(scopes []shadowScope, scopeIndex int, binding shadowBi
 		}
 	}
 
-	// A binding can also be shadowed by another binding in its OWN scope when one of the two came
+	// A binding can also be shadowed by another binding in its own scope when one of the two came
 	// from AST shape rather than from the table, which is how a function expression's name and a
 	// declaration inside it end up together. Upstream separates them into two scopes; here the
 	// order they were collected in preserves the nesting, so an expression name recorded before a
 	// binding in the same slice encloses it.
 	own := &scopes[scopeIndex]
 	for _, outer := range own.bindings {
-		// This loop DOES search the binding's own scope, so unlike the one above it can be handed
+		// This loop does search the binding's own scope, so unlike the one above it can be handed
 		// the binding itself, and the identity test is what declines that.
 		if outer.name != binding.name || outer.identifier == binding.identifier {
 			continue
 		}
 		// The symbol test is the whole condition, and a containment test beside it would be
-		// REDUNDANT rather than merely untested. An expression-name binding is recorded against
+		// redundant rather than merely untested. An expression-name binding is recorded against
 		// the innermost scope open at the point the walk reaches the expression, so any binding
 		// sharing that scope with it is inside the expression by construction. Two sibling
 		// function expressions each open their own container and never land in one list together.
 		//
 		// Measured rather than argued, because a mutant removing the containment test survived and
 		// two fixtures written for it did too: the condition was instrumented to panic whenever it
-		// held with containment FALSE, and across every case in this file it never fired.
+		// held with containment false, and across every case in this file it never fired.
 		if outer.symbol == nil {
 			return outer, nil, true
 		}
@@ -683,7 +697,7 @@ func bindingIdentifierOf(declaration *ast.Node) *ast.Node {
 	return name
 }
 
-// expressionSelfName returns the name of a named function or class EXPRESSION.
+// expressionSelfName returns the name of a named function or class expression.
 //
 // Nil for everything else, including an anonymous expression and every declaration form, because a
 // declaration's name is already in a table and collecting it twice would double every finding.
@@ -706,12 +720,14 @@ func expressionSelfName(node *ast.Node) *ast.Node {
 // Through the enum symbol's Exports table rather than through Locals, because an enum declaration
 // is not a locals container and `ast.GetLocals` would panic on it. Measured: for `enum E { A }` the
 // symbol carries `exports=[A]` and `members=[]`.
-func collectEnumMembers(ctx rule.Context, enumDeclaration *ast.Node, scope *shadowScope) {
+//
+// Mutates: scope the caller hands in the enclosing scope for the enum's members to join
+func collectEnumMembers(ruleContext rule.Context, enumDeclaration *ast.Node, scope *shadowScope) {
 	name := enumDeclaration.Name()
 	if name == nil {
 		return
 	}
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(name)
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(name)
 	if symbol == nil {
 		return
 	}
@@ -724,7 +740,7 @@ func collectEnumMembers(ctx rule.Context, enumDeclaration *ast.Node, scope *shad
 			if identifier == nil {
 				continue
 			}
-			// Two `enum A` declarations MERGE onto one symbol, so the Exports table reached from
+			// Two `enum A` declarations merge onto one symbol, so the Exports table reached from
 			// either one lists every member of both. Without this test each declaration collects
 			// the whole merged membership and every finding is emitted once per declaration, at
 			// the identical span. Upstream cannot hit this because its members come from the
@@ -743,20 +759,20 @@ func collectEnumMembers(ctx rule.Context, enumDeclaration *ast.Node, scope *shad
 	}
 }
 
-// bindingIsAnEnumName answers whether the SHADOWED binding is an enum declaration, which picks the
+// bindingIsAnEnumName answers whether the shadowed binding is an enum declaration, which picks the
 // message.
 //
 // The enum message is chosen by what is being shadowed, not by what is doing the shadowing, and the
 // distinction is the whole content of the second message: when the outer binding is an enum, a
 // member initializer naming it resolves to the shadowing member rather than to the enum, which is a
-// different failure from an ordinary shadow. Upstream reads this off the SHADOWED variable's
+// different failure from an ordinary shadow. Upstream reads this off the shadowed variable's
 // definitions (`shadowed.defs.some(def => def.type === TSEnumName)`), and reading it off the inner
 // binding instead renders every enum finding with the ordinary message.
 func bindingIsAnEnumName(binding shadowBinding) bool {
 	if binding.declaration != nil && binding.declaration.Kind == ast.KindEnumDeclaration {
 		return true
 	}
-	// A merged symbol carries several declarations and upstream asks whether ANY of them is an
+	// A merged symbol carries several declarations and upstream asks whether any of them is an
 	// enum, so a namespace merged onto an enum still selects the enum message.
 	if binding.symbol == nil {
 		return false
@@ -771,10 +787,10 @@ func bindingIsAnEnumName(binding shadowBinding) bool {
 
 // expressionNameIsDirectInitializerOf reproduces upstream's isOnInitializer.
 //
-// `var a = function a() {};` is clean because the inner name IS the thing being assigned to the
+// `var a = function a() {};` is clean because the inner name is the thing being assigned to the
 // outer one, so no read can be confused: every reference to `a` inside the function refers to the
 // same function the outer name refers to. `var a = wrap(function a() {})` reports, because the
-// outer `a` is the wrapper's RESULT and the inner name is a different value.
+// outer `a` is the wrapper's result and the inner name is a different value.
 //
 // Upstream unwraps through `||` and a conditional's branches, so `var a = foo || function a() {}`
 // and `var a = foo ? function a() {} : bar` are clean too. Both are in the default corpus.
@@ -783,7 +799,7 @@ func bindingIsAnEnumName(binding shadowBinding) bool {
 // upstream's folds away, so without this a parenthesized initializer would fail the identity test
 // and report where upstream is silent. Unwrapped in a loop because parentheses nest.
 func expressionNameIsDirectInitializerOf(inner shadowBinding, outer shadowBinding) bool {
-	// Only an expression NAME qualifies. A function or class DECLARATION shadowing an outer binding
+	// Only an expression name qualifies. A function or class declaration shadowing an outer binding
 	// is a real shadow whatever the initializer says.
 	if inner.symbol != nil || inner.declaration == nil {
 		return false
@@ -859,7 +875,7 @@ func unwrapToAssignedExpression(node *ast.Node) *ast.Node {
 // bindingIsInTemporalDeadZoneOf reproduces upstream's isInTdz, for every hoist setting but `all`,
 // which never asks.
 //
-// An inner binding written textually BEFORE the outer one it would shadow is only a shadow if the
+// An inner binding written textually before the outer one it would shadow is only a shadow if the
 // outer declaration hoists to the top of its scope under the setting. An outer `var`, `let`, `const`
 // or class never does, so at the inner binding's position it is not yet in scope and the inner one
 // shadows nothing.
@@ -875,8 +891,8 @@ func bindingIsInTemporalDeadZoneOf(inner shadowBinding, outer shadowBinding, hoi
 
 	// Not in the dead zone at all when the inner binding is written at or after the outer one.
 	//
-	// A mutant rewriting this to compare against the outer identifier's END rather than its start
-	// SURVIVES, and it is equivalent rather than untested. Two distinct identifiers cannot
+	// A mutant rewriting this to compare against the outer identifier's end rather than its start
+	// survives, and it is equivalent rather than untested. Two distinct identifiers cannot
 	// partially overlap, so the inner one's end is never strictly inside the outer one's extent and
 	// the two spellings can only differ there. Measured rather than argued: the condition was
 	// instrumented to panic whenever the two disagreed, and across every case in this rule's test
@@ -945,7 +961,7 @@ func nodeContains(outer *ast.Node, inner *ast.Node) bool {
 //	const x = 1; { type x = string; }   clean, a type over a value
 //	var a = 3; function b() { var a = 10; }   reports, both are values
 //
-// In the SAME scope the binder merges the two into one symbol and the question never arises, which
+// In the same scope the binder merges the two into one symbol and the question never arises, which
 // is why `const x = 1; type x = string;` needs nothing here. Across scopes they are two symbols and
 // this test is what separates them.
 //
@@ -964,8 +980,8 @@ func bindingCrossesTheTypeValueBoundary(inner shadowBinding, outer shadowBinding
 		return false
 	}
 
-	// The question is whether the two OVERLAP, not whether either is pure. A class and an enum
-	// occupy BOTH spaces, and the direction of the comparison is what decides them:
+	// The question is whether the two overlap, not whether either is pure. A class and an enum
+	// occupy both spaces, and the direction of the comparison is what decides them:
 	//
 	//	class A {} ... type A = string     clean, the inner type shadows only the type half
 	//	class A {} ... const A = 1         reports, the inner value shadows the value half
@@ -977,9 +993,9 @@ func bindingCrossesTheTypeValueBoundary(inner shadowBinding, outer shadowBinding
 	// of those six rows wrong while passing every imported fixture. The corpus writes no
 	// class-over-type pair at all.
 	//
-	// The rule that reproduces all six: they collide only where the INNER binding's spaces meet the
+	// The rule that reproduces all six: they collide only where the inner binding's spaces meet the
 	// outer's. A pure type inner meets a class outer in the type space, and upstream is silent
-	// there, so the collision test is on the VALUE space alone, which is the space a reference in
+	// there, so the collision test is on the value space alone, which is the space a reference in
 	// expression position resolves through.
 	return innerIsValue != outerIsValue
 }
@@ -996,7 +1012,7 @@ func bindingDeclarationSpaces(binding shadowBinding) (isValue bool, isType bool)
 
 	// An alias is an import, and it stands for whatever it imports, so it is treated as occupying
 	// both spaces rather than neither. Upstream reaches the same answer through isTypeImport: a
-	// plain import counts as a value, and only a TYPE-only one counts as a type alone.
+	// plain import counts as a value, and only a type-only one counts as a type alone.
 	if flags&ast.SymbolFlagsAlias != 0 {
 		if bindingIsTypeOnlyImport(binding) {
 			return false, true
@@ -1019,7 +1035,7 @@ func bindingIsTypeOnlyImport(binding shadowBinding) bool {
 			return true
 		}
 	}
-	// `import type { Foo } from 'bar'` carries the marker on the CLAUSE rather than on the
+	// `import type { Foo } from 'bar'` carries the marker on the clause rather than on the
 	// specifier, so the specifier reads false and the clause has to be consulted.
 	for current := declaration; current != nil; current = current.Parent {
 		if current.Kind == ast.KindImportClause {
@@ -1035,24 +1051,24 @@ func bindingIsTypeOnlyImport(binding shadowBinding) bool {
 // bindingIsAFunctionTypeParameterName reproduces upstream's isFunctionTypeParameterNameValueShadow,
 // which ignoreFunctionTypeParameterNameValueShadow (default true) turns on.
 //
-// A parameter name written inside a function TYPE binds nothing. It exists so the signature reads
+// A parameter name written inside a function type binds nothing. It exists so the signature reads
 // well and so an editor can show a label; no expression can reference it, so it cannot shadow.
 //
 //	type Args = 1; function foo<T extends (Args: any) => void>(arg: T) {}   clean
 //
-// Only over a VALUE: a name in a function type shadowing a type is a real shadow, which the
+// Only over a value: a name in a function type shadowing a type is a real shadow, which the
 // type-and-value carve-out decides before this one.
 //
 // Upstream tests every definition's node against seven type-position function shapes. A parameter's
 // definition node is its function, so the test here is the parameter's own parent; the shapes include
 // the bodiless forms, TSDeclareFunction (an overload signature or a `declare function`) and
 // TSEmptyBodyFunctionExpression (an abstract, overload or `declare class` method). A bodiless
-// function's NAME has that same function as its definition node, so a name declared only by
+// function's name has that same function as its definition node, so a name declared only by
 // signatures counts too, while an overload set with its implementation does not: measured on the
 // installed rule.
-func bindingIsAFunctionTypeParameterName(ctx rule.Context, binding shadowBinding, shadowed shadowBinding) bool {
+func bindingIsAFunctionTypeParameterName(ruleContext rule.Context, binding shadowBinding, shadowed shadowBinding) bool {
 	if shadowed.global {
-		if !builtinGlobalIsValue(ctx.TypeChecker, ctx.Program, shadowed.name) {
+		if !builtinGlobalIsValue(ruleContext.TypeChecker, ruleContext.Program, shadowed.name) {
 			return false
 		}
 	} else if shadowedIsValue, _ := bindingDeclarationSpaces(shadowed); !shadowedIsValue {
@@ -1110,8 +1126,8 @@ func bindingIsAnIndexSignatureParameter(declaration *ast.Node) bool {
 // The four definition types upstream reads are a variable (the `declare` is on its statement), a
 // class, an enum and a namespace. A declaration inside a `declare namespace` without its own `declare`
 // is not one, and still reports; measured on the installed rule.
-func bindingIsDeclaredInADefinitionFile(ctx rule.Context, binding shadowBinding) bool {
-	fileName := strings.ToLower(ctx.SourceFile.FileName().AsString())
+func bindingIsDeclaredInADefinitionFile(ruleContext rule.Context, binding shadowBinding) bool {
+	fileName := strings.ToLower(ruleContext.SourceFile.FileName().AsString())
 	if !strings.HasSuffix(fileName, ".d.ts") && !strings.HasSuffix(fileName, ".d.cts") &&
 		!strings.HasSuffix(fileName, ".d.mts") {
 		return false
@@ -1171,7 +1187,12 @@ func bindingIsAStaticMethodGenericOverAClassGeneric(binding shadowBinding, shado
 //	const a = wrap(class { m() { let a; } });   reports, the method's outer scope is the class
 //
 // A method is a function expression to upstream, which nests it under a MethodDefinition.
-func bindingIsInitializedThrough(ctx rule.Context, binding shadowBinding, shadowed shadowBinding, shadowedContainer *ast.Node) bool {
+func bindingIsInitializedThrough(
+	ruleContext rule.Context,
+	binding shadowBinding,
+	shadowed shadowBinding,
+	shadowedContainer *ast.Node,
+) bool {
 	if shadowed.global || shadowed.symbol == nil || shadowed.identifier == nil || shadowedContainer == nil {
 		return false
 	}
@@ -1192,7 +1213,7 @@ func bindingIsInitializedThrough(ctx rule.Context, binding shadowBinding, shadow
 	}
 	location := call.End()
 	spans := func(node *ast.Node) bool {
-		return node != nil && rule.TokenRange(ctx.SourceFile, node).Pos() <= location && location <= node.End()
+		return node != nil && rule.TokenRange(ruleContext.SourceFile, node).Pos() <= location && location <= node.End()
 	}
 
 	for current := shadowed.identifier; current != nil; current = current.Parent {
@@ -1201,7 +1222,9 @@ func bindingIsInitializedThrough(ctx rule.Context, binding shadowBinding, shadow
 			if spans(current.AsVariableDeclaration().Initializer) {
 				return true
 			}
-			if list := current.Parent; list != nil && list.Kind == ast.KindVariableDeclarationList && list.Parent != nil &&
+			if list := current.Parent; list != nil &&
+				list.Kind == ast.KindVariableDeclarationList &&
+				list.Parent != nil &&
 				(list.Parent.Kind == ast.KindForInStatement || list.Parent.Kind == ast.KindForOfStatement) {
 				return spans(list.Parent.AsForInOrOfStatement().Expression)
 			}
@@ -1226,7 +1249,7 @@ func bindingIsInitializedThrough(ctx rule.Context, binding shadowBinding, shadow
 //
 // The walk goes outward from the binding's identifier to the nearest variable scope: a function, a
 // class static block, a class field's initializer, a namespace or the file. A function or namespace
-// whose NAME the identifier is binds it in the scope outside, so that one is passed over.
+// whose name the identifier is binds it in the scope outside, so that one is passed over.
 func variableScopeFunctionOf(binding shadowBinding) *ast.Node {
 	start := binding.identifier
 	if start == nil {
@@ -1287,13 +1310,13 @@ func enclosingScopeContainerOf(function *ast.Node) *ast.Node {
 // Upstream scopes an `infer T` to the `extends` clause of the conditional type that introduces it,
 // so two `infer T` in a chain of conditionals are siblings and never see each other. Our binder
 // puts each on the conditional type it belongs to, and a chained conditional nests inside its
-// parent's false branch BY RANGE, so the general containment search finds the outer one and would
+// parent's false branch by range, so the general containment search finds the outer one and would
 // report a shadow upstream is silent about.
 //
 // # The narrowness is measured, not assumed
 //
 // The obvious repair is to exempt `infer` from shadowing altogether, and it is wrong. Driven
-// against the installed rule at 8.67.0, an `infer` DOES report when what it shadows is an ordinary
+// against the installed rule at 8.67.0, an `infer` does report when what it shadows is an ordinary
 // outer type:
 //
 //	type T = string; type A<F> = F extends (a: infer T) => any ? T : never;   REPORTS
@@ -1321,7 +1344,7 @@ func bindingIsAnInferredTypeParameter(binding shadowBinding) bool {
 
 // bindingIsExternalDeclarationMerging reproduces upstream's isExternalDeclarationMerging.
 //
-// A type-only import of a name, augmented inside a `declare module` naming the SAME module, is
+// A type-only import of a name, augmented inside a `declare module` naming the same module, is
 // declaration merging rather than shadowing: the interface or alias being declared inside the
 // augmentation is the very thing the import refers to, so a reference resolving to it is correct.
 //
@@ -1332,7 +1355,7 @@ func bindingIsAnInferredTypeParameter(binding shadowBinding) bool {
 // The module name is what separates the first two, and the outer being an import is what separates
 // the first from the third. Both are checked, because dropping either one silently converts one of
 // upstream's own reporting cases into silence.
-func bindingIsExternalDeclarationMerging(ctx rule.Context, container *ast.Node,
+func bindingIsExternalDeclarationMerging(ruleContext rule.Context, container *ast.Node,
 	inner shadowBinding, outer shadowBinding) bool {
 	if container == nil || container.Kind != ast.KindModuleDeclaration {
 		return false
@@ -1349,12 +1372,12 @@ func bindingIsExternalDeclarationMerging(ctx rule.Context, container *ast.Node,
 		return false
 	}
 
-	// The outer binding has to be an IMPORT, not merely any binding of that name. A local
+	// The outer binding has to be an import, not merely any binding of that name. A local
 	// `interface Foo {}` augmented in `declare module 'bar'` reports, because nothing connects the
 	// two, and that is one of upstream's own default invalid cases.
 	//
-	// It does NOT have to be a type-only import, and requiring that was wrong. Measured against the
-	// installed rule at 8.67.0: a PLAIN `import { Foo } from 'bar'` augmented in `declare module
+	// It does not have to be a type-only import, and requiring that was wrong. Measured against the
+	// installed rule at 8.67.0: a plain `import { Foo } from 'bar'` augmented in `declare module
 	// 'bar'` is clean, for both an interface and a type alias. Upstream reaches that answer by a
 	// different route, through its type-versus-value carve-out rather than through this one, but
 	// the verdict is the verdict and this is where our binder puts the question.
@@ -1387,8 +1410,8 @@ func moduleSpecifierTextOf(declaration *ast.Node) string {
 }
 
 // noShadowLineAndColumnOf renders a node's one-based line and column, which the message quotes.
-func noShadowLineAndColumnOf(ctx rule.Context, node *ast.Node) (int, int) {
-	line, column := scanner.GetLineAndCharacterOfPosition(ctx.SourceFile,
-		rule.TokenRange(ctx.SourceFile, node).Pos())
+func noShadowLineAndColumnOf(ruleContext rule.Context, node *ast.Node) (int, int) {
+	line, column := scanner.GetLineAndCharacterOfPosition(ruleContext.SourceFile,
+		rule.TokenRange(ruleContext.SourceFile, node).Pos())
 	return line + 1, column + 1
 }

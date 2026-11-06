@@ -59,10 +59,10 @@ func messageWindowLocalStorage() rule.Message {
 // The six other direct uses in `services/network/internal/` all carry per-line disable comments, so
 // the rule fires on them and the suppression layer withholds the findings, exactly as under the
 // gate.
-var StorageNoDirectLocalStorage = rule.Rule{
+var StorageNoDirectLocalStorage = rule.Rule[rule.NoOptions]{
 	Name: "structure/storage-no-direct-local-storage",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if FileContextFor(ctx.SourceFile.FileName().AsString()).IsLocalStorageServiceFile {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		if FileContextFor(ruleContext.SourceFile.FileName().AsString()).IsLocalStorageServiceFile {
 			// The service itself has to reach the real thing, or the rule forbids the thing it
 			// recommends.
 			return nil
@@ -88,14 +88,14 @@ var StorageNoDirectLocalStorage = rule.Rule{
 					if access.Name() == node {
 						receiver := ast.SkipParentheses(access.Expression)
 						if receiver != nil && receiver.Kind == ast.KindIdentifier && receiver.Text() == "window" {
-							ctx.ReportNode(parent, messageWindowLocalStorage())
+							ruleContext.ReportNode(parent, messageWindowLocalStorage())
 						}
 						// A `localStorage` property on anything else is somebody's own field.
 						return
 					}
 
 					// `localStorage.getItem(...)`, where the identifier is the receiver.
-					ctx.ReportNode(node, messageDirectLocalStorage())
+					ruleContext.ReportNode(node, messageDirectLocalStorage())
 
 				case ast.KindPropertyAssignment:
 					// A key named localStorage is a name, not a use. `{ localStorage: x }` stores
@@ -104,7 +104,7 @@ var StorageNoDirectLocalStorage = rule.Rule{
 					if parent.AsPropertyAssignment().Name() == node {
 						return
 					}
-					ctx.ReportNode(node, messageDirectLocalStorage())
+					ruleContext.ReportNode(node, messageDirectLocalStorage())
 
 				case ast.KindPropertyDeclaration, ast.KindMethodDeclaration,
 					ast.KindPropertySignature, ast.KindMethodSignature,
@@ -112,19 +112,19 @@ var StorageNoDirectLocalStorage = rule.Rule{
 					ast.KindFunctionDeclaration, ast.KindClassDeclaration, ast.KindImportSpecifier:
 					// Declaring or binding a name is not reaching for the global one.
 					//
-					// Only when the identifier IS the name. `const storage = localStorage` has a
+					// Only when the identifier is the name. `const storage = localStorage` has a
 					// VariableDeclaration parent too, and there the identifier is the initializer,
 					// which is a real use. Matching on the parent kind alone silenced exactly that
 					// case, and a fixture caught it.
 					if declaredName(parent) == node {
 						return
 					}
-					ctx.ReportNode(node, messageDirectLocalStorage())
+					ruleContext.ReportNode(node, messageDirectLocalStorage())
 
 				default:
 					// Every other position is the value being used: an argument, an initializer, a
 					// return, an element of an array.
-					ctx.ReportNode(node, messageDirectLocalStorage())
+					ruleContext.ReportNode(node, messageDirectLocalStorage())
 				}
 			},
 		}

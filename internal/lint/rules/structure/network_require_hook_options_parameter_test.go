@@ -15,8 +15,8 @@ const optionsDeclarations = "import { networkService } from './NetworkService.ts
 
 const optionsFile = "/repository/source/api/UserRequest.ts"
 
-func TestNetworkRequireHookOptionsParameterFires(t *testing.T) {
-	t.Parallel()
+func TestNetworkRequireHookOptionsParameterFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -62,7 +62,8 @@ func TestNetworkRequireHookOptionsParameterFires(t *testing.T) {
 		// slot, so it is dropped exactly as if it were never passed.
 		{
 			"options forwarded in the variables position of a three-argument query",
-			"export function useUserRequest(variables: UserQueryVariablesType, options?: InferUseGraphQlQueryOptions<typeof Document>) {\n" +
+			"export function useUserRequest(variables: UserQueryVariablesType, " +
+				"options?: InferUseGraphQlQueryOptions<typeof Document>) {\n" +
 				"    return networkService.useGraphQlQuery(Document, options, variables);\n}\n",
 			[]string{"optionsParameterNotPassedThrough"},
 		},
@@ -107,22 +108,23 @@ func TestNetworkRequireHookOptionsParameterFires(t *testing.T) {
 		// the hook reads as having none.
 		{
 			"a destructured last parameter",
-			"export function useUserRequest({ options }: { options?: InferUseGraphQlQueryOptions<typeof Document> }) {\n" +
+			"export function useUserRequest({ options }: " +
+				"{ options?: InferUseGraphQlQueryOptions<typeof Document> }) {\n" +
 				"    return networkService.useGraphQlQuery(Document, undefined, options);\n}\n",
 			[]string{"missingOptionsParameter"},
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.Run(t, NetworkRequireHookOptionsParameter, optionsFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.Run(test, NetworkRequireHookOptionsParameter, optionsFile,
 				optionsDeclarations+testCase.sourceText), testCase.wantIds...)
 		})
 	}
 }
 
-func TestNetworkRequireHookOptionsParameterStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNetworkRequireHookOptionsParameterStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -131,7 +133,8 @@ func TestNetworkRequireHookOptionsParameterStaysSilent(t *testing.T) {
 		// The shape the rule asks for, in the three-argument query form.
 		{
 			"a query forwarding options third with variables second",
-			"export function useUserRequest(variables: UserQueryVariablesType, options?: InferUseGraphQlQueryOptions<typeof Document>) {\n" +
+			"export function useUserRequest(variables: UserQueryVariablesType, " +
+				"options?: InferUseGraphQlQueryOptions<typeof Document>) {\n" +
 				"    return networkService.useGraphQlQuery(Document, variables, options);\n}\n",
 		},
 		{
@@ -185,9 +188,9 @@ func TestNetworkRequireHookOptionsParameterStaysSilent(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NetworkRequireHookOptionsParameter, optionsFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NetworkRequireHookOptionsParameter, optionsFile,
 				optionsDeclarations+testCase.sourceText))
 		})
 	}

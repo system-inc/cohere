@@ -123,29 +123,32 @@ func variantOrderVariantFromFixture(fixture *variantOrderShapeFixture) *ParsedVa
 		variant.Value = &ParsedVariantValue{Kind: ParsedValueKind(fixture.Value.Kind), Value: fixture.Value.Value}
 	}
 	if fixture.Modifier != nil {
-		variant.Modifier = &ParsedModifier{Kind: ParsedModifierKind(fixture.Modifier.Kind), Value: fixture.Modifier.Value}
+		variant.Modifier = &ParsedModifier{
+			Kind:  ParsedModifierKind(fixture.Modifier.Kind),
+			Value: fixture.Modifier.Value,
+		}
 	}
 	return variant
 }
 
-func loadVariantOrderCorpus(t *testing.T) variantOrderCorpus {
-	t.Helper()
+func loadVariantOrderCorpus(test *testing.T) variantOrderCorpus {
+	test.Helper()
 
 	path := filepath.Join("testdata", "variant_fixtures.json")
-	contents, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("read %s: %v", path, err)
+	contents, readError := os.ReadFile(path)
+	if readError != nil {
+		test.Fatalf("read %s: %v", path, readError)
 	}
 
 	var corpus variantOrderCorpus
-	if err := json.Unmarshal(contents, &corpus); err != nil {
-		t.Fatalf("parse %s: %v", path, err)
+	if decodeError := json.Unmarshal(contents, &corpus); decodeError != nil {
+		test.Fatalf("parse %s: %v", path, decodeError)
 	}
 	if corpus.TailwindVersion != "4.3.3" {
-		t.Fatalf("the fixture was captured from Tailwind %s and this port targets 4.3.3", corpus.TailwindVersion)
+		test.Fatalf("the fixture was captured from Tailwind %s and this port targets 4.3.3", corpus.TailwindVersion)
 	}
 	if len(corpus.Cases) == 0 {
-		t.Fatal("the fixture holds no cases, so every assertion below would pass vacuously")
+		test.Fatal("the fixture holds no cases, so every assertion below would pass vacuously")
 	}
 	return corpus
 }
@@ -161,8 +164,12 @@ func loadVariantOrderCorpus(t *testing.T) variantOrderCorpus {
 // orders carry one but cannot record the function itself. All four are breakpoint comparisons in a
 // default build, and their directions come from `variants.ts`: `max` and `@max` descend, the
 // breakpoint group and `@`/`@min` ascend.
-func variantOrderRegistryFrom(t *testing.T, fixture *variantOrderRegistryFixture, resolveBreakpoint func(ParsedVariant) (string, bool)) *VariantRegistry {
-	t.Helper()
+func variantOrderRegistryFrom(
+	test *testing.T,
+	fixture *variantOrderRegistryFixture,
+	resolveBreakpoint func(ParsedVariant) (string, bool),
+) *VariantRegistry {
+	test.Helper()
 
 	registry := NewVariantRegistry()
 	descending := map[int]bool{}
@@ -206,9 +213,9 @@ func variantOrderRegistryFrom(t *testing.T, fixture *variantOrderRegistryFixture
 // The counts are printed on success. A suite that compared twelve answers and one that compared
 // twenty thousand look the same as a green line, and this component's whole claim is about a
 // population rather than about a handful of cases.
-func TestVariantOrderMatchesTheEngine(t *testing.T) {
-	t.Parallel()
-	corpus := loadVariantOrderCorpus(t)
+func TestVariantOrderMatchesTheEngine(test *testing.T) {
+	test.Parallel()
+	corpus := loadVariantOrderCorpus(test)
 
 	comparedVariantOrders := 0
 	comparedIndices := 0
@@ -217,38 +224,38 @@ func TestVariantOrderMatchesTheEngine(t *testing.T) {
 	comparedRanks := 0
 
 	for _, aCase := range corpus.Cases {
-		registryFixture := variantOrderRegistryForCase(t, corpus, aCase)
+		registryFixture := variantOrderRegistryForCase(test, corpus, aCase)
 		if registryFixture == nil {
 			continue
 		}
 		resolveBreakpoint := variantOrderBreakpointResolverFor(aCase, corpus)
-		registry := variantOrderRegistryFrom(t, registryFixture, resolveBreakpoint)
+		registry := variantOrderRegistryFrom(test, registryFixture, resolveBreakpoint)
 
 		if aCase.VariantOrd != nil {
 			comparedVariantOrders++
-			comparedIndices += checkVariantOrderIndices(t, aCase.Name, registry, aCase.VariantOrd)
+			comparedIndices += checkVariantOrderIndices(test, aCase.Name, registry, aCase.VariantOrd)
 		}
 
 		if aCase.ClassOrder != nil {
 			comparedClassLists++
-			masks, ranks := checkVariantOrderClassOrder(t, aCase.Name, registry, *aCase.ClassOrder)
+			masks, ranks := checkVariantOrderClassOrder(test, aCase.Name, registry, *aCase.ClassOrder)
 			comparedMasks += masks
 			comparedRanks += ranks
 		}
 
 		for _, classList := range aCase.ClassLists {
 			comparedClassLists++
-			masks, ranks := checkVariantOrderClassOrder(t, classList.Name, registry, classList.ClassOrder)
+			masks, ranks := checkVariantOrderClassOrder(test, classList.Name, registry, classList.ClassOrder)
 			comparedMasks += masks
 			comparedRanks += ranks
 		}
 	}
 
 	if comparedIndices == 0 || comparedMasks == 0 {
-		t.Fatal("the differential compared nothing, so it cannot have found agreement")
+		test.Fatal("the differential compared nothing, so it cannot have found agreement")
 	}
 
-	t.Logf(
+	test.Logf(
 		"tailwind %s: %d variant-order cases (%d indices), %d class lists (%d masks, %d ranks)",
 		corpus.TailwindVersion, comparedVariantOrders, comparedIndices,
 		comparedClassLists, comparedMasks, comparedRanks,
@@ -261,8 +268,12 @@ func TestVariantOrderMatchesTheEngine(t *testing.T) {
 // repository's registry, so the lists are matched back to their repository by name prefix. Falling
 // back to the framework registry rather than skipping is deliberate: a synthetic case is built on a
 // default design system and has no registry of its own.
-func variantOrderRegistryForCase(t *testing.T, corpus variantOrderCorpus, aCase variantOrderCase) *variantOrderRegistryFixture {
-	t.Helper()
+func variantOrderRegistryForCase(
+	test *testing.T,
+	corpus variantOrderCorpus,
+	aCase variantOrderCase,
+) *variantOrderRegistryFixture {
+	test.Helper()
 
 	if aCase.Registry != nil {
 		return aCase.Registry
@@ -282,8 +293,25 @@ func variantOrderRegistryForCase(t *testing.T, corpus variantOrderCorpus, aCase 
 			return candidate.Registry
 		}
 	}
-	t.Fatalf("%s: no registry to compare under", aCase.Name)
+	test.Fatalf("%s: no registry to compare under", aCase.Name)
 	return nil
+}
+
+// variantOrderDefaultBreakpointScale is Tailwind 4.3.3's own `--breakpoint-*`, which both corpus repositories
+// inherit unchanged.
+//
+// Hardcoded here and only here, in the test's resolver, never in variant_registry.go. The port reads
+// breakpoints from the theme; this table exists so the differential can answer the same question
+// without taking a dependency on a sibling component's port.
+var variantOrderDefaultBreakpointScale = map[string]string{
+	"sm": "40rem", "md": "48rem", "lg": "64rem", "xl": "80rem", "2xl": "96rem",
+}
+
+// variantOrderDefaultContainerScale is Tailwind 4.3.3's `--container-*`, for the `@` container-query variants.
+var variantOrderDefaultContainerScale = map[string]string{
+	"3xs": "16rem", "2xs": "18rem", "xs": "20rem", "sm": "24rem", "md": "28rem",
+	"lg": "32rem", "xl": "36rem", "2xl": "42rem", "3xl": "48rem", "4xl": "56rem",
+	"5xl": "64rem", "6xl": "72rem", "7xl": "80rem",
 }
 
 // variantOrderBreakpointResolverFor answers what a breakpoint variant resolves to, from the fixture's own data.
@@ -293,7 +321,10 @@ func variantOrderRegistryForCase(t *testing.T, corpus variantOrderCorpus, aCase 
 // variant when it is arbitrary and falls back to the default scale by name, which is what both
 // repositories in the corpus use. A name this cannot resolve reports false, which is upstream's own
 // `null` branch and is ordered rather than skipped.
-func variantOrderBreakpointResolverFor(aCase variantOrderCase, corpus variantOrderCorpus) func(ParsedVariant) (string, bool) {
+func variantOrderBreakpointResolverFor(
+	aCase variantOrderCase,
+	corpus variantOrderCorpus,
+) func(ParsedVariant) (string, bool) {
 	return func(variant ParsedVariant) (string, bool) {
 		switch variant.Kind {
 		case ParsedVariantKindStatic:
@@ -321,26 +352,14 @@ func variantOrderBreakpointResolverFor(aCase variantOrderCase, corpus variantOrd
 	}
 }
 
-// variantOrderDefaultBreakpointScale is Tailwind 4.3.3's own `--breakpoint-*`, which both corpus repositories
-// inherit unchanged.
-//
-// Hardcoded here and only here, in the test's resolver, never in variant.go. The port reads
-// breakpoints from the theme; this table exists so the differential can answer the same question
-// without taking a dependency on a sibling component's port.
-var variantOrderDefaultBreakpointScale = map[string]string{
-	"sm": "40rem", "md": "48rem", "lg": "64rem", "xl": "80rem", "2xl": "96rem",
-}
-
-// variantOrderDefaultContainerScale is Tailwind 4.3.3's `--container-*`, for the `@` container-query variants.
-var variantOrderDefaultContainerScale = map[string]string{
-	"3xs": "16rem", "2xs": "18rem", "xs": "20rem", "sm": "24rem", "md": "28rem",
-	"lg": "32rem", "xl": "36rem", "2xl": "42rem", "3xl": "48rem", "4xl": "56rem",
-	"5xl": "64rem", "6xl": "72rem", "7xl": "80rem",
-}
-
 // checkVariantOrderIndices compares the port's dense indices against the engine's, for one case.
-func checkVariantOrderIndices(t *testing.T, name string, registry *VariantRegistry, fixture *variantOrderIndicesFixture) int {
-	t.Helper()
+func checkVariantOrderIndices(
+	test *testing.T,
+	name string,
+	registry *VariantRegistry,
+	fixture *variantOrderIndicesFixture,
+) int {
+	test.Helper()
 
 	variants := make([]ParsedVariant, 0, len(fixture.Positions))
 	for _, position := range fixture.Positions {
@@ -351,8 +370,8 @@ func checkVariantOrderIndices(t *testing.T, name string, registry *VariantRegist
 	}
 
 	order := registry.BuildVariantOrder(variants)
-	if order.Len() != fixture.Size {
-		t.Errorf("%s: the port ordered %d variants and the engine ordered %d", name, order.Len(), fixture.Size)
+	if order.Length() != fixture.Size {
+		test.Errorf("%s: the port ordered %d variants and the engine ordered %d", name, order.Length(), fixture.Size)
 	}
 
 	compared := 0
@@ -362,11 +381,16 @@ func checkVariantOrderIndices(t *testing.T, name string, registry *VariantRegist
 		}
 		got, hasIndex := order.IndexOf(*variantOrderVariantFromFixture(position.Variant))
 		if !hasIndex {
-			t.Errorf("%s: the port assigned no index to %q, which the engine placed at %d", name, position.Raw, *position.Index)
+			test.Errorf(
+				"%s: the port assigned no index to %q, which the engine placed at %d",
+				name,
+				position.Raw,
+				*position.Index,
+			)
 			continue
 		}
 		if got != *position.Index {
-			t.Errorf("%s: %q is at %d in the port and %d in the engine", name, position.Raw, got, *position.Index)
+			test.Errorf("%s: %q is at %d in the port and %d in the engine", name, position.Raw, got, *position.Index)
 		}
 		compared++
 	}
@@ -379,8 +403,13 @@ func checkVariantOrderIndices(t *testing.T, name string, registry *VariantRegist
 // ports can agree on every rank in a corpus while building the mask differently. The rank is the
 // observable behaviour, and a mask that is right in a way that does not reach the sort is not
 // worth much either.
-func checkVariantOrderClassOrder(t *testing.T, name string, registry *VariantRegistry, fixture variantOrderClassOrderFixture) (int, int) {
-	t.Helper()
+func checkVariantOrderClassOrder(
+	test *testing.T,
+	name string,
+	registry *VariantRegistry,
+	fixture variantOrderClassOrderFixture,
+) (int, int) {
+	test.Helper()
 
 	// Every variant the engine saw for this class list, which is the population its dense indices
 	// were assigned over. Taking it from the fixture rather than re-parsing keeps this a test of
@@ -412,15 +441,20 @@ func checkVariantOrderClassOrder(t *testing.T, name string, registry *VariantReg
 
 		got, isComplete := order.VariantBitmask(variants)
 		if !isComplete {
-			t.Errorf("%s: the port could not build a mask for %q", name, maskFixture.ClassName)
+			test.Errorf("%s: the port could not build a mask for %q", name, maskFixture.ClassName)
 			continue
 		}
 		want, isNumeric := new(big.Int).SetString(*maskFixture.Mask, 10)
 		if !isNumeric {
-			t.Fatalf("%s: the fixture holds an unreadable mask %q for %q", name, *maskFixture.Mask, maskFixture.ClassName)
+			test.Fatalf(
+				"%s: the fixture holds an unreadable mask %q for %q",
+				name,
+				*maskFixture.Mask,
+				maskFixture.ClassName,
+			)
 		}
 		if got.Cmp(want) != 0 {
-			t.Errorf("%s: %q has mask %s in the port and %s in the engine", name, maskFixture.ClassName, got, want)
+			test.Errorf("%s: %q has mask %s in the port and %s in the engine", name, maskFixture.ClassName, got, want)
 		}
 		masksByClass[maskFixture.ClassName] = got
 		comparedMasks++
@@ -451,7 +485,13 @@ func checkVariantOrderClassOrder(t *testing.T, name string, registry *VariantReg
 
 	for index := range sorted {
 		if index < len(expected) && expected[index] != sorted[index] {
-			t.Errorf("%s: position %d is %q in the port and %q in the engine", name, index, sorted[index], expected[index])
+			test.Errorf(
+				"%s: position %d is %q in the port and %q in the engine",
+				name,
+				index,
+				sorted[index],
+				expected[index],
+			)
 		}
 	}
 
@@ -466,16 +506,16 @@ func checkVariantOrderClassOrder(t *testing.T, name string, registry *VariantReg
 // whatever they start with." That rule was arrived at by fixture failure, and its comment names the
 // evidence honestly as four real class lists.
 //
-// The engine implements no such rule. `compile.ts` OR-s one bit per variant into a mask and
+// The engine implements no such rule. `compile.ts` sets one bit per variant in a mask and
 // compares the masks numerically, so a class's position is decided by its highest-ranked variant
 // and only ties on that are broken lower down. A stacked variant whose members all rank low
-// therefore sorts BEFORE a single variant that ranks high.
+// therefore sorts before a single variant that ranks high.
 //
 // Measured on the engine: `group-hover:disabled:` carries bits 0 and 2, mask 5. `dark:` carries bit
 // 3, mask 8. The stacked class sorts first, and the depth-first rule puts it second.
-func TestVariantBitmaskIsNotDepthFirst(t *testing.T) {
-	t.Parallel()
-	corpus := loadVariantOrderCorpus(t)
+func TestVariantBitmaskIsNotDepthFirst(test *testing.T) {
+	test.Parallel()
+	corpus := loadVariantOrderCorpus(test)
 
 	var probe *variantOrderCase
 	for index, aCase := range corpus.Cases {
@@ -485,17 +525,17 @@ func TestVariantBitmaskIsNotDepthFirst(t *testing.T) {
 		}
 	}
 	if probe == nil || probe.ClassOrder == nil {
-		t.Fatal("the fixture no longer holds the stacked-against-single case, which is what this assertion measures")
+		test.Fatal("the fixture no longer holds the stacked-against-single case, which is what this assertion measures")
 	}
 
 	if len(probe.ClassOrder.Sorted) != 2 {
-		t.Fatalf("expected two classes, got %v", probe.ClassOrder.Sorted)
+		test.Fatalf("expected two classes, got %v", probe.ClassOrder.Sorted)
 	}
 
 	stacked := "group-hover:disabled:flex"
 	single := "dark:flex"
 	if probe.ClassOrder.Sorted[0] != stacked || probe.ClassOrder.Sorted[1] != single {
-		t.Fatalf(
+		test.Fatalf(
 			"the engine no longer sorts the stacked variant first: got %v. If Tailwind changed this, "+
 				"the divergence this test records has closed and the finding needs rewriting rather "+
 				"than the assertion flipping",
@@ -515,16 +555,16 @@ func TestVariantBitmaskIsNotDepthFirst(t *testing.T) {
 		masks[mask.ClassName] = value
 	}
 	if masks[stacked] == nil || masks[single] == nil {
-		t.Fatal("both classes should have masks")
+		test.Fatal("both classes should have masks")
 	}
 	if masks[stacked].BitLen() >= masks[single].BitLen() {
-		t.Errorf(
+		test.Errorf(
 			"the stacked class should carry only lower bits: %s is %s and %s is %s",
 			stacked, masks[stacked], single, masks[single],
 		)
 	}
 	if CompareVariantBitmasks(masks[stacked], masks[single]) >= 0 {
-		t.Errorf("mask comparison should place %s first", stacked)
+		test.Errorf("mask comparison should place %s first", stacked)
 	}
 }
 
@@ -545,7 +585,7 @@ func TestVariantBitmaskIsNotDepthFirst(t *testing.T) {
 //
 // #4q5dsn3 swapped the rule onto the live design system, so the depth-first comparison this counts
 // against no longer ships anywhere: `compareVariants`, `variantSegments` and the rest of that path
-// were deleted with it. What this test compares is a depth-first rule REIMPLEMENTED here, in the loop
+// were deleted with it. What this test compares is a depth-first rule reimplemented here, in the loop
 // below, against the engine's masks from the fixture.
 //
 // It is kept in that form rather than repointed at the new code, because the two answer different
@@ -558,9 +598,9 @@ func TestVariantBitmaskIsNotDepthFirst(t *testing.T) {
 //
 // So a nonzero count here is correct and expected forever. A zero would mean the corpus lost its
 // stacked-variant cases, which is what the assertion at the bottom exists to catch.
-func TestDepthFirstDisagreesWithTheEngineOnTheCorpus(t *testing.T) {
-	t.Parallel()
-	corpus := loadVariantOrderCorpus(t)
+func TestDepthFirstDisagreesWithTheEngineOnTheCorpus(test *testing.T) {
+	test.Parallel()
+	corpus := loadVariantOrderCorpus(test)
 
 	comparedPairs := 0
 	disagreeingPairs := 0
@@ -645,19 +685,19 @@ func TestDepthFirstDisagreesWithTheEngineOnTheCorpus(t *testing.T) {
 	}
 
 	if comparedPairs == 0 {
-		t.Fatal("no separable pairs were compared, so this measured nothing")
+		test.Fatal("no separable pairs were compared, so this measured nothing")
 	}
 
-	t.Logf(
+	test.Logf(
 		"depth-first vs the engine's bitmask: %d disagreeing pairs of %d separable pairs (%.4f%%), across %d class lists",
 		disagreeingPairs, comparedPairs, 100*float64(disagreeingPairs)/float64(comparedPairs), disagreeingLists,
 	)
 	for _, example := range examples {
-		t.Log("  " + example)
+		test.Log("  " + example)
 	}
 
 	if disagreeingPairs == 0 {
-		t.Error(
+		test.Error(
 			"depth-first agreed with the engine on every pair in the corpus, which contradicts the " +
 				"synthetic probe in TestVariantBitmaskIsNotDepthFirst. Either the corpus lost its " +
 				"stacked-variant cases or the mask comparison stopped being a mask comparison",
@@ -671,9 +711,9 @@ func TestDepthFirstDisagreesWithTheEngineOnTheCorpus(t *testing.T) {
 // order numbers carry comparison functions. A port that gave each breakpoint its own position would
 // pass every test built from a default theme and diverge on any repository that redefines a
 // breakpoint, which is the per-repository failure this whole port exists to remove.
-func TestRegistrationOrderIsSharedWithinAGroup(t *testing.T) {
-	t.Parallel()
-	corpus := loadVariantOrderCorpus(t)
+func TestRegistrationOrderIsSharedWithinAGroup(test *testing.T) {
+	test.Parallel()
+	corpus := loadVariantOrderCorpus(test)
 
 	var framework *variantOrderRegistryFixture
 	for _, aCase := range corpus.Cases {
@@ -683,7 +723,7 @@ func TestRegistrationOrderIsSharedWithinAGroup(t *testing.T) {
 		}
 	}
 	if framework == nil {
-		t.Fatal("the fixture no longer holds the framework-default registry")
+		test.Fatal("the fixture no longer holds the framework-default registry")
 	}
 
 	orderByName := map[string]int{}
@@ -696,21 +736,26 @@ func TestRegistrationOrderIsSharedWithinAGroup(t *testing.T) {
 	breakpoints := []string{"sm", "md", "lg", "xl", "2xl", "min"}
 	shared, isRegistered := orderByName["sm"]
 	if !isRegistered {
-		t.Fatal("`sm` is not registered, so the breakpoint group is gone")
+		test.Fatal("`sm` is not registered, so the breakpoint group is gone")
 	}
 	for _, name := range breakpoints {
 		order, isRegistered := orderByName[name]
 		if !isRegistered {
-			t.Errorf("%q is not registered", name)
+			test.Errorf("%q is not registered", name)
 			continue
 		}
 		if order != shared {
-			t.Errorf("%q holds order %d and `sm` holds %d, so the group no longer shares one number", name, order, shared)
+			test.Errorf(
+				"%q holds order %d and `sm` holds %d, so the group no longer shares one number",
+				name,
+				order,
+				shared,
+			)
 		}
 	}
 
 	if len(framework.CompareFnOrders) == 0 {
-		t.Fatal("no order carries a comparison function, so every shared-order group would tie")
+		test.Fatal("no order carries a comparison function, so every shared-order group would tie")
 	}
 	carriesComparison := false
 	for _, order := range framework.CompareFnOrders {
@@ -719,7 +764,7 @@ func TestRegistrationOrderIsSharedWithinAGroup(t *testing.T) {
 		}
 	}
 	if !carriesComparison {
-		t.Errorf(
+		test.Errorf(
 			"the breakpoint group holds order %d and the comparison functions are registered against %v, "+
 				"so the breakpoints would tie and their classes interleave",
 			shared, framework.CompareFnOrders,
@@ -730,7 +775,7 @@ func TestRegistrationOrderIsSharedWithinAGroup(t *testing.T) {
 // TestCustomVariantOverridingAFrameworkNameKeepsItsOrder pins the per-repository behaviour, and it
 // is the opposite of what the task description assumed.
 //
-// A `@custom-variant` under a NEW name appends a position past the framework's last, and genuinely
+// A `@custom-variant` under a new name appends a position past the framework's last, and genuinely
 // changes what a repository's classes sort against. A `@custom-variant` that reuses a framework
 // name overwrites the registration in place: `Variants.set` assigns kind, applyFn and compounds
 // onto the existing record and never touches `order`.
@@ -740,9 +785,9 @@ func TestRegistrationOrderIsSharedWithinAGroup(t *testing.T) {
 // the CSS `dark:` emits, and leaves its sort position exactly where the framework put it. Their
 // variant registries are therefore identical to the framework's, which is a real finding rather
 // than a missing measurement: for ordering purposes an overriding custom variant is invisible.
-func TestCustomVariantOverridingAFrameworkNameKeepsItsOrder(t *testing.T) {
-	t.Parallel()
-	corpus := loadVariantOrderCorpus(t)
+func TestCustomVariantOverridingAFrameworkNameKeepsItsOrder(test *testing.T) {
+	test.Parallel()
+	corpus := loadVariantOrderCorpus(test)
 
 	registries := map[string]*variantOrderRegistryFixture{}
 	for index, aCase := range corpus.Cases {
@@ -753,7 +798,7 @@ func TestCustomVariantOverridingAFrameworkNameKeepsItsOrder(t *testing.T) {
 
 	framework := registries["framework-default"]
 	if framework == nil {
-		t.Fatal("the fixture no longer holds the framework-default registry")
+		test.Fatal("the fixture no longer holds the framework-default registry")
 	}
 	frameworkOrders := map[string]int{}
 	for _, entry := range framework.Entries {
@@ -762,29 +807,34 @@ func TestCustomVariantOverridingAFrameworkNameKeepsItsOrder(t *testing.T) {
 
 	overriding := registries["custom-variant/custom-variant-overrides-framework"]
 	if overriding == nil {
-		t.Fatal("the fixture no longer holds the overriding-custom-variant case")
+		test.Fatal("the fixture no longer holds the overriding-custom-variant case")
 	}
 	for _, entry := range overriding.Entries {
 		frameworkOrder, isFramework := frameworkOrders[entry.Name]
 		if !isFramework {
-			t.Errorf("overriding `dark` should register no new name, but %q appeared", entry.Name)
+			test.Errorf("overriding `dark` should register no new name, but %q appeared", entry.Name)
 			continue
 		}
 		if entry.Order != frameworkOrder {
-			t.Errorf("%q moved from order %d to %d when `dark` was overridden", entry.Name, frameworkOrder, entry.Order)
+			test.Errorf(
+				"%q moved from order %d to %d when `dark` was overridden",
+				entry.Name,
+				frameworkOrder,
+				entry.Order,
+			)
 		}
 	}
 	if len(overriding.Entries) != len(framework.Entries) {
-		t.Errorf("overriding a framework variant changed the registry size from %d to %d",
+		test.Errorf("overriding a framework variant changed the registry size from %d to %d",
 			len(framework.Entries), len(overriding.Entries))
 	}
 
 	newName := registries["custom-variant/custom-variant-new-name"]
 	if newName == nil {
-		t.Fatal("the fixture no longer holds the new-name-custom-variant case")
+		test.Fatal("the fixture no longer holds the new-name-custom-variant case")
 	}
 	if len(newName.Entries) != len(framework.Entries)+1 {
-		t.Fatalf("a new custom variant should append exactly one registration, got %d against %d",
+		test.Fatalf("a new custom variant should append exactly one registration, got %d against %d",
 			len(newName.Entries), len(framework.Entries))
 	}
 	appended := ""
@@ -796,7 +846,7 @@ func TestCustomVariantOverridingAFrameworkNameKeepsItsOrder(t *testing.T) {
 		}
 	}
 	if appended != "sidebar" {
-		t.Fatalf("expected `sidebar` to be appended, got %q", appended)
+		test.Fatalf("expected `sidebar` to be appended, got %q", appended)
 	}
 	highestFramework := 0
 	for _, order := range frameworkOrders {
@@ -805,7 +855,7 @@ func TestCustomVariantOverridingAFrameworkNameKeepsItsOrder(t *testing.T) {
 		}
 	}
 	if appendedOrder <= highestFramework {
-		t.Errorf(
+		test.Errorf(
 			"a new custom variant should append past the framework's last order %d, but `sidebar` took %d",
 			highestFramework, appendedOrder,
 		)
@@ -816,11 +866,11 @@ func TestCustomVariantOverridingAFrameworkNameKeepsItsOrder(t *testing.T) {
 	for _, repository := range []string{"ahra", "www-connected-app"} {
 		registry := registries[repository]
 		if registry == nil {
-			t.Errorf("%s has no registry in the fixture", repository)
+			test.Errorf("%s has no registry in the fixture", repository)
 			continue
 		}
 		if len(registry.Entries) != len(framework.Entries) {
-			t.Logf(
+			test.Logf(
 				"%s registers %d variants against the framework's %d, so it adds names of its own",
 				repository, len(registry.Entries), len(framework.Entries),
 			)
@@ -836,9 +886,9 @@ func TestCustomVariantOverridingAFrameworkNameKeepsItsOrder(t *testing.T) {
 //
 // Without this, every other assertion here would still pass against a port that memoized one
 // global order and got lucky on a corpus.
-func TestVariantOrderIsRunScoped(t *testing.T) {
-	t.Parallel()
-	corpus := loadVariantOrderCorpus(t)
+func TestVariantOrderIsRunScoped(test *testing.T) {
+	test.Parallel()
+	corpus := loadVariantOrderCorpus(test)
 
 	indicesByCase := map[string]int{}
 	for _, aCase := range corpus.Cases {
@@ -853,7 +903,7 @@ func TestVariantOrderIsRunScoped(t *testing.T) {
 	}
 
 	if len(indicesByCase) < 2 {
-		t.Fatalf("`hover` appears in %d cases, which cannot show a difference", len(indicesByCase))
+		test.Fatalf("`hover` appears in %d cases, which cannot show a difference", len(indicesByCase))
 	}
 
 	distinct := map[int]bool{}
@@ -861,7 +911,7 @@ func TestVariantOrderIsRunScoped(t *testing.T) {
 		distinct[index] = true
 	}
 	if len(distinct) < 2 {
-		t.Errorf(
+		test.Errorf(
 			"`hover` received index %v in every case, so the order would be expressible as a static "+
 				"table and this component's premise is wrong",
 			indicesByCase,
@@ -875,7 +925,7 @@ func TestVariantOrderIsRunScoped(t *testing.T) {
 			framework = aCase.Registry
 		}
 	}
-	registry := variantOrderRegistryFrom(t, framework, func(ParsedVariant) (string, bool) { return "", false })
+	registry := variantOrderRegistryFrom(test, framework, func(ParsedVariant) (string, bool) { return "", false })
 
 	small := registry.BuildVariantOrder([]ParsedVariant{
 		{Kind: ParsedVariantKindStatic, Root: "hover"},
@@ -884,13 +934,17 @@ func TestVariantOrderIsRunScoped(t *testing.T) {
 	large := registry.BuildVariantOrder([]ParsedVariant{
 		{Kind: ParsedVariantKindStatic, Root: "hover"},
 		{Kind: ParsedVariantKindStatic, Root: "focus"},
-		{Kind: ParsedVariantKindCompound, Root: "group", Variant: &ParsedVariant{Kind: ParsedVariantKindStatic, Root: "hover"}},
+		{
+			Kind:    ParsedVariantKindCompound,
+			Root:    "group",
+			Variant: &ParsedVariant{Kind: ParsedVariantKindStatic, Root: "hover"},
+		},
 	})
 
 	smallIndex, _ := small.IndexOf(ParsedVariant{Kind: ParsedVariantKindStatic, Root: "hover"})
 	largeIndex, _ := large.IndexOf(ParsedVariant{Kind: ParsedVariantKindStatic, Root: "hover"})
 	if smallIndex == largeIndex {
-		t.Errorf(
+		test.Errorf(
 			"the port gave `hover` index %d in both a two-variant and a three-variant run, so it is "+
 				"not reproducing the dense reindex",
 			smallIndex,
@@ -911,8 +965,8 @@ func TestVariantOrderIsRunScoped(t *testing.T) {
 // roots in one group still separate. Measured on the engine, `sm` through `2xl` share order 64 and
 // receive five distinct indices. A tie needs two variants that compare equal all the way down,
 // which is what a group whose comparison function returns zero produces.
-func TestTiedVariantsShareAnIndex(t *testing.T) {
-	t.Parallel()
+func TestTiedVariantsShareAnIndex(test *testing.T) {
+	test.Parallel()
 	registry := NewVariantRegistry()
 	// A comparison function that ties every member, which is what a real tie looks like. Upstream
 	// reaches this state through `compareBreakpointVariants` when two breakpoints resolve to the
@@ -927,10 +981,10 @@ func TestTiedVariantsShareAnIndex(t *testing.T) {
 	beta, _ := registry.Get("beta")
 	gamma, _ := registry.Get("gamma")
 	if alpha.Order != beta.Order {
-		t.Fatalf("a group should share one order, got %d and %d", alpha.Order, beta.Order)
+		test.Fatalf("a group should share one order, got %d and %d", alpha.Order, beta.Order)
 	}
 	if gamma.Order <= alpha.Order {
-		t.Fatalf("a registration after a group should append past it, got %d against %d", gamma.Order, alpha.Order)
+		test.Fatalf("a registration after a group should append past it, got %d against %d", gamma.Order, alpha.Order)
 	}
 
 	order := registry.BuildVariantOrder([]ParsedVariant{
@@ -944,10 +998,14 @@ func TestTiedVariantsShareAnIndex(t *testing.T) {
 	gammaIndex, _ := order.IndexOf(ParsedVariant{Kind: ParsedVariantKindStatic, Root: "gamma"})
 
 	if alphaIndex != betaIndex {
-		t.Errorf("variants whose comparison returns zero should share an index, got %d and %d", alphaIndex, betaIndex)
+		test.Errorf(
+			"variants whose comparison returns zero should share an index, got %d and %d",
+			alphaIndex,
+			betaIndex,
+		)
 	}
 	if gammaIndex != alphaIndex+1 {
-		t.Errorf(
+		test.Errorf(
 			"the index should advance by one past a tie, so `gamma` should be %d and it is %d",
 			alphaIndex+1, gammaIndex,
 		)
@@ -965,8 +1023,8 @@ func TestTiedVariantsShareAnIndex(t *testing.T) {
 // and `order` is not among the assigned keys. A port that re-derived the order on every
 // registration would push every overridden framework variant to the end of the sort, which is a
 // reordering of the whole class list for a stylesheet that only meant to restyle one variant.
-func TestReRegisteringAVariantKeepsItsOrder(t *testing.T) {
-	t.Parallel()
+func TestReRegisteringAVariantKeepsItsOrder(test *testing.T) {
+	test.Parallel()
 	registry := NewVariantRegistry()
 	registry.Register("first", ParsedVariantKindStatic)
 	registry.Register("second", ParsedVariantKindStatic)
@@ -980,10 +1038,10 @@ func TestReRegisteringAVariantKeepsItsOrder(t *testing.T) {
 
 	updated, isRegistered := registry.Get("first")
 	if !isRegistered {
-		t.Fatal("re-registering should not remove the variant")
+		test.Fatal("re-registering should not remove the variant")
 	}
 	if updated.Order != originalOrder {
-		t.Errorf(
+		test.Errorf(
 			"re-registering moved `first` from order %d to %d, so overriding a framework variant "+
 				"would reorder every class that uses it",
 			originalOrder, updated.Order,
@@ -992,20 +1050,20 @@ func TestReRegisteringAVariantKeepsItsOrder(t *testing.T) {
 
 	third, _ := registry.Get("third")
 	if updated.Order >= third.Order {
-		t.Errorf(
+		test.Errorf(
 			"`first` should still precede `third`, but holds order %d against %d",
 			updated.Order, third.Order,
 		)
 	}
 	if len(registry.Registrations()) != 3 {
-		t.Errorf("re-registering should not add a registration, got %d", len(registry.Registrations()))
+		test.Errorf("re-registering should not add a registration, got %d", len(registry.Registrations()))
 	}
 
 	// The kind is updated even though the order is not, which is the other half of the assignment.
 	registry.Register("second", ParsedVariantKindFunctional)
 	second, _ := registry.Get("second")
 	if second.Kind != ParsedVariantKindFunctional {
-		t.Errorf("re-registering should update the kind, got %q", second.Kind)
+		test.Errorf("re-registering should update the kind, got %q", second.Kind)
 	}
 }
 
@@ -1015,8 +1073,8 @@ func TestReRegisteringAVariantKeepsItsOrder(t *testing.T) {
 // TestTiedVariantsShareAnIndex and be wrong about all five breakpoints. The engine gives `sm`
 // through `2xl` five distinct indices despite one shared order, because `compare` continues to the
 // root name when no comparison function is registered.
-func TestSharedRegistrationOrderStillSeparatesByRoot(t *testing.T) {
-	t.Parallel()
+func TestSharedRegistrationOrderStillSeparatesByRoot(test *testing.T) {
+	test.Parallel()
 	registry := NewVariantRegistry()
 	registry.Group(func() {
 		registry.Register("alpha", ParsedVariantKindStatic)
@@ -1031,7 +1089,7 @@ func TestSharedRegistrationOrderStillSeparatesByRoot(t *testing.T) {
 	alphaIndex, _ := order.IndexOf(ParsedVariant{Kind: ParsedVariantKindStatic, Root: "alpha"})
 	betaIndex, _ := order.IndexOf(ParsedVariant{Kind: ParsedVariantKindStatic, Root: "beta"})
 	if alphaIndex == betaIndex {
-		t.Errorf(
+		test.Errorf(
 			"a shared order with no comparison function should still separate by root, but both took "+
 				"index %d, which would collapse the five breakpoints onto one bit",
 			alphaIndex,
@@ -1045,8 +1103,8 @@ func TestSharedRegistrationOrderStillSeparatesByRoot(t *testing.T) {
 // Bucketing strips digits and dots, so values in different units never compare numerically at all:
 // `40rem` and `1024px` bucket as `rem` and `px` and sort alphabetically. And a value that parses to
 // no number falls back to a string comparison, which is upstream's `Number.isNaN` branch.
-func TestCompareBreakpointsBucketsByUnit(t *testing.T) {
-	t.Parallel()
+func TestCompareBreakpointsBucketsByUnit(test *testing.T) {
+	test.Parallel()
 	testCases := []struct {
 		name      string
 		left      string
@@ -1078,23 +1136,27 @@ func TestCompareBreakpointsBucketsByUnit(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			order := CompareBreakpoints(testCase.left, testCase.right, testCase.ascending)
 			if order == 0 {
-				t.Fatalf("%q and %q tied, which the engine does not do for distinct values", testCase.left, testCase.right)
+				test.Fatalf(
+					"%q and %q tied, which the engine does not do for distinct values",
+					testCase.left,
+					testCase.right,
+				)
 			}
 			first := testCase.left
 			if order > 0 {
 				first = testCase.right
 			}
 			if first != testCase.wantFirst {
-				t.Errorf("expected %q first because %s, got %q", testCase.wantFirst, testCase.why, first)
+				test.Errorf("expected %q first because %s, got %q", testCase.wantFirst, testCase.why, first)
 			}
 			// Antisymmetry, because a comparator that is not antisymmetric makes sort.Slice's
 			// behaviour undefined rather than merely wrong.
 			if reversed := CompareBreakpoints(testCase.right, testCase.left, testCase.ascending); reversed != -order {
-				t.Errorf("the comparison is not antisymmetric: %d one way and %d the other", order, reversed)
+				test.Errorf("the comparison is not antisymmetric: %d one way and %d the other", order, reversed)
 			}
 		})
 	}
@@ -1106,8 +1168,8 @@ func TestCompareBreakpointsBucketsByUnit(t *testing.T) {
 // in one class list's population, and a large repository reaches well past 64. A `uint64` port
 // would shift past the word width, which in Go silently yields zero rather than trapping, so the
 // class would carry no bit at all and sort as though it had no variants.
-func TestBitmaskExceedsSixtyFourBits(t *testing.T) {
-	t.Parallel()
+func TestBitmaskExceedsSixtyFourBits(test *testing.T) {
+	test.Parallel()
 	registry := NewVariantRegistry()
 	var variants []ParsedVariant
 	for index := 0; index < 100; index++ {
@@ -1117,20 +1179,20 @@ func TestBitmaskExceedsSixtyFourBits(t *testing.T) {
 	}
 
 	order := registry.BuildVariantOrder(variants)
-	if order.Len() != 100 {
-		t.Fatalf("expected 100 distinct variants, got %d", order.Len())
+	if order.Length() != 100 {
+		test.Fatalf("expected 100 distinct variants, got %d", order.Length())
 	}
 
 	highest := variants[len(variants)-1]
 	mask, isComplete := order.VariantBitmask([]ParsedVariant{highest})
 	if !isComplete {
-		t.Fatal("the highest variant should have an index")
+		test.Fatal("the highest variant should have an index")
 	}
 	if mask.BitLen() <= 64 {
-		t.Errorf("the mask should exceed 64 bits, got %d bits for %s", mask.BitLen(), mask)
+		test.Errorf("the mask should exceed 64 bits, got %d bits for %s", mask.BitLen(), mask)
 	}
 	if mask.Sign() == 0 {
-		t.Error("the mask is zero, which is what a uint64 shift past the word width would produce")
+		test.Error("the mask is zero, which is what a uint64 shift past the word width would produce")
 	}
 }
 
@@ -1138,9 +1200,9 @@ func TestBitmaskExceedsSixtyFourBits(t *testing.T) {
 //
 // A fixture that regenerated to zero repository class lists would leave every differential passing
 // vacuously and every logged percentage a percentage of nothing.
-func TestCorpusHoldsRealClassLists(t *testing.T) {
-	t.Parallel()
-	corpus := loadVariantOrderCorpus(t)
+func TestCorpusHoldsRealClassLists(test *testing.T) {
+	test.Parallel()
+	corpus := loadVariantOrderCorpus(test)
 
 	classListsByRepository := map[string]int{}
 	classesByRepository := map[string]int{}
@@ -1156,15 +1218,19 @@ func TestCorpusHoldsRealClassLists(t *testing.T) {
 	}
 
 	if len(classListsByRepository) < 2 {
-		t.Fatalf(
+		test.Fatalf(
 			"the corpus holds class lists from %d repositories and the argument for this port needs two",
 			len(classListsByRepository),
 		)
 	}
 	for repository, count := range classListsByRepository {
 		if count < 100 {
-			t.Errorf("%s contributed only %d class lists, which is too few to measure agreement on", repository, count)
+			test.Errorf(
+				"%s contributed only %d class lists, which is too few to measure agreement on",
+				repository,
+				count,
+			)
 		}
-		t.Logf("%s: %d class lists, %d classes", repository, count, classesByRepository[repository])
+		test.Logf("%s: %d class lists, %d classes", repository, count, classesByRepository[repository])
 	}
 }

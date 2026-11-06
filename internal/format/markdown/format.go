@@ -24,19 +24,19 @@ var visitorKeys = map[string][]string{
 }
 
 // mdastPrinter is src/language-markdown/printers.js.
-var mdastPrinter = &printing.Printer[*Node]{
+var mdastPrinter = &printing.Printer[*Node, *settings, printing.NoArguments]{
 	Print:       printMdast,
 	LocStart:    locStart,
 	LocEnd:      locEnd,
 	VisitorKeys: func(node *Node) []string { return visitorKeys[node.NodeType] },
 	Embed:       embed,
 	Preprocess: func(ast *Node, options *options) *Node {
-		ast = preprocess(ast, options.OriginalText, settingsOf(options).tabWidth, settingsOf(options).nodes)
+		preprocessed := preprocess(ast, options.OriginalText, settingsOf(options).tabWidth, settingsOf(options).nodes)
 		// The print cache is made once preprocess returns, and most of the nodes it prints, the sentences,
 		// words and whitespace, are only made here. The arena holds every node of the tree from both,
 		// so its count, read now, presizes the cache without a walk (#4bq8vyn).
 		options.NodeCount = settingsOf(options).nodes.Len()
-		return ast
+		return preprocessed
 	},
 	HasPrettierIgnore:    hasPrettierIgnore,
 	PrintPrettierIgnored: printPrettierIgnored,
@@ -61,10 +61,15 @@ func Format(text string, prettierOptions formatoptions.Options, textToDoc printi
 
 // formatWithProseWrap is Format with proseWrap given, so the tests can reach the always and never
 // branches the corpora never take.
-func formatWithProseWrap(text string, prettierOptions formatoptions.Options, proseWrap string, textToDoc printing.TextToDoc) (formatted string, err error) {
+func formatWithProseWrap(
+	text string,
+	prettierOptions formatoptions.Options,
+	proseWrap string,
+	textToDoc printing.TextToDoc,
+) (formatted string, formatWithProseWrapError error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
-			formatted, err = "", fmt.Errorf("markdown: %v", recovered)
+			formatted, formatWithProseWrapError = "", fmt.Errorf("markdown: %v", recovered)
 		}
 	}()
 
@@ -72,14 +77,18 @@ func formatWithProseWrap(text string, prettierOptions formatoptions.Options, pro
 	// native.Formatter, once for every printer.
 	// The tree, and the words and whitespace preprocess splits its text into, come from an arena released
 	// once the file is printed: doc.Print below has read the last of them before the deferred release runs.
-	nodes := nodeArenas.Get().(*arena.Arena[Node])
+	nodes, isNodeArena := nodeArenas.Get().(*arena.Arena[Node])
+	if !isNodeArena {
+		// Invariant: the pool's New makes only node arenas, and the release below puts back only the one taken here.
+		panic("markdown: the node arena pool held something other than a node arena")
+	}
 	defer func() {
 		nodes.Reset()
 		nodeArenas.Put(nodes)
 	}()
-	ast, err := mdast.ParseMarkdown(text, nodes)
-	if err != nil {
-		return "", err
+	ast, formatWithProseWrapError := mdast.ParseMarkdown(text, nodes)
+	if formatWithProseWrapError != nil {
+		return "", formatWithProseWrapError
 	}
 
 	printOptions := &options{
@@ -96,10 +105,14 @@ func formatWithProseWrap(text string, prettierOptions formatoptions.Options, pro
 		EmbeddedLanguageFormatting: "auto",
 		TextToDoc:                  textToDoc,
 	}
-	document, err := printing.PrintAstToDoc(ast, nil, printOptions)
-	if err != nil {
-		return "", err
+	document, formatWithProseWrapError := printing.PrintAstToDoc(ast, nil, printOptions)
+	if formatWithProseWrapError != nil {
+		return "", formatWithProseWrapError
 	}
 
-	return doc.Print(document, doc.Options{PrintWidth: prettierOptions.PrintWidth, TabWidth: prettierOptions.TabWidth, UseTabs: prettierOptions.UseTabs}), nil
+	return doc.Print(document, doc.Options{
+		PrintWidth: prettierOptions.PrintWidth,
+		TabWidth:   prettierOptions.TabWidth,
+		UseTabs:    prettierOptions.UseTabs,
+	}), nil
 }

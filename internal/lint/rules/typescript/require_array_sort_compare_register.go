@@ -8,12 +8,12 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // concurrent port has to edit, so two ports landing at once conflict on a file neither is really
 // changing.
 //
-// The Decode entry names the rule's OWN decoder rather than `rule.DecodeOptionsInto`, and that is
-// load-bearing rather than stylistic. The rule's single option defaults to TRUE, so the generic
+// The Decode entry names the rule's own decoder rather than `rule.DecodeOptionsInto`, and that is
+// load-bearing rather than stylistic. The rule's single option defaults to true, so the generic
 // helper would yield a zero-value struct on an absent key and invert the rule silently. The
 // hand-rolled decoder keeps an absent key distinguishable from an explicit false.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[RequireArraySortCompareOptions]{
 		Rule:   RequireArraySortCompare,
 		Decode: DecodeRequireArraySortCompareOptions,
 	})

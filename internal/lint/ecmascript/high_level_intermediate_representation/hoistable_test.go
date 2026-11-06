@@ -14,10 +14,10 @@ import (
 //
 // Typed for the reason `scopesFor` is: a checker-less lowering never emits `StoreContext`, so
 // several assertions below would pass vacuously against a plain harness.
-func hoistableFor(t *testing.T, source string) (*Function, *ReactiveScopes, ScopeIdentity,
+func hoistableFor(test *testing.T, source string) (*Function, *ReactiveScopes, ScopeIdentity,
 	*mutation_aliasing.MutableRanges, *HoistableAnalysis) {
-	t.Helper()
-	function, ranges := rangesFor(t, source)
+	test.Helper()
+	function, ranges := rangesFor(test, source)
 	set := FindDisjointMutableValuesWithRanges(function, ranges)
 	scopes := AssignReactiveScopesWithSets(function, ranges, set)
 	aligned, merged := AlignThenMergeReactiveScopes(function, scopes)
@@ -34,7 +34,7 @@ func hoistableFor(t *testing.T, source string) (*Function, *ReactiveScopes, Scop
 //
 // `dependencies.go` shipped with every dependency truncated to its bare root -- 4,426 of 4,426 with
 // an empty path -- because `addDependency` stops at the first entry it cannot prove hoistable. The
-// measurement that shows this analysis works is therefore the PATH-LENGTH DISTRIBUTION, before and
+// measurement that shows this analysis works is therefore the PATH-length distribution, before and
 // after, over 400 corpus files and 677 functions:
 //
 //	path length      0      1     2     3    4+
@@ -46,24 +46,24 @@ func hoistableFor(t *testing.T, source string) (*Function, *ReactiveScopes, Scop
 // a real path and the total moves from 4,426 to 4,559, because a scope that reported one truncated
 // root can report two distinct deeper paths once they stop collapsing together.
 //
-// The thresholds below are far looser than those numbers. This guards the SHAPE, not the corpus.
-func TestHoistableAnalysisDeepensDependencyPaths(t *testing.T) {
-	t.Parallel()
+// The thresholds below are far looser than those numbers. This guards the shape, not the corpus.
+func TestHoistableAnalysisDeepensDependencyPaths(test *testing.T) {
+	test.Parallel()
 
 	// # Why this fixture and not a simpler one
 	//
 	// The first two attempts here used a single object literal reading `props.configuration.alpha`, and
-	// BOTH produced zero deep paths while the corpus test passed with 171. A fixture failing against
+	// both produced zero deep paths while the corpus test passed with 171. A fixture failing against
 	// working code means the fixture is wrong, so the shape was taken from a real corpus function
 	// (`parseListType` in `GraphQlOperationsMetadataPlugin.ts`) rather than invented again.
 	//
-	// What the invented fixtures missed: a scope that reads its root BARE anywhere collapses every
+	// What the invented fixtures missed: a scope that reads its root bare anywhere collapses every
 	// deeper path into that root, because `deriveMinimalDependencies` correctly prunes a subtree
 	// under a node already marked a dependency. Depending on all of `props` subsumes
-	// `props.configuration.alpha`. The shape that actually exercises path depth is REPEATED deep reads
-	// across BRANCHES with no bare read of the root -- which is also precisely the shape the
+	// `props.configuration.alpha`. The shape that actually exercises path depth is repeated deep reads
+	// across branches with no bare read of the root -- which is also precisely the shape the
 	// backward pass exists to serve, since it proves the deref safe above the branch.
-	function, scopes, identity, ranges, _ := hoistableFor(t, `
+	function, scopes, identity, ranges, _ := hoistableFor(test, `
 		function parseListType(listType) {
 			if (listType.type.kind === 1) {
 				return {requiresItems: false, itemType: listType.type.name.value};
@@ -94,11 +94,11 @@ func TestHoistableAnalysisDeepensDependencyPaths(t *testing.T) {
 		}
 	}
 	if deepBefore != 0 {
-		t.Errorf("without the hoistable analysis %d dependencies carried a path; every one should "+
+		test.Errorf("without the hoistable analysis %d dependencies carried a path; every one should "+
 			"truncate to its root", deepBefore)
 	}
 	if deepAfter == 0 {
-		t.Error("with the hoistable analysis no dependency carried a path, so the pass is inert; " +
+		test.Error("with the hoistable analysis no dependency carried a path, so the pass is inert; " +
 			"this is the cell whose failure to shrink is the tell")
 	}
 }
@@ -109,12 +109,12 @@ func TestHoistableAnalysisDeepensDependencyPaths(t *testing.T) {
 // than needed. Over-approximating is the dangerous direction, because a dependency on `props.a.b`
 // for a program where `props.a` can be nullish makes the memoized read throw where the original did
 // not. Measured over 400 corpus files: 564 path entries, 0 naming a property never loaded.
-func TestHoistablePathsAreAlwaysPrefixesOfRealAccesses(t *testing.T) {
-	t.Parallel()
+func TestHoistablePathsAreAlwaysPrefixesOfRealAccesses(test *testing.T) {
+	test.Parallel()
 
 	// The same corpus-derived shape as the headline test, for the reason given there: a fixture
 	// whose root is read bare produces no path entries and would make this assertion vacuous.
-	function, scopes, identity, ranges, _ := hoistableFor(t, `
+	function, scopes, identity, ranges, _ := hoistableFor(test, `
 		function parseListType(listType) {
 			if (listType.type.kind === 1) {
 				return {requiresItems: false, itemType: listType.type.name.value};
@@ -135,7 +135,7 @@ func TestHoistablePathsAreAlwaysPrefixesOfRealAccesses(t *testing.T) {
 		}
 	}
 	if len(loaded) == 0 {
-		t.Fatal("no property loads, so this test measured nothing")
+		test.Fatal("no property loads, so this test measured nothing")
 	}
 	after := CollectScopeDependenciesWithHoistable(function, scopes, identity, ranges)
 	entries := 0
@@ -144,26 +144,26 @@ func TestHoistablePathsAreAlwaysPrefixesOfRealAccesses(t *testing.T) {
 			for _, entry := range dep.Path {
 				entries++
 				if !loaded[entry.Property] {
-					t.Errorf("derived a path through %q, which is never loaded; that is the "+
+					test.Errorf("derived a path through %q, which is never loaded; that is the "+
 						"over-approximating direction and it invents a crash", entry.Property)
 				}
 			}
 		}
 	}
 	if entries == 0 {
-		t.Error("no path entries were checked, so this test proves nothing about safety")
+		test.Error("no path entries were checked, so this test proves nothing about safety")
 	}
 }
 
 // ---------------------------------------------------------------------------
-// Termination, which is a BOUND rather than a proof
+// Termination, which is a bound rather than a proof
 // ---------------------------------------------------------------------------
 
 // TestHoistableConvergenceIsFarInsideTheBound measures how close real code comes to the cap.
 //
 // The outer loop is capped at 100 alternating passes. That cap is not decoration: the monotonicity
 // argument that would make this a true fixpoint does not close, because `reduceOptionalChains`
-// REPLACES nodes rather than adding them. So the honest claim is a bound, and a bound that is
+// replaces nodes rather than adding them. So the honest claim is a bound, and a bound that is
 // routinely brushed is a materially different fact from one never approached.
 //
 // Measured over 400 corpus files and 677 functions:
@@ -174,10 +174,10 @@ func TestHoistablePathsAreAlwaysPrefixesOfRealAccesses(t *testing.T) {
 // The maximum observed is 3 against a cap of 100. This test pins that real code stays far inside it,
 // so a future change that starts approaching the cap is a visible event rather than a slow drift
 // into silent truncation.
-func TestHoistableConvergenceIsFarInsideTheBound(t *testing.T) {
-	t.Parallel()
+func TestHoistableConvergenceIsFarInsideTheBound(test *testing.T) {
+	test.Parallel()
 
-	_, _, _, _, analysis := hoistableFor(t, `
+	_, _, _, _, analysis := hoistableFor(test, `
 		function Component(props) {
 			let total = props.seed.value;
 			for (const item of props.items) {
@@ -189,14 +189,14 @@ func TestHoistableConvergenceIsFarInsideTheBound(t *testing.T) {
 		}
 	`)
 	if analysis == nil {
-		t.Fatal("no analysis, so this test measured nothing")
+		test.Fatal("no analysis, so this test measured nothing")
 	}
 	if !analysis.Converged() {
-		t.Errorf("a function with one loop failed to converge in %d iterations; the cap is %d",
+		test.Errorf("a function with one loop failed to converge in %d iterations; the cap is %d",
 			analysis.Iterations(), hoistableIterationCap)
 	}
 	if analysis.Iterations() > 10 {
-		t.Errorf("converged only after %d iterations against a cap of %d; the measured maximum on "+
+		test.Errorf("converged only after %d iterations against a cap of %d; the measured maximum on "+
 			"real code is 3, so this is a drift toward silent truncation",
 			analysis.Iterations(), hoistableIterationCap)
 	}
@@ -205,14 +205,14 @@ func TestHoistableConvergenceIsFarInsideTheBound(t *testing.T) {
 // TestHoistableReportsRatherThanHidingNonConvergence pins the divergence from oxc.
 //
 // React raises a hard invariant when the loop fails to converge. oxc writes `for _ in 0..100` and
-// EXITS silently, so a truncated answer is indistinguishable from a converged one. A linter can do
+// exits silently, so a truncated answer is indistinguishable from a converged one. A linter can do
 // neither, so it reports -- and this pins that the reporting channel exists and answers true on
 // ordinary input, because a `Converged` that returned false everywhere would be just as useless as
 // one that always returned true.
-func TestHoistableReportsRatherThanHidingNonConvergence(t *testing.T) {
-	t.Parallel()
+func TestHoistableReportsRatherThanHidingNonConvergence(test *testing.T) {
+	test.Parallel()
 
-	_, _, _, _, analysis := hoistableFor(t, `
+	_, _, _, _, analysis := hoistableFor(test, `
 		function Component(props) {
 			const object = {a: props.configuration.alpha};
 			object.b = props.configuration.beta;
@@ -220,25 +220,25 @@ func TestHoistableReportsRatherThanHidingNonConvergence(t *testing.T) {
 		}
 	`)
 	if analysis == nil {
-		t.Fatal("no analysis")
+		test.Fatal("no analysis")
 	}
 	if !analysis.Converged() {
-		t.Error("ordinary input reported as non-converged, so the channel carries no signal")
+		test.Error("ordinary input reported as non-converged, so the channel carries no signal")
 	}
 	if analysis.Iterations() < 1 {
-		t.Error("reported zero iterations, but the loop always runs at least one pass")
+		test.Error("reported zero iterations, but the loop always runs at least one pass")
 	}
 }
 
-// TestOptionalChainReductionTerminates pins the inner loop, which has NO bound at all.
+// TestOptionalChainReductionTerminates pins the inner loop, which has no bound at all.
 //
 // `reduceOptionalChains` is an unbounded `do/while` upstream and here. It terminates because each
 // replacement strictly decreases the number of optional entries in a path, and a path has finitely
 // many entries -- so a node is replaced at most as many times as its path is long. That argument is
 // implicit in upstream's construction rather than stated by it, so it is pinned on the shape that
 // would spin forever if the optional-to-unconditional flip were ever reversible.
-func TestOptionalChainReductionTerminates(t *testing.T) {
-	t.Parallel()
+func TestOptionalChainReductionTerminates(test *testing.T) {
+	test.Parallel()
 
 	registry := newPathRegistry()
 	root := ReactiveScopeDependency{Identifier: 7}
@@ -256,11 +256,11 @@ func TestOptionalChainReductionTerminates(t *testing.T) {
 
 	for index := range nodes {
 		if registry.nodes[index].hasOptional && index == guarded {
-			t.Error("the guarded node survived reduction even though its object is known non-null")
+			test.Error("the guarded node survived reduction even though its object is known non-null")
 		}
 	}
 	if len(nodes) != 2 {
-		t.Errorf("reduction changed the set size to %d, want 2; it replaces nodes rather than "+
+		test.Errorf("reduction changed the set size to %d, want 2; it replaces nodes rather than "+
 			"adding or dropping them", len(nodes))
 	}
 }
@@ -271,13 +271,13 @@ func TestOptionalChainReductionTerminates(t *testing.T) {
 
 // TestForwardPropagationIntersectsRatherThanUnions pins soundness of the forward direction.
 //
-// A value is non-null at a join only if it was non-null on EVERY path reaching it. Unioning instead
+// A value is non-null at a join only if it was non-null on every path reaching it. Unioning instead
 // would let one branch's dereference vouch for a path the other branch never took, which is the
 // over-approximating direction that invents crashes.
-func TestForwardPropagationIntersectsRatherThanUnions(t *testing.T) {
-	t.Parallel()
+func TestForwardPropagationIntersectsRatherThanUnions(test *testing.T) {
+	test.Parallel()
 
-	function, scopes, identity, ranges, _ := hoistableFor(t, `
+	function, scopes, identity, ranges, _ := hoistableFor(test, `
 		function Component(props) {
 			let value;
 			if (props.flag) { value = props.left.deep; } else { value = props.right; }
@@ -293,7 +293,7 @@ func TestForwardPropagationIntersectsRatherThanUnions(t *testing.T) {
 				// `left` is dereferenced on only one branch, so nothing after the join may claim it
 				// is non-null. A union would let `left` through here.
 				if entry.Property == "left" && len(dep.Path) > 1 {
-					t.Error("a path descended through `left`, which is only dereferenced on one " +
+					test.Error("a path descended through `left`, which is only dereferenced on one " +
 						"branch; the join is unioning where it must intersect")
 				}
 			}
@@ -304,7 +304,7 @@ func TestForwardPropagationIntersectsRatherThanUnions(t *testing.T) {
 // A top-level scope beginning inside a branch is seeded with that branch's own facts.
 //
 // The intersection above covers the join: after an `if`, a fact true on one arm alone is gone. This
-// covers the other half, which the intersection cannot reach. A scope whose first block sits INSIDE
+// covers the other half, which the intersection cannot reach. A scope whose first block sits inside
 // the arm is asking a block where the fact is still true, and upstream's keying -- which this tree
 // reproduces exactly -- hands it that block's set.
 //
@@ -317,10 +317,10 @@ func TestForwardPropagationIntersectsRatherThanUnions(t *testing.T) {
 //
 // A fact from the untaken arm is still unavailable; that is the intersection invariant above, not
 // a reason to erase facts at a scope that genuinely begins inside the taken arm.
-func TestATopLevelScopeInsideABranchUsesItsFacts(t *testing.T) {
-	t.Parallel()
+func TestATopLevelScopeInsideABranchUsesItsFacts(test *testing.T) {
+	test.Parallel()
 
-	function, scopes, identity, ranges, _ := hoistableFor(t, `
+	function, scopes, identity, ranges, _ := hoistableFor(test, `
 		function Component(props) {
 			if (props.flag) {
 				return {value: props.deep.inner};
@@ -339,32 +339,32 @@ func TestATopLevelScopeInsideABranchUsesItsFacts(t *testing.T) {
 			// must carry it and may descend to `inner`.
 			if path.Path[0].Property == "deep" {
 				found = true
-				t.Logf("scope %d retains the branch-local `deep` fact", scope)
+				test.Logf("scope %d retains the branch-local `deep` fact", scope)
 			}
 		}
 	}
 	if !found {
-		t.Error("the top-level branch scope lost `deep`, even though its body starts after that " +
+		test.Error("the top-level branch scope lost `deep`, even though its body starts after that " +
 			"dereference in the same branch")
 	}
 }
 
 // TestHoistableHandlesNilInputs pins that the pass declines rather than panicking.
-func TestHoistableHandlesNilInputs(t *testing.T) {
-	t.Parallel()
+func TestHoistableHandlesNilInputs(test *testing.T) {
+	test.Parallel()
 
 	if got := analyseHoistableLoads(nil, nil, nil, nil, nil); got != nil {
-		t.Error("a nil function produced an analysis")
+		test.Error("a nil function produced an analysis")
 	}
 	if got := CollectHoistablePropertyLoads(nil, nil, nil, nil, nil); got != nil {
-		t.Error("a nil function produced hoistable loads")
+		test.Error("a nil function produced hoistable loads")
 	}
-	if got := CollectScopeDependenciesWithHoistable(nil, nil, nil, nil); got.Len() != 0 {
-		t.Errorf("a nil function produced %d scopes", got.Len())
+	if got := CollectScopeDependenciesWithHoistable(nil, nil, nil, nil); got.Length() != 0 {
+		test.Errorf("a nil function produced %d scopes", got.Length())
 	}
 	var empty *HoistableAnalysis
 	if empty.Converged() || empty.Iterations() != 0 || empty.hoistableAt(1) != nil {
-		t.Error("the nil analysis is not readable")
+		test.Error("the nil analysis is not readable")
 	}
 }
 
@@ -374,10 +374,10 @@ func TestHoistableHandlesNilInputs(t *testing.T) {
 // claiming to match TypeScript. React does neither: no sort, and a hard invariant on a conflict.
 // This reports instead of raising, because a linter must not panic. Measured at zero conflicts
 // across 400 corpus files, so this pins the zero rather than describing a behaviour that fires.
-func TestHoistableConflictsAreReportedNotSwallowed(t *testing.T) {
-	t.Parallel()
+func TestHoistableConflictsAreReportedNotSwallowed(test *testing.T) {
+	test.Parallel()
 
-	function, scopes, identity, ranges, _ := hoistableFor(t, `
+	function, scopes, identity, ranges, _ := hoistableFor(test, `
 		function Component(props) {
 			const object = {a: props.configuration.alpha};
 			object.b = props.configuration.beta;
@@ -386,40 +386,40 @@ func TestHoistableConflictsAreReportedNotSwallowed(t *testing.T) {
 	`)
 	after := CollectScopeDependenciesWithHoistable(function, scopes, identity, ranges)
 	if after.Conflicts() != 0 {
-		t.Errorf("%d conflicting access types on ordinary input; upstream raises on any of these",
+		test.Errorf("%d conflicting access types on ordinary input; upstream raises on any of these",
 			after.Conflicts())
 	}
 }
 
 // TestHoistableCorpusDistribution pins the shape over real code, read at a fixed commit so the exact
 // counts below move only when the analysis does (see pinnedCorpusFiles).
-func TestHoistableCorpusDistribution(t *testing.T) {
-	t.Parallel()
+func TestHoistableCorpusDistribution(test *testing.T) {
+	test.Parallel()
 
-	files, contentsOf := pinnedCorpusFiles(t, 150)
+	files, contentsOf := pinnedCorpusFiles(test, 150)
 
-	deep, flat, notConverged, maxIterations, conflicts := 0, 0, 0, 0, 0
+	deep, flat, notConverged, maximumIterations, conflicts := 0, 0, 0, 0, 0
 	for _, path := range files {
 		contents := contentsOf[path]
 		fileName := "/corpus/" + filepath.Base(path)
-		probe := rule.Rule{
+		probe := rule.Rule[rule.NoOptions]{
 			Name:             "hoistable-corpus",
 			NeedsTypeChecker: true,
-			Run: func(ctx rule.Context, options any) rule.Listeners {
+			Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 				return rule.Listeners{
 					ast.KindSourceFile: func(node *ast.Node) {
-						if ctx.TypeChecker == nil {
-							t.Fatal("the typed harness handed this probe a nil checker, so every " +
+						if ruleContext.TypeChecker == nil {
+							test.Fatal("the typed harness handed this probe a nil checker, so every " +
 								"count below would be a fact about the harness rather than the code")
 						}
 						forEachFunctionLike(node, func(functionNode *ast.Node) {
-							function := Lower(functionNode, ctx.TypeChecker)
+							function := Lower(functionNode, ruleContext.TypeChecker)
 							if function == nil {
 								return
 							}
 							Construct(function)
 							OutlineFunctions(function)
-							InferReactive(function, ctx.TypeChecker)
+							InferReactive(function, ruleContext.TypeChecker)
 							DropManualMemoization(function)
 							if InlineImmediatelyInvokedFunctionExpressionsIncludingMemoCallbacks(function) > 0 {
 								MergeConsecutiveBlocks(function)
@@ -437,8 +437,8 @@ func TestHoistableCorpusDistribution(t *testing.T) {
 								if !analysis.Converged() {
 									notConverged++
 								}
-								if analysis.Iterations() > maxIterations {
-									maxIterations = analysis.Iterations()
+								if analysis.Iterations() > maximumIterations {
+									maximumIterations = analysis.Iterations()
 								}
 							}
 							after := CollectScopeDependenciesWithHoistable(function, scopes,
@@ -458,23 +458,23 @@ func TestHoistableCorpusDistribution(t *testing.T) {
 				}
 			},
 		}
-		rule_testing.RunTypedFiles(t, probe, map[string]string{fileName: contents}, fileName)
+		rule_testing.RunTypedFiles(test, probe, map[string]string{fileName: contents}, fileName)
 	}
 
 	if deep == 0 {
-		t.Error("no dependency on the whole corpus carries a path; the pass is inert")
+		test.Error("no dependency on the whole corpus carries a path; the pass is inert")
 	}
 	if flat == 0 {
-		t.Error("every dependency carries a path, which is not what the truncation rule predicts " +
+		test.Error("every dependency carries a path, which is not what the truncation rule predicts " +
 			"and would mean the hoistable gate never fires")
 	}
 	if notConverged != 0 {
-		t.Errorf("%d functions failed to converge inside %d iterations", notConverged,
+		test.Errorf("%d functions failed to converge inside %d iterations", notConverged,
 			hoistableIterationCap)
 	}
-	if maxIterations > 10 {
-		t.Errorf("a function needed %d iterations against a cap of %d; the measured maximum is 3",
-			maxIterations, hoistableIterationCap)
+	if maximumIterations > 10 {
+		test.Errorf("a function needed %d iterations against a cap of %d; the measured maximum is 3",
+			maximumIterations, hoistableIterationCap)
 	}
 	// # Why this is one rather than zero
 	//
@@ -483,7 +483,7 @@ func TestHoistableCorpusDistribution(t *testing.T) {
 	// the real flag makes genuine disagreements visible, which is the point -- upstream raises on
 	// these, and being unable to see them at all is worse than counting one.
 	//
-	// The seam that produced them is the nested-function hoistable seed, which is assembled AFTER
+	// The seam that produced them is the nested-function hoistable seed, which is assembled after
 	// `reduceOptionalChains` has run and so can reintroduce the duplicates upstream's constructor
 	// documents as its precondition ("we expect these to not contain duplicates (e.g. both `a?.b`
 	// and `a.b`)"). `appendWithoutOptionalDuplicates` restores that precondition per prefix and
@@ -502,17 +502,17 @@ func TestHoistableCorpusDistribution(t *testing.T) {
 	// real code, rather than a construct this analysis mishandles.
 	const knownConflicts = 3
 	if conflicts > knownConflicts {
-		t.Errorf("%d conflicting access types across the corpus, want at most %d; upstream raises "+
+		test.Errorf("%d conflicting access types across the corpus, want at most %d; upstream raises "+
 			"on any, and a rise here means two paths disagree about the same access in a way the "+
 			"prefix dedup no longer prevents", conflicts, knownConflicts)
 	}
 
 	// # Why these are exact rather than loose bounds
 	//
-	// The first sweep against this file produced SEVEN survivors from seven mutants, which is the
+	// The first sweep against this file produced seven survivors from seven mutants, which is the
 	// shape of a broken harness rather than a weak suite -- so the harness was checked first, by
 	// neutralising the analysis entirely, and it was caught. The survivors were therefore real, and
-	// reading them found what they share: each moves a DIFFERENT quantity by a small amount, and
+	// reading them found what they share: each moves a different quantity by a small amount, and
 	// every assertion above was a loose bound that all of them satisfied.
 	//
 	// Measured, one mutant at a time, against a baseline of 171 deep / 1,434 flat / 2 iterations:
@@ -523,9 +523,9 @@ func TestHoistableCorpusDistribution(t *testing.T) {
 	//	immutability gate always true                 172 / 1,433, one path GAINED
 	//	component seed ungated                        171 / 1,434, unchanged
 	//
-	// The distinguishing quantity is a COUNT OVER A TABLE rather than any named value, which is why
+	// The distinguishing quantity is a count over A table rather than any named value, which is why
 	// the exact figures are asserted here. The immutability row is the one that matters most: a
-	// mutant that GAINS a path is moving in the over-approximating direction, the one that invents
+	// mutant that gains a path is moving in the over-approximating direction, the one that invents
 	// crashes, and only an exact count can see it -- every "at least one deep path" assertion in
 	// this file passes happily while it does so.
 	//
@@ -548,7 +548,7 @@ func TestHoistableCorpusDistribution(t *testing.T) {
 	// `useCallback-nonescaping-invoked-callback-escaping-return`. Both are dependencies upstream
 	// infers and we did not.
 	//
-	// So these ranges were WRONG before, not conservative: a scope whose range did not contain its
+	// So these ranges were wrong before, not conservative: a scope whose range did not contain its
 	// own instructions made the hoistable analysis unable to prove accesses it should have proven.
 	// Measured, scopes covering the order of none of their own members: 2,345 of 3,357 before the
 	// fix, 0 after.
@@ -558,7 +558,7 @@ func TestHoistableCorpusDistribution(t *testing.T) {
 	// and it is recorded rather than buried; it is smaller than two recovered true dependencies and
 	// a corrected invariant.
 	//
-	// # Both counts moved again when `isDeferredDependency` landed, and this gain in `deep` is NOT
+	// # Both counts moved again when `isDeferredDependency` landed, and this gain in `deep` is not
 	// over-approximation
 	//
 	// Transcribing upstream's `isDeferredDependency` -- skip an instruction whose lvalue is in the
@@ -596,7 +596,7 @@ func TestHoistableCorpusDistribution(t *testing.T) {
 	// now invalidates on the field the callback actually reads.
 	//
 	// The oracle is unmoved -- 76 matched of 88, ours 158 against upstream's 116, identical before
-	// and after -- so it cannot adjudicate this one either way. What it CAN say is that nothing was
+	// and after -- so it cannot adjudicate this one either way. What it can say is that nothing was
 	// lost: `matched` did not fall and `ours` did not rise, so no dependency was dropped and none
 	// was invented. The eleven are on corpus files rather than on scored fixtures.
 	// # And again when `.current` reads stopped being dependencies
@@ -606,7 +606,7 @@ func TestHoistableCorpusDistribution(t *testing.T) {
 	// with the comment "ref.current access is not a valid dep", because a scope must depend on the
 	// ref object rather than on the mutable slot inside it.
 	//
-	// A FALL in `deep` is the direction this heading calls safe, and the oracle agrees it cost
+	// A fall in `deep` is the direction this heading calls safe, and the oracle agrees it cost
 	// nothing: 78 matched of 88 with `ours` at 158, identical before and after.
 	// # And again when the dependency array stopped being evidence
 	//
@@ -638,7 +638,7 @@ func TestHoistableCorpusDistribution(t *testing.T) {
 	// scope now stand alone. More scopes name a dependency, and fewer of those dependencies sit
 	// deep enough inside a widened range to carry a path.
 	//
-	// `deep` FALLING is the safe direction by this test's own rule -- a gain in depth is the
+	// `deep` falling is the safe direction by this test's own rule -- a gain in depth is the
 	// over-approximating one -- and the scope oracle agrees rather than merely not objecting:
 	// surviving scopes 114 to 108 against upstream's 97, and exact per-fixture agreement 26 to 30.
 	// # And again when three `Object.*` entries gained their aliasing signatures
@@ -676,7 +676,7 @@ func TestHoistableCorpusDistribution(t *testing.T) {
 	// `dependency_oracle_test.go` and at `knownSurvivedExact` in `scope_oracle_test.go`.
 	// # And again when a property read off a frozen object stayed frozen
 	//
-	// 625 deep to 588, 2,023 flat to 2,203. `deep` FALLING is the safe direction by the rule above,
+	// 625 deep to 588, 2,023 flat to 2,203. `deep` falling is the safe direction by the rule above,
 	// and here an oracle says so outright rather than merely not objecting: the dependency count
 	// reaches upstream's exactly, 114 to 116 against 116, with `matched` unmoved at 74. Both added
 	// rows are therefore ones upstream also produces.
@@ -697,7 +697,7 @@ func TestHoistableCorpusDistribution(t *testing.T) {
 	//
 	// 610 deep to 615, 2,346 flat to 2,376. `deep` rising is the over-approximating direction and no
 	// oracle endorses it, which is why the move is small and the reason is fidelity rather than a
-	// gain: upstream prunes a capture whose DESTINATION is not mutable, in the same arm and the same
+	// gain: upstream prunes a capture whose destination is not mutable, in the same arm and the same
 	// comment as the source half -- "If the destination is not mutable, or the source value has
 	// copy-on-write semantics, then we can prune the effect".
 	//
@@ -716,7 +716,7 @@ func TestHoistableCorpusDistribution(t *testing.T) {
 	// # And again when a scope inside a branch stopped being seeded from that branch
 	//
 	// 615 deep to 576, 2,379 flat to 2,414. Thirty-nine paths become shallow, and this is the only
-	// entry here where `deep` FALLS. That is the conservative direction the rule above asks for: a
+	// entry here where `deep` falls. That is the conservative direction the rule above asks for: a
 	// property proven non-null only under an `if` no longer licenses the walk to descend past it
 	// when the scope asking began inside that same `if`.
 	//
@@ -730,7 +730,7 @@ func TestHoistableCorpusDistribution(t *testing.T) {
 	//
 	// The old 576 / 2,414 pin ran range and scope inference directly after `Construct`, while the
 	// production path had moved to Outline -> InferReactive -> Drop -> inclusive Inline -> Merge ->
-	// DCE. On the final tree, the old probe reports 622 / 2,778 and the production-aligned probe
+	// `DCE`. On the final tree, the old probe reports 622 / 2,778 and the production-aligned probe
 	// reports 626 / 2,731: alignment recovers four deep paths and removes 47 flat dependencies that
 	// do not survive the real prefix.
 	//
@@ -749,7 +749,7 @@ func TestHoistableCorpusDistribution(t *testing.T) {
 	// lifetime rather than added path depth.
 	// # Re-pinned 2026-09-06: 2,764 to 2,809 flat, deep unchanged at 626
 	//
-	// This distribution is measured over a LIVE directory, not a frozen fixture, so it moves when
+	// This distribution is measured over a live directory, not a frozen fixture, so it moves when
 	// that directory does. Between the previous pin and this one the corpus gained 151 uncommitted
 	// files and an import-aliasing pass applied by this tool's own fixer, which is precisely the
 	// kind of edit a dependency analysis is supposed to notice: 45 more root-only dependencies, no
@@ -782,13 +782,13 @@ func TestHoistableCorpusDistribution(t *testing.T) {
 	// the frozen corpus. Discrimination survives the change: the immutability gate forced always true
 	// gives 832 / 3,295 with 3 iterations, and fails here.
 	if deep != 769 || flat != 3320 {
-		t.Errorf("got %d deep and %d flat dependencies, want 769 and 3320; a SMALL move here is "+
+		test.Errorf("got %d deep and %d flat dependencies, want 769 and 3320; a SMALL move here is "+
 			"what every mutation of this analysis produces, and a gain in `deep` specifically is "+
 			"the over-approximating direction unless an oracle says otherwise", deep, flat)
 	}
-	if maxIterations != 2 {
-		t.Errorf("max iterations %d, want 2; the intersection at a join is what keeps this low, "+
-			"and unioning instead produces the same answer in 4", maxIterations)
+	if maximumIterations != 2 {
+		test.Errorf("max iterations %d, want 2; the intersection at a join is what keeps this low, "+
+			"and unioning instead produces the same answer in 4", maximumIterations)
 	}
-	t.Logf("%d dependencies with a path, %d without; max iterations %d", deep, flat, maxIterations)
+	test.Logf("%d dependencies with a path, %d without; max iterations %d", deep, flat, maximumIterations)
 }

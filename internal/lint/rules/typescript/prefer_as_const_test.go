@@ -13,10 +13,10 @@ const preferAsConstFile = "/repository/source/Thing.ts"
 // Upstream ships twenty failing inputs and its snapshot holds twenty entries, but three of those
 // entries are `Unexpected token` parse errors rather than rule diagnostics: the tester runs .tsx,
 // where `<'bar'>'bar'` is a JSX fragment opening rather than a type assertion. That is the whole
-// of the extractor's DISCREPANCY warning, 17 diagnostics against 20 inputs, and it resolves to
+// of the extractor's discrepancy warning, 17 diagnostics against 20 inputs, and it resolves to
 // exactly one finding per reporting input with nothing left to recover.
-func TestPreferAsConstFires(t *testing.T) {
-	t.Parallel()
+func TestPreferAsConstFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -30,21 +30,36 @@ func TestPreferAsConstFires(t *testing.T) {
 		{"upstream fail 6", "const example: 'hello' = 'hello';"},
 		{"upstream fail 7", "let foo: 'bar' = \"bar\";"},
 		{"upstream fail 8", "const foo: 2 = 2;"},
-		{"upstream fail 9", "\n            class foo {\n              readonly bar: 'baz' = 'baz';\n            }\n                  "},
-		{"upstream fail 10", "\n            class foo {\n              static bar: 2 = 2;\n            }\n                  "},
+		{
+			"upstream fail 9",
+			"\n            class foo {\n              readonly bar: 'baz' = 'baz';\n            }\n                  ",
+		},
+		{
+			"upstream fail 10",
+			"\n            class foo {\n              static bar: 2 = 2;\n            }\n                  ",
+		},
 		{"upstream fail 11", "let foo: 'bar' = 'bar' as 'bar';"},
 		{"upstream fail 12", "let foo = 'bar' as 'bar';"},
 		{"upstream fail 13", "let foo = 5 as 5;"},
-		{"upstream fail 14", "\n            class foo {\n              bar: 'baz' = 'baz';\n            }\n                  "},
+		{
+			"upstream fail 14",
+			"\n            class foo {\n              bar: 'baz' = 'baz';\n            }\n                  ",
+		},
 		{"upstream fail 15", "\n            class foo {\n              bar: 2 = 2;\n            }\n                  "},
-		{"upstream fail 16", "\n            class foo {\n              foo = 'bar' as 'bar';\n            }\n                  "},
-		{"upstream fail 17", "\n            class foo {\n              foo = 5 as 5;\n            }\n                  "},
+		{
+			"upstream fail 16",
+			"\n            class foo {\n              foo = 'bar' as 'bar';\n            }\n                  ",
+		},
+		{
+			"upstream fail 17",
+			"\n            class foo {\n              foo = 5 as 5;\n            }\n                  ",
+		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, PreferAsConst, preferAsConstFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "preferAsConst")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, PreferAsConst, preferAsConstFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "preferAsConst")
 		})
 	}
 }
@@ -56,8 +71,8 @@ func TestPreferAsConstFires(t *testing.T) {
 // rule ships: the annotation arm writes two edits at two separated offsets, and a finding carrying
 // a repair that deleted the wrong range satisfies every assertion in TestPreferAsConstFires,
 // because the finding is byte-identical either way.
-func TestPreferAsConstFixesWriteWhatTheyClaim(t *testing.T) {
-	t.Parallel()
+func TestPreferAsConstFixesWriteWhatTheyClaim(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -74,26 +89,54 @@ func TestPreferAsConstFixesWriteWhatTheyClaim(t *testing.T) {
 		{"upstream fix vector 8", "const foo: 2 = 2;", "const foo = 2 as const;"},
 		{"upstream fix vector 9", "let foo = 'bar' as 'bar';", "let foo = 'bar' as const;"},
 		{"upstream fix vector 10", "let foo = 5 as 5;", "let foo = 5 as const;"},
-		{"upstream fix vector 11", "\n            class foo {\n              readonly bar: 'baz' = 'baz';\n            }\n                  ", "\n            class foo {\n              readonly bar = 'baz' as const;\n            }\n                  "},
-		{"upstream fix vector 12", "\n            class foo {\n              static bar: 2 = 2;\n            }\n                  ", "\n            class foo {\n              static bar = 2 as const;\n            }\n                  "},
-		{"upstream fix vector 13", "\n            class foo {\n              foo = 'bar' as 'bar';\n            }\n                  ", "\n            class foo {\n              foo = 'bar' as const;\n            }\n                  "},
-		{"upstream fix vector 14", "\n            class foo {\n              foo = 5 as 5;\n            }\n                  ", "\n            class foo {\n              foo = 5 as const;\n            }\n                  "},
+		{
+			"upstream fix vector 11",
+			"\n            class foo {\n              readonly bar: 'baz' = 'baz';\n            }\n                  ",
+			"\n            class foo {\n              readonly bar = 'baz' as const;\n            }\n                  ",
+		},
+		{
+			"upstream fix vector 12",
+			"\n            class foo {\n              static bar: 2 = 2;\n            }\n                  ",
+			"\n            class foo {\n              static bar = 2 as const;\n            }\n                  ",
+		},
+		{
+			"upstream fix vector 13",
+			"\n            class foo {\n              foo = 'bar' as 'bar';\n            }\n                  ",
+			"\n            class foo {\n              foo = 'bar' as const;\n            }\n                  ",
+		},
+		{
+			"upstream fix vector 14",
+			"\n            class foo {\n              foo = 5 as 5;\n            }\n                  ",
+			"\n            class foo {\n              foo = 5 as const;\n            }\n                  ",
+		},
 		// Upstream omits the unmodified class property from its fix vectors, covering only the
 		// `readonly` and `static` spellings. Measured against the release binary, the plain form is
 		// fixed identically, so the omission is an incomplete vector list rather than a behavior.
-		{"a plain class property is fixed too", "class foo {\n  bar: 'baz' = 'baz';\n}\n", "class foo {\n  bar = 'baz' as const;\n}\n"},
+		{
+			"a plain class property is fixed too",
+			"class foo {\n  bar: 'baz' = 'baz';\n}\n",
+			"class foo {\n  bar = 'baz' as const;\n}\n",
+		},
 		// The annotation delete trims to the colon and leaves the whitespace before it, and the
 		// insert lands at the initializer's end rather than after its trailing trivia. Both are
 		// measured byte behaviors of upstream, not guesses about what looks tidy.
-		{"whitespace before the colon survives the delete", "let a  :  'bar' = 'bar';\n", "let a   = 'bar' as const;\n"},
-		{"a comment after the type survives the delete", "let a: 'bar' /*c*/ = 'bar';\n", "let a /*c*/ = 'bar' as const;\n"},
+		{
+			"whitespace before the colon survives the delete",
+			"let a  :  'bar' = 'bar';\n",
+			"let a   = 'bar' as const;\n",
+		},
+		{
+			"a comment after the type survives the delete",
+			"let a: 'bar' /*c*/ = 'bar';\n",
+			"let a /*c*/ = 'bar' as const;\n",
+		},
 		{"the insert precedes trailing trivia", "let a: 'bar' = 'bar' /*t*/;\n", "let a = 'bar' as const /*t*/;\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFixedSource(t,
-				rule_testing.Run(t, PreferAsConst, preferAsConstFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFixedSource(test,
+				rule_testing.Run(test, PreferAsConst, preferAsConstFile, testCase.sourceText),
 				testCase.wantSource)
 		})
 	}
@@ -109,8 +152,8 @@ func TestPreferAsConstFixesWriteWhatTheyClaim(t *testing.T) {
 //
 // ExpectFixedSource returns the source unchanged when a diagnostic carries no fix, so asserting
 // the input back is the assertion that no repair was offered.
-func TestPreferAsConstReportsTheDestructuringCaseWithoutARepair(t *testing.T) {
-	t.Parallel()
+func TestPreferAsConstReportsTheDestructuringCaseWithoutARepair(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -122,15 +165,18 @@ func TestPreferAsConstReportsTheDestructuringCaseWithoutARepair(t *testing.T) {
 		{"an object binding pattern", "let {}: 'bar' = 'bar';"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, PreferAsConst, preferAsConstFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "preferAsConst")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, PreferAsConst, preferAsConstFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "preferAsConst")
 			if len(result.Diagnostics[0].Fixes) != 0 {
-				t.Fatalf("expected no fix on a binding pattern, got %d", len(result.Diagnostics[0].Fixes))
+				test.Fatalf("expected no fix on a binding pattern, got %d", len(result.Diagnostics[0].Fixes))
 			}
 			if len(result.Diagnostics[0].Suggestions) != 0 {
-				t.Fatalf("expected no suggestion on a binding pattern, got %d", len(result.Diagnostics[0].Suggestions))
+				test.Fatalf(
+					"expected no suggestion on a binding pattern, got %d",
+					len(result.Diagnostics[0].Suggestions),
+				)
 			}
 		})
 	}
@@ -145,8 +191,8 @@ func TestPreferAsConstReportsTheDestructuringCaseWithoutARepair(t *testing.T) {
 //
 // The expected text is a literal typed here rather than a reference to the rule's own message or
 // span helper, so that a mutation moving the report site cannot move the assertion with it.
-func TestPreferAsConstPointsAtTheLiteralType(t *testing.T) {
-	t.Parallel()
+func TestPreferAsConstPointsAtTheLiteralType(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -163,23 +209,23 @@ func TestPreferAsConstPointsAtTheLiteralType(t *testing.T) {
 		{"a binding pattern", "let []: 'bar' = 'bar';", "'bar'"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, PreferAsConst, preferAsConstFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "preferAsConst")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, PreferAsConst, preferAsConstFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "preferAsConst")
 			finding := result.Diagnostics[0]
 			if got := testCase.sourceText[finding.Range.Pos():finding.Range.End()]; got != testCase.wantText {
-				t.Fatalf("finding points at %q, want %q", got, testCase.wantText)
+				test.Fatalf("finding points at %q, want %q", got, testCase.wantText)
 			}
 			if finding.Message.Id != "preferAsConst" {
-				t.Fatalf("message id %q, want %q", finding.Message.Id, "preferAsConst")
+				test.Fatalf("message id %q, want %q", finding.Message.Id, "preferAsConst")
 			}
 		})
 	}
 }
 
-func TestPreferAsConstStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestPreferAsConstStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -204,17 +250,50 @@ func TestPreferAsConstStaysSilent(t *testing.T) {
 		{"upstream pass 17", "let foo: 'bar';"},
 		{"upstream pass 18", "let foo = { bar };"},
 		{"upstream pass 19", "let foo: 'baz' = 'baz' as const;"},
-		{"upstream pass 20", "\n                  class foo {\n                    bar = 'baz';\n                  }\n                "},
-		{"upstream pass 21", "\n                  class foo {\n                    bar: 'baz';\n                  }\n                "},
-		{"upstream pass 22", "\n                  class foo {\n                    bar;\n                  }\n                "},
-		{"upstream pass 23", "\n                  class foo {\n                    bar: string = 'baz';\n                  }\n                "},
-		{"upstream pass 24", "\n                  class foo {\n                    bar: number = 1;\n                  }\n                "},
-		{"upstream pass 25", "\n                  class foo {\n                    bar = 'baz' as const;\n                  }\n                "},
-		{"upstream pass 26", "\n                  class foo {\n                    bar = 2 as const;\n                  }\n                "},
-		{"upstream pass 27", "\n                  class foo {\n                    get bar(): 'bar' {}\n                    set bar(bar: 'bar') {}\n                  }\n                "},
-		{"upstream pass 28", "\n                  class foo {\n                    bar = () => 'bar' as const;\n                  }\n                "},
-		{"upstream pass 29", "\n                  type BazFunction = () => 'baz';\n                  class foo {\n                    bar: BazFunction = () => 'bar';\n                  }\n                "},
-		{"upstream pass 30", "\n                  class foo {\n                    bar(): void {}\n                  }\n                "},
+		{
+			"upstream pass 20",
+			"\n                  class foo {\n                    bar = 'baz';\n                  }\n                ",
+		},
+		{
+			"upstream pass 21",
+			"\n                  class foo {\n                    bar: 'baz';\n                  }\n                ",
+		},
+		{
+			"upstream pass 22",
+			"\n                  class foo {\n                    bar;\n                  }\n                ",
+		},
+		{
+			"upstream pass 23",
+			"\n                  class foo {\n                    bar: string = 'baz';\n                  }\n                ",
+		},
+		{
+			"upstream pass 24",
+			"\n                  class foo {\n                    bar: number = 1;\n                  }\n                ",
+		},
+		{
+			"upstream pass 25",
+			"\n                  class foo {\n                    bar = 'baz' as const;\n                  }\n                ",
+		},
+		{
+			"upstream pass 26",
+			"\n                  class foo {\n                    bar = 2 as const;\n                  }\n                ",
+		},
+		{
+			"upstream pass 27",
+			"\n                  class foo {\n                    get bar(): 'bar' {}\n                    set bar(bar: 'bar') {}\n                  }\n                ",
+		},
+		{
+			"upstream pass 28",
+			"\n                  class foo {\n                    bar = () => 'bar' as const;\n                  }\n                ",
+		},
+		{
+			"upstream pass 29",
+			"\n                  type BazFunction = () => 'baz';\n                  class foo {\n                    bar: BazFunction = () => 'bar';\n                  }\n                ",
+		},
+		{
+			"upstream pass 30",
+			"\n                  class foo {\n                    bar(): void {}\n                  }\n                ",
+		},
 
 		// The three angle-bracket assertions upstream lists as failures. They are failures in its
 		// tester only because it parses .tsx, where the snapshot records `Unexpected token` rather
@@ -223,7 +302,10 @@ func TestPreferAsConstStaysSilent(t *testing.T) {
 		// at all. This is a real gap against typescript-eslint, which does register one and would
 		// report. Upstream knows: its own fix vectors for these three are commented out. Reproduced
 		// as silence because oxc is what the differential harness compares against.
-		{"an angle bracket type assertion", "\n            class foo {\n              foo = <'bar'>'bar';\n            }\n                  "},
+		{
+			"an angle bracket type assertion",
+			"\n            class foo {\n              foo = <'bar'>'bar';\n            }\n                  ",
+		},
 		{"an angle bracket type assertion", "let foo = <'bar'>'bar';"},
 		{"an angle bracket type assertion", "let foo = <4>4;"},
 
@@ -253,9 +335,12 @@ func TestPreferAsConstStaysSilent(t *testing.T) {
 		{"a string type against a numeric value", "let a: '2' = 2;"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, PreferAsConst, preferAsConstFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(
+				test,
+				rule_testing.Run(test, PreferAsConst, preferAsConstFile, testCase.sourceText),
+			)
 		})
 	}
 }
@@ -269,8 +354,8 @@ func TestPreferAsConstStaysSilent(t *testing.T) {
 //
 // Our NumericLiteral.Text already holds the canonical rendering of the double, so string equality
 // on it reproduces the float comparison without parsing anything.
-func TestPreferAsConstMatchesNumericValuesNotSpellings(t *testing.T) {
-	t.Parallel()
+func TestPreferAsConstMatchesNumericValuesNotSpellings(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -282,10 +367,10 @@ func TestPreferAsConstMatchesNumericValuesNotSpellings(t *testing.T) {
 		{"exponent notation", "let a: 1e2 = 100;"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, PreferAsConst, preferAsConstFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, PreferAsConst, preferAsConstFile, testCase.sourceText),
 				"preferAsConst")
 		})
 	}
@@ -303,17 +388,17 @@ func TestPreferAsConstMatchesNumericValuesNotSpellings(t *testing.T) {
 // This matters beyond the count. The two arms being mutually exclusive on one declarator is what
 // makes the annotation arm's two-part edit safe to ship as a plain fix: the pair can never
 // compete with this rule's own other repair for the same bytes.
-func TestPreferAsConstReportsOnceWhenBothArmsCouldApply(t *testing.T) {
-	t.Parallel()
+func TestPreferAsConstReportsOnceWhenBothArmsCouldApply(test *testing.T) {
+	test.Parallel()
 
 	sourceText := "let foo: 'bar' = 'bar' as 'bar';"
-	result := rule_testing.Run(t, PreferAsConst, preferAsConstFile, sourceText)
-	rule_testing.ExpectFindings(t, result, "preferAsConst")
+	result := rule_testing.Run(test, PreferAsConst, preferAsConstFile, sourceText)
+	rule_testing.ExpectFindings(test, result, "preferAsConst")
 	finding := result.Diagnostics[0]
 	if got := sourceText[finding.Range.Pos():finding.Range.End()]; got != "'bar'" {
-		t.Fatalf("finding points at %q, want the assertion type", got)
+		test.Fatalf("finding points at %q, want the assertion type", got)
 	}
 	if finding.Range.Pos() != 26 {
-		t.Fatalf("finding starts at %d, want 26, the assertion type rather than the annotation", finding.Range.Pos())
+		test.Fatalf("finding starts at %d, want 26, the assertion type rather than the annotation", finding.Range.Pos())
 	}
 }

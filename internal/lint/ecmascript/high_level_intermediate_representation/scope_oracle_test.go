@@ -19,9 +19,9 @@
 // # The stage question, which had to be settled before any number here meant anything
 //
 // Our pipeline holds two different scope populations, and upstream's guards correspond to only one
-// of them. Scopes are ASSIGNED by `AssignReactiveScopes`, then a chain of prune passes dissolves
+// of them. Scopes are assigned by `AssignReactiveScopes`, then a chain of prune passes dissolves
 // the ones that turn out not to be worth memoizing. Upstream's output is emitted after their
-// equivalent chain, so their guards are the SURVIVORS.
+// equivalent chain, so their guards are the survivors.
 //
 // Measured both ways over the same fixtures, one pipeline run counted twice:
 //
@@ -31,7 +31,7 @@
 //
 // The totals alone do not settle it -- 114 is closer to 97 than 160 is, but a stage could get the
 // aggregate right while being wrong on every individual fixture. The per-fixture agreement is what
-// settles it: EXACT more than doubles, 11 of 48 to 25 of 48. A stage that merely netted out would
+// settles it: exact more than doubles, 11 of 48 to 25 of 48. A stage that merely netted out would
 // leave that flat. So this oracle scores the survived population, and the assigned count is
 // reported alongside it as context rather than pinned.
 //
@@ -41,10 +41,10 @@
 //
 // # Three numbers, because one would have lied
 //
-// At the survived stage the total improved AND per-fixture agreement doubled AND `under` got worse
+// At the survived stage the total improved and per-fixture agreement doubled and `under` got worse
 // (4 fixtures to 5). A single-number oracle reports that as an unambiguous win. It is not: `under`
 // is the correctness direction. An extra scope memoizes something upstream did not, which costs
-// performance; a MISSING scope drops a memoization the developer wrote, which changes behaviour.
+// performance; a missing scope drops a memoization the developer wrote, which changes behaviour.
 // Two of the five are our prune chain dissolving scopes upstream keeps.
 //
 // So `under` is pinned as a ceiling that fails loudly, and it is the number that outranks the other
@@ -68,8 +68,8 @@ import (
 
 // upstreamScopeGuard matches a changing-input cache guard in upstream's compiled output.
 //
-// Anchored on `!==` rather than on `$[` alone, because a cache WRITE (`$[0] = propA`) and a cache
-// READ (`t2 = $[2]`) both name a slot and neither opens a scope. Constant-cache guards are omitted.
+// Anchored on `!==` rather than on `$[` alone, because a cache write (`$[0] = propA`) and a cache
+// read (`t2 = $[2]`) both name a slot and neither opens a scope. Constant-cache guards are omitted.
 var upstreamScopeGuard = regexp.MustCompile(`if \(\$\[\d+\] !==`)
 
 // scopeStageCounts is one fixture's scope count at each of the two pipeline stages.
@@ -100,7 +100,7 @@ func countScopeStages(function *Function, checker *shimchecker.Checker) scopeSta
 	BuildReactiveScopeTerminals(function, scopes, identity)
 	dependencies := CollectScopeDependenciesWithHoistable(function, scopes, identity, ranges)
 
-	counts := scopeStageCounts{assigned: scopes.Len()}
+	counts := scopeStageCounts{assigned: scopes.Length()}
 
 	tree, _ := BuildReactiveFunction(function)
 	if tree == nil {
@@ -113,7 +113,7 @@ func countScopeStages(function *Function, checker *shimchecker.Checker) scopeSta
 	PruneNonReactiveDependencies(tree, function, dependencies)
 
 	// Counted by walking the tree rather than by subtracting a pruned count, because a scope block
-	// can appear in the tree more than once and the question is how many DISTINCT scopes survive --
+	// can appear in the tree more than once and the question is how many distinct scopes survive --
 	// which is what one of upstream's guards represents.
 	surviving := map[ScopeId]bool{}
 	VisitReactiveFunction(tree, ReactiveVisitor{
@@ -145,12 +145,12 @@ func countScopeStages(function *Function, checker *shimchecker.Checker) scopeSta
 //   - A `## Code` block emitting zero guards: upstream compiled the fixture and memoized nothing.
 //     Scoring these inflates the gap from +17 to +44 while saying nothing about correspondence,
 //     since any scope we produce is over-production by construction.
-func TestScopeStructureAgainstUpstreamGuards(t *testing.T) {
-	t.Parallel()
+func TestScopeStructureAgainstUpstreamGuards(test *testing.T) {
+	test.Parallel()
 
-	fixtures, err := react_conformance.Load("../../rules/react/conformance/testdata/fixtures")
-	if err != nil {
-		t.Fatalf("loading the vendored corpus: %v", err)
+	fixtures, loadError := react_conformance.Load("../../rules/react/conformance/testdata/fixtures")
+	if loadError != nil {
+		test.Fatalf("loading the vendored corpus: %v", loadError)
 	}
 
 	var lines []string
@@ -169,8 +169,8 @@ func TestScopeStructureAgainstUpstreamGuards(t *testing.T) {
 			flowExcluded++
 			continue
 		}
-		body, readErr := os.ReadFile(fixture.ExpectPath)
-		if readErr != nil {
+		body, readError := os.ReadFile(fixture.ExpectPath)
+		if readError != nil {
 			continue
 		}
 		text := string(body)
@@ -187,23 +187,23 @@ func TestScopeStructureAgainstUpstreamGuards(t *testing.T) {
 
 		total := scopeStageCounts{}
 		ran := false
-		probe := rule.Rule{
+		probe := rule.Rule[rule.NoOptions]{
 			Name:             "scope-oracle",
 			NeedsTypeChecker: true,
-			Run: func(ctx rule.Context, options any) rule.Listeners {
+			Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 				return rule.Listeners{
 					ast.KindSourceFile: func(node *ast.Node) {
-						if ctx.TypeChecker == nil {
+						if ruleContext.TypeChecker == nil {
 							return
 						}
 						forEachFunctionLike(node, func(functionNode *ast.Node) {
-							function := Lower(functionNode, ctx.TypeChecker)
+							function := Lower(functionNode, ruleContext.TypeChecker)
 							if function == nil {
 								return
 							}
 							Construct(function)
 							ran = true
-							one := countScopeStages(function, ctx.TypeChecker)
+							one := countScopeStages(function, ruleContext.TypeChecker)
 							total.assigned += one.assigned
 							total.survived += one.survived
 						})
@@ -211,7 +211,7 @@ func TestScopeStructureAgainstUpstreamGuards(t *testing.T) {
 				}
 			},
 		}
-		rule_testing.RunTypedFiles(t, probe, map[string]string{
+		rule_testing.RunTypedFiles(test, probe, map[string]string{
 			"/react.d.ts":  reactiveDeclarations,
 			"/fixture.tsx": fixture.Source,
 		}, "/fixture.tsx")
@@ -251,15 +251,15 @@ func TestScopeStructureAgainstUpstreamGuards(t *testing.T) {
 
 	sort.Strings(lines)
 	scored := survivedOver + survivedUnder + survivedExact
-	t.Logf("scored=%d upstream=%d assigned=%d survived=%d", scored,
+	test.Logf("scored=%d upstream=%d assigned=%d survived=%d", scored,
 		upstreamTotal, assignedTotal, survivedTotal)
-	t.Logf("assigned: over=%d under=%d exact=%d", assignedOver, assignedUnder, assignedExact)
-	t.Logf("survived: over=%d under=%d exact=%d underScopes=%d",
+	test.Logf("assigned: over=%d under=%d exact=%d", assignedOver, assignedUnder, assignedExact)
+	test.Logf("survived: over=%d under=%d exact=%d underScopes=%d",
 		survivedOver, survivedUnder, survivedExact, survivedUnderScopes)
-	t.Logf("excluded: flow=%d noCodeSection=%d zeroGuard=%d", flowExcluded, noCodeSection, zeroGuard)
+	test.Logf("excluded: flow=%d noCodeSection=%d zeroGuard=%d", flowExcluded, noCodeSection, zeroGuard)
 
 	if scored == 0 {
-		t.Fatal("no fixture was scored; the corpus, the gate string or the guard pattern is wrong, " +
+		test.Fatal("no fixture was scored; the corpus, the gate string or the guard pattern is wrong, " +
 			"and every count below would be a meaningless zero")
 	}
 
@@ -268,13 +268,13 @@ func TestScopeStructureAgainstUpstreamGuards(t *testing.T) {
 	// denominator moving.
 	const knownScored = 48
 	if scored != knownScored {
-		t.Errorf("scored %d fixtures, want %d; the population changed, so every count below is "+
+		test.Errorf("scored %d fixtures, want %d; the population changed, so every count below is "+
 			"against a different set and none of them can be compared to its pin", scored,
 			knownScored)
 	}
 	const knownUpstreamTotal = 97
 	if upstreamTotal != knownUpstreamTotal {
-		t.Errorf("upstream guards = %d, want %d; the answer key itself moved, which means the "+
+		test.Errorf("upstream guards = %d, want %d; the answer key itself moved, which means the "+
 			"corpus was re-vendored or the guard pattern stopped matching", upstreamTotal,
 			knownUpstreamTotal)
 	}
@@ -283,7 +283,7 @@ func TestScopeStructureAgainstUpstreamGuards(t *testing.T) {
 	//
 	// `under` first. It is the correctness direction and it outranks the other two whenever they
 	// disagree -- which they already have: at the survived stage the total improved and per-fixture
-	// agreement doubled while `under` got WORSE than at the assigned stage.
+	// agreement doubled while `under` got worse than at the assigned stage.
 	//
 	// Zero once the memo callbacks are counted. All five under-producing fixtures were the same
 	// bookkeeping error rather than a missing scope: their scopes sit in the callback, which
@@ -297,7 +297,7 @@ func TestScopeStructureAgainstUpstreamGuards(t *testing.T) {
 	const knownSurvivedUnder = 0
 	const knownSurvivedUnderScopes = 0
 	if survivedUnder > knownSurvivedUnder || survivedUnderScopes > knownSurvivedUnderScopes {
-		t.Errorf("under-production = %d fixtures / %d scopes, want at most %d / %d; we now produce "+
+		test.Errorf("under-production = %d fixtures / %d scopes, want at most %d / %d; we now produce "+
 			"FEWER scopes than upstream somewhere new, which drops a memoization the developer "+
 			"wrote rather than adding one they did not. This is a behaviour change, not a "+
 			"performance one, and it outranks any improvement in the two counts below.\n  %s",
@@ -341,7 +341,7 @@ func TestScopeStructureAgainstUpstreamGuards(t *testing.T) {
 	// agreement floor becomes ten fixtures stronger.
 	const knownSurvivedExact = 26
 	if survivedExact < knownSurvivedExact {
-		t.Errorf("exact per-fixture agreement = %d of %d, want at least %d; fewer fixtures now "+
+		test.Errorf("exact per-fixture agreement = %d of %d, want at least %d; fewer fixtures now "+
 			"match upstream's scope count exactly, which a stable total would hide", survivedExact,
 			scored, knownSurvivedExact)
 	}
@@ -383,7 +383,7 @@ func TestScopeStructureAgainstUpstreamGuards(t *testing.T) {
 	// is a stricter ceiling than the callback-counting approximation's 146, not a tolerance increase.
 	const knownSurvivedTotal = 142
 	if survivedTotal > knownSurvivedTotal {
-		t.Errorf("surviving scopes = %d against upstream's %d, want at most %d; we produce more "+
+		test.Errorf("surviving scopes = %d against upstream's %d, want at most %d; we produce more "+
 			"scopes than before, so something split a scope upstream keeps whole or stopped a "+
 			"prune pass that used to fire", survivedTotal, upstreamTotal, knownSurvivedTotal)
 	}
@@ -393,14 +393,14 @@ func TestScopeStructureAgainstUpstreamGuards(t *testing.T) {
 	// two answers point at different passes. Pinning it would also fail this test for changes that
 	// improve the population upstream's output does not describe.
 	if assignedTotal < survivedTotal {
-		t.Errorf("assigned %d < survived %d, which is impossible: pruning cannot create a scope, "+
+		test.Errorf("assigned %d < survived %d, which is impossible: pruning cannot create a scope, "+
 			"so the two stages are being counted over different populations", assignedTotal,
 			survivedTotal)
 	}
 
 	if dump := os.Getenv("SCOPE_ORACLE_DUMP"); dump != "" {
-		if writeErr := os.WriteFile(dump, []byte(strings.Join(lines, "\n")+"\n"), 0o644); writeErr != nil {
-			t.Errorf("writing the per-fixture dump to %s: %v", dump, writeErr)
+		if writeError := os.WriteFile(dump, []byte(strings.Join(lines, "\n")+"\n"), 0o644); writeError != nil {
+			test.Errorf("writing the per-fixture dump to %s: %v", dump, writeError)
 		}
 	}
 }

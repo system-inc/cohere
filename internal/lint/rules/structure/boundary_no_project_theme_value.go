@@ -18,7 +18,10 @@ import (
 
 // boundaryNoProjectThemeValueText is the rule's message, whose wording lives in
 // `policy/messages/boundary-no-project-theme-value.json`.
-var boundaryNoProjectThemeValueText = policy.MessageOf("structure/boundary-no-project-theme-value", "forbiddenThemeValue")
+var boundaryNoProjectThemeValueText = policy.MessageOf(
+	"structure/boundary-no-project-theme-value",
+	"forbiddenThemeValue",
+)
 
 // messageForbiddenThemeValue names the value, the component, and what is allowed instead.
 //
@@ -100,7 +103,7 @@ const interfaceNameSuffix = "Interface"
 //
 // A project using its own values is the system working. The boundary is one-directional: the
 // library may not reach into the project, and the project may extend the library freely.
-var BoundaryNoProjectThemeValue = rule.Rule{
+var BoundaryNoProjectThemeValue = rule.Rule[rule.NoOptions]{
 	Name: "structure/boundary-no-project-theme-value",
 
 	// Every theme file in the program.
@@ -108,15 +111,16 @@ var BoundaryNoProjectThemeValue = rule.Rule{
 	// A file's verdict reads its own bytes, its own path, and the theme map, so the theme map is the whole
 	// fingerprint (#kdee854). See themeFingerprint.
 	ProgramFingerprint: themeFingerprint,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil || !FileContextFor(ctx.SourceFile.FileName().AsString()).IsInLibrariesStructure {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		if ruleContext.SourceFile == nil ||
+			!FileContextFor(ruleContext.SourceFile.FileName().AsString()).IsInLibrariesStructure {
 			return nil
 		}
-		if ctx.Program == nil {
+		if ruleContext.Program == nil {
 			return nil
 		}
 
-		themes := themeValuesForProgram(ctx.Program)
+		themes := themeValuesForProgram(ruleContext.Program)
 		if len(themes) == 0 {
 			// No themes found means the rule cannot decide anything, and reporting nothing would be
 			// indistinguishable from a clean tree. Declining is the honest answer; the coverage
@@ -167,7 +171,7 @@ var BoundaryNoProjectThemeValue = rule.Rule{
 						return
 					}
 				}
-				ctx.ReportNode(attribute.Initializer,
+				ruleContext.ReportNode(attribute.Initializer,
 					messageForbiddenThemeValue(componentName, name.Text(), value, allowed))
 			},
 		}
@@ -249,7 +253,7 @@ func themeValuesForProgram(program rule.Program) map[string]map[string][]string 
 // since the message names them in it. Nothing else outside a file reaches its verdict, so an edit anywhere but a
 // theme interface's exported keys leaves this alone and the file's findings replay (#kdee854). The rule takes no
 // options, so none reach it.
-func themeFingerprint(program rule.Program, _ any) [sha256.Size]byte {
+func themeFingerprint(program rule.Program, _ rule.Given[rule.NoOptions]) [sha256.Size]byte {
 	themes := themeValuesForProgram(program)
 	hash := sha256.New()
 	for _, component := range slices.Sorted(maps.Keys(themes)) {

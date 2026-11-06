@@ -22,11 +22,11 @@ func noUnusedPrivateClassMembersCaseName(index int) string {
 // which this rule must leave to the core rule of the same name.
 //
 // The shapes worth naming, because each is a class of false positive a plausible port ships:
-// a use through a NON-this receiver typed as the class, a use through an alias of `this` and
+// a use through a non-this receiver typed as the class, a use through an alias of `this` and
 // through an alias of that alias, a write to a setter (which calls a body and so is a read), a
 // destructuring read, and a computed key that reads the member to decide which property to take.
-func TestNoUnusedPrivateClassMembersStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedPrivateClassMembersStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		"class Foo {}\n",
@@ -85,9 +85,9 @@ func TestNoUnusedPrivateClassMembersStaysSilent(t *testing.T) {
 		"class C {\n  private set privateMember(value) {\n    doSomething(value);\n  }\n\n  foo() {\n    this.privateMember = 1;\n  }\n}\n",
 	}
 	for index, sourceText := range cases {
-		t.Run(noUnusedPrivateClassMembersCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoUnusedPrivateClassMembers,
+		test.Run(noUnusedPrivateClassMembersCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoUnusedPrivateClassMembers,
 				noUnusedPrivateClassMembersFile, sourceText))
 		})
 	}
@@ -95,7 +95,7 @@ func TestNoUnusedPrivateClassMembersStaysSilent(t *testing.T) {
 
 // noUnusedPrivateClassMembersFinding is one expected finding with the layers it can be wrong at.
 //
-// One message id, so the id proves little. The rendered text names the member, and the SPAN is what
+// One message id, so the id proves little. The rendered text names the member, and the span is what
 // separates a property from a constructor parameter property: upstream reports the whole parameter
 // there, so the span covers the type annotation, which no id assertion can see.
 type noUnusedPrivateClassMembersFinding struct {
@@ -105,8 +105,8 @@ type noUnusedPrivateClassMembersFinding struct {
 
 // TestNoUnusedPrivateClassMembersFires is upstream's reporting cases verbatim, with every finding's
 // rendered text and span taken from the installed 8.67.0 build.
-func TestNoUnusedPrivateClassMembersFires(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedPrivateClassMembersFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText   string
@@ -533,7 +533,7 @@ func TestNoUnusedPrivateClassMembersFires(t *testing.T) {
 			// Measured, not imported. `this` inside a nested class is the nested class, so neither
 			// row reaches the outer member: the first reads the nested class's own `a`, the second
 			// reads nothing the checker resolves. Both report, here and on the installed 8.67.0 build.
-			// A receiver of the OUTER type does reach it from the nested class, which
+			// A receiver of the outer type does reach it from the nested class, which
 			// TestNoUnusedPrivateClassMembersDivergesOnReceiverReach pins (#yfkhkvy).
 			sourceText: "class C {\n  private a = 1;\n  m() {\n    return class D {\n      private a = 2;\n      n() { return this.a; }\n    };\n  }\n}\n",
 			wantFindings: []noUnusedPrivateClassMembersFinding{
@@ -554,26 +554,26 @@ func TestNoUnusedPrivateClassMembersFires(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(noUnusedPrivateClassMembersCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoUnusedPrivateClassMembers,
+		test.Run(noUnusedPrivateClassMembersCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoUnusedPrivateClassMembers,
 				noUnusedPrivateClassMembersFile, testCase.sourceText)
 
 			wantIds := make([]string, len(testCase.wantFindings))
 			for position := range testCase.wantFindings {
 				wantIds[position] = "unusedPrivateClassMember"
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 
 			onDisk := strings.TrimSpace(testCase.sourceText) + "\n"
 			for position, want := range testCase.wantFindings {
 				diagnostic := result.Diagnostics[position]
 				gotSpan := onDisk[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if gotSpan != want.wantSpan {
-					t.Fatalf("finding %d span: expected %q, got %q", position, want.wantSpan, gotSpan)
+					test.Fatalf("finding %d span: expected %q, got %q", position, want.wantSpan, gotSpan)
 				}
 				if diagnostic.Message.Description != want.wantMessage {
-					t.Fatalf("finding %d message: expected %q, got %q", position, want.wantMessage,
+					test.Fatalf("finding %d message: expected %q, got %q", position, want.wantMessage,
 						diagnostic.Message.Description)
 				}
 			}
@@ -584,7 +584,7 @@ func TestNoUnusedPrivateClassMembersFires(t *testing.T) {
 // TestNoUnusedPrivateClassMembersDivergesOnReceiverReach records where this port and upstream
 // disagree, and which way.
 //
-// Upstream reaches a use through scope analysis and follows exactly ONE hop of `const self = this`.
+// Upstream reaches a use through scope analysis and follows exactly one hop of `const self = this`.
 // Measured on the installed 8.67.0 build across three depths:
 //
 //	const a = this; a.prop            clean
@@ -596,12 +596,12 @@ func TestNoUnusedPrivateClassMembersFires(t *testing.T) {
 // We resolve the property name through the checker instead of tracking aliases, so depth costs
 // nothing and all three are clean here.
 //
-// The SAME divergence has a second face, found on the real tree rather than by construction. A
-// receiver held in a LOCAL is not followed either:
+// The same divergence has a second face, found on the real tree rather than by construction. A
+// receiver held in a local is not followed either:
 //
 //	class Foo { private helper() {...}  m() { const other = this.clone(); return other.helper(); } }
 //
-// Upstream reports `helper` there and is silent when the receiver is a PARAMETER annotated as the
+// Upstream reports `helper` there and is silent when the receiver is a parameter annotated as the
 // class, which its own corpus carries as a passing case. So the line it draws is not "only this"
 // but "this, a one-hop alias, or an annotated parameter", and a local holding the same type falls
 // outside it. Measured against the installed build both ways.
@@ -614,8 +614,8 @@ func TestNoUnusedPrivateClassMembersFires(t *testing.T) {
 // cases asserting such a report are removed from the firing table above and live here instead, at
 // the verdict this rule actually produces. For an unused-thing rule the direction matters: a false
 // positive asks a reader to delete working code, which is the expensive failure.
-func TestNoUnusedPrivateClassMembersDivergesOnReceiverReach(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedPrivateClassMembersDivergesOnReceiverReach(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		"class Foo {\n  private prop: number = 1;\n  method() {\n    const self1 = this;\n    return self1.prop;\n  }\n}\n",
@@ -633,15 +633,15 @@ func TestNoUnusedPrivateClassMembersDivergesOnReceiverReach(t *testing.T) {
 		"class Outer {\n  private secret = 1;\n  make() {\n    return class {\n      read(outer: Outer) { return outer.secret; }\n    };\n  }\n}\n",
 	)
 	for index, sourceText := range cases {
-		t.Run(noUnusedPrivateClassMembersCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoUnusedPrivateClassMembers,
+		test.Run(noUnusedPrivateClassMembersCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoUnusedPrivateClassMembers,
 				noUnusedPrivateClassMembersFile, sourceText))
 		})
 	}
 
 	// The control. Without it every row above is satisfied by a rule that cannot report at all.
-	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoUnusedPrivateClassMembers,
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoUnusedPrivateClassMembers,
 		noUnusedPrivateClassMembersFile, "class Foo {\n  private prop: number = 1;\n}\n"),
 		"unusedPrivateClassMember")
 }
@@ -658,8 +658,8 @@ func TestNoUnusedPrivateClassMembersDivergesOnReceiverReach(t *testing.T) {
 //
 // The firing half matters as much: a real `private` field beside the brand must still report, or the
 // arm could be skipping the whole class rather than the one member.
-func TestNoUnusedPrivateClassMembersDivergesOnDeclareField(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedPrivateClassMembersDivergesOnDeclareField(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		"class TypedBinding {\n  declare private readonly __brand: 'TypedBinding';\n}\n",
@@ -668,18 +668,18 @@ func TestNoUnusedPrivateClassMembersDivergesOnDeclareField(t *testing.T) {
 		"class TypedBinding {\n  declare private static readonly __brand: 'TypedBinding';\n}\n",
 	}
 	for index, sourceText := range cases {
-		t.Run(noUnusedPrivateClassMembersCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoUnusedPrivateClassMembers,
+		test.Run(noUnusedPrivateClassMembersCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoUnusedPrivateClassMembers,
 				noUnusedPrivateClassMembersFile, sourceText))
 		})
 	}
 
 	// The control: the brand stays silent and the real dead field beside it still reports, once.
-	result := rule_testing.RunTyped(t, NoUnusedPrivateClassMembers, noUnusedPrivateClassMembersFile,
+	result := rule_testing.RunTyped(test, NoUnusedPrivateClassMembers, noUnusedPrivateClassMembersFile,
 		"class TypedBinding {\n  declare private readonly __brand: 'TypedBinding';\n  private readonly unused: number = 1;\n}\n")
-	rule_testing.ExpectFindings(t, result, "unusedPrivateClassMember")
+	rule_testing.ExpectFindings(test, result, "unusedPrivateClassMember")
 	if description := result.Diagnostics[0].Message.Description; !strings.Contains(description, "'unused'") {
-		t.Fatalf("expected the finding on 'unused', got %q", description)
+		test.Fatalf("expected the finding on 'unused', got %q", description)
 	}
 }

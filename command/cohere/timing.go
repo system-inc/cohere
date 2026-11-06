@@ -1,8 +1,8 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
-	"io"
 	"runtime"
 	"sort"
 	"strings"
@@ -25,7 +25,7 @@ import (
 //
 // Every cost here is the walk threads' own CPU clock (see program.Timings), so a rule that waits costs
 // nothing and the first line says so.
-func printTimings(out io.Writer, timings *program.Timings, lintDuration time.Duration) {
+func printTimings(out *bufio.Writer, timings *program.Timings, lintDuration time.Duration) {
 	sorted := timings.Sorted()
 	if len(sorted) == 0 {
 		// A timing table with no rows is the instrument measuring nothing, which must not print as
@@ -38,47 +38,61 @@ func printTimings(out io.Writer, timings *program.Timings, lintDuration time.Dur
 	if account.Unavailable != "" {
 		// No CPU is not zero CPU. A table of zeros would read as every rule being free, so the CPU
 		// columns are left out and the reason given, and the counts, which were still counted, stay.
-		fmt.Fprintf(out, "\ntiming: no rule CPU this run, because %s. The counts below are real; the CPU columns are left out rather than shown as zero.\n",
-			account.Unavailable)
+		fmt.Fprintf(
+			out,
+			"\ntiming: no rule CPU this run, because %s. The counts below are real; the CPU columns are left out rather than shown as zero.\n",
+			account.Unavailable,
+		)
 		fmt.Fprintf(out, "  %-42s %8s %8s %8s\n", "rule", "files", "nodes", "found")
 		for _, timing := range sorted {
-			fmt.Fprintf(out, "  %-42s %8d %8d %8d\n", timing.Name, timing.FilesListened, timing.NodesOffered, timing.Findings)
+			fmt.Fprintf(
+				out,
+				"  %-42s %8d %8d %8d\n",
+				timing.Name,
+				timing.FilesListened,
+				timing.NodesOffered,
+				timing.Findings,
+			)
 		}
 		return
 	}
 
 	// CPU is summed across workers, so it exceeds wall clock by roughly the worker count. Shares are
 	// taken against the rules' total, which is the number they are actually a share of.
-	ruleCPU := timings.TotalCPU()
+	ruleCpu := timings.TotalCpu()
 
 	// The unit is in the first line, because the table this replaced printed wall time under the same
 	// columns and was read as cost (#8qyzmxw): a rule descheduled mid-call was billed for the wait.
 	fmt.Fprintf(out, "\ntiming: rule CPU, from each walk thread's own CPU clock, not wall time: "+
 		"%d rules, %s of rule CPU across all workers, %s wall clock\n",
-		len(sorted), formatMilliseconds(ruleCPU), formatMilliseconds(lintDuration))
+		len(sorted), formatMilliseconds(ruleCpu), formatMilliseconds(lintDuration))
 	perCall := time.Duration(0)
 	if account.Calls > 0 {
-		perCall = account.InstrumentCPU / time.Duration(account.Calls)
+		perCall = account.InstrumentCpu / time.Duration(account.Calls)
 	}
-	fmt.Fprintf(out, "  (a rule that waits, sleeps or is descheduled costs nothing here. Each of the %d measured calls "+
-		"costs about %dns to measure, subtracted from every row and counted once below. Compare rules to each other: "+
-		"the measurement makes a --timing run slower than a real one.)\n",
-		account.Calls, perCall.Nanoseconds())
+	fmt.Fprintf(
+		out,
+		"  (a rule that waits, sleeps or is descheduled costs nothing here. Each of the %d measured calls "+
+			"costs about %dns to measure, subtracted from every row and counted once below. Compare rules to each "+
+			"other: the measurement makes a --timing run slower than a real one.)\n",
+		account.Calls,
+		perCall.Nanoseconds(),
+	)
 	printCoverage(out, timings)
 	fmt.Fprintf(out, "  %-42s %9s %9s %9s %8s %8s %8s\n",
 		"rule", "cpu", "setup", "listen", "files", "nodes", "found")
 
 	for _, timing := range sorted {
 		share := ""
-		if ruleCPU > 0 {
-			share = fmt.Sprintf(" %5.1f%%", 100*float64(timing.TotalCPU())/float64(ruleCPU))
+		if ruleCpu > 0 {
+			share = fmt.Sprintf(" %5.1f%%", 100*float64(timing.TotalCpu())/float64(ruleCpu))
 		}
 
 		fmt.Fprintf(out, "  %-42s %9s %9s %9s %8d %8d %8d%s\n",
 			timing.Name,
-			formatMilliseconds(timing.TotalCPU()),
-			formatMilliseconds(timing.SetupCPU),
-			formatMilliseconds(timing.ListenerCPU),
+			formatMilliseconds(timing.TotalCpu()),
+			formatMilliseconds(timing.SetupCpu),
+			formatMilliseconds(timing.ListenerCpu),
 			timing.FilesListened,
 			timing.NodesOffered,
 			timing.Findings,
@@ -98,13 +112,13 @@ func printTimings(out io.Writer, timings *program.Timings, lintDuration time.Dur
 // last. A reader would have concluded the 171ms rule was expensive and optimized the wrong thing.
 //
 // Reported by family, which is a cache key up to its first colon, because a key identifies a cache
-// entry and a cache entry is not a line worth reading. The HIR cache keys per function node, by kind
+// entry and a cache entry is not a line worth reading. The `HIR` cache keys per function node, by kind
 // and source offset, which is correct for a cache and once produced 11,150 rows here against three
 // real ones: `--timing` was 17,000 lines, two thirds of them a single derivation reported one
 // function at a time, each costing 0.00ms and none of them actionable. The family is the label the
 // fill's CPU carries, so the collapse happens where it is measured.
-func printSharedFills(out io.Writer, timings *program.Timings) {
-	shared := timings.SharedCPU()
+func printSharedFills(out *bufio.Writer, timings *program.Timings) {
+	shared := timings.SharedCpu()
 	if len(shared) == 0 {
 		return
 	}
@@ -125,7 +139,7 @@ func printSharedFills(out io.Writer, timings *program.Timings) {
 //
 // The coverage line already reports a rule that listened to nothing. These are the other two the
 // brief asked for: a rule that listens to everything, and work duplicated across rules.
-func printTimingNotes(out io.Writer, sorted []program.RuleTiming) {
+func printTimingNotes(out *bufio.Writer, sorted []program.RuleTiming) {
 	mostOffered := 0
 	for _, timing := range sorted {
 		if timing.NodesOffered > mostOffered {
@@ -151,10 +165,13 @@ func printTimingNotes(out io.Writer, sorted []program.RuleTiming) {
 
 		perNode := ""
 		if timing.NodesOffered > 0 {
-			perNode = fmt.Sprintf(", %.0fns per node", float64(timing.TotalCPU().Nanoseconds())/float64(timing.NodesOffered))
+			perNode = fmt.Sprintf(
+				", %.0fns per node",
+				float64(timing.TotalCpu().Nanoseconds())/float64(timing.NodesOffered),
+			)
 		}
 		fmt.Fprintf(out,
-			"  note: %s saw the most nodes of any rule (%d%s) — compare a rule's cost against this one, not against its own node count\n",
+			"  note: %s saw the most nodes of any rule (%d%s), so compare a rule's cost against this one, not against its own node count\n",
 			timing.Name, timing.NodesOffered, perNode)
 	}
 
@@ -192,7 +209,7 @@ func printTimingNotes(out io.Writer, sorted []program.RuleTiming) {
 		}
 
 		fmt.Fprintf(out,
-			"  note: %s and %s were each offered %d nodes but differ %.0fx in cost (%s against %s) — if they share work, this table may be billing it to whichever ran first\n",
+			"  note: %s and %s were each offered %d nodes but differ %.0fx in cost (%s against %s), and if they share work, this table may be billing it to whichever ran first\n",
 			extremes.dearestName, extremes.cheapestName, offered,
 			float64(extremes.dearestCost)/float64(extremes.cheapestCost),
 			formatMilliseconds(extremes.dearestCost), formatMilliseconds(extremes.cheapestCost))
@@ -232,7 +249,7 @@ func costRange(sorted []program.RuleTiming, names []string) costExtremes {
 		if !named[timing.Name] {
 			continue
 		}
-		total := timing.TotalCPU()
+		total := timing.TotalCpu()
 		if extremes.cheapestName == "" || total < extremes.cheapestCost {
 			extremes.cheapestName, extremes.cheapestCost = timing.Name, total
 		}
@@ -269,30 +286,30 @@ func formatMilliseconds(duration time.Duration) string {
 // derivations and the measurement itself are read inside it, and the walk is what of the worker's CPU
 // lay outside every call: a difference between readings of one thread's clock, which holds no waiting.
 // The process's CPU outside the workers is read the same way.
-func printCoverage(out io.Writer, timings *program.Timings) {
+func printCoverage(out *bufio.Writer, timings *program.Timings) {
 	account := timings.Account
-	ruleCPU := timings.TotalCPU()
-	var sharedCPU time.Duration
-	for _, cost := range timings.SharedCPU() {
-		sharedCPU += cost
+	ruleCpu := timings.TotalCpu()
+	var sharedCpu time.Duration
+	for _, cost := range timings.SharedCpu() {
+		sharedCpu += cost
 	}
-	workersCPU := ruleCPU + sharedCPU + account.InstrumentCPU + account.WalkCPU
-	if workersCPU <= 0 {
+	workersCpu := ruleCpu + sharedCpu + account.InstrumentCpu + account.WalkCpu
+	if workersCpu <= 0 {
 		// Nothing measured on the walk workers means no share to state. A share computed from a zero
 		// would be worse than the silence it replaces.
 		return
 	}
 
 	fmt.Fprintf(out,
-		"  coverage: the walk workers spent %s of CPU: rules %.0f%%, shared derivations %.0f%%, measuring %.0f%%, and %.0f%% "+
-			"the walk itself (traversal, dispatch, configuration). Another %s of process CPU ran on no walk worker "+
-			"(the garbage collector, the runtime).\n",
-		formatMilliseconds(workersCPU),
-		100*float64(ruleCPU)/float64(workersCPU),
-		100*float64(sharedCPU)/float64(workersCPU),
-		100*float64(account.InstrumentCPU)/float64(workersCPU),
-		100*float64(account.WalkCPU)/float64(workersCPU),
-		formatMilliseconds(account.OtherCPU),
+		"  coverage: the walk workers spent %s of CPU: rules %.0f%%, shared derivations %.0f%%, measuring %.0f%%, "+
+			"and %.0f%% the walk itself (traversal, dispatch, configuration). Another %s of process CPU ran on no "+
+			"walk worker (the garbage collector, the runtime).\n",
+		formatMilliseconds(workersCpu),
+		100*float64(ruleCpu)/float64(workersCpu),
+		100*float64(sharedCpu)/float64(workersCpu),
+		100*float64(account.InstrumentCpu)/float64(workersCpu),
+		100*float64(account.WalkCpu)/float64(workersCpu),
+		formatMilliseconds(account.OtherCpu),
 	)
 }
 
@@ -307,32 +324,62 @@ func printCoverage(out io.Writer, timings *program.Timings) {
 // loader, and a number for either would be a guess presented as a measurement. What the loads and the
 // disk leave of the program's wall is resolution and the loader's bookkeeping together, and the last
 // line says so.
-func printGraphTiming(out io.Writer, timing *program.GraphTiming, buildDuration time.Duration, contentPackOpened time.Duration, checkers int) {
-	accounted := contentPackOpened + timing.Config + timing.Program + timing.Verify
+func printGraphTiming(
+	out *bufio.Writer,
+	timing *program.GraphTiming,
+	buildDuration time.Duration,
+	contentPackOpened time.Duration,
+	checkers int,
+) {
+	accounted := contentPackOpened + timing.Configuration + timing.Program + timing.Verify
 	builds := ""
 	if timing.Builds > 1 {
 		builds = fmt.Sprintf(" (%d builds: the first one's files moved under it)", timing.Builds)
 	}
-	fmt.Fprintf(out, "graph timing: %s wall = content pack %s + tsconfig %s + program %s + verify %s + %s elsewhere%s\n",
-		formatMilliseconds(buildDuration), formatMilliseconds(contentPackOpened), formatMilliseconds(timing.Config),
-		formatMilliseconds(timing.Program), formatMilliseconds(timing.Verify),
-		formatMilliseconds(max(buildDuration-accounted, 0)), builds)
+	fmt.Fprintf(
+		out,
+		"graph timing: %s wall = content pack %s + tsconfig %s + program %s + verify %s + %s elsewhere%s\n",
+		formatMilliseconds(buildDuration),
+		formatMilliseconds(contentPackOpened),
+		formatMilliseconds(timing.Configuration),
+		formatMilliseconds(timing.Program),
+		formatMilliseconds(timing.Verify),
+		formatMilliseconds(max(buildDuration-accounted, 0)),
+		builds,
+	)
 	fmt.Fprintf(out, "  tsconfig, its include patterns enumerated: disk %s summed over %s\n",
 		formatMilliseconds(timing.ConfigDisk.Summed()), describeDiskCalls(timing.ConfigDisk))
 	pack := "no content pack"
 	if timing.PackServed+timing.PackRead > 0 {
-		pack = fmt.Sprintf("the content pack served %d of the reads and %d were read from disk", timing.PackServed, timing.PackRead)
+		pack = fmt.Sprintf(
+			"the content pack served %d of the reads and %d were read from disk",
+			timing.PackServed,
+			timing.PackRead,
+		)
 	}
 	if timing.CheckedAnswers > 0 {
-		pack += fmt.Sprintf("; %d existence checks and stats, config's and program's, were answered from the run cache's check rather than by the disk", timing.CheckedAnswers)
+		pack += fmt.Sprintf(
+			"; %d existence checks and stats, config's and program's, were answered from the run cache's check rather than by the disk",
+			timing.CheckedAnswers,
+		)
 	}
-	fmt.Fprintf(out, "  program, summed over the compiler's parallel loaders: %d files loaded (each a read and a parse) in %s; "+
-		"disk %s over %s; %s\n",
-		timing.SourceFileLoads, formatMilliseconds(timing.SourceFileSummed),
-		formatMilliseconds(timing.ProgramDisk.Summed()), describeDiskCalls(timing.ProgramDisk), pack)
-	fmt.Fprintf(out, "  (summed times run past the program's %s wall because the loaders run at once; parse and import "+
-		"resolution happen inside one load and are not split, so what the loads leave of the wall is resolution "+
-		"and the loader's own work together)\n", formatMilliseconds(timing.Program))
+	fmt.Fprintf(
+		out,
+		"  program, summed over the compiler's parallel loaders: %d files loaded (each a read and a parse) in %s; "+
+			"disk %s over %s; %s\n",
+		timing.SourceFileLoads,
+		formatMilliseconds(timing.SourceFileSummed),
+		formatMilliseconds(timing.ProgramDisk.Summed()),
+		describeDiskCalls(timing.ProgramDisk),
+		pack,
+	)
+	fmt.Fprintf(
+		out,
+		"  (summed times run past the program's %s wall because the loaders run at once; parse and import "+
+			"resolution happen inside one load and are not split, so what the loads leave of the wall is resolution "+
+			"and the loader's own work together)\n",
+		formatMilliseconds(timing.Program),
+	)
 	// The count every later phase runs at, said where a reader timing the run looks: by default one per core
 	// up to 12, where the measured wall stops improving (program.defaultCheckerCount, #xwv641q).
 	fmt.Fprintf(out, "  checkers: %d, on %d cores\n", checkers, runtime.GOMAXPROCS(0))
@@ -354,7 +401,10 @@ func describeDiskCalls(disk program.DiskTiming) string {
 		if kind.calls.Count == 0 {
 			continue
 		}
-		parts = append(parts, fmt.Sprintf("%d %s %s", kind.calls.Count, kind.name, formatMilliseconds(kind.calls.Summed)))
+		parts = append(
+			parts,
+			fmt.Sprintf("%d %s %s", kind.calls.Count, kind.name, formatMilliseconds(kind.calls.Summed)),
+		)
 	}
 	if len(parts) == 0 {
 		// Said, rather than printing an empty list that reads like a sentence cut off: a build answered

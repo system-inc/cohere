@@ -74,7 +74,8 @@ function Component(props) {
 }
 `
 
-// optionalMemberDependencyNonOptionalInBody is `error.invalid-optional-member-expression-as-memo-dep-non-optional-in-body.js`.
+// optionalMemberDependencyNonOptionalInBody is
+// `error.invalid-optional-member-expression-as-memo-dep-non-optional-in-body.js`.
 //
 // An optional member expression written as a dependency and read non-optionally in the body.
 const optionalMemberDependencyNonOptionalInBody = `// @validatePreserveExistingMemoizationGuarantees
@@ -88,19 +89,21 @@ function Component(props) {
 }
 `
 
-// useMemoOverlappingScopes is `preserve-memo-validation/error.false-positive-useMemo-overlap-scopes.ts`.
+// useMemoOverlappingScopes is
+// `preserve-memo-validation/error.false-positive-useMemo-overlap-scopes.ts`.
 //
 // Overlapping reactive scopes; upstream anchors at 23:10 on the dependency identifier.
 const useMemoOverlappingScopes = "// @validatePreserveExistingMemoizationGuarantees:true\nimport {useMemo} from 'react';\nimport {arrayPush} from 'shared-runtime';\n\n/**\n * Repro showing differences between mutable ranges and scope ranges.\n *\n * For useMemo dependency `x`:\n * - mutable range ends after the `arrayPush(x, b)` instruction\n * - scope range is extended due to MergeOverlappingScopes\n *\n * Since manual memo deps are guaranteed to be named (guaranteeing valid\n * codegen), it's correct to take a dependency on a dep *before* the end\n * of its scope (but after its mutable range ends).\n */\n\nfunction useFoo(a, b) {\n  const x = [];\n  const y = [];\n  arrayPush(x, b);\n  const result = useMemo(() => {\n    return [Math.max(x[1], a)];\n  }, [a, x]);\n  arrayPush(y, 3);\n  return {result, y};\n}\n\nexport const FIXTURE_ENTRYPOINT = {\n  fn: useFoo,\n  params: [1, 2],\n};\n"
 
-// mixedOptionalNonOptionalPropertyChain is `error.todo-preserve-memo-deps-mixed-optional-nonoptional-property-chain.js`.
+// mixedOptionalNonOptionalPropertyChain is
+// `error.todo-preserve-memo-deps-mixed-optional-nonoptional-property-chain.js`.
 //
 // A dependency chain written with mixed optional and non-optional links. Upstream
 // reports it at 7:26, on the memo callback.
 const mixedOptionalNonOptionalPropertyChain = "// @enablePreserveExistingMemoizationGuarantees @validatePreserveExistingMemoizationGuarantees @enableOptionalDependencies\n\nimport {useMemo} from 'react';\nimport {identity, ValidateMemoization} from 'shared-runtime';\n\nfunction Component({x}) {\n  const object = useMemo(() => {\n    return identity({\n      callback: () => {\n        // This is a bug in our dependency inference: we stop capturing dependencies\n        // after x.a.b?.c. But what this dependency is telling us is that if `x.a.b`\n        // was non-nullish, then we can access `.c.d?.e`. Thus we should take the\n        // full property chain, exactly as-is with optionals/non-optionals, as a\n        // dependency\n        return identity(x.a.b?.c.d?.e);\n      },\n    });\n  }, [x.a.b?.c.d?.e]);\n  const result = useMemo(() => {\n    return [object.callback()];\n  }, [object]);\n  return <Inner x={x} result={result} />;\n}\n\nfunction Inner({x, result}) {\n  'use no memo';\n  return <ValidateMemoization inputs={[x.y.z]} output={result} />;\n}\n\nexport const FIXTURE_ENTRYPOINT = {\n  fn: Component,\n  params: [{x: {y: {z: 42}}}],\n  sequentialRenders: [\n    {x: {y: {z: 42}}},\n    {x: {y: {z: 42}}},\n    {x: {y: {z: 3.14}}},\n    {x: {y: {z: 42}}},\n    {x: {y: {z: 3.14}}},\n    {x: {y: {z: 42}}},\n  ],\n};\n"
 
-// preserveManualMemoizationClean1 is `preserve-memo-validation/preserve-use-callback-stable-built-ins.ts`, which upstream compiles
-// without reporting this rule.
+// preserveManualMemoizationClean1 is `preserve-memo-validation/preserve-use-callback-stable-built-ins.ts`, which
+// upstream compiles without reporting this rule.
 const preserveManualMemoizationClean1 = `// @validatePreserveExistingMemoizationGuarantees
 import {
   useCallback,
@@ -136,8 +139,8 @@ export const FIXTURE_ENTRYPOINT = {
 };
 `
 
-// preserveManualMemoizationClean2 is `preserve-memo-validation/preserve-use-memo-ref-missing-ok.ts`, which upstream compiles
-// without reporting this rule.
+// preserveManualMemoizationClean2 is `preserve-memo-validation/preserve-use-memo-ref-missing-ok.ts`, which upstream
+// compiles without reporting this rule.
 const preserveManualMemoizationClean2 = `// @validatePreserveExistingMemoizationGuarantees
 import {useCallback, useRef} from 'react';
 
@@ -157,8 +160,8 @@ export const FIXTURE_ENTRYPOINT = {
 };
 `
 
-// preserveManualMemoizationClean3 is `preserve-memo-validation/preserve-use-memo-transition.ts`, which upstream compiles
-// without reporting this rule.
+// preserveManualMemoizationClean3 is `preserve-memo-validation/preserve-use-memo-transition.ts`, which upstream
+// compiles without reporting this rule.
 const preserveManualMemoizationClean3 = `// @validatePreserveExistingMemoizationGuarantees
 import {useCallback, useTransition} from 'react';
 
@@ -197,8 +200,8 @@ export const FIXTURE_ENTRYPOINT = {
 };
 `
 
-// preserveManualMemoizationClean5 is `preserve-memo-validation/maybe-invalid-useMemo-no-memoblock-sideeffect.ts`, which upstream compiles
-// without reporting this rule.
+// preserveManualMemoizationClean5 is `preserve-memo-validation/maybe-invalid-useMemo-no-memoblock-sideeffect.ts`, which
+// upstream compiles without reporting this rule.
 const preserveManualMemoizationClean5 = `// @validatePreserveExistingMemoizationGuarantees
 
 import {useMemo} from 'react';
@@ -360,20 +363,23 @@ export const FIXTURE_ENTRYPOINT = {
 // preserveManualMemoizationFixtureSources maps each fixture to the corpus file it was copied
 // from, so the copies can be diffed against the originals.
 var preserveManualMemoizationFixtureSources = map[string]string{
-	"new-mutability/error.invalid-useCallback-captures-reassigned-context.js":      reassignedContextCapture,
-	"error.hoist-optional-member-expression-with-conditional-optional.js":          hoistOptionalMemberWithConditionalOptional,
-	"error.invalid-optional-member-expression-as-memo-dep-non-optional-in-body.js": optionalMemberDependencyNonOptionalInBody,
-	"preserve-memo-validation/error.false-positive-useMemo-overlap-scopes.ts":      useMemoOverlappingScopes,
-	"error.todo-preserve-memo-deps-mixed-optional-nonoptional-property-chain.js":   mixedOptionalNonOptionalPropertyChain,
-	"preserve-memo-validation/preserve-use-callback-stable-built-ins.ts":           preserveManualMemoizationClean1,
-	"preserve-memo-validation/preserve-use-memo-ref-missing-ok.ts":                 preserveManualMemoizationClean2,
-	"preserve-memo-validation/preserve-use-memo-transition.ts":                     preserveManualMemoizationClean3,
-	"preserve-memo-validation/prune-nonescaping-useMemo.ts":                        preserveManualMemoizationClean4,
-	"preserve-memo-validation/maybe-invalid-useMemo-no-memoblock-sideeffect.ts":    preserveManualMemoizationClean5,
-	"optional-member-expression-as-memo-dep.js":                                    preserveManualMemoizationClean6,
-	"preserve-memo-deps-conditional-property-chain.js":                             preserveManualMemoizationClean7,
-	"preserve-memo-deps-optional-property-chain.js":                                preserveManualMemoizationClean8,
-	"memoize-primitive-function-calls.js":                                          preserveManualMemoizationClean9,
+	"new-mutability/error.invalid-useCallback-captures-reassigned-context.js": reassignedContextCapture,
+	"error.hoist-optional-member-expression-" +
+		"with-conditional-optional.js": hoistOptionalMemberWithConditionalOptional,
+	"error.invalid-optional-member-expression-as-memo-dep-" +
+		"non-optional-in-body.js": optionalMemberDependencyNonOptionalInBody,
+	"preserve-memo-validation/error.false-positive-useMemo-overlap-scopes.ts": useMemoOverlappingScopes,
+	"error.todo-preserve-memo-deps-" +
+		"mixed-optional-nonoptional-property-chain.js": mixedOptionalNonOptionalPropertyChain,
+	"preserve-memo-validation/preserve-use-callback-stable-built-ins.ts":        preserveManualMemoizationClean1,
+	"preserve-memo-validation/preserve-use-memo-ref-missing-ok.ts":              preserveManualMemoizationClean2,
+	"preserve-memo-validation/preserve-use-memo-transition.ts":                  preserveManualMemoizationClean3,
+	"preserve-memo-validation/prune-nonescaping-useMemo.ts":                     preserveManualMemoizationClean4,
+	"preserve-memo-validation/maybe-invalid-useMemo-no-memoblock-sideeffect.ts": preserveManualMemoizationClean5,
+	"optional-member-expression-as-memo-dep.js":                                 preserveManualMemoizationClean6,
+	"preserve-memo-deps-conditional-property-chain.js":                          preserveManualMemoizationClean7,
+	"preserve-memo-deps-optional-property-chain.js":                             preserveManualMemoizationClean8,
+	"memoize-primitive-function-calls.js":                                       preserveManualMemoizationClean9,
 }
 
 // preserveManualMemoizationReactDeclarations is a minimal `react` module for the fixtures.
@@ -402,16 +408,16 @@ const preserveManualMemoizationReactDeclarations = `declare module 'react' {
 }`
 
 // runPreserveManualMemoization runs the rule over one fixture with the `react` module in scope.
-func runPreserveManualMemoization(t *testing.T, name string, source string) rule_testing.Result {
-	t.Helper()
-	return rule_testing.RunTypedFiles(t, PreserveManualMemoization, map[string]string{
+func runPreserveManualMemoization(test *testing.T, name string, source string) rule_testing.Result {
+	test.Helper()
+	return rule_testing.RunTypedFiles(test, PreserveManualMemoization, map[string]string{
 		"/react.d.ts": preserveManualMemoizationReactDeclarations,
 		"/" + name:    source,
 	}, "/"+name)
 }
 
-func TestPreserveManualMemoizationReportsMissingSeedDependency(t *testing.T) {
-	t.Parallel()
+func TestPreserveManualMemoizationReportsMissingSeedDependency(test *testing.T) {
+	test.Parallel()
 	const source = `import React from 'react'; import {useField} from './field';
 function Component() {
 const field=useField();
@@ -426,11 +432,11 @@ return <div>{value}</div>;
 		{"missing", source, 1},
 		{"correct", strings.Replace(source, "},[]);", "},[field.value]);", 1), 0},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runPreserveManualMemoization(t, testCase.name+".tsx", testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runPreserveManualMemoization(test, testCase.name+".tsx", testCase.source)
 			if len(result.Diagnostics) != testCase.findings {
-				t.Fatalf("findings=%v, want %d", result.Diagnostics, testCase.findings)
+				test.Fatalf("findings=%v, want %d", result.Diagnostics, testCase.findings)
 			}
 		})
 	}
@@ -444,15 +450,15 @@ return <div>{value}</div>;
 // pipeline, is recognised, and reports the same missing seed dependency as the plain spelling. None
 // of them contains the plain name anywhere. Dropping the file-level backslash clause, the syntax-tree
 // fallback, or the identifier or string-literal kind from that fallback each fails a case here.
-func TestPreserveManualMemoizationGateSeesEscapedNames(t *testing.T) {
-	t.Parallel()
+func TestPreserveManualMemoizationGateSeesEscapedNames(test *testing.T) {
+	test.Parallel()
 	const body = `function Component() {
 const field=useField();
 const seeded=%s(()=>field.value ? {value:field.value.value} : {value:undefined},[]);
 const [value]=React.useState(seeded.value);
 return <div>{value}</div>;
 }`
-	const imports = `import React from 'react'; import {useField} from './field';` + "\n"
+	const imports = "import React from 'react'; import {useField} from './field';\n"
 	for _, testCase := range []struct {
 		name, source string
 	}{
@@ -460,13 +466,13 @@ return <div>{value}</div>;
 		{"identifierEscape", strings.Replace(imports, "import React ", "import React, {use\x5cu004Demo} ", 1) +
 			fmt.Sprintf(body, "use\x5cu004Demo")},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			if strings.Contains(testCase.source, "useMemo") {
-				t.Fatalf("fixture spells the name plainly, so it cannot exercise the escape path")
+				test.Fatalf("fixture spells the name plainly, so it cannot exercise the escape path")
 			}
-			result := runPreserveManualMemoization(t, testCase.name+".tsx", testCase.source)
-			rule_testing.ExpectFindings(t, result, "preserveManualMemoizationValueUnmemoized")
+			result := runPreserveManualMemoization(test, testCase.name+".tsx", testCase.source)
+			rule_testing.ExpectFindings(test, result, "preserveManualMemoizationValueUnmemoized")
 		})
 	}
 }
@@ -477,40 +483,43 @@ return <div>{value}</div>;
 // reading, because the tool that writes a fixture can change it and the result still compiles and
 // still goes green. Three porters have lost a case to a cooked escape. This is that check, and it
 // covers the two interpreted literals as well, which are the ones most exposed to it.
-func TestFixturesMatchTheVendoredCorpus(t *testing.T) {
-	t.Parallel()
+func TestFixturesMatchTheVendoredCorpus(test *testing.T) {
+	test.Parallel()
 
 	const corpus = "conformance/testdata/fixtures"
 	copies := map[string]string{
-		"new-mutability/error.invalid-useCallback-captures-reassigned-context.js":      reassignedContextCapture,
-		"error.hoist-optional-member-expression-with-conditional-optional.js":          hoistOptionalMemberWithConditionalOptional,
-		"error.invalid-optional-member-expression-as-memo-dep-non-optional-in-body.js": optionalMemberDependencyNonOptionalInBody,
-		"preserve-memo-validation/error.false-positive-useMemo-overlap-scopes.ts":      useMemoOverlappingScopes,
-		"error.todo-preserve-memo-deps-mixed-optional-nonoptional-property-chain.js":   mixedOptionalNonOptionalPropertyChain,
-		"preserve-memo-validation/preserve-use-callback-stable-built-ins.ts":           preserveManualMemoizationClean1,
-		"preserve-memo-validation/preserve-use-memo-ref-missing-ok.ts":                 preserveManualMemoizationClean2,
-		"preserve-memo-validation/preserve-use-memo-transition.ts":                     preserveManualMemoizationClean3,
-		"preserve-memo-validation/prune-nonescaping-useMemo.ts":                        preserveManualMemoizationClean4,
-		"preserve-memo-validation/maybe-invalid-useMemo-no-memoblock-sideeffect.ts":    preserveManualMemoizationClean5,
-		"optional-member-expression-as-memo-dep.js":                                    preserveManualMemoizationClean6,
-		"preserve-memo-deps-conditional-property-chain.js":                             preserveManualMemoizationClean7,
-		"preserve-memo-deps-optional-property-chain.js":                                preserveManualMemoizationClean8,
-		"memoize-primitive-function-calls.js":                                          preserveManualMemoizationClean9,
+		"new-mutability/error.invalid-useCallback-captures-reassigned-context.js": reassignedContextCapture,
+		"error.hoist-optional-member-expression-" +
+			"with-conditional-optional.js": hoistOptionalMemberWithConditionalOptional,
+		"error.invalid-optional-member-expression-as-memo-dep-" +
+			"non-optional-in-body.js": optionalMemberDependencyNonOptionalInBody,
+		"preserve-memo-validation/error.false-positive-useMemo-overlap-scopes.ts": useMemoOverlappingScopes,
+		"error.todo-preserve-memo-deps-" +
+			"mixed-optional-nonoptional-property-chain.js": mixedOptionalNonOptionalPropertyChain,
+		"preserve-memo-validation/preserve-use-callback-stable-built-ins.ts":        preserveManualMemoizationClean1,
+		"preserve-memo-validation/preserve-use-memo-ref-missing-ok.ts":              preserveManualMemoizationClean2,
+		"preserve-memo-validation/preserve-use-memo-transition.ts":                  preserveManualMemoizationClean3,
+		"preserve-memo-validation/prune-nonescaping-useMemo.ts":                     preserveManualMemoizationClean4,
+		"preserve-memo-validation/maybe-invalid-useMemo-no-memoblock-sideeffect.ts": preserveManualMemoizationClean5,
+		"optional-member-expression-as-memo-dep.js":                                 preserveManualMemoizationClean6,
+		"preserve-memo-deps-conditional-property-chain.js":                          preserveManualMemoizationClean7,
+		"preserve-memo-deps-optional-property-chain.js":                             preserveManualMemoizationClean8,
+		"memoize-primitive-function-calls.js":                                       preserveManualMemoizationClean9,
 	}
 	if len(copies) != len(preserveManualMemoizationFixtureSources) {
-		t.Fatalf("the byte check covers %d fixtures and %d are declared; a fixture added above and "+
+		test.Fatalf("the byte check covers %d fixtures and %d are declared; a fixture added above and "+
 			"not added here is unchecked, which is the state this test exists to prevent",
 			len(copies), len(preserveManualMemoizationFixtureSources))
 	}
 	checked := 0
 	for relative, copied := range copies {
-		original, err := os.ReadFile(filepath.Join(corpus, relative))
-		if err != nil {
-			t.Errorf("reading %s: %v", relative, err)
+		original, readError := os.ReadFile(filepath.Join(corpus, relative))
+		if readError != nil {
+			test.Errorf("reading %s: %v", relative, readError)
 			continue
 		}
 		if string(original) != copied {
-			t.Errorf("fixture %s does not match the corpus file byte for byte; the copy was "+
+			test.Errorf("fixture %s does not match the corpus file byte for byte; the copy was "+
 				"changed on the way in, which is how a fixture ends up asserting the opposite of "+
 				"what upstream asserts", relative)
 			continue
@@ -519,7 +528,7 @@ func TestFixturesMatchTheVendoredCorpus(t *testing.T) {
 	}
 	// Without this the loop passes vacuously if `copies` is ever emptied.
 	if checked != len(copies) {
-		t.Errorf("verified %d of %d fixtures", checked, len(copies))
+		test.Errorf("verified %d of %d fixtures", checked, len(copies))
 	}
 }
 
@@ -528,34 +537,34 @@ func TestFixturesMatchTheVendoredCorpus(t *testing.T) {
 // The finding counts are upstream's own, measured by running its rule rather than by reading the
 // golden files: the corpus goldens are produced by the babel plugin under fixture pragmas, and the
 // ESLint surface this gate replaces does not read those pragmas, so the two populations differ.
-func TestPreserveManualMemoizationFires(t *testing.T) {
-	t.Parallel()
+func TestPreserveManualMemoizationFires(test *testing.T) {
+	test.Parallel()
 
 	// Both conditions in one program, which is what makes this the load-bearing case: upstream
 	// reports the value condition on the callback and the dependency condition on the identifier
 	// inside the array, at 11:26 and 11:38.
-	result := runPreserveManualMemoization(t, "reassigned.tsx", reassignedContextCapture)
-	rule_testing.ExpectFindings(t, result,
+	result := runPreserveManualMemoization(test, "reassigned.tsx", reassignedContextCapture)
+	rule_testing.ExpectFindings(test, result,
 		"preserveManualMemoizationDependencyMutable",
 		"preserveManualMemoizationValueUnmemoized")
 
-	result = runPreserveManualMemoization(t, "hoistOptional.tsx",
+	result = runPreserveManualMemoization(test, "hoistOptional.tsx",
 		hoistOptionalMemberWithConditionalOptional)
-	rule_testing.ExpectFindings(t, result, "preserveManualMemoizationValueUnmemoized")
+	rule_testing.ExpectFindings(test, result, "preserveManualMemoizationValueUnmemoized")
 
-	result = runPreserveManualMemoization(t, "optionalMember.tsx",
+	result = runPreserveManualMemoization(test, "optionalMember.tsx",
 		optionalMemberDependencyNonOptionalInBody)
-	rule_testing.ExpectFindings(t, result, "preserveManualMemoizationValueUnmemoized")
+	rule_testing.ExpectFindings(test, result, "preserveManualMemoizationValueUnmemoized")
 
 	// The dependency condition, alone. Upstream's golden for this fixture reads "This dependency
 	// may be mutated later" at 23:9, so the other id would be the wrong verdict here rather than a
 	// stricter one. The expectation first written for this case asserted the value condition and
 	// was wrong; the golden settled it.
-	result = runPreserveManualMemoization(t, "overlapScopes.tsx", useMemoOverlappingScopes)
-	rule_testing.ExpectFindings(t, result, "preserveManualMemoizationDependencyMutable")
+	result = runPreserveManualMemoization(test, "overlapScopes.tsx", useMemoOverlappingScopes)
+	rule_testing.ExpectFindings(test, result, "preserveManualMemoizationDependencyMutable")
 
-	result = runPreserveManualMemoization(t, "mixedChain.tsx", mixedOptionalNonOptionalPropertyChain)
-	rule_testing.ExpectFindings(t, result, "preserveManualMemoizationValueUnmemoized")
+	result = runPreserveManualMemoization(test, "mixedChain.tsx", mixedOptionalNonOptionalPropertyChain)
+	rule_testing.ExpectFindings(test, result, "preserveManualMemoizationValueUnmemoized")
 }
 
 // TestPreserveManualMemoizationStaysSilent covers programs that use manual memoization and that
@@ -564,8 +573,8 @@ func TestPreserveManualMemoizationFires(t *testing.T) {
 // This is the population a false positive lands in, and it is the reason the substrate's own score
 // test held this rule's registration: a gate that reports a lost memoization on a program upstream
 // compiles clean gets switched off. That rate is now zero over all 69 clean corpus fixtures.
-func TestPreserveManualMemoizationStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestPreserveManualMemoizationStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	for name, source := range map[string]string{
 		"stableBuiltIns":        preserveManualMemoizationClean1,
@@ -578,10 +587,10 @@ func TestPreserveManualMemoizationStaysSilent(t *testing.T) {
 		"optionalChain":         preserveManualMemoizationClean8,
 		"primitiveCalls":        preserveManualMemoizationClean9,
 	} {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			result := runPreserveManualMemoization(t, name+".tsx", source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+			result := runPreserveManualMemoization(test, name+".tsx", source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -592,12 +601,12 @@ func TestPreserveManualMemoizationStaysSilent(t *testing.T) {
 // that anchor on different nodes, so an id assertion cannot tell a correct port from one that
 // reports both on the same place. The spans below were read out of upstream's own output on the same
 // fixture: 11:26 for the callback and 11:38 for the dependency, one-based.
-func TestPreserveManualMemoizationSpans(t *testing.T) {
-	t.Parallel()
+func TestPreserveManualMemoizationSpans(test *testing.T) {
+	test.Parallel()
 
-	result := runPreserveManualMemoization(t, "reassigned.tsx", reassignedContextCapture)
+	result := runPreserveManualMemoization(test, "reassigned.tsx", reassignedContextCapture)
 	if len(result.Diagnostics) != 2 {
-		t.Fatalf("findings = %d, want 2; the span assertions below have nothing to read", len(result.Diagnostics))
+		test.Fatalf("findings = %d, want 2; the span assertions below have nothing to read", len(result.Diagnostics))
 	}
 	// `RunTyped` trims the fixture before writing it, so the file on disk is offset from the Go
 	// literal. Slicing the source the harness actually wrote is the only reliable read; see the
@@ -607,16 +616,16 @@ func TestPreserveManualMemoizationSpans(t *testing.T) {
 	for _, diagnostic := range result.Diagnostics {
 		start, end := diagnostic.Range.Pos(), diagnostic.Range.End()
 		if start < 0 || end > len(source) || start >= end {
-			t.Fatalf("finding range %d:%d does not lie inside the source", start, end)
+			test.Fatalf("finding range %d:%d does not lie inside the source", start, end)
 		}
 		spans[diagnostic.Message.Id] = source[start:end]
 	}
 	if got, want := spans["preserveManualMemoizationValueUnmemoized"], "() => [x]"; got != want {
-		t.Errorf("value condition points at %q, want %q; upstream anchors this one on the memo "+
+		test.Errorf("value condition points at %q, want %q; upstream anchors this one on the memo "+
 			"callback, at 11:26 on this fixture", got, want)
 	}
 	if got, want := spans["preserveManualMemoizationDependencyMutable"], "x"; got != want {
-		t.Errorf("dependency condition points at %q, want %q; upstream anchors this one on the "+
+		test.Errorf("dependency condition points at %q, want %q; upstream anchors this one on the "+
 			"written dependency, at 11:38 on this fixture", got, want)
 	}
 }
@@ -628,22 +637,22 @@ func TestPreserveManualMemoizationSpans(t *testing.T) {
 // nothing, so every finding disappears while the suite stays green.
 //
 // The silence check below is weaker than it looks, and saying so is the honest version. Handed a
-// nil checker the pipeline does NOT panic -- measured: `Lower` returns a function, the analysis
+// nil checker the pipeline does not panic -- measured: `Lower` returns a function, the analysis
 // runs, and it reports zero -- so this assertion passes with the guard in `Run` and passes without
 // it, and a mutation removing that guard survives. The guard is a cost decline rather than a
 // correctness one; the reasoning is recorded at the guard itself.
-func TestPreserveManualMemoizationRequiresTheTypeChecker(t *testing.T) {
-	t.Parallel()
+func TestPreserveManualMemoizationRequiresTheTypeChecker(test *testing.T) {
+	test.Parallel()
 
 	if !PreserveManualMemoization.NeedsTypeChecker {
-		t.Fatal("the rule stopped declaring NeedsTypeChecker; lowering resolves every binding " +
+		test.Fatal("the rule stopped declaring NeedsTypeChecker; lowering resolves every binding " +
 			"through the checker and the untyped harness hands it nil")
 	}
 	// The untyped harness supplies no checker. This asserts the rule stays silent rather than
 	// panicking, which is true both with and without the guard; see the note above.
-	result := rule_testing.Run(t, PreserveManualMemoization, "untyped.tsx", reassignedContextCapture)
+	result := rule_testing.Run(test, PreserveManualMemoization, "untyped.tsx", reassignedContextCapture)
 	if len(result.Diagnostics) != 0 {
-		t.Errorf("findings under the untyped harness = %d, want 0; the rule read a nil checker "+
+		test.Errorf("findings under the untyped harness = %d, want 0; the rule read a nil checker "+
 			"rather than declining", len(result.Diagnostics))
 	}
 }
@@ -653,24 +662,24 @@ func TestPreserveManualMemoizationRequiresTheTypeChecker(t *testing.T) {
 // Neither message interpolates, so there is nothing to render wrong, but the ids and descriptions
 // are what a reader acts on and an id assertion cannot see a description that was edited into
 // saying something false.
-func TestPreserveManualMemoizationMessages(t *testing.T) {
-	t.Parallel()
+func TestPreserveManualMemoizationMessages(test *testing.T) {
+	test.Parallel()
 
 	if got, want := messagePreserveManualMemoizationValueUnmemoized.Id,
 		"preserveManualMemoizationValueUnmemoized"; got != want {
-		t.Errorf("value message id = %q, want %q", got, want)
+		test.Errorf("value message id = %q, want %q", got, want)
 	}
 	if got, want := messagePreserveManualMemoizationDependencyMutable.Id,
 		"preserveManualMemoizationDependencyMutable"; got != want {
-		t.Errorf("dependency message id = %q, want %q", got, want)
+		test.Errorf("dependency message id = %q, want %q", got, want)
 	}
 	if !strings.Contains(messagePreserveManualMemoizationValueUnmemoized.Description,
 		"memoized in source but not in the compiled output") {
-		t.Error("the value message stopped saying what the condition is")
+		test.Error("the value message stopped saying what the condition is")
 	}
 	if !strings.Contains(messagePreserveManualMemoizationDependencyMutable.Description,
 		"may be modified after the memo block") {
-		t.Error("the dependency message stopped saying what the condition is")
+		test.Error("the dependency message stopped saying what the condition is")
 	}
 }
 
@@ -682,8 +691,8 @@ func TestPreserveManualMemoizationMessages(t *testing.T) {
 // none of them carries a nil identifier or a nil node, so no input reaches the branch. What the
 // guard prevents is a panic, and a panic is invisible to `ExpectFindings`. This asserts the
 // mechanism directly instead, so a later reader deleting the guard as dead code fails here.
-func TestPreserveManualMemoizationNilNodeGuardIsCrashProtection(t *testing.T) {
-	t.Parallel()
+func TestPreserveManualMemoizationNilNodeGuardIsCrashProtection(test *testing.T) {
+	test.Parallel()
 
 	panicked := false
 	func() {
@@ -695,7 +704,7 @@ func TestPreserveManualMemoizationNilNodeGuardIsCrashProtection(t *testing.T) {
 		_ = rule.TokenRange(nil, nil)
 	}()
 	if !panicked {
-		t.Error("rule.TokenRange survived a nil node, so the nil-node guard in this rule is not " +
+		test.Error("rule.TokenRange survived a nil node, so the nil-node guard in this rule is not " +
 			"crash protection and the reasoning recorded beside it needs remaking")
 	}
 }
@@ -711,10 +720,10 @@ func TestPreserveManualMemoizationNilNodeGuardIsCrashProtection(t *testing.T) {
 //
 // Written as an assertion rather than a comment for two reasons. It fails if the substrate ever
 // carries a range on the finding, which is the fix, and whoever sees it then gets told what the old
-// behaviour was instead of having to reconstruct it. And it fails if the COUNT ever drifts, which
+// behaviour was instead of having to reconstruct it. And it fails if the count ever drifts, which
 // would be a real defect hiding behind a divergence that is currently only cosmetic.
-func TestPreserveManualMemoizationCollapsesAnchorsAcrossMemoBlocks(t *testing.T) {
-	t.Parallel()
+func TestPreserveManualMemoizationCollapsesAnchorsAcrossMemoBlocks(test *testing.T) {
+	test.Parallel()
 
 	const source = `import {useCallback} from 'react';
 import {makeArray} from 'shared-runtime';
@@ -727,9 +736,9 @@ function Foo(props) {
   return [a, b];
 }
 `
-	result := runPreserveManualMemoization(t, "twoBlocks.tsx", source)
+	result := runPreserveManualMemoization(test, "twoBlocks.tsx", source)
 	if len(result.Diagnostics) != 4 {
-		t.Fatalf("findings = %d, want 4; upstream reports four on this source and a different "+
+		test.Fatalf("findings = %d, want 4; upstream reports four on this source and a different "+
 			"number here is a verdict difference rather than the anchor difference being pinned",
 			len(result.Diagnostics))
 	}
@@ -739,11 +748,11 @@ function Foo(props) {
 	}
 	// Three, not four, and the shape of the collapse is the informative part rather than the
 	// number. The two callbacks are distinct syntax, so they keep distinct anchors; the shared
-	// DEPENDENCY is one declaration named by both blocks, so its two findings land on one anchor.
+	// dependency is one declaration named by both blocks, so its two findings land on one anchor.
 	// The first expectation written here said two and was wrong, which is why this asserts the
 	// distribution rather than only the count.
 	if len(anchors) != 3 {
-		t.Errorf("distinct anchors = %d, want 3; upstream produces 4. If this is now 4, the "+
+		test.Errorf("distinct anchors = %d, want 3; upstream produces 4. If this is now 4, the "+
 			"substrate started carrying a per-use range on the finding and the divergence "+
 			"recorded in the rule's doc comment is closed", len(anchors))
 	}
@@ -754,11 +763,11 @@ function Foo(props) {
 		case 2:
 			doubled++
 		default:
-			t.Errorf("anchor %s carries %d findings, want 1 or 2", anchor, count)
+			test.Errorf("anchor %s carries %d findings, want 1 or 2", anchor, count)
 		}
 	}
 	if doubled != 1 {
-		t.Errorf("anchors carrying two findings = %d, want 1; the collapse is specifically the "+
+		test.Errorf("anchors carrying two findings = %d, want 1; the collapse is specifically the "+
 			"shared dependency named by both memo blocks", doubled)
 	}
 }
@@ -808,8 +817,8 @@ function Foo(props) {
  * each one variable away from a firing case: same loop without the mutation, same mutation without
  * the loop, same collection built without either.
  */
-func TestPreserveManualMemoizationLoopBuiltCollections(t *testing.T) {
-	t.Parallel()
+func TestPreserveManualMemoizationLoopBuiltCollections(test *testing.T) {
+	test.Parallel()
 
 	const preamble = "import {useMemo} from 'react';\n"
 
@@ -880,19 +889,19 @@ function Component(props) {
 }
 `},
 	} {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			result := runPreserveManualMemoization(t, name+".tsx", testCase.source)
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+			result := runPreserveManualMemoization(test, name+".tsx", testCase.source)
 			if testCase.fires {
 				if len(result.Diagnostics) == 0 {
-					t.Errorf("%s: no findings, want at least one; if this now passes the rule "+
+					test.Errorf("%s: no findings, want at least one; if this now passes the rule "+
 						"stopped reporting a case it used to, which is the removal this table "+
 						"exists to catch", name)
 				}
 				return
 			}
 			if len(result.Diagnostics) != 0 {
-				t.Errorf("%s: %d findings, want none; a memo that mutates only what it created "+
+				test.Errorf("%s: %d findings, want none; a memo that mutates only what it created "+
 					"has nothing for the compiler to fail to preserve", name, len(result.Diagnostics))
 			}
 		})
@@ -910,8 +919,8 @@ function Component(props) {
 // Query's useMutation.ts and useMutationState.ts, cut down (#zx5xvtg), the fourth the same shape
 // through a hook that is not React's. Every verdict was read from React Compiler as bundled in
 // eslint-plugin-react-hooks 7.1.1, which compiles the first four clean and reports the last twice.
-func TestPreserveManualMemoizationAroundAHookCall(t *testing.T) {
-	t.Parallel()
+func TestPreserveManualMemoizationAroundAHookCall(test *testing.T) {
+	test.Parallel()
 
 	for _, row := range []struct {
 		name     string
@@ -1028,16 +1037,16 @@ export function useReassigned(properties: { value: number }) {
 `,
 		},
 	} {
-		t.Run(row.name, func(t *testing.T) {
-			t.Parallel()
-			result := runPreserveManualMemoization(t, "hook.tsx", row.source)
+		test.Run(row.name, func(test *testing.T) {
+			test.Parallel()
+			result := runPreserveManualMemoization(test, "hook.tsx", row.source)
 			if row.reported {
 				if len(result.Diagnostics) == 0 {
-					t.Error("upstream reports this program and the rule is silent")
+					test.Error("upstream reports this program and the rule is silent")
 				}
 				return
 			}
-			rule_testing.ExpectClean(t, result)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -1049,8 +1058,8 @@ export function useReassigned(properties: { value: number }) {
 // 1.0.0 at its defaults and from react-hooks 7.1.1's preserve-manual-memoization. With the double
 // mapping put back, the first two rows report; TestCopyNestedBodyMapsEveryPlaceOnce pins the mapping.
 // The last row is one upstream reports, so the fix is shown not to quiet a real finding.
-func TestPreserveManualMemoizationWhereTheInlinedIdsCanOverlap(t *testing.T) {
-	t.Parallel()
+func TestPreserveManualMemoizationWhereTheInlinedIdsCanOverlap(test *testing.T) {
+	test.Parallel()
 
 	for _, row := range []struct {
 		name     string
@@ -1211,16 +1220,16 @@ export function ZzReassignedComponent(properties: P) { const onPick = useReassig
 `,
 		},
 	} {
-		t.Run(row.name, func(t *testing.T) {
-			t.Parallel()
-			result := runPreserveManualMemoization(t, "overlap.tsx", row.source)
+		test.Run(row.name, func(test *testing.T) {
+			test.Parallel()
+			result := runPreserveManualMemoization(test, "overlap.tsx", row.source)
 			if row.reported {
 				if len(result.Diagnostics) == 0 {
-					t.Error("upstream reports this program and the rule is silent")
+					test.Error("upstream reports this program and the rule is silent")
 				}
 				return
 			}
-			rule_testing.ExpectClean(t, result)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }

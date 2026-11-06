@@ -104,18 +104,12 @@ type FormatEntry struct {
 	ModifiedNanoseconds int64
 }
 
-// CacheTableIdentity is what built the binary that writes or reads a table. It goes in the header, so a
-// table written by any other build is discarded before a byte of its body is trusted.
-type CacheTableIdentity struct {
-	SelfCommit     string
-	CompilerCommit string
-	GoToolchain    string
-	Platform       string
-}
-
 // cacheTableVersion is the format, and it moves whenever the encoded shape or its meaning does. The shape
 // half is enforced by TestCacheTableShapeIsPinnedToItsVersion; the meaning half is the reason each
 // section also keeps its own version.
+//
+// 16: a stored type diagnostic names its offset Start and its arguments MessageArguments, as findings entries
+// spell them.
 //
 // 15: findings entries carry whether their file has directives, and the findings those directives withheld.
 //
@@ -148,7 +142,7 @@ type CacheTableIdentity struct {
 // design system's key.
 //
 // 2: findings entries carry shape-keyed rules and their fingerprint, and the table holds Signatures.
-const cacheTableVersion = 15
+const cacheTableVersion = 16
 
 // cacheTableMagic opens every file of the table, so a file that is not one is refused on its first field.
 const cacheTableMagic = "cohere cache table"
@@ -213,7 +207,13 @@ type CacheTableSections struct {
 }
 
 // EveryCacheTableSection is the whole table.
-var EveryCacheTableSection = CacheTableSections{AllRuns: true, Findings: true, Signatures: true, Formatted: true, Types: true}
+var EveryCacheTableSection = CacheTableSections{
+	AllRuns:    true,
+	Findings:   true,
+	Signatures: true,
+	Formatted:  true,
+	Types:      true,
+}
 
 // cacheTableRunFile is the file a recorded run lives in: a hash of its invocation, since an invocation is
 // arguments joined by NUL and no file name can hold it.
@@ -225,19 +225,6 @@ func cacheTableRunFile(invocation string) string {
 // cacheTableFile is the file a section other than a run lives in.
 func cacheTableFile(section string) string {
 	return section + ".gob"
-}
-
-// lintCacheWire is the findings section as encoded. Rule lists are stored once and referenced by index:
-// on ahra 3,605 entries share 4 distinct rule lists and 24 listening lists, and writing each out in full
-// once made the file 53 MB.
-type lintCacheWire struct {
-	Version  int
-	Key      [sha256.Size]byte
-	KeyParts RunCacheKeyParts
-	Lists    [][]string
-	Entries  []lintCacheWireEntry
-
-	DesignSystem *DesignSystemKey
 }
 
 type lintCacheWireEntry struct {
@@ -319,34 +306,36 @@ func CacheTableInvocation(arguments []string) string {
 	return strings.Join(arguments, "\x00")
 }
 
-// encodeCacheTableFile encodes one file of the table: its header, then the section's body.
-func encodeCacheTableFile(section string, body any, identity CacheTableIdentity) ([]byte, error) {
+// encodeCacheTableFile encodes one file of the table: its header, then the section's body, of the section's type.
+func encodeCacheTableFile[Body any](section string, body Body, identity CacheTableIdentity) ([]byte, error) {
 	var buffer bytes.Buffer
 	encoder := gob.NewEncoder(&buffer)
-	if err := encoder.Encode(cacheTableHeader{Magic: cacheTableMagic, Version: cacheTableVersion, Identity: identity, Section: section}); err != nil {
-		return nil, fmt.Errorf("encoding the %s file's header: %w", section, err)
+	if encodeError := encoder.Encode(
+		cacheTableHeader{Magic: cacheTableMagic, Version: cacheTableVersion, Identity: identity, Section: section},
+	); encodeError != nil {
+		return nil, fmt.Errorf("encoding the %s file's header: %w", section, encodeError)
 	}
-	if err := encoder.Encode(body); err != nil {
-		return nil, fmt.Errorf("encoding the %s file: %w", section, err)
+	if encodeError := encoder.Encode(body); encodeError != nil {
+		return nil, fmt.Errorf("encoding the %s file: %w", section, encodeError)
 	}
 	return buffer.Bytes(), nil
 }
 
-// errWrittenByAnotherCommit is a file whose header differs from this build's only in the cohere commit, the
+// errorWrittenByAnotherCommit is a file whose header differs from this build's only in the cohere commit, the
 // one difference the format record survives.
-var errWrittenByAnotherCommit = errors.New("written by another cohere commit")
+var errorWrittenByAnotherCommit = errors.New("written by another cohere commit")
 
 // decodeCacheTableFile decodes one file of the table into body, a pointer to the section's type. Anything but
 // a file of this section, written by this build, with nothing after its body, is an error: a file from
 // another cohere commit that differs in nothing else wraps errWrittenByAnotherCommit, and body is still
 // filled, for the one section that may keep it.
-func decodeCacheTableFile(contents []byte, section string, identity CacheTableIdentity, body any) error {
+func decodeCacheTableFile[Body any](contents []byte, section string, identity CacheTableIdentity, body *Body) error {
 	reader := bytes.NewReader(contents)
 	decoder := gob.NewDecoder(reader)
 
 	var header cacheTableHeader
-	if err := decoder.Decode(&header); err != nil {
-		return fmt.Errorf("unreadable header: %v", err)
+	if decodeError := decoder.Decode(&header); decodeError != nil {
+		return fmt.Errorf("unreadable header: %w", decodeError)
 	}
 	if header.Magic != cacheTableMagic {
 		return errors.New("not a cache table file")
@@ -364,11 +353,16 @@ func decodeCacheTableFile(contents []byte, section string, identity CacheTableId
 		if other != identity {
 			return fmt.Errorf("written by %s, this is %s", header.Identity, identity)
 		}
-		otherCommit = fmt.Errorf("%w (%s, this is %s)", errWrittenByAnotherCommit, orUnknown(header.Identity.SelfCommit), orUnknown(identity.SelfCommit))
+		otherCommit = fmt.Errorf(
+			"%w (%s, this is %s)",
+			errorWrittenByAnotherCommit,
+			orUnknown(header.Identity.SelfCommit),
+			orUnknown(identity.SelfCommit),
+		)
 	}
 
-	if err := decoder.Decode(body); err != nil {
-		return fmt.Errorf("unreadable body: %v", err)
+	if decodeError := decoder.Decode(body); decodeError != nil {
+		return fmt.Errorf("unreadable body: %w", decodeError)
 	}
 	// gob stops at the end of the value it was asked for, so bytes after it would otherwise go unread. A
 	// file longer than its contents is a file something else wrote into.
@@ -378,135 +372,11 @@ func decodeCacheTableFile(contents []byte, section string, identity CacheTableId
 	return otherCommit
 }
 
-func (identity CacheTableIdentity) String() string {
-	return fmt.Sprintf("cohere %s, compiler %s, %s, %s",
-		orUnknown(identity.SelfCommit), orUnknown(identity.CompilerCommit), identity.GoToolchain, identity.Platform)
-}
-
 func orUnknown(value string) string {
 	if value == "" {
 		return "unknown"
 	}
 	return value
-}
-
-// wire interns the findings cache's rule lists. It is stamped with this build's lintCacheVersion: a cache in
-// memory always means what this build means.
-func (c *LintCache) wire() *lintCacheWire {
-	wire := &lintCacheWire{Version: lintCacheVersion, Key: c.Key, KeyParts: c.KeyParts, DesignSystem: c.DesignSystem}
-	// Interned by a cheap key, the length and the two ends, and confirmed by comparing names, never by joining
-	// a list into one string: ahra's entries hold about 18,000 lists of up to ~250 names, and joining each cost
-	// about 25ms of every recording run to find 31 distinct ones (#a66sfmh).
-	type listKey struct {
-		length      int
-		first, last string
-	}
-	positions := map[listKey][]int{}
-	intern := func(list []string) int {
-		key := listKey{length: len(list)}
-		if len(list) > 0 {
-			key.first, key.last = list[0], list[len(list)-1]
-		}
-		for _, position := range positions[key] {
-			if equalStrings(wire.Lists[position], list) {
-				return position
-			}
-		}
-		positions[key] = append(positions[key], len(wire.Lists))
-		wire.Lists = append(wire.Lists, append([]string{}, list...))
-		return len(wire.Lists) - 1
-	}
-	for _, entry := range c.Entries {
-		wire.Entries = append(wire.Entries, lintCacheWireEntry{
-			Path:            entry.Path,
-			ContentHash:     entry.ContentHash,
-			Rules:           intern(entry.Rules),
-			TypedRules:      intern(entry.TypedRules),
-			TypeFingerprint: entry.TypeFingerprint,
-			Listening:       intern(entry.Listening),
-			VisitedNodes:    entry.VisitedNodes,
-			Findings:        entry.Findings,
-
-			ShapedRules:      intern(entry.ShapedRules),
-			ShapeFingerprint: entry.ShapeFingerprint,
-
-			DesignRules:       intern(entry.DesignRules),
-			DesignFingerprint: entry.DesignFingerprint,
-
-			DerivedRules:       intern(entry.DerivedRules),
-			DerivedFingerprint: entry.DerivedFingerprint,
-
-			Notes: wireNotes(entry.Notes),
-
-			Directives: entry.Directives,
-			Withheld:   entry.Withheld,
-
-			Adamic: entry.Adamic,
-		})
-	}
-	return wire
-}
-
-// cache resolves the interned lists. An index past its table is an error rather than an empty list: an
-// index trusted past its table would hand an entry another file's rule list.
-//
-// A findings section of another version decodes to nil rather than failing the table. The runs beside it
-// are proven by their own keys, and a findings cache is only ever a miss when it is absent.
-func (wire *lintCacheWire) cache() (*LintCache, error) {
-	if wire.Version != lintCacheVersion {
-		return nil, nil
-	}
-	cache := &LintCache{Version: wire.Version, Key: wire.Key, KeyParts: wire.KeyParts, Entries: make([]LintCacheEntry, 0, len(wire.Entries)),
-		DesignSystem: wire.DesignSystem}
-	list := func(index int) ([]string, error) {
-		if index < 0 || index >= len(wire.Lists) {
-			return nil, fmt.Errorf("list %d of %d", index, len(wire.Lists))
-		}
-		return wire.Lists[index], nil
-	}
-	for position, stored := range wire.Entries {
-		entry := LintCacheEntry{
-			Path:            stored.Path,
-			ContentHash:     stored.ContentHash,
-			TypeFingerprint: stored.TypeFingerprint,
-			VisitedNodes:    stored.VisitedNodes,
-			Findings:        stored.Findings,
-
-			ShapeFingerprint: stored.ShapeFingerprint,
-
-			DesignFingerprint: stored.DesignFingerprint,
-
-			DerivedFingerprint: stored.DerivedFingerprint,
-
-			Notes: ruleNotes(stored.Notes),
-
-			Directives: stored.Directives,
-			Withheld:   stored.Withheld,
-
-			Adamic: stored.Adamic,
-		}
-		var err error
-		if entry.Rules, err = list(stored.Rules); err != nil {
-			return nil, fmt.Errorf("entry %d rules: %v", position, err)
-		}
-		if entry.TypedRules, err = list(stored.TypedRules); err != nil {
-			return nil, fmt.Errorf("entry %d typed rules: %v", position, err)
-		}
-		if entry.Listening, err = list(stored.Listening); err != nil {
-			return nil, fmt.Errorf("entry %d listening: %v", position, err)
-		}
-		if entry.ShapedRules, err = list(stored.ShapedRules); err != nil {
-			return nil, fmt.Errorf("entry %d shaped rules: %v", position, err)
-		}
-		if entry.DesignRules, err = list(stored.DesignRules); err != nil {
-			return nil, fmt.Errorf("entry %d design-system rules: %v", position, err)
-		}
-		if entry.DerivedRules, err = list(stored.DerivedRules); err != nil {
-			return nil, fmt.Errorf("entry %d derived rules: %v", position, err)
-		}
-		cache.Entries = append(cache.Entries, entry)
-	}
-	return cache, nil
 }
 
 // ReadCacheTable loads the named sections of the table in directory. It always returns a table: every
@@ -519,51 +389,72 @@ func (wire *lintCacheWire) cache() (*LintCache, error) {
 // appears.
 //
 // The single table.gob of earlier formats is removed here, unread.
-func ReadCacheTable(directory string, identity CacheTableIdentity, sections CacheTableSections, anchor PathAnchor) (*CacheTable, error) {
-	table, err := readCacheTable(directory, identity, sections)
+func ReadCacheTable(
+	directory string,
+	identity CacheTableIdentity,
+	sections CacheTableSections,
+	anchor PathAnchor,
+) (*CacheTable, error) {
+	table, readCacheTableError := readCacheTable(directory, identity, sections)
 	table.spell(anchor)
-	return table, err
+	return table, readCacheTableError
+}
+
+// cacheTableRead is what reading a table's files gathers as it goes: whether any file was there at all, each file
+// not kept with why, and whether every one not kept was only from another cohere commit.
+type cacheTableRead struct {
+	directory         string
+	identity          CacheTableIdentity
+	found             bool
+	dropped           []string
+	anotherCommit     string
+	onlyAnotherCommit bool
+}
+
+// readCacheTableSection decodes the table's file called name, of section, into body, a pointer to the section's
+// type, and is whether body was kept.
+//
+// Mutates: read records that the file was there, and why it was not kept when it is not
+func readCacheTableSection[Body any](read *cacheTableRead, name string, section string, body *Body) bool {
+	contents, readError := os.ReadFile(filepath.Join(read.directory, name))
+	if errors.Is(readError, os.ErrNotExist) {
+		return false
+	}
+	read.found = true
+	if readError == nil {
+		readError = decodeCacheTableFile(contents, section, read.identity, body)
+	}
+	switch {
+	case readError == nil:
+		return true
+	case errors.Is(readError, errorWrittenByAnotherCommit):
+		if section == cacheTableFormatSection {
+			return true
+		}
+		read.anotherCommit = strings.TrimPrefix(readError.Error(), errorWrittenByAnotherCommit.Error()+" ")
+		read.dropped = append(read.dropped, name)
+	default:
+		read.onlyAnotherCommit = false
+		read.dropped = append(read.dropped, fmt.Sprintf("%s (%v)", name, readError))
+	}
+	return false
 }
 
 func readCacheTable(directory string, identity CacheTableIdentity, sections CacheTableSections) (*CacheTable, error) {
+	// Ignored: the legacy file is gone after its first removal, and one that will not go is never read anyway.
 	os.Remove(filepath.Join(directory, legacyCacheTableFile))
 	table := NewCacheTable()
-	found := false
-	var dropped []string
-	anotherCommit := ""
-	onlyAnotherCommit := true
-	read := func(name string, section string, body any) bool {
-		contents, err := os.ReadFile(filepath.Join(directory, name))
-		if errors.Is(err, os.ErrNotExist) {
-			return false
-		}
-		found = true
-		if err == nil {
-			err = decodeCacheTableFile(contents, section, identity, body)
-		}
-		switch {
-		case err == nil:
-			return true
-		case errors.Is(err, errWrittenByAnotherCommit):
-			if section == cacheTableFormatSection {
-				return true
-			}
-			anotherCommit = strings.TrimPrefix(err.Error(), errWrittenByAnotherCommit.Error()+" ")
-			dropped = append(dropped, name)
-		default:
-			onlyAnotherCommit = false
-			dropped = append(dropped, fmt.Sprintf("%s (%v)", name, err))
-		}
-		return false
-	}
+	read := &cacheTableRead{directory: directory, identity: identity, onlyAnotherCommit: true}
 
 	invocations := sections.Runs
 	if sections.AllRuns {
 		invocations = nil
+		// Ignored: Glob fails only on a malformed pattern, which only a directory holding an unclosed [ makes, and
+		// then the runs go unread, a cache miss like a first run's.
 		names, _ := filepath.Glob(filepath.Join(directory, "run-*.gob"))
 		for _, name := range names {
 			var body cacheTableRunBody
-			if read(filepath.Base(name), cacheTableRunSection, &body) && body.Run != nil {
+			if readCacheTableSection(read, filepath.Base(name), cacheTableRunSection, &body) && body.Run != nil {
 				table.Runs[body.Invocation] = body.Run
 			}
 		}
@@ -571,23 +462,25 @@ func readCacheTable(directory string, identity CacheTableIdentity, sections Cach
 	for _, invocation := range invocations {
 		var body cacheTableRunBody
 		name := cacheTableRunFile(invocation)
-		if !read(name, cacheTableRunSection, &body) || body.Run == nil {
+		if !readCacheTableSection(read, name, cacheTableRunSection, &body) || body.Run == nil {
 			continue
 		}
 		if body.Invocation != invocation {
-			onlyAnotherCommit = false
-			dropped = append(dropped, fmt.Sprintf("%s (recorded for another invocation)", name))
+			read.onlyAnotherCommit = false
+			read.dropped = append(read.dropped, fmt.Sprintf("%s (recorded for another invocation)", name))
 			continue
 		}
 		table.Runs[invocation] = body.Run
 	}
 	if sections.Findings {
 		var wire *lintCacheWire
-		if read(cacheTableFile(cacheTableFindingsSection), cacheTableFindingsSection, &wire) && wire != nil {
-			findings, err := wire.cache()
-			if err != nil {
-				onlyAnotherCommit = false
-				dropped = append(dropped, fmt.Sprintf("%s (%v)", cacheTableFile(cacheTableFindingsSection), err))
+		if readCacheTableSection(read, cacheTableFile(cacheTableFindingsSection), cacheTableFindingsSection, &wire) &&
+			wire != nil {
+			findings, cacheError := wire.cache()
+			if cacheError != nil {
+				read.onlyAnotherCommit = false
+				read.dropped = append(read.dropped,
+					fmt.Sprintf("%s (%v)", cacheTableFile(cacheTableFindingsSection), cacheError))
 			} else {
 				table.Findings = findings
 			}
@@ -595,33 +488,34 @@ func readCacheTable(directory string, identity CacheTableIdentity, sections Cach
 	}
 	if sections.Signatures {
 		var signatures map[string]SignatureEntry
-		if read(cacheTableFile(cacheTableSignaturesSection), cacheTableSignaturesSection, &signatures) {
+		if readCacheTableSection(read, cacheTableFile(cacheTableSignaturesSection), cacheTableSignaturesSection,
+			&signatures) {
 			table.Signatures = signatures
 		}
 	}
 	if sections.Formatted {
 		var formatted *FormatSection
-		if read(cacheTableFile(cacheTableFormatSection), cacheTableFormatSection, &formatted) {
+		if readCacheTableSection(read, cacheTableFile(cacheTableFormatSection), cacheTableFormatSection, &formatted) {
 			table.Formatted = formatted
 		}
 	}
 	if sections.Types {
 		var types *TypesSection
-		if read(cacheTableFile(cacheTableTypesSection), cacheTableTypesSection, &types) {
+		if readCacheTableSection(read, cacheTableFile(cacheTableTypesSection), cacheTableTypesSection, &types) {
 			table.Types = types
 		}
 	}
 
 	switch {
-	case len(dropped) == 0 && !found:
+	case len(read.dropped) == 0 && !read.found:
 		return table, fmt.Errorf("no cache table in %s: %w", directory, os.ErrNotExist)
-	case len(dropped) == 0:
+	case len(read.dropped) == 0:
 		return table, nil
-	case onlyAnotherCommit:
+	case read.onlyAnotherCommit:
 		return table, fmt.Errorf("%w %s: %s dropped, and its format record is kept for its own key to decide",
-			ErrCacheTablePartlyKept, anotherCommit, strings.Join(dropped, ", "))
+			ErrCacheTablePartlyKept, read.anotherCommit, strings.Join(read.dropped, ", "))
 	default:
-		return table, fmt.Errorf("%w: %s", ErrCacheTableUnreadable, strings.Join(dropped, ", "))
+		return table, fmt.Errorf("%w: %s", ErrCacheTableUnreadable, strings.Join(read.dropped, ", "))
 	}
 }
 
@@ -639,54 +533,86 @@ var beforeCacheTableRename func(temporaryName string)
 // has moved on, where nothing stops a kill landing mid-write; the rename is what keeps the old file whole if
 // one does (TestAWriterKilledBeforeItsRenameLeavesTheOldTable). Files are not atomic with each other, and
 // need not be: each carries its own proof, and the table's lock orders whole writes against reads.
-func WriteCacheTable(directory string, table *CacheTable, identity CacheTableIdentity, sections CacheTableSections, anchor PathAnchor) error {
-	table = table.anchored(anchor)
-	if err := os.MkdirAll(directory, 0o755); err != nil {
-		return fmt.Errorf("creating %s: %w", directory, err)
-	}
-	write := func(name string, section string, body any) error {
-		encoded, err := encodeCacheTableFile(section, body, identity)
-		if err != nil {
-			return err
-		}
-		return writeCacheTableFile(filepath.Join(directory, name), encoded)
+func WriteCacheTable(
+	directory string,
+	table *CacheTable,
+	identity CacheTableIdentity,
+	sections CacheTableSections,
+	anchor PathAnchor,
+) error {
+	anchored := table.anchored(anchor)
+	if createDirectoryError := os.MkdirAll(directory, 0o755); createDirectoryError != nil {
+		return fmt.Errorf("creating %s: %w", directory, createDirectoryError)
 	}
 	invocations := sections.Runs
 	if sections.AllRuns {
 		invocations = invocations[:0:0]
-		for invocation := range table.Runs {
+		for invocation := range anchored.Runs {
 			invocations = append(invocations, invocation)
 		}
 		sort.Strings(invocations)
 	}
 	for _, invocation := range invocations {
-		if run := table.Runs[invocation]; run != nil {
-			if err := write(cacheTableRunFile(invocation), cacheTableRunSection, cacheTableRunBody{Invocation: invocation, Run: run}); err != nil {
-				return err
+		if run := anchored.Runs[invocation]; run != nil {
+			body := cacheTableRunBody{Invocation: invocation, Run: run}
+			name := cacheTableRunFile(invocation)
+			if writeCacheTableSectionError := writeCacheTableSection(
+				directory,
+				name,
+				cacheTableRunSection,
+				body,
+				identity,
+			); writeCacheTableSectionError != nil {
+				return writeCacheTableSectionError
 			}
 		}
 	}
-	if sections.Findings && table.Findings != nil {
-		if err := write(cacheTableFile(cacheTableFindingsSection), cacheTableFindingsSection, table.Findings.wire()); err != nil {
-			return err
+	if sections.Findings && anchored.Findings != nil {
+		if writeCacheTableSectionError := writeCacheTableSection(directory, cacheTableFile(cacheTableFindingsSection),
+			cacheTableFindingsSection, anchored.Findings.wire(), identity); writeCacheTableSectionError != nil {
+			return writeCacheTableSectionError
 		}
 	}
-	if sections.Signatures && table.Signatures != nil {
-		if err := write(cacheTableFile(cacheTableSignaturesSection), cacheTableSignaturesSection, table.Signatures); err != nil {
-			return err
+	if sections.Signatures && anchored.Signatures != nil {
+		if writeCacheTableSectionError := writeCacheTableSection(directory, cacheTableFile(cacheTableSignaturesSection),
+			cacheTableSignaturesSection, anchored.Signatures, identity); writeCacheTableSectionError != nil {
+			return writeCacheTableSectionError
 		}
 	}
-	if sections.Formatted && table.Formatted != nil {
-		if err := write(cacheTableFile(cacheTableFormatSection), cacheTableFormatSection, table.Formatted); err != nil {
-			return err
+	if sections.Formatted && anchored.Formatted != nil {
+		if writeCacheTableSectionError := writeCacheTableSection(
+			directory,
+			cacheTableFile(cacheTableFormatSection),
+			cacheTableFormatSection,
+			anchored.Formatted,
+			identity,
+		); writeCacheTableSectionError != nil {
+			return writeCacheTableSectionError
 		}
 	}
-	if sections.Types && table.Types != nil {
-		if err := write(cacheTableFile(cacheTableTypesSection), cacheTableTypesSection, table.Types); err != nil {
-			return err
+	if sections.Types && anchored.Types != nil {
+		if writeCacheTableSectionError := writeCacheTableSection(
+			directory,
+			cacheTableFile(cacheTableTypesSection),
+			cacheTableTypesSection,
+			anchored.Types,
+			identity,
+		); writeCacheTableSectionError != nil {
+			return writeCacheTableSectionError
 		}
 	}
 	return nil
+}
+
+// writeCacheTableSection encodes body, of section's type, as section's file and writes it to name in directory.
+func writeCacheTableSection[Body any](
+	directory string, name string, section string, body Body, identity CacheTableIdentity,
+) error {
+	encoded, encodeCacheTableFileError := encodeCacheTableFile(section, body, identity)
+	if encodeCacheTableFileError != nil {
+		return encodeCacheTableFileError
+	}
+	return writeCacheTableFile(filepath.Join(directory, name), encoded)
 }
 
 // anchored is a copy of the table with every file path it keys on anchored, for writing. A recorded run's
@@ -763,29 +689,32 @@ func (table *CacheTable) mapPaths(path func(string) string) *CacheTable {
 // writeCacheTableFile writes one file through a temporary beside it and a rename.
 func writeCacheTableFile(path string, encoded []byte) error {
 	directory := filepath.Dir(path)
-	temporary, err := os.CreateTemp(directory, ".cachetable-*")
-	if err != nil {
-		return fmt.Errorf("creating a temporary in %s: %w", directory, err)
+	temporary, temporaryFileError := os.CreateTemp(directory, ".cachetable-*")
+	if temporaryFileError != nil {
+		return fmt.Errorf("creating a temporary in %s: %w", directory, temporaryFileError)
 	}
 	temporaryName := temporary.Name()
 	defer func() {
 		if temporaryName != "" {
+			// Ignored: a temporary left behind is named so no reader opens it, and the error that matters is the
+			// one already returned.
 			os.Remove(temporaryName)
 		}
 	}()
-	if _, err := temporary.Write(encoded); err != nil {
+	if _, writeError := temporary.Write(encoded); writeError != nil {
+		// Ignored: the write's error is the one to report, and the temporary is removed either way.
 		temporary.Close()
-		return fmt.Errorf("writing %s: %w", temporaryName, err)
+		return fmt.Errorf("writing %s: %w", temporaryName, writeError)
 	}
-	if err := temporary.Close(); err != nil {
-		return fmt.Errorf("closing %s: %w", temporaryName, err)
+	if closeError := temporary.Close(); closeError != nil {
+		return fmt.Errorf("closing %s: %w", temporaryName, closeError)
 	}
 	if beforeCacheTableRename != nil {
 		beforeCacheTableRename(temporaryName)
 	}
 	// replace.File, which retries through Windows refusing the rename while another run reads the file.
-	if err := replace.File(temporaryName, path); err != nil {
-		return fmt.Errorf("renaming %s into place: %w", filepath.Base(path), err)
+	if fileError := replace.File(temporaryName, path); fileError != nil {
+		return fmt.Errorf("renaming %s into place: %w", filepath.Base(path), fileError)
 	}
 	temporaryName = ""
 	return nil
@@ -794,15 +723,24 @@ func writeCacheTableFile(path string, encoded []byte) error {
 // DumpCacheTable prints a table for a person: every run and every file entry, one line each, so a cache
 // that looks wrong can be read rather than guessed at.
 func DumpCacheTable(out io.Writer, directory string, table *CacheTable, identity CacheTableIdentity) {
-	fmt.Fprintf(out, "cache table %s\n", directory)
-	fmt.Fprintf(out, "  format %d, written by %s\n", cacheTableVersion, identity)
+	var dump strings.Builder
+	writeCacheTableDump(&dump, directory, table, identity)
+	// Ignored: the dump is printed for a person to read, and no caller has anything to do when a terminal
+	// stops taking it.
+	io.WriteString(out, dump.String())
+}
+
+// writeCacheTableDump writes DumpCacheTable's lines into dump.
+func writeCacheTableDump(dump *strings.Builder, directory string, table *CacheTable, identity CacheTableIdentity) {
+	fmt.Fprintf(dump, "cache table %s\n", directory)
+	fmt.Fprintf(dump, "  format %d, written by %s\n", cacheTableVersion, identity)
 
 	invocations := make([]string, 0, len(table.Runs))
 	for invocation := range table.Runs {
 		invocations = append(invocations, invocation)
 	}
 	sort.Strings(invocations)
-	fmt.Fprintf(out, "runs: %d\n", len(invocations))
+	fmt.Fprintf(dump, "runs: %d\n", len(invocations))
 	for _, invocation := range invocations {
 		run := table.Runs[invocation]
 		name := strings.ReplaceAll(invocation, "\x00", " ")
@@ -820,37 +758,57 @@ func DumpCacheTable(out io.Writer, directory string, table *CacheTable, identity
 				files++
 			}
 		}
-		fmt.Fprintf(out, "  %s: recorded %s, exit %d, key %.12s, %d inputs (%d files, %d directories, %d absent), %d bytes of output, %d of errors\n",
-			name, time.Unix(0, run.RecordedUnixNanoseconds).Format(time.DateTime), run.ExitCode, run.Key,
-			len(run.Inputs), files, directories, absent, len(run.Output), len(run.Errors))
+		fmt.Fprintf(
+			dump,
+			"  %s: recorded %s, exit %d, key %.12s, %d inputs (%d files, %d directories, %d absent), %d bytes of output, %d of errors\n",
+			name,
+			time.Unix(0, run.RecordedUnixNanoseconds).Format(time.DateTime),
+			run.ExitCode,
+			run.Key,
+			len(run.Inputs),
+			files,
+			directories,
+			absent,
+			len(run.Output),
+			len(run.Errors),
+		)
 		if changed := run.ChangedInput(); changed != nil {
-			fmt.Fprintf(out, "    now: would not replay, %v\n", changed)
+			fmt.Fprintf(dump, "    now: would not replay, %v\n", changed)
 		} else {
-			fmt.Fprintln(out, "    now: every input as recorded, so it replays if the binary, flags and directory match")
+			fmt.Fprintln(
+				dump,
+				"    now: every input as recorded, so it replays if the binary, flags and directory match",
+			)
 		}
 	}
 
-	fmt.Fprintf(out, "signatures: %d files\n", len(table.Signatures))
+	fmt.Fprintf(dump, "signatures: %d files\n", len(table.Signatures))
 
 	if table.Formatted == nil {
-		fmt.Fprintln(out, "formatted: none")
+		fmt.Fprintln(dump, "formatted: none")
 	} else {
-		fmt.Fprintf(out, "formatted: %d files, key %.12s\n", len(table.Formatted.Entries), table.Formatted.Key)
+		fmt.Fprintf(dump, "formatted: %d files, key %.12s\n", len(table.Formatted.Entries), table.Formatted.Key)
 	}
 
 	if table.Findings == nil {
-		fmt.Fprintln(out, "findings: none")
+		fmt.Fprintln(dump, "findings: none")
 		return
 	}
 	findingCount := 0
 	for _, entry := range table.Findings.Entries {
 		findingCount += len(entry.Findings)
 	}
-	fmt.Fprintf(out, "findings: %d files, %d findings, key %x\n", len(table.Findings.Entries), findingCount, table.Findings.Key[:6])
+	fmt.Fprintf(
+		dump,
+		"findings: %d files, %d findings, key %x\n",
+		len(table.Findings.Entries),
+		findingCount,
+		table.Findings.Key[:6],
+	)
 	if design := table.Findings.DesignSystem; design == nil {
-		fmt.Fprintln(out, "  design system: none recorded")
+		fmt.Fprintln(dump, "  design system: none recorded")
 	} else {
-		fmt.Fprintf(out, "  design system: %x, %d paths read\n", design.Fingerprint[:6], len(design.Reads))
+		fmt.Fprintf(dump, "  design system: %x, %d paths read\n", design.Fingerprint[:6], len(design.Reads))
 		for _, read := range design.Reads {
 			state := "absent"
 			switch {
@@ -859,24 +817,50 @@ func DumpCacheTable(out io.Writer, directory string, table *CacheTable, identity
 			case read.Present:
 				state = fmt.Sprintf("file %x", read.Hash[:6])
 			}
-			fmt.Fprintf(out, "    %s  %s\n", read.Path, state)
+			fmt.Fprintf(dump, "    %s  %s\n", read.Path, state)
 		}
 	}
 	for _, entry := range table.Findings.Entries {
-		fmt.Fprintf(out, "  %s  content %x  types %x  shapes %x  design %x  %d pure + %d type-aware + %d shape-keyed + %d design-system rules, %d listening, %d nodes, %d findings\n",
-			entry.Path, entry.ContentHash[:6], entry.TypeFingerprint[:6], entry.ShapeFingerprint[:6], entry.DesignFingerprint[:6], len(entry.Rules),
-			len(entry.TypedRules), len(entry.ShapedRules), len(entry.DesignRules), len(entry.Listening), entry.VisitedNodes, len(entry.Findings))
+		fmt.Fprintf(
+			dump,
+			"  %s  content %x  types %x  shapes %x  design %x  %d pure + %d type-aware + %d shape-keyed + %d design-system rules, %d listening, %d nodes, %d findings\n",
+			entry.Path,
+			entry.ContentHash[:6],
+			entry.TypeFingerprint[:6],
+			entry.ShapeFingerprint[:6],
+			entry.DesignFingerprint[:6],
+			len(entry.Rules),
+			len(entry.TypedRules),
+			len(entry.ShapedRules),
+			len(entry.DesignRules),
+			len(entry.Listening),
+			entry.VisitedNodes,
+			len(entry.Findings),
+		)
 		for _, finding := range entry.Findings {
-			fmt.Fprintf(out, "    %d-%d %s/%s: %s\n", finding.Start, finding.End, finding.RuleName, finding.MessageId, finding.MessageDescription)
+			fmt.Fprintf(
+				dump,
+				"    %d-%d %s/%s: %s\n",
+				finding.Start,
+				finding.End,
+				finding.RuleName,
+				finding.MessageId,
+				finding.MessageDescription,
+			)
 		}
 		for _, withheld := range entry.Withheld {
-			fmt.Fprintf(out, "    withheld by directive %d: %s\n", withheld.Directive, withheld.RuleName)
+			fmt.Fprintf(dump, "    withheld by directive %d: %s\n", withheld.Directive, withheld.RuleName)
 		}
 		if entry.Adamic != nil {
-			fmt.Fprintf(out, "    adamic: %d rules measured, %d skipped\n", len(entry.Adamic.Counts), len(entry.Adamic.Skipped))
+			fmt.Fprintf(
+				dump,
+				"    adamic: %d rules measured, %d skipped\n",
+				len(entry.Adamic.Counts),
+				len(entry.Adamic.Skipped),
+			)
 			for _, count := range entry.Adamic.Counts {
 				if count.Findings > 0 {
-					fmt.Fprintf(out, "      %s: %d\n", count.Rule, count.Findings)
+					fmt.Fprintf(dump, "      %s: %d\n", count.Rule, count.Findings)
 				}
 			}
 		}

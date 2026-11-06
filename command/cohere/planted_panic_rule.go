@@ -15,9 +15,9 @@ const plantedPanicMarker = "cohere-test: panic here"
 // rule's crash and say so. Compiled only under the cohere_planted_panic tag, which only the binary
 // TestARuleCrashFailsTheRunAndNamesItselfAsCohere builds carries: no shipped binary has it.
 func init() {
-	rule.Register(rule.Registration{Rule: rule.Rule{
+	rule.Register(rule.Registration[rule.NoOptions]{Rule: rule.Rule[rule.NoOptions]{
 		Name: "cohere-test/panics-on-marked-file",
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ctx rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			if strings.Contains(ctx.SourceFile.Text(), plantedPanicMarker) {
 				panic("planted: Unhandled case in Node.Text: *ast.ComputedPropertyName")
 			}

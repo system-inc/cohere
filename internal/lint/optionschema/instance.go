@@ -9,31 +9,9 @@ import (
 	"strconv"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/system-inc/cohere/internal/json_value"
 )
-
-// Violation is the first place an option list departs from upstream's schema: where, as a path into the
-// list ESLint validates (`[0].allow[1].from`), and what the schema expected there.
-type Violation struct {
-	Path     string
-	Expected string
-}
-
-// Error names the element the way a config author counts them, the first after the severity being
-// element 1, and the path inside it: `element 1 at allow[1].from: upstream's schema expects ...`.
-func (violation *Violation) Error() string {
-	where := violation.Path
-	if rest, isElement := strings.CutPrefix(violation.Path, "["); isElement {
-		if closing := strings.Index(rest, "]"); closing > 0 {
-			if index, err := strconv.Atoi(rest[:closing]); err == nil {
-				where = "element " + strconv.Itoa(index+1)
-				if inner := strings.TrimPrefix(rest[closing+1:], "."); inner != "" {
-					where += " at " + inner
-				}
-			}
-		}
-	}
-	return fmt.Sprintf("%s: upstream's schema, which ESLint validates against, expects %s", where, violation.Expected)
-}
 
 // Extension is a shape cohere accepts on purpose beyond upstream's schema: one key of one option
 // element, removed before the element is checked and left for the rule's own decoder to read.
@@ -61,9 +39,9 @@ var Extensions = []Extension{
 // Check validates a rule's option elements, the list after the severity, against upstream's schema. A
 // rule with no schema here, either not a port or one whose upstream opts out, passes unchecked.
 func Check(ruleName string, elements []json.RawMessage) error {
-	schema, found, err := For(ruleName)
-	if err != nil || !found {
-		return err
+	schema, found, optionSchemaForError := For(ruleName)
+	if optionSchemaForError != nil || !found {
+		return optionSchemaForError
 	}
 	return schema.Validate(withoutExtensions(ruleName, elements))
 }
@@ -84,8 +62,8 @@ func withoutExtensions(ruleName string, elements []json.RawMessage) []json.RawMe
 			continue
 		}
 		delete(object, extension.Key)
-		encoded, err := json.Marshal(object)
-		if err != nil {
+		encoded, encodeError := json.Marshal(object)
+		if encodeError != nil {
 			continue
 		}
 		if stripped == nil {
@@ -99,23 +77,7 @@ func withoutExtensions(ruleName string, elements []json.RawMessage) []json.RawMe
 	return stripped
 }
 
-// Validate checks an option list against the schema and returns its first Violation, or nil.
-func (schema *Schema) Validate(elements []json.RawMessage) error {
-	list := make([]any, len(elements))
-	for index, element := range elements {
-		decoder := json.NewDecoder(bytes.NewReader(element))
-		decoder.UseNumber()
-		if err := decoder.Decode(&list[index]); err != nil {
-			return fmt.Errorf("element %d is not JSON: %w", index+1, err)
-		}
-	}
-	if violation := validate(schema.root, list, ""); violation != nil {
-		return violation
-	}
-	return nil
-}
-
-func validate(schema *node, value any, path string) *Violation {
+func validate(schema *node, value json_value.Value, path string) *Violation {
 	if schema.referenceTarget != nil {
 		return validate(schema.referenceTarget, value, path)
 	}
@@ -127,12 +89,18 @@ func validate(schema *node, value any, path string) *Violation {
 	}
 
 	if len(schema.types) > 0 && !hasAnyType(value, schema.types) {
-		return &Violation{Path: pathOrRoot(path), Expected: fmt.Sprintf("%s, got %s", typeList(schema.types), describe(value))}
+		return &Violation{
+			Path:     pathOrRoot(path),
+			Expected: fmt.Sprintf("%s, got %s", typeList(schema.types), describe(value)),
+		}
 	}
 	if schema.hasConst && !equal(value, schema.constant) {
-		return &Violation{Path: pathOrRoot(path), Expected: fmt.Sprintf("%s, got %s", encode(schema.constant), describe(value))}
+		return &Violation{
+			Path:     pathOrRoot(path),
+			Expected: fmt.Sprintf("%s, got %s", encode(schema.constant), describe(value)),
+		}
 	}
-	if schema.enumValues != nil {
+	if schema.hasEnum {
 		matched := false
 		for _, candidate := range schema.enumValues {
 			if equal(value, candidate) {
@@ -145,37 +113,65 @@ func validate(schema *node, value any, path string) *Violation {
 			for index, candidate := range schema.enumValues {
 				listed[index] = encode(candidate)
 			}
-			return &Violation{Path: pathOrRoot(path), Expected: fmt.Sprintf("one of %s, got %s", strings.Join(listed, ", "), describe(value))}
+			return &Violation{
+				Path:     pathOrRoot(path),
+				Expected: fmt.Sprintf("one of %s, got %s", strings.Join(listed, ", "), describe(value)),
+			}
 		}
 	}
 
 	switch typed := value.(type) {
-	case json.Number:
-		number, _ := typed.Float64()
+	case json_value.Number:
+		// Ignored: the decoder only yields a valid number literal, and one past float64's range comes back
+		// as an infinity of its sign with the range error, which still compares truthfully to both bounds.
+		number, _ := json.Number(typed).Float64()
 		if schema.minimum != nil && number < *schema.minimum {
-			return &Violation{Path: pathOrRoot(path), Expected: fmt.Sprintf("a number of at least %s, got %s", formatNumber(*schema.minimum), typed)}
+			return &Violation{
+				Path:     pathOrRoot(path),
+				Expected: fmt.Sprintf("a number of at least %s, got %s", formatNumber(*schema.minimum), typed),
+			}
 		}
 		if schema.maximum != nil && number > *schema.maximum {
-			return &Violation{Path: pathOrRoot(path), Expected: fmt.Sprintf("a number of at most %s, got %s", formatNumber(*schema.maximum), typed)}
+			return &Violation{
+				Path:     pathOrRoot(path),
+				Expected: fmt.Sprintf("a number of at most %s, got %s", formatNumber(*schema.maximum), typed),
+			}
 		}
-	case string:
-		length := utf8.RuneCountInString(typed)
-		if schema.minLength != nil && length < *schema.minLength {
-			return &Violation{Path: pathOrRoot(path), Expected: fmt.Sprintf("a string of at least %d characters, got %s", *schema.minLength, describe(value))}
+	case json_value.String:
+		length := utf8.RuneCountInString(string(typed))
+		if schema.minimumLength != nil && length < *schema.minimumLength {
+			return &Violation{
+				Path: pathOrRoot(path),
+				Expected: fmt.Sprintf(
+					"a string of at least %d characters, got %s",
+					*schema.minimumLength,
+					describe(value),
+				),
+			}
 		}
-		if schema.maxLength != nil && length > *schema.maxLength {
-			return &Violation{Path: pathOrRoot(path), Expected: fmt.Sprintf("a string of at most %d characters, got %s", *schema.maxLength, describe(value))}
+		if schema.maximumLength != nil && length > *schema.maximumLength {
+			return &Violation{
+				Path: pathOrRoot(path),
+				Expected: fmt.Sprintf(
+					"a string of at most %d characters, got %s",
+					*schema.maximumLength,
+					describe(value),
+				),
+			}
 		}
 		// A match that runs past esregexp's time bound counts as a match: this check may only refuse
 		// what ajv refuses, and a refusal stops the whole run.
-		if schema.pattern != nil && !schema.pattern.TestOrTimeout(typed) {
-			return &Violation{Path: pathOrRoot(path), Expected: fmt.Sprintf("a string matching /%s/, got %s", schema.patternSource, describe(value))}
+		if schema.pattern != nil && !schema.pattern.TestOrTimeout(string(typed)) {
+			return &Violation{
+				Path:     pathOrRoot(path),
+				Expected: fmt.Sprintf("a string matching /%s/, got %s", schema.patternSource, describe(value)),
+			}
 		}
-	case []any:
+	case json_value.Array:
 		if violation := validateArray(schema, typed, path); violation != nil {
 			return violation
 		}
-	case map[string]any:
+	case json_value.Object:
 		if violation := validateObject(schema, typed, path); violation != nil {
 			return violation
 		}
@@ -200,7 +196,11 @@ func validate(schema *node, value any, path string) *Violation {
 			}
 		}
 		if !matched {
-			return &Violation{Path: pathOrRoot(path), Expected: fmt.Sprintf("one of %d shapes, and matches none (the first: %s)", len(schema.anyOf), first.Error())}
+			return &Violation{Path: pathOrRoot(path), Expected: fmt.Sprintf(
+				"one of %d shapes, and matches none (the first: %s)",
+				len(schema.anyOf),
+				first.Error(),
+			)}
 		}
 	}
 	if len(schema.oneOf) > 0 {
@@ -216,9 +216,16 @@ func validate(schema *node, value any, path string) *Violation {
 		}
 		switch {
 		case matches == 0:
-			return &Violation{Path: pathOrRoot(path), Expected: fmt.Sprintf("exactly one of %d shapes, and matches none (the first: %s)", len(schema.oneOf), first.Error())}
+			return &Violation{Path: pathOrRoot(path), Expected: fmt.Sprintf(
+				"exactly one of %d shapes, and matches none (the first: %s)",
+				len(schema.oneOf),
+				first.Error(),
+			)}
 		case matches > 1:
-			return &Violation{Path: pathOrRoot(path), Expected: fmt.Sprintf("exactly one of %d shapes, and matches %d of them", len(schema.oneOf), matches)}
+			return &Violation{
+				Path:     pathOrRoot(path),
+				Expected: fmt.Sprintf("exactly one of %d shapes, and matches %d of them", len(schema.oneOf), matches),
+			}
 		}
 	}
 	if schema.not != nil && validate(schema.not, value, path) == nil {
@@ -227,18 +234,29 @@ func validate(schema *node, value any, path string) *Violation {
 	return nil
 }
 
-func validateArray(schema *node, list []any, path string) *Violation {
-	if schema.minItems != nil && len(list) < *schema.minItems {
-		return &Violation{Path: pathOrRoot(path), Expected: fmt.Sprintf("at least %d items, got %d", *schema.minItems, len(list))}
+func validateArray(schema *node, list json_value.Array, path string) *Violation {
+	if schema.minimumItems != nil && len(list) < *schema.minimumItems {
+		return &Violation{
+			Path:     pathOrRoot(path),
+			Expected: fmt.Sprintf("at least %d items, got %d", *schema.minimumItems, len(list)),
+		}
 	}
-	if schema.maxItems != nil && len(list) > *schema.maxItems {
-		return &Violation{Path: pathOrRoot(path), Expected: fmt.Sprintf("at most %d items, got %d", *schema.maxItems, len(list))}
+	if schema.maximumItems != nil && len(list) > *schema.maximumItems {
+		return &Violation{
+			Path:     pathOrRoot(path),
+			Expected: fmt.Sprintf("at most %d items, got %d", *schema.maximumItems, len(list)),
+		}
 	}
 	if schema.uniqueItems {
 		for later := 1; later < len(list); later++ {
 			for earlier := 0; earlier < later; earlier++ {
 				if equal(list[earlier], list[later]) {
-					return &Violation{Path: pathOrRoot(path), Expected: fmt.Sprintf("unique items, and items %d and %d are both %s", earlier, later, encode(list[later]))}
+					return &Violation{Path: pathOrRoot(path), Expected: fmt.Sprintf(
+						"unique items, and items %d and %d are both %s",
+						earlier,
+						later,
+						encode(list[later]),
+					)}
 				}
 			}
 		}
@@ -250,7 +268,10 @@ func validateArray(schema *node, list []any, path string) *Violation {
 		case schema.tupleItems != nil && index < len(schema.tupleItems):
 			itemSchema = schema.tupleItems[index]
 		case schema.tupleItems != nil && schema.noAdditionalItems:
-			return &Violation{Path: pathOrRoot(path), Expected: fmt.Sprintf("at most %d items, got %d", len(schema.tupleItems), len(list))}
+			return &Violation{
+				Path:     pathOrRoot(path),
+				Expected: fmt.Sprintf("at most %d items, got %d", len(schema.tupleItems), len(list)),
+			}
 		case schema.tupleItems != nil:
 			itemSchema = schema.additionalItems
 		default:
@@ -266,7 +287,7 @@ func validateArray(schema *node, list []any, path string) *Violation {
 	return nil
 }
 
-func validateObject(schema *node, object map[string]any, path string) *Violation {
+func validateObject(schema *node, object json_value.Object, path string) *Violation {
 	for _, name := range schema.required {
 		if _, present := object[name]; !present {
 			return &Violation{Path: pathOrRoot(path), Expected: fmt.Sprintf("the key %q, which is required", name)}
@@ -298,7 +319,10 @@ func validateObject(schema *node, object map[string]any, path string) *Violation
 			continue
 		}
 		if schema.noAdditional {
-			return &Violation{Path: pathOrRoot(path), Expected: fmt.Sprintf("only its declared keys, and %q is not one", key)}
+			return &Violation{
+				Path:     pathOrRoot(path),
+				Expected: fmt.Sprintf("only its declared keys, and %q is not one", key),
+			}
 		}
 		if schema.additionalProperties != nil {
 			if violation := validate(schema.additionalProperties, object[key], keyPath); violation != nil {
@@ -310,38 +334,38 @@ func validateObject(schema *node, object map[string]any, path string) *Violation
 }
 
 // hasAnyType is ajv's type check: "integer" is a number with no fractional part.
-func hasAnyType(value any, types []string) bool {
+func hasAnyType(value json_value.Value, types []string) bool {
 	for _, name := range types {
 		switch name {
 		case "null":
-			if value == nil {
+			if _, is := value.(json_value.Null); is {
 				return true
 			}
 		case "boolean":
-			if _, is := value.(bool); is {
+			if _, is := value.(json_value.Boolean); is {
 				return true
 			}
 		case "string":
-			if _, is := value.(string); is {
+			if _, is := value.(json_value.String); is {
 				return true
 			}
 		case "number":
-			if _, is := value.(json.Number); is {
+			if _, is := value.(json_value.Number); is {
 				return true
 			}
 		case "integer":
-			if number, is := value.(json.Number); is {
-				parsed, err := number.Float64()
-				if err == nil && !math.IsInf(parsed, 0) && parsed == math.Trunc(parsed) {
+			if number, is := value.(json_value.Number); is {
+				parsed, float64Error := json.Number(number).Float64()
+				if float64Error == nil && !math.IsInf(parsed, 0) && parsed == math.Trunc(parsed) {
 					return true
 				}
 			}
 		case "array":
-			if _, is := value.([]any); is {
+			if _, is := value.(json_value.Array); is {
 				return true
 			}
 		case "object":
-			if _, is := value.(map[string]any); is {
+			if _, is := value.(json_value.Object); is {
 				return true
 			}
 		}
@@ -350,26 +374,27 @@ func hasAnyType(value any, types []string) bool {
 }
 
 // equal is ajv's deep equality (fast-deep-equal): numbers by value, objects by key set and values.
-func equal(left any, right any) bool {
+func equal(left json_value.Value, right json_value.Value) bool {
 	switch typedLeft := left.(type) {
-	case nil:
-		return right == nil
-	case bool:
-		typedRight, is := right.(bool)
+	case json_value.Null:
+		_, is := right.(json_value.Null)
+		return is
+	case json_value.Boolean:
+		typedRight, is := right.(json_value.Boolean)
 		return is && typedLeft == typedRight
-	case string:
-		typedRight, is := right.(string)
+	case json_value.String:
+		typedRight, is := right.(json_value.String)
 		return is && typedLeft == typedRight
-	case json.Number:
-		typedRight, is := right.(json.Number)
+	case json_value.Number:
+		typedRight, is := right.(json_value.Number)
 		if !is {
 			return false
 		}
-		leftValue, leftErr := typedLeft.Float64()
-		rightValue, rightErr := typedRight.Float64()
-		return leftErr == nil && rightErr == nil && leftValue == rightValue
-	case []any:
-		typedRight, is := right.([]any)
+		leftValue, leftError := json.Number(typedLeft).Float64()
+		rightValue, rightError := json.Number(typedRight).Float64()
+		return leftError == nil && rightError == nil && leftValue == rightValue
+	case json_value.Array:
+		typedRight, is := right.(json_value.Array)
 		if !is || len(typedLeft) != len(typedRight) {
 			return false
 		}
@@ -379,8 +404,8 @@ func equal(left any, right any) bool {
 			}
 		}
 		return true
-	case map[string]any:
-		typedRight, is := right.(map[string]any)
+	case json_value.Object:
+		typedRight, is := right.(json_value.Object)
 		if !is || len(typedLeft) != len(typedRight) {
 			return false
 		}
@@ -395,26 +420,26 @@ func equal(left any, right any) bool {
 	return false
 }
 
-func count(value any) (*int, error) {
-	number, isNumber := value.(json.Number)
+func count(value json_value.Value) (*int, error) {
+	number, isNumber := value.(json_value.Number)
 	if !isNumber {
 		return nil, fmt.Errorf("must be a number")
 	}
-	parsed, err := strconv.Atoi(string(number))
-	if err != nil || parsed < 0 {
+	parsed, parseError := strconv.Atoi(string(number))
+	if parseError != nil || parsed < 0 {
 		return nil, fmt.Errorf("must be a non-negative integer")
 	}
 	return &parsed, nil
 }
 
-func number(value any) (*float64, error) {
-	typed, isNumber := value.(json.Number)
+func number(value json_value.Value) (*float64, error) {
+	typed, isNumber := value.(json_value.Number)
 	if !isNumber {
 		return nil, fmt.Errorf("must be a number")
 	}
-	parsed, err := typed.Float64()
-	if err != nil {
-		return nil, err
+	parsed, float64Error := json.Number(typed).Float64()
+	if float64Error != nil {
+		return nil, float64Error
 	}
 	return &parsed, nil
 }
@@ -424,7 +449,7 @@ func escapePointer(name string) string {
 }
 
 // pointerTarget follows a JSON pointer reference (`#/items/0/$defs/name`) through the document.
-func pointerTarget(document any, reference string) (any, error) {
+func pointerTarget(document json_value.Value, reference string) (json_value.Value, error) {
 	if reference == "#" {
 		return document, nil
 	}
@@ -436,15 +461,15 @@ func pointerTarget(document any, reference string) (any, error) {
 	for _, part := range strings.Split(rest, "/") {
 		part = strings.ReplaceAll(strings.ReplaceAll(part, "~1", "/"), "~0", "~")
 		switch typed := current.(type) {
-		case map[string]any:
+		case json_value.Object:
 			next, present := typed[part]
 			if !present {
 				return nil, fmt.Errorf("$ref %q names %q, which is not there", reference, part)
 			}
 			current = next
-		case []any:
-			index, err := strconv.Atoi(part)
-			if err != nil || index < 0 || index >= len(typed) {
+		case json_value.Array:
+			index, parseError := strconv.Atoi(part)
+			if parseError != nil || index < 0 || index >= len(typed) {
 				return nil, fmt.Errorf("$ref %q names item %q, which is not there", reference, part)
 			}
 			current = typed[index]
@@ -473,15 +498,78 @@ func formatNumber(value float64) string {
 	return strconv.FormatFloat(value, 'f', -1, 64)
 }
 
-func encode(value any) string {
-	encoded, err := json.Marshal(value)
-	if err != nil {
+func encode(value json_value.Value) string {
+	var encoded bytes.Buffer
+	if encodeError := writeJson(&encoded, value); encodeError != nil {
 		return fmt.Sprint(value)
 	}
-	return string(encoded)
+	return encoded.String()
 }
 
-func describe(value any) string {
+// writeJson writes a value as json.Marshal wrote the untyped value it was once decoded into: compact, an
+// object's keys sorted, a number in its own spelling, and every string and key escaped by json.Marshal itself.
+//
+// Mutates: encoded the buffer each value is appended to, in order
+func writeJson(encoded *bytes.Buffer, value json_value.Value) error {
+	switch typed := value.(type) {
+	case json_value.Null:
+		encoded.WriteString("null")
+	case json_value.Boolean:
+		encoded.WriteString(strconv.FormatBool(bool(typed)))
+	case json_value.Number:
+		return writeMarshaled(encoded, json.Number(typed))
+	case json_value.String:
+		return writeMarshaled(encoded, string(typed))
+	case json_value.Array:
+		encoded.WriteByte('[')
+		for index, element := range typed {
+			if index > 0 {
+				encoded.WriteByte(',')
+			}
+			if writeError := writeJson(encoded, element); writeError != nil {
+				return writeError
+			}
+		}
+		encoded.WriteByte(']')
+	case json_value.Object:
+		keys := make([]string, 0, len(typed))
+		for key := range typed {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		encoded.WriteByte('{')
+		for index, key := range keys {
+			if index > 0 {
+				encoded.WriteByte(',')
+			}
+			if writeError := writeMarshaled(encoded, key); writeError != nil {
+				return writeError
+			}
+			encoded.WriteByte(':')
+			if writeError := writeJson(encoded, typed[key]); writeError != nil {
+				return writeError
+			}
+		}
+		encoded.WriteByte('}')
+	default:
+		return fmt.Errorf("writing JSON: %T is not a JSON value", value)
+	}
+	return nil
+}
+
+// writeMarshaled writes one number or string as json.Marshal writes it, so its escaping is exactly that.
+//
+// Mutates: encoded the buffer the marshaled text is appended to
+func writeMarshaled[T json.Number | string](encoded *bytes.Buffer, value T) error {
+	marshaled, marshalError := json.Marshal(value)
+	if marshalError != nil {
+		return fmt.Errorf("writing JSON: %w", marshalError)
+	}
+	encoded.Write(marshaled)
+	return nil
+}
+
+func describe(value json_value.Value) string {
 	encoded := encode(value)
 	if len(encoded) > 60 {
 		encoded = encoded[:57] + "..."

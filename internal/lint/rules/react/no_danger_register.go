@@ -9,5 +9,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // happens to be the right answer here, so the generic decoder would work by accident. Answering the
 // documented default explicitly makes the unconfigured path a decision instead.
 func init() {
-	rule.Register(rule.Registration{Rule: NoDanger, Decode: DecodeNoDangerOptions})
+	rule.Register(rule.Registration[NoDangerOptions]{Rule: NoDanger, Decode: DecodeNoDangerOptions})
 }

@@ -29,7 +29,7 @@ var messageUnexpectedLonelyIf = rule.Message{
 // # The shape being matched
 //
 // An `if` whose parent is a block, where that block holds exactly one statement, and where the
-// block is the ELSE branch of an enclosing `if`. The last test is identity against the enclosing
+// block is the `else` branch of an enclosing `if`. The last test is identity against the enclosing
 // statement's else branch rather than a kind test, because the then branch of an `if` is a block
 // holding one `if` just as often and is not this rule's subject.
 //
@@ -42,7 +42,7 @@ var messageUnexpectedLonelyIf = rule.Message{
 // `hasUnsafeIf(statement) && isFollowedByElseKeyword(node)`.
 //
 // The other half of that helper, `isLexicalDeclaration`, cannot fire from this rule at all: the
-// statement being tested is the block's only statement AND this listener already knows it is an
+// statement being tested is the block's only statement and this listener already knows it is an
 // `if`, so it is never a `let`, `const`, `using`, function or class declaration. It is left out
 // rather than transcribed, and the reasoning is here so the omission does not read as a gap.
 //
@@ -77,15 +77,15 @@ var messageUnexpectedLonelyIf = rule.Message{
 // The semicolon-insertion group is the subtle one, and each shape is in the corpus. An unbraced
 // consequent whose statement is not terminated joins the line after it: `baz()` followed by
 // `qux();` on the same line becomes one call, `baz()` followed by a line opening `[` becomes a
-// subscript, and `baz++` followed by anything becomes an operand. The same sources WITH a semicolon
+// subscript, and `baz++` followed by anything becomes an operand. The same sources with a semicolon
 // are fixed, and both spellings are in the corpus for the comparison.
 //
 // A wrong fix here is worse than no fix, because the engine's only guard is that the result parses
 // and every one of these parses. So the finding still fires in all five and only the repair is
 // withheld, which is upstream's own trade.
-var NoLonelyIf = rule.Rule{
+var NoLonelyIf = rule.Rule[rule.NoOptions]{
 	Name: "no-lonely-if",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindIfStatement: func(node *ast.Node) {
 				block := node.Parent
@@ -99,20 +99,20 @@ var NoLonelyIf = rule.Rule{
 				if enclosing == nil || enclosing.Kind != ast.KindIfStatement {
 					return
 				}
-				// Identity against the ELSE branch. A then branch is the same shape and is not the
+				// Identity against the `else` branch. A then branch is the same shape and is not the
 				// subject, so a kind test here would report every `if (a) { if (b) {} }`.
 				if enclosing.AsIfStatement().ElseStatement != block {
 					return
 				}
-				if noLonelyIfBracesAreNecessary(ctx, node, block) {
+				if noLonelyIfBracesAreNecessary(ruleContext, node, block) {
 					return
 				}
 
-				if fix, canFix := noLonelyIfFix(ctx, node, block, enclosing); canFix {
-					ctx.ReportNodeWithFixes(node, messageUnexpectedLonelyIf, fix)
+				if fix, canFix := noLonelyIfFix(ruleContext, node, block, enclosing); canFix {
+					ruleContext.ReportNodeWithFixes(node, messageUnexpectedLonelyIf, fix)
 					return
 				}
-				ctx.ReportNode(node, messageUnexpectedLonelyIf)
+				ruleContext.ReportNode(node, messageUnexpectedLonelyIf)
 			},
 		}
 	},
@@ -125,8 +125,8 @@ var NoLonelyIf = rule.Rule{
 // statement it tests is the one this listener already knows to be an `if`, so only the second is
 // transcribed. The reasoning is recorded rather than the code, so the omission does not read as a
 // gap somebody should fill.
-func noLonelyIfBracesAreNecessary(ctx rule.Context, node *ast.Node, block *ast.Node) bool {
-	return noLonelyIfHasUnsafeIf(node) && noLonelyIfIsFollowedByElse(ctx, block)
+func noLonelyIfBracesAreNecessary(ruleContext rule.Context, node *ast.Node, block *ast.Node) bool {
+	return noLonelyIfHasUnsafeIf(node) && noLonelyIfIsFollowedByElse(ruleContext, block)
 }
 
 // noLonelyIfHasUnsafeIf answers whether the code would end with an `if` carrying no `else`.
@@ -168,10 +168,10 @@ func noLonelyIfHasUnsafeIf(node *ast.Node) bool {
 // Upstream reads the next token and compares it to `else`. Here the same question is asked of the
 // enclosing statement rather than of the token stream: the block is some enclosing `if`'s else
 // branch, so the only way an `else` can follow it is if a further enclosing `if` holds that
-// statement as ITS then branch. Both spellings were compared against the installed build on the
+// statement as its then branch. Both spellings were compared against the installed build on the
 // four dangling-else shapes above and they agree.
-func noLonelyIfIsFollowedByElse(ctx rule.Context, block *ast.Node) bool {
-	text := ctx.SourceFile.Text()
+func noLonelyIfIsFollowedByElse(ruleContext rule.Context, block *ast.Node) bool {
+	text := ruleContext.SourceFile.Text()
 	position := scanner.SkipTrivia(text, block.End())
 	return strings.HasPrefix(text[position:], "else") &&
 		(position+4 >= len(text) || !noLonelyIfIsIdentifierCharacter(text[position+4]))
@@ -197,12 +197,12 @@ func noLonelyIfIsIdentifierCharacter(character byte) bool {
 // The repair replaces the else block's braces, inclusive, with the inner `if`'s own text, adding a
 // space when the `else` keyword sits directly against the opening brace. Reproduced from upstream's
 // fixer and checked against every `output` its corpus asserts.
-func noLonelyIfFix(ctx rule.Context, node *ast.Node, block *ast.Node, enclosing *ast.Node) (rule.Fix, bool) {
-	sourceText := ctx.SourceFile.Text()
+func noLonelyIfFix(ruleContext rule.Context, node *ast.Node, block *ast.Node, enclosing *ast.Node) (rule.Fix, bool) {
+	sourceText := ruleContext.SourceFile.Text()
 
-	blockStart := rule.TokenRange(ctx.SourceFile, block).Pos()
+	blockStart := rule.TokenRange(ruleContext.SourceFile, block).Pos()
 	blockEnd := block.End()
-	innerStart := rule.TokenRange(ctx.SourceFile, node).Pos()
+	innerStart := rule.TokenRange(ruleContext.SourceFile, node).Pos()
 	innerEnd := node.End()
 
 	// A comment on either side of the inner statement would be discarded by the rewrite, and
@@ -215,12 +215,12 @@ func noLonelyIfFix(ctx rule.Context, node *ast.Node, block *ast.Node, enclosing 
 		return rule.Fix{}, false
 	}
 
-	if noLonelyIfFixWouldChangeMeaning(ctx, node, block) {
+	if noLonelyIfFixWouldChangeMeaning(ruleContext, node, block) {
 		return rule.Fix{}, false
 	}
 
 	separator := ""
-	elseEnd := noLonelyIfElseKeywordEnd(ctx, enclosing, blockStart)
+	elseEnd := noLonelyIfElseKeywordEnd(ruleContext, enclosing, blockStart)
 	if elseEnd == blockStart {
 		separator = " "
 	}
@@ -234,8 +234,8 @@ func noLonelyIfFix(ctx rule.Context, node *ast.Node, block *ast.Node, enclosing 
 // Only its end is wanted, and only to decide whether a space has to be inserted: `else{ ... }`
 // becomes `else if ...` rather than `elseif ...`. The keyword lies between the enclosing
 // statement's then branch and the block, and it is the only `else` that can appear in that gap.
-func noLonelyIfElseKeywordEnd(ctx rule.Context, enclosing *ast.Node, blockStart int) int {
-	text := ctx.SourceFile.Text()
+func noLonelyIfElseKeywordEnd(ruleContext rule.Context, enclosing *ast.Node, blockStart int) int {
+	text := ruleContext.SourceFile.Text()
 	thenEnd := enclosing.AsIfStatement().ThenStatement.End()
 	if thenEnd < 0 || thenEnd > blockStart {
 		return -1
@@ -249,21 +249,23 @@ func noLonelyIfElseKeywordEnd(ctx rule.Context, enclosing *ast.Node, blockStart 
 
 // noLonelyIfFixWouldChangeMeaning reproduces upstream's automatic-semicolon-insertion refusal.
 //
-// The hazard exists only when the inner `if`'s consequent is NOT a block and does not already end
+// The hazard exists only when the inner `if`'s consequent is not a block and does not already end
 // in a semicolon, because then removing the braces lets the following line join it. Upstream then
 // declines on three signals, each of which has a corpus case:
 //
 //	the next token starts on the consequent's own line, so the two run together outright
 //	the next token opens with one of `( [ / + ` -`, each of which continues an expression
 //	the consequent ends in `++` or `--`, which take the next token as an operand
-func noLonelyIfFixWouldChangeMeaning(ctx rule.Context, node *ast.Node, block *ast.Node) bool {
-	sourceText := ctx.SourceFile.Text()
+func noLonelyIfFixWouldChangeMeaning(ruleContext rule.Context, node *ast.Node, block *ast.Node) bool {
+	sourceText := ruleContext.SourceFile.Text()
 	consequent := node.AsIfStatement().ThenStatement
 	if consequent == nil || consequent.Kind == ast.KindBlock {
 		return false
 	}
 
-	lastToken := text.TrimWhitespace(sourceText[rule.TokenRange(ctx.SourceFile, consequent).Pos():consequent.End()])
+	lastToken := text.TrimWhitespace(
+		sourceText[rule.TokenRange(ruleContext.SourceFile, consequent).Pos():consequent.End()],
+	)
 	if strings.HasSuffix(lastToken, ";") {
 		return false
 	}

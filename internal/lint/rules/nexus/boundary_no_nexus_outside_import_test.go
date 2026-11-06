@@ -8,8 +8,8 @@ import (
 
 const nexusFile = "/repository/libraries/nexus/code-quality/Thing.ts"
 
-func TestBoundaryNoNexusOutsideImportFires(t *testing.T) {
-	t.Parallel()
+func TestBoundaryNoNexusOutsideImportFires(test *testing.T) {
+	test.Parallel()
 
 	// All three import shapes, because a boundary that only guards the static form is a boundary
 	// with a documented way around it.
@@ -24,16 +24,16 @@ func TestBoundaryNoNexusOutsideImportFires(t *testing.T) {
 		{"require", "const thing = require('@base/source/Thing');\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, BoundaryNoNexusOutsideImport, nexusFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "forbiddenOutsideImport")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, BoundaryNoNexusOutsideImport, nexusFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "forbiddenOutsideImport")
 		})
 	}
 }
 
-func TestBoundaryNoNexusOutsideImportStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestBoundaryNoNexusOutsideImportStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -52,23 +52,43 @@ func TestBoundaryNoNexusOutsideImportStaysSilent(t *testing.T) {
 		{"lookalike base", nexusFile, "import { Thing } from '@basement/Thing';\n"},
 
 		// Outside nexus, every one of these is legal, so the rule must decline the file entirely.
-		{"outside nexus static", "/repository/libraries/structure/source/Thing.ts", "import { Thing } from '@project/ProjectSettings';\n"},
-		{"outside nexus dynamic", "/repository/source/Thing.ts", "export async function load() {\n    return await import('@structure/source/Thing');\n}\n"},
+		{
+			"outside nexus static",
+			"/repository/libraries/structure/source/Thing.ts",
+			"import { Thing } from '@project/ProjectSettings';\n",
+		},
+		{
+			"outside nexus dynamic",
+			"/repository/source/Thing.ts",
+			"export async function load() {\n    return await import('@structure/source/Thing');\n}\n",
+		},
 
 		// A path that merely mentions nexus is not the nexus library.
-		{"nexus lookalike path", "/repository/libraries/nexus-template/source/Thing.ts", "import { Thing } from '@project/ProjectSettings';\n"},
+		{
+			"nexus lookalike path",
+			"/repository/libraries/nexus-template/source/Thing.ts",
+			"import { Thing } from '@project/ProjectSettings';\n",
+		},
 
 		// A computed specifier has no string to read, and the rule must not crash reaching for one.
-		{"computed dynamic import", nexusFile, "export async function load(name: string) {\n    return await import(name);\n}\n"},
+		{
+			"computed dynamic import",
+			nexusFile,
+			"export async function load(name: string) {\n    return await import(name);\n}\n",
+		},
 
 		// A method named require is not the CommonJS require.
-		{"method named require", nexusFile, "declare const loader: { require(name: string): unknown };\nconst thing = loader.require('@base/source/Thing');\n"},
+		{
+			"method named require",
+			nexusFile,
+			"declare const loader: { require(name: string): unknown };\nconst thing = loader.require('@base/source/Thing');\n",
+		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, BoundaryNoNexusOutsideImport, testCase.fileName, testCase.sourceText)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, BoundaryNoNexusOutsideImport, testCase.fileName, testCase.sourceText)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -90,8 +110,8 @@ func TestBoundaryNoNexusOutsideImportStaysSilent(t *testing.T) {
 // landed on line 1 and an `eslint-disable-next-line` written above the specifier could not reach
 // it. A `-next-line` directive matches the line after itself, so the finding was unreachable by any
 // suppression the author could write, and it read as a real finding in every count.
-func TestBoundaryNoNexusOutsideImportReportsTheSpecifier(t *testing.T) {
-	t.Parallel()
+func TestBoundaryNoNexusOutsideImportReportsTheSpecifier(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name       string
@@ -121,15 +141,15 @@ func TestBoundaryNoNexusOutsideImportReportsTheSpecifier(t *testing.T) {
 			"'@structure/source/Thing'",
 		},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, BoundaryNoNexusOutsideImport, nexusFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, BoundaryNoNexusOutsideImport, nexusFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("want exactly one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("want exactly one finding, got %d", len(result.Diagnostics))
 			}
 			reported := testCase.sourceText[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 			if reported != testCase.want {
-				t.Errorf("finding covers %q, want %q", reported, testCase.want)
+				test.Errorf("finding covers %q, want %q", reported, testCase.want)
 			}
 		})
 	}

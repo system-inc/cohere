@@ -49,11 +49,11 @@ var messageJsxPropsNoSpreadMultiMemberExpression = rule.Message{
 //
 // **Identifier spreads are grouped.** `{...props}` is keyed by the identifier's name into a map, and
 // the whole group produces exactly one finding however many copies there are. So
-// `<div {...props} {...props} {...props} />` reports ONCE.
+// `<div {...props} {...props} {...props} />` reports once.
 //
 // **Member-expression spreads are paired.** `{...props.foo}` is pushed onto a list and every
-// unordered PAIR is compared, so N copies produce N*(N-1)/2 findings.
-// `<App {...props.foo} {...props.foo} {...props.foo} />` reports THREE times. Measured on the
+// unordered pair is compared, so N copies produce N*(N-1)/2 findings.
+// `<App {...props.foo} {...props.foo} {...props.foo} />` reports three times. Measured on the
 // release oxlint binary rather than inferred from `array_combinations`, and pinned by a fixture
 // below that upstream does not have, since upstream never writes a third copy of a member
 // expression.
@@ -96,7 +96,7 @@ var messageJsxPropsNoSpreadMultiMemberExpression = rule.Message{
 //
 // # Optional chaining, which is the hardest thing in this port and is entirely measured
 //
-// `<App {...props?.foo} {...props?.foo} />` is SILENT in oxc and is silent here, and the two are
+// `<App {...props?.foo} {...props?.foo} />` is silent in oxc and is silent here, and the two are
 // silent for completely different reasons, which is why this needs a section rather than a line.
 //
 // oxc wraps an optional chain in a `ChainExpression`, a sibling variant of `MemberExpression`, so
@@ -122,10 +122,10 @@ var messageJsxPropsNoSpreadMultiMemberExpression = rule.Message{
 //	<App {...props[a?.b]} {...props[a.b]} />   REPORTS   a chain NESTED in a subscript is ordinary
 //	                                                     structure and compares equal too
 //
-// Two rules fall out and both are load-bearing. The exclusion applies only to the spread ARGUMENT,
+// Two rules fall out and both are load-bearing. The exclusion applies only to the spread argument,
 // never to an expression nested inside one, which is why `isSameExpression` reaches for a plain
 // access check while the argument loop reaches for `isSpreadableMemberExpression`. And the walk
-// looking for a question-dot descends through receivers but STOPS at a parenthesis or a TypeScript
+// looking for a question-dot descends through receivers but stops at a parenthesis or a TypeScript
 // assertion, because those terminate the chain rather than being transparent to it.
 //
 // The first version of this rule had both halves wrong: it excluded nested chains and it descended
@@ -133,13 +133,13 @@ var messageJsxPropsNoSpreadMultiMemberExpression = rule.Message{
 // visible from any fixture. What exposed them was mutating the descent, finding the mutant survived,
 // and going to the binary to ask why rather than adding a fixture to kill it.
 //
-// The intuitive reading is that `props?.foo` twice IS the same double spread and should report, and
+// The intuitive reading is that `props?.foo` twice is the same double spread and should report, and
 // that reading is recorded here beside the actual one precisely so the next reader does not
 // helpfully correct the rule back to it.
 //
 // # A variable subscript compares as equal here, which the shelf declines to do
 //
-// `<App {...props[k]} {...props[k]} />` REPORTS in oxc, measured. That is worth stating because it
+// `<App {...props[k]} {...props[k]} />` reports in oxc, measured. That is worth stating because it
 // runs against the grain of every other same-reference judgment in this tree:
 // `no_self_assign.go`'s `isSameReference` returns false for `a[i]` even against itself, and
 // `property.AccessedName` declines a variable subscript by design, its doc saying a comparison
@@ -164,7 +164,7 @@ var messageJsxPropsNoSpreadMultiMemberExpression = rule.Message{
 //
 // oxc declares `fix` and ships one, deleting all but the last spread. This port reports without it.
 // The identifier half's fixer is defensible on its own, but the member half emits one fix per
-// PAIR, so a third copy produces three findings whose fixes delete overlapping ranges, and the
+// pair, so a third copy produces three findings whose fixes delete overlapping ranges, and the
 // merged result on `<App {...props.foo} {...props.foo} {...props.foo} />` was measured on the
 // release binary as `<App   {...props.foo} />`: correct output arrived at by three separate
 // deletions that happen not to conflict. Reproducing that arithmetic faithfully is possible and
@@ -181,12 +181,12 @@ var messageJsxPropsNoSpreadMultiMemberExpression = rule.Message{
 // literal translation of oxc's node would make this rule silent on every fail fixture upstream
 // ships: all five are self-closing. Both kinds are listened on, which `jsx_no_duplicate_props.go`
 // established here first.
-var JsxPropsNoSpreadMulti = rule.Rule{
+var JsxPropsNoSpreadMulti = rule.Rule[rule.NoOptions]{
 	// No namespace prefix. The config writes `react/jsx-props-no-spread-multi` and the parity guard
 	// strips the namespace on a `/` boundary, so a rule named `react-jsx-props-no-spread-multi`
 	// would match no inventory entry, lint no files, and still pass every fixture in this package.
 	Name: "react/jsx-props-no-spread-multi",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		report := func(node *ast.Node) {
 			_, attributes := jsx.ElementParts(node)
 			if attributes == nil {
@@ -237,7 +237,7 @@ var JsxPropsNoSpreadMulti = rule.Rule{
 						// `<div {...props} {...props} {...props} />` a single finding.
 						if !reportedIdentifiers[name] {
 							reportedIdentifiers[name] = true
-							ctx.ReportNode(earlier, messageJsxPropsNoSpreadMultiIdentifier)
+							ruleContext.ReportNode(earlier, messageJsxPropsNoSpreadMultiIdentifier)
 						}
 						continue
 					}
@@ -258,7 +258,7 @@ var JsxPropsNoSpreadMulti = rule.Rule{
 			for leftIndex := 0; leftIndex < len(memberExpressions); leftIndex++ {
 				for rightIndex := leftIndex + 1; rightIndex < len(memberExpressions); rightIndex++ {
 					if isSameMemberExpression(memberExpressions[leftIndex], memberExpressions[rightIndex]) {
-						ctx.ReportNode(memberSpreads[leftIndex], messageJsxPropsNoSpreadMultiMemberExpression)
+						ruleContext.ReportNode(memberSpreads[leftIndex], messageJsxPropsNoSpreadMultiMemberExpression)
 					}
 				}
 			}
@@ -274,7 +274,7 @@ var JsxPropsNoSpreadMulti = rule.Rule{
 	},
 }
 
-// isSpreadableMemberExpression reports whether a spread ARGUMENT is what oxc's
+// isSpreadableMemberExpression reports whether a spread argument is what oxc's
 // `as_member_expression` accepts on the spread argument itself.
 //
 // A property access and an element access, and nothing else. A call, an identifier, a literal and an
@@ -283,15 +283,15 @@ var JsxPropsNoSpreadMulti = rule.Rule{
 //
 // An optional chain declines too, and getting the boundary of that decline right took four
 // measurements against the release binary, because the intuitive reading is wrong in both
-// directions at once. See `isOptionalChain` for the boundary. The decline belongs HERE, on the
+// directions at once. See `isOptionalChain` for the boundary. The decline belongs here, on the
 // argument, rather than inside the comparison: declining it in the comparison would leave the
 // spread in the collection where it would pair against a plain `props.foo`, giving a pair count
 // that is right for the wrong reason.
 //
 // The name says `Spreadable` rather than plain `isMemberExpression` because the chain exclusion is
-// specific to the argument position. An identical node NESTED inside a subscript is not excluded,
+// specific to the argument position. An identical node nested inside a subscript is not excluded,
 // and `isSameExpression` deliberately does not call this. That distinction is measured:
-// `<App {...props[a?.b]} {...props[a.b]} />` REPORTS.
+// `<App {...props[a?.b]} {...props[a.b]} />` reports.
 func isSpreadableMemberExpression(node *ast.Node) bool {
 	if node == nil {
 		return false
@@ -324,31 +324,32 @@ func isSpreadableMemberExpression(node *ast.Node) bool {
 // first version: it made line three silent, and a mutation of the descent is what exposed it, since
 // no imported fixture writes any of these four shapes.
 //
-// TypeScript's non-null and assertion wrappers are NOT walked through either, for the same reason as
+// TypeScript's non-null and assertion wrappers are not walked through either, for the same reason as
 // the parenthesis: `a?.b!.c` terminates the chain at the `!` in oxc exactly as `(a?.b).c` does.
 func isOptionalChain(node *ast.Node) bool {
-	for node != nil {
-		switch node.Kind {
+	current := node
+	for current != nil {
+		switch current.Kind {
 		case ast.KindPropertyAccessExpression:
-			access := node.AsPropertyAccessExpression()
+			access := current.AsPropertyAccessExpression()
 			if access.QuestionDotToken != nil {
 				return true
 			}
-			node = access.Expression
+			current = access.Expression
 		case ast.KindElementAccessExpression:
-			access := node.AsElementAccessExpression()
+			access := current.AsElementAccessExpression()
 			if access.QuestionDotToken != nil {
 				return true
 			}
-			node = access.Expression
+			current = access.Expression
 		case ast.KindCallExpression:
-			call := node.AsCallExpression()
+			call := current.AsCallExpression()
 			if call.QuestionDotToken != nil {
 				return true
 			}
-			node = call.Expression
+			current = call.Expression
 		default:
-			// A parenthesis, a non-null assertion or a type assertion TERMINATES the chain rather
+			// A parenthesis, a non-null assertion or a type assertion terminates the chain rather
 			// than being seen through. That is the third measured line above, and descending here
 			// instead is the defect this comment exists to prevent being reintroduced.
 			return false
@@ -361,20 +362,20 @@ func isOptionalChain(node *ast.Node) bool {
 // receiver, reproducing oxc's `is_same_member_expression`.
 //
 // Shape taken from `no_self_assign.go`'s `isSameReference`, which asks a structurally similar
-// question, and its semantics deliberately NOT taken: that function treats `a.b` and `a?.b` as one
+// question, and its semantics deliberately not taken: that function treats `a.b` and `a?.b` as one
 // reference and returns false for `a[i]` against itself, and this rule needs the opposite answer on
 // both. See the rule's doc comment for why the two questions differ.
 //
 // The static-key path and the structural path are both needed and neither subsumes the other.
 // `AccessedName` settles `.foo` against `["foo"]`, which is how `<App {...props["foo"]}
-// {...props.foo} />` reports, measured. It declines a variable subscript, and where BOTH decline the
+// {...props.foo} />` reports, measured. It declines a variable subscript, and where both decline the
 // comparison falls through to comparing the subscript expressions structurally, which is how
 // `<App {...props[k]} {...props[k]} />` reports, also measured. Where exactly one declines the two
 // are different shapes and the answer is false, which is oxc's `(Some, None)` arm.
 // Both arguments arrive already peeled and this function deliberately does not peel them again.
 // The two call sites are the pair loop, whose entries were peeled when they were collected, and
 // `isSameExpression`, which peels at its own top before dispatching here. A peel here as well was
-// in the first version and a mutation removing it SURVIVED, correctly: no input can reach this
+// in the first version and a mutation removing it survived, correctly: no input can reach this
 // function with an unpeeled node, so the line was unreachable defence rather than a discrimination.
 // It is deleted rather than covered by a fixture, since a fixture over an unreachable branch
 // asserts nothing.
@@ -389,10 +390,10 @@ func isSameMemberExpression(left *ast.Node, right *ast.Node) bool {
 		return false
 	}
 
-	// TAGGED rather than plain, and the tag is load-bearing. `property.AccessedName` renders a
+	// Tagged rather than plain, and the tag is load-bearing. `property.AccessedName` renders a
 	// numeric key and a string key with the same digits as one name, so `o[1]` and `o["1"]` compare
 	// equal under it, and `<App {...props[o[1]]} {...props[o["1"]]} />` then reports where upstream
-	// is SILENT. oxc keys its literal comparison on matched pairs of variants, so a NumericLiteral
+	// is silent. oxc keys its literal comparison on matched pairs of variants, so a NumericLiteral
 	// and a StringLiteral never meet whatever their text.
 	//
 	// This is exactly the caller `property.NameTagged`'s doc says it exists for, and it was found by
@@ -436,9 +437,9 @@ func isSameMemberExpression(left *ast.Node, right *ast.Node) bool {
 // arm, which is what returning false here gives them. What is reproduced is every shape a real
 // spread receiver takes.
 func isSameExpression(left *ast.Node, right *ast.Node) bool {
-	left = ast.SkipOuterExpressions(left, ast.OEKParentheses|ast.OEKAssertions)
-	right = ast.SkipOuterExpressions(right, ast.OEKParentheses|ast.OEKAssertions)
-	if left == nil || right == nil {
+	unwrappedLeft := ast.SkipOuterExpressions(left, ast.OEKParentheses|ast.OEKAssertions)
+	unwrappedRight := ast.SkipOuterExpressions(right, ast.OEKParentheses|ast.OEKAssertions)
+	if unwrappedLeft == nil || unwrappedRight == nil {
 		return false
 	}
 
@@ -449,24 +450,24 @@ func isSameExpression(left *ast.Node, right *ast.Node) bool {
 	//	<App {...props[a?.b]} {...props[a.b]} />    REPORTS
 	//	<App {...(a?.b).c}    {...(a.b).c}    />    REPORTS
 	//
-	// So `a?.b` compares EQUAL to `a.b` once it is nested, which is why this reaches for the plain
+	// So `a?.b` compares equal to `a.b` once it is nested, which is why this reaches for the plain
 	// access check rather than `isSpreadableMemberExpression`.
-	if ast.IsAccessExpression(left) && ast.IsAccessExpression(right) {
-		return isSameMemberExpression(left, right)
+	if ast.IsAccessExpression(unwrappedLeft) && ast.IsAccessExpression(unwrappedRight) {
+		return isSameMemberExpression(unwrappedLeft, unwrappedRight)
 	}
 
-	if left.Kind != right.Kind {
+	if unwrappedLeft.Kind != unwrappedRight.Kind {
 		return false
 	}
 
-	switch left.Kind {
+	switch unwrappedLeft.Kind {
 	case ast.KindIdentifier, ast.KindPrivateIdentifier:
-		return left.Text() == right.Text()
+		return unwrappedLeft.Text() == unwrappedRight.Text()
 	case ast.KindThisKeyword, ast.KindSuperKeyword, ast.KindNullKeyword:
 		return true
 	case ast.KindStringLiteral, ast.KindNumericLiteral,
 		ast.KindNoSubstitutionTemplateLiteral, ast.KindRegularExpressionLiteral:
-		return left.Text() == right.Text()
+		return unwrappedLeft.Text() == unwrappedRight.Text()
 	case ast.KindTrueKeyword, ast.KindFalseKeyword:
 		return true
 	}
@@ -476,8 +477,8 @@ func isSameExpression(left *ast.Node, right *ast.Node) bool {
 
 // accessedNameTagged is `property.AccessedName` with the key's type carried alongside it.
 //
-// The shelf has `property.NameTagged` for a property KEY and `property.AccessedName` for a member
-// ACCESS, but no tagged variant of the access reader, so this composes the two: it takes the
+// The shelf has `property.NameTagged` for a property key and `property.AccessedName` for a member
+// access, but no tagged variant of the access reader, so this composes the two: it takes the
 // subscript or name node the way `AccessedName` does and then reads it through `NameTagged` rather
 // than `Name`.
 //

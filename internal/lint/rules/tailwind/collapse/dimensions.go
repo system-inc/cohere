@@ -76,8 +76,8 @@ func parseDimension(input string) *dimension {
 	// `Infinity` to JavaScript, and ParseFloat returns the same infinity alongside its range error,
 	// so the range error is not a reason to decline. Upstream's `Number.isNaN` guard can never fire
 	// on this grammar.
-	value, err := strconv.ParseFloat(input[:numberEnd], 64)
-	if err != nil && !errors.Is(err, strconv.ErrRange) {
+	value, parseError := strconv.ParseFloat(input[:numberEnd], 64)
+	if parseError != nil && !errors.Is(parseError, strconv.ErrRange) {
 		return nil
 	}
 	return &dimension{value: value, unit: unit}
@@ -113,6 +113,7 @@ func javaScriptNumberString(value float64) string {
 	scientific := strconv.FormatFloat(value, 'e', -1, 64)
 	mantissa, exponentText, _ := strings.Cut(scientific, "e")
 	digits := strings.Replace(mantissa, ".", "", 1)
+	// Ignored: the `e` form of a finite number always ends in a signed decimal exponent, so this parses.
 	exponent, _ := strconv.Atoi(exponentText)
 	digitCount := len(digits)
 	decimalExponent := exponent + 1

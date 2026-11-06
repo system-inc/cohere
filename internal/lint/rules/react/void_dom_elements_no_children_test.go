@@ -23,8 +23,8 @@ const voidDomElementsFile = "/repository/source/VoidDomElements.tsx"
 // per-input count to recover. Both halves of the rule are represented: four JSX elements and six
 // `createElement` calls, and within the calls both the positional third argument and the two
 // property names that carry children inside the props object.
-func TestVoidDomElementsNoChildrenFires(t *testing.T) {
-	t.Parallel()
+func TestVoidDomElementsNoChildrenFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -36,17 +36,29 @@ func TestVoidDomElementsNoChildrenFires(t *testing.T) {
 		{"a br with the danger prop", "<br dangerouslySetInnerHTML={{ __html: 'Foo' }} />;"},
 		{"createElement for a br with a third argument", "React.createElement('br', {}, 'Foo');"},
 		{"createElement for a br with a children prop", "React.createElement('br', { children: 'Foo' });"},
-		{"createElement for a br with the danger prop", "React.createElement('br', { dangerouslySetInnerHTML: { __html: 'Foo' } });"},
-		{"a bare createElement for an img with a third argument", "\n                import React, {createElement} from 'react';\n                createElement('img', {}, 'Foo');\n            "},
-		{"a bare createElement for an img with a children prop", "\n                import React, {createElement} from 'react';\n                createElement('img', { children: 'Foo' });\n            "},
-		{"a bare createElement for an img with the danger prop", "\n                import React, {createElement} from 'react';\n                createElement('img', { dangerouslySetInnerHTML: { __html: 'Foo' } });\n            "},
+		{
+			"createElement for a br with the danger prop",
+			"React.createElement('br', { dangerouslySetInnerHTML: { __html: 'Foo' } });",
+		},
+		{
+			"a bare createElement for an img with a third argument",
+			"\n                import React, {createElement} from 'react';\n                createElement('img', {}, 'Foo');\n            ",
+		},
+		{
+			"a bare createElement for an img with a children prop",
+			"\n                import React, {createElement} from 'react';\n                createElement('img', { children: 'Foo' });\n            ",
+		},
+		{
+			"a bare createElement for an img with the danger prop",
+			"\n                import React, {createElement} from 'react';\n                createElement('img', { dangerouslySetInnerHTML: { __html: 'Foo' } });\n            ",
+		},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, VoidDomElementsNoChildren, voidDomElementsFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "voidDomElementsNoChildren")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, VoidDomElementsNoChildren, voidDomElementsFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "voidDomElementsNoChildren")
 		})
 	}
 }
@@ -57,8 +69,8 @@ func TestVoidDomElementsNoChildrenFires(t *testing.T) {
 // fail list with `div` in place of `br`, which pins that the element name is what decides, plus the
 // arity cases (`createElement('img')` and `createElement()`) and the props-as-a-variable case that
 // upstream declines because it reads only an object literal written at the call site.
-func TestVoidDomElementsNoChildrenStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestVoidDomElementsNoChildrenStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -69,20 +81,35 @@ func TestVoidDomElementsNoChildrenStaysSilent(t *testing.T) {
 		{"a div with the danger prop", "<div dangerouslySetInnerHTML={{ __html: 'Foo' }} />;"},
 		{"createElement for a div with a third argument", "React.createElement('div', {}, 'Foo');"},
 		{"createElement for a div with a children prop", "React.createElement('div', { children: 'Foo' });"},
-		{"createElement for a div with the danger prop", "React.createElement('div', { dangerouslySetInnerHTML: { __html: 'Foo' } });"},
+		{
+			"createElement for a div with the danger prop",
+			"React.createElement('div', { dangerouslySetInnerHTML: { __html: 'Foo' } });",
+		},
 		{"createElement for an img with no props", "React.createElement('img');"},
 		{"createElement with no arguments at all", "React.createElement();"},
-		{"createElement for an img whose props are a variable", "\n                const props = {};\n                React.createElement('img', props);\n            "},
-		{"a bare createElement for a div", "\n                import React, {createElement} from 'react';\n                createElement('div');\n            "},
-		{"a bare createElement for an img", "\n                import React, {createElement} from 'react';\n                createElement('img');\n            "},
-		{"a class component rendering a div", "\n                import React, {createElement, PureComponent} from 'react';\n                class Button extends PureComponent {\n                    handleClick(ev) {\n                        ev.preventDefault();\n                    }\n                    render() {\n                        return <div onClick={this.handleClick}>Hello</div>;\n                    }\n                }\n            "},
+		{
+			"createElement for an img whose props are a variable",
+			"\n                const props = {};\n                React.createElement('img', props);\n            ",
+		},
+		{
+			"a bare createElement for a div",
+			"\n                import React, {createElement} from 'react';\n                createElement('div');\n            ",
+		},
+		{
+			"a bare createElement for an img",
+			"\n                import React, {createElement} from 'react';\n                createElement('img');\n            ",
+		},
+		{
+			"a class component rendering a div",
+			"\n                import React, {createElement, PureComponent} from 'react';\n                class Button extends PureComponent {\n                    handleClick(ev) {\n                        ev.preventDefault();\n                    }\n                    render() {\n                        return <div onClick={this.handleClick}>Hello</div>;\n                    }\n                }\n            ",
+		},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, VoidDomElementsNoChildren, voidDomElementsFile, testCase.sourceText)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, VoidDomElementsNoChildren, voidDomElementsFile, testCase.sourceText)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -96,8 +123,8 @@ func TestVoidDomElementsNoChildrenStaysSilent(t *testing.T) {
 // span in oxc covers the whole token. Both were read off the release binary's own columns rather
 // than inferred: `<br>Foo</br>;` prints 1:2 over two columns, and `React.createElement('br', ...)`
 // prints 1:21 over four, which is `'br'` with its quotes and not `br`.
-func TestVoidDomElementsNoChildrenPointsAtTheElementName(t *testing.T) {
-	t.Parallel()
+func TestVoidDomElementsNoChildrenPointsAtTheElementName(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -111,17 +138,17 @@ func TestVoidDomElementsNoChildrenPointsAtTheElementName(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, VoidDomElementsNoChildren, voidDomElementsFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "voidDomElementsNoChildren")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, VoidDomElementsNoChildren, voidDomElementsFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "voidDomElementsNoChildren")
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
 			}
 			diagnostic := result.Diagnostics[0]
 			reported := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
 			if reported != testCase.reported {
-				t.Errorf("finding covers %q, wanted %q", reported, testCase.reported)
+				test.Errorf("finding covers %q, wanted %q", reported, testCase.reported)
 			}
 		})
 	}
@@ -134,8 +161,8 @@ func TestVoidDomElementsNoChildrenPointsAtTheElementName(t *testing.T) {
 // right prefix. The name is interpolated from the tag, so the two halves are checked separately and
 // the `createElement` half is checked against the literal's *value* rather than its source text,
 // which is the one place the two could differ.
-func TestVoidDomElementsNoChildrenNamesTheElementInTheMessage(t *testing.T) {
-	t.Parallel()
+func TestVoidDomElementsNoChildrenNamesTheElementInTheMessage(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name        string
@@ -143,19 +170,27 @@ func TestVoidDomElementsNoChildrenNamesTheElementInTheMessage(t *testing.T) {
 		wantMessage string
 	}{
 		{"a JSX element", "<br>Foo</br>;", "Void DOM element <br /> cannot receive children."},
-		{"a longer element name", "<menuitem>Foo</menuitem>;", "Void DOM element <menuitem /> cannot receive children."},
-		{"a createElement call names the literal's value, without quotes", "React.createElement('img', {}, 'Foo');", "Void DOM element <img /> cannot receive children."},
+		{
+			"a longer element name",
+			"<menuitem>Foo</menuitem>;",
+			"Void DOM element <menuitem /> cannot receive children.",
+		},
+		{
+			"a createElement call names the literal's value, without quotes",
+			"React.createElement('img', {}, 'Foo');",
+			"Void DOM element <img /> cannot receive children.",
+		},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, VoidDomElementsNoChildren, voidDomElementsFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, VoidDomElementsNoChildren, voidDomElementsFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
 			}
 			if got := result.Diagnostics[0].Message.Description; got != testCase.wantMessage {
-				t.Errorf("message is %q, wanted %q", got, testCase.wantMessage)
+				test.Errorf("message is %q, wanted %q", got, testCase.wantMessage)
 			}
 		})
 	}
@@ -166,8 +201,8 @@ func TestVoidDomElementsNoChildrenNamesTheElementInTheMessage(t *testing.T) {
 // Sixteen names, and the list is the rule's entire subject, so a typo in any one of them would make
 // the rule quietly narrower on exactly one element and every other fixture would stay green.
 // Upstream's corpus exercises only `br` and `img`, so fourteen of these sixteen are untested there.
-func TestVoidDomElementsNoChildrenCoversEveryVoidElement(t *testing.T) {
-	t.Parallel()
+func TestVoidDomElementsNoChildrenCoversEveryVoidElement(test *testing.T) {
+	test.Parallel()
 
 	voidElements := []string{
 		"area", "base", "br", "col", "embed", "hr", "img", "input",
@@ -175,11 +210,11 @@ func TestVoidDomElementsNoChildrenCoversEveryVoidElement(t *testing.T) {
 	}
 
 	for _, elementName := range voidElements {
-		t.Run(elementName, func(t *testing.T) {
-			t.Parallel()
+		test.Run(elementName, func(test *testing.T) {
+			test.Parallel()
 			sourceText := "<" + elementName + " children='Foo' />;"
-			result := rule_testing.Run(t, VoidDomElementsNoChildren, voidDomElementsFile, sourceText)
-			rule_testing.ExpectFindings(t, result, "voidDomElementsNoChildren")
+			result := rule_testing.Run(test, VoidDomElementsNoChildren, voidDomElementsFile, sourceText)
+			rule_testing.ExpectFindings(test, result, "voidDomElementsNoChildren")
 		})
 	}
 }
@@ -192,8 +227,8 @@ func TestVoidDomElementsNoChildrenCoversEveryVoidElement(t *testing.T) {
 // than merely faithful is that JSX resolves a capitalized tag to a component in scope: `<BR>` and
 // `<Img>` render whatever those names are bound to, which is not the void HTML element and may
 // legitimately take children. A port that folded case would report on component references.
-func TestVoidDomElementsNoChildrenIsCaseSensitive(t *testing.T) {
-	t.Parallel()
+func TestVoidDomElementsNoChildrenIsCaseSensitive(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -206,10 +241,10 @@ func TestVoidDomElementsNoChildrenIsCaseSensitive(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, VoidDomElementsNoChildren, voidDomElementsFile, testCase.sourceText)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, VoidDomElementsNoChildren, voidDomElementsFile, testCase.sourceText)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -234,8 +269,8 @@ func TestVoidDomElementsNoChildrenIsCaseSensitive(t *testing.T) {
 // each silent there. Upstream's own corpus contains the case that proves a spread does not *stop*
 // the search either: `<img {...props} children='Foo' />` reports, because the written attribute
 // beside the spread still answers.
-func TestVoidDomElementsNoChildrenDeclinesSpreads(t *testing.T) {
-	t.Parallel()
+func TestVoidDomElementsNoChildrenDeclinesSpreads(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -248,10 +283,10 @@ func TestVoidDomElementsNoChildrenDeclinesSpreads(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, VoidDomElementsNoChildren, voidDomElementsFile, testCase.sourceText)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, VoidDomElementsNoChildren, voidDomElementsFile, testCase.sourceText)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -269,8 +304,8 @@ func TestVoidDomElementsNoChildrenDeclinesSpreads(t *testing.T) {
 // Stating it matters more than usual, because `TryGetTextOfPropertyName` is the house answer to
 // reading a key and reaching for it here would silently widen the rule past upstream on two inputs
 // no imported fixture covers. The command that established it is in the doc comment on the rule.
-func TestVoidDomElementsNoChildrenReadsOnlyStaticIdentifierKeys(t *testing.T) {
-	t.Parallel()
+func TestVoidDomElementsNoChildrenReadsOnlyStaticIdentifierKeys(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -282,10 +317,10 @@ func TestVoidDomElementsNoChildrenReadsOnlyStaticIdentifierKeys(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, VoidDomElementsNoChildren, voidDomElementsFile, testCase.sourceText)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, VoidDomElementsNoChildren, voidDomElementsFile, testCase.sourceText)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -306,8 +341,8 @@ func TestVoidDomElementsNoChildrenReadsOnlyStaticIdentifierKeys(t *testing.T) {
 //
 // And an element with no children at all is clean even written with a closing tag, so `<br></br>`
 // is silent while `<br> </br>` reports on the single space.
-func TestVoidDomElementsNoChildrenTreatsAnyChildAsContent(t *testing.T) {
-	t.Parallel()
+func TestVoidDomElementsNoChildrenTreatsAnyChildAsContent(test *testing.T) {
+	test.Parallel()
 
 	reports := []struct {
 		name       string
@@ -319,17 +354,17 @@ func TestVoidDomElementsNoChildrenTreatsAnyChildAsContent(t *testing.T) {
 		{"an expression container holding a string", "<br>{'x'}</br>;"},
 	}
 	for _, testCase := range reports {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, VoidDomElementsNoChildren, voidDomElementsFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "voidDomElementsNoChildren")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, VoidDomElementsNoChildren, voidDomElementsFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "voidDomElementsNoChildren")
 		})
 	}
 
-	t.Run("a closing tag with nothing between it and the opening tag", func(t *testing.T) {
-		t.Parallel()
-		result := rule_testing.Run(t, VoidDomElementsNoChildren, voidDomElementsFile, "<br></br>;")
-		rule_testing.ExpectClean(t, result)
+	test.Run("a closing tag with nothing between it and the opening tag", func(test *testing.T) {
+		test.Parallel()
+		result := rule_testing.Run(test, VoidDomElementsNoChildren, voidDomElementsFile, "<br></br>;")
+		rule_testing.ExpectClean(test, result)
 	})
 }
 
@@ -344,8 +379,8 @@ func TestVoidDomElementsNoChildrenTreatsAnyChildAsContent(t *testing.T) {
 // a JSX member-expression tag parses to a `PropertyAccessExpression` here and `Node.Text()` panics
 // outright on that kind. The rule asks `jsx.ElementParts` and then checks for `KindIdentifier`, so
 // the kind check is load-bearing against a crash as well as against a wrong verdict.
-func TestVoidDomElementsNoChildrenDeclinesNonIdentifierTags(t *testing.T) {
-	t.Parallel()
+func TestVoidDomElementsNoChildrenDeclinesNonIdentifierTags(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -357,10 +392,10 @@ func TestVoidDomElementsNoChildrenDeclinesNonIdentifierTags(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, VoidDomElementsNoChildren, voidDomElementsFile, testCase.sourceText)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, VoidDomElementsNoChildren, voidDomElementsFile, testCase.sourceText)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -372,8 +407,8 @@ func TestVoidDomElementsNoChildrenDeclinesNonIdentifierTags(t *testing.T) {
 // look at and the shelf helper is the right one here for that reason. All four spellings were
 // measured on the release binary and all four report: a bare `createElement`, a dotted member on
 // any object rather than only `React`, a computed member, and `document` excluded by name.
-func TestVoidDomElementsNoChildrenAcceptsEveryCalleeSpellingUpstreamDoes(t *testing.T) {
-	t.Parallel()
+func TestVoidDomElementsNoChildrenAcceptsEveryCalleeSpellingUpstreamDoes(test *testing.T) {
+	test.Parallel()
 
 	reports := []struct {
 		name       string
@@ -384,19 +419,24 @@ func TestVoidDomElementsNoChildrenAcceptsEveryCalleeSpellingUpstreamDoes(t *test
 		{"an object that is not React", "Preact.createElement('br', {}, 'Foo');"},
 	}
 	for _, testCase := range reports {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, VoidDomElementsNoChildren, voidDomElementsFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "voidDomElementsNoChildren")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, VoidDomElementsNoChildren, voidDomElementsFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "voidDomElementsNoChildren")
 		})
 	}
 
 	// `document.createElement` builds a DOM node rather than a React element, and it is the one
 	// call sharing the property name. Upstream excludes it by name in both member arms.
-	t.Run("document.createElement is excluded by name", func(t *testing.T) {
-		t.Parallel()
-		result := rule_testing.Run(t, VoidDomElementsNoChildren, voidDomElementsFile, "document.createElement('br', {}, 'Foo');")
-		rule_testing.ExpectClean(t, result)
+	test.Run("document.createElement is excluded by name", func(test *testing.T) {
+		test.Parallel()
+		result := rule_testing.Run(
+			test,
+			VoidDomElementsNoChildren,
+			voidDomElementsFile,
+			"document.createElement('br', {}, 'Foo');",
+		)
+		rule_testing.ExpectClean(test, result)
 	})
 }
 
@@ -424,8 +464,8 @@ func TestVoidDomElementsNoChildrenAcceptsEveryCalleeSpellingUpstreamDoes(t *test
 // The first argument is a separate question and falls the same way: `React.createElement(('br'), ...)`
 // is silent, because upstream matches `Argument::StringLiteral` and a parenthesized literal is not
 // one. That needs no special handling here since the rule checks the argument's kind directly.
-func TestVoidDomElementsNoChildrenMatchesUpstreamOnParenthesizedCallees(t *testing.T) {
-	t.Parallel()
+func TestVoidDomElementsNoChildrenMatchesUpstreamOnParenthesizedCallees(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -437,10 +477,10 @@ func TestVoidDomElementsNoChildrenMatchesUpstreamOnParenthesizedCallees(t *testi
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, VoidDomElementsNoChildren, voidDomElementsFile, testCase.sourceText)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, VoidDomElementsNoChildren, voidDomElementsFile, testCase.sourceText)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -454,8 +494,8 @@ func TestVoidDomElementsNoChildrenMatchesUpstreamOnParenthesizedCallees(t *testi
 // `React.createElement('br', null, 'Foo')` really does pass children positionally and really is
 // silent upstream, because the second argument must destructure as an `ObjectExpression` before the
 // third is ever consulted. Measured on the release binary, and reproduced rather than improved on.
-func TestVoidDomElementsNoChildrenCountsArgumentsBeforeReadingThem(t *testing.T) {
-	t.Parallel()
+func TestVoidDomElementsNoChildrenCountsArgumentsBeforeReadingThem(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -465,14 +505,17 @@ func TestVoidDomElementsNoChildrenCountsArgumentsBeforeReadingThem(t *testing.T)
 		{"a props argument that is not an object", "React.createElement('br', 'notanobject', 'Foo');"},
 		{"a first argument that is not a string literal", "React.createElement(Component, {}, 'Foo');"},
 		{"a template literal element name", "React.createElement(`br`, {}, 'Foo');"},
-		{"a props variable rather than a literal", "const props = {children: 'Foo'}; React.createElement('br', props);"},
+		{
+			"a props variable rather than a literal",
+			"const props = {children: 'Foo'}; React.createElement('br', props);",
+		},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, VoidDomElementsNoChildren, voidDomElementsFile, testCase.sourceText)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, VoidDomElementsNoChildren, voidDomElementsFile, testCase.sourceText)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -484,8 +527,8 @@ func TestVoidDomElementsNoChildrenCountsArgumentsBeforeReadingThem(t *testing.T)
 // corpus never writes an element that satisfies both, so nothing imported pins it. Measured on the
 // release binary: `<br dangerouslySetInnerHTML={{__html: 'Foo'}}>Foo</br>` reports once, and
 // `React.createElement('br', {children: 'Foo'}, 'Bar')` reports once.
-func TestVoidDomElementsNoChildrenReportsOncePerElement(t *testing.T) {
-	t.Parallel()
+func TestVoidDomElementsNoChildrenReportsOncePerElement(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -497,10 +540,10 @@ func TestVoidDomElementsNoChildrenReportsOncePerElement(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, VoidDomElementsNoChildren, voidDomElementsFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "voidDomElementsNoChildren")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, VoidDomElementsNoChildren, voidDomElementsFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "voidDomElementsNoChildren")
 		})
 	}
 }

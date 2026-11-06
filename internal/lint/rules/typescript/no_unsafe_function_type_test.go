@@ -8,8 +8,8 @@ import (
 
 const unsafeFunctionFile = "/repository/source/Thing.ts"
 
-func TestNoUnsafeFunctionTypeFires(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeFunctionTypeFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -30,16 +30,19 @@ func TestNoUnsafeFunctionTypeFires(t *testing.T) {
 		{"as a type argument", "export let handlers: Array<Function>;\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.Run(t, NoUnsafeFunctionType, unsafeFunctionFile, testCase.sourceText),
-				"bannedFunctionType")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(
+				test,
+				rule_testing.Run(test, NoUnsafeFunctionType, unsafeFunctionFile, testCase.sourceText),
+				"bannedFunctionType",
+			)
 		})
 	}
 }
 
-func TestNoUnsafeFunctionTypeStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeFunctionTypeStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -71,7 +74,7 @@ func TestNoUnsafeFunctionTypeStaysSilent(t *testing.T) {
 		{"a locally declared type alias", "type Function = (input: string) => void;\nexport let handler: Function;\n"},
 		{"a locally declared class", "class Function {\n    tag = 'x';\n}\nexport let handler: Function;\n"},
 		// An enum shadows too, measured with the checker rather than assumed: an enum declares a
-		// value and a TYPE of the same name, so the annotation resolves to the enum rather than to
+		// value and a type of the same name, so the annotation resolves to the enum rather than to
 		// the global. The shadow walk counted only interface, type alias and class until it was
 		// lifted onto the shelf, so this was a false positive on a name the author owns.
 		{"a locally declared enum", "enum Function {\n    A,\n}\nexport let handler: Function;\n"},
@@ -82,9 +85,12 @@ func TestNoUnsafeFunctionTypeStaysSilent(t *testing.T) {
 		{"a generic signature", "export let value: <T>(input: T) => T;\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoUnsafeFunctionType, unsafeFunctionFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(
+				test,
+				rule_testing.Run(test, NoUnsafeFunctionType, unsafeFunctionFile, testCase.sourceText),
+			)
 		})
 	}
 }

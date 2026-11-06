@@ -29,7 +29,10 @@ const untranslatedValuePreviewLength = 40
 
 // localizationNoUntranslatedValueMissingTranslationText is the rule's `missingTranslation` message,
 // whose wording lives in `policy/messages/localization-no-untranslated-value.json`.
-var localizationNoUntranslatedValueMissingTranslationText = policy.MessageOf("nexus/localization-no-untranslated-value", "missingTranslation")
+var localizationNoUntranslatedValueMissingTranslationText = policy.MessageOf(
+	"nexus/localization-no-untranslated-value",
+	"missingTranslation",
+)
 
 func messageMissingTranslation(key string, locale string) rule.Message {
 	return rule.Message{
@@ -43,7 +46,10 @@ func messageMissingTranslation(key string, locale string) rule.Message {
 
 // localizationNoUntranslatedValueAmbiguousEnglishSiblingText is the rule's `ambiguousEnglishSibling`
 // message, whose wording lives in `policy/messages/localization-no-untranslated-value.json`.
-var localizationNoUntranslatedValueAmbiguousEnglishSiblingText = policy.MessageOf("nexus/localization-no-untranslated-value", "ambiguousEnglishSibling")
+var localizationNoUntranslatedValueAmbiguousEnglishSiblingText = policy.MessageOf(
+	"nexus/localization-no-untranslated-value",
+	"ambiguousEnglishSibling",
+)
 
 func messageAmbiguousEnglishSibling(first string, second string) rule.Message {
 	return rule.Message{
@@ -57,7 +63,10 @@ func messageAmbiguousEnglishSibling(first string, second string) rule.Message {
 
 // localizationNoUntranslatedValueMissingEnglishSiblingText is the rule's `missingEnglishSibling`
 // message, whose wording lives in `policy/messages/localization-no-untranslated-value.json`.
-var localizationNoUntranslatedValueMissingEnglishSiblingText = policy.MessageOf("nexus/localization-no-untranslated-value", "missingEnglishSibling")
+var localizationNoUntranslatedValueMissingEnglishSiblingText = policy.MessageOf(
+	"nexus/localization-no-untranslated-value",
+	"missingEnglishSibling",
+)
 
 func messageMissingEnglishSibling(expected string, alternative string) rule.Message {
 	return rule.Message{
@@ -71,7 +80,10 @@ func messageMissingEnglishSibling(expected string, alternative string) rule.Mess
 
 // localizationNoUntranslatedValueIdenticalToSourceText is the rule's `identicalToSource` message,
 // whose wording lives in `policy/messages/localization-no-untranslated-value.json`.
-var localizationNoUntranslatedValueIdenticalToSourceText = policy.MessageOf("nexus/localization-no-untranslated-value", "identicalToSource")
+var localizationNoUntranslatedValueIdenticalToSourceText = policy.MessageOf(
+	"nexus/localization-no-untranslated-value",
+	"identicalToSource",
+)
 
 func messageIdenticalToSource(key string, locale string, value string) rule.Message {
 	preview := value
@@ -118,7 +130,7 @@ func messageIdenticalToSource(key string, locale string, value string) rule.Mess
 // translations, since the comparison basis is what is missing.
 //
 // No fix. The repair is a translation, which a rule cannot write.
-var LocalizationNoUntranslatedValue = rule.Rule{
+var LocalizationNoUntranslatedValue = rule.Rule[rule.NoOptions]{
 	Name: "nexus/localization-no-untranslated-value",
 
 	// The English translation table, en.ts, which this file does not import, and the current directory the
@@ -127,30 +139,34 @@ var LocalizationNoUntranslatedValue = rule.Rule{
 	// A file's verdict reads its own bytes and path and its directory's English tables, so every English
 	// table in the program is the fingerprint (#31ffaaa). See localizationNoUntranslatedValueFingerprint.
 	ProgramFingerprint: localizationNoUntranslatedValueFingerprint,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
-		localeCode, translationsDirectory, isTranslationFile := translationFileInformation(ctx.SourceFile)
+		localeCode, translationsDirectory, isTranslationFile := translationFileInformation(ruleContext.SourceFile)
 		if !isTranslationFile {
 			// Deciding on the path alone, before any node is visited, is what keeps this rule free
 			// on the overwhelming majority of files that are not locale data.
 			return nil
 		}
 
-		if ctx.Program == nil {
+		if ruleContext.Program == nil {
 			return nil
 		}
-		englishSourceFile, both := englishSibling(ctx.Program, translationsDirectory, ctx.SourceFile.FileName().AsString())
-		fileStart := ctx.SourceFile.AsNode().Loc.WithEnd(ctx.SourceFile.AsNode().Loc.Pos())
+		englishSourceFile, both := englishSibling(
+			ruleContext.Program,
+			translationsDirectory,
+			ruleContext.SourceFile.FileName().AsString(),
+		)
+		fileStart := ruleContext.SourceFile.AsNode().Loc.WithEnd(ruleContext.SourceFile.AsNode().Loc.Pos())
 		if both != nil {
-			ctx.ReportRange(fileStart, messageAmbiguousEnglishSibling(both[0], both[1]))
+			ruleContext.ReportRange(fileStart, messageAmbiguousEnglishSibling(both[0], both[1]))
 			return nil
 		}
 		if englishSourceFile == nil {
-			lookedFor := englishSiblingBaseNames(ctx.SourceFile.FileName().AsString())
-			ctx.ReportRange(fileStart, messageMissingEnglishSibling(lookedFor[0], lookedFor[1]))
+			lookedFor := englishSiblingBaseNames(ruleContext.SourceFile.FileName().AsString())
+			ruleContext.ReportRange(fileStart, messageMissingEnglishSibling(lookedFor[0], lookedFor[1]))
 			return nil
 		}
 		englishValues := map[string]string{}
@@ -170,12 +186,12 @@ var LocalizationNoUntranslatedValue = rule.Rule{
 					return
 				}
 
-				objectLiteral := resolveObjectLiteral(assignment.Expression, ctx.SourceFile)
+				objectLiteral := resolveObjectLiteral(assignment.Expression, ruleContext.SourceFile)
 				if objectLiteral == nil {
 					return
 				}
 
-				reportUntranslated(ctx, objectLiteral, "", englishValues, localeCode)
+				reportUntranslated(ruleContext, objectLiteral, "", englishValues, localeCode)
 			},
 		}
 	},
@@ -186,7 +202,7 @@ var LocalizationNoUntranslatedValue = rule.Rule{
 // Nested objects recurse with a dotted prefix, so a key path in a finding reads the same way it is
 // written in the file.
 func reportUntranslated(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	objectLiteral *ast.Node,
 	prefix string,
 	englishValues map[string]string,
@@ -201,20 +217,22 @@ func reportUntranslated(
 		}
 
 		if text.TrimWhitespace(value) == "" && text.TrimWhitespace(englishValue) != "" {
-			ctx.ReportNode(valueNode, messageMissingTranslation(key, localeCode))
+			ruleContext.ReportNode(valueNode, messageMissingTranslation(key, localeCode))
 			return
 		}
 
 		if value == englishValue && len(englishValue) >= minimumLengthToFlagAsUntranslated {
-			ctx.ReportNode(valueNode, messageIdenticalToSource(key, localeCode, englishValue))
+			ruleContext.ReportNode(valueNode, messageIdenticalToSource(key, localeCode, englishValue))
 		}
 	}, func(key string, nested *ast.Node) {
-		reportUntranslated(ctx, nested, key, englishValues, localeCode)
+		reportUntranslated(ruleContext, nested, key, englishValues, localeCode)
 	})
 }
 
 // collectStringValues flattens an object literal into dotted key paths, which is how the English
 // side is read.
+//
+// Mutates: into the walk records every key path it finds, so one map gathers a whole nested object
 func collectStringValues(objectLiteral *ast.Node, prefix string, into map[string]string) {
 	forEachStringProperty(objectLiteral, prefix, func(key string, value string, valueNode *ast.Node) {
 		into[key] = value
@@ -476,7 +494,7 @@ var localizationNoUntranslatedValueFingerprints struct {
 // stands in for a version, since the rule reads the text, so an edit to a comment in en.ts moves it too.
 // Nothing else outside the file reaches a verdict: recognizing locale data reads only the file's own name.
 // The rule takes no options, so none reach it.
-func localizationNoUntranslatedValueFingerprint(program rule.Program, _ any) [sha256.Size]byte {
+func localizationNoUntranslatedValueFingerprint(program rule.Program, _ rule.Given[rule.NoOptions]) [sha256.Size]byte {
 	cache := &localizationNoUntranslatedValueFingerprints
 	cache.Lock()
 	defer cache.Unlock()
@@ -501,9 +519,15 @@ func localizationNoUntranslatedValueFingerprint(program rule.Program, _ any) [sh
 		if !isTranslationsDirectory(fileName[:lastSlash]) {
 			continue
 		}
-		tables = append(tables, englishTable{name: rule.FingerprintPath(program, fileName), text: sha256.Sum256([]byte(sourceFile.Text()))})
+		tables = append(
+			tables,
+			englishTable{name: rule.FingerprintPath(program, fileName), text: sha256.Sum256([]byte(sourceFile.Text()))},
+		)
 	}
-	slices.SortFunc(tables, func(first englishTable, second englishTable) int { return strings.Compare(first.name, second.name) })
+	slices.SortFunc(
+		tables,
+		func(first englishTable, second englishTable) int { return strings.Compare(first.name, second.name) },
+	)
 
 	hash := sha256.New()
 	for _, table := range tables {

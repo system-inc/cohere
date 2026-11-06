@@ -39,8 +39,8 @@ type JsxNoScriptUrlOptions struct {
 	// Legacy is the list of component-and-attribute pairs to check, from the array arm.
 	//
 	// Order matters and later entries win, which the corpus does not state and which was measured
-	// against the installed build both ways. An entry naming a component twice keeps the LAST
-	// entry's attribute list, and an entry naming `a` REPLACES the built-in `href` default rather
+	// against the installed build both ways. An entry naming a component twice keeps the last
+	// entry's attribute list, and an entry naming `a` replaces the built-in `href` default rather
 	// than adding to it.
 	Legacy []JsxNoScriptUrlComponent
 }
@@ -50,14 +50,14 @@ type JsxNoScriptUrlComponent struct {
 	// Name is the JSX tag name to check, matched exactly.
 	Name string
 
-	// Props are the attribute names on that tag whose string values are examined.
-	Props []string
+	// Properties are the attribute names on that tag whose string values are examined.
+	Properties []string `json:"Props"`
 }
 
 // jsxNoScriptUrlWireComponent is the JSON shape of one legacy entry.
 type jsxNoScriptUrlWireComponent struct {
-	Name  string   `json:"name"`
-	Props []string `json:"props"`
+	Name       string   `json:"name"`
+	Properties []string `json:"props"`
 }
 
 // jsxNoScriptUrlWireObject is the JSON shape of the object arm.
@@ -85,25 +85,28 @@ type jsxNoScriptUrlWireObject struct {
 //
 // A rule configured as a bare severity is handed nil options, and the empty body has to produce
 // upstream's default of the built-in pair alone rather than an error.
-func DecodeJsxNoScriptUrlOptions(list []byte) (any, error) {
+func DecodeJsxNoScriptUrlOptions(list []byte) (JsxNoScriptUrlOptions, error) {
 	options := JsxNoScriptUrlOptions{}
-	elements, err := rule.OptionElements(list, 2)
-	if err != nil || len(elements) == 0 {
-		return options, err
+	elements, optionElementsError := rule.OptionElements(list, 2)
+	if optionElementsError != nil || len(elements) == 0 {
+		return options, optionElementsError
 	}
 
 	objectElement := elements[0]
 	// Go whitespace: raw JSON bytes of a rule's options, whose whitespace is the same in both sets.
 	if bytes.HasPrefix(bytes.TrimSpace(elements[0]), []byte("[")) {
 		var legacy []jsxNoScriptUrlWireComponent
-		if err := jsxNoScriptUrlDecodeStrictly(elements[0], &legacy); err != nil {
-			return JsxNoScriptUrlOptions{}, fmt.Errorf("jsx-no-script-url element 1: %w", err)
+		if jsxNoScriptUrlDecodeStrictlyError := jsxNoScriptUrlDecodeStrictly(
+			elements[0],
+			&legacy,
+		); jsxNoScriptUrlDecodeStrictlyError != nil {
+			return JsxNoScriptUrlOptions{}, fmt.Errorf(
+				"jsx-no-script-url element 1: %w",
+				jsxNoScriptUrlDecodeStrictlyError,
+			)
 		}
 		for _, entry := range legacy {
-			options.Legacy = append(options.Legacy, JsxNoScriptUrlComponent{
-				Name:  entry.Name,
-				Props: entry.Props,
-			})
+			options.Legacy = append(options.Legacy, JsxNoScriptUrlComponent(entry))
 		}
 		if len(elements) < 2 {
 			return options, nil
@@ -116,8 +119,14 @@ func DecodeJsxNoScriptUrlOptions(list []byte) (any, error) {
 	}
 
 	var object jsxNoScriptUrlWireObject
-	if err := jsxNoScriptUrlDecodeStrictly(objectElement, &object); err != nil {
-		return JsxNoScriptUrlOptions{}, fmt.Errorf("jsx-no-script-url options object: %w", err)
+	if jsxNoScriptUrlDecodeStrictlyError := jsxNoScriptUrlDecodeStrictly(
+		objectElement,
+		&object,
+	); jsxNoScriptUrlDecodeStrictlyError != nil {
+		return JsxNoScriptUrlOptions{}, fmt.Errorf(
+			"jsx-no-script-url options object: %w",
+			jsxNoScriptUrlDecodeStrictlyError,
+		)
 	}
 	if object.IncludeFromSettings {
 		return JsxNoScriptUrlOptions{}, fmt.Errorf("jsx-no-script-url: includeFromSettings: true " +
@@ -129,24 +138,24 @@ func DecodeJsxNoScriptUrlOptions(list []byte) (any, error) {
 }
 
 // jsxNoScriptUrlDecodeStrictly decodes one element and refuses keys its schema does not declare.
-func jsxNoScriptUrlDecodeStrictly(element json.RawMessage, into any) error {
+func jsxNoScriptUrlDecodeStrictly[Target any](element json.RawMessage, into *Target) error {
 	decoder := json.NewDecoder(bytes.NewReader(element))
 	decoder.DisallowUnknownFields()
 	return decoder.Decode(into)
 }
 
-// jsxNoScriptUrlIsInterleavingWhitespace reports whether a character may sit BETWEEN the letters of
+// jsxNoScriptUrlIsInterleavingWhitespace reports whether a character may sit between the letters of
 // the protocol.
 //
 // Upstream's regex writes a carriage-return, newline and tab class between every letter, so only
-// those three are accepted there. A plain space inside the word does NOT match, which is the
+// those three are accepted there. A plain space inside the word does not match, which is the
 // distinction a port is most likely to get wrong by reusing the wider prefix class below. Measured
 // against the installed build: a space inside the word is clean and a newline inside it reports.
 func jsxNoScriptUrlIsInterleavingWhitespace(character byte) bool {
 	return character == '\r' || character == '\n' || character == '\t'
 }
 
-// jsxNoScriptUrlIsLeadingWhitespace reports whether a character may sit BEFORE the protocol.
+// jsxNoScriptUrlIsLeadingWhitespace reports whether a character may sit before the protocol.
 //
 // Upstream's prefix class spans every code unit from zero through 0x1F, plus the space, which is
 // wider than the interleaving class. Measured at the edges against the installed build: 0x01, 0x09,
@@ -217,7 +226,7 @@ func jsxNoScriptUrlHasJavaScriptProtocol(value string) bool {
 func jsxNoScriptUrlLinkComponents(options JsxNoScriptUrlOptions) map[string][]string {
 	components := map[string][]string{"a": {"href"}}
 	for _, entry := range options.Legacy {
-		components[entry.Name] = entry.Props
+		components[entry.Name] = entry.Properties
 	}
 	return components
 }
@@ -282,11 +291,11 @@ func jsxNoScriptUrlLinkComponents(options JsxNoScriptUrlOptions) map[string][]st
 // The parent's name is read the same way, so a member tag and a namespaced tag are both clean,
 // since neither carries a plain name under its name. Both measured. A port reading source text for
 // the tag would report on inputs upstream ignores.
-var JsxNoScriptUrl = rule.Rule{
+var JsxNoScriptUrl = rule.Rule[JsxNoScriptUrlOptions]{
 	Name: "react/jsx-no-script-url",
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, _ := rule.OptionsAs[JsxNoScriptUrlOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[JsxNoScriptUrlOptions]) rule.Listeners {
+		settings, _ := options.Read()
 		components := jsxNoScriptUrlLinkComponents(settings)
 
 		return rule.Listeners{
@@ -303,13 +312,13 @@ var JsxNoScriptUrl = rule.Rule{
 				// tree has no attribute-list node in between. Walking two levels here reaches the
 				// same element rather than a different one.
 				//
-				// The KIND half of this guard is unreachable and is kept as crash protection
+				// The kind half of this guard is unreachable and is kept as crash protection
 				// rather than as a filter, which is why a mutant removing it survives every
 				// fixture. Probed with a rule collecting the parent kind of every JsxAttribute
 				// over nine attributes across eight sources, including a spread beside an
 				// attribute, a nested element inside an attribute value, and four malformed
 				// inputs the parser recovers from: the parent is `KindJsxAttributes` in all nine
-				// and nothing else appeared. The NIL half is what earns its place, since the line
+				// and nothing else appeared. The `nil` half is what earns its place, since the line
 				// below dereferences this node.
 				//
 				// The enumeration is what makes the verdict expire: it names error recovery and a
@@ -354,7 +363,7 @@ var JsxNoScriptUrl = rule.Rule{
 				// Upstream reports on the whole attribute, so the span covers the name and the
 				// value together rather than just one. Measured: an attribute at column 4 reports
 				// through the closing quote of its value.
-				ctx.ReportNode(node, jsxNoScriptUrlMessage)
+				ruleContext.ReportNode(node, jsxNoScriptUrlMessage)
 			},
 		}
 	},

@@ -40,13 +40,13 @@ type NoExplicitAnyOptions struct {
 	// when the flag is on, and no repair at all when it is off.
 	FixToUnknown bool `json:"fixToUnknown"`
 
-	// IgnoreRestArgs exempts every `any` written anywhere inside a rest parameter.
+	// IgnoreRestArguments exempts every `any` written anywhere inside a rest parameter.
 	//
 	// The exemption is by containment rather than by shape, which is wider than it first reads and
 	// was measured rather than inferred. Upstream walks *every* ancestor of the `any` token looking
 	// for a rest parameter, so `...args: Map<any, any>` and `...args: any[][]` are exempt as
 	// wholly as `...args: any[]` is. See `isInsideRestParameter` for the four inputs that pin it.
-	IgnoreRestArgs bool `json:"ignoreRestArgs"`
+	IgnoreRestArguments bool `json:"ignoreRestArgs"`
 }
 
 // NoExplicitAny flags an explicit `any` type annotation.
@@ -70,7 +70,7 @@ type NoExplicitAnyOptions struct {
 // forty different syntactic homes for one token rather than forty judgments. A variable annotation,
 // a return type, a type argument, an array element type, a union member, an intersection member, a
 // type parameter default, a heritage type argument, a constraint, an index signature value, an
-// `as` assertion, a bare type alias — all of them are the same node reached by a different route,
+// `as` assertion, a bare type alias: all of them are the same node reached by a different route,
 // and none of them needs its own arm.
 //
 // That makes the two option flags and the file gate the whole of the port, which is why they carry
@@ -117,34 +117,34 @@ type NoExplicitAnyOptions struct {
 // which is not its job and would misfire on every other tolerated shape. Both cases are pinned as
 // fixtures asserting a finding, with the upstream behavior noted at the line, so the next reader
 // does not discover the mismatch by grepping the snapshot and quietly "fix" it.
-var NoExplicitAny = rule.Rule{
+var NoExplicitAny = rule.Rule[NoExplicitAnyOptions]{
 	Name: "@typescript-eslint/no-explicit-any",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[NoExplicitAnyOptions]) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
 		// Declining the file rather than the node, matching upstream's `should_run`. It is also the
 		// cheapest possible decline in a tree where one walk serves every rule.
-		if !isTypeScriptSourceFile(ctx.SourceFile.FileName().AsString()) {
+		if !isTypeScriptSourceFile(ruleContext.SourceFile.FileName().AsString()) {
 			return nil
 		}
 
-		parsed, _ := rule.OptionsAs[NoExplicitAnyOptions](options)
+		parsed, _ := options.Read()
 
 		return rule.Listeners{
 			ast.KindAnyKeyword: func(node *ast.Node) {
-				if parsed.IgnoreRestArgs && isInsideRestParameter(node) {
+				if parsed.IgnoreRestArguments && isInsideRestParameter(node) {
 					return
 				}
 
 				if parsed.FixToUnknown {
-					ctx.ReportNodeWithFixes(node, messageNoExplicitAny,
-						rule.ReplaceRange(rule.TokenRange(ctx.SourceFile, node), "unknown"))
+					ruleContext.ReportNodeWithFixes(node, messageNoExplicitAny,
+						rule.ReplaceRange(rule.TokenRange(ruleContext.SourceFile, node), "unknown"))
 					return
 				}
 
-				ctx.ReportNode(node, messageNoExplicitAny)
+				ruleContext.ReportNode(node, messageNoExplicitAny)
 			},
 		}
 	},
@@ -180,9 +180,9 @@ func isTypeScriptSourceFile(fileName string) bool {
 // because all forty-five are `any[]`, `readonly any[]`, `Array<any>` or `ReadonlyArray<any>`. The
 // corpus cannot distinguish the two readings. The release binary can, and does:
 //
-//	function r04(...args: Map<any, any>) {}   silent   — not an array shape at all
-//	function r06(...args: any[][]) {}          silent   — nested two deep
-//	function r01(...args: any) {}              silent   — no array anywhere
+//	function r04(...args: Map<any, any>) {}   silent     not an array shape at all
+//	function r06(...args: any[][]) {}          silent     nested two deep
+//	function r01(...args: any) {}              silent     no array anywhere
 //	function r05(cb: (...a: any[]) => any) {}  reports once, on the RETURN type only
 //
 // The last one is what pins the walk as unbounded-but-scoped: the `any` in `...a: any[]` is two
@@ -190,13 +190,13 @@ func isTypeScriptSourceFile(fileName string) bool {
 // type but no rest-parameter ancestor and reports. A parent-only check would report both; a
 // whole-subtree check would report neither.
 //
-// # The stale TODO
+// # The stale `// todo`
 //
 // Upstream's corpus carries `function foo(...args: any) {}` commented out under a `// todo`, which
 // reads as a known gap where the bare form is not yet exempt. It is stale: measured on the release
 // binary that input is silent, with a control `any` on the next line of the same file firing, so
 // the ancestor walk already covers it. This port matches the measured behavior rather than the
-// comment, and the case is pinned as a fixture so a later reader who finds the TODO does not
+// comment, and the case is pinned as a fixture so a later reader who finds the `// todo` does not
 // "restore" a gap that never shipped.
 func isInsideRestParameter(node *ast.Node) bool {
 	for parent := node.Parent; parent != nil; parent = parent.Parent {

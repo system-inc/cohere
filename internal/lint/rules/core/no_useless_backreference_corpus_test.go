@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -23,8 +24,8 @@ import (
  * pattern ESLint evaluates by calling String.raw, and which reference.ConstantStringIn declines, as it
  * declines every built-in call. Its own test says what the rule does instead.
  */
-func TestNoUselessBackreferenceAgreesWithESLint(t *testing.T) {
-	t.Parallel()
+func TestNoUselessBackreferenceAgreesWithEsLint(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		origin string
@@ -132,7 +133,11 @@ func TestNoUselessBackreferenceAgreesWithESLint(t *testing.T) {
 		{"corpus", "/(b)(\\2a)/", []string{"nested /(b)(\\2a)/@0"}},
 		{"corpus", "/\\k<foo>(?<foo>bar)/", []string{"forward /\\k<foo>(?<foo>bar)/@0"}},
 		{"corpus", "RegExp('(a|bc)|\\\\1')", []string{"disjunctive RegExp('(a|bc)|\\\\1')@0"}},
-		{"corpus", "new RegExp('(?!(?<foo>\\\\n))\\\\1')", []string{"intoNegativeLookaround new RegExp('(?!(?<foo>\\\\n))\\\\1')@0"}},
+		{
+			"corpus",
+			"new RegExp('(?!(?<foo>\\\\n))\\\\1')",
+			[]string{"intoNegativeLookaround new RegExp('(?!(?<foo>\\\\n))\\\\1')@0"},
+		},
 		{"corpus", "/(?<!(a)\\1)b/", []string{"backward /(?<!(a)\\1)b/@0"}},
 		{"corpus", "new RegExp('(\\\\1)')", []string{"nested new RegExp('(\\\\1)')@0"}},
 		{"corpus", "/^(a\\1)$/", []string{"nested /^(a\\1)$/@0"}},
@@ -204,20 +209,51 @@ func TestNoUselessBackreferenceAgreesWithESLint(t *testing.T) {
 		{"corpus", "/\\1(a)\\1/", []string{"forward /\\1(a)\\1/@0"}},
 		{"corpus", "/\\1(a)\\2(b)/", []string{"forward /\\1(a)\\2(b)/@0", "forward /\\1(a)\\2(b)/@0"}},
 		{"corpus", "/\\1.(?<=(a)\\1)/", []string{"forward /\\1.(?<=(a)\\1)/@0", "backward /\\1.(?<=(a)\\1)/@0"}},
-		{"corpus", "/(?!\\1(a)).\\1/", []string{"forward /(?!\\1(a)).\\1/@0", "intoNegativeLookaround /(?!\\1(a)).\\1/@0"}},
+		{
+			"corpus",
+			"/(?!\\1(a)).\\1/",
+			[]string{"forward /(?!\\1(a)).\\1/@0", "intoNegativeLookaround /(?!\\1(a)).\\1/@0"},
+		},
 		{"corpus", "/(a)\\2(b)/; RegExp('(\\\\1)');", []string{"forward /(a)\\2(b)/@0", "nested RegExp('(\\\\1)')@12"}},
 		{"corpus", "RegExp('\\\\1(a){', flags);", []string{"forward RegExp('\\\\1(a){', flags)@0"}},
 		{"corpus", "const r = RegExp, p = '\\\\1', s = '(a)'; new r(p + s);", []string{"forward new r(p + s)@40"}},
 		{"corpus", "new RegExp('\\\\1([[A--B]])', 'v')", []string{"forward new RegExp('\\\\1([[A--B]])', 'v')@0"}},
 		{"corpus", "/\\k<foo>((?<foo>bar)|(?<foo>baz))/", []string{"forward /\\k<foo>((?<foo>bar)|(?<foo>baz))/@0"}},
 		{"corpus", "/((?<foo>bar)|\\k<foo>(?<foo>baz))/", []string{"forward /((?<foo>bar)|\\k<foo>(?<foo>baz))/@0"}},
-		{"corpus", "/\\k<foo>((?<foo>bar)|(?<foo>baz)|(?<foo>qux))/", []string{"forward /\\k<foo>((?<foo>bar)|(?<foo>baz)|(?<foo>qux))/@0"}},
-		{"corpus", "/((?<foo>bar)|\\k<foo>(?<foo>baz)|(?<foo>qux))/", []string{"forward /((?<foo>bar)|\\k<foo>(?<foo>baz)|(?<foo>qux))/@0"}},
-		{"corpus", "/((?<foo>bar)|\\k<foo>|(?<foo>baz))/", []string{"disjunctive /((?<foo>bar)|\\k<foo>|(?<foo>baz))/@0"}},
-		{"corpus", "/((?<foo>bar)|\\k<foo>|(?<foo>baz)|(?<foo>qux))/", []string{"disjunctive /((?<foo>bar)|\\k<foo>|(?<foo>baz)|(?<foo>qux))/@0"}},
-		{"corpus", "/((?<foo>bar)|(?<foo>baz\\k<foo>)|(?<foo>qux\\k<foo>))/", []string{"nested /((?<foo>bar)|(?<foo>baz\\k<foo>)|(?<foo>qux\\k<foo>))/@0", "nested /((?<foo>bar)|(?<foo>baz\\k<foo>)|(?<foo>qux\\k<foo>))/@0"}},
-		{"corpus", "/(?<=((?<foo>bar)|(?<foo>baz))\\k<foo>)/", []string{"backward /(?<=((?<foo>bar)|(?<foo>baz))\\k<foo>)/@0"}},
-		{"corpus", "/((?!(?<foo>bar))|(?!(?<foo>baz)))\\k<foo>/", []string{"intoNegativeLookaround /((?!(?<foo>bar))|(?!(?<foo>baz)))\\k<foo>/@0"}},
+		{
+			"corpus",
+			"/\\k<foo>((?<foo>bar)|(?<foo>baz)|(?<foo>qux))/",
+			[]string{"forward /\\k<foo>((?<foo>bar)|(?<foo>baz)|(?<foo>qux))/@0"},
+		},
+		{
+			"corpus",
+			"/((?<foo>bar)|\\k<foo>(?<foo>baz)|(?<foo>qux))/",
+			[]string{"forward /((?<foo>bar)|\\k<foo>(?<foo>baz)|(?<foo>qux))/@0"},
+		},
+		{
+			"corpus",
+			"/((?<foo>bar)|\\k<foo>|(?<foo>baz))/",
+			[]string{"disjunctive /((?<foo>bar)|\\k<foo>|(?<foo>baz))/@0"},
+		},
+		{
+			"corpus",
+			"/((?<foo>bar)|\\k<foo>|(?<foo>baz)|(?<foo>qux))/",
+			[]string{"disjunctive /((?<foo>bar)|\\k<foo>|(?<foo>baz)|(?<foo>qux))/@0"},
+		},
+		{"corpus", "/((?<foo>bar)|(?<foo>baz\\k<foo>)|(?<foo>qux\\k<foo>))/", []string{
+			"nested /((?<foo>bar)|(?<foo>baz\\k<foo>)|(?<foo>qux\\k<foo>))/@0",
+			"nested /((?<foo>bar)|(?<foo>baz\\k<foo>)|(?<foo>qux\\k<foo>))/@0",
+		}},
+		{
+			"corpus",
+			"/(?<=((?<foo>bar)|(?<foo>baz))\\k<foo>)/",
+			[]string{"backward /(?<=((?<foo>bar)|(?<foo>baz))\\k<foo>)/@0"},
+		},
+		{
+			"corpus",
+			"/((?!(?<foo>bar))|(?!(?<foo>baz)))\\k<foo>/",
+			[]string{"intoNegativeLookaround /((?!(?<foo>bar))|(?!(?<foo>baz)))\\k<foo>/@0"},
+		},
 		{"edge", "const r = RegExp, p = '\\\\1', s = '(a)'; new r(p + s);", []string{"forward new r(p + s)@40"}},
 		{"edge", "const flags = 'gus'; RegExp('\\\\1(a){', flags);", []string{}},
 		{"edge", "let f = 'u'; f = ''; RegExp('\\\\1(a){', f);", []string{"forward RegExp('\\\\1(a){', f)@21"}},
@@ -235,13 +271,23 @@ func TestNoUselessBackreferenceAgreesWithESLint(t *testing.T) {
 		{"edge", "const p = '(a)\\\\1'; const q = p + '\\\\2(b)'; RegExp(q);", []string{"forward RegExp(q)@44"}},
 		{"edge", "RegExp(foo + '\\\\1(a)');", []string{}},
 		{"edge", "RegExp('\\\\1(a)', flags);", []string{"forward RegExp('\\\\1(a)', flags)@0"}},
-		{"edge", "/\\1(a)\\k<x>(?<x>b)/;", []string{"forward /\\1(a)\\k<x>(?<x>b)/@0", "forward /\\1(a)\\k<x>(?<x>b)/@0"}},
+		{
+			"edge",
+			"/\\1(a)\\k<x>(?<x>b)/;",
+			[]string{"forward /\\1(a)\\k<x>(?<x>b)/@0", "forward /\\1(a)\\k<x>(?<x>b)/@0"},
+		},
 		{"edge", "/(?<a>x)|(?<a>y)\\k<a>/;", []string{}},
 		{"edge", "RegExp(1);", []string{}},
 	}
 
 	for index, testCase := range cases {
-		result := rule_testing.RunTypedVerbatimWithOptions(t, NoUselessBackreference, "input.ts", testCase.code, nil)
+		result := rule_testing.RunTypedVerbatimGiven(
+			test,
+			NoUselessBackreference,
+			"input.ts",
+			testCase.code,
+			rule.Given[rule.NoOptions]{},
+		)
 		source := result.SourceFile.Text()
 		got := []string{}
 		for _, diagnostic := range result.Diagnostics {
@@ -252,7 +298,7 @@ func TestNoUselessBackreferenceAgreesWithESLint(t *testing.T) {
 		sort.Strings(got)
 		sort.Strings(want)
 		if strings.Join(got, "\n") != strings.Join(want, "\n") {
-			t.Errorf("case %d (%s): %q\n got: %q\nwant: %q", index, testCase.origin, testCase.code, got, want)
+			test.Errorf("case %d (%s): %q\n got: %q\nwant: %q", index, testCase.origin, testCase.code, got, want)
 		}
 	}
 }

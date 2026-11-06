@@ -83,20 +83,20 @@ var messageOctalEscape = rule.Message{
 // mechanical (write `A` for `\101`) but it is only correct when the escape is the whole story:
 // in `\400` the trailing `0` is a plain digit that the rewritten escape must keep, and in `\08` the
 // `8` is likewise data. A fixer getting that wrong changes the string unattended.
-var NoOctalEscape = rule.Rule{
+var NoOctalEscape = rule.Rule[rule.NoOptions]{
 	Name: "no-octal-escape",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindStringLiteral: func(node *ast.Node) {
-				literalRange := rule.TokenRange(ctx.SourceFile, node)
-				raw := ctx.SourceFile.Text()[literalRange.Pos():literalRange.End()]
+				literalRange := rule.TokenRange(ruleContext.SourceFile, node)
+				raw := ruleContext.SourceFile.Text()[literalRange.Pos():literalRange.End()]
 
 				sequence, found := firstOctalEscapeSequence(raw)
 				if !found {
 					return
 				}
 
-				ctx.ReportNode(node, rule.Message{
+				ruleContext.ReportNode(node, rule.Message{
 					Id: messageOctalEscape.Id,
 					Description: fmt.Sprintf("Do not use the octal escape `\\%s`. %s",
 						sequence, messageOctalEscape.Description),
@@ -118,7 +118,7 @@ var NoOctalEscape = rule.Rule{
 // wins. Order is load bearing rather than a tidy way to write four independent tests: `0` is in
 // range for the first production, so `\08` would be taken as a one-digit `[0-3][0-7]{1,2}` match if
 // that production could accept a single digit. It cannot, since `{1,2}` demands at least one digit
-// AFTER the leading one, which is why `\0` alone is clean and why the `0(?=[89])` production has to
+// after the leading one, which is why `\0` alone is clean and why the `0(?=[89])` production has to
 // exist separately.
 func firstOctalEscapeSequence(raw string) (string, bool) {
 	for index := 0; index < len(raw); {

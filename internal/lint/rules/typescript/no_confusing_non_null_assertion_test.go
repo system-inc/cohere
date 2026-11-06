@@ -20,9 +20,9 @@ func noConfusingNonNullAssertionCaseName(index int) string {
 //
 // Four of upstream's eight are parenthesized, which is not decoration: they are the whole of its
 // `tokenAfterLeft !== ')'` test, and they are what keeps this port from reporting a left operand
-// that merely CONTAINS an assertion.
-func TestNoConfusingNonNullAssertionStaysSilent(t *testing.T) {
-	t.Parallel()
+// that merely contains an assertion.
+func TestNoConfusingNonNullAssertionStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		// Upstream's valid list, byte for byte.
@@ -38,7 +38,7 @@ func TestNoConfusingNonNullAssertionStaysSilent(t *testing.T) {
 		// Measured silent on the installed build. Each would report under a plausible wrong port,
 		// and none is expressible from upstream's corpus.
 
-		// The operators NOT in the confusing set, which is the half of the set definition the
+		// The operators not in the confusing set, which is the half of the set definition the
 		// corpus never exercises. `a! != b` is the shape a naive reading flags first and it is
 		// silent, because the assertion and the operator are already spelled apart.
 		"a! != b;\n",
@@ -46,14 +46,14 @@ func TestNoConfusingNonNullAssertionStaysSilent(t *testing.T) {
 		"a! < b;\n",
 		"a! += b;\n",
 
-		// A bang that is the last CHARACTER of the left operand without being its last TOKEN.
+		// A bang that is the last character of the left operand without being its last token.
 		// This is the only way the text test could diverge from upstream's token test, and the
 		// parser does not produce it: the closing quote or bracket is the final character in each.
 		"'a!' == b;\n",
 		"`a!` == b;\n",
 		"x[`!`] == b;\n",
 
-		// `a!!== b` parses as `a!` with the operator `!==`, so the left text DOES end in a bang
+		// `a!!== b` parses as `a!` with the operator `!==`, so the left text does end in a bang
 		// and the operator test is what declines it. This is the one input where the two halves of
 		// the judgment could disagree, and it is pinned so a change to either is visible.
 		"a!!== b;\n",
@@ -63,9 +63,9 @@ func TestNoConfusingNonNullAssertionStaysSilent(t *testing.T) {
 		"a /* ! */ == b;\n",
 	}
 	for index, sourceText := range cases {
-		t.Run(noConfusingNonNullAssertionCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoConfusingNonNullAssertion,
+		test.Run(noConfusingNonNullAssertionCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoConfusingNonNullAssertion,
 				noConfusingNonNullAssertionFile, sourceText))
 		})
 	}
@@ -74,13 +74,13 @@ func TestNoConfusingNonNullAssertionStaysSilent(t *testing.T) {
 // TestNoConfusingNonNullAssertionFires is upstream's eleven reporting cases verbatim, with their
 // message ids, their rendered message text, their spans, and every suggestion each one offers.
 //
-// The suggestions are asserted by APPLYING them and comparing the rewritten source against
+// The suggestions are asserted by applying them and comparing the rewritten source against
 // upstream's own `output` field, because rule_testing has no ExpectFixedSource equivalent for a
 // suggestion. A suggestion asserted only by its message id is a repair nothing checks, and this
 // rule's wrap suggestion writes two separate edits, so a single-edit applier would pass it while
 // producing the wrong text.
-func TestNoConfusingNonNullAssertionFires(t *testing.T) {
-	t.Parallel()
+func TestNoConfusingNonNullAssertionFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText      string
@@ -103,7 +103,11 @@ func TestNoConfusingNonNullAssertionFires(t *testing.T) {
 				description string
 				rewrite     string
 			}{
-				{id: "notNeedInEqualTest", description: "Remove unnecessary non-null assertion (!) in equality test.", rewrite: "a == b;"},
+				{
+					id:          "notNeedInEqualTest",
+					description: "Remove unnecessary non-null assertion (!) in equality test.",
+					rewrite:     "a == b;",
+				},
 			},
 		},
 		{
@@ -116,7 +120,11 @@ func TestNoConfusingNonNullAssertionFires(t *testing.T) {
 				description string
 				rewrite     string
 			}{
-				{id: "notNeedInEqualTest", description: "Remove unnecessary non-null assertion (!) in equality test.", rewrite: "a === b;"},
+				{
+					id:          "notNeedInEqualTest",
+					description: "Remove unnecessary non-null assertion (!) in equality test.",
+					rewrite:     "a === b;",
+				},
 			},
 		},
 		{
@@ -129,7 +137,11 @@ func TestNoConfusingNonNullAssertionFires(t *testing.T) {
 				description string
 				rewrite     string
 			}{
-				{id: "wrapUpLeft", description: "Wrap the left-hand side in parentheses to avoid confusion with \"==\" operator.", rewrite: "(a + b!) == c;"},
+				{
+					id:          "wrapUpLeft",
+					description: "Wrap the left-hand side in parentheses to avoid confusion with \"==\" operator.",
+					rewrite:     "(a + b!) == c;",
+				},
 			},
 		},
 		{
@@ -142,7 +154,11 @@ func TestNoConfusingNonNullAssertionFires(t *testing.T) {
 				description string
 				rewrite     string
 			}{
-				{id: "notNeedInEqualTest", description: "Remove unnecessary non-null assertion (!) in equality test.", rewrite: "(obj = new new OuterObj().InnerObj).Name == c;"},
+				{
+					id:          "notNeedInEqualTest",
+					description: "Remove unnecessary non-null assertion (!) in equality test.",
+					rewrite:     "(obj = new new OuterObj().InnerObj).Name == c;",
+				},
 			},
 		},
 		{
@@ -155,7 +171,11 @@ func TestNoConfusingNonNullAssertionFires(t *testing.T) {
 				description string
 				rewrite     string
 			}{
-				{id: "notNeedInEqualTest", description: "Remove unnecessary non-null assertion (!) in equality test.", rewrite: "(a==b) ==c;"},
+				{
+					id:          "notNeedInEqualTest",
+					description: "Remove unnecessary non-null assertion (!) in equality test.",
+					rewrite:     "(a==b) ==c;",
+				},
 			},
 		},
 		{
@@ -168,7 +188,11 @@ func TestNoConfusingNonNullAssertionFires(t *testing.T) {
 				description string
 				rewrite     string
 			}{
-				{id: "notNeedInAssign", description: "Remove unnecessary non-null assertion (!) in assignment left-hand side.", rewrite: "a = b;"},
+				{
+					id:          "notNeedInAssign",
+					description: "Remove unnecessary non-null assertion (!) in assignment left-hand side.",
+					rewrite:     "a = b;",
+				},
 			},
 		},
 		{
@@ -181,7 +205,11 @@ func TestNoConfusingNonNullAssertionFires(t *testing.T) {
 				description string
 				rewrite     string
 			}{
-				{id: "notNeedInAssign", description: "Remove unnecessary non-null assertion (!) in assignment left-hand side.", rewrite: "(obj = new new OuterObj().InnerObj).Name = c;"},
+				{
+					id:          "notNeedInAssign",
+					description: "Remove unnecessary non-null assertion (!) in assignment left-hand side.",
+					rewrite:     "(obj = new new OuterObj().InnerObj).Name = c;",
+				},
 			},
 		},
 		{
@@ -194,7 +222,11 @@ func TestNoConfusingNonNullAssertionFires(t *testing.T) {
 				description string
 				rewrite     string
 			}{
-				{id: "notNeedInAssign", description: "Remove unnecessary non-null assertion (!) in assignment left-hand side.", rewrite: "(a=b) =c;"},
+				{
+					id:          "notNeedInAssign",
+					description: "Remove unnecessary non-null assertion (!) in assignment left-hand side.",
+					rewrite:     "(a=b) =c;",
+				},
 			},
 		},
 		{
@@ -207,8 +239,16 @@ func TestNoConfusingNonNullAssertionFires(t *testing.T) {
 				description string
 				rewrite     string
 			}{
-				{id: "notNeedInOperator", description: "Remove possibly unnecessary non-null assertion (!) in the left operand of the `in` operator.", rewrite: "a in b;"},
-				{id: "wrapUpLeft", description: "Wrap the left-hand side in parentheses to avoid confusion with \"in\" operator.", rewrite: "(a!) in b;"},
+				{
+					id:          "notNeedInOperator",
+					description: "Remove possibly unnecessary non-null assertion (!) in the left operand of the `in` operator.",
+					rewrite:     "a in b;",
+				},
+				{
+					id:          "wrapUpLeft",
+					description: "Wrap the left-hand side in parentheses to avoid confusion with \"in\" operator.",
+					rewrite:     "(a!) in b;",
+				},
 			},
 		},
 		{
@@ -221,8 +261,16 @@ func TestNoConfusingNonNullAssertionFires(t *testing.T) {
 				description string
 				rewrite     string
 			}{
-				{id: "notNeedInOperator", description: "Remove possibly unnecessary non-null assertion (!) in the left operand of the `in` operator.", rewrite: "\na in b;\n      "},
-				{id: "wrapUpLeft", description: "Wrap the left-hand side in parentheses to avoid confusion with \"in\" operator.", rewrite: "\n(a !)in b;\n      "},
+				{
+					id:          "notNeedInOperator",
+					description: "Remove possibly unnecessary non-null assertion (!) in the left operand of the `in` operator.",
+					rewrite:     "\na in b;\n      ",
+				},
+				{
+					id:          "wrapUpLeft",
+					description: "Wrap the left-hand side in parentheses to avoid confusion with \"in\" operator.",
+					rewrite:     "\n(a !)in b;\n      ",
+				},
 			},
 		},
 		{
@@ -235,45 +283,53 @@ func TestNoConfusingNonNullAssertionFires(t *testing.T) {
 				description string
 				rewrite     string
 			}{
-				{id: "notNeedInOperator", description: "Remove possibly unnecessary non-null assertion (!) in the left operand of the `instanceof` operator.", rewrite: "a instanceof b;"},
-				{id: "wrapUpLeft", description: "Wrap the left-hand side in parentheses to avoid confusion with \"instanceof\" operator.", rewrite: "(a!) instanceof b;"},
+				{
+					id:          "notNeedInOperator",
+					description: "Remove possibly unnecessary non-null assertion (!) in the left operand of the `instanceof` operator.",
+					rewrite:     "a instanceof b;",
+				},
+				{
+					id:          "wrapUpLeft",
+					description: "Wrap the left-hand side in parentheses to avoid confusion with \"instanceof\" operator.",
+					rewrite:     "(a!) instanceof b;",
+				},
 			},
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(noConfusingNonNullAssertionCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoConfusingNonNullAssertion,
+		test.Run(noConfusingNonNullAssertionCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoConfusingNonNullAssertion,
 				noConfusingNonNullAssertionFile, testCase.sourceText)
 
-			rule_testing.ExpectFindings(t, result, testCase.wantId)
+			rule_testing.ExpectFindings(test, result, testCase.wantId)
 
 			diagnostic := result.Diagnostics[0]
 			if diagnostic.Message.Id != testCase.wantId {
-				t.Fatalf("message id: expected %q, got %q", testCase.wantId, diagnostic.Message.Id)
+				test.Fatalf("message id: expected %q, got %q", testCase.wantId, diagnostic.Message.Id)
 			}
 
 			// Equality rather than a substring test. `confusingOperator` splices the operator into
 			// its text twice, and a substring predicate cannot see a wrong operator in either slot.
 			if diagnostic.Message.Description != testCase.wantMessage {
-				t.Fatalf("message: expected %q, got %q", testCase.wantMessage,
+				test.Fatalf("message: expected %q, got %q", testCase.wantMessage,
 					diagnostic.Message.Description)
 			}
 
 			// rule_testing.Run does not trim, so the source on disk is the literal above.
 			gotSpan := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
 			if gotSpan != testCase.wantSpan {
-				t.Fatalf("span: expected %q, got %q", testCase.wantSpan, gotSpan)
+				test.Fatalf("span: expected %q, got %q", testCase.wantSpan, gotSpan)
 			}
 
 			if len(diagnostic.Suggestions) != len(testCase.wantSuggestions) {
-				t.Fatalf("suggestions: expected %d, got %d", len(testCase.wantSuggestions),
+				test.Fatalf("suggestions: expected %d, got %d", len(testCase.wantSuggestions),
 					len(diagnostic.Suggestions))
 			}
 			for suggestionIndex, want := range testCase.wantSuggestions {
 				got := diagnostic.Suggestions[suggestionIndex]
 				if got.Message.Id != want.id {
-					t.Fatalf("suggestion %d id: expected %q, got %q", suggestionIndex, want.id,
+					test.Fatalf("suggestion %d id: expected %q, got %q", suggestionIndex, want.id,
 						got.Message.Id)
 				}
 				// The rendered suggestion text, asserted by equality. `notNeedInOperator` and
@@ -282,12 +338,12 @@ func TestNoConfusingNonNullAssertionFires(t *testing.T) {
 				// mutant hardcoding `in` into that slot survived the whole suite until this line
 				// existed.
 				if got.Message.Description != want.description {
-					t.Fatalf("suggestion %d description: expected %q, got %q", suggestionIndex,
+					test.Fatalf("suggestion %d description: expected %q, got %q", suggestionIndex,
 						want.description, got.Message.Description)
 				}
 				rewritten := applySuggestionFixes(testCase.sourceText, got)
 				if rewritten != want.rewrite {
-					t.Fatalf("suggestion %d rewrites to %q, wanted %q", suggestionIndex, rewritten,
+					test.Fatalf("suggestion %d rewrites to %q, wanted %q", suggestionIndex, rewritten,
 						want.rewrite)
 				}
 			}
@@ -297,7 +353,7 @@ func TestNoConfusingNonNullAssertionFires(t *testing.T) {
 
 // applySuggestionFixes replays every edit a suggestion carries, highest offset first.
 //
-// Hand-rolled because rule_testing.ExpectFixedSource applies FIXES and this rule ships only
+// Hand-rolled because rule_testing.ExpectFixedSource applies fixes and this rule ships only
 // suggestions, which the harness deliberately does not apply: a suggestion changes what the code
 // means and a human has to choose it. Descending order so an earlier edit does not move a later
 // one, which matters here because the wrap suggestion writes an opening and a closing paren as
@@ -305,11 +361,12 @@ func TestNoConfusingNonNullAssertionFires(t *testing.T) {
 func applySuggestionFixes(sourceText string, suggestion rule.Suggestion) string {
 	ordered := make([]rule.Fix, len(suggestion.Fixes))
 	copy(ordered, suggestion.Fixes)
-	sort.SliceStable(ordered, func(a int, b int) bool {
-		return ordered[a].Range.Pos() > ordered[b].Range.Pos()
+	sort.SliceStable(ordered, func(left int, right int) bool {
+		return ordered[left].Range.Pos() > ordered[right].Range.Pos()
 	})
+	edited := sourceText
 	for _, fix := range ordered {
-		sourceText = sourceText[:fix.Range.Pos()] + fix.Text + sourceText[fix.Range.End():]
+		edited = edited[:fix.Range.Pos()] + fix.Text + edited[fix.Range.End():]
 	}
-	return sourceText
+	return edited
 }

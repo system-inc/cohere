@@ -90,7 +90,10 @@ func expectedAlias(source string) string {
 
 // importRequireNodeNamespaceRequireNamespaceImportText is the rule's `requireNamespaceImport` message,
 // whose wording lives in `policy/messages/import-require-node-namespace.json`.
-var importRequireNodeNamespaceRequireNamespaceImportText = policy.MessageOf("nexus/import-require-node-namespace", "requireNamespaceImport")
+var importRequireNodeNamespaceRequireNamespaceImportText = policy.MessageOf(
+	"nexus/import-require-node-namespace",
+	"requireNamespaceImport",
+)
 
 func messageRequireNamespaceImport(source string, expected string, bare string) rule.Message {
 	return rule.Message{
@@ -105,7 +108,10 @@ func messageRequireNamespaceImport(source string, expected string, bare string) 
 
 // importRequireNodeNamespaceRequireNodePrefixText is the rule's `requireNodePrefix` message,
 // whose wording lives in `policy/messages/import-require-node-namespace.json`.
-var importRequireNodeNamespaceRequireNodePrefixText = policy.MessageOf("nexus/import-require-node-namespace", "requireNodePrefix")
+var importRequireNodeNamespaceRequireNodePrefixText = policy.MessageOf(
+	"nexus/import-require-node-namespace",
+	"requireNodePrefix",
+)
 
 func messageRequireNodePrefix(source string, expected string, bare string) rule.Message {
 	return rule.Message{
@@ -120,7 +126,10 @@ func messageRequireNodePrefix(source string, expected string, bare string) rule.
 
 // importRequireNodeNamespaceRequireCorrectAliasText is the rule's `requireCorrectAlias` message,
 // whose wording lives in `policy/messages/import-require-node-namespace.json`.
-var importRequireNodeNamespaceRequireCorrectAliasText = policy.MessageOf("nexus/import-require-node-namespace", "requireCorrectAlias")
+var importRequireNodeNamespaceRequireCorrectAliasText = policy.MessageOf(
+	"nexus/import-require-node-namespace",
+	"requireCorrectAlias",
+)
 
 func messageRequireCorrectAlias(expected string, actual string, bare string) rule.Message {
 	return rule.Message{
@@ -151,9 +160,9 @@ func messageRequireCorrectAlias(expected string, actual string, bare string) rul
 // The TypeScript original followed each binding through scope and re-rooted it at the namespace.
 // That needs scope analysis this rule does not have yet, so the finding is reported without a fix
 // rather than with one that breaks the build. Reporting honestly beats fixing wrongly.
-var ImportRequireNodeNamespace = rule.Rule{
+var ImportRequireNodeNamespace = rule.Rule[rule.NoOptions]{
 	Name: "nexus/import-require-node-namespace",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindImportDeclaration: func(node *ast.Node) {
 				declaration := node.AsImportDeclaration()
@@ -171,7 +180,7 @@ var ImportRequireNodeNamespace = rule.Rule{
 
 				namespaceImport, hasNamespaceImport := namespaceImportOf(declaration)
 				if !hasNamespaceImport {
-					ctx.ReportNode(node, messageRequireNamespaceImport(source, expected, bare))
+					ruleContext.ReportNode(node, messageRequireNamespaceImport(source, expected, bare))
 					return
 				}
 
@@ -184,17 +193,17 @@ var ImportRequireNodeNamespace = rule.Rule{
 				// alias at the `* as alias` specifier (its `namespaceSpecifier`) rather than at the
 				// name alone.
 				if !strings.HasPrefix(source, "node:") {
-					ctx.ReportNodeWithFixes(
+					ruleContext.ReportNodeWithFixes(
 						node,
 						messageRequireNodePrefix(source, expected, bare),
-						ctx.ReplaceNode(declaration.ModuleSpecifier, "'node:"+bare+"'"),
+						ruleContext.ReplaceNode(declaration.ModuleSpecifier, "'node:"+bare+"'"),
 					)
 				}
 
 				if alias := namespaceImport.Name(); alias != nil && alias.Text() != expected {
 					// No fix: renaming the alias without renaming its references through scope
 					// would leave the file uncompilable, the same trap as the namespace case above.
-					ctx.ReportNode(namespaceImport, messageRequireCorrectAlias(expected, alias.Text(), bare))
+					ruleContext.ReportNode(namespaceImport, messageRequireCorrectAlias(expected, alias.Text(), bare))
 				}
 			},
 		}

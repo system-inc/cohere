@@ -8,5 +8,8 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // sometimes a string and sometimes an object, and because two of its three defaults are not Go zero
 // values. See `DecodeJsxCurlyBracePresenceOptions`.
 func init() {
-	rule.Register(rule.Registration{Rule: JsxCurlyBracePresence, Decode: DecodeJsxCurlyBracePresenceOptions})
+	rule.Register(rule.Registration[JsxCurlyBracePresenceOptions]{
+		Rule:   JsxCurlyBracePresence,
+		Decode: DecodeJsxCurlyBracePresenceOptions,
+	})
 }

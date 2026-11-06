@@ -9,12 +9,10 @@ import (
 
 // Every expectation below is what `new RegExp(source, flags).test(subject)`
 // answers in JavaScript.
-func TestTest(t *testing.T) {
-	t.Parallel()
-	const (
-		LS = "\u2028"
-		PS = "\u2029"
-	)
+func TestTest(test *testing.T) {
+	test.Parallel()
+	const lineSeparator = "\u2028"
+	const paragraphSeparator = "\u2029"
 
 	tests := []struct {
 		name    string
@@ -26,10 +24,10 @@ func TestTest(t *testing.T) {
 		// ---- `.` stops at every line terminator, not just `\n` ----
 		{name: "dot vs LF", source: "^.$", subject: "\n"},
 		{name: "dot vs CR", source: "^.$", subject: "\r"},
-		{name: "dot vs LS", source: "^.$", subject: LS},
-		{name: "dot vs PS", source: "^.$", subject: PS},
+		{name: "dot vs LS", source: "^.$", subject: lineSeparator},
+		{name: "dot vs PS", source: "^.$", subject: paragraphSeparator},
 		{name: "dot vs letter", source: "^.$", subject: "a", want: true},
-		{name: "dotAll vs LS", source: "^.$", flags: "s", subject: LS, want: true},
+		{name: "dotAll vs LS", source: "^.$", flags: "s", subject: lineSeparator, want: true},
 		{name: "dotAll vs LF", source: "^.$", flags: "s", subject: "\n", want: true},
 
 		// ---- anchors without `m` mean the very ends ----
@@ -40,11 +38,11 @@ func TestTest(t *testing.T) {
 		// ---- anchors with `m` break on all four terminators ----
 		{name: "m start after LF", source: "^b", flags: "m", subject: "a\nb", want: true},
 		{name: "m start after CR", source: "^b", flags: "m", subject: "a\rb", want: true},
-		{name: "m start after LS", source: "^b", flags: "m", subject: "a" + LS + "b", want: true},
-		{name: "m start after PS", source: "^b", flags: "m", subject: "a" + PS + "b", want: true},
+		{name: "m start after LS", source: "^b", flags: "m", subject: "a" + lineSeparator + "b", want: true},
+		{name: "m start after PS", source: "^b", flags: "m", subject: "a" + paragraphSeparator + "b", want: true},
 		{name: "m start mid-word", source: "^b", flags: "m", subject: "ab"},
 		{name: "m end before CR", source: "a$", flags: "m", subject: "a\rb", want: true},
-		{name: "m end before LS", source: "a$", flags: "m", subject: "a" + LS + "b", want: true},
+		{name: "m end before LS", source: "a$", flags: "m", subject: "a" + lineSeparator + "b", want: true},
 		{name: "m end mid-word", source: "a$", flags: "m", subject: "ab"},
 
 		// ---- `i` compares the way JavaScript compares ----
@@ -52,7 +50,7 @@ func TestTest(t *testing.T) {
 		{name: "i sigma final", source: "^\u03a3$", flags: "i", subject: "\u03c2", want: true},
 		{name: "i sigma small", source: "^\u03a3$", flags: "i", subject: "\u03c3", want: true},
 		// A character outside ASCII never folds into ASCII, so these do not
-		// match — which is where Unicode folding gives the other answer.
+		// match, which is where Unicode folding gives the other answer.
 		{name: "i kelvin sign", source: "^k$", flags: "i", subject: "\u212a"},
 		{name: "i long s", source: "^s$", flags: "i", subject: "\u017f"},
 		{name: "i eszett", source: "^\u00df$", flags: "i", subject: "\u1e9e"},
@@ -211,22 +209,29 @@ func TestTest(t *testing.T) {
 		{name: "anchor in a class", source: "^[$^]$", subject: "^", want: true},
 	}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
-			re, err := Compile(test.source, test.flags)
-			if err != nil {
-				t.Fatalf("Compile(%q, %q) = %v", test.source, test.flags, err)
+	for _, testCase := range tests {
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			re, compileError := Compile(testCase.source, testCase.flags)
+			if compileError != nil {
+				test.Fatalf("Compile(%q, %q) = %v", testCase.source, testCase.flags, compileError)
 			}
-			if got := re.Test(test.subject); got != test.want {
-				t.Errorf("/%s/%s.test(%q) = %v, want %v", test.source, test.flags, test.subject, got, test.want)
+			if got := re.Test(testCase.subject); got != testCase.want {
+				test.Errorf(
+					"/%s/%s.test(%q) = %v, want %v",
+					testCase.source,
+					testCase.flags,
+					testCase.subject,
+					got,
+					testCase.want,
+				)
 			}
 		})
 	}
 }
 
-func TestCompileRejects(t *testing.T) {
-	t.Parallel()
+func TestCompileRejects(test *testing.T) {
+	test.Parallel()
 	tests := []struct {
 		name   string
 		source string
@@ -272,45 +277,51 @@ func TestCompileRejects(t *testing.T) {
 		{name: "backslash at the end", source: `a\`, is: ErrUnsupportedSyntax},
 	}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
-			_, err := Compile(test.source, test.flags)
-			if !errors.Is(err, test.is) {
-				t.Errorf("Compile(%q, %q) error = %v, want %v", test.source, test.flags, err, test.is)
+	for _, testCase := range tests {
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			_, compileError := Compile(testCase.source, testCase.flags)
+			if !errors.Is(compileError, testCase.is) {
+				test.Errorf(
+					"Compile(%q, %q) error = %v, want %v",
+					testCase.source,
+					testCase.flags,
+					compileError,
+					testCase.is,
+				)
 			}
 		})
 	}
 }
 
-func TestAccessorsKeepTheWrittenForm(t *testing.T) {
-	t.Parallel()
+func TestAccessorsKeepTheWrittenForm(test *testing.T) {
+	test.Parallel()
 	re := MustCompile("^a.b$", "im")
 	if re.Source() != "^a.b$" {
-		t.Errorf("Source() = %q, want the pattern as written", re.Source())
+		test.Errorf("Source() = %q, want the pattern as written", re.Source())
 	}
 	if re.Flags() != "im" {
-		t.Errorf("Flags() = %q, want %q", re.Flags(), "im")
+		test.Errorf("Flags() = %q, want %q", re.Flags(), "im")
 	}
 	if re.String() != "/^a.b$/im" {
-		t.Errorf("String() = %q, want %q", re.String(), "/^a.b$/im")
+		test.Errorf("String() = %q, want %q", re.String(), "/^a.b$/im")
 	}
 }
 
 // TestMatchingIsBounded covers the bound on how long one subject may spend in
 // one pattern. A pattern a user wrote can backtrack exponentially, so this
 // reads the bound off the compiled pattern rather than handing it one that
-// needs it — running the pathological case to watch it stop costs a core for
+// needs it: running the pathological case to watch it stop costs a core for
 // as long as the bound allows, every time the suite runs.
-func TestMatchingIsBounded(t *testing.T) {
-	t.Parallel()
+func TestMatchingIsBounded(test *testing.T) {
+	test.Parallel()
 	if MatchTimeout <= 0 {
-		t.Fatalf("MatchTimeout = %s, want a finite bound", MatchTimeout)
+		test.Fatalf("MatchTimeout = %s, want a finite bound", MatchTimeout)
 	}
 	for _, source := range []string{"(a|aa)+$", "^a$", "[a-z]+", `(?<n>x)\k<n>`} {
 		re := MustCompile(source, "")
 		if got := re.Unwrap().MatchTimeout; got != MatchTimeout {
-			t.Errorf("%q compiled with MatchTimeout %s, want %s", source, got, MatchTimeout)
+			test.Errorf("%q compiled with MatchTimeout %s, want %s", source, got, MatchTimeout)
 		}
 	}
 }
@@ -319,27 +330,29 @@ func TestMatchingIsBounded(t *testing.T) {
 // produces a report. The bound is pulled in rather than waited out, so the
 // pathological pattern stops at the first check rather than costing a core for
 // a second.
-func TestTestOrTimeoutFailsOpen(t *testing.T) {
-	t.Parallel()
+func TestTestOrTimeoutFailsOpen(test *testing.T) {
+	test.Parallel()
 	re := MustCompile(`^(?:(a+)+b|a+)$`, "")
 	re.Unwrap().MatchTimeout = time.Nanosecond
 	subject := strings.Repeat("a", 200)
 
 	if re.Test(subject) {
-		t.Fatal("the match settled inside the bound, so there is nothing to fail open on")
+		test.Fatal("the match settled inside the bound, so there is nothing to fail open on")
 	}
 	if !re.TestOrTimeout(subject) {
-		t.Error("TestOrTimeout read a bound match as no match, which is what turns a skipped report into a false positive")
+		test.Error(
+			"TestOrTimeout read a bound match as no match, which is what turns a skipped report into a false positive",
+		)
 	}
 }
 
-func TestNilIsSafe(t *testing.T) {
-	t.Parallel()
+func TestNilIsSafe(test *testing.T) {
+	test.Parallel()
 	var re *RegExp
 	if re.Test("anything") {
-		t.Error("a nil RegExp matched")
+		test.Error("a nil RegExp matched")
 	}
 	if re.Unwrap() != nil {
-		t.Error("a nil RegExp unwrapped to something")
+		test.Error("a nil RegExp unwrapped to something")
 	}
 }

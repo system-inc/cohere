@@ -10,15 +10,16 @@ import (
 // processor is upstream's events.processor: the doc for the child at path, or false to skip it.
 type processor func(path *astPath) (doc.Doc, bool)
 
-func printChildren(path *astPath, options *options, print printing.PrintFunc, process processor) doc.Doc {
-	if process == nil {
-		process = func(*astPath) (doc.Doc, bool) { return print(nil, nil), true }
+func printChildren(path *astPath, options *options, print printFunc, process processor) doc.Doc {
+	childProcessor := process
+	if childProcessor == nil {
+		childProcessor = func(*astPath) (doc.Doc, bool) { return print("", nil), true }
 	}
 
 	parts := doc.Concat{}
 
-	path.Each(func(path *astPath, _ int, _ any) {
-		result, keep := process(path)
+	path.Each(func(path *astPath, _ int) {
+		result, keep := childProcessor(path)
 		if keep {
 			if len(parts) > 0 && shouldPrePrintHardline(path) {
 				parts = append(parts, doc.Hardline)
@@ -39,9 +40,9 @@ func shouldPrePrintHardline(path *astPath) bool {
 	node, parent := currentNode(path), parentNode(path)
 	isInlineNode := inlineNodeTypes[node.NodeType]
 
-	isInlineHTML := node.NodeType == "html" && inlineNodeWrapperTypes[parent.NodeType]
+	isInlineHtml := node.NodeType == "html" && inlineNodeWrapperTypes[parent.NodeType]
 
-	return !isInlineNode && !isInlineHTML
+	return !isInlineNode && !isInlineHtml
 }
 
 var siblingNodeTypes = map[string]bool{"listItem": true, "definition": true}
@@ -68,13 +69,13 @@ func shouldPrePrintDoubleHardline(path *astPath, options *options) bool {
 	isInTightListItem := parent.NodeType == "listItem" &&
 		(node.NodeType == "list" || !printing.CallParent(path, isLooseListItemAt, 0))
 	isPrevNodePrettierIgnore := isPrettierIgnore(previous) == "next"
-	isBlockHTMLWithoutBlankLineBetweenPrevHTML := node.NodeType == "html" &&
+	isBlockHtmlWithoutBlankLineBetweenPrevHtml := node.NodeType == "html" &&
 		previous.NodeType == "html" &&
 		previous.Position.End.Line+1 == node.Position.Start.Line
-	isBlockHTMLWithoutBlankLineBetweenPrevParagraph := node.NodeType == "html" &&
+	isBlockHtmlWithoutBlankLineBetweenPrevParagraph := node.NodeType == "html" &&
 		previous.NodeType == "paragraph" &&
 		previous.Position.End.Line+1 == node.Position.Start.Line
-	isHTMLDirectAfterListItem := node.NodeType == "html" &&
+	isHtmlDirectAfterListItem := node.NodeType == "html" &&
 		parent.NodeType == "listItem" &&
 		previous.NodeType == "paragraph" &&
 		previous.Position.End.Line+1 == node.Position.Start.Line
@@ -82,9 +83,9 @@ func shouldPrePrintDoubleHardline(path *astPath, options *options) bool {
 	return !(isSiblingNode ||
 		isInTightListItem ||
 		isPrevNodePrettierIgnore ||
-		isBlockHTMLWithoutBlankLineBetweenPrevHTML ||
-		isBlockHTMLWithoutBlankLineBetweenPrevParagraph ||
-		isHTMLDirectAfterListItem)
+		isBlockHtmlWithoutBlankLineBetweenPrevHtml ||
+		isBlockHtmlWithoutBlankLineBetweenPrevParagraph ||
+		isHtmlDirectAfterListItem)
 }
 
 func isLooseListItem(node *Node, parent *Node, next *Node) bool {

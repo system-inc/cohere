@@ -19,14 +19,14 @@ var messageSelfAssignment = rule.Message{
 // Upstream's schema is a single object with one boolean, `props`, defaulting to true. Our config
 // layer unwraps the severity tuple before dispatch, so the decoder receives that object directly.
 type NoSelfAssignOptions struct {
-	// Props compares member expressions as well as names, so `a.b = a.b` and `a[b] = a[b]` report.
+	// Properties compares member expressions as well as names, so `a.b = a.b` and `a[b] = a[b]` report.
 	// Absent means true, which is upstream's default and the reason the decoder is hand-written.
-	Props bool `json:"props"`
+	Properties bool `json:"props"`
 }
 
 // DefaultNoSelfAssignOptions is the unconfigured answer.
 func DefaultNoSelfAssignOptions() NoSelfAssignOptions {
-	return NoSelfAssignOptions{Props: true}
+	return NoSelfAssignOptions{Properties: true}
 }
 
 // DecodeNoSelfAssignOptions reads this rule's configuration from the config layer.
@@ -34,13 +34,13 @@ func DefaultNoSelfAssignOptions() NoSelfAssignOptions {
 // Hand-rolled rather than `rule.DecodeOptionsInto` for two reasons, both about the default being
 // true. A bare `"error"` arrives as empty input and must resolve to the default rather than error,
 // and `{}` must keep `props` on, which decoding into a zero struct would silently turn off.
-func DecodeNoSelfAssignOptions(raw []byte) (any, error) {
+func DecodeNoSelfAssignOptions(raw []byte) (NoSelfAssignOptions, error) {
 	options := DefaultNoSelfAssignOptions()
 	if len(raw) == 0 {
 		return options, nil
 	}
-	if err := rule.UnmarshalOptions(raw, &options); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &options); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 	return options, nil
 }
@@ -75,12 +75,12 @@ func DecodeNoSelfAssignOptions(raw []byte) (any, error) {
 //
 // Only the four assignment operators that write the whole value are considered: `=`, `&&=`, `||=`,
 // and `??=`. `a += a` doubles a, which is a different statement and not this rule's business.
-var NoSelfAssign = rule.Rule{
+var NoSelfAssign = rule.Rule[NoSelfAssignOptions]{
 	Name: "no-self-assign",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		props := DefaultNoSelfAssignOptions().Props
-		if resolved, isNoSelfAssignOptions := rule.OptionsAs[NoSelfAssignOptions](options); isNoSelfAssignOptions {
-			props = resolved.Props
+	Run: func(ruleContext rule.Context, options rule.Given[NoSelfAssignOptions]) rule.Listeners {
+		properties := DefaultNoSelfAssignOptions().Properties
+		if resolved, isNoSelfAssignOptions := options.Read(); isNoSelfAssignOptions {
+			properties = resolved.Properties
 		}
 
 		return rule.Listeners{
@@ -106,7 +106,7 @@ var NoSelfAssign = rule.Rule{
 					return
 				}
 
-				reportSelfAssignments(ctx, binary.Left, binary.Right, props)
+				reportSelfAssignments(ruleContext, binary.Left, binary.Right, properties)
 			},
 		}
 	},
@@ -116,34 +116,36 @@ var NoSelfAssign = rule.Rule{
 //
 // Recursive because a destructuring assignment is a tree of targets against a tree of values, and a
 // self-assignment can sit at any depth: `[a, [b]] = [a, [b]]` is two of them.
-func reportSelfAssignments(ctx rule.Context, left *ast.Node, right *ast.Node, props bool) {
+func reportSelfAssignments(ruleContext rule.Context, left *ast.Node, right *ast.Node, properties bool) {
 	if left == nil || right == nil {
 		return
 	}
-	left = ast.SkipParentheses(left)
-	right = ast.SkipParentheses(right)
-	if left == nil || right == nil {
+	unwrappedLeft := ast.SkipParentheses(left)
+	unwrappedRight := ast.SkipParentheses(right)
+	if unwrappedLeft == nil || unwrappedRight == nil {
 		return
 	}
 
 	switch {
-	case left.Kind == ast.KindIdentifier && right.Kind == ast.KindIdentifier:
-		if left.Text() == right.Text() {
-			ctx.ReportNode(right, messageSelfAssignment)
+	case unwrappedLeft.Kind == ast.KindIdentifier && unwrappedRight.Kind == ast.KindIdentifier:
+		if unwrappedLeft.Text() == unwrappedRight.Text() {
+			ruleContext.ReportNode(unwrappedRight, messageSelfAssignment)
 		}
 
-	case left.Kind == ast.KindArrayLiteralExpression && right.Kind == ast.KindArrayLiteralExpression:
-		reportArraySelfAssignments(ctx, left, right, props)
+	case unwrappedLeft.Kind == ast.KindArrayLiteralExpression && unwrappedRight.Kind == ast.KindArrayLiteralExpression:
+		reportArraySelfAssignments(ruleContext, unwrappedLeft, unwrappedRight, properties)
 
-	case left.Kind == ast.KindObjectLiteralExpression && right.Kind == ast.KindObjectLiteralExpression:
-		reportObjectSelfAssignments(ctx, left, right, props)
+	case unwrappedLeft.Kind == ast.KindObjectLiteralExpression &&
+		unwrappedRight.Kind == ast.KindObjectLiteralExpression:
+		reportObjectSelfAssignments(ruleContext, unwrappedLeft, unwrappedRight, properties)
 
-	case left.Kind == ast.KindSpreadElement && right.Kind == ast.KindSpreadElement:
-		reportSelfAssignments(ctx, left.AsSpreadElement().Expression, right.AsSpreadElement().Expression, props)
+	case unwrappedLeft.Kind == ast.KindSpreadElement && unwrappedRight.Kind == ast.KindSpreadElement:
+		reportSelfAssignments(ruleContext, unwrappedLeft.AsSpreadElement().Expression,
+			unwrappedRight.AsSpreadElement().Expression, properties)
 
-	case props && ast.IsAccessExpression(left) && ast.IsAccessExpression(right):
-		if isSameReference(left, right) {
-			ctx.ReportNode(right, messageSelfAssignment)
+	case properties && ast.IsAccessExpression(unwrappedLeft) && ast.IsAccessExpression(unwrappedRight):
+		if isSameReference(unwrappedLeft, unwrappedRight) {
+			ruleContext.ReportNode(unwrappedRight, messageSelfAssignment)
 		}
 	}
 }
@@ -152,7 +154,7 @@ func reportSelfAssignments(ctx rule.Context, left *ast.Node, right *ast.Node, pr
 //
 // Positional rather than by membership, which is what keeps `[a, b] = [b, a]` silent: a swap
 // assigns each name a different value and is the reason anyone writes this shape at all.
-func reportArraySelfAssignments(ctx rule.Context, left *ast.Node, right *ast.Node, props bool) {
+func reportArraySelfAssignments(ruleContext rule.Context, left *ast.Node, right *ast.Node, properties bool) {
 	leftElements := left.AsArrayLiteralExpression().Elements.Nodes
 	rightElements := right.AsArrayLiteralExpression().Elements.Nodes
 
@@ -167,7 +169,7 @@ func reportArraySelfAssignments(ctx rule.Context, left *ast.Node, right *ast.Nod
 			return
 		}
 
-		reportSelfAssignments(ctx, leftElement, rightElement, props)
+		reportSelfAssignments(ruleContext, leftElement, rightElement, properties)
 
 		// After a spread on the value side, every later index is unknown, so no further position
 		// can be claimed to match.
@@ -181,7 +183,7 @@ func reportArraySelfAssignments(ctx rule.Context, left *ast.Node, right *ast.Nod
 //
 // By name rather than positionally, because object properties are unordered and `{ a, b } = { b, a }`
 // really is a self-assignment of both.
-func reportObjectSelfAssignments(ctx rule.Context, left *ast.Node, right *ast.Node, props bool) {
+func reportObjectSelfAssignments(ruleContext rule.Context, left *ast.Node, right *ast.Node, properties bool) {
 	leftProperties := left.AsObjectLiteralExpression().Properties.Nodes
 	rightProperties := right.AsObjectLiteralExpression().Properties.Nodes
 	if len(rightProperties) == 0 {
@@ -220,7 +222,7 @@ func reportObjectSelfAssignments(ctx rule.Context, left *ast.Node, right *ast.No
 			if !rightOk || leftName != rightName {
 				continue
 			}
-			reportSelfAssignments(ctx, propertyValue(leftProperty), propertyValue(rightProperty), props)
+			reportSelfAssignments(ruleContext, propertyValue(leftProperty), propertyValue(rightProperty), properties)
 		}
 	}
 }
@@ -330,41 +332,45 @@ func noSelfAssignStaticAccessedName(node *ast.Node) (string, bool) {
 // so ignoring it is the comparison upstream's unwrapping arrives at. Anything outside the arms below
 // is false: `f().x = f().x` calls f twice, and `a[i + 1]` is an expression rather than a reference.
 func isSameReference(left *ast.Node, right *ast.Node) bool {
-	left = ast.SkipParentheses(left)
-	right = ast.SkipParentheses(right)
-	if left == nil || right == nil {
+	unwrappedLeft := ast.SkipParentheses(left)
+	unwrappedRight := ast.SkipParentheses(right)
+	if unwrappedLeft == nil || unwrappedRight == nil {
 		return false
 	}
 
-	if ast.IsAccessExpression(left) && ast.IsAccessExpression(right) {
+	if ast.IsAccessExpression(unwrappedLeft) && ast.IsAccessExpression(unwrappedRight) {
 		// When the target's key is static, the value's must be the same static key, which is what
 		// lets a dot and a bracket spelling meet before their kinds are compared.
-		if leftName, leftStatic := noSelfAssignStaticAccessedName(left); leftStatic {
-			rightName, rightStatic := noSelfAssignStaticAccessedName(right)
+		if leftName, leftStatic := noSelfAssignStaticAccessedName(unwrappedLeft); leftStatic {
+			rightName, rightStatic := noSelfAssignStaticAccessedName(unwrappedRight)
 			return rightStatic && leftName == rightName &&
-				isSameReference(accessedObject(left), accessedObject(right))
+				isSameReference(accessedObject(unwrappedLeft), accessedObject(unwrappedRight))
 		}
 
 		// Otherwise both must be written the same way, dotted or bracketed, with the same key
 		// expression: `a[b] = a[b]` and `this.#a = this.#a`.
-		if left.Kind != right.Kind {
+		if unwrappedLeft.Kind != unwrappedRight.Kind {
 			return false
 		}
-		if left.Kind == ast.KindPropertyAccessExpression {
-			return isSameReference(left.AsPropertyAccessExpression().Expression, right.AsPropertyAccessExpression().Expression) &&
-				isSameReference(left.AsPropertyAccessExpression().Name(), right.AsPropertyAccessExpression().Name())
+		if unwrappedLeft.Kind == ast.KindPropertyAccessExpression {
+			return isSameReference(unwrappedLeft.AsPropertyAccessExpression().Expression,
+				unwrappedRight.AsPropertyAccessExpression().Expression) &&
+				isSameReference(unwrappedLeft.AsPropertyAccessExpression().Name(),
+					unwrappedRight.AsPropertyAccessExpression().Name())
 		}
-		return isSameReference(left.AsElementAccessExpression().Expression, right.AsElementAccessExpression().Expression) &&
-			isSameReference(left.AsElementAccessExpression().ArgumentExpression, right.AsElementAccessExpression().ArgumentExpression)
+		return isSameReference(unwrappedLeft.AsElementAccessExpression().Expression,
+			unwrappedRight.AsElementAccessExpression().Expression) &&
+			isSameReference(unwrappedLeft.AsElementAccessExpression().ArgumentExpression,
+				unwrappedRight.AsElementAccessExpression().ArgumentExpression)
 	}
 
-	if left.Kind != right.Kind {
+	if unwrappedLeft.Kind != unwrappedRight.Kind {
 		return false
 	}
 
-	switch left.Kind {
+	switch unwrappedLeft.Kind {
 	case ast.KindIdentifier, ast.KindPrivateIdentifier:
-		return left.Text() == right.Text()
+		return unwrappedLeft.Text() == unwrappedRight.Text()
 	case ast.KindThisKeyword, ast.KindSuperKeyword,
 		ast.KindNullKeyword, ast.KindTrueKeyword, ast.KindFalseKeyword:
 		return true
@@ -372,7 +378,7 @@ func isSameReference(left *ast.Node, right *ast.Node) bool {
 		// Upstream compares literal values, and `Text()` is the cooked value for a string and the
 		// canonical rendering for a number. A template is a TemplateLiteral in ESTree rather than a
 		// Literal, so it falls to the default arm there and here.
-		return left.Text() == right.Text()
+		return unwrappedLeft.Text() == unwrappedRight.Text()
 	}
 
 	return false

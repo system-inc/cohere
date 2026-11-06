@@ -13,7 +13,10 @@ const correctnessNoNullishStrippingAssertionId = "nullishStrippedByAssertion"
 // correctnessNoNullishStrippingAssertionText is the rule's message, whose wording lives in
 // `policy/messages/correctness-no-nullish-stripping-assertion.json`. It gives the repairs in the
 // order `no-non-null-assertion` does, since the two rules report the same claim through two doors.
-var correctnessNoNullishStrippingAssertionText = policy.MessageOf("nexus/correctness-no-nullish-stripping-assertion", correctnessNoNullishStrippingAssertionId)
+var correctnessNoNullishStrippingAssertionText = policy.MessageOf(
+	"nexus/correctness-no-nullish-stripping-assertion",
+	correctnessNoNullishStrippingAssertionId,
+)
 
 func correctnessNoNullishStrippingAssertionMessage() rule.Message {
 	return rule.Message{
@@ -52,7 +55,7 @@ func correctnessNoNullishStrippingAssertionMessage() rule.Message {
 // the same cast, so the decline is that rule's own predicate, copied here verbatim
 // (`isSameTypeWithoutNullish` in `rules/typescript/non_nullable_type_assertion_style.go`, which is
 // unexported): every asserted constituent is a non-nullish constituent of the original by type
-// IDENTITY, and every non-nullish original constituent is asserted. Anything this rule reports fails
+// identity, and every non-nullish original constituent is asserted. Anything this rule reports fails
 // that predicate, so the style rule declines it; anything the style rule reports passes it, so this
 // rule declines it. The fixtures assert both directions by running both rules on the same cast.
 //
@@ -74,7 +77,7 @@ func correctnessNoNullishStrippingAssertionMessage() rule.Message {
 // # What counts as stripping
 //
 // The original (the expression's type at the assertion, after narrowing) must be a union holding at
-// least one constituent flagged Null or Undefined AND at least one that is not. The asserted type must
+// least one constituent flagged Null or Undefined and at least one that is not. The asserted type must
 // have no constituent that could be nullish:
 //
 //   - **`any`, `unknown` on either side decline.** Asserting from `unknown` is a parse at a boundary,
@@ -113,7 +116,7 @@ func correctnessNoNullishStrippingAssertionMessage() rule.Message {
 //
 // Whether a missing value should throw, default, return early, or stay in the type is the author's
 // call, and a fixer choosing one would be wrong for most sites.
-var CorrectnessNoNullishStrippingAssertion = rule.Rule{
+var CorrectnessNoNullishStrippingAssertion = rule.Rule[rule.NoOptions]{
 	Name: "nexus/correctness-no-nullish-stripping-assertion",
 
 	// Every finding is decided by the types on both sides of the assertion; there is no syntactic
@@ -122,13 +125,13 @@ var CorrectnessNoNullishStrippingAssertion = rule.Rule{
 	// The rule asks only for the types at the assertion itself, never into an imported body.
 	TypeReach: rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.TypeChecker == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		if ruleContext.TypeChecker == nil {
 			return nil
 		}
 		check := func(node *ast.Node, expression *ast.Node, typeNode *ast.Node) {
-			if correctnessNoNullishStrippingAssertionStrips(ctx.TypeChecker, node, expression, typeNode) {
-				ctx.ReportNode(node, correctnessNoNullishStrippingAssertionMessage())
+			if correctnessNoNullishStrippingAssertionStrips(ruleContext.TypeChecker, node, expression, typeNode) {
+				ruleContext.ReportNode(node, correctnessNoNullishStrippingAssertionMessage())
 			}
 		}
 		return rule.Listeners{
@@ -202,7 +205,11 @@ func correctnessNoNullishStrippingAssertionStrips(
 // answers for its base constraint, and one with no constraint answers yes, because a caller can
 // instantiate it with `undefined`. The depth bound is a guard against a constraint chain that
 // refers back to itself; a chain that deep answers yes, which declines.
-func correctnessNoNullishStrippingAssertionCouldBeNullish(typeChecker *checker.Checker, candidate *checker.Type, depth int) bool {
+func correctnessNoNullishStrippingAssertionCouldBeNullish(
+	typeChecker *checker.Checker,
+	candidate *checker.Type,
+	depth int,
+) bool {
 	if candidate == nil || depth > 8 {
 		return true
 	}
@@ -215,7 +222,7 @@ func correctnessNoNullishStrippingAssertionCouldBeNullish(typeChecker *checker.C
 		if constraint == nil || constraint == candidate {
 			return true
 		}
-		for constraintPart := range type_checking.UnionTypePartsSeq(constraint) {
+		for constraintPart := range type_checking.UnionTypePartsSequence(constraint) {
 			if correctnessNoNullishStrippingAssertionCouldBeNullish(typeChecker, constraintPart, depth+1) {
 				return true
 			}
@@ -230,7 +237,10 @@ func correctnessNoNullishStrippingAssertionCouldBeNullish(typeChecker *checker.C
 // nullish, which is a strictly wider test than the style rule's). What remains is the identity
 // comparison both ways, by pointer, because the checker interns a type and hands back the same object
 // for it from anywhere in one program.
-func correctnessNoNullishStrippingAssertionIsPureRemoval(assertedTypes []*checker.Type, nonNullishOriginalTypes []*checker.Type) bool {
+func correctnessNoNullishStrippingAssertionIsPureRemoval(
+	assertedTypes []*checker.Type,
+	nonNullishOriginalTypes []*checker.Type,
+) bool {
 	for _, assertedPart := range assertedTypes {
 		if !correctnessNoNullishStrippingAssertionContains(nonNullishOriginalTypes, assertedPart) {
 			return false

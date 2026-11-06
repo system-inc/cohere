@@ -84,7 +84,7 @@ func splitCandidateIn(
 	// The prefix is rebuilt from the source text rather than from the parsed variants, because it is
 	// used verbatim to reassemble the output class. `dissectClass` cuts at the last colon, which is
 	// exactly the text `rebuildClass` needs to put back, and reprinting parsed variants would have
-	// to reproduce their spelling — including arbitrary ones like `[&_svg]:` — from a structure that
+	// to reproduce their spelling (including arbitrary ones like `[&_svg]:`) from a structure that
 	// deliberately decoded them.
 	prefix, _, _ := dissectClass(className)
 
@@ -142,7 +142,7 @@ func sourceValueAfterRoot(className string, root string) string {
 //     A NAMED modifier is also mirrored into `Fraction`, so the fraction branch below happens to
 //     cover it and the modifier branch is only reachable for an ARBITRARY one:
 //     `bg-emerald-500/[0.07]` parses with `Fraction` empty and modifier `[0.07]`. That is worth
-//     stating because it is what a mutation found — removing the modifier branch left every named
+//     stating because it is what a mutation found: removing the modifier branch left every named
 //     modifier correct and silently dropped the arbitrary ones, which is one corpus class and would
 //     have looked like an unused branch to anyone reading it.
 //
@@ -155,7 +155,7 @@ func sourceValueAfterRoot(className string, root string) string {
 // The fraction is preferred when present because it is the whole `value/modifier` text, so taking it
 // and the modifier both would print the slash twice.
 //
-// Removing the fraction branch is an EQUIVALENT mutation on this corpus and is left in anyway.
+// Removing the fraction branch is an equivalent mutation on this corpus and is left in anyway.
 // Measured: over every corpus class carrying a fraction, reconstructing `value + "/" + modifier`
 // produces the fraction text exactly, 0 differing of all of them, because a named modifier is
 // mirrored into Fraction by the parser. The branch stays because the equivalence is the parser's

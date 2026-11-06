@@ -16,38 +16,38 @@ func NewSetWithSizeHint[T comparable](hint int) *Set[T] {
 	}
 }
 
-func (s *Set[T]) Has(key T) bool {
-	_, ok := s.M[key]
+func (set *Set[T]) Has(key T) bool {
+	_, ok := set.M[key]
 	return ok
 }
 
-func (s *Set[T]) Add(key T) {
-	if s.M == nil {
-		s.M = make(map[T]struct{})
+func (set *Set[T]) Add(key T) {
+	if set.M == nil {
+		set.M = make(map[T]struct{})
 	}
-	s.M[key] = struct{}{}
+	set.M[key] = struct{}{}
 }
 
-func (s *Set[T]) Delete(key T) {
-	delete(s.M, key)
+func (set *Set[T]) Delete(key T) {
+	delete(set.M, key)
 }
 
-func (s *Set[T]) Len() int {
-	return len(s.M)
+func (set *Set[T]) Len() int {
+	return len(set.M)
 }
 
-func (s *Set[T]) Keys() map[T]struct{} {
-	return s.M
+func (set *Set[T]) Keys() map[T]struct{} {
+	return set.M
 }
 
-func (s *Set[T]) Clear() {
-	clear(s.M)
+func (set *Set[T]) Clear() {
+	clear(set.M)
 }
 
 func NewSetFromItems[T comparable](items ...T) *Set[T] {
-	s := &Set[T]{}
+	set := &Set[T]{}
 	for _, item := range items {
-		s.Add(item)
+		set.Add(item)
 	}
-	return s
+	return set
 }

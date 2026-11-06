@@ -53,15 +53,15 @@ func consistencyNoForInMessage() rule.Message {
 // keys than a snapshot does, and choosing between `Object.keys` and `Object.entries` (and how to
 // rename the value reads in the body) is the author's call. So the finding says what to write and
 // the author writes it.
-var ConsistencyNoForIn = rule.Rule{
+var ConsistencyNoForIn = rule.Rule[rule.NoOptions]{
 	Name: "nexus/consistency-no-for-in",
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			// Keyed on the `for...in` kind alone. `for...of` shares `ForInOrOfStatement` in this
 			// parser, and a listener on the shared shape would report every `for...of` in the tree.
 			ast.KindForInStatement: func(node *ast.Node) {
-				ctx.ReportNode(node, consistencyNoForInMessage())
+				ruleContext.ReportNode(node, consistencyNoForInMessage())
 			},
 		}
 	},

@@ -21,8 +21,8 @@ const newWrappersFile = "/repository/source/NewWrappers.ts"
 // declares `NeedsTypeChecker`, and the plain harness supplies a nil checker, under which
 // `resolvesToAGlobal` answers false for every input. Every Fires case would fail and every
 // StaysSilent case would pass vacuously, so the syntax-only harness cannot prove this rule.
-func TestNoNewWrappersFires(t *testing.T) {
-	t.Parallel()
+func TestNoNewWrappersFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -31,14 +31,17 @@ func TestNoNewWrappersFires(t *testing.T) {
 		{"new String", "var a = new String('hello');"},
 		{"new Number", "var a = new Number(10);"},
 		{"new Boolean", "var a = new Boolean(false);"},
-		{"the outer new String reports while the block-shadowed one does not", "\n            const a = new String('bar');\n            {\n                const String = CustomString;\n                const b = new String('foo');\n            }\n            "},
+		{
+			"the outer new String reports while the block-shadowed one does not",
+			"\n            const a = new String('bar');\n            {\n                const String = CustomString;\n                const b = new String('foo');\n            }\n            ",
+		},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.RunTypedFiles(t, NoNewWrappers,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.RunTypedFiles(test, NoNewWrappers,
 					map[string]string{newWrappersFile: testCase.sourceText}, newWrappersFile),
 				"noNewWrappers")
 		})
@@ -55,24 +58,33 @@ func TestNoNewWrappersFires(t *testing.T) {
 //
 // The import case needs a second file, since a bare unresolvable import leaves the checker with no
 // declaration to find and the case would pass for the wrong reason. Its module is written here.
-func TestNoNewWrappersStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoNewWrappersStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
 		sourceText string
 	}{
 		{"new Object is not a wrapper", "var a = new Object();"},
-		{"String called without new, beside a static read off it", "var a = String('test'), b = String.fromCharCode(32);"},
-		{"a parameter named Number shadows the global", "\n        function test(Number) {\n            return new Number;\n        }\n        "},
-		{"a var hoisted out of the else branch shadows Boolean", "\n        if (foo) {\n            result = new Boolean(bar);\n        } else {\n            var Boolean = CustomBoolean;\n        }\n        "},
+		{
+			"String called without new, beside a static read off it",
+			"var a = String('test'), b = String.fromCharCode(32);",
+		},
+		{
+			"a parameter named Number shadows the global",
+			"\n        function test(Number) {\n            return new Number;\n        }\n        ",
+		},
+		{
+			"a var hoisted out of the else branch shadows Boolean",
+			"\n        if (foo) {\n            result = new Boolean(bar);\n        } else {\n            var Boolean = CustomBoolean;\n        }\n        ",
+		},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.RunTypedFiles(t, NoNewWrappers,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.RunTypedFiles(test, NoNewWrappers,
 					map[string]string{newWrappersFile: testCase.sourceText}, newWrappersFile))
 		})
 	}
@@ -86,15 +98,15 @@ func TestNoNewWrappersStaysSilent(t *testing.T) {
 // the reason. That is the brief's "a passing case is not evidence about what you think": changing
 // the one thing believed to make it pass has to move the verdict, and here it does, since deleting
 // the import makes this report.
-func TestNoNewWrappersDeclinesAnImportedShadow(t *testing.T) {
-	t.Parallel()
+func TestNoNewWrappersDeclinesAnImportedShadow(test *testing.T) {
+	test.Parallel()
 
 	const stringModule = "/repository/source/string.ts"
 	files := map[string]string{
 		stringModule:    "export default class Str { constructor(_value: number) {} }\n",
 		newWrappersFile: "\n            import String from \"./string\";\n            const str = new String(42);\n            ",
 	}
-	rule_testing.ExpectClean(t, rule_testing.RunTypedFiles(t, NoNewWrappers, files, newWrappersFile))
+	rule_testing.ExpectClean(test, rule_testing.RunTypedFiles(test, NoNewWrappers, files, newWrappersFile))
 }
 
 // Upstream's remaining two valid cases, which report here, and the reasoning for why that is right.
@@ -108,22 +120,25 @@ func TestNoNewWrappersDeclinesAnImportedShadow(t *testing.T) {
 //
 // The global comment is carried verbatim so that if a global-comment reader ever lands, this test
 // fails and names the case rather than the case quietly disappearing.
-func TestNoNewWrappersReportsWhereUpstreamsGlobalsConfigWouldNot(t *testing.T) {
-	t.Parallel()
+func TestNoNewWrappersReportsWhereUpstreamsGlobalsConfigWouldNot(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
 		sourceText string
 	}{
 		{"globals String off", "new String()"},
-		{"a global comment turning Boolean off", "\n        /* global Boolean:off */\n        assert(new Boolean);\n        "},
+		{
+			"a global comment turning Boolean off",
+			"\n        /* global Boolean:off */\n        assert(new Boolean);\n        ",
+		},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.RunTypedFiles(t, NoNewWrappers,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.RunTypedFiles(test, NoNewWrappers,
 					map[string]string{newWrappersFile: testCase.sourceText}, newWrappersFile),
 				"noNewWrappers")
 		})
@@ -140,8 +155,8 @@ func TestNoNewWrappersReportsWhereUpstreamsGlobalsConfigWouldNot(t *testing.T) {
 // `RunTypedFiles` writes each fixture through `strings.TrimSpace(contents)+"\n"`, so a span sliced
 // out of the Go literal is offset by one on any case with a leading newline. The expectation is
 // transformed the same way the harness transforms the input rather than sliced from the literal.
-func TestNoNewWrappersReportsTheWholeNewExpression(t *testing.T) {
-	t.Parallel()
+func TestNoNewWrappersReportsTheWholeNewExpression(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -151,22 +166,26 @@ func TestNoNewWrappersReportsTheWholeNewExpression(t *testing.T) {
 		{"new String", "var a = new String('hello');", "new String('hello')"},
 		{"new Number", "var a = new Number(10);", "new Number(10)"},
 		{"new Boolean", "var a = new Boolean(false);", "new Boolean(false)"},
-		{"the outer call in the block-shadow case", "\n            const a = new String('bar');\n            {\n                const String = CustomString;\n                const b = new String('foo');\n            }\n            ", "new String('bar')"},
+		{
+			"the outer call in the block-shadow case",
+			"\n            const a = new String('bar');\n            {\n                const String = CustomString;\n                const b = new String('foo');\n            }\n            ",
+			"new String('bar')",
+		},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			sourceOnDisk := strings.TrimSpace(testCase.sourceText) + "\n"
-			result := rule_testing.RunTypedFiles(t, NoNewWrappers,
+			result := rule_testing.RunTypedFiles(test, NoNewWrappers,
 				map[string]string{newWrappersFile: testCase.sourceText}, newWrappersFile)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("want 1 diagnostic, got %d", len(result.Diagnostics))
+				test.Fatalf("want 1 diagnostic, got %d", len(result.Diagnostics))
 			}
 			diagnostic := result.Diagnostics[0]
 			got := sourceOnDisk[diagnostic.Range.Pos():diagnostic.Range.End()]
 			if got != testCase.wantSpan {
-				t.Fatalf("span %q, want %q", got, testCase.wantSpan)
+				test.Fatalf("span %q, want %q", got, testCase.wantSpan)
 			}
 		})
 	}
@@ -177,22 +196,22 @@ func TestNoNewWrappersReportsTheWholeNewExpression(t *testing.T) {
 // The description interpolates the name three times, and an id assertion cannot see anything a
 // format string does. Comparing against the rule's own constant would be equality that moves on
 // both sides under mutation, so the expected text is written out rather than referenced.
-func TestNoNewWrappersRendersTheName(t *testing.T) {
-	t.Parallel()
+func TestNoNewWrappersRendersTheName(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTypedFiles(t, NoNewWrappers,
+	result := rule_testing.RunTypedFiles(test, NoNewWrappers,
 		map[string]string{newWrappersFile: "var a = new Boolean(false);"}, newWrappersFile)
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("want 1 diagnostic, got %d", len(result.Diagnostics))
+		test.Fatalf("want 1 diagnostic, got %d", len(result.Diagnostics))
 	}
 	const want = "This calls `new Boolean()`. Constructed, Boolean returns an object rather than " +
 		"a primitive, so the result is always truthy, compares equal to nothing by `===`, and " +
 		"reports its `typeof` as \"object\". Drop the `new` and call Boolean directly."
 	if got := result.Diagnostics[0].Message.Description; got != want {
-		t.Fatalf("description %q, want %q", got, want)
+		test.Fatalf("description %q, want %q", got, want)
 	}
 	if got := result.Diagnostics[0].Message.Id; got != "noNewWrappers" {
-		t.Fatalf("id %q, want %q", got, "noNewWrappers")
+		test.Fatalf("id %q, want %q", got, "noNewWrappers")
 	}
 }
 
@@ -203,19 +222,31 @@ func TestNoNewWrappersRendersTheName(t *testing.T) {
 // actually differ, so every one of these is invisible to the imported corpus. The probe drove
 // `eslint@9` through the Linter API on each input; the verdicts recorded beside them are that
 // measurement rather than a reading of the source.
-func TestNoNewWrappersOnFormsUpstreamDoesNotWrite(t *testing.T) {
-	t.Parallel()
+func TestNoNewWrappersOnFormsUpstreamDoesNotWrite(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
 		sourceText string
 		wantReport bool
 	}{
-		{"a parenthesized callee reports, because ESTree has no node for the parenthesis", "var a = new (String)('x');", true},
+		{
+			"a parenthesized callee reports, because ESTree has no node for the parenthesis",
+			"var a = new (String)('x');",
+			true,
+		},
 		{"and so does a doubly parenthesized one", "var a = new ((String))('x');", true},
 		{"a new expression with no argument list still reports", "var a = new String;", true},
-		{"a property access callee is silent, since upstream reads callee.name and finds none", "var a = new window.String('x');", false},
-		{"globalThis.String is a property access too, and equally silent", "var a = new globalThis.String('x');", false},
+		{
+			"a property access callee is silent, since upstream reads callee.name and finds none",
+			"var a = new window.String('x');",
+			false,
+		},
+		{
+			"globalThis.String is a property access too, and equally silent",
+			"var a = new globalThis.String('x');",
+			false,
+		},
 		{"parentheses around the whole expression do not change the callee", "var a = (new String('x'));", true},
 		{"a class shadowing the name declines", "class String {} new String();", false},
 		{"a function declaration shadowing the name declines", "function Boolean() {} new Boolean();", false},
@@ -225,15 +256,15 @@ func TestNoNewWrappersOnFormsUpstreamDoesNotWrite(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedFiles(t, NoNewWrappers,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedFiles(test, NoNewWrappers,
 				map[string]string{newWrappersFile: testCase.sourceText}, newWrappersFile)
 			if testCase.wantReport {
-				rule_testing.ExpectFindings(t, result, "noNewWrappers")
+				rule_testing.ExpectFindings(test, result, "noNewWrappers")
 				return
 			}
-			rule_testing.ExpectClean(t, result)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -242,11 +273,11 @@ func TestNoNewWrappersOnFormsUpstreamDoesNotWrite(t *testing.T) {
 //
 // `ExpectFindings` asserts the count as well as the ids, so a rule reporting once on a file with
 // two violations fails here and passes every single-finding fixture above.
-func TestNoNewWrappersReportsEachViolation(t *testing.T) {
-	t.Parallel()
+func TestNoNewWrappersReportsEachViolation(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectFindings(t,
-		rule_testing.RunTypedFiles(t, NoNewWrappers,
+	rule_testing.ExpectFindings(test,
+		rule_testing.RunTypedFiles(test, NoNewWrappers,
 			map[string]string{newWrappersFile: "var a = new Number(1); var b = new Boolean(0);"},
 			newWrappersFile),
 		"noNewWrappers", "noNewWrappers")
@@ -258,9 +289,9 @@ func TestNoNewWrappersReportsEachViolation(t *testing.T) {
 // the rule goes completely silent. That is a vacuous green for every StaysSilent case in this file,
 // which is the more dangerous failure of the two the brief names, so it is pinned rather than left
 // to be rediscovered.
-func TestNoNewWrappersIsSilentWithoutAChecker(t *testing.T) {
-	t.Parallel()
+func TestNoNewWrappersIsSilentWithoutAChecker(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectClean(t,
-		rule_testing.Run(t, NoNewWrappers, newWrappersFile, "var a = new String('hello');"))
+	rule_testing.ExpectClean(test,
+		rule_testing.Run(test, NoNewWrappers, newWrappersFile, "var a = new String('hello');"))
 }

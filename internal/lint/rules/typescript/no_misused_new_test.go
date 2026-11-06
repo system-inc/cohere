@@ -11,8 +11,8 @@ const misusedNewFile = "/repository/source/Thing.ts"
 // TestNoMisusedNewFires carries every failing case from the oxc corpus verbatim, plus cases that
 // pin decisions the corpus never exercises. Counts come from partitioning the seven snapshot
 // diagnostics across six inputs by the source line each one prints.
-func TestNoMisusedNewFires(t *testing.T) {
-	t.Parallel()
+func TestNoMisusedNewFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -68,7 +68,7 @@ func TestNoMisusedNewFires(t *testing.T) {
 		{"a class inside a namespace",
 			"declare namespace N { class C { new(): C; } }",
 			[]string{"classNew"}},
-		// A NAMED class expression. Upstream anchors on AstKind::Class, which covers the
+		// A named class expression. Upstream anchors on AstKind::Class, which covers the
 		// declaration and expression forms alike; our parser gives them separate kinds, so the
 		// expression form is a second listener that no corpus case reaches. Every class
 		// expression upstream writes is anonymous, and an anonymous one returns early on the
@@ -88,18 +88,18 @@ func TestNoMisusedNewFires(t *testing.T) {
 			[]string{"interfaceConstruct"}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoMisusedNew, misusedNewFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.messageIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoMisusedNew, misusedNewFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, testCase.messageIds...)
 		})
 	}
 }
 
 // TestNoMisusedNewStaysSilent carries every passing case from the oxc corpus verbatim, plus the
 // clean side of each decision the fires table exercises.
-func TestNoMisusedNewStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoMisusedNewStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -185,7 +185,7 @@ func TestNoMisusedNewStaysSilent(t *testing.T) {
 		// A real class constructor declaration, which is KindConstructor rather than a method
 		// signature and is never the subject of either arm. Measured: silent.
 		{"a declared class constructor returning the class", "declare class C { constructor(): C; }"},
-		// The comparison is by NAME TEXT, not by resolution. `D` is an alias of `C`, so a port
+		// The comparison is by name text, not by resolution. `D` is an alias of `C`, so a port
 		// resolving the return type would find the enclosing class and report. oxc compares the
 		// written identifier and stays silent. This is the sharpest divergence available and no
 		// imported fixture covers it. Measured: silent.
@@ -200,9 +200,9 @@ func TestNoMisusedNewStaysSilent(t *testing.T) {
 			"interface I {}\ntype A = I;\ninterface I3 { new (): A; }\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoMisusedNew, misusedNewFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoMisusedNew, misusedNewFile, testCase.sourceText))
 		})
 	}
 }
@@ -211,8 +211,8 @@ func TestNoMisusedNewStaysSilent(t *testing.T) {
 // finding lands. Both arms of this rule report a token that is not the node the listener receives,
 // so a port that reported the whole signature would pass every table above while pointing at the
 // wrong span in every case.
-func TestNoMisusedNewPointsAtTheRightToken(t *testing.T) {
-	t.Parallel()
+func TestNoMisusedNewPointsAtTheRightToken(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -235,17 +235,17 @@ func TestNoMisusedNewPointsAtTheRightToken(t *testing.T) {
 		{"a getter named new", "declare abstract class C { get new(): C; }", []string{"new"}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoMisusedNew, misusedNewFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoMisusedNew, misusedNewFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.wantTexts) {
-				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.wantTexts))
+				test.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.wantTexts))
 			}
 			for index, wantText := range testCase.wantTexts {
 				diagnostic := result.Diagnostics[index]
 				gotText := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if gotText != wantText {
-					t.Errorf("finding %d spans %q, want %q", index, gotText, wantText)
+					test.Errorf("finding %d spans %q, want %q", index, gotText, wantText)
 				}
 			}
 		})
@@ -255,26 +255,26 @@ func TestNoMisusedNewPointsAtTheRightToken(t *testing.T) {
 // TestNoMisusedNewMessagesReadAsWritten asserts the message text against literal strings typed
 // here rather than against the rule's own constants, so that a mutation moving a constant moves
 // only one side of the comparison.
-func TestNoMisusedNewMessagesReadAsWritten(t *testing.T) {
-	t.Parallel()
+func TestNoMisusedNewMessagesReadAsWritten(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, NoMisusedNew, misusedNewFile,
+	result := rule_testing.Run(test, NoMisusedNew, misusedNewFile,
 		"interface I { new (): I; constructor(): void;}")
 	if len(result.Diagnostics) != 2 {
-		t.Fatalf("got %d findings, want 2", len(result.Diagnostics))
+		test.Fatalf("got %d findings, want 2", len(result.Diagnostics))
 	}
 	if got := result.Diagnostics[0].Message.Id; got != "interfaceConstruct" {
-		t.Errorf("first finding id is %q, want %q", got, "interfaceConstruct")
+		test.Errorf("first finding id is %q, want %q", got, "interfaceConstruct")
 	}
 	if got := result.Diagnostics[1].Message.Id; got != "interfaceConstructor" {
-		t.Errorf("second finding id is %q, want %q", got, "interfaceConstructor")
+		test.Errorf("second finding id is %q, want %q", got, "interfaceConstructor")
 	}
 
-	classResult := rule_testing.Run(t, NoMisusedNew, misusedNewFile, "class C { new(): C;}")
+	classResult := rule_testing.Run(test, NoMisusedNew, misusedNewFile, "class C { new(): C;}")
 	if len(classResult.Diagnostics) != 1 {
-		t.Fatalf("got %d class findings, want 1", len(classResult.Diagnostics))
+		test.Fatalf("got %d class findings, want 1", len(classResult.Diagnostics))
 	}
 	if got := classResult.Diagnostics[0].Message.Id; got != "classNew" {
-		t.Errorf("class finding id is %q, want %q", got, "classNew")
+		test.Errorf("class finding id is %q, want %q", got, "classNew")
 	}
 }

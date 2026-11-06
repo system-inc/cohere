@@ -5,14 +5,14 @@
 // property is checked directly, over whatever function is handed in:
 //
 //  1. Every value is defined at most once.
-//  2. EVERY USE IS DOMINATED BY ITS DEFINITION.
+//  2. Every use is dominated by its definition.
 //
 // The second is the real one. It is what makes SSA worth having: a pass that sees a use can reach
 // the single definition and know it has already executed. A construction that places a phi at the
 // wrong block, or renames a use to a definition sitting on a sibling branch, breaks exactly this
 // and breaks nothing that a structural well-formedness check would notice.
 //
-// # Phi operands are checked against the PREDECESSOR, not the phi's own block
+// # Phi operands are checked against the predecessor, not the phi's own block
 //
 // A phi is not an ordinary instruction. Its operand for predecessor P is read on the edge from P,
 // so the definition must dominate P's exit, not the block holding the phi. Checking it the naive
@@ -34,51 +34,40 @@ package static_single_assignment
 
 import "fmt"
 
-// SSAViolation is one broken invariant.
-type SSAViolation struct {
-	// Kind is which invariant broke.
-	Kind SSAViolationKind
-	// Identifier is the value involved.
-	Identifier IdentifierId
-	// Block is where the violating use or duplicate definition sits.
-	Block BlockId
-	// Detail is a human-readable explanation naming both ends.
-	Detail string
-}
-
-func (v SSAViolation) String() string { return v.Detail }
-
-// SSAViolationKind is which invariant a violation breaks: one of the two single assignment states, or
-// the precondition Construct rests on.
-type SSAViolationKind uint8
+// StaticSingleAssignmentViolationKind is which invariant a violation breaks: one of the two single assignment states,
+// or the precondition Construct rests on.
+type StaticSingleAssignmentViolationKind uint8
 
 const (
-	// SSAViolationMultipleDefinitions is a value written more than once.
-	SSAViolationMultipleDefinitions SSAViolationKind = iota
-	// SSAViolationUseNotDominated is a use the definition does not dominate.
-	SSAViolationUseNotDominated
-	// SSAViolationEntryHasPredecessors is an entry block some edge enters, which Graph.Entry rules out
-	// and Construct refuses.
-	SSAViolationEntryHasPredecessors
+	// StaticSingleAssignmentViolationMultipleDefinitions is a value written more than once.
+	StaticSingleAssignmentViolationMultipleDefinitions StaticSingleAssignmentViolationKind = iota
+	// StaticSingleAssignmentViolationUseNotDominated is a use the definition does not dominate.
+	StaticSingleAssignmentViolationUseNotDominated
+	// StaticSingleAssignmentViolationEntryHasPredecessors is an entry block some edge enters, which Graph.Entry rules
+	// out and Construct refuses.
+	StaticSingleAssignmentViolationEntryHasPredecessors
 )
 
-// VerifySSA checks that a function is in single static assignment form and returns every violation.
+// VerifyStaticSingleAssignment checks that a function is in single static assignment form and returns every violation.
 //
-// An empty result means the property holds. It does NOT mean the function was worth checking: a
+// An empty result means the property holds. It does not mean the function was worth checking: a
 // function whose variable references all lowered to globals has almost nothing to check and passes
-// trivially. `CollectSSAStats` is how a caller tells a real pass from a vacuous one.
+// trivially. `CollectStaticSingleAssignmentStatistics` is how a caller tells a real pass from a vacuous one.
 //
 // Nested functions are not descended into; call it per function.
-func VerifySSA[G Graph[F, B, P], F any, B comparable, P any](graph G, function F) []SSAViolation {
+func VerifyStaticSingleAssignment[G Graph[F, B, P], F any, B comparable, P any](
+	graph G,
+	function F,
+) []StaticSingleAssignmentViolation {
 	blocks := graph.Blocks(function)
 	if len(blocks) == 0 {
 		return nil
 	}
 
-	var violations []SSAViolation
+	var violations []StaticSingleAssignmentViolation
 	if entry, predecessors, entered := entryPredecessors(graph, function); entered {
-		violations = append(violations, SSAViolation{
-			Kind:  SSAViolationEntryHasPredecessors,
+		violations = append(violations, StaticSingleAssignmentViolation{
+			Kind:  StaticSingleAssignmentViolationEntryHasPredecessors,
 			Block: entry,
 			Detail: fmt.Sprintf("the entry block bb%d has predecessors %v, and no edge may enter it",
 				entry, predecessors),
@@ -93,8 +82,8 @@ func VerifySSA[G Graph[F, B, P], F any, B comparable, P any](graph G, function F
 
 	recordDefinition := func(id IdentifierId, blockId BlockId, position int) {
 		if previous, exists := definedIn[id]; exists {
-			violations = append(violations, SSAViolation{
-				Kind:       SSAViolationMultipleDefinitions,
+			violations = append(violations, StaticSingleAssignmentViolation{
+				Kind:       StaticSingleAssignmentViolationMultipleDefinitions,
 				Identifier: id,
 				Block:      blockId,
 				Detail: fmt.Sprintf("value %s is defined in bb%d and again in bb%d",
@@ -107,8 +96,8 @@ func VerifySSA[G Graph[F, B, P], F any, B comparable, P any](graph G, function F
 	}
 
 	entry := graph.Entry(function)
-	for _, param := range graph.Params(function) {
-		recordDefinition(graph.IdentifierOf(param), entry, -1)
+	for _, parameter := range graph.Parameters(function) {
+		recordDefinition(graph.IdentifierOf(parameter), entry, -1)
 	}
 
 	// The visitors are made once and read the block and position being walked from these: one handed
@@ -171,8 +160,8 @@ func VerifySSA[G Graph[F, B, P], F any, B comparable, P any](graph G, function F
 		}
 		if definitionBlock == useBlock {
 			if definedAt[id] > usePosition {
-				violations = append(violations, SSAViolation{
-					Kind:       SSAViolationUseNotDominated,
+				violations = append(violations, StaticSingleAssignmentViolation{
+					Kind:       StaticSingleAssignmentViolationUseNotDominated,
 					Identifier: id,
 					Block:      useBlock,
 					Detail: fmt.Sprintf("%s in bb%d reads %s before it is defined in the same block",
@@ -182,8 +171,8 @@ func VerifySSA[G Graph[F, B, P], F any, B comparable, P any](graph G, function F
 			return
 		}
 		if !dominance.Dominates(definitionBlock, useBlock) {
-			violations = append(violations, SSAViolation{
-				Kind:       SSAViolationUseNotDominated,
+			violations = append(violations, StaticSingleAssignmentViolation{
+				Kind:       StaticSingleAssignmentViolationUseNotDominated,
 				Identifier: id,
 				Block:      useBlock,
 				Detail: fmt.Sprintf("%s in bb%d reads %s defined in bb%d, which does not dominate bb%d",
@@ -206,7 +195,7 @@ func VerifySSA[G Graph[F, B, P], F any, B comparable, P any](graph G, function F
 	for _, block := range blocks {
 		blockId = graph.Id(block)
 		// A phi operand is read on the edge from its predecessor, so it must be dominated by the
-		// PREDECESSOR's exit rather than by the phi's own block. See the file comment.
+		// predecessor's exit rather than by the phi's own block. See the file comment.
 		for _, phi := range graph.Phis(block) {
 			for _, predecessorId := range PhiOperandsInOrder(phi) {
 				operand := phi.Operands.At(predecessorId)
@@ -228,13 +217,13 @@ func VerifySSA[G Graph[F, B, P], F any, B comparable, P any](graph G, function F
 	return violations
 }
 
-// SSAStats counts what a verification actually had to look at.
+// StaticSingleAssignmentStatistics counts what a verification actually had to look at.
 //
 // This exists because an empty violation list is exactly what a vacuous check returns. A function
-// with no phis and no renamed values passes `VerifySSA` perfectly while proving nothing, and that
-// is the failure mode this whole package has been bitten by twice. A caller reporting a clean run
-// should report these numbers alongside it.
-type SSAStats struct {
+// with no phis and no renamed values passes `VerifyStaticSingleAssignment` perfectly while proving
+// nothing, and that is the failure mode this whole package has been bitten by twice. A caller
+// reporting a clean run should report these numbers alongside it.
+type StaticSingleAssignmentStatistics struct {
 	// Phis is how many merge points were placed.
 	Phis int
 	// NamedValues is how many defined values carry a source name rather than being a temporary.
@@ -244,9 +233,12 @@ type SSAStats struct {
 	Uses int
 }
 
-// CollectSSAStats measures one function.
-func CollectSSAStats[G Graph[F, B, P], F any, B comparable, P any](graph G, function F) SSAStats {
-	var stats SSAStats
+// CollectStaticSingleAssignmentStatistics measures one function.
+func CollectStaticSingleAssignmentStatistics[G Graph[F, B, P], F any, B comparable, P any](
+	graph G,
+	function F,
+) StaticSingleAssignmentStatistics {
+	var statistics StaticSingleAssignmentStatistics
 	seen := map[IdentifierId]bool{}
 	note := func(place P) {
 		id := graph.IdentifierOf(place)
@@ -255,7 +247,7 @@ func CollectSSAStats[G Graph[F, B, P], F any, B comparable, P any](graph G, func
 		}
 		seen[id] = true
 		if graph.Named(function, id) {
-			stats.NamedValues++
+			statistics.NamedValues++
 		}
 	}
 	instruction := func(place *P, role Role) {
@@ -263,16 +255,16 @@ func CollectSSAStats[G Graph[F, B, P], F any, B comparable, P any](graph G, func
 			note(*place)
 			return
 		}
-		stats.Uses++
+		statistics.Uses++
 	}
 	terminal := func(place *P, role Role) {
 		if role != Define {
-			stats.Uses++
+			statistics.Uses++
 		}
 	}
 	for _, block := range graph.Blocks(function) {
 		phis := graph.Phis(block)
-		stats.Phis += len(phis)
+		statistics.Phis += len(phis)
 		for _, phi := range phis {
 			note(phi.Place)
 		}
@@ -282,17 +274,7 @@ func CollectSSAStats[G Graph[F, B, P], F any, B comparable, P any](graph G, func
 		}
 		graph.EachTerminalPlace(block, terminal)
 	}
-	return stats
-}
-
-// Dominance is the immediate-dominator array over a function's block slice, by position in it.
-type Dominance struct {
-	// position maps a block id to its index in the order ComputeDominance made: a reverse postorder of
-	// the real edges from the entry, then the blocks they don't reach.
-	position map[BlockId]int
-	// immediate[i] is the index of block i's immediate dominator; the entry is its own, and a block the
-	// real edges don't reach has none (-1), dominated by nothing but itself.
-	immediate []int
+	return statistics
 }
 
 // ComputeDominance runs Cooper-Harvey-Kennedy over the function's blocks.
@@ -328,16 +310,17 @@ func ComputeDominance[G Graph[F, B, P], F any, B comparable, P any](graph G, fun
 	tree.immediate[0] = 0
 	blocks = blocks[:reached]
 
-	intersect := func(a, b int) int {
-		for a != b {
-			for a > b {
-				a = tree.immediate[a]
+	intersect := func(leftBlock, rightBlock int) int {
+		left, right := leftBlock, rightBlock
+		for left != right {
+			for left > right {
+				left = tree.immediate[left]
 			}
-			for b > a {
-				b = tree.immediate[b]
+			for right > left {
+				right = tree.immediate[right]
 			}
 		}
-		return a
+		return left
 	}
 
 	for changed := true; changed; {
@@ -377,7 +360,7 @@ func realReversePostorder[G Graph[F, B, P], F any, B comparable, P any](graph G,
 		next       int
 	}
 	var stack []frame
-	scratch := edgeScratchPool.Get().(*edgeScratch)
+	scratch := takeEdgeScratch()
 	defer edgeScratchPool.Put(scratch)
 	enter := func(id BlockId) {
 		block, ok := graph.Block(function, id)
@@ -430,27 +413,4 @@ func entryPredecessors[G Graph[F, B, P], F any, B comparable, P any](graph G, fu
 	}
 	predecessors := graph.Predecessors(block)
 	return entry, predecessors, len(predecessors) > 0
-}
-
-// Dominates reports whether every path from the entry to block passes through dominator.
-//
-// A block dominates itself, the standard convention.
-func (t *Dominance) Dominates(dominator, block BlockId) bool {
-	target, ok := t.position[dominator]
-	if !ok {
-		return false
-	}
-	index, ok := t.position[block]
-	if !ok {
-		return false
-	}
-	for {
-		if index == target {
-			return true
-		}
-		if index == 0 || t.immediate[index] == -1 {
-			return false
-		}
-		index = t.immediate[index]
-	}
 }

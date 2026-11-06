@@ -13,7 +13,7 @@ type noRestrictedImportsGlobCase struct {
 
 // TestNoRestrictedImportsGlobMatchesTheIgnorePackage is the differential this matcher exists to pass.
 //
-// The table is the CROSS PRODUCT of every `group` configuration in upstream's corpus with every
+// The table is the cross product of every `group` configuration in upstream's corpus with every
 // module specifier that appears in it, driven through the real `ignore` package at the version ESLint
 // 10.8.1 depends on. That is deliberately wider than the corpus itself: the corpus pairs each group
 // with the two or three specifiers its author was thinking about, and a matcher can pass all of those
@@ -22,13 +22,13 @@ type noRestrictedImportsGlobCase struct {
 // 90 of the 864 pairs match. That ratio is the control: a matcher that answered false everywhere
 // would fail 90 rows, and one that answered true everywhere would fail 774, so neither degenerate
 // answer can pass.
-func TestNoRestrictedImportsGlobMatchesTheIgnorePackage(t *testing.T) {
-	t.Parallel()
+func TestNoRestrictedImportsGlobMatchesTheIgnorePackage(test *testing.T) {
+	test.Parallel()
 
 	cases := noRestrictedImportsGlobCases()
 
 	if len(cases) != 864 {
-		t.Fatalf("expected 864 measured pairs from the corpus cross product, have %d", len(cases))
+		test.Fatalf("expected 864 measured pairs from the corpus cross product, have %d", len(cases))
 	}
 	matching := 0
 	for _, testCase := range cases {
@@ -37,7 +37,7 @@ func TestNoRestrictedImportsGlobMatchesTheIgnorePackage(t *testing.T) {
 		}
 	}
 	if matching != 90 {
-		t.Fatalf("expected 90 matching pairs, have %d", matching)
+		test.Fatalf("expected 90 matching pairs, have %d", matching)
 	}
 
 	// Four pairs the cross product cannot supply, because the only `./`-prefixed specifier in
@@ -51,12 +51,12 @@ func TestNoRestrictedImportsGlobMatchesTheIgnorePackage(t *testing.T) {
 		noRestrictedImportsGlobCase{[]string{"types"}, false, "./types", true},
 		noRestrictedImportsGlobCase{[]string{"types"}, false, "types", true},
 		noRestrictedImportsGlobCase{[]string{"./types"}, false, "./types", true},
-		// `./types` as a PATTERN contains a slash, so it anchors and does not match bare `types`.
+		// `./types` as a pattern contains a slash, so it anchors and does not match bare `types`.
 		// Measured false. A trim on the pattern side made it true.
 		noRestrictedImportsGlobCase{[]string{"./types"}, false, "types", false},
 		noRestrictedImportsGlobCase{[]string{"./types"}, false, "a/types", false},
 		noRestrictedImportsGlobCase{[]string{"other"}, false, "./types", false},
-		// The asymmetry: an ANCHORED pattern does not absorb a `./` prefix, where an unanchored one
+		// The asymmetry: an anchored pattern does not absorb a `./` prefix, where an unanchored one
 		// does. All three of these were measured false against the installed `ignore`, and all three
 		// were true under a matcher that trimmed `./` off the candidate.
 		noRestrictedImportsGlobCase{[]string{"foo/bar"}, false, "./foo/bar", false},
@@ -64,7 +64,7 @@ func TestNoRestrictedImportsGlobMatchesTheIgnorePackage(t *testing.T) {
 		noRestrictedImportsGlobCase{[]string{"a/b/c"}, false, "./a/b/c", false},
 		noRestrictedImportsGlobCase{[]string{"**/x"}, false, "./a/x", true},
 
-		// gitignore's comment and escape grammar. A bare `#` opens a COMMENT, so `#foo` is not a
+		// gitignore's comment and escape grammar. A bare `#` opens a comment, so `#foo` is not a
 		// pattern at all and matches nothing; `\#` and `\!` escape a leading `#` and `!` into
 		// literals. Upstream's corpus carries only `\#foo`, which a matcher can get right while
 		// treating a bare `#foo` as a literal too -- and then a project that wrote a comment gets a
@@ -83,7 +83,7 @@ func TestNoRestrictedImportsGlobMatchesTheIgnorePackage(t *testing.T) {
 		noRestrictedImportsGlobCase{[]string{"   "}, false, "foo", false},
 	)
 
-	// A second, ADVERSARIAL table: the same 27 group configurations crossed with twenty specifiers
+	// A second, adversarial table: the same 27 group configurations crossed with twenty specifiers
 	// upstream's corpus never contains -- `./foo`, `../../foo`, `foo/`, `foo//bar`, a bare `.`, a
 	// leading `#`, a trailing dot, a case-flipped name. 540 more pairs, 76 of them matching.
 	//
@@ -96,8 +96,8 @@ func TestNoRestrictedImportsGlobMatchesTheIgnorePackage(t *testing.T) {
 	//	a `./` trim on the pattern        made ["./types"] match "types", which is false
 	//	`*` allowed to match nothing      made ["foo/*"] match "foo/" and "foo//bar"
 	//
-	// The third is the subtle one: `*` genuinely IS zero-or-more here -- `f*` matches bare `f` --
-	// so the constraint that fixed it is on the SEGMENT rather than on the wildcard.
+	// The third is the subtle one: `*` genuinely is zero-or-more here -- `f*` matches bare `f` --
+	// so the constraint that fixed it is on the segment rather than on the wildcard.
 	cases = append(cases,
 		noRestrictedImportsGlobCase{[]string{"foo/c*"}, false, "./types", false},
 		noRestrictedImportsGlobCase{[]string{"foo/c*"}, false, "./foo", false},
@@ -479,26 +479,86 @@ func TestNoRestrictedImportsGlobMatchesTheIgnorePackage(t *testing.T) {
 		noRestrictedImportsGlobCase{[]string{"*/bar"}, false, "Foo", false},
 		noRestrictedImportsGlobCase{[]string{"*/bar"}, false, "#foo", false},
 		noRestrictedImportsGlobCase{[]string{"*/bar"}, false, "\\#foo", false},
-		noRestrictedImportsGlobCase{[]string{"import1/private/*", "import2/*", "!import2/good"}, false, "./types", false},
+		noRestrictedImportsGlobCase{
+			[]string{"import1/private/*", "import2/*", "!import2/good"},
+			false,
+			"./types",
+			false,
+		},
 		noRestrictedImportsGlobCase{[]string{"import1/private/*", "import2/*", "!import2/good"}, false, "./foo", false},
-		noRestrictedImportsGlobCase{[]string{"import1/private/*", "import2/*", "!import2/good"}, false, "./foo/bar", false},
-		noRestrictedImportsGlobCase{[]string{"import1/private/*", "import2/*", "!import2/good"}, false, "../foo", false},
-		noRestrictedImportsGlobCase{[]string{"import1/private/*", "import2/*", "!import2/good"}, false, "../../foo", false},
+		noRestrictedImportsGlobCase{
+			[]string{"import1/private/*", "import2/*", "!import2/good"},
+			false,
+			"./foo/bar",
+			false,
+		},
+		noRestrictedImportsGlobCase{
+			[]string{"import1/private/*", "import2/*", "!import2/good"},
+			false,
+			"../foo",
+			false,
+		},
+		noRestrictedImportsGlobCase{
+			[]string{"import1/private/*", "import2/*", "!import2/good"},
+			false,
+			"../../foo",
+			false,
+		},
 		noRestrictedImportsGlobCase{[]string{"import1/private/*", "import2/*", "!import2/good"}, false, "foo/", false},
-		noRestrictedImportsGlobCase{[]string{"import1/private/*", "import2/*", "!import2/good"}, false, "foo//bar", false},
-		noRestrictedImportsGlobCase{[]string{"import1/private/*", "import2/*", "!import2/good"}, false, "a/b/c/foo", false},
-		noRestrictedImportsGlobCase{[]string{"import1/private/*", "import2/*", "!import2/good"}, false, "FOO/BAR", false},
-		noRestrictedImportsGlobCase{[]string{"import1/private/*", "import2/*", "!import2/good"}, false, "foo.bar", false},
+		noRestrictedImportsGlobCase{
+			[]string{"import1/private/*", "import2/*", "!import2/good"},
+			false,
+			"foo//bar",
+			false,
+		},
+		noRestrictedImportsGlobCase{
+			[]string{"import1/private/*", "import2/*", "!import2/good"},
+			false,
+			"a/b/c/foo",
+			false,
+		},
+		noRestrictedImportsGlobCase{
+			[]string{"import1/private/*", "import2/*", "!import2/good"},
+			false,
+			"FOO/BAR",
+			false,
+		},
+		noRestrictedImportsGlobCase{
+			[]string{"import1/private/*", "import2/*", "!import2/good"},
+			false,
+			"foo.bar",
+			false,
+		},
 		noRestrictedImportsGlobCase{[]string{"import1/private/*", "import2/*", "!import2/good"}, false, ".foo", false},
 		noRestrictedImportsGlobCase{[]string{"import1/private/*", "import2/*", "!import2/good"}, false, "foo.", false},
-		noRestrictedImportsGlobCase{[]string{"import1/private/*", "import2/*", "!import2/good"}, false, "x/foo/y", false},
-		noRestrictedImportsGlobCase{[]string{"import1/private/*", "import2/*", "!import2/good"}, false, "/foo/bar", false},
+		noRestrictedImportsGlobCase{
+			[]string{"import1/private/*", "import2/*", "!import2/good"},
+			false,
+			"x/foo/y",
+			false,
+		},
+		noRestrictedImportsGlobCase{
+			[]string{"import1/private/*", "import2/*", "!import2/good"},
+			false,
+			"/foo/bar",
+			false,
+		},
 		noRestrictedImportsGlobCase{[]string{"import1/private/*", "import2/*", "!import2/good"}, false, ".", false},
 		noRestrictedImportsGlobCase{[]string{"import1/private/*", "import2/*", "!import2/good"}, false, "..", false},
-		noRestrictedImportsGlobCase{[]string{"import1/private/*", "import2/*", "!import2/good"}, false, "foo/bar/baz", false},
+		noRestrictedImportsGlobCase{
+			[]string{"import1/private/*", "import2/*", "!import2/good"},
+			false,
+			"foo/bar/baz",
+			false,
+		},
 		noRestrictedImportsGlobCase{[]string{"import1/private/*", "import2/*", "!import2/good"}, false, "Foo", false},
 		noRestrictedImportsGlobCase{[]string{"import1/private/*", "import2/*", "!import2/good"}, false, "#foo", false},
-		noRestrictedImportsGlobCase{[]string{"import1/private/*", "import2/*", "!import2/good"}, false, "\\#foo", false},
+		noRestrictedImportsGlobCase{
+			[]string{"import1/private/*", "import2/*", "!import2/good"},
+			false,
+			"\\#foo",
+			false,
+		},
 		noRestrictedImportsGlobCase{[]string{"import1/private/*"}, false, "./types", false},
 		noRestrictedImportsGlobCase{[]string{"import1/private/*"}, false, "./foo", false},
 		noRestrictedImportsGlobCase{[]string{"import1/private/*"}, false, "./foo/bar", false},
@@ -644,7 +704,7 @@ func TestNoRestrictedImportsGlobMatchesTheIgnorePackage(t *testing.T) {
 	// Every table's rows are counted after merging, so a block deleted or half-pasted fails here
 	// rather than leaving a suite that passes on whatever survived.
 	if len(cases) != 1424 {
-		t.Fatalf("expected 1424 pairs across all three tables, have %d", len(cases))
+		test.Fatalf("expected 1424 pairs across all three tables, have %d", len(cases))
 	}
 	merged := 0
 	for _, testCase := range cases {
@@ -653,17 +713,17 @@ func TestNoRestrictedImportsGlobMatchesTheIgnorePackage(t *testing.T) {
 		}
 	}
 	if merged != 174 {
-		t.Fatalf("expected 174 matching pairs across all three tables, have %d", merged)
+		test.Fatalf("expected 174 matching pairs across all three tables, have %d", merged)
 	}
 
 	for _, testCase := range cases {
 		matcher, ok := noRestrictedImportsCompileGroup(testCase.group, testCase.caseSensitive)
 		if !ok {
-			t.Errorf("group %v did not compile", testCase.group)
+			test.Errorf("group %v did not compile", testCase.group)
 			continue
 		}
 		if got := matcher.Ignores(testCase.source); got != testCase.wantIgnores {
-			t.Errorf("group %v (caseSensitive %v) against %q: got %v, want %v",
+			test.Errorf("group %v (caseSensitive %v) against %q: got %v, want %v",
 				testCase.group, testCase.caseSensitive, testCase.source, got, testCase.wantIgnores)
 		}
 	}
@@ -1314,7 +1374,12 @@ func noRestrictedImportsGlobCases() []noRestrictedImportsGlobCase {
 		{[]string{"import1/private/*", "import2/*", "!import2/good"}, false, "import1", false},
 		{[]string{"import1/private/*", "import2/*", "!import2/good"}, false, "import1/private/foo", true},
 		{[]string{"import1/private/*", "import2/*", "!import2/good"}, false, "import1/private-package", false},
-		{[]string{"import1/private/*", "import2/*", "!import2/good"}, false, "@typescript-eslint/utils/dist/ts-eslint", false},
+		{
+			[]string{"import1/private/*", "import2/*", "!import2/good"},
+			false,
+			"@typescript-eslint/utils/dist/ts-eslint",
+			false,
+		},
 		{[]string{"import1/private/*", "import2/*", "!import2/good"}, false, "restricted-path", false},
 		{[]string{"import1/private/*"}, false, "os", false},
 		{[]string{"import1/private/*"}, false, "fs", false},

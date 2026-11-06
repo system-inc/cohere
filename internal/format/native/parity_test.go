@@ -14,8 +14,8 @@ import (
 // Empty or whitespace-only text is core.js's to answer, before any parser, so it is asked of every
 // language. A numeric separator is Babel's to judge, so the JSON cases run under both of JSON's parsers,
 // json (probe.json) and json-stringify (package.json), well-formed separators beside malformed ones.
-func TestEmptyTextAndNumericSeparatorsMatchTheFork(t *testing.T) {
-	t.Parallel()
+func TestEmptyTextAndNumericSeparatorsMatchTheFork(test *testing.T) {
+	test.Parallel()
 	type input struct{ fileName, text string }
 	var inputs []input
 	for _, fileName := range []string{"probe.json", "package.json", "probe.ts", "probe.tsx", "probe.js", "probe.md",
@@ -40,29 +40,41 @@ func TestEmptyTextAndNumericSeparatorsMatchTheFork(t *testing.T) {
 	}
 
 	options := formatoptions.Default()
-	oracle := oracletest.Open(t, t.Name()).Engine(options)
+	oracle := oracletest.Open(test, test.Name()).Engine(options)
 	formatter := Formatter{Options: options}
 	compared, refusedByBoth := 0, 0
 	for _, each := range inputs {
-		expected, oracleErr := oracle.Format(each.fileName, each.text)
-		actual, nativeErr := formatter.Format(each.fileName, each.text)
+		expected, oracleError := oracle.Format(each.fileName, each.text)
+		actual, nativeError := formatter.Format(each.fileName, each.text)
 		switch {
-		case oracleErr != nil && nativeErr != nil:
+		case oracleError != nil && nativeError != nil:
 			refusedByBoth++
-		case oracleErr != nil:
-			t.Errorf("%s %q: the fork refuses it (%v) and Formatter printed %q", each.fileName, each.text, oracleErr, actual)
-		case nativeErr != nil:
-			t.Errorf("%s %q: the fork prints %q and Formatter refused: %v", each.fileName, each.text, expected, nativeErr)
+		case oracleError != nil:
+			test.Errorf(
+				"%s %q: the fork refuses it (%v) and Formatter printed %q",
+				each.fileName,
+				each.text,
+				oracleError,
+				actual,
+			)
+		case nativeError != nil:
+			test.Errorf(
+				"%s %q: the fork prints %q and Formatter refused: %v",
+				each.fileName,
+				each.text,
+				expected,
+				nativeError,
+			)
 		default:
 			compared++
 			if actual != expected {
-				t.Errorf("%s %q: the fork prints %q and Formatter %q", each.fileName, each.text, expected, actual)
+				test.Errorf("%s %q: the fork prints %q and Formatter %q", each.fileName, each.text, expected, actual)
 			}
 		}
 	}
 	// Both answers must occur, so a side that refuses everything, or nothing, can't read as agreement.
 	if compared == 0 || refusedByBoth == 0 {
-		t.Errorf("%d compared and %d refused by both: one kind of answer is missing", compared, refusedByBoth)
+		test.Errorf("%d compared and %d refused by both: one kind of answer is missing", compared, refusedByBoth)
 	}
-	t.Logf("%d inputs: %d printed alike, %d refused by both", len(inputs), compared, refusedByBoth)
+	test.Logf("%d inputs: %d printed alike, %d refused by both", len(inputs), compared, refusedByBoth)
 }

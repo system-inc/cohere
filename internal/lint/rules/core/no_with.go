@@ -40,16 +40,16 @@ var messageNoWith = rule.Message{
 // plainly, that the rule is unnecessary when `alwaysStrict` is on. It is kept because it is free at
 // runtime, it names the problem better than the compiler's grammar error does, and it holds for the
 // `.js` files in the tree where no such check runs.
-var NoWith = rule.Rule{
+var NoWith = rule.Rule[rule.NoOptions]{
 	Name: "no-with",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindWithStatement: func(node *ast.Node) {
 				// The first token of the statement, which is the `with` keyword. Built from the
 				// scanner rather than from `node.Pos()` directly, because `Pos()` sits before the
 				// node's leading comments and whitespace and would underline those instead.
-				ctx.ReportRange(
-					scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, node.Pos()),
+				ruleContext.ReportRange(
+					scanner.GetRangeOfTokenAtPosition(ruleContext.SourceFile, node.Pos()),
 					messageNoWith)
 			},
 		}

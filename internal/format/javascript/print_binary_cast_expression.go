@@ -1,5 +1,7 @@
 package javascript
 
+import "github.com/system-inc/cohere/internal/format/doc"
+
 // print/binary-cast-expression.js.
 
 // printBinaryCastExpression is upstream's printBinaryCastExpression. Upstream's isFlowAsConstExpression
@@ -15,17 +17,20 @@ func printBinaryCastExpression(path *Path, options *Options, print PrintFunc) Do
 	if isSatisfiesExpression(current) {
 		keyword = "satisfies"
 	}
-	parts := []any{
+	parts := []Doc{
 		print("expression", nil),
-		" ",
-		keyword,
-		" ",
+		doc.Text(" "),
+		textDoc(keyword),
+		doc.Text(" "),
 		typeAnnotationDoc,
 	}
 
 	if key == "callee" && isCallOrNewExpression(parent) ||
 		key == "object" && isMemberExpression(parent) {
-		return groupIn(path, concatIn(path, indentIn(path, concatIn(path, append([]any{softline}, parts...)...)), softline))
+		return groupIn(
+			path,
+			concatIn(path, indentIn(path, concatIn(path, append([]Doc{softline}, parts...)...)), softline),
+		)
 	}
 
 	return concatIn(path, parts...)

@@ -19,10 +19,10 @@ const alertFile = "/repository/source/Alert.ts"
 // The clean list is almost entirely shadowing, in five different binding positions: a function
 // declaration, a var, a nested var, a parameter, and a var declared in an enclosing function. Read
 // against the reporting list they pair up, and the pairs are the whole point: `var alert = function()
-// {}; window.alert(foo)` REPORTS while `var alert = function() {}; alert();` is clean, because
+// {}; window.alert(foo)` reports while `var alert = function() {}; alert();` is clean, because
 // shadowing the name `alert` says nothing about the property `window.alert`.
-func TestNoAlertStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoAlertStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -47,16 +47,16 @@ func TestNoAlertStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoAlert, alertFile, testCase.sourceText))
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoAlert, alertFile, testCase.sourceText))
 		})
 	}
 }
 
 // The twenty reporting cases this port reproduces exactly.
-func TestNoAlertFires(t *testing.T) {
-	t.Parallel()
+func TestNoAlertFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -84,22 +84,22 @@ func TestNoAlertFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.RunTyped(t, NoAlert, alertFile, testCase.sourceText), "unexpected")
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.RunTyped(test, NoAlert, alertFile, testCase.sourceText), "unexpected")
 		})
 	}
 }
 
 // The two upstream reporting cases that are clean here, and the reason is not this rule.
 //
-// Upstream reports `this.alert(foo)` at the top level of a SCRIPT, where `this` is the global
+// Upstream reports `this.alert(foo)` at the top level of a script, where `this` is the global
 // object. Our harness pins `moduleDetection: "force"` in `internal/rule_testing/program.go` and our tree
 // is modules throughout, and in a module top-level `this` is `undefined` rather than the global.
 //
 // Measured on the installed rule rather than reasoned about: with `sourceType: "module"` both of
-// these come back CLEAN from upstream itself, and with `sourceType: "script"` both report. So this
+// these come back clean from upstream itself, and with `sourceType: "script"` both report. So this
 // is not a divergence in the port at all, it is the same rule reaching the same verdict about a
 // different kind of file, and no fixture in this tree can express the reporting half because the
 // tree cannot produce a script.
@@ -107,8 +107,8 @@ func TestNoAlertFires(t *testing.T) {
 // Recorded as passing cases with the measurement rather than deleted, so the next reader does not
 // read the missing `this` arm as an oversight and helpfully add one. The control is `window.alert`,
 // which reports in both source types.
-func TestNoAlertLeavesGlobalThisToScriptFiles(t *testing.T) {
-	t.Parallel()
+func TestNoAlertLeavesGlobalThisToScriptFiles(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -118,17 +118,17 @@ func TestNoAlertLeavesGlobalThisToScriptFiles(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoAlert, alertFile, testCase.sourceText))
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoAlert, alertFile, testCase.sourceText))
 		})
 	}
 
-	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoAlert, alertFile,
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoAlert, alertFile,
 		"window.alert(foo)"), "unexpected")
 }
 
-// Two upstream CLEAN cases that report here, and the discriminator is the language version.
+// Two upstream clean cases that report here, and the discriminator is the language version.
 //
 // `globalThis.alert();` appears in upstream's corpus twice, once in each list, with identical source
 // text. The only difference is `ecmaVersion`: the clean copies are pinned to the default and to
@@ -146,13 +146,13 @@ func TestNoAlertLeavesGlobalThisToScriptFiles(t *testing.T) {
 //
 // `internal/rule_testing/program.go` pins `target: "ES2022"` and our tree compiles to the same, so
 // `globalThis` is always in the standard library the checker reads and the pre-2020 verdict is not
-// reachable here. Reporting these is therefore agreement with upstream AT OUR TARGET rather than a
+// reachable here. Reporting these is therefore agreement with upstream at our target rather than a
 // divergence from it, and a port reproducing them as clean would be silent on the modern spelling of
 // the exact thing this rule exists to catch.
 //
 // The control is the shadowed form, which upstream reports clean at every version and so does this.
-func TestNoAlertReportsGlobalThisAtOurTarget(t *testing.T) {
-	t.Parallel()
+func TestNoAlertReportsGlobalThisAtOurTarget(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -162,14 +162,14 @@ func TestNoAlertReportsGlobalThisAtOurTarget(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.RunTyped(t, NoAlert, alertFile, testCase.sourceText), "unexpected")
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.RunTyped(test, NoAlert, alertFile, testCase.sourceText), "unexpected")
 		})
 	}
 
-	rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoAlert, alertFile,
+	rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoAlert, alertFile,
 		"var globalThis = foo; globalThis.alert();"))
 }
 
@@ -178,8 +178,8 @@ func TestNoAlertReportsGlobalThisAtOurTarget(t *testing.T) {
 // The Description interpolates the function's name, and a `rule.Message` carries no rendering layer.
 // A `confirm` finding whose sentence says `alert` has the right id and the right span while naming
 // something that is not on the line.
-func TestNoAlertNamesTheFunction(t *testing.T) {
-	t.Parallel()
+func TestNoAlertNamesTheFunction(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -192,15 +192,15 @@ func TestNoAlertNamesTheFunction(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoAlert, alertFile, testCase.sourceText)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoAlert, alertFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 			}
 			description := result.Diagnostics[0].Message.Description
 			if !strings.HasPrefix(description, "This calls `"+testCase.wantName+"`") {
-				t.Fatalf("the message reads %q, which does not name %q", description, testCase.wantName)
+				test.Fatalf("the message reads %q, which does not name %q", description, testCase.wantName)
 			}
 		})
 	}
@@ -210,8 +210,8 @@ func TestNoAlertNamesTheFunction(t *testing.T) {
 //
 // Upstream passes `node`, the CallExpression, for both shapes. A port anchoring on the callee
 // satisfies every assertion above while pointing past the arguments.
-func TestNoAlertReportsTheWholeCall(t *testing.T) {
-	t.Parallel()
+func TestNoAlertReportsTheWholeCall(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -222,16 +222,16 @@ func TestNoAlertReportsTheWholeCall(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoAlert, alertFile, testCase.sourceText)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoAlert, alertFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 			}
 			written := result.SourceFile.Text()
 			reported := written[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 			if reported != testCase.wantSpan {
-				t.Fatalf("reported %q, wanted %q", reported, testCase.wantSpan)
+				test.Fatalf("reported %q, wanted %q", reported, testCase.wantSpan)
 			}
 		})
 	}
@@ -247,78 +247,84 @@ func TestNoAlertReportsTheWholeCall(t *testing.T) {
 // The last is the one that separates this rule from a text match. `foo.alert(foo)` is upstream's own
 // clean case because the receiver is not the global object; the control beside it changes only the
 // receiver and reports.
-func TestNoAlertHandlesShapesTheCorpusOmits(t *testing.T) {
-	t.Parallel()
+func TestNoAlertHandlesShapesTheCorpusOmits(test *testing.T) {
+	test.Parallel()
 
-	t.Run("globalThis with an optional chain reports", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoAlert, alertFile,
+	test.Run("globalThis with an optional chain reports", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoAlert, alertFile,
 			"globalThis?.alert(foo)"), "unexpected")
 	})
 
-	t.Run("a computed access through a variable stays clean", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoAlert, alertFile,
+	test.Run("a computed access through a variable stays clean", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoAlert, alertFile,
 			"declare const confirm: string;\nglobalThis[confirm]();\n"))
 	})
 
-	t.Run("a receiver that is not the global object stays clean", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoAlert, alertFile,
+	test.Run("a receiver that is not the global object stays clean", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoAlert, alertFile,
 			"declare const foo: any;\nfoo.alert(foo);\n"))
 		// The control changes only the receiver.
-		rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoAlert, alertFile,
+		rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoAlert, alertFile,
 			"declare const foo: any;\nwindow.alert(foo);\n"), "unexpected")
 	})
 }
 
 // The typed harness is required, so a later revert to `rule_testing.Run` fails loudly.
-func TestNoAlertNeedsTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestNoAlertNeedsTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	if !NoAlert.NeedsTypeChecker {
-		t.Fatal("this rule resolves shadowing through the checker and must declare it")
+		test.Fatal("this rule resolves shadowing through the checker and must declare it")
 	}
-	rule_testing.ExpectClean(t, rule_testing.Run(t, NoAlert, alertFile, "alert(foo)"))
+	rule_testing.ExpectClean(test, rule_testing.Run(test, NoAlert, alertFile, "alert(foo)"))
 }
 
 // A callee that is neither an identifier nor a member access must not crash the file.
 //
 // `memberAccessObject` answers nil for such a callee and the member branch fed that nil straight into
-// `ast.SkipParentheses`, which dereferences it. The walk recovers per FILE rather than per rule, so
+// `ast.SkipParentheses`, which dereferences it. The walk recovers per file rather than per rule, so
 // the panic took the whole file away from every rule: 167 files, about five percent of the tree we
 // lint, silently unchecked while the run still printed green and the node count sat a quarter of a
 // million nodes low.
 //
-// The two shapes that occur are `super(...)` and `import(...)` — call expressions whose callee is a
+// The two shapes that occur are `super(...)` and `import(...)`, call expressions whose callee is a
 // bare keyword. Every subclass constructor carries a `super()`, which is why this was not a rare edge.
 //
 // # What this test does and does not prove
 //
-// It pins the shapes so a future edit to the member branch has them written down, and it is NOT the
+// It pins the shapes so a future edit to the member branch has them written down, and it is not the
 // regression proof: it passes against the unfixed rule too. The panic needs the real program, and the
 // fixtures below never reach the nil path in this harness. The proof is an A/B on the tree itself,
 // same tree and same flags, differing only in this file: 167 crashed files before, 0 after. Anyone
 // changing this branch should re-run that rather than trust the green below.
-func TestNoAlertSurvivesACalleeThatIsNotAMemberAccess(t *testing.T) {
-	t.Parallel()
+func TestNoAlertSurvivesACalleeThatIsNotAMemberAccess(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
 		source string
 	}{
-		{name: "super call", source: "class Base { constructor(a: number) {} }\nclass Derived extends Base { constructor() { super(1); } }"},
-		{name: "super method call", source: "class Base { go() {} }\nclass Derived extends Base { go() { super.go(); } }"},
+		{
+			name:   "super call",
+			source: "class Base { constructor(a: number) {} }\nclass Derived extends Base { constructor() { super(1); } }",
+		},
+		{
+			name:   "super method call",
+			source: "class Base { go() {} }\nclass Derived extends Base { go() { super.go(); } }",
+		},
 		{name: "dynamic import", source: "async function load() { await import('./Other'); }"},
 		{name: "immediately invoked function", source: "(function() { return 1; })();"},
 		{name: "call returning a function", source: "function outer() { return function() {}; }\nouter()();"},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoAlert, alertFile, testCase.source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoAlert, alertFile, testCase.source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }

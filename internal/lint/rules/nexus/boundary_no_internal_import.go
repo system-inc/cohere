@@ -13,8 +13,14 @@ import (
 // boundaryNoInternalImportAliasedInternalText and boundaryNoInternalImportOutsideInternalText are the
 // rule's messages, whose wording lives in `policy/messages/boundary-no-internal-import.json`.
 var (
-	boundaryNoInternalImportAliasedInternalText = policy.MessageOf("nexus/boundary-no-internal-import", "aliasedInternal")
-	boundaryNoInternalImportOutsideInternalText = policy.MessageOf("nexus/boundary-no-internal-import", "outsideInternal")
+	boundaryNoInternalImportAliasedInternalText = policy.MessageOf(
+		"nexus/boundary-no-internal-import",
+		"aliasedInternal",
+	)
+	boundaryNoInternalImportOutsideInternalText = policy.MessageOf(
+		"nexus/boundary-no-internal-import",
+		"outsideInternal",
+	)
 )
 
 func messageAliasedInternal() rule.Message {
@@ -48,22 +54,22 @@ func messageOutsideInternal() rule.Message {
 // That original compared two paths both made relative to cwd, so it agreed with this one whenever
 // the linter ran from the repository root and silently stopped enforcing anything when it did not.
 // Resolving against the importing file has no such dependence.
-var BoundaryNoInternalImport = rule.Rule{
+var BoundaryNoInternalImport = rule.Rule[rule.NoOptions]{
 	Name: "nexus/boundary-no-internal-import",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
-		importingFile := imports.NormalizedFileName(ctx.SourceFile)
+		importingFile := imports.NormalizedFileName(ruleContext.SourceFile)
 
 		return imports.SourceVisitors(func(source string, node *ast.Node) {
-			checkInternalImport(ctx, node, importingFile, source)
+			checkInternalImport(ruleContext, node, importingFile, source)
 		})
 	},
 }
 
 // checkInternalImport decides one specifier against one importing file.
-func checkInternalImport(ctx rule.Context, node *ast.Node, importingFile string, source string) {
+func checkInternalImport(ruleContext rule.Context, node *ast.Node, importingFile string, source string) {
 	if !strings.Contains(source, "internal") {
 		return
 	}
@@ -73,7 +79,7 @@ func checkInternalImport(ctx rule.Context, node *ast.Node, importingFile string,
 	// that can prove it belongs.
 	if !strings.HasPrefix(source, ".") {
 		if imports.HasPathSegment(source, "internal") {
-			ctx.ReportNode(imports.SpecifierNode(node), messageAliasedInternal())
+			ruleContext.ReportNode(imports.SpecifierNode(node), messageAliasedInternal())
 		}
 		return
 	}
@@ -95,6 +101,6 @@ func checkInternalImport(ctx rule.Context, node *ast.Node, importingFile string,
 
 	owningFolder := strings.Join(segments[:internalIndex], "/")
 	if !strings.HasPrefix(importingFile, owningFolder+"/") {
-		ctx.ReportNode(imports.SpecifierNode(node), messageOutsideInternal())
+		ruleContext.ReportNode(imports.SpecifierNode(node), messageOutsideInternal())
 	}
 }

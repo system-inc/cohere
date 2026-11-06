@@ -65,10 +65,10 @@ var messageBannedWrapperObjectType = rule.Message{
 // A fix is offered only in a plain type-reference position. oxc makes the same distinction: replacing
 // `Number` with `number` inside `implements` would produce code that does not compile, since a class
 // cannot implement a primitive.
-var NoWrapperObjectTypes = rule.Rule{
+var NoWrapperObjectTypes = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/no-wrapper-object-types",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -81,7 +81,7 @@ var NoWrapperObjectTypes = rule.Rule{
 		for name := range wrapperObjectTypes {
 			wrapperNames[name] = true
 		}
-		shadowed := module.DeclaredTypeNames(ctx.SourceFile, wrapperNames)
+		shadowed := module.DeclaredTypeNames(ruleContext.SourceFile, wrapperNames)
 
 		return rule.Listeners{
 			ast.KindTypeReference: func(node *ast.Node) {
@@ -103,11 +103,15 @@ var NoWrapperObjectTypes = rule.Rule{
 				if isImplementsHeritage(node) {
 					// No fix. `class Thing implements number {}` does not compile, so the repair a
 					// reader would expect is not available here.
-					ctx.ReportNode(name, messageBannedWrapperObjectType)
+					ruleContext.ReportNode(name, messageBannedWrapperObjectType)
 					return
 				}
 
-				ctx.ReportNodeWithFixes(name, messageBannedWrapperObjectType, ctx.ReplaceNode(name, primitive))
+				ruleContext.ReportNodeWithFixes(
+					name,
+					messageBannedWrapperObjectType,
+					ruleContext.ReplaceNode(name, primitive),
+				)
 			},
 		}
 	},

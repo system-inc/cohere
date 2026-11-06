@@ -5,7 +5,7 @@
 //
 // # Why the question cannot be asked during lowering
 //
-// A write lowers as `StoreContext` here when the WRITER is a nested function reaching outward, which
+// A write lowers as `StoreContext` here when the writer is a nested function reaching outward, which
 // is decidable at that point because `captureOf` has already seen the binding come in from an
 // enclosing scope. Upstream asks a different question: is this binding reassigned anywhere, and does
 // any inner function reference it? That is a property of the whole function, and at the moment an
@@ -108,7 +108,7 @@ func findContextIdentifiers(node *ast.Node, checker *checker.Checker) contextIde
 	}
 	walk(body, 0)
 
-	// # A mutation dropping the `referencedByInnerFunction` half SURVIVES
+	// # A mutation dropping the `referencedByInnerFunction` half survives
 	//
 	// Measured: accepting every reassigned binding scores identically on all five instruments --
 	// goldens 26, false positives 31, scope `under` 5 fixtures / 7 scopes, `exact` 26. No corpus
@@ -117,7 +117,7 @@ func findContextIdentifiers(node *ast.Node, checker *checker.Checker) contextIde
 	// Kept as upstream's because the direction matters and this one is not symmetric. Marking a
 	// binding contextual makes SSA define it once, which suppresses the versioning that every later
 	// pass reads -- so a binding no closure captures would lose its phis for no reason, and the
-	// analysis below it would see one value where the program has several. The verdict EXPIRES the
+	// analysis below it would see one value where the program has several. The verdict expires the
 	// moment a fixture reassigns a purely local binding, which any loop counter would produce.
 	for symbol, entry := range usage {
 		if entry.reassignedByInnerFunction ||

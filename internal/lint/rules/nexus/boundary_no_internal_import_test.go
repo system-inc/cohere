@@ -7,8 +7,8 @@ import (
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
-func TestBoundaryNoInternalImportFires(t *testing.T) {
-	t.Parallel()
+func TestBoundaryNoInternalImportFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name     string
@@ -49,16 +49,16 @@ func TestBoundaryNoInternalImportFires(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, BoundaryNoInternalImport, testCase.fileName, testCase.source)
-			rule_testing.ExpectFindings(t, result, testCase.wantId)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, BoundaryNoInternalImport, testCase.fileName, testCase.source)
+			rule_testing.ExpectFindings(test, result, testCase.wantId)
 		})
 	}
 }
 
-func TestBoundaryNoInternalImportStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestBoundaryNoInternalImportStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name     string
@@ -105,10 +105,10 @@ func TestBoundaryNoInternalImportStaysSilent(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, BoundaryNoInternalImport, testCase.fileName, testCase.source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, BoundaryNoInternalImport, testCase.fileName, testCase.source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -116,19 +116,19 @@ func TestBoundaryNoInternalImportStaysSilent(t *testing.T) {
 // A finding has to land on the line the author can suppress. A node's Pos() includes its leading
 // trivia, so reporting the declaration anchors the finding at the first comment above the import,
 // where no `eslint-disable-next-line` can reach it.
-func TestBoundaryNoInternalImportReportsAtTheSpecifier(t *testing.T) {
-	t.Parallel()
+func TestBoundaryNoInternalImportReportsAtTheSpecifier(test *testing.T) {
+	test.Parallel()
 
 	sourceText := "// Dependencies\n// a second comment\nimport { Detail } from '../widget/internal/Detail';\\n"
 
-	result := rule_testing.RunWithOptions(t, BoundaryNoInternalImport, "/repo/source/other/Thing.ts", sourceText, nil)
+	result := rule_testing.Run(test, BoundaryNoInternalImport, "/repo/source/other/Thing.ts", sourceText)
 	if len(result.Diagnostics) == 0 {
-		t.Fatalf("expected a finding, got none")
+		test.Fatalf("expected a finding, got none")
 	}
 
 	line, _ := scanner.GetECMALineAndByteOffsetOfPosition(result.SourceFile, result.Diagnostics[0].Range.Pos())
 	const importLine = 2 // zero-based, so the third line
 	if line != importLine {
-		t.Fatalf("expected the finding on the import line (%d), got line %d", importLine+1, line+1)
+		test.Fatalf("expected the finding on the import line (%d), got line %d", importLine+1, line+1)
 	}
 }

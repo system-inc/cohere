@@ -96,9 +96,9 @@ type privateClassMember struct {
 // often "add the reader I forgot" as "delete this". That is a choice a human makes, so nothing is
 // proposed here rather than proposing a rewrite the engine would apply while the reader is not
 // looking.
-var NoUnusedPrivateClassMembers = rule.Rule{
+var NoUnusedPrivateClassMembers = rule.Rule[rule.NoOptions]{
 	Name: "no-unused-private-class-members",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		check := func(members *ast.NodeList) {
 			if members == nil {
 				return
@@ -139,7 +139,7 @@ var NoUnusedPrivateClassMembers = rule.Rule{
 				if declared[text].used {
 					continue
 				}
-				ctx.ReportNode(declared[text].name, rule.Message{
+				ruleContext.ReportNode(declared[text].name, rule.Message{
 					Id: "noUnusedPrivateClassMember",
 					// `text` is the name node's own text, which already carries the leading
 					// hash: `#foo`, not `foo`. Measured by the dry run against the real tree,
@@ -220,20 +220,21 @@ func markPrivateMemberUses(node *ast.Node, declared map[string]*privateClassMemb
 
 	// A nested class shadows the names it redeclares. Anything it does not redeclare stays visible,
 	// so the recursion continues with a narrowed map rather than stopping outright.
+	searched := declared
 	if node.Kind == ast.KindClassDeclaration || node.Kind == ast.KindClassExpression {
 		if narrowed := withoutShadowedNames(node, declared); narrowed != nil {
-			declared = narrowed
+			searched = narrowed
 			// Another short-circuit the sweep flagged as equivalent: with nothing left to look for,
 			// the walk below would descend the whole nested class and mark nothing. Stopping early
 			// is faster and cannot differ.
-			if len(declared) == 0 {
+			if len(searched) == 0 {
 				return
 			}
 		}
 	}
 
 	node.ForEachChild(func(child *ast.Node) bool {
-		markPrivateMemberUses(child, declared)
+		markPrivateMemberUses(child, searched)
 		return false
 	})
 }

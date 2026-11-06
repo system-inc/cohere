@@ -7,6 +7,11 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
+var preferNonNullAssertionMessage = rule.Message{
+	Id:          "preferNonNullAssertion",
+	Description: "Use a ! assertion to more succinctly remove null and undefined from the type.",
+}
+
 // NonNullableTypeAssertionStyle flags a type assertion whose only effect is removing null and
 // undefined, which a `!` says in one character.
 //
@@ -23,7 +28,7 @@ import (
 // underlying type changes. So this is a rule about which assertion survives a refactor, not about
 // character count.
 //
-// # The judgment is type IDENTITY, and identity is why the checker is required
+// # The judgment is type identity, and identity is why the checker is required
 //
 // Upstream compares the asserted type's constituents against the original's with `includes`, which
 // is reference equality on interned `ts.Type` objects rather than any structural comparison. That is
@@ -39,7 +44,7 @@ import (
 // # The fixture harness must be one file per program, and measuring this cost a cycle
 //
 // Two of upstream's own failing cases assert to a `type` alias and to an `interface`, and both depend
-// on the asserted object type being the SAME interned object as the one in the original union. A
+// on the asserted object type being the same interned object as the one in the original union. A
 // replay harness that put all twenty cases in one program had several files each declaring
 // `type Type`, the checker interned one per file, identity failed, and those two cases came back
 // clean. It reads exactly like a rule that cannot see object types. Running each case in its own
@@ -73,7 +78,7 @@ import (
 //
 // A const assertion yields the same type object as the expression, so nothing downstream would report
 // it and the guard reads as redundant. It is not: `getTypeAtLocation` on the `const` type node
-// answers the expression's own type, so for `x as const` where x is `string | null` BOTH sides are
+// answers the expression's own type, so for `x as const` where x is `string | null` both sides are
 // that union, the original has nullish, and the asserted constituents are a subset. Without the guard
 // the rule reports `const foo = [] as const;` and rewrites it to `[]!`, changing what the code means.
 // Upstream guards on the syntax rather than the type for the same reason.
@@ -83,7 +88,7 @@ import (
 // Two rare anchors, and the checker is consulted only when one is found. Both type lookups are
 // declined early when the expression is any or unknown, which is the common shape in the code this
 // rule runs on.
-var NonNullableTypeAssertionStyle = rule.Rule{
+var NonNullableTypeAssertionStyle = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/non-nullable-type-assertion-style",
 
 	// Every finding is decided by comparing two types by identity, so there is no syntactic subset of
@@ -91,7 +96,7 @@ var NonNullableTypeAssertionStyle = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// report is shared by the two assertion spellings, which differ only in where the expression
 		// and the type node live. `x as T` and `<T>x` are the same judgment and upstream registers
 		// one visitor over both.
@@ -99,7 +104,7 @@ var NonNullableTypeAssertionStyle = rule.Rule{
 			// Without this the rule is not merely wrong, it is silently wrong: the shim answers nil
 			// from GetSymbolAtLocation and friends rather than panicking, so a missing guard buys a
 			// vacuous green rather than an obvious crash.
-			if ctx.TypeChecker == nil {
+			if ruleContext.TypeChecker == nil {
 				return
 			}
 			if expression == nil || typeNode == nil {
@@ -110,16 +115,16 @@ var NonNullableTypeAssertionStyle = rule.Rule{
 				return
 			}
 
-			originalTypes, isUsable := unionConstituentsIfNotLoose(ctx.TypeChecker, expression)
+			originalTypes, isUsable := unionConstituentsIfNotLoose(ruleContext.TypeChecker, expression)
 			if !isUsable {
 				return
 			}
-			assertedTypes, isUsable := unionConstituentsIfNotLoose(ctx.TypeChecker, typeNode)
+			assertedTypes, isUsable := unionConstituentsIfNotLoose(ruleContext.TypeChecker, typeNode)
 			if !isUsable {
 				return
 			}
 
-			if !isSameTypeWithoutNullish(ctx.TypeChecker, assertedTypes, originalTypes) {
+			if !isSameTypeWithoutNullish(ruleContext.TypeChecker, assertedTypes, originalTypes) {
 				return
 			}
 
@@ -156,8 +161,8 @@ var NonNullableTypeAssertionStyle = rule.Rule{
 
 			// `rule.TokenRange` supplies the text rather than `Pos()`, which includes leading trivia
 			// and would pull the preceding whitespace into the replacement as well as into the span.
-			expressionRange := rule.TokenRange(ctx.SourceFile, assertedExpression)
-			expressionText := ctx.SourceFile.Text()[expressionRange.Pos():expressionRange.End()]
+			expressionRange := rule.TokenRange(ruleContext.SourceFile, assertedExpression)
+			expressionText := ruleContext.SourceFile.Text()[expressionRange.Pos():expressionRange.End()]
 
 			precedence := ast.GetOperatorPrecedence(assertedExpression.Kind, ast.KindUnknown,
 				ast.OperatorPrecedenceFlagsNone)
@@ -166,8 +171,8 @@ var NonNullableTypeAssertionStyle = rule.Rule{
 				replacement = "(" + expressionText + ")!"
 			}
 
-			ctx.ReportNodeWithFixes(node, preferNonNullAssertionMessage,
-				rule.ReplaceRange(rule.TokenRange(ctx.SourceFile, node), replacement))
+			ruleContext.ReportNodeWithFixes(node, preferNonNullAssertionMessage,
+				rule.ReplaceRange(rule.TokenRange(ruleContext.SourceFile, node), replacement))
 		}
 
 		return rule.Listeners{
@@ -183,24 +188,19 @@ var NonNullableTypeAssertionStyle = rule.Rule{
 	},
 }
 
-var preferNonNullAssertionMessage = rule.Message{
-	Id:          "preferNonNullAssertion",
-	Description: "Use a ! assertion to more succinctly remove null and undefined from the type.",
-}
-
 // unionConstituentsIfNotLoose is upstream's `getTypesIfNotLoose`.
 //
 // A type that is `any` or `unknown` carries no information the comparison could use, and asserting
 // away from one is the whole point of an assertion, so the rule declines rather than reporting. The
 // second return says whether the answer is usable, which upstream expresses as undefined.
 //
-// # The early decline is SUBSUMED here, and it is kept anyway
+// # The early decline is subsumed here, and it is kept anyway
 //
 // Neutralizing this branch survived the whole fixture set, which is the sweep telling the truth: the
 // comparison below already declines every shape it could see. Measured over six inputs rather than
-// argued, with a reporting control in the same run. Asserting TO `any` or `unknown` leaves an asserted
+// argued, with a reporting control in the same run. Asserting to `any` or `unknown` leaves an asserted
 // list holding one type that is not a constituent of the original, so the membership loop declines;
-// asserting FROM one leaves an original list of a single non-nullish type, so the nothing-was-dropped
+// asserting from one leaves an original list of a single non-nullish type, so the nothing-was-dropped
 // guard declines first. Both routes reach silence.
 //
 // It stays because it is upstream's, because it is the cheaper of the two routes on the shape this
@@ -243,7 +243,7 @@ func couldBeNullish(typeChecker *checker.Checker, candidate *checker.Type) bool 
 	}
 
 	if type_checking.IsUnionType(candidate) {
-		for part := range type_checking.UnionTypePartsSeq(candidate) {
+		for part := range type_checking.UnionTypePartsSequence(candidate) {
 			if couldBeNullish(typeChecker, part) {
 				return true
 			}
@@ -257,7 +257,7 @@ func couldBeNullish(typeChecker *checker.Checker, candidate *checker.Type) bool 
 
 // isSameTypeWithoutNullish is upstream's `sameTypeWithoutNullish`.
 //
-// The two lists are compared by IDENTITY rather than structurally, which is upstream's `includes` on
+// The two lists are compared by identity rather than structurally, which is upstream's `includes` on
 // an array of interned type objects. Three conditions, all required:
 //
 //	the original must lose something          otherwise the assertion is not about nullish at all
@@ -317,9 +317,9 @@ func containsType(types []*checker.Type, wanted *checker.Type) bool {
 
 // isConstTypeAssertion is upstream's `isConstAssertion`.
 //
-// It keys on the SYNTAX, `as const`, rather than on the resulting type.
+// It keys on the syntax, `as const`, rather than on the resulting type.
 //
-// # This guard is SUBSUMED here too, and the reason is worth stating because the doc comment it
+// # This guard is subsumed here too, and the reason is worth stating because the doc comment it
 // replaces asserted the opposite
 //
 // The obvious reading is that the guard is load-bearing: a const assertion yields the expression's
@@ -332,7 +332,7 @@ func containsType(types []*checker.Type, wanted *checker.Type) bool {
 //
 // The mechanism is that `as const` returns the expression's own type, so the asserted list is the
 // original list. When the original holds nothing nullish the nothing-was-dropped guard declines, and
-// when it does hold something nullish that constituent is in the ASSERTED list too, where couldBeNullish
+// when it does hold something nullish that constituent is in the asserted list too, where couldBeNullish
 // rejects it. There is no third arrangement.
 //
 // It is kept because it is upstream's, because it declines in one syntactic step what otherwise costs

@@ -11,12 +11,12 @@ import (
 
 // answersFor drives IsForeignName over every occurrence of `target` in a source and returns the
 // answers in source order, so every assertion runs against real parsed nodes.
-func answersFor(t *testing.T, source string, target string) []bool {
-	t.Helper()
+func answersFor(test *testing.T, source string, target string) []bool {
+	test.Helper()
 	var answers []bool
-	rule_testing.Run(t, rule.Rule{
+	rule_testing.Run(test, rule.Rule[rule.NoOptions]{
 		Name: "foreign-probe",
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{
 				ast.KindIdentifier: func(node *ast.Node) {
 					if node.Text() == target {
@@ -29,20 +29,20 @@ func answersFor(t *testing.T, source string, target string) []bool {
 	return answers
 }
 
-func expectFirst(t *testing.T, source string, want bool) {
-	t.Helper()
-	got := answersFor(t, source, "name")
+func expectFirst(test *testing.T, source string, want bool) {
+	test.Helper()
+	got := answersFor(test, source, "name")
 	if len(got) == 0 {
-		t.Fatalf("%q: no occurrence of `name` reached the probe", source)
+		test.Fatalf("%q: no occurrence of `name` reached the probe", source)
 	}
 	if got[0] != want {
-		t.Errorf("%q: IsForeignName = %v, want %v", source, got[0], want)
+		test.Errorf("%q: IsForeignName = %v, want %v", source, got[0], want)
 	}
 }
 
 // TestForeignPositions covers every position a name can occupy that this file did not choose.
-func TestForeignPositions(t *testing.T) {
-	t.Parallel()
+func TestForeignPositions(test *testing.T) {
+	test.Parallel()
 	for _, source := range []string{
 		"declare const thing: any; thing.name;",
 		"({ name: 1 });",
@@ -51,35 +51,35 @@ func TestForeignPositions(t *testing.T) {
 		"import name from './m';",
 		"interface I { name: string }",
 	} {
-		expectFirst(t, source, true)
+		expectFirst(test, source, true)
 	}
 
-	// The two type positions declare the name first, so the USE is the occurrence under test. The
+	// The two type positions declare the name first, so the use is the occurrence under test. The
 	// declaration is this file's own and correctly answers owned, which is what the index picks
 	// apart here rather than asserting on whichever occurrence came first.
-	for _, c := range []struct {
+	for _, testCase := range []struct {
 		source string
 		use    int
 	}{
 		{"declare namespace A { type name = string }\ndeclare const v: A.name;", 1},
 		{"type name = string;\ndeclare const v: name;", 1},
 	} {
-		got := answersFor(t, c.source, "name")
-		if len(got) <= c.use {
-			t.Fatalf("%q: expected at least %d occurrences, got %d", c.source, c.use+1, len(got))
+		got := answersFor(test, testCase.source, "name")
+		if len(got) <= testCase.use {
+			test.Fatalf("%q: expected at least %d occurrences, got %d", testCase.source, testCase.use+1, len(got))
 		}
 		if got[0] {
-			t.Errorf("%q: the declaration answered foreign, want owned", c.source)
+			test.Errorf("%q: the declaration answered foreign, want owned", testCase.source)
 		}
-		if !got[c.use] {
-			t.Errorf("%q: the use answered owned, want foreign", c.source)
+		if !got[testCase.use] {
+			test.Errorf("%q: the use answered owned, want foreign", testCase.source)
 		}
 	}
 }
 
 // TestOwnedPositions covers the positions this file does choose, which must stay judged.
-func TestOwnedPositions(t *testing.T) {
-	t.Parallel()
+func TestOwnedPositions(test *testing.T) {
+	test.Parallel()
 	for _, source := range []string{
 		"const name = 1;",
 		"declare function f(name: string): void;",
@@ -88,7 +88,7 @@ func TestOwnedPositions(t *testing.T) {
 		// A shorthand value is a real reference to a binding, not a key.
 		"declare const name: any; ({ name });",
 	} {
-		expectFirst(t, source, false)
+		expectFirst(test, source, false)
 	}
 }
 
@@ -98,19 +98,19 @@ func TestOwnedPositions(t *testing.T) {
 // The property belongs to the class being read, which this file owns, and its declaration is a
 // property declaration that no member check protects. A class once declared `maximumBackoff` while
 // reading `this.maximumBackoff`, which is the measured defect this answer prevents.
-func TestPropertyReadOffThisIsOwned(t *testing.T) {
-	t.Parallel()
-	got := answersFor(t, "class C { name = 1; m() { return this.name; } }", "name")
+func TestPropertyReadOffThisIsOwned(test *testing.T) {
+	test.Parallel()
+	got := answersFor(test, "class C { name = 1; m() { return this.name; } }", "name")
 	if len(got) != 2 {
-		t.Fatalf("expected the declaration and the read, got %d occurrences", len(got))
+		test.Fatalf("expected the declaration and the read, got %d occurrences", len(got))
 	}
 	if got[1] {
-		t.Error("a property read off `this` answered foreign; the class owns that property")
+		test.Error("a property read off `this` answered foreign; the class owns that property")
 	}
 	// A read off anything else is foreign, which is what makes the `this` carve-out narrow.
-	other := answersFor(t, "declare const thing: any; thing.name;", "name")
+	other := answersFor(test, "declare const thing: any; thing.name;", "name")
 	if len(other) != 1 || !other[0] {
-		t.Errorf("a property read off another object answered %v, want [true]", other)
+		test.Errorf("a property read off another object answered %v, want [true]", other)
 	}
 }
 
@@ -119,29 +119,29 @@ func TestPropertyReadOffThisIsOwned(t *testing.T) {
 // Their parser gives a JSX name its own node type so it never reaches an identifier visitor. Here a
 // tag and an attribute are plain identifiers, and reproducing only the written-down exemptions cost
 // 3,081 false findings on a real tree.
-func TestJsxNamesAreForeign(t *testing.T) {
-	t.Parallel()
+func TestJsxNamesAreForeign(test *testing.T) {
+	test.Parallel()
 	for _, source := range []string{
 		"const x = <name />;",
 		"const x = <name></name>;",
 		"declare const Thing: any; const x = <Thing name=\"v\" />;",
 	} {
-		got := answersFor(t, source, "name")
+		got := answersFor(test, source, "name")
 		if len(got) == 0 {
-			t.Fatalf("%q: no occurrence reached the probe", source)
+			test.Fatalf("%q: no occurrence reached the probe", source)
 		}
 		for index, answer := range got {
 			if !answer {
-				t.Errorf("%q: occurrence %d answered owned, want foreign", source, index)
+				test.Errorf("%q: occurrence %d answered owned, want foreign", source, index)
 			}
 		}
 	}
 }
 
 // TestNilIsNotForeign covers the guard a shared function needs and a rule-local one did not.
-func TestNilIsNotForeign(t *testing.T) {
-	t.Parallel()
+func TestNilIsNotForeign(test *testing.T) {
+	test.Parallel()
 	if binding.IsForeignName(nil) {
-		t.Error("IsForeignName(nil) = true, want false")
+		test.Error("IsForeignName(nil) = true, want false")
 	}
 }

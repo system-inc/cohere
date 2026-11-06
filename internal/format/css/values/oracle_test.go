@@ -10,12 +10,14 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 	"unicode/utf8"
 
 	"github.com/system-inc/cohere/internal/corpus"
 	"github.com/system-inc/cohere/internal/format/estree"
+	"github.com/system-inc/cohere/internal/json_value"
 )
 
 // valuesParseScript is the oracle: postcss-values-parser 2.0.1 from the fork's node_modules, loaded
@@ -144,7 +146,10 @@ var valuesFixtures = []valuesFixture{
 	{name: "calc with var fallback", text: "calc(100% - var(--x, 2px))"},
 	{name: "color-mix", text: "color-mix(in oklab, var(--color-red-500) 50%, transparent)"},
 	{name: "nested functions three deep", text: "translate(calc(var(--a) * -1), min(10px, max(1vw, 2em)))"},
-	{name: "function after a function", text: "rgb(0 0 0 / 0.5) linear-gradient(to right, #fff 0%, rgba(0, 0, 0, .5) 100%)"},
+	{
+		name: "function after a function",
+		text: "rgb(0 0 0 / 0.5) linear-gradient(to right, #fff 0%, rgba(0, 0, 0, .5) 100%)",
+	},
 	{name: "parenthesized group", text: "(min-width: 100px) and (max-width: 200px)"},
 	{name: "nested parens in calc", text: "calc((1px + 2px) * (3 - 4))"},
 	{name: "empty function", text: "foo()"},
@@ -249,13 +254,13 @@ line"`},
 // A corpus value the library refuses under { loose: true } is counted, and the test fails if that
 // count passes a tenth of the corpus values: an oracle that rejects everything would otherwise read as
 // perfect agreement.
-func TestParseAgreesWithPostcssValuesParser(t *testing.T) {
-	t.Parallel()
+func TestParseAgreesWithPostcssValuesParser(test *testing.T) {
+	test.Parallel()
 	corpora := os.Getenv("COHERE_CSS_CORPORA")
 	if corpora == "" {
-		t.Skip("set COHERE_CSS_CORPORA to compare the parser against postcss-values-parser")
+		test.Skip("set COHERE_CSS_CORPORA to compare the parser against postcss-values-parser")
 	}
-	root := corpus.PrettierFork.Root(t)
+	root := corpus.PrettierFork.Root(test)
 
 	type request struct {
 		Name string  `json:"name"`
@@ -267,12 +272,15 @@ func TestParseAgreesWithPostcssValuesParser(t *testing.T) {
 	for _, corpus := range strings.Split(corpora, ":") {
 		corpus = strings.TrimSpace(corpus)
 		if strings.HasPrefix(corpus, "~/") {
-			home, _ := os.UserHomeDir()
+			home, homeError := os.UserHomeDir()
+			if homeError != nil {
+				test.Fatalf("expanding %s: %v", corpus, homeError)
+			}
 			corpus = filepath.Join(home, corpus[2:])
 		}
-		err := filepath.WalkDir(corpus, func(path string, entry fs.DirEntry, err error) error {
-			if err != nil {
-				return err
+		walkError := filepath.WalkDir(corpus, func(path string, entry fs.DirEntry, pathError error) error {
+			if pathError != nil {
+				return pathError
 			}
 			if entry.IsDir() && (entry.Name() == "node_modules" || entry.Name() == ".git" || entry.Name() == ".next") {
 				return filepath.SkipDir
@@ -280,23 +288,25 @@ func TestParseAgreesWithPostcssValuesParser(t *testing.T) {
 			if entry.IsDir() || filepath.Ext(path) != ".css" {
 				return nil
 			}
-			source, err := os.ReadFile(path)
-			if err != nil {
-				return err
+			source, readError := os.ReadFile(path)
+			if readError != nil {
+				return readError
 			}
 			if !utf8.Valid(source) {
 				return fmt.Errorf("%s is not UTF-8, which the comparison cannot carry through JSON", path)
 			}
-			requests = append(requests, request{Name: path, Path: &path})
+			// The request keeps a pointer, so it points at this file's own copy of the path.
+			filePath := path
+			requests = append(requests, request{Name: path, Path: &filePath})
 			return nil
 		})
-		if err != nil {
-			t.Fatalf("walking %s: %v", corpus, err)
+		if walkError != nil {
+			test.Fatalf("walking %s: %v", corpus, walkError)
 		}
 	}
 	corpusFiles := len(requests)
 	if corpusFiles == 0 {
-		t.Fatalf("no .css files under %s", corpora)
+		test.Fatalf("no .css files under %s", corpora)
 	}
 	for index := range valuesFixtures {
 		name := "fixture: " + valuesFixtures[index].name
@@ -306,9 +316,9 @@ func TestParseAgreesWithPostcssValuesParser(t *testing.T) {
 
 	var stdin bytes.Buffer
 	for _, each := range requests {
-		encoded, err := json.Marshal(each)
-		if err != nil {
-			t.Fatal(err)
+		encoded, encodeError := json.Marshal(each)
+		if encodeError != nil {
+			test.Fatal(encodeError)
 		}
 		stdin.Write(encoded)
 		stdin.WriteByte('\n')
@@ -316,19 +326,20 @@ func TestParseAgreesWithPostcssValuesParser(t *testing.T) {
 	command := exec.Command("node", "-e", valuesParseScript)
 	command.Dir = root
 	command.Stdin = &stdin
-	var stdout, stderr bytes.Buffer
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
 	command.Stdout, command.Stderr = &stdout, &stderr
-	if err := command.Run(); err != nil {
-		t.Fatalf("node: %v\n%s", err, stderr.String())
+	if runError := command.Run(); runError != nil {
+		test.Fatalf("node: %v\n%s", runError, stderr.String())
 	}
 
 	type record struct {
-		Name   string         `json:"name"`
-		Source string         `json:"source"`
-		Text   string         `json:"text"`
-		Loose  map[string]any `json:"loose"`
-		Strict map[string]any `json:"strict"`
-		Done   bool           `json:"done"`
+		Name   string       `json:"name"`
+		Source string       `json:"source"`
+		Text   string       `json:"text"`
+		Loose  oracleResult `json:"loose"`
+		Strict oracleResult `json:"strict"`
+		Done   bool         `json:"done"`
 	}
 	var records []record
 	answered := map[string]bool{}
@@ -337,8 +348,8 @@ func TestParseAgreesWithPostcssValuesParser(t *testing.T) {
 			continue
 		}
 		var each record
-		if err := json.Unmarshal([]byte(line), &each); err != nil {
-			t.Fatal(err)
+		if decodeError := json.Unmarshal([]byte(line), &each); decodeError != nil {
+			test.Fatal(decodeError)
 		}
 		if each.Done {
 			answered[each.Name] = true
@@ -348,7 +359,7 @@ func TestParseAgreesWithPostcssValuesParser(t *testing.T) {
 	}
 	for _, each := range requests {
 		if !answered[each.Name] {
-			t.Fatalf("the oracle did not finish %s", each.Name)
+			test.Fatalf("the oracle did not finish %s", each.Name)
 		}
 	}
 
@@ -357,7 +368,7 @@ func TestParseAgreesWithPostcssValuesParser(t *testing.T) {
 	fail := func(format string, arguments ...any) {
 		different++
 		if different <= 25 {
-			t.Errorf(format, arguments...)
+			test.Errorf(format, arguments...)
 		}
 	}
 	for _, each := range records {
@@ -365,40 +376,54 @@ func TestParseAgreesWithPostcssValuesParser(t *testing.T) {
 		switch each.Source {
 		case "decl", "atrule":
 			corpusValues++
-			if _, refused := each.Loose["error"]; refused {
+			if each.Loose.Error != nil {
 				corpusRefused++
 			}
 		case "extra":
 			extraValues++
 		}
 		if expectMalformed, isFixture := malformed[each.Name]; isFixture {
-			if _, refused := each.Loose["error"]; refused != expectMalformed {
-				fail("%s: the fixture says malformed=%v and the library says %v", label, expectMalformed, each.Loose)
+			if refused := each.Loose.Error != nil; refused != expectMalformed {
+				fail(
+					"%s: the fixture says malformed=%v and the library says %s",
+					label,
+					expectMalformed,
+					each.Loose.describe(),
+				)
 				continue
 			}
 		}
 		for _, mode := range []struct {
 			name  string
-			want  map[string]any
+			want  oracleResult
 			loose bool
 		}{{"loose", each.Loose, true}, {"strict", each.Strict, false}} {
 			compared++
-			got, err := dumpValues(each.Text, Options{Loose: mode.loose})
-			wantError, oracleRefused := mode.want["error"].(string)
+			got, dumpValuesError := dumpValues(each.Text, Options{Loose: mode.loose})
 			switch {
-			case oracleRefused && err != nil:
-				var thrown *Error
-				if !asError(err, &thrown) || thrown.Error() != wantError {
-					fail("%s %s: both refuse, with different messages:\n  library %s\n  Go      %v", label, mode.name, wantError, err)
+			case mode.want.Error != nil && dumpValuesError != nil:
+				if thrown, isThrown := asError(dumpValuesError); !isThrown || thrown.Error() != *mode.want.Error {
+					fail(
+						"%s %s: both refuse, with different messages:\n  library %s\n  Go      %v",
+						label,
+						mode.name,
+						*mode.want.Error,
+						dumpValuesError,
+					)
 					continue
 				}
 				refusedByBoth++
-			case oracleRefused:
-				fail("%s %s: the library refuses it (%s) and Go parsed it", label, mode.name, wantError)
-			case err != nil:
-				fail("%s %s: the library parses it and Go refused: %v", label, mode.name, err)
+			case mode.want.Error != nil:
+				fail("%s %s: the library refuses it (%s) and Go parsed it", label, mode.name, *mode.want.Error)
+			case dumpValuesError != nil:
+				fail("%s %s: the library parses it and Go refused: %v", label, mode.name, dumpValuesError)
 			default:
-				if difference := firstValuesDifference(mode.want["tree"], got, "root"); difference != "" {
+				want, wantError := json_value.Parse(mode.want.Tree)
+				if wantError != nil {
+					fail("%s %s: the library's tree does not read as JSON: %v", label, mode.name, wantError)
+					continue
+				}
+				if difference := firstValuesDifference(want, got, "root"); difference != "" {
 					fail("%s %s: %s", label, mode.name, difference)
 					continue
 				}
@@ -406,94 +431,129 @@ func TestParseAgreesWithPostcssValuesParser(t *testing.T) {
 			}
 		}
 	}
-	t.Logf("%d corpus files: %d values Prettier parses (%d refused in loose mode) and %d extra at-rule params; %d fixtures; %d comparisons (loose and strict): %d identical, %d refused by both with the same message, %d different",
-		corpusFiles, corpusValues, corpusRefused, extraValues, len(valuesFixtures), compared, identical, refusedByBoth, different)
+	test.Logf(
+		"%d corpus files: %d values Prettier parses (%d refused in loose mode) and %d extra at-rule params; %d fixtures; %d comparisons (loose and strict): %d identical, %d refused by both with the same message, %d different",
+		corpusFiles,
+		corpusValues,
+		corpusRefused,
+		extraValues,
+		len(valuesFixtures),
+		compared,
+		identical,
+		refusedByBoth,
+		different,
+	)
 	if corpusValues == 0 {
-		t.Errorf("the corpus yielded no values")
+		test.Errorf("the corpus yielded no values")
 	}
 	if corpusRefused > corpusValues/10 {
-		t.Errorf("the library refused %d of %d corpus values; the comparison is thinner than it looks", corpusRefused, corpusValues)
+		test.Errorf(
+			"the library refused %d of %d corpus values; the comparison is thinner than it looks",
+			corpusRefused,
+			corpusValues,
+		)
 	}
 }
 
-func asError(err error, target **Error) bool {
-	for err != nil {
-		if thrown, isThrown := err.(*Error); isThrown {
-			*target = thrown
-			return true
+// oracleResult is what the oracle script reports for one value in one mode: { tree } for a parse, or
+// { error } holding String(error) for a throw. The tree stays raw JSON until it is compared.
+type oracleResult struct {
+	Tree  json.RawMessage `json:"tree"`
+	Error *string         `json:"error"`
+}
+
+// describe is the result as a failure message shows it.
+func (result oracleResult) describe() string {
+	if result.Error != nil {
+		return "it throws " + *result.Error
+	}
+	return "it parses to " + string(result.Tree)
+}
+
+// asError is the first *Error in the chain dumpValuesError unwraps to, and whether there is one.
+func asError(dumpValuesError error) (*Error, bool) {
+	for current := dumpValuesError; current != nil; {
+		if thrown, isThrown := current.(*Error); isThrown {
+			return thrown, true
 		}
-		unwrapper, isUnwrapper := err.(interface{ Unwrap() error })
+		unwrapper, isUnwrapper := current.(interface{ Unwrap() error })
 		if !isUnwrapper {
-			return false
+			return nil, false
 		}
-		err = unwrapper.Unwrap()
+		current = unwrapper.Unwrap()
 	}
-	return false
+	return nil, false
 }
 
-// dumpValues parses one value and renders it the way the oracle script does, through JSON, with
-// sourceIndex converted back to UTF-16.
-func dumpValues(text string, options Options) (any, error) {
-	tree, err := Parse(text, options)
-	if err != nil {
-		return nil, err
+// dumpValues parses one value and renders it the way the oracle script does, as the JSON value the
+// script prints, with sourceIndex converted back to UTF-16.
+func dumpValues(text string, options Options) (json_value.Value, error) {
+	tree, parseError := Parse(text, options)
+	if parseError != nil {
+		return nil, parseError
 	}
-	toUTF16 := utf16IndexOf(text)
-	encoded, err := json.Marshal(dumpValuesValue(tree, toUTF16))
-	if err != nil {
-		return nil, err
-	}
-	var result any
-	err = json.Unmarshal(encoded, &result)
-	return result, err
+	return dumpValuesValue(tree, utf16IndexOf(text)), nil
 }
 
-func dumpValuesValue(value any, toUTF16 func(int) int) any {
+// dumpValuesValue is one of a node's properties as the JSON value the oracle script prints for it.
+// Every string the parser builds is decoded from UTF-16, so it is valid UTF-8 and reads in JSON as
+// it is. A float64 JSON cannot carry, which json.Marshal would refuse, becomes a description no
+// oracle prints, so the comparison still fails on it.
+func dumpValuesValue(value estree.Value, toUtf16 func(int) int) json_value.Value {
 	switch typed := value.(type) {
 	case nil:
-		return "<undefined>"
+		return json_value.String("<undefined>")
 	case *estree.Node:
 		if typed.Range != [2]int{0, 0} {
-			return fmt.Sprintf("a node with range %v, which the port leaves at [0, 0]", typed.Range)
+			return json_value.String(
+				fmt.Sprintf("a node with range %v, which the port leaves at [0, 0]", typed.Range),
+			)
 		}
-		result := map[string]any{"type": typed.Type()}
+		result := json_value.Object{"type": json_value.String(typed.Type())}
 		for _, key := range typed.Keys() {
 			if key == "sourceIndex" {
-				index, isInt := typed.Get(key).(int)
+				index, isInt := typed.Get(key).(estree.Integer)
 				if !isInt {
-					result[key] = fmt.Sprintf("a sourceIndex of type %T", typed.Get(key))
+					result[key] = json_value.String(fmt.Sprintf("a sourceIndex of type %T", typed.Get(key)))
 					continue
 				}
-				result[key] = toUTF16(index)
+				result[key] = json_value.Number(strconv.Itoa(toUtf16(int(index))))
 				continue
 			}
-			result[key] = dumpValuesValue(typed.Get(key), toUTF16)
+			result[key] = dumpValuesValue(typed.Get(key), toUtf16)
 		}
 		return result
-	case []*estree.Node:
+	case estree.Nodes:
 		if typed == nil {
-			return "a nil list, which no field of the library holds"
+			return json_value.String("a nil list, which no field of the library holds")
 		}
-		result := make([]any, len(typed))
+		result := make(json_value.Array, len(typed))
 		for index, child := range typed {
-			result[index] = dumpValuesValue(child, toUTF16)
+			result[index] = dumpValuesValue(child, toUtf16)
 		}
 		return result
-	case map[string]any:
-		result := map[string]any{}
+	case estree.Record:
+		result := json_value.Object{}
 		for key, each := range typed {
-			result[key] = dumpValuesValue(each, toUTF16)
+			result[key] = dumpValuesValue(each, toUtf16)
 		}
 		return result
-	case float64:
-		if math.IsNaN(typed) {
-			return "NaN"
+	case estree.Number:
+		if math.IsNaN(float64(typed)) {
+			return json_value.String("NaN")
 		}
-		return typed
-	case string, bool, int:
-		return typed
+		if math.IsInf(float64(typed), 0) {
+			return json_value.String(fmt.Sprintf("a float64 of %v, which JSON cannot carry", float64(typed)))
+		}
+		return json_value.Number(strconv.FormatFloat(float64(typed), 'g', -1, 64))
+	case estree.String:
+		return json_value.String(typed)
+	case estree.Boolean:
+		return json_value.Boolean(typed)
+	case estree.Integer:
+		return json_value.Number(strconv.Itoa(int(typed)))
 	default:
-		return fmt.Sprintf("an unexpected %T", typed)
+		return json_value.String(fmt.Sprintf("an unexpected %T", typed))
 	}
 }
 
@@ -518,11 +578,11 @@ func utf16IndexOf(text string) func(int) int {
 	}
 }
 
-// firstValuesDifference names the first path where two decoded JSON values differ, or "".
-func firstValuesDifference(want any, got any, path string) string {
+// firstValuesDifference names the first path where two JSON values differ, or "".
+func firstValuesDifference(want json_value.Value, got json_value.Value, path string) string {
 	switch typed := want.(type) {
-	case map[string]any:
-		other, isMap := got.(map[string]any)
+	case json_value.Object:
+		other, isMap := got.(json_value.Object)
 		if !isMap {
 			return fmt.Sprintf("%s: want an object, got %v", path, got)
 		}
@@ -542,27 +602,59 @@ func firstValuesDifference(want any, got any, path string) string {
 			wantValue, wantPresent := typed[key]
 			gotValue, gotPresent := other[key]
 			if wantPresent != gotPresent {
-				return fmt.Sprintf("%s.%s: present in the library %v, in Go %v (%v)", path, key, wantPresent, gotPresent, typed["type"])
+				return fmt.Sprintf(
+					"%s.%s: present in the library %v, in Go %v (%v)",
+					path,
+					key,
+					wantPresent,
+					gotPresent,
+					typed["type"],
+				)
 			}
 			if difference := firstValuesDifference(wantValue, gotValue, path+"."+key); difference != "" {
 				return difference
 			}
 		}
 		return ""
-	case []any:
-		other, isList := got.([]any)
+	case json_value.Array:
+		other, isList := got.(json_value.Array)
 		if !isList || len(other) != len(typed) {
 			return fmt.Sprintf("%s: want %d elements, got %v", path, len(typed), got)
 		}
 		for index := range typed {
-			if difference := firstValuesDifference(typed[index], other[index], fmt.Sprintf("%s[%d]", path, index)); difference != "" {
+			if difference := firstValuesDifference(
+				typed[index],
+				other[index],
+				fmt.Sprintf("%s[%d]", path, index),
+			); difference != "" {
 				return difference
 			}
 		}
 		return ""
 	}
-	if fmt.Sprintf("%T %v", want, want) != fmt.Sprintf("%T %v", got, got) {
-		return fmt.Sprintf("%s: want %#v, got %#v", path, want, got)
+	if jsonLeafText(want) != jsonLeafText(got) {
+		return fmt.Sprintf("%s: want %s, got %s", path, jsonLeafText(want), jsonLeafText(got))
 	}
 	return ""
+}
+
+// jsonLeafText is a JSON value as Go's untyped decode would hold it, its type and its value, so two
+// leaves are equal exactly when they decode to the same thing: a number is read as a float64, so 1
+// and 1.0 are one number, as they are in JavaScript.
+func jsonLeafText(value json_value.Value) string {
+	switch typed := value.(type) {
+	case json_value.Number:
+		number, parseError := json.Number(typed).Float64()
+		if parseError != nil {
+			return fmt.Sprintf("a number that does not read as a float64, %q", string(typed))
+		}
+		return fmt.Sprintf("float64 %v", number)
+	case json_value.String:
+		return fmt.Sprintf("string %q", string(typed))
+	case json_value.Boolean:
+		return fmt.Sprintf("bool %v", bool(typed))
+	case json_value.Null:
+		return "null"
+	}
+	return fmt.Sprintf("%T %v", value, value)
 }

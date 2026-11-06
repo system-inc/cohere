@@ -20,26 +20,28 @@ func noUselessDefaultAssignmentCaseName(index int) string {
 // Building the options struct directly would leave the decoder untested, and the decoder is where
 // upstream's long option name is transcribed. A typo there yields a struct that silently keeps
 // the default, which no fixture built from a struct could see.
-func noUselessDefaultAssignmentOptionsFor(t *testing.T, optionsJson string) any {
-	t.Helper()
+func noUselessDefaultAssignmentOptionsFor(test *testing.T, optionsJson string) NoUselessDefaultAssignmentOptions {
+	test.Helper()
 	if optionsJson == "" {
 		return DefaultNoUselessDefaultAssignmentSettings()
 	}
-	decoded, err := DecodeNoUselessDefaultAssignmentOptions(json.RawMessage(optionsJson))
-	if err != nil {
-		t.Fatalf("decoding %s: %v", optionsJson, err)
+	decoded, decodeNoUselessDefaultAssignmentOptionsError := DecodeNoUselessDefaultAssignmentOptions(
+		json.RawMessage(optionsJson),
+	)
+	if decodeNoUselessDefaultAssignmentOptionsError != nil {
+		test.Fatalf("decoding %s: %v", optionsJson, decodeNoUselessDefaultAssignmentOptionsError)
 	}
 	return decoded
 }
 
 // TestNoUselessDefaultAssignmentStaysSilent is upstream's sixty two passing cases verbatim.
 //
-// Each was re-measured one file per program against the installed 8.67.0 build under THIS
+// Each was re-measured one file per program against the installed 8.67.0 build under this
 // harness's compiler options. Three of them are written by upstream against a
 // `noUncheckedIndexedAccess` project our harness cannot express; measured, all three stay clean
 // under our options too, so the option is not what decides them and importing them costs nothing.
-func TestNoUselessDefaultAssignmentStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoUselessDefaultAssignmentStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		"function Bar({ foo = '' }: { foo?: string }) {\n  return foo;\n}\n",
@@ -106,11 +108,11 @@ func TestNoUselessDefaultAssignmentStaysSilent(t *testing.T) {
 		"interface Fn {\n  (value: string): void;\n  (value?: string): void;\n}\nconst fn: Fn = (value = 'default') => {\n  return value;\n};\n",
 	}
 	for index, sourceText := range cases {
-		t.Run(noUselessDefaultAssignmentCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoUselessDefaultAssignment,
+		test.Run(noUselessDefaultAssignmentCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoUselessDefaultAssignment,
 				noUselessDefaultAssignmentFile, sourceText,
-				noUselessDefaultAssignmentOptionsFor(t, "")))
+				noUselessDefaultAssignmentOptionsFor(test, "")))
 		})
 	}
 }
@@ -118,17 +120,17 @@ func TestNoUselessDefaultAssignmentStaysSilent(t *testing.T) {
 // TestNoUselessDefaultAssignmentFires is upstream's twenty three reporting cases verbatim.
 //
 // Every row asserts the span, the id, the whole rendered message, and the rewritten file. The
-// rewrite carries the most weight: the repair deletes a range computed from the BOUND NAME's end
+// rewrite carries the most weight: the repair deletes a range computed from the bound name's end
 // rather than the default's start, so a fixer built the obvious way leaves `function foo(a = )`,
 // which still satisfies every message id while producing source that does not parse. One case's
 // repair also inserts a `?`, and one keeps a comment sitting between the name and the annotation.
 //
-// Three of these are written by upstream against a project WITHOUT strictNullChecks, where
+// Three of these are written by upstream against a project without strictNullChecks, where
 // upstream emits an extra file-level `noStrictNullCheck` finding alongside the real one. Measured
 // under our options, the real finding is identical and the file-level one is absent, which is
 // what these rows assert. See the rule's doc comment for why the gate is a decline here.
-func TestNoUselessDefaultAssignmentFires(t *testing.T) {
-	t.Parallel()
+func TestNoUselessDefaultAssignmentFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText  string
@@ -324,13 +326,13 @@ func TestNoUselessDefaultAssignmentFires(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(noUselessDefaultAssignmentCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoUselessDefaultAssignment,
+		test.Run(noUselessDefaultAssignmentCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, NoUselessDefaultAssignment,
 				noUselessDefaultAssignmentFile, testCase.sourceText,
-				noUselessDefaultAssignmentOptionsFor(t, testCase.optionsJson))
+				noUselessDefaultAssignmentOptionsFor(test, testCase.optionsJson))
 
-			rule_testing.ExpectFindings(t, result, testCase.wantId)
+			rule_testing.ExpectFindings(test, result, testCase.wantId)
 
 			// The harness writes the fixture trimmed, so both the span slice and the expected
 			// rewrite are against that text rather than the Go literal above.
@@ -339,17 +341,17 @@ func TestNoUselessDefaultAssignmentFires(t *testing.T) {
 
 			gotSpan := onDisk[diagnostic.Range.Pos():diagnostic.Range.End()]
 			if gotSpan != testCase.wantSpan {
-				t.Fatalf("span: expected %q, got %q", testCase.wantSpan, gotSpan)
+				test.Fatalf("span: expected %q, got %q", testCase.wantSpan, gotSpan)
 			}
 			if diagnostic.Message.Id != testCase.wantId {
-				t.Fatalf("id: expected %q, got %q", testCase.wantId, diagnostic.Message.Id)
+				test.Fatalf("id: expected %q, got %q", testCase.wantId, diagnostic.Message.Id)
 			}
 			if diagnostic.Message.Description != testCase.wantMessage {
-				t.Fatalf("message: expected %q, got %q", testCase.wantMessage,
+				test.Fatalf("message: expected %q, got %q", testCase.wantMessage,
 					diagnostic.Message.Description)
 			}
 
-			rule_testing.ExpectFixedSource(t, result, strings.TrimSpace(testCase.wantFixed)+"\n")
+			rule_testing.ExpectFixedSource(test, result, strings.TrimSpace(testCase.wantFixed)+"\n")
 		})
 	}
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"os"
@@ -14,6 +15,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/release/packaging"
+	"github.com/system-inc/cohere/internal/streams"
 )
 
 // How a run prints. The default is the human view: the files cohere rewrote, the findings, and one
@@ -24,7 +26,7 @@ type outputMode int
 const (
 	outputHuman outputMode = iota
 	outputVerbose
-	outputJSON
+	outputJson
 )
 
 // outputSettings is the run's choice of view, set once from the flags and the project's settings.
@@ -41,28 +43,46 @@ var activeOutput = outputSettings{Mode: outputHuman}
 // accountOutput is where a line that accounts for the run goes: the phase lines, the coverage block, the
 // scopes and notes. Under `--verbose` that is out; in the human view and under `--json` it is nowhere,
 // since the footer says what a reader needs and `--json` prints nothing a program did not ask for.
-func accountOutput(out io.Writer) io.Writer {
+func accountOutput(out *bufio.Writer) *bufio.Writer {
 	if activeOutput.Mode == outputVerbose {
 		return out
 	}
-	return io.Discard
+	return discardedOutput()
+}
+
+// showWarning delivers a warning or note just written to streams.Errors where it happened, among the findings, as
+// it landed when stderr was written straight to the terminal: stdout first, so nothing said before the warning
+// on stdout is left behind it, then stderr. Main goroutine only, as the streams are.
+func showWarning() {
+	streams.Show(streams.Output)
+	streams.Show(streams.Errors)
+}
+
+// discardedOutput is a stream for a line no one reads, a stream rather than io.Discard so that every print through
+// accountOutput writes to a *bufio.Writer (see package streams). A fresh one each time rather than one shared,
+// because io.Discard was safe from any goroutine and a shared buffer is not, and the printers' tests render in
+// parallel. Its buffer is small, since nothing it holds is ever read.
+func discardedOutput() *bufio.Writer {
+	return bufio.NewWriterSize(io.Discard, 16)
 }
 
 // activeSummary is the run's summary, filled as the phases finish and rendered at the end.
 var activeSummary runSummary
 
 // printFinding prints one finding in the view the run asked for: as it always printed under `--verbose`,
-// as `path:line:col severity rule message` in the human view, as a line of JSON under `--json`.
-func printFinding(out io.Writer, finding runFinding, verboseLine string) {
+// as `path:line:col severity rule message` in the human view, as a line of JSON under `--json`. Each is shown
+// as it is printed, since what follows a finding is often seconds of work, and a person watches them arrive.
+func printFinding(out *bufio.Writer, finding runFinding, verboseLine string) {
 	activeOpen.add(finding.Path)
 	switch activeOutput.Mode {
 	case outputVerbose:
 		fmt.Fprint(out, verboseLine)
-	case outputJSON:
-		writeJSONLine(out, findingAsJSON(finding))
+	case outputJson:
+		writeJsonLine(out, findingAsJson(finding))
 	default:
 		fmt.Fprintln(out, findingLine(finding, activeOutput.Style))
 	}
+	streams.Show(out)
 }
 
 // compilerFinding is a type error as a runFinding: its rule is its TypeScript code.
@@ -81,21 +101,23 @@ func compilerFinding(diagnostic *ast.Diagnostic) runFinding {
 
 // ruleFinding is a rule's diagnostic as a runFinding, with the severity the settings give the rule for
 // its file. Unnamed rules report as errors, and so does the unused-disable engine diagnostic by default.
-func ruleFinding(diagnostic rule.Diagnostic, lintConfig *configuration.Config) runFinding {
+func ruleFinding(diagnostic rule.Diagnostic, lintConfiguration *configuration.Configuration) runFinding {
 	finding := runFinding{
 		Severity:  "error",
 		Rule:      diagnostic.RuleName,
-		MessageID: diagnostic.Message.Id,
+		MessageId: diagnostic.Message.Id,
 		Message:   singleLineDescription(diagnostic.Message.Description),
 	}
 	if diagnostic.RuleName == configuration.UnusedDisable {
 		path, _, _ := diagnostic.Location()
-		finding.Severity = unusedDisableSeverity(lintConfig, path).String()
+		finding.Severity = unusedDisableSeverity(lintConfiguration, path).String()
 	}
 	if sourceFile := diagnostic.SourceFile; sourceFile != nil {
 		finding.Path, finding.Line, finding.Column = diagnostic.Location()
-		if lintConfig != nil {
-			if setting, named := lintConfig.Resolve(sourceFile.FileName().AsString()).Rules[diagnostic.RuleName]; named &&
+		if lintConfiguration != nil {
+			if setting, named := lintConfiguration.Resolve(
+				sourceFile.FileName().AsString(),
+			).Rules[diagnostic.RuleName]; named &&
 				setting.Severity == configuration.SeverityWarn {
 				finding.Severity = "warn"
 			}
@@ -108,7 +130,7 @@ func ruleFinding(diagnostic rule.Diagnostic, lintConfig *configuration.Config) r
 // account, then the footer; in the human view the footer; under `--json` the summary line. The footer is
 // written as describing this invocation, since its time is this run's, so the run cache never replays it
 // as recorded; a replay renders its own from the stored summary.
-func writeRunEnd(report *pipelineReport, out io.Writer) {
+func writeRunEnd(report *pipelineReport, out *bufio.Writer) {
 	summary := activeSummary
 	summary.Phases = report.records
 	summary.Graph = report.graph
@@ -153,13 +175,14 @@ func writeRunEnd(report *pipelineReport, out io.Writer) {
 	case outputVerbose:
 		report.Write(out)
 		if line := summary.Cache.missLine(); line != "" {
-			fmt.Fprintln(invocationOutput(out), line)
+			printInvocation(out, "%s\n", line)
 		}
-		fmt.Fprintln(invocationOutput(out), footer(summary, activeOutput.Style, footerOptions{Phases: activeOutput.Phases, Verbose: true}))
-	case outputJSON:
-		writeJSONLine(invocationOutput(out), summaryAsJSON(summary))
+		printInvocation(out, "%s\n",
+			footer(summary, activeOutput.Style, footerOptions{Phases: activeOutput.Phases, Verbose: true}))
+	case outputJson:
+		printInvocation(out, "%s", summaryJsonLine(summaryAsJson(summary)))
 	default:
-		fmt.Fprintln(invocationOutput(out), footer(summary, activeOutput.Style, footerOptions{Phases: activeOutput.Phases}))
+		printInvocation(out, "%s\n", footer(summary, activeOutput.Style, footerOptions{Phases: activeOutput.Phases}))
 	}
 }
 
@@ -170,7 +193,10 @@ func changedFilesFrom(files []edit.ChangedFile, root string) []changedFile {
 	changed := make([]changedFile, 0, len(files))
 	for _, file := range files {
 		path := file.FileName
-		if relative, err := filepath.Rel(root, file.FileName); err == nil && !strings.HasPrefix(relative, "..") {
+		if relative, relativePathError := filepath.Rel(
+			root,
+			file.FileName,
+		); relativePathError == nil && !strings.HasPrefix(relative, "..") {
 			path = relative
 		}
 		entry := changedFile{Path: path, FixedBy: file.FixesByRule}
@@ -188,11 +214,11 @@ func changedFilesFrom(files []edit.ChangedFile, root string) []changedFile {
 
 // printChangedFiles lists the files the fix phase rewrote, above the findings, in the human view, and as
 // lines of JSON under `--json`. `--verbose` has the fix phase's own line for it instead.
-func printChangedFiles(out io.Writer, changed []changedFile) {
+func printChangedFiles(out *bufio.Writer, changed []changedFile) {
 	switch activeOutput.Mode {
-	case outputJSON:
-		for _, line := range changedFilesAsJSON(changed) {
-			writeJSONLine(out, line)
+	case outputJson:
+		for _, line := range changedFilesAsJson(changed) {
+			writeJsonLine(out, line)
 		}
 	case outputHuman:
 		for _, line := range changedFileLines(changed, activeOutput.Style) {
@@ -202,18 +228,18 @@ func printChangedFiles(out io.Writer, changed []changedFile) {
 }
 
 // unusedDisableSeverity is shared by rendering and check-only fixes, including nil-config harnesses.
-func unusedDisableSeverity(config *configuration.Config, path string) configuration.Severity {
+func unusedDisableSeverity(lintConfiguration *configuration.Configuration, path string) configuration.Severity {
 	resolved := configuration.Resolved{}
-	if config != nil {
-		resolved = config.Resolve(path)
+	if lintConfiguration != nil {
+		resolved = lintConfiguration.Resolve(path)
 	}
 	return resolved.UnusedDisableSeverity()
 }
 
-func lintWarningCount(diagnostics []rule.Diagnostic, config *configuration.Config) int {
+func lintWarningCount(diagnostics []rule.Diagnostic, lintConfiguration *configuration.Configuration) int {
 	warnings := 0
 	for _, diagnostic := range diagnostics {
-		if ruleFinding(diagnostic, config).Severity == "warn" {
+		if ruleFinding(diagnostic, lintConfiguration).Severity == "warn" {
 			warnings++
 		}
 	}

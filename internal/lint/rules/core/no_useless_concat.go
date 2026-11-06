@@ -29,10 +29,10 @@ var messageUnexpectedConcat = rule.Message{
 //	invalid: foo + 'a' + 'b'
 //	invalid: `a` + `b`
 //
-// # The operands are the ADJACENT ones, not the node's own children
+// # The operands are the adjacent ones, not the node's own children
 //
 // Concatenation associates left, so `foo + 'a' + 'b'` parses as `(foo + 'a') + 'b'` and the outer
-// node's left child is a whole binary expression rather than a literal. Upstream walks INTO that
+// node's left child is a whole binary expression rather than a literal. Upstream walks into that
 // child to find the rightmost thing actually next to the operator, and symmetrically walks into the
 // right child to find its leftmost. Without that descent the rule reports only the innermost `+` of
 // a chain and misses `foo + 'a' + 'b'` entirely, which is one of upstream's own reporting cases.
@@ -84,9 +84,9 @@ var messageUnexpectedConcat = rule.Message{
 // Upstream declares none and marks the rule frozen. Joining the two literals is not always a
 // spelling change: the halves may use different quote styles, one may be a template carrying a
 // substitution, and the line break the author chose is often what makes a long string readable.
-var NoUselessConcat = rule.Rule{
+var NoUselessConcat = rule.Rule[rule.NoOptions]{
 	Name: "no-useless-concat",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindBinaryExpression: func(node *ast.Node) {
 				expression := node.AsBinaryExpression()
@@ -100,16 +100,16 @@ var NoUselessConcat = rule.Rule{
 					return
 				}
 
-				leftRange := rule.TokenRange(ctx.SourceFile, left)
-				rightRange := rule.TokenRange(ctx.SourceFile, right)
-				if !noUselessConcatOnSameLine(ctx.SourceFile.Text(), leftRange.End(), rightRange.Pos()) {
+				leftRange := rule.TokenRange(ruleContext.SourceFile, left)
+				rightRange := rule.TokenRange(ruleContext.SourceFile, right)
+				if !noUselessConcatOnSameLine(ruleContext.SourceFile.Text(), leftRange.End(), rightRange.Pos()) {
 					return
 				}
 
 				// The operator token rather than the expression, which is upstream's own location
 				// override. `TokenRange` strips the leading trivia the raw token position carries,
 				// so this is the single `+` character and matches upstream's one-column span.
-				ctx.ReportRange(rule.TokenRange(ctx.SourceFile, expression.OperatorToken),
+				ruleContext.ReportRange(rule.TokenRange(ruleContext.SourceFile, expression.OperatorToken),
 					messageUnexpectedConcat)
 			},
 		}
@@ -158,7 +158,7 @@ func noUselessConcatLeftmostOfRight(node *ast.Node) *ast.Node {
 // noUselessConcatIsStringLiteral is upstream's `astUtils.isStringLiteral`.
 //
 // A string-valued literal or any template literal. This parser gives a template two kinds depending
-// on whether it carries substitutions, and BOTH count, which is upstream's own behaviour rather
+// on whether it carries substitutions, and both count, which is upstream's own behaviour rather
 // than a widening: measured against the installed build, a template carrying a substitution added
 // to a string reports, even though such a template is not a constant.
 //

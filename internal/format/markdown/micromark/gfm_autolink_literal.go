@@ -97,106 +97,20 @@ func tokenizeGfmAutolinkLiteralEmailAutolink(self *Self, effects *Effects, ok St
 	return run.startState
 }
 
-// emailAutolink is one email autolink literal: the closure state upstream keeps in variables, and its
-// states, each made once per slot.
-type emailAutolink struct {
-	self    *Self
-	effects *Effects
-	ok, nok State
-
-	dot, data bool
-
-	startState, atextState, emailDomainState, emailDomainDotState, emailDomainAfterState State
-}
-
 func newEmailAutolink() *emailAutolink {
 	run := &emailAutolink{}
-	run.startState, run.atextState = run.start, run.atext
-	run.emailDomainState, run.emailDomainDotState, run.emailDomainAfterState = run.emailDomain, run.emailDomainDot, run.emailDomainAfter
+	run.startState = run.start
+	run.atextState = run.atext
+	run.emailDomainState = run.emailDomain
+	run.emailDomainDotState = run.emailDomainDot
+	run.emailDomainAfterState = run.emailDomainAfter
 	return run
-}
-
-// release zeroes the autolink for its next parse, keeping its bound states.
-func (run *emailAutolink) release() {
-	*run = emailAutolink{
-		startState: run.startState, atextState: run.atextState, emailDomainState: run.emailDomainState,
-		emailDomainDotState: run.emailDomainDotState, emailDomainAfterState: run.emailDomainAfterState,
-	}
-}
-
-// Start of email autolink literal.
-func (run *emailAutolink) start(code Code) State {
-	if !gfmAutolinkLiteralAtext(code) || !gfmAutolinkLiteralPreviousEmail(run.self.Previous) ||
-		gfmAutolinkLiteralPreviousUnbalanced(run.self.Events) {
-		return run.nok(code)
-	}
-	run.effects.Enter(typeLiteralAutolink, nil)
-	run.effects.Enter(typeLiteralAutolinkEmail, nil)
-	return run.atext(code)
-}
-
-// In email atext.
-func (run *emailAutolink) atext(code Code) State {
-	if gfmAutolinkLiteralAtext(code) {
-		run.effects.Consume(code)
-		return run.atextState
-	}
-	if code == CodeAtSign {
-		run.effects.Consume(code)
-		return run.emailDomainState
-	}
-	return run.nok(code)
-}
-
-// In email domain.
-//
-// The reference code is a bit overly complex as it handles the `@`, of which
-// there may be just one.
-// Source: <https://github.com/github/cmark-gfm/blob/ef1cfcb/extensions/autolink.c#L318>
-func (run *emailAutolink) emailDomain(code Code) State {
-	// Dot followed by alphanumerical (not `-` or `_`).
-	if code == CodeDot {
-		return run.effects.Check(gfmAutolinkLiteralEmailDomainDotTrail, run.emailDomainAfterState, run.emailDomainDotState)(code)
-	}
-
-	// Alphanumerical, `-`, and `_`.
-	if code == CodeDash || code == CodeUnderscore || asciiAlphanumeric(code) {
-		run.data = true
-		run.effects.Consume(code)
-		return run.emailDomainState
-	}
-
-	// To do: `/` if xmpp.
-
-	// Note: normally we’d truncate trailing punctuation from the link.
-	// However, email autolink literals cannot contain any of those markers,
-	// except for `.`, but that can only occur if it isn’t trailing.
-	// So we can ignore truncating!
-	return run.emailDomainAfter(code)
-}
-
-// In email domain, on dot that is not a trail.
-func (run *emailAutolink) emailDomainDot(code Code) State {
-	run.effects.Consume(code)
-	run.dot = true
-	return run.emailDomainState
-}
-
-// After email domain.
-func (run *emailAutolink) emailDomainAfter(code Code) State {
-	// Domain must not be empty, must include a dot, and must end in alphabetical.
-	// Source: <https://github.com/github/cmark-gfm/blob/ef1cfcb/extensions/autolink.c#L332>.
-	if run.data && run.dot && asciiAlpha(run.self.Previous) {
-		run.effects.Exit(typeLiteralAutolinkEmail)
-		run.effects.Exit(typeLiteralAutolink)
-		return run.ok(code)
-	}
-	return run.nok(code)
 }
 
 // tokenizeGfmAutolinkLiteralWwwAutolink is a `www` autolink literal: `a www.example.org b`.
 func tokenizeGfmAutolinkLiteralWwwAutolink(self *Self, effects *Effects, ok State, nok State) State {
-	var wwwStart, wwwAfter State
+	var wwwStart State
+	var wwwAfter State
 
 	// Start of www autolink literal.
 	wwwStart = func(code Code) State {
@@ -231,7 +145,11 @@ func tokenizeGfmAutolinkLiteralProtocolAutolink(self *Self, effects *Effects, ok
 	buffer := ""
 	seen := false
 
-	var protocolStart, protocolPrefixInside, protocolSlashesInside, afterProtocol, protocolAfter State
+	var protocolStart State
+	var protocolPrefixInside State
+	var protocolSlashesInside State
+	var afterProtocol State
+	var protocolAfter State
 
 	// Start of protocol autolink literal.
 	protocolStart = func(code Code) State {
@@ -306,7 +224,8 @@ func tokenizeGfmAutolinkLiteralProtocolAutolink(self *Self, effects *Effects, ok
 func tokenizeGfmAutolinkLiteralWwwPrefix(self *Self, effects *Effects, ok State, nok State) State {
 	size := 0
 
-	var wwwPrefixInside, wwwPrefixAfter State
+	var wwwPrefixInside State
+	var wwwPrefixAfter State
 
 	// In www prefix.
 	wwwPrefixInside = func(code Code) State {
@@ -340,7 +259,9 @@ func tokenizeGfmAutolinkLiteralDomain(self *Self, effects *Effects, ok State, no
 	underscoreInLastLastSegment := false
 	seen := false
 
-	var domainInside, domainAtPunctuation, domainAfter State
+	var domainInside State
+	var domainAtPunctuation State
+	var domainAfter State
 
 	// In domain.
 	domainInside = func(code Code) State {
@@ -400,7 +321,8 @@ func tokenizeGfmAutolinkLiteralPath(self *Self, effects *Effects, ok State, nok 
 	sizeOpen := 0
 	sizeClose := 0
 
-	var pathInside, pathAtPunctuation State
+	var pathInside State
+	var pathAtPunctuation State
 
 	// In path.
 	pathInside = func(code Code) State {
@@ -452,7 +374,10 @@ func tokenizeGfmAutolinkLiteralPath(self *Self, effects *Effects, ok State, nok 
 // the entire trail is not part of the link.
 // It calls `nok` if this *is* part of the link.
 func tokenizeGfmAutolinkLiteralTrail(self *Self, effects *Effects, ok State, nok State) State {
-	var trail, trailBracketAfter, trailCharacterReferenceStart, trailCharacterReferenceInside State
+	var trail State
+	var trailBracketAfter State
+	var trailCharacterReferenceStart State
+	var trailCharacterReferenceInside State
 
 	// In trail of domain or path.
 	trail = func(code Code) State {
@@ -538,7 +463,8 @@ func tokenizeGfmAutolinkLiteralTrail(self *Self, effects *Effects, ok State, nok
 // the trail is not part of the link.
 // It calls `nok` if this *is* part of the link.
 func tokenizeGfmAutolinkLiteralEmailDomainDotTrail(self *Self, effects *Effects, ok State, nok State) State {
-	var start, after State
+	var start State
+	var after State
 
 	// Dot.
 	start = func(code Code) State {

@@ -18,8 +18,8 @@ const funcAssignFile = "/repository/source/FuncAssign.ts"
 // Every case below is verbatim from `oxc/crates/oxc_linter/src/rules/eslint/no_func_assign.rs`:
 // one Tester block, 7 pass and 9 fail. The snapshot records 9 diagnostics from those 9 inputs, so
 // the extractor reported no discrepancy and one finding per input is right here.
-func TestNoFuncAssignFires(t *testing.T) {
-	t.Parallel()
+func TestNoFuncAssignFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -50,10 +50,10 @@ func TestNoFuncAssignFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.RunTyped(t, NoFuncAssign, funcAssignFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.RunTyped(test, NoFuncAssign, funcAssignFile, testCase.sourceText),
 				testCase.wantIds...)
 		})
 	}
@@ -66,8 +66,8 @@ func TestNoFuncAssignFires(t *testing.T) {
 // foo = bar;` to the variable holding an anonymous function expression rather than to any function
 // name at all. Their text is nearly identical to the failing forms and only name resolution
 // separates them, which is why this rule reads the checker.
-func TestNoFuncAssignStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoFuncAssignStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -88,10 +88,10 @@ func TestNoFuncAssignStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.RunTyped(t, NoFuncAssign, funcAssignFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.RunTyped(test, NoFuncAssign, funcAssignFile, testCase.sourceText))
 		})
 	}
 }
@@ -104,8 +104,8 @@ func TestNoFuncAssignStaysSilent(t *testing.T) {
 //
 // Sliced out of the source with the finding's own range rather than compared against an offset,
 // since an offset computed by the test is wrong in the same direction as the code that produced it.
-func TestNoFuncAssignPointsAtTheWrite(t *testing.T) {
-	t.Parallel()
+func TestNoFuncAssignPointsAtTheWrite(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -133,18 +133,18 @@ func TestNoFuncAssignPointsAtTheWrite(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoFuncAssign, funcAssignFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoFuncAssign, funcAssignFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.want) {
-				t.Fatalf("wanted %d findings, got %d", len(testCase.want), len(result.Diagnostics))
+				test.Fatalf("wanted %d findings, got %d", len(testCase.want), len(result.Diagnostics))
 			}
 			// The harness trims and appends a newline, so read positions against that same text.
 			source := strings.TrimSpace(testCase.sourceText) + "\n"
-			for i, want := range testCase.want {
-				reported := source[result.Diagnostics[i].Range.Pos():result.Diagnostics[i].Range.End()]
+			for index, want := range testCase.want {
+				reported := source[result.Diagnostics[index].Range.Pos():result.Diagnostics[index].Range.End()]
 				if reported != want {
-					t.Errorf("finding %d pointed at %q, wanted %q", i, reported, want)
+					test.Errorf("finding %d pointed at %q, wanted %q", index, reported, want)
 				}
 			}
 		})
@@ -155,15 +155,15 @@ func TestNoFuncAssignPointsAtTheWrite(t *testing.T) {
 //
 // `[]string{"foo", "foo"}` is satisfied by a rule reporting the same identifier twice, and a rule
 // looping over the wrong collection does exactly that. This pins that they are distinct offsets.
-func TestNoFuncAssignReportsEachWriteAtItsOwnOffset(t *testing.T) {
-	t.Parallel()
+func TestNoFuncAssignReportsEachWriteAtItsOwnOffset(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTyped(t, NoFuncAssign, funcAssignFile, "function foo() {} foo = 0; foo = 1;")
+	result := rule_testing.RunTyped(test, NoFuncAssign, funcAssignFile, "function foo() {} foo = 0; foo = 1;")
 	if len(result.Diagnostics) != 2 {
-		t.Fatalf("wanted 2 findings, got %d", len(result.Diagnostics))
+		test.Fatalf("wanted 2 findings, got %d", len(result.Diagnostics))
 	}
 	if result.Diagnostics[0].Range.Pos() == result.Diagnostics[1].Range.Pos() {
-		t.Fatalf("both findings pointed at offset %d, so one write went unreported",
+		test.Fatalf("both findings pointed at offset %d, so one write went unreported",
 			result.Diagnostics[0].Range.Pos())
 	}
 }
@@ -175,14 +175,14 @@ func TestNoFuncAssignReportsEachWriteAtItsOwnOffset(t *testing.T) {
 // Fires cases would fail in a way that reads as a rule bug rather than as a harness mistake. This
 // asserts the silence directly, so the vacuous configuration is a named, tested state rather than
 // something a later edit can drift into unnoticed.
-func TestNoFuncAssignNeedsTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestNoFuncAssignNeedsTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	if !NoFuncAssign.NeedsTypeChecker {
-		t.Fatal("the rule stopped declaring NeedsTypeChecker, so the engine will not lock the file")
+		test.Fatal("the rule stopped declaring NeedsTypeChecker, so the engine will not lock the file")
 	}
-	rule_testing.ExpectClean(t,
-		rule_testing.Run(t, NoFuncAssign, funcAssignFile, "function foo() {}; foo = bar;"))
+	rule_testing.ExpectClean(test,
+		rule_testing.Run(test, NoFuncAssign, funcAssignFile, "function foo() {}; foo = bar;"))
 }
 
 // Cases written from reading our code rather than upstream's, each covering a write shape the
@@ -200,8 +200,8 @@ func TestNoFuncAssignNeedsTheTypedHarness(t *testing.T) {
 // the function object and leaves the binding alone, and it resolves to the function's symbol
 // exactly as a real reassignment does, so symbol identity alone reports it. That one is the reason
 // this rule needs structural write detection as well as the checker.
-func TestNoFuncAssignCoversWriteShapesUpstreamNeverExercises(t *testing.T) {
-	t.Parallel()
+func TestNoFuncAssignCoversWriteShapesUpstreamNeverExercises(test *testing.T) {
+	test.Parallel()
 
 	fires := []struct {
 		name       string
@@ -251,10 +251,10 @@ func TestNoFuncAssignCoversWriteShapesUpstreamNeverExercises(t *testing.T) {
 	}
 
 	for _, testCase := range fires {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.RunTyped(t, NoFuncAssign, funcAssignFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.RunTyped(test, NoFuncAssign, funcAssignFile, testCase.sourceText),
 				testCase.wantIds...)
 		})
 	}
@@ -298,10 +298,10 @@ func TestNoFuncAssignCoversWriteShapesUpstreamNeverExercises(t *testing.T) {
 	}
 
 	for _, testCase := range silent {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.RunTyped(t, NoFuncAssign, funcAssignFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.RunTyped(test, NoFuncAssign, funcAssignFile, testCase.sourceText))
 		})
 	}
 }

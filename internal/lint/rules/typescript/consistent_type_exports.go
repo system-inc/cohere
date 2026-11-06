@@ -66,14 +66,14 @@ func messageConsistentTypeExportsMultipleExportsAreTypes(names string) rule.Mess
 //	                                           plus    export { valueC };
 //	export { TypeA as 'string-name', valueC }; keeps the quoted form verbatim
 //
-// The second is why the rendering reads a string specifier's RAW text rather than its cooked value:
+// The second is why the rendering reads a string specifier's raw text rather than its cooked value:
 // re-quoting would change `'a'` into `"a"` and could not represent an escape at all.
 //
 // # Two arms, and only one has exposure in this tree
 //
 // The named-export arm judges `export { ... }`. The star arm judges `export * from './x'` by asking
-// what the OTHER module exports. Measured with a control: this tree holds 88 named exports and 59
-// type exports and ZERO export-star statements, so the star arm finds nothing here and is ported for
+// what the other module exports. Measured with a control: this tree holds 88 named exports and 59
+// type exports and zero export-star statements, so the star arm finds nothing here and is ported for
 // correctness rather than for cleanup.
 //
 // # The star arm reproduces an upstream hack, deliberately
@@ -93,12 +93,12 @@ func messageConsistentTypeExportsMultipleExportsAreTypes(names string) rule.Mess
 // Upstream gathers per module specifier and reports on `Program:exit`. There is no exit hook here,
 // so the gathering and the reporting both happen inside the source-file listener, which fires before
 // its children and can walk the tree itself.
-var ConsistentTypeExports = rule.Rule{
+var ConsistentTypeExports = rule.Rule[ConsistentTypeExportsOptions]{
 	Name:             "@typescript-eslint/consistent-type-exports",
 	NeedsTypeChecker: true,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[ConsistentTypeExportsOptions]) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -106,17 +106,17 @@ var ConsistentTypeExports = rule.Rule{
 		// false, but the fallback is written anyway: a later option with a true default would
 		// otherwise invert silently, and a reader should not have to check the default to know
 		// whether nil is handled.
-		parsed, decoded := rule.OptionsAs[ConsistentTypeExportsOptions](options)
+		parsed, decoded := options.Read()
 		if !decoded {
 			parsed = DefaultConsistentTypeExportsOptions()
 		}
 
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
-				reportConsistentTypeExports(ctx, parsed)
+				reportConsistentTypeExports(ruleContext, parsed)
 			},
 		}
 	},
@@ -136,10 +136,10 @@ type consistentTypeExportsReport struct {
 // is not reproduced: the reports are collected in source order and emitted in source order, which is
 // the same sequence upstream produces because its map preserves insertion order and each entry holds
 // its own reports.
-func reportConsistentTypeExports(ctx rule.Context, options ConsistentTypeExportsOptions) {
+func reportConsistentTypeExports(ruleContext rule.Context, options ConsistentTypeExportsOptions) {
 	var reports []consistentTypeExportsReport
 
-	for _, statement := range ctx.SourceFile.AsNode().Statements() {
+	for _, statement := range ruleContext.SourceFile.AsNode().Statements() {
 		if statement.Kind != ast.KindExportDeclaration {
 			continue
 		}
@@ -149,7 +149,7 @@ func reportConsistentTypeExports(ctx rule.Context, options ConsistentTypeExports
 		// namespace binding. Upstream handles both in its ExportAllDeclaration visitor.
 		if declaration.ExportClause == nil ||
 			declaration.ExportClause.Kind == ast.KindNamespaceExport {
-			reportConsistentTypeExportsStar(ctx, statement, declaration)
+			reportConsistentTypeExportsStar(ruleContext, statement, declaration)
 			continue
 		}
 
@@ -157,20 +157,20 @@ func reportConsistentTypeExports(ctx rule.Context, options ConsistentTypeExports
 			continue
 		}
 
-		report, reportable := consistentTypeExportsClassify(ctx, statement, declaration)
+		report, reportable := consistentTypeExportsClassify(ruleContext, statement, declaration)
 		if reportable {
 			reports = append(reports, report)
 		}
 	}
 
 	for _, report := range reports {
-		consistentTypeExportsEmit(ctx, report, options)
+		consistentTypeExportsEmit(ruleContext, report, options)
 	}
 }
 
 // consistentTypeExportsClassify sorts a named export's specifiers into upstream's three buckets.
 func consistentTypeExportsClassify(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	statement *ast.Node,
 	declaration *ast.ExportDeclaration,
 ) (consistentTypeExportsReport, bool) {
@@ -201,20 +201,20 @@ func consistentTypeExportsClassify(
 			continue
 		}
 
-		typeBased, resolved := consistentTypeExportsSymbolIsTypeBased(ctx,
-			ctx.TypeChecker.GetSymbolAtLocation(name))
+		typeBased, resolved := consistentTypeExportsSymbolIsTypeBased(ruleContext,
+			ruleContext.TypeChecker.GetSymbolAtLocation(name))
 		if !resolved {
 			// Upstream's `undefined` case: a specifier whose symbol cannot be resolved is left
 			// alone rather than guessed at, so an unresolvable name never produces a finding.
 			//
-			// This branch is UNREACHABLE through this tree's checker and the verdict is recorded
+			// This branch is unreachable through this tree's checker and the verdict is recorded
 			// rather than the branch deleted. A mutant forcing an unresolved specifier to be
 			// bucketed as type-based survives every fixture, including four written for exactly
 			// this shape, and the reason is that nothing here answers unresolved.
 			//
 			// Traced rather than argued. `export { NotDeclaredAnywhere };` still yields a symbol,
 			// carrying the alias flag and one declaration, which is the specifier itself.
-			// `SkipAlias` then resolves it to a DIFFERENT symbol whose flags include the value bit,
+			// `SkipAlias` then resolves it to a different symbol whose flags include the value bit,
 			// so the recursion answers `(false, true)` and the specifier is bucketed as a value.
 			// Upstream is silent on the same input and so is this rule, by a different route.
 			//
@@ -245,7 +245,7 @@ func consistentTypeExportsClassify(
 // and the loop's only exit is a non-alias, which is exactly where `SkipAlias` stops. Measured on a
 // re-exported value and a re-exported type through two files: the value resolves to a value and the
 // type does not.
-func consistentTypeExportsSymbolIsTypeBased(ctx rule.Context, symbol *ast.Symbol) (bool, bool) {
+func consistentTypeExportsSymbolIsTypeBased(ruleContext rule.Context, symbol *ast.Symbol) (bool, bool) {
 	if symbol == nil {
 		return false, false
 	}
@@ -254,7 +254,7 @@ func consistentTypeExportsSymbolIsTypeBased(ctx rule.Context, symbol *ast.Symbol
 	// the checker's `unknownSymbol` is an unexported field with no linkname. The nil check above
 	// covers the shape that matters, because an unresolvable name gives no symbol at all here
 	// rather than the placeholder one. Stated rather than silently dropped; the residual gap is a
-	// name that resolves TO the placeholder, which would be read as type-based and reported. No
+	// name that resolves to the placeholder, which would be read as type-based and reported. No
 	// corpus case and no measured shape reaches it, and the failure direction is a false positive
 	// on source that already fails to compile.
 
@@ -270,11 +270,11 @@ func consistentTypeExportsSymbolIsTypeBased(ctx rule.Context, symbol *ast.Symbol
 	}
 
 	if symbol.Flags&ast.SymbolFlagsAlias != 0 {
-		target := shimchecker.SkipAlias(symbol, ctx.TypeChecker)
+		target := shimchecker.SkipAlias(symbol, ruleContext.TypeChecker)
 		if target == nil || target == symbol {
 			return true, true
 		}
-		return consistentTypeExportsSymbolIsTypeBased(ctx, target)
+		return consistentTypeExportsSymbolIsTypeBased(ruleContext, target)
 	}
 
 	return true, true
@@ -287,7 +287,7 @@ func consistentTypeExportsSymbolIsTypeBased(ctx rule.Context, symbol *ast.Symbol
 // each declaration type: an import clause spells its own type-only-ness as a phase modifier rather
 // than a boolean, which a hand-written switch gets wrong and this does not.
 //
-// The specifier arms then walk UP as well, because a specifier inside `export type { A }` is
+// The specifier arms then walk up as well, because a specifier inside `export type { A }` is
 // type-only through its parent rather than through its own flag.
 func consistentTypeExportsIsTypeOnlyImportOrExport(node *ast.Node) bool {
 	if node == nil {
@@ -326,24 +326,24 @@ func consistentTypeExportsAncestorIsTypeOnly(node *ast.Node, carrier ast.Kind, c
 
 // consistentTypeExportsEmit is upstream's `Program:exit` body for one report.
 func consistentTypeExportsEmit(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	report consistentTypeExportsReport,
 	options ConsistentTypeExportsOptions,
 ) {
 	if len(report.valueSpecifiers) == 0 {
 		// Every name is a type, so the whole statement becomes `export type`.
-		fixes, buildable := consistentTypeExportsInsertTypeFixes(ctx, report)
+		fixes, buildable := consistentTypeExportsInsertTypeFixes(ruleContext, report)
 		if !buildable {
-			ctx.ReportNode(report.node, messageConsistentTypeExportsTypeOverValue())
+			ruleContext.ReportNode(report.node, messageConsistentTypeExportsTypeOverValue())
 			return
 		}
-		ctx.ReportNodeWithFixes(report.node, messageConsistentTypeExportsTypeOverValue(), fixes...)
+		ruleContext.ReportNodeWithFixes(report.node, messageConsistentTypeExportsTypeOverValue(), fixes...)
 		return
 	}
 
 	names := make([]string, 0, len(report.typeBasedSpecifiers))
 	for _, specifier := range report.typeBasedSpecifiers {
-		local, readable := consistentTypeExportsLocalName(ctx, specifier)
+		local, readable := consistentTypeExportsLocalName(ruleContext, specifier)
 		if !readable {
 			continue
 		}
@@ -359,15 +359,15 @@ func consistentTypeExportsEmit(
 	var fixes []rule.Fix
 	var buildable bool
 	if options.FixMixedExportsWithInlineTypeSpecifier {
-		fixes, buildable = consistentTypeExportsInlineSpecifierFixes(ctx, report)
+		fixes, buildable = consistentTypeExportsInlineSpecifierFixes(ruleContext, report)
 	} else {
-		fixes, buildable = consistentTypeExportsSeparateFixes(ctx, report)
+		fixes, buildable = consistentTypeExportsSeparateFixes(ruleContext, report)
 	}
 	if !buildable {
-		ctx.ReportNode(report.node, message)
+		ruleContext.ReportNode(report.node, message)
 		return
 	}
-	ctx.ReportNodeWithFixes(report.node, message, fixes...)
+	ruleContext.ReportNodeWithFixes(report.node, message, fixes...)
 }
 
 // consistentTypeExportsFormatWordList is upstream's `formatWordList`.
@@ -391,11 +391,11 @@ func consistentTypeExportsFormatWordList(words []string) string {
 // removed, since the statement now carries it. Upstream removes from the keyword's start to the
 // start of the next token, which takes the whitespace with it.
 func consistentTypeExportsInsertTypeFixes(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	report consistentTypeExportsReport,
 ) ([]rule.Fix, bool) {
-	sourceText := ctx.SourceFile.Text()
-	statementRange := rule.TokenRange(ctx.SourceFile, report.node)
+	sourceText := ruleContext.SourceFile.Text()
+	statementRange := rule.TokenRange(ruleContext.SourceFile, report.node)
 
 	// The `export` keyword is the statement's first token, so its end is six characters in.
 	const exportKeyword = "export"
@@ -410,7 +410,7 @@ func consistentTypeExportsInsertTypeFixes(
 	}
 
 	for _, specifier := range report.inlineTypeSpecifiers {
-		keywordRange, found := consistentTypeExportsInlineTypeKeywordRange(ctx, specifier)
+		keywordRange, found := consistentTypeExportsInlineTypeKeywordRange(ruleContext, specifier)
 		if !found {
 			return nil, false
 		}
@@ -424,11 +424,11 @@ func consistentTypeExportsInsertTypeFixes(
 // From the specifier's own start through the whitespace that follows the keyword, matching
 // upstream's removal from the keyword's start to the next token's start.
 func consistentTypeExportsInlineTypeKeywordRange(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	specifier *ast.Node,
 ) (shimcore.TextRange, bool) {
-	sourceText := ctx.SourceFile.Text()
-	start := rule.TokenRange(ctx.SourceFile, specifier).Pos()
+	sourceText := ruleContext.SourceFile.Text()
+	start := rule.TokenRange(ruleContext.SourceFile, specifier).Pos()
 
 	const typeKeyword = "type"
 	if start+len(typeKeyword) > len(sourceText) ||
@@ -459,7 +459,7 @@ func consistentTypeExportsIsSpace(character byte) bool {
 // ESLint sorts by range; the order here is the same edit either way because the two ranges do not
 // overlap.
 func consistentTypeExportsSeparateFixes(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	report consistentTypeExportsReport,
 ) ([]rule.Fix, bool) {
 	typeSpecifiers := make([]*ast.Node, 0,
@@ -467,19 +467,19 @@ func consistentTypeExportsSeparateFixes(
 	typeSpecifiers = append(typeSpecifiers, report.typeBasedSpecifiers...)
 	typeSpecifiers = append(typeSpecifiers, report.inlineTypeSpecifiers...)
 
-	typeNames, typeOk := consistentTypeExportsSpecifierList(ctx, typeSpecifiers)
-	valueNames, valueOk := consistentTypeExportsSpecifierList(ctx, report.valueSpecifiers)
+	typeNames, typeOk := consistentTypeExportsSpecifierList(ruleContext, typeSpecifiers)
+	valueNames, valueOk := consistentTypeExportsSpecifierList(ruleContext, report.valueSpecifiers)
 	if !typeOk || !valueOk {
 		return nil, false
 	}
 
-	open, closing, found := consistentTypeExportsBraceRange(ctx, report.node)
+	open, closing, found := consistentTypeExportsBraceRange(ruleContext, report.node)
 	if !found {
 		return nil, false
 	}
 
-	statementRange := rule.TokenRange(ctx.SourceFile, report.node)
-	source, hasSource := consistentTypeExportsModuleSpecifierText(ctx, report.node)
+	statementRange := rule.TokenRange(ruleContext.SourceFile, report.node)
+	source, hasSource := consistentTypeExportsModuleSpecifierText(ruleContext, report.node)
 
 	inserted := "export type { " + typeNames + " }"
 	if hasSource {
@@ -499,7 +499,7 @@ func consistentTypeExportsSeparateFixes(
 // statement. Upstream returns nothing for a type-only export; that case cannot reach here because
 // the classifier declines it earlier, and the guard is kept because it is upstream's.
 func consistentTypeExportsInlineSpecifierFixes(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	report consistentTypeExportsReport,
 ) ([]rule.Fix, bool) {
 	if report.node.AsExportDeclaration().IsTypeOnly {
@@ -508,7 +508,7 @@ func consistentTypeExportsInlineSpecifierFixes(
 
 	fixes := make([]rule.Fix, 0, len(report.typeBasedSpecifiers))
 	for _, specifier := range report.typeBasedSpecifiers {
-		start := rule.TokenRange(ctx.SourceFile, specifier).Pos()
+		start := rule.TokenRange(ruleContext.SourceFile, specifier).Pos()
 		fixes = append(fixes,
 			rule.ReplaceRange(shimcore.NewTextRange(start, start), "type "))
 	}
@@ -516,8 +516,8 @@ func consistentTypeExportsInlineSpecifierFixes(
 }
 
 // consistentTypeExportsSpecifierList renders a run of specifiers as `a, b as c`.
-func consistentTypeExportsSpecifierList(ctx rule.Context, specifiers []*ast.Node) (string, bool) {
-	// BUCKET order rather than source order, which is upstream's and is measured rather than
+func consistentTypeExportsSpecifierList(ruleContext rule.Context, specifiers []*ast.Node) (string, bool) {
+	// Bucket order rather than source order, which is upstream's and is measured rather than
 	// assumed. `fixSeparateNamedExports` concatenates `[...typeBasedSpecifiers,
 	// ...inlineTypeSpecifiers]`, so every name the checker found follows in source order and every
 	// name already carrying an inline `type` comes after them all.
@@ -533,7 +533,7 @@ func consistentTypeExportsSpecifierList(ctx rule.Context, specifiers []*ast.Node
 	// caller built it.
 	parts := make([]string, 0, len(specifiers))
 	for _, specifier := range specifiers {
-		text, readable := consistentTypeExportsSpecifierText(ctx, specifier)
+		text, readable := consistentTypeExportsSpecifierText(ruleContext, specifier)
 		if !readable {
 			return "", false
 		}
@@ -545,13 +545,13 @@ func consistentTypeExportsSpecifierList(ctx rule.Context, specifiers []*ast.Node
 // consistentTypeExportsSpecifierText is upstream's `getSpecifierText`.
 //
 // `local` alone when the two names agree, and `local as exported` when they differ. A string-literal
-// name is rendered from its RAW source text rather than its cooked value, which upstream does with
+// name is rendered from its raw source text rather than its cooked value, which upstream does with
 // `.raw`: re-quoting a cooked value would change the quote character and could not represent an
 // escape at all.
 //
-// The inline `type` keyword is deliberately NOT rendered. A specifier moved into an `export type`
+// The inline `type` keyword is deliberately not rendered. A specifier moved into an `export type`
 // statement no longer needs it, and one left behind was never type-only.
-func consistentTypeExportsSpecifierText(ctx rule.Context, specifier *ast.Node) (string, bool) {
+func consistentTypeExportsSpecifierText(ruleContext rule.Context, specifier *ast.Node) (string, bool) {
 	element := specifier.AsExportSpecifier()
 
 	exportedNode := element.Name()
@@ -563,8 +563,8 @@ func consistentTypeExportsSpecifierText(ctx rule.Context, specifier *ast.Node) (
 		return "", false
 	}
 
-	local, localOk := consistentTypeExportsNameText(ctx, localNode)
-	exported, exportedOk := consistentTypeExportsNameText(ctx, exportedNode)
+	local, localOk := consistentTypeExportsNameText(ruleContext, localNode)
+	exported, exportedOk := consistentTypeExportsNameText(ruleContext, exportedNode)
 	if !localOk || !exportedOk {
 		return "", false
 	}
@@ -577,10 +577,10 @@ func consistentTypeExportsSpecifierText(ctx rule.Context, specifier *ast.Node) (
 
 // consistentTypeExportsLocalName is the name upstream puts in the message.
 //
-// Upstream reads `specifier.local`, which is the ORIGINAL name rather than the alias, and takes a
+// Upstream reads `specifier.local`, which is the original name rather than the alias, and takes a
 // string literal's cooked `value` here where the fixer takes its raw text. Both are reproduced as
 // written: the message names what the reader wrote on the left of `as`.
-func consistentTypeExportsLocalName(ctx rule.Context, specifier *ast.Node) (string, bool) {
+func consistentTypeExportsLocalName(ruleContext rule.Context, specifier *ast.Node) (string, bool) {
 	element := specifier.AsExportSpecifier()
 	localNode := element.PropertyName
 	if localNode == nil {
@@ -592,13 +592,13 @@ func consistentTypeExportsLocalName(ctx rule.Context, specifier *ast.Node) (stri
 	if localNode.Kind == ast.KindStringLiteral {
 		return localNode.Text(), true
 	}
-	return consistentTypeExportsNameText(ctx, localNode)
+	return consistentTypeExportsNameText(ruleContext, localNode)
 }
 
 // consistentTypeExportsNameText renders a specifier name as written in the source.
-func consistentTypeExportsNameText(ctx rule.Context, node *ast.Node) (string, bool) {
-	trimmed := rule.TokenRange(ctx.SourceFile, node)
-	sourceText := ctx.SourceFile.Text()
+func consistentTypeExportsNameText(ruleContext rule.Context, node *ast.Node) (string, bool) {
+	trimmed := rule.TokenRange(ruleContext.SourceFile, node)
+	sourceText := ruleContext.SourceFile.Text()
 	if trimmed.Pos() < 0 || trimmed.End() > len(sourceText) || trimmed.Pos() > trimmed.End() {
 		return "", false
 	}
@@ -606,13 +606,13 @@ func consistentTypeExportsNameText(ctx rule.Context, node *ast.Node) (string, bo
 }
 
 // consistentTypeExportsBraceRange finds the export clause's braces.
-func consistentTypeExportsBraceRange(ctx rule.Context, statement *ast.Node) (int, int, bool) {
+func consistentTypeExportsBraceRange(ruleContext rule.Context, statement *ast.Node) (int, int, bool) {
 	clause := statement.AsExportDeclaration().ExportClause
 	if clause == nil {
 		return 0, 0, false
 	}
-	clauseRange := rule.TokenRange(ctx.SourceFile, clause)
-	sourceText := ctx.SourceFile.Text()
+	clauseRange := rule.TokenRange(ruleContext.SourceFile, clause)
+	sourceText := ruleContext.SourceFile.Text()
 
 	open := -1
 	for offset := clauseRange.Pos(); offset < clauseRange.End() && offset < len(sourceText); offset++ {
@@ -642,7 +642,7 @@ func consistentTypeExportsBraceRange(ctx rule.Context, statement *ast.Node) (int
 // Upstream reads `node.source.value`, the cooked string, and then re-quotes it with single quotes
 // when writing the new statement. Both halves are reproduced, which is why a double-quoted source
 // comes back single-quoted: that is upstream's own output rather than a choice made here.
-func consistentTypeExportsModuleSpecifierText(ctx rule.Context, statement *ast.Node) (string, bool) {
+func consistentTypeExportsModuleSpecifierText(ruleContext rule.Context, statement *ast.Node) (string, bool) {
 	specifier := statement.AsExportDeclaration().ModuleSpecifier
 	if specifier == nil || specifier.Kind != ast.KindStringLiteral {
 		return "", false
@@ -653,11 +653,11 @@ func consistentTypeExportsModuleSpecifierText(ctx rule.Context, statement *ast.N
 // reportConsistentTypeExportsStar is upstream's `ExportAllDeclaration` visitor.
 //
 // It asks whether the module being re-exported has any value export at all, and reports when it does
-// not. The question is answered through the module symbol's TYPE rather than through its export
+// not. The question is answered through the module symbol's type rather than through its export
 // table, because that is the only route that distinguishes a type-only star re-export; see the note
 // on the rule.
 func reportConsistentTypeExportsStar(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	statement *ast.Node,
 	declaration *ast.ExportDeclaration,
 ) {
@@ -669,11 +669,11 @@ func reportConsistentTypeExportsStar(
 		return
 	}
 
-	moduleSymbol := ctx.TypeChecker.GetSymbolAtLocation(specifier)
+	moduleSymbol := ruleContext.TypeChecker.GetSymbolAtLocation(specifier)
 	if moduleSymbol == nil {
 		return
 	}
-	moduleType := ctx.TypeChecker.GetTypeOfSymbol(moduleSymbol)
+	moduleType := ruleContext.TypeChecker.GetTypeOfSymbol(moduleSymbol)
 	if moduleType == nil {
 		return
 	}
@@ -682,23 +682,23 @@ func reportConsistentTypeExportsStar(
 	// value; `getPropertyOfType` answers nil for a name that reached this module through a
 	// type-only star re-export. A name present in the first and absent from the second is therefore
 	// type-only, and a name present in both is a real exported value.
-	for _, property := range shimchecker.Checker_getPropertiesOfType(ctx.TypeChecker, moduleType) {
-		if shimchecker.Checker_getPropertyOfType(ctx.TypeChecker, moduleType, property.Name) != nil {
+	for _, property := range shimchecker.Checker_getPropertiesOfType(ruleContext.TypeChecker, moduleType) {
+		if shimchecker.Checker_getPropertyOfType(ruleContext.TypeChecker, moduleType, property.Name) != nil {
 			return
 		}
 	}
 
-	fix, buildable := consistentTypeExportsStarFix(ctx, statement)
+	fix, buildable := consistentTypeExportsStarFix(ruleContext, statement)
 	if !buildable {
-		ctx.ReportNode(statement, messageConsistentTypeExportsTypeOverValue())
+		ruleContext.ReportNode(statement, messageConsistentTypeExportsTypeOverValue())
 		return
 	}
-	ctx.ReportNodeWithFixes(statement, messageConsistentTypeExportsTypeOverValue(), fix)
+	ruleContext.ReportNodeWithFixes(statement, messageConsistentTypeExportsTypeOverValue(), fix)
 }
 
 // consistentTypeExportsStarFix inserts `type ` before the asterisk.
 //
-// The asterisk has to be found as a TOKEN rather than as a byte, and the difference is not
+// The asterisk has to be found as a token rather than as a byte, and the difference is not
 // theoretical: upstream's own corpus writes an export-star with a block comment between `export` and
 // `*`, so the first `*` in the statement belongs to `/* comment 2 */`. Scanning bytes put the
 // keyword inside the comment and produced `/type * comment 2 */ *`, which is neither valid nor what
@@ -707,9 +707,9 @@ func reportConsistentTypeExportsStar(
 // Comments are skipped rather than the token stream consulted, because a statement this shape holds
 // only comments and whitespace before its asterisk. Both comment forms are handled, and an
 // unterminated one declines rather than running to the end of the file.
-func consistentTypeExportsStarFix(ctx rule.Context, statement *ast.Node) (rule.Fix, bool) {
-	sourceText := ctx.SourceFile.Text()
-	statementRange := rule.TokenRange(ctx.SourceFile, statement)
+func consistentTypeExportsStarFix(ruleContext rule.Context, statement *ast.Node) (rule.Fix, bool) {
+	sourceText := ruleContext.SourceFile.Text()
+	statementRange := rule.TokenRange(ruleContext.SourceFile, statement)
 
 	offset := statementRange.Pos()
 	end := statementRange.End()
@@ -778,16 +778,15 @@ type consistentTypeExportsRawOptions struct {
 }
 
 // DecodeConsistentTypeExportsOptions maps the wire key onto the rule's setting.
-func DecodeConsistentTypeExportsOptions(raw []byte) (any, error) {
-	decoded, err := rule.DecodeOptionsInto[consistentTypeExportsRawOptions]()(raw)
-	if err != nil {
-		return DefaultConsistentTypeExportsOptions(), err
+func DecodeConsistentTypeExportsOptions(raw []byte) (ConsistentTypeExportsOptions, error) {
+	decoded, decodeOptionsError := rule.DecodeOptionsInto[consistentTypeExportsRawOptions]()(raw)
+	if decodeOptionsError != nil {
+		return DefaultConsistentTypeExportsOptions(), decodeOptionsError
 	}
 
-	wire, _ := decoded.(consistentTypeExportsRawOptions)
 	options := DefaultConsistentTypeExportsOptions()
-	if wire.FixMixedExportsWithInlineTypeSpecifier != nil {
-		options.FixMixedExportsWithInlineTypeSpecifier = *wire.FixMixedExportsWithInlineTypeSpecifier
+	if decoded.FixMixedExportsWithInlineTypeSpecifier != nil {
+		options.FixMixedExportsWithInlineTypeSpecifier = *decoded.FixMixedExportsWithInlineTypeSpecifier
 	}
 	return options, nil
 }

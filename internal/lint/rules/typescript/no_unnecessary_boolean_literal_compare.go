@@ -81,8 +81,8 @@ func messageNoUnnecessaryBooleanLiteralCompareNoStrictNullCheck() rule.Message {
 // # The repair copies the compared expression rather than re-rendering it
 //
 // This is the shape that lost type information twice in this project, and it is safe here for a
-// structural reason worth stating: the replacement is built from the compared expression's OWN
-// SOURCE TEXT plus punctuation, so nothing inside it is re-rendered and nothing inside it can be
+// structural reason worth stating: the replacement is built from the compared expression's own
+// source text plus punctuation, so nothing inside it is re-rendered and nothing inside it can be
 // lost. The span being replaced holds only the comparison operator and the boolean literal, neither
 // of which carries a type.
 //
@@ -105,20 +105,20 @@ func messageNoUnnecessaryBooleanLiteralCompareNoStrictNullCheck() rule.Message {
 // Reading it without unwrapping would be wrong twice over: the text would carry parentheses upstream
 // does not write, and the precedence test would answer about the wrapper rather than about what is
 // inside it. `type_checking.IsStrongPrecedenceNode` on the shelf treats a parenthesized expression as
-// STRONG, which is correct for a caller handed the wrapper and wrong here, because upstream's own
+// strong, which is correct for a caller handed the wrapper and wrong here, because upstream's own
 // list has no such arm and cannot: its parser deleted the node. So the unwrap happens first and the
 // shelf helper is then asked about the inner node, where it agrees with upstream's list.
 //
 // # The nullish arms produce different code, not just different messages
 //
-// A plain boolean rewrites to the expression or its negation. A NULLABLE one has to say what the
+// A plain boolean rewrites to the expression or its negation. A nullable one has to say what the
 // nullish case means, and upstream picks the default that preserves the original truth table:
 //
 //	b === true    in a value position   becomes b ?? false
 //	b === true    in a conditional test becomes b            the test coerces anyway
 //	b === false                          becomes !(b ?? true)
 //
-// Both nullish arms are ALLOWED by default, so the rule is silent on them unless configured. That is
+// Both nullish arms are allowed by default, so the rule is silent on them unless configured. That is
 // the one place a Go zero value would invert the rule rather than silence it, which is why the
 // decoder is hand-rolled with pointer fields.
 //
@@ -129,12 +129,12 @@ func messageNoUnnecessaryBooleanLiteralCompareNoStrictNullCheck() rule.Message {
 // propose repairs that change behavior on null.
 //
 // It is reproduced, and it cannot be fixtured through `rule_testing`: the harness writes its own
-// tsconfig AFTER the setup hook runs, so a fixture cannot turn the option off. Probed directly,
+// tsconfig after the setup hook runs, so a fixture cannot turn the option off. Probed directly,
 // with a hook writing `strict:false` and `strictNullChecks:false` into the directory: the resolved
 // option is still true, in both the default path and the hook path. The predicate is therefore
 // pinned by a unit test on the option resolution rather than by a rule fixture, and that is stated
 // rather than left as a gap.
-var NoUnnecessaryBooleanLiteralCompare = rule.Rule{
+var NoUnnecessaryBooleanLiteralCompare = rule.Rule[NoUnnecessaryBooleanLiteralCompareOptions]{
 	Name:             "@typescript-eslint/no-unnecessary-boolean-literal-compare",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
@@ -142,17 +142,17 @@ var NoUnnecessaryBooleanLiteralCompare = rule.Rule{
 	// The compiler options.
 	ProgramReads: rule.ReadsCompilerOptions,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[NoUnnecessaryBooleanLiteralCompareOptions]) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
 		// The zero value is not the default and this is the normal path, not a defensive branch.
-		// Both nullish allowances default to TRUE, so a zero-valued struct would turn them off and
+		// Both nullish allowances default to true, so a zero-valued struct would turn them off and
 		// the rule would report cases upstream is silent on. A rule configured as a bare `"error"`
 		// is handed nil options, because `DecodeOptionsInto` errors on empty input and the config
 		// layer turns that into nil.
-		parsed, decoded := rule.OptionsAs[NoUnnecessaryBooleanLiteralCompareOptions](options)
+		parsed, decoded := options.Read()
 		if !decoded {
 			parsed = DefaultNoUnnecessaryBooleanLiteralCompareOptions()
 		}
@@ -164,7 +164,7 @@ var NoUnnecessaryBooleanLiteralCompare = rule.Rule{
 				if reportedStrictNullChecks {
 					return
 				}
-				if noUnnecessaryBooleanLiteralCompareStrictNullChecksEnabled(ctx) {
+				if noUnnecessaryBooleanLiteralCompareStrictNullChecksEnabled(ruleContext) {
 					return
 				}
 				if parsed.AllowRuleToRunWithoutStrictNullChecks {
@@ -174,14 +174,16 @@ var NoUnnecessaryBooleanLiteralCompare = rule.Rule{
 				// Upstream reports at line zero, column zero, which is a location rather than a
 				// node. The file's first token is the nearest thing this tree has to that and it
 				// puts the finding where a reader will look.
-				ctx.ReportRange(ctx.SourceFile.AsNode().Loc.WithEnd(ctx.SourceFile.AsNode().Loc.Pos()),
-					messageNoUnnecessaryBooleanLiteralCompareNoStrictNullCheck())
+				ruleContext.ReportRange(
+					ruleContext.SourceFile.AsNode().Loc.WithEnd(ruleContext.SourceFile.AsNode().Loc.Pos()),
+					messageNoUnnecessaryBooleanLiteralCompareNoStrictNullCheck(),
+				)
 			},
 			ast.KindBinaryExpression: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
-				reportNoUnnecessaryBooleanLiteralCompare(ctx, node, parsed)
+				reportNoUnnecessaryBooleanLiteralCompare(ruleContext, node, parsed)
 			},
 		}
 	},
@@ -205,11 +207,11 @@ type noUnnecessaryBooleanLiteralCompareComparison struct {
 
 // reportNoUnnecessaryBooleanLiteralCompare is upstream's `BinaryExpression` visitor.
 func reportNoUnnecessaryBooleanLiteralCompare(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	node *ast.Node,
 	options NoUnnecessaryBooleanLiteralCompareOptions,
 ) {
-	comparison, found := noUnnecessaryBooleanLiteralCompareDeconstruct(ctx, node)
+	comparison, found := noUnnecessaryBooleanLiteralCompareDeconstruct(ruleContext, node)
 	if !found {
 		return
 	}
@@ -225,14 +227,14 @@ func reportNoUnnecessaryBooleanLiteralCompare(
 
 	message := noUnnecessaryBooleanLiteralCompareMessageFor(comparison)
 
-	replacement, mutated, buildable := noUnnecessaryBooleanLiteralCompareReplacement(ctx, node, comparison)
+	replacement, mutated, buildable := noUnnecessaryBooleanLiteralCompareReplacement(ruleContext, node, comparison)
 	if !buildable {
-		ctx.ReportNode(node, message)
+		ruleContext.ReportNode(node, message)
 		return
 	}
 
-	ctx.ReportNodeWithFixes(node, message,
-		rule.ReplaceRange(rule.TokenRange(ctx.SourceFile, mutated), replacement))
+	ruleContext.ReportNodeWithFixes(node, message,
+		rule.ReplaceRange(rule.TokenRange(ruleContext.SourceFile, mutated), replacement))
 }
 
 // noUnnecessaryBooleanLiteralCompareMessageFor is upstream's nested conditional over the ids.
@@ -257,7 +259,7 @@ func noUnnecessaryBooleanLiteralCompareMessageFor(
 // noUnnecessaryBooleanLiteralCompareDeconstruct is upstream's `getBooleanComparison`, which folds
 // `deconstructComparison` and the type test together.
 func noUnnecessaryBooleanLiteralCompareDeconstruct(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	node *ast.Node,
 ) (noUnnecessaryBooleanLiteralCompareComparison, bool) {
 	var empty noUnnecessaryBooleanLiteralCompareComparison
@@ -273,8 +275,8 @@ func noUnnecessaryBooleanLiteralCompareDeconstruct(
 	}
 
 	// Upstream tries the right side as the literal first, then the left, and returns on the first
-	// match. The order decides `true === true`, where both sides are literals: the RIGHT one is
-	// taken as the literal and the LEFT becomes the compared expression.
+	// match. The order decides `true === true`, where both sides are literals: the right one is
+	// taken as the literal and the left becomes the compared expression.
 	sides := [2][2]*ast.Node{
 		{binary.Right, binary.Left},
 		{binary.Left, binary.Right},
@@ -302,7 +304,7 @@ func noUnnecessaryBooleanLiteralCompareDeconstruct(
 			negated:       !positive,
 		}
 
-		expressionType := ctx.TypeChecker.GetTypeAtLocation(expression)
+		expressionType := ruleContext.TypeChecker.GetTypeAtLocation(expression)
 		if expressionType == nil {
 			return empty, false
 		}
@@ -310,7 +312,7 @@ func noUnnecessaryBooleanLiteralCompareDeconstruct(
 		// Upstream's `getConstraintInfo`: a type parameter is judged by its constraint, and one
 		// with no constraint is declined rather than treated as its own type.
 		//
-		// The nil check is upstream's and it is INERT here, which is recorded rather than left for
+		// The nil check is upstream's and it is inert here, which is recorded rather than left for
 		// the next reader to rediscover. Two mutants establish it: deleting the check survives, and
 		// so does replacing it with a fallback to the type parameter itself. Both shelf predicates
 		// below guard nil and answer false, and a bare type parameter carries neither the Boolean
@@ -319,7 +321,7 @@ func noUnnecessaryBooleanLiteralCompareDeconstruct(
 		// not because any input can see it.
 		constraint := expressionType
 		if type_checking.IsTypeFlagSet(expressionType, shimchecker.TypeFlagsTypeParameter) {
-			constraint = shimchecker.Checker_getBaseConstraintOfType(ctx.TypeChecker, expressionType)
+			constraint = shimchecker.Checker_getBaseConstraintOfType(ruleContext.TypeChecker, expressionType)
 			if constraint == nil {
 				return empty, false
 			}
@@ -374,7 +376,7 @@ func noUnnecessaryBooleanLiteralCompareBooleanLiteral(node *ast.Node) (isTrue bo
 // noUnnecessaryBooleanLiteralCompareIsBoolean is upstream's `isBooleanType`.
 //
 // `Boolean` and `BooleanLiteral` together, so `true`, `false` and `boolean` all answer yes. Note
-// this is a FLAG test on the type as a whole rather than on its constituents, which is why a
+// this is a flag test on the type as a whole rather than on its constituents, which is why a
 // `boolean | string` union answers no here and falls through to the nullable test.
 func noUnnecessaryBooleanLiteralCompareIsBoolean(expressionType *shimchecker.Type) bool {
 	return type_checking.IsTypeFlagSet(expressionType,
@@ -405,7 +407,7 @@ func noUnnecessaryBooleanLiteralCompareIsNullableBoolean(expressionType *shimche
 	if len(nonNullish) == 0 {
 		return false
 	}
-	// This one is SUBSUMED by the loop below and the verdict is recorded rather than the guard
+	// This one is subsumed by the loop below and the verdict is recorded rather than the guard
 	// deleted. A union with no nullish constituent reaches the loop with every constituent intact,
 	// and any union of only booleans has already been answered by the flag test on the whole type
 	// before this function is called, so whatever survives here is a non-boolean the loop declines.
@@ -429,12 +431,12 @@ func noUnnecessaryBooleanLiteralCompareIsNullableBoolean(expressionType *shimche
 // thing this function decides is punctuation. Returning the node to replace as well as the text,
 // because a comparison wrapped in `!` is replaced together with its wrapper.
 func noUnnecessaryBooleanLiteralCompareReplacement(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	node *ast.Node,
 	comparison noUnnecessaryBooleanLiteralCompareComparison,
 ) (replacement string, mutated *ast.Node, buildable bool) {
 	// The wrapping negation may sit outside a parenthesis, because our parser keeps a node TSESTree
-	// deletes. `!(b !== false)` hands upstream a negation whose argument IS the comparison, and
+	// deletes. `!(b !== false)` hands upstream a negation whose argument is the comparison, and
 	// hands this rule a negation whose argument is a parenthesized expression. Walking out through
 	// the parentheses finds the same negation upstream found, and the node replaced then has to be
 	// that negation rather than the comparison, or the parentheses would be left stranded.
@@ -464,7 +466,7 @@ func noUnnecessaryBooleanLiteralCompareReplacement(
 	}
 	overallNegated := inversions%2 == 1
 
-	text, readable := noUnnecessaryBooleanLiteralCompareNodeText(ctx, comparison.expression)
+	text, readable := noUnnecessaryBooleanLiteralCompareNodeText(ruleContext, comparison.expression)
 	if !readable {
 		return "", nil, false
 	}
@@ -472,7 +474,7 @@ func noUnnecessaryBooleanLiteralCompareReplacement(
 	mayNeedParentheses := !type_checking.IsStrongPrecedenceNode(comparison.expression)
 
 	// A nullable expression that is not being negated overall becomes the expression with an
-	// explicit nullish default, EXCEPT in a conditional test, where the test coerces the nullish
+	// explicit nullish default, except in a conditional test, where the test coerces the nullish
 	// value the same way and the default would be noise.
 	if !overallNegated && comparison.expressionIsNullableBoolean &&
 		!noUnnecessaryBooleanLiteralCompareIsConditionalTest(mutated) {
@@ -519,10 +521,11 @@ func noUnnecessaryBooleanLiteralCompareReplacement(
 // stops being recognized as a literal at all), the parent walk (`!(b !== false)` stops being seen as
 // negated), and the compared expression (its text would carry parentheses upstream does not write).
 func noUnnecessaryBooleanLiteralCompareSkipParentheses(node *ast.Node) *ast.Node {
-	for node != nil && node.Kind == ast.KindParenthesizedExpression {
-		node = node.AsParenthesizedExpression().Expression
+	unwrapped := node
+	for unwrapped != nil && unwrapped.Kind == ast.KindParenthesizedExpression {
+		unwrapped = unwrapped.AsParenthesizedExpression().Expression
 	}
-	return node
+	return unwrapped
 }
 
 // noUnnecessaryBooleanLiteralCompareIsUnaryNegation answers whether a node is `!x`.
@@ -539,8 +542,9 @@ func noUnnecessaryBooleanLiteralCompareIsUnaryNegation(node *ast.Node) bool {
 // operator, the branches of a conditional, the last element of a sequence, and a negation. The walk
 // stops at a node whose parent tests it.
 func noUnnecessaryBooleanLiteralCompareIsConditionalTest(node *ast.Node) bool {
-	for node != nil {
-		parent := node.Parent
+	current := node
+	for current != nil {
+		parent := current.Parent
 		if parent == nil {
 			return false
 		}
@@ -556,18 +560,18 @@ func noUnnecessaryBooleanLiteralCompareIsConditionalTest(node *ast.Node) bool {
 			}
 			switch operator.Kind {
 			case ast.KindAmpersandAmpersandToken, ast.KindBarBarToken, ast.KindQuestionQuestionToken:
-				node = parent
+				current = parent
 				continue
 			}
 			return false
 
 		case ast.KindConditionalExpression:
 			conditional := parent.AsConditionalExpression()
-			if conditional.Condition == node {
+			if conditional.Condition == current {
 				return true
 			}
-			if conditional.WhenTrue == node || conditional.WhenFalse == node {
-				node = parent
+			if conditional.WhenTrue == current || conditional.WhenFalse == current {
+				current = parent
 				continue
 			}
 			return false
@@ -576,7 +580,7 @@ func noUnnecessaryBooleanLiteralCompareIsConditionalTest(node *ast.Node) bool {
 			if parent.AsPrefixUnaryExpression().Operator != ast.KindExclamationToken {
 				return false
 			}
-			node = parent
+			current = parent
 			continue
 
 		case ast.KindParenthesizedExpression:
@@ -584,17 +588,17 @@ func noUnnecessaryBooleanLiteralCompareIsConditionalTest(node *ast.Node) bool {
 			// so a parenthesized test reaches upstream's walk already unwrapped. Without this arm
 			// `if ((b === true)) {}` would read as not-a-test and the repair would add a nullish
 			// default the conditional does not need.
-			node = parent
+			current = parent
 			continue
 
 		case ast.KindIfStatement:
-			return parent.AsIfStatement().Expression == node
+			return parent.AsIfStatement().Expression == current
 		case ast.KindWhileStatement:
-			return parent.AsWhileStatement().Expression == node
+			return parent.AsWhileStatement().Expression == current
 		case ast.KindDoStatement:
-			return parent.AsDoStatement().Expression == node
+			return parent.AsDoStatement().Expression == current
 		case ast.KindForStatement:
-			return parent.AsForStatement().Condition == node
+			return parent.AsForStatement().Condition == current
 		}
 
 		return false
@@ -638,11 +642,11 @@ func noUnnecessaryBooleanLiteralCompareIsWeakPrecedenceParent(node *ast.Node) bo
 // `GetStrictOptionValue` is the same resolution: an explicit value wins, and an unset one falls back
 // to `strict` unless `strict` is explicitly false. Reading it through the program handle is why this
 // rule declares that it reads the program.
-func noUnnecessaryBooleanLiteralCompareStrictNullChecksEnabled(ctx rule.Context) bool {
-	if ctx.Program == nil {
+func noUnnecessaryBooleanLiteralCompareStrictNullChecksEnabled(ruleContext rule.Context) bool {
+	if ruleContext.Program == nil {
 		return true
 	}
-	compilerOptions := ctx.Program.Options()
+	compilerOptions := ruleContext.Program.Options()
 	if compilerOptions == nil {
 		return true
 	}
@@ -650,12 +654,12 @@ func noUnnecessaryBooleanLiteralCompareStrictNullChecksEnabled(ctx rule.Context)
 }
 
 // noUnnecessaryBooleanLiteralCompareNodeText slices a node's own source text, trivia excluded.
-func noUnnecessaryBooleanLiteralCompareNodeText(ctx rule.Context, node *ast.Node) (string, bool) {
+func noUnnecessaryBooleanLiteralCompareNodeText(ruleContext rule.Context, node *ast.Node) (string, bool) {
 	if node == nil {
 		return "", false
 	}
-	trimmed := rule.TokenRange(ctx.SourceFile, node)
-	sourceText := ctx.SourceFile.Text()
+	trimmed := rule.TokenRange(ruleContext.SourceFile, node)
+	sourceText := ruleContext.SourceFile.Text()
 	if trimmed.Pos() < 0 || trimmed.End() > len(sourceText) || trimmed.Pos() > trimmed.End() {
 		return "", false
 	}
@@ -664,7 +668,7 @@ func noUnnecessaryBooleanLiteralCompareNodeText(ctx rule.Context, node *ast.Node
 
 // NoUnnecessaryBooleanLiteralCompareOptions is the rule's configuration.
 //
-// Both allowances default to TRUE, which is the trap this rule's decoder exists for: a Go zero value
+// Both allowances default to true, which is the trap this rule's decoder exists for: a Go zero value
 // turns them off and the rule reports two whole families of comparison upstream is silent on.
 type NoUnnecessaryBooleanLiteralCompareOptions struct {
 	AllowComparingNullableBooleansToFalse bool
@@ -700,23 +704,22 @@ type noUnnecessaryBooleanLiteralCompareRawOptions struct {
 // both allowances off and make the rule report the two nullish families upstream allows by default.
 // Every fixture built from a struct rather than routed through this decoder would pass anyway,
 // which is the failure this project has shipped before.
-func DecodeNoUnnecessaryBooleanLiteralCompareOptions(raw []byte) (any, error) {
-	decoded, err := rule.DecodeOptionsInto[noUnnecessaryBooleanLiteralCompareRawOptions]()(raw)
-	if err != nil {
-		return DefaultNoUnnecessaryBooleanLiteralCompareOptions(), err
+func DecodeNoUnnecessaryBooleanLiteralCompareOptions(raw []byte) (NoUnnecessaryBooleanLiteralCompareOptions, error) {
+	decoded, decodeOptionsError := rule.DecodeOptionsInto[noUnnecessaryBooleanLiteralCompareRawOptions]()(raw)
+	if decodeOptionsError != nil {
+		return DefaultNoUnnecessaryBooleanLiteralCompareOptions(), decodeOptionsError
 	}
 
-	wire, _ := decoded.(noUnnecessaryBooleanLiteralCompareRawOptions)
 	options := DefaultNoUnnecessaryBooleanLiteralCompareOptions()
 
-	if wire.AllowComparingNullableBooleansToFalse != nil {
-		options.AllowComparingNullableBooleansToFalse = *wire.AllowComparingNullableBooleansToFalse
+	if decoded.AllowComparingNullableBooleansToFalse != nil {
+		options.AllowComparingNullableBooleansToFalse = *decoded.AllowComparingNullableBooleansToFalse
 	}
-	if wire.AllowComparingNullableBooleansToTrue != nil {
-		options.AllowComparingNullableBooleansToTrue = *wire.AllowComparingNullableBooleansToTrue
+	if decoded.AllowComparingNullableBooleansToTrue != nil {
+		options.AllowComparingNullableBooleansToTrue = *decoded.AllowComparingNullableBooleansToTrue
 	}
-	if wire.AllowRuleToRunWithoutStrictNullChecks != nil {
-		options.AllowRuleToRunWithoutStrictNullChecks = *wire.AllowRuleToRunWithoutStrictNullChecks
+	if decoded.AllowRuleToRunWithoutStrictNullChecks != nil {
+		options.AllowRuleToRunWithoutStrictNullChecks = *decoded.AllowRuleToRunWithoutStrictNullChecks
 	}
 
 	return options, nil

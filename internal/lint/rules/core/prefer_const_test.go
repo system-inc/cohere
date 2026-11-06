@@ -12,7 +12,7 @@ const preferConstFile = "/repository/source/PreferConst.ts"
 
 // The corpus is oxc's, copied rather than rewritten.
 //
-// `oxc/crates/oxc_linter/src/rules/eslint/prefer_const.rs` carries FIVE Tester blocks, which the
+// `oxc/crates/oxc_linter/src/rules/eslint/prefer_const.rs` carries five Tester blocks, which the
 // extractor reports and which reading only the last one would silently drop four of:
 //
 //	block 1   75 pass, 65 fail   test_and_snapshot
@@ -33,8 +33,8 @@ const preferConstFile = "/repository/source/PreferConst.ts"
 // known-wrong entry: it fails on a file oxlint cannot parse as JavaScript.
 
 // TestPreferConstFires covers the inputs upstream reports on, with the snapshot's own count.
-func TestPreferConstFires(t *testing.T) {
-	t.Parallel()
+func TestPreferConstFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -89,26 +89,26 @@ func TestPreferConstFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, PreferConst, preferConstFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, PreferConst, preferConstFile, testCase.sourceText)
 			wantIds := make([]string, testCase.findings)
 			for index := range wantIds {
 				wantIds[index] = "preferConst"
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 		})
 	}
 }
 
 // TestPreferConstStaysSilent is where this rule earns its keep.
 //
-// The inversion note on PreferConst applies to every case here: this rule reports the ABSENCE of a
+// The inversion note on PreferConst applies to every case here: this rule reports the absence of a
 // write, so each of these is a write category that, if the rule fails to see it, becomes a false
 // positive on correct code carrying a fix that breaks the file. They are not "cases upstream also
 // declines"; they are the rule's entire safety margin.
-func TestPreferConstStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestPreferConstStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -148,7 +148,10 @@ func TestPreferConstStaysSilent(t *testing.T) {
 		// Writes from a nested function, which may run any number of times.
 		{"a write from a function declaration", "let a; function foo() { if (a) {} a = bar(); }"},
 		{"a logical write from a function", "let a; function foo() { a = a || bar(); baz(a); }"},
-		{"a deferred write from a function", "let id;\nfunction foo() {\n  if (typeof id !== 'undefined') {\n    return;\n  }\n  id = setInterval(() => {}, 250);\n}\nfoo();\n"},
+		{
+			"a deferred write from a function",
+			"let id;\nfunction foo() {\n  if (typeof id !== 'undefined') {\n    return;\n  }\n  id = setInterval(() => {}, 250);\n}\nfoo();\n",
+		},
 		{"a write into a static block from outside", "let a; class C { static { a = 1; } }"},
 
 		// Two writes, where neither can be the initializer.
@@ -156,7 +159,10 @@ func TestPreferConstStaysSilent(t *testing.T) {
 		{"an initializer and two writes", "class C { static { let a; a = 1; a = 2; } }"},
 		{"a conditional write in a static block", "class C { static { let a; if (foo) { a = 1; } } }"},
 		{"an unbraced conditional write in a static block", "class C { static { let a; if (foo) a = 1; } }"},
-		{"a conditional destructuring write in a static block", "class C { static { let a, b; if (foo) { ({ a, b } = foo); } } }"},
+		{
+			"a conditional destructuring write in a static block",
+			"class C { static { let a, b; if (foo) { ({ a, b } = foo); } } }",
+		},
 		{"an unbraced conditional destructuring write", "class C { static { let a, b; if (foo) ({ a, b } = foo); } }"},
 
 		// Function shapes that are not conversions.
@@ -167,7 +173,10 @@ func TestPreferConstStaysSilent(t *testing.T) {
 		{"a const inside a function", "(function() { const x = 0; })();"},
 		{"a parameter default", "(function(x = 0) { })();"},
 		{"a write in a nested block then read, inside a function", "(function() { let x; { x = 0; foo(x); } })();"},
-		{"a write inside a loop inside a function", "(function() { let x; for (const a of [1,2,3]) { x = foo(); bar(x); } })();"},
+		{
+			"a write inside a loop inside a function",
+			"(function() { let x; for (const a of [1,2,3]) { x = foo(); bar(x); } })();",
+		},
 
 		// A classic for head with a written counter.
 		{"a for head whose counter is updated", "for (let i = 0, end = 10; i < end; ++i) {}"},
@@ -200,19 +209,31 @@ func TestPreferConstStaysSilent(t *testing.T) {
 		{"two hole bindings written later", "const x = [1,2,3]; let y, z; [y,,z] = x; y = 0; z = 0;"},
 
 		// Block 5: shapes upstream added as regressions.
-		{"a write in a logical expression the return depends on", "function example() {\n  let value;\n  return someCheck() && (value = getValue());\n}\n"},
-		{"a write inside an array literal argument", "let t;\nconst r = await Promise.race([ a(), (t = b()) ]);\nt.cancel();\n"},
-		{"a write in a for condition with no initializer", "for (let match; (match = REGEX.exec(line)); ) {\n  handle(match);\n}"},
-		{"the same with a type annotation", "for (let match: string[]; (match = REGEX.exec(line)); ) {\n  handle(match);\n}"},
+		{
+			"a write in a logical expression the return depends on",
+			"function example() {\n  let value;\n  return someCheck() && (value = getValue());\n}\n",
+		},
+		{
+			"a write inside an array literal argument",
+			"let t;\nconst r = await Promise.race([ a(), (t = b()) ]);\nt.cancel();\n",
+		},
+		{
+			"a write in a for condition with no initializer",
+			"for (let match; (match = REGEX.exec(line)); ) {\n  handle(match);\n}",
+		},
+		{
+			"the same with a type annotation",
+			"for (let match: string[]; (match = REGEX.exec(line)); ) {\n  handle(match);\n}",
+		},
 
 		// Ours, not upstream's. Each covers a write category the task named and the imported corpus
 		// does not separate, because upstream's semantic layer classifies them all as is_write()
 		// and so never has to enumerate them.
 		//
-		// A rest element in a destructuring assignment target. `ast.IsWriteAccess` returns FALSE
+		// A rest element in a destructuring assignment target. `ast.IsWriteAccess` returns `false`
 		// for these, measured; without the spread arms in writesToBinding the rule reports `w` as
 		// never reassigned and offers a fix that produces a const it then writes to.
-		// These carry an INITIALIZER, and that is the whole point of them. With one the test is
+		// These carry an initializer, and that is the whole point of them. With one the test is
 		// `len(writes) == 0` and nothing else runs, so the rest arm is the only thing standing
 		// between correct code and a finding that rewrites it into a const it then writes to. A
 		// mutation stubbing isRestTargetOfAssignment to false survived the whole suite until these
@@ -296,10 +317,10 @@ func TestPreferConstStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.RunTyped(t, PreferConst, preferConstFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.RunTyped(test, PreferConst, preferConstFile, testCase.sourceText))
 		})
 	}
 }
@@ -311,82 +332,82 @@ func TestPreferConstStaysSilent(t *testing.T) {
 // `ignoreReadBeforeAssign: { type: "boolean" }`, `additionalProperties: false`. oxc's config agrees.
 //
 // The cases are upstream's own, and they are the answer to the task's third question: a pattern
-// where only some bindings are reassigned DOES report under the default, naming just the
+// where only some bindings are reassigned does report under the default, naming just the
 // never-reassigned ones, and reports nothing under "all".
-func TestPreferConstDestructuringOption(t *testing.T) {
-	t.Parallel()
+func TestPreferConstDestructuringOption(test *testing.T) {
+	test.Parallel()
 
 	anyMode := PreferConstOptions{Destructuring: PreferConstDestructuringAny}
 	allMode := PreferConstOptions{Destructuring: PreferConstDestructuringAll}
 
-	t.Run("any reports the unwritten binding of a mixed pattern", func(t *testing.T) {
-		t.Parallel()
-		result := rule_testing.RunTypedWithOptions(t, PreferConst, preferConstFile,
+	test.Run("any reports the unwritten binding of a mixed pattern", func(test *testing.T) {
+		test.Parallel()
+		result := rule_testing.RunTypedWithOptions(test, PreferConst, preferConstFile,
 			"let {a = 0, b} = obj; b = 0; foo(a, b);", anyMode)
-		rule_testing.ExpectFindings(t, result, "preferConst")
-		reported := reportedTextOf(t, result, 0)
+		rule_testing.ExpectFindings(test, result, "preferConst")
+		reported := reportedTextOf(test, result, 0)
 		if reported != "a" {
-			t.Fatalf("reported %q, want the unwritten binding \"a\"", reported)
+			test.Fatalf("reported %q, want the unwritten binding \"a\"", reported)
 		}
 	})
 
-	t.Run("all declines the same mixed pattern", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, PreferConst, preferConstFile,
+	test.Run("all declines the same mixed pattern", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, PreferConst, preferConstFile,
 			"let {a, b} = obj; b = 0;", allMode))
 	})
 
-	t.Run("all declines a mixed pattern written by an update", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, PreferConst, preferConstFile,
+	test.Run("all declines a mixed pattern written by an update", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, PreferConst, preferConstFile,
 			"let a, b; ({a, b} = obj); b++;", allMode))
 	})
 
-	t.Run("all declines a rest binding that is written", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, PreferConst, preferConstFile,
+	test.Run("all declines a rest binding that is written", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, PreferConst, preferConstFile,
 			"let { name, ...otherStuff } = obj; otherStuff = {};", allMode))
 	})
 
-	t.Run("any reports the unwritten binding beside a written rest", func(t *testing.T) {
-		t.Parallel()
-		result := rule_testing.RunTypedWithOptions(t, PreferConst, preferConstFile,
+	test.Run("any reports the unwritten binding beside a written rest", func(test *testing.T) {
+		test.Parallel()
+		result := rule_testing.RunTypedWithOptions(test, PreferConst, preferConstFile,
 			"let { name, ...otherStuff } = obj; otherStuff = {};", anyMode)
-		rule_testing.ExpectFindings(t, result, "preferConst")
-		if reported := reportedTextOf(t, result, 0); reported != "name" {
-			t.Fatalf("reported %q, want \"name\"", reported)
+		rule_testing.ExpectFindings(test, result, "preferConst")
+		if reported := reportedTextOf(test, result, 0); reported != "name" {
+			test.Fatalf("reported %q, want \"name\"", reported)
 		}
 	})
 
-	t.Run("all reports a pattern where every binding qualifies", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, PreferConst, preferConstFile,
+	test.Run("all reports a pattern where every binding qualifies", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, PreferConst, preferConstFile,
 			"let {a = 0, b} = obj; foo(a, b);", allMode), "preferConst", "preferConst")
 	})
 
-	t.Run("all reports a nested pattern where every binding qualifies", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, PreferConst, preferConstFile,
+	test.Run("all reports a nested pattern where every binding qualifies", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, PreferConst, preferConstFile,
 			"let {a: {b, c}} = {a: {b: 1, c: 2}}", allMode), "preferConst", "preferConst")
 	})
 
-	t.Run("any reports the unwritten binding of a nested pattern", func(t *testing.T) {
-		t.Parallel()
-		result := rule_testing.RunTypedWithOptions(t, PreferConst, preferConstFile,
+	test.Run("any reports the unwritten binding of a nested pattern", func(test *testing.T) {
+		test.Parallel()
+		result := rule_testing.RunTypedWithOptions(test, PreferConst, preferConstFile,
 			"let {a: {b, c}} = {a: {b: 1, c: 2}}; b = 3;", anyMode)
-		rule_testing.ExpectFindings(t, result, "preferConst")
-		if reported := reportedTextOf(t, result, 0); reported != "c" {
-			t.Fatalf("reported %q, want \"c\"", reported)
+		rule_testing.ExpectFindings(test, result, "preferConst")
+		if reported := reportedTextOf(test, result, 0); reported != "c" {
+			test.Fatalf("reported %q, want \"c\"", reported)
 		}
 	})
 
 	// The default is "any", so an unconfigured run and an explicitly-any run must agree. A mutant
 	// flipping the zero value is otherwise invisible.
-	t.Run("the default matches any", func(t *testing.T) {
-		t.Parallel()
+	test.Run("the default matches any", func(test *testing.T) {
+		test.Parallel()
 		source := "let {a = 0, b} = obj; b = 0; foo(a, b);"
-		rule_testing.ExpectFindings(t,
-			rule_testing.RunTyped(t, PreferConst, preferConstFile, source), "preferConst")
+		rule_testing.ExpectFindings(test,
+			rule_testing.RunTyped(test, PreferConst, preferConstFile, source), "preferConst")
 	})
 }
 
@@ -396,8 +417,8 @@ func TestPreferConstDestructuringOption(t *testing.T) {
 // nine inputs, which is the strongest possible fixture shape: the same source must report with the
 // option off and stay silent with it on, so a rule ignoring the option fails one half whichever way
 // it errs.
-func TestPreferConstIgnoreReadBeforeAssignOption(t *testing.T) {
-	t.Parallel()
+func TestPreferConstIgnoreReadBeforeAssignOption(test *testing.T) {
+	test.Parallel()
 
 	ignoring := PreferConstOptions{IgnoreReadBeforeAssign: true}
 	notIgnoring := PreferConstOptions{IgnoreReadBeforeAssign: false}
@@ -411,63 +432,75 @@ func TestPreferConstIgnoreReadBeforeAssignOption(t *testing.T) {
 		{"a read from a function declared earlier",
 			"function square(n) { x * x }\nlet x = 5;\nconsole.log(square(4));", 1},
 		{"a read from an arrow assigned earlier", "const fn = () => x;\nlet x = 5;", 1},
-		{"a read from an inner function", "function outer() {\n  function inner() { return x; }\n  let x = 5;\n  return inner();\n}", 1},
+		{
+			"a read from an inner function",
+			"function outer() {\n  function inner() { return x; }\n  let x = 5;\n  return inner();\n}",
+			1,
+		},
 		{"a read from a class method", "class C {\n  method() { return x; }\n}\nlet x = 5;", 1},
 		{"a read from an async function", "async function fetchData() { return x; }\nlet x = 5;", 1},
 		{"a read from a generator", "function* gen() { yield x; }\nlet x = 5;", 1},
-		{"a read from the first of two functions", "function reader() { return x; }\nfunction setup() { console.log('setup'); }\nlet x = 5;", 1},
-		{"a read from an arrow inside a static block", "class C {\n  static {\n    const fn = () => a;\n    let a = 1;\n  }\n}", 1},
+		{
+			"a read from the first of two functions",
+			"function reader() { return x; }\nfunction setup() { console.log('setup'); }\nlet x = 5;",
+			1,
+		},
+		{
+			"a read from an arrow inside a static block",
+			"class C {\n  static {\n    const fn = () => a;\n    let a = 1;\n  }\n}",
+			1,
+		},
 	}
 
 	for _, testCase := range bothWays {
-		t.Run(testCase.name+", ignoring", func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, PreferConst, preferConstFile,
+		test.Run(testCase.name+", ignoring", func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, PreferConst, preferConstFile,
 				testCase.sourceText, ignoring))
 		})
-		t.Run(testCase.name+", not ignoring", func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, PreferConst, preferConstFile,
+		test.Run(testCase.name+", not ignoring", func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, PreferConst, preferConstFile,
 				testCase.sourceText, notIgnoring)
 			wantIds := make([]string, testCase.findings)
 			for index := range wantIds {
 				wantIds[index] = "preferConst"
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 		})
 	}
 
-	// A read AFTER the declaration is not a read before assignment, so the option must not
+	// A read after the declaration is not a read before assignment, so the option must not
 	// suppress it. Upstream lists this one only under `ignoreReadBeforeAssign: false`, and it is
 	// the case that stops the option from being implemented as "never report anything that is
 	// read".
-	t.Run("a read after the declaration reports either way", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a read after the declaration reports either way", func(test *testing.T) {
+		test.Parallel()
 		source := "let x = 0; function foo() { bar(x); }"
-		rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, PreferConst, preferConstFile,
+		rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, PreferConst, preferConstFile,
 			source, ignoring), "preferConst")
-		rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, PreferConst, preferConstFile,
+		rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, PreferConst, preferConstFile,
 			source, notIgnoring), "preferConst")
 	})
 
 	// The uninitialized shape. Upstream declines this under the option because the read in `foo`
 	// precedes the write, and reports it otherwise.
-	t.Run("an uninitialized binding read before its write", func(t *testing.T) {
-		t.Parallel()
+	test.Run("an uninitialized binding read before its write", func(test *testing.T) {
+		test.Parallel()
 		source := "let x; function foo() { bar(x); } x = 0;"
-		rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, PreferConst, preferConstFile,
+		rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, PreferConst, preferConstFile,
 			source, ignoring))
-		rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, PreferConst, preferConstFile, source),
+		rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, PreferConst, preferConstFile, source),
 			"preferConst")
 	})
 
 	// Upstream's static-block pair, both polarities.
-	t.Run("a static block reading a later declaration", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a static block reading a later declaration", func(test *testing.T) {
+		test.Parallel()
 		source := "class C { static { a; } } let a = 1;"
-		rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, PreferConst, preferConstFile,
+		rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, PreferConst, preferConstFile,
 			source, ignoring))
-		rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, PreferConst, preferConstFile, source),
+		rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, PreferConst, preferConstFile, source),
 			"preferConst")
 	})
 }
@@ -477,8 +510,8 @@ func TestPreferConstIgnoreReadBeforeAssignOption(t *testing.T) {
 // Every spelling of that pair breaks one of prefer-const and no-use-before-define at their defaults.
 // These are the two sites in ahra that held a disable for it (CodexAppServerClient.ts), reduced, so
 // the tier's option is shown to clear exactly them while a plain never-reassigned let still reports.
-func TestPreferConstIgnoreReadBeforeAssignClearsMutuallyReferencingTimers(t *testing.T) {
-	t.Parallel()
+func TestPreferConstIgnoreReadBeforeAssignClearsMutuallyReferencingTimers(test *testing.T) {
+	test.Parallel()
 
 	ignoring := PreferConstOptions{IgnoreReadBeforeAssign: true}
 	sites := []struct {
@@ -521,29 +554,29 @@ func TestPreferConstIgnoreReadBeforeAssignClearsMutuallyReferencingTimers(t *tes
 				"}\n"},
 	}
 	for _, site := range sites {
-		t.Run(site.name+", ignoring", func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, PreferConst, preferConstFile,
+		test.Run(site.name+", ignoring", func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, PreferConst, preferConstFile,
 				site.sourceText, ignoring))
 		})
-		t.Run(site.name+", not ignoring", func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, PreferConst, preferConstFile, site.sourceText)
-			rule_testing.ExpectFindings(t, result, "preferConst")
-			if reported := reportedTextOf(t, result, 0); reported != "timeout" {
-				t.Errorf("reported %q, want the timer binding", reported)
+		test.Run(site.name+", not ignoring", func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, PreferConst, preferConstFile, site.sourceText)
+			rule_testing.ExpectFindings(test, result, "preferConst")
+			if reported := reportedTextOf(test, result, 0); reported != "timeout" {
+				test.Errorf("reported %q, want the timer binding", reported)
 			}
 		})
 	}
 
 	// The option clears a read before the first write, not every let a closure reads.
-	t.Run("a never-reassigned let still reports", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a never-reassigned let still reports", func(test *testing.T) {
+		test.Parallel()
 		source := "export function delay(milliseconds: number): Promise<void> {\n" +
 			"    let timeout = milliseconds * 2;\n" +
 			"    return new Promise((resolve) => { setTimeout(resolve, timeout); });\n" +
 			"}\n"
-		rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, PreferConst, preferConstFile,
+		rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, PreferConst, preferConstFile,
 			source, ignoring), "preferConst")
 	})
 }
@@ -551,12 +584,12 @@ func TestPreferConstIgnoreReadBeforeAssignClearsMutuallyReferencingTimers(t *tes
 // reportedTextOf slices the source with a finding's own range.
 //
 // Brief step 8: ExpectFindings asserts message ids and count and nothing else, so a rule whose
-// defect is WHERE it points passes a complete fixture pair while being wrong. A clone shipped 187
+// defect is where it points passes a complete fixture pair while being wrong. A clone shipped 187
 // green fixtures over a rule whose findings all pointed at the wrong place.
-func reportedTextOf(t *testing.T, result rule_testing.Result, index int) string {
-	t.Helper()
+func reportedTextOf(test *testing.T, result rule_testing.Result, index int) string {
+	test.Helper()
 	if index >= len(result.Diagnostics) {
-		t.Fatalf("wanted diagnostic %d, got %d", index, len(result.Diagnostics))
+		test.Fatalf("wanted diagnostic %d, got %d", index, len(result.Diagnostics))
 	}
 	finding := result.Diagnostics[index]
 	return finding.SourceFile.Text()[finding.Range.Pos():finding.Range.End()]
@@ -567,8 +600,8 @@ func reportedTextOf(t *testing.T, result rule_testing.Result, index int) string 
 // The finding points at the bound identifier rather than at the `let` keyword or the whole
 // declaration, which is what makes an `eslint-disable-next-line` above the declaration work and
 // what makes a multi-binding pattern's findings distinguishable from each other.
-func TestPreferConstReportsAtTheBinding(t *testing.T) {
-	t.Parallel()
+func TestPreferConstReportsAtTheBinding(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -592,15 +625,15 @@ func TestPreferConstReportsAtTheBinding(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, PreferConst, preferConstFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, PreferConst, preferConstFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.want) {
-				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.want))
+				test.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.want))
 			}
 			for index, want := range testCase.want {
-				if got := reportedTextOf(t, result, index); got != want {
-					t.Errorf("finding %d reported %q, want %q", index, got, want)
+				if got := reportedTextOf(test, result, index); got != want {
+					test.Errorf("finding %d reported %q, want %q", index, got, want)
 				}
 			}
 		})
@@ -612,8 +645,8 @@ func TestPreferConstReportsAtTheBinding(t *testing.T) {
 // ESLint names the single write, since that is the line that becomes the declaration, and names the
 // declaration instead when something reads the binding before the write. The text alone cannot tell
 // the two apart in `let x; x = 0;`, so these assert offsets, counted off the literal.
-func TestPreferConstReportsAtTheWrite(t *testing.T) {
-	t.Parallel()
+func TestPreferConstReportsAtTheWrite(test *testing.T) {
+	test.Parallel()
 
 	ignoring := PreferConstOptions{IgnoreReadBeforeAssign: true}
 	cases := []struct {
@@ -626,7 +659,12 @@ func TestPreferConstReportsAtTheWrite(t *testing.T) {
 		{"the write in a switch case", "switch (a) { case 0: let x; x = 0; }", PreferConstOptions{}, []int{28}},
 		{"the write in a static block", "class C { static { let a; a = 1; } }", PreferConstOptions{}, []int{26}},
 		{"the declaration, when a read comes first", "let x; foo(x); x = 0;", PreferConstOptions{}, []int{4}},
-		{"the declaration, when a closure reads first", "let x; function f() { x; } x = 0;", PreferConstOptions{}, []int{4}},
+		{
+			"the declaration, when a closure reads first",
+			"let x; function f() { x; } x = 0;",
+			PreferConstOptions{},
+			[]int{4},
+		},
 		{"the write, after a read the write follows", "let x; x = 0; foo(x);", PreferConstOptions{}, []int{7}},
 		// A departure: ESLint leaves this, since a namespace body is not a block it knows, and reports
 		// the initialized `let` in the same place. The write converts here as in any block.
@@ -635,29 +673,34 @@ func TestPreferConstReportsAtTheWrite(t *testing.T) {
 		// The declaration's own name is not a read. Counting it silenced every uninitialized binding
 		// under the option, and ESLint reports this one.
 		{"the write, under ignoreReadBeforeAssign", "let x; x = 0;", ignoring, []int{7}},
-		{"the write in a function, under ignoreReadBeforeAssign", "(function() { let x; x = 1; })();", ignoring, []int{21}},
+		{
+			"the write in a function, under ignoreReadBeforeAssign",
+			"(function() { let x; x = 1; })();",
+			ignoring,
+			[]int{21},
+		},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, PreferConst, preferConstFile, testCase.sourceText,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, PreferConst, preferConstFile, testCase.sourceText,
 				testCase.options)
 			if len(result.Diagnostics) != len(testCase.want) {
-				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.want))
+				test.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.want))
 			}
 			for index, want := range testCase.want {
 				if got := result.Diagnostics[index].Range.Pos(); got != want {
-					t.Errorf("finding %d is at %d, want %d", index, got, want)
+					test.Errorf("finding %d is at %d, want %d", index, got, want)
 				}
 			}
 		})
 	}
 
 	// Still read before its write under the option, so still silent there.
-	t.Run("a read before the write, under ignoreReadBeforeAssign", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, PreferConst, preferConstFile,
+	test.Run("a read before the write, under ignoreReadBeforeAssign", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, PreferConst, preferConstFile,
 			"let x; foo(x); x = 0;", ignoring))
 	})
 }
@@ -668,8 +711,8 @@ func TestPreferConstReportsAtTheWrite(t *testing.T) {
 // Each finding names the target inside the pattern, by offset. A pattern holding a name nothing
 // declares is still convertible, as ESLint has it: `returnType` below would be declared by the new
 // pattern, and a TypeScript file that writes an undeclared name already has a compile error to fix.
-func TestPreferConstReportsADestructuringWrite(t *testing.T) {
-	t.Parallel()
+func TestPreferConstReportsADestructuringWrite(test *testing.T) {
+	test.Parallel()
 
 	allMode := PreferConstOptions{Destructuring: PreferConstDestructuringAll}
 	cases := []struct {
@@ -686,7 +729,12 @@ func TestPreferConstReportsADestructuringWrite(t *testing.T) {
 		{"two lets in one pattern", "let a, b; ({a, b} = obj);", PreferConstOptions{}, []int{12, 15}},
 		{"two let statements in one pattern", "let a; let b; [a, b] = xs;", PreferConstOptions{}, []int{15, 18}},
 		{"a nested pattern", "let a, b; [a, [b]] = xs;", PreferConstOptions{}, []int{11, 15}},
-		{"a pattern holding an undeclared name", "let predicate; [, {foo:returnType, predicate}] = foo();", PreferConstOptions{}, []int{35}},
+		{
+			"a pattern holding an undeclared name",
+			"let predicate; [, {foo:returnType, predicate}] = foo();",
+			PreferConstOptions{},
+			[]int{35},
+		},
 		{"a pattern inside a for-of body", "for (const b of c) { let a; ({a} = b); }", PreferConstOptions{}, []int{30}},
 
 		// The rest shapes, which are writes the shelf's accessor once missed. Without an initializer
@@ -711,19 +759,19 @@ func TestPreferConstReportsADestructuringWrite(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, PreferConst, preferConstFile, testCase.sourceText,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, PreferConst, preferConstFile, testCase.sourceText,
 				testCase.options)
 			if len(result.Diagnostics) != len(testCase.want) {
-				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.want))
+				test.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.want))
 			}
 			for index, want := range testCase.want {
 				if got := result.Diagnostics[index].Range.Pos(); got != want {
-					t.Errorf("finding %d is at %d, want %d", index, got, want)
+					test.Errorf("finding %d is at %d, want %d", index, got, want)
 				}
 				if len(result.Diagnostics[index].Fixes) != 0 {
-					t.Errorf("finding %d offered a fix, and `const` cannot be spelled at a write", index)
+					test.Errorf("finding %d offered a fix, and `const` cannot be spelled at a write", index)
 				}
 			}
 		})
@@ -738,8 +786,8 @@ func TestPreferConstReportsADestructuringWrite(t *testing.T) {
 // The repair is a fix rather than a suggestion because it preserves what the code means: the rule
 // only fires where nothing reassigns the binding, so `const` is a strictly more accurate spelling
 // of the same program. It stays a fix, not a suggestion, because there is exactly one valid answer.
-func TestPreferConstFixesTheKeyword(t *testing.T) {
-	t.Parallel()
+func TestPreferConstFixesTheKeyword(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -768,10 +816,10 @@ func TestPreferConstFixesTheKeyword(t *testing.T) {
 	// case asserted the harness rather than the rule.
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, PreferConst, preferConstFile, testCase.sourceText)
-			rule_testing.ExpectFixedSource(t, result, testCase.want)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, PreferConst, preferConstFile, testCase.sourceText)
+			rule_testing.ExpectFixedSource(test, result, testCase.want)
 		})
 	}
 }
@@ -780,44 +828,44 @@ func TestPreferConstFixesTheKeyword(t *testing.T) {
 //
 // The finding is still reported in both; only the fix is withheld. That is the honest split: the
 // diagnosis is correct and the repair needs a human to split the declaration.
-func TestPreferConstWithholdsTheFix(t *testing.T) {
-	t.Parallel()
+func TestPreferConstWithholdsTheFix(test *testing.T) {
+	test.Parallel()
 
 	// A list where one declarator is reassigned. Rewriting the shared keyword would make the
 	// reassigned one a const that is then written to, which is source that parses and does not
 	// compile: the one failure the fix engine structurally cannot refuse.
-	t.Run("a list where another declarator is written", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a list where another declarator is written", func(test *testing.T) {
+		test.Parallel()
 		source := "let x = 'x', y = 'y'; x = 1"
-		result := rule_testing.RunTyped(t, PreferConst, preferConstFile, source)
-		rule_testing.ExpectFindings(t, result, "preferConst")
+		result := rule_testing.RunTyped(test, PreferConst, preferConstFile, source)
+		rule_testing.ExpectFindings(test, result, "preferConst")
 		if len(result.Diagnostics[0].Fixes) != 0 {
-			t.Fatalf("offered a fix that would rewrite `x` into a const it then writes to")
+			test.Fatalf("offered a fix that would rewrite `x` into a const it then writes to")
 		}
 	})
 
 	// A list holding a declarator with no initializer. `const d;` does not parse.
-	t.Run("a list holding an uninitialized declarator", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a list holding an uninitialized declarator", func(test *testing.T) {
+		test.Parallel()
 		source := "let {a, b} = c, d;"
-		result := rule_testing.RunTyped(t, PreferConst, preferConstFile, source)
-		rule_testing.ExpectFindings(t, result, "preferConst", "preferConst")
+		result := rule_testing.RunTyped(test, PreferConst, preferConstFile, source)
+		rule_testing.ExpectFindings(test, result, "preferConst", "preferConst")
 		for index, finding := range result.Diagnostics {
 			if len(finding.Fixes) != 0 {
-				t.Fatalf("finding %d offered a fix producing `const ..., d;` which does not parse", index)
+				test.Fatalf("finding %d offered a fix producing `const ..., d;` which does not parse", index)
 			}
 		}
 	})
 
 	// An uninitialized declarator whose single write stands in for the initializer. `const x;` does
 	// not parse and the write is a separate statement, so there is a finding and no fix.
-	t.Run("an uninitialized binding written separately", func(t *testing.T) {
-		t.Parallel()
+	test.Run("an uninitialized binding written separately", func(test *testing.T) {
+		test.Parallel()
 		source := "let x; x = 0;"
-		result := rule_testing.RunTyped(t, PreferConst, preferConstFile, source)
-		rule_testing.ExpectFindings(t, result, "preferConst")
+		result := rule_testing.RunTyped(test, PreferConst, preferConstFile, source)
+		rule_testing.ExpectFindings(test, result, "preferConst")
 		if len(result.Diagnostics[0].Fixes) != 0 {
-			t.Fatalf("offered a fix producing `const x;` which does not parse")
+			test.Fatalf("offered a fix producing `const x;` which does not parse")
 		}
 	})
 }
@@ -828,46 +876,46 @@ func TestPreferConstWithholdsTheFix(t *testing.T) {
 // completely silent, and every StaysSilent case then passes vacuously while every Fires case fails
 // in a way that reads like a rule bug. This asserts the silence directly, so the failure names its
 // own cause.
-func TestPreferConstNeedsTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestPreferConstNeedsTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	if !PreferConst.NeedsTypeChecker {
-		t.Fatal("PreferConst stopped declaring NeedsTypeChecker; the fixtures below assume it")
+		test.Fatal("PreferConst stopped declaring NeedsTypeChecker; the fixtures below assume it")
 	}
-	rule_testing.ExpectClean(t, rule_testing.Run(t, PreferConst, preferConstFile, "let x = 1; foo(x);"))
-	rule_testing.ExpectFindings(t,
-		rule_testing.RunTyped(t, PreferConst, preferConstFile, "let x = 1; foo(x);"), "preferConst")
+	rule_testing.ExpectClean(test, rule_testing.Run(test, PreferConst, preferConstFile, "let x = 1; foo(x);"))
+	rule_testing.ExpectFindings(test,
+		rule_testing.RunTyped(test, PreferConst, preferConstFile, "let x = 1; foo(x);"), "preferConst")
 }
 
 // TestPreferConstUsesNodeIdentityNotDeclarationKind is the trap from brief step 8b.
 //
-// Both anchors here are KindVariableDeclaration, so comparing the resolved declaration's KIND
+// Both anchors here are KindVariableDeclaration, so comparing the resolved declaration's kind
 // instead of its identity cannot separate them at all. Under a kind comparison the inner write is
 // seen as a write to the outer binding too, so the outer `a` is silenced and the finding count
 // drops. Nothing in the imported corpus catches this, because upstream's shadow cases resolve to
 // declarations that exit through a different path.
-func TestPreferConstUsesNodeIdentityNotDeclarationKind(t *testing.T) {
-	t.Parallel()
+func TestPreferConstUsesNodeIdentityNotDeclarationKind(test *testing.T) {
+	test.Parallel()
 
 	// The outer `a` is never written and must report; the inner `a` is written and must not.
-	result := rule_testing.RunTyped(t, PreferConst, preferConstFile, "let a = 1; { let a = 1; a = 2; }")
-	rule_testing.ExpectFindings(t, result, "preferConst")
-	if got := reportedTextOf(t, result, 0); got != "a" {
-		t.Fatalf("reported %q, want the outer binding", got)
+	result := rule_testing.RunTyped(test, PreferConst, preferConstFile, "let a = 1; { let a = 1; a = 2; }")
+	rule_testing.ExpectFindings(test, result, "preferConst")
+	if got := reportedTextOf(test, result, 0); got != "a" {
+		test.Fatalf("reported %q, want the outer binding", got)
 	}
-	// The span pins WHICH `a`: the outer one is at offset 4, the inner at offset 17.
+	// The span pins which `a`: the outer one is at offset 4, the inner at offset 17.
 	if position := result.Diagnostics[0].Range.Pos(); position != 4 {
-		t.Fatalf("reported the `a` at offset %d, want the outer one at 4", position)
+		test.Fatalf("reported the `a` at offset %d, want the outer one at 4", position)
 	}
 
 	// The mirror image, so a rule that simply reports the first of two matching names fails one of
 	// the pair whichever way it errs.
-	mirror := rule_testing.RunTyped(t, PreferConst, preferConstFile, "let a = 1; a = 2; { let a = 1; foo(a); }")
-	rule_testing.ExpectFindings(t, mirror, "preferConst")
+	mirror := rule_testing.RunTyped(test, PreferConst, preferConstFile, "let a = 1; a = 2; { let a = 1; foo(a); }")
+	rule_testing.ExpectFindings(test, mirror, "preferConst")
 	// Offset 24, counted off the literal rather than read back off the rule: `let a = 1; a = 2; { `
 	// is twenty characters and `let ` is four more.
 	if position := mirror.Diagnostics[0].Range.Pos(); position != 24 {
-		t.Fatalf("reported the `a` at offset %d, want the inner one at 24", position)
+		test.Fatalf("reported the `a` at offset %d, want the inner one at 24", position)
 	}
 }
 
@@ -878,8 +926,8 @@ func TestPreferConstUsesNodeIdentityNotDeclarationKind(t *testing.T) {
 // rules built on that accessor under-report as a result; this rule would over-report, and the fix
 // it offered would rewrite correct code into a const that is then written to. This asserts the
 // patched detection directly so a revert to the bare accessor fails here rather than in production.
-func TestPreferConstSeesRestTargets(t *testing.T) {
-	t.Parallel()
+func TestPreferConstSeesRestTargets(test *testing.T) {
+	test.Parallel()
 
 	// Initialized, so any write at all keeps the binding a `let`. Without an initializer the rest
 	// write would be the one that initializes it, which is a conversion ESLint reports.
@@ -893,9 +941,9 @@ func TestPreferConstSeesRestTargets(t *testing.T) {
 		"let w = []; for ([...w] of pairs) {}",
 	}
 	for _, source := range written {
-		t.Run("written "+source, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, PreferConst, preferConstFile, source))
+		test.Run("written "+source, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, PreferConst, preferConstFile, source))
 		})
 	}
 
@@ -912,10 +960,10 @@ func TestPreferConstSeesRestTargets(t *testing.T) {
 		{"a spread in a new expression", "let w = [1]; new Foo(...w);"},
 	}
 	for _, testCase := range notWritten {
-		t.Run("read "+testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.RunTyped(t, PreferConst, preferConstFile, testCase.sourceText), "preferConst")
+		test.Run("read "+testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.RunTyped(test, PreferConst, preferConstFile, testCase.sourceText), "preferConst")
 		})
 	}
 }
@@ -927,8 +975,8 @@ func TestPreferConstSeesRestTargets(t *testing.T) {
 // object fails to decode and the rule falls back to its zero value, which happens to be "any": a
 // project asking for "all" would silently get the other judgment with nothing reported anywhere.
 // This asserts the decode directly so that a revert fails here rather than in a user's tree.
-func TestPreferConstDecodesItsOptions(t *testing.T) {
-	t.Parallel()
+func TestPreferConstDecodesItsOptions(test *testing.T) {
+	test.Parallel()
 
 	decode := rule.DecodeOptionsInto[PreferConstOptions]()
 
@@ -939,26 +987,27 @@ func TestPreferConstDecodesItsOptions(t *testing.T) {
 		{`{"destructuring":"any"}`, PreferConstDestructuringAny},
 		{`{"destructuring":"all"}`, PreferConstDestructuringAll},
 	} {
-		decoded, err := decode([]byte(testCase.raw))
-		if err != nil {
-			t.Fatalf("decoding %s: %v", testCase.raw, err)
+		decoded, decodeError := decode([]byte(testCase.raw))
+		if decodeError != nil {
+			test.Fatalf("decoding %s: %v", testCase.raw, decodeError)
 		}
-		if got := decoded.(PreferConstOptions).Destructuring; got != testCase.want {
-			t.Fatalf("decoding %s gave destructuring %d, want %d", testCase.raw, got, testCase.want)
+		if decoded.Destructuring != testCase.want {
+			test.Fatalf("decoding %s gave destructuring %d, want %d", testCase.raw, decoded.Destructuring,
+				testCase.want)
 		}
 	}
 
-	decoded, err := decode([]byte(`{"ignoreReadBeforeAssign":true}`))
-	if err != nil {
-		t.Fatalf("decoding the boolean option: %v", err)
+	decoded, decodeError := decode([]byte(`{"ignoreReadBeforeAssign":true}`))
+	if decodeError != nil {
+		test.Fatalf("decoding the boolean option: %v", decodeError)
 	}
-	if !decoded.(PreferConstOptions).IgnoreReadBeforeAssign {
-		t.Fatal("ignoreReadBeforeAssign decoded as false")
+	if !decoded.IgnoreReadBeforeAssign {
+		test.Fatal("ignoreReadBeforeAssign decoded as false")
 	}
 
 	// A typo is an error rather than a silent fallback to the default, which is the whole reason
 	// the decoder exists.
-	if _, err := decode([]byte(`{"destructuring":"al"}`)); err == nil {
-		t.Fatal("a misspelled destructuring value decoded without complaint")
+	if _, decodeError := decode([]byte(`{"destructuring":"al"}`)); decodeError == nil {
+		test.Fatal("a misspelled destructuring value decoded without complaint")
 	}
 }

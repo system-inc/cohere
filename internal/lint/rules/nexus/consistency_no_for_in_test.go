@@ -9,13 +9,13 @@ import (
 
 const consistencyNoForInFile = "/repository/source/ConsistencyNoForIn.ts"
 
-// Every `for...in` in ahra at HEAD on 2026-10-01, trimmed to the loop. The first four are the ones
+// Every `for...in` in ahra at `HEAD` on 2026-10-01, trimmed to the loop. The first four are the ones
 // upstream `guard-for-in` reported; the last four are the ones it accepted as guarded, and this rule
 // reports them too, because a guarded `for...in` is still the shape being retired. The fifth is the
 // case that shows why: its guard is `if (key === 'parent') continue;`, which upstream counts as a
 // guard while the loop still visits inherited keys.
-func TestConsistencyNoForInReportsEveryForIn(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoForInReportsEveryForIn(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name  string
@@ -96,23 +96,26 @@ func TestConsistencyNoForInReportsEveryForIn(t *testing.T) {
 		}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			sourceText := strings.Join(testCase.lines, "\n") + "\n"
-			result := rule_testing.Run(t, ConsistencyNoForIn, consistencyNoForInFile, sourceText)
+			result := rule_testing.Run(test, ConsistencyNoForIn, consistencyNoForInFile, sourceText)
 
 			want := strings.Count(sourceText, " in ") - strings.Count(sourceText, "' in ")
 			wantIds := make([]string, 0, want)
 			for range want {
 				wantIds = append(wantIds, consistencyNoForInId)
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 
 			// The finding starts at the `for` keyword, so the line a reader is sent to is the loop
 			// header rather than the comment or blank line above it.
 			for _, diagnostic := range result.Diagnostics {
 				if !strings.HasPrefix(sourceText[diagnostic.Range.Pos():], "for(") {
-					t.Fatalf("finding starts at %q, not at the for keyword", sourceText[diagnostic.Range.Pos():][:10])
+					test.Fatalf(
+						"finding starts at %q, not at the for keyword",
+						sourceText[diagnostic.Range.Pos():][:10],
+					)
 				}
 			}
 		})
@@ -121,8 +124,8 @@ func TestConsistencyNoForInReportsEveryForIn(t *testing.T) {
 
 // The shapes the replacement is written in, and the constructs that share syntax with `for...in`
 // without being it.
-func TestConsistencyNoForInStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoForInStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name  string
@@ -158,23 +161,28 @@ func TestConsistencyNoForInStaysSilent(t *testing.T) {
 		}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ConsistencyNoForIn, consistencyNoForInFile, strings.Join(testCase.lines, "\n")+"\n")
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(
+				test,
+				ConsistencyNoForIn,
+				consistencyNoForInFile,
+				strings.Join(testCase.lines, "\n")+"\n",
+			)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
 
 // The rewrite is not meaning-preserving in general (a prototype with enumerable properties, a body
 // that mutates what it walks), so the finding carries no fix.
-func TestConsistencyNoForInProposesNoFix(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoForInProposesNoFix(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, ConsistencyNoForIn, consistencyNoForInFile, "for(const key in object) use(key);\n")
-	rule_testing.ExpectFindings(t, result, consistencyNoForInId)
+	result := rule_testing.Run(test, ConsistencyNoForIn, consistencyNoForInFile, "for(const key in object) use(key);\n")
+	rule_testing.ExpectFindings(test, result, consistencyNoForInId)
 	if len(result.Diagnostics[0].Fixes) != 0 || len(result.Diagnostics[0].Suggestions) != 0 {
-		t.Fatalf("expected no fix and no suggestion, got %d and %d",
+		test.Fatalf("expected no fix and no suggestion, got %d and %d",
 			len(result.Diagnostics[0].Fixes), len(result.Diagnostics[0].Suggestions))
 	}
 }

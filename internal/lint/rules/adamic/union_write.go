@@ -20,19 +20,19 @@ var unionWriteText = policy.MessageOf("adamic/union-write", "unionWrite")
 // its types, so the same check covers arbitrary target depth without recovering
 // declared types and undoing narrowing. A generic receiver uses its constraint.
 // Each refused syntax has a strict-tsc-accepted, Node-failing testdata probe.
-var UnionWrite = rule.Rule{
+var UnionWrite = rule.Rule[rule.NoOptions]{
 	Name:             "adamic/union-write",
 	NeedsTypeChecker: true,
 	ProgramReads:     rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.TypeChecker == nil || ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		if ruleContext.TypeChecker == nil || ruleContext.SourceFile == nil {
 			return nil
 		}
 		checkSlot := func(target, receiver *ast.Node, value *checker.Type, name *string) {
 			if value == nil {
 				return
 			}
-			typeChecker := ctx.TypeChecker
+			typeChecker := ruleContext.TypeChecker
 			receiverType := unionWriteConstraint(typeChecker, typeChecker.GetTypeAtLocation(receiver))
 			if receiverType == nil || receiverType.Flags()&checker.TypeFlagsUnion == 0 {
 				return
@@ -48,27 +48,30 @@ var UnionWrite = rule.Rule{
 				}
 				for _, slot := range slots {
 					if !checker.Checker_isTypeAssignableTo(typeChecker, value, slot) {
-						span := rule.TokenRange(ctx.SourceFile, target)
-						slotName := ctx.SourceFile.Text()[span.Pos():span.End()]
+						span := rule.TokenRange(ruleContext.SourceFile, target)
+						slotName := ruleContext.SourceFile.Text()[span.Pos():span.End()]
 						if name != nil {
 							slotName += "." + *name
 						}
-						ctx.ReportNode(target, rule.Message{Id: "unionWrite", Description: unionWriteText.Render(map[string]string{
-							"slot":   slotName,
-							"source": type_checking.StableTypeText(typeChecker, value),
-							"member": type_checking.StableTypeText(typeChecker, member),
-							"target": type_checking.StableTypeText(typeChecker, slot),
-						})})
+						ruleContext.ReportNode(
+							target,
+							rule.Message{Id: "unionWrite", Description: unionWriteText.Render(map[string]string{
+								"slot":   slotName,
+								"source": type_checking.StableTypeText(typeChecker, value),
+								"member": type_checking.StableTypeText(typeChecker, member),
+								"target": type_checking.StableTypeText(typeChecker, slot),
+							})},
+						)
 						return
 					}
 				}
 			}
 		}
 		check := func(target *ast.Node, value *checker.Type) {
-			target = ast.SkipParentheses(target)
-			switch target.Kind {
+			unwrapped := ast.SkipParentheses(target)
+			switch unwrapped.Kind {
 			case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
-				checkSlot(target, target.Expression(), value, nil)
+				checkSlot(unwrapped, unwrapped.Expression(), value, nil)
 			}
 		}
 		// The compiler projects the actual source part through nested patterns,
@@ -80,7 +83,7 @@ var UnionWrite = rule.Rule{
 				return
 			}
 			if flow.IsDestructuringTarget(node) {
-				check(node, checker.Checker_getAssignedType(ctx.TypeChecker, node))
+				check(node, checker.Checker_getAssignedType(ruleContext.TypeChecker, node))
 			}
 		}
 		restWrite := func(node *ast.Node) {
@@ -93,15 +96,18 @@ var UnionWrite = rule.Rule{
 			}
 			// Most rest targets are identifiers or non-union slots. Do not ask
 			// the checker to project a remainder until there is a union to judge.
-			receiver := unionWriteConstraint(ctx.TypeChecker, ctx.TypeChecker.GetTypeAtLocation(target.Expression()))
+			receiver := unionWriteConstraint(
+				ruleContext.TypeChecker,
+				ruleContext.TypeChecker.GetTypeAtLocation(target.Expression()),
+			)
 			if receiver == nil || receiver.Flags()&checker.TypeFlagsUnion == 0 {
 				return
 			}
-			check(target, unionWriteRestType(ctx.TypeChecker, node))
+			check(target, unionWriteRestType(ruleContext.TypeChecker, node))
 		}
 		update := func(node, operand *ast.Node, operator ast.Kind) {
 			if operator == ast.KindPlusPlusToken || operator == ast.KindMinusMinusToken {
-				check(operand, ctx.TypeChecker.GetTypeAtLocation(node))
+				check(operand, ruleContext.TypeChecker.GetTypeAtLocation(node))
 			}
 		}
 		return rule.Listeners{
@@ -116,23 +122,36 @@ var UnionWrite = rule.Rule{
 					return
 				}
 				access := callee.AsPropertyAccessExpression()
-				if access.Name().Text() != "assign" || access.Expression.Kind != ast.KindIdentifier || access.Expression.Text() != "Object" ||
-					!rule.IsSymbolFromDefaultLibrary(ctx.Program, ctx.TypeChecker.GetSymbolAtLocation(access.Name())) {
+				if access.Name().Text() != "assign" ||
+					access.Expression.Kind != ast.KindIdentifier ||
+					access.Expression.Text() != "Object" ||
+					!rule.IsSymbolFromDefaultLibrary(
+						ruleContext.Program,
+						ruleContext.TypeChecker.GetSymbolAtLocation(access.Name()),
+					) {
 					return
 				}
 				target := node.Arguments()[0]
 				for _, source := range node.Arguments()[1:] {
-					sourceType := unionWriteConstraint(ctx.TypeChecker, ctx.TypeChecker.GetTypeAtLocation(source))
+					sourceType := unionWriteConstraint(
+						ruleContext.TypeChecker,
+						ruleContext.TypeChecker.GetTypeAtLocation(source),
+					)
 					sources := []*checker.Type{sourceType}
 					if sourceType.Flags()&checker.TypeFlagsUnion != 0 {
 						sources = sourceType.AsUnionType().Types()
 					}
 					for _, member := range sources {
-						for _, property := range checker.Checker_getPropertiesOfType(ctx.TypeChecker, member) {
+						for _, property := range checker.Checker_getPropertiesOfType(ruleContext.TypeChecker, member) {
 							name := property.Name
 							// An absent optional property is not copied. Preserve real undefined,
 							// but remove the compiler's missing-property marker.
-							checkSlot(target, target, checker.Checker_getNonMissingTypeOfSymbol(ctx.TypeChecker, property), &name)
+							checkSlot(
+								target,
+								target,
+								checker.Checker_getNonMissingTypeOfSymbol(ruleContext.TypeChecker, property),
+								&name,
+							)
 						}
 					}
 				}
@@ -144,13 +163,13 @@ var UnionWrite = rule.Rule{
 					return
 				}
 				if flow.IsDestructuringTarget(node) {
-					value := checker.Checker_getAssignedType(ctx.TypeChecker, node)
+					value := checker.Checker_getAssignedType(ruleContext.TypeChecker, node)
 					// A missing optional source property is the compiler's error/any
 					// type here; the default is still a concrete possible write.
 					if value.Flags()&checker.TypeFlagsAny != 0 {
-						value = ctx.TypeChecker.GetTypeAtLocation(binary.Right)
+						value = ruleContext.TypeChecker.GetTypeAtLocation(binary.Right)
 					} else {
-						value = checker.Checker_getTypeWithDefault(ctx.TypeChecker, value, binary.Right)
+						value = checker.Checker_getTypeWithDefault(ruleContext.TypeChecker, value, binary.Right)
 					}
 					check(binary.Left, value)
 					return
@@ -159,11 +178,12 @@ var UnionWrite = rule.Rule{
 				// A logical assignment writes only its RHS. The expression's type also
 				// contains the old value, which need not fit another member's slot.
 				switch operator {
-				case ast.KindEqualsToken, ast.KindQuestionQuestionEqualsToken, ast.KindBarBarEqualsToken, ast.KindAmpersandAmpersandEqualsToken:
+				case ast.KindEqualsToken, ast.KindQuestionQuestionEqualsToken, ast.KindBarBarEqualsToken,
+					ast.KindAmpersandAmpersandEqualsToken:
 				default:
 					value = node // arithmetic compound assignment writes the operation's result
 				}
-				check(binary.Left, ctx.TypeChecker.GetTypeAtLocation(value))
+				check(binary.Left, ruleContext.TypeChecker.GetTypeAtLocation(value))
 			},
 			ast.KindPrefixUnaryExpression: func(node *ast.Node) {
 				unary := node.AsPrefixUnaryExpression()
@@ -198,7 +218,10 @@ func unionWriteSlots(typeChecker *checker.Checker, member *checker.Type, target 
 	if target.Kind != ast.KindElementAccessExpression {
 		return nil
 	}
-	key := unionWriteConstraint(typeChecker, typeChecker.GetTypeAtLocation(target.AsElementAccessExpression().ArgumentExpression))
+	key := unionWriteConstraint(
+		typeChecker,
+		typeChecker.GetTypeAtLocation(target.AsElementAccessExpression().ArgumentExpression),
+	)
 	keys := []*checker.Type{key}
 	if key.Flags()&checker.TypeFlagsUnion != 0 {
 		keys = key.AsUnionType().Types()
@@ -206,7 +229,11 @@ func unionWriteSlots(typeChecker *checker.Checker, member *checker.Type, target 
 	slots := make([]*checker.Type, 0, len(keys))
 	for _, key := range keys {
 		if key.Flags()&checker.TypeFlagsStringOrNumberLiteralOrUnique != 0 {
-			if property := checker.Checker_getPropertyOfType(typeChecker, member, checker.GetPropertyNameFromType(key)); property != nil {
+			if property := checker.Checker_getPropertyOfType(
+				typeChecker,
+				member,
+				checker.GetPropertyNameFromType(key),
+			); property != nil {
 				slots = append(slots, checker.Checker_getWriteTypeOfSymbol(typeChecker, property))
 				continue
 			}

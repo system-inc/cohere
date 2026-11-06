@@ -21,7 +21,7 @@ import (
 // published artifact should not carry.
 var BuildFlags = []string{"-trimpath"}
 
-// StripFlags remove the symbol table and DWARF from a released binary.
+// StripFlags remove the symbol table and `DWARF` from a released binary.
 //
 // Named rather than inlined so that DescribeBuild reports the flags a release actually used. A
 // hand-written description drifts from the build it claims to describe, and a size label that names
@@ -32,7 +32,7 @@ var StripFlags = []string{"-s", "-w"}
 //
 // A size without its build is not a measurement. The same commit measures 43.1 MB stripped and
 // 61.9 MB from a plain `go build`, an 18 MB spread, so two people quoting sizes from different
-// builds can both be right and still disagree — which is exactly what happened here, and cost two
+// builds can both be right and still disagree, which is exactly what happened here, and cost two
 // messages to reconcile. The same trap has a sharper form for anyone attributing those bytes:
 // `go tool nm` reports every symbol as size zero on a stripped binary, so an attribution run
 // against a release build sums to zero rather than failing.
@@ -68,6 +68,10 @@ type Options struct {
 	// Never inside OutputDirectory: the scratch is over a gigabyte, and everything in the output is
 	// packed into the artifact every proof downloads.
 	SwiftScratchDirectory string
+
+	// Progress is where the notarization of each macOS binary, minutes against Apple's service, is announced
+	// as it starts and ends. Nil announces nothing.
+	Progress io.Writer
 }
 
 // Result reports what a release build produced.
@@ -92,107 +96,6 @@ type StagedPackage struct {
 	SizeInBytes int64
 }
 
-// Build stages every platform package and the dispatcher package.
-//
-// It fails on the first target that does not build, rather than collecting errors and reporting at
-// the end. A release missing one platform is not a release with a warning: it is a published
-// version that resolves to nothing on that platform, and the dispatcher's loud failure would be
-// reported as a bug against a version that looked fine everywhere else.
-func Build(options Options) (Result, error) {
-	if options.Version == "" {
-		// A release with no version stamps "dev" into the binary, and a binary that says "dev"
-		// cannot be traced back to what shipped. That is precisely the thing --version exists for.
-		return Result{}, fmt.Errorf("a release needs a version")
-	}
-
-	if err := requireReleaseVersion(options.Version); err != nil {
-		return Result{}, err
-	}
-
-	scratch, err := swiftScratchDirectory(options)
-	if err != nil {
-		return Result{}, err
-	}
-	options.SwiftScratchDirectory = scratch
-
-	// Read before the minimum is checked, though neither depends on the other, because a fixture can
-	// pin a compiler and cannot contain MinimumReleaseCommit. In the other order no test could reach
-	// this refusal through Build, and a test that drives readCompilerPin directly passes with the call
-	// deleted from here.
-	pin, err := readCompilerPin(options.ModuleDirectory)
-	if err != nil {
-		return Result{}, err
-	}
-
-	if err := requireAncestor(options.ModuleDirectory, MinimumReleaseCommit, minimumReleaseReason); err != nil {
-		return Result{}, err
-	}
-
-	targets := options.Targets
-	if len(targets) == 0 {
-		targets = Targets
-	}
-
-	goToolchain, err := readGoToolchain(options.ModuleDirectory)
-	if err != nil {
-		return Result{}, err
-	}
-
-	result := Result{}
-
-	packageDirectoryNames := []string{}
-	for _, target := range targets {
-		staged, err := buildPlatformPackage(options, target, pin, goToolchain)
-		if err != nil {
-			return Result{}, fmt.Errorf("building %s: %w", target, err)
-		}
-		result.Packages = append(result.Packages, staged)
-		packageDirectoryNames = append(packageDirectoryNames, target.DirectoryName())
-	}
-
-	// After every platform package is signed, so the sums describe the bytes that ship. One rendering is
-	// written twice, into the dispatcher and beside the packages for the GitHub release, so the copy a
-	// reader downloads and the copy the launcher checks cannot disagree.
-	checksums, err := Checksums(options.OutputDirectory, packageDirectoryNames)
-	if err != nil {
-		return Result{}, err
-	}
-	if err := os.WriteFile(filepath.Join(options.OutputDirectory, ChecksumsFileName), checksums, 0o644); err != nil {
-		return Result{}, fmt.Errorf("writing %s: %w", ChecksumsFileName, err)
-	}
-
-	dispatcher, err := buildDispatcherPackage(options, checksums)
-	if err != nil {
-		return Result{}, fmt.Errorf("building the dispatcher package: %w", err)
-	}
-	result.Packages = append(result.Packages, dispatcher)
-
-	return result, nil
-}
-
-// releaseVersionPattern is a semantic version: three numbers with no leading zeros, and an
-// optional pre-release such as `-rc.1`. Build metadata (`+...`) is refused, because npm ignores it
-// when comparing versions, so two releases differing only there would collide.
-var releaseVersionPattern = regexp.MustCompile(`^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$`)
-
-// requireReleaseVersion refuses a version that is not semver, or that is below 0.1.0.
-//
-// cohere's versions start at 0.1.0, by Kirk's ruling of 2026-11-03, which replaced the 1.0.0 of #ed2dp27:
-// a 0.x says the configuration and the rule sets are still settling, and semver gives 0.x its own
-// contract for that (CONTRIBUTING.md, "Versioning and the changelog"). A 0.0.x would read as a toy, so it
-// stays refused. The version is typed by hand into the release workflow, so the floor is enforced here
-// rather than left to an example someone has to remember, and npm cannot take a published version back.
-func requireReleaseVersion(version string) error {
-	match := releaseVersionPattern.FindStringSubmatch(version)
-	if match == nil {
-		return fmt.Errorf("%q is not a semantic version like 0.1.0 or 0.1.0-rc.1, so it cannot be published", version)
-	}
-	if match[1] == "0" && match[2] == "0" {
-		return fmt.Errorf("%q is below 0.1.0, and cohere's versions start at 0.1.0", version)
-	}
-	return nil
-}
-
 // MinimumReleaseCommit is the oldest cohere commit a release may be built from.
 //
 // It is `1bd41fb1`, where formatting options started coming only from CohereSettings.json's format
@@ -212,6 +115,117 @@ const MinimumReleaseCommit = "1bd41fb1bdb465f4453c472bcb1e17da5d2d6cf1"
 
 const minimumReleaseReason = "older engines ignore CohereSettings.json's format block and format with Prettier's defaults"
 
+// Build stages every platform package and the dispatcher package.
+//
+// It fails on the first target that does not build, rather than collecting errors and reporting at
+// the end. A release missing one platform is not a release with a warning: it is a published
+// version that resolves to nothing on that platform, and the dispatcher's loud failure would be
+// reported as a bug against a version that looked fine everywhere else.
+func Build(options Options) (Result, error) {
+	if options.Version == "" {
+		// A release with no version stamps "dev" into the binary, and a binary that says "dev"
+		// cannot be traced back to what shipped. That is precisely the thing --version exists for.
+		return Result{}, fmt.Errorf("a release needs a version")
+	}
+
+	if requireReleaseVersionError := requireReleaseVersion(options.Version); requireReleaseVersionError != nil {
+		return Result{}, requireReleaseVersionError
+	}
+
+	scratch, swiftScratchDirectoryError := swiftScratchDirectory(options)
+	if swiftScratchDirectoryError != nil {
+		return Result{}, swiftScratchDirectoryError
+	}
+	options.SwiftScratchDirectory = scratch
+
+	// Read before the minimum is checked, though neither depends on the other, because a fixture can
+	// pin a compiler and cannot contain MinimumReleaseCommit. In the other order no test could reach
+	// this refusal through Build, and a test that drives readCompilerPin directly passes with the call
+	// deleted from here.
+	pin, readCompilerPinError := readCompilerPin(options.ModuleDirectory)
+	if readCompilerPinError != nil {
+		return Result{}, readCompilerPinError
+	}
+
+	if requireAncestorError := requireAncestor(
+		options.ModuleDirectory,
+		MinimumReleaseCommit,
+		minimumReleaseReason,
+	); requireAncestorError != nil {
+		return Result{}, requireAncestorError
+	}
+
+	targets := options.Targets
+	if len(targets) == 0 {
+		targets = Targets
+	}
+
+	goToolchain, readGoToolchainError := readGoToolchain(options.ModuleDirectory)
+	if readGoToolchainError != nil {
+		return Result{}, readGoToolchainError
+	}
+
+	result := Result{}
+
+	packageDirectoryNames := []string{}
+	for _, target := range targets {
+		staged, buildPlatformPackageError := buildPlatformPackage(options, target, pin, goToolchain)
+		if buildPlatformPackageError != nil {
+			return Result{}, fmt.Errorf("building %s: %w", target, buildPlatformPackageError)
+		}
+		result.Packages = append(result.Packages, staged)
+		packageDirectoryNames = append(packageDirectoryNames, target.DirectoryName())
+	}
+
+	// After every platform package is signed, so the sums describe the bytes that ship. One rendering is
+	// written twice, into the dispatcher and beside the packages for the GitHub release, so the copy a
+	// reader downloads and the copy the launcher checks cannot disagree.
+	checksums, checksumsError := Checksums(options.OutputDirectory, packageDirectoryNames)
+	if checksumsError != nil {
+		return Result{}, checksumsError
+	}
+	if writeError := os.WriteFile(
+		filepath.Join(options.OutputDirectory, ChecksumsFileName),
+		checksums,
+		0o644,
+	); writeError != nil {
+		return Result{}, fmt.Errorf("writing %s: %w", ChecksumsFileName, writeError)
+	}
+
+	dispatcher, buildDispatcherPackageError := buildDispatcherPackage(options, checksums)
+	if buildDispatcherPackageError != nil {
+		return Result{}, fmt.Errorf("building the dispatcher package: %w", buildDispatcherPackageError)
+	}
+	result.Packages = append(result.Packages, dispatcher)
+
+	return result, nil
+}
+
+// releaseVersionPattern is a semantic version: three numbers with no leading zeros, and an
+// optional pre-release such as `-rc.1`. Build metadata (`+...`) is refused, because npm ignores it
+// when comparing versions, so two releases differing only there would collide.
+var releaseVersionPattern = regexp.MustCompile(
+	`^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$`,
+)
+
+// requireReleaseVersion refuses a version that is not semver, or that is below 0.1.0.
+//
+// cohere's versions start at 0.1.0, by Kirk's ruling of 2026-11-03, which replaced the 1.0.0 of #ed2dp27:
+// a 0.x says the configuration and the rule sets are still settling, and semver gives 0.x its own
+// contract for that (`CONTRIBUTING.md`, "Versioning and the changelog"). A 0.0.x would read as a toy, so it
+// stays refused. The version is typed by hand into the release workflow, so the floor is enforced here
+// rather than left to an example someone has to remember, and npm cannot take a published version back.
+func requireReleaseVersion(version string) error {
+	match := releaseVersionPattern.FindStringSubmatch(version)
+	if match == nil {
+		return fmt.Errorf("%q is not a semantic version like 0.1.0 or 0.1.0-rc.1, so it cannot be published", version)
+	}
+	if match[1] == "0" && match[2] == "0" {
+		return fmt.Errorf("%q is below 0.1.0, and cohere's versions start at 0.1.0", version)
+	}
+	return nil
+}
+
 // requireAncestor refuses a release built from a commit that does not contain minimum.
 //
 // git answers with three exit codes, and only one of them is a pass. 0 means minimum is in the
@@ -220,21 +234,21 @@ const minimumReleaseReason = "older engines ignore CohereSettings.json's format 
 // tell is not a check that passed.
 func requireAncestor(moduleDirectory string, minimum string, reason string) error {
 	command := exec.Command("git", "-C", moduleDirectory, "merge-base", "--is-ancestor", minimum, "HEAD")
-	output, err := command.CombinedOutput()
-	if err == nil {
+	output, outputError := command.CombinedOutput()
+	if outputError == nil {
 		return nil
 	}
 
 	var exitError *exec.ExitError
-	if errors.As(err, &exitError) && exitError.ExitCode() == 1 {
+	if errors.As(outputError, &exitError) && exitError.ExitCode() == 1 {
 		return fmt.Errorf(
 			"this release would be built from a commit that does not contain %s, and %s. Release from a checkout that includes it",
 			ShortCommit(minimum), reason,
 		)
 	}
 	return fmt.Errorf(
-		"could not tell whether this release contains %s, so it is refused rather than assumed: %w\n%s\nA shallow clone is the usual cause; fetch full history and release again",
-		ShortCommit(minimum), err, strings.TrimSpace(string(output)),
+		"git cannot tell whether this release contains %s, so it is refused rather than assumed: %w\n%s\nA shallow clone is the usual cause; fetch full history and release again",
+		ShortCommit(minimum), outputError, strings.TrimSpace(string(output)),
 	)
 }
 
@@ -243,17 +257,17 @@ func buildPlatformPackage(options Options, target Target, pin compilerPin, goToo
 	directory := filepath.Join(options.OutputDirectory, target.DirectoryName())
 	binaryPath := filepath.Join(directory, "bin", target.BinaryFileName())
 
-	if err := os.MkdirAll(filepath.Dir(binaryPath), 0o755); err != nil {
-		return StagedPackage{}, fmt.Errorf("creating the package directory: %w", err)
+	if createDirectoryError := os.MkdirAll(filepath.Dir(binaryPath), 0o755); createDirectoryError != nil {
+		return StagedPackage{}, fmt.Errorf("creating the package directory: %w", createDirectoryError)
 	}
 
-	if err := compile(options, target, binaryPath, pin, goToolchain); err != nil {
-		return StagedPackage{}, err
+	if compileError := compile(options, target, binaryPath, pin, goToolchain); compileError != nil {
+		return StagedPackage{}, compileError
 	}
 
-	size, err := cohereBinary(binaryPath, target)
-	if err != nil {
-		return StagedPackage{}, err
+	size, cohereBinaryError := cohereBinary(binaryPath, target)
+	if cohereBinaryError != nil {
+		return StagedPackage{}, cohereBinaryError
 	}
 
 	// The Swift engine, beside cohere in the same bin/, on the platforms that ship it. A released cohere
@@ -263,12 +277,19 @@ func buildPlatformPackage(options Options, target Target, pin compilerPin, goToo
 	enginePath := filepath.Join(directory, "bin", SwiftEngineFileName)
 	engineCommit := ""
 	if ShipsSwiftEngine(target.GoOperatingSystem) {
-		engineCommit, err = readReleaseCommit(options.ModuleDirectory)
-		if err != nil {
-			return StagedPackage{}, err
+		var readReleaseCommitError error
+		engineCommit, readReleaseCommitError = readReleaseCommit(options.ModuleDirectory)
+		if readReleaseCommitError != nil {
+			return StagedPackage{}, readReleaseCommitError
 		}
-		if err := buildSwiftEngine(options.ModuleDirectory, options.SwiftScratchDirectory, target, enginePath, engineCommit); err != nil {
-			return StagedPackage{}, err
+		if buildSwiftEngineError := buildSwiftEngine(
+			options.ModuleDirectory,
+			options.SwiftScratchDirectory,
+			target,
+			enginePath,
+			engineCommit,
+		); buildSwiftEngineError != nil {
+			return StagedPackage{}, buildSwiftEngineError
 		}
 		executables = append(executables, enginePath)
 	}
@@ -276,42 +297,46 @@ func buildPlatformPackage(options Options, target Target, pin compilerPin, goToo
 	// Signed before the manifest is written, so a signing failure leaves an obviously incomplete
 	// package rather than one that looks finished. Only macOS is signed: Linux and Windows have no
 	// equivalent gate on an npm-installed binary.
-	if target.IsMacOS() && options.Signing.IsConfigured() {
+	if target.IsMacOs() && options.Signing.IsConfigured() {
 		for _, executable := range executables {
-			if err := Sign(executable, options.Signing); err != nil {
-				return StagedPackage{}, err
+			if signError := Sign(executable, options.Signing); signError != nil {
+				return StagedPackage{}, signError
 			}
 		}
 	}
 
 	// Each signed executable goes to Apple and must come back Accepted, before anything checks or packs
 	// it, so a binary the notary service refused never reaches a package.
-	if target.IsMacOS() && options.Signing.CanNotarize() {
+	if target.IsMacOs() && options.Signing.CanNotarize() {
 		for _, executable := range executables {
-			if err := Notarize(executable, options.Signing); err != nil {
-				return StagedPackage{}, err
+			if notarizeError := Notarize(executable, options.Signing, options.Progress); notarizeError != nil {
+				return StagedPackage{}, notarizeError
 			}
 		}
 	}
 
 	// After signing, so the pair checked is the pair that ships.
 	if ShipsSwiftEngine(target.GoOperatingSystem) {
-		if err := requireSwiftContract(binaryPath, enginePath, engineCommit); err != nil {
-			return StagedPackage{}, err
+		if requireSwiftContractError := requireSwiftContract(
+			binaryPath,
+			enginePath,
+			engineCommit,
+		); requireSwiftContractError != nil {
+			return StagedPackage{}, requireSwiftContractError
 		}
 	}
 
-	manifest, err := PlatformManifest(target, options.Version)
-	if err != nil {
-		return StagedPackage{}, err
+	manifest, platformManifestError := PlatformManifest(target, options.Version)
+	if platformManifestError != nil {
+		return StagedPackage{}, platformManifestError
 	}
-	if err := os.WriteFile(filepath.Join(directory, "package.json"), manifest, 0o644); err != nil {
-		return StagedPackage{}, fmt.Errorf("writing the package manifest: %w", err)
+	if writeError := os.WriteFile(filepath.Join(directory, "package.json"), manifest, 0o644); writeError != nil {
+		return StagedPackage{}, fmt.Errorf("writing the package manifest: %w", writeError)
 	}
 
 	// Beside bin/, not in it, so the checksums stay a list of executables.
-	if err := stageLicenses(options.ModuleDirectory, directory); err != nil {
-		return StagedPackage{}, err
+	if stageLicensesError := stageLicenses(options.ModuleDirectory, directory); stageLicensesError != nil {
+		return StagedPackage{}, stageLicensesError
 	}
 
 	return StagedPackage{
@@ -326,8 +351,8 @@ func buildPlatformPackage(options Options, target Target, pin compilerPin, goToo
 //
 // Nothing is compiled here, which is the point. The dispatcher is one package every machine
 // installs regardless of platform, so it cannot be a Go binary without becoming a seventh platform
-// package and defeating the single-install premise. It is a Node script instead — Node is present
-// by construction in an npm install — and it resolves the platform package through the package
+// package and defeating the single-install premise. It is a Node script instead (Node is present
+// by construction in an npm install), and it resolves the platform package through the package
 // manager rather than by guessing at directory layouts.
 //
 // It takes no compiler pin and no toolchain for that reason: there is nothing here to stamp them
@@ -343,39 +368,42 @@ func buildDispatcherPackage(options Options, checksums []byte) (StagedPackage, e
 	}
 
 	directory := filepath.Join(options.OutputDirectory, UnscopedDispatcherPackageName)
-	if err := os.MkdirAll(filepath.Join(directory, "bin"), 0o755); err != nil {
-		return StagedPackage{}, fmt.Errorf("creating the dispatcher package directory: %w", err)
+	if createDirectoryError := os.MkdirAll(filepath.Join(directory, "bin"), 0o755); createDirectoryError != nil {
+		return StagedPackage{}, fmt.Errorf("creating the dispatcher package directory: %w", createDirectoryError)
 	}
 
-	manifest, err := DispatcherManifest(options.Version)
-	if err != nil {
-		return StagedPackage{}, err
+	manifest, dispatcherManifestError := DispatcherManifest(options.Version)
+	if dispatcherManifestError != nil {
+		return StagedPackage{}, dispatcherManifestError
 	}
-	if err := os.WriteFile(filepath.Join(directory, "package.json"), manifest, 0o644); err != nil {
-		return StagedPackage{}, fmt.Errorf("writing the dispatcher manifest: %w", err)
+	if writeError := os.WriteFile(filepath.Join(directory, "package.json"), manifest, 0o644); writeError != nil {
+		return StagedPackage{}, fmt.Errorf("writing the dispatcher manifest: %w", writeError)
 	}
 
 	launcher := DispatcherLauncher()
 	launcherPath := filepath.Join(directory, "bin", FullCommandName)
-	if err := os.WriteFile(launcherPath, []byte(launcher), 0o755); err != nil {
-		return StagedPackage{}, fmt.Errorf("writing the dispatcher launcher: %w", err)
+	if writeError := os.WriteFile(launcherPath, []byte(launcher), 0o755); writeError != nil {
+		return StagedPackage{}, fmt.Errorf("writing the dispatcher launcher: %w", writeError)
 	}
 	// WriteFile's mode is masked by umask, so the executable bit is set explicitly. A launcher that
 	// ships without it fails at exec with a permission error on every machine that installs it.
-	if err := os.Chmod(launcherPath, 0o755); err != nil {
-		return StagedPackage{}, fmt.Errorf("making the dispatcher launcher executable: %w", err)
+	if changeModeError := os.Chmod(launcherPath, 0o755); changeModeError != nil {
+		return StagedPackage{}, fmt.Errorf("making the dispatcher launcher executable: %w", changeModeError)
 	}
 
-	if err := stageSettingsSchemas(options.ModuleDirectory, directory); err != nil {
-		return StagedPackage{}, err
+	if stageSettingsSchemasError := stageSettingsSchemas(
+		options.ModuleDirectory,
+		directory,
+	); stageSettingsSchemasError != nil {
+		return StagedPackage{}, stageSettingsSchemasError
 	}
 
-	if err := stageLicenses(options.ModuleDirectory, directory); err != nil {
-		return StagedPackage{}, err
+	if stageLicensesError := stageLicenses(options.ModuleDirectory, directory); stageLicensesError != nil {
+		return StagedPackage{}, stageLicensesError
 	}
 
-	if err := os.WriteFile(filepath.Join(directory, ChecksumsFileName), checksums, 0o644); err != nil {
-		return StagedPackage{}, fmt.Errorf("writing the dispatcher's %s: %w", ChecksumsFileName, err)
+	if writeError := os.WriteFile(filepath.Join(directory, ChecksumsFileName), checksums, 0o644); writeError != nil {
+		return StagedPackage{}, fmt.Errorf("writing the dispatcher's %s: %w", ChecksumsFileName, writeError)
 	}
 
 	return StagedPackage{Name: DispatcherPackageName, Directory: directory}, nil
@@ -387,22 +415,29 @@ func buildDispatcherPackage(options Options, checksums []byte) (StagedPackage, e
 func swiftScratchDirectory(options Options) (string, error) {
 	scratch := options.SwiftScratchDirectory
 	if scratch == "" {
-		cache, err := os.UserCacheDir()
-		if err != nil {
-			return "", fmt.Errorf("finding a cache directory for the Swift engine's build: %w", err)
+		cache, userCacheDirectoryError := os.UserCacheDir()
+		if userCacheDirectoryError != nil {
+			return "", fmt.Errorf("finding a cache directory for the Swift engine's build: %w", userCacheDirectoryError)
 		}
 		scratch = filepath.Join(cache, "cohere", "release-swift-build")
 	}
-	scratch, err := filepath.Abs(scratch)
-	if err != nil {
-		return "", err
+	scratch, absolutePathError := filepath.Abs(scratch)
+	if absolutePathError != nil {
+		return "", absolutePathError
 	}
-	output, err := filepath.Abs(options.OutputDirectory)
-	if err != nil {
-		return "", err
+	output, absolutePathError := filepath.Abs(options.OutputDirectory)
+	if absolutePathError != nil {
+		return "", absolutePathError
 	}
-	if relative, err := filepath.Rel(output, scratch); err == nil && relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
-		return "", fmt.Errorf("the Swift engine's build directory %s is inside the output %s, which is packed and uploaded whole", scratch, output)
+	if relative, relativePathError := filepath.Rel(
+		output,
+		scratch,
+	); relativePathError == nil && relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf(
+			"the Swift engine's build directory %s is inside the output %s, which is packed and uploaded whole",
+			scratch,
+			output,
+		)
 	}
 	return scratch, nil
 }
@@ -423,21 +458,40 @@ var SettingsSchemaFileNames = []string{"CohereSettings.schema.json", "NexusCoher
 // release: a "$schema" path that resolves to nothing validates nothing, and an editor shows no error for
 // that, so it would read as a settings file with no mistakes in it.
 func stageSettingsSchemas(moduleDirectory string, packageDirectory string) error {
-	if err := os.MkdirAll(filepath.Join(packageDirectory, SchemaDirectoryName), 0o755); err != nil {
-		return fmt.Errorf("creating the dispatcher's schema directory: %w", err)
+	if createDirectoryError := os.MkdirAll(
+		filepath.Join(packageDirectory, SchemaDirectoryName),
+		0o755,
+	); createDirectoryError != nil {
+		return fmt.Errorf("creating the dispatcher's schema directory: %w", createDirectoryError)
 	}
 	for _, name := range SettingsSchemaFileNames {
 		source := filepath.Join(moduleDirectory, SchemaDirectoryName, name)
-		contents, err := os.ReadFile(source)
-		if err != nil {
-			return fmt.Errorf("reading the settings schema the dispatcher ships: %w", err)
+		contents, readError := os.ReadFile(source)
+		if readError != nil {
+			return fmt.Errorf("reading the settings schema the dispatcher ships: %w", readError)
 		}
-		var schema map[string]any
-		if err := json.Unmarshal(contents, &schema); err != nil || len(schema) == 0 {
-			return fmt.Errorf("%s is not a JSON schema (%v), so the dispatcher would ship a $schema target that validates nothing", source, err)
+		// Its members are left as written: what is checked is that it is an object with any at all.
+		var schema map[string]json.RawMessage
+		if decodeError := json.Unmarshal(contents, &schema); decodeError != nil {
+			return fmt.Errorf(
+				"%s is not a JSON schema (%w), so the dispatcher would ship a $schema target that validates nothing",
+				source,
+				decodeError,
+			)
 		}
-		if err := os.WriteFile(filepath.Join(packageDirectory, SchemaDirectoryName, name), contents, 0o644); err != nil {
-			return fmt.Errorf("staging the settings schema %s: %w", name, err)
+		if len(schema) == 0 {
+			return fmt.Errorf(
+				"%s is not a JSON schema (an empty object), so the dispatcher would ship a $schema target that "+
+					"validates nothing",
+				source,
+			)
+		}
+		if writeError := os.WriteFile(
+			filepath.Join(packageDirectory, SchemaDirectoryName, name),
+			contents,
+			0o644,
+		); writeError != nil {
+			return fmt.Errorf("staging the settings schema %s: %w", name, writeError)
 		}
 	}
 	return nil
@@ -447,7 +501,7 @@ func stageSettingsSchemas(moduleDirectory string, packageDirectory string) error
 func compile(options Options, target Target, binaryPath string, pin compilerPin, goToolchain string) error {
 	const packagePath = "github.com/system-inc/cohere/internal/release/packaging"
 
-	// Strip the symbol table and DWARF. Measured on a comparable binary: marginally faster to link
+	// Strip the symbol table and `DWARF`. Measured on a comparable binary: marginally faster to link
 	// and 29% smaller, with nothing traded away that a released binary needs.
 	stamps := append([]string{}, StripFlags...)
 	stamps = append(stamps,
@@ -460,8 +514,8 @@ func compile(options Options, target Target, binaryPath string, pin compilerPin,
 	command := GoBuildCommand(options.ModuleDirectory, target, strings.Join(stamps, " "), binaryPath)
 	command.Stderr = os.Stderr
 
-	if err := command.Run(); err != nil {
-		return fmt.Errorf("go build: %w", err)
+	if runError := command.Run(); runError != nil {
+		return fmt.Errorf("go build: %w", runError)
 	}
 	return nil
 }
@@ -469,8 +523,8 @@ func compile(options Options, target Target, binaryPath string, pin compilerPin,
 // GoBuildCommand is the `go build` that produces cohere for one target.
 //
 // It is the single definition of how a target is compiled, shared by the release and by
-// TestEveryReleaseTargetCompiles (internal/release/crosscompile), so a flag or an environment variable added here for the release
-// is one the test compiles with too. A test with its own copy would keep passing on the copy after
+// TestEveryReleaseTargetCompiles (internal/release/crosscompile), so a flag or an environment variable added here for
+// the release is one the test compiles with too. A test with its own copy would keep passing on the copy after
 // the release had changed.
 func GoBuildCommand(moduleDirectory string, target Target, linkerFlags string, binaryPath string) *exec.Cmd {
 	arguments := append([]string{"build"}, BuildFlags...)
@@ -503,9 +557,9 @@ func GoBuildCommand(moduleDirectory string, target Target, linkerFlags string, b
 // install rather than as the packaging mistake it is. Magic bytes separate all three families we
 // ship, so the check costs four bytes of read.
 func cohereBinary(path string, target Target) (int64, error) {
-	information, err := os.Stat(path)
-	if err != nil {
-		return 0, fmt.Errorf("go build reported success but produced no binary at %s: %w", path, err)
+	information, statError := os.Stat(path)
+	if statError != nil {
+		return 0, fmt.Errorf("go build reported success but produced no binary at %s: %w", path, statError)
 	}
 
 	// A real cohere binary statically links the whole TypeScript compiler and is over ten megabytes.
@@ -513,11 +567,15 @@ func cohereBinary(path string, target Target) (int64, error) {
 	// installs perfectly and does nothing.
 	const implausiblySmall = 1 << 20
 	if information.Size() < implausiblySmall {
-		return 0, fmt.Errorf("the binary at %s is %d bytes, which is far too small to be a real build", path, information.Size())
+		return 0, fmt.Errorf(
+			"the binary at %s is %d bytes, which is far too small to be a real build",
+			path,
+			information.Size(),
+		)
 	}
 
-	if err := requireExecutableFormat(path, target); err != nil {
-		return 0, err
+	if requireExecutableFormatError := requireExecutableFormat(path, target); requireExecutableFormatError != nil {
+		return 0, requireExecutableFormatError
 	}
 
 	return information.Size(), nil
@@ -525,7 +583,7 @@ func cohereBinary(path string, target Target) (int64, error) {
 
 // executableMagic is the leading byte sequence of each executable format we ship.
 //
-// Keyed by GOOS because that is what decides the format: both darwin targets are Mach-O and both
+// Keyed by `GOOS` because that is what decides the format: both darwin targets are Mach-O and both
 // windows targets are PE, so the architecture is carried inside the file rather than in its first
 // bytes. That means this catches a binary built for the wrong operating system and not one built
 // for the wrong architecture of the right system, which is a real limit and is stated in the test
@@ -533,7 +591,7 @@ func cohereBinary(path string, target Target) (int64, error) {
 var executableMagic = map[string][]byte{
 	// Mach-O 64-bit, little-endian. Go emits this for both darwin targets.
 	"darwin": {0xcf, 0xfa, 0xed, 0xfe},
-	// ELF.
+	// `ELF`.
 	"linux": {0x7f, 'E', 'L', 'F'},
 	// PE, which still begins with the DOS stub's "MZ".
 	"windows": {'M', 'Z'},
@@ -551,21 +609,21 @@ func requireExecutableFormat(path string, target Target) error {
 		return nil
 	}
 
-	file, err := os.Open(path)
-	if err != nil {
-		return fmt.Errorf("reading the binary at %s: %w", path, err)
+	file, openError := os.Open(path)
+	if openError != nil {
+		return fmt.Errorf("reading the binary at %s: %w", path, openError)
 	}
-	defer file.Close()
+	defer file.Close() // Ignored: the binary was only read, so a failed close loses nothing.
 
 	header := make([]byte, len(magic))
-	if _, err := io.ReadFull(file, header); err != nil {
-		return fmt.Errorf("reading the header of %s: %w", path, err)
+	if _, readFullError := io.ReadFull(file, header); readFullError != nil {
+		return fmt.Errorf("reading the header of %s: %w", path, readFullError)
 	}
 
 	if !bytes.Equal(header, magic) {
 		// The observation and the likely cause are stated as separate claims, because they are: the
 		// bytes are measured and the cause is a guess. A message that asserts one explanation sends
-		// a reader hunting that bug, and several things produce these bytes — another target's
+		// a reader hunting that bug, and several things produce these bytes: another target's
 		// build staged here, a truncated write that kept the path, a file that was never a program.
 		// Naming the most likely one while marking it a guess costs nothing and misdirects nobody.
 		return fmt.Errorf(
@@ -578,7 +636,7 @@ func requireExecutableFormat(path string, target Target) error {
 
 // compilerPin is which commit of which repository the vendored compiler is pinned to.
 type compilerPin struct {
-	// Commit is the gitlink HEAD records for the submodule, which the submodule's checkout was
+	// Commit is the gitlink `HEAD` records for the submodule, which the submodule's checkout was
 	// required to match.
 	Commit string
 
@@ -600,17 +658,17 @@ type compilerPin struct {
 // whatever the checkout holds, so a checkout moved without a commit would ship a compiler that no
 // cohere commit names, and the release could not be rebuilt from history. `--version` would name it
 // accurately and still point at nothing. Commits are compared and trees are not: the compiler patches
-// change files in the checkout without moving its HEAD, so a tree comparison would refuse every
+// change files in the checkout without moving its `HEAD`, so a tree comparison would refuse every
 // patched release, which is every correct one.
 func readCompilerPin(moduleDirectory string) (compilerPin, error) {
-	recorded, err := PinnedCompilerCommit(moduleDirectory, "HEAD")
-	if err != nil {
-		return compilerPin{}, err
+	recorded, pinnedCompilerCommitError := PinnedCompilerCommit(moduleDirectory, "HEAD")
+	if pinnedCompilerCommitError != nil {
+		return compilerPin{}, pinnedCompilerCommitError
 	}
 
-	checkedOut, err := checkedOutCompilerCommit(moduleDirectory)
-	if err != nil {
-		return compilerPin{}, err
+	checkedOut, checkedOutCompilerCommitError := checkedOutCompilerCommit(moduleDirectory)
+	if checkedOutCompilerCommitError != nil {
+		return compilerPin{}, checkedOutCompilerCommitError
 	}
 
 	if checkedOut != recorded {
@@ -626,22 +684,30 @@ func readCompilerPin(moduleDirectory string) (compilerPin, error) {
 // PinnedCompilerCommit reads the vendored compiler's commit from a commit's tree. Exported because the
 // launcher builds from a commit too, and two readers of one gitlink would drift.
 //
-// The gitlink recorded in the commit is the pin. The submodule's own HEAD is what the working tree
+// The gitlink recorded in the commit is the pin. The submodule's own `HEAD` is what the working tree
 // has checked out, and it differs exactly when someone has moved it without committing.
 func PinnedCompilerCommit(moduleDirectory string, commit string) (string, error) {
 	command := exec.Command("git", "-C", moduleDirectory, "ls-tree", commit, "TypeScript")
 	var standardError bytes.Buffer
 	command.Stderr = &standardError
-	output, err := command.Output()
-	if err != nil {
-		return "", fmt.Errorf("reading the compiler pin from %s: %w: %s", ShortCommit(commit), err, strings.TrimSpace(standardError.String()))
+	output, outputError := command.Output()
+	if outputError != nil {
+		return "", fmt.Errorf(
+			"reading the compiler pin from %s: %w: %s",
+			ShortCommit(commit),
+			outputError,
+			strings.TrimSpace(standardError.String()),
+		)
 	}
 	// "160000 commit <sha>\tTypeScript" for a submodule. Anything else means the commit does not pin
 	// a compiler at all, and building would pick one up from somewhere unnamed.
 	fields := strings.Fields(string(output))
 	if len(fields) < 3 || fields[0] != "160000" || fields[1] != "commit" {
-		return "", fmt.Errorf("commit %s does not pin the vendored compiler as a submodule at TypeScript (ls-tree printed %q)",
-			ShortCommit(commit), strings.TrimSpace(string(output)))
+		return "", fmt.Errorf(
+			"commit %s does not pin the vendored compiler as a submodule at TypeScript (ls-tree printed %q)",
+			ShortCommit(commit),
+			strings.TrimSpace(string(output)),
+		)
 	}
 	return fields[2], nil
 }
@@ -649,33 +715,36 @@ func PinnedCompilerCommit(moduleDirectory string, commit string) (string, error)
 // checkedOutCompilerCommit reads the commit the compiler's checkout is at.
 //
 // The checkout has to be a repository of its own first. A submodule that was never initialized is an
-// empty directory, and `git -C` from an empty directory walks up and answers with cohere's own HEAD,
+// empty directory, and `git -C` from an empty directory walks up and answers with cohere's own `HEAD`,
 // which would be reported as a moved compiler naming a commit that is not a compiler at all.
 func checkedOutCompilerCommit(moduleDirectory string) (string, error) {
 	submoduleDirectory := filepath.Join(moduleDirectory, "TypeScript")
 
-	notCheckedOut := fmt.Errorf("the compiler at %s is not checked out. Run `git submodule update --init TypeScript`", submoduleDirectory)
-	output, err := exec.Command("git", "-C", submoduleDirectory, "rev-parse", "--show-toplevel").Output()
-	if err != nil {
+	notCheckedOut := fmt.Errorf(
+		"the compiler at %s is not checked out. Run `git submodule update --init TypeScript`",
+		submoduleDirectory,
+	)
+	output, readError := exec.Command("git", "-C", submoduleDirectory, "rev-parse", "--show-toplevel").Output()
+	if readError != nil {
 		return "", notCheckedOut
 	}
-	topLevel, err := filepath.EvalSymlinks(strings.TrimSpace(string(output)))
-	if err != nil {
+	topLevel, readError := filepath.EvalSymlinks(strings.TrimSpace(string(output)))
+	if readError != nil {
 		return "", notCheckedOut
 	}
 	// Absolute before resolving, because git answers with an absolute path and EvalSymlinks keeps a
 	// relative one relative. Without it a module named as "." reads as never checked out.
-	expected, err := filepath.Abs(submoduleDirectory)
-	if err == nil {
-		expected, err = filepath.EvalSymlinks(expected)
+	expected, readError := filepath.Abs(submoduleDirectory)
+	if readError == nil {
+		expected, readError = filepath.EvalSymlinks(expected)
 	}
-	if err != nil || topLevel != expected {
+	if readError != nil || topLevel != expected {
 		return "", notCheckedOut
 	}
 
-	output, err = exec.Command("git", "-C", submoduleDirectory, "rev-parse", "HEAD").Output()
-	if err != nil {
-		return "", fmt.Errorf("reading the checked-out compiler commit: %w", err)
+	output, readError = exec.Command("git", "-C", submoduleDirectory, "rev-parse", "HEAD").Output()
+	if readError != nil {
+		return "", fmt.Errorf("reading the checked-out compiler commit: %w", readError)
 	}
 	commit := strings.TrimSpace(string(output))
 	if commit == "" {
@@ -684,7 +753,7 @@ func checkedOutCompilerCommit(moduleDirectory string) (string, error) {
 	return commit, nil
 }
 
-// readCompilerUpstream names the compiler's repository from the `.gitmodules` HEAD commits.
+// readCompilerUpstream names the compiler's repository from the `.gitmodules` `HEAD` commits.
 //
 // The committed file and not the submodule's `origin` remote, which is local configuration no commit
 // records. The pin moved to the fork in a commit, and a checkout cloned before that still has an
@@ -694,8 +763,8 @@ func checkedOutCompilerCommit(moduleDirectory string) (string, error) {
 // A file that does not say degrades to "unknown" rather than failing the release. The commit is the
 // fact a bug report needs most, and it was already read from the commit and checked above.
 func readCompilerUpstream(moduleDirectory string) string {
-	output, err := exec.Command("git", "-C", moduleDirectory, "show", "HEAD:.gitmodules").Output()
-	if err != nil {
+	output, outputError := exec.Command("git", "-C", moduleDirectory, "show", "HEAD:.gitmodules").Output()
+	if outputError != nil {
 		return "unknown"
 	}
 	return CompilerUpstreamFromGitmodules(string(output))
@@ -742,8 +811,8 @@ func CompilerUpstreamFromGitmodules(contents string) string {
 // compiler's repository from the same kind of url, read from a committed `.gitmodules`, and two parsers
 // of one url would drift.
 //
-// The two url shapes git accepts — the ssh `git@github.com:owner/name.git` and the https
-// `https://github.com/owner/name.git` — have to produce the same label, because otherwise the same
+// The two url shapes git accepts (the ssh `git@github.com:owner/name.git` and the https
+// `https://github.com/owner/name.git`) have to produce the same label, because otherwise the same
 // pin reads differently depending on how the build machine happened to clone, and a reader
 // comparing two reports would see a difference that is not one.
 //
@@ -767,7 +836,7 @@ func NormalizeUpstream(remoteUrl string) string {
 
 	// Both halves have to be non-empty, not just present. A count alone passes for
 	// `https://github.com/`, whose segments are ["https:", "", "github.com", ""], and the last two
-	// join to "/github.com" — a label that is not a repository, printed by `--version` as though it
+	// join to "/github.com": a label that is not a repository, printed by `--version` as though it
 	// were one. A guard on position says the pieces exist; this says they mean something.
 	owner, name := segments[len(segments)-2], segments[len(segments)-1]
 	if owner == "" || name == "" {
@@ -781,9 +850,9 @@ func readGoToolchain(moduleDirectory string) (string, error) {
 	command := exec.Command("go", "env", "GOVERSION")
 	command.Dir = moduleDirectory
 
-	output, err := command.Output()
-	if err != nil {
-		return "", fmt.Errorf("reading the Go toolchain version: %w", err)
+	output, outputError := command.Output()
+	if outputError != nil {
+		return "", fmt.Errorf("reading the Go toolchain version: %w", outputError)
 	}
 
 	toolchain := strings.TrimSpace(string(output))

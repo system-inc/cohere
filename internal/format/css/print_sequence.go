@@ -8,15 +8,15 @@ import (
 	"github.com/system-inc/cohere/internal/format/printing"
 )
 
-func printSequence(path *astPath, options *printerOptions, print printing.PrintFunc) doc.Doc {
+func printSequence(path *astPath, options *printerOptions, print printFunc) doc.Doc {
 	parts := doc.Concat{}
-	path.Each(func(path *astPath, _ int, _ any) {
+	path.Each(func(path *astPath, _ int) {
 		node := currentNode(path)
 		previous, _ := path.Previous()
 		if previous.Type() == "css-comment" && trim(previous.String("text")) == "prettier-ignore" {
 			parts = append(parts, doc.Text(options.OriginalText[locStart(node):locEnd(node)]))
 		} else {
-			parts = append(parts, print(nil, nil))
+			parts = append(parts, print("", nil))
 		}
 
 		if path.IsLast() {

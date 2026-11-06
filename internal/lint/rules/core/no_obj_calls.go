@@ -61,7 +61,7 @@ var nonCallableTraceMap = func() map[string]*reference.TraceMap {
 // naming both when it does not (`j()` calling JSON). A callee with no name of its own,
 // `(a ? JSON : b)()`, is the second kind. One call reaching two of them, `(a ? JSON : Math)()`,
 // reports twice, once for each.
-var NoObjCalls = rule.Rule{
+var NoObjCalls = rule.Rule[rule.NoOptions]{
 	Name: "no-obj-calls",
 
 	// A local that shares a global's spelling is told apart from the global by asking where its
@@ -69,21 +69,21 @@ var NoObjCalls = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 				// Every trace starts at a reference to one of these names, so a file that never
 				// spells any of them has nothing to follow, and the index is never built.
-				if !spellsANonCallableGlobal(ctx.SourceFile.Text()) {
+				if !spellsANonCallableGlobal(ruleContext.SourceFile.Text()) {
 					return
 				}
-				tracker := reference.NewTracker(ctx.SourceFile, ctx.TypeChecker, nil)
+				tracker := reference.NewTracker(ruleContext.SourceFile, ruleContext.TypeChecker, nil)
 				for _, tracked := range tracker.GlobalReferences(nonCallableTraceMap) {
 					callee := tracked.Node.Expression()
-					ctx.ReportNode(tracked.Node, objCallsMessage(calleeName(callee), tracked.Path[0]))
+					ruleContext.ReportNode(tracked.Node, objectCallsMessage(calleeName(callee), tracked.Path[0]))
 				}
 			},
 		}
@@ -109,23 +109,24 @@ func spellsANonCallableGlobal(text string) bool {
 // identifier's own name, or the static name of the member it reads, through parentheses. A callee of
 // any other shape has none.
 func calleeName(callee *ast.Node) string {
-	callee = ast.SkipParentheses(callee)
-	switch callee.Kind {
+	unwrapped := ast.SkipParentheses(callee)
+	switch unwrapped.Kind {
 	case ast.KindIdentifier:
-		return callee.Text()
+		return unwrapped.Text()
 	case ast.KindPropertyAccessExpression:
-		name, _ := property.Name(callee.AsPropertyAccessExpression().Name(), property.Named|property.Private)
+		name, _ := property.Name(unwrapped.AsPropertyAccessExpression().Name(), property.Named|property.Private)
 		return name
 	case ast.KindElementAccessExpression:
-		name, _ := property.Name(callee.AsElementAccessExpression().ArgumentExpression, property.Quoted|property.Templated|property.Numeric)
+		name, _ := property.Name(unwrapped.AsElementAccessExpression().ArgumentExpression,
+			property.Quoted|property.Templated|property.Numeric)
 		return name
 	}
 	return ""
 }
 
-// objCallsMessage builds the finding for one call: unexpectedCall when the callee spells the global,
+// objectCallsMessage builds the finding for one call: unexpectedCall when the callee spells the global,
 // unexpectedRefCall when it reaches the global through another name or none.
-func objCallsMessage(name string, global string) rule.Message {
+func objectCallsMessage(name string, global string) rule.Message {
 	if name == global {
 		return rule.Message{
 			Id: "unexpectedCall",

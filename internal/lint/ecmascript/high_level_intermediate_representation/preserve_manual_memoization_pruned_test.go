@@ -26,9 +26,9 @@ import (
 // is pruned -- a first version of this test asserted against an untyped lowering and reported zero
 // pruned scopes, which would have passed whichever arm ran.
 //
-// # What this does NOT catch, stated because a guard that cannot fail is worse than none
+// # What this does not catch, stated because a guard that cannot fail is worse than none
 //
-// It pins the SHAPE the defect needs, not the behaviour. Every call site passes nil for the
+// It pins the shape the defect needs, not the behaviour. Every call site passes nil for the
 // dependency table, so `compareInferredDependencies` returns immediately and moving it back above
 // the `Pruned` check changes no output -- measured, that mutation survives. The behavioural assertion
 // becomes possible when the third firing condition is ungated, and belongs in the score test at that
@@ -37,8 +37,8 @@ import (
 // Kept anyway because the shape is the load-bearing half: a live and a pruned scope carrying the
 // same dependencies is what makes the arm split matter, and if a future change stops producing that
 // shape the reason this code exists has quietly evaporated.
-func TestPrunedScopesAreRecordedRatherThanCompared(t *testing.T) {
-	t.Parallel()
+func TestPrunedScopesAreRecordedRatherThanCompared(test *testing.T) {
+	test.Parallel()
 
 	const source = `
 		import {useCallback} from 'react';
@@ -51,45 +51,45 @@ func TestPrunedScopesAreRecordedRatherThanCompared(t *testing.T) {
 
 	live, pruned := 0, 0
 	var sharedDependencies int
-	probe := rule.Rule{
+	probe := rule.Rule[rule.NoOptions]{
 		Name:             "pruned-scope-split",
 		NeedsTypeChecker: true,
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
-					if ctx.TypeChecker == nil {
+					if ruleContext.TypeChecker == nil {
 						return
 					}
 					forEachFunctionLike(node, func(functionNode *ast.Node) {
-						function := Lower(functionNode, ctx.TypeChecker)
+						function := Lower(functionNode, ruleContext.TypeChecker)
 						if function == nil {
 							return
 						}
 						Construct(function)
-						live, pruned, sharedDependencies = prunedScopeShape(function, ctx.TypeChecker)
+						live, pruned, sharedDependencies = prunedScopeShape(function, ruleContext.TypeChecker)
 					})
 				},
 			}
 		},
 	}
-	rule_testing.RunTypedFiles(t, probe, map[string]string{
+	rule_testing.RunTypedFiles(test, probe, map[string]string{
 		"/react.d.ts":  reactiveDeclarations,
 		"/fixture.tsx": source,
 	}, "/fixture.tsx")
 
 	if pruned == 0 {
-		t.Fatal("no scope was pruned on this fixture, so the split this test pins is never " +
+		test.Fatal("no scope was pruned on this fixture, so the split this test pins is never " +
 			"exercised and it would pass whichever arm ran")
 	}
 	if live == 0 {
-		t.Fatal("every scope was pruned, so there is no surviving twin for a pruned scope to " +
+		test.Fatal("every scope was pruned, so there is no surviving twin for a pruned scope to " +
 			"duplicate and the finding this pins does not arise")
 	}
 	if sharedDependencies == 0 {
-		t.Error("no dependency appears in both a live and a pruned scope, which is the duplication " +
+		test.Error("no dependency appears in both a live and a pruned scope, which is the duplication " +
 			"that made comparing pruned scopes report twice; the fixture stopped exercising it")
 	}
-	t.Logf("scopes: %d live, %d pruned; %d dependencies carried by both",
+	test.Logf("scopes: %d live, %d pruned; %d dependencies carried by both",
 		live, pruned, sharedDependencies)
 }
 

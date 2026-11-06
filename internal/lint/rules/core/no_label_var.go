@@ -5,7 +5,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
-var messageNoLabelVar = rule.Message{
+var messageNoLabelVariable = rule.Message{
 	Id: "identifierClashWithLabel",
 	Description: "This label has the same name as a variable in scope, so the same word means two " +
 		"different things a few lines apart and neither reading is wrong on sight. A reader who " +
@@ -13,7 +13,7 @@ var messageNoLabelVar = rule.Message{
 		"what the statement does. Rename the label.",
 }
 
-// NoLabelVar flags a label whose name is already a variable in scope.
+// NoLabelVariable flags a label whose name is already a variable in scope.
 //
 //	valid:   x: for(;;) { break x; }
 //	valid:   function bar() { var x = foo; q: for(;;) { break q; } }
@@ -32,13 +32,13 @@ var messageNoLabelVar = rule.Message{
 // the same question of the checker, and the meaning it is asked for is what has to match.
 //
 // `SymbolFlagsValue` is that meaning, measured rather than chosen. Upstream's `getVariableByName`
-// returns ANY scope variable, so a function declaration, a class, a `let` and a `const` all clash,
+// returns any scope variable, so a function declaration, a class, a `let` and a `const` all clash,
 // not only a `var`. Probed against sixteen inputs on the installed build at 10.8.1, the two agree on
 // every one, including the four `SymbolFlagsVariable` gets wrong.
 //
 // # Two upstream behaviours that read as false positives, reproduced
 //
-// `Object: for(;;) {}` and `undefined: for(;;) {}` both REPORT, measured. The scope chain ends at
+// `Object: for(;;) {}` and `undefined: for(;;) {}` both report, measured. The scope chain ends at
 // the global scope, where every standard library name is a variable, so any label named after a
 // builtin clashes. That is upstream's actual behaviour rather than an oversight in this port, and
 // widening or narrowing it here would be a different rule.
@@ -49,17 +49,17 @@ var messageNoLabelVar = rule.Message{
 // Nor does one inside the label's own body: `x: for(;;) { let x = 1; }` is clean, because the label
 // sits outside the block it labels. Both measured, and both would report for any rule that searched
 // the file for the name instead of asking what is in scope at this point.
-var NoLabelVar = rule.Rule{
+var NoLabelVariable = rule.Rule[rule.NoOptions]{
 	Name:             "no-label-var",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindLabeledStatement: func(node *ast.Node) {
 				// Without this the rule goes completely silent under the plain harness rather than
 				// crashing, which is the more dangerous failure: every clean fixture would pass
-				// vacuously. `TestNoLabelVarRequiresTheTypedHarness` pins it.
-				if ctx.TypeChecker == nil {
+				// vacuously. `TestNoLabelVariableRequiresTheTypedHarness` pins it.
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 
@@ -74,9 +74,9 @@ var NoLabelVar = rule.Rule{
 
 				// Asked at the labeled statement rather than inside it, which is upstream's own
 				// anchor and is what makes a binding declared in the label's body not clash.
-				for _, symbol := range ctx.TypeChecker.GetSymbolsInScope(node, ast.SymbolFlagsValue) {
+				for _, symbol := range ruleContext.TypeChecker.GetSymbolsInScope(node, ast.SymbolFlagsValue) {
 					if symbol.Name == labelName {
-						ctx.ReportNode(node, messageNoLabelVar)
+						ruleContext.ReportNode(node, messageNoLabelVariable)
 						return
 					}
 				}

@@ -16,7 +16,7 @@ var messageNoSelfCompareComparingToSelf = rule.Message{
 // noSelfCompareOperators are the eight comparison operators upstream watches.
 //
 // Upstream spells them as a set of source strings; here they are token kinds, which is the same set
-// read off the parser rather than off the text. Deliberately NOT the whole relational family: `in`
+// read off the parser rather than off the text. Deliberately not the whole relational family: `in`
 // and `instanceof` are comparisons in the grammar and are absent from upstream's set, because
 // `x in x` and `x instanceof x` are not tautologies, and adding them because they look like they
 // belong is a false-positive class the imported corpus cannot see.
@@ -46,10 +46,10 @@ var noSelfCompareOperators = map[ast.Kind]bool{
 // Upstream's predicate is `hasSameTokens`, which asks the source code for both operands' token
 // streams and compares them pairwise on type and value. Two consequences the corpus pins:
 //
-// `foo.bar().baz.qux >= foo.bar ().baz .qux` REPORTS. The two sides differ in whitespace and are
+// `foo.bar().baz.qux >= foo.bar ().baz .qux` reports. The two sides differ in whitespace and are
 // the same tokens, so a port comparing raw source text is silent on upstream's own reporting case.
 //
-// `this.#field === this['#field']` is CLEAN. The two sides read the same characters where it
+// `this.#field === this['#field']` is clean. The two sides read the same characters where it
 // matters and are different tokens: a private name is one token, while a subscript is a bracket, a
 // string and a bracket. A port comparing text with the punctuation stripped reports it, and it is a
 // real distinction rather than a curiosity, because the two access different things entirely.
@@ -65,9 +65,9 @@ var noSelfCompareOperators = map[ast.Kind]bool{
 // are identical tokens. That is upstream saying the shape is worth a look even when the two sides
 // could evaluate differently; it is a deliberate over-report rather than an oversight, and it is
 // reproduced rather than improved on.
-var NoSelfCompare = rule.Rule{
+var NoSelfCompare = rule.Rule[rule.NoOptions]{
 	Name: "no-self-compare",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindBinaryExpression: func(node *ast.Node) {
 				binaryExpression := node.AsBinaryExpression()
@@ -77,8 +77,8 @@ var NoSelfCompare = rule.Rule{
 				if !noSelfCompareOperators[binaryExpression.OperatorToken.Kind] {
 					return
 				}
-				if hasSameTokens(ctx.SourceFile, binaryExpression.Left, binaryExpression.Right) {
-					ctx.ReportNode(node, messageNoSelfCompareComparingToSelf)
+				if hasSameTokens(ruleContext.SourceFile, binaryExpression.Left, binaryExpression.Right) {
+					ruleContext.ReportNode(node, messageNoSelfCompareComparingToSelf)
 				}
 			},
 		}

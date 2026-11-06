@@ -23,7 +23,7 @@ func (custom *strictCustom) UnmarshalJSON(raw []byte) error {
 
 type strictOptions struct {
 	strictEmbedded
-	EnforceForTSTypes bool          `json:"enforceForTSTypes"`
+	EnforceForTsTypes bool          `json:"enforceForTSTypes"`
 	Paths             []strictInner `json:"paths"`
 	Ignore            []string      // untagged: reached through Go's case-insensitive match
 	Custom            strictCustom  `json:"custom"`
@@ -32,16 +32,16 @@ type strictOptions struct {
 // TestUnmarshalOptionsRefusesWhatUpstreamRefuses is #4n972g9: an unknown key, and a key spelled in
 // a different case from its tag, are refused rather than dropped. The baseline case comes first, so
 // a refusal below cannot be explained by the decoder refusing everything.
-func TestUnmarshalOptionsRefusesWhatUpstreamRefuses(t *testing.T) {
-	t.Parallel()
+func TestUnmarshalOptionsRefusesWhatUpstreamRefuses(test *testing.T) {
+	test.Parallel()
 	var decoded strictOptions
 	valid := `{"shared": true, "enforceForTSTypes": true, "paths": [{"pattern": "x"}], "ignore": ["a"], "custom": {"Anything": 1}}`
-	if err := UnmarshalOptions([]byte(valid), &decoded); err != nil {
-		t.Fatalf("baseline: a valid config was refused: %v", err)
+	if unmarshalOptionsError := UnmarshalOptions([]byte(valid), &decoded); unmarshalOptionsError != nil {
+		test.Fatalf("baseline: a valid config was refused: %v", unmarshalOptionsError)
 	}
-	if !decoded.Shared || !decoded.EnforceForTSTypes || len(decoded.Paths) != 1 || decoded.Paths[0].Pattern != "x" ||
+	if !decoded.Shared || !decoded.EnforceForTsTypes || len(decoded.Paths) != 1 || decoded.Paths[0].Pattern != "x" ||
 		len(decoded.Ignore) != 1 || decoded.Custom.value == "" {
-		t.Fatalf("baseline: decoded %+v", decoded)
+		test.Fatalf("baseline: decoded %+v", decoded)
 	}
 
 	refused := []struct {
@@ -51,17 +51,25 @@ func TestUnmarshalOptionsRefusesWhatUpstreamRefuses(t *testing.T) {
 	}{
 		{"unknown key at the top", `{"ignorePatern": ["a"]}`, "ignorePatern"},
 		{"unknown key inside a list element", `{"paths": [{"pattern": "x", "message": "y"}]}`, "message"},
-		{"tagged key in the wrong case", `{"enforceForTsTypes": true}`, `"enforceForTsTypes" is spelled "enforceForTSTypes"`},
-		{"tagged key in the wrong case inside a list", `{"paths": [{"Pattern": "x"}]}`, `"paths.0.Pattern" is spelled "paths.0.pattern"`},
+		{
+			"tagged key in the wrong case",
+			`{"enforceForTsTypes": true}`,
+			`"enforceForTsTypes" is spelled "enforceForTSTypes"`,
+		},
+		{
+			"tagged key in the wrong case inside a list",
+			`{"paths": [{"Pattern": "x"}]}`,
+			`"paths.0.Pattern" is spelled "paths.0.pattern"`,
+		},
 		{"promoted key in the wrong case", `{"Shared": true}`, `"Shared" is spelled "shared"`},
 	}
 	for _, testCase := range refused {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			var target strictOptions
-			err := UnmarshalOptions([]byte(testCase.raw), &target)
-			if err == nil || !strings.Contains(err.Error(), testCase.mention) {
-				t.Fatalf("want a refusal naming %q, got %v", testCase.mention, err)
+			unmarshalOptionsError := UnmarshalOptions([]byte(testCase.raw), &target)
+			if unmarshalOptionsError == nil || !strings.Contains(unmarshalOptionsError.Error(), testCase.mention) {
+				test.Fatalf("want a refusal naming %q, got %v", testCase.mention, unmarshalOptionsError)
 			}
 		})
 	}
@@ -71,26 +79,30 @@ func TestUnmarshalOptionsRefusesWhatUpstreamRefuses(t *testing.T) {
 	accepted := []string{`{"Ignore": ["a"]}`, `{"IGNORE": ["a"]}`, `{"custom": {"whatever": true}}`}
 	for _, raw := range accepted {
 		var target strictOptions
-		if err := UnmarshalOptions([]byte(raw), &target); err != nil {
-			t.Errorf("%s was refused: %v", raw, err)
+		if unmarshalOptionsError := UnmarshalOptions([]byte(raw), &target); unmarshalOptionsError != nil {
+			test.Errorf("%s was refused: %v", raw, unmarshalOptionsError)
 		}
 		var plain strictOptions
-		if err := json.Unmarshal([]byte(raw), &plain); err != nil {
-			t.Errorf("control: plain json refused %s: %v", raw, err)
+		if decodeError := json.Unmarshal([]byte(raw), &plain); decodeError != nil {
+			test.Errorf("control: plain json refused %s: %v", raw, decodeError)
 		}
 	}
 }
 
 // TestDecodeOptionsIntoIsStrict pins that the decoder 112 rules register through uses the strict
-// path, so a refusal reaches the config layer with the type named.
-func TestDecodeOptionsIntoIsStrict(t *testing.T) {
-	t.Parallel()
+// path, so a refusal reaches the config layer naming the key the user wrote, and never the Go type it
+// decodes into: the config layer puts the rule's name in front of it.
+func TestDecodeOptionsIntoIsStrict(test *testing.T) {
+	test.Parallel()
 	decode := DecodeOptionsInto[strictOptions]()
-	if _, err := decode([]byte(`{"enforceForTSTypes": true}`)); err != nil {
-		t.Fatalf("baseline: %v", err)
+	if _, decodeError := decode([]byte(`{"enforceForTSTypes": true}`)); decodeError != nil {
+		test.Fatalf("baseline: %v", decodeError)
 	}
-	_, err := decode([]byte(`{"enforceForTsTypes": true}`))
-	if err == nil || !strings.Contains(err.Error(), "rule.strictOptions") {
-		t.Fatalf("want a refusal naming the options type, got %v", err)
+	_, decodeError := decode([]byte(`{"enforceForTsTypes": true}`))
+	if decodeError == nil || !strings.Contains(decodeError.Error(), `"enforceForTsTypes"`) {
+		test.Fatalf("want a refusal naming the misspelled key, got %v", decodeError)
+	}
+	if strings.Contains(decodeError.Error(), "strictOptions") {
+		test.Fatalf("the refusal names the Go type its options decode into: %v", decodeError)
 	}
 }
