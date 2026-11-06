@@ -209,7 +209,7 @@ func writeAdamicCase[G static_single_assignment.Graph[F, B, P], F any, B compara
 		terminal     []placeRecord
 	}
 	var parameters []int
-	for _, parameter := range graph.Params(function) {
+	for _, parameter := range graph.Parameters(function) {
 		parameters = append(parameters, identifier(parameter))
 	}
 	returns := -1

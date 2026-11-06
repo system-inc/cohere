@@ -86,7 +86,7 @@ func TestIncrementalProgramSkipsUnchangedFiles(test *testing.T) {
 			test.Fatal("Graph.CompilerHost is nil; the incremental path cannot be reached without it")
 		}
 		reader := incremental.NewBuildInfoReader(graph.CompilerHost)
-		return incremental.ReadBuildInfoProgram(graph.Config, reader, graph.CompilerHost)
+		return incremental.ReadBuildInfoProgram(graph.Configuration, reader, graph.CompilerHost)
 	}
 
 	// Leg one: cold. No build info exists, so ReadBuildInfoProgram must return nil, and that
@@ -165,7 +165,7 @@ func TestBuildInfoReaderReturnsNilBeforeAnyBuild(test *testing.T) {
 	}
 
 	reader := incremental.NewBuildInfoReader(graph.CompilerHost)
-	if previous := incremental.ReadBuildInfoProgram(graph.Config, reader, graph.CompilerHost); previous != nil {
+	if previous := incremental.ReadBuildInfoProgram(graph.Configuration, reader, graph.CompilerHost); previous != nil {
 		test.Fatal("ReadBuildInfoProgram returned a program with no build info on disk")
 	}
 }

@@ -145,7 +145,7 @@ func sameResults(test *testing.T, label string, expected *formatSpeculation, act
 			continue
 		}
 		if got.result.Text != want.result.Text || got.result.TransformSkipped != want.result.TransformSkipped ||
-			errorText(got.err) != errorText(want.err) {
+			errorText(got.formatError) != errorText(want.formatError) {
 			test.Errorf("%s: %s formatted otherwise from the program's tree", label, filepath.Base(fileName))
 		}
 	}

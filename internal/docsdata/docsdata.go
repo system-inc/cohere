@@ -52,7 +52,7 @@ type Inputs struct {
 	// SetNames is every rule set cohere carries, prefixed (`cohere:typescript`), and LoadSet resolves
 	// one the way a project extending it alone would see it. SetContents is a set's own text.
 	SetNames    []string
-	LoadSet     func(name string) (*configuration.Config, error)
+	LoadSet     func(name string) (*configuration.Configuration, error)
 	SetContents func(name string) ([]byte, error)
 
 	// SwiftVerdicts is swift/HouseRuleVerdicts.json.

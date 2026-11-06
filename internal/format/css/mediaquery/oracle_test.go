@@ -76,134 +76,134 @@ process.stdin.on("end", () => {
 // oracle that throws on a fixture meant to parse, or parses one meant to throw, fails the test rather
 // than quietly agreeing.
 type mediaQueryFixture struct {
-	name   string
-	params string
-	throws bool
+	name       string
+	parameters string
+	throws     bool
 }
 
 var mediaQueryFixtures = []mediaQueryFixture{
 	// Media types, keywords and features.
-	{name: "type and feature", params: "screen and (min-width: 768px)"},
-	{name: "not", params: "not print"},
-	{name: "only", params: "only screen"},
-	{name: "bare type", params: "print"},
-	{name: "bare feature", params: "(color)"},
-	{name: "prefers color scheme", params: "(prefers-color-scheme: dark)"},
-	{name: "prefers reduced motion", params: "(prefers-reduced-motion: reduce)"},
-	{name: "vendor feature", params: "(-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi)"},
-	{name: "only with two features", params: "only screen and (min-width: 100px) and (max-width: 200px)"},
-	{name: "not with feature", params: "not screen and (color), print and (orientation: landscape)"},
-	{name: "features joined", params: "(min-width: 100px) and (max-width: 200px)"},
-	{name: "upper case", params: "SCREEN AND (COLOR), NOT print, ONLY tv"},
-	{name: "keywords alone", params: "and"},
-	{name: "keywords in a row", params: "only and not"},
+	{name: "type and feature", parameters: "screen and (min-width: 768px)"},
+	{name: "not", parameters: "not print"},
+	{name: "only", parameters: "only screen"},
+	{name: "bare type", parameters: "print"},
+	{name: "bare feature", parameters: "(color)"},
+	{name: "prefers color scheme", parameters: "(prefers-color-scheme: dark)"},
+	{name: "prefers reduced motion", parameters: "(prefers-reduced-motion: reduce)"},
+	{name: "vendor feature", parameters: "(-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi)"},
+	{name: "only with two features", parameters: "only screen and (min-width: 100px) and (max-width: 200px)"},
+	{name: "not with feature", parameters: "not screen and (color), print and (orientation: landscape)"},
+	{name: "features joined", parameters: "(min-width: 100px) and (max-width: 200px)"},
+	{name: "upper case", parameters: "SCREEN AND (COLOR), NOT print, ONLY tv"},
+	{name: "keywords alone", parameters: "and"},
+	{name: "keywords in a row", parameters: "only and not"},
 
 	// Comma lists.
-	{name: "comma list", params: "screen, print"},
-	{name: "comma list with spacing", params: "screen , print and (color)  ,tv"},
-	{name: "empty queries in a list", params: "a,,b"},
-	{name: "only commas", params: " , "},
-	{name: "trailing comma", params: "screen,"},
-	{name: "comma inside parens", params: "(a: f(1, 2)), print"},
+	{name: "comma list", parameters: "screen, print"},
+	{name: "comma list with spacing", parameters: "screen , print and (color)  ,tv"},
+	{name: "empty queries in a list", parameters: "a,,b"},
+	{name: "only commas", parameters: " , "},
+	{name: "trailing comma", parameters: "screen,"},
+	{name: "comma inside parens", parameters: "(a: f(1, 2)), print"},
 
 	// Range syntax.
-	{name: "range both sides", params: "(400px <= width <= 700px)"},
-	{name: "range one side", params: "(width >= 600px)"},
-	{name: "range strict", params: "screen and (400px < width < 700px)"},
-	{name: "range with colon free value", params: "(height > 30em) and (width = 50em)"},
+	{name: "range both sides", parameters: "(400px <= width <= 700px)"},
+	{name: "range one side", parameters: "(width >= 600px)"},
+	{name: "range strict", parameters: "screen and (400px < width < 700px)"},
+	{name: "range with colon free value", parameters: "(height > 30em) and (width = 50em)"},
 
 	// Spacing.
-	{name: "no space inside", params: "screen and (max-width:100px)"},
-	{name: "wide spacing", params: "  screen  and   (  max-width  :  100px  )   "},
-	{name: "tabs and newlines", params: "screen\tand\n(color)\r\n,\n\tprint"},
-	{name: "no space before paren", params: "screen and(color)"},
-	{name: "no space after paren", params: "(color)and screen"},
-	{name: "paren then word", params: "(a)b"},
-	{name: "colon with empty value", params: "(a:)"},
-	{name: "colon with spaces only", params: "(a:   )"},
-	{name: "two colons", params: "(a: b: c)"},
-	{name: "empty parens", params: "()"},
+	{name: "no space inside", parameters: "screen and (max-width:100px)"},
+	{name: "wide spacing", parameters: "  screen  and   (  max-width  :  100px  )   "},
+	{name: "tabs and newlines", parameters: "screen\tand\n(color)\r\n,\n\tprint"},
+	{name: "no space before paren", parameters: "screen and(color)"},
+	{name: "no space after paren", parameters: "(color)and screen"},
+	{name: "paren then word", parameters: "(a)b"},
+	{name: "colon with empty value", parameters: "(a:)"},
+	{name: "colon with spaces only", parameters: "(a:   )"},
+	{name: "two colons", parameters: "(a: b: c)"},
+	{name: "empty parens", parameters: "()"},
 
 	// Comments (the library has no notion of them).
-	{name: "comment between", params: "screen /* comment */ and (color)"},
-	{name: "comment first", params: "/* c */ screen"},
-	{name: "comment in feature", params: "(min-width: /* x */ 100px)"},
+	{name: "comment between", parameters: "screen /* comment */ and (color)"},
+	{name: "comment first", parameters: "/* c */ screen"},
+	{name: "comment in feature", parameters: "(min-width: /* x */ 100px)"},
 
 	// Custom media and functions.
-	{name: "custom media", params: "--small-viewport (max-width: 30em)"},
-	{name: "custom media list", params: "--narrow-window (max-width: 30em), print"},
-	{name: "custom media reference", params: "(--small-viewport)"},
-	{name: "calc value", params: "(max-width: calc(100px + 2em))"},
-	{name: "var value", params: "screen and (min-width: var(--bp))"},
-	{name: "function first", params: "fn(a, b) and (color)"},
-	{name: "function alone", params: "fn(a b)"},
-	{name: "nested parens", params: "(display: grid) and (not (display: inline-grid))"},
-	{name: "style query", params: "style(--responsive: true)"},
-	{name: "container params", params: "sidebar (min-width: 400px)"},
-	{name: "custom variant params", params: "dark (&:where(.dark, .dark *))"},
+	{name: "custom media", parameters: "--small-viewport (max-width: 30em)"},
+	{name: "custom media list", parameters: "--narrow-window (max-width: 30em), print"},
+	{name: "custom media reference", parameters: "(--small-viewport)"},
+	{name: "calc value", parameters: "(max-width: calc(100px + 2em))"},
+	{name: "var value", parameters: "screen and (min-width: var(--bp))"},
+	{name: "function first", parameters: "fn(a, b) and (color)"},
+	{name: "function alone", parameters: "fn(a b)"},
+	{name: "nested parens", parameters: "(display: grid) and (not (display: inline-grid))"},
+	{name: "style query", parameters: "style(--responsive: true)"},
+	{name: "container params", parameters: "sidebar (min-width: 400px)"},
+	{name: "custom variant params", parameters: "dark (&:where(.dark, .dark *))"},
 
 	// The post-pass that types what the first pass left undefined.
-	{name: "two words", params: "a b"},
-	{name: "three words", params: "a b c"},
-	{name: "four words", params: "a b c d"},
-	{name: "five words", params: "a b c d e"},
-	{name: "word paren word", params: "a (b) c"},
-	{name: "word word paren", params: "a b (c)"},
-	{name: "word word word paren", params: "a b c (d)"},
-	{name: "word keyword word word", params: "a and b c"},
-	{name: "paren then words", params: "(a) b c"},
-	{name: "not then words", params: "not a b"},
-	{name: "type then words", params: "only a b c"},
+	{name: "two words", parameters: "a b"},
+	{name: "three words", parameters: "a b c"},
+	{name: "four words", parameters: "a b c d"},
+	{name: "five words", parameters: "a b c d e"},
+	{name: "word paren word", parameters: "a (b) c"},
+	{name: "word word paren", parameters: "a b (c)"},
+	{name: "word word word paren", parameters: "a b c (d)"},
+	{name: "word keyword word word", parameters: "a and b c"},
+	{name: "paren then words", parameters: "(a) b c"},
+	{name: "not then words", parameters: "not a b"},
+	{name: "type then words", parameters: "only a b c"},
 
 	// Interpolation and strings, which only the feature parser tracks.
-	{name: "interpolation type", params: "#{$query} and (color)"},
-	{name: "interpolation value", params: "screen and (max-width: #{$w})"},
-	{name: "interpolation with colon", params: "(#{$a: b}: c)"},
-	{name: "string in interpolation", params: "({'a}' : b}: c)"},
-	{name: "escaped quote in interpolation", params: "({'a\\'b'}: c)"},
-	{name: "double quote in interpolation", params: "({\"x:y\"}: z)"},
-	{name: "quote outside interpolation", params: "(a: \"b:c\")"},
-	{name: "braces first", params: "{a} b"},
-	{name: "brace element", params: "{a b} (c)"},
+	{name: "interpolation type", parameters: "#{$query} and (color)"},
+	{name: "interpolation value", parameters: "screen and (max-width: #{$w})"},
+	{name: "interpolation with colon", parameters: "(#{$a: b}: c)"},
+	{name: "string in interpolation", parameters: "({'a}' : b}: c)"},
+	{name: "escaped quote in interpolation", parameters: "({'a\\'b'}: c)"},
+	{name: "double quote in interpolation", parameters: "({\"x:y\"}: z)"},
+	{name: "quote outside interpolation", parameters: "(a: \"b:c\")"},
+	{name: "braces first", parameters: "{a} b"},
+	{name: "brace element", parameters: "{a b} (c)"},
 
 	// url(), which the library peels off the front.
-	{name: "url then type", params: "url(foo.css) screen"},
-	{name: "url with spacing", params: "  url ( 'a(b)' )  print, tv"},
-	{name: "url alone", params: "url(x)"},
-	{name: "url not first", params: "screen url(x)"},
-	{name: "url upper case", params: "URL(x) screen"},
+	{name: "url then type", parameters: "url(foo.css) screen"},
+	{name: "url with spacing", parameters: "  url ( 'a(b)' )  print, tv"},
+	{name: "url alone", parameters: "url(x)"},
+	{name: "url not first", parameters: "screen url(x)"},
+	{name: "url upper case", parameters: "URL(x) screen"},
 
 	// Unbalanced parentheses: elements that never close are dropped.
-	{name: "stray close paren", params: "screen)"},
-	{name: "close paren mid word", params: "a)b c"},
-	{name: "unclosed feature", params: "print and (color"},
-	{name: "unclosed alone", params: "(a"},
-	{name: "close paren first", params: ")"},
-	{name: "open paren alone", params: "("},
-	{name: "brace closing a feature", params: "(a} b", throws: true},
-	{name: "brace closing a feature at the end", params: "screen and (color}", throws: true},
-	{name: "brace closing a feature mid-word drops it", params: "(a}:b)"},
-	{name: "interpolation then an extra brace", params: "(a{}}", throws: true},
-	{name: "brace alone", params: "}"},
-	{name: "brace pair element", params: "{a}"},
+	{name: "stray close paren", parameters: "screen)"},
+	{name: "close paren mid word", parameters: "a)b c"},
+	{name: "unclosed feature", parameters: "print and (color"},
+	{name: "unclosed alone", parameters: "(a"},
+	{name: "close paren first", parameters: ")"},
+	{name: "open paren alone", parameters: "("},
+	{name: "brace closing a feature", parameters: "(a} b", throws: true},
+	{name: "brace closing a feature at the end", parameters: "screen and (color}", throws: true},
+	{name: "brace closing a feature mid-word drops it", parameters: "(a}:b)"},
+	{name: "interpolation then an extra brace", parameters: "(a{}}", throws: true},
+	{name: "brace alone", parameters: "}"},
+	{name: "brace pair element", parameters: "{a}"},
 
 	// Empty and blank.
-	{name: "empty", params: ""},
-	{name: "blank", params: "   "},
+	{name: "empty", parameters: ""},
+	{name: "blank", parameters: "   "},
 
 	// Non-ASCII: offsets differ between UTF-16 and bytes, and JavaScript's \s is wider than ASCII.
-	{name: "non-ASCII comment", params: "screen and (min-width: 1em) /* \xc3\xa9 */"},
-	{name: "non-ASCII type", params: "\xc3\xa9cran and (color)"},
+	{name: "non-ASCII comment", parameters: "screen and (min-width: 1em) /* \xc3\xa9 */"},
+	{name: "non-ASCII type", parameters: "\xc3\xa9cran and (color)"},
 	// Before a feature's colon, where the feature is gathered byte by byte (@system_adamic's stream P2).
-	{name: "no-break space before a feature", params: "(\u00a0x: 1px)"},
-	{name: "non-ASCII in a feature", params: "(\xc3\xa9-width: 1px)"},
-	{name: "non-ASCII after a feature's colon", params: "(x: \xc3\xa9)"},
-	{name: "no-break space", params: "(max-width:\xc2\xa0100px)\xc2\xa0and\xc2\xa0print"},
-	{name: "ideographic space", params: "\xe3\x80\x80screen\xe3\x80\x80and (color)"},
-	{name: "emoji", params: "\xf0\x9f\x98\x80 and (a: \xf0\x9f\x98\x80), \xf0\x9f\x98\x80"},
-	{name: "byte order mark", params: "\xef\xbb\xbfscreen"},
-	{name: "next line is not whitespace", params: "a\xc2\x85b"},
-	{name: "em space and line separator", params: "a\xe2\x80\x83b\xe2\x80\xa8c"},
+	{name: "no-break space before a feature", parameters: "(\u00a0x: 1px)"},
+	{name: "non-ASCII in a feature", parameters: "(\xc3\xa9-width: 1px)"},
+	{name: "non-ASCII after a feature's colon", parameters: "(x: \xc3\xa9)"},
+	{name: "no-break space", parameters: "(max-width:\xc2\xa0100px)\xc2\xa0and\xc2\xa0print"},
+	{name: "ideographic space", parameters: "\xe3\x80\x80screen\xe3\x80\x80and (color)"},
+	{name: "emoji", parameters: "\xf0\x9f\x98\x80 and (a: \xf0\x9f\x98\x80), \xf0\x9f\x98\x80"},
+	{name: "byte order mark", parameters: "\xef\xbb\xbfscreen"},
+	{name: "next line is not whitespace", parameters: "a\xc2\x85b"},
+	{name: "em space and line separator", parameters: "a\xe2\x80\x83b\xe2\x80\xa8c"},
 }
 
 // TestParseAgreesWithPostcssMediaQueryParser is the parser's acceptance test: for the params of every
@@ -274,7 +274,7 @@ func TestParseAgreesWithPostcssMediaQueryParser(test *testing.T) {
 	throws := map[string]bool{}
 	for _, fixture := range mediaQueryFixtures {
 		name := "fixture: " + fixture.name
-		inputs = append(inputs, input{Name: name, Parameters: fixture.params})
+		inputs = append(inputs, input{Name: name, Parameters: fixture.parameters})
 		throws[name] = fixture.throws
 	}
 

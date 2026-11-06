@@ -160,7 +160,7 @@ type projectRun struct {
 	// otherwise, when the two share output in the order they were written.
 	standardError []byte
 	exitCode      int
-	err           error
+	runError      error
 	elapsed       time.Duration
 }
 
@@ -210,7 +210,7 @@ func runProjects(found discovery, arguments []string, out *bufio.Writer) int {
 			runs[index] = projectRun{
 				project:  project,
 				exitCode: 1,
-				err:      fmt.Errorf("writing what it yields: %w", writeProjectYieldError),
+				runError: fmt.Errorf("writing what it yields: %w", writeProjectYieldError),
 			}
 			continue
 		}
@@ -244,7 +244,7 @@ func runProjects(found discovery, arguments []string, out *bufio.Writer) int {
 	}
 	for _, checked := range runs {
 		if activeOpen != nil {
-			if checked.open == nil || !checked.open.Checked || checked.err != nil {
+			if checked.open == nil || !checked.open.Checked || checked.runError != nil {
 				activeOpen.Checked = false
 			}
 			if checked.open != nil {
@@ -262,8 +262,8 @@ func runProjects(found discovery, arguments []string, out *bufio.Writer) int {
 		// Under `--json` stdout is records only, so what a child wrote to stderr, an engine's note or a
 		// file it could not format, goes to stderr, where a single project's run puts it too.
 		streams.Errors.Write(checked.standardError)
-		if checked.err != nil {
-			unfinished := fmt.Errorf("the %s run did not finish: %w", checked.project.Engine, checked.err)
+		if checked.runError != nil {
+			unfinished := fmt.Errorf("the %s run did not finish: %w", checked.project.Engine, checked.runError)
 			failureLine(out, unfinished)
 			// Under `--json` the project's record says it too, since a run that never finished printed none.
 			if activeOutput.Mode == outputJson {
@@ -340,7 +340,7 @@ func overallFactsOf(runs []projectRun, total time.Duration) overallFacts {
 	for _, checked := range runs {
 		facts.ProjectsByEngine[string(checked.project.Engine)]++
 		switch {
-		case checked.err != nil:
+		case checked.runError != nil:
 			facts.Unfinished++
 		case checked.exitCode != 0:
 			facts.Failed = append(
@@ -421,7 +421,7 @@ func runProject(
 	default:
 		// Killed by a signal, or never started: a project that was not checked is a failure.
 		run.exitCode = 1
-		run.err = runError
+		run.runError = runError
 	}
 	return run
 }

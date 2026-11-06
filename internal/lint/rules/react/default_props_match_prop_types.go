@@ -139,7 +139,7 @@ type defaultPropEntry struct {
 // exit because both objects can be declared in separate statements and either one can be the
 // spread that disqualifies the component.
 type componentPropDeclarations struct {
-	propTypes               map[string]propertyTypeEntry
+	propertyTypes           map[string]propertyTypeEntry
 	propertyTypeOrder       []string
 	sawPropTypes            bool
 	propertyTypesUnresolved bool
@@ -174,7 +174,7 @@ func checkDefaultPropsAgainstPropTypes(
 		if found {
 			return existing
 		}
-		created := &componentPropDeclarations{propTypes: map[string]propertyTypeEntry{}}
+		created := &componentPropDeclarations{propertyTypes: map[string]propertyTypeEntry{}}
 		byOwner[owner] = created
 		order = append(order, owner)
 		return created
@@ -354,10 +354,10 @@ func readPropTypesObject(declarations *componentPropDeclarations, value *ast.Nod
 		if !readable {
 			continue
 		}
-		if _, already := declarations.propTypes[text]; !already {
+		if _, already := declarations.propertyTypes[text]; !already {
 			declarations.propertyTypeOrder = append(declarations.propertyTypeOrder, text)
 		}
-		declarations.propTypes[text] = propertyTypeEntry{
+		declarations.propertyTypes[text] = propertyTypeEntry{
 			isRequired: propertyTypeIsRequired(property),
 		}
 	}
@@ -421,12 +421,12 @@ func reportMismatchedDefaults(
 	if declarations.propertyTypesUnresolved {
 		return
 	}
-	if !declarations.sawPropTypes || len(declarations.propTypes) == 0 {
+	if !declarations.sawPropTypes || len(declarations.propertyTypes) == 0 {
 		return
 	}
 
 	for _, defaultProperty := range declarations.defaults {
-		declared, isDeclared := declarations.propTypes[defaultProperty.name]
+		declared, isDeclared := declarations.propertyTypes[defaultProperty.name]
 		if isDeclared && (settings.AllowRequiredDefaults || !declared.isRequired) {
 			continue
 		}
@@ -515,10 +515,10 @@ func enclosingObjectOwnerName(member *ast.Node) string {
 // Mutates: declarations gains the prop, as a `propTypes` member would add it
 func addSinglePropType(declarations *componentPropDeclarations, name string, value *ast.Node) {
 	declarations.sawPropTypes = true
-	if _, already := declarations.propTypes[name]; !already {
+	if _, already := declarations.propertyTypes[name]; !already {
 		declarations.propertyTypeOrder = append(declarations.propertyTypeOrder, name)
 	}
-	declarations.propTypes[name] = propertyTypeEntry{isRequired: expressionIsRequired(value)}
+	declarations.propertyTypes[name] = propertyTypeEntry{isRequired: expressionIsRequired(value)}
 }
 
 // addSingleDefaultProperty folds a `C.defaultProps.foo = ...` assignment into a component's record.

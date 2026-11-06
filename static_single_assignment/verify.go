@@ -96,7 +96,7 @@ func VerifyStaticSingleAssignment[G Graph[F, B, P], F any, B comparable, P any](
 	}
 
 	entry := graph.Entry(function)
-	for _, parameter := range graph.Params(function) {
+	for _, parameter := range graph.Parameters(function) {
 		recordDefinition(graph.IdentifierOf(parameter), entry, -1)
 	}
 

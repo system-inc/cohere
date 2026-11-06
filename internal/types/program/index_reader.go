@@ -7,14 +7,14 @@ import (
 
 // indexReader reads little-endian fields, remembering the first read past the end.
 type indexReader struct {
-	data     []byte
-	position int
-	err      error
+	data      []byte
+	position  int
+	readError error
 }
 
 func (reader *indexReader) bytes(length int) []byte {
-	if reader.err != nil || length < 0 || reader.position+length > len(reader.data) {
-		reader.err = io.ErrUnexpectedEOF
+	if reader.readError != nil || length < 0 || reader.position+length > len(reader.data) {
+		reader.readError = io.ErrUnexpectedEOF
 		return nil
 	}
 	read := reader.data[reader.position : reader.position+length]

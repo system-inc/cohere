@@ -37,7 +37,7 @@ func DefaultMaxLinesOptions() MaxLinesOptions {
 	return MaxLinesOptions{Maximum: 300}
 }
 
-type maxLinesObjectShape struct {
+type maximumLinesObjectShape struct {
 	Maximum        *int  `json:"max"`
 	SkipBlankLines *bool `json:"skipBlankLines"`
 	SkipComments   *bool `json:"skipComments"`
@@ -58,7 +58,7 @@ func DecodeMaxLinesOptions(raw []byte) (MaxLinesOptions, error) {
 		options.Maximum = maximum
 		return options, nil
 	}
-	var object maxLinesObjectShape
+	var object maximumLinesObjectShape
 	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &object); unmarshalOptionsError != nil {
 		return DefaultMaxLinesOptions(), unmarshalOptionsError
 	}

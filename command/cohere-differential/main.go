@@ -141,7 +141,7 @@ func run() error {
 // has been. The plugin-default knowledge it carried lives in `configuration.PluginDefaultRules`,
 // which the resolver already applies before this function sees the config, so those rules arrive
 // here as ordinary configured rules rather than as a second source to union in.
-func configuredRuleNames(lintConfiguration *configuration.Config) map[string]bool {
+func configuredRuleNames(lintConfiguration *configuration.Configuration) map[string]bool {
 	names := map[string]bool{}
 	for name, setting := range lintConfiguration.Rules {
 		normalized := differential.NormalizeRuleName(name)
@@ -406,7 +406,7 @@ func cohereOnlyRuleSettings(root string) map[string]json.RawMessage {
 // The check runs before either gate is launched, so a misplaced control costs a second rather than
 // two full lint runs and a misleading verdict.
 func checkControlsAreLintable(
-	lintConfiguration *configuration.Config,
+	lintConfiguration *configuration.Configuration,
 	controls []differential.Control,
 	extraVerifyRules []string,
 ) error {
@@ -461,7 +461,7 @@ func checkControlsAreLintable(
 // Returning the bare name when nothing matches is deliberate. It makes Enabled report unconfigured,
 // which is the correct answer for a rule the config genuinely does not mention, and it keeps this
 // helper from being the thing that decides a control is valid.
-func pluginQualified(lintConfiguration *configuration.Config, bareRuleName string) string {
+func pluginQualified(lintConfiguration *configuration.Configuration, bareRuleName string) string {
 	for name := range lintConfiguration.Rules {
 		if differential.NormalizeRuleName(name) == bareRuleName {
 			return name

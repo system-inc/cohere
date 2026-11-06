@@ -12,7 +12,7 @@ import "testing"
 func TestSettingForDeclinesAnAmbiguousBareName(test *testing.T) {
 	test.Parallel()
 
-	configuration := &Config{
+	configuration := &Configuration{
 		Rules: map[string]RuleSetting{
 			"@typescript-eslint/no-shadow": {Severity: SeverityError},
 			"nexus/no-shadow":              {Severity: SeverityOff},
@@ -39,7 +39,7 @@ func TestSettingForDeclinesAnAmbiguousBareName(test *testing.T) {
 func TestSettingForStillReconcilesABarePluginRule(test *testing.T) {
 	test.Parallel()
 
-	configuration := &Config{
+	configuration := &Configuration{
 		Rules: map[string]RuleSetting{"nexus/consistency-no-enum": {Severity: SeverityError}},
 		Root:  "/",
 	}

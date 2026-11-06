@@ -15,7 +15,7 @@ import (
  * ignoreClassWithStaticInitBlock, ignoreUsingDeclarations and reportUsedIgnorePattern, replayed through
  * upstream (#e1zk9s0). The corpus is every typescript-eslint 8.71.0 row that sets one of the three, plus
  * edge rows for the order of upstream's gates, each with the verdict the installed rule gave on the same
- * bytes under the same tsconfig; no_unused_vars_options_corpus_data_test.go says how it was built.
+ * bytes under the same tsconfig; no_unused_variables_options_corpus_data_test.go says how it was built.
  */
 
 // noUnusedVariablesUpstreamIds maps this rule's message ids to typescript-eslint's, the one place they differ.

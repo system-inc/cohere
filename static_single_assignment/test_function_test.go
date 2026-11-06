@@ -8,7 +8,7 @@ type testFunction struct {
 	table       map[ssa.BlockId]*testBlock
 	next        ssa.BlockId
 	identifiers []testIdentifier
-	params      []testPlace
+	parameters  []testPlace
 	returns     *testPlace
 	contextual  map[ssa.DeclarationId]bool
 	// variables maps a name to its declaration, for building.

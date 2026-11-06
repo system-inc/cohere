@@ -80,8 +80,8 @@ func DecodeMaxDepthOptions(raw []byte) (MaxDepthSettings, error) {
 	}
 
 	var object struct {
-		Maximum *int `json:"maximum"`
-		Max     *int `json:"max"`
+		Maximum           *int `json:"maximum"`
+		DeprecatedMaximum *int `json:"max"`
 	}
 	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &object); unmarshalOptionsError != nil {
 		return settings, unmarshalOptionsError
@@ -89,7 +89,7 @@ func DecodeMaxDepthOptions(raw []byte) (MaxDepthSettings, error) {
 
 	// Upstream's `hasOwn` guard: neither key present means the branch is never entered and the
 	// initialized default of 4 stands.
-	if object.Maximum == nil && object.Max == nil {
+	if object.Maximum == nil && object.DeprecatedMaximum == nil {
 		return settings, nil
 	}
 
@@ -97,9 +97,9 @@ func DecodeMaxDepthOptions(raw []byte) (MaxDepthSettings, error) {
 	switch {
 	case object.Maximum != nil && *object.Maximum != 0:
 		settings.Maximum = *object.Maximum
-	case object.Max != nil && *object.Max != 0:
-		settings.Maximum = *object.Max
-	case object.Max != nil:
+	case object.DeprecatedMaximum != nil && *object.DeprecatedMaximum != 0:
+		settings.Maximum = *object.DeprecatedMaximum
+	case object.DeprecatedMaximum != nil:
 		// `undefined || 0` and `0 || 0` both yield 0, so a `max` of zero wins whenever `maximum`
 		// is absent or is itself zero.
 		settings.Maximum = 0

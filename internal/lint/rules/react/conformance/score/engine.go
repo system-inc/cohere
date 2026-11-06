@@ -158,7 +158,7 @@ var Rules = map[string]RuleUnderTest{
 	},
 	"config": {
 		Upstream: "config",
-		Rule:     unconfigured(react.Config),
+		Rule:     unconfigured(react.Configuration),
 		Messages: map[string]UpstreamMessage{
 			"invalidTypeConfiguration": {Heading: "Error", Text: "Invalid type configuration for module"},
 		},

@@ -419,7 +419,7 @@ func TestScopeHandlesANilFunction(test *testing.T) {
 	if got := empty.RangeOf(1); got.IsSet() {
 		test.Error("the nil table must answer the unset range")
 	}
-	if got := empty.MemberRanges(); got == nil || got.Len() != 0 {
+	if got := empty.MemberRanges(); got == nil || got.Length() != 0 {
 		test.Error("the nil table's rewritten ranges must be empty rather than nil")
 	}
 	if got := ValidateScopes(nil, nil); got != nil {

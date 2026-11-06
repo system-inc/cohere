@@ -263,13 +263,13 @@ func TestNoMisusedPromisesDecodesOptionsThroughTheRegisteredDecoder(test *testin
 	decode := rule.DecodeOptionsInto[NoMisusedPromisesOptions]()
 
 	cases := []struct {
-		name   string
-		config string
-		assert func(test *testing.T, decoded NoMisusedPromisesOptions)
+		name          string
+		configuration string
+		assert        func(test *testing.T, decoded NoMisusedPromisesOptions)
 	}{
 		{
-			name:   "an explicit false on a check that defaults to true survives decoding",
-			config: `{"checksConditionals": false}`,
+			name:          "an explicit false on a check that defaults to true survives decoding",
+			configuration: `{"checksConditionals": false}`,
 			assert: func(test *testing.T, decoded NoMisusedPromisesOptions) {
 				if decoded.ChecksConditionals == nil {
 					test.Fatal(
@@ -282,8 +282,8 @@ func TestNoMisusedPromisesDecodesOptionsThroughTheRegisteredDecoder(test *testin
 			},
 		},
 		{
-			name:   "an omitted check decodes to nil so Run can apply the true default",
-			config: `{"checksSpreads": false}`,
+			name:          "an omitted check decodes to nil so Run can apply the true default",
+			configuration: `{"checksSpreads": false}`,
 			assert: func(test *testing.T, decoded NoMisusedPromisesOptions) {
 				if decoded.ChecksConditionals != nil {
 					test.Fatal("an omitted checksConditionals should stay nil for Run to default")
@@ -297,8 +297,8 @@ func TestNoMisusedPromisesDecodesOptionsThroughTheRegisteredDecoder(test *testin
 			// Upstream's spelling: the object form under checksVoidReturn itself. Until #4a4yse4 this
 			// row wrote tsgolint's `checksVoidReturnOpts`, a key upstream does not have, and upstream's
 			// own spelling failed to decode into a boolean.
-			name:   "the sub-flag object under checksVoidReturn turns the check on and binds onto ChecksVoidReturnOpts",
-			config: `{"checksVoidReturn": {"arguments": false, "attributes": true}}`,
+			name:          "the sub-flag object under checksVoidReturn turns the check on and binds onto ChecksVoidReturnOpts",
+			configuration: `{"checksVoidReturn": {"arguments": false, "attributes": true}}`,
 			assert: func(test *testing.T, decoded NoMisusedPromisesOptions) {
 				if decoded.ChecksVoidReturn == nil || !*decoded.ChecksVoidReturn {
 					test.Fatal(
@@ -320,8 +320,8 @@ func TestNoMisusedPromisesDecodesOptionsThroughTheRegisteredDecoder(test *testin
 			},
 		},
 		{
-			name:   "the boolean form of checksVoidReturn binds onto ChecksVoidReturn alone",
-			config: `{"checksVoidReturn": false}`,
+			name:          "the boolean form of checksVoidReturn binds onto ChecksVoidReturn alone",
+			configuration: `{"checksVoidReturn": false}`,
 			assert: func(test *testing.T, decoded NoMisusedPromisesOptions) {
 				if decoded.ChecksVoidReturn == nil || *decoded.ChecksVoidReturn {
 					test.Fatal("checksVoidReturn should have decoded to an explicit false")
@@ -336,9 +336,9 @@ func TestNoMisusedPromisesDecodesOptionsThroughTheRegisteredDecoder(test *testin
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			decoded, decodeError := decode([]byte(testCase.config))
+			decoded, decodeError := decode([]byte(testCase.configuration))
 			if decodeError != nil {
-				test.Fatalf("decoding %s: %v", testCase.config, decodeError)
+				test.Fatalf("decoding %s: %v", testCase.configuration, decodeError)
 			}
 			testCase.assert(test, decoded)
 		})

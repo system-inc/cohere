@@ -39,7 +39,7 @@ func (builder *ssaBuilder[G, F, B, P]) run() {
 		return
 	}
 	builder.states[entryId] = newSsaState[P]()
-	parameters := builder.graph.Params(builder.function)
+	parameters := builder.graph.Parameters(builder.function)
 	for index := range parameters {
 		builder.defineIn(entryId, &parameters[index])
 	}

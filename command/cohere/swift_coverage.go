@@ -84,10 +84,10 @@ func resolveSwiftCoverage(found *discovery) swiftCoverage {
 
 	answers := querySwiftCoverage(found.Root, swiftProjects)
 	for _, project := range swiftProjects {
-		if answer := answers[project.Directory]; answer.err != nil {
+		if answer := answers[project.Directory]; answer.queryError != nil {
 			decided.FailedQueries = append(
 				decided.FailedQueries,
-				failedCoverageQuery{Label: projectLabel(project), Reason: answer.err.Error()},
+				failedCoverageQuery{Label: projectLabel(project), Reason: answer.queryError.Error()},
 			)
 		}
 	}
@@ -108,7 +108,7 @@ func resolveSwiftCoverage(found *discovery) swiftCoverage {
 			continue
 		}
 		running = append(running, project)
-		if answer := answers[project.Directory]; answer.err == nil {
+		if answer := answers[project.Directory]; answer.queryError == nil {
 			coverers = append(coverers, answer.covered)
 		}
 	}
@@ -143,8 +143,8 @@ func coveredByAny(coverers []coveredPackages, directory string, label string) (c
 
 // coverageAnswer is one project's query, answered or failed.
 type coverageAnswer struct {
-	covered coveredPackages
-	err     error
+	covered    coveredPackages
+	queryError error
 }
 
 // querySwiftCoverage asks every Swift project's coverage, several at once, by the project's directory. An
@@ -170,7 +170,7 @@ func querySwiftCoverage(root string, projects []discoveredProject) map[string]co
 	if resolveSwiftEngineBinaryError != nil {
 		for _, project := range projects {
 			answers[project.Directory] = coverageAnswer{
-				err: fmt.Errorf("resolving the Swift engine: %w", resolveSwiftEngineBinaryError),
+				queryError: fmt.Errorf("resolving the Swift engine: %w", resolveSwiftEngineBinaryError),
 			}
 		}
 		return answers
@@ -186,7 +186,7 @@ func querySwiftCoverage(root string, projects []discoveredProject) map[string]co
 			querying <- struct{}{}
 			record, queryCoveredPackagesError := queryCoveredPackages(binaryPath, directories[index], cacheOff)
 			<-querying
-			answer := coverageAnswer{err: queryCoveredPackagesError}
+			answer := coverageAnswer{queryError: queryCoveredPackagesError}
 			if queryCoveredPackagesError == nil {
 				answer.covered = coveredPackages{
 					label:     projectLabel(project),

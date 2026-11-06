@@ -10,7 +10,8 @@ package core
 // (@typescript-eslint/eslint-plugin 8.71.0, one program per row) under noUnusedVarsOptionsCorpusTsconfig, on the bytes
 // this harness writes: the source trimmed plus one newline. A row upstream parses as a module with no import or
 // export gets `export {};` appended (exportAppended), since cohere's module is TypeScript's. Each finding records
-// upstream's message id and the exact text its location covers. TestNoUnusedVarsOptionsUpstreamCorpus replays this.
+// upstream's message id and the exact text its location covers. TestNoUnusedVariablesOptionsUpstreamCorpus replays
+// this.
 
 // noUnusedVarsOptionsCorpusTsconfig is the options tests' tsconfig, with the disposable lib `using` needs.
 const noUnusedVarsOptionsCorpusTsconfig = "{\n \"compilerOptions\": {\n  \"strict\": true,\n  \"target\": \"ES2022\",\n  \"lib\": [\n   \"ES2022\",\n   \"ESNext.Disposable\"\n  ],\n  \"types\": []\n },\n \"include\": [\n  \"file.ts\"\n ]\n}"

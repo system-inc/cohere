@@ -339,7 +339,7 @@ func (writer *jsonWriter) value(value ScalarValue) {
 	}
 }
 
-func (writer *jsonWriter) srcToken(token *cst.Token) {
+func (writer *jsonWriter) sourceToken(token *cst.Token) {
 	id, found := writer.tokenIdentifiers[token]
 	if !found {
 		writer.text(fmt.Sprintf("foreign %s@%d", token.Type, token.Offset))
@@ -365,7 +365,7 @@ func (writer *jsonWriter) node(node *Node) {
 	}
 	if node.SourceToken != nil {
 		writer.key(&first, "srcToken")
-		writer.srcToken(node.SourceToken)
+		writer.sourceToken(node.SourceToken)
 	} else if node.SourceItem != nil {
 		writer.key(&first, "srcToken")
 		if id, found := writer.itemIdentifiers[node.SourceItem]; found {

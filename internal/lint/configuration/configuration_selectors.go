@@ -24,7 +24,7 @@ import (
 // not have (`**/*.generated.*`), not paths in this one, so a project with no generated file is not a
 // broken config, and refusing it would make every outsider's zero-config run fail on the house's
 // patterns rather than its own.
-func (configuration *Config) ValidateSelectors(fileNames []string) error {
+func (configuration *Configuration) ValidateSelectors(fileNames []string) error {
 	// Each file split once and each pattern compiled once, rather than both on every pairing (#hsd2dfb).
 	globs := configuration.globs()
 	lintable := make([][]string, 0, len(fileNames))

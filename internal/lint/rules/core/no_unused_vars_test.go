@@ -99,7 +99,7 @@ func TestNoUnusedVariablesMessageIdAndDescription(test *testing.T) {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 
-			var options rule.Given[NoUnusedVarsOptions]
+			var options rule.Given[NoUnusedVariablesOptions]
 			if testCase.options != "" {
 				decoded, decodeNoUnusedVariablesOptionsError := DecodeNoUnusedVariablesOptions(
 					json.RawMessage(testCase.options),
@@ -840,9 +840,9 @@ func TestNoUnusedVariablesTreatsADecoratedClassOrParameterAsUsed(test *testing.T
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			var options rule.Given[NoUnusedVarsOptions]
+			var options rule.Given[NoUnusedVariablesOptions]
 			if strings.Contains(testCase.name, "args all") {
-				options = rule.Configured(NoUnusedVarsOptions{Arguments: "all"})
+				options = rule.Configured(NoUnusedVariablesOptions{Arguments: "all"})
 			}
 			result := rule_testing.RunTypedGiven(test, NoUnusedVariables, "a.ts", testCase.source, options)
 			var got []string

@@ -71,8 +71,8 @@ func darwinAvailableMemory(pageSize, free, fileBacked, purgeable uint64) uint64 
 // linuxCgroupMemory is what a cgroup says about this process's memory, each file's raw bytes, any of
 // them missing outside a container or under the other cgroup version.
 type linuxCgroupMemory struct {
-	v2Max, v2Current []byte // memory.max, memory.current
-	v1Limit, v1Usage []byte // memory/memory.limit_in_bytes, memory/memory.usage_in_bytes
+	v2Maximum, v2Current []byte // memory.max, memory.current
+	v1Limit, v1Usage     []byte // memory/memory.limit_in_bytes, memory/memory.usage_in_bytes
 }
 
 // linuxAvailableMemory is MemAvailable from /proc/meminfo, lowered to the room left under the cgroup's
@@ -100,7 +100,7 @@ func linuxAvailableMemory(meminfo []byte, cgroup linuxCgroupMemory) (uint64, err
 	if !found {
 		return 0, fmt.Errorf("/proc/meminfo has no MemAvailable line")
 	}
-	for _, pair := range [][2][]byte{{cgroup.v2Max, cgroup.v2Current}, {cgroup.v1Limit, cgroup.v1Usage}} {
+	for _, pair := range [][2][]byte{{cgroup.v2Maximum, cgroup.v2Current}, {cgroup.v1Limit, cgroup.v1Usage}} {
 		// memory.max reads "max" when there is no limit, which fails the parse and so applies none.
 		limit, parseError := strconv.ParseUint(strings.TrimSpace(string(pair[0])), 10, 64)
 		if parseError != nil {

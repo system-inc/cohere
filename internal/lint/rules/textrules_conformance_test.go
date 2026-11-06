@@ -28,7 +28,7 @@ var textRulesProbeRules = map[string]string{"nexus/consistency-no-abbreviated-id
 
 // textRulesHouse is the house configuration loaded once per test, which each case's own file resolves through.
 type textRulesHouse struct {
-	loaded *configuration.Config
+	loaded *configuration.Configuration
 	// directory is where the settings file sits, which a case's project-relative file name resolves under, so
 	// the house's overrides (`**/*.generated.*` under max-lines) reach it as they reach a project's file.
 	directory string

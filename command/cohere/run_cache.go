@@ -1027,8 +1027,8 @@ func compilerOptionsFacts(graph *program.Graph, location projectLocation) ([]str
 	if fileFactError := fileFact("tsconfig", location.ConfigFileName); fileFactError != nil {
 		return nil, fileFactError
 	}
-	if graph.Config != nil {
-		for _, extended := range graph.Config.ExtendedSourceFiles() {
+	if graph.Configuration != nil {
+		for _, extended := range graph.Configuration.ExtendedSourceFiles() {
 			if fileFactError := fileFact("extends", extended.AsString()); fileFactError != nil {
 				return nil, fileFactError
 			}

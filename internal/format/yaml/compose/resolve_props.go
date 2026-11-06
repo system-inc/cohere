@@ -16,8 +16,8 @@ type resolvePropsOptions struct {
 	startOnNewline bool
 }
 
-// props is resolveProps's result. A token field is nil for upstream's null.
-type props struct {
+// properties is resolveProps's result. A token field is nil for upstream's null.
+type properties struct {
 	comma                *cst.Token
 	found                *cst.Token
 	spaceBefore          bool
@@ -30,7 +30,7 @@ type props struct {
 	start                int
 }
 
-func resolveProperties(tokens []*cst.Token, options resolvePropsOptions) props {
+func resolveProperties(tokens []*cst.Token, options resolvePropsOptions) properties {
 	flow, indicator, next, onError := options.flow, options.indicator, options.next, options.onError
 	spaceBefore := false
 	atNewline := options.startOnNewline
@@ -194,7 +194,7 @@ func resolveProperties(tokens []*cst.Token, options resolvePropsOptions) props {
 	if !startSet {
 		start = end
 	}
-	return props{
+	return properties{
 		comma:                comma,
 		found:                found,
 		spaceBefore:          spaceBefore,

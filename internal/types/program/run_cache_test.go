@@ -15,30 +15,30 @@ import (
 
 // runCacheTree is a small project: two sources in nested directories, a config, and the key.
 type runCacheTree struct {
-	root    string
-	sourceA string
-	sourceB string
-	config  string
-	subdir  string
-	files   []string
-	absent  []string
-	key     string
+	root          string
+	sourceA       string
+	sourceB       string
+	configuration string
+	subdir        string
+	files         []string
+	absent        []string
+	key           string
 }
 
 func newRunCacheTree(test *testing.T) *runCacheTree {
 	test.Helper()
 	root := test.TempDir()
 	tree := &runCacheTree{
-		root:    root,
-		sourceA: filepath.Join(root, "source", "a.ts"),
-		subdir:  filepath.Join(root, "source", "nested"),
-		config:  filepath.Join(root, "tsconfig.json"),
+		root:          root,
+		sourceA:       filepath.Join(root, "source", "a.ts"),
+		subdir:        filepath.Join(root, "source", "nested"),
+		configuration: filepath.Join(root, "tsconfig.json"),
 	}
 	tree.sourceB = filepath.Join(tree.subdir, "b.ts")
 	writeFile(test, tree.sourceA, "export const a = 1;\n")
 	writeFile(test, tree.sourceB, "export const b = 2;\n")
-	writeFile(test, tree.config, `{"include":["source"]}`)
-	tree.files = []string{tree.sourceA, tree.sourceB, tree.config}
+	writeFile(test, tree.configuration, `{"include":["source"]}`)
+	tree.files = []string{tree.sourceA, tree.sourceB, tree.configuration}
 	// Absent inputs sit in their own directory, which no recorded file shares, so the absence check is
 	// the only thing that can notice one appearing. See the "absent now exists" case.
 	tree.absent = []string{filepath.Join(root, "unwatched", ".cohererc")}
@@ -149,8 +149,8 @@ func TestRunCacheInvalidatesOnEveryInputCategory(test *testing.T) {
 			writeFile(test, filepath.Join(tree.subdir, "added.ts"), "export const x = 4;\n")
 		}},
 		{"the config changes", func(test *testing.T, tree *runCacheTree) {
-			waitForClock(test, tree.config)
-			writeFile(test, tree.config, `{"include":["source","more"]}`)
+			waitForClock(test, tree.configuration)
+			writeFile(test, tree.configuration, `{"include":["source","more"]}`)
 		}},
 		// The absent input lives in a directory nothing else is watched in, on purpose. Placed beside
 		// a watched file, creating it would also move that directory's mtime and the directory check

@@ -17,7 +17,7 @@ import (
 // are still counted once for every file rather than once for every selection.
 func TestFilesThatResolveAlikeShareOneSelectionAndStillCountPerFile(test *testing.T) {
 	test.Parallel()
-	graph := &Graph{LintConfiguration: &configuration.Config{
+	graph := &Graph{LintConfiguration: &configuration.Configuration{
 		Rules: map[string]configuration.RuleSetting{
 			"runs": {Severity: configuration.SeverityError},
 			"off":  {Severity: configuration.SeverityOff},
@@ -101,7 +101,7 @@ func TestSelectionsFingerprintADerivedRuleOncePerOptionsForTheWholeWalk(test *te
 	}
 	rules := []rule.Entry{derivedEntry}
 	graph := &Graph{
-		LintConfiguration: &configuration.Config{
+		LintConfiguration: &configuration.Configuration{
 			Rules: map[string]configuration.RuleSetting{"derived": setting("red")},
 			Overrides: []configuration.Override{
 				{

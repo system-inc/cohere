@@ -472,8 +472,8 @@ func parseContentPackIndex(index []byte) (string, map[string]contentPackEntry, e
 			checksum: reader.uint32(),
 		}
 	}
-	if reader.err != nil {
-		return "", nil, reader.err
+	if reader.readError != nil {
+		return "", nil, reader.readError
 	}
 	if len(reader.data) != reader.position {
 		return "", nil, errors.New("bytes follow its last entry")
