@@ -8,7 +8,7 @@ import (
 )
 
 // consistencyNoUtilsFolderAtProject is the rule's options as a run rooted at `/project` decodes them.
-var consistencyNoUtilsFolderAtProject = ConsistencyNoUtilsFolderOptions{ProjectRoot: "/project"}
+var consistencyNoUtilsFolderAtProject = ProjectRootOptions{ProjectRoot: "/project"}
 
 func TestConsistencyNoUtilsFolderFires(test *testing.T) {
 	test.Parallel()
@@ -141,7 +141,7 @@ func TestConsistencyNoUtilsFolderJudgesOnlyInsideTheProject(test *testing.T) {
 				ConsistencyNoUtilsFolder,
 				testCase.fileName,
 				"export const Value = 1;\n",
-				ConsistencyNoUtilsFolderOptions{ProjectRoot: testCase.projectRoot},
+				ProjectRootOptions{ProjectRoot: testCase.projectRoot},
 			)
 			rule_testing.ExpectClean(test, result)
 		})
@@ -152,7 +152,7 @@ func TestConsistencyNoUtilsFolderJudgesOnlyInsideTheProject(test *testing.T) {
 		ConsistencyNoUtilsFolder,
 		"/checkouts/utils/project/source/utils/Thing.ts",
 		"export const Value = 1;\n",
-		ConsistencyNoUtilsFolderOptions{ProjectRoot: "/checkouts/utils/project"},
+		ProjectRootOptions{ProjectRoot: "/checkouts/utils/project"},
 	)
 	rule_testing.ExpectFindings(test, inside, "noUtils")
 }
@@ -162,7 +162,7 @@ func TestConsistencyNoUtilsFolderJudgesOnlyInsideTheProject(test *testing.T) {
 func TestConsistencyNoUtilsFolderJudgesNothingWithoutARoot(test *testing.T) {
 	test.Parallel()
 
-	unconfigured := rule.Bind(ConsistencyNoUtilsFolder, rule.Given[ConsistencyNoUtilsFolderOptions]{})
+	unconfigured := rule.Bind(ConsistencyNoUtilsFolder, rule.Given[ProjectRootOptions]{})
 	result := rule_testing.RunBound(test, unconfigured, "/project/source/utils/Thing.ts", "export const Value = 1;\n")
 	rule_testing.ExpectClean(test, result)
 }

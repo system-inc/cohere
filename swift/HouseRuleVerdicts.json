@@ -246,6 +246,12 @@
     "reason": "A bare `return` in a non-Void Swift function is a compile error and `nil` must always be written, so the two spellings cannot be confused."
   },
   {
+    "typeScriptRule": "nexus/consistency-require-separated-folder-words",
+    "verdict": "Port",
+    "swiftRule": null,
+    "reason": "A Swift package's folders run words together as any project's do, and the text rules corpus holds the family, so the port reads the same judgment through policy's words (#2fnqe2h)."
+  },
+  {
     "typeScriptRule": "nexus/consistency-require-type-suffix",
     "verdict": "NotApplicable",
     "swiftRule": null,

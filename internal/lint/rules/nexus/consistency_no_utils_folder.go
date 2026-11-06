@@ -1,11 +1,9 @@
 package nexus
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/policy"
 )
@@ -30,38 +28,6 @@ func messageUtilsFolder(folder string) rule.Message {
 	}
 }
 
-// ConsistencyNoUtilsFolderOptions is never written in a config, since the rule takes no options and its
-// decoder refuses any. It carries the project root the run discovered, the one place a rule learns it, so
-// only the folders inside the project are judged.
-type ConsistencyNoUtilsFolderOptions struct {
-	// ProjectRoot is the project's absolute root, spelled as tspath spells a file name.
-	ProjectRoot string `json:"-"`
-}
-
-// decodeConsistencyNoUtilsFolderOptions takes the project root from the run, for a bare severity, and refuses
-// any option element, as the config layer refuses one for a rule with no decoder.
-//
-// With no root known it fails, and the config layer then runs the rule unconfigured, which judges nothing. A
-// lint run always knows its root; a harness that hands no base is the only caller left without one.
-func decodeConsistencyNoUtilsFolderOptions(
-	raw []byte,
-	base rule.OptionsBase,
-) (ConsistencyNoUtilsFolderOptions, error) {
-	if len(raw) > 0 {
-		return ConsistencyNoUtilsFolderOptions{}, fmt.Errorf(
-			"the rule takes no options, and the config gives it %s, which it would never read. "+
-				"Remove the options or write the bare severity",
-			raw,
-		)
-	}
-	if base.ProjectRoot == "" {
-		return ConsistencyNoUtilsFolderOptions{}, fmt.Errorf(
-			"no project root is known, so no folder inside the project could be told from one above it",
-		)
-	}
-	return ConsistencyNoUtilsFolderOptions{ProjectRoot: tspath.NormalizePath(base.ProjectRoot)}, nil
-}
-
 // ConsistencyNoUtilsFolder bans a folder named `util` or `utils` inside the project, in any casing and
 // with any leading underscores: a folder's name is judged lowercased with its leading underscores
 // removed, the verdict every engine gives in the text rules corpus (#4b337jk, family `utils-folder`).
@@ -77,12 +43,12 @@ func decodeConsistencyNoUtilsFolderOptions(
 //
 // This rule reads only the path, so it is the cheapest kind of rule there is: it decides on a
 // string and declines the file before any node is visited.
-var ConsistencyNoUtilsFolder = rule.Rule[ConsistencyNoUtilsFolderOptions]{
+var ConsistencyNoUtilsFolder = rule.Rule[ProjectRootOptions]{
 	Name:       "nexus/consistency-no-utils-folder",
 	NoListener: rule.NoListenerDeclinesIrrelevantFiles,
 	Run: func(
 		ruleContext rule.Context,
-		options rule.Given[ConsistencyNoUtilsFolderOptions],
+		options rule.Given[ProjectRootOptions],
 	) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
@@ -113,14 +79,13 @@ var ConsistencyNoUtilsFolder = rule.Rule[ConsistencyNoUtilsFolderOptions]{
 // and false when there is none or the file is not under the root. The file's own name is never a folder:
 // `utils.ts` is a file name.
 func outermostUtilsFolder(projectRoot string, fileName string) (string, bool) {
-	relative, under := strings.CutPrefix(fileName, strings.TrimSuffix(projectRoot, "/")+"/")
+	folders, under := foldersInProject(projectRoot, fileName)
 	if !under {
 		return "", false
 	}
-	segments := strings.Split(relative, "/")
-	for _, segment := range segments[:len(segments)-1] {
-		if isUtilsFolder(segment) {
-			return segment, true
+	for _, folder := range folders {
+		if isUtilsFolder(folder) {
+			return folder, true
 		}
 	}
 	return "", false

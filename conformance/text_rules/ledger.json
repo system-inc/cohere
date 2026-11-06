@@ -40,12 +40,6 @@
         "reason": "`no-labels` reports the `continue` and the `break` naming the label too, three findings for one label"
     },
     {
-        "engine": "typescript",
-        "family": "separated-folder-words",
-        "task": "narw7aq",
-        "reason": "TypeScript has no separated-folder-words rule"
-    },
-    {
         "engine": "go",
         "family": "separated-folder-words",
         "case": "fw00",
