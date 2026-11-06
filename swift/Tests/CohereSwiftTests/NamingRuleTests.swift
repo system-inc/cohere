@@ -13,6 +13,10 @@ struct NamingRuleTests {
         try AbbreviationVocabulary.compiledIn()
     }
 
+    static func brands() throws -> BrandVocabulary {
+        try BrandVocabulary.compiledIn()
+    }
+
     static func file(_ source: String, name: String = "Subject.swift") -> ParsedFile {
         ParsedFile(
             url: URL(fileURLWithPath: "/fixture/\(name)"),
@@ -264,7 +268,7 @@ struct NamingRuleTests {
         #expect(Self.flagged(ConsistencyNoAbbreviatedIdentifier(vocabulary: try Self.vocabulary()), source).isEmpty)
     }
 
-    @Test func lowerCamelCaseIsSwiftFormatsOwnRule() {
+    @Test func lowerCamelCaseIsSwiftFormatsOwnRule() throws {
         let source = """
             import XCTest
             let max_bytes = 1
@@ -273,12 +277,18 @@ struct NamingRuleTests {
                 func test_scrolls_to_bottom() {}
             }
             """
-        #expect(Self.flagged(SwiftFormatRule.requireLowerCamelCase, source) == ["max_bytes:2", "LoadAll:3"])
+        #expect(
+            Self.flagged(SwiftFormatRule.requireLowerCamelCase(brands: try Self.brands()), source) == [
+                "max_bytes:2", "LoadAll:3",
+            ]
+        )
     }
 
     /* swift-format's text, made a sentence, then the house's reason, filed under the catalog's id. */
-    @Test func lowerCamelCaseSaysSwiftFormatsWordsAndTheReason() {
-        let findings = SwiftFormatRule.requireLowerCamelCase.findings(in: Self.file("let max_bytes = 1"))
+    @Test func lowerCamelCaseSaysSwiftFormatsWordsAndTheReason() throws {
+        let findings = SwiftFormatRule.requireLowerCamelCase(brands: try Self.brands()).findings(
+            in: Self.file("let max_bytes = 1")
+        )
         #expect(findings.map(\.messageId) == ["alwaysUseLowerCamelCase"])
         #expect(
             findings.first?.message
@@ -288,7 +298,9 @@ struct NamingRuleTests {
 
     /* A finding covers the name swift-format pointed at, from its first byte to its last, counted in UTF-8 bytes. */
     @Test func lowerCamelCaseCoversTheName() throws {
-        let findings = SwiftFormatRule.requireLowerCamelCase.findings(in: Self.file("let café = 1, max_bytes = 2"))
+        let findings = SwiftFormatRule.requireLowerCamelCase(brands: try Self.brands()).findings(
+            in: Self.file("let café = 1, max_bytes = 2")
+        )
         let finding = try #require(findings.first)
         #expect(findings.count == 1)
         #expect(finding.line == 1 && finding.column == 16)
@@ -296,7 +308,7 @@ struct NamingRuleTests {
     }
 
     /* Types are UpperCamelCase with no `_` inside, which swift-format leaves alone, under their own message. */
-    @Test func typesAreUpperCamelCase() {
+    @Test func typesAreUpperCamelCase() throws {
         let source = """
             struct Order_Line<element_Type> {}
             final class lowercaseWidget {}
@@ -308,19 +320,51 @@ struct NamingRuleTests {
             struct _Storage {}
             """
         #expect(
-            Self.flagged(SwiftFormatRule.requireLowerCamelCase, source) == [
+            Self.flagged(SwiftFormatRule.requireLowerCamelCase(brands: try Self.brands()), source) == [
                 "Order_Line:1", "element_Type:1", "lowercaseWidget:2", "Shape_Kind:3", "Drawing_Surface:4", "canvas:4",
                 "Ledger_Writer:5", "row_Index:6",
             ]
         )
-        let finding = SwiftFormatRule.requireLowerCamelCase.findings(in: Self.file("struct Order_Line {}")).first
+        let finding = SwiftFormatRule.requireLowerCamelCase(brands: try Self.brands()).findings(
+            in: Self.file("struct Order_Line {}")
+        ).first
         #expect(finding?.messageId == "alwaysUseUpperCamelCaseForType")
         #expect(finding?.message.hasPrefix("Rename the struct 'Order_Line' using UpperCamelCase. Swift spells") == true)
         #expect(finding?.column == 8 && finding?.endColumn == 18)
     }
 
+    /*
+     A type may open with a brand policy/Brands.json lists, spelled as its owner spells it, alone or before an
+     UpperCamelCase rest (us12), TypeScript's verdict. A brand spelled otherwise, a rest that opens lowercase or on an
+     `_`, and a lowercase opening no brand explains are reported (us13), and a brand inside a name is ordinary casing.
+     */
+    @Test func aTypeMayOpenWithAListedBrand() throws {
+        let source = """
+            struct iMessageThing {}
+            enum iMessage {}
+            protocol iMessageCommandLineInterface {}
+            struct SendIMessage {}
+            struct iMessagething {}
+            struct iMessage_Thing {}
+            struct imessageThing {}
+            struct fooThing {}
+            """
+        #expect(
+            Self.flagged(SwiftFormatRule.requireLowerCamelCase(brands: try Self.brands()), source) == [
+                "iMessagething:5", "iMessage_Thing:6", "imessageThing:7", "fooThing:8",
+            ]
+        )
+        /* The same names with no brand read report every lowercase opening, so the passes above are the brands' doing. */
+        #expect(
+            Self.flagged(SwiftFormatRule.requireLowerCamelCase(brands: BrandVocabulary()), source) == [
+                "iMessageThing:1", "iMessage:2", "iMessageCommandLineInterface:3", "iMessagething:5",
+                "iMessage_Thing:6", "imessageThing:7", "fooThing:8",
+            ]
+        )
+    }
+
     /* A value spelled exactly as the external name it reads is the owner's spelling, and is not judged. */
-    @Test func aValueMirroringTheNameItReadsIsNotJudged() {
+    @Test func aValueMirroringTheNameItReadsIsNotJudged() throws {
         let source = """
             import Darwin
             let DATABASE_URL = ProcessInfo.processInfo.environment["DATABASE_URL"] ?? ""
@@ -333,11 +377,13 @@ struct NamingRuleTests {
                 guard let MAX_SIZE = MAX_SIZE else { return }
             }
             """
-        #expect(Self.flagged(SwiftFormatRule.requireLowerCamelCase, source) == ["MAX_SIZE:7"])
+        #expect(
+            Self.flagged(SwiftFormatRule.requireLowerCamelCase(brands: try Self.brands()), source) == ["MAX_SIZE:7"]
+        )
     }
 
     /* The mirror is exact and read: a renamed upstream value, a key under another name, or a literal held is ours. */
-    @Test func aValueThatMirrorsNothingIsJudged() {
+    @Test func aValueThatMirrorsNothingIsJudged() throws {
         let source = """
             let O_RDONLY_MODE = O_RDONLY
             let DATABASE_ADDRESS = ProcessInfo.processInfo.environment["DATABASE_URL"]
@@ -347,7 +393,7 @@ struct NamingRuleTests {
             if let CACHE_SIZE = limits["cache_size"] {}
             """
         #expect(
-            Self.flagged(SwiftFormatRule.requireLowerCamelCase, source) == [
+            Self.flagged(SwiftFormatRule.requireLowerCamelCase(brands: try Self.brands()), source) == [
                 "O_RDONLY_MODE:1", "DATABASE_ADDRESS:2", "API_KEY:3", "SECRET_NAME:4", "TOKEN_VALUE:5", "CACHE_SIZE:6",
             ]
         )
