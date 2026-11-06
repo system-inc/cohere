@@ -15,6 +15,14 @@ plus the `ISO` 4217 currency codes), carries a digit or an underscore, is a two-
 or has no vowel. Code is masked first: fenced blocks, backticks, double-quoted strings, single-quoted
 tokens, single-quoted capital phrases, `@example` blocks, and command lines.
 
+A run of `//` comments on consecutive lines, with nothing but whitespace between them, is masked as
+one text, as a block comment is, so a backtick pair or a fence wrapped across its lines masks what it
+holds. A blank line, code between two comments, or a block comment ends the run. The generated-code
+marker, `// Code generated ... DO NOT EDIT.` before the file's first token, is not read: its capitals
+are fixed by go.dev/s/generatedcode, which tools match exactly. Each finding covers one shouted word,
+each occurrence, and names it. The text rules corpus holds all three (`sh04`, `sh05`, `sh10`, and the
+span cases), task #34fejeq.
+
 The safe list and the masks live in `internal/shouting/shouting.go`, which the Go engine's
 `cohere-go/consistency-no-shouting` reads too, so both engines agree on what an acronym is.
 
@@ -67,5 +75,8 @@ Go port afterwards and belongs in the original's list too.
   comment is masked. Recorded in `maskCommandLines`.
 
 Fixtures: `TestConsistencyNoShoutingKnowsTheAcronymsTheReviewFound` (the review's lines verbatim, both
-directions), `TestConsistencyNoShoutingMasksASingleQuotedCapitalPhrase` and
-`TestConsistencyNoShoutingMasksADoubleQuoteThatWraps`.
+directions), `TestConsistencyNoShoutingMasksASingleQuotedCapitalPhrase`,
+`TestConsistencyNoShoutingMasksADoubleQuoteThatWraps`,
+`TestConsistencyNoShoutingMasksARunOfLineCommentsAsOneText`,
+`TestConsistencyNoShoutingSetsAsideTheGeneratedMarker` and
+`TestConsistencyNoShoutingReportsEachWordAtTheWord`.

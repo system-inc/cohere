@@ -178,22 +178,14 @@ type projectRun struct {
 // TanStack Query's 95 projects started at once were 95 graphs in memory, and more children than that buys no
 // time the cores do not already give one.
 func runProjects(found discovery, arguments []string, out *bufio.Writer) int {
-	// failures is where this run's own failure lines go: with the report in the human views, and on stderr
-	// under `--json`, whose stdout is records only.
-	failures := out
-	if activeOutput.Mode == outputJson {
-		failures = streams.Errors
-	}
 	executable, executableError := os.Executable()
 	if executableError != nil {
-		fmt.Fprintf(failures, "cohere: %s\n",
-			sentence.FromError(fmt.Errorf("finding this binary to run each project: %w", executableError)))
+		failRunProjects(out, fmt.Errorf("finding this binary to run each project: %w", executableError))
 		return 1
 	}
 	yieldDirectory, temporaryDirectoryError := os.MkdirTemp("", "cohere-yield-")
 	if temporaryDirectoryError != nil {
-		fmt.Fprintf(failures, "cohere: %s\n",
-			sentence.FromError(fmt.Errorf("making a place for what each project yields: %w", temporaryDirectoryError)))
+		failRunProjects(out, fmt.Errorf("making a place for what each project yields: %w", temporaryDirectoryError))
 		return 1
 	}
 	// Ignored: a temporary directory that outlives the run costs only its space, and nothing reads it again.
@@ -271,10 +263,15 @@ func runProjects(found discovery, arguments []string, out *bufio.Writer) int {
 		// file it could not format, goes to stderr, where a single project's run puts it too.
 		streams.Errors.Write(checked.standardError)
 		if checked.runError != nil {
-			fmt.Fprintf(failures, "cohere: %s\n",
-				sentence.FromError(
-					fmt.Errorf("the %s run did not finish: %w", checked.project.Engine, checked.runError),
-				))
+			unfinished := fmt.Errorf("the %s run did not finish: %w", checked.project.Engine, checked.runError)
+			failureLine(out, unfinished)
+			// Under `--json` the project's record says it too, since a run that never finished printed none.
+			if activeOutput.Mode == outputJson {
+				line := summaryAsJson(runSummary{Label: projectLabel(checked.project), Total: checked.elapsed})
+				line.Verdict = "fail"
+				line.Error = sentence.FromError(unfinished)
+				writeJsonLine(out, line)
+			}
 		}
 		// Each project's stderr where its section is, as when it was written straight to the terminal.
 		showWarning()
@@ -317,6 +314,23 @@ func runProjects(found discovery, arguments []string, out *bufio.Writer) int {
 		return 128 + received
 	}
 	return worst
+}
+
+// failRunProjects says why the projects could not be run at all: as a failure line, and under `--json` as a
+// failed summary line too, so the stream still ends on one.
+func failRunProjects(out *bufio.Writer, runError error) {
+	failureLine(out, runError)
+	writeFailedRunSummary(out, runError)
+}
+
+// failureLine is one of this run's own failure lines, as the sentence a person reads: with the report in the
+// human views, and on stderr under `--json`, whose stdout is records only.
+func failureLine(out *bufio.Writer, runError error) {
+	failures := out
+	if activeOutput.Mode == outputJson {
+		failures = streams.Errors
+	}
+	fmt.Fprintf(failures, "cohere: %s\n", sentence.FromError(runError))
 }
 
 // overallFactsOf is what the overall verdict says of the projects' runs: how many of each engine, the ones

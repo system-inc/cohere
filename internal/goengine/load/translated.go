@@ -17,8 +17,10 @@ func translated(workspace string, patterns []string, environment []string) ([]*p
 		return nil, nil, environmentError
 	}
 	roots, loadError := packages.Load(&packages.Config{
-		// ForTest is what tells a test variant from the package it tests without reading the opaque ID.
-		Mode:  packages.LoadAllSyntax | packages.NeedForTest,
+		// ForTest is what tells a test variant from the package it tests without reading the opaque ID. Module is
+		// what gives a pass its module's path, so a rule that judges a package's path below its module root, as
+		// consistency_no_utils_folder does, never judges the module's own name, which nobody inside it can rename.
+		Mode:  packages.LoadAllSyntax | packages.NeedForTest | packages.NeedModule,
 		Tests: true,
 		Dir:   workspace,
 		Env:   fullEnvironment,

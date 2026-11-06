@@ -222,6 +222,12 @@
     "reason": null
   },
   {
+    "typeScriptRule": "nexus/consistency-no-warning-comment",
+    "verdict": "Ported",
+    "swiftRule": "cohere-swift/todo",
+    "reason": null
+  },
+  {
     "typeScriptRule": "nexus/consistency-require-constant-casing",
     "verdict": "NotApplicable",
     "swiftRule": null,

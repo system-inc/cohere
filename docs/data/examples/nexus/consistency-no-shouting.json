@@ -6,11 +6,27 @@
         "findings": [
             {
                 "line": 1,
-                "column": 1,
+                "column": 4,
+                "endLine": 1,
+                "endColumn": 6,
+                "messageId": "shoutingInComment",
+                "message": "\"DO\" in a comment reads as shouting, and the register spreads: the next reader mirrors it, so emphasis on everything becomes emphasis on nothing. If it is code, put it in backticks. If it is a point, make it in a normal voice, and if the sentence needed the volume to land, it probably needed the reason instead."
+            },
+            {
+                "line": 1,
+                "column": 7,
+                "endLine": 1,
+                "endColumn": 10,
+                "messageId": "shoutingInComment",
+                "message": "\"NOT\" in a comment reads as shouting, and the register spreads: the next reader mirrors it, so emphasis on everything becomes emphasis on nothing. If it is code, put it in backticks. If it is a point, make it in a normal voice, and if the sentence needed the volume to land, it probably needed the reason instead."
+            },
+            {
+                "line": 1,
+                "column": 11,
                 "endLine": 1,
                 "endColumn": 15,
                 "messageId": "shoutingInComment",
-                "message": "\"DO\", \"NOT\", \"EDIT\" in a comment reads as shouting, and the register spreads: the next reader mirrors it, so emphasis on everything becomes emphasis on nothing. If it is code, put it in backticks. If it is a point, make it in a normal voice, and if the sentence needed the volume to land, it probably needed the reason instead."
+                "message": "\"EDIT\" in a comment reads as shouting, and the register spreads: the next reader mirrors it, so emphasis on everything becomes emphasis on nothing. If it is code, put it in backticks. If it is a point, make it in a normal voice, and if the sentence needed the volume to land, it probably needed the reason instead."
             }
         ]
     },

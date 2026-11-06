@@ -1,5 +1,6 @@
 {
   "rules": {
+    "TypeScript": "nexus/consistency-no-warning-comment",
     "Go": "cohere-go/consistency-no-warning-comment"
   },
   "messages": {

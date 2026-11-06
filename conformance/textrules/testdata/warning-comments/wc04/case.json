@@ -1,0 +1,16 @@
+{
+    "why": "wc04: a `TODO` mid-sentence is reported, since the word counts anywhere in a comment",
+    "expect": [
+        {
+            "covers": "TODO",
+            "occurrence": 1
+        }
+    ],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

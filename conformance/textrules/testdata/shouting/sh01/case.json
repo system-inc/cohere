@@ -1,0 +1,17 @@
+{
+    "why": "sh01: the control, a shouted word in prose is reported, on the word",
+    "control": true,
+    "expect": [
+        {
+            "covers": "REALLY",
+            "occurrence": 1
+        }
+    ],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

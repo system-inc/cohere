@@ -1,4 +1,6 @@
-// An in-package test file joins the package's test variant, which is reported at the same first file as the package.
+// want `^Folder name "utils" is not allowed\. Use "utilities" instead\.$`
+
+// An in-package test file is a file of the folder like any other.
 package utils
 
 import "testing"

@@ -1,0 +1,16 @@
+{
+    "why": "wc07: a trailing comment is a comment",
+    "expect": [
+        {
+            "covers": "TODO",
+            "occurrence": 1
+        }
+    ],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

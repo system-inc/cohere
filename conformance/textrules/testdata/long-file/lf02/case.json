@@ -1,0 +1,11 @@
+{
+    "why": "lf02: a `*.generated.*` file is exempt by name in every engine",
+    "expect": [],
+    "options": {},
+    "path": "lf02.generated",
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

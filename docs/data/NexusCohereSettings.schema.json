@@ -677,6 +677,9 @@
                 "nexus/consistency-no-utils-folder": {
                     "$ref": "#/$defs/ruleSetting"
                 },
+                "nexus/consistency-no-warning-comment": {
+                    "$ref": "#/$defs/ruleSetting"
+                },
                 "nexus/consistency-require-constant-casing": {
                     "$ref": "#/$defs/ruleSetting"
                 },

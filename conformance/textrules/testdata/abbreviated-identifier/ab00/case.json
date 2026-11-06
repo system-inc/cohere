@@ -1,0 +1,17 @@
+{
+    "why": "ab00: the control, an abbreviated name declared and never read is reported at its declaration",
+    "control": true,
+    "expect": [
+        {
+            "covers": "msg",
+            "occurrence": 1
+        }
+    ],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

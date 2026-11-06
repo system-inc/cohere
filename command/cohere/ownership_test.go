@@ -309,3 +309,50 @@ func TestOneRunChecksEveryNestedProjectAndEachFileOnce(test *testing.T) {
 		test.Fatalf("a solution root did not run what it references (exit %d):\n%s", code, output)
 	}
 }
+
+// A tsconfig that cannot be read claims the files under its directory, so an enclosing tsconfig that
+// includes them yields them rather than judging them in its own program, where their imports and options
+// are not theirs (#0xg4y8w). A file outside it stays the enclosing one's, a readable tsconfig nested inside
+// it keeps its own, and the unreadable one still runs, for its own run to fail naming why.
+func TestAnUnreadableTsconfigClaimsTheFilesUnderIt(test *testing.T) {
+	test.Parallel()
+	root := newRepository(test, map[string]string{
+		"tsconfig.json":                  `{` + ownershipOptions + `,"include":["**/*.ts"]}`,
+		"index.ts":                       "export const index = 1;\n",
+		"wire/tsconfig.json":             `{"extends":"./missing/TypeScriptConfiguration.json"}`,
+		"wire/source/a.ts":               "export const a = 1;\n",
+		"wire/source/deep/b.ts":          "export const b = 1;\n",
+		"wire/tools/inner/tsconfig.json": `{` + ownershipOptions + `,"include":["*.ts"]}`,
+		"wire/tools/inner/c.ts":          "export const c = 1;\n",
+	})
+	found := ownedDiscovery(test, root)
+	if want := []string{".", "wire", "wire/tools/inner"}; !reflect.DeepEqual(found.labels(), want) {
+		test.Fatalf("ran %v, want %v: an unreadable tsconfig still runs, to fail naming why", found.labels(), want)
+	}
+	want := []string{
+		filepath.Join(root, "wire", "source", "a.ts"),
+		filepath.Join(root, "wire", "source", "deep", "b.ts"),
+		filepath.Join(root, "wire", "tools", "inner", "c.ts"),
+	}
+	if got := found.Ownership.Yields["."].Files; !reflect.DeepEqual(got, want) {
+		test.Fatalf("the root yields %v, want %v: index.ts stays the root's, everything under wire is not", got, want)
+	}
+	if got := found.Ownership.Unloaded; !reflect.DeepEqual(got, map[string]int{"wire": 2}) {
+		test.Errorf(
+			"unloaded %v, want wire claiming a.ts and b.ts, and c.ts left to the readable tsconfig nearer it",
+			got,
+		)
+	}
+	if yield := found.Ownership.Yields["wire/tools/inner"]; len(yield.Files) != 0 {
+		test.Errorf("the readable tsconfig inside the unreadable one yields %v, want nothing", yield.Files)
+	}
+	var notes []string
+	for _, note := range found.notes() {
+		if strings.HasPrefix(note, "wire: its tsconfig did not load") {
+			notes = append(notes, note)
+		}
+	}
+	if len(notes) != 1 || !strings.Contains(notes[0], "the 2 files under it") {
+		test.Errorf("the notes do not say once what the unreadable tsconfig left unjudged: %v", found.notes())
+	}
+}

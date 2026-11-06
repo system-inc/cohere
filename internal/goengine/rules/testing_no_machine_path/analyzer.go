@@ -5,9 +5,8 @@
 // A literal that only looks like a home path, such as the input to a function that trims one, says so where a reader
 // will see it.
 //
-// It is the port of internal/testpolicy's HomePaths and finds the same home directories by the same regular
-// expression. Its marker is read as every house rule reads one, stricter than testpolicy: the marker opens a comment
-// line, spelled as written, and a comment trailing the code on the line above a statement speaks for that line alone.
+// Its marker is read as every house rule reads one: the marker opens a comment line, spelled as written, and a comment
+// trailing the code on the line above a statement speaks for that line alone.
 package testing_no_machine_path
 
 import (
@@ -45,16 +44,16 @@ var machinePathMessage = policy.MessageOf(Name, "machinePath")
 
 var machinePathWithoutReasonMessage = policy.MessageOf(Name, "machinePathWithoutReason")
 
-// notAMachinePathMarker opens the comment that excuses a literal, spelled as testpolicy's NotAMachinePathMarker.
+// notAMachinePathMarker opens the comment that excuses a literal. It is matched as written.
 const notAMachinePathMarker = "Not a machine path:"
 
-// homeDirectory is testpolicy's expression as written: a /Users/ or /home/ that no word character runs into, followed
-// by a name and the slash after it, so /Users/ alone and /AllUsers/x/ are not home directories.
+// homeDirectory is a /Users/ or /home/ that no word character runs into, followed by a name and the slash after it,
+// so /Users/ alone and /AllUsers/x/ are not home directories.
 var homeDirectory = regexp.MustCompile(`(^|[^A-Za-z0-9_])/(Users|home)/[^/\s"']+/`)
 
 func run(pass *analysis.Pass) (any, error) {
 	for _, file := range pass.Files {
-		// The file's own name, not one a //line directive gives it, since testpolicy judges _test.go files by path.
+		// The file's own name, not one a //line directive gives it, since only a _test.go file holds tests.
 		if !strings.HasSuffix(pass.Fset.PositionFor(file.Package, false).Filename, "_test.go") {
 			continue
 		}
@@ -65,7 +64,7 @@ func run(pass *analysis.Pass) (any, error) {
 			if !isLiteral || literal.Kind != token.STRING {
 				return true
 			}
-			// A literal the parser accepted always unquotes; the check is testpolicy's, kept so the two agree.
+			// A literal the parser accepted always unquotes; one that does not is left alone rather than guessed at.
 			value, unquoteError := strconv.Unquote(literal.Value)
 			if unquoteError != nil || !homeDirectory.MatchString(value) {
 				return true
@@ -101,8 +100,8 @@ func run(pass *analysis.Pass) (any, error) {
 // it, over as many lines as it runs.
 func linesCoveredAbove(pass *analysis.Pass, file *ast.File, comments *marker.Index) map[int]marker.Excuse {
 	covered := map[int]marker.Excuse{}
-	// Every node, not only the outermost, as testpolicy walks it; an inner node lies within the outer one's lines, so
-	// the lines covered are the outermost node's.
+	// Every node, not only the outermost, since a marker may sit above a statement inside a function; an inner node
+	// lies within the outer one's lines, so the lines covered are the outermost marked node's.
 	ast.Inspect(file, func(node ast.Node) bool {
 		if node == nil {
 			return true

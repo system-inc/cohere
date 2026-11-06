@@ -5,7 +5,8 @@
     "Go": "cohere-go/consistency-no-screaming-snake-case"
   },
   "phrases": {
-    "reasoning": "`const` already tells the reader and the compiler the value is immutable, so shouting adds no information. The casing is free to signal scope instead, the way Go does it: PascalCase means the value came from somewhere else, camelCase means it lives in this file. Reserve the shouting form for values that mirror an external system's grammar, where matching the upstream spelling keeps the value greppable across a boundary you do not control."
+    "reasoning": "`const` already tells the reader and the compiler the value is immutable, so shouting adds no information. The casing is free to signal scope instead, the way Go does it: PascalCase means the value came from somewhere else, camelCase means it lives in this file. Reserve the shouting form for values that mirror an external system's grammar, where matching the upstream spelling keeps the value greppable across a boundary you do not control.",
+    "swiftCasing": "Swift spells values in lowerCamelCase and types in UpperCamelCase, so a reader tells which is which at a glance, and an underscore inside a name is a word boundary camel case already marks."
   },
   "messages": {
     "noScreamingSnakeCaseExported": {
@@ -21,7 +22,13 @@
       ]
     },
     "alwaysUseLowerCamelCase": {
-      "text": "{{swiftFormatFinding}}. Swift spells values in lowerCamelCase and types in UpperCamelCase, so a reader tells which is which at a glance, and an underscore inside a name is a word boundary camel case already marks.",
+      "text": "{{swiftFormatFinding}}. <<swiftCasing>>",
+      "languages": [
+        "Swift"
+      ]
+    },
+    "alwaysUseUpperCamelCaseForType": {
+      "text": "Rename the {{declaration}} '{{name}}' using UpperCamelCase. <<swiftCasing>>",
       "languages": [
         "Swift"
       ]
@@ -34,6 +41,12 @@
     },
     "underscoreInName": {
       "text": "`{{name}}` has an underscore in it; spell it `{{suggestion}}`. Go spells every name in MixedCaps, so a capital letter already marks where one word ends and the next begins, and an underscore says it a second time and makes the name read as if it came from another language. A leading underscore hides nothing in Go either: only the case of the first letter decides whether a name is exported.",
+      "languages": [
+        "Go"
+      ]
+    },
+    "capitalizedLocalValue": {
+      "text": "`{{name}}` is declared inside a function and opens with a capital; spell it `{{suggestion}}`. Go reads a capital first letter as exported, and a value local to a function never is, so the capital promises something the name cannot do. Values open lower-case and types upper-case, so a reader tells which is which at a glance.",
       "languages": [
         "Go"
       ]

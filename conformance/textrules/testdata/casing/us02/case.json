@@ -1,0 +1,20 @@
+{
+    "why": "us02: values are lowerCamel, so a snake_case parameter and a snake_case mutable local are each reported at their declaration",
+    "expect": [
+        {
+            "covers": "first_value",
+            "occurrence": 1
+        },
+        {
+            "covers": "running_total",
+            "occurrence": 1
+        }
+    ],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

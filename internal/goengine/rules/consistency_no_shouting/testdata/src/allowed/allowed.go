@@ -145,3 +145,13 @@ var Thing = 1
 
 // Deprecated: use Thing instead.
 var Older = 1
+
+// The same shapes the flagged words take, quieted: code in backticks on a block comment's second line after
+// multi-byte text, and an acronym said twice.
+
+/*
+ * the café's `naïve` cache
+ * is `NEVER` warm, and the crème is `ALWAYS` cold
+ */
+
+// the API calls the API

@@ -1,0 +1,16 @@
+{
+    "why": "wc08: `FIXME` is a warning word",
+    "expect": [
+        {
+            "covers": "FIXME",
+            "occurrence": 1
+        }
+    ],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

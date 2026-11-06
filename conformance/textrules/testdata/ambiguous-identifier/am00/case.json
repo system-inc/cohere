@@ -1,0 +1,21 @@
+{
+    "why": "am00: the control, an ambiguous single letter declared and never read is reported at its declaration",
+    "control": true,
+    "expect": [
+        {
+            "covers": "n",
+            "occurrence": {
+                "typescript": 2,
+                "go": 1,
+                "swift": 1
+            }
+        }
+    ],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

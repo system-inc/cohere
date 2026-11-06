@@ -1,0 +1,11 @@
+{
+    "why": "wc06: `TODO_LIST` is an identifier, since `_` is a word character, and is clean",
+    "expect": [],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

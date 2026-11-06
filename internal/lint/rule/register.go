@@ -291,6 +291,10 @@ func OptionElements(list []byte, maximum int) ([]json.RawMessage, error) {
 // Nothing here is config-specific. It decodes JSON into a struct, which is what the rule declared
 // and what only the rule's own package knows the type of. The config layer's job is deciding
 // whether a rule that got no options may still run, and that judgment stays there.
+//
+// Its errors name no Go type: the config layer puts the rule's name in front of them
+// (configuration.OptionsRegistry.Decode), and a user who misconfigured a rule reads that name and what
+// was wrong with the options they wrote, not how cohere spells the struct it decodes into.
 func DecodeOptionsInto[Options any]() func(raw []byte) (Options, error) {
 	return func(raw []byte) (Options, error) {
 		var decoded Options
@@ -298,7 +302,7 @@ func DecodeOptionsInto[Options any]() func(raw []byte) (Options, error) {
 			return decoded, fmt.Errorf("no options were configured")
 		}
 		if unmarshalOptionsError := UnmarshalOptions(raw, &decoded); unmarshalOptionsError != nil {
-			return decoded, fmt.Errorf("decoding %T: %w", decoded, unmarshalOptionsError)
+			return decoded, fmt.Errorf("reading its options: %w", unmarshalOptionsError)
 		}
 		return decoded, nil
 	}

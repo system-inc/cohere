@@ -1,0 +1,11 @@
+{
+    "why": "wc02: lowercase `todo` is ordinary English and is clean",
+    "expect": [],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

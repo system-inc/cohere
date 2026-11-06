@@ -90,7 +90,8 @@ func TestUnmarshalOptionsRefusesWhatUpstreamRefuses(test *testing.T) {
 }
 
 // TestDecodeOptionsIntoIsStrict pins that the decoder 112 rules register through uses the strict
-// path, so a refusal reaches the config layer with the type named.
+// path, so a refusal reaches the config layer naming the key the user wrote, and never the Go type it
+// decodes into: the config layer puts the rule's name in front of it.
 func TestDecodeOptionsIntoIsStrict(test *testing.T) {
 	test.Parallel()
 	decode := DecodeOptionsInto[strictOptions]()
@@ -98,7 +99,10 @@ func TestDecodeOptionsIntoIsStrict(test *testing.T) {
 		test.Fatalf("baseline: %v", decodeError)
 	}
 	_, decodeError := decode([]byte(`{"enforceForTsTypes": true}`))
-	if decodeError == nil || !strings.Contains(decodeError.Error(), "rule.strictOptions") {
-		test.Fatalf("want a refusal naming the options type, got %v", decodeError)
+	if decodeError == nil || !strings.Contains(decodeError.Error(), `"enforceForTsTypes"`) {
+		test.Fatalf("want a refusal naming the misspelled key, got %v", decodeError)
+	}
+	if strings.Contains(decodeError.Error(), "strictOptions") {
+		test.Fatalf("the refusal names the Go type its options decode into: %v", decodeError)
 	}
 }

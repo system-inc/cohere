@@ -1,0 +1,11 @@
+{
+    "why": "sh03: `WHATWG` is on the one allowlist every engine reads, so it is clean",
+    "expect": [],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}
