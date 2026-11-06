@@ -136,7 +136,7 @@
 //
 // # Convergence: there is none here, deliberately
 //
-// `reactive.go` and `immutability.go` both carry a warning that convergence equality is not
+// `reactivity.go` and `immutability.go` both carry a warning that convergence equality is not
 // identity equality and that a fixpoint comparing anything meaninglessly variable hangs silently.
 // That hazard does not arise in this file because this pass is not a fixpoint: upstream's
 // `compute_signature_for_instruction` is a pure function of one instruction, and the fixpoint in
@@ -171,41 +171,6 @@ import (
 // its own places: the kinds, the value kinds, and the reasoning behind each. This is the vocabulary
 // instantiated on this IR's Place, so it is this IR's own type, as Phi is.
 type AliasingEffect = mutation_aliasing.AliasingEffect[Place]
-
-// AliasingEffects is the table this pass produces: the effect list of every instruction.
-//
-// Keyed by InstructionId rather than stored on the Instruction because an Instruction is shared
-// through the per-file lowering cache and several rules hold the same one. Writing effects onto it
-// would make one rule's pass visible to another that never asked for it, and `Construct` is not
-// idempotent, so a table that has to be rebuilt is safer than a graph that has been mutated.
-type AliasingEffects struct {
-	byInstruction map[InstructionId][]AliasingEffect
-}
-
-// Get returns one instruction's effects, or nil when it has none.
-func (effects *AliasingEffects) Get(id InstructionId) []AliasingEffect {
-	if effects == nil {
-		return nil
-	}
-	return effects.byInstruction[id]
-}
-
-// Length is how many instructions carry at least one effect.
-func (effects *AliasingEffects) Length() int {
-	if effects == nil {
-		return 0
-	}
-	return len(effects.byInstruction)
-}
-
-// EffectGap names an effect-inference rule this pass cannot apply, for a caller that needs to know.
-//
-// Named in the API rather than only in a comment, the way `ReactiveGaps` and `RangeGaps` are, for
-// the reason `reactive.go` gives: a caller that needs the missing half should be able to ask rather
-// than discover it. Both React and oxc treat a half-filled effect table as an invariant violation
-// rather than a skippable default, so a consumer being able to enumerate what is missing is the
-// difference between an under-approximation it can reason about and a table that silently lies.
-type EffectGap uint8
 
 const (
 	// EffectGapInterproceduralParameters is an effect that would reach a call site from the body of
@@ -242,7 +207,7 @@ const (
 	//
 	// Upstream's `Environment` carries a shape registry keyed by `TypeId`, so `props.items.push(x)`
 	// resolves `push` against the array shape rather than against a bare name. This pass keys on
-	// the syntactic name, which is what `reactive.go` also had to do and for the same stated
+	// the syntactic name, which is what `reactivity.go` also had to do and for the same stated
 	// reason: cohere has the real checker but no shape registry, and building one is Stage 4 work.
 	// The consequence is that a name shadowed by an unrelated method of the same spelling gets the
 	// builtin's effect.
@@ -255,19 +220,6 @@ func EffectGaps() []EffectGap {
 		EffectGapInterproceduralParameters,
 		EffectGapSignatureTable,
 		EffectGapTypeDirectedShapes,
-	}
-}
-
-func (gap EffectGap) String() string {
-	switch gap {
-	case EffectGapInterproceduralParameters:
-		return "interprocedural-parameters"
-	case EffectGapSignatureTable:
-		return "signature-table"
-	case EffectGapTypeDirectedShapes:
-		return "type-directed-shapes"
-	default:
-		return "<unknown>"
 	}
 }
 
@@ -352,7 +304,7 @@ type aliasingSignatureEffect struct {
 //
 // See `EffectGapTypeDirectedShapes`. A user-defined `push` on an unrelated class gets Array's
 // signature here and does not upstream. That is a real divergence and it is the same shape
-// `reactive.go` accepted for `isHookCallee` for the same reason: cohere has no shape registry.
+// `reactivity.go` accepted for `isHookCallee` for the same reason: cohere has no shape registry.
 // It is recorded rather than hidden, and the direction is that a mutating effect is applied where
 // upstream might apply the default -- which is also a mutating effect, so the two agree on the
 // mutation question and differ only on transitivity.

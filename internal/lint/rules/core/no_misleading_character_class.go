@@ -379,24 +379,6 @@ func checkRegexPatternMapped(
 	checkRegexPatternWithReporter(pattern, flagsText, source, collector.report)
 }
 
-// mappedFindingCollector reports a finding at the raw offsets its cooked span maps to.
-type mappedFindingCollector struct {
-	ctx       rule.Context
-	bodyStart int
-	offsets   []int
-}
-
-func (collector *mappedFindingCollector) report(finding pendingMisleadingFinding) {
-	if finding.start >= len(collector.offsets) || finding.end >= len(collector.offsets) {
-		return
-	}
-	collector.ctx.ReportRange(
-		core.NewTextRange(
-			collector.bodyStart+collector.offsets[finding.start],
-			collector.bodyStart+collector.offsets[finding.end]),
-		finding.message)
-}
-
 // checkRegexPattern reports every misleading sequence in every character class of a pattern.
 //
 // suggestions is called only for the without-flag surrogate finding, which is the one finding whose

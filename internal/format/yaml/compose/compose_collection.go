@@ -135,14 +135,6 @@ func knownTag(schema *Schema, tagName string) *Tag {
 	return nil
 }
 
-// tagString is `${tag.tag}`: "undefined" for an inherited property, which has no tag.
-func (tag *Tag) tagString() string {
-	if tag.prototypeProperty {
-		return "undefined"
-	}
-	return tag.Tag
-}
-
 type scalarResolution struct {
 	value      []uint16
 	scalarType string

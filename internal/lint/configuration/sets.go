@@ -2,7 +2,6 @@ package configuration
 
 import (
 	"embed"
-	"encoding/json"
 	"fmt"
 	"io/fs"
 	"os"
@@ -49,11 +48,6 @@ func InOurTiers(sources []string) bool {
 		}
 	}
 	return false
-}
-
-// InOurTiers reports whether this configuration's chain reaches one of our tier sets. See InOurTiers.
-func (configuration *Config) InOurTiers() bool {
-	return configuration != nil && InOurTiers(configuration.Sources)
 }
 
 // SourceContents returns the bytes of one source in a configuration's chain: an embedded set's text,
@@ -104,32 +98,4 @@ func SetNames() []string {
 
 func setFilePath(name string) string {
 	return "sets/" + name + ".json"
-}
-
-// extendsList is what `extends` names: one source, or a list of them, applied in order.
-//
-// A list is how a project composes sets that each sit on the same base (`cohere:react` and
-// `cohere:next` both extend `cohere:typescript`). The shared base is read once, where it first
-// appears, so it stays the outermost layer.
-type extendsList []string
-
-func (list *extendsList) UnmarshalJSON(data []byte) error {
-	var single string
-	if decodeError := json.Unmarshal(data, &single); decodeError == nil {
-		if single != "" {
-			*list = extendsList{single}
-		}
-		return nil
-	}
-	var many []string
-	if decodeError := json.Unmarshal(data, &many); decodeError != nil {
-		return fmt.Errorf("\"extends\" names a path or a rule set, or a list of them: %w", decodeError)
-	}
-	for _, entry := range many {
-		if entry == "" {
-			return fmt.Errorf("\"extends\" lists an empty entry")
-		}
-	}
-	*list = many
-	return nil
 }

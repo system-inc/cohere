@@ -24,12 +24,6 @@ var wrapped = struct {
 	analyzers map[*analysis.Analyzer]bool
 }{analyzers: map[*analysis.Analyzer]bool{}}
 
-// recoveringRun is one analyzer's Run with a recover around it.
-type recoveringRun struct {
-	analyzer *analysis.Analyzer
-	original func(*analysis.Pass) (any, error)
-}
-
 // wrapRuns validates analyzers and replaces Run, on each of them and every analyzer they require, with one that
 // turns a panic into the action's error.
 //
@@ -66,21 +60,6 @@ func wrapRuns(analyzers []*analysis.Analyzer) error {
 		wrap(analyzer)
 	}
 	return nil
-}
-
-// run calls the original Run, and a panic in it, or in anything it calls such as pass.Report refusing a
-// malformed fix, becomes the error checker.Analyze records on the action.
-func (recovering *recoveringRun) run(pass *analysis.Pass) (result any, runError error) {
-	defer func() {
-		recovered := recover()
-		if recovered == nil {
-			return
-		}
-		result = nil
-		runError = fmt.Errorf("running analyzer %s on %s: it panicked with %v, at %s", recovering.analyzer.Name,
-			pass.Pkg.Path(), recovered, panicFrames())
-	}()
-	return recovering.original(pass)
 }
 
 // panicFrames is the frames of the panic being recovered, innermost first, from where it was raised up to the

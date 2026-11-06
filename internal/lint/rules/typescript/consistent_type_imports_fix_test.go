@@ -67,7 +67,7 @@ func runConsistentTypeImportsFix(test *testing.T, options string, code string) (
 //
 // Only one shape diverges: upstream merges moved names into a type-only declaration that already
 // exists elsewhere in the file, which is a second statement and so a second edit, and this port's
-// repair is one edit inside the reported declaration. See consistent_type_imports_fix.go.
+// repair is one edit inside the reported declaration. See consistent_type_imports_fixer.go.
 var consistentTypeImportsFixDivergences = map[int]string{
 	// Upstream writes `import type { Already1 , B }` and `import type { Already2 , C, D}`, merging into
 	// the two existing declarations. This writes each moved group as its own declaration beside the

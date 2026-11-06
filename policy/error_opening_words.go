@@ -14,15 +14,6 @@ import (
 //go:embed ErrorOpeningWords.json
 var errorOpeningWordsFile []byte
 
-// ErrorOpeningVocabulary is ErrorOpeningWords.json, read and checked.
-type ErrorOpeningVocabulary struct {
-	About string             `json:"about"`
-	Words []ErrorOpeningWord `json:"words"`
-
-	// held is Words as a set, built when the file is read, so a lookup does not walk the list.
-	held map[string]bool
-}
-
 // ErrorOpeningWord is one entry of the vocabulary: a word, lowercase, as it would read mid-sentence.
 type ErrorOpeningWord struct {
 	Word string `json:"word"`
@@ -31,11 +22,6 @@ type ErrorOpeningWord struct {
 // ErrorOpeningWords is the embedded file, read once. An invalid file panics at startup, since a vocabulary read
 // wrongly would let the rule flag a proper name or miss every ordinary word while its tests reported it clean.
 var ErrorOpeningWords = mustLoadErrorOpeningWords(errorOpeningWordsFile)
-
-// Holds is whether word, lowercase, is in the vocabulary.
-func (vocabulary ErrorOpeningVocabulary) Holds(word string) bool {
-	return vocabulary.held[word]
-}
 
 func mustLoadErrorOpeningWords(data []byte) ErrorOpeningVocabulary {
 	vocabulary, loadError := loadErrorOpeningWords(data)

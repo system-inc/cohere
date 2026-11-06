@@ -104,15 +104,6 @@ type FormatEntry struct {
 	ModifiedNanoseconds int64
 }
 
-// CacheTableIdentity is what built the binary that writes or reads a table. It goes in the header, so a
-// table written by any other build is discarded before a byte of its body is trusted.
-type CacheTableIdentity struct {
-	SelfCommit     string
-	CompilerCommit string
-	GoToolchain    string
-	Platform       string
-}
-
 // cacheTableVersion is the format, and it moves whenever the encoded shape or its meaning does. The shape
 // half is enforced by TestCacheTableShapeIsPinnedToItsVersion; the meaning half is the reason each
 // section also keeps its own version.
@@ -231,19 +222,6 @@ func cacheTableRunFile(invocation string) string {
 // cacheTableFile is the file a section other than a run lives in.
 func cacheTableFile(section string) string {
 	return section + ".gob"
-}
-
-// lintCacheWire is the findings section as encoded. Rule lists are stored once and referenced by index:
-// on ahra 3,605 entries share 4 distinct rule lists and 24 listening lists, and writing each out in full
-// once made the file 53 MB.
-type lintCacheWire struct {
-	Version  int
-	Key      [sha256.Size]byte
-	KeyParts RunCacheKeyParts
-	Lists    [][]string
-	Entries  []lintCacheWireEntry
-
-	DesignSystem *DesignSystemKey
 }
 
 type lintCacheWireEntry struct {
@@ -391,145 +369,11 @@ func decodeCacheTableFile[Body any](contents []byte, section string, identity Ca
 	return otherCommit
 }
 
-func (identity CacheTableIdentity) String() string {
-	return fmt.Sprintf("cohere %s, compiler %s, %s, %s",
-		orUnknown(identity.SelfCommit), orUnknown(identity.CompilerCommit), identity.GoToolchain, identity.Platform)
-}
-
 func orUnknown(value string) string {
 	if value == "" {
 		return "unknown"
 	}
 	return value
-}
-
-// wire interns the findings cache's rule lists. It is stamped with this build's lintCacheVersion: a cache in
-// memory always means what this build means.
-func (cache *LintCache) wire() *lintCacheWire {
-	wire := &lintCacheWire{
-		Version:      lintCacheVersion,
-		Key:          cache.Key,
-		KeyParts:     cache.KeyParts,
-		DesignSystem: cache.DesignSystem,
-	}
-	// Interned by a cheap key, the length and the two ends, and confirmed by comparing names, never by joining
-	// a list into one string: ahra's entries hold about 18,000 lists of up to ~250 names, and joining each cost
-	// about 25ms of every recording run to find 31 distinct ones (#a66sfmh).
-	type listKey struct {
-		length      int
-		first, last string
-	}
-	positions := map[listKey][]int{}
-	intern := func(list []string) int {
-		key := listKey{length: len(list)}
-		if len(list) > 0 {
-			key.first, key.last = list[0], list[len(list)-1]
-		}
-		for _, position := range positions[key] {
-			if equalStrings(wire.Lists[position], list) {
-				return position
-			}
-		}
-		positions[key] = append(positions[key], len(wire.Lists))
-		wire.Lists = append(wire.Lists, append([]string{}, list...))
-		return len(wire.Lists) - 1
-	}
-	for _, entry := range cache.Entries {
-		wire.Entries = append(wire.Entries, lintCacheWireEntry{
-			Path:            entry.Path,
-			ContentHash:     entry.ContentHash,
-			Rules:           intern(entry.Rules),
-			TypedRules:      intern(entry.TypedRules),
-			TypeFingerprint: entry.TypeFingerprint,
-			Listening:       intern(entry.Listening),
-			VisitedNodes:    entry.VisitedNodes,
-			Findings:        entry.Findings,
-
-			ShapedRules:      intern(entry.ShapedRules),
-			ShapeFingerprint: entry.ShapeFingerprint,
-
-			DesignRules:       intern(entry.DesignRules),
-			DesignFingerprint: entry.DesignFingerprint,
-
-			DerivedRules:       intern(entry.DerivedRules),
-			DerivedFingerprint: entry.DerivedFingerprint,
-
-			Notes: wireNotes(entry.Notes),
-
-			Directives: entry.Directives,
-			Withheld:   entry.Withheld,
-
-			Adamic: entry.Adamic,
-		})
-	}
-	return wire
-}
-
-// cache resolves the interned lists. An index past its table is an error rather than an empty list: an
-// index trusted past its table would hand an entry another file's rule list.
-//
-// A findings section of another version decodes to nil rather than failing the table. The runs beside it
-// are proven by their own keys, and a findings cache is only ever a miss when it is absent.
-func (wire *lintCacheWire) cache() (*LintCache, error) {
-	if wire.Version != lintCacheVersion {
-		return nil, nil
-	}
-	cache := &LintCache{
-		Version:      wire.Version,
-		Key:          wire.Key,
-		KeyParts:     wire.KeyParts,
-		Entries:      make([]LintCacheEntry, 0, len(wire.Entries)),
-		DesignSystem: wire.DesignSystem,
-	}
-	list := func(index int) ([]string, error) {
-		if index < 0 || index >= len(wire.Lists) {
-			return nil, fmt.Errorf("list %d of %d", index, len(wire.Lists))
-		}
-		return wire.Lists[index], nil
-	}
-	for position, stored := range wire.Entries {
-		entry := LintCacheEntry{
-			Path:            stored.Path,
-			ContentHash:     stored.ContentHash,
-			TypeFingerprint: stored.TypeFingerprint,
-			VisitedNodes:    stored.VisitedNodes,
-			Findings:        stored.Findings,
-
-			ShapeFingerprint: stored.ShapeFingerprint,
-
-			DesignFingerprint: stored.DesignFingerprint,
-
-			DerivedFingerprint: stored.DerivedFingerprint,
-
-			Notes: ruleNotes(stored.Notes),
-
-			Directives: stored.Directives,
-			Withheld:   stored.Withheld,
-
-			Adamic: stored.Adamic,
-		}
-		var listError error
-		if entry.Rules, listError = list(stored.Rules); listError != nil {
-			return nil, fmt.Errorf("entry %d rules: %w", position, listError)
-		}
-		if entry.TypedRules, listError = list(stored.TypedRules); listError != nil {
-			return nil, fmt.Errorf("entry %d typed rules: %w", position, listError)
-		}
-		if entry.Listening, listError = list(stored.Listening); listError != nil {
-			return nil, fmt.Errorf("entry %d listening: %w", position, listError)
-		}
-		if entry.ShapedRules, listError = list(stored.ShapedRules); listError != nil {
-			return nil, fmt.Errorf("entry %d shaped rules: %w", position, listError)
-		}
-		if entry.DesignRules, listError = list(stored.DesignRules); listError != nil {
-			return nil, fmt.Errorf("entry %d design-system rules: %w", position, listError)
-		}
-		if entry.DerivedRules, listError = list(stored.DerivedRules); listError != nil {
-			return nil, fmt.Errorf("entry %d derived rules: %w", position, listError)
-		}
-		cache.Entries = append(cache.Entries, entry)
-	}
-	return cache, nil
 }
 
 // ReadCacheTable loads the named sections of the table in directory. It always returns a table: every

@@ -9,7 +9,7 @@
 //
 // The base descriptor table carries `{order, count}` per static, which is the answer rather than the
 // input. Carrying declarations instead means the reading is computed by the same PropertySort walk
-// that answers a repository's own `@utility` blocks in descriptor_live.go, so the framework path and
+// that answers a repository's own `@utility` blocks in table_descriptor_live.go, so the framework path and
 // the repository path cannot drift apart about what a declaration list means. A table of readings
 // can disagree with the walk; a table of declarations feeding the walk cannot.
 //

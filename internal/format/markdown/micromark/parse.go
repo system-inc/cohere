@@ -40,26 +40,6 @@ func Combine(extensions []*Extension) *FullConstructs {
 // table, and combining it was a measurable share of a format's allocation (#93dpede).
 var MarkdownConstructs = sync.OnceValue(func() *FullConstructs { return Combine(MarkdownExtensions()) })
 
-// create makes a tokenizer for a content type, upstream's parser.document() and friends.
-func (parser *ParseContext) create(contentType string, from *Point) *TokenizeContext {
-	var initial *InitialConstruct
-	switch contentType {
-	case ContentTypeDocument:
-		initial = documentInitial
-	case ContentTypeFlow:
-		initial = flowInitial
-	case ContentTypeContent:
-		initial = contentInitial
-	case ContentTypeString:
-		initial = stringInitial
-	case ContentTypeText:
-		initial = textInitial
-	default:
-		panic("micromark: unknown content type " + contentType)
-	}
-	return createTokenizer(parser, initial, from)
-}
-
 // combineExtensions is micromark-util-combine-extensions.
 func combineExtensions(extensions []*Extension) *Extension {
 	all := &Extension{

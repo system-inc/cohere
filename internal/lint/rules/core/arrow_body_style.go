@@ -93,14 +93,6 @@ func DecodeArrowBodyStyleOptions(list []byte) (ArrowBodyStyleOptions, error) {
 	return options, nil
 }
 
-// arrowBodyStyleModeError names an unrecognized mode and the three that are recognized.
-type arrowBodyStyleModeError struct{ mode string }
-
-func (modeError *arrowBodyStyleModeError) Error() string {
-	return "arrow-body-style: unknown mode " + modeError.mode +
-		", wanted one of as-needed, always, never"
-}
-
 // The five findings. Upstream splits the braced case four ways by what the block holds, because the
 // remedy differs: an empty block wants `undefined` written out, an object literal wants parentheses,
 // and a block doing real work cannot be shortened at all.

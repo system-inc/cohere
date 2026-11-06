@@ -432,3 +432,54 @@ func parseLocation(line string) (file string, lineNumber int, column int, ok boo
 	}
 	return file, lineNumber, column, true
 }
+
+// Categories returns the categories a fixture's diagnostics belong to, and whether every one was
+// attributed.
+//
+// The bool is not decoration. A fixture with an unattributed diagnostic must not be scored against
+// any rule, because the rule that owns it is exactly the unknown; scoring it would credit or blame
+// whichever rule happened to be running.
+func (fixture Fixture) Categories() (categories []string, complete bool) {
+	seen := map[string]bool{}
+	complete = true
+	for _, expectedError := range fixture.Expected.Errors {
+		category, found := CategoryForMessage(expectedError.Message)
+		if !found {
+			complete = false
+			continue
+		}
+		if !seen[category] {
+			seen[category] = true
+			categories = append(categories, category)
+		}
+	}
+	return categories, complete
+}
+
+// Rules returns the upstream rule names a fixture's diagnostics belong to.
+func (fixture Fixture) Rules() (rules []string, complete bool) {
+	categories, complete := fixture.Categories()
+	seen := map[string]bool{}
+	for _, category := range categories {
+		rule, found := RuleForCategory(category)
+		if !found {
+			complete = false
+			continue
+		}
+		if !seen[rule] {
+			seen[rule] = true
+			rules = append(rules, rule)
+		}
+	}
+	return rules, complete
+}
+
+// ResolvesReactTypes reports whether a fixture could resolve `@types/react`.
+func (fixture Fixture) ResolvesReactTypes() bool {
+	return reactImportPattern.MatchString(fixture.Source)
+}
+
+// CallsHook reports whether a fixture calls anything named like a hook.
+func (fixture Fixture) CallsHook() bool {
+	return hookCallPattern.MatchString(fixture.Source)
+}

@@ -124,16 +124,6 @@ func (family family) signature() string {
 	)
 }
 
-// pathList collects a repeatable flag.
-type pathList []string
-
-func (list *pathList) String() string { return strings.Join(*list, ", ") }
-
-func (list *pathList) Set(value string) error {
-	*list = append(*list, value)
-	return nil
-}
-
 // designSystemInput is one design system to enumerate: a CSS entry point, and where its bare
 // specifiers resolve from.
 //

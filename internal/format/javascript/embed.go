@@ -125,12 +125,6 @@ func printEmbedUnsupported(language string) embedPrint {
 	}
 }
 
-type unsupportedEmbedError string
-
-func (language unsupportedEmbedError) Error() string {
-	return "no native printer embeds " + string(language) + " in a template literal yet"
-}
-
 // predicate adapts a (node, key) test to the print core's path.match predicate.
 func predicate(test func(node Node, name string) bool) printing.Predicate[Node] {
 	return func(value PathValue, name string, _ int, _ bool) bool {

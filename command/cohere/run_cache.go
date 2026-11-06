@@ -80,74 +80,6 @@ var invocationTag = []byte("\x1ecohere-invocation\x1e")
 // line stays in the recording, tagged, so the replay can find it without matching on its text.
 var provenanceTag = []byte("\x1ecohere-provenance\x1e")
 
-type runCacheSession struct {
-	// directory is where this root's cache table lives, invocation the name this run's record goes under
-	// in it, and table what was read from it when the run began: this invocation's run and the sections a
-	// walk reuses.
-	directory  string
-	invocation string
-	table      *program.CacheTable
-
-	key      string
-	recorder *program.InputRecorder
-
-	// anchor is the project root, which the table names paths relative to and the recording names its
-	// output's root by, so every spelling of the root is one cache (#547dhjz). See program.PathAnchor.
-	anchor program.PathAnchor
-
-	// keyParts is key's parts, recorded with the run so a later one under another key can say which moved.
-	keyParts program.RunCacheKeyParts
-
-	// missed is why this run was not replayed whole, and findingsMissed why its files' findings were not, when
-	// the findings section as a whole was missing or under another key. Each is said in --verbose and --json, so
-	// a run that could have replayed and did not explains itself (#547dhjz).
-	missed         string
-	findingsMissed string
-
-	// findingsKeyParts is the findings key's parts, recorded with the section. See keyParts.
-	findingsKeyParts program.RunCacheKeyParts
-
-	// readSince is when the run began reading its inputs. An input changed after it keeps the run from
-	// being recorded.
-	readSince time.Time
-
-	// declared is set once the build succeeds and the inputs are known. A session that never declares
-	// is never recorded.
-	declared   bool
-	extraFiles []string
-
-	// extraDirectories is every directory a format walk listed, so a file added, removed or renamed in one
-	// moves an input. See declareFormatWalk.
-	extraDirectories []string
-
-	// extraAbsent is every file a format walk looked for and did not find, an ignore file a directory
-	// does not have, so one appearing moves an input. See declareFormatWalk.
-	extraAbsent []string
-
-	// declined is the reason this run must not be recorded, empty while it may be.
-	declined string
-
-	// findings is the findings cache this run consults and records, the run cache's second layer. Nil
-	// when the graph never reached a walk.
-	findings *program.FindingsReuse
-
-	// shapes is every project file's shape this run, recorded so the next computes only what changed. Nil
-	// when no rule is keyed on shapes, since then nothing reads them and computing them would be waste.
-	shapes map[string]program.SignatureEntry
-	// shapesGraph is the graph shapes describe, the one rebuilt after a fix rewrite when there was one, kept so
-	// the shapes still keyed on content can graduate after the verdict. See graduateSignatures.
-	shapesGraph *program.Graph
-
-	// types is the types phase's section, what the table held and what this run records. Nil when the
-	// graph never reached a walk.
-	types *program.TypeDiagnosticsReuse
-
-	// summary is the run's summary, encoded, which a replay renders its footer from. See recordRunSummary.
-	summary []byte
-
-	stdout, stderr teeStream
-}
-
 // recordRunSummary keeps the run's summary for the record, when this run is being recorded.
 func recordRunSummary(summary runSummary) {
 	if activeRunCache == nil {
@@ -156,85 +88,6 @@ func recordRunSummary(summary runSummary) {
 	if encoded, encodeError := json.Marshal(summary); encodeError == nil {
 		activeRunCache.summary = encoded
 	}
-}
-
-// teeStream copies a standard stream to its real destination and to a buffer.
-type teeStream struct {
-	real   *os.File
-	writer *os.File
-	buffer bytes.Buffer
-	done   chan struct{}
-}
-
-// start points target at a pipe whose every line is copied to the real file and kept for the recording.
-// buffered is the stream that writes to target (see package streams), shown first, so what it held from before
-// the recording reaches the real file and stays out of it.
-//
-// Mutates: target the caller's stream variable is what every write goes through, so it is pointed at the pipe
-func (stream *teeStream) start(target **os.File, buffered *bufio.Writer) error {
-	reader, writer, pipeError := os.Pipe()
-	if pipeError != nil {
-		return pipeError
-	}
-	streams.Show(buffered)
-	stream.real = *target
-	stream.writer = writer
-	stream.done = make(chan struct{})
-	go func() {
-		defer close(stream.done)
-		// Ignored: the read end, closed once everything written to the pipe has been read from it.
-		defer reader.Close()
-		// Line by line, so a line tagged as describing this invocation reaches the terminal untagged
-		// and never reaches the replay. The tag travels in the stream itself because the tee is a pipe:
-		// noting the buffer's length at the moment of printing would read it before the pipe delivered.
-		lines := bufio.NewReader(reader)
-		for {
-			line, readBytesError := lines.ReadBytes('\n')
-			if len(line) > 0 {
-				if rest, tagged := bytes.CutPrefix(line, invocationTag); tagged {
-					stream.copyToReal(rest)
-				} else if rest, tagged := bytes.CutPrefix(line, provenanceTag); tagged {
-					// Kept tagged in the recording, so a replay knows to say where the line came from.
-					stream.copyToReal(rest)
-					stream.buffer.Write(line)
-				} else {
-					stream.copyToReal(line)
-					stream.buffer.Write(line)
-				}
-			}
-			if readBytesError != nil {
-				return
-			}
-		}
-	}()
-	*target = writer
-	return nil
-}
-
-// copyToReal copies one line to the real file. The copy runs on the tee's own goroutine, so a failure is
-// reported to package streams rather than returned, and the exit code counts it there: a run whose output never
-// reached the terminal must not exit as though it had.
-func (stream *teeStream) copyToReal(line []byte) {
-	if _, writeError := stream.real.Write(line); writeError != nil {
-		streams.Report(fmt.Errorf("copying the run's output to %s: %w", stream.real.Name(), writeError))
-	}
-}
-
-// stop restores the stream and waits for everything written so far to reach both destinations. buffered is
-// the stream that writes to target, shown first, so what it held from during the recording is recorded.
-//
-// Mutates: target the caller's stream variable is pointed back at the real file start took it from
-func (stream *teeStream) stop(target **os.File, buffered *bufio.Writer) {
-	if stream.writer == nil {
-		return
-	}
-	streams.Show(buffered)
-	*target = stream.real
-	// Ignored: closing the write end only tells the copy it has everything. A pipe's writes are not buffered, so
-	// every one already reached the pipe, or failed and was kept by the stream that made it.
-	_ = stream.writer.Close()
-	<-stream.done
-	stream.writer = nil
 }
 
 // runCacheEligible reports whether this invocation may use the run cache at all.
@@ -791,83 +644,6 @@ func graduateSignatures(directory string, graph *program.Graph, shapes map[strin
 	return graduated
 }
 
-// record captures this run, or returns nil when it cannot.
-func (session *runCacheSession) record(exitCode int) *program.RunCache {
-	// A replay renders its footer from the summary, so a run that recorded none would replay a verdict with
-	// no footer. Refused here, once, rather than resting on every verdict path remembering writeRunEnd.
-	if session.summary == nil {
-		session.note("a run that recorded no summary is not recorded: its replay would print a verdict with no footer")
-		return nil
-	}
-	present, absent, probed := session.recorder.Inputs()
-	files := append(present, session.extraFiles...)
-	absent = append(absent, session.extraAbsent...)
-	cache, recordRunCacheError := program.RecordRunCache(session.key, files, session.extraDirectories, absent, probed,
-		recordedOutput(session.stdout.buffer.Bytes(), session.anchor), exitCode, session.readSince)
-	if recordRunCacheError != nil {
-		// Not recording is always safe. Said on stderr because a cache that silently never records is
-		// a saving that quietly never appears.
-		session.note(fmt.Sprintf("the run cache did not record this run: %v", firstLine(recordRunCacheError.Error())))
-		return nil
-	}
-	cache.Errors = recordedOutput(session.stderr.buffer.Bytes(), session.anchor)
-	cache.KeyParts = session.keyParts
-	cache.RecordedUnixNanoseconds = time.Now().UnixNano()
-	cache.Summary = recordedOutput(session.summary, session.anchor)
-	return cache
-}
-
-// write puts this run's record, findings, shapes and types into the table, each into its own file, once.
-//
-// Only this run's files are written: its own invocation's run, and the sections it produced. Another
-// invocation's run is another file, so a bare run and `--no-fix` started together never erase each other's
-// record, and nothing has to be read back first to keep it. Two runs writing the same section is a race the
-// later one wins, which costs a miss; nothing here can make a stale entry match, since every entry carries
-// its own proof.
-//
-// The findings are saved even when the run itself was declined. Their entries are keyed on each file's
-// bytes, so a file the fix phase rewrote left an entry for bytes that no longer exist, which can never
-// match.
-func (session *runCacheSession) write(recorded *program.RunCache) {
-	table := program.NewCacheTable()
-	var sections program.CacheTableSections
-	if recorded != nil {
-		table.Runs[session.invocation] = recorded
-		sections.Runs = []string{session.invocation}
-	}
-	if session.findings != nil {
-		table.Findings = session.findings.Recorded()
-		table.Findings.KeyParts = session.findingsKeyParts
-		sections.Findings = true
-	}
-	if session.shapes != nil {
-		table.Signatures = session.shapes
-		sections.Signatures = true
-	}
-	if session.types != nil {
-		if recorded := session.types.Recorded(); recorded != nil {
-			table.Types = recorded
-			sections.Types = true
-		}
-	}
-	if writeCacheTableError := program.WriteCacheTable(
-		session.directory,
-		table,
-		cacheTableIdentity(),
-		sections,
-		session.anchor,
-	); writeCacheTableError != nil {
-		session.note(fmt.Sprintf("the cache table could not be written: %v", firstLine(writeCacheTableError.Error())))
-	}
-}
-
-// note says something about recording this run. Before the caller has its verdict it goes to stderr, as
-// it always did; after, the caller has moved on and its terminal may hold someone else's prompt, so it is
-// kept beside the table for the next run to say instead (printPreviousNotes).
-func (session *runCacheSession) note(text string) {
-	cacheNote(session.directory, text)
-}
-
 // cacheNote says something about the cache in directory: on stderr while the caller is still waiting, and to
 // the next run once it has its verdict.
 func cacheNote(directory string, text string) {
@@ -1132,24 +908,6 @@ func activeTypesReuse() *program.TypeDiagnosticsReuse {
 	return nil
 }
 
-// typesRecord is the types section's own reading and writing, for a run with no recording to carry it: any
-// flag, any named path, the editor's save of one file (#hfv0ae3). Those runs paid the full incremental
-// session, about 180ms reading the build info and 150ms rewriting it, whether they checked 84 files or
-// 3,889. The section is keyed per file on the shape fingerprint and on the compiler options, never on the
-// arguments, so a scoped run may replay what a bare run recorded and the other way round.
-type typesRecord struct {
-	directory string
-	anchor    program.PathAnchor
-	reuse     *program.TypeDiagnosticsReuse
-
-	// shapes is every project file's shape this run, kept for the next when computedShapes says any was
-	// computed rather than carried from the table.
-	shapes         map[string]program.SignatureEntry
-	computedShapes int
-	// shapesGraph is the graph shapes describe. See runCacheSession.shapesGraph.
-	shapesGraph *program.Graph
-}
-
 // attachTypesCache gives a run the run cache does not record the types section, and the shapes it is keyed
 // on. A recorded run already has both from attachFindingsCache.
 //
@@ -1187,36 +945,6 @@ func attachTypesCache(graph *program.Graph, location projectLocation) {
 	record.shapesGraph = graph
 	graph.Shapes = record.shapes
 	pendingTypes = record
-}
-
-// write puts the section, and the shapes when any was computed, into their files, and writes nothing when
-// neither moved. The caller holds the table's lock.
-func (record *typesRecord) write() {
-	if record.reuse.Unchanged() && record.computedShapes == 0 {
-		return
-	}
-	table := program.NewCacheTable()
-	var sections program.CacheTableSections
-	if recorded := record.reuse.Recorded(); recorded != nil {
-		table.Types = recorded
-		sections.Types = true
-	}
-	if record.computedShapes > 0 {
-		table.Signatures = record.shapes
-		sections.Signatures = true
-	}
-	if writeCacheTableError := program.WriteCacheTable(
-		record.directory,
-		table,
-		cacheTableIdentity(),
-		sections,
-		record.anchor,
-	); writeCacheTableError != nil {
-		cacheNote(
-			record.directory,
-			fmt.Sprintf("the cache table could not be written: %v", firstLine(writeCacheTableError.Error())),
-		)
-	}
 }
 
 // anyRuleKeyedOnShapes reports whether any rule declares rule.TypeReachShapes.

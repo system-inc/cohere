@@ -75,18 +75,6 @@ var configParsingOptionCodes = map[int32]string{
 	6046: "An option's value is not one of the values it takes",
 }
 
-// IsOptionsDiagnostic reports whether a diagnostic is about the compiler options rather than about
-// source: a code from either list, located in no file or in one outside this program.
-func (graph *Graph) IsOptionsDiagnostic(diagnostic *ast.Diagnostic) bool {
-	_, raisedByProgram := optionsDiagnosticCodes[diagnostic.Code()]
-	_, raisedByConfiguration := configParsingOptionCodes[diagnostic.Code()]
-	if !raisedByProgram && !raisedByConfiguration {
-		return false
-	}
-	sourceFile := diagnostic.File()
-	return sourceFile == nil || graph.Program.GetSourceFile(sourceFile.FileName()) != sourceFile
-}
-
 // onlyOptionValueDiagnostics reports whether every diagnostic from reading a tsconfig is about one
 // option's name or value, so the graph can still be built. See configParsingOptionCodes.
 func onlyOptionValueDiagnostics(diagnostics []*ast.Diagnostic) bool {

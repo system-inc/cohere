@@ -26,24 +26,6 @@ import (
 	"strings"
 )
 
-// GateCommand is how to invoke one side.
-type GateCommand struct {
-	// Name is what appears in the report.
-	Name string
-	// Program and Arguments are the exact invocation.
-	Program   string
-	Arguments []string
-	// Directory is the working directory, which for both gates is the tree being linted. Getting
-	// this wrong is the single most likely way to produce a confident empty result: both gates
-	// resolve their config and their file list from here.
-	Directory string
-}
-
-// String renders the invocation so a reader can rerun it verbatim.
-func (command GateCommand) String() string {
-	return strings.TrimSpace(command.Program + " " + strings.Join(command.Arguments, " "))
-}
-
 // RunOptions is everything Run needs to compare the two gates over one tree.
 type RunOptions struct {
 	// Root is the tree both gates lint, and the directory paths are made relative to.
@@ -790,18 +772,6 @@ func markPlantedDifferences(report *Report, planted []Control) {
 // sharesPath reports whether a finding landed in the file a control planted.
 func sharesPath(controlPath string, findingPath string) bool {
 	return strings.HasSuffix(filepath.ToSlash(findingPath), filepath.ToSlash(controlPath))
-}
-
-// ObservedDifferences returns the differences that are about the codebase rather than about the
-// harness, which is the number a reader means when they ask how far apart the two gates are.
-func (report Report) ObservedDifferences() []Difference {
-	observed := make([]Difference, 0, len(report.Differences))
-	for _, difference := range report.Differences {
-		if !difference.Planted {
-			observed = append(observed, difference)
-		}
-	}
-	return observed
 }
 
 // sourceLineReaderAt reads lines of files under a root, each file read once, which is how an
