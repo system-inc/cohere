@@ -6,9 +6,13 @@ import (
 	"go/token"
 	"os"
 	"path/filepath"
+	"reflect"
+	"runtime"
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
 // A rule declares exactly what it reads through ctx.Program, and this is what makes that structural
@@ -258,22 +262,46 @@ var programReadsByConstant = map[string]programRead{
 	"ReadsDesignSystem":     readsDesignSystem,
 }
 
-// programReadsByMethod is what each rule.Program method reads. It must name every method the
-// interface has, which the build cannot check from here, so a method missing from this table is
-// refused as unseen rather than counted as reading nothing.
+// programReadsByMethod is what each rule.Program method reads, keyed by the name the method itself
+// gives, so the compiler holds every key to the interface and a rename of a method carries its key.
+// TestProgramReadsNameEveryProgramMethod holds the table to the interface's whole method set; a
+// method missing from it anyway is refused as unseen rather than counted as reading nothing.
 var programReadsByMethod = map[string]programRead{
-	"Options":                        readsCompilerOptions,
-	"GetCurrentDirectory":            readsCompilerOptions,
-	"UseCaseSensitiveFileNames":      readsCompilerOptions,
-	"IsSourceFileDefaultLibrary":     readsDefaultLibrary,
-	"DefaultLibraryPath":             readsDefaultLibrary,
-	"ResolveModule":                  readsModuleResolution,
-	"GetSourceFileForResolvedModule": readsOtherFiles,
-	"SourceFiles":                    readsOtherFiles,
-	"GetSourceFile":                  readsOtherFiles,
-	"FS":                             readsOtherFiles,
-	"DesignSystemFS":                 readsDesignSystem,
-	"Identity":                       0,
+	programMethodName(rule.Program.Options):                        readsCompilerOptions,
+	programMethodName(rule.Program.GetCurrentDirectory):            readsCompilerOptions,
+	programMethodName(rule.Program.UseCaseSensitiveFileNames):      readsCompilerOptions,
+	programMethodName(rule.Program.IsSourceFileDefaultLibrary):     readsDefaultLibrary,
+	programMethodName(rule.Program.DefaultLibraryPath):             readsDefaultLibrary,
+	programMethodName(rule.Program.ResolveModule):                  readsModuleResolution,
+	programMethodName(rule.Program.GetSourceFileForResolvedModule): readsOtherFiles,
+	programMethodName(rule.Program.SourceFiles):                    readsOtherFiles,
+	programMethodName(rule.Program.GetSourceFile):                  readsOtherFiles,
+	programMethodName(rule.Program.FS):                             readsOtherFiles,
+	programMethodName(rule.Program.DesignSystemFS):                 readsDesignSystem,
+	programMethodName(rule.Program.Identity):                       0,
+}
+
+// programMethodName is the name of the rule.Program method a method expression names, as the
+// compiler spells the function: the method's name after the last dot.
+func programMethodName[Method any](method Method) string {
+	function := runtime.FuncForPC(reflect.ValueOf(method).Pointer()).Name()
+	return function[strings.LastIndex(function, ".")+1:]
+}
+
+// The table names every method of rule.Program, read from the interface's type, so a method added to
+// the interface without a line here fails by name, here, rather than as unseen in whichever rule calls
+// it first. A key is a method expression, so it can name nothing else, and a method keyed twice leaves
+// another missing.
+func TestProgramReadsNameEveryProgramMethod(test *testing.T) {
+	test.Parallel()
+
+	programType := reflect.TypeFor[rule.Program]()
+	for index := range programType.NumMethod() {
+		if _, named := programReadsByMethod[programType.Method(index).Name]; !named {
+			test.Errorf("rule.Program.%s is missing from programReadsByMethod, so a rule calling it is "+
+				"refused as reading what this cannot count", programType.Method(index).Name)
+		}
+	}
 }
 
 // programFacts is what one rule file does with the program, read from its syntax.
