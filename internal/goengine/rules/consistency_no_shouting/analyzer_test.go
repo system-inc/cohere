@@ -1,6 +1,9 @@
 package consistency_no_shouting_test
 
 import (
+	"go/token"
+	"os"
+	"strings"
 	"testing"
 
 	"golang.org/x/tools/go/analysis/analysistest"
@@ -38,6 +41,46 @@ func TestAnalyzer(test *testing.T) {
 		"allowed",
 		"lookalike",
 	)
+}
+
+// Each finding covers the word its message names, byte for byte, which the wants above cannot see: analysistest
+// matches a finding's line and message, never its columns. The flagged fixtures put words after multi-byte text,
+// inside masked code and out, on a block comment's lines below its opening one, and twice in one comment, so a finding
+// off by a rune's extra bytes, at the comment's start, or at a word's first occurrence covers something else.
+func TestEachFindingCoversItsWord(test *testing.T) {
+	test.Parallel()
+	results := analysistest.Run(errorsOnly{test}, analysistest.TestData(), consistency_no_shouting.Analyzer, "flagged")
+	sources := map[string][]byte{}
+	checked := 0
+	for _, result := range results {
+		// Per result, since the package and its test variant are each a result that reads flagged.go.
+		reportedAt := map[token.Pos]bool{}
+		for _, diagnostic := range result.Diagnostics {
+			file := result.Pass.Fset.File(diagnostic.Pos)
+			source, isRead := sources[file.Name()]
+			if !isRead {
+				var readError error
+				source, readError = os.ReadFile(file.Name())
+				if readError != nil {
+					test.Fatalf("reading the fixture %s: %v", file.Name(), readError)
+				}
+				sources[file.Name()] = source
+			}
+			position := result.Pass.Fset.Position(diagnostic.Pos)
+			covered := string(source[file.Offset(diagnostic.Pos):file.Offset(diagnostic.End)])
+			if !strings.HasPrefix(diagnostic.Message, `"`+covered+`" in a comment`) {
+				test.Errorf("%s: the finding covers %q, and its message is %q", position, covered, diagnostic.Message)
+			}
+			if reportedAt[diagnostic.Pos] {
+				test.Errorf("%s: two findings start here, so one word was reported for another", position)
+			}
+			reportedAt[diagnostic.Pos] = true
+			checked++
+		}
+	}
+	if checked == 0 {
+		test.Fatal("the flagged fixtures gave no findings, so no span was checked")
+	}
 }
 
 // errorsOnly hands analysistest.Run a reporter that isn't a testing.TB. Given a testing.TB, Run first proves the go
