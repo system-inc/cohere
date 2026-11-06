@@ -1,0 +1,14 @@
+package nexus
+
+import "github.com/system-inc/cohere/internal/lint/rule"
+
+// init registers nexus/consistency-no-label.
+//
+// A file of its own rather than a line in the package's shared `register.go`, so two authors landing
+// at once touch nothing in common.
+//
+// No decoder: the rule takes no options. Labels are banned in every language, and an option exempting
+// a loop or a switch would let a project's engines disagree.
+func init() {
+	rule.Register(rule.Registration[rule.NoOptions]{Rule: ConsistencyNoLabel})
+}

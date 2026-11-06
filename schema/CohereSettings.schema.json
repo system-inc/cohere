@@ -650,6 +650,9 @@
                 "nexus/consistency-no-iso-string-date-cut": {
                     "$ref": "#/$defs/ruleSetting"
                 },
+                "nexus/consistency-no-label": {
+                    "$ref": "#/$defs/ruleSetting"
+                },
                 "nexus/consistency-no-long-line-comment": {
                     "$ref": "#/$defs/ruleSetting"
                 },

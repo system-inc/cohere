@@ -25,22 +25,6 @@
     },
     {
         "engine": "typescript",
-        "family": "labels",
-        "case": "lb00",
-        "kind": "span",
-        "task": "bwrr0nm",
-        "reason": "`no-labels` covers the whole labeled statement, the loop included, rather than the label"
-    },
-    {
-        "engine": "typescript",
-        "family": "labels",
-        "case": "lb01",
-        "kind": "verdict",
-        "task": "bwrr0nm",
-        "reason": "`no-labels` reports the `continue` and the `break` naming the label too, three findings for one label"
-    },
-    {
-        "engine": "typescript",
         "family": "separated-folder-words",
         "task": "narw7aq",
         "reason": "TypeScript has no separated-folder-words rule"
