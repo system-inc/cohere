@@ -314,45 +314,5 @@
         "kind": "span",
         "task": "rv17qp3",
         "reason": "covers the whole comment rather than the shouted word"
-    },
-    {
-        "engine": "go",
-        "family": "utils-folder",
-        "case": "uf01",
-        "kind": "span",
-        "task": "mxe7xjy",
-        "reason": "covers the package clause `package utils` rather than the file's start"
-    },
-    {
-        "engine": "go",
-        "family": "utils-folder",
-        "case": "uf01b",
-        "kind": "span",
-        "task": "mxe7xjy",
-        "reason": "covers the package clause rather than the file's start"
-    },
-    {
-        "engine": "go",
-        "family": "utils-folder",
-        "case": "uf02",
-        "kind": "span",
-        "task": "mxe7xjy",
-        "reason": "covers the package clause `package util` rather than the file's start"
-    },
-    {
-        "engine": "go",
-        "family": "utils-folder",
-        "case": "uf03",
-        "kind": "verdict",
-        "task": "mxe7xjy",
-        "reason": "silent on the folder `Utils`: it reads only the import path's last element, case-sensitively"
-    },
-    {
-        "engine": "go",
-        "family": "utils-folder",
-        "case": "uf05",
-        "kind": "span",
-        "task": "mxe7xjy",
-        "reason": "covers the package clause `package utils` rather than the file's start"
     }
 ]
