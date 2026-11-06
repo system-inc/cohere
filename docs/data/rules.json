@@ -8803,8 +8803,7 @@
             "typeAware": false,
             "messageIds": [
                 "noAmbiguousE",
-                "noSingleLetter",
-                "noUnderscore"
+                "noSingleLetter"
             ],
             "sets": [
                 {
