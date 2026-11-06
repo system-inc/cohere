@@ -25,7 +25,7 @@ func TestLandRefusesTheRuleCpuBudgetBeforeTests(test *testing.T) {
 		test.Fatal(writeError)
 	}
 	fixture.git(worktreeA, "add", "internal")
-	fixture.git(worktreeA, "commit", "-q", "-m", "a rule CPU check")
+	fixture.git(worktreeA, "commit", "-q", "-m", "internal: a rule CPU check (#"+fixtureTask+")")
 	bin := test.TempDir()
 	marker := filepath.Join(bin, "under-budget")
 	log := filepath.Join(bin, "commands")
@@ -49,7 +49,7 @@ exit 0
 	}
 	environment := append(fixture.environment, "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"))
 	land := func() (string, error) {
-		command := exec.Command(fixture.wrapper, "land")
+		command := exec.Command(fixture.wrapper, "land", "--message", "a rule CPU check")
 		command.Dir, command.Env = worktreeA, environment
 		output, outputError := command.CombinedOutput()
 		return string(output), outputError

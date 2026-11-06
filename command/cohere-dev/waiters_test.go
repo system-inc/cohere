@@ -57,7 +57,12 @@ func TestAWaiterNamesEachNewHolder(test *testing.T) {
 		if createError != nil {
 			test.Fatal(createError)
 		}
-		defer file.Close()
+		// The child writes through its own copy of the descriptor, so this one closes once the child has it.
+		defer func() {
+			if closeError := file.Close(); closeError != nil {
+				test.Error(closeError)
+			}
+		}()
 		// Each run holds its token until the test lets it go, so how long it holds is the test's to decide.
 		command := exec.Command(wrapper, "exec", "--", "sh", "-c",
 			"while [ ! -e '"+release+"' ]; do sleep 0.05; done # "+marker)
