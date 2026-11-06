@@ -85,7 +85,7 @@ func (product Product) state() (*productState, error) {
 				"listing the %s product's packages: %s: %s",
 				product.Name,
 				listedPackage.ImportPath,
-				listedPackage.Error.Err,
+				listedPackage.Error.Message,
 			)
 		}
 	}
@@ -453,7 +453,7 @@ func (product Product) compile(state *productState, directory string) error {
 		var listed struct {
 			ImportPath string
 			Export     string
-			Error      *struct{ Err string }
+			Error      *listedError
 		}
 		if decodeError := decoder.Decode(&listed); errors.Is(decodeError, io.EOF) {
 			break
@@ -461,7 +461,7 @@ func (product Product) compile(state *productState, directory string) error {
 			return decodeError
 		}
 		if listed.Error != nil {
-			return fmt.Errorf("building the %s product: %s: %s", product.Name, listed.ImportPath, listed.Error.Err)
+			return fmt.Errorf("building the %s product: %s: %s", product.Name, listed.ImportPath, listed.Error.Message)
 		}
 		if !state.exported[listed.ImportPath] {
 			return fmt.Errorf(

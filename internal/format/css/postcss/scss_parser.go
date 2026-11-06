@@ -179,14 +179,14 @@ func (parser *scssParser) rule(tokens []token) {
 			}
 		}
 
-		node.prop = ""
+		node.property = ""
 		node.mark("prop")
 		for len(remaining) > 0 {
 			kind := remaining[0].kind
 			if kind == ":" || kind == "space" || kind == "comment" {
 				break
 			}
-			node.prop += remaining[0].value
+			node.property += remaining[0].value
 			remaining = remaining[1:]
 		}
 
@@ -205,9 +205,9 @@ func (parser *scssParser) rule(tokens []token) {
 			}
 		}
 
-		if node.prop != "" && (node.prop[0] == '_' || node.prop[0] == '*') {
-			node.raws["before"] = rawText(node.rawString("before") + node.prop[:1])
-			node.prop = node.prop[1:]
+		if node.property != "" && (node.property[0] == '_' || node.property[0] == '*') {
+			node.raws["before"] = rawText(node.rawString("before") + node.property[:1])
+			node.property = node.property[1:]
 		}
 		node.raws["between"] = rawText(node.rawString("between") + parser.spacesAndCommentsFromStart(&remaining))
 		// precheckMissedSemicolon is a hook for postcss-safe-parser; the base parser's does nothing.

@@ -112,7 +112,7 @@ func TestCheckSeesATierChange(test *testing.T) {
 	changedSet := inputs.SetNames[0]
 	var changedRule string
 	loadSet := inputs.LoadSet
-	inputs.LoadSet = func(name string) (*configuration.Config, error) {
+	inputs.LoadSet = func(name string) (*configuration.Configuration, error) {
 		resolved, loadSetError := loadSet(name)
 		if loadSetError != nil || name != changedSet {
 			return resolved, loadSetError

@@ -175,10 +175,10 @@ func TestFormatInParallelLeavesTheRulesToTheSerialPath(test *testing.T) {
 			attempts[1],
 		)
 	}
-	if !attempts[2].done || !errors.Is(attempts[2].err, failure) {
+	if !attempts[2].done || !errors.Is(attempts[2].formatError, failure) {
 		test.Errorf("a failure was not kept for the serial loop to report: %+v", attempts[2])
 	}
-	if !attempts[3].done || attempts[3].result.FileName != "/d.md" || attempts[3].err != nil {
+	if !attempts[3].done || attempts[3].result.FileName != "/d.md" || attempts[3].formatError != nil {
 		test.Errorf("a file with nothing to ask was not done: %+v", attempts[3])
 	}
 }

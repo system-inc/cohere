@@ -326,7 +326,7 @@ func applyProposedFixes(
 
 	results := make([]edit.FileResult, 0, len(fileNames))
 	for index, fileName := range fileNames {
-		fileResult, processError := attempts[index].result, attempts[index].err
+		fileResult, processError := attempts[index].result, attempts[index].formatError
 		if !attempts[index].done {
 			// Again for each file this loop formats, since a file before it may have failed and said so.
 			streams.Show(streams.Errors)
@@ -402,9 +402,9 @@ var parallelFormatWorkers = func() int { return runtime.GOMAXPROCS(0) }
 // formatAttempt is one file's result from the parallel pass. done is false when the file is left to the
 // serial path, because it had proposals or its formatting led back to the rules.
 type formatAttempt struct {
-	result edit.FileResult
-	err    error
-	done   bool
+	result      edit.FileResult
+	formatError error
+	done        bool
 }
 
 // formatInParallel runs the fix phase's own processing, in parallel, over the candidates no rule proposed
@@ -449,7 +449,7 @@ func formatInParallel(fileNames []string, byFileName map[string][]edit.Proposal,
 				if errors.Is(processError, errorRelintRefused) {
 					continue
 				}
-				attempts[index] = formatAttempt{result: result, err: processError, done: true}
+				attempts[index] = formatAttempt{result: result, formatError: processError, done: true}
 			}
 		}()
 	}
@@ -848,7 +848,7 @@ func speculateFormatOn(
 					continue
 				}
 				mutex.Lock()
-				speculation.attempts[fileName] = formatAttempt{result: result, err: checkError, done: true}
+				speculation.attempts[fileName] = formatAttempt{result: result, formatError: checkError, done: true}
 				speculation.read[fileName] = result.Text
 				mutex.Unlock()
 			}

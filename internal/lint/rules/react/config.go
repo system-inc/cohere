@@ -50,7 +50,7 @@ const (
 	typeConfigFunction typeConfigKind = "function"
 )
 
-// Config flags a React Compiler module type configuration whose declared type contradicts its name.
+// Configuration flags a React Compiler module type configuration whose declared type contradicts its name.
 //
 //	valid:   import {useForm} from 'react-hook-form';
 //	valid:   import {useReactTable} from '@tanstack/react-table';
@@ -137,7 +137,7 @@ const (
 // stated divergence rather than an oversight: reproducing the use site would require the binding
 // resolution pass this rule deliberately does not build, and the import specifier is the node that
 // actually carries the misconfigured name.
-var Config = rule.Rule[CompilerRuleOptions]{
+var Configuration = rule.Rule[CompilerRuleOptions]{
 	// Bare name, no namespace prefix. The inventory writes `react/config` and the parity guard
 	// strips the namespace on a `/` boundary, so `react-config` would match no entry while still
 	// passing every fixture in this file.

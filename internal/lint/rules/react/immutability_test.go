@@ -705,9 +705,9 @@ func TestImmutabilityJoinIsNotAnOrdering(test *testing.T) {
 	test.Parallel()
 
 	cases := []struct {
-		name     string
-		right, b immutabilityValueKind
-		expected immutabilityValueKind
+		name        string
+		left, right immutabilityValueKind
+		expected    immutabilityValueKind
 	}{
 		{"frozen with mutable is a third element", immutabilityFrozen, immutabilityMutable, immutabilityMaybeFrozen},
 		{"the join is commutative", immutabilityMutable, immutabilityFrozen, immutabilityMaybeFrozen},
@@ -727,7 +727,7 @@ func TestImmutabilityJoinIsNotAnOrdering(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			if got := immutabilityMergeKinds(testCase.right, testCase.b); got != testCase.expected {
+			if got := immutabilityMergeKinds(testCase.left, testCase.right); got != testCase.expected {
 				test.Errorf("expected %v, got %v", testCase.expected, got)
 			}
 		})

@@ -12,10 +12,10 @@ import (
 // no config, or a tsconfig without `incremental` all mean the caller should use
 // AllDiagnostics.
 func (graph *Graph) NewIncrementalSession() *IncrementalSession {
-	if graph.CompilerHost == nil || graph.Config == nil {
+	if graph.CompilerHost == nil || graph.Configuration == nil {
 		return nil
 	}
-	if !graph.Config.CompilerOptions().IsIncremental() {
+	if !graph.Configuration.CompilerOptions().IsIncremental() {
 		return nil
 	}
 
@@ -28,7 +28,7 @@ func (graph *Graph) NewIncrementalSession() *IncrementalSession {
 	// A nil previous program is a cold start, not a failure: no build info on disk, a version
 	// mismatch, or a non-incremental one all return nil and all mean check everything.
 	reader := incremental.NewBuildInfoReader(graph.CompilerHost)
-	previous := incremental.ReadBuildInfoProgram(graph.Config, reader, graph.CompilerHost)
+	previous := incremental.ReadBuildInfoProgram(graph.Configuration, reader, graph.CompilerHost)
 
 	incrementalProgram := incremental.NewProgram(graph.Program, previous, host)
 	if incrementalProgram == nil {

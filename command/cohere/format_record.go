@@ -320,11 +320,11 @@ func enumerateFormatUniverse(engine formatEngine, root string) (formatUniverse, 
 
 // formatWalkAhead is the format walk begun before the graph build, for the fix phase to take.
 type formatWalkAhead struct {
-	engine      formatEngine
-	root        string
-	done        chan struct{}
-	enumeration formatfiles.Enumeration
-	err         error
+	engine           formatEngine
+	root             string
+	done             chan struct{}
+	enumeration      formatfiles.Enumeration
+	enumerationError error
 }
 
 // aheadFormatWalk is the walk startFormatWalkAhead began, nil once taken or when none was.
@@ -345,9 +345,9 @@ func startFormatWalkAhead(engine formatEngine, root string, listing gitignore.Li
 	go func() {
 		defer close(ahead.done)
 		if listed, ok := engine.(listedEnumerator); ok && listing != nil {
-			ahead.enumeration, ahead.err = listed.EnumerateListed(root, listing)
+			ahead.enumeration, ahead.enumerationError = listed.EnumerateListed(root, listing)
 		} else {
-			ahead.enumeration, ahead.err = engine.Enumerate(root)
+			ahead.enumeration, ahead.enumerationError = engine.Enumerate(root)
 		}
 		ahead.enumeration = withoutYieldedDirectories(ahead.enumeration)
 	}()
@@ -365,7 +365,7 @@ func enumerateFormatTree(engine formatEngine, root string) (formatfiles.Enumerat
 	if ahead := aheadFormatWalk; ahead != nil && ahead.engine == engine && ahead.root == root {
 		aheadFormatWalk = nil
 		<-ahead.done
-		return ahead.enumeration, ahead.err
+		return ahead.enumeration, ahead.enumerationError
 	}
 	// Less what the projects below this one format, when it is one project of several. See ownership.go.
 	enumeration, enumerateError := engine.Enumerate(root)

@@ -90,7 +90,7 @@ func TestBuildReturnsEveryNamedFileWhenNothingMoved(test *testing.T) {
 	if buildError != nil {
 		test.Fatalf("building: %v", buildError)
 	}
-	if named, got := len(graph.Config.FileNames()), len(graph.ProjectFiles()); named != 2 || got != 2 {
+	if named, got := len(graph.Configuration.FileNames()), len(graph.ProjectFiles()); named != 2 || got != 2 {
 		test.Fatalf("named %d and returned %d project files, want 2 and 2", named, got)
 	}
 }
@@ -137,7 +137,7 @@ func TestBuildNeverPanicsWhileTheTreeChangesUnderIt(test *testing.T) {
 			if buildError != nil {
 				return
 			}
-			if named, got := len(graph.Config.FileNames()), len(graph.ProjectFiles()); named != got {
+			if named, got := len(graph.Configuration.FileNames()), len(graph.ProjectFiles()); named != got {
 				test.Fatalf("attempt %d: a successful build named %d files and returned %d", attempt, named, got)
 			}
 		}()

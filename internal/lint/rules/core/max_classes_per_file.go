@@ -52,9 +52,9 @@ func DefaultMaxClassesPerFileSettings() MaxClassesPerFileOptions {
 	return MaxClassesPerFileOptions{Maximum: &maximum, IgnoreExpressions: &ignoreExpressions}
 }
 
-// maxClassesPerFileObjectShape is the object arm of upstream's `oneOf`, named so the decoder can try
+// maximumClassesPerFileObjectShape is the object arm of upstream's `oneOf`, named so the decoder can try
 // it after the integer arm fails.
-type maxClassesPerFileObjectShape struct {
+type maximumClassesPerFileObjectShape struct {
 	Maximum           *int  `json:"max"`
 	IgnoreExpressions *bool `json:"ignoreExpressions"`
 }
@@ -99,7 +99,7 @@ func DecodeMaxClassesPerFileOptions(raw []byte) (MaxClassesPerFileOptions, error
 		return settings, nil
 	}
 
-	var object maxClassesPerFileObjectShape
+	var object maximumClassesPerFileObjectShape
 	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &object); unmarshalOptionsError != nil {
 		return DefaultMaxClassesPerFileSettings(), unmarshalOptionsError
 	}

@@ -41,7 +41,7 @@ type scssTokenizer struct {
 	currentToken      token
 
 	length   int
-	pos      int
+	offset   int
 	buffer   []token
 	returned []token
 
@@ -54,7 +54,7 @@ func newScssTokenizer(in *input) *scssTokenizer {
 		input:    in,
 		css:      in.units,
 		length:   len(in.units),
-		pos:      0,
+		offset:   0,
 		buffer:   []token{},
 		returned: []token{},
 	}
@@ -86,18 +86,18 @@ func (tokens *scssTokenizer) indexOf(search string, from int) int {
 }
 
 func (tokens *scssTokenizer) position() int {
-	return tokens.pos
+	return tokens.offset
 }
 
 func (tokens *scssTokenizer) unclosed(what string) {
 	// Invariant: this is upstream's throw of a CssSyntaxError, which an unclosed string, comment or
 	// interpolation reaches; Parse recovers every *CssSyntaxError and returns it as a syntax error, so the
 	// panic never leaves the package.
-	panic(tokens.input.errorAt("Unclosed "+what, tokens.pos))
+	panic(tokens.input.errorAt("Unclosed "+what, tokens.offset))
 }
 
 func (tokens *scssTokenizer) endOfFile() bool {
-	return len(tokens.returned) == 0 && tokens.pos >= tokens.length
+	return len(tokens.returned) == 0 && tokens.offset >= tokens.length
 }
 
 // `SCSS PATCH` {
@@ -143,15 +143,15 @@ func (tokens *scssTokenizer) nextToken() (token, bool) {
 		tokens.returned = tokens.returned[:len(tokens.returned)-1]
 		return last, true
 	}
-	if tokens.pos >= tokens.length {
+	if tokens.offset >= tokens.length {
 		return token{}, false
 	}
 
-	tokens.code = tokens.characterCodeAt(tokens.pos)
+	tokens.code = tokens.characterCodeAt(tokens.offset)
 
 	switch tokens.code {
 	case newline, space, tab, carriageReturn, feed:
-		tokens.next = tokens.pos
+		tokens.next = tokens.offset
 		for {
 			tokens.next += 1
 			tokens.code = tokens.characterCodeAt(tokens.next)
@@ -166,19 +166,19 @@ func (tokens *scssTokenizer) nextToken() (token, bool) {
 
 		tokens.currentToken = token{
 			kind:  "space",
-			value: tokens.input.slice(tokens.pos, tokens.next),
+			value: tokens.input.slice(tokens.offset, tokens.next),
 			start: -1,
 			end:   -1,
 		}
-		tokens.pos = tokens.next - 1
+		tokens.offset = tokens.next - 1
 
 	case openSquare, closeSquare, openCurly, closeCurly, colon, semicolon, closeParentheses:
 		controlCharacter := string(rune(tokens.code))
-		tokens.currentToken = token{kind: controlCharacter, value: controlCharacter, start: tokens.pos, end: -1}
+		tokens.currentToken = token{kind: controlCharacter, value: controlCharacter, start: tokens.offset, end: -1}
 
 	// `SCSS PATCH` {
 	case comma:
-		tokens.currentToken = token{kind: "word", value: ",", start: tokens.pos, end: tokens.pos + 1}
+		tokens.currentToken = token{kind: "word", value: ",", start: tokens.offset, end: tokens.offset + 1}
 	// } `SCSS PATCH`
 
 	case openParentheses:
@@ -187,13 +187,13 @@ func (tokens *scssTokenizer) nextToken() (token, bool) {
 			tokens.previous = tokens.buffer[len(tokens.buffer)-1].value
 			tokens.buffer = tokens.buffer[:len(tokens.buffer)-1]
 		}
-		tokens.nextCode = tokens.characterCodeAt(tokens.pos + 1)
+		tokens.nextCode = tokens.characterCodeAt(tokens.offset + 1)
 
 		// `SCSS PATCH` {
 		if tokens.previous == "url" && tokens.nextCode != singleQuote && tokens.nextCode != doubleQuote {
 			tokens.brackets = 1
 			tokens.escaped = false
-			tokens.next = tokens.pos + 1
+			tokens.next = tokens.offset + 1
 			for tokens.next <= tokens.length-1 {
 				tokens.nextCode = tokens.characterCodeAt(tokens.next)
 				if tokens.nextCode == backslash {
@@ -209,31 +209,31 @@ func (tokens *scssTokenizer) nextToken() (token, bool) {
 				tokens.next += 1
 			}
 
-			tokens.content = tokens.input.slice(tokens.pos, tokens.next+1)
-			tokens.currentToken = token{kind: "brackets", value: tokens.content, start: tokens.pos, end: tokens.next}
-			tokens.pos = tokens.next
+			tokens.content = tokens.input.slice(tokens.offset, tokens.next+1)
+			tokens.currentToken = token{kind: "brackets", value: tokens.content, start: tokens.offset, end: tokens.next}
+			tokens.offset = tokens.next
 			// } `SCSS PATCH`
 		} else {
-			tokens.next = tokens.indexOf(")", tokens.pos+1)
-			tokens.content = tokens.input.slice(tokens.pos, tokens.next+1)
+			tokens.next = tokens.indexOf(")", tokens.offset+1)
+			tokens.content = tokens.input.slice(tokens.offset, tokens.next+1)
 
-			if tokens.next == -1 || hasBadBracket(tokens.css[tokens.pos:tokens.next+1]) {
-				tokens.currentToken = token{kind: "(", value: "(", start: tokens.pos, end: -1}
+			if tokens.next == -1 || hasBadBracket(tokens.css[tokens.offset:tokens.next+1]) {
+				tokens.currentToken = token{kind: "(", value: "(", start: tokens.offset, end: -1}
 			} else {
 				tokens.currentToken = token{
 					kind:  "brackets",
 					value: tokens.content,
-					start: tokens.pos,
+					start: tokens.offset,
 					end:   tokens.next,
 				}
-				tokens.pos = tokens.next
+				tokens.offset = tokens.next
 			}
 		}
 
 	case singleQuote, doubleQuote:
 		// `SCSS PATCH` {
 		tokens.quote = tokens.code
-		tokens.next = tokens.pos
+		tokens.next = tokens.offset
 
 		tokens.escaped = false
 		for tokens.next < tokens.length {
@@ -259,17 +259,17 @@ func (tokens *scssTokenizer) nextToken() (token, bool) {
 
 		tokens.currentToken = token{
 			kind:  "string",
-			value: tokens.input.slice(tokens.pos, tokens.next+1),
-			start: tokens.pos,
+			value: tokens.input.slice(tokens.offset, tokens.next+1),
+			start: tokens.offset,
 			end:   tokens.next,
 		}
-		tokens.pos = tokens.next
+		tokens.offset = tokens.next
 
 	case at:
 		// RE_AT_END.lastIndex = pos + 1; RE_AT_END.test(css): a match at index m leaves lastIndex m + 1,
 		// and no match leaves it 0.
 		match := -1
-		for index := tokens.pos + 1; index < tokens.length; index++ {
+		for index := tokens.offset + 1; index < tokens.length; index++ {
 			if isAtEnd(tokens.css[index]) {
 				match = index
 				break
@@ -283,15 +283,15 @@ func (tokens *scssTokenizer) nextToken() (token, bool) {
 
 		tokens.currentToken = token{
 			kind:  "at-word",
-			value: tokens.input.slice(tokens.pos, tokens.next+1),
-			start: tokens.pos,
+			value: tokens.input.slice(tokens.offset, tokens.next+1),
+			start: tokens.offset,
 			end:   tokens.next,
 		}
 
-		tokens.pos = tokens.next
+		tokens.offset = tokens.next
 
 	case backslash:
-		tokens.next = tokens.pos
+		tokens.next = tokens.offset
 		tokens.escape = true
 		for tokens.characterCodeAt(tokens.next+1) == backslash {
 			tokens.next += 1
@@ -318,26 +318,26 @@ func (tokens *scssTokenizer) nextToken() (token, bool) {
 
 		tokens.currentToken = token{
 			kind:  "word",
-			value: tokens.input.slice(tokens.pos, tokens.next+1),
-			start: tokens.pos,
+			value: tokens.input.slice(tokens.offset, tokens.next+1),
+			start: tokens.offset,
 			end:   tokens.next,
 		}
 
-		tokens.pos = tokens.next
+		tokens.offset = tokens.next
 
 	default:
 		// `SCSS PATCH` {
-		tokens.nextCode = tokens.characterCodeAt(tokens.pos + 1)
+		tokens.nextCode = tokens.characterCodeAt(tokens.offset + 1)
 
 		if tokens.code == hash && tokens.nextCode == openCurly {
-			tokens.next = tokens.pos
+			tokens.next = tokens.offset
 			tokens.interpolation()
-			tokens.content = tokens.input.slice(tokens.pos, tokens.next+1)
-			tokens.currentToken = token{kind: "word", value: tokens.content, start: tokens.pos, end: tokens.next}
-			tokens.pos = tokens.next
+			tokens.content = tokens.input.slice(tokens.offset, tokens.next+1)
+			tokens.currentToken = token{kind: "word", value: tokens.content, start: tokens.offset, end: tokens.next}
+			tokens.offset = tokens.next
 		} else if tokens.code == slash && tokens.nextCode == asterisk {
 			// } `SCSS PATCH`
-			tokens.next = tokens.indexOf("*/", tokens.pos+2) + 1
+			tokens.next = tokens.indexOf("*/", tokens.offset+2) + 1
 			if tokens.next == 0 {
 				// ignore and ignoreUnclosed are always false here.
 				tokens.unclosed("comment")
@@ -345,17 +345,17 @@ func (tokens *scssTokenizer) nextToken() (token, bool) {
 
 			tokens.currentToken = token{
 				kind:  "comment",
-				value: tokens.input.slice(tokens.pos, tokens.next+1),
-				start: tokens.pos,
+				value: tokens.input.slice(tokens.offset, tokens.next+1),
+				start: tokens.offset,
 				end:   tokens.next,
 			}
-			tokens.pos = tokens.next
+			tokens.offset = tokens.next
 
 			// `SCSS PATCH` {
 		} else if tokens.code == slash && tokens.nextCode == slash {
 			// RE_NEW_LINE.lastIndex = pos + 1; RE_NEW_LINE.test(css).
 			match := -1
-			for index := tokens.pos + 1; index < tokens.length; index++ {
+			for index := tokens.offset + 1; index < tokens.length; index++ {
 				if isNewLine(tokens.css[index]) {
 					match = index
 					break
@@ -367,21 +367,21 @@ func (tokens *scssTokenizer) nextToken() (token, bool) {
 				tokens.next = match - 1
 			}
 
-			tokens.content = tokens.input.slice(tokens.pos, tokens.next+1)
+			tokens.content = tokens.input.slice(tokens.offset, tokens.next+1)
 			tokens.currentToken = token{
 				kind:   "comment",
 				value:  tokens.content,
-				start:  tokens.pos,
+				start:  tokens.offset,
 				end:    tokens.next,
 				inline: true,
 			}
 
-			tokens.pos = tokens.next
+			tokens.offset = tokens.next
 			// } `SCSS PATCH`
 		} else {
 			// RE_WORD_END.lastIndex = pos + 1; RE_WORD_END.test(css).
 			match := -1
-			for index := tokens.pos + 1; index < tokens.length; index++ {
+			for index := tokens.offset + 1; index < tokens.length; index++ {
 				unit := tokens.css[index]
 				if isScssWordEnd(unit) || (unit == slash && tokens.characterCodeAt(index+1) == asterisk) {
 					match = index
@@ -396,16 +396,16 @@ func (tokens *scssTokenizer) nextToken() (token, bool) {
 
 			tokens.currentToken = token{
 				kind:  "word",
-				value: tokens.input.slice(tokens.pos, tokens.next+1),
-				start: tokens.pos,
+				value: tokens.input.slice(tokens.offset, tokens.next+1),
+				start: tokens.offset,
 				end:   tokens.next,
 			}
 			tokens.buffer = append(tokens.buffer, tokens.currentToken)
-			tokens.pos = tokens.next
+			tokens.offset = tokens.next
 		}
 	}
 
-	tokens.pos++
+	tokens.offset++
 	return tokens.currentToken, true
 }
 

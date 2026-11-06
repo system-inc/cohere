@@ -32,7 +32,12 @@ func resolveCollection(
 	return coll
 }
 
-func composeCollection(composition *composeContext, token *cst.Token, properties props, onError onErrorFunc) *Node {
+func composeCollection(
+	composition *composeContext,
+	token *cst.Token,
+	properties properties,
+	onError onErrorFunc,
+) *Node {
 	tagToken := properties.tag
 	tagName := ""
 	if tagToken != nil {

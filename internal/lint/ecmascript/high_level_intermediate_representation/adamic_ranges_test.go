@@ -171,7 +171,7 @@ func writeAdamicRangesCase(out *strings.Builder, name string, function *Function
 	if graph.ParametersFrozen(function) {
 		out.WriteString("frozen-parameters\n")
 	}
-	for _, parameter := range graph.Params(function) {
+	for _, parameter := range graph.Parameters(function) {
 		fmt.Fprintf(out, "param %d\n", value(parameter))
 	}
 	for _, context := range graph.Context(function) {
@@ -243,7 +243,7 @@ func writeAdamicRangesCase(out *strings.Builder, name string, function *Function
 			fmt.Fprintf(out, "expect %d %d %d\n", id, mutableRange.Start, mutableRange.End)
 		}
 	}
-	fmt.Fprintf(out, "expect-length %d\n", ranges.Len())
+	fmt.Fprintf(out, "expect-length %d\n", ranges.Length())
 	out.WriteString("passes ranges\n")
 	return closures
 }

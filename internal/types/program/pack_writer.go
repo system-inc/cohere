@@ -8,10 +8,10 @@ import (
 
 // packWriter appends entries' bytes to a data file through one buffer, tracking where each lands.
 type packWriter struct {
-	file   *os.File
-	offset int64
-	buffer []byte
-	err    error
+	file       *os.File
+	offset     int64
+	buffer     []byte
+	writeError error
 }
 
 // add appends contents to the data file and is the entry that says where they land.
@@ -43,12 +43,12 @@ func (writer *packWriter) flush() {
 }
 
 func (writer *packWriter) write(data []byte) {
-	if writer.err == nil && len(data) > 0 {
-		_, writer.err = writer.file.Write(data)
+	if writer.writeError == nil && len(data) > 0 {
+		_, writer.writeError = writer.file.Write(data)
 	}
 }
 
 func (writer *packWriter) finish() error {
 	writer.flush()
-	return writer.err
+	return writer.writeError
 }

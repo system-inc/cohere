@@ -25,8 +25,8 @@ type ruleSelection struct {
 	scopedOff    []string
 	unconfigured []string
 
-	// err is a rule's options failing to decode, which fails the run.
-	err error
+	// decodeError is a rule's options failing to decode, which fails the run.
+	decodeError error
 
 	// measureOnly is the cohere:adamic rules the chain leaves off or never names, run for readiness alone,
 	// empty when the run measures no readiness. See Readiness.

@@ -158,7 +158,7 @@ type lintConfigOverride struct {
 // Built through configuration.Load rather than by hand so the test exercises the same parsing, override
 // ordering, and root resolution the command does. A hand-built Config would test this guard against
 // a shape the loader never produces.
-func configurationFrom(test *testing.T, raw lintConfigFile) *configuration.Config {
+func configurationFrom(test *testing.T, raw lintConfigFile) *configuration.Configuration {
 	test.Helper()
 
 	directory := test.TempDir()

@@ -101,7 +101,11 @@ func (testGraph) EachTerminalPlace(block *testBlock, visit func(*testPlace, ssa.
 func (testGraph) SetTerminalOrder(block *testBlock, order ssa.EvaluationOrder) {
 	block.terminalOrder = order
 }
-func (testGraph) Params(function *testFunction) []testPlace                                 { return function.params }
+func (testGraph) Parameters(
+	function *testFunction,
+) []testPlace {
+	return function.parameters
+}
 func (testGraph) Returns(function *testFunction) *testPlace                                 { return function.returns }
 func (testGraph) Declaration(function *testFunction, id ssa.IdentifierId) ssa.DeclarationId { return 0 }
 func (testGraph) Contextual(function *testFunction, declaration ssa.DeclarationId) bool     { return false }
@@ -178,7 +182,7 @@ func TestParametersDefinedOnEntryBothWays(test *testing.T) {
 	build := func() (*testFunction, ssa.IdentifierId, ssa.IdentifierId, ssa.IdentifierId) {
 		function := newTestFunction()
 		mutated, readOnly, untouched := ssa.IdentifierId(1), ssa.IdentifierId(2), ssa.IdentifierId(3)
-		function.params = []testPlace{place(mutated), place(readOnly), place(untouched)}
+		function.parameters = []testPlace{place(mutated), place(readOnly), place(untouched)}
 		entry := function.block()
 		entry.add(&testInstruction{
 			uses: []testPlace{place(readOnly)},
@@ -287,7 +291,7 @@ func TestFrozenParametersDropAConditionalMutation(test *testing.T) {
 		function := newTestFunction()
 		function.parametersFrozen = frozen
 		identifierId := ssa.IdentifierId(1)
-		function.params = []testPlace{place(identifierId)}
+		function.parameters = []testPlace{place(identifierId)}
 		entry := function.block()
 		entry.add(&testInstruction{uses: []testPlace{place(identifierId)}})
 		entry.add(&testInstruction{uses: []testPlace{place(identifierId)},

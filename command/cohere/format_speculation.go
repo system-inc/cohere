@@ -58,7 +58,7 @@ func (speculation *formatSpeculation) keepable(
 		if len(byFileName[fileName]) != 0 {
 			continue
 		}
-		if attempt.err == nil && graph != nil && graph.Program != nil {
+		if attempt.formatError == nil && graph != nil && graph.Program != nil {
 			if sourceFile := graph.Program.GetSourceFile(
 				tspath.RootedFilePath(fileName),
 			); sourceFile != nil && sourceFile.Text() != speculation.read[fileName] {

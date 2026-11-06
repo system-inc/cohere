@@ -341,7 +341,7 @@ func TestADerivedRuleIsFingerprintedUnderEachSelectionsOptions(test *testing.T) 
 					Options:  []json.RawMessage{json.RawMessage(`"` + marker + `"`)},
 				}
 			}
-			lintConfiguration := &configuration.Config{
+			lintConfiguration := &configuration.Configuration{
 				Root:  root,
 				Rules: map[string]configuration.RuleSetting{"test-derived-options": setting("red-marker.ts")},
 				Overrides: []configuration.Override{{Files: []string{"blues/**"},
@@ -514,16 +514,20 @@ func TestAWalkComputesEachProgramFingerprintOnce(test *testing.T) {
 	}
 	// Two overrides that change nothing but which resolution a file lands in, so the walk makes three
 	// selections on each worker that sees all three directories.
-	graph.LintConfiguration = &configuration.Config{Root: root, Rules: settings, Overrides: []configuration.Override{
-		{
-			Files: []string{"b/**"},
-			Rules: map[string]configuration.RuleSetting{"test-derived-a": {Severity: configuration.SeverityError}},
+	graph.LintConfiguration = &configuration.Configuration{
+		Root:  root,
+		Rules: settings,
+		Overrides: []configuration.Override{
+			{
+				Files: []string{"b/**"},
+				Rules: map[string]configuration.RuleSetting{"test-derived-a": {Severity: configuration.SeverityError}},
+			},
+			{
+				Files: []string{"c/**"},
+				Rules: map[string]configuration.RuleSetting{"test-derived-b": {Severity: configuration.SeverityError}},
+			},
 		},
-		{
-			Files: []string{"c/**"},
-			Rules: map[string]configuration.RuleSetting{"test-derived-b": {Severity: configuration.SeverityError}},
-		},
-	}}
+	}
 	graph.FindingsReuse = program.NewFindingsReuse(
 		program.HashRuleSet([]string{"computed-once"}),
 		nil,

@@ -31,7 +31,7 @@ func TestALoadReadsTheOverlayInPlaceOfTheFile(test *testing.T) {
 	test.Parallel()
 
 	directory, file := loadFixture(test)
-	clean, loadError := Load(Config{Directory: directory}, ".")
+	clean, loadError := Load(Configuration{Directory: directory}, ".")
 	if loadError != nil {
 		test.Fatal(loadError)
 	}
@@ -42,7 +42,7 @@ func TestALoadReadsTheOverlayInPlaceOfTheFile(test *testing.T) {
 		test.Fatal("the fixture's Count was not in its types")
 	}
 
-	planted, loadError := Load(Config{
+	planted, loadError := Load(Configuration{
 		Directory: directory,
 		Overlay:   map[string][]byte{file: []byte("package fixture\n\nvar Count int = \"text\"\n")},
 	}, ".")
@@ -63,7 +63,7 @@ func TestAnOverlayNoSourcePackageReadsIsRefused(test *testing.T) {
 	directory, _ := loadFixture(test)
 	added := filepath.Join(directory, "added.go")
 	_, loadError := Load(
-		Config{Directory: directory, Overlay: map[string][]byte{added: []byte("package fixture\n")}},
+		Configuration{Directory: directory, Overlay: map[string][]byte{added: []byte("package fixture\n")}},
 		".",
 	)
 	if loadError == nil || !strings.Contains(loadError.Error(), added) {
@@ -101,7 +101,7 @@ func TestTestsAreCheckedAsGoTestBuildsThem(test *testing.T) {
 		"q/q.go":              "package q\n\nimport \"example.com/variants/p\"\n\nfunc Make() p.T { return p.T{N: 1} }\n",
 		"q/signature_test.go": "package q\n\nfunc TestWrongSignature(count int) {}\n",
 	})
-	loaded, loadError := Load(Config{Directory: directory, Tests: true}, "./...")
+	loaded, loadError := Load(Configuration{Directory: directory, Tests: true}, "./...")
 	if loadError != nil {
 		test.Fatal(loadError)
 	}

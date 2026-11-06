@@ -324,7 +324,7 @@ func draftFourTuples(test *testing.T, value json.RawMessage) json.RawMessage {
 }
 
 // TestTheLoaderTablesAgreeWithItsTypes: parsedTopLevelKeys and overrideKeys are the loader's refusal
-// lists, and rawConfig and rawOverride are what it decodes; the schema reads the types, so the lists must
+// lists, and rawConfiguration and rawOverride are what it decodes; the schema reads the types, so the lists must
 // name the same keys.
 func TestTheLoaderTablesAgreeWithItsTypes(test *testing.T) {
 	test.Parallel()
@@ -337,7 +337,7 @@ func TestTheLoaderTablesAgreeWithItsTypes(test *testing.T) {
 	sort.Strings(decoded)
 	if strings.Join(decoded, ",") != strings.Join(configuration.ParsedTopLevelKeyNames(), ",") {
 		test.Errorf(
-			"rawConfig decodes %v, parsedTopLevelKeys names %v",
+			"rawConfiguration decodes %v, parsedTopLevelKeys names %v",
 			decoded,
 			configuration.ParsedTopLevelKeyNames(),
 		)

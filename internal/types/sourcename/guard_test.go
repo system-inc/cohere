@@ -219,7 +219,7 @@ func tsDecisions(test *testing.T) []tsDecision {
 		test.Fatal(absolutePathError)
 	}
 	// Syntax alone, which reads every file go list selects and compiles nothing (#qnnnkbf).
-	loaded, parseError := gotypes.Parse(gotypes.Config{Directory: moduleRoot}, "./...")
+	loaded, parseError := gotypes.Parse(gotypes.Configuration{Directory: moduleRoot}, "./...")
 	if parseError != nil {
 		test.Fatalf("loading the module: %v", parseError)
 	}

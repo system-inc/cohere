@@ -58,17 +58,17 @@ func stampedCohere(test *testing.T, version string) string {
 	}
 	stampedBinaries.Unlock()
 	stamped.once.Do(func() {
-		stamped.directory, stamped.err = os.MkdirTemp("", "cohere-test-stamped-binary-")
-		if stamped.err != nil {
+		stamped.directory, stamped.buildError = os.MkdirTemp("", "cohere-test-stamped-binary-")
+		if stamped.buildError != nil {
 			return
 		}
 		stamped.path = filepath.Join(stamped.directory, "cohere")
 		build := exec.Command("go", "build", "-o", stamped.path,
 			"-ldflags=-X github.com/system-inc/cohere/internal/release/packaging.version="+version, ".")
-		stamped.output, stamped.err = build.CombinedOutput()
+		stamped.output, stamped.buildError = build.CombinedOutput()
 	})
-	if stamped.err != nil {
-		test.Fatalf("cannot build cohere stamped %s: %v\n%s", version, stamped.err, stamped.output)
+	if stamped.buildError != nil {
+		test.Fatalf("cannot build cohere stamped %s: %v\n%s", version, stamped.buildError, stamped.output)
 	}
 	return stamped.path
 }

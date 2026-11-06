@@ -71,9 +71,9 @@ func DecodeComplexityOptions(raw []byte) (ComplexitySettings, error) {
 	}
 
 	var object struct {
-		Maximum *int    `json:"maximum"`
-		Max     *int    `json:"max"`
-		Variant *string `json:"variant"`
+		Maximum           *int    `json:"maximum"`
+		DeprecatedMaximum *int    `json:"max"`
+		Variant           *string `json:"variant"`
 	}
 	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &object); unmarshalOptionsError != nil {
 		return settings, unmarshalOptionsError
@@ -84,15 +84,15 @@ func DecodeComplexityOptions(raw []byte) (ComplexitySettings, error) {
 	}
 
 	// Upstream's `hasOwn` guard: neither key present leaves the default of 20.
-	if object.Maximum == nil && object.Max == nil {
+	if object.Maximum == nil && object.DeprecatedMaximum == nil {
 		return settings, nil
 	}
 	switch {
 	case object.Maximum != nil && *object.Maximum != 0:
 		settings.Maximum = *object.Maximum
-	case object.Max != nil && *object.Max != 0:
-		settings.Maximum = *object.Max
-	case object.Max != nil:
+	case object.DeprecatedMaximum != nil && *object.DeprecatedMaximum != 0:
+		settings.Maximum = *object.DeprecatedMaximum
+	case object.DeprecatedMaximum != nil:
 		// `undefined || 0` and `0 || 0` both yield 0, so a `max` of zero wins.
 		settings.Maximum = 0
 	default:

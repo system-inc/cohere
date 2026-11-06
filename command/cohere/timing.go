@@ -331,7 +331,7 @@ func printGraphTiming(
 	contentPackOpened time.Duration,
 	checkers int,
 ) {
-	accounted := contentPackOpened + timing.Config + timing.Program + timing.Verify
+	accounted := contentPackOpened + timing.Configuration + timing.Program + timing.Verify
 	builds := ""
 	if timing.Builds > 1 {
 		builds = fmt.Sprintf(" (%d builds: the first one's files moved under it)", timing.Builds)
@@ -341,7 +341,7 @@ func printGraphTiming(
 		"graph timing: %s wall = content pack %s + tsconfig %s + program %s + verify %s + %s elsewhere%s\n",
 		formatMilliseconds(buildDuration),
 		formatMilliseconds(contentPackOpened),
-		formatMilliseconds(timing.Config),
+		formatMilliseconds(timing.Configuration),
 		formatMilliseconds(timing.Program),
 		formatMilliseconds(timing.Verify),
 		formatMilliseconds(max(buildDuration-accounted, 0)),

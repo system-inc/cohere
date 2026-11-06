@@ -276,7 +276,7 @@ func TestMalformedOptionsAreAnError(test *testing.T) {
 // excluded, which is a lie about who decided what.
 func TestUnconfiguredIsNotScopedOff(test *testing.T) {
 	test.Parallel()
-	configuration := &Config{
+	configuration := &Configuration{
 		Rules: map[string]RuleSetting{
 			"configured-on":  {Severity: SeverityError},
 			"configured-off": {Severity: SeverityOff},
@@ -294,7 +294,7 @@ func TestUnconfiguredIsNotScopedOff(test *testing.T) {
 		test.Fatalf("a rule absent from the config reported status %d rather than unconfigured", status)
 	}
 
-	ignoring := &Config{IgnorePatterns: []string{"**"}}
+	ignoring := &Configuration{IgnorePatterns: []string{"**"}}
 	if status, _ := ignoring.Resolve("File.ts").StatusOf("anything"); status != StatusFileIgnored {
 		test.Fatal("a rule on an ignored file did not report the file as the reason")
 	}

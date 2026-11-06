@@ -106,5 +106,5 @@ func (graph *Graph) DependentClosure(seeds []*ast.SourceFile) ([]*ast.SourceFile
 
 // pathFor normalises a file name the way the program keys its own maps.
 func (graph *Graph) pathFor(fileName string) tspath.PathKey {
-	return toPath(fileName, graph.Anchor.Root(), graph.Config.CaseSensitivity())
+	return toPath(fileName, graph.Anchor.Root(), graph.Configuration.CaseSensitivity())
 }

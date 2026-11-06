@@ -348,7 +348,7 @@ func InferMutableRanges[G Graph[F, B, P], F any, B comparable, P any](
 	// above opens a range nothing defines. So its range starts at the function's first instruction,
 	// and one nothing widened is that instruction alone.
 	if options.ParametersDefinedOnEntry {
-		for _, parameter := range graph.Params(function) {
+		for _, parameter := range graph.Parameters(function) {
 			id := graph.IdentifierOf(parameter)
 			existing := result.Get(id)
 			if existing.End == 0 {
@@ -740,7 +740,7 @@ func BuildAliasingGraph[G Graph[F, B, P], F any, B comparable, P any](
 	// borrowed values, mutable unless their type says otherwise (its inference marks an immutable one
 	// with a Create of its kind), so it answers false.
 	parametersAreFrozen := graph.ParametersFrozen(function)
-	for _, parameter := range graph.Params(function) {
+	for _, parameter := range graph.Parameters(function) {
 		id := graph.IdentifierOf(parameter)
 		state.create(id, aliasingNodeObject)
 		if parametersAreFrozen {

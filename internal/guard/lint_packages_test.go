@@ -106,7 +106,7 @@ func loadLintPackages(overlay map[string][]byte) ([]*gotypes.Package, string) {
 		return nil, lintExportsError.Error()
 	}
 	loaded, loadError := gotypes.Load(
-		gotypes.Config{Directory: root, Overlay: overlay, Exports: exports},
+		gotypes.Configuration{Directory: root, Overlay: overlay, Exports: exports},
 		"./internal/lint/...",
 	)
 	if loadError != nil {

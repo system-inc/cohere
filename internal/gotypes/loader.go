@@ -14,12 +14,12 @@ import (
 )
 
 type loader struct {
-	config      Config
-	fileSet     *token.FileSet
-	sizes       types.Sizes
-	listed      *listing
-	roots       map[string]bool
-	fromExports map[string]bool
+	configuration Configuration
+	fileSet       *token.FileSet
+	sizes         types.Sizes
+	listed        *listing
+	roots         map[string]bool
+	fromExports   map[string]bool
 
 	// exportImporter reads export data, and is not safe for concurrent use, so exportLock guards it.
 	exportImporter types.Importer
@@ -84,7 +84,7 @@ func (loader *loader) load() (*Loaded, error) {
 			loaded.Roots = append(loaded.Roots, checked)
 		}
 	}
-	if loader.config.Tests {
+	if loader.configuration.Tests {
 		loaded.Source = append(loaded.Source, loader.testVariants(sourcePackages, slots)...)
 	}
 	for _, listedPackage := range loader.listed.packages {
@@ -259,11 +259,11 @@ func (loader *loader) testVariantsOf(listedPackage *listedPackage) []*Package {
 // Mutates: read gains the files, their syntax and their errors, as the package being loaded
 func (loader *loader) parse(listedPackage *listedPackage, names []string, withListErrors bool, read *Package) {
 	if withListErrors && listedPackage.Error != nil {
-		read.Errors = append(read.Errors, errors.New(listedPackage.Error.Err))
+		read.Errors = append(read.Errors, errors.New(listedPackage.Error.Message))
 	}
 	if withListErrors {
 		for _, dependencyError := range listedPackage.DepsErrors {
-			read.Errors = append(read.Errors, errors.New(dependencyError.Err))
+			read.Errors = append(read.Errors, errors.New(dependencyError.Message))
 		}
 	}
 	for _, name := range names {
@@ -273,7 +273,7 @@ func (loader *loader) parse(listedPackage *listedPackage, names []string, withLi
 		var parseFileError error
 		// The parser reads the file itself when handed a nil source, and a nil []byte is no nil source: it would
 		// parse as an empty file. So the overlay's contents go in only when the overlay names the file.
-		if replacement, ok := loader.config.Overlay[path]; ok {
+		if replacement, ok := loader.configuration.Overlay[path]; ok {
 			file, parseFileError = parser.ParseFile(loader.fileSet, path, replacement, mode)
 		} else {
 			file, parseFileError = parser.ParseFile(loader.fileSet, path, nil, mode)

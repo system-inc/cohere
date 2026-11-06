@@ -1395,7 +1395,7 @@ config layer and the rule, and a fixture never crosses that boundary: it hands t
 decoder a literal it wrote itself, so the decoder is exercised on the shape the fixture
 author already believed in.
 
-The measured instance was one line. `internal/lint/configuration/configuration.go` parsed a
+The measured instance was one line. `internal/lint/configuration/load.go` parsed a
 rule setting as `["severity", <options>]` and kept exactly one element, `tuple[1]`, while
 ESLint's `context.options` is **every** element after the severity. Every rule whose upstream
 option surface has more than one element was configured differently from upstream, and each

@@ -168,7 +168,9 @@ func Build(options Options) (*Graph, error) {
 			"program left them out: %s. Linting the rest would silently skip them",
 			len(missing), graph.ConfigFileName, describeRoots(missing))
 	case rootsUnmatched:
-		return nil, errors.New(projectFilesMismatchMessage(len(graph.Config.FileNames()), len(graph.projectFiles)))
+		return nil, errors.New(
+			projectFilesMismatchMessage(len(graph.Configuration.FileNames()), len(graph.projectFiles)),
+		)
 	}
 	// After verifying, which holds the program to every file the config named, yielded ones included.
 	graph.yield(options.Yielded)
@@ -332,7 +334,7 @@ func buildOnce(options Options) (*Graph, error) {
 		return nil, fmt.Errorf("%s matched no files: check its include, files, and exclude", configurationFileName)
 	}
 	if options.Timing != nil {
-		options.Timing.Config += time.Since(configurationStarted)
+		options.Timing.Configuration += time.Since(configurationStarted)
 		options.Timing.ConfigDisk = options.Timing.ConfigDisk.plus(configurationDisk.snapshot())
 		timedDisk.current.Store(&programDisk)
 	}
@@ -423,7 +425,7 @@ func buildOnce(options Options) (*Graph, error) {
 
 	return &Graph{
 		Program:        builtProgram,
-		Config:         parsedCommandLine,
+		Configuration:  parsedCommandLine,
 		ConfigFileName: configurationFileName,
 		CompilerHost:   compilerHost,
 		Anchor:         NewPathAnchor(currentDirectory),

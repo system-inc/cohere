@@ -218,9 +218,9 @@ func TestTheSecondOptionElementReachesTheRule(test *testing.T) {
 			}
 
 			for _, arm := range []struct {
-				name   string
-				config string
-				want   int
+				name          string
+				configuration string
+				want          int
 			}{
 				{"control", testCase.control, testCase.controlCount},
 				{"treatment", testCase.treatment, testCase.treatmentCount},
@@ -228,15 +228,20 @@ func TestTheSecondOptionElementReachesTheRule(test *testing.T) {
 				bound, optionsThroughTheConfigurationLayerError := optionsThroughTheConfigLayer(
 					test,
 					testCase.rule,
-					arm.config,
+					arm.configuration,
 				)
 				if optionsThroughTheConfigurationLayerError != nil {
-					test.Fatalf("%s %s was refused: %v", arm.name, arm.config, optionsThroughTheConfigurationLayerError)
+					test.Fatalf(
+						"%s %s was refused: %v",
+						arm.name,
+						arm.configuration,
+						optionsThroughTheConfigurationLayerError,
+					)
 				}
 				result := rule_testing.RunTypedBound(test, bound, fileName, testCase.source)
 				if len(result.Diagnostics) != arm.want {
 					test.Errorf("%s %s reported %d, want %d: %v",
-						arm.name, arm.config, len(result.Diagnostics), arm.want, result.MessageIds())
+						arm.name, arm.configuration, len(result.Diagnostics), arm.want, result.MessageIds())
 				}
 			}
 		})
@@ -304,35 +309,39 @@ func TestAnElementTheRuleDoesNotTakeIsALoudError(test *testing.T) {
 	test.Parallel()
 
 	for _, testCase := range []struct {
-		rule, config string
-		mustName     []string
+		rule, configuration string
+		mustName            []string
 	}{
 		// array-callback-return takes one object; a second is refused.
 		{
-			rule:     "array-callback-return",
-			config:   `["error", {"allowImplicit": true}, {"checkForEach": true}]`,
-			mustName: []string{"array-callback-return", `element 2 {"checkForEach": true}`},
+			rule:          "array-callback-return",
+			configuration: `["error", {"allowImplicit": true}, {"checkForEach": true}]`,
+			mustName:      []string{"array-callback-return", `element 2 {"checkForEach": true}`},
 		},
 		// default-case-last takes none; any option is refused.
 		{
-			rule:     "default-case-last",
-			config:   `["error", {"ignored": true}]`,
-			mustName: []string{"default-case-last", `element 1 {"ignored": true}`},
+			rule:          "default-case-last",
+			configuration: `["error", {"ignored": true}]`,
+			mustName:      []string{"default-case-last", `element 1 {"ignored": true}`},
 		},
 		// A list rule given more elements than upstream's schema allows.
 		{
-			rule:     "prefer-destructuring",
-			config:   `["error", {"object": true}, {"enforceForRenamedProperties": true}, {"array": true}]`,
-			mustName: []string{"prefer-destructuring", `element 3 {"array":true}`},
+			rule:          "prefer-destructuring",
+			configuration: `["error", {"object": true}, {"enforceForRenamedProperties": true}, {"array": true}]`,
+			mustName:      []string{"prefer-destructuring", `element 3 {"array":true}`},
 		},
 	} {
 		_, optionsThroughTheConfigurationLayerError := optionsThroughTheConfigLayer(
 			test,
 			testCase.rule,
-			testCase.config,
+			testCase.configuration,
 		)
 		if optionsThroughTheConfigurationLayerError == nil {
-			test.Errorf("%s %s loaded, and the extra element would never be read", testCase.rule, testCase.config)
+			test.Errorf(
+				"%s %s loaded, and the extra element would never be read",
+				testCase.rule,
+				testCase.configuration,
+			)
 			continue
 		}
 		for _, want := range testCase.mustName {

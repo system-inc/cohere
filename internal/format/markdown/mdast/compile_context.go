@@ -9,10 +9,10 @@ import (
 
 // compileContext is upstream's CompileContext, with the event's sliceSerialize bound per handler call.
 type compileContext struct {
-	stack      []*Node
-	tokenStack []tokenStackEntry
-	config     *config
-	data       compileData
+	stack         []*Node
+	tokenStack    []tokenStackEntry
+	configuration *configuration
+	data          compileData
 
 	tokenizer *micromark.TokenizeContext
 	offsets   []int

@@ -20,9 +20,13 @@ func SourceInputs(root string) (Inputs, error) {
 	inputs := Inputs{
 		Registrations: rule.Registered(),
 		SetNames:      configuration.SetNames(),
-		LoadSet:       func(name string) (*configuration.Config, error) { return configuration.LoadFor(name, names) },
-		SetContents:   configuration.SourceContents,
-		GoRules:       rules.All(),
+		LoadSet: func(
+			name string,
+		) (*configuration.Configuration, error) {
+			return configuration.LoadFor(name, names)
+		},
+		SetContents: configuration.SourceContents,
+		GoRules:     rules.All(),
 	}
 	var readError error
 	if inputs.SwiftVerdicts, readError = os.ReadFile(

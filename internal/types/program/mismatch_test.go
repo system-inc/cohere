@@ -57,7 +57,7 @@ func TestProjectFilesGuardFiresOnMismatch(test *testing.T) {
 		test.Fatalf("building: %v", buildError)
 	}
 
-	named := graph.Config.FileNames()
+	named := graph.Configuration.FileNames()
 	if len(named) == 0 {
 		test.Fatal("fixture named no files, so this test proves nothing")
 	}

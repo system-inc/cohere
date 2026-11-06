@@ -15,8 +15,8 @@ import (
 // handle is upstream's Handle: what runs on entering or exiting a token type.
 type handle func(context *compileContext, token *micromark.Token)
 
-// config is upstream's Config, after the fork's mdast extensions are configured in.
-type config struct {
+// configuration is upstream's Config, after the fork's mdast extensions are configured in.
+type configuration struct {
 	canContainEols []string
 	enter          map[string]handle
 	exit           map[string]handle
@@ -109,8 +109,8 @@ func byteOffsets(text string, offsets []int) []int {
 // newConfiguration is upstream's compiler config with the fork's mdastExtensions configured in, in order:
 // gfmFromMarkdown() (autolink literal without its transform, footnote, strikethrough, table, task list
 // item), mathFromMarkdown(), the wiki-link fromMarkdown() and liquidFromMarkdown().
-func newConfiguration() *config {
-	configuration := &config{
+func newConfiguration() *configuration {
+	configuration := &configuration{
 		canContainEols: []string{"emphasis", "fragment", "heading", "paragraph", "strong"},
 		enter: map[string]handle{
 			"autolink":                    opener(newLink, nil),
@@ -237,9 +237,9 @@ func newConfiguration() *config {
 }
 
 // compile turns events into a tree, upstream's compile.
-func compile(events []micromark.Event, configuration *config, offsets []int, nodes *arena.Arena[Node]) *Node {
+func compile(events []micromark.Event, configuration *configuration, offsets []int, nodes *arena.Arena[Node]) *Node {
 	tree := nodes.New(Node{NodeType: "root", IsParent: true, Children: []*Node{}})
-	context := &compileContext{stack: []*Node{tree}, config: configuration, offsets: offsets, nodes: nodes}
+	context := &compileContext{stack: []*Node{tree}, configuration: configuration, offsets: offsets, nodes: nodes}
 	var listStack []int
 
 	// preparedEvents is events with the listItem tokens prepareList splices in, as upstream splices them
@@ -607,7 +607,8 @@ func onExitLineEnding(context *compileContext, token *micromark.Token) {
 		return
 	}
 
-	if !context.data.setextHeadingSlurpLineEnding && slices.Contains(context.config.canContainEols, node.NodeType) {
+	if !context.data.setextHeadingSlurpLineEnding &&
+		slices.Contains(context.configuration.canContainEols, node.NodeType) {
 		onEnterData(context, token)
 		onExitData(context, token)
 	}

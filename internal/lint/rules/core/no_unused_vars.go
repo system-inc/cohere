@@ -142,7 +142,7 @@ func noUnusedVariablesMessage(name string, assigned bool, underscoreSilences boo
 // `bindingType` arm in `collectCandidateBindings` is what does it. A port of the namespaced rule
 // undertaken to recover type-declaration coverage would be recovering coverage that is already
 // here.
-var NoUnusedVariables = rule.Rule[NoUnusedVarsOptions]{
+var NoUnusedVariables = rule.Rule[NoUnusedVariablesOptions]{
 	Name: "@typescript-eslint/no-unused-vars",
 
 	// Symbol identity, not name matching. Two bindings can share a name across scopes and a read of
@@ -153,7 +153,7 @@ var NoUnusedVariables = rule.Rule[NoUnusedVarsOptions]{
 	// Reads only this file's declarations (rule.DeclarationsIn), so its findings key on imports' shapes.
 	TypeReach: rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options rule.Given[NoUnusedVarsOptions]) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoUnusedVariablesOptions]) rule.Listeners {
 		settings := resolveNoUnusedVariablesOptions(options)
 
 		return rule.Listeners{
@@ -257,7 +257,7 @@ func noUnusedVariablesUsedOnlyAsTypeMessage(name string, assigned bool) rule.Mes
 	}
 }
 
-func analyzeUnusedBindings(ruleContext rule.Context, sourceFile *ast.Node, settings NoUnusedVarsOptions) {
+func analyzeUnusedBindings(ruleContext rule.Context, sourceFile *ast.Node, settings NoUnusedVariablesOptions) {
 	candidates := collectCandidateBindings(sourceFile)
 	if len(candidates) == 0 {
 		return
@@ -721,7 +721,7 @@ func isExemptFromUnusedReport(
 	candidate candidateBinding,
 	symbol *ast.Symbol,
 	all []candidateBinding,
-	settings NoUnusedVarsOptions,
+	settings NoUnusedVariablesOptions,
 	reads map[*ast.Symbol]bool,
 ) bool {
 	// An import named `React` or `h` in a file containing JSX is used by the JSX transform, which
@@ -1491,7 +1491,7 @@ func reportUsedIgnoredName(
 	candidate candidateBinding,
 	symbol *ast.Symbol,
 	writes []*ast.Node,
-	settings NoUnusedVarsOptions,
+	settings NoUnusedVariablesOptions,
 	reads map[*ast.Symbol]bool,
 	option string,
 	pattern string,
@@ -1508,7 +1508,7 @@ func reportUsedIgnoredName(
 
 // ignorePatternFor names the ignore pattern a kind of binding answers to, as nameMatchesIgnorePattern
 // chooses it, and what the pattern calls that kind.
-func ignorePatternFor(kind unusedBindingKind, settings NoUnusedVarsOptions) (string, string, string) {
+func ignorePatternFor(kind unusedBindingKind, settings NoUnusedVariablesOptions) (string, string, string) {
 	switch kind {
 	case bindingParameter:
 		return "argsIgnorePattern", settings.ArgsIgnorePattern, "an argument"
@@ -1543,7 +1543,7 @@ func isUsingDeclaration(candidate candidateBinding) bool {
 }
 
 // matchesIgnorePattern reports whether a binding's name says the omission is deliberate.
-func matchesIgnorePattern(candidate candidateBinding, settings NoUnusedVarsOptions) bool {
+func matchesIgnorePattern(candidate candidateBinding, settings NoUnusedVariablesOptions) bool {
 	return nameMatchesIgnorePattern(candidate.name.Text(), candidate.kind, settings)
 }
 
@@ -1560,7 +1560,7 @@ func matchesIgnorePattern(candidate candidateBinding, settings NoUnusedVarsOptio
 // Asked by name rather than by candidate so the report can ask the same question of a name the
 // binding does not have yet: whether prefixing an underscore would silence it, which decides
 // whether the message may offer that escape.
-func nameMatchesIgnorePattern(name string, kind unusedBindingKind, settings NoUnusedVarsOptions) bool {
+func nameMatchesIgnorePattern(name string, kind unusedBindingKind, settings NoUnusedVariablesOptions) bool {
 	pattern := settings.VariablesIgnorePattern
 	switch kind {
 	case bindingParameter:
@@ -1584,33 +1584,33 @@ func nameMatchesIgnorePattern(name string, kind unusedBindingKind, settings NoUn
 	return compiled.TestOrTimeout(name)
 }
 
-// NoUnusedVarsAutofixRemoval is enableAutofixRemoval's object. Decoded strictly like the rest, so a key
+// NoUnusedVariablesAutofixRemoval is enableAutofixRemoval's object. Decoded strictly like the rest, so a key
 // upstream's schema does not name is refused.
-type NoUnusedVarsAutofixRemoval struct {
+type NoUnusedVariablesAutofixRemoval struct {
 	Imports bool `json:"imports"`
 }
 
-// noUnusedVarsOptionFields is NoUnusedVarsOptions without its UnmarshalJSON, the shape the object
+// noUnusedVariablesOptionFields is NoUnusedVariablesOptions without its UnmarshalJSON, the shape the object
 // form decodes into.
-type noUnusedVarsOptionFields NoUnusedVarsOptions
+type noUnusedVariablesOptionFields NoUnusedVariablesOptions
 
 // noUnusedVariablesModes are the spellings upstream's schema allows for each mode key. Any other value is
 // refused, because reading it as the default runs a mode nobody wrote (#p9s1131, #rfbha44).
 var noUnusedVariablesModes = []struct {
 	key     string
 	allowed []string
-	value   func(*NoUnusedVarsOptions) string
+	value   func(*NoUnusedVariablesOptions) string
 }{
-	{"vars", []string{"all", "local"}, func(options *NoUnusedVarsOptions) string { return options.Variables }},
+	{"vars", []string{"all", "local"}, func(options *NoUnusedVariablesOptions) string { return options.Variables }},
 	{
 		"args",
 		[]string{"all", "after-used", "none"},
-		func(options *NoUnusedVarsOptions) string { return options.Arguments },
+		func(options *NoUnusedVariablesOptions) string { return options.Arguments },
 	},
 	{
 		"caughtErrors",
 		[]string{"all", "none"},
-		func(options *NoUnusedVarsOptions) string { return options.CaughtErrors },
+		func(options *NoUnusedVariablesOptions) string { return options.CaughtErrors },
 	},
 }
 
@@ -1620,7 +1620,7 @@ var noUnusedVariablesModes = []struct {
 // rule's default state: it would set `args` and `caughtErrors` to the empty string, which is two
 // wrong answers. So the nil case is written explicitly rather than relying on the zero value, which
 // is the shape a shipped rule got wrong on 3,407 files.
-func resolveNoUnusedVariablesOptions(options rule.Given[NoUnusedVarsOptions]) NoUnusedVarsOptions {
+func resolveNoUnusedVariablesOptions(options rule.Given[NoUnusedVariablesOptions]) NoUnusedVariablesOptions {
 	settings, _ := options.Read()
 
 	if settings.Variables == "" {
@@ -1640,13 +1640,13 @@ func resolveNoUnusedVariablesOptions(options rule.Given[NoUnusedVarsOptions]) No
 //
 // Exported so fixtures can route through the real decoder rather than building the struct, which is
 // what puts the default resolution above under test instead of bypassing it.
-func DecodeNoUnusedVariablesOptions(raw json.RawMessage) (NoUnusedVarsOptions, error) {
-	var decoded NoUnusedVarsOptions
+func DecodeNoUnusedVariablesOptions(raw json.RawMessage) (NoUnusedVariablesOptions, error) {
+	var decoded NoUnusedVariablesOptions
 	if len(raw) == 0 {
-		return resolveNoUnusedVariablesOptions(rule.Given[NoUnusedVarsOptions]{}), nil
+		return resolveNoUnusedVariablesOptions(rule.Given[NoUnusedVariablesOptions]{}), nil
 	}
 	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &decoded); unmarshalOptionsError != nil {
-		return resolveNoUnusedVariablesOptions(rule.Given[NoUnusedVarsOptions]{}), unmarshalOptionsError
+		return resolveNoUnusedVariablesOptions(rule.Given[NoUnusedVariablesOptions]{}), unmarshalOptionsError
 	}
 	return resolveNoUnusedVariablesOptions(rule.Configured(decoded)), nil
 }

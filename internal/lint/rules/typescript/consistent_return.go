@@ -29,7 +29,7 @@ type consistentReturnWire struct {
 //
 // # The config layer hands this a different shape than a fixture does
 //
-// `internal/lint/configuration/configuration.go` keeps `setting.Options = tuple[1]`, a single JSON
+// `internal/lint/configuration/load.go` keeps `setting.Options = tuple[1]`, a single JSON
 // value after the severity, while ESLint's `context.options` is every element after it. This rule's
 // `meta.schema` declares one element, so the two shapes coincide here and the object arrives whole.
 // Written out rather than assumed, because a decoder that is wrong for the config shape passes every

@@ -825,7 +825,7 @@ func run() error {
 	//
 	// The lint config is loaded here because fixing needs to know which rules apply to which files,
 	// and loading it once serves both this phase and lint below.
-	var lintConfiguration *configuration.Config
+	var lintConfiguration *configuration.Configuration
 
 	// The fix phase's walk, kept when it is still valid for the lint phase to reuse.
 	//
@@ -1165,8 +1165,8 @@ func run() error {
 				waitStart := time.Now()
 				answer := <-nestedCheck
 				fixDuration += time.Since(waitStart)
-				if answer.err != nil {
-					return fmt.Errorf("reading the nested repositories: %w", answer.err)
+				if answer.checkError != nil {
+					return fmt.Errorf("reading the nested repositories: %w", answer.checkError)
 				}
 				nested := answer.check
 				for _, walk := range nested.Walks {
@@ -1573,7 +1573,7 @@ func rebuildGraph(
 	configurationFileName string,
 	directory string,
 	singleThreaded bool,
-	lintConfiguration *configuration.Config,
+	lintConfiguration *configuration.Configuration,
 	yieldedFiles map[string]struct{},
 ) (*program.Graph, time.Duration, error) {
 	start := time.Now()
@@ -1615,15 +1615,15 @@ func configureLint(
 	graph *program.Graph,
 	location projectLocation,
 	ahead *lintConfigAhead,
-) (*configuration.Config, error) {
+) (*configuration.Configuration, error) {
 	// A config that cannot be read is a hard failure and never a permissive default. Linting
 	// everything with nothing configured produces output indistinguishable from a clean run, and
 	// that exact confusion is what this tool exists to make impossible.
-	var lintConfiguration *configuration.Config
+	var lintConfiguration *configuration.Configuration
 	var loadError error
 	if ahead != nil {
 		<-ahead.done
-		lintConfiguration, loadError = ahead.config, ahead.loadError
+		lintConfiguration, loadError = ahead.configuration, ahead.loadError
 	} else {
 		lintConfiguration, loadError = loadLintConfiguration(graph, location)
 	}
@@ -1673,7 +1673,7 @@ func configureLint(
 	return lintConfiguration, nil
 }
 
-func optionsBase(lintConfiguration *configuration.Config, projectRoot string) rule.OptionsBase {
+func optionsBase(lintConfiguration *configuration.Configuration, projectRoot string) rule.OptionsBase {
 	base := rule.OptionsBase{ProjectRoot: projectRoot}
 	if lintConfiguration != nil {
 		base.ConfigDirectory = lintConfiguration.Root
@@ -1730,7 +1730,11 @@ func singleLineDescription(description string) string {
 
 // printRuleDiagnostic prints one rule finding in the same shape, with the rule name where the error
 // code goes, since a reader should not have to learn two formats. The settings give it its severity.
-func printRuleDiagnostic(out *bufio.Writer, diagnostic rule.Diagnostic, lintConfiguration *configuration.Config) {
+func printRuleDiagnostic(
+	out *bufio.Writer,
+	diagnostic rule.Diagnostic,
+	lintConfiguration *configuration.Configuration,
+) {
 	sourceFile := diagnostic.SourceFile
 	if sourceFile == nil {
 		printFinding(
@@ -1805,7 +1809,7 @@ func lintConfigSources(path string) []string {
 // Keys naming a rule cohere has not ported yet are the expected case and not an error: a decision
 // recorded ahead of the rule is how this migration is supposed to work. They are counted and named
 // separately so the two are never confused.
-func writeOrphanedConfigKeys(out *bufio.Writer, rules []rule.Entry, lintConfiguration *configuration.Config) {
+func writeOrphanedConfigKeys(out *bufio.Writer, rules []rule.Entry, lintConfiguration *configuration.Configuration) {
 	if lintConfiguration == nil {
 		return
 	}

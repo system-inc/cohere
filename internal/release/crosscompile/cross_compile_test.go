@@ -111,7 +111,7 @@ func typeCheckTarget(moduleDirectory string, target release.Target) []string {
 // `go list -deps -json` and `go env`, which read and never build, so a runner of prebuilt tests can run it
 // (#qnnnkbf): go/packages asked go list for -compiled files and test variants, flags such a runner refuses.
 func typeCheck(moduleDirectory string, target release.Target, tests bool, patterns ...string) []string {
-	loaded, loadError := gotypes.Load(gotypes.Config{
+	loaded, loadError := gotypes.Load(gotypes.Configuration{
 		Directory:   moduleDirectory,
 		Environment: []string{"GOOS=" + target.GoOperatingSystem, "GOARCH=" + target.GoArchitecture, "CGO_ENABLED=0"},
 		Tests:       tests,

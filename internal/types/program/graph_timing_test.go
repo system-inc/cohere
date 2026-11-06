@@ -62,15 +62,15 @@ func TestGraphTimingMeasuresTheBuildItTimes(test *testing.T) {
 	if timing.Builds != 1 {
 		test.Errorf("Builds is %d for one build", timing.Builds)
 	}
-	if timing.Config <= 0 || timing.Program <= 0 || timing.Verify <= 0 {
+	if timing.Configuration <= 0 || timing.Program <= 0 || timing.Verify <= 0 {
 		test.Errorf(
 			"a wall part read zero: config %v, program %v, verify %v",
-			timing.Config,
+			timing.Configuration,
 			timing.Program,
 			timing.Verify,
 		)
 	}
-	if parts := timing.Config + timing.Program + timing.Verify; parts > wall {
+	if parts := timing.Configuration + timing.Program + timing.Verify; parts > wall {
 		test.Errorf("the wall parts add to %v, more than the %v the whole build took", parts, wall)
 	}
 
