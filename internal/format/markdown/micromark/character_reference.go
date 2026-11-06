@@ -11,7 +11,10 @@ func tokenizeCharacterReference(self *Self, effects *Effects, ok State, nok Stat
 	// open records the named kind alongside test.
 	named := false
 
-	var start, open, numeric, value State
+	var start State
+	var open State
+	var numeric State
+	var value State
 
 	// Start of character reference.
 	//

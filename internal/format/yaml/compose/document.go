@@ -57,7 +57,8 @@ type Document struct {
 // newDocument is `new Document(undefined, Object.assign({ _directives: directives }, options))`.
 func newDocument(directives *Directives, options Options) *Document {
 	document := &Document{Errors: []*YamlError{}, Warnings: []*YamlError{}}
-	document.Options = &options
+	documentOptions := options
+	document.Options = &documentOptions
 	version := options.Version
 	document.Directives = directives.atDocument()
 	if document.Directives.Yaml.Explicit {
@@ -78,6 +79,9 @@ func (document *Document) setSchema(version string, options Options) {
 		document.Directives.Yaml.Version = version
 		schema = schemaOptions{resolveKnownTags: true, schema: "core"}
 	default:
+		// Invariant: version is the caller's Options.Version, which comes with the Document's defaults
+		// applied (UnistParserOptions sets "1.2"), or an explicit %YAML directive's, which add sets only
+		// to "1.1" or "1.2", so no input reaches the throw upstream's setSchema has here.
 		panic("compose: Expected '1.1', '1.2' or null as first argument, but found: " + version)
 	}
 	schema.merge = options.Merge

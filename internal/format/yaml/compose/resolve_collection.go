@@ -20,6 +20,10 @@ func nodeClass(tag *Tag, fallback string) string {
 
 const startColMessage = "All mapping items must start at the same column"
 
+// resolveBlockMap is upstream's: a block map token's items composed into a map of pairs.
+//
+// Mutates: composition the shared context, whose atRoot and atKey the map switches as composing descends
+// into its keys and values, as upstream switches its ComposeContext
 func resolveBlockMap(composition *composeContext, bm *cst.Token, onError onErrorFunc, tag *Tag) *Node {
 	yamlMap := composition.newCollection(nodeClass(tag, "YAMLMap"))
 	if composition.atRoot {
@@ -44,13 +48,13 @@ func resolveBlockMap(composition *composeContext, bm *cst.Token, onError onError
 			if key != nil {
 				if key.Type == "block-seq" {
 					onError(
-						offset,
+						errorOffset(offset),
 						"BLOCK_AS_IMPLICIT_KEY",
 						"A block sequence may not be used as an implicit map key",
 						false,
 					)
 				} else if key.HasIndent() && key.Indent != bm.Indent {
-					onError(offset, "BAD_INDENT", startColMessage, false)
+					onError(errorOffset(offset), "BAD_INDENT", startColMessage, false)
 				}
 			}
 			if keyProperties.anchor == nil && keyProperties.tag == nil && sep == nil {
@@ -66,14 +70,19 @@ func resolveBlockMap(composition *composeContext, bm *cst.Token, onError onError
 			}
 			if keyProperties.newlineAfterProperty != nil || containsNewline(key) {
 				// `key ?? start[start.length - 1]`
-				var source any = key
+				source := key
 				if key == nil {
 					source = start[len(start)-1]
 				}
-				onError(source, "MULTILINE_IMPLICIT_KEY", "Implicit keys need to be on a single line", false)
+				onError(
+					errorToken{token: source},
+					"MULTILINE_IMPLICIT_KEY",
+					"Implicit keys need to be on a single line",
+					false,
+				)
 			}
 		} else if keyProperties.found.Indent != bm.Indent {
-			onError(offset, "BAD_INDENT", startColMessage, false)
+			onError(errorOffset(offset), "BAD_INDENT", startColMessage, false)
 		}
 		// key value
 		composition.atKey = true
@@ -86,7 +95,7 @@ func resolveBlockMap(composition *composeContext, bm *cst.Token, onError onError
 		}
 		composition.atKey = false
 		if mapIncludes(composition, yamlMap.Items, keyNode) {
-			onError(keyStart, "DUPLICATE_KEY", "Map keys must be unique", false)
+			onError(errorOffset(keyStart), "DUPLICATE_KEY", "Map keys must be unique", false)
 		}
 		// value properties
 		valueProperties := resolveProperties(sepOrEmpty(sep), resolvePropsOptions{
@@ -102,7 +111,7 @@ func resolveBlockMap(composition *composeContext, bm *cst.Token, onError onError
 			if implicitKey {
 				if value != nil && value.Type == "block-map" && !valueProperties.hasNewline {
 					onError(
-						offset,
+						errorOffset(offset),
 						"BLOCK_AS_IMPLICIT_KEY",
 						"Nested mappings are not allowed in compact mappings",
 						false,
@@ -110,7 +119,7 @@ func resolveBlockMap(composition *composeContext, bm *cst.Token, onError onError
 				}
 				if composition.options.Strict && keyProperties.start < valueProperties.found.Offset-1024 {
 					onError(
-						keyNode.Range,
+						errorRange(keyNode.Range),
 						"KEY_OVER_1024_CHARS",
 						"The : indicator must be at most 1024 chars after the start of an implicit block mapping key",
 						false,
@@ -133,7 +142,12 @@ func resolveBlockMap(composition *composeContext, bm *cst.Token, onError onError
 		} else {
 			// key with no value
 			if implicitKey {
-				onError(keyNode.Range, "MISSING_CHAR", "Implicit map keys need to be followed by map values", false)
+				onError(
+					errorRange(keyNode.Range),
+					"MISSING_CHAR",
+					"Implicit map keys need to be followed by map values",
+					false,
+				)
 			}
 			if valueProperties.comment != "" {
 				if keyNode.Comment != "" {
@@ -150,7 +164,7 @@ func resolveBlockMap(composition *composeContext, bm *cst.Token, onError onError
 		}
 	}
 	if commentEndSet && commentEnd != 0 && commentEnd < offset {
-		onError(commentEnd, "IMPOSSIBLE", "Map comment with trailing content", false)
+		onError(errorOffset(commentEnd), "IMPOSSIBLE", "Map comment with trailing content", false)
 	}
 	end := offset
 	if commentEndSet {
@@ -179,6 +193,10 @@ func sepOrEmpty(sep []*cst.Token) []*cst.Token {
 	return sep
 }
 
+// resolveBlockSequence is upstream's: a block sequence token's items composed into a sequence.
+//
+// Mutates: composition the shared context, whose atRoot and atKey the sequence clears before composing
+// its items, as upstream clears its ComposeContext's
 func resolveBlockSequence(composition *composeContext, bs *cst.Token, onError onErrorFunc, tag *Tag) *Node {
 	seq := composition.newCollection(nodeClass(tag, "YAMLSeq"))
 	if composition.atRoot {
@@ -202,9 +220,14 @@ func resolveBlockSequence(composition *composeContext, bs *cst.Token, onError on
 		if properties.found == nil {
 			if properties.anchor != nil || properties.tag != nil || value != nil {
 				if value != nil && value.Type == "block-seq" {
-					onError(properties.end, "BAD_INDENT", "All sequence items must start at the same column", false)
+					onError(
+						errorOffset(properties.end),
+						"BAD_INDENT",
+						"All sequence items must start at the same column",
+						false,
+					)
 				} else {
-					onError(offset, "MISSING_CHAR", "Sequence item without - indicator", false)
+					onError(errorOffset(offset), "MISSING_CHAR", "Sequence item without - indicator", false)
 				}
 			} else {
 				commentEnd, commentEndSet = properties.end, true
@@ -241,6 +264,11 @@ func isBlock(token *cst.Token) bool {
 // where upstream's try/catch around composeCollection does.
 type typeError string
 
+// resolveFlowCollection is upstream's: a flow collection token's items composed into a flow map, or a
+// flow sequence of values and single-pair maps.
+//
+// Mutates: composition the shared context, whose atRoot and atKey the collection switches as composing
+// descends into its keys and values, as upstream switches its ComposeContext
 func resolveFlowCollection(composition *composeContext, fc *cst.Token, onError onErrorFunc, tag *Tag) *Node {
 	isMap := equalsAscii(fc.FlowStart.Source, "{")
 	fcName := "flow sequence"
@@ -274,9 +302,14 @@ func resolveFlowCollection(composition *composeContext, fc *cst.Token, onError o
 		if properties.found == nil {
 			if properties.anchor == nil && properties.tag == nil && sep == nil && value == nil {
 				if index == 0 && properties.comma != nil {
-					onError(properties.comma, "UNEXPECTED_TOKEN", "Unexpected , in "+fcName, false)
+					onError(errorToken{token: properties.comma}, "UNEXPECTED_TOKEN", "Unexpected , in "+fcName, false)
 				} else if index < len(fc.Items)-1 {
-					onError(properties.start, "UNEXPECTED_TOKEN", "Unexpected empty item in "+fcName, false)
+					onError(
+						errorOffset(properties.start),
+						"UNEXPECTED_TOKEN",
+						"Unexpected empty item in "+fcName,
+						false,
+					)
 				}
 				if properties.comment != "" {
 					if coll.Comment != "" {
@@ -289,34 +322,26 @@ func resolveFlowCollection(composition *composeContext, fc *cst.Token, onError o
 				continue
 			}
 			if !isMap && composition.options.Strict && containsNewline(key) {
-				onError(key, // checked by containsNewline()
+				onError(errorToken{token: key}, // checked by containsNewline()
 					"MULTILINE_IMPLICIT_KEY", "Implicit keys of flow sequence pairs need to be on a single line", false)
 			}
 		}
 		if index == 0 {
 			if properties.comma != nil {
-				onError(properties.comma, "UNEXPECTED_TOKEN", "Unexpected , in "+fcName, false)
+				onError(errorToken{token: properties.comma}, "UNEXPECTED_TOKEN", "Unexpected , in "+fcName, false)
 			}
 		} else {
 			if properties.comma == nil {
-				onError(properties.start, "MISSING_CHAR", "Missing , between "+fcName+" items", false)
+				onError(errorOffset(properties.start), "MISSING_CHAR", "Missing , between "+fcName+" items", false)
 			}
 			if properties.comment != "" {
-				previousItemComment := []uint16{}
-			loop:
-				for _, st := range start {
-					switch st.Type {
-					case "comma", "space":
-					case "comment":
-						previousItemComment = substring(st.Source, 1, len(st.Source))
-						break loop
-					default:
-						break loop
-					}
-				}
+				previousItemComment := leadingComment(start)
 				if len(previousItemComment) > 0 {
 					if len(coll.Items) == 0 {
 						// `coll.items[coll.items.length - 1]` is undefined.
+						// Invariant: this is upstream's TypeError, which input can raise and which stops no
+						// process: resolveFlowCollection runs only under composeCollectionCatching, which
+						// recovers a typeError and reports it as upstream's catch does.
 						panic(typeError("Cannot read properties of undefined (reading 'comment')"))
 					}
 					previous := coll.Items[len(coll.Items)-1]
@@ -352,7 +377,7 @@ func resolveFlowCollection(composition *composeContext, fc *cst.Token, onError o
 			coll.Items = append(coll.Items, valueNode)
 			offset = valueNode.Range[2]
 			if isBlock(value) {
-				onError(valueNode.Range, "BLOCK_IN_FLOW", blockMessage, false)
+				onError(errorRange(valueNode.Range), "BLOCK_IN_FLOW", blockMessage, false)
 			}
 		} else {
 			// item is a key+value pair
@@ -366,7 +391,7 @@ func resolveFlowCollection(composition *composeContext, fc *cst.Token, onError o
 				keyNode = composeEmptyNode(composition, keyStart, start, properties, onError)
 			}
 			if isBlock(key) {
-				onError(keyNode.Range, "BLOCK_IN_FLOW", blockMessage, false)
+				onError(errorRange(keyNode.Range), "BLOCK_IN_FLOW", blockMessage, false)
 			}
 			composition.atKey = false
 			// value properties
@@ -387,7 +412,7 @@ func resolveFlowCollection(composition *composeContext, fc *cst.Token, onError o
 						}
 						if st.Type == "newline" {
 							onError(
-								st,
+								errorToken{token: st},
 								"MULTILINE_IMPLICIT_KEY",
 								"Implicit keys of flow sequence pairs need to be on a single line",
 								false,
@@ -397,7 +422,7 @@ func resolveFlowCollection(composition *composeContext, fc *cst.Token, onError o
 					}
 					if properties.start < valueProperties.found.Offset-1024 {
 						onError(
-							valueProperties.found,
+							errorToken{token: valueProperties.found},
 							"KEY_OVER_1024_CHARS",
 							"The : indicator must be at most 1024 chars after the start of an implicit flow sequence key",
 							false,
@@ -406,9 +431,14 @@ func resolveFlowCollection(composition *composeContext, fc *cst.Token, onError o
 				}
 			} else if value != nil {
 				if value.HasSource() && characterAt(value.Source, 0) == ':' {
-					onError(value, "MISSING_CHAR", "Missing space after : in "+fcName, false)
+					onError(errorToken{token: value}, "MISSING_CHAR", "Missing space after : in "+fcName, false)
 				} else {
-					onError(valueProperties.start, "MISSING_CHAR", "Missing , or : between "+fcName+" items", false)
+					onError(
+						errorOffset(valueProperties.start),
+						"MISSING_CHAR",
+						"Missing , or : between "+fcName+" items",
+						false,
+					)
 				}
 			}
 			// value value
@@ -420,7 +450,7 @@ func resolveFlowCollection(composition *composeContext, fc *cst.Token, onError o
 			}
 			if valueNode != nil {
 				if isBlock(value) {
-					onError(valueNode.Range, "BLOCK_IN_FLOW", blockMessage, false)
+					onError(errorRange(valueNode.Range), "BLOCK_IN_FLOW", blockMessage, false)
 				}
 			} else if valueProperties.comment != "" {
 				if keyNode.Comment != "" {
@@ -435,7 +465,7 @@ func resolveFlowCollection(composition *composeContext, fc *cst.Token, onError o
 			}
 			if isMap {
 				if mapIncludes(composition, coll.Items, keyNode) {
-					onError(keyStart, "DUPLICATE_KEY", "Map keys must be unique", false)
+					onError(errorOffset(keyStart), "DUPLICATE_KEY", "Map keys must be unique", false)
 				}
 				coll.Items = append(coll.Items, pair)
 			} else {
@@ -478,7 +508,7 @@ func resolveFlowCollection(composition *composeContext, fc *cst.Token, onError o
 			code = "MISSING_CHAR"
 			message = name + " must end with a " + expectedEnd
 		}
-		onError(offset, code, message, false)
+		onError(errorOffset(offset), code, message, false)
 		if ce != nil && len(ce.Source) != 1 {
 			ee = append([]*cst.Token{ce}, ee...)
 		}
@@ -497,6 +527,21 @@ func resolveFlowCollection(composition *composeContext, fc *cst.Token, onError o
 		coll.Range = []int{fc.Offset, cePosition, cePosition}
 	}
 	return coll
+}
+
+// leadingComment is the comment among an item's leading tokens, `prevItemComment`: the first comment's
+// text without its #, read past commas and spaces and stopping at anything else, empty when there is none.
+func leadingComment(start []*cst.Token) []uint16 {
+	for _, st := range start {
+		switch st.Type {
+		case "comma", "space":
+		case "comment":
+			return substring(st.Source, 1, len(st.Source))
+		default:
+			return []uint16{}
+		}
+	}
+	return []uint16{}
 }
 
 // containsNewline is upstream's, with its null for no key as false: every caller tests it for
@@ -554,10 +599,10 @@ func mapIncludes(composition *composeContext, items []*Node, search *Node) bool 
 }
 
 // strictEquals is `a === b` for scalar values: NaN is not itself, and objects are only themselves.
-func strictEquals(left any, right any) bool {
+func strictEquals(left ScalarValue, right ScalarValue) bool {
 	switch x := left.(type) {
-	case float64:
-		y, isNumber := right.(float64)
+	case ScalarNumber:
+		y, isNumber := right.(ScalarNumber)
 		return isNumber && x == y
 	case Date, Binary:
 		return false

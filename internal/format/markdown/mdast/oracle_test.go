@@ -1,6 +1,7 @@
 package mdast
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -64,8 +65,99 @@ func (oracle *treeOracle) load() {
 	oracle.runtime = runtime
 }
 
-// parse returns upstream's tree as generic JSON, with `data` (hast hints for HTML output) dropped.
-func (oracle *treeOracle) parse(text string) (any, error) {
+// treeValue is one value of a tree serialized as JSON, upstream's or the port's: an object, a list, a
+// string, a number, a boolean or null. Sealed by isTreeValue, so a comparison's type switch sees every kind.
+type treeValue interface{ isTreeValue() }
+
+type (
+	treeObject  map[string]treeValue
+	treeList    []treeValue
+	treeString  string
+	treeNumber  float64
+	treeBoolean bool
+	treeNull    struct{}
+)
+
+func (treeObject) isTreeValue()  {}
+func (treeList) isTreeValue()    {}
+func (treeString) isTreeValue()  {}
+func (treeNumber) isTreeValue()  {}
+func (treeBoolean) isTreeValue() {}
+func (treeNull) isTreeValue()    {}
+
+// decodeTree reads serialized JSON into a treeValue, as json.Unmarshal into an interface would: numbers as
+// float64, strings with invalid UTF-8 replaced, and the last of two equal keys kept.
+func decodeTree(serialized []byte) (treeValue, error) {
+	decoder := json.NewDecoder(bytes.NewReader(serialized))
+	tree, decodeError := decodeTreeValue(decoder)
+	if decodeError != nil {
+		return nil, decodeError
+	}
+	if decoder.More() {
+		return nil, fmt.Errorf("the tree's JSON holds more than one value")
+	}
+	return tree, nil
+}
+
+// decodeTreeValue reads the next JSON value from decoder.
+func decodeTreeValue(decoder *json.Decoder) (treeValue, error) {
+	token, tokenError := decoder.Token()
+	if tokenError != nil {
+		return nil, tokenError
+	}
+	switch typed := token.(type) {
+	case json.Delim:
+		switch typed {
+		case '{':
+			object := treeObject{}
+			for decoder.More() {
+				keyToken, keyError := decoder.Token()
+				if keyError != nil {
+					return nil, keyError
+				}
+				key, isKey := keyToken.(string)
+				if !isKey {
+					return nil, fmt.Errorf("an object key is a %T, not a string", keyToken)
+				}
+				value, valueError := decodeTreeValue(decoder)
+				if valueError != nil {
+					return nil, valueError
+				}
+				object[key] = value
+			}
+			if _, closeError := decoder.Token(); closeError != nil {
+				return nil, closeError
+			}
+			return object, nil
+		case '[':
+			list := treeList{}
+			for decoder.More() {
+				value, valueError := decodeTreeValue(decoder)
+				if valueError != nil {
+					return nil, valueError
+				}
+				list = append(list, value)
+			}
+			if _, closeError := decoder.Token(); closeError != nil {
+				return nil, closeError
+			}
+			return list, nil
+		}
+		return nil, fmt.Errorf("a value opens with %v", typed)
+	case string:
+		return treeString(typed), nil
+	case float64:
+		return treeNumber(typed), nil
+	case bool:
+		return treeBoolean(typed), nil
+	case nil:
+		return treeNull{}, nil
+	}
+	return nil, fmt.Errorf("a JSON token of type %T", token)
+}
+
+// parse returns upstream's tree, with `data` (hast hints for HTML output) dropped.
+func (oracle *treeOracle) parse(text string) (treeValue, error) {
 	var serialized string
 	var err error
 	if oracle.golden == nil {
@@ -82,16 +174,14 @@ func (oracle *treeOracle) parse(text string) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	var tree any
-	if decodeError := json.Unmarshal([]byte(serialized), &tree); decodeError != nil {
-		return nil, decodeError
-	}
-	return tree, nil
+	return decodeTree([]byte(serialized))
 }
 
 // serialize is upstream's tree for text, as the JSON text the bundle's parser and JSON.stringify give.
 func (oracle *treeOracle) serialize(text string) (string, error) {
-	oracle.runtime.Set("__text", text)
+	if setError := oracle.runtime.Set("__text", text); setError != nil {
+		return "", fmt.Errorf("setting the text to parse: %w", setError)
+	}
 	value, runStringError := oracle.runtime.RunString(
 		`JSON.stringify(prettierPlugins.markdown.parsers.markdown.parse(__text),
 		(key, value) => key === "data" ? undefined : value)`,
@@ -103,36 +193,39 @@ func (oracle *treeOracle) serialize(text string) (string, error) {
 }
 
 // convertOffsets rewrites every position offset in upstream's tree from UTF-16 units to bytes.
-func convertOffsets(tree any, offsets []int) {
+//
+// Mutates: tree its offsets are rewritten in place, so the comparison reads the same tree in bytes.
+func convertOffsets(tree treeValue, offsets []int) {
 	switch typed := tree.(type) {
-	case map[string]any:
+	case treeObject:
 		for key, value := range typed {
 			if key == "offset" {
-				if number, isNumber := value.(float64); isNumber {
-					typed[key] = float64(offsets[int(number)])
+				if number, isNumber := value.(treeNumber); isNumber {
+					typed[key] = treeNumber(offsets[int(number)])
 				}
 				continue
 			}
 			convertOffsets(value, offsets)
 		}
-	case []any:
+	case treeList:
 		for _, value := range typed {
 			convertOffsets(value, offsets)
 		}
 	}
 }
 
-// describe renders a Go node with exactly the keys upstream's node of that type has.
-func describe(node *Node) map[string]any {
-	description := map[string]any{"type": node.NodeType}
+// describe renders a Go node with exactly the keys upstream's node of that type has. A null is a nil
+// treeValue, which json.Marshal writes as null and describeThroughJson reads back as a treeNull.
+func describe(node *Node) treeObject {
+	description := treeObject{"type": treeString(node.NodeType)}
 	if node.Position != nil {
-		description["position"] = map[string]any{
+		description["position"] = treeObject{
 			"start": describePoint(node.Position.Start),
 			"end":   describePoint(node.Position.End),
 		}
 	}
 	if node.IsParent {
-		children := make([]any, len(node.Children))
+		children := make(treeList, len(node.Children))
 		for index, child := range node.Children {
 			children[index] = describe(child)
 		}
@@ -142,100 +235,106 @@ func describe(node *Node) map[string]any {
 		if node.ValueNull {
 			description["value"] = nil
 		} else {
-			description["value"] = node.Value
+			description["value"] = treeString(node.Value)
 		}
 	}
 	optional := func(key string, value *string) {
 		if value == nil {
 			description[key] = nil
 		} else {
-			description[key] = *value
+			description[key] = treeString(*value)
 		}
 	}
 	switch node.NodeType {
 	case "heading":
-		description["depth"] = float64(node.Depth)
+		description["depth"] = treeNumber(node.Depth)
 	case "code":
 		optional("lang", node.Lang)
 		optional("meta", node.Meta)
 	case "math":
 		optional("meta", node.Meta)
 	case "definition":
-		description["identifier"] = node.Identifier
+		description["identifier"] = treeString(node.Identifier)
 		optional("label", node.Label)
 		optional("title", node.Title)
-		description["url"] = node.Url
+		description["url"] = treeString(node.Url)
 	case "link":
 		optional("title", node.Title)
-		description["url"] = node.Url
+		description["url"] = treeString(node.Url)
 	case "image":
 		optional("title", node.Title)
-		description["url"] = node.Url
+		description["url"] = treeString(node.Url)
 		optional("alt", node.Alt)
 	case "linkReference":
-		description["identifier"] = node.Identifier
+		description["identifier"] = treeString(node.Identifier)
 		optional("label", node.Label)
-		description["referenceType"] = node.ReferenceType
+		description["referenceType"] = treeString(node.ReferenceType)
 	case "imageReference":
 		optional("alt", node.Alt)
-		description["identifier"] = node.Identifier
+		description["identifier"] = treeString(node.Identifier)
 		optional("label", node.Label)
-		description["referenceType"] = node.ReferenceType
+		description["referenceType"] = treeString(node.ReferenceType)
 	case "list":
-		description["ordered"] = node.Ordered
+		description["ordered"] = treeBoolean(node.Ordered)
 		if node.Start == nil {
 			description["start"] = nil
 		} else {
-			description["start"] = float64(*node.Start)
+			description["start"] = treeNumber(*node.Start)
 		}
-		description["spread"] = node.Spread
+		description["spread"] = treeBoolean(node.Spread)
 	case "listItem":
-		description["spread"] = node.Spread
+		description["spread"] = treeBoolean(node.Spread)
 		if node.Checked == nil {
 			description["checked"] = nil
 		} else {
-			description["checked"] = *node.Checked
+			description["checked"] = treeBoolean(*node.Checked)
 		}
 	case "footnoteReference", "footnoteDefinition":
-		description["identifier"] = node.Identifier
+		description["identifier"] = treeString(node.Identifier)
 		optional("label", node.Label)
 	case "table":
-		align := make([]any, len(node.Align))
+		align := make(treeList, len(node.Align))
 		for index, value := range node.Align {
 			if value != "" {
-				align[index] = value
+				align[index] = treeString(value)
 			}
 		}
 		description["align"] = align
 	case "frontMatter":
 		frontMatter := node.FrontMatter
-		description["language"] = frontMatter.Language
+		description["language"] = treeString(frontMatter.Language)
 		optional("explicitLanguage", frontMatter.ExplicitLanguage)
-		description["value"] = frontMatter.Value
-		description["startDelimiter"] = frontMatter.StartDelimiter
-		description["endDelimiter"] = frontMatter.EndDelimiter
-		description["raw"] = frontMatter.Raw
+		description["value"] = treeString(frontMatter.Value)
+		description["startDelimiter"] = treeString(frontMatter.StartDelimiter)
+		description["endDelimiter"] = treeString(frontMatter.EndDelimiter)
+		description["raw"] = treeString(frontMatter.Raw)
 	}
 	return description
 }
 
-func describePoint(point Point) map[string]any {
-	return map[string]any{"line": float64(point.Line), "column": float64(point.Column), "offset": float64(point.Offset)}
+func describePoint(point Point) treeObject {
+	return treeObject{
+		"line":   treeNumber(point.Line),
+		"column": treeNumber(point.Column),
+		"offset": treeNumber(point.Offset),
+	}
 }
 
 // normalizeUpstream drops the fields of upstream's front matter node that are parser bookkeeping (its
 // own start and end, which the position restates).
-func normalizeUpstream(tree any) {
+//
+// Mutates: tree the fields are deleted in place, from the tree compareTree has just decoded for itself.
+func normalizeUpstream(tree treeValue) {
 	switch typed := tree.(type) {
-	case map[string]any:
-		if typed["type"] == "frontMatter" {
+	case treeObject:
+		if typed["type"] == treeString("frontMatter") {
 			delete(typed, "start")
 			delete(typed, "end")
 		}
 		for _, value := range typed {
 			normalizeUpstream(value)
 		}
-	case []any:
+	case treeList:
 		for _, value := range typed {
 			normalizeUpstream(value)
 		}
@@ -255,18 +354,28 @@ func compareTree(oracle *treeOracle, text string) string {
 	if parseMarkdownError != nil {
 		return "the port failed: " + parseMarkdownError.Error()
 	}
-	// Round-trip through JSON so both sides hold the same Go types.
-	encoded, _ := json.Marshal(describe(root))
-	var actual any
-	_ = json.Unmarshal(encoded, &actual)
+	actual, describeError := describeThroughJson(root)
+	if describeError != nil {
+		return "describing the port's tree: " + describeError.Error()
+	}
 
 	return firstTreeDifference("root", expected, actual)
 }
 
-func firstTreeDifference(path string, expected any, actual any) string {
+// describeThroughJson is describe round-tripped through JSON, so the port's strings are read back the way
+// upstream's are, invalid UTF-8 replaced on both sides.
+func describeThroughJson(root *Node) (treeValue, error) {
+	encoded, encodeError := json.Marshal(describe(root))
+	if encodeError != nil {
+		return nil, fmt.Errorf("encoding the tree: %w", encodeError)
+	}
+	return decodeTree(encoded)
+}
+
+func firstTreeDifference(path string, expected treeValue, actual treeValue) string {
 	switch want := expected.(type) {
-	case map[string]any:
-		got, isMap := actual.(map[string]any)
+	case treeObject:
+		got, isMap := actual.(treeObject)
 		if !isMap {
 			return fmt.Sprintf("%s: want an object, got %v", path, actual)
 		}
@@ -306,8 +415,8 @@ func firstTreeDifference(path string, expected any, actual any) string {
 			}
 		}
 		return ""
-	case []any:
-		got, isSlice := actual.([]any)
+	case treeList:
+		got, isSlice := actual.(treeList)
 		if !isSlice {
 			return fmt.Sprintf("%s: want a list, got %v", path, actual)
 		}
@@ -363,10 +472,14 @@ func TestTreeOracleCanFail(test *testing.T) {
 	if parseError != nil {
 		test.Fatal(parseError)
 	}
-	root, _ := ParseMarkdown("**a**", nil)
-	encoded, _ := json.Marshal(describe(root))
-	var actual any
-	_ = json.Unmarshal(encoded, &actual)
+	root, parseMarkdownError := ParseMarkdown("**a**", nil)
+	if parseMarkdownError != nil {
+		test.Fatal(parseMarkdownError)
+	}
+	actual, describeError := describeThroughJson(root)
+	if describeError != nil {
+		test.Fatal(describeError)
+	}
 	if firstTreeDifference("root", expected, actual) == "" {
 		test.Fatal("no difference found between the trees of *a* and **a**")
 	}

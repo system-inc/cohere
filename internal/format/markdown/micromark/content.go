@@ -8,14 +8,17 @@ var continuationConstruct = &Construct{Partial: true, Tokenize: tokenizeContinua
 
 // resolveContent tokenizes the content chunks.
 func resolveContent(events []Event, _ *TokenizeContext) []Event {
-	events, _ = subtokenize(events)
-	return events
+	subtokenizedEvents, _ := subtokenize(events)
+	return subtokenizedEvents
 }
 
 func tokenizeContent(self *Self, effects *Effects, ok State, nok State) State {
 	var previous *Token
 
-	var chunkStart, chunkInside, contentEnd, contentContinue State
+	var chunkStart State
+	var chunkInside State
+	var contentEnd State
+	var contentContinue State
 
 	chunkStart = func(code Code) State {
 		effects.Enter(TypeContent, nil)
@@ -57,7 +60,8 @@ func tokenizeContent(self *Self, effects *Effects, ok State, nok State) State {
 }
 
 func tokenizeContinuation(self *Self, effects *Effects, ok State, nok State) State {
-	var startLookahead, prefixed State
+	var startLookahead State
+	var prefixed State
 
 	startLookahead = func(code Code) State {
 		effects.Exit(TypeChunkContent)

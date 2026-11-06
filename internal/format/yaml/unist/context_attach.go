@@ -197,6 +197,8 @@ func (context *context) isExplicitMappingKey(node *Node) bool {
 // defineParents is upstream's defineParents: Parent for the node and everything under it. Upstream
 // defines _parent as a non-writable property, so defining it again with a different parent throws; no
 // path does, since attachComments only attaches comments that have none.
+//
+// Mutates: node and everything under it get their Parent, which is this function's whole job.
 func defineParents(node *Node, parent *Node) {
 	for _, child := range node.Children {
 		defineParents(child, node)
@@ -296,9 +298,19 @@ func createUpdater(
 	}
 }
 
-func startPointGetter(position *position) *point               { return position.start }
-func startPointSetter(position *position, at *point)           { position.start = at }
-func endPointGetter(position *position) *point                 { return position.end }
-func endPointSetter(position *position, at *point)             { position.end = at }
+func startPointGetter(position *position) *point { return position.start }
+
+// startPointSetter is the setter createUpdater calls to move a host's start.
+//
+// Mutates: position takes the new start: it is the host an updater grows, and that is the setter's job.
+func startPointSetter(position *position, at *point) { position.start = at }
+
+func endPointGetter(position *position) *point { return position.end }
+
+// endPointSetter is the setter createUpdater calls to move a host's end.
+//
+// Mutates: position takes the new end: it is the host an updater grows, and that is the setter's job.
+func endPointSetter(position *position, at *point) { position.end = at }
+
 func shouldUpdateStartPoint(reduced *point, value *point) bool { return value.offset < reduced.offset }
 func shouldUpdateEndPoint(reduced *point, value *point) bool   { return value.offset > reduced.offset }

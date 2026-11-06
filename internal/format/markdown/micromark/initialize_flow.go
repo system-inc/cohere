@@ -5,8 +5,14 @@ var flowInitial *InitialConstruct
 
 func init() { flowInitial = &InitialConstruct{Tokenize: initializeFlow} }
 
+// initializeFlow starts the flow tokenizer: blank lines, then flow constructs, then content.
+//
+// Mutates: self its CurrentConstruct is cleared after each line, as upstream's initializer sets
+// `this.currentConstruct` on the tokenize context it is bound to
 func initializeFlow(self *Self, effects *Effects) State {
-	var initial, atBlankEnding, afterConstruct State
+	var initial State
+	var atBlankEnding State
+	var afterConstruct State
 
 	// Upstream's two states are hoisted function declarations, so they exist before the attempts that
 	// return to them are built. Here they are assigned first and the chain is built once, after, because

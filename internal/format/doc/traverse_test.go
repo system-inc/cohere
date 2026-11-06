@@ -121,6 +121,7 @@ func showDoc(document Doc) string {
 		var buffer bytes.Buffer
 		encoder := json.NewEncoder(&buffer)
 		encoder.SetEscapeHTML(false)
+		// Ignored: a string always has a JSON form, and a bytes.Buffer never fails a write.
 		_ = encoder.Encode(text)
 		return strings.TrimSuffix(buffer.String(), "\n")
 	}
@@ -218,7 +219,8 @@ func TestUtilitiesAgreeWithUpstream(test *testing.T) {
 	command := exec.Command("node", "--input-type=module", "-e", utilitiesScript)
 	command.Dir = root
 	command.Stdin = bytes.NewReader(encoded)
-	var stdout, stderr bytes.Buffer
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
 	command.Stdout, command.Stderr = &stdout, &stderr
 	if runError := command.Run(); runError != nil {
 		test.Fatalf("node: %v\n%s", runError, stderr.String())
@@ -238,10 +240,13 @@ func TestUtilitiesAgreeWithUpstream(test *testing.T) {
 	}
 
 	mismatches, upstreamErrors := 0, 0
-	report := func(index int, what string, want any, got any) {
+	report := func(index int, what string, want string, got string) {
 		mismatches++
 		if mismatches <= 8 {
-			specJson, _ := json.Marshal(cases[index].Spec)
+			specJson, marshalError := json.Marshal(cases[index].Spec)
+			if marshalError != nil {
+				test.Fatalf("encoding case %d's spec: %v", index, marshalError)
+			}
 			test.Errorf("case %d %s\nspec %s\nwant %v\ngot  %v", index, what, specJson, want, got)
 		}
 	}
@@ -252,14 +257,14 @@ func TestUtilitiesAgreeWithUpstream(test *testing.T) {
 			continue
 		}
 		if got := WillBreak(buildSpec(testCase.Spec)); got != want.WillBreak {
-			report(index, "willBreak", want.WillBreak, got)
+			report(index, "willBreak", fmt.Sprint(want.WillBreak), fmt.Sprint(got))
 		}
 		if got := CanBreak(buildSpec(testCase.Spec)); got != want.CanBreak {
-			report(index, "canBreak", want.CanBreak, got)
+			report(index, "canBreak", fmt.Sprint(want.CanBreak), fmt.Sprint(got))
 		}
 		if want.IsEmpty != nil {
 			if got := IsEmptyDoc(buildSpec(testCase.Spec)); got != *want.IsEmpty {
-				report(index, "isEmptyDoc", *want.IsEmpty, got)
+				report(index, "isEmptyDoc", fmt.Sprint(*want.IsEmpty), fmt.Sprint(got))
 			}
 		}
 		cleaned := CleanDoc(buildSpec(testCase.Spec))

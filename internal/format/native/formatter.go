@@ -37,9 +37,9 @@ func (formatter Formatter) FormatParsed(fileName string, text string, parsed *as
 	// comes off before parsing and goes back on after, and carriage returns become newlines. endOfLine
 	// is always "lf" (formatoptions.Resolve refuses anything else), so nothing converts them back.
 	hasByteOrderMark := strings.HasPrefix(text, byteOrderMark)
-	text = strings.TrimPrefix(text, byteOrderMark)
-	if strings.Contains(text, "\r") {
-		text = strings.ReplaceAll(strings.ReplaceAll(text, "\r\n", "\n"), "\r", "\n")
+	normalizedText := strings.TrimPrefix(text, byteOrderMark)
+	if strings.Contains(normalizedText, "\r") {
+		normalizedText = strings.ReplaceAll(strings.ReplaceAll(normalizedText, "\r\n", "\n"), "\r", "\n")
 	}
 
 	// The tree is of the text as given, so a byte order mark or a carriage return taken off above leaves it
@@ -47,14 +47,15 @@ func (formatter Formatter) FormatParsed(fileName string, text string, parsed *as
 	// texts, but not handing it over says why.
 	var formatted string
 	var err error
-	if ecmascripttext.TrimWhitespace(text) == "" {
+	if ecmascripttext.TrimWhitespace(normalizedText) == "" {
 		// core.js's coreFormat: empty or whitespace-only text formats to nothing before any parser sees it,
 		// in every language. A parser that refuses empty input (JSON's) is never asked (#w6vtsrn).
 		formatted = ""
-	} else if printParsed, takesTree := lookupParsed(fileName); takesTree && parsed != nil && parsed.Text() == text {
-		formatted, err = printParsed(fileName, text, parsed, formatter.Options)
+	} else if printParsed, takesTree := lookupParsed(fileName); takesTree && parsed != nil &&
+		parsed.Text() == normalizedText {
+		formatted, err = printParsed(fileName, normalizedText, parsed, formatter.Options)
 	} else {
-		formatted, err = print(fileName, text, formatter.Options)
+		formatted, err = print(fileName, normalizedText, formatter.Options)
 	}
 	if err != nil {
 		return "", err

@@ -594,17 +594,18 @@ func nearestSwiftMarker(
 	packages map[string]bool,
 	xcodeCandidates map[string]bool,
 ) (string, bool, bool) {
+	current := directory
 	for {
-		if packages[directory] {
-			return directory, false, true
+		if packages[current] {
+			return current, false, true
 		}
-		if xcodeCandidates[directory] {
-			return directory, true, true
+		if xcodeCandidates[current] {
+			return current, true, true
 		}
-		if directory == "." {
+		if current == "." {
 			return "", false, false
 		}
-		directory = path.Dir(directory)
+		current = path.Dir(current)
 	}
 }
 

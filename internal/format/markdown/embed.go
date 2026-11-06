@@ -166,8 +166,9 @@ func embedFrontMatter(node *Node) embedPrint {
 // block's inferred parser (or a ts/tsx file name, as embed passes it) and yaml or toml front matter with
 // content, in document order. A report uses it to attribute a difference to a missing printer by name.
 func EmbeddedParsers(text string) []string {
-	text = strings.ReplaceAll(strings.ReplaceAll(strings.TrimPrefix(text, "\ufeff"), "\r\n", "\n"), "\r", "\n")
-	ast, parseMarkdownError := mdast.ParseMarkdown(text, nil)
+	normalizedText := strings.ReplaceAll(
+		strings.ReplaceAll(strings.TrimPrefix(text, "\ufeff"), "\r\n", "\n"), "\r", "\n")
+	ast, parseMarkdownError := mdast.ParseMarkdown(normalizedText, nil)
 	if parseMarkdownError != nil {
 		return nil
 	}

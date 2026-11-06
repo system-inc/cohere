@@ -1,6 +1,7 @@
 package doc
 
 import (
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -158,7 +159,12 @@ func arrayTypeChecks(test *testing.T, path string, source string) []string {
 				}
 			case *ast.TypeSwitchStmt:
 				for _, statement := range typed.Body.List {
-					for _, listed := range statement.(*ast.CaseClause).List {
+					clause, isClause := statement.(*ast.CaseClause)
+					if !isClause {
+						// Invariant: go/ast gives a type switch's body only case clauses, one per case.
+						panic(fmt.Sprintf("%s: a type switch body holds a %T", path, statement))
+					}
+					for _, listed := range clause.List {
 						report(listed)
 					}
 				}
@@ -171,11 +177,12 @@ func arrayTypeChecks(test *testing.T, path string, source string) []string {
 
 // namesArrayType is whether expression is Concat or Sequence, bare or as doc.Concat, behind a pointer or not.
 func namesArrayType(expression ast.Expr) bool {
+	peeledExpression := expression
 	if star, isStar := expression.(*ast.StarExpr); isStar {
-		expression = star.X
+		peeledExpression = star.X
 	}
 	var name string
-	switch typed := expression.(type) {
+	switch typed := peeledExpression.(type) {
 	case *ast.Ident:
 		name = typed.Name
 	case *ast.SelectorExpr:

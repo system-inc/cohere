@@ -99,14 +99,18 @@ func tokenizeGfmAutolinkLiteralEmailAutolink(self *Self, effects *Effects, ok St
 
 func newEmailAutolink() *emailAutolink {
 	run := &emailAutolink{}
-	run.startState, run.atextState = run.start, run.atext
-	run.emailDomainState, run.emailDomainDotState, run.emailDomainAfterState = run.emailDomain, run.emailDomainDot, run.emailDomainAfter
+	run.startState = run.start
+	run.atextState = run.atext
+	run.emailDomainState = run.emailDomain
+	run.emailDomainDotState = run.emailDomainDot
+	run.emailDomainAfterState = run.emailDomainAfter
 	return run
 }
 
 // tokenizeGfmAutolinkLiteralWwwAutolink is a `www` autolink literal: `a www.example.org b`.
 func tokenizeGfmAutolinkLiteralWwwAutolink(self *Self, effects *Effects, ok State, nok State) State {
-	var wwwStart, wwwAfter State
+	var wwwStart State
+	var wwwAfter State
 
 	// Start of www autolink literal.
 	wwwStart = func(code Code) State {
@@ -141,7 +145,11 @@ func tokenizeGfmAutolinkLiteralProtocolAutolink(self *Self, effects *Effects, ok
 	buffer := ""
 	seen := false
 
-	var protocolStart, protocolPrefixInside, protocolSlashesInside, afterProtocol, protocolAfter State
+	var protocolStart State
+	var protocolPrefixInside State
+	var protocolSlashesInside State
+	var afterProtocol State
+	var protocolAfter State
 
 	// Start of protocol autolink literal.
 	protocolStart = func(code Code) State {
@@ -216,7 +224,8 @@ func tokenizeGfmAutolinkLiteralProtocolAutolink(self *Self, effects *Effects, ok
 func tokenizeGfmAutolinkLiteralWwwPrefix(self *Self, effects *Effects, ok State, nok State) State {
 	size := 0
 
-	var wwwPrefixInside, wwwPrefixAfter State
+	var wwwPrefixInside State
+	var wwwPrefixAfter State
 
 	// In www prefix.
 	wwwPrefixInside = func(code Code) State {
@@ -250,7 +259,9 @@ func tokenizeGfmAutolinkLiteralDomain(self *Self, effects *Effects, ok State, no
 	underscoreInLastLastSegment := false
 	seen := false
 
-	var domainInside, domainAtPunctuation, domainAfter State
+	var domainInside State
+	var domainAtPunctuation State
+	var domainAfter State
 
 	// In domain.
 	domainInside = func(code Code) State {
@@ -310,7 +321,8 @@ func tokenizeGfmAutolinkLiteralPath(self *Self, effects *Effects, ok State, nok 
 	sizeOpen := 0
 	sizeClose := 0
 
-	var pathInside, pathAtPunctuation State
+	var pathInside State
+	var pathAtPunctuation State
 
 	// In path.
 	pathInside = func(code Code) State {
@@ -362,7 +374,10 @@ func tokenizeGfmAutolinkLiteralPath(self *Self, effects *Effects, ok State, nok 
 // the entire trail is not part of the link.
 // It calls `nok` if this *is* part of the link.
 func tokenizeGfmAutolinkLiteralTrail(self *Self, effects *Effects, ok State, nok State) State {
-	var trail, trailBracketAfter, trailCharacterReferenceStart, trailCharacterReferenceInside State
+	var trail State
+	var trailBracketAfter State
+	var trailCharacterReferenceStart State
+	var trailCharacterReferenceInside State
 
 	// In trail of domain or path.
 	trail = func(code Code) State {
@@ -448,7 +463,8 @@ func tokenizeGfmAutolinkLiteralTrail(self *Self, effects *Effects, ok State, nok
 // the trail is not part of the link.
 // It calls `nok` if this *is* part of the link.
 func tokenizeGfmAutolinkLiteralEmailDomainDotTrail(self *Self, effects *Effects, ok State, nok State) State {
-	var start, after State
+	var start State
+	var after State
 
 	// Dot.
 	start = func(code Code) State {
