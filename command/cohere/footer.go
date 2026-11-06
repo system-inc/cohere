@@ -42,10 +42,10 @@ import (
 // rule crashed on, a rule that skipped every file it was offered, a phase that could not run, formatting
 // not checked, a run narrowed to some of the files, a project with nothing to check, a generated file the
 // program asks for that does not exist yet, Swift files beside the project that no package holds, Swift
-// files inside a package's directory that no target compiles and no other project's run checks. The old
-// phase line existed so that a run which checked nothing could not print like one that checked everything,
-// and a one-line summary that dropped those cases would undo it in the line people actually read. So a gap
-// is never left to `--verbose`.
+// files inside a package's directory that no target compiles and no other project's run checks, and what a
+// Go run withheld of its dependencies because no cgo tool ran. The old phase line existed so that a run which
+// checked nothing could not print like one that checked everything, and a one-line summary that dropped those
+// cases would undo it in the line people actually read. So a gap is never left to `--verbose`.
 
 // phaseGlyphs are the house's glyph for each phase that has one.
 var phaseGlyphs = map[phaseName]string{
@@ -223,6 +223,9 @@ func uncheckedMarkers(summary runSummary) []string {
 		markers = append(markers, "⚠ "+
 			counted(len(gaps.UncheckedSwift), "Swift file not checked", "Swift files not checked"))
 	}
+	if marker := withheldCgoMarker(gaps.WithheldInDependencyCgo, gaps.WithheldDependencyCgoDeclarations); marker != "" {
+		markers = append(markers, marker)
+	}
 	if gaps.ModifiedBuild {
 		markers = append(markers, "⚠ built from a modified tree")
 	}
@@ -290,6 +293,31 @@ func overallFooter(facts overallFacts, style textStyle) string {
 		line += " • " + unclaimedSwiftMarker(facts.UnclaimedSwift)
 	}
 	return line
+}
+
+// withheldCgoMarker says what a Go run withheld because no cgo tool ran, each part only when there is some, or is
+// empty when it withheld nothing. The account under `--verbose` names the files; this only counts them, so a
+// green Linux run reaching `net` never reads like one that saw every dependency whole:
+//
+//	⚠ cgo withheld: 1 type error in 1 dependency file, 14 declarations
+//	⚠ cgo withheld: 14 declarations
+func withheldCgoMarker(files []withheldCgoFile, declarations int) string {
+	var parts []string
+	if len(files) > 0 {
+		typeErrors := 0
+		for _, file := range files {
+			typeErrors += file.Errors
+		}
+		parts = append(parts, counted(typeErrors, "type error", "type errors")+" in "+
+			counted(len(files), "dependency file", "dependency files"))
+	}
+	if declarations > 0 {
+		parts = append(parts, counted(declarations, "declaration", "declarations"))
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return "⚠ cgo withheld: " + strings.Join(parts, ", ")
 }
 
 // unclaimedSwiftMarker says the directories of Swift files no package checks, the first three by name and

@@ -1124,8 +1124,9 @@ func summaryJsonOf(test *testing.T, output string) string {
 }
 
 // A Go run that withheld type errors in a dependency's cgo files, and gave some of its declarations without bodies,
-// says so: one count line under the types line and each file by name in the account `--verbose` prints, both
-// fields in `--json`'s gaps, and neither fails the run, since what was withheld is not the project's to fix.
+// says so: one count line under the types line and each file by name in the account `--verbose` prints, one
+// marker in the footer every view ends with, both fields in `--json`'s gaps, and neither fails the run, since
+// what was withheld is not the project's to fix.
 // Not parallel: it swaps the package-level activeOutput and activeSummary, which the record acceptors set
 func TestEngineRunSaysWhatAGoRunWithheldForCgo(test *testing.T) {
 	saved, savedSummary := activeOutput, activeSummary
@@ -1152,8 +1153,11 @@ func TestEngineRunSaysWhatAGoRunWithheldForCgo(test *testing.T) {
 		test.Errorf("what a run withheld for cgo failed it: %+v", summary.Gaps)
 	}
 
+	const marker = " • ⚠ cgo withheld: 1 type error in 1 dependency file, 14 declarations"
+	requireLines(test, verbose, marker)
 	human, _ := renderGoStreamAs(test, outputHuman, withheld)
-	forbidLines(test, human, "withheld", "cgo_unix.go")
+	requireLines(test, human, marker)
+	forbidLines(test, human, "types: withheld", "cgo_unix.go")
 
 	jsonOutput, _ := renderGoStreamAs(test, outputJson, withheld)
 	var decoded struct {
@@ -1173,8 +1177,8 @@ func TestEngineRunSaysWhatAGoRunWithheldForCgo(test *testing.T) {
 	}
 }
 
-// A Go run that withheld nothing, as on macOS, says nothing of it: no line in the account, and neither field in
-// `--json`'s gaps.
+// A Go run that withheld nothing, as on macOS, says nothing of it: no line in the account, no marker in the
+// footer, and neither field in `--json`'s gaps.
 // Not parallel: it swaps the package-level activeOutput and activeSummary, which the record acceptors set
 func TestEngineRunSaysNothingWhenAGoRunWithheldNothing(test *testing.T) {
 	saved, savedSummary := activeOutput, activeSummary
@@ -1184,6 +1188,8 @@ func TestEngineRunSaysNothingWhenAGoRunWithheldNothing(test *testing.T) {
 	verbose, _ := renderGoStreamAs(test, outputVerbose, nothing)
 	requireLines(test, verbose, "types: 0 diagnostics over 3 files in 240ms\n")
 	forbidLines(test, verbose, "withheld", "cgo")
+	human, _ := renderGoStreamAs(test, outputHuman, nothing)
+	forbidLines(test, human, "withheld", "cgo")
 
 	jsonOutput, _ := renderGoStreamAs(test, outputJson, nothing)
 	forbidLines(test, summaryJsonOf(test, jsonOutput), "withheldInDependencyCgo", "withheldDependencyCgoDeclarations")
