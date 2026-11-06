@@ -284,10 +284,23 @@ public struct Pipeline {
                 parsed.files.map { ($0.url.path, $0.source) },
                 uniquingKeysWith: { first, _ in first },
             )
-            let formatting =
-                options.runFormat
-                ? await FormatPhase().run(toFormat)
-                : FormatPhase.Result(outcomes: toFormat.map { (file: $0, outcome: .unchanged) })
+            /*
+             A run that writes is handed the formatted text. `--no-fix` asks only the verdict, which is kept in the
+             package's scratch for the next run (`FormatVerdictCache`); under `--no-cache` nothing is read or kept.
+             */
+            let formatting: FormatPhase.Result
+            if !options.runFormat {
+                formatting = FormatPhase.Result(outcomes: toFormat.map { (file: $0, outcome: .unchanged) })
+            }
+            else if options.mutate {
+                formatting = await FormatPhase().run(toFormat)
+            }
+            else {
+                formatting = await FormatPhase().check(
+                    toFormat,
+                    scratchPath: options.noCache ? nil : runScratch(for: root),
+                )
+            }
             var rewritten: [FileSet.OwnedFile] = []
             var changedFiles: [FixRecord.ChangedFile] = []
             var reformatted = 0
@@ -299,27 +312,23 @@ public struct Pipeline {
                     case .unchanged:
                         break
                     case let .changed(formatted):
-                        if options.mutate {
-                            final = formatted
-                            reformatted += 1
-                            formattedHere = true
-                        }
-                        else {
-                            /* `--no-fix` writes nothing and reports what it would have changed, one finding per file, at the first line that moves. */
-                            let line = FormatPhase.firstDifferingLine(file.source, formatted)
-                            try writer.write(
-                                FindingRecord(
-                                    source: .format,
-                                    file: file.url.path,
-                                    line: line,
-                                    column: 1,
-                                    severity: .error,
-                                    rule: "cohere-swift/consistency-require-formatting",
-                                    messageId: "notFormatted",
-                                    message: "not formatted the house way; a run without --no-fix rewrites it",
-                                )
+                        final = formatted
+                        reformatted += 1
+                        formattedHere = true
+                    case let .wouldChange(line):
+                        /* `--no-fix` writes nothing and reports what it would have changed, one finding per file, at the first line that moves. */
+                        try writer.write(
+                            FindingRecord(
+                                source: .format,
+                                file: file.url.path,
+                                line: line,
+                                column: 1,
+                                severity: .error,
+                                rule: "cohere-swift/consistency-require-formatting",
+                                messageId: "notFormatted",
+                                message: "not formatted the house way; a run without --no-fix rewrites it",
                             )
-                        }
+                        )
                     case let .failed(reason):
                         notFormatted["the formatter failed: \(reason)", default: 0] += 1
                         complete = false
@@ -886,8 +895,9 @@ public struct Pipeline {
     /*
      Where SwiftPM writes when the engine runs it: the project's own `.cache/cohere/swift`, beside the dispatcher's
      table (#wb3xz1h), so deleting that one folder is always a correct answer and a worktree gets its own. It is
-     never `.build`, so a run never takes the developer's lock, and SwiftPM and the engine's walks skip hidden
-     directories, so nothing here is ever read as source. `--no-fix` writes no source file; this cache is cohere's.
+     never `.build`, so a run never takes the developer's lock. SwiftPM's walks skip hidden directories, and the
+     file set's walk skips this scratch by its path (`FileSet.buildScratches`), whatever the project's
+     `.gitignore` says, so nothing here is ever read as source. `--no-fix` writes no source file; this cache is cohere's.
      */
     /* This run's scratch: its own under `--no-cache`, the package's otherwise. */
     private func runScratch(for root: URL) -> URL {

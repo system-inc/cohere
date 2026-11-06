@@ -1,5 +1,6 @@
 import ClangDiagnosticsShim
 import Foundation
+import Synchronization
 
 /*
  Reads the compiler's serialized diagnostics (`.dia` files) through the toolchain's own libclang.
@@ -82,8 +83,51 @@ import Foundation
         unsafe disposeString = try symbol("clang_disposeString", as: CohereClangDisposeString.self)
     }
 
-    /* The libclang beside the `swift` that `xcrun` resolves: the toolchain that also builds the checked package. */
-    static func toolchainLibraryPath(runner: ProcessRunner = ProcessRunner()) throws -> String {
+    /*
+     The environment value a caller sets to what `xcrun --find swift` printed, so a process tree that already asked
+     does not ask again, as `EngineVersion.toolchainVariable` does for `swift --version`. Trusted only when it names
+     an executable file; anything else and the engine asks.
+     */
+    static let swiftExecutableVariable = "COHERE_SWIFT_EXECUTABLE"
+
+    /* This process's `swift`, kept after the first answer. A question that failed is asked again, since nothing was kept. */
+    private static let knownSwiftExecutable = Mutex<String?>(nil)
+
+    /*
+     The libclang beside the `swift` that `xcrun` resolves: the toolchain that also builds the checked package. The
+     index store, the demangler and sourcekitd are found beside it too, so one process asked `xcrun` up to five
+     times for the same answer; it asks once.
+     */
+    static func toolchainLibraryPath(
+        runner: ProcessRunner = ProcessRunner(),
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+    ) throws -> String {
+        let swift = try knownSwiftExecutable.withLock { known in
+            if let known {
+                return known
+            }
+            let answer = try swiftExecutableGiven(environment) ?? askSwiftExecutable(runner: runner)
+            known = answer
+            return answer
+        }
+        return URL(fileURLWithPath: swift)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("lib/libclang.dylib")
+            .path
+    }
+
+    /* The `swift` the caller's environment names, or nil when it names no executable file. */
+    static func swiftExecutableGiven(_ environment: [String: String]) -> String? {
+        guard let given = environment[swiftExecutableVariable]?.trimmingCharacters(in: .whitespacesAndNewlines),
+            given.hasPrefix("/"), FileManager.default.isExecutableFile(atPath: given)
+        else {
+            return nil
+        }
+        return given
+    }
+
+    private static func askSwiftExecutable(runner: ProcessRunner) throws -> String {
         let result = try runner.run("xcrun", ["--find", "swift"], in: URL(fileURLWithPath: "/"))
         let swift = String(decoding: result.standardOutput, as: UTF8.self).trimmingCharacters(
             in: .whitespacesAndNewlines
@@ -94,11 +138,7 @@ import Foundation
                     "xcrun could not find swift, so there is no toolchain libclang to read diagnostics with: \(result.standardError)"
             )
         }
-        return URL(fileURLWithPath: swift)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .appendingPathComponent("lib/libclang.dylib")
-            .path
+        return swift
     }
 
     /*
