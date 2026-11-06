@@ -38,7 +38,7 @@ func land(arguments []string) int {
 		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", parseLandingOptionsError)
 		return 2
 	}
-	worktree, gitOutputError := gitOutput("", "rev-parse", "--show-toplevel")
+	worktree, gitOutputError := landWorktree()
 	if gitOutputError != nil {
 		fmt.Fprintf(streams.Errors, "cohere-dev: land runs inside the worktree to land: %v\n", gitOutputError)
 		return 2
@@ -86,6 +86,9 @@ func land(arguments []string) int {
 			"cohere-dev: land runs in the worktree being landed, not in the checkout of main itself",
 		)
 		return 2
+	}
+	if !runsMainsLand(worktree) {
+		return runMainsLand(worktree, mainCheckout, arguments)
 	}
 
 	head, gitOutputError := gitOutput(worktree, "rev-parse", "HEAD")
