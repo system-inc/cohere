@@ -117,6 +117,61 @@ struct IgnoreRulesTests {
         #expect(fileSet.owned.map(\.url.lastPathComponent) == ["A.swift", "Schema.generated.swift"])
     }
 
+    /* What the file set excludes from a one-target package holding these files, by path relative to its root, with each reason. */
+    static func excluded(packageFiles: [String: String]) throws -> [String: String] {
+        let fixture = try Fixture(
+            files: packageFiles.merging(["Package.swift": "", "Sources/A/A.swift": ""]) { kept, _ in kept }
+        )
+        let describe =
+            #"{"name":"Example","targets":[{"name":"A","type":"library","path":"Sources/A","sources":["A.swift"]}]}"#
+        let dump = #"{"toolsVersion":{"_version":"6.4.0"},"swiftLanguageVersions":null,"targets":[]}"#
+        let package = try PackageModel(
+            root: fixture.root,
+            describeJson: Data(describe.utf8),
+            dumpPackageJson: Data(dump.utf8),
+        )
+        let fileSet = try FileSet.build(package: package, environment: fixture.environment)
+        #expect(fileSet.owned.map(\.url.lastPathComponent) == ["A.swift"])
+        let rootPath = fixture.root.resolvingSymlinksInPath().path + "/"
+        return Dictionary(
+            uniqueKeysWithValues: fileSet.excluded.map { (String($0.file.dropFirst(rootPath.count)), $0.reason) }
+        )
+    }
+
+    /*
+     The engine's own scratch is never the project's source, so after a build a package whose `.gitignore` does not
+     list `.cache` names none of the build's generated sources as a file nothing checked, as ahraos-macos named six
+     under `DerivedSources` on every run. SwiftPM's `.build` is skipped the same way when SwiftPM's cache tag is in it.
+     */
+    @Test func theBuildScratchesHoldNoFileNothingChecks() throws {
+        let excluded = try Self.excluded(packageFiles: [
+            ".gitignore": "",
+            ".cache/cohere/swift/out/Intermediates.noindex/A.build/Debug/A-p.build/DerivedSources/resource_bundle_accessor.swift":
+                "",
+            ".cache/cohere/swift/package-description.json": "{}",
+            ".build/CACHEDIR.TAG": FileSet.cacheDirectoryTagSignature + "\n# a cache directory tag\n",
+            ".build/debug/A.build/DerivedSources/resource_bundle_accessor.swift": "",
+        ])
+        #expect(excluded == ["Package.swift": "a package manifest"])
+    }
+
+    /* A `.build` with no cache tag is not known to be SwiftPM's, so it is walked as any directory is, and so is a `.cache` that is not the engine's scratch. */
+    @Test func anUntaggedBuildDirectoryAndAnotherCacheAreWalked() throws {
+        let excluded = try Self.excluded(packageFiles: [
+            ".gitignore": "",
+            ".build/Script.swift": "",
+            ".build/CACHEDIR.TAG": "not the signature\n",
+            ".cache/other/Script.swift": "",
+        ])
+        #expect(
+            excluded == [
+                "Package.swift": "a package manifest",
+                ".build/Script.swift": "no target of this package compiles it",
+                ".cache/other/Script.swift": "no target of this package compiles it",
+            ]
+        )
+    }
+
     @Test func aPackageOutsideAnyRepositoryTreatsEveryTargetFileAsOurs() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(
             "cohere-swift-no-git-\(UUID().uuidString)",

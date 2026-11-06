@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/system-inc/cohere/internal/go_engine/check"
 	"github.com/system-inc/cohere/internal/go_engine/contract"
 	"github.com/system-inc/cohere/internal/go_engine/format"
 	"github.com/system-inc/cohere/internal/go_engine/load"
@@ -42,6 +43,10 @@ type pipeline struct {
 	// incomplete is set by every gap: a requested phase not reached, an unreadable file, a file without a
 	// compiler record, a file the formatter could not format, a rule that crashed.
 	incomplete bool
+
+	// session is the findings cache the load and the lint phase share, nil under `--no-cache` or when the cache
+	// sat the run out.
+	session *check.CacheSession
 }
 
 func newPipeline(
@@ -76,8 +81,15 @@ func (engine *pipeline) run() int {
 	var loadError error
 	// The load runs once, after the fix phase so it reads the formatted tree, whenever a phase needs types.
 	if engine.request.requests(contract.PhaseTypes) || engine.request.requests(contract.PhaseLint) {
-		loaded, loadError = load.Packages(engine.described.workspace.Root, engine.described.workspace.Patterns(),
-			engine.described.workspace.Environment(), engine.described.readableOurs)
+		engine.session = engine.cacheSession()
+		workspace := engine.described.workspace
+		if engine.session != nil {
+			loaded, loadError = load.PackagesRestoring(workspace.Root, workspace.Patterns(), workspace.Environment(),
+				engine.described.readableOurs, engine.session)
+		} else {
+			loaded, loadError = load.Packages(workspace.Root, workspace.Patterns(), workspace.Environment(),
+				engine.described.readableOurs)
+		}
 		if loadError != nil {
 			engine.note("the load failed, so nothing was type-checked or linted: %v", loadError)
 		}
@@ -253,20 +265,27 @@ func (engine *pipeline) runTypes(loaded *load.Loaded, loadError error) {
 		}
 		withheld = append(withheld, contract.WithheldFile{Package: each.Package, File: each.File, Errors: each.Errors})
 	}
-	// The build text says which load ran: from source, or through go/packages for a project with cgo of its own.
-	build := "go list -deps with go test's variants built here"
+	// The build text says which load ran: from source, or through go/packages for a project with cgo of its own. It
+	// reads the same with the findings cache or without, so a run under `--no-cache` writes the same record.
+	build := "go list -deps with go test's variants built here, each package type-checked from source unless the " +
+		"findings cache holds its export data"
 	if loaded.CgoTranslated {
-		build = "go/packages with go list -deps -test -compiled, the project's cgo translated by the cgo tool"
+		build = "go/packages with go list -deps -test -compiled, the project's cgo translated by the cgo tool, " +
+			"each package type-checked from source, the findings cache restoring analysis only"
 	}
 	engine.write(contract.TypesRecord{
 		Diagnostics:         len(loaded.Diagnostics),
 		Files:               loaded.FilesTypeChecked,
 		ElapsedMilliseconds: int(loaded.Elapsed.Milliseconds()),
 		FilesWithoutRecord:  withoutRecord,
-		Build: fmt.Sprintf("%s, type-checked from source: %d packages, %d in the workspace", build,
+		Build: fmt.Sprintf("%s: %d packages, %d in the workspace", build,
 			loaded.PackagesLoaded, loaded.PackagesInWorkspace),
 		WithheldInDependencyCgo:           withheld,
 		WithheldDependencyCgoDeclarations: loaded.WithheldDependencyCgoDeclarations,
+		CgoTranslation: contract.CgoTranslation{
+			Packages:     loaded.CgoTranslatedPackages,
+			Milliseconds: int(loaded.CgoTranslationElapsed.Milliseconds()),
+		},
 	})
 	engine.phase(contract.PhaseTypes, contract.OutcomeRan, loaded.Elapsed, "")
 }

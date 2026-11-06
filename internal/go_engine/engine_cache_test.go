@@ -204,7 +204,7 @@ func TestTheBuildContextNamesTheProcessVariablesAnAnalyzerReads(test *testing.T)
 	}
 	test.Setenv("GOARCH", "arm64")
 	test.Setenv("BURNTSUSHI_TOML_110", "1")
-	set, setError := cacheBuild(root, nil, false)
+	set, setError := cacheBuild(root, nil)
 	if setError != nil {
 		test.Fatalf("reading the build context: %v", setError)
 	}
@@ -216,7 +216,7 @@ func TestTheBuildContextNamesTheProcessVariablesAnAnalyzerReads(test *testing.T)
 	if unsetError := os.Unsetenv("BURNTSUSHI_TOML_110"); unsetError != nil {
 		test.Fatalf("unsetting BURNTSUSHI_TOML_110: %v", unsetError)
 	}
-	unset, unsetBuildError := cacheBuild(root, nil, false)
+	unset, unsetBuildError := cacheBuild(root, nil)
 	if unsetBuildError != nil {
 		test.Fatalf("reading the build context: %v", unsetBuildError)
 	}
