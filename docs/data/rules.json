@@ -9335,9 +9335,6 @@
             "origin": "house",
             "category": "consistency",
             "typeAware": false,
-            "options": {
-                "elements": "one"
-            },
             "messageIds": [
                 "shoutingInComment"
             ],

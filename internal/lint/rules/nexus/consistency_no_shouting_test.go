@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -338,19 +339,6 @@ func TestConsistencyNoShoutingMasksADoubleQuoteThatWraps(test *testing.T) {
 	}
 }
 
-func TestConsistencyNoShoutingRespectsTheAllowOption(test *testing.T) {
-	test.Parallel()
-
-	sourceText := "// the WIDGET subsystem owns this\nexport const Value = 1;\n"
-
-	withoutOption := rule_testing.Run(test, ConsistencyNoShouting, shoutingFile, sourceText)
-	expectShoutedWords(test, withoutOption, sourceText, "WIDGET")
-
-	withOption := rule_testing.RunWithOptions(test, ConsistencyNoShouting, shoutingFile, sourceText,
-		ConsistencyNoShoutingOptions{Allow: []string{"WIDGET"}})
-	rule_testing.ExpectClean(test, withOption)
-}
-
 // The message has to name what it saw, and the finding has to sit on it. A finding that says only
 // "this comment shouts", over the whole comment, makes the reader rescan a paragraph to find the
 // word that tripped it.
@@ -499,6 +487,27 @@ func TestConsistencyNoShoutingSetsAsideTheGeneratedMarker(test *testing.T) {
 			expectShoutedWords(test, result, testCase.sourceText, testCase.words...)
 		})
 	}
+}
+
+// Kirk ruled on 2026-11-06 (#4b337jk) that shouting has no per-project allow list, so the rule registers
+// with no decoder and the config layer refuses any option written for it, `allow` included. This reads the
+// registration the catalog holds, as a lint run does; the config layer's refusal for that arity is
+// TestTheShoutingRuleRefusesAnAllowList's, in the registry, through a written CohereSettings.json. The
+// text rules corpus cannot carry the row: a case's outcome is its findings, and its adapter stops at a
+// refused option rather than judging it.
+func TestConsistencyNoShoutingTakesNoOptions(test *testing.T) {
+	test.Parallel()
+	for _, entry := range rule.Registered() {
+		if entry.Name != ConsistencyNoShouting.Name {
+			continue
+		}
+		if entry.Arity != rule.OptionArityNone {
+			test.Fatalf("%s registers a decoder of arity %q, so a config's `allow` list would load", entry.Name,
+				entry.Arity)
+		}
+		return
+	}
+	test.Fatalf("%s is not registered", ConsistencyNoShouting.Name)
 }
 
 // expectShoutedWords asserts one finding per word, in order, each covering exactly that word in the
