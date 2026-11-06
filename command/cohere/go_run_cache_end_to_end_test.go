@@ -432,6 +432,15 @@ func TestAGoRunWithAStaleInputIsNeverReplayed(test *testing.T) {
 				fixture.test.Fatal(writeError)
 			}
 		}},
+		// staticcheck's config analyzer reads a staticcheck.conf in every directory above a package (ST1001 and
+		// ST1013 read it), so one appearing above the module changes what the rules see, and only its recorded
+		// absence can tell.
+		{"a staticcheck.conf created above the module", nil, func(fixture *goReplayFixture) {
+			path := filepath.Join(fixture.parent, "staticcheck.conf")
+			if writeError := os.WriteFile(path, []byte("checks = [\"inherit\"]\n"), 0o644); writeError != nil {
+				fixture.test.Fatal(writeError)
+			}
+		}},
 		{"the settings file edited", nil, func(fixture *goReplayFixture) {
 			fixture.write("CohereSettings.json", `{"go":{"rules":{"cohere-go/printf":"off"}}}`)
 		}},
