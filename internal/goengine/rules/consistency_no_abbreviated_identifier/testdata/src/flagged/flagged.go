@@ -78,3 +78,15 @@ idxLoop: // want `Identifier "idxLoop" should not be abbreviated\. Use "indexLoo
 	_ = argCount
 	_ = time.Duration(timeoutMs)
 }
+
+// Words with more than one meaning. `pos` names both of its own and asks for whichever it is, here positive beside a
+// negative; `sb` fits more words than a list could hold, here a scroll region's bottom, so it asks what it holds.
+func scroll(
+	pos int, // want `Identifier "pos" should not be abbreviated\. Use "position" or "positive", whichever it means, or a more descriptive name\.`
+	sb int, // want `Identifier "sb" should not be abbreviated\. Spell out what it holds\.`
+	resultPos bool, // want `Identifier "resultPos" abbreviates "Pos"\. Use "resultPosition" or "resultPositive", whichever it means\.`
+	resultNeg bool,
+	scrollSbOffset int, // want `Identifier "scrollSbOffset" abbreviates "Sb"\. Spell out what it holds\.`
+) {
+	_, _, _, _, _ = pos, sb, resultPos, resultNeg, scrollSbOffset
+}

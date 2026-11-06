@@ -174,34 +174,34 @@ func TestAbbreviationVocabularyRefusesAMalformedFile(test *testing.T) {
 		name string
 		file string
 	}{
-		{"a misspelled form", `{"abbreviations": [{"abbreviation": "val", "expansion": "value", "suffx": {}}]}`},
-		{"an entry with no form", `{"abbreviations": [{"abbreviation": "val", "expansion": "value"}]}`},
+		{"a misspelled form", `{"abbreviations": [{"abbreviation": "val", "expansions": ["value"], "suffx": {}}]}`},
+		{"an entry with no form", `{"abbreviations": [{"abbreviation": "val", "expansions": ["value"]}]}`},
 		{
 			"an unknown whole style",
-			`{"abbreviations": [{"abbreviation": "val", "expansion": "value", "whole": {"style": "loud"}}]}`,
+			`{"abbreviations": [{"abbreviation": "val", "expansions": ["value"], "whole": {"style": "loud"}}]}`,
 		},
 		{"a rename with no expansion", `{"abbreviations": [{"abbreviation": "val", "whole": {"style": "plain"}}]}`},
 		{
 			"an unknown prefix phase",
-			`{"abbreviations": [{"abbreviation": "val", "expansion": "value", "prefix": {"phase": "middle"}}]}`,
+			`{"abbreviations": [{"abbreviation": "val", "expansions": ["value"], "prefix": {"phase": "middle"}}]}`,
 		},
 		{
 			"an uppercase abbreviation",
-			`{"abbreviations": [{"abbreviation": "Val", "expansion": "value", "segment": {}}]}`,
+			`{"abbreviations": [{"abbreviation": "Val", "expansions": ["value"], "segment": {}}]}`,
 		},
 		{
 			"a duplicate entry",
-			`{"abbreviations": [{"abbreviation": "val", "expansion": "value", "segment": {}}, {"abbreviation": "val", "expansion": "value", "segment": {}}]}`,
+			`{"abbreviations": [{"abbreviation": "val", "expansions": ["value"], "segment": {}}, {"abbreviation": "val", "expansions": ["value"], "segment": {}}]}`,
 		},
 		{
 			"an unknown matcher",
-			`{"abbreviations": [{"abbreviation": "ms", "expansion": "m", "suffix": {"matcher": "seconds"}}]}`,
+			`{"abbreviations": [{"abbreviation": "ms", "expansions": ["m"], "suffix": {"matcher": "seconds"}}]}`,
 		},
-		{"a broken prefix", `{"abbreviations":[{"abbreviation":"v(","expansion":"v","prefix":{"phase":"late"}}]}`},
-		{"a broken segment", `{"abbreviations":[{"abbreviation":"v(","expansion":"v","segment":{}}]}`},
+		{"a broken prefix", `{"abbreviations":[{"abbreviation":"v(","expansions":["v"],"prefix":{"phase":"late"}}]}`},
+		{"a broken segment", `{"abbreviations":[{"abbreviation":"v(","expansions":["v"],"segment":{}}]}`},
 		{
 			"a retired per-word messageId",
-			`{"abbreviations": [{"abbreviation": "val", "expansion": "value", "whole": {"messageId": "noVal", "style": "plain"}}]}`,
+			`{"abbreviations": [{"abbreviation": "val", "expansions": ["value"], "whole": {"messageId": "noVal", "style": "plain"}}]}`,
 		},
 	}
 	for _, testCase := range cases {

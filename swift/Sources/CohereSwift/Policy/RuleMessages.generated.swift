@@ -10,7 +10,7 @@ enum RuleMessages {
     }
 
     /* SHA-256 of the messages that reach Swift, resolved, which a test recomputes from policy/messages/ on disk. */
-    static let sourceDigest = "3ff174301bf29fcc8f4e461773ee0afa170c399ba822376e8cd3db08e61c6993"
+    static let sourceDigest = "8c644386172daa3f147bf45e282bda095e5a00d9bb0ec06ae5cf14e4d7e7109f"
 
     /* Every message here, as `Rule.id`, for the test that fails on one no rule renders. */
     static let all = [
@@ -137,11 +137,11 @@ enum RuleMessages {
             )
         }
 
-        static func abbreviatedWordSegment(name: String, word: String, suggestion: String) -> Message {
+        static func abbreviatedWordSegment(name: String, word: String, advice: String) -> Message {
             Message(
                 id: "abbreviatedWordSegment",
                 text:
-                    #"Identifier "\#(name)" abbreviates "\#(word)". Use "\#(suggestion)". A name is written once and read everywhere, so the letters saved at the declaration are paid back at every call site by a reader who has to expand the abbreviation themselves and hope they expanded it the way the author meant."#,
+                    #"Identifier "\#(name)" abbreviates "\#(word)". \#(advice) A name is written once and read everywhere, so the letters saved at the declaration are paid back at every call site by a reader who has to expand the abbreviation themselves and hope they expanded it the way the author meant."#,
             )
         }
 
