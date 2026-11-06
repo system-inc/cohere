@@ -14,20 +14,20 @@ import (
 // belowTree is a project whose run read a file above its root, as a Go run reads a staticcheck.conf or a
 // .gitignore in a directory above its module, and listed a directory holding no file it read.
 type belowTree struct {
-	above  string
-	root   string
-	source string
-	listed string
-	config string
+	above         string
+	root          string
+	source        string
+	listed        string
+	configuration string
 }
 
 func newBelowTree(test *testing.T) belowTree {
 	test.Helper()
 	above := test.TempDir()
 	tree := belowTree{
-		above:  above,
-		root:   filepath.Join(above, "module"),
-		config: filepath.Join(above, "staticcheck.conf"),
+		above:         above,
+		root:          filepath.Join(above, "module"),
+		configuration: filepath.Join(above, "staticcheck.conf"),
 	}
 	tree.source = filepath.Join(tree.root, "a.go")
 	tree.listed = filepath.Join(tree.root, "notes")
@@ -36,7 +36,7 @@ func newBelowTree(test *testing.T) belowTree {
 			test.Fatal(createDirectoryError)
 		}
 	}
-	for _, file := range []string{tree.source, tree.config} {
+	for _, file := range []string{tree.source, tree.configuration} {
 		if writeError := os.WriteFile(file, []byte("x\n"), 0o644); writeError != nil {
 			test.Fatal(writeError)
 		}
@@ -59,7 +59,7 @@ func recordedPaths(cache *program.RunCache) []string {
 func TestRecordRunCacheBelowKeepsNoDirectoryAboveTheRoot(test *testing.T) {
 	test.Parallel()
 	tree := newBelowTree(test)
-	files := []string{tree.source, tree.config}
+	files := []string{tree.source, tree.configuration}
 	below, belowError := program.RecordRunCacheBelow([]string{tree.root}, "key", files, []string{tree.listed}, nil,
 		nil, nil, 0, time.Time{})
 	if belowError != nil {
@@ -69,7 +69,7 @@ func TestRecordRunCacheBelowKeepsNoDirectoryAboveTheRoot(test *testing.T) {
 	if slices.Contains(paths, tree.above) {
 		test.Errorf("the directory above the root was recorded: %q", paths)
 	}
-	for _, kept := range []string{tree.source, tree.config, tree.root, tree.listed} {
+	for _, kept := range []string{tree.source, tree.configuration, tree.root, tree.listed} {
 		if !slices.Contains(paths, kept) {
 			test.Errorf("%s was not recorded: %q", kept, paths)
 		}

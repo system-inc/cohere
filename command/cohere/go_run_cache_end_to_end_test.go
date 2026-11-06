@@ -92,6 +92,52 @@ func (fixture *goReplayFixture) setVariable(name string, value string) {
 	fixture.environment = append(withoutVariable(fixture.environment, name), name+"="+value)
 }
 
+// variable is the value every run from here on gets for name, empty when the fixture sets none.
+func (fixture *goReplayFixture) variable(name string) string {
+	for _, variable := range slices.Backward(fixture.environment) {
+		if value, found := strings.CutPrefix(variable, name+"="); found {
+			return value
+		}
+	}
+	return ""
+}
+
+// goStandInRoot is a GOROOT of the test's own: every entry of the real one linked, but VERSION and go.env, which
+// are copies a scenario may rewrite without touching the toolchain every other test runs.
+func goStandInRoot(test *testing.T) string {
+	test.Helper()
+	output, outputError := exec.Command("go", "env", "GOROOT").Output()
+	if outputError != nil {
+		test.Fatalf("reading GOROOT: %v", outputError)
+	}
+	realRoot := strings.TrimSpace(string(output))
+	entries, readError := os.ReadDir(realRoot)
+	if readError != nil {
+		test.Fatal(readError)
+	}
+	standIn := filepath.Join(test.TempDir(), "goroot")
+	if createDirectoryError := os.Mkdir(standIn, 0o755); createDirectoryError != nil {
+		test.Fatal(createDirectoryError)
+	}
+	for _, entry := range entries {
+		source, target := filepath.Join(realRoot, entry.Name()), filepath.Join(standIn, entry.Name())
+		if entry.Name() != "VERSION" && entry.Name() != "go.env" {
+			if linkError := os.Symlink(source, target); linkError != nil {
+				test.Fatal(linkError)
+			}
+			continue
+		}
+		contents, readFileError := os.ReadFile(source)
+		if readFileError != nil {
+			test.Fatal(readFileError)
+		}
+		if writeError := os.WriteFile(target, contents, 0o644); writeError != nil {
+			test.Fatal(writeError)
+		}
+	}
+	return standIn
+}
+
 // goReplayRun is what one run printed to each stream, and how it exited.
 type goReplayRun struct {
 	stdout   string
@@ -314,18 +360,20 @@ func jsonText(test *testing.T, value any) string {
 func TestAGoRunWithAStaleInputIsNeverReplayed(test *testing.T) {
 	test.Parallel()
 	scenarios := []struct {
-		name   string
-		change func(fixture *goReplayFixture)
+		name string
+		// prepare, when there is one, shapes the fixture before its hit is established.
+		prepare func(fixture *goReplayFixture)
+		change  func(fixture *goReplayFixture)
 	}{
 		// The same size, so only the bytes and the modification time moved, as an editor's save of one character.
-		{"a .go file's bytes edited in place", func(fixture *goReplayFixture) {
+		{"a .go file's bytes edited in place", nil, func(fixture *goReplayFixture) {
 			// The new modification time must differ from the recorded one at the file system's resolution.
 			time.Sleep(10 * time.Millisecond)
 			fixture.write("a.go", strings.Replace(goReplaySource("replay", "Greet"), `"%d"`, `"%s"`, 1))
 		}},
 		// The same size and the old modification time, as cp -p, rsync -t and touch -r leave a file: only the change
 		// time and the bytes moved.
-		{"a same-size edit with its modification time restored", func(fixture *goReplayFixture) {
+		{"a same-size edit with its modification time restored", nil, func(fixture *goReplayFixture) {
 			path := filepath.Join(fixture.root, "a.go")
 			information, statError := os.Stat(path)
 			if statError != nil {
@@ -338,57 +386,79 @@ func TestAGoRunWithAStaleInputIsNeverReplayed(test *testing.T) {
 				fixture.test.Fatal(changeTimesError)
 			}
 		}},
-		{"an embedded file edited", func(fixture *goReplayFixture) {
+		{"an embedded file edited", nil, func(fixture *goReplayFixture) {
 			fixture.write("data/message.txt", "hello, again\n")
 		}},
 		// Its constraint taken off, so a file the load left out joins it.
-		{"a build-tagged file edited", func(fixture *goReplayFixture) {
+		{"a build-tagged file edited", nil, func(fixture *goReplayFixture) {
 			fixture.write("tagged.go", goReplaySource("replay", "Tagged"))
 		}},
-		{"a .go file added to a package directory", func(fixture *goReplayFixture) {
+		{"a .go file added to a package directory", nil, func(fixture *goReplayFixture) {
 			fixture.write("sub/c.go", goReplaySource("sub", "Added"))
 		}},
 		// Below a directory that holds no Go file, so no file the load read sits beside it, and only the listed
 		// directory's signature moves.
-		{"a package directory added", func(fixture *goReplayFixture) {
+		{"a package directory added", nil, func(fixture *goReplayFixture) {
 			fixture.write("notes/fresh/f.go", goReplaySource("fresh", "Fresh"))
 		}},
-		{"go.mod edited", func(fixture *goReplayFixture) {
+		{"go.mod edited", nil, func(fixture *goReplayFixture) {
 			fixture.write("go.mod", "module example.com/replay\n\ngo 1.27\n\n// edited\n")
 		}},
-		{"go.sum edited", func(fixture *goReplayFixture) {
+		{"go.sum edited", nil, func(fixture *goReplayFixture) {
 			fixture.write("go.sum", "example.com/other v1.0.0/go.mod h1:47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=\n")
 		}},
-		{"a go.work created in an ancestor directory", func(fixture *goReplayFixture) {
+		// Held by the front door's own root resolution rather than by the engine's absent paths: a module root loads
+		// with `GOWORK=off`, and a go.work that uses the module moves the root, and with it the key and the cache
+		// directory, before anything is checked. The go command's settings file below is the absent-path case.
+		{"a go.work created in an ancestor directory", nil, func(fixture *goReplayFixture) {
 			path := filepath.Join(fixture.parent, "go.work")
 			if writeError := os.WriteFile(path, []byte("go 1.27\n\nuse ./module\n"), 0o644); writeError != nil {
 				fixture.test.Fatal(writeError)
 			}
 		}},
-		// The variable naming it is the same before and after, so only the file's absence, recorded, can tell.
-		{"the go command's settings file created", func(fixture *goReplayFixture) {
+		// The absent-path case: the variable naming the file is the same before and after, so only the file's absence,
+		// recorded, can tell.
+		{"the go command's settings file created", nil, func(fixture *goReplayFixture) {
 			path := filepath.Join(fixture.parent, "go.env")
 			if writeError := os.WriteFile(path, []byte("GOFLAGS=-tags=replaytest\n"), 0o644); writeError != nil {
 				fixture.test.Fatal(writeError)
 			}
 		}},
-		{"the settings file edited", func(fixture *goReplayFixture) {
+		{"the settings file edited", nil, func(fixture *goReplayFixture) {
 			fixture.write("CohereSettings.json", `{"go":{"rules":{"cohere-go/printf":"off"}}}`)
 		}},
-		{"GOFLAGS changed", func(fixture *goReplayFixture) {
+		{"GOFLAGS changed", nil, func(fixture *goReplayFixture) {
 			fixture.setVariable("GOFLAGS", strings.TrimSpace(os.Getenv("GOFLAGS")+" -tags=replaytest"))
 		}},
 		// A target other than the host, so only_linux.go joins the load or leaves it.
-		{"GOOS changed", func(fixture *goReplayFixture) {
+		{"GOOS changed", nil, func(fixture *goReplayFixture) {
 			target := "linux"
 			if goHostIsLinux() {
 				target = "darwin"
 			}
 			fixture.setVariable("GOOS", target)
 		}},
-		{"CGO_ENABLED changed", func(fixture *goReplayFixture) { fixture.setVariable("CGO_ENABLED", "1") }},
+		{"CGO_ENABLED changed", nil, func(fixture *goReplayFixture) { fixture.setVariable("CGO_ENABLED", "1") }},
+		// The toolchain that ran, as the engine names it: a GOROOT of the fixture's own, its tree the real one's by
+		// links and its VERSION and go.env copies, so the VERSION a toolchain's update rewrites can be rewritten here.
+		// `GOROOT` is set before the hit and never changes, so only the recorded file can tell.
+		{"the toolchain's VERSION rewritten", func(fixture *goReplayFixture) {
+			fixture.setVariable("GOROOT", goStandInRoot(fixture.test))
+		}, func(fixture *goReplayFixture) {
+			version := filepath.Join(fixture.variable("GOROOT"), "VERSION")
+			contents, readError := os.ReadFile(version)
+			if readError != nil {
+				fixture.test.Fatal(readError)
+			}
+			// Its first line is the toolchain's version, which the go command holds itself to, so the stamp below it
+			// is what moves, as a rebuild of the same version moves it.
+			time.Sleep(10 * time.Millisecond)
+			if writeError := os.WriteFile(version, append(contents, "rebuilt\n"...), 0o644); writeError != nil {
+				fixture.test.Fatal(writeError)
+			}
+		}},
 		// A directory of its own holding a go that runs the real one, first on PATH, so the cold run still loads.
-		{"the go on PATH changed", func(fixture *goReplayFixture) {
+		{"the go on PATH changed", nil, func(fixture *goReplayFixture) {
 			realGo, lookPathError := exec.LookPath("go")
 			if lookPathError != nil {
 				fixture.test.Fatal(lookPathError)
@@ -405,6 +475,9 @@ func TestAGoRunWithAStaleInputIsNeverReplayed(test *testing.T) {
 		test.Run(scenario.name, func(test *testing.T) {
 			test.Parallel()
 			fixture := newGoReplayFixture(test)
+			if scenario.prepare != nil {
+				scenario.prepare(fixture)
+			}
 			arguments := []string{"--no-fix", "--verbose"}
 			fixture.establishHit(arguments...)
 			scenario.change(fixture)

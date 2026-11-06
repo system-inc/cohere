@@ -252,8 +252,8 @@ func (set *inputSet) addGoFlagFiles(workspace string, goFlags []string) {
 // Mutates: set gains each directory reached
 func (set *inputSet) addReachableDirectories(root string) {
 	// Ignored: the walk's callback returns no error, so neither does the walk.
-	_ = filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkError error) error {
-		if walkError != nil || !entry.IsDir() {
+	_ = filepath.WalkDir(root, func(path string, entry fs.DirEntry, pathError error) error {
+		if pathError != nil || !entry.IsDir() {
 			// A directory that cannot be read was named when the walk reached it, and the front door, which cannot
 			// list it either, counts it as moved.
 			return nil
