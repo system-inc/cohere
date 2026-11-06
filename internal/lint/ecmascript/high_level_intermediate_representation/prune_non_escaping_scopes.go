@@ -73,7 +73,7 @@ func PruneNonEscapingScopes(tree *ReactiveFunction, function *Function,
 		graph:        NewMemoizationGraph(),
 		definitions:  map[static_single_assignment.DeclarationId]static_single_assignment.DeclarationId{},
 	}
-	for _, parameter := range function.Params {
+	for _, parameter := range function.Parameters {
 		collector.graph.Declare(declarationOf(function, parameter.Identifier))
 	}
 	collector.walk(tree.Body)
@@ -105,7 +105,7 @@ func PruneNonEscapingScopesWithScopes(tree *ReactiveFunction, function *Function
 		graph:        NewMemoizationGraph(),
 		definitions:  map[static_single_assignment.DeclarationId]static_single_assignment.DeclarationId{},
 	}
-	for _, parameter := range function.Params {
+	for _, parameter := range function.Parameters {
 		collector.graph.Declare(declarationOf(function, parameter.Identifier))
 	}
 	collector.walk(tree.Body)
@@ -126,7 +126,7 @@ func pruneNonEscapingScopesWith(tree *ReactiveFunction, function *Function,
 	return PruneNonEscapingScopesResult{
 		PrunedScopes:  prunedScopes,
 		Pruned:        pruned,
-		Declarations:  collector.graph.Len(),
+		Declarations:  collector.graph.Length(),
 		EscapingRoots: collector.graph.EscapingCount(),
 		Memoized:      len(memoized),
 		MarkersPruned: markers,
@@ -257,7 +257,7 @@ func (collector *memoizationCollector) visitInstruction(instruction *ReactiveIns
 	switch call := plain.Value.(type) {
 	case *CallExpression:
 		if IsHookCallee(collector.function, call.Callee.Identifier) {
-			for _, argument := range call.Args {
+			for _, argument := range call.Arguments {
 				collector.graph.MarkEscaping(
 					collector.resolve(declarationOf(collector.function, argument.Place.Identifier)),
 				)
@@ -265,7 +265,7 @@ func (collector *memoizationCollector) visitInstruction(instruction *ReactiveIns
 		}
 	case *MethodCall:
 		if IsHookCallee(collector.function, call.Property.Identifier) {
-			for _, argument := range call.Args {
+			for _, argument := range call.Arguments {
 				collector.graph.MarkEscaping(
 					collector.resolve(declarationOf(collector.function, argument.Place.Identifier)),
 				)

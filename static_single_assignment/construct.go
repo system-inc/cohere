@@ -183,7 +183,7 @@ func (builder *ssaBuilder[G, F, B, P]) run() {
 	if _, ok := builder.graph.Block(builder.function, entryId); !ok {
 		return
 	}
-	builder.states[entryId] = newSSAState[P]()
+	builder.states[entryId] = newSsaState[P]()
 	parameters := builder.graph.Params(builder.function)
 	for index := range parameters {
 		builder.defineIn(entryId, &parameters[index])
@@ -201,7 +201,7 @@ func (builder *ssaBuilder[G, F, B, P]) run() {
 		blockId := builder.graph.Id(block)
 		builder.walkingBlock = blockId
 		if _, exists := builder.states[blockId]; !exists {
-			builder.states[blockId] = newSSAState[P]()
+			builder.states[blockId] = newSsaState[P]()
 		}
 		builder.visited[blockId] = true
 
@@ -269,7 +269,7 @@ func (builder *ssaBuilder[G, F, B, P]) visitPlace(place *P, role Role) {
 	}
 }
 
-func newSSAState[P any]() *ssaState[P] {
+func newSsaState[P any]() *ssaState[P] {
 	return &ssaState[P]{defs: map[DeclarationId]IdentifierId{}}
 }
 
@@ -358,7 +358,7 @@ func (builder *ssaBuilder[G, F, B, P]) valueAt(place P, blockId BlockId) Identif
 
 	state, ok := builder.states[blockId]
 	if !ok {
-		state = newSSAState[P]()
+		state = newSsaState[P]()
 		builder.states[blockId] = state
 	}
 	if renamed, defined := state.defs[binding]; defined {

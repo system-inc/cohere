@@ -282,7 +282,7 @@ func fits(
 	rest []command,
 	remainingWidth int,
 	hasLineSuffix bool,
-	groupModes map[*GroupID]mode,
+	groupModes map[*GroupId]mode,
 	mustBeFlat bool,
 ) bool {
 	restIndex := len(rest)
@@ -369,8 +369,8 @@ func fits(
 
 		case *IfBreak:
 			groupMode := current.mode
-			if document.GroupID != nil {
-				groupMode = groupModes[document.GroupID]
+			if document.GroupId != nil {
+				groupMode = groupModes[document.GroupId]
 				if groupMode == modeUnset {
 					groupMode = modeFlat
 				}
@@ -423,7 +423,7 @@ func isEmpty(document Doc) bool {
 
 // Print is upstream's printDocToString, printer/printer.js.
 func Print(document Doc, options Options) string {
-	groupModes := map[*GroupID]mode{}
+	groupModes := map[*GroupId]mode{}
 	width := options.PrintWidth
 	position := 0
 	commands := []command{{indent: rootIndentation, mode: modeBreak, doc: document}}
@@ -474,8 +474,8 @@ func Print(document Doc, options Options) string {
 				&shouldRemeasure,
 			)
 			commands = append(commands, next)
-			if document.ID != nil {
-				groupModes[document.ID] = next.mode
+			if document.Id != nil {
+				groupModes[document.Id] = next.mode
 			}
 
 		case *Fill:
@@ -492,8 +492,8 @@ func Print(document Doc, options Options) string {
 
 		case *IfBreak:
 			groupMode := current.mode
-			if document.GroupID != nil {
-				groupMode = groupModes[document.GroupID]
+			if document.GroupId != nil {
+				groupMode = groupModes[document.GroupId]
 			}
 			if groupMode == modeBreak && !isEmpty(document.BreakContents) {
 				commands = append(
@@ -510,8 +510,8 @@ func Print(document Doc, options Options) string {
 
 		case *IndentIfBreak:
 			groupMode := current.mode
-			if document.GroupID != nil {
-				groupMode = groupModes[document.GroupID]
+			if document.GroupId != nil {
+				groupMode = groupModes[document.GroupId]
 			}
 			if groupMode == modeBreak {
 				contents := document.Contents
@@ -620,7 +620,7 @@ func printGroup(
 	rest []command,
 	remainingWidth int,
 	hasLineSuffix bool,
-	groupModes map[*GroupID]mode,
+	groupModes map[*GroupId]mode,
 	shouldRemeasure *bool,
 ) command {
 	if current.mode == modeFlat && !*shouldRemeasure {
@@ -659,7 +659,7 @@ func printFill(
 	commands []command,
 	remainingWidth int,
 	hasLineSuffix bool,
-	groupModes map[*GroupID]mode,
+	groupModes map[*GroupId]mode,
 ) []command {
 	parts := progress.fill.Parts
 	offset := progress.offset

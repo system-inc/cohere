@@ -617,7 +617,7 @@ func tokenizeHtmlFlow(self *Self, effects *Effects, ok State, nok State) State {
 			return continuation(code)
 		}
 
-		if asciiAlpha(code) && len(buffer) < htmlRawSizeMax {
+		if asciiAlpha(code) && len(buffer) < htmlRawSizeMaximum {
 			// Always the case.
 			effects.Consume(code)
 			buffer += string(rune(code))

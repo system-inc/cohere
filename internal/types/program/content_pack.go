@@ -171,17 +171,17 @@ func (pack *ContentPack) Counts() (hits int, misses int, damaged int) {
 
 // wrap returns a filesystem that serves ReadFile from the pack where it can.
 func (pack *ContentPack) wrap(inner vfs.FS) vfs.FS {
-	return &contentPackFS{FS: inner, pack: pack}
+	return &contentPackFileSystem{FS: inner, pack: pack}
 }
 
-// contentPackFS answers ReadFile from the pack when the file's stat still matches, and otherwise reads the
+// contentPackFileSystem answers ReadFile from the pack when the file's stat still matches, and otherwise reads the
 // disk and hands the bytes to the pack. Everything else passes through.
-type contentPackFS struct {
+type contentPackFileSystem struct {
 	vfs.FS
 	pack *ContentPack
 }
 
-func (fileSystem *contentPackFS) ReadFile(path tspath.RootedFilePath) (string, bool) {
+func (fileSystem *contentPackFileSystem) ReadFile(path tspath.RootedFilePath) (string, bool) {
 	if contents, served := fileSystem.pack.serve(path.AsString()); served {
 		return contents, true
 	}

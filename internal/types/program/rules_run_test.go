@@ -26,13 +26,14 @@ func TestRulesRunCountsOnlyTheRulesOfferedAFile(test *testing.T) {
 		"main.ts":    "export const value = 1;\n",
 		"special.ts": "export const other = 2;\n",
 	})
-	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
-	if err != nil {
-		test.Fatalf("building: %v", err)
+	graph, buildError := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
+	if buildError != nil {
+		test.Fatalf("building: %v", buildError)
 	}
-	graph.LintConfig, err = configuration.Load(filepath.Join(directory, "CohereSettings.json"))
-	if err != nil {
-		test.Fatalf("loading the config: %v", err)
+	var loadError error
+	graph.LintConfig, loadError = configuration.Load(filepath.Join(directory, "CohereSettings.json"))
+	if loadError != nil {
+		test.Fatalf("loading the config: %v", loadError)
 	}
 
 	listens := func(name string) rule.Rule[rule.NoOptions] {
@@ -58,9 +59,9 @@ func TestRulesRunCountsOnlyTheRulesOfferedAFile(test *testing.T) {
 		listens("test-nobody-configured"),
 	}
 
-	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), rule_testing.EntriesOf(test, rules...))
-	if err != nil {
-		test.Fatalf("walking: %v", err)
+	result, walkError := graph.Walk(context.Background(), graph.ProjectFiles(), rule_testing.EntriesOf(test, rules...))
+	if walkError != nil {
+		test.Fatalf("walking: %v", walkError)
 	}
 	if result.Coverage.RulesRun != 3 {
 		test.Errorf(

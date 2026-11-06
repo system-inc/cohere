@@ -578,7 +578,7 @@ var scssFormatCases = []formatCase{
 	},
 }
 
-func TestFormatSCSSMatchesTheFork(test *testing.T) {
+func TestFormatScssMatchesTheFork(test *testing.T) {
 	test.Parallel()
 	// The oracle's answers, recorded (see oracletest), so no JavaScript runs here.
 	golden := oracletest.Open(test, test.Name())
@@ -609,7 +609,7 @@ func TestFormatSCSSMatchesTheFork(test *testing.T) {
 					}
 				}
 			}
-			actual, formatScssError := FormatSCSS(testCase.source, options)
+			actual, formatScssError := FormatScss(testCase.source, options)
 			if formatScssError != nil {
 				test.Errorf("%s (%s): %v", testCase.name, optionsName, formatScssError)
 				continue
@@ -623,7 +623,7 @@ func TestFormatSCSSMatchesTheFork(test *testing.T) {
 
 // The scss parser is not the css one: the same text formats differently under each, so FormatSCSS is
 // not Format under another name. Each of these is printed differently by the fork as .css and as .scss.
-func TestFormatSCSSIsNotFormat(test *testing.T) {
+func TestFormatScssIsNotFormat(test *testing.T) {
 	test.Parallel()
 	// The oracle's answers, recorded (see oracletest), so no JavaScript runs here.
 	oracle := oracletest.Open(test, test.Name()).Engine(formatoptions.Default())
@@ -632,45 +632,45 @@ func TestFormatSCSSIsNotFormat(test *testing.T) {
 		"$map:(key1:value1,key2:value2);",
 		"@if $a==1{a{x:y}}@else{b{x:y}}",
 	} {
-		asCSS, cssError := oracle.Format("Probe.css", source)
-		asSCSS, scssError := oracle.Format("Probe.scss", source)
+		asCss, cssError := oracle.Format("Probe.css", source)
+		asScss, scssError := oracle.Format("Probe.scss", source)
 		if scssError != nil {
 			test.Fatalf("%q: the oracle refused it as scss: %v", source, scssError)
 		}
-		if cssError == nil && asCSS == asSCSS {
+		if cssError == nil && asCss == asScss {
 			test.Fatalf(
 				"%q: the oracle prints it the same as css and as scss, so it tells the parsers apart for nothing",
 				source,
 			)
 		}
-		actualSCSS, formatScssError := FormatSCSS(source, formatoptions.Default())
-		if formatScssError != nil || actualSCSS != asSCSS {
-			test.Errorf("%q as scss:\n--- fork\n%s--- native (%v)\n%s", source, asSCSS, formatScssError, actualSCSS)
+		actualScss, formatScssError := FormatScss(source, formatoptions.Default())
+		if formatScssError != nil || actualScss != asScss {
+			test.Errorf("%q as scss:\n--- fork\n%s--- native (%v)\n%s", source, asScss, formatScssError, actualScss)
 		}
-		actualCSS, formatError := Format(source, formatoptions.Default())
-		if (formatError == nil) != (cssError == nil) || actualCSS != asCSS {
+		actualCss, formatError := Format(source, formatoptions.Default())
+		if (formatError == nil) != (cssError == nil) || actualCss != asCss {
 			test.Errorf(
 				"%q as css:\n--- fork (%v)\n%s--- native (%v)\n%s",
 				source,
 				cssError,
-				asCSS,
+				asCss,
 				formatError,
-				actualCSS,
+				actualCss,
 			)
 		}
 	}
 }
 
 // PrintToDocSCSS is FormatSCSS's doc without its trailing hardline.
-func TestPrintToDocSCSSIsFormatSCSSWithoutTheTrailingHardline(test *testing.T) {
+func TestPrintToDocScssIsFormatScssWithoutTheTrailingHardline(test *testing.T) {
 	test.Parallel()
 	options := formatoptions.Default()
 	for _, testCase := range scssFormatCases {
-		formatted, formatScssError := FormatSCSS(testCase.source, options)
+		formatted, formatScssError := FormatScss(testCase.source, options)
 		if formatScssError != nil {
 			test.Fatalf("%s: %v", testCase.name, formatScssError)
 		}
-		document, printToDocScssError := PrintToDocSCSS(testCase.source, options)
+		document, printToDocScssError := PrintToDocScss(testCase.source, options)
 		if printToDocScssError != nil {
 			test.Fatalf("%s: %v", testCase.name, printToDocScssError)
 		}
@@ -688,7 +688,7 @@ func TestPrintToDocSCSSIsFormatSCSSWithoutTheTrailingHardline(test *testing.T) {
 // printer, vendored beside the CSS ones in testdata/prettier/scss. Every file the fork formats must match
 // byte for byte, and a file the fork refuses must be refused here too. The one kind set aside is yaml
 // front matter, which FormatSCSS refuses as Format does.
-func TestPrettierSCSSFixturesMatchTheFork(test *testing.T) {
+func TestPrettierScssFixturesMatchTheFork(test *testing.T) {
 	test.Parallel()
 	fixtures := filepath.Join("testdata", "prettier", "scss")
 	var files []string
@@ -711,11 +711,11 @@ func TestPrettierSCSSFixturesMatchTheFork(test *testing.T) {
 			}
 			// The shared layer normalizes line endings before any printer runs, as Prettier's core does.
 			text := strings.ReplaceAll(string(source), "\r\n", "\n")
-			actual, nativeError := FormatSCSS(text, options)
+			actual, nativeError := FormatScss(text, options)
 
 			// yaml front matter is formatted by the yaml printer, which FormatSCSS cannot reach, so it refuses.
 			if strings.HasPrefix(text, "---") && strings.Contains(text[3:], "\n---") {
-				if frontMatterRoot, parseError := parseSCSS(text); parseError == nil &&
+				if frontMatterRoot, parseError := scssParse(text); parseError == nil &&
 					frontMatterRoot.Child("frontMatter").String("language") == "yaml" &&
 					strings.TrimSpace(frontMatterRoot.Child("frontMatter").String("value")) != "" {
 					if nativeError == nil {

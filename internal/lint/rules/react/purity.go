@@ -488,7 +488,7 @@ func (unit *purityUnit) step(
 		purityMethodCall(function, instruction, values, instructionValue, report)
 		unit.callbackArguments(
 			function,
-			instructionValue.Args,
+			instructionValue.Arguments,
 			purityCalleeName(function, instructionValue.Property),
 			report,
 		)
@@ -497,7 +497,7 @@ func (unit *purityUnit) step(
 		unit.callExpression(function, instruction, instructionValue, report)
 		unit.callbackArguments(
 			function,
-			instructionValue.Args,
+			instructionValue.Arguments,
 			purityCalleeIdentifierName(function, instructionValue.Callee),
 			report,
 		)
@@ -802,14 +802,14 @@ func (unit *purityUnit) callExpression(
 // So the test is: a hook-named callee exempts its callback arguments, unless it is `useMemo`.
 func (unit *purityUnit) callbackArguments(
 	function *high_level_intermediate_representation.Function,
-	args []high_level_intermediate_representation.Argument,
+	arguments []high_level_intermediate_representation.Argument,
 	calleeName string,
 	report func(purityFinding),
 ) {
 	if calleeName != "useMemo" && utilsreact.IsCompilerHookName(calleeName) {
 		return
 	}
-	for _, argument := range args {
+	for _, argument := range arguments {
 		// A spread argument is not skipped explicitly, and the guard that did so was measured
 		// subsumed by the kind test below: a spread's place is the iterable, so it can never hold
 		// `purityValueCallsImpure`, which is only ever written against a `FunctionExpression`

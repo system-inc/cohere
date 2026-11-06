@@ -306,7 +306,7 @@ func reportUnboundConstituent(
 	propertyName string,
 	subjectType *checker.Type,
 ) bool {
-	for unionPart := range type_checking.UnionTypePartsSeq(subjectType) {
+	for unionPart := range type_checking.UnionTypePartsSequence(subjectType) {
 		for _, intersectionPart := range type_checking.IntersectionTypeParts(unionPart) {
 			property := checker.Checker_getPropertyOfType(ruleContext.TypeChecker, intersectionPart, propertyName)
 			if reportIfUnboundMethod(ruleContext, settings, reportNode, property) {
@@ -469,7 +469,7 @@ func accessedPropertyNames(ruleContext rule.Context, node *ast.Node, property *a
 		return nil
 	}
 	var names []string
-	for part := range type_checking.UnionTypePartsSeq(subscriptType) {
+	for part := range type_checking.UnionTypePartsSequence(subscriptType) {
 		if !type_checking.IsTypeFlagSet(part, checker.TypeFlagsStringLiteral|checker.TypeFlagsNumberLiteral) {
 			continue
 		}

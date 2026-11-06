@@ -45,7 +45,7 @@ func enterLiteralAutolinkValue(context *compileContext, token *micromark.Token) 
 
 func exitLiteralAutolinkWww(context *compileContext, token *micromark.Token) {
 	context.config.exit["data"](context, token)
-	context.top().URL = "http://" + context.sliceSerialize(token)
+	context.top().Url = "http://" + context.sliceSerialize(token)
 }
 
 // gfmFootnoteFromMarkdown is mdast-util-gfm-footnote's.

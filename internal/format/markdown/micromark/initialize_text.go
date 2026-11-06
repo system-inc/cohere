@@ -183,7 +183,7 @@ func resolveAllLineSuffixes(events []Event, context *TokenizeContext) []Event {
 
 			if size != 0 {
 				tokenType := TypeHardBreakTrailing
-				if eventIndex == len(resolvedEvents) || tabs || size < hardBreakPrefixSizeMin {
+				if eventIndex == len(resolvedEvents) || tabs || size < hardBreakPrefixSizeMinimum {
 					tokenType = TypeLineSuffix
 				}
 				startBufferIndex := bufferIndex

@@ -18,7 +18,7 @@ import (
 // went on compiling with nobody to read its result (#nqb3mjv).
 func TestASignalDuringABuildEndsTheToolAndWhatItStarted(test *testing.T) {
 	test.Parallel()
-	compilerPID := filepath.Join(test.TempDir(), "compiler.pid")
+	compilerPid := filepath.Join(test.TempDir(), "compiler.pid")
 	// The path is the script's $1, so the shell never parses it; the script's own syntax, a job started in the
 	// background and waited on, is the tool being stood in for.
 	tool := exec.Command(
@@ -26,7 +26,7 @@ func TestASignalDuringABuildEndsTheToolAndWhatItStarted(test *testing.T) {
 		"-c",
 		`sleep 300 & echo $! > "$1.partial" && mv "$1.partial" "$1"; wait`,
 		"sh",
-		compilerPID,
+		compilerPid,
 	)
 
 	signals := make(chan os.Signal, 1)
@@ -35,7 +35,7 @@ func TestASignalDuringABuildEndsTheToolAndWhatItStarted(test *testing.T) {
 
 	compiler := 0
 	for deadline := time.Now().Add(time.Minute); compiler == 0 && time.Now().Before(deadline); {
-		if contents, readError := os.ReadFile(compilerPID); readError == nil {
+		if contents, readError := os.ReadFile(compilerPid); readError == nil {
 			// The file is written whole under another name and moved into place, so what is read is all of it.
 			parsed, parseError := strconv.Atoi(strings.TrimSpace(string(contents)))
 			if parseError != nil {
@@ -51,9 +51,9 @@ func TestASignalDuringABuildEndsTheToolAndWhatItStarted(test *testing.T) {
 
 	signals <- syscall.SIGTERM
 	select {
-	case err := <-result:
-		if err == nil || !strings.Contains(err.Error(), "stopped by terminated") {
-			test.Errorf("a stopped build reported %v", err)
+	case resultError := <-result:
+		if resultError == nil || !strings.Contains(resultError.Error(), "stopped by terminated") {
+			test.Errorf("a stopped build reported %v", resultError)
 		}
 	case <-time.After(buildToolGrace + 30*time.Second):
 		test.Fatal("the build did not end after the signal")

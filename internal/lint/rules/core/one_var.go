@@ -64,7 +64,7 @@ func modeIs(mode *OneVarMode, wanted OneVarMode) bool {
 // Five declaration kinds because upstream carries five: `var`, `let`, `const`, `using` and
 // `await using`. The last is spelled `awaitUsing` in the config, matching upstream's schema.
 type OneVarSettings struct {
-	Var        oneVarGroup
+	Variable   oneVarGroup `json:"Var"`
 	Let        oneVarGroup
 	Const      oneVarGroup
 	Using      oneVarGroup
@@ -88,7 +88,7 @@ type OneVarSettings struct {
 // place that can explain itself.
 type oneVarObjectOptions struct {
 	SeparateRequires *bool   `json:"separateRequires"`
-	Var              *string `json:"var"`
+	Variable         *string `json:"var"`
 	Let              *string `json:"let"`
 	Const            *string `json:"const"`
 	Using            *string `json:"using"`
@@ -125,7 +125,7 @@ func oneVarModeFromWire(wire string) (OneVarMode, error) {
 func DefaultOneVarSettings() OneVarSettings {
 	always := OneVarAlways
 	group := oneVarGroup{Uninitialized: &always, Initialized: &always}
-	return OneVarSettings{Var: group, Let: group, Const: group, Using: group, AwaitUsing: group}
+	return OneVarSettings{Variable: group, Let: group, Const: group, Using: group, AwaitUsing: group}
 }
 
 // DecodeOneVarOptions reads the string or object form off the config.
@@ -164,7 +164,7 @@ func DecodeOneVarOptions(raw []byte) (OneVarSettings, error) {
 			return DefaultOneVarSettings(), modeError
 		}
 		group := oneVarGroup{Uninitialized: &mode, Initialized: &mode}
-		return OneVarSettings{Var: group, Let: group, Const: group, Using: group, AwaitUsing: group}, nil
+		return OneVarSettings{Variable: group, Let: group, Const: group, Using: group, AwaitUsing: group}, nil
 	}
 
 	var object oneVarObjectOptions
@@ -177,7 +177,7 @@ func DecodeOneVarOptions(raw []byte) (OneVarSettings, error) {
 	// declaration kind and an initialization state is rejected by the schema before the rule runs.
 	// Reproduced as a refusal rather than by picking one arm, because either choice silently
 	// enforces something the author did not write.
-	namesKind := object.Var != nil || object.Let != nil || object.Const != nil ||
+	namesKind := object.Variable != nil || object.Let != nil || object.Const != nil ||
 		object.Using != nil || object.AwaitUsing != nil
 	namesState := object.Initialized != nil || object.Uninitialized != nil
 	if namesKind && namesState {
@@ -209,7 +209,7 @@ func DecodeOneVarOptions(raw []byte) (OneVarSettings, error) {
 		wire  *string
 		group *oneVarGroup
 	}{
-		{object.Var, &settings.Var},
+		{object.Variable, &settings.Variable},
 		{object.Let, &settings.Let},
 		{object.Const, &settings.Const},
 		{object.Using, &settings.Using},
@@ -228,7 +228,7 @@ func DecodeOneVarOptions(raw []byte) (OneVarSettings, error) {
 		if oneVariableModeFromWireError != nil {
 			return DefaultOneVarSettings(), oneVariableModeFromWireError
 		}
-		settings.Var.Uninitialized = &mode
+		settings.Variable.Uninitialized = &mode
 		settings.Let.Uninitialized = &mode
 		settings.Const.Uninitialized = &mode
 		settings.Using.Uninitialized = &mode
@@ -239,7 +239,7 @@ func DecodeOneVarOptions(raw []byte) (OneVarSettings, error) {
 		if oneVariableModeFromWireError != nil {
 			return DefaultOneVarSettings(), oneVariableModeFromWireError
 		}
-		settings.Var.Initialized = &mode
+		settings.Variable.Initialized = &mode
 		settings.Let.Initialized = &mode
 		settings.Const.Initialized = &mode
 		settings.Using.Initialized = &mode
@@ -856,7 +856,7 @@ func (checker *oneVarChecker) groupFor(kind oneVarKind) oneVarGroup {
 	case oneVarKindAwaitUsing:
 		return checker.settings.AwaitUsing
 	}
-	return checker.settings.Var
+	return checker.settings.Variable
 }
 
 // recordTypes is upstream's `recordTypes`, marking what this scope has now seen.

@@ -48,7 +48,7 @@ func label(node *Node) string {
 	case KindRule:
 		return "rule" + node.Selector
 	case KindAtRule:
-		return "atrule:" + node.Params
+		return "atrule:" + node.Parameters
 	case KindAtRoot:
 		return "atroot"
 	case KindContext:
@@ -108,7 +108,7 @@ func TestWalkSkipPrunesTheSubtreeAndContinues(test *testing.T) {
 		test.Parallel()
 		want := "a rule.b b1 atrule:b2 b3 atroot atrule:c1 c1a context d1 rule.d2 d2a comment:e f"
 		got := record(walkFixture(), func(node *Node) WalkAction {
-			if node.Kind == KindAtRule && node.Params == "b2" {
+			if node.Kind == KindAtRule && node.Parameters == "b2" {
 				return WalkSkip
 			}
 			return WalkContinue

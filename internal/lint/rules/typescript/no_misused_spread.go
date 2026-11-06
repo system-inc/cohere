@@ -557,7 +557,7 @@ func noMisusedSpreadMapSuggestions(
 	argument *ast.Node,
 	argumentType *checker.Type,
 ) []rule.Suggestion {
-	for part := range type_checking.UnionTypePartsSeq(argumentType) {
+	for part := range type_checking.UnionTypePartsSequence(argumentType) {
 		if !noMisusedSpreadIsMap(ruleContext, part) {
 			return nil
 		}

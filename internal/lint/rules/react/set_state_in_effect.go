@@ -406,7 +406,7 @@ func reportSetStateInEffects(ruleContext rule.Context, function *high_level_inte
 					function,
 					target,
 					instructionValue.Callee,
-					instructionValue.Args,
+					instructionValue.Arguments,
 					setStateFunctions,
 				)
 			case *high_level_intermediate_representation.MethodCall:
@@ -417,7 +417,7 @@ func reportSetStateInEffects(ruleContext rule.Context, function *high_level_inte
 					function,
 					target,
 					instructionValue.Property,
-					instructionValue.Args,
+					instructionValue.Arguments,
 					setStateFunctions,
 				)
 			}
@@ -457,10 +457,10 @@ func handleEffectCall(
 	function *high_level_intermediate_representation.Function,
 	target static_single_assignment.IdentifierId,
 	callee high_level_intermediate_representation.Place,
-	args []high_level_intermediate_representation.Argument,
+	arguments []high_level_intermediate_representation.Argument,
 	setStateFunctions map[static_single_assignment.IdentifierId]high_level_intermediate_representation.Place,
 ) {
-	firstArgument, hasFirst := firstIdentifierArgument(args)
+	firstArgument, hasFirst := firstIdentifierArgument(arguments)
 	if !hasFirst {
 		return
 	}
@@ -640,7 +640,9 @@ func findSetStateCall(
 				}
 				// The value-taint half of the ref exemption: a setter fed a ref-derived value is
 				// synchronizing React with something outside it, which is what effects are for.
-				if argument, ok := firstIdentifierArgument(instructionValue.Args); ok && referenceDerived[argument] {
+				if argument, ok := firstIdentifierArgument(
+					instructionValue.Arguments,
+				); ok && referenceDerived[argument] {
 					return high_level_intermediate_representation.Place{}, false
 				}
 				// The control-dominance half: a setter that only runs when a branch on a ref says
@@ -688,7 +690,7 @@ func instructionReadsRefDerived(
 		if isDerived(instructionValue.Callee) {
 			return true
 		}
-		for _, argument := range instructionValue.Args {
+		for _, argument := range instructionValue.Arguments {
 			if isDerived(argument.Place) {
 				return true
 			}
@@ -697,7 +699,7 @@ func instructionReadsRefDerived(
 		if isDerived(instructionValue.Receiver) || isDerived(instructionValue.Property) {
 			return true
 		}
-		for _, argument := range instructionValue.Args {
+		for _, argument := range instructionValue.Arguments {
 			if isDerived(argument.Place) {
 				return true
 			}
@@ -814,12 +816,12 @@ func markPatternRefDerived(
 // spread fixtures are also kept, in `TestSetStateInEffectSpreadArgument`, since they assert real
 // upstream behaviour even though they cannot see this particular branch.
 func firstIdentifierArgument(
-	args []high_level_intermediate_representation.Argument,
+	arguments []high_level_intermediate_representation.Argument,
 ) (static_single_assignment.IdentifierId, bool) {
-	if len(args) == 0 || args[0].Spread {
+	if len(arguments) == 0 || arguments[0].Spread {
 		return 0, false
 	}
-	return args[0].Place.Identifier, true
+	return arguments[0].Place.Identifier, true
 }
 
 // anyOperandIsSetter reports whether a function expression closes over a known or typed setter.
@@ -881,14 +883,14 @@ func isSetterPlace(
 // answer too: a `dispatch` called in an effect is silent.
 const setStateTypeAliasName = "Dispatch"
 
-// refTypeSymbolName is the type `@types/react` puts on a ref.
+// referenceTypeSymbolName is the type `@types/react` puts on a ref.
 //
 // This reads the symbol where the setter reads the alias, and the asymmetry is real rather than an
 // inconsistency to tidy up. `RefObject` is an interface, so it has no alias and its name lives in
 // the symbol; `Dispatch` is a type alias, so its name lives in the alias and its symbol is the
 // anonymous literal behind it. Using one field for both reports a genuine ref as not-a-ref, which
 // is a defect an agent shipped on this exact pair before it was measured.
-const refTypeSymbolName = "RefObject"
+const referenceTypeSymbolName = "RefObject"
 
 // isSetterTyped asks the checker whether a value is a `useState` setter.
 func isSetterTyped(
@@ -914,7 +916,7 @@ func isRefTyped(
 		return false
 	}
 	symbol := checker.Type_symbol(valueType)
-	return symbol != nil && symbol.Name == refTypeSymbolName
+	return symbol != nil && symbol.Name == referenceTypeSymbolName
 }
 
 // typeAliasNameOf returns the name of the type alias on a value, or the empty string.

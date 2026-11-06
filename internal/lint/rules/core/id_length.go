@@ -38,8 +38,8 @@ func DefaultIdLengthSettings() IdLengthSettings {
 // Minimum and Properties are pointers so an absent key is distinguishable from a written zero or
 // empty string, which mean different things for a default-2 and a default-"always" option.
 type idLengthRawOptions struct {
-	Min               *int     `json:"min"`
-	Max               *int     `json:"max"`
+	Minimum           *int     `json:"min"`
+	Maximum           *int     `json:"max"`
 	Exceptions        []string `json:"exceptions"`
 	ExceptionPatterns []string `json:"exceptionPatterns"`
 	Properties        *string  `json:"properties"`
@@ -69,11 +69,11 @@ func DecodeIdLengthOptions(raw []byte) (IdLengthSettings, error) {
 		return settings, unmarshalOptionsError
 	}
 
-	if wire.Min != nil {
-		settings.Minimum = *wire.Min
+	if wire.Minimum != nil {
+		settings.Minimum = *wire.Minimum
 	}
-	if wire.Max != nil {
-		settings.Maximum = *wire.Max
+	if wire.Maximum != nil {
+		settings.Maximum = *wire.Maximum
 		settings.HasMaximum = true
 	}
 	// Upstream's `options.properties !== "never"`, so anything other than the literal "never"

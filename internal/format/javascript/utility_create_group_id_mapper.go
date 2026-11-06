@@ -8,22 +8,22 @@ import "github.com/system-inc/cohere/internal/format/doc"
 // Upstream keeps a module-level WeakMap per mapper; Go has no weak map, so the ids live on the
 // format's settings, keyed on the description and then the node, and the returned function takes
 // options to reach them.
-func createGroupIdMapper(description string) func(options *Options, node Node) *doc.GroupID {
-	return func(options *Options, node Node) *doc.GroupID {
+func createGroupIdMapper(description string) func(options *Options, node Node) *doc.GroupId {
+	return func(options *Options, node Node) *doc.GroupId {
 		formatSettings := settingsOf(options)
-		if formatSettings.groupIDs == nil {
-			formatSettings.groupIDs = map[string]map[Node]*doc.GroupID{}
+		if formatSettings.groupIds == nil {
+			formatSettings.groupIds = map[string]map[Node]*doc.GroupId{}
 		}
-		groupIds := formatSettings.groupIDs[description]
+		groupIds := formatSettings.groupIds[description]
 		if groupIds == nil {
-			groupIds = map[Node]*doc.GroupID{}
-			formatSettings.groupIDs[description] = groupIds
+			groupIds = map[Node]*doc.GroupId{}
+			formatSettings.groupIds[description] = groupIds
 		}
-		if groupID, present := groupIds[node]; present {
-			return groupID
+		if groupId, present := groupIds[node]; present {
+			return groupId
 		}
-		groupID := newGroupID(description)
-		groupIds[node] = groupID
-		return groupID
+		groupId := newGroupId(description)
+		groupIds[node] = groupId
+		return groupId
 	}
 }

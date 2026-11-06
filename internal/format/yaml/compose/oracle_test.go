@@ -273,7 +273,7 @@ func (writer *jsonWriter) number(token *cst.Token) {
 		}
 		writer.number(item.Value)
 	}
-	for _, each := range token.Props {
+	for _, each := range token.Properties {
 		writer.number(each)
 	}
 	for _, each := range token.End {
@@ -294,7 +294,7 @@ func (writer *jsonWriter) key(first *bool, name string) {
 	writer.builder.WriteString(`"` + name + `":`)
 }
 
-func (writer *jsonWriter) text(text string) { writeJSONString(&writer.builder, stringToUnits(text)) }
+func (writer *jsonWriter) text(text string) { writeJsonString(&writer.builder, stringToUnits(text)) }
 
 func (writer *jsonWriter) ints(values []int) {
 	if values == nil {
@@ -363,12 +363,12 @@ func (writer *jsonWriter) node(node *Node) {
 		writer.key(&first, "range")
 		writer.ints(node.Range)
 	}
-	if node.SrcToken != nil {
+	if node.SourceToken != nil {
 		writer.key(&first, "srcToken")
-		writer.srcToken(node.SrcToken)
-	} else if node.SrcItem != nil {
+		writer.srcToken(node.SourceToken)
+	} else if node.SourceItem != nil {
 		writer.key(&first, "srcToken")
-		if id, found := writer.itemIdentifiers[node.SrcItem]; found {
+		if id, found := writer.itemIdentifiers[node.SourceItem]; found {
 			writer.text(fmt.Sprintf("#%d item", id))
 		} else {
 			writer.text("foreign item")
@@ -418,7 +418,7 @@ func (writer *jsonWriter) node(node *Node) {
 		writer.key(&first, "spaceBefore")
 		writer.raw("true")
 	}
-	if node.Kind == KindMap || node.Kind == KindSeq {
+	if node.Kind == KindMap || node.Kind == KindSequence {
 		writer.key(&first, "items")
 		writer.builder.WriteByte('[')
 		for index, item := range node.Items {
@@ -446,7 +446,7 @@ func (writer *jsonWriter) nullableText(text string) {
 	writer.text(text)
 }
 
-func (writer *jsonWriter) errors(errors []*YAMLError) {
+func (writer *jsonWriter) errors(errors []*YamlError) {
 	writer.builder.WriteByte('[')
 	for index, yamlError := range errors {
 		if index > 0 {
@@ -461,7 +461,7 @@ func (writer *jsonWriter) errors(errors []*YAMLError) {
 		writer.key(&first, "message")
 		writer.text(yamlError.Message)
 		writer.key(&first, "pos")
-		writer.ints(yamlError.Pos[:])
+		writer.ints(yamlError.Position[:])
 		writer.builder.WriteByte('}')
 	}
 	writer.builder.WriteByte(']')
@@ -491,8 +491,8 @@ func (writer *jsonWriter) document(document *Document) {
 	writer.key(&inner, "docEnd")
 	writer.raw(strconv.FormatBool(directives.DocEnd))
 	writer.key(&inner, "yaml")
-	writer.raw(`{"explicit":` + strconv.FormatBool(directives.YAML.Explicit) + `,"version":`)
-	writer.text(directives.YAML.Version)
+	writer.raw(`{"explicit":` + strconv.FormatBool(directives.Yaml.Explicit) + `,"version":`)
+	writer.text(directives.Yaml.Version)
 	writer.raw("}")
 	writer.key(&inner, "tags")
 	handles := make([]string, 0, len(directives.Tags))

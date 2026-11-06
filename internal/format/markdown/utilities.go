@@ -35,10 +35,10 @@ var inlineNodeWrapperTypes = func() map[string]bool {
 }()
 
 const (
-	kindNonCJK          = "non-cjk"
-	kindCJLetter        = "cj-letter"
+	kindNonCjk          = "non-cjk"
+	kindCjLetter        = "cj-letter"
 	kindKLetter         = "k-letter"
-	kindCJKPunctuation  = "cjk-punctuation"
+	kindCjkPunctuation  = "cjk-punctuation"
 	javaScriptSpace     = `\t\n\v\f\r \x{a0}\x{1680}\x{2000}-\x{200a}\x{2028}\x{2029}\x{202f}\x{205f}\x{3000}\x{feff}`
 	javaScriptSpaceText = "\t\n\v\f\r \u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000\ufeff"
 )
@@ -105,7 +105,7 @@ func splitText(text string, nodes *arena.Arena[Node]) []*Node {
 			return (lastNode.Kind == kind1 && node.Kind == kind2) || (lastNode.Kind == kind2 && node.Kind == kind1)
 		}
 		if lastNode != nil && lastNode.NodeType == "word" &&
-			!isBetween(kindNonCJK, kindCJKPunctuation) &&
+			!isBetween(kindNonCjk, kindCjkPunctuation) &&
 			// disallow leading/trailing full-width whitespace
 			!strings.ContainsRune(lastNode.Value, '\u3000') && !strings.ContainsRune(node.Value, '\u3000') {
 			split = append(split, nodes.New(Node{NodeType: "whitespace", Value: "", IsLiteral: true}))
@@ -135,7 +135,7 @@ func splitText(text string, nodes *arena.Arena[Node]) []*Node {
 			continue
 		}
 
-		innerTokens = appendSplitOnCJK(innerTokens[:0], token)
+		innerTokens = appendSplitOnCjk(innerTokens[:0], token)
 		for innerIndex, innerToken := range innerTokens {
 			if (innerIndex == 0 || innerIndex == len(innerTokens)-1) && innerToken == "" {
 				continue
@@ -148,8 +148,8 @@ func splitText(text string, nodes *arena.Arena[Node]) []*Node {
 						NodeType:               "word",
 						Value:                  innerToken,
 						IsLiteral:              true,
-						Kind:                   kindNonCJK,
-						IsCJ:                   false,
+						Kind:                   kindNonCjk,
+						IsCj:                   false,
 						HasLeadingPunctuation:  isPunctuationUnit(firstUnit(innerToken)),
 						HasTrailingPunctuation: isPunctuationUnit(lastUnit(innerToken)),
 					}))
@@ -162,7 +162,7 @@ func splitText(text string, nodes *arena.Arena[Node]) []*Node {
 			// punctuation for CJ(K). Korean doesn't use them in horizontal writing usually.
 			if containsClass(punctuationRanges, innerToken) {
 				appendNode(nodes.New(Node{
-					NodeType: "word", Value: innerToken, IsLiteral: true, Kind: kindCJKPunctuation, IsCJ: true,
+					NodeType: "word", Value: innerToken, IsLiteral: true, Kind: kindCjkPunctuation, IsCj: true,
 					HasLeadingPunctuation: true, HasTrailingPunctuation: true,
 				}))
 				continue
@@ -172,13 +172,13 @@ func splitText(text string, nodes *arena.Arena[Node]) []*Node {
 			// be treated like non-CJK.
 			if containsClass(hangulRanges, innerToken) {
 				appendNode(nodes.New(
-					Node{NodeType: "word", Value: innerToken, IsLiteral: true, Kind: kindKLetter, IsCJ: false},
+					Node{NodeType: "word", Value: innerToken, IsLiteral: true, Kind: kindKLetter, IsCj: false},
 				))
 				continue
 			}
 
 			appendNode(
-				nodes.New(Node{NodeType: "word", Value: innerToken, IsLiteral: true, Kind: kindCJLetter, IsCJ: true}),
+				nodes.New(Node{NodeType: "word", Value: innerToken, IsLiteral: true, Kind: kindCjLetter, IsCj: true}),
 			)
 		}
 	}
@@ -212,9 +212,9 @@ func splitKeepingSeparators(text string, isSeparator func(rune) bool) []string {
 	return append(parts, text[start:])
 }
 
-// appendSplitOnCJK appends token.split(new RegExp(`(${CJK_REGEXP.source})`, "u")) to parts: pieces
+// appendSplitOnCjk appends token.split(new RegExp(`(${CJK_REGEXP.source})`, "u")) to parts: pieces
 // alternate with the CJK matches, each one CJK character and an optional variation selector after it.
-func appendSplitOnCJK(parts []string, token string) []string {
+func appendSplitOnCjk(parts []string, token string) []string {
 	appended := parts
 	start := 0
 	index := 0

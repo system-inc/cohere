@@ -29,7 +29,7 @@ func tokenizeThematicBreak(self *Self, effects *Effects, ok State, nok State) St
 			return sequence(code)
 		}
 
-		if size >= thematicBreakMarkerCountMin && (code == CodeEof || markdownLineEnding(code)) {
+		if size >= thematicBreakMarkerCountMinimum && (code == CodeEof || markdownLineEnding(code)) {
 			effects.Exit(TypeThematicBreak)
 			return ok(code)
 		}

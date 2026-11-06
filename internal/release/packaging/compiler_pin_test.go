@@ -66,8 +66,8 @@ func moduleWithCompiler(test *testing.T) compilerFixture {
 
 	template := sharedModuleWithCompiler(test)
 	module := filepath.Join(test.TempDir(), "module")
-	if copyFSError := os.CopyFS(module, os.DirFS(template.Module)); copyFSError != nil {
-		test.Fatalf("copying the compiler fixture: %v", copyFSError)
+	if copyFileSystemError := os.CopyFS(module, os.DirFS(template.Module)); copyFileSystemError != nil {
+		test.Fatalf("copying the compiler fixture: %v", copyFileSystemError)
 	}
 	return compilerFixture{Module: module, Recorded: template.Recorded, Later: template.Later}
 }

@@ -39,7 +39,7 @@ func TestASequenceIsTheConcatOfItsParts(test *testing.T) {
 		}{
 			{"Print", func(document Doc) string { return Print(document, options) }},
 			{"CleanDoc", func(document Doc) string { return showDoc(CleanDoc(document)) }},
-			{"MapDoc", func(document Doc) string { return showDoc(MapDoc(document, cleanDocFn)) }},
+			{"MapDoc", func(document Doc) string { return showDoc(MapDoc(document, cleanDoc)) }},
 			{"StripTrailingHardline", func(document Doc) string { return showDoc(StripTrailingHardline(document)) }},
 			{"RemoveLines", func(document Doc) string { return showDoc(RemoveLines(document)) }},
 			{"WillBreak", func(document Doc) string { return boolText(WillBreak(document)) }},

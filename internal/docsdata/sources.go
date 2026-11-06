@@ -24,22 +24,26 @@ func SourceInputs(root string) (Inputs, error) {
 		SetContents:   configuration.SourceContents,
 		GoRules:       rules.All(),
 	}
-	var err error
-	if inputs.SwiftVerdicts, err = os.ReadFile(filepath.Join(root, "swift", "HouseRuleVerdicts.json")); err != nil {
-		return inputs, err
+	var readError error
+	if inputs.SwiftVerdicts, readError = os.ReadFile(
+		filepath.Join(root, "swift", "HouseRuleVerdicts.json"),
+	); readError != nil {
+		return inputs, readError
 	}
-	if inputs.SwiftRules, err = os.ReadFile(filepath.Join(root, "swift", "Rules.json")); err != nil {
-		return inputs, err
+	if inputs.SwiftRules, readError = os.ReadFile(filepath.Join(root, "swift", "Rules.json")); readError != nil {
+		return inputs, readError
 	}
-	if inputs.Changelog, err = os.ReadFile(filepath.Join(root, "CHANGELOG.md")); err != nil {
-		return inputs, err
+	if inputs.Changelog, readError = os.ReadFile(filepath.Join(root, "CHANGELOG.md")); readError != nil {
+		return inputs, readError
 	}
-	if inputs.SettingsSchemas, err = settingsschema.Build(names); err != nil {
-		return inputs, err
+	var buildError error
+	if inputs.SettingsSchemas, buildError = settingsschema.Build(names); buildError != nil {
+		return inputs, buildError
 	}
-	if inputs.Benchmarks, err = benchresults.Read(filepath.Join(root, benchresults.Directory)); err != nil {
-		return inputs, err
+	if inputs.Benchmarks, readError = benchresults.Read(filepath.Join(root, benchresults.Directory)); readError != nil {
+		return inputs, readError
 	}
-	inputs.Examples, err = ReadCommittedExamples(root)
-	return inputs, err
+	var readCommittedExamplesError error
+	inputs.Examples, readCommittedExamplesError = ReadCommittedExamples(root)
+	return inputs, readCommittedExamplesError
 }

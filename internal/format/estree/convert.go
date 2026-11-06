@@ -238,9 +238,9 @@ func hasModifier(kind ast.Kind, node *ast.Node) bool {
 	return false
 }
 
-// getTSNodeAccessibility is upstream's getTSNodeAccessibility. Upstream returns undefined when there
+// getTsNodeAccessibility is upstream's getTsNodeAccessibility. Upstream returns undefined when there
 // is none, so nil here, which a Node stores as a present property with no value.
-func getTSNodeAccessibility(node *ast.Node) any {
+func getTsNodeAccessibility(node *ast.Node) any {
 	for _, modifier := range modifiers(node) {
 		switch modifier.Kind {
 		case ast.KindPublicKeyword:
@@ -466,14 +466,14 @@ func (converter *Converter) convertImportAttributes(attributes *ast.Node) []*Nod
 	return converter.convertChildren(attributes.AsImportAttributes().Attributes.Nodes, nil)
 }
 
-// convertJSXIdentifier is upstream's convertJSXIdentifier.
-func (converter *Converter) convertJSXIdentifier(node *ast.Node) *Node {
+// convertJsxIdentifier is upstream's convertJsxIdentifier.
+func (converter *Converter) convertJsxIdentifier(node *ast.Node) *Node {
 	return converter.createNode(node, "JSXIdentifier", "name", converter.getText(node))
 }
 
-// convertJSXNamespaceOrIdentifier is upstream's convertJSXNamespaceOrIdentifier, for TypeScript 5.1
+// convertJsxNamespaceOrIdentifier is upstream's convertJsxNamespaceOrIdentifier, for TypeScript 5.1
 // and later where JsxNamespacedName is its own node.
-func (converter *Converter) convertJSXNamespaceOrIdentifier(node *ast.Node) *Node {
+func (converter *Converter) convertJsxNamespaceOrIdentifier(node *ast.Node) *Node {
 	if node.Kind == ast.KindJsxNamespacedName {
 		namespaced := node.AsJsxNamespacedName()
 		return converter.createNode(
@@ -502,18 +502,18 @@ func (converter *Converter) convertJSXNamespaceOrIdentifier(node *ast.Node) *Nod
 				text[:colon],
 			))
 	}
-	return converter.convertJSXIdentifier(node)
+	return converter.convertJsxIdentifier(node)
 }
 
-// convertJSXTagName is upstream's convertJSXTagName.
-func (converter *Converter) convertJSXTagName(node *ast.Node, parent *ast.Node) *Node {
+// convertJsxTagName is upstream's convertJsxTagName.
+func (converter *Converter) convertJsxTagName(node *ast.Node, parent *ast.Node) *Node {
 	if node.Kind == ast.KindPropertyAccessExpression {
 		access := node.AsPropertyAccessExpression()
 		return converter.createNode(node, "JSXMemberExpression",
-			"object", converter.convertJSXTagName(access.Expression, parent),
-			"property", converter.convertJSXIdentifier(access.Name()))
+			"object", converter.convertJsxTagName(access.Expression, parent),
+			"property", converter.convertJsxIdentifier(access.Name()))
 	}
-	return converter.convertJSXNamespaceOrIdentifier(node)
+	return converter.convertJsxNamespaceOrIdentifier(node)
 }
 
 // convertMethodSignature is upstream's convertMethodSignature.
@@ -526,7 +526,7 @@ func (converter *Converter) convertMethodSignature(node *ast.Node) *Node {
 		kind = "set"
 	}
 	return converter.createNode(node, "TSMethodSignature",
-		"accessibility", getTSNodeAccessibility(node),
+		"accessibility", getTsNodeAccessibility(node),
 		"computed", isComputedProperty(node.Name()),
 		"key", converter.convertChild(node.Name(), nil),
 		"kind", kind,
@@ -941,7 +941,7 @@ func (converter *Converter) convertNode(node *ast.Node, parent *ast.Node) *Node 
 			typeAnnotation = converter.convertTypeAnnotation(property.Type, node)
 		}
 		return converter.createNode(node, nodeType,
-			"accessibility", getTSNodeAccessibility(node),
+			"accessibility", getTsNodeAccessibility(node),
 			"computed", isComputedProperty(node.Name()),
 			"declare", hasModifier(ast.KindDeclareKeyword, node),
 			"decorators", converter.convertChildren(decorators(node), nil),
@@ -1363,7 +1363,7 @@ func (converter *Converter) convertNode(node *ast.Node, parent *ast.Node) *Node 
 			"closingElement", nil,
 			"openingElement", converter.createNodeWithRange("JSXOpeningElement", converter.getRange(node),
 				"attributes", converter.convertChildren(element.Attributes.AsJsxAttributes().Properties.Nodes, nil),
-				"name", converter.convertJSXTagName(element.TagName, node),
+				"name", converter.convertJsxTagName(element.TagName, node),
 				"selfClosing", true,
 				"typeArguments", converter.convertTypeArguments(node)))
 
@@ -1371,13 +1371,13 @@ func (converter *Converter) convertNode(node *ast.Node, parent *ast.Node) *Node 
 		element := node.AsJsxOpeningElement()
 		return converter.createNode(node, "JSXOpeningElement",
 			"attributes", converter.convertChildren(element.Attributes.AsJsxAttributes().Properties.Nodes, nil),
-			"name", converter.convertJSXTagName(element.TagName, node),
+			"name", converter.convertJsxTagName(element.TagName, node),
 			"selfClosing", false,
 			"typeArguments", converter.convertTypeArguments(node))
 
 	case ast.KindJsxClosingElement:
 		return converter.createNode(node, "JSXClosingElement",
-			"name", converter.convertJSXTagName(node.AsJsxClosingElement().TagName, node))
+			"name", converter.convertJsxTagName(node.AsJsxClosingElement().TagName, node))
 
 	case ast.KindJsxOpeningFragment:
 		return converter.createNode(node, "JSXOpeningFragment")
@@ -1403,7 +1403,7 @@ func (converter *Converter) convertNode(node *ast.Node, parent *ast.Node) *Node 
 	case ast.KindJsxAttribute:
 		attribute := node.AsJsxAttribute()
 		return converter.createNode(node, "JSXAttribute",
-			"name", converter.convertJSXNamespaceOrIdentifier(attribute.Name()),
+			"name", converter.convertJsxNamespaceOrIdentifier(attribute.Name()),
 			"value", converter.convertChild(attribute.Initializer, nil))
 
 	case ast.KindJsxText:
@@ -1557,7 +1557,7 @@ func (converter *Converter) convertNode(node *ast.Node, parent *ast.Node) *Node 
 			typeAnnotation = converter.convertTypeAnnotation(signature.Type, node)
 		}
 		return converter.createNode(node, "TSPropertySignature",
-			"accessibility", getTSNodeAccessibility(node),
+			"accessibility", getTsNodeAccessibility(node),
 			"computed", isComputedProperty(node.Name()),
 			"key", converter.convertChild(node.Name(), nil),
 			"optional", isOptional(node),
@@ -1567,7 +1567,7 @@ func (converter *Converter) convertNode(node *ast.Node, parent *ast.Node) *Node 
 
 	case ast.KindIndexSignature:
 		return converter.createNode(node, "TSIndexSignature",
-			"accessibility", getTSNodeAccessibility(node),
+			"accessibility", getTsNodeAccessibility(node),
 			"parameters", converter.convertChildren(converter.parameterList(node), nil),
 			"readonly", hasModifier(ast.KindReadonlyKeyword, node),
 			"static", hasModifier(ast.KindStaticKeyword, node),
@@ -1860,7 +1860,7 @@ func (converter *Converter) convertMethod(node *ast.Node, parent *ast.Node) *Nod
 			methodDefinitionType = "TSAbstractMethodDefinition"
 		}
 		result = converter.createNode(node, methodDefinitionType,
-			"accessibility", getTSNodeAccessibility(node),
+			"accessibility", getTsNodeAccessibility(node),
 			"computed", isComputedProperty(node.Name()),
 			"decorators", converter.convertChildren(decorators(node), nil),
 			"key", converter.convertChild(node.Name(), nil),
@@ -1931,7 +1931,7 @@ func (converter *Converter) convertConstructor(node *ast.Node) *Node {
 		kind = "method"
 	}
 	return converter.createNode(node, methodType,
-		"accessibility", getTSNodeAccessibility(node),
+		"accessibility", getTsNodeAccessibility(node),
 		"computed", false,
 		"decorators", noNodes,
 		"key", constructorKey,
@@ -2062,7 +2062,7 @@ func (converter *Converter) convertParameter(node *ast.Node, parent *ast.Node) *
 	}
 	if len(modifiers(node)) > 0 {
 		return converter.createNode(node, "TSParameterProperty",
-			"accessibility", getTSNodeAccessibility(node),
+			"accessibility", getTsNodeAccessibility(node),
 			"decorators", noNodes,
 			"override", hasModifier(ast.KindOverrideKeyword, node),
 			"parameter", result,

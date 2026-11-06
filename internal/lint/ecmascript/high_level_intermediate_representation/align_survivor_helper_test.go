@@ -14,7 +14,7 @@ import (
 // comparator rather than to this copy having drifted.
 func mergeWithReversedEndOrder(function *Function, scopes *ReactiveScopes) *MergedScopes {
 	result := &MergedScopes{}
-	if function == nil || scopes == nil || scopes.Len() == 0 {
+	if function == nil || scopes == nil || scopes.Length() == 0 {
 		return result
 	}
 	state := &mergeSweepState{rangeOf: scopes.RangeOf}

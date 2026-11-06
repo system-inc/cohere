@@ -82,7 +82,7 @@ func tokenizeHeadingAtx(self *Self, effects *Effects, ok State, nok State) State
 		if code == CodeNumberSign {
 			// `size++ < atxHeadingOpeningFenceSizeMax`: the increment happens whether or not the
 			// comparison passes.
-			below := size < atxHeadingOpeningFenceSizeMax
+			below := size < atxHeadingOpeningFenceSizeMaximum
 			size++
 			if below {
 				effects.Consume(code)

@@ -22,7 +22,7 @@ type createItemFunc func(position *position, key *Node, value *Node) *Node
 
 // transformMap is upstream's transformMap.
 func (context *context) transformMap(mapNode *compose.Node, properties []*cst.Token) *Node {
-	sourceToken := mapNode.SrcToken
+	sourceToken := mapNode.SourceToken
 	if sourceToken == nil || sourceToken.Type != "block-map" {
 		throwError("Expected block mapping srcToken")
 	}
@@ -51,9 +51,9 @@ func (context *context) transformMap(mapNode *compose.Node, properties []*cst.To
 		context.transformContentProperties(mapNode, properties), mappingItems)
 }
 
-// transformSeq is upstream's transformSeq.
-func (context *context) transformSeq(seq *compose.Node, properties []*cst.Token) *Node {
-	sourceToken := seq.SrcToken
+// transformSequence is upstream's transformSequence.
+func (context *context) transformSequence(seq *compose.Node, properties []*cst.Token) *Node {
+	sourceToken := seq.SourceToken
 	if sourceToken == nil || sourceToken.Type != "block-seq" {
 		throwError("Expected block sequence srcToken")
 	}
@@ -125,7 +125,7 @@ func (context *context) transformItemValue(itemNode *compose.Node, properties []
 		}
 		return context.transformNode(itemNode, properties)
 	}
-	sourceItem := itemNode.SrcItem
+	sourceItem := itemNode.SourceItem
 	mappingItem := context.transformPair(itemNode, sourceItem, context.createMappingItem)
 	return context.createMapping(
 		context.position(mappingItem),
@@ -136,7 +136,7 @@ func (context *context) transformItemValue(itemNode *compose.Node, properties []
 
 // transformFlowMap is upstream's transformFlowMap.
 func (context *context) transformFlowMap(flowMap *compose.Node, properties []*cst.Token) *Node {
-	sourceToken := flowMap.SrcToken
+	sourceToken := flowMap.SourceToken
 	if sourceToken == nil || sourceToken.Type != "flow-collection" {
 		throwError("Expected flow-collection CST node for flow map")
 	}
@@ -178,9 +178,9 @@ func (context *context) extractTrailingItemComments(composed int, items []*cst.C
 	}
 }
 
-// transformFlowSeq is upstream's transformFlowSeq.
-func (context *context) transformFlowSeq(flowSequence *compose.Node, properties []*cst.Token) *Node {
-	sourceToken := flowSequence.SrcToken
+// transformFlowSequence is upstream's transformFlowSequence.
+func (context *context) transformFlowSequence(flowSequence *compose.Node, properties []*cst.Token) *Node {
+	sourceToken := flowSequence.SourceToken
 	if sourceToken == nil || sourceToken.Type != "flow-collection" {
 		throwError("Expected flow-collection CST node for flow sequence")
 	}
@@ -248,7 +248,7 @@ func (context *context) transformFlowSeq(flowSequence *compose.Node, properties 
 // in a flow sequence, `[ key: value ]`, which has no source token and one pair whose source is this
 // item. Both sides of the last comparison can be undefined, and undefined === undefined.
 func isBlockMappingOfImmediateChildOfFlowSequence(item *compose.Node, sourceItem *cst.CollectionItem) bool {
-	if item.SrcToken != nil {
+	if item.SourceToken != nil {
 		return false
 	}
 	if !compose.IsMap(item) {
@@ -257,7 +257,7 @@ func isBlockMappingOfImmediateChildOfFlowSequence(item *compose.Node, sourceItem
 	if len(item.Items) != 1 {
 		return false
 	}
-	return item.Items[0].SrcItem == sourceItem
+	return item.Items[0].SourceItem == sourceItem
 }
 
 // transformPair is upstream's transformPair (pair.mjs).

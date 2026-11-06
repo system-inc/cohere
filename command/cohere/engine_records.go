@@ -440,7 +440,7 @@ func (run *engineRun) acceptFinding(record *engineFindingRecord) error {
 	if record.Severity == "warning" {
 		severity = "warn"
 	}
-	rule, messageID := record.Rule, record.MessageId
+	rule, messageId := record.Rule, record.MessageId
 	if record.Source == "compiler" {
 		activeSummary.TypeErrors++
 		if rule != "" {
@@ -458,7 +458,7 @@ func (run *engineRun) acceptFinding(record *engineFindingRecord) error {
 			Column:    record.Column,
 			Severity:  severity,
 			Rule:      rule,
-			MessageID: messageID,
+			MessageId: messageId,
 			Message:   singleLineDescription(record.Message),
 		},
 		engineFindingLine(record)+"\n")

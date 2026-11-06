@@ -204,9 +204,9 @@ type Function struct {
 	// property worth having when the corpus disagrees.
 	Kind FunctionKind
 
-	// Params are the parameter values, in order. A destructured parameter lowers to a temporary
+	// Parameters are the parameter values, in order. A destructured parameter lowers to a temporary
 	// here plus destructuring instructions in the entry block, so this is always flat.
-	Params []Place
+	Parameters []Place
 
 	// Returns is the value returned. Every `return` stores into it, so a pass asking what a
 	// function yields has one identifier to ask about rather than a set of terminals to collect.

@@ -690,12 +690,12 @@ func noInvalidHtmlAttributeCheckCreateElement(ruleContext rule.Context, node *as
 	}
 
 	for _, attributeName := range noInvalidHtmlAttributeDefaultAttributes {
-		noInvalidHtmlAttributeCheckCreateProps(ruleContext, call, attributeName, elementName)
+		noInvalidHtmlAttributeCheckCreateProperties(ruleContext, call, attributeName, elementName)
 	}
 }
 
-// noInvalidHtmlAttributeCheckCreateProps is upstream's `checkCreateProps`.
-func noInvalidHtmlAttributeCheckCreateProps(
+// noInvalidHtmlAttributeCheckCreateProperties is upstream's `checkCreateProps`.
+func noInvalidHtmlAttributeCheckCreateProperties(
 	ruleContext rule.Context,
 	call *ast.CallExpression,
 	attributeName string,

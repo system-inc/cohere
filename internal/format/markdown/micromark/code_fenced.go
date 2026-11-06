@@ -135,7 +135,7 @@ func tokenizeCodeFenced(self *Self, effects *Effects, ok State, nok State) State
 			return sequenceOpen
 		}
 
-		if sizeOpen < codeFencedSequenceSizeMin {
+		if sizeOpen < codeFencedSequenceSizeMinimum {
 			return nok(code)
 		}
 

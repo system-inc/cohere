@@ -117,7 +117,7 @@ func (context *context) position(node *Node) *position {
 
 // transformOffset is upstream's transformOffset: a new point.
 func (context *context) transformOffset(offset int) *point {
-	line, col := context.lineCounter.LinePos(offset)
+	line, col := context.lineCounter.LinePosition(offset)
 	return context.memory.points.New(point{line: line, column: col, offset: offset})
 }
 
@@ -218,11 +218,11 @@ type SyntaxError struct {
 
 func (syntaxError *SyntaxError) Error() string { return syntaxError.Message }
 
-// newYAMLSyntaxError is `new YAMLSyntaxError(context, error)`.
-func (context *context) newYAMLSyntaxError(yamlError *compose.YAMLError, offsets unitOffsets) *SyntaxError {
+// newYamlSyntaxError is `new YAMLSyntaxError(context, error)`.
+func (context *context) newYamlSyntaxError(yamlError *compose.YamlError, offsets unitOffsets) *SyntaxError {
 	return &SyntaxError{
 		Message:  yamlError.Message,
 		Code:     yamlError.Code,
-		Position: offsets.convert(context.transformRange(yamlError.Pos[0], yamlError.Pos[1])),
+		Position: offsets.convert(context.transformRange(yamlError.Position[0], yamlError.Position[1])),
 	}
 }

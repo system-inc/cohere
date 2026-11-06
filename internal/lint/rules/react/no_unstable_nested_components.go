@@ -15,8 +15,8 @@ import (
 // before dispatch, so the decoder receives that object directly rather than upstream's one-element
 // array.
 type NoUnstableNestedComponentsOptions struct {
-	// AllowAsProps permits a component defined inside a prop. Absent means false.
-	AllowAsProps bool `json:"allowAsProps"`
+	// AllowAsProperties permits a component defined inside a prop. Absent means false.
+	AllowAsProperties bool `json:"allowAsProps"`
 
 	// PropNamePattern is the glob a prop name is matched against to be treated as a render prop.
 	// Absent means `render*`, which is upstream's default.
@@ -46,8 +46,8 @@ type NoUnstableNestedComponentsOptions struct {
 // not one.
 func DefaultNoUnstableNestedComponentsOptions() NoUnstableNestedComponentsOptions {
 	return NoUnstableNestedComponentsOptions{
-		AllowAsProps:    false,
-		PropNamePattern: "render*",
+		AllowAsProperties: false,
+		PropNamePattern:   "render*",
 	}
 }
 
@@ -69,7 +69,7 @@ func DecodeNoUnstableNestedComponentsOptions(raw []byte) (NoUnstableNestedCompon
 	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &wire); unmarshalOptionsError != nil {
 		return options, unmarshalOptionsError
 	}
-	options.AllowAsProps = wire.AllowAsProps
+	options.AllowAsProperties = wire.AllowAsProperties
 	options.CustomValidators = wire.CustomValidators
 	if wire.PropNamePattern != "" {
 		options.PropNamePattern = wire.PropNamePattern
@@ -168,10 +168,10 @@ var NoUnstableNestedComponents = rule.Rule[NoUnstableNestedComponentsOptions]{
 				}
 
 				state := &unstableNestedState{
-					ctx:             ruleContext,
-					isComponent:     isComponent,
-					allowAsProps:    settings.AllowAsProps,
-					propNameMatches: propertyNameMatches,
+					ctx:                 ruleContext,
+					isComponent:         isComponent,
+					allowAsProps:        settings.AllowAsProperties,
+					propertyNameMatches: propertyNameMatches,
 				}
 
 				var visit func(*ast.Node)
@@ -199,8 +199,8 @@ type unstableNestedState struct {
 	ctx         rule.Context
 	isComponent map[*ast.Node]bool
 
-	allowAsProps    bool
-	propNameMatches func(string) bool
+	allowAsProps        bool
+	propertyNameMatches func(string) bool
 }
 
 // validate reproduces upstream's function of the same name.
@@ -213,7 +213,7 @@ func (state *unstableNestedState) validate(node *ast.Node) {
 		return
 	}
 
-	isDeclaredInsideProperties := state.isComponentInProp(node)
+	isDeclaredInsideProperties := state.isComponentInProperty(node)
 
 	if !state.isComponent[node] &&
 		!state.isFunctionComponentInsideClassComponent(node) &&
@@ -223,7 +223,7 @@ func (state *unstableNestedState) validate(node *ast.Node) {
 
 	switch {
 	// The `allowAsProps` option, and the render-prop exemption that applies regardless of it.
-	case isDeclaredInsideProperties && (state.allowAsProps || state.isComponentInRenderProp(node)):
+	case isDeclaredInsideProperties && (state.allowAsProps || state.isComponentInRenderProperty(node)):
 		return
 
 	// A component created inside `items.map(...)` is a callback rather than a nested component.
@@ -450,16 +450,16 @@ func (state *unstableNestedState) isReturnStatementOfHook(node *ast.Node) bool {
 	return hookNamePattern.MatchString(callee.Text())
 }
 
-// isComponentInRenderProp is upstream's function of the same name.
+// isComponentInRenderProperty is upstream's function of the same name.
 //
 // Three routes, checked in upstream's order.
-func (state *unstableNestedState) isComponentInRenderProp(node *ast.Node) bool {
+func (state *unstableNestedState) isComponentInRenderProperty(node *ast.Node) bool {
 	parent := semanticParentOf(node)
 
 	// `{ renderFooter: () => <div /> }`, matched on the object key.
 	if parent != nil && parent.Kind == ast.KindPropertyAssignment {
 		if key := parent.AsPropertyAssignment().Name(); key != nil &&
-			key.Kind == ast.KindIdentifier && state.propNameMatches(key.Text()) {
+			key.Kind == ast.KindIdentifier && state.propertyNameMatches(key.Text()) {
 			return true
 		}
 	}
@@ -518,7 +518,7 @@ func (state *unstableNestedState) isComponentInRenderProp(node *ast.Node) bool {
 		return false
 	}
 	propertyName := name.Text()
-	return state.propNameMatches(propertyName) || propertyName == "children"
+	return state.propertyNameMatches(propertyName) || propertyName == "children"
 }
 
 // isDirectValueOfRenderProperty is upstream's function of the same name.
@@ -535,10 +535,10 @@ func (state *unstableNestedState) isDirectValueOfRenderProperty(node *ast.Node) 
 	if key == nil || key.Kind != ast.KindIdentifier {
 		return false
 	}
-	return state.propNameMatches(key.Text())
+	return state.propertyNameMatches(key.Text())
 }
 
-// isComponentInProp is upstream's function of the same name.
+// isComponentInProperty is upstream's function of the same name.
 //
 // Upstream's first branch is `isPropertyOfObjectExpressionMatcher(node)`, whose body is
 // `node && node.parent && node.parent.type === 'Property'`. Despite the name, which reads as though
@@ -556,7 +556,7 @@ func (state *unstableNestedState) isDirectValueOfRenderProperty(node *ast.Node) 
 // That is the "never document a limit you did not measure" failure, arriving as a confident
 // paragraph rather than as a missing check, and it is recorded here because a future reader
 // comparing the helper's name against its body will have the same instinct.
-func (state *unstableNestedState) isComponentInProp(node *ast.Node) bool {
+func (state *unstableNestedState) isComponentInProperty(node *ast.Node) bool {
 	if parent := semanticParentOf(node); parent != nil &&
 		parent.Kind == ast.KindPropertyAssignment {
 		return returnsJsx(state.ctx, node)
@@ -564,7 +564,7 @@ func (state *unstableNestedState) isComponentInProp(node *ast.Node) bool {
 
 	attribute := closestMatchingAncestor(node, isJsxAttributeOfExpressionContainer)
 	if attribute == nil {
-		return state.isComponentInsideCreateElementProps(node)
+		return state.isComponentInsideCreateElementProperties(node)
 	}
 	return returnsJsx(state.ctx, node)
 }
@@ -606,13 +606,13 @@ func isJsxAttributeOfExpressionContainer(node *ast.Node) bool {
 	return initializer != nil && initializer.Kind == ast.KindJsxExpression
 }
 
-// isComponentInsideCreateElementProps is upstream's `isComponentInsideCreateElementsProp`.
+// isComponentInsideCreateElementProperties is upstream's `isComponentInsideCreateElementsProp`.
 //
 // Upstream gates on `components.get(node)` first, so a function that is not already a detected
 // component takes no part in this. Then it requires the closest enclosing object literal to be
 // exactly the second argument of the closest enclosing `createElement` call, which is the props
 // position. Object identity is the test upstream uses and node identity is the same test here.
-func (state *unstableNestedState) isComponentInsideCreateElementProps(node *ast.Node) bool {
+func (state *unstableNestedState) isComponentInsideCreateElementProperties(node *ast.Node) bool {
 	if !state.isComponent[node] {
 		return false
 	}
@@ -843,8 +843,8 @@ func (state *unstableNestedState) parentStatelessComponentOf(node *ast.Node) *as
 	return nil
 }
 
-// propNamePatternMatchers holds compilePropNamePattern's matcher for each pattern seen.
-var propNamePatternMatchers sync.Map
+// propertyNamePatternMatchers holds compilePropNamePattern's matcher for each pattern seen.
+var propertyNamePatternMatchers sync.Map
 
 // compilePropNamePattern turns upstream's minimatch pattern into a matcher.
 //
@@ -868,9 +868,9 @@ var propNamePatternMatchers sync.Map
 // kept in propNamePatternMatchers. Keyed by the pattern rather than held in one variable, because a
 // run can lint under more than one configuration.
 func compilePropNamePattern(pattern string) func(string) bool {
-	stored, found := propNamePatternMatchers.Load(pattern)
+	stored, found := propertyNamePatternMatchers.Load(pattern)
 	if !found {
-		stored, _ = propNamePatternMatchers.LoadOrStore(pattern, buildPropNamePattern(pattern))
+		stored, _ = propertyNamePatternMatchers.LoadOrStore(pattern, buildPropNamePattern(pattern))
 	}
 	matcher, isMatcher := stored.(func(string) bool)
 	if !isMatcher {

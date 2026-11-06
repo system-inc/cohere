@@ -132,7 +132,7 @@ func showDoc(document Doc) string {
 		}
 		return strings.Join(shown, ",")
 	}
-	idName := func(id *GroupID) string {
+	idName := func(id *GroupId) string {
 		if id == nil {
 			return ""
 		}
@@ -144,7 +144,7 @@ func showDoc(document Doc) string {
 	case Text:
 		return quote(string(typed))
 	case *Group:
-		result := "group(" + idName(typed.ID) + "," + fmt.Sprint(typed.Break) + "," + showDoc(typed.Contents)
+		result := "group(" + idName(typed.Id) + "," + fmt.Sprint(typed.Break) + "," + showDoc(typed.Contents)
 		if typed.ExpandedStates != nil {
 			result += ",states[" + list(typed.ExpandedStates) + "]"
 		}
@@ -153,7 +153,7 @@ func showDoc(document Doc) string {
 		return "fill[" + list(typed.Parts) + "]"
 	case *IfBreak:
 		return "ifBreak(" +
-			idName(typed.GroupID) +
+			idName(typed.GroupId) +
 			"," +
 			showDoc(typed.BreakContents) +
 			"," +
@@ -176,7 +176,7 @@ func showDoc(document Doc) string {
 		return "align(" + n + "," + showDoc(typed.Contents) + ")"
 	case *IndentIfBreak:
 		return "indentIfBreak(" +
-			idName(typed.GroupID) +
+			idName(typed.GroupId) +
 			"," +
 			fmt.Sprint(typed.Negate) +
 			"," +
@@ -243,11 +243,11 @@ func TestUtilitiesAgreeWithUpstream(test *testing.T) {
 	report := func(index int, what string, want string, got string) {
 		mismatches++
 		if mismatches <= 8 {
-			specJSON, marshalError := json.Marshal(cases[index].Spec)
+			specJson, marshalError := json.Marshal(cases[index].Spec)
 			if marshalError != nil {
 				test.Fatalf("encoding case %d's spec: %v", index, marshalError)
 			}
-			test.Errorf("case %d %s\nspec %s\nwant %v\ngot  %v", index, what, specJSON, want, got)
+			test.Errorf("case %d %s\nspec %s\nwant %v\ngot  %v", index, what, specJson, want, got)
 		}
 	}
 	for index, testCase := range cases {

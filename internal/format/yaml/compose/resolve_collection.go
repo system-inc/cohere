@@ -18,7 +18,7 @@ func nodeClass(tag *Tag, fallback string) string {
 	return fallback
 }
 
-const startColMsg = "All mapping items must start at the same column"
+const startColMessage = "All mapping items must start at the same column"
 
 // resolveBlockMap is upstream's: a block map token's items composed into a map of pairs.
 //
@@ -35,7 +35,7 @@ func resolveBlockMap(composition *composeContext, bm *cst.Token, onError onError
 	for _, collItem := range bm.Items {
 		start, key, sep, value := collItem.Start, collItem.Key, collItem.Sep, collItem.Value
 		// key properties
-		keyProperties := resolveProps(start, resolvePropsOptions{
+		keyProperties := resolveProperties(start, resolvePropsOptions{
 			indicator:      "explicit-key-ind",
 			next:           keyOrFirstSep(key, sep),
 			offset:         offset,
@@ -54,7 +54,7 @@ func resolveBlockMap(composition *composeContext, bm *cst.Token, onError onError
 						false,
 					)
 				} else if key.HasIndent() && key.Indent != bm.Indent {
-					onError(errorOffset(offset), "BAD_INDENT", startColMsg, false)
+					onError(errorOffset(offset), "BAD_INDENT", startColMessage, false)
 				}
 			}
 			if keyProperties.anchor == nil && keyProperties.tag == nil && sep == nil {
@@ -68,7 +68,7 @@ func resolveBlockMap(composition *composeContext, bm *cst.Token, onError onError
 				}
 				continue
 			}
-			if keyProperties.newlineAfterProp != nil || containsNewline(key) {
+			if keyProperties.newlineAfterProperty != nil || containsNewline(key) {
 				// `key ?? start[start.length - 1]`
 				source := key
 				if key == nil {
@@ -82,7 +82,7 @@ func resolveBlockMap(composition *composeContext, bm *cst.Token, onError onError
 				)
 			}
 		} else if keyProperties.found.Indent != bm.Indent {
-			onError(errorOffset(offset), "BAD_INDENT", startColMsg, false)
+			onError(errorOffset(offset), "BAD_INDENT", startColMessage, false)
 		}
 		// key value
 		composition.atKey = true
@@ -98,7 +98,7 @@ func resolveBlockMap(composition *composeContext, bm *cst.Token, onError onError
 			onError(errorOffset(keyStart), "DUPLICATE_KEY", "Map keys must be unique", false)
 		}
 		// value properties
-		valueProperties := resolveProps(sepOrEmpty(sep), resolvePropsOptions{
+		valueProperties := resolveProperties(sepOrEmpty(sep), resolvePropsOptions{
 			indicator:      "map-value-ind",
 			next:           value,
 			offset:         keyNode.Range[2],
@@ -136,7 +136,7 @@ func resolveBlockMap(composition *composeContext, bm *cst.Token, onError onError
 			offset = valueNode.Range[2]
 			pair := composition.newPair(keyNode, valueNode)
 			if composition.options.KeepSourceTokens {
-				pair.SrcItem = collItem
+				pair.SourceItem = collItem
 			}
 			yamlMap.Items = append(yamlMap.Items, pair)
 		} else {
@@ -158,7 +158,7 @@ func resolveBlockMap(composition *composeContext, bm *cst.Token, onError onError
 			}
 			pair := composition.newPair(keyNode, nil)
 			if composition.options.KeepSourceTokens {
-				pair.SrcItem = collItem
+				pair.SourceItem = collItem
 			}
 			yamlMap.Items = append(yamlMap.Items, pair)
 		}
@@ -193,11 +193,11 @@ func sepOrEmpty(sep []*cst.Token) []*cst.Token {
 	return sep
 }
 
-// resolveBlockSeq is upstream's: a block sequence token's items composed into a sequence.
+// resolveBlockSequence is upstream's: a block sequence token's items composed into a sequence.
 //
 // Mutates: composition the shared context, whose atRoot and atKey the sequence clears before composing
 // its items, as upstream clears its ComposeContext's
-func resolveBlockSeq(composition *composeContext, bs *cst.Token, onError onErrorFunc, tag *Tag) *Node {
+func resolveBlockSequence(composition *composeContext, bs *cst.Token, onError onErrorFunc, tag *Tag) *Node {
 	seq := composition.newCollection(nodeClass(tag, "YAMLSeq"))
 	if composition.atRoot {
 		composition.atRoot = false
@@ -209,7 +209,7 @@ func resolveBlockSeq(composition *composeContext, bs *cst.Token, onError onError
 	commentEnd, commentEndSet := 0, false
 	for _, item := range bs.Items {
 		start, value := item.Start, item.Value
-		properties := resolveProps(start, resolvePropsOptions{
+		properties := resolveProperties(start, resolvePropsOptions{
 			indicator:      "seq-item-ind",
 			next:           value,
 			offset:         offset,
@@ -254,7 +254,7 @@ func resolveBlockSeq(composition *composeContext, bs *cst.Token, onError onError
 	return seq
 }
 
-const blockMsg = "Block collections are not allowed within flow collections"
+const blockMessage = "Block collections are not allowed within flow collections"
 
 func isBlock(token *cst.Token) bool {
 	return token != nil && (token.Type == "block-map" || token.Type == "block-seq")
@@ -270,7 +270,7 @@ type typeError string
 // Mutates: composition the shared context, whose atRoot and atKey the collection switches as composing
 // descends into its keys and values, as upstream switches its ComposeContext
 func resolveFlowCollection(composition *composeContext, fc *cst.Token, onError onErrorFunc, tag *Tag) *Node {
-	isMap := equalsASCII(fc.FlowStart.Source, "{")
+	isMap := equalsAscii(fc.FlowStart.Source, "{")
 	fcName := "flow sequence"
 	fallback := "YAMLSeq"
 	if isMap {
@@ -290,7 +290,7 @@ func resolveFlowCollection(composition *composeContext, fc *cst.Token, onError o
 	for index := 0; index < len(fc.Items); index++ {
 		collItem := fc.Items[index]
 		start, key, sep, value := collItem.Start, collItem.Key, collItem.Sep, collItem.Value
-		properties := resolveProps(start, resolvePropsOptions{
+		properties := resolveProperties(start, resolvePropsOptions{
 			flow:           fcName,
 			indicator:      "explicit-key-ind",
 			next:           keyOrFirstSep(key, sep),
@@ -377,7 +377,7 @@ func resolveFlowCollection(composition *composeContext, fc *cst.Token, onError o
 			coll.Items = append(coll.Items, valueNode)
 			offset = valueNode.Range[2]
 			if isBlock(value) {
-				onError(errorRange(valueNode.Range), "BLOCK_IN_FLOW", blockMsg, false)
+				onError(errorRange(valueNode.Range), "BLOCK_IN_FLOW", blockMessage, false)
 			}
 		} else {
 			// item is a key+value pair
@@ -391,11 +391,11 @@ func resolveFlowCollection(composition *composeContext, fc *cst.Token, onError o
 				keyNode = composeEmptyNode(composition, keyStart, start, properties, onError)
 			}
 			if isBlock(key) {
-				onError(errorRange(keyNode.Range), "BLOCK_IN_FLOW", blockMsg, false)
+				onError(errorRange(keyNode.Range), "BLOCK_IN_FLOW", blockMessage, false)
 			}
 			composition.atKey = false
 			// value properties
-			valueProperties := resolveProps(sepOrEmpty(sep), resolvePropsOptions{
+			valueProperties := resolveProperties(sepOrEmpty(sep), resolvePropsOptions{
 				flow:           fcName,
 				indicator:      "map-value-ind",
 				next:           value,
@@ -450,7 +450,7 @@ func resolveFlowCollection(composition *composeContext, fc *cst.Token, onError o
 			}
 			if valueNode != nil {
 				if isBlock(value) {
-					onError(errorRange(valueNode.Range), "BLOCK_IN_FLOW", blockMsg, false)
+					onError(errorRange(valueNode.Range), "BLOCK_IN_FLOW", blockMessage, false)
 				}
 			} else if valueProperties.comment != "" {
 				if keyNode.Comment != "" {
@@ -461,7 +461,7 @@ func resolveFlowCollection(composition *composeContext, fc *cst.Token, onError o
 			}
 			pair := composition.newPair(keyNode, valueNode)
 			if composition.options.KeepSourceTokens {
-				pair.SrcItem = collItem
+				pair.SourceItem = collItem
 			}
 			if isMap {
 				if mapIncludes(composition, coll.Items, keyNode) {
@@ -498,7 +498,7 @@ func resolveFlowCollection(composition *composeContext, fc *cst.Token, onError o
 		ee = append(ee, fc.End[1:]...)
 	}
 	cePosition := offset
-	if ce != nil && equalsASCII(ce.Source, expectedEnd) {
+	if ce != nil && equalsAscii(ce.Source, expectedEnd) {
 		cePosition = ce.Offset + len(ce.Source)
 	} else {
 		name := strings.ToUpper(fcName[:1]) + fcName[1:]

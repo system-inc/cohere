@@ -36,18 +36,19 @@ func TestOneWorkerHandsEveryFileItsOwnRuleState(test *testing.T) {
 		"c.ts": "// a plain comment, the length of a.ts's directive, nothing else at all\n" +
 			declarations,
 	})
-	graph, err := program.Build(
+	graph, buildError := program.Build(
 		program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory, SingleThreaded: true},
 	)
-	if err != nil {
-		test.Fatalf("building: %v", err)
+	if buildError != nil {
+		test.Fatalf("building: %v", buildError)
 	}
 	if graph.Workers() != 1 {
 		test.Fatalf("the walk has %d workers, so files need not meet each other's leftovers", graph.Workers())
 	}
-	graph.LintConfig, err = configuration.Load(filepath.Join(directory, "CohereSettings.json"))
-	if err != nil {
-		test.Fatalf("loading the config: %v", err)
+	var loadError error
+	graph.LintConfig, loadError = configuration.Load(filepath.Join(directory, "CohereSettings.json"))
+	if loadError != nil {
+		test.Fatalf("loading the config: %v", loadError)
 	}
 
 	isA := func(ruleContext rule.Context) bool {
@@ -99,13 +100,13 @@ func TestOneWorkerHandsEveryFileItsOwnRuleState(test *testing.T) {
 		},
 	}
 
-	result, err := graph.Walk(
+	result, walkError := graph.Walk(
 		context.Background(),
 		graph.ProjectFiles(),
 		rule_testing.EntriesOf(test, runCrashes, listenerCrashes, functionsOnlyInA, notes),
 	)
-	if err != nil {
-		test.Fatalf("walking: %v", err)
+	if walkError != nil {
+		test.Fatalf("walking: %v", walkError)
 	}
 
 	reported := map[string][]string{}

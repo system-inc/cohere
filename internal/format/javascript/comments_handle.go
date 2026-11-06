@@ -51,7 +51,7 @@ func handleOwnLineComment(context *commentContext) bool {
 		handleLabeledStatementComments,
 		handleNestedConditionalExpressionComments,
 		handleCommentsInDestructuringPattern,
-		handleTSMappedTypeComments,
+		handleTsMappedTypeComments,
 		handleBinaryCastExpressionComment,
 		handleUnionTypeLeadingComments,
 	)
@@ -79,7 +79,7 @@ func handleEndOfLineComment(context *commentContext) bool {
 		handleSwitchDefaultCaseComments,
 		handleLastUnionElementInExpression,
 		handleLastBinaryOperatorOperand,
-		handleTSMappedTypeComments,
+		handleTsMappedTypeComments,
 		handleArrowExpressionComments,
 		handleParenthesizedExpressionTrailingComment,
 		handlePropertySignatureComments,
@@ -99,10 +99,10 @@ func handleRemainingComment(context *commentContext) bool {
 		handleMethodNameComments,
 		handleOnlyComments,
 		handleAssignmentLikeComments,
-		handleTSMappedTypeComments,
-		handleCommentAfterArrowParams,
+		handleTsMappedTypeComments,
+		handleCommentAfterArrowParameters,
 		handleFunctionNameComments,
-		handleTSFunctionTrailingComments,
+		handleTsFunctionTrailingComments,
 		handleParenthesizedExpressionTrailingComment,
 		handleBinaryCastExpressionComment,
 		handleUnionTypeLeadingComments,
@@ -326,8 +326,8 @@ func handleFunctionNameComments(context *commentContext) bool {
 	return false
 }
 
-// handleCommentAfterArrowParams is upstream's handleCommentAfterArrowParams.
-func handleCommentAfterArrowParams(context *commentContext) bool {
+// handleCommentAfterArrowParameters is upstream's handleCommentAfterArrowParameters.
+func handleCommentAfterArrowParameters(context *commentContext) bool {
 	comment, enclosingNode, text := context.Comment, context.Enclosing, context.Text
 	if !enclosingNode.Is("ArrowFunctionExpression") {
 		return false

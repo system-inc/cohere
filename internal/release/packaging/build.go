@@ -265,9 +265,9 @@ func buildPlatformPackage(options Options, target Target, pin compilerPin, goToo
 		return StagedPackage{}, compileError
 	}
 
-	size, err := cohereBinary(binaryPath, target)
-	if err != nil {
-		return StagedPackage{}, err
+	size, cohereBinaryError := cohereBinary(binaryPath, target)
+	if cohereBinaryError != nil {
+		return StagedPackage{}, cohereBinaryError
 	}
 
 	// The Swift engine, beside cohere in the same bin/, on the platforms that ship it. A released cohere
@@ -277,9 +277,10 @@ func buildPlatformPackage(options Options, target Target, pin compilerPin, goToo
 	enginePath := filepath.Join(directory, "bin", SwiftEngineFileName)
 	engineCommit := ""
 	if ShipsSwiftEngine(target.GoOperatingSystem) {
-		engineCommit, err = readReleaseCommit(options.ModuleDirectory)
-		if err != nil {
-			return StagedPackage{}, err
+		var readReleaseCommitError error
+		engineCommit, readReleaseCommitError = readReleaseCommit(options.ModuleDirectory)
+		if readReleaseCommitError != nil {
+			return StagedPackage{}, readReleaseCommitError
 		}
 		if buildSwiftEngineError := buildSwiftEngine(
 			options.ModuleDirectory,
@@ -296,7 +297,7 @@ func buildPlatformPackage(options Options, target Target, pin compilerPin, goToo
 	// Signed before the manifest is written, so a signing failure leaves an obviously incomplete
 	// package rather than one that looks finished. Only macOS is signed: Linux and Windows have no
 	// equivalent gate on an npm-installed binary.
-	if target.IsMacOS() && options.Signing.IsConfigured() {
+	if target.IsMacOs() && options.Signing.IsConfigured() {
 		for _, executable := range executables {
 			if signError := Sign(executable, options.Signing); signError != nil {
 				return StagedPackage{}, signError
@@ -306,7 +307,7 @@ func buildPlatformPackage(options Options, target Target, pin compilerPin, goToo
 
 	// Each signed executable goes to Apple and must come back Accepted, before anything checks or packs
 	// it, so a binary the notary service refused never reaches a package.
-	if target.IsMacOS() && options.Signing.CanNotarize() {
+	if target.IsMacOs() && options.Signing.CanNotarize() {
 		for _, executable := range executables {
 			if notarizeError := Notarize(executable, options.Signing, options.Progress); notarizeError != nil {
 				return StagedPackage{}, notarizeError
@@ -325,9 +326,9 @@ func buildPlatformPackage(options Options, target Target, pin compilerPin, goToo
 		}
 	}
 
-	manifest, err := PlatformManifest(target, options.Version)
-	if err != nil {
-		return StagedPackage{}, err
+	manifest, platformManifestError := PlatformManifest(target, options.Version)
+	if platformManifestError != nil {
+		return StagedPackage{}, platformManifestError
 	}
 	if writeError := os.WriteFile(filepath.Join(directory, "package.json"), manifest, 0o644); writeError != nil {
 		return StagedPackage{}, fmt.Errorf("writing the package manifest: %w", writeError)

@@ -170,7 +170,7 @@ func Load(configuration Config, patterns ...string) (*Loaded, error) {
 			)
 		}
 		for _, name := range names {
-			sourceFiles[filepath.Join(listedPackage.Dir, name)] = true
+			sourceFiles[filepath.Join(listedPackage.Directory, name)] = true
 		}
 		if len(listedPackage.CgoFiles) > 0 {
 			return nil, fmt.Errorf(
@@ -230,7 +230,7 @@ func Parse(configuration Config, patterns ...string) ([]*Package, error) {
 			)
 		}
 		for _, name := range listedPackage.GoFiles {
-			sourceFiles[filepath.Join(listedPackage.Dir, name)] = true
+			sourceFiles[filepath.Join(listedPackage.Directory, name)] = true
 		}
 		read := &Package{ImportPath: listedPackage.ImportPath, Name: listedPackage.Name, Fset: fileSet}
 		reader.parse(listedPackage, listedPackage.GoFiles, true, read)
@@ -525,7 +525,7 @@ func (loader *loader) parse(listedPackage *listedPackage, names []string, withLi
 		}
 	}
 	for _, name := range names {
-		path := filepath.Join(listedPackage.Dir, name)
+		path := filepath.Join(listedPackage.Directory, name)
 		mode := parser.AllErrors | parser.ParseComments
 		var file *ast.File
 		var parseFileError error

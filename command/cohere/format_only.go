@@ -77,7 +77,7 @@ func printUnchecked(out *bufio.Writer, unchecked []uncheckedFile) {
 				runFinding{
 					Severity:  "error",
 					Rule:      "format",
-					MessageID: "unchecked",
+					MessageId: "unchecked",
 					Message:   "the formatter could not check this run: " + file.Reason,
 				},
 				fmt.Sprintf("cohere: the formatter could not check this run: %s [format/unchecked]\n", file.Reason))
@@ -90,7 +90,7 @@ func printUnchecked(out *bufio.Writer, unchecked []uncheckedFile) {
 				Column:    1,
 				Severity:  "error",
 				Rule:      "format",
-				MessageID: "unchecked",
+				MessageId: "unchecked",
 				Message:   "the formatter could not check this file: " + file.Reason,
 			},
 			fmt.Sprintf(

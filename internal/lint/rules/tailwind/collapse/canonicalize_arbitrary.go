@@ -399,10 +399,10 @@ func (canonicalizer *Canonicalizer) isDroppedNegativeZero(className string, sign
 	return state == SignatureExact && positive == signature
 }
 
-// themeToVarUtilityGuard stands where upstream's themeToVarUtility runs. That pass rewrites a legacy
+// themeToVariableUtilityGuard stands where upstream's themeToVarUtility runs. That pass rewrites a legacy
 // `theme()` call in an arbitrary value to `var()`, and is not ported, so a value holding one stops the
 // passes rather than reaching the ones after it in a form upstream's never have.
-func (canonicalizer *Canonicalizer) themeToVarUtilityGuard(candidate ParsedCandidate) (ParsedCandidate, bool) {
+func (canonicalizer *Canonicalizer) themeToVariableUtilityGuard(candidate ParsedCandidate) (ParsedCandidate, bool) {
 	value, isArbitrary := arbitraryValueOf(candidate)
 	if !isArbitrary {
 		return candidate, true

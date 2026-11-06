@@ -352,10 +352,10 @@ func (shape poolShape) widened(tokens int) poolShape {
 func waitInLine(directory string, slots int, what string, noun string, explain func()) (*heldSlot, error) {
 	// In line, in arrival order, where a lock holds; see queueTicket.
 	var ticket *queueTicket
-	var err error
+	var joinQueueError error
 	if filesLock {
-		if ticket, err = joinQueue(directory); err != nil {
-			return nil, fmt.Errorf("joining the line for a %s: %w", noun, err)
+		if ticket, joinQueueError = joinQueue(directory); joinQueueError != nil {
+			return nil, fmt.Errorf("joining the line for a %s: %w", noun, joinQueueError)
 		}
 		// Left as soon as a slot is taken, so the next in line moves up while this one runs; this covers
 		// every way out before that.
@@ -376,8 +376,9 @@ func waitInLine(directory string, slots int, what string, noun string, explain f
 	for {
 		ahead, waiting := 0, 0
 		if ticket != nil {
-			if ahead, waiting, err = ticket.place(); err != nil {
-				return nil, fmt.Errorf("reading the line for a %s: %w", noun, err)
+			var placeError error
+			if ahead, waiting, placeError = ticket.place(); placeError != nil {
+				return nil, fmt.Errorf("reading the line for a %s: %w", noun, placeError)
 			}
 		}
 		// Only the first in line, as many as there are slots, may take one, so no later arrival passes them.

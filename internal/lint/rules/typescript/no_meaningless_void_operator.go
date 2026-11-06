@@ -140,7 +140,7 @@ var NoMeaninglessVoidOperator = rule.Rule[NoMeaninglessVoidOperatorOptions]{
 		// everyConstituentHasFlag is upstream's `unionConstituents(...).every(isTypeFlagSet(...))`.
 		// A non-union is its own single constituent, so this reads the same for both shapes.
 		everyConstituentHasFlag := func(argumentType *checker.Type, flags checker.TypeFlags) bool {
-			for constituent := range type_checking.UnionTypePartsSeq(argumentType) {
+			for constituent := range type_checking.UnionTypePartsSequence(argumentType) {
 				if !type_checking.IsTypeFlagSet(constituent, flags) {
 					return false
 				}

@@ -350,7 +350,7 @@ func consistentReturnUnionFlagSet(subject *checker.Type, flags checker.TypeFlags
 		return false
 	}
 	var combined checker.TypeFlags
-	for part := range type_checking.UnionTypePartsSeq(subject) {
+	for part := range type_checking.UnionTypePartsSequence(subject) {
 		if part == nil {
 			continue
 		}

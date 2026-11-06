@@ -39,7 +39,7 @@ func TestFindLastUsageRecordsTheHighestOrder(test *testing.T) {
 	}
 
 	usage := FindLastUsage(tree, function)
-	if usage.Len() == 0 {
+	if usage.Length() == 0 {
 		test.Fatal("no declaration was recorded, so every assertion below is vacuous")
 	}
 

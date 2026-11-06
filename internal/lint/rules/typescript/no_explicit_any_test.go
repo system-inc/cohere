@@ -321,7 +321,7 @@ func TestNoExplicitAnyIgnoreRestArgsStaysSilent(test *testing.T) {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoExplicitAny, explicitAnyFile,
-				testCase.sourceText, NoExplicitAnyOptions{IgnoreRestArgs: true}))
+				testCase.sourceText, NoExplicitAnyOptions{IgnoreRestArguments: true}))
 		})
 	}
 }
@@ -536,18 +536,18 @@ func TestNoExplicitAnyFixToUnknownRewritesTheKeyword(test *testing.T) {
 	}
 }
 
-// TestNoExplicitAnyFixToUnknownDoesNotDefeatIgnoreRestArgs runs both flags together.
+// TestNoExplicitAnyFixToUnknownDoesNotDefeatIgnoreRestArguments runs both flags together.
 //
 // Upstream notes at the bottom of its fix vectors that it has no way to test this combination,
 // because its harness panics when an expected fix does not occur. Ours does not have that
 // limitation, so the case upstream could not write is written here: an exempt `any` must produce no
 // finding and therefore no repair, while a reportable one in the same file is still rewritten.
-func TestNoExplicitAnyFixToUnknownDoesNotDefeatIgnoreRestArgs(test *testing.T) {
+func TestNoExplicitAnyFixToUnknownDoesNotDefeatIgnoreRestArguments(test *testing.T) {
 	test.Parallel()
 
 	result := rule_testing.RunWithOptions(test, NoExplicitAny, explicitAnyFile,
 		"function foo(a: any, ...rest: any[]): void {}",
-		NoExplicitAnyOptions{FixToUnknown: true, IgnoreRestArgs: true})
+		NoExplicitAnyOptions{FixToUnknown: true, IgnoreRestArguments: true})
 	rule_testing.ExpectFindings(test, result, "unexpectedAny")
 	rule_testing.ExpectFixedSource(test, result, "function foo(a: unknown, ...rest: any[]): void {}")
 }
@@ -645,7 +645,7 @@ func TestNoExplicitAnyIgnoreRestArgsExemptsByContainmentNotByShape(test *testing
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			result := rule_testing.RunWithOptions(test, NoExplicitAny, explicitAnyFile, testCase.sourceText,
-				NoExplicitAnyOptions{IgnoreRestArgs: true})
+				NoExplicitAnyOptions{IgnoreRestArguments: true})
 			if len(testCase.wantIds) == 0 {
 				rule_testing.ExpectClean(test, result)
 				return

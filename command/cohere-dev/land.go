@@ -407,7 +407,7 @@ func gate(worktree string, commit string) int {
 		if runError := vet.Run(); runError != nil {
 			return exitCodeOf(runError)
 		}
-		if code := checkRuleCPU(
+		if code := checkRuleCpu(
 			worktree,
 			func() []string { return gateEnvironment(step("the rule CPU budget check")) },
 		); code != 0 {
@@ -433,21 +433,21 @@ func gate(worktree string, commit string) int {
 	})
 }
 
-// ruleCPUCheck is the repository-local, generated stress corpus and its budget test.
-const ruleCPUCheck = "./internal/lint/registry/rule_budget_test.go"
+// ruleCpuCheck is the repository-local, generated stress corpus and its budget test.
+const ruleCpuCheck = "./internal/lint/registry/rule_budget_test.go"
 
 // docsDataGenerator is the repository's generator of the website's data, relative to its root.
 const docsDataGenerator = "./internal/docsdata/tools/generate"
 
-// checkRuleCPU runs uncached on each land attempt, before tests and fast-forward.
+// checkRuleCpu runs uncached on each land attempt, before tests and fast-forward.
 // Repositories without this cohere-specific check say so, like the docs data check.
-func checkRuleCPU(worktree string, environment func() []string) int {
-	if _, statError := os.Stat(filepath.Join(worktree, ruleCPUCheck)); statError != nil {
+func checkRuleCpu(worktree string, environment func() []string) int {
+	if _, statError := os.Stat(filepath.Join(worktree, ruleCpuCheck)); statError != nil {
 		if !os.IsNotExist(statError) {
 			fmt.Fprintf(streams.Errors, "cohere-dev: reading the rule CPU check: %v\n", statError)
 			return 1
 		}
-		fmt.Fprintf(streams.Errors, "cohere-dev: no %s here, so no rule CPU budget to check\n", ruleCPUCheck)
+		fmt.Fprintf(streams.Errors, "cohere-dev: no %s here, so no rule CPU budget to check\n", ruleCpuCheck)
 		return 0
 	}
 	started := time.Now()
@@ -460,7 +460,7 @@ func checkRuleCPU(worktree string, environment func() []string) int {
 		"-timeout=30s",
 		"-run=^TestRegisteredRuleCPUBudget$",
 		"-v",
-		"./"+filepath.ToSlash(filepath.Dir(ruleCPUCheck)),
+		"./"+filepath.ToSlash(filepath.Dir(ruleCpuCheck)),
 	)
 	check.Dir, check.Env = worktree, environment()
 	check.Stdout, check.Stderr = os.Stdout, os.Stderr

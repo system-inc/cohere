@@ -127,9 +127,9 @@ type DesignSystemLocation struct {
 	// Anchor is upstream's `ctx.cwd`, the directory ESLint runs from, which is the config file's
 	// directory here. Empty means the project root.
 	Anchor string
-	// Cwd is upstream's `cwd`, as written: where Tailwind and the stylesheet are looked for from,
+	// WorkingDirectory is upstream's `cwd`, as written: where Tailwind and the stylesheet are looked for from,
 	// relative to Anchor when relative.
-	Cwd string
+	WorkingDirectory string
 	// ConfigPath is upstream's `entryPoint ?? tailwindConfig`, as written.
 	ConfigPath string
 	// Tsconfig is upstream's `tsconfig`, as written. It never chooses the stylesheet, only how its
@@ -139,7 +139,7 @@ type DesignSystemLocation struct {
 
 // isDefault reports whether no option named a location, so the project's own stylesheet is used.
 func (location DesignSystemLocation) isDefault() bool {
-	return location.Cwd == "" && location.ConfigPath == ""
+	return location.WorkingDirectory == "" && location.ConfigPath == ""
 }
 
 // DesignSystemForProgram returns this run's design system, building it at most once.
@@ -201,7 +201,7 @@ func loadDesignSystemForProgram(program rule.Program, location DesignSystemLocat
 // loadDesignSystemThrough is the load itself, asking fileSystem every question about the disk.
 func loadDesignSystemThrough(
 	program rule.Program,
-	fileSystem *rule.RecordingFS,
+	fileSystem *rule.RecordingFileSystem,
 	location DesignSystemLocation,
 ) DesignSystemResult {
 	projectRoot := projectRootOf(program)

@@ -257,13 +257,13 @@ func describe(node *Node) treeObject {
 		description["identifier"] = treeString(node.Identifier)
 		optional("label", node.Label)
 		optional("title", node.Title)
-		description["url"] = treeString(node.URL)
+		description["url"] = treeString(node.Url)
 	case "link":
 		optional("title", node.Title)
-		description["url"] = treeString(node.URL)
+		description["url"] = treeString(node.Url)
 	case "image":
 		optional("title", node.Title)
-		description["url"] = treeString(node.URL)
+		description["url"] = treeString(node.Url)
 		optional("alt", node.Alt)
 	case "linkReference":
 		description["identifier"] = treeString(node.Identifier)

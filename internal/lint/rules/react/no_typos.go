@@ -123,9 +123,9 @@ var NoTypos = rule.Rule[rule.NoOptions]{
 type noTyposState struct {
 	ctx rule.Context
 
-	// propTypesPackageName is the local name `prop-types` was imported under, or the name a
+	// propertyTypesPackageName is the local name `prop-types` was imported under, or the name a
 	// `PropTypes` specifier from `react` was bound to.
-	propTypesPackageName string
+	propertyTypesPackageName string
 
 	// reactPackageName is the local name `react` was imported under.
 	reactPackageName string
@@ -189,7 +189,7 @@ func (state *noTyposState) recordImport(node *ast.Node) {
 			})
 			return
 		}
-		state.propTypesPackageName = specifiers[0].localName
+		state.propertyTypesPackageName = specifiers[0].localName
 
 	case "react":
 		if len(specifiers) == 0 {
@@ -206,7 +206,7 @@ func (state *noTyposState) recordImport(node *ast.Node) {
 		// pre-15.5 spelling `import { PropTypes } from 'react'`.
 		for _, specifier := range specifiers {
 			if specifier.importedName == "PropTypes" {
-				state.propTypesPackageName = specifier.localName
+				state.propertyTypesPackageName = specifier.localName
 			}
 		}
 	}
@@ -677,17 +677,17 @@ func (state *noTyposState) checkPropObject(node *ast.Node) {
 		return
 	}
 	for _, property := range properties.Nodes {
-		state.checkProp(noTyposPropertyValue(property))
+		state.checkProperty(noTyposPropertyValue(property))
 	}
 }
 
-// checkProp answers upstream's `checkValidProp`, including its recursion through shape and oneOfType.
+// checkProperty answers upstream's `checkValidProp`, including its recursion through shape and oneOfType.
 //
 // The leading guard is upstream's and it is load-bearing: with neither package name known, every
 // prop-type arm is silent, so a file that imports nothing produces no typo findings however
 // misspelled it is.
-func (state *noTyposState) checkProp(node *ast.Node) {
-	if state.propTypesPackageName == "" && state.reactPackageName == "" {
+func (state *noTyposState) checkProperty(node *ast.Node) {
+	if state.propertyTypesPackageName == "" && state.reactPackageName == "" {
 		return
 	}
 	if node == nil {
@@ -765,7 +765,7 @@ func (state *noTyposState) checkPropCall(node *ast.Node) {
 			return
 		}
 		for _, element := range elements.Nodes {
-			state.checkProp(element)
+			state.checkProperty(element)
 		}
 	}
 }
@@ -778,7 +778,7 @@ func (state *noTyposState) isPropTypesPackage(node *ast.Node) bool {
 		return false
 	}
 	if node.Kind == ast.KindIdentifier {
-		return state.propTypesPackageName != "" && node.Text() == state.propTypesPackageName
+		return state.propertyTypesPackageName != "" && node.Text() == state.propertyTypesPackageName
 	}
 	if node.Kind == ast.KindPropertyAccessExpression {
 		access := node.AsPropertyAccessExpression()

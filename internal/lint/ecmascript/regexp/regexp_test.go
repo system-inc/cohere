@@ -11,8 +11,8 @@ import (
 // answers in JavaScript.
 func TestTest(test *testing.T) {
 	test.Parallel()
-	const LS = "\u2028"
-	const PS = "\u2029"
+	const lineSeparator = "\u2028"
+	const paragraphSeparator = "\u2029"
 
 	tests := []struct {
 		name    string
@@ -24,10 +24,10 @@ func TestTest(test *testing.T) {
 		// ---- `.` stops at every line terminator, not just `\n` ----
 		{name: "dot vs LF", source: "^.$", subject: "\n"},
 		{name: "dot vs CR", source: "^.$", subject: "\r"},
-		{name: "dot vs LS", source: "^.$", subject: LS},
-		{name: "dot vs PS", source: "^.$", subject: PS},
+		{name: "dot vs LS", source: "^.$", subject: lineSeparator},
+		{name: "dot vs PS", source: "^.$", subject: paragraphSeparator},
 		{name: "dot vs letter", source: "^.$", subject: "a", want: true},
-		{name: "dotAll vs LS", source: "^.$", flags: "s", subject: LS, want: true},
+		{name: "dotAll vs LS", source: "^.$", flags: "s", subject: lineSeparator, want: true},
 		{name: "dotAll vs LF", source: "^.$", flags: "s", subject: "\n", want: true},
 
 		// ---- anchors without `m` mean the very ends ----
@@ -38,11 +38,11 @@ func TestTest(test *testing.T) {
 		// ---- anchors with `m` break on all four terminators ----
 		{name: "m start after LF", source: "^b", flags: "m", subject: "a\nb", want: true},
 		{name: "m start after CR", source: "^b", flags: "m", subject: "a\rb", want: true},
-		{name: "m start after LS", source: "^b", flags: "m", subject: "a" + LS + "b", want: true},
-		{name: "m start after PS", source: "^b", flags: "m", subject: "a" + PS + "b", want: true},
+		{name: "m start after LS", source: "^b", flags: "m", subject: "a" + lineSeparator + "b", want: true},
+		{name: "m start after PS", source: "^b", flags: "m", subject: "a" + paragraphSeparator + "b", want: true},
 		{name: "m start mid-word", source: "^b", flags: "m", subject: "ab"},
 		{name: "m end before CR", source: "a$", flags: "m", subject: "a\rb", want: true},
-		{name: "m end before LS", source: "a$", flags: "m", subject: "a" + LS + "b", want: true},
+		{name: "m end before LS", source: "a$", flags: "m", subject: "a" + lineSeparator + "b", want: true},
 		{name: "m end mid-word", source: "a$", flags: "m", subject: "ab"},
 
 		// ---- `i` compares the way JavaScript compares ----

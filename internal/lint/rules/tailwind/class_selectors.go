@@ -191,16 +191,16 @@ func (legacy LegacySelector) selector(kind SelectorKind) Selector {
 	return selector
 }
 
-// defaultSelectorsJSON is upstream 4.7.0's DEFAULT_SELECTORS, written by
+// defaultSelectorsJson is upstream 4.7.0's DEFAULT_SELECTORS, written by
 // tools/generate_class_literals from the installed package, never by hand.
 //
 //go:embed default_selectors.json
-var defaultSelectorsJSON []byte
+var defaultSelectorsJson []byte
 
 // DefaultSelectors is upstream's default selectors, decoded once.
 var DefaultSelectors = sync.OnceValue(func() []Selector {
 	var selectors []Selector
-	decoder := json.NewDecoder(bytes.NewReader(defaultSelectorsJSON))
+	decoder := json.NewDecoder(bytes.NewReader(defaultSelectorsJson))
 	decoder.DisallowUnknownFields()
 	if decodeError := decoder.Decode(&selectors); decodeError != nil {
 		// Invariant: default_selectors.json is embedded at build time, and every test that reads the default

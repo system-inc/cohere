@@ -433,9 +433,9 @@ func copyFixture(test *testing.T, fixture string) string {
 		test.Fatalf("resolving the temporary directory: %v", resolveError)
 	}
 	root := filepath.Join(base, "project")
-	walkError := filepath.WalkDir(fixture, func(path string, entry fs.DirEntry, walkError error) error {
-		if walkError != nil {
-			return walkError
+	walkError := filepath.WalkDir(fixture, func(path string, entry fs.DirEntry, pathError error) error {
+		if pathError != nil {
+			return pathError
 		}
 		relative, relativeError := filepath.Rel(fixture, path)
 		if relativeError != nil {

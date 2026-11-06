@@ -49,7 +49,7 @@ const (
 	DataTypeRatio          DataType = "ratio"
 	DataTypeNumber         DataType = "number"
 	DataTypeInteger        DataType = "integer"
-	DataTypeURL            DataType = "url"
+	DataTypeUrl            DataType = "url"
 	DataTypePosition       DataType = "position"
 	DataTypeBackgroundSize DataType = "bg-size"
 	DataTypeLineWidth      DataType = "line-width"
@@ -76,7 +76,7 @@ func AllDataTypes() []DataType {
 		DataTypeRatio,
 		DataTypeNumber,
 		DataTypeInteger,
-		DataTypeURL,
+		DataTypeUrl,
 		DataTypePosition,
 		DataTypeBackgroundSize,
 		DataTypeLineWidth,
@@ -129,8 +129,8 @@ func matchesDataType(value string, dataType DataType) bool {
 		return isNumber(value)
 	case DataTypeInteger:
 		return IsPositiveInteger(value)
-	case DataTypeURL:
-		return isURL(value)
+	case DataTypeUrl:
+		return isUrl(value)
 	case DataTypePosition:
 		return isBackgroundPosition(value)
 	case DataTypeBackgroundSize:
@@ -157,12 +157,12 @@ func matchesDataType(value string, dataType DataType) bool {
 
 /* -------------------------------------------------------------------------- */
 
-// isURL ports `IS_URL = /^url\(.*\)$/`.
+// isUrl ports `IS_URL = /^url\(.*\)$/`.
 //
 // `.` in JavaScript regexps without the `s` flag does not match a newline, so a value containing one
 // between the parens is not a url to the engine even though the string plainly starts with `url(`
 // and ends with `)`. Reproduced rather than tidied, because "the obvious reading" is how ports drift.
-func isURL(value string) bool {
+func isUrl(value string) bool {
 	if !strings.HasPrefix(value, "url(") || !strings.HasSuffix(value, ")") {
 		return false
 	}
@@ -224,7 +224,7 @@ func isImage(value string) bool {
 		if strings.HasPrefix(part, "var(") {
 			continue
 		}
-		if isURL(part) {
+		if isUrl(part) {
 			count++
 			continue
 		}

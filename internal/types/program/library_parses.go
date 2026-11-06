@@ -64,8 +64,8 @@ func NewLibraryParses() *LibraryParses {
 	return &LibraryParses{entries: map[libraryParseKey]*libraryParse{}, hashes: map[string][sha256.Size]byte{}}
 }
 
-// Len is how many distinct parses the cache holds.
-func (parses *LibraryParses) Len() int {
+// Length is how many distinct parses the cache holds.
+func (parses *LibraryParses) Length() int {
 	parses.mutex.Lock()
 	defer parses.mutex.Unlock()
 	return len(parses.entries)

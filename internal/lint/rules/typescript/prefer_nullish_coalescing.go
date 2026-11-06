@@ -540,7 +540,7 @@ func preferNullishCoalescingTypeEligible(ruleContext rule.Context, subject *chec
 		return false
 	}
 
-	for part := range type_checking.UnionTypePartsSeq(subject) {
+	for part := range type_checking.UnionTypePartsSequence(subject) {
 		for _, intersected := range type_checking.IntersectionTypeParts(part) {
 			if type_checking.IsTypeFlagSet(intersected, ignorable) {
 				return false
@@ -572,7 +572,7 @@ func preferNullishCoalescingUnionFlagSet(subject *checker.Type, flags checker.Ty
 		return false
 	}
 	var combined checker.TypeFlags
-	for part := range type_checking.UnionTypePartsSeq(subject) {
+	for part := range type_checking.UnionTypePartsSequence(subject) {
 		if part != nil {
 			combined |= checker.Type_flags(part)
 		}

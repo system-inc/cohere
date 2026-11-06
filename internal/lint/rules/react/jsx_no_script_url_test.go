@@ -334,7 +334,7 @@ func TestDecodeJsxNoScriptUrlOptions(test *testing.T) {
 		if len(decoded.Legacy) != 1 || decoded.Legacy[0].Name != "Foo" {
 			test.Fatalf("legacy list is %v, want one entry named Foo", decoded.Legacy)
 		}
-		if got := strings.Join(decoded.Legacy[0].Props, ","); got != "to,href" {
+		if got := strings.Join(decoded.Legacy[0].Properties, ","); got != "to,href" {
 			test.Fatalf("props are %q, want %q", got, "to,href")
 		}
 	})

@@ -94,7 +94,7 @@ func tokenizeListStart(self *Self, effects *Effects, ok State, nok State) State 
 		// `asciiDigit(code) && ++size < 10`: the increment only happens on a digit.
 		if asciiDigit(code) {
 			size++
-			if size < listItemValueSizeMax {
+			if size < listItemValueSizeMaximum {
 				effects.Consume(code)
 				return inside
 			}

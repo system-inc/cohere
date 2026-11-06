@@ -298,7 +298,7 @@ func (walk *jsxNoConstructedContextValuesStabilityWalk) isPrimitive(node *ast.No
 		checker.TypeFlagsBigIntLike | checker.TypeFlagsBooleanLike | checker.TypeFlagsEnumLike |
 		checker.TypeFlagsESSymbolLike | checker.TypeFlagsNull | checker.TypeFlagsUndefined |
 		checker.TypeFlagsVoid
-	for part := range type_checking.UnionTypePartsSeq(subjectType) {
+	for part := range type_checking.UnionTypePartsSequence(subjectType) {
 		if !type_checking.IsTypeFlagSet(part, primitive) {
 			return false
 		}

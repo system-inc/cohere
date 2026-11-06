@@ -272,7 +272,7 @@ func TestPreserveCaughtErrorMessagesSayDifferentThings(test *testing.T) {
 	messages := map[string]rule.Message{
 		"missingCause":           messageMissingCause,
 		"incorrectCause":         messageIncorrectCause,
-		"missingCatchErrorParam": messageMissingCatchErrorParam,
+		"missingCatchErrorParam": messageMissingCatchErrorParameter,
 		"partiallyLostError":     messagePartiallyLostError,
 		"caughtErrorShadowed":    messageCaughtErrorShadowed,
 		"includeCause":           messageIncludeCause,

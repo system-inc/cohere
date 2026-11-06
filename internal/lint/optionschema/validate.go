@@ -374,8 +374,9 @@ func (compiler *compiler) keyword(compiled *node, key string, value JsonValue, p
 		}
 	case "items":
 		if _, isList := value.(JsonArray); isList {
-			compiled.tupleItems, err = children(key, value)
-			return err
+			var childrenError error
+			compiled.tupleItems, childrenError = children(key, value)
+			return childrenError
 		}
 		compiled.items, err = child(key, value)
 	case "additionalItems":

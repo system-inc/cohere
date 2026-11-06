@@ -17,14 +17,15 @@ func printCallExpression(path *Path, options *Options, print PrintFunc) Doc {
 	isNewExpression := current.Is("NewExpression")
 
 	optional := printOptionalToken(path)
-	args := getCallArguments(current)
+	arguments := getCallArguments(current)
 	// `TSImportType.typeArguments` is after `qualifier`, not before the "arguments"
 	var typeArgumentsDoc Doc = emptyDoc
 	if !current.Is("TSImportType") && current.Child("typeArguments") != nil {
 		typeArgumentsDoc = concatIn(path, print("typeArguments", nil), lineSuffixBoundary)
 	}
 
-	isTemplateLiteralSingleArgument := len(args) == 1 && isTemplateOnItsOwnLine(args[0], originalText(options))
+	isTemplateLiteralSingleArgument := len(arguments) == 1 &&
+		isTemplateOnItsOwnLine(arguments[0], originalText(options))
 
 	if isTemplateLiteralSingleArgument ||
 		// Don't break simple `import()` with long module name
@@ -140,9 +141,9 @@ func isSimpleModuleImport(path *Path) bool {
 		return false
 	}
 
-	args := getCallArguments(current)
+	arguments := getCallArguments(current)
 
-	return len(args) == 1 && isStringLiteral(args[0]) && !hasAnyComment(args[0])
+	return len(arguments) == 1 && isStringLiteral(arguments[0]) && !hasAnyComment(arguments[0])
 }
 
 // isCommonsJsOrAmdModuleDefinition is upstream's isCommonsJsOrAmdModuleDefinition.
@@ -157,22 +158,22 @@ func isCommonsJsOrAmdModuleDefinition(path *Path) bool {
 		return false
 	}
 
-	args := getCallArguments(current)
+	arguments := getCallArguments(current)
 
 	// AMD module
 	if current.Child("callee").String("name") == "require" {
-		return (len(args) == 1 && isStringLiteral(args[0]) || len(args) > 1) &&
-			!hasAnyComment(args[0])
+		return (len(arguments) == 1 && isStringLiteral(arguments[0]) || len(arguments) > 1) &&
+			!hasAnyComment(arguments[0])
 	}
 
 	// CommonJS module
 	if current.Child("callee").String("name") == "define" &&
 		parentOf(path).Is("ExpressionStatement") {
-		return len(args) == 1 ||
-			len(args) == 2 && args[0].Is("ArrayExpression") ||
-			len(args) == 3 &&
-				isStringLiteral(args[0]) &&
-				args[1].Is("ArrayExpression")
+		return len(arguments) == 1 ||
+			len(arguments) == 2 && arguments[0].Is("ArrayExpression") ||
+			len(arguments) == 3 &&
+				isStringLiteral(arguments[0]) &&
+				arguments[1].Is("ArrayExpression")
 	}
 
 	return false

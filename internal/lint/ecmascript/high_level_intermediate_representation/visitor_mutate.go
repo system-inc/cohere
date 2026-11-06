@@ -64,14 +64,14 @@ func EachPlacePointer(value InstructionValue, visit func(place *Place, role Plac
 		visit(&typed.Property, PlaceRoleUse)
 	case *CallExpression:
 		visit(&typed.Callee, PlaceRoleUse)
-		eachArgumentPlacePointer(typed.Args, visit)
+		eachArgumentPlacePointer(typed.Arguments, visit)
 	case *MethodCall:
 		visit(&typed.Receiver, PlaceRoleReceiver)
 		visit(&typed.Property, PlaceRoleUse)
-		eachArgumentPlacePointer(typed.Args, visit)
+		eachArgumentPlacePointer(typed.Arguments, visit)
 	case *NewExpression:
 		visit(&typed.Callee, PlaceRoleUse)
-		eachArgumentPlacePointer(typed.Args, visit)
+		eachArgumentPlacePointer(typed.Arguments, visit)
 	case *BinaryExpression:
 		visit(&typed.Left, PlaceRoleUse)
 		visit(&typed.Right, PlaceRoleUse)
@@ -133,8 +133,8 @@ func EachPlacePointer(value InstructionValue, visit func(place *Place, role Plac
 		if typed.Tag.Place != nil {
 			visit(typed.Tag.Place, PlaceRoleUse)
 		}
-		for index := range typed.Props {
-			visit(&typed.Props[index].Value, PlaceRoleUse)
+		for index := range typed.Properties {
+			visit(&typed.Properties[index].Value, PlaceRoleUse)
 		}
 		for index := range typed.Children {
 			visit(&typed.Children[index], PlaceRoleUse)
@@ -196,9 +196,9 @@ func EachTerminalPlacePointer(terminal Terminal, visit func(place *Place, role P
 	}
 }
 
-func eachArgumentPlacePointer(args []Argument, visit func(place *Place, role PlaceRole)) {
-	for index := range args {
-		visit(&args[index].Place, PlaceRoleUse)
+func eachArgumentPlacePointer(arguments []Argument, visit func(place *Place, role PlaceRole)) {
+	for index := range arguments {
+		visit(&arguments[index].Place, PlaceRoleUse)
 	}
 }
 

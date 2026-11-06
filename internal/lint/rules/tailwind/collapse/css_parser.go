@@ -73,25 +73,25 @@ const (
 	byteExclamationMark = '!'
 )
 
-// CSSSyntaxError is a malformed-stylesheet error.
+// CssSyntaxError is a malformed-stylesheet error.
 //
 // Upstream carries a SourceLocation so it can render `file:line:column`. This port carries the byte
 // offset instead: cohere reports on the class literal in a user's source file, never on CSS it
 // parsed, so an offset is enough to identify the input that failed and a line table would be
 // machinery with no reader. The message text matches upstream so a failure here is greppable
 // against the upstream source that produced it.
-type CSSSyntaxError struct {
+type CssSyntaxError struct {
 	// Message is the upstream message text, without any location prefix.
 	Message string
 	// Offset is the byte offset into the parsed input where the error was detected.
 	Offset int
 }
 
-func (syntaxError *CSSSyntaxError) Error() string {
+func (syntaxError *CssSyntaxError) Error() string {
 	return fmt.Sprintf("%d: %s", syntaxError.Offset, syntaxError.Message)
 }
 
-// ParseCSS parses a stylesheet into the AST in ast.go.
+// ParseCss parses a stylesheet into the AST in ast.go.
 //
 // The returned nodes are the top level of the stylesheet, with license comments (`/*! ... */`)
 // hoisted to the front, matching upstream. Any other comment is discarded during parsing rather
@@ -99,7 +99,7 @@ func (syntaxError *CSSSyntaxError) Error() string {
 // declaration splitter below can assume no comment contains the `:` it searches for.
 //
 // A malformed stylesheet returns a *CSSSyntaxError and a nil tree.
-func ParseCSS(input string) ([]*Node, error) {
+func ParseCss(input string) ([]*Node, error) {
 	// A leading byte-order mark is replaced by a space rather than stripped. Upstream notes that
 	// any transformation before the loop must not change the length of the input, because source
 	// offsets are taken against it; the same reasoning keeps the offsets in CSSSyntaxError honest.
@@ -204,9 +204,9 @@ func ParseCSS(input string) ([]*Node, error) {
 		// Start of a string. The whole string, quotes included, joins the buffer verbatim; a `;`,
 		// `}` or `:` inside it is text rather than structure.
 		case currentCharacter == byteSingleQuote || currentCharacter == byteDoubleQuote:
-			end, parseCSSStringError := parseCSSString(stylesheet, i, currentCharacter)
-			if parseCSSStringError != nil {
-				return nil, parseCSSStringError
+			end, parseCssStringError := parseCssString(stylesheet, i, currentCharacter)
+			if parseCssStringError != nil {
+				return nil, parseCssStringError
 			}
 			appendToBuffer(stylesheet[i : end+1])
 			i = end
@@ -264,9 +264,9 @@ func ParseCSS(input string) ([]*Node, error) {
 					j++
 
 				case peekCharacter == byteSingleQuote || peekCharacter == byteDoubleQuote:
-					end, parseCSSStringError := parseCSSString(stylesheet, j, peekCharacter)
-					if parseCSSStringError != nil {
-						return nil, parseCSSStringError
+					end, parseCssStringError := parseCssString(stylesheet, j, peekCharacter)
+					if parseCssStringError != nil {
+						return nil, parseCssStringError
 					}
 					j = end
 
@@ -323,9 +323,9 @@ func ParseCSS(input string) ([]*Node, error) {
 				}
 			}
 
-			declaration := parseCSSDeclaration(buffer.String(), colonIndex)
+			declaration := parseCssDeclaration(buffer.String(), colonIndex)
 			if declaration == nil {
-				return nil, &CSSSyntaxError{Message: "Invalid custom property, expected a value", Offset: start}
+				return nil, &CssSyntaxError{Message: "Invalid custom property, expected a value", Offset: start}
 			}
 
 			if parent != nil {
@@ -352,13 +352,13 @@ func ParseCSS(input string) ([]*Node, error) {
 		// End of an ordinary declaration. The `)` guard keeps a `;` inside parentheses (which is
 		// legal inside, for example, a `url()`) from ending the declaration early.
 		case currentCharacter == byteSemicolon && topOfStack(closingBracketStack) != byteCloseParen:
-			declaration := parseCSSDeclaration(buffer.String(), strings.Index(buffer.String(), ":"))
+			declaration := parseCssDeclaration(buffer.String(), strings.Index(buffer.String(), ":"))
 			if declaration == nil {
 				// A stray `;` with nothing before it is not an error, it is empty input.
 				if buffer.Len() == 0 {
 					continue
 				}
-				return nil, &CSSSyntaxError{
+				return nil, &CssSyntaxError{
 					Message: fmt.Sprintf("Invalid declaration: `%s`", text.TrimWhitespace(buffer.String())),
 					Offset:  bufferStart,
 				}
@@ -401,7 +401,7 @@ func ParseCSS(input string) ([]*Node, error) {
 		// End of a block.
 		case currentCharacter == byteCloseCurly && topOfStack(closingBracketStack) != byteCloseParen:
 			if len(closingBracketStack) == 0 {
-				return nil, &CSSSyntaxError{Message: "Missing opening {", Offset: i}
+				return nil, &CssSyntaxError{Message: "Missing opening {", Offset: i}
 			}
 			closingBracketStack = closingBracketStack[:len(closingBracketStack)-1]
 
@@ -428,9 +428,9 @@ func ParseCSS(input string) ([]*Node, error) {
 					// Upstream only attaches this when there is a parent; a trailing declaration at
 					// the top level is dropped rather than being an error.
 					if parent != nil {
-						declaration := parseCSSDeclaration(buffer.String(), colonIndex)
+						declaration := parseCssDeclaration(buffer.String(), colonIndex)
 						if declaration == nil {
-							return nil, &CSSSyntaxError{
+							return nil, &CssSyntaxError{
 								Message: fmt.Sprintf("Invalid declaration: `%s`", text.TrimWhitespace(buffer.String())),
 								Offset:  bufferStart,
 							}
@@ -466,7 +466,7 @@ func ParseCSS(input string) ([]*Node, error) {
 
 		case currentCharacter == byteCloseParen:
 			if topOfStack(closingBracketStack) != byteCloseParen {
-				return nil, &CSSSyntaxError{Message: "Missing opening (", Offset: i}
+				return nil, &CssSyntaxError{Message: "Missing opening (", Offset: i}
 			}
 			closingBracketStack = closingBracketStack[:len(closingBracketStack)-1]
 			appendToBuffer(")")
@@ -495,13 +495,13 @@ func ParseCSS(input string) ([]*Node, error) {
 	if len(closingBracketStack) > 0 && parent != nil {
 		switch parent.Kind {
 		case KindRule:
-			return nil, &CSSSyntaxError{
+			return nil, &CssSyntaxError{
 				Message: fmt.Sprintf("Missing closing } at %s", parent.Selector),
 				Offset:  bufferStart,
 			}
 		case KindAtRule:
-			return nil, &CSSSyntaxError{
-				Message: fmt.Sprintf("Missing closing } at %s %s", parent.Name, parent.Params),
+			return nil, &CssSyntaxError{
+				Message: fmt.Sprintf("Missing closing } at %s %s", parent.Name, parent.Parameters),
 				Offset:  bufferStart,
 			}
 		}
@@ -559,7 +559,7 @@ func ParseAtRule(buffer string, nodes ...*Node) *Node {
 	return AtRule(text.TrimWhitespace(name), text.TrimWhitespace(parameters), nodes...)
 }
 
-// parseCSSDeclaration splits a buffer into a property and a value at colonIndex.
+// parseCssDeclaration splits a buffer into a property and a value at colonIndex.
 //
 // A colonIndex of -1 means there is no separator and therefore no declaration; the caller turns
 // that into the appropriate syntax error, since the two call sites word it differently.
@@ -568,7 +568,7 @@ func ParseAtRule(buffer string, nodes ...*Node) *Node {
 // mistaken for a flag, and the value is cut at it rather than around it. Upstream slices to the
 // marker and discards everything from there to the end, so trailing text after `!important` is
 // dropped rather than kept.
-func parseCSSDeclaration(buffer string, colonIndex int) *Node {
+func parseCssDeclaration(buffer string, colonIndex int) *Node {
 	if colonIndex == -1 || colonIndex > len(buffer) {
 		return nil
 	}
@@ -589,12 +589,12 @@ func parseCSSDeclaration(buffer string, colonIndex int) *Node {
 	return declaration
 }
 
-// parseCSSString returns the index of the closing quote of the string starting at startIndex.
+// parseCssString returns the index of the closing quote of the string starting at startIndex.
 //
 // A string must close on the same quote it opened with, so an apostrophe inside a double-quoted
 // value is content. An unterminated string is an error rather than a value running to end of input,
 // which is what stops a missing quote from swallowing the rest of the stylesheet.
-func parseCSSString(input string, startIndex int, quoteCharacter byte) (int, error) {
+func parseCssString(input string, startIndex int, quoteCharacter byte) (int, error) {
 	for index := startIndex + 1; index < len(input); index++ {
 		peekCharacter := input[index]
 
@@ -610,14 +610,14 @@ func parseCSSString(input string, startIndex int, quoteCharacter byte) (int, err
 		case peekCharacter == byteSemicolon &&
 			(peekByte(input, index+1) == byteLineBreak ||
 				(peekByte(input, index+1) == byteCarriageReturn && peekByte(input, index+2) == byteLineBreak)):
-			return 0, &CSSSyntaxError{
+			return 0, &CssSyntaxError{
 				Message: fmt.Sprintf("Unterminated string: %s%c", input[startIndex:index+1], quoteCharacter),
 				Offset:  startIndex,
 			}
 
 		case peekCharacter == byteLineBreak ||
 			(peekCharacter == byteCarriageReturn && peekByte(input, index+1) == byteLineBreak):
-			return 0, &CSSSyntaxError{
+			return 0, &CssSyntaxError{
 				Message: fmt.Sprintf("Unterminated string: %s%c", input[startIndex:index], quoteCharacter),
 				Offset:  startIndex,
 			}

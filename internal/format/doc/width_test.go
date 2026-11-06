@@ -59,7 +59,7 @@ func TestStringWidthAgreesWithUpstream(test *testing.T) {
 		if corpus == "" {
 			continue
 		}
-		inputs = append(inputs, nonASCIILines(test, corpus, seen)...)
+		inputs = append(inputs, nonAsciiLines(test, corpus, seen)...)
 	}
 
 	// Batched, because the corpus population is hundreds of megabytes and a single JSON payload
@@ -129,7 +129,7 @@ process.stdin.on("end", () => process.stdout.write(JSON.stringify(JSON.parse(dat
 	return widths
 }
 
-// nonASCIILines collects distinct lines with a non-ASCII byte from the files the formatter is offered
+// nonAsciiLines collects distinct lines with a non-ASCII byte from the files the formatter is offered
 // under root, nested repositories included, which is the population that actually reaches a printer.
 //
 // The first version walked every text file under the root and collected 1.08 GB across 607,275 lines,
@@ -141,7 +141,7 @@ process.stdin.on("end", () => process.stdout.write(JSON.stringify(JSON.parse(dat
 // be measuring different strings, which is exactly the comparison that looks clean and proves nothing.
 //
 // Mutates: seen gains every line collected, so the caller's next corpus skips the lines this one found.
-func nonASCIILines(test *testing.T, root string, seen map[string]bool) []string {
+func nonAsciiLines(test *testing.T, root string, seen map[string]bool) []string {
 	test.Helper()
 	engine, newPrettierError := prettier.New(formatoptions.Default())
 	if newPrettierError != nil {
@@ -182,7 +182,7 @@ func nonASCIILines(test *testing.T, root string, seen map[string]bool) []string 
 			scanner.Buffer(make([]byte, 1<<20), 1<<24)
 			for scanner.Scan() {
 				line := scanner.Text()
-				if isPrintableASCII(line) || !utf8.ValidString(line) || seen[line] {
+				if isPrintableAscii(line) || !utf8.ValidString(line) || seen[line] {
 					continue
 				}
 				seen[line] = true

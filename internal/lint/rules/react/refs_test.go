@@ -451,7 +451,7 @@ func TestRefsMessagesReadCorrectly(test *testing.T) {
 			"event handler",
 		},
 		{
-			refsFindingFunctionAccessesRef,
+			refsFindingFunctionAccessesReference,
 			"functionAccessesRef",
 			"This function accesses a ref value, and calling it during render reads the ref.",
 			"event handler",
@@ -497,8 +497,8 @@ func TestRefsConvergenceEqualityIgnoresRefIdentity(test *testing.T) {
 	}{
 		{
 			Name:  "two refs with different identities are equal",
-			A:     &refsAccessType{Kind: refsRef, RefId: 1, HasRefId: true},
-			B:     &refsAccessType{Kind: refsRef, RefId: 999, HasRefId: true},
+			A:     &refsAccessType{Kind: refsReference, RefId: 1, HasRefId: true},
+			B:     &refsAccessType{Kind: refsReference, RefId: 999, HasRefId: true},
 			Equal: true,
 			Why:   "a join mints a fresh id, so comparing ids would prevent the fixpoint settling",
 		},
@@ -525,7 +525,7 @@ func TestRefsConvergenceEqualityIgnoresRefIdentity(test *testing.T) {
 		},
 		{
 			Name:  "different kinds are never equal",
-			A:     &refsAccessType{Kind: refsRef},
+			A:     &refsAccessType{Kind: refsReference},
 			B:     &refsAccessType{Kind: refsRefValue},
 			Equal: false,
 			Why:   "the kinds are the lattice; a ref and a ref value are different findings",
@@ -549,11 +549,11 @@ func TestRefsJoinMintsAFreshIdentityForDifferentRefs(test *testing.T) {
 	// The operands take identities the environment's counter has already issued, so a freshly
 	// minted id cannot coincide with one of them by accident. Without this the test can pass or
 	// fail on the counter's starting value rather than on the join's behaviour.
-	first := &refsAccessType{Kind: refsRef, RefId: env.nextRefId(), HasRefId: true}
-	second := &refsAccessType{Kind: refsRef, RefId: env.nextRefId(), HasRefId: true}
+	first := &refsAccessType{Kind: refsReference, RefId: env.nextRefId(), HasRefId: true}
+	second := &refsAccessType{Kind: refsReference, RefId: env.nextRefId(), HasRefId: true}
 
 	joined := refsJoin(first, second, env.nextRefId)
-	if joined.Kind != refsRef {
+	if joined.Kind != refsReference {
 		test.Fatalf("joining two refs gave kind %d, want a ref", joined.Kind)
 	}
 	if joined.RefId == first.RefId || joined.RefId == second.RefId {
@@ -717,7 +717,7 @@ func TestRefsExemptsTheMergeRefsShape(test *testing.T) {
 	}
 }
 
-// TestRefsDoesNotTaintSiblingFieldsOfARefProp covers the aliasing restriction.
+// TestRefsDoesNotTaintSiblingFieldsOfARefProperty covers the aliasing restriction.
 //
 // A property load aliases its result to its object, which is how an alias chain keeps its identity.
 // Applied to a props bag holding a ref beside ordinary fields it is a disaster: reading the ref
@@ -729,7 +729,7 @@ func TestRefsExemptsTheMergeRefsShape(test *testing.T) {
 // The assertion is that reading the ref field does not make the number field a finding. It also
 // pins that the ref field itself is still tracked, so a fix that simply stopped seeing refs on
 // props would fail the second half rather than passing this by going blind.
-func TestRefsDoesNotTaintSiblingFieldsOfARefProp(test *testing.T) {
+func TestRefsDoesNotTaintSiblingFieldsOfARefProperty(test *testing.T) {
 	test.Parallel()
 
 	declarations := "declare module 'react' {\n  export interface RefObject<T> { current: T }\n  export function useRef<T>(initial: T): RefObject<T>;\n}"

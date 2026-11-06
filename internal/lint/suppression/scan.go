@@ -4,8 +4,8 @@ import "github.com/system-inc/cohere/internal/lint/ecmascript/directives"
 
 // commentSpan is one comment's byte range in a file.
 type commentSpan struct {
-	pos int
-	end int
+	position int
+	end      int
 }
 
 // scanComments finds every comment in a file, skipping the ones that are not comments.
@@ -68,7 +68,7 @@ func scanCode(text string, index int, inInterpolation bool, comments *[]commentS
 			for position < len(text) && text[position] != '\n' {
 				position++
 			}
-			*comments = append(*comments, commentSpan{pos: start, end: position})
+			*comments = append(*comments, commentSpan{position: start, end: position})
 
 		case character == '/' && position+1 < len(text) && text[position+1] == '*':
 			start := position
@@ -81,7 +81,7 @@ func scanCode(text string, index int, inInterpolation bool, comments *[]commentS
 			} else {
 				position = len(text)
 			}
-			*comments = append(*comments, commentSpan{pos: start, end: position})
+			*comments = append(*comments, commentSpan{position: start, end: position})
 
 		case character == '"' || character == '\'':
 			position = skipQuoted(text, position, character)
@@ -130,12 +130,12 @@ func scanEnables(text string, lineOf func(offset int) int) []enableSpan {
 	found := []enableSpan{}
 
 	for _, comment := range scanComments(text) {
-		names, isEnable := directives.ParseEnable(text[comment.pos:comment.end])
+		names, isEnable := directives.ParseEnable(text[comment.position:comment.end])
 		if !isEnable {
 			continue
 		}
 		found = append(found, enableSpan{
-			line:  lineOf(comment.pos),
+			line:  lineOf(comment.position),
 			rules: names,
 		})
 	}

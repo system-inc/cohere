@@ -498,8 +498,8 @@ func TestTheSeveritiesAreTheLoaders(test *testing.T) {
 	}
 }
 
-// TestEveryExampleIsJSON: the reference's examples are copied into real files, so each must parse.
-func TestEveryExampleIsJSON(test *testing.T) {
+// TestEveryExampleIsJson: the reference's examples are copied into real files, so each must parse.
+func TestEveryExampleIsJson(test *testing.T) {
 	test.Parallel()
 	for _, key := range configuration.TopLevelKeys() {
 		example, present := examples[key.Name]

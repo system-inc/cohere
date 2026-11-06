@@ -29,11 +29,11 @@ func (context *context) transformNode(node *compose.Node, properties []*cst.Toke
 		}
 		return context.transformMap(node, properties)
 	}
-	if compose.IsSeq(node) {
+	if compose.IsSequence(node) {
 		if node.Flow {
-			return context.transformFlowSeq(node, properties)
+			return context.transformFlowSequence(node, properties)
 		}
-		return context.transformSeq(node, properties)
+		return context.transformSequence(node, properties)
 	}
 	if compose.IsScalar(node) {
 		switch node.Type {
@@ -81,7 +81,7 @@ func isEmptyNode(node *compose.Node, properties []*cst.Token) bool {
 
 // transformAlias is upstream's transformAlias.
 func (context *context) transformAlias(alias *compose.Node, properties []*cst.Token) *Node {
-	sourceToken := alias.SrcToken
+	sourceToken := alias.SourceToken
 	if sourceToken == nil {
 		throwTypeError("undefined", "end")
 	}
@@ -95,7 +95,7 @@ func (context *context) transformAlias(alias *compose.Node, properties []*cst.To
 // transformBlockValue is transformBlockFolded and transformBlockLiteral, which differ only in the
 // factory they hand transformAstBlockValue's result to.
 func (context *context) transformBlockValue(nodeType string, blockValue *compose.Node, properties []*cst.Token) *Node {
-	sourceToken := blockValue.SrcToken
+	sourceToken := blockValue.SourceToken
 	if sourceToken == nil || sourceToken.Type != "block-scalar" {
 		throwError("Expected block scalar srcToken")
 	}
@@ -111,7 +111,7 @@ func (context *context) transformAstBlockValue(
 ) *Node {
 	var blockScalarHeaderToken *cst.Token
 	var indicatorComment *Node
-	for _, token := range tokens(sourceToken.Props) {
+	for _, token := range tokens(sourceToken.Properties) {
 		if token.Type == "comment" {
 			indicatorComment = context.transformComment(token)
 		} else if token.Type == "block-scalar-header" {
@@ -178,7 +178,7 @@ func (context *context) transformPlain(plain *compose.Node, properties []*cst.To
 			"",
 		)
 	}
-	sourceToken := plain.SrcToken
+	sourceToken := plain.SourceToken
 	if sourceToken == nil || sourceToken.Type != "scalar" {
 		throwError("Expected plain scalar srcToken")
 	}
@@ -191,7 +191,7 @@ func (context *context) transformPlain(plain *compose.Node, properties []*cst.To
 
 // transformQuoteValue is transformQuoteDouble and transformQuoteSingle with transformAstQuoteValue.
 func (context *context) transformQuoteValue(nodeType string, quoteValue *compose.Node, properties []*cst.Token) *Node {
-	sourceToken := quoteValue.SrcToken
+	sourceToken := quoteValue.SourceToken
 	expected := "single-quoted-scalar"
 	message := "Expected single-quoted scalar srcToken"
 	if nodeType == "quoteDouble" {

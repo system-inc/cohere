@@ -123,11 +123,11 @@ func copyTag(tag *Tag) *Tag {
 
 // The tag names composing compares against.
 const (
-	mapTagName  = "tag:yaml.org,2002:map"
-	seqTagName  = "tag:yaml.org,2002:seq"
-	strTagName  = "tag:yaml.org,2002:str"
-	omapTagName = "tag:yaml.org,2002:omap"
-	setTagName  = "tag:yaml.org,2002:set"
+	mapTagName    = "tag:yaml.org,2002:map"
+	seqTagName    = "tag:yaml.org,2002:seq"
+	stringTagName = "tag:yaml.org,2002:str"
+	omapTagName   = "tag:yaml.org,2002:omap"
+	setTagName    = "tag:yaml.org,2002:set"
 )
 
 // Ported from dist/schema/common/: map.js, seq.js, string.js, null.js.
@@ -151,7 +151,7 @@ var seqTag = &Tag{
 	NodeClass:  "YAMLSeq",
 	Tag:        seqTagName,
 	resolveCollection: func(collection *Node, onError func(message string)) *Node {
-		if !IsSeq(collection) {
+		if !IsSequence(collection) {
 			onError("Expected a sequence for this tag")
 		}
 		return collection
@@ -160,7 +160,7 @@ var seqTag = &Tag{
 
 var stringTag = &Tag{
 	Default: defaultTrue,
-	Tag:     strTagName,
+	Tag:     stringTagName,
 	resolveScalar: func(value []uint16, _ func(string), _ *Options) (*Node, ScalarValue, error) {
 		return nil, ScalarString(unitsToString(value)), nil
 	},
@@ -229,7 +229,7 @@ var coreIntHexTag = &Tag{
 // floatNaNResolve is floatNaN's resolve, the same in both schemas.
 func floatNaNResolve(value []uint16, _ func(string), _ *Options) (*Node, ScalarValue, error) {
 	last := slice(value, -3, len(value))
-	if len(last) == 3 && toLowerASCII(last) == "nan" {
+	if len(last) == 3 && toLowerAscii(last) == "nan" {
 		return nil, ScalarNumber(nan()), nil
 	}
 	if characterAt(value, 0) == '-' {
@@ -238,9 +238,9 @@ func floatNaNResolve(value []uint16, _ func(string), _ *Options) (*Node, ScalarV
 	return nil, ScalarNumber(positiveInfinity()), nil
 }
 
-// toLowerASCII is `text.toLowerCase()` for text whose comparison is against an ASCII literal: any
+// toLowerAscii is `text.toLowerCase()` for text whose comparison is against an ASCII literal: any
 // non-ASCII unit stays non-ASCII, so it can never compare equal.
-func toLowerASCII(text []uint16) string {
+func toLowerAscii(text []uint16) string {
 	lowered := []byte(asciiView(text))
 	for index, character := range lowered {
 		if character >= 'A' && character <= 'Z' {

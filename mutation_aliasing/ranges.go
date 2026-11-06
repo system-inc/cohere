@@ -498,7 +498,7 @@ func (walk *definitionWalk[G, F, B, P]) openLValue(id static_single_assignment.I
 		changed = true
 	}
 	if existing.End == 0 {
-		existing.End = maxOrder(order+1, existing.End)
+		existing.End = maximumOrder(order+1, existing.End)
 		changed = true
 	}
 	// Divergence from both upstreams, in the conservative direction, and it is the only
@@ -658,12 +658,12 @@ func BlockFirstOrder[G Graph[F, B, P], F any, B comparable, P any](
 	return graph.TerminalOrder(block)
 }
 
-// maxOrder returns the larger of two evaluation positions.
+// maximumOrder returns the larger of two evaluation positions.
 //
 // Upstream writes `Math.max(instr.id + 1, existing)` inside a branch that has just tested the
 // existing value is zero, so the max is redundant there. It is reproduced rather than simplified
 // because the redundancy is upstream's and a later widening rule reaching this line would need it.
-func maxOrder(left, right static_single_assignment.EvaluationOrder) static_single_assignment.EvaluationOrder {
+func maximumOrder(left, right static_single_assignment.EvaluationOrder) static_single_assignment.EvaluationOrder {
 	if left > right {
 		return left
 	}

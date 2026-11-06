@@ -334,7 +334,7 @@ func scopeItemsInNestingOrder(function *Function, scopes *ReactiveScopes,
 // operand keys that block-splitting invalidates. See the package comment.
 func BuildReactiveScopeTerminals(function *Function, scopes *ReactiveScopes,
 	identity ScopeIdentity) ScopeTerminals {
-	if function == nil || scopes == nil || scopes.Len() == 0 {
+	if function == nil || scopes == nil || scopes.Length() == 0 {
 		return ScopeTerminals{}
 	}
 	items := scopeItemsInNestingOrder(function, scopes, identity)

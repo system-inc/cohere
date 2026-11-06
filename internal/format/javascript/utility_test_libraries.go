@@ -69,31 +69,31 @@ func isTestCall(node Node, parent Node) bool {
 		return false
 	}
 
-	args := getCallArguments(node)
+	arguments := getCallArguments(node)
 
-	if len(args) == 1 {
+	if len(arguments) == 1 {
 		if isAngularTestWrapper(node) && isTestCall(parent, nil) {
-			return isFunctionOrArrowExpression(args[0])
+			return isFunctionOrArrowExpression(arguments[0])
 		}
 
 		if isUnitTestSetupIdentifier(node.Child("callee")) {
-			return isAngularTestWrapper(args[0])
+			return isAngularTestWrapper(arguments[0])
 		}
-	} else if (len(args) == 2 || len(args) == 3) &&
-		(args[0].Is("TemplateLiteral") || isStringLiteral(args[0])) &&
+	} else if (len(arguments) == 2 || len(arguments) == 3) &&
+		(arguments[0].Is("TemplateLiteral") || isStringLiteral(arguments[0])) &&
 		isTestCallCallee(node.Child("callee")) {
 		// it("name", () => { ... }, 2500)
-		if len(args) > 2 && args[2] != nil && !isNumericLiteral(args[2]) {
+		if len(arguments) > 2 && arguments[2] != nil && !isNumericLiteral(arguments[2]) {
 			return false
 		}
 		var isTestFunction bool
-		if len(args) == 2 {
-			isTestFunction = isFunctionOrArrowExpression(args[1])
+		if len(arguments) == 2 {
+			isTestFunction = isFunctionOrArrowExpression(arguments[1])
 		} else {
-			isTestFunction = isFunctionOrArrowExpressionWithBody(args[1]) &&
-				len(getFunctionParameters(args[1])) <= 1
+			isTestFunction = isFunctionOrArrowExpressionWithBody(arguments[1]) &&
+				len(getFunctionParameters(arguments[1])) <= 1
 		}
-		return isTestFunction || isAngularTestWrapper(args[1])
+		return isTestFunction || isAngularTestWrapper(arguments[1])
 	}
 	return false
 }

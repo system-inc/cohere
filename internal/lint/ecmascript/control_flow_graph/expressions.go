@@ -69,8 +69,8 @@ func (builder *Builder[E]) expr(node *ast.Node) {
 // join (for example, the short branch of `a || b` reaching an `else` body).
 func (builder *Builder[E]) condition(node *ast.Node, whenTrue, whenFalse *Block[E]) {
 	if node == nil {
-		builder.link(builder.cur, whenTrue)
-		builder.link(builder.cur, whenFalse)
+		builder.link(builder.current, whenTrue)
+		builder.link(builder.current, whenFalse)
 		return
 	}
 
@@ -85,8 +85,8 @@ func (builder *Builder[E]) condition(node *ast.Node, whenTrue, whenFalse *Block[
 		unary := node.AsPrefixUnaryExpression()
 		if unary.Operator != ast.KindExclamationToken {
 			builder.expr(node)
-			builder.link(builder.cur, whenTrue)
-			builder.link(builder.cur, whenFalse)
+			builder.link(builder.current, whenTrue)
+			builder.link(builder.current, whenFalse)
 			return
 		}
 		if builder.hooks.Expression != nil {
@@ -101,8 +101,8 @@ func (builder *Builder[E]) condition(node *ast.Node, whenTrue, whenFalse *Block[
 			operator != ast.KindBarBarToken &&
 			operator != ast.KindQuestionQuestionToken {
 			builder.expr(node)
-			builder.link(builder.cur, whenTrue)
-			builder.link(builder.cur, whenFalse)
+			builder.link(builder.current, whenTrue)
+			builder.link(builder.current, whenFalse)
 			return
 		}
 		if builder.hooks.Expression != nil {
@@ -118,9 +118,9 @@ func (builder *Builder[E]) condition(node *ast.Node, whenTrue, whenFalse *Block[
 			// A non-nullish left operand may itself be truthy or falsy; a
 			// nullish one evaluates the right operand.
 			builder.expr(binary.Left)
-			builder.link(builder.cur, whenTrue)
-			builder.link(builder.cur, whenFalse)
-			builder.link(builder.cur, right)
+			builder.link(builder.current, whenTrue)
+			builder.link(builder.current, whenFalse)
+			builder.link(builder.current, right)
 		}
 		builder.enter(right)
 		builder.condition(binary.Right, whenTrue, whenFalse)
@@ -140,8 +140,8 @@ func (builder *Builder[E]) condition(node *ast.Node, whenTrue, whenFalse *Block[
 
 	default:
 		builder.expr(node)
-		builder.link(builder.cur, whenTrue)
-		builder.link(builder.cur, whenFalse)
+		builder.link(builder.current, whenTrue)
+		builder.link(builder.current, whenFalse)
 	}
 }
 
@@ -169,25 +169,25 @@ func (builder *Builder[E]) binaryExpression(node *ast.Node) {
 		operator == ast.KindQuestionQuestionToken:
 		builder.expr(binary.Left)
 		join := builder.newBlock()
-		builder.link(builder.cur, join)
+		builder.link(builder.current, join)
 		right := builder.newBlock()
-		builder.link(builder.cur, right)
+		builder.link(builder.current, right)
 		builder.enter(right)
 		builder.expr(binary.Right)
-		builder.link(builder.cur, join)
+		builder.link(builder.current, join)
 		builder.enter(join)
 
 	case ast.IsLogicalOrCoalescingAssignmentOperator(operator):
 		// `a ||= b` reads a, then conditionally evaluates b and writes a.
 		builder.patternReads(binary.Left)
 		join := builder.newBlock()
-		builder.link(builder.cur, join)
+		builder.link(builder.current, join)
 		right := builder.newBlock()
-		builder.link(builder.cur, right)
+		builder.link(builder.current, right)
 		builder.enter(right)
 		builder.expr(binary.Right)
 		builder.patternWrites(binary.Left)
-		builder.link(builder.cur, join)
+		builder.link(builder.current, join)
 		builder.enter(join)
 
 	case operator == ast.KindEqualsToken:
@@ -217,20 +217,20 @@ func (builder *Builder[E]) binaryExpression(node *ast.Node) {
 func (builder *Builder[E]) conditionalExpression(node *ast.Node) {
 	cond := node.AsConditionalExpression()
 	builder.expr(cond.Condition)
-	testEnd := builder.cur
+	testEnd := builder.current
 	join := builder.newBlock()
 
 	whenTrue := builder.newBlock()
 	builder.link(testEnd, whenTrue)
 	builder.enter(whenTrue)
 	builder.expr(cond.WhenTrue)
-	builder.link(builder.cur, join)
+	builder.link(builder.current, join)
 
 	whenFalse := builder.newBlock()
 	builder.link(testEnd, whenFalse)
 	builder.enter(whenFalse)
 	builder.expr(cond.WhenFalse)
-	builder.link(builder.cur, join)
+	builder.link(builder.current, join)
 
 	builder.enter(join)
 }
@@ -263,8 +263,8 @@ func (builder *Builder[E]) accessOrCall(node *ast.Node) {
 		builder.forkOptionalChain(node)
 		builder.typeArguments(node)
 		if call.Arguments != nil {
-			for _, arg := range call.Arguments.Nodes {
-				builder.expr(arg)
+			for _, argument := range call.Arguments.Nodes {
+				builder.expr(argument)
 			}
 		}
 	case ast.KindNewExpression:
@@ -272,8 +272,8 @@ func (builder *Builder[E]) accessOrCall(node *ast.Node) {
 		builder.expr(newExpr.Expression)
 		builder.typeArguments(node)
 		if newExpr.Arguments != nil {
-			for _, arg := range newExpr.Arguments.Nodes {
-				builder.expr(arg)
+			for _, argument := range newExpr.Arguments.Nodes {
+				builder.expr(argument)
 			}
 		}
 	case ast.KindTaggedTemplateExpression:
@@ -288,7 +288,7 @@ func (builder *Builder[E]) accessOrCall(node *ast.Node) {
 	if outermost {
 		join := builder.chainJoins[len(builder.chainJoins)-1]
 		builder.chainJoins = builder.chainJoins[:len(builder.chainJoins)-1]
-		builder.link(builder.cur, join)
+		builder.link(builder.current, join)
 		builder.enter(join)
 	}
 }
@@ -297,9 +297,9 @@ func (builder *Builder[E]) forkOptionalChain(node *ast.Node) {
 	if len(builder.chainJoins) == 0 || !ast.IsOptionalChainRoot(node) {
 		return
 	}
-	builder.link(builder.cur, builder.chainJoins[len(builder.chainJoins)-1])
+	builder.link(builder.current, builder.chainJoins[len(builder.chainJoins)-1])
 	next := builder.newBlock()
-	builder.link(builder.cur, next)
+	builder.link(builder.current, next)
 	builder.enter(next)
 }
 

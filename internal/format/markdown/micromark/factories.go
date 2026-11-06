@@ -120,7 +120,7 @@ func factoryLabel(
 	}
 
 	atBreak = func(code Code) State {
-		if size > linkReferenceSizeMax ||
+		if size > linkReferenceSizeMaximum ||
 			code == CodeEof ||
 			code == CodeLeftSquareBracket ||
 			(code == CodeRightSquareBracket && !seen) ||
@@ -159,7 +159,7 @@ func factoryLabel(
 			return atBreak(code)
 		}
 		// `size++ > linkReferenceSizeMax`, evaluated last, so it only counts when nothing before matched.
-		over := size > linkReferenceSizeMax
+		over := size > linkReferenceSizeMaximum
 		size++
 		if over {
 			effects.Exit(TypeChunkString)

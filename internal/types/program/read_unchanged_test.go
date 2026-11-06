@@ -42,9 +42,9 @@ func TestTheProgramsCopyIsTheFilesBytesOnlyWithoutAByteOrderMark(test *testing.T
 	for _, withPack := range []bool{true, false} {
 		test.Run(map[bool]string{true: "with a content pack", false: "without one"}[withPack], func(test *testing.T) {
 			test.Parallel()
-			directory, err := filepath.EvalSymlinks(test.TempDir())
-			if err != nil {
-				test.Fatal(err)
+			directory, resolveSymlinksError := filepath.EvalSymlinks(test.TempDir())
+			if resolveSymlinksError != nil {
+				test.Fatal(resolveSymlinksError)
 			}
 			for name, file := range files {
 				if writeError := os.WriteFile(filepath.Join(directory, name), file.bytes, 0o644); writeError != nil {
@@ -61,15 +61,16 @@ func TestTheProgramsCopyIsTheFilesBytesOnlyWithoutAByteOrderMark(test *testing.T
 			}
 			var pack *ContentPack
 			if withPack {
-				if pack, err = OpenContentPack(test.TempDir()); err != nil {
-					test.Fatal(err)
+				var openContentPackError error
+				if pack, openContentPackError = OpenContentPack(test.TempDir()); openContentPackError != nil {
+					test.Fatal(openContentPackError)
 				}
 			}
-			graph, err := Build(
+			graph, buildError := Build(
 				Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory, ContentPack: pack},
 			)
-			if err != nil {
-				test.Fatal(err)
+			if buildError != nil {
+				test.Fatal(buildError)
 			}
 			// The plain file first: a guard that refused everything would pass every case below.
 			for _, name := range []string{"Plain.ts", "Utf8Mark.ts", "Utf16.ts", "SameLength.ts"} {

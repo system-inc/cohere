@@ -5,7 +5,7 @@ import "github.com/system-inc/cohere/internal/format/printing"
 // print/union-type.js and print/intersection-type.js.
 
 // printUnionType is upstream's printUnionType, for `TSUnionType` and `UnionTypeAnnotation`.
-func printUnionType(path *Path, options *Options, print PrintFunc, args *printArguments) Doc {
+func printUnionType(path *Path, options *Options, print PrintFunc, arguments *printArguments) Doc {
 	current := node(path)
 
 	// {
@@ -63,7 +63,7 @@ func printUnionType(path *Path, options *Options, print PrintFunc, args *printAr
 	}
 
 	// Already indent in parent
-	if (args != nil && args.assignmentLayout == "break-after-operator") ||
+	if (arguments != nil && arguments.assignmentLayout == "break-after-operator") ||
 		!shouldIndentUnionType(path) {
 		return printed
 	}

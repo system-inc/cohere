@@ -83,9 +83,9 @@ func TestMaxNestedCallbacksStaysSilent(test *testing.T) {
 
 // wantSpan is one expected finding: where it points and what text that covers.
 type wantSpan struct {
-	pos  int
-	end  int
-	text string
+	position int
+	end      int
+	text     string
 }
 
 // Each invalid case asserts the finding count, every span, the text each span covers, and the
@@ -245,9 +245,9 @@ func TestMaxNestedCallbacksFires(test *testing.T) {
 			}
 			for index, finding := range result.Diagnostics {
 				want := testCase.wantSpans[index]
-				if finding.Range.Pos() != want.pos || finding.Range.End() != want.end {
+				if finding.Range.Pos() != want.position || finding.Range.End() != want.end {
 					test.Errorf("finding %d span: got [%d,%d), want [%d,%d)",
-						index, finding.Range.Pos(), finding.Range.End(), want.pos, want.end)
+						index, finding.Range.Pos(), finding.Range.End(), want.position, want.end)
 				}
 				if got := testCase.source[finding.Range.Pos():finding.Range.End()]; got != want.text {
 					test.Errorf("finding %d text: got %q, want %q", index, got, want.text)

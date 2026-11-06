@@ -81,7 +81,7 @@ func tokenizeAutolink(self *Self, effects *Effects, ok State, nok State) State {
 		// ASCII alphanumeric and `+`, `-`, and `.`. The `size++ < autolinkSchemeSizeMax` only runs, and so
 		// only increments, when the code is one of them: `&&` short-circuits.
 		if code == CodePlusSign || code == CodeDash || code == CodeDot || asciiAlphanumeric(code) {
-			below := size < autolinkSchemeSizeMax
+			below := size < autolinkSchemeSizeMaximum
 			size++
 			if below {
 				effects.Consume(code)
@@ -173,7 +173,7 @@ func tokenizeAutolink(self *Self, effects *Effects, ok State, nok State) State {
 		// ASCII alphanumeric or `-`. As above, `size++ < autolinkDomainSizeMax` only runs, and increments,
 		// when the code is one of them.
 		if code == CodeDash || asciiAlphanumeric(code) {
-			below := size < autolinkDomainSizeMax
+			below := size < autolinkDomainSizeMaximum
 			size++
 			if below {
 				next := emailLabel

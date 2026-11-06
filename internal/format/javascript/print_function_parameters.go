@@ -105,7 +105,7 @@ func printFunctionParameters(
 	if shouldExpandParameters && !isDecoratedFunction(path) {
 		if doc.WillBreak(typeParametersDoc) || doc.WillBreak(doc.Concat(printed)) {
 			// Removing lines in this case leads to broken or ugly output
-			panic(argExpansionBailout{})
+			panic(argumentExpansionBailout{})
 		}
 		return groupIn(path, concatIn(path, doc.RemoveLines(typeParametersDoc),
 			"(",

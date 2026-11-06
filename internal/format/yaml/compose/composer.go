@@ -58,8 +58,8 @@ type Composer struct {
 	doc          *Document
 	atDirectives bool
 	prelude      [][]uint16
-	errors       []*YAMLError
-	warnings     []*YAMLError
+	errors       []*YamlError
+	warnings     []*YamlError
 	directives   *Directives
 	options      Options
 }
@@ -72,9 +72,9 @@ func NewComposer(options Options) *Composer {
 	}
 	return &Composer{
 		prelude:    [][]uint16{},
-		errors:     []*YAMLError{},
-		warnings:   []*YAMLError{},
-		directives: newDirectives(DirectivesYAML{Version: version}, nil),
+		errors:     []*YamlError{},
+		warnings:   []*YamlError{},
+		directives: newDirectives(DirectivesYaml{Version: version}, nil),
 		options:    options,
 	}
 }
@@ -82,9 +82,9 @@ func NewComposer(options Options) *Composer {
 func (composer *Composer) onError(source errorSource, code string, message string, warning bool) {
 	position := source.position()
 	if warning {
-		composer.warnings = append(composer.warnings, newYAMLWarning(position, code, message))
+		composer.warnings = append(composer.warnings, newYamlWarning(position, code, message))
 	} else {
-		composer.errors = append(composer.errors, newYAMLParseError(position, code, message))
+		composer.errors = append(composer.errors, newYamlParseError(position, code, message))
 	}
 }
 
@@ -132,8 +132,8 @@ func (composer *Composer) decorate(doc *Document, afterDoc bool) {
 		doc.Warnings = composer.warnings
 	}
 	composer.prelude = [][]uint16{}
-	composer.errors = []*YAMLError{}
-	composer.warnings = []*YAMLError{}
+	composer.errors = []*YamlError{}
+	composer.warnings = []*YamlError{}
 }
 
 // Compose composes tokens into documents. With forceDoc, a stream that contains no document still
@@ -188,7 +188,7 @@ func (composer *Composer) next(token *cst.Token, yield func(*Document) bool) boo
 		if len(token.Source) > 0 {
 			message = token.Message + ": " + jsonStringify(token.Source)
 		}
-		yamlError := newYAMLParseError(errorToken{token: token}.position(), "UNEXPECTED_TOKEN", message)
+		yamlError := newYamlParseError(errorToken{token: token}.position(), "UNEXPECTED_TOKEN", message)
 		if composer.atDirectives || composer.doc == nil {
 			composer.errors = append(composer.errors, yamlError)
 		} else {
@@ -199,7 +199,7 @@ func (composer *Composer) next(token *cst.Token, yield func(*Document) bool) boo
 			message := "Unexpected doc-end without preceding document"
 			composer.errors = append(
 				composer.errors,
-				newYAMLParseError(errorToken{token: token}.position(), "UNEXPECTED_TOKEN", message),
+				newYamlParseError(errorToken{token: token}.position(), "UNEXPECTED_TOKEN", message),
 			)
 			break
 		}
@@ -218,7 +218,7 @@ func (composer *Composer) next(token *cst.Token, yield func(*Document) bool) boo
 	default:
 		composer.errors = append(
 			composer.errors,
-			newYAMLParseError(errorToken{token: token}.position(), "UNEXPECTED_TOKEN", "Unsupported token "+token.Type),
+			newYamlParseError(errorToken{token: token}.position(), "UNEXPECTED_TOKEN", "Unsupported token "+token.Type),
 		)
 	}
 	return true

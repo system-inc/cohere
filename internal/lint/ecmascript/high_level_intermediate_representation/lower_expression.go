@@ -231,12 +231,12 @@ func (builder *builder) lowerCallExpression(node *ast.Node) Place {
 			name = access.Name().Text()
 		}
 		property := builder.emit(&Primitive{Value: PrimitiveString(name)}, access.Name())
-		args := builder.lowerArguments(expression.Arguments)
+		arguments := builder.lowerArguments(expression.Arguments)
 		return builder.emit(&MethodCall{
 			CalleeOrigin: origin,
 			Receiver:     receiver,
 			Property:     property,
-			Args:         args,
+			Arguments:    arguments,
 			Optional:     optional,
 		}, node)
 	}
@@ -244,20 +244,20 @@ func (builder *builder) lowerCallExpression(node *ast.Node) Place {
 		access := callee.AsElementAccessExpression()
 		receiver := builder.lowerExpressionToPlace(access.Expression)
 		property := builder.lowerExpressionToPlace(access.ArgumentExpression)
-		args := builder.lowerArguments(expression.Arguments)
+		arguments := builder.lowerArguments(expression.Arguments)
 		return builder.emit(&MethodCall{
 			CalleeOrigin: origin,
 			Receiver:     receiver,
 			Property:     property,
-			Args:         args,
+			Arguments:    arguments,
 			Optional:     optional,
 		}, node)
 	}
 
 	calleePlace := builder.lowerExpressionToPlace(callee)
-	args := builder.lowerArguments(expression.Arguments)
+	arguments := builder.lowerArguments(expression.Arguments)
 	return builder.emit(
-		&CallExpression{Callee: calleePlace, Args: args, Optional: optional, CalleeOrigin: origin},
+		&CallExpression{Callee: calleePlace, Arguments: arguments, Optional: optional, CalleeOrigin: origin},
 		node,
 	)
 }
@@ -265,24 +265,24 @@ func (builder *builder) lowerCallExpression(node *ast.Node) Place {
 func (builder *builder) lowerNewExpression(node *ast.Node) Place {
 	expression := node.AsNewExpression()
 	callee := builder.lowerExpressionToPlace(expression.Expression)
-	args := builder.lowerArguments(expression.Arguments)
-	return builder.emit(&NewExpression{Callee: callee, Args: args}, node)
+	arguments := builder.lowerArguments(expression.Arguments)
+	return builder.emit(&NewExpression{Callee: callee, Arguments: arguments}, node)
 }
 
 func (builder *builder) lowerArguments(list *ast.NodeList) []Argument {
 	if list == nil {
 		return nil
 	}
-	args := make([]Argument, 0, len(list.Nodes))
+	arguments := make([]Argument, 0, len(list.Nodes))
 	for _, argument := range list.Nodes {
 		if argument.Kind == ast.KindSpreadElement {
 			value := builder.lowerExpressionToPlace(argument.AsSpreadElement().Expression)
-			args = append(args, Argument{Place: value, Spread: true})
+			arguments = append(arguments, Argument{Place: value, Spread: true})
 			continue
 		}
-		args = append(args, Argument{Place: builder.lowerExpressionToPlace(argument)})
+		arguments = append(arguments, Argument{Place: builder.lowerExpressionToPlace(argument)})
 	}
-	return args
+	return arguments
 }
 
 // lowerBinaryExpression lowers a binary operator, an assignment, or a logical operator.
@@ -727,7 +727,7 @@ func (builder *builder) lowerJsxElement(node *ast.Node) Place {
 	properties := builder.lowerJsxAttributes(attributes)
 	childPlaces := builder.lowerJsxChildren(children)
 
-	return builder.emit(&JsxExpression{Tag: tag, Props: properties, Children: childPlaces}, node)
+	return builder.emit(&JsxExpression{Tag: tag, Properties: properties, Children: childPlaces}, node)
 }
 
 func (builder *builder) lowerJsxFragment(node *ast.Node) Place {

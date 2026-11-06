@@ -30,7 +30,7 @@ func composeDoc(options Options, directives *Directives, token *cst.Token, onErr
 	if next == nil && len(end) > 0 {
 		next = end[0]
 	}
-	properties := resolveProps(start, resolvePropsOptions{
+	properties := resolveProperties(start, resolvePropsOptions{
 		indicator:      "doc-start",
 		next:           next,
 		offset:         offset,
@@ -97,7 +97,7 @@ func composeNode(composition *composeContext, token *cst.Token, properties props
 		onError(errorToken{token: anchor}, "BAD_ALIAS", "Anchor cannot be an empty string", false)
 	}
 	if atKey && composition.options.StringKeys && (!IsScalar(node) || !isString(node.ScalarValue) ||
-		node.Tag != "" && node.Tag != strTagName) {
+		node.Tag != "" && node.Tag != stringTagName) {
 		message := "With stringKeys, all keys must be strings"
 		source := token
 		if tag != nil {
@@ -116,7 +116,7 @@ func composeNode(composition *composeContext, token *cst.Token, properties props
 		}
 	}
 	if composition.options.KeepSourceTokens && isSourceToken {
-		node.SrcToken = token
+		node.SourceToken = token
 	}
 	return node
 }

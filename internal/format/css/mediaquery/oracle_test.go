@@ -223,9 +223,9 @@ func TestParseAgreesWithPostcssMediaQueryParser(test *testing.T) {
 	root := corpus.PrettierFork.Root(test)
 
 	type input struct {
-		Name   string `json:"name"`
-		Params string `json:"params"`
-		File   string `json:"file,omitempty"`
+		Name       string `json:"name"`
+		Parameters string `json:"params"`
+		File       string `json:"file,omitempty"`
 	}
 	var inputs []input
 	corpusFiles := 0
@@ -269,7 +269,7 @@ func TestParseAgreesWithPostcssMediaQueryParser(test *testing.T) {
 	throws := map[string]bool{}
 	for _, fixture := range mediaQueryFixtures {
 		name := "fixture: " + fixture.name
-		inputs = append(inputs, input{Name: name, Params: fixture.params})
+		inputs = append(inputs, input{Name: name, Parameters: fixture.params})
 		throws[name] = fixture.throws
 	}
 

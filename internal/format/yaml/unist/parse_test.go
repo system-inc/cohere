@@ -770,7 +770,7 @@ func TestComparisonSeesEveryField(test *testing.T) {
 		"name":          func(root *jsonNode) { find(root, "directive").Name = new("TAG") },
 		"parameters":    func(root *jsonNode) { find(root, "directive").Parameters = []string{} },
 		"parent":        func(root *jsonNode) { find(root, "plain").Parent = 0 },
-		"identity":      func(root *jsonNode) { find(root, "comment").ID = 9999 },
+		"identity":      func(root *jsonNode) { find(root, "comment").Id = 9999 },
 		"keys":          func(root *jsonNode) { find(root, "plain").Keys = []string{"type"} },
 		"null for []":   func(root *jsonNode) { find(root, "mappingValue").LeadingComments = nil },
 		"no tag":        func(root *jsonNode) { find(root, "blockLiteral").Tag = nil },

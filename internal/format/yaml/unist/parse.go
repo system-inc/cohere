@@ -71,7 +71,7 @@ func Parse(text string, nodes *arena.Arena[Node]) (root *Node, parseError error)
 	cstTokens := slices.Collect(parser.Parse(units, false))
 	for parsedDocument := range composer.Compose(cstTokens, true, len(units)) {
 		if len(parsedDocument.Errors) > 0 {
-			return nil, context.newYAMLSyntaxError(parsedDocument.Errors[0], offsets)
+			return nil, context.newYamlSyntaxError(parsedDocument.Errors[0], offsets)
 		}
 		parsedDocuments = append(parsedDocuments, parsedDocument)
 	}

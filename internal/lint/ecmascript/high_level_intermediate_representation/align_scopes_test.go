@@ -94,7 +94,7 @@ func violationsByKind(scopes, blocks []nestingItem) (scopeInBlock, blockInScope,
 func widenedTableFrom(scopes *ReactiveScopes, aligned *AlignedScopes) *ReactiveScopes {
 	widened := &ReactiveScopes{
 		byIdentifier: scopes.byIdentifier,
-		ranges:       make(map[ScopeId]mutation_aliasing.MutableRange, scopes.Len()),
+		ranges:       make(map[ScopeId]mutation_aliasing.MutableRange, scopes.Length()),
 		members:      scopes.members,
 		order:        scopes.order,
 	}
@@ -132,7 +132,7 @@ func TestAlignClosesTheFullBlockNestingAssertion(test *testing.T) {
 		scopes *ReactiveScopes,
 	) {
 		functions++
-		scopesBefore += scopes.Len()
+		scopesBefore += scopes.Length()
 		blocks := programBlockSubtrees(function)
 
 		pre := scopeNestingItems(scopeRangeMap(scopes))
@@ -153,7 +153,7 @@ func TestAlignClosesTheFullBlockNestingAssertion(test *testing.T) {
 
 		aligned, merged := AlignThenMergeReactiveScopes(function, scopes)
 		widened += aligned.Widened()
-		scopesAfter += merged.Len()
+		scopesAfter += merged.Length()
 		finalItems := scopeNestingItems(mergedRangeMap(merged))
 		fullAligned += blockNestingViolations(finalItems, blocks)
 		scopeAligned += blockNestingViolations(finalItems, nil)
@@ -762,7 +762,7 @@ func TestAlignVoidsTheMergesComparatorVerdicts(test *testing.T) {
 	alignedDiffering, unalignedDiffering := 0, 0
 
 	differs := func(left, right *MergedScopes) bool {
-		if left.Unions() != right.Unions() || left.Len() != right.Len() {
+		if left.Unions() != right.Unions() || left.Length() != right.Length() {
 			return true
 		}
 		for _, id := range left.Ids() {
@@ -909,7 +909,7 @@ func TestAlignIsASingleSweep(test *testing.T) {
 			}
 		}
 		blocksOverall += blocks
-		if scopes.Len() == 0 {
+		if scopes.Length() == 0 {
 			functionsWithoutScopes++
 		} else {
 			blocksWithScopes += blocks
@@ -951,9 +951,9 @@ func TestAlignIsDeterministic(test *testing.T) {
 	) {
 		first := AlignReactiveScopesToBlockScopes(function, scopes)
 		second := AlignReactiveScopesToBlockScopes(function, scopes)
-		if first.Len() != second.Len() || first.Widened() != second.Widened() {
+		if first.Length() != second.Length() || first.Widened() != second.Widened() {
 			test.Fatalf("two runs disagree on size: %d/%d scopes, %d/%d widened",
-				first.Len(), second.Len(), first.Widened(), second.Widened())
+				first.Length(), second.Length(), first.Widened(), second.Widened())
 		}
 		for _, id := range first.Ids() {
 			if first.RangeOf(id) != second.RangeOf(id) {
@@ -974,15 +974,15 @@ func TestAlignHandlesAnEmptyScopeTable(test *testing.T) {
 	test.Parallel()
 
 	function := &Function{}
-	if got := AlignReactiveScopesToBlockScopes(function, &ReactiveScopes{}); got.Len() != 0 {
-		test.Errorf("an empty scope table produced %d scopes", got.Len())
+	if got := AlignReactiveScopesToBlockScopes(function, &ReactiveScopes{}); got.Length() != 0 {
+		test.Errorf("an empty scope table produced %d scopes", got.Length())
 	}
-	if got := AlignReactiveScopesToBlockScopes(nil, nil); got.Len() != 0 {
-		test.Errorf("nil inputs produced %d scopes", got.Len())
+	if got := AlignReactiveScopesToBlockScopes(nil, nil); got.Length() != 0 {
+		test.Errorf("nil inputs produced %d scopes", got.Length())
 	}
 	aligned, merged := AlignThenMergeReactiveScopes(nil, nil)
-	if aligned.Len() != 0 || merged.Len() != 0 {
+	if aligned.Length() != 0 || merged.Length() != 0 {
 		test.Errorf("nil inputs through the composed spelling produced %d aligned and %d merged",
-			aligned.Len(), merged.Len())
+			aligned.Length(), merged.Length())
 	}
 }

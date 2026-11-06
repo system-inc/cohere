@@ -441,9 +441,9 @@ func TestALeftoverIsNamedWithItsFile(test *testing.T) {
 	}
 }
 
-// TestAPackageJSONWithoutPrettierIsNotALeftover: almost every repository has a package.json, and only
+// TestAPackageJsonWithoutPrettierIsNotALeftover: almost every repository has a package.json, and only
 // its "prettier" key is old config.
-func TestAPackageJSONWithoutPrettierIsNotALeftover(test *testing.T) {
+func TestAPackageJsonWithoutPrettierIsNotALeftover(test *testing.T) {
 	test.Parallel()
 	root := test.TempDir()
 	project(test, root, `{"printWidth": 120}`)

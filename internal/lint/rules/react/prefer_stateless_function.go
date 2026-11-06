@@ -180,7 +180,7 @@ var PreferStatelessFunction = rule.Rule[PreferStatelessFunctionOptions]{
 				// A JSX `ref` attribute anywhere in the file disqualifies every component in it.
 				// That is upstream's own scope: `markRefAsUsed` sets the flag on the component the
 				// registry currently holds, and with one component per file that is file-wide.
-				fileUsesReference := preferStatelessFunctionFileUsesRef(sourceFile)
+				fileUsesReference := preferStatelessFunctionFileUsesReference(sourceFile)
 
 				var visit func(*ast.Node)
 				visit = func(node *ast.Node) {
@@ -507,7 +507,7 @@ func preferStatelessFunctionHasDecorator(component *ast.Node) bool {
 	return false
 }
 
-// preferStatelessFunctionFileUsesRef reports whether any JSX `ref` attribute appears in the file.
+// preferStatelessFunctionFileUsesReference reports whether any JSX `ref` attribute appears in the file.
 //
 // Upstream's handler sets the flag on whichever component the registry currently holds, which for a
 // one-component file is the component being judged. File scope reproduces that for every input the
@@ -515,7 +515,7 @@ func preferStatelessFunctionHasDecorator(component *ast.Node) bool {
 //
 // The name is compared exactly. Upstream renders the attribute name through `getText` and compares
 // against `ref`, so a namespaced `a:ref` renders as `a:ref` and does not match.
-func preferStatelessFunctionFileUsesRef(sourceFile *ast.Node) bool {
+func preferStatelessFunctionFileUsesReference(sourceFile *ast.Node) bool {
 	found := false
 	var visit func(*ast.Node)
 	visit = func(node *ast.Node) {

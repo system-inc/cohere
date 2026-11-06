@@ -90,9 +90,9 @@ func parseValueNode(valueNode *estree.Node, walk valueRootWalk, options *parseOp
 			}
 
 			// Stringify if the value parser can't handle the content.
-			if hasSCSSInterpolation(groupList) ||
+			if hasScssInterpolation(groupList) ||
 				(!hasStringOrFunction(groupList) &&
-					!isSCSSVariable(firstGroup, options)) {
+					!isScssVariable(firstGroup, options)) {
 				// The one place a groups list holds a string, so it is a []any here and not a
 				// []*estree.Node.
 				node.Child("group").Set("groups", []any{getFunctionArgumentsText(node, walk)})

@@ -41,12 +41,12 @@ func printAssignment(
 
 	// First break right-hand side, then after operator
 	case "fluid":
-		groupID := newGroupID("assignment")
+		groupId := newGroupId("assignment")
 		return groupIn(path, concatIn(path, groupIn(path, leftDoc),
 			operator,
-			groupWithIn(path, indentIn(path, line), doc.GroupOptions{ID: groupID}),
+			groupWithIn(path, indentIn(path, line), doc.GroupOptions{Id: groupId}),
 			lineSuffixBoundary,
-			indentIfBreak(rightDoc, groupID, false),
+			indentIfBreak(rightDoc, groupId, false),
 		))
 
 	case "break-lhs":
@@ -166,7 +166,7 @@ func chooseLayout(path *Path, options *Options, print PrintFunc, leftDoc Doc, ri
 		return "break-after-operator"
 	}
 
-	if isComplexTypeAliasParams(current) {
+	if isComplexTypeAliasParameters(current) {
 		return "break-lhs"
 	}
 
@@ -275,8 +275,8 @@ func isAssignmentOrVariableDeclarator(current Node) bool {
 	return isAssignment(current) || current.Is("VariableDeclarator")
 }
 
-// isComplexTypeAliasParams is upstream's isComplexTypeAliasParams.
-func isComplexTypeAliasParams(current Node) bool {
+// isComplexTypeAliasParameters is upstream's isComplexTypeAliasParameters.
+func isComplexTypeAliasParameters(current Node) bool {
 	typeParameters := getTypeParametersFromTypeAlias(current)
 	if len(typeParameters) > 0 {
 		constraintPropertyName := "bound"
@@ -362,9 +362,9 @@ func isPoorlyBreakableMemberOrCallChain(path *Path, options *Options, print Prin
 			return false
 		}
 
-		args := getCallArguments(current)
-		isPoorlyBreakableCall := len(args) == 0 ||
-			(len(args) == 1 && isLoneShortArgument(args[0], options))
+		arguments := getCallArguments(current)
+		isPoorlyBreakableCall := len(arguments) == 0 ||
+			(len(arguments) == 1 && isLoneShortArgument(arguments[0], options))
 		if !isPoorlyBreakableCall {
 			return false
 		}
@@ -392,7 +392,7 @@ func isObjectPropertyWithShortKey(current Node, keyDoc Doc, options *Options) bo
 	// version of cleanDoc, such that it would stop once it detects that
 	// the doc can't be reduced to a string.
 	keyDoc = doc.CleanDoc(keyDoc)
-	const minOverlapForBreak = 3
+	const minimumOverlapForBreak = 3
 	//   ↓↓ - insufficient overlap for a line break
 	// key1: longValue1,
 	//   ↓↓↓↓↓↓ - overlap is long enough to break
@@ -402,7 +402,7 @@ func isObjectPropertyWithShortKey(current Node, keyDoc Doc, options *Options) bo
 	// Upstream's `typeof keyDoc === "string"`; getStringWidth is doc.StringWidth.
 	text, isText := keyDoc.(doc.Text)
 	return isText &&
-		doc.StringWidth(string(text)) < settingsOf(options).TabWidth+minOverlapForBreak
+		doc.StringWidth(string(text)) < settingsOf(options).TabWidth+minimumOverlapForBreak
 }
 
 // isCallExpressionWithComplexTypeArguments is upstream's isCallExpressionWithComplexTypeArguments.

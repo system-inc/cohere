@@ -187,7 +187,7 @@ func (theme *Theme) Size() int {
 func (theme *Theme) Add(key, value string, options ThemeOptions) error {
 	if strings.HasSuffix(key, "-*") {
 		if value != "initial" {
-			return &CSSSyntaxError{Message: "Invalid theme value `" + value + "` for namespace `" + key + "`"}
+			return &CssSyntaxError{Message: "Invalid theme value `" + value + "` for namespace `" + key + "`"}
 		}
 		if key == "--*" {
 			theme.clearAll()
@@ -376,7 +376,7 @@ func (theme *Theme) HasDefault(key string) bool {
 // rather than as it is stored. That asymmetry is upstream's: Entries hands out prefixed keys, and
 // this takes them back.
 func (theme *Theme) GetOptions(key string) ThemeOptions {
-	storedKey := unescapeCSSIdentifier(theme.unprefixKey(key))
+	storedKey := unescapeCssIdentifier(theme.unprefixKey(key))
 	if value, ok := theme.values[storedKey]; ok {
 		return value.options
 	}
@@ -496,7 +496,7 @@ func (theme *Theme) variableReference(themeKey string) (string, bool) {
 		return "", false
 	}
 
-	reference := "var(" + escapeCSSIdentifier(theme.PrefixKey(themeKey))
+	reference := "var(" + escapeCssIdentifier(theme.PrefixKey(themeKey))
 	if declaration.options&ThemeOptionReference != 0 && declaration.value != "" {
 		reference += ", " + declaration.value
 	}
@@ -511,7 +511,7 @@ func (theme *Theme) variableReference(themeKey string) (string, bool) {
 // first-caller-wins signal that is easy to get backwards when written later from memory. The key is
 // unprefixed and unescaped first, matching GetOptions.
 func (theme *Theme) MarkUsedVariable(themeKey string) bool {
-	key := unescapeCSSIdentifier(theme.unprefixKey(themeKey))
+	key := unescapeCssIdentifier(theme.unprefixKey(themeKey))
 	value, ok := theme.values[key]
 	if !ok {
 		return false
@@ -655,7 +655,7 @@ func (theme *Theme) Namespace(namespace string) []NamespaceEntry {
 	return entries
 }
 
-// escapeCSSIdentifier serializes a string as a CSS identifier, and is a port of `CSS.escape` from
+// escapeCssIdentifier serializes a string as a CSS identifier, and is a port of `CSS.escape` from
 // `src/utils/escape.ts`.
 //
 // Ported rather than approximated because it runs on every `var()` this file builds, and the escape
@@ -667,7 +667,7 @@ func (theme *Theme) Namespace(namespace string) []NamespaceEntry {
 // reachable for a non-ASCII byte is the `>= 0x80` passthrough, and every byte of a multi-byte UTF-8
 // sequence has its high bit set. So a multi-byte character is copied through byte by byte and
 // reassembles unchanged, exactly as upstream copies it code unit by code unit.
-func escapeCSSIdentifier(value string) string {
+func escapeCssIdentifier(value string) string {
 	if len(value) == 1 && value[0] == '-' {
 		return "\\-"
 	}
@@ -707,7 +707,7 @@ func escapeCSSIdentifier(value string) string {
 	return builder.String()
 }
 
-// unescapeCSSIdentifier reverses escapeCSSIdentifier, and is a port of `unescape` from
+// unescapeCssIdentifier reverses escapeCSSIdentifier, and is a port of `unescape` from
 // `src/utils/escape.ts`.
 //
 // Upstream is a regex, `/\\([\dA-Fa-f]{1,6}[\t\n\f\r ]?|[\S\s])/g`, and this is the same grammar as
@@ -720,7 +720,7 @@ func escapeCSSIdentifier(value string) string {
 // one *rune* rather than one byte for the same reason: upstream's `[\S\s]` matches a whole code
 // unit, and taking a byte would split a multi-byte character after a backslash. Everything else
 // scans bytes, since the hex digits and whitespace terminators are all ASCII.
-func unescapeCSSIdentifier(escaped string) string {
+func unescapeCssIdentifier(escaped string) string {
 	if !strings.Contains(escaped, "\\") {
 		return escaped
 	}

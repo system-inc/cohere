@@ -40,13 +40,13 @@ type NoExplicitAnyOptions struct {
 	// when the flag is on, and no repair at all when it is off.
 	FixToUnknown bool `json:"fixToUnknown"`
 
-	// IgnoreRestArgs exempts every `any` written anywhere inside a rest parameter.
+	// IgnoreRestArguments exempts every `any` written anywhere inside a rest parameter.
 	//
 	// The exemption is by containment rather than by shape, which is wider than it first reads and
 	// was measured rather than inferred. Upstream walks *every* ancestor of the `any` token looking
 	// for a rest parameter, so `...args: Map<any, any>` and `...args: any[][]` are exempt as
 	// wholly as `...args: any[]` is. See `isInsideRestParameter` for the four inputs that pin it.
-	IgnoreRestArgs bool `json:"ignoreRestArgs"`
+	IgnoreRestArguments bool `json:"ignoreRestArgs"`
 }
 
 // NoExplicitAny flags an explicit `any` type annotation.
@@ -134,7 +134,7 @@ var NoExplicitAny = rule.Rule[NoExplicitAnyOptions]{
 
 		return rule.Listeners{
 			ast.KindAnyKeyword: func(node *ast.Node) {
-				if parsed.IgnoreRestArgs && isInsideRestParameter(node) {
+				if parsed.IgnoreRestArguments && isInsideRestParameter(node) {
 					return
 				}
 
