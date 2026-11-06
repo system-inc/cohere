@@ -14,8 +14,8 @@ const defaultParamLastFile = "/repository/source/Parameters.ts"
 // per finding, so the counts here are read off rather than recovered: 45 inputs producing 54
 // findings. Every case was replayed through the installed @typescript-eslint build before it was
 // written here, and all 45 agreed with the corpus on count and on span.
-func TestDefaultParamLastFires(t *testing.T) {
-	t.Parallel()
+func TestDefaultParamLastFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -199,20 +199,20 @@ func TestDefaultParamLastFires(t *testing.T) {
 		{"an optional parameter property",
 			"class Foo { constructor(private a?: number, b: number) {} }", []string{"shouldBeLast"}},
 		// Four violations in one list, alternating, to pin that the sweep does not stop at the
-		// first finding and that the region boundary is the LAST plain parameter rather than the
+		// first finding and that the region boundary is the last plain parameter rather than the
 		// first. Measured: two findings, on `a = 1` and `c = 2`, with `e = 3` clean because no
 		// plain parameter follows it.
 		{"three defaults straddling two required parameters",
 			"function foo(a = 1, b: number, c = 2, d: number, e = 3) {}",
 			[]string{"shouldBeLast", "shouldBeLast"}},
 
-		// An accessor with an ILLEGAL parameter list. These four exist because a mutation emptying
+		// An accessor with an illegal parameter list. These four exist because a mutation emptying
 		// the getter and setter arms survived the whole suite, and the reason it survived was that
 		// the reasoning behind those arms was wrong rather than that nothing could reach them.
 		//
 		// The argument that looked airtight: a setter takes exactly one parameter and a getter
 		// none, so no plain parameter can follow a defaulted one and the loop body never runs.
-		// That is the GRAMMAR. Our parser recovers from source that violates it and attaches the
+		// That is the grammar. Our parser recovers from source that violates it and attaches the
 		// extra parameters anyway, so a two-parameter setter is a live node here. Probed directly:
 		// all four inputs below give the accessor two parameters and a body.
 		//
@@ -229,10 +229,10 @@ func TestDefaultParamLastFires(t *testing.T) {
 			"const o = { get x(a = 1, b: number) { return 1; } };", []string{"shouldBeLast"}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, DefaultParamLast, defaultParamLastFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.messageIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, DefaultParamLast, defaultParamLastFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, testCase.messageIds...)
 		})
 	}
 }
@@ -241,8 +241,8 @@ func TestDefaultParamLastFires(t *testing.T) {
 // verbatim, plus the clean side of every decision the fires table exercises. Upstream's clean cases
 // are the false positives it already thought about; the added ones cover the two places our tree
 // differs from the one upstream reads.
-func TestDefaultParamLastStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestDefaultParamLastStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -335,12 +335,12 @@ func TestDefaultParamLastStaysSilent(t *testing.T) {
 			"\nclass Foo {\n  constructor(\n    a: number,\n    private b?: number,\n    c = 0,\n  ) {}\n}\n    "},
 		// Beyond the corpus, and this block is the substance of the port.
 		//
-		// Every bodyless function-like construct is a DIFFERENT node type in the tree upstream
+		// Every bodyless function-like construct is a different node type in the tree upstream
 		// reads, so none of them reaches its three listeners. Our parser draws no such distinction
 		// for the first four: a `declare function` is an ordinary KindFunctionDeclaration whose
 		// Body() is nil, and an overload signature is an ordinary KindConstructor whose Body() is
 		// nil. Without the nil-body guard the rule reports every ambient declaration in the tree,
-		// and NOT ONE of the 42 clean corpus cases above can see it, because the corpus writes no
+		// and not one of the 42 clean corpus cases above can see it, because the corpus writes no
 		// ambient declaration anywhere. All six were measured clean against the installed rule.
 		{"an ambient function declaration",
 			"declare function foo(a = 1, b: number): void;"},
@@ -359,7 +359,7 @@ func TestDefaultParamLastStaysSilent(t *testing.T) {
 		{"a function type alias",
 			"type T = (a?: number, b: number) => void;"},
 
-		// An accessor is a FunctionExpression upstream and is visited. These two are the LEGAL
+		// An accessor is a FunctionExpression upstream and is visited. These two are the legal
 		// shapes, where no violation is expressible: a setter takes exactly one parameter and a
 		// getter none, so no plain parameter can follow a defaulted one. The illegal shapes, which
 		// our parser does produce and which do report, are in the fires table above. Measured:
@@ -380,10 +380,10 @@ func TestDefaultParamLastStaysSilent(t *testing.T) {
 			"function foo(a: number, b: number, c = 1, d = 2) {}"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, DefaultParamLast, defaultParamLastFile, testCase.sourceText)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, DefaultParamLast, defaultParamLastFile, testCase.sourceText)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -391,20 +391,20 @@ func TestDefaultParamLastStaysSilent(t *testing.T) {
 // TestDefaultParamLastSpans asserts where each finding points, by slicing the source the harness
 // actually wrote and comparing the text.
 //
-// The span is the load-bearing half of this port. Upstream reports the OUTER TSParameterProperty
+// The span is the load-bearing half of this port. Upstream reports the outer TSParameterProperty
 // node for a parameter property, so its finding covers the `public` or `readonly` keyword;
 // typescript-go has no wrapper and the modifiers live on the parameter, so the same span arrives
 // for a different structural reason and only an assertion records that the two agree. Nothing in
 // ExpectFindings can see it: every one of these cases carries the same single message id.
 //
-// The expected texts are the spans MEASURED against the installed @typescript-eslint build over the
+// The expected texts are the spans measured against the installed @typescript-eslint build over the
 // same 45 inputs, converted from line and column to byte offsets over the trimmed source. All 45
 // agreed with the corpus's own stated columns.
 //
 // rule_testing.Run does not trim, so the literal here and the file on disk are the same bytes and the
 // slice is not offset. The typed harness would trim; this rule needs no checker.
-func TestDefaultParamLastSpans(t *testing.T) {
-	t.Parallel()
+func TestDefaultParamLastSpans(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -568,17 +568,17 @@ func TestDefaultParamLastSpans(t *testing.T) {
 			[]string{"a = 1", "c = 2"}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, DefaultParamLast, defaultParamLastFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, DefaultParamLast, defaultParamLastFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.wantTexts) {
-				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.wantTexts))
+				test.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.wantTexts))
 			}
 			for index, wantText := range testCase.wantTexts {
 				diagnostic := result.Diagnostics[index]
 				gotText := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if gotText != wantText {
-					t.Errorf("finding %d spans %q, want %q", index, gotText, wantText)
+					test.Errorf("finding %d spans %q, want %q", index, gotText, wantText)
 				}
 			}
 		})
@@ -591,24 +591,24 @@ func TestDefaultParamLastSpans(t *testing.T) {
 //
 // The rule interpolates nothing, so there is no rendered text and no format string to guard; a
 // rule.Message is {Id, Description} and both halves are asserted directly.
-func TestDefaultParamLastMessageReadsAsWritten(t *testing.T) {
-	t.Parallel()
+func TestDefaultParamLastMessageReadsAsWritten(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, DefaultParamLast, defaultParamLastFile,
+	result := rule_testing.Run(test, DefaultParamLast, defaultParamLastFile,
 		"function foo(a = 1, b: number) {}")
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
+		test.Fatalf("got %d findings, want 1", len(result.Diagnostics))
 	}
 	message := result.Diagnostics[0].Message
 	if message.Id != "shouldBeLast" {
-		t.Errorf("message id is %q, want %q", message.Id, "shouldBeLast")
+		test.Errorf("message id is %q, want %q", message.Id, "shouldBeLast")
 	}
 	// The description says why the code is wrong rather than restating the rule name. Asserted on
 	// the opening clause and on the closing one, so a mutation to either end is visible.
 	if !strings.HasPrefix(message.Description, "A parameter with a default sits before a parameter") {
-		t.Errorf("description opens with %q", message.Description)
+		test.Errorf("description opens with %q", message.Description)
 	}
 	if !strings.HasSuffix(message.Description, "where omitting it is what selects the default.") {
-		t.Errorf("description closes with %q", message.Description)
+		test.Errorf("description closes with %q", message.Description)
 	}
 }

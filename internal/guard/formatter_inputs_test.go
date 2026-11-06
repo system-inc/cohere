@@ -16,27 +16,30 @@ import (
 // TestFormatterInputsCoverWhatCanChangeTheOutput reads the real module's inputs and checks each class
 // is there: the printers, the options they resolve, the typescript-go parser they parse with, and the
 // pass loop, and that no lint rule is.
-func TestFormatterInputsCoverWhatCanChangeTheOutput(t *testing.T) {
-	t.Parallel()
+func TestFormatterInputsCoverWhatCanChangeTheOutput(test *testing.T) {
+	test.Parallel()
 
 	// This package sits two directories below the module root.
-	module, err := filepath.Abs(filepath.Join("..", ".."))
-	if err != nil {
-		t.Fatal(err)
+	module, absolutePathError := filepath.Abs(filepath.Join("..", ".."))
+	if absolutePathError != nil {
+		test.Fatal(absolutePathError)
 	}
 
-	inputs, err := dispatch.FormatterInputs(module, nil)
-	if err != nil {
-		t.Fatal(err)
+	inputs, formatterInputsError := dispatch.FormatterInputs(module, nil)
+	if formatterInputsError != nil {
+		test.Fatal(formatterInputsError)
 	}
 	names := map[string]bool{}
 	for _, input := range inputs {
 		names[input.Name] = true
 		if strings.Contains(input.Name, "/internal/lint/rules/") {
-			t.Errorf("a lint rule is a formatter input, so a rule commit would throw the record away: %s", input.Name)
+			test.Errorf(
+				"a lint rule is a formatter input, so a rule commit would throw the record away: %s",
+				input.Name,
+			)
 		}
 		if len(input.Sum) != 64 {
-			t.Errorf("%s has no content hash: %q", input.Name, input.Sum)
+			test.Errorf("%s has no content hash: %q", input.Name, input.Sum)
 		}
 	}
 	for _, class := range []struct{ what, contains string }{
@@ -50,7 +53,7 @@ func TestFormatterInputsCoverWhatCanChangeTheOutput(t *testing.T) {
 			present = present || strings.Contains(name, class.contains)
 		}
 		if !present {
-			t.Errorf("%s (%s) are not among the formatter's inputs", class.what, class.contains)
+			test.Errorf("%s (%s) are not among the formatter's inputs", class.what, class.contains)
 		}
 	}
 }

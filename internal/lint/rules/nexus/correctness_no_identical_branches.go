@@ -14,10 +14,16 @@ const correctnessNoIdenticalBranchesId = "identicalBranches"
 
 // correctnessNoIdenticalBranchesText is the rule's message, whose wording lives in
 // `policy/messages/correctness-no-identical-branches.json`.
-var correctnessNoIdenticalBranchesText = policy.MessageOf("nexus/correctness-no-identical-branches", correctnessNoIdenticalBranchesId)
+var correctnessNoIdenticalBranchesText = policy.MessageOf(
+	"nexus/correctness-no-identical-branches",
+	correctnessNoIdenticalBranchesId,
+)
 
 func correctnessNoIdenticalBranchesMessage() rule.Message {
-	return rule.Message{Id: correctnessNoIdenticalBranchesId, Description: correctnessNoIdenticalBranchesText.Render(nil)}
+	return rule.Message{
+		Id:          correctnessNoIdenticalBranchesId,
+		Description: correctnessNoIdenticalBranchesText.Render(nil),
+	}
 }
 
 // CorrectnessNoIdenticalBranches reports a conditional whose every branch is the same code, so the
@@ -108,13 +114,13 @@ func correctnessNoIdenticalBranchesMessage() rule.Message {
 //
 // Which branch was meant is the author's call: the KlingApi site needed `'std'` on one side, and
 // deleting the conditional would have kept the bug.
-var CorrectnessNoIdenticalBranches = rule.Rule{
+var CorrectnessNoIdenticalBranches = rule.Rule[rule.NoOptions]{
 	Name:             "nexus/correctness-no-identical-branches",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.TypeChecker == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		if ruleContext.TypeChecker == nil {
 			// The narrowing guard needs types. Reporting without it would report the overload
 			// pattern above, so with no checker the rule declines the file.
 			return nil
@@ -123,7 +129,11 @@ var CorrectnessNoIdenticalBranches = rule.Rule{
 			ast.KindConditionalExpression: func(node *ast.Node) {
 				conditional := node.AsConditionalExpression()
 				whenTrue := ast.SkipParentheses(conditional.WhenTrue)
-				if !correctnessNoIdenticalBranchesSame(ctx, whenTrue, ast.SkipParentheses(conditional.WhenFalse)) {
+				if !correctnessNoIdenticalBranchesSame(
+					ruleContext,
+					whenTrue,
+					ast.SkipParentheses(conditional.WhenFalse),
+				) {
 					return
 				}
 				anchor := node
@@ -136,12 +146,16 @@ var CorrectnessNoIdenticalBranches = rule.Rule{
 					if ast.SkipParentheses(parentConditional.WhenFalse) != anchor {
 						break
 					}
-					if !correctnessNoIdenticalBranchesSame(ctx, ast.SkipParentheses(parentConditional.WhenTrue), whenTrue) {
+					if !correctnessNoIdenticalBranchesSame(
+						ruleContext,
+						ast.SkipParentheses(parentConditional.WhenTrue),
+						whenTrue,
+					) {
 						break
 					}
 					anchor = parent
 				}
-				ctx.ReportNode(anchor, correctnessNoIdenticalBranchesMessage())
+				ruleContext.ReportNode(anchor, correctnessNoIdenticalBranchesMessage())
 			},
 			ast.KindIfStatement: func(node *ast.Node) {
 				ifStatement := node.AsIfStatement()
@@ -154,24 +168,31 @@ var CorrectnessNoIdenticalBranches = rule.Rule{
 				// last `if` and reaches back up through the widening below.
 				thenBranch := correctnessNoIdenticalBranchesUnwrapBlock(ifStatement.ThenStatement)
 				elseBranch := correctnessNoIdenticalBranchesUnwrapBlock(ifStatement.ElseStatement)
-				if correctnessNoIdenticalBranchesIsEmpty(thenBranch) || correctnessNoIdenticalBranchesIsEmpty(elseBranch) {
+				if correctnessNoIdenticalBranchesIsEmpty(thenBranch) ||
+					correctnessNoIdenticalBranchesIsEmpty(elseBranch) {
 					return
 				}
-				if !correctnessNoIdenticalBranchesSame(ctx, thenBranch, elseBranch) {
+				if !correctnessNoIdenticalBranchesSame(ruleContext, thenBranch, elseBranch) {
 					return
 				}
 				anchor := node
 				for {
 					parent := anchor.Parent
-					if parent == nil || parent.Kind != ast.KindIfStatement || parent.AsIfStatement().ElseStatement != anchor {
+					if parent == nil ||
+						parent.Kind != ast.KindIfStatement ||
+						parent.AsIfStatement().ElseStatement != anchor {
 						break
 					}
-					if !correctnessNoIdenticalBranchesSame(ctx, correctnessNoIdenticalBranchesUnwrapBlock(parent.AsIfStatement().ThenStatement), thenBranch) {
+					if !correctnessNoIdenticalBranchesSame(
+						ruleContext,
+						correctnessNoIdenticalBranchesUnwrapBlock(parent.AsIfStatement().ThenStatement),
+						thenBranch,
+					) {
 						break
 					}
 					anchor = parent
 				}
-				ctx.ReportNode(anchor, correctnessNoIdenticalBranchesMessage())
+				ruleContext.ReportNode(anchor, correctnessNoIdenticalBranchesMessage())
 			},
 		}
 	},
@@ -214,14 +235,14 @@ func correctnessNoIdenticalBranchesIsEmpty(statement *ast.Node) bool {
 
 // correctnessNoIdenticalBranchesSame says whether two branches are the same code: the same tokens,
 // and, where the condition could have narrowed a type the branch reads, the same types.
-func correctnessNoIdenticalBranchesSame(ctx rule.Context, left *ast.Node, right *ast.Node) bool {
+func correctnessNoIdenticalBranchesSame(ruleContext rule.Context, left *ast.Node, right *ast.Node) bool {
 	if left == nil || right == nil {
 		return false
 	}
-	if !correctnessNoIdenticalBranchesSameTokens(ctx.SourceFile, left, right) {
+	if !correctnessNoIdenticalBranchesSameTokens(ruleContext.SourceFile, left, right) {
 		return false
 	}
-	return correctnessNoIdenticalBranchesSameTypes(ctx, left, right)
+	return correctnessNoIdenticalBranchesSameTypes(ruleContext, left, right)
 }
 
 // correctnessNoIdenticalBranchesChildren lists a node's children in source order.
@@ -258,7 +279,13 @@ func correctnessNoIdenticalBranchesSameTokens(sourceFile *ast.SourceFile, left *
 	rightRange := rule.TokenRange(sourceFile, right)
 	if len(leftChildren) == 0 {
 		if correctnessNoIdenticalBranchesIsPunctuationLeaf(left) {
-			return correctnessNoIdenticalBranchesSameGap(sourceFile, leftRange.Pos(), leftRange.End(), rightRange.Pos(), rightRange.End())
+			return correctnessNoIdenticalBranchesSameGap(
+				sourceFile,
+				leftRange.Pos(),
+				leftRange.End(),
+				rightRange.Pos(),
+				rightRange.End(),
+			)
 		}
 		text := sourceFile.Text()
 		return text[leftRange.Pos():leftRange.End()] == text[rightRange.Pos():rightRange.End()]
@@ -268,7 +295,13 @@ func correctnessNoIdenticalBranchesSameTokens(sourceFile *ast.SourceFile, left *
 	for index := range leftChildren {
 		leftChildRange := rule.TokenRange(sourceFile, leftChildren[index])
 		rightChildRange := rule.TokenRange(sourceFile, rightChildren[index])
-		if !correctnessNoIdenticalBranchesSameGap(sourceFile, leftCursor, leftChildRange.Pos(), rightCursor, rightChildRange.Pos()) {
+		if !correctnessNoIdenticalBranchesSameGap(
+			sourceFile,
+			leftCursor,
+			leftChildRange.Pos(),
+			rightCursor,
+			rightChildRange.Pos(),
+		) {
 			return false
 		}
 		if !correctnessNoIdenticalBranchesSameTokens(sourceFile, leftChildren[index], rightChildren[index]) {
@@ -293,7 +326,13 @@ func correctnessNoIdenticalBranchesIsPunctuationLeaf(node *ast.Node) bool {
 
 // correctnessNoIdenticalBranchesSameGap says whether two source ranges hold the same tokens,
 // ignoring the whitespace and comments between them.
-func correctnessNoIdenticalBranchesSameGap(sourceFile *ast.SourceFile, leftStart int, leftEnd int, rightStart int, rightEnd int) bool {
+func correctnessNoIdenticalBranchesSameGap(
+	sourceFile *ast.SourceFile,
+	leftStart int,
+	leftEnd int,
+	rightStart int,
+	rightEnd int,
+) bool {
 	leftTokens := correctnessNoIdenticalBranchesTokens(sourceFile, leftStart, leftEnd)
 	rightTokens := correctnessNoIdenticalBranchesTokens(sourceFile, rightStart, rightEnd)
 	if len(leftTokens) != len(rightTokens) {
@@ -321,6 +360,25 @@ func correctnessNoIdenticalBranchesTokens(sourceFile *ast.SourceFile, start int,
 		tokenScanner.Scan()
 	}
 	return tokens
+}
+
+// correctnessNoIdenticalBranchesTypedOperators are the binary operators that can reject a union
+// whose members they each accept. Equality, the logical operators, `??`, `,` and plain assignment
+// accept any union of what they accept, so narrowing cannot change whether they compile.
+var correctnessNoIdenticalBranchesTypedOperators = map[ast.Kind]bool{
+	ast.KindPlusToken: true, ast.KindMinusToken: true, ast.KindAsteriskToken: true,
+	ast.KindAsteriskAsteriskToken: true, ast.KindSlashToken: true, ast.KindPercentToken: true,
+	ast.KindLessThanLessThanToken: true, ast.KindGreaterThanGreaterThanToken: true,
+	ast.KindGreaterThanGreaterThanGreaterThanToken: true, ast.KindAmpersandToken: true,
+	ast.KindBarToken: true, ast.KindCaretToken: true,
+	ast.KindLessThanToken: true, ast.KindGreaterThanToken: true,
+	ast.KindLessThanEqualsToken: true, ast.KindGreaterThanEqualsToken: true,
+	ast.KindInKeyword: true, ast.KindInstanceOfKeyword: true,
+	ast.KindPlusEqualsToken: true, ast.KindMinusEqualsToken: true, ast.KindAsteriskEqualsToken: true,
+	ast.KindAsteriskAsteriskEqualsToken: true, ast.KindSlashEqualsToken: true,
+	ast.KindPercentEqualsToken: true, ast.KindLessThanLessThanEqualsToken: true,
+	ast.KindGreaterThanGreaterThanEqualsToken: true, ast.KindGreaterThanGreaterThanGreaterThanEqualsToken: true,
+	ast.KindAmpersandEqualsToken: true, ast.KindBarEqualsToken: true, ast.KindCaretEqualsToken: true,
 }
 
 // correctnessNoIdenticalBranchesSameTypes walks two token-identical branches in parallel and says
@@ -352,66 +410,56 @@ func correctnessNoIdenticalBranchesTokens(sourceFile *ast.SourceFile, start int,
 // A type of `never` on one side matches anything on the other: the condition narrowed that
 // reference to nothing in one branch, so the other branch already sees its whole type, and the
 // merged copy is exactly that branch as the checker sees it.
-func correctnessNoIdenticalBranchesSameTypes(ctx rule.Context, left *ast.Node, right *ast.Node) bool {
+func correctnessNoIdenticalBranchesSameTypes(ruleContext rule.Context, left *ast.Node, right *ast.Node) bool {
 	switch left.Kind {
 	case ast.KindCallExpression, ast.KindNewExpression, ast.KindTaggedTemplateExpression,
 		ast.KindJsxOpeningElement, ast.KindJsxSelfClosingElement:
 		if !correctnessNoIdenticalBranchesIsIntrinsicJsx(left) &&
-			ctx.TypeChecker.GetResolvedSignature(left) != ctx.TypeChecker.GetResolvedSignature(right) {
+			ruleContext.TypeChecker.GetResolvedSignature(left) != ruleContext.TypeChecker.GetResolvedSignature(right) {
 			return false
 		}
 		for index, leftArgument := range correctnessNoIdenticalBranchesArguments(left) {
 			if leftArgument.Kind == ast.KindSpreadElement &&
-				!correctnessNoIdenticalBranchesSameTypeAt(ctx, leftArgument.AsSpreadElement().Expression,
+				!correctnessNoIdenticalBranchesSameTypeAt(ruleContext, leftArgument.AsSpreadElement().Expression,
 					correctnessNoIdenticalBranchesArguments(right)[index].AsSpreadElement().Expression) {
 				return false
 			}
 		}
 	case ast.KindBinaryExpression:
 		if correctnessNoIdenticalBranchesTypedOperators[left.AsBinaryExpression().OperatorToken.Kind] &&
-			(!correctnessNoIdenticalBranchesSameTypeAt(ctx, left.AsBinaryExpression().Left, right.AsBinaryExpression().Left) ||
-				!correctnessNoIdenticalBranchesSameTypeAt(ctx, left.AsBinaryExpression().Right, right.AsBinaryExpression().Right)) {
+			(!correctnessNoIdenticalBranchesSameTypeAt(
+				ruleContext,
+				left.AsBinaryExpression().Left,
+				right.AsBinaryExpression().Left,
+			) ||
+				!correctnessNoIdenticalBranchesSameTypeAt(
+					ruleContext,
+					left.AsBinaryExpression().Right,
+					right.AsBinaryExpression().Right,
+				)) {
 			return false
 		}
 	}
 	leftChildren := correctnessNoIdenticalBranchesChildren(left)
 	rightChildren := correctnessNoIdenticalBranchesChildren(right)
 	for index := range leftChildren {
-		if !correctnessNoIdenticalBranchesSameTypes(ctx, leftChildren[index], rightChildren[index]) {
+		if !correctnessNoIdenticalBranchesSameTypes(ruleContext, leftChildren[index], rightChildren[index]) {
 			return false
 		}
 	}
 	return true
 }
 
-// correctnessNoIdenticalBranchesTypedOperators are the binary operators that can reject a union
-// whose members they each accept. Equality, the logical operators, `??`, `,` and plain assignment
-// accept any union of what they accept, so narrowing cannot change whether they compile.
-var correctnessNoIdenticalBranchesTypedOperators = map[ast.Kind]bool{
-	ast.KindPlusToken: true, ast.KindMinusToken: true, ast.KindAsteriskToken: true,
-	ast.KindAsteriskAsteriskToken: true, ast.KindSlashToken: true, ast.KindPercentToken: true,
-	ast.KindLessThanLessThanToken: true, ast.KindGreaterThanGreaterThanToken: true,
-	ast.KindGreaterThanGreaterThanGreaterThanToken: true, ast.KindAmpersandToken: true,
-	ast.KindBarToken: true, ast.KindCaretToken: true,
-	ast.KindLessThanToken: true, ast.KindGreaterThanToken: true,
-	ast.KindLessThanEqualsToken: true, ast.KindGreaterThanEqualsToken: true,
-	ast.KindInKeyword: true, ast.KindInstanceOfKeyword: true,
-	ast.KindPlusEqualsToken: true, ast.KindMinusEqualsToken: true, ast.KindAsteriskEqualsToken: true,
-	ast.KindAsteriskAsteriskEqualsToken: true, ast.KindSlashEqualsToken: true,
-	ast.KindPercentEqualsToken: true, ast.KindLessThanLessThanEqualsToken: true,
-	ast.KindGreaterThanGreaterThanEqualsToken: true, ast.KindGreaterThanGreaterThanGreaterThanEqualsToken: true,
-	ast.KindAmpersandEqualsToken: true, ast.KindBarEqualsToken: true, ast.KindCaretEqualsToken: true,
-}
-
 // correctnessNoIdenticalBranchesSameTypeAt compares the checker's type for one pair of matching
 // expressions, with `never` on either side matching anything (see above).
-func correctnessNoIdenticalBranchesSameTypeAt(ctx rule.Context, left *ast.Node, right *ast.Node) bool {
-	leftType := ctx.TypeChecker.GetTypeAtLocation(left)
-	rightType := ctx.TypeChecker.GetTypeAtLocation(right)
+func correctnessNoIdenticalBranchesSameTypeAt(ruleContext rule.Context, left *ast.Node, right *ast.Node) bool {
+	leftType := ruleContext.TypeChecker.GetTypeAtLocation(left)
+	rightType := ruleContext.TypeChecker.GetTypeAtLocation(right)
 	if leftType == rightType {
 		return true
 	}
-	return type_checking.IsTypeFlagSet(leftType, checker.TypeFlagsNever) || type_checking.IsTypeFlagSet(rightType, checker.TypeFlagsNever)
+	return type_checking.IsTypeFlagSet(leftType, checker.TypeFlagsNever) ||
+		type_checking.IsTypeFlagSet(rightType, checker.TypeFlagsNever)
 }
 
 // correctnessNoIdenticalBranchesArguments lists a call's or a construction's arguments.

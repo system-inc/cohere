@@ -10,5 +10,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // package may hold as many of these as it has rules, and a port becomes three new files and no
 // shared edit.
 func init() {
-	rule.Register(rule.Registration{Rule: DefaultParamLast})
+	rule.Register(rule.Registration[rule.NoOptions]{Rule: DefaultParamLast})
 }

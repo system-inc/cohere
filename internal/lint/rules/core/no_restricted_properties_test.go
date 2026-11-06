@@ -14,7 +14,7 @@ const noRestrictedPropertiesFile = "/repository/source/NoRestrictedProperties.ts
 // noRestrictedPropertiesCase is one imported corpus row.
 type noRestrictedPropertiesCase struct {
 	sourceText string
-	options    any
+	options    NoRestrictedPropertiesOptions
 	wantIds    []string
 }
 
@@ -24,31 +24,27 @@ type noRestrictedPropertiesCase struct {
 // schema constraints upstream expresses declaratively are actually checked. A fixture handing the
 // rule a struct would leave all three untested.
 func runNoRestrictedProperties(
-	t *testing.T,
+	test *testing.T,
 	testCase noRestrictedPropertiesCase,
 ) rule_testing.Result {
-	t.Helper()
-	if testCase.options == nil {
-		return rule_testing.Run(t, NoRestrictedProperties, noRestrictedPropertiesFile,
-			testCase.sourceText)
-	}
+	test.Helper()
 	// Written the way upstream's config writes it: each restriction its own element.
-	encoded, err := json.Marshal(testCase.options.(NoRestrictedPropertiesOptions).Restrictions)
-	if err != nil {
-		t.Fatalf("could not encode options: %v", err)
+	encoded, encodeError := json.Marshal(testCase.options.Restrictions)
+	if encodeError != nil {
+		test.Fatalf("could not encode options: %v", encodeError)
 	}
-	decoded, err := DecodeNoRestrictedPropertiesOptions(encoded)
-	if err != nil {
-		t.Fatalf("could not decode options: %v", err)
+	decoded, decodeNoRestrictedPropertiesOptionsError := DecodeNoRestrictedPropertiesOptions(encoded)
+	if decodeNoRestrictedPropertiesOptionsError != nil {
+		test.Fatalf("could not decode options: %v", decodeNoRestrictedPropertiesOptionsError)
 	}
-	return rule_testing.RunWithOptions(t, NoRestrictedProperties, noRestrictedPropertiesFile,
+	return rule_testing.RunWithOptions(test, NoRestrictedProperties, noRestrictedPropertiesFile,
 		testCase.sourceText, decoded)
 }
 
 // The corpus is ESLint's own, extracted mechanically rather than retyped.
 //
 // `tests/lib/rules/no-restricted-properties.js` was loaded with its RuleTester stubbed so every case
-// came out as data with its restrictions attached, then replayed against the INSTALLED rule to
+// came out as data with its restrictions attached, then replayed against the installed rule to
 // record what it reports. All 89 reproduced.
 //
 // Upstream's options are a variadic list of restriction objects, one per element. The struct here
@@ -56,122 +52,439 @@ func runNoRestrictedProperties(
 // keeps upstream's own field names and crosses the decoder on the shape the config layer delivers.
 func noRestrictedPropertiesFiresCases() []noRestrictedPropertiesCase {
 	return []noRestrictedPropertiesCase{
-		{"someObject.disallowedProperty", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "someObject", Property: "disallowedProperty"}}}, []string{"restrictedObjectProperty"}},
-		{"someObject.disallowedProperty", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "someObject", Property: "disallowedProperty", Message: "Please use someObject.allowedProperty instead."}}}, []string{"restrictedObjectProperty"}},
-		{"someObject.disallowedProperty; anotherObject.anotherDisallowedProperty()", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "someObject", Property: "disallowedProperty"}, {Object: "anotherObject", Property: "anotherDisallowedProperty"}}}, []string{"restrictedObjectProperty", "restrictedObjectProperty"}},
-		{"foo.__proto__", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Property: "__proto__", Message: "Please use Object.getPrototypeOf instead."}}}, []string{"restrictedProperty"}},
-		{"foo['__proto__']", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Property: "__proto__", Message: "Please use Object.getPrototypeOf instead."}}}, []string{"restrictedProperty"}},
-		{"foo.bar.baz;", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo"}}}, []string{"restrictedObjectProperty"}},
-		{"foo.bar();", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo"}}}, []string{"restrictedObjectProperty"}},
-		{"foo.bar.baz();", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo"}}}, []string{"restrictedObjectProperty"}},
-		{"foo.bar.baz;", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Property: "bar"}}}, []string{"restrictedProperty"}},
-		{"foo.bar();", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Property: "bar"}}}, []string{"restrictedProperty"}},
-		{"foo.bar.baz();", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Property: "bar"}}}, []string{"restrictedProperty"}},
-		{"foo[/(?<zero>0)/]", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Property: "/(?<zero>0)/"}}}, []string{"restrictedProperty"}},
-		{"require.call({}, 'foo')", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "require", Message: "Please call require() directly."}}}, []string{"restrictedObjectProperty"}},
-		{"require['resolve']", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "require"}}}, []string{"restrictedObjectProperty"}},
-		{"let {bar} = foo;", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo", Property: "bar"}}}, []string{"restrictedObjectProperty"}},
-		{"let {bar: baz} = foo;", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo", Property: "bar"}}}, []string{"restrictedObjectProperty"}},
-		{"let {'bar': baz} = foo;", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo", Property: "bar"}}}, []string{"restrictedObjectProperty"}},
-		{"let {bar: {baz: qux}} = foo;", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo", Property: "bar"}}}, []string{"restrictedObjectProperty"}},
-		{"let {bar} = foo;", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo"}}}, []string{"restrictedObjectProperty"}},
-		{"let {bar: baz} = foo;", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo"}}}, []string{"restrictedObjectProperty"}},
-		{"let {bar} = foo;", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Property: "bar"}}}, []string{"restrictedProperty"}},
-		{"let bar; ({bar} = foo);", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo", Property: "bar"}}}, []string{"restrictedObjectProperty"}},
-		{"let bar; ({bar: baz = 1} = foo);", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo", Property: "bar"}}}, []string{"restrictedObjectProperty"}},
-		{"function qux({bar} = foo) {}", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo", Property: "bar"}}}, []string{"restrictedObjectProperty"}},
-		{"function qux({bar: baz} = foo) {}", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo", Property: "bar"}}}, []string{"restrictedObjectProperty"}},
-		{"var {['foo']: qux, bar} = baz", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "baz", Property: "foo"}}}, []string{"restrictedObjectProperty"}},
-		{"obj['#foo']", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Property: "#foo"}}}, []string{"restrictedProperty"}},
-		{"const { bar: { bad } = {} } = foo;", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Property: "bad"}}}, []string{"restrictedProperty"}},
-		{"const { bar: { bad } } = foo;", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Property: "bad"}}}, []string{"restrictedProperty"}},
-		{"const { bad } = foo();", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Property: "bad"}}}, []string{"restrictedProperty"}},
-		{"({ bad } = foo());", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Property: "bad"}}}, []string{"restrictedProperty"}},
-		{"({ bar: { bad } } = foo);", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Property: "bad"}}}, []string{"restrictedProperty"}},
-		{"({ bar: { bad } = {} } = foo);", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Property: "bad"}}}, []string{"restrictedProperty"}},
-		{"({ bad }) => {};", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Property: "bad"}}}, []string{"restrictedProperty"}},
-		{"({ bad } = {}) => {};", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Property: "bad"}}}, []string{"restrictedProperty"}},
-		{"({ bad: bar }) => {};", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Property: "bad"}}}, []string{"restrictedProperty"}},
-		{"({ bar: { bad } = {} }) => {};", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Property: "bad"}}}, []string{"restrictedProperty"}},
-		{"[{ bad }] = foo;", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Property: "bad"}}}, []string{"restrictedProperty"}},
-		{"const [{ bad }] = foo;", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Property: "bad"}}}, []string{"restrictedProperty"}},
-		{"someObject.disallowedProperty", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Property: "disallowedProperty", AllowObjects: []string{"anotherObject"}}}}, []string{"restrictedProperty"}},
-		{"someObject.disallowedProperty", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Property: "disallowedProperty", AllowObjects: []string{"anotherObject"}, Message: "Please use someObject.allowedProperty instead."}}}, []string{"restrictedProperty"}},
-		{"someObject.disallowedProperty; anotherObject.anotherDisallowedProperty()", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Property: "disallowedProperty", AllowObjects: []string{"anotherObject"}}, {Property: "anotherDisallowedProperty", AllowObjects: []string{"someObject"}}}}, []string{"restrictedProperty", "restrictedProperty"}},
-		{"someObject.disallowedProperty", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "someObject", AllowProperties: []string{"allowedProperty"}}}}, []string{"restrictedObjectProperty"}},
-		{"someObject.disallowedProperty", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "someObject", AllowProperties: []string{"allowedProperty"}, Message: "Please use someObject.allowedProperty instead."}}}, []string{"restrictedObjectProperty"}},
-		{"someObject.disallowedProperty; anotherObject.anotherDisallowedProperty()", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "someObject", AllowProperties: []string{"anotherDisallowedProperty"}}, {Object: "anotherObject", AllowProperties: []string{"disallowedProperty"}}}}, []string{"restrictedObjectProperty", "restrictedObjectProperty"}},
+		{"someObject.disallowedProperty", NoRestrictedPropertiesOptions{
+			Restrictions: []NoRestrictedPropertiesRestriction{{Object: "someObject", Property: "disallowedProperty"}},
+		}, []string{"restrictedObjectProperty"}},
+		{
+			"someObject.disallowedProperty",
+			NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{
+				Object:   "someObject",
+				Property: "disallowedProperty",
+				Message:  "Please use someObject.allowedProperty instead.",
+			}}},
+			[]string{"restrictedObjectProperty"},
+		},
+		{
+			"someObject.disallowedProperty; anotherObject.anotherDisallowedProperty()",
+			NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{
+				{Object: "someObject", Property: "disallowedProperty"},
+				{Object: "anotherObject", Property: "anotherDisallowedProperty"},
+			}},
+			[]string{"restrictedObjectProperty", "restrictedObjectProperty"},
+		},
+		{"foo.__proto__", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{
+			{Property: "__proto__", Message: "Please use Object.getPrototypeOf instead."},
+		}}, []string{"restrictedProperty"}},
+		{"foo['__proto__']", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{
+			{Property: "__proto__", Message: "Please use Object.getPrototypeOf instead."},
+		}}, []string{"restrictedProperty"}},
+		{
+			"foo.bar.baz;",
+			NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo"}}},
+			[]string{"restrictedObjectProperty"},
+		},
+		{
+			"foo.bar();",
+			NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo"}}},
+			[]string{"restrictedObjectProperty"},
+		},
+		{
+			"foo.bar.baz();",
+			NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo"}}},
+			[]string{"restrictedObjectProperty"},
+		},
+		{
+			"foo.bar.baz;",
+			NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Property: "bar"}}},
+			[]string{"restrictedProperty"},
+		},
+		{
+			"foo.bar();",
+			NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Property: "bar"}}},
+			[]string{"restrictedProperty"},
+		},
+		{
+			"foo.bar.baz();",
+			NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Property: "bar"}}},
+			[]string{"restrictedProperty"},
+		},
+		{"foo[/(?<zero>0)/]", NoRestrictedPropertiesOptions{
+			Restrictions: []NoRestrictedPropertiesRestriction{{Property: "/(?<zero>0)/"}},
+		}, []string{"restrictedProperty"}},
+		{"require.call({}, 'foo')", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{
+			{Object: "require", Message: "Please call require() directly."},
+		}}, []string{"restrictedObjectProperty"}},
+		{
+			"require['resolve']",
+			NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "require"}}},
+			[]string{"restrictedObjectProperty"},
+		},
+		{"let {bar} = foo;", NoRestrictedPropertiesOptions{
+			Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo", Property: "bar"}},
+		}, []string{"restrictedObjectProperty"}},
+		{"let {bar: baz} = foo;", NoRestrictedPropertiesOptions{
+			Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo", Property: "bar"}},
+		}, []string{"restrictedObjectProperty"}},
+		{"let {'bar': baz} = foo;", NoRestrictedPropertiesOptions{
+			Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo", Property: "bar"}},
+		}, []string{"restrictedObjectProperty"}},
+		{"let {bar: {baz: qux}} = foo;", NoRestrictedPropertiesOptions{
+			Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo", Property: "bar"}},
+		}, []string{"restrictedObjectProperty"}},
+		{
+			"let {bar} = foo;",
+			NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo"}}},
+			[]string{"restrictedObjectProperty"},
+		},
+		{
+			"let {bar: baz} = foo;",
+			NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo"}}},
+			[]string{"restrictedObjectProperty"},
+		},
+		{
+			"let {bar} = foo;",
+			NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Property: "bar"}}},
+			[]string{"restrictedProperty"},
+		},
+		{"let bar; ({bar} = foo);", NoRestrictedPropertiesOptions{
+			Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo", Property: "bar"}},
+		}, []string{"restrictedObjectProperty"}},
+		{"let bar; ({bar: baz = 1} = foo);", NoRestrictedPropertiesOptions{
+			Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo", Property: "bar"}},
+		}, []string{"restrictedObjectProperty"}},
+		{"function qux({bar} = foo) {}", NoRestrictedPropertiesOptions{
+			Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo", Property: "bar"}},
+		}, []string{"restrictedObjectProperty"}},
+		{"function qux({bar: baz} = foo) {}", NoRestrictedPropertiesOptions{
+			Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo", Property: "bar"}},
+		}, []string{"restrictedObjectProperty"}},
+		{"var {['foo']: qux, bar} = baz", NoRestrictedPropertiesOptions{
+			Restrictions: []NoRestrictedPropertiesRestriction{{Object: "baz", Property: "foo"}},
+		}, []string{"restrictedObjectProperty"}},
+		{
+			"obj['#foo']",
+			NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Property: "#foo"}}},
+			[]string{"restrictedProperty"},
+		},
+		{
+			"const { bar: { bad } = {} } = foo;",
+			NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Property: "bad"}}},
+			[]string{"restrictedProperty"},
+		},
+		{
+			"const { bar: { bad } } = foo;",
+			NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Property: "bad"}}},
+			[]string{"restrictedProperty"},
+		},
+		{
+			"const { bad } = foo();",
+			NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Property: "bad"}}},
+			[]string{"restrictedProperty"},
+		},
+		{
+			"({ bad } = foo());",
+			NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Property: "bad"}}},
+			[]string{"restrictedProperty"},
+		},
+		{
+			"({ bar: { bad } } = foo);",
+			NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Property: "bad"}}},
+			[]string{"restrictedProperty"},
+		},
+		{
+			"({ bar: { bad } = {} } = foo);",
+			NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Property: "bad"}}},
+			[]string{"restrictedProperty"},
+		},
+		{
+			"({ bad }) => {};",
+			NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Property: "bad"}}},
+			[]string{"restrictedProperty"},
+		},
+		{
+			"({ bad } = {}) => {};",
+			NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Property: "bad"}}},
+			[]string{"restrictedProperty"},
+		},
+		{
+			"({ bad: bar }) => {};",
+			NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Property: "bad"}}},
+			[]string{"restrictedProperty"},
+		},
+		{
+			"({ bar: { bad } = {} }) => {};",
+			NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Property: "bad"}}},
+			[]string{"restrictedProperty"},
+		},
+		{
+			"[{ bad }] = foo;",
+			NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Property: "bad"}}},
+			[]string{"restrictedProperty"},
+		},
+		{
+			"const [{ bad }] = foo;",
+			NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Property: "bad"}}},
+			[]string{"restrictedProperty"},
+		},
+		{
+			"someObject.disallowedProperty",
+			NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{
+				{Property: "disallowedProperty", AllowObjects: []string{"anotherObject"}},
+			}},
+			[]string{"restrictedProperty"},
+		},
+		{
+			"someObject.disallowedProperty",
+			NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{
+				Property:     "disallowedProperty",
+				AllowObjects: []string{"anotherObject"},
+				Message:      "Please use someObject.allowedProperty instead.",
+			}}},
+			[]string{"restrictedProperty"},
+		},
+		{
+			"someObject.disallowedProperty; anotherObject.anotherDisallowedProperty()",
+			NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{
+				{Property: "disallowedProperty", AllowObjects: []string{"anotherObject"}},
+				{Property: "anotherDisallowedProperty", AllowObjects: []string{"someObject"}},
+			}},
+			[]string{"restrictedProperty", "restrictedProperty"},
+		},
+		{
+			"someObject.disallowedProperty",
+			NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{
+				{Object: "someObject", AllowProperties: []string{"allowedProperty"}},
+			}},
+			[]string{"restrictedObjectProperty"},
+		},
+		{
+			"someObject.disallowedProperty",
+			NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{
+				Object:          "someObject",
+				AllowProperties: []string{"allowedProperty"},
+				Message:         "Please use someObject.allowedProperty instead.",
+			}}},
+			[]string{"restrictedObjectProperty"},
+		},
+		{
+			"someObject.disallowedProperty; anotherObject.anotherDisallowedProperty()",
+			NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{
+				{Object: "someObject", AllowProperties: []string{"anotherDisallowedProperty"}},
+				{Object: "anotherObject", AllowProperties: []string{"disallowedProperty"}},
+			}},
+			[]string{"restrictedObjectProperty", "restrictedObjectProperty"},
+		},
 	}
 }
 
 func noRestrictedPropertiesSilentCases() []noRestrictedPropertiesCase {
 	return []noRestrictedPropertiesCase{
-		{"someObject.someProperty", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "someObject", Property: "disallowedProperty"}}}, nil},
-		{"anotherObject.disallowedProperty", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "someObject", Property: "disallowedProperty"}}}, nil},
-		{"someObject.someProperty()", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "someObject", Property: "disallowedProperty"}}}, nil},
-		{"anotherObject.disallowedProperty()", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "someObject", Property: "disallowedProperty"}}}, nil},
-		{"anotherObject.disallowedProperty()", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "someObject", Property: "disallowedProperty", Message: "Please use someObject.allowedProperty instead."}}}, nil},
-		{"anotherObject['disallowedProperty']()", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "someObject", Property: "disallowedProperty"}}}, nil},
-		{"obj.toString", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "obj", Property: "__proto__"}}}, nil},
-		{"toString.toString", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "obj", Property: "foo"}}}, nil},
-		{"obj.toString", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "obj", Property: "foo"}}}, nil},
-		{"foo.bar", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Property: "baz"}}}, nil},
-		{"foo.bar", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "baz"}}}, nil},
-		{"foo()", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo"}}}, nil},
-		{"foo;", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo"}}}, nil},
-		{"foo[/(?<zero>0)/]", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Property: "null"}}}, nil},
-		{"let bar = foo;", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo", Property: "bar"}}}, nil},
-		{"let {baz: bar} = foo;", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo", Property: "bar"}}}, nil},
-		{"let {unrelated} = foo;", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo", Property: "bar"}}}, nil},
-		{"let {baz: {bar: qux}} = foo;", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo", Property: "bar"}}}, nil},
-		{"let {bar} = foo.baz;", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo", Property: "bar"}}}, nil},
-		{"let {baz: bar} = foo;", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Property: "bar"}}}, nil},
-		{"let baz; ({baz: bar} = foo)", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo", Property: "bar"}}}, nil},
-		{"let bar;", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo", Property: "bar"}}}, nil},
-		{"let bar; ([bar = 5] = foo);", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo", Property: "1"}}}, nil},
-		{"function qux({baz: bar} = foo) {}", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo", Property: "bar"}}}, nil},
-		{"let [bar, baz] = foo;", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo", Property: "1"}}}, nil},
-		{"let [, bar] = foo;", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo", Property: "0"}}}, nil},
-		{"let [, bar = 5] = foo;", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo", Property: "1"}}}, nil},
-		{"let bar; ([bar = 5] = foo);", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo", Property: "0"}}}, nil},
-		{"function qux([bar] = foo) {}", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo", Property: "0"}}}, nil},
-		{"function qux([, bar] = foo) {}", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo", Property: "0"}}}, nil},
-		{"function qux([, bar] = foo) {}", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo", Property: "1"}}}, nil},
-		{"class C { #foo; foo() { this.#foo; } }", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Property: "#foo"}}}, nil},
-		{"someObject.disallowedProperty", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Property: "disallowedProperty", AllowObjects: []string{"someObject"}}}}, nil},
-		{"someObject.disallowedProperty; anotherObject.disallowedProperty();", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Property: "disallowedProperty", AllowObjects: []string{"someObject", "anotherObject"}}}}, nil},
-		{"someObject.disallowedProperty()", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Property: "disallowedProperty", AllowObjects: []string{"someObject"}}}}, nil},
-		{"someObject['disallowedProperty']()", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Property: "disallowedProperty", AllowObjects: []string{"someObject"}}}}, nil},
-		{"let {bar} = foo;", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Property: "bar", AllowObjects: []string{"foo"}}}}, nil},
-		{"let {baz: bar} = foo;", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Property: "baz", AllowObjects: []string{"foo"}}}}, nil},
-		{"someObject.disallowedProperty", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "someObject", AllowProperties: []string{"disallowedProperty"}}}}, nil},
-		{"someObject.disallowedProperty; someObject.anotherDisallowedProperty();", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "someObject", AllowProperties: []string{"disallowedProperty", "anotherDisallowedProperty"}}}}, nil},
-		{"someObject.disallowedProperty()", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "someObject", AllowProperties: []string{"disallowedProperty"}}}}, nil},
-		{"someObject['disallowedProperty']()", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "someObject", AllowProperties: []string{"disallowedProperty"}}}}, nil},
-		{"let {bar} = foo;", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo", AllowProperties: []string{"bar"}}}}, nil},
-		{"let {baz: bar} = foo;", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo", AllowProperties: []string{"baz"}}}}, nil},
+		{"someObject.someProperty", NoRestrictedPropertiesOptions{
+			Restrictions: []NoRestrictedPropertiesRestriction{{Object: "someObject", Property: "disallowedProperty"}},
+		}, nil},
+		{"anotherObject.disallowedProperty", NoRestrictedPropertiesOptions{
+			Restrictions: []NoRestrictedPropertiesRestriction{{Object: "someObject", Property: "disallowedProperty"}},
+		}, nil},
+		{"someObject.someProperty()", NoRestrictedPropertiesOptions{
+			Restrictions: []NoRestrictedPropertiesRestriction{{Object: "someObject", Property: "disallowedProperty"}},
+		}, nil},
+		{"anotherObject.disallowedProperty()", NoRestrictedPropertiesOptions{
+			Restrictions: []NoRestrictedPropertiesRestriction{{Object: "someObject", Property: "disallowedProperty"}},
+		}, nil},
+		{
+			"anotherObject.disallowedProperty()",
+			NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{
+				{
+					Object:   "someObject",
+					Property: "disallowedProperty",
+					Message:  "Please use someObject.allowedProperty instead.",
+				},
+			}},
+			nil,
+		},
+		{"anotherObject['disallowedProperty']()", NoRestrictedPropertiesOptions{
+			Restrictions: []NoRestrictedPropertiesRestriction{{Object: "someObject", Property: "disallowedProperty"}},
+		}, nil},
+		{"obj.toString", NoRestrictedPropertiesOptions{
+			Restrictions: []NoRestrictedPropertiesRestriction{{Object: "obj", Property: "__proto__"}},
+		}, nil},
+		{"toString.toString", NoRestrictedPropertiesOptions{
+			Restrictions: []NoRestrictedPropertiesRestriction{{Object: "obj", Property: "foo"}},
+		}, nil},
+		{"obj.toString", NoRestrictedPropertiesOptions{
+			Restrictions: []NoRestrictedPropertiesRestriction{{Object: "obj", Property: "foo"}},
+		}, nil},
+		{
+			"foo.bar",
+			NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Property: "baz"}}},
+			nil,
+		},
+		{
+			"foo.bar",
+			NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "baz"}}},
+			nil,
+		},
+		{
+			"foo()",
+			NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo"}}},
+			nil,
+		},
+		{
+			"foo;",
+			NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo"}}},
+			nil,
+		},
+		{
+			"foo[/(?<zero>0)/]",
+			NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Property: "null"}}},
+			nil,
+		},
+		{"let bar = foo;", NoRestrictedPropertiesOptions{
+			Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo", Property: "bar"}},
+		}, nil},
+		{"let {baz: bar} = foo;", NoRestrictedPropertiesOptions{
+			Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo", Property: "bar"}},
+		}, nil},
+		{"let {unrelated} = foo;", NoRestrictedPropertiesOptions{
+			Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo", Property: "bar"}},
+		}, nil},
+		{"let {baz: {bar: qux}} = foo;", NoRestrictedPropertiesOptions{
+			Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo", Property: "bar"}},
+		}, nil},
+		{"let {bar} = foo.baz;", NoRestrictedPropertiesOptions{
+			Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo", Property: "bar"}},
+		}, nil},
+		{
+			"let {baz: bar} = foo;",
+			NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Property: "bar"}}},
+			nil,
+		},
+		{"let baz; ({baz: bar} = foo)", NoRestrictedPropertiesOptions{
+			Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo", Property: "bar"}},
+		}, nil},
+		{"let bar;", NoRestrictedPropertiesOptions{
+			Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo", Property: "bar"}},
+		}, nil},
+		{"let bar; ([bar = 5] = foo);", NoRestrictedPropertiesOptions{
+			Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo", Property: "1"}},
+		}, nil},
+		{"function qux({baz: bar} = foo) {}", NoRestrictedPropertiesOptions{
+			Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo", Property: "bar"}},
+		}, nil},
+		{"let [bar, baz] = foo;", NoRestrictedPropertiesOptions{
+			Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo", Property: "1"}},
+		}, nil},
+		{"let [, bar] = foo;", NoRestrictedPropertiesOptions{
+			Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo", Property: "0"}},
+		}, nil},
+		{"let [, bar = 5] = foo;", NoRestrictedPropertiesOptions{
+			Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo", Property: "1"}},
+		}, nil},
+		{"let bar; ([bar = 5] = foo);", NoRestrictedPropertiesOptions{
+			Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo", Property: "0"}},
+		}, nil},
+		{"function qux([bar] = foo) {}", NoRestrictedPropertiesOptions{
+			Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo", Property: "0"}},
+		}, nil},
+		{"function qux([, bar] = foo) {}", NoRestrictedPropertiesOptions{
+			Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo", Property: "0"}},
+		}, nil},
+		{"function qux([, bar] = foo) {}", NoRestrictedPropertiesOptions{
+			Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo", Property: "1"}},
+		}, nil},
+		{
+			"class C { #foo; foo() { this.#foo; } }",
+			NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Property: "#foo"}}},
+			nil,
+		},
+		{
+			"someObject.disallowedProperty",
+			NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{
+				{Property: "disallowedProperty", AllowObjects: []string{"someObject"}},
+			}},
+			nil,
+		},
+		{"someObject.disallowedProperty; anotherObject.disallowedProperty();", NoRestrictedPropertiesOptions{
+			Restrictions: []NoRestrictedPropertiesRestriction{
+				{Property: "disallowedProperty", AllowObjects: []string{"someObject", "anotherObject"}},
+			},
+		}, nil},
+		{
+			"someObject.disallowedProperty()",
+			NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{
+				{Property: "disallowedProperty", AllowObjects: []string{"someObject"}},
+			}},
+			nil,
+		},
+		{
+			"someObject['disallowedProperty']()",
+			NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{
+				{Property: "disallowedProperty", AllowObjects: []string{"someObject"}},
+			}},
+			nil,
+		},
+		{"let {bar} = foo;", NoRestrictedPropertiesOptions{
+			Restrictions: []NoRestrictedPropertiesRestriction{{Property: "bar", AllowObjects: []string{"foo"}}},
+		}, nil},
+		{"let {baz: bar} = foo;", NoRestrictedPropertiesOptions{
+			Restrictions: []NoRestrictedPropertiesRestriction{{Property: "baz", AllowObjects: []string{"foo"}}},
+		}, nil},
+		{
+			"someObject.disallowedProperty",
+			NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{
+				{Object: "someObject", AllowProperties: []string{"disallowedProperty"}},
+			}},
+			nil,
+		},
+		{
+			"someObject.disallowedProperty; someObject.anotherDisallowedProperty();",
+			NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{
+				{Object: "someObject", AllowProperties: []string{"disallowedProperty", "anotherDisallowedProperty"}},
+			}},
+			nil,
+		},
+		{
+			"someObject.disallowedProperty()",
+			NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{
+				{Object: "someObject", AllowProperties: []string{"disallowedProperty"}},
+			}},
+			nil,
+		},
+		{
+			"someObject['disallowedProperty']()",
+			NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{
+				{Object: "someObject", AllowProperties: []string{"disallowedProperty"}},
+			}},
+			nil,
+		},
+		{"let {bar} = foo;", NoRestrictedPropertiesOptions{
+			Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo", AllowProperties: []string{"bar"}}},
+		}, nil},
+		{"let {baz: bar} = foo;", NoRestrictedPropertiesOptions{
+			Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo", AllowProperties: []string{"baz"}}},
+		}, nil},
 	}
 }
 
-func TestNoRestrictedPropertiesFires(t *testing.T) {
-	t.Parallel()
+func TestNoRestrictedPropertiesFires(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range noRestrictedPropertiesFiresCases() {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, runNoRestrictedProperties(t, testCase),
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, runNoRestrictedProperties(test, testCase),
 				testCase.wantIds...)
 		})
 	}
 }
 
-func TestNoRestrictedPropertiesStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoRestrictedPropertiesStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range noRestrictedPropertiesSilentCases() {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, runNoRestrictedProperties(t, testCase))
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, runNoRestrictedProperties(test, testCase))
 		})
 	}
 }
@@ -179,32 +492,32 @@ func TestNoRestrictedPropertiesStaysSilent(t *testing.T) {
 // With no restrictions configured, the rule registers nothing at all.
 //
 // This is the property that makes the rule's violation count on any codebase structurally zero
-// rather than evidence of a clean tree, and it is why this port ships REGISTERED BUT NOT ENABLED:
+// rather than evidence of a clean tree, and it is why this port ships registered but not enabled:
 // enabling it means choosing restrictions, which is a decision about this codebase rather than a
 // porting question.
 //
 // Verified against the installed build the same way: `foo.bar; baz.qux;` with no options reports
 // nothing, on source that names exactly the shape a restriction would ban.
-func TestNoRestrictedPropertiesEnforcesNothingUnconfigured(t *testing.T) {
-	t.Parallel()
+func TestNoRestrictedPropertiesEnforcesNothingUnconfigured(test *testing.T) {
+	test.Parallel()
 
 	source := "foo.bar; baz.qux; var { bar } = foo;"
-	rule_testing.ExpectClean(t, rule_testing.Run(t, NoRestrictedProperties,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, NoRestrictedProperties,
 		noRestrictedPropertiesFile, source))
 
 	// The control: the same source under a restriction reports, so the silence above is the empty
 	// configuration rather than a rule that cannot fire.
-	decoded, err := DecodeNoRestrictedPropertiesOptions(
+	decoded, decodeNoRestrictedPropertiesOptionsError := DecodeNoRestrictedPropertiesOptions(
 		[]byte(`[{"object":"foo","property":"bar"}]`))
-	if err != nil {
-		t.Fatalf("could not decode options: %v", err)
+	if decodeNoRestrictedPropertiesOptionsError != nil {
+		test.Fatalf("could not decode options: %v", decodeNoRestrictedPropertiesOptionsError)
 	}
-	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoRestrictedProperties,
+	rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoRestrictedProperties,
 		noRestrictedPropertiesFile, source, decoded),
 		"restrictedObjectProperty", "restrictedObjectProperty")
 }
 
-// What the finding SAYS, asserted by equality on the whole rendered sentence.
+// What the finding says, asserted by equality on the whole rendered sentence.
 //
 // Every message on this rule is built by interpolation from up to four pieces: the object name, the
 // property name, an allowance list, and the project's own message. Nothing above can see any of
@@ -214,8 +527,8 @@ func TestNoRestrictedPropertiesEnforcesNothingUnconfigured(t *testing.T) {
 // Backticks replace upstream's single quotes around identifiers, matching how every other message in
 // this tree renders code. The rest of each sentence is upstream's wording, including the ordering
 // of the two optional suffixes: the allowance first, then the project message.
-func TestNoRestrictedPropertiesRendersTheWholeMessage(t *testing.T) {
-	t.Parallel()
+func TestNoRestrictedPropertiesRendersTheWholeMessage(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -295,20 +608,20 @@ func TestNoRestrictedPropertiesRendersTheWholeMessage(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runNoRestrictedProperties(t, noRestrictedPropertiesCase{
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runNoRestrictedProperties(test, noRestrictedPropertiesCase{
 				sourceText: testCase.sourceText, options: testCase.options})
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
 			}
 			// Equality against a literal typed here, never against the rule's own constant: a
 			// comparison to the constant moves with the code under mutation and asserts nothing.
 			if got := result.Diagnostics[0].Message.Description; got != testCase.wantText {
-				t.Errorf("rendered\n  %q\nwanted\n  %q", got, testCase.wantText)
+				test.Errorf("rendered\n  %q\nwanted\n  %q", got, testCase.wantText)
 			}
 			if got := result.Diagnostics[0].Message.Id; got != testCase.wantId {
-				t.Errorf("message id was %q, wanted %q", got, testCase.wantId)
+				test.Errorf("message id was %q, wanted %q", got, testCase.wantId)
 			}
 		})
 	}
@@ -316,11 +629,11 @@ func TestNoRestrictedPropertiesRendersTheWholeMessage(t *testing.T) {
 
 // Where the finding points, which no message-id fixture can see.
 //
-// A member access reports on the WHOLE access rather than on the property, and a destructuring
+// A member access reports on the whole access rather than on the property, and a destructuring
 // pattern reports on the whole pattern rather than on the property being read -- which is why one
 // pattern restricting two properties reports twice on the same span. Both are upstream's `node`.
-func TestNoRestrictedPropertiesPointsAtTheAccess(t *testing.T) {
-	t.Parallel()
+func TestNoRestrictedPropertiesPointsAtTheAccess(test *testing.T) {
+	test.Parallel()
 
 	restrictBar := NoRestrictedPropertiesOptions{
 		Restrictions: []NoRestrictedPropertiesRestriction{{Property: "bar"}},
@@ -341,28 +654,28 @@ func TestNoRestrictedPropertiesPointsAtTheAccess(t *testing.T) {
 			"{ bar, bar: other }", "{ bar, bar: other }"}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := runNoRestrictedProperties(t, noRestrictedPropertiesCase{
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := runNoRestrictedProperties(test, noRestrictedPropertiesCase{
 				sourceText: testCase.sourceText, options: testCase.options})
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
-				t.Fatalf("wanted %d findings, got %d", len(testCase.wantSpans),
+				test.Fatalf("wanted %d findings, got %d", len(testCase.wantSpans),
 					len(result.Diagnostics))
 			}
 			for index, want := range testCase.wantSpans {
 				span := result.Diagnostics[index].Range
 				if got := testCase.sourceText[span.Pos():span.End()]; got != want {
-					t.Errorf("finding %d pointed at %q, wanted %q", index, got, want)
+					test.Errorf("finding %d pointed at %q, wanted %q", index, got, want)
 				}
 			}
 		})
 	}
 }
 
-// Destructuring written as an ASSIGNMENT, which our parser gives a different node kind.
+// Destructuring written as an assignment, which our parser gives a different node kind.
 //
 // ESTree calls `var {bar} = foo` and `({bar} = foo)` the same `ObjectPattern`, so upstream needs one
-// listener. Ours parses the second as an object LITERAL whose members are property assignments, so
+// listener. Ours parses the second as an object literal whose members are property assignments, so
 // the same judgment needs a second entry point over a different shape entirely.
 //
 // Six of upstream's imported cases reported nothing until that arm existed, and a seventh -- the
@@ -370,8 +683,8 @@ func TestNoRestrictedPropertiesPointsAtTheAccess(t *testing.T) {
 // binding pattern ships with a whole syntactic form silently exempt, and only the corpus says so.
 //
 // The last two rows are the controls that separate "is a pattern" from "is any object literal".
-func TestNoRestrictedPropertiesReadsAssignmentDestructuring(t *testing.T) {
-	t.Parallel()
+func TestNoRestrictedPropertiesReadsAssignmentDestructuring(test *testing.T) {
+	test.Parallel()
 
 	restrictBad := NoRestrictedPropertiesOptions{
 		Restrictions: []NoRestrictedPropertiesRestriction{{Property: "bad"}},
@@ -386,23 +699,23 @@ func TestNoRestrictedPropertiesReadsAssignmentDestructuring(t *testing.T) {
 		{"[{ bad }] = foo;", restrictBad, []string{"restrictedProperty"}},
 		// An ordinary object literal in a call argument is not a pattern and must stay clean.
 		{"foo({ bad: 1 });", restrictBad, nil},
-		// Nor is one on the RIGHT of an assignment.
+		// Nor is one on the right of an assignment.
 		{"x = { bad: 1 };", restrictBad, nil},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := runNoRestrictedProperties(t, testCase)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := runNoRestrictedProperties(test, testCase)
 			if len(testCase.wantIds) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
 
-// The property-name predicate, which is NOT the shelf's `property.AccessedName`.
+// The property-name predicate, which is not the shelf's `property.AccessedName`.
 //
 // The shelf helper is the closest thing on any shelf and disagrees with upstream on four of the
 // eight spellings this rule can meet. That was measured with a probe rather than read off its doc
@@ -416,8 +729,8 @@ func TestNoRestrictedPropertiesReadsAssignmentDestructuring(t *testing.T) {
 //
 // Three of those cost findings and one adds a false one. Widening the shelf helper would change four
 // other rules, so this rule carries its own predicate; these rows are what pin the difference.
-func TestNoRestrictedPropertiesReadsUpstreamsPropertyNames(t *testing.T) {
-	t.Parallel()
+func TestNoRestrictedPropertiesReadsUpstreamsPropertyNames(test *testing.T) {
+	test.Parallel()
 
 	restrict := func(property string) NoRestrictedPropertiesOptions {
 		return NoRestrictedPropertiesOptions{
@@ -441,14 +754,14 @@ func TestNoRestrictedPropertiesReadsUpstreamsPropertyNames(t *testing.T) {
 		{"foo[bar];", restrict("bar"), nil},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := runNoRestrictedProperties(t, testCase)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := runNoRestrictedProperties(test, testCase)
 			if len(testCase.wantIds) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -458,59 +771,59 @@ func TestNoRestrictedPropertiesReadsUpstreamsPropertyNames(t *testing.T) {
 // We have no schema layer, so an entry naming neither an object nor a property would sit in the
 // config matching nothing forever, and the two self-contradictory pairings would be accepted
 // silently. None of these is reachable from a fixture that builds the options struct directly.
-func TestDecodeNoRestrictedPropertiesOptions(t *testing.T) {
-	t.Parallel()
+func TestDecodeNoRestrictedPropertiesOptions(test *testing.T) {
+	test.Parallel()
 
-	t.Run("nil input yields an empty list", func(t *testing.T) {
-		t.Parallel()
-		decoded, err := DecodeNoRestrictedPropertiesOptions(nil)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
+	test.Run("nil input yields an empty list", func(test *testing.T) {
+		test.Parallel()
+		decoded, decodeNoRestrictedPropertiesOptionsError := DecodeNoRestrictedPropertiesOptions(nil)
+		if decodeNoRestrictedPropertiesOptionsError != nil {
+			test.Fatalf("unexpected error: %v", decodeNoRestrictedPropertiesOptionsError)
 		}
-		if len(decoded.(NoRestrictedPropertiesOptions).Restrictions) != 0 {
-			t.Error("nil input produced restrictions")
-		}
-	})
-
-	t.Run("an entry naming neither an object nor a property is rejected", func(t *testing.T) {
-		t.Parallel()
-		if _, err := DecodeNoRestrictedPropertiesOptions(
-			[]byte(`[{"message":"nope"}]`)); err == nil {
-			t.Error("an entry that can never match anything decoded")
+		if len(decoded.Restrictions) != 0 {
+			test.Error("nil input produced restrictions")
 		}
 	})
 
-	t.Run("object paired with allowObjects is rejected", func(t *testing.T) {
-		t.Parallel()
-		if _, err := DecodeNoRestrictedPropertiesOptions(
-			[]byte(`[{"object":"foo","allowObjects":["bar"]}]`)); err == nil {
-			t.Error("a self-contradictory pairing decoded")
+	test.Run("an entry naming neither an object nor a property is rejected", func(test *testing.T) {
+		test.Parallel()
+		if _, decodeNoRestrictedPropertiesOptionsError := DecodeNoRestrictedPropertiesOptions(
+			[]byte(`[{"message":"nope"}]`)); decodeNoRestrictedPropertiesOptionsError == nil {
+			test.Error("an entry that can never match anything decoded")
 		}
 	})
 
-	t.Run("property paired with allowProperties is rejected", func(t *testing.T) {
-		t.Parallel()
-		if _, err := DecodeNoRestrictedPropertiesOptions(
-			[]byte(`[{"property":"foo","allowProperties":["bar"]}]`)); err == nil {
-			t.Error("a self-contradictory pairing decoded")
+	test.Run("object paired with allowObjects is rejected", func(test *testing.T) {
+		test.Parallel()
+		if _, decodeNoRestrictedPropertiesOptionsError := DecodeNoRestrictedPropertiesOptions(
+			[]byte(`[{"object":"foo","allowObjects":["bar"]}]`)); decodeNoRestrictedPropertiesOptionsError == nil {
+			test.Error("a self-contradictory pairing decoded")
 		}
 	})
 
-	t.Run("every element is a restriction, upstream's variadic spelling", func(t *testing.T) {
-		t.Parallel()
-		decoded, err := DecodeNoRestrictedPropertiesOptions(
+	test.Run("property paired with allowProperties is rejected", func(test *testing.T) {
+		test.Parallel()
+		if _, decodeNoRestrictedPropertiesOptionsError := DecodeNoRestrictedPropertiesOptions(
+			[]byte(`[{"property":"foo","allowProperties":["bar"]}]`)); decodeNoRestrictedPropertiesOptionsError == nil {
+			test.Error("a self-contradictory pairing decoded")
+		}
+	})
+
+	test.Run("every element is a restriction, upstream's variadic spelling", func(test *testing.T) {
+		test.Parallel()
+		decoded, decodeNoRestrictedPropertiesOptionsError := DecodeNoRestrictedPropertiesOptions(
 			[]byte(`[{"object":"foo","property":"bar"},{"property":"__proto__","message":"No."}]`))
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
+		if decodeNoRestrictedPropertiesOptionsError != nil {
+			test.Fatalf("unexpected error: %v", decodeNoRestrictedPropertiesOptionsError)
 		}
-		restrictions := decoded.(NoRestrictedPropertiesOptions).Restrictions
+		restrictions := decoded.Restrictions
 		if len(restrictions) != 2 || restrictions[1].Property != "__proto__" || restrictions[1].Message != "No." {
-			t.Errorf("the second element was not read as a restriction: %+v", restrictions)
+			test.Errorf("the second element was not read as a restriction: %+v", restrictions)
 		}
 	})
 
-	t.Run("shapes the config layer does not deliver, or upstream refuses, are rejected", func(t *testing.T) {
-		t.Parallel()
+	test.Run("shapes the config layer does not deliver, or upstream refuses, are rejected", func(test *testing.T) {
+		test.Parallel()
 		for _, raw := range []string{
 			// The wrapper this decoder used to read.
 			`{"restrictions":[{"object":"foo"}]}`,
@@ -519,14 +832,16 @@ func TestDecodeNoRestrictedPropertiesOptions(t *testing.T) {
 			// An element that is not a restriction object.
 			`["foo"]`,
 		} {
-			if decoded, err := DecodeNoRestrictedPropertiesOptions([]byte(raw)); err == nil {
-				t.Errorf("%s decoded to %+v; it must be refused", raw, decoded)
+			if decoded, decodeNoRestrictedPropertiesOptionsError := DecodeNoRestrictedPropertiesOptions(
+				[]byte(raw),
+			); decodeNoRestrictedPropertiesOptionsError == nil {
+				test.Errorf("%s decoded to %+v; it must be refused", raw, decoded)
 			}
 		}
 	})
 }
 
-// The empty-list guard registers NO listener, which is a cost property no findings test can see.
+// The empty-list guard registers no listener, which is a cost property no findings test can see.
 //
 // Written for a surviving mutant. Removing the guard changes no verdict -- an index built from an
 // empty list matches nothing, so both paths reach the same silence -- and `ExpectFindings` asserts
@@ -539,19 +854,19 @@ func TestDecodeNoRestrictedPropertiesOptions(t *testing.T) {
 // reach a lookup that can never match.
 //
 // So the assertion is on the listener set rather than on any finding.
-func TestNoRestrictedPropertiesRegistersNothingUnconfigured(t *testing.T) {
-	t.Parallel()
+func TestNoRestrictedPropertiesRegistersNothingUnconfigured(test *testing.T) {
+	test.Parallel()
 
-	listenersFor := func(options any) rule.Listeners {
+	listenersFor := func(options rule.Given[NoRestrictedPropertiesOptions]) rule.Listeners {
 		return NoRestrictedProperties.Run(rule.Context{}, options)
 	}
 
-	if got := len(listenersFor(nil)); got != 0 {
-		t.Errorf("nil options registered %d listeners, wanted none: an unconfigured rule that "+
+	if got := len(listenersFor(rule.Given[NoRestrictedPropertiesOptions]{})); got != 0 {
+		test.Errorf("no options registered %d listeners, wanted none: an unconfigured rule that "+
 			"walks the tree costs every file for a lookup that cannot match", got)
 	}
-	if got := len(listenersFor(NoRestrictedPropertiesOptions{})); got != 0 {
-		t.Errorf("an empty restriction list registered %d listeners, wanted none", got)
+	if got := len(listenersFor(rule.Configured(NoRestrictedPropertiesOptions{}))); got != 0 {
+		test.Errorf("an empty restriction list registered %d listeners, wanted none", got)
 	}
 
 	// The control: one restriction registers the full set, so the zero above is the guard rather
@@ -559,8 +874,8 @@ func TestNoRestrictedPropertiesRegistersNothingUnconfigured(t *testing.T) {
 	configured := NoRestrictedPropertiesOptions{
 		Restrictions: []NoRestrictedPropertiesRestriction{{Property: "bar"}},
 	}
-	if got := len(listenersFor(configured)); got == 0 {
-		t.Error("a configured restriction registered no listeners")
+	if got := len(listenersFor(rule.Configured(configured))); got == 0 {
+		test.Error("a configured restriction registered no listeners")
 	}
 }
 
@@ -576,8 +891,8 @@ func TestNoRestrictedPropertiesRegistersNothingUnconfigured(t *testing.T) {
 //	                          `rest` would report on every rest destructuring in the tree.
 //
 // Both verdicts were measured against the installed rule before the rows were written.
-func TestNoRestrictedPropertiesSkipsParenthesesAndRestElements(t *testing.T) {
-	t.Parallel()
+func TestNoRestrictedPropertiesSkipsParenthesesAndRestElements(test *testing.T) {
+	test.Parallel()
 
 	restrictFooBar := NoRestrictedPropertiesOptions{
 		Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo", Property: "bar"}},
@@ -608,20 +923,20 @@ func TestNoRestrictedPropertiesSkipsParenthesesAndRestElements(t *testing.T) {
 			nil},
 		{"a rest element against an object restriction", "var {...rest} = foo;", restrictFoo, nil},
 		{"a rest element in an assignment pattern", "({...rest} = foo);", restrictRest, nil},
-		// The control: the same binding name written as an ordinary property DOES report.
+		// The control: the same binding name written as an ordinary property does report.
 		{"the same name as a real property", "var {rest} = foo;", restrictRest,
 			[]string{"restrictedProperty"}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runNoRestrictedProperties(t, noRestrictedPropertiesCase{
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runNoRestrictedProperties(test, noRestrictedPropertiesCase{
 				sourceText: testCase.sourceText, options: testCase.options})
 			if len(testCase.wantIds) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -38,19 +39,24 @@ type noRestrictedGlobalsCase struct {
 	findings    []noRestrictedGlobalsExpectation
 }
 
-func noRestrictedGlobalsStringPointer(value string) *string { return &value }
+func noRestrictedGlobalsStringPointer(value string) *string { return new(value) }
 
 // decodeNoRestrictedGlobalsOptionsForTest routes a case's options through the shipped decoder.
-func decodeNoRestrictedGlobalsOptionsForTest(t *testing.T, optionsJson string) any {
-	t.Helper()
+//
+// An empty string is a rule configured as a bare severity, which runs it unconfigured.
+func decodeNoRestrictedGlobalsOptionsForTest(
+	test *testing.T,
+	optionsJson string,
+) rule.Given[NoRestrictedGlobalsSettings] {
+	test.Helper()
 	if optionsJson == "" {
-		return nil
+		return rule.Given[NoRestrictedGlobalsSettings]{}
 	}
-	decoded, err := DecodeNoRestrictedGlobalsOptions(json.RawMessage(optionsJson))
-	if err != nil {
-		t.Fatalf("decoding options %q: %v", optionsJson, err)
+	decoded, decodeNoRestrictedGlobalsOptionsError := DecodeNoRestrictedGlobalsOptions(json.RawMessage(optionsJson))
+	if decodeNoRestrictedGlobalsOptionsError != nil {
+		test.Fatalf("decoding options %q: %v", optionsJson, decodeNoRestrictedGlobalsOptionsError)
 	}
-	return decoded
+	return rule.Configured(decoded)
 }
 
 // Block 0, upstream's JavaScript RuleTester.
@@ -58,107 +64,666 @@ var noRestrictedGlobalsCleanCasesBlock0 = []noRestrictedGlobalsCase{
 	{source: "foo", optionsJson: "", environmentGlobals: nil, ecmaVersion: 0},
 	{source: "foo", optionsJson: "[\"bar\"]", environmentGlobals: nil, ecmaVersion: 0},
 	{source: "var foo = 1;", optionsJson: "[\"foo\"]", environmentGlobals: nil, ecmaVersion: 0},
-	{source: "event", optionsJson: "[\"bar\"]", environmentGlobals: noRestrictedGlobalsStringPointer("window,self,event"), ecmaVersion: 0},
+	{
+		source:             "event",
+		optionsJson:        "[\"bar\"]",
+		environmentGlobals: noRestrictedGlobalsStringPointer("window,self,event"),
+		ecmaVersion:        0,
+	},
 	{source: "import foo from 'bar';", optionsJson: "[\"foo\"]", environmentGlobals: nil, ecmaVersion: 6},
 	{source: "function foo() {}", optionsJson: "[\"foo\"]", environmentGlobals: nil, ecmaVersion: 0},
 	{source: "function fn() { var foo; }", optionsJson: "[\"foo\"]", environmentGlobals: nil, ecmaVersion: 0},
 	{source: "foo.bar", optionsJson: "[\"bar\"]", environmentGlobals: nil, ecmaVersion: 0},
-	{source: "foo", optionsJson: "[{\"name\":\"bar\",\"message\":\"Use baz instead.\"}]", environmentGlobals: nil, ecmaVersion: 0},
+	{
+		source:             "foo",
+		optionsJson:        "[{\"name\":\"bar\",\"message\":\"Use baz instead.\"}]",
+		environmentGlobals: nil,
+		ecmaVersion:        0,
+	},
 	{source: "foo", optionsJson: "[{\"globals\":[\"bar\"]}]", environmentGlobals: nil, ecmaVersion: 0},
 	{source: "const foo = 1", optionsJson: "[{\"globals\":[\"foo\"]}]", environmentGlobals: nil, ecmaVersion: 0},
-	{source: "event", optionsJson: "[{\"globals\":[\"bar\"]}]", environmentGlobals: noRestrictedGlobalsStringPointer("window,self,event"), ecmaVersion: 0},
-	{source: "import foo from 'bar';", optionsJson: "[{\"globals\":[\"foo\"]}]", environmentGlobals: nil, ecmaVersion: 6},
+	{
+		source:             "event",
+		optionsJson:        "[{\"globals\":[\"bar\"]}]",
+		environmentGlobals: noRestrictedGlobalsStringPointer("window,self,event"),
+		ecmaVersion:        0,
+	},
+	{
+		source:             "import foo from 'bar';",
+		optionsJson:        "[{\"globals\":[\"foo\"]}]",
+		environmentGlobals: nil,
+		ecmaVersion:        6,
+	},
 	{source: "function foo() {}", optionsJson: "[{\"globals\":[\"foo\"]}]", environmentGlobals: nil, ecmaVersion: 0},
-	{source: "function fn() { let foo; }", optionsJson: "[{\"globals\":[\"foo\"]}]", environmentGlobals: nil, ecmaVersion: 0},
+	{
+		source:             "function fn() { let foo; }",
+		optionsJson:        "[{\"globals\":[\"foo\"]}]",
+		environmentGlobals: nil,
+		ecmaVersion:        0,
+	},
 	{source: "foo.bar", optionsJson: "[{\"globals\":[\"bar\"]}]", environmentGlobals: nil, ecmaVersion: 0},
-	{source: "foo", optionsJson: "[{\"globals\":[{\"name\":\"bar\",\"message\":\"Use baz instead.\"}]}]", environmentGlobals: nil, ecmaVersion: 0},
-	{source: "window.foo()", optionsJson: "[{\"globals\":[\"foo\"]}]", environmentGlobals: noRestrictedGlobalsStringPointer("window,self,event"), ecmaVersion: 0},
-	{source: "self.foo()", optionsJson: "[{\"globals\":[\"foo\"]}]", environmentGlobals: noRestrictedGlobalsStringPointer("window,self,event"), ecmaVersion: 0},
+	{
+		source:             "foo",
+		optionsJson:        "[{\"globals\":[{\"name\":\"bar\",\"message\":\"Use baz instead.\"}]}]",
+		environmentGlobals: nil,
+		ecmaVersion:        0,
+	},
+	{
+		source:             "window.foo()",
+		optionsJson:        "[{\"globals\":[\"foo\"]}]",
+		environmentGlobals: noRestrictedGlobalsStringPointer("window,self,event"),
+		ecmaVersion:        0,
+	},
+	{
+		source:             "self.foo()",
+		optionsJson:        "[{\"globals\":[\"foo\"]}]",
+		environmentGlobals: noRestrictedGlobalsStringPointer("window,self,event"),
+		ecmaVersion:        0,
+	},
 	{source: "globalThis.foo()", optionsJson: "[{\"globals\":[\"foo\"]}]", environmentGlobals: nil, ecmaVersion: 2020},
-	{source: "myGlobal.foo()", optionsJson: "[{\"globals\":[\"foo\"],\"globalObjects\":[\"myGlobal\"]}]", environmentGlobals: noRestrictedGlobalsStringPointer("myGlobal"), ecmaVersion: 0},
-	{source: "window.foo()", optionsJson: "[{\"globals\":[\"foo\"],\"checkGlobalObject\":true}]", environmentGlobals: nil, ecmaVersion: 0},
-	{source: "self.foo()", optionsJson: "[{\"globals\":[\"foo\"],\"checkGlobalObject\":true}]", environmentGlobals: nil, ecmaVersion: 0},
-	{source: "globalThis.foo()", optionsJson: "[{\"globals\":[\"foo\"],\"checkGlobalObject\":true}]", environmentGlobals: nil, ecmaVersion: 6},
-	{source: "myGlobal.foo()", optionsJson: "[{\"globals\":[\"foo\"],\"checkGlobalObject\":true,\"globalObjects\":[\"myGlobal\"]}]", environmentGlobals: nil, ecmaVersion: 0},
-	{source: "otherGlobal.foo()", optionsJson: "[{\"globals\":[\"foo\"],\"checkGlobalObject\":true,\"globalObjects\":[\"myGlobal\"]}]", environmentGlobals: noRestrictedGlobalsStringPointer("otherGlobal"), ecmaVersion: 0},
-	{source: "foo.window.bar()", optionsJson: "[{\"globals\":[\"bar\"],\"checkGlobalObject\":true}]", environmentGlobals: noRestrictedGlobalsStringPointer("window,self,event"), ecmaVersion: 0},
-	{source: "foo.self.bar()", optionsJson: "[{\"globals\":[\"bar\"],\"checkGlobalObject\":true}]", environmentGlobals: noRestrictedGlobalsStringPointer("window,self,event"), ecmaVersion: 0},
-	{source: "foo.globalThis.bar()", optionsJson: "[{\"globals\":[\"bar\"],\"checkGlobalObject\":true}]", environmentGlobals: nil, ecmaVersion: 2020},
-	{source: "foo.myGlobal.bar()", optionsJson: "[{\"globals\":[\"bar\"],\"checkGlobalObject\":true,\"globalObjects\":[\"myGlobal\"]}]", environmentGlobals: noRestrictedGlobalsStringPointer("myGlobal"), ecmaVersion: 0},
-	{source: "let window; window.foo()", optionsJson: "[{\"globals\":[\"foo\"],\"checkGlobalObject\":true}]", environmentGlobals: noRestrictedGlobalsStringPointer("window,self,event"), ecmaVersion: 0},
-	{source: "let self; self.foo()", optionsJson: "[{\"globals\":[\"foo\"],\"checkGlobalObject\":true}]", environmentGlobals: noRestrictedGlobalsStringPointer("window,self,event"), ecmaVersion: 0},
-	{source: "let globalThis; globalThis.foo()", optionsJson: "[{\"globals\":[\"foo\"],\"checkGlobalObject\":true}]", environmentGlobals: nil, ecmaVersion: 2020},
-	{source: "let myGlobal; myGlobal.foo()", optionsJson: "[{\"globals\":[\"foo\"],\"checkGlobalObject\":true,\"globalObjects\":[\"myGlobal\"]}]", environmentGlobals: noRestrictedGlobalsStringPointer("myGlobal"), ecmaVersion: 0},
+	{
+		source:             "myGlobal.foo()",
+		optionsJson:        "[{\"globals\":[\"foo\"],\"globalObjects\":[\"myGlobal\"]}]",
+		environmentGlobals: noRestrictedGlobalsStringPointer("myGlobal"),
+		ecmaVersion:        0,
+	},
+	{
+		source:             "window.foo()",
+		optionsJson:        "[{\"globals\":[\"foo\"],\"checkGlobalObject\":true}]",
+		environmentGlobals: nil,
+		ecmaVersion:        0,
+	},
+	{
+		source:             "self.foo()",
+		optionsJson:        "[{\"globals\":[\"foo\"],\"checkGlobalObject\":true}]",
+		environmentGlobals: nil,
+		ecmaVersion:        0,
+	},
+	{
+		source:             "globalThis.foo()",
+		optionsJson:        "[{\"globals\":[\"foo\"],\"checkGlobalObject\":true}]",
+		environmentGlobals: nil,
+		ecmaVersion:        6,
+	},
+	{
+		source:             "myGlobal.foo()",
+		optionsJson:        "[{\"globals\":[\"foo\"],\"checkGlobalObject\":true,\"globalObjects\":[\"myGlobal\"]}]",
+		environmentGlobals: nil,
+		ecmaVersion:        0,
+	},
+	{
+		source:             "otherGlobal.foo()",
+		optionsJson:        "[{\"globals\":[\"foo\"],\"checkGlobalObject\":true,\"globalObjects\":[\"myGlobal\"]}]",
+		environmentGlobals: noRestrictedGlobalsStringPointer("otherGlobal"),
+		ecmaVersion:        0,
+	},
+	{
+		source:             "foo.window.bar()",
+		optionsJson:        "[{\"globals\":[\"bar\"],\"checkGlobalObject\":true}]",
+		environmentGlobals: noRestrictedGlobalsStringPointer("window,self,event"),
+		ecmaVersion:        0,
+	},
+	{
+		source:             "foo.self.bar()",
+		optionsJson:        "[{\"globals\":[\"bar\"],\"checkGlobalObject\":true}]",
+		environmentGlobals: noRestrictedGlobalsStringPointer("window,self,event"),
+		ecmaVersion:        0,
+	},
+	{
+		source:             "foo.globalThis.bar()",
+		optionsJson:        "[{\"globals\":[\"bar\"],\"checkGlobalObject\":true}]",
+		environmentGlobals: nil,
+		ecmaVersion:        2020,
+	},
+	{
+		source:             "foo.myGlobal.bar()",
+		optionsJson:        "[{\"globals\":[\"bar\"],\"checkGlobalObject\":true,\"globalObjects\":[\"myGlobal\"]}]",
+		environmentGlobals: noRestrictedGlobalsStringPointer("myGlobal"),
+		ecmaVersion:        0,
+	},
+	{
+		source:             "let window; window.foo()",
+		optionsJson:        "[{\"globals\":[\"foo\"],\"checkGlobalObject\":true}]",
+		environmentGlobals: noRestrictedGlobalsStringPointer("window,self,event"),
+		ecmaVersion:        0,
+	},
+	{
+		source:             "let self; self.foo()",
+		optionsJson:        "[{\"globals\":[\"foo\"],\"checkGlobalObject\":true}]",
+		environmentGlobals: noRestrictedGlobalsStringPointer("window,self,event"),
+		ecmaVersion:        0,
+	},
+	{
+		source:             "let globalThis; globalThis.foo()",
+		optionsJson:        "[{\"globals\":[\"foo\"],\"checkGlobalObject\":true}]",
+		environmentGlobals: nil,
+		ecmaVersion:        2020,
+	},
+	{
+		source:             "let myGlobal; myGlobal.foo()",
+		optionsJson:        "[{\"globals\":[\"foo\"],\"checkGlobalObject\":true,\"globalObjects\":[\"myGlobal\"]}]",
+		environmentGlobals: noRestrictedGlobalsStringPointer("myGlobal"),
+		ecmaVersion:        0,
+	},
 }
 
 var noRestrictedGlobalsFiringCasesBlock0 = []noRestrictedGlobalsCase{
-	{source: "foo", optionsJson: "[\"foo\"]", environmentGlobals: nil, ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}}},
-	{source: "function fn() { foo; }", optionsJson: "[\"foo\"]", environmentGlobals: nil, ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}}},
-	{source: "function fn() { foo; }", optionsJson: "[\"foo\"]", environmentGlobals: noRestrictedGlobalsStringPointer("foo"), ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}}},
-	{source: "event", optionsJson: "[\"foo\",\"event\"]", environmentGlobals: noRestrictedGlobalsStringPointer("window,self,event"), ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "event", customMessage: ""}}},
-	{source: "foo", optionsJson: "[\"foo\"]", environmentGlobals: noRestrictedGlobalsStringPointer("foo"), ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}}},
-	{source: "foo()", optionsJson: "[\"foo\"]", environmentGlobals: nil, ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}}},
-	{source: "foo.bar()", optionsJson: "[\"foo\"]", environmentGlobals: nil, ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}}},
-	{source: "foo", optionsJson: "[{\"name\":\"foo\"}]", environmentGlobals: nil, ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}}},
-	{source: "function fn() { foo; }", optionsJson: "[{\"name\":\"foo\"}]", environmentGlobals: nil, ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}}},
-	{source: "function fn() { foo; }", optionsJson: "[{\"name\":\"foo\"}]", environmentGlobals: noRestrictedGlobalsStringPointer("foo"), ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}}},
-	{source: "event", optionsJson: "[\"foo\",{\"name\":\"event\"}]", environmentGlobals: noRestrictedGlobalsStringPointer("window,self,event"), ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "event", customMessage: ""}}},
-	{source: "foo", optionsJson: "[{\"name\":\"foo\"}]", environmentGlobals: noRestrictedGlobalsStringPointer("foo"), ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}}},
-	{source: "foo()", optionsJson: "[{\"name\":\"foo\"}]", environmentGlobals: nil, ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}}},
-	{source: "foo.bar()", optionsJson: "[{\"name\":\"foo\"}]", environmentGlobals: nil, ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}}},
-	{source: "foo", optionsJson: "[{\"name\":\"foo\",\"message\":\"Use bar instead.\"}]", environmentGlobals: nil, ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "customMessage", name: "foo", customMessage: "Use bar instead."}}},
-	{source: "function fn() { foo; }", optionsJson: "[{\"name\":\"foo\",\"message\":\"Use bar instead.\"}]", environmentGlobals: nil, ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "customMessage", name: "foo", customMessage: "Use bar instead."}}},
-	{source: "function fn() { foo; }", optionsJson: "[{\"name\":\"foo\",\"message\":\"Use bar instead.\"}]", environmentGlobals: noRestrictedGlobalsStringPointer("foo"), ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "customMessage", name: "foo", customMessage: "Use bar instead."}}},
-	{source: "event", optionsJson: "[\"foo\",{\"name\":\"event\",\"message\":\"Use local event parameter.\"}]", environmentGlobals: noRestrictedGlobalsStringPointer("window,self,event"), ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "customMessage", name: "event", customMessage: "Use local event parameter."}}},
-	{source: "foo", optionsJson: "[{\"name\":\"foo\",\"message\":\"Use bar instead.\"}]", environmentGlobals: noRestrictedGlobalsStringPointer("foo"), ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "customMessage", name: "foo", customMessage: "Use bar instead."}}},
-	{source: "foo()", optionsJson: "[{\"name\":\"foo\",\"message\":\"Use bar instead.\"}]", environmentGlobals: nil, ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "customMessage", name: "foo", customMessage: "Use bar instead."}}},
-	{source: "foo.bar()", optionsJson: "[{\"name\":\"foo\",\"message\":\"Use bar instead.\"}]", environmentGlobals: nil, ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "customMessage", name: "foo", customMessage: "Use bar instead."}}},
-	{source: "var foo = obj => hasOwnProperty(obj, 'name');", optionsJson: "[\"hasOwnProperty\"]", environmentGlobals: nil, ecmaVersion: 6, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "hasOwnProperty", customMessage: ""}}},
-	{source: "foo", optionsJson: "[{\"globals\":[\"foo\"]}]", environmentGlobals: nil, ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}}},
-	{source: "function fn() { foo; }", optionsJson: "[{\"globals\":[\"foo\"]}]", environmentGlobals: nil, ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}}},
-	{source: "function fn() { foo; }", optionsJson: "[{\"globals\":[\"foo\"]}]", environmentGlobals: noRestrictedGlobalsStringPointer("foo"), ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}}},
-	{source: "event", optionsJson: "[{\"globals\":[\"foo\",\"event\"]}]", environmentGlobals: noRestrictedGlobalsStringPointer("window,self,event"), ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "event", customMessage: ""}}},
-	{source: "foo", optionsJson: "[{\"globals\":[\"foo\"]}]", environmentGlobals: noRestrictedGlobalsStringPointer("foo"), ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}}},
-	{source: "foo()", optionsJson: "[{\"globals\":[\"foo\"]}]", environmentGlobals: nil, ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}}},
-	{source: "foo.bar()", optionsJson: "[{\"globals\":[\"foo\"]}]", environmentGlobals: nil, ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}}},
-	{source: "foo", optionsJson: "[{\"globals\":[{\"name\":\"foo\"}]}]", environmentGlobals: nil, ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}}},
-	{source: "function fn() { foo; }", optionsJson: "[{\"globals\":[{\"name\":\"foo\"}]}]", environmentGlobals: nil, ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}}},
-	{source: "function fn() { foo; }", optionsJson: "[{\"globals\":[{\"name\":\"foo\"}]}]", environmentGlobals: noRestrictedGlobalsStringPointer("foo"), ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}}},
-	{source: "event", optionsJson: "[{\"globals\":[\"foo\",{\"name\":\"event\"}]}]", environmentGlobals: noRestrictedGlobalsStringPointer("window,self,event"), ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "event", customMessage: ""}}},
-	{source: "foo", optionsJson: "[{\"globals\":[{\"name\":\"foo\"}]}]", environmentGlobals: noRestrictedGlobalsStringPointer("foo"), ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}}},
-	{source: "foo()", optionsJson: "[{\"globals\":[{\"name\":\"foo\"}]}]", environmentGlobals: nil, ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}}},
-	{source: "foo.bar()", optionsJson: "[{\"globals\":[{\"name\":\"foo\"}]}]", environmentGlobals: nil, ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}}},
-	{source: "foo", optionsJson: "[{\"globals\":[{\"name\":\"foo\",\"message\":\"Use bar instead.\"}]}]", environmentGlobals: nil, ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "customMessage", name: "foo", customMessage: "Use bar instead."}}},
-	{source: "function fn() { foo; }", optionsJson: "[{\"globals\":[{\"name\":\"foo\",\"message\":\"Use bar instead.\"}]}]", environmentGlobals: nil, ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "customMessage", name: "foo", customMessage: "Use bar instead."}}},
-	{source: "function fn() { foo; }", optionsJson: "[{\"globals\":[{\"name\":\"foo\",\"message\":\"Use bar instead.\"}]}]", environmentGlobals: noRestrictedGlobalsStringPointer("foo"), ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "customMessage", name: "foo", customMessage: "Use bar instead."}}},
-	{source: "event", optionsJson: "[{\"globals\":[\"foo\",{\"name\":\"event\",\"message\":\"Use local event parameter.\"}]}]", environmentGlobals: noRestrictedGlobalsStringPointer("window,self,event"), ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "customMessage", name: "event", customMessage: "Use local event parameter."}}},
-	{source: "foo", optionsJson: "[{\"globals\":[{\"name\":\"foo\",\"message\":\"Use bar instead.\"}]}]", environmentGlobals: noRestrictedGlobalsStringPointer("foo"), ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "customMessage", name: "foo", customMessage: "Use bar instead."}}},
-	{source: "foo()", optionsJson: "[{\"globals\":[{\"name\":\"foo\",\"message\":\"Use bar instead.\"}]}]", environmentGlobals: nil, ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "customMessage", name: "foo", customMessage: "Use bar instead."}}},
-	{source: "foo.bar()", optionsJson: "[{\"globals\":[{\"name\":\"foo\",\"message\":\"Use bar instead.\"}]}]", environmentGlobals: nil, ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "customMessage", name: "foo", customMessage: "Use bar instead."}}},
-	{source: "var foo = obj => hasOwnProperty(obj, 'name');", optionsJson: "[{\"globals\":[\"hasOwnProperty\"]}]", environmentGlobals: nil, ecmaVersion: 6, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "hasOwnProperty", customMessage: ""}}},
-	{source: "window.foo()", optionsJson: "[{\"globals\":[\"foo\"],\"checkGlobalObject\":true}]", environmentGlobals: noRestrictedGlobalsStringPointer("window,self,event"), ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}}},
-	{source: "self.foo()", optionsJson: "[{\"globals\":[\"foo\"],\"checkGlobalObject\":true}]", environmentGlobals: noRestrictedGlobalsStringPointer("window,self,event"), ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}}},
-	{source: "window.window.foo()", optionsJson: "[{\"globals\":[\"foo\"],\"checkGlobalObject\":true}]", environmentGlobals: noRestrictedGlobalsStringPointer("window,self,event"), ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}}},
-	{source: "self.self.foo()", optionsJson: "[{\"globals\":[\"foo\"],\"checkGlobalObject\":true}]", environmentGlobals: noRestrictedGlobalsStringPointer("window,self,event"), ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}}},
-	{source: "globalThis.foo()", optionsJson: "[{\"globals\":[\"foo\"],\"checkGlobalObject\":true}]", environmentGlobals: nil, ecmaVersion: 2020, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}}},
-	{source: "globalThis.globalThis.foo()", optionsJson: "[{\"globals\":[\"foo\"],\"checkGlobalObject\":true}]", environmentGlobals: nil, ecmaVersion: 2020, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}}},
-	{source: "myGlobal.foo()", optionsJson: "[{\"globals\":[\"foo\"],\"checkGlobalObject\":true,\"globalObjects\":[\"myGlobal\"]}]", environmentGlobals: noRestrictedGlobalsStringPointer("myGlobal"), ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}}},
-	{source: "myGlobal.myGlobal.foo()", optionsJson: "[{\"globals\":[\"foo\"],\"checkGlobalObject\":true,\"globalObjects\":[\"myGlobal\"]}]", environmentGlobals: noRestrictedGlobalsStringPointer("myGlobal"), ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}}},
-	{source: "window[\"foo\"]", optionsJson: "[{\"globals\":[\"foo\"],\"checkGlobalObject\":true}]", environmentGlobals: noRestrictedGlobalsStringPointer("window,self,event"), ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}}},
-	{source: "self[\"foo\"]", optionsJson: "[{\"globals\":[\"foo\"],\"checkGlobalObject\":true}]", environmentGlobals: noRestrictedGlobalsStringPointer("window,self,event"), ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}}},
-	{source: "globalThis[\"foo\"]", optionsJson: "[{\"globals\":[\"foo\"],\"checkGlobalObject\":true}]", environmentGlobals: nil, ecmaVersion: 2020, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}}},
-	{source: "myGlobal[\"foo\"]", optionsJson: "[{\"globals\":[\"foo\"],\"checkGlobalObject\":true,\"globalObjects\":[\"myGlobal\"]}]", environmentGlobals: noRestrictedGlobalsStringPointer("myGlobal"), ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}}},
-	{source: "window?.foo()", optionsJson: "[{\"globals\":[\"foo\"],\"checkGlobalObject\":true}]", environmentGlobals: noRestrictedGlobalsStringPointer("window,self,event"), ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}}},
-	{source: "self?.foo()", optionsJson: "[{\"globals\":[\"foo\"],\"checkGlobalObject\":true}]", environmentGlobals: noRestrictedGlobalsStringPointer("window,self,event"), ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}}},
-	{source: "window.foo(); myGlobal.foo()", optionsJson: "[{\"globals\":[\"foo\"],\"checkGlobalObject\":true,\"globalObjects\":[\"myGlobal\"]}]", environmentGlobals: noRestrictedGlobalsStringPointer("window,self,event,myGlobal"), ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}, {id: "defaultMessage", name: "foo", customMessage: ""}}},
-	{source: "myGlobal.foo(); myOtherGlobal.bar()", optionsJson: "[{\"globals\":[\"foo\",\"bar\"],\"checkGlobalObject\":true,\"globalObjects\":[\"myGlobal\",\"myOtherGlobal\"]}]", environmentGlobals: noRestrictedGlobalsStringPointer("myGlobal,myOtherGlobal"), ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}, {id: "defaultMessage", name: "bar", customMessage: ""}}},
-	{source: "foo(); window.foo()", optionsJson: "[{\"globals\":[\"foo\"],\"checkGlobalObject\":true}]", environmentGlobals: noRestrictedGlobalsStringPointer("window,self,event"), ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}, {id: "defaultMessage", name: "foo", customMessage: ""}}},
-	{source: "foo(); self.foo()", optionsJson: "[{\"globals\":[\"foo\"],\"checkGlobalObject\":true}]", environmentGlobals: noRestrictedGlobalsStringPointer("window,self,event"), ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}, {id: "defaultMessage", name: "foo", customMessage: ""}}},
-	{source: "foo(); myGlobal.foo()", optionsJson: "[{\"globals\":[\"foo\"],\"checkGlobalObject\":true,\"globalObjects\":[\"myGlobal\"]}]", environmentGlobals: noRestrictedGlobalsStringPointer("myGlobal"), ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}, {id: "defaultMessage", name: "foo", customMessage: ""}}},
-	{source: "function onClick(event) { console.log(event); console.log(window.event); }", optionsJson: "[{\"globals\":[\"event\"],\"checkGlobalObject\":true}]", environmentGlobals: noRestrictedGlobalsStringPointer("window,self,event"), ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "event", customMessage: ""}}},
-	{source: "function onClick(event) { console.log(event); console.log(self.event); }", optionsJson: "[{\"globals\":[\"event\"],\"checkGlobalObject\":true}]", environmentGlobals: noRestrictedGlobalsStringPointer("window,self,event"), ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "event", customMessage: ""}}},
-	{source: "function onClick(event) { console.log(event); console.log(globalThis.event); }", optionsJson: "[{\"globals\":[\"event\"],\"checkGlobalObject\":true}]", environmentGlobals: nil, ecmaVersion: 2020, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "event", customMessage: ""}}},
-	{source: "function onClick(event) { console.log(event); console.log(myGlobal.event); }", optionsJson: "[{\"globals\":[\"event\"],\"checkGlobalObject\":true,\"globalObjects\":[\"myGlobal\"]}]", environmentGlobals: noRestrictedGlobalsStringPointer("myGlobal"), ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "event", customMessage: ""}}},
+	{
+		source:             "foo",
+		optionsJson:        "[\"foo\"]",
+		environmentGlobals: nil,
+		ecmaVersion:        0,
+		findings:           []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}},
+	},
+	{
+		source:             "function fn() { foo; }",
+		optionsJson:        "[\"foo\"]",
+		environmentGlobals: nil,
+		ecmaVersion:        0,
+		findings:           []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}},
+	},
+	{
+		source:             "function fn() { foo; }",
+		optionsJson:        "[\"foo\"]",
+		environmentGlobals: noRestrictedGlobalsStringPointer("foo"),
+		ecmaVersion:        0,
+		findings:           []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}},
+	},
+	{
+		source:             "event",
+		optionsJson:        "[\"foo\",\"event\"]",
+		environmentGlobals: noRestrictedGlobalsStringPointer("window,self,event"),
+		ecmaVersion:        0,
+		findings:           []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "event", customMessage: ""}},
+	},
+	{
+		source:             "foo",
+		optionsJson:        "[\"foo\"]",
+		environmentGlobals: noRestrictedGlobalsStringPointer("foo"),
+		ecmaVersion:        0,
+		findings:           []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}},
+	},
+	{
+		source:             "foo()",
+		optionsJson:        "[\"foo\"]",
+		environmentGlobals: nil,
+		ecmaVersion:        0,
+		findings:           []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}},
+	},
+	{
+		source:             "foo.bar()",
+		optionsJson:        "[\"foo\"]",
+		environmentGlobals: nil,
+		ecmaVersion:        0,
+		findings:           []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}},
+	},
+	{
+		source:             "foo",
+		optionsJson:        "[{\"name\":\"foo\"}]",
+		environmentGlobals: nil,
+		ecmaVersion:        0,
+		findings:           []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}},
+	},
+	{
+		source:             "function fn() { foo; }",
+		optionsJson:        "[{\"name\":\"foo\"}]",
+		environmentGlobals: nil,
+		ecmaVersion:        0,
+		findings:           []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}},
+	},
+	{
+		source:             "function fn() { foo; }",
+		optionsJson:        "[{\"name\":\"foo\"}]",
+		environmentGlobals: noRestrictedGlobalsStringPointer("foo"),
+		ecmaVersion:        0,
+		findings:           []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}},
+	},
+	{
+		source:             "event",
+		optionsJson:        "[\"foo\",{\"name\":\"event\"}]",
+		environmentGlobals: noRestrictedGlobalsStringPointer("window,self,event"),
+		ecmaVersion:        0,
+		findings:           []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "event", customMessage: ""}},
+	},
+	{
+		source:             "foo",
+		optionsJson:        "[{\"name\":\"foo\"}]",
+		environmentGlobals: noRestrictedGlobalsStringPointer("foo"),
+		ecmaVersion:        0,
+		findings:           []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}},
+	},
+	{
+		source:             "foo()",
+		optionsJson:        "[{\"name\":\"foo\"}]",
+		environmentGlobals: nil,
+		ecmaVersion:        0,
+		findings:           []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}},
+	},
+	{
+		source:             "foo.bar()",
+		optionsJson:        "[{\"name\":\"foo\"}]",
+		environmentGlobals: nil,
+		ecmaVersion:        0,
+		findings:           []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}},
+	},
+	{
+		source:             "foo",
+		optionsJson:        "[{\"name\":\"foo\",\"message\":\"Use bar instead.\"}]",
+		environmentGlobals: nil,
+		ecmaVersion:        0,
+		findings: []noRestrictedGlobalsExpectation{
+			{id: "customMessage", name: "foo", customMessage: "Use bar instead."},
+		},
+	},
+	{
+		source:             "function fn() { foo; }",
+		optionsJson:        "[{\"name\":\"foo\",\"message\":\"Use bar instead.\"}]",
+		environmentGlobals: nil,
+		ecmaVersion:        0,
+		findings: []noRestrictedGlobalsExpectation{
+			{id: "customMessage", name: "foo", customMessage: "Use bar instead."},
+		},
+	},
+	{
+		source:             "function fn() { foo; }",
+		optionsJson:        "[{\"name\":\"foo\",\"message\":\"Use bar instead.\"}]",
+		environmentGlobals: noRestrictedGlobalsStringPointer("foo"),
+		ecmaVersion:        0,
+		findings: []noRestrictedGlobalsExpectation{
+			{id: "customMessage", name: "foo", customMessage: "Use bar instead."},
+		},
+	},
+	{
+		source:             "event",
+		optionsJson:        "[\"foo\",{\"name\":\"event\",\"message\":\"Use local event parameter.\"}]",
+		environmentGlobals: noRestrictedGlobalsStringPointer("window,self,event"),
+		ecmaVersion:        0,
+		findings: []noRestrictedGlobalsExpectation{
+			{id: "customMessage", name: "event", customMessage: "Use local event parameter."},
+		},
+	},
+	{
+		source:             "foo",
+		optionsJson:        "[{\"name\":\"foo\",\"message\":\"Use bar instead.\"}]",
+		environmentGlobals: noRestrictedGlobalsStringPointer("foo"),
+		ecmaVersion:        0,
+		findings: []noRestrictedGlobalsExpectation{
+			{id: "customMessage", name: "foo", customMessage: "Use bar instead."},
+		},
+	},
+	{
+		source:             "foo()",
+		optionsJson:        "[{\"name\":\"foo\",\"message\":\"Use bar instead.\"}]",
+		environmentGlobals: nil,
+		ecmaVersion:        0,
+		findings: []noRestrictedGlobalsExpectation{
+			{id: "customMessage", name: "foo", customMessage: "Use bar instead."},
+		},
+	},
+	{
+		source:             "foo.bar()",
+		optionsJson:        "[{\"name\":\"foo\",\"message\":\"Use bar instead.\"}]",
+		environmentGlobals: nil,
+		ecmaVersion:        0,
+		findings: []noRestrictedGlobalsExpectation{
+			{id: "customMessage", name: "foo", customMessage: "Use bar instead."},
+		},
+	},
+	{
+		source:             "var foo = obj => hasOwnProperty(obj, 'name');",
+		optionsJson:        "[\"hasOwnProperty\"]",
+		environmentGlobals: nil,
+		ecmaVersion:        6,
+		findings: []noRestrictedGlobalsExpectation{
+			{id: "defaultMessage", name: "hasOwnProperty", customMessage: ""},
+		},
+	},
+	{
+		source:             "foo",
+		optionsJson:        "[{\"globals\":[\"foo\"]}]",
+		environmentGlobals: nil,
+		ecmaVersion:        0,
+		findings:           []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}},
+	},
+	{
+		source:             "function fn() { foo; }",
+		optionsJson:        "[{\"globals\":[\"foo\"]}]",
+		environmentGlobals: nil,
+		ecmaVersion:        0,
+		findings:           []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}},
+	},
+	{
+		source:             "function fn() { foo; }",
+		optionsJson:        "[{\"globals\":[\"foo\"]}]",
+		environmentGlobals: noRestrictedGlobalsStringPointer("foo"),
+		ecmaVersion:        0,
+		findings:           []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}},
+	},
+	{
+		source:             "event",
+		optionsJson:        "[{\"globals\":[\"foo\",\"event\"]}]",
+		environmentGlobals: noRestrictedGlobalsStringPointer("window,self,event"),
+		ecmaVersion:        0,
+		findings:           []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "event", customMessage: ""}},
+	},
+	{
+		source:             "foo",
+		optionsJson:        "[{\"globals\":[\"foo\"]}]",
+		environmentGlobals: noRestrictedGlobalsStringPointer("foo"),
+		ecmaVersion:        0,
+		findings:           []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}},
+	},
+	{
+		source:             "foo()",
+		optionsJson:        "[{\"globals\":[\"foo\"]}]",
+		environmentGlobals: nil,
+		ecmaVersion:        0,
+		findings:           []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}},
+	},
+	{
+		source:             "foo.bar()",
+		optionsJson:        "[{\"globals\":[\"foo\"]}]",
+		environmentGlobals: nil,
+		ecmaVersion:        0,
+		findings:           []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}},
+	},
+	{
+		source:             "foo",
+		optionsJson:        "[{\"globals\":[{\"name\":\"foo\"}]}]",
+		environmentGlobals: nil,
+		ecmaVersion:        0,
+		findings:           []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}},
+	},
+	{
+		source:             "function fn() { foo; }",
+		optionsJson:        "[{\"globals\":[{\"name\":\"foo\"}]}]",
+		environmentGlobals: nil,
+		ecmaVersion:        0,
+		findings:           []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}},
+	},
+	{
+		source:             "function fn() { foo; }",
+		optionsJson:        "[{\"globals\":[{\"name\":\"foo\"}]}]",
+		environmentGlobals: noRestrictedGlobalsStringPointer("foo"),
+		ecmaVersion:        0,
+		findings:           []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}},
+	},
+	{
+		source:             "event",
+		optionsJson:        "[{\"globals\":[\"foo\",{\"name\":\"event\"}]}]",
+		environmentGlobals: noRestrictedGlobalsStringPointer("window,self,event"),
+		ecmaVersion:        0,
+		findings:           []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "event", customMessage: ""}},
+	},
+	{
+		source:             "foo",
+		optionsJson:        "[{\"globals\":[{\"name\":\"foo\"}]}]",
+		environmentGlobals: noRestrictedGlobalsStringPointer("foo"),
+		ecmaVersion:        0,
+		findings:           []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}},
+	},
+	{
+		source:             "foo()",
+		optionsJson:        "[{\"globals\":[{\"name\":\"foo\"}]}]",
+		environmentGlobals: nil,
+		ecmaVersion:        0,
+		findings:           []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}},
+	},
+	{
+		source:             "foo.bar()",
+		optionsJson:        "[{\"globals\":[{\"name\":\"foo\"}]}]",
+		environmentGlobals: nil,
+		ecmaVersion:        0,
+		findings:           []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}},
+	},
+	{
+		source:             "foo",
+		optionsJson:        "[{\"globals\":[{\"name\":\"foo\",\"message\":\"Use bar instead.\"}]}]",
+		environmentGlobals: nil,
+		ecmaVersion:        0,
+		findings: []noRestrictedGlobalsExpectation{
+			{id: "customMessage", name: "foo", customMessage: "Use bar instead."},
+		},
+	},
+	{
+		source:             "function fn() { foo; }",
+		optionsJson:        "[{\"globals\":[{\"name\":\"foo\",\"message\":\"Use bar instead.\"}]}]",
+		environmentGlobals: nil,
+		ecmaVersion:        0,
+		findings: []noRestrictedGlobalsExpectation{
+			{id: "customMessage", name: "foo", customMessage: "Use bar instead."},
+		},
+	},
+	{
+		source:             "function fn() { foo; }",
+		optionsJson:        "[{\"globals\":[{\"name\":\"foo\",\"message\":\"Use bar instead.\"}]}]",
+		environmentGlobals: noRestrictedGlobalsStringPointer("foo"),
+		ecmaVersion:        0,
+		findings: []noRestrictedGlobalsExpectation{
+			{id: "customMessage", name: "foo", customMessage: "Use bar instead."},
+		},
+	},
+	{
+		source:             "event",
+		optionsJson:        "[{\"globals\":[\"foo\",{\"name\":\"event\",\"message\":\"Use local event parameter.\"}]}]",
+		environmentGlobals: noRestrictedGlobalsStringPointer("window,self,event"),
+		ecmaVersion:        0,
+		findings: []noRestrictedGlobalsExpectation{
+			{id: "customMessage", name: "event", customMessage: "Use local event parameter."},
+		},
+	},
+	{
+		source:             "foo",
+		optionsJson:        "[{\"globals\":[{\"name\":\"foo\",\"message\":\"Use bar instead.\"}]}]",
+		environmentGlobals: noRestrictedGlobalsStringPointer("foo"),
+		ecmaVersion:        0,
+		findings: []noRestrictedGlobalsExpectation{
+			{id: "customMessage", name: "foo", customMessage: "Use bar instead."},
+		},
+	},
+	{
+		source:             "foo()",
+		optionsJson:        "[{\"globals\":[{\"name\":\"foo\",\"message\":\"Use bar instead.\"}]}]",
+		environmentGlobals: nil,
+		ecmaVersion:        0,
+		findings: []noRestrictedGlobalsExpectation{
+			{id: "customMessage", name: "foo", customMessage: "Use bar instead."},
+		},
+	},
+	{
+		source:             "foo.bar()",
+		optionsJson:        "[{\"globals\":[{\"name\":\"foo\",\"message\":\"Use bar instead.\"}]}]",
+		environmentGlobals: nil,
+		ecmaVersion:        0,
+		findings: []noRestrictedGlobalsExpectation{
+			{id: "customMessage", name: "foo", customMessage: "Use bar instead."},
+		},
+	},
+	{
+		source:             "var foo = obj => hasOwnProperty(obj, 'name');",
+		optionsJson:        "[{\"globals\":[\"hasOwnProperty\"]}]",
+		environmentGlobals: nil,
+		ecmaVersion:        6,
+		findings: []noRestrictedGlobalsExpectation{
+			{id: "defaultMessage", name: "hasOwnProperty", customMessage: ""},
+		},
+	},
+	{
+		source:             "window.foo()",
+		optionsJson:        "[{\"globals\":[\"foo\"],\"checkGlobalObject\":true}]",
+		environmentGlobals: noRestrictedGlobalsStringPointer("window,self,event"),
+		ecmaVersion:        0,
+		findings:           []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}},
+	},
+	{
+		source:             "self.foo()",
+		optionsJson:        "[{\"globals\":[\"foo\"],\"checkGlobalObject\":true}]",
+		environmentGlobals: noRestrictedGlobalsStringPointer("window,self,event"),
+		ecmaVersion:        0,
+		findings:           []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}},
+	},
+	{
+		source:             "window.window.foo()",
+		optionsJson:        "[{\"globals\":[\"foo\"],\"checkGlobalObject\":true}]",
+		environmentGlobals: noRestrictedGlobalsStringPointer("window,self,event"),
+		ecmaVersion:        0,
+		findings:           []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}},
+	},
+	{
+		source:             "self.self.foo()",
+		optionsJson:        "[{\"globals\":[\"foo\"],\"checkGlobalObject\":true}]",
+		environmentGlobals: noRestrictedGlobalsStringPointer("window,self,event"),
+		ecmaVersion:        0,
+		findings:           []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}},
+	},
+	{
+		source:             "globalThis.foo()",
+		optionsJson:        "[{\"globals\":[\"foo\"],\"checkGlobalObject\":true}]",
+		environmentGlobals: nil,
+		ecmaVersion:        2020,
+		findings:           []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}},
+	},
+	{
+		source:             "globalThis.globalThis.foo()",
+		optionsJson:        "[{\"globals\":[\"foo\"],\"checkGlobalObject\":true}]",
+		environmentGlobals: nil,
+		ecmaVersion:        2020,
+		findings:           []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}},
+	},
+	{
+		source:             "myGlobal.foo()",
+		optionsJson:        "[{\"globals\":[\"foo\"],\"checkGlobalObject\":true,\"globalObjects\":[\"myGlobal\"]}]",
+		environmentGlobals: noRestrictedGlobalsStringPointer("myGlobal"),
+		ecmaVersion:        0,
+		findings:           []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}},
+	},
+	{
+		source:             "myGlobal.myGlobal.foo()",
+		optionsJson:        "[{\"globals\":[\"foo\"],\"checkGlobalObject\":true,\"globalObjects\":[\"myGlobal\"]}]",
+		environmentGlobals: noRestrictedGlobalsStringPointer("myGlobal"),
+		ecmaVersion:        0,
+		findings:           []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}},
+	},
+	{
+		source:             "window[\"foo\"]",
+		optionsJson:        "[{\"globals\":[\"foo\"],\"checkGlobalObject\":true}]",
+		environmentGlobals: noRestrictedGlobalsStringPointer("window,self,event"),
+		ecmaVersion:        0,
+		findings:           []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}},
+	},
+	{
+		source:             "self[\"foo\"]",
+		optionsJson:        "[{\"globals\":[\"foo\"],\"checkGlobalObject\":true}]",
+		environmentGlobals: noRestrictedGlobalsStringPointer("window,self,event"),
+		ecmaVersion:        0,
+		findings:           []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}},
+	},
+	{
+		source:             "globalThis[\"foo\"]",
+		optionsJson:        "[{\"globals\":[\"foo\"],\"checkGlobalObject\":true}]",
+		environmentGlobals: nil,
+		ecmaVersion:        2020,
+		findings:           []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}},
+	},
+	{
+		source:             "myGlobal[\"foo\"]",
+		optionsJson:        "[{\"globals\":[\"foo\"],\"checkGlobalObject\":true,\"globalObjects\":[\"myGlobal\"]}]",
+		environmentGlobals: noRestrictedGlobalsStringPointer("myGlobal"),
+		ecmaVersion:        0,
+		findings:           []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}},
+	},
+	{
+		source:             "window?.foo()",
+		optionsJson:        "[{\"globals\":[\"foo\"],\"checkGlobalObject\":true}]",
+		environmentGlobals: noRestrictedGlobalsStringPointer("window,self,event"),
+		ecmaVersion:        0,
+		findings:           []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}},
+	},
+	{
+		source:             "self?.foo()",
+		optionsJson:        "[{\"globals\":[\"foo\"],\"checkGlobalObject\":true}]",
+		environmentGlobals: noRestrictedGlobalsStringPointer("window,self,event"),
+		ecmaVersion:        0,
+		findings:           []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}},
+	},
+	{
+		source:             "window.foo(); myGlobal.foo()",
+		optionsJson:        "[{\"globals\":[\"foo\"],\"checkGlobalObject\":true,\"globalObjects\":[\"myGlobal\"]}]",
+		environmentGlobals: noRestrictedGlobalsStringPointer("window,self,event,myGlobal"),
+		ecmaVersion:        0,
+		findings: []noRestrictedGlobalsExpectation{
+			{id: "defaultMessage", name: "foo", customMessage: ""},
+			{id: "defaultMessage", name: "foo", customMessage: ""},
+		},
+	},
+	{
+		source:             "myGlobal.foo(); myOtherGlobal.bar()",
+		optionsJson:        "[{\"globals\":[\"foo\",\"bar\"],\"checkGlobalObject\":true,\"globalObjects\":[\"myGlobal\",\"myOtherGlobal\"]}]",
+		environmentGlobals: noRestrictedGlobalsStringPointer("myGlobal,myOtherGlobal"),
+		ecmaVersion:        0,
+		findings: []noRestrictedGlobalsExpectation{
+			{id: "defaultMessage", name: "foo", customMessage: ""},
+			{id: "defaultMessage", name: "bar", customMessage: ""},
+		},
+	},
+	{
+		source:             "foo(); window.foo()",
+		optionsJson:        "[{\"globals\":[\"foo\"],\"checkGlobalObject\":true}]",
+		environmentGlobals: noRestrictedGlobalsStringPointer("window,self,event"),
+		ecmaVersion:        0,
+		findings: []noRestrictedGlobalsExpectation{
+			{id: "defaultMessage", name: "foo", customMessage: ""},
+			{id: "defaultMessage", name: "foo", customMessage: ""},
+		},
+	},
+	{
+		source:             "foo(); self.foo()",
+		optionsJson:        "[{\"globals\":[\"foo\"],\"checkGlobalObject\":true}]",
+		environmentGlobals: noRestrictedGlobalsStringPointer("window,self,event"),
+		ecmaVersion:        0,
+		findings: []noRestrictedGlobalsExpectation{
+			{id: "defaultMessage", name: "foo", customMessage: ""},
+			{id: "defaultMessage", name: "foo", customMessage: ""},
+		},
+	},
+	{
+		source:             "foo(); myGlobal.foo()",
+		optionsJson:        "[{\"globals\":[\"foo\"],\"checkGlobalObject\":true,\"globalObjects\":[\"myGlobal\"]}]",
+		environmentGlobals: noRestrictedGlobalsStringPointer("myGlobal"),
+		ecmaVersion:        0,
+		findings: []noRestrictedGlobalsExpectation{
+			{id: "defaultMessage", name: "foo", customMessage: ""},
+			{id: "defaultMessage", name: "foo", customMessage: ""},
+		},
+	},
+	{
+		source:             "function onClick(event) { console.log(event); console.log(window.event); }",
+		optionsJson:        "[{\"globals\":[\"event\"],\"checkGlobalObject\":true}]",
+		environmentGlobals: noRestrictedGlobalsStringPointer("window,self,event"),
+		ecmaVersion:        0,
+		findings:           []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "event", customMessage: ""}},
+	},
+	{
+		source:             "function onClick(event) { console.log(event); console.log(self.event); }",
+		optionsJson:        "[{\"globals\":[\"event\"],\"checkGlobalObject\":true}]",
+		environmentGlobals: noRestrictedGlobalsStringPointer("window,self,event"),
+		ecmaVersion:        0,
+		findings:           []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "event", customMessage: ""}},
+	},
+	{
+		source:             "function onClick(event) { console.log(event); console.log(globalThis.event); }",
+		optionsJson:        "[{\"globals\":[\"event\"],\"checkGlobalObject\":true}]",
+		environmentGlobals: nil,
+		ecmaVersion:        2020,
+		findings:           []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "event", customMessage: ""}},
+	},
+	{
+		source:             "function onClick(event) { console.log(event); console.log(myGlobal.event); }",
+		optionsJson:        "[{\"globals\":[\"event\"],\"checkGlobalObject\":true,\"globalObjects\":[\"myGlobal\"]}]",
+		environmentGlobals: noRestrictedGlobalsStringPointer("myGlobal"),
+		ecmaVersion:        0,
+		findings:           []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "event", customMessage: ""}},
+	},
 }
 
 // Block 1, upstream's TypeScript RuleTester.
@@ -166,14 +731,34 @@ var noRestrictedGlobalsCleanCasesBlock1 = []noRestrictedGlobalsCase{
 	{source: "foo", optionsJson: "", environmentGlobals: nil, ecmaVersion: 0},
 	{source: "foo", optionsJson: "[\"bar\"]", environmentGlobals: nil, ecmaVersion: 0},
 	{source: "const foo: number = 1;", optionsJson: "[\"foo\"]", environmentGlobals: nil, ecmaVersion: 0},
-	{source: "event", optionsJson: "[\"bar\"]", environmentGlobals: noRestrictedGlobalsStringPointer("window,self,event"), ecmaVersion: 0},
+	{
+		source:             "event",
+		optionsJson:        "[\"bar\"]",
+		environmentGlobals: noRestrictedGlobalsStringPointer("window,self,event"),
+		ecmaVersion:        0,
+	},
 	{source: "import foo from 'bar';", optionsJson: "[\"foo\"]", environmentGlobals: nil, ecmaVersion: 0},
 	{source: "function foo(): void {}", optionsJson: "[\"foo\"]", environmentGlobals: nil, ecmaVersion: 0},
 	{source: "function fn(): void { let foo; }", optionsJson: "[\"foo\"]", environmentGlobals: nil, ecmaVersion: 0},
 	{source: "foo.bar", optionsJson: "[\"bar\"]", environmentGlobals: nil, ecmaVersion: 0},
-	{source: "foo", optionsJson: "[{\"name\":\"bar\",\"message\":\"Use baz instead.\"}]", environmentGlobals: nil, ecmaVersion: 0},
-	{source: "\n\t\t\texport default class Test {\n\t\t\t\tprivate status: string;\n\t\t\t\tgetStatus() {\n\t\t\t\t\treturn this.status;\n\t\t\t\t}\n\t\t\t}", optionsJson: "[\"status\"]", environmentGlobals: nil, ecmaVersion: 0},
-	{source: "type Handler = (event: string) => any", optionsJson: "[\"event\"]", environmentGlobals: nil, ecmaVersion: 0},
+	{
+		source:             "foo",
+		optionsJson:        "[{\"name\":\"bar\",\"message\":\"Use baz instead.\"}]",
+		environmentGlobals: nil,
+		ecmaVersion:        0,
+	},
+	{
+		source:             "\n\t\t\texport default class Test {\n\t\t\t\tprivate status: string;\n\t\t\t\tgetStatus() {\n\t\t\t\t\treturn this.status;\n\t\t\t\t}\n\t\t\t}",
+		optionsJson:        "[\"status\"]",
+		environmentGlobals: nil,
+		ecmaVersion:        0,
+	},
+	{
+		source:             "type Handler = (event: string) => any",
+		optionsJson:        "[\"event\"]",
+		environmentGlobals: nil,
+		ecmaVersion:        0,
+	},
 	{source: "let value: bigint", optionsJson: "[\"bigint\"]", environmentGlobals: nil, ecmaVersion: 0},
 	{source: "let value: boolean", optionsJson: "[\"boolean\"]", environmentGlobals: nil, ecmaVersion: 0},
 	{source: "let value: never", optionsJson: "[\"never\"]", environmentGlobals: nil, ecmaVersion: 0},
@@ -194,7 +779,12 @@ var noRestrictedGlobalsCleanCasesBlock1 = []noRestrictedGlobalsCase{
 	{source: "function foo(param: Test) {}", optionsJson: "[\"Test\"]", environmentGlobals: nil, ecmaVersion: 0},
 	{source: "1 as Test", optionsJson: "[\"Test\"]", environmentGlobals: nil, ecmaVersion: 0},
 	{source: "class Derived implements Test {}", optionsJson: "[\"Test\"]", environmentGlobals: nil, ecmaVersion: 0},
-	{source: "class Derived implements Test1, Test2 {}", optionsJson: "[\"Test1\",\"Test2\"]", environmentGlobals: nil, ecmaVersion: 0},
+	{
+		source:             "class Derived implements Test1, Test2 {}",
+		optionsJson:        "[\"Test1\",\"Test2\"]",
+		environmentGlobals: nil,
+		ecmaVersion:        0,
+	},
 	{source: "interface Derived extends Test {}", optionsJson: "[\"Test\"]", environmentGlobals: nil, ecmaVersion: 0},
 	{source: "type Intersection = Test & {}", optionsJson: "[\"Test\"]", environmentGlobals: nil, ecmaVersion: 0},
 	{source: "type Union = Test | {}", optionsJson: "[\"Test\"]", environmentGlobals: nil, ecmaVersion: 0},
@@ -203,34 +793,200 @@ var noRestrictedGlobalsCleanCasesBlock1 = []noRestrictedGlobalsCase{
 	{source: "let value: NS.Test", optionsJson: "[\"NS.Test\"]", environmentGlobals: nil, ecmaVersion: 0},
 	{source: "let value: typeof Test", optionsJson: "[\"Test\"]", environmentGlobals: nil, ecmaVersion: 0},
 	{source: "let value: Type<Test>", optionsJson: "[\"Type\",\"Test\"]", environmentGlobals: nil, ecmaVersion: 0},
-	{source: "type Intersection = Test<any>", optionsJson: "[\"Test\",\"any\"]", environmentGlobals: nil, ecmaVersion: 0},
-	{source: "type Intersection = Test<A, B>", optionsJson: "[\"Test\",\"A\",\"B\"]", environmentGlobals: nil, ecmaVersion: 0},
+	{
+		source:             "type Intersection = Test<any>",
+		optionsJson:        "[\"Test\",\"any\"]",
+		environmentGlobals: nil,
+		ecmaVersion:        0,
+	},
+	{
+		source:             "type Intersection = Test<A, B>",
+		optionsJson:        "[\"Test\",\"A\",\"B\"]",
+		environmentGlobals: nil,
+		ecmaVersion:        0,
+	},
 }
 
 var noRestrictedGlobalsFiringCasesBlock1 = []noRestrictedGlobalsCase{
-	{source: "foo", optionsJson: "[\"foo\"]", environmentGlobals: nil, ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}}},
-	{source: "function fn(): void { foo; }", optionsJson: "[\"foo\"]", environmentGlobals: nil, ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}}},
-	{source: "function fn(): void { foo; }", optionsJson: "[\"foo\"]", environmentGlobals: noRestrictedGlobalsStringPointer("foo"), ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}}},
-	{source: "event", optionsJson: "[\"foo\",\"event\"]", environmentGlobals: noRestrictedGlobalsStringPointer("window,self,event"), ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "event", customMessage: ""}}},
-	{source: "foo", optionsJson: "[\"foo\"]", environmentGlobals: noRestrictedGlobalsStringPointer("foo"), ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}}},
-	{source: "foo()", optionsJson: "[\"foo\"]", environmentGlobals: nil, ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}}},
-	{source: "foo.bar()", optionsJson: "[\"foo\"]", environmentGlobals: nil, ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}}},
-	{source: "foo", optionsJson: "[{\"name\":\"foo\"}]", environmentGlobals: nil, ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}}},
-	{source: "function fn(): void { foo; }", optionsJson: "[{\"name\":\"foo\"}]", environmentGlobals: nil, ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}}},
-	{source: "function fn(): void { foo; }", optionsJson: "[{\"name\":\"foo\"}]", environmentGlobals: noRestrictedGlobalsStringPointer("foo"), ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}}},
-	{source: "event", optionsJson: "[\"foo\",{\"name\":\"event\"}]", environmentGlobals: noRestrictedGlobalsStringPointer("window,self,event"), ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "event", customMessage: ""}}},
-	{source: "foo", optionsJson: "[{\"name\":\"foo\"}]", environmentGlobals: noRestrictedGlobalsStringPointer("foo"), ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}}},
-	{source: "foo()", optionsJson: "[{\"name\":\"foo\"}]", environmentGlobals: nil, ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}}},
-	{source: "foo.bar()", optionsJson: "[{\"name\":\"foo\"}]", environmentGlobals: nil, ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}}},
-	{source: "foo", optionsJson: "[{\"name\":\"foo\",\"message\":\"Use bar instead.\"}]", environmentGlobals: nil, ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "customMessage", name: "foo", customMessage: "Use bar instead."}}},
-	{source: "function fn(): void { foo; }", optionsJson: "[{\"name\":\"foo\",\"message\":\"Use bar instead.\"}]", environmentGlobals: nil, ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "customMessage", name: "foo", customMessage: "Use bar instead."}}},
-	{source: "function fn(): void { foo; }", optionsJson: "[{\"name\":\"foo\",\"message\":\"Use bar instead.\"}]", environmentGlobals: noRestrictedGlobalsStringPointer("foo"), ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "customMessage", name: "foo", customMessage: "Use bar instead."}}},
-	{source: "event", optionsJson: "[\"foo\",{\"name\":\"event\",\"message\":\"Use local event parameter.\"}]", environmentGlobals: noRestrictedGlobalsStringPointer("window,self,event"), ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "customMessage", name: "event", customMessage: "Use local event parameter."}}},
-	{source: "foo", optionsJson: "[{\"name\":\"foo\",\"message\":\"Use bar instead.\"}]", environmentGlobals: noRestrictedGlobalsStringPointer("foo"), ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "customMessage", name: "foo", customMessage: "Use bar instead."}}},
-	{source: "foo()", optionsJson: "[{\"name\":\"foo\",\"message\":\"Use bar instead.\"}]", environmentGlobals: nil, ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "customMessage", name: "foo", customMessage: "Use bar instead."}}},
-	{source: "foo.bar()", optionsJson: "[{\"name\":\"foo\",\"message\":\"Use bar instead.\"}]", environmentGlobals: nil, ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "customMessage", name: "foo", customMessage: "Use bar instead."}}},
-	{source: "const foo = obj => hasOwnProperty(obj, 'name');", optionsJson: "[\"hasOwnProperty\"]", environmentGlobals: nil, ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "hasOwnProperty", customMessage: ""}}},
-	{source: "const x: Promise<any> = Promise.resolve();", optionsJson: "[\"Promise\"]", environmentGlobals: nil, ecmaVersion: 0, findings: []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "Promise", customMessage: ""}}},
+	{
+		source:             "foo",
+		optionsJson:        "[\"foo\"]",
+		environmentGlobals: nil,
+		ecmaVersion:        0,
+		findings:           []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}},
+	},
+	{
+		source:             "function fn(): void { foo; }",
+		optionsJson:        "[\"foo\"]",
+		environmentGlobals: nil,
+		ecmaVersion:        0,
+		findings:           []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}},
+	},
+	{
+		source:             "function fn(): void { foo; }",
+		optionsJson:        "[\"foo\"]",
+		environmentGlobals: noRestrictedGlobalsStringPointer("foo"),
+		ecmaVersion:        0,
+		findings:           []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}},
+	},
+	{
+		source:             "event",
+		optionsJson:        "[\"foo\",\"event\"]",
+		environmentGlobals: noRestrictedGlobalsStringPointer("window,self,event"),
+		ecmaVersion:        0,
+		findings:           []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "event", customMessage: ""}},
+	},
+	{
+		source:             "foo",
+		optionsJson:        "[\"foo\"]",
+		environmentGlobals: noRestrictedGlobalsStringPointer("foo"),
+		ecmaVersion:        0,
+		findings:           []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}},
+	},
+	{
+		source:             "foo()",
+		optionsJson:        "[\"foo\"]",
+		environmentGlobals: nil,
+		ecmaVersion:        0,
+		findings:           []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}},
+	},
+	{
+		source:             "foo.bar()",
+		optionsJson:        "[\"foo\"]",
+		environmentGlobals: nil,
+		ecmaVersion:        0,
+		findings:           []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}},
+	},
+	{
+		source:             "foo",
+		optionsJson:        "[{\"name\":\"foo\"}]",
+		environmentGlobals: nil,
+		ecmaVersion:        0,
+		findings:           []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}},
+	},
+	{
+		source:             "function fn(): void { foo; }",
+		optionsJson:        "[{\"name\":\"foo\"}]",
+		environmentGlobals: nil,
+		ecmaVersion:        0,
+		findings:           []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}},
+	},
+	{
+		source:             "function fn(): void { foo; }",
+		optionsJson:        "[{\"name\":\"foo\"}]",
+		environmentGlobals: noRestrictedGlobalsStringPointer("foo"),
+		ecmaVersion:        0,
+		findings:           []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}},
+	},
+	{
+		source:             "event",
+		optionsJson:        "[\"foo\",{\"name\":\"event\"}]",
+		environmentGlobals: noRestrictedGlobalsStringPointer("window,self,event"),
+		ecmaVersion:        0,
+		findings:           []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "event", customMessage: ""}},
+	},
+	{
+		source:             "foo",
+		optionsJson:        "[{\"name\":\"foo\"}]",
+		environmentGlobals: noRestrictedGlobalsStringPointer("foo"),
+		ecmaVersion:        0,
+		findings:           []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}},
+	},
+	{
+		source:             "foo()",
+		optionsJson:        "[{\"name\":\"foo\"}]",
+		environmentGlobals: nil,
+		ecmaVersion:        0,
+		findings:           []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}},
+	},
+	{
+		source:             "foo.bar()",
+		optionsJson:        "[{\"name\":\"foo\"}]",
+		environmentGlobals: nil,
+		ecmaVersion:        0,
+		findings:           []noRestrictedGlobalsExpectation{{id: "defaultMessage", name: "foo", customMessage: ""}},
+	},
+	{
+		source:             "foo",
+		optionsJson:        "[{\"name\":\"foo\",\"message\":\"Use bar instead.\"}]",
+		environmentGlobals: nil,
+		ecmaVersion:        0,
+		findings: []noRestrictedGlobalsExpectation{
+			{id: "customMessage", name: "foo", customMessage: "Use bar instead."},
+		},
+	},
+	{
+		source:             "function fn(): void { foo; }",
+		optionsJson:        "[{\"name\":\"foo\",\"message\":\"Use bar instead.\"}]",
+		environmentGlobals: nil,
+		ecmaVersion:        0,
+		findings: []noRestrictedGlobalsExpectation{
+			{id: "customMessage", name: "foo", customMessage: "Use bar instead."},
+		},
+	},
+	{
+		source:             "function fn(): void { foo; }",
+		optionsJson:        "[{\"name\":\"foo\",\"message\":\"Use bar instead.\"}]",
+		environmentGlobals: noRestrictedGlobalsStringPointer("foo"),
+		ecmaVersion:        0,
+		findings: []noRestrictedGlobalsExpectation{
+			{id: "customMessage", name: "foo", customMessage: "Use bar instead."},
+		},
+	},
+	{
+		source:             "event",
+		optionsJson:        "[\"foo\",{\"name\":\"event\",\"message\":\"Use local event parameter.\"}]",
+		environmentGlobals: noRestrictedGlobalsStringPointer("window,self,event"),
+		ecmaVersion:        0,
+		findings: []noRestrictedGlobalsExpectation{
+			{id: "customMessage", name: "event", customMessage: "Use local event parameter."},
+		},
+	},
+	{
+		source:             "foo",
+		optionsJson:        "[{\"name\":\"foo\",\"message\":\"Use bar instead.\"}]",
+		environmentGlobals: noRestrictedGlobalsStringPointer("foo"),
+		ecmaVersion:        0,
+		findings: []noRestrictedGlobalsExpectation{
+			{id: "customMessage", name: "foo", customMessage: "Use bar instead."},
+		},
+	},
+	{
+		source:             "foo()",
+		optionsJson:        "[{\"name\":\"foo\",\"message\":\"Use bar instead.\"}]",
+		environmentGlobals: nil,
+		ecmaVersion:        0,
+		findings: []noRestrictedGlobalsExpectation{
+			{id: "customMessage", name: "foo", customMessage: "Use bar instead."},
+		},
+	},
+	{
+		source:             "foo.bar()",
+		optionsJson:        "[{\"name\":\"foo\",\"message\":\"Use bar instead.\"}]",
+		environmentGlobals: nil,
+		ecmaVersion:        0,
+		findings: []noRestrictedGlobalsExpectation{
+			{id: "customMessage", name: "foo", customMessage: "Use bar instead."},
+		},
+	},
+	{
+		source:             "const foo = obj => hasOwnProperty(obj, 'name');",
+		optionsJson:        "[\"hasOwnProperty\"]",
+		environmentGlobals: nil,
+		ecmaVersion:        0,
+		findings: []noRestrictedGlobalsExpectation{
+			{id: "defaultMessage", name: "hasOwnProperty", customMessage: ""},
+		},
+	},
+	{
+		source:             "const x: Promise<any> = Promise.resolve();",
+		optionsJson:        "[\"Promise\"]",
+		environmentGlobals: nil,
+		ecmaVersion:        0,
+		findings: []noRestrictedGlobalsExpectation{
+			{id: "defaultMessage", name: "Promise", customMessage: ""},
+		},
+	},
 }
 
 // runNoRestrictedGlobalsCase drives one case and asserts every finding's id and rendered message.
@@ -240,12 +996,12 @@ var noRestrictedGlobalsFiringCasesBlock1 = []noRestrictedGlobalsCase{
 // Upstream declares environment globals through a config knob. We have no such knob: our program is
 // built from a tsconfig, and the fixture harness pins `lib: ["ES2022"]`, so `window`, `self` and
 // `event` resolve to no symbol at all. Rather than weaken the rule to make those cases green, each
-// case carries what upstream configured and the runner writes an equivalent AMBIENT DECLARATION
-// FILE beside the fixture. That is how a real tree declares these names, so the rule takes the same
+// case carries what upstream configured and the runner writes an equivalent ambient declaration
+// file beside the fixture. That is how a real tree declares these names, so the rule takes the same
 // path it takes on a repository rather than one arranged for the test.
 //
 // The distinction is load bearing rather than cosmetic, and the corpus is what proves it. Under
-// `checkGlobalObject`, `window.foo()` REPORTS when the browser set is declared and is CLEAN when it
+// `checkGlobalObject`, `window.foo()` reports when the browser set is declared and is clean when it
 // is not, while `globalThis.foo()` reports either way. Measured, our checker draws that same
 // three-way line by itself: `globalThis` resolves to a symbol carrying zero declarations, `window`
 // resolves to nothing without a declaration and to a declaration-file symbol with one. So the
@@ -254,11 +1010,11 @@ var noRestrictedGlobalsFiringCasesBlock1 = []noRestrictedGlobalsCase{
 //
 // Only four globals are ever named explicitly across the corpus, and a case marked `browser` needs
 // the handful the cases actually touch.
-func runNoRestrictedGlobalsCase(t *testing.T, testCase noRestrictedGlobalsCase) {
-	t.Helper()
+func runNoRestrictedGlobalsCase(test *testing.T, testCase noRestrictedGlobalsCase) {
+	test.Helper()
 
-	// A case whose verdict is decided ABOVE the rule, by the language version rather than by the
-	// rule's own judgment. `globalThis.foo()` appears in upstream's valid AND invalid lists with
+	// A case whose verdict is decided above the rule, by the language version rather than by the
+	// rule's own judgment. `globalThis.foo()` appears in upstream's valid and invalid lists with
 	// byte-identical options, separated only by `ecmaVersion`: the name did not exist before
 	// ES2020, so eslint's scope does not know it under ecmaVersion 6 and the input is clean there.
 	//
@@ -267,7 +1023,7 @@ func runNoRestrictedGlobalsCase(t *testing.T, testCase noRestrictedGlobalsCase) 
 	// weakening the rule, which would also have silenced the ES2020 half that upstream reports.
 	if testCase.ecmaVersion != 0 && testCase.ecmaVersion < 2020 &&
 		strings.Contains(testCase.source, "globalThis") {
-		t.Skipf("upstream runs this at ecmaVersion %d, where globalThis is not a known name; "+
+		test.Skipf("upstream runs this at ecmaVersion %d, where globalThis is not a known name; "+
 			"our program is ES2022 and the checker knows it unconditionally", testCase.ecmaVersion)
 	}
 
@@ -276,16 +1032,16 @@ func runNoRestrictedGlobalsCase(t *testing.T, testCase noRestrictedGlobalsCase) 
 		files["EnvironmentGlobals.d.ts"] = declarations
 	}
 
-	result := rule_testing.RunTypedFilesWithOptions(t, NoRestrictedGlobals, files, "Probe.ts",
-		decodeNoRestrictedGlobalsOptionsForTest(t, testCase.optionsJson))
+	result := rule_testing.RunTypedFilesGiven(test, NoRestrictedGlobals, files, "Probe.ts",
+		decodeNoRestrictedGlobalsOptionsForTest(test, testCase.optionsJson))
 
 	wantIds := make([]string, len(testCase.findings))
-	for i, finding := range testCase.findings {
-		wantIds[i] = finding.id
+	for index, finding := range testCase.findings {
+		wantIds[index] = finding.id
 	}
-	rule_testing.ExpectFindings(t, result, wantIds...)
+	rule_testing.ExpectFindings(test, result, wantIds...)
 
-	for i, finding := range testCase.findings {
+	for index, finding := range testCase.findings {
 		// Upstream's two templates: `Unexpected use of '{{name}}'.` and
 		// `Unexpected use of '{{name}}'. {{customMessage}}`. Asserted as an exact prefix rather
 		// than with a substring test, because the custom message is interpolated and a
@@ -294,8 +1050,8 @@ func runNoRestrictedGlobalsCase(t *testing.T, testCase noRestrictedGlobalsCase) 
 		if finding.customMessage != "" {
 			want += " " + finding.customMessage
 		}
-		if got := result.Diagnostics[i].Message.Description; !strings.HasPrefix(got, want) {
-			t.Errorf("finding %d: message should begin %q, got %q", i, want, got)
+		if got := result.Diagnostics[index].Message.Description; !strings.HasPrefix(got, want) {
+			test.Errorf("finding %d: message should begin %q, got %q", index, want, got)
 		}
 	}
 }
@@ -305,7 +1061,7 @@ func runNoRestrictedGlobalsCase(t *testing.T, testCase noRestrictedGlobalsCase) 
 // The field holds the names upstream declared, comma separated. Upstream's browser set is 1164
 // names of which these cases only ever read `window`, `self` and `event`, so the extractor records
 // those three rather than the whole list, plus any name added on top of the set. That last part is
-// load bearing: one case configures the browser set AND `myGlobal`, and recording it as a bare
+// load bearing: one case configures the browser set and `myGlobal`, and recording it as a bare
 // "browser" flag dropped the extra and made the case report once where upstream reports twice.
 //
 // `globalThis` is deliberately never emitted. The checker knows it without a declaration, which is
@@ -326,19 +1082,19 @@ func noRestrictedGlobalsAmbientDeclarations(environmentGlobals *string) string {
 }
 
 // TestNoRestrictedGlobalsFires runs both of upstream's invalid blocks.
-func TestNoRestrictedGlobalsFires(t *testing.T) {
-	t.Parallel()
+func TestNoRestrictedGlobalsFires(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range noRestrictedGlobalsFiringCasesBlock0 {
-		t.Run("javascript/"+testCase.source, func(t *testing.T) {
-			t.Parallel()
-			runNoRestrictedGlobalsCase(t, testCase)
+		test.Run("javascript/"+testCase.source, func(test *testing.T) {
+			test.Parallel()
+			runNoRestrictedGlobalsCase(test, testCase)
 		})
 	}
 	for _, testCase := range noRestrictedGlobalsFiringCasesBlock1 {
-		t.Run("typescript/"+testCase.source, func(t *testing.T) {
-			t.Parallel()
-			runNoRestrictedGlobalsCase(t, testCase)
+		test.Run("typescript/"+testCase.source, func(test *testing.T) {
+			test.Parallel()
+			runNoRestrictedGlobalsCase(test, testCase)
 		})
 	}
 }
@@ -348,19 +1104,19 @@ func TestNoRestrictedGlobalsFires(t *testing.T) {
 // The TypeScript block is the more valuable of the two here: 32 of its 42 cases are type positions,
 // which is the exclusion a port is most likely to get wrong, and several of them differ only in
 // how deeply the type is nested.
-func TestNoRestrictedGlobalsStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoRestrictedGlobalsStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range noRestrictedGlobalsCleanCasesBlock0 {
-		t.Run("javascript/"+testCase.source, func(t *testing.T) {
-			t.Parallel()
-			runNoRestrictedGlobalsCase(t, testCase)
+		test.Run("javascript/"+testCase.source, func(test *testing.T) {
+			test.Parallel()
+			runNoRestrictedGlobalsCase(test, testCase)
 		})
 	}
 	for _, testCase := range noRestrictedGlobalsCleanCasesBlock1 {
-		t.Run("typescript/"+testCase.source, func(t *testing.T) {
-			t.Parallel()
-			runNoRestrictedGlobalsCase(t, testCase)
+		test.Run("typescript/"+testCase.source, func(test *testing.T) {
+			test.Parallel()
+			runNoRestrictedGlobalsCase(test, testCase)
 		})
 	}
 }
@@ -375,8 +1131,8 @@ func TestNoRestrictedGlobalsStaysSilent(t *testing.T) {
 //	a bare reference          the identifier itself
 //	window.foo                the PROPERTY, `foo`, not `window.foo` and not `window`
 //	window["foo"]             the string literal, again the property half
-func TestNoRestrictedGlobalsSpan(t *testing.T) {
-	t.Parallel()
+func TestNoRestrictedGlobalsSpan(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name        string
@@ -414,15 +1170,15 @@ func TestNoRestrictedGlobalsSpan(t *testing.T) {
 			wantText:    "foo",
 		},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			files := map[string]string{"Probe.ts": testCase.source}
 			if testCase.globals != "" {
 				files["EnvironmentGlobals.d.ts"] = "declare var " + testCase.globals + ": any;\n"
 			}
-			result := rule_testing.RunTypedFilesWithOptions(t, NoRestrictedGlobals, files, "Probe.ts",
-				decodeNoRestrictedGlobalsOptionsForTest(t, testCase.optionsJson))
-			rule_testing.ExpectFindings(t, result, "defaultMessage")
+			result := rule_testing.RunTypedFilesGiven(test, NoRestrictedGlobals, files, "Probe.ts",
+				decodeNoRestrictedGlobalsOptionsForTest(test, testCase.optionsJson))
+			rule_testing.ExpectFindings(test, result, "defaultMessage")
 
 			// `RunTypedFiles` writes each fixture as TrimSpace(contents)+"\n", so the literal above
 			// is one byte offset from the file on disk unless it is transformed the same way.
@@ -431,7 +1187,7 @@ func TestNoRestrictedGlobalsSpan(t *testing.T) {
 			onDisk := strings.TrimSpace(testCase.source) + "\n"
 			reported := onDisk[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 			if reported != testCase.wantText {
-				t.Errorf("finding should point at %q, got %q", testCase.wantText, reported)
+				test.Errorf("finding should point at %q, got %q", testCase.wantText, reported)
 			}
 		})
 	}
@@ -441,23 +1197,23 @@ func TestNoRestrictedGlobalsSpan(t *testing.T) {
 //
 // This rule reports nothing until somebody names a global, which is upstream's design: `create`
 // returns an empty visitor when the list is empty. A rule configured as a bare severity is handed
-// nil options rather than a struct, so this asserts the path no case in the corpus takes and the
+// no options rather than a struct, so this asserts the path no case in the corpus takes and the
 // one the live config will take if the rule is enabled without a list.
 //
-// The early return itself is an OPTIMISATION rather than a discrimination, and the mutation
+// The early return itself is an optimisation rather than a discrimination, and the mutation
 // neutralising it survives for that reason: with an empty map the identifier listener looks every
 // name up, finds nothing restricted, and reports nothing anyway. No input can distinguish the two,
 // because distinguishing them would need a name that is restricted while the map is empty. Kept
 // because registering no listener at all is measurably cheaper on a tree of this size than one
 // map lookup per identifier in every file.
-func TestNoRestrictedGlobalsIsInertWithoutConfiguration(t *testing.T) {
-	t.Parallel()
+func TestNoRestrictedGlobalsIsInertWithoutConfiguration(test *testing.T) {
+	test.Parallel()
 
 	for _, source := range []string{"foo;", "window.foo();", "event;"} {
-		t.Run(source, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoRestrictedGlobals,
-				noRestrictedGlobalsFile, source, nil))
+		test.Run(source, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoRestrictedGlobals,
+				noRestrictedGlobalsFile, source))
 		})
 	}
 }
@@ -467,17 +1223,17 @@ func TestNoRestrictedGlobalsIsInertWithoutConfiguration(t *testing.T) {
 // A typed rule handed the plain harness goes silent rather than crashing, which makes every
 // StaysSilent case pass vacuously and every Fires case look like a rule defect. Asserted so a later
 // revert to `Run` fails loudly here rather than quietly everywhere.
-func TestNoRestrictedGlobalsRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestNoRestrictedGlobalsRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
-	decoded := decodeNoRestrictedGlobalsOptionsForTest(t, `["foo"]`)
+	decoded := decodeNoRestrictedGlobalsOptionsForTest(test, `["foo"]`)
 
-	rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoRestrictedGlobals,
+	rule_testing.ExpectClean(test, rule_testing.RunGiven(test, NoRestrictedGlobals,
 		noRestrictedGlobalsFile, "foo;", decoded))
 
 	// The control: the same input through the typed harness does report, so the silence above is
 	// the nil-checker guard rather than a rule that cannot fire.
-	rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, NoRestrictedGlobals,
+	rule_testing.ExpectFindings(test, rule_testing.RunTypedGiven(test, NoRestrictedGlobals,
 		noRestrictedGlobalsFile, "foo;", decoded), "defaultMessage")
 }
 
@@ -485,27 +1241,25 @@ func TestNoRestrictedGlobalsRequiresTheTypedHarness(t *testing.T) {
 // ones it must refuse. Upstream's variadic spelling, `["error", "event", "fdescribe"]`, used to
 // reach this decoder as the bare string "event" and fail, while `["error", ["event", "fdescribe"]]`
 // was the workaround; now the list arrives whole and every element is a global.
-func TestDecodeNoRestrictedGlobalsOptions(t *testing.T) {
-	t.Parallel()
+func TestDecodeNoRestrictedGlobalsOptions(test *testing.T) {
+	test.Parallel()
 
-	decoded, err := DecodeNoRestrictedGlobalsOptions([]byte(
+	settings, decodeNoRestrictedGlobalsOptionsError := DecodeNoRestrictedGlobalsOptions([]byte(
 		`["event", {"name": "fdescribe", "message": "Do not commit fdescribe."}]`))
-	if err != nil {
-		t.Fatalf("upstream's variadic spelling was refused: %v", err)
+	if decodeNoRestrictedGlobalsOptionsError != nil {
+		test.Fatalf("upstream's variadic spelling was refused: %v", decodeNoRestrictedGlobalsOptionsError)
 	}
-	settings := decoded.(NoRestrictedGlobalsSettings)
 	if len(settings.GlobalsOrder) != 2 || settings.Globals["fdescribe"] != "Do not commit fdescribe." {
-		t.Errorf("both elements must be read, the second with its message: %+v", settings)
+		test.Errorf("both elements must be read, the second with its message: %+v", settings)
 	}
 
-	decoded, err = DecodeNoRestrictedGlobalsOptions([]byte(
+	settings, decodeNoRestrictedGlobalsOptionsError = DecodeNoRestrictedGlobalsOptions([]byte(
 		`[{"globals": ["event"], "checkGlobalObject": true, "globalObjects": ["myGlobal"]}]`))
-	if err != nil {
-		t.Fatalf("the object form was refused: %v", err)
+	if decodeNoRestrictedGlobalsOptionsError != nil {
+		test.Fatalf("the object form was refused: %v", decodeNoRestrictedGlobalsOptionsError)
 	}
-	settings = decoded.(NoRestrictedGlobalsSettings)
 	if !settings.CheckGlobalObject || len(settings.GlobalObjects) != 1 || len(settings.GlobalsOrder) != 1 {
-		t.Errorf("the object form's flags must be read: %+v", settings)
+		test.Errorf("the object form's flags must be read: %+v", settings)
 	}
 
 	for _, raw := range []string{
@@ -519,8 +1273,10 @@ func TestDecodeNoRestrictedGlobalsOptions(t *testing.T) {
 		`[{"globals": ["event"], "checkGlobalObjects": true}]`,
 		`[{"name": "event", "mesage": "x"}]`,
 	} {
-		if decoded, err := DecodeNoRestrictedGlobalsOptions([]byte(raw)); err == nil {
-			t.Errorf("%s decoded to %+v; it must be refused", raw, decoded)
+		if decoded, decodeNoRestrictedGlobalsOptionsError := DecodeNoRestrictedGlobalsOptions(
+			[]byte(raw),
+		); decodeNoRestrictedGlobalsOptionsError == nil {
+			test.Errorf("%s decoded to %+v; it must be refused", raw, decoded)
 		}
 	}
 }
@@ -537,23 +1293,38 @@ func TestDecodeNoRestrictedGlobalsOptions(t *testing.T) {
 // The firing rows are the controls: a component tag and a shorthand both read a binding, and
 // WisdomGateItems.ts:304 before #war4qsy read a bare `status`, which is `window.status` and rendered
 // empty every time.
-func TestNoRestrictedGlobalsJudgesOnlyValueReferences(t *testing.T) {
-	t.Parallel()
+func TestNoRestrictedGlobalsJudgesOnlyValueReferences(test *testing.T) {
+	test.Parallel()
 
 	const file = "/repository/source/NoRestrictedGlobals.tsx"
 	const confusing = `["status", "name", "open", "stop", "length", "event", "Option"]`
 	silent := []struct{ name, source string }{
-		{"an intrinsic tag, the svg gradient stop", "export const Gradient = () => <linearGradient><stop offset=\"0\" /><stop offset=\"1\"></stop></linearGradient>;\n"},
-		{"an attribute name", "declare const Dialog: (properties: { open: boolean }) => null;\nexport const Shown = () => <Dialog open={true} />;\n"},
-		{"a destructuring key over a standard-library type", "declare const text: string;\nconst { length: size } = text;\nexport { size };\n"},
-		{"an object-literal key typed by a standard-library type", "export const descriptor: PropertyDescriptor & { length?: number } = { length: 1 };\n"},
-		{"an object-literal method typed by a standard-library type", "export const lengthy: { length(): number } = { length() { return 1; } };\n"},
+		{
+			"an intrinsic tag, the svg gradient stop",
+			"export const Gradient = () => <linearGradient><stop offset=\"0\" /><stop offset=\"1\"></stop></linearGradient>;\n",
+		},
+		{
+			"an attribute name",
+			"declare const Dialog: (properties: { open: boolean }) => null;\nexport const Shown = () => <Dialog open={true} />;\n",
+		},
+		{
+			"a destructuring key over a standard-library type",
+			"declare const text: string;\nconst { length: size } = text;\nexport { size };\n",
+		},
+		{
+			"an object-literal key typed by a standard-library type",
+			"export const descriptor: PropertyDescriptor & { length?: number } = { length: 1 };\n",
+		},
+		{
+			"an object-literal method typed by a standard-library type",
+			"export const lengthy: { length(): number } = { length() { return 1; } };\n",
+		},
 	}
 	for _, testCase := range silent {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoRestrictedGlobals, file,
-				testCase.source, decodeNoRestrictedGlobalsOptionsForTest(t, confusing)))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTypedGiven(test, NoRestrictedGlobals, file,
+				testCase.source, decodeNoRestrictedGlobalsOptionsForTest(test, confusing)))
 		})
 	}
 
@@ -561,16 +1332,24 @@ func TestNoRestrictedGlobalsJudgesOnlyValueReferences(t *testing.T) {
 		name, source string
 		ids          []string
 	}{
-		{"WisdomGateItems.ts:304 before #war4qsy, a bare status", "declare const intent: { task: { routedTo: string | null } };\nexport const text = `${status.toLowerCase()}${intent.task.routedTo ? ` · @${intent.task.routedTo}` : ''}`;\n", []string{"defaultMessage"}},
+		{
+			"WisdomGateItems.ts:304 before #war4qsy, a bare status",
+			"declare const intent: { task: { routedTo: string | null } };\nexport const text = `${status.toLowerCase()}${intent.task.routedTo ? ` · @${intent.task.routedTo}` : ''}`;\n",
+			[]string{"defaultMessage"},
+		},
 		{"a component tag reads its binding", "export const Shown = () => <Option />;\n", []string{"defaultMessage"}},
 		{"a shorthand reads the global", "export const values = { status };\n", []string{"defaultMessage"}},
-		{"a destructuring default reads the global", "declare const source: { label?: string };\nconst { label = name } = source;\nexport { label };\n", []string{"defaultMessage"}},
+		{
+			"a destructuring default reads the global",
+			"declare const source: { label?: string };\nconst { label = name } = source;\nexport { label };\n",
+			[]string{"defaultMessage"},
+		},
 	}
 	for _, testCase := range firing {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, NoRestrictedGlobals, file,
-				testCase.source, decodeNoRestrictedGlobalsOptionsForTest(t, confusing)), testCase.ids...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.RunTypedGiven(test, NoRestrictedGlobals, file,
+				testCase.source, decodeNoRestrictedGlobalsOptionsForTest(test, confusing)), testCase.ids...)
 		})
 	}
 }
@@ -586,16 +1365,16 @@ func TestNoRestrictedGlobalsJudgesOnlyValueReferences(t *testing.T) {
 // export-from and import rows are clean, and the firing rows report at the `print` they name. A
 // local `export { print }` with no `from` exports whatever `print` resolves to here, which is the
 // global, so it is a read and reports.
-func TestNoRestrictedGlobalsSkipsAnotherModulesExportName(t *testing.T) {
-	t.Parallel()
+func TestNoRestrictedGlobalsSkipsAnotherModulesExportName(test *testing.T) {
+	test.Parallel()
 
 	const graphql = "export declare function print(): string;\nexport declare const other: number;\n"
-	run := func(t *testing.T, source string) rule_testing.Result {
-		t.Helper()
-		return rule_testing.RunTypedFilesWithOptions(t, NoRestrictedGlobals, map[string]string{
+	run := func(test *testing.T, source string) rule_testing.Result {
+		test.Helper()
+		return rule_testing.RunTypedFilesGiven(test, NoRestrictedGlobals, map[string]string{
 			"graphql.d.ts": graphql,
 			"a.ts":         source,
-		}, "a.ts", decodeNoRestrictedGlobalsOptionsForTest(t, `["print"]`))
+		}, "a.ts", decodeNoRestrictedGlobalsOptionsForTest(test, `["print"]`))
 	}
 
 	silent := []struct{ name, source string }{
@@ -607,9 +1386,9 @@ func TestNoRestrictedGlobalsSkipsAnotherModulesExportName(t *testing.T) {
 		{"a global exported under the restricted name", "export { undeclaredThing as print };\n"},
 	}
 	for _, testCase := range silent {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, run(t, testCase.source))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, run(test, testCase.source))
 		})
 	}
 
@@ -620,9 +1399,9 @@ func TestNoRestrictedGlobalsSkipsAnotherModulesExportName(t *testing.T) {
 		{"a local export of the global under its own name, reported once", "export { print as print };\n"},
 	}
 	for _, testCase := range firing {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, run(t, testCase.source), "defaultMessage")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, run(test, testCase.source), "defaultMessage")
 		})
 	}
 }
@@ -636,28 +1415,35 @@ func TestNoRestrictedGlobalsSkipsAnotherModulesExportName(t *testing.T) {
 // is clean on each row below, restricting `top`.
 //
 // The firing row is the control: a value read in a declaration file is still a read.
-func TestNoRestrictedGlobalsSkipsDeclarationNamesInADeclarationFile(t *testing.T) {
-	t.Parallel()
+func TestNoRestrictedGlobalsSkipsDeclarationNamesInADeclarationFile(test *testing.T) {
+	test.Parallel()
 
-	run := func(t *testing.T, source string) rule_testing.Result {
-		t.Helper()
-		return rule_testing.RunTypedFilesWithOptions(t, NoRestrictedGlobals, map[string]string{
+	run := func(test *testing.T, source string) rule_testing.Result {
+		test.Helper()
+		return rule_testing.RunTypedFilesGiven(test, NoRestrictedGlobals, map[string]string{
 			"photon.d.ts": source,
-		}, "photon.d.ts", decodeNoRestrictedGlobalsOptionsForTest(t, `["top"]`))
+		}, "photon.d.ts", decodeNoRestrictedGlobalsOptionsForTest(test, `["top"]`))
 	}
 
 	silent := []struct{ name, source string }{
-		{"photon_rs_bg.d.ts:41, a parameter of a declared function", "export function crop(left: number, top: number): void;\n"},
+		{
+			"photon_rs_bg.d.ts:41, a parameter of a declared function",
+			"export function crop(left: number, top: number): void;\n",
+		},
 		{"a declared constant", "export declare const top: number;\n"},
 		{"an interface member", "export interface Box { top: number }\n"},
 		{"a type query is a type position", "export declare const edge: typeof top;\n"},
 	}
 	for _, testCase := range silent {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, run(t, testCase.source))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, run(test, testCase.source))
 		})
 	}
 
-	rule_testing.ExpectFindings(t, run(t, "export declare const edge: number;\nexport default top;\n"), "defaultMessage")
+	rule_testing.ExpectFindings(
+		test,
+		run(test, "export declare const edge: number;\nexport default top;\n"),
+		"defaultMessage",
+	)
 }

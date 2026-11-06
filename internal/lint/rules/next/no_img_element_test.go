@@ -8,8 +8,8 @@ import (
 
 // The fail cases are oxc's own, plus the paired `<img></img>` form, which our tree reaches at a
 // different depth than the self-closing one and which oxc's corpus does not contain.
-func TestNoImgElementReports(t *testing.T) {
-	t.Parallel()
+func TestNoImgElementReports(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -55,12 +55,12 @@ export const MyComponent = () => <img src={somePicture.src} alt='foo' />;`,
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoImgElement, "Component.tsx", testCase.source)
-			rule_testing.ExpectFindings(t, result, messageNoImgElement.Id)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoImgElement, "Component.tsx", testCase.source)
+			rule_testing.ExpectFindings(test, result, messageNoImgElement.Id)
 			if result.Diagnostics[0].Message.Id != "noImgElement" {
-				t.Fatalf("unexpected message id %q", result.Diagnostics[0].Message.Id)
+				test.Fatalf("unexpected message id %q", result.Diagnostics[0].Message.Id)
 			}
 		})
 	}
@@ -68,8 +68,8 @@ export const MyComponent = () => <img src={somePicture.src} alt='foo' />;`,
 
 // The pass cases are oxc's own. The <picture> ones are the exemption, and the `<Image />` one is
 // the replacement the rule exists to push toward, which must never itself report.
-func TestNoImgElementIsSilent(t *testing.T) {
-	t.Parallel()
+func TestNoImgElementIsSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -128,10 +128,10 @@ export class MyComponent {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoImgElement, "Component.tsx", testCase.source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoImgElement, "Component.tsx", testCase.source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }

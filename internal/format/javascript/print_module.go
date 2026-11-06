@@ -21,10 +21,10 @@ func printImportDeclaration(path *Path, options *Options, print PrintFunc) Doc {
 	if current.Truthy("phase") {
 		phase = " " + current.String("phase")
 	}
-	return concatIn(path, "import",
-		phase,
+	return concatIn(path, doc.Text("import"),
+		textDoc(phase),
 		// Upstream's printImportKind(node) leaves spaceBeforeKind undefined, which defaults to true.
-		printImportKind(current, true),
+		textDoc(printImportKind(current, true)),
 		printModuleSpecifiers(path, options, print),
 		printModuleSource(path, options, print),
 		printImportAttributes(path, options, print),
@@ -53,18 +53,22 @@ func printExportDeclaration(path *Path, options *Options, print PrintFunc) Doc {
 	if isDefaultExport(current) {
 		defaultKeyword = " default"
 	}
-	parts := []any{
+	parts := []Doc{
 		printDecoratorsBeforeExport(path, options, print),
 		printDeclareToken(path),
-		"export",
-		defaultKeyword,
+		doc.Text("export"),
+		textDoc(defaultKeyword),
 	}
 
 	declaration := current.Child("declaration")
 	exported := current.Child("exported")
 
 	if hasComment(current, commentDangling, nil) {
-		parts = append(parts, " ", printing.PrintDanglingComments(path, options, printing.DanglingOptions[Node]{}))
+		parts = append(
+			parts,
+			doc.Text(" "),
+			printing.PrintDanglingComments(path, options, printing.DanglingOptions[Node]{}),
+		)
 
 		if needsHardlineAfterDanglingComment(current) {
 			parts = append(parts, hardline)
@@ -72,14 +76,14 @@ func printExportDeclaration(path *Path, options *Options, print PrintFunc) Doc {
 	}
 
 	if declaration != nil {
-		parts = append(parts, " ", print("declaration", nil))
+		parts = append(parts, doc.Text(" "), print("declaration", nil))
 	} else {
-		parts = append(parts, printExportKind(current))
+		parts = append(parts, textDoc(printExportKind(current)))
 
 		if current.Is("ExportAllDeclaration", "DeclareExportAllDeclaration") {
-			parts = append(parts, " *")
+			parts = append(parts, doc.Text(" *"))
 			if exported != nil {
-				parts = append(parts, " as ", print("exported", nil))
+				parts = append(parts, doc.Text(" as "), print("exported", nil))
 			}
 		} else {
 			parts = append(parts, printModuleSpecifiers(path, options, print))
@@ -159,7 +163,7 @@ func printModuleSource(path *Path, options *Options, print PrintFunc) Doc {
 	if shouldPrintSpecifiers(current, options) {
 		from = " from"
 	}
-	return concatIn(path, from, " ", print("source", nil))
+	return concatIn(path, textDoc(from), doc.Text(" "), print("source", nil))
 }
 
 // printModuleSpecifiers is upstream's printModuleSpecifiers.
@@ -170,7 +174,7 @@ func printModuleSpecifiers(path *Path, options *Options, print PrintFunc) Doc {
 		return emptyDoc
 	}
 
-	parts := []any{" "}
+	parts := []Doc{doc.Text(" ")}
 
 	if len(current.List("specifiers")) > 0 {
 		var standaloneSpecifiers []Doc
@@ -182,21 +186,22 @@ func printModuleSpecifiers(path *Path, options *Options, print PrintFunc) Doc {
 				specifierType == "ExportDefaultSpecifier" ||
 				specifierType == "ImportNamespaceSpecifier" ||
 				specifierType == "ImportDefaultSpecifier" {
-				standaloneSpecifiers = append(standaloneSpecifiers, print(nil, nil))
+				standaloneSpecifiers = append(standaloneSpecifiers, print("", nil))
 			} else if specifierType == "ExportSpecifier" ||
 				specifierType == "ImportSpecifier" {
-				groupedSpecifiers = append(groupedSpecifiers, print(nil, nil))
+				groupedSpecifiers = append(groupedSpecifiers, print("", nil))
 			} else {
 				// Upstream throws UnexpectedNodeError(node, "specifier").
+				// Invariant: the parser builds no specifier but the six named above, as Prettier's printer assumes.
 				panic(fmt.Sprintf("javascript: unexpected specifier %q", specifierType))
 			}
 		}, "specifiers")
 
-		parts = append(parts, join(", ", standaloneSpecifiers))
+		parts = append(parts, join(doc.Text(", "), standaloneSpecifiers))
 
 		if len(groupedSpecifiers) > 0 {
 			if len(standaloneSpecifiers) > 0 {
-				parts = append(parts, ", ")
+				parts = append(parts, doc.Text(", "))
 			}
 
 			canBreak := len(groupedSpecifiers) > 1 ||
@@ -210,13 +215,13 @@ func printModuleSpecifiers(path *Path, options *Options, print PrintFunc) Doc {
 					spacingLine = line
 				}
 				parts = append(parts,
-					groupIn(path, concatIn(path, "{",
+					groupIn(path, concatIn(path, doc.Text("{"),
 						indentIn(path, concatIn(path, spacingLine,
-							join(concatIn(path, ",", line), groupedSpecifiers),
+							join(concatIn(path, doc.Text(","), line), groupedSpecifiers),
 						)),
 						printTrailingComma(options, ""),
 						spacingLine,
-						"}",
+						doc.Text("}"),
 					)),
 				)
 			} else {
@@ -224,16 +229,14 @@ func printModuleSpecifiers(path *Path, options *Options, print PrintFunc) Doc {
 				if bracketSpacing {
 					spacing = " "
 				}
-				single := []any{"{", spacing}
-				for _, specifier := range groupedSpecifiers {
-					single = append(single, specifier)
-				}
-				single = append(single, spacing, "}")
+				single := []Doc{doc.Text("{"), textDoc(spacing)}
+				single = append(single, groupedSpecifiers...)
+				single = append(single, textDoc(spacing), doc.Text("}"))
 				parts = append(parts, concatIn(path, single...))
 			}
 		}
 	} else {
-		parts = append(parts, "{}")
+		parts = append(parts, doc.Text("{}"))
 	}
 	return concatIn(path, parts...)
 }
@@ -269,7 +272,9 @@ func getImportAttributesKeyword(node Node, options *Options) string {
 	if len(attributes) > 0 && attributes[0] != nil {
 		end = locStart(attributes[0])
 	}
-	textBetweenSourceAndAttributes := estree.TrimStartJavaScript(stripComments(options)[locEnd(node.Child("source")):end])
+	textBetweenSourceAndAttributes := estree.TrimStartJavaScript(
+		stripComments(options)[locEnd(node.Child("source")):end],
+	)
 
 	if strings.HasPrefix(textBetweenSourceAndAttributes, "assert") {
 		return "assert"
@@ -331,7 +336,7 @@ func printImportAttributes(path *Path, options *Options, print PrintFunc) Doc {
 		attributesDoc = doc.RemoveLines(attributesDoc)
 	}
 
-	return concatIn(path, " "+keyword+" ", attributesDoc)
+	return concatIn(path, textDoc(" "+keyword+" "), attributesDoc)
 }
 
 // printModuleSpecifier is upstream's printModuleSpecifier.
@@ -370,9 +375,9 @@ func printModuleSpecifier(path *Path, options *Options, print PrintFunc) Doc {
 	if !isEmptyString(left) && !isEmptyString(right) {
 		as = " as "
 	}
-	return concatIn(path, printImportOrExportKind(kind, false /* spaceBeforeKind */),
+	return concatIn(path, textDoc(printImportOrExportKind(kind, false /* spaceBeforeKind */)),
 		left,
-		as,
+		textDoc(as),
 		right,
 	)
 }

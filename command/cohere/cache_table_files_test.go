@@ -7,26 +7,26 @@ import (
 )
 
 // cacheTableFiles lists a project's cache table files, one per section and per recorded run, sorted.
-func cacheTableFiles(t *testing.T, root string) []string {
-	t.Helper()
-	files, err := filepath.Glob(filepath.Join(cacheDirectory(root), "*.gob"))
-	if err != nil {
-		t.Fatal(err)
+func cacheTableFiles(test *testing.T, root string) []string {
+	test.Helper()
+	files, globError := filepath.Glob(filepath.Join(cacheDirectory(root), "*.gob"))
+	if globError != nil {
+		test.Fatal(globError)
 	}
 	return files
 }
 
 // removeCacheTable removes a project's cache table, file by file, so the next run starts without it. A
 // project with no table to remove fails here, since a control that removed nothing proves nothing.
-func removeCacheTable(t *testing.T, root string) {
-	t.Helper()
-	files := cacheTableFiles(t, root)
+func removeCacheTable(test *testing.T, root string) {
+	test.Helper()
+	files := cacheTableFiles(test, root)
 	if len(files) == 0 {
-		t.Fatalf("no cache table in %s to remove", cacheDirectory(root))
+		test.Fatalf("no cache table in %s to remove", cacheDirectory(root))
 	}
 	for _, file := range files {
-		if err := os.Remove(file); err != nil {
-			t.Fatal(err)
+		if removeError := os.Remove(file); removeError != nil {
+			test.Fatal(removeError)
 		}
 	}
 }

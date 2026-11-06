@@ -15,10 +15,10 @@ import (
 // A walk that type-checks each file it visits (program.FusedCheck) reports the diagnostics the compiler's
 // whole-program check reports, part for part: the files the walk checked, the declaration it never visited,
 // an unused @ts-expect-error, and an error whose related information sits in another file.
-func TestAFusedCheckReportsWhatTheWholeProgramCheckReports(t *testing.T) {
-	t.Parallel()
+func TestAFusedCheckReportsWhatTheWholeProgramCheckReports(test *testing.T) {
+	test.Parallel()
 	files := map[string]string{
-		"tsconfig.json": minimalConfig,
+		"tsconfig.json": minimalConfiguration,
 		"shared.ts":     "export function take(value: string): string {\n    return value;\n}\nexport interface Shape { a: number }\n",
 		"global.d.ts":   "declare const declared: { broken: UnknownName };\n",
 	}
@@ -34,22 +34,29 @@ func TestAFusedCheckReportsWhatTheWholeProgramCheckReports(t *testing.T) {
 	files["a-importer.ts"] = "import { late } from './z-imported';\nexport const early: number = late;\n"
 	files["z-imported.ts"] = "export const late: string = 1;\n"
 
-	whole := buildProgram(t, files)
+	whole := buildProgram(test, files)
 	expected := whole.AllDiagnosticParts(context.Background())
 
-	fused := buildProgram(t, files)
+	fused := buildProgram(test, files)
 	fused.FusedCheck = program.NewFusedCheck()
-	if _, err := fused.Walk(context.Background(), fused.ProjectFiles(), []rule.Rule{typeAwareRule(t)}); err != nil {
-		t.Fatalf("walk: %v", err)
+	if _, walkError := fused.Walk(
+		context.Background(),
+		fused.ProjectFiles(),
+		[]rule.Entry{typeAwareRule(test)},
+	); walkError != nil {
+		test.Fatalf("walk: %v", walkError)
 	}
 	if checked := fused.FusedCheck.Checked(); checked != len(fused.ProjectFiles()) {
-		t.Fatalf("the walk checked %d of %d project files, so the parts below came from the remainder, not the walk",
+		test.Fatalf("the walk checked %d of %d project files, so the parts below came from the remainder, not the walk",
 			checked, len(fused.ProjectFiles()))
 	}
 	actual := fused.FusedCheck.DiagnosticParts(context.Background(), fused)
 
 	if len(expected.Semantic) < 80 {
-		t.Fatalf("the whole check found %d semantic diagnostics, too few for a match to prove anything", len(expected.Semantic))
+		test.Fatalf(
+			"the whole check found %d semantic diagnostics, too few for a match to prove anything",
+			len(expected.Semantic),
+		)
 	}
 	for _, part := range []struct {
 		name             string
@@ -60,41 +67,45 @@ func TestAFusedCheckReportsWhatTheWholeProgramCheckReports(t *testing.T) {
 		{"semantic", expected.Semantic, actual.Semantic},
 	} {
 		if !slices.Equal(renderedFully(part.expected), renderedFully(part.actual)) {
-			t.Errorf("%s diagnostics differ\n--- whole program\n%v\n--- fused\n%v", part.name,
+			test.Errorf("%s diagnostics differ\n--- whole program\n%v\n--- fused\n%v", part.name,
 				renderedFully(part.expected), renderedFully(part.actual))
 		}
 	}
 }
 
 // A file that does not parse stops a fused check at its syntactic diagnostics, as it stops the whole check.
-func TestAFusedCheckStopsAtASyntaxErrorAsTheWholeCheckDoes(t *testing.T) {
-	t.Parallel()
+func TestAFusedCheckStopsAtASyntaxErrorAsTheWholeCheckDoes(test *testing.T) {
+	test.Parallel()
 	files := map[string]string{
-		"tsconfig.json": minimalConfig,
+		"tsconfig.json": minimalConfiguration,
 		"broken.ts":     "export const value = ;\n",
 		"typed.ts":      "export const wrong: number = 'text';\n",
 	}
-	expected := buildProgram(t, files).AllDiagnosticParts(context.Background())
-	fused := buildProgram(t, files)
+	expected := buildProgram(test, files).AllDiagnosticParts(context.Background())
+	fused := buildProgram(test, files)
 	fused.FusedCheck = program.NewFusedCheck()
-	if _, err := fused.Walk(context.Background(), fused.ProjectFiles(), []rule.Rule{typeAwareRule(t)}); err != nil {
-		t.Fatalf("walk: %v", err)
+	if _, walkError := fused.Walk(
+		context.Background(),
+		fused.ProjectFiles(),
+		[]rule.Entry{typeAwareRule(test)},
+	); walkError != nil {
+		test.Fatalf("walk: %v", walkError)
 	}
 	actual := fused.FusedCheck.DiagnosticParts(context.Background(), fused)
 	if len(expected.Syntactic) == 0 {
-		t.Fatal("the fixture has no syntax error, so this test proves nothing")
+		test.Fatal("the fixture has no syntax error, so this test proves nothing")
 	}
 	if !slices.Equal(renderedFully(expected.All()), renderedFully(actual.All())) {
-		t.Fatalf("got %v, want %v", renderedFully(actual.All()), renderedFully(expected.All()))
+		test.Fatalf("got %v, want %v", renderedFully(actual.All()), renderedFully(expected.All()))
 	}
 }
 
-func buildProgram(t *testing.T, files map[string]string) *program.Graph {
-	t.Helper()
-	root := writeProject(t, files)
-	graph, err := program.Build(program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json")})
-	if err != nil {
-		t.Fatalf("build: %v", err)
+func buildProgram(test *testing.T, files map[string]string) *program.Graph {
+	test.Helper()
+	root := writeProject(test, files)
+	graph, buildError := program.Build(program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json")})
+	if buildError != nil {
+		test.Fatalf("build: %v", buildError)
 	}
 	return graph
 }

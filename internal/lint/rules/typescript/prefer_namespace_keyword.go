@@ -72,7 +72,7 @@ var messagePreferNamespaceKeyword = rule.Message{
 // ModuleBlock. Upstream reports it twice, which the snapshot also pins: six diagnostics across five
 // failing inputs, and this is the input supplying the sixth.
 //
-// So the exemption is keyed on the PARENT being a ModuleDeclaration, never on the node being
+// So the exemption is keyed on the parent being a ModuleDeclaration, never on the node being
 // nested. A guard reading "skip anything inside another module" would silence the second case and
 // still pass every fixture that only covers the first.
 //
@@ -92,16 +92,16 @@ var messagePreferNamespaceKeyword = rule.Message{
 // typescript-go puts both modifiers inside the declaration, so matching that means starting the
 // span after an `export` modifier and before a `declare` one. The corpus contains no exported
 // declaration, so nothing upstream covers this and only the fixtures written here hold it.
-var PreferNamespaceKeyword = rule.Rule{
+var PreferNamespaceKeyword = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/prefer-namespace-keyword",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// Defensive at the boundary, and deliberately untested. Mutating this guard away survives
 		// the whole fixture set, and no fixture can change that: rule_testing.Run always builds a real
 		// program, so no input reachable through the harness produces a nil SourceFile. That makes
 		// it unreachable through the harness rather than a fixture blind spot, and a test written
 		// for it would assert nothing. Kept because everything below reads the source text, and
 		// because 46 of the 184 rule files here open the same way.
-		if ctx.SourceFile == nil {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -128,8 +128,8 @@ var PreferNamespaceKeyword = rule.Rule{
 
 				// The token that opens the declaration proper, past any modifiers and any trivia
 				// between them.
-				keyword := moduleDeclarationKeywordRange(ctx.SourceFile, node)
-				sourceText := ctx.SourceFile.Text()
+				keyword := moduleDeclarationKeywordRange(ruleContext.SourceFile, node)
+				sourceText := ruleContext.SourceFile.Text()
 				if keyword.End() > len(sourceText) {
 					return
 				}
@@ -141,8 +141,8 @@ var PreferNamespaceKeyword = rule.Rule{
 					return
 				}
 
-				ctx.ReportRangeWithFixes(
-					moduleDeclarationReportRange(ctx.SourceFile, node),
+				ruleContext.ReportRangeWithFixes(
+					moduleDeclarationReportRange(ruleContext.SourceFile, node),
 					messagePreferNamespaceKeyword,
 					rule.ReplaceRange(keyword, "namespace"),
 				)

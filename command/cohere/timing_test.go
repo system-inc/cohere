@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"strings"
 	"testing"
 	"time"
@@ -13,8 +14,8 @@ import (
 // Two rules offered exactly the same node count and differing by orders of magnitude means one is
 // carrying work the other reads for free. Requiring three or more rules would have missed the case
 // that motivated this note: it was found on a pair, 3,407 nodes each, 83x apart.
-func TestPairsWithEqualNodesAndUnequalCostAreFlagged(t *testing.T) {
-	t.Parallel()
+func TestPairsWithEqualNodesAndUnequalCostAreFlagged(test *testing.T) {
+	test.Parallel()
 	timings := program.NewTimings([]string{"expensive", "cheap"})
 	setCost(timings, "expensive", 100*time.Millisecond, 3407)
 	setCost(timings, "cheap", time.Millisecond, 3407)
@@ -22,10 +23,10 @@ func TestPairsWithEqualNodesAndUnequalCostAreFlagged(t *testing.T) {
 	rendered := renderTimings(timings, 200*time.Millisecond)
 
 	if !strings.Contains(rendered, "differ") {
-		t.Fatalf("a pair with equal nodes and 100x cost was not flagged:\n%s", rendered)
+		test.Fatalf("a pair with equal nodes and 100x cost was not flagged:\n%s", rendered)
 	}
 	if !strings.Contains(rendered, "3407") {
-		t.Fatalf("the note did not name the shared node count:\n%s", rendered)
+		test.Fatalf("the note did not name the shared node count:\n%s", rendered)
 	}
 }
 
@@ -34,43 +35,43 @@ func TestPairsWithEqualNodesAndUnequalCostAreFlagged(t *testing.T) {
 // Rules registered for the same kind and costing about the same are unremarkable. A note that fired
 // on every pair sharing a node count would be noise, and noise in a diagnostic is how a real signal
 // stops being read.
-func TestSimilarCostsAreNotFlagged(t *testing.T) {
-	t.Parallel()
+func TestSimilarCostsAreNotFlagged(test *testing.T) {
+	test.Parallel()
 	timings := program.NewTimings([]string{"first", "second"})
 	setCost(timings, "first", 10*time.Millisecond, 3407)
 	setCost(timings, "second", 8*time.Millisecond, 3407)
 
 	if rendered := renderTimings(timings, 100*time.Millisecond); strings.Contains(rendered, "differ") {
-		t.Fatalf("two comparably-priced rules were flagged as sharing work:\n%s", rendered)
+		test.Fatalf("two comparably-priced rules were flagged as sharing work:\n%s", rendered)
 	}
 }
 
 // TestDifferentNodeCountsAreNotCompared keeps the note from pairing rules that never registered for
 // the same kinds, where a cost difference means nothing.
-func TestDifferentNodeCountsAreNotCompared(t *testing.T) {
-	t.Parallel()
+func TestDifferentNodeCountsAreNotCompared(test *testing.T) {
+	test.Parallel()
 	timings := program.NewTimings([]string{"many-nodes", "few-nodes"})
 	setCost(timings, "many-nodes", 100*time.Millisecond, 600000)
 	setCost(timings, "few-nodes", time.Millisecond, 3407)
 
 	if rendered := renderTimings(timings, 200*time.Millisecond); strings.Contains(rendered, "differ") {
-		t.Fatalf("rules with unrelated node counts were compared:\n%s", rendered)
+		test.Fatalf("rules with unrelated node counts were compared:\n%s", rendered)
 	}
 }
 
 // TestSharedFillIsReported proves the cost lands on the derivation rather than vanishing.
-func TestSharedFillIsReported(t *testing.T) {
-	t.Parallel()
+func TestSharedFillIsReported(test *testing.T) {
+	test.Parallel()
 	timings := program.NewTimings([]string{"a-rule"})
 	setCost(timings, "a-rule", 10*time.Millisecond, 100)
 	timings.SetSharedForTest("nexus.allComments", 120*time.Millisecond)
 
 	rendered := renderTimings(timings, 200*time.Millisecond)
 	if !strings.Contains(rendered, "shared: nexus.allComments cost 120ms of CPU") {
-		t.Fatalf("the shared derivation was not named with its cost:\n%s", rendered)
+		test.Fatalf("the shared derivation was not named with its cost:\n%s", rendered)
 	}
 	if !strings.Contains(rendered, "computed once per file") {
-		t.Fatalf("the note did not explain what a shared cost is:\n%s", rendered)
+		test.Fatalf("the note did not explain what a shared cost is:\n%s", rendered)
 	}
 }
 
@@ -80,7 +81,10 @@ func setCost(timings *program.Timings, name string, cost time.Duration, nodes in
 
 func renderTimings(timings *program.Timings, wall time.Duration) string {
 	builder := &strings.Builder{}
-	printTimings(builder, timings, wall)
+	stream := bufio.NewWriter(builder)
+	printTimings(stream, timings, wall)
+	// Ignored: a stream over a strings.Builder cannot fail to flush, since the builder's writes never do.
+	_ = stream.Flush()
 	return builder.String()
 }
 
@@ -95,8 +99,8 @@ func renderTimings(timings *program.Timings, wall time.Duration) string {
 // A fixture asserting that the note fired is not a fixture asserting the note is right. The earlier
 // tests checked for the substring "differ" and for one rule name, both present in a line that was
 // wrong about everything else. This one requires the quoted numbers to belong to the named rules.
-func TestTheNamedRulesAreTheRulesWhoseCostsAreQuoted(t *testing.T) {
-	t.Parallel()
+func TestTheNamedRulesAreTheRulesWhoseCostsAreQuoted(test *testing.T) {
+	test.Parallel()
 	timings := program.NewTimings([]string{"aaa-middling", "mmm-dearest", "zzz-cheapest"})
 	setCost(timings, "aaa-middling", 50*time.Millisecond, 3407)
 	setCost(timings, "mmm-dearest", 400*time.Millisecond, 3407)
@@ -112,22 +116,22 @@ func TestTheNamedRulesAreTheRulesWhoseCostsAreQuoted(t *testing.T) {
 		}
 	}
 	if line == "" {
-		t.Fatalf("three rules at one node count and 400x apart produced no note:\n%s", rendered)
+		test.Fatalf("three rules at one node count and 400x apart produced no note:\n%s", rendered)
 	}
 
 	// The dearest rule must be named, because it is the one a reader should go look at.
 	if !strings.Contains(line, "mmm-dearest") {
-		t.Fatalf("the note quotes the dearest cost but does not name the dearest rule:\n  %s", line)
+		test.Fatalf("the note quotes the dearest cost but does not name the dearest rule:\n  %s", line)
 	}
 	if !strings.Contains(line, "zzz-cheapest") {
-		t.Fatalf("the note does not name the cheapest rule:\n  %s", line)
+		test.Fatalf("the note does not name the cheapest rule:\n  %s", line)
 	}
 	// And the rule that is neither must not appear, or the line points somewhere misleading.
 	if strings.Contains(line, "aaa-middling") {
-		t.Fatalf("the note names a middling rule as though it were an extreme:\n  %s", line)
+		test.Fatalf("the note names a middling rule as though it were an extreme:\n  %s", line)
 	}
 	if !strings.Contains(line, "400ms") || !strings.Contains(line, "1.0ms") {
-		t.Fatalf("the note does not quote both extremes:\n  %s", line)
+		test.Fatalf("the note does not quote both extremes:\n  %s", line)
 	}
 }
 
@@ -136,65 +140,74 @@ func TestTheNamedRulesAreTheRulesWhoseCostsAreQuoted(t *testing.T) {
 // The table this replaced printed wall time under the same columns, and the better-tailwindcss family
 // read about 1.2s on it where its real cost was about 0.05s. The unit goes in the first line, and the
 // measurement's own cost per call in the second, so a reader cannot mistake what a row is.
-func TestTheHeaderNamesItsUnit(t *testing.T) {
-	t.Parallel()
+func TestTheHeaderNamesItsUnit(test *testing.T) {
+	test.Parallel()
 	timings := program.NewTimings([]string{"a-rule"})
 	setCost(timings, "a-rule", 120*time.Millisecond, 100)
 	timings.Account.Calls = 1000
-	timings.Account.InstrumentCPU = 150 * time.Microsecond
+	timings.Account.InstrumentCpu = 150 * time.Microsecond
 
 	rendered := renderTimings(timings, time.Second)
 	header := strings.SplitN(strings.TrimLeft(rendered, "\n"), "\n", 2)[0]
 	if !strings.Contains(header, "rule CPU") || !strings.Contains(header, "not wall time") {
-		t.Fatalf("the header does not say the table is CPU and not wall time:\n  %s", header)
+		test.Fatalf("the header does not say the table is CPU and not wall time:\n  %s", header)
 	}
 	if !strings.Contains(rendered, "1000 measured calls costs about 150ns to measure") {
-		t.Fatalf("the header does not state what measuring a call cost:\n%s", rendered)
+		test.Fatalf("the header does not state what measuring a call cost:\n%s", rendered)
 	}
 }
 
 // TestNoClockIsSaidRatherThanPrintedAsZero covers a platform with no thread CPU clock. A table of zeros
 // would read as every rule being free.
-func TestNoClockIsSaidRatherThanPrintedAsZero(t *testing.T) {
-	t.Parallel()
+func TestNoClockIsSaidRatherThanPrintedAsZero(test *testing.T) {
+	test.Parallel()
 	timings := program.NewTimings([]string{"a-rule"})
 	setCost(timings, "a-rule", 0, 100)
 	timings.Account.Unavailable = "this platform has no thread CPU clock to read"
 
 	rendered := renderTimings(timings, time.Second)
 	if !strings.Contains(rendered, "no rule CPU this run, because this platform has no thread CPU clock to read") {
-		t.Fatalf("the table did not say why it has no CPU:\n%s", rendered)
+		test.Fatalf("the table did not say why it has no CPU:\n%s", rendered)
 	}
 	if strings.Contains(rendered, "0.00ms") || strings.Contains(rendered, "coverage:") {
-		t.Fatalf("a table with no clock printed CPU figures anyway:\n%s", rendered)
+		test.Fatalf("a table with no clock printed CPU figures anyway:\n%s", rendered)
 	}
 	if !strings.Contains(rendered, "a-rule") || !strings.Contains(rendered, " 100 ") {
-		t.Fatalf("the counts, which were still counted, were dropped:\n%s", rendered)
+		test.Fatalf("the counts, which were still counted, were dropped:\n%s", rendered)
 	}
 }
 
-// TestCoverageStatesEveryPartOfTheWalksCPU guards the line that keeps the table honest.
+// TestCoverageStatesEveryPartOfTheWalksCpu guards the line that keeps the table honest.
 //
 // The rows are rule listeners and per-file setup. A reader who sums the share column gets 100 percent and
 // concludes the phase is explained, when the walk that offers nodes to those listeners costs CPU too. The
 // wall-clock table could only guess at that from wall clock, which absorbed every wait, and in a parallel
 // run it vanished entirely. The threads' clocks account for it, so the line states each part.
-func TestCoverageStatesEveryPartOfTheWalksCPU(t *testing.T) {
-	t.Parallel()
+func TestCoverageStatesEveryPartOfTheWalksCpu(test *testing.T) {
+	test.Parallel()
 	timings := program.NewTimings([]string{"a-rule"})
 	setCost(timings, "a-rule", 300*time.Millisecond, 100)
 	timings.SetSharedForTest("hir.Function", 100*time.Millisecond)
-	timings.Account.InstrumentCPU = 100 * time.Millisecond
-	timings.Account.WalkCPU = 500 * time.Millisecond
-	timings.Account.OtherCPU = 250 * time.Millisecond
+	timings.Account.InstrumentCpu = 100 * time.Millisecond
+	timings.Account.WalkCpu = 500 * time.Millisecond
+	timings.Account.OtherCpu = 250 * time.Millisecond
 
 	var out strings.Builder
-	printCoverage(&out, timings)
+	stream := bufio.NewWriter(&out)
+	printCoverage(stream, timings)
+	flushStream(test, stream)
 	rendered := out.String()
 
-	for _, want := range []string{"1000ms", "rules 30%", "shared derivations 10%", "measuring 10%", "50% the walk itself", "250ms of process CPU"} {
+	for _, want := range []string{
+		"1000ms",
+		"rules 30%",
+		"shared derivations 10%",
+		"measuring 10%",
+		"50% the walk itself",
+		"250ms of process CPU",
+	} {
 		if !strings.Contains(rendered, want) {
-			t.Fatalf("coverage did not state %q: %q", want, rendered)
+			test.Fatalf("coverage did not state %q: %q", want, rendered)
 		}
 	}
 }
@@ -202,12 +215,14 @@ func TestCoverageStatesEveryPartOfTheWalksCPU(t *testing.T) {
 // TestCoverageSaysNothingRatherThanComputingFromZero covers the degenerate input. Nothing sampled on the
 // walk workers means no share to state, and a share computed from a zero would be harder to notice than a
 // missing line.
-func TestCoverageSaysNothingRatherThanComputingFromZero(t *testing.T) {
-	t.Parallel()
+func TestCoverageSaysNothingRatherThanComputingFromZero(test *testing.T) {
+	test.Parallel()
 	var out strings.Builder
-	printCoverage(&out, program.NewTimings([]string{"a-rule"}))
+	stream := bufio.NewWriter(&out)
+	printCoverage(stream, program.NewTimings([]string{"a-rule"}))
+	flushStream(test, stream)
 	if out.String() != "" {
-		t.Fatalf("coverage printed a claim computed from zero CPU: %q", out.String())
+		test.Fatalf("coverage printed a claim computed from zero CPU: %q", out.String())
 	}
 }
 
@@ -216,14 +231,14 @@ func TestCoverageSaysNothingRatherThanComputingFromZero(t *testing.T) {
 // The tests above call printCoverage directly, which verifies a fragment and reads as though it verifies
 // the behavior. It does not: deleting the call from printTimings leaves them green while the table goes
 // back to implying it explains the whole phase. Guard present, fixtures passing, behavior gone.
-func TestTheTableItselfCarriesTheCoverageLine(t *testing.T) {
-	t.Parallel()
+func TestTheTableItselfCarriesTheCoverageLine(test *testing.T) {
+	test.Parallel()
 	timings := program.NewTimings([]string{"a-rule"})
 	setCost(timings, "a-rule", 285*time.Millisecond, 100)
-	timings.Account.WalkCPU = 700 * time.Millisecond
+	timings.Account.WalkCpu = 700 * time.Millisecond
 
 	rendered := renderTimings(timings, 1024*time.Millisecond)
 	if !strings.Contains(rendered, "coverage:") || !strings.Contains(rendered, "the walk itself") {
-		t.Fatalf("the table did not carry a coverage line naming the walk's own CPU:\n%s", rendered)
+		test.Fatalf("the table did not carry a coverage line naming the walk's own CPU:\n%s", rendered)
 	}
 }

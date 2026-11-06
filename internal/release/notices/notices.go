@@ -1,4 +1,4 @@
-// Package notices writes cohere's third-party notices: NOTICE, which carries the TypeScript compiler's
+// Package notices writes cohere's third-party notices: `NOTICE`, which carries the TypeScript compiler's
 // Apache-2.0 notice, and THIRD_PARTY_NOTICES.md, which credits every other project cohere is built on
 // with its license in full.
 //
@@ -19,7 +19,9 @@ import (
 	"bytes"
 	"embed"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -46,7 +48,7 @@ func isCohere(path string) bool {
 }
 
 // compilerModulePrefix is the vendored TypeScript compiler and the shim modules over it. The compiler is
-// credited in NOTICE and its own entry, and the shims are cohere's generated code.
+// credited in `NOTICE` and its own entry, and the shims are cohere's generated code.
 const compilerModulePrefix = "github.com/microsoft/TypeScript/"
 
 // licenseTexts are the curated upstreams' license texts, one file each, named in upstreams.go.
@@ -69,26 +71,31 @@ type Files map[string][]byte
 
 // Generate renders both files for the module at moduleDirectory.
 func Generate(moduleDirectory string) (Files, error) {
-	compiled, err := CompiledModules(moduleDirectory)
-	if err != nil {
-		return nil, err
+	compiled, compiledModulesError := CompiledModules(moduleDirectory)
+	if compiledModulesError != nil {
+		return nil, compiledModulesError
 	}
-	repositoryOnly, err := repositoryOnlyModules(moduleDirectory, compiled)
-	if err != nil {
-		return nil, err
+	repositoryOnly, repositoryOnlyModulesError := repositoryOnlyModules(moduleDirectory, compiled)
+	if repositoryOnlyModulesError != nil {
+		return nil, repositoryOnlyModulesError
 	}
-	swiftPins, err := readSwiftPins(moduleDirectory)
-	if err != nil {
-		return nil, err
+	swiftPins, readSwiftPinsError := readSwiftPins(moduleDirectory)
+	if readSwiftPinsError != nil {
+		return nil, readSwiftPinsError
 	}
 
-	notice, err := renderNotice(moduleDirectory)
-	if err != nil {
-		return nil, err
+	notice, renderNoticeError := renderNotice(moduleDirectory)
+	if renderNoticeError != nil {
+		return nil, renderNoticeError
 	}
-	thirdParty, err := renderThirdPartyNotices(moduleDirectory, compiled, repositoryOnly, swiftPins)
-	if err != nil {
-		return nil, err
+	thirdParty, renderThirdPartyNoticesError := renderThirdPartyNotices(
+		moduleDirectory,
+		compiled,
+		repositoryOnly,
+		swiftPins,
+	)
+	if renderThirdPartyNoticesError != nil {
+		return nil, renderThirdPartyNoticesError
 	}
 	return Files{NoticeFileName: notice, ThirdPartyNoticesFileName: thirdParty}, nil
 }
@@ -103,12 +110,22 @@ func CompiledModules(moduleDirectory string) ([]Module, error) {
 		command := exec.Command("go", "list", "-deps", "-f",
 			"{{with .Module}}{{.Path}}\t{{.Version}}\t{{.Dir}}{{end}}", "./command/cohere")
 		command.Dir = moduleDirectory
-		command.Env = append(os.Environ(), "GOOS="+target.GoOperatingSystem, "GOARCH="+target.GoArchitecture, "CGO_ENABLED=0")
+		command.Env = append(
+			os.Environ(),
+			"GOOS="+target.GoOperatingSystem,
+			"GOARCH="+target.GoArchitecture,
+			"CGO_ENABLED=0",
+		)
 		var standardError bytes.Buffer
 		command.Stderr = &standardError
-		output, err := command.Output()
-		if err != nil {
-			return nil, fmt.Errorf("listing cohere's build graph for %s: %w\n%s", target, err, standardError.String())
+		output, outputError := command.Output()
+		if outputError != nil {
+			return nil, fmt.Errorf(
+				"listing cohere's build graph for %s: %w\n%s",
+				target,
+				outputError,
+				standardError.String(),
+			)
 		}
 		for line := range strings.SplitSeq(strings.TrimSpace(string(output)), "\n") {
 			fields := strings.Split(line, "\t")
@@ -138,15 +155,15 @@ func CompiledModules(moduleDirectory string) ([]Module, error) {
 func repositoryOnlyModules(moduleDirectory string, compiled []Module) ([]Module, error) {
 	command := exec.Command("go", "mod", "edit", "-json")
 	command.Dir = moduleDirectory
-	output, err := command.Output()
-	if err != nil {
-		return nil, fmt.Errorf("reading go.mod: %w", err)
+	output, outputError := command.Output()
+	if outputError != nil {
+		return nil, fmt.Errorf("reading go.mod: %w", outputError)
 	}
 	var goMod struct {
 		Require []struct{ Path, Version string }
 	}
-	if err := json.Unmarshal(output, &goMod); err != nil {
-		return nil, fmt.Errorf("reading go.mod: %w", err)
+	if decodeError := json.Unmarshal(output, &goMod); decodeError != nil {
+		return nil, fmt.Errorf("reading go.mod: %w", decodeError)
 	}
 
 	byPath := map[string]Module{}
@@ -157,15 +174,26 @@ func repositoryOnlyModules(moduleDirectory string, compiled []Module) ([]Module,
 		}
 		download := exec.Command("go", "mod", "download", "-json", requirement.Path+"@"+requirement.Version)
 		download.Dir = moduleDirectory
-		output, err := download.Output()
-		if err != nil {
-			return nil, fmt.Errorf("finding %s@%s to read its license: %w", requirement.Path, requirement.Version, err)
+		output, outputError := download.Output()
+		if outputError != nil {
+			return nil, fmt.Errorf(
+				"finding %s@%s to read its license: %w",
+				requirement.Path,
+				requirement.Version,
+				outputError,
+			)
 		}
-		var downloaded struct{ Dir string }
-		if err := json.Unmarshal(output, &downloaded); err != nil {
-			return nil, err
+		var downloaded struct {
+			Directory string `json:"Dir"`
 		}
-		byPath[requirement.Path] = Module{Path: requirement.Path, Version: requirement.Version, Directory: downloaded.Dir}
+		if decodeError := json.Unmarshal(output, &downloaded); decodeError != nil {
+			return nil, decodeError
+		}
+		byPath[requirement.Path] = Module{
+			Path:      requirement.Path,
+			Version:   requirement.Version,
+			Directory: downloaded.Directory,
+		}
 	}
 	return sortedModules(byPath), nil
 }
@@ -186,12 +214,39 @@ var moduleLicenseFileNames = []string{"LICENSE", "LICENSE.md", "LICENSE.txt", "L
 // with no license file can't be credited, and that is a question for a person, not something to skip.
 func readModuleLicense(module Module) (string, error) {
 	for _, name := range moduleLicenseFileNames {
-		contents, err := os.ReadFile(filepath.Join(module.Directory, name))
-		if err == nil {
+		contents, readError := os.ReadFile(filepath.Join(module.Directory, name))
+		if readError == nil {
 			return string(contents), nil
 		}
 	}
-	return "", fmt.Errorf("%s@%s has no license file in %s (looked for %s)", module.Path, module.Version, module.Directory, strings.Join(moduleLicenseFileNames, ", "))
+	return "", fmt.Errorf(
+		"%s@%s has no license file in %s (looked for %s)",
+		module.Path,
+		module.Version,
+		module.Directory,
+		strings.Join(moduleLicenseFileNames, ", "),
+	)
+}
+
+// moduleThirdPartyFileNames are the names a Go module ships its own credit for code it includes under,
+// beside its license: the spellings the module cache holds at a module's root, honnef.co/go/tools'
+// `LICENSE-THIRD-PARTY` and github.com/mholt/acmez's `THIRD-PARTY`.
+var moduleThirdPartyFileNames = []string{"LICENSE-THIRD-PARTY", "THIRD-PARTY"}
+
+// readModuleThirdPartyCredit reads a module's own credit for the code it includes, and the name it was
+// found under. A module that ships none returns an empty name, since most don't.
+func readModuleThirdPartyCredit(module Module) (name string, contents string, readError error) {
+	for _, fileName := range moduleThirdPartyFileNames {
+		fileContents, fileError := os.ReadFile(filepath.Join(module.Directory, fileName))
+		if errors.Is(fileError, fs.ErrNotExist) {
+			continue
+		}
+		if fileError != nil {
+			return "", "", fmt.Errorf("reading %s@%s's %s: %w", module.Path, module.Version, fileName, fileError)
+		}
+		return fileName, string(fileContents), nil
+	}
+	return "", "", nil
 }
 
 // swiftPin is one package the Swift engine resolves, from swift/Package.resolved.
@@ -202,9 +257,9 @@ type swiftPin struct {
 }
 
 func readSwiftPins(moduleDirectory string) ([]swiftPin, error) {
-	contents, err := os.ReadFile(filepath.Join(moduleDirectory, "swift", "Package.resolved"))
-	if err != nil {
-		return nil, fmt.Errorf("reading the Swift engine's resolved packages: %w", err)
+	contents, readError := os.ReadFile(filepath.Join(moduleDirectory, "swift", "Package.resolved"))
+	if readError != nil {
+		return nil, fmt.Errorf("reading the Swift engine's resolved packages: %w", readError)
 	}
 	var resolved struct {
 		Pins []struct {
@@ -213,8 +268,8 @@ func readSwiftPins(moduleDirectory string) ([]swiftPin, error) {
 			State    struct{ Version, Revision string }
 		}
 	}
-	if err := json.Unmarshal(contents, &resolved); err != nil {
-		return nil, fmt.Errorf("reading swift/Package.resolved: %w", err)
+	if decodeError := json.Unmarshal(contents, &resolved); decodeError != nil {
+		return nil, fmt.Errorf("reading swift/Package.resolved: %w", decodeError)
 	}
 	pins := make([]swiftPin, 0, len(resolved.Pins))
 	for _, pin := range resolved.Pins {
@@ -222,8 +277,14 @@ func readSwiftPins(moduleDirectory string) ([]swiftPin, error) {
 		if version == "" {
 			version = pin.State.Revision
 		}
-		pins = append(pins, swiftPin{Identity: pin.Identity, Location: strings.TrimSuffix(pin.Location, ".git"), Version: version})
+		pins = append(
+			pins,
+			swiftPin{Identity: pin.Identity, Location: strings.TrimSuffix(pin.Location, ".git"), Version: version},
+		)
 	}
-	slices.SortFunc(pins, func(left swiftPin, right swiftPin) int { return strings.Compare(left.Identity, right.Identity) })
+	slices.SortFunc(
+		pins,
+		func(left swiftPin, right swiftPin) int { return strings.Compare(left.Identity, right.Identity) },
+	)
 	return pins, nil
 }

@@ -1,7 +1,9 @@
 package main
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -10,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/system-inc/cohere/internal/streams"
 )
 
 // The machine's budget for heavy Go work (#qhg0ntb).
@@ -22,10 +26,10 @@ import (
 // tests failed, and Kirk's typing lagged.
 //
 // A token is a slot lock (slot-N.lock in the pool directory), taken in arrival order (queueTicket). Go is
-// held to the token's share twice over: GOFLAGS' -p bounds how many packages it compiles and how many test
-// binaries it runs at once, and GOMAXPROCS bounds the threads each of those processes uses, so a token
-// costs about -p times GOMAXPROCS threads. Both are inherited by every go command a test or script starts
-// beneath it. GOMAXPROCS alone is not a budget: go's -p defaults to it, so 8 meant up to eight test binaries
+// held to the token's share twice over: `GOFLAGS`' -p bounds how many packages it compiles and how many test
+// binaries it runs at once, and `GOMAXPROCS` bounds the threads each of those processes uses, so a token
+// costs about -p times `GOMAXPROCS` threads. Both are inherited by every go command a test or script starts
+// beneath it. `GOMAXPROCS` alone is not a budget: go's -p defaults to it, so 8 meant up to eight test binaries
 // at eight threads each, and the measured load stayed at 107 to 140 on sixteen cores (#qhg0ntb).
 // A command that already runs under a token, a test that runs go build, say, runs inside its parent's share
 // and takes no second token, which would also deadlock a pool its parent has already filled.
@@ -35,7 +39,7 @@ import (
 // 2026-10-19 a whole-module gate alone on the machine ran 906 CPU-seconds in 4m05s, an average of 3.7 of 16
 // cores, with three tokens free the whole time. One token is always left, so a run that arrives next starts
 // at once rather than waiting out a borrower, and the threads in use never pass the pool's. Go's -p and
-// GOMAXPROCS are fixed when a process starts, so a borrower keeps what it took until its command ends: a run of
+// `GOMAXPROCS` are fixed when a process starts, so a borrower keeps what it took until its command ends: a run of
 // several commands, the landing gate's, rebalances between them (tokenRun), widening when the pool went idle
 // and giving tokens back to anyone who arrived.
 
@@ -49,7 +53,7 @@ const tokensVariable = "COHERE_DEV_TOKENS"
 // packagesVariable sets how many packages each token's run builds or tests at once: go's -p.
 const packagesVariable = "COHERE_DEV_PACKAGES"
 
-// threadsVariable sets how many threads each of those processes may use: GOMAXPROCS.
+// threadsVariable sets how many threads each of those processes may use: `GOMAXPROCS`.
 const threadsVariable = "COHERE_DEV_THREADS"
 
 // heldTokenVariable is set, to the token's number, in the environment of everything a token's run starts.
@@ -63,7 +67,7 @@ const coresVariable = "COHERE_DEV_CORES"
 // The pool's shape: four runs at once, each two packages at a time on two threads, sixteen threads on a
 // sixteen-core machine. Measured in a quiet window on 2026-10-05 replaying the morning's mix, four gates and
 // two builds started at once: this shape finished in 112s at a mean load of 28, against 113s at 119 for
-// four tokens bounded by GOMAXPROCS alone, 130s at 140 for two of eight, and 125s at 191 with no pool, where
+// four tokens bounded by `GOMAXPROCS` alone, 130s at 140 for two of eight, and 125s at 191 with no pool, where
 // all four gates failed on a test's deadline (#qhg0ntb).
 const (
 	defaultTokens   = 4
@@ -71,23 +75,27 @@ const (
 	defaultThreads  = 2
 )
 
-// poolShape is the pool's tokens, and how many packages and threads each token's run may use.
-type poolShape struct {
-	tokens, packages, threads int
-}
-
 // readPoolShape is the pool's shape, from the defaults and whatever the environment changes.
 func readPoolShape() (poolShape, error) {
 	var shape poolShape
-	var err error
-	if shape.tokens, err = positiveVariable(tokensVariable, defaultTokens); err != nil {
-		return shape, err
+	var positiveVariableError error
+	if shape.tokens, positiveVariableError = positiveVariable(
+		tokensVariable,
+		defaultTokens,
+	); positiveVariableError != nil {
+		return shape, positiveVariableError
 	}
-	if shape.packages, err = positiveVariable(packagesVariable, defaultPackages); err != nil {
-		return shape, err
+	if shape.packages, positiveVariableError = positiveVariable(
+		packagesVariable,
+		defaultPackages,
+	); positiveVariableError != nil {
+		return shape, positiveVariableError
 	}
-	if shape.threads, err = positiveVariable(threadsVariable, defaultThreads); err != nil {
-		return shape, err
+	if shape.threads, positiveVariableError = positiveVariable(
+		threadsVariable,
+		defaultThreads,
+	); positiveVariableError != nil {
+		return shape, positiveVariableError
 	}
 	return shape, nil
 }
@@ -97,8 +105,8 @@ func positiveVariable(name string, fallback int) (int, error) {
 	if value == "" {
 		return fallback, nil
 	}
-	parsed, err := strconv.Atoi(value)
-	if err != nil || parsed < 1 {
+	parsed, parseError := strconv.Atoi(value)
+	if parseError != nil || parsed < 1 {
 		return 0, fmt.Errorf("%s is %q, want a whole number of at least 1", name, value)
 	}
 	return parsed, nil
@@ -116,9 +124,9 @@ func poolHome() (string, error) {
 	if home := os.Getenv(homeVariable); home != "" {
 		return home, nil
 	}
-	account, err := user.Current()
-	if err != nil {
-		return "", fmt.Errorf("finding this account's home for the machine's pool: %w", err)
+	account, currentError := user.Current()
+	if currentError != nil {
+		return "", fmt.Errorf("finding this account's home for the machine's pool: %w", currentError)
 	}
 	return account.HomeDir, nil
 }
@@ -138,9 +146,9 @@ func userCacheDirectoryIn(home string) string {
 
 // poolDirectory is where the tokens, their holders and the line live, one per machine user.
 func poolDirectory() (string, error) {
-	home, err := poolHome()
-	if err != nil {
-		return "", err
+	home, poolHomeError := poolHome()
+	if poolHomeError != nil {
+		return "", poolHomeError
 	}
 	// The directory the whole-module slot used, so a checkout still on that wrapper and one on this pool take
 	// the same lock for slot 1 and never run at once on it.
@@ -165,24 +173,30 @@ func withSteppedToken(what string, steps func(step func(name string) []string) i
 		// Inside a parent's share, which the parent rebalances: a nested run never steps.
 		return steps(func(string) []string { return os.Environ() })
 	}
-	shape, err := readPoolShape()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "cohere-dev: %v\n", err)
+	shape, readPoolShapeError := readPoolShape()
+	if readPoolShapeError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", readPoolShapeError)
 		return 2
 	}
 	tokens := shape.tokens
-	directory, err := poolDirectory()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "cohere-dev: %v\n", err)
+	directory, poolDirectoryError := poolDirectory()
+	if poolDirectoryError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", poolDirectoryError)
 		return 1
 	}
 
-	held, err := waitInLine(directory, tokens, what, "token", func() {
-		fmt.Fprintf(os.Stderr, "cohere-dev: waiting for a token; the machine runs %d heavy Go runs at once, each %d packages "+
-			"at a time on %d threads, and these hold them (cohere-dev status shows the line):\n", tokens, shape.packages, shape.threads)
+	held, waitInLineError := waitInLine(directory, tokens, what, "token", func() {
+		fmt.Fprintf(
+			streams.Errors,
+			"cohere-dev: waiting for a token; the machine runs %d heavy Go runs at once, each %d packages "+
+				"at a time on %d threads, and these hold them (cohere-dev status shows the line):\n",
+			tokens,
+			shape.packages,
+			shape.threads,
+		)
 	})
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "cohere-dev: %v\n", err)
+	if waitInLineError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", waitInLineError)
 		return 1
 	}
 	run := &tokenRun{directory: directory, shape: shape, held: held, what: what}
@@ -210,8 +224,12 @@ func borrowTokens(directory string, shape poolShape, own int, what string) []*he
 	}
 	borrowed := []*heldSlot{}
 	for len(borrowed) < free-1 {
-		token, err := takeSlot(directory, shape.tokens, "borrowed by token "+strconv.Itoa(own)+"'s run: "+what)
-		if err != nil || token == nil {
+		token, takeSlotError := takeSlot(
+			directory,
+			shape.tokens,
+			"borrowed by token "+strconv.Itoa(own)+"'s run: "+what,
+		)
+		if takeSlotError != nil || token == nil {
 			break
 		}
 		borrowed = append(borrowed, token)
@@ -221,54 +239,6 @@ func borrowTokens(directory string, shape poolShape, own int, what string) []*he
 		borrowed = borrowed[:len(borrowed)-1]
 	}
 	return borrowed
-}
-
-// tokenRun is a token's run and what it has borrowed, rebalanced before each of its go commands (#fvbwfvh).
-// Go's -p and GOMAXPROCS are fixed when a process starts, so a run's share can only change between its
-// commands: one that started on a busy pool with one token widens once the pool goes idle, and one holding
-// borrowed tokens gives them back at its next command when anyone is waiting.
-type tokenRun struct {
-	directory string
-	shape     poolShape
-	held      *heldSlot
-	what      string
-	borrowed  []*heldSlot
-	stepped   bool
-}
-
-// step gives back what the run borrowed, borrows again from the pool as it is now (borrowTokens: all but one
-// free token, and none while anyone waits), says when that changed the run's share, and returns the
-// environment the next command runs in. name names the command in what it says.
-func (run *tokenRun) step(name string) []string {
-	before := len(run.borrowed)
-	run.giveBack()
-	run.borrowed = borrowTokens(run.directory, run.shape, run.held.number, run.what)
-	wide := run.shape.widened(1 + len(run.borrowed))
-	subject := "this run"
-	if name != "" {
-		subject = name
-	}
-	switch {
-	case !run.stepped && len(run.borrowed) > 0:
-		fmt.Fprintf(os.Stderr, "cohere-dev: the pool is idle, so %s borrows %s: %d packages at a time on %d threads\n",
-			subject, tokenNumbers(run.borrowed), wide.packages, wide.threads)
-	case run.stepped && len(run.borrowed) > before:
-		fmt.Fprintf(os.Stderr, "cohere-dev: the pool went idle, so %s borrows %s: %d packages at a time on %d threads\n",
-			subject, tokenNumbers(run.borrowed), wide.packages, wide.threads)
-	case run.stepped && len(run.borrowed) < before:
-		fmt.Fprintf(os.Stderr, "cohere-dev: the pool is busy now, so %s gives back %d borrowed tokens and runs %d packages at a time on %d threads\n",
-			subject, before-len(run.borrowed), wide.packages, wide.threads)
-	}
-	run.stepped = true
-	return budgetEnvironment(os.Environ(), run.held.number, wide)
-}
-
-// giveBack releases every borrowed token.
-func (run *tokenRun) giveBack() {
-	for _, token := range run.borrowed {
-		token.release()
-	}
-	run.borrowed = nil
 }
 
 // anyFree reports whether any token is free.
@@ -293,33 +263,16 @@ func tokenNumbers(held []*heldSlot) string {
 	return "tokens " + strings.Join(names[:len(names)-1], ", ") + " and " + names[len(names)-1]
 }
 
-// widened is the shape of a run holding tokens of the pool's tokens: their cores together, split between
-// packages and threads as evenly as they divide, packages the larger, so a lone long test binary gains threads
-// as well as the run gaining binaries. Held to one token, it is the pool's own shape, unchanged.
-func (shape poolShape) widened(tokens int) poolShape {
-	if tokens <= 1 {
-		return shape
-	}
-	cores := shape.packages * shape.threads * tokens
-	threads := 1
-	for candidate := 1; candidate*candidate <= cores; candidate++ {
-		if cores%candidate == 0 {
-			threads = candidate
-		}
-	}
-	return poolShape{tokens: shape.tokens, packages: cores / threads, threads: threads}
-}
-
 // waitInLine takes one of a directory's slots in arrival order, waiting its turn, and returns it held. The
 // slots are the pool's tokens, or land's one lock (land.go). noun names a slot in what a waiting run prints,
 // and explain opens what it prints when it first finds every slot held, before the holders' lines.
 func waitInLine(directory string, slots int, what string, noun string, explain func()) (*heldSlot, error) {
 	// In line, in arrival order, where a lock holds; see queueTicket.
 	var ticket *queueTicket
-	var err error
+	var joinQueueError error
 	if filesLock {
-		if ticket, err = joinQueue(directory); err != nil {
-			return nil, fmt.Errorf("joining the line for a %s: %w", noun, err)
+		if ticket, joinQueueError = joinQueue(directory); joinQueueError != nil {
+			return nil, fmt.Errorf("joining the line for a %s: %w", noun, joinQueueError)
 		}
 		// Left as soon as a slot is taken, so the next in line moves up while this one runs; this covers
 		// every way out before that.
@@ -340,15 +293,16 @@ func waitInLine(directory string, slots int, what string, noun string, explain f
 	for {
 		ahead, waiting := 0, 0
 		if ticket != nil {
-			if ahead, waiting, err = ticket.place(); err != nil {
-				return nil, fmt.Errorf("reading the line for a %s: %w", noun, err)
+			var placeError error
+			if ahead, waiting, placeError = ticket.place(); placeError != nil {
+				return nil, fmt.Errorf("reading the line for a %s: %w", noun, placeError)
 			}
 		}
 		// Only the first in line, as many as there are slots, may take one, so no later arrival passes them.
 		if ahead < slots {
-			held, err := takeSlot(directory, slots, what)
-			if err != nil {
-				return nil, fmt.Errorf("taking a %s: %w", noun, err)
+			held, takeSlotError := takeSlot(directory, slots, what)
+			if takeSlotError != nil {
+				return nil, fmt.Errorf("taking a %s: %w", noun, takeSlotError)
 			}
 			if held != nil {
 				if ticket != nil {
@@ -356,7 +310,13 @@ func waitInLine(directory string, slots int, what string, noun string, explain f
 					ticket = nil
 				}
 				if announced {
-					fmt.Fprintf(os.Stderr, "cohere-dev: took %s %d after waiting %s\n", noun, held.number, time.Since(waitingSince).Round(time.Second))
+					fmt.Fprintf(
+						streams.Errors,
+						"cohere-dev: took %s %d after waiting %s\n",
+						noun,
+						held.number,
+						time.Since(waitingSince).Round(time.Second),
+					)
 				}
 				return held, nil
 			}
@@ -365,33 +325,35 @@ func waitInLine(directory string, slots int, what string, noun string, explain f
 		if !announced {
 			explain()
 			for _, holder := range current {
-				fmt.Fprintf(os.Stderr, "  %s\n", holder)
+				fmt.Fprintf(streams.Errors, "  %s\n", holder)
 			}
 			announced = true
 			lastHolders = strings.Join(current, "\n")
 		} else if joined := strings.Join(current, "\n"); joined != lastHolders && len(current) > 0 {
-			fmt.Fprintf(os.Stderr, "cohere-dev: the %s holders changed; now:\n", noun)
+			fmt.Fprintf(streams.Errors, "cohere-dev: the %s holders changed; now:\n", noun)
 			for _, holder := range current {
-				fmt.Fprintf(os.Stderr, "  %s\n", holder)
+				fmt.Fprintf(streams.Errors, "  %s\n", holder)
 			}
 			lastHolders = joined
 		}
 		if ticket != nil && ahead != lastAhead {
-			fmt.Fprintf(os.Stderr, "cohere-dev: %s in line of %d waiting\n", ordinal(ahead+1), waiting)
+			fmt.Fprintf(streams.Errors, "cohere-dev: %s in line of %d waiting\n", ordinal(ahead+1), waiting)
 			lastAhead = ahead
 		}
+		// A person waits on this line, so what it said is delivered before the wait, not when the run ends.
+		streams.Show(streams.Errors)
 		time.Sleep(time.Second)
 	}
 }
 
 // budgetEnvironment is the environment a token's run starts its commands in: Go held to the token's packages
-// and threads, the caller's other GOFLAGS kept, -trimpath always, and the token named, so a command started
+// and threads, the caller's other `GOFLAGS` kept, -trimpath always, and the token named, so a command started
 // beneath it runs in this share rather than taking another.
 //
 // -trimpath because without it Go keys every compile on the source's directory, so each member's worktree,
 // and each land gate's, compiled cohere from nothing: a fresh worktree's first fast tier took 211s and 1,630s
 // of CPU at a commit the gate had just tested, and 52 to 63s with -trimpath, every package from the shared
-// cache (2026-11-05). The machine's go env sets it, but setting GOFLAGS here overrides that file, so this
+// cache (2026-11-05). The machine's go env sets it, but setting `GOFLAGS` here overrides that file, so this
 // run dropped it until it was written in (#system_cohere_tools).
 //
 // One cost, found by @system_cohere_go on 2026-11-05: under -trimpath the cache key for a main-module package
@@ -426,47 +388,54 @@ func budgetEnvironment(base []string, token int, shape poolShape) []string {
 
 // status prints the pool: its shape, who holds each token, and who waits in line, oldest first.
 func status() int {
-	shape, err := readPoolShape()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "cohere-dev: %v\n", err)
+	shape, readPoolShapeError := readPoolShape()
+	if readPoolShapeError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", readPoolShapeError)
 		return 2
 	}
-	directory, err := poolDirectory()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "cohere-dev: %v\n", err)
+	directory, poolDirectoryError := poolDirectory()
+	if poolDirectoryError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", poolDirectoryError)
 		return 1
 	}
-	fmt.Printf("pool: %d tokens, each %d packages at a time on %d threads, nice %d (%s)\n", shape.tokens, shape.packages,
-		shape.threads, testNiceness, directory)
+	fmt.Fprintf(
+		streams.Output,
+		"pool: %d tokens, each %d packages at a time on %d threads, nice %d (%s)\n",
+		shape.tokens,
+		shape.packages,
+		shape.threads,
+		testNiceness,
+		directory,
+	)
 	for token := 1; token <= shape.tokens; token++ {
 		holder := "free"
 		if held := heldBy(directory, token); held != "" {
 			holder = held
 		}
-		fmt.Printf("  token %d: %s\n", token, holder)
+		fmt.Fprintf(streams.Output, "  token %d: %s\n", token, holder)
 	}
-	fmt.Println(cacheStatus(directory))
-	fmt.Println(quietStatus(directory, time.Now()))
+	fmt.Fprintln(streams.Output, cacheStatus(directory))
+	fmt.Fprintln(streams.Output, quietStatus(directory, time.Now()))
 	waiting := waiters(directory)
-	fmt.Printf("line: %d waiting\n", len(waiting))
+	fmt.Fprintf(streams.Output, "line: %d waiting\n", len(waiting))
 	for place, waiter := range waiting {
-		fmt.Printf("  %s: %s\n", ordinal(place+1), waiter)
+		fmt.Fprintf(streams.Output, "  %s: %s\n", ordinal(place+1), waiter)
 	}
 	// Land's one lock and its own line (land.go), so a stalled landing shows here beside the tokens.
-	land, err := landDirectory()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "cohere-dev: %v\n", err)
+	land, landDirectoryError := landDirectory()
+	if landDirectoryError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", landDirectoryError)
 		return 1
 	}
 	holder := "free"
 	if held := heldBy(land, 1); held != "" {
 		holder = held
 	}
-	fmt.Printf("land lock: %s\n", holder)
+	fmt.Fprintf(streams.Output, "land lock: %s\n", holder)
 	landing := waiters(land)
-	fmt.Printf("land line: %d waiting\n", len(landing))
+	fmt.Fprintf(streams.Output, "land line: %d waiting\n", len(landing))
 	for place, waiter := range landing {
-		fmt.Printf("  %s: %s\n", ordinal(place+1), waiter)
+		fmt.Fprintf(streams.Output, "  %s: %s\n", ordinal(place+1), waiter)
 	}
 	return 0
 }
@@ -474,16 +443,23 @@ func status() int {
 // heldBy says who holds a token, or nothing when it is free: its lock is what says so, not its holder file,
 // which a run killed outright leaves behind.
 func heldBy(directory string, token int) string {
-	lock, err := os.OpenFile(lockPath(directory, token), os.O_RDWR, 0)
-	if err != nil {
+	lock, openError := os.OpenFile(lockPath(directory, token), os.O_RDWR, 0)
+	if openError != nil {
 		return ""
 	}
+	// Ignored: opened only to test its lock, and never written.
 	defer lock.Close()
+	// Ignored: a lock that can't be tested reads as held, the side on which no borrower takes it and status
+	// never calls it free.
 	if taken, _ := tryLockFile(lock); taken {
 		unlockFile(lock)
 		return ""
 	}
-	contents, _ := os.ReadFile(holderPath(directory, token))
+	contents, readError := os.ReadFile(holderPath(directory, token))
+	if readError != nil && !errors.Is(readError, fs.ErrNotExist) {
+		return fmt.Sprintf("held, and its holder could not be read: %v", readError)
+	}
+	// A holder file not written yet is a run that took the lock and has not named itself.
 	if line := strings.TrimSpace(string(contents)); line != "" {
 		return line
 	}
@@ -492,8 +468,8 @@ func heldBy(directory string, token int) string {
 
 // waiters names every live ticket in line, oldest first, by its pid.
 func waiters(directory string) []string {
-	entries, err := os.ReadDir(queueDirectory(directory))
-	if err != nil {
+	entries, readDirectoryError := os.ReadDir(queueDirectory(directory))
+	if readDirectoryError != nil {
 		return nil
 	}
 	lines := []string{}
@@ -502,20 +478,22 @@ func waiters(directory string) []string {
 		if strings.HasPrefix(name, ".") {
 			continue
 		}
-		ticket, err := os.OpenFile(filepath.Join(queueDirectory(directory), name), os.O_RDWR, 0)
-		if err != nil {
+		ticket, openError := os.OpenFile(filepath.Join(queueDirectory(directory), name), os.O_RDWR, 0)
+		if openError != nil {
 			continue
 		}
+		// Ignored: a ticket whose lock can't be tested is listed as a live waiter, the side on which no borrower
+		// passes over someone in line.
 		if taken, _ := tryLockFile(ticket); taken {
 			// A waiter that is gone; the next waiter's look at the line removes it.
 			unlockFile(ticket)
-			ticket.Close()
+			_ = ticket.Close() // Ignored: opened only to test its lock, and never written.
 			continue
 		}
-		ticket.Close()
+		_ = ticket.Close() // Ignored: opened only to test its lock, and never written.
 		arrived, pid, _ := strings.Cut(name, "-")
 		since := ""
-		if nanoseconds, err := strconv.ParseInt(arrived, 10, 64); err == nil {
+		if nanoseconds, parseError := strconv.ParseInt(arrived, 10, 64); parseError == nil {
 			since = " since " + time.Unix(0, nanoseconds).Format("15:04:05")
 		}
 		lines = append(lines, "pid "+pid+since)

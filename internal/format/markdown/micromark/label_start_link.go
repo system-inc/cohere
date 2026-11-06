@@ -5,7 +5,8 @@ package micromark
 var labelStartLink = &Construct{Name: "labelStartLink", Tokenize: tokenizeLabelStartLink}
 
 func tokenizeLabelStartLink(self *Self, effects *Effects, ok State, nok State) State {
-	var start, after State
+	var start State
+	var after State
 
 	start = func(code Code) State {
 		effects.Enter(TypeLabelLink, nil)

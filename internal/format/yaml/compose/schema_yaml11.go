@@ -16,8 +16,8 @@ var trueTag = &Tag{
 	Default: defaultTrue,
 	Tag:     "tag:yaml.org,2002:bool",
 	Test:    regexp.MustCompile(`^(?:Y|y|[Yy]es|YES|[Tt]rue|TRUE|[Oo]n|ON)$`),
-	resolveScalar: func([]uint16, func(string), *Options) (any, error) {
-		return newScalar(true), nil
+	resolveScalar: func([]uint16, func(string), *Options) (*Node, ScalarValue, error) {
+		return newScalar(ScalarBoolean(true)), nil, nil
 	},
 }
 
@@ -25,8 +25,8 @@ var falseTag = &Tag{
 	Default: defaultTrue,
 	Tag:     "tag:yaml.org,2002:bool",
 	Test:    regexp.MustCompile(`^(?:N|n|[Nn]o|NO|[Ff]alse|FALSE|[Oo]ff|OFF)$`),
-	resolveScalar: func([]uint16, func(string), *Options) (any, error) {
-		return newScalar(false), nil
+	resolveScalar: func([]uint16, func(string), *Options) (*Node, ScalarValue, error) {
+		return newScalar(ScalarBoolean(false)), nil, nil
 	},
 }
 
@@ -46,15 +46,16 @@ func removeUnderscores(text []uint16) []uint16 {
 // yaml11IntResolve is int.js's intResolve. intAsBigInt is never set on this path.
 func yaml11IntResolve(value []uint16, offset int, radix int) float64 {
 	sign := characterAt(value, 0)
+	digitsOffset := offset
 	if sign == '-' || sign == '+' {
-		offset++
+		digitsOffset++
 	}
-	digits := removeUnderscores(substring(value, offset, len(value)))
-	n := parseInt(digits, radix)
+	digits := removeUnderscores(substring(value, digitsOffset, len(value)))
+	number := parseInt(digits, radix)
 	if sign == '-' {
-		return -1 * n
+		return -1 * number
 	}
-	return n
+	return number
 }
 
 var yaml11IntBinTag = &Tag{
@@ -62,8 +63,8 @@ var yaml11IntBinTag = &Tag{
 	Tag:     "tag:yaml.org,2002:int",
 	Format:  "BIN",
 	Test:    regexp.MustCompile(`^[-+]?0b[0-1_]+$`),
-	resolveScalar: func(value []uint16, _ func(string), _ *Options) (any, error) {
-		return yaml11IntResolve(value, 2, 2), nil
+	resolveScalar: func(value []uint16, _ func(string), _ *Options) (*Node, ScalarValue, error) {
+		return nil, ScalarNumber(yaml11IntResolve(value, 2, 2)), nil
 	},
 }
 
@@ -72,8 +73,8 @@ var yaml11IntOctTag = &Tag{
 	Tag:     "tag:yaml.org,2002:int",
 	Format:  "OCT",
 	Test:    regexp.MustCompile(`^[-+]?0[0-7_]+$`),
-	resolveScalar: func(value []uint16, _ func(string), _ *Options) (any, error) {
-		return yaml11IntResolve(value, 1, 8), nil
+	resolveScalar: func(value []uint16, _ func(string), _ *Options) (*Node, ScalarValue, error) {
+		return nil, ScalarNumber(yaml11IntResolve(value, 1, 8)), nil
 	},
 }
 
@@ -81,8 +82,8 @@ var yaml11IntTag = &Tag{
 	Default: defaultTrue,
 	Tag:     "tag:yaml.org,2002:int",
 	Test:    regexp.MustCompile(`^[-+]?[0-9][0-9_]*$`),
-	resolveScalar: func(value []uint16, _ func(string), _ *Options) (any, error) {
-		return yaml11IntResolve(value, 0, 10), nil
+	resolveScalar: func(value []uint16, _ func(string), _ *Options) (*Node, ScalarValue, error) {
+		return nil, ScalarNumber(yaml11IntResolve(value, 0, 10)), nil
 	},
 }
 
@@ -91,8 +92,8 @@ var yaml11IntHexTag = &Tag{
 	Tag:     "tag:yaml.org,2002:int",
 	Format:  "HEX",
 	Test:    regexp.MustCompile(`^[-+]?0x[0-9a-fA-F_]+$`),
-	resolveScalar: func(value []uint16, _ func(string), _ *Options) (any, error) {
-		return yaml11IntResolve(value, 2, 16), nil
+	resolveScalar: func(value []uint16, _ func(string), _ *Options) (*Node, ScalarValue, error) {
+		return nil, ScalarNumber(yaml11IntResolve(value, 2, 16)), nil
 	},
 }
 
@@ -110,8 +111,8 @@ var yaml11FloatExpTag = &Tag{
 	Tag:     "tag:yaml.org,2002:float",
 	Format:  "EXP",
 	Test:    regexp.MustCompile(`^[-+]?(?:[0-9][0-9_]*)?(?:\.[0-9_]*)?[eE][-+]?[0-9]+$`),
-	resolveScalar: func(value []uint16, _ func(string), _ *Options) (any, error) {
-		return parseFloat(removeUnderscores(value)), nil
+	resolveScalar: func(value []uint16, _ func(string), _ *Options) (*Node, ScalarValue, error) {
+		return nil, ScalarNumber(parseFloat(removeUnderscores(value))), nil
 	},
 }
 
@@ -119,16 +120,16 @@ var yaml11FloatTag = &Tag{
 	Default: defaultTrue,
 	Tag:     "tag:yaml.org,2002:float",
 	Test:    regexp.MustCompile(`^[-+]?(?:[0-9][0-9_]*)?\.[0-9_]*$`),
-	resolveScalar: func(value []uint16, _ func(string), _ *Options) (any, error) {
-		node := newScalar(parseFloat(removeUnderscores(value)))
+	resolveScalar: func(value []uint16, _ func(string), _ *Options) (*Node, ScalarValue, error) {
+		node := newScalar(ScalarNumber(parseFloat(removeUnderscores(value))))
 		dot := indexOfUnit(value, '.')
 		if dot != -1 {
-			f := removeUnderscores(substring(value, dot+1, len(value)))
-			if characterAt(f, len(f)-1) == '0' {
-				node.MinFractionDigits = len(f)
+			fraction := removeUnderscores(substring(value, dot+1, len(value)))
+			if characterAt(fraction, len(fraction)-1) == '0' {
+				node.MinFractionDigits = len(fraction)
 			}
 		}
-		return node, nil
+		return node, nil, nil
 	},
 }
 
@@ -137,8 +138,8 @@ var yaml11FloatTag = &Tag{
 var binaryTag = &Tag{
 	Default: defaultFalse,
 	Tag:     "tag:yaml.org,2002:binary",
-	resolveScalar: func(value []uint16, _ func(string), _ *Options) (any, error) {
-		return nodeBase64Decode(value), nil
+	resolveScalar: func(value []uint16, _ func(string), _ *Options) (*Node, ScalarValue, error) {
+		return nil, nodeBase64Decode(value), nil
 	},
 }
 
@@ -175,91 +176,100 @@ func nodeBase64Decode(text []uint16) Binary {
 
 	// nbytes Base64DecodeFast.
 	available := min(destinationLength, decodedSize)
-	maxK := available / 3 * 3
-	maxI := len(text) / 4 * 4
-	i := 0
-	for i < maxI && len(destination) < maxK {
-		quad := [4]byte{unbase64(text[i]), unbase64(text[i+1]), unbase64(text[i+2]), unbase64(text[i+3])}
+	destinationLimit := available / 3 * 3
+	textLimit := len(text) / 4 * 4
+	index := 0
+	for index < textLimit && len(destination) < destinationLimit {
+		quad := [4]byte{
+			unbase64(text[index]),
+			unbase64(text[index+1]),
+			unbase64(text[index+2]),
+			unbase64(text[index+3]),
+		}
 		if binary.BigEndian.Uint32(quad[:])&0x80808080 != 0 {
 			var proceed bool
-			destination, i, proceed = base64DecodeGroupSlow(destination, destinationLength, text, i)
+			destination, index, proceed = base64DecodeGroupSlow(destination, destinationLength, text, index)
 			if !proceed {
 				return Binary(destination)
 			}
-			maxI = i + (len(text)-i)/4*4
+			textLimit = index + (len(text)-index)/4*4
 		} else {
 			destination = append(destination,
 				quad[0]<<2|quad[1]>>4, quad[1]<<4|quad[2]>>2, quad[2]<<6|quad[3])
-			i += 4
+			index += 4
 		}
 	}
-	if i < len(text) && len(destination) < destinationLength {
-		destination, _, _ = base64DecodeGroupSlow(destination, destinationLength, text, i)
+	if index < len(text) && len(destination) < destinationLength {
+		destination, _, _ = base64DecodeGroupSlow(destination, destinationLength, text, index)
 	}
 	return Binary(destination)
 }
 
 // base64DecodeGroupSlow is nbytes' Base64DecodeGroupSlow: one group of four alphabet characters,
 // skipping others, writing as many bytes as fit. It returns false to stop decoding.
-func base64DecodeGroupSlow(destination []byte, destinationLength int, text []uint16, i int) ([]byte, int, bool) {
-	var hi, lo byte
+func base64DecodeGroupSlow(destination []byte, destinationLength int, text []uint16, index int) ([]byte, int, bool) {
+	var hi byte
+	var lo byte
+	// readIndex walks the text forward from index, and decoded grows from destination.
+	readIndex := index
+	decoded := destination
 	// next is the V macro's loop: the next alphabet character, false at = or the end.
 	next := func() bool {
 		for {
-			c := byte(text[i])
-			lo = unbase64(text[i])
-			i++
+			character := byte(text[readIndex])
+			lo = unbase64(text[readIndex])
+			readIndex++
 			if lo < 64 {
 				return true
 			}
-			if c == '=' || i >= len(text) {
+			if character == '=' || readIndex >= len(text) {
 				return false
 			}
 		}
 	}
 	// after is the V macro's tail: false at the end of the input or of the buffer.
 	after := func() bool {
-		if i >= len(text) || len(destination) >= destinationLength {
+		if readIndex >= len(text) || len(decoded) >= destinationLength {
 			return false
 		}
 		hi = lo
 		return true
 	}
 	if !next() || !after() {
-		return destination, i, false
+		return decoded, readIndex, false
 	}
 	if !next() {
-		return destination, i, false
+		return decoded, readIndex, false
 	}
-	destination = append(destination, (hi&0x3F)<<2|(lo&0x30)>>4)
+	decoded = append(decoded, (hi&0x3F)<<2|(lo&0x30)>>4)
 	if !after() || !next() {
-		return destination, i, false
+		return decoded, readIndex, false
 	}
-	destination = append(destination, (hi&0x0F)<<4|(lo&0x3C)>>2)
+	decoded = append(decoded, (hi&0x0F)<<4|(lo&0x3C)>>2)
 	if !after() || !next() {
-		return destination, i, false
+		return decoded, readIndex, false
 	}
-	destination = append(destination, (hi&0x03)<<6|lo&0x3F)
+	decoded = append(decoded, (hi&0x03)<<6|lo&0x3F)
 	if !after() {
-		return destination, i, false
+		return decoded, readIndex, false
 	}
-	return destination, i, true
+	return decoded, readIndex, true
 }
 
 // unbase64 is nbytes' table lookup on a code unit's low byte: 0 to 63 for the standard and URL-safe
 // alphabets, 255 otherwise.
 func unbase64(unit uint16) byte {
-	c := byte(unit)
+	character := byte(unit)
 	switch {
-	case c >= 'A' && c <= 'Z':
-		return c - 'A'
-	case c >= 'a' && c <= 'z':
-		return c - 'a' + 26
-	case c >= '0' && c <= '9':
-		return c - '0' + 52
-	case c == '+' || c == '-':
+	case character >= 'A' && character <= 'Z':
+		return character - 'A'
+	case character >= 'a' && character <= 'z':
+		return character - 'a' + 26
+	case character >= '0' && character <= '9':
+		return character - '0' + 52
+	case character == '+' || character == '-':
 		return 62
-	case c == '/' || c == '_':
+	case character == '/' || character == '_':
 		return 63
 	}
 	return 255
@@ -271,18 +281,18 @@ var mergeTag = &Tag{
 	Default: defaultKey,
 	Tag:     "tag:yaml.org,2002:merge",
 	Test:    regexp.MustCompile(`^<<$`),
-	resolveScalar: func([]uint16, func(string), *Options) (any, error) {
+	resolveScalar: func([]uint16, func(string), *Options) (*Node, ScalarValue, error) {
 		// `Object.assign(new Scalar(Symbol(MERGE_KEY)), { addToJSMap })`
-		return newScalar(&MergeKey{}), nil
+		return newScalar(&MergeKey{}), nil, nil
 	},
 }
 
 // Ported from pairs.js: resolvePairs. createPairs serves createNode.
 
 func resolvePairs(seq *Node, onError func(message string)) *Node {
-	if IsSeq(seq) {
-		for i := 0; i < len(seq.Items); i++ {
-			item := seq.Items[i]
+	if IsSequence(seq) {
+		for index := 0; index < len(seq.Items); index++ {
+			item := seq.Items[index]
 			if IsPair(item) {
 				continue
 			} else if IsMap(item) {
@@ -318,9 +328,9 @@ func resolvePairs(seq *Node, onError func(message string)) *Node {
 				item = pair
 			}
 			if IsPair(item) {
-				seq.Items[i] = item
+				seq.Items[index] = item
 			} else {
-				seq.Items[i] = newPair(item, nil)
+				seq.Items[index] = newPair(item, nil)
 			}
 		}
 	} else {
@@ -347,7 +357,7 @@ var omapTag = &Tag{
 	resolveCollection: func(seq *Node, onError func(message string)) *Node {
 		pairs := resolvePairs(seq, onError)
 		// `seenKeys.includes(key.value)` is SameValueZero.
-		var seenKeys []any
+		var seenKeys []ScalarValue
 		for _, item := range pairs.Items {
 			key := item.Key
 			if IsScalar(key) {
@@ -412,8 +422,8 @@ var intTimeTag = &Tag{
 	Tag:     "tag:yaml.org,2002:int",
 	Format:  "TIME",
 	Test:    regexp.MustCompile(`^[-+]?[0-9][0-9_]*(?::[0-5]?[0-9])+$`),
-	resolveScalar: func(value []uint16, _ func(string), _ *Options) (any, error) {
-		return parseSexagesimal(value), nil
+	resolveScalar: func(value []uint16, _ func(string), _ *Options) (*Node, ScalarValue, error) {
+		return nil, ScalarNumber(parseSexagesimal(value)), nil
 	},
 }
 
@@ -422,20 +432,8 @@ var floatTimeTag = &Tag{
 	Tag:     "tag:yaml.org,2002:float",
 	Format:  "TIME",
 	Test:    regexp.MustCompile(`^[-+]?[0-9][0-9_]*(?::[0-5]?[0-9])+\.[0-9_]*$`),
-	resolveScalar: func(value []uint16, _ func(string), _ *Options) (any, error) {
-		return parseSexagesimal(value), nil
-	},
-}
-
-var timestampTag = &Tag{
-	Default: defaultTrue,
-	Tag:     "tag:yaml.org,2002:timestamp",
-	// If the time zone is omitted, the timestamp is assumed to be specified in UTC. The time part
-	// may be omitted altogether, resulting in a date format. In such a case, the time part is
-	// assumed to be 00:00:00Z (start of day, UTC).
-	Test: timestampRegexp,
-	resolveScalar: func(value []uint16, _ func(string), _ *Options) (any, error) {
-		return timestampResolve(value)
+	resolveScalar: func(value []uint16, _ func(string), _ *Options) (*Node, ScalarValue, error) {
+		return nil, ScalarNumber(parseSexagesimal(value)), nil
 	},
 }
 
@@ -446,7 +444,20 @@ var timestampRegexp = regexp.MustCompile(`^([0-9]{4})-([0-9]{1,2})-([0-9]{1,2})`
 	`(?:[ \t]*(Z|[-+][012]?[0-9](?::[0-9]{2})?))?` + // Z | +5 | -03:30
 	`)?$`)
 
-func timestampResolve(value []uint16) (any, error) {
+var timestampTag = &Tag{
+	Default: defaultTrue,
+	Tag:     "tag:yaml.org,2002:timestamp",
+	// If the time zone is omitted, the timestamp is assumed to be specified in UTC. The time part
+	// may be omitted altogether, resulting in a date format. In such a case, the time part is
+	// assumed to be 00:00:00Z (start of day, UTC).
+	Test: timestampRegexp,
+	resolveScalar: func(value []uint16, _ func(string), _ *Options) (*Node, ScalarValue, error) {
+		date, resolveError := timestampResolve(value)
+		return nil, date, resolveError
+	},
+}
+
+func timestampResolve(value []uint16) (ScalarValue, error) {
 	match := timestampRegexp.FindStringSubmatch(asciiView(value))
 	if match == nil {
 		return nil, errorString("!!timestamp expects a date, starting with yyyy-mm-dd")
@@ -467,46 +478,47 @@ func timestampResolve(value []uint16) (any, error) {
 	if match[7] != "" {
 		millisec = number(substr(asciiUnits(match[7]+"00"), 1, 3))
 	}
-	date := dateUTC(year, month-1, day, hour, minute, second, millisec)
+	date := dateUtc(year, month-1, day, hour, minute, second, millisec)
 	tz := match[8]
 	if tz != "" && tz != "Z" {
-		d := parseSexagesimal(asciiUnits(tz))
-		if math.Abs(d) < 30 {
-			d *= 60
+		offset := parseSexagesimal(asciiUnits(tz))
+		if math.Abs(offset) < 30 {
+			offset *= 60
 		}
-		date -= 60000 * d
+		date -= 60000 * offset
 	}
 	return Date(timeClip(date)), nil
 }
 
 // orZero is `n || 0` for a number.
-func orZero(n float64) float64 {
-	if math.IsNaN(n) || n == 0 {
+func orZero(number float64) float64 {
+	if math.IsNaN(number) || number == 0 {
 		return 0
 	}
-	return n
+	return number
 }
 
-// dateUTC is `Date.UTC(year, month, day, hour, minute, second, millisecond)`: a year from 0 to 99 means
+// dateUtc is `Date.UTC(year, month, day, hour, minute, second, millisecond)`: a year from 0 to 99 means
 // 1900 plus it, each field is truncated to an integer, and months and days overflow into the next.
-func dateUTC(year, month, day, hour, minute, second, millisecond float64) float64 {
+func dateUtc(year, month, day, hour, minute, second, millisecond float64) float64 {
 	for _, field := range []float64{year, month, day, hour, minute, second, millisecond} {
 		if math.IsNaN(field) || math.IsInf(field, 0) {
 			return nan()
 		}
 	}
 	yearInteger := math.Trunc(year)
+	fullYear := year
 	if yearInteger >= 0 && yearInteger <= 99 {
-		year = 1900 + yearInteger
+		fullYear = 1900 + yearInteger
 	}
 	// MakeDay.
-	y, m, dt := math.Trunc(year), math.Trunc(month), math.Trunc(day)
-	ym := y + math.Floor(m/12)
-	mn := math.Mod(m, 12)
-	if mn < 0 {
-		mn += 12
+	wholeYear, wholeMonth, wholeDay := math.Trunc(fullYear), math.Trunc(month), math.Trunc(day)
+	yearAfterMonths := wholeYear + math.Floor(wholeMonth/12)
+	monthInYear := math.Mod(wholeMonth, 12)
+	if monthInYear < 0 {
+		monthInYear += 12
 	}
-	days := daysFromCivil(int64(ym), int64(mn)+1, 1) + dt - 1
+	days := daysFromCivil(int64(yearAfterMonths), int64(monthInYear)+1, 1) + wholeDay - 1
 	// MakeTime.
 	time := math.Trunc(hour)*3600000 + math.Trunc(minute)*60000 + math.Trunc(second)*1000 + math.Trunc(millisecond)
 	return timeClip(days*86400000 + time)
@@ -514,15 +526,17 @@ func dateUTC(year, month, day, hour, minute, second, millisecond float64) float6
 
 // daysFromCivil is the number of days from 1970-01-01 to the proleptic Gregorian date.
 func daysFromCivil(year int64, month int64, day int64) float64 {
+	// civilYear counts years from March, as the algorithm does, so January and February fall in the year before.
+	civilYear := year
 	if month <= 2 {
-		year--
+		civilYear--
 	}
-	era := year
+	era := civilYear
 	if era < 0 {
 		era -= 399
 	}
 	era /= 400
-	yearOfEra := year - era*400
+	yearOfEra := civilYear - era*400
 	shifted := month + 9
 	if month > 2 {
 		shifted = month - 3

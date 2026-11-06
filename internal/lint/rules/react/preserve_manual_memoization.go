@@ -33,9 +33,13 @@ var messagePreserveManualMemoizationDependencyMutable = rule.Message{
 // not preserve.
 //
 //	valid:   function Component(props) { const x = useMemo(() => [props.a], [props.a]); return <div>{x}</div>; }
-//	valid:   function Component(props) { const cb = useCallback(() => props.a, [props.a]); return <div onClick={cb} />; }
-//	invalid: function Foo(props) { let x = []; x.push(props); const cb = useCallback(() => [x], [x]); x = makeArray(); return cb; }
-//	invalid: function Component(props) { const data = useMemo(() => { const x = []; x.push(props?.items); return x; }, [props?.items, props.cond]); return <Validate output={data} />; }
+//	valid:   function Component(props) { const cb = useCallback(() => props.a, [props.a]);
+//	         return <div onClick={cb} />; }
+//	invalid: function Foo(props) { let x = []; x.push(props); const cb = useCallback(() => [x], [x]);
+//	         x = makeArray(); return cb; }
+//	invalid: function Component(props) { const data = useMemo(() => {
+//	         const x = []; x.push(props?.items); return x; }, [props?.items, props.cond]);
+//	         return <Validate output={data} />; }
 //
 // # This is a compiler validation pass, not an abstract syntax tree walk
 //
@@ -82,16 +86,16 @@ var messagePreserveManualMemoizationDependencyMutable = rule.Message{
 // # One anchor per declaration rather than per use, which is a bounded substrate gap
 //
 // When several memo blocks in one function name the same value, upstream reports one finding per
-// block at the block's own column, and this rule reports the same NUMBER of findings collapsed onto
-// FEWER distinct columns. Measured against the installed rule on two `useCallback` blocks sharing
+// block at the block's own column, and this rule reports the same number of findings collapsed onto
+// fewer distinct columns. Measured against the installed rule on two `useCallback` blocks sharing
 // one mutated dependency: upstream gives four findings at 6:25, 6:37, 7:25 and 7:37, and this rule
-// gives the same four at THREE anchors. The two callbacks keep their own anchors because they are
+// gives the same four at three anchors. The two callbacks keep their own anchors because they are
 // distinct syntax; only the shared dependency collapses, because both blocks name one
 // declaration.
 //
 // The count is faithful and the anchor is not, and the cause is one field. Upstream's `loc` comes
-// from the operand's own `Place`, which is a per-USE record; a `PreserveManualMemoizationFinding`
-// carries an `IdentifierId`, which names the DECLARATION, so the per-use span is discarded before
+// from the operand's own `Place`, which is a per-use record; a `PreserveManualMemoizationFinding`
+// carries an `IdentifierId`, which names the declaration, so the per-use span is discarded before
 // the finding is built even though `Place.Range` carries it. Closing it means adding a range to the
 // finding at both report sites in
 // `internal/lint/ecmascript/high_level_intermediate_representation/preserve_manual_memoization.go`, which
@@ -131,7 +135,7 @@ var messagePreserveManualMemoizationDependencyMutable = rule.Message{
 // Lowering is keyed on `*ast.Symbol` identity throughout, and `Lower` takes the checker directly.
 // Beyond that, the pipeline consults it for reactivity inference and for scope pruning. The
 // declaration is for binding and resolution rather than for any single type question.
-var PreserveManualMemoization = rule.Rule{
+var PreserveManualMemoization = rule.Rule[CompilerRuleOptions]{
 	// The upstream spelling. This rule ships in `eslint-plugin-react-hooks`, which was measured
 	// rather than inferred: the plugin's rule table contains it and `eslint-plugin-react`'s does
 	// not, and configuring it as `react/preserve-manual-memoization` makes ESLint refuse to lint
@@ -145,13 +149,13 @@ var PreserveManualMemoization = rule.Rule{
 	// Reads other files only through shape readers (rule.ExportNameIn), so its findings key on imports' shapes.
 	TypeReach: rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[CompilerRuleOptions]) rule.Listeners {
 		// Declined once per file rather than once per node. `NeedsTypeChecker` governs the
-		// REGISTRATION path and says nothing about the harness path, where a context is built by
+		// registration path and says nothing about the harness path, where a context is built by
 		// hand with no checker at all, so the declaration is not the guard.
 		//
 		// What this guard is worth was measured rather than assumed, because a mutation
-		// neutralizing it SURVIVES the fixture set and that survival is honest. Handed a nil
+		// neutralizing it survives the fixture set and that survival is honest. Handed a nil
 		// checker the pipeline does not panic: `Lower` returns a function, `Construct` runs, and
 		// the analysis completes reporting zero. So the verdict is silence either way, and no
 		// fixture can separate the two. The guard is a cost decline, not a correctness one -- it
@@ -162,12 +166,12 @@ var PreserveManualMemoization = rule.Rule{
 		// rather than a contract: every pass below consults the checker, and one of them growing a
 		// dereference would turn this from wasted work into the panic that costs every rule on the
 		// file its verdict.
-		if ctx.TypeChecker == nil {
+		if ruleContext.TypeChecker == nil {
 			return nil
 		}
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
-				text := ctx.SourceFile.Text()
+				text := ruleContext.SourceFile.Text()
 				if !hir.SpellsManualMemoization(text) && strings.IndexByte(text, '\\') < 0 {
 					return
 				}
@@ -192,15 +196,15 @@ var PreserveManualMemoization = rule.Rule{
 					// rewrites the graph it is handed, so it cannot read the shared one, and a copy
 					// skips the control-flow build and single-assignment construction the other react
 					// rules have already paid for on this function (#rwsffzm).
-					function := hir.CloneFunction(hir.ForFunction(ctx, functionNode))
+					function := hir.CloneFunction(hir.ForFunction(ruleContext, functionNode))
 					if function == nil {
 						return
 					}
-					for _, finding := range hir.AnalyzePreservedManualMemoization(function, ctx.TypeChecker) {
+					for _, finding := range hir.AnalyzePreservedManualMemoization(function, ruleContext.TypeChecker) {
 						identifier := function.Identifier(finding.Identifier)
 						if identifier == nil || identifier.Node == nil {
 							// Crash protection rather than a filter, which is worth stating because
-							// a mutation removing this guard SURVIVES the whole fixture set and
+							// a mutation removing this guard survives the whole fixture set and
 							// reads as a blind spot.
 							//
 							// Measured over all 395 vendored corpus fixtures: 48 findings, zero
@@ -209,7 +213,7 @@ var PreserveManualMemoization = rule.Rule{
 							// prevents is a panic, which no `ExpectFindings` fixture can see:
 							// `rule.TokenRange` reads `node.Loc` inside its own nil branch
 							// (`internal/rule/rule.go:452`), so a nil node handed to `ReportNode`
-							// takes the walk down. The walk recovers per FILE rather than per rule,
+							// takes the walk down. The walk recovers per file rather than per rule,
 							// so that costs every rule its verdict on the file, not just this one.
 							//
 							// It is reachable in principle rather than merely defensive: the memo
@@ -218,7 +222,7 @@ var PreserveManualMemoization = rule.Rule{
 							// construction. The corpus never routes one into a finding today.
 							continue
 						}
-						ctx.ReportNode(identifier.Node, messageFor(finding.Kind))
+						ruleContext.ReportNode(identifier.Node, messageFor(finding.Kind))
 					}
 				})
 			},

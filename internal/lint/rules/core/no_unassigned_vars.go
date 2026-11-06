@@ -6,7 +6,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
-var messageNoUnassignedVars = rule.Message{
+var messageNoUnassignedVariables = rule.Message{
 	Id: "noUnassignedVars",
 	Description: "This declares a variable without a value and nothing ever assigns one, so every " +
 		"read of it is `undefined`. The code below it is written as though the value arrives from " +
@@ -17,7 +17,7 @@ var messageNoUnassignedVars = rule.Message{
 		"known, or delete the declaration.",
 }
 
-// NoUnassignedVars flags a `let` or `var` that is read but never assigned.
+// NoUnassignedVariables flags a `let` or `var` that is read but never assigned.
 //
 //	valid:   let x;
 //	valid:   let y = undefined; log(y);
@@ -63,8 +63,8 @@ var messageNoUnassignedVars = rule.Message{
 // anchors above are both `let` declarations, so a comparison on kind calls the inner declaration a
 // match for the outer one, concludes the outer is assigned, and reports the inner instead. That
 // produces exactly one finding, same as the correct behavior, so a fixture asserting the count
-// passes while the rule names the wrong variable. `TestNoUnassignedVarsNamesTheOuterBindingWhenOnlyTheInnerIsWritten`
-// asserts the offset for that reason.
+// passes while the rule names the wrong variable.
+// `TestNoUnassignedVariablesNamesTheOuterBindingWhenOnlyTheInnerIsWritten` asserts the offset for that reason.
 //
 // # Why the checker is not sufficient on its own
 //
@@ -91,7 +91,7 @@ var messageNoUnassignedVars = rule.Message{
 //
 // No fix. The repair is either an initializer whose value the rule cannot know, or a deletion that
 // is only correct if every read was also a mistake.
-var NoUnassignedVars = rule.Rule{
+var NoUnassignedVariables = rule.Rule[rule.NoOptions]{
 	Name: "no-unassigned-vars",
 
 	// See the doc above: the discrimination is which binding a write names, and the shape that
@@ -100,14 +100,14 @@ var NoUnassignedVars = rule.Rule{
 	// Reads only this file's declarations (rule.DeclarationsIn), so its findings key on imports' shapes.
 	TypeReach: rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindVariableDeclaration: func(node *ast.Node) {
 				// The engine hands every rule a nil checker when the program could not be built,
 				// and this rule can answer nothing without one. Reporting on a nil checker would be
 				// the worst available behavior here, since it would mean reporting every readable
 				// declaration in the file as never-assigned.
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 
@@ -165,7 +165,7 @@ var NoUnassignedVars = rule.Rule{
 					return
 				}
 
-				anchor := declarationAnchoredAt(ctx, name)
+				anchor := declarationAnchoredAt(ruleContext, name)
 				if anchor == nil {
 					return
 				}
@@ -194,7 +194,7 @@ var NoUnassignedVars = rule.Rule{
 					// resolve to this declaration. It is here because it is far cheaper than a
 					// checker call and this walk visits every identifier in the file.
 					if current.Kind == ast.KindIdentifier && current.Text() == name.Text() &&
-						current != name && resolvesToDeclaration(ctx, current, anchor) {
+						current != name && resolvesToDeclaration(ruleContext, current, anchor) {
 						if reference.WritesToBinding(current) {
 							// One write is enough to settle the question, and finding it stops the
 							// walk. Upstream returns on its first `is_write()` for the same reason.
@@ -215,7 +215,7 @@ var NoUnassignedVars = rule.Rule{
 					return
 				}
 
-				ctx.ReportNode(name, messageNoUnassignedVars)
+				ruleContext.ReportNode(name, messageNoUnassignedVariables)
 			},
 		}
 	},

@@ -20,9 +20,9 @@ func (lineCounter *LineCounter) AddNewLine(offset int) {
 	lineCounter.LineStarts = append(lineCounter.LineStarts, offset)
 }
 
-// LinePos performs a binary search and returns the 1-indexed { line, col } position of offset. If
+// LinePosition performs a binary search and returns the 1-indexed { line, col } position of offset. If
 // line == 0, AddNewLine has never been called or offset is before the first known newline.
-func (lineCounter *LineCounter) LinePos(offset int) (line int, col int) {
+func (lineCounter *LineCounter) LinePosition(offset int) (line int, col int) {
 	low := 0
 	high := len(lineCounter.LineStarts)
 	for low < high {

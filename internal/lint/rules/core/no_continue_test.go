@@ -3,6 +3,7 @@ package core
 import (
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	rule_testing "github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -20,7 +21,7 @@ type noContinueCase struct {
 	// source is upstream's `code`, byte for byte.
 	source string
 
-	// options is the RAW JSON of upstream's options object, routed through the rule's own
+	// options is the raw JSON of upstream's options object, routed through the rule's own
 	// exported decoder rather than built as a struct, so the decoder's defaults and its
 	// empty-input path are under test.
 	options string
@@ -73,35 +74,35 @@ var noContinueSilentCases = []noContinueCase{
 
 // decodedNoContinue routes a row's raw JSON through the rule's own exported decoder.
 // no-continue has no option surface (upstream's schema is []), so there is no decoder to route
-// through and the harness is handed nil, which is what the config layer passes for a bare "error".
-func decodedNoContinue(t *testing.T, raw string) any {
-	t.Helper()
+// through and the harness is handed no options, which is what the config layer passes for a bare "error".
+func decodedNoContinue(test *testing.T, raw string) rule.Given[rule.NoOptions] {
+	test.Helper()
 	if raw != "" {
-		t.Fatalf("no-continue takes no options, got %q", raw)
+		test.Fatalf("no-continue takes no options, got %q", raw)
 	}
-	return nil
+	return rule.Given[rule.NoOptions]{}
 }
 
-func TestNoContinueFires(t *testing.T) {
-	t.Parallel()
+func TestNoContinueFires(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range noContinueFiresCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoContinue, noContinueFile, testCase.source,
-				decodedNoContinue(t, testCase.options))
-			rule_testing.ExpectFindings(t, result, testCase.ids...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunGiven(test, NoContinue, noContinueFile, testCase.source,
+				decodedNoContinue(test, testCase.options))
+			rule_testing.ExpectFindings(test, result, testCase.ids...)
 		})
 	}
 }
 
-func TestNoContinueStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoContinueStaysSilent(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range noContinueSilentCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoContinue, noContinueFile, testCase.source,
-				decodedNoContinue(t, testCase.options))
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunGiven(test, NoContinue, noContinueFile, testCase.source,
+				decodedNoContinue(test, testCase.options))
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }

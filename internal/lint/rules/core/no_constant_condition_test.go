@@ -11,8 +11,8 @@ const constantConditionFile = "/repository/source/Condition.ts"
 
 const constantConditionDeclarations = "declare let a: any, b: any;\n"
 
-func TestNoConstantConditionFires(t *testing.T) {
-	t.Parallel()
+func TestNoConstantConditionFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -73,16 +73,16 @@ func TestNoConstantConditionFires(t *testing.T) {
 		{"a for on a constant condition", "export function run() { for(let i = 0; true; i++) {} }\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.Run(t, NoConstantCondition, constantConditionFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.Run(test, NoConstantCondition, constantConditionFile,
 				constantConditionDeclarations+testCase.sourceText), "unexpected")
 		})
 	}
 }
 
-func TestNoConstantConditionStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoConstantConditionStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -135,16 +135,19 @@ func TestNoConstantConditionStaysSilent(t *testing.T) {
 
 		// Boolean is the only call anyone can reason about, and only with a constant argument.
 		{"a Boolean call with a variable", "export function run() { if(Boolean(a)) {} }\n"},
-		{"a differently named call", "export function run() { declare function Bool(v: any): boolean; if(Bool(1)) {} }\n"},
+		{
+			"a differently named call",
+			"export function run() { declare function Bool(v: any): boolean; if(Bool(1)) {} }\n",
+		},
 
 		{"a sequence ending in a variable", "export function run() { if((1, a)) {} }\n"},
 		{"a negation of a variable", "export function run() { if(!a) {} }\n"},
 		{"no condition at all", "export const value = 1;\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoConstantCondition, constantConditionFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoConstantCondition, constantConditionFile,
 				constantConditionDeclarations+testCase.sourceText))
 		})
 	}
@@ -155,8 +158,8 @@ func TestNoConstantConditionStaysSilent(t *testing.T) {
 //
 // `while(true)` separates "all" from "allExceptWhileTrue", and `while(1)` separates both of them
 // from "none". The booleans are upstream's older spelling: true reads as "all" and false as "none".
-func TestNoConstantConditionCheckLoops(t *testing.T) {
-	t.Parallel()
+func TestNoConstantConditionCheckLoops(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		raw            string
@@ -171,11 +174,11 @@ func TestNoConstantConditionCheckLoops(t *testing.T) {
 		{`{"checkLoops": false}`, false, false},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.raw, func(t *testing.T) {
-			t.Parallel()
-			decoded, err := rule.DecodeOptionsInto[NoConstantConditionOptions]()([]byte(testCase.raw))
-			if err != nil {
-				t.Fatalf("decoding %s: %v", testCase.raw, err)
+		test.Run(testCase.raw, func(test *testing.T) {
+			test.Parallel()
+			decoded, decodeOptionsError := rule.DecodeOptionsInto[NoConstantConditionOptions]()([]byte(testCase.raw))
+			if decodeOptionsError != nil {
+				test.Fatalf("decoding %s: %v", testCase.raw, decodeOptionsError)
 			}
 			for _, loop := range []struct {
 				sourceText string
@@ -184,21 +187,34 @@ func TestNoConstantConditionCheckLoops(t *testing.T) {
 				{"while (true) {}", testCase.whileTrueFires},
 				{"while (1) {}", testCase.whileOneFires},
 			} {
-				result := rule_testing.RunWithOptions(t, NoConstantCondition, constantConditionFile, loop.sourceText, decoded)
+				result := rule_testing.RunWithOptions(
+					test,
+					NoConstantCondition,
+					constantConditionFile,
+					loop.sourceText,
+					decoded,
+				)
 				if loop.fires {
-					rule_testing.ExpectFindings(t, result, "unexpected")
+					rule_testing.ExpectFindings(test, result, "unexpected")
 				} else {
-					rule_testing.ExpectClean(t, result)
+					rule_testing.ExpectClean(test, result)
 				}
 			}
 		})
 	}
 
-	for _, raw := range []string{`{"checkLoops": "sometimes"}`, `{"checkLoops": "All"}`, `{"checkLoops": 1}`, `{"checkLoops": null}`} {
-		t.Run(raw+" is refused", func(t *testing.T) {
-			t.Parallel()
-			if _, err := rule.DecodeOptionsInto[NoConstantConditionOptions]()([]byte(raw)); err == nil {
-				t.Errorf("%s decoded; upstream's schema refuses it", raw)
+	for _, raw := range []string{
+		`{"checkLoops": "sometimes"}`,
+		`{"checkLoops": "All"}`,
+		`{"checkLoops": 1}`,
+		`{"checkLoops": null}`,
+	} {
+		test.Run(raw+" is refused", func(test *testing.T) {
+			test.Parallel()
+			if _, decodeOptionsError := rule.DecodeOptionsInto[NoConstantConditionOptions]()(
+				[]byte(raw),
+			); decodeOptionsError == nil {
+				test.Errorf("%s decoded; upstream's schema refuses it", raw)
 			}
 		})
 	}

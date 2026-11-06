@@ -31,7 +31,7 @@ const forbidPropTypesFile = "/repository/source/PropTypes.tsx"
 // divergence instead of leaving it unrecorded. What is imported is 48 passing and 49 reporting
 // cases asserting 56 findings.
 //
-// Thirty-seven of the reporting cases state only a COUNT rather than per-error data, so these
+// Thirty-seven of the reporting cases state only a count rather than per-error data, so these
 // assert the count. `ExpectFindings` takes one id per finding and every finding this rule can
 // produce carries the same id, so a repeated id is the faithful expectation.
 
@@ -49,25 +49,25 @@ func forbidPropTypesExpectedIds(count int) []string {
 // Routing through DecodeForbidPropTypesOptions rather than building the struct is what puts the
 // absent-versus-empty distinction on `forbid` under test, which is the one line here with no
 // upstream counterpart.
-func runForbidPropTypes(t *testing.T, sourceText string, options *ForbidPropTypesOptions) rule_testing.Result {
-	t.Helper()
+func runForbidPropTypes(test *testing.T, sourceText string, options *ForbidPropTypesOptions) rule_testing.Result {
+	test.Helper()
 	if options == nil {
-		return rule_testing.RunTyped(t, ForbidPropTypes, forbidPropTypesFile, sourceText)
+		return rule_testing.RunTyped(test, ForbidPropTypes, forbidPropTypesFile, sourceText)
 	}
-	encoded, err := json.Marshal(options)
-	if err != nil {
-		t.Fatalf("encoding options: %v", err)
+	encoded, encodeError := json.Marshal(options)
+	if encodeError != nil {
+		test.Fatalf("encoding options: %v", encodeError)
 	}
-	decoded, err := DecodeForbidPropTypesOptions(encoded)
-	if err != nil {
-		t.Fatalf("decoding options: %v", err)
+	decoded, decodeForbidPropertyTypesOptionsError := DecodeForbidPropTypesOptions(encoded)
+	if decodeForbidPropertyTypesOptionsError != nil {
+		test.Fatalf("decoding options: %v", decodeForbidPropertyTypesOptionsError)
 	}
-	return rule_testing.RunTypedWithOptions(t, ForbidPropTypes, forbidPropTypesFile, sourceText, decoded)
+	return rule_testing.RunTypedWithOptions(test, ForbidPropTypes, forbidPropTypesFile, sourceText, decoded)
 }
 
 // TestForbidPropTypesFires runs the forty-nine reporting cases from upstream.
-func TestForbidPropTypesFires(t *testing.T) {
-	t.Parallel()
+func TestForbidPropTypesFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -593,10 +593,10 @@ func TestForbidPropTypesFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runForbidPropTypes(t, testCase.sourceText, testCase.options)
-			rule_testing.ExpectFindings(t, result, forbidPropTypesExpectedIds(testCase.wantCount)...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runForbidPropTypes(test, testCase.sourceText, testCase.options)
+			rule_testing.ExpectFindings(test, result, forbidPropTypesExpectedIds(testCase.wantCount)...)
 		})
 	}
 }
@@ -606,8 +606,8 @@ func TestForbidPropTypesFires(t *testing.T) {
 // These are the false positives upstream already thought about. Several turn on the forbid list
 // being configurable rather than on the shape of the code, which is why the option travels with
 // each case rather than being applied to the table as a whole.
-func TestForbidPropTypesStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestForbidPropTypesStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -1077,10 +1077,10 @@ func TestForbidPropTypesStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runForbidPropTypes(t, testCase.sourceText, testCase.options)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runForbidPropTypes(test, testCase.sourceText, testCase.options)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -1092,8 +1092,8 @@ func TestForbidPropTypesStaysSilent(t *testing.T) {
 // costs exactly this shape rather than the rule, and the second half of this test is what makes
 // that visible: the direct form still reports under the plain harness while the indirect form goes
 // silent. A single-assertion test would have read as "the rule needs types" and hidden which part.
-func TestForbidPropTypesRequiresTheTypedHarnessForIndirection(t *testing.T) {
-	t.Parallel()
+func TestForbidPropTypesRequiresTheTypedHarnessForIndirection(test *testing.T) {
+	test.Parallel()
 
 	indirect := "const shared = { a: PropTypes.any };\n" +
 		"class C extends React.Component { render() { return null; } }\n" +
@@ -1101,19 +1101,19 @@ func TestForbidPropTypesRequiresTheTypedHarnessForIndirection(t *testing.T) {
 	direct := "class C extends React.Component { render() { return null; } }\n" +
 		"C.propTypes = { a: PropTypes.any };\n"
 
-	t.Run("the indirect form needs the checker", func(t *testing.T) {
-		t.Parallel()
-		typed := rule_testing.RunTyped(t, ForbidPropTypes, forbidPropTypesFile, indirect)
-		rule_testing.ExpectFindings(t, typed, "forbiddenPropType")
+	test.Run("the indirect form needs the checker", func(test *testing.T) {
+		test.Parallel()
+		typed := rule_testing.RunTyped(test, ForbidPropTypes, forbidPropTypesFile, indirect)
+		rule_testing.ExpectFindings(test, typed, "forbiddenPropType")
 
-		untyped := rule_testing.Run(t, ForbidPropTypes, forbidPropTypesFile, indirect)
-		rule_testing.ExpectClean(t, untyped)
+		untyped := rule_testing.Run(test, ForbidPropTypes, forbidPropTypesFile, indirect)
+		rule_testing.ExpectClean(test, untyped)
 	})
 
-	t.Run("the direct form does not", func(t *testing.T) {
-		t.Parallel()
-		untyped := rule_testing.Run(t, ForbidPropTypes, forbidPropTypesFile, direct)
-		rule_testing.ExpectFindings(t, untyped, "forbiddenPropType")
+	test.Run("the direct form does not", func(test *testing.T) {
+		test.Parallel()
+		untyped := rule_testing.Run(test, ForbidPropTypes, forbidPropTypesFile, direct)
+		rule_testing.ExpectFindings(test, untyped, "forbiddenPropType")
 	})
 }
 
@@ -1124,13 +1124,13 @@ func TestForbidPropTypesRequiresTheTypedHarnessForIndirection(t *testing.T) {
 // `["**/*.ts", "**/*.tsx"]` (internal/rule_testing/program.go:30), so a .jsx or .js fixture is not
 // in the program and the run fails before any rule is offered a file. That is a fact about the
 // typed harness rather than about this rule.
-func TestForbidPropTypesHasNoFileSuffixGate(t *testing.T) {
-	t.Parallel()
+func TestForbidPropTypesHasNoFileSuffixGate(test *testing.T) {
+	test.Parallel()
 
 	source := "class C extends React.Component { render() { return null; } }\n" +
 		"C.propTypes = { a: PropTypes.any };\n"
-	result := rule_testing.RunTyped(t, ForbidPropTypes, "/repository/source/Suffix.tsx", source)
-	rule_testing.ExpectFindings(t, result, "forbiddenPropType")
+	result := rule_testing.RunTyped(test, ForbidPropTypes, "/repository/source/Suffix.tsx", source)
+	rule_testing.ExpectFindings(test, result, "forbiddenPropType")
 }
 
 // TestForbidPropTypesDeclarationShapes pins the six places a prop types object can live.
@@ -1140,8 +1140,8 @@ func TestForbidPropTypesHasNoFileSuffixGate(t *testing.T) {
 // plain class and a bare object literal both report. A port that added a component gate would go
 // silent on inputs upstream reports while every imported fixture stayed green, because the corpus
 // writes real components throughout.
-func TestForbidPropTypesDeclarationShapes(t *testing.T) {
-	t.Parallel()
+func TestForbidPropTypesDeclarationShapes(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -1186,10 +1186,10 @@ func TestForbidPropTypesDeclarationShapes(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runForbidPropTypes(t, testCase.sourceText, nil)
-			rule_testing.ExpectFindings(t, result, forbidPropTypesExpectedIds(testCase.wantCount)...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runForbidPropTypes(test, testCase.sourceText, nil)
+			rule_testing.ExpectFindings(test, result, forbidPropTypesExpectedIds(testCase.wantCount)...)
 		})
 	}
 }
@@ -1200,8 +1200,8 @@ func TestForbidPropTypesDeclarationShapes(t *testing.T) {
 // is an array literal, which contributes no name, so a port that read a name off any argument would
 // report on it. And `PropTypes.string` is clean only because it is off the default list, which the
 // forbid-list table below separates from the shape question.
-func TestForbidPropTypesValueShapes(t *testing.T) {
-	t.Parallel()
+func TestForbidPropTypesValueShapes(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name      string
@@ -1216,7 +1216,7 @@ func TestForbidPropTypesValueShapes(t *testing.T) {
 
 		// The silent rows.
 		//
-		// A BARE nested object contributes nothing, because `checkProperties` does not recurse: a
+		// A bare nested object contributes nothing, because `checkProperties` does not recurse: a
 		// nested `shape({...})` is reached by the shape arm instead, which visits every such call
 		// in the file independently. The pair of rows below is what separates those two routes, and
 		// a mutant adding recursion survived every imported case because the corpus writes no bare
@@ -1230,12 +1230,12 @@ func TestForbidPropTypesValueShapes(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			source := "class C extends React.Component { render() { return null; } }\n" +
 				"C.propTypes = { a: " + testCase.value + " };\n"
-			result := runForbidPropTypes(t, source, nil)
-			rule_testing.ExpectFindings(t, result, forbidPropTypesExpectedIds(testCase.wantCount)...)
+			result := runForbidPropTypes(test, source, nil)
+			rule_testing.ExpectFindings(test, result, forbidPropTypesExpectedIds(testCase.wantCount)...)
 		})
 	}
 }
@@ -1246,8 +1246,8 @@ func TestForbidPropTypesValueShapes(t *testing.T) {
 // three defaults and an explicit `[]` forbids nothing, and a decoder collapsing both to a nil slice
 // would silently turn the second into the first. Measured on the installed build: `{forbid: []}`
 // over `PropTypes.any` is clean.
-func TestForbidPropTypesForbidList(t *testing.T) {
-	t.Parallel()
+func TestForbidPropTypesForbidList(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name      string
@@ -1261,8 +1261,18 @@ func TestForbidPropTypesForbidList(t *testing.T) {
 		{"string is allowed by default", "PropTypes.string", nil, 0},
 
 		// A custom list replaces the defaults rather than adding to them.
-		{"a custom list refuses what it names", "PropTypes.string", &ForbidPropTypesOptions{Forbid: &[]string{"string"}}, 1},
-		{"a custom list allows what it omits", "PropTypes.any", &ForbidPropTypesOptions{Forbid: &[]string{"string"}}, 0},
+		{
+			"a custom list refuses what it names",
+			"PropTypes.string",
+			&ForbidPropTypesOptions{Forbid: &[]string{"string"}},
+			1,
+		},
+		{
+			"a custom list allows what it omits",
+			"PropTypes.any",
+			&ForbidPropTypesOptions{Forbid: &[]string{"string"}},
+			0,
+		},
 
 		// The distinction the pointer exists for.
 		{"an explicitly empty list forbids nothing", "PropTypes.any", &ForbidPropTypesOptions{Forbid: &[]string{}}, 0},
@@ -1270,19 +1280,19 @@ func TestForbidPropTypesForbidList(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			source := "class C extends React.Component { render() { return null; } }\n" +
 				"C.propTypes = { a: " + testCase.value + " };\n"
-			result := runForbidPropTypes(t, source, testCase.options)
-			rule_testing.ExpectFindings(t, result, forbidPropTypesExpectedIds(testCase.wantCount)...)
+			result := runForbidPropTypes(test, source, testCase.options)
+			rule_testing.ExpectFindings(test, result, forbidPropTypesExpectedIds(testCase.wantCount)...)
 		})
 	}
 }
 
 // TestForbidPropTypesContextOptions pins the two declaration names that are off by default.
-func TestForbidPropTypesContextOptions(t *testing.T) {
-	t.Parallel()
+func TestForbidPropTypesContextOptions(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name        string
@@ -1294,20 +1304,35 @@ func TestForbidPropTypesContextOptions(t *testing.T) {
 		{"contextTypes is off by default", "contextTypes", nil, 0},
 		{"childContextTypes is off by default", "childContextTypes", nil, 0},
 		{"contextTypes when asked for", "contextTypes", &ForbidPropTypesOptions{CheckContextTypes: true}, 1},
-		{"childContextTypes when asked for", "childContextTypes", &ForbidPropTypesOptions{CheckChildContextTypes: true}, 1},
+		{
+			"childContextTypes when asked for",
+			"childContextTypes",
+			&ForbidPropTypesOptions{CheckChildContextTypes: true},
+			1,
+		},
 
 		// Each option governs only its own name.
-		{"childContextTypes stays off under the other option", "childContextTypes", &ForbidPropTypesOptions{CheckContextTypes: true}, 0},
-		{"contextTypes stays off under the other option", "contextTypes", &ForbidPropTypesOptions{CheckChildContextTypes: true}, 0},
+		{
+			"childContextTypes stays off under the other option",
+			"childContextTypes",
+			&ForbidPropTypesOptions{CheckContextTypes: true},
+			0,
+		},
+		{
+			"contextTypes stays off under the other option",
+			"contextTypes",
+			&ForbidPropTypesOptions{CheckChildContextTypes: true},
+			0,
+		},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			source := "class C extends React.Component { static " + testCase.declaration +
 				" = { a: PropTypes.any }; render() { return null; } }\n"
-			result := runForbidPropTypes(t, source, testCase.options)
-			rule_testing.ExpectFindings(t, result, forbidPropTypesExpectedIds(testCase.wantCount)...)
+			result := runForbidPropTypes(test, source, testCase.options)
+			rule_testing.ExpectFindings(test, result, forbidPropTypesExpectedIds(testCase.wantCount)...)
 		})
 	}
 }
@@ -1319,11 +1344,11 @@ func TestForbidPropTypesContextOptions(t *testing.T) {
 // clearest thing the imported corpus did for this port: nothing about the rule's description
 // suggests a validation library is the false positive to worry about.
 //
-// The discriminator is the RECEIVER, not the import. `isPropTypesPackage` accepts an identifier or
+// The discriminator is the receiver, not the import. `isPropTypesPackage` accepts an identifier or
 // a member expression and nothing else, so a call receiver such as `Yup.object()` falls through to
 // false whatever is imported. Measured with and without the yup import: both clean.
-func TestForbidPropTypesShapeReceiver(t *testing.T) {
-	t.Parallel()
+func TestForbidPropTypesShapeReceiver(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -1355,10 +1380,10 @@ func TestForbidPropTypesShapeReceiver(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runForbidPropTypes(t, testCase.sourceText, nil)
-			rule_testing.ExpectFindings(t, result, forbidPropTypesExpectedIds(testCase.wantCount)...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runForbidPropTypes(test, testCase.sourceText, nil)
+			rule_testing.ExpectFindings(test, result, forbidPropTypesExpectedIds(testCase.wantCount)...)
 		})
 	}
 }
@@ -1372,8 +1397,8 @@ func TestForbidPropTypesShapeReceiver(t *testing.T) {
 // The state is per file and an import may sit after the usage it governs, so the imports are
 // collected in a pass before anything is judged. The last case is what makes that pre-pass
 // observable: the same code with the import moved below still reports.
-func TestForbidPropTypesForeignPackageGuard(t *testing.T) {
-	t.Parallel()
+func TestForbidPropTypesForeignPackageGuard(test *testing.T) {
+	test.Parallel()
 
 	body := "class C extends React.Component { static propTypes = { a: PropTypes.any }; render() { return null; } }\n"
 	cases := []struct {
@@ -1392,7 +1417,7 @@ func TestForbidPropTypesForeignPackageGuard(t *testing.T) {
 			1,
 		},
 
-		// The rows that need BOTH imports, which is what makes the recorded local name observable.
+		// The rows that need both imports, which is what makes the recorded local name observable.
 		// Without a foreign import the package predicate passes everything, so the recorded name is
 		// never consulted and a mutant dropping the `import { PropTypes } from 'react'` branch
 		// survives. These two are the same file shape with different sources for the alias, and
@@ -1414,28 +1439,29 @@ func TestForbidPropTypesForeignPackageGuard(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runForbidPropTypes(t, testCase.sourceText, nil)
-			rule_testing.ExpectFindings(t, result, forbidPropTypesExpectedIds(testCase.wantCount)...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runForbidPropTypes(test, testCase.sourceText, nil)
+			rule_testing.ExpectFindings(test, result, forbidPropTypesExpectedIds(testCase.wantCount)...)
 		})
 	}
 }
 
 // TestForbidPropTypesCollectsImportsBeforeJudging pins the ordering the pre-pass exists for.
 //
-// A foreign `PropTypes` import written BELOW the declaration it governs still silences it. Upstream
+// A foreign `PropTypes` import written below the declaration it governs still silences it. Upstream
 // gets this from ESLint visiting the whole program before the rule's other listeners can matter for
 // a top-level import; our walk is a single pre-order pass, so the imports are collected explicitly
 // first. Without that pass this case reports and the one above it does not, which is a difference no
 // imported fixture can see because the corpus writes every import at the top.
-func TestForbidPropTypesCollectsImportsBeforeJudging(t *testing.T) {
-	t.Parallel()
+func TestForbidPropTypesCollectsImportsBeforeJudging(test *testing.T) {
+	test.Parallel()
 
-	source := "class C extends React.Component { static propTypes = { a: PropTypes.any }; render() { return null; } }\n" +
+	source := "class C extends React.Component { static propTypes = { a: PropTypes.any }; " +
+		"render() { return null; } }\n" +
 		"import { PropTypes } from 'other-lib';\n"
-	result := runForbidPropTypes(t, source, nil)
-	rule_testing.ExpectClean(t, result)
+	result := runForbidPropTypes(test, source, nil)
+	rule_testing.ExpectClean(test, result)
 }
 
 // TestForbidPropTypesDoesNotUnwrapPropWrappers records a deliberate divergence rather than hiding it.
@@ -1450,32 +1476,32 @@ func TestForbidPropTypesCollectsImportsBeforeJudging(t *testing.T) {
 // assert 26 of the 82 findings. Every one is this shape. The divergence costs findings rather than
 // inventing them, and this case pins the resulting silence so a later settings surface turns it
 // into a failing test rather than leaving it unnoticed.
-func TestForbidPropTypesDoesNotUnwrapPropWrappers(t *testing.T) {
-	t.Parallel()
+func TestForbidPropTypesDoesNotUnwrapPropWrappers(test *testing.T) {
+	test.Parallel()
 
 	source := "class C extends React.Component { render() { return null; } }\n" +
 		"C.propTypes = forbidExtraProps({ a: PropTypes.any });\n"
-	result := runForbidPropTypes(t, source, nil)
-	rule_testing.ExpectClean(t, result)
+	result := runForbidPropTypes(test, source, nil)
+	rule_testing.ExpectClean(test, result)
 
 	// The control: the same object without the wrapper reports, so the silence above is the wrapper
 	// and not something else about the source.
 	unwrapped := "class C extends React.Component { render() { return null; } }\n" +
 		"C.propTypes = { a: PropTypes.any };\n"
-	rule_testing.ExpectFindings(t, runForbidPropTypes(t, unwrapped, nil), "forbiddenPropType")
+	rule_testing.ExpectFindings(test, runForbidPropTypes(test, unwrapped, nil), "forbiddenPropType")
 }
 
 // TestForbidPropTypesSpans asserts where each finding points.
 //
-// The finding is anchored on the PROPERTY rather than on the value, so `a: PropTypes.any`
+// The finding is anchored on the property rather than on the value, so `a: PropTypes.any`
 // underlines the whole property including its key. For a nested shape it underlines the inner
 // property, which is the row a message-id fixture cannot see: both findings would otherwise look
 // identical.
 //
 // `RunTyped` writes `strings.TrimSpace(source) + "\n"`, so the expectation is sliced from the same
 // transform rather than from the Go literal.
-func TestForbidPropTypesSpans(t *testing.T) {
-	t.Parallel()
+func TestForbidPropTypesSpans(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -1505,17 +1531,17 @@ func TestForbidPropTypesSpans(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runForbidPropTypes(t, testCase.sourceText, nil)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runForbidPropTypes(test, testCase.sourceText, nil)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted exactly one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted exactly one finding, got %d", len(result.Diagnostics))
 			}
 			written := strings.TrimSpace(testCase.sourceText) + "\n"
 			diagnostic := result.Diagnostics[0]
 			got := written[diagnostic.Range.Pos():diagnostic.Range.End()]
 			if got != testCase.wantText {
-				t.Errorf("span text = %q, wanted %q", got, testCase.wantText)
+				test.Errorf("span text = %q, wanted %q", got, testCase.wantText)
 			}
 		})
 	}
@@ -1526,8 +1552,8 @@ func TestForbidPropTypesSpans(t *testing.T) {
 // The message interpolates the offending type name, so the id assertion cannot see anything the
 // format string does. Asserted by equality against a literal typed here rather than against the
 // rule's own constant, which would move on both sides under mutation and could not fail.
-func TestForbidPropTypesMessageText(t *testing.T) {
-	t.Parallel()
+func TestForbidPropTypesMessageText(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -1539,17 +1565,17 @@ func TestForbidPropTypesMessageText(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			source := "X.propTypes = { a: " + testCase.value + " };\n"
-			result := runForbidPropTypes(t, source, nil)
-			rule_testing.ExpectFindings(t, result, "forbiddenPropType")
+			result := runForbidPropTypes(test, source, nil)
+			rule_testing.ExpectFindings(test, result, "forbiddenPropType")
 			want := "Prop type \"" + testCase.wanted + "\" is forbidden here. A prop typed this " +
 				"loosely documents nothing and checks nothing: every reader still has to find a " +
 				"call site to learn what shape is really expected, and a wrong shape reaches the " +
 				"component unreported. Declare the shape it actually takes instead."
 			if got := result.Diagnostics[0].Message.Description; got != want {
-				t.Errorf("message =\n%q\nwanted\n%q", got, want)
+				test.Errorf("message =\n%q\nwanted\n%q", got, want)
 			}
 		})
 	}
@@ -1557,71 +1583,70 @@ func TestForbidPropTypesMessageText(t *testing.T) {
 
 // TestDecodeForbidPropTypesOptions pins the decoder, whose absent-versus-empty handling on `forbid`
 // has no upstream counterpart.
-func TestDecodeForbidPropTypesOptions(t *testing.T) {
-	t.Parallel()
+func TestDecodeForbidPropTypesOptions(test *testing.T) {
+	test.Parallel()
 
-	t.Run("no options means the default list", func(t *testing.T) {
-		t.Parallel()
-		decoded, err := DecodeForbidPropTypesOptions(nil)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
+	test.Run("no options means the default list", func(test *testing.T) {
+		test.Parallel()
+		decoded, decodeForbidPropertyTypesOptionsError := DecodeForbidPropTypesOptions(nil)
+		if decodeForbidPropertyTypesOptionsError != nil {
+			test.Fatalf("unexpected error: %v", decodeForbidPropertyTypesOptionsError)
 		}
-		options := decoded.(ForbidPropTypesOptions)
-		if options.Forbid != nil {
-			t.Errorf("Forbid = %v, wanted nil so the defaults apply", options.Forbid)
+		if decoded.Forbid != nil {
+			test.Errorf("Forbid = %v, wanted nil so the defaults apply", decoded.Forbid)
 		}
-		if got := options.forbiddenTypes(); len(got) != 3 {
-			t.Errorf("effective list = %v, wanted the three defaults", got)
+		if got := decoded.forbiddenTypes(); len(got) != 3 {
+			test.Errorf("effective list = %v, wanted the three defaults", got)
 		}
 	})
 
-	t.Run("an empty object means the default list", func(t *testing.T) {
-		t.Parallel()
-		decoded, err := DecodeForbidPropTypesOptions([]byte(`{}`))
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
+	test.Run("an empty object means the default list", func(test *testing.T) {
+		test.Parallel()
+		decoded, decodeForbidPropertyTypesOptionsError := DecodeForbidPropTypesOptions([]byte(`{}`))
+		if decodeForbidPropertyTypesOptionsError != nil {
+			test.Fatalf("unexpected error: %v", decodeForbidPropertyTypesOptionsError)
 		}
-		if got := decoded.(ForbidPropTypesOptions).forbiddenTypes(); len(got) != 3 {
-			t.Errorf("effective list = %v, wanted the three defaults", got)
-		}
-	})
-
-	t.Run("an explicitly empty list forbids nothing", func(t *testing.T) {
-		t.Parallel()
-		decoded, err := DecodeForbidPropTypesOptions([]byte(`{"forbid":[]}`))
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		options := decoded.(ForbidPropTypesOptions)
-		if options.Forbid == nil {
-			t.Fatal("Forbid is nil, so an explicit empty list was indistinguishable from absent")
-		}
-		if got := options.forbiddenTypes(); len(got) != 0 {
-			t.Errorf("effective list = %v, wanted empty", got)
+		if got := decoded.forbiddenTypes(); len(got) != 3 {
+			test.Errorf("effective list = %v, wanted the three defaults", got)
 		}
 	})
 
-	t.Run("a custom list replaces the defaults", func(t *testing.T) {
-		t.Parallel()
-		decoded, err := DecodeForbidPropTypesOptions([]byte(`{"forbid":["string"]}`))
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
+	test.Run("an explicitly empty list forbids nothing", func(test *testing.T) {
+		test.Parallel()
+		decoded, decodeForbidPropertyTypesOptionsError := DecodeForbidPropTypesOptions([]byte(`{"forbid":[]}`))
+		if decodeForbidPropertyTypesOptionsError != nil {
+			test.Fatalf("unexpected error: %v", decodeForbidPropertyTypesOptionsError)
 		}
-		got := decoded.(ForbidPropTypesOptions).forbiddenTypes()
+		if decoded.Forbid == nil {
+			test.Fatal("Forbid is nil, so an explicit empty list was indistinguishable from absent")
+		}
+		if got := decoded.forbiddenTypes(); len(got) != 0 {
+			test.Errorf("effective list = %v, wanted empty", got)
+		}
+	})
+
+	test.Run("a custom list replaces the defaults", func(test *testing.T) {
+		test.Parallel()
+		decoded, decodeForbidPropertyTypesOptionsError := DecodeForbidPropTypesOptions([]byte(`{"forbid":["string"]}`))
+		if decodeForbidPropertyTypesOptionsError != nil {
+			test.Fatalf("unexpected error: %v", decodeForbidPropertyTypesOptionsError)
+		}
+		got := decoded.forbiddenTypes()
 		if len(got) != 1 || got[0] != "string" {
-			t.Errorf("effective list = %v, wanted exactly [string]", got)
+			test.Errorf("effective list = %v, wanted exactly [string]", got)
 		}
 	})
 
-	t.Run("the two context flags decode", func(t *testing.T) {
-		t.Parallel()
-		decoded, err := DecodeForbidPropTypesOptions([]byte(`{"checkContextTypes":true,"checkChildContextTypes":true}`))
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
+	test.Run("the two context flags decode", func(test *testing.T) {
+		test.Parallel()
+		decoded, decodeForbidPropertyTypesOptionsError := DecodeForbidPropTypesOptions(
+			[]byte(`{"checkContextTypes":true,"checkChildContextTypes":true}`),
+		)
+		if decodeForbidPropertyTypesOptionsError != nil {
+			test.Fatalf("unexpected error: %v", decodeForbidPropertyTypesOptionsError)
 		}
-		options := decoded.(ForbidPropTypesOptions)
-		if !options.CheckContextTypes || !options.CheckChildContextTypes {
-			t.Errorf("flags = %v/%v, wanted both true", options.CheckContextTypes, options.CheckChildContextTypes)
+		if !decoded.CheckContextTypes || !decoded.CheckChildContextTypes {
+			test.Errorf("flags = %v/%v, wanted both true", decoded.CheckContextTypes, decoded.CheckChildContextTypes)
 		}
 	})
 }
@@ -1635,47 +1660,47 @@ func TestDecodeForbidPropTypesOptions(t *testing.T) {
 // all 97 imported cases, because the corpus writes only plain assignment.
 //
 // All four rows measured against the installed build.
-func TestForbidPropTypesAssignmentOperators(t *testing.T) {
-	t.Parallel()
+func TestForbidPropTypesAssignmentOperators(test *testing.T) {
+	test.Parallel()
 
 	for _, operator := range []string{"=", "||=", "??=", "+="} {
-		t.Run(operator, func(t *testing.T) {
-			t.Parallel()
+		test.Run(operator, func(test *testing.T) {
+			test.Parallel()
 			source := "class C extends React.Component { render() { return null; } }\n" +
 				"C.propTypes " + operator + " { a: PropTypes.any };\n"
-			result := runForbidPropTypes(t, source, nil)
-			rule_testing.ExpectFindings(t, result, "forbiddenPropType")
+			result := runForbidPropTypes(test, source, nil)
+			rule_testing.ExpectFindings(test, result, "forbiddenPropType")
 		})
 	}
 
-	t.Run("a comparison is not an assignment", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a comparison is not an assignment", func(test *testing.T) {
+		test.Parallel()
 		// The control that keeps the operator test from being vacuous: without it, any binary
 		// expression whose left side is a `.propTypes` access would be read as a declaration.
 		source := "class C extends React.Component { render() { return null; } }\n" +
 			"if (C.propTypes === { a: PropTypes.any }) {}\n"
-		result := runForbidPropTypes(t, source, nil)
-		rule_testing.ExpectClean(t, result)
+		result := runForbidPropTypes(test, source, nil)
+		rule_testing.ExpectClean(test, result)
 	})
 }
 
 // TestForbidPropTypesGetterTakesTheLastReturn pins which return a multi-return getter uses.
 //
-// Upstream's `findReturnStatement` walks the body's statement list backwards and takes the LAST
+// Upstream's `findReturnStatement` walks the body's statement list backwards and takes the last
 // top-level return. Nothing in the corpus writes a getter with two returns, so a mutant reversing
 // the search direction survived every imported case.
 //
 // The two rows have opposite verdicts from statement order alone, which is the cheapest possible
 // distinguishing pair. Both measured on the installed build.
-func TestForbidPropTypesGetterTakesTheLastReturn(t *testing.T) {
-	t.Parallel()
+func TestForbidPropTypesGetterTakesTheLastReturn(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name      string
 		body      string
 		wantCount int
 	}{
-		// Both returns are TOP LEVEL statements, and that is load-bearing rather than incidental.
+		// Both returns are top level statements, and that is load-bearing rather than incidental.
 		// A first draft wrote the earlier return as `if (x) return ...`, which puts it inside an
 		// if statement rather than in the body's own statement list, so only one return was at the
 		// top level and the search direction could not matter. The mutant survived that fixture,
@@ -1693,7 +1718,7 @@ func TestForbidPropTypesGetterTakesTheLastReturn(t *testing.T) {
 			0,
 		},
 		{
-			// And a return nested inside an if is NOT top level, so it is not scanned at all.
+			// And a return nested inside an if is not top level, so it is not scanned at all.
 			"a forbidden return nested inside an if, with an allowed one after",
 			"if (x) return { a: PropTypes.any };\n    return { a: PropTypes.string };",
 			0,
@@ -1707,14 +1732,14 @@ func TestForbidPropTypesGetterTakesTheLastReturn(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			source := "declare const x: boolean;\n" +
 				"class C extends React.Component {\n" +
 				"  static get propTypes() {\n    " + testCase.body + "\n  }\n" +
 				"  render() { return null; }\n}\n"
-			result := runForbidPropTypes(t, source, nil)
-			rule_testing.ExpectFindings(t, result, forbidPropTypesExpectedIds(testCase.wantCount)...)
+			result := runForbidPropTypes(test, source, nil)
+			rule_testing.ExpectFindings(test, result, forbidPropTypesExpectedIds(testCase.wantCount)...)
 		})
 	}
 }
@@ -1725,7 +1750,7 @@ func TestForbidPropTypesGetterTakesTheLastReturn(t *testing.T) {
 // The predicate is not symmetric. Its member arm compares a receiver against `reactPackageName`
 // only, so an aliased `prop-types` import never qualifies there; its identifier arm compares a bare
 // value against `propTypesPackageName`. So the only shape on which the recorded name matters is a
-// BARE prop type value whose name happens to equal that recorded local name, with a foreign
+// bare prop type value whose name happens to equal that recorded local name, with a foreign
 // `PropTypes` import present to close the general escape hatch.
 //
 // That took three attempts to locate. Two mutants survived here, one dropping the branch that
@@ -1735,8 +1760,8 @@ func TestForbidPropTypesGetterTakesTheLastReturn(t *testing.T) {
 //
 // Contrived, and that is the point: everything less contrived cannot distinguish the versions, so a
 // fixture over it would assert nothing. Every row measured against the installed build.
-func TestForbidPropTypesRecordedPackageNameReachesTheIdentifierArm(t *testing.T) {
-	t.Parallel()
+func TestForbidPropTypesRecordedPackageNameReachesTheIdentifierArm(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name      string
@@ -1783,13 +1808,13 @@ func TestForbidPropTypesRecordedPackageNameReachesTheIdentifierArm(t *testing.T)
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			source := testCase.imports +
 				"class C extends React.Component { static propTypes = { a: " + testCase.value +
 				" }; render() { return null; } }\n"
-			result := runForbidPropTypes(t, source, nil)
-			rule_testing.ExpectFindings(t, result, forbidPropTypesExpectedIds(testCase.wantCount)...)
+			result := runForbidPropTypes(test, source, nil)
+			rule_testing.ExpectFindings(test, result, forbidPropTypesExpectedIds(testCase.wantCount)...)
 		})
 	}
 }
@@ -1799,15 +1824,15 @@ func TestForbidPropTypesRecordedPackageNameReachesTheIdentifierArm(t *testing.T)
 //
 // The object-literal arm, which handles `createReactClass({ propTypes: ... })`, tests for an object
 // expression and nothing else. The member-assignment arm routes through the full resolution, which
-// also follows an identifier to what it was declared with. So the SAME identifier reports through
+// also follows an identifier to what it was declared with. So the same identifier reports through
 // one and is silent through the other.
 //
 // Nothing in the corpus writes a factory whose propTypes is an identifier, so a mutant widening the
 // object-literal arm to accept any value survived every imported case. The first two rows are the
 // same shape reached two ways with opposite verdicts, which is what makes this measurable at all.
 // Every row measured against the installed build.
-func TestForbidPropTypesObjectLiteralArmDoesNotFollowIdentifiers(t *testing.T) {
-	t.Parallel()
+func TestForbidPropTypesObjectLiteralArmDoesNotFollowIdentifiers(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -1840,10 +1865,10 @@ func TestForbidPropTypesObjectLiteralArmDoesNotFollowIdentifiers(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runForbidPropTypes(t, testCase.sourceText, nil)
-			rule_testing.ExpectFindings(t, result, forbidPropTypesExpectedIds(testCase.wantCount)...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runForbidPropTypes(test, testCase.sourceText, nil)
+			rule_testing.ExpectFindings(test, result, forbidPropTypesExpectedIds(testCase.wantCount)...)
 		})
 	}
 }

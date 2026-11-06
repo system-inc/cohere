@@ -16,13 +16,13 @@ import (
 //	invalid: enum Direction { Up }
 //	invalid: enum Direction { Up = 'Up', Down }
 //
-// An uninitialized member takes its value from its POSITION, so inserting a member above it or
+// An uninitialized member takes its value from its position, so inserting a member above it or
 // reordering two silently renumbers everything below. That is invisible in a diff of the enum and
 // catastrophic anywhere the number was persisted: a value written to a database or sent over a wire
 // last week now means a different member. Writing the value down makes the enum's contract explicit
 // and makes a reorder a no-op.
 //
-// # The repair is three SUGGESTIONS, never a fix
+// # The repair is three suggestions, never a fix
 //
 // Upstream sets `hasSuggestions` and offers three, and the reason it cannot be a fix is the whole
 // point of the rule: the correct value is not recoverable from the source. The rule does not know
@@ -34,7 +34,7 @@ import (
 //	Name = <index + 1>   the value it would have if the enum were one-based
 //	Name = 'Name'        a string enum, where position cannot matter at all
 //
-// `index` is the member's POSITION in the enum rather than the value TypeScript would compute for
+// `index` is the member's position in the enum rather than the value TypeScript would compute for
 // it. Those differ whenever an earlier member carries an initializer, and upstream uses the position
 // in both the suggestion text and the applied edit. Measured on `enum D { A, B = 1, C }`, where `C`
 // is offered `C = 2` and `C = 3` while its actual computed value is 2: the first suggestion happens
@@ -45,7 +45,7 @@ import (
 // # The member's own text is the interpolated name, and upstream doubles a quote
 //
 // The name in both messages is `sourceCode.getText(member)`, which for an uninitialized member is
-// the member's whole text and therefore just its key. For a QUOTED key that text includes the
+// the member's whole text and therefore just its key. For a quoted key that text includes the
 // quotes, so upstream renders them twice over:
 //
 //	enum D { 'quoted' }   The value of the member ''quoted'' should be explicitly defined.
@@ -61,7 +61,7 @@ import (
 // beginning at the end of the previous line and would anchor the replacement over the whitespace
 // too, which is a fix hazard as much as a span one.
 //
-// # Where our parser and upstream's differ, and it is a SEMANTIC ERROR rather than a rule decision
+// # Where our parser and upstream's differ, and it is a semantic error rather than a rule decision
 //
 // A computed enum key is illegal TypeScript. `@typescript-eslint/parser` refuses it outright:
 //
@@ -79,10 +79,10 @@ import (
 //
 // One listener on `KindEnumDeclaration`, which is a rare anchor, and the body is a single pass over
 // the member list. No checker, no program, no per-file state.
-var PreferEnumInitializers = rule.Rule{
+var PreferEnumInitializers = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/prefer-enum-initializers",
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindEnumDeclaration: func(node *ast.Node) {
 				// Members is never nil, so there is no guard here.
@@ -104,10 +104,10 @@ var PreferEnumInitializers = rule.Rule{
 					// Upstream interpolates `getText(member)`, which for a member with no
 					// initializer is the key and nothing else. The same text anchors the
 					// replacement, so the two cannot drift apart.
-					memberRange := rule.TokenRange(ctx.SourceFile, member)
-					name := ctx.SourceFile.Text()[memberRange.Pos():memberRange.End()]
+					memberRange := rule.TokenRange(ruleContext.SourceFile, member)
+					name := ruleContext.SourceFile.Text()[memberRange.Pos():memberRange.End()]
 
-					ctx.ReportNodeWithSuggestions(member, buildDefineInitializerMessage(name),
+					ruleContext.ReportNodeWithSuggestions(member, buildDefineInitializerMessage(name),
 						buildEnumInitializerSuggestion(memberRange, name, strconv.Itoa(index)),
 						buildEnumInitializerSuggestion(memberRange, name, strconv.Itoa(index+1)),
 						buildEnumInitializerSuggestion(memberRange, name, "'"+name+"'"),

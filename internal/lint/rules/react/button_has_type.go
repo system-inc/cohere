@@ -56,22 +56,6 @@ func buttonHasTypeValueMessage(id string, value string) rule.Message {
 	}
 }
 
-// ButtonHasTypeOptions is the decoded option object.
-//
-// Three booleans, one per HTML button type, matching `meta.schema` exactly. All three default to
-// TRUE, which is the opposite of Go's zero value, and that inversion is the whole reason the decoder
-// below is hand-written; see DecodeButtonHasTypeOptions.
-type ButtonHasTypeOptions struct {
-	// Button allows `type="button"`. Default true.
-	Button bool
-
-	// Submit allows `type="submit"`. Default true.
-	Submit bool
-
-	// Reset allows `type="reset"`. Default true.
-	Reset bool
-}
-
 // DefaultButtonHasTypeOptions is what an unconfigured rule uses.
 //
 // Upstream's `optionDefaults`, which `Object.assign` merges under whatever the config supplies.
@@ -79,28 +63,9 @@ func DefaultButtonHasTypeOptions() ButtonHasTypeOptions {
 	return ButtonHasTypeOptions{Button: true, Submit: true, Reset: true}
 }
 
-// allows reports whether a written-out type is permitted, and whether it is a type at all.
-//
-// The two returns are upstream's two branches in `checkValue` and they mean different things. The
-// second says the value is not one of the three names in the configuration object at all, which is
-// `invalidValue`; the first says it is one of them and is switched off, which is `forbiddenValue`.
-// Upstream expresses both against the same object, so a name outside the three can never be
-// "forbidden" no matter how the rule is configured.
-func (o ButtonHasTypeOptions) allows(value string) (permitted bool, known bool) {
-	switch value {
-	case "button":
-		return o.Button, true
-	case "submit":
-		return o.Submit, true
-	case "reset":
-		return o.Reset, true
-	}
-	return false, false
-}
-
 // buttonHasTypeWireOptions is the JSON shape, which is not the struct shape.
 //
-// Pointers so an absent key is distinguishable from an explicit `false`. Every default here is TRUE,
+// Pointers so an absent key is distinguishable from an explicit `false`. Every default here is `true`,
 // so a plain bool field would make `{}` and `{"button": false}` decode identically and silently
 // invert the rule, and every fixture built from a struct rather than routed through this decoder
 // would pass anyway. That is the default-true trap the port brief names, and this is the shape that
@@ -114,19 +79,19 @@ type buttonHasTypeWireOptions struct {
 // DecodeButtonHasTypeOptions decodes the option object over upstream's defaults.
 //
 // Hand-written rather than `rule.DecodeOptionsInto` for two reasons, either of which alone would be
-// enough. The generic helper errors on EMPTY input, which is what a bare `"error"` configuration
+// enough. The generic helper errors on empty input, which is what a bare `"error"` configuration
 // hands a rule. And its zero value is all-false, which for this rule means every written-out type is
 // forbidden, so a rule that fell back to the zero value would report `forbiddenValue` on correct
 // code rather than going quiet, which is the loud direction of a silent inversion but still wrong.
-func DecodeButtonHasTypeOptions(raw []byte) (any, error) {
+func DecodeButtonHasTypeOptions(raw []byte) (ButtonHasTypeOptions, error) {
 	options := DefaultButtonHasTypeOptions()
 	if len(raw) == 0 {
 		return options, nil
 	}
 
 	var wire buttonHasTypeWireOptions
-	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &wire); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 	if wire.Button != nil {
 		options.Button = *wire.Button
@@ -163,7 +128,7 @@ func DecodeButtonHasTypeOptions(raw []byte) (any, error) {
 // are `missingType`, for no `type` at all, and `complexType`, for a type this rule declines to
 // evaluate.
 //
-// # complexType points at the EXPRESSION, and everything else points at the element
+// # complexType points at the expression, and everything else points at the element
 //
 // Upstream's `reportComplex(expression)` takes the offending expression node while every other
 // report takes the element or the call. That is not cosmetic: on
@@ -177,7 +142,7 @@ func DecodeButtonHasTypeOptions(raw []byte) (any, error) {
 //
 // `checkExpression` calls itself on the consequent and the alternate, so a nested ternary is walked
 // to whatever depth it is written at, and `<button type={condition ? "foo" : "bar"}/>` reports
-// TWICE. Measured on the installed build. A rule that stopped at one finding per element would pass
+// twice, once per branch. Measured on the installed build. A rule that stopped at one finding per element would pass
 // every corpus case, because the corpus writes no ternary with two bad branches.
 //
 // # What counts as a static value, measured rather than assumed
@@ -199,12 +164,12 @@ func DecodeButtonHasTypeOptions(raw []byte) (any, error) {
 // NumericLiteral is already `1.5`, `16`, `1000`, `10`, probed against all six forms. The one
 // difference is a BigIntLiteral, whose `.Text()` keeps the `n` suffix where upstream renders `1`, so
 // that suffix is stripped at the site.
-var ButtonHasType = rule.Rule{
+var ButtonHasType = rule.Rule[ButtonHasTypeOptions]{
 	Name:             "react/button-has-type",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, ok := rule.OptionsAs[ButtonHasTypeOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[ButtonHasTypeOptions]) rule.Listeners {
+		settings, ok := options.Read()
 		if !ok {
 			// Nil options reach here when the config layer turns a decoder error into nil for a
 			// non-required rule. The zero value would forbid all three types and report on correct
@@ -213,17 +178,17 @@ var ButtonHasType = rule.Rule{
 		}
 
 		reportMissing := func(node *ast.Node) {
-			ctx.ReportNode(node, messageButtonMissingType)
+			ruleContext.ReportNode(node, messageButtonMissingType)
 		}
 
 		checkValue := func(node *ast.Node, value string) {
 			permitted, known := settings.allows(value)
 			if !known {
-				ctx.ReportNode(node, buttonHasTypeValueMessage(buttonHasTypeInvalidId, value))
+				ruleContext.ReportNode(node, buttonHasTypeValueMessage(buttonHasTypeInvalidId, value))
 				return
 			}
 			if !permitted {
-				ctx.ReportNode(node, buttonHasTypeValueMessage(buttonHasTypeForbiddenId, value))
+				ruleContext.ReportNode(node, buttonHasTypeValueMessage(buttonHasTypeForbiddenId, value))
 			}
 		}
 
@@ -245,25 +210,25 @@ var ButtonHasType = rule.Rule{
 			// reports invalidValue upstream and reported complexType here until this line existed.
 			// Skipping reproduces upstream rather than improving on it, and `SkipParentheses`
 			// dereferences its argument, which is why the nil check above it is not optional.
-			expression = ast.SkipParentheses(expression)
-			if expression == nil {
+			unwrapped := ast.SkipParentheses(expression)
+			if unwrapped == nil {
 				return
 			}
 
-			if value, static := buttonHasTypeLiteralValue(expression); static {
+			if value, static := buttonHasTypeLiteralValue(unwrapped); static {
 				checkValue(node, value)
 				return
 			}
 
-			switch expression.Kind {
+			switch unwrapped.Kind {
 			case ast.KindNoSubstitutionTemplateLiteral:
 				// A template with no interpolations is upstream's `expressions.length === 0` arm,
 				// which reads `quasis[0].value.raw`. Our parser gives this its own kind, so an
 				// interpolating template is a TemplateExpression and never reaches here.
-				checkValue(node, expression.Text())
+				checkValue(node, unwrapped.Text())
 
 			case ast.KindConditionalExpression:
-				conditional := expression.AsConditionalExpression()
+				conditional := unwrapped.AsConditionalExpression()
 				checkExpression(node, conditional.WhenTrue)
 				checkExpression(node, conditional.WhenFalse)
 
@@ -272,12 +237,12 @@ var ButtonHasType = rule.Rule{
 				// checker proves every value this expression can take is a written-out type the
 				// config permits, nothing is computed in the sense the message means, so there is
 				// nothing to report. See buttonHasTypeProvenPermitted.
-				if buttonHasTypeProvenPermitted(ctx, expression, settings) {
+				if buttonHasTypeProvenPermitted(ruleContext, unwrapped, settings) {
 					return
 				}
-				// The complex report anchors on the EXPRESSION rather than on the element, which is
+				// The complex report anchors on the expression rather than on the element, which is
 				// upstream's `reportComplex(expression)` and is the one place these two nodes differ.
-				ctx.ReportNode(expression, messageButtonComplexType)
+				ruleContext.ReportNode(unwrapped, messageButtonComplexType)
 			}
 		}
 
@@ -300,10 +265,10 @@ var ButtonHasType = rule.Rule{
 			},
 
 			ast.KindCallExpression: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
-				if !isPragmaCreateElementCall(ctx, node) {
+				if !isPragmaCreateElementCall(ruleContext, node) {
 					return
 				}
 				arguments := node.AsCallExpression().Arguments
@@ -357,7 +322,7 @@ func buttonHasTypeCheckElement(
 	typeAttribute := buttonHasTypeFindAttribute(attributes)
 	if typeAttribute == nil {
 		// A spread does not exempt. `<button {...properties}/>` reports, measured on the installed
-		// build, because upstream's `getProp` looks for a NAMED attribute and a spread carries none.
+		// build, because upstream's `getProp` looks for a named attribute and a spread carries none.
 		reportMissing(reported)
 		return
 	}
@@ -404,7 +369,7 @@ func buttonHasTypeFindAttribute(attributes *ast.Node) *ast.Node {
 //
 // Upstream requires `'key' in prop && prop.key && 'name' in prop.key && prop.key.name === 'type'`,
 // which is an Identifier key and nothing else. So `{'type': 'foo'}` and `{['type']: 'foo'}` are both
-// INVISIBLE and the call reports as missing a type rather than as an invalid one, and a spread
+// invisible to it and the call reports as missing a type rather than as an invalid one, and a spread
 // contributes no key at all. All three measured on the installed build.
 func buttonHasTypeFindTypeProperty(object *ast.Node) *ast.Node {
 	properties := object.AsObjectLiteralExpression().Properties
@@ -423,7 +388,7 @@ func buttonHasTypeFindTypeProperty(object *ast.Node) *ast.Node {
 // buttonHasTypePropertyValue returns the value expression of an object member.
 //
 // A shorthand `{type}` has no value node, and upstream passes `undefined` into `checkExpression`,
-// whose `switch` falls through to the default arm and reports complex ON THE PROPERTY. So the
+// whose `switch` falls through to the default arm and reports complex at the property. So the
 // shorthand itself is returned rather than nil, which is what puts the finding in the same place.
 // Measured: `React.createElement('button', {type})` reports complexType spanning `type`.
 func buttonHasTypePropertyValue(property *ast.Node) *ast.Node {
@@ -448,20 +413,20 @@ func buttonHasTypePropertyValue(property *ast.Node) *ast.Node {
 //
 // Every constituent must be a string literal, so `undefined` (an optional prop with no default, where
 // HTML's `submit` default applies), `string`, `any`, an error type and a type parameter all keep
-// reporting. Every literal must be PERMITTED rather than merely known, so a config that switches
+// reporting. Every literal must be permitted rather than merely known, so a config that switches
 // `reset` off still reports a union that contains it.
-func buttonHasTypeProvenPermitted(ctx rule.Context, expression *ast.Node, settings ButtonHasTypeOptions) bool {
-	if ctx.TypeChecker == nil {
+func buttonHasTypeProvenPermitted(ruleContext rule.Context, expression *ast.Node, settings ButtonHasTypeOptions) bool {
+	if ruleContext.TypeChecker == nil {
 		return false
 	}
 	// A shorthand `{type}` arrives as the property node itself (see buttonHasTypePropertyValue), and
 	// the checker types it as the binding it names, so it needs no unwrapping. Measured: unwrapping to
 	// its name changed no fixture.
-	expressionType := ctx.TypeChecker.GetTypeAtLocation(expression)
+	expressionType := ruleContext.TypeChecker.GetTypeAtLocation(expression)
 	if expressionType == nil {
 		return false
 	}
-	for constituent := range type_checking.UnionTypePartsSeq(expressionType) {
+	for constituent := range type_checking.UnionTypePartsSequence(expressionType) {
 		if !type_checking.IsTypeFlagSet(constituent, checker.TypeFlagsStringLiteral) {
 			return false
 		}

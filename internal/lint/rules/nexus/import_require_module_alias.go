@@ -51,7 +51,10 @@ var defaultModuleAliases = map[string]ModuleAlias{
 
 // importRequireModuleAliasRequireAliasNameText is the rule's `requireAliasName` message,
 // whose wording lives in `policy/messages/import-require-module-alias.json`.
-var importRequireModuleAliasRequireAliasNameText = policy.MessageOf("nexus/import-require-module-alias", "requireAliasName")
+var importRequireModuleAliasRequireAliasNameText = policy.MessageOf(
+	"nexus/import-require-module-alias",
+	"requireAliasName",
+)
 
 func messageRequireAliasName(source string, expected string, actual string) rule.Message {
 	return rule.Message{
@@ -66,7 +69,10 @@ func messageRequireAliasName(source string, expected string, actual string) rule
 
 // importRequireModuleAliasRequireDefaultStyleText is the rule's `requireDefaultStyle` message,
 // whose wording lives in `policy/messages/import-require-module-alias.json`.
-var importRequireModuleAliasRequireDefaultStyleText = policy.MessageOf("nexus/import-require-module-alias", "requireDefaultStyle")
+var importRequireModuleAliasRequireDefaultStyleText = policy.MessageOf(
+	"nexus/import-require-module-alias",
+	"requireDefaultStyle",
+)
 
 func messageRequireDefaultStyle(source string, expected string) rule.Message {
 	return rule.Message{
@@ -80,7 +86,10 @@ func messageRequireDefaultStyle(source string, expected string) rule.Message {
 
 // importRequireModuleAliasRequireNamespaceStyleText is the rule's `requireNamespaceStyle` message,
 // whose wording lives in `policy/messages/import-require-module-alias.json`.
-var importRequireModuleAliasRequireNamespaceStyleText = policy.MessageOf("nexus/import-require-module-alias", "requireNamespaceStyle")
+var importRequireModuleAliasRequireNamespaceStyleText = policy.MessageOf(
+	"nexus/import-require-module-alias",
+	"requireNamespaceStyle",
+)
 
 func messageRequireNamespaceStyle(source string, expected string) rule.Message {
 	return rule.Message{
@@ -127,10 +136,10 @@ func messageRequireNamespaceStyle(source string, expected string) rule.Message {
 //
 // The repair is a rename, which an editor does correctly with the whole file in view. The rule's
 // job here is to say which name and which form, and to say why.
-var ImportRequireModuleAlias = rule.Rule{
+var ImportRequireModuleAlias = rule.Rule[ImportRequireModuleAliasOptions]{
 	Name: "nexus/import-require-module-alias",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[ImportRequireModuleAliasOptions]) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -139,7 +148,7 @@ var ImportRequireModuleAlias = rule.Rule{
 		for source, alias := range defaultModuleAliases {
 			configuredModules[source] = alias
 		}
-		if settings, hasSettings := rule.OptionsAs[ImportRequireModuleAliasOptions](options); hasSettings {
+		if settings, hasSettings := options.Read(); hasSettings {
 			for source, alias := range settings.Modules {
 				if alias.Name == "" {
 					continue
@@ -195,9 +204,9 @@ var ImportRequireModuleAlias = rule.Rule{
 
 				if defaultBinding != nil {
 					if expectsNamespace {
-						ctx.ReportNode(defaultBinding, messageRequireNamespaceStyle(source, alias.Name))
+						ruleContext.ReportNode(defaultBinding, messageRequireNamespaceStyle(source, alias.Name))
 					} else if defaultBinding.Text() != alias.Name {
-						ctx.ReportNode(
+						ruleContext.ReportNode(
 							defaultBinding,
 							messageRequireAliasName(source, alias.Name, defaultBinding.Text()),
 						)
@@ -207,9 +216,9 @@ var ImportRequireModuleAlias = rule.Rule{
 				if namespaceBinding != nil {
 					namespaceName := namespaceBinding.AsNamespaceImport().Name()
 					if !expectsNamespace {
-						ctx.ReportNode(namespaceBinding, messageRequireDefaultStyle(source, alias.Name))
+						ruleContext.ReportNode(namespaceBinding, messageRequireDefaultStyle(source, alias.Name))
 					} else if namespaceName != nil && namespaceName.Text() != alias.Name {
-						ctx.ReportNode(
+						ruleContext.ReportNode(
 							namespaceName,
 							messageRequireAliasName(source, alias.Name, namespaceName.Text()),
 						)

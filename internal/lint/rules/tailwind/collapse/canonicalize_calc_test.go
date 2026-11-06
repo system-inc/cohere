@@ -4,8 +4,8 @@ import "testing"
 
 // TestCanonicalizeCalcExpressions ports upstream's two tables: the expressions whose operands are
 // reordered, and the ones kept exactly as written.
-func TestCanonicalizeCalcExpressions(t *testing.T) {
-	t.Parallel()
+func TestCanonicalizeCalcExpressions(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range []struct {
 		input    string
 		expected string
@@ -25,10 +25,15 @@ func TestCanonicalizeCalcExpressions(t *testing.T) {
 		{"calc(var(--a) + 1rem)", "calc(var(--a) + 1rem)"},
 		{"calc(2rem * 3px)", "calc(2rem * 3px)"},
 	} {
-		t.Run(testCase.input, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.input, func(test *testing.T) {
+			test.Parallel()
 			if actual := canonicalizeCalcExpressions(testCase.input); actual != testCase.expected {
-				t.Errorf("canonicalizeCalcExpressions(%q) = %q, upstream gives %q", testCase.input, actual, testCase.expected)
+				test.Errorf(
+					"canonicalizeCalcExpressions(%q) = %q, upstream gives %q",
+					testCase.input,
+					actual,
+					testCase.expected,
+				)
 			}
 		})
 	}
@@ -37,8 +42,8 @@ func TestCanonicalizeCalcExpressions(t *testing.T) {
 // TestCanonicalizeCalcLocaleCompare holds javaScriptLocaleCompare to the sign of `localeCompare` in
 // Node 24, locale `en-US`, on the pairs where collation and code point order disagree. Not an
 // upstream test: upstream's tables only compare strings that sort the same either way.
-func TestCanonicalizeCalcLocaleCompare(t *testing.T) {
-	t.Parallel()
+func TestCanonicalizeCalcLocaleCompare(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range []struct {
 		left     string
 		right    string
@@ -62,11 +67,18 @@ func TestCanonicalizeCalcLocaleCompare(t *testing.T) {
 	} {
 		order, collated := javaScriptLocaleCompare(testCase.left, testCase.right)
 		if !collated || order != testCase.expected {
-			t.Errorf("javaScriptLocaleCompare(%q, %q) = %d, %v, Node gives %d", testCase.left, testCase.right, order, collated, testCase.expected)
+			test.Errorf(
+				"javaScriptLocaleCompare(%q, %q) = %d, %v, Node gives %d",
+				testCase.left,
+				testCase.right,
+				order,
+				collated,
+				testCase.expected,
+			)
 		}
 	}
 
 	if _, collated := javaScriptLocaleCompare("var(--é)", "var(--a)"); collated {
-		t.Errorf("javaScriptLocaleCompare collated a string outside ASCII, which it has no tables for")
+		test.Errorf("javaScriptLocaleCompare collated a string outside ASCII, which it has no tables for")
 	}
 }

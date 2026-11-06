@@ -87,10 +87,8 @@ func printJsxElementInternal(path *Path, options *Options, print PrintFunc) Doc 
 	if len(current.List("children")) == 1 &&
 		current.List("children")[0].Is("JSXExpressionContainer") &&
 		current.List("children")[0].Child("expression").Is("TemplateLiteral", "TaggedTemplateExpression") {
-		parts := []any{openingLines}
-		for _, printed := range printAll(path, print, "children") {
-			parts = append(parts, printed)
-		}
+		parts := []Doc{openingLines}
+		parts = append(parts, printAll(path, print, "children")...)
 		parts = append(parts, closingLines)
 		return concatIn(path, parts...)
 	}
@@ -101,10 +99,13 @@ func printJsxElementInternal(path *Path, options *Options, print PrintFunc) Doc 
 	//
 	// Upstream's replacement node has no range; nothing reads one, since printJsxChildren never prints
 	// a JSXText, so the Go gives it an empty range at 0.
-	convertedChildren := make([]Node, len(current.List("children")))
+	convertedChildren := make(estree.Nodes, len(current.List("children")))
 	for index, child := range current.List("children") {
 		if isJsxWhitespaceExpression(child) {
-			convertedChildren[index] = estree.New("JSXText", 0, 0, "value", " ", "raw", " ")
+			convertedChildren[index] = estree.New("JSXText", 0, 0, []estree.Property{
+				{Key: "value", Value: estree.String(" ")},
+				{Key: "raw", Value: estree.String(" ")},
+			})
 		} else {
 			convertedChildren[index] = child
 		}
@@ -138,7 +139,7 @@ func printJsxElementInternal(path *Path, options *Options, print PrintFunc) Doc 
 	if settingsOf(options).SingleQuote {
 		rawJsxWhitespace = "{' '}"
 	}
-	whitespace := ifBreak(concatIn(path, rawJsxWhitespace, softline), " ")
+	whitespace := ifBreak(concatIn(path, textDoc(rawJsxWhitespace), softline), doc.Text(" "))
 
 	isFacebookTranslationTag := current.Child("openingElement").Child("name").String("name") == "fbt"
 
@@ -174,35 +175,35 @@ func printJsxElementInternal(path *Path, options *Options, print PrintFunc) Doc 
 	// content between them.
 	// We need to remove empty whitespace and softlines before JSX whitespace
 	// to get the correct output.
-	for i := len(children) - 2; i >= 0; i-- {
-		isPairOfEmptyStrings := isEmptyText(at(i)) && isEmptyText(at(i+1))
-		isPairOfHardlines := isSameDoc(at(i), hardline) &&
-			isEmptyText(at(i+1)) &&
-			isSameDoc(at(i+2), hardline)
-		isLineFollowedByJsxWhitespace := (isSameDoc(at(i), softline) || isSameDoc(at(i), hardline)) &&
-			isEmptyText(at(i+1)) &&
-			isSameDoc(at(i+2), whitespace)
-		isJsxWhitespaceFollowedByLine := isSameDoc(at(i), whitespace) &&
-			isEmptyText(at(i+1)) &&
-			(isSameDoc(at(i+2), softline) || isSameDoc(at(i+2), hardline))
-		isDoubleJsxWhitespace := isSameDoc(at(i), whitespace) &&
-			isEmptyText(at(i+1)) &&
-			isSameDoc(at(i+2), whitespace)
-		isPairOfHardOrSoftLines := (isSameDoc(at(i), softline) &&
-			isEmptyText(at(i+1)) &&
-			isSameDoc(at(i+2), hardline)) ||
-			(isSameDoc(at(i), hardline) &&
-				isEmptyText(at(i+1)) &&
-				isSameDoc(at(i+2), softline))
+	for index := len(children) - 2; index >= 0; index-- {
+		isPairOfEmptyStrings := isEmptyText(at(index)) && isEmptyText(at(index+1))
+		isPairOfHardlines := isSameDoc(at(index), hardline) &&
+			isEmptyText(at(index+1)) &&
+			isSameDoc(at(index+2), hardline)
+		isLineFollowedByJsxWhitespace := (isSameDoc(at(index), softline) || isSameDoc(at(index), hardline)) &&
+			isEmptyText(at(index+1)) &&
+			isSameDoc(at(index+2), whitespace)
+		isJsxWhitespaceFollowedByLine := isSameDoc(at(index), whitespace) &&
+			isEmptyText(at(index+1)) &&
+			(isSameDoc(at(index+2), softline) || isSameDoc(at(index+2), hardline))
+		isDoubleJsxWhitespace := isSameDoc(at(index), whitespace) &&
+			isEmptyText(at(index+1)) &&
+			isSameDoc(at(index+2), whitespace)
+		isPairOfHardOrSoftLines := (isSameDoc(at(index), softline) &&
+			isEmptyText(at(index+1)) &&
+			isSameDoc(at(index+2), hardline)) ||
+			(isSameDoc(at(index), hardline) &&
+				isEmptyText(at(index+1)) &&
+				isSameDoc(at(index+2), softline))
 
 		if (isPairOfHardlines && containsText) ||
 			isPairOfEmptyStrings ||
 			isLineFollowedByJsxWhitespace ||
 			isDoubleJsxWhitespace ||
 			isPairOfHardOrSoftLines {
-			splice(i, 2)
+			splice(index, 2)
 		} else if isJsxWhitespaceFollowedByLine {
-			splice(i+1, 2)
+			splice(index+1, 2)
 		}
 	}
 
@@ -229,34 +230,38 @@ func printJsxElementInternal(path *Path, options *Options, print PrintFunc) Doc 
 	 */
 	multilineChildren := []Doc{emptyDoc}
 	// pushOntoLast is multilineChildren.push([multilineChildren.pop(), doc]).
-	pushOntoLast := func(document any) {
+	pushOntoLast := func(document Doc) {
 		last := len(multilineChildren) - 1
 		multilineChildren[last] = concatIn(path, multilineChildren[last], document)
 	}
-	for i, child := range children {
+	for index, child := range children {
 		// There are a number of situations where we need to ensure we display
 		// whitespace as `{" "}` when outputting this element over multiple lines.
 		if isSameDoc(child, whitespace) {
-			if i == 1 && doc.IsEmptyDoc(children[i-1]) {
+			if index == 1 && doc.IsEmptyDoc(children[index-1]) {
 				if len(children) == 2 {
 					// Solitary whitespace
-					pushOntoLast(rawJsxWhitespace)
+					pushOntoLast(textDoc(rawJsxWhitespace))
 					continue
 				}
 				// Leading whitespace
-				multilineChildren = append(multilineChildren, concatIn(path, rawJsxWhitespace, hardline), emptyDoc)
+				multilineChildren = append(
+					multilineChildren,
+					concatIn(path, textDoc(rawJsxWhitespace), hardline),
+					emptyDoc,
+				)
 				continue
 			}
 
-			if i == len(children)-1 {
+			if index == len(children)-1 {
 				// Trailing whitespace
-				pushOntoLast(rawJsxWhitespace)
+				pushOntoLast(textDoc(rawJsxWhitespace))
 				continue
 			}
 
-			if isEmptyText(at(i-1)) && isSameDoc(at(i-2), hardline) {
+			if isEmptyText(at(index-1)) && isSameDoc(at(index-2), hardline) {
 				// Whitespace after line break
-				pushOntoLast(rawJsxWhitespace)
+				pushOntoLast(textDoc(rawJsxWhitespace))
 				continue
 			}
 		}
@@ -264,7 +269,7 @@ func printJsxElementInternal(path *Path, options *Options, print PrintFunc) Doc 
 		// Note that children always satisfy the rule of fill() content.
 		// - printJsxChildren always returns valid fill() content
 		// - we always remove even number (containing zero) of leading items from children.
-		if i%2 == 0 {
+		if index%2 == 0 {
 			// non-line-like
 			pushOntoLast(child)
 		} else {
@@ -284,7 +289,7 @@ func printJsxElementInternal(path *Path, options *Options, print PrintFunc) Doc 
 	if containsText {
 		content = fill(multilineChildren)
 	} else {
-		content = groupWithIn(path, multilineChildren, doc.GroupOptions{ShouldBreak: true})
+		content = groupWithIn(path, doc.Concat(multilineChildren), doc.GroupOptions{ShouldBreak: true})
 	}
 
 	// Upstream wraps content in `cursor` when options.cursorNode, nodeBeforeCursor or nodeAfterCursor
@@ -300,10 +305,8 @@ func printJsxElementInternal(path *Path, options *Options, print PrintFunc) Doc 
 		return multiLineElem
 	}
 
-	flatParts := []any{openingLines}
-	for _, child := range children {
-		flatParts = append(flatParts, child)
-	}
+	flatParts := []Doc{openingLines}
+	flatParts = append(flatParts, children...)
 	flatParts = append(flatParts, closingLines)
 	return conditionalGroup([]Doc{
 		groupIn(path, concatIn(path, flatParts...)),
@@ -330,11 +333,11 @@ func printJsxChildren(
 	whitespace Doc,
 	isFacebookTranslationTag bool,
 ) []Doc {
-	var prevPart Doc = emptyDoc
-	parts := []Doc{prevPart}
+	var previousPart Doc = emptyDoc
+	parts := []Doc{previousPart}
 	// To ensure rule of `fill()`, we use `push()` and `pushLine()` instead of `parts.push()`.
 	push := func(document Doc) {
-		prevPart = document
+		previousPart = document
 		last := len(parts) - 1
 		parts[last] = concatIn(path, parts[last], document)
 	}
@@ -342,13 +345,13 @@ func printJsxChildren(
 		if isEmptyText(document) {
 			return
 		}
-		prevPart = document
+		previousPart = document
 		parts = append(parts, document, emptyDoc)
 	}
 	// prevPartText is prevPart as the string upstream passes to the separators as `child`. Where they
 	// are called with prevPart it is always the last word pushed, a string.
-	prevPartText := func() string {
-		text, _ := prevPart.(doc.Text)
+	previousPartText := func() string {
+		text, _ := previousPart.(doc.Text)
 		return string(text)
 	}
 	each(path, func(path *Path, _ int) {
@@ -397,8 +400,8 @@ func printJsxChildren(
 					return
 				}
 
-				for i, word := range words {
-					if i%2 == 1 {
+				for index, word := range words {
+					if index%2 == 1 {
 						pushLine(line)
 					} else {
 						push(doc.Text(word))
@@ -410,7 +413,7 @@ func printJsxChildren(
 						pushLine(
 							separatorWithWhitespace(
 								isFacebookTranslationTag,
-								prevPartText(),
+								previousPartText(),
 								current,
 								next,
 							),
@@ -422,7 +425,7 @@ func printJsxChildren(
 					pushLine(
 						separatorNoWhitespace(
 							isFacebookTranslationTag,
-							prevPartText(),
+							previousPartText(),
 							current,
 							next,
 						),
@@ -438,7 +441,7 @@ func printJsxChildren(
 				pushLine(whitespace)
 			}
 		} else {
-			printedChild := print(nil, nil)
+			printedChild := print("", nil)
 			push(printedChild)
 
 			directlyFollowedByMeaningfulText := next != nil && isMeaningfulJsxText(next)

@@ -1,8 +1,8 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
-	"io"
 	"path/filepath"
 	"sort"
 
@@ -29,15 +29,15 @@ func adamicHeld(graph *program.Graph) map[string]struct{} {
 // adamicIncluded is adamicHeld for a run that builds no graph, `--format-only` (#m0dktbn): the `.a` files the
 // tsconfig includes, read from the config alone. It is the program's own list less any `.a` file reached only
 // by an import from outside the include, which Adamic's layout does not have: its code is listed where its
-// tsconfig claims ".a". ReadProjectConfig cleans each name to the platform's separator, the form the walk's
+// tsconfig claims ".a". ReadProjectConfiguration cleans each name to the platform's separator, the form the walk's
 // names and adamicHeld's are in, so a tsconfig's `/` names match a walk's `\` ones on Windows.
-func adamicIncluded(configFileName string) (map[string]struct{}, error) {
-	config, err := program.ReadProjectConfig(configFileName)
-	if err != nil {
-		return nil, err
+func adamicIncluded(configurationFileName string) (map[string]struct{}, error) {
+	configuration, readProjectConfigurationError := program.ReadProjectConfiguration(configurationFileName)
+	if readProjectConfigurationError != nil {
+		return nil, readProjectConfigurationError
 	}
 	held := map[string]struct{}{}
-	for _, fileName := range config.FileNames {
+	for _, fileName := range configuration.FileNames {
 		if sourcename.IsAdamic(fileName) {
 			held[fileName] = struct{}{}
 		}
@@ -51,7 +51,7 @@ func adamicIncluded(configFileName string) (map[string]struct{}, error) {
 // silence. `.a` is the static library's extension, and C and C++ ignore templates list `*.a`, which is how
 // Adamic source lands there. Only `.a`: a `.ts` file git ignores is usually generated, and naming those would
 // be noise.
-func reportIgnoredAdamic(out io.Writer, root string, held map[string]struct{}) int {
+func reportIgnoredAdamic(out *bufio.Writer, root string, held map[string]struct{}) int {
 	names := make([]string, 0, len(held))
 	for fileName := range held {
 		names = append(names, fileName)
@@ -65,11 +65,15 @@ func reportIgnoredAdamic(out io.Writer, root string, held map[string]struct{}) i
 		}
 		ignored++
 		shown := fileName
-		if relative, err := filepath.Rel(root, fileName); err == nil {
+		if relative, relativePathError := filepath.Rel(root, fileName); relativePathError == nil {
 			shown = relative
 		}
-		fmt.Fprintf(out, "⚠ %s is in the program, but git's ignore rules leave it out of the format walk (%s): checked, not formatted\n",
-			shown, ignoredBy)
+		fmt.Fprintf(
+			out,
+			"⚠ %s is in the program, but git's ignore rules leave it out of the format walk (%s): checked, not formatted\n",
+			shown,
+			ignoredBy,
+		)
 	}
 	return ignored
 }

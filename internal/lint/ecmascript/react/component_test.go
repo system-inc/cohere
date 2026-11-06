@@ -9,14 +9,14 @@ import (
 )
 
 // firstNodeOfKind parses source text and returns the first node of the given kind.
-func firstNodeOfKind(t *testing.T, sourceText string, kinds ...ast.Kind) *ast.Node {
-	t.Helper()
+func firstNodeOfKind(test *testing.T, sourceText string, kinds ...ast.Kind) *ast.Node {
+	test.Helper()
 	file := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/repository/source/Thing.tsx",
 		PathKey:  "/repository/source/Thing.tsx",
 	}, sourceText, core.ScriptKindTSX)
 	if file == nil {
-		t.Fatal("the parser returned no source file")
+		test.Fatal("the parser returned no source file")
 	}
 
 	wanted := make(map[ast.Kind]bool, len(kinds))
@@ -40,7 +40,7 @@ func firstNodeOfKind(t *testing.T, sourceText string, kinds ...ast.Kind) *ast.No
 	file.AsNode().ForEachChild(walk)
 
 	if found == nil {
-		t.Fatalf("no node of the wanted kind in %q", sourceText)
+		test.Fatalf("no node of the wanted kind in %q", sourceText)
 	}
 	return found
 }
@@ -48,8 +48,8 @@ func firstNodeOfKind(t *testing.T, sourceText string, kinds ...ast.Kind) *ast.No
 // The object is deliberately not required to be React, because a file importing the function
 // directly writes a bare call and that is the common modern spelling. The one exception is
 // document, which shares the property name and constructs a DOM node instead.
-func TestIsCreateElementCall(t *testing.T) {
-	t.Parallel()
+func TestIsCreateElementCall(test *testing.T) {
+	test.Parallel()
 	cases := []struct {
 		name       string
 		sourceText string
@@ -67,11 +67,11 @@ func TestIsCreateElementCall(t *testing.T) {
 		{"a different bare name", "export const A = createFragment('div');\n", false},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			node := firstNodeOfKind(t, testCase.sourceText, ast.KindCallExpression)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			node := firstNodeOfKind(test, testCase.sourceText, ast.KindCallExpression)
 			if got := IsCreateElementCall(node); got != testCase.want {
-				t.Fatalf("want %v, got %v", testCase.want, got)
+				test.Fatalf("want %v, got %v", testCase.want, got)
 			}
 		})
 	}
@@ -79,8 +79,8 @@ func TestIsCreateElementCall(t *testing.T) {
 
 // Both factory spellings count, and the namespaced form checks the object is React specifically,
 // because Foo.createClass is somebody else's factory.
-func TestIsEs5ComponentCall(t *testing.T) {
-	t.Parallel()
+func TestIsEs5ComponentCall(test *testing.T) {
+	test.Parallel()
 	cases := []struct {
 		name       string
 		sourceText string
@@ -93,11 +93,11 @@ func TestIsEs5ComponentCall(t *testing.T) {
 		{"an unrelated call", "export const A = makeThing({});\n", false},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			node := firstNodeOfKind(t, testCase.sourceText, ast.KindCallExpression)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			node := firstNodeOfKind(test, testCase.sourceText, ast.KindCallExpression)
 			if got := IsEs5ComponentCall(node); got != testCase.want {
-				t.Fatalf("want %v, got %v", testCase.want, got)
+				test.Fatalf("want %v, got %v", testCase.want, got)
 			}
 		})
 	}
@@ -105,8 +105,8 @@ func TestIsEs5ComponentCall(t *testing.T) {
 
 // A class with no extends clause is the case this gate mostly exists to stay silent on: it is 2 of
 // the 8 passing fixtures upstream ships for no-direct-mutation-state.
-func TestIsEs6ComponentClass(t *testing.T) {
-	t.Parallel()
+func TestIsEs6ComponentClass(test *testing.T) {
+	test.Parallel()
 	cases := []struct {
 		name       string
 		sourceText string
@@ -124,12 +124,12 @@ func TestIsEs6ComponentClass(t *testing.T) {
 		{"implements rather than extends", "export class Thing implements Component {}\n", false},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			node := firstNodeOfKind(t, testCase.sourceText,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			node := firstNodeOfKind(test, testCase.sourceText,
 				ast.KindClassDeclaration, ast.KindClassExpression)
 			if got := IsEs6ComponentClass(node); got != testCase.want {
-				t.Fatalf("want %v, got %v", testCase.want, got)
+				test.Fatalf("want %v, got %v", testCase.want, got)
 			}
 		})
 	}
@@ -138,8 +138,8 @@ func TestIsEs6ComponentClass(t *testing.T) {
 // Both definitions are searched in one walk, so the answer does not depend on which era wrote the
 // component. The node itself is considered, so a rule that already matched a class can ask without
 // stepping to the parent.
-func TestEnclosingComponent(t *testing.T) {
-	t.Parallel()
+func TestEnclosingComponent(test *testing.T) {
+	test.Parallel()
 	cases := []struct {
 		name       string
 		sourceText string
@@ -168,12 +168,12 @@ func TestEnclosingComponent(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			node := firstNodeOfKind(t, testCase.sourceText, testCase.startKind)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			node := firstNodeOfKind(test, testCase.sourceText, testCase.startKind)
 			got := EnclosingComponent(node)
 			if (got != nil) != testCase.wantFound {
-				t.Fatalf("want found=%v, got %v", testCase.wantFound, got != nil)
+				test.Fatalf("want found=%v, got %v", testCase.wantFound, got != nil)
 			}
 		})
 	}
@@ -181,25 +181,25 @@ func TestEnclosingComponent(t *testing.T) {
 
 // A rule reaching a shared helper with a node it did not check is a bug in the rule, and a panic in
 // a shared package takes the whole run down rather than that one rule's finding.
-func TestHelpersSurviveNilAndWrongKinds(t *testing.T) {
-	t.Parallel()
+func TestHelpersSurviveNilAndWrongKinds(test *testing.T) {
+	test.Parallel()
 	if IsCreateElementCall(nil) || IsEs5ComponentCall(nil) || IsEs6ComponentClass(nil) {
-		t.Fatal("want nil to answer false everywhere")
+		test.Fatal("want nil to answer false everywhere")
 	}
 	if EnclosingComponent(nil) != nil {
-		t.Fatal("want nil to have no enclosing component")
+		test.Fatal("want nil to have no enclosing component")
 	}
 
 	// A node of the wrong kind answers rather than panics.
-	identifier := firstNodeOfKind(t, "export const A = value;\n", ast.KindIdentifier)
+	identifier := firstNodeOfKind(test, "export const A = value;\n", ast.KindIdentifier)
 	if IsCreateElementCall(identifier) || IsEs5ComponentCall(identifier) || IsEs6ComponentClass(identifier) {
-		t.Fatal("want an identifier to answer false everywhere")
+		test.Fatal("want an identifier to answer false everywhere")
 	}
 }
 
 // TestIsNamespacedMember covers the shape four rules were matching by hand.
-func TestIsNamespacedMember(t *testing.T) {
-	t.Parallel()
+func TestIsNamespacedMember(test *testing.T) {
+	test.Parallel()
 	anyName := func(string) bool { return true }
 	named := func(want string) func(string) bool {
 		return func(got string) bool { return got == want }
@@ -224,11 +224,11 @@ func TestIsNamespacedMember(t *testing.T) {
 		// still declines.
 		{"a name the predicate rejects", "React.useMemo;", named("useEffect"), false},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			node := firstNodeOfKind(t, testCase.sourceText, ast.KindPropertyAccessExpression)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			node := firstNodeOfKind(test, testCase.sourceText, ast.KindPropertyAccessExpression)
 			if got := IsNamespacedMember(node, testCase.matches); got != testCase.want {
-				t.Errorf("%q: IsNamespacedMember = %v, want %v", testCase.sourceText, got, testCase.want)
+				test.Errorf("%q: IsNamespacedMember = %v, want %v", testCase.sourceText, got, testCase.want)
 			}
 		})
 	}
@@ -239,24 +239,24 @@ func TestIsNamespacedMember(t *testing.T) {
 // Inside its rule the node always arrived from a matched switch arm, so the guard was unnecessary
 // there; on a shelf any caller can pass anything, and the local version dereferences without
 // checking.
-func TestIsNamespacedMemberDeclinesOtherKinds(t *testing.T) {
-	t.Parallel()
+func TestIsNamespacedMemberDeclinesOtherKinds(test *testing.T) {
+	test.Parallel()
 	anyName := func(string) bool { return true }
 
 	if IsNamespacedMember(nil, anyName) {
-		t.Error("IsNamespacedMember(nil) = true, want false")
+		test.Error("IsNamespacedMember(nil) = true, want false")
 	}
 
 	// A computed member carries no identifier name to match, and it is a different node kind.
-	elementAccess := firstNodeOfKind(t, "React['useEffect'];", ast.KindElementAccessExpression)
+	elementAccess := firstNodeOfKind(test, "React['useEffect'];", ast.KindElementAccessExpression)
 	if IsNamespacedMember(elementAccess, anyName) {
-		t.Error("a computed member answered true")
+		test.Error("a computed member answered true")
 	}
 
 	// A call expression is the kind the four lifted copies were handed after their own switch had
 	// already narrowed it. Passing one directly must decline rather than panic.
-	call := firstNodeOfKind(t, "f();", ast.KindCallExpression)
+	call := firstNodeOfKind(test, "f();", ast.KindCallExpression)
 	if IsNamespacedMember(call, anyName) {
-		t.Error("a call expression answered true")
+		test.Error("a call expression answered true")
 	}
 }

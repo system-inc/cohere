@@ -3,74 +3,76 @@
 
 package core
 
+import "github.com/system-inc/cohere/internal/lint/rule"
+
 // requireAtomicUpdatesCase is one imported upstream case: its source, the options it was
 // tested under, and the message ids upstream reports on it in order.
 type requireAtomicUpdatesCase struct {
 	source  string
-	options any
+	options rule.Given[RequireAtomicUpdatesOptions]
 	wantIds []string
 }
 
 var requireAtomicUpdatesCleanCases = []requireAtomicUpdatesCase{
 	{
 		source:  `let foo; async function x() { foo += bar; }`,
-		options: nil,
+		options: rule.Given[RequireAtomicUpdatesOptions]{},
 	},
 	{
 		source:  `let foo; async function x() { foo = foo + bar; }`,
-		options: nil,
+		options: rule.Given[RequireAtomicUpdatesOptions]{},
 	},
 	{
 		source:  `let foo; async function x() { foo = await bar + foo; }`,
-		options: nil,
+		options: rule.Given[RequireAtomicUpdatesOptions]{},
 	},
 	{
 		source:  `async function x() { let foo; foo += await bar; }`,
-		options: nil,
+		options: rule.Given[RequireAtomicUpdatesOptions]{},
 	},
 	{
 		source:  `let foo; async function x() { foo = (await result)(foo); }`,
-		options: nil,
+		options: rule.Given[RequireAtomicUpdatesOptions]{},
 	},
 	{
 		source:  `let foo; async function x() { foo = bar(await something, foo) }`,
-		options: nil,
+		options: rule.Given[RequireAtomicUpdatesOptions]{},
 	},
 	{
 		source:  `function* x() { let foo; foo += yield bar; }`,
-		options: nil,
+		options: rule.Given[RequireAtomicUpdatesOptions]{},
 	},
 	{
 		source:  `const foo = {}; async function x() { foo.bar = await baz; }`,
-		options: nil,
+		options: rule.Given[RequireAtomicUpdatesOptions]{},
 	},
 	{
 		source:  `const foo = []; async function x() { foo[x] += 1;  }`,
-		options: nil,
+		options: rule.Given[RequireAtomicUpdatesOptions]{},
 	},
 	{
 		source:  `let foo; function* x() { foo = bar + foo; }`,
-		options: nil,
+		options: rule.Given[RequireAtomicUpdatesOptions]{},
 	},
 	{
 		source:  `async function x() { let foo; bar(() => baz += 1); foo += await amount; }`,
-		options: nil,
+		options: rule.Given[RequireAtomicUpdatesOptions]{},
 	},
 	{
 		source:  `let foo; async function x() { foo = condition ? foo : await bar; }`,
-		options: nil,
+		options: rule.Given[RequireAtomicUpdatesOptions]{},
 	},
 	{
 		source:  `async function x() { let foo; bar(() => { let foo; blah(foo); }); foo += await result; }`,
-		options: nil,
+		options: rule.Given[RequireAtomicUpdatesOptions]{},
 	},
 	{
 		source:  `let foo; async function x() { foo = foo + 1; await bar; }`,
-		options: nil,
+		options: rule.Given[RequireAtomicUpdatesOptions]{},
 	},
 	{
 		source:  `async function x() { foo += await bar; }`,
-		options: nil,
+		options: rule.Given[RequireAtomicUpdatesOptions]{},
 	},
 	{
 		source: `
@@ -97,7 +99,7 @@ var requireAtomicUpdatesCleanCases = []requireAtomicUpdatesCase{
                 if (20);
             }
         `,
-		options: nil,
+		options: rule.Given[RequireAtomicUpdatesOptions]{},
 	},
 	{
 		source: `
@@ -126,7 +128,7 @@ var requireAtomicUpdatesCleanCases = []requireAtomicUpdatesCase{
                 ];
             }
         `,
-		options: nil,
+		options: rule.Given[RequireAtomicUpdatesOptions]{},
 	},
 	{
 		source: `
@@ -136,7 +138,7 @@ var requireAtomicUpdatesCleanCases = []requireAtomicUpdatesCase{
                 g(() => { records })
             }
         `,
-		options: nil,
+		options: rule.Given[RequireAtomicUpdatesOptions]{},
 	},
 	{
 		source: `
@@ -149,7 +151,7 @@ var requireAtomicUpdatesCleanCases = []requireAtomicUpdatesCase{
                 }
             }
         `,
-		options: nil,
+		options: rule.Given[RequireAtomicUpdatesOptions]{},
 	},
 	{
 		source: `
@@ -158,7 +160,7 @@ var requireAtomicUpdatesCleanCases = []requireAtomicUpdatesCase{
                 bar.prop = foo.prop;
             }
         `,
-		options: nil,
+		options: rule.Given[RequireAtomicUpdatesOptions]{},
 	},
 	{
 		source: `
@@ -167,7 +169,7 @@ var requireAtomicUpdatesCleanCases = []requireAtomicUpdatesCase{
                 foo = bar.prop;
             }
         `,
-		options: nil,
+		options: rule.Given[RequireAtomicUpdatesOptions]{},
 	},
 	{
 		source: `
@@ -177,7 +179,7 @@ var requireAtomicUpdatesCleanCases = []requireAtomicUpdatesCase{
                 foo.prop = bar.prop;
             }
         `,
-		options: nil,
+		options: rule.Given[RequireAtomicUpdatesOptions]{},
 	},
 	{
 		source: `
@@ -190,7 +192,7 @@ var requireAtomicUpdatesCleanCases = []requireAtomicUpdatesCase{
                 return
             }
         `,
-		options: nil,
+		options: rule.Given[RequireAtomicUpdatesOptions]{},
 	},
 	{
 		source: `
@@ -215,7 +217,7 @@ var requireAtomicUpdatesCleanCases = []requireAtomicUpdatesCase{
               }
             }
         `,
-		options: nil,
+		options: rule.Given[RequireAtomicUpdatesOptions]{},
 	},
 	{
 		source: `
@@ -232,7 +234,7 @@ var requireAtomicUpdatesCleanCases = []requireAtomicUpdatesCase{
               }
             }
         `,
-		options: nil,
+		options: rule.Given[RequireAtomicUpdatesOptions]{},
 	},
 	{
 		source: `
@@ -241,7 +243,7 @@ var requireAtomicUpdatesCleanCases = []requireAtomicUpdatesCase{
                 b = 1;
             }
         `,
-		options: nil,
+		options: rule.Given[RequireAtomicUpdatesOptions]{},
 	},
 	{
 		source: `
@@ -251,7 +253,7 @@ var requireAtomicUpdatesCleanCases = []requireAtomicUpdatesCase{
                     }
                 }
             `,
-		options: RequireAtomicUpdatesOptions{AllowProperties: true},
+		options: rule.Configured(RequireAtomicUpdatesOptions{AllowProperties: true}),
 	},
 	{
 		source: `
@@ -261,134 +263,134 @@ var requireAtomicUpdatesCleanCases = []requireAtomicUpdatesCase{
                     foo.bar = 1;
                 }
             `,
-		options: RequireAtomicUpdatesOptions{AllowProperties: true},
+		options: rule.Configured(RequireAtomicUpdatesOptions{AllowProperties: true}),
 	},
 }
 
 var requireAtomicUpdatesReportingCases = []requireAtomicUpdatesCase{
 	{
 		source:  `let foo; async function x() { foo += await amount; }`,
-		options: nil,
+		options: rule.Given[RequireAtomicUpdatesOptions]{},
 		wantIds: []string{"nonAtomicUpdate"},
 	},
 	{
 		source:  `if (1); let foo; async function x() { foo += await amount; }`,
-		options: nil,
+		options: rule.Given[RequireAtomicUpdatesOptions]{},
 		wantIds: []string{"nonAtomicUpdate"},
 	},
 	{
 		source:  `let foo; async function x() { while (condition) { foo += await amount; } }`,
-		options: nil,
+		options: rule.Given[RequireAtomicUpdatesOptions]{},
 		wantIds: []string{"nonAtomicUpdate"},
 	},
 	{
 		source:  `let foo; async function x() { foo = foo + await amount; }`,
-		options: nil,
+		options: rule.Given[RequireAtomicUpdatesOptions]{},
 		wantIds: []string{"nonAtomicUpdate"},
 	},
 	{
 		source:  `let foo; async function x() { foo = foo + (bar ? baz : await amount); }`,
-		options: nil,
+		options: rule.Given[RequireAtomicUpdatesOptions]{},
 		wantIds: []string{"nonAtomicUpdate"},
 	},
 	{
 		source:  `let foo; async function x() { foo = foo + (bar ? await amount : baz); }`,
-		options: nil,
+		options: rule.Given[RequireAtomicUpdatesOptions]{},
 		wantIds: []string{"nonAtomicUpdate"},
 	},
 	{
 		source:  `let foo; async function x() { foo = condition ? foo + await amount : somethingElse; }`,
-		options: nil,
+		options: rule.Given[RequireAtomicUpdatesOptions]{},
 		wantIds: []string{"nonAtomicUpdate"},
 	},
 	{
 		source:  `let foo; async function x() { foo = (condition ? foo : await bar) + await bar; }`,
-		options: nil,
+		options: rule.Given[RequireAtomicUpdatesOptions]{},
 		wantIds: []string{"nonAtomicUpdate"},
 	},
 	{
 		source:  `let foo; async function x() { foo += bar + await amount; }`,
-		options: nil,
+		options: rule.Given[RequireAtomicUpdatesOptions]{},
 		wantIds: []string{"nonAtomicUpdate"},
 	},
 	{
 		source:  `async function x() { let foo; bar(() => foo); foo += await amount; }`,
-		options: nil,
+		options: rule.Given[RequireAtomicUpdatesOptions]{},
 		wantIds: []string{"nonAtomicUpdate"},
 	},
 	{
 		source:  `let foo; function* x() { foo += yield baz }`,
-		options: nil,
+		options: rule.Given[RequireAtomicUpdatesOptions]{},
 		wantIds: []string{"nonAtomicUpdate"},
 	},
 	{
 		source:  `let foo; async function x() { foo = bar(foo, await something) }`,
-		options: nil,
+		options: rule.Given[RequireAtomicUpdatesOptions]{},
 		wantIds: []string{"nonAtomicUpdate"},
 	},
 	{
 		source:  `const foo = {}; async function x() { foo.bar += await baz }`,
-		options: nil,
+		options: rule.Given[RequireAtomicUpdatesOptions]{},
 		wantIds: []string{"nonAtomicObjectUpdate"},
 	},
 	{
 		source:  `const foo = []; async function x() { foo[bar].baz += await result;  }`,
-		options: nil,
+		options: rule.Given[RequireAtomicUpdatesOptions]{},
 		wantIds: []string{"nonAtomicObjectUpdate"},
 	},
 	{
 		source:  `const foo = {}; class C { #bar; async wrap() { foo.#bar += await baz } }`,
-		options: nil,
+		options: rule.Given[RequireAtomicUpdatesOptions]{},
 		wantIds: []string{"nonAtomicObjectUpdate"},
 	},
 	{
 		source:  `let foo; async function* x() { foo = (yield foo) + await bar; }`,
-		options: nil,
+		options: rule.Given[RequireAtomicUpdatesOptions]{},
 		wantIds: []string{"nonAtomicUpdate"},
 	},
 	{
 		source:  `let foo; async function x() { foo = foo + await result(foo); }`,
-		options: nil,
+		options: rule.Given[RequireAtomicUpdatesOptions]{},
 		wantIds: []string{"nonAtomicUpdate"},
 	},
 	{
 		source:  `let foo; async function x() { foo = await result(foo, await somethingElse); }`,
-		options: nil,
+		options: rule.Given[RequireAtomicUpdatesOptions]{},
 		wantIds: []string{"nonAtomicUpdate"},
 	},
 	{
 		source:  `function* x() { let foo; yield async function y() { foo += await bar; } }`,
-		options: nil,
+		options: rule.Given[RequireAtomicUpdatesOptions]{},
 		wantIds: []string{"nonAtomicUpdate"},
 	},
 	{
 		source:  `let foo; async function* x() { foo = await foo + (yield bar); }`,
-		options: nil,
+		options: rule.Given[RequireAtomicUpdatesOptions]{},
 		wantIds: []string{"nonAtomicUpdate"},
 	},
 	{
 		source:  `let foo; async function x() { foo = bar + await foo; }`,
-		options: nil,
+		options: rule.Given[RequireAtomicUpdatesOptions]{},
 		wantIds: []string{"nonAtomicUpdate"},
 	},
 	{
 		source:  `let foo = {}; async function x() { foo[bar].baz = await (foo.bar += await foo[bar].baz) }`,
-		options: nil,
+		options: rule.Given[RequireAtomicUpdatesOptions]{},
 		wantIds: []string{"nonAtomicObjectUpdate", "nonAtomicObjectUpdate"},
 	},
 	{
 		source:  `let foo = ''; async function x() { foo += await bar; }`,
-		options: nil,
+		options: rule.Given[RequireAtomicUpdatesOptions]{},
 		wantIds: []string{"nonAtomicUpdate"},
 	},
 	{
 		source:  `let foo = 0; async function x() { foo = (a ? b : foo) + await bar; if (baz); }`,
-		options: nil,
+		options: rule.Given[RequireAtomicUpdatesOptions]{},
 		wantIds: []string{"nonAtomicUpdate"},
 	},
 	{
 		source:  `let foo = 0; async function x() { foo = (a ? b ? c ? d ? foo : e : f : g : h) + await bar; if (baz); }`,
-		options: nil,
+		options: rule.Given[RequireAtomicUpdatesOptions]{},
 		wantIds: []string{"nonAtomicUpdate"},
 	},
 	{
@@ -398,7 +400,7 @@ var requireAtomicUpdatesReportingCases = []requireAtomicUpdatesCase{
                     foo.bar = buz.bar;
                 }
             `,
-		options: nil,
+		options: rule.Given[RequireAtomicUpdatesOptions]{},
 		wantIds: []string{"nonAtomicObjectUpdate"},
 	},
 	{
@@ -413,7 +415,7 @@ var requireAtomicUpdatesReportingCases = []requireAtomicUpdatesCase{
                     }
               };
             `,
-		options: nil,
+		options: rule.Given[RequireAtomicUpdatesOptions]{},
 		wantIds: []string{"nonAtomicObjectUpdate", "nonAtomicObjectUpdate"},
 	},
 	{
@@ -424,7 +426,7 @@ var requireAtomicUpdatesReportingCases = []requireAtomicUpdatesCase{
                     }
                 }
             `,
-		options: nil,
+		options: rule.Given[RequireAtomicUpdatesOptions]{},
 		wantIds: []string{"nonAtomicObjectUpdate"},
 	},
 	{
@@ -435,7 +437,7 @@ var requireAtomicUpdatesReportingCases = []requireAtomicUpdatesCase{
                     foo.bar = 1;
                 }
             `,
-		options: nil,
+		options: rule.Given[RequireAtomicUpdatesOptions]{},
 		wantIds: []string{"nonAtomicObjectUpdate"},
 	},
 	{
@@ -446,7 +448,7 @@ var requireAtomicUpdatesReportingCases = []requireAtomicUpdatesCase{
                     }
                 }
             `,
-		options: RequireAtomicUpdatesOptions{},
+		options: rule.Configured(RequireAtomicUpdatesOptions{}),
 		wantIds: []string{"nonAtomicObjectUpdate"},
 	},
 	{
@@ -457,7 +459,7 @@ var requireAtomicUpdatesReportingCases = []requireAtomicUpdatesCase{
                     foo.bar = 1;
                 }
             `,
-		options: RequireAtomicUpdatesOptions{},
+		options: rule.Configured(RequireAtomicUpdatesOptions{}),
 		wantIds: []string{"nonAtomicObjectUpdate"},
 	},
 	{
@@ -468,7 +470,7 @@ var requireAtomicUpdatesReportingCases = []requireAtomicUpdatesCase{
                     }
                 }
             `,
-		options: RequireAtomicUpdatesOptions{AllowProperties: false},
+		options: rule.Configured(RequireAtomicUpdatesOptions{AllowProperties: false}),
 		wantIds: []string{"nonAtomicObjectUpdate"},
 	},
 	{
@@ -479,7 +481,7 @@ var requireAtomicUpdatesReportingCases = []requireAtomicUpdatesCase{
                     foo.bar = 1;
                 }
             `,
-		options: RequireAtomicUpdatesOptions{AllowProperties: false},
+		options: rule.Configured(RequireAtomicUpdatesOptions{AllowProperties: false}),
 		wantIds: []string{"nonAtomicObjectUpdate"},
 	},
 	{
@@ -491,7 +493,7 @@ var requireAtomicUpdatesReportingCases = []requireAtomicUpdatesCase{
                     }
                 }
             `,
-		options: RequireAtomicUpdatesOptions{AllowProperties: true},
+		options: rule.Configured(RequireAtomicUpdatesOptions{AllowProperties: true}),
 		wantIds: []string{"nonAtomicUpdate"},
 	},
 	{
@@ -503,7 +505,7 @@ var requireAtomicUpdatesReportingCases = []requireAtomicUpdatesCase{
                     foo = 1;
                 }
             `,
-		options: RequireAtomicUpdatesOptions{AllowProperties: true},
+		options: rule.Configured(RequireAtomicUpdatesOptions{AllowProperties: true}),
 		wantIds: []string{"nonAtomicUpdate"},
 	},
 }

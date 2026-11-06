@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"os"
 	"runtime/pprof"
+
+	"github.com/system-inc/cohere/internal/sentence"
+	"github.com/system-inc/cohere/internal/streams"
 )
 
 // profileFile is the open `--profile` file while the CPU profile is running, nil otherwise.
@@ -11,13 +14,13 @@ var profileFile *os.File
 
 // startProfile begins writing a Go CPU profile of the rest of the run to path, for `go tool pprof`.
 func startProfile(path string) error {
-	file, err := os.Create(path)
-	if err != nil {
-		return fmt.Errorf("creating the profile: %w", err)
+	file, createError := os.Create(path)
+	if createError != nil {
+		return fmt.Errorf("creating the profile: %w", createError)
 	}
-	if err := pprof.StartCPUProfile(file); err != nil {
-		file.Close()
-		return fmt.Errorf("starting the profile: %w", err)
+	if startCpuProfileError := pprof.StartCPUProfile(file); startCpuProfileError != nil {
+		_ = file.Close() // Ignored: the profile never started, so nothing was written, and its start error is returned.
+		return fmt.Errorf("starting the profile: %w", startCpuProfileError)
 	}
 	profileFile = file
 	// A profiled run never returns early: the profile is something the caller reads, and it is complete
@@ -28,19 +31,25 @@ func startProfile(path string) error {
 }
 
 // exitProcess ends the process with code, finishing the profile first. os.Exit runs no deferred call, so
-// every exit goes through here, or a profiled run would leave a truncated profile behind.
+// every exit goes through here, or a profiled run would leave a truncated profile behind, and the streams a
+// person reads would never be flushed.
 func exitProcess(code int) {
 	finishOpen()
 	if profileFile != nil {
 		pprof.StopCPUProfile()
-		if err := profileFile.Close(); err != nil {
-			fmt.Fprintf(os.Stderr, "cohere: closing the profile: %v\n", err)
+		if closeError := profileFile.Close(); closeError != nil {
+			fmt.Fprintf(streams.Errors, "cohere: %s\n",
+				sentence.FromError(fmt.Errorf("closing the profile: %w", closeError)))
 		}
 		profileFile = nil
 	}
+	// The streams are flushed before the caller is answered, and the answer is 1 in place of a 0 when they
+	// could not be, since a report that never arrived is not a clean run (see package streams). A run cache
+	// that finished first has flushed them already, and then this changes nothing.
+	exitCode := streams.Finish(code)
 	// Every exit answers the caller, if a run cache has not already: what follows, keeping what the run read
 	// in the content pack and the heap's teardown, is nothing the caller waits for. See sendVerdict.
-	sendVerdict(code)
+	sendVerdict(exitCode)
 	saveContentPack()
-	os.Exit(code)
+	os.Exit(exitCode)
 }

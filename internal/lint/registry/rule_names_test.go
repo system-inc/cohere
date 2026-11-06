@@ -36,11 +36,11 @@ func registeredRuleNames() []string {
 // `cohere --rules` prints these names and `configuration.settingFor` splits them on the `/`
 // boundary, so a name that lies about its plugin still reaches a user and still fails a config
 // lookup. The guard outlived the instrument that motivated it.
-func TestRegisteredNamesMatchTheirUpstreamSpelling(t *testing.T) {
-	t.Parallel()
+func TestRegisteredNamesMatchTheirUpstreamSpelling(test *testing.T) {
+	test.Parallel()
 	registered := registeredRuleNames()
 	if len(registered) == 0 {
-		t.Fatal("registry.All() returned no rules, so this test checked nothing")
+		test.Fatal("registry.All() returned no rules, so this test checked nothing")
 	}
 
 	// The namespaces a rule may carry. A rule with no slash is an ESLint core rule or one of this
@@ -77,7 +77,7 @@ func TestRegisteredNamesMatchTheirUpstreamSpelling(t *testing.T) {
 		if knownNamespaces[namespace] {
 			continue
 		}
-		t.Errorf("rule %q carries the namespace %q, which is not one this tree recognizes; a rule "+
+		test.Errorf("rule %q carries the namespace %q, which is not one this tree recognizes; a rule "+
 			"registers under its real upstream name, and an unrecognized prefix is the spelling "+
 			"that reaches ESLint and kills the run", name, namespace)
 	}

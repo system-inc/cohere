@@ -14,18 +14,18 @@ import (
 // a file the tsconfig excludes and .gitignore leaves out. Nothing said which. Each row is one of the
 // three reasons, and the gitignore rows assert the line and pattern come through, with no git
 // repository at all: the clause is read from the file.
-func TestExplainNamedPathsOutsideProgramSaysWhy(t *testing.T) {
-	t.Parallel()
+func TestExplainNamedPathsOutsideProgramSaysWhy(test *testing.T) {
+	test.Parallel()
 
-	root := t.TempDir()
+	root := test.TempDir()
 	write := func(name string, contents string) {
-		t.Helper()
+		test.Helper()
 		path := filepath.Join(root, name)
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			t.Fatal(err)
+		if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
+			test.Fatal(createDirectoryError)
 		}
-		if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
-			t.Fatal(err)
+		if writeError := os.WriteFile(path, []byte(contents), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 	}
 	write(".gitignore", "node_modules/\nmodules/*/data/\n")
@@ -62,10 +62,10 @@ func TestExplainNamedPathsOutsideProgramSaysWhy(t *testing.T) {
 				"in it out with its `include` and `exclude` lists, and git's ignore rules leave it out " +
 				"too (.gitignore line 2, `modules/*/data/`)."},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			if got := explainNamedPathsOutsideProgram(location, []string{testCase.path}); got != testCase.want {
-				t.Errorf("explanation is\n%q\nwant\n%q", got, testCase.want)
+				test.Errorf("explanation is\n%q\nwant\n%q", got, testCase.want)
 			}
 		})
 	}

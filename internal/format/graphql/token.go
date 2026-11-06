@@ -6,8 +6,8 @@ package graphql
 type tokenKind string
 
 const (
-	tokenKindSOF         tokenKind = "<SOF>"
-	tokenKindEOF         tokenKind = "<EOF>"
+	tokenKindSof         tokenKind = "<SOF>"
+	tokenKindEof         tokenKind = "<EOF>"
 	tokenKindBang        tokenKind = "!"
 	tokenKindDollar      tokenKind = "$"
 	tokenKindAmp         tokenKind = "&"
@@ -58,9 +58,9 @@ type token struct {
 	hasValue bool
 
 	// Tokens exist as nodes in a double-linked-list amongst all tokens including ignored tokens.
-	// <SOF> is always the first node and <EOF> the last.
-	prev *token
-	next *token
+	// `<SOF>` is always the first node and `<EOF>` the last.
+	previous *token
+	next     *token
 }
 
 func newToken(kind tokenKind, start int, end int, line int, column int, value ...string) *token {

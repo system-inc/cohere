@@ -10,12 +10,12 @@ import (
 )
 
 // atMarker parses a source holding a `marker` identifier and hands that node to `ask`.
-func atMarker(t *testing.T, source string, ask func(node *ast.Node)) {
-	t.Helper()
+func atMarker(test *testing.T, source string, ask func(node *ast.Node)) {
+	test.Helper()
 	found := false
-	rule_testing.Run(t, rule.Rule{
+	rule_testing.Run(test, rule.Rule[rule.NoOptions]{
 		Name: "scope-probe",
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{
 				ast.KindIdentifier: func(node *ast.Node) {
 					if found || node.Text() != "marker" {
@@ -31,26 +31,26 @@ func atMarker(t *testing.T, source string, ask func(node *ast.Node)) {
 		},
 	}, "p.ts", "declare const marker: any;\n"+source)
 	if !found {
-		t.Fatalf("%q: the marker never reached the probe", source)
+		test.Fatalf("%q: the marker never reached the probe", source)
 	}
 }
 
-func expectEnclosing(t *testing.T, source string, want ast.Kind) {
-	t.Helper()
-	atMarker(t, source, func(node *ast.Node) {
+func expectEnclosing(test *testing.T, source string, want ast.Kind) {
+	test.Helper()
+	atMarker(test, source, func(node *ast.Node) {
 		got := scope.EnclosingFunctionLike(node)
 		if want == ast.KindUnknown {
 			if got != nil {
-				t.Errorf("%q: EnclosingFunctionLike = kind %d, want nil", source, int(got.Kind))
+				test.Errorf("%q: EnclosingFunctionLike = kind %d, want nil", source, int(got.Kind))
 			}
 			return
 		}
 		if got == nil {
-			t.Errorf("%q: EnclosingFunctionLike = nil, want kind %d", source, int(want))
+			test.Errorf("%q: EnclosingFunctionLike = nil, want kind %d", source, int(want))
 			return
 		}
 		if got.Kind != want {
-			t.Errorf("%q: EnclosingFunctionLike = kind %d, want %d", source, int(got.Kind), int(want))
+			test.Errorf("%q: EnclosingFunctionLike = kind %d, want %d", source, int(got.Kind), int(want))
 		}
 	})
 }
@@ -59,22 +59,22 @@ func expectEnclosing(t *testing.T, source string, want ast.Kind) {
 //
 // The last three are where the four lifted implementations disagreed: an accessor and a constructor
 // introduce a scope exactly as a method does, and the narrowest set answered nil for all three.
-func TestEnclosingFunctionLikeCoversEveryFunctionScope(t *testing.T) {
-	t.Parallel()
-	expectEnclosing(t, "function f() { marker; }", ast.KindFunctionDeclaration)
-	expectEnclosing(t, "const g = function () { marker; };", ast.KindFunctionExpression)
-	expectEnclosing(t, "const g = () => { marker; };", ast.KindArrowFunction)
-	expectEnclosing(t, "class C { m() { marker; } }", ast.KindMethodDeclaration)
-	expectEnclosing(t, "class C { get p() { marker; return 1; } }", ast.KindGetAccessor)
-	expectEnclosing(t, "class C { set p(v: number) { marker; } }", ast.KindSetAccessor)
-	expectEnclosing(t, "class C { constructor() { marker; } }", ast.KindConstructor)
+func TestEnclosingFunctionLikeCoversEveryFunctionScope(test *testing.T) {
+	test.Parallel()
+	expectEnclosing(test, "function f() { marker; }", ast.KindFunctionDeclaration)
+	expectEnclosing(test, "const g = function () { marker; };", ast.KindFunctionExpression)
+	expectEnclosing(test, "const g = () => { marker; };", ast.KindArrowFunction)
+	expectEnclosing(test, "class C { m() { marker; } }", ast.KindMethodDeclaration)
+	expectEnclosing(test, "class C { get p() { marker; return 1; } }", ast.KindGetAccessor)
+	expectEnclosing(test, "class C { set p(v: number) { marker; } }", ast.KindSetAccessor)
+	expectEnclosing(test, "class C { constructor() { marker; } }", ast.KindConstructor)
 }
 
 // TestEnclosingFunctionLikeStopsAtTheNearest pins that the walk does not skip past an inner scope.
-func TestEnclosingFunctionLikeStopsAtTheNearest(t *testing.T) {
-	t.Parallel()
-	expectEnclosing(t, "class C { get p() { const f = () => { marker; }; return 1; } }", ast.KindArrowFunction)
-	expectEnclosing(t, "function outer() { function inner() { marker; } }", ast.KindFunctionDeclaration)
+func TestEnclosingFunctionLikeStopsAtTheNearest(test *testing.T) {
+	test.Parallel()
+	expectEnclosing(test, "class C { get p() { const f = () => { marker; }; return 1; } }", ast.KindArrowFunction)
+	expectEnclosing(test, "function outer() { function inner() { marker; } }", ast.KindFunctionDeclaration)
 }
 
 // TestEnclosingFunctionLikeAnswersNilOutsideAFunction covers the shapes this deliberately does not
@@ -84,18 +84,18 @@ func TestEnclosingFunctionLikeStopsAtTheNearest(t *testing.T) {
 // answer a different question: which flow graph a node belongs to, whose set is the bodies the
 // binder gives a fresh start node. Merging the two would give this one the wrong answer at module
 // scope, where nil is correct.
-func TestEnclosingFunctionLikeAnswersNilOutsideAFunction(t *testing.T) {
-	t.Parallel()
-	expectEnclosing(t, "marker;", ast.KindUnknown)
-	expectEnclosing(t, "class C { static { marker; } }", ast.KindUnknown)
-	expectEnclosing(t, "class C { p = marker; }", ast.KindUnknown)
-	expectEnclosing(t, "if (true) { marker; }", ast.KindUnknown)
+func TestEnclosingFunctionLikeAnswersNilOutsideAFunction(test *testing.T) {
+	test.Parallel()
+	expectEnclosing(test, "marker;", ast.KindUnknown)
+	expectEnclosing(test, "class C { static { marker; } }", ast.KindUnknown)
+	expectEnclosing(test, "class C { p = marker; }", ast.KindUnknown)
+	expectEnclosing(test, "if (true) { marker; }", ast.KindUnknown)
 }
 
 // TestNameOf covers the names a function-like node is known by, including the borrowed ones.
-func TestNameOf(t *testing.T) {
-	t.Parallel()
-	for _, c := range []struct {
+func TestNameOf(test *testing.T) {
+	test.Parallel()
+	for _, testCase := range []struct {
 		source string
 		want   string
 	}{
@@ -112,18 +112,18 @@ func TestNameOf(t *testing.T) {
 		{"class C { get p() { marker; return 1; } }", ""},
 		{"class C { set p(v: number) { marker; } }", ""},
 		{"class C { constructor() { marker; } }", ""},
-		// Only the IMMEDIATE parent supplies a borrowed name. A function passed directly as an
+		// Only the immediate parent supplies a borrowed name. A function passed directly as an
 		// argument has a call expression as its parent and borrows nothing, where the same function
 		// assigned to a variable would borrow that variable's name.
 		{"call(function () { marker; });", ""},
 		{"call(() => { marker; });", ""},
 		{"const outer = [function () { marker; }];", ""},
 	} {
-		source, want := c.source, c.want
-		atMarker(t, "declare function call(x: any): void;\n"+source, func(node *ast.Node) {
+		source, want := testCase.source, testCase.want
+		atMarker(test, "declare function call(x: any): void;\n"+source, func(node *ast.Node) {
 			enclosing := scope.EnclosingFunctionLike(node)
 			if got := scope.NameOf(enclosing); got != want {
-				t.Errorf("%q: NameOf = %q, want %q", source, got, want)
+				test.Errorf("%q: NameOf = %q, want %q", source, got, want)
 			}
 		})
 	}
@@ -134,9 +134,9 @@ func TestNameOf(t *testing.T) {
 //
 // The nearest function is usually the anonymous callback passed to a hook, so a caller that stopped
 // there would answer "" everywhere it is meant to fire. This continues outward until it finds a name.
-func TestEnclosingNamedFunctionWalksPastAnonymousOnes(t *testing.T) {
-	t.Parallel()
-	for _, c := range []struct {
+func TestEnclosingNamedFunctionWalksPastAnonymousOnes(test *testing.T) {
+	test.Parallel()
+	for _, testCase := range []struct {
 		source string
 		want   string
 	}{
@@ -146,29 +146,29 @@ func TestEnclosingNamedFunctionWalksPastAnonymousOnes(t *testing.T) {
 		// Nothing named anywhere above.
 		{"effect(() => { marker; });", ""},
 	} {
-		source, want := c.source, c.want
-		atMarker(t, "declare function effect(x: any): void;\n"+source, func(node *ast.Node) {
+		source, want := testCase.source, testCase.want
+		atMarker(test, "declare function effect(x: any): void;\n"+source, func(node *ast.Node) {
 			_, got := scope.EnclosingNamedFunction(node)
 			if got != want {
-				t.Errorf("%q: EnclosingNamedFunction = %q, want %q", source, got, want)
+				test.Errorf("%q: EnclosingNamedFunction = %q, want %q", source, got, want)
 			}
 		})
 	}
 
 	// The contrast: the pair stops at the first function whether or not it has a name, which is what
 	// a caller reproducing an original that does the same needs.
-	atMarker(t, "declare function effect(x: any): void;\nfunction useThing() { effect(() => { marker; }); }",
+	atMarker(test, "declare function effect(x: any): void;\nfunction useThing() { effect(() => { marker; }); }",
 		func(node *ast.Node) {
 			if got := scope.NameOf(scope.EnclosingFunctionLike(node)); got != "" {
-				t.Errorf("the pair answered %q; it should stop at the anonymous arrow", got)
+				test.Errorf("the pair answered %q; it should stop at the anonymous arrow", got)
 			}
 		})
 }
 
 // TestBodyOf covers the body accessor, which answers for accessors and constructors where NameOf
 // does not.
-func TestBodyOf(t *testing.T) {
-	t.Parallel()
+func TestBodyOf(test *testing.T) {
+	test.Parallel()
 	for _, source := range []string{
 		"function f() { marker; }",
 		"const g = function () { marker; };",
@@ -179,10 +179,10 @@ func TestBodyOf(t *testing.T) {
 		"class C { constructor() { marker; } }",
 	} {
 		source := source
-		atMarker(t, source, func(node *ast.Node) {
+		atMarker(test, source, func(node *ast.Node) {
 			enclosing := scope.EnclosingFunctionLike(node)
 			if scope.BodyOf(enclosing) == nil {
-				t.Errorf("%q: BodyOf answered nil", source)
+				test.Errorf("%q: BodyOf answered nil", source)
 			}
 		})
 	}
@@ -190,18 +190,18 @@ func TestBodyOf(t *testing.T) {
 
 // TestNilGuards covers what a shared function needs and a rule-local one did not: inside a rule the
 // node always came from a walk, and on a shelf any caller can pass anything.
-func TestNilGuards(t *testing.T) {
-	t.Parallel()
+func TestNilGuards(test *testing.T) {
+	test.Parallel()
 	if scope.EnclosingFunctionLike(nil) != nil {
-		t.Error("EnclosingFunctionLike(nil) answered non-nil")
+		test.Error("EnclosingFunctionLike(nil) answered non-nil")
 	}
 	if scope.NameOf(nil) != "" {
-		t.Error("NameOf(nil) answered non-empty")
+		test.Error("NameOf(nil) answered non-empty")
 	}
 	if node, name := scope.EnclosingNamedFunction(nil); node != nil || name != "" {
-		t.Error("EnclosingNamedFunction(nil) answered non-empty")
+		test.Error("EnclosingNamedFunction(nil) answered non-empty")
 	}
 	if scope.BodyOf(nil) != nil {
-		t.Error("BodyOf(nil) answered non-nil")
+		test.Error("BodyOf(nil) answered non-nil")
 	}
 }

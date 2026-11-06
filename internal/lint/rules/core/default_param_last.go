@@ -35,7 +35,7 @@ var messageDefaultParamLastShouldBeLast = rule.Message{
 // reimplementation rather than a wrapper, and the two disagree on one class of input.
 //
 // Core's `isRequiredParameter` answers false for a rest element, and core's report is then
-// UNCONDITIONAL once a required parameter has been seen to the right. The typescript-eslint
+// unconditional once a required parameter has been seen to the right. The typescript-eslint
 // rewrite adds a second gate, reporting only when the parameter is optional or an assignment
 // pattern, which excludes a rest element from ever reporting. Driving both installed builds over
 // the same inputs:
@@ -44,7 +44,7 @@ var messageDefaultParamLastShouldBeLast = rule.Message{
 //	function f(a: number, ...b: number[], c: number) {}   core [1:23-1:37]  ts silent
 //	function f(a = 1, ...b: number[], c: number) {}       core 2 findings   ts 1 finding
 //
-// The same replay over all 96 cases of core's own corpus produced ZERO divergence, so no imported
+// The same replay over all 96 cases of core's own corpus produced zero divergence, so no imported
 // fixture can see this and the cases pinning it below are written from the measurement rather than
 // from the corpus. A rest parameter before another parameter is illegal source that the parser
 // accepts under error recovery, which is the only reason the shape is reachable at all.
@@ -60,25 +60,25 @@ var messageDefaultParamLastShouldBeLast = rule.Message{
 //	RestElement           DotDotDotToken != nil
 //	node.optional         QuestionToken != nil
 //
-// Nothing here reads a parameter's NAME, which matters: a destructured parameter's name node is a
+// Nothing here reads a parameter's name, which matters: a destructured parameter's name node is a
 // `KindObjectBindingPattern` or `KindArrayBindingPattern`, and `Node.Text()` panics on both. The
 // corpus writes five such parameters and the walk recovers per file, so one call would have cost
 // every rule in the package its verdict on that file.
 //
-// # A parameter property is a WRAPPER upstream and a modifier list here
+// # A parameter property is a wrapper upstream and a modifier list here
 //
 // `constructor(public a = 0, ...)` gives upstream a `TSParameterProperty` node wrapping the real
-// parameter. Core asks its classification questions of the INNER node and calls `context.report`
-// on the OUTER one, so the finding spans the modifier as well as the parameter.
+// parameter. Core asks its classification questions of the inner node and calls `context.report`
+// on the outer one, so the finding spans the modifier as well as the parameter.
 //
 // typescript-go attaches modifiers to the parameter itself, so there is no wrapper to unwrap and
 // the parameter's own token range already begins at the modifier. The corpus pins four such spans
 // and they are asserted as text rather than as columns.
 //
-// # A BODYLESS function-like construct is exempt, and that is a false-positive class of its own
+// # A bodyless function-like construct is exempt, and that is a false-positive class of its own
 //
 // Upstream listens on exactly three node types, and in the TypeScript ESTree every function-like
-// construct WITHOUT a body is a different node type that falls outside all three. Our parser draws
+// construct without a body is a different node type that falls outside all three. Our parser draws
 // no such distinction: a `declare function` is an ordinary `KindFunctionDeclaration` whose `Body()`
 // is nil, and an overload signature is an ordinary `KindConstructor` whose `Body()` is nil. Without
 // the nil-body guard this rule would report every ambient declaration in the tree, and not one of
@@ -102,14 +102,14 @@ var messageDefaultParamLastShouldBeLast = rule.Message{
 // parser gives each its own kind, so each needs its own arm.
 //
 // The obvious argument is that the accessor arms can never fire, because the grammar gives a setter
-// exactly one parameter and a getter none. That argument is about the GRAMMAR and it is wrong about
-// the PARSER: `class C { set x(a = 1, b: number) {} }` is illegal source, and typescript-go recovers
+// exactly one parameter and a getter none. That argument is about the grammar and it is wrong about
+// the parser: `class C { set x(a = 1, b: number) {} }` is illegal source, and typescript-go recovers
 // by attaching both parameters and a body. The installed core build reports all four such shapes.
 // This was found on the namespaced sibling by a mutation that emptied both arms and survived its
 // entire corpus; the same measurement holds here and four fixtures pin it.
-var DefaultParamLast = rule.Rule{
+var DefaultParamLast = rule.Rule[rule.NoOptions]{
 	Name: "default-param-last",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		check := func(node *ast.Node) {
 			// A bodyless construct declares a shape rather than an implementation, and upstream
 			// gives every such construct a node type outside its three listeners. See the doc
@@ -132,7 +132,7 @@ var DefaultParamLast = rule.Rule{
 			}
 			for index, parameter := range parameters {
 				// The boundary and the required-skip below overlap by exactly one index, and that
-				// is measured rather than assumed. Widening this to `lastRequiredIndex+1` SURVIVES
+				// is measured rather than assumed. Widening this to `lastRequiredIndex+1` survives
 				// the whole suite, and no fixture can catch it: the parameter at lastRequiredIndex
 				// is by definition required, so the skip declines it anyway. Enumerating every
 				// parameter list up to length six over the four classes, all 5,461 of them, the two
@@ -153,7 +153,7 @@ var DefaultParamLast = rule.Rule{
 				// What remains is defaulted, optional or rest, and core reports all three. This is
 				// the whole difference from the namespaced sibling, which gates the report a second
 				// time on optional-or-defaulted and so never reports a rest parameter.
-				ctx.ReportNode(parameter, messageDefaultParamLastShouldBeLast)
+				ruleContext.ReportNode(parameter, messageDefaultParamLastShouldBeLast)
 			}
 		}
 

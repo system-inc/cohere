@@ -17,7 +17,11 @@ import (
 
 // exportRanges names the directory TestExportRangesForAdamic writes to. Only a test flag sets it, so
 // nothing in a cohere run can reach the export.
-var exportRanges = flag.String("export-ranges", "", "write the functions React Compiler's vendored fixtures lower to, with their effects, into this directory, in the cases format of Adamic's mutation_aliasing slice")
+var exportRanges = flag.String(
+	"export-ranges",
+	"",
+	"write the functions React Compiler's vendored fixtures lower to, with their effects, into this directory, in the cases format of Adamic's mutation_aliasing slice",
+)
 
 // TestExportRangesForAdamic writes every function React Compiler's own fixtures lower to, as this IR
 // hands it to mutation_aliasing.InferMutableRanges, for Adamic's port of that module (#dnv6f2c), which
@@ -25,7 +29,8 @@ var exportRanges = flag.String("export-ranges", "", "write the functions React C
 //
 // It skips unless -export-ranges names a directory:
 //
-//	go test -count=1 -run '^TestExportRangesForAdamic$' ./internal/lint/ecmascript/high_level_intermediate_representation -args -export-ranges <dir>
+//	go test -count=1 -run '^TestExportRangesForAdamic$' \
+//		./internal/lint/ecmascript/high_level_intermediate_representation -args -export-ranges <dir>
 //
 // Each fixture becomes one file of cases, named for the fixture, holding its outermost functions and
 // every function nested in them, as ForFunction gives them. A fixture whose source names useMemo or
@@ -44,13 +49,13 @@ var exportRanges = flag.String("export-ranges", "", "write the functions React C
 // closure, which the cases replay. And each function carries the ranges cohere's own pass gave it, as
 // `expect` records, so the side of Adamic's test that runs the module in Go can show the cases
 // reproduce what cohere computes before it holds the port to them.
-func TestExportRangesForAdamic(t *testing.T) {
-	t.Parallel()
+func TestExportRangesForAdamic(test *testing.T) {
+	test.Parallel()
 	if *exportRanges == "" {
-		t.Skip("writes Adamic's corpus only when -export-ranges names a directory")
+		test.Skip("writes Adamic's corpus only when -export-ranges names a directory")
 	}
-	if err := os.MkdirAll(*exportRanges, 0o755); err != nil {
-		t.Fatal(err)
+	if createDirectoryError := os.MkdirAll(*exportRanges, 0o755); createDirectoryError != nil {
+		test.Fatal(createDirectoryError)
 	}
 
 	pipelines := []struct {
@@ -65,7 +70,7 @@ func TestExportRangesForAdamic(t *testing.T) {
 	}
 
 	fixtures, functions, closures := 0, 0, 0
-	for _, fixture := range reactCompilerFixtures(t) {
+	for _, fixture := range reactCompilerFixtures(test) {
 		var out strings.Builder
 		for _, pipeline := range pipelines {
 			if !pipeline.applies(fixture.source) {
@@ -74,28 +79,42 @@ func TestExportRangesForAdamic(t *testing.T) {
 			index := 0
 			var write func(function *Function)
 			write = func(function *Function) {
-				closures += writeAdamicRangesCase(&out, fmt.Sprintf("%s%s#%d", fixture.name, pipeline.suffix, index), function)
+				closures += writeAdamicRangesCase(
+					&out,
+					fmt.Sprintf("%s%s#%d", fixture.name, pipeline.suffix, index),
+					function,
+				)
 				index++
 				functions++
 				for _, nested := range function.Functions {
 					write(nested)
 				}
 			}
-			for _, function := range lowerReactCompilerFixture(t, fixture.source, pipeline.lower) {
+			for _, function := range lowerReactCompilerFixture(test, fixture.source, pipeline.lower) {
 				write(function)
 			}
 		}
 		if out.Len() == 0 {
 			continue
 		}
-		if err := os.WriteFile(filepath.Join(*exportRanges, fixture.name+".txt"), []byte(out.String()), 0o644); err != nil {
-			t.Fatal(err)
+		if writeError := os.WriteFile(
+			filepath.Join(*exportRanges, fixture.name+".txt"),
+			[]byte(out.String()),
+			0o644,
+		); writeError != nil {
+			test.Fatal(writeError)
 		}
 		fixtures++
 	}
-	t.Logf("%d fixtures, %d functions, %d closure answers, written to %s", fixtures, functions, closures, *exportRanges)
+	test.Logf(
+		"%d fixtures, %d functions, %d closure answers, written to %s",
+		fixtures,
+		functions,
+		closures,
+		*exportRanges,
+	)
 	if fixtures == 0 {
-		t.Fatal("no fixture lowered to anything, so the export holds nothing")
+		test.Fatal("no fixture lowered to anything, so the export holds nothing")
 	}
 }
 
@@ -118,12 +137,17 @@ type recordingRangeGraph struct {
 	answers map[closureKey][]closureAnswer
 }
 
-func (g recordingRangeGraph) Closure(function *Function, block *BasicBlock, index int, into static_single_assignment.IdentifierId,
-	kinds map[static_single_assignment.IdentifierId]mutation_aliasing.EffectValueKind) ([]Place, bool) {
-	captures, frozen := g.rangeGraph.Closure(function, block, index, into, kinds)
+func (graph recordingRangeGraph) Closure(
+	function *Function,
+	block *BasicBlock,
+	index int,
+	into static_single_assignment.IdentifierId,
+	kinds map[static_single_assignment.IdentifierId]mutation_aliasing.EffectValueKind,
+) ([]Place, bool) {
+	captures, frozen := graph.rangeGraph.Closure(function, block, index, into, kinds)
 	if captures != nil {
 		key := closureKey{block: block.Id, index: index}
-		g.answers[key] = append(g.answers[key], closureAnswer{into: into, captures: captures, frozen: frozen})
+		graph.answers[key] = append(graph.answers[key], closureAnswer{into: into, captures: captures, frozen: frozen})
 	}
 	return captures, frozen
 }
@@ -131,7 +155,10 @@ func (g recordingRangeGraph) Closure(function *Function, block *BasicBlock, inde
 // writeAdamicRangesCase writes one function as Adamic's mutation_aliasing cases records, returning how
 // many closure answers it holds.
 func writeAdamicRangesCase(out *strings.Builder, name string, function *Function) int {
-	graph := recordingRangeGraph{rangeGraph: newRangeGraph(function, InferAliasingEffects(function)), answers: map[closureKey][]closureAnswer{}}
+	graph := recordingRangeGraph{
+		rangeGraph: newRangeGraph(function, InferAliasingEffects(function)),
+		answers:    map[closureKey][]closureAnswer{},
+	}
 	ranges := mutation_aliasing.InferMutableRanges(graph, function, mutation_aliasing.Options{})
 
 	values := map[static_single_assignment.IdentifierId]bool{}
@@ -144,8 +171,8 @@ func writeAdamicRangesCase(out *strings.Builder, name string, function *Function
 	if graph.ParametersFrozen(function) {
 		out.WriteString("frozen-parameters\n")
 	}
-	for _, param := range graph.Params(function) {
-		fmt.Fprintf(out, "param %d\n", value(param))
+	for _, parameter := range graph.Parameters(function) {
+		fmt.Fprintf(out, "param %d\n", value(parameter))
 	}
 	for _, context := range graph.Context(function) {
 		fmt.Fprintf(out, "context %d\n", value(context))
@@ -210,13 +237,13 @@ func writeAdamicRangesCase(out *strings.Builder, name string, function *Function
 	for id := range values {
 		ids = append(ids, id)
 	}
-	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+	sort.Slice(ids, func(left, right int) bool { return ids[left] < ids[right] })
 	for _, id := range ids {
-		if r := ranges.Get(id); r.IsSet() {
-			fmt.Fprintf(out, "expect %d %d %d\n", id, r.Start, r.End)
+		if mutableRange := ranges.Get(id); mutableRange.IsSet() {
+			fmt.Fprintf(out, "expect %d %d %d\n", id, mutableRange.Start, mutableRange.End)
 		}
 	}
-	fmt.Fprintf(out, "expect-length %d\n", ranges.Len())
+	fmt.Fprintf(out, "expect-length %d\n", ranges.Length())
 	out.WriteString("passes ranges\n")
 	return closures
 }

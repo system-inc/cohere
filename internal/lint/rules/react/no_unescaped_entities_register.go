@@ -9,5 +9,8 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // `forbid` array is heterogeneous and has to be distinguishable as absent; see
 // DecodeNoUnescapedEntitiesOptions.
 func init() {
-	rule.Register(rule.Registration{Rule: NoUnescapedEntities, Decode: DecodeNoUnescapedEntitiesOptions})
+	rule.Register(rule.Registration[NoUnescapedEntitiesOptions]{
+		Rule:   NoUnescapedEntities,
+		Decode: DecodeNoUnescapedEntitiesOptions,
+	})
 }

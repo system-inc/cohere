@@ -8,7 +8,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // value, so a decoder handing back a zero struct would give an assertion style matching no branch
 // and the rule would report nothing on every input.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[ConsistentTypeAssertionsOptions]{
 		Rule:   ConsistentTypeAssertions,
 		Decode: DecodeConsistentTypeAssertionsOptions,
 	})

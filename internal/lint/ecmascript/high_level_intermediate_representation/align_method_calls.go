@@ -36,13 +36,13 @@ import (
 //
 // # Two mechanisms, and they are not interchangeable
 //
-// When both sides carry a scope, the two scopes MERGE: the survivor's range grows to cover both.
-// When only one side carries one, the other side's scope ASSIGNMENT changes -- the property joins
+// When both sides carry a scope, the two scopes merge: the survivor's range grows to cover both.
+// When only one side carries one, the other side's scope assignment changes -- the property joins
 // the call's scope, or loses its own. Upstream keeps these apart with a disjoint set for the first
 // and a mapping for the second, and the distinction matters because a merge changes a range while a
 // mapping changes membership.
 func AlignMethodCallScopes(function *Function, scopes *ReactiveScopes) *ReactiveScopes {
-	if function == nil || scopes == nil || scopes.Len() == 0 {
+	if function == nil || scopes == nil || scopes.Length() == 0 {
 		return scopes
 	}
 
@@ -82,7 +82,10 @@ func AlignMethodCallScopes(function *Function, scopes *ReactiveScopes) *Reactive
 		switch {
 		case lvalueScope != 0 && propertyScope != 0:
 			if lvalueScope != propertyScope {
-				merged.Union([]static_single_assignment.IdentifierId{static_single_assignment.IdentifierId(lvalueScope), static_single_assignment.IdentifierId(propertyScope)})
+				merged.Union([]static_single_assignment.IdentifierId{
+					static_single_assignment.IdentifierId(lvalueScope),
+					static_single_assignment.IdentifierId(propertyScope),
+				})
 			}
 		case lvalueScope != 0:
 			// The call is scoped and the property is not, so the property joins the call's scope.
@@ -104,8 +107,11 @@ func AlignMethodCallScopes(function *Function, scopes *ReactiveScopes) *Reactive
 // The two are applied in that order because a mapping names a scope by id, and a merge changes which
 // id survives. Applying the mapping first would assign a property to a scope that the merge is about
 // to fold away.
-func rebuildWithAlignedMethodCalls(scopes *ReactiveScopes, scopeMapping map[static_single_assignment.IdentifierId]ScopeId,
-	merged *DisjointSet) *ReactiveScopes {
+func rebuildWithAlignedMethodCalls(
+	scopes *ReactiveScopes,
+	scopeMapping map[static_single_assignment.IdentifierId]ScopeId,
+	merged *DisjointSet,
+) *ReactiveScopes {
 	// survivorOf resolves a scope through the merge, or returns it unchanged.
 	survivorOf := func(scope ScopeId) ScopeId {
 		if scope == 0 || !merged.Has(static_single_assignment.IdentifierId(scope)) {
@@ -170,8 +176,8 @@ func rebuildWithAlignedMethodCalls(scopes *ReactiveScopes, scopeMapping map[stat
 		rebuilt.members[scope] = append(rebuilt.members[scope], identifier)
 	}
 	for scope := range rebuilt.members {
-		sort.Slice(rebuilt.members[scope], func(a, b int) bool {
-			return rebuilt.members[scope][a] < rebuilt.members[scope][b]
+		sort.Slice(rebuilt.members[scope], func(left, right int) bool {
+			return rebuilt.members[scope][left] < rebuilt.members[scope][right]
 		})
 	}
 	return rebuilt

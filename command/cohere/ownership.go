@@ -45,18 +45,6 @@ import (
 // projectYieldVariable names the file that tells a project's run what it yields. See projectYield.
 const projectYieldVariable = "COHERE_PROJECT_YIELD"
 
-// projectYield is what one project's run leaves to others, as its parent wrote it.
-type projectYield struct {
-	// Files are files the tsconfig includes that a nearer one owns, absolute.
-	Files []string `json:"files"`
-
-	// Directories are directories the run's format walk leaves out, absolute, each formatted by the run
-	// of the project there. The project's own directory means the walk formats nothing: another tsconfig
-	// in the same directory formats it. A Swift run's are the Swift projects below it, whose files its
-	// not-checked notes leave out (see discovery.swiftYield).
-	Directories []string `json:"directories"`
-}
-
 // ownership is what reading the TypeScript projects decided, for the report and for each child.
 type ownership struct {
 	// Solutions are the solution roots, by label: found, and not run.
@@ -79,20 +67,17 @@ type ownership struct {
 	SharedDirectory map[string]bool
 }
 
-// configPath is the absolute path of a TypeScript project's tsconfig.
-func (found discovery) configPath(project discoveredProject) string {
-	name := project.ConfigFile
-	if name == "" {
-		name = projectMarker
-	}
-	return filepath.Join(found.Root, filepath.FromSlash(project.Directory), name)
-}
-
 // resolveOwnership reads every TypeScript project's tsconfig, follows references, drops solution roots and
 // projects left with nothing, and decides what each remaining project yields. found.Projects is rewritten
 // to the projects that run.
+//
+// Mutates: found the caller runs the projects found holds, so its list becomes the ones that run here
 func resolveOwnership(found *discovery) (ownership, error) {
-	decided := ownership{Yields: map[string]projectYield{}, Unloaded: map[string]int{}, SharedDirectory: map[string]bool{}}
+	decided := ownership{
+		Yields:          map[string]projectYield{},
+		Unloaded:        map[string]int{},
+		SharedDirectory: map[string]bool{},
+	}
 	typeScript := 0
 	for _, project := range found.Projects {
 		if project.Engine == engineTypeScript {
@@ -107,7 +92,7 @@ func resolveOwnership(found *discovery) (ownership, error) {
 		// tsconfig that points at one discovery's walk did not find. Reading a tsconfig is milliseconds, and
 		// a byte search keeps ahra's run from paying even that.
 		for _, project := range found.Projects {
-			if project.Engine == engineTypeScript && !mentionsReferences(found.configPath(project)) {
+			if project.Engine == engineTypeScript && !mentionsReferences(found.configurationPath(project)) {
 				return decided, nil
 			}
 		}
@@ -117,7 +102,7 @@ func resolveOwnership(found *discovery) (ownership, error) {
 	known := map[string]bool{}
 	for _, project := range found.Projects {
 		if project.Engine == engineTypeScript {
-			known[found.configPath(project)] = true
+			known[found.configurationPath(project)] = true
 		}
 	}
 	// The references, followed to the end: each one discovery did not find is a project of its own, in the
@@ -125,11 +110,11 @@ func resolveOwnership(found *discovery) (ownership, error) {
 	for queue := found.Projects; len(queue) > 0; {
 		var added []discoveredProject
 		for _, project := range queue {
-			read, isRead := reads[found.configPath(project)]
-			if project.Engine != engineTypeScript || !isRead || read.err != nil {
+			read, isRead := reads[found.configurationPath(project)]
+			if project.Engine != engineTypeScript || !isRead || read.readError != nil {
 				continue
 			}
-			for _, reference := range read.config.References {
+			for _, reference := range read.configuration.References {
 				if known[reference] {
 					continue
 				}
@@ -141,8 +126,8 @@ func resolveOwnership(found *discovery) (ownership, error) {
 				added = append(added, referenced)
 			}
 		}
-		for configFile, read := range readProjectConfigs(*found, added) {
-			reads[configFile] = read
+		for configurationFile, read := range readProjectConfigs(*found, added) {
+			reads[configurationFile] = read
 		}
 		found.Projects = append(found.Projects, added...)
 		queue = added
@@ -152,8 +137,10 @@ func resolveOwnership(found *discovery) (ownership, error) {
 	// Solution roots: nothing to check, and their references are projects now.
 	running := found.Projects[:0:0]
 	for _, project := range found.Projects {
-		if read, isRead := reads[found.configPath(project)]; project.Engine == engineTypeScript && isRead && read.err == nil &&
-			len(read.config.FileNames) == 0 && len(read.config.References) > 0 {
+		if read, isRead := reads[found.configurationPath(
+			project,
+		)]; project.Engine == engineTypeScript && isRead && read.readError == nil &&
+			len(read.configuration.FileNames) == 0 && len(read.configuration.References) > 0 {
 			decided.Solutions = append(decided.Solutions, projectLabel(project))
 			continue
 		}
@@ -164,11 +151,11 @@ func resolveOwnership(found *discovery) (ownership, error) {
 	// Each file to the nearest tsconfig that includes it.
 	includers := map[string][]int{}
 	for index, project := range found.Projects {
-		read, isRead := reads[found.configPath(project)]
-		if project.Engine != engineTypeScript || !isRead || read.err != nil {
+		read, isRead := reads[found.configurationPath(project)]
+		if project.Engine != engineTypeScript || !isRead || read.readError != nil {
 			continue
 		}
-		for _, fileName := range read.config.FileNames {
+		for _, fileName := range read.configuration.FileNames {
 			includers[fileName] = append(includers[fileName], index)
 		}
 	}
@@ -176,7 +163,9 @@ func resolveOwnership(found *discovery) (ownership, error) {
 	// See Ownership.
 	var unloaded []int
 	for index, project := range found.Projects {
-		if read, isRead := reads[found.configPath(project)]; project.Engine == engineTypeScript && isRead && read.err != nil {
+		if read, isRead := reads[found.configurationPath(
+			project,
+		)]; project.Engine == engineTypeScript && isRead && read.readError != nil {
 			unloaded = append(unloaded, index)
 		}
 	}
@@ -208,8 +197,11 @@ func resolveOwnership(found *discovery) (ownership, error) {
 	running = found.Projects[:0:0]
 	var runningYields [][]string
 	for index, project := range found.Projects {
-		read, isRead := reads[found.configPath(project)]
-		if isRead && read.err == nil && len(read.config.FileNames) > 0 && len(yielded[index]) == len(read.config.FileNames) {
+		read, isRead := reads[found.configurationPath(project)]
+		if isRead &&
+			read.readError == nil &&
+			len(read.configuration.FileNames) > 0 &&
+			len(yielded[index]) == len(read.configuration.FileNames) {
 			decided.Yielding = append(decided.Yielding, projectLabel(project))
 			continue
 		}
@@ -233,7 +225,10 @@ func resolveOwnership(found *discovery) (ownership, error) {
 			cacheDirectories[directory] = true
 			for _, other := range found.Projects {
 				if other.Engine == engineTypeScript && isBelow(other.Directory, project.Directory) {
-					yield.Directories = append(yield.Directories, filepath.Join(found.Root, filepath.FromSlash(other.Directory)))
+					yield.Directories = append(
+						yield.Directories,
+						filepath.Join(found.Root, filepath.FromSlash(other.Directory)),
+					)
 				}
 			}
 		}
@@ -249,8 +244,8 @@ func resolveOwnership(found *discovery) (ownership, error) {
 // projectConfigRead is one tsconfig read, or why it could not be: a project whose tsconfig cannot be read
 // still runs, and its own run reports what is wrong with it.
 type projectConfigRead struct {
-	config program.ProjectConfig
-	err    error
+	configuration program.ProjectConfiguration
+	readError     error
 }
 
 // readProjectConfigs reads the TypeScript projects' tsconfigs, several at once, by absolute path.
@@ -263,15 +258,18 @@ func readProjectConfigs(found discovery, projects []discoveredProject) map[strin
 		if project.Engine != engineTypeScript {
 			continue
 		}
-		configFile := found.configPath(project)
+		configurationFile := found.configurationPath(project)
 		group.Add(1)
 		go func() {
 			defer group.Done()
 			reading <- struct{}{}
-			config, err := program.ReadProjectConfig(configFile)
+			configuration, readProjectConfigurationError := program.ReadProjectConfiguration(configurationFile)
 			<-reading
 			lock.Lock()
-			reads[configFile] = projectConfigRead{config: config, err: err}
+			reads[configurationFile] = projectConfigRead{
+				configuration: configuration,
+				readError:     readProjectConfigurationError,
+			}
 			lock.Unlock()
 		}()
 	}
@@ -279,42 +277,10 @@ func readProjectConfigs(found discovery, projects []discoveredProject) map[strin
 	return reads
 }
 
-// projectAt is the project a referenced tsconfig defines, and whether it lies in the repository discovery
-// walked and outside what it never enters: a dependency, build or cache directory, a repository of its
-// own, or a marker the root's ignorePatterns refused.
-func (found discovery) projectAt(configFile string) (discoveredProject, bool) {
-	relative, err := filepath.Rel(found.Root, configFile)
-	if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
-		return discoveredProject{}, false
-	}
-	relative = filepath.ToSlash(relative)
-	for _, segment := range strings.Split(path.Dir(relative), "/") {
-		if neverDescended[segment] {
-			return discoveredProject{}, false
-		}
-	}
-	for _, repository := range found.NestedRepositories {
-		if isBelow(path.Dir(relative), repository) || path.Dir(relative) == repository {
-			return discoveredProject{}, false
-		}
-	}
-	if slices.Contains(found.Refused, relative) {
-		return discoveredProject{}, false
-	}
-	if !isRegularFile(configFile) {
-		return discoveredProject{}, false
-	}
-	project := discoveredProject{Directory: path.Dir(relative), Engine: engineTypeScript}
-	if name := path.Base(relative); name != projectMarker {
-		project.ConfigFile = name
-	}
-	return project, true
-}
-
 // nearestIncluder is which of the projects that include a file owns it. See Ownership.
 func nearestIncluder(found discovery, fileName string, indexes []int) int {
-	relative, err := filepath.Rel(found.Root, fileName)
-	if err != nil {
+	relative, relativePathError := filepath.Rel(found.Root, fileName)
+	if relativePathError != nil {
 		return indexes[0]
 	}
 	fileDirectory := path.Dir(filepath.ToSlash(relative))
@@ -334,8 +300,8 @@ func nearestIncluder(found discovery, fileName string, indexes []int) int {
 // slashDirectoryOf is a file's directory, slash-separated and relative to the root, or "" when the file
 // lies outside it.
 func slashDirectoryOf(found discovery, fileName string) string {
-	relative, err := filepath.Rel(found.Root, fileName)
-	if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+	relative, relativePathError := filepath.Rel(found.Root, fileName)
+	if relativePathError != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
 		return ""
 	}
 	return path.Dir(filepath.ToSlash(relative))
@@ -373,9 +339,9 @@ func sharedSegments(left string, right string) int {
 
 // mentionsReferences reports whether a tsconfig's text could hold project references: a byte search, so a
 // false positive costs one read and a false negative is impossible.
-func mentionsReferences(configFile string) bool {
-	contents, err := os.ReadFile(configFile)
-	return err != nil || bytes.Contains(contents, []byte(`"references"`))
+func mentionsReferences(configurationFile string) bool {
+	contents, readError := os.ReadFile(configurationFile)
+	return readError != nil || bytes.Contains(contents, []byte(`"references"`))
 }
 
 // writeProjectYield writes what one project yields to a file of its own for its run to read, and returns
@@ -384,17 +350,22 @@ func writeProjectYield(yield projectYield, directory string) (string, error) {
 	if len(yield.Files) == 0 && len(yield.Directories) == 0 {
 		return "", nil
 	}
-	encoded, err := json.Marshal(yield)
-	if err != nil {
-		return "", err
+	encoded, encodeError := json.Marshal(yield)
+	if encodeError != nil {
+		return "", encodeError
 	}
-	file, err := os.CreateTemp(directory, "yield-*.json")
-	if err != nil {
-		return "", err
+	file, temporaryFileError := os.CreateTemp(directory, "yield-*.json")
+	if temporaryFileError != nil {
+		return "", temporaryFileError
 	}
-	defer file.Close()
-	if _, err := file.Write(encoded); err != nil {
-		return "", err
+	if _, writeError := file.Write(encoded); writeError != nil {
+		_ = file.Close() // Ignored: the write's error is the one returned.
+		return "", writeError
+	}
+	// The close is the write's last chance to fail, and a yield file that did not land would leave the project's
+	// run reading less than it yields.
+	if closeError := file.Close(); closeError != nil {
+		return "", closeError
 	}
 	return file.Name(), nil
 }
@@ -406,28 +377,20 @@ var activeProjectYield = sync.OnceValues(func() (projectYield, error) {
 	if yieldFile == "" {
 		return projectYield{}, nil
 	}
-	contents, err := os.ReadFile(yieldFile)
-	if err != nil {
-		return projectYield{}, fmt.Errorf("reading what this project yields to the others: %w", err)
+	contents, readError := os.ReadFile(yieldFile)
+	if readError != nil {
+		return projectYield{}, fmt.Errorf("reading what this project yields to the others: %w", readError)
 	}
 	var yield projectYield
-	if err := json.Unmarshal(contents, &yield); err != nil {
-		return projectYield{}, fmt.Errorf("reading what this project yields to the others, %s: %w", yieldFile, err)
+	if decodeError := json.Unmarshal(contents, &yield); decodeError != nil {
+		return projectYield{}, fmt.Errorf(
+			"reading what this project yields to the others, %s: %w",
+			yieldFile,
+			decodeError,
+		)
 	}
 	return yield, nil
 })
-
-// yieldedFiles is the run's yielded files as the set program.Options.Yielded takes, nil when it yields none.
-func (yield projectYield) yieldedFiles() map[string]struct{} {
-	if len(yield.Files) == 0 {
-		return nil
-	}
-	files := make(map[string]struct{}, len(yield.Files))
-	for _, fileName := range yield.Files {
-		files[filepath.Clean(fileName)] = struct{}{}
-	}
-	return files
-}
 
 // nestedProjectsLayer is the format walk's count of files it left to the projects below it.
 const nestedProjectsLayer = "nearer projects"
@@ -435,8 +398,8 @@ const nestedProjectsLayer = "nearer projects"
 // withoutYieldedDirectories is a format walk less the files under the directories this run yields, each the
 // run of the project there formats. A walk the run yields nothing from is returned as it is.
 func withoutYieldedDirectories(enumeration formatfiles.Enumeration) formatfiles.Enumeration {
-	yield, err := activeProjectYield()
-	if err != nil || len(yield.Directories) == 0 {
+	yield, activeProjectYieldError := activeProjectYield()
+	if activeProjectYieldError != nil || len(yield.Directories) == 0 {
 		return enumeration
 	}
 	kept := enumeration.Files[:0:0]
@@ -462,9 +425,9 @@ func withoutYieldedDirectories(enumeration formatfiles.Enumeration) formatfiles.
 
 // yieldsFile reports whether a file lies in one of the yielded directories, or is one of them.
 func yieldsFile(directories []string, fileName string) bool {
-	fileName = filepath.Clean(fileName)
+	cleanFileName := filepath.Clean(fileName)
 	for _, directory := range directories {
-		if strings.HasPrefix(fileName, directory+string(filepath.Separator)) {
+		if strings.HasPrefix(cleanFileName, directory+string(filepath.Separator)) {
 			return true
 		}
 	}
@@ -474,10 +437,11 @@ func yieldsFile(directories []string, fileName string) bool {
 // activeProjectYieldFingerprint names what this run yields, for the run cache's key: empty when it yields
 // nothing, so a run that is not one of several keeps the key it had.
 func activeProjectYieldFingerprint() string {
-	yield, err := activeProjectYield()
-	if err != nil || (len(yield.Files) == 0 && len(yield.Directories) == 0) {
+	yield, activeProjectYieldError := activeProjectYield()
+	if activeProjectYieldError != nil || (len(yield.Files) == 0 && len(yield.Directories) == 0) {
 		return ""
 	}
+	// Ignored: a projectYield is two lists of strings, which always encode.
 	encoded, _ := json.Marshal(yield)
 	digest := sha256.Sum256(encoded)
 	return hex.EncodeToString(digest[:])

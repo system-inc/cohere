@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"os/exec"
 	"syscall"
 	"testing"
@@ -14,12 +15,29 @@ import (
 // machine (#wwhrpm0). So a signaled child is said to be one, by name, before the test reports its -1. It
 // is an error rather than a fatal one because some of these runs are made from a subtest's goroutine
 // through the enclosing test's t, where only Errorf is safe.
-func childExitCode(t testing.TB, exitError *exec.ExitError) int {
-	t.Helper()
+func childExitCode(test testing.TB, exitError *exec.ExitError) int {
+	test.Helper()
 	if status, isStatus := exitError.Sys().(syscall.WaitStatus); isStatus && status.Signaled() {
-		t.Errorf("cohere was killed by signal %d (%s), from outside it rather than an exit it chose: rerun "+
+		test.Errorf("cohere was killed by signal %d (%s), from outside it rather than an exit it chose: rerun "+
 			"the test alone, and look for a kill by name (pkill, killall) or memory pressure on the machine",
 			int(status.Signal()), status.Signal())
 	}
 	return exitError.ExitCode()
+}
+
+// requireChildRan fails the test when a cohere child did not run to an exit of its own. An exit that is not
+// zero passes, as a run with findings ends; an error that is no exit at all means the child never started or
+// could not be waited for, and its output is then nothing to assert on. Errorf rather than Fatalf, for the
+// reason childExitCode gives.
+func requireChildRan(test testing.TB, runError error) {
+	test.Helper()
+	if runError == nil {
+		return
+	}
+	var exitError *exec.ExitError
+	if !errors.As(runError, &exitError) {
+		test.Errorf("running cohere: %v", runError)
+		return
+	}
+	childExitCode(test, exitError)
 }

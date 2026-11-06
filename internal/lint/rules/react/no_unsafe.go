@@ -26,7 +26,8 @@ var (
 			"interrupts the render. Move the work to `componentDidMount`, which runs after the " +
 			"tree is committed and cannot be thrown away.",
 	}
-	messageUnsafeComponentWillReceiveProps = rule.Message{
+	// messageUnsafeComponentWillReceiveProperties reports React's `componentWillReceiveProps`.
+	messageUnsafeComponentWillReceiveProperties = rule.Message{
 		Id: "unsafeComponentWillReceiveProps",
 		Description: "`componentWillReceiveProps` runs on every parent render rather than only when " +
 			"the props changed, so state derived inside it drifts out of step with the props it " +
@@ -196,15 +197,15 @@ const (
 // React.Component` is legal TypeScript and the finding is correct there. Stated rather than silent,
 // because it is the one place this port is knowingly wider than oxc, and the only inputs it can
 // differ on are ones oxc declines to look at rather than ones it judges differently.
-var NoUnsafe = rule.Rule{
+var NoUnsafe = rule.Rule[NoUnsafeOptions]{
 	// No namespace prefix. The config writes `react/no-unsafe` and the parity guard strips the
 	// namespace on a `/` boundary.
 	Name: "react/no-unsafe",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoUnsafeOptions]) rule.Listeners {
 		// An unconfigured rule gets the zero value, which is upstream's default of false. The
 		// comma-ok form matters: the plain harness and a bare severity in the config both hand this
 		// a nil, and an unchecked assertion would panic on every real file.
-		settings, _ := rule.OptionsAs[NoUnsafeOptions](options)
+		settings, _ := options.Read()
 
 		report := func(name *ast.Node, message rule.Message) {
 			// The key, not the member. Upstream's span is `key.span()` on both arms, so
@@ -222,12 +223,13 @@ var NoUnsafe = rule.Rule{
 			//
 			// Found by asserting the span, which is the whole reason step 8 is not optional here:
 			// every identifier assertion in this file was already green with the brackets included.
-			if name != nil && name.Kind == ast.KindComputedPropertyName {
-				if inner := name.AsComputedPropertyName().Expression; inner != nil {
-					name = inner
+			key := name
+			if key != nil && key.Kind == ast.KindComputedPropertyName {
+				if inner := key.AsComputedPropertyName().Expression; inner != nil {
+					key = inner
 				}
 			}
-			ctx.ReportNode(name, message)
+			ruleContext.ReportNode(key, message)
 		}
 
 		judge := func(name *ast.Node) (rule.Message, bool) {
@@ -242,13 +244,13 @@ var NoUnsafe = rule.Rule{
 			case unsafeWillMountName:
 				return messageUnsafeComponentWillMount, true
 			case unsafeWillReceivePropsName:
-				return messageUnsafeComponentWillReceiveProps, true
+				return messageUnsafeComponentWillReceiveProperties, true
 			case unsafeWillUpdateName:
 				return messageUnsafeComponentWillUpdate, true
 			case unsafeAliasWillMountName:
 				return messageUnsafeComponentWillMount, settings.CheckAliases
 			case unsafeAliasWillReceivePropsName:
-				return messageUnsafeComponentWillReceiveProps, settings.CheckAliases
+				return messageUnsafeComponentWillReceiveProperties, settings.CheckAliases
 			case unsafeAliasWillUpdateName:
 				return messageUnsafeComponentWillUpdate, settings.CheckAliases
 			}

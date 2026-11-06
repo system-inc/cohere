@@ -19,7 +19,9 @@ import (
 // namespace bar followed by something other than a word or `*` (`a| b`, `:is(a|)`),
 // where parser.js's namespace() returns without consuming the bar and every caller comes straight
 // back to it. Prettier would hang on such a selector; the port refuses it instead.
-var ErrLoopsForever = errors.New("postcss-selector-parser 2.2.3 never returns on this selector: a namespace bar it does not consume")
+var ErrLoopsForever = errors.New(
+	"postcss-selector-parser 2.2.3 never returns on this selector: a namespace bar it does not consume",
+)
 
 // Parse is processor.js's process(selector) with Prettier's callback: the root the parser builds, or
 // the error it throws, marked printing.Syntax. Upstream's own errors keep their messages ("Unclosed
@@ -30,7 +32,7 @@ var ErrLoopsForever = errors.New("postcss-selector-parser 2.2.3 never returns on
 // offset into selector, converted from upstream's UTF-16 index; source's lines and columns stay as
 // upstream computes them, columns in UTF-16 units. Every node's Range is [0, 0]: upstream records a
 // start (sourceIndex) and no end, and Prettier's loc.js computes positions from those fields.
-func Parse(selector string) (root *estree.Node, err error) {
+func Parse(selector string) (root *estree.Node, parseError error) {
 	defer func() {
 		recovered := recover()
 		if recovered == nil {
@@ -39,11 +41,11 @@ func Parse(selector string) (root *estree.Node, err error) {
 		root = nil
 		switch thrown := recovered.(type) {
 		case thrownError:
-			err = printing.Syntax(errors.New(thrown.message))
+			parseError = printing.Syntax(errors.New(thrown.message))
 		case loopsForever:
-			err = printing.Syntax(ErrLoopsForever)
+			parseError = printing.Syntax(ErrLoopsForever)
 		default:
-			err = fmt.Errorf("css selector parser: %v", recovered)
+			parseError = fmt.Errorf("css selector parser: %v", recovered)
 		}
 	}()
 
@@ -84,8 +86,8 @@ func byteOffset(offsets []int, index int) int {
 }
 
 func convertSourceIndexes(node *estree.Node, offsets []int) {
-	if index, isInt := node.Get("sourceIndex").(int); isInt {
-		node.Set("sourceIndex", byteOffset(offsets, index))
+	if index, isInt := node.Get("sourceIndex").(estree.Integer); isInt {
+		node.Set("sourceIndex", estree.Integer(byteOffset(offsets, int(index))))
 	}
 	for _, child := range node.List("nodes") {
 		convertSourceIndexes(child, offsets)

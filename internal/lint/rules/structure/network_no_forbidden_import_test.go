@@ -8,8 +8,8 @@ import (
 
 const forbiddenImportFile = "/repository/source/components/Thing.tsx"
 
-func TestNetworkNoForbiddenImportFires(t *testing.T) {
-	t.Parallel()
+func TestNetworkNoForbiddenImportFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -65,16 +65,16 @@ func TestNetworkNoForbiddenImportFires(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.Run(t, NetworkNoForbiddenImport, testCase.fileName,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.Run(test, NetworkNoForbiddenImport, testCase.fileName,
 				testCase.sourceText), testCase.wantIds...)
 		})
 	}
 }
 
-func TestNetworkNoForbiddenImportStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNetworkNoForbiddenImportStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -92,11 +92,13 @@ func TestNetworkNoForbiddenImportStaysSilent(t *testing.T) {
 			"import { QueryClient } from '@tanstack/react-query';\nexport const Use = QueryClient;\n",
 		},
 		{
-			"tanstack inside NetworkService's provider", "/repository/source/services/network/NetworkServiceProvider.tsx",
+			"tanstack inside NetworkService's provider",
+			"/repository/source/services/network/NetworkServiceProvider.tsx",
 			"import { QueryClientProvider } from '@tanstack/react-query';\nexport const Use = QueryClientProvider;\n",
 		},
 		{
-			"tanstack inside NetworkService's internal cache", "/repository/libraries/structure/source/services/network/internal/NetworkServiceCache.ts",
+			"tanstack inside NetworkService's internal cache",
+			"/repository/libraries/structure/source/services/network/internal/NetworkServiceCache.ts",
 			"import { QueryClient } from '@tanstack/react-query';\nexport const Use = QueryClient;\n",
 		},
 		// The apollo exemption is deliberately absent, so this is the boundary: the prefix must be
@@ -123,9 +125,9 @@ func TestNetworkNoForbiddenImportStaysSilent(t *testing.T) {
 		{"no imports at all", forbiddenImportFile, "export const Value = 1;\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NetworkNoForbiddenImport, testCase.fileName,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NetworkNoForbiddenImport, testCase.fileName,
 				testCase.sourceText))
 		})
 	}

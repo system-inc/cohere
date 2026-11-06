@@ -31,6 +31,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/docsdata"
 	"github.com/system-inc/cohere/internal/docsdata/capture"
+	"github.com/system-inc/cohere/internal/sentence"
 )
 
 // capturedPackages are the tests that assert rule cases through the harness.
@@ -41,7 +42,9 @@ var verbs = []string{"rename"}
 
 // notRecaptured is what a run that read the examples back says, every time, so nothing it prints reads as
 // a verdict on the examples themselves.
-const notRecaptured = "the examples were read back from " + docsdata.ExamplesDirectory + ", not recaptured from the lint tests; -check recaptures them"
+const notRecaptured = "the examples were read back from " +
+	docsdata.ExamplesDirectory +
+	", not recaptured from the lint tests; -check recaptures them"
 
 // sources is where a run reads what Build takes beyond the module's files: the binary's help and the lint
 // tests' captured cases. A test swaps both, so it can run a check without building the binary or the suite.
@@ -55,18 +58,31 @@ type sources struct {
 
 var moduleSources = sources{root: ".", help: binaryHelp, capture: captureLintTests}
 
-// errStale is a check that found stale files, which it has already named: exit 1 with nothing more to say.
-var errStale = errors.New("stale")
+// errorStale is a check that found stale files, which it has already named: exit 1 with nothing more to say.
+var errorStale = errors.New("stale")
 
 func main() {
-	check := flag.Bool("check", false, "recapture the examples from the lint tests, then report every stale file and exit 1, writing nothing (minutes)")
-	checkRendering := flag.Bool("check-rendering", false, "report every stale file rendered from the committed examples and exit 1, writing nothing; the examples are not recaptured")
-	recapture := flag.Bool("capture", false, "rerun the lint tests with "+capture.Variable+" set and pick the examples afresh")
+	check := flag.Bool(
+		"check",
+		false,
+		"recapture the examples from the lint tests, then report every stale file and exit 1, writing nothing (minutes)",
+	)
+	checkRendering := flag.Bool(
+		"check-rendering",
+		false,
+		"report every stale file rendered from the committed examples and exit 1, writing nothing; the examples are not recaptured",
+	)
+	recapture := flag.Bool(
+		"capture",
+		false,
+		"rerun the lint tests with "+capture.Variable+" set and pick the examples afresh",
+	)
 	flag.Parse()
 
-	if err := run(*check, *checkRendering, *recapture); err != nil {
-		if !errors.Is(err, errStale) {
-			fmt.Fprintln(os.Stderr, err)
+	if runError := run(*check, *checkRendering, *recapture); runError != nil {
+		if !errors.Is(runError, errorStale) {
+			// Ignored: the exit code below says the run failed even when standard error cannot.
+			fmt.Fprintln(os.Stderr, runError)
 		}
 		os.Exit(1)
 	}
@@ -79,40 +95,47 @@ func run(check bool, checkRendering bool, recapture bool) error {
 	if checkRendering && recapture {
 		return fmt.Errorf("-check-rendering reads the committed examples back; to recapture them, run -check")
 	}
-	scratch, err := os.MkdirTemp("", "cohere-docsdata-")
-	if err != nil {
-		return err
+	scratch, temporaryDirectoryError := os.MkdirTemp("", "cohere-docsdata-")
+	if temporaryDirectoryError != nil {
+		return temporaryDirectoryError
 	}
 	defer removeScratch(scratch)
 
 	if check || checkRendering {
-		stale, err := staleFiles(moduleSources, scratch, check)
-		if err != nil {
-			return err
+		stale, staleFilesError := staleFiles(moduleSources, scratch, check)
+		if staleFilesError != nil {
+			return staleFilesError
 		}
 		for _, path := range stale {
-			fmt.Printf("stale: %s\n", path)
+			if _, printError := fmt.Printf("stale: %s\n", path); printError != nil {
+				return fmt.Errorf("naming a stale file: %w", printError)
+			}
 		}
 		if checkRendering {
-			fmt.Println(notRecaptured)
+			if _, printError := fmt.Println(notRecaptured); printError != nil {
+				return fmt.Errorf("saying the examples were not recaptured: %w", printError)
+			}
 		}
 		if len(stale) > 0 {
 			// Returned rather than exiting here, so the scratch directory is still removed.
-			return errStale
+			return errorStale
 		}
 		if check {
-			fmt.Println("every file is current, the examples recaptured from the lint tests")
+			_, printError := fmt.Println("every file is current, the examples recaptured from the lint tests")
+			if printError != nil {
+				return fmt.Errorf("saying every file is current: %w", printError)
+			}
 		}
 		return nil
 	}
 
-	inputs, err := gather(moduleSources, scratch, recapture)
-	if err != nil {
-		return err
+	inputs, gatherError := gather(moduleSources, scratch, recapture)
+	if gatherError != nil {
+		return gatherError
 	}
-	files, err := docsdata.Build(inputs)
-	if err != nil {
-		return err
+	files, buildError := docsdata.Build(inputs)
+	if buildError != nil {
+		return buildError
 	}
 
 	paths := make([]string, 0, len(files))
@@ -121,30 +144,37 @@ func run(check bool, checkRendering bool, recapture bool) error {
 	}
 	sort.Strings(paths)
 	for _, path := range paths {
+		// Ignored: a file missing or unreadable is written afresh, and a write that fails returns its error below.
 		existing, _ := os.ReadFile(path)
 		if bytes.Equal(existing, files[path]) {
 			continue
 		}
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			return err
+		if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
+			return createDirectoryError
 		}
-		if err := os.WriteFile(path, files[path], 0o644); err != nil {
-			return err
+		if writeError := os.WriteFile(path, files[path], 0o644); writeError != nil {
+			return writeError
 		}
-		fmt.Printf("wrote %s\n", path)
+		if _, printError := fmt.Printf("wrote %s\n", path); printError != nil {
+			return fmt.Errorf("saying %s was written: %w", path, printError)
+		}
 	}
-	orphans, err := docsdata.OrphanedExamples(".", files)
-	if err != nil {
-		return err
+	orphans, orphanedExamplesError := docsdata.OrphanedExamples(".", files)
+	if orphanedExamplesError != nil {
+		return orphanedExamplesError
 	}
 	for _, path := range orphans {
-		if err := os.Remove(path); err != nil {
-			return err
+		if removeError := os.Remove(path); removeError != nil {
+			return removeError
 		}
-		fmt.Printf("removed %s\n", path)
+		if _, printError := fmt.Printf("removed %s\n", path); printError != nil {
+			return fmt.Errorf("saying %s was removed: %w", path, printError)
+		}
 	}
 	if !recapture {
-		fmt.Println(notRecaptured)
+		if _, printError := fmt.Println(notRecaptured); printError != nil {
+			return fmt.Errorf("saying the examples were not recaptured: %w", printError)
+		}
 	}
 	return nil
 }
@@ -154,37 +184,38 @@ func run(check bool, checkRendering bool, recapture bool) error {
 // committed example that no longer matches its rule's tests is stale; without it, they are the committed
 // files, and only what is rendered from them is checked.
 func staleFiles(source sources, scratch string, recapture bool) ([]string, error) {
-	inputs, err := gather(source, scratch, recapture)
-	if err != nil {
-		return nil, err
+	inputs, gatherError := gather(source, scratch, recapture)
+	if gatherError != nil {
+		return nil, gatherError
 	}
-	files, err := docsdata.Build(inputs)
-	if err != nil {
-		return nil, err
+	files, buildError := docsdata.Build(inputs)
+	if buildError != nil {
+		return nil, buildError
 	}
 	return docsdata.Stale(source.root, files)
 }
 
 // gather reads every source Build takes. Without recapture, the examples are the committed files.
 func gather(source sources, scratch string, recapture bool) (docsdata.Inputs, error) {
-	inputs, err := docsdata.SourceInputs(source.root)
-	if err != nil {
-		return inputs, err
+	inputs, sourceInputsError := docsdata.SourceInputs(source.root)
+	if sourceInputsError != nil {
+		return inputs, sourceInputsError
 	}
-	if inputs.Help, inputs.VerbHelp, err = source.help(scratch); err != nil {
-		return inputs, err
+	var helpError error
+	if inputs.Help, inputs.VerbHelp, helpError = source.help(scratch); helpError != nil {
+		return inputs, helpError
 	}
 	if !recapture {
 		return inputs, nil
 	}
 
 	captured := filepath.Join(scratch, "captured")
-	if err := source.capture(captured); err != nil {
-		return inputs, err
+	if captureError := source.capture(captured); captureError != nil {
+		return inputs, captureError
 	}
-	records, err := docsdata.ReadCaptures(captured)
-	if err != nil {
-		return inputs, err
+	records, readCapturesError := docsdata.ReadCaptures(captured)
+	if readCapturesError != nil {
+		return inputs, readCapturesError
 	}
 	if len(records) == 0 {
 		// A capture that recorded nothing would leave every example orphaned, and a check reading that as a
@@ -193,7 +224,14 @@ func gather(source sources, scratch string, recapture bool) (docsdata.Inputs, er
 	}
 	var withOptions int
 	inputs.Examples, withOptions = docsdata.PickExamples(records)
-	fmt.Printf("captured %d records; %d distinct cases ran with options, counted for message ids and never shown\n", len(records), withOptions)
+	_, printError := fmt.Printf(
+		"captured %d records; %d distinct cases ran with options, counted for message ids and never shown\n",
+		len(records),
+		withOptions,
+	)
+	if printError != nil {
+		return inputs, fmt.Errorf("saying what was captured: %w", printError)
+	}
 	return inputs, nil
 }
 
@@ -207,8 +245,8 @@ func captureLintTests(directory string) error {
 	test := exec.Command("go", "test", capturedPackages)
 	test.Env = append(os.Environ(), capture.Variable+"="+directory)
 	test.Stdout, test.Stderr = os.Stderr, os.Stderr
-	if err := test.Run(); err != nil {
-		return fmt.Errorf("the lint tests failed under capture, so their cases are not all asserted: %w", err)
+	if runError := test.Run(); runError != nil {
+		return fmt.Errorf("the lint tests failed under capture, so their cases are not all asserted: %w", runError)
 	}
 	return nil
 }
@@ -219,18 +257,18 @@ func binaryHelp(scratch string) ([]byte, map[string][]byte, error) {
 	binary := filepath.Join(scratch, "cohere")
 	build := exec.Command("go", "build", "-o", binary, "./command/cohere")
 	build.Stdout, build.Stderr = os.Stderr, os.Stderr
-	if err := build.Run(); err != nil {
-		return nil, nil, fmt.Errorf("building ./command/cohere for its help: %w", err)
+	if runError := build.Run(); runError != nil {
+		return nil, nil, fmt.Errorf("building ./command/cohere for its help: %w", runError)
 	}
 
-	help, err := helpOutput(binary, "-help")
-	if err != nil {
-		return nil, nil, err
+	help, helpOutputError := helpOutput(binary, "-help")
+	if helpOutputError != nil {
+		return nil, nil, helpOutputError
 	}
 	verbHelp := map[string][]byte{}
 	for _, verb := range verbs {
-		if verbHelp[verb], err = helpOutput(binary, verb, "-help"); err != nil {
-			return nil, nil, err
+		if verbHelp[verb], helpOutputError = helpOutput(binary, verb, "-help"); helpOutputError != nil {
+			return nil, nil, helpOutputError
 		}
 	}
 	return help, verbHelp, nil
@@ -244,15 +282,16 @@ func helpOutput(binary string, arguments ...string) ([]byte, error) {
 	command.Dir = filepath.Dir(binary)
 	var output bytes.Buffer
 	command.Stdout, command.Stderr = &output, &output
-	if err := command.Run(); err != nil {
+	if runError := command.Run(); runError != nil {
 		var exit *exec.ExitError
-		if !errors.As(err, &exit) {
-			return nil, err
+		if !errors.As(runError, &exit) {
+			return nil, runError
 		}
 	}
 	var kept []string
 	for _, line := range strings.Split(output.String(), "\n") {
-		if strings.HasPrefix(line, "Usage of ") || line == "cohere: flag: help requested" {
+		// The second is the flag package's help error as cohere prints a failure, one sentence (internal/sentence).
+		if strings.HasPrefix(line, "Usage of ") || line == "cohere: "+sentence.FromError(flag.ErrHelp) {
 			continue
 		}
 		kept = append(kept, line)
@@ -263,8 +302,9 @@ func helpOutput(binary string, arguments ...string) ([]byte, error) {
 // removeScratch removes the temporary directory's files one by one, by name, and then the directories.
 func removeScratch(scratch string) {
 	var directories []string
-	_ = filepath.WalkDir(scratch, func(path string, entry os.DirEntry, err error) error {
-		if err != nil {
+	// Ignored: a temporary directory left behind costs disk, never a wrong file.
+	_ = filepath.WalkDir(scratch, func(path string, entry os.DirEntry, pathError error) error {
+		if pathError != nil {
 			return nil
 		}
 		if entry.IsDir() {
@@ -274,6 +314,6 @@ func removeScratch(scratch string) {
 		return os.Remove(path)
 	})
 	for index := len(directories) - 1; index >= 0; index-- {
-		_ = os.Remove(directories[index])
+		_ = os.Remove(directories[index]) // Ignored: a temporary directory left behind costs disk, never a wrong file.
 	}
 }

@@ -9,7 +9,10 @@ import (
 
 // correctnessRequireOrmColumnNullableParityText is the rule's message, whose wording lives in
 // `policy/messages/correctness-require-orm-column-nullable-parity.json`.
-var correctnessRequireOrmColumnNullableParityText = policy.MessageOf("base/correctness-require-orm-column-nullable-parity", "columnNullableButTypeNot")
+var correctnessRequireOrmColumnNullableParityText = policy.MessageOf(
+	"base/correctness-require-orm-column-nullable-parity",
+	"columnNullableButTypeNot",
+)
 
 // ormNullableColumnDecorators is the source rule's own `nullableColumnDecorators`.
 //
@@ -73,17 +76,17 @@ var ormRelationDecorators = map[string]struct{}{
 //
 // Anchored on a decorator, which is rare, and the checker is consulted only after the decorator name
 // and its `nullable: true` option have both matched.
-var CorrectnessRequireOrmColumnNullableParity = rule.Rule{
+var CorrectnessRequireOrmColumnNullableParity = rule.Rule[rule.NoOptions]{
 	Name: "base/correctness-require-orm-column-nullable-parity",
 
 	// The property's type decides every finding.
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindDecorator: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 
@@ -93,14 +96,14 @@ var CorrectnessRequireOrmColumnNullableParity = rule.Rule{
 
 				// Only an explicit `nullable: true` is this rule's question.
 				//
-				// The `skip` test is SUBSUMED here and kept anyway, which a mutation sweep will
+				// The `skip` test is subsumed here and kept anyway, which a mutation sweep will
 				// report as a survivor. The shelf sets `skip` only on the non-boolean path, where it
 				// also returns `value=false`, so `!declaredNullable` already declines every input
 				// that would skip: no shape can reach this line with `skip` true and
 				// `declaredNullable` true. It is written because it states the rule's intent about
 				// `nullable: 'items'`, which is a list-nullability spelling rather than a false
 				// claim, and because that reasoning stops holding the moment the shelf's contract
-				// changes. The serializable sibling in this package tests `skip` where it is NOT
+				// changes. The serializable sibling in this package tests `skip` where it is not
 				// subsumed, and the two lines should keep reading the same way.
 				declaredNullable, skip, found := decorators.BooleanOption(node, "nullable")
 				if skip || !found || !declaredNullable {
@@ -126,13 +129,13 @@ var CorrectnessRequireOrmColumnNullableParity = rule.Rule{
 					return
 				}
 
-				propertyType := ctx.TypeChecker.GetTypeAtLocation(name)
+				propertyType := ruleContext.TypeChecker.GetTypeAtLocation(name)
 				if propertyType == nil || decorators.IsNullableType(propertyType) {
 					return
 				}
 
-				ctx.ReportNode(name, buildColumnNullableButTypeNotMessage(
-					ctx.TypeChecker.TypeToString(propertyType)))
+				ruleContext.ReportNode(name, buildColumnNullableButTypeNotMessage(
+					ruleContext.TypeChecker.TypeToString(propertyType)))
 			},
 		}
 	},

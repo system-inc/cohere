@@ -36,20 +36,20 @@ const jsxNoScriptUrlFile = "/repository/source/JsxNoScriptUrl.tsx"
 // jsxNoScriptUrlOptions decodes a raw option body the way the config layer does.
 //
 // Fixtures route through the exported decoder rather than building the struct, which is what puts
-// the positional union and the built-in default under test. An empty body is the nil-options case:
+// the positional union and the built-in default under test. An empty body is the bare-severity case:
 // upstream still checks `a` and `href`, so the answer is the built-in pair rather than an error.
-func jsxNoScriptUrlOptions(t *testing.T, raw string) any {
-	t.Helper()
-	decoded, err := DecodeJsxNoScriptUrlOptions([]byte(raw))
-	if err != nil {
-		t.Fatalf("decoding %q: %v", raw, err)
+func jsxNoScriptUrlOptions(test *testing.T, raw string) JsxNoScriptUrlOptions {
+	test.Helper()
+	decoded, decodeJsxNoScriptUrlOptionsError := DecodeJsxNoScriptUrlOptions([]byte(raw))
+	if decodeJsxNoScriptUrlOptionsError != nil {
+		test.Fatalf("decoding %q: %v", raw, decodeJsxNoScriptUrlOptionsError)
 	}
 	return decoded
 }
 
 // TestJsxNoScriptUrlFires runs every case this port reports on.
-func TestJsxNoScriptUrlFires(t *testing.T) {
-	t.Parallel()
+func TestJsxNoScriptUrlFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -84,7 +84,7 @@ func TestJsxNoScriptUrlFires(t *testing.T) {
 		{"prefix 0x09 tab", "<a href=\"\tjavascript:x\"></a>", ``, 1},
 		{"prefix 0x1f", "<a href=\"\x1fjavascript:x\"></a>", ``, 1},
 		{"prefix space", `<a href=" javascript:x"></a>`, ``, 1},
-		// A newline BETWEEN letters is in the interleaving class and reports. Its partner in the
+		// A newline between letters is in the interleaving class and reports. Its partner in the
 		// silent table is the same shape with a space, which is not.
 		{"newline inside the word", "<a href=\"ja\nvascript:x\"></a>", ``, 1},
 		// The separator class applies after the final letter too, before the colon.
@@ -95,31 +95,42 @@ func TestJsxNoScriptUrlFires(t *testing.T) {
 		// A self-closing element is a different node kind here and upstream's one selector covers
 		// both, so this pins that the attribute listener reaches it.
 		{"self-closing anchor", `<a href="javascript:" />`, ``, 1},
-		// A legacy entry naming a component twice keeps the LAST entry's prop list. Measured both
+		// A legacy entry naming a component twice keeps the last entry's prop list. Measured both
 		// ways; the partner case in the silent table uses the first entry's prop and is clean.
-		{"repeated name keeps the last props", `<Foo to="javascript:"></Foo>`, `[[{"name":"Foo","props":["href"]},{"name":"Foo","props":["to"]}]]`, 1},
-		// An entry named `a` REPLACES the built-in href pair rather than adding to it, so the
+		{
+			"repeated name keeps the last props",
+			`<Foo to="javascript:"></Foo>`,
+			`[[{"name":"Foo","props":["href"]},{"name":"Foo","props":["to"]}]]`,
+			1,
+		},
+		// An entry named `a` replaces the built-in href pair rather than adding to it, so the
 		// replacement's own prop reports. Its partner below shows `href` going clean.
 		{"an entry named a replaces the default", `<a to="javascript:"></a>`, `[[{"name":"a","props":["to"]}]]`, 1},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			options := jsxNoScriptUrlOptions(t, testCase.rawOptions)
-			result := rule_testing.RunWithOptions(t, JsxNoScriptUrl, jsxNoScriptUrlFile, testCase.sourceText, options)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			options := jsxNoScriptUrlOptions(test, testCase.rawOptions)
+			result := rule_testing.RunWithOptions(
+				test,
+				JsxNoScriptUrl,
+				jsxNoScriptUrlFile,
+				testCase.sourceText,
+				options,
+			)
 			wantIds := make([]string, testCase.wantCount)
 			for index := range wantIds {
 				wantIds[index] = "noScriptURL"
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 		})
 	}
 }
 
 // TestJsxNoScriptUrlStaysSilent runs every case this port declines.
-func TestJsxNoScriptUrlStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestJsxNoScriptUrlStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -137,7 +148,7 @@ func TestJsxNoScriptUrlStaysSilent(t *testing.T) {
 		{"valid 6", `<Foo href="javascript:"></Foo>`, ``},
 		{"valid 7", `<a href />`, ``},
 		{"valid 8", `<Foo other="javascript:"></Foo>`, `[[{"name":"Foo","props":["to","href"]}]]`},
-		// Clean upstream WITH its settings and clean here without them, so the missing surface
+		// Clean upstream with its settings and clean here without them, so the missing surface
 		// costs nothing on these two. Measured both ways. Upstream's valid 11 carries
 		// `includeFromSettings: true` and is in TestJsxNoScriptUrlRefusesIncludeFromSettings.
 		{"valid 9", `<Foo href="javascript:"></Foo>`, ``},
@@ -145,7 +156,7 @@ func TestJsxNoScriptUrlStaysSilent(t *testing.T) {
 
 		// Cases upstream's corpus does not write, each measured against the installed build.
 
-		// A space between the letters is NOT in the interleaving class, unlike a newline. This is
+		// A space between the letters is not in the interleaving class, unlike a newline. This is
 		// the distinction a port reusing the wider prefix class would get wrong, and its partner
 		// in the firing table is the same shape with a newline.
 		{"space inside the word", `<a href="ja vascript:x"></a>`, ``},
@@ -161,49 +172,65 @@ func TestJsxNoScriptUrlStaysSilent(t *testing.T) {
 		{"namespaced tag name", `<svg:a href="javascript:"></svg:a>`, ``},
 		// A capitalised tag is a different name from the built-in `a`, matched exactly.
 		{"uppercase tag", `<A href="javascript:"></A>`, ``},
-		// `form` and `action` are the FORM component defaults, which this rule never consults.
+		// `form` and `action` are the form component defaults, which this rule never consults.
 		{"a form action is not a link", `<form action="javascript:"></form>`, ``},
 		// A template literal is not a Literal upstream, so it declines like the expression case.
 		{"template literal value", "<a href={`javascript:`}></a>", ``},
 		// The partner to the replacement case above: once `a` is redefined, its built-in `href`
 		// pair is gone and the same source goes clean.
 		{"an entry named a drops the built-in href", `<a href="javascript:"></a>`, `[[{"name":"a","props":["to"]}]]`},
-		// The partner to the repeated-name case: the FIRST entry's prop no longer applies.
-		{"repeated name drops the first props", `<Foo href="javascript:"></Foo>`, `[[{"name":"Foo","props":["href"]},{"name":"Foo","props":["to"]}]]`},
+		// The partner to the repeated-name case: the first entry's prop no longer applies.
+		{
+			"repeated name drops the first props",
+			`<Foo href="javascript:"></Foo>`,
+			`[[{"name":"Foo","props":["href"]},{"name":"Foo","props":["to"]}]]`,
+		},
 		// An empty prop list matches nothing.
 		{"empty props list", `<Foo href="javascript:"></Foo>`, `[[{"name":"Foo","props":[]}]]`},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			options := jsxNoScriptUrlOptions(t, testCase.rawOptions)
-			result := rule_testing.RunWithOptions(t, JsxNoScriptUrl, jsxNoScriptUrlFile, testCase.sourceText, options)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			options := jsxNoScriptUrlOptions(test, testCase.rawOptions)
+			result := rule_testing.RunWithOptions(
+				test,
+				JsxNoScriptUrl,
+				jsxNoScriptUrlFile,
+				testCase.sourceText,
+				options,
+			)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
 
-// TestJsxNoScriptUrlReportsOnTheWholeAttribute pins WHERE the finding points.
+// TestJsxNoScriptUrlReportsOnTheWholeAttribute pins where the finding points.
 //
 // Upstream reports on the JSXAttribute, so the span covers the name and the value together rather
 // than either alone. Measured on the installed build: the attribute in this source reports from
 // column 4 through the closing quote. A port anchoring on the value node, or on the element, would
 // pass every message-id fixture above while pointing somewhere the reader was never shown.
-func TestJsxNoScriptUrlReportsOnTheWholeAttribute(t *testing.T) {
-	t.Parallel()
+func TestJsxNoScriptUrlReportsOnTheWholeAttribute(test *testing.T) {
+	test.Parallel()
 
 	const source = `<a href="javascript:void(0)"></a>`
 
-	result := rule_testing.RunWithOptions(t, JsxNoScriptUrl, jsxNoScriptUrlFile, source, jsxNoScriptUrlOptions(t, ``))
-	rule_testing.ExpectFindings(t, result, "noScriptURL")
+	result := rule_testing.RunWithOptions(
+		test,
+		JsxNoScriptUrl,
+		jsxNoScriptUrlFile,
+		source,
+		jsxNoScriptUrlOptions(test, ``),
+	)
+	rule_testing.ExpectFindings(test, result, "noScriptURL")
 
 	// The harness does not trim for an untyped run, so the literal above and the file on disk are
 	// the same bytes and this slice is safe.
 	span := result.Diagnostics[0].Range
 	reported := source[span.Pos():span.End()]
 	if reported != `href="javascript:void(0)"` {
-		t.Fatalf("finding spans %q, want the whole attribute", reported)
+		test.Fatalf("finding spans %q, want the whole attribute", reported)
 	}
 }
 
@@ -212,20 +239,26 @@ func TestJsxNoScriptUrlReportsOnTheWholeAttribute(t *testing.T) {
 // The message carries no format verbs, so there is nothing to interpolate and the assertion is
 // equality against a literal typed here rather than against the rule's own constant, which would
 // move with any mutation of it.
-func TestJsxNoScriptUrlMessageText(t *testing.T) {
-	t.Parallel()
+func TestJsxNoScriptUrlMessageText(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunWithOptions(t, JsxNoScriptUrl, jsxNoScriptUrlFile, `<a href="javascript:"></a>`, jsxNoScriptUrlOptions(t, ``))
-	rule_testing.ExpectFindings(t, result, "noScriptURL")
+	result := rule_testing.RunWithOptions(
+		test,
+		JsxNoScriptUrl,
+		jsxNoScriptUrlFile,
+		`<a href="javascript:"></a>`,
+		jsxNoScriptUrlOptions(test, ``),
+	)
+	rule_testing.ExpectFindings(test, result, "noScriptURL")
 
 	const want = "A future version of React will block javascript: URLs as a security precaution. " +
 		"Use event handlers instead if you can. If you need to generate unsafe HTML, try using " +
 		"dangerouslySetInnerHTML instead."
 	if got := jsxNoScriptUrlMessage.Description; got != want {
-		t.Fatalf("message description is %q, want %q", got, want)
+		test.Fatalf("message description is %q, want %q", got, want)
 	}
 	if got := jsxNoScriptUrlMessage.Id; got != "noScriptURL" {
-		t.Fatalf("message id is %q, want %q", got, "noScriptURL")
+		test.Fatalf("message id is %q, want %q", got, "noScriptURL")
 	}
 }
 
@@ -234,7 +267,7 @@ func TestJsxNoScriptUrlMessageText(t *testing.T) {
 // Three siblings in this package gate on `.tsx` and `.jsx`, which is oxc residue. Upstream has no
 // such gate anywhere, and a gate here would blind the rule to most of a tree.
 //
-// `.ts` is deliberately absent, and it is absent for a PARSER reason rather than a rule one, which
+// `.ts` is deliberately absent, and it is absent for a parser reason rather than a rule one, which
 // is a distinction worth stating because the two look identical from a fixture. TypeScript reads
 // `<a href="...">` in a `.ts` file as a type assertion, not as JSX, so no attribute node is
 // produced for any rule to see. Probed with a control across all four extensions: `.tsx`, `.jsx`
@@ -242,8 +275,8 @@ func TestJsxNoScriptUrlMessageText(t *testing.T) {
 // the same options. A sibling makes the ungated point using `React.createElement` source, which
 // needs no JSX; this rule anchors on a JSX attribute and has no such arm, so the honest coverage is
 // the three extensions where the node can exist.
-func TestJsxNoScriptUrlHasNoFileSuffixGate(t *testing.T) {
-	t.Parallel()
+func TestJsxNoScriptUrlHasNoFileSuffixGate(test *testing.T) {
+	test.Parallel()
 
 	const source = `<a href="javascript:"></a>`
 
@@ -252,10 +285,16 @@ func TestJsxNoScriptUrlHasNoFileSuffixGate(t *testing.T) {
 		"/repository/source/JsxNoScriptUrl.js",
 		"/repository/source/JsxNoScriptUrl.jsx",
 	} {
-		t.Run(fileName, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, JsxNoScriptUrl, fileName, source, jsxNoScriptUrlOptions(t, ``))
-			rule_testing.ExpectFindings(t, result, "noScriptURL")
+		test.Run(fileName, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(
+				test,
+				JsxNoScriptUrl,
+				fileName,
+				source,
+				jsxNoScriptUrlOptions(test, ``),
+			)
+			rule_testing.ExpectFindings(test, result, "noScriptURL")
 		})
 	}
 }
@@ -264,83 +303,87 @@ func TestJsxNoScriptUrlHasNoFileSuffixGate(t *testing.T) {
 //
 // The two slots have different shapes and Go has no single type for that, so the decoder tries the
 // array arm first, matching upstream's own test on whether the first option is an array. An empty
-// body must yield the built-in pair rather than an error, which is the nil-options path a rule
+// body must yield the built-in pair rather than an error, which is the empty-input path a rule
 // configured as a bare severity takes.
-func TestDecodeJsxNoScriptUrlOptions(t *testing.T) {
-	t.Parallel()
+func TestDecodeJsxNoScriptUrlOptions(test *testing.T) {
+	test.Parallel()
 
-	t.Run("an empty body keeps the built-in pair", func(t *testing.T) {
-		t.Parallel()
-		decoded, err := DecodeJsxNoScriptUrlOptions(nil)
-		if err != nil {
-			t.Fatalf("decoding an empty body: %v", err)
+	test.Run("an empty body keeps the built-in pair", func(test *testing.T) {
+		test.Parallel()
+		decoded, decodeJsxNoScriptUrlOptionsError := DecodeJsxNoScriptUrlOptions(nil)
+		if decodeJsxNoScriptUrlOptionsError != nil {
+			test.Fatalf("decoding an empty body: %v", decodeJsxNoScriptUrlOptionsError)
 		}
-		options, ok := decoded.(JsxNoScriptUrlOptions)
-		if !ok {
-			t.Fatalf("decoded to %T, want JsxNoScriptUrlOptions", decoded)
+		if len(decoded.Legacy) != 0 {
+			test.Fatalf("legacy list is %v, want empty", decoded.Legacy)
 		}
-		if len(options.Legacy) != 0 {
-			t.Fatalf("legacy list is %v, want empty", options.Legacy)
-		}
-		components := jsxNoScriptUrlLinkComponents(options)
+		components := jsxNoScriptUrlLinkComponents(decoded)
 		if got := strings.Join(components["a"], ","); got != "href" {
-			t.Fatalf("built-in pair is %q, want %q", got, "href")
+			test.Fatalf("built-in pair is %q, want %q", got, "href")
 		}
 	})
 
-	t.Run("the array arm alone", func(t *testing.T) {
-		t.Parallel()
-		decoded, err := DecodeJsxNoScriptUrlOptions([]byte(`[[{"name":"Foo","props":["to","href"]}]]`))
-		if err != nil {
-			t.Fatalf("decoding the array arm: %v", err)
+	test.Run("the array arm alone", func(test *testing.T) {
+		test.Parallel()
+		decoded, decodeJsxNoScriptUrlOptionsError := DecodeJsxNoScriptUrlOptions(
+			[]byte(`[[{"name":"Foo","props":["to","href"]}]]`),
+		)
+		if decodeJsxNoScriptUrlOptionsError != nil {
+			test.Fatalf("decoding the array arm: %v", decodeJsxNoScriptUrlOptionsError)
 		}
-		options := decoded.(JsxNoScriptUrlOptions)
-		if len(options.Legacy) != 1 || options.Legacy[0].Name != "Foo" {
-			t.Fatalf("legacy list is %v, want one entry named Foo", options.Legacy)
+		if len(decoded.Legacy) != 1 || decoded.Legacy[0].Name != "Foo" {
+			test.Fatalf("legacy list is %v, want one entry named Foo", decoded.Legacy)
 		}
-		if got := strings.Join(options.Legacy[0].Props, ","); got != "to,href" {
-			t.Fatalf("props are %q, want %q", got, "to,href")
-		}
-	})
-
-	t.Run("the object arm alone, at its default", func(t *testing.T) {
-		t.Parallel()
-		decoded, err := DecodeJsxNoScriptUrlOptions([]byte(`[{"includeFromSettings":false}]`))
-		if err != nil {
-			t.Fatalf("decoding the object arm: %v", err)
-		}
-		if options := decoded.(JsxNoScriptUrlOptions); len(options.Legacy) != 0 {
-			t.Fatalf("legacy list is %v, want empty", options.Legacy)
+		if got := strings.Join(decoded.Legacy[0].Properties, ","); got != "to,href" {
+			test.Fatalf("props are %q, want %q", got, "to,href")
 		}
 	})
 
-	t.Run("both arms in order", func(t *testing.T) {
-		t.Parallel()
-		decoded, err := DecodeJsxNoScriptUrlOptions([]byte(`[[{"name":"Bar","props":["link"]}],{"includeFromSettings":false}]`))
-		if err != nil {
-			t.Fatalf("decoding both arms: %v", err)
+	test.Run("the object arm alone, at its default", func(test *testing.T) {
+		test.Parallel()
+		decoded, decodeJsxNoScriptUrlOptionsError := DecodeJsxNoScriptUrlOptions(
+			[]byte(`[{"includeFromSettings":false}]`),
+		)
+		if decodeJsxNoScriptUrlOptionsError != nil {
+			test.Fatalf("decoding the object arm: %v", decodeJsxNoScriptUrlOptionsError)
 		}
-		options := decoded.(JsxNoScriptUrlOptions)
-		if len(options.Legacy) != 1 || options.Legacy[0].Name != "Bar" {
-			t.Fatalf("legacy list is %v, want one entry named Bar", options.Legacy)
+		if len(decoded.Legacy) != 0 {
+			test.Fatalf("legacy list is %v, want empty", decoded.Legacy)
 		}
 	})
 
-	t.Run("an empty array slot is not the object arm", func(t *testing.T) {
-		t.Parallel()
+	test.Run("both arms in order", func(test *testing.T) {
+		test.Parallel()
+		decoded, decodeJsxNoScriptUrlOptionsError := DecodeJsxNoScriptUrlOptions(
+			[]byte(`[[{"name":"Bar","props":["link"]}],{"includeFromSettings":false}]`),
+		)
+		if decodeJsxNoScriptUrlOptionsError != nil {
+			test.Fatalf("decoding both arms: %v", decodeJsxNoScriptUrlOptionsError)
+		}
+		if len(decoded.Legacy) != 1 || decoded.Legacy[0].Name != "Bar" {
+			test.Fatalf("legacy list is %v, want one entry named Bar", decoded.Legacy)
+		}
+	})
+
+	test.Run("an empty array slot is not the object arm", func(test *testing.T) {
+		test.Parallel()
 		// `[[], {...}]` is upstream's own spelling in two corpus cases. An empty JSON array is the
 		// array arm, so the object must still be read from the second position: the refusal of
 		// `true` there is what proves it was read at all.
-		if _, err := DecodeJsxNoScriptUrlOptions([]byte(`[[],{"includeFromSettings":true}]`)); err == nil {
-			t.Fatal("the object in the second position was not read, so its `true` was not refused")
+		if _, decodeJsxNoScriptUrlOptionsError := DecodeJsxNoScriptUrlOptions(
+			[]byte(`[[],{"includeFromSettings":true}]`),
+		); decodeJsxNoScriptUrlOptionsError == nil {
+			test.Fatal("the object in the second position was not read, so its `true` was not refused")
 		}
-		if _, err := DecodeJsxNoScriptUrlOptions([]byte(`[[],{"includeFromSettings":false}]`)); err != nil {
-			t.Fatalf("the same list at the default was refused: %v", err)
+		if _, decodeJsxNoScriptUrlOptionsError := DecodeJsxNoScriptUrlOptions(
+			[]byte(`[[],{"includeFromSettings":false}]`),
+		); decodeJsxNoScriptUrlOptionsError != nil {
+			test.Fatalf("the same list at the default was refused: %v", decodeJsxNoScriptUrlOptionsError)
 		}
 	})
 
-	t.Run("shapes the config layer does not deliver, or upstream refuses, are refused", func(t *testing.T) {
-		t.Parallel()
+	test.Run("shapes the config layer does not deliver, or upstream refuses, are refused", func(test *testing.T) {
+		test.Parallel()
 		for _, raw := range []string{
 			// The wrapper this decoder used to read.
 			`{"positional":[[{"name":"Foo","props":["to"]}]]}`,
@@ -352,8 +395,10 @@ func TestDecodeJsxNoScriptUrlOptions(t *testing.T) {
 			`[[{"name":"Foo","prop":["to"]}]]`,
 			`[{"includeFromSetting":false}]`,
 		} {
-			if decoded, err := DecodeJsxNoScriptUrlOptions([]byte(raw)); err == nil {
-				t.Errorf("%s decoded to %+v; it must be refused", raw, decoded)
+			if decoded, decodeJsxNoScriptUrlOptionsError := DecodeJsxNoScriptUrlOptions(
+				[]byte(raw),
+			); decodeJsxNoScriptUrlOptionsError == nil {
+				test.Errorf("%s decoded to %+v; it must be refused", raw, decoded)
 			}
 		}
 	})
@@ -367,8 +412,8 @@ func TestDecodeJsxNoScriptUrlOptions(t *testing.T) {
 // were empty, which made invalid 6 and 7 silent and invalid 8 report once where upstream reports
 // twice, with nothing telling the author their flag had no effect. They are refused at configuration
 // now, so the gap is a startup error naming the flag rather than a quiet difference in findings.
-func TestJsxNoScriptUrlRefusesIncludeFromSettings(t *testing.T) {
-	t.Parallel()
+func TestJsxNoScriptUrlRefusesIncludeFromSettings(test *testing.T) {
+	test.Parallel()
 
 	for _, raw := range []string{
 		`[[],{"includeFromSettings":true}]`,                                     // valid 11, clean upstream
@@ -376,16 +421,17 @@ func TestJsxNoScriptUrlRefusesIncludeFromSettings(t *testing.T) {
 		`[{"includeFromSettings":true}]`,                                        // invalid 7, one finding upstream
 		`[[{"name":"Bar","props":["link"]}],{"includeFromSettings":true}]`,      // invalid 8, two findings upstream
 	} {
-		_, err := DecodeJsxNoScriptUrlOptions([]byte(raw))
-		if err == nil || !strings.Contains(err.Error(), "includeFromSettings") {
-			t.Errorf("%s: want a refusal naming includeFromSettings, got %v", raw, err)
+		_, decodeJsxNoScriptUrlOptionsError := DecodeJsxNoScriptUrlOptions([]byte(raw))
+		if decodeJsxNoScriptUrlOptionsError == nil ||
+			!strings.Contains(decodeJsxNoScriptUrlOptionsError.Error(), "includeFromSettings") {
+			test.Errorf("%s: want a refusal naming includeFromSettings, got %v", raw, decodeJsxNoScriptUrlOptionsError)
 			continue
 		}
 		// The refusal says why (no shared settings) and where the components go instead (ruled on
 		// #e06zm4b), so an author copying an ESLint config is told what to write.
 		for _, want := range []string{"does not read settings.linkComponents", `[{"name": "Link", "props": ["to"]}]`} {
-			if !strings.Contains(err.Error(), want) {
-				t.Errorf("%s: the refusal does not say %q: %v", raw, want, err)
+			if !strings.Contains(decodeJsxNoScriptUrlOptionsError.Error(), want) {
+				test.Errorf("%s: the refusal does not say %q: %v", raw, want, decodeJsxNoScriptUrlOptionsError)
 			}
 		}
 	}
@@ -396,8 +442,8 @@ func TestJsxNoScriptUrlRefusesIncludeFromSettings(t *testing.T) {
 // The scan is the whole judgment and its two character classes differ, which no corpus case
 // separates: upstream writes only one interleaved case and no prefix case at all. Every expectation
 // here was measured by driving the installed rule on the same value.
-func TestJsxNoScriptUrlProtocolScan(t *testing.T) {
-	t.Parallel()
+func TestJsxNoScriptUrlProtocolScan(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		value string
@@ -437,7 +483,7 @@ func TestJsxNoScriptUrlProtocolScan(t *testing.T) {
 
 	for _, testCase := range cases {
 		if got := jsxNoScriptUrlHasJavaScriptProtocol(testCase.value); got != testCase.want {
-			t.Errorf("protocol scan of %q is %v, want %v", testCase.value, got, testCase.want)
+			test.Errorf("protocol scan of %q is %v, want %v", testCase.value, got, testCase.want)
 		}
 	}
 }

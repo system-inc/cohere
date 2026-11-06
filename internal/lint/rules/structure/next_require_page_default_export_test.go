@@ -9,8 +9,8 @@ import (
 const pageFile = "/repository/app/account/settings/page.tsx"
 const layoutFile = "/repository/app/account/settings/layout.tsx"
 
-func TestNextRequirePageDefaultExportFires(t *testing.T) {
-	t.Parallel()
+func TestNextRequirePageDefaultExportFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -95,16 +95,16 @@ func TestNextRequirePageDefaultExportFires(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.Run(t, NextRequirePageDefaultExport, pageFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.Run(test, NextRequirePageDefaultExport, pageFile,
 				testCase.sourceText), testCase.wantIds...)
 		})
 	}
 }
 
-func TestNextRequirePageDefaultExportStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNextRequirePageDefaultExportStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -169,7 +169,8 @@ func TestNextRequirePageDefaultExportStaysSilent(t *testing.T) {
 		{
 			"another page's default re-exported (www-phi-health app/(main-layout)/research/page.tsx)",
 			pageFile,
-			"// Next.js Metadata\nexport function generateMetadata() {\n    return {\n        title: 'Research',\n    };\n}\n\n" +
+			"// Next.js Metadata\nexport function generateMetadata() {\n" +
+				"    return {\n        title: 'Research',\n    };\n}\n\n" +
 				"export { default } from './subscribe/page';\n",
 		},
 		// An imported binding exported as default. Its declaration is in another module, so it cannot
@@ -200,9 +201,9 @@ func TestNextRequirePageDefaultExportStaysSilent(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NextRequirePageDefaultExport, testCase.fileName,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NextRequirePageDefaultExport, testCase.fileName,
 				testCase.sourceText))
 		})
 	}

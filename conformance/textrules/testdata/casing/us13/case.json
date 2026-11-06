@@ -1,0 +1,15 @@
+{
+    "why": "us13: us12's negative control, a type opening lowercase on a word no brand list holds is not UpperCamel, so it is reported at its declaration. Go has no form: an unexported Go type opens lowercase by the language's own grammar, so `fooThing` is correct Go",
+    "expect": [
+        {
+            "covers": "fooThing",
+            "occurrence": 1
+        }
+    ],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "swift"
+    ]
+}

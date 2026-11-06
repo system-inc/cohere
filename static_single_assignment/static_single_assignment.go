@@ -87,7 +87,7 @@ const (
 // and its function. The passes hold no IR type; every read and write of one goes through here.
 type Graph[F any, B comparable, P any] interface {
 	// Entry is the block control begins at. No edge enters it, so it has no predecessors: Construct's
-	// lookup ends there, refuses a function whose entry breaks this, and VerifySSA reports one.
+	// lookup ends there, refuses a function whose entry breaks this, and VerifyStaticSingleAssignment reports one.
 	Entry(function F) BlockId
 	// BlockBound is one past the largest block id the function has handed out or holds.
 	BlockBound(function F) int
@@ -138,8 +138,8 @@ type Graph[F any, B comparable, P any] interface {
 	// SetTerminalOrder sets the evaluation order of a block's terminal.
 	SetTerminalOrder(block B, order EvaluationOrder)
 
-	// Params are the function's parameters, defined on entry, in a slice whose elements a pass renames.
-	Params(function F) []P
+	// Parameters are the function's parameters, defined on entry, in a slice whose elements a pass renames.
+	Parameters(function F) []P
 	// Returns is the place every return stores into, or nil for an IR with none.
 	Returns(function F) *P
 	// Declaration is the binding an identifier is a value of.

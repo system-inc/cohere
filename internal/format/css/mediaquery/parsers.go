@@ -26,10 +26,14 @@ import (
 // and is undefined forever); that cannot be ported, so it is an error here too, named for what it is.
 
 // errorReadingMode is the TypeError V8 throws on modesEntered[lastModeIndex].mode with lastModeIndex -1.
+//
+//cohere:ignore consistency-require-error-clause V8's TypeError text, which the oracle compares byte for byte
 var errorReadingMode = errors.New("Cannot read properties of undefined (reading 'mode')")
 
 // errorUnclosedUrl stands for the infinite loop on an unclosed `url(`, where the library never returns.
-var errorUnclosedUrl = errors.New("postcss-media-query-parser never returns on an unclosed url(: its parentheses loop reads past the end forever")
+var errorUnclosedUrl = errors.New(
+	"postcss-media-query-parser never returns on an unclosed url(: its parentheses loop reads past the end forever",
+)
 
 // mode is one entry of modesEntered. character is the quote a string mode was entered with.
 type mode struct {
@@ -66,8 +70,8 @@ func parseMediaFeature(text string, index int) ([]*estree.Node, error) {
 		indexLocal++
 	}
 
-	for i := 0; i < len(stringNormalized); i++ {
-		character := stringNormalized[i]
+	for index := 0; index < len(stringNormalized); index++ {
+		character := stringNormalized[index]
 
 		// If entering/exiting a string
 		if character == '\'' || character == '"' {
@@ -78,7 +82,9 @@ func parseMediaFeature(text string, index int) ([]*estree.Node, error) {
 					character:            character,
 				})
 				lastModeIndex++
-			} else if modesEntered[lastModeIndex].mode == "string" && modesEntered[lastModeIndex].character == character && (i == 0 || stringNormalized[i-1] != '\\') {
+			} else if modesEntered[lastModeIndex].mode == "string" &&
+				modesEntered[lastModeIndex].character == character &&
+				(index == 0 || stringNormalized[index-1] != '\\') {
 				modesEntered = modesEntered[:len(modesEntered)-1]
 				lastModeIndex--
 			}
@@ -105,19 +111,23 @@ func parseMediaFeature(text string, index int) ([]*estree.Node, error) {
 		// If a : is met outside of a string, function call or interpolation, than
 		// this : separates a media feature and a value
 		if modesEntered[lastModeIndex].mode == "normal" && character == ':' {
-			mediaFeatureValueString := stringNormalized[i+1:]
+			mediaFeatureValueString := stringNormalized[index+1:]
 			mediaFeatureValueBefore := leadingWhitespace(mediaFeatureValueString)
 			mediaFeatureValue = estree.New("value", 0, 0,
-				"before", mediaFeatureValueBefore,
-				"after", trailingWhitespace(mediaFeatureValueString),
-				"value", trim(mediaFeatureValueString),
+				[]estree.Property{
+					{Key: "before", Value: estree.String(mediaFeatureValueBefore)},
+					{Key: "after", Value: estree.String(trailingWhitespace(mediaFeatureValueString))},
+					{Key: "value", Value: estree.String(trim(mediaFeatureValueString))},
+				},
 			)
 			// +1 for the colon
-			mediaFeatureValue.Set("sourceIndex", len(mediaFeatureValueBefore)+i+1+indexLocal)
+			mediaFeatureValue.Set("sourceIndex", estree.Integer(len(mediaFeatureValueBefore)+index+1+indexLocal))
 			colon = estree.New("colon", 0, 0,
-				"sourceIndex", i+indexLocal,
-				"after", mediaFeatureValueBefore,
-				"value", ":",
+				[]estree.Property{
+					{Key: "sourceIndex", Value: estree.Integer(index + indexLocal)},
+					{Key: "after", Value: estree.String(mediaFeatureValueBefore)},
+					{Key: "value", Value: estree.String(":")},
+				},
 			)
 			break
 		}
@@ -125,22 +135,24 @@ func parseMediaFeature(text string, index int) ([]*estree.Node, error) {
 		// The byte itself, as text: string(character) made it a rune, so each byte of a character outside ASCII
 		// became a character of its own, and a no-break space before a feature read as "\u00c2\u00a0", which is
 		// not whitespace (found by @system_adamic's stream P2).
-		mediaFeature += stringNormalized[i : i+1]
+		mediaFeature += stringNormalized[index : index+1]
 	}
 
 	// Forming a media feature node
 	mediaFeatureBefore := leadingWhitespace(mediaFeature)
 	mediaFeatureAfter := trailingWhitespace(mediaFeature)
 	mediaFeatureNode := estree.New("media-feature", 0, 0,
-		"before", mediaFeatureBefore,
-		"after", mediaFeatureAfter,
-		"value", trim(mediaFeature),
+		[]estree.Property{
+			{Key: "before", Value: estree.String(mediaFeatureBefore)},
+			{Key: "after", Value: estree.String(mediaFeatureAfter)},
+			{Key: "value", Value: estree.String(trim(mediaFeature))},
+		},
 	)
-	mediaFeatureNode.Set("sourceIndex", len(mediaFeatureBefore)+indexLocal)
+	mediaFeatureNode.Set("sourceIndex", estree.Integer(len(mediaFeatureBefore)+indexLocal))
 	result = append(result, mediaFeatureNode)
 
 	if colon != nil {
-		colon.Set("before", mediaFeatureAfter)
+		colon.Set("before", estree.String(mediaFeatureAfter))
 		result = append(result, colon)
 	}
 
@@ -190,9 +202,9 @@ func parseMediaQuery(text string, index int) ([]*estree.Node, error) {
 	node := resetNode()
 
 	// Go walks runes where JavaScript walks units: the whitespace tests need the whole character.
-	for i := 0; i < len(text); {
-		decoded, size := utf8.DecodeRuneInString(text[i:])
-		character := text[i : i+size]
+	for offset := 0; offset < len(text); {
+		decoded, size := utf8.DecodeRuneInString(text[offset:])
+		character := text[offset : offset+size]
 		// If not yet entered any element
 		if !insideSomeValue {
 			if isWhitespace(decoded) {
@@ -207,7 +219,7 @@ func parseMediaQuery(text string, index int) ([]*estree.Node, error) {
 					localLevel++
 				}
 				node.value = character
-				node.sourceIndex = index + i
+				node.sourceIndex = index + offset
 				insideSomeValue = true
 			}
 		} else {
@@ -227,20 +239,25 @@ func parseMediaQuery(text string, index int) ([]*estree.Node, error) {
 		}
 
 		// If exited all parens/curlies and the next symbol
-		if insideSomeValue && localLevel == 0 && (character == ")" || i+size == len(text) || startsWithWhitespace(text[i+size:])) {
+		if insideSomeValue &&
+			localLevel == 0 &&
+			(character == ")" || offset+size == len(text) || startsWithWhitespace(text[offset+size:])) {
 			if node.value == "not" || node.value == "only" || node.value == "and" {
 				node.nodeType = "keyword"
 			}
 			// if it's an expression, parse its contents
 			if node.nodeType == "media-feature-expression" {
-				nodes, err := parseMediaFeature(node.value, node.sourceIndex)
-				if err != nil {
-					return nil, err
+				nodes, parseMediaFeatureError := parseMediaFeature(node.value, node.sourceIndex)
+				if parseMediaFeatureError != nil {
+					return nil, parseMediaFeatureError
 				}
 				node.nodes = nodes
 			}
 			if node.nodes != nil {
-				result = append(result, newContainer(node.after, node.before, node.nodeType, node.value, node.sourceIndex, node.nodes))
+				result = append(
+					result,
+					newContainer(node.after, node.before, node.nodeType, node.value, node.sourceIndex, node.nodes),
+				)
 			} else {
 				result = append(result, newNode(node.after, node.before, node.nodeType, node.value, node.sourceIndex))
 			}
@@ -248,43 +265,43 @@ func parseMediaQuery(text string, index int) ([]*estree.Node, error) {
 			insideSomeValue = false
 		}
 
-		i += size
+		offset += size
 	}
 
 	// Now process the result array - to specify undefined types of the nodes
 	// and specify the `after` prop
-	for i := 0; i < len(result); i++ {
-		node := result[i]
-		if i > 0 {
-			result[i-1].Set("after", node.Get("before"))
+	for index := 0; index < len(result); index++ {
+		node := result[index]
+		if index > 0 {
+			result[index-1].Set("after", node.Get("before"))
 		}
 
 		// Node types. Might not be set because contains interpolation/function
 		// calls or fully consists of them
 		if node.Type() == "" {
-			if i > 0 {
+			if index > 0 {
 				// only `and` can follow an expression
-				if result[i-1].Type() == "media-feature-expression" {
+				if result[index-1].Type() == "media-feature-expression" {
 					node.SetType("keyword")
 					continue
 				}
 				// Anything after 'only|not' is a media type
-				if result[i-1].String("value") == "not" || result[i-1].String("value") == "only" {
+				if result[index-1].String("value") == "not" || result[index-1].String("value") == "only" {
 					node.SetType("media-type")
 					continue
 				}
 				// Anything after 'and' is an expression
-				if result[i-1].String("value") == "and" {
+				if result[index-1].String("value") == "and" {
 					node.SetType("media-feature-expression")
 					continue
 				}
 
-				if result[i-1].Type() == "media-type" {
+				if result[index-1].Type() == "media-type" {
 					// if it is the last element - it might be an expression
 					// or 'and' depending on what is after it
-					if i+1 >= len(result) {
+					if index+1 >= len(result) {
 						node.SetType("media-feature-expression")
-					} else if result[i+1].Type() == "media-feature-expression" {
+					} else if result[index+1].Type() == "media-feature-expression" {
 						node.SetType("keyword")
 					} else {
 						node.SetType("media-feature-expression")
@@ -292,39 +309,39 @@ func parseMediaQuery(text string, index int) ([]*estree.Node, error) {
 				}
 			}
 
-			if i == 0 {
+			if index == 0 {
 				// `screen`, `fn( ... )`, `#{ ... }`. Not an expression, since then
 				// its type would have been set by now
-				if i+1 >= len(result) {
+				if index+1 >= len(result) {
 					node.SetType("media-type")
 					continue
 				}
 
 				// `screen and` or `#{...} (max-width: 10px)`
-				if result[i+1].Type() == "media-feature-expression" || result[i+1].Type() == "keyword" {
+				if result[index+1].Type() == "media-feature-expression" || result[index+1].Type() == "keyword" {
 					node.SetType("media-type")
 					continue
 				}
-				if i+2 < len(result) {
+				if index+2 < len(result) {
 					// `screen and (color) ...`
-					if result[i+2].Type() == "media-feature-expression" {
+					if result[index+2].Type() == "media-feature-expression" {
 						node.SetType("media-type")
-						result[i+1].SetType("keyword")
+						result[index+1].SetType("keyword")
 						continue
 					}
 					// `only screen and ...`
-					if result[i+2].Type() == "keyword" {
+					if result[index+2].Type() == "keyword" {
 						node.SetType("keyword")
-						result[i+1].SetType("media-type")
+						result[index+1].SetType("media-type")
 						continue
 					}
 				}
-				if i+3 < len(result) {
+				if index+3 < len(result) {
 					// `screen and (color) ...`
-					if result[i+3].Type() == "media-feature-expression" {
+					if result[index+3].Type() == "media-feature-expression" {
 						node.SetType("keyword")
-						result[i+1].SetType("media-type")
-						result[i+2].SetType("keyword")
+						result[index+1].SetType("media-type")
+						result[index+2].SetType("keyword")
 						continue
 					}
 				}
@@ -349,36 +366,36 @@ func parseMediaList(text string) ([]*estree.Node, error) {
 
 	// Check for a `url(...)` part (if it is contents of an @import rule)
 	if doesHaveUrl, urlBefore := matchUrlStart(text); doesHaveUrl > 0 {
-		i := doesHaveUrl
+		index := doesHaveUrl
 		parenthesesLevel := 1
 		for parenthesesLevel > 0 {
 			// string[i] past the end is undefined, and the loop never ends.
-			if i >= len(text) {
+			if index >= len(text) {
 				return nil, errorUnclosedUrl
 			}
-			character := text[i]
+			character := text[index]
 			if character == '(' {
 				parenthesesLevel++
 			}
 			if character == ')' {
 				parenthesesLevel--
 			}
-			i++
+			index++
 		}
 		// result.unshift into an empty result.
 		result = append([]*estree.Node{newNode(
-			leadingWhitespace(text[i:]),
+			leadingWhitespace(text[index:]),
 			urlBefore,
 			"url",
-			trim(text[:i]),
+			trim(text[:index]),
 			len(urlBefore),
 		)}, result...)
-		interimIndex = i
+		interimIndex = index
 	}
 
 	// Start processing the media query list
-	for i := interimIndex; i < len(text); i++ {
-		character := text[i]
+	for index := interimIndex; index < len(text); index++ {
+		character := text[index]
 
 		// Dividing the media query list into comma-separated media queries
 		// Only count commas that are outside of any parens
@@ -390,11 +407,11 @@ func parseMediaList(text string) ([]*estree.Node, error) {
 			levelLocal--
 		}
 		if levelLocal == 0 && character == ',' {
-			mediaQueryString := text[interimIndex:i]
+			mediaQueryString := text[interimIndex:index]
 			spaceBefore := leadingWhitespace(mediaQueryString)
-			nodes, err := parseMediaQuery(mediaQueryString, interimIndex)
-			if err != nil {
-				return nil, err
+			nodes, parseMediaQueryError := parseMediaQuery(mediaQueryString, interimIndex)
+			if parseMediaQueryError != nil {
+				return nil, parseMediaQueryError
 			}
 			result = append(result, newContainer(
 				trailingWhitespace(mediaQueryString),
@@ -404,15 +421,15 @@ func parseMediaList(text string) ([]*estree.Node, error) {
 				interimIndex+len(spaceBefore),
 				nodes,
 			))
-			interimIndex = i + 1
+			interimIndex = index + 1
 		}
 	}
 
 	mediaQueryString := text[interimIndex:]
 	spaceBefore := leadingWhitespace(mediaQueryString)
-	nodes, err := parseMediaQuery(mediaQueryString, interimIndex)
-	if err != nil {
-		return nil, err
+	nodes, parseMediaQueryError := parseMediaQuery(mediaQueryString, interimIndex)
+	if parseMediaQueryError != nil {
+		return nil, parseMediaQueryError
 	}
 	result = append(result, newContainer(
 		trailingWhitespace(mediaQueryString),

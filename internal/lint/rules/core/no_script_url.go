@@ -38,12 +38,12 @@ var messageScriptUrl = rule.Message{
 // zero-expression test upstream performs inside the helper is a listener key here, and the
 // expression-carrying kind is simply not listened for. That is the same decision reached earlier.
 //
-// # The tagged-template exemption is about the DIRECT parent, and only that
+// # The tagged-template exemption is about the direct parent, and only that
 //
 // Upstream declines a template whose `parent` is a `TaggedTemplateExpression`, because a tag
 // receives the raw strings and decides what they mean, so the text is an argument rather than a
 // URL. The check is on the immediate parent and nothing wider, which has a consequence upstream's
-// corpus does not write: a template nested INSIDE a tagged template's interpolation still reports.
+// corpus does not write: a template nested inside a tagged template's interpolation still reports.
 // Measured against the installed ESLint build, a template written foo`x${`javascript:`}y` reports,
 // because the inner template's parent is the outer template rather than the tagged expression.
 // A port asking "is this anywhere under a tagged template" would be silent there, and every
@@ -66,7 +66,7 @@ var messageScriptUrl = rule.Message{
 // # One case upstream declines for a reason that does not survive the translation
 //
 // The `Literal` arm is guarded by `node.value && typeof node.value === "string"`, and the first
-// half of that is a truthiness test, so an EMPTY string never reaches the check. That is invisible
+// half of that is a truthiness test, so an empty string never reaches the check. That is invisible
 // here because an empty string cannot start with `javascript:` anyway, and it is recorded rather
 // than reproduced: there is no input on which the guard changes the answer. The second half is what
 // declines a regular expression, whose value is a truthy object; measured, `/javascript:/` is clean
@@ -74,15 +74,15 @@ var messageScriptUrl = rule.Message{
 //
 // The rule reports without a repair, matching upstream, which ships no fixer. There is no
 // mechanical repair: replacing the URL means writing a handler somewhere else.
-var NoScriptUrl = rule.Rule{
+var NoScriptUrl = rule.Rule[rule.NoOptions]{
 	Name: "no-script-url",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindStringLiteral: func(node *ast.Node) {
 				if !beginsWithScriptScheme(node.Text()) {
 					return
 				}
-				ctx.ReportNode(node, messageScriptUrl)
+				ruleContext.ReportNode(node, messageScriptUrl)
 			},
 
 			// A template with no expressions, which is the only template shape whose value is
@@ -97,7 +97,7 @@ var NoScriptUrl = rule.Rule{
 				if !beginsWithScriptScheme(node.Text()) {
 					return
 				}
-				ctx.ReportNode(node, messageScriptUrl)
+				ruleContext.ReportNode(node, messageScriptUrl)
 			},
 		}
 	},

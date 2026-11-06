@@ -21,8 +21,8 @@ import (
 // A counting cache stands in for the real one so the test can observe how many times the work ran.
 // The production path uses `rule.Cached` against a live `FileCache`; what is asserted here is the
 // contract both sides rely on, which is that a second ask does not recompute.
-func TestForFileComputesOncePerFile(t *testing.T) {
-	t.Parallel()
+func TestForFileComputesOncePerFile(test *testing.T) {
+	test.Parallel()
 	fileCache := rule.NewFileCache()
 
 	computations := 0
@@ -34,12 +34,12 @@ func TestForFileComputesOncePerFile(t *testing.T) {
 	for range 3 {
 		result := rule.Cached(fileCache, "comments.All", compute)
 		if len(result) != 1 {
-			t.Fatalf("want one comment back on every ask, got %d", len(result))
+			test.Fatalf("want one comment back on every ask, got %d", len(result))
 		}
 	}
 
 	if computations != 1 {
-		t.Fatalf("want the scan to run once across three asks, ran %d times", computations)
+		test.Fatalf("want the scan to run once across three asks, ran %d times", computations)
 	}
 }
 
@@ -47,8 +47,8 @@ func TestForFileComputesOncePerFile(t *testing.T) {
 // different keys each compute. This is what makes the key rename from `nexus.allComments` to
 // `comments.All` load-bearing rather than cosmetic: a stale key naming the old home would have
 // meant two packages each paying for the same scan.
-func TestDifferentKeysDoNotShareAnEntry(t *testing.T) {
-	t.Parallel()
+func TestDifferentKeysDoNotShareAnEntry(test *testing.T) {
+	test.Parallel()
 	fileCache := rule.NewFileCache()
 
 	computations := 0
@@ -61,15 +61,15 @@ func TestDifferentKeysDoNotShareAnEntry(t *testing.T) {
 	rule.Cached(fileCache, "nexus.allComments", compute)
 
 	if computations != 2 {
-		t.Fatalf("want two distinct keys to compute separately, computed %d times", computations)
+		test.Fatalf("want two distinct keys to compute separately, computed %d times", computations)
 	}
 }
 
 // A nil cache is legal and means no caching, so a harness that builds a Context by hand keeps
 // working and simply recomputes. Asserted because the alternative is a panic in a shared package,
 // which takes the whole run down rather than one rule's finding.
-func TestForFileSurvivesANilCache(t *testing.T) {
-	t.Parallel()
+func TestForFileSurvivesANilCache(test *testing.T) {
+	test.Parallel()
 	computations := 0
 	compute := func() []Comment {
 		computations++
@@ -80,9 +80,9 @@ func TestForFileSurvivesANilCache(t *testing.T) {
 	second := rule.Cached(nil, "comments.All", compute)
 
 	if len(first) != 1 || len(second) != 1 {
-		t.Fatal("want a nil cache to still answer")
+		test.Fatal("want a nil cache to still answer")
 	}
 	if computations != 2 {
-		t.Fatalf("want a nil cache to recompute rather than cache, computed %d times", computations)
+		test.Fatalf("want a nil cache to recompute rather than cache, computed %d times", computations)
 	}
 }

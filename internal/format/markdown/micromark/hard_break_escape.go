@@ -4,7 +4,8 @@ package micromark
 var hardBreakEscape = &Construct{Name: "hardBreakEscape", Tokenize: tokenizeHardBreakEscape}
 
 func tokenizeHardBreakEscape(self *Self, effects *Effects, ok State, nok State) State {
-	var start, after State
+	var start State
+	var after State
 
 	start = func(code Code) State {
 		effects.Enter(TypeHardBreakEscape, nil)

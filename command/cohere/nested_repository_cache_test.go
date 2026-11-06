@@ -20,37 +20,46 @@ import (
 //
 // The report that prompted this was a lint-only run, which reads no cache, catching BaseWorker.ts between
 // two writes of one edit. It was the truth about that tree, reproduced cold. This holds the line it raised.
-func TestANestedRepositoryEditReachesItsImportersWarm(t *testing.T) {
-	t.Parallel()
-	binary := buildCohere(t)
-	root := t.TempDir()
+func TestANestedRepositoryEditReachesItsImportersWarm(test *testing.T) {
+	test.Parallel()
+	binary := buildCohere(test)
+	root := test.TempDir()
 	write := func(name string, contents string) {
-		t.Helper()
+		test.Helper()
 		path := filepath.Join(root, name)
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			t.Fatal(err)
+		if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
+			test.Fatal(createDirectoryError)
 		}
-		if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
-			t.Fatal(err)
+		if writeError := os.WriteFile(path, []byte(contents), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 	}
 	git := func(directory string, arguments ...string) {
-		t.Helper()
-		command := exec.Command("git", append([]string{"-c", "user.email=fixture@example.com", "-c", "user.name=fixture"}, arguments...)...)
+		test.Helper()
+		command := exec.Command(
+			"git",
+			append([]string{"-c", "user.email=fixture@example.com", "-c", "user.name=fixture"}, arguments...)...,
+		)
 		command.Dir = directory
-		if output, err := command.CombinedOutput(); err != nil {
-			t.Fatalf("git %v: %v\n%s", arguments, err, output)
+		if output, outputError := command.CombinedOutput(); outputError != nil {
+			test.Fatalf("git %v: %v\n%s", arguments, outputError, output)
 		}
 	}
 
 	// EventType is a literal in the finding state, which a string union makes redundant, and a number otherwise.
 	const withFinding = "export type EventType = 'alarm';\n"
 	const withoutFinding = "export type EventType = number;\n"
-	write("tsconfig.json", `{"compilerOptions":{"strict":true,"noEmit":true,"target":"es2022","module":"esnext","moduleResolution":"bundler"},"include":["source","libraries"]}`)
+	write(
+		"tsconfig.json",
+		`{"compilerOptions":{"strict":true,"noEmit":true,"target":"es2022","module":"esnext","moduleResolution":"bundler"},"include":["source","libraries"]}`,
+	)
 	write("CohereSettings.json", `{"rules":{"@typescript-eslint/no-redundant-type-constituents":"error"}}`)
 	write("package.json", `{"name":"fixture","private":true,"type":"module"}`)
 	write(".gitignore", ".cache/\nnode_modules/\n")
-	write("source/Use.ts", "import type { EventType } from '../libraries/base/Event';\nexport type EitherType = string | EventType;\n")
+	write(
+		"source/Use.ts",
+		"import type { EventType } from '../libraries/base/Event';\nexport type EitherType = string | EventType;\n",
+	)
 	write("libraries/base/Event.ts", withoutFinding)
 	write("libraries/base/package.json", `{"name":"base","private":true,"type":"module"}`)
 	nested := filepath.Join(root, "libraries", "base")
@@ -66,8 +75,8 @@ func TestANestedRepositoryEditReachesItsImportersWarm(t *testing.T) {
 	// Lint findings across a nested repository are the subject, so formatting is left out of every run: the
 	// fixture's settings are written unformatted, and their would-change findings are not what it counts.
 	run := func(arguments ...string) string {
-		t.Helper()
-		output, _ := runCohere(t, binary, root, append(arguments, "--no-format")...)
+		test.Helper()
+		output, _ := runCohere(test, binary, root, append(arguments, "--no-format")...)
 		return output
 	}
 
@@ -83,21 +92,39 @@ func TestANestedRepositoryEditReachesItsImportersWarm(t *testing.T) {
 		write("libraries/base/Event.ts", step.before)
 		run("--no-fix")
 		if replayed := run("--no-fix"); !strings.HasPrefix(replayed, "cached: ") {
-			t.Fatalf("%s: an unchanged tree did not replay, so the edit below proves nothing:\n%s", step.name, replayed)
+			test.Fatalf(
+				"%s: an unchanged tree did not replay, so the edit below proves nothing:\n%s",
+				step.name,
+				replayed,
+			)
 		}
 
 		write("libraries/base/Event.ts", step.after)
 		warm := run("--no-fix")
 		cold := run("--no-fix", "--no-cache")
 		if strings.HasPrefix(warm, "cached: ") {
-			t.Fatalf("%s: a run after the nested repository's Event.ts changed replayed the run from before:\n%s", step.name, warm)
+			test.Fatalf(
+				"%s: a run after the nested repository's Event.ts changed replayed the run from before:\n%s",
+				step.name,
+				warm,
+			)
 		}
 		if findings(warm) != findings(cold) {
-			t.Fatalf("%s: warm and cold disagree after the nested repository's Event.ts changed\n--- warm\n%s\n--- cold\n%s",
-				step.name, warm, cold)
+			test.Fatalf(
+				"%s: warm and cold disagree after the nested repository's Event.ts changed\n--- warm\n%s\n--- cold\n%s",
+				step.name,
+				warm,
+				cold,
+			)
 		}
 		if got := len(finding.FindAllString(cold, -1)); got != step.want {
-			t.Fatalf("%s: cold reports %d findings, want %d, so the fixture does not test what it says:\n%s", step.name, got, step.want, cold)
+			test.Fatalf(
+				"%s: cold reports %d findings, want %d, so the fixture does not test what it says:\n%s",
+				step.name,
+				got,
+				step.want,
+				cold,
+			)
 		}
 	}
 }

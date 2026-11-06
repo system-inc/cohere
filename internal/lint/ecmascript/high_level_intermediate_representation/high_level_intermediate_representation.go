@@ -31,17 +31,17 @@
 // obstruction: for `f(g(x), h(y))` the hooks fire at each identifier read, but nothing reports that
 // `g(x)` produced a value, that the value is the first argument to `f`, or which of the two calls
 // the current block belongs to when they fork. Recovering that means walking the expression tree
-// alongside the graph and re-deriving evaluation order — which is lowering, performed by the
+// alongside the graph and re-deriving evaluation order, which is lowering, performed by the
 // consumer, without the builder's cooperation, once per consumer.
 //
 // The second obstruction is layout. `controlflow` deliberately reproduces ESLint's code-path
 // shape, and two of its properties are wrong for an IR:
 //
-//   - A `finally` body is laid out TWICE, once for normal completion and once for the abrupt path.
+//   - A `finally` body is laid out twice, once for normal completion and once for the abrupt path.
 //     Both copies carry the same source positions. An IR whose instructions are keyed by position
 //     would give a value two definitions that are not a merge of each other, and single-assignment
 //     construction over that produces a phi where the source has no join.
-//   - A `try` whose body cannot throw gets NO edge to its `catch`, and the first throwable node in
+//   - A `try` whose body cannot throw gets no edge to its `catch`, and the first throwable node in
 //     a body forks to the handler so later statements are bypassed on the throwing path. That is
 //     the right answer for reachability and the wrong one for a mutation lattice, which needs the
 //     handler to see the state the body actually left behind.
@@ -49,7 +49,7 @@
 // So this package lowers independently, and the duplication is real and accepted. What it buys is
 // that the two graphs answer different questions and neither is bent to serve the other:
 // `controlflow` keeps mirroring ESLint for the rules whose observable behaviour depends on that,
-// and this keeps mirroring React's HIR for the passes that will be ported onto it. A shared graph
+// and this keeps mirroring React's `HIR` for the passes that will be ported onto it. A shared graph
 // would have to be both, and the finally-duplication alone makes that impossible.
 //
 // # Why the shape mirrors React's compiler rather than being designed fresh
@@ -88,7 +88,7 @@
 // (`JsxExpression`, `JsxFragment`, `JsxText`, `StartMemoize`, `FinishMemoize`), and 22 terminals of
 // which 2 are React (`Scope`, `PrunedScope`).
 //
-// All 5 instruction values are HERE, in the core set. Of the 2 terminals, `Scope` is now here and
+// All 5 instruction values are here, in the core set. Of the 2 terminals, `Scope` is now here and
 // `PrunedScope` is not. The paragraphs below describe the state before reactive scopes were built
 // and the rule that governed it; they are kept because the rule still governs `PrunedScope`, and
 // because the condition they name is exactly the one that was met. See the end of this section.
@@ -113,8 +113,8 @@
 // may never be written. If reactive scopes are ever built, they add two variants then, and every
 // exhaustive switch goes red and gets read by a human. That is the correct time to pay it.
 //
-// THAT MOMENT ARRIVED, for one of the two. Reactive scopes are built: `scopes.go` assigns them,
-// `align_scopes.go` and `merge_scopes.go` bring them to the shape upstream's own
+// That moment arrived, for one of the two. Reactive scopes are built: `scopes.go` assigns them,
+// `align_sweep_state.go` and `merge_scopes.go` bring them to the shape upstream's own
 // `assertValidBlockNesting` demands, and `scope_terminals.go` rewrites the graph to carry them.
 // `Scope` is therefore in the core set, added in the same commit as the pass that constructs it.
 // Every exhaustive switch did go red and was read; two more had a `default` arm and were found by
@@ -124,16 +124,16 @@
 // produces -- the exact shape of `Optional`, which this package already carries as a warning.
 //
 // The rule this follows, stated so the next person can apply it rather than re-litigate it: a
-// variant belongs in the core set when LOWERING must produce it, and belongs behind a seam when
-// only a LATER PASS would produce it and no other pass must interpret it. Lowering produces JSX
+// variant belongs in the core set when lowering must produce it, and belongs behind a seam when
+// only a later pass would produce it and no other pass must interpret it. Lowering produces JSX
 // because the grammar does. Nothing lowers to a reactive scope.
 //
 // # What this package deliberately does not do
 //
-// Single-assignment form is NOT what lowering produces, and is a separate opt-in pass. Straight out
+// Single-assignment form is not what lowering produces, and is a separate opt-in pass. Straight out
 // of `Lower`, values are named but not uniquely defined: a `let` reassigned in a loop is several
 // `Identifier`s sharing one `DeclarationId`, each store mints a fresh one, and a read binds to
-// whichever store the lowering WALK saw last rather than to the one that reaches it on the path.
+// whichever store the lowering walk saw last rather than to the one that reaches it on the path.
 // That last part is the important one: the pre-SSA graph's reads are lexically correct and
 // dataflow-wrong at any join, so a pass must not read them as reaching definitions.
 //
@@ -146,8 +146,6 @@
 package high_level_intermediate_representation
 
 import (
-	"fmt"
-
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/system-inc/cohere/static_single_assignment"
@@ -178,86 +176,6 @@ const InvalidBlock static_single_assignment.BlockId = 0
 // HasBlock reports whether a terminal's successor field names a real block.
 func HasBlock(block static_single_assignment.BlockId) bool { return block != InvalidBlock }
 
-// Function is one lowered function: its control-flow graph, its instruction table, and the tables
-// naming everything the graph refers to.
-//
-// It owns its tables rather than sharing an arena, which is the main structural divergence from
-// upstream. See the package comment.
-type Function struct {
-	// ContextDeclarations are bindings this function declares, reassigns, and shares with a closure
-	// inside it -- upstream's second `FindContextIdentifiers` rule. Recorded during lowering, and
-	// read by SSA, which defines such a binding once rather than versioning every write.
-	ContextDeclarations map[static_single_assignment.DeclarationId]bool
-
-	// Node is the syntactic function this was lowered from. Retained so a pass can reach the type
-	// checker, and so a diagnostic can point at source without the IR carrying its own copy of
-	// every span.
-	Node *ast.Node
-
-	// Name is the function's name where it has one, for diagnostics only. Nothing may key on it.
-	Name string
-
-	// Kind records whether this looked like a React component or hook at lowering time.
-	//
-	// It is a syntactic guess - capitalized name, or `use` prefix - and it is recorded here rather
-	// than computed by each consumer so that all of them are wrong in the same way, which is a
-	// property worth having when the corpus disagrees.
-	Kind FunctionKind
-
-	// Params are the parameter values, in order. A destructured parameter lowers to a temporary
-	// here plus destructuring instructions in the entry block, so this is always flat.
-	Params []Place
-
-	// Returns is the value returned. Every `return` stores into it, so a pass asking what a
-	// function yields has one identifier to ask about rather than a set of terminals to collect.
-	Returns Place
-
-	// Context are the values this function closes over from an enclosing one. Empty for a
-	// top-level function.
-	Context []Place
-
-	// Entry is the block control begins at.
-	Entry static_single_assignment.BlockId
-
-	// Blocks are the basic blocks in reverse postorder, so a forward analysis that iterates the
-	// slice once converges in one pass over an acyclic region.
-	Blocks []*BasicBlock
-
-	// Instructions is the flat instruction table. Blocks hold indices into it.
-	Instructions []*Instruction
-
-	// Identifiers names every value. Indexed by IdentifierId.
-	Identifiers []*Identifier
-
-	// Functions are the nested functions lowered within this one. Indexed by FunctionId.
-	Functions []*Function
-
-	// Outlined maps a value holding an outlined function to the function it names.
-	//
-	// `OutlineFunctions` replaces a capture-free `FunctionExpression` with a `LoadGlobal`, which
-	// leaves the entry in `Functions` reachable only through this map. A pass that needs the
-	// callee's own body -- `argumentMutationsFromCallbacks` is the one today -- looks here rather
-	// than parsing the synthetic name, because `Name` is documented as diagnostics-only and a user
-	// function called `_temp` would otherwise resolve to the wrong body.
-	//
-	// Nil until something is outlined, which is the common case.
-	Outlined map[static_single_assignment.IdentifierId]FunctionId
-
-	// IsAsync and IsGenerator carry the modifiers, which change what `await` and `yield` mean and
-	// are consulted by validators that do not want to walk back to the AST for them.
-	IsAsync     bool
-	IsGenerator bool
-
-	blocksById map[static_single_assignment.BlockId]*BasicBlock
-	nextBlock  static_single_assignment.BlockId
-
-	// identifierSlab is the chunk NewIdentifier carves identifiers from. See NewIdentifier.
-	identifierSlab []Identifier
-}
-
-// FunctionKind is what a function syntactically looked like.
-type FunctionKind uint8
-
 const (
 	// FunctionKindOther is anything not named like a component or a hook.
 	FunctionKindOther FunctionKind = iota
@@ -266,42 +184,6 @@ const (
 	// FunctionKindHook is a function whose name begins with `use` followed by a capital or digit.
 	FunctionKindHook
 )
-
-func (k FunctionKind) String() string {
-	switch k {
-	case FunctionKindComponent:
-		return "component"
-	case FunctionKindHook:
-		return "hook"
-	default:
-		return "other"
-	}
-}
-
-// Block returns the block with the given id.
-//
-// The second result is false for InvalidBlock and for an id that no longer names a block, which a
-// pass that removes blocks will produce. Callers that have just read the id out of a terminal of a
-// well-formed function may ignore it; callers walking a function mid-mutation may not.
-func (f *Function) Block(id static_single_assignment.BlockId) (*BasicBlock, bool) {
-	block, ok := f.blocksById[id]
-	return block, ok
-}
-
-// Instruction returns the instruction with the given id.
-func (f *Function) Instruction(id InstructionId) *Instruction {
-	return f.Instructions[id]
-}
-
-// Identifier returns the identifier naming one value.
-func (f *Function) Identifier(id static_single_assignment.IdentifierId) *Identifier {
-	return f.Identifiers[id]
-}
-
-// IdentifierOf returns the identifier a place names.
-func (f *Function) IdentifierOf(place Place) *Identifier {
-	return f.Identifiers[place.Identifier]
-}
 
 // BasicBlock is a straight-line run of instructions ending in exactly one terminal.
 //
@@ -328,17 +210,10 @@ type BasicBlock struct {
 	// Phis are the merge points for values with several reaching definitions.
 	//
 	// Empty until `Construct` runs. After it, a phi appears here wherever a binding's value depends
-	// on which predecessor control arrived from, and every phi is a REAL merge: `Construct` runs
+	// on which predecessor control arrived from, and every phi is a real merge: `Construct` runs
 	// redundant-phi elimination, so a phi whose operands all agree has already been removed.
 	Phis []*Phi
 }
-
-// BlockKind is what a block was created for.
-//
-// It is upstream's, and it matters to codegen and to reactive scopes rather than to analysis. It is
-// carried because the fixtures' expectations were produced by a compiler that had it, and dropping
-// it would make a later divergence harder to explain.
-type BlockKind uint8
 
 const (
 	// BlockKindBlock is an ordinary statement block.
@@ -352,21 +227,6 @@ const (
 	// BlockKindCatch is a catch handler.
 	BlockKindCatch
 )
-
-func (k BlockKind) String() string {
-	switch k {
-	case BlockKindValue:
-		return "value"
-	case BlockKindLoop:
-		return "loop"
-	case BlockKindSequence:
-		return "sequence"
-	case BlockKindCatch:
-		return "catch"
-	default:
-		return "block"
-	}
-}
 
 // Phi is a merge: the value of Place at the top of a block, given which predecessor control came
 // from. Its operands are a short slice sorted by predecessor; static_single_assignment.Phi says why.
@@ -453,35 +313,6 @@ type Place struct {
 	Range core.TextRange
 }
 
-// Effect is what a reference does to the value it names.
-//
-// Nothing computes these yet; lowering leaves every place at EffectUnknown.
-//
-// # This ordering is NOT the lattice an effect inference joins over, and reading it that way is a
-// # trap that was walked into once
-//
-// The declaration order below runs least to most constraining, which reads like the specification
-// for a meet operation. It is not one, and building a dataflow pass whose join is "take the larger
-// Effect" would produce a pass that is self-consistent, passes its own tests, and is wrong.
-//
-// Upstream's effect inference (`InferMutationAliasingEffects`, 3,297 lines) joins over a DIFFERENT
-// and disjoint lattice, `ValueKind`: `Mutable | Frozen | Primitive | MaybeFrozen | Global |
-// Context`. Its join, `mergeValueKinds`, is not a max over an order, because it is not a total
-// order at all: `Frozen` joined with `Mutable` is `MaybeFrozen`, a THIRD element that is neither
-// operand. No ordering of the constants below can express that, so a meet defined over this type
-// cannot be made correct by reordering it.
-//
-// `Effect` is an OUTPUT of that pass, written per reference by `applySignature` once the abstract
-// interpretation has settled what kind of value each place holds. The abstract state is keyed by
-// value, `Effect` is recorded per reference, and the two are different things: a value has one
-// kind at a program point, while the several references to it at that point can read, mutate, and
-// freeze it independently. That is what the `Place` comment means by the effect differing per
-// reference.
-//
-// So a pass filling these in computes a `ValueKind` lattice it must add, and writes `Effect` as a
-// result. See `Reactive` below for the other half, and the package comment for what is not here.
-type Effect uint8
-
 const (
 	// EffectUnknown is the unset value. Every place lowering produces holds this.
 	EffectUnknown Effect = iota
@@ -500,44 +331,6 @@ const (
 	// EffectStore means the value is stored into.
 	EffectStore
 )
-
-// IsMutable reports whether this effect can modify the value.
-func (e Effect) IsMutable() bool {
-	switch e {
-	case EffectCapture, EffectStore, EffectConditionallyMutate, EffectConditionallyMutateIterator, EffectMutate:
-		return true
-	default:
-		return false
-	}
-}
-
-func (e Effect) String() string {
-	switch e {
-	case EffectFreeze:
-		return "freeze"
-	case EffectRead:
-		return "read"
-	case EffectCapture:
-		return "capture"
-	case EffectConditionallyMutateIterator:
-		return "mutate-iterator?"
-	case EffectConditionallyMutate:
-		return "mutate?"
-	case EffectMutate:
-		return "mutate"
-	case EffectStore:
-		return "store"
-	default:
-		return "<unknown>"
-	}
-}
-
-// InstructionKind is the binding form a store establishes.
-//
-// `Const` and `Let` come from the declaration; `Reassign` is a store to an existing binding.
-// Upstream reclassifies between these after single-assignment form, which is why the distinction is
-// carried rather than collapsed into "store".
-type InstructionKind uint8
 
 const (
 	// InstructionKindConst declares a `const` binding.
@@ -558,27 +351,6 @@ const (
 	InstructionKindFunction
 )
 
-func (k InstructionKind) String() string {
-	switch k {
-	case InstructionKindLet:
-		return "let"
-	case InstructionKindReassign:
-		return "reassign"
-	case InstructionKindCatch:
-		return "catch"
-	case InstructionKindHoistedConst:
-		return "hoisted const"
-	case InstructionKindHoistedLet:
-		return "hoisted let"
-	case InstructionKindHoistedFunction:
-		return "hoisted function"
-	case InstructionKindFunction:
-		return "function"
-	default:
-		return "const"
-	}
-}
-
 // NewFunction creates an empty function ready for lowering.
 func NewFunction(node *ast.Node, name string, kind FunctionKind) *Function {
 	return &Function{
@@ -588,57 +360,4 @@ func NewFunction(node *ast.Node, name string, kind FunctionKind) *Function {
 		blocksById: map[static_single_assignment.BlockId]*BasicBlock{},
 		nextBlock:  1, // 0 is InvalidBlock.
 	}
-}
-
-// NewBlock appends a block and returns it.
-func (f *Function) NewBlock(kind BlockKind) *BasicBlock {
-	block := &BasicBlock{Id: f.nextBlock, Kind: kind}
-	f.nextBlock++
-	f.Blocks = append(f.Blocks, block)
-	f.blocksById[block.Id] = block
-	return block
-}
-
-// NewIdentifier mints a new value.
-//
-// Every value gets its own IdentifierId. Passing a non-zero declaration groups this value with
-// others of the same binding; passing 0 mints a fresh declaration, which is what a temporary wants.
-func (f *Function) NewIdentifier(name string, node *ast.Node, declaration static_single_assignment.DeclarationId) *Identifier {
-	id := static_single_assignment.IdentifierId(len(f.Identifiers))
-	if declaration == 0 {
-		declaration = static_single_assignment.DeclarationId(id) + 1
-	}
-	// Identifiers are carved from a chunk this function owns rather than allocated one at a time,
-	// which was 1.28M objects on a cold ahra run, the most of any allocation in lowering (#rwsffzm).
-	// A chunk is only ever appended to within its capacity, so a pointer into it stays put; a full
-	// chunk is left as it is and a new one started, sized to the function so far, from 4 to 256. The
-	// first chunk is small because most functions are small: a callback's handful of values, and a
-	// first chunk of 16 cost 0.07 GB of unused slots on a cold ahra run. Each function has its own
-	// chunks, so no identifier of one shares storage with another's, which
-	// TestIdentifiersShareNoStorageAcrossFunctions holds.
-	if len(f.identifierSlab) == cap(f.identifierSlab) {
-		f.identifierSlab = make([]Identifier, 0, min(max(4, len(f.Identifiers)), 256))
-	}
-	f.identifierSlab = append(f.identifierSlab, Identifier{Id: id, Declaration: declaration, Name: name, Node: node})
-	identifier := &f.identifierSlab[len(f.identifierSlab)-1]
-	f.Identifiers = append(f.Identifiers, identifier)
-	return identifier
-}
-
-// AddInstruction appends an instruction to the table and to the given block, returning its id.
-func (f *Function) AddInstruction(block *BasicBlock, instruction *Instruction) InstructionId {
-	id := InstructionId(len(f.Instructions))
-	instruction.Id = id
-	f.Instructions = append(f.Instructions, instruction)
-	block.Instructions = append(block.Instructions, id)
-	return id
-}
-
-// String renders a place as its identifier, for printing and tests.
-func (f *Function) PlaceString(place Place) string {
-	identifier := f.Identifiers[place.Identifier]
-	if identifier.Name != "" {
-		return fmt.Sprintf("%s$%d", identifier.Name, identifier.Id)
-	}
-	return fmt.Sprintf("$%d", identifier.Id)
 }

@@ -91,7 +91,7 @@ var pathSegmentMatchers = []pathSegmentMatcher{
 
 // specificGroups are the groups a path match is trusted for outright.
 //
-// The two groups NOT in this set are the ones a path can name generically: Components and Local
+// The two groups not in this set are the ones a path can name generically: Components and Local
 // Components. For those the specifier names get a second say, so `import { useThing } from
 // '@structure/source/components/Button'` is Hooks rather than Components. Measured both ways.
 var specificGroups = map[string]bool{
@@ -288,7 +288,7 @@ func classifyImport(source string, isTypeOnly bool, localNames []string) string 
 
 // classifyRelativeImport is the ladder for `./` and `../` paths.
 //
-// Note what is NOT here that is in the first-party ladder: there is no `/components/` segment and no
+// Note what is not here that is in the first-party ladder: there is no `/components/` segment and no
 // `/app/` fallback, so a relative path through a components directory falls all the way to Local
 // Components. And note the `Context` test is a bare substring rather than a path segment, so
 // `./MyContext` is Context while `@structure/source/MyContext` is not.
@@ -339,7 +339,7 @@ func classifyRelativeImport(source string, isTypeOnly bool, localNames []string)
 	if anyProviderName(localNames) || matchesProviderPath(source) {
 		return "Providers"
 	}
-	// Type-only sits BELOW the hook and provider tests here and ABOVE every path segment in the
+	// Type-only sits below the hook and provider tests here and above every path segment in the
 	// first-party ladder. That asymmetry is the original's and it is observable: a type-only
 	// relative import of a hook is Hooks, while a type-only first-party import of one is Types.
 	if isTypeOnly {

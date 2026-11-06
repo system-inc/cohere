@@ -30,7 +30,7 @@ var messageNoThrowLiteralUndef = rule.Message{
 //	invalid: throw undefined;
 //	invalid: throw foo ? 'not an Error' : 'literal';
 //
-// # This is the SYNTACTIC sibling of typescript/only-throw-error, not a duplicate of it
+// # This is the syntactic sibling of typescript/only-throw-error, not a duplicate of it
 //
 // Both rules exist upstream and both are ported here. `only-throw-error` asks the type checker what
 // the thrown expression's type is, so it can tell `throw someError` from `throw someString` when
@@ -42,7 +42,7 @@ var messageNoThrowLiteralUndef = rule.Message{
 //
 // # The judgment is `couldBeError`, and it is optimistic by construction
 //
-// Upstream asks whether the argument has ANY possibility of being an Error and reports only when it
+// Upstream asks whether the argument has any possibility of being an Error and reports only when it
 // provably cannot be. Eight node types answer yes outright because their value is not knowable
 // syntactically, and everything else is either recursion or a no.
 //
@@ -77,15 +77,15 @@ var messageNoThrowLiteralUndef = rule.Message{
 // An identifier is "could be an Error", so `throw undefined` reaches the second test rather than the
 // first. It reports `undef` only when the name resolves to the global; upstream asks
 // `isGlobalReference` and the corpus pins it with `function foo(undefined) { throw undefined; }`,
-// which is CLEAN because the parameter shadows the global and could hold anything.
-var NoThrowLiteral = rule.Rule{
+// which is clean because the parameter shadows the global and could hold anything.
+var NoThrowLiteral = rule.Rule[rule.NoOptions]{
 	Name:             "no-throw-literal",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindThrowStatement: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 				argument := node.AsThrowStatement().Expression
@@ -97,15 +97,15 @@ var NoThrowLiteral = rule.Rule{
 				}
 
 				if !couldBeError(argument) {
-					ctx.ReportNode(node, messageNoThrowLiteralObject)
+					ruleContext.ReportNode(node, messageNoThrowLiteralObject)
 					return
 				}
 
 				// Reached only for an argument that could be an Error, which an identifier always
 				// is. Upstream orders these the same way, so `throw undefined` never produces both.
 				if argument.Kind == ast.KindIdentifier && argument.Text() == "undefined" &&
-					!undefinedIsShadowed(ctx, argument) {
-					ctx.ReportNode(node, messageNoThrowLiteralUndef)
+					!undefinedIsShadowed(ruleContext, argument) {
+					ruleContext.ReportNode(node, messageNoThrowLiteralUndef)
 				}
 			},
 		}

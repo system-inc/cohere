@@ -25,8 +25,8 @@ const extraBindFile = "/repository/source/ExtraBind.ts"
 // The offsets were measured by running the installed rule over each case and converting its
 // one-based line and column to a byte offset, which two of these cases need because their span sits
 // on the second line.
-func TestNoExtraBindFires(t *testing.T) {
-	t.Parallel()
+func TestNoExtraBindFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText  string
@@ -39,10 +39,25 @@ func TestNoExtraBindFires(t *testing.T) {
 		{"var a = function() { return 1; }[`bind`](b)", 33, 39, "var a = function() { return 1; }"},
 		{"var a = (() => { return 1; }).bind(b)", 30, 34, "var a = (() => { return 1; })"},
 		{"var a = (() => { return this; }).bind(b)", 33, 37, "var a = (() => { return this; })"},
-		{"var a = function() { (function(){ this.c }) }.bind(b)", 46, 50, "var a = function() { (function(){ this.c }) }"},
-		{"var a = function() { function c(){ this.d } }.bind(b)", 46, 50, "var a = function() { function c(){ this.d } }"},
+		{
+			"var a = function() { (function(){ this.c }) }.bind(b)",
+			46,
+			50,
+			"var a = function() { (function(){ this.c }) }",
+		},
+		{
+			"var a = function() { function c(){ this.d } }.bind(b)",
+			46,
+			50,
+			"var a = function() { function c(){ this.d } }",
+		},
 		{"var a = function() { return 1; }.bind(this)", 33, 37, "var a = function() { return 1; }"},
-		{"var a = function() { (function(){ (function(){ this.d }.bind(c)) }) }.bind(b)", 70, 74, "var a = function() { (function(){ (function(){ this.d }.bind(c)) }) }"},
+		{
+			"var a = function() { (function(){ (function(){ this.d }.bind(c)) }) }.bind(b)",
+			70,
+			74,
+			"var a = function() { (function(){ (function(){ this.d }.bind(c)) }) }",
+		},
 		{"var a = (function() { return 1; }).bind(this)", 35, 39, "var a = (function() { return 1; })"},
 		{"var a = (function() { return 1; }.bind)(this)", 34, 38, "var a = (function() { return 1; })"},
 		{"var a = function() {}.bind(b++)", 22, 26, nil},
@@ -70,16 +85,36 @@ func TestNoExtraBindFires(t *testing.T) {
 		// Beyond the corpus. A method shorthand and a class method rebind `this`, so a `this` inside
 		// one says nothing about the function being judged -- the same distinction upstream's corpus
 		// makes with a nested function declaration, on shapes it never writes.
-		{"var a = function() { var o = { m() { return this; } }; }.bind(b)", 57, 61, "var a = function() { var o = { m() { return this; } }; }"},
-		{"var a = function() { class C { m() { return this; } } }.bind(b)", 56, 60, "var a = function() { class C { m() { return this; } } }"},
+		{
+			"var a = function() { var o = { m() { return this; } }; }.bind(b)",
+			57,
+			61,
+			"var a = function() { var o = { m() { return this; } }; }",
+		},
+		{
+			"var a = function() { class C { m() { return this; } } }.bind(b)",
+			56,
+			60,
+			"var a = function() { class C { m() { return this; } } }",
+		},
 
 		// A getter and a setter, which are the two accessor shapes and neither is a corpus case.
-		{"var a = function() { var o = { get x() { return this; } }; }.bind(b)", 61, 65, "var a = function() { var o = { get x() { return this; } }; }"},
+		{
+			"var a = function() { var o = { get x() { return this; } }; }.bind(b)",
+			61,
+			65,
+			"var a = function() { var o = { get x() { return this; } }; }",
+		},
 
-		// A `this` inside a nested arrow does NOT save the outer function, so this reports while the
+		// A `this` inside a nested arrow does not save the outer function, so this reports while the
 		// corpus's `function() { return () => this; }` is clean. The difference is which function the
 		// arrow is written inside: here it is a nested function, so its `this` is that function's.
-		{"var a = function() { function c() { return () => this; } }.bind(b)", 59, 63, "var a = function() { function c() { return () => this; } }"},
+		{
+			"var a = function() { function c() { return () => this; } }.bind(b)",
+			59,
+			63,
+			"var a = function() { function c() { return () => this; } }",
+		},
 
 		// An argument that is a literal rather than an identifier, which upstream's allowed set
 		// covers and its corpus never writes.
@@ -92,7 +127,7 @@ func TestNoExtraBindFires(t *testing.T) {
 		{"var a = function() {}.bind(true)", 22, 26, "var a = function() {}"},
 		{"var a = function() {}.bind('s')", 22, 26, "var a = function() {}"},
 
-		// Three shapes that report and are NOT repaired, because upstream's allowed set is estree's
+		// Three shapes that report and are not repaired, because upstream's allowed set is estree's
 		// `Literal` and these are outside it. Each is inside the intuitive reading of the set and
 		// outside the real one, which is why all three are measured against the installed rule
 		// rather than reasoned about, and why the corpus -- which writes no literal argument at all
@@ -115,14 +150,14 @@ func TestNoExtraBindFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoExtraBind, extraBindFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "unexpected")
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoExtraBind, extraBindFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "unexpected")
 
 			reported := result.Diagnostics[0].Range
 			if reported.Pos() != testCase.spanStart || reported.End() != testCase.spanEnd {
-				t.Errorf("reported [%d,%d), want [%d,%d) -- text %q",
+				test.Errorf("reported [%d,%d), want [%d,%d) -- text %q",
 					reported.Pos(), reported.End(), testCase.spanStart, testCase.spanEnd,
 					testCase.sourceText[reported.Pos():reported.End()])
 			}
@@ -132,10 +167,10 @@ func TestNoExtraBindFires(t *testing.T) {
 				// `output: null` upstream. The finding stands and the repair is declined, so
 				// asserting no fixes is asserting the decline rather than asserting nothing.
 				if fixes := result.Diagnostics[0].Fixes; len(fixes) != 0 {
-					t.Errorf("proposed %d fixes on a case upstream declines to repair", len(fixes))
+					test.Errorf("proposed %d fixes on a case upstream declines to repair", len(fixes))
 				}
 			case string:
-				rule_testing.ExpectFixedSource(t, result, want)
+				rule_testing.ExpectFixedSource(test, result, want)
 			}
 		})
 	}
@@ -143,8 +178,8 @@ func TestNoExtraBindFires(t *testing.T) {
 
 // The clean cases are what separate a pointless bind from a useful one, and every one of them is a
 // false positive this rule would otherwise ship.
-func TestNoExtraBindStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoExtraBindStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct{ sourceText string }{
 		{"var a = function(b) { return b }.bind(c, d)"},
@@ -168,7 +203,7 @@ func TestNoExtraBindStaysSilent(t *testing.T) {
 		// substitution is the empty string and the text still is not statically `bind`.
 		{"var a = function() { return 1; }[`bind${x}`](b)"},
 
-		// A subscript that IS a static string and is not `bind`. The corpus separates a static
+		// A subscript that is a static string and is not `bind`. The corpus separates a static
 		// subscript from a dynamic one and never separates a static subscript from a static one
 		// naming something else, so a rule reading only the node kind passes every imported case.
 		// Found by a mutant that let the string arm accept any text; measured silent upstream.
@@ -181,11 +216,11 @@ func TestNoExtraBindStaysSilent(t *testing.T) {
 		{"var a = function() { return 1; }.bind()"},
 		{"var a = function() { return 1; }.bind(b, c, d)"},
 
-		// The receiver is not the function. `bind` called ON something else, with a function as its
+		// The receiver is not the function. `bind` called on something else, with a function as its
 		// argument, is a different expression entirely.
 		{"var a = b.bind(function() { return 1; })"},
 
-		// The `*.bind` access is an ARGUMENT of a call rather than its callee, so nothing is being
+		// The `*.bind` access is an argument of a call rather than its callee, so nothing is being
 		// bound. One argument, so the argument-count check cannot cover for the callee check that
 		// actually declines it; found by a mutant that dropped the callee identity comparison and
 		// survived every other fixture. Measured silent upstream.
@@ -215,9 +250,9 @@ func TestNoExtraBindStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoExtraBind, extraBindFile, testCase.sourceText))
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoExtraBind, extraBindFile, testCase.sourceText))
 		})
 	}
 }
@@ -228,8 +263,8 @@ func TestNoExtraBindStaysSilent(t *testing.T) {
 // corpus case, because none of them writes anything between the member access and the argument list
 // that has to survive. Upstream's comment names the shape that does, and it is the reason the fixer
 // is built as a pair, so it is written here.
-func TestNoExtraBindRepairKeepsWhatSitsBetweenTheTwoSpans(t *testing.T) {
-	t.Parallel()
+func TestNoExtraBindRepairKeepsWhatSitsBetweenTheTwoSpans(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText  string
@@ -242,24 +277,24 @@ func TestNoExtraBindRepairKeepsWhatSitsBetweenTheTwoSpans(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoExtraBind, extraBindFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "unexpected")
-			rule_testing.ExpectFixedSource(t, result, testCase.fixedSource)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoExtraBind, extraBindFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "unexpected")
+			rule_testing.ExpectFixedSource(test, result, testCase.fixedSource)
 		})
 	}
 }
 
 // The message is a value with no interpolation, so the assertion is on the constant's own fields,
 // compared against literals typed here rather than against the rule's own constant.
-func TestNoExtraBindMessage(t *testing.T) {
-	t.Parallel()
+func TestNoExtraBindMessage(test *testing.T) {
+	test.Parallel()
 
 	if messageUnnecessaryBind.Id != "unexpected" {
-		t.Errorf("message id is %q", messageUnnecessaryBind.Id)
+		test.Errorf("message id is %q", messageUnnecessaryBind.Id)
 	}
 	if messageUnnecessaryBind.Description == "" {
-		t.Error("message carries no description")
+		test.Error("message carries no description")
 	}
 }

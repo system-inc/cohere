@@ -27,9 +27,9 @@ type alignCase struct {
 }
 
 // buildAlignCase builds the case with an `If` terminal, which is the ordinary widening shape.
-func buildAlignCase(t *testing.T, testCase alignCase) (*Function, *ReactiveScopes) {
-	t.Helper()
-	return buildAlignCaseWithTerminal(t, testCase, func(fallthroughBlock static_single_assignment.BlockId) Terminal {
+func buildAlignCase(test *testing.T, testCase alignCase) (*Function, *ReactiveScopes) {
+	test.Helper()
+	return buildAlignCaseWithTerminal(test, testCase, func(fallthroughBlock static_single_assignment.BlockId) Terminal {
 		return &If{
 			Consequent:  2,
 			Alternate:   fallthroughBlock,
@@ -41,9 +41,9 @@ func buildAlignCase(t *testing.T, testCase alignCase) (*Function, *ReactiveScope
 
 // buildAlignCaseWithTerminal builds the case with a caller-supplied terminal, so that one graph can
 // be run with the terminal kind as the only variable. That is what isolates the branch exclusion.
-func buildAlignCaseWithTerminal(t *testing.T, testCase alignCase,
+func buildAlignCaseWithTerminal(test *testing.T, testCase alignCase,
 	makeTerminal func(fallthroughBlock static_single_assignment.BlockId) Terminal) (*Function, *ReactiveScopes) {
-	t.Helper()
+	test.Helper()
 
 	function := &Function{}
 	function.Identifiers = append(function.Identifiers, nil)
@@ -104,7 +104,7 @@ func buildAlignCaseWithTerminal(t *testing.T, testCase alignCase,
 	return function, scopes
 }
 
-// buildNestedGotoCase builds two nested constructs and a goto that leaves BOTH at once, which is the
+// buildNestedGotoCase builds two nested constructs and a goto that leaves both at once, which is the
 // only shape reaching the goto back-reference mechanism.
 //
 // Layout, with evaluation orders in brackets:
@@ -119,8 +119,8 @@ func buildAlignCaseWithTerminal(t *testing.T, testCase alignCase,
 // When the sweep reaches bb3's goto, both fallthrough ranges are open and bb10 is at index 0 rather
 // than at the top, so the back-reference fires. A goto to bb2 instead would target the innermost and
 // take the other path.
-func buildNestedGotoCase(t *testing.T) (*Function, *ReactiveScopes) {
-	t.Helper()
+func buildNestedGotoCase(test *testing.T) (*Function, *ReactiveScopes) {
+	test.Helper()
 
 	function := &Function{}
 	function.Identifiers = append(function.Identifiers, nil)
@@ -179,12 +179,12 @@ func buildNestedGotoCase(t *testing.T) (*Function, *ReactiveScopes) {
 	return function, scopes
 }
 
-// buildInnermostGotoCase builds one construct and a goto targeting its OWN fallthrough, which is the
+// buildInnermostGotoCase builds one construct and a goto targeting its own fallthrough, which is the
 // innermost open one.
 //
 // This is the shape that separates upstream's `start !== at(-1)` test from its absence. Upstream
-// SKIPS this case, because the fallthrough pop on the very next block applies the same start
-// widening. The pop does not touch the END, so a scope whose end falls short of the fallthrough is
+// skips this case, because the fallthrough pop on the very next block applies the same start
+// widening. The pop does not touch the end, so a scope whose end falls short of the fallthrough is
 // where skipping and not-skipping produce different answers.
 //
 //	bb0  `if` [5]                 fallthrough bb1
@@ -194,8 +194,8 @@ func buildNestedGotoCase(t *testing.T) (*Function, *ReactiveScopes) {
 //
 // The scope is [7,9): active at the goto (9 > 8), and ending well before the fallthrough's first
 // instruction at 20. Upstream leaves its end at 9; removing the test would drag it to 20.
-func buildInnermostGotoCase(t *testing.T) (*Function, *ReactiveScopes) {
-	t.Helper()
+func buildInnermostGotoCase(test *testing.T) (*Function, *ReactiveScopes) {
+	test.Helper()
 
 	function := &Function{}
 	function.Identifiers = append(function.Identifiers, nil)

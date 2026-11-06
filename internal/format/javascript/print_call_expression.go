@@ -1,5 +1,7 @@
 package javascript
 
+import "github.com/system-inc/cohere/internal/format/doc"
+
 // print/call-expression.js.
 
 /*
@@ -17,16 +19,17 @@ func printCallExpression(path *Path, options *Options, print PrintFunc) Doc {
 	isNewExpression := current.Is("NewExpression")
 
 	optional := printOptionalToken(path)
-	args := getCallArguments(current)
+	arguments := getCallArguments(current)
 	// `TSImportType.typeArguments` is after `qualifier`, not before the "arguments"
 	var typeArgumentsDoc Doc = emptyDoc
 	if !current.Is("TSImportType") && current.Child("typeArguments") != nil {
 		typeArgumentsDoc = concatIn(path, print("typeArguments", nil), lineSuffixBoundary)
 	}
 
-	isTemplateLiteralSingleArg := len(args) == 1 && isTemplateOnItsOwnLine(args[0], originalText(options))
+	isTemplateLiteralSingleArgument := len(arguments) == 1 &&
+		isTemplateOnItsOwnLine(arguments[0], originalText(options))
 
-	if isTemplateLiteralSingleArg ||
+	if isTemplateLiteralSingleArgument ||
 		// Don't break simple `import()` with long module name
 		isSimpleModuleImport(path) ||
 		// Dangling comments are not handled, all these special cases should have arguments #9668
@@ -39,16 +42,16 @@ func printCallExpression(path *Path, options *Options, print PrintFunc) Doc {
 		isTestCall(current, parentOf(path)) {
 		var printed []Doc
 		iterateCallArgumentsPath(path, func(*Path, int) {
-			printed = append(printed, print(nil, nil))
+			printed = append(printed, print("", nil))
 		})
 		// Upstream skips this return when `printed[0].label?.embed`. The JavaScript printer has no embed
 		// hook (printer.go), so no printed argument carries that label and the condition always holds.
 		return concatIn(path, printCallee(path, print),
 			optional,
 			typeArgumentsDoc,
-			"(",
-			join(", ", printed),
-			")",
+			doc.Text("("),
+			join(doc.Text(", "), printed),
+			doc.Text(")"),
 		)
 	}
 
@@ -59,7 +62,7 @@ func printCallExpression(path *Path, options *Options, print PrintFunc) Doc {
 	if !isDynamicImportLike &&
 		!isNewExpression &&
 		isMemberish(current.Child("callee")) {
-		names := []any{"callee"}
+		names := []string{"callee"}
 		if current.Child("callee").Is("ChainExpression") {
 			names = append(names, "expression")
 		}
@@ -92,22 +95,22 @@ func printCallee(path *Path, print PrintFunc) Doc {
 		if current.Truthy("phase") {
 			phase = "." + current.String("phase")
 		}
-		return concatIn(path, "import"+phase)
+		return concatIn(path, textDoc("import"+phase))
 	}
 
 	if current.Is("TSImportType") {
-		return concatIn(path, "import")
+		return concatIn(path, doc.Text("import"))
 	}
 
 	if current.Is("TSExternalModuleReference") {
-		return concatIn(path, "require")
+		return concatIn(path, doc.Text("require"))
 	}
 
 	newKeyword := ""
 	if current.Is("NewExpression") {
 		newKeyword = "new "
 	}
-	return concatIn(path, newKeyword,
+	return concatIn(path, textDoc(newKeyword),
 		print("callee", nil),
 		lineSuffixBoundary,
 	)
@@ -140,9 +143,9 @@ func isSimpleModuleImport(path *Path) bool {
 		return false
 	}
 
-	args := getCallArguments(current)
+	arguments := getCallArguments(current)
 
-	return len(args) == 1 && isStringLiteral(args[0]) && !hasAnyComment(args[0])
+	return len(arguments) == 1 && isStringLiteral(arguments[0]) && !hasAnyComment(arguments[0])
 }
 
 // isCommonsJsOrAmdModuleDefinition is upstream's isCommonsJsOrAmdModuleDefinition.
@@ -157,22 +160,22 @@ func isCommonsJsOrAmdModuleDefinition(path *Path) bool {
 		return false
 	}
 
-	args := getCallArguments(current)
+	arguments := getCallArguments(current)
 
 	// AMD module
 	if current.Child("callee").String("name") == "require" {
-		return (len(args) == 1 && isStringLiteral(args[0]) || len(args) > 1) &&
-			!hasAnyComment(args[0])
+		return (len(arguments) == 1 && isStringLiteral(arguments[0]) || len(arguments) > 1) &&
+			!hasAnyComment(arguments[0])
 	}
 
 	// CommonJS module
 	if current.Child("callee").String("name") == "define" &&
 		parentOf(path).Is("ExpressionStatement") {
-		return len(args) == 1 ||
-			len(args) == 2 && args[0].Is("ArrayExpression") ||
-			len(args) == 3 &&
-				isStringLiteral(args[0]) &&
-				args[1].Is("ArrayExpression")
+		return len(arguments) == 1 ||
+			len(arguments) == 2 && arguments[0].Is("ArrayExpression") ||
+			len(arguments) == 3 &&
+				isStringLiteral(arguments[0]) &&
+				arguments[1].Is("ArrayExpression")
 	}
 
 	return false

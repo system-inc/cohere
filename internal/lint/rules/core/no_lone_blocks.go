@@ -41,7 +41,7 @@ var messageRedundantNestedBlock = rule.Message{
 // containing a block-scoped binding is doing real work, and `var` is the case that catches people
 // out, because it looks identical and is function-scoped.
 //
-// # Which message, and it is decided by the PARENT
+// # Which message, and it is decided by the parent
 //
 // A block whose parent is another block or a static block reports `redundantNestedBlock`; anything
 // else reports `redundantBlock`. Both messages are in upstream's `meta.messages` and the corpus
@@ -54,7 +54,7 @@ var messageRedundantNestedBlock = rule.Message{
 //	the block is lone AND holds no block-scoped binding      redundant on its own
 //	the block is the ONLY statement of an enclosing block     redundant regardless of its contents
 //
-// The second is what makes `{ {let y = 1;} }` report TWICE. The inner block holds a `let` so it is
+// The second is what makes `{ {let y = 1;} }` report twice. The inner block holds a `let` so it is
 // not redundant by the first test, but it is its parent's only statement, so the outer braces add
 // nothing and the inner ones are reported for being the sole occupant. Measured against the
 // installed eslint 10.8.1 build, which returns `redundantBlock` then `redundantNestedBlock`.
@@ -68,7 +68,7 @@ var messageRedundantNestedBlock = rule.Message{
 //
 // The function declaration is the subtle one. Upstream gates it on `sourceCode.getScope(node).isStrict`,
 // because a function declaration in a block binds to the block in strict mode and hoists out of it
-// in sloppy mode. Upstream's corpus runs `{ function bar() {} }` twice at the SAME ecmaVersion and
+// in sloppy mode. Upstream's corpus runs `{ function bar() {} }` twice at the same ecmaVersion and
 // gets opposite verdicts, differing only in `impliedStrict`.
 //
 // cohere lints TypeScript, and a TypeScript file is a module, and a module body is always strict.
@@ -79,7 +79,7 @@ var messageRedundantNestedBlock = rule.Message{
 //
 // # A switch case is a statement list, and the exemption is positional
 //
-// A block inside a `case` is lone unless it is the case's ONLY statement. `case bar: { baz; }` is
+// A block inside a `case` is lone unless it is the case's only statement. `case bar: { baz; }` is
 // clean and `case 1: foo(); { bar; }` reports, and so does `case 1: { bar; } foo();`. The braces
 // are how you give a case its own scope, which only reads as deliberate when they wrap the whole
 // case.
@@ -94,9 +94,9 @@ var messageRedundantNestedBlock = rule.Message{
 // No fix. Removing the braces is safe only when nothing inside them is block-scoped, which is the
 // rule's own predicate, but the repair still has to reindent the body and decide what to do with
 // comments attached to the braces. Upstream ships no fixer either.
-var NoLoneBlocks = rule.Rule{
+var NoLoneBlocks = rule.Rule[rule.NoOptions]{
 	Name: "no-lone-blocks",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
 				type finding struct {
@@ -126,12 +126,12 @@ var NoLoneBlocks = rule.Rule{
 					// `KindClassStaticBlockDeclaration`, which is neither of the two parent kinds
 					// the arms below accept, so both decline it without a guard in front. An
 					// explicit guard was written first, and a mutant deleting it survived every
-					// fixture; deleting it AND widening `isLoneBlock` to accept a static block
+					// fixture; deleting it and widening `isLoneBlock` to accept a static block
 					// parent is caught by 29 lines, which is what showed the guard was a second
 					// spelling of a decision the helpers already make rather than a filter of its
 					// own.
 					//
-					// This still matters to read, because in ESTree the static block IS the
+					// This still matters to read, because in ESTree the static block is the
 					// statement list and this position does not exist. Every arm below therefore
 					// has to keep declining a `KindClassStaticBlockDeclaration` parent, and the
 					// corpus's eight clean static-block cases are what will notice if one stops.
@@ -141,7 +141,7 @@ var NoLoneBlocks = rule.Rule{
 							report(current)
 						case isOnlyStatementOfABlock(current):
 							// The second arm, and the reason `{ {let y = 1;} }` reports twice: a
-							// block that IS its parent's whole contents adds nothing, whatever it
+							// block that is its parent's whole contents adds nothing, whatever it
 							// holds. Upstream reaches this through the `else if` after its lone
 							// check, so a block satisfying both reports once rather than twice.
 							report(current)
@@ -153,7 +153,7 @@ var NoLoneBlocks = rule.Rule{
 				node.ForEachChild(visit)
 
 				for _, found := range findings {
-					ctx.ReportNode(found.node, found.message)
+					ruleContext.ReportNode(found.node, found.message)
 				}
 			},
 		}
@@ -176,18 +176,18 @@ func isLoneBlock(block *ast.Node) bool {
 		return true
 
 	case ast.KindCaseClause, ast.KindDefaultClause:
-		// A block wrapping the WHOLE case is how a case is given its own scope, and upstream
+		// A block wrapping the whole case is how a case is given its own scope, and upstream
 		// exempts exactly that. `case bar: { baz; }` is clean; `case 1: foo(); { bar; }` and
 		// `case 1: { bar; } foo();` both report, so the test is on the case's length as well as on
 		// which statement the block is.
 		// No nil guard on the list: probed with `switch(a){ case 1: }`, `case 1: case 2: b;`,
-		// `default: }` and a truncated `case }`, and the parser gives an EMPTY list every time,
+		// `default: }` and a truncated `case }`, and the parser gives an empty list every time,
 		// never nil. A mutant flipping the guard's verdict survived every fixture, which is what
 		// sent us to probe rather than to write a case for it.
 		statements := parent.AsCaseOrDefaultClause().Statements
 
 		// The identity comparison is equivalent to the length test alone and is kept for what it
-		// SAYS rather than for what it decides. A block reached here is by construction one of its
+		// says rather than for what it decides. A block reached here is by construction one of its
 		// parent clause's statements, so a clause with exactly one statement has that statement be
 		// this block. Checked exhaustively over sixteen nesting shapes with a probe asserting the
 		// invariant directly: zero violations. Two mutants deleting the comparison, one per arm,
@@ -227,7 +227,7 @@ func isOnlyStatementOfABlock(block *ast.Node) bool {
 	return statements != nil && len(statements.Nodes) == 1 && statements.Nodes[0] == block
 }
 
-// holdsBlockScopedBinding reports whether anything DIRECTLY inside a block binds to it.
+// holdsBlockScopedBinding reports whether anything directly inside a block binds to it.
 //
 // Directly, not recursively: a `let` inside a nested block belongs to that block, and upstream
 // answers the same way because its marker only fires for a declaration whose immediate parent is

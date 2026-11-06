@@ -11,7 +11,7 @@ const controlRegexFile = "/repository/source/ControlRegex.ts"
 
 // The corpus is oxc's, copied rather than rewritten.
 //
-// That file carries FIVE Tester blocks, and four of them call `.test()` rather than
+// That file carries five Tester blocks, and four of them call `.test()` rather than
 // `.test_and_snapshot()`. Reading only the last one, which is what a porter opening the file sees,
 // imports 34 of 57 failing cases and silently drops the rest. The extractor counts the blocks first
 // for exactly this reason.
@@ -19,8 +19,8 @@ const controlRegexFile = "/repository/source/ControlRegex.ts"
 // Only the regex-literal cases are taken here. Upstream's corpus is roughly half `new RegExp(...)`
 // calls, and this port watches the literal form only; the constructor arm is a separate surface with
 // its own discrimination and porting half of it silently would be worse than declining it.
-func TestNoControlRegexFires(t *testing.T) {
-	t.Parallel()
+func TestNoControlRegexFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -37,10 +37,10 @@ func TestNoControlRegexFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoControlRegex, controlRegexFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, NoControlRegex, controlRegexFile, testCase.sourceText),
 				"noControlRegex")
 		})
 	}
@@ -55,8 +55,8 @@ func TestNoControlRegexFires(t *testing.T) {
 // The named escapes are the other half: `\t`, `\n`, `\r`, `\f`, `\v` are all control characters by
 // value and none is reported, because the rule objects to spelling a code out by number rather than
 // to the code point being present.
-func TestNoControlRegexStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoControlRegexStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -77,10 +77,10 @@ func TestNoControlRegexStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.Run(t, NoControlRegex, controlRegexFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.Run(test, NoControlRegex, controlRegexFile, testCase.sourceText))
 		})
 	}
 }
@@ -90,10 +90,10 @@ func TestNoControlRegexStaysSilent(t *testing.T) {
 // Upstream batches every control character in one pattern into a single diagnostic, which is why
 // its 57 failing inputs produce 34. Its corpus proves the batching only indirectly, through a
 // snapshot count a porter has to go and read. This asserts it directly: three escapes, one finding.
-func TestNoControlRegexReportsOncePerPattern(t *testing.T) {
-	t.Parallel()
+func TestNoControlRegexReportsOncePerPattern(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectFindings(t,
-		rule_testing.Run(t, NoControlRegex, controlRegexFile, "export const r = /\\x01\\x02\\x03/;"),
+	rule_testing.ExpectFindings(test,
+		rule_testing.Run(test, NoControlRegex, controlRegexFile, "export const r = /\\x01\\x02\\x03/;"),
 		"noControlRegex")
 }

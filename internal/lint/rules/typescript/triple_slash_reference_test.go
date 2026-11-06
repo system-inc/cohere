@@ -3,6 +3,7 @@ package typescript
 import (
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -14,12 +15,12 @@ const tripleSlashFile = "/repository/source/Thing.ts"
 // The decoder holds three defaults and a per-key value filter, so a fixture that constructed
 // `TripleSlashReferenceOptions` by hand would test the rule while leaving the half of the port that
 // reads the config unexercised. Every case below names its configuration the way a user writes it.
-func decodeTripleSlashOptions(t *testing.T, configuration string) any {
-	t.Helper()
+func decodeTripleSlashOptions(test *testing.T, configuration string) TripleSlashReferenceOptions {
+	test.Helper()
 
-	options, err := DecodeTripleSlashReferenceOptions([]byte(configuration))
-	if err != nil {
-		t.Fatalf("could not decode %s: %v", configuration, err)
+	options, decodeTripleSlashReferenceOptionsError := DecodeTripleSlashReferenceOptions([]byte(configuration))
+	if decodeTripleSlashReferenceOptionsError != nil {
+		test.Fatalf("could not decode %s: %v", configuration, decodeTripleSlashReferenceOptionsError)
 	}
 	return options
 }
@@ -28,19 +29,37 @@ func decodeTripleSlashOptions(t *testing.T, configuration string) any {
 //
 // All sixteen of upstream's passing inputs, extracted by the fixture tool and written out by a
 // script so no escape sequence passed through a shell or a keyboard on the way here.
-func TestTripleSlashReferenceStaysSilentOnUpstreamPassCases(t *testing.T) {
-	t.Parallel()
+func TestTripleSlashReferenceStaysSilentOnUpstreamPassCases(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		configuration string
 		sourceText    string
 	}{
-		{"{ \"lib\": \"never\", \"path\": \"never\", \"types\": \"never\" }", "\n                    // <reference path=\"foo\" />\n                    // <reference types=\"bar\" />\n                    // <reference lib=\"baz\" />\n                    import * as foo from 'foo';\n                    import * as bar from 'bar';\n                    import * as baz from 'baz';\n                  "},
-		{"{ \"lib\": \"never\", \"path\": \"never\", \"types\": \"never\" }", "\n                    // <reference path=\"foo\" />\n                    // <reference types=\"bar\" />\n                    // <reference lib=\"baz\" />\n                    import foo = require('foo');\n                    import bar = require('bar');\n                    import baz = require('baz');\n                  "},
-		{"{ \"lib\": \"always\", \"path\": \"always\", \"types\": \"always\" }", "\n                    /// <reference path=\"foo\" />\n                    /// <reference types=\"bar\" />\n                    /// <reference lib=\"baz\" />\n                    import * as foo from 'foo';\n                    import * as bar from 'bar';\n                    import * as baz from 'baz';\n                  "},
-		{"{ \"lib\": \"always\", \"path\": \"always\", \"types\": \"always\" }", "\n                    /// <reference path=\"foo\" />\n                    /// <reference types=\"bar\" />\n                    /// <reference lib=\"baz\" />\n                    import foo = require('foo');\n                    import bar = require('bar');\n                    import baz = require('baz');\n                  "},
-		{"{ \"lib\": \"always\", \"path\": \"always\", \"types\": \"always\" }", "\n                    /// <reference path=\"foo\" />\n                    /// <reference types=\"bar\" />\n                    /// <reference lib=\"baz\" />\n                    import foo = foo;\n                    import bar = bar;\n                    import baz = baz;\n                  "},
-		{"{ \"lib\": \"always\", \"path\": \"always\", \"types\": \"always\" }", "\n                    /// <reference path=\"foo\" />\n                    /// <reference types=\"bar\" />\n                    /// <reference lib=\"baz\" />\n                    import foo = foo.foo;\n                    import bar = bar.bar.bar.bar;\n                    import baz = baz.baz;\n                  "},
+		{
+			"{ \"lib\": \"never\", \"path\": \"never\", \"types\": \"never\" }",
+			"\n                    // <reference path=\"foo\" />\n                    // <reference types=\"bar\" />\n                    // <reference lib=\"baz\" />\n                    import * as foo from 'foo';\n                    import * as bar from 'bar';\n                    import * as baz from 'baz';\n                  ",
+		},
+		{
+			"{ \"lib\": \"never\", \"path\": \"never\", \"types\": \"never\" }",
+			"\n                    // <reference path=\"foo\" />\n                    // <reference types=\"bar\" />\n                    // <reference lib=\"baz\" />\n                    import foo = require('foo');\n                    import bar = require('bar');\n                    import baz = require('baz');\n                  ",
+		},
+		{
+			"{ \"lib\": \"always\", \"path\": \"always\", \"types\": \"always\" }",
+			"\n                    /// <reference path=\"foo\" />\n                    /// <reference types=\"bar\" />\n                    /// <reference lib=\"baz\" />\n                    import * as foo from 'foo';\n                    import * as bar from 'bar';\n                    import * as baz from 'baz';\n                  ",
+		},
+		{
+			"{ \"lib\": \"always\", \"path\": \"always\", \"types\": \"always\" }",
+			"\n                    /// <reference path=\"foo\" />\n                    /// <reference types=\"bar\" />\n                    /// <reference lib=\"baz\" />\n                    import foo = require('foo');\n                    import bar = require('bar');\n                    import baz = require('baz');\n                  ",
+		},
+		{
+			"{ \"lib\": \"always\", \"path\": \"always\", \"types\": \"always\" }",
+			"\n                    /// <reference path=\"foo\" />\n                    /// <reference types=\"bar\" />\n                    /// <reference lib=\"baz\" />\n                    import foo = foo;\n                    import bar = bar;\n                    import baz = baz;\n                  ",
+		},
+		{
+			"{ \"lib\": \"always\", \"path\": \"always\", \"types\": \"always\" }",
+			"\n                    /// <reference path=\"foo\" />\n                    /// <reference types=\"bar\" />\n                    /// <reference lib=\"baz\" />\n                    import foo = foo.foo;\n                    import bar = bar.bar.bar.bar;\n                    import baz = baz.baz;\n                  ",
+		},
 		{"{ \"path\": \"never\" }", "import * as foo from 'foo';"},
 		{"{ \"path\": \"never\" }", "import foo = require('foo');"},
 		{"{ \"types\": \"never\" }", "import * as foo from 'foo';"},
@@ -49,16 +68,22 @@ func TestTripleSlashReferenceStaysSilentOnUpstreamPassCases(t *testing.T) {
 		{"{ \"lib\": \"never\" }", "import foo = require('foo');"},
 		{"{ \"types\": \"prefer-import\" }", "import * as foo from 'foo';"},
 		{"{ \"types\": \"prefer-import\" }", "import foo = require('foo');"},
-		{"{ \"types\": \"prefer-import\" }", "\n                    /// <reference types=\"foo\" />\n                    import * as bar from 'bar';\n                  "},
-		{"{ \"lib\": \"never\", \"path\": \"never\", \"types\": \"never\" }", "\n                    /*\n                    /// <reference types=\"foo\" />\n                    */\n                    import * as foo from 'foo';\n                  "},
+		{
+			"{ \"types\": \"prefer-import\" }",
+			"\n                    /// <reference types=\"foo\" />\n                    import * as bar from 'bar';\n                  ",
+		},
+		{
+			"{ \"lib\": \"never\", \"path\": \"never\", \"types\": \"never\" }",
+			"\n                    /*\n                    /// <reference types=\"foo\" />\n                    */\n                    import * as foo from 'foo';\n                  ",
+		},
 	}
 	for index, testCase := range cases {
-		t.Run(testCase.configuration, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.configuration, func(test *testing.T) {
+			test.Parallel()
 			_ = index
-			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, TripleSlashReference,
+			rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, TripleSlashReference,
 				tripleSlashFile, testCase.sourceText,
-				decodeTripleSlashOptions(t, testCase.configuration)))
+				decodeTripleSlashOptions(test, testCase.configuration)))
 		})
 	}
 }
@@ -67,30 +92,38 @@ func TestTripleSlashReferenceStaysSilentOnUpstreamPassCases(t *testing.T) {
 //
 // The snapshot records five diagnostics against these five inputs, one each, so the extractor
 // reported no discrepancy and every count below is one.
-func TestTripleSlashReferenceFiresOnUpstreamFailCases(t *testing.T) {
-	t.Parallel()
+func TestTripleSlashReferenceFiresOnUpstreamFailCases(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		configuration string
 		sourceText    string
 		count         int
 	}{
-		{"{ \"types\": \"prefer-import\" }", "\n            /// <reference types=\"foo\" />\n            import * as foo from 'foo';\n                  ", 1},
-		{"{ \"types\": \"prefer-import\" }", "\n            /// <reference types=\"foo\" />\n            import foo = require('foo');\n                  ", 1},
+		{
+			"{ \"types\": \"prefer-import\" }",
+			"\n            /// <reference types=\"foo\" />\n            import * as foo from 'foo';\n                  ",
+			1,
+		},
+		{
+			"{ \"types\": \"prefer-import\" }",
+			"\n            /// <reference types=\"foo\" />\n            import foo = require('foo');\n                  ",
+			1,
+		},
 		{"{ \"path\": \"never\" }", "/// <reference path=\"foo\" />", 1},
 		{"{ \"types\": \"never\" }", "/// <reference types=\"foo\" />", 1},
 		{"{ \"lib\": \"never\" }", "/// <reference lib=\"foo\" />", 1},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.configuration, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, TripleSlashReference, tripleSlashFile,
-				testCase.sourceText, decodeTripleSlashOptions(t, testCase.configuration))
+		test.Run(testCase.configuration, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, TripleSlashReference, tripleSlashFile,
+				testCase.sourceText, decodeTripleSlashOptions(test, testCase.configuration))
 			expected := make([]string, testCase.count)
 			for index := range expected {
 				expected[index] = "tripleSlashReference"
 			}
-			rule_testing.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(test, result, expected...)
 		})
 	}
 }
@@ -102,8 +135,8 @@ func TestTripleSlashReferenceFiresOnUpstreamFailCases(t *testing.T) {
 // reading the upstream source settles almost none of them: the attribute scan, the position cutoff
 // and the prefer-import counting each have several plausible readings and the corpus separates
 // none of them.
-func TestTripleSlashReferenceFiresOnCasesUpstreamDoesNotCover(t *testing.T) {
-	t.Parallel()
+func TestTripleSlashReferenceFiresOnCasesUpstreamDoesNotCover(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name          string
@@ -111,29 +144,39 @@ func TestTripleSlashReferenceFiresOnCasesUpstreamDoesNotCover(t *testing.T) {
 		sourceText    string
 		count         int
 	}{
-		{"a directive above the first statement is still a directive", "{}", "/// <reference path=\"foo\" />\nconst a = 1;\n", 1},
+		{
+			"a directive above the first statement is still a directive",
+			"{}",
+			"/// <reference path=\"foo\" />\nconst a = 1;\n",
+			1,
+		},
 		{"four slashes, because the test is on the third character", "{}", "//// <reference path=\"foo\" />\n", 1},
 		{"a block comment whose content opens with a slash", "{}", "/*/ <reference path=\"foo\" /> */\n", 1},
 		{"attributes read in whitespace order, path first", "{}", "/// <reference path=\"bar\" lib=\"foo\" />\n", 1},
 		{"an unquoted value", "{}", "/// <reference path=foo />\n", 1},
 		{"no space before the closing slash", "{}", "/// <reference path=\"foo\"/>\n", 1},
 		{"text around the reference", "{}", "/// junk <reference path=\"foo\" /> junk\n", 1},
-		{"two imports of one module report the one directive twice", "{}", "/// <reference types=\"foo\" />\nimport * as a from 'foo';\nimport * as b from 'foo';\n", 2},
+		{
+			"two imports of one module report the one directive twice",
+			"{}",
+			"/// <reference types=\"foo\" />\nimport * as a from 'foo';\nimport * as b from 'foo';\n",
+			2,
+		},
 		{"a type-only import counts", "{}", "/// <reference types=\"foo\" />\nimport type { T } from 'foo';\n", 1},
 		{"a bare side-effect import counts", "{}", "/// <reference types=\"foo\" />\nimport 'foo';\n", 1},
 		{"types never reports without any import", "{\"types\": \"never\"}", "/// <reference types=\"foo\" />\n", 1},
 		{"lib never", "{\"lib\": \"never\"}", "/// <reference lib=\"foo\" />\n", 1},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, TripleSlashReference, tripleSlashFile,
-				testCase.sourceText, decodeTripleSlashOptions(t, testCase.configuration))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, TripleSlashReference, tripleSlashFile,
+				testCase.sourceText, decodeTripleSlashOptions(test, testCase.configuration))
 			expected := make([]string, testCase.count)
 			for index := range expected {
 				expected[index] = "tripleSlashReference"
 			}
-			rule_testing.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(test, result, expected...)
 		})
 	}
 }
@@ -144,46 +187,82 @@ func TestTripleSlashReferenceFiresOnCasesUpstreamDoesNotCover(t *testing.T) {
 // The position cases are the most valuable here: a scanner that matched a directive anywhere in the
 // file would pass every fires case above and every upstream fail case, and would report on real
 // source that TypeScript does not treat as a directive at all.
-func TestTripleSlashReferenceStaysSilentOnCasesUpstreamDoesNotCover(t *testing.T) {
-	t.Parallel()
+func TestTripleSlashReferenceStaysSilentOnCasesUpstreamDoesNotCover(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name          string
 		configuration string
 		sourceText    string
 	}{
-		{"a directive after the first statement is not a directive", "{}", "const a = 1;\n/// <reference path=\"foo\" />\n"},
+		{
+			"a directive after the first statement is not a directive",
+			"{}",
+			"const a = 1;\n/// <reference path=\"foo\" />\n",
+		},
 		{"a directive between two statements", "{}", "const a = 1;\n/// <reference path=\"foo\" />\nconst b = 2;\n"},
 		{"a directive trailing code on the same line", "{}", "const a = 1; /// <reference path=\"foo\" />\n"},
 		{"a double slash is not a directive", "{}", "// <reference path=\"foo\" />\n"},
 		{"a block comment whose content opens with a space", "{}", "/* <reference path=\"foo\" /> */\n"},
 		{"a jsdoc block, whose content opens with a star", "{}", "/** <reference path=\"foo\" /> */\n"},
-		{"attributes read in whitespace order, lib first and lib defaults to always", "{}", "/// <reference lib=\"foo\" path=\"bar\" />\n"},
+		{
+			"attributes read in whitespace order, lib first and lib defaults to always",
+			"{}",
+			"/// <reference lib=\"foo\" path=\"bar\" />\n",
+		},
 		{"a value containing an equals sign declines the whole comment", "{}", "/// <reference path=\"a=b\" />\n"},
 		{"no-default-lib is not an attribute this rule reads", "{}", "/// <reference no-default-lib=\"true\" />\n"},
-		// A malformed first attribute declines the WHOLE comment rather than falling through to a
+		// A malformed first attribute declines the whole comment rather than falling through to a
 		// later well-formed one. Upstream returns from `get_attr_key_and_value` on the first match
 		// whose split is not exactly two parts, and the loop never continues. Measured on the release
 		// binary: both of these are silent even under a configuration that would report their second
 		// attribute. This is the fixture that catches turning that return into a continue.
-		{"a malformed first attribute declines the comment rather than falling through", "{\"types\": \"never\"}", "/// <reference path=\"a=b\" types=\"foo\" />\n"},
-		{"a malformed lib attribute declines a following path attribute", "{}", "/// <reference lib=\"a=b\" path=\"foo\" />\n"},
+		{
+			"a malformed first attribute declines the comment rather than falling through",
+			"{\"types\": \"never\"}",
+			"/// <reference path=\"a=b\" types=\"foo\" />\n",
+		},
+		{
+			"a malformed lib attribute declines a following path attribute",
+			"{}",
+			"/// <reference lib=\"a=b\" path=\"foo\" />\n",
+		},
 		{"lib defaults to always", "{}", "/// <reference lib=\"foo\" />\n"},
 		{"types defaults to prefer-import, so no import means no finding", "{}", "/// <reference types=\"foo\" />\n"},
-		{"a dynamic import is not one of the two shapes", "{}", "/// <reference types=\"foo\" />\nconst p = import('foo');\n"},
-		{"a require call is not an import-equals declaration", "{}", "/// <reference types=\"foo\" />\nconst q = require('foo');\n"},
+		{
+			"a dynamic import is not one of the two shapes",
+			"{}",
+			"/// <reference types=\"foo\" />\nconst p = import('foo');\n",
+		},
+		{
+			"a require call is not an import-equals declaration",
+			"{}",
+			"/// <reference types=\"foo\" />\nconst q = require('foo');\n",
+		},
 		{"an export-from is not an import", "{}", "/// <reference types=\"foo\" />\nexport * from 'foo';\n"},
-		{"an import nested in a namespace is not a top-level statement", "{}", "/// <reference types=\"foo\" />\ndeclare module M { import foo = require('foo'); }\n"},
-		{"an import-equals naming a qualified name rather than a module", "{}", "/// <reference types=\"foo\" />\nimport foo = foo.bar;\n"},
+		{
+			"an import nested in a namespace is not a top-level statement",
+			"{}",
+			"/// <reference types=\"foo\" />\ndeclare module M { import foo = require('foo'); }\n",
+		},
+		{
+			"an import-equals naming a qualified name rather than a module",
+			"{}",
+			"/// <reference types=\"foo\" />\nimport foo = foo.bar;\n",
+		},
 		{"path always", "{\"path\": \"always\"}", "/// <reference path=\"foo\" />\n"},
-		{"prefer-import is refused for path, so the default of never is kept and this reports elsewhere", "{\"lib\": \"prefer-import\"}", "/// <reference lib=\"foo\" />\n"},
+		{
+			"prefer-import is refused for path, so the default of never is kept and this reports elsewhere",
+			"{\"lib\": \"prefer-import\"}",
+			"/// <reference lib=\"foo\" />\n",
+		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, TripleSlashReference,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, TripleSlashReference,
 				tripleSlashFile, testCase.sourceText,
-				decodeTripleSlashOptions(t, testCase.configuration)))
+				decodeTripleSlashOptions(test, testCase.configuration)))
 		})
 	}
 }
@@ -193,8 +272,8 @@ func TestTripleSlashReferenceStaysSilentOnCasesUpstreamDoesNotCover(t *testing.T
 // A comment is reported through ReportRange rather than ReportNode, so nothing in the harness is
 // trimming trivia on this rule's behalf and the span is entirely the rule's own arithmetic. Every
 // message-id fixture above stays green over a span off by the two leading slashes.
-func TestTripleSlashReferencePointsAtTheDirective(t *testing.T) {
-	t.Parallel()
+func TestTripleSlashReferencePointsAtTheDirective(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name          string
@@ -202,23 +281,48 @@ func TestTripleSlashReferencePointsAtTheDirective(t *testing.T) {
 		sourceText    string
 		reported      string
 	}{
-		{"the whole comment including the leading slashes", "{}", "/// <reference path=\"foo\" />\n", "/// <reference path=\"foo\" />"},
-		{"four slashes are all inside the span", "{}", "//// <reference path=\"foo\" />\n", "//// <reference path=\"foo\" />"},
-		{"a block comment reports its closing delimiter too", "{}", "/*/ <reference path=\"foo\" /> */\n", "/*/ <reference path=\"foo\" /> */"},
-		{"indentation is not part of the span", "{}", "\n    /// <reference path=\"foo\" />\n", "/// <reference path=\"foo\" />"},
-		{"a prefer-import finding points at the directive, not at the import", "{}", "/// <reference types=\"foo\" />\nimport * as foo from 'foo';\n", "/// <reference types=\"foo\" />"},
+		{
+			"the whole comment including the leading slashes",
+			"{}",
+			"/// <reference path=\"foo\" />\n",
+			"/// <reference path=\"foo\" />",
+		},
+		{
+			"four slashes are all inside the span",
+			"{}",
+			"//// <reference path=\"foo\" />\n",
+			"//// <reference path=\"foo\" />",
+		},
+		{
+			"a block comment reports its closing delimiter too",
+			"{}",
+			"/*/ <reference path=\"foo\" /> */\n",
+			"/*/ <reference path=\"foo\" /> */",
+		},
+		{
+			"indentation is not part of the span",
+			"{}",
+			"\n    /// <reference path=\"foo\" />\n",
+			"/// <reference path=\"foo\" />",
+		},
+		{
+			"a prefer-import finding points at the directive, not at the import",
+			"{}",
+			"/// <reference types=\"foo\" />\nimport * as foo from 'foo';\n",
+			"/// <reference types=\"foo\" />",
+		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, TripleSlashReference, tripleSlashFile,
-				testCase.sourceText, decodeTripleSlashOptions(t, testCase.configuration))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, TripleSlashReference, tripleSlashFile,
+				testCase.sourceText, decodeTripleSlashOptions(test, testCase.configuration))
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("expected one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("expected one finding, got %d", len(result.Diagnostics))
 			}
 			reported := testCase.sourceText[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 			if reported != testCase.reported {
-				t.Fatalf("expected the finding to cover %q, got %q", testCase.reported, reported)
+				test.Fatalf("expected the finding to cover %q, got %q", testCase.reported, reported)
 			}
 		})
 	}
@@ -234,8 +338,8 @@ func TestTripleSlashReferencePointsAtTheDirective(t *testing.T) {
 // The expected strings are literals typed here rather than references to
 // messageTripleSlashReference, because comparing a finding against the constant it was built from
 // moves both sides together under mutation and asserts nothing.
-func TestTripleSlashReferenceNamesTheModuleInItsMessage(t *testing.T) {
-	t.Parallel()
+func TestTripleSlashReferenceNamesTheModuleInItsMessage(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name          string
@@ -244,18 +348,28 @@ func TestTripleSlashReferenceNamesTheModuleInItsMessage(t *testing.T) {
 		moduleName    string
 	}{
 		{"the module name is the trimmed attribute value", "{}", "/// <reference path=\"foo\" />\n", "foo"},
-		{"single quotes survive, because only the double quote is trimmed", "{}", "/// <reference path='foo' />\n", "'foo'"},
+		{
+			"single quotes survive, because only the double quote is trimmed",
+			"{}",
+			"/// <reference path='foo' />\n",
+			"'foo'",
+		},
 		{"an empty value renders an empty name", "{}", "/// <reference path=\"\" />\n", ""},
 		{"trailing slashes are stripped from inside the value", "{}", "/// <reference path=\"foo///\"/>\n", "foo"},
-		{"the second attribute is the one read when it is the first match", "{}", "/// <reference path=\"bar\" lib=\"foo\" />\n", "bar"},
+		{
+			"the second attribute is the one read when it is the first match",
+			"{}",
+			"/// <reference path=\"bar\" lib=\"foo\" />\n",
+			"bar",
+		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, TripleSlashReference, tripleSlashFile,
-				testCase.sourceText, decodeTripleSlashOptions(t, testCase.configuration))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, TripleSlashReference, tripleSlashFile,
+				testCase.sourceText, decodeTripleSlashOptions(test, testCase.configuration))
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("expected one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("expected one finding, got %d", len(result.Diagnostics))
 			}
 			want := "This file pulls in `" + testCase.moduleName + "` with a triple-slash reference " +
 				"directive. A directive is a global instruction to the compiler with no binding and no " +
@@ -263,10 +377,10 @@ func TestTripleSlashReferenceNamesTheModuleInItsMessage(t *testing.T) {
 				"tool can follow it the way it follows an import. Write an `import` instead, which " +
 				"names what it brings in and participates in module resolution."
 			if got := result.Diagnostics[0].Message.Description; got != want {
-				t.Fatalf("expected message\n  %q\ngot\n  %q", want, got)
+				test.Fatalf("expected message\n  %q\ngot\n  %q", want, got)
 			}
 			if got := result.Diagnostics[0].Message.Id; got != "tripleSlashReference" {
-				t.Fatalf("expected id %q, got %q", "tripleSlashReference", got)
+				test.Fatalf("expected id %q, got %q", "tripleSlashReference", got)
 			}
 		})
 	}
@@ -282,8 +396,8 @@ func TestTripleSlashReferenceNamesTheModuleInItsMessage(t *testing.T) {
 //
 // Measured on the release binary before this was written. A file with three identical directives
 // and one import reports once, against line three.
-func TestTripleSlashReferenceKeepsTheLastOfTwoIdenticalDirectives(t *testing.T) {
-	t.Parallel()
+func TestTripleSlashReferenceKeepsTheLastOfTwoIdenticalDirectives(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -302,15 +416,15 @@ func TestTripleSlashReferenceKeepsTheLastOfTwoIdenticalDirectives(t *testing.T) 
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, TripleSlashReference, tripleSlashFile,
-				testCase.sourceText, decodeTripleSlashOptions(t, "{}"))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, TripleSlashReference, tripleSlashFile,
+				testCase.sourceText, decodeTripleSlashOptions(test, "{}"))
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("expected one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("expected one finding, got %d", len(result.Diagnostics))
 			}
 			if got := result.Diagnostics[0].Range.Pos(); got != testCase.wantColumn {
-				t.Fatalf("expected the finding to start at %d, got %d", testCase.wantColumn, got)
+				test.Fatalf("expected the finding to start at %d, got %d", testCase.wantColumn, got)
 			}
 		})
 	}
@@ -321,21 +435,21 @@ func TestTripleSlashReferenceKeepsTheLastOfTwoIdenticalDirectives(t *testing.T) 
 // Two directives naming different modules each keep their own entry, so both report. Written
 // alongside the overwrite test so the two cases that separate "keyed by name" from "keyed by
 // position" sit together.
-func TestTripleSlashReferenceReportsTwoDirectivesInSourceOrder(t *testing.T) {
-	t.Parallel()
+func TestTripleSlashReferenceReportsTwoDirectivesInSourceOrder(test *testing.T) {
+	test.Parallel()
 
 	const source = "/// <reference types=\"a\" />\n/// <reference types=\"b\" />\nimport * as y from 'b';\nimport * as x from 'a';\n"
 
-	result := rule_testing.RunWithOptions(t, TripleSlashReference, tripleSlashFile, source,
-		decodeTripleSlashOptions(t, "{}"))
-	rule_testing.ExpectFindings(t, result, "tripleSlashReference", "tripleSlashReference")
+	result := rule_testing.RunWithOptions(test, TripleSlashReference, tripleSlashFile, source,
+		decodeTripleSlashOptions(test, "{}"))
+	rule_testing.ExpectFindings(test, result, "tripleSlashReference", "tripleSlashReference")
 
 	// The findings arrive in the order the import loop produces them rather than in source order,
 	// because the second pass walks statements. The import of `b` is written first, so `b`'s
 	// directive is reported first even though it sits second in the file.
 	first := source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 	if first != "/// <reference types=\"b\" />" {
-		t.Fatalf("expected the first finding to be b's directive, got %q", first)
+		test.Fatalf("expected the first finding to be b's directive, got %q", first)
 	}
 }
 
@@ -345,28 +459,36 @@ func TestTripleSlashReferenceReportsTwoDirectivesInSourceOrder(t *testing.T) {
 // in a `.ts` file and is silent in a `.js` one. Dropping the gate would report every triple-slash
 // directive in every JavaScript file in a tree upstream leaves alone, and JavaScript is where these
 // directives are most common.
-func TestTripleSlashReferenceDeclinesJavaScript(t *testing.T) {
-	t.Parallel()
+func TestTripleSlashReferenceDeclinesJavaScript(test *testing.T) {
+	test.Parallel()
 
 	const source = "/// <reference path=\"foo\" />\n"
 
-	rule_testing.ExpectFindings(t,
-		rule_testing.RunWithOptions(t, TripleSlashReference, "/repository/source/Thing.ts", source,
-			decodeTripleSlashOptions(t, "{}")),
+	rule_testing.ExpectFindings(test,
+		rule_testing.RunWithOptions(test, TripleSlashReference, "/repository/source/Thing.ts", source,
+			decodeTripleSlashOptions(test, "{}")),
 		"tripleSlashReference")
 
-	for _, fileName := range []string{"/repository/source/Thing.js", "/repository/source/Thing.jsx", "/repository/source/Thing.mjs"} {
-		rule_testing.ExpectClean(t,
-			rule_testing.RunWithOptions(t, TripleSlashReference, fileName, source,
-				decodeTripleSlashOptions(t, "{}")))
+	for _, fileName := range []string{
+		"/repository/source/Thing.js",
+		"/repository/source/Thing.jsx",
+		"/repository/source/Thing.mjs",
+	} {
+		rule_testing.ExpectClean(test,
+			rule_testing.RunWithOptions(test, TripleSlashReference, fileName, source,
+				decodeTripleSlashOptions(test, "{}")))
 	}
 
 	// The TypeScript extensions the gate does admit, including the definition file where a
 	// directive is most likely to be written deliberately.
-	for _, fileName := range []string{"/repository/source/Thing.tsx", "/repository/source/Thing.mts", "/repository/source/Thing.d.ts"} {
-		rule_testing.ExpectFindings(t,
-			rule_testing.RunWithOptions(t, TripleSlashReference, fileName, source,
-				decodeTripleSlashOptions(t, "{}")),
+	for _, fileName := range []string{
+		"/repository/source/Thing.tsx",
+		"/repository/source/Thing.mts",
+		"/repository/source/Thing.d.ts",
+	} {
+		rule_testing.ExpectFindings(test,
+			rule_testing.RunWithOptions(test, TripleSlashReference, fileName, source,
+				decodeTripleSlashOptions(test, "{}")),
 			"tripleSlashReference")
 	}
 }
@@ -377,8 +499,8 @@ func TestTripleSlashReferenceDeclinesJavaScript(t *testing.T) {
 // the Go zero value and a struct built by hand would carry three empty strings that match no arm.
 // Our own rule inventory records this rule as taking no options at all, which is what makes writing
 // the surface down here worth more than usual.
-func TestDecodeTripleSlashReferenceOptions(t *testing.T) {
-	t.Parallel()
+func TestDecodeTripleSlashReferenceOptions(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name          string
@@ -421,18 +543,16 @@ func TestDecodeTripleSlashReferenceOptions(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			decoded, err := DecodeTripleSlashReferenceOptions([]byte(testCase.configuration))
-			if err != nil {
-				t.Fatalf("could not decode: %v", err)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			decoded, decodeTripleSlashReferenceOptionsError := DecodeTripleSlashReferenceOptions(
+				[]byte(testCase.configuration),
+			)
+			if decodeTripleSlashReferenceOptionsError != nil {
+				test.Fatalf("could not decode: %v", decodeTripleSlashReferenceOptionsError)
 			}
-			got, ok := decoded.(TripleSlashReferenceOptions)
-			if !ok {
-				t.Fatalf("expected TripleSlashReferenceOptions, got %T", decoded)
-			}
-			if got != testCase.want {
-				t.Fatalf("expected %+v, got %+v", testCase.want, got)
+			if decoded != testCase.want {
+				test.Fatalf("expected %+v, got %+v", testCase.want, decoded)
 			}
 		})
 	}
@@ -453,38 +573,38 @@ func TestDecodeTripleSlashReferenceOptions(t *testing.T) {
 // separated this from an unwired rule; the finding count is what said it was broken anyway.
 //
 // The nil case is the one the config actually produces. A value of the wrong type must not silently
-// disable the rule either, and since #qmvkf83 it cannot: rule.OptionsAs panics on it, which
-// TestTripleSlashReferenceRefusesOptionsOfTheWrongType holds.
-func TestTripleSlashReferenceUsesDefaultsWhenTheConfigNamesNoOptions(t *testing.T) {
-	t.Parallel()
+// disable the rule either, and since #ymag4q6 it cannot be written: the rule and its decoder meet in
+// rule.Registration[TripleSlashReferenceOptions], so options of another type are a compile error.
+func TestTripleSlashReferenceUsesDefaultsWhenTheConfigNamesNoOptions(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name    string
-		options any
+		options rule.Given[TripleSlashReferenceOptions]
 	}{
-		{"nil, which is what a bare severity in the config produces", nil},
+		{"nil, which is what a bare severity in the config produces", rule.Given[TripleSlashReferenceOptions]{}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			// path defaults to never, so this must report.
-			rule_testing.ExpectFindings(t,
-				rule_testing.RunWithOptions(t, TripleSlashReference, tripleSlashFile,
+			rule_testing.ExpectFindings(test,
+				rule_testing.RunGiven(test, TripleSlashReference, tripleSlashFile,
 					"/// <reference path=\"foo\" />\n", testCase.options),
 				"tripleSlashReference")
 
 			// lib defaults to always, so this must not. Both halves are needed: a fallback that
 			// set every key to never would pass the first assertion alone.
-			rule_testing.ExpectClean(t,
-				rule_testing.RunWithOptions(t, TripleSlashReference, tripleSlashFile,
+			rule_testing.ExpectClean(test,
+				rule_testing.RunGiven(test, TripleSlashReference, tripleSlashFile,
 					"/// <reference lib=\"foo\" />\n", testCase.options))
 
 			// types defaults to prefer-import, which is neither of the other two settings.
-			rule_testing.ExpectClean(t,
-				rule_testing.RunWithOptions(t, TripleSlashReference, tripleSlashFile,
+			rule_testing.ExpectClean(test,
+				rule_testing.RunGiven(test, TripleSlashReference, tripleSlashFile,
 					"/// <reference types=\"foo\" />\n", testCase.options))
-			rule_testing.ExpectFindings(t,
-				rule_testing.RunWithOptions(t, TripleSlashReference, tripleSlashFile,
+			rule_testing.ExpectFindings(test,
+				rule_testing.RunGiven(test, TripleSlashReference, tripleSlashFile,
 					"/// <reference types=\"foo\" />\nimport * as foo from 'foo';\n", testCase.options),
 				"tripleSlashReference")
 		})
@@ -501,8 +621,8 @@ func TestTripleSlashReferenceUsesDefaultsWhenTheConfigNamesNoOptions(t *testing.
 //
 // Four directives above the first statement, each reporting, is what an early exit fires too soon
 // would break; the fifth below the statement is what a missing exit would wrongly report.
-func TestTripleSlashReferenceScansEveryDirectiveBeforeTheCutoff(t *testing.T) {
-	t.Parallel()
+func TestTripleSlashReferenceScansEveryDirectiveBeforeTheCutoff(test *testing.T) {
+	test.Parallel()
 
 	const source = "/// <reference path=\"a\" />\n" +
 		"/// <reference path=\"b\" />\n" +
@@ -511,9 +631,9 @@ func TestTripleSlashReferenceScansEveryDirectiveBeforeTheCutoff(t *testing.T) {
 		"export const value = 1;\n" +
 		"/// <reference path=\"e\" />\n"
 
-	result := rule_testing.RunWithOptions(t, TripleSlashReference, tripleSlashFile, source,
-		decodeTripleSlashOptions(t, "{}"))
-	rule_testing.ExpectFindings(t, result, "tripleSlashReference", "tripleSlashReference",
+	result := rule_testing.RunWithOptions(test, TripleSlashReference, tripleSlashFile, source,
+		decodeTripleSlashOptions(test, "{}"))
+	rule_testing.ExpectFindings(test, result, "tripleSlashReference", "tripleSlashReference",
 		"tripleSlashReference", "tripleSlashReference")
 
 	// The four that report are the four above the statement, in source order, and `e` is absent.
@@ -526,34 +646,7 @@ func TestTripleSlashReferenceScansEveryDirectiveBeforeTheCutoff(t *testing.T) {
 	for index, want := range wantSpans {
 		got := source[result.Diagnostics[index].Range.Pos():result.Diagnostics[index].Range.End()]
 		if got != want {
-			t.Fatalf("finding %d: expected %q, got %q", index, want, got)
+			test.Fatalf("finding %d: expected %q, got %q", index, want, got)
 		}
-	}
-}
-
-// Options of a type the decoder never returns are a disagreement between the registration and the
-// rule, and that fails loudly rather than defaulting: these used to fall back to the defaults, which
-// is the silence that let unified-signatures ignore its options (#qmvkf83).
-func TestTripleSlashReferenceRefusesOptionsOfTheWrongType(t *testing.T) {
-	t.Parallel()
-
-	cases := []struct {
-		name    string
-		options any
-	}{
-		{"a value of some other type", "error"},
-		{"a pointer rather than the value", &TripleSlashReferenceOptions{}},
-	}
-	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			defer func() {
-				if recover() == nil {
-					t.Fatal("expected options of the wrong type to panic rather than default")
-				}
-			}()
-			rule_testing.RunWithOptions(t, TripleSlashReference, tripleSlashFile,
-				"/// <reference path=\"foo\" />\n", testCase.options)
-		})
 	}
 }

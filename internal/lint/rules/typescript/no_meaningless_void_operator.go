@@ -11,9 +11,9 @@ import (
 
 // NoMeaninglessVoidOperatorOptions is the rule's option surface.
 type NoMeaninglessVoidOperatorOptions struct {
-	// CheckNever extends the rule to an argument of type `never`, as a SUGGESTION rather than a fix.
+	// CheckNever extends the rule to an argument of type `never`, as a suggestion rather than a fix.
 	//
-	// It defaults to FALSE, so unlike the sibling rule in this package the generic decoder happens
+	// It defaults to false, so unlike the sibling rule in this package the generic decoder happens
 	// to produce the right zero value. The decoder below is still hand-rolled, because relying on
 	// that coincidence means the next person to add a default-true key inherits a decoder that
 	// silently does the wrong thing.
@@ -35,16 +35,15 @@ type noMeaninglessVoidOperatorRawOptions struct {
 //
 // cohere's config layer strips ESLint's `[severity, options]` tuple before dispatch, so what
 // arrives is the bare object rather than upstream's one-element array.
-func DecodeNoMeaninglessVoidOperatorOptions(raw []byte) (any, error) {
-	decoded, err := rule.DecodeOptionsInto[noMeaninglessVoidOperatorRawOptions]()(raw)
-	if err != nil {
-		return DefaultNoMeaninglessVoidOperatorSettings(), err
+func DecodeNoMeaninglessVoidOperatorOptions(raw []byte) (NoMeaninglessVoidOperatorOptions, error) {
+	decoded, decodeOptionsError := rule.DecodeOptionsInto[noMeaninglessVoidOperatorRawOptions]()(raw)
+	if decodeOptionsError != nil {
+		return DefaultNoMeaninglessVoidOperatorSettings(), decodeOptionsError
 	}
 
-	wire, _ := decoded.(noMeaninglessVoidOperatorRawOptions)
 	options := DefaultNoMeaninglessVoidOperatorSettings()
-	if wire.CheckNever != nil {
-		options.CheckNever = *wire.CheckNever
+	if decoded.CheckNever != nil {
+		options.CheckNever = *decoded.CheckNever
 	}
 	return options, nil
 }
@@ -82,21 +81,21 @@ func DecodeNoMeaninglessVoidOperatorOptions(raw []byte) (any, error) {
 // The type test below then runs only on a call, which is also new in 8.71: `void x` with `x: void`
 // is now a non-call finding rather than a "used on void" one.
 //
-// # Two branches, and the SAME repair is a fix in one and a suggestion in the other
+// # Two branches, and the same repair is a fix in one and a suggestion in the other
 //
 // That distinction is the most important thing in this rule and it is easy to flatten.
 //
-// When every constituent of the argument's type is `void` or `undefined`, the repair is a FIX:
+// When every constituent of the argument's type is `void` or `undefined`, the repair is a fix:
 // removing the operator cannot change what the program does, because the expression already
 // evaluated to the value `void` would have produced.
 //
 // When `checkNever` is on and every constituent is `void`, `undefined` or `never`, the repair is a
-// SUGGESTION. `never` means control does not return from that expression at all, so removing the
+// suggestion. `never` means control does not return from that expression at all, so removing the
 // operator is a judgment about code the type system says is unreachable, and upstream declines to
 // make it unattended. Shipping that as a fix would have the edit engine rewriting it silently.
 //
 // The two tests are nested rather than exclusive, and the order matters: `void | never` under
-// `checkNever` satisfies the FIRST predicate, because a union's `every` is over its constituents and
+// `checkNever` satisfies the first predicate, because a union's `every` is over its constituents and
 // `never` is absorbed out of a union by the checker before the rule sees it. Measured on the
 // installed build: `declare const x: void | never; void x;` reports with a fix, not a suggestion.
 //
@@ -110,7 +109,7 @@ func DecodeNoMeaninglessVoidOperatorOptions(raw []byte) (any, error) {
 //
 // # What the fix removes, including a comment
 //
-// Upstream removes the range from the start of the first token to the start of the SECOND, which is
+// Upstream removes the range from the start of the first token to the start of the second, which is
 // the `void` keyword plus everything between it and the argument. That is whitespace usually, and
 // it is not always:
 //
@@ -125,15 +124,15 @@ func DecodeNoMeaninglessVoidOperatorOptions(raw []byte) (any, error) {
 // # Cost
 //
 // `KindVoidExpression` is a rare anchor and the checker is consulted only when one is found.
-var NoMeaninglessVoidOperator = rule.Rule{
+var NoMeaninglessVoidOperator = rule.Rule[NoMeaninglessVoidOperatorOptions]{
 	Name: "@typescript-eslint/no-meaningless-void-operator",
 
 	// The argument's type decides every finding, so the checker is required.
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, isSettings := rule.OptionsAs[NoMeaninglessVoidOperatorOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[NoMeaninglessVoidOperatorOptions]) rule.Listeners {
+		settings, isSettings := options.Read()
 		if !isSettings {
 			settings = DefaultNoMeaninglessVoidOperatorSettings()
 		}
@@ -141,7 +140,7 @@ var NoMeaninglessVoidOperator = rule.Rule{
 		// everyConstituentHasFlag is upstream's `unionConstituents(...).every(isTypeFlagSet(...))`.
 		// A non-union is its own single constituent, so this reads the same for both shapes.
 		everyConstituentHasFlag := func(argumentType *checker.Type, flags checker.TypeFlags) bool {
-			for constituent := range type_checking.UnionTypePartsSeq(argumentType) {
+			for constituent := range type_checking.UnionTypePartsSequence(argumentType) {
 				if !type_checking.IsTypeFlagSet(constituent, flags) {
 					return false
 				}
@@ -151,7 +150,7 @@ var NoMeaninglessVoidOperator = rule.Rule{
 
 		return rule.Listeners{
 			ast.KindVoidExpression: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 
@@ -160,7 +159,7 @@ var NoMeaninglessVoidOperator = rule.Rule{
 					return
 				}
 
-				argumentType := ctx.TypeChecker.GetTypeAtLocation(argument)
+				argumentType := ruleContext.TypeChecker.GetTypeAtLocation(argument)
 				if argumentType == nil {
 					return
 				}
@@ -169,11 +168,11 @@ var NoMeaninglessVoidOperator = rule.Rule{
 				// which is upstream's "first token start to second token start".
 				//
 				// `rule.TokenRange` supplies the argument's start rather than `Pos()`, because
-				// `Pos()` includes leading trivia and would put the range's END inside the
+				// `Pos()` includes leading trivia and would put the range's end inside the
 				// whitespace, leaving a stray fragment behind. That is the fix hazard the span
 				// hazard is usually described as, arriving through the other side of the range.
-				voidKeyword := scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, node.Pos())
-				removal := core.NewTextRange(voidKeyword.Pos(), rule.TokenRange(ctx.SourceFile, argument).Pos())
+				voidKeyword := scanner.GetRangeOfTokenAtPosition(ruleContext.SourceFile, node.Pos())
+				removal := core.NewTextRange(voidKeyword.Pos(), rule.TokenRange(ruleContext.SourceFile, argument).Pos())
 
 				inner := unwrapVoidArgument(argument)
 				if !isDiscardedCall(inner) {
@@ -188,25 +187,25 @@ var NoMeaninglessVoidOperator = rule.Rule{
 						// and logical assignment included.
 						return
 					}
-					if type_checking.IsThenableType(ctx.TypeChecker, argument, argumentType) {
+					if type_checking.IsThenableType(ruleContext.TypeChecker, argument, argumentType) {
 						// Left to no-floating-promises, which asks for exactly this.
 						return
 					}
 					if isWholeStatement(node) {
-						ctx.ReportNodeWithFixes(node, buildMeaninglessVoidOnNonCallMessage(),
+						ruleContext.ReportNodeWithFixes(node, buildMeaninglessVoidOnNonCallMessage(),
 							rule.RemoveRange(removal))
 						return
 					}
 					// Anywhere else the void's undefined is the value, so removing it would change
 					// what the expression evaluates to.
-					ctx.ReportNode(node, buildMeaninglessVoidOnNonCallMessage())
+					ruleContext.ReportNode(node, buildMeaninglessVoidOnNonCallMessage())
 					return
 				}
 
 				// Upstream interpolates `checker.typeToString(argType)`, which is this method
 				// rather than the shelf's `GetTypeName`.
 				//
-				// Swapping the two is an EQUIVALENT mutation here, and the sweep says so: no input
+				// Swapping the two is an equivalent mutation here, and the sweep says so: no input
 				// this rule reports on can distinguish them. `GetTypeName` differs only by
 				// collapsing string-like types to the word "string", and it delegates to
 				// `TypeToString` for everything else, while this rule reports only when every
@@ -217,12 +216,12 @@ var NoMeaninglessVoidOperator = rule.Rule{
 				// equivalence is a property of which types get here rather than of the two
 				// functions. A later widening of the type test would make the difference real, and
 				// `GetTypeName` would then start naming a type the reader never wrote.
-				typeName := ctx.TypeChecker.TypeToString(argumentType)
+				typeName := ruleContext.TypeChecker.TypeToString(argumentType)
 
 				if everyConstituentHasFlag(argumentType, checker.TypeFlagsVoid|checker.TypeFlagsUndefined) {
 					// Removing the operator cannot change behavior here, so it is applied
 					// unattended.
-					ctx.ReportNodeWithFixes(node, buildMeaninglessVoidOperatorMessage(typeName),
+					ruleContext.ReportNodeWithFixes(node, buildMeaninglessVoidOperatorMessage(typeName),
 						rule.RemoveRange(removal))
 					return
 				}
@@ -231,7 +230,7 @@ var NoMeaninglessVoidOperator = rule.Rule{
 					checker.TypeFlagsVoid|checker.TypeFlagsUndefined|checker.TypeFlagsNever) {
 					// `never` means this expression does not return, so the same edit becomes a
 					// judgment rather than a rewrite and a person chooses it.
-					ctx.ReportNodeWithSuggestions(node, buildMeaninglessVoidOperatorMessage(typeName),
+					ruleContext.ReportNodeWithSuggestions(node, buildMeaninglessVoidOperatorMessage(typeName),
 						rule.Suggestion{
 							Message: buildRemoveVoidMessage(),
 							Fixes:   []rule.Fix{rule.RemoveRange(removal)},

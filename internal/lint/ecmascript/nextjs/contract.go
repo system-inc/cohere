@@ -4,7 +4,7 @@ import (
 	"strings"
 )
 
-// The names below are what Next.js reads off an App Router module BY NAME, with no import anywhere
+// The names below are what Next.js reads off an App Router module by name, with no import anywhere
 // to say so. Read from the installed build, next 16.2.11, rather than from documentation:
 //
 //	routeSegmentConfiguration   the `checkFields` block next-types-plugin generates for every page,
@@ -83,7 +83,7 @@ var routeModuleExtensions = []string{".tsx", ".ts", ".jsx", ".js"}
 // RouteContractExports returns the export names Next.js reads by name from an App Router file, or
 // nil when the path is not one.
 //
-// The file must sit under a path SEGMENT named `app`, which is deliberately tighter than
+// The file must sit under a path segment named `app`, which is deliberately tighter than
 // `IsInApplicationDirectory`: that one is a substring test and answers true for every file in
 // `www-connected-app/`, and here a false yes would silence naming rules across a whole checkout. A
 // numbered metadata image (`icon1.tsx`, `opengraph-image2.tsx`) is the same convention as the bare

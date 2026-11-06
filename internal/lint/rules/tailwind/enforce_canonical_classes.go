@@ -109,34 +109,34 @@ type EnforceCanonicalClassesOptions struct {
 // be spliced into a class list whose order is `enforce-consistent-class-order`'s concern, and a
 // rewrite that also reordered would fight it. Reporting the shorter spelling is enough for an
 // author to act on.
-var EnforceCanonicalClasses = rule.Rule{
+var EnforceCanonicalClasses = rule.Rule[EnforceCanonicalClassesOptions]{
 	Name: "better-tailwindcss/enforce-canonical-classes",
-	// The design system: its stylesheets, read through the recording file system (DesignSystemFS).
+	// The design system: its stylesheets, read through the recording file system (DesignSystemFileSystem).
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDesignSystem,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[EnforceCanonicalClassesOptions]) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
 		// Read before the design system is resolved: reading is pure, and a run that declines for want
 		// of a Tailwind entry point must still reach it, or the registry's decoder agreement check
 		// never looks at this rule (#zwd43jn).
-		configured, isConfigured := rule.OptionsAs[EnforceCanonicalClassesOptions](options)
+		configured, isConfigured := options.Read()
 
 		// Resolved once per file and before the listeners are built, matching the other two migrated
 		// rules. A project with no Tailwind is silence with nothing wrong; a project whose CSS will
 		// not parse is reported once per file rather than swallowed.
-		designSystem := DesignSystemForProgramAt(ctx.Program, configured.Location())
-		if designSystem.Err != nil {
-			if ctx.Program == nil {
+		designSystem := DesignSystemForProgramAt(ruleContext.Program, configured.Location())
+		if designSystem.Error != nil {
+			if ruleContext.Program == nil {
 				return nil
 			}
 			// No Tailwind entry point is silence with nothing wrong in a project without Tailwind, and
 			// a skip --coverage names, so a project that enables this rule without one can see it (#pa7k7zv).
-			if skipWithoutTailwind(ctx, designSystem.Err) {
+			if skipWithoutTailwind(ruleContext, designSystem.Error) {
 				return nil
 			}
-			return declineListeners(ctx, "enforce-canonical-classes", designSystem)
+			return declineListeners(ruleContext, "enforce-canonical-classes", designSystem)
 		}
 
 		surfaces := DefaultClassLiteralSurfaces()
@@ -153,7 +153,7 @@ var EnforceCanonicalClasses = rule.Rule{
 			ignore = configured.Ignore
 		}
 
-		reader := surfaces.ReaderFor(ctx.FileCache)
+		reader := surfaces.ReaderFor(ruleContext.FileCache)
 		ignored := compileIgnorePatterns(ignore)
 		// Every result that built carries its Canonicalizer, from loadedDesignSystemResult. One without it
 		// was put together by hand, and building one here would build a fresh memo for every file, the
@@ -167,12 +167,14 @@ var EnforceCanonicalClasses = rule.Rule{
 			for _, literal := range reader.ClassLiteralsIn(node) {
 				var merged map[string]bool
 				if collapse.enabled {
-					merged = reportCollapses(ctx, literal, ignored, designSystem, collapse)
+					merged = reportCollapses(ruleContext, literal, ignored, designSystem, collapse)
 				}
 				// Upstream signs every class under the same options it collapses with, so a project that
 				// turns collapse off compares signatures without expanding shorthands.
-				canonicalizer := designSystem.Canonicalizer.WithFeatures(tailwindengine.SignatureFeaturesFor(collapse.enabled, collapse.logical))
-				reportSingles(ctx, literal, ignored, designSystem.System, canonicalizer, merged)
+				canonicalizer := designSystem.Canonicalizer.WithFeatures(
+					tailwindengine.SignatureFeaturesFor(collapse.enabled, collapse.logical),
+				)
+				reportSingles(ruleContext, literal, ignored, designSystem.System, canonicalizer, merged)
 			}
 		}
 
@@ -184,52 +186,6 @@ var EnforceCanonicalClasses = rule.Rule{
 	},
 }
 
-// candidateParts is a class split into the pieces that decide whether it can merge.
-type candidateParts struct {
-	ClassName string
-	// Prefix is everything before the root: the variants, in source order.
-	Prefix string
-	Root   string
-	// Value is the text after the root, empty for a class like `border-l`.
-	//
-	// Decoded rather than verbatim, because it decides equality: `parseCandidate` resolves
-	// `bg-(--x)` and `bg-[var(--x)]` to the same value, and they ARE the same class, so the merge
-	// precondition must see them as equal. SourceValue is the half that gets printed.
-	Value string
-	// SourceValue is the same value as the author spelled it, for printing back.
-	//
-	// Two fields rather than one because the decoded form is unwritable. `grid-cols-[1fr_auto]`
-	// decodes to `1fr auto`, and a rewrite suggesting `grid-cols-[1fr auto]` names a class with a
-	// space in it, which cannot appear in a class attribute at all. Measured on the corpus: 16
-	// classes decode to something different from what was written, all of them arbitrary values
-	// carrying `_` or the `(--x)` custom-property shorthand.
-	//
-	// Empty means "same as Value", which is the common case and keeps every caller that builds these
-	// by hand correct by default.
-	SourceValue string
-	Important   bool
-}
-
-// mergeKey is everything except the root. Two classes can only merge when this matches.
-func (c candidateParts) mergeKey() string {
-	importance := ""
-	if c.Important {
-		importance = "!"
-	}
-	return c.Prefix + "|" + importance + "|" + c.Value
-}
-
-// printedValue is the value to write into a rebuilt class name.
-//
-// SourceValue when the decoded form differs from what the author wrote, Value otherwise. See the
-// field comment: the decoded form is what decides equality and is not always writable.
-func (c candidateParts) printedValue() string {
-	if c.SourceValue != "" {
-		return c.SourceValue
-	}
-	return c.Value
-}
-
 // reportCollapses finds mergeable sets in one literal and reports the shorter spelling, returning the
 // classes it reported as merged so reportSingles leaves them to this finding.
 //
@@ -237,7 +193,7 @@ func (c candidateParts) printedValue() string {
 // `mt+mb => my`, then `ml+mr => mx`, then `my+mx => m`. Verified against the engine, which produces
 // the same single finding for the four-class case.
 func reportCollapses(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	literal ClassLiteral,
 	ignored []*ignorePattern,
 	designSystem DesignSystemResult,
@@ -269,7 +225,7 @@ func reportCollapses(
 			return reported
 		}
 
-		ctx.ReportRange(literal.Range, messageCanonicalCollapse(inputs, output))
+		ruleContext.ReportRange(literal.Range, messageCanonicalCollapse(inputs, output))
 		for _, input := range inputs {
 			reported[input] = true
 		}
@@ -299,7 +255,7 @@ func reportCollapses(
 // reason reportDeprecations gives: `no-duplicate-classes` deletes a repeat, and renaming the same bytes
 // would be refused as an overlap.
 func reportSingles(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	literal ClassLiteral,
 	ignored []*ignorePattern,
 	system *tailwindengine.LoadedDesignSystem,
@@ -313,8 +269,8 @@ func reportSingles(
 
 	var tokens []classToken
 	tokenized := false
-	if ctx.SourceFile != nil {
-		tokens, tokenized = classTokensIn(ctx.SourceFile.Text(), literal.Range, literal.Text)
+	if ruleContext.SourceFile != nil {
+		tokens, tokenized = classTokensIn(ruleContext.SourceFile.Text(), literal.Range, literal.Text)
 	}
 	classTokens := classesOf(tokens)
 	if tokenized && len(classTokens) == len(classes) {
@@ -344,10 +300,10 @@ func reportSingles(
 		if canFix && !containsString(classes[:index], className) {
 			fixes = []rule.Fix{rule.ReplaceRange(classTokens[index].Range, canonical)}
 		}
-		ctx.Report(rule.Diagnostic{
+		ruleContext.Report(rule.Diagnostic{
 			Range:      literal.Range,
 			Message:    messageCanonicalSingle(className, canonical),
-			SourceFile: ctx.SourceFile,
+			SourceFile: ruleContext.SourceFile,
 			Fixes:      fixes,
 		})
 	}
@@ -363,7 +319,11 @@ type canonicalCollapseOptions struct {
 }
 
 // mergeOnce finds the first mergeable pair and returns what it becomes.
-func mergeOnce(classes []string, designSystem DesignSystemResult, collapse canonicalCollapseOptions) ([]string, string, bool) {
+func mergeOnce(
+	classes []string,
+	designSystem DesignSystemResult,
+	collapse canonicalCollapseOptions,
+) ([]string, string, bool) {
 	parsed := make([]candidateParts, 0, len(classes))
 	for _, className := range classes {
 		parts, canParse := splitCandidateIn(className, designSystem.System)
@@ -373,9 +333,9 @@ func mergeOnce(classes []string, designSystem DesignSystemResult, collapse canon
 		parsed = append(parsed, parts)
 	}
 
-	for i := 0; i < len(parsed); i++ {
-		for j := i + 1; j < len(parsed); j++ {
-			left, right := parsed[i], parsed[j]
+	for leftIndex := 0; leftIndex < len(parsed); leftIndex++ {
+		for rightIndex := leftIndex + 1; rightIndex < len(parsed); rightIndex++ {
+			left, right := parsed[leftIndex], parsed[rightIndex]
 
 			// Everything except the root must already agree. This is the precondition the whole
 			// rule rests on, and relaxing it reports `px-4 py-2` and `px-4 sm:py-4`, both correct.
@@ -441,8 +401,8 @@ type ignorePattern struct {
 func compileIgnorePatterns(patterns []string) []*ignorePattern {
 	compiled := make([]*ignorePattern, 0, len(patterns))
 	for _, pattern := range patterns {
-		expression, err := esregexp.Compile(pattern, "")
-		if err != nil {
+		expression, compileError := esregexp.Compile(pattern, "")
+		if compileError != nil {
 			continue
 		}
 		compiled = append(compiled, &ignorePattern{pattern: expression})

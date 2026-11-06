@@ -93,12 +93,12 @@ var messageNoIsMounted = rule.Message{
 // A parenthesized object or callee is silent too, for the reason given on `isThisKeyword` below.
 // That one is upstream being narrow rather than upstream being right, and it is reproduced anyway
 // because a differential run against oxlint is the thing this port has to survive.
-var NoIsMounted = rule.Rule{
+var NoIsMounted = rule.Rule[rule.NoOptions]{
 	// No namespace prefix. The config writes `react/no-is-mounted` and the parity guard strips the
 	// namespace on a `/` boundary, so `react-no-is-mounted` would match no inventory entry, lint no
 	// files, and still pass every fixture in this package.
 	Name: "react/no-is-mounted",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				if !isThisIsMountedCallee(node.AsCallExpression().Expression) {
@@ -109,11 +109,14 @@ var NoIsMounted = rule.Rule{
 				}
 				// The whole call expression, matching oxc's `call_expr.span` rather than ESLint's
 				// narrower `callee`.
-				ctx.ReportNode(node, messageNoIsMounted)
+				ruleContext.ReportNode(node, messageNoIsMounted)
 			},
 		}
 	},
 }
+
+// isMountedName is the one method this rule is about.
+const isMountedName = "isMounted"
 
 // isThisIsMountedCallee reports whether a callee reads `isMounted` directly off `this`.
 //
@@ -163,9 +166,6 @@ func isThisIsMountedCallee(callee *ast.Node) bool {
 	}
 	return false
 }
-
-// isMountedName is the one method this rule is about.
-const isMountedName = "isMounted"
 
 // isThisKeyword reports whether an expression is the `this` keyword.
 //

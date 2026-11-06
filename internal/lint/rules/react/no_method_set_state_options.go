@@ -28,13 +28,13 @@ type NoMethodSetStateOptions struct {
 // into a struct, cannot read it. Anything but `"disallow-in-func"` is refused, naming the value: an
 // unknown value read as the default would leave an author who misspelled the option believing
 // their nested calls are checked.
-func DecodeNoMethodSetStateOptions(raw []byte) (any, error) {
+func DecodeNoMethodSetStateOptions(raw []byte) (NoMethodSetStateOptions, error) {
 	options := NoMethodSetStateOptions{}
 	if len(raw) == 0 {
 		return options, nil
 	}
 	var mode string
-	if err := json.Unmarshal(raw, &mode); err != nil {
+	if decodeError := json.Unmarshal(raw, &mode); decodeError != nil {
 		return options, fmt.Errorf(`expected the mode string "disallow-in-func", got %s`, raw)
 	}
 	if mode != "disallow-in-func" {

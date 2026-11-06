@@ -4,68 +4,68 @@
  */
 enum PolicyAbbreviations {
     /* policy/Abbreviations.json, byte for byte. */
-    static let file = #"""
+    static let file = ##"""
         {
-            "about": "The abbreviation vocabulary for nexus/consistency-no-abbreviated-identifier, read by the Go rule through go:embed and by the Swift engine directly. Each entry is one abbreviated word: `expansion` is the word it stands in for, and each form says where in a name the word is judged. A suffix or segment form matches the word capitalized, and suggests the expansion capitalized. ORDER IS OBSERVABLE: within each form the rule reports the first entry that matches, so `ms` sits between `params` and `ref`, the early prefixes run `ctx` through `prev` in this order, and `vars` precedes `var`. Framework exemptions (`params` in route files, `ref` in React property positions, `config` in middleware, a `...args` rest, TanStack's `queryFn`) are policy rather than vocabulary and stay in the Go rule.",
+            "about": "The abbreviation vocabulary for nexus/consistency-no-abbreviated-identifier, read by the Go rule through go:embed and by the Swift engine directly. Each entry is one abbreviated word: `expansions` are the words it stands in for, the most common meaning first, and each form says where in a name the word is judged. A suffix or segment form matches the word capitalized, and suggests the expansion capitalized. A word with more than one common meaning lists every one, and its messages name them all and ask for whichever it means, never one guess; a word whose meanings are too many to list has no `expansions` and gives its `advice` instead. No engine fixes a name from this file, and a word with more than one expansion must never be fixed, since only its author knows which it means. Order is observable: within each form the rule reports the first entry that matches, so `ms` sits between `params` and `ref`, the early prefixes run `ctx` through `prev` in this order, and `vars` precedes `var`. Framework exemptions (`params` in route files, `ref` in React property positions, `config` in middleware, TanStack's `queryFn`) are policy rather than vocabulary and stay in the Go rule.",
             "abbreviations": [
                 {
                     "abbreviation": "prop",
-                    "expansion": "property",
+                    "expansions": ["property"],
                     "whole": { "style": "orDescriptive" },
                     "prefix": { "phase": "late" },
                     "suffix": {}
                 },
                 {
                     "abbreviation": "props",
-                    "expansion": "properties",
+                    "expansions": ["properties"],
                     "whole": { "style": "orDescriptive" },
                     "prefix": { "phase": "late" },
                     "suffix": {}
                 },
                 {
                     "abbreviation": "param",
-                    "expansion": "parameter",
+                    "expansions": ["parameter"],
                     "whole": { "style": "orDescriptive" },
                     "prefix": { "phase": "late" },
                     "suffix": {}
                 },
                 {
                     "abbreviation": "params",
-                    "expansion": "parameters",
+                    "expansions": ["parameters"],
                     "whole": { "style": "orDescriptive" },
                     "prefix": { "phase": "late" },
                     "suffix": {}
                 },
                 {
                     "abbreviation": "ms",
-                    "expansion": "milliseconds",
+                    "expansions": ["milliseconds"],
                     "reason": "A millisecond unit read as a camelCase word: a lowercase letter before it, and the end of the name or the next word after, so `maximumAgeMsHalf` counts while `SMS`, `LLMs` and `msgText` do not. The tree spells the unit `InMilliseconds`, more than two to one over `Ms` for the identical value.",
                     "suffix": { "matcher": "millisecondWord", "replacement": "InMilliseconds" }
                 },
                 {
                     "abbreviation": "ref",
-                    "expansion": "reference",
+                    "expansions": ["reference"],
                     "whole": { "style": "orDescriptive" },
                     "prefix": { "phase": "late" },
                     "suffix": {}
                 },
                 {
                     "abbreviation": "config",
-                    "expansion": "configuration",
+                    "expansions": ["configuration"],
                     "whole": { "style": "orDescriptive" },
                     "prefix": { "phase": "late" },
                     "suffix": {}
                 },
                 {
                     "abbreviation": "idx",
-                    "expansion": "index",
+                    "expansions": ["index"],
                     "whole": { "style": "orDescriptive" },
                     "prefix": { "phase": "late" },
                     "suffix": {}
                 },
                 {
                     "abbreviation": "arg",
-                    "expansion": "argument",
+                    "expansions": ["argument"],
                     "advice": "Use \"argument\", \"commandArgument\", or a more descriptive name.",
                     "reason": "The whole word and the prefix give advice rather than one rename, because the right name depends on what the argument is.",
                     "whole": { "style": "advice" },
@@ -74,7 +74,7 @@ enum PolicyAbbreviations {
                 },
                 {
                     "abbreviation": "args",
-                    "expansion": "arguments",
+                    "expansions": ["arguments"],
                     "advice": "Use \"arguments\", \"commandArguments\", \"commandLineArguments\", or a more descriptive name.",
                     "reason": "`arguments` is a reserved binding, so the whole word and the prefix give advice rather than the bare expansion.",
                     "whole": { "style": "advice" },
@@ -89,7 +89,7 @@ enum PolicyAbbreviations {
                 },
                 {
                     "abbreviation": "char",
-                    "expansion": "character",
+                    "expansions": ["character"],
                     "whole": { "style": "orDescriptive" },
                     "prefix": { "phase": "late" },
                     "suffix": {}
@@ -106,167 +106,262 @@ enum PolicyAbbreviations {
                 },
                 {
                     "abbreviation": "str",
-                    "expansion": "string",
+                    "expansions": ["string"],
                     "whole": { "style": "orDescriptive" },
                     "prefix": { "phase": "late" },
                     "suffix": {}
                 },
                 {
                     "abbreviation": "val",
-                    "expansion": "value",
+                    "expansions": ["value"],
                     "whole": { "style": "orDescriptive" },
                     "prefix": { "phase": "late" },
                     "suffix": {}
                 },
                 {
                     "abbreviation": "arr",
-                    "expansion": "array",
+                    "expansions": ["array"],
                     "whole": { "style": "orDescriptive" },
                     "prefix": { "phase": "late" },
                     "suffix": {}
                 },
                 {
                     "abbreviation": "obj",
-                    "expansion": "object",
+                    "expansions": ["object"],
                     "whole": { "style": "orDescriptive" },
                     "prefix": { "phase": "late" },
                     "suffix": {}
                 },
                 {
                     "abbreviation": "num",
-                    "expansion": "number",
+                    "expansions": ["number"],
                     "whole": { "style": "orDescriptive" },
                     "prefix": { "phase": "late" },
                     "suffix": {}
                 },
                 {
                     "abbreviation": "res",
-                    "expansion": "response",
+                    "expansions": ["response"],
                     "whole": { "style": "orDescriptive" },
                     "prefix": { "phase": "late" },
                     "suffix": {}
                 },
                 {
                     "abbreviation": "err",
-                    "expansion": "error",
+                    "expansions": ["error"],
                     "whole": { "style": "orDescriptive" },
                     "prefix": { "phase": "late" },
                     "suffix": {}
                 },
                 {
                     "abbreviation": "req",
-                    "expansion": "request",
+                    "expansions": ["request"],
                     "whole": { "style": "orDescriptive" },
                     "prefix": { "phase": "late" },
                     "suffix": {}
                 },
                 {
                     "abbreviation": "msg",
-                    "expansion": "message",
+                    "expansions": ["message"],
                     "whole": { "style": "orDescriptive" },
                     "prefix": { "phase": "late" },
                     "suffix": {}
                 },
                 {
                     "abbreviation": "min",
-                    "expansion": "minimum",
+                    "expansions": ["minimum"],
                     "whole": { "style": "orDescriptive" },
                     "prefix": { "phase": "late" },
                     "suffix": {}
                 },
                 {
                     "abbreviation": "max",
-                    "expansion": "maximum",
+                    "expansions": ["maximum"],
                     "whole": { "style": "orDescriptive" },
                     "prefix": { "phase": "late" },
                     "suffix": {}
                 },
                 {
                     "abbreviation": "ctx",
-                    "expansion": "context",
+                    "expansions": ["context"],
                     "reason": "An early prefix: judged before any suffix, so a name starting with it reports the prefix even when it also ends with an abbreviation.",
                     "whole": { "style": "plain" },
                     "prefix": { "phase": "early" }
                 },
                 {
                     "abbreviation": "cwd",
-                    "expansion": "workingDirectory",
+                    "expansions": ["workingDirectory"],
                     "segment": {}
                 },
                 {
                     "abbreviation": "dir",
-                    "expansion": "directory",
+                    "expansions": ["directory"],
                     "reason": "A segment ends at the end of the name or the start of the next word, which is what keeps `Direction` from reading as `Dir`.",
                     "segment": {}
                 },
                 {
                     "abbreviation": "env",
-                    "expansion": "environment",
+                    "expansions": ["environment"],
                     "segment": {}
                 },
                 {
                     "abbreviation": "cli",
-                    "expansion": "commandLineInterface",
+                    "expansions": ["commandLineInterface"],
                     "segment": {}
                 },
                 {
                     "abbreviation": "len",
-                    "expansion": "length",
+                    "expansions": ["length"],
                     "segment": {}
                 },
                 {
                     "abbreviation": "seq",
-                    "expansion": "sequence",
+                    "expansions": ["sequence"],
                     "segment": {}
                 },
                 {
                     "abbreviation": "db",
-                    "expansion": "database",
+                    "expansions": ["database"],
                     "whole": { "style": "plain" },
                     "prefix": { "phase": "early" },
                     "segment": {}
                 },
                 {
                     "abbreviation": "tx",
-                    "expansion": "transaction",
+                    "expansions": ["transaction"],
                     "whole": { "style": "plain" },
                     "prefix": { "phase": "early" },
                     "segment": {}
                 },
                 {
                     "abbreviation": "opts",
-                    "expansion": "options",
+                    "expansions": ["options"],
                     "whole": { "style": "plain" },
                     "prefix": { "phase": "early" }
                 },
                 {
                     "abbreviation": "cur",
-                    "expansion": "current",
+                    "expansions": ["current"],
                     "whole": { "style": "plain" },
                     "prefix": { "phase": "early" }
                 },
                 {
                     "abbreviation": "pct",
-                    "expansion": "percent",
+                    "expansions": ["percent"],
                     "whole": { "style": "plain" },
                     "prefix": { "phase": "early" }
                 },
                 {
                     "abbreviation": "prev",
-                    "expansion": "previous",
+                    "expansions": ["previous"],
                     "whole": { "style": "plain" },
                     "prefix": { "phase": "early" }
                 },
                 {
                     "abbreviation": "vars",
-                    "expansion": "variables",
+                    "expansions": ["variables"],
                     "reason": "Before `var`, so the longer word wins.",
                     "segment": {}
                 },
                 {
                     "abbreviation": "var",
-                    "expansion": "variable",
+                    "expansions": ["variable"],
                     "segment": {}
+                },
+                {
+                    "abbreviation": "buf",
+                    "expansions": ["buffer"],
+                    "reason": "The thirteen from `buf` to `sb` are Go's everyday abbreviations, added for every engine by @system_cohere's ruling on #ec8mvbg so the house keeps one vocabulary. Each is judged as the whole name, as a prefix followed by a capital, and as a segment, so only a whole camelCase word counts: `Buffer` and `Buffalo` never read as `Buf`.",
+                    "whole": { "style": "orDescriptive" },
+                    "prefix": { "phase": "late" },
+                    "segment": {}
+                },
+                {
+                    "abbreviation": "tmp",
+                    "expansions": ["temporary"],
+                    "whole": { "style": "orDescriptive" },
+                    "prefix": { "phase": "late" },
+                    "segment": {}
+                },
+                {
+                    "abbreviation": "pkg",
+                    "expansions": ["package"],
+                    "whole": { "style": "orDescriptive" },
+                    "prefix": { "phase": "late" },
+                    "segment": {}
+                },
+                {
+                    "abbreviation": "src",
+                    "expansions": ["source"],
+                    "whole": { "style": "orDescriptive" },
+                    "prefix": { "phase": "late" },
+                    "segment": {}
+                },
+                {
+                    "abbreviation": "dst",
+                    "expansions": ["destination"],
+                    "whole": { "style": "orDescriptive" },
+                    "prefix": { "phase": "late" },
+                    "segment": {}
+                },
+                {
+                    "abbreviation": "conn",
+                    "expansions": ["connection"],
+                    "whole": { "style": "orDescriptive" },
+                    "prefix": { "phase": "late" },
+                    "segment": {}
+                },
+                {
+                    "abbreviation": "cmd",
+                    "expansions": ["command"],
+                    "whole": { "style": "orDescriptive" },
+                    "prefix": { "phase": "late" },
+                    "segment": {}
+                },
+                {
+                    "abbreviation": "cfg",
+                    "expansions": ["configuration"],
+                    "whole": { "style": "orDescriptive" },
+                    "prefix": { "phase": "late" },
+                    "segment": {}
+                },
+                {
+                    "abbreviation": "pos",
+                    "expansions": ["position", "positive"],
+                    "reason": "Every form needs a word boundary after it, so `Posix` and `Post` never read as `Pos`. It has two common meanings: a census found `resultPos` beside `resultNeg`, where it means positive, so every message names both.",
+                    "whole": { "style": "orDescriptive" },
+                    "prefix": { "phase": "late" },
+                    "segment": {}
+                },
+                {
+                    "abbreviation": "wg",
+                    "expansions": ["waitGroup"],
+                    "whole": { "style": "orDescriptive" },
+                    "prefix": { "phase": "late" },
+                    "segment": {}
+                },
+                {
+                    "abbreviation": "mu",
+                    "expansions": ["mutex"],
+                    "whole": { "style": "orDescriptive" },
+                    "prefix": { "phase": "late" },
+                    "segment": {}
+                },
+                {
+                    "abbreviation": "ch",
+                    "expansions": ["channel"],
+                    "reason": "Every form needs a word boundary after it, so `Check` and `Change` never read as `Ch`.",
+                    "whole": { "style": "orDescriptive" },
+                    "prefix": { "phase": "late" },
+                    "segment": {}
+                },
+                {
+                    "abbreviation": "sb",
+                    "advice": "Spell out what it holds.",
+                    "reason": "Go's habit reads `sb` as a strings.Builder, but a census found it naming a scroll region's bottom, and the letters fit more words than a list could hold, so every form asks for the name rather than guessing one.",
+                    "whole": { "style": "advice" },
+                    "prefix": { "phase": "late", "style": "advice" },
+                    "segment": { "style": "advice" }
                 }
             ],
             "allowedNames": [
@@ -280,5 +375,5 @@ enum PolicyAbbreviations {
             ]
         }
 
-        """#
+        """##
 }

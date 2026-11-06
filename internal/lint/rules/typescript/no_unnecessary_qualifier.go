@@ -23,7 +23,7 @@ import (
 //
 // A qualifier is unnecessary only when all three hold. The qualifier resolves to a symbol whose
 // declaration is one of the namespaces or enums this node is lexically inside. The accessed name
-// resolves to a symbol. And the name the checker finds in scope AT THE QUALIFIER is the same symbol
+// resolves to a symbol. And the name the checker finds in scope at the qualifier is the same symbol
 // the access resolved to, compared through `GetExportSymbolOfSymbol` because a namespace member's
 // local symbol and its exported symbol are different objects.
 //
@@ -31,7 +31,7 @@ import (
 //
 //	namespace X { export type T = number; namespace Y { type T = string; const x: X.T = 0; } }
 //
-// `T` IS in scope at that point, and it is the wrong `T`. Measured with a probe: the scope lookup
+// `T` is in scope at that point, and it is the wrong `T`. Measured with a probe: the scope lookup
 // finds a `T` and the export-symbol comparison answers false, so dropping the comparison would
 // report a qualifier that is load-bearing and the fix would change what the code means.
 //
@@ -49,7 +49,7 @@ import (
 //
 //	namespace A { export type B<T> = T; export type C = number; const x: A.B<A.C> = 3; }
 //
-// Measured: both report, because a type reference's arguments are children of the TYPE REFERENCE
+// Measured: both report, because a type reference's arguments are children of the type reference
 // and not of the qualified name, in our parser as in estree. So the subtree of a reported
 // `KindQualifiedName` or `KindPropertyAccessExpression` holds nothing but its own chain, and
 // skipping it is exactly upstream's suppression.
@@ -58,8 +58,8 @@ import (
 //
 // Upstream's ninth reporting case is `import * as Foo from './foo'; declare module './foo' { const
 // x: Foo.T = 3; }`, which needs `./foo` to resolve so the namespace import aliases to a real module
-// symbol. Driven through the installed 8.67.0 build with no `./foo` on disk, UPSTREAM IS SILENT
-// TOO, so this is a case whose verdict depends on a module existing rather than a shape our harness
+// symbol. Driven through the installed 8.67.0 build with no `./foo` on disk, upstream is silent
+// too, so this is a case whose verdict depends on a module existing rather than a shape our harness
 // cannot express. The alias branch it exercises is reached by a different fixture, recorded there.
 //
 // # Cost, and why the walk starts at the outermost enum or namespace
@@ -74,7 +74,7 @@ import (
 // So the walk starts at each outermost enum or namespace, with that declaration as the stack's
 // first entry, which is the stack the whole-file walk had at that point. A nested one is reached
 // by its outermost one's walk, and skipped by the listener so no subtree is walked twice.
-var NoUnnecessaryQualifier = rule.Rule{
+var NoUnnecessaryQualifier = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/no-unnecessary-qualifier",
 
 	// Every question the rule asks is a resolution question: what does this qualifier name, what is
@@ -82,9 +82,9 @@ var NoUnnecessaryQualifier = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		walkOutermost := func(node *ast.Node) {
-			if ctx.TypeChecker == nil {
+			if ruleContext.TypeChecker == nil {
 				return
 			}
 			for ancestor := node.Parent; ancestor != nil; ancestor = ancestor.Parent {
@@ -118,9 +118,9 @@ var NoUnnecessaryQualifier = rule.Rule{
 					}
 					// A type-position qualifier cannot itself be parenthesized in the grammar
 					// (`A.(B)` is not a type), so there is nothing to unwrap on the left. The
-					// parenthesized TYPE case `const x: (A.T) = 3` puts the parens around the
+					// parenthesized type case `const x: (A.T) = 3` puts the parens around the
 					// whole type reference, above this node, and reaches here unwrapped.
-					if unnecessaryQualifierReport(ctx, namespacesInScope,
+					if unnecessaryQualifierReport(ruleContext, namespacesInScope,
 						qualifiedName.Left, qualifiedName.Right) {
 						// Reported: upstream suppresses everything inside this node, and so
 						// does declining to recurse. See the doc comment.
@@ -153,7 +153,7 @@ var NoUnnecessaryQualifier = rule.Rule{
 					if name == nil {
 						break
 					}
-					if unnecessaryQualifierReport(ctx, namespacesInScope, qualifier, name) {
+					if unnecessaryQualifierReport(ruleContext, namespacesInScope, qualifier, name) {
 						return
 					}
 				}
@@ -177,25 +177,25 @@ var NoUnnecessaryQualifier = rule.Rule{
 //
 // Returns whether it reported, which is what drives the subtree suppression at the call site.
 func unnecessaryQualifierReport(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	namespacesInScope []*ast.Node,
 	qualifier *ast.Node,
 	name *ast.Node,
 ) bool {
-	namespaceSymbol := ctx.TypeChecker.GetSymbolAtLocation(qualifier)
-	if namespaceSymbol == nil || !qualifierSymbolIsNamespaceInScope(ctx, namespacesInScope, namespaceSymbol) {
+	namespaceSymbol := ruleContext.TypeChecker.GetSymbolAtLocation(qualifier)
+	if namespaceSymbol == nil || !qualifierSymbolIsNamespaceInScope(ruleContext, namespacesInScope, namespaceSymbol) {
 		return false
 	}
 
-	accessedSymbol := ctx.TypeChecker.GetSymbolAtLocation(name)
+	accessedSymbol := ruleContext.TypeChecker.GetSymbolAtLocation(name)
 	if accessedSymbol == nil {
 		return false
 	}
 
-	// The scope lookup is anchored at the QUALIFIER rather than at the name, which is upstream's
+	// The scope lookup is anchored at the qualifier rather than at the name, which is upstream's
 	// choice and is load-bearing: asking at the name would ask what is visible after the dot, which
 	// is the namespace's own member table and would answer yes for every qualifier.
-	scopeSymbols := ctx.TypeChecker.GetSymbolsInScope(qualifier, accessedSymbol.Flags)
+	scopeSymbols := ruleContext.TypeChecker.GetSymbolsInScope(qualifier, accessedSymbol.Flags)
 	var fromScope *ast.Symbol
 	for _, scopeSymbol := range scopeSymbols {
 		if scopeSymbol.Name == name.Text() {
@@ -211,7 +211,7 @@ func unnecessaryQualifierReport(
 	// with the local one while the access resolves to the exported one. Comparing them directly
 	// would answer false on every real finding. Comparing without this normalization also loses the
 	// shadowing case in the other direction, so the call is doing two jobs.
-	if ctx.TypeChecker.GetExportSymbolOfSymbol(fromScope) != accessedSymbol {
+	if ruleContext.TypeChecker.GetExportSymbolOfSymbol(fromScope) != accessedSymbol {
 		return false
 	}
 
@@ -234,20 +234,20 @@ func unnecessaryQualifierReport(
 	//	(A.T)     ->  `const x: (T) = 3;` fine, same reason
 	//
 	// A fix is applied unattended, so shipping the first two would rewrite working code into a
-	// syntax error with nobody watching. The FINDING is upstream's and is reproduced; only the
+	// syntax error with nobody watching. The finding is upstream's and is reproduced; only the
 	// repair is withheld, and only on the shapes where upstream's own repair is broken. The test
 	// for it is positional rather than a paren count: if an open parenthesis lies between the
 	// qualifier's start and the enclosing expression's start, its partner is outside the removal.
 	removal := core.NewTextRange(
-		rule.TokenRange(ctx.SourceFile, qualifier).Pos(),
-		rule.TokenRange(ctx.SourceFile, name).Pos(),
+		rule.TokenRange(ruleContext.SourceFile, qualifier).Pos(),
+		rule.TokenRange(ruleContext.SourceFile, name).Pos(),
 	)
 	if qualifierRemovalWouldStrandAParenthesis(qualifier) {
-		ctx.ReportNode(qualifier, message)
+		ruleContext.ReportNode(qualifier, message)
 		return true
 	}
 
-	ctx.ReportNodeWithFixes(qualifier, message, rule.RemoveRange(removal))
+	ruleContext.ReportNodeWithFixes(qualifier, message, rule.RemoveRange(removal))
 	return true
 }
 
@@ -261,7 +261,7 @@ func unnecessaryQualifierReport(
 // The recursion is upstream's and terminates because an alias chain is finite and the checker
 // resolves it to a non-alias.
 func qualifierSymbolIsNamespaceInScope(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	namespacesInScope []*ast.Node,
 	symbol *ast.Symbol,
 ) bool {
@@ -274,11 +274,11 @@ func qualifierSymbolIsNamespaceInScope(
 	if symbol.Flags&ast.SymbolFlagsAlias == 0 {
 		return false
 	}
-	aliased := ctx.TypeChecker.GetAliasedSymbol(symbol)
+	aliased := ruleContext.TypeChecker.GetAliasedSymbol(symbol)
 	if aliased == nil || aliased == symbol {
 		return false
 	}
-	return qualifierSymbolIsNamespaceInScope(ctx, namespacesInScope, aliased)
+	return qualifierSymbolIsNamespaceInScope(ruleContext, namespacesInScope, aliased)
 }
 
 // isEntityNameExpressionForQualifier is upstream's `isEntityNameExpression`: an identifier, or a
@@ -295,7 +295,7 @@ func qualifierSymbolIsNamespaceInScope(
 // report. Probed over fourteen shapes that can sit left of a dot: call, element access, `as`, angle
 // assertion, non-null, conditional, comma, nullish coalesce, await, array index, object literal,
 // optional chain, `this`, and a property access on a literal. Every one of them either resolves to
-// NO SYMBOL, which the `namespaceSymbol == nil` guard declines, or resolves to something whose
+// no symbol, which the `namespaceSymbol == nil` guard declines, or resolves to something whose
 // declarations are not in the stack, which the identity loop declines.
 //
 // So it is redundant against this parser today. It is kept because it is upstream's, because the
@@ -319,10 +319,11 @@ func isEntityNameExpressionForQualifier(node *ast.Node) bool {
 // ast.SkipParentheses, which dereferences its argument: the caller's node is optional and that
 // helper is how this project lost 167 files to a nil panic.
 func unwrapQualifierParentheses(node *ast.Node) *ast.Node {
-	for node != nil && node.Kind == ast.KindParenthesizedExpression {
-		node = node.AsParenthesizedExpression().Expression
+	unwrapped := node
+	for unwrapped != nil && unwrapped.Kind == ast.KindParenthesizedExpression {
+		unwrapped = unwrapped.AsParenthesizedExpression().Expression
 	}
-	return node
+	return unwrapped
 }
 
 // qualifierRemovalWouldStrandAParenthesis answers whether removing the qualifier and its dot would

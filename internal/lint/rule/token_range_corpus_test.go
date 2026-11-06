@@ -27,15 +27,15 @@ const tokenRangeCorpusVariable = "COHERE_TOKEN_RANGE_CORPUS"
 // them on every node of every file: the repository's fixtures, JSX, templates and JSDoc among them, and a real
 // tree when the variable names one. A start one past the scanner's is the mutant it must catch. The scanner's
 // start is clamped to the node's end, since a range never starts past its end; see TokenRange.
-func TestTokenRangeStartsWhereTheScannerDoes(t *testing.T) {
-	t.Parallel()
-	roots := []string{repositoryRoot(t)}
+func TestTokenRangeStartsWhereTheScannerDoes(test *testing.T) {
+	test.Parallel()
+	roots := []string{repositoryRoot(test)}
 	if extra := os.Getenv(tokenRangeCorpusVariable); extra != "" {
 		roots = append(roots, filepath.SplitList(extra)...)
 	}
-	files := corpusFiles(t, roots)
+	files := corpusFiles(test, roots)
 	if len(files) < 50 {
-		t.Fatalf("the corpus holds %d files, too few for agreement to mean anything", len(files))
+		test.Fatalf("the corpus holds %d files, too few for agreement to mean anything", len(files))
 	}
 
 	// The scanner's start, never past the node's end: a zero-width node has no token, and the scanner's next one
@@ -46,37 +46,42 @@ func TestTokenRangeStartsWhereTheScannerDoes(t *testing.T) {
 	_, clamped := compareStarts(files, scannerStart, func(sourceFile *ast.SourceFile, node *ast.Node) int {
 		return scanner.GetRangeOfTokenAtPosition(sourceFile, node.Pos()).Pos()
 	})
-	t.Logf("the scanner's start passes the node's end on %d nodes, by kind: %s", total(clamped), summary(clamped))
+	test.Logf("the scanner's start passes the node's end on %d nodes, by kind: %s", total(clamped), summary(clamped))
 	nodes, disagreements := compareStarts(files, scannerStart, func(sourceFile *ast.SourceFile, node *ast.Node) int {
 		return TokenRange(sourceFile, node).Pos()
 	})
 	if len(disagreements) > 0 {
-		t.Errorf("TokenRange and the scanner disagree on %d of %d nodes, by kind: %s", total(disagreements), nodes, summary(disagreements))
+		test.Errorf(
+			"TokenRange and the scanner disagree on %d of %d nodes, by kind: %s",
+			total(disagreements),
+			nodes,
+			summary(disagreements),
+		)
 	}
-	t.Logf("%d nodes in %d files compared, %d disagreeing", nodes, len(files), total(disagreements))
+	test.Logf("%d nodes in %d files compared, %d disagreeing", nodes, len(files), total(disagreements))
 
 	_, caught := compareStarts(files, scannerStart, func(sourceFile *ast.SourceFile, node *ast.Node) int {
 		return TokenRange(sourceFile, node).Pos() + 1
 	})
 	if total(caught) == 0 {
-		t.Error("a start one past the scanner's agreed on every node, so this comparison could not have failed")
+		test.Error("a start one past the scanner's agreed on every node, so this comparison could not have failed")
 	}
 }
 
 // repositoryRoot is the module's root, where the fixtures are.
-func repositoryRoot(t *testing.T) string {
-	t.Helper()
-	directory, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
+func repositoryRoot(test *testing.T) string {
+	test.Helper()
+	directory, workingDirectoryError := os.Getwd()
+	if workingDirectoryError != nil {
+		test.Fatal(workingDirectoryError)
 	}
 	for {
-		if _, err := os.Stat(filepath.Join(directory, "go.mod")); err == nil {
+		if _, statError := os.Stat(filepath.Join(directory, "go.mod")); statError == nil {
 			return directory
 		}
 		parent := filepath.Dir(directory)
 		if parent == directory {
-			t.Fatal("no go.mod above the test's directory")
+			test.Fatal("no go.mod above the test's directory")
 		}
 		directory = parent
 	}
@@ -84,15 +89,24 @@ func repositoryRoot(t *testing.T) string {
 
 // corpusFiles is every TypeScript and JavaScript source under roots, outside dependency, build and cache
 // directories and the TypeScript checkout, each parsed.
-func corpusFiles(t *testing.T, roots []string) []*ast.SourceFile {
-	t.Helper()
+func corpusFiles(test *testing.T, roots []string) []*ast.SourceFile {
+	test.Helper()
 	kinds := map[string]core.ScriptKind{".ts": core.ScriptKindTS, ".mts": core.ScriptKindTS, ".cts": core.ScriptKindTS,
 		".tsx": core.ScriptKindTSX, ".js": core.ScriptKindJS, ".jsx": core.ScriptKindJSX, ".mjs": core.ScriptKindJS}
-	skipped := map[string]bool{"node_modules": true, ".git": true, ".cache": true, ".next": true, "dist": true, "TypeScript": true}
+	skipped := map[string]bool{
+		"node_modules": true,
+		".git":         true,
+		".cache":       true,
+		".next":        true,
+		"dist":         true,
+		"TypeScript":   true,
+	}
 	var files []*ast.SourceFile
 	for _, root := range roots {
-		filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
-			if err != nil {
+		// Ignored: the callback skips every path it cannot read and never returns an error, so the walk has
+		// none to return.
+		filepath.WalkDir(root, func(path string, entry fs.DirEntry, pathError error) error {
+			if pathError != nil {
 				return nil
 			}
 			if entry.IsDir() {
@@ -105,12 +119,15 @@ func corpusFiles(t *testing.T, roots []string) []*ast.SourceFile {
 			if !handled || entry.Type()&fs.ModeSymlink != 0 {
 				return nil
 			}
-			contents, err := os.ReadFile(path)
-			if err != nil {
+			contents, readError := os.ReadFile(path)
+			if readError != nil {
 				return nil
 			}
 			fileName := tspath.NormalizePath(path)
-			if sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: tspath.RootedFilePath(fileName), PathKey: tspath.PathKey(fileName)},
+			if sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+				FileName: tspath.RootedFilePath(fileName),
+				PathKey:  tspath.PathKey(fileName),
+			},
 				string(contents), kind); sourceFile != nil {
 				files = append(files, sourceFile)
 			}

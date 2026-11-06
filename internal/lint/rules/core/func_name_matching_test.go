@@ -20,7 +20,7 @@ type funcNameMatchingCase struct {
 	// source is upstream's `code`, byte for byte.
 	source string
 
-	// options is the RAW JSON of upstream's options object, routed through the rule's own
+	// options is the raw JSON of upstream's options object, routed through the rule's own
 	// exported decoder rather than built as a struct, so the decoder's defaults and its
 	// empty-input path are under test.
 	options string
@@ -1048,42 +1048,42 @@ var funcNameMatchingSilentCases = []funcNameMatchingCase{
 }
 
 // decodedFuncNameMatching routes a row's raw JSON through the rule's own exported decoder.
-func decodedFuncNameMatching(t *testing.T, raw string) any {
-	t.Helper()
-	decoded, err := DecodeFuncNameMatchingOptions([]byte(raw))
-	if err != nil {
-		t.Fatalf("decoding options %q: %v", raw, err)
+func decodedFuncNameMatching(test *testing.T, raw string) FuncNameMatchingOptions {
+	test.Helper()
+	decoded, decodeFuncNameMatchingOptionsError := DecodeFuncNameMatchingOptions([]byte(raw))
+	if decodeFuncNameMatchingOptionsError != nil {
+		test.Fatalf("decoding options %q: %v", raw, decodeFuncNameMatchingOptionsError)
 	}
 	return decoded
 }
 
-func TestFuncNameMatchingFires(t *testing.T) {
-	t.Parallel()
+func TestFuncNameMatchingFires(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range funcNameMatchingFiresCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, FuncNameMatching, funcNameMatchingFile, testCase.source,
-				decodedFuncNameMatching(t, testCase.options))
-			rule_testing.ExpectFindings(t, result, testCase.ids...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, FuncNameMatching, funcNameMatchingFile, testCase.source,
+				decodedFuncNameMatching(test, testCase.options))
+			rule_testing.ExpectFindings(test, result, testCase.ids...)
 		})
 	}
 }
 
-func TestFuncNameMatchingStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestFuncNameMatchingStaysSilent(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range funcNameMatchingSilentCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, FuncNameMatching, funcNameMatchingFile, testCase.source,
-				decodedFuncNameMatching(t, testCase.options))
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, FuncNameMatching, funcNameMatchingFile, testCase.source,
+				decodedFuncNameMatching(test, testCase.options))
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
 
 // TestFuncNameMatchingResolvesAVersionGateTowardEs6 pins a case held out of the tables above.
 //
-// Upstream's corpus carries `var obj = { 'ᢅ': function foo() {} };` TWICE, byte for byte
+// Upstream's corpus carries `var obj = { 'ᢅ': function foo() {} };` twice, byte for byte
 // identical, with opposite verdicts:
 //
 //	invalid[49]   languageOptions: {ecmaVersion: 6}                      reports
@@ -1096,39 +1096,39 @@ func TestFuncNameMatchingStaysSilent(t *testing.T) {
 //
 // `rule.Context` carries no `ecmaVersion`, so this rule must answer one way for both rows. It
 // answers ES6, deliberately: nothing cohere lints is pinned below ES2015, and choosing ES5 would
-// drop findings on modern source. The ES5 row is therefore a KNOWN divergence, recorded here with
+// drop findings on modern source. The ES5 row is therefore a known divergence, recorded here with
 // both verdicts rather than removed.
 //
 // If an `ecmaVersion` channel is ever added, this test is where the choice is written down and the
 // held-out row is waiting in upstream's corpus.
-func TestFuncNameMatchingResolvesAVersionGateTowardEs6(t *testing.T) {
-	t.Parallel()
+func TestFuncNameMatchingResolvesAVersionGateTowardEs6(test *testing.T) {
+	test.Parallel()
 
 	const source = "var obj = { 'ᢅ': function foo() {} };"
 
-	result := rule_testing.RunWithOptions(t, FuncNameMatching, funcNameMatchingFile, source,
-		decodedFuncNameMatching(t, ""))
+	result := rule_testing.RunWithOptions(test, FuncNameMatching, funcNameMatchingFile, source,
+		decodedFuncNameMatching(test, ""))
 
 	// The ES6 answer, which is upstream's invalid[49].
-	rule_testing.ExpectFindings(t, result, "matchProperty")
+	rule_testing.ExpectFindings(test, result, "matchProperty")
 
 	// The premise, asserted so this test fails loudly if the predicate ever narrows back to ASCII
 	// rather than passing vacuously.
 	if !funcNameMatchingIsIdentifier("ᢅ") {
-		t.Error("U+1885 is an ES6 identifier start; the predicate no longer says so, which means " +
+		test.Error("U+1885 is an ES6 identifier start; the predicate no longer says so, which means " +
 			"this rule has silently reverted to the ES5 answer for every non-ASCII key")
 	}
 	// The control. Without it an always-true predicate would satisfy the check above.
 	if funcNameMatchingIsIdentifier("0not-an-identifier") {
-		t.Error("the identifier predicate accepts everything, so the assertion above proved nothing")
+		test.Error("the identifier predicate accepts everything, so the assertion above proved nothing")
 	}
 }
 
 // TestDecodeFuncNameMatchingOptions pins the list shapes the config layer delivers and the ones it
 // must refuse. Every row above reaches the decoder with a list this file wrote, so this is where the
 // refusals are, and where the second element is proved to be read rather than defaulted.
-func TestDecodeFuncNameMatchingOptions(t *testing.T) {
-	t.Parallel()
+func TestDecodeFuncNameMatchingOptions(test *testing.T) {
+	test.Parallel()
 
 	accepted := []struct {
 		raw  string
@@ -1139,18 +1139,18 @@ func TestDecodeFuncNameMatchingOptions(t *testing.T) {
 		{`["never", {"considerPropertyDescriptor": true}]`,
 			FuncNameMatchingOptions{Direction: "never", ConsiderPropertyDescriptor: true}},
 		{`["always", {"includeCommonJSModuleExports": true}]`,
-			FuncNameMatchingOptions{Direction: "always", IncludeCommonJSModuleExports: true}},
+			FuncNameMatchingOptions{Direction: "always", IncludeCommonJsModuleExports: true}},
 		{`[{"considerPropertyDescriptor": true}]`,
 			FuncNameMatchingOptions{Direction: "always", ConsiderPropertyDescriptor: true}},
 	}
 	for _, testCase := range accepted {
-		decoded, err := DecodeFuncNameMatchingOptions([]byte(testCase.raw))
-		if err != nil {
-			t.Errorf("%s was refused: %v", testCase.raw, err)
+		decoded, decodeFuncNameMatchingOptionsError := DecodeFuncNameMatchingOptions([]byte(testCase.raw))
+		if decodeFuncNameMatchingOptionsError != nil {
+			test.Errorf("%s was refused: %v", testCase.raw, decodeFuncNameMatchingOptionsError)
 			continue
 		}
-		if decoded.(FuncNameMatchingOptions) != testCase.want {
-			t.Errorf("%s decoded to %+v, want %+v", testCase.raw, decoded, testCase.want)
+		if decoded != testCase.want {
+			test.Errorf("%s decoded to %+v, want %+v", testCase.raw, decoded, testCase.want)
 		}
 	}
 
@@ -1162,8 +1162,10 @@ func TestDecodeFuncNameMatchingOptions(t *testing.T) {
 		`"never"`,
 		`{"considerPropertyDescriptor": true}`,
 	} {
-		if decoded, err := DecodeFuncNameMatchingOptions([]byte(raw)); err == nil {
-			t.Errorf("%s decoded to %+v; it must be refused", raw, decoded)
+		if decoded, decodeFuncNameMatchingOptionsError := DecodeFuncNameMatchingOptions(
+			[]byte(raw),
+		); decodeFuncNameMatchingOptionsError == nil {
+			test.Errorf("%s decoded to %+v; it must be refused", raw, decoded)
 		}
 	}
 }

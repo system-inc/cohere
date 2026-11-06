@@ -44,27 +44,49 @@ func main() {
 	for _, mode := range strings.Split(*modes, ",") {
 		measured = append(measured, benchresults.Mode(mode))
 	}
-	path, err := record(*runsPath, *engine, *project, *projectCommit, *idleFloor, *settle, *rounds, measured, *band, *stoppedEarly, *edit, *out)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "record: %v\n", err)
+	path, recordError := record(
+		*runsPath,
+		*engine,
+		*project,
+		*projectCommit,
+		*idleFloor,
+		*settle,
+		*rounds,
+		measured,
+		*band,
+		*stoppedEarly,
+		*edit,
+		*out,
+	)
+	if recordError != nil {
+		// Ignored: the exit code below says the run failed even when standard error cannot.
+		fmt.Fprintf(os.Stderr, "record: %v\n", recordError)
 		os.Exit(1)
 	}
+	// Ignored: the record is already on disk, and this line only names where.
 	fmt.Printf("recorded %s\n", path)
 }
 
-func record(runsPath, engine, project, projectCommit string, idleFloor, settle float64, rounds int, measured []benchresults.Mode,
-	band float64, stoppedEarly bool, edit, out string) (string, error) {
-	cohere, err := engineProvenance(engine)
-	if err != nil {
-		return "", err
+func record(
+	runsPath, engine, project, projectCommit string,
+	idleFloor, settle float64,
+	rounds int,
+	measured []benchresults.Mode,
+	band float64,
+	stoppedEarly bool,
+	edit, out string,
+) (string, error) {
+	cohere, engineProvenanceError := engineProvenance(engine)
+	if engineProvenanceError != nil {
+		return "", engineProvenanceError
 	}
-	machine, err := thisMachine()
-	if err != nil {
-		return "", err
+	machine, thisMachineError := thisMachine()
+	if thisMachineError != nil {
+		return "", thisMachineError
 	}
-	runs, err := readRuns(runsPath)
-	if err != nil {
-		return "", err
+	runs, readRunsError := readRuns(runsPath)
+	if readRunsError != nil {
+		return "", readRunsError
 	}
 	result := benchresults.Record{
 		Schema:        benchresults.SchemaVersion,
@@ -82,16 +104,19 @@ func record(runsPath, engine, project, projectCommit string, idleFloor, settle f
 		Runs:          runs,
 		Modes:         benchresults.Summarize(measured, runs),
 	}
-	encoded, err := benchresults.Encode(result)
-	if err != nil {
-		return "", err
+	encoded, encodeError := benchresults.Encode(result)
+	if encodeError != nil {
+		return "", encodeError
 	}
-	if err := os.MkdirAll(out, 0o755); err != nil {
-		return "", err
+	if createDirectoryError := os.MkdirAll(out, 0o755); createDirectoryError != nil {
+		return "", createDirectoryError
 	}
 	path := filepath.Join(out, benchresults.FileName(result))
-	if _, err := os.Stat(path); err == nil {
-		return "", fmt.Errorf("%s exists; a second run of this commit on this machine today needs a record of its own", path)
+	if _, statError := os.Stat(path); statError == nil {
+		return "", fmt.Errorf(
+			"%s exists; a second run of this commit on this machine today needs a record of its own",
+			path,
+		)
 	}
 	return path, os.WriteFile(path, encoded, 0o644)
 }
@@ -102,9 +127,9 @@ func record(runsPath, engine, project, projectCommit string, idleFloor, settle f
 // the `commit:` line, lengthened to the full commit by this repository, and the tree was modified when the
 // `source:` line is printed or the binary's own vcs.modified stamp says so.
 func engineProvenance(engine string) (benchresults.Cohere, error) {
-	output, err := exec.Command(engine, "--version").Output()
-	if err != nil {
-		return benchresults.Cohere{}, fmt.Errorf("%s --version: %w", engine, err)
+	output, outputError := exec.Command(engine, "--version").Output()
+	if outputError != nil {
+		return benchresults.Cohere{}, fmt.Errorf("%s --version: %w", engine, outputError)
 	}
 	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
 	cohere := benchresults.Cohere{Version: strings.TrimSpace(lines[0])}
@@ -124,12 +149,12 @@ func engineProvenance(engine string) (benchresults.Cohere, error) {
 	if short == "" {
 		return cohere, fmt.Errorf("%s names no commit, so nothing reproduces its numbers", engine)
 	}
-	full, err := exec.Command("git", "rev-parse", "--verify", "--quiet", short+"^{commit}").Output()
-	if err != nil {
+	full, outputError := exec.Command("git", "rev-parse", "--verify", "--quiet", short+"^{commit}").Output()
+	if outputError != nil {
 		return cohere, fmt.Errorf("%s was built from %s, which this repository does not have", engine, short)
 	}
 	cohere.Commit = strings.TrimSpace(string(full))
-	if info, err := buildinfo.ReadFile(engine); err == nil {
+	if info, readFileError := buildinfo.ReadFile(engine); readFileError == nil {
 		for _, setting := range info.Settings {
 			if setting.Key == "vcs.modified" && setting.Value == "true" {
 				cohere.Dirty = true
@@ -142,39 +167,40 @@ func engineProvenance(engine string) (benchresults.Cohere, error) {
 // thisMachine is the hardware, read from sysctl and sw_vers. The host's name is never read.
 func thisMachine() (benchresults.Machine, error) {
 	read := func(name string, arguments ...string) (string, error) {
-		output, err := exec.Command(name, arguments...).Output()
-		if err != nil {
-			return "", fmt.Errorf("%s %s: %w", name, strings.Join(arguments, " "), err)
+		output, outputError := exec.Command(name, arguments...).Output()
+		if outputError != nil {
+			return "", fmt.Errorf("%s %s: %w", name, strings.Join(arguments, " "), outputError)
 		}
 		return strings.TrimSpace(string(output)), nil
 	}
 	machine := benchresults.Machine{}
-	var err error
-	if machine.Model, err = read("sysctl", "-n", "hw.model"); err != nil {
-		return machine, err
+	var readError error
+	if machine.Model, readError = read("sysctl", "-n", "hw.model"); readError != nil {
+		return machine, readError
 	}
-	if machine.Processor, err = read("sysctl", "-n", "machdep.cpu.brand_string"); err != nil {
-		return machine, err
+	if machine.Processor, readError = read("sysctl", "-n", "machdep.cpu.brand_string"); readError != nil {
+		return machine, readError
 	}
-	cores, err := read("sysctl", "-n", "hw.ncpu")
-	if err != nil {
-		return machine, err
+	cores, readError := read("sysctl", "-n", "hw.ncpu")
+	if readError != nil {
+		return machine, readError
 	}
-	if machine.Cores, err = strconv.Atoi(cores); err != nil {
-		return machine, err
+	var parseError error
+	if machine.Cores, parseError = strconv.Atoi(cores); parseError != nil {
+		return machine, parseError
 	}
-	memory, err := read("sysctl", "-n", "hw.memsize")
-	if err != nil {
-		return machine, err
+	memory, readError := read("sysctl", "-n", "hw.memsize")
+	if readError != nil {
+		return machine, readError
 	}
-	if machine.MemoryBytes, err = strconv.ParseInt(memory, 10, 64); err != nil {
-		return machine, err
+	if machine.MemoryBytes, parseError = strconv.ParseInt(memory, 10, 64); parseError != nil {
+		return machine, parseError
 	}
-	version, err := read("sw_vers", "-productVersion")
-	if err != nil {
-		return machine, err
+	version, readError := read("sw_vers", "-productVersion")
+	if readError != nil {
+		return machine, readError
 	}
-	machine.OS = "macOS " + version
+	machine.Os = "macOS " + version
 	return machine, nil
 }
 
@@ -182,13 +208,17 @@ func thisMachine() (benchresults.Machine, error) {
 // cache, load_before, load_after, idle_before, idle_after, quiet, exit, primes, tab-separated, with a header
 // line the script prints apart.
 func readRuns(path string) ([]benchresults.Run, error) {
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, err
+	file, openError := os.Open(path)
+	if openError != nil {
+		return nil, openError
 	}
-	defer file.Close()
-	modes := map[string]benchresults.Mode{"cold": benchresults.ModeCold, "warm": benchresults.ModeWarm, "edit": benchresults.ModeEdit,
-		"idle": benchresults.ModeIdle}
+	defer file.Close() // Ignored: the file was only read, so a failed close loses nothing.
+	modes := map[string]benchresults.Mode{
+		"cold": benchresults.ModeCold,
+		"warm": benchresults.ModeWarm,
+		"edit": benchresults.ModeEdit,
+		"idle": benchresults.ModeIdle,
+	}
 	runs := []benchresults.Run{}
 	scanner := bufio.NewScanner(file)
 	for line := 1; scanner.Scan(); line++ {
@@ -205,14 +235,26 @@ func readRuns(path string) ([]benchresults.Run, error) {
 		}
 		numbers := map[int]float64{}
 		for _, index := range []int{1, 2, 3, 4, 5, 7, 8, 9, 10, 12, 13} {
-			if numbers[index], err = strconv.ParseFloat(fields[index], 64); err != nil {
-				return nil, fmt.Errorf("%s:%d: field %d: %w", path, line, index+1, err)
+			var parseError error
+			if numbers[index], parseError = strconv.ParseFloat(fields[index], 64); parseError != nil {
+				return nil, fmt.Errorf("%s:%d: field %d: %w", path, line, index+1, parseError)
 			}
 		}
 		runs = append(runs, benchresults.Run{
-			Mode: mode, Round: int(numbers[1]), VerdictSeconds: numbers[2], SettledSeconds: numbers[3],
-			EngineSeconds: numbers[4], LoadBefore: numbers[7], LoadAfter: numbers[8], IdleBefore: numbers[9], IdleAfter: numbers[10],
-			Quiet: fields[11] == "quiet", Findings: int(numbers[5]), Cache: fields[6], Exit: int(numbers[12]), Primes: int(numbers[13]),
+			Mode:           mode,
+			Round:          int(numbers[1]),
+			VerdictSeconds: numbers[2],
+			SettledSeconds: numbers[3],
+			EngineSeconds:  numbers[4],
+			LoadBefore:     numbers[7],
+			LoadAfter:      numbers[8],
+			IdleBefore:     numbers[9],
+			IdleAfter:      numbers[10],
+			Quiet:          fields[11] == "quiet",
+			Findings:       int(numbers[5]),
+			Cache:          fields[6],
+			Exit:           int(numbers[12]),
+			Primes:         int(numbers[13]),
 		})
 	}
 	return runs, scanner.Err()

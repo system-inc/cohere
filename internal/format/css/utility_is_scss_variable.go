@@ -8,7 +8,7 @@ import (
 	"github.com/system-inc/cohere/internal/format/estree"
 )
 
-func isSCSSVariable(node *estree.Node, options *parseOptions) bool {
+func isScssVariable(node *estree.Node, options *parseOptions) bool {
 	return options.parser == "scss" &&
 		node.Is("word") &&
 		strings.HasPrefix(node.String("value"), "$")

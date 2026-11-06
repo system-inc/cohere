@@ -426,28 +426,37 @@ var consistencyRequireMatchingReturnTypeSilentCases = []struct {
 	}},
 }
 
-func consistencyRequireMatchingReturnTypeAssertCase(t *testing.T, subject consistencyRequireMatchingReturnTypeCase, id string) {
-	t.Helper()
+func consistencyRequireMatchingReturnTypeAssertCase(
+	test *testing.T,
+	subject consistencyRequireMatchingReturnTypeCase,
+	id string,
+) {
+	test.Helper()
 	source := consistencyRequireMatchingReturnTypeSource(subject.lines...)
-	result := rule_testing.RunTyped(t, ConsistencyRequireMatchingReturnType, consistencyRequireMatchingReturnTypeFile, source)
+	result := rule_testing.RunTyped(
+		test,
+		ConsistencyRequireMatchingReturnType,
+		consistencyRequireMatchingReturnTypeFile,
+		source,
+	)
 	want := make([]string, len(subject.reported))
 	for index := range want {
 		want[index] = id
 	}
-	rule_testing.ExpectFindings(t, result, want...)
+	rule_testing.ExpectFindings(test, result, want...)
 	if len(result.Diagnostics) != len(subject.reported) {
 		return
 	}
 	for index, diagnostic := range result.Diagnostics {
 		reported := result.SourceFile.Text()[diagnostic.Range.Pos():diagnostic.Range.End()]
 		if reported != subject.reported[index] {
-			t.Errorf("finding %d spans %q, want %q", index, reported, subject.reported[index])
+			test.Errorf("finding %d spans %q, want %q", index, reported, subject.reported[index])
 		}
 	}
 	if subject.fixed == "" {
 		for _, diagnostic := range result.Diagnostics {
 			if len(diagnostic.Fixes) != 0 {
-				t.Errorf("the finding must carry no fix, got %+v", diagnostic.Fixes)
+				test.Errorf("the finding must carry no fix, got %+v", diagnostic.Fixes)
 			}
 		}
 		return
@@ -463,47 +472,60 @@ func consistencyRequireMatchingReturnTypeAssertCase(t *testing.T, subject consis
 		}
 	}
 	if changed != 1 {
-		t.Fatalf("the case names no line holding %q to fix", subject.reported[0])
+		test.Fatalf("the case names no line holding %q to fix", subject.reported[0])
 	}
-	rule_testing.ExpectFixedSource(t, result, strings.TrimSpace(consistencyRequireMatchingReturnTypeSource(fixedLines...))+"\n")
+	rule_testing.ExpectFixedSource(
+		test,
+		result,
+		strings.TrimSpace(consistencyRequireMatchingReturnTypeSource(fixedLines...))+"\n",
+	)
 }
 
-func TestConsistencyRequireReturnMatchingTypeFiresOnBareReturnInValueFunction(t *testing.T) {
-	t.Parallel()
+func TestConsistencyRequireReturnMatchingTypeFiresOnBareReturnInValueFunction(test *testing.T) {
+	test.Parallel()
 	for _, subject := range consistencyRequireMatchingReturnTypeBareCases {
-		t.Run(subject.name, func(t *testing.T) {
-			t.Parallel()
-			consistencyRequireMatchingReturnTypeAssertCase(t, subject, consistencyRequireMatchingReturnTypeBareId)
+		test.Run(subject.name, func(test *testing.T) {
+			test.Parallel()
+			consistencyRequireMatchingReturnTypeAssertCase(test, subject, consistencyRequireMatchingReturnTypeBareId)
 		})
 	}
 }
 
-func TestConsistencyRequireReturnMatchingTypeFiresOnUndefinedReturnInVoidFunction(t *testing.T) {
-	t.Parallel()
+func TestConsistencyRequireReturnMatchingTypeFiresOnUndefinedReturnInVoidFunction(test *testing.T) {
+	test.Parallel()
 	for _, subject := range consistencyRequireMatchingReturnTypeUndefinedCases {
-		t.Run(subject.name, func(t *testing.T) {
-			t.Parallel()
-			consistencyRequireMatchingReturnTypeAssertCase(t, subject, consistencyRequireMatchingReturnTypeUndefinedId)
+		test.Run(subject.name, func(test *testing.T) {
+			test.Parallel()
+			consistencyRequireMatchingReturnTypeAssertCase(
+				test,
+				subject,
+				consistencyRequireMatchingReturnTypeUndefinedId,
+			)
 		})
 	}
 }
 
-func TestConsistencyRequireReturnMatchingTypeStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestConsistencyRequireReturnMatchingTypeStaysSilent(test *testing.T) {
+	test.Parallel()
 	for _, subject := range consistencyRequireMatchingReturnTypeSilentCases {
-		t.Run(subject.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(subject.name, func(test *testing.T) {
+			test.Parallel()
 			source := consistencyRequireMatchingReturnTypeSource(subject.lines...)
-			result := rule_testing.RunTyped(t, ConsistencyRequireMatchingReturnType, consistencyRequireMatchingReturnTypeFile, source)
-			rule_testing.ExpectClean(t, result)
+			result := rule_testing.RunTyped(
+				test,
+				ConsistencyRequireMatchingReturnType,
+				consistencyRequireMatchingReturnTypeFile,
+				source,
+			)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
 
 // The message names the kind of function, the type, where the type came from, and what to write,
 // asserted whole because the computed parts are where a rendering defect would live.
-func TestConsistencyRequireReturnMatchingTypeMessages(t *testing.T) {
-	t.Parallel()
+func TestConsistencyRequireReturnMatchingTypeMessages(test *testing.T) {
+	test.Parallel()
 	cases := []struct {
 		name  string
 		lines []string
@@ -529,27 +551,34 @@ func TestConsistencyRequireReturnMatchingTypeMessages(t *testing.T) {
 			"value, so a reader can tell at the return which kind of function this is."},
 	}
 	for _, subject := range cases {
-		t.Run(subject.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, ConsistencyRequireMatchingReturnType, consistencyRequireMatchingReturnTypeFile,
-				consistencyRequireMatchingReturnTypeSource(subject.lines...))
+		test.Run(subject.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(
+				test,
+				ConsistencyRequireMatchingReturnType,
+				consistencyRequireMatchingReturnTypeFile,
+				consistencyRequireMatchingReturnTypeSource(subject.lines...),
+			)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("want one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("want one finding, got %d", len(result.Diagnostics))
 			}
 			if got := result.Diagnostics[0].Message.Description; got != subject.want {
-				t.Errorf("message\n got: %s\nwant: %s", got, subject.want)
+				test.Errorf("message\n got: %s\nwant: %s", got, subject.want)
 			}
 		})
 	}
 }
 
 // The rule declares the checker and declines a file without one, rather than dereferencing nil.
-func TestConsistencyRequireReturnMatchingTypeDeclinesWithoutAChecker(t *testing.T) {
-	t.Parallel()
+func TestConsistencyRequireReturnMatchingTypeDeclinesWithoutAChecker(test *testing.T) {
+	test.Parallel()
 	if !ConsistencyRequireMatchingReturnType.NeedsTypeChecker {
-		t.Fatal("the rule must declare NeedsTypeChecker")
+		test.Fatal("the rule must declare NeedsTypeChecker")
 	}
-	if listeners := ConsistencyRequireMatchingReturnType.Run(rule.Context{}, nil); listeners != nil {
-		t.Errorf("with no checker the rule must register no listeners, got %d", len(listeners))
+	if listeners := ConsistencyRequireMatchingReturnType.Run(
+		rule.Context{},
+		rule.Given[rule.NoOptions]{},
+	); listeners != nil {
+		test.Errorf("with no checker the rule must register no listeners, got %d", len(listeners))
 	}
 }

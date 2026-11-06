@@ -24,8 +24,8 @@ const explicitAnyFile = "/repository/source/Thing.ts"
 // element type and a return type, or a type-parameter default and a heritage type argument. A
 // fixture asserting one finding per input would be wrong on all four, which is what the extractor
 // warns about when the diagnostic count and the input count disagree.
-func TestNoExplicitAnyFires(t *testing.T) {
-	t.Parallel()
+func TestNoExplicitAnyFires(test *testing.T) {
+	test.Parallel()
 
 	testCases := []struct {
 		name       string
@@ -83,14 +83,14 @@ func TestNoExplicitAnyFires(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoExplicitAny, explicitAnyFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoExplicitAny, explicitAnyFile, testCase.sourceText)
 			wantIds := make([]string, testCase.findings)
 			for index := range wantIds {
 				wantIds[index] = "unexpectedAny"
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 		})
 	}
 }
@@ -100,8 +100,8 @@ func TestNoExplicitAnyFires(t *testing.T) {
 // These are the cases that catch a port, because each was added when somebody hit that bug. They
 // are almost all the same shapes as the failing inputs with a real type in place of `any`, which
 // is the point: the rule must key on the keyword and not on the surrounding shape.
-func TestNoExplicitAnyStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoExplicitAnyStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	testCases := []struct {
 		name       string
@@ -115,35 +115,104 @@ func TestNoExplicitAnyStaysSilent(t *testing.T) {
 		{"upstream clean 5", "function greet(): Array<Array<string>> {}"},
 		{"upstream clean 6", "function greet(): Array<string[]> {}"},
 		{"upstream clean 7", "function greet(param: Array<string>): Array<string> {}"},
-		{"upstream clean 8", "\n                class Greeter {\n                  message: string;\n                }\n                    "},
-		{"upstream clean 9", "\n                class Greeter {\n                  message: Array<string>;\n                }\n                    "},
-		{"upstream clean 10", "\n                class Greeter {\n                  message: string[];\n                }\n                    "},
-		{"upstream clean 11", "\n                class Greeter {\n                  message: Array<Array<string>>;\n                }\n                    "},
-		{"upstream clean 12", "\n                class Greeter {\n                  message: Array<string[]>;\n                }\n                    "},
-		{"upstream clean 13", "\n                interface Greeter {\n                  message: string;\n                }\n                    "},
-		{"upstream clean 14", "\n                interface Greeter {\n                  message: Array<string>;\n                }\n                    "},
-		{"upstream clean 15", "\n                interface Greeter {\n                  message: string[];\n                }\n                    "},
-		{"upstream clean 16", "\n                interface Greeter {\n                  message: Array<Array<string>>;\n                }\n                    "},
-		{"upstream clean 17", "\n                interface Greeter {\n                  message: Array<string[]>;\n                }\n                    "},
-		{"upstream clean 18", "\n                type obj = {\n                  message: string;\n                };\n                    "},
-		{"upstream clean 19", "\n                type obj = {\n                  message: Array<string>;\n                };\n                    "},
-		{"upstream clean 20", "\n                type obj = {\n                  message: string[];\n                };\n                    "},
-		{"upstream clean 21", "\n                type obj = {\n                  message: Array<Array<string>>;\n                };\n                    "},
-		{"upstream clean 22", "\n                type obj = {\n                  message: Array<string[]>;\n                };\n                    "},
-		{"upstream clean 23", "\n                type obj = {\n                  message: string | number;\n                };\n                    "},
-		{"upstream clean 24", "\n                type obj = {\n                  message: string | Array<string>;\n                };\n                    "},
-		{"upstream clean 25", "\n                type obj = {\n                  message: string | string[];\n                };\n                    "},
-		{"upstream clean 26", "\n                type obj = {\n                  message: string | Array<Array<string>>;\n                };\n                    "},
-		{"upstream clean 27", "\n                type obj = {\n                  message: string & number;\n                };\n                    "},
-		{"upstream clean 28", "\n                type obj = {\n                  message: string & Array<string>;\n                };\n                    "},
-		{"upstream clean 29", "\n                type obj = {\n                  message: string & string[];\n                };\n                    "},
-		{"upstream clean 30", "\n                type obj = {\n                  message: string & Array<Array<string>>;\n                };\n                    "},
+		{
+			"upstream clean 8",
+			"\n                class Greeter {\n                  message: string;\n                }\n                    ",
+		},
+		{
+			"upstream clean 9",
+			"\n                class Greeter {\n                  message: Array<string>;\n                }\n                    ",
+		},
+		{
+			"upstream clean 10",
+			"\n                class Greeter {\n                  message: string[];\n                }\n                    ",
+		},
+		{
+			"upstream clean 11",
+			"\n                class Greeter {\n                  message: Array<Array<string>>;\n                }\n                    ",
+		},
+		{
+			"upstream clean 12",
+			"\n                class Greeter {\n                  message: Array<string[]>;\n                }\n                    ",
+		},
+		{
+			"upstream clean 13",
+			"\n                interface Greeter {\n                  message: string;\n                }\n                    ",
+		},
+		{
+			"upstream clean 14",
+			"\n                interface Greeter {\n                  message: Array<string>;\n                }\n                    ",
+		},
+		{
+			"upstream clean 15",
+			"\n                interface Greeter {\n                  message: string[];\n                }\n                    ",
+		},
+		{
+			"upstream clean 16",
+			"\n                interface Greeter {\n                  message: Array<Array<string>>;\n                }\n                    ",
+		},
+		{
+			"upstream clean 17",
+			"\n                interface Greeter {\n                  message: Array<string[]>;\n                }\n                    ",
+		},
+		{
+			"upstream clean 18",
+			"\n                type obj = {\n                  message: string;\n                };\n                    ",
+		},
+		{
+			"upstream clean 19",
+			"\n                type obj = {\n                  message: Array<string>;\n                };\n                    ",
+		},
+		{
+			"upstream clean 20",
+			"\n                type obj = {\n                  message: string[];\n                };\n                    ",
+		},
+		{
+			"upstream clean 21",
+			"\n                type obj = {\n                  message: Array<Array<string>>;\n                };\n                    ",
+		},
+		{
+			"upstream clean 22",
+			"\n                type obj = {\n                  message: Array<string[]>;\n                };\n                    ",
+		},
+		{
+			"upstream clean 23",
+			"\n                type obj = {\n                  message: string | number;\n                };\n                    ",
+		},
+		{
+			"upstream clean 24",
+			"\n                type obj = {\n                  message: string | Array<string>;\n                };\n                    ",
+		},
+		{
+			"upstream clean 25",
+			"\n                type obj = {\n                  message: string | string[];\n                };\n                    ",
+		},
+		{
+			"upstream clean 26",
+			"\n                type obj = {\n                  message: string | Array<Array<string>>;\n                };\n                    ",
+		},
+		{
+			"upstream clean 27",
+			"\n                type obj = {\n                  message: string & number;\n                };\n                    ",
+		},
+		{
+			"upstream clean 28",
+			"\n                type obj = {\n                  message: string & Array<string>;\n                };\n                    ",
+		},
+		{
+			"upstream clean 29",
+			"\n                type obj = {\n                  message: string & string[];\n                };\n                    ",
+		},
+		{
+			"upstream clean 30",
+			"\n                type obj = {\n                  message: string & Array<Array<string>>;\n                };\n                    ",
+		},
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoExplicitAny, explicitAnyFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoExplicitAny, explicitAnyFile, testCase.sourceText))
 		})
 	}
 }
@@ -155,14 +224,17 @@ func TestNoExplicitAnyStaysSilent(t *testing.T) {
 // construct signatures, method signatures, function and constructor types, and ambient
 // declarations. All forty-five are exempt only because the option is on, which the companion test
 // below pins by running the same inputs with the option off.
-func TestNoExplicitAnyIgnoreRestArgsStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoExplicitAnyIgnoreRestArgsStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	testCases := []struct {
 		name       string
 		sourceText string
 	}{
-		{"upstream rest 1", "\n                        function foo(a: number, ...rest: any[]): void {\n                          return;\n                        }\n                      "},
+		{
+			"upstream rest 1",
+			"\n                        function foo(a: number, ...rest: any[]): void {\n                          return;\n                        }\n                      ",
+		},
 		{"upstream rest 2", "function foo1(...args: any[]) {}"},
 		{"upstream rest 3", "const bar1 = function (...args: any[]) {};"},
 		{"upstream rest 4", "const baz1 = (...args: any[]) => {};"},
@@ -175,10 +247,22 @@ func TestNoExplicitAnyIgnoreRestArgsStaysSilent(t *testing.T) {
 		{"upstream rest 11", "function foo4(...args: ReadonlyArray<any>) {}"},
 		{"upstream rest 12", "const bar4 = function (...args: ReadonlyArray<any>) {};"},
 		{"upstream rest 13", "const baz4 = (...args: ReadonlyArray<any>) => {};"},
-		{"upstream rest 14", "\n                interface Qux1 {\n                  (...args: any[]): void;\n                }\n                      "},
-		{"upstream rest 15", "\n                interface Qux2 {\n                  (...args: readonly any[]): void;\n                }\n                      "},
-		{"upstream rest 16", "\n                interface Qux3 {\n                  (...args: Array<any>): void;\n                }\n                      "},
-		{"upstream rest 17", "\n                interface Qux4 {\n                  (...args: ReadonlyArray<any>): void;\n                }\n                      "},
+		{
+			"upstream rest 14",
+			"\n                interface Qux1 {\n                  (...args: any[]): void;\n                }\n                      ",
+		},
+		{
+			"upstream rest 15",
+			"\n                interface Qux2 {\n                  (...args: readonly any[]): void;\n                }\n                      ",
+		},
+		{
+			"upstream rest 16",
+			"\n                interface Qux3 {\n                  (...args: Array<any>): void;\n                }\n                      ",
+		},
+		{
+			"upstream rest 17",
+			"\n                interface Qux4 {\n                  (...args: ReadonlyArray<any>): void;\n                }\n                      ",
+		},
 		{"upstream rest 18", "function quux1(fn: (...args: any[]) => void): void {}"},
 		{"upstream rest 19", "function quux2(fn: (...args: readonly any[]) => void): void {}"},
 		{"upstream rest 20", "function quux3(fn: (...args: Array<any>) => void): void {}"},
@@ -195,14 +279,38 @@ func TestNoExplicitAnyIgnoreRestArgsStaysSilent(t *testing.T) {
 		{"upstream rest 31", "type Corge2 = new (...args: readonly any[]) => void;"},
 		{"upstream rest 32", "type Corge3 = new (...args: Array<any>) => void;"},
 		{"upstream rest 33", "type Corge4 = new (...args: ReadonlyArray<any>) => void;"},
-		{"upstream rest 34", "\n                interface Grault1 {\n                  new (...args: any[]): void;\n                }\n                      "},
-		{"upstream rest 35", "\n                interface Grault2 {\n                  new (...args: readonly any[]): void;\n                }\n                      "},
-		{"upstream rest 36", "\n                interface Grault3 {\n                  new (...args: Array<any>): void;\n                }\n                      "},
-		{"upstream rest 37", "\n                interface Grault4 {\n                  new (...args: ReadonlyArray<any>): void;\n                }\n                      "},
-		{"upstream rest 38", "\n                interface Garply1 {\n                  f(...args: any[]): void;\n                }\n                      "},
-		{"upstream rest 39", "\n                interface Garply2 {\n                  f(...args: readonly any[]): void;\n                }\n                      "},
-		{"upstream rest 40", "\n                interface Garply3 {\n                  f(...args: Array<any>): void;\n                }\n                      "},
-		{"upstream rest 41", "\n                interface Garply4 {\n                  f(...args: ReadonlyArray<any>): void;\n                }\n                      "},
+		{
+			"upstream rest 34",
+			"\n                interface Grault1 {\n                  new (...args: any[]): void;\n                }\n                      ",
+		},
+		{
+			"upstream rest 35",
+			"\n                interface Grault2 {\n                  new (...args: readonly any[]): void;\n                }\n                      ",
+		},
+		{
+			"upstream rest 36",
+			"\n                interface Grault3 {\n                  new (...args: Array<any>): void;\n                }\n                      ",
+		},
+		{
+			"upstream rest 37",
+			"\n                interface Grault4 {\n                  new (...args: ReadonlyArray<any>): void;\n                }\n                      ",
+		},
+		{
+			"upstream rest 38",
+			"\n                interface Garply1 {\n                  f(...args: any[]): void;\n                }\n                      ",
+		},
+		{
+			"upstream rest 39",
+			"\n                interface Garply2 {\n                  f(...args: readonly any[]): void;\n                }\n                      ",
+		},
+		{
+			"upstream rest 40",
+			"\n                interface Garply3 {\n                  f(...args: Array<any>): void;\n                }\n                      ",
+		},
+		{
+			"upstream rest 41",
+			"\n                interface Garply4 {\n                  f(...args: ReadonlyArray<any>): void;\n                }\n                      ",
+		},
 		{"upstream rest 42", "declare function waldo1(...args: any[]): void;"},
 		{"upstream rest 43", "declare function waldo2(...args: readonly any[]): void;"},
 		{"upstream rest 44", "declare function waldo3(...args: Array<any>): void;"},
@@ -210,10 +318,10 @@ func TestNoExplicitAnyIgnoreRestArgsStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoExplicitAny, explicitAnyFile,
-				testCase.sourceText, NoExplicitAnyOptions{IgnoreRestArgs: true}))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoExplicitAny, explicitAnyFile,
+				testCase.sourceText, NoExplicitAnyOptions{IgnoreRestArguments: true}))
 		})
 	}
 }
@@ -225,8 +333,8 @@ func TestNoExplicitAnyIgnoreRestArgsStaysSilent(t *testing.T) {
 // subtly it passes under a rule whose rest detection is broken in the always-exempt direction. A
 // clean case is only evidence about the thing you think it is when the edit you believe makes it
 // clean is shown to move the verdict.
-func TestNoExplicitAnyIgnoreRestArgsIsWhatSilencesThem(t *testing.T) {
-	t.Parallel()
+func TestNoExplicitAnyIgnoreRestArgsIsWhatSilencesThem(test *testing.T) {
+	test.Parallel()
 
 	testCases := []string{
 		"\n                        function foo(a: number, ...rest: any[]): void {\n                          return;\n                        }\n                      ",
@@ -277,11 +385,14 @@ func TestNoExplicitAnyIgnoreRestArgsIsWhatSilencesThem(t *testing.T) {
 	}
 
 	for _, sourceText := range testCases {
-		t.Run(sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoExplicitAny, explicitAnyFile, sourceText)
+		test.Run(sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoExplicitAny, explicitAnyFile, sourceText)
 			if len(result.Diagnostics) == 0 {
-				t.Fatalf("expected the rest-parameter `any` to report with ignoreRestArgs off, got silence for %q", sourceText)
+				test.Fatalf(
+					"expected the rest-parameter `any` to report with ignoreRestArgs off, got silence for %q",
+					sourceText,
+				)
 			}
 		})
 	}
@@ -295,8 +406,8 @@ func TestNoExplicitAnyIgnoreRestArgsIsWhatSilencesThem(t *testing.T) {
 // the `fixToUnknown` repair overwrites, so a span one byte wide in either direction would write
 // `unknown` over a colon or eat the following bracket. Columns cross-checked against oxc's own
 // snapshot, which is one-based where these are zero-based.
-func TestNoExplicitAnyPointsAtTheKeywordItself(t *testing.T) {
-	t.Parallel()
+func TestNoExplicitAnyPointsAtTheKeywordItself(test *testing.T) {
+	test.Parallel()
 
 	testCases := []struct {
 		name       string
@@ -318,19 +429,24 @@ func TestNoExplicitAnyPointsAtTheKeywordItself(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoExplicitAny, explicitAnyFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoExplicitAny, explicitAnyFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
-				t.Fatalf("wanted %d findings, got %d", len(testCase.wantSpans), len(result.Diagnostics))
+				test.Fatalf("wanted %d findings, got %d", len(testCase.wantSpans), len(result.Diagnostics))
 			}
 			for index, diagnostic := range result.Diagnostics {
 				reported := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if reported != testCase.wantSpans[index] {
-					t.Errorf("finding %d covered %q, wanted %q", index, reported, testCase.wantSpans[index])
+					test.Errorf("finding %d covered %q, wanted %q", index, reported, testCase.wantSpans[index])
 				}
 				if diagnostic.Range.Pos() != testCase.wantStarts[index] {
-					t.Errorf("finding %d started at %d, wanted %d", index, diagnostic.Range.Pos(), testCase.wantStarts[index])
+					test.Errorf(
+						"finding %d started at %d, wanted %d",
+						index,
+						diagnostic.Range.Pos(),
+						testCase.wantStarts[index],
+					)
 				}
 			}
 		})
@@ -343,22 +459,22 @@ func TestNoExplicitAnyPointsAtTheKeywordItself(t *testing.T) {
 // Comparing a finding to the constant it was reported with is equality that looks correct and
 // measures nothing, because both sides move together under any mutation of the constant. These are
 // literals, so a renamed identifier or a rewritten description fails here.
-func TestNoExplicitAnyReportsOneMessage(t *testing.T) {
-	t.Parallel()
+func TestNoExplicitAnyReportsOneMessage(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, NoExplicitAny, explicitAnyFile, "const number: any = 1")
+	result := rule_testing.Run(test, NoExplicitAny, explicitAnyFile, "const number: any = 1")
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
+		test.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
 	}
 	if result.Diagnostics[0].Message.Id != "unexpectedAny" {
-		t.Errorf("message id was %q, wanted %q", result.Diagnostics[0].Message.Id, "unexpectedAny")
+		test.Errorf("message id was %q, wanted %q", result.Diagnostics[0].Message.Id, "unexpectedAny")
 	}
 	if !strings.HasPrefix(result.Diagnostics[0].Message.Description,
 		"This annotation is `any`, which switches the type system off") {
-		t.Errorf("description began %q", result.Diagnostics[0].Message.Description)
+		test.Errorf("description began %q", result.Diagnostics[0].Message.Description)
 	}
 	if !strings.Contains(result.Diagnostics[0].Message.Description, "`unknown`") {
-		t.Errorf("description never mentions the replacement it recommends: %q",
+		test.Errorf("description never mentions the replacement it recommends: %q",
 			result.Diagnostics[0].Message.Description)
 	}
 }
@@ -369,18 +485,18 @@ func TestNoExplicitAnyReportsOneMessage(t *testing.T) {
 // the same run with `fixToUnknown` set rewrote it. A port offering the repair unconditionally would
 // pass every message-id fixture in this file while silently rewriting Kirk's tree, which is the
 // exact failure mode an unattended fix has and a suggestion does not.
-func TestNoExplicitAnyOffersNoRepairByDefault(t *testing.T) {
-	t.Parallel()
+func TestNoExplicitAnyOffersNoRepairByDefault(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, NoExplicitAny, explicitAnyFile, "let x: any = 1")
+	result := rule_testing.Run(test, NoExplicitAny, explicitAnyFile, "let x: any = 1")
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
+		test.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
 	}
 	if len(result.Diagnostics[0].Fixes) != 0 {
-		t.Errorf("wanted no fix without fixToUnknown, got %d", len(result.Diagnostics[0].Fixes))
+		test.Errorf("wanted no fix without fixToUnknown, got %d", len(result.Diagnostics[0].Fixes))
 	}
 	if len(result.Diagnostics[0].Suggestions) != 0 {
-		t.Errorf("wanted no suggestion either, got %d", len(result.Diagnostics[0].Suggestions))
+		test.Errorf("wanted no suggestion either, got %d", len(result.Diagnostics[0].Suggestions))
 	}
 }
 
@@ -391,8 +507,8 @@ func TestNoExplicitAnyOffersNoRepairByDefault(t *testing.T) {
 // second. The extractor reported only two, because it reads the first block's `fix` binding and
 // stops, so the six in the second block were found by grepping the rule file. A port trusting the
 // tool's count would have asserted a quarter of the repairs upstream pins.
-func TestNoExplicitAnyFixToUnknownRewritesTheKeyword(t *testing.T) {
-	t.Parallel()
+func TestNoExplicitAnyFixToUnknownRewritesTheKeyword(test *testing.T) {
+	test.Parallel()
 
 	testCases := []struct {
 		sourceText string
@@ -411,29 +527,29 @@ func TestNoExplicitAnyFixToUnknownRewritesTheKeyword(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoExplicitAny, explicitAnyFile, testCase.sourceText,
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoExplicitAny, explicitAnyFile, testCase.sourceText,
 				NoExplicitAnyOptions{FixToUnknown: true})
-			rule_testing.ExpectFixedSource(t, result, testCase.wantSource)
+			rule_testing.ExpectFixedSource(test, result, testCase.wantSource)
 		})
 	}
 }
 
-// TestNoExplicitAnyFixToUnknownDoesNotDefeatIgnoreRestArgs runs both flags together.
+// TestNoExplicitAnyFixToUnknownDoesNotDefeatIgnoreRestArguments runs both flags together.
 //
 // Upstream notes at the bottom of its fix vectors that it has no way to test this combination,
 // because its harness panics when an expected fix does not occur. Ours does not have that
 // limitation, so the case upstream could not write is written here: an exempt `any` must produce no
 // finding and therefore no repair, while a reportable one in the same file is still rewritten.
-func TestNoExplicitAnyFixToUnknownDoesNotDefeatIgnoreRestArgs(t *testing.T) {
-	t.Parallel()
+func TestNoExplicitAnyFixToUnknownDoesNotDefeatIgnoreRestArguments(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunWithOptions(t, NoExplicitAny, explicitAnyFile,
+	result := rule_testing.RunWithOptions(test, NoExplicitAny, explicitAnyFile,
 		"function foo(a: any, ...rest: any[]): void {}",
-		NoExplicitAnyOptions{FixToUnknown: true, IgnoreRestArgs: true})
-	rule_testing.ExpectFindings(t, result, "unexpectedAny")
-	rule_testing.ExpectFixedSource(t, result, "function foo(a: unknown, ...rest: any[]): void {}")
+		NoExplicitAnyOptions{FixToUnknown: true, IgnoreRestArguments: true})
+	rule_testing.ExpectFindings(test, result, "unexpectedAny")
+	rule_testing.ExpectFixedSource(test, result, "function foo(a: unknown, ...rest: any[]): void {}")
 }
 
 // TestNoExplicitAnyDeclinesJavaScriptFiles is the file gate, and it is the fixture this port would
@@ -444,8 +560,8 @@ func TestNoExplicitAnyFixToUnknownDoesNotDefeatIgnoreRestArgs(t *testing.T) {
 // were run against the release binary and both are silent there, with a `.ts` control firing in the
 // same batch. Without the gate this rule would report every JSDoc `any` in every JavaScript file in
 // the tree, and no imported fixture could see it because upstream cannot express the input.
-func TestNoExplicitAnyDeclinesJavaScriptFiles(t *testing.T) {
-	t.Parallel()
+func TestNoExplicitAnyDeclinesJavaScriptFiles(test *testing.T) {
+	test.Parallel()
 
 	testCases := []struct {
 		fileName   string
@@ -461,9 +577,12 @@ func TestNoExplicitAnyDeclinesJavaScriptFiles(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.fileName+" "+testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoExplicitAny, testCase.fileName, testCase.sourceText))
+		test.Run(testCase.fileName+" "+testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(
+				test,
+				rule_testing.Run(test, NoExplicitAny, testCase.fileName, testCase.sourceText),
+			)
 		})
 	}
 }
@@ -474,8 +593,8 @@ func TestNoExplicitAnyDeclinesJavaScriptFiles(t *testing.T) {
 // run against the release binary and each one reports there, `.d.ts` included: a rule about type
 // annotations does not exempt the files that are nothing but type annotations, which is the
 // plausible wrong guess.
-func TestNoExplicitAnyCoversEveryTypeScriptExtension(t *testing.T) {
-	t.Parallel()
+func TestNoExplicitAnyCoversEveryTypeScriptExtension(test *testing.T) {
+	test.Parallel()
 
 	for _, fileName := range []string{
 		"/repository/source/Thing.ts",
@@ -484,9 +603,9 @@ func TestNoExplicitAnyCoversEveryTypeScriptExtension(t *testing.T) {
 		"/repository/source/Thing.cts",
 		"/repository/source/Thing.d.ts",
 	} {
-		t.Run(fileName, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.Run(t, NoExplicitAny, fileName, "declare const x: any;"),
+		test.Run(fileName, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.Run(test, NoExplicitAny, fileName, "declare const x: any;"),
 				"unexpectedAny")
 		})
 	}
@@ -499,8 +618,8 @@ func TestNoExplicitAnyCoversEveryTypeScriptExtension(t *testing.T) {
 // `readonly any[]`, `Array<any>` or `ReadonlyArray<any>`, so a port that exempted only those four
 // shapes would pass every one of them. These five inputs separate that reading from the real one,
 // and every verdict below was taken from the release binary rather than from reading the Rust.
-func TestNoExplicitAnyIgnoreRestArgsExemptsByContainmentNotByShape(t *testing.T) {
-	t.Parallel()
+func TestNoExplicitAnyIgnoreRestArgsExemptsByContainmentNotByShape(test *testing.T) {
+	test.Parallel()
 
 	testCases := []struct {
 		name       string
@@ -523,15 +642,15 @@ func TestNoExplicitAnyIgnoreRestArgsExemptsByContainmentNotByShape(t *testing.T)
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoExplicitAny, explicitAnyFile, testCase.sourceText,
-				NoExplicitAnyOptions{IgnoreRestArgs: true})
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoExplicitAny, explicitAnyFile, testCase.sourceText,
+				NoExplicitAnyOptions{IgnoreRestArguments: true})
 			if len(testCase.wantIds) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -542,8 +661,8 @@ func TestNoExplicitAnyIgnoreRestArgsExemptsByContainmentNotByShape(t *testing.T)
 // Our tree is full of these shapes and none of them appears in the imported corpus, so without them
 // the port's coverage of real inputs would rest entirely on the assumption that one node kind
 // behaves the same everywhere. Each was confirmed reporting on the release binary.
-func TestNoExplicitAnyReportsPositionsOurTreeActuallyWrites(t *testing.T) {
-	t.Parallel()
+func TestNoExplicitAnyReportsPositionsOurTreeActuallyWrites(test *testing.T) {
+	test.Parallel()
 
 	testCases := []struct {
 		name       string
@@ -568,14 +687,14 @@ func TestNoExplicitAnyReportsPositionsOurTreeActuallyWrites(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoExplicitAny, explicitAnyFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoExplicitAny, explicitAnyFile, testCase.sourceText)
 			wantIds := make([]string, testCase.findings)
 			for index := range wantIds {
 				wantIds[index] = "unexpectedAny"
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 		})
 	}
 }
@@ -586,8 +705,8 @@ func TestNoExplicitAnyReportsPositionsOurTreeActuallyWrites(t *testing.T) {
 // A port built on text matching rather than on the node kind would pass every fixture above and
 // report all of these. `type Any = any;` is upstream's own case and reports exactly once, which is
 // the same distinction stated from the other side.
-func TestNoExplicitAnyIgnoresIdentifiersNamedAny(t *testing.T) {
-	t.Parallel()
+func TestNoExplicitAnyIgnoresIdentifiersNamedAny(test *testing.T) {
+	test.Parallel()
 
 	for _, sourceText := range []string{
 		"const any = 1;",
@@ -598,9 +717,9 @@ func TestNoExplicitAnyIgnoresIdentifiersNamedAny(t *testing.T) {
 		"type any2 = string;",
 		"import { any } from \"./m\";",
 	} {
-		t.Run(sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoExplicitAny, explicitAnyFile, sourceText))
+		test.Run(sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoExplicitAny, explicitAnyFile, sourceText))
 		})
 	}
 }

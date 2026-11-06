@@ -10,11 +10,9 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/system-inc/cohere/internal/format/formatoptions"
 	"github.com/system-inc/cohere/internal/gitignore"
-	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/types/sourcename"
 )
 
@@ -80,43 +78,6 @@ type Enumeration struct {
 	Adamic []string
 }
 
-// ignoreLayer is one of the project's ignore lists after git's, and how its patterns are read.
-type ignoreLayer struct {
-	name string
-
-	// lines, when set, is the house list: lines of an ignore file, read with git's syntax relative to the
-	// walk root. Otherwise globs are lint's globs, relative to globsFrom: the `ignorePatterns` layer.
-	lines     *gitignore.Patterns
-	globs     []string
-	globsFrom string
-}
-
-// covers reports whether the layer excludes a path, given relative to the walk root. A directory is
-// covered when the layer prunes it whole.
-func (layer ignoreLayer) covers(root string, relative string, directory bool) bool {
-	if layer.lines != nil {
-		ignored, _ := layer.lines.Ignored(relative, directory)
-		return ignored
-	}
-
-	fromSettings, err := filepath.Rel(layer.globsFrom, filepath.Join(root, relative))
-	if err != nil || fromSettings == ".." || strings.HasPrefix(fromSettings, ".."+string(filepath.Separator)) {
-		return false
-	}
-	fromSettings = filepath.ToSlash(fromSettings)
-	for _, pattern := range layer.globs {
-		// A glob prunes a directory only when it takes everything below it, `name/**` or `**`: lint
-		// matches files, and `*.code.js` matching a directory's name says nothing about its contents.
-		if directory && pattern != "**" && !strings.HasSuffix(pattern, "/**") {
-			continue
-		}
-		if configuration.Match(pattern, fromSettings) {
-			return true
-		}
-	}
-	return false
-}
-
 // The names the walk's layers are counted under. GitignoreLayer counts every git ignore source together:
 // the `.gitignore` files from the root down and info/exclude.
 const (
@@ -132,10 +93,10 @@ const (
 //
 // The layers, in order: git's ignore rules, read as git reads them (every `.gitignore` from the root down,
 // each scoped to its directory, and info/exclude; see internal/gitignore); the house list, the `ignore`
-// key of the format block in the Nexus tier, read with the same syntax; and the `ignorePatterns` of the CohereSettings.json governing root, the one
-// list lint and the format walk share, read as lint reads it. Each is counted separately so a
-// misconfigured layer shows as a suspicious zero rather than as a slightly smaller total. That is the
-// difference between a corpus that measures the tree and one that measures a smaller subject while
+// key of the format block in the Nexus tier, read with the same syntax; and the `ignorePatterns` of the
+// CohereSettings.json governing root, the one list lint and the format walk share, read as lint reads it. Each is
+// counted separately so a misconfigured layer shows as a suspicious zero rather than as a slightly smaller total. That
+// is the difference between a corpus that measures the tree and one that measures a smaller subject while
 // looking complete.
 //
 // Every resolution carries a house list: our tiers' from the Nexus tier, an outsider's from its own
@@ -161,33 +122,40 @@ func EnumerateListed(root string, handles func(fileName string) bool, listing gi
 		DeclinedExtensions: map[string]int{},
 	}
 
-	resolution, err := formatoptions.Resolve(root)
-	if err != nil {
-		return enumeration, err
+	resolution, resolveError := formatoptions.Resolve(root)
+	if resolveError != nil {
+		return enumeration, resolveError
 	}
 	leftover := filepath.Join(root, ".prettierignore")
 	if _, statError := os.Lstat(leftover); statError == nil {
-		return enumeration, fmt.Errorf("%s: %w; delete it, since the format block's \"ignore\" in the Nexus tier (%s) and the ignorePatterns of CohereSettings.json say what the walk skips",
-			leftover, formatoptions.ErrPrettierConfigRemains, formatoptions.NexusTierFileName)
+		return enumeration, fmt.Errorf(
+			"%s: %w; delete it, since the format block's \"ignore\" in the Nexus tier (%s) and the ignorePatterns of CohereSettings.json say what the walk skips",
+			leftover,
+			formatoptions.ErrPrettierConfigRemains,
+			formatoptions.NexusTierFileName,
+		)
 	}
 
-	matcher, err := gitignore.New(root)
-	if err != nil {
-		return enumeration, err
+	matcher, newGitignoreError := gitignore.New(root)
+	if newGitignoreError != nil {
+		return enumeration, newGitignoreError
 	}
 	if listing != nil {
 		matcher = matcher.WithListing(listing)
 	}
 	enumeration.IgnoreFiles = append(enumeration.IgnoreFiles, filepath.Join(root, gitignore.IgnoreFileName))
 	if information, statError := os.Stat(filepath.Join(root, ".git")); statError == nil && information.IsDir() {
-		enumeration.IgnoreFiles = append(enumeration.IgnoreFiles, filepath.Join(root, filepath.FromSlash(gitignore.ExcludeFile)))
+		enumeration.IgnoreFiles = append(
+			enumeration.IgnoreFiles,
+			filepath.Join(root, filepath.FromSlash(gitignore.ExcludeFile)),
+		)
 	}
 	enumeration.IgnoredByLayer[GitignoreLayer] = 0
 	var layers []ignoreLayer
 	if resolution.HouseIgnoreDeclared {
-		house, err := gitignore.CompilePatterns(resolution.HouseIgnore, HouseIgnoreLayer)
-		if err != nil {
-			return enumeration, err
+		house, compilePatternsError := gitignore.CompilePatterns(resolution.HouseIgnore, HouseIgnoreLayer)
+		if compilePatternsError != nil {
+			return enumeration, compilePatternsError
 		}
 		layers = append(layers, ignoreLayer{name: HouseIgnoreLayer, lines: house})
 	}
@@ -208,10 +176,10 @@ func EnumerateListed(root string, handles func(fileName string) bool, listing gi
 
 	walk := filepath.Walk
 	if listing != nil {
-		walk = func(root string, walkFn filepath.WalkFunc) error { return walkListed(root, listing, walkFn) }
+		walk = func(root string, walkVisit filepath.WalkFunc) error { return walkListed(root, listing, walkVisit) }
 	}
-	walkError := walk(root, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
+	walkError := walk(root, func(path string, info os.FileInfo, pathError error) error {
+		if pathError != nil {
 			return nil
 		}
 		relative, relativeError := filepath.Rel(root, path)
@@ -256,9 +224,9 @@ func EnumerateListed(root string, handles func(fileName string) bool, listing gi
 					return filepath.SkipDir
 				}
 			}
-			entered, err := scope.Enter(relative)
-			if err != nil {
-				return err
+			entered, enterError := scope.Enter(relative)
+			if enterError != nil {
+				return enterError
 			}
 			scopes[relative] = entered
 			enumeration.Directories = append(enumeration.Directories, path)
@@ -317,22 +285,27 @@ func EnumerateListed(root string, handles func(fileName string) bool, listing gi
 // before walkFn is told of it, with the read's error, and its entries go by name, as os.ReadDir sorts a
 // listing. A listed entry's FileInfo is its listing's, the type an lstat gives (so a symbolic link is never a
 // directory) and nothing else, where Walk lstats each entry; the walk's callback reads only the name and type.
-func walkListed(root string, listing gitignore.Listing, walkFn filepath.WalkFunc) error {
-	information, err := os.Lstat(root)
-	if err != nil {
-		err = walkFn(root, nil, err)
+func walkListed(root string, listing gitignore.Listing, walkVisit filepath.WalkFunc) error {
+	information, walkError := os.Lstat(root)
+	if walkError != nil {
+		walkError = walkVisit(root, nil, walkError)
 	} else {
-		err = walkListedFrom(root, information, listing, walkFn)
+		walkError = walkListedFrom(root, information, listing, walkVisit)
 	}
-	if err == filepath.SkipDir || err == filepath.SkipAll {
+	if walkError == filepath.SkipDir || walkError == filepath.SkipAll {
 		return nil
 	}
-	return err
+	return walkError
 }
 
-func walkListedFrom(path string, information os.FileInfo, listing gitignore.Listing, walkFn filepath.WalkFunc) error {
+func walkListedFrom(
+	path string,
+	information os.FileInfo,
+	listing gitignore.Listing,
+	walkVisit filepath.WalkFunc,
+) error {
 	if !information.IsDir() {
-		return walkFn(path, information, nil)
+		return walkVisit(path, information, nil)
 	}
 	var entries []os.FileInfo
 	var readError error
@@ -341,16 +314,21 @@ func walkListedFrom(path string, information os.FileInfo, listing gitignore.List
 	} else {
 		entries, readError = lstatEntries(path)
 	}
-	if err := walkFn(path, information, readError); readError != nil || err != nil {
-		return err
+	if walkError := walkVisit(path, information, readError); readError != nil || walkError != nil {
+		return walkError
 	}
 	for _, entry := range entries {
 		if entry == nil {
 			continue
 		}
-		if err := walkListedFrom(filepath.Join(path, entry.Name()), entry, listing, walkFn); err != nil {
-			if !entry.IsDir() || err != filepath.SkipDir {
-				return err
+		if walkListedFromError := walkListedFrom(
+			filepath.Join(path, entry.Name()),
+			entry,
+			listing,
+			walkVisit,
+		); walkListedFromError != nil {
+			if !entry.IsDir() || walkListedFromError != filepath.SkipDir {
+				return walkListedFromError
 			}
 		}
 	}
@@ -383,36 +361,24 @@ func listedEntries(directory string, listing gitignore.Listing) ([]os.FileInfo, 
 // lstat'd. An entry gone between the two is nil, and skipped, where Walk tells its callback of the error, which
 // this walk's callback ignores.
 func lstatEntries(directory string) ([]os.FileInfo, error) {
-	opened, err := os.Open(directory)
-	if err != nil {
-		return nil, err
+	opened, openError := os.Open(directory)
+	if openError != nil {
+		return nil, openError
 	}
-	names, err := opened.Readdirnames(-1)
+	names, readdirnamesError := opened.Readdirnames(-1)
+	// Ignored: the directory was opened only to read its names, and a failed close loses nothing already read.
 	opened.Close()
-	if err != nil {
-		return nil, err
+	if readdirnamesError != nil {
+		return nil, readdirnamesError
 	}
 	sort.Strings(names)
 	information := make([]os.FileInfo, len(names))
 	for index, name := range names {
+		// Ignored: an entry gone since the listing is left nil, and skipped, as the doc comment above says.
 		information[index], _ = os.Lstat(filepath.Join(directory, name))
 	}
 	return information, nil
 }
-
-// listedInformation is a listed entry as the walk's callback reads it: its name, whether it is a directory and
-// its type bits. Size and modification time are not in a listing, so both are zero, and Enumerate's callback
-// must never read them: from Walk it would get the true values and from a listed walk zero, silently.
-type listedInformation struct {
-	entry os.DirEntry
-}
-
-func (information listedInformation) Name() string       { return information.entry.Name() }
-func (information listedInformation) Size() int64        { return 0 }
-func (information listedInformation) Mode() os.FileMode  { return information.entry.Type() }
-func (information listedInformation) ModTime() time.Time { return time.Time{} }
-func (information listedInformation) IsDir() bool        { return information.entry.IsDir() }
-func (information listedInformation) Sys() any           { return nil }
 
 // hasOwnRepositoryListed is HasOwnRepository, answered false from a listing of directory that shows no `.git`,
 // as the stat would then fail. A `.git` the listing names, or a directory it does not hold, is asked of the disk.
@@ -439,9 +405,9 @@ func hasOwnRepositoryListed(directory string, listing gitignore.Listing) bool {
 // options still apply, the house formats one way, but its ignorePatterns describe its own tree, and
 // `projects/**` in ahra's list would otherwise leave a repository under projects/ offering nothing.
 func repositoryBoundaryBetween(root string, settingsDirectory string) bool {
-	root = filepath.Clean(root)
-	settingsDirectory = filepath.Clean(settingsDirectory)
-	for directory := root; directory != settingsDirectory; directory = filepath.Dir(directory) {
+	cleanRoot := filepath.Clean(root)
+	cleanSettingsDirectory := filepath.Clean(settingsDirectory)
+	for directory := cleanRoot; directory != cleanSettingsDirectory; directory = filepath.Dir(directory) {
 		if HasOwnRepository(directory) {
 			return true
 		}
@@ -456,19 +422,19 @@ func repositoryBoundaryBetween(root string, settingsDirectory string) bool {
 // to root: what a corpus harness measures beside root, each as its own corpus.
 //
 // It checks a directory for a repository before pruning it, as Enumerate does, and prunes only by git's
-// ignore rules, read as Enumerate reads them. The project's own lists (the house list, ignorePatterns) are not read: they say
-// what root formats, and a repository under a path root never formats is still a body of code a printer
+// ignore rules, read as Enumerate reads them. The project's own lists (the house list, ignorePatterns) are not read:
+// they say what root formats, and a repository under a path root never formats is still a body of code a printer
 // can be measured on. Reading them is how ahra's `projects/**` hid five repositories from the
 // differential (#k6vebep).
 func NestedRepositoriesBelow(root string) ([]string, error) {
-	matcher, err := gitignore.New(root)
-	if err != nil {
-		return nil, err
+	matcher, newGitignoreError := gitignore.New(root)
+	if newGitignoreError != nil {
+		return nil, newGitignoreError
 	}
 	scopes := map[string]*gitignore.Matcher{"": matcher}
 	var nested []string
-	walkError := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
-		if err != nil || !entry.IsDir() {
+	walkError := filepath.WalkDir(root, func(path string, entry os.DirEntry, pathError error) error {
+		if pathError != nil || !entry.IsDir() {
 			return nil
 		}
 		relative, relativeError := filepath.Rel(root, path)
@@ -487,9 +453,9 @@ func NestedRepositoriesBelow(root string) ([]string, error) {
 		if ignored, _ := scope.Ignored(relative, true); ignored {
 			return filepath.SkipDir
 		}
-		entered, err := scope.Enter(relative)
-		if err != nil {
-			return err
+		entered, enterError := scope.Enter(relative)
+		if enterError != nil {
+			return enterError
 		}
 		scopes[relative] = entered
 		return nil
@@ -507,8 +473,8 @@ func NestedRepositoriesBelow(root string) ([]string, error) {
 // fix phase refuses to write past it on a whole-tree run, so neither edits a repository nobody asked
 // it to touch.
 func HasOwnRepository(directory string) bool {
-	_, err := os.Stat(filepath.Join(directory, ".git"))
-	return err == nil
+	_, statError := os.Stat(filepath.Join(directory, ".git"))
+	return statError == nil
 }
 
 // NestedRepositoryContaining returns the outermost repository of its own that holds fileName below
@@ -518,11 +484,14 @@ func HasOwnRepository(directory string) bool {
 // in libraries/structure/libraries/nexus is reported under libraries/structure, the repository a run
 // in the parent would have had to name.
 func NestedRepositoryContaining(root string, fileName string) string {
-	root = filepath.Clean(root)
+	cleanRoot := filepath.Clean(root)
 	nested := ""
 	for directory := filepath.Dir(filepath.Clean(fileName)); ; directory = filepath.Dir(directory) {
-		relative, err := filepath.Rel(root, directory)
-		if err != nil || relative == "." || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+		relative, relativePathError := filepath.Rel(cleanRoot, directory)
+		if relativePathError != nil ||
+			relative == "." ||
+			relative == ".." ||
+			strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
 			return nested
 		}
 		if HasOwnRepository(directory) {

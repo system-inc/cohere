@@ -28,8 +28,8 @@ const unusedExpressionsFile = "/repository/source/UnusedExpressions.tsx"
 // port: `f(); g()` and `a?.b()?.c;`.
 
 // TestNoUnusedExpressionsFires runs every fail case upstream lists under default options.
-func TestNoUnusedExpressionsFires(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedExpressionsFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -113,10 +113,10 @@ func TestNoUnusedExpressionsFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoUnusedExpressions, unusedExpressionsFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, NoUnusedExpressions, unusedExpressionsFile, testCase.sourceText),
 				"unusedExpression")
 		})
 	}
@@ -129,8 +129,8 @@ func TestNoUnusedExpressionsFires(t *testing.T) {
 // rule reading the sequence wrongly reports it. `a?.['b']?.c()` and `one[2]?.[3][4]?.()` are the
 // optional-call question, which is the whole typescript-eslint divergence and which TypeScript's AST
 // answers for free because it has no ChainExpression node.
-func TestNoUnusedExpressionsStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedExpressionsStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -162,12 +162,24 @@ func TestNoUnusedExpressionsStaysSilent(t *testing.T) {
 		{"an element used as an initialiser", "var partial = <div />"},
 		// The typescript-eslint half.
 		{"an optional call as a statement", "\n                  test.age?.toLocaleString();\n                "},
-		{"a parenthesised optional access used as an initialiser", "\n                  let a = (a?.b).c;\n                "},
-		{"an optional element access used as an initialiser", "\n                  let b = a?.['b'];\n                "},
-		{"a chained optional access used as an initialiser", "\n                  let c = one[2]?.[3][4];\n                "},
+		{
+			"a parenthesised optional access used as an initialiser",
+			"\n                  let a = (a?.b).c;\n                ",
+		},
+		{
+			"an optional element access used as an initialiser",
+			"\n                  let b = a?.['b'];\n                ",
+		},
+		{
+			"a chained optional access used as an initialiser",
+			"\n                  let c = one[2]?.[3][4];\n                ",
+		},
 		{"a chained optional call as a statement", "\n                  one[2]?.[3][4]?.();\n                "},
 		{"an optional element access then an optional call", "\n                  a?.['b']?.c();\n                "},
-		{"a directive at the top of a module block", "\n                  module Foo {\n                    'use strict';\n                  }\n                "},
+		{
+			"a directive at the top of a module block",
+			"\n                  module Foo {\n                    'use strict';\n                  }\n                ",
+		},
 		{
 			"a directive at the top of a namespace",
 			"\n                  namespace Foo {\n                    'use strict';\n\n                    export class Foo {}\n                    export class Bar {}\n                  }\n                ",
@@ -191,10 +203,10 @@ func TestNoUnusedExpressionsStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.Run(t, NoUnusedExpressions, unusedExpressionsFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.Run(test, NoUnusedExpressions, unusedExpressionsFile, testCase.sourceText))
 		})
 	}
 }
@@ -204,8 +216,8 @@ func TestNoUnusedExpressionsStaysSilent(t *testing.T) {
 // Kept in one table rather than split across the two above, because the interesting property of
 // these cases is that the same source flips verdict with the option: `a ? b() : c()` passes under
 // allowTernary and fails under allowShortCircuit, and reading them apart loses that.
-func TestNoUnusedExpressionsUnderOptions(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedExpressionsUnderOptions(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -215,18 +227,48 @@ func TestNoUnusedExpressionsUnderOptions(t *testing.T) {
 	}{
 		// allowShortCircuit
 		{"a short circuit onto a call", "a && a()", NoUnusedExpressionsOptions{AllowShortCircuit: true}, 0},
-		{"a short circuit onto an assignment", "a() || (b = c)", NoUnusedExpressionsOptions{AllowShortCircuit: true}, 0},
+		{
+			"a short circuit onto an assignment",
+			"a() || (b = c)",
+			NoUnusedExpressionsOptions{AllowShortCircuit: true},
+			0,
+		},
 		{
 			"a short circuit onto an await",
 			"async function foo() { bar && await baz; }",
 			NoUnusedExpressionsOptions{AllowShortCircuit: true}, 0,
 		},
-		{"a short circuit onto an optional call", "foo && foo?.();", NoUnusedExpressionsOptions{AllowShortCircuit: true}, 0},
-		{"a short circuit onto a dynamic import", "foo && import('./foo');", NoUnusedExpressionsOptions{AllowShortCircuit: true}, 0},
+		{
+			"a short circuit onto an optional call",
+			"foo && foo?.();",
+			NoUnusedExpressionsOptions{AllowShortCircuit: true},
+			0,
+		},
+		{
+			"a short circuit onto a dynamic import",
+			"foo && import('./foo');",
+			NoUnusedExpressionsOptions{AllowShortCircuit: true},
+			0,
+		},
 		{"a short circuit onto an identifier", "a || b", NoUnusedExpressionsOptions{AllowShortCircuit: true}, 1},
-		{"a short circuit onto an identifier, left used", "a() && b", NoUnusedExpressionsOptions{AllowShortCircuit: true}, 1},
-		{"a short circuit onto an optional access", "foo && foo?.bar;", NoUnusedExpressionsOptions{AllowShortCircuit: true}, 1},
-		{"a ternary under the short-circuit option only", "a ? b() : c()", NoUnusedExpressionsOptions{AllowShortCircuit: true}, 1},
+		{
+			"a short circuit onto an identifier, left used",
+			"a() && b",
+			NoUnusedExpressionsOptions{AllowShortCircuit: true},
+			1,
+		},
+		{
+			"a short circuit onto an optional access",
+			"foo && foo?.bar;",
+			NoUnusedExpressionsOptions{AllowShortCircuit: true},
+			1,
+		},
+		{
+			"a ternary under the short-circuit option only",
+			"a ? b() : c()",
+			NoUnusedExpressionsOptions{AllowShortCircuit: true},
+			1,
+		},
 
 		// allowTernary
 		{"a ternary onto two calls", "a ? b() : c()", NoUnusedExpressionsOptions{AllowTernary: true}, 0},
@@ -242,8 +284,18 @@ func TestNoUnusedExpressionsUnderOptions(t *testing.T) {
 		},
 		{"a ternary with a literal alternate", "a ? b : 0", NoUnusedExpressionsOptions{AllowTernary: true}, 1},
 		{"a ternary with an identifier consequent", "a ? b : c()", NoUnusedExpressionsOptions{AllowTernary: true}, 1},
-		{"a ternary onto an optional access", "foo ? foo?.bar : bar.baz;", NoUnusedExpressionsOptions{AllowTernary: true}, 1},
-		{"a short circuit under the ternary option only", "a && b()", NoUnusedExpressionsOptions{AllowTernary: true}, 1},
+		{
+			"a ternary onto an optional access",
+			"foo ? foo?.bar : bar.baz;",
+			NoUnusedExpressionsOptions{AllowTernary: true},
+			1,
+		},
+		{
+			"a short circuit under the ternary option only",
+			"a && b()",
+			NoUnusedExpressionsOptions{AllowTernary: true},
+			1,
+		},
 
 		// both
 		{
@@ -253,42 +305,87 @@ func TestNoUnusedExpressionsUnderOptions(t *testing.T) {
 		},
 
 		// allowTaggedTemplates
-		{"a tagged template", "tag`tagged template literal`", NoUnusedExpressionsOptions{AllowTaggedTemplates: true}, 0},
+		{
+			"a tagged template",
+			"tag`tagged template literal`",
+			NoUnusedExpressionsOptions{AllowTaggedTemplates: true},
+			0,
+		},
 		{
 			"a call is unaffected by the tagged-template option",
 			"shouldNotBeAffectedByAllowTemplateTagsOption()",
 			NoUnusedExpressionsOptions{AllowTaggedTemplates: true}, 0,
 		},
-		{"an untagged template is unaffected", "`untagged template literal`", NoUnusedExpressionsOptions{AllowTaggedTemplates: true}, 1},
-		{"an untagged template with the option off", "`untagged template literal`", NoUnusedExpressionsOptions{AllowTaggedTemplates: false}, 1},
-		{"a tagged template with the option off", "tag`tagged template literal`", NoUnusedExpressionsOptions{AllowTaggedTemplates: false}, 1},
+		{
+			"an untagged template is unaffected",
+			"`untagged template literal`",
+			NoUnusedExpressionsOptions{AllowTaggedTemplates: true},
+			1,
+		},
+		{
+			"an untagged template with the option off",
+			"`untagged template literal`",
+			NoUnusedExpressionsOptions{AllowTaggedTemplates: false},
+			1,
+		},
+		{
+			"a tagged template with the option off",
+			"tag`tagged template literal`",
+			NoUnusedExpressionsOptions{AllowTaggedTemplates: false},
+			1,
+		},
 
 		// enforceForJSX
-		{"an element used as an initialiser is still not a statement", "var partial = <div />", NoUnusedExpressionsOptions{EnforceForJSX: true}, 0},
-		{"a fragment used as an initialiser", "var partial = <></>", NoUnusedExpressionsOptions{EnforceForJSX: true}, 0},
-		{"a self-closing element as a statement", "<div />", NoUnusedExpressionsOptions{EnforceForJSX: true}, 1},
-		{"a fragment as a statement", "<></>", NoUnusedExpressionsOptions{EnforceForJSX: true}, 1},
+		{
+			"an element used as an initialiser is still not a statement",
+			"var partial = <div />",
+			NoUnusedExpressionsOptions{EnforceForJsx: true},
+			0,
+		},
+		{
+			"a fragment used as an initialiser",
+			"var partial = <></>",
+			NoUnusedExpressionsOptions{EnforceForJsx: true},
+			0,
+		},
+		{"a self-closing element as a statement", "<div />", NoUnusedExpressionsOptions{EnforceForJsx: true}, 1},
+		{"a fragment as a statement", "<></>", NoUnusedExpressionsOptions{EnforceForJsx: true}, 1},
 
 		// ignoreDirectives. Every one of these already passes without the option, because a real
 		// directive prologue is exempt unconditionally in both upstreams. They are here verbatim
 		// anyway: upstream wrote them, and a port under which they changed verdict would be wrong.
 		{"a directive under the option", `"use strict";`, NoUnusedExpressionsOptions{IgnoreDirectives: true}, 0},
-		{"two directives then a call, under the option", `"directive one"; "directive two"; f();`, NoUnusedExpressionsOptions{IgnoreDirectives: true}, 0},
-		{"a function-body directive under the option", `function foo() {"use strict"; return true; }`, NoUnusedExpressionsOptions{IgnoreDirectives: true}, 0},
-		{"two function-body directives under the option", `function foo() {"directive one"; "directive two"; f(); }`, NoUnusedExpressionsOptions{IgnoreDirectives: true}, 0},
+		{
+			"two directives then a call, under the option",
+			`"directive one"; "directive two"; f();`,
+			NoUnusedExpressionsOptions{IgnoreDirectives: true},
+			0,
+		},
+		{
+			"a function-body directive under the option",
+			`function foo() {"use strict"; return true; }`,
+			NoUnusedExpressionsOptions{IgnoreDirectives: true},
+			0,
+		},
+		{
+			"two function-body directives under the option",
+			`function foo() {"directive one"; "directive two"; f(); }`,
+			NoUnusedExpressionsOptions{IgnoreDirectives: true},
+			0,
+		},
 		{"an identifier is not a directive", "foo;", NoUnusedExpressionsOptions{IgnoreDirectives: true}, 1},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoUnusedExpressions, unusedExpressionsFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoUnusedExpressions, unusedExpressionsFile,
 				testCase.sourceText, testCase.options)
 			expected := make([]string, testCase.findings)
 			for index := range expected {
 				expected[index] = "unusedExpression"
 			}
-			rule_testing.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(test, result, expected...)
 		})
 	}
 }
@@ -300,11 +397,11 @@ func TestNoUnusedExpressionsUnderOptions(t *testing.T) {
 // *both* strings report, where the same two lines at the top of a function body would report
 // neither. A port whose directive carve-out asked only "is this a string statement" would report
 // zero here and pass every other fail case in the corpus.
-func TestNoUnusedExpressionsReportsTwiceInAClassStaticBlock(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedExpressionsReportsTwiceInAClassStaticBlock(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectFindings(t,
-		rule_testing.Run(t, NoUnusedExpressions, unusedExpressionsFile,
+	rule_testing.ExpectFindings(test,
+		rule_testing.Run(test, NoUnusedExpressions, unusedExpressionsFile,
 			"class C { static {\n            'foo'\n            'bar'\n             } }"),
 		"unusedExpression", "unusedExpression")
 }
@@ -320,8 +417,8 @@ func TestNoUnusedExpressionsReportsTwiceInAClassStaticBlock(t *testing.T) {
 //
 // The statement rather than the expression is the reported node, which is why the trailing
 // semicolon is inside every span that has one.
-func TestNoUnusedExpressionsPointsAtTheStatement(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedExpressionsPointsAtTheStatement(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -363,17 +460,17 @@ func TestNoUnusedExpressionsPointsAtTheStatement(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoUnusedExpressions, unusedExpressionsFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoUnusedExpressions, unusedExpressionsFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.reported) {
-				t.Fatalf("wanted %d diagnostics, got %d", len(testCase.reported), len(result.Diagnostics))
+				test.Fatalf("wanted %d diagnostics, got %d", len(testCase.reported), len(result.Diagnostics))
 			}
 			for index, want := range testCase.reported {
 				found := result.Diagnostics[index]
 				got := testCase.sourceText[found.Range.Pos():found.Range.End()]
 				if got != want {
-					t.Errorf("diagnostic %d reported %q, wanted %q", index, got, want)
+					test.Errorf("diagnostic %d reported %q, wanted %q", index, got, want)
 				}
 			}
 		})
@@ -395,8 +492,8 @@ func TestNoUnusedExpressionsPointsAtTheStatement(t *testing.T) {
 // Upstream's corpus does cover `a = b` and `a + b` separately, so that much is caught. What it does
 // not cover is the compound and logical assignment operators, which are assignments spelled with a
 // logical operator and which a port discriminating by "is the operator token logical" would report.
-func TestNoUnusedExpressionsSeparatesBinaryOperators(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedExpressionsSeparatesBinaryOperators(test *testing.T) {
+	test.Parallel()
 
 	silent := []string{
 		"a += b;",
@@ -407,10 +504,10 @@ func TestNoUnusedExpressionsSeparatesBinaryOperators(t *testing.T) {
 		"a >>>= b;",
 	}
 	for _, sourceText := range silent {
-		t.Run(sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.Run(t, NoUnusedExpressions, unusedExpressionsFile, sourceText))
+		test.Run(sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.Run(test, NoUnusedExpressions, unusedExpressionsFile, sourceText))
 		})
 	}
 
@@ -422,10 +519,10 @@ func TestNoUnusedExpressionsSeparatesBinaryOperators(t *testing.T) {
 		"a instanceof b;",
 	}
 	for _, sourceText := range fires {
-		t.Run(sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoUnusedExpressions, unusedExpressionsFile, sourceText),
+		test.Run(sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, NoUnusedExpressions, unusedExpressionsFile, sourceText),
 				"unusedExpression")
 		})
 	}
@@ -438,12 +535,12 @@ func TestNoUnusedExpressionsSeparatesBinaryOperators(t *testing.T) {
 // No upstream case configures the option over `??`, so the behaviour is inherited rather than
 // tested, and a port using a helper that answered only for `&&` and `||` would differ here with
 // nothing to say so.
-func TestNoUnusedExpressionsTreatsNullishAsShortCircuit(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedExpressionsTreatsNullishAsShortCircuit(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoUnusedExpressions, unusedExpressionsFile,
+	rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoUnusedExpressions, unusedExpressionsFile,
 		"a ?? b();", NoUnusedExpressionsOptions{AllowShortCircuit: true}))
-	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoUnusedExpressions, unusedExpressionsFile,
+	rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoUnusedExpressions, unusedExpressionsFile,
 		"a ?? b;", NoUnusedExpressionsOptions{AllowShortCircuit: true}), "unusedExpression")
 }
 
@@ -454,22 +551,22 @@ func TestNoUnusedExpressionsTreatsNullishAsShortCircuit(t *testing.T) {
 // short circuit. It never nests a short circuit inside a short circuit, nor a ternary inside a
 // ternary, and both recursions run through the same call in this port. A port that checked the
 // operand's kind instead of recursing would pass upstream's case and fail these.
-func TestNoUnusedExpressionsRecursesThroughAllowedForms(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedExpressionsRecursesThroughAllowedForms(test *testing.T) {
+	test.Parallel()
 
 	both := NoUnusedExpressionsOptions{AllowShortCircuit: true, AllowTernary: true}
 
-	rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoUnusedExpressions, unusedExpressionsFile,
+	rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoUnusedExpressions, unusedExpressionsFile,
 		"a && b && c();", NoUnusedExpressionsOptions{AllowShortCircuit: true}))
-	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoUnusedExpressions, unusedExpressionsFile,
+	rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoUnusedExpressions, unusedExpressionsFile,
 		"a && b && c;", NoUnusedExpressionsOptions{AllowShortCircuit: true}), "unusedExpression")
 
-	rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoUnusedExpressions, unusedExpressionsFile,
+	rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoUnusedExpressions, unusedExpressionsFile,
 		"a ? b ? c() : d() : e();", NoUnusedExpressionsOptions{AllowTernary: true}))
-	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoUnusedExpressions, unusedExpressionsFile,
+	rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoUnusedExpressions, unusedExpressionsFile,
 		"a ? b ? c() : d : e();", NoUnusedExpressionsOptions{AllowTernary: true}), "unusedExpression")
 
-	rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoUnusedExpressions, unusedExpressionsFile,
+	rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoUnusedExpressions, unusedExpressionsFile,
 		"a ? b && c() : d();", both))
 }
 
@@ -480,15 +577,15 @@ func TestNoUnusedExpressionsRecursesThroughAllowedForms(t *testing.T) {
 // alternate (`a ? b : 0`) and a bad consequent (`a ? b : c()`), so both arms are reached, but only
 // under allowTernary alone. A port that recursed into one branch and took the other on trust would
 // need both of these to notice, and they are cheap to state directly.
-func TestNoUnusedExpressionsChecksBothTernaryBranches(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedExpressionsChecksBothTernaryBranches(test *testing.T) {
+	test.Parallel()
 
 	options := NoUnusedExpressionsOptions{AllowTernary: true}
 	for _, sourceText := range []string{"a ? b() : c;", "a ? b : c();"} {
-		t.Run(sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.RunWithOptions(t, NoUnusedExpressions, unusedExpressionsFile, sourceText, options),
+		test.Run(sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.RunWithOptions(test, NoUnusedExpressions, unusedExpressionsFile, sourceText, options),
 				"unusedExpression")
 		})
 	}
@@ -502,8 +599,8 @@ func TestNoUnusedExpressionsChecksBothTernaryBranches(t *testing.T) {
 // stay silent because the call inside is used, and a port hard-coding "an as-expression is unused"
 // would report it. `<any>foo` is the older assertion spelling, which has its own node kind and
 // which upstream reaches only through ESLint's TSTypeAssertion arm with no case exercising it.
-func TestNoUnusedExpressionsUnwrapsTypeOnlyWrappers(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedExpressionsUnwrapsTypeOnlyWrappers(test *testing.T) {
+	test.Parallel()
 
 	silent := []string{
 		"a() as any;",
@@ -513,10 +610,10 @@ func TestNoUnusedExpressionsUnwrapsTypeOnlyWrappers(t *testing.T) {
 		"(a());",
 	}
 	for _, sourceText := range silent {
-		t.Run(sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.Run(t, NoUnusedExpressions, unusedExpressionsFile, sourceText))
+		test.Run(sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.Run(test, NoUnusedExpressions, unusedExpressionsFile, sourceText))
 		})
 	}
 
@@ -527,10 +624,10 @@ func TestNoUnusedExpressionsUnwrapsTypeOnlyWrappers(t *testing.T) {
 		"((a));",
 	}
 	for _, sourceText := range fires {
-		t.Run(sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoUnusedExpressions, unusedExpressionsFile, sourceText),
+		test.Run(sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, NoUnusedExpressions, unusedExpressionsFile, sourceText),
 				"unusedExpression")
 		})
 	}
@@ -547,11 +644,11 @@ func TestNoUnusedExpressionsUnwrapsTypeOnlyWrappers(t *testing.T) {
 // operand. The divergence that would exist if it recursed is `0 satisfies number;`, which reports
 // under a recursing port and passes under both upstreams. Pinned here so a later reader changing
 // this to recurse finds out immediately.
-func TestNoUnusedExpressionsDivergesFromOxcOnSatisfies(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedExpressionsDivergesFromOxcOnSatisfies(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectClean(t,
-		rule_testing.Run(t, NoUnusedExpressions, unusedExpressionsFile, "0 satisfies number;"))
+	rule_testing.ExpectClean(test,
+		rule_testing.Run(test, NoUnusedExpressions, unusedExpressionsFile, "0 satisfies number;"))
 }
 
 // TestNoUnusedExpressionsCarvesOutOnlyRealDirectivePrologues is the carve-out, stated directly.
@@ -571,8 +668,8 @@ func TestNoUnusedExpressionsDivergesFromOxcOnSatisfies(t *testing.T) {
 // answers true for every string statement anywhere, including the class-static-block cases upstream
 // reports and the after-a-declaration cases upstream reports. Building on it would have silenced
 // eight fail cases.
-func TestNoUnusedExpressionsCarvesOutOnlyRealDirectivePrologues(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedExpressionsCarvesOutOnlyRealDirectivePrologues(test *testing.T) {
+	test.Parallel()
 
 	silent := []string{
 		// A prologue at the top of each container that has one.
@@ -588,10 +685,10 @@ func TestNoUnusedExpressionsCarvesOutOnlyRealDirectivePrologues(t *testing.T) {
 		"'a';\n'b';\n'c';\nf();",
 	}
 	for _, sourceText := range silent {
-		t.Run(sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.Run(t, NoUnusedExpressions, unusedExpressionsFile, sourceText))
+		test.Run(sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.Run(test, NoUnusedExpressions, unusedExpressionsFile, sourceText))
 		})
 	}
 
@@ -614,11 +711,11 @@ func TestNoUnusedExpressionsCarvesOutOnlyRealDirectivePrologues(t *testing.T) {
 		"0;\n'use strict';",
 	}
 	for _, sourceText := range fires {
-		t.Run(sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoUnusedExpressions, unusedExpressionsFile, sourceText)
+		test.Run(sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoUnusedExpressions, unusedExpressionsFile, sourceText)
 			if len(result.Diagnostics) == 0 {
-				t.Fatalf("wanted at least one diagnostic for %q, got none", sourceText)
+				test.Fatalf("wanted at least one diagnostic for %q, got none", sourceText)
 			}
 		})
 	}
@@ -638,8 +735,8 @@ func TestNoUnusedExpressionsCarvesOutOnlyRealDirectivePrologues(t *testing.T) {
 // that is a deliberate simplification rather than an oversight. This test is what would fail if
 // somebody later wired the option to something, and it runs every string-statement case in the file
 // through both settings to show they agree.
-func TestNoUnusedExpressionsIgnoreDirectivesIsInertHere(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedExpressionsIgnoreDirectivesIsInertHere(test *testing.T) {
+	test.Parallel()
 
 	sources := []string{
 		`"use strict";`,
@@ -652,14 +749,14 @@ func TestNoUnusedExpressionsIgnoreDirectivesIsInertHere(t *testing.T) {
 		"0;",
 	}
 	for _, sourceText := range sources {
-		t.Run(sourceText, func(t *testing.T) {
-			t.Parallel()
-			off := rule_testing.RunWithOptions(t, NoUnusedExpressions, unusedExpressionsFile,
+		test.Run(sourceText, func(test *testing.T) {
+			test.Parallel()
+			off := rule_testing.RunWithOptions(test, NoUnusedExpressions, unusedExpressionsFile,
 				sourceText, NoUnusedExpressionsOptions{IgnoreDirectives: false})
-			on := rule_testing.RunWithOptions(t, NoUnusedExpressions, unusedExpressionsFile,
+			on := rule_testing.RunWithOptions(test, NoUnusedExpressions, unusedExpressionsFile,
 				sourceText, NoUnusedExpressionsOptions{IgnoreDirectives: true})
 			if len(off.Diagnostics) != len(on.Diagnostics) {
-				t.Errorf("ignoreDirectives changed the verdict on %q: %d without, %d with",
+				test.Errorf("ignoreDirectives changed the verdict on %q: %d without, %d with",
 					sourceText, len(off.Diagnostics), len(on.Diagnostics))
 			}
 		})
@@ -678,25 +775,25 @@ func TestNoUnusedExpressionsIgnoreDirectivesIsInertHere(t *testing.T) {
 // corpus: it covers `!a` and `+a` firing and `void new C` and `delete foo.bar` staying silent, but
 // never `typeof`, and never a prefix increment. A mutation flipping the typeof verdict survived the
 // whole corpus before these cases existed.
-func TestNoUnusedExpressionsSeparatesUnaryFormsByKind(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedExpressionsSeparatesUnaryFormsByKind(test *testing.T) {
+	test.Parallel()
 
 	fires := []string{"typeof a;", "!a;", "+a;", "-a;", "~a;"}
 	for _, sourceText := range fires {
-		t.Run(sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoUnusedExpressions, unusedExpressionsFile, sourceText),
+		test.Run(sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, NoUnusedExpressions, unusedExpressionsFile, sourceText),
 				"unusedExpression")
 		})
 	}
 
 	silent := []string{"void 0;", "delete a.b;", "++a;", "--a;", "a++;", "a--;"}
 	for _, sourceText := range silent {
-		t.Run(sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.Run(t, NoUnusedExpressions, unusedExpressionsFile, sourceText))
+		test.Run(sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.Run(test, NoUnusedExpressions, unusedExpressionsFile, sourceText))
 		})
 	}
 }
@@ -714,34 +811,30 @@ func TestNoUnusedExpressionsSeparatesUnaryFormsByKind(t *testing.T) {
 // form out of roughly seventy spellings probed that reached the fallthrough. Without this case a
 // mutation flipping the default to `return true` survives the entire corpus, which is how it was
 // found: the mutant compiled, changed bytes, and nothing noticed.
-func TestNoUnusedExpressionsLeavesUnrecognisedFormsAlone(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedExpressionsLeavesUnrecognisedFormsAlone(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectClean(t,
-		rule_testing.Run(t, NoUnusedExpressions, unusedExpressionsFile, "#x;"))
+	rule_testing.ExpectClean(test,
+		rule_testing.Run(test, NoUnusedExpressions, unusedExpressionsFile, "#x;"))
 }
 
-// TestNoUnusedExpressionsReadsOptionsFromJSON pins the wire names.
+// TestNoUnusedExpressionsReadsOptionsFromJson pins the wire names.
 //
 // The struct fields are Go-cased and the config is JSON, so a missing or misspelled tag reads as the
 // option being absent, which is silent: the rule runs with defaults and every fires case still
 // fires. The five names below are ESLint's meta.schema verbatim, which is the authoritative surface
 // and which the inventory got wrong for this rule, recording "options": "no" for a rule with five.
-func TestNoUnusedExpressionsReadsOptionsFromJSON(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedExpressionsReadsOptionsFromJson(test *testing.T) {
+	test.Parallel()
 
-	decoded, err := rule.DecodeOptionsInto[NoUnusedExpressionsOptions]()([]byte(
+	decoded, decodeOptionsError := rule.DecodeOptionsInto[NoUnusedExpressionsOptions]()([]byte(
 		`{"allowShortCircuit":true,"allowTernary":true,"allowTaggedTemplates":true,` +
 			`"enforceForJSX":true,"ignoreDirectives":true}`))
-	if err != nil {
-		t.Fatalf("decoding the full option object failed: %v", err)
+	if decodeOptionsError != nil {
+		test.Fatalf("decoding the full option object failed: %v", decodeOptionsError)
 	}
-	options, ok := decoded.(NoUnusedExpressionsOptions)
-	if !ok {
-		t.Fatalf("decoded to %T rather than NoUnusedExpressionsOptions", decoded)
-	}
-	if !options.AllowShortCircuit || !options.AllowTernary || !options.AllowTaggedTemplates ||
-		!options.EnforceForJSX || !options.IgnoreDirectives {
-		t.Errorf("some option did not survive the round trip: %+v", options)
+	if !decoded.AllowShortCircuit || !decoded.AllowTernary || !decoded.AllowTaggedTemplates ||
+		!decoded.EnforceForJsx || !decoded.IgnoreDirectives {
+		test.Errorf("some option did not survive the round trip: %+v", decoded)
 	}
 }

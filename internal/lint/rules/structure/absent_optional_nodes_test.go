@@ -36,14 +36,15 @@ import (
 // line proves nothing about the line, only about the inputs. So when a new rule reaches for
 // something optional in a shape not listed here, the fix is to add the shape, not to trust the
 // green.
-func TestNoRuleCrashesOnAbsentOptionalNodes(t *testing.T) {
-	t.Parallel()
+func TestNoRuleCrashesOnAbsentOptionalNodes(test *testing.T) {
+	test.Parallel()
 
 	sources := []string{
 		"declare const memo: unknown;\nexport const value = 1;\n",
 		"import { networkService } from './NetworkService.ts';\nlet useThingRequest;\nexport const value = useThingRequest;\n",
 		"import { networkService } from './NetworkService.ts';\ndeclare const Document: unknown;\n" +
-			"export function useThingRequest(o?: unknown) { return networkService.useGraphQlQuery(Document, { shorthand }, o); }\n" +
+			"export function useThingRequest(o?: unknown) { " +
+			"return networkService.useGraphQlQuery(Document, { shorthand }, o); }\n" +
 			"declare const shorthand: unknown;\n",
 		"import { networkService } from './NetworkService.ts';\nexport function useThingRequest() { return networkService.useGraphQlQuery(); }\n",
 		"declare const Field: { displayName: string };\nlet other;\nexport const value = other;\n",
@@ -67,14 +68,14 @@ func TestNoRuleCrashesOnAbsentOptionalNodes(t *testing.T) {
 			"    return networkService.useGraphQlQuery(Document, { identifier });\n}\n",
 	}
 
-	rules := []rule.Rule{
+	rules := []rule.Rule[rule.NoOptions]{
 		NetworkNoStringLiteralQuery,
 		NetworkRequireHookRequestSuffix,
 		NetworkRequireHookOptionsParameter,
 		NetworkRequireHookVariablesType,
 		ReactElementNoAnchor,
 		ReactElementNoHorizontalRule,
-		ReactComponentNoForwardRef,
+		ReactComponentNoForwardReference,
 		NextNoPageState,
 		NextRequireApiParameterName,
 		NextRequirePageDefaultExport,
@@ -93,8 +94,8 @@ func TestNoRuleCrashesOnAbsentOptionalNodes(t *testing.T) {
 
 	for _, currentRule := range rules {
 		for index, source := range sources {
-			t.Run(fmt.Sprintf("%s/shape-%d", currentRule.Name, index), func(t *testing.T) {
-				t.Parallel()
+			test.Run(fmt.Sprintf("%s/shape-%d", currentRule.Name, index), func(test *testing.T) {
+				test.Parallel()
 				// A panic fails the test. The assertion is only that this returns at all, so
 				// findings are deliberately not checked: what each rule concludes about these
 				// shapes belongs in its own pair, and asserting it here would make this guard
@@ -113,7 +114,7 @@ func TestNoRuleCrashesOnAbsentOptionalNodes(t *testing.T) {
 					"/repository/source/components/ThingRequest.tsx",
 					"/repository/app/thing/page.tsx",
 				} {
-					rule_testing.Run(t, currentRule, fileName, source)
+					rule_testing.Run(test, currentRule, fileName, source)
 				}
 			})
 		}

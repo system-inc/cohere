@@ -18,7 +18,39 @@ var messageInvalidTypeConfiguration = rule.Message{
 		"as a hook, or rename so the name no longer claims to be one.",
 }
 
-// Config flags a React Compiler module type configuration whose declared type contradicts its name.
+// moduleTypeProvider is the table consulted for a module, and the seam a test can substitute at.
+//
+// A variable rather than a direct call, and the reason is the whole difficulty of this rule. The
+// user-supplied `moduleTypeProvider` does not exist in this tree, and the hardcoded default table
+// is provably self-consistent, so a rule calling `defaultModuleTypeProvider` directly could not be
+// shown to fire by any input whatsoever. That is a rule nothing can guard: every fixture would pass
+// by finding nothing, which reads exactly like a working rule and exactly like a broken one.
+//
+// This seam is what makes the difference visible. The seeded test replaces it with upstream's own
+// test provider, the one the four `error.invalid-type-provider-*` fixtures are written against, and
+// asserts that all four report. Restoring the default and re-running the same four asserts they go
+// silent. That pair is the only available proof that the zero this rule produces on Kirk's tree is
+// a real zero rather than an inert rule.
+//
+// It is deliberately not exported and deliberately not a configuration surface. Making it one would
+// invent a config channel React does not have in this form, and this rule's job is to reproduce a
+// judgment rather than to grow the place that judgment reads from.
+var moduleTypeProvider = defaultModuleTypeProvider
+
+// typeConfigKind is the `kind` discriminant of a TypeConfig entry.
+//
+// Only the two values this rule can distinguish are modelled. React's schema also carries `object`
+// and `type`, and both answer `isHook == false` exactly as `function` does, so collapsing them into
+// one non-hook value cannot change a verdict. Named rather than boolean so a reader sees which
+// upstream field is being compared.
+type typeConfigKind string
+
+const (
+	typeConfigHook     typeConfigKind = "hook"
+	typeConfigFunction typeConfigKind = "function"
+)
+
+// Configuration flags a React Compiler module type configuration whose declared type contradicts its name.
 //
 //	valid:   import {useForm} from 'react-hook-form';
 //	valid:   import {useReactTable} from '@tanstack/react-table';
@@ -90,7 +122,7 @@ var messageInvalidTypeConfiguration = rule.Message{
 //
 // A second consequence of those goldens is worth stating because it looks like a bug. The fixture
 // `error.invalid-type-provider-nonhook-name-typed-as-hook` imports `notAhookTypedAsHook` and its
-// expected message names `useHookNotTypedAsHook` — a *different* property. That is not a
+// expected message names `useHookNotTypedAsHook`, a *different* property. That is not a
 // transcription slip: the error is raised while installing the whole module object, so the first
 // inconsistent property in declaration order is the one named, whichever property the file went on
 // to import. Reproduced here rather than corrected.
@@ -100,17 +132,17 @@ var messageInvalidTypeConfiguration = rule.Message{
 // There is nowhere else to point. The configuration has no source location in the file being
 // linted, which is exactly why React threads a `loc` down from the import site and labels the
 // span there. All four fixtures point inside the component body at the *use* of the import rather
-// than at the import statement itself, because React's HIR only consults the provider when a
+// than at the import statement itself, because React's `HIR` only consults the provider when a
 // binding is actually resolved. This port points at the import specifier instead, and that is a
 // stated divergence rather than an oversight: reproducing the use site would require the binding
 // resolution pass this rule deliberately does not build, and the import specifier is the node that
 // actually carries the misconfigured name.
-var Config = rule.Rule{
+var Configuration = rule.Rule[CompilerRuleOptions]{
 	// Bare name, no namespace prefix. The inventory writes `react/config` and the parity guard
 	// strips the namespace on a `/` boundary, so `react-config` would match no entry while still
 	// passing every fixture in this file.
 	Name: "react-hooks/config",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[CompilerRuleOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindImportDeclaration: func(node *ast.Node) {
 				moduleName, named := importedModuleName(node)
@@ -125,13 +157,13 @@ var Config = rule.Rule{
 					return
 				}
 				properties, configured := moduleTypeProvider(moduleName)
-				// This early return is a COST guard rather than a behavioral one, and a mutation
+				// This early return is a cost guard rather than a behavioral one, and a mutation
 				// sweep is what established that rather than reading. Removing it leaves every
 				// verdict unchanged: an unconfigured module answers a nil `properties` map, and a
 				// nil map lookup in Go returns the zero value with `present == false`, so the
 				// named arm's `continue` and the default arm's `present &&` already decline every
 				// input this line could reach. Verified with a standalone program rather than
-				// assumed, and the mutant correctly SURVIVED the whole suite.
+				// assumed, and the mutant correctly survived the whole suite.
 				//
 				// It is kept anyway, and the reason is measurable on this tree: it returns before
 				// `BindingsOf` walks the import clause, and on Kirk's tree every single import is
@@ -155,7 +187,7 @@ var Config = rule.Rule{
 						continue
 					}
 					if isHookName(importedName) != (declaredKind == typeConfigHook) {
-						ctx.ReportNode(element, messageInvalidTypeConfiguration)
+						ruleContext.ReportNode(element, messageInvalidTypeConfiguration)
 					}
 				}
 
@@ -166,45 +198,13 @@ var Config = rule.Rule{
 				if bindings.Default != nil {
 					declaredKind, present := properties["default"]
 					if present && isHookName(moduleName) != (declaredKind == typeConfigHook) {
-						ctx.ReportNode(bindings.Default, messageInvalidTypeConfiguration)
+						ruleContext.ReportNode(bindings.Default, messageInvalidTypeConfiguration)
 					}
 				}
 			},
 		}
 	},
 }
-
-// typeConfigKind is the `kind` discriminant of a TypeConfig entry.
-//
-// Only the two values this rule can distinguish are modelled. React's schema also carries `object`
-// and `type`, and both answer `isHook == false` exactly as `function` does, so collapsing them into
-// one non-hook value cannot change a verdict. Named rather than boolean so a reader sees which
-// upstream field is being compared.
-type typeConfigKind string
-
-const (
-	typeConfigHook     typeConfigKind = "hook"
-	typeConfigFunction typeConfigKind = "function"
-)
-
-// moduleTypeProvider is the table consulted for a module, and the seam a test can substitute at.
-//
-// A variable rather than a direct call, and the reason is the whole difficulty of this rule. The
-// user-supplied `moduleTypeProvider` does not exist in this tree, and the hardcoded default table
-// is provably self-consistent, so a rule calling `defaultModuleTypeProvider` directly could not be
-// shown to fire by any input whatsoever. That is a rule nothing can guard: every fixture would pass
-// by finding nothing, which reads exactly like a working rule and exactly like a broken one.
-//
-// This seam is what makes the difference visible. The seeded test replaces it with upstream's own
-// test provider, the one the four `error.invalid-type-provider-*` fixtures are written against, and
-// asserts that all four report. Restoring the default and re-running the same four asserts they go
-// silent. That pair is the only available proof that the zero this rule produces on Kirk's tree is
-// a real zero rather than an inert rule.
-//
-// It is deliberately not exported and deliberately not a configuration surface. Making it one would
-// invent a config channel React does not have in this form, and this rule's job is to reproduce a
-// judgment rather than to grow the place that judgment reads from.
-var moduleTypeProvider = defaultModuleTypeProvider
 
 // defaultModuleTypeProvider returns the property table the compiler holds for a module, if it holds one.
 //
@@ -221,14 +221,14 @@ var moduleTypeProvider = defaultModuleTypeProvider
 //
 // # Why removing an entry here is an equivalent mutation, and what proves the table is read
 //
-// A sweep deleting the `react-hook-form` arm SURVIVED the whole suite, and so did one deleting
+// A sweep deleting the `react-hook-form` arm survived the whole suite, and so did one deleting
 // `@tanstack/react-table`. That is equivalence rather than a fixture gap, and it is stateable in
 // one sentence: with the entry present the module is configured and its single property is
 // name-consistent, so the verdict is silence; with the entry removed the module is unconfigured and
 // returns early, so the verdict is silence. Both routes, one verdict, for every possible input.
 //
 // The control that keeps this from being a comfortable excuse is the mutation that *changes* an
-// entry rather than removing it: rewriting `useForm` from a hook to a function was CAUGHT, which
+// entry rather than removing it: rewriting `useForm` from a hook to a function was caught, which
 // proves this table is genuinely consulted and genuinely compared. A table nothing reads and a
 // table whose every row agrees with itself produce the same zero, and only that pair of mutations
 // separates them.

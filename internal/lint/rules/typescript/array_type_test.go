@@ -21,23 +21,23 @@ func arrayTypeCaseName(index int) string {
 // options struct directly.
 //
 // The decoder holds two defaults, neither of which is a Go zero value, and a fallback of `readonly`
-// onto the RESOLVED value of `default`. A fixture constructing ArrayTypeOptions by hand would leave
+// onto the resolved value of `default`. A fixture constructing ArrayTypeOptions by hand would leave
 // both untested, and those are the two lines with no upstream counterpart. An empty configuration
-// is the bare `"error"` case, which the config layer turns into nil options, and it reaches the rule
+// is the bare `"error"` case, which the config layer turns into no options, and it reaches the rule
 // the same way here.
-func decodeArrayTypeOptions(t *testing.T, configuration string) any {
-	t.Helper()
+func decodeArrayTypeOptions(test *testing.T, configuration string) rule.Given[ArrayTypeOptions] {
+	test.Helper()
 
 	if configuration == "" {
-		// A rule configured as a bare `"error"` is handed nil, not an empty struct. Passing nil
-		// here is what puts the rule's own fallback under test rather than the decoder's.
-		return nil
+		// A rule configured as a bare `"error"` is handed no options, not an empty struct. Handing
+		// it none here is what puts the rule's own fallback under test rather than the decoder's.
+		return rule.Given[ArrayTypeOptions]{}
 	}
-	options, err := DecodeArrayTypeOptions([]byte(configuration))
-	if err != nil {
-		t.Fatalf("could not decode %s: %v", configuration, err)
+	options, decodeArrayTypeOptionsError := DecodeArrayTypeOptions([]byte(configuration))
+	if decodeArrayTypeOptionsError != nil {
+		test.Fatalf("could not decode %s: %v", configuration, decodeArrayTypeOptionsError)
 	}
-	return options
+	return rule.Configured(options)
 }
 
 // TestArrayTypeStaysSilentOnUpstreamPassCases is the imported clean corpus, verbatim.
@@ -50,8 +50,8 @@ func decodeArrayTypeOptions(t *testing.T, configuration string) any {
 //
 // The same source appears several times under different options, which is the point: this rule's
 // verdict lives above the code as often as in it.
-func TestArrayTypeStaysSilentOnUpstreamPassCases(t *testing.T) {
-	t.Parallel()
+func TestArrayTypeStaysSilentOnUpstreamPassCases(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		configuration string
@@ -435,11 +435,11 @@ func TestArrayTypeStaysSilentOnUpstreamPassCases(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(arrayTypeCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, ArrayType,
+		test.Run(arrayTypeCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunGiven(test, ArrayType,
 				arrayTypeFile, testCase.sourceText,
-				decodeArrayTypeOptions(t, testCase.configuration)))
+				decodeArrayTypeOptions(test, testCase.configuration)))
 		})
 	}
 }
@@ -456,8 +456,8 @@ func TestArrayTypeStaysSilentOnUpstreamPassCases(t *testing.T) {
 // array is the type operator rather than the array. The rendered text says what the reader is told,
 // including the collapse of a non-simple element to the letter `T`, which no id can see. And the
 // applied source says what the edit engine will write into the file unattended.
-func TestArrayTypeFiresOnUpstreamFailCases(t *testing.T) {
-	t.Parallel()
+func TestArrayTypeFiresOnUpstreamFailCases(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		configuration string
@@ -1161,20 +1161,21 @@ func TestArrayTypeFiresOnUpstreamFailCases(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(arrayTypeCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, ArrayType, arrayTypeFile,
-				testCase.sourceText, decodeArrayTypeOptions(t, testCase.configuration))
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(arrayTypeCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunGiven(test, ArrayType, arrayTypeFile,
+				testCase.sourceText, decodeArrayTypeOptions(test, testCase.configuration))
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 
 			for index, wantSpan := range testCase.wantSpans {
-				reported := testCase.sourceText[result.Diagnostics[index].Range.Pos():result.Diagnostics[index].Range.End()]
+				reported :=
+					testCase.sourceText[result.Diagnostics[index].Range.Pos():result.Diagnostics[index].Range.End()]
 				if reported != wantSpan {
-					t.Errorf("finding %d covers %q, want %q", index, reported, wantSpan)
+					test.Errorf("finding %d covers %q, want %q", index, reported, wantSpan)
 				}
 			}
 
-			rule_testing.ExpectFixedSource(t, result, testCase.wantFixed)
+			rule_testing.ExpectFixedSource(test, result, testCase.wantFixed)
 		})
 	}
 }
@@ -1183,13 +1184,13 @@ func TestArrayTypeFiresOnUpstreamFailCases(t *testing.T) {
 //
 // Upstream interpolates `className`, `type` and `readonlyPrefix` into six message strings, and the
 // `type` slot is the one that hides a decision: a simple element is rendered as its own source text
-// and everything else COLLAPSES to the single letter `T`. A message-id assertion cannot see that,
+// and everything else collapses to the single letter `T`. A message-id assertion cannot see that,
 // nor can a span, nor can the applied fix, since the repair writes the real type either way.
 //
 // Every expectation here is the triple the installed build produced for that exact input, recovered
 // from its message text rather than predicted.
-func TestArrayTypeRendersTheMessageUpstreamRenders(t *testing.T) {
-	t.Parallel()
+func TestArrayTypeRendersTheMessageUpstreamRenders(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		configuration string
@@ -1321,16 +1322,16 @@ func TestArrayTypeRendersTheMessageUpstreamRenders(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(arrayTypeCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, ArrayType, arrayTypeFile,
-				testCase.sourceText, decodeArrayTypeOptions(t, testCase.configuration))
-			rule_testing.ExpectFindings(t, result, testCase.wantId)
+		test.Run(arrayTypeCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunGiven(test, ArrayType, arrayTypeFile,
+				testCase.sourceText, decodeArrayTypeOptions(test, testCase.configuration))
+			rule_testing.ExpectFindings(test, result, testCase.wantId)
 
 			want := arrayTypeMessageForTest(testCase.wantId, testCase.wantClassName,
 				testCase.wantType, testCase.wantReadonly)
 			if result.Diagnostics[0].Message.Description != want.Description {
-				t.Errorf("the description is %q, want %q",
+				test.Errorf("the description is %q, want %q",
 					result.Diagnostics[0].Message.Description, want.Description)
 			}
 		})
@@ -1349,8 +1350,8 @@ func TestArrayTypeRendersTheMessageUpstreamRenders(t *testing.T) {
 // both extra were `extends Array<...>` in one file. All five rows below are the installed 8.67.0
 // build's verdict, and the last is the control that separates "declined the heritage clause" from
 // "never reached the shape".
-func TestArrayTypeDeclinesAHeritageClause(t *testing.T) {
-	t.Parallel()
+func TestArrayTypeDeclinesAHeritageClause(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -1360,19 +1361,23 @@ func TestArrayTypeDeclinesAHeritageClause(t *testing.T) {
 		{"interface I extends Array<string> {}", 0, "an interface extends clause is not a type position"},
 		{"interface I extends ReadonlyArray<string> {}", 0, "nor is a readonly one"},
 		{"class C implements Array<string> {}", 0, "nor is a class implements clause"},
-		{"class C extends Array<string> {}", 0, "a class extends clause is a different node kind and was already declined"},
+		{
+			"class C extends Array<string> {}",
+			0,
+			"a class extends clause is a different node kind and was already declined",
+		},
 		{"let x: Array<string>;", 1, "the control: an ordinary type position does report"},
 	}
 	for index, testCase := range cases {
-		t.Run(arrayTypeCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, ArrayType, arrayTypeFile,
-				testCase.sourceText, decodeArrayTypeOptions(t, "{\"default\": \"array\"}"))
+		test.Run(arrayTypeCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunGiven(test, ArrayType, arrayTypeFile,
+				testCase.sourceText, decodeArrayTypeOptions(test, "{\"default\": \"array\"}"))
 			wantIds := make([]string, testCase.wantCount)
 			for index := range wantIds {
 				wantIds[index] = "errorStringArray"
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 		})
 	}
 }
@@ -1387,8 +1392,8 @@ func TestArrayTypeDeclinesAHeritageClause(t *testing.T) {
 // A mutant relaxing the test from "exactly one" to "at least one" survived the imported corpus,
 // which writes no two-argument case at all. All four rows were run through the installed 8.67.0
 // build.
-func TestArrayTypeDeclinesAGenericWithTheWrongArgumentCount(t *testing.T) {
-	t.Parallel()
+func TestArrayTypeDeclinesAGenericWithTheWrongArgumentCount(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -1401,15 +1406,15 @@ func TestArrayTypeDeclinesAGenericWithTheWrongArgumentCount(t *testing.T) {
 		{"let x: Array<string>;", 1, "the control: exactly one argument does report"},
 	}
 	for index, testCase := range cases {
-		t.Run(arrayTypeCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, ArrayType, arrayTypeFile,
-				testCase.sourceText, decodeArrayTypeOptions(t, "{\"default\": \"array\"}"))
+		test.Run(arrayTypeCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunGiven(test, ArrayType, arrayTypeFile,
+				testCase.sourceText, decodeArrayTypeOptions(test, "{\"default\": \"array\"}"))
 			wantIds := make([]string, testCase.wantCount)
 			for index := range wantIds {
 				wantIds[index] = "errorStringArray"
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 		})
 	}
 }
@@ -1418,7 +1423,7 @@ func TestArrayTypeDeclinesAGenericWithTheWrongArgumentCount(t *testing.T) {
 //
 // A `readonly` rewrite sitting directly inside another suffix array needs its own parentheses,
 // because `readonly string[][]` would read as an array of readonly arrays only by accident. When the
-// element is ALREADY parenthesized the rewrite must not add a second pair, and the reason it does
+// element is already parenthesized the rewrite must not add a second pair, and the reason it does
 // not is subtle: the node's own range starts inside the existing parentheses, so the fix that
 // replaces it never sees them.
 //
@@ -1428,8 +1433,8 @@ func TestArrayTypeDeclinesAGenericWithTheWrongArgumentCount(t *testing.T) {
 // comparison.
 //
 // All four outputs are what the installed 8.67.0 build's `cohereAndFix` wrote.
-func TestArrayTypeWrapsAReadonlyRewriteOnlyWhenItHasTo(t *testing.T) {
-	t.Parallel()
+func TestArrayTypeWrapsAReadonlyRewriteOnlyWhenItHasTo(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -1465,12 +1470,12 @@ func TestArrayTypeWrapsAReadonlyRewriteOnlyWhenItHasTo(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(arrayTypeCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, ArrayType, arrayTypeFile,
-				testCase.sourceText, decodeArrayTypeOptions(t, "{\"default\": \"array\"}"))
-			rule_testing.ExpectFindings(t, result, testCase.wantId)
-			rule_testing.ExpectFixedSource(t, result, testCase.wantFixed)
+		test.Run(arrayTypeCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunGiven(test, ArrayType, arrayTypeFile,
+				testCase.sourceText, decodeArrayTypeOptions(test, "{\"default\": \"array\"}"))
+			rule_testing.ExpectFindings(test, result, testCase.wantId)
+			rule_testing.ExpectFixedSource(test, result, testCase.wantFixed)
 		})
 	}
 }
@@ -1481,17 +1486,17 @@ func TestArrayTypeWrapsAReadonlyRewriteOnlyWhenItHasTo(t *testing.T) {
 // exists only because our parser keeps parentheses. Mutants removing each survived the whole
 // imported corpus, which writes neither shape under `array-simple`.
 //
-// The `Array` arm: a reference is simple only when it takes NO type arguments, EXCEPT that `Array`
+// The `Array` arm: a reference is simple only when it takes no type arguments, except that `Array`
 // is simple when its single argument is. So `Array<Array<string>>` is simple all the way down and
 // reports twice under `array-simple`, once per level, while `Foo<string>` is not simple at all.
 //
 // The parenthesis behavior: TSESTree has no parenthesized-type node, so `(string)[]`'s element type
-// IS the string keyword and is simple. Ours produces a real node that would answer false without
+// is the string keyword and is simple. Ours produces a real node that would answer false without
 // the skip, turning a clean case into a reported one.
 //
 // Every field is what the installed 8.67.0 build produced for that exact input.
-func TestArrayTypeJudgesSimplicityTheWayUpstreamDoes(t *testing.T) {
-	t.Parallel()
+func TestArrayTypeJudgesSimplicityTheWayUpstreamDoes(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		configuration string
@@ -1537,13 +1542,13 @@ func TestArrayTypeJudgesSimplicityTheWayUpstreamDoes(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(arrayTypeCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, ArrayType, arrayTypeFile,
-				testCase.sourceText, decodeArrayTypeOptions(t, testCase.configuration))
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(arrayTypeCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunGiven(test, ArrayType, arrayTypeFile,
+				testCase.sourceText, decodeArrayTypeOptions(test, testCase.configuration))
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 			if len(testCase.wantIds) > 0 {
-				rule_testing.ExpectFixedSource(t, result, testCase.wantFixed)
+				rule_testing.ExpectFixedSource(test, result, testCase.wantFixed)
 			}
 		})
 	}
@@ -1558,8 +1563,8 @@ func TestArrayTypeJudgesSimplicityTheWayUpstreamDoes(t *testing.T) {
 // at all; these rows are what it takes to see it.
 //
 // Every field is what the installed 8.67.0 build produced for that exact input.
-func TestArrayTypeReadsOnlyTheReadonlyOperator(t *testing.T) {
-	t.Parallel()
+func TestArrayTypeReadsOnlyTheReadonlyOperator(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		configuration string
@@ -1603,21 +1608,22 @@ func TestArrayTypeReadsOnlyTheReadonlyOperator(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(arrayTypeCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, ArrayType, arrayTypeFile,
-				testCase.sourceText, decodeArrayTypeOptions(t, testCase.configuration))
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(arrayTypeCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunGiven(test, ArrayType, arrayTypeFile,
+				testCase.sourceText, decodeArrayTypeOptions(test, testCase.configuration))
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 
 			for index, wantSpan := range testCase.wantSpans {
-				reported := testCase.sourceText[result.Diagnostics[index].Range.Pos():result.Diagnostics[index].Range.End()]
+				reported :=
+					testCase.sourceText[result.Diagnostics[index].Range.Pos():result.Diagnostics[index].Range.End()]
 				if reported != wantSpan {
-					t.Errorf("finding %d covers %q, want %q", index, reported, wantSpan)
+					test.Errorf("finding %d covers %q, want %q", index, reported, wantSpan)
 				}
 			}
 
 			if len(testCase.wantIds) > 0 {
-				rule_testing.ExpectFixedSource(t, result, testCase.wantFixed)
+				rule_testing.ExpectFixedSource(test, result, testCase.wantFixed)
 			}
 		})
 	}
@@ -1632,8 +1638,8 @@ func TestArrayTypeReadsOnlyTheReadonlyOperator(t *testing.T) {
 // The rows come in pairs on purpose. A silence that is not paired with a control is not a
 // measurement: it reads identically whether the shadow was seen or the rule simply never reached
 // the shape.
-func TestArrayTypeDeclinesAShadowedName(t *testing.T) {
-	t.Parallel()
+func TestArrayTypeDeclinesAShadowedName(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -1792,15 +1798,15 @@ func TestArrayTypeDeclinesAShadowedName(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(arrayTypeCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, ArrayType, arrayTypeFile,
-				testCase.sourceText, decodeArrayTypeOptions(t, "{\"default\": \"array\"}"))
+		test.Run(arrayTypeCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunGiven(test, ArrayType, arrayTypeFile,
+				testCase.sourceText, decodeArrayTypeOptions(test, "{\"default\": \"array\"}"))
 			wantIds := make([]string, testCase.wantCount)
 			for index := range wantIds {
 				wantIds[index] = "errorStringArray"
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 		})
 	}
 }
@@ -1808,11 +1814,11 @@ func TestArrayTypeDeclinesAShadowedName(t *testing.T) {
 // TestArrayTypeDecoderResolvesBothAxes puts the two lines with no upstream counterpart under test.
 //
 // `default` defaults to `array` rather than to the empty string a Go zero value would give, and
-// `readonly` falls back to the RESOLVED `default` rather than to a constant. Both are invisible to
+// `readonly` falls back to the resolved `default` rather than to a constant. Both are invisible to
 // any fixture that builds the options struct directly, which is why every other test in this file
 // routes through the decoder and why this one asserts the decoder's output.
-func TestArrayTypeDecoderResolvesBothAxes(t *testing.T) {
-	t.Parallel()
+func TestArrayTypeDecoderResolvesBothAxes(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		configuration string
@@ -1826,21 +1832,17 @@ func TestArrayTypeDecoderResolvesBothAxes(t *testing.T) {
 		{"{\"readonly\": \"generic\"}", ArrayTypeArray, ArrayTypeGeneric},
 	}
 	for index, testCase := range cases {
-		t.Run(arrayTypeCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			decoded, err := DecodeArrayTypeOptions([]byte(testCase.configuration))
-			if err != nil {
-				t.Fatalf("decoding %s: %v", testCase.configuration, err)
+		test.Run(arrayTypeCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			decoded, decodeArrayTypeOptionsError := DecodeArrayTypeOptions([]byte(testCase.configuration))
+			if decodeArrayTypeOptionsError != nil {
+				test.Fatalf("decoding %s: %v", testCase.configuration, decodeArrayTypeOptionsError)
 			}
-			options, ok := decoded.(ArrayTypeOptions)
-			if !ok {
-				t.Fatalf("the decoder returned %T rather than ArrayTypeOptions", decoded)
+			if decoded.Default != testCase.wantDefault {
+				test.Errorf("default resolved to %q, want %q", decoded.Default, testCase.wantDefault)
 			}
-			if options.Default != testCase.wantDefault {
-				t.Errorf("default resolved to %q, want %q", options.Default, testCase.wantDefault)
-			}
-			if options.Readonly != testCase.wantReadonly {
-				t.Errorf("readonly resolved to %q, want %q", options.Readonly, testCase.wantReadonly)
+			if decoded.Readonly != testCase.wantReadonly {
+				test.Errorf("readonly resolved to %q, want %q", decoded.Readonly, testCase.wantReadonly)
 			}
 		})
 	}
@@ -1853,28 +1855,28 @@ func TestArrayTypeDecoderResolvesBothAxes(t *testing.T) {
 // every file and reports nothing while every decoder-routed fixture stays green, which is the exact
 // failure this project has shipped before. So the nil path gets its own row rather than being
 // covered by implication.
-func TestArrayTypeNilOptionsFallsBackToUpstreamDefaults(t *testing.T) {
-	t.Parallel()
+func TestArrayTypeNilOptionsFallsBackToUpstreamDefaults(test *testing.T) {
+	test.Parallel()
 
 	// `array` is the default, so the generic spelling reports and the suffix one does not.
-	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, ArrayType, arrayTypeFile,
-		"let x: Array<string>;", nil), "errorStringArray")
-	rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, ArrayType, arrayTypeFile,
-		"let x: string[];", nil))
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, ArrayType, arrayTypeFile,
+		"let x: Array<string>;"), "errorStringArray")
+	rule_testing.ExpectClean(test, rule_testing.Run(test, ArrayType, arrayTypeFile,
+		"let x: string[];"))
 }
 
 // TestArrayTypeSurvivesMalformedTypes is a crash fixture.
 //
 // `ast.SkipTypeParentheses` dereferences its argument on the first loop test, so a nil element type
 // reaches it as a panic rather than as a nil result, and error recovery is where a nil element type
-// comes from. The walk recovers per FILE rather than per rule, so one such panic would cost every
+// comes from. The walk recovers per file rather than per rule, so one such panic would cost every
 // rule that file rather than one finding.
 //
 // There is no finding to assert; the assertion is that the run completes. Upstream cannot reach
 // most of these at all, since its parser rejects what ours recovers from, so asserting a verdict
 // would be inventing one.
-func TestArrayTypeSurvivesMalformedTypes(t *testing.T) {
-	t.Parallel()
+func TestArrayTypeSurvivesMalformedTypes(test *testing.T) {
+	test.Parallel()
 
 	for name, sourceText := range map[string]string{
 		"emptyBrackets":   "let x: [];",
@@ -1887,10 +1889,10 @@ func TestArrayTypeSurvivesMalformedTypes(t *testing.T) {
 		"parenNothing":    "let x: ()[];",
 		"onlyReadonly":    "type T = readonly;",
 	} {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.RunWithOptions(t, ArrayType, arrayTypeFile, sourceText,
-				decodeArrayTypeOptions(t, "{\"default\": \"generic\"}"))
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.RunGiven(test, ArrayType, arrayTypeFile, sourceText,
+				decodeArrayTypeOptions(test, "{\"default\": \"generic\"}"))
 		})
 	}
 }
@@ -1899,7 +1901,7 @@ func TestArrayTypeSurvivesMalformedTypes(t *testing.T) {
 //
 // The switch exists so a fixture can name the arm it expects by upstream's own id rather than by
 // calling one of six Go constructors, which keeps the fixture table readable as the upstream table
-// it came from. It is deliberately NOT a function the rule uses: a test that reached into the rule
+// it came from. It is deliberately not a function the rule uses: a test that reached into the rule
 // for its expectation would move both sides together under mutation and assert nothing.
 func arrayTypeMessageForTest(id string, className string, elementType string, readonlyPrefix string) rule.Message {
 	switch id {
@@ -1923,8 +1925,8 @@ func arrayTypeMessageForTest(id string, className string, elementType string, re
 // spellings as itself, under either key, and refuses a spelling outside them, naming the key and the
 // value (#rfbha44). Each refused value used to fall back to the default, so a config naming one loaded
 // clean and ran a setting nobody wrote; upstream's schema is an enum and refuses every one at load.
-func TestArrayTypeDecoderRefusesWhatUpstreamRefuses(t *testing.T) {
-	t.Parallel()
+func TestArrayTypeDecoderRefusesWhatUpstreamRefuses(test *testing.T) {
+	test.Parallel()
 
 	for _, accepted := range []struct {
 		wire               string
@@ -1936,14 +1938,19 @@ func TestArrayTypeDecoderRefusesWhatUpstreamRefuses(t *testing.T) {
 		{`{"default": "generic"}`, ArrayTypeGeneric, ArrayTypeGeneric},
 		{`{"default": "array-simple", "readonly": "array"}`, ArrayTypeArraySimple, ArrayTypeArray},
 	} {
-		decoded, err := DecodeArrayTypeOptions([]byte(accepted.wire))
-		if err != nil {
-			t.Errorf("%s was refused: %v", accepted.wire, err)
+		decoded, decodeArrayTypeOptionsError := DecodeArrayTypeOptions([]byte(accepted.wire))
+		if decodeArrayTypeOptionsError != nil {
+			test.Errorf("%s was refused: %v", accepted.wire, decodeArrayTypeOptionsError)
 			continue
 		}
-		options := decoded.(ArrayTypeOptions)
-		if options.Default != accepted.default_ || options.Readonly != accepted.readonly {
-			t.Errorf("%s decoded to %+v, want %s and %s", accepted.wire, options, accepted.default_, accepted.readonly)
+		if decoded.Default != accepted.default_ || decoded.Readonly != accepted.readonly {
+			test.Errorf(
+				"%s decoded to %+v, want %s and %s",
+				accepted.wire,
+				decoded,
+				accepted.default_,
+				accepted.readonly,
+			)
 		}
 	}
 	for _, refused := range []struct{ wire, named string }{
@@ -1952,13 +1959,18 @@ func TestArrayTypeDecoderRefusesWhatUpstreamRefuses(t *testing.T) {
 		{`{"readonly": "simple"}`, "simple"},
 		{`"generic"`, "generic"},
 	} {
-		_, err := DecodeArrayTypeOptions([]byte(refused.wire))
-		if err == nil {
-			t.Errorf("%s decoded; it must be refused", refused.wire)
+		_, decodeArrayTypeOptionsError := DecodeArrayTypeOptions([]byte(refused.wire))
+		if decodeArrayTypeOptionsError == nil {
+			test.Errorf("%s decoded; it must be refused", refused.wire)
 			continue
 		}
-		if !strings.Contains(err.Error(), refused.named) {
-			t.Errorf("%s was refused without naming %s: %v", refused.wire, refused.named, err)
+		if !strings.Contains(decodeArrayTypeOptionsError.Error(), refused.named) {
+			test.Errorf(
+				"%s was refused without naming %s: %v",
+				refused.wire,
+				refused.named,
+				decodeArrayTypeOptionsError,
+			)
 		}
 	}
 }

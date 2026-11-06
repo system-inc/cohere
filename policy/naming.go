@@ -1,5 +1,6 @@
-// Package policy is the house policy both engines read as data: what the Go engine embeds here, the Swift
-// engine reads from the same file, so a decision about the house lands once and cannot drift between them.
+// Package policy is the house policy every engine reads as data: what cohere's binary embeds here for its
+// TypeScript and Go engines, the Swift engine reads from the same file, so a decision about the house lands
+// once and cannot drift between them.
 package policy
 
 import (
@@ -7,7 +8,6 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
-	"sort"
 	"strings"
 )
 
@@ -18,18 +18,6 @@ var ruleNamingFile []byte
 type RuleNamingWord struct {
 	Name       string `json:"name"`
 	Definition string `json:"definition"`
-}
-
-// RuleNaming is RuleNaming.json: the closed lists a house rule's name is built from.
-type RuleNaming struct {
-	About      string           `json:"about"`
-	Verbs      []RuleNamingWord `json:"verbs"`
-	Categories []RuleNamingWord `json:"categories"`
-
-	// Namespaces are the namespaces whose rules are named by a closed list rather than by the scheme:
-	// `adamic/invariant-mutable` keeps Adamic's own name, so one rule has one name across both projects,
-	// and the guard still covers it because a name outside the list is refused.
-	Namespaces []RuleNamingNamespace `json:"namespaces"`
 }
 
 // RuleNamingNamespace is one namespace named by a closed list, and the sentence saying what belongs in it.
@@ -51,9 +39,11 @@ type HouseRuleName struct {
 var Naming = mustLoadRuleNaming(ruleNamingFile)
 
 func mustLoadRuleNaming(data []byte) RuleNaming {
-	loaded, err := loadRuleNaming(data)
-	if err != nil {
-		panic(fmt.Sprintf("RuleNaming.json: %v", err))
+	loaded, loadRuleNamingError := loadRuleNaming(data)
+	if loadRuleNamingError != nil {
+		// Invariant: the file is embedded at build and read when the package initializes, so an invalid one
+		// fails every test binary that links this package, and no build that passed its tests reaches here.
+		panic(fmt.Sprintf("RuleNaming.json: %v", loadRuleNamingError))
 	}
 	return loaded
 }
@@ -65,8 +55,8 @@ func loadRuleNaming(data []byte) (RuleNaming, error) {
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.DisallowUnknownFields()
 	var naming RuleNaming
-	if err := decoder.Decode(&naming); err != nil {
-		return RuleNaming{}, err
+	if decodeError := decoder.Decode(&naming); decodeError != nil {
+		return RuleNaming{}, decodeError
 	}
 	lists := []struct {
 		label string
@@ -107,52 +97,6 @@ func loadRuleNaming(data []byte) (RuleNaming, error) {
 		}
 	}
 	return naming, nil
-}
-
-// ParseHouseRuleName splits a house rule's name after its namespace (`consistency-no-print`, not
-// `cohere-swift/consistency-no-print`) into category, verb and object, or says why it does not fit.
-//
-// Categories are tried longest first, so `react-hook-no-any-type` reads as `react-hook`, and a category
-// that is a prefix of another can never claim the longer one's names.
-func (naming RuleNaming) ParseHouseRuleName(leaf string) (HouseRuleName, error) {
-	categories := make([]string, 0, len(naming.Categories))
-	for _, category := range naming.Categories {
-		categories = append(categories, category.Name)
-	}
-	sort.Slice(categories, func(left, right int) bool { return len(categories[left]) > len(categories[right]) })
-
-	for _, category := range categories {
-		rest, found := strings.CutPrefix(leaf, category+"-")
-		if !found {
-			continue
-		}
-		for _, verb := range naming.Verbs {
-			object, found := strings.CutPrefix(rest, verb.Name+"-")
-			if found && isKebabWord(object) {
-				return HouseRuleName{Category: category, Verb: verb.Name, Object: object}, nil
-			}
-		}
-		return HouseRuleName{}, fmt.Errorf("%q has the category %q, and what follows is not a verb from the closed list and an object", leaf, category)
-	}
-	return HouseRuleName{}, fmt.Errorf("%q does not begin with a category from the closed list", leaf)
-}
-
-// ParseRuleName judges a house rule's name in its namespace: against the closed list when the namespace
-// has one, and by the scheme otherwise. A closed name reads as the namespace for its category and the
-// whole name for its object, since it was never built from a verb.
-func (naming RuleNaming) ParseRuleName(namespace string, leaf string) (HouseRuleName, error) {
-	for _, closed := range naming.Namespaces {
-		if closed.Name != namespace {
-			continue
-		}
-		for _, name := range closed.Names {
-			if name.Name == leaf {
-				return HouseRuleName{Category: closed.Name, Object: leaf}, nil
-			}
-		}
-		return HouseRuleName{}, fmt.Errorf("%q is not in the %s namespace's closed list in RuleNaming.json", leaf, closed.Name)
-	}
-	return naming.ParseHouseRuleName(leaf)
 }
 
 // isKebabWord is one or more lowercase words of letters and digits joined by single dashes.

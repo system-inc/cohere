@@ -13,5 +13,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // The bare name, not the namespaced one. The parity guard at internal/registry/parity_test.go
 // catches `typescript/related-getter-setter-pairs` with a message saying so.
 func init() {
-	rule.Register(rule.Registration{Rule: RelatedGetterSetterPairs})
+	rule.Register(rule.Registration[rule.NoOptions]{Rule: RelatedGetterSetterPairs})
 }

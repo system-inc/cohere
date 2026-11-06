@@ -31,7 +31,7 @@ var messageUnicodeBomUnexpected = rule.Message{
 // This is the whole difference between the two ports: ESLint reads its source as a JavaScript
 // string with the mark already stripped into a `hasBOM` flag, so its fixer can write the sentinel
 // range `[-1, 0)` and let the fix applier interpret it. cohere's source text is the file's bytes,
-// measured: `SourceFile.Text()` on a marked file begins `ef bb bf` and the source file NODE's own
+// measured: `SourceFile.Text()` on a marked file begins `ef bb bf` and the source file node's own
 // range starts after them, at position 3. So the mark is ordinary text here and the repair is an
 // ordinary edit over `[0, 3)`.
 const unicodeBomMark = "\ufeff"
@@ -53,7 +53,7 @@ const (
 
 // UnicodeBomOptions carries upstream's single positional option.
 //
-// The pointer is the point. Upstream's `defaultOptions: ["never"]` means an ABSENT option forbids
+// The pointer is the point. Upstream's `defaultOptions: ["never"]` means an absent option forbids
 // the mark, so the zero value of a plain `UnicodeBomSetting` field is the empty string, which
 // matches neither arm and makes the rule silent on every file it is meant to catch. A rule
 // configured as bare `"error"` in the live config is exactly that case, and it is the common one.
@@ -76,10 +76,10 @@ func DefaultUnicodeBomSettings() UnicodeBomOptions {
 //
 // The generic helper errors on empty input, the config layer turns that error into nil for a rule
 // whose options are not required, and the rule then reads nil as a zero value. For an option
-// defaulting to FALSE that is harmless; for this one it is an inversion, because the default is
+// defaulting to `false` that is harmless; for this one it is an inversion, because the default is
 // `never` and the zero value is the empty string, which reports nothing at all.
 //
-// The second reason is the wire shape. Upstream's option is a bare STRING at the top of its schema
+// The second reason is the wire shape. Upstream's option is a bare string at the top of its schema
 // array, so a config writes `["error", "always"]` and cohere's config layer strips the tuple before
 // dispatch: what arrives here is the JSON `"always"`, not `["always"]` and not `{"require":...}`.
 // A decoder built by naming a struct field could not read that at all.
@@ -87,14 +87,14 @@ func DefaultUnicodeBomSettings() UnicodeBomOptions {
 // An unrecognised string is an error rather than a silent fallback to the default. A config saying
 // `"alway"` is a mistake somebody made, and turning it into `never` would enforce the opposite of
 // what they wrote with nothing anywhere saying so.
-func DecodeUnicodeBomOptions(raw []byte) (any, error) {
+func DecodeUnicodeBomOptions(raw []byte) (UnicodeBomOptions, error) {
 	if len(raw) == 0 {
 		return DefaultUnicodeBomSettings(), nil
 	}
 
 	var configured string
-	if err := json.Unmarshal(raw, &configured); err != nil {
-		return DefaultUnicodeBomSettings(), err
+	if decodeError := json.Unmarshal(raw, &configured); decodeError != nil {
+		return DefaultUnicodeBomSettings(), decodeError
 	}
 
 	setting := UnicodeBomSetting(configured)
@@ -103,16 +103,6 @@ func DecodeUnicodeBomOptions(raw []byte) (any, error) {
 		return UnicodeBomOptions{Require: &setting}, nil
 	}
 	return DefaultUnicodeBomSettings(), &unicodeBomUnknownSetting{configured: configured}
-}
-
-// unicodeBomUnknownSetting names the bad value rather than only saying the shape was wrong.
-type unicodeBomUnknownSetting struct {
-	configured string
-}
-
-func (e *unicodeBomUnknownSetting) Error() string {
-	// Go whitespace: the bad option value echoed in cohere's own error message, which decides nothing.
-	return "unicode-bom takes \"always\" or \"never\", got " + strings.TrimSpace(e.configured)
 }
 
 // UnicodeBom requires or forbids a byte order mark at the start of a file.
@@ -134,9 +124,9 @@ func (e *unicodeBomUnknownSetting) Error() string {
 // # Where the finding points
 //
 // Upstream reports with an explicit `loc: {line: 1, column: 0}` and no end, which is line 1 column
-// 1 in the one-based numbering a reader sees, and it does that for BOTH arms including the one where
-// the mark is absent. Reporting the source file NODE would be wrong in a way no message-id fixture
-// could see: the node's range begins AFTER the mark, measured at position 3 for a marked `var a = 1;`,
+// 1 in the one-based numbering a reader sees, and it does that for both arms including the one where
+// the mark is absent. Reporting the source file node would be wrong in a way no message-id fixture
+// could see: the node's range begins after the mark, measured at position 3 for a marked `var a = 1;`,
 // so a marked file would report at the first real token rather than at the mark being complained
 // about. The empty range at position zero is used instead, which is where upstream points and the
 // only span that is inside the mark rather than after it.
@@ -146,22 +136,22 @@ func (e *unicodeBomUnknownSetting) Error() string {
 // Both arms are fixable and upstream declares `fixable: "whitespace"`. Adding the mark is an insert
 // at position zero; removing it is a delete of the three bytes there.
 //
-// A file beginning with the mark TWICE reports once and this rule's single fix removes one of them,
+// A file beginning with the mark twice reports once and this rule's single fix removes one of them,
 // leaving a file that still begins with a mark. That is not a defect and it matches upstream:
 // measured, `linter.cohere` on a doubled mark returns exactly one message carrying one fix, and it
 // is `cohereAndFix`'s re-lint loop, not the rule, that strips the second on a later pass. A port
 // removing both in one edit would be doing something upstream's rule never does.
 //
-// # This rule is registered and NOT enabled, because it cannot see its subject here
+// # This rule is registered and not enabled, because it cannot see its subject here
 //
 // Everything above is a faithful port and every fixture below it passes, and the rule still reports
 // nothing on a real file no matter what that file contains. The reason is one layer down and it is
 // measured rather than argued.
 //
-// Every source file in a real run is read through `osvfs.FS().ReadFile`, and that read STRIPS a
+// Every source file in a real run is read through `osvfs.FS().ReadFile`, and that read strips a
 // leading byte order mark. Probed directly: a file whose first bytes on disk are `ef bb bf` arrives
 // as text beginning `65 78 70`, three bytes shorter, while an unmarked control of the same length
-// comes back unchanged and a mark written in the MIDDLE of a file survives. The removal is specific
+// comes back unchanged and a mark written in the middle of a file survives. The removal is specific
 // to position zero, which is the only position this rule asks about. `cachedvfs` wrapping the same
 // reads answers identically, so it is not the caching layer.
 //
@@ -174,22 +164,22 @@ func (e *unicodeBomUnknownSetting) Error() string {
 // So the rule stays registered and out of the config, with the reason recorded in
 // `deliberatelyNotEnabled`. What would make it work is small and belongs elsewhere: a lint phase
 // reading the file's real bytes, or a flag on the source file saying a mark was stripped. Worth
-// knowing while that is decided: the FIX phase reads through `os.ReadFile` and KEEPS the mark, so
+// knowing while that is decided: the fix phase reads through `os.ReadFile` and keeps the mark, so
 // on a marked file the two phases disagree by three bytes about where every offset in that file
 // lives. That is a hazard for any fixable rule, not only this one.
 //
 // # Only the first position counts
 //
-// A mark written at the END of a file is clean under `never`, which is upstream's own third valid case. A mark
+// A mark written at the end of a file is clean under `never`, which is upstream's own third valid case. A mark
 // anywhere but position zero is an ordinary zero-width no-break space character, so the test is a
 // prefix test rather than a search.
-var UnicodeBom = rule.Rule{
+var UnicodeBom = rule.Rule[UnicodeBomOptions]{
 	Name: "unicode-bom",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[UnicodeBomOptions]) rule.Listeners {
 		// A rule configured as a bare severity is handed nil, which the type assertion turns into a
 		// zero-valued struct whose Require is nil. That is the live config's shape, so the fallback
 		// below is the ordinary path rather than a defensive one.
-		settings, _ := rule.OptionsAs[UnicodeBomOptions](options)
+		settings, _ := options.Read()
 		if settings.Require == nil {
 			settings = DefaultUnicodeBomSettings()
 		}
@@ -197,7 +187,7 @@ var UnicodeBom = rule.Rule{
 
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
-				hasMark := strings.HasPrefix(ctx.SourceFile.Text(), unicodeBomMark)
+				hasMark := strings.HasPrefix(ruleContext.SourceFile.Text(), unicodeBomMark)
 
 				// The empty range at position zero, which is upstream's `{line: 1, column: 0}` and
 				// is inside the mark rather than after it.
@@ -205,11 +195,11 @@ var UnicodeBom = rule.Rule{
 
 				switch {
 				case require == UnicodeBomAlways && !hasMark:
-					ctx.ReportRangeWithFixes(start, messageUnicodeBomExpected,
+					ruleContext.ReportRangeWithFixes(start, messageUnicodeBomExpected,
 						rule.ReplaceRange(start, unicodeBomMark))
 				case require == UnicodeBomNever && hasMark:
 					markRange := core.NewTextRange(0, len(unicodeBomMark))
-					ctx.ReportRangeWithFixes(start, messageUnicodeBomUnexpected,
+					ruleContext.ReportRangeWithFixes(start, messageUnicodeBomUnexpected,
 						rule.RemoveRange(markRange))
 				}
 			},

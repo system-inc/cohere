@@ -10,7 +10,7 @@ import (
 
 // NoDuplicateTypeConstituentsOptions is the rule's option surface.
 //
-// Both keys default to FALSE, so the generic decoder would happen to produce the right zero value.
+// Both keys default to false, so the generic decoder would happen to produce the right zero value.
 // The decoder below is hand-rolled anyway, for the reason recorded on its wire struct.
 type NoDuplicateTypeConstituentsOptions struct {
 	// IgnoreIntersections turns off the `&` half of the rule entirely.
@@ -40,19 +40,18 @@ type noDuplicateTypeConstituentsRawOptions struct {
 //
 // cohere's config layer strips ESLint's `[severity, options]` tuple before dispatch, so what
 // arrives is the bare object rather than upstream's one-element array.
-func DecodeNoDuplicateTypeConstituentsOptions(raw []byte) (any, error) {
-	decoded, err := rule.DecodeOptionsInto[noDuplicateTypeConstituentsRawOptions]()(raw)
-	if err != nil {
-		return DefaultNoDuplicateTypeConstituentsSettings(), err
+func DecodeNoDuplicateTypeConstituentsOptions(raw []byte) (NoDuplicateTypeConstituentsOptions, error) {
+	decoded, decodeOptionsError := rule.DecodeOptionsInto[noDuplicateTypeConstituentsRawOptions]()(raw)
+	if decodeOptionsError != nil {
+		return DefaultNoDuplicateTypeConstituentsSettings(), decodeOptionsError
 	}
 
-	wire, _ := decoded.(noDuplicateTypeConstituentsRawOptions)
 	options := DefaultNoDuplicateTypeConstituentsSettings()
-	if wire.IgnoreIntersections != nil {
-		options.IgnoreIntersections = *wire.IgnoreIntersections
+	if decoded.IgnoreIntersections != nil {
+		options.IgnoreIntersections = *decoded.IgnoreIntersections
 	}
-	if wire.IgnoreUnions != nil {
-		options.IgnoreUnions = *wire.IgnoreUnions
+	if decoded.IgnoreUnions != nil {
+		options.IgnoreUnions = *decoded.IgnoreUnions
 	}
 	return options, nil
 }
@@ -72,9 +71,9 @@ func DecodeNoDuplicateTypeConstituentsOptions(raw []byte) (any, error) {
 //
 // # Two questions are asked, and the order between them is load-bearing
 //
-// Upstream compares constituents by DEEP AST EQUALITY first and only then by type identity, and its
+// Upstream compares constituents by deep AST equality first and only then by type identity, and its
 // comment says the first is a performance shortcut. It is not only that here, and the difference is
-// measurable: two structurally identical object literals get DISTINCT type objects from the
+// measurable: two structurally identical object literals get distinct type objects from the
 // checker, so `{ a: 1 } | { a: 1 }` is invisible to a type-identity comparison and is caught only by
 // the syntactic one. Probed directly before this rule was written, over twelve shapes.
 //
@@ -91,7 +90,7 @@ func DecodeNoDuplicateTypeConstituentsOptions(raw []byte) (any, error) {
 // belongs to the separator rather than to either node, and `rule.TokenRange` starts each at its
 // first real token. Measured over the whole corpus, all 82 cases agree.
 //
-// # Nested same-kind constituents are FLATTENED, and the parse tree makes that visible
+// # Nested same-kind constituents are flattened, and the parse tree makes that visible
 //
 // `A | (B | A)` is one union of two constituents whose second is a parenthesized union. Upstream
 // recurses into a constituent whose own kind matches the enclosing one, so the inner `A` is compared
@@ -102,46 +101,46 @@ func DecodeNoDuplicateTypeConstituentsOptions(raw []byte) (any, error) {
 // The top-level listener declines a node whose parent is the same kind, so a nested union is
 // visited once through its parent's recursion rather than twice.
 //
-// # The repair removes an OPERATOR AND ITS CONSTITUENT, and the span is not the removal
+// # The repair removes an operator and its constituent, and the span is not the removal
 //
 // These are two different ranges and conflating them is the easy mistake.
 //
-// The REMOVAL runs from the separator before the constituent through the end of the constituent,
+// The removal runs from the separator before the constituent through the end of the constituent,
 // including any parentheses around it and any comment between the separator and the node. When the
-// duplicate is the FIRST constituent there is no separator before it, so the removal runs from the
+// duplicate is the first constituent there is no separator before it, so the removal runs from the
 // constituent through the separator after it instead. Measured against the installed build over
 // every corpus case: the bytes that vanish are exactly `| A`, `& true`, `| /* comment */ A`,
 // `| (A | B)`, or in the leading position `T |` and `number &`.
 //
-// The SPAN reported is narrower and starts inside any parentheses. For `A | (A | A)` the finding
+// The span reported is narrower and starts inside any parentheses. For `A | (A | A)` the finding
 // underlines `A | A)`, which reads oddly and is upstream's: the span begins at the inner
 // constituent's own start and ends after the closing brackets that follow it. Reproduced rather
 // than corrected, because the differential compares where findings land.
 //
-// The repair is a FIX rather than a suggestion, matching `meta.fixable: 'code'`. Removing a
+// The repair is a fix rather than a suggestion, matching `meta.fixable: 'code'`. Removing a
 // duplicate constituent cannot change what the type means, which is the whole finding.
 //
-// # One corpus case needs TWO passes and that is a real property of the fixer
+// # One corpus case needs two passes and that is a real property of the fixer
 //
 // `type A = number & string & (number & string);` carries two findings whose repairs overlap in
 // effect: applying both in one pass leaves `(  )`, and the fix engine runs to convergence, at which
 // point the emptied parenthesis is itself removed. Upstream records that case with an `output`
-// ARRAY of two states rather than one string. Our harness applies one pass, so the fixture for that
+// array of two states rather than one string. Our harness applies one pass, so the fixture for that
 // case asserts the first state and says so at the line.
 //
 // # Cost
 //
 // The anchor is a union or intersection type node, and the checker is consulted once per
 // constituent only after the syntactic comparison has failed to find a duplicate.
-var NoDuplicateTypeConstituents = rule.Rule{
+var NoDuplicateTypeConstituents = rule.Rule[NoDuplicateTypeConstituentsOptions]{
 	Name: "@typescript-eslint/no-duplicate-type-constituents",
 
 	// Every constituent's type is resolved to compare identities.
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, isSettings := rule.OptionsAs[NoDuplicateTypeConstituentsOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[NoDuplicateTypeConstituentsOptions]) rule.Listeners {
+		settings, isSettings := options.Read()
 		if !isSettings {
 			settings = DefaultNoDuplicateTypeConstituentsSettings()
 		}
@@ -166,8 +165,8 @@ var NoDuplicateTypeConstituents = rule.Rule{
 				}
 				inner = next
 			}
-			nodeRange := rule.TokenRange(ctx.SourceFile, inner)
-			return ctx.SourceFile.Text()[nodeRange.Pos():nodeRange.End()]
+			nodeRange := rule.TokenRange(ruleContext.SourceFile, inner)
+			return ruleContext.SourceFile.Text()[nodeRange.Pos():nodeRange.End()]
 		}
 
 		// report builds the two ranges and emits the finding.
@@ -175,11 +174,11 @@ var NoDuplicateTypeConstituents = rule.Rule{
 		// `parent` is the union or intersection the constituent belongs to, which bounds the search
 		// for a separator so that an operator belonging to an enclosing type is never taken.
 		report := func(message rule.Message, constituent *ast.Node, parent *ast.Node) {
-			constituentRange := rule.TokenRange(ctx.SourceFile, constituent)
+			constituentRange := rule.TokenRange(ruleContext.SourceFile, constituent)
 
-			// The SPAN starts inside any parentheses while the REMOVAL starts outside them, and
+			// The span starts inside any parentheses while the removal starts outside them, and
 			// that asymmetry is upstream's rather than a choice here. estree has no parenthesized
-			// type node, so upstream's `constituentNode` for `(A | B)` IS the inner union and its
+			// type node, so upstream's `constituentNode` for `(A | B)` is the inner union and its
 			// `loc.start` sits after the opening bracket, while the token run its fixer removes
 			// still reaches back to the bracket. The result reads as an unbalanced fragment:
 			// `A | (A | A)` underlines `A | A)`.
@@ -192,14 +191,14 @@ var NoDuplicateTypeConstituents = rule.Rule{
 				if next == nil {
 					break
 				}
-				spanStart = rule.TokenRange(ctx.SourceFile, next).Pos()
+				spanStart = rule.TokenRange(ruleContext.SourceFile, next).Pos()
 				inner = next
 			}
-			parentRange := rule.TokenRange(ctx.SourceFile, parent)
-			text := ctx.SourceFile.Text()
+			parentRange := rule.TokenRange(ruleContext.SourceFile, parent)
+			text := ruleContext.SourceFile.Text()
 
 			// The separator before the constituent, searched backwards within the parent. Upstream
-			// takes the LAST such token before the node, which is the one immediately preceding it.
+			// takes the last such token before the node, which is the one immediately preceding it.
 			separatorBefore, hasSeparatorBefore := lastSeparatorBefore(text, parentRange.Pos(), constituentRange.Pos())
 
 			// The constituent's own end already covers its closing brackets, so there is nothing
@@ -208,7 +207,7 @@ var NoDuplicateTypeConstituents = rule.Rule{
 			// Upstream has to reassemble that run from tokens, because estree has no parenthesized
 			// type node: its constituent for `(A | B)` is the inner union, whose range stops before
 			// the bracket, so its fixer collects the brackets on either side separately. Our parser
-			// gives `KindParenthesizedType` a range that INCLUDES both brackets, which is the same
+			// gives `KindParenthesizedType` a range that includes both brackets, which is the same
 			// asymmetry that makes the reported span start inside the opening one.
 			//
 			// A bracket-walking helper was written here first and a mutation disabling it survived
@@ -222,10 +221,10 @@ var NoDuplicateTypeConstituents = rule.Rule{
 			// paragraph above.
 			closeEnd := constituentRange.End()
 
-			// The repair is a LIST of token removals rather than one contiguous span, and that
+			// The repair is a list of token removals rather than one contiguous span, and that
 			// distinction is visible in every one of upstream's forty-eight recorded outputs.
 			//
-			// `type T = 1 | 1;` repairs to `type T = 1  ;` with TWO spaces: upstream removes the
+			// `type T = 1 | 1;` repairs to `type T = 1  ;` with two spaces: upstream removes the
 			// separator token and the constituent token as separate edits, so the whitespace
 			// between them survives. A single range from the separator through the constituent
 			// removes that space too and produces one space, which is byte-wrong on all forty-two
@@ -240,11 +239,15 @@ var NoDuplicateTypeConstituents = rule.Rule{
 					rule.RemoveRange(core.NewTextRange(separatorBefore, separatorBefore+1)),
 					rule.RemoveRange(core.NewTextRange(constituentRange.Pos(), closeEnd)))
 			} else {
-				// The constituent is first, so upstream takes the separator AFTER it instead. That
+				// The constituent is first, so upstream takes the separator after it instead. That
 				// is why `type T = T | undefined` repairs by deleting `T` and its following `|`.
 				fixes = append(fixes,
 					rule.RemoveRange(core.NewTextRange(constituentRange.Pos(), closeEnd)))
-				if separatorAfter, hasSeparatorAfter := firstSeparatorAfter(text, closeEnd, parentRange.End()); hasSeparatorAfter {
+				if separatorAfter, hasSeparatorAfter := firstSeparatorAfter(
+					text,
+					closeEnd,
+					parentRange.End(),
+				); hasSeparatorAfter {
 					fixes = append(fixes,
 						rule.RemoveRange(core.NewTextRange(separatorAfter, separatorAfter+1)))
 				}
@@ -252,7 +255,7 @@ var NoDuplicateTypeConstituents = rule.Rule{
 
 			// The reported span starts at the constituent and ends after its trailing brackets,
 			// which is narrower than what the repair removes whenever a separator was taken.
-			ctx.ReportRangeWithFixes(
+			ruleContext.ReportRangeWithFixes(
 				core.NewTextRange(spanStart, closeEnd),
 				message,
 				fixes...,
@@ -277,7 +280,7 @@ var NoDuplicateTypeConstituents = rule.Rule{
 				return
 			}
 
-			constituentType := ctx.TypeChecker.GetTypeAtLocation(constituent)
+			constituentType := ruleContext.TypeChecker.GetTypeAtLocation(constituent)
 			if constituentType == nil {
 				return
 			}
@@ -329,7 +332,7 @@ var NoDuplicateTypeConstituents = rule.Rule{
 
 		return rule.Listeners{
 			ast.KindIntersectionType: func(node *ast.Node) {
-				if ctx.TypeChecker == nil || settings.IgnoreIntersections {
+				if ruleContext.TypeChecker == nil || settings.IgnoreIntersections {
 					return
 				}
 				// A nested intersection is reached through its parent's recursion, so visiting it
@@ -341,14 +344,18 @@ var NoDuplicateTypeConstituents = rule.Rule{
 			},
 
 			ast.KindUnionType: func(node *ast.Node) {
-				if ctx.TypeChecker == nil || settings.IgnoreUnions {
+				if ruleContext.TypeChecker == nil || settings.IgnoreUnions {
 					return
 				}
 				if isNestedInSameKind(node, ast.KindUnionType) {
 					return
 				}
 
-				check(node, ast.KindUnionType, func(constituentType *checker.Type, constituent *ast.Node, parent *ast.Node) {
+				check(node, ast.KindUnionType, func(
+					constituentType *checker.Type,
+					constituent *ast.Node,
+					parent *ast.Node,
+				) {
 					// The second message: an explicit `undefined` in the type of a parameter that
 					// is already optional. The `?` has already widened the type, so the union member
 					// adds nothing.

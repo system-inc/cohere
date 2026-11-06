@@ -25,13 +25,6 @@ type importedNames struct {
 	names      map[string]bool
 }
 
-// importerIndex is, for each file in the program, the names any other file imports from it, plus
-// the files that are alive without an importer.
-type importerIndex struct {
-	byPath map[tspath.PathKey]*importedNames
-	roots  *module_roots.Set
-}
-
 // importerCache holds one index per program, built the first time a camelCase export asks.
 //
 // A package variable for the reason `boundary_no_project_theme_value.go` gives at length: the file
@@ -113,7 +106,10 @@ func buildImporterIndex(program rule.Program) *importerIndex {
 // The options are not read. The rule's one option, frameworkConstantNames, judges a declaration inside
 // the file and chooses nothing the index reads, and the findings cache's key already holds every config
 // file, so a change of options re-runs the rule without the fingerprint having to move.
-func constantCasingFingerprint(program rule.Program, options any) [sha256.Size]byte {
+func constantCasingFingerprint(
+	program rule.Program,
+	options rule.Given[ConsistencyRequireConstantCasingOptions],
+) [sha256.Size]byte {
 	hash := sha256.New()
 	if index := importerIndexFor(program); index != nil {
 		for _, path := range slices.Sorted(maps.Keys(index.byPath)) {
@@ -140,6 +136,8 @@ func constantCasingFingerprint(program rule.Program, options any) [sha256.Size]b
 }
 
 // recordImportedNames adds what one specifier's statement takes from its target.
+//
+// Mutates: entry the index keeps one entry per target file, and every specifier naming that file adds to it
 func recordImportedNames(entry *importedNames, specifier *ast.Node) {
 	statement := specifier.Parent
 	if statement == nil {
@@ -182,36 +180,6 @@ func recordImportedNames(entry *importedNames, specifier *ast.Node) {
 	}
 }
 
-// provablyUnimported reports whether nothing in the program can import this name from this file,
-// and the file is not one a framework or test runner loads without an import.
-//
-// Every doubt answers false, because a false here only keeps the older PascalCase advice, while a
-// wrong true tells the author to drop an export something reads.
-//
-// Several names because one binding can leave its file under more than one: `export { x, x as Y }`.
-// It is unimported only when every one of them is.
-func (index *importerIndex) provablyUnimported(sourceFile *ast.SourceFile, names ...string) bool {
-	if index == nil || sourceFile == nil || len(names) == 0 {
-		return false
-	}
-	if isRoot, _ := index.roots.IsRoot(sourceFile.FileName().AsString()); isRoot {
-		return false
-	}
-	entry := index.byPath[sourceFile.PathKey()]
-	if entry == nil {
-		return true
-	}
-	if entry.everything {
-		return false
-	}
-	for _, name := range names {
-		if entry.names[name] {
-			return false
-		}
-	}
-	return true
-}
-
 // exportedNamesOf returns the names a constant leaves its file under, or none when it stays local.
 //
 // Two ways out. The modifier (`export const X`) exports it as X. A local export clause
@@ -225,17 +193,17 @@ func (index *importerIndex) provablyUnimported(sourceFile *ast.SourceFile, names
 // Missing this cost a false finding: `PensieveCommandBoundary.ts` declares
 // `const IdentitySafePensieveCommandPaths` and exports it on line 39 with `export { ... }`, and the
 // rule called it file-local and told it to become camelCase, which would have renamed an export.
-func exportedNamesOf(ctx rule.Context, statement *ast.Node, name *ast.Node) []string {
+func exportedNamesOf(ruleContext rule.Context, statement *ast.Node, name *ast.Node) []string {
 	if module.IsExported(statement) {
 		return []string{name.Text()}
 	}
-	clauses := localExportClausesFor(ctx)
-	if len(clauses) == 0 || ctx.TypeChecker == nil {
+	clauses := localExportClausesFor(ruleContext)
+	if len(clauses) == 0 || ruleContext.TypeChecker == nil {
 		return nil
 	}
 	// A nil here would match every clause whose own target is unresolved. A const's declaration name
 	// always resolves, so no fixture reaches this; it is the guard that keeps nil from equalling nil.
-	declared := ctx.TypeChecker.GetSymbolAtLocation(name)
+	declared := ruleContext.TypeChecker.GetSymbolAtLocation(name)
 	if declared == nil {
 		return nil
 	}
@@ -245,7 +213,7 @@ func exportedNamesOf(ctx rule.Context, statement *ast.Node, name *ast.Node) []st
 		if exportedName == nil || exportedName.Text() == "default" {
 			continue
 		}
-		if ctx.TypeChecker.GetExportSpecifierLocalTargetSymbol(specifier) == declared {
+		if ruleContext.TypeChecker.GetExportSpecifierLocalTargetSymbol(specifier) == declared {
 			names = append(names, exportedName.Text())
 		}
 	}
@@ -258,13 +226,13 @@ func exportedNamesOf(ctx rule.Context, statement *ast.Node, name *ast.Node) []st
 // Leaving out the `from` clauses is cost, not correctness, and a mutation confirms it: their local
 // target is the other module's binding, so the checker comparison already rejects them. The filter
 // keeps them from costing a checker call per constant.
-func localExportClausesFor(ctx rule.Context) []*ast.Node {
-	return rule.Cached(ctx.FileCache, "nexus/constant-casing/local-export-clauses", func() []*ast.Node {
+func localExportClausesFor(ruleContext rule.Context) []*ast.Node {
+	return rule.Cached(ruleContext.FileCache, "nexus/constant-casing/local-export-clauses", func() []*ast.Node {
 		var specifiers []*ast.Node
-		if ctx.SourceFile == nil {
+		if ruleContext.SourceFile == nil {
 			return specifiers
 		}
-		for _, statement := range ctx.SourceFile.Statements.Nodes {
+		for _, statement := range ruleContext.SourceFile.Statements.Nodes {
 			if statement.Kind != ast.KindExportDeclaration {
 				continue
 			}

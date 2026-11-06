@@ -34,14 +34,18 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rules/nexus"
 )
 
-// allowed is every rule another program may run, by its registered name. See the package comment.
-var allowed = map[string]rule.Rule{
+// allowed is every rule another program may run, by its registered name, each bound with no options, since none
+// of them takes any. See the package comment.
+var allowed = map[string]rule.Bound{
 	// For Adamic's stage 3, which accepts import cycles in module order and refuses only a read at load.
-	nexus.CorrectnessNoImportCycleLoadTimeRead.Name: nexus.CorrectnessNoImportCycleLoadTimeRead,
+	nexus.CorrectnessNoImportCycleLoadTimeRead.Name: rule.Bind(
+		nexus.CorrectnessNoImportCycleLoadTimeRead,
+		rule.Given[rule.NoOptions]{},
+	),
 	// For Adamic's lowering, which refused these holes in a copy of its own until cohere's rules took every one
 	// that is real (#xjdce2d step 4, ruled by @system_cohere). What Adamic can't represent stays its own refusal.
-	adamic.InvariantMutable.Name: adamic.InvariantMutable,
-	adamic.NominalClass.Name:     adamic.NominalClass,
+	adamic.InvariantMutable.Name: rule.Bind(adamic.InvariantMutable, rule.Given[rule.NoOptions]{}),
+	adamic.NominalClass.Name:     rule.Bind(adamic.NominalClass, rule.Given[rule.NoOptions]{}),
 }
 
 // Finding is one finding, named as cohere's own `--json` output names it: the rule, the file, the 1-based
@@ -56,15 +60,6 @@ type Finding struct {
 	Message string
 }
 
-// NotAllowedError is a request for a rule that isn't on the allowlist, whether or not cohere has the rule.
-type NotAllowedError struct {
-	Rule string
-}
-
-func (err NotAllowedError) Error() string {
-	return fmt.Sprintf("rule_runner: %q is not a rule another program may run; the allowlist in rule_runner.go decides which are", err.Rule)
-}
-
 // RunRule runs the rule named ruleName over files, which belong to program, with typeChecker answering its
 // type questions, and returns what it found, in file order and then source order.
 //
@@ -75,18 +70,28 @@ func (err NotAllowedError) Error() string {
 //
 // typeChecker must be one the caller holds exclusively for the call, as the walk holds a file's checker. A
 // rule that panics is reported as an error naming the rule and the file, never as an empty result.
-func RunRule(program *compiler.Program, typeChecker *checker.Checker, files []*ast.SourceFile, ruleName string) (findings []Finding, err error) {
+func RunRule(
+	program *compiler.Program,
+	typeChecker *checker.Checker,
+	files []*ast.SourceFile,
+	ruleName string,
+) (findings []Finding, runRuleError error) {
 	subject, isAllowed := allowed[ruleName]
 	if !isAllowed {
 		return nil, NotAllowedError{Rule: ruleName}
 	}
 	if program == nil || typeChecker == nil {
-		return nil, fmt.Errorf("rule_runner: %s needs a program and a checker, and was given program %t and checker %t", ruleName, program != nil, typeChecker != nil)
+		return nil, fmt.Errorf(
+			"rule_runner: %s needs a program and a checker, and was given program %t and checker %t",
+			ruleName,
+			program != nil,
+			typeChecker != nil,
+		)
 	}
 	for _, sourceFile := range files {
-		diagnostics, fileErr := runOnFile(sourceFile, subject, program, typeChecker)
-		if fileErr != nil {
-			return nil, fileErr
+		diagnostics, fileError := runOnFile(sourceFile, subject, program, typeChecker)
+		if fileError != nil {
+			return nil, fileError
 		}
 		sort.SliceStable(diagnostics, func(left int, right int) bool {
 			return diagnostics[left].Range.Pos() < diagnostics[right].Range.Pos()
@@ -106,11 +111,21 @@ func RunRule(program *compiler.Program, typeChecker *checker.Checker, files []*a
 }
 
 // runOnFile runs subject on one file, turning a panic into an error that names the rule and the file.
-func runOnFile(sourceFile *ast.SourceFile, subject rule.Rule, program *compiler.Program, typeChecker *checker.Checker) (diagnostics []rule.Diagnostic, err error) {
+func runOnFile(
+	sourceFile *ast.SourceFile,
+	subject rule.Bound,
+	program *compiler.Program,
+	typeChecker *checker.Checker,
+) (diagnostics []rule.Diagnostic, runOnFileError error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
-			err = fmt.Errorf("rule_runner: %s panicked on %s: %v", subject.Name, sourceFile.FileName(), recovered)
+			runOnFileError = fmt.Errorf(
+				"rule_runner: %s panicked on %s: %v",
+				subject.Name,
+				sourceFile.FileName(),
+				recovered,
+			)
 		}
 	}()
-	return linter.LintFile(sourceFile, []rule.Rule{subject}, program, typeChecker), nil
+	return linter.LintFile(sourceFile, []rule.Bound{subject}, program, typeChecker), nil
 }

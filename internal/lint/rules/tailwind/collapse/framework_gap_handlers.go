@@ -54,86 +54,18 @@
 // reason.
 package tailwind
 
-// UtilityBranch is what one of these handle bodies reads before it picks an arm.
-//
-// Four fields rather than a resolved value, for the reason in the package comment: the shadow family
-// branches on the modifier, which resolution consumes and does not report.
-//
-// The zero value is a class written with no value at all, which is a real state here and the one
-// several of these roots answer differently from every other: `border` is a width, `border-red-500`
-// is a colour.
-type UtilityBranch struct {
-	// HasValue is false for a class written as the bare root, such as `border` or `ring`.
-	HasValue bool
-	// IsArbitrary is true for a bracketed value, such as `border-[3px]`.
-	//
-	// Separate from DataType because it decides an arm on its own for three roots. `scale-[2]`
-	// returns from upstream's arbitrary arm with one declaration while `scale-150` falls through to
-	// four, and both infer the same type.
-	IsArbitrary bool
-	// DataType is the value's inferred type, or the empty string when it infers as nothing.
-	//
-	// Callers get this from InferDataType against the root's own ordered type list, or from the
-	// author's own annotation on a value written as `bg-[color:var(--x)]`.
-	DataType DataType
-	// ResolvedAsColor is whether a named value resolved through a colour namespace.
-	//
-	// An input rather than something derived here. Upstream this is `resolveThemeColor` returning a
-	// value, which consults the repository's own `--color` keys; deriving it in this file would put
-	// one repository's tokens in a table describing Tailwind.
-	ResolvedAsColor bool
-	// HasModifier is whether the class carried a `/...` modifier.
-	//
-	// The shadow family writes an alpha declaration whose value is absent without one and present
-	// with one, and PropertySort skips the first and counts the second. `text` uses it differently
-	// again: a modifier turns a font size into a font size plus a line height.
-	HasModifier bool
-	// ResolvedNamespace is the theme namespace a named value resolved through, when one that is not
-	// a colour decides an arm.
-	//
-	// `ResolvedAsColor` covers the colour namespaces, which is the split most of these roots make.
-	// One root splits on a namespace that is not a colour: `font` consults `--font` before
-	// `--font-weight`, so `font-mono` emits `font-family` and `font-medium` emits `font-weight`,
-	// and both are named values that infer as nothing. That is the branch `ClassDeclaredProperties`
-	// recorded as three per-class overrides.
-	//
-	// An input for the same reason `ResolvedAsColor` is: which keys are in `--font` is this
-	// repository's `@theme`, not Tailwind's.
-	ResolvedNamespace string
-	// Value is the resolved value the class carried, when a caller needs the declarations to differ
-	// between two values of one root.
-	//
-	// Empty for every caller that reads property names, which is all of them but one: the branch
-	// decides which arm runs and the arm decides the properties, and neither consults this. It
-	// exists for `ComposesFor`, which emits a root twice and asks whether the declarations an author
-	// can see came out the same, and that question is meaningless if both emissions carry one
-	// sentinel.
-	//
-	// A root's own `--tw-*` variables take this. The shared property its family layers through does
-	// not: `box-shadow` carries a constant naming every shadow variable whatever the value was, and
-	// that constant is what makes two shadows stack rather than overwrite. Emitting the value there
-	// instead is exactly the flattening that made composition unanswerable from these bodies.
-	Value string
-}
-
-// valueOr returns the branch's value, falling back to the sentinel every property-name caller wants.
-//
-// One place rather than a check at each `Declaration` call, so a new arm gets the behaviour by
-// construction instead of by remembering.
-func (branch UtilityBranch) valueOr() string {
-	if branch.Value != "" {
-		return branch.Value
-	}
-	return gapEmitterValue
-}
-
 // UtilityBranchFor builds a branch from a parsed candidate and the root's own type list.
 //
 // The colour question is passed in rather than asked here, for the reason on the field. Everything
 // else is read off the candidate the same way upstream's handle body reads it: the presence of a
 // value, its kind, and the type inferred against the root's list in the root's own order, which
 // InferDataType already implements and which the descriptor rows already carry per root.
-func UtilityBranchFor(candidate *ParsedCandidate, typeList []DataType, resolvedAsColor bool, resolvedNamespace string) UtilityBranch {
+func UtilityBranchFor(
+	candidate *ParsedCandidate,
+	typeList []DataType,
+	resolvedAsColor bool,
+	resolvedNamespace string,
+) UtilityBranch {
 	branch := UtilityBranch{ResolvedAsColor: resolvedAsColor, ResolvedNamespace: resolvedNamespace}
 	if candidate == nil {
 		return branch
@@ -156,26 +88,19 @@ func UtilityBranchFor(candidate *ParsedCandidate, typeList []DataType, resolvedA
 	return branch
 }
 
-// isOneOf reports whether the branch's type is any of the given ones.
-//
-// Upstream these arms are `switch` cases that fall through to one body, as in `case 'length': case
-// 'line-width':`. Written as a predicate rather than a Go switch so an arm reads as the set of types
-// it accepts, which is how the source spells it.
-func (branch UtilityBranch) isOneOf(types ...DataType) bool {
-	for _, dataType := range types {
-		if branch.DataType == dataType {
-			return true
-		}
-	}
-	return false
-}
-
 // GapEmitter is one of these roots' handle bodies.
 //
 // Returns nil where upstream returns without producing declarations, which is a class that compiles
 // to nothing rather than one that compiles to an empty rule. Every consumer here distinguishes the
 // two: a class with no rules has no reading at all.
 type GapEmitter func(branch UtilityBranch) []*Node
+
+// gapEmitterValue is what every ported declaration here carries.
+//
+// Named rather than spelled at 200 call sites so that the one place a value is meaningful, the
+// absent-valued alpha declaration below, is visibly a different thing rather than a different
+// string.
+const gapEmitterValue = "zzsentinel"
 
 // declarations is the common tail of these bodies: a fixed property list, all carrying the value.
 //
@@ -189,13 +114,6 @@ func declarations(properties ...string) []*Node {
 	}
 	return nodes
 }
-
-// gapEmitterValue is what every ported declaration here carries.
-//
-// Named rather than spelled at 200 call sites so that the one place a value is meaningful, the
-// absent-valued alpha declaration below, is visibly a different thing rather than a different
-// string.
-const gapEmitterValue = "zzsentinel"
 
 // absentValued is a declaration upstream emits with an undefined value.
 //
@@ -284,19 +202,6 @@ func maskGradientEmitter(gradient, stop string) GapEmitter {
 	}
 }
 
-// maskStopIsColor is the shared dispatcher in `maskStopUtility`, which all 18 stop roots run.
-//
-// An arbitrary value is a colour when it infers as one, against the list `['length', 'percentage',
-// 'color']`; a named value is a colour when the theme's colour namespaces answered it, and a
-// position otherwise. Both halves are read off the branch rather than recomputed, for the reason in
-// the package comment.
-func (branch UtilityBranch) maskStopIsColor() bool {
-	if branch.IsArbitrary {
-		return branch.DataType == DataTypeColor
-	}
-	return branch.ResolvedAsColor
-}
-
 // containsString is a membership test over a small fixed slice.
 //
 // Written out rather than reaching for `slices.Contains` to keep this file's imports empty, which is
@@ -331,28 +236,20 @@ func shadowFamilyEmitter(alphaProperty, colorProperty string, sizeProperties ...
 	}
 }
 
-// shadowIsColor is the shadow family's own type question.
-//
-// The arbitrary arm infers against the single-element list `['color']`, so anything that is not a
-// colour falls to the size arm. A named value is a colour when the theme's colour namespaces
-// answered it.
-func (branch UtilityBranch) shadowIsColor() bool {
-	if branch.IsArbitrary {
-		return branch.DataType == DataTypeColor
-	}
-	return branch.ResolvedAsColor
-}
-
 // gapEmitters is the ported body of each root, keyed the way the descriptor rows are.
 //
 // Grouped by family rather than sorted, because these bodies are shared: eleven border roots run one
 // function and twelve mask edge roots run another, and the grouping is what makes that visible.
 var gapEmitters = map[string]GapEmitter{
 	// The eleven `borderSideUtility` registrations, in the source's own order.
-	"border":    borderSideEmitter("border-style", "border-width", "border-color"),
-	"border-x":  borderSideEmitter("border-inline-style", "border-inline-width", "border-inline-color"),
-	"border-y":  borderSideEmitter("border-block-style", "border-block-width", "border-block-color"),
-	"border-s":  borderSideEmitter("border-inline-start-style", "border-inline-start-width", "border-inline-start-color"),
+	"border":   borderSideEmitter("border-style", "border-width", "border-color"),
+	"border-x": borderSideEmitter("border-inline-style", "border-inline-width", "border-inline-color"),
+	"border-y": borderSideEmitter("border-block-style", "border-block-width", "border-block-color"),
+	"border-s": borderSideEmitter(
+		"border-inline-start-style",
+		"border-inline-start-width",
+		"border-inline-start-color",
+	),
 	"border-e":  borderSideEmitter("border-inline-end-style", "border-inline-end-width", "border-inline-end-color"),
 	"border-bs": borderSideEmitter("border-block-start-style", "border-block-start-width", "border-block-start-color"),
 	"border-be": borderSideEmitter("border-block-end-style", "border-block-end-width", "border-block-end-color"),
@@ -385,9 +282,14 @@ var gapEmitters = map[string]GapEmitter{
 
 	// The shadow family. The size arm's property lists are upstream's, including the `box-shadow`
 	// three of them end with and the two `--tw-drop-shadow*` declarations drop-shadow emits.
-	"shadow":       shadowFamilyEmitter("--tw-shadow-alpha", "--tw-shadow-color", "--tw-shadow", "box-shadow"),
-	"inset-shadow": shadowFamilyEmitter("--tw-inset-shadow-alpha", "--tw-inset-shadow-color", "--tw-inset-shadow", "box-shadow"),
-	"text-shadow":  shadowFamilyEmitter("--tw-text-shadow-alpha", "--tw-text-shadow-color", "text-shadow"),
+	"shadow": shadowFamilyEmitter("--tw-shadow-alpha", "--tw-shadow-color", "--tw-shadow", "box-shadow"),
+	"inset-shadow": shadowFamilyEmitter(
+		"--tw-inset-shadow-alpha",
+		"--tw-inset-shadow-color",
+		"--tw-inset-shadow",
+		"box-shadow",
+	),
+	"text-shadow": shadowFamilyEmitter("--tw-text-shadow-alpha", "--tw-text-shadow-color", "text-shadow"),
 
 	// `drop-shadow` is the shadow family's odd member and does not share their emitter. Its colour
 	// arm emits two declarations rather than one, because it writes `--tw-drop-shadow` as well as
@@ -415,7 +317,7 @@ var gapEmitters = map[string]GapEmitter{
 				return declarations("background-position")
 			case branch.isOneOf(DataTypeBackgroundSize, DataTypeLength):
 				return declarations("background-size")
-			case branch.isOneOf(DataTypeImage, DataTypeURL):
+			case branch.isOneOf(DataTypeImage, DataTypeUrl):
 				return declarations("background-image")
 			default:
 				return declarations("background-color")
@@ -692,38 +594,19 @@ func EmitGapRoot(root string, branch UtilityBranch) []*Node {
 	return withResolvedValue(root, nodes, branch.Value)
 }
 
-// withResolvedValue restates a gap root's declarations for one concrete value.
-//
-// The 58 `declarations` call sites in this file all carry the sentinel, because every consumer but
-// one reads property names. Rewriting here rather than threading a value through all 58 keeps one
-// seam: an arm added later gets this by construction, and the arms stay readable against upstream's
-// source, which is the property this file was built for.
-//
-// Two rules, and the split is the whole of composition. A `--tw-*` custom property is the root's own
-// contribution and takes the value, so `shadow-sm` and `shadow-lg` write different `--tw-shadow`.
-// A shared property its family layers through takes that family's constant, which names every
-// sibling variable and mentions no value, so both write an identical `box-shadow` and stack rather
-// than overwrite. A property in neither set is an ordinary declaration and takes the value, which is
-// what makes `border-2` and `border-4` collide.
-//
-// The declarations are copied rather than mutated. The emitters build fresh nodes per call today,
-// and a caller that reads property names must not observe a value another caller asked for.
-func withResolvedValue(root string, nodes []*Node, value string) []*Node {
-	rewritten := make([]*Node, 0, len(nodes))
-	for _, node := range nodes {
-		if node.Kind != KindDeclaration || !node.ValuePresent {
-			rewritten = append(rewritten, node)
-			continue
-		}
-		replacement := *node
-		if constant, shared := composedAggregateValues[composedAggregate{root: root, property: node.Property}]; shared {
-			replacement.Value = constant
-		} else {
-			replacement.Value = value
-		}
-		rewritten = append(rewritten, &replacement)
-	}
-	return rewritten
+// The shared constants these gap roots write, read from the shipped 4.3.3 source.
+const (
+	cssBoxShadowValue      = "var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow)"
+	cssConicGradientValue  = "conic-gradient(var(--tw-gradient-stops))"
+	cssLinearGradientValue = "linear-gradient(var(--tw-gradient-stops))"
+	cssRadialGradientValue = "radial-gradient(var(--tw-gradient-stops))"
+	cssMaskCompositeValue  = "intersect"
+)
+
+// composedAggregate is one root's use of one shared property.
+type composedAggregate struct {
+	root     string
+	property string
 }
 
 // composedAggregateValues is the constant each layering family writes to its shared property.
@@ -797,17 +680,36 @@ var composedAggregateValues = map[composedAggregate]string{
 	{root: "mask-conic-to", property: "mask-composite"}:    cssMaskCompositeValue,
 }
 
-// composedAggregate is one root's use of one shared property.
-type composedAggregate struct {
-	root     string
-	property string
+// withResolvedValue restates a gap root's declarations for one concrete value.
+//
+// The 58 `declarations` call sites in this file all carry the sentinel, because every consumer but
+// one reads property names. Rewriting here rather than threading a value through all 58 keeps one
+// seam: an arm added later gets this by construction, and the arms stay readable against upstream's
+// source, which is the property this file was built for.
+//
+// Two rules, and the split is the whole of composition. A `--tw-*` custom property is the root's own
+// contribution and takes the value, so `shadow-sm` and `shadow-lg` write different `--tw-shadow`.
+// A shared property its family layers through takes that family's constant, which names every
+// sibling variable and mentions no value, so both write an identical `box-shadow` and stack rather
+// than overwrite. A property in neither set is an ordinary declaration and takes the value, which is
+// what makes `border-2` and `border-4` collide.
+//
+// The declarations are copied rather than mutated. The emitters build fresh nodes per call today,
+// and a caller that reads property names must not observe a value another caller asked for.
+func withResolvedValue(root string, nodes []*Node, value string) []*Node {
+	rewritten := make([]*Node, 0, len(nodes))
+	for _, node := range nodes {
+		if node.Kind != KindDeclaration || !node.ValuePresent {
+			rewritten = append(rewritten, node)
+			continue
+		}
+		replacement := *node
+		if constant, shared := composedAggregateValues[composedAggregate{root: root, property: node.Property}]; shared {
+			replacement.Value = constant
+		} else {
+			replacement.Value = value
+		}
+		rewritten = append(rewritten, &replacement)
+	}
+	return rewritten
 }
-
-// The shared constants these gap roots write, read from the shipped 4.3.3 source.
-const (
-	cssBoxShadowValue      = "var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow)"
-	cssConicGradientValue  = "conic-gradient(var(--tw-gradient-stops))"
-	cssLinearGradientValue = "linear-gradient(var(--tw-gradient-stops))"
-	cssRadialGradientValue = "radial-gradient(var(--tw-gradient-stops))"
-	cssMaskCompositeValue  = "intersect"
-)

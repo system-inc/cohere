@@ -8,5 +8,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // shared edit. The decoder is hand-written so a bare `"error"` configuration resolves to the
 // documented default; see DecodeNoInlineCommentsOptions.
 func init() {
-	rule.Register(rule.Registration{Rule: NoInlineComments, Decode: DecodeNoInlineCommentsOptions})
+	rule.Register(
+		rule.Registration[NoInlineCommentsOptions]{Rule: NoInlineComments, Decode: DecodeNoInlineCommentsOptions},
+	)
 }

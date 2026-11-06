@@ -10,39 +10,39 @@ import (
 
 // noDangerFile is where the fixtures pretend to live.
 //
-// A .tsx extension because the rule reads JSX, and NO file-suffix gate exists in this rule. Three
+// A .tsx extension because the rule reads JSX, and no file-suffix gate exists in this rule. Three
 // shipped react rules here gate on .tsx or .jsx, which is oxc-era residue rather than upstream
 // behavior, and TestNoDangerHasNoFileSuffixGate below pins the absence so nobody reintroduces it by
 // pattern-matching a neighbour.
 const noDangerFile = "/repository/source/Danger.tsx"
 
-// runNoDanger routes every option fixture through the rule's OWN exported decoder rather than
+// runNoDanger routes every option fixture through the rule's own exported decoder rather than
 // building the options struct directly.
 //
 // That is what puts the decoder under test, and it is the one line with no upstream counterpart.
 // A fixture handing RunWithOptions a struct would leave both the default fallback and the JSON tag
 // untested, and either could be wrong while every fixture stayed green.
 //
-// The raw JSON here is the BARE object, not upstream's [{...}] array. cohere's config layer unwraps
+// The raw JSON here is the bare object, not upstream's [{...}] array. cohere's config layer unwraps
 // the [severity, options] tuple before dispatch, so copying ESLint's spelling into a fixture fails
 // on every row.
-func runNoDanger(t *testing.T, sourceText string, rawOptions string) rule_testing.Result {
-	t.Helper()
-	var decoded any
+func runNoDanger(test *testing.T, sourceText string, rawOptions string) rule_testing.Result {
+	test.Helper()
+	var decoded NoDangerOptions
 	if rawOptions == "" {
-		var err error
-		decoded, err = DecodeNoDangerOptions(nil)
-		if err != nil {
-			t.Fatalf("decoding absent options: %v", err)
+		var decodeNoDangerOptionsError error
+		decoded, decodeNoDangerOptionsError = DecodeNoDangerOptions(nil)
+		if decodeNoDangerOptionsError != nil {
+			test.Fatalf("decoding absent options: %v", decodeNoDangerOptionsError)
 		}
 	} else {
-		var err error
-		decoded, err = DecodeNoDangerOptions(json.RawMessage(rawOptions))
-		if err != nil {
-			t.Fatalf("decoding %s: %v", rawOptions, err)
+		var decodeNoDangerOptionsError error
+		decoded, decodeNoDangerOptionsError = DecodeNoDangerOptions(json.RawMessage(rawOptions))
+		if decodeNoDangerOptionsError != nil {
+			test.Fatalf("decoding %s: %v", rawOptions, decodeNoDangerOptionsError)
 		}
 	}
-	return rule_testing.RunWithOptions(t, NoDanger, noDangerFile, sourceText, decoded)
+	return rule_testing.RunWithOptions(test, NoDanger, noDangerFile, sourceText, decoded)
 }
 
 // The corpus is eslint-plugin-react's own, imported verbatim from tests/lib/rules/no-danger.js by
@@ -50,14 +50,14 @@ func runNoDanger(t *testing.T, sourceText string, rawOptions string) rule_testin
 // case was retyped and no escape could be cooked on the way in. 6 valid and 7 invalid.
 //
 // The options column matters more here than in most corpora: four of the 6 valid cases and six of
-// the 7 invalid ones carry customComponentNames, and one input appears in BOTH lists separated
+// the 7 invalid ones carry customComponentNames, and one input appears in both lists separated
 // only by its pattern. <TextMUI> is clean under ["MUI*"] and reports under ["*MUI"], which is the
 // single best case in this corpus because it pins the glob dialect rather than the rule's shape.
 //
-// The last invalid case names THREE entries in its errors array, so its finding count is upstream's
+// The last invalid case names three entries in its errors array, so its finding count is upstream's
 // statement rather than my inference.
-func TestNoDangerFires(t *testing.T) {
-	t.Parallel()
+func TestNoDangerFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -65,24 +65,48 @@ func TestNoDangerFires(t *testing.T) {
 		findings   []string
 	}{
 		{"<div dangerouslySetInnerHTML={{ __html: \"\" }}></div>;", "", []string{"dangerousProp"}},
-		{"<App dangerouslySetInnerHTML={{ __html: \"<span>hello</span>\" }} />;", "{\"customComponentNames\":[\"*\"]}", []string{"dangerousProp"}},
-		{"\n        function App() {\n          return <Title dangerouslySetInnerHTML={{ __html: \"<span>hello</span>\" }} />;\n        }\n      ", "{\"customComponentNames\":[\"Title\"]}", []string{"dangerousProp"}},
-		{"\n        function App() {\n          return <TextFoo dangerouslySetInnerHTML={{ __html: \"<span>hello</span>\" }} />;\n        }\n      ", "{\"customComponentNames\":[\"*Foo\"]}", []string{"dangerousProp"}},
-		{"\n        function App() {\n          return <FooText dangerouslySetInnerHTML={{ __html: \"<span>hello</span>\" }} />;\n        }\n      ", "{\"customComponentNames\":[\"Foo*\"]}", []string{"dangerousProp"}},
-		{"\n        function App() {\n          return <TextMUI dangerouslySetInnerHTML={{ __html: \"<span>hello</span>\" }} />;\n        }\n      ", "{\"customComponentNames\":[\"*MUI\"]}", []string{"dangerousProp"}},
-		{"\n        import type { ComponentProps } from \"react\";\n\n        const Comp = \"div\";\n        const Component = () => <></>;\n\n        const NestedComponent = (_props: ComponentProps<\"div\">) => <></>;\n\n        Component.NestedComponent = NestedComponent;\n\n        function App() {\n          return (\n            <>\n              <div dangerouslySetInnerHTML={{ __html: \"<div>aaa</div>\" }} />\n              <Comp dangerouslySetInnerHTML={{ __html: \"<div>aaa</div>\" }} />\n\n              <Component.NestedComponent\n                dangerouslySetInnerHTML={{ __html: '<div>aaa</div>' }}\n              />\n            </>\n          );\n        }\n      ", "{\"customComponentNames\":[\"*\"]}", []string{"dangerousProp", "dangerousProp", "dangerousProp"}},
+		{
+			"<App dangerouslySetInnerHTML={{ __html: \"<span>hello</span>\" }} />;",
+			"{\"customComponentNames\":[\"*\"]}",
+			[]string{"dangerousProp"},
+		},
+		{
+			"\n        function App() {\n          return <Title dangerouslySetInnerHTML={{ __html: \"<span>hello</span>\" }} />;\n        }\n      ",
+			"{\"customComponentNames\":[\"Title\"]}",
+			[]string{"dangerousProp"},
+		},
+		{
+			"\n        function App() {\n          return <TextFoo dangerouslySetInnerHTML={{ __html: \"<span>hello</span>\" }} />;\n        }\n      ",
+			"{\"customComponentNames\":[\"*Foo\"]}",
+			[]string{"dangerousProp"},
+		},
+		{
+			"\n        function App() {\n          return <FooText dangerouslySetInnerHTML={{ __html: \"<span>hello</span>\" }} />;\n        }\n      ",
+			"{\"customComponentNames\":[\"Foo*\"]}",
+			[]string{"dangerousProp"},
+		},
+		{
+			"\n        function App() {\n          return <TextMUI dangerouslySetInnerHTML={{ __html: \"<span>hello</span>\" }} />;\n        }\n      ",
+			"{\"customComponentNames\":[\"*MUI\"]}",
+			[]string{"dangerousProp"},
+		},
+		{
+			"\n        import type { ComponentProps } from \"react\";\n\n        const Comp = \"div\";\n        const Component = () => <></>;\n\n        const NestedComponent = (_props: ComponentProps<\"div\">) => <></>;\n\n        Component.NestedComponent = NestedComponent;\n\n        function App() {\n          return (\n            <>\n              <div dangerouslySetInnerHTML={{ __html: \"<div>aaa</div>\" }} />\n              <Comp dangerouslySetInnerHTML={{ __html: \"<div>aaa</div>\" }} />\n\n              <Component.NestedComponent\n                dangerouslySetInnerHTML={{ __html: '<div>aaa</div>' }}\n              />\n            </>\n          );\n        }\n      ",
+			"{\"customComponentNames\":[\"*\"]}",
+			[]string{"dangerousProp", "dangerousProp", "dangerousProp"},
+		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := runNoDanger(t, testCase.sourceText, testCase.options)
-			rule_testing.ExpectFindings(t, result, testCase.findings...)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := runNoDanger(test, testCase.sourceText, testCase.options)
+			rule_testing.ExpectFindings(test, result, testCase.findings...)
 		})
 	}
 }
 
-func TestNoDangerStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoDangerStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -92,14 +116,20 @@ func TestNoDangerStaysSilent(t *testing.T) {
 		{"<App dangerouslySetInnerHTML={{ __html: \"\" }} />;", ""},
 		{"<div className=\"bar\"></div>;", ""},
 		{"<div className=\"bar\"></div>;", "{\"customComponentNames\":[\"*\"]}"},
-		{"\n        function App() {\n          return <Title dangerouslySetInnerHTML={{ __html: \"<span>hello</span>\" }} />;\n        }\n      ", "{\"customComponentNames\":[\"Home\"]}"},
-		{"\n        function App() {\n          return <TextMUI dangerouslySetInnerHTML={{ __html: \"<span>hello</span>\" }} />;\n        }\n      ", "{\"customComponentNames\":[\"MUI*\"]}"},
+		{
+			"\n        function App() {\n          return <Title dangerouslySetInnerHTML={{ __html: \"<span>hello</span>\" }} />;\n        }\n      ",
+			"{\"customComponentNames\":[\"Home\"]}",
+		},
+		{
+			"\n        function App() {\n          return <TextMUI dangerouslySetInnerHTML={{ __html: \"<span>hello</span>\" }} />;\n        }\n      ",
+			"{\"customComponentNames\":[\"MUI*\"]}",
+		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := runNoDanger(t, testCase.sourceText, testCase.options)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := runNoDanger(test, testCase.sourceText, testCase.options)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -108,14 +138,14 @@ func TestNoDangerStaysSilent(t *testing.T) {
 // eslint-plugin-react through the Linter API before being written here, except where noted as a
 // deliberate divergence.
 
-// TestNoDangerElementNameBoundary pins WHICH tags count as DOM elements.
+// TestNoDangerElementNameBoundary pins which tags count as DOM elements.
 //
 // Upstream renders the tag to a string and tests /^[a-z]/ against it, so this is a first-character
 // test on a rendered name rather than a check for an intrinsic element. The dotted and namespaced
 // lines are the ones that look wrong and are not: a port testing "is the tag a lowercase Identifier"
 // would be silent on both and pass every imported fixture, because the corpus writes neither.
-func TestNoDangerElementNameBoundary(t *testing.T) {
-	t.Parallel()
+func TestNoDangerElementNameBoundary(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -123,30 +153,46 @@ func TestNoDangerElementNameBoundary(t *testing.T) {
 		findings   []string
 	}{
 		{"a plain DOM element", "<div dangerouslySetInnerHTML={{__html:''}} />;", []string{"dangerousProp"}},
-		{"a custom element, still lowercase", "<x-custom dangerouslySetInnerHTML={{__html:''}} />;", []string{"dangerousProp"}},
-		{"a dotted tag whose first character is lowercase", "<a.b dangerouslySetInnerHTML={{__html:''}} />;", []string{"dangerousProp"}},
-		{"a namespaced tag whose first character is lowercase", "<div:ns dangerouslySetInnerHTML={{__html:''}} />;", []string{"dangerousProp"}},
+		{
+			"a custom element, still lowercase",
+			"<x-custom dangerouslySetInnerHTML={{__html:''}} />;",
+			[]string{"dangerousProp"},
+		},
+		{
+			"a dotted tag whose first character is lowercase",
+			"<a.b dangerouslySetInnerHTML={{__html:''}} />;",
+			[]string{"dangerousProp"},
+		},
+		{
+			"a namespaced tag whose first character is lowercase",
+			"<div:ns dangerouslySetInnerHTML={{__html:''}} />;",
+			[]string{"dangerousProp"},
+		},
 		{"a component is silent by the capital", "<App dangerouslySetInnerHTML={{__html:''}} />;", nil},
 		{"and so is a dotted one", "<A.B dangerouslySetInnerHTML={{__html:''}} />;", nil},
-		{"a paired tag reports on the attribute of the opening element", "<div dangerouslySetInnerHTML={{__html:''}}></div>;", []string{"dangerousProp"}},
+		{
+			"a paired tag reports on the attribute of the opening element",
+			"<div dangerouslySetInnerHTML={{__html:''}}></div>;",
+			[]string{"dangerousProp"},
+		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runNoDanger(t, testCase.sourceText, "")
-			rule_testing.ExpectFindings(t, result, testCase.findings...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runNoDanger(test, testCase.sourceText, "")
+			rule_testing.ExpectFindings(test, result, testCase.findings...)
 		})
 	}
 }
 
-// TestNoDangerAttributeNameBoundary pins WHICH attribute spellings count.
+// TestNoDangerAttributeNameBoundary pins which attribute spellings count.
 //
-// The comparison is exact and case-sensitive, and the attribute's VALUE is never examined. The last
+// The comparison is exact and case-sensitive, and the attribute's value is never examined. The last
 // two lines matter for a reason no fixture makes obvious: reaching for the attribute's expression
 // would be the natural way to write this rule and would panic on the string-valued form, which the
 // port brief names as a crash class that costs a whole file.
-func TestNoDangerAttributeNameBoundary(t *testing.T) {
-	t.Parallel()
+func TestNoDangerAttributeNameBoundary(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -160,29 +206,37 @@ func TestNoDangerAttributeNameBoundary(t *testing.T) {
 		{"an unrelated attribute", "<div className=\"bar\" />;", nil},
 		{"a spread carries no name and is skipped, even though it may supply the property", "<div {...props} />;", nil},
 		{"a bare attribute with no value still reports", "<div dangerouslySetInnerHTML />;", []string{"dangerousProp"}},
-		{"and a string-valued one does too, which is where a value-reading port would panic", "<div dangerouslySetInnerHTML=\"x\" />;", []string{"dangerousProp"}},
-		{"written twice reports twice, because the loop does not stop at the first", "<div dangerouslySetInnerHTML={{__html:''}} dangerouslySetInnerHTML={{__html:''}} />;", []string{"dangerousProp", "dangerousProp"}},
+		{
+			"and a string-valued one does too, which is where a value-reading port would panic",
+			"<div dangerouslySetInnerHTML=\"x\" />;",
+			[]string{"dangerousProp"},
+		},
+		{
+			"written twice reports twice, because the loop does not stop at the first",
+			"<div dangerouslySetInnerHTML={{__html:''}} dangerouslySetInnerHTML={{__html:''}} />;",
+			[]string{"dangerousProp", "dangerousProp"},
+		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runNoDanger(t, testCase.sourceText, "")
-			rule_testing.ExpectFindings(t, result, testCase.findings...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runNoDanger(test, testCase.sourceText, "")
+			rule_testing.ExpectFindings(test, result, testCase.findings...)
 		})
 	}
 }
 
 // TestNoDangerCustomComponentNames pins the glob dialect and the two declined upstream defects.
 //
-// The first four rows are the dialect, and MUI* against TextMUI is the one that looks wrong: both
-// minimatch and filepath.Match say false, and upstream's corpus has exactly that pair in its VALID
+// The first four rows are the dialect, and `MUI*` against `TextMUI` is the one that looks wrong: both
+// minimatch and filepath.Match say false, and upstream's corpus has exactly that pair in its valid
 // list, so a port that "fixed" it would break an imported clean case.
 //
-// The last three rows are DELIBERATE DIVERGENCES, not measurements of agreement, and each is stated
+// The last three rows are deliberate divergences, not measurements of agreement, and each is stated
 // at the line. Upstream compares against a name it builds with a shallow expression that is not the
 // one it renders elsewhere, and the two shapes below are where that expression breaks.
-func TestNoDangerCustomComponentNames(t *testing.T) {
-	t.Parallel()
+func TestNoDangerCustomComponentNames(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -190,150 +244,226 @@ func TestNoDangerCustomComponentNames(t *testing.T) {
 		options    string
 		findings   []string
 	}{
-		{"a star matches any component", "<App dangerouslySetInnerHTML={{__html:''}} />;", `{"customComponentNames":["*"]}`, []string{"dangerousProp"}},
-		{"an exact name matches itself", "<Title dangerouslySetInnerHTML={{__html:''}} />;", `{"customComponentNames":["Title"]}`, []string{"dangerousProp"}},
-		{"a different exact name does not", "<Title dangerouslySetInnerHTML={{__html:''}} />;", `{"customComponentNames":["Home"]}`, nil},
-		{"a trailing star anchors the prefix, so MUI* does not match TextMUI", "<TextMUI dangerouslySetInnerHTML={{__html:''}} />;", `{"customComponentNames":["MUI*"]}`, nil},
-		{"a leading star does match it", "<TextMUI dangerouslySetInnerHTML={{__html:''}} />;", `{"customComponentNames":["*MUI"]}`, []string{"dangerousProp"}},
-		{"an empty list checks nothing extra", "<App dangerouslySetInnerHTML={{__html:''}} />;", `{"customComponentNames":[]}`, nil},
+		{
+			"a star matches any component",
+			"<App dangerouslySetInnerHTML={{__html:''}} />;",
+			`{"customComponentNames":["*"]}`,
+			[]string{"dangerousProp"},
+		},
+		{
+			"an exact name matches itself",
+			"<Title dangerouslySetInnerHTML={{__html:''}} />;",
+			`{"customComponentNames":["Title"]}`,
+			[]string{"dangerousProp"},
+		},
+		{
+			"a different exact name does not",
+			"<Title dangerouslySetInnerHTML={{__html:''}} />;",
+			`{"customComponentNames":["Home"]}`,
+			nil,
+		},
+		{
+			"a trailing star anchors the prefix, so MUI* does not match TextMUI",
+			"<TextMUI dangerouslySetInnerHTML={{__html:''}} />;",
+			`{"customComponentNames":["MUI*"]}`,
+			nil,
+		},
+		{
+			"a leading star does match it",
+			"<TextMUI dangerouslySetInnerHTML={{__html:''}} />;",
+			`{"customComponentNames":["*MUI"]}`,
+			[]string{"dangerousProp"},
+		},
+		{
+			"an empty list checks nothing extra",
+			"<App dangerouslySetInnerHTML={{__html:''}} />;",
+			`{"customComponentNames":[]}`,
+			nil,
+		},
 		{"an absent key behaves as an empty list", "<App dangerouslySetInnerHTML={{__html:''}} />;", `{}`, nil},
-		{"a DOM element still reports whatever the option says", "<div dangerouslySetInnerHTML={{__html:''}} />;", `{"customComponentNames":["Nothing"]}`, []string{"dangerousProp"}},
+		{
+			"a DOM element still reports whatever the option says",
+			"<div dangerouslySetInnerHTML={{__html:''}} />;",
+			`{"customComponentNames":["Nothing"]}`,
+			[]string{"dangerousProp"},
+		},
 
-		// DIVERGENCE. Upstream builds the compared name with an expression that does not recurse
+		// Divergence. Upstream builds the compared name with an expression that does not recurse
 		// through a nested member, so <A.B.C /> renders as "undefined.C" there. Measured
-		// behaviorally: with ["A.B.C"] upstream is SILENT and with ["undefined.C"] it REPORTS.
+		// behaviorally: with ["A.B.C"] upstream is silent and with ["undefined.C"] it reports.
 		// Declined, because carrying it means matching a pattern nobody would write.
-		{"a nested member renders fully here, which upstream does not", "<A.B.C dangerouslySetInnerHTML={{__html:''}} />;", `{"customComponentNames":["A.B.C"]}`, []string{"dangerousProp"}},
-		{"a two-part member matches under both", "<A.B dangerouslySetInnerHTML={{__html:''}} />;", `{"customComponentNames":["A.B"]}`, []string{"dangerousProp"}},
+		{
+			"a nested member renders fully here, which upstream does not",
+			"<A.B.C dangerouslySetInnerHTML={{__html:''}} />;",
+			`{"customComponentNames":["A.B.C"]}`,
+			[]string{"dangerousProp"},
+		},
+		{
+			"a two-part member matches under both",
+			"<A.B dangerouslySetInnerHTML={{__html:''}} />;",
+			`{"customComponentNames":["A.B"]}`,
+			[]string{"dangerousProp"},
+		},
 
-		// DIVERGENCE, and this one is a CRASH upstream rather than a wrong answer. The same
-		// expression yields the name NODE for a namespaced tag, minimatch calls split on an object
+		// Divergence, and this one is a crash upstream rather than a wrong answer. The same
+		// expression yields the name node for a namespaced tag, minimatch calls split on an object
 		// and throws a TypeError that takes down the lint run for that file. Reproduced directly
 		// against the installed build. Declined, because reproducing it would take a file away
 		// from every rule, the walk recovering per file rather than per rule.
 		//
-		// The tag has to carry a CAPITAL namespace to reach the option path at all, which is a
+		// The tag has to carry a capital namespace to reach the option path at all, which is a
 		// distinction I got wrong first and the fixture caught. A lowercase one renders as
 		// "ns:App", whose first character is lowercase, so it is a DOM element by the regex above
 		// and reports with no options set. Both lines measured on the installed build: <ns:App>
-		// with no options REPORTS, and <Ns:App> with any customComponentNames CRASHES.
-		{"a lowercase namespace is a DOM element and needs no option", "<ns:App dangerouslySetInnerHTML={{__html:''}} />;", "", []string{"dangerousProp"}},
-		{"a capital namespace is not, and is silent unconfigured", "<Ns:App dangerouslySetInnerHTML={{__html:''}} />;", "", nil},
-		{"and matches its rendered name rather than crashing, which is where upstream throws", "<Ns:App dangerouslySetInnerHTML={{__html:''}} />;", `{"customComponentNames":["Ns:App"]}`, []string{"dangerousProp"}},
-		{"declining cleanly on a pattern that does not match, where upstream also throws", "<Ns:App dangerouslySetInnerHTML={{__html:''}} />;", `{"customComponentNames":["Other"]}`, nil},
+		// with no options reports, and <Ns:App> with any customComponentNames crashes.
+		{
+			"a lowercase namespace is a DOM element and needs no option",
+			"<ns:App dangerouslySetInnerHTML={{__html:''}} />;",
+			"",
+			[]string{"dangerousProp"},
+		},
+		{
+			"a capital namespace is not, and is silent unconfigured",
+			"<Ns:App dangerouslySetInnerHTML={{__html:''}} />;",
+			"",
+			nil,
+		},
+		{
+			"and matches its rendered name rather than crashing, which is where upstream throws",
+			"<Ns:App dangerouslySetInnerHTML={{__html:''}} />;",
+			`{"customComponentNames":["Ns:App"]}`,
+			[]string{"dangerousProp"},
+		},
+		{
+			"declining cleanly on a pattern that does not match, where upstream also throws",
+			"<Ns:App dangerouslySetInnerHTML={{__html:''}} />;",
+			`{"customComponentNames":["Other"]}`,
+			nil,
+		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runNoDanger(t, testCase.sourceText, testCase.options)
-			rule_testing.ExpectFindings(t, result, testCase.findings...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runNoDanger(test, testCase.sourceText, testCase.options)
+			rule_testing.ExpectFindings(test, result, testCase.findings...)
 		})
 	}
 }
 
 // TestNoDangerDecodesOptions exercises the decoder directly, including the unconfigured path.
 //
-// A rule configured as a bare severity is handed nil rather than a struct, and the port brief
+// A rule configured as a bare severity hands its decoder empty input rather than an object, and the port brief
 // records a rule that registered on 3,407 files and was completely inert because nothing in its
 // suite reached that path. Every fixture above goes through the decoder, so this is what covers the
 // nil input and the JSON tag, neither of which has an upstream counterpart.
-func TestNoDangerDecodesOptions(t *testing.T) {
-	t.Parallel()
+func TestNoDangerDecodesOptions(test *testing.T) {
+	test.Parallel()
 
-	t.Run("absent options give the documented default", func(t *testing.T) {
-		t.Parallel()
-		decoded, err := DecodeNoDangerOptions(nil)
-		if err != nil {
-			t.Fatalf("decoding nil: %v", err)
+	test.Run("absent options give the documented default", func(test *testing.T) {
+		test.Parallel()
+		decoded, decodeNoDangerOptionsError := DecodeNoDangerOptions(nil)
+		if decodeNoDangerOptionsError != nil {
+			test.Fatalf("decoding nil: %v", decodeNoDangerOptionsError)
 		}
-		settings, ok := decoded.(NoDangerOptions)
-		if !ok {
-			t.Fatalf("decoded to %T", decoded)
-		}
-		if len(settings.CustomComponentNames) != 0 {
-			t.Fatalf("default custom names were %v, wanted none", settings.CustomComponentNames)
+		if len(decoded.CustomComponentNames) != 0 {
+			test.Fatalf("default custom names were %v, wanted none", decoded.CustomComponentNames)
 		}
 	})
 
-	t.Run("the wire name is customComponentNames", func(t *testing.T) {
-		t.Parallel()
-		decoded, err := DecodeNoDangerOptions(json.RawMessage(`{"customComponentNames":["A","B*"]}`))
-		if err != nil {
-			t.Fatalf("decoding: %v", err)
+	test.Run("the wire name is customComponentNames", func(test *testing.T) {
+		test.Parallel()
+		decoded, decodeNoDangerOptionsError := DecodeNoDangerOptions(
+			json.RawMessage(`{"customComponentNames":["A","B*"]}`),
+		)
+		if decodeNoDangerOptionsError != nil {
+			test.Fatalf("decoding: %v", decodeNoDangerOptionsError)
 		}
-		settings := decoded.(NoDangerOptions)
-		if len(settings.CustomComponentNames) != 2 || settings.CustomComponentNames[0] != "A" || settings.CustomComponentNames[1] != "B*" {
-			t.Fatalf("decoded to %v", settings.CustomComponentNames)
-		}
-	})
-
-	t.Run("an unknown key is accepted and ignored, matching a schema without additionalProperties false", func(t *testing.T) {
-		t.Parallel()
-		decoded, err := DecodeNoDangerOptions(json.RawMessage(`{"somethingElse":1}`))
-		if err != nil {
-			t.Fatalf("decoding: %v", err)
-		}
-		if len(decoded.(NoDangerOptions).CustomComponentNames) != 0 {
-			t.Fatal("unknown key changed the options")
+		if len(decoded.CustomComponentNames) != 2 ||
+			decoded.CustomComponentNames[0] != "A" ||
+			decoded.CustomComponentNames[1] != "B*" {
+			test.Fatalf("decoded to %v", decoded.CustomComponentNames)
 		}
 	})
 
-	t.Run("the rule falls back to the default when handed nil rather than the struct", func(t *testing.T) {
-		t.Parallel()
+	test.Run("an unknown key is accepted and ignored, matching a schema without additionalProperties false", func(
+		test *testing.T,
+	) {
+		test.Parallel()
+		decoded, decodeNoDangerOptionsError := DecodeNoDangerOptions(json.RawMessage(`{"somethingElse":1}`))
+		if decodeNoDangerOptionsError != nil {
+			test.Fatalf("decoding: %v", decodeNoDangerOptionsError)
+		}
+		if len(decoded.CustomComponentNames) != 0 {
+			test.Fatal("unknown key changed the options")
+		}
+	})
+
+	test.Run("the rule falls back to the default when handed nil rather than the struct", func(test *testing.T) {
+		test.Parallel()
 		// This bypasses the decoder entirely, which is the one path every other fixture misses.
 		//
-		// The COMPONENT is the case that measures anything, and a first version of this used a
+		// The component is the case that measures anything, and a first version of this used a
 		// <div>. That was a fixture over a distinction it could not see: a div reports under the
-		// real default AND under a wrong fallback of ["*"], so both paths reach the same verdict
-		// and a mutation of the fallback SURVIVED. A component separates them, because it reports
+		// real default and under a wrong fallback of ["*"], so both paths reach the same verdict
+		// and a mutation of the fallback survived. A component separates them, because it reports
 		// only if the fallback wrongly matches everything.
 		//
 		// This is the port brief's point that a survivor needs an input on which the two versions
-		// produce different OUTPUT rather than merely take different internal paths.
-		component := rule_testing.RunWithOptions(t, NoDanger, noDangerFile, "<App dangerouslySetInnerHTML={{__html:''}} />;", nil)
-		rule_testing.ExpectClean(t, component)
+		// produce different output rather than merely take different internal paths.
+		component := rule_testing.Run(
+			test,
+			NoDanger,
+			noDangerFile,
+			"<App dangerouslySetInnerHTML={{__html:''}} />;",
+		)
+		rule_testing.ExpectClean(test, component)
 
-		element := rule_testing.RunWithOptions(t, NoDanger, noDangerFile, "<div dangerouslySetInnerHTML={{__html:''}} />;", nil)
-		rule_testing.ExpectFindings(t, element, "dangerousProp")
+		element := rule_testing.Run(
+			test,
+			NoDanger,
+			noDangerFile,
+			"<div dangerouslySetInnerHTML={{__html:''}} />;",
+		)
+		rule_testing.ExpectFindings(test, element, "dangerousProp")
 	})
 }
 
-// TestNoDangerSpanAndMessage asserts WHERE the finding points and WHAT it says.
+// TestNoDangerSpanAndMessage asserts where the finding points and what it says.
 //
 // Upstream reports on the JSXAttribute rather than on the element, measured: the span for
 // <div dangerouslySetInnerHTML={{__html:'}} /> runs columns 6 to 43, which is the attribute alone.
 // ExpectFindings cannot see any of this, so a rule anchoring on the element would pass every fixture
 // above while pointing somewhere the reader was never shown.
-func TestNoDangerSpanAndMessage(t *testing.T) {
-	t.Parallel()
+func TestNoDangerSpanAndMessage(test *testing.T) {
+	test.Parallel()
 
-	t.Run("the finding points at the attribute, not the element", func(t *testing.T) {
-		t.Parallel()
+	test.Run("the finding points at the attribute, not the element", func(test *testing.T) {
+		test.Parallel()
 		const sourceText = "const a = <div dangerouslySetInnerHTML={{__html:''}} />;"
 		const want = "dangerouslySetInnerHTML={{__html:''}}"
-		result := runNoDanger(t, sourceText, "")
-		rule_testing.ExpectFindings(t, result, "dangerousProp")
+		result := runNoDanger(test, sourceText, "")
+		rule_testing.ExpectFindings(test, result, "dangerousProp")
 		reported := result.SourceFile.Text()[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 		if reported != want {
-			t.Fatalf("reported on %q, wanted %q", reported, want)
+			test.Fatalf("reported on %q, wanted %q", reported, want)
 		}
 	})
 
-	t.Run("a bare attribute spans just the name", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a bare attribute spans just the name", func(test *testing.T) {
+		test.Parallel()
 		const sourceText = "const a = <div dangerouslySetInnerHTML />;"
-		result := runNoDanger(t, sourceText, "")
-		rule_testing.ExpectFindings(t, result, "dangerousProp")
+		result := runNoDanger(test, sourceText, "")
+		rule_testing.ExpectFindings(test, result, "dangerousProp")
 		reported := result.SourceFile.Text()[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 		if reported != "dangerouslySetInnerHTML" {
-			t.Fatalf("reported on %q", reported)
+			test.Fatalf("reported on %q", reported)
 		}
 	})
 
-	t.Run("the message names the property and explains the defect", func(t *testing.T) {
-		t.Parallel()
-		result := runNoDanger(t, "<div dangerouslySetInnerHTML={{__html:''}} />;", "")
-		rule_testing.ExpectFindings(t, result, "dangerousProp")
+	test.Run("the message names the property and explains the defect", func(test *testing.T) {
+		test.Parallel()
+		result := runNoDanger(test, "<div dangerouslySetInnerHTML={{__html:''}} />;", "")
+		rule_testing.ExpectFindings(test, result, "dangerousProp")
 		got := result.Diagnostics[0].Message.Description
 		// Compared against a literal typed here rather than against the rule's own format string,
 		// because a comparison to the rule's own constant moves with it under mutation. Asserted as
@@ -341,10 +471,10 @@ func TestNoDangerSpanAndMessage(t *testing.T) {
 		// is not a guard.
 		const wantPrefix = "This element sets dangerouslySetInnerHTML, which hands React a raw string"
 		if !strings.HasPrefix(got, wantPrefix) {
-			t.Fatalf("message was %q, wanted it to start %q", got, wantPrefix)
+			test.Fatalf("message was %q, wanted it to start %q", got, wantPrefix)
 		}
 		if result.Diagnostics[0].Message.Id != "dangerousProp" {
-			t.Fatalf("id was %q", result.Diagnostics[0].Message.Id)
+			test.Fatalf("id was %q", result.Diagnostics[0].Message.Id)
 		}
 	})
 }
@@ -352,11 +482,11 @@ func TestNoDangerSpanAndMessage(t *testing.T) {
 // TestNoDangerDoesNotPanicOnUnusualTagNames is crash protection, not a behavioral fixture.
 //
 // ast.Node.Text panics on a PropertyAccessExpression, measured with a probe, so a rule rendering an
-// arbitrary tag name through it would take the whole FILE down for all of this package's rules. No
-// ExpectFindings fixture can see a panic, so the sweep reports SURVIVED identically whether the
+// arbitrary tag name through it would take the whole file down for all of this package's rules. No
+// ExpectFindings fixture can see a panic, so the sweep reports `SURVIVED` identically whether the
 // part-by-part rendering matters or not. This names what it prevents.
-func TestNoDangerDoesNotPanicOnUnusualTagNames(t *testing.T) {
-	t.Parallel()
+func TestNoDangerDoesNotPanicOnUnusualTagNames(test *testing.T) {
+	test.Parallel()
 
 	for _, sourceText := range []string{
 		"<a.b.c.d dangerouslySetInnerHTML={{__html:''}} />;",
@@ -365,16 +495,16 @@ func TestNoDangerDoesNotPanicOnUnusualTagNames(t *testing.T) {
 		"<ns:tag className=\"x\" />;",
 		"<a.b></a.b>;",
 	} {
-		t.Run(sourceText, func(t *testing.T) {
-			t.Parallel()
+		test.Run(sourceText, func(test *testing.T) {
+			test.Parallel()
 			// The verdict is not the point; surviving the render is. Both verdicts are pinned in
 			// the boundary tables above for the shapes that have one.
-			runNoDanger(t, sourceText, `{"customComponentNames":["*"]}`)
+			runNoDanger(test, sourceText, `{"customComponentNames":["*"]}`)
 		})
 	}
 }
 
-// TestNoDangerHasNoFileSuffixGate pins the ABSENCE of a suffix gate.
+// TestNoDangerHasNoFileSuffixGate pins the absence of a suffix gate.
 //
 // Three shipped react rules in this package gate on .tsx or .jsx, which is oxc-era residue rather
 // than upstream behavior, and it blinds them to most of this tree. Measured against
@@ -383,22 +513,22 @@ func TestNoDangerDoesNotPanicOnUnusualTagNames(t *testing.T) {
 // A .ts file cannot hold JSX, so only the two JSX-capable suffixes can carry this rule's subject.
 // That is a fact about the language rather than about the rule, and it is stated here rather than
 // left as an unexplained narrowing.
-func TestNoDangerHasNoFileSuffixGate(t *testing.T) {
-	t.Parallel()
+func TestNoDangerHasNoFileSuffixGate(test *testing.T) {
+	test.Parallel()
 
 	const sourceText = "<div dangerouslySetInnerHTML={{__html:''}} />;"
 	for _, fileName := range []string{
 		"/repository/source/Danger.tsx",
 		"/repository/source/Danger.jsx",
 	} {
-		t.Run(fileName, func(t *testing.T) {
-			t.Parallel()
-			decoded, err := DecodeNoDangerOptions(nil)
-			if err != nil {
-				t.Fatalf("decoding: %v", err)
+		test.Run(fileName, func(test *testing.T) {
+			test.Parallel()
+			decoded, decodeNoDangerOptionsError := DecodeNoDangerOptions(nil)
+			if decodeNoDangerOptionsError != nil {
+				test.Fatalf("decoding: %v", decodeNoDangerOptionsError)
 			}
-			result := rule_testing.RunWithOptions(t, NoDanger, fileName, sourceText, decoded)
-			rule_testing.ExpectFindings(t, result, "dangerousProp")
+			result := rule_testing.RunWithOptions(test, NoDanger, fileName, sourceText, decoded)
+			rule_testing.ExpectFindings(test, result, "dangerousProp")
 		})
 	}
 }

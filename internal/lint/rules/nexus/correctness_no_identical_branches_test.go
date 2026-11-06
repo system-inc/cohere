@@ -88,25 +88,34 @@ func correctnessNoIdenticalBranchesReported(result rule_testing.Result, sourceTe
 	return reported
 }
 
-func correctnessNoIdenticalBranchesExpectSpans(t *testing.T, result rule_testing.Result, sourceText string, wantSpans []string) {
-	t.Helper()
+func correctnessNoIdenticalBranchesExpectSpans(
+	test *testing.T,
+	result rule_testing.Result,
+	sourceText string,
+	wantSpans []string,
+) {
+	test.Helper()
 	wantIds := make([]string, 0, len(wantSpans))
 	for range wantSpans {
 		wantIds = append(wantIds, correctnessNoIdenticalBranchesId)
 	}
-	rule_testing.ExpectFindings(t, result, wantIds...)
+	rule_testing.ExpectFindings(test, result, wantIds...)
 	reported := correctnessNoIdenticalBranchesReported(result, sourceText)
 	for index := range wantSpans {
 		if reported[index] != wantSpans[index] {
-			t.Fatalf("finding %d points at\n%s\nwant\n%s", index, reported[index], wantSpans[index])
+			test.Fatalf("finding %d points at\n%s\nwant\n%s", index, reported[index], wantSpans[index])
 		}
 	}
 	for _, diagnostic := range result.Diagnostics {
 		if diagnostic.Message.Description != correctnessNoIdenticalBranchesMessage().Description {
-			t.Fatalf("message is %q", diagnostic.Message.Description)
+			test.Fatalf("message is %q", diagnostic.Message.Description)
 		}
 		if len(diagnostic.Fixes) != 0 || len(diagnostic.Suggestions) != 0 {
-			t.Fatalf("expected no fix and no suggestion, got %d and %d", len(diagnostic.Fixes), len(diagnostic.Suggestions))
+			test.Fatalf(
+				"expected no fix and no suggestion, got %d and %d",
+				len(diagnostic.Fixes),
+				len(diagnostic.Suggestions),
+			)
 		}
 	}
 }
@@ -114,27 +123,37 @@ func correctnessNoIdenticalBranchesExpectSpans(t *testing.T, result rule_testing
 // The real site, before the fix: both payload builders, one finding each, on the ternary itself.
 // The other ternaries in the file (`is3 ? ... : highQuality ? ... : ...`, `hasTailImage ? '5' : '7'`)
 // differ and stay silent beside it.
-func TestCorrectnessNoIdenticalBranchesFiresOnKlingApi(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoIdenticalBranchesFiresOnKlingApi(test *testing.T) {
+	test.Parallel()
 
 	sourceText := correctnessNoIdenticalBranchesKlingApi("'pro'")
-	result := rule_testing.RunTyped(t, CorrectnessNoIdenticalBranches, correctnessNoIdenticalBranchesFile, sourceText)
-	correctnessNoIdenticalBranchesExpectSpans(t, result, sourceText, []string{
+	result := rule_testing.RunTyped(
+		test,
+		CorrectnessNoIdenticalBranches,
+		correctnessNoIdenticalBranchesFile,
+		sourceText,
+	)
+	correctnessNoIdenticalBranchesExpectSpans(test, result, sourceText, []string{
 		"highQuality ? 'pro' : 'pro'",
 		"highQuality ? 'pro' : 'pro'",
 	})
 }
 
 // The same file after the fix: the false side asks for the standard mode, and nothing fires.
-func TestCorrectnessNoIdenticalBranchesStaysSilentOnFixedKlingApi(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoIdenticalBranchesStaysSilentOnFixedKlingApi(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTyped(t, CorrectnessNoIdenticalBranches, correctnessNoIdenticalBranchesFile, correctnessNoIdenticalBranchesKlingApi("'std'"))
-	rule_testing.ExpectClean(t, result)
+	result := rule_testing.RunTyped(
+		test,
+		CorrectnessNoIdenticalBranches,
+		correctnessNoIdenticalBranchesFile,
+		correctnessNoIdenticalBranchesKlingApi("'std'"),
+	)
+	rule_testing.ExpectClean(test, result)
 }
 
-func TestCorrectnessNoIdenticalBranchesFires(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoIdenticalBranchesFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name      string
@@ -165,7 +184,9 @@ func TestCorrectnessNoIdenticalBranchesFires(t *testing.T) {
 			"            count+1 /* again */ );",
 			"    }",
 			"}",
-		}, []string{"if(ready) {\n        // keep it\n        save('count', count + 1);\n    }\n    else {\n        save( 'count' ,\n            count+1 /* again */ );\n    }"}},
+		}, []string{
+			"if(ready) {\n        // keep it\n        save('count', count + 1);\n    }\n    else {\n        save( 'count' ,\n            count+1 /* again */ );\n    }",
+		}},
 		{"a braced branch against the same statement unbraced", []string{
 			"declare function start(): void;",
 			"export function run(ready: boolean) {",
@@ -241,7 +262,9 @@ func TestCorrectnessNoIdenticalBranchesFires(t *testing.T) {
 			"              value: prompt",
 			"          };",
 			"}",
-		}, []string{"ready\n        ? { name: 'prompt', value: prompt }\n        : {\n              name: 'prompt',\n              value: prompt\n          }"}},
+		}, []string{
+			"ready\n        ? { name: 'prompt', value: prompt }\n        : {\n              name: 'prompt',\n              value: prompt\n          }",
+		}},
 		// ImportRequirePathAliasRule.ts:158 in ahra's nexus. The condition narrows a discriminated
 		// union, but the branch only reads a property, and reading a property of the union compiles
 		// exactly when reading it of each member does, so the condition really is ignored.
@@ -268,7 +291,9 @@ func TestCorrectnessNoIdenticalBranchesFires(t *testing.T) {
 			"    }",
 			"    return expiresAt;",
 			"}",
-		}, []string{"typeof parsed.expiresAt === 'number'\n                ? new Date(parsed.expiresAt)\n                : new Date(parsed.expiresAt)"}},
+		}, []string{
+			"typeof parsed.expiresAt === 'number'\n                ? new Date(parsed.expiresAt)\n                : new Date(parsed.expiresAt)",
+		}},
 		// The same `never` shape reaching a compared position, an operand of `*`: the first branch
 		// cannot run, the second sees the whole `number`, and the merged copy is the second branch.
 		{"an operator operand narrowed to never on one side", []string{
@@ -310,17 +335,22 @@ func TestCorrectnessNoIdenticalBranchesFires(t *testing.T) {
 		}, []string{"if(a) { if(c) p(); else q(); } else if(c) p(); else q();"}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			sourceText := correctnessNoIdenticalBranchesSource(testCase.lines...)
-			result := rule_testing.RunTyped(t, CorrectnessNoIdenticalBranches, correctnessNoIdenticalBranchesFile, sourceText)
-			correctnessNoIdenticalBranchesExpectSpans(t, result, sourceText, testCase.wantSpans)
+			result := rule_testing.RunTyped(
+				test,
+				CorrectnessNoIdenticalBranches,
+				correctnessNoIdenticalBranchesFile,
+				sourceText,
+			)
+			correctnessNoIdenticalBranchesExpectSpans(test, result, sourceText, testCase.wantSpans)
 		})
 	}
 }
 
-func TestCorrectnessNoIdenticalBranchesStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoIdenticalBranchesStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name  string
@@ -477,18 +507,23 @@ func TestCorrectnessNoIdenticalBranchesStaysSilent(t *testing.T) {
 		}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, CorrectnessNoIdenticalBranches, correctnessNoIdenticalBranchesFile, correctnessNoIdenticalBranchesSource(testCase.lines...))
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(
+				test,
+				CorrectnessNoIdenticalBranches,
+				correctnessNoIdenticalBranchesFile,
+				correctnessNoIdenticalBranchesSource(testCase.lines...),
+			)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
 
 // JSX text is not code: doubled spaces render, and `/* */` inside it is text. A scanner run over it
 // as code would call both pairs equal.
-func TestCorrectnessNoIdenticalBranchesJsx(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoIdenticalBranchesJsx(test *testing.T) {
+	test.Parallel()
 
 	silent := correctnessNoIdenticalBranchesSource(
 		"export function Label(props: { ready: boolean }) {",
@@ -497,27 +532,30 @@ func TestCorrectnessNoIdenticalBranchesJsx(t *testing.T) {
 		"    return <div>{first}{second}</div>;",
 		"}",
 	)
-	rule_testing.ExpectClean(t, rule_testing.RunTyped(t, CorrectnessNoIdenticalBranches, correctnessNoIdenticalBranchesJsxFile, silent))
+	rule_testing.ExpectClean(
+		test,
+		rule_testing.RunTyped(test, CorrectnessNoIdenticalBranches, correctnessNoIdenticalBranchesJsxFile, silent),
+	)
 
 	firing := correctnessNoIdenticalBranchesSource(
 		"export function Label(props: { ready: boolean }) {",
 		"    return props.ready ? <p className='label'>Ready</p> : <p className='label' >Ready</p>;",
 		"}",
 	)
-	result := rule_testing.RunTyped(t, CorrectnessNoIdenticalBranches, correctnessNoIdenticalBranchesJsxFile, firing)
-	correctnessNoIdenticalBranchesExpectSpans(t, result, firing, []string{
+	result := rule_testing.RunTyped(test, CorrectnessNoIdenticalBranches, correctnessNoIdenticalBranchesJsxFile, firing)
+	correctnessNoIdenticalBranchesExpectSpans(test, result, firing, []string{
 		"props.ready ? <p className='label'>Ready</p> : <p className='label' >Ready</p>",
 	})
 }
 
 // The rule declares the checker and declines a file without one, rather than reporting without the
 // narrowing guard.
-func TestCorrectnessNoIdenticalBranchesDeclinesWithoutAChecker(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoIdenticalBranchesDeclinesWithoutAChecker(test *testing.T) {
+	test.Parallel()
 	if !CorrectnessNoIdenticalBranches.NeedsTypeChecker {
-		t.Fatal("the rule must declare NeedsTypeChecker")
+		test.Fatal("the rule must declare NeedsTypeChecker")
 	}
-	if listeners := CorrectnessNoIdenticalBranches.Run(rule.Context{}, nil); listeners != nil {
-		t.Errorf("with no checker the rule must register no listeners, got %d", len(listeners))
+	if listeners := CorrectnessNoIdenticalBranches.Run(rule.Context{}, rule.Given[rule.NoOptions]{}); listeners != nil {
+		test.Errorf("with no checker the rule must register no listeners, got %d", len(listeners))
 	}
 }

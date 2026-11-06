@@ -28,19 +28,19 @@ import (
 // Files whose name begins with a dot are skipped too, as gofmt skips them. go/format is gofmt's own printer,
 // run in process and on every core rather than as a command. A file that does not parse fails too, since
 // gofmt stops the release on it as surely.
-func TestEveryGoFileCohereOwnsIsGofmtClean(t *testing.T) {
-	t.Parallel()
+func TestEveryGoFileCohereOwnsIsGofmtClean(test *testing.T) {
+	test.Parallel()
 
 	// This package sits two directories below the module root.
-	module, err := filepath.Abs(filepath.Join("..", ".."))
-	if err != nil {
-		t.Fatal(err)
+	module, absolutePathError := filepath.Abs(filepath.Join("..", ".."))
+	if absolutePathError != nil {
+		test.Fatal(absolutePathError)
 	}
 
 	var files []string
-	err = filepath.WalkDir(module, func(path string, entry fs.DirEntry, err error) error {
-		if err != nil {
-			return err
+	walkError := filepath.WalkDir(module, func(path string, entry fs.DirEntry, pathError error) error {
+		if pathError != nil {
+			return pathError
 		}
 		if entry.IsDir() {
 			if path != module && (path == filepath.Join(module, "TypeScript") ||
@@ -54,20 +54,24 @@ func TestEveryGoFileCohereOwnsIsGofmtClean(t *testing.T) {
 		}
 		return nil
 	})
-	if err != nil {
-		t.Fatal(err)
+	if walkError != nil {
+		test.Fatal(walkError)
 	}
 	// The same guard the release keeps: a walk that found nothing would pass over a tree nobody examined.
 	// The release's own set is required in particular, so a walk that lost it cannot pass on the rest.
 	var underReleaseSet int
 	for _, path := range files {
-		relative, _ := filepath.Rel(module, path)
-		if strings.HasPrefix(filepath.ToSlash(relative), "command/") || strings.HasPrefix(filepath.ToSlash(relative), "internal/") {
+		relative, relativeError := filepath.Rel(module, path)
+		if relativeError != nil {
+			test.Fatal(relativeError)
+		}
+		if strings.HasPrefix(filepath.ToSlash(relative), "command/") ||
+			strings.HasPrefix(filepath.ToSlash(relative), "internal/") {
 			underReleaseSet++
 		}
 	}
 	if underReleaseSet == 0 {
-		t.Fatal("found no Go files under command/ and internal/, so a clean answer would mean nothing")
+		test.Fatal("found no Go files under command/ and internal/, so a clean answer would mean nothing")
 	}
 
 	var mutex sync.Mutex
@@ -84,8 +88,12 @@ func TestEveryGoFileCohereOwnsIsGofmtClean(t *testing.T) {
 					continue
 				}
 				mutex.Lock()
-				relative, _ := filepath.Rel(module, path)
-				unformatted = append(unformatted, filepath.ToSlash(relative)+problem)
+				// A worker cannot end the test, so a path Rel cannot shorten is named in full instead.
+				named := path
+				if relative, relativeError := filepath.Rel(module, path); relativeError == nil {
+					named = filepath.ToSlash(relative)
+				}
+				unformatted = append(unformatted, named+problem)
 				mutex.Unlock()
 			}
 		}()
@@ -98,20 +106,24 @@ func TestEveryGoFileCohereOwnsIsGofmtClean(t *testing.T) {
 
 	if len(unformatted) > 0 {
 		sort.Strings(unformatted)
-		t.Fatalf("%d of %d Go files are not gofmt-clean, and any under command/ or internal/ would fail the release's first step; run `gofmt -w` on them:\n  %s",
-			len(unformatted), len(files), strings.Join(unformatted, "\n  "))
+		test.Fatalf(
+			"%d of %d Go files are not gofmt-clean, and any under command/ or internal/ would fail the release's first step; run `gofmt -w` on them:\n  %s",
+			len(unformatted),
+			len(files),
+			strings.Join(unformatted, "\n  "),
+		)
 	}
 }
 
 // gofmtProblem says what is wrong with one file, or nothing when gofmt would leave it as it is.
 func gofmtProblem(path string) string {
-	source, err := os.ReadFile(path)
-	if err != nil {
-		return " (unreadable: " + err.Error() + ")"
+	source, readError := os.ReadFile(path)
+	if readError != nil {
+		return " (unreadable: " + readError.Error() + ")"
 	}
-	formatted, err := format.Source(source)
-	if err != nil {
-		return " (does not parse: " + err.Error() + ")"
+	formatted, formatError := format.Source(source)
+	if formatError != nil {
+		return " (does not parse: " + formatError.Error() + ")"
 	}
 	if !bytes.Equal(source, formatted) {
 		return " (not formatted)"

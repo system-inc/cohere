@@ -7,10 +7,10 @@
 //
 // # Why this exists, which is a question the earlier stages did not have to answer
 //
-// Every pass in this package so far has read the HIR and written a side table. This one converts the
+// Every pass in this package so far has read the `HIR` and written a side table. This one converts the
 // IR itself into a different shape, and the reason is that the remaining work is not analysis. It is
 // reconstruction: `validatePreservedManualMemoization` and the eleven passes before it all run on a
-// TREE that resembles the source, not on a graph. A graph says "control reached here from three
+// tree that resembles the source, not on a graph. A graph says "control reached here from three
 // places"; a tree says "this is a while loop whose body is these statements". Getting from the first
 // to the second is what this file does.
 //
@@ -21,18 +21,18 @@
 // # What a ReactiveFunction is, in one paragraph
 //
 // A `ReactiveBlock` is a flat list of `ReactiveStatement`. A statement is one of four things: an
-// instruction, a terminal (which CONTAINS its own nested blocks, so an `if` holds its arms), a scope
-// block, or a pruned scope block. That containment is the whole difference from the HIR, where an
+// instruction, a terminal (which contains its own nested blocks, so an `if` holds its arms), a scope
+// block, or a pruned scope block. That containment is the whole difference from the `HIR`, where an
 // `If` terminal names its arms by id and the arms live in a flat block table.
 //
-// The second difference is `ReactiveValue`. In the HIR, `a && b`, `a ? b : c`, `(a, b)` and `a?.b`
-// are TERMINALS -- control-flow constructs with value blocks. Here they are VALUES, nested inside a
+// The second difference is `ReactiveValue`. In the `HIR`, `a && b`, `a ? b : c`, `(a, b)` and `a?.b`
+// are terminals -- control-flow constructs with value blocks. Here they are values, nested inside a
 // single instruction. That is what lets the tree be printed back as an expression.
 //
 // # Three-level input check, run before this file was written
 //
 // The instrument this package uses is: does the type exist, is it ever constructed, and does the
-// pass run on the IR we have. The third level is trivially satisfied here because this file BUILDS
+// pass run on the IR we have. The third level is trivially satisfied here because this file builds
 // the IR in question. The initial check found four gaps; optional lowering has since closed one:
 //
 //	terminal        declared   constructed   how this pass handles it
@@ -50,7 +50,7 @@
 // upstream passes that would set it are downstream of here. Declaring the terminal to satisfy this
 // file would create a switchable variant nothing builds.
 //
-// # DIVERGENCE FROM React: labels are emitted for every terminal there and here
+// # Divergence from React: labels are emitted for every terminal there and here
 //
 // Upstream's own comment says it "naively emits labels for *all* terminals: see PruneUnusedLabels
 // which removes unnecessary labels". That pruning pass is not in this tree, so this output carries
@@ -86,8 +86,8 @@ type ReactiveFunction struct {
 	Name string
 	// Kind records the component/hook guess, carried from the source function.
 	Kind FunctionKind
-	// Params are the parameter values, in order.
-	Params []Place
+	// Parameters are the parameter values, in order.
+	Parameters []Place
 	// Body is the tree.
 	Body ReactiveBlock
 }
@@ -110,8 +110,8 @@ type ReactiveInstructionStatement struct {
 
 // ReactiveTerminalStatement is a control-flow construct and everything nested inside it.
 //
-// This is the variant that makes the structure a tree. The HIR's `If` names its arms by BlockId;
-// this one HOLDS them.
+// This is the variant that makes the structure a tree. The `HIR`'s `If` names its arms by BlockId;
+// this one holds them.
 type ReactiveTerminalStatement struct {
 	Terminal ReactiveTerminal
 	// Label is the block this terminal can be broken out of, and whether the label is implicit.
@@ -164,7 +164,7 @@ func (*ReactiveScopeBlock) reactiveStatement()           {}
 
 // ReactiveInstruction is one instruction in the tree.
 //
-// `LValue` is a POINTER rather than a value, because upstream's is nullable and the distinction is
+// `LValue` is a pointer rather than a value, because upstream's is nullable and the distinction is
 // load-bearing: an instruction whose result is discarded has no lvalue, and a zero `Place` would be
 // indistinguishable from a real place naming identifier zero.
 type ReactiveInstruction struct {
@@ -175,25 +175,25 @@ type ReactiveInstruction struct {
 
 // ReactiveValue is what an instruction computes.
 //
-// The set is closed. Either a plain HIR `InstructionValue`, or one of the four COMPOSITE values that
+// The set is closed. Either a plain `HIR` `InstructionValue`, or one of the four composite values that
 // exist only in this form -- the ones that are terminals in the graph and expressions in the tree.
 type ReactiveValue interface {
 	reactiveValue()
 }
 
-// ReactiveInstructionValue wraps a plain HIR instruction value.
+// ReactiveInstructionValue wraps a plain `HIR` instruction value.
 type ReactiveInstructionValue struct {
 	Value InstructionValue
 }
 
-// ReactiveLogicalValue is `a && b` or `a || b`, which the HIR holds as a `Logical` terminal.
+// ReactiveLogicalValue is `a && b` or `a || b`, which the `HIR` holds as a `Logical` terminal.
 type ReactiveLogicalValue struct {
 	Operator string
 	Left     ReactiveValue
 	Right    ReactiveValue
 }
 
-// ReactiveTernaryValue is `a ? b : c`, which the HIR holds as a `Ternary` terminal.
+// ReactiveTernaryValue is `a ? b : c`, which the `HIR` holds as a `Ternary` terminal.
 type ReactiveTernaryValue struct {
 	Test       ReactiveValue
 	Consequent ReactiveValue
@@ -210,7 +210,7 @@ type ReactiveSequenceValue struct {
 	Value        ReactiveValue
 }
 
-// ReactiveOptionalValue is `a?.b`, which the HIR holds as an `Optional` terminal. The nested Value
+// ReactiveOptionalValue is `a?.b`, which the `HIR` holds as an `Optional` terminal. The nested Value
 // is a sequence containing the chain's test and consequent computations, matching upstream's
 // `visitValueBlockTerminal` reconstruction.
 type ReactiveOptionalValue struct {
@@ -231,7 +231,7 @@ func (*ReactiveOptionalValue) reactiveValue()    {}
 
 // ReactiveTerminal is a control-flow construct in the tree.
 //
-// Thirteen variants, exactly upstream's. Fewer than the HIR's 22, and the difference is the point of
+// Thirteen variants, exactly upstream's. Fewer than the `HIR`'s 22, and the difference is the point of
 // this pass: `goto`, `branch`, `logical`, `ternary`, `sequence`, `optional`, `maybe-throw`,
 // `scope`, `pruned-scope` and `unreachable` all disappear here. Some become values, some become
 // statements, and `goto` becomes a break, a continue, or nothing at all when control was going to
@@ -382,7 +382,7 @@ type ReactiveFunctionGap uint8
 const (
 	// ReactiveFunctionGapUnprunedLabels is upstream's own naivety, faithfully reproduced.
 	//
-	// `BuildReactiveFunction` emits a label for EVERY terminal that has a fallthrough, and upstream's
+	// `BuildReactiveFunction` emits a label for every terminal that has a fallthrough, and upstream's
 	// comment says so outright: "this pass naively emits labels for *all* terminals: see
 	// PruneUnusedLabels which removes unnecessary labels". That pruning pass is not in this tree.
 	//
@@ -400,7 +400,7 @@ const (
 	// currently a constant rather than a measurement.
 	ReactiveFunctionGapPrunedScopes
 
-	// ReactiveFunctionGapUnbuiltTerminals is the remaining HIR terminals this pass would consume but never sees.
+	// ReactiveFunctionGapUnbuiltTerminals is the remaining `HIR` terminals this pass would consume but never sees.
 	//
 	// `Sequence` and `MaybeThrow` are declared in `terminal.go` and constructed zero times. Optional
 	// used to belong to this set, but optional lowering now constructs it and this pass rebuilds its

@@ -30,13 +30,13 @@ const messageIdNoRedundantShouldComponentUpdate = "noShouldCompUpdate"
 //
 // # What counts as PureComponent, and it is narrower than the shelf
 //
-// `react.IsEs6ComponentClass` is NOT used here, deliberately. It accepts `Component` and
+// `react.IsEs6ComponentClass` is not used here, deliberately. It accepts `Component` and
 // `PureComponent` alike, which is the right question for the eight rules that ask "is this a class
 // component" and the wrong one here: `class Foo extends React.Component` with a
-// shouldComponentUpdate is upstream's very FIRST valid case, and routing through the shelf would
+// shouldComponentUpdate is upstream's very first valid case, and routing through the shelf would
 // report it. The two predicates answer different questions and this one needs its own.
 //
-// Upstream tests the heritage's SOURCE TEXT against `^(React\.)?PureComponent$`, which is why the
+// Upstream tests the heritage's source text against `^(React\.)?PureComponent$`, which is why the
 // accepted set is exactly two spellings and why a third package's is not. Measured on the installed
 // build:
 //
@@ -96,9 +96,9 @@ const messageIdNoRedundantShouldComponentUpdate = "noShouldCompUpdate"
 //
 // Reproduced exactly, empty string included. A port that helpfully fell back to the property name
 // would report text upstream never produces, and no fixture asserting a message id could see it.
-var NoRedundantShouldComponentUpdate = rule.Rule{
+var NoRedundantShouldComponentUpdate = rule.Rule[rule.NoOptions]{
 	Name: "react/no-redundant-should-component-update",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		check := func(node *ast.Node) {
 			if !extendsPureComponent(node) {
 				return
@@ -108,7 +108,7 @@ var NoRedundantShouldComponentUpdate = rule.Rule{
 				if identifierMemberName(member) != "shouldComponentUpdate" {
 					continue
 				}
-				ctx.ReportNode(node, rule.Message{
+				ruleContext.ReportNode(node, rule.Message{
 					Id: messageIdNoRedundantShouldComponentUpdate,
 					Description: fmt.Sprintf(
 						"%s extends PureComponent and also writes shouldComponentUpdate. "+
@@ -122,7 +122,7 @@ var NoRedundantShouldComponentUpdate = rule.Rule{
 					),
 				})
 				// Upstream's `properties.some(...)` stops at the first match, so a class writing
-				// the method twice reports ONCE. Measured on the installed build with a duplicated
+				// the method twice reports once. Measured on the installed build with a duplicated
 				// method: one finding, not two.
 				return
 			}
@@ -186,23 +186,23 @@ func extendsPureComponent(node *ast.Node) bool {
 // reference implementation is already the member access, because its tree has no parenthesis node,
 // so `class Foo extends (React.PureComponent)` reports there. Measured on the installed build.
 //
-// The nil test comes BEFORE the skip, because `ast.SkipParentheses` dereferences its argument and
-// the walk recovers per FILE rather than per rule.
+// The nil test comes before the skip, because `ast.SkipParentheses` dereferences its argument and
+// the walk recovers per file rather than per rule.
 func isPureComponentBase(expression *ast.Node) bool {
 	if expression == nil {
 		return false
 	}
-	expression = ast.SkipParentheses(expression)
-	if expression == nil {
+	unwrapped := ast.SkipParentheses(expression)
+	if unwrapped == nil {
 		return false
 	}
 
-	switch expression.Kind {
+	switch unwrapped.Kind {
 	case ast.KindIdentifier:
-		return expression.Text() == "PureComponent"
+		return unwrapped.Text() == "PureComponent"
 
 	case ast.KindPropertyAccessExpression:
-		access := expression.AsPropertyAccessExpression()
+		access := unwrapped.AsPropertyAccessExpression()
 		// The object must be exactly `React`. Upstream builds its regex from the configured pragma
 		// and compares the whole rendered text, so `Preact.PureComponent` and `Foo.PureComponent`
 		// both decline on that anchor. Both measured silent.
@@ -257,9 +257,9 @@ func identifierMemberName(member *ast.Node) string {
 		return ""
 	}
 	// A computed key's name node is a ComputedPropertyName and a string key's is a StringLiteral.
-	// Both decline here, which reproduces upstream and is ALSO crash protection: `Text()` has no
+	// Both decline here, which reproduces upstream and is also crash protection: `Text()` has no
 	// case for a ComputedPropertyName and reaches its unhandled-case panic, measured directly. The
-	// walk recovers per FILE, so a single computed member in a PureComponent would cost every rule
+	// walk recovers per file, so a single computed member in a PureComponent would cost every rule
 	// in this package every finding in that file. No ExpectFindings fixture can see a panic, which
 	// is why TestNoRedundantShouldComponentUpdateDoesNotPanicOnComputedMembers exists separately.
 	if name.Kind != ast.KindIdentifier && name.Kind != ast.KindPrivateIdentifier {
@@ -267,7 +267,7 @@ func identifierMemberName(member *ast.Node) string {
 	}
 	// A PrivateIdentifier's Text() already carries the leading hash, measured: the node for
 	// `#shouldComponentUpdate` answers "#shouldComponentUpdate" rather than the bare name. Upstream
-	// compares `nameNode.name`, which for its PrivateIdentifier is the name WITHOUT the hash, so a
+	// compares `nameNode.name`, which for its PrivateIdentifier is the name without the hash, so a
 	// direct comparison here would be silent on a case upstream reports. The hash is trimmed rather
 	// than the comparison being widened, so the returned value means the same thing for both kinds.
 	if name.Kind == ast.KindPrivateIdentifier {

@@ -11,13 +11,13 @@ import (
 //
 // Both directions before any specific claim, because a pass that prunes everything and one that
 // prunes nothing each satisfy an assertion phrased about only one side.
-func TestPruneAlwaysInvalidatingPrunesSomethingAndKeepsSomething(t *testing.T) {
-	t.Parallel()
+func TestPruneAlwaysInvalidatingPrunesSomethingAndKeepsSomething(test *testing.T) {
+	test.Parallel()
 
 	functions, scopes, pruned, kept := 0, 0, 0, 0
 
-	forEachCorpusFunctionWithChecker(t, 200, func(function *Function, checker *shimchecker.Checker) {
-		tree, dependencies := prunableTree(t, function, checker)
+	forEachCorpusFunctionWithChecker(test, 200, func(function *Function, checker *shimchecker.Checker) {
+		tree, dependencies := prunableTree(test, function, checker)
 		if tree == nil {
 			return
 		}
@@ -36,18 +36,18 @@ func TestPruneAlwaysInvalidatingPrunesSomethingAndKeepsSomething(t *testing.T) {
 	})
 
 	if functions < 50 {
-		t.Fatalf("only %d functions reached the pass; the corpus walk is not reaching real source",
+		test.Fatalf("only %d functions reached the pass; the corpus walk is not reaching real source",
 			functions)
 	}
 	if scopes == 0 {
-		t.Fatal("the corpus produced no scopes, so pruning none proves nothing")
+		test.Fatal("the corpus produced no scopes, so pruning none proves nothing")
 	}
 	if kept == 0 {
-		t.Error("every scope was pruned; a pass that prunes unconditionally satisfies any " +
+		test.Error("every scope was pruned; a pass that prunes unconditionally satisfies any " +
 			"assertion phrased about the pruned side alone")
 	}
 
-	t.Logf("functions=%d scopes=%d pruned=%d kept=%d", functions, scopes, pruned, kept)
+	test.Logf("functions=%d scopes=%d pruned=%d kept=%d", functions, scopes, pruned, kept)
 }
 
 // TestPruneAlwaysInvalidatingSeedsFromAllocationsOnly covers the edge case upstream calls out.
@@ -56,8 +56,8 @@ func TestPruneAlwaysInvalidatingPrunesSomethingAndKeepsSomething(t *testing.T) {
 // unmemoized call does not prune downstream memoization. Only guaranteed allocations do. That is a
 // deliberate imprecision and the arm most likely to be "fixed" by someone reasoning from first
 // principles, so it gets a case rather than only a comment.
-func TestPruneAlwaysInvalidatingSeedsFromAllocationsOnly(t *testing.T) {
-	t.Parallel()
+func TestPruneAlwaysInvalidatingSeedsFromAllocationsOnly(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name       string
@@ -70,14 +70,14 @@ func TestPruneAlwaysInvalidatingSeedsFromAllocationsOnly(t *testing.T) {
 		{name: "jsx fragment allocates", value: &JsxFragment{}, wantPruned: true},
 		{name: "new allocates", value: &NewExpression{}, wantPruned: true},
 		{name: "a call may return a primitive", value: &CallExpression{}, wantPruned: false},
-		{name: "a primitive does not allocate", value: &Primitive{}, wantPruned: false},
+		{name: "a primitive does not allocate", value: &Primitive{Value: PrimitiveUndefined{}}, wantPruned: false},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			function := &Function{Identifiers: []*Identifier{{Id: 0}, {Id: 1}}}
 			allocation := Place{Identifier: 1}
 
-			// The allocation sits OUTSIDE any scope, which is what makes it unmemoized; a scope
+			// The allocation sits outside any scope, which is what makes it unmemoized; a scope
 			// then depends on it and must prune.
 			scope := &ReactiveScopeBlock{Scope: 1}
 			tree := &ReactiveFunction{Body: ReactiveBlock{
@@ -93,10 +93,10 @@ func TestPruneAlwaysInvalidatingSeedsFromAllocationsOnly(t *testing.T) {
 
 			pruned := PruneAlwaysInvalidatingScopes(tree, function, dependencies)
 			if (pruned == 1) != testCase.wantPruned {
-				t.Errorf("pruned=%d, want pruned=%t", pruned, testCase.wantPruned)
+				test.Errorf("pruned=%d, want pruned=%t", pruned, testCase.wantPruned)
 			}
 			if scope.Pruned != testCase.wantPruned {
-				t.Errorf("scope.Pruned=%t, want %t", scope.Pruned, testCase.wantPruned)
+				test.Errorf("scope.Pruned=%t, want %t", scope.Pruned, testCase.wantPruned)
 			}
 		})
 	}
@@ -107,13 +107,13 @@ func TestPruneAlwaysInvalidatingSeedsFromAllocationsOnly(t *testing.T) {
 // An allocation inside a scope is memoized by that scope, so it is always-invalidating in principle
 // and not unmemoized in fact. Losing that distinction makes every array literal anywhere prune every
 // scope reading it, which is the failure mode with no fixture of its own unless one is written.
-func TestPruneAlwaysInvalidatingRespectsWithinScope(t *testing.T) {
-	t.Parallel()
+func TestPruneAlwaysInvalidatingRespectsWithinScope(test *testing.T) {
+	test.Parallel()
 
 	function := &Function{Identifiers: []*Identifier{{Id: 0}, {Id: 1}}}
 	allocation := Place{Identifier: 1}
 
-	// The allocation is INSIDE a scope, so it is memoized and must not make the consumer prune.
+	// The allocation is inside a scope, so it is memoized and must not make the consumer prune.
 	producer := &ReactiveScopeBlock{Scope: 1, Instructions: ReactiveBlock{
 		&ReactiveInstructionStatement{Instruction: &ReactiveInstruction{
 			LValue: &allocation,
@@ -127,7 +127,7 @@ func TestPruneAlwaysInvalidatingRespectsWithinScope(t *testing.T) {
 	}
 
 	if pruned := PruneAlwaysInvalidatingScopes(tree, function, dependencies); pruned != 0 {
-		t.Errorf("pruned %d scope(s); an allocation inside a scope is memoized by it and must not "+
+		test.Errorf("pruned %d scope(s); an allocation inside a scope is memoized by it and must not "+
 			"make a consumer prune", pruned)
 	}
 
@@ -143,7 +143,7 @@ func TestPruneAlwaysInvalidatingRespectsWithinScope(t *testing.T) {
 		consumerAlone,
 	}}
 	if pruned := PruneAlwaysInvalidatingScopes(controlTree, function, dependencies); pruned != 1 {
-		t.Fatalf("the control pruned %d, want 1; the case above is therefore not testing the "+
+		test.Fatalf("the control pruned %d, want 1; the case above is therefore not testing the "+
 			"within-scope distinction", pruned)
 	}
 }
@@ -155,8 +155,8 @@ func TestPruneAlwaysInvalidatingRespectsWithinScope(t *testing.T) {
 // scope depending on them prunes in turn. That chain is the reason a stale declaration in the table
 // prunes a scope upstream keeps -- the deny direction that made `PruneDeclarationsLastUsedBefore`
 // stop being optional.
-func TestPruneAlwaysInvalidatingPropagatesOutward(t *testing.T) {
-	t.Parallel()
+func TestPruneAlwaysInvalidatingPropagatesOutward(test *testing.T) {
+	test.Parallel()
 
 	function := &Function{Identifiers: []*Identifier{{Id: 0}, {Id: 1}, {Id: 2}}}
 	seed := Place{Identifier: 1}
@@ -192,13 +192,13 @@ func TestPruneAlwaysInvalidatingPropagatesOutward(t *testing.T) {
 
 	pruned := PruneAlwaysInvalidatingScopes(tree, function, dependencies)
 	if !first.Pruned {
-		t.Fatal("the first scope did not prune, so the propagation below cannot be tested")
+		test.Fatal("the first scope did not prune, so the propagation below cannot be tested")
 	}
 	if !second.Pruned {
-		t.Error("the second scope did not prune; the first stopped memoizing what it declares, so " +
+		test.Error("the second scope did not prune; the first stopped memoizing what it declares, so " +
 			"that value is unmemoized and its consumer must prune in turn")
 	}
 	if pruned != 2 {
-		t.Errorf("pruned %d, want 2", pruned)
+		test.Errorf("pruned %d, want 2", pruned)
 	}
 }

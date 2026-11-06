@@ -6,6 +6,12 @@ so a Swift run reads exactly like a TypeScript run: same finding lines, same pha
 coverage notes, same accounting, same exit code. Someone who knows how to read one already knows
 how to read the other.
 
+The Go engine speaks it too. It is the cohere binary itself in a hidden mode, `cohere go-engine
+--contract 3 --root <dir>`, which the front door runs as a child exactly as it runs cohere-swift, so a
+crash or an out-of-memory in a Go load ends that child and prints as nothing checked rather than taking
+the front door down with it. One renderer serves both engines; only its words differ (`engineLanguage`
+in command/cohere: "the Go engine", "Go files", a `go` label on a compiler finding with no rule).
+
 The fixtures in `Contract/` are the agreement made executable. The Go renderer's tests and the Swift
 encoder's tests both read them, so neither side can drift without the other's test failing.
 
@@ -18,6 +24,7 @@ encoder's tests both read them, so neither side can drift without the other's te
 | `Unreadable.jsonl` | One file the engine could not read: named beside the excluded files, every phase ran, nothing found, and still incomplete with exit 1. |
 | `LintOnly.jsonl` | `--lint`, a real run: fix and types skipped as `not requested`, lint ran and found two, and the summary calls the run complete, which it is. Exit 1, for the findings. |
 | `FormatOnly.jsonl` | `--no-fix --format-only`, a real run: the fix phase ran with no fix proposed and found one file the formatter would change, which is the one finding; types, lint and unused skipped as `not requested`, and the summary calls the run complete. Exit 1, for the finding. |
+| `GoClean.jsonl` | A clean run as the Go engine writes it: its provenance names a go toolchain and no swift-syntax or swift-format, and the front door renders it in Go's words, with nothing in the output saying Swift. Exit 0. |
 | `Unused.jsonl` | `--unused`: after lint, each rule's `unused` records then its `unusedCoverage`, `unused-import` first and `unused-declaration` second (the declaration section is from a real run on ahraos-presence), the unused phase ran, and the summary counts no findings and exits 0, because the report is not a gate. |
 
 **Version 2** (2026-10-02) added the `unreadable` record. Before it, a file the engine could not read was a
@@ -119,8 +126,8 @@ nothing else.
 Rendered (whole package, then scoped):
 
 ```
-package described in 412ms — 152 Swift files in the package, 149 of them ours
-package described in 412ms — 152 Swift files in the package, 149 of them ours, 3 in scope (Sources/AhraOsIpc)
+package described in 412ms: 152 Swift files in the package, 149 of them ours
+package described in 412ms: 152 Swift files in the package, 149 of them ours, 3 in scope (Sources/AhraOsIpc)
 ```
 
 Excluded files print as coverage notes under the lint line, grouped by reason. Up to five files of a
@@ -335,6 +342,21 @@ then the step a failed build failed at. A local package's own tests are not buil
 files are in `filesWithoutRecord` and `build` says so. A package whose platforms name none of those (Mac Catalyst
 alone), or whose folder also holds an Xcode project or workspace, is not built: `build` begins `not built:` and
 says why, and every file is in `filesWithoutRecord`, so the run is incomplete.
+
+The Go engine's types record carries two more fields, additive within contract 3, so a front door that does
+not read them yet loses only what they count. The Go engine type-checks every package from source and runs no
+cgo tool, so a dependency's package `"C"` is faked, and every C name is of an invalid type.
+`withheldInDependencyCgo` names each file of a dependency outside the root, whose package has cgo files, where a
+type error was withheld because the expression it is about uses package `"C"` or something the package's cgo
+files declare: not the project's to fix. Each entry gives the file's package and how many errors it held, as
+`{"package":"net","file":"<goroot>/src/net/cgo_unix.go","errors":1}`, sorted by file, and the list is `[]` when
+nothing was withheld. A parse or list error is never withheld, nor a type error that uses nothing of the cgo
+files, nor anything in the project's own packages. `withheldDependencyCgoDeclarations` counts the declarations
+of such dependencies that use the same, or what it left without a valid type: functions, which every rule was
+given without their bodies, as an assembly function is given, and package-level variables, given without their
+initial values. It is `0` when there were none. A project with cgo files of its own is loaded through
+go/packages instead, which has the cgo tool translate every cgo file, so both are empty then, and the record's
+`build` says which load ran.
 
 **Only compiler errors cut lint off.** In TypeScript every diagnostic the checker reports is an
 error, so "any type diagnostic bails" and "any type error bails" were the same rule. In Swift they

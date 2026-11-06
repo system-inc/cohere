@@ -5,7 +5,8 @@
 //
 // Usage:
 //
-//	go run ./internal/lint/rules/tailwind/tools/generate_syntax_tree -package-root <tailwindcss package> [-output <file.json>] [-check]
+//	go run ./internal/lint/rules/tailwind/tools/generate_syntax_tree \
+//	    -package-root <tailwindcss package> [-output <file.json>] [-check]
 //
 // The distinction this tool exists to enforce is the same one generate_data_type enforces, and
 // it bites harder here. `getPropertySort` looks like a tree walk and is not one: it is a
@@ -33,39 +34,53 @@ import (
 )
 
 func main() {
-	packageRoot := flag.String("package-root", "", "path to the tailwindcss package root (the directory holding package.json)")
-	output := flag.String("output", filepath.Join("internal", "tailwind", "testdata", "ast_fixtures.json"), "where to write the fixture")
+	packageRoot := flag.String(
+		"package-root",
+		"",
+		"path to the tailwindcss package root (the directory holding package.json)",
+	)
+	output := flag.String(
+		"output",
+		filepath.Join("internal", "tailwind", "testdata", "ast_fixtures.json"),
+		"where to write the fixture",
+	)
 	check := flag.Bool("check", false, "regenerate and fail if the committed fixture disagrees")
 	flag.Parse()
 
 	if *packageRoot == "" {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 		fmt.Fprintln(os.Stderr, "-package-root is required")
 		os.Exit(2)
 	}
 
-	generated, err := enumerate(*packageRoot)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "enumerate: %v\n", err)
+	generated, enumerateError := enumerate(*packageRoot)
+	if enumerateError != nil {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
+		fmt.Fprintf(os.Stderr, "enumerate: %v\n", enumerateError)
 		os.Exit(1)
 	}
 
 	if *check {
-		committed, err := os.ReadFile(*output)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "read committed fixture: %v\n", err)
+		committed, readError := os.ReadFile(*output)
+		if readError != nil {
+			// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
+			fmt.Fprintf(os.Stderr, "read committed fixture: %v\n", readError)
 			os.Exit(1)
 		}
 		// Go whitespace: this tool comparing its own committed fixture with its own output.
 		if !bytes.Equal(bytes.TrimSpace(committed), bytes.TrimSpace(generated)) {
+			// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 			fmt.Fprintf(os.Stderr, "%s is out of date; rerun without -check\n", *output)
 			os.Exit(1)
 		}
+		// Ignored: the check has passed, and the exit code says so whether or not this lands.
 		fmt.Fprintf(os.Stderr, "%s is up to date\n", *output)
 		return
 	}
 
-	if err := os.WriteFile(*output, generated, 0o644); err != nil {
-		fmt.Fprintf(os.Stderr, "write %s: %v\n", *output, err)
+	if writeError := os.WriteFile(*output, generated, 0o644); writeError != nil {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
+		fmt.Fprintf(os.Stderr, "write %s: %v\n", *output, writeError)
 		os.Exit(1)
 	}
 
@@ -81,11 +96,13 @@ func main() {
 		Cases          []json.RawMessage `json:"cases"`
 		TraversalCases []json.RawMessage `json:"traversalCases"`
 	}
-	if err := json.Unmarshal(generated, &summary); err != nil {
-		fmt.Fprintf(os.Stderr, "summarize: %v\n", err)
+	if decodeError := json.Unmarshal(generated, &summary); decodeError != nil {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
+		fmt.Fprintf(os.Stderr, "summarize: %v\n", decodeError)
 		os.Exit(1)
 	}
 
+	// Ignored: what it reports is already written, and a summary that cannot reach the terminal changes none of it.
 	fmt.Fprintf(
 		os.Stderr,
 		"wrote %s: tailwind %s, %d cases over %d distinct tree shapes, %d traversal-divergence cases; "+
@@ -107,19 +124,20 @@ func main() {
 // boundary is here, at generation time, and never at lint time: the committed fixture is what the
 // test reads.
 func enumerate(packageRoot string) ([]byte, error) {
-	directory, err := toolDirectory()
-	if err != nil {
-		return nil, err
+	directory, toolDirectoryError := toolDirectory()
+	if toolDirectoryError != nil {
+		return nil, toolDirectoryError
 	}
 	script := filepath.Join(directory, "enumerate.mjs")
 
 	command := exec.Command("node", script, packageRoot)
-	var stdout, stderr bytes.Buffer
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
 	command.Stdout = &stdout
 	command.Stderr = &stderr
 
-	if err := command.Run(); err != nil {
-		return nil, fmt.Errorf("node %s: %w\n%s", script, err, stderr.String())
+	if runError := command.Run(); runError != nil {
+		return nil, fmt.Errorf("node %s: %w\n%s", script, runError, stderr.String())
 	}
 	return stdout.Bytes(), nil
 }

@@ -5,8 +5,8 @@ import (
 	"testing"
 )
 
-func TestManualMemoDependenciesProveOnlyNonOptionalPrefixes(t *testing.T) {
-	t.Parallel()
+func TestManualMemoDependenciesProveOnlyNonOptionalPrefixes(test *testing.T) {
+	test.Parallel()
 	const source = `import {useState, useMemo} from 'react';
 function usePreview(options) {
 const [selected] = useState(null);
@@ -22,18 +22,26 @@ return {result};
 		fires  bool
 	}{
 		{"non-optional dependency", source, false},
-		{"optional dependency", strings.Replace(source, "[options.rows, selected]", "[options?.rows, selected]", 1), true},
+		{
+			"optional dependency",
+			strings.Replace(source, "[options.rows, selected]", "[options?.rows, selected]", 1),
+			true,
+		},
 		{"unconditional read", strings.Replace(source, "if (selected === null) return null;", "", 1), false},
-		{"unpreserved dependency", `import {useMemo} from 'react'; function Component({propA}) {return useMemo(() => propA.x(), [propA.x]);}`, true},
+		{
+			"unpreserved dependency",
+			`import {useMemo} from 'react'; function Component({propA}) {return useMemo(() => propA.x(), [propA.x]);}`,
+			true,
+		},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			findings, lowered := findingsForSource(t, testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			findings, lowered := findingsForSource(test, testCase.source)
 			if !lowered {
-				t.Fatal("fixture did not lower")
+				test.Fatal("fixture did not lower")
 			}
 			if (len(findings) != 0) != testCase.fires {
-				t.Fatalf("findings=%v, want fires=%t", findings, testCase.fires)
+				test.Fatalf("findings=%v, want fires=%t", findings, testCase.fires)
 			}
 		})
 	}

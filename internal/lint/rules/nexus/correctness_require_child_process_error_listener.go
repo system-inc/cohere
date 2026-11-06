@@ -14,7 +14,10 @@ const correctnessRequireChildProcessErrorListenerId = "childProcessWithoutErrorL
 
 // correctnessRequireChildProcessErrorListenerText is the rule's message, whose wording lives in
 // `policy/messages/correctness-require-child-process-error-listener.json`.
-var correctnessRequireChildProcessErrorListenerText = policy.MessageOf("nexus/correctness-require-child-process-error-listener", correctnessRequireChildProcessErrorListenerId)
+var correctnessRequireChildProcessErrorListenerText = policy.MessageOf(
+	"nexus/correctness-require-child-process-error-listener",
+	correctnessRequireChildProcessErrorListenerId,
+)
 
 func correctnessRequireChildProcessErrorListenerMessage() rule.Message {
 	return rule.Message{
@@ -22,6 +25,18 @@ func correctnessRequireChildProcessErrorListenerMessage() rule.Message {
 		Description: correctnessRequireChildProcessErrorListenerText.Render(nil),
 	}
 }
+
+// correctnessRequireChildProcessErrorListenerFate is what one use does with a child.
+type correctnessRequireChildProcessErrorListenerFate uint8
+
+const (
+	// correctnessRequireChildProcessErrorListenerNeither reads the child and lets it go nowhere.
+	correctnessRequireChildProcessErrorListenerNeither correctnessRequireChildProcessErrorListenerFate = iota
+	correctnessRequireChildProcessErrorListenerHandled
+	correctnessRequireChildProcessErrorListenerEscaped
+	// correctnessRequireChildProcessErrorListenerBound stores the child in a plain identifier.
+	correctnessRequireChildProcessErrorListenerBound
+)
 
 // CorrectnessRequireChildProcessErrorListener reports a ChildProcess from `node:child_process`'s
 // `spawn` or `fork` that never gets an `'error'` listener and never leaves the file's hands.
@@ -40,7 +55,7 @@ func correctnessRequireChildProcessErrorListenerMessage() rule.Message {
 //
 // `modules/os/sensation/AhraOsMonitors.ts:140` in ahra: the `prCheckStream` monitor source spawns
 // `gh pr checks --watch` and listens for stdout, stderr and `'exit'`, never `'error'`. With `gh` off
-// the daemon's PATH, or an EAGAIN when the process table is full, node emits `'error'` on the next
+// the daemon's PATH, or an `EAGAIN` when the process table is full, node emits `'error'` on the next
 // tick, nothing listens, and the throw takes down the whole sensation daemon. Found by the
 // cross-language pass of the new-rules sweep (`#tevhg3f`, after clippy's `zombie_processes`), built
 // as task `#8gcxzsw`.
@@ -105,7 +120,7 @@ func correctnessRequireChildProcessErrorListenerMessage() rule.Message {
 //
 // What a failed spawn should do is the author's call: reject the promise around it, log and carry
 // on, or fall back to another binary. A listener written in by a fixer would swallow the failure.
-var CorrectnessRequireChildProcessErrorListener = rule.Rule{
+var CorrectnessRequireChildProcessErrorListener = rule.Rule[rule.NoOptions]{
 	Name:             "nexus/correctness-require-child-process-error-listener",
 	NeedsTypeChecker: true,
 
@@ -113,8 +128,8 @@ var CorrectnessRequireChildProcessErrorListener = rule.Rule{
 	// and the dispatch scan cannot prove that read stops short of a body, so a shape-keyed replay is not
 	// claimed (TestRulesClaimShapesOnlyWhereTheScanAllowsIt).
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.TypeChecker == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		if ruleContext.TypeChecker == nil {
 			// Telling node's `spawn` from any other function of that name is a question for the
 			// checker. With none, the rule declines rather than guess by name.
 			return nil
@@ -122,46 +137,35 @@ var CorrectnessRequireChildProcessErrorListener = rule.Rule{
 		verdicts := map[*ast.Symbol]bool{}
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
-				switch securityNoInterpolatedShellCommandFunction(ctx, node) {
+				switch securityNoInterpolatedShellCommandFunction(ruleContext, node) {
 				case "spawn", "fork":
 				default:
 					return
 				}
-				fate, bound := correctnessRequireChildProcessErrorListenerFollow(ctx, node)
+				fate, bound := correctnessRequireChildProcessErrorListenerFollow(ruleContext, node)
 				switch fate {
-				case correctnessRequireChildProcessErrorListenerHandled, correctnessRequireChildProcessErrorListenerEscaped:
+				case correctnessRequireChildProcessErrorListenerHandled,
+					correctnessRequireChildProcessErrorListenerEscaped:
 					return
 				case correctnessRequireChildProcessErrorListenerBound:
-					symbol := ctx.TypeChecker.GetSymbolAtLocation(bound)
+					symbol := ruleContext.TypeChecker.GetSymbolAtLocation(bound)
 					if symbol == nil {
 						return
 					}
 					handled, seen := verdicts[symbol]
 					if !seen {
-						handled = correctnessRequireChildProcessErrorListenerVariableIsHandled(ctx, symbol)
+						handled = correctnessRequireChildProcessErrorListenerVariableIsHandled(ruleContext, symbol)
 						verdicts[symbol] = handled
 					}
 					if handled {
 						return
 					}
 				}
-				ctx.ReportNode(node, correctnessRequireChildProcessErrorListenerMessage())
+				ruleContext.ReportNode(node, correctnessRequireChildProcessErrorListenerMessage())
 			},
 		}
 	},
 }
-
-// correctnessRequireChildProcessErrorListenerFate is what one use does with a child.
-type correctnessRequireChildProcessErrorListenerFate uint8
-
-const (
-	// correctnessRequireChildProcessErrorListenerNeither reads the child and lets it go nowhere.
-	correctnessRequireChildProcessErrorListenerNeither correctnessRequireChildProcessErrorListenerFate = iota
-	correctnessRequireChildProcessErrorListenerHandled
-	correctnessRequireChildProcessErrorListenerEscaped
-	// correctnessRequireChildProcessErrorListenerBound stores the child in a plain identifier.
-	correctnessRequireChildProcessErrorListenerBound
-)
 
 // correctnessRequireChildProcessErrorListenerRegistrations are the EventEmitter methods that attach
 // a listener. Each returns the emitter.
@@ -178,7 +182,10 @@ var correctnessRequireChildProcessErrorListenerReturnsEmitter = map[string]bool{
 // correctnessRequireChildProcessErrorListenerFollow reads what the surroundings of one expression
 // holding a child do with it, following the chain of emitter methods that hand the child back. For
 // Bound, it also returns the identifier the child is stored in.
-func correctnessRequireChildProcessErrorListenerFollow(ctx rule.Context, expression *ast.Node) (correctnessRequireChildProcessErrorListenerFate, *ast.Node) {
+func correctnessRequireChildProcessErrorListenerFollow(
+	ruleContext rule.Context,
+	expression *ast.Node,
+) (correctnessRequireChildProcessErrorListenerFate, *ast.Node) {
 	current := expression
 	for {
 		current = correctnessRequireChildProcessErrorListenerOutermost(current)
@@ -188,8 +195,10 @@ func correctnessRequireChildProcessErrorListenerFollow(ctx rule.Context, express
 		}
 		switch parent.Kind {
 		case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
-			if (parent.Kind == ast.KindPropertyAccessExpression && parent.AsPropertyAccessExpression().Expression != current) ||
-				(parent.Kind == ast.KindElementAccessExpression && parent.AsElementAccessExpression().Expression != current) {
+			if (parent.Kind == ast.KindPropertyAccessExpression &&
+				parent.AsPropertyAccessExpression().Expression != current) ||
+				(parent.Kind == ast.KindElementAccessExpression &&
+					parent.AsElementAccessExpression().Expression != current) {
 				// The child is the subscript, `table[child]`, a key into something else.
 				return correctnessRequireChildProcessErrorListenerEscaped, nil
 			}
@@ -207,7 +216,7 @@ func correctnessRequireChildProcessErrorListenerFollow(ctx rule.Context, express
 				// The method itself handed somewhere, bound or called later: it may register anything.
 				return correctnessRequireChildProcessErrorListenerEscaped, nil
 			}
-			if registers && correctnessRequireChildProcessErrorListenerNamesError(ctx, call) {
+			if registers && correctnessRequireChildProcessErrorListenerNamesError(ruleContext, call) {
 				return correctnessRequireChildProcessErrorListenerHandled, nil
 			}
 			current = call
@@ -247,7 +256,9 @@ func correctnessRequireChildProcessErrorListenerFollow(ctx rule.Context, express
 					return correctnessRequireChildProcessErrorListenerNeither, nil
 				}
 			case ast.KindEqualsToken:
-				if target := ast.SkipParentheses(binary.Left); binary.Right == current && target.Kind == ast.KindIdentifier {
+				if target := ast.SkipParentheses(
+					binary.Left,
+				); binary.Right == current && target.Kind == ast.KindIdentifier {
 					return correctnessRequireChildProcessErrorListenerBound, target
 				}
 			}
@@ -264,22 +275,23 @@ func correctnessRequireChildProcessErrorListenerFollow(ctx rule.Context, express
 // correctnessRequireChildProcessErrorListenerOutermost climbs from an expression through the
 // wrappers that pass its value through unchanged.
 func correctnessRequireChildProcessErrorListenerOutermost(expression *ast.Node) *ast.Node {
-	for expression.Parent != nil {
-		switch expression.Parent.Kind {
+	current := expression
+	for current.Parent != nil {
+		switch current.Parent.Kind {
 		case ast.KindParenthesizedExpression, ast.KindNonNullExpression, ast.KindAsExpression,
 			ast.KindSatisfiesExpression, ast.KindTypeAssertionExpression:
-			expression = expression.Parent
+			current = current.Parent
 			continue
 		}
-		return expression
+		return current
 	}
-	return expression
+	return current
 }
 
 // correctnessRequireChildProcessErrorListenerNamesError says whether a listener registration may be
 // for `'error'`: its event is the literal `'error'`, or its type is not made only of string literals
 // that exclude it.
-func correctnessRequireChildProcessErrorListenerNamesError(ctx rule.Context, call *ast.Node) bool {
+func correctnessRequireChildProcessErrorListenerNamesError(ruleContext rule.Context, call *ast.Node) bool {
 	arguments := call.AsCallExpression().Arguments
 	if arguments == nil || len(arguments.Nodes) == 0 {
 		return true
@@ -289,11 +301,11 @@ func correctnessRequireChildProcessErrorListenerNamesError(ctx rule.Context, cal
 	case ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral:
 		return event.Text() == "error"
 	}
-	eventType := ctx.TypeChecker.GetTypeAtLocation(event)
+	eventType := ruleContext.TypeChecker.GetTypeAtLocation(event)
 	if eventType == nil {
 		return true
 	}
-	for part := range type_checking.UnionTypePartsSeq(eventType) {
+	for part := range type_checking.UnionTypePartsSequence(eventType) {
 		if !type_checking.IsTypeFlagSet(part, checker.TypeFlagsStringLiteral) {
 			return true
 		}
@@ -308,8 +320,8 @@ func correctnessRequireChildProcessErrorListenerNamesError(ctx rule.Context, cal
 // stored in is handled or escapes through any reference in the file. A variable the file does not
 // wholly own (declared elsewhere, exported, a script-file global, not a plain variable or
 // parameter) counts as escaped.
-func correctnessRequireChildProcessErrorListenerVariableIsHandled(ctx rule.Context, symbol *ast.Symbol) bool {
-	sourceFile := ctx.SourceFile
+func correctnessRequireChildProcessErrorListenerVariableIsHandled(ruleContext rule.Context, symbol *ast.Symbol) bool {
+	sourceFile := ruleContext.SourceFile
 	declarations := rule.DeclarationsIn(sourceFile, symbol)
 	if len(declarations) == 0 || len(declarations) != len(symbol.Declarations) {
 		return true
@@ -327,7 +339,9 @@ func correctnessRequireChildProcessErrorListenerVariableIsHandled(ctx rule.Conte
 				if module.IsExported(statement) {
 					return true
 				}
-				if statement.Parent != nil && statement.Parent.Kind == ast.KindSourceFile && !ast.IsExternalModule(sourceFile) {
+				if statement.Parent != nil &&
+					statement.Parent.Kind == ast.KindSourceFile &&
+					!ast.IsExternalModule(sourceFile) {
 					return true
 				}
 			}
@@ -348,7 +362,11 @@ func correctnessRequireChildProcessErrorListenerVariableIsHandled(ctx rule.Conte
 			return true
 		}
 		if node.Kind == ast.KindIdentifier && node.Text() == name && !declarationNames[node] {
-			if fate := correctnessRequireChildProcessErrorListenerReference(ctx, node, symbol); fate == correctnessRequireChildProcessErrorListenerHandled ||
+			if fate := correctnessRequireChildProcessErrorListenerReference(
+				ruleContext,
+				node,
+				symbol,
+			); fate == correctnessRequireChildProcessErrorListenerHandled ||
 				fate == correctnessRequireChildProcessErrorListenerEscaped {
 				handled = true
 				return true
@@ -364,24 +382,28 @@ func correctnessRequireChildProcessErrorListenerVariableIsHandled(ctx rule.Conte
 // correctnessRequireChildProcessErrorListenerReference reads one identifier spelled like the
 // variable: Neither when it is another binding, a type position or a write into the variable, and
 // otherwise what its surroundings do with the child.
-func correctnessRequireChildProcessErrorListenerReference(ctx rule.Context, identifier *ast.Node, symbol *ast.Symbol) correctnessRequireChildProcessErrorListenerFate {
+func correctnessRequireChildProcessErrorListenerReference(
+	ruleContext rule.Context,
+	identifier *ast.Node,
+	symbol *ast.Symbol,
+) correctnessRequireChildProcessErrorListenerFate {
 	parent := identifier.Parent
 	if parent != nil {
 		switch parent.Kind {
 		case ast.KindShorthandPropertyAssignment:
 			// `{ child }` stores it in an object.
-			if ctx.TypeChecker.GetShorthandAssignmentValueSymbol(parent) == symbol {
+			if ruleContext.TypeChecker.GetShorthandAssignmentValueSymbol(parent) == symbol {
 				return correctnessRequireChildProcessErrorListenerEscaped
 			}
 			return correctnessRequireChildProcessErrorListenerNeither
 		case ast.KindExportSpecifier:
-			if ctx.TypeChecker.GetExportSpecifierLocalTargetSymbol(parent) == symbol {
+			if ruleContext.TypeChecker.GetExportSpecifierLocalTargetSymbol(parent) == symbol {
 				return correctnessRequireChildProcessErrorListenerEscaped
 			}
 			return correctnessRequireChildProcessErrorListenerNeither
 		}
 	}
-	if ctx.TypeChecker.GetSymbolAtLocation(identifier) != symbol {
+	if ruleContext.TypeChecker.GetSymbolAtLocation(identifier) != symbol {
 		return correctnessRequireChildProcessErrorListenerNeither
 	}
 	// `typeof child` and `typeof child.stdout` name a type and run nothing.
@@ -393,12 +415,14 @@ func correctnessRequireChildProcessErrorListenerReference(ctx rule.Context, iden
 		return correctnessRequireChildProcessErrorListenerNeither
 	}
 	outer := correctnessRequireChildProcessErrorListenerOutermost(identifier)
-	if assignment := outer.Parent; assignment != nil && assignment.Kind == ast.KindBinaryExpression &&
-		assignment.AsBinaryExpression().Left == outer && ast.IsAssignmentOperator(assignment.AsBinaryExpression().OperatorToken.Kind) {
+	if assignment := outer.Parent; assignment != nil &&
+		assignment.Kind == ast.KindBinaryExpression &&
+		assignment.AsBinaryExpression().Left == outer &&
+		ast.IsAssignmentOperator(assignment.AsBinaryExpression().OperatorToken.Kind) {
 		// A write into the variable: the child it held, if any, is not read here.
 		return correctnessRequireChildProcessErrorListenerNeither
 	}
-	fate, _ := correctnessRequireChildProcessErrorListenerFollow(ctx, identifier)
+	fate, _ := correctnessRequireChildProcessErrorListenerFollow(ruleContext, identifier)
 	if fate == correctnessRequireChildProcessErrorListenerBound {
 		// Copied into another variable, which this rule does not follow.
 		return correctnessRequireChildProcessErrorListenerEscaped

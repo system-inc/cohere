@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	rule_testing "github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -34,20 +35,20 @@ type consistentReturnCase struct {
 	findings    []consistentReturnExpectation
 }
 
-// decodeConsistentReturnOptionsForTest routes a case's options through the SHIPPED decoder.
+// decodeConsistentReturnOptionsForTest routes a case's options through the shipped decoder.
 //
 // Not a hand-built settings struct. A fixture that constructs the options directly never exercises
 // the decoder, so a decoder wrong about the shape the config layer delivers passes every fixture.
-func decodeConsistentReturnOptionsForTest(t *testing.T, optionsJson string) any {
-	t.Helper()
+func decodeConsistentReturnOptionsForTest(test *testing.T, optionsJson string) rule.Given[ConsistentReturnSettings] {
+	test.Helper()
 	if optionsJson == "" {
-		return nil
+		return rule.Given[ConsistentReturnSettings]{}
 	}
-	decoded, err := DecodeConsistentReturnOptions(json.RawMessage(optionsJson))
-	if err != nil {
-		t.Fatalf("the decoder refused %s: %v", optionsJson, err)
+	decoded, decodeConsistentReturnOptionsError := DecodeConsistentReturnOptions(json.RawMessage(optionsJson))
+	if decodeConsistentReturnOptionsError != nil {
+		test.Fatalf("the decoder refused %s: %v", optionsJson, decodeConsistentReturnOptionsError)
 	}
-	return decoded
+	return rule.Configured(decoded)
 }
 
 // asTheTypedConsistentReturnHarnessWroteIt transforms a fixture the way RunTyped transforms it.
@@ -62,20 +63,20 @@ func asTheTypedConsistentReturnHarnessWroteIt(text string) string {
 
 // consistentReturnOffsetOf converts a 1-based line and column into a byte offset in the file as the
 // harness wrote it, so upstream's asserted positions can be compared against reported ranges.
-func consistentReturnOffsetOf(t *testing.T, source string, line int, column int) int {
-	t.Helper()
+func consistentReturnOffsetOf(test *testing.T, source string, line int, column int) int {
+	test.Helper()
 	text := asTheTypedConsistentReturnHarnessWroteIt(source)
 	// Upstream's asserted line numbers count the leading newline every case in its tester carries,
 	// and `RunTyped` trims it. So upstream's line N is the harness's line N-1, and a helper that did
-	// not shift would report an off-by-one-LINE that reads exactly like a defect in the rule's span
-	// computation. Measured: every reported span here already covered the right TEXT while the
+	// not shift would report an off-by-one-line that reads exactly like a defect in the rule's span
+	// computation. Measured: every reported span here already covered the right text while the
 	// arithmetic disagreed, which is the tell.
-	line -= consistentReturnLeadingBlankLines(source)
+	harnessLine := line - consistentReturnLeadingBlankLines(source)
 	offset := 0
-	for current := 1; current < line; current++ {
+	for current := 1; current < harnessLine; current++ {
 		next := strings.IndexByte(text[offset:], '\n')
 		if next < 0 {
-			t.Fatalf("the fixture has no line %d", line)
+			test.Fatalf("the fixture has no line %d", harnessLine)
 		}
 		offset += next + 1
 	}
@@ -89,59 +90,10 @@ func consistentReturnLeadingBlankLines(source string) int {
 	return strings.Count(source[:len(source)-len(trimmed)], "\n")
 }
 
-func runConsistentReturn(t *testing.T, testCase consistentReturnCase) rule_testing.Result {
-	t.Helper()
-	return rule_testing.RunTypedWithOptions(t, ConsistentReturn, consistentReturnFile,
-		testCase.source, decodeConsistentReturnOptionsForTest(t, testCase.optionsJson))
-}
-
-// TestConsistentReturnStaysSilent runs upstream's whole `valid` list.
-//
-// Thirteen of these nineteen report under the bare core rule and are silent here, which is the whole
-// difference between the two rules. See the rule's doc comment for the measurement.
-func TestConsistentReturnStaysSilent(t *testing.T) {
-	t.Parallel()
-	for _, testCase := range consistentReturnCleanCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, runConsistentReturn(t, testCase))
-		})
-	}
-}
-
-// TestConsistentReturnFires runs upstream's whole `invalid` list and asserts every span it states.
-func TestConsistentReturnFires(t *testing.T) {
-	t.Parallel()
-	for _, testCase := range consistentReturnReportingCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runConsistentReturn(t, testCase)
-
-			// The message ids and the count through the harness, so the mechanical fixture-pair
-			// guard in `internal/lint/registry` can see that this rule is proven to fire. The spans
-			// below are the part that guard does not check and that this rule most needs: it
-			// computes a different report position per node kind, and upstream states all four
-			// coordinates on every one of these cases.
-			wantIds := make([]string, 0, len(testCase.findings))
-			for _, expected := range testCase.findings {
-				wantIds = append(wantIds, expected.id)
-			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
-
-			for index, expected := range testCase.findings {
-				diagnostic := result.Diagnostics[index]
-				wantPos := consistentReturnOffsetOf(t, testCase.source, expected.line, expected.column)
-				wantEnd := consistentReturnOffsetOf(t, testCase.source, expected.endLine, expected.endColumn)
-				if diagnostic.Range.Pos() != wantPos || diagnostic.Range.End() != wantEnd {
-					t.Errorf("finding %d: expected span [%d,%d) (%d:%d-%d:%d), got [%d,%d) %q",
-						index, wantPos, wantEnd,
-						expected.line, expected.column, expected.endLine, expected.endColumn,
-						diagnostic.Range.Pos(), diagnostic.Range.End(),
-						asTheTypedConsistentReturnHarnessWroteIt(testCase.source)[diagnostic.Range.Pos():diagnostic.Range.End()])
-				}
-			}
-		})
-	}
+func runConsistentReturn(test *testing.T, testCase consistentReturnCase) rule_testing.Result {
+	test.Helper()
+	return rule_testing.RunTypedGiven(test, ConsistentReturn, consistentReturnFile,
+		testCase.source, decodeConsistentReturnOptionsForTest(test, testCase.optionsJson))
 }
 
 // consistentReturnCleanCases are upstream's `valid` list, verbatim.
@@ -390,6 +342,20 @@ function foo(flag: boolean): undefined {
 	},
 }
 
+// TestConsistentReturnStaysSilent runs upstream's whole `valid` list.
+//
+// Thirteen of these nineteen report under the bare core rule and are silent here, which is the whole
+// difference between the two rules. See the rule's doc comment for the measurement.
+func TestConsistentReturnStaysSilent(test *testing.T) {
+	test.Parallel()
+	for _, testCase := range consistentReturnCleanCases {
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, runConsistentReturn(test, testCase))
+		})
+	}
+}
+
 // consistentReturnReportingCases are upstream's `invalid` list, verbatim, with the spans it asserts.
 var consistentReturnReportingCases = []consistentReturnCase{
 	{
@@ -552,25 +518,62 @@ function foo(flag: boolean) {
 	},
 }
 
+// TestConsistentReturnFires runs upstream's whole `invalid` list and asserts every span it states.
+func TestConsistentReturnFires(test *testing.T) {
+	test.Parallel()
+	for _, testCase := range consistentReturnReportingCases {
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runConsistentReturn(test, testCase)
+
+			// The message ids and the count through the harness, so the mechanical fixture-pair
+			// guard in `internal/lint/registry` can see that this rule is proven to fire. The spans
+			// below are the part that guard does not check and that this rule most needs: it
+			// computes a different report position per node kind, and upstream states all four
+			// coordinates on every one of these cases.
+			wantIds := make([]string, 0, len(testCase.findings))
+			for _, expected := range testCase.findings {
+				wantIds = append(wantIds, expected.id)
+			}
+			rule_testing.ExpectFindings(test, result, wantIds...)
+
+			for index, expected := range testCase.findings {
+				diagnostic := result.Diagnostics[index]
+				wantPosition := consistentReturnOffsetOf(test, testCase.source, expected.line, expected.column)
+				wantEnd := consistentReturnOffsetOf(test, testCase.source, expected.endLine, expected.endColumn)
+				if diagnostic.Range.Pos() != wantPosition || diagnostic.Range.End() != wantEnd {
+					test.Errorf("finding %d: expected span [%d,%d) (%d:%d-%d:%d), got [%d,%d) %q",
+						index, wantPosition, wantEnd,
+						expected.line, expected.column, expected.endLine, expected.endColumn,
+						diagnostic.Range.Pos(), diagnostic.Range.End(),
+						asTheTypedConsistentReturnHarnessWroteIt(
+							testCase.source,
+						)[diagnostic.Range.Pos():diagnostic.Range.End()])
+				}
+			}
+		})
+	}
+}
+
 // TestConsistentReturnDecoderAcceptsTheShapesTheConfigLayerDelivers crosses the config boundary.
 //
 // Every fixture above reaches the decoder with bytes this test file built. The config layer builds
-// different bytes: `internal/lint/configuration/configuration.go` parses a rule setting as
+// different bytes: `internal/lint/configuration/load.go` parses a rule setting as
 // `["severity", <options>]` and keeps `tuple[1]`, a single JSON value, while ESLint's
 // `context.options` is every element after the severity. A decoder wrong for the cohere shape is
 // right on every fixture and wrong on every real configuration, and nothing else in this file can
 // see that.
 //
-// `meta.schema` for this rule declares ONE element, so the two spellings coincide and the object
+// `meta.schema` for this rule declares one element, so the two spellings coincide and the object
 // arrives whole. That is the fact being pinned, rather than assumed: if it were variadic there would
 // be a second shape to accept.
-func TestConsistentReturnDecoderAcceptsTheShapesTheConfigLayerDelivers(t *testing.T) {
-	t.Parallel()
+func TestConsistentReturnDecoderAcceptsTheShapesTheConfigLayerDelivers(test *testing.T) {
+	test.Parallel()
 	cases := []struct {
-		name     string
-		raw      string
-		wantFlag bool
-		wantErr  bool
+		name      string
+		raw       string
+		wantFlag  bool
+		wantError bool
 	}{
 		{
 			name: "absent options, which is what a bare \"error\" delivers",
@@ -593,37 +596,33 @@ func TestConsistentReturnDecoderAcceptsTheShapesTheConfigLayerDelivers(t *testin
 			// A decoder answering "no options" to a shape it did not understand produces a rule
 			// that registers, reports, and enforces something other than what the config says.
 			// Refusing is the only answer that cannot ship silently.
-			name:    "a shape that is neither, which must error rather than decode to a default",
-			raw:     `"treatUndefinedAsUnspecified"`,
-			wantErr: true,
+			name:      "a shape that is neither, which must error rather than decode to a default",
+			raw:       `"treatUndefinedAsUnspecified"`,
+			wantError: true,
 		},
 		{
-			name:    "an array, which is upstream's variadic spelling and not one this layer delivers",
-			raw:     `[{"treatUndefinedAsUnspecified": true}]`,
-			wantErr: true,
+			name:      "an array, which is upstream's variadic spelling and not one this layer delivers",
+			raw:       `[{"treatUndefinedAsUnspecified": true}]`,
+			wantError: true,
 		},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			decoded, err := DecodeConsistentReturnOptions(json.RawMessage(testCase.raw))
-			if testCase.wantErr {
-				if err == nil {
-					t.Fatalf("expected the decoder to refuse %s, got %#v", testCase.raw, decoded)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			decoded, decodeConsistentReturnOptionsError := DecodeConsistentReturnOptions(json.RawMessage(testCase.raw))
+			if testCase.wantError {
+				if decodeConsistentReturnOptionsError == nil {
+					test.Fatalf("expected the decoder to refuse %s, got %#v", testCase.raw, decoded)
 				}
 				return
 			}
-			if err != nil {
-				t.Fatalf("the decoder refused %s: %v", testCase.raw, err)
+			if decodeConsistentReturnOptionsError != nil {
+				test.Fatalf("the decoder refused %s: %v", testCase.raw, decodeConsistentReturnOptionsError)
 			}
-			settings, ok := decoded.(ConsistentReturnSettings)
-			if !ok {
-				t.Fatalf("the decoder returned %T rather than ConsistentReturnSettings", decoded)
-			}
-			if settings.TreatUndefinedAsUnspecified != testCase.wantFlag {
-				t.Errorf("treatUndefinedAsUnspecified: expected %v, got %v",
-					testCase.wantFlag, settings.TreatUndefinedAsUnspecified)
+			if decoded.TreatUndefinedAsUnspecified != testCase.wantFlag {
+				test.Errorf("treatUndefinedAsUnspecified: expected %v, got %v",
+					testCase.wantFlag, decoded.TreatUndefinedAsUnspecified)
 			}
 		})
 	}
@@ -633,26 +632,26 @@ func TestConsistentReturnDecoderAcceptsTheShapesTheConfigLayerDelivers(t *testin
 //
 // A decoder that round-trips correctly and a rule that ignores what it decoded look identical from
 // the test above. One source, two configurations, opposite verdicts.
-func TestConsistentReturnOptionActuallyReachesTheRule(t *testing.T) {
-	t.Parallel()
+func TestConsistentReturnOptionActuallyReachesTheRule(test *testing.T) {
+	test.Parallel()
 	const source = `
 function foo(flag: boolean) {
   if (flag) return undefined;
   return;
 }
 `
-	withOption := runConsistentReturn(t, consistentReturnCase{
+	withOption := runConsistentReturn(test, consistentReturnCase{
 		source:      source,
 		optionsJson: `{"treatUndefinedAsUnspecified": true}`,
 	})
 	if len(withOption.Diagnostics) != 0 {
-		t.Errorf("with treatUndefinedAsUnspecified the two returns agree, got %v",
+		test.Errorf("with treatUndefinedAsUnspecified the two returns agree, got %v",
 			withOption.MessageIds())
 	}
 
-	withoutOption := runConsistentReturn(t, consistentReturnCase{source: source})
+	withoutOption := runConsistentReturn(test, consistentReturnCase{source: source})
 	if len(withoutOption.Diagnostics) == 0 {
-		t.Error("without the option `return undefined` carries a value and must contradict `return`")
+		test.Error("without the option `return undefined` carries a value and must contradict `return`")
 	}
 }
 
@@ -662,8 +661,8 @@ function foo(flag: boolean) {
 // never writes, aimed one per decision the void filter makes. Each expectation was taken by driving
 // the installed 8.67.0 extension rather than reasoned about, because every one of them is a place
 // where a locally sound argument gets the wrong answer.
-func TestConsistentReturnVoidSuppressionShapesTheCorpusDoesNotWrite(t *testing.T) {
-	t.Parallel()
+func TestConsistentReturnVoidSuppressionShapesTheCorpusDoesNotWrite(test *testing.T) {
+	test.Parallel()
 	cases := []struct {
 		name    string
 		source  string
@@ -790,16 +789,16 @@ function foo(flag: boolean): undefined {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runConsistentReturn(t, consistentReturnCase{
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runConsistentReturn(test, consistentReturnCase{
 				source: testCase.source, optionsJson: testCase.options,
 			})
 			if testCase.reports && len(result.Diagnostics) == 0 {
-				t.Errorf("expected a finding and got none. %s", testCase.reason)
+				test.Errorf("expected a finding and got none. %s", testCase.reason)
 			}
 			if !testCase.reports && len(result.Diagnostics) != 0 {
-				t.Errorf("expected silence, got %v. %s", result.MessageIds(), testCase.reason)
+				test.Errorf("expected silence, got %v. %s", result.MessageIds(), testCase.reason)
 			}
 		})
 	}
@@ -807,19 +806,19 @@ function foo(flag: boolean): undefined {
 
 // TestConsistentReturnTypedUndefinedReadsTheArgumentsType pins the second filter's two sides.
 //
-// Both rows come from upstream's corpus and both are about the TYPE rather than the spelling: the
+// Both rows come from upstream's corpus and both are about the type rather than the spelling: the
 // syntactic test in the shared judgment matches a bare `undefined` identifier and a `void`
 // expression, and neither row here is either of those.
 //
-// What this deliberately does NOT assert is that the filter's `==` differs from an `&`. A first
+// What this deliberately does not assert is that the filter's `==` differs from an `&`. A first
 // draft claimed it did, with a reasoned argument that a union would carry extra bits. Measured, a
 // union carries the Union flag alone and no input separates the two spellings. The rule's doc
 // comment carries the measurement; there is no distinction here to pin.
-func TestConsistentReturnTypedUndefinedReadsTheArgumentsType(t *testing.T) {
-	t.Parallel()
+func TestConsistentReturnTypedUndefinedReadsTheArgumentsType(test *testing.T) {
+	test.Parallel()
 	const options = `{"treatUndefinedAsUnspecified": true}`
 
-	exactly := runConsistentReturn(t, consistentReturnCase{
+	exactly := runConsistentReturn(test, consistentReturnCase{
 		source: `
 declare const undef: undefined;
 function foo(flag: boolean): undefined {
@@ -832,11 +831,11 @@ function foo(flag: boolean): undefined {
 		optionsJson: options,
 	})
 	if len(exactly.Diagnostics) != 0 {
-		t.Errorf("a value typed exactly `undefined` counts as unspecified, got %v",
+		test.Errorf("a value typed exactly `undefined` counts as unspecified, got %v",
 			exactly.MessageIds())
 	}
 
-	union := runConsistentReturn(t, consistentReturnCase{
+	union := runConsistentReturn(test, consistentReturnCase{
 		source: `
 declare const undefOrNum: undefined | number;
 function foo(flag: boolean) {
@@ -849,18 +848,18 @@ function foo(flag: boolean) {
 		optionsJson: options,
 	})
 	if len(union.Diagnostics) == 0 {
-		t.Error("a union containing undefined is not exactly undefined and must still report")
+		test.Error("a union containing undefined is not exactly undefined and must still report")
 	}
 }
 
 // TestConsistentReturnDoesNotPanicOnShapesWithNoUsefulType is the crash guard.
 //
-// `Checker_getTypeArguments` PANICS on a type that is not a reference, reproduced directly while
-// this rule was being written. The walk recovers per FILE rather than per rule, so one such node
+// `Checker_getTypeArguments` panics on a type that is not a reference, reproduced directly while
+// this rule was being written. The walk recovers per file rather than per rule, so one such node
 // costs every rule in the package its verdict on that file. Each row here reaches the filter with
 // something other than an ordinary annotated function.
-func TestConsistentReturnDoesNotPanicOnShapesWithNoUsefulType(t *testing.T) {
-	t.Parallel()
+func TestConsistentReturnDoesNotPanicOnShapesWithNoUsefulType(test *testing.T) {
+	test.Parallel()
 	sources := []string{
 		"declare function foo(flag: boolean): void;\n",
 		"function foo(flag: boolean): any { if (flag) return true; return; }\n",
@@ -873,11 +872,11 @@ func TestConsistentReturnDoesNotPanicOnShapesWithNoUsefulType(t *testing.T) {
 		"function foo(this: void, flag: boolean): void { if (flag) return; return; }\n",
 	}
 	for _, source := range sources {
-		t.Run(strings.TrimSpace(source), func(t *testing.T) {
-			t.Parallel()
+		test.Run(strings.TrimSpace(source), func(test *testing.T) {
+			test.Parallel()
 			// The assertion is that this returns at all. A panic in the rule surfaces as a failure
 			// here rather than as a silently lost file.
-			runConsistentReturn(t, consistentReturnCase{source: source})
+			runConsistentReturn(test, consistentReturnCase{source: source})
 		})
 	}
 }
@@ -885,7 +884,7 @@ func TestConsistentReturnDoesNotPanicOnShapesWithNoUsefulType(t *testing.T) {
 // TestConsistentReturnPromiseVoidGuardsAreBothLoadBearing pins the two tests inside isPromiseVoid.
 //
 // `isPromiseVoid` asks two questions before it unwraps: is the type thenable, and is it a type
-// reference. Neither is implied by the other, and a mutation removing either SURVIVED upstream's
+// reference. Neither is implied by the other, and a mutation removing either survived upstream's
 // whole 30-case corpus, because every promise upstream writes answers both the same way.
 //
 // Measured in `internal/consistent_return_ext_probe` across ten return types, five diverge:
@@ -894,17 +893,17 @@ func TestConsistentReturnDoesNotPanicOnShapesWithNoUsefulType(t *testing.T) {
 //	void[], Map<string, void>, Pair<void>         thenable F  reference T   DIVERGE
 //	a bare `interface T { then(...) }`            thenable T  reference F   DIVERGE
 //
-// The two directions fail differently and that is why both rows below exist. Dropping the THENABLE
+// The two directions fail differently and that is why both rows below exist. Dropping the thenable
 // test lets an ordinary generic whose first type argument happens to be `void` suppress a real
 // finding -- `Promise<Map<string, void>>` unwraps to `Map<string, void>`, then to `string`, and a
-// version that unwrapped without checking thenability would walk into it. Dropping the REFERENCE
+// version that unwrapped without checking thenability would walk into it. Dropping the reference
 // test is worse than wrong: `Checker_getTypeArguments` panics on a non-reference, and the walk
-// recovers per FILE, so one such return type costs every rule in the package its verdict on that
+// recovers per file, so one such return type costs every rule in the package its verdict on that
 // file.
 //
 // Every expectation here was taken by driving the installed 8.67.0 extension. All six report.
-func TestConsistentReturnPromiseVoidGuardsAreBothLoadBearing(t *testing.T) {
-	t.Parallel()
+func TestConsistentReturnPromiseVoidGuardsAreBothLoadBearing(test *testing.T) {
+	test.Parallel()
 	cases := []struct {
 		name   string
 		source string
@@ -977,11 +976,11 @@ async function foo(flag: boolean): Weird {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runConsistentReturn(t, consistentReturnCase{source: testCase.source})
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runConsistentReturn(test, consistentReturnCase{source: testCase.source})
 			if len(result.Diagnostics) == 0 {
-				t.Errorf("expected a finding and got none. %s", testCase.reason)
+				test.Errorf("expected a finding and got none. %s", testCase.reason)
 			}
 		})
 	}
@@ -989,7 +988,7 @@ async function foo(flag: boolean): Weird {
 
 // TestConsistentReturnSuppressingTheFirstReturnMovesTheExpectation is the shape found on real source.
 //
-// This is the case that proves the void filter has to be an INPUT to the judgment rather than a
+// This is the case that proves the void filter has to be an input to the judgment rather than a
 // filter over its findings, and it was found by running the rule over the ahra tree rather than
 // reasoned about. Two of the tree's findings appear under the extension that the bare core rule does
 // not report at all, which looks backwards for a rule that only ever suppresses.
@@ -1004,9 +1003,9 @@ async function foo(flag: boolean): Weird {
 // Both verdicts confirmed by driving the installed 8.67.0 extension and the installed ESLint 10.8.1
 // core over this exact source. A post-filter cannot produce this: dropping the finding a suppressed
 // return generates still leaves it setting the expectation.
-func TestConsistentReturnSuppressingTheFirstReturnMovesTheExpectation(t *testing.T) {
-	t.Parallel()
-	result := runConsistentReturn(t, consistentReturnCase{
+func TestConsistentReturnSuppressingTheFirstReturnMovesTheExpectation(test *testing.T) {
+	test.Parallel()
+	result := runConsistentReturn(test, consistentReturnCase{
 		source: `
 class DeviceId {
   private deviceIdPromise: Promise<void> | undefined;
@@ -1029,5 +1028,5 @@ class DeviceId {
 }
 `,
 	})
-	rule_testing.ExpectFindings(t, result, "missingReturn")
+	rule_testing.ExpectFindings(test, result, "missingReturn")
 }

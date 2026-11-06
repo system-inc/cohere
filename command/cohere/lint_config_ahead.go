@@ -21,7 +21,7 @@ type lintConfigAhead struct {
 
 	// Set before done closes. The errors are kept apart so configureLint reports them in the order it always did:
 	// the load's, then the selectors', then the settings'.
-	config        *configuration.Config
+	configuration *configuration.Configuration
 	loadError     error
 	settingsError error
 	options       configuration.OptionsRegistry
@@ -36,12 +36,12 @@ func startLintConfigAhead(location projectLocation) *lintConfigAhead {
 	ahead := &lintConfigAhead{done: make(chan struct{})}
 	go func() {
 		defer close(ahead.done)
-		// What loadLintConfig does for a project that names its sets.
-		ahead.config, ahead.loadError = configuration.LoadFor(location.LintConfigFileName, registeredRuleNames())
+		// What loadLintConfiguration does for a project that names its sets.
+		ahead.configuration, ahead.loadError = configuration.LoadFor(location.LintConfigFileName, registeredRuleNames())
 		if ahead.loadError != nil {
 			return
 		}
-		base := optionsBase(ahead.config, location.Root)
+		base := optionsBase(ahead.configuration, location.Root)
 		ahead.settingsError = registry.CheckSettings(base)
 		if ahead.settingsError == nil {
 			ahead.options = registry.OptionsAt(base)

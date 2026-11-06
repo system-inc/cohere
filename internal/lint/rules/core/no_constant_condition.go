@@ -1,9 +1,6 @@
 package core
 
 import (
-	"encoding/json"
-	"fmt"
-
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
@@ -24,41 +21,6 @@ type NoConstantConditionOptions struct {
 	// rather than a mistake, so the default exempts it while still catching `while(1)` and
 	// `while(a || true)`, which are not idioms and are usually accidents.
 	CheckLoops NoConstantConditionCheckLoops `json:"checkLoops"`
-}
-
-// NoConstantConditionCheckLoops is the `checkLoops` value, in the three-string spelling.
-type NoConstantConditionCheckLoops string
-
-// UnmarshalJSON reads every value upstream's schema accepts and refuses the rest.
-//
-// The schema is `enum: ["all", "allExceptWhileTrue", "none", true, false]`, and upstream maps the
-// two booleans onto the strings before anything reads them: true is "all" and false is "none". The
-// booleans are the option's older spelling, and ESLint 10.8.1 still accepts them (#d21war2). An
-// unlisted string is refused rather than reaching the rule, where it would match no case and check
-// every loop.
-func (checkLoops *NoConstantConditionCheckLoops) UnmarshalJSON(raw []byte) error {
-	// `null` decodes into a bool as false without an error, which would read it as "none".
-	if string(raw) == "null" {
-		return fmt.Errorf("checkLoops is null, which upstream's schema refuses")
-	}
-	var enabled bool
-	if err := json.Unmarshal(raw, &enabled); err == nil {
-		*checkLoops = "none"
-		if enabled {
-			*checkLoops = "all"
-		}
-		return nil
-	}
-	var spelling string
-	if err := json.Unmarshal(raw, &spelling); err != nil {
-		return fmt.Errorf(`checkLoops is %s, which is neither a string nor a boolean`, raw)
-	}
-	switch spelling {
-	case "all", "allExceptWhileTrue", "none":
-		*checkLoops = NoConstantConditionCheckLoops(spelling)
-		return nil
-	}
-	return fmt.Errorf(`checkLoops is %q, which is not "all", "allExceptWhileTrue", "none", true or false`, spelling)
 }
 
 // NoConstantCondition flags a condition whose value cannot vary.
@@ -84,17 +46,17 @@ func (checkLoops *NoConstantConditionCheckLoops) UnmarshalJSON(raw []byte) error
 // local shadows. We treat the names as the globals. Shadowing either is vanishingly rare and doing
 // it deliberately to defeat a lint rule is not a thing anyone does, so the exposure is a false
 // positive on code that redefines `undefined`, which has larger problems.
-var NoConstantCondition = rule.Rule{
+var NoConstantCondition = rule.Rule[NoConstantConditionOptions]{
 	Name: "no-constant-condition",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoConstantConditionOptions]) rule.Listeners {
 		checkLoops := NoConstantConditionCheckLoops("allExceptWhileTrue")
-		if parsed, ok := rule.OptionsAs[NoConstantConditionOptions](options); ok && parsed.CheckLoops != "" {
+		if parsed, ok := options.Read(); ok && parsed.CheckLoops != "" {
 			checkLoops = parsed.CheckLoops
 		}
 
 		reportIfConstant := func(condition *ast.Node) {
 			if condition != nil && isConstantExpression(condition, true) {
-				ctx.ReportNode(condition, messageUnexpectedConstantCondition)
+				ruleContext.ReportNode(condition, messageUnexpectedConstantCondition)
 			}
 		}
 
@@ -153,8 +115,8 @@ var NoConstantCondition = rule.Rule{
 
 // isTrueLiteral reports the literal `true`, which is the exempt loop idiom.
 func isTrueLiteral(node *ast.Node) bool {
-	node = ast.SkipParentheses(node)
-	return node != nil && node.Kind == ast.KindTrueKeyword
+	unwrapped := ast.SkipParentheses(node)
+	return unwrapped != nil && unwrapped.Kind == ast.KindTrueKeyword
 }
 
 // isConstantExpression reports whether an expression's value cannot vary.
@@ -170,12 +132,12 @@ func isConstantExpression(node *ast.Node, inBooleanPosition bool) bool {
 	if node == nil {
 		return true
 	}
-	node = ast.SkipParentheses(node)
-	if node == nil {
+	unwrapped := ast.SkipParentheses(node)
+	if unwrapped == nil {
 		return true
 	}
 
-	switch node.Kind {
+	switch unwrapped.Kind {
 	case ast.KindStringLiteral, ast.KindNumericLiteral, ast.KindBigIntLiteral,
 		ast.KindTrueKeyword, ast.KindFalseKeyword, ast.KindNullKeyword,
 		ast.KindRegularExpressionLiteral, ast.KindNoSubstitutionTemplateLiteral,
@@ -189,10 +151,10 @@ func isConstantExpression(node *ast.Node, inBooleanPosition bool) bool {
 	case ast.KindIdentifier:
 		// `undefined` is the only identifier with a fixed value. See the rule comment on why this
 		// does not check that it is the global one.
-		return node.Text() == "undefined"
+		return unwrapped.Text() == "undefined"
 
 	case ast.KindTemplateExpression:
-		return isConstantTemplate(node, inBooleanPosition)
+		return isConstantTemplate(unwrapped, inBooleanPosition)
 
 	case ast.KindArrayLiteralExpression:
 		// Truthy whatever it holds, so constant as a condition. As a value it is constant only if
@@ -200,7 +162,7 @@ func isConstantExpression(node *ast.Node, inBooleanPosition bool) bool {
 		if inBooleanPosition {
 			return true
 		}
-		for _, element := range node.AsArrayLiteralExpression().Elements.Nodes {
+		for _, element := range unwrapped.AsArrayLiteralExpression().Elements.Nodes {
 			if !isConstantExpression(element, false) {
 				return false
 			}
@@ -208,7 +170,7 @@ func isConstantExpression(node *ast.Node, inBooleanPosition bool) bool {
 		return true
 
 	case ast.KindPrefixUnaryExpression:
-		unary := node.AsPrefixUnaryExpression()
+		unary := unwrapped.AsPrefixUnaryExpression()
 		switch unary.Operator {
 		case ast.KindExclamationToken:
 			// Negation reads its operand as a condition, so the flag flips to true rather than
@@ -226,20 +188,20 @@ func isConstantExpression(node *ast.Node, inBooleanPosition bool) bool {
 		if inBooleanPosition {
 			return true
 		}
-		return isConstantExpression(node.AsTypeOfExpression().Expression, false)
+		return isConstantExpression(unwrapped.AsTypeOfExpression().Expression, false)
 
 	case ast.KindNewExpression:
 		// A constructed object is truthy, and that is all that can be said about it.
 		return inBooleanPosition
 
 	case ast.KindBinaryExpression:
-		return isConstantBinaryExpression(node, inBooleanPosition)
+		return isConstantBinaryExpression(unwrapped, inBooleanPosition)
 
 	case ast.KindCallExpression:
-		return isConstantBooleanCall(node)
+		return isConstantBooleanCall(unwrapped)
 
 	case ast.KindSpreadElement:
-		return isConstantExpression(node.AsSpreadElement().Expression, inBooleanPosition)
+		return isConstantExpression(unwrapped.AsSpreadElement().Expression, inBooleanPosition)
 	}
 
 	return false
@@ -332,25 +294,25 @@ func isConstantBinaryExpression(node *ast.Node, inBooleanPosition bool) bool {
 // look: `a && false || b` has a left operand that is an identity for `&&` and not for `||`, so the
 // operator has to match at every level.
 func isLogicalIdentity(node *ast.Node, operator ast.Kind) bool {
-	node = ast.SkipParentheses(node)
-	if node == nil {
+	unwrapped := ast.SkipParentheses(node)
+	if unwrapped == nil {
 		return false
 	}
 
-	switch node.Kind {
+	switch unwrapped.Kind {
 	case ast.KindTrueKeyword:
 		return operator == ast.KindBarBarToken
 	case ast.KindFalseKeyword, ast.KindNullKeyword:
 		return operator == ast.KindAmpersandAmpersandToken
 
 	case ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral:
-		if len(node.Text()) > 0 {
+		if len(unwrapped.Text()) > 0 {
 			return operator == ast.KindBarBarToken
 		}
 		return operator == ast.KindAmpersandAmpersandToken
 
 	case ast.KindNumericLiteral, ast.KindBigIntLiteral:
-		if numericLiteralSign(node.Text()) == 0 {
+		if numericLiteralSign(unwrapped.Text()) == 0 {
 			return operator == ast.KindAmpersandAmpersandToken
 		}
 		return operator == ast.KindBarBarToken
@@ -365,7 +327,7 @@ func isLogicalIdentity(node *ast.Node, operator ast.Kind) bool {
 		return operator == ast.KindAmpersandAmpersandToken
 
 	case ast.KindBinaryExpression:
-		binary := node.AsBinaryExpression()
+		binary := unwrapped.AsBinaryExpression()
 		if binary.OperatorToken == nil {
 			return false
 		}

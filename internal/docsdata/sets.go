@@ -44,17 +44,17 @@ type SetOverride struct {
 func buildSets(inputs Inputs) ([]RuleSet, error) {
 	sets := make([]RuleSet, 0, len(inputs.SetNames))
 	for _, name := range inputs.SetNames {
-		contents, err := inputs.SetContents(name)
-		if err != nil {
-			return nil, err
+		contents, setContentsError := inputs.SetContents(name)
+		if setContentsError != nil {
+			return nil, setContentsError
 		}
-		extends, err := ownExtends(contents)
-		if err != nil {
-			return nil, fmt.Errorf("docsdata: %s: %w", name, err)
+		extends, ownExtendsError := ownExtends(contents)
+		if ownExtendsError != nil {
+			return nil, fmt.Errorf("docsdata: %s: %w", name, ownExtendsError)
 		}
-		resolved, err := inputs.LoadSet(name)
-		if err != nil {
-			return nil, fmt.Errorf("docsdata: resolving %s: %w", name, err)
+		resolved, loadSetError := inputs.LoadSet(name)
+		if loadSetError != nil {
+			return nil, fmt.Errorf("docsdata: resolving %s: %w", name, loadSetError)
 		}
 
 		set := RuleSet{
@@ -97,19 +97,19 @@ func ownExtends(contents []byte) ([]string, error) {
 	var file struct {
 		Extends json.RawMessage `json:"extends"`
 	}
-	if err := json.Unmarshal(contents, &file); err != nil {
-		return nil, err
+	if decodeError := json.Unmarshal(contents, &file); decodeError != nil {
+		return nil, decodeError
 	}
 	if len(file.Extends) == 0 {
 		return nil, nil
 	}
 	var single string
-	if err := json.Unmarshal(file.Extends, &single); err == nil {
+	if decodeError := json.Unmarshal(file.Extends, &single); decodeError == nil {
 		return []string{single}, nil
 	}
 	var many []string
-	if err := json.Unmarshal(file.Extends, &many); err != nil {
-		return nil, fmt.Errorf("extends is neither a name nor a list of names: %w", err)
+	if decodeError := json.Unmarshal(file.Extends, &many); decodeError != nil {
+		return nil, fmt.Errorf("extends is neither a name nor a list of names: %w", decodeError)
 	}
 	return many, nil
 }

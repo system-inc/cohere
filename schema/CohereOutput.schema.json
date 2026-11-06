@@ -154,7 +154,22 @@
                                 }
                             },
                             "description": "Swift files a Swift run's engine listed as not checked for a reason other than git ignoring them, Vendor/ or being a package manifest, which today means no target of the package compiles them, less those under a Swift project below it that runs on its own. Each is listed, however many share a reason. They fail nothing. Absent when there are none."
-                        }
+                        },
+                        "withheldInDependencyCgo": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": ["package", "file", "errors"],
+                                "properties": {
+                                    "package": { "type": "string", "description": "The dependency's package, as the Go engine names it, such as \"net\"." },
+                                    "file": { "type": "string", "description": "The file, as the Go engine names it." },
+                                    "errors": { "type": "integer", "description": "The type errors withheld in it." }
+                                }
+                            },
+                            "description": "Files of a dependency with cgo files whose type errors a Go run withheld, because no cgo tool ran and the faked package \"C\" is what they are about, sorted by file. They are a dependency's, not the project's to fix, so they fail nothing. Absent when there are none, as on macOS."
+                        },
+                        "withheldDependencyCgoDeclarations": { "type": "integer", "description": "Declarations of dependencies with cgo files that every rule of a Go run was given without their bodies or initial values, because no cgo tool ran. They fail nothing. Absent when there are none, as on macOS." }
                     }
                 },
                 "adamic": {

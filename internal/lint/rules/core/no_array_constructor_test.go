@@ -23,8 +23,8 @@ const arrayConstructorFile = "/repository/source/ArrayConstructor.tsx"
 //
 // Copied because a fixture a porter invents encodes the same belief as the port, and the case that
 // catches a bug is the one nobody would think to write.
-func TestNoArrayConstructorFires(t *testing.T) {
-	t.Parallel()
+func TestNoArrayConstructorFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -57,14 +57,30 @@ func TestNoArrayConstructorFires(t *testing.T) {
 		{"comments everywhere", "/*a*//*b*/Array/*c*//*d*/()/*e*//*f*/;/*g*//*h*/", []string{"noArrayConstructor"}},
 		{"comments as the only arguments", "Array(/*a*/ /*b*/)", []string{"noArrayConstructor"}},
 		{"comments among the arguments", "Array(/*a*/ x /*b*/, /*c*/ y /*d*/)", []string{"noArrayConstructor"}},
-		{"comments among arguments and outside", "/*a*/Array(/*b*/ x /*c*/, /*d*/ y /*e*/)/*f*/;/*g*/", []string{"noArrayConstructor"}},
+		{
+			"comments among arguments and outside",
+			"/*a*/Array(/*b*/ x /*c*/, /*d*/ y /*e*/)/*f*/;/*g*/",
+			[]string{"noArrayConstructor"},
+		},
 		{"a comment before new", "/*a*/new Array", []string{"noArrayConstructor"}},
 		{"comments around a parenless new", "/*a*/new Array/*b*/", []string{"noArrayConstructor"}},
 		{"a comment inside new", "new/*a*/Array", []string{"noArrayConstructor"}},
-		{"comments everywhere under new", "new/*a*//*b*/Array/*c*//*d*/()/*e*//*f*/;/*g*//*h*/", []string{"noArrayConstructor"}},
+		{
+			"comments everywhere under new",
+			"new/*a*//*b*/Array/*c*//*d*/()/*e*//*f*/;/*g*//*h*/",
+			[]string{"noArrayConstructor"},
+		},
 		{"new with comments as arguments", "new Array(/*a*/ /*b*/)", []string{"noArrayConstructor"}},
-		{"new with comments among arguments", "new Array(/*a*/ x /*b*/, /*c*/ y /*d*/)", []string{"noArrayConstructor"}},
-		{"new with comments throughout", "new/*a*/Array(/*b*/ x /*c*/, /*d*/ y /*e*/)/*f*/;/*g*/", []string{"noArrayConstructor"}},
+		{
+			"new with comments among arguments",
+			"new Array(/*a*/ x /*b*/, /*c*/ y /*d*/)",
+			[]string{"noArrayConstructor"},
+		},
+		{
+			"new with comments throughout",
+			"new/*a*/Array(/*b*/ x /*c*/, /*d*/ y /*e*/)/*f*/;/*g*/",
+			[]string{"noArrayConstructor"},
+		},
 
 		// The same shapes terminated by a semicolon, which upstream carries separately because the
 		// statement boundary is what the fixer has to reason about.
@@ -97,10 +113,10 @@ func TestNoArrayConstructorFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.RunTyped(t, NoArrayConstructor, arrayConstructorFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.RunTyped(test, NoArrayConstructor, arrayConstructorFile, testCase.sourceText),
 				testCase.wantIds...)
 		})
 	}
@@ -111,8 +127,8 @@ func TestNoArrayConstructorFires(t *testing.T) {
 // The single-argument forms are the exemption the rule is built around. The dotted forms are a
 // different function entirely. The type-argument forms are TypeScript rather than the untyped
 // pitfall. The optional forms are upstream declining to judge a case, not judging it safe.
-func TestNoArrayConstructorStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoArrayConstructorStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -164,7 +180,7 @@ func TestNoArrayConstructorStaysSilent(t *testing.T) {
 
 		// The optional family. `Array?.(x)` and `Array?.(9)` would pass on argument count anyway,
 		// but `Array?.<Foo>(1, 2, 3)` and the bare optional forms are exempt only because upstream
-		// marks optional chaining "TODO: Catch optional chaining cases".
+		// marks optional chaining `TODO: Catch optional chaining cases`.
 		{"an optional call with one argument", "Array?.(x);"},
 		{"an optional call with a length", "Array?.(9);"},
 		{"an optional property of foo", "foo?.Array();"},
@@ -176,10 +192,10 @@ func TestNoArrayConstructorStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.RunTyped(t, NoArrayConstructor, arrayConstructorFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.RunTyped(test, NoArrayConstructor, arrayConstructorFile, testCase.sourceText))
 		})
 	}
 }
@@ -194,8 +210,8 @@ func TestNoArrayConstructorStaysSilent(t *testing.T) {
 //
 // That is the most damaging failure this rule has available, and upstream's corpus is blind to it,
 // which is a good demonstration that copying the corpus is a floor rather than a ceiling.
-func TestNoArrayConstructorDeclinesOtherConstructors(t *testing.T) {
-	t.Parallel()
+func TestNoArrayConstructorDeclinesOtherConstructors(test *testing.T) {
+	test.Parallel()
 
 	for _, sourceText := range []string{
 		"foo();",
@@ -207,10 +223,10 @@ func TestNoArrayConstructorDeclinesOtherConstructors(t *testing.T) {
 		"ArrayBuffer(1, 2);",
 		"new ArrayLike();",
 	} {
-		t.Run(sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.RunTyped(t, NoArrayConstructor, arrayConstructorFile, sourceText))
+		test.Run(sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.RunTyped(test, NoArrayConstructor, arrayConstructorFile, sourceText))
 		})
 	}
 }
@@ -221,14 +237,14 @@ func TestNoArrayConstructorDeclinesOtherConstructors(t *testing.T) {
 // optional pass case either carries one argument or carries type arguments, both of which are
 // refused a step earlier. So deleting the optional check entirely leaves upstream's whole corpus
 // green. `Array?.()` and `Array?.(1, 2)` are the inputs that can see it, and neither is upstream's.
-func TestNoArrayConstructorDeclinesBareOptionalCalls(t *testing.T) {
-	t.Parallel()
+func TestNoArrayConstructorDeclinesBareOptionalCalls(test *testing.T) {
+	test.Parallel()
 
 	for _, sourceText := range []string{"Array?.();", "Array?.(1, 2);", "Array?.(...args);"} {
-		t.Run(sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.RunTyped(t, NoArrayConstructor, arrayConstructorFile, sourceText))
+		test.Run(sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.RunTyped(test, NoArrayConstructor, arrayConstructorFile, sourceText))
 		})
 	}
 }
@@ -238,18 +254,18 @@ func TestNoArrayConstructorDeclinesBareOptionalCalls(t *testing.T) {
 // Upstream's two shadow cases are both zero-argument. This one passes two arguments through a
 // parameter named `Array`, so it exercises the same resolution on a different reported shape, and it
 // is the case a reader is most likely to hit in real code: a function that takes a constructor.
-func TestNoArrayConstructorDeclinesAShadowedArray(t *testing.T) {
-	t.Parallel()
+func TestNoArrayConstructorDeclinesAShadowedArray(test *testing.T) {
+	test.Parallel()
 
 	for _, sourceText := range []string{
 		"function build(Array) { return new Array(1, 2); }",
 		"function build(Array) { return Array(); }",
 		"import { Array } from './Shim';\nexport const a = new Array(1, 2);\n",
 	} {
-		t.Run(sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.RunTyped(t, NoArrayConstructor, arrayConstructorFile, sourceText))
+		test.Run(sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.RunTyped(test, NoArrayConstructor, arrayConstructorFile, sourceText))
 		})
 	}
 }
@@ -266,15 +282,15 @@ func TestNoArrayConstructorDeclinesAShadowedArray(t *testing.T) {
 // So this states the dependency as an executable claim: the syntax-only harness cannot see this
 // rule, and anyone who switches a fixture back to `Run` gets a failure here rather than a green
 // suite that proves nothing.
-func TestNoArrayConstructorNeedsTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestNoArrayConstructorNeedsTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	if !NoArrayConstructor.NeedsTypeChecker {
-		t.Fatal("the rule stopped declaring NeedsTypeChecker; the shadow fixtures no longer mean anything")
+		test.Fatal("the rule stopped declaring NeedsTypeChecker; the shadow fixtures no longer mean anything")
 	}
-	result := rule_testing.Run(t, NoArrayConstructor, arrayConstructorFile, "new Array()")
+	result := rule_testing.Run(test, NoArrayConstructor, arrayConstructorFile, "new Array()")
 	if len(result.Diagnostics) != 0 {
-		t.Fatalf("expected the syntax-only harness to see nothing, got %v", result.MessageIds())
+		test.Fatalf("expected the syntax-only harness to see nothing, got %v", result.MessageIds())
 	}
 }
 
@@ -284,8 +300,8 @@ func TestNoArrayConstructorNeedsTheTypedHarness(t *testing.T) {
 // text: a fix writing the right string over the wrong span passes a text comparison. Every pair here
 // is upstream's own `fix` table, which is the part of the corpus the extractor's counts do not
 // cover.
-func TestNoArrayConstructorSuggestsAnArrayLiteral(t *testing.T) {
-	t.Parallel()
+func TestNoArrayConstructorSuggestsAnArrayLiteral(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -315,22 +331,22 @@ func TestNoArrayConstructorSuggestsAnArrayLiteral(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoArrayConstructor, arrayConstructorFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoArrayConstructor, arrayConstructorFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 			}
 			suggestions := result.Diagnostics[0].Suggestions
 			if len(suggestions) != 1 || len(suggestions[0].Fixes) != 1 {
-				t.Fatalf("wanted one suggestion carrying one fix, got %d suggestions", len(suggestions))
+				test.Fatalf("wanted one suggestion carrying one fix, got %d suggestions", len(suggestions))
 			}
 
 			fix := suggestions[0].Fixes[0]
 			rewritten := testCase.sourceText[:fix.Range.Pos()] + fix.Text +
 				testCase.sourceText[fix.Range.End():]
 			if rewritten != testCase.wantSource {
-				t.Fatalf("applying the suggestion gave %q, wanted %q", rewritten, testCase.wantSource)
+				test.Fatalf("applying the suggestion gave %q, wanted %q", rewritten, testCase.wantSource)
 			}
 		})
 	}
@@ -338,7 +354,7 @@ func TestNoArrayConstructorSuggestsAnArrayLiteral(t *testing.T) {
 
 // What the suggestion does to comments, measured rather than assumed.
 //
-// Upstream carries these three under "TODO: Preserve comments around callee" and does not assert
+// Upstream carries these three under `TODO: Preserve comments around callee` and does not assert
 // them, so this is the part of the corpus with no expected answer to copy and the part a porter is
 // most likely to get wrong by writing down what they expected.
 //
@@ -354,8 +370,8 @@ func TestNoArrayConstructorSuggestsAnArrayLiteral(t *testing.T) {
 //
 // None of this is a correctness problem while the rewrite is a suggestion, because a human sees the
 // result before it lands. It would be one if this were ever promoted to a fix.
-func TestNoArrayConstructorKeepsCommentsAmongArguments(t *testing.T) {
-	t.Parallel()
+func TestNoArrayConstructorKeepsCommentsAmongArguments(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct{ sourceText, wantSource string }{
 		// Comments as the only "arguments" are lost, because they are not arguments.
@@ -370,17 +386,17 @@ func TestNoArrayConstructorKeepsCommentsAmongArguments(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoArrayConstructor, arrayConstructorFile, testCase.sourceText)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoArrayConstructor, arrayConstructorFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 			}
 			fix := result.Diagnostics[0].Suggestions[0].Fixes[0]
 			rewritten := testCase.sourceText[:fix.Range.Pos()] + fix.Text +
 				testCase.sourceText[fix.Range.End():]
 			if rewritten != testCase.wantSource {
-				t.Fatalf("applying the suggestion gave %q, wanted %q", rewritten, testCase.wantSource)
+				test.Fatalf("applying the suggestion gave %q, wanted %q", rewritten, testCase.wantSource)
 			}
 		})
 	}
@@ -401,25 +417,25 @@ func TestNoArrayConstructorKeepsCommentsAmongArguments(t *testing.T) {
 // The claim under test is not that the rewrite is wrong everywhere. It is that the rule cannot tell
 // this case from the ordinary one without looking at what precedes the statement, so nothing here
 // may be applied unattended.
-func TestNoArrayConstructorNeverProposesAnAutomaticFix(t *testing.T) {
-	t.Parallel()
+func TestNoArrayConstructorNeverProposesAnAutomaticFix(test *testing.T) {
+	test.Parallel()
 
 	sourceText := "const value = 1;\nFn\nArray()\n"
-	result := rule_testing.RunTyped(t, NoArrayConstructor, arrayConstructorFile, sourceText)
+	result := rule_testing.RunTyped(test, NoArrayConstructor, arrayConstructorFile, sourceText)
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
+		test.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 	}
 	if len(result.Diagnostics[0].Fixes) != 0 {
-		t.Fatalf("the rule proposed %d unattended fixes; every rewrite here must be a suggestion",
+		test.Fatalf("the rule proposed %d unattended fixes; every rewrite here must be a suggestion",
 			len(result.Diagnostics[0].Fixes))
 	}
 
 	// And the suggestion, if a human took it blindly, would be the meaning change described above.
-	// Recorded rather than repaired, so that a later change adding an ASI guard has a fixture that
+	// Recorded rather than repaired, so that a later change adding an `ASI` guard has a fixture that
 	// visibly flips instead of a comment nobody reads.
 	fix := result.Diagnostics[0].Suggestions[0].Fixes[0]
 	rewritten := sourceText[:fix.Range.Pos()] + fix.Text + sourceText[fix.Range.End():]
 	if rewritten != "const value = 1;\nFn\n[]\n" {
-		t.Fatalf("unexpected rewrite %q", rewritten)
+		test.Fatalf("unexpected rewrite %q", rewritten)
 	}
 }

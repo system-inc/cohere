@@ -17,7 +17,7 @@ import (
 // the severity tuple before dispatch, so the decoder receives that object directly rather than
 // upstream's one-element array.
 type NoInlineCommentsOptions struct {
-	// IgnorePattern is a regular expression source, tested against the comment's INNER text. A
+	// IgnorePattern is a regular expression source, tested against the comment's inner text. A
 	// comment matching it is allowed inline, which is how a project keeps a convention like
 	// `// webpackChunkName: ...` while banning the rest.
 	IgnorePattern string `json:"ignorePattern"`
@@ -34,8 +34,8 @@ var messageNoInlineCommentsUnexpected = rule.Message{
 
 // noInlineCommentsDirectivePattern is upstream's `ESLINT_DIRECTIVE_PATTERN`.
 //
-// `/^(?:eslint[- ]|(?:globals?|exported) )/u`, applied to a BLOCK comment's trimmed inner text. A
-// LINE comment uses a different and simpler test upstream, `startsWith("eslint-")`, so the two are
+// `/^(?:eslint[- ]|(?:globals?|exported) )/u`, applied to a block comment's trimmed inner text. A
+// line comment uses a different and simpler test upstream, `startsWith("eslint-")`, so the two are
 // not interchangeable and both are reproduced below.
 var noInlineCommentsDirectivePattern = regexp.MustCompile(`^(?:eslint[- ]|(?:globals?|exported) )`)
 
@@ -57,9 +57,9 @@ var noInlineCommentsDirectivePattern = regexp.MustCompile(`^(?:eslint[- ]|(?:glo
 // # The oracle disagreed with the corpus on two cases, and the corpus was right
 //
 // Driving this rule standalone through the Linter API reports on `var a = 1; // eslint-disable-line
-// no-debugger`, which upstream's corpus lists as CLEAN. That is not a disagreement about the rule:
+// no-debugger`, which upstream's corpus lists as clean. That is not a disagreement about the rule:
 // ESLint's own machinery consumes directive comments before a standalone rule run sees them in the
-// same way, while the rule ALSO carries its own `isDirectiveComment` guard. Both exist, and the
+// same way, while the rule also carries its own `isDirectiveComment` guard. Both exist, and the
 // guard is the half that belongs to this port.
 //
 // Reproducing it here means all three of those cases are expressible as fixtures rather than being
@@ -67,19 +67,19 @@ var noInlineCommentsDirectivePattern = regexp.MustCompile(`^(?:eslint[- ]|(?:glo
 // `internal/lint/suppression`, so a case that depended on the suppression layer could not be pinned
 // at all.
 //
-// # The directive test is TWO tests, and they are not the same
+// # The directive test is two tests, and they are not the same
 //
 // Upstream's `isDirectiveComment` branches on comment type:
 //
 //	Line comment    comment.startsWith("eslint-")
 //	Block comment   /^(?:eslint[- ]|(?:globals?|exported) )/
 //
-// So `// global foo` is NOT a directive and reports, while `/* global foo */` IS one and does not.
+// So `// global foo` is not a directive and reports, while `/* global foo */` is one and does not.
 // Collapsing the two into one test is the obvious simplification and it changes verdicts in both
 // directions. The corpus contains the block form; the line form is covered by a fixture written
 // here.
 //
-// # What counts as "inline" is decided on the raw LINE text, not on the AST
+// # What counts as "inline" is decided on the raw line text, not on the AST
 //
 // Upstream slices the comment's own start and end lines and trims what sits outside it. A comment is
 // inline when either side has anything left. That is a text question rather than a syntactic one,
@@ -92,18 +92,18 @@ var noInlineCommentsDirectivePattern = regexp.MustCompile(`^(?:eslint[- ]|(?:glo
 // is a `JSXEmptyExpression` -- an expression container holding nothing but the comment. Ours has no
 // such node kind: an empty JSX expression is `KindJsxExpression` with a nil `Expression`, which is
 // the same shape under a different name.
-var NoInlineComments = rule.Rule{
+var NoInlineComments = rule.Rule[NoInlineCommentsOptions]{
 	Name: "no-inline-comments",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoInlineCommentsOptions]) rule.Listeners {
 		var ignorePattern *esregexp.RegExp
-		if resolved, isNoInlineCommentsOptions := rule.OptionsAs[NoInlineCommentsOptions](options); isNoInlineCommentsOptions &&
+		if resolved, isNoInlineCommentsOptions := options.Read(); isNoInlineCommentsOptions &&
 			resolved.IgnorePattern != "" {
 			// Upstream's `new RegExp(ignorePattern, "u")`, read as JavaScript reads it: RE2 refuses a
 			// lookaround or a backreference its user wrote, and reads `\s` and `\b` differently
 			// (#7mztrdd). A pattern that does not compile is dropped rather than crashing the run,
-			// which reports MORE rather than less. Upstream's `new RegExp` throws and takes every
+			// which reports more rather than less. Upstream's `new RegExp` throws and takes every
 			// other rule's verdict on that file with it, because the walk recovers per file.
-			if compiled, err := esregexp.Compile(resolved.IgnorePattern, "u"); err == nil {
+			if compiled, compileError := esregexp.Compile(resolved.IgnorePattern, "u"); compileError == nil {
 				ignorePattern = compiled
 			}
 		}
@@ -112,7 +112,7 @@ var NoInlineComments = rule.Rule{
 			// Upstream's listener is `Program`, which fires once and walks every comment. The
 			// equivalent here is `KindSourceFile`, which fires before its children.
 			ast.KindSourceFile: func(node *ast.Node) {
-				sourceFile := ctx.SourceFile
+				sourceFile := ruleContext.SourceFile
 				if sourceFile == nil {
 					return
 				}
@@ -121,11 +121,11 @@ var NoInlineComments = rule.Rule{
 				// Read the shared list once. `ForFile` is cached per file, so calling it in the
 				// loop header is not a rescan, but it is a map lookup and a closure call per
 				// comment for no reason.
-				fileComments := comments.ForFile(ctx)
+				fileComments := comments.ForFile(ruleContext)
 				for index := range fileComments {
 					comment := &fileComments[index]
-					if noInlineCommentsIsInline(ctx, lines, comment, ignorePattern) {
-						ctx.ReportRange(comment.Range, messageNoInlineCommentsUnexpected)
+					if noInlineCommentsIsInline(ruleContext, lines, comment, ignorePattern) {
+						ruleContext.ReportRange(comment.Range, messageNoInlineCommentsUnexpected)
 					}
 				}
 			},
@@ -135,7 +135,7 @@ var NoInlineComments = rule.Rule{
 
 // noInlineCommentsIsInline answers upstream's `testCodeAroundComment`, minus the report.
 func noInlineCommentsIsInline(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	lines []string,
 	comment *comments.Comment,
 	ignorePattern *esregexp.RegExp,
@@ -179,7 +179,7 @@ func noInlineCommentsIsInline(
 	// The JSX exception. A comment alone inside an expression container is idiomatic React and the
 	// braces around it are not "code" in the sense this rule means.
 	if (preamble == "" || preamble == "{") && (postamble == "" || postamble == "}") {
-		if noInlineCommentsIsInsideEmptyJsxExpression(ctx, comment) {
+		if noInlineCommentsIsInsideEmptyJsxExpression(ruleContext, comment) {
 			return false
 		}
 	}
@@ -195,7 +195,7 @@ func noInlineCommentsIsInline(
 // noInlineCommentsBody strips a comment's delimiters and trims, matching ESLint's `comment.value`
 // passed through `.trim()`.
 //
-// ESLint's `value` is the text BETWEEN the delimiters; the shelf's `Text` includes them, because
+// ESLint's `value` is the text between the delimiters; the shelf's `Text` includes them, because
 // what counts as content differs by rule. A block comment's closing delimiter is removed only when
 // present, since an unterminated block comment at end of file has none.
 func noInlineCommentsBody(comment *comments.Comment) string {
@@ -231,8 +231,8 @@ func noInlineCommentsIsDirective(comment *comments.Comment, body string) bool {
 // Walked from the source file rather than looked up by index, because there is no range-index lookup
 // on the shim. The walk descends only into nodes whose range contains the comment, so it is a
 // descent rather than a scan.
-func noInlineCommentsIsInsideEmptyJsxExpression(ctx rule.Context, comment *comments.Comment) bool {
-	if ctx.SourceFile == nil {
+func noInlineCommentsIsInsideEmptyJsxExpression(ruleContext rule.Context, comment *comments.Comment) bool {
+	if ruleContext.SourceFile == nil {
 		return false
 	}
 	position := comment.Range.Pos()
@@ -257,7 +257,7 @@ func noInlineCommentsIsInsideEmptyJsxExpression(ctx rule.Context, comment *comme
 			return found
 		})
 	}
-	descend(ctx.SourceFile.AsNode())
+	descend(ruleContext.SourceFile.AsNode())
 
 	return found
 }
@@ -271,13 +271,13 @@ func DefaultNoInlineCommentsOptions() NoInlineCommentsOptions {
 //
 // Hand-rolled rather than `rule.DecodeOptionsInto` so a bare `"error"` configuration, which arrives
 // as empty input, resolves to the documented default instead of erroring.
-func DecodeNoInlineCommentsOptions(raw []byte) (any, error) {
+func DecodeNoInlineCommentsOptions(raw []byte) (NoInlineCommentsOptions, error) {
 	options := DefaultNoInlineCommentsOptions()
 	if len(raw) == 0 {
 		return options, nil
 	}
-	if err := rule.UnmarshalOptions(raw, &options); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &options); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 	return options, nil
 }

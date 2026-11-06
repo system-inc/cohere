@@ -1,7 +1,6 @@
 package typescript
 
 import (
-	"encoding/json"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -13,12 +12,12 @@ import (
 // OnlyThrowErrorOptions is upstream's option struct, field-for-field, plus the one split our wire
 // format forces.
 //
-// `allow` arrives as ONE heterogeneous array whose entries are either a bare string (matched
+// `allow` arrives as one heterogeneous array whose entries are either a bare string (matched
 // against the type's own name) or a `TypeOrValueSpecifier` object. `Allow` and `AllowInline` are
 // the two typed halves of that array, exactly as `no-floating-promises` splits its two allowlists.
 //
-// The three booleans stay POINTERS all the way through, because every one of them defaults to
-// TRUE. Binding them to plain `bool` would make an unconfigured rule behave as though all three had
+// The three booleans stay pointers all the way through, because every one of them defaults to
+// true. Binding them to plain `bool` would make an unconfigured rule behave as though all three had
 // been explicitly turned off, which is the loudest possible failure: `throw someAny` would start
 // reporting on every file in the tree. Absent has to stay distinguishable from false.
 type OnlyThrowErrorOptions struct {
@@ -66,7 +65,7 @@ func buildOnlyThrowErrorUndefMessage() rule.Message {
 //
 // # What decides a finding
 //
-// One listener on `KindThrowStatement`, reading the argument's TYPE. The order below is upstream's
+// One listener on `KindThrowStatement`, reading the argument's type. The order below is upstream's
 // and it is load-bearing, because two arms can both match the same input and the first one wins:
 //
 //	rethrow          an identifier bound by a catch clause, or by the rejection handler of a
@@ -84,7 +83,7 @@ func buildOnlyThrowErrorUndefMessage() rule.Message {
 // that is not obvious, and upstream's own corpus pins it: `throw undefined` is invalid case 0 with
 // no options at all, so it reports while every default is still permissive.
 //
-// The type test is `TypeFlagsUndefined`, which is a FLAG test rather than an equality, so a union
+// The type test is `TypeFlagsUndefined`, which is a flag test rather than an equality, so a union
 // containing `undefined` takes this arm. Measured against the installed rule:
 // `declare const x: Error | undefined; throw x;` reports `object`, not `undef`, because the union
 // as a whole does not carry the undefined flag at the top level -- `Error | undefined` is a union
@@ -94,11 +93,11 @@ func buildOnlyThrowErrorUndefMessage() rule.Message {
 //
 // ESTree does not represent parentheses as nodes at all, so upstream's rule is handed a bare
 // `Identifier` for `throw (e)` and its `node.type !== Identifier` guard never sees the wrapper.
-// Our parser DOES produce `KindParenthesizedExpression`, so a literal port of that guard would
+// Our parser does produce `KindParenthesizedExpression`, so a literal port of that guard would
 // decline every parenthesized rethrow and report it as a violation.
 //
 // This is a parser difference rather than a rule difference, so the port skips parentheses in the
-// rethrow check to reproduce the DECISION. Measured on the installed rule, holding source fixed and
+// rethrow check to reproduce the decision. Measured on the installed rule, holding source fixed and
 // varying only `allowRethrowing`:
 //
 //	try {} catch (e) { throw (e); }    allowRethrowing default   SILENT
@@ -107,7 +106,7 @@ func buildOnlyThrowErrorUndefMessage() rule.Message {
 // The second row is what proves the rethrow arm is actually firing on the parenthesized form rather
 // than the case being silent for some other reason. Both are fixtured.
 //
-// The SPAN excludes the parentheses too, and that is measured rather than inherited: upstream
+// The span excludes the parentheses too, and that is measured rather than inherited: upstream
 // reports `throw ('error')` at columns 8..15, which is `'error'` without its wrapper, because
 // ESTree hands it the inner node. `ctx.ReportNode` on the skipped node reproduces it.
 //
@@ -147,24 +146,24 @@ func buildOnlyThrowErrorUndefMessage() rule.Message {
 // `.catch((...e) => { throw e; })` binds `e` to the whole argument list rather than to the
 // rejection, so upstream reports it, and its corpus pins that as invalid case 40.
 //
-// The method NAME is read statically, and it resolves through a computed access and even through a
+// The method name is read statically, and it resolves through a computed access and even through a
 // const-folded variable key. Measured, with `allowRethrowing: false` as the control on each:
 //
 //	Promise.reject('x')['catch'](e => { throw e; })          SILENT (reports with rethrow off)
 //	const k = 'catch'; Promise.reject('x')[k](e => ...)      SILENT (reports with rethrow off)
 //	p?.catch(e => { throw e; })                              SILENT
 //
-// The const-folded key is the one this port does NOT reproduce, and it is stated rather than
+// The const-folded key is the one this port does not reproduce, and it is stated rather than
 // silent. Upstream's `getStaticMemberAccessValue` falls back to `getStaticValue`, an evaluator that
 // resolves an identifier through the scope manager to a constant initializer. Reproducing it means
 // a constant-folding pass, which is a substantially larger piece of machinery than the rest of this
 // rule, and it costs exactly one thing: `obj[k](e => { throw e; })` where `k` is a `const` bound to
 // `'catch'` or `'then'` reports here and is silent upstream. No case in the corpus writes that
-// shape. The literal computed form `['catch']` IS reproduced, since that needs no evaluator.
+// shape. The literal computed form `['catch']` is reproduced, since that needs no evaluator.
 //
 // # Two arms of the `then` shape, and why the second argument matters
 //
-// `.then(onFulfilled, onRejected)` puts the rejection handler SECOND, so the arrow must be
+// `.then(onFulfilled, onRejected)` puts the rejection handler second, so the arrow must be
 // `arguments[1]`; `.then(onRejected)` has no rejection handler at all, and upstream reports it.
 // That is invalid case 43 in the corpus. A spread anywhere before the handler makes the position
 // unknowable, so upstream returns the object without an `onRejected` and the arm declines: invalid
@@ -181,7 +180,7 @@ func buildOnlyThrowErrorUndefMessage() rule.Message {
 // `KindThrowStatement` is a rare anchor. The checker is consulted once per throw, and the rethrow
 // arm short-circuits on anything that is not a bare identifier, so the thenable test runs only for
 // a `throw e` inside a callback.
-var OnlyThrowError = rule.Rule{
+var OnlyThrowError = rule.Rule[OnlyThrowErrorOptions]{
 	Name: "@typescript-eslint/only-throw-error",
 
 	// Every arm reads the argument's type, so the checker is required.
@@ -191,11 +190,11 @@ var OnlyThrowError = rule.Rule{
 	// Compiler options and the default library, through type_checking's builtin and specifier helpers.
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, _ := rule.OptionsAs[OnlyThrowErrorOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[OnlyThrowErrorOptions]) rule.Listeners {
+		settings, _ := options.Read()
 
 		// A rule configured as bare `"error"` is handed nil options, and `options.(T)` on nil yields
-		// the zero value, which is three nil pointers. Every default here is TRUE, so defaulting
+		// the zero value, which is three nil pointers. Every default here is true, so defaulting
 		// them is what keeps an unconfigured rule permissive rather than reporting every `any`.
 		allowRethrowing := settings.AllowRethrowing == nil || *settings.AllowRethrowing
 		allowThrowingAny := settings.AllowThrowingAny == nil || *settings.AllowThrowingAny
@@ -203,46 +202,46 @@ var OnlyThrowError = rule.Rule{
 
 		return rule.Listeners{
 			ast.KindThrowStatement: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 
-				// Three nil checks in this listener are DEFENSIVE rather than behavioral, and the
+				// Three nil checks in this listener are defensive rather than behavioral, and the
 				// mutation sweep says so: neutralizing any of them changes no verdict, and a
 				// reachability probe over ten malformed shapes -- `throw;`, `throw ();`,
 				// `throw (());`, a bare `throw` at the end of a function body, in a switch case,
 				// after an `if`, in a `do` body, plus three well-formed controls -- never produced
-				// a nil for any of them. Our parser recovers by SYNTHESIZING a zero-width
+				// a nil for any of them. Our parser recovers by synthesizing a zero-width
 				// `KindIdentifier` rather than by leaving the field empty, which is why. Kept
 				// because a panic in a linter takes down the whole run, and because the verdict
 				// names the shapes it was taken over: a parser change that starts leaving these
 				// empty voids it.
 				//
-				// The FOURTH nil check, on the resolved symbol below, is a different matter. It is
+				// The fourth nil check, on the resolved symbol below, is a different matter. It is
 				// reachable, it was the one survivor of these four that a real input reached, and
-				// upstream CRASHES on that input. See the test.
+				// upstream crashes on that input. See the test.
 				argument := node.AsThrowStatement().Expression
 				if argument == nil {
 					return
 				}
 
 				// ESTree has no parenthesis node, so upstream's rule never sees one. Skipping here
-				// is what makes the DECISION and the SPAN match; see the doc comment above.
+				// is what makes the decision and the span match; see the doc comment above.
 				subject := ast.SkipParentheses(argument)
 				if subject == nil {
 					return
 				}
 
-				// A SYNTHESIZED node has no text to point at, so reporting on it emits a
+				// A synthesized node has no text to point at, so reporting on it emits a
 				// zero-width finding at a position the author never wrote.
 				//
 				// Upstream cannot reach this at all: `throw;` and `throw ();` are both
-				// "Expression expected" PARSE ERRORS for its parser, so the rule never runs and
-				// there is no upstream verdict to be faithful to. Our parser RECOVERS, handing
+				// "Expression expected" parse errors for its parser, so the rule never runs and
+				// there is no upstream verdict to be faithful to. Our parser recovers, handing
 				// back a zero-width `KindIdentifier` whose type is `any`, which is silent only
 				// while `allowThrowingAny` is true. With the option off it reports on nothing.
 				//
-				// The test is AFTER the parenthesis skip rather than before it, and that is the
+				// The test is after the parenthesis skip rather than before it, and that is the
 				// whole point: `throw;` puts the synthesized node directly under the statement, so
 				// a check on the raw argument catches it, while `throw ();` wraps it in a real
 				// `KindParenthesizedExpression` that is not itself missing. Measured with
@@ -253,24 +252,29 @@ var OnlyThrowError = rule.Rule{
 					return
 				}
 
-				if allowRethrowing && onlyThrowErrorIsRethrown(ctx, subject) {
+				if allowRethrowing && onlyThrowErrorIsRethrown(ruleContext, subject) {
 					return
 				}
 
-				argumentType := ctx.TypeChecker.GetTypeAtLocation(subject)
+				argumentType := ruleContext.TypeChecker.GetTypeAtLocation(subject)
 				if argumentType == nil {
 					return
 				}
 
-				if type_checking.TypeMatchesSomeSpecifier(argumentType, settings.Allow, settings.AllowInline, ctx.Program) {
+				if type_checking.TypeMatchesSomeSpecifier(
+					argumentType,
+					settings.Allow,
+					settings.AllowInline,
+					ruleContext.Program,
+				) {
 					return
 				}
 
-				// A FLAG test rather than an equality, matching upstream's `isTypeFlagSet`, and it
+				// A flag test rather than an equality, matching upstream's `isTypeFlagSet`, and it
 				// sits above the any/unknown escapes on purpose: `throw undefined` reports even
 				// with every default still permissive.
 				if type_checking.IsTypeFlagSet(argumentType, checker.TypeFlagsUndefined) {
-					ctx.ReportNode(subject, buildOnlyThrowErrorUndefMessage())
+					ruleContext.ReportNode(subject, buildOnlyThrowErrorUndefMessage())
 					return
 				}
 
@@ -282,11 +286,11 @@ var OnlyThrowError = rule.Rule{
 					return
 				}
 
-				if type_checking.IsErrorLike(ctx.Program, ctx.TypeChecker, argumentType) {
+				if type_checking.IsErrorLike(ruleContext.Program, ruleContext.TypeChecker, argumentType) {
 					return
 				}
 
-				ctx.ReportNode(subject, buildOnlyThrowErrorObjectMessage())
+				ruleContext.ReportNode(subject, buildOnlyThrowErrorObjectMessage())
 			},
 		}
 	},
@@ -297,12 +301,12 @@ var OnlyThrowError = rule.Rule{
 // Two shapes count, and they are the two upstream names: a catch clause binding, and the rejection
 // handler parameter of a `.catch`/`.then` on something thenable. Anything that is not a bare
 // identifier is not a rethrow, which is what keeps `throw 'literal'` reportable.
-func onlyThrowErrorIsRethrown(ctx rule.Context, node *ast.Node) bool {
+func onlyThrowErrorIsRethrown(ruleContext rule.Context, node *ast.Node) bool {
 	if !ast.IsIdentifier(node) {
 		return false
 	}
 
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(node)
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(node)
 	if symbol == nil {
 		return false
 	}
@@ -320,7 +324,7 @@ func onlyThrowErrorIsRethrown(ctx rule.Context, node *ast.Node) bool {
 
 	// try { ... } catch (x) { throw x; }
 	//
-	// A destructured catch parameter binds a NEW name taken out of the exception rather than the
+	// A destructured catch parameter binds a new name taken out of the exception rather than the
 	// exception itself, and its declaration's parent is the binding pattern rather than the clause,
 	// so it falls out here without a special case. Measured: upstream reports it too.
 	if declaration.Parent.Kind == ast.KindCatchClause {
@@ -357,7 +361,7 @@ func onlyThrowErrorIsRethrown(ctx rule.Context, node *ast.Node) bool {
 
 	// The name alone is not enough: any object can have a method called `catch`. Upstream tests the
 	// receiver's type, and a plain `{ catch(cb) {} }` object reports.
-	return type_checking.IsThenableType(ctx.TypeChecker, receiver, nil)
+	return type_checking.IsThenableType(ruleContext.TypeChecker, receiver, nil)
 }
 
 // onlyThrowErrorParsePromiseHandlingCall reads a syntactically possible `.catch`/`.then` call,
@@ -378,12 +382,12 @@ func onlyThrowErrorParsePromiseHandlingCall(call *ast.Node) (receiver *ast.Node,
 	var methodName string
 	switch {
 	case ast.IsPropertyAccessExpression(callee):
-		// A PRIVATE name counts. Upstream's static member reader accepts `Identifier` and
+		// A private name counts. Upstream's static member reader accepts `Identifier` and
 		// `PrivateIdentifier` alike, so a thenable class with a `#catch` method is a catch call as
 		// far as this rule is concerned.
 		//
 		// That is not obvious and it is not what this port first wrote. Restricting to
-		// `KindIdentifier` reads as the careful choice and is a DIVERGENCE. Measured on the
+		// `KindIdentifier` reads as the careful choice and is a divergence. Measured on the
 		// installed rule, on a class that is itself thenable so the receiver test cannot be what
 		// decides it:
 		//
@@ -393,15 +397,15 @@ func onlyThrowErrorParsePromiseHandlingCall(call *ast.Node) (receiver *ast.Node,
 		//	  m() { this.#catch(e => { throw e; }); }
 		//	}
 		//
-		// Upstream is SILENT on that and the identifier-only version reports. Found by a mutation
+		// Upstream is silent on that and the identifier-only version reports. Found by a mutation
 		// that survived: dropping the kind guard changed nothing on any fixture, which sent this
 		// back to upstream rather than to a new fixture, and upstream disagreed with the guard.
 		//
-		// The `#` has to come OFF, and that is the second half of the same finding. Our
+		// The `#` has to come off, and that is the second half of the same finding. Our
 		// `Node.Text()` on a private name returns `"#catch"`, while ESTree's `PrivateIdentifier`
 		// carries `name: "catch"` with the hash stripped -- verified by reading the property off
 		// the parser directly. Comparing our text against `"catch"` would therefore never match and
-		// the arm would be inert while LOOKING correct, which is the doubled-hash failure this
+		// the arm would be inert while looking correct, which is the doubled-hash failure this
 		// project has already shipped once, arriving as a silent non-match rather than as a visibly
 		// wrong message.
 		name := callee.AsPropertyAccessExpression().Name()
@@ -447,7 +451,7 @@ func onlyThrowErrorParsePromiseHandlingCall(call *ast.Node) (receiver *ast.Node,
 		return receiver, arguments[0]
 
 	case "then":
-		// The rejection handler is the SECOND argument. A one-argument `.then` has none at all, and
+		// The rejection handler is the second argument. A one-argument `.then` has none at all, and
 		// upstream reports a throw inside it.
 		if len(arguments) < 2 {
 			return receiver, nil
@@ -474,75 +478,25 @@ type onlyThrowErrorRawOptions struct {
 	AllowThrowingUnknown *bool                        `json:"allowThrowingUnknown"`
 }
 
-// onlyThrowErrorRawSpecifier is one entry of the allowlist, in either of its two wire forms.
-type onlyThrowErrorRawSpecifier struct {
-	inline string
-
-	From    string
-	Name    []string
-	Path    string
-	Package string
-}
-
-// UnmarshalJSON accepts both wire forms: a bare string, or the object the schema describes.
-//
-// `name` is itself two shapes, a string or an array of strings. An unrecognized `from` is dropped
-// rather than erroring, which matches how `no-floating-promises` treats the same field: the
-// specifier then matches nothing instead of failing the whole run, and dropping it says nothing
-// rather than silently meaning `file`, which is the zero value.
-func (s *onlyThrowErrorRawSpecifier) UnmarshalJSON(raw []byte) error {
-	var asString string
-	if err := json.Unmarshal(raw, &asString); err == nil {
-		*s = onlyThrowErrorRawSpecifier{inline: asString}
-		return nil
-	}
-
-	var object struct {
-		From    string          `json:"from"`
-		Name    json.RawMessage `json:"name"`
-		Path    string          `json:"path"`
-		Package string          `json:"package"`
-	}
-	if err := rule.UnmarshalOptions(raw, &object); err != nil {
-		return err
-	}
-
-	*s = onlyThrowErrorRawSpecifier{From: object.From, Path: object.Path, Package: object.Package}
-
-	var names []string
-	if err := json.Unmarshal(object.Name, &names); err == nil {
-		s.Name = names
-		return nil
-	}
-	var name string
-	if err := json.Unmarshal(object.Name, &name); err != nil {
-		return err
-	}
-	s.Name = []string{name}
-	return nil
-}
-
 // DecodeOnlyThrowErrorOptions maps upstream's JSON onto the struct the rule reads.
 //
 // Hand-written rather than `rule.DecodeOptionsInto` because `allow` arrives as one heterogeneous
 // array and leaves as two typed fields, and because `from` is a string on the wire and an integer
 // enum in the struct. The three booleans stay pointers all the way through so that "absent" stays
-// distinguishable from "false"; every one of them defaults to TRUE, so collapsing that distinction
+// distinguishable from "false"; every one of them defaults to true, so collapsing that distinction
 // would turn an unconfigured rule into a maximally strict one.
-func DecodeOnlyThrowErrorOptions(raw []byte) (any, error) {
-	decoded, err := rule.DecodeOptionsInto[onlyThrowErrorRawOptions]()(raw)
-	if err != nil {
-		return OnlyThrowErrorOptions{}, err
+func DecodeOnlyThrowErrorOptions(raw []byte) (OnlyThrowErrorOptions, error) {
+	decoded, decodeOptionsError := rule.DecodeOptionsInto[onlyThrowErrorRawOptions]()(raw)
+	if decodeOptionsError != nil {
+		return OnlyThrowErrorOptions{}, decodeOptionsError
 	}
-
-	wire, _ := decoded.(onlyThrowErrorRawOptions)
 
 	options := OnlyThrowErrorOptions{
-		AllowRethrowing:      wire.AllowRethrowing,
-		AllowThrowingAny:     wire.AllowThrowingAny,
-		AllowThrowingUnknown: wire.AllowThrowingUnknown,
+		AllowRethrowing:      decoded.AllowRethrowing,
+		AllowThrowingAny:     decoded.AllowThrowingAny,
+		AllowThrowingUnknown: decoded.AllowThrowingUnknown,
 	}
-	for _, entry := range wire.Allow {
+	for _, entry := range decoded.Allow {
 		if entry.inline != "" {
 			options.AllowInline = append(options.AllowInline, entry.inline)
 			continue

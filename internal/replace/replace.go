@@ -23,13 +23,19 @@ const retryBound = 2 * time.Second
 
 // replacing is File with what it calls handed in, so a test can refuse a rename the way Windows does on
 // a platform that never would.
-func replacing(rename func(string, string) error, retryable func(error) bool, sleep func(time.Duration), from string, to string) error {
+func replacing(
+	rename func(string, string) error,
+	retryable func(error) bool,
+	sleep func(time.Duration),
+	from string,
+	to string,
+) error {
 	pause := 5 * time.Millisecond
 	waited := time.Duration(0)
 	for {
-		err := rename(from, to)
-		if err == nil || !retryable(err) || waited >= retryBound {
-			return err
+		renameError := rename(from, to)
+		if renameError == nil || !retryable(renameError) || waited >= retryBound {
+			return renameError
 		}
 		sleep(pause)
 		waited += pause

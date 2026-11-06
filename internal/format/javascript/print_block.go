@@ -1,6 +1,9 @@
 package javascript
 
-import "github.com/system-inc/cohere/internal/format/printing"
+import (
+	"github.com/system-inc/cohere/internal/format/doc"
+	"github.com/system-inc/cohere/internal/format/printing"
+)
 
 // print/block.js and print/statement-sequence.js.
 
@@ -17,11 +20,11 @@ func printBlock(path *Path, options *Options, print PrintFunc) Doc {
 		return emptyDoc
 	}
 
-	var parts []any
+	var parts []Doc
 	if current.Is("StaticBlock") {
-		parts = append(parts, "static ")
+		parts = append(parts, doc.Text("static "))
 	}
-	parts = append(parts, "{")
+	parts = append(parts, doc.Text("{"))
 	if bodyDoc != nil {
 		parts = append(parts, indentIn(path, concatIn(path, hardline, bodyDoc)), hardline)
 	} else {
@@ -35,7 +38,7 @@ func printBlock(path *Path, options *Options, print PrintFunc) Doc {
 			parts = append(parts, hardline)
 		}
 	}
-	parts = append(parts, "}")
+	parts = append(parts, doc.Text("}"))
 	return concatIn(path, parts...)
 }
 
@@ -58,7 +61,7 @@ func printBlockBody(path *Path, options *Options, print PrintFunc) Doc {
 		return nil
 	}
 
-	var parts []any
+	var parts []Doc
 	if hasDirectives {
 		parts = append(parts, printStatementSequence(path, options, print, "directives"))
 		if hasBody || hasDanglingComments {
@@ -81,7 +84,7 @@ func printBlockBody(path *Path, options *Options, print PrintFunc) Doc {
 // printStatementSequence is upstream's printStatementSequence.
 func printStatementSequence(path *Path, options *Options, print PrintFunc, property string) Doc {
 	current := node(path)
-	var parts []any
+	var parts []Doc
 
 	var lastStatement Node
 	statements := current.List(property)
@@ -97,7 +100,7 @@ func printStatementSequence(path *Path, options *Options, print PrintFunc, prope
 		if statement.Is("EmptyStatement") {
 			return
 		}
-		parts = append(parts, print(nil, nil))
+		parts = append(parts, print("", nil))
 		if statement != lastStatement {
 			parts = append(parts, hardline)
 			if isNextLineEmptyAfter(statement, options) {

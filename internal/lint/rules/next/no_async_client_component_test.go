@@ -20,31 +20,46 @@ const asyncClientComponentFile = "/repository/app/Component.tsx"
 // snapshot records 5 diagnostics from those 5 inputs, so exactly one finding per failing input is
 // measured rather than assumed. The strings were emitted from the extractor's own Rust parse
 // through JSON encoding, so no escape was ever typed on the way here.
-func TestNoAsyncClientComponentFires(t *testing.T) {
-	t.Parallel()
+func TestNoAsyncClientComponentFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
 		sourceText string
 		why        string
 	}{
-		{"fail[0]", "\n                  \"use client\"\n\n                  export default async function MyComponent() {\n                    return <></>\n                  }\n                  ",
-			"the direct shape, returning markup"},
-		{"fail[1]", "\n                  \"use client\"\n\n                  export default async function MyFunction() {\n                    return ''\n                  }\n                  ",
-			"the direct shape returning a string, which is why a component predicate would be wrong here"},
-		{"fail[2]", "\n                  \"use client\"\n\n                  async function MyComponent() {\n                    return <></>\n                  }\n\n                  export default MyComponent\n                  ",
-			"the indirect function shape"},
-		{"fail[3]", "\n                  \"use client\"\n\n                  async function MyFunction() {\n                    return ''\n                  }\n\n                  export default MyFunction\n                  ",
-			"the indirect function shape returning a string"},
-		{"fail[4]", "\n                  \"use client\"\n\n                  const MyFunction = async () => {\n                    return '123'\n                  }\n\n                  export default MyFunction\n                  ",
-			"the indirect async arrow shape"},
+		{
+			"fail[0]",
+			"\n                  \"use client\"\n\n                  export default async function MyComponent() {\n                    return <></>\n                  }\n                  ",
+			"the direct shape, returning markup",
+		},
+		{
+			"fail[1]",
+			"\n                  \"use client\"\n\n                  export default async function MyFunction() {\n                    return ''\n                  }\n                  ",
+			"the direct shape returning a string, which is why a component predicate would be wrong here",
+		},
+		{
+			"fail[2]",
+			"\n                  \"use client\"\n\n                  async function MyComponent() {\n                    return <></>\n                  }\n\n                  export default MyComponent\n                  ",
+			"the indirect function shape",
+		},
+		{
+			"fail[3]",
+			"\n                  \"use client\"\n\n                  async function MyFunction() {\n                    return ''\n                  }\n\n                  export default MyFunction\n                  ",
+			"the indirect function shape returning a string",
+		},
+		{
+			"fail[4]",
+			"\n                  \"use client\"\n\n                  const MyFunction = async () => {\n                    return '123'\n                  }\n\n                  export default MyFunction\n                  ",
+			"the indirect async arrow shape",
+		},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.RunTyped(t, NoAsyncClientComponent, asyncClientComponentFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.RunTyped(test, NoAsyncClientComponent, asyncClientComponentFile,
 					testCase.sourceText), "noAsyncClientComponent")
 		})
 	}
@@ -54,30 +69,45 @@ func TestNoAsyncClientComponentFires(t *testing.T) {
 //
 // Read as a set they say what the rule is: a directive, a capitalized name, and an async binding
 // that is the default export. Remove any one and the finding goes away.
-func TestNoAsyncClientComponentStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoAsyncClientComponentStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
 		sourceText string
 		why        string
 	}{
-		{"pass[0]", "\n                export default async function MyComponent() {\n                  return <></>\n                }\n                ",
-			"no directive at all, so the async default export is a server component and fine"},
-		{"pass[1]", "\n                \"use client\"\n\n                export default async function myFunction() {\n                  return ''\n                }\n                ",
-			"lowercase name, which is the entire component signal this rule has"},
-		{"pass[2]", "\n                async function MyComponent() {\n                  return <></>\n                }\n\n                export default MyComponent\n                ",
-			"indirect export with no directive"},
-		{"pass[3]", "\n                \"use client\"\n\n                async function myFunction() {\n                  return ''\n                }\n\n                export default myFunction\n                ",
-			"lowercase name reached indirectly"},
-		{"pass[4]", "\n                \"use client\"\n\n                const myFunction = () => {\n                  return ''\n                }\n\n                export default myFunction\n                ",
-			"not async, and lowercase, so it fails both tests"},
+		{
+			"pass[0]",
+			"\n                export default async function MyComponent() {\n                  return <></>\n                }\n                ",
+			"no directive at all, so the async default export is a server component and fine",
+		},
+		{
+			"pass[1]",
+			"\n                \"use client\"\n\n                export default async function myFunction() {\n                  return ''\n                }\n                ",
+			"lowercase name, which is the entire component signal this rule has",
+		},
+		{
+			"pass[2]",
+			"\n                async function MyComponent() {\n                  return <></>\n                }\n\n                export default MyComponent\n                ",
+			"indirect export with no directive",
+		},
+		{
+			"pass[3]",
+			"\n                \"use client\"\n\n                async function myFunction() {\n                  return ''\n                }\n\n                export default myFunction\n                ",
+			"lowercase name reached indirectly",
+		},
+		{
+			"pass[4]",
+			"\n                \"use client\"\n\n                const myFunction = () => {\n                  return ''\n                }\n\n                export default myFunction\n                ",
+			"not async, and lowercase, so it fails both tests",
+		},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoAsyncClientComponent,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoAsyncClientComponent,
 				asyncClientComponentFile, testCase.sourceText))
 		})
 	}
@@ -94,22 +124,31 @@ func TestNoAsyncClientComponentStaysSilent(t *testing.T) {
 // literal. Upstream is silent on both, since a directive prologue ends at the first statement that
 // is not a directive. Pinned on the release binary. A port reaching for that predicate alone,
 // which is what the recorded research recommended building on, reports both.
-func TestNoAsyncClientComponentRequiresTheProloguePosition(t *testing.T) {
-	t.Parallel()
+func TestNoAsyncClientComponentRequiresTheProloguePosition(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
 		sourceText string
 	}{
-		{"after an import", "import * as React from \"react\"\n\"use client\"\nexport default async function MyComponent() { return null }\n"},
-		{"after a statement", "const z = 1\n\"use client\"\nexport default async function MyComponent() { return null }\n"},
-		{"inside a function body", "function f() { \"use client\" }\nexport default async function MyComponent() { return null }\n"},
+		{
+			"after an import",
+			"import * as React from \"react\"\n\"use client\"\nexport default async function MyComponent() { return null }\n",
+		},
+		{
+			"after a statement",
+			"const z = 1\n\"use client\"\nexport default async function MyComponent() { return null }\n",
+		},
+		{
+			"inside a function body",
+			"function f() { \"use client\" }\nexport default async function MyComponent() { return null }\n",
+		},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoAsyncClientComponent,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoAsyncClientComponent,
 				asyncClientComponentFile, testCase.sourceText))
 		})
 	}
@@ -121,32 +160,38 @@ func TestNoAsyncClientComponentRequiresTheProloguePosition(t *testing.T) {
 // This is not cosmetic: every one of the 874 client files in the `ahra` tree writes single quotes
 // with a trailing comment, so a port comparing raw source text would be inert on all of them while
 // the imported corpus, which writes double quotes, stayed green.
-func TestNoAsyncClientComponentReadsTheDirectiveValue(t *testing.T) {
-	t.Parallel()
+func TestNoAsyncClientComponentReadsTheDirectiveValue(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
 		sourceText string
 	}{
 		{"single quotes", "'use client'\nexport default async function MyComponent() { return null }\n"},
-		{"single quotes with a trailing comment", "'use client'; // uses client-only features\nexport default async function MyComponent() { return null }\n"},
-		{"a use strict directive above it", "\"use strict\"\n'use client'\nexport default async function MyComponent() { return null }\n"},
+		{
+			"single quotes with a trailing comment",
+			"'use client'; // uses client-only features\nexport default async function MyComponent() { return null }\n",
+		},
+		{
+			"a use strict directive above it",
+			"\"use strict\"\n'use client'\nexport default async function MyComponent() { return null }\n",
+		},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoAsyncClientComponent,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoAsyncClientComponent,
 				asyncClientComponentFile, testCase.sourceText), "noAsyncClientComponent")
 		})
 	}
 }
 
 // A backtick-quoted string is not a directive per the specification, and the parser agrees.
-func TestNoAsyncClientComponentDeclinesATemplateLiteral(t *testing.T) {
-	t.Parallel()
+func TestNoAsyncClientComponentDeclinesATemplateLiteral(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoAsyncClientComponent,
+	rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoAsyncClientComponent,
 		asyncClientComponentFile, "`use client`\nexport default async function MyComponent() { return null }\n"))
 }
 
@@ -156,21 +201,27 @@ func TestNoAsyncClientComponentDeclinesATemplateLiteral(t *testing.T) {
 // skipping, so both of these are silent on the release binary. The corpus writes no parenthesized
 // form at all, so guessing either way would have cost nothing at fixture time and shipped a
 // divergence. Measured rather than assumed, in both directions.
-func TestNoAsyncClientComponentDeclinesParenthesizedForms(t *testing.T) {
-	t.Parallel()
+func TestNoAsyncClientComponentDeclinesParenthesizedForms(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
 		sourceText string
 	}{
-		{"a parenthesized async arrow initializer", "\"use client\"\nconst MyThing = (async () => { return null })\nexport default MyThing\n"},
-		{"a parenthesized exported identifier", "\"use client\"\nasync function MyComponent() { return null }\nexport default (MyComponent)\n"},
+		{
+			"a parenthesized async arrow initializer",
+			"\"use client\"\nconst MyThing = (async () => { return null })\nexport default MyThing\n",
+		},
+		{
+			"a parenthesized exported identifier",
+			"\"use client\"\nasync function MyComponent() { return null }\nexport default (MyComponent)\n",
+		},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoAsyncClientComponent,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoAsyncClientComponent,
 				asyncClientComponentFile, testCase.sourceText))
 		})
 	}
@@ -184,74 +235,93 @@ func TestNoAsyncClientComponentDeclinesParenthesizedForms(t *testing.T) {
 // records an open ASCII question against oxc's *component* path, which uses `is_ascii_uppercase`;
 // this rule is not on that path, so the helper is simply correct for it. That is the dispatch's
 // warning about the helper checked and found not to apply to this rule.
-func TestNoAsyncClientComponentAcceptsNonAsciiUppercase(t *testing.T) {
-	t.Parallel()
+func TestNoAsyncClientComponentAcceptsNonAsciiUppercase(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoAsyncClientComponent,
-		asyncClientComponentFile, "\"use client\"\nexport default async function \u0424oo() { return null }\n"), "noAsyncClientComponent")
+	rule_testing.ExpectFindings(
+		test,
+		rule_testing.RunTyped(test, NoAsyncClientComponent,
+			asyncClientComponentFile, "\"use client\"\nexport default async function \u0424oo() { return null }\n"),
+		"noAsyncClientComponent",
+	)
 }
 
-func TestNoAsyncClientComponentDeclinesNonAsciiLowercase(t *testing.T) {
-	t.Parallel()
+func TestNoAsyncClientComponentDeclinesNonAsciiLowercase(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoAsyncClientComponent,
+	rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoAsyncClientComponent,
 		asyncClientComponentFile, "\"use client\"\nexport default async function \u0444oo() { return null }\n"))
 }
 
 // Shapes the corpus never writes, each silent upstream for a different reason.
-func TestNoAsyncClientComponentDeclinesNearMisses(t *testing.T) {
-	t.Parallel()
+func TestNoAsyncClientComponentDeclinesNearMisses(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
 		sourceText string
 		why        string
 	}{
-		{"an async function expression rather than an arrow", "\"use client\"\nconst MyThing = async function () { return null }\nexport default MyThing\n",
-			"upstream binds an ArrowFunctionExpression specifically, so this is a kind check rather than an oversight"},
+		{
+			"an async function expression rather than an arrow",
+			"\"use client\"\nconst MyThing = async function () { return null }\nexport default MyThing\n",
+			"upstream binds an ArrowFunctionExpression specifically, so this is a kind check rather than an oversight",
+		},
 		{"an anonymous default export", "\"use client\"\nexport default async function () { return null }\n",
 			"there is no name to capitalize-test, and upstream reads the check through the function id"},
 		{"a named export with no default", "\"use client\"\nexport async function MyComponent() { return null }\n",
 			"every reportable shape upstream requires the default export"},
-		{"an imported binding re-exported", "\"use client\"\nimport MyComponent from \"./other\"\nexport default MyComponent\n",
-			"the name resolves to an import rather than a function or a variable declaration"},
+		{
+			"an imported binding re-exported",
+			"\"use client\"\nimport MyComponent from \"./other\"\nexport default MyComponent\n",
+			"the name resolves to an import rather than a function or a variable declaration",
+		},
 		{"a leading underscore", "\"use client\"\nexport default async function _MyComponent() { return null }\n",
 			"the first rune is not uppercase, so it fails the only component signal the rule has"},
-		{"a destructured binding", "\"use client\"\ndeclare const source: { MyThing: () => Promise<null> }\nconst { MyThing } = source\nexport default MyThing\n",
-			"upstream requires a binding identifier, and a pattern binds names without naming the initializer"},
+		{
+			"a destructured binding",
+			"\"use client\"\ndeclare const source: { MyThing: () => Promise<null> }\nconst { MyThing } = source\nexport default MyThing\n",
+			"upstream requires a binding identifier, and a pattern binds names without naming the initializer",
+		},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoAsyncClientComponent,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoAsyncClientComponent,
 				asyncClientComponentFile, testCase.sourceText))
 		})
 	}
 }
 
-// Shapes the corpus never writes that DO report, so the silence above is a discrimination rather
+// Shapes the corpus never writes that do report, so the silence above is a discrimination rather
 // than a narrow rule.
-func TestNoAsyncClientComponentReportsShapesTheCorpusOmits(t *testing.T) {
-	t.Parallel()
+func TestNoAsyncClientComponentReportsShapesTheCorpusOmits(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
 		sourceText string
 		why        string
 	}{
-		{"a let binding rather than const", "\"use client\"\nlet MyThing = async () => { return null }\nexport default MyThing\n",
-			"upstream reads the declarator, not the declaration kind"},
+		{
+			"a let binding rather than const",
+			"\"use client\"\nlet MyThing = async () => { return null }\nexport default MyThing\n",
+			"upstream reads the declarator, not the declaration kind",
+		},
 		{"a var binding", "\"use client\"\nvar MyThing = async () => { return null }\nexport default MyThing\n",
 			"same, and var is the one whose hoisting might have suggested otherwise"},
-		{"a declaration written after the export", "\"use client\"\nexport default MyThing\nconst MyThing = async () => { return null }\n",
-			"upstream resolves the symbol rather than scanning statements before the export, so order does not matter"},
+		{
+			"a declaration written after the export",
+			"\"use client\"\nexport default MyThing\nconst MyThing = async () => { return null }\n",
+			"upstream resolves the symbol rather than scanning statements before the export, so order does not matter",
+		},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoAsyncClientComponent,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoAsyncClientComponent,
 				asyncClientComponentFile, testCase.sourceText), "noAsyncClientComponent")
 		})
 	}
@@ -263,11 +333,15 @@ func TestNoAsyncClientComponentReportsShapesTheCorpusOmits(t *testing.T) {
 // by name. That scan finds the synchronous top-level `MyComponent` here and so happens to agree,
 // but the two are different rules and no imported fixture votes on it. Silent on the release
 // binary, and silent here because the checker resolves the export to the top-level declaration.
-func TestNoAsyncClientComponentResolvesThroughShadowing(t *testing.T) {
-	t.Parallel()
+func TestNoAsyncClientComponentResolvesThroughShadowing(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoAsyncClientComponent,
-		asyncClientComponentFile, "\"use client\"\nfunction MyComponent() { return null }\n{ async function MyComponent() { return null } }\nexport default MyComponent\n"))
+	rule_testing.ExpectClean(test, rule_testing.RunTyped(
+		test,
+		NoAsyncClientComponent,
+		asyncClientComponentFile,
+		"\"use client\"\nfunction MyComponent() { return null }\n{ async function MyComponent() { return null } }\nexport default MyComponent\n",
+	))
 }
 
 // Declaration merging, where the standing advice in this tree points the wrong way and where the
@@ -281,61 +355,76 @@ func TestNoAsyncClientComponentResolvesThroughShadowing(t *testing.T) {
 // written specifically to kill it.
 //
 // All four verdicts below are pinned on the release oxlint binary, and they split on which
-// declaration appears FIRST IN SOURCE. oxc reaches one node through `symbol_declaration(symbol_id)`
+// declaration appears first in source. oxc reaches one node through `symbol_declaration(symbol_id)`
 // and its binder records the first declaration it walks past, so a merged name whose first
 // declaration is a type or a namespace never reaches the async check at all. A loop reports all
 // four; an index-zero read reports three and is right twice by accident.
-func TestNoAsyncClientComponentReportsWhenTheAsyncDeclarationIsFirst(t *testing.T) {
-	t.Parallel()
+func TestNoAsyncClientComponentReportsWhenTheAsyncDeclarationIsFirst(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
 		sourceText string
 	}{
-		{"an interface below the function", "\"use client\"\nasync function MyComponent() { return null }\ninterface MyComponent { field: string }\nexport default MyComponent\n"},
-		{"a namespace below the arrow", "\"use client\"\nlet MyThing = async () => { return null }\nnamespace MyThing { export const x = 1 }\nexport default MyThing\n"},
+		{
+			"an interface below the function",
+			"\"use client\"\nasync function MyComponent() { return null }\ninterface MyComponent { field: string }\nexport default MyComponent\n",
+		},
+		{
+			"a namespace below the arrow",
+			"\"use client\"\nlet MyThing = async () => { return null }\nnamespace MyThing { export const x = 1 }\nexport default MyThing\n",
+		},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoAsyncClientComponent,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoAsyncClientComponent,
 				asyncClientComponentFile, testCase.sourceText), "noAsyncClientComponent")
 		})
 	}
 }
 
-func TestNoAsyncClientComponentDeclinesWhenTheMergedDeclarationIsFirst(t *testing.T) {
-	t.Parallel()
+func TestNoAsyncClientComponentDeclinesWhenTheMergedDeclarationIsFirst(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
 		sourceText string
 	}{
-		{"an interface above the function", "\"use client\"\ninterface MyComponent { field: string }\nasync function MyComponent() { return null }\nexport default MyComponent\n"},
-		{"a namespace above the function", "\"use client\"\nnamespace MyComponent { export const x = 1 }\nasync function MyComponent() { return null }\nexport default MyComponent\n"},
-		{"a namespace above the arrow", "\"use client\"\nnamespace MyThing { export const x = 1 }\nlet MyThing = async () => { return null }\nexport default MyThing\n"},
+		{
+			"an interface above the function",
+			"\"use client\"\ninterface MyComponent { field: string }\nasync function MyComponent() { return null }\nexport default MyComponent\n",
+		},
+		{
+			"a namespace above the function",
+			"\"use client\"\nnamespace MyComponent { export const x = 1 }\nasync function MyComponent() { return null }\nexport default MyComponent\n",
+		},
+		{
+			"a namespace above the arrow",
+			"\"use client\"\nnamespace MyThing { export const x = 1 }\nlet MyThing = async () => { return null }\nexport default MyThing\n",
+		},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoAsyncClientComponent,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoAsyncClientComponent,
 				asyncClientComponentFile, testCase.sourceText))
 		})
 	}
 }
 
-// A synchronous arrow with a CAPITALIZED name, which the corpus never writes.
+// A synchronous arrow with a capitalized name, which the corpus never writes.
 //
 // Upstream's only sync-arrow clean case is `pass[4]`, and its name is lowercase, so it exits on the
 // capitalization test and never votes on whether the initializer is async. A mutant forcing the
 // async check always-true survived every imported fixture on exactly that gap. This is the input
 // that separates the two conditions.
-func TestNoAsyncClientComponentDeclinesASynchronousCapitalizedArrow(t *testing.T) {
-	t.Parallel()
+func TestNoAsyncClientComponentDeclinesASynchronousCapitalizedArrow(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoAsyncClientComponent,
+	rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoAsyncClientComponent,
 		asyncClientComponentFile, "\"use client\"\nconst MyThing = () => { return null }\nexport default MyThing\n"))
 }
 
@@ -344,32 +433,40 @@ func TestNoAsyncClientComponentDeclinesASynchronousCapitalizedArrow(t *testing.T
 // Kept as a fixture even though the rule has no kind guard for it, because the reason it is silent
 // lives in the parse shape rather than in the rule, and a later reader adding that guard back
 // should see this case already passing without it.
-func TestNoAsyncClientComponentDeclinesADestructuredArrayBinding(t *testing.T) {
-	t.Parallel()
+func TestNoAsyncClientComponentDeclinesADestructuredArrayBinding(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoAsyncClientComponent,
-		asyncClientComponentFile, "\"use client\"\ndeclare const source: Array<() => Promise<null>>\nconst [MyThing] = source\nexport default MyThing\n"))
+	rule_testing.ExpectClean(test, rule_testing.RunTyped(
+		test,
+		NoAsyncClientComponent,
+		asyncClientComponentFile,
+		"\"use client\"\ndeclare const source: Array<() => Promise<null>>\nconst [MyThing] = source\nexport default MyThing\n",
+	))
 }
 
 // A declared binding with no initializer at all, which reaches the arm and must not dereference.
-func TestNoAsyncClientComponentDeclinesABindingWithNoInitializer(t *testing.T) {
-	t.Parallel()
+func TestNoAsyncClientComponentDeclinesABindingWithNoInitializer(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoAsyncClientComponent,
+	rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoAsyncClientComponent,
 		asyncClientComponentFile, "\"use client\"\nlet MyThing: unknown\nexport default MyThing\n"))
 }
 
-// A lowercase name on an ASYNC arrow, which the corpus does not write.
+// A lowercase name on an async arrow, which the corpus does not write.
 //
 // Upstream's `pass[4]` is the nearest case and it turns off two conditions at once, being both
 // lowercase and synchronous, so it exits on the async test and never votes on capitalization for
 // the arrow path. A mutant neutralizing the capitalization check in that arm survived every other
 // fixture in this file on exactly that gap. Silent on the release binary.
-func TestNoAsyncClientComponentDeclinesALowercaseAsyncArrow(t *testing.T) {
-	t.Parallel()
+func TestNoAsyncClientComponentDeclinesALowercaseAsyncArrow(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoAsyncClientComponent,
-		asyncClientComponentFile, "\"use client\"\nconst myThing = async () => { return null }\nexport default myThing\n"))
+	rule_testing.ExpectClean(test, rule_testing.RunTyped(
+		test,
+		NoAsyncClientComponent,
+		asyncClientComponentFile,
+		"\"use client\"\nconst myThing = async () => { return null }\nexport default myThing\n",
+	))
 }
 
 // The typed harness is required, and this fails loudly if the declaration is ever reverted.
@@ -377,13 +474,13 @@ func TestNoAsyncClientComponentDeclinesALowercaseAsyncArrow(t *testing.T) {
 // Under the plain harness the checker is nil, the guard at the top of the listener returns, and
 // every silence fixture above would pass vacuously while every firing one failed. That is the more
 // dangerous half: a vacuous green does not announce itself.
-func TestNoAsyncClientComponentNeedsTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestNoAsyncClientComponentNeedsTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	if !NoAsyncClientComponent.NeedsTypeChecker {
-		t.Fatal("the rule resolves an exported identifier through the checker and must declare it")
+		test.Fatal("the rule resolves an exported identifier through the checker and must declare it")
 	}
-	rule_testing.ExpectClean(t, rule_testing.Run(t, NoAsyncClientComponent, asyncClientComponentFile,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, NoAsyncClientComponent, asyncClientComponentFile,
 		"\"use client\"\nexport default async function MyComponent() { return null }\n"))
 }
 
@@ -397,30 +494,42 @@ func TestNoAsyncClientComponentNeedsTheTypedHarness(t *testing.T) {
 // The expected text is a literal typed here rather than a reference to the rule's own message
 // constant. Compared against the constant, both sides move together under mutation and the
 // assertion can never fail.
-func TestNoAsyncClientComponentPointsAtTheIdentifier(t *testing.T) {
-	t.Parallel()
+func TestNoAsyncClientComponentPointsAtTheIdentifier(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
 		sourceText string
 		want       string
 	}{
-		{"the direct shape", "\"use client\"\nexport default async function MyComponent() { return null }\n", "MyComponent"},
-		{"the indirect function shape", "\"use client\"\nasync function MyComponent() { return null }\nexport default MyComponent\n", "MyComponent"},
-		{"the indirect arrow shape", "\"use client\"\nconst MyThing = async () => { return null }\nexport default MyThing\n", "MyThing"},
+		{
+			"the direct shape",
+			"\"use client\"\nexport default async function MyComponent() { return null }\n",
+			"MyComponent",
+		},
+		{
+			"the indirect function shape",
+			"\"use client\"\nasync function MyComponent() { return null }\nexport default MyComponent\n",
+			"MyComponent",
+		},
+		{
+			"the indirect arrow shape",
+			"\"use client\"\nconst MyThing = async () => { return null }\nexport default MyThing\n",
+			"MyThing",
+		},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoAsyncClientComponent, asyncClientComponentFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoAsyncClientComponent, asyncClientComponentFile,
 				testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
+				test.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
 			}
 			reported := testCase.sourceText[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 			if reported != testCase.want {
-				t.Errorf("finding points at %q, want %q", reported, testCase.want)
+				test.Errorf("finding points at %q, want %q", reported, testCase.want)
 			}
 			wantDescription := "A client component declared as an async function is rendered on " +
 				"the client, where React cannot await it the way the server can. The promise it " +
@@ -428,10 +537,10 @@ func TestNoAsyncClientComponentPointsAtTheIdentifier(t *testing.T) {
 				"server produced. Move the awaiting into an effect or an event handler and keep " +
 				"the component itself synchronous."
 			if result.Diagnostics[0].Message.Description != wantDescription {
-				t.Errorf("description is %q", result.Diagnostics[0].Message.Description)
+				test.Errorf("description is %q", result.Diagnostics[0].Message.Description)
 			}
 			if result.Diagnostics[0].Message.Id != "noAsyncClientComponent" {
-				t.Errorf("id is %q", result.Diagnostics[0].Message.Id)
+				test.Errorf("id is %q", result.Diagnostics[0].Message.Id)
 			}
 		})
 	}

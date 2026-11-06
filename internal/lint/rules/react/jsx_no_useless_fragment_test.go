@@ -10,7 +10,7 @@ import (
 
 // jsxNoUselessFragmentFile is where the fixtures pretend to live.
 //
-// A `.tsx` name, and here that IS load-bearing rather than incidental: every case is JSX, and JSX in
+// A `.tsx` name, and here that is load-bearing rather than incidental: every case is JSX, and JSX in
 // a `.ts` file is a syntax error, so a `.ts` fixture would be silent because the parser read `<div>`
 // as a type assertion rather than because any rule declined. That is a different zero from a file
 // gate, and it is why this rule ships no gate test: there is no gate, and no fixture could tell the
@@ -25,12 +25,12 @@ const jsxNoUselessFragmentFile = "/repository/source/JsxNoUselessFragment.tsx"
 // generator. No case was typed by hand.
 //
 // All 30 were run against the installed build, 7.37.5, through the ESLint Linter API with the
-// TypeScript parser, driving `cohereAndFix` as well as `cohere` so the REPAIR was measured and not
+// TypeScript parser, driving `cohereAndFix` as well as `cohere` so the repair was measured and not
 // only the judgment.
 //
 // # One case is held back, and it is a duplicate with an opposite verdict
 //
-// `<div><>{"a"}{"b"}</></div>` appears TWICE in the corpus: once with an output and once with
+// `<div><>{"a"}{"b"}</></div>` appears twice in the corpus: once with an output and once with
 // `output: null`. They are not a contradiction, they are a parser-version gate. The second carries
 // `features: ["ts-old", "no-ts-new"]`, so it is asserted only under a TypeScript parser old enough
 // that a fragment node lacked its opening and closing tokens, which made upstream's `canFix` decline.
@@ -38,17 +38,17 @@ const jsxNoUselessFragmentFile = "/repository/source/JsxNoUselessFragment.tsx"
 // The extractor is the only place that difference is visible; read as prose the two look like an
 // error in the corpus.
 //
-// # The fix column is the REPAIRED SOURCE, and an empty string means the fixer declined
+// # The fix column is the repaired source, and an empty string means the fixer declined
 //
 // `ExpectFindings` cannot see what a fix writes, and the port brief records a rule whose flag was
 // forced always-on while thirty fixtures stayed green, because every one asserted an id and none
 // asserted the repair. So every reporting row carries the exact source the installed build's fixer
-// produced, and the rows where it produced nothing carry an empty string, which asserts the DECLINE
+// produced, and the rows where it produced nothing carry an empty string, which asserts the decline
 // rather than skipping the question.
 
 // TestJsxNoUselessFragmentFires asserts ids, count, and the repaired source.
-func TestJsxNoUselessFragmentFires(t *testing.T) {
-	t.Parallel()
+func TestJsxNoUselessFragmentFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -61,23 +61,71 @@ func TestJsxNoUselessFragmentFires(t *testing.T) {
 		{"upstream invalid-1", "<>{}</>", "", []string{"NeedsMoreChildren"}, ""},
 		{"upstream invalid-2", "<>{meow}</>", "", []string{"NeedsMoreChildren"}, ""},
 		{"upstream invalid-3", "<><div/></>", "", []string{"NeedsMoreChildren"}, "<div/>"},
-		{"upstream invalid-4", "\n        <>\n          <div/>\n        </>\n      ", "", []string{"NeedsMoreChildren"}, "\n        <div/>\n      "},
+		{
+			"upstream invalid-4",
+			"\n        <>\n          <div/>\n        </>\n      ",
+			"",
+			[]string{"NeedsMoreChildren"},
+			"\n        <div/>\n      ",
+		},
 		{"upstream invalid-5", "<Fragment />", "", []string{"NeedsMoreChildren"}, ""},
-		{"upstream invalid-6", "\n        <React.Fragment>\n          <Foo />\n        </React.Fragment>\n      ", "", []string{"NeedsMoreChildren"}, "\n        <Foo />\n      "},
+		{
+			"upstream invalid-6",
+			"\n        <React.Fragment>\n          <Foo />\n        </React.Fragment>\n      ",
+			"",
+			[]string{"NeedsMoreChildren"},
+			"\n        <Foo />\n      ",
+		},
 		{"upstream invalid-8", "<Eeee><>foo</></Eeee>", "", []string{"NeedsMoreChildren"}, ""},
-		{"upstream invalid-9", "<div><>{\"a\"}{\"b\"}</></div>", "", []string{"ChildOfHtmlElement"}, "<div>{\"a\"}{\"b\"}</div>"},
-		{"upstream invalid-11", "\n        <section>\n          <Eeee />\n          <Eeee />\n          <>{\"a\"}{\"b\"}</>\n        </section>", "", []string{"ChildOfHtmlElement"}, "\n        <section>\n          <Eeee />\n          <Eeee />\n          {\"a\"}{\"b\"}\n        </section>"},
-		{"upstream invalid-12", "<div><Fragment>{\"a\"}{\"b\"}</Fragment></div>", "", []string{"ChildOfHtmlElement"}, "<div>{\"a\"}{\"b\"}</div>"},
-		{"upstream invalid-13", "\n        <section>\n          git<>\n            <b>hub</b>.\n          </>\n\n          git<> <b>hub</b></>\n        </section>", "", []string{"ChildOfHtmlElement", "ChildOfHtmlElement"}, "\n        <section>\n          git<b>hub</b>.\n\n          git <b>hub</b>\n        </section>"},
-		{"upstream invalid-14", "<div>a <>{\"\"}{\"\"}</> a</div>", "", []string{"ChildOfHtmlElement"}, "<div>a {\"\"}{\"\"} a</div>"},
-		{"upstream invalid-15", "<><Foo>{moo}</Foo></>", "{\"allowExpressions\":true}", []string{"NeedsMoreChildren"}, "<Foo>{moo}</Foo>"},
+		{
+			"upstream invalid-9",
+			"<div><>{\"a\"}{\"b\"}</></div>",
+			"",
+			[]string{"ChildOfHtmlElement"},
+			"<div>{\"a\"}{\"b\"}</div>",
+		},
+		{
+			"upstream invalid-11",
+			"\n        <section>\n          <Eeee />\n          <Eeee />\n          <>{\"a\"}{\"b\"}</>\n        </section>",
+			"",
+			[]string{"ChildOfHtmlElement"},
+			"\n        <section>\n          <Eeee />\n          <Eeee />\n          {\"a\"}{\"b\"}\n        </section>",
+		},
+		{
+			"upstream invalid-12",
+			"<div><Fragment>{\"a\"}{\"b\"}</Fragment></div>",
+			"",
+			[]string{"ChildOfHtmlElement"},
+			"<div>{\"a\"}{\"b\"}</div>",
+		},
+		{
+			"upstream invalid-13",
+			"\n        <section>\n          git<>\n            <b>hub</b>.\n          </>\n\n          git<> <b>hub</b></>\n        </section>",
+			"",
+			[]string{"ChildOfHtmlElement", "ChildOfHtmlElement"},
+			"\n        <section>\n          git<b>hub</b>.\n\n          git <b>hub</b>\n        </section>",
+		},
+		{
+			"upstream invalid-14",
+			"<div>a <>{\"\"}{\"\"}</> a</div>",
+			"",
+			[]string{"ChildOfHtmlElement"},
+			"<div>a {\"\"}{\"\"} a</div>",
+		},
+		{
+			"upstream invalid-15",
+			"<><Foo>{moo}</Foo></>",
+			"{\"allowExpressions\":true}",
+			[]string{"NeedsMoreChildren"},
+			"<Foo>{moo}</Foo>",
+		},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runJsxNoUselessFragment(t, testCase.sourceText, testCase.rawOptions)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runJsxNoUselessFragment(test, testCase.sourceText, testCase.rawOptions)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 			want := testCase.wantFixed
 			if want == "" {
 				// The fixer declined, so replaying whatever it offered must leave the source alone.
@@ -89,11 +137,11 @@ func TestJsxNoUselessFragmentFires(t *testing.T) {
 			// cases this rule reports twice on one node, where the same span arrives from both
 			// messages and replaying it unmerged would double the edit.
 			if testCase.wantFixed != "" && countJsxNoUselessFragmentFixes(result) == 1 {
-				rule_testing.ExpectFixedSource(t, result, want)
+				rule_testing.ExpectFixedSource(test, result, want)
 				return
 			}
-			if got := applyJsxNoUselessFragmentFixes(t, result); got != want {
-				t.Errorf("the repair produced %q, want %q", got, want)
+			if got := applyJsxNoUselessFragmentFixes(test, result); got != want {
+				test.Errorf("the repair produced %q, want %q", got, want)
 			}
 		})
 	}
@@ -110,8 +158,8 @@ func countJsxNoUselessFragmentFixes(result rule_testing.Result) int {
 }
 
 // TestJsxNoUselessFragmentStaysSilent runs upstream's clean cases.
-func TestJsxNoUselessFragmentStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestJsxNoUselessFragmentStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -135,9 +183,9 @@ func TestJsxNoUselessFragmentStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, runJsxNoUselessFragment(t, testCase.sourceText, testCase.rawOptions))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, runJsxNoUselessFragment(test, testCase.sourceText, testCase.rawOptions))
 		})
 	}
 }
@@ -148,19 +196,19 @@ func TestJsxNoUselessFragmentStaysSilent(t *testing.T) {
 // children it has, and what its parent is. `Run` also does not trim the fixture, which matters here
 // more than usual: `ExpectFixedSource` compares the whole rewritten file, so a trimming harness
 // would produce byte-correct repairs that all fail on a trailing newline.
-func runJsxNoUselessFragment(t *testing.T, sourceText string, rawOptions string) rule_testing.Result {
-	t.Helper()
-	decoded, err := DecodeJsxNoUselessFragmentOptions([]byte(rawOptions))
-	if err != nil {
-		t.Fatalf("decoding %q: %v", rawOptions, err)
+func runJsxNoUselessFragment(test *testing.T, sourceText string, rawOptions string) rule_testing.Result {
+	test.Helper()
+	decoded, decodeJsxNoUselessFragmentOptionsError := DecodeJsxNoUselessFragmentOptions([]byte(rawOptions))
+	if decodeJsxNoUselessFragmentOptionsError != nil {
+		test.Fatalf("decoding %q: %v", rawOptions, decodeJsxNoUselessFragmentOptionsError)
 	}
-	return rule_testing.RunWithOptions(t, JsxNoUselessFragment, jsxNoUselessFragmentFile, sourceText, decoded)
+	return rule_testing.RunWithOptions(test, JsxNoUselessFragment, jsxNoUselessFragmentFile, sourceText, decoded)
 }
 
 // applyJsxNoUselessFragmentFixes replays the repair the way the edit engine would.
 //
 // `rule_testing.ExpectFixedSource` cannot be used directly here for two reasons, and both are
-// correct refusals rather than harness gaps. It fatals when a rule proposed NO fix, which is exactly
+// correct refusals rather than harness gaps. It fatals when a rule proposed no fix, which is exactly
 // what this rule's declines produce and exactly what those rows need to assert. And it fatals on
 // overlapping fixes, which this rule produces whenever both arms report on one node: they carry the
 // same replacement over the same range, so the overlap is a duplicate rather than a conflict a
@@ -169,8 +217,8 @@ func runJsxNoUselessFragment(t *testing.T, sourceText string, rawOptions string)
 // So this applies at most one fix per distinct range, back to front, which is what the engine does
 // with a duplicate pair, and it returns the source unchanged when there is nothing to apply. Both
 // behaviours were checked against the installed build's own `cohereAndFix` on the same inputs.
-func applyJsxNoUselessFragmentFixes(t *testing.T, result rule_testing.Result) string {
-	t.Helper()
+func applyJsxNoUselessFragmentFixes(test *testing.T, result rule_testing.Result) string {
+	test.Helper()
 
 	type edit struct {
 		start, end int
@@ -195,7 +243,7 @@ func applyJsxNoUselessFragmentFixes(t *testing.T, result rule_testing.Result) st
 	previousStart := len(source)
 	for _, item := range edits {
 		if item.end > previousStart {
-			t.Fatalf("fixes genuinely overlap at [%d,%d), which is a rule defect rather than a duplicate",
+			test.Fatalf("fixes genuinely overlap at [%d,%d), which is a rule defect rather than a duplicate",
 				item.start, item.end)
 		}
 		source = source[:item.start] + item.text + source[item.end:]
@@ -215,12 +263,12 @@ func applyJsxNoUselessFragmentFixes(t *testing.T, result rule_testing.Result) st
 //
 // A spread can carry `key`, so the second changes behavior rather than spelling, and neither tells
 // the reader anything was removed. This port reports both and withholds the repair. The rows below
-// assert BOTH halves of that decision: the finding still appears, and the source is unchanged.
+// assert both halves of that decision: the finding still appears, and the source is unchanged.
 //
 // The decline is mutation-tested. Disabling `jsxNoUselessFragmentHasNonKeyAttributes` makes these
 // rows fail, which is what separates a real guard from a comment claiming one.
-func TestJsxNoUselessFragmentDeclinesToDropAttributes(t *testing.T) {
-	t.Parallel()
+func TestJsxNoUselessFragmentDeclinesToDropAttributes(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -245,14 +293,14 @@ func TestJsxNoUselessFragmentDeclinesToDropAttributes(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runJsxNoUselessFragment(t, testCase.sourceText, "")
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runJsxNoUselessFragment(test, testCase.sourceText, "")
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 			// The finding stands and the source is untouched. Both halves matter: a rule that went
 			// silent here would also leave the source alone and would pass half this assertion.
-			if got := applyJsxNoUselessFragmentFixes(t, result); got != testCase.sourceText {
-				t.Errorf("the repair produced %q, want the source unchanged", got)
+			if got := applyJsxNoUselessFragmentFixes(test, result); got != testCase.sourceText {
+				test.Errorf("the repair produced %q, want the source unchanged", got)
 			}
 		})
 	}
@@ -267,8 +315,8 @@ func TestJsxNoUselessFragmentDeclinesToDropAttributes(t *testing.T) {
 // no JavaScript counterpart, and each repaired source must still contain it.
 //
 // Every expected output was produced by the installed build's own fixer first.
-func TestJsxNoUselessFragmentFixKeepsTypeScript(t *testing.T) {
-	t.Parallel()
+func TestJsxNoUselessFragmentFixKeepsTypeScript(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -308,24 +356,24 @@ func TestJsxNoUselessFragmentFixKeepsTypeScript(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runJsxNoUselessFragment(t, testCase.sourceText, "")
-			if got := applyJsxNoUselessFragmentFixes(t, result); got != testCase.wantFixed {
-				t.Errorf("the repair produced %q, want %q", got, testCase.wantFixed)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runJsxNoUselessFragment(test, testCase.sourceText, "")
+			if got := applyJsxNoUselessFragmentFixes(test, result); got != testCase.wantFixed {
+				test.Errorf("the repair produced %q, want %q", got, testCase.wantFixed)
 			}
 		})
 	}
 }
 
-// TestJsxNoUselessFragmentSpans asserts WHERE each finding points.
+// TestJsxNoUselessFragmentSpans asserts where each finding points.
 //
 // Upstream reports on the fragment node itself for both ids, and the fix is anchored on the same
 // node. The port brief notes that a fix which is right and anchored wrong is worse than no fix,
 // because the edit lands somewhere the reader was never shown, so this is asserted on a rule that
 // carries a repair rather than left to the fix assertion alone.
-func TestJsxNoUselessFragmentSpans(t *testing.T) {
-	t.Parallel()
+func TestJsxNoUselessFragmentSpans(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -355,17 +403,17 @@ func TestJsxNoUselessFragmentSpans(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runJsxNoUselessFragment(t, testCase.sourceText, "")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runJsxNoUselessFragment(test, testCase.sourceText, "")
 			if len(result.Diagnostics) != len(testCase.wantTexts) {
-				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.wantTexts))
+				test.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.wantTexts))
 			}
 			source := result.SourceFile.Text()
 			for index, diagnostic := range result.Diagnostics {
 				got := source[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if got != testCase.wantTexts[index] {
-					t.Errorf("finding %d points at %q, want %q", index, got, testCase.wantTexts[index])
+					test.Errorf("finding %d points at %q, want %q", index, got, testCase.wantTexts[index])
 				}
 			}
 		})
@@ -378,28 +426,28 @@ func TestJsxNoUselessFragmentSpans(t *testing.T) {
 // Description is what a reader sees. Asserted against literals typed here rather than against the
 // rule's own constants, because comparing a diagnostic to the constant it was reported with is an
 // equality whose two sides move together under mutation.
-func TestJsxNoUselessFragmentMessagesReadAsWritten(t *testing.T) {
-	t.Parallel()
+func TestJsxNoUselessFragmentMessagesReadAsWritten(test *testing.T) {
+	test.Parallel()
 
-	result := runJsxNoUselessFragment(t, "declare const x: any;\nconst a = <div><>{x}</></div>;\n", "")
+	result := runJsxNoUselessFragment(test, "declare const x: any;\nconst a = <div><>{x}</></div>;\n", "")
 	if len(result.Diagnostics) != 2 {
-		t.Fatalf("got %d findings, want 2", len(result.Diagnostics))
+		test.Fatalf("got %d findings, want 2", len(result.Diagnostics))
 	}
 
 	if result.Diagnostics[0].Message.Id != "NeedsMoreChildren" {
-		t.Errorf("first id is %q", result.Diagnostics[0].Message.Id)
+		test.Errorf("first id is %q", result.Diagnostics[0].Message.Id)
 	}
 	if !strings.HasPrefix(result.Diagnostics[0].Message.Description,
 		"This fragment wraps one thing, so it does nothing.") {
-		t.Errorf("first reads %q", result.Diagnostics[0].Message.Description)
+		test.Errorf("first reads %q", result.Diagnostics[0].Message.Description)
 	}
 
 	if result.Diagnostics[1].Message.Id != "ChildOfHtmlElement" {
-		t.Errorf("second id is %q", result.Diagnostics[1].Message.Id)
+		test.Errorf("second id is %q", result.Diagnostics[1].Message.Id)
 	}
 	if !strings.HasPrefix(result.Diagnostics[1].Message.Description,
 		"This fragment is the child of an HTML element,") {
-		t.Errorf("second reads %q", result.Diagnostics[1].Message.Description)
+		test.Errorf("second reads %q", result.Diagnostics[1].Message.Description)
 	}
 }
 
@@ -407,9 +455,9 @@ func TestJsxNoUselessFragmentMessagesReadAsWritten(t *testing.T) {
 //
 // Each row was run against the installed build before it was written here. The lowercase-letters
 // rows are the surprising ones: upstream's html test is `/^[a-z]+$/`, letters only, so `<h1>` and
-// `<my-tag>` are NOT html elements to this rule and a fragment inside either reports only one arm.
-func TestJsxNoUselessFragmentMatchesUpstreamOnShapesTheCorpusOmits(t *testing.T) {
-	t.Parallel()
+// `<my-tag>` are not html elements to this rule and a fragment inside either reports only one arm.
+func TestJsxNoUselessFragmentMatchesUpstreamOnShapesTheCorpusOmits(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -423,7 +471,7 @@ func TestJsxNoUselessFragmentMatchesUpstreamOnShapesTheCorpusOmits(t *testing.T)
 		},
 		{
 			// A tag name outside ASCII. Upstream's `/^[a-z]+$/` rejects it, and every byte of it is
-			// ABOVE the letter z, so this is the input that separates the upper bound of the byte
+			// above the letter z, so this is the input that separates the upper bound of the byte
 			// test from its lower bound. A mutant dropping only the upper bound survived an
 			// uppercase fixture, because an uppercase letter is below `a` and the lower bound
 			// already rejects it; this is what actually kills that mutant.
@@ -484,16 +532,20 @@ func TestJsxNoUselessFragmentMatchesUpstreamOnShapesTheCorpusOmits(t *testing.T)
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, runJsxNoUselessFragment(t, testCase.sourceText, ""), testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(
+				test,
+				runJsxNoUselessFragment(test, testCase.sourceText, ""),
+				testCase.wantIds...,
+			)
 		})
 	}
 }
 
 // TestJsxNoUselessFragmentDecodesItsOptions exercises the decoder the config layer calls.
-func TestJsxNoUselessFragmentDecodesItsOptions(t *testing.T) {
-	t.Parallel()
+func TestJsxNoUselessFragmentDecodesItsOptions(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name string
@@ -508,32 +560,32 @@ func TestJsxNoUselessFragmentDecodesItsOptions(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			decoded, err := DecodeJsxNoUselessFragmentOptions([]byte(testCase.raw))
-			if err != nil {
-				t.Fatalf("decoding %q: %v", testCase.raw, err)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			decoded, decodeJsxNoUselessFragmentOptionsError := DecodeJsxNoUselessFragmentOptions([]byte(testCase.raw))
+			if decodeJsxNoUselessFragmentOptionsError != nil {
+				test.Fatalf("decoding %q: %v", testCase.raw, decodeJsxNoUselessFragmentOptionsError)
 			}
-			settings, ok := decoded.(JsxNoUselessFragmentOptions)
-			if !ok {
-				t.Fatalf("decoded to %T", decoded)
-			}
-			if settings.AllowExpressions != testCase.want {
-				t.Errorf("AllowExpressions is %v, want %v", settings.AllowExpressions, testCase.want)
+			if decoded.AllowExpressions != testCase.want {
+				test.Errorf("AllowExpressions is %v, want %v", decoded.AllowExpressions, testCase.want)
 			}
 		})
 	}
 }
 
 // TestJsxNoUselessFragmentRejectsMalformedOptions asserts the decoder surfaces bad input.
-func TestJsxNoUselessFragmentRejectsMalformedOptions(t *testing.T) {
-	t.Parallel()
+func TestJsxNoUselessFragmentRejectsMalformedOptions(test *testing.T) {
+	test.Parallel()
 
-	if _, err := DecodeJsxNoUselessFragmentOptions([]byte(`{"allowExpressions":`)); err == nil {
-		t.Fatal("truncated JSON decoded without error")
+	if _, decodeJsxNoUselessFragmentOptionsError := DecodeJsxNoUselessFragmentOptions(
+		[]byte(`{"allowExpressions":`),
+	); decodeJsxNoUselessFragmentOptionsError == nil {
+		test.Fatal("truncated JSON decoded without error")
 	}
-	if _, err := DecodeJsxNoUselessFragmentOptions([]byte(`"error"`)); err == nil {
-		t.Fatal("a string decoded into the options struct without error")
+	if _, decodeJsxNoUselessFragmentOptionsError := DecodeJsxNoUselessFragmentOptions(
+		[]byte(`"error"`),
+	); decodeJsxNoUselessFragmentOptionsError == nil {
+		test.Fatal("a string decoded into the options struct without error")
 	}
 }
 
@@ -542,51 +594,51 @@ func TestJsxNoUselessFragmentRejectsMalformedOptions(t *testing.T) {
 // It suppresses `NeedsMoreChildren` and leaves `ChildOfHtmlElement` alone, so a single-expression
 // fragment inside a `div` still reports one finding with the option on. Measured, and the corpus
 // writes only the top-level shape where the difference is invisible.
-func TestJsxNoUselessFragmentAllowExpressionsSilencesOneArmOnly(t *testing.T) {
-	t.Parallel()
+func TestJsxNoUselessFragmentAllowExpressionsSilencesOneArmOnly(test *testing.T) {
+	test.Parallel()
 
 	const topLevel = "declare const x: any;\nconst a = <>{x}</>;\n"
-	rule_testing.ExpectFindings(t, runJsxNoUselessFragment(t, topLevel, ""), "NeedsMoreChildren")
-	rule_testing.ExpectClean(t, runJsxNoUselessFragment(t, topLevel, `{"allowExpressions":true}`))
+	rule_testing.ExpectFindings(test, runJsxNoUselessFragment(test, topLevel, ""), "NeedsMoreChildren")
+	rule_testing.ExpectClean(test, runJsxNoUselessFragment(test, topLevel, `{"allowExpressions":true}`))
 
 	const insideDiv = "declare const x: any;\nconst a = <div><>{x}</></div>;\n"
-	rule_testing.ExpectFindings(t, runJsxNoUselessFragment(t, insideDiv, ""),
+	rule_testing.ExpectFindings(test, runJsxNoUselessFragment(test, insideDiv, ""),
 		"NeedsMoreChildren", "ChildOfHtmlElement")
-	rule_testing.ExpectFindings(t, runJsxNoUselessFragment(t, insideDiv, `{"allowExpressions":true}`),
+	rule_testing.ExpectFindings(test, runJsxNoUselessFragment(test, insideDiv, `{"allowExpressions":true}`),
 		"ChildOfHtmlElement")
 }
 
 // TestJsxNoUselessFragmentHandlesNilOptions covers the path the fixtures cannot reach.
 //
-// The config layer turns a decoder error into nil for a non-required rule, and `options.(T)` on nil
-// yields the zero value, which here IS the default. Asserted rather than assumed.
-func TestJsxNoUselessFragmentHandlesNilOptions(t *testing.T) {
-	t.Parallel()
+// The config layer binds a non-required rule whose decoder errors to the zero `rule.Given`, whose `Read`
+// returns false, so it reads the zero value, which here is the default. Asserted rather than assumed.
+func TestJsxNoUselessFragmentHandlesNilOptions(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunWithOptions(t, JsxNoUselessFragment, jsxNoUselessFragmentFile,
-		"declare const x: any;\nconst a = <>{x}</>;\n", nil)
-	rule_testing.ExpectFindings(t, result, "NeedsMoreChildren")
+	result := rule_testing.Run(test, JsxNoUselessFragment, jsxNoUselessFragmentFile,
+		"declare const x: any;\nconst a = <>{x}</>;\n")
+	rule_testing.ExpectFindings(test, result, "NeedsMoreChildren")
 }
 
 // TestJsxNoUselessFragmentNeedsNoChecker pins that this rule is syntactic.
-func TestJsxNoUselessFragmentNeedsNoChecker(t *testing.T) {
-	t.Parallel()
+func TestJsxNoUselessFragmentNeedsNoChecker(test *testing.T) {
+	test.Parallel()
 
 	const source = "declare const Foo: any;\nconst a = <><Foo /></>;\n"
-	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, JsxNoUselessFragment,
+	rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, JsxNoUselessFragment,
 		jsxNoUselessFragmentFile, source, JsxNoUselessFragmentOptions{}), "NeedsMoreChildren")
-	rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, JsxNoUselessFragment,
+	rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, JsxNoUselessFragment,
 		jsxNoUselessFragmentFile, source, JsxNoUselessFragmentOptions{}), "NeedsMoreChildren")
 }
 
 // TestJsxNoUselessFragmentSurvivesShapesThatWouldPanic drives shapes with pieces missing.
 //
-// The walk recovers per FILE rather than per rule, so one nil dereference here takes the file away
+// The walk recovers per file rather than per rule, so one nil dereference here takes the file away
 // from every rule in the tree, and no `ExpectFindings` fixture can see a panic. The unclosed forms
 // are the ones that matter: they reach the listeners through error recovery with a nil opener or
 // closer, which is exactly what the fix's bounds function guards against.
-func TestJsxNoUselessFragmentSurvivesShapesThatWouldPanic(t *testing.T) {
-	t.Parallel()
+func TestJsxNoUselessFragmentSurvivesShapesThatWouldPanic(test *testing.T) {
+	test.Parallel()
 
 	sources := []string{
 		"const a = <div />;\n",
@@ -600,34 +652,34 @@ func TestJsxNoUselessFragmentSurvivesShapesThatWouldPanic(t *testing.T) {
 	}
 
 	for index, sourceText := range sources {
-		t.Run(string(rune('a'+index)), func(t *testing.T) {
-			t.Parallel()
-			runJsxNoUselessFragment(t, sourceText, "")
+		test.Run(string(rune('a'+index)), func(test *testing.T) {
+			test.Parallel()
+			runJsxNoUselessFragment(test, sourceText, "")
 		})
 	}
 }
 
 // TestJsxNoUselessFragmentPragmaIsFixedAtReact records the corpus case a settings surface would change.
 //
-// Upstream reads BOTH pragmas from settings: `settings.react.pragma` for the namespace and
+// Upstream reads both pragmas from settings: `settings.react.pragma` for the namespace and
 // `settings.react.fragment` for the name. cohere reads no React settings, so both are the fixed
-// `React` and `Fragment` here, and a project renaming either gets a false NEGATIVE.
+// `React` and `Fragment` here, and a project renaming either gets a false negative.
 //
 // The case is upstream's own invalid-7, held out of the imported table because it is not
 // reproducible rather than because it disagrees. Measured on the installed build: with
 // `{react: {pragma: "SomeReact", fragment: "SomeFragment"}}` it reports `NeedsMoreChildren`, and
 // with settings removed it goes clean, which is the answer this port produces. Recorded here rather
 // than dropped, so the next reader sees the whole corpus accounted for.
-func TestJsxNoUselessFragmentPragmaIsFixedAtReact(t *testing.T) {
-	t.Parallel()
+func TestJsxNoUselessFragmentPragmaIsFixedAtReact(test *testing.T) {
+	test.Parallel()
 
 	const source = "declare const SomeReact: any;\ndeclare const foo: any;\nconst a = <SomeReact.SomeFragment>{foo}</SomeReact.SomeFragment>;\n"
-	rule_testing.ExpectClean(t, runJsxNoUselessFragment(t, source, ""))
+	rule_testing.ExpectClean(test, runJsxNoUselessFragment(test, source, ""))
 
-	// The control: the same shape under the fixed pragma pair DOES report, so the silence above is
+	// The control: the same shape under the fixed pragma pair does report, so the silence above is
 	// the pragma comparison rather than anything else declining.
 	const control = "declare const React: any;\ndeclare const foo: any;\nconst a = <React.Fragment>{foo}</React.Fragment>;\n"
-	rule_testing.ExpectFindings(t, runJsxNoUselessFragment(t, control, ""), "NeedsMoreChildren")
+	rule_testing.ExpectFindings(test, runJsxNoUselessFragment(test, control, ""), "NeedsMoreChildren")
 }
 
 // TestJsxNoUselessFragmentReadsBothFragmentSpellings pins why this file does not call jsx.ElementParts.
@@ -646,8 +698,8 @@ func TestJsxNoUselessFragmentPragmaIsFixedAtReact(t *testing.T) {
 // What the guard is really protecting is covered, and covered by a different mechanism: the
 // self-closing spelling has its own listener, and the rows below run every spelling of a fragment
 // through the rule so a regression that dropped one is visible here rather than only in the guard.
-func TestJsxNoUselessFragmentReadsBothFragmentSpellings(t *testing.T) {
-	t.Parallel()
+func TestJsxNoUselessFragmentReadsBothFragmentSpellings(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -701,9 +753,13 @@ func TestJsxNoUselessFragmentReadsBothFragmentSpellings(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, runJsxNoUselessFragment(t, testCase.sourceText, ""), testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(
+				test,
+				runJsxNoUselessFragment(test, testCase.sourceText, ""),
+				testCase.wantIds...,
+			)
 		})
 	}
 }
@@ -717,8 +773,8 @@ func TestJsxNoUselessFragmentReadsBothFragmentSpellings(t *testing.T) {
 // for a child that is not there, and the honest repair is to delete the comment and return `null`.
 // An empty fragment is the third shape. The finding and its id are unchanged; only the sentence
 // that describes the contents follows them.
-func TestJsxNoUselessFragmentNeedsMoreChildrenSaysWhatTheFragmentHolds(t *testing.T) {
-	t.Parallel()
+func TestJsxNoUselessFragmentNeedsMoreChildrenSaysWhatTheFragmentHolds(test *testing.T) {
+	test.Parallel()
 
 	const why = " A fragment exists to give several siblings a single parent without emitting an element"
 	for _, testCase := range []struct {
@@ -737,18 +793,18 @@ func TestJsxNoUselessFragmentNeedsMoreChildrenSaysWhatTheFragmentHolds(t *testin
 			"This fragment is empty, so it renders nothing." + why +
 				", and here there is nothing to group. Delete it; where a value is still required, write `null`."},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 
-			result := runJsxNoUselessFragment(t, testCase.source, "")
+			result := runJsxNoUselessFragment(test, testCase.source, "")
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
+				test.Fatalf("got %d findings, want 1", len(result.Diagnostics))
 			}
 			if result.Diagnostics[0].Message.Id != "NeedsMoreChildren" {
-				t.Errorf("id is %q", result.Diagnostics[0].Message.Id)
+				test.Errorf("id is %q", result.Diagnostics[0].Message.Id)
 			}
 			if got := result.Diagnostics[0].Message.Description; got != testCase.want {
-				t.Errorf("description is\n%q\nwant\n%q", got, testCase.want)
+				test.Errorf("description is\n%q\nwant\n%q", got, testCase.want)
 			}
 		})
 	}

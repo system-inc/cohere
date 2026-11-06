@@ -15,20 +15,20 @@ import (
 // therefore disagree by 2x with neither being wrong, which is what happened here.
 //
 //	COHERE_COST_LIST=/path/to/list go test ./internal/prettier/ -run TestCost -v
-func TestCost(t *testing.T) {
-	t.Parallel()
+func TestCost(test *testing.T) {
+	test.Parallel()
 
 	listPath := os.Getenv("COHERE_COST_LIST")
 	if listPath == "" {
-		t.Skip("set COHERE_COST_LIST")
+		test.Skip("set COHERE_COST_LIST")
 	}
-	listBytes, err := os.ReadFile(listPath)
-	if err != nil {
-		t.Fatalf("reading the list: %v", err)
+	listBytes, readError := os.ReadFile(listPath)
+	if readError != nil {
+		test.Fatalf("reading the list: %v", readError)
 	}
 
 	constructionStart := time.Now()
-	engine := newTestEngine(t)
+	engine := newTestEngine(test)
 	construction := time.Since(constructionStart)
 
 	var totalBytes int
@@ -39,13 +39,13 @@ func TestCost(t *testing.T) {
 		if path == "" || !engine.Handles(path) {
 			continue
 		}
-		source, err := os.ReadFile(path)
-		if err != nil {
+		source, readError := os.ReadFile(path)
+		if readError != nil {
 			continue
 		}
 		start := time.Now()
-		if _, err := engine.Format(path, string(source)); err != nil {
-			t.Errorf("%s: %v", path, err)
+		if _, formatError := engine.Format(path, string(source)); formatError != nil {
+			test.Errorf("%s: %v", path, formatError)
 			continue
 		}
 		formatting += time.Since(start)
@@ -54,11 +54,11 @@ func TestCost(t *testing.T) {
 	}
 
 	if formatted == 0 {
-		t.Fatal("measured no files, so this run says nothing")
+		test.Fatal("measured no files, so this run says nothing")
 	}
-	t.Logf("construction %v (once)", construction)
-	t.Logf("files %d, bytes %d, mean file %d bytes", formatted, totalBytes, totalBytes/formatted)
-	t.Logf("formatting %v total, %v per file, %.1f KB/s",
+	test.Logf("construction %v (once)", construction)
+	test.Logf("files %d, bytes %d, mean file %d bytes", formatted, totalBytes, totalBytes/formatted)
+	test.Logf("formatting %v total, %v per file, %.1f KB/s",
 		formatting, formatting/time.Duration(formatted),
 		float64(totalBytes)/1024/formatting.Seconds())
 }

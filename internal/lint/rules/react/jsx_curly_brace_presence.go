@@ -40,13 +40,13 @@ const (
 // JsxCurlyBracePresenceOptions is the decoded option object.
 //
 // Upstream accepts either an object with three keys or a bare string that sets two of them, and the
-// defaults are NOT symmetric: `props` and `children` default to `never` while `propElementValues`
+// defaults are not symmetric: `props` and `children` default to `never` while `propElementValues`
 // defaults to `ignore`. The string form sets `props` and `children` to the named value and forces
 // `propElementValues` to `ignore` rather than to the same value, which is why the two forms are not
 // interchangeable. Measured: `["always"]` leaves `<App horror=<div /> />` clean, while
 // `[{props: "always", children: "always", propElementValues: "always"}]` reports it.
 type JsxCurlyBracePresenceOptions struct {
-	Props             jsxCurlyBracePresenceSetting
+	Properties        jsxCurlyBracePresenceSetting `json:"Props"`
 	Children          jsxCurlyBracePresenceSetting
 	PropElementValues jsxCurlyBracePresenceSetting
 }
@@ -54,7 +54,7 @@ type JsxCurlyBracePresenceOptions struct {
 // DefaultJsxCurlyBracePresenceOptions is the configuration a bare `"error"` gets.
 func DefaultJsxCurlyBracePresenceOptions() JsxCurlyBracePresenceOptions {
 	return JsxCurlyBracePresenceOptions{
-		Props:             jsxCurlyBracePresenceNever,
+		Properties:        jsxCurlyBracePresenceNever,
 		Children:          jsxCurlyBracePresenceNever,
 		PropElementValues: jsxCurlyBracePresenceIgnore,
 	}
@@ -63,11 +63,11 @@ func DefaultJsxCurlyBracePresenceOptions() JsxCurlyBracePresenceOptions {
 // DecodeJsxCurlyBracePresenceOptions decodes either spelling of the option surface.
 //
 // Hand-written rather than `rule.DecodeOptionsInto` for two reasons the port brief names. The
-// generic helper errors on EMPTY input, which is what a bare `"error"` configuration hands a rule,
+// generic helper errors on empty input, which is what a bare `"error"` configuration hands a rule,
 // and it cannot express a wire shape that is sometimes a string and sometimes an object. The
 // defaults here are also not Go zero values, so a struct built by hand rather than routed through
 // this function would silently configure the rule as `ignore` on every axis and report nothing.
-func DecodeJsxCurlyBracePresenceOptions(raw []byte) (any, error) {
+func DecodeJsxCurlyBracePresenceOptions(raw []byte) (JsxCurlyBracePresenceOptions, error) {
 	settings := DefaultJsxCurlyBracePresenceOptions()
 	if len(raw) == 0 {
 		return settings, nil
@@ -76,13 +76,13 @@ func DecodeJsxCurlyBracePresenceOptions(raw []byte) (any, error) {
 	// The bare string form. Upstream reads it as both halves at once, and pins the third axis to
 	// `ignore` rather than carrying the value across.
 	var shorthand string
-	if err := json.Unmarshal(raw, &shorthand); err == nil {
+	if decodeError := json.Unmarshal(raw, &shorthand); decodeError == nil {
 		value := jsxCurlyBracePresenceSetting(shorthand)
 		if !jsxCurlyBracePresenceIsValidSetting(value) {
 			return settings, nil
 		}
 		return JsxCurlyBracePresenceOptions{
-			Props:             value,
+			Properties:        value,
 			Children:          value,
 			PropElementValues: jsxCurlyBracePresenceIgnore,
 		}, nil
@@ -93,18 +93,18 @@ func DecodeJsxCurlyBracePresenceOptions(raw []byte) (any, error) {
 	// distinguishable in the result but must be distinguishable while decoding, since the default
 	// for `propElementValues` differs from the other two.
 	var wire struct {
-		Props             *string `json:"props"`
+		Properties        *string `json:"props"`
 		Children          *string `json:"children"`
 		PropElementValues *string `json:"propElementValues"`
 	}
-	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
-		return settings, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &wire); unmarshalOptionsError != nil {
+		return settings, unmarshalOptionsError
 	}
 	for _, field := range []struct {
 		value  *string
 		target *jsxCurlyBracePresenceSetting
 	}{
-		{wire.Props, &settings.Props},
+		{wire.Properties, &settings.Properties},
 		{wire.Children, &settings.Children},
 		{wire.PropElementValues, &settings.PropElementValues},
 	} {
@@ -148,7 +148,7 @@ func jsxCurlyBracePresenceIsValidSetting(value jsxCurlyBracePresenceSetting) boo
 //
 // Removing the braces from `{'foo'}` is a text substitution, so every case where the literal cannot
 // survive unquoted has to be declined. Upstream's `needToEscapeCharacterForJSX` declines three
-// classes, and the discrimination is between the RAW source text and the COOKED value, which our
+// classes, and the discrimination is between the raw source text and the cooked value, which our
 // parser exposes as different things: `Text()` is cooked, and the raw text is the source slice.
 //
 //	a backslash in the raw       `{'it\'s'}` cooked to `it's` would need requoting
@@ -161,9 +161,9 @@ func jsxCurlyBracePresenceIsValidSetting(value jsxCurlyBracePresenceSetting) boo
 // # The quote check is asymmetric between a string and a template, and that asymmetry is upstream's
 //
 // For a string literal, upstream's own condition `(!containsQuoteCharacters(value) || typeof value
-// === 'string')` is always true, because the arm only runs when the value IS a string. So the quote
+// === 'string')` is always true, because the arm only runs when the value is a string. So the quote
 // test is dead for strings and a quote in the value never declines: `<App>{"it's"}</App>` reports.
-// For a TEMPLATE literal the same helper is called without that escape hatch, so any quote in the
+// For a template literal the same helper is called without that escape hatch, so any quote in the
 // cooked text declines: `<App>{`it's`}</App>` is clean. Both directions measured. This reads like a
 // defect in upstream and it is reproduced rather than corrected, because the corpus asserts it:
 // case I35 requires `<App>{"foo 'bar'"}</App>` to report.
@@ -193,10 +193,10 @@ func jsxCurlyBracePresenceIsValidSetting(value jsxCurlyBracePresenceSetting) boo
 // findings, which is what I13 asserts, so I13 is the row that describes this tree and I12 is
 // recorded here rather than imported. This is the version-gate shape the port brief warns about,
 // and it was visible only because the extractor kept the `features` field beside each case.
-var JsxCurlyBracePresence = rule.Rule{
+var JsxCurlyBracePresence = rule.Rule[JsxCurlyBracePresenceOptions]{
 	Name: "react/jsx-curly-brace-presence",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, ok := rule.OptionsAs[JsxCurlyBracePresenceOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[JsxCurlyBracePresenceOptions]) rule.Listeners {
+		settings, ok := options.Read()
 		if !ok {
 			settings = DefaultJsxCurlyBracePresenceOptions()
 		}
@@ -206,20 +206,20 @@ var JsxCurlyBracePresence = rule.Rule{
 				// Upstream reaches this through two selectors that can both match one node. The
 				// element-valued-prop selector runs first and short-circuits, matching the order
 				// ESLint visits them in, which matters because both would otherwise report.
-				if jsxCurlyBracePresenceIsElementValuedProp(node) {
+				if jsxCurlyBracePresenceIsElementValuedProperty(node) {
 					if settings.PropElementValues == jsxCurlyBracePresenceNever {
-						jsxCurlyBracePresenceReportUnnecessary(ctx, node)
+						jsxCurlyBracePresenceReportUnnecessary(ruleContext, node)
 					}
 					return
 				}
-				if jsxCurlyBracePresenceShouldCheckUnnecessary(ctx, node, settings) {
-					jsxCurlyBracePresenceLintUnnecessary(ctx, node, settings)
+				if jsxCurlyBracePresenceShouldCheckUnnecessary(ruleContext, node, settings) {
+					jsxCurlyBracePresenceLintUnnecessary(ruleContext, node, settings)
 				}
 			},
 
 			ast.KindJsxText: func(node *ast.Node) {
 				if jsxCurlyBracePresenceShouldCheckMissing(node, settings) {
-					jsxCurlyBracePresenceReportMissing(ctx, node)
+					jsxCurlyBracePresenceReportMissing(ruleContext, node)
 				}
 			},
 
@@ -231,7 +231,7 @@ var JsxCurlyBracePresence = rule.Rule{
 					return
 				}
 				if jsxCurlyBracePresenceShouldCheckMissing(node, settings) {
-					jsxCurlyBracePresenceReportMissing(ctx, node)
+					jsxCurlyBracePresenceReportMissing(ruleContext, node)
 				}
 			},
 
@@ -240,10 +240,10 @@ var JsxCurlyBracePresence = rule.Rule{
 			// which was measured rather than assumed: the corpus marks these cases `no-ts` because
 			// older TypeScript parsers rejected them, and this one does not.
 			ast.KindJsxSelfClosingElement: func(node *ast.Node) {
-				jsxCurlyBracePresenceCheckBareElementAttribute(ctx, node, settings)
+				jsxCurlyBracePresenceCheckBareElementAttribute(ruleContext, node, settings)
 			},
 			ast.KindJsxElement: func(node *ast.Node) {
-				jsxCurlyBracePresenceCheckBareElementAttribute(ctx, node, settings)
+				jsxCurlyBracePresenceCheckBareElementAttribute(ruleContext, node, settings)
 			},
 		}
 	},
@@ -251,7 +251,7 @@ var JsxCurlyBracePresence = rule.Rule{
 
 // jsxCurlyBracePresenceCheckBareElementAttribute handles `<App horror=<div /> />`.
 func jsxCurlyBracePresenceCheckBareElementAttribute(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	node *ast.Node,
 	settings JsxCurlyBracePresenceOptions,
 ) {
@@ -262,13 +262,13 @@ func jsxCurlyBracePresenceCheckBareElementAttribute(
 		return
 	}
 	if settings.PropElementValues == jsxCurlyBracePresenceAlways {
-		jsxCurlyBracePresenceReportMissing(ctx, node)
+		jsxCurlyBracePresenceReportMissing(ruleContext, node)
 	}
 }
 
-// jsxCurlyBracePresenceIsElementValuedProp matches `JSXAttribute > JSXExpressionContainer >
+// jsxCurlyBracePresenceIsElementValuedProperty matches `JSXAttribute > JSXExpressionContainer >
 // JSXElement`, the shape upstream gives its own listener.
-func jsxCurlyBracePresenceIsElementValuedProp(container *ast.Node) bool {
+func jsxCurlyBracePresenceIsElementValuedProperty(container *ast.Node) bool {
 	if container.Parent == nil || container.Parent.Kind != ast.KindJsxAttribute {
 		return false
 	}
@@ -290,7 +290,7 @@ func jsxCurlyBracePresenceIsJsx(node *ast.Node) bool {
 
 // jsxCurlyBracePresenceShouldCheckUnnecessary reproduces `shouldCheckForUnnecessaryCurly`.
 func jsxCurlyBracePresenceShouldCheckUnnecessary(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	container *ast.Node,
 	settings JsxCurlyBracePresenceOptions,
 ) bool {
@@ -314,13 +314,13 @@ func jsxCurlyBracePresenceShouldCheckUnnecessary(
 		if jsxCurlyBracePresenceHasAdjacentContainers(container, children) {
 			return false
 		}
-		// This guard survives mutation ALONE and is not dead, which took two sites to establish.
+		// Mutated on its own this guard survives, yet it is not dead, which took two sites to establish.
 		// A whitespace-only container beside an element is also declined further down, by the
 		// child arm's edge-whitespace test, so neutralizing either one changes no output. Both
 		// were neutralized together and all four shapes went from clean to reporting, which is
 		// what shows the pair is load-bearing rather than one member of it. Kept because it is
 		// upstream's, and because the two tests are not equivalent: this one asks about the
-		// container's SIBLINGS and the later one about the value, so a change to either would
+		// container's siblings and the later one about the value, so a change to either would
 		// leave the other covering a different set.
 		if jsxCurlyBracePresenceContainsWhitespaceExpression(container) &&
 			jsxCurlyBracePresenceHasAdjacentJsx(container, children) {
@@ -363,7 +363,7 @@ func jsxCurlyBracePresenceShouldCheckMissing(node *ast.Node, settings JsxCurlyBr
 
 // jsxCurlyBracePresenceConditionsSatisfied reproduces `areRuleConditionsSatisfied`.
 //
-// The two halves of the option surface are keyed on WHERE the node sits: inside an attribute the
+// The two halves of the option surface are keyed on where the node sits: inside an attribute the
 // `props` setting decides, inside an element or a fragment the `children` setting does.
 func jsxCurlyBracePresenceConditionsSatisfied(
 	parent *ast.Node,
@@ -371,7 +371,7 @@ func jsxCurlyBracePresenceConditionsSatisfied(
 	wanted jsxCurlyBracePresenceSetting,
 ) bool {
 	if parent.Kind == ast.KindJsxAttribute {
-		return settings.Props == wanted
+		return settings.Properties == wanted
 	}
 	if jsxCurlyBracePresenceIsJsx(parent) {
 		return settings.Children == wanted
@@ -381,7 +381,7 @@ func jsxCurlyBracePresenceConditionsSatisfied(
 
 // jsxCurlyBracePresenceLintUnnecessary reproduces `lintUnnecessaryCurly`.
 func jsxCurlyBracePresenceLintUnnecessary(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	container *ast.Node,
 	settings JsxCurlyBracePresenceOptions,
 ) {
@@ -394,7 +394,7 @@ func jsxCurlyBracePresenceLintUnnecessary(
 	// and `{/* why */ 'foo'}` would lose it. Upstream asks `sourceCode.getCommentsInside`, which
 	// sees a comment on either side of the expression; a leading-trivia check would miss a trailing
 	// one, measured on `{'foo' /* trailing */}`, which upstream leaves clean.
-	if jsxCurlyBracePresenceHasCommentInside(ctx, container) {
+	if jsxCurlyBracePresenceHasCommentInside(ruleContext, container) {
 		return
 	}
 
@@ -411,7 +411,7 @@ func jsxCurlyBracePresenceLintUnnecessary(
 		// any leading or trailing whitespace at all is enough, because JSX would trim it.
 		//
 		// The attribute test is upstream's `isWhiteSpaceLiteral`, whose `node.value &&` makes an
-		// EMPTY string not whitespace, so `label={''}` reports and repairs to `label=""`. Testing
+		// empty string not whitespace, so `label={''}` reports and repairs to `label=""`. Testing
 		// the value against `/^\s*$/` alone, which an empty string satisfies, silenced it: ESLint
 		// reported two sites in www-phi-health that this did not (#t5dwy1t).
 		if inAttribute {
@@ -432,7 +432,7 @@ func jsxCurlyBracePresenceLintUnnecessary(
 		// declines anything. Reproduced as its absence rather than written out and negated, with
 		// the reasoning recorded here: corpus case I35 asserts that `{"foo 'bar'"}` reports, so the
 		// dead test is not merely inert, it is required to be inert.
-		jsxCurlyBracePresenceReportUnnecessary(ctx, container)
+		jsxCurlyBracePresenceReportUnnecessary(ruleContext, container)
 
 	case expression.Kind == ast.KindNoSubstitutionTemplateLiteral:
 		// A template with substitutions is a different node kind and never reaches here, which is
@@ -449,16 +449,16 @@ func jsxCurlyBracePresenceLintUnnecessary(
 			return
 		}
 		// Unlike the string arm above, this one's quote test is live: upstream calls
-		// `containsQuoteCharacters` on the COOKED text with no escape hatch, so any quote declines.
+		// `containsQuoteCharacters` on the cooked text with no escape hatch, so any quote declines.
 		// Measured both ways against the installed build: `{"it's"}` reports and `` {`it's`} ``
 		// does not.
 		if strings.ContainsAny(expression.Text(), "'\"") {
 			return
 		}
-		jsxCurlyBracePresenceReportUnnecessary(ctx, container)
+		jsxCurlyBracePresenceReportUnnecessary(ruleContext, container)
 
 	case jsxCurlyBracePresenceIsJsx(expression):
-		jsxCurlyBracePresenceReportUnnecessary(ctx, container)
+		jsxCurlyBracePresenceReportUnnecessary(ruleContext, container)
 	}
 }
 
@@ -467,21 +467,22 @@ func jsxCurlyBracePresenceLintUnnecessary(
 // This has no counterpart upstream and it exists for a parser difference. typescript-eslint's tree
 // has no node for a parenthesis, so `{('bar')}` reaches upstream's rule as the bare literal and
 // reports; ours keeps a `KindParenthesizedExpression` and the literal arm never matched, so all
-// three parenthesized shapes went SILENT here while upstream repairs them. No imported fixture can
+// three parenthesized shapes went silent here while upstream repairs them. No imported fixture can
 // see this, because upstream's parser deleted the node before its corpus was written.
 //
 // The loop rather than a single step, because `(('bar'))` nests, and `ast.SkipParentheses` is not
 // used because it dereferences its argument and a container's expression is optional.
 //
-// The repair is unaffected by the unwrapping: it is built from the CONTAINER's span and the
+// The repair is unaffected by the unwrapping: it is built from the container's span and the
 // unwrapped expression's value, so `<App>{('bar')}</App>` becomes `<App>bar</App>` and the
 // parentheses go with the braces, which is what upstream writes. Measured against the installed
 // build on all three shapes.
 func jsxCurlyBracePresenceUnwrapParentheses(expression *ast.Node) *ast.Node {
-	for expression != nil && expression.Kind == ast.KindParenthesizedExpression {
-		expression = expression.AsParenthesizedExpression().Expression
+	unwrapped := expression
+	for unwrapped != nil && unwrapped.Kind == ast.KindParenthesizedExpression {
+		unwrapped = unwrapped.AsParenthesizedExpression().Expression
 	}
-	return expression
+	return unwrapped
 }
 
 // jsxCurlyBracePresenceIsStringOrTemplate answers the parent-attribute guard in
@@ -496,40 +497,40 @@ func jsxCurlyBracePresenceIsStringOrTemplate(expression *ast.Node) bool {
 
 // jsxCurlyBracePresenceSpanOf returns the range a finding points at and a repair writes over.
 //
-// `rule.TokenRange` is right for every kind here except JSX TEXT, and wrong for that one in a way
+// `rule.TokenRange` is right for every kind here except JSX text, and wrong for that one in a way
 // that corrupts the repair rather than merely misplacing the finding. It skips leading trivia, and
 // the newline and indentation in front of a text child is not trivia, it is part of the text: the
 // range would start after the indent while the replacement text still carries it, so applying the
-// fix leaves the original indentation AND writes it again, adding a blank line to the file for
+// fix leaves the original indentation in place and writes it again, adding a blank line to the file for
 // every child it repairs. Four of upstream's own repair vectors caught this once the repairs were
 // asserted; none of the message-id fixtures over the same inputs could see it.
-func jsxCurlyBracePresenceSpanOf(ctx rule.Context, node *ast.Node) core.TextRange {
+func jsxCurlyBracePresenceSpanOf(ruleContext rule.Context, node *ast.Node) core.TextRange {
 	if node.Kind == ast.KindJsxText {
 		return node.Loc
 	}
-	return rule.TokenRange(ctx.SourceFile, node)
+	return rule.TokenRange(ruleContext.SourceFile, node)
 }
 
 // jsxCurlyBracePresenceReportUnnecessary reports the container and offers to unwrap it.
-func jsxCurlyBracePresenceReportUnnecessary(ctx rule.Context, container *ast.Node) {
-	span := jsxCurlyBracePresenceSpanOf(ctx, container)
-	replacement, ok := jsxCurlyBracePresenceUnwrappedText(ctx, container)
+func jsxCurlyBracePresenceReportUnnecessary(ruleContext rule.Context, container *ast.Node) {
+	span := jsxCurlyBracePresenceSpanOf(ruleContext, container)
+	replacement, ok := jsxCurlyBracePresenceUnwrappedText(ruleContext, container)
 	if !ok {
-		ctx.ReportNode(container, messageJsxCurlyBracePresenceUnnecessaryCurly)
+		ruleContext.ReportNode(container, messageJsxCurlyBracePresenceUnnecessaryCurly)
 		return
 	}
-	ctx.ReportNodeWithFixes(container, messageJsxCurlyBracePresenceUnnecessaryCurly,
+	ruleContext.ReportNodeWithFixes(container, messageJsxCurlyBracePresenceUnnecessaryCurly,
 		rule.ReplaceRange(span, replacement))
 }
 
 // jsxCurlyBracePresenceUnwrappedText builds the text that replaces `{...}`.
 //
-// Every branch writes a slice of the ORIGINAL source or a value derived from it, and the span is
+// Every branch writes a slice of the original source or a value derived from it, and the span is
 // the container's own token range, so nothing outside the braces is inside the edit. That
 // enumeration is the check the port brief asks for on any fixer that constructs a replacement: what
 // lives in this span is the two braces and the expression between them, and the expression is
 // copied rather than rebuilt except where a quote character has to change.
-func jsxCurlyBracePresenceUnwrappedText(ctx rule.Context, container *ast.Node) (string, bool) {
+func jsxCurlyBracePresenceUnwrappedText(ruleContext rule.Context, container *ast.Node) (string, bool) {
 	expression := jsxCurlyBracePresenceUnwrapParentheses(container.AsJsxExpression().Expression)
 	if expression == nil {
 		return "", false
@@ -543,7 +544,7 @@ func jsxCurlyBracePresenceUnwrappedText(ctx rule.Context, container *ast.Node) (
 	parent := container.Parent
 	if parent != nil && parent.Kind == ast.KindJsxAttribute {
 		// An attribute value has to end up inside quotes, so its quoting is the thing being
-		// decided. Upstream writes the raw literal back UNCHANGED when the text between its quotes
+		// decided. Upstream writes the raw literal back unchanged when the text between its quotes
 		// already contains a double quote, which preserves a single-quoted literal that could not
 		// be double-quoted without escaping; otherwise it wraps the inner text in double quotes.
 		raw := jsxCurlyBracePresenceRawTextOf(expression)
@@ -554,23 +555,23 @@ func jsxCurlyBracePresenceUnwrappedText(ctx rule.Context, container *ast.Node) (
 		return "\"" + inner + "\"", true
 	}
 
-	// A child is written as its COOKED value, which is what the markup would have held. A template
+	// A child is written as its cooked value, which is what the markup would have held. A template
 	// uses the same cooked text; upstream reads `quasis[0].value.cooked` here and `.raw` in the
 	// attribute branch above, and the difference is deliberate on its side.
 	return expression.Text(), true
 }
 
 // jsxCurlyBracePresenceReportMissing reports a bare literal and offers to wrap it.
-func jsxCurlyBracePresenceReportMissing(ctx rule.Context, node *ast.Node) {
-	span := jsxCurlyBracePresenceSpanOf(ctx, node)
-	replacement, ok := jsxCurlyBracePresenceWrappedText(ctx, node)
+func jsxCurlyBracePresenceReportMissing(ruleContext rule.Context, node *ast.Node) {
+	span := jsxCurlyBracePresenceSpanOf(ruleContext, node)
+	replacement, ok := jsxCurlyBracePresenceWrappedText(ruleContext, node)
 	if !ok {
 		// Upstream returns null from its fixer for three shapes it can see no single right answer
 		// for, and a declined repair is reproduced as a declined repair.
-		ctx.ReportNode(node, messageJsxCurlyBracePresenceMissingCurly)
+		ruleContext.ReportNode(node, messageJsxCurlyBracePresenceMissingCurly)
 		return
 	}
-	ctx.ReportNodeWithFixes(node, messageJsxCurlyBracePresenceMissingCurly,
+	ruleContext.ReportNodeWithFixes(node, messageJsxCurlyBracePresenceMissingCurly,
 		rule.ReplaceRange(span, replacement))
 }
 
@@ -578,9 +579,9 @@ func jsxCurlyBracePresenceReportMissing(ctx rule.Context, node *ast.Node) {
 //
 // The three declines are upstream's, at the line where it returns null: a literal that is only
 // character references, because the repair could equally write the reference or the character it
-// names; an ATTRIBUTE literal containing a line terminator; and a child that is a line break with
+// names; an attribute literal containing a line terminator; and a child that is a line break with
 // nothing else on it.
-func jsxCurlyBracePresenceWrappedText(ctx rule.Context, node *ast.Node) (string, bool) {
+func jsxCurlyBracePresenceWrappedText(ruleContext rule.Context, node *ast.Node) (string, bool) {
 	if jsxCurlyBracePresenceIsJsx(node) {
 		return "{" + jsxCurlyBracePresenceRawTextOf(node) + "}", true
 	}
@@ -588,7 +589,7 @@ func jsxCurlyBracePresenceWrappedText(ctx rule.Context, node *ast.Node) (string,
 	raw := jsxCurlyBracePresenceRawTextOf(node)
 	inAttribute := node.Parent != nil && node.Parent.Kind == ast.KindJsxAttribute
 
-	// Upstream's three declines, two of which are unreachable HERE and are kept anyway because
+	// Upstream's three declines, two of which are unreachable here and are kept anyway because
 	// they are upstream's and because reachability is a property of the callers rather than of
 	// this function. Measured by neutralizing each and looking for an input whose output moves:
 	//
@@ -633,7 +634,7 @@ func jsxCurlyBracePresenceWrapChildText(raw string) string {
 		// the helper. That rune is reachable and changes what the repair writes, and swapping the
 		// two spellings is caught by a fixture.
 		//
-		// The GUARD itself, as opposed to the character set it uses, is equivalent to the
+		// The guard itself, as opposed to the character set it uses, is equivalent to the
 		// `firstCharacter < 0` test below: both ask whether the line holds a non-whitespace
 		// character, now through the same set, so no line can take one path and not the other.
 		// Kept because it is upstream's and because the two would diverge again the moment either
@@ -661,7 +662,7 @@ func jsxCurlyBracePresenceWrapChildText(raw string) string {
 
 // jsxCurlyBracePresenceTrimLikeJavaScript reproduces `String.prototype.trim`.
 //
-// Its character set is exactly `\s`, so this is a thin wrapper and NOT `strings.TrimSpace`. The
+// Its character set is exactly `\s`, so this is a thin wrapper and not `strings.TrimSpace`. The
 // difference is one rune and it changes the output: Go's `unicode.IsSpace` counts U+0085 and
 // JavaScript counts it in neither `trim` nor `\s`, so `TrimSpace` calls a line holding only that
 // character blank and skips it, while upstream treats the character as the line's content and
@@ -717,7 +718,7 @@ func jsxCurlyBracePresenceQuote(text string) string {
 	var builder strings.Builder
 	encoder := json.NewEncoder(&builder)
 	encoder.SetEscapeHTML(false)
-	if err := encoder.Encode(text); err != nil {
+	if encodeError := encoder.Encode(text); encodeError != nil {
 		return strconv.Quote(text)
 	}
 	return strings.TrimSuffix(builder.String(), "\n")
@@ -767,7 +768,7 @@ func jsxCurlyBracePresenceHasAdjacentJsx(node *ast.Node, children []*ast.Node) b
 // from its neighbour only by indentation still counts as adjacent. Its loop over the interior runs
 // `for (let i = 1; i < children.length - 1; i++)`, which deliberately excludes both ends, and the
 // two ends are then handled by the pair of checks after it. Reproducing the bounds exactly matters:
-// a node that is BOTH first and last has no siblings under this definition even when the list has
+// a node that is both first and last has no siblings under this definition even when the list has
 // other members, and widening the loop would change which inputs report.
 func jsxCurlyBracePresenceAdjacentSiblings(node *ast.Node, children []*ast.Node) []*ast.Node {
 	filtered := make([]*ast.Node, 0, len(children))
@@ -796,15 +797,15 @@ func jsxCurlyBracePresenceAdjacentSiblings(node *ast.Node, children []*ast.Node)
 //
 // Two details, and getting either wrong changes which inputs report.
 //
-// It tests `node.type === 'Literal'`, which does NOT include a JSXText node. The indentation
-// between two children is a JSXText, so it is NOT filtered out of the sibling list and a container
-// separated from its neighbour by a newline is therefore NOT adjacent to it. Reading the function's
+// It tests `node.type === 'Literal'`, which does not include a JSXText node. The indentation
+// between two children is a JSXText, so it is not filtered out of the sibling list and a container
+// separated from its neighbour by a newline is therefore not adjacent to it. Reading the function's
 // name rather than its condition costs findings in one direction only: corpus case I13 lays four
 // containers out one per line and expects all four to report, and treating the indentation as
 // filterable makes the last two read as adjacent and silences them. The two children lists were
 // compared element for element, ours against the installed build's, and they are identical.
 //
-// And it tests `node.value &&`, so an EMPTY string is falsy and is not whitespace. That is
+// And it tests `node.value &&`, so an empty string is falsy and is not whitespace. That is
 // preserved: an empty string literal in a container is not a whitespace literal and does report.
 func jsxCurlyBracePresenceIsWhitespaceLiteral(node *ast.Node) bool {
 	if node.Kind != ast.KindStringLiteral {
@@ -819,7 +820,7 @@ func jsxCurlyBracePresenceIsWhitespaceLiteral(node *ast.Node) bool {
 
 // jsxCurlyBracePresenceLiteralValue reads the cooked value of a text or string child.
 //
-// The `Text` FIELD is read for JSX text rather than `Node.Text()`, which panics on some kinds; this
+// The `Text` field is read for JSX text rather than `Node.Text()`, which panics on some kinds; this
 // is the same accessor `jsx-no-useless-fragment` uses beside it for the same reason.
 func jsxCurlyBracePresenceLiteralValue(node *ast.Node) (string, bool) {
 	switch node.Kind {
@@ -851,10 +852,10 @@ func jsxCurlyBracePresenceContainsWhitespaceExpression(child *ast.Node) bool {
 //
 // `comments.ForFile` is the shelf's cached per-file scan, so asking it once per container costs one
 // scan for the whole file rather than one per node.
-func jsxCurlyBracePresenceHasCommentInside(ctx rule.Context, container *ast.Node) bool {
-	start := scanner.SkipTrivia(ctx.SourceFile.Text(), container.Pos())
+func jsxCurlyBracePresenceHasCommentInside(ruleContext rule.Context, container *ast.Node) bool {
+	start := scanner.SkipTrivia(ruleContext.SourceFile.Text(), container.Pos())
 	end := container.End()
-	for _, comment := range comments.ForFile(ctx) {
+	for _, comment := range comments.ForFile(ruleContext) {
 		if comment.Range.Pos() >= start && comment.Range.End() <= end {
 			return true
 		}
@@ -864,12 +865,12 @@ func jsxCurlyBracePresenceHasCommentInside(ctx rule.Context, container *ast.Node
 
 // jsxCurlyBracePresenceRawTextOf returns a node's text as it is written in the source.
 //
-// `Node.Text()` is the COOKED value for a literal, so `'it\'s'` comes back as `it's` with the
+// `Node.Text()` is the cooked value for a literal, so `'it\'s'` comes back as `it's` with the
 // backslash gone and the quotes stripped. Every escaping decision in this rule is about the raw
 // form, so the source is sliced instead.
 //
-// `Pos()` includes leading trivia, which has to be skipped for an EXPRESSION and must not be
-// skipped for JSX TEXT. Whitespace between two JSX children is text content rather than trivia,
+// `Pos()` includes leading trivia, which has to be skipped for an expression and must not be
+// skipped for JSX text. Whitespace between two JSX children is text content rather than trivia,
 // and `scanner.SkipTrivia` consumes all of it: handed the indentation between two elements it
 // returns the node's own end, so the raw text comes back empty, the line-break test that should
 // have declined it sees no line break, and the rule reports a finding on every indent in the file.
@@ -909,7 +910,7 @@ func jsxCurlyBracePresenceTemplateInner(raw string) string {
 //
 // A backslash or a character reference declines anywhere, because unquoting either would change
 // what the text means. The third class, the four characters that delimit JSX itself, declines only
-// in a CHILD: inside an attribute's quotes they are ordinary. Measured both ways.
+// in a child: inside an attribute's quotes they are ordinary. Measured both ways.
 func jsxCurlyBracePresenceNeedsEscaping(raw string, inAttribute bool) bool {
 	if strings.Contains(raw, `\`) {
 		return true
@@ -1017,7 +1018,7 @@ func jsxCurlyBracePresenceIsLineBreak(text string) bool {
 
 // jsxCurlyBracePresenceIsAllWhitespace reproduces `jsxUtil.isWhiteSpaces`, which is `/^\s*$/`.
 //
-// Note that an EMPTY string satisfies this, matching the regular expression, and callers that need
+// Note that an empty string satisfies this, matching the regular expression, and callers that need
 // to exclude it do so themselves the way upstream's `node.value &&` guard does.
 func jsxCurlyBracePresenceIsAllWhitespace(text string) bool {
 	return strings.TrimFunc(text, jsxCurlyBracePresenceIsWhitespaceRune) == ""
@@ -1035,7 +1036,7 @@ func jsxCurlyBracePresenceHasEdgeWhitespace(text string) bool {
 
 // jsxCurlyBracePresenceIsWhitespaceRune is the character set JavaScript's `\s` matches.
 //
-// This package already has `isJavaScriptWhitespace` in `self_closing_comp.go` and it is NOT what
+// This package already has `isJavaScriptWhitespace` in `self_closing_comp.go` and it is not what
 // this rule needs: that one deliberately excludes the non-breaking space, because the rule it
 // serves uses a negative lookahead that spares it. JavaScript's `\s` does match U+00A0, and so does
 // the regular expression this rule reproduces. Measured against the installed build: a container

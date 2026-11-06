@@ -5,41 +5,32 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
-// NoUnneededTernaryOptions configures the rule.
-type NoUnneededTernaryOptions struct {
-	// DefaultAssignment allows `foo ? foo : bar`, the pre-`||` way to spell a default.
-	//
-	// Defaults to TRUE upstream, so the second half of this rule is off unless somebody asks for
-	// it. A pointer because of that default: the config layer hands a rule configured as a bare
-	// severity a nil, and a plain bool field behind a nil decodes to false, which would silently
-	// turn the second judgment ON for everyone.
-	DefaultAssignment *bool `json:"defaultAssignment"`
-}
-
 // noUnneededTernaryDefaultAssignment is upstream's default for the only option.
 const noUnneededTernaryDefaultAssignment = true
 
-// resolve applies the default, leaving an absent key alone.
-func (options NoUnneededTernaryOptions) resolve() bool {
-	if options.DefaultAssignment == nil {
-		return noUnneededTernaryDefaultAssignment
-	}
-	return *options.DefaultAssignment
-}
+// noUnneededTernaryOrPrecedence is the precedence of `||`, which the alternate is compared against.
+//
+// Named rather than written as 4 at the call site, because the number only means anything relative
+// to `operatorAssignmentPrecedence`'s table and a bare literal there reads as a magic constant.
+const noUnneededTernaryOrPrecedence = 4
+
+// noUnneededTernaryUnaryPrecedence is the precedence of a unary operator, which decides whether a
+// negated expression needs wrapping.
+const noUnneededTernaryUnaryPrecedence = 16
 
 // DecodeNoUnneededTernaryOptions reads this rule's configuration from the config layer.
 //
 // Hand-rolled rather than `rule.DecodeOptionsInto`, because that helper errors on empty input and
 // the config layer turns the error into nil, so a rule reached through it cannot tell "no options
-// were written" from "the option was written as false". This option defaults to TRUE, so that
+// were written" from "the option was written as false". This option defaults to `true`, so that
 // distinction turns the second judgment on rather than merely narrowing it.
-func DecodeNoUnneededTernaryOptions(raw []byte) (any, error) {
+func DecodeNoUnneededTernaryOptions(raw []byte) (NoUnneededTernaryOptions, error) {
 	var options NoUnneededTernaryOptions
 	if len(raw) == 0 {
 		return options, nil
 	}
-	if err := rule.UnmarshalOptions(raw, &options); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &options); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 	return options, nil
 }
@@ -69,20 +60,20 @@ var messageNoUnneededTernaryConditionalAssignment = rule.Message{
 //
 // # Two judgments, and only the first is on by default
 //
-// Boolean literals on BOTH branches means the ternary is a restatement of its own test, and that is
+// Boolean literals on both branches means the ternary is a restatement of its own test, and that is
 // always reported. The default-assignment shape is reported only when the option asks, because
 // `foo ? foo : bar` predates `||` and some codebases still spell it that way deliberately.
 //
 // # The repair rebuilds text, which is what makes it dangerous, and why it is still safe here
 //
-// Every arm of this fixer REPLACES THE WHOLE TERNARY with reconstructed text rather than deleting a
+// Every arm of this fixer replaces the whole ternary with reconstructed text rather than deleting a
 // span, which is the shape that destroyed type information in two other rules tonight. It is safe
 // here for a specific reason worth stating rather than assuming: every piece of the replacement is
-// SLICED FROM THE SOURCE by range, never rebuilt from node fields, so an `as` expression, a
+// sliced from the source by range, never rebuilt from node fields, so an `as` expression, a
 // `satisfies`, a non-null `!`, explicit type arguments and a `<T>` cast all survive as written.
 // Measured against the installed rule on eight TypeScript shapes upstream's corpus does not contain.
 //
-// The one thing reconstructed rather than copied is the OPERATOR of an inverted comparison, and that
+// The one thing reconstructed rather than copied is the operator of an inverted comparison, and that
 // is four characters chosen from a fixed table.
 //
 // # Where the parentheses come from
@@ -95,27 +86,27 @@ var messageNoUnneededTernaryConditionalAssignment = rule.Message{
 //	                         looser than `||` is wrapped, and `??` is wrapped as well because
 //	                         mixing it with `||` unparenthesized is a syntax error
 //
-// `as` and `satisfies` bind LOOSER than every binary operator, which upstream's table has no row
+// `as` and `satisfies` bind looser than every binary operator, which upstream's table has no row
 // for. `a ? a : b as any` becomes `a || (b as any)`, measured; a port inheriting upstream's table
 // unchanged would give them the tightest precedence and emit `a || b as any`, which parses as
 // `(a || b) as any` and asserts the type of the wrong thing.
-var NoUnneededTernary = rule.Rule{
+var NoUnneededTernary = rule.Rule[NoUnneededTernaryOptions]{
 	Name: "no-unneeded-ternary",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoUnneededTernaryOptions]) rule.Listeners {
 		allowDefaultAssignment := noUnneededTernaryDefaultAssignment
-		if decoded, configured := rule.OptionsAs[NoUnneededTernaryOptions](options); configured {
+		if decoded, configured := options.Read(); configured {
 			allowDefaultAssignment = decoded.resolve()
 		}
 		return rule.Listeners{
 			ast.KindConditionalExpression: func(node *ast.Node) {
-				checkNoUnneededTernary(ctx, node, allowDefaultAssignment)
+				checkNoUnneededTernary(ruleContext, node, allowDefaultAssignment)
 			},
 		}
 	},
 }
 
 // checkNoUnneededTernary judges one conditional expression.
-func checkNoUnneededTernary(ctx rule.Context, node *ast.Node, allowDefaultAssignment bool) {
+func checkNoUnneededTernary(ruleContext rule.Context, node *ast.Node, allowDefaultAssignment bool) {
 	conditional := node.AsConditionalExpression()
 	if conditional.Condition == nil || conditional.WhenTrue == nil || conditional.WhenFalse == nil {
 		return
@@ -125,12 +116,12 @@ func checkNoUnneededTernary(ctx rule.Context, node *ast.Node, allowDefaultAssign
 	alternate, alternateIsBoolean := noUnneededTernaryBooleanLiteralValue(conditional.WhenFalse)
 
 	if consequentIsBoolean && alternateIsBoolean {
-		reportNoUnneededTernaryBooleanBranches(ctx, node, conditional, consequent, alternate)
+		reportNoUnneededTernaryBooleanBranches(ruleContext, node, conditional, consequent, alternate)
 		return
 	}
 
 	if !allowDefaultAssignment && noUnneededTernaryMatchesDefaultAssignment(conditional) {
-		reportNoUnneededTernaryDefaultAssignment(ctx, node, conditional)
+		reportNoUnneededTernaryDefaultAssignment(ruleContext, node, conditional)
 	}
 }
 
@@ -145,58 +136,58 @@ func checkNoUnneededTernary(ctx rule.Context, node *ast.Node, allowDefaultAssign
 //	true then false   the ternary is the test coerced to boolean, so it becomes the test itself
 //	                  when the test already produces a boolean, and `!!test` when it does not
 func reportNoUnneededTernaryBooleanBranches(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	node *ast.Node,
 	conditional *ast.ConditionalExpression,
 	consequent bool,
 	alternate bool,
 ) {
-	nodeRange := rule.TokenRange(ctx.SourceFile, node)
+	nodeRange := rule.TokenRange(ruleContext.SourceFile, node)
 
 	if consequent == alternate {
 		// `f() ? true : true` is left unrepaired: collapsing it would drop the call, and whether
 		// that call mattered is not something the rule can know. Upstream returns null here, which
 		// its corpus records as the single `output: null` case.
 		if ast.SkipParentheses(conditional.Condition).Kind != ast.KindIdentifier {
-			ctx.ReportRange(nodeRange, messageNoUnneededTernaryConditionalExpression)
+			ruleContext.ReportRange(nodeRange, messageNoUnneededTernaryConditionalExpression)
 			return
 		}
 		literal := "false"
 		if consequent {
 			literal = "true"
 		}
-		ctx.ReportRangeWithFixes(nodeRange, messageNoUnneededTernaryConditionalExpression,
+		ruleContext.ReportRangeWithFixes(nodeRange, messageNoUnneededTernaryConditionalExpression,
 			rule.ReplaceRange(nodeRange, literal))
 		return
 	}
 
 	if alternate {
 		// `test ? false : true` is the negation of the test.
-		ctx.ReportRangeWithFixes(nodeRange, messageNoUnneededTernaryConditionalExpression,
-			rule.ReplaceRange(nodeRange, noUnneededTernaryInvert(ctx, conditional.Condition)))
+		ruleContext.ReportRangeWithFixes(nodeRange, messageNoUnneededTernaryConditionalExpression,
+			rule.ReplaceRange(nodeRange, noUnneededTernaryInvert(ruleContext, conditional.Condition)))
 		return
 	}
 
 	// `test ? true : false` is the test, coerced when it is not already a boolean. The double
-	// negation is written as a negation OF THE INVERSION rather than as `!!` plus the test, which
+	// negation is written as a negation of the inversion rather than as `!!` plus the test, which
 	// is upstream's `!${invertExpression(node.test)}` and is what makes `!(a + b)` come out as
 	// `!!(a + b)` with the parentheses in the right place.
-	replacement := "!" + noUnneededTernaryInvert(ctx, conditional.Condition)
+	replacement := "!" + noUnneededTernaryInvert(ruleContext, conditional.Condition)
 	if noUnneededTernaryAlwaysBoolean(conditional.Condition) {
-		replacement = noUnneededTernaryParenthesizedText(ctx, conditional.Condition)
+		replacement = noUnneededTernaryParenthesizedText(ruleContext, conditional.Condition)
 	}
-	ctx.ReportRangeWithFixes(nodeRange, messageNoUnneededTernaryConditionalExpression,
+	ruleContext.ReportRangeWithFixes(nodeRange, messageNoUnneededTernaryConditionalExpression,
 		rule.ReplaceRange(nodeRange, replacement))
 }
 
 // reportNoUnneededTernaryDefaultAssignment reports `a ? a : b` and repairs it to `a || b`.
 func reportNoUnneededTernaryDefaultAssignment(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	node *ast.Node,
 	conditional *ast.ConditionalExpression,
 ) {
-	nodeRange := rule.TokenRange(ctx.SourceFile, node)
-	alternateText := noUnneededTernaryParenthesizedText(ctx, conditional.WhenFalse)
+	nodeRange := rule.TokenRange(ruleContext.SourceFile, node)
+	alternateText := noUnneededTernaryParenthesizedText(ruleContext, conditional.WhenFalse)
 
 	// The alternate is wrapped when it binds looser than `||`, and separately when it is a `??`,
 	// which cannot sit beside `||` without parentheses at all. Already-parenthesized alternates are
@@ -207,24 +198,18 @@ func reportNoUnneededTernaryDefaultAssignment(
 		alternateText = "(" + alternateText + ")"
 	}
 
-	replacement := noUnneededTernaryParenthesizedText(ctx, conditional.Condition) + " || " +
+	replacement := noUnneededTernaryParenthesizedText(ruleContext, conditional.Condition) + " || " +
 		alternateText
-	ctx.ReportRangeWithFixes(nodeRange, messageNoUnneededTernaryConditionalAssignment,
+	ruleContext.ReportRangeWithFixes(nodeRange, messageNoUnneededTernaryConditionalAssignment,
 		rule.ReplaceRange(nodeRange, replacement))
 }
-
-// noUnneededTernaryOrPrecedence is the precedence of `||`, which the alternate is compared against.
-//
-// Named rather than written as 4 at the call site, because the number only means anything relative
-// to `operatorAssignmentPrecedence`'s table and a bare literal there reads as a magic constant.
-const noUnneededTernaryOrPrecedence = 4
 
 // noUnneededTernaryBooleanLiteralValue reads a `true` or `false` literal branch.
 //
 // The second return separates "not a boolean literal" from the literal `false`, which a caller
 // comparing the two branches has to be able to tell apart.
 //
-// Parentheses are NOT skipped, and that is upstream's behaviour rather than an oversight: espree
+// Parentheses are not skipped, and that is upstream's behaviour rather than an oversight: espree
 // gives them no node, so `foo ? (true) : false` has a parenthesized consequent here and a bare
 // literal there. Measured -- upstream reports it, so the skip is required for fidelity, the same
 // correction `no-eq-null` documents for its own operands.
@@ -243,7 +228,7 @@ func noUnneededTernaryBooleanLiteralValue(branch *ast.Node) (bool, bool) {
 
 // noUnneededTernaryMatchesDefaultAssignment answers whether a ternary is `a ? a : b`.
 //
-// Upstream compares the two identifiers by NAME, not by binding, so a shadowed `a` still matches.
+// Upstream compares the two identifiers by name, not by binding, so a shadowed `a` still matches.
 // That is the right call for a rule about spelling: the repair `a || b` evaluates the same `a` the
 // ternary's test evaluated, whatever it resolves to.
 func noUnneededTernaryMatchesDefaultAssignment(conditional *ast.ConditionalExpression) bool {
@@ -299,7 +284,7 @@ func noUnneededTernaryIsCoalesce(expression *ast.Node) bool {
 
 // noUnneededTernaryInvert renders the boolean inverse of an expression, as source text.
 //
-// Three shapes, in upstream's order. A comparison with a true inverse has its OPERATOR swapped in
+// Three shapes, in upstream's order. A comparison with a true inverse has its operator swapped in
 // place, which is why `a === b ? false : true` becomes `a !== b` rather than `!(a === b)`. Note the
 // relational operators are deliberately absent from that table: `<` and `>=` are not inverses,
 // because both answer false for a NaN operand.
@@ -309,51 +294,51 @@ func noUnneededTernaryIsCoalesce(expression *ast.Node) bool {
 // # Every piece of this is sliced from the source
 //
 // The two halves either side of a swapped operator, and the whole expression in the negation arms,
-// are taken by RANGE out of the file rather than rebuilt from node fields. That is what makes the
+// are taken by range out of the file rather than rebuilt from node fields. That is what makes the
 // repair safe on TypeScript: `foo as any`, `foo!`, `f<number>()` and `<boolean>a` all survive
 // verbatim because nothing here ever looks at what they are made of.
-func noUnneededTernaryInvert(ctx rule.Context, expression *ast.Node) string {
-	text := ctx.SourceFile.Text()
+func noUnneededTernaryInvert(ruleContext rule.Context, expression *ast.Node) string {
+	text := ruleContext.SourceFile.Text()
 
 	if expression.Kind == ast.KindBinaryExpression {
 		if operator := expression.AsBinaryExpression().OperatorToken; operator != nil {
 			if inverse := noUnneededTernaryInverseOperator(operator.Kind); inverse != "" {
-				expressionRange := rule.TokenRange(ctx.SourceFile, expression)
-				operatorRange := rule.TokenRange(ctx.SourceFile, operator)
+				expressionRange := rule.TokenRange(ruleContext.SourceFile, expression)
+				operatorRange := rule.TokenRange(ruleContext.SourceFile, operator)
 				return text[expressionRange.Pos():operatorRange.Pos()] + inverse +
 					text[operatorRange.End():expressionRange.End()]
 			}
 		}
 	}
 
-	inner := noUnneededTernaryParenthesizedText(ctx, expression)
+	inner := noUnneededTernaryParenthesizedText(ruleContext, expression)
 	if noUnneededTernaryPrecedence(expression) < noUnneededTernaryUnaryPrecedence {
 		return "!(" + inner + ")"
 	}
 	return "!" + inner
 }
 
-// noUnneededTernaryPrecedence is upstream's `getPrecedence` as THIS rule needs to ask it.
+// noUnneededTernaryPrecedence is upstream's `getPrecedence` as this rule needs to ask it.
 //
 // It defers to the shared table in `operator_assignment.go` for everything both rules agree on, and
 // corrects it in two places where that table answers a different question than upstream's. Both
 // corrections were measured against the installed rule driven through the TypeScript parser, and
 // both were found by a fixture failing rather than by reading the table.
 //
-// # A parenthesized expression reports what is INSIDE it
+// # A parenthesized expression reports what is inside it
 //
 // Espree produces no node for parentheses, so upstream's `getPrecedence(node.test)` on `(foo + 1)`
 // is asking about the addition and answers 12. The shared table answers 20, because our parser gives
 // the parentheses a node and a parenthesized expression genuinely binds tightest.
 //
 // Both answers are right about their own question, and only one produces upstream's text: measured,
-// `(foo + 1) ? true : false` becomes `!!((foo + 1))` with BOTH pairs of parentheses. That reads as
+// `(foo + 1) ? true : false` becomes `!!((foo + 1))` with both pairs of parentheses. That reads as
 // redundant and it is exactly what upstream writes, because `getParenthesisedText` has already kept
 // the source pair and the precedence test then adds its own. Reproduced rather than tidied: emitting
 // one pair would be a nicer output that no upstream fixture asserts, and the corpus is the
 // specification.
 //
-// # An unknown node type is the LOWEST precedence, not the highest
+// # An unknown node type is the lowest precedence, not the highest
 //
 // Upstream's default arm returns 20 for a node in `eslintVisitorKeys` and -1 for anything else, with
 // a comment saying the -1 is deliberate: an unrecognised node is assumed to bind loosely so a fixer
@@ -376,10 +361,6 @@ func noUnneededTernaryPrecedence(expression *ast.Node) int {
 	}
 	return operatorAssignmentPrecedence(expression)
 }
-
-// noUnneededTernaryUnaryPrecedence is the precedence of a unary operator, which decides whether a
-// negated expression needs wrapping.
-const noUnneededTernaryUnaryPrecedence = 16
 
 // noUnneededTernaryInverseOperator returns the true inverse of a comparison, or "" when there is
 // none.
@@ -409,7 +390,7 @@ func noUnneededTernaryInverseOperator(kind ast.Kind) string {
 //
 // Taken by range rather than reconstructed, which is the whole reason this fixer does not lose type
 // syntax.
-func noUnneededTernaryParenthesizedText(ctx rule.Context, expression *ast.Node) string {
-	expressionRange := rule.TokenRange(ctx.SourceFile, expression)
-	return ctx.SourceFile.Text()[expressionRange.Pos():expressionRange.End()]
+func noUnneededTernaryParenthesizedText(ruleContext rule.Context, expression *ast.Node) string {
+	expressionRange := rule.TokenRange(ruleContext.SourceFile, expression)
+	return ruleContext.SourceFile.Text()[expressionRange.Pos():expressionRange.End()]
 }

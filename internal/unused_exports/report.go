@@ -1,6 +1,7 @@
 package unused_exports
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"io"
@@ -18,15 +19,15 @@ import (
 // note on `computeIslands`.
 //
 // The two halves are computed together and printed together because they read as one question to a
-// person — "what did I write that is not doing anything" — while being two analyses with different
+// person ("what did I write that is not doing anything") while being two analyses with different
 // evidence behind them. The report keeps them in separate sections precisely so the reader can trust
 // them differently, which is the honest presentation of two claims of unequal strength.
-func Run(ctx context.Context, graph *program.Graph, files []*ast.SourceFile, deep bool) (*Report, error) {
+func Run(callerContext context.Context, graph *program.Graph, files []*ast.SourceFile, deep bool) (*Report, error) {
 	roots := module_roots.Build(files)
 
-	report, err := FindUnreferenced(ctx, graph, files, roots, deep)
-	if err != nil {
-		return nil, err
+	report, findUnreferencedError := FindUnreferenced(callerContext, graph, files, roots, deep)
+	if findUnreferencedError != nil {
+		return nil, findUnreferencedError
 	}
 
 	for _, file := range files {
@@ -42,8 +43,14 @@ func Run(ctx context.Context, graph *program.Graph, files []*ast.SourceFile, dee
 // with no denominator cannot be told apart from a broken probe. A report saying "0 unused" over a
 // tree of 3,400 files is far more likely to be a broken analysis than a clean codebase, and the
 // only thing that separates those two readings is the denominator printed beside the zero.
-func Write(out io.Writer, report *Report, showIntentional bool) {
-	fmt.Fprintf(out, "\nunused: a report, not a gate — nothing here fails a build\n")
+//
+// A bufio.Writer keeps the first failed write's error and hands it back from Flush, so the one check at the end
+// catches a report that never reached out, whichever section failed.
+func Write(out io.Writer, report *Report, showIntentional bool) error {
+	writer := bufio.NewWriter(out)
+	// The dashes here and in every section below are escaped, not changed: the Swift unused report in
+	// command/cohere/engine_run.go prints this same shape, so the two print the same bytes.
+	fmt.Fprintf(writer, "\nunused: a report, not a gate \u2014 nothing here fails a build\n")
 
 	intentionalFiles := 0
 	for _, file := range report.Files {
@@ -58,14 +65,14 @@ func Write(out io.Writer, report *Report, showIntentional bool) {
 		}
 	}
 
-	writeIslandSection(out, report, showIntentional)
-	writeFileSection(out, report, showIntentional, intentionalFiles)
-	writeExportSection(out, report, showIntentional, intentionalExports)
-	writeUnreachableSection(out, report)
+	writeIslandSection(writer, report, showIntentional)
+	writeFileSection(writer, report, showIntentional, intentionalFiles)
+	writeExportSection(writer, report, showIntentional, intentionalExports)
+	writeUnreachableSection(writer, report)
 
 	// The coverage line, in the same spirit as the lint phase's. It states what was looked at, not
 	// only what was found, so a run that analyzed nothing cannot read like a run that found nothing.
-	fmt.Fprintf(out,
+	fmt.Fprintf(writer,
 		"  looked at %d files (%d spared by a framework or dynamic-load convention) and %d exported declarations\n",
 		report.FilesAnalyzed, report.RootedFiles, report.ExportsAnalyzed,
 	)
@@ -74,17 +81,21 @@ func Write(out io.Writer, report *Report, showIntentional bool) {
 		// on a real tree has failed to propagate rather than found a flat codebase, and printing the
 		// number is what makes that visible instead of quietly doubling the report.
 		//
-		// The depth is "at least", not an invariant. It is the longest chain THIS traversal happened
+		// The depth is "at least", not an invariant. It is the longest chain this traversal happened
 		// to follow, and a worklist reaches a symbol by whichever path it pops first, so the number
-		// moves run to run — measured on the ahra tree: 8, 9 and 10 across three runs whose findings
+		// moves run to run. Measured on the ahra tree: 8, 9 and 10 across three runs whose findings
 		// were byte-identical at 1042 clusters and 2051 declarations every time. The set is the
 		// result; the depth is a liveness signal about the traversal, and saying so stops a reader
 		// from reading a moving number as an unstable analysis.
-		fmt.Fprintf(out,
+		fmt.Fprintf(writer,
 			"  the closure walked %d declarations and reached a depth of at least %d\n",
 			report.DeclarationsAnalyzed, report.ClosurePasses,
 		)
 	}
+	if flushError := writer.Flush(); flushError != nil {
+		return fmt.Errorf("writing the unused report: %w", flushError)
+	}
+	return nil
 }
 
 // writeIslandSection prints the clusters, largest first.
@@ -93,7 +104,7 @@ func Write(out io.Writer, report *Report, showIntentional bool) {
 // the table only that helper read as three unrelated lines in three places, and the reader has to
 // reassemble them. Printing them as one block with a size is what turns the report from a list into
 // the "oh hey, this was written and never got used" it exists to produce.
-func writeIslandSection(out io.Writer, report *Report, showIntentional bool) {
+func writeIslandSection(out *bufio.Writer, report *Report, showIntentional bool) {
 	if len(report.Islands) == 0 {
 		return
 	}
@@ -118,8 +129,9 @@ func writeIslandSection(out io.Writer, report *Report, showIntentional bool) {
 		declarations += len(island.Members)
 	}
 
+	// Escaped, not changed, like every dash in this report: see Write.
 	fmt.Fprintf(out,
-		"\n  islands — %d clusters, %d declarations, dead together (transitive; --unused-deep)\n",
+		"\n  islands \u2014 %d clusters, %d declarations, dead together (transitive; --unused-deep)\n",
 		clusters, declarations,
 	)
 	if intentional > 0 {
@@ -141,7 +153,7 @@ func writeIslandSection(out io.Writer, report *Report, showIntentional bool) {
 		// header earns its line only when there is a group to name.
 		if len(island.Members) == 1 {
 			member := island.Members[0]
-			fmt.Fprintf(out, "    %s — %s %s%s\n",
+			fmt.Fprintf(out, "    %s \u2014 %s %s%s\n",
 				member.FileName, member.Kind, member.Name, intentionalSuffix(member.Intentional))
 			continue
 		}
@@ -154,13 +166,13 @@ func writeIslandSection(out io.Writer, report *Report, showIntentional bool) {
 			if member.Exported {
 				visibility = "exported"
 			}
-			fmt.Fprintf(out, "      %s %s %s — %s%s\n",
+			fmt.Fprintf(out, "      %s %s %s \u2014 %s%s\n",
 				visibility, member.Kind, member.Name, member.FileName, intentionalSuffix(member.Intentional))
 		}
 	}
 }
 
-func writeFileSection(out io.Writer, report *Report, showIntentional bool, intentional int) {
+func writeFileSection(out *bufio.Writer, report *Report, showIntentional bool, intentional int) {
 	if len(report.Files) == 0 {
 		return
 	}
@@ -168,7 +180,12 @@ func writeFileSection(out io.Writer, report *Report, showIntentional bool, inten
 		return report.Files[left].FileName < report.Files[right].FileName
 	})
 
-	fmt.Fprintf(out, "\n  files whose every export is unreferenced — %s\n", countPhrase(len(report.Files), intentional))
+	// Escaped, not changed, like every dash in this report: see Write.
+	fmt.Fprintf(
+		out,
+		"\n  files whose every export is unreferenced \u2014 %s\n",
+		countPhrase(len(report.Files), intentional),
+	)
 	for _, file := range report.Files {
 		if file.Intentional.Present && !showIntentional {
 			continue
@@ -177,11 +194,11 @@ func writeFileSection(out io.Writer, report *Report, showIntentional bool, inten
 		if file.Intentional.Present {
 			marker = intentionalSuffix(file.Intentional)
 		}
-		fmt.Fprintf(out, "    %s — %d exports, none used%s\n", file.FileName, file.Exports, marker)
+		fmt.Fprintf(out, "    %s \u2014 %d exports, none used%s\n", file.FileName, file.Exports, marker)
 	}
 }
 
-func writeExportSection(out io.Writer, report *Report, showIntentional bool, intentional int) {
+func writeExportSection(out *bufio.Writer, report *Report, showIntentional bool, intentional int) {
 	if len(report.Unreferenced) == 0 {
 		return
 	}
@@ -192,17 +209,18 @@ func writeExportSection(out io.Writer, report *Report, showIntentional bool, int
 		return report.Unreferenced[left].Name < report.Unreferenced[right].Name
 	})
 
-	fmt.Fprintf(out, "\n  exports nothing references — %s\n", countPhrase(len(report.Unreferenced), intentional))
+	// Escaped, not changed, like every dash in this report: see Write.
+	fmt.Fprintf(out, "\n  exports nothing references \u2014 %s\n", countPhrase(len(report.Unreferenced), intentional))
 	for _, finding := range report.Unreferenced {
 		if finding.Intentional.Present && !showIntentional {
 			continue
 		}
-		fmt.Fprintf(out, "    %s — %s %s%s\n",
+		fmt.Fprintf(out, "    %s \u2014 %s %s%s\n",
 			finding.FileName, finding.Kind, finding.Name, intentionalSuffix(finding.Intentional))
 	}
 }
 
-func writeUnreachableSection(out io.Writer, report *Report) {
+func writeUnreachableSection(out *bufio.Writer, report *Report) {
 	if len(report.Unreachable) == 0 {
 		return
 	}
@@ -213,9 +231,10 @@ func writeUnreachableSection(out io.Writer, report *Report) {
 		return report.Unreachable[left].Range.Position < report.Unreachable[right].Range.Position
 	})
 
-	fmt.Fprintf(out, "\n  statements nothing can reach — %d\n", len(report.Unreachable))
+	// Escaped, not changed, like every dash in this report: see Write.
+	fmt.Fprintf(out, "\n  statements nothing can reach \u2014 %d\n", len(report.Unreachable))
 	for _, finding := range report.Unreachable {
-		fmt.Fprintf(out, "    %s:%d — %s\n", finding.FileName, finding.Range.Position, finding.Cause)
+		fmt.Fprintf(out, "    %s:%d \u2014 %s\n", finding.FileName, finding.Range.Position, finding.Cause)
 	}
 }
 

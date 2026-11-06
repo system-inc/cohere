@@ -16,11 +16,11 @@ import (
 //	invalid: const d = x as any;
 //	invalid: function f<T>(x: unknown) { x as T; }  T could be instantiated with anything
 //
-// An assertion is the one construct that turns type checking OFF for the value it wraps. Widening is
+// An assertion is the one construct that turns type checking off for the value it wraps. Widening is
 // harmless because the checker keeps checking against the wider type, and narrowing is a promise
 // nobody verifies: `event.target as HTMLElement` compiles whatever `target` really is, and the
 // mistake surfaces at run time as a property read on null. That is the whole rule, and everything
-// below is about telling the reader WHICH kind of unverifiable claim they made.
+// below is about telling the reader which kind of unverifiable claim they made.
 //
 // # Five messages, and the order they are decided in is the rule
 //
@@ -32,9 +32,9 @@ import (
 // \t2. unknown asserted to any   unsafeToAnyTypeAssertion. Called out ahead of the general any test
 // \t                             because `unknown` to `any` is the one direction the assignability
 // \t                             test below would call safe.
-// \t3. any flowing OUT           unsafeOfAnyTypeAssertion. The EXPRESSION is any, or contains an any
+// \t3. any flowing out           unsafeOfAnyTypeAssertion. The expression is any, or contains an any
 // \t                             in a generic position.
-// \t4. any flowing IN            unsafeToAnyTypeAssertion. The ASSERTED type is the any one.
+// \t4. any flowing in            unsafeToAnyTypeAssertion. The asserted type is the any one.
 // \t5. not assignable            then three sub-cases, below.
 //
 // Step five splits on whether the asserted type is a type parameter, because a type parameter is
@@ -58,7 +58,7 @@ import (
 // # The object literal widening, which is not an optimization
 //
 // An object literal's type carries its excess-property information, so asking whether
-// `{ foo: 'hi', bar: 1 }` is assignable to `{ foo: string }` answers NO for a reason that has
+// `{ foo: 'hi', bar: 1 }` is assignable to `{ foo: string }` answers no for a reason that has
 // nothing to do with this rule. Upstream widens an object literal type before the assignability
 // test for exactly that, and without it every object literal assertion in the tree would report.
 //
@@ -70,30 +70,30 @@ import (
 // future reader comparing the two files will notice the missing try and should not have to work out
 // whether it was an oversight.
 //
-// # Cost, and why this rule is registered but NOT enabled
+// # Cost, and why this rule is registered but not enabled
 //
 // Measured against the ahra tree with the installed 8.67.0 build: 2,846 findings across 672 files,
 // one file holding 324 of them. The rule is not auto-fixable and every site is a human decision
 // about what the code really guarantees, so switching it on is a project rather than a config line.
 // The port is here and correct; whether the tree adopts it is not a porter's call.
-var NoUnsafeTypeAssertion = rule.Rule{
+var NoUnsafeTypeAssertion = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/no-unsafe-type-assertion",
 
 	// Every step is a type question, and two of them are assignability queries.
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		checkAssertion := func(node *ast.Node, expression *ast.Node, assertedTypeNode *ast.Node) {
-			if ctx.TypeChecker == nil {
+			if ruleContext.TypeChecker == nil {
 				return
 			}
 			if expression == nil || assertedTypeNode == nil {
 				return
 			}
 
-			expressionType := ctx.TypeChecker.GetTypeAtLocation(expression)
-			assertedType := ctx.TypeChecker.GetTypeAtLocation(assertedTypeNode)
+			expressionType := ruleContext.TypeChecker.GetTypeAtLocation(expression)
+			assertedType := ruleContext.TypeChecker.GetTypeAtLocation(assertedTypeNode)
 			if expressionType == nil || assertedType == nil {
 				return
 			}
@@ -111,21 +111,21 @@ var NoUnsafeTypeAssertion = rule.Rule{
 			// off.
 			if type_checking.IsTypeAnyType(assertedType) &&
 				type_checking.IsTypeUnknownType(expressionType) {
-				ctx.ReportNode(node, buildUnsafeToAnyMessage("`any`"))
+				ruleContext.ReportNode(node, buildUnsafeToAnyMessage("`any`"))
 				return
 			}
 
-			// An any flowing OUT of the expression, including one buried in a generic position.
+			// An any flowing out of the expression, including one buried in a generic position.
 			if _, sender, isUnsafe := type_checking.IsUnsafeAssignment(expressionType, assertedType,
-				ctx.TypeChecker, expression); isUnsafe {
-				ctx.ReportNode(node, buildUnsafeOfAnyMessage(anyTypeName(sender)))
+				ruleContext.TypeChecker, expression); isUnsafe {
+				ruleContext.ReportNode(node, buildUnsafeOfAnyMessage(anyTypeName(sender)))
 				return
 			}
 
-			// An any flowing IN from the asserted type. Same helper, arguments swapped.
+			// An any flowing in from the asserted type. Same helper, arguments swapped.
 			if _, sender, isUnsafe := type_checking.IsUnsafeAssignment(assertedType, expressionType,
-				ctx.TypeChecker, assertedTypeNode); isUnsafe {
-				ctx.ReportNode(node, buildUnsafeToAnyMessage(anyTypeName(sender)))
+				ruleContext.TypeChecker, assertedTypeNode); isUnsafe {
+				ruleContext.ReportNode(node, buildUnsafeToAnyMessage(anyTypeName(sender)))
 				return
 			}
 
@@ -134,37 +134,37 @@ var NoUnsafeTypeAssertion = rule.Rule{
 			// that is not this rule's. Widening drops that and asks the question the rule means.
 			expressionWidenedType := expressionType
 			if isObjectLiteralType(expressionType) {
-				expressionWidenedType = checker.Checker_getWidenedType(ctx.TypeChecker, expressionType)
+				expressionWidenedType = checker.Checker_getWidenedType(ruleContext.TypeChecker, expressionType)
 			}
 
 			// Upstream wraps this call in a try for a TypeScript crash it cites by issue number.
 			// Our checker does not signal failure by panicking here, so there is nothing to catch.
-			if checker.Checker_isTypeAssignableTo(ctx.TypeChecker, expressionWidenedType, assertedType) {
+			if checker.Checker_isTypeAssignableTo(ruleContext.TypeChecker, expressionWidenedType, assertedType) {
 				return
 			}
 
-			// A type parameter is unsafe for a reason worth naming: the CALLER picks what it is, so
+			// A type parameter is unsafe for a reason worth naming: the caller picks what it is, so
 			// no amount of local reasoning makes the assertion true.
 			if type_checking.IsTypeParameter(assertedType) {
-				constraint := checker.Checker_getBaseConstraintOfType(ctx.TypeChecker, assertedType)
+				constraint := checker.Checker_getBaseConstraintOfType(ruleContext.TypeChecker, assertedType)
 				if constraint == nil {
-					ctx.ReportNode(node, buildUnsafeToUnconstrainedMessage(
-						ctx.TypeChecker.TypeToString(assertedType)))
+					ruleContext.ReportNode(node, buildUnsafeToUnconstrainedMessage(
+						ruleContext.TypeChecker.TypeToString(assertedType)))
 					return
 				}
 
 				// The expression satisfies the constraint, so the assertion is not absurd; it is
 				// merely unprovable, because the caller can still choose a different subtype of
 				// that constraint. Upstream gives this its own message and so does this port.
-				if checker.Checker_isTypeAssignableTo(ctx.TypeChecker, expressionWidenedType, constraint) {
-					ctx.ReportNode(node, buildUnsafeAssignableToConstraintMessage(
-						ctx.TypeChecker.TypeToString(assertedType)))
+				if checker.Checker_isTypeAssignableTo(ruleContext.TypeChecker, expressionWidenedType, constraint) {
+					ruleContext.ReportNode(node, buildUnsafeAssignableToConstraintMessage(
+						ruleContext.TypeChecker.TypeToString(assertedType)))
 					return
 				}
 			}
 
-			ctx.ReportNode(node, buildUnsafeTypeAssertionMessage(
-				ctx.TypeChecker.TypeToString(assertedType)))
+			ruleContext.ReportNode(node, buildUnsafeTypeAssertionMessage(
+				ruleContext.TypeChecker.TypeToString(assertedType)))
 		}
 
 		return rule.Listeners{
@@ -185,16 +185,16 @@ var NoUnsafeTypeAssertion = rule.Rule{
 // The object-literal flag lives in the object-flags word, which is only meaningful on a type that is
 // an object in the first place, so both halves are read.
 //
-// The flag half is EQUIVALENT here and is kept for fidelity rather than for effect. Measured: a
+// The flag half is equivalent here and is kept for fidelity rather than for effect. Measured: a
 // mutant dropping it survives every fixture, and probing `getWidenedType` directly says why. On
 // `Date`, on a class instance, on a plain object type, on an array and on a function type it returns
-// the SAME type object, so widening a non-literal is the identity and the assignability question
+// the same type object, so widening a non-literal is the identity and the assignability question
 // below is unchanged. Only a fresh object literal widens to something different. So the flag saves a
 // checker call on the common path and decides nothing, and no fixture can prove it; this comment is
 // the record instead.
-func isObjectLiteralType(t *checker.Type) bool {
-	return type_checking.IsObjectType(t) &&
-		checker.Type_objectFlags(t)&checker.ObjectFlagsObjectLiteral != 0
+func isObjectLiteralType(subjectType *checker.Type) bool {
+	return type_checking.IsObjectType(subjectType) &&
+		checker.Type_objectFlags(subjectType)&checker.ObjectFlagsObjectLiteral != 0
 }
 
 // anyTypeName renders the type the message names, reproducing upstream's `getAnyTypeName`.

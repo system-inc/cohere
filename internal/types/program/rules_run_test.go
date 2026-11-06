@@ -8,6 +8,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/lint/testing"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
@@ -15,40 +16,58 @@ import (
 // every registered rule. TanStack/query's config turned most of them off and the footer still read
 // "484 rules" when 118 ran (#v1ah2qq). A rule off everywhere and a rule nobody configured did not run; a
 // rule offered a file that it declined did, and so did one offered only some files.
-func TestRulesRunCountsOnlyTheRulesOfferedAFile(t *testing.T) {
-	t.Parallel()
-	directory := writeProject(t, map[string]string{
-		"tsconfig.json": minimalConfig,
+func TestRulesRunCountsOnlyTheRulesOfferedAFile(test *testing.T) {
+	test.Parallel()
+	directory := writeProject(test, map[string]string{
+		"tsconfig.json": minimalConfiguration,
 		"CohereSettings.json": `{"rules": {"test-listens": "error", "test-declines": "error", "test-off": "off",
 			"test-only-in-special": "off"},
 			"overrides": [{"files": ["special.ts"], "rules": {"test-only-in-special": "error"}}]}`,
 		"main.ts":    "export const value = 1;\n",
 		"special.ts": "export const other = 2;\n",
 	})
-	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
-	if err != nil {
-		t.Fatalf("building: %v", err)
+	graph, buildError := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
+	if buildError != nil {
+		test.Fatalf("building: %v", buildError)
 	}
-	graph.LintConfig, err = configuration.Load(filepath.Join(directory, "CohereSettings.json"))
-	if err != nil {
-		t.Fatalf("loading the config: %v", err)
+	var loadError error
+	graph.LintConfiguration, loadError = configuration.Load(filepath.Join(directory, "CohereSettings.json"))
+	if loadError != nil {
+		test.Fatalf("loading the config: %v", loadError)
 	}
 
-	listens := func(name string) rule.Rule {
-		return rule.Rule{Name: name, Run: func(ctx rule.Context, options any) rule.Listeners {
-			return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {}}
-		}}
+	listens := func(name string) rule.Rule[rule.NoOptions] {
+		return rule.Rule[rule.NoOptions]{
+			Name: name,
+			Run: func(rule.Context, rule.Given[rule.NoOptions]) rule.Listeners {
+				return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {
+					// Listens and reports nothing: the test counts which rules were offered a file, not what they
+					// found.
+				}}
+			},
+		}
 	}
-	declines := rule.Rule{Name: "test-declines", Run: func(ctx rule.Context, options any) rule.Listeners { return nil }}
-	rules := []rule.Rule{listens("test-listens"), declines, listens("test-off"), listens("test-only-in-special"),
-		listens("test-nobody-configured")}
+	declines := rule.Rule[rule.NoOptions]{
+		Name: "test-declines",
+		Run:  func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners { return nil },
+	}
+	rules := []rule.Rule[rule.NoOptions]{
+		listens("test-listens"),
+		declines,
+		listens("test-off"),
+		listens("test-only-in-special"),
+		listens("test-nobody-configured"),
+	}
 
-	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), rules)
-	if err != nil {
-		t.Fatalf("walking: %v", err)
+	result, walkError := graph.Walk(context.Background(), graph.ProjectFiles(), rule_testing.EntriesOf(test, rules...))
+	if walkError != nil {
+		test.Fatalf("walking: %v", walkError)
 	}
 	if result.Coverage.RulesRun != 3 {
-		t.Errorf("RulesRun is %d of the %d rules handed in, want 3: test-listens, test-declines and test-only-in-special",
-			result.Coverage.RulesRun, len(rules))
+		test.Errorf(
+			"RulesRun is %d of the %d rules handed in, want 3: test-listens, test-declines and test-only-in-special",
+			result.Coverage.RulesRun,
+			len(rules),
+		)
 	}
 }

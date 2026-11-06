@@ -50,13 +50,13 @@ func DefaultStateInConstructorOptions() StateInConstructorOptions {
 //
 // A rule configured as bare `"error"` is handed no options at all, and the empty case has to return
 // the default rather than the zero value for the same reason: an empty Mode matches neither arm.
-func DecodeStateInConstructorOptions(raw []byte) (any, error) {
+func DecodeStateInConstructorOptions(raw []byte) (StateInConstructorOptions, error) {
 	options := DefaultStateInConstructorOptions()
 	if len(raw) == 0 {
 		return options, nil
 	}
 	var mode string
-	if err := json.Unmarshal(raw, &mode); err != nil {
+	if decodeError := json.Unmarshal(raw, &mode); decodeError != nil {
 		return options, fmt.Errorf(`expected a mode string, "always" or "never", got %s`, raw)
 	}
 	switch mode {
@@ -131,16 +131,16 @@ var messageStateInConstructorClassProperty = rule.Message{
 //	declare state: any reports upstream    a declaration is still a property definition
 //
 // The last two rows of that list are the interesting ones and they run opposite ways in our tree,
-// which is why the comparison here is written against the key's KIND rather than only its text:
+// which is why the comparison here is written against the key's kind rather than only its text:
 //
 //   - A private name's `Text()` here is `#state`, with the hash, where the ESLint AST's `.name` is
-//     the bare `state`. So a text comparison alone would go SILENT on `#state` and lose a finding
+//     the bare `state`. So a text comparison alone would go silent on `#state` and lose a finding
 //     upstream produces. Upstream reporting there is a defect rather than a decision, since `#state`
 //     is not React's state at all, but it is reproduced: fidelity is to what the rule decides, and
 //     a port that silently improves on it is a divergence nothing records.
 //
 //   - A string-literal key's `Text()` here is the bare `state`, where ESLint's Literal carries the
-//     value on `.value` and has no `.name`. So a text comparison alone would REPORT on `"state" =
+//     value on `.value` and has no `.name`. So a text comparison alone would report on `"state" =
 //     {}` where upstream is silent, inventing a finding. This is the direction that costs a false
 //     positive, and it is the reason the key kind is checked at all.
 //
@@ -160,7 +160,7 @@ var messageStateInConstructorClassProperty = rule.Message{
 //	(this.state) = {}        reports    see the parentheses note below
 //	(this).state = {}        reports    see the parentheses note below
 //
-// `inConstructor` walks the SCOPE chain upward rather than the syntactic ancestor chain, which
+// `inConstructor` walks the scope chain upward rather than the syntactic ancestor chain, which
 // sounds equivalent and is not: a write inside a callback declared in the constructor is still
 // "in the constructor" to this rule, and upstream reports it. Measured:
 //
@@ -185,7 +185,7 @@ var messageStateInConstructorClassProperty = rule.Message{
 //
 // So the target is unwrapped, and so is the receiver inside it. That is the opposite of the
 // advice `no-direct-mutation-state` in this package records, where paren-skipping inside the chain
-// would have INVENTED findings; the difference is that the rule being ported there was oxc's, whose
+// would have invented findings; the difference is that the rule being ported there was oxc's, whose
 // tree keeps parens where ESLint's discards them. The authority decides, and the authority here is
 // ESLint's.
 //
@@ -203,12 +203,12 @@ var messageStateInConstructorClassProperty = rule.Message{
 //	this.state = { bar: 0 }             the Never span, right-hand side included
 //
 // A message-id assertion cannot see any of that, so every fixture below asserts the sliced text.
-var StateInConstructor = rule.Rule{
+var StateInConstructor = rule.Rule[StateInConstructorOptions]{
 	// No namespace prefix beyond the plugin's own. The config writes `react/state-in-constructor`
 	// and the parity guard strips the namespace on a `/` boundary.
 	Name: "react/state-in-constructor",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, ok := rule.OptionsAs[StateInConstructorOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[StateInConstructorOptions]) rule.Listeners {
+		settings, ok := options.Read()
 		if !ok {
 			// A rule configured as bare `"error"` reaches here with nil options, which type-asserts
 			// to the zero value whose Mode matches neither arm. Falling back to the default is what
@@ -227,7 +227,7 @@ var StateInConstructor = rule.Rule{
 						return
 					}
 					if stateInConstructorIsComponentClass(enclosingClassOf(node)) {
-						ctx.ReportNode(node, messageStateInConstructorInConstructor)
+						ruleContext.ReportNode(node, messageStateInConstructorInConstructor)
 					}
 				},
 			}
@@ -250,7 +250,7 @@ var StateInConstructor = rule.Rule{
 					return
 				}
 				if stateInConstructorIsComponentClass(enclosingClassOf(node)) {
-					ctx.ReportNode(node, messageStateInConstructorClassProperty)
+					ruleContext.ReportNode(node, messageStateInConstructorClassProperty)
 				}
 			},
 		}
@@ -260,7 +260,7 @@ var StateInConstructor = rule.Rule{
 // isStateInConstructorStateProperty reports whether a class property is the non-static `state` that
 // upstream's Always arm looks for.
 //
-// The key KIND is checked as well as its text, because the two parsers disagree about two key
+// The key kind is checked as well as its text, because the two parsers disagree about two key
 // shapes in opposite directions and the rule's real predicate is "does this key carry a `.name`
 // field spelling `state`". See the rule doc for the measurements. An identifier and a private
 // identifier are the two kinds whose ESLint counterpart carries `.name`; a string literal and a
@@ -295,11 +295,11 @@ func isStateInConstructorStateProperty(node *ast.Node) bool {
 // {}` report upstream; without the unwrapping this rule would go silent on both, which no imported
 // fixture could see because the corpus writes no parenthesized form at all.
 func isStateInConstructorThisStateTarget(target *ast.Node) bool {
-	target = ast.SkipParentheses(target)
-	if target == nil || target.Kind != ast.KindPropertyAccessExpression {
+	unwrapped := ast.SkipParentheses(target)
+	if unwrapped == nil || unwrapped.Kind != ast.KindPropertyAccessExpression {
 		return false
 	}
-	access := target.AsPropertyAccessExpression()
+	access := unwrapped.AsPropertyAccessExpression()
 	if ast.SkipParentheses(access.Expression) == nil ||
 		ast.SkipParentheses(access.Expression).Kind != ast.KindThisKeyword {
 		return false
@@ -310,7 +310,7 @@ func isStateInConstructorThisStateTarget(target *ast.Node) bool {
 
 // stateInConstructorIsInsideConstructor reports whether a node has any constructor ancestor.
 //
-// This reproduces upstream's `inConstructor`, which walks the SCOPE chain looking for a scope whose
+// This reproduces upstream's `inConstructor`, which walks the scope chain looking for a scope whose
 // block's parent is a constructor. Two things follow from it being the scope chain, and the second
 // one cost a mutant here:
 //
@@ -337,12 +337,12 @@ func isStateInConstructorThisStateTarget(target *ast.Node) bool {
 //	class Outer extends React.Component { someMethod() { this.state = {} } }
 //	                                                             SILENT
 //
-// The first two have identical inner structure and differ only in whether the OUTER context is a
+// The first two have identical inner structure and differ only in whether the outer context is a
 // constructor, which is the whole proof that the walk crosses the class. The third shows the rule
 // still requires a constructor somewhere, so the walk is not vacuous.
 //
 // The component gate is a separate question and stays separate: `enclosingClassOf` takes the
-// NEAREST class, so a plain inner class is still declined there. That is why the first row above
+// nearest class, so a plain inner class is still declined there. That is why the first row above
 // needs the inner class to extend a component in order to report at all.
 func stateInConstructorIsInsideConstructor(node *ast.Node) bool {
 	for current := node; current != nil; current = current.Parent {
@@ -356,9 +356,9 @@ func stateInConstructorIsInsideConstructor(node *ast.Node) bool {
 // enclosingClassOf returns the nearest class ancestor of a node, or nil.
 //
 // Upstream's `getParentES6Component` walks the scope chain to the nearest `class` scope and asks
-// whether that class is a component, so the NEAREST class is the one that decides and an outer
+// whether that class is a component, so the nearest class is the one that decides and an outer
 // component cannot rescue an inner plain class. Written here rather than reaching for
-// `react.EnclosingComponent`, which searches for the nearest thing that IS a component and would
+// `react.EnclosingComponent`, which searches for the nearest thing that is a component and would
 // therefore skip past an intervening plain class and answer with the outer component. That is a
 // different question and it reports on inputs upstream is silent on: a
 // `class G { state = {} }` written inside a real component's render method is clean upstream, and
@@ -381,7 +381,7 @@ func enclosingClassOf(node *ast.Node) *ast.Node {
 //
 // # The divergence, measured rather than reasoned
 //
-// The shelf skips parentheses around the RECEIVER inside a qualified name, so `extends
+// The shelf skips parentheses around the receiver inside a qualified name, so `extends
 // (React).Component` answers true. It does not skip parentheses around the whole base expression,
 // so `extends (React.Component)` answers false, because the heritage type's expression is a
 // `KindParenthesizedExpression` and neither of the helper's two arms names that kind.
@@ -392,7 +392,7 @@ func enclosingClassOf(node *ast.Node) *ast.Node {
 // missing skip costs findings here rather than inventing them, and the fix is to unwrap before
 // asking.
 //
-// This is worth stating carefully because the shelf's own doc comment records the OPPOSITE
+// This is worth stating carefully because the shelf's own doc comment records the opposite
 // conclusion: it flags its paren-skip as a divergence on the grounds that `extends
 // (React.Component)` is silent upstream. That measurement was taken against oxc, which is the
 // authority for the rules that motivated the helper and is not the authority here. Both readings

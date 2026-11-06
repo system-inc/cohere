@@ -4,9 +4,7 @@ import (
 	"fmt"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
-	type_checking "github.com/system-inc/cohere/internal/lint/checking"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -23,7 +21,7 @@ import (
 // as if the wrapper were not there. That is the shape the review found at DialogRoot, DrawerRoot,
 // TableRoot and Field: wrapping the value, which is upstream's own remedy, would have done nothing.
 //
-// The judgment is one-sided on purpose. A dependency is reported only when the code PROVES it can be
+// The judgment is one-sided on purpose. A dependency is reported only when the code proves it can be
 // a new identity on a render: it is built by an object, array, function, class, `new`, JSX or
 // regular-expression expression evaluated during render, or it is the result of a call whose body
 // returns such a construction on some path (or of any async function or generator, which return a new
@@ -88,18 +86,19 @@ func jsxNoConstructedContextValuesMemoHookName(call *ast.Node) string {
 // jsxNoConstructedContextValuesUnwrap strips the wrappers that do not change identity: parentheses,
 // `as`, `satisfies` and a non-null assertion.
 func jsxNoConstructedContextValuesUnwrap(node *ast.Node) *ast.Node {
-	for node != nil {
-		switch node.Kind {
+	unwrapped := node
+	for unwrapped != nil {
+		switch unwrapped.Kind {
 		case ast.KindParenthesizedExpression:
-			node = node.AsParenthesizedExpression().Expression
+			unwrapped = unwrapped.AsParenthesizedExpression().Expression
 		case ast.KindAsExpression:
-			node = node.AsAsExpression().Expression
+			unwrapped = unwrapped.AsAsExpression().Expression
 		case ast.KindSatisfiesExpression:
-			node = node.AsSatisfiesExpression().Expression
+			unwrapped = unwrapped.AsSatisfiesExpression().Expression
 		case ast.KindNonNullExpression:
-			node = node.AsNonNullExpression().Expression
+			unwrapped = unwrapped.AsNonNullExpression().Expression
 		default:
-			return node
+			return unwrapped
 		}
 	}
 	return nil
@@ -121,15 +120,24 @@ func jsxNoConstructedContextValuesNearestFunction(node *ast.Node) *ast.Node {
 //
 // Only `const`, because a `let` can be reassigned to something stable after its initializer, and
 // following the initializer alone would report a value the code later replaced.
-func jsxNoConstructedContextValuesRenderConst(ctx rule.Context, identifier *ast.Node, scope *ast.Node, render *ast.Node) *ast.Node {
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(identifier)
+func jsxNoConstructedContextValuesRenderConst(
+	ruleContext rule.Context,
+	identifier *ast.Node,
+	scope *ast.Node,
+	render *ast.Node,
+) *ast.Node {
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(identifier)
 	if symbol == nil || len(symbol.Declarations) == 0 {
 		return nil
 	}
 	// The first declaration. A `const` cannot merge with anything, and a function declared with
 	// overloads in a render body is a function declared during render whichever signature answers.
 	declaration := symbol.Declarations[0]
-	if !jsxNoConstructedContextValuesRunsWith(jsxNoConstructedContextValuesNearestFunction(declaration), scope, render) {
+	if !jsxNoConstructedContextValuesRunsWith(
+		jsxNoConstructedContextValuesNearestFunction(declaration),
+		scope,
+		render,
+	) {
 		return nil
 	}
 	switch declaration.Kind {
@@ -182,18 +190,18 @@ func jsxNoConstructedContextValuesRunsWith(owner *ast.Node, scope *ast.Node, ren
 
 // jsxNoConstructedContextValuesMemoOf finds the memo call behind a provider's value expression: the
 // call written inline, or the call a render-scoped `const` was initialized with.
-func jsxNoConstructedContextValuesMemoOf(ctx rule.Context, value *ast.Node, scope *ast.Node) *ast.Node {
-	value = jsxNoConstructedContextValuesUnwrap(value)
-	if value == nil {
+func jsxNoConstructedContextValuesMemoOf(ruleContext rule.Context, value *ast.Node, scope *ast.Node) *ast.Node {
+	unwrapped := jsxNoConstructedContextValuesUnwrap(value)
+	if unwrapped == nil {
 		return nil
 	}
-	if jsxNoConstructedContextValuesMemoHookName(value) != "" {
-		return value
+	if jsxNoConstructedContextValuesMemoHookName(unwrapped) != "" {
+		return unwrapped
 	}
-	if value.Kind != ast.KindIdentifier {
+	if unwrapped.Kind != ast.KindIdentifier {
 		return nil
 	}
-	declaration := jsxNoConstructedContextValuesRenderConst(ctx, value, scope, scope)
+	declaration := jsxNoConstructedContextValuesRenderConst(ruleContext, unwrapped, scope, scope)
 	if declaration == nil || declaration.Kind != ast.KindVariableDeclaration {
 		return nil
 	}
@@ -228,365 +236,21 @@ func jsxNoConstructedContextValuesConstructionKind(node *ast.Node) string {
 	return ""
 }
 
-// jsxNoConstructedContextValuesStabilityWalk carries the state one provider's analysis shares.
-//
-// `active` is an in-progress set rather than a visited set: a declaration, callee or memo is marked
-// on entry and cleared on exit, so it guards a cycle without making a second, independent encounter
-// of the same name answer differently from the first.
-type jsxNoConstructedContextValuesStabilityWalk struct {
-	ctx    rule.Context
-	active map[*ast.Node]bool
-
-	// render is the component whose provider is being judged.
-	render *ast.Node
-}
-
-// jsxNoConstructedContextValuesEvaluation is what one expression can evaluate to.
-type jsxNoConstructedContextValuesEvaluation struct {
-	// fresh is set when some evaluation is proven to be a new identity.
-	fresh *jsxNoConstructedContextValuesInstability
-
-	// other is set when some evaluation can instead be an object that already existed: a value read
-	// from somewhere this walk cannot see into. When both are set, the fresh value may have been
-	// stored on its way out and read back on a later call through the other path, which is exactly
-	// what a cache does, so it proves nothing unless it never escapes.
-	other bool
-
-	// holders are the `const` (or assigned local) declarations the fresh value passed through in
-	// the current function, which the escape check reads when `other` is set.
-	holders []*ast.Node
-}
-
 // jsxNoConstructedContextValuesUnknown is an evaluation the walk cannot see into.
 var jsxNoConstructedContextValuesUnknown = jsxNoConstructedContextValuesEvaluation{other: true}
-
-// combine merges two evaluations that are alternatives, as the two branches of `?:` or the two
-// sides of `??` are. The left finding wins for the message; the holders of both are kept, so an
-// escape on either side silences the pair.
-func (evaluation jsxNoConstructedContextValuesEvaluation) combine(
-	alternative jsxNoConstructedContextValuesEvaluation,
-) jsxNoConstructedContextValuesEvaluation {
-	fresh := evaluation.fresh
-	if fresh == nil {
-		fresh = alternative.fresh
-	}
-	return jsxNoConstructedContextValuesEvaluation{
-		fresh:   fresh,
-		other:   evaluation.other || alternative.other,
-		holders: append(append([]*ast.Node{}, evaluation.holders...), alternative.holders...),
-	}
-}
-
-// isPrimitive reports whether every part of a node's type compares by value, so a fresh computation
-// of it is still equal to the last one.
-func (walk *jsxNoConstructedContextValuesStabilityWalk) isPrimitive(node *ast.Node) bool {
-	t := walk.ctx.TypeChecker.GetTypeAtLocation(node)
-	if t == nil {
-		return false
-	}
-	const primitive = checker.TypeFlagsStringLike | checker.TypeFlagsNumberLike |
-		checker.TypeFlagsBigIntLike | checker.TypeFlagsBooleanLike | checker.TypeFlagsEnumLike |
-		checker.TypeFlagsESSymbolLike | checker.TypeFlagsNull | checker.TypeFlagsUndefined |
-		checker.TypeFlagsVoid
-	for part := range type_checking.UnionTypePartsSeq(t) {
-		if !type_checking.IsTypeFlagSet(part, primitive) {
-			return false
-		}
-	}
-	return true
-}
-
-// memoFinding explains why a memo's result is a new identity on a render, or returns nil.
-//
-// Both halves are required. The memo has to recompute (a dependency proven unstable, or no
-// dependency list at all), and what it recomputes has to be new: `useCallback` always hands back the
-// callback it was given, which is a new function on every render, but a `useMemo` factory that
-// returns an object that already existed hands back that same object however often it runs. The
-// returned `other` is the factory's, for the caller's escape check.
-//
-// A dependency list has to be an array literal to be judged. A list passed by name is a shape this
-// analysis cannot see into, so it is stable by the one-sided rule. The returned finding's
-// `dependency` is nil when the list is missing.
-func (walk *jsxNoConstructedContextValuesStabilityWalk) memoFinding(
-	call *ast.Node,
-	scope *ast.Node,
-	depth int,
-) (*jsxNoConstructedContextValuesInstability, bool) {
-	if depth > jsxNoConstructedContextValuesStabilityDepthLimit || walk.active[call] {
-		return nil, true
-	}
-	walk.active[call] = true
-	defer delete(walk.active, call)
-
-	arguments := call.AsCallExpression().Arguments
-	if arguments == nil || len(arguments.Nodes) == 0 {
-		return nil, true
-	}
-	var finding *jsxNoConstructedContextValuesInstability
-	if len(arguments.Nodes) == 1 {
-		finding = &jsxNoConstructedContextValuesInstability{origin: call}
-	} else {
-		list := jsxNoConstructedContextValuesUnwrap(arguments.Nodes[1])
-		if list == nil || list.Kind != ast.KindArrayLiteralExpression {
-			return nil, true
-		}
-		for _, element := range list.AsArrayLiteralExpression().Elements.Nodes {
-			if found := walk.dependencyFinding(element, scope, depth+1); found != nil {
-				finding = found
-				break
-			}
-		}
-		if finding == nil {
-			return nil, true
-		}
-	}
-
-	if jsxNoConstructedContextValuesMemoHookName(call) == "useCallback" {
-		return finding, false
-	}
-	factory := jsxNoConstructedContextValuesUnwrap(arguments.Nodes[0])
-	if factory == nil || (factory.Kind != ast.KindArrowFunction && factory.Kind != ast.KindFunctionExpression) {
-		return nil, true
-	}
-	result := walk.functionEvaluation(factory, depth+1)
-	if result.fresh == nil {
-		return nil, true
-	}
-	return finding, result.other
-}
-
-// dependencyFinding explains why one entry of a memo's dependency list is a new identity on a
-// render, or returns nil. This is where a render-scoped holder's escape is checked.
-func (walk *jsxNoConstructedContextValuesStabilityWalk) dependencyFinding(
-	element *ast.Node,
-	scope *ast.Node,
-	depth int,
-) *jsxNoConstructedContextValuesInstability {
-	result := walk.evaluate(element, scope, depth)
-	if result.fresh == nil {
-		return nil
-	}
-	if result.other && walk.anyEscapes(result.holders, true) {
-		return nil
-	}
-	finding := *result.fresh
-	finding.dependency = element
-	return &finding
-}
-
-// evaluate says what an expression evaluated in `scope` can be: proven new, possibly an existing
-// object, or both.
-func (walk *jsxNoConstructedContextValuesStabilityWalk) evaluate(
-	node *ast.Node,
-	scope *ast.Node,
-	depth int,
-) jsxNoConstructedContextValuesEvaluation {
-	node = jsxNoConstructedContextValuesUnwrap(node)
-	if node == nil {
-		return jsxNoConstructedContextValuesEvaluation{}
-	}
-	if depth > jsxNoConstructedContextValuesStabilityDepthLimit {
-		return jsxNoConstructedContextValuesUnknown
-	}
-	if walk.isPrimitive(node) {
-		return jsxNoConstructedContextValuesEvaluation{}
-	}
-
-	if kind := jsxNoConstructedContextValuesConstructionKind(node); kind != "" {
-		return jsxNoConstructedContextValuesEvaluation{fresh: &jsxNoConstructedContextValuesInstability{
-			origin: node,
-			reason: fmt.Sprintf("is a new %s built during render", kind),
-		}}
-	}
-
-	switch node.Kind {
-	case ast.KindConditionalExpression:
-		conditional := node.AsConditionalExpression()
-		return walk.evaluate(conditional.WhenTrue, scope, depth+1).
-			combine(walk.evaluate(conditional.WhenFalse, scope, depth+1))
-
-	case ast.KindBinaryExpression:
-		// A logical operator evaluates to either side. A comma evaluates to its right side, and so
-		// does a plain assignment, but an assignment is also a store: into a local it adds a holder,
-		// and into anything else (a property, an element, an outer variable) it is an escape, which
-		// proves nothing. Every other binary operator produces a primitive, which the type check
-		// above has already let through.
-		binary := node.AsBinaryExpression()
-		switch binary.OperatorToken.Kind {
-		case ast.KindAmpersandAmpersandToken, ast.KindBarBarToken, ast.KindQuestionQuestionToken:
-			return walk.evaluate(binary.Left, scope, depth+1).combine(walk.evaluate(binary.Right, scope, depth+1))
-		case ast.KindCommaToken:
-			return walk.evaluate(binary.Right, scope, depth+1)
-		case ast.KindEqualsToken:
-			target := jsxNoConstructedContextValuesUnwrap(binary.Left)
-			local := jsxNoConstructedContextValuesLocalDeclaration(walk.ctx, target, scope)
-			if local == nil {
-				return jsxNoConstructedContextValuesUnknown
-			}
-			result := walk.evaluate(binary.Right, scope, depth+1)
-			if result.fresh != nil {
-				result.holders = append(result.holders, local)
-			}
-			return result
-		}
-		return jsxNoConstructedContextValuesUnknown
-
-	case ast.KindCallExpression:
-		if name := jsxNoConstructedContextValuesMemoHookName(node); name != "" {
-			inner, other := walk.memoFinding(node, scope, depth+1)
-			if inner == nil {
-				return jsxNoConstructedContextValuesUnknown
-			}
-			reason := fmt.Sprintf("comes from a %s with no dependency list", name)
-			if inner.dependency != nil {
-				reason = fmt.Sprintf("comes from a %s whose own dependency %q %s",
-					name, jsxNoConstructedContextValuesDependencyText(walk.ctx, inner.dependency), inner.reason)
-			}
-			return jsxNoConstructedContextValuesEvaluation{
-				fresh: &jsxNoConstructedContextValuesInstability{origin: inner.origin, reason: reason},
-				other: other,
-			}
-		}
-		return walk.callEvaluation(node, depth+1)
-
-	case ast.KindIdentifier:
-		declaration := jsxNoConstructedContextValuesRenderConst(walk.ctx, node, scope, walk.render)
-		if declaration == nil || walk.active[declaration] {
-			return jsxNoConstructedContextValuesUnknown
-		}
-		if declaration.Kind == ast.KindFunctionDeclaration {
-			return jsxNoConstructedContextValuesEvaluation{
-				fresh: &jsxNoConstructedContextValuesInstability{
-					origin: declaration,
-					reason: "is a function declared during render",
-				},
-				holders: []*ast.Node{declaration},
-			}
-		}
-		walk.active[declaration] = true
-		result := walk.evaluate(declaration.AsVariableDeclaration().Initializer, scope, depth+1)
-		delete(walk.active, declaration)
-		if result.fresh != nil {
-			result.holders = append(result.holders, declaration)
-		}
-		return result
-	}
-	return jsxNoConstructedContextValuesUnknown
-}
-
-// callEvaluation says what a call can return, by reading the body of the function the checker
-// resolves it to.
-//
-// The callee has to be source the program holds: every signature that can be read has a body (a
-// function declaration, method, function expression or arrow), and every one that cannot (an
-// interface member, a function type, an overload, anything in a declaration file, so every library
-// and every `declare function`) is unknown. An async callee or a generator is new outright.
-func (walk *jsxNoConstructedContextValuesStabilityWalk) callEvaluation(
-	call *ast.Node,
-	depth int,
-) jsxNoConstructedContextValuesEvaluation {
-	signature := walk.ctx.TypeChecker.GetResolvedSignature(call)
-	if signature == nil {
-		return jsxNoConstructedContextValuesUnknown
-	}
-	callee := signature.Declaration()
-	if callee == nil || callee.Body() == nil {
-		return jsxNoConstructedContextValuesUnknown
-	}
-
-	name := jsxNoConstructedContextValuesCalleeName(call)
-	// An async function returns a new promise from every call, and a generator a new iterator,
-	// whatever their bodies return. That is the strongest proof this walk has.
-	if ast.HasSyntacticModifier(callee, ast.ModifierFlagsAsync) {
-		return jsxNoConstructedContextValuesEvaluation{fresh: &jsxNoConstructedContextValuesInstability{
-			origin: callee,
-			reason: fmt.Sprintf("is the result of `%s(...)`, an async function, which returns a new promise on every call", name),
-		}}
-	}
-	if jsxNoConstructedContextValuesIsGenerator(callee) {
-		return jsxNoConstructedContextValuesEvaluation{fresh: &jsxNoConstructedContextValuesInstability{
-			origin: callee,
-			reason: fmt.Sprintf("is the result of `%s(...)`, a generator, which returns a new iterator on every call", name),
-		}}
-	}
-
-	result := walk.functionEvaluation(callee, depth+1)
-	if result.fresh != nil {
-		result.fresh = &jsxNoConstructedContextValuesInstability{
-			origin: result.fresh.origin,
-			reason: fmt.Sprintf("is the result of `%s(...)`, which can return a new value on every call", name),
-		}
-	}
-	return result
-}
-
-// functionEvaluation says what a function body returns, across every `return` it owns (not those of
-// nested functions), or its expression body.
-//
-// "Some path returns a new value" proves a new identity on that path when no other path can return
-// an existing object. When one can, the new value proves nothing if it escapes before it is
-// returned: passed to a call, stored into a property, an element or anything outside the function,
-// captured by a closure, aliased, or used as a method receiver. That is the caching helper, whose
-// first call builds and stores and whose later calls read the stored one back, and it is checked
-// here, in the function's own scope, before the holders are dropped for the caller.
-func (walk *jsxNoConstructedContextValuesStabilityWalk) functionEvaluation(
-	function *ast.Node,
-	depth int,
-) jsxNoConstructedContextValuesEvaluation {
-	if depth > jsxNoConstructedContextValuesStabilityDepthLimit || walk.active[function] {
-		return jsxNoConstructedContextValuesUnknown
-	}
-	body := function.Body()
-	if body == nil {
-		return jsxNoConstructedContextValuesUnknown
-	}
-	walk.active[function] = true
-	defer delete(walk.active, function)
-
-	var result jsxNoConstructedContextValuesEvaluation
-	if body.Kind != ast.KindBlock {
-		result = walk.evaluate(body, function, depth+1)
-	} else {
-		var visit func(node *ast.Node) bool
-		visit = func(node *ast.Node) bool {
-			if node.Kind == ast.KindReturnStatement {
-				result = result.combine(walk.evaluate(node.AsReturnStatement().Expression, function, depth+1))
-				return false
-			}
-			if ast.IsFunctionLike(node) || ast.IsClassLike(node) {
-				return false
-			}
-			return node.ForEachChild(visit)
-		}
-		body.ForEachChild(visit)
-	}
-
-	// Only the holders this function declared are judged here, against this function's body. A holder
-	// from an enclosing function (a render `const` a memo factory or a nested helper returns) travels
-	// on to the dependency, where it is judged against the body that declared it.
-	var own, enclosing []*ast.Node
-	for _, holder := range result.holders {
-		if jsxNoConstructedContextValuesNearestFunction(holder) == function {
-			own = append(own, holder)
-		} else {
-			enclosing = append(enclosing, holder)
-		}
-	}
-	if result.fresh != nil && result.other && walk.anyEscapes(own, false) {
-		result.fresh = nil
-	}
-	result.holders = enclosing
-	return result
-}
 
 // jsxNoConstructedContextValuesLocalDeclaration resolves an identifier to a variable declared
 // directly in `scope`, of any kind, or nil. It is what an assignment target has to be for the
 // assignment to be a holder rather than an escape.
-func jsxNoConstructedContextValuesLocalDeclaration(ctx rule.Context, target *ast.Node, scope *ast.Node) *ast.Node {
+func jsxNoConstructedContextValuesLocalDeclaration(
+	ruleContext rule.Context,
+	target *ast.Node,
+	scope *ast.Node,
+) *ast.Node {
 	if target == nil || target.Kind != ast.KindIdentifier {
 		return nil
 	}
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(target)
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(target)
 	if symbol == nil || len(symbol.Declarations) == 0 {
 		return nil
 	}
@@ -596,49 +260,6 @@ func jsxNoConstructedContextValuesLocalDeclaration(ctx rule.Context, target *ast
 		return nil
 	}
 	return declaration
-}
-
-// anyEscapes reports whether any holder is referenced anywhere in the function that declared it,
-// nested functions included, in a way that could let the value outlive the call.
-func (walk *jsxNoConstructedContextValuesStabilityWalk) anyEscapes(holders []*ast.Node, render bool) bool {
-	for _, holder := range holders {
-		scope := jsxNoConstructedContextValuesNearestFunction(holder)
-		if scope == nil || scope.Body() == nil {
-			return true
-		}
-		body := scope.Body()
-		name := holder.Name()
-		if name == nil {
-			return true
-		}
-		symbol := walk.ctx.TypeChecker.GetSymbolAtLocation(name)
-		if symbol == nil {
-			return true
-		}
-		escaped := false
-		var visit func(node *ast.Node) bool
-		visit = func(node *ast.Node) bool {
-			if escaped {
-				return true
-			}
-			if node.Kind == ast.KindIdentifier && node != name {
-				reference := walk.ctx.TypeChecker.GetSymbolAtLocation(node)
-				if node.Parent != nil && node.Parent.Kind == ast.KindShorthandPropertyAssignment {
-					reference = walk.ctx.TypeChecker.GetShorthandAssignmentValueSymbol(node.Parent)
-				}
-				if reference == symbol && !jsxNoConstructedContextValuesStaysHome(node, scope, render) {
-					escaped = true
-					return true
-				}
-			}
-			return node.ForEachChild(visit)
-		}
-		body.ForEachChild(visit)
-		if escaped {
-			return true
-		}
-	}
-	return false
 }
 
 // jsxNoConstructedContextValuesStaysHome reports whether one reference to a holder leaves the value
@@ -776,33 +397,40 @@ func jsxNoConstructedContextValuesCalleeName(call *ast.Node) string {
 }
 
 // jsxNoConstructedContextValuesDependencyText is a dependency's source text, trimmed of trivia.
-func jsxNoConstructedContextValuesDependencyText(ctx rule.Context, dependency *ast.Node) string {
-	span := rule.TokenRange(ctx.SourceFile, dependency)
-	return ctx.SourceFile.Text()[span.Pos():span.End()]
+func jsxNoConstructedContextValuesDependencyText(ruleContext rule.Context, dependency *ast.Node) string {
+	span := rule.TokenRange(ruleContext.SourceFile, dependency)
+	return ruleContext.SourceFile.Text()[span.Pos():span.End()]
 }
 
 // jsxNoConstructedContextValuesCheckMemo reports a provider value that is memoized over an input
 // that changes every render, or memoized with no dependency list at all.
-func jsxNoConstructedContextValuesCheckMemo(ctx rule.Context, value *ast.Node, provider *ast.Node) {
+func jsxNoConstructedContextValuesCheckMemo(ruleContext rule.Context, value *ast.Node, provider *ast.Node) {
 	// The caller has already established the provider sits in a component, so there is a function.
 	scope := jsxNoConstructedContextValuesNearestFunction(provider)
-	memo := jsxNoConstructedContextValuesMemoOf(ctx, value, scope)
+	memo := jsxNoConstructedContextValuesMemoOf(ruleContext, value, scope)
 	if memo == nil {
 		return
 	}
 	hook := jsxNoConstructedContextValuesMemoHookName(memo)
 	lineOf := func(node *ast.Node) int {
-		line, _ := scanner.GetLineAndCharacterOfPosition(ctx.SourceFile, rule.TokenRange(ctx.SourceFile, node).Pos())
+		line, _ := scanner.GetLineAndCharacterOfPosition(
+			ruleContext.SourceFile,
+			rule.TokenRange(ruleContext.SourceFile, node).Pos(),
+		)
 		return line + 1
 	}
 
-	walk := &jsxNoConstructedContextValuesStabilityWalk{ctx: ctx, active: map[*ast.Node]bool{}, render: scope}
+	walk := &jsxNoConstructedContextValuesStabilityWalk{
+		ruleContext: ruleContext,
+		active:      map[*ast.Node]bool{},
+		render:      scope,
+	}
 	found, _ := walk.memoFinding(memo, scope, 0)
 	if found == nil {
 		return
 	}
 	if found.dependency == nil {
-		ctx.ReportNode(memo.AsCallExpression().Expression, rule.Message{
+		ruleContext.ReportNode(memo.AsCallExpression().Expression, rule.Message{
 			Id: "memoWithoutDependenciesMsg",
 			Description: fmt.Sprintf(
 				"The %s that builds the Context provider's value (at line %d) has no dependency list, "+
@@ -815,12 +443,12 @@ func jsxNoConstructedContextValuesCheckMemo(ctx rule.Context, value *ast.Node, p
 		return
 	}
 
-	dependencyText := jsxNoConstructedContextValuesDependencyText(ctx, found.dependency)
+	dependencyText := jsxNoConstructedContextValuesDependencyText(ruleContext, found.dependency)
 	location := ""
-	if ast.GetSourceFileOfNode(found.origin) == ctx.SourceFile {
+	if ast.GetSourceFileOfNode(found.origin) == ruleContext.SourceFile {
 		location = fmt.Sprintf(" (at line %d)", lineOf(found.origin))
 	}
-	ctx.ReportNode(found.dependency, rule.Message{
+	ruleContext.ReportNode(found.dependency, rule.Message{
 		Id: "unstableDependencyMsg",
 		Description: fmt.Sprintf(
 			"The %q dependency of the %s that builds the Context provider's value (at line %d) %s%s, "+

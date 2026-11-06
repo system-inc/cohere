@@ -1,0 +1,10 @@
+{
+  "rules": {
+    "Go": "cohere-go/consistency-no-redundant-import-alias"
+  },
+  "messages": {
+    "redundantImportAlias": {
+      "text": "`{{alias}}` renames the import of `{{importPath}}` to the name it already has, so it renames nothing. A reader takes an alias as a decision and goes looking for the clash it avoids, and here there is none. Drop the alias, so an alias in this code always means a name was chosen."
+    }
+  }
+}

@@ -68,25 +68,25 @@ var htmlTextOverrideFixtures = []string{
 	"a <b c=\"d\n  e\"> f\n\ng <h\n  i> j",
 }
 
-func TestHtmlTextOverrideEvents(t *testing.T) {
-	t.Parallel()
-	compareEvents(t, htmlTextOverrideFixtures)
-	compareEvents(t, htmlTextFixtures)
+func TestHtmlTextOverrideEvents(test *testing.T) {
+	test.Parallel()
+	compareEvents(test, htmlTextOverrideFixtures)
+	compareEvents(test, htmlTextFixtures)
 }
 
 // TestHtmlTextOverrideOrder checks the combined text constructs on `<`: the copy, then autolink, then core.
 // mergeConstructs puts every construct not marked "after" before the existing ones, so `add: "before"`
 // holds the copy ahead of the defaults.
-func TestHtmlTextOverrideOrder(t *testing.T) {
-	t.Parallel()
+func TestHtmlTextOverrideOrder(test *testing.T) {
+	test.Parallel()
 	constructs := MarkdownConstructs().Text.ByCode[CodeLessThan]
 	want := []*Construct{htmlTextOverride, autolink, htmlText}
 	if len(constructs) != len(want) {
-		t.Fatalf("%d constructs on `<`, want %d", len(constructs), len(want))
+		test.Fatalf("%d constructs on `<`, want %d", len(constructs), len(want))
 	}
 	for index := range want {
 		if constructs[index] != want[index] {
-			t.Errorf("construct %d on `<` is %q, not the expected one", index, constructs[index].Name)
+			test.Errorf("construct %d on `<` is %q, not the expected one", index, constructs[index].Name)
 		}
 	}
 }

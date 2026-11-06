@@ -34,16 +34,14 @@ func printTemplateLiteral(path *Path, options *Options, print PrintFunc) Doc {
 	parts := mapPath(path, func(_ *Path, index int) Doc {
 		isLast := index == quasiCount-1
 		if isLast {
-			return concatIn(path, print(nil, nil), "")
+			return concatIn(path, print("", nil), doc.Text(""))
 		}
-		return concatIn(path, print(nil, nil), expressionDocs[index])
+		return concatIn(path, print("", nil), expressionDocs[index])
 	}, "quasis")
 
-	result := []any{lineSuffixBoundary, "`"}
-	for _, part := range parts {
-		result = append(result, part)
-	}
-	result = append(result, "`")
+	result := []Doc{lineSuffixBoundary, doc.Text("`")}
+	result = append(result, parts...)
+	result = append(result, doc.Text("`"))
 	return concatIn(path, result...)
 }
 
@@ -130,26 +128,26 @@ func printJestEachTemplateLiteral(path *Path, options *Options, print PrintFunc)
 		}
 
 		tableBody := []*jestEachTableRow{{hasLineBreak: false, cells: nil}}
-		for i := 1; i < len(quasis); i++ {
+		for index := 1; index < len(quasis); index++ {
 			row := tableBody[len(tableBody)-1]
-			correspondingExpression := stringifiedExpressions[i-1]
+			correspondingExpression := stringifiedExpressions[index-1]
 
 			row.cells = append(row.cells, correspondingExpression)
 			if strings.Contains(correspondingExpression, "\n") {
 				row.hasLineBreak = true
 			}
 
-			if strings.Contains(templateElementRaw(quasis[i]), "\n") {
+			if strings.Contains(templateElementRaw(quasis[index]), "\n") {
 				tableBody = append(tableBody, &jestEachTableRow{hasLineBreak: false, cells: nil})
 			}
 		}
 
-		maxColumnCount := len(headerNames)
+		maximumColumnCount := len(headerNames)
 		for _, row := range tableBody {
-			maxColumnCount = max(maxColumnCount, len(row.cells))
+			maximumColumnCount = max(maximumColumnCount, len(row.cells))
 		}
 
-		maxColumnWidths := make([]int, maxColumnCount)
+		maximumColumnWidths := make([]int, maximumColumnCount)
 		table := []*jestEachTableRow{{cells: headerNames}}
 		for _, row := range tableBody {
 			if len(row.cells) > 0 {
@@ -163,8 +161,8 @@ func printJestEachTemplateLiteral(path *Path, options *Options, print PrintFunc)
 
 			for index, cell := range row.cells {
 				// getStringWidth(cell)
-				maxColumnWidths[index] = max(
-					maxColumnWidths[index],
+				maximumColumnWidths[index] = max(
+					maximumColumnWidths[index],
 					doc.StringWidth(cell),
 				)
 			}
@@ -177,19 +175,21 @@ func printJestEachTemplateLiteral(path *Path, options *Options, print PrintFunc)
 				if row.hasLineBreak {
 					cellDocs[index] = doc.Text(cell)
 				} else {
-					cellDocs[index] = doc.Text(cell + strings.Repeat(" ", maxColumnWidths[index]-doc.StringWidth(cell)))
+					cellDocs[index] = doc.Text(
+						cell + strings.Repeat(" ", maximumColumnWidths[index]-doc.StringWidth(cell)),
+					)
 				}
 			}
-			rowDocs[rowIndex] = join(" | ", cellDocs)
+			rowDocs[rowIndex] = join(doc.Text(" | "), cellDocs)
 		}
 
 		return concatIn(path, lineSuffixBoundary,
-			"`",
+			doc.Text("`"),
 			indentIn(path, concatIn(path, hardline,
 				join(hardline, rowDocs),
 			)),
 			hardline,
-			"`",
+			doc.Text("`"),
 		)
 	}
 	return nil
@@ -232,7 +232,7 @@ func getTemplateLiteralExpressionIndent(path *Path, options *Options) templateLi
 // printTemplateExpression is upstream's printTemplateExpression.
 func printTemplateExpression(path *Path, options *Options, print PrintFunc) Doc {
 	current, index := node(path), indexOf(path)
-	expressionDoc := print(nil, nil)
+	expressionDoc := print("", nil)
 
 	templateLiteral := parentOf(path)
 	quasis := templateLiteral.List("quasis")
@@ -299,7 +299,7 @@ func printTemplateExpression(path *Path, options *Options, print PrintFunc) Doc 
 		expressionDoc = addAlignmentToDoc(expressionDoc, indentSize, settingsOf(options).TabWidth)
 	}
 
-	return groupIn(path, concatIn(path, "${", expressionDoc, lineSuffixBoundary, "}"))
+	return groupIn(path, concatIn(path, doc.Text("${"), expressionDoc, lineSuffixBoundary, doc.Text("}")))
 }
 
 // printTemplateExpressions is upstream's printTemplateExpressions.

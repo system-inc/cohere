@@ -33,7 +33,7 @@ var messageNoNewStatement = rule.Message{
 //
 // # Parentheses, which are a parser difference rather than a judgment
 //
-// The upstream selector demands a DIRECT child, and in ESTree it gets one however many parentheses
+// The upstream selector demands a direct child, and in ESTree it gets one however many parentheses
 // are written, because that tree discards them. Ours does not: `(new Date())` parses as a
 // parenthesized expression wrapping the `new`. So the direct-child reading, ported literally, goes
 // silent on a case upstream reports.
@@ -58,9 +58,9 @@ var messageNoNewStatement = rule.Message{
 //
 // Nesting reports once rather than twice. `new new Foo();` is one finding, because only the outer
 // `new` is the statement's expression and the inner one is its callee.
-var NoNew = rule.Rule{
+var NoNew = rule.Rule[rule.NoOptions]{
 	Name: "no-new",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindExpressionStatement: func(node *ast.Node) {
 				// See the doc above: our tree keeps parentheses that ESTree discards, so the
@@ -69,7 +69,7 @@ var NoNew = rule.Rule{
 				if expression == nil || expression.Kind != ast.KindNewExpression {
 					return
 				}
-				ctx.ReportNode(node, messageNoNewStatement)
+				ruleContext.ReportNode(node, messageNoNewStatement)
 			},
 		}
 	},

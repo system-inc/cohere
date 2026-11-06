@@ -6,7 +6,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // upstream's option surface is a two-element list: `["error", "always", {"enforceForIfStatements":
 // true}]`.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[LogicalAssignmentOperatorsOptions]{
 		Rule:             LogicalAssignmentOperators,
 		DecodeOptionList: DecodeLogicalAssignmentOperatorsOptions,
 	})

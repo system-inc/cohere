@@ -16,14 +16,14 @@ func noUnsafeCallCaseName(index int) string {
 
 // TestNoUnsafeCallStaysSilent is upstream's fifteen passing cases verbatim.
 //
-// Each was re-measured one file per program against the installed 8.67.0 build under THIS
+// Each was re-measured one file per program against the installed 8.67.0 build under this
 // harness's compiler options rather than upstream's, because upstream runs this rule's whole
 // corpus under `tsconfig.noImplicitThis.json` and our harness pins `strict: true` with no way for
 // a fixture to override it. All fifteen are clean under both settings, so nothing here depends on
-// which one is in force. The two cases where the setting DOES decide the verdict are in the
+// which one is in force. The two cases where the setting does decide the verdict are in the
 // firing test, at the ids upstream produces under our configuration.
-func TestNoUnsafeCallStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeCallStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		"function foo(x: () => void) {\n  x();\n}\n",
@@ -56,7 +56,7 @@ func TestNoUnsafeCallStaysSilent(t *testing.T) {
 		// `unknown` is not `any`, and narrowing it to something other than a function keeps it so.
 		"declare const value: unknown;\nif (typeof value === 'object' && value !== null) {\n  String(value);\n}\n",
 
-		// A construct signature makes a Function subtype safe to CALL as well, which is the half
+		// A construct signature makes a Function subtype safe to call as well, which is the half
 		// of the asymmetry the corpus exercises only in the construction direction.
 		"interface ConstructOnly extends Function {\n  new (): ConstructOnly;\n}\ndeclare const safe: ConstructOnly;\nsafe();\n",
 
@@ -64,16 +64,16 @@ func TestNoUnsafeCallStaysSilent(t *testing.T) {
 		"declare function tag(strings: TemplateStringsArray): string;\ntag`hello`;\n",
 	}
 	for index, sourceText := range cases {
-		t.Run(noUnsafeCallCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoUnsafeCall, noUnsafeCallFile, sourceText))
+		test.Run(noUnsafeCallCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoUnsafeCall, noUnsafeCallFile, sourceText))
 		})
 	}
 }
 
 // noUnsafeCallFinding is one expected finding with every layer it can be wrong at.
 //
-// The rule has EIGHT message ids across three anchors, and the id is the whole judgment: which
+// The rule has eight message ids across three anchors, and the id is the whole judgment: which
 // site fired, and whether the type was an `any` the author wrote or one the checker could not
 // resolve. The rendered text carries a second judgment the id cannot, since `{{type}}` is filled
 // with either "an `any`" or "a `Function`" and the two describe different defects.
@@ -88,15 +88,15 @@ type noUnsafeCallFinding struct {
 //
 // Twenty-three of upstream's twenty-four reporting cases are here; the twenty-fourth is in the
 // silent test above for the compiler-option reason documented there. Case 23 reports under both
-// settings and its IDS MOVE between them, from `errorCallThis` to `errorCall`, so the row asserts
+// settings and its ids move between them, from `errorCallThis` to `errorCall`, so the row asserts
 // the latter and the rule's doc comment records the former.
 //
 // Every row asserts the span, the id, and the whole rendered message. The span matters more here
 // than on most rules because the three anchors point at different things: a call and a tagged
-// template report on the CALLEE, so `x.a.b.c.d.e.f.g()` underlines everything but the parentheses,
-// while `new` reports on the WHOLE expression. Collapsing those would satisfy every id.
-func TestNoUnsafeCallFires(t *testing.T) {
-	t.Parallel()
+// template report on the callee, so `x.a.b.c.d.e.f.g()` underlines everything but the parentheses,
+// while `new` reports on the whole expression. Collapsing those would satisfy every id.
+func TestNoUnsafeCallFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText   string
@@ -341,7 +341,7 @@ func TestNoUnsafeCallFires(t *testing.T) {
 		// Measured additions covering discriminations the corpus leaves untested.
 		{
 			// A Function subtype with only a void-returning call signature. The corpus writes this
-			// exact interface in its PASSING list, called rather than constructed, so this row is
+			// exact interface in its passing list, called rather than constructed, so this row is
 			// the other half of that pair: the same type is safe to call and unsafe to construct,
 			// which is the asymmetry the rule reproduces from upstream.
 			sourceText: "interface CallGoodConstructBad extends Function {\n  (): void;\n}\ndeclare const safe: CallGoodConstructBad;\nnew safe();\n",
@@ -355,7 +355,7 @@ func TestNoUnsafeCallFires(t *testing.T) {
 		},
 		{
 			// A parenthesized callee. The corpus writes none, so this row is measured rather than
-			// imported, and the first version of it was WRONG in a way only the measurement caught:
+			// imported, and the first version of it was wrong in a way only the measurement caught:
 			// the checker answers the same type for `(x)` and for `x`, so the finding appears
 			// either way and only the span moves. Upstream reports at columns 4-5, which is `x`,
 			// because estree has no parenthesized node for its selector to bind to. Without the
@@ -371,15 +371,15 @@ func TestNoUnsafeCallFires(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(noUnsafeCallCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoUnsafeCall, noUnsafeCallFile, testCase.sourceText)
+		test.Run(noUnsafeCallCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoUnsafeCall, noUnsafeCallFile, testCase.sourceText)
 
 			wantIds := make([]string, len(testCase.wantFindings))
 			for position, want := range testCase.wantFindings {
 				wantIds[position] = want.wantId
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 
 			// The harness writes the fixture trimmed, so the span slices are against that text
 			// rather than the Go literal above.
@@ -389,14 +389,14 @@ func TestNoUnsafeCallFires(t *testing.T) {
 
 				gotSpan := onDisk[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if gotSpan != want.wantSpan {
-					t.Fatalf("finding %d span: expected %q, got %q", position, want.wantSpan, gotSpan)
+					test.Fatalf("finding %d span: expected %q, got %q", position, want.wantSpan, gotSpan)
 				}
 				if diagnostic.Message.Id != want.wantId {
-					t.Fatalf("finding %d id: expected %q, got %q", position, want.wantId,
+					test.Fatalf("finding %d id: expected %q, got %q", position, want.wantId,
 						diagnostic.Message.Id)
 				}
 				if diagnostic.Message.Description != want.wantMessage {
-					t.Fatalf("finding %d message: expected %q, got %q", position, want.wantMessage,
+					test.Fatalf("finding %d message: expected %q, got %q", position, want.wantMessage,
 						diagnostic.Message.Description)
 				}
 			}

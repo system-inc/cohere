@@ -13,20 +13,20 @@ import (
 // every fixture expects at least one.
 type declineEverything struct{ reason string }
 
-func (d declineEverything) Analyze(Fixture) (Result, error) {
-	return Result{}, &ErrUnsupported{Reason: d.reason}
+func (everything declineEverything) Analyze(Fixture) (Result, error) {
+	return Result{}, &ErrUnsupported{Reason: everything.reason}
 }
 
 // TestAggregatedScoreAgainstReactsOwnFixtures is the number this package exists to produce.
 //
 // It is deliberately run against an implementation that answers nothing, and that is not a
 // placeholder. Wiring cohere's rule engine in here would require building a TypeScript program per
-// fixture — roughly a second each, so about five minutes for the corpus — inside a suite whose
+// fixture (roughly a second each, so about five minutes for the corpus) inside a suite whose
 // stated design property is that it costs 0.3 to 0.8 seconds and therefore never gets gated behind
 // a tag. Paying that to watch 293 fixtures land in a decline bucket that is already decidable from
 // the corpus alone would buy one number, `failed`, at the cost of the suite being run.
 //
-// What is asserted instead is every number that does NOT depend on running a rule: which fixtures
+// What is asserted instead is every number that does not depend on running a rule: which fixtures
 // any shipped rule could even be asked about, and why each of the others cannot be. That is the
 // part that was never measured, and it is the part that decides whether a raw score would have
 // lied.
@@ -35,23 +35,26 @@ func (d declineEverything) Analyze(Fixture) (Result, error) {
 // responsible for. 196 belong entirely to rules cohere does not implement, and 35 need a Flow
 // parser. Of the 94, eleven have been run against the real rule and every one landed in `stated
 // divergence`; the remaining 83 are unscored. Every fixture has a named reason, counted here.
-func TestAggregatedScoreAgainstReactsOwnFixtures(t *testing.T) {
-	t.Parallel()
-	fixtures := load(t)
+func TestAggregatedScoreAgainstReactsOwnFixtures(test *testing.T) {
+	test.Parallel()
+	fixtures := load(test)
 
-	report, err := Aggregate(fixtures, declineEverything{reason: "scored without a rule engine; see the note on this test"})
-	if err != nil {
-		t.Fatalf("aggregating: %v", err)
+	report, aggregateError := Aggregate(
+		fixtures,
+		declineEverything{reason: "scored without a rule engine; see the note on this test"},
+	)
+	if aggregateError != nil {
+		test.Fatalf("aggregating: %v", aggregateError)
 	}
 
 	if report.Considered != ExpectedFixtureCount {
-		t.Errorf("considered %d, want %d", report.Considered, ExpectedFixtureCount)
+		test.Errorf("considered %d, want %d", report.Considered, ExpectedFixtureCount)
 	}
 
 	// Flow count, unchanged from `TestFlowFixtureCountIsUpstreamsOwnTest`, restated here so a change in
 	// the exclusion rule shows up in the aggregate rather than only in the loader's own test.
 	if got := report.Counts[VerdictFlowSyntax]; got != ExpectedFlowFixtureCount {
-		t.Errorf("flow-excluded %d, want %d", got, ExpectedFlowFixtureCount)
+		test.Errorf("flow-excluded %d, want %d", got, ExpectedFlowFixtureCount)
 	}
 
 	// 166 fixtures belong entirely to rules cohere does not ship: 101 of the error population, and
@@ -69,7 +72,7 @@ func TestAggregatedScoreAgainstReactsOwnFixtures(t *testing.T) {
 	// a third of React's error corpus is preserve-manual-memoization, todo, invariant and friends,
 	// none of which cohere has.
 	if got := report.Counts[VerdictNoRuleShipped]; got != 166 {
-		t.Errorf("no-rule-shipped %d, want 166", got)
+		test.Errorf("no-rule-shipped %d, want 166", got)
 	}
 
 	// The addressable set: fixtures a rule cohere ships is responsible for. This is the real
@@ -80,30 +83,30 @@ func TestAggregatedScoreAgainstReactsOwnFixtures(t *testing.T) {
 		report.Counts[VerdictUnresolvableTypes] + report.Counts[VerdictUnreachableFixture] +
 		report.Counts[VerdictNotScored] + report.Counts[VerdictStatedDivergence]
 	if answerable != 189 {
-		t.Errorf("fixtures a shipped rule could be asked about = %d, want 189", answerable)
+		test.Errorf("fixtures a shipped rule could be asked about = %d, want 189", answerable)
 	}
 
-	// This test scores `NothingImplemented`, so it measures the CATEGORISATION rather than any rule:
+	// This test scores `NothingImplemented`, so it measures the categorisation rather than any rule:
 	// 18 fixtures carry a stated divergence, and every other addressable fixture lands in
 	// `not scored` because the implementation handed in here declines everything.
 	//
 	// That is deliberate and it is why this package still depends on nothing in the rule engine.
-	// The same partition WITH real rules running is
+	// The same partition with real rules running is
 	// `react_conformance_score.TestAggregateWithTheRuleEngineWired`, and the two are meant to differ:
 	// this one answers "what could be asked", that one answers "what did the rules say".
 	if got := report.Counts[VerdictStatedDivergence]; got != 18 {
-		t.Errorf("stated-divergence %d, want 18", got)
+		test.Errorf("stated-divergence %d, want 18", got)
 	}
 	if got := report.Counts[VerdictNotScored]; got != 171 {
-		t.Errorf("not-scored %d, want 171", got)
+		test.Errorf("not-scored %d, want 171", got)
 	}
 
-	t.Logf("\n%s", report.Summary())
+	test.Logf("\n%s", report.Summary())
 	for _, ruleName := range report.RuleNames() {
 		if _, shipped := ShippedRules[ruleName]; !shipped {
 			continue
 		}
-		t.Logf("  shipped rule %-22s %v", ruleName, report.ByRule()[ruleName])
+		test.Logf("  shipped rule %-22s %v", ruleName, report.ByRule()[ruleName])
 	}
 }
 
@@ -113,9 +116,9 @@ func TestAggregatedScoreAgainstReactsOwnFixtures(t *testing.T) {
 // with and the breakdown is a list anybody can check. Six categories are most of React's error
 // corpus, and cohere implements none of them; that is the honest reason the parity number is small,
 // and it is a different reason from "our rules are wrong".
-func TestNoRuleShippedIsTheCorpusRatherThanTheRules(t *testing.T) {
-	t.Parallel()
-	fixtures := load(t)
+func TestNoRuleShippedIsTheCorpusRatherThanTheRules(test *testing.T) {
+	test.Parallel()
+	fixtures := load(test)
 
 	perRule := map[string]int{}
 	for _, fixture := range fixtures {
@@ -143,7 +146,7 @@ func TestNoRuleShippedIsTheCorpusRatherThanTheRules(t *testing.T) {
 	//
 	// `todo` moved 36 -> 30 in the same change, and the six are enumerated rather than retyped,
 	// because a pinned number that is edited to match whatever the code now says has stopped being
-	// a pin. Each is a fixture whose diagnostics span `todo` AND a now-shipped rule, so it leaves
+	// a pin. Each is a fixture whose diagnostics span `todo` and a now-shipped rule, so it leaves
 	// the set of fixtures no shipped rule claims at all: `error.todo-reassign-const.js`,
 	// `fault-tolerance/error.try-finally-and-mutation-of-props.js`,
 	// `fault-tolerance/error.try-finally-and-ref-access.js`,
@@ -160,7 +163,7 @@ func TestNoRuleShippedIsTheCorpusRatherThanTheRules(t *testing.T) {
 		{"memo-dependencies", 8},
 	} {
 		if got := perRule[want.Rule]; got != want.Count {
-			t.Errorf("unshipped rule %s covers %d flow-free fixtures, want %d", want.Rule, got, want.Count)
+			test.Errorf("unshipped rule %s covers %d flow-free fixtures, want %d", want.Rule, got, want.Count)
 		}
 	}
 }
@@ -175,8 +178,8 @@ func TestNoRuleShippedIsTheCorpusRatherThanTheRules(t *testing.T) {
 // So each category is driven to non-empty with a constructed input, through the real `Classify`
 // rather than by writing the constant into a map. A category that cannot be produced here is not a
 // category and should be deleted rather than shipped as a label.
-func TestEveryCategoryIsReachable(t *testing.T) {
-	t.Parallel()
+func TestEveryCategoryIsReachable(test *testing.T) {
+	test.Parallel()
 	globalsFixture := Fixture{
 		Name:   "reachability.globals.js",
 		Source: "function Component() { someGlobal = true; }",
@@ -189,14 +192,18 @@ func TestEveryCategoryIsReachable(t *testing.T) {
 		Name    string
 		Fixture Fixture
 		Result  Result
-		Err     error
+		Error   error
 		Want    Verdict
 	}{
 		{
 			Name:    "passed",
 			Fixture: globalsFixture,
 			Result: Result{Errors: []ReportedError{
-				{Heading: "Error", Message: "Cannot reassign variables declared outside of the component/hook", Line: 1},
+				{
+					Heading: "Error",
+					Message: "Cannot reassign variables declared outside of the component/hook",
+					Line:    1,
+				},
 			}},
 			Want: VerdictPassed,
 		},
@@ -210,14 +217,18 @@ func TestEveryCategoryIsReachable(t *testing.T) {
 			Name:    "failed: reported the wrong line",
 			Fixture: globalsFixture,
 			Result: Result{Errors: []ReportedError{
-				{Heading: "Error", Message: "Cannot reassign variables declared outside of the component/hook", Line: 9},
+				{
+					Heading: "Error",
+					Message: "Cannot reassign variables declared outside of the component/hook",
+					Line:    9,
+				},
 			}},
 			Want: VerdictFailed,
 		},
 		{
 			Name:    "not scored: the implementation declined",
 			Fixture: globalsFixture,
-			Err:     &ErrUnsupported{Reason: "no rule engine was run"},
+			Error:   &ErrUnsupported{Reason: "no rule engine was run"},
 			Want:    VerdictNotScored,
 		},
 		{
@@ -251,7 +262,7 @@ func TestEveryCategoryIsReachable(t *testing.T) {
 			// `preserve-manual-memoization` rather than `immutability`, which this case used until
 			// `immutability` shipped on 2026-08-24. The case needs a rule cohere genuinely does not
 			// implement, so picking one that is being actively ported makes the calibration expire
-			// the day the port lands — which is exactly what happened here.
+			// the day the port lands, which is exactly what happened here.
 			Name: "declined: no rule shipped",
 			Fixture: Fixture{
 				Name:   "reachability.preserve-manual-memoization.js",
@@ -272,14 +283,14 @@ func TestEveryCategoryIsReachable(t *testing.T) {
 			Want: VerdictFlowSyntax,
 		},
 	} {
-		t.Run(testCase.Name, func(t *testing.T) {
-			t.Parallel()
-			got := Classify(testCase.Fixture, testCase.Result, testCase.Err)
+		test.Run(testCase.Name, func(test *testing.T) {
+			test.Parallel()
+			got := Classify(testCase.Fixture, testCase.Result, testCase.Error)
 			if got.Verdict != testCase.Want {
-				t.Errorf("classified as %q, want %q (reason: %s)", got.Verdict, testCase.Want, got.Reason)
+				test.Errorf("classified as %q, want %q (reason: %s)", got.Verdict, testCase.Want, got.Reason)
 			}
 			if got.Verdict != VerdictPassed && got.Reason == "" {
-				t.Error("a non-pass with no reason")
+				test.Error("a non-pass with no reason")
 			}
 		})
 	}
@@ -294,7 +305,7 @@ func TestEveryCategoryIsReachable(t *testing.T) {
 // again, rather than by asserting the constant exists.
 // Not parallel: it adds entries to the package statedDivergences map, which Classify reads for every fixture,
 // so a parallel test classifying at the same moment would race it and could see the entry.
-func TestStatedDivergenceCategoryCanHoldAnEntry(t *testing.T) {
+func TestStatedDivergenceCategoryCanHoldAnEntry(test *testing.T) {
 	const name = "reachability.divergence.js"
 
 	statedDivergences[name] = StatedDivergence{
@@ -311,10 +322,14 @@ func TestStatedDivergenceCategoryCanHoldAnEntry(t *testing.T) {
 	}, Result{}, nil)
 
 	if verdict.Verdict != VerdictStatedDivergence {
-		t.Fatalf("classified as %q, want %q; the category is decorative rather than wired", verdict.Verdict, VerdictStatedDivergence)
+		test.Fatalf(
+			"classified as %q, want %q; the category is decorative rather than wired",
+			verdict.Verdict,
+			VerdictStatedDivergence,
+		)
 	}
 	if !strings.Contains(verdict.Reason, "TestStatedDivergenceCategoryCanHoldAnEntry") {
-		t.Errorf("the reason does not name the boundary that holds it: %s", verdict.Reason)
+		test.Errorf("the reason does not name the boundary that holds it: %s", verdict.Reason)
 	}
 
 	// And it must beat the categories below it. A deliberate decision reclassified as a corpus
@@ -335,7 +350,10 @@ func TestStatedDivergenceCategoryCanHoldAnEntry(t *testing.T) {
 		}},
 	}, Result{}, nil)
 	if shadowed.Verdict != VerdictStatedDivergence {
-		t.Errorf("a stated divergence on an import-less fixture classified as %q; the decision must outrank the corpus artifact", shadowed.Verdict)
+		test.Errorf(
+			"a stated divergence on an import-less fixture classified as %q; the decision must outrank the corpus artifact",
+			shadowed.Verdict,
+		)
 	}
 }
 
@@ -345,8 +363,8 @@ func TestStatedDivergenceCategoryCanHoldAnEntry(t *testing.T) {
 // on silence, and silence is what a broken rule produces. The thing stopping it is that only a
 // type-aware rule can claim it. This proves that restriction is live, by handing the same silent
 // result to a syntax-only rule's fixture and requiring a failure.
-func TestUnresolvableTypesIsNotAnExcuseForSyntaxRules(t *testing.T) {
-	t.Parallel()
+func TestUnresolvableTypesIsNotAnExcuseForSyntaxRules(test *testing.T) {
+	test.Parallel()
 	// `globals` is syntax-only and is not in TypeAwareRules.
 	verdict := Classify(Fixture{
 		Name:   "reachability.globals-no-import.js",
@@ -357,7 +375,7 @@ func TestUnresolvableTypesIsNotAnExcuseForSyntaxRules(t *testing.T) {
 	}, Result{}, nil)
 
 	if verdict.Verdict != VerdictFailed {
-		t.Errorf("a syntax-only rule that found nothing classified as %q, want %q; the types excuse is leaking",
+		test.Errorf("a syntax-only rule that found nothing classified as %q, want %q; the types excuse is leaking",
 			verdict.Verdict, VerdictFailed)
 	}
 }
@@ -366,11 +384,11 @@ func TestUnresolvableTypesIsNotAnExcuseForSyntaxRules(t *testing.T) {
 //
 // The count that justifies `VerdictUnresolvableTypes` is "128 of 202 hook-using fixtures do not
 // import react", and it is only as good as this predicate. A substring test for `react` would match
-// `react-dom` and `./react-utils`, shrinking the category and moving those fixtures into `failed` —
+// `react-dom` and `./react-utils`, shrinking the category and moving those fixtures into `failed`:
 // an error in the direction that looks more rigorous, which is the direction least likely to be
 // questioned.
-func TestReactImportDetectionDoesNotOverMatch(t *testing.T) {
-	t.Parallel()
+func TestReactImportDetectionDoesNotOverMatch(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range []struct {
 		Source string
 		Want   bool
@@ -385,7 +403,7 @@ func TestReactImportDetectionDoesNotOverMatch(t *testing.T) {
 		{"function Component() { useState(0); }", false},
 	} {
 		if got := (Fixture{Source: testCase.Source}).ResolvesReactTypes(); got != testCase.Want {
-			t.Errorf("ResolvesReactTypes(%q) = %v, want %v", testCase.Source, got, testCase.Want)
+			test.Errorf("ResolvesReactTypes(%q) = %v, want %v", testCase.Source, got, testCase.Want)
 		}
 	}
 }
@@ -395,16 +413,20 @@ func TestReactImportDetectionDoesNotOverMatch(t *testing.T) {
 // These come from the vendored corpus rather than from the brief, which carried oxc's figures (1 of
 // 13 resolved, 33% of hook-using fixtures missing the import). React's own corpus is worse on this
 // axis, not better, so a stub matters more here than the brief assumed.
-func TestCorpusTypeResolutionIsMeasured(t *testing.T) {
-	t.Parallel()
-	fixtures := load(t)
+func TestCorpusTypeResolutionIsMeasured(test *testing.T) {
+	test.Parallel()
+	fixtures := load(test)
 
 	// Counted per population rather than over the corpus as a whole, because the two differ sharply
 	// and a combined number would hide it: 63% of hook-using error fixtures omit the import against
 	// 13% of the clean ones. Summing them reports 51%, a figure describing neither population and
 	// moving with the mix rather than with anything about React.
-	var importing, hookUsing, hookUsingWithoutImport int
-	var cleanImporting, cleanHookUsing, cleanHookUsingWithoutImport int
+	var importing int
+	var hookUsing int
+	var hookUsingWithoutImport int
+	var cleanImporting int
+	var cleanHookUsing int
+	var cleanHookUsingWithoutImport int
 	for _, fixture := range fixtures {
 		base := filepath.Base(fixture.Name)
 		errorNamed := strings.HasPrefix(base, "error.") || strings.HasPrefix(base, "todo.error.")
@@ -434,41 +456,41 @@ func TestCorpusTypeResolutionIsMeasured(t *testing.T) {
 	}
 
 	if importing != 77 {
-		t.Errorf("error fixtures importing react = %d, want 77", importing)
+		test.Errorf("error fixtures importing react = %d, want 77", importing)
 	}
 	if hookUsing != 202 {
-		t.Errorf("error fixtures calling a hook = %d, want 202", hookUsing)
+		test.Errorf("error fixtures calling a hook = %d, want 202", hookUsing)
 	}
 	if hookUsingWithoutImport != 128 {
-		t.Errorf("hook-using error fixtures with no react import = %d, want 128", hookUsingWithoutImport)
+		test.Errorf("hook-using error fixtures with no react import = %d, want 128", hookUsingWithoutImport)
 	}
 
 	if cleanImporting != 61 {
-		t.Errorf("clean fixtures importing react = %d, want 61", cleanImporting)
+		test.Errorf("clean fixtures importing react = %d, want 61", cleanImporting)
 	}
 	if cleanHookUsing != 69 {
-		t.Errorf("clean fixtures calling a hook = %d, want 69", cleanHookUsing)
+		test.Errorf("clean fixtures calling a hook = %d, want 69", cleanHookUsing)
 	}
 	if cleanHookUsingWithoutImport != 9 {
-		t.Errorf("hook-using clean fixtures with no react import = %d, want 9", cleanHookUsingWithoutImport)
+		test.Errorf("hook-using clean fixtures with no react import = %d, want 9", cleanHookUsingWithoutImport)
 	}
 
-	t.Logf("error fixtures: %d of %d hook-using (%.0f%%) never import react, so a type-aware rule reads `any`",
+	test.Logf("error fixtures: %d of %d hook-using (%.0f%%) never import react, so a type-aware rule reads `any`",
 		hookUsingWithoutImport, hookUsing, 100*float64(hookUsingWithoutImport)/float64(hookUsing))
-	t.Logf("clean fixtures: %d of %d hook-using (%.0f%%) never import react",
+	test.Logf("clean fixtures: %d of %d hook-using (%.0f%%) never import react",
 		cleanHookUsingWithoutImport, cleanHookUsing, 100*float64(cleanHookUsingWithoutImport)/float64(cleanHookUsing))
 }
 
 // TestReportCheckCatchesANonPartition proves the arithmetic guard fires.
-func TestReportCheckCatchesANonPartition(t *testing.T) {
-	t.Parallel()
+func TestReportCheckCatchesANonPartition(test *testing.T) {
+	test.Parallel()
 	report := Report{
 		Considered: 2,
 		Counts:     map[Verdict]int{VerdictPassed: 1},
 		Fixtures:   []FixtureVerdict{{Name: "a", Verdict: VerdictPassed}},
 	}
-	if err := report.Check(); err == nil {
-		t.Fatal("Check accepted a report whose categories do not sum to the denominator")
+	if checkError := report.Check(); checkError == nil {
+		test.Fatal("Check accepted a report whose categories do not sum to the denominator")
 	}
 
 	unreasoned := Report{
@@ -476,7 +498,7 @@ func TestReportCheckCatchesANonPartition(t *testing.T) {
 		Counts:     map[Verdict]int{VerdictFailed: 1},
 		Fixtures:   []FixtureVerdict{{Name: "a", Verdict: VerdictFailed}},
 	}
-	if err := unreasoned.Check(); err == nil {
-		t.Fatal("Check accepted a non-pass with no reason")
+	if checkError := unreasoned.Check(); checkError == nil {
+		test.Fatal("Check accepted a non-pass with no reason")
 	}
 }

@@ -17,14 +17,22 @@ import (
 // nextNoNearMissRouteExportNearMissText and nextNoNearMissRouteExportPagesRouterText are the rule's
 // messages, whose wording lives in `policy/messages/next-no-near-miss-route-export.json`.
 var (
-	nextNoNearMissRouteExportNearMissText    = policy.MessageOf("structure/next-no-near-miss-route-export", "nearMissRouteExport")
-	nextNoNearMissRouteExportPagesRouterText = policy.MessageOf("structure/next-no-near-miss-route-export", "pagesRouterExport")
+	nextNoNearMissRouteExportNearMissText = policy.MessageOf(
+		"structure/next-no-near-miss-route-export",
+		"nearMissRouteExport",
+	)
+	nextNoNearMissRouteExportPagesRouterText = policy.MessageOf(
+		"structure/next-no-near-miss-route-export",
+		"pagesRouterExport",
+	)
 )
 
 func messageNearMissRouteExport(name string, contractName string) rule.Message {
 	return rule.Message{
-		Id:          nextNoNearMissRouteExportNearMissText.Id,
-		Description: nextNoNearMissRouteExportNearMissText.Render(map[string]string{"name": name, "contractName": contractName}),
+		Id: nextNoNearMissRouteExportNearMissText.Id,
+		Description: nextNoNearMissRouteExportNearMissText.Render(
+			map[string]string{"name": name, "contractName": contractName},
+		),
 	}
 }
 
@@ -101,10 +109,10 @@ var nearMissConfusableWords = map[string]bool{"params": true, "props": true, "pa
 //
 // Only value exports count. A type export cannot be a route contract, and `export type { Metadata }`
 // is the ordinary way a layout re-exports Next's own type, which a case-insensitive test would flag.
-var NextNoNearMissRouteExport = rule.Rule{
+var NextNoNearMissRouteExport = rule.Rule[rule.NoOptions]{
 	Name: "structure/next-no-near-miss-route-export",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		contract := nextjs.RouteContractExports(imports.NormalizedFileName(ctx.SourceFile))
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		contract := nextjs.RouteContractExports(imports.NormalizedFileName(ruleContext.SourceFile))
 		if len(contract) == 0 {
 			return nil
 		}
@@ -121,11 +129,11 @@ var NextNoNearMissRouteExport = rule.Rule{
 				return
 			}
 			if pagesRouterDataFunctions[spelling] {
-				ctx.ReportNode(name, messagePagesRouterExport(spelling))
+				ruleContext.ReportNode(name, messagePagesRouterExport(spelling))
 				return
 			}
 			if contractName, found := nearMissContractName(spelling, contractNames); found {
-				ctx.ReportNode(name, messageNearMissRouteExport(spelling, contractName))
+				ruleContext.ReportNode(name, messageNearMissRouteExport(spelling, contractName))
 			}
 		}
 

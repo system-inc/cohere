@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/lint/testing"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
@@ -46,46 +47,63 @@ export function run(): Shelter {
 // finds a node's sites once for all of them and remembers the checker's answers (#m6tyg79). Run together
 // through the walk a real run uses, one file cache and one dispatch, they report exactly what each reports
 // walked alone, so the sharing changes what is asked, never what is found.
-func TestTheRulesSharingAWalkerReportWhatEachReportsAlone(t *testing.T) {
-	t.Parallel()
-	directory := t.TempDir()
-	writeAdamicSupport(t)(directory)
-	if err := os.WriteFile(filepath.Join(directory, "Case.ts"), []byte(sharedWalkerFixture), 0o644); err != nil {
-		t.Fatal(err)
+func TestTheRulesSharingAWalkerReportWhatEachReportsAlone(test *testing.T) {
+	test.Parallel()
+	directory := test.TempDir()
+	writeAdamicSupport(test)(directory)
+	if writeError := os.WriteFile(
+		filepath.Join(directory, "Case.ts"),
+		[]byte(sharedWalkerFixture),
+		0o644,
+	); writeError != nil {
+		test.Fatal(writeError)
 	}
-	walk := func(rules ...rule.Rule) []string {
-		t.Helper()
-		graph, err := program.Build(program.Options{ConfigFileName: filepath.Join(directory, "tsconfig.json")})
-		if err != nil {
-			t.Fatalf("building: %v", err)
+	walk := func(rules ...rule.Rule[rule.NoOptions]) []string {
+		test.Helper()
+		graph, buildError := program.Build(program.Options{ConfigFileName: filepath.Join(directory, "tsconfig.json")})
+		if buildError != nil {
+			test.Fatalf("building: %v", buildError)
 		}
 		if diagnostics := graph.Program.GetSemanticDiagnostics(context.Background(), nil); len(diagnostics) > 0 {
-			t.Fatalf("the fixture has %d type errors, so it is not a program tsc accepts", len(diagnostics))
+			test.Fatalf("the fixture has %d type errors, so it is not a program tsc accepts", len(diagnostics))
 		}
-		result, err := graph.Walk(context.Background(), graph.ProjectFiles(), rules)
-		if err != nil {
-			t.Fatalf("walking: %v", err)
+		result, walkError := graph.Walk(
+			context.Background(),
+			graph.ProjectFiles(),
+			rule_testing.EntriesOf(test, rules...),
+		)
+		if walkError != nil {
+			test.Fatalf("walking: %v", walkError)
 		}
 		findings := []string{}
 		for _, diagnostic := range result.Diagnostics {
-			findings = append(findings, fmt.Sprintf("%s %d-%d %s: %s", filepath.Base(diagnostic.SourceFile.FileName().AsString()),
-				diagnostic.Range.Pos(), diagnostic.Range.End(), diagnostic.RuleName, diagnostic.Message.Description))
+			findings = append(
+				findings,
+				fmt.Sprintf(
+					"%s %d-%d %s: %s",
+					filepath.Base(diagnostic.SourceFile.FileName().AsString()),
+					diagnostic.Range.Pos(),
+					diagnostic.Range.End(),
+					diagnostic.RuleName,
+					diagnostic.Message.Description,
+				),
+			)
 		}
 		sort.Strings(findings)
 		return findings
 	}
 
 	alone := []string{}
-	for _, subject := range []rule.Rule{InvariantMutable, NominalClass, NoOptionalWidening} {
+	for _, subject := range []rule.Rule[rule.NoOptions]{InvariantMutable, NominalClass, NoOptionalWidening} {
 		found := walk(subject)
 		if len(found) == 0 {
-			t.Fatalf("%s found nothing walked alone, so sharing is untested for it", subject.Name)
+			test.Fatalf("%s found nothing walked alone, so sharing is untested for it", subject.Name)
 		}
 		alone = append(alone, found...)
 	}
 	sort.Strings(alone)
 	together := walk(InvariantMutable, NominalClass, NoOptionalWidening)
 	if !reflect.DeepEqual(together, alone) {
-		t.Errorf("walked together the rules report\n  %q\nand walked alone\n  %q", together, alone)
+		test.Errorf("walked together the rules report\n  %q\nand walked alone\n  %q", together, alone)
 	}
 }

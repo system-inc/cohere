@@ -11,5 +11,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // malformed text, and an option adding to them could name one that returns an outcome instead,
 // which would report a try that guards nothing.
 func init() {
-	rule.Register(rule.Registration{Rule: CorrectnessNoCallbackInParseTry})
+	rule.Register(rule.Registration[rule.NoOptions]{Rule: CorrectnessNoCallbackInParseTry})
 }

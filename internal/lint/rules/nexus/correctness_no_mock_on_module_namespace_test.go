@@ -79,9 +79,9 @@ func correctnessNoMockOnModuleNamespaceFiles(subjectFileName string, sourceText 
 	}
 }
 
-func correctnessNoMockOnModuleNamespaceRun(t *testing.T, sourceText string) rule_testing.Result {
-	t.Helper()
-	return rule_testing.RunTypedFiles(t, CorrectnessNoMockOnModuleNamespace,
+func correctnessNoMockOnModuleNamespaceRun(test *testing.T, sourceText string) rule_testing.Result {
+	test.Helper()
+	return rule_testing.RunTypedFiles(test, CorrectnessNoMockOnModuleNamespace,
 		correctnessNoMockOnModuleNamespaceFiles(correctnessNoMockOnModuleNamespaceFile, sourceText),
 		correctnessNoMockOnModuleNamespaceFile)
 }
@@ -89,8 +89,13 @@ func correctnessNoMockOnModuleNamespaceRun(t *testing.T, sourceText string) rule
 // correctnessNoMockOnModuleNamespaceRunUnder builds the fixture under a tsconfig of its own, with the
 // `module` option given and every TypeScript extension included, so a `.mts` or `.cts` subject and a
 // CommonJS program can be reached.
-func correctnessNoMockOnModuleNamespaceRunUnder(t *testing.T, module string, subjectFileName string, sourceText string) rule_testing.Result {
-	t.Helper()
+func correctnessNoMockOnModuleNamespaceRunUnder(
+	test *testing.T,
+	module string,
+	subjectFileName string,
+	sourceText string,
+) rule_testing.Result {
+	test.Helper()
 	configuration := `{
 	"compilerOptions": {
 		"strict": true,
@@ -102,22 +107,26 @@ func correctnessNoMockOnModuleNamespaceRunUnder(t *testing.T, module string, sub
 	},
 	"include": ["**/*.ts", "**/*.mts", "**/*.cts"]
 }`
-	return rule_testing.RunTypedFilesWithSetup(t, CorrectnessNoMockOnModuleNamespace,
+	return rule_testing.RunTypedFilesWithSetup(test, CorrectnessNoMockOnModuleNamespace,
 		correctnessNoMockOnModuleNamespaceFiles(subjectFileName, sourceText), subjectFileName,
 		func(directory string) {
-			if err := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(configuration), 0o644); err != nil {
-				t.Fatalf("writing the tsconfig: %v", err)
+			if writeError := os.WriteFile(
+				filepath.Join(directory, "tsconfig.json"),
+				[]byte(configuration),
+				0o644,
+			); writeError != nil {
+				test.Fatalf("writing the tsconfig: %v", writeError)
 			}
 		})
 }
 
 // correctnessNoMockOnModuleNamespaceExpect asserts the findings in source order, each by the first
 // line of the text it points at, and that none carries a fix.
-func correctnessNoMockOnModuleNamespaceExpect(t *testing.T, result rule_testing.Result, want []string) {
-	t.Helper()
+func correctnessNoMockOnModuleNamespaceExpect(test *testing.T, result rule_testing.Result, want []string) {
+	test.Helper()
 	// A silent case goes through the shared assertion that the rule stays quiet.
 	if len(want) == 0 {
-		rule_testing.ExpectClean(t, result)
+		rule_testing.ExpectClean(test, result)
 		return
 	}
 	diagnostics := append(result.Diagnostics[:0:0], result.Diagnostics...)
@@ -128,16 +137,20 @@ func correctnessNoMockOnModuleNamespaceExpect(t *testing.T, result rule_testing.
 	for index := range want {
 		wantIds[index] = correctnessNoMockOnModuleNamespaceId
 	}
-	rule_testing.ExpectFindings(t, result, wantIds...)
+	rule_testing.ExpectFindings(test, result, wantIds...)
 	text := result.SourceFile.Text()
 	for index, diagnostic := range diagnostics {
 		span := text[diagnostic.Range.Pos():diagnostic.Range.End()]
 		firstLine, _, _ := strings.Cut(span, "\n")
 		if firstLine != want[index] {
-			t.Fatalf("finding %d starts %q, want %q", index, firstLine, want[index])
+			test.Fatalf("finding %d starts %q, want %q", index, firstLine, want[index])
 		}
 		if len(diagnostic.Fixes) != 0 || len(diagnostic.Suggestions) != 0 {
-			t.Fatalf("expected no fix and no suggestion, got %d and %d", len(diagnostic.Fixes), len(diagnostic.Suggestions))
+			test.Fatalf(
+				"expected no fix and no suggestion, got %d and %d",
+				len(diagnostic.Fixes),
+				len(diagnostic.Suggestions),
+			)
 		}
 	}
 }
@@ -166,7 +179,10 @@ func correctnessNoMockOnModuleNamespaceTransportSecurity(fixed bool) string {
 		"declare function searchBroadly(query: string): Promise<unknown>;",
 	}
 	lines = append(lines, exports...)
-	for _, name := range []string{"source searches pass hostile query text as an argv value", "iMessage search keeps metacharacters in argv"} {
+	for _, name := range []string{
+		"source searches pass hostile query text as an argv value",
+		"iMessage search keeps metacharacters in argv",
+	} {
 		lines = append(lines,
 			"test('"+name+"', async function() {",
 			"    const executions: string[] = [];",
@@ -193,28 +209,28 @@ func correctnessNoMockOnModuleNamespaceTransportSecurity(fixed bool) string {
 }
 
 // The real site, before the fix: both tests mock the sealed namespace.
-func TestCorrectnessNoMockOnModuleNamespaceFiresOnTransportSecurity(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoMockOnModuleNamespaceFiresOnTransportSecurity(test *testing.T) {
+	test.Parallel()
 
-	result := correctnessNoMockOnModuleNamespaceRun(t, correctnessNoMockOnModuleNamespaceTransportSecurity(false))
-	correctnessNoMockOnModuleNamespaceExpect(t, result, []string{"test.mock.method(", "test.mock.method("})
+	result := correctnessNoMockOnModuleNamespaceRun(test, correctnessNoMockOnModuleNamespaceTransportSecurity(false))
+	correctnessNoMockOnModuleNamespaceExpect(test, result, []string{"test.mock.method(", "test.mock.method("})
 }
 
 // The real site, after the fix: the CommonJS exports object is typed `typeof NodeChildProcess` and is
 // not the namespace, and the namespace import is type-only.
-func TestCorrectnessNoMockOnModuleNamespaceStaysSilentOnFixedTransportSecurity(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoMockOnModuleNamespaceStaysSilentOnFixedTransportSecurity(test *testing.T) {
+	test.Parallel()
 
-	result := correctnessNoMockOnModuleNamespaceRun(t, correctnessNoMockOnModuleNamespaceTransportSecurity(true))
-	correctnessNoMockOnModuleNamespaceExpect(t, result, nil)
+	result := correctnessNoMockOnModuleNamespaceRun(test, correctnessNoMockOnModuleNamespaceTransportSecurity(true))
+	correctnessNoMockOnModuleNamespaceExpect(test, result, nil)
 }
 
 // Every way node:test reaches MockTracker, every method that redefines a property, a project module's
 // namespace as well as a builtin's, and the wrappers that change only the type.
-func TestCorrectnessNoMockOnModuleNamespaceFiresOnEveryMockOfANamespace(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoMockOnModuleNamespaceFiresOnEveryMockOfANamespace(test *testing.T) {
+	test.Parallel()
 
-	result := correctnessNoMockOnModuleNamespaceRun(t, correctnessNoMockOnModuleNamespaceSource(
+	result := correctnessNoMockOnModuleNamespaceRun(test, correctnessNoMockOnModuleNamespaceSource(
 		"import * as NodeOs from 'node:os';",
 		"import * as Store from './Store';",
 		"import test, { mock } from 'node:test';",
@@ -226,7 +242,7 @@ func TestCorrectnessNoMockOnModuleNamespaceFiresOnEveryMockOfANamespace(t *testi
 		"test.mock.method(NodeOs as typeof NodeOs, 'hostname');",
 		"test.mock.method(NodeOs!, 'hostname');",
 	))
-	correctnessNoMockOnModuleNamespaceExpect(t, result, []string{
+	correctnessNoMockOnModuleNamespaceExpect(test, result, []string{
 		"t.mock.method(Store, 'load')",
 		"mock.getter(NodeOs, 'EOL')",
 		"mock.setter(NodeOs, 'EOL')",
@@ -240,10 +256,10 @@ func TestCorrectnessNoMockOnModuleNamespaceFiresOnEveryMockOfANamespace(t *testi
 // The nearest legitimate shapes: another object of the same type, a default import, a member of the
 // namespace, a parameter shadowing the import, a mock that is not node:test's, and calls that patch
 // nothing.
-func TestCorrectnessNoMockOnModuleNamespaceStaysSilentOnOtherObjects(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoMockOnModuleNamespaceStaysSilentOnOtherObjects(test *testing.T) {
+	test.Parallel()
 
-	result := correctnessNoMockOnModuleNamespaceRun(t, correctnessNoMockOnModuleNamespaceSource(
+	result := correctnessNoMockOnModuleNamespaceRun(test, correctnessNoMockOnModuleNamespaceSource(
 		"import * as NodeChildProcess from 'node:child_process';",
 		"import * as NodeOs from 'node:os';",
 		"import fileSystem from 'node:fs';",
@@ -266,29 +282,29 @@ func TestCorrectnessNoMockOnModuleNamespaceStaysSilentOnOtherObjects(t *testing.
 		"mock.restoreAll();",
 		"patch({ execFileSync() { return ''; } });",
 	))
-	correctnessNoMockOnModuleNamespaceExpect(t, result, nil)
+	correctnessNoMockOnModuleNamespaceExpect(test, result, nil)
 }
 
 // A file that runs as an ES module whatever the program emits, and one that never does.
-func TestCorrectnessNoMockOnModuleNamespaceReadsTheFileExtension(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoMockOnModuleNamespaceReadsTheFileExtension(test *testing.T) {
+	test.Parallel()
 
 	source := correctnessNoMockOnModuleNamespaceSource(
 		"import * as NodeOs from 'node:os';",
 		"import { mock } from 'node:test';",
 		"mock.method(NodeOs, 'hostname');",
 	)
-	module := correctnessNoMockOnModuleNamespaceRunUnder(t, "commonjs", "/repository/source/Module.test.mts", source)
-	correctnessNoMockOnModuleNamespaceExpect(t, module, []string{"mock.method(NodeOs, 'hostname')"})
+	module := correctnessNoMockOnModuleNamespaceRunUnder(test, "commonjs", "/repository/source/Module.test.mts", source)
+	correctnessNoMockOnModuleNamespaceExpect(test, module, []string{"mock.method(NodeOs, 'hostname')"})
 
-	commonJs := correctnessNoMockOnModuleNamespaceRunUnder(t, "esnext", "/repository/source/Script.test.cts", source)
-	correctnessNoMockOnModuleNamespaceExpect(t, commonJs, nil)
+	commonJs := correctnessNoMockOnModuleNamespaceRunUnder(test, "esnext", "/repository/source/Script.test.cts", source)
+	correctnessNoMockOnModuleNamespaceExpect(test, commonJs, nil)
 }
 
 // A `.ts` file follows the program: reported under an ES `module` and `preserve`, declined under
 // CommonJS and under `nodenext`, where its format comes from a `package.json` the rule does not read.
-func TestCorrectnessNoMockOnModuleNamespaceReadsTheModuleOption(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoMockOnModuleNamespaceReadsTheModuleOption(test *testing.T) {
+	test.Parallel()
 
 	source := correctnessNoMockOnModuleNamespaceSource(
 		"import * as NodeOs from 'node:os';",
@@ -296,11 +312,21 @@ func TestCorrectnessNoMockOnModuleNamespaceReadsTheModuleOption(t *testing.T) {
 		"mock.method(NodeOs, 'hostname');",
 	)
 	for _, module := range []string{"esnext", "es2020", "preserve"} {
-		result := correctnessNoMockOnModuleNamespaceRunUnder(t, module, correctnessNoMockOnModuleNamespaceFile, source)
-		correctnessNoMockOnModuleNamespaceExpect(t, result, []string{"mock.method(NodeOs, 'hostname')"})
+		result := correctnessNoMockOnModuleNamespaceRunUnder(
+			test,
+			module,
+			correctnessNoMockOnModuleNamespaceFile,
+			source,
+		)
+		correctnessNoMockOnModuleNamespaceExpect(test, result, []string{"mock.method(NodeOs, 'hostname')"})
 	}
 	for _, module := range []string{"commonjs", "nodenext"} {
-		result := correctnessNoMockOnModuleNamespaceRunUnder(t, module, correctnessNoMockOnModuleNamespaceFile, source)
-		correctnessNoMockOnModuleNamespaceExpect(t, result, nil)
+		result := correctnessNoMockOnModuleNamespaceRunUnder(
+			test,
+			module,
+			correctnessNoMockOnModuleNamespaceFile,
+			source,
+		)
+		correctnessNoMockOnModuleNamespaceExpect(test, result, nil)
 	}
 }

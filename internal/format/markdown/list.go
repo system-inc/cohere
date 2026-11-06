@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/system-inc/cohere/internal/format/doc"
-	"github.com/system-inc/cohere/internal/format/printing"
 )
 
 // src/language-markdown/print/list.js, printList and printListItem (the legacy pair is MDX's).
@@ -14,13 +13,13 @@ import (
 // CommonMark: https://spec.commonmark.org/0.31.2/#ordered-list-marker
 const maximumOrderedListMarker = 999_999_999
 
-func printList(path *astPath, options *options, print printing.PrintFunc) doc.Doc {
+func printList(path *astPath, options *options, print printFunc) doc.Doc {
 	node := currentNode(path)
 	nthSiblingIndex := getNthListSiblingIndex(node, parentNode(path))
 
 	isGitDiffFriendlyOrderedList := hasGitDiffFriendlyOrderedList(node, options.OriginalText)
 
-	minIndent := requiredIndent(path)
+	minimumIndent := requiredIndent(path)
 
 	return printChildren(path, options, print, func(path *astPath) (doc.Doc, bool) {
 		getPrefix := func() string {
@@ -52,16 +51,16 @@ func printList(path *astPath, options *options, print printing.PrintFunc) doc.Do
 				prefix = alignListPrefix(rawPrefix, settingsOf(options))
 			}
 
-			if len(prefix) >= minIndent {
+			if len(prefix) >= minimumIndent {
 				return prefix
 			}
 
 			prefix = strings.TrimRight(prefix, javaScriptSpaceText)
-			trailingSpaces := min(minIndent-len(prefix), 4) // 5+ will cause indented code block
+			trailingSpaces := min(minimumIndent-len(prefix), 4) // 5+ will cause indented code block
 			if trailingSpaces > 0 {
 				prefix += strings.Repeat(" ", trailingSpaces)
 			}
-			leadingSpaces := min(minIndent-len(prefix), 3) // 4+ will cause indented code block
+			leadingSpaces := min(minimumIndent-len(prefix), 3) // 4+ will cause indented code block
 			if leadingSpaces > 0 {
 				prefix = strings.Repeat(" ", leadingSpaces) + prefix
 			}
@@ -85,7 +84,7 @@ func printList(path *astPath, options *options, print printing.PrintFunc) doc.Do
 	})
 }
 
-func printListItem(path *astPath, options *options, print printing.PrintFunc, listPrefix string) doc.Doc {
+func printListItem(path *astPath, options *options, print printFunc, listPrefix string) doc.Doc {
 	node := currentNode(path)
 	prefix := ""
 	if node.Checked != nil {
@@ -100,11 +99,14 @@ func printListItem(path *astPath, options *options, print printing.PrintFunc, li
 		printChildren(path, options, print, func(path *astPath) (doc.Doc, bool) {
 			child := currentNode(path)
 			if (path.IsFirst() && child.NodeType != "list") || (child.NodeType == "code" && child.IsIndented) {
-				return doc.AlignWithString(strings.Repeat(" ", len(prefix)), print(nil, nil)), true
+				return doc.AlignWithString(strings.Repeat(" ", len(prefix)), print("", nil)), true
 			}
 
-			alignment := strings.Repeat(" ", clamp(settingsOf(options).tabWidth-len(listPrefix), 0, 3)) // 4+ will cause indented code block
-			return doc.Concat{doc.Text(alignment), doc.AlignWithString(alignment, print(nil, nil))}, true
+			alignment := strings.Repeat(
+				" ",
+				clamp(settingsOf(options).tabWidth-len(listPrefix), 0, 3),
+			) // 4+ will cause indented code block
+			return doc.Concat{doc.Text(alignment), doc.AlignWithString(alignment, print("", nil))}, true
 		}),
 	}
 }

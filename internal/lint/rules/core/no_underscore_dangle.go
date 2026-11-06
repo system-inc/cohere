@@ -10,7 +10,7 @@ import (
 
 // NoUnderscoreDangleOptions carries upstream's nine options.
 //
-// # THREE of the nine default to TRUE, and the Go zero value is wrong for all three
+// # Three of the nine default to true, and the Go zero value is wrong for all three
 //
 // A first draft of this rule assumed every default was the zero value, wrote that down as a reasoned
 // observation, and was wrong about `allowFunctionParams`, `allowInArrayDestructuring` and
@@ -23,7 +23,7 @@ import (
 //	enforceInClassFields: false    enforceInMethodNames: false
 //
 // So out of the box `function foo(_bar) {}`, `const [_foo] = arr` and `const { _foo } = obj` are all
-// CLEAN, and twelve of upstream's valid cases assert exactly that. The corpus caught this; nothing
+// clean, and twelve of upstream's valid cases assert exactly that. The corpus caught this; nothing
 // in the source's shape suggests it.
 //
 // The three are pointers rather than bools for that reason. A `*bool` distinguishes "absent, so use
@@ -38,15 +38,15 @@ type NoUnderscoreDangleOptions struct {
 	AllowAfterSuper bool `json:"allowAfterSuper"`
 	// AllowAfterThisConstructor permits `this.constructor._foo`.
 	AllowAfterThisConstructor bool `json:"allowAfterThisConstructor"`
-	// EnforceInMethodNames turns the method-name arm ON. Off by default.
+	// EnforceInMethodNames turns the method-name arm on. Off by default.
 	EnforceInMethodNames bool `json:"enforceInMethodNames"`
-	// AllowFunctionParams permits an underscored parameter name. Defaults TRUE.
-	AllowFunctionParams *bool `json:"allowFunctionParams"`
-	// EnforceInClassFields turns the class-field arm ON. Off by default.
+	// AllowFunctionParameters permits an underscored parameter name. Defaults true.
+	AllowFunctionParameters *bool `json:"allowFunctionParams"`
+	// EnforceInClassFields turns the class-field arm on. Off by default.
 	EnforceInClassFields bool `json:"enforceInClassFields"`
-	// AllowInArrayDestructuring permits a name coined by an array pattern. Defaults TRUE.
+	// AllowInArrayDestructuring permits a name coined by an array pattern. Defaults true.
 	AllowInArrayDestructuring *bool `json:"allowInArrayDestructuring"`
-	// AllowInObjectDestructuring permits a name coined by an object pattern. Defaults TRUE.
+	// AllowInObjectDestructuring permits a name coined by an object pattern. Defaults true.
 	AllowInObjectDestructuring *bool `json:"allowInObjectDestructuring"`
 }
 
@@ -54,9 +54,9 @@ type NoUnderscoreDangleOptions struct {
 //
 // # The config layer hands this a different shape than a fixture does
 //
-// `internal/lint/configuration/configuration.go` keeps `setting.Options = tuple[1]`, a single JSON
+// `internal/lint/configuration/load.go` keeps `setting.Options = tuple[1]`, a single JSON
 // value after the severity, while ESLint's `context.options` is every element after it. This rule's
-// `meta.schema` declares ONE element, so the two coincide and the object arrives whole. Written out
+// `meta.schema` declares one element, so the two coincide and the object arrives whole. Written out
 // rather than assumed: a decoder wrong for the config shape passes every fixture, because a fixture
 // hands it bytes the test built rather than bytes the config layer sliced.
 //
@@ -65,13 +65,13 @@ type NoUnderscoreDangleOptions struct {
 // four of them start with `allow` and two with `enforce`, and `allowInMethodNames` is a plausible
 // thing to type for `enforceInMethodNames`. Silently ignoring it would leave a project believing it
 // had turned an arm off when it had never been on.
-func DecodeNoUnderscoreDangleOptions(raw []byte) (any, error) {
+func DecodeNoUnderscoreDangleOptions(raw []byte) (NoUnderscoreDangleOptions, error) {
 	var options NoUnderscoreDangleOptions
 	if len(raw) == 0 {
 		return options, nil
 	}
-	if err := rule.UnmarshalOptions(raw, &options); err != nil {
-		return options, fmt.Errorf("no-underscore-dangle: %w", err)
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &options); unmarshalOptionsError != nil {
+		return options, fmt.Errorf("no-underscore-dangle: %w", unmarshalOptionsError)
 	}
 	return options, nil
 }
@@ -106,7 +106,7 @@ var messageNoUnderscoreDangle = rule.Message{
 // Upstream registers eight listeners over five judgments: a function's own name, a function's
 // parameters, a variable declarator's bindings, a member access, a method name, and a class field.
 // The last two are gated behind `enforceInMethodNames` and `enforceInClassFields`, both defaulting
-// FALSE, so out of the box this rule says nothing about `class A { _method() {} }`. That is worth
+// false, so out of the box this rule says nothing about `class A { _method() {} }`. That is worth
 // stating because the audit's violation count was taken with the defaults, and turning either flag
 // on is a different rule.
 //
@@ -120,10 +120,10 @@ var messageNoUnderscoreDangle = rule.Message{
 //	`#name`              a private identifier renders with its hash in the message, in the method and
 //	                     class-field arms. Measured: `#_bar` reports as "'#_bar'".
 //
-// # The destructuring arms ask which pattern COINED the name, not which pattern contains it
+// # The destructuring arms ask which pattern coined the name, not which pattern contains it
 //
 // Upstream walks up from the identifier to the first `VariableDeclarator`, `ArrayPattern` or
-// `ObjectPattern` and tests THAT node's type. So in
+// `ObjectPattern` and tests that node's type. So in
 // `const { foo: [_bar, { a: _a }] } = ...` the name `_bar` is coined by an array pattern and `_a` by
 // an object one, in the same declarator, and the two flags exempt them independently. Upstream's
 // corpus asserts exactly that with `allowInArrayDestructuring: true, allowInObjectDestructuring:
@@ -132,11 +132,11 @@ var messageNoUnderscoreDangle = rule.Message{
 // A port testing "is this declarator's binding a pattern at all" collapses the two flags into one
 // and passes most of the corpus. The nested case is what separates them.
 //
-// # The span is the DECLARATOR, not the identifier, and several findings can share it
+// # The span is the declarator, not the identifier, and several findings can share it
 //
 // Upstream reports `node` from the `VariableDeclarator` listener, so every underscored name a
 // declarator coins reports at the same span covering the whole declaration. Measured:
-// `const { foo: [_bar, { a: _a, b } ] } = ...` produces TWO findings, both at columns 7 to 72, whose
+// `const { foo: [_bar, { a: _a, b } ] } = ...` produces two findings, both at columns 7 to 72, whose
 // only difference is the identifier in the message. A port asserting one finding per span, or
 // anchoring on the identifier, is wrong on both counts and a message-id fixture cannot see it.
 //
@@ -148,13 +148,13 @@ var messageNoUnderscoreDangle = rule.Message{
 //
 // `meta.fixable` is unset and the rule is `frozen`. Renaming an identifier is a refactor across
 // every reference, which a span-local repair cannot do.
-var NoUnderscoreDangle = rule.Rule{
+var NoUnderscoreDangle = rule.Rule[NoUnderscoreDangleOptions]{
 	Name: "no-underscore-dangle",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, _ := rule.OptionsAs[NoUnderscoreDangleOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[NoUnderscoreDangleOptions]) rule.Listeners {
+		settings, _ := options.Read()
 
 		reportNamed := func(node *ast.Node, identifier string) {
-			ctx.ReportNode(node, rule.Message{
+			ruleContext.ReportNode(node, rule.Message{
 				Id: messageNoUnderscoreDangle.Id,
 				Description: fmt.Sprintf("Unexpected dangling '_' in '%s'. %s",
 					identifier, messageNoUnderscoreDangle.Description),
@@ -162,7 +162,7 @@ var NoUnderscoreDangle = rule.Rule{
 		}
 
 		checkFunction := func(node *ast.Node) {
-			// Upstream checks the NAME only for a FunctionDeclaration. A named function expression
+			// Upstream checks the name only for a FunctionDeclaration. A named function expression
 			// or an arrow assigned to a variable is not checked here; the variable arm catches the
 			// binding instead.
 			if node.Kind == ast.KindFunctionDeclaration {
@@ -172,7 +172,7 @@ var NoUnderscoreDangle = rule.Rule{
 					}
 				}
 			}
-			if noUnderscoreDangleFlag(settings.AllowFunctionParams, true) {
+			if noUnderscoreDangleFlag(settings.AllowFunctionParameters, true) {
 				return
 			}
 			functionLike := node.FunctionLikeData()
@@ -190,7 +190,7 @@ var NoUnderscoreDangle = rule.Rule{
 					continue
 				}
 				if noUnderscoreDangleReportable(name.Text(), settings) {
-					// The PARAMETER is reported, not its name. Measured at columns 14 to 22 for
+					// The parameter is reported, not its name. Measured at columns 14 to 22 for
 					// `function foo(_bar = 0) {}`, which covers the default too.
 					reportNamed(parameter, name.Text())
 				}
@@ -237,7 +237,7 @@ var NoUnderscoreDangle = rule.Rule{
 			}
 			// A private identifier's Text() already carries the leading hash here, which is what
 			// upstream builds by hand with a template literal. The dangling test runs on the name
-			// WITHOUT the hash, so `#_bar` is dangling and `#bar` is not.
+			// without the hash, so `#_bar` is dangling and `#bar` is not.
 			identifier := name.Text()
 			bare := identifier
 			if name.Kind == ast.KindPrivateIdentifier {
@@ -277,7 +277,7 @@ var NoUnderscoreDangle = rule.Rule{
 							noUnderscoreDangleFlag(settings.AllowInObjectDestructuring, true) {
 							return
 						}
-						// The DECLARATOR is reported, so several findings share one span.
+						// The declarator is reported, so several findings share one span.
 						reportNamed(node, name)
 					})
 			},
@@ -291,9 +291,9 @@ var NoUnderscoreDangle = rule.Rule{
 			// an object literal method its own kind, so both arrive here.
 			ast.KindMethodDeclaration: func(node *ast.Node) {
 				checkMemberName(node, settings.EnforceInMethodNames)
-				// A method's PARAMETERS are checked whatever `enforceInMethodNames` says, because
+				// A method's parameters are checked whatever `enforceInMethodNames` says, because
 				// upstream reaches them through its FunctionExpression listener: in ESTree a
-				// method's value IS a FunctionExpression. Our parser has no such wrapper, so
+				// method's value is a FunctionExpression. Our parser has no such wrapper, so
 				// without this line `const o = { onClick(_bar) {} }` is silently unchecked. Three
 				// of upstream's reporting cases are exactly that shape.
 				checkFunction(node)
@@ -313,7 +313,7 @@ func noUnderscoreDangleReportable(identifier string, settings NoUnderscoreDangle
 
 // noUnderscoreDangleHasDanglingUnderscore is upstream's `hasDanglingUnderscore`.
 //
-// The `identifier !== "_"` clause lives INSIDE this test rather than beside one arm, which is what
+// The `identifier !== "_"` clause lives inside this test rather than beside one arm, which is what
 // makes `var _ = require('underscore')` clean everywhere at once. A port hoisting that exemption
 // into the variable arm alone passes the corpus, whose only `_` case is a variable.
 func noUnderscoreDangleHasDanglingUnderscore(identifier string) bool {
@@ -341,12 +341,12 @@ func noUnderscoreDangleIsThisConstructor(expression *ast.Node) bool {
 // it.
 //
 // `coinedBy` is upstream's walk up to the nearest `VariableDeclarator`, `ArrayPattern` or
-// `ObjectPattern`, expressed as a walk DOWN instead: the enclosing pattern is known on the way in,
+// `ObjectPattern`, expressed as a walk down instead: the enclosing pattern is known on the way in,
 // so no parent chain is needed. A plain `const _foo = 1` has no pattern at all and reports under
 // both flags, which upstream gets from landing on the VariableDeclarator.
 //
 // The recursion is what the nested case needs. `const { foo: [_bar, { a: _a }] }` coins `_bar` under
-// an ARRAY pattern and `_a` under an OBJECT one, and the two flags exempt them independently.
+// an array pattern and `_a` under an object one, and the two flags exempt them independently.
 func noUnderscoreDangleWalkBindings(node *ast.Node, root *ast.Node, visit func(string, ast.Kind)) {
 	if node == nil {
 		return

@@ -9,11 +9,18 @@ import (
 
 // reactComponentNoDisplayNameText is the rule's message, whose wording lives in
 // `policy/messages/react-component-no-display-name.json`.
-var reactComponentNoDisplayNameText = policy.MessageOf("structure/react-component-no-display-name", "noDisplayNameAssignment")
+var reactComponentNoDisplayNameText = policy.MessageOf(
+	"structure/react-component-no-display-name",
+	"noDisplayNameAssignment",
+)
 
-// messageNoDisplayNameAssignment is the finding, rendered when it is reported so the text comes from the current catalog.
+// messageNoDisplayNameAssignment is the finding, rendered when it is reported so the text comes from the current
+// catalog.
 func messageNoDisplayNameAssignment() rule.Message {
-	return rule.Message{Id: reactComponentNoDisplayNameText.Id, Description: reactComponentNoDisplayNameText.Render(nil)}
+	return rule.Message{
+		Id:          reactComponentNoDisplayNameText.Id,
+		Description: reactComponentNoDisplayNameText.Render(nil),
+	}
 }
 
 // anonymousComponentWrapperNames are the wrappers whose result carries no name of its own.
@@ -62,9 +69,9 @@ var anonymousComponentWrapperNames = map[string]bool{
 // is the right one, because `Field.displayName = 'x'` above `const Field = memo(...)` is a
 // temporal dead zone error at runtime anyway. A rule that exempted it would be excusing code that
 // cannot run.
-var ReactComponentNoDisplayName = rule.Rule{
+var ReactComponentNoDisplayName = rule.Rule[rule.NoOptions]{
 	Name: "structure/react-component-no-display-name",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// Scoped to this file's walk, which is the whole lifetime that matters: the original keys
 		// the same set on one `create` call per file.
 		wrappedAsAnonymous := map[string]bool{}
@@ -111,13 +118,13 @@ var ReactComponentNoDisplayName = rule.Rule{
 					return
 				}
 				if componentNames == nil {
-					componentNames = componentsDeclaredAtTopLevel(ctx.SourceFile.AsNode())
+					componentNames = componentsDeclaredAtTopLevel(ruleContext.SourceFile.AsNode())
 				}
 				if !componentNames[target.Text()] {
 					return
 				}
 
-				ctx.ReportNode(node, messageNoDisplayNameAssignment())
+				ruleContext.ReportNode(node, messageNoDisplayNameAssignment())
 			},
 		}
 	},
@@ -158,7 +165,9 @@ func componentsDeclaredAtTopLevel(sourceFile *ast.Node) map[string]bool {
 				initializer := ast.SkipParentheses(declaration.Initializer)
 				// A memo or forwardRef result is a component too. Declared above the assignment it is exempt,
 				// by the walk; below it, the assignment is a temporal dead zone error and reports.
-				if IsLikelyReactComponent(initializer) || react.IsEs6ComponentClass(initializer) || isAnonymousWrapperCall(initializer) {
+				if IsLikelyReactComponent(initializer) ||
+					react.IsEs6ComponentClass(initializer) ||
+					isAnonymousWrapperCall(initializer) {
 					record(declaration.Name())
 				}
 			}
@@ -179,12 +188,12 @@ func isAnonymousWrapperCall(initializer *ast.Node) bool {
 	if initializer == nil {
 		return false
 	}
-	initializer = ast.SkipParentheses(initializer)
-	if initializer == nil || initializer.Kind != ast.KindCallExpression {
+	unwrapped := ast.SkipParentheses(initializer)
+	if unwrapped == nil || unwrapped.Kind != ast.KindCallExpression {
 		return false
 	}
 
-	callee := ast.SkipParentheses(initializer.AsCallExpression().Expression)
+	callee := ast.SkipParentheses(unwrapped.AsCallExpression().Expression)
 	if callee == nil {
 		return false
 	}

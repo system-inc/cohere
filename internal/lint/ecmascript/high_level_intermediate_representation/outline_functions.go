@@ -35,6 +35,8 @@ import (
 // that clause has nothing to select and is not ported -- recorded here rather than silently absent.
 //
 // Recursive, because an inner function may itself be capture-free.
+//
+// Mutates: function the pass rewrites the caller's function in place and records what it lifted on it
 func OutlineFunctions(function *Function) int {
 	if function == nil {
 		return 0
@@ -61,7 +63,7 @@ func OutlineFunctions(function *Function) int {
 				continue
 			}
 			if nested.Name != "" {
-				// Upstream: "TODO: handle outlining named functions".
+				// Upstream: `TODO: handle outlining named functions`.
 				continue
 			}
 			// The lifted function's name is not observable here -- nothing in this tree emits code,
@@ -109,8 +111,8 @@ func outlinedFunctionByName(function *Function, name string) (FunctionId, bool) 
 	if suffix == "" {
 		return 0, len(function.Functions) > 0
 	}
-	parsed, err := strconv.Atoi(suffix)
-	if err != nil || parsed < 1 {
+	parsed, parseError := strconv.Atoi(suffix)
+	if parseError != nil || parsed < 1 {
 		return 0, false
 	}
 	id := FunctionId(parsed - 1)

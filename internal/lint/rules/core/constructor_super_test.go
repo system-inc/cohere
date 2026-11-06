@@ -32,8 +32,8 @@ const constructorSuperFile = "/repository/source/Subject.js"
 //
 // Grouped by message id rather than left in corpus order, because the grouping is the rule's real
 // shape: four judgments, and which one an input lands in is the entire question.
-func TestConstructorSuperFires(t *testing.T) {
-	t.Parallel()
+func TestConstructorSuperFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -43,16 +43,56 @@ func TestConstructorSuperFires(t *testing.T) {
 		// missingAll: 15 inputs
 		{`class A extends null { constructor() { } }`, `class A extends null { constructor() { } }`, `missingAll`},
 		{`class A extends B { constructor() { } }`, `class A extends B { constructor() { } }`, `missingAll`},
-		{`class A extends B { constructor() { for (var a of b) super.f`, `class A extends B { constructor() { for (var a of b) super.foo(); } }`, `missingAll`},
-		{`class A extends B { constructor() { for (var i = 1; i < 10; `, `class A extends B { constructor() { for (var i = 1; i < 10; i++) super.foo(); } }`, `missingAll`},
-		{`class A extends B { constructor() { var c = class extends D `, `class A extends B { constructor() { var c = class extends D { constructor() { super(); } } } }`, `missingAll`},
-		{`class A extends B { constructor() { var c = () => super(); }`, `class A extends B { constructor() { var c = () => super(); } }`, `missingAll`},
-		{`class A extends B { constructor() { class C extends D { cons`, `class A extends B { constructor() { class C extends D { constructor() { super(); } } } }`, `missingAll`},
-		{`class A extends B { constructor() { var C = class extends D `, `class A extends B { constructor() { var C = class extends D { constructor() { super(); } } } }`, `missingAll`},
-		{`class A extends B { constructor() { super(); class C extends`, `class A extends B { constructor() { super(); class C extends D { constructor() { } } } }`, `missingAll`},
-		{`class A extends B { constructor() { super(); var C = class e`, `class A extends B { constructor() { super(); var C = class extends D { constructor() { } } } }`, `missingAll`},
-		{`class A extends B { constructor() { a && super(); } }`, `class A extends B { constructor() { a && super(); } }`, `missingAll`},
-		{`class A extends B { constructor() { return; super(); } }`, `class A extends B { constructor() { return; super(); } }`, `missingAll`},
+		{
+			`class A extends B { constructor() { for (var a of b) super.f`,
+			`class A extends B { constructor() { for (var a of b) super.foo(); } }`,
+			`missingAll`,
+		},
+		{
+			`class A extends B { constructor() { for (var i = 1; i < 10; `,
+			`class A extends B { constructor() { for (var i = 1; i < 10; i++) super.foo(); } }`,
+			`missingAll`,
+		},
+		{
+			`class A extends B { constructor() { var c = class extends D `,
+			`class A extends B { constructor() { var c = class extends D { constructor() { super(); } } } }`,
+			`missingAll`,
+		},
+		{
+			`class A extends B { constructor() { var c = () => super(); }`,
+			`class A extends B { constructor() { var c = () => super(); } }`,
+			`missingAll`,
+		},
+		{
+			`class A extends B { constructor() { class C extends D { cons`,
+			`class A extends B { constructor() { class C extends D { constructor() { super(); } } } }`,
+			`missingAll`,
+		},
+		{
+			`class A extends B { constructor() { var C = class extends D `,
+			`class A extends B { constructor() { var C = class extends D { constructor() { super(); } } } }`,
+			`missingAll`,
+		},
+		{
+			`class A extends B { constructor() { super(); class C extends`,
+			`class A extends B { constructor() { super(); class C extends D { constructor() { } } } }`,
+			`missingAll`,
+		},
+		{
+			`class A extends B { constructor() { super(); var C = class e`,
+			`class A extends B { constructor() { super(); var C = class extends D { constructor() { } } } }`,
+			`missingAll`,
+		},
+		{
+			`class A extends B { constructor() { a && super(); } }`,
+			`class A extends B { constructor() { a && super(); } }`,
+			`missingAll`,
+		},
+		{
+			`class A extends B { constructor() { return; super(); } }`,
+			`class A extends B { constructor() { return; super(); } }`,
+			`missingAll`,
+		},
 		{`class Foo extends Bar { constructor() { for (a in b) for (c `, `class Foo extends Bar {
                             constructor() {
                                 for (a in b) for (c in d);
@@ -79,14 +119,46 @@ func TestConstructorSuperFires(t *testing.T) {
 
                         }`, `missingAll`},
 		// missingSome: 13 inputs
-		{`class A extends B { constructor() { if (a) super(); } }`, `class A extends B { constructor() { if (a) super(); } }`, `missingSome`},
-		{`class A extends B { constructor() { if (a); else super(); } `, `class A extends B { constructor() { if (a); else super(); } }`, `missingSome`},
-		{`class A extends B { constructor() { switch (a) { case 0: sup`, `class A extends B { constructor() { switch (a) { case 0: super(); } } }`, `missingSome`},
-		{`class A extends B { constructor() { switch (a) { case 0: bre`, `class A extends B { constructor() { switch (a) { case 0: break; default: super(); } } }`, `missingSome`},
-		{`class A extends B { constructor() { try { super(); } catch (`, `class A extends B { constructor() { try { super(); } catch (err) {} } }`, `missingSome`},
-		{`class A extends B { constructor() { try { a; } catch (err) {`, `class A extends B { constructor() { try { a; } catch (err) { super(); } } }`, `missingSome`},
-		{`class A extends B { constructor() { if (a) return; super(); `, `class A extends B { constructor() { if (a) return; super(); } }`, `missingSome`},
-		{`class A extends B { constructor(a) { while (a) super(); } }`, `class A extends B { constructor(a) { while (a) super(); } }`, `missingSome`},
+		{
+			`class A extends B { constructor() { if (a) super(); } }`,
+			`class A extends B { constructor() { if (a) super(); } }`,
+			`missingSome`,
+		},
+		{
+			`class A extends B { constructor() { if (a); else super(); } `,
+			`class A extends B { constructor() { if (a); else super(); } }`,
+			`missingSome`,
+		},
+		{
+			`class A extends B { constructor() { switch (a) { case 0: sup`,
+			`class A extends B { constructor() { switch (a) { case 0: super(); } } }`,
+			`missingSome`,
+		},
+		{
+			`class A extends B { constructor() { switch (a) { case 0: bre`,
+			`class A extends B { constructor() { switch (a) { case 0: break; default: super(); } } }`,
+			`missingSome`,
+		},
+		{
+			`class A extends B { constructor() { try { super(); } catch (`,
+			`class A extends B { constructor() { try { super(); } catch (err) {} } }`,
+			`missingSome`,
+		},
+		{
+			`class A extends B { constructor() { try { a; } catch (err) {`,
+			`class A extends B { constructor() { try { a; } catch (err) { super(); } } }`,
+			`missingSome`,
+		},
+		{
+			`class A extends B { constructor() { if (a) return; super(); `,
+			`class A extends B { constructor() { if (a) return; super(); } }`,
+			`missingSome`,
+		},
+		{
+			`class A extends B { constructor(a) { while (a) super(); } }`,
+			`class A extends B { constructor(a) { while (a) super(); } }`,
+			`missingSome`,
+		},
 		{`class C extends D { constructor() { do { super(); } while (f`, `class C extends D {
 
                             constructor() {
@@ -130,29 +202,89 @@ func TestConstructorSuperFires(t *testing.T) {
             }
         }`, `missingSome`},
 		// badSuper: 11 inputs
-		{`class A extends null { constructor() { super(); } }`, `class A extends null { constructor() { super(); } }`, `badSuper`},
-		{`class A extends 100 { constructor() { super(); } }`, `class A extends 100 { constructor() { super(); } }`, `badSuper`},
-		{`class A extends 'test' { constructor() { super(); } }`, `class A extends 'test' { constructor() { super(); } }`, `badSuper`},
-		{`class A extends (B = 5) { constructor() { super(); } }`, `class A extends (B = 5) { constructor() { super(); } }`, `badSuper`},
-		{`class A extends (B && 5) { constructor() { super(); } }`, `class A extends (B && 5) { constructor() { super(); } }`, `badSuper`},
-		{`class A extends (B &&= 5) { constructor() { super(); } }`, `class A extends (B &&= 5) { constructor() { super(); } }`, `badSuper`},
-		{`class A extends (B += C) { constructor() { super(); } }`, `class A extends (B += C) { constructor() { super(); } }`, `badSuper`},
-		{`class A extends (B -= C) { constructor() { super(); } }`, `class A extends (B -= C) { constructor() { super(); } }`, `badSuper`},
-		{`class A extends (B **= C) { constructor() { super(); } }`, `class A extends (B **= C) { constructor() { super(); } }`, `badSuper`},
-		{`class A extends (B |= C) { constructor() { super(); } }`, `class A extends (B |= C) { constructor() { super(); } }`, `badSuper`},
-		{`class A extends (B &= C) { constructor() { super(); } }`, `class A extends (B &= C) { constructor() { super(); } }`, `badSuper`},
+		{
+			`class A extends null { constructor() { super(); } }`,
+			`class A extends null { constructor() { super(); } }`,
+			`badSuper`,
+		},
+		{
+			`class A extends 100 { constructor() { super(); } }`,
+			`class A extends 100 { constructor() { super(); } }`,
+			`badSuper`,
+		},
+		{
+			`class A extends 'test' { constructor() { super(); } }`,
+			`class A extends 'test' { constructor() { super(); } }`,
+			`badSuper`,
+		},
+		{
+			`class A extends (B = 5) { constructor() { super(); } }`,
+			`class A extends (B = 5) { constructor() { super(); } }`,
+			`badSuper`,
+		},
+		{
+			`class A extends (B && 5) { constructor() { super(); } }`,
+			`class A extends (B && 5) { constructor() { super(); } }`,
+			`badSuper`,
+		},
+		{
+			`class A extends (B &&= 5) { constructor() { super(); } }`,
+			`class A extends (B &&= 5) { constructor() { super(); } }`,
+			`badSuper`,
+		},
+		{
+			`class A extends (B += C) { constructor() { super(); } }`,
+			`class A extends (B += C) { constructor() { super(); } }`,
+			`badSuper`,
+		},
+		{
+			`class A extends (B -= C) { constructor() { super(); } }`,
+			`class A extends (B -= C) { constructor() { super(); } }`,
+			`badSuper`,
+		},
+		{
+			`class A extends (B **= C) { constructor() { super(); } }`,
+			`class A extends (B **= C) { constructor() { super(); } }`,
+			`badSuper`,
+		},
+		{
+			`class A extends (B |= C) { constructor() { super(); } }`,
+			`class A extends (B |= C) { constructor() { super(); } }`,
+			`badSuper`,
+		},
+		{
+			`class A extends (B &= C) { constructor() { super(); } }`,
+			`class A extends (B &= C) { constructor() { super(); } }`,
+			`badSuper`,
+		},
 		// duplicate: 4 inputs
-		{`class A extends B { constructor() { super(); super(); } }`, `class A extends B { constructor() { super(); super(); } }`, `duplicate`},
-		{`class A extends B { constructor() { super() || super(); } }`, `class A extends B { constructor() { super() || super(); } }`, `duplicate`},
-		{`class A extends B { constructor() { if (a) super(); super();`, `class A extends B { constructor() { if (a) super(); super(); } }`, `duplicate`},
-		{`class A extends B { constructor() { switch (a) { case 0: sup (2)`, `class A extends B { constructor() { switch (a) { case 0: super(); default: super(); } } }`, `duplicate`},
+		{
+			`class A extends B { constructor() { super(); super(); } }`,
+			`class A extends B { constructor() { super(); super(); } }`,
+			`duplicate`,
+		},
+		{
+			`class A extends B { constructor() { super() || super(); } }`,
+			`class A extends B { constructor() { super() || super(); } }`,
+			`duplicate`,
+		},
+		{
+			`class A extends B { constructor() { if (a) super(); super();`,
+			`class A extends B { constructor() { if (a) super(); super(); } }`,
+			`duplicate`,
+		},
+		{
+			`class A extends B { constructor() { switch (a) { case 0: sup (2)`,
+			`class A extends B { constructor() { switch (a) { case 0: super(); default: super(); } } }`,
+			`duplicate`,
+		},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, ConstructorSuper, constructorSuperFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, ConstructorSuper, constructorSuperFile, testCase.sourceText),
 				testCase.messageId)
 		})
 	}
@@ -166,8 +298,8 @@ func TestConstructorSuperFires(t *testing.T) {
 // reports it wrongly. `for (const a of list) { if (a.foo) { super(a); return; } } super();` is
 // clean because the loop body may run zero times and the trailing call covers that, which is the
 // same reasoning that makes the loop cases in the fail list fire.
-func TestConstructorSuperStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestConstructorSuperStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -178,35 +310,119 @@ func TestConstructorSuperStaysSilent(t *testing.T) {
 		{`class A extends null { }`, `class A extends null { }`},
 		{`class A extends B { }`, `class A extends B { }`},
 		{`class A extends B { constructor() { super(); } }`, `class A extends B { constructor() { super(); } }`},
-		{`class A extends B { constructor() { if (true) { super(); } e`, `class A extends B { constructor() { if (true) { super(); } else { super(); } } }`},
-		{`class A extends (class B {}) { constructor() { super(); } }`, `class A extends (class B {}) { constructor() { super(); } }`},
-		{`class A extends (B = C) { constructor() { super(); } }`, `class A extends (B = C) { constructor() { super(); } }`},
-		{`class A extends (B &&= C) { constructor() { super(); } }`, `class A extends (B &&= C) { constructor() { super(); } }`},
-		{`class A extends (B ||= C) { constructor() { super(); } }`, `class A extends (B ||= C) { constructor() { super(); } }`},
-		{`class A extends (B ??= C) { constructor() { super(); } }`, `class A extends (B ??= C) { constructor() { super(); } }`},
-		{`class A extends (B ||= 5) { constructor() { super(); } }`, `class A extends (B ||= 5) { constructor() { super(); } }`},
-		{`class A extends (B ??= 5) { constructor() { super(); } }`, `class A extends (B ??= 5) { constructor() { super(); } }`},
-		{`class A extends (B || C) { constructor() { super(); } }`, `class A extends (B || C) { constructor() { super(); } }`},
-		{`class A extends (5 && B) { constructor() { super(); } }`, `class A extends (5 && B) { constructor() { super(); } }`},
-		{`class A extends (false && B) { constructor() { super(); } }`, `class A extends (false && B) { constructor() { super(); } }`},
-		{`class A extends (B || 5) { constructor() { super(); } }`, `class A extends (B || 5) { constructor() { super(); } }`},
-		{`class A extends (B ?? 5) { constructor() { super(); } }`, `class A extends (B ?? 5) { constructor() { super(); } }`},
-		{`class A extends (a ? B : C) { constructor() { super(); } }`, `class A extends (a ? B : C) { constructor() { super(); } }`},
-		{`class A extends (B, C) { constructor() { super(); } }`, `class A extends (B, C) { constructor() { super(); } }`},
-		{`class A { constructor() { class B extends C { constructor() `, `class A { constructor() { class B extends C { constructor() { super(); } } } }`},
-		{`class A extends B { constructor() { super(); class C extends`, `class A extends B { constructor() { super(); class C extends D { constructor() { super(); } } } }`},
-		{`class A extends B { constructor() { super(); class C { const`, `class A extends B { constructor() { super(); class C { constructor() { } } } }`},
-		{`class A extends B { constructor() { a ? super() : super(); }`, `class A extends B { constructor() { a ? super() : super(); } }`},
-		{`class A extends B { constructor() { if (a) super(); else sup`, `class A extends B { constructor() { if (a) super(); else super(); } }`},
-		{`class A extends B { constructor() { switch (a) { case 0: sup`, `class A extends B { constructor() { switch (a) { case 0: super(); break; default: super(); } } }`},
-		{`class A extends B { constructor() { try {} finally { super()`, `class A extends B { constructor() { try {} finally { super(); } } }`},
-		{`class A extends B { constructor() { if (a) throw Error(); su`, `class A extends B { constructor() { if (a) throw Error(); super(); } }`},
-		{`class A extends B { constructor() { if (true) return a; supe`, `class A extends B { constructor() { if (true) return a; super(); } }`},
-		{`class A extends null { constructor() { return a; } }`, `class A extends null { constructor() { return a; } }`},
+		{
+			`class A extends B { constructor() { if (true) { super(); } e`,
+			`class A extends B { constructor() { if (true) { super(); } else { super(); } } }`,
+		},
+		{
+			`class A extends (class B {}) { constructor() { super(); } }`,
+			`class A extends (class B {}) { constructor() { super(); } }`,
+		},
+		{
+			`class A extends (B = C) { constructor() { super(); } }`,
+			`class A extends (B = C) { constructor() { super(); } }`,
+		},
+		{
+			`class A extends (B &&= C) { constructor() { super(); } }`,
+			`class A extends (B &&= C) { constructor() { super(); } }`,
+		},
+		{
+			`class A extends (B ||= C) { constructor() { super(); } }`,
+			`class A extends (B ||= C) { constructor() { super(); } }`,
+		},
+		{
+			`class A extends (B ??= C) { constructor() { super(); } }`,
+			`class A extends (B ??= C) { constructor() { super(); } }`,
+		},
+		{
+			`class A extends (B ||= 5) { constructor() { super(); } }`,
+			`class A extends (B ||= 5) { constructor() { super(); } }`,
+		},
+		{
+			`class A extends (B ??= 5) { constructor() { super(); } }`,
+			`class A extends (B ??= 5) { constructor() { super(); } }`,
+		},
+		{
+			`class A extends (B || C) { constructor() { super(); } }`,
+			`class A extends (B || C) { constructor() { super(); } }`,
+		},
+		{
+			`class A extends (5 && B) { constructor() { super(); } }`,
+			`class A extends (5 && B) { constructor() { super(); } }`,
+		},
+		{
+			`class A extends (false && B) { constructor() { super(); } }`,
+			`class A extends (false && B) { constructor() { super(); } }`,
+		},
+		{
+			`class A extends (B || 5) { constructor() { super(); } }`,
+			`class A extends (B || 5) { constructor() { super(); } }`,
+		},
+		{
+			`class A extends (B ?? 5) { constructor() { super(); } }`,
+			`class A extends (B ?? 5) { constructor() { super(); } }`,
+		},
+		{
+			`class A extends (a ? B : C) { constructor() { super(); } }`,
+			`class A extends (a ? B : C) { constructor() { super(); } }`,
+		},
+		{
+			`class A extends (B, C) { constructor() { super(); } }`,
+			`class A extends (B, C) { constructor() { super(); } }`,
+		},
+		{
+			`class A { constructor() { class B extends C { constructor() `,
+			`class A { constructor() { class B extends C { constructor() { super(); } } } }`,
+		},
+		{
+			`class A extends B { constructor() { super(); class C extends`,
+			`class A extends B { constructor() { super(); class C extends D { constructor() { super(); } } } }`,
+		},
+		{
+			`class A extends B { constructor() { super(); class C { const`,
+			`class A extends B { constructor() { super(); class C { constructor() { } } } }`,
+		},
+		{
+			`class A extends B { constructor() { a ? super() : super(); }`,
+			`class A extends B { constructor() { a ? super() : super(); } }`,
+		},
+		{
+			`class A extends B { constructor() { if (a) super(); else sup`,
+			`class A extends B { constructor() { if (a) super(); else super(); } }`,
+		},
+		{
+			`class A extends B { constructor() { switch (a) { case 0: sup`,
+			`class A extends B { constructor() { switch (a) { case 0: super(); break; default: super(); } } }`,
+		},
+		{
+			`class A extends B { constructor() { try {} finally { super()`,
+			`class A extends B { constructor() { try {} finally { super(); } } }`,
+		},
+		{
+			`class A extends B { constructor() { if (a) throw Error(); su`,
+			`class A extends B { constructor() { if (a) throw Error(); super(); } }`,
+		},
+		{
+			`class A extends B { constructor() { if (true) return a; supe`,
+			`class A extends B { constructor() { if (true) return a; super(); } }`,
+		},
+		{
+			`class A extends null { constructor() { return a; } }`,
+			`class A extends null { constructor() { return a; } }`,
+		},
 		{`class A { constructor() { return a; } }`, `class A { constructor() { return a; } }`},
-		{`class A extends B { constructor(a) { super(); for (const b o`, `class A extends B { constructor(a) { super(); for (const b of a) { this.a(); } } }`},
-		{`class A extends B { constructor(a) { super(); for (b in a) (`, `class A extends B { constructor(a) { super(); for (b in a) ( foo(b) ); } }`},
-		{`class Foo extends Object { constructor(method) { super(); th`, `class Foo extends Object { constructor(method) { super(); this.method = method || function() {}; } }`},
+		{
+			`class A extends B { constructor(a) { super(); for (const b o`,
+			`class A extends B { constructor(a) { super(); for (const b of a) { this.a(); } } }`,
+		},
+		{
+			`class A extends B { constructor(a) { super(); for (b in a) (`,
+			`class A extends B { constructor(a) { super(); for (b in a) ( foo(b) ); } }`,
+		},
+		{
+			`class Foo extends Object { constructor(method) { super(); th`,
+			`class Foo extends Object { constructor(method) { super(); this.method = method || function() {}; } }`,
+		},
 		{`class A extends Object { constructor() { super(); for (let i`, `class A extends Object {
                 constructor() {
                     super();
@@ -260,7 +476,10 @@ func TestConstructorSuperStaysSilent(t *testing.T) {
                             }
                         }
                     `},
-		{`class A extends obj?.prop { constructor() { super(); } }`, `class A extends obj?.prop { constructor() { super(); } }`},
+		{
+			`class A extends obj?.prop { constructor() { super(); } }`,
+			`class A extends obj?.prop { constructor() { super(); } }`,
+		},
 		{`class A extends Base { constructor(list) { for (const a of l`, `
                         class A extends Base {
                             constructor(list) {
@@ -274,15 +493,21 @@ func TestConstructorSuperStaysSilent(t *testing.T) {
                             }
                         }
                     `},
-		{`class A extends B { constructor() { super(); try { throw new`, `class A extends B { constructor() { super(); try { throw new Error(); } catch (e) {} } }`},
-		{`class A extends B { constructor() { try { mayThrow(); } catc`, `class A extends B { constructor() { try { mayThrow(); } catch (e) {} finally { super(); } } }`},
+		{
+			`class A extends B { constructor() { super(); try { throw new`,
+			`class A extends B { constructor() { super(); try { throw new Error(); } catch (e) {} } }`,
+		},
+		{
+			`class A extends B { constructor() { try { mayThrow(); } catc`,
+			`class A extends B { constructor() { try { mayThrow(); } catch (e) {} finally { super(); } } }`,
+		},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.Run(t, ConstructorSuper, constructorSuperFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.Run(test, ConstructorSuper, constructorSuperFile, testCase.sourceText))
 		})
 	}
 }
@@ -296,8 +521,8 @@ func TestConstructorSuperStaysSilent(t *testing.T) {
 // point at the constructor, because there is no single place a missing call belongs, while
 // `duplicate` and `badSuper` point at the offending call, because there is one and deleting it is
 // the fix. Upstream's snapshot records both and each expectation below is a column read out of it.
-func TestConstructorSuperPointsAtTheRightNode(t *testing.T) {
-	t.Parallel()
+func TestConstructorSuperPointsAtTheRightNode(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -332,17 +557,17 @@ func TestConstructorSuperPointsAtTheRightNode(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ConstructorSuper, constructorSuperFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ConstructorSuper, constructorSuperFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
-				t.Fatalf("expected %d findings, got %d: %v",
+				test.Fatalf("expected %d findings, got %d: %v",
 					len(testCase.wantSpans), len(result.Diagnostics), result.MessageIds())
 			}
 			for index, diagnostic := range result.Diagnostics {
 				got := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if got != testCase.wantSpans[index] {
-					t.Errorf("finding %d: reported %q, want %q",
+					test.Errorf("finding %d: reported %q, want %q",
 						index, got, testCase.wantSpans[index])
 				}
 			}
@@ -358,19 +583,19 @@ func TestConstructorSuperPointsAtTheRightNode(t *testing.T) {
 // offsets instead. Upstream's snapshot pins it at column 46 for
 // `class A extends B { constructor() { super(); super(); } }`, which is the second call, and a rule
 // reporting the first would be green under the test above and wrong.
-func TestConstructorSuperReportsTheSecondCallNotTheFirst(t *testing.T) {
-	t.Parallel()
+func TestConstructorSuperReportsTheSecondCallNotTheFirst(test *testing.T) {
+	test.Parallel()
 
 	sourceText := "class A extends B { constructor() { super(); super(); } }"
-	result := rule_testing.Run(t, ConstructorSuper, constructorSuperFile, sourceText)
+	result := rule_testing.Run(test, ConstructorSuper, constructorSuperFile, sourceText)
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("expected 1 finding, got %d: %v", len(result.Diagnostics), result.MessageIds())
+		test.Fatalf("expected 1 finding, got %d: %v", len(result.Diagnostics), result.MessageIds())
 	}
 
 	firstCall := strings.Index(sourceText, "super()")
 	secondCall := strings.Index(sourceText[firstCall+1:], "super()") + firstCall + 1
 	if got := result.Diagnostics[0].Range.Pos(); got != secondCall {
-		t.Errorf("reported at offset %d, want the second call at %d (the first is at %d)",
+		test.Errorf("reported at offset %d, want the second call at %d (the first is at %d)",
 			got, secondCall, firstCall)
 	}
 }
@@ -380,18 +605,18 @@ func TestConstructorSuperReportsTheSecondCallNotTheFirst(t *testing.T) {
 //
 // `super() || super()` reports its *right* operand. The left one is the call that actually runs, so
 // deleting it would be the wrong repair, and upstream's snapshot pins column 48 rather than 37.
-func TestConstructorSuperReportsTheRightOperandOfALogicalOr(t *testing.T) {
-	t.Parallel()
+func TestConstructorSuperReportsTheRightOperandOfALogicalOr(test *testing.T) {
+	test.Parallel()
 
 	sourceText := "class A extends B { constructor() { super() || super(); } }"
-	result := rule_testing.Run(t, ConstructorSuper, constructorSuperFile, sourceText)
+	result := rule_testing.Run(test, ConstructorSuper, constructorSuperFile, sourceText)
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("expected 1 finding, got %d: %v", len(result.Diagnostics), result.MessageIds())
+		test.Fatalf("expected 1 finding, got %d: %v", len(result.Diagnostics), result.MessageIds())
 	}
 
 	rightOperand := strings.Index(sourceText, "|| super()") + len("|| ")
 	if got := result.Diagnostics[0].Range.Pos(); got != rightOperand {
-		t.Errorf("reported at offset %d, want the right operand at %d", got, rightOperand)
+		test.Errorf("reported at offset %d, want the right operand at %d", got, rightOperand)
 	}
 }
 
@@ -401,8 +626,8 @@ func TestConstructorSuperReportsTheRightOperandOfALogicalOr(t *testing.T) {
 // property it guards is not a guard. A description built by concatenating string literals is the
 // shape that loses a space at a seam, and a `Contains` check on a fragment would stay green through
 // it.
-func TestConstructorSuperRendersItsMessages(t *testing.T) {
-	t.Parallel()
+func TestConstructorSuperRendersItsMessages(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name            string
@@ -441,18 +666,18 @@ func TestConstructorSuperRendersItsMessages(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ConstructorSuper, constructorSuperFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ConstructorSuper, constructorSuperFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("expected 1 finding, got %d: %v",
+				test.Fatalf("expected 1 finding, got %d: %v",
 					len(result.Diagnostics), result.MessageIds())
 			}
 			if got := result.Diagnostics[0].Message.Id; got != testCase.wantId {
-				t.Errorf("message id %q, want %q", got, testCase.wantId)
+				test.Errorf("message id %q, want %q", got, testCase.wantId)
 			}
 			if got := result.Diagnostics[0].Message.Description; got != testCase.wantDescription {
-				t.Errorf("description:\n got %q\nwant %q", got, testCase.wantDescription)
+				test.Errorf("description:\n got %q\nwant %q", got, testCase.wantDescription)
 			}
 		})
 	}
@@ -467,8 +692,8 @@ func TestConstructorSuperRendersItsMessages(t *testing.T) {
 // none of these can be on the right of a `new`, so the `super()` throws a TypeError at runtime.
 // This rule uses the whitelist, so it agrees with ESLint here and with oxc everywhere oxc has an
 // opinion the corpus records.
-func TestConstructorSuperClassifiesUnconstructableExtends(t *testing.T) {
-	t.Parallel()
+func TestConstructorSuperClassifiesUnconstructableExtends(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -487,10 +712,10 @@ func TestConstructorSuperClassifiesUnconstructableExtends(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, ConstructorSuper, constructorSuperFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, ConstructorSuper, constructorSuperFile, testCase.sourceText),
 				"badSuper")
 		})
 	}
@@ -504,8 +729,8 @@ func TestConstructorSuperClassifiesUnconstructableExtends(t *testing.T) {
 // because we lint TypeScript and ESLint's list was written for JavaScript: a non-null assertion and
 // an `as` cast are both erasures that leave the operand behind at runtime, so a class extending one
 // is constructable exactly when the operand is.
-func TestConstructorSuperAcceptsConstructableExtendsOurCodeWrites(t *testing.T) {
-	t.Parallel()
+func TestConstructorSuperAcceptsConstructableExtendsOurCodeWrites(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -521,10 +746,10 @@ func TestConstructorSuperAcceptsConstructableExtendsOurCodeWrites(t *testing.T) 
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.Run(t, ConstructorSuper, constructorSuperFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.Run(test, ConstructorSuper, constructorSuperFile, testCase.sourceText))
 		})
 	}
 }
@@ -536,11 +761,11 @@ func TestConstructorSuperAcceptsConstructableExtendsOurCodeWrites(t *testing.T) 
 // than guessed at: `super(); super(); super();` reports two duplicates, not one. A rule reporting
 // once per constructor would be green across the whole imported corpus, because every duplicate
 // case in it holds exactly two calls.
-func TestConstructorSuperCountsOneFindingPerExtraCall(t *testing.T) {
-	t.Parallel()
+func TestConstructorSuperCountsOneFindingPerExtraCall(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectFindings(t,
-		rule_testing.Run(t, ConstructorSuper, constructorSuperFile,
+	rule_testing.ExpectFindings(test,
+		rule_testing.Run(test, ConstructorSuper, constructorSuperFile,
 			"class A extends B { constructor() { super(); super(); super(); } }"),
 		"duplicate", "duplicate")
 }
@@ -558,8 +783,8 @@ func TestConstructorSuperCountsOneFindingPerExtraCall(t *testing.T) {
 // The first case is not valid JavaScript, since `super()` in a plain function is a syntax error,
 // but our parser produces a tree for it rather than refusing the file, so the rule still has to
 // have the right opinion about it.
-func TestConstructorSuperIgnoresCallsInNestedEvaluationContexts(t *testing.T) {
-	t.Parallel()
+func TestConstructorSuperIgnoresCallsInNestedEvaluationContexts(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -580,10 +805,10 @@ func TestConstructorSuperIgnoresCallsInNestedEvaluationContexts(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, ConstructorSuper, constructorSuperFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, ConstructorSuper, constructorSuperFile, testCase.sourceText),
 				"missingAll")
 		})
 	}
@@ -596,8 +821,8 @@ func TestConstructorSuperIgnoresCallsInNestedEvaluationContexts(t *testing.T) {
 // a class is obliged to bind `this` and forbidden from calling `super()` to do it. Three of the
 // four rows come from the corpus and are asserted again here as a group, because the discrimination
 // only reads as a discrimination when the four sit together.
-func TestConstructorSuperHandlesBaseAndNullExtendsSeparately(t *testing.T) {
-	t.Parallel()
+func TestConstructorSuperHandlesBaseAndNullExtendsSeparately(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -624,14 +849,14 @@ func TestConstructorSuperHandlesBaseAndNullExtendsSeparately(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ConstructorSuper, constructorSuperFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ConstructorSuper, constructorSuperFile, testCase.sourceText)
 			if len(testCase.wantIds) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -642,10 +867,10 @@ func TestConstructorSuperHandlesBaseAndNullExtendsSeparately(t *testing.T) {
 // A signature has no body, so there is no path through it to be missing anything on. Reporting one
 // would be a false positive on every overloaded constructor in the tree, and the implementation
 // right below it is the declaration that actually has to call `super()`.
-func TestConstructorSuperDeclinesAConstructorOverloadSignature(t *testing.T) {
-	t.Parallel()
+func TestConstructorSuperDeclinesAConstructorOverloadSignature(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectClean(t, rule_testing.Run(t, ConstructorSuper, constructorSuperFile, `
+	rule_testing.ExpectClean(test, rule_testing.Run(test, ConstructorSuper, constructorSuperFile, `
 		class A extends B {
 			constructor(value: string);
 			constructor(value: number);
@@ -669,18 +894,21 @@ func TestConstructorSuperDeclinesAConstructorOverloadSignature(t *testing.T) {
 // over: that call is correct, and the outer constructor's real problem goes unreported. ESLint was
 // run on this input rather than reasoned about, and it reports `missingAll` on the outer
 // constructor.
-func TestConstructorSuperDoesNotBlameANestedClassForAnUnconstructableExtends(t *testing.T) {
-	t.Parallel()
+func TestConstructorSuperDoesNotBlameANestedClassForAnUnconstructableExtends(test *testing.T) {
+	test.Parallel()
 
 	sourceText := "class A extends null { constructor() { class C extends D { constructor() { super(); } } } }"
-	result := rule_testing.Run(t, ConstructorSuper, constructorSuperFile, sourceText)
-	rule_testing.ExpectFindings(t, result, "missingAll")
+	result := rule_testing.Run(test, ConstructorSuper, constructorSuperFile, sourceText)
+	rule_testing.ExpectFindings(test, result, "missingAll")
 
 	// The span matters as much as the id here, since the whole failure mode is the finding landing
 	// on the inner class's correct call. Asserting the outer constructor is what makes this test
 	// see the defect rather than merely notice a count.
-	if got := sourceText[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]; !strings.HasPrefix(got, "constructor() { class C") {
-		t.Errorf("reported at %q, want the outer constructor", got)
+	if got := sourceText[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]; !strings.HasPrefix(
+		got,
+		"constructor() { class C",
+	) {
+		test.Errorf("reported at %q, want the outer constructor", got)
 	}
 }
 
@@ -701,8 +929,8 @@ func TestConstructorSuperDoesNotBlameANestedClassForAnUnconstructableExtends(t *
 // The last row is the counterexample that keeps this from proving too much. A sequence expression
 // really does yield only its last operand, so `(5, B)` is clean and `(B, 5)` is not, and a
 // classifier treating a comma like an `||` would get the second one wrong.
-func TestConstructorSuperAcceptsAMixedShortCircuit(t *testing.T) {
-	t.Parallel()
+func TestConstructorSuperAcceptsAMixedShortCircuit(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -721,10 +949,10 @@ func TestConstructorSuperAcceptsAMixedShortCircuit(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.Run(t, ConstructorSuper, constructorSuperFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.Run(test, ConstructorSuper, constructorSuperFile, testCase.sourceText))
 		})
 	}
 }
@@ -748,8 +976,8 @@ func TestConstructorSuperAcceptsAMixedShortCircuit(t *testing.T) {
 // The third row is the other survivor. A call in a loop body still sets the state for what follows
 // the loop, so `super(); while (a) super();` reports the loop's call as a duplicate of the earlier
 // one. A walk that discarded everything the body established would miss it.
-func TestConstructorSuperTreatsLoopBodiesAsOneIteration(t *testing.T) {
-	t.Parallel()
+func TestConstructorSuperTreatsLoopBodiesAsOneIteration(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -774,10 +1002,10 @@ func TestConstructorSuperTreatsLoopBodiesAsOneIteration(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, ConstructorSuper, constructorSuperFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, ConstructorSuper, constructorSuperFile, testCase.sourceText),
 				testCase.wantIds...)
 		})
 	}
@@ -791,11 +1019,11 @@ func TestConstructorSuperTreatsLoopBodiesAsOneIteration(t *testing.T) {
 // stop at the `return` would find two calls, call the second a repeat of the first, and add a
 // finding for code that never executes. The corpus has the one-call version of this and it cannot
 // see the difference, because one call is never a duplicate however it is counted.
-func TestConstructorSuperFindsNoDuplicateAmongUnreachableCalls(t *testing.T) {
-	t.Parallel()
+func TestConstructorSuperFindsNoDuplicateAmongUnreachableCalls(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectFindings(t,
-		rule_testing.Run(t, ConstructorSuper, constructorSuperFile,
+	rule_testing.ExpectFindings(test,
+		rule_testing.Run(test, ConstructorSuper, constructorSuperFile,
 			"class A extends B { constructor() { return; super(); super(); } }"),
 		"missingAll")
 }
@@ -812,8 +1040,8 @@ func TestConstructorSuperFindsNoDuplicateAmongUnreachableCalls(t *testing.T) {
 // constructable check and short-circuits. Oxc reports `badSuper` twice, which is the better answer:
 // the second call is not a duplicate of a call that was never valid, it is the same error again.
 // Oxc's is the one reproduced.
-func TestConstructorSuperReportsEveryBadCall(t *testing.T) {
-	t.Parallel()
+func TestConstructorSuperReportsEveryBadCall(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -824,10 +1052,10 @@ func TestConstructorSuperReportsEveryBadCall(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, ConstructorSuper, constructorSuperFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, ConstructorSuper, constructorSuperFile, testCase.sourceText),
 				"badSuper", "badSuper")
 		})
 	}
@@ -845,8 +1073,8 @@ func TestConstructorSuperReportsEveryBadCall(t *testing.T) {
 // it is not a substitute and the constructor is still wrong. And a `return a` written inside a
 // nested function returns from that function rather than from the constructor, so it does not count
 // either. Both report `missingAll`, confirmed by running ESLint on them rather than by reading.
-func TestConstructorSuperRequiresARealValueFromAnExtendsNullConstructor(t *testing.T) {
-	t.Parallel()
+func TestConstructorSuperRequiresARealValueFromAnExtendsNullConstructor(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -859,10 +1087,10 @@ func TestConstructorSuperRequiresARealValueFromAnExtendsNullConstructor(t *testi
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, ConstructorSuper, constructorSuperFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, ConstructorSuper, constructorSuperFile, testCase.sourceText),
 				"missingAll")
 		})
 	}

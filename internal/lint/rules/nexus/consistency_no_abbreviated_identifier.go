@@ -1,7 +1,6 @@
 package nexus
 
 import (
-	"regexp"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -42,45 +41,22 @@ type ConsistencyNoAbbreviatedIdentifierOptions struct {
 	FrameworkParameterScopeSuffixes []string `json:"frameworkParameterScopeSuffixes"`
 }
 
-// millisecondSegmentPattern matches a millisecond unit written as a camelCase word.
-//
-// Go's regexp has no lookahead, so where the TypeScript wrote `[a-z]Ms(?=$|[A-Z])` this captures the
-// character after instead and puts it back in the replacement. The distinction the pattern is making
-// is unchanged: a lowercase letter before, and either the end of the name or the start of the next
-// word after.
-var millisecondSegmentPattern = regexp.MustCompile(`([a-z])Ms($|[A-Z])`)
-
-// wordSegmentPatterns are the two shapes a mid-name segment can take, plus the replacement form.
-type wordSegmentPatterns struct {
-	boundary *regexp.Regexp
-	camel    *regexp.Regexp
-	replace  *regexp.Regexp
-}
-
 // The rule's four messages, one per shape a finding takes, whose wording lives in
 // `policy/messages/consistency-no-abbreviated-identifier.json`. The reasoning they share is written
 // once there as the `reasoning` phrase, because it is the same argument every time. The id names the
 // shape, not the word: the word is already in the text, and the vocabulary's entries carry no id.
 var (
-	abbreviatedIdentifierText  = policy.MessageOf("nexus/consistency-no-abbreviated-identifier", "abbreviatedIdentifier")
+	abbreviatedIdentifierText = policy.MessageOf(
+		"nexus/consistency-no-abbreviated-identifier",
+		"abbreviatedIdentifier",
+	)
 	abbreviatedSuffixText      = policy.MessageOf("nexus/consistency-no-abbreviated-identifier", "abbreviatedSuffix")
 	millisecondSuffixText      = policy.MessageOf("nexus/consistency-no-abbreviated-identifier", "millisecondSuffix")
-	abbreviatedWordSegmentText = policy.MessageOf("nexus/consistency-no-abbreviated-identifier", "abbreviatedWordSegment")
+	abbreviatedWordSegmentText = policy.MessageOf(
+		"nexus/consistency-no-abbreviated-identifier",
+		"abbreviatedWordSegment",
+	)
 )
-
-func messageNoMsSuffix(name string, suggestion string) rule.Message {
-	return rule.Message{
-		Id:          millisecondSuffixText.Id,
-		Description: millisecondSuffixText.Render(map[string]string{"name": name, "suggestion": suggestion}),
-	}
-}
-
-func messageNoWordSegment(name string, word string, suggestion string) rule.Message {
-	return rule.Message{
-		Id:          abbreviatedWordSegmentText.Id,
-		Description: abbreviatedWordSegmentText.Render(map[string]string{"name": name, "word": word, "suggestion": suggestion}),
-	}
-}
 
 // ConsistencyNoAbbreviatedIdentifier rejects abbreviated identifier names in favor of full words.
 //
@@ -93,11 +69,12 @@ func messageNoWordSegment(name string, word string, suggestion string) rule.Mess
 //	invalid: const idx = 0
 //	invalid: const durationMs = 500
 //	invalid: const originalInitCwd = process.cwd()
+//	invalid: function join(...args: string[])   (once, at the rest, not at its reads)
 //
 // The exemptions carry the judgment, and they divide into two kinds. Some names are not ours: a
-// property read, an import specifier, a member of a qualified type name, a JSX tag or attribute. Renaming any of those changes what the code reaches
-// for rather than what it calls something. The others are names a framework mandates, which the
-// caller names through options because only the caller knows which framework it is running.
+// property read, an import specifier, a member of a qualified type name, a JSX tag or attribute. Renaming any of those
+// changes what the code reaches for rather than what it calls something. The others are names a framework mandates,
+// which the caller names through options because only the caller knows which framework it is running.
 // Property declarations in our source and literals defining their own shape are judged. A contextual
 // property already declared elsewhere is judged at its declaration, and dependency contracts and
 // augmentations are silent. Ownership comes from the checker, never from a property-name list.
@@ -111,25 +88,21 @@ func messageNoWordSegment(name string, word string, suggestion string) rule.Mess
 // travels in the message instead, where a reader applies it with the scope in front of them. Four
 // other ported rules made the same call for the same reason.
 //
-// The original's scope walk also kept it silent on every reference to an imported name, and this
-// port reported those until api-phi-health's parity sweep counted six (#dx1vrfm). It now skips a
-// reference to a name an import binds and nothing else in the file declares, which agrees with the
-// scope walk everywhere but a file that shadows an import; there it keeps reporting, erring toward a
-// finding. The rule judges names the code declares, never names it reads from elsewhere.
-var ConsistencyNoAbbreviatedIdentifier = rule.Rule{
+// A name is judged where it is declared, and its reads are not reported again (#2wgkyfn, the text
+// rules' first principle). One `msg` read twice was three findings for one defect, the noise that
+// pushes people toward suppressions, and a read of an imported name was the other module's spelling
+// reported here (#dx1vrfm). With no fix there is nothing a read's finding carried that the
+// declaration's does not: the declaration is where the name is chosen, and where it is renamed.
+var ConsistencyNoAbbreviatedIdentifier = rule.Rule[ConsistencyNoAbbreviatedIdentifierOptions]{
 	Name:             "nexus/consistency-no-abbreviated-identifier",
 	NeedsTypeChecker: true,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, _ := rule.OptionsAs[ConsistencyNoAbbreviatedIdentifierOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[ConsistencyNoAbbreviatedIdentifierOptions]) rule.Listeners {
+		settings, _ := options.Read()
 
-		fileName := imports.NormalizedFileName(ctx.SourceFile)
+		fileName := imports.NormalizedFileName(ruleContext.SourceFile)
 		isFrameworkParameterFile := matchesAnyFilePattern(fileName, settings.FrameworkParameterFilePatterns)
 		isFrameworkConstantFile := matchesAnyFilePattern(fileName, settings.FrameworkConstantFilePatterns)
 		routeContract := nextjs.RouteContractExports(fileName)
-		// Built on the first candidate identifier, so a file with no abbreviated name never walks.
-		var importedNames map[string]bool
-		// Answered on the first `args`, so no other file walks for it.
-		argumentsNameRestOnly, argumentsBindingsRead := false, false
 
 		judge := func(node *ast.Node) {
 			name := node.Text()
@@ -146,24 +119,13 @@ var ConsistencyNoAbbreviatedIdentifier = rule.Rule{
 
 			property := abbreviatedPropertyMember(node) != nil
 			if property {
-				if !abbreviatedOwnsProperty(ctx, node) {
+				if !abbreviatedOwnsProperty(ruleContext, node) {
 					return
 				}
-			} else if node.Kind != ast.KindIdentifier || binding.IsForeignName(node) ||
-				(node.Parent != nil && node.Parent.Kind == ast.KindPropertyAccessExpression && node.Parent.Name() == node) {
-				return
-			}
-
-			// A reference to an imported name is the other module's spelling, as the import
-			// specifier is: `loadConfig(directory)` and drizzle's `char(name)` read names this
-			// file does not own (#dx1vrfm). The original skips them through a scope walk; this
-			// port has none, so a name counts as imported when an import binds it and nothing
-			// else in the file declares it. A file that shadows an import keeps reporting the
-			// name everywhere, which errs toward a finding rather than away from one.
-			if importedNames == nil {
-				importedNames = importedNamesNeverRedeclared(ctx.SourceFile)
-			}
-			if !property && importedNames[name] {
+			} else if node.Kind != ast.KindIdentifier || !declaresName(node) || binding.IsForeignName(node) {
+				// A read, a write and a type reference are uses of a name chosen at its
+				// declaration, which is judged there, once. Of the declarations, the foreign
+				// ones are imports, export specifiers and JSX attributes, named elsewhere.
 				return
 			}
 
@@ -174,16 +136,16 @@ var ConsistencyNoAbbreviatedIdentifier = rule.Rule{
 			// shape of the rename that cost five phi web routes their prerendering, so the
 			// floor comes from `nextjs.IsRouteContractExport` whatever the consumer passes.
 			//
-			// Every occurrence of the spelling is exempt, the export and its references alike,
-			// except a nested binding that shadows it: a `const config` inside a function is
-			// this file's own name again and is judged on its merits.
+			// The module-scope declaration is exempt, but not a nested binding that shares
+			// its spelling: a `const config` inside a function is this file's own name again
+			// and is judged on its merits.
 			if !property && routeContract[name] && !declaresNestedBinding(node) {
 				return
 			}
 
 			// The vocabulary says what the word is; policy/Abbreviations.json holds it, and Swift
 			// compiles in the same file. What follows is policy, which stays here.
-			finding, found := vocabulary.find(name)
+			finding, found := findAbbreviation(name, !property)
 			if !found {
 				return
 			}
@@ -211,29 +173,10 @@ var ConsistencyNoAbbreviatedIdentifier = rule.Rule{
 				if !property && isFrameworkConstantFile {
 					return
 				}
-			case "whole args":
-				// A rest parameter in a variadic or framework function keeps the conventional
-				// spelling: `...args` is the shape everyone reads.
-				//
-				// Its uses have to agree with it. The name was chosen once, at the exempt rest,
-				// so reporting `target(...args)` put the finding away from where anyone could act
-				// on it, and only there (#e000k8d). Without scope analysis a use cannot be traced
-				// to its binding, so the question is asked of the file, the same way imported
-				// names are: when every `args` the file binds is a rest, every `args` is exempt.
-				// A file that also binds a plain parameter or catch binding named `args` keeps
-				// reporting all of them, erring toward a finding. The ESLint twin asks the file
-				// the same question, so the two engines agree.
-				if isRestElement(node) {
-					return
-				}
-				if !argumentsBindingsRead {
-					argumentsNameRestOnly = nameBoundOnlyAsRest(ctx.SourceFile, "args")
-					argumentsBindingsRead = true
-				}
-				if !property && argumentsNameRestOnly {
-					return
-				}
 			}
+			// A rest `...args` is judged like any other `args`: strict code cannot bind its
+			// expansion, so its advice names a descriptive name ending in it, and no spelling of
+			// it is exempt (#2wgkyfn). See findAbbreviation.
 
 			// The identifier's own text, not its leading trivia.
 			//
@@ -242,24 +185,10 @@ var ConsistencyNoAbbreviatedIdentifier = rule.Rule{
 			// it cannot cover, since the directive matches the line after itself: `params` in
 			// McpApi.ts reported at line 240 while its suppression sat on 241 covering 242, so a
 			// correctly-suppressed identifier still produced a finding nothing could silence.
-			ctx.ReportRange(rule.TokenRange(ctx.SourceFile, node), finding.message)
+			ruleContext.ReportRange(rule.TokenRange(ruleContext.SourceFile, node), finding.message)
 		}
 		return rule.Listeners{ast.KindIdentifier: judge, ast.KindStringLiteral: judge, ast.KindPrivateIdentifier: judge}
 	},
-}
-
-// replaceFirst replaces only the first match, which is what JavaScript's non-global String.replace
-// does and what every suggestion in this rule means.
-//
-// Go's ReplaceAllString would rewrite every occurrence, so `variablesForVars` would come back
-// double-renamed while the original renamed one segment and left the reader to judge the rest.
-func replaceFirst(pattern *regexp.Regexp, text string, replacement string) string {
-	location := pattern.FindStringSubmatchIndex(text)
-	if location == nil {
-		return text
-	}
-	expanded := pattern.ExpandString(nil, replacement, text, location)
-	return text[:location[0]] + string(expanded) + text[location[1]:]
 }
 
 // matchesAnyFilePattern reports whether the linted file matches any caller-supplied path substring.
@@ -272,22 +201,27 @@ func matchesAnyFilePattern(fileName string, patterns []string) bool {
 	return false
 }
 
-// isRestElement reports whether an identifier is the name bound by a rest parameter or a rest
-// binding element, the `...args` shape.
-func isRestElement(node *ast.Node) bool {
+// declaresName reports whether an identifier is the name a declaration binds: a variable, a
+// parameter or destructured element, a function, class, interface, type, enum or namespace, a type
+// parameter, or a statement label. A read, a write or a type reference is a use, and is not.
+//
+// The compiler's own `IsDeclarationName` answers for every declaration but the label, which the
+// grammar gives a statement rather than a declaration node, and which `break` and `continue` read.
+// An import-equals alias is a declaration the compiler counts, and an import, the one spelling of
+// import that `binding.IsForeignName` does not cover, so it is answered here as the other four are
+// there.
+func declaresName(node *ast.Node) bool {
 	parent := node.Parent
 	if parent == nil {
 		return false
 	}
 	switch parent.Kind {
-	case ast.KindParameter:
-		parameter := parent.AsParameterDeclaration()
-		return parameter != nil && parameter.DotDotDotToken != nil && parameter.Name() == node
-	case ast.KindBindingElement:
-		element := parent.AsBindingElement()
-		return element != nil && element.DotDotDotToken != nil && element.Name() == node
+	case ast.KindLabeledStatement:
+		return parent.AsLabeledStatement().Label == node
+	case ast.KindImportEqualsDeclaration:
+		return false
 	}
-	return false
+	return ast.IsDeclarationName(node)
 }
 
 // isReactReferencePropertyContext reports whether a `ref` identifier is participating in React 19's
@@ -489,73 +423,6 @@ func declaresNestedBinding(node *ast.Node) bool {
 	return false
 }
 
-// nameBoundOnlyAsRest reports whether a file binds a name at least once and only ever as a rest:
-// `...args` in a parameter list or `[first, ...args]` in a destructuring pattern.
-//
-// A binding is counted by the same test importedNamesNeverRedeclared uses, an identifier that is its
-// parent's name, less the members and keys that bind nothing in scope. An import counts as a binding
-// that is not a rest, though the import skip has already answered for an imported name.
-func nameBoundOnlyAsRest(sourceFile *ast.SourceFile, name string) bool {
-	bound, onlyRest := false, true
-	var visit func(node *ast.Node) bool
-	visit = func(node *ast.Node) bool {
-		if !onlyRest {
-			return true
-		}
-		if node.Kind == ast.KindIdentifier && node.Text() == name && node.Parent != nil && node.Parent.Name() == node {
-			switch node.Parent.Kind {
-			case ast.KindPropertyAssignment, ast.KindShorthandPropertyAssignment, ast.KindPropertyAccessExpression,
-				ast.KindPropertySignature, ast.KindPropertyDeclaration, ast.KindMethodDeclaration,
-				ast.KindMethodSignature, ast.KindGetAccessor, ast.KindSetAccessor, ast.KindExportSpecifier,
-				ast.KindEnumMember, ast.KindJsxAttribute:
-				// Members and keys bind no name in scope.
-			default:
-				bound = true
-				if !isRestElement(node) {
-					onlyRest = false
-					return true
-				}
-			}
-		}
-		node.ForEachChild(visit)
-		return !onlyRest
-	}
-	sourceFile.AsNode().ForEachChild(visit)
-	return bound && onlyRest
-}
-
-// importedNamesNeverRedeclared returns the names an import in this file binds, less any name the
-// file also declares somewhere: a variable, a parameter, a destructured element, a function, a class
-// or any other named declaration. Such a name may be shadowed, and without scope analysis a reference
-// cannot be told apart, so it is left to be judged.
-func importedNamesNeverRedeclared(sourceFile *ast.SourceFile) map[string]bool {
-	imported := map[string]bool{}
-	declared := map[string]bool{}
-	var visit func(node *ast.Node) bool
-	visit = func(node *ast.Node) bool {
-		if node.Kind == ast.KindIdentifier && node.Parent != nil && node.Parent.Name() == node {
-			switch node.Parent.Kind {
-			case ast.KindImportClause, ast.KindNamespaceImport, ast.KindImportSpecifier, ast.KindImportEqualsDeclaration:
-				imported[node.Text()] = true
-			case ast.KindPropertyAssignment, ast.KindShorthandPropertyAssignment, ast.KindPropertyAccessExpression,
-				ast.KindPropertySignature, ast.KindPropertyDeclaration, ast.KindMethodDeclaration,
-				ast.KindMethodSignature, ast.KindGetAccessor, ast.KindSetAccessor, ast.KindExportSpecifier,
-				ast.KindEnumMember, ast.KindJsxAttribute:
-				// Members and keys bind no name in scope.
-			default:
-				declared[node.Text()] = true
-			}
-		}
-		node.ForEachChild(visit)
-		return false
-	}
-	sourceFile.AsNode().ForEachChild(visit)
-	for name := range declared {
-		delete(imported, name)
-	}
-	return imported
-}
-
 // abbreviatedPropertyMember separates property declarations from reads and binding names.
 // A computed string literal is a known key; other computed expressions remain references.
 func abbreviatedPropertyMember(node *ast.Node) *ast.Node {
@@ -580,18 +447,18 @@ func abbreviatedPropertyMember(node *ast.Node) *ast.Node {
 	return nil
 }
 
-func abbreviatedOwnsProperty(ctx rule.Context, name *ast.Node) bool {
+func abbreviatedOwnsProperty(ruleContext rule.Context, name *ast.Node) bool {
 	member := abbreviatedPropertyMember(name)
 	owner := member.Parent
 	if owner == nil {
 		return false
 	}
 	if owner.Kind == ast.KindObjectLiteralExpression {
-		if ctx.TypeChecker == nil {
+		if ruleContext.TypeChecker == nil {
 			return true
 		}
-		contextual := ctx.TypeChecker.GetContextualType(owner, checker.ContextFlagsIgnoreNodeInferences)
-		return !abbreviatedContextDeclaresProperty(ctx, contextual, name.Text(), owner)
+		contextual := ruleContext.TypeChecker.GetContextualType(owner, checker.ContextFlagsIgnoreNodeInferences)
+		return !abbreviatedContextDeclaresProperty(ruleContext, contextual, name.Text(), owner)
 	}
 	if rule.IsDependencyDeclaration(member) {
 		return false
@@ -602,22 +469,36 @@ func abbreviatedOwnsProperty(ctx rule.Context, name *ast.Node) bool {
 			return false
 		}
 	}
-	if ctx.TypeChecker == nil {
+	if ruleContext.TypeChecker == nil {
 		return true
 	}
-	if owner.Kind == ast.KindTypeLiteral && abbreviatedCombinedExternal(ctx, owner, name.Text()) {
+	if owner.Kind == ast.KindTypeLiteral && abbreviatedCombinedExternal(ruleContext, owner, name.Text()) {
 		return false
 	}
 	// Declaration merging can add a member to a foreign interface without a module wrapper.
-	if owner.Name() != nil && rule.IsDeclaredByADependency(ctx.TypeChecker.GetSymbolAtLocation(owner.Name())) {
+	if owner.Name() != nil && rule.IsDeclaredByADependency(ruleContext.TypeChecker.GetSymbolAtLocation(owner.Name())) {
 		return false
 	}
-	return !abbreviatedInheritedExternal(ctx, owner, name.Text(), ast.IsStatic(member), make(map[*ast.Node]bool))
+	return !abbreviatedInheritedExternal(
+		ruleContext,
+		owner,
+		name.Text(),
+		ast.IsStatic(member),
+		make(map[*ast.Node]bool),
+	)
 }
 
 // A local override can still carry a dependency's contract through another local override.
 // Follow the declarations behind inherited properties, with a cycle guard for erroneous heritage.
-func abbreviatedInheritedExternal(ctx rule.Context, owner *ast.Node, name string, static bool, seen map[*ast.Node]bool) bool {
+//
+// Mutates: seen the walk marks every owner it visits, so one guard spans the whole recursion
+func abbreviatedInheritedExternal(
+	ruleContext rule.Context,
+	owner *ast.Node,
+	name string,
+	static bool,
+	seen map[*ast.Node]bool,
+) bool {
 	if seen[owner] {
 		return false
 	}
@@ -631,9 +512,9 @@ func abbreviatedInheritedExternal(ctx rule.Context, owner *ast.Node, name string
 			continue
 		}
 		for _, base := range clause.AsHeritageClause().Types.Nodes {
-			baseType := ctx.TypeChecker.GetTypeAtLocation(base)
+			baseType := ruleContext.TypeChecker.GetTypeAtLocation(base)
 			if static {
-				baseType = ctx.TypeChecker.GetTypeAtLocation(base.Expression())
+				baseType = ruleContext.TypeChecker.GetTypeAtLocation(base.Expression())
 			}
 			if rule.IsUnresolvedType(baseType) {
 				return true
@@ -641,7 +522,7 @@ func abbreviatedInheritedExternal(ctx rule.Context, owner *ast.Node, name string
 			if baseType == nil {
 				continue
 			}
-			symbol := ctx.TypeChecker.GetPropertyOfType(baseType, name)
+			symbol := ruleContext.TypeChecker.GetPropertyOfType(baseType, name)
 			if rule.IsDeclaredByADependency(symbol) {
 				return true
 			}
@@ -649,7 +530,8 @@ func abbreviatedInheritedExternal(ctx rule.Context, owner *ast.Node, name string
 				continue
 			}
 			for _, declaration := range symbol.Declarations {
-				if declaration.Parent != nil && abbreviatedInheritedExternal(ctx, declaration.Parent, name, static, seen) {
+				if declaration.Parent != nil &&
+					abbreviatedInheritedExternal(ruleContext, declaration.Parent, name, static, seen) {
 					return true
 				}
 			}
@@ -661,7 +543,12 @@ func abbreviatedInheritedExternal(ctx rule.Context, owner *ast.Node, name string
 // A contextual type may be a union whose alternatives do not share the property. A named
 // declaration in any alternative still owns that spelling; a synthetic index/mapped property
 // without a declaration of this name does not. Inferred self-context is not an earlier declaration.
-func abbreviatedContextDeclaresProperty(ctx rule.Context, contextual *checker.Type, name string, literal *ast.Node) bool {
+func abbreviatedContextDeclaresProperty(
+	ruleContext rule.Context,
+	contextual *checker.Type,
+	name string,
+	literal *ast.Node,
+) bool {
 	// A missing contract has no declaration from which to infer ownership.
 	if rule.IsUnresolvedType(contextual) {
 		return true
@@ -671,13 +558,13 @@ func abbreviatedContextDeclaresProperty(ctx rule.Context, contextual *checker.Ty
 	}
 	if contextual.Flags()&checker.TypeFlagsUnionOrIntersection != 0 {
 		for _, part := range contextual.Types() {
-			if abbreviatedContextDeclaresProperty(ctx, part, name, literal) {
+			if abbreviatedContextDeclaresProperty(ruleContext, part, name, literal) {
 				return true
 			}
 		}
 		return false
 	}
-	symbol := ctx.TypeChecker.GetPropertyOfType(contextual, name)
+	symbol := ruleContext.TypeChecker.GetPropertyOfType(contextual, name)
 	if symbol == nil {
 		return false
 	}
@@ -704,7 +591,7 @@ func abbreviatedHeritage(owner *ast.Node) *ast.NodeList {
 
 // Only union/intersection constituents at this shape's level can share its spelling. Stop at
 // properties and named declarations so a nested shape or an alias used elsewhere stays ours.
-func abbreviatedCombinedExternal(ctx rule.Context, literal *ast.Node, name string) bool {
+func abbreviatedCombinedExternal(ruleContext rule.Context, literal *ast.Node, name string) bool {
 	for current := literal; current.Parent != nil; current = current.Parent {
 		parent := current.Parent
 		var constituents *ast.NodeList
@@ -719,7 +606,11 @@ func abbreviatedCombinedExternal(ctx rule.Context, literal *ast.Node, name strin
 			return false
 		}
 		for _, constituent := range constituents.Nodes {
-			if constituent != current && abbreviatedTypeHasExternalProperty(ctx, ctx.TypeChecker.GetTypeAtLocation(constituent), name) {
+			if constituent != current && abbreviatedTypeHasExternalProperty(
+				ruleContext,
+				ruleContext.TypeChecker.GetTypeAtLocation(constituent),
+				name,
+			) {
 				return true
 			}
 		}
@@ -727,7 +618,7 @@ func abbreviatedCombinedExternal(ctx rule.Context, literal *ast.Node, name strin
 	return false
 }
 
-func abbreviatedTypeHasExternalProperty(ctx rule.Context, valueType *checker.Type, name string) bool {
+func abbreviatedTypeHasExternalProperty(ruleContext rule.Context, valueType *checker.Type, name string) bool {
 	// An unresolved constituent may own the spelling once its declaration exists.
 	if rule.IsUnresolvedType(valueType) {
 		return true
@@ -738,11 +629,11 @@ func abbreviatedTypeHasExternalProperty(ctx rule.Context, valueType *checker.Typ
 	// A union need not share the property across every alternative. Each constituent gets a vote.
 	if valueType.Flags()&checker.TypeFlagsUnionOrIntersection != 0 {
 		for _, part := range valueType.Types() {
-			if abbreviatedTypeHasExternalProperty(ctx, part, name) {
+			if abbreviatedTypeHasExternalProperty(ruleContext, part, name) {
 				return true
 			}
 		}
 		return false
 	}
-	return rule.IsDeclaredByADependency(ctx.TypeChecker.GetPropertyOfType(valueType, name))
+	return rule.IsDeclaredByADependency(ruleContext.TypeChecker.GetPropertyOfType(valueType, name))
 }

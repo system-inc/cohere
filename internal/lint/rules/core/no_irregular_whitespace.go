@@ -10,7 +10,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
-// byteOrderMark is U+FEFF, which opens a file legitimately and is a stray character anywhere else.
+// byteOrderMark is `U+FEFF`, which opens a file legitimately and is a stray character anywhere else.
 const byteOrderMark = 0xFEFF
 
 // lineSeparator and paragraphSeparator, U+2028 and U+2029, end a line, so each is a finding of its own
@@ -91,11 +91,11 @@ type NoIrregularWhitespaceOptions struct {
 	SkipTemplates *bool `json:"skipTemplates"`
 	SkipRegExps   *bool `json:"skipRegExps"`
 
-	// SkipJSXText's tag is worth a note because the option is spelled skipJSXText rather than
+	// SkipJsxText's tag is worth a note because the option is spelled skipJSXText rather than
 	// skipJsxText. Every option field is tagged, and rule.UnmarshalOptions matches a tagged key
 	// exactly, so `skipJsxText` is refused rather than resolved; the upstream Rust needs an explicit
 	// rename for the same reason.
-	SkipJSXText *bool `json:"skipJSXText"`
+	SkipJsxText *bool `json:"skipJSXText"`
 }
 
 // skippedRegion is one span of the file that an option has excused.
@@ -139,7 +139,7 @@ type skippedRegion struct {
 //
 // # The byte order mark
 //
-// A U+FEFF at offset zero is a byte order mark rather than a stray character, and is not reported.
+// A `U+FEFF` at offset zero is a byte order mark rather than a stray character, and is not reported.
 // Anywhere else in the file it is reported like any other member of the set. oxc carries this
 // carve-out and ESLint does not, and oxc's corpus pins it with a passing case.
 //
@@ -147,15 +147,15 @@ type skippedRegion struct {
 // string is sometimes deliberate, a byte order mark mid-file is an encoding accident rather than a
 // typo, and deleting versus replacing changes the token stream differently. An unattended rewrite
 // that picks wrong here edits characters nobody can see, which is the worst place to be wrong.
-var NoIrregularWhitespace = rule.Rule{
+var NoIrregularWhitespace = rule.Rule[NoIrregularWhitespaceOptions]{
 	Name: "no-irregular-whitespace",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoIrregularWhitespaceOptions]) rule.Listeners {
 		// ESLint's defaults, which are also this tree's resolved configuration. Only SkipStrings defaults
 		// to on: irregular whitespace inside a string is usually data rather than a typo, and
 		// reporting it would flag every file that holds a no-break space on purpose.
 		skipComments, skipStrings, skipTemplates := false, true, false
-		skipRegExps, skipJSXText := false, false
-		if settings, hasSettings := rule.OptionsAs[NoIrregularWhitespaceOptions](options); hasSettings {
+		skipRegExps, skipJsxText := false, false
+		if settings, hasSettings := options.Read(); hasSettings {
 			if settings.SkipComments != nil {
 				skipComments = *settings.SkipComments
 			}
@@ -168,14 +168,14 @@ var NoIrregularWhitespace = rule.Rule{
 			if settings.SkipRegExps != nil {
 				skipRegExps = *settings.SkipRegExps
 			}
-			if settings.SkipJSXText != nil {
-				skipJSXText = *settings.SkipJSXText
+			if settings.SkipJsxText != nil {
+				skipJsxText = *settings.SkipJsxText
 			}
 		}
 
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
-				text := ctx.SourceFile.Text()
+				text := ruleContext.SourceFile.Text()
 
 				// Nothing below runs on a file that holds none of these characters, which is very
 				// nearly every file. Without this the rule walks the whole tree collecting skip
@@ -200,7 +200,7 @@ var NoIrregularWhitespace = rule.Rule{
 					// per file and shares it. Reading trivia rather than matching on `//` is what
 					// makes this immune to a comment opener living inside a string, which was
 					// measured on this corpus: `var s = '// not a comment';` yields no comment.
-					for _, comment := range comments.ForFile(ctx) {
+					for _, comment := range comments.ForFile(ruleContext) {
 						skipped = append(skipped,
 							skippedRegion{comment.Range.Pos(), comment.Range.End()})
 					}
@@ -216,8 +216,8 @@ var NoIrregularWhitespace = rule.Rule{
 					}
 				}
 
-				collectSkippedLiterals(ctx.SourceFile, node, &skipped,
-					skipStrings, skipTemplates, skipRegExps, skipJSXText)
+				collectSkippedLiterals(ruleContext.SourceFile, node, &skipped,
+					skipStrings, skipTemplates, skipRegExps, skipJsxText)
 
 				// A run of irregular spaces is one finding and each irregular line terminator is
 				// its own, as ESLint reports them: its IRREGULAR_WHITESPACE pattern is a `+` run per
@@ -229,7 +229,7 @@ var NoIrregularWhitespace = rule.Rule{
 				runStart := -1
 				reportRun := func(end int) {
 					if runStart >= 0 && !isInsideAny(runStart, skipped) {
-						ctx.ReportRange(core.NewTextRange(runStart, end), messageIrregularWhitespace)
+						ruleContext.ReportRange(core.NewTextRange(runStart, end), messageIrregularWhitespace)
 					}
 					runStart = -1
 				}
@@ -313,6 +313,8 @@ func containsIrregularWhitespace(text string) bool {
 // fires first in a pre-order traversal: a rule collecting these from listeners would run its scan
 // before any of them had fired and excuse nothing. One stated walk is the honest version of that
 // ordering rather than a coincidence waiting to be broken.
+//
+// Mutates: skipped the walk appends every excused span, so one slice gathers the whole file's regions
 func collectSkippedLiterals(
 	sourceFile *ast.SourceFile,
 	node *ast.Node,
@@ -320,7 +322,7 @@ func collectSkippedLiterals(
 	skipStrings bool,
 	skipTemplates bool,
 	skipRegExps bool,
-	skipJSXText bool,
+	skipJsxText bool,
 ) {
 	if node == nil {
 		return
@@ -376,14 +378,14 @@ func collectSkippedLiterals(
 			excuseToken()
 		}
 	case ast.KindJsxText:
-		if skipJSXText {
+		if skipJsxText {
 			excuseWholeNode()
 		}
 	}
 
 	node.ForEachChild(func(child *ast.Node) bool {
 		collectSkippedLiterals(sourceFile, child, skipped,
-			skipStrings, skipTemplates, skipRegExps, skipJSXText)
+			skipStrings, skipTemplates, skipRegExps, skipJsxText)
 		return false
 	})
 }

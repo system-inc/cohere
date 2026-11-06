@@ -75,7 +75,7 @@ const (
 	// noUnsafeAssignmentComparisonBasic uses the receiver's own type.
 	noUnsafeAssignmentComparisonBasic
 
-	// noUnsafeAssignmentComparisonContextual uses the receiver's CONTEXTUAL type, for a position
+	// noUnsafeAssignmentComparisonContextual uses the receiver's contextual type, for a position
 	// whose own type is inferred from the value being put in it.
 	noUnsafeAssignmentComparisonContextual
 )
@@ -92,7 +92,7 @@ const (
 //	invalid: const a = [...(x as any)];            spreading an any into an array
 //
 // Ported from `@typescript-eslint/no-unsafe-assignment`, the fourth of the `no-unsafe-*` family and
-// the first that also has to reason about DESTRUCTURING. Every verdict below was measured against
+// the first that also has to reason about destructuring. Every verdict below was measured against
 // the installed 8.67.0 build driven over a real TypeScript program, one file per program.
 //
 // # 387 findings on the ahra tree
@@ -111,8 +111,8 @@ const (
 //
 // # Three comparison modes, and the distinction is what keeps inferred variables quiet
 //
-// `const x = 1 as any` is SILENT while `const x: string = 1 as any` reports, and the difference is
-// not the value but whether a type was written down. With no annotation the variable's type IS the
+// `const x = 1 as any` is silent while `const x: string = 1 as any` reports, and the difference is
+// not the value but whether a type was written down. With no annotation the variable's type is the
 // sender's, so a comparison would be asking whether a type differs from itself. Upstream expresses
 // that as `ComparisonType.None`, and it is why the annotation is consulted before the types are.
 //
@@ -124,13 +124,13 @@ const (
 //
 // `const { a: { b } } = x` walks into the object pattern and then into the nested one, reporting on
 // each element whose sender type is `any`. Two rules govern it and both are upstream's: an `any`
-// element is reported and NOT descended into, so `[[[x]]] = [any]` reports once rather than three
+// element is reported and not descended into, so `[[[x]]] = [any]` reports once rather than three
 // times, and a rest element is skipped entirely because it is not a one-to-one assignment.
 //
 // # A reported assignment suppresses the destructuring walk
 //
 // Upstream threads a `didReport` boolean through: if the plain assignment check reported, the
-// destructuring helpers do not run. That is why `const { a } = 1 as any` produces ONE finding rather
+// destructuring helpers do not run. That is why `const { a } = 1 as any` produces one finding rather
 // than one per destructured name. Reproduced, and it is the reason those helpers return a boolean
 // rather than nothing.
 //
@@ -142,7 +142,7 @@ const (
 //
 // # Measured against ESLint, and the three rows that differ are the checker's, not the rule's
 //
-// Run over the ahra tree, 132 files, this reports 435 and ESLint reports 432, with ZERO findings
+// Run over the ahra tree, 132 files, this reports 435 and ESLint reports 432, with zero findings
 // ESLint has that this misses. All three extra rows are the same shape:
 //
 //	const { value, done } = await reader.read();   // reader from fetch(...).body.getReader()
@@ -160,7 +160,7 @@ const (
 //
 // Nothing is special-cased for it. A rule that suppressed these would be lying about what its own
 // checker knows, and would go silent if the resolution is later fixed.
-var NoUnsafeAssignment = rule.Rule{
+var NoUnsafeAssignment = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/no-unsafe-assignment",
 
 	// Every judgment compares a sender type against a receiver type.
@@ -170,15 +170,15 @@ var NoUnsafeAssignment = rule.Rule{
 	// The compiler options.
 	ProgramReads: rule.ReadsCompilerOptions,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
 		return rule.Listeners{
 			// `const x: T = value` and `let x = value`. Upstream's `VariableDeclarator[init != null]`.
 			ast.KindVariableDeclaration: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 				declaration := node.AsVariableDeclaration()
@@ -190,14 +190,14 @@ var NoUnsafeAssignment = rule.Rule{
 				if name == nil {
 					return
 				}
-				noUnsafeAssignmentCheckWithDestructuring(ctx, name, initializer, node,
+				noUnsafeAssignmentCheckWithDestructuring(ruleContext, name, initializer, node,
 					noUnsafeAssignmentComparisonFor(declaration.Type))
 			},
 
 			// `x = value`. Upstream's `AssignmentExpression[operator = "="]`, and only that
 			// operator: `x += value` is a different question the rule does not ask.
 			ast.KindBinaryExpression: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 				binary := node.AsBinaryExpression()
@@ -209,7 +209,7 @@ var NoUnsafeAssignment = rule.Rule{
 				}
 				// Basic rather than derived from an annotation: the target already has a type,
 				// whether it was written down or inferred at its declaration.
-				noUnsafeAssignmentCheckWithDestructuring(ctx, binary.Left, binary.Right, node,
+				noUnsafeAssignmentCheckWithDestructuring(ruleContext, binary.Left, binary.Right, node,
 					noUnsafeAssignmentComparisonBasic)
 			},
 
@@ -218,7 +218,7 @@ var NoUnsafeAssignment = rule.Rule{
 			// typescript-go folds both into a property declaration carrying an `accessor` modifier.
 			// One anchor here for upstream's two, reaching the same set.
 			ast.KindPropertyDeclaration: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 				property := node.AsPropertyDeclaration()
@@ -229,7 +229,7 @@ var NoUnsafeAssignment = rule.Rule{
 				if name == nil {
 					return
 				}
-				noUnsafeAssignmentCheck(ctx, name, property.Initializer, node,
+				noUnsafeAssignmentCheck(ruleContext, name, property.Initializer, node,
 					noUnsafeAssignmentComparisonFor(property.Type))
 			},
 
@@ -237,12 +237,12 @@ var NoUnsafeAssignment = rule.Rule{
 			// structural here: a property inside a destructuring pattern is a KindBindingElement
 			// rather than a KindPropertyAssignment, so this anchor cannot see one.
 			ast.KindPropertyAssignment: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 				// Upstream's selector excludes a property inside an ObjectPattern, and its parser
 				// has a distinct node for one. Ours reuses KindObjectLiteralExpression for a
-				// literal being used as a destructuring TARGET, so the exclusion has to be asked
+				// literal being used as a destructuring target, so the exclusion has to be asked
 				// of the position rather than of the kind. Without it `({ x: y } = source)` reports
 				// twice: once here and once from the destructuring walk that owns it.
 				if noUnsafeAssignmentIsDestructuringTarget(node.Parent) {
@@ -261,7 +261,7 @@ var NoUnsafeAssignment = rule.Rule{
 					value.AsFunctionExpression().Body == nil {
 					return
 				}
-				noUnsafeAssignmentCheck(ctx, name, value, node,
+				noUnsafeAssignmentCheck(ruleContext, name, value, node,
 					noUnsafeAssignmentComparisonContextual)
 			},
 
@@ -271,14 +271,14 @@ var NoUnsafeAssignment = rule.Rule{
 			// of the key is what the property declares and the type at the identifier is what is
 			// being put there.
 			ast.KindShorthandPropertyAssignment: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 				if noUnsafeAssignmentIsDestructuringTarget(node.Parent) {
 					return
 				}
 				shorthand := node.AsShorthandPropertyAssignment()
-				// `{ y = 1 }` in a VALUE position is not legal TypeScript; the parser recovers and
+				// `{ y = 1 }` in a value position is not legal TypeScript; the parser recovers and
 				// hands back a shorthand carrying an initializer. Upstream's parser refuses the
 				// file, so its rule never meets the shape and is silent on it, measured. Declining
 				// here keeps one of its own passing cases passing.
@@ -289,14 +289,14 @@ var NoUnsafeAssignment = rule.Rule{
 				if name == nil {
 					return
 				}
-				noUnsafeAssignmentCheck(ctx, name, name, node,
+				noUnsafeAssignmentCheck(ruleContext, name, name, node,
 					noUnsafeAssignmentComparisonContextual)
 			},
 
 			// `[...value]`. Upstream's `ArrayExpression > SpreadElement`, and the parent test is
-			// load-bearing: a spread in a CALL is `no-unsafe-argument`'s question, not this one.
+			// load-bearing: a spread in a call is `no-unsafe-argument`'s question, not this one.
 			ast.KindSpreadElement: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 				if node.Parent == nil || node.Parent.Kind != ast.KindArrayLiteralExpression {
@@ -306,21 +306,21 @@ var NoUnsafeAssignment = rule.Rule{
 				if argument == nil {
 					return
 				}
-				restType := ctx.TypeChecker.GetTypeAtLocation(argument)
+				restType := ruleContext.TypeChecker.GetTypeAtLocation(argument)
 				if restType == nil {
 					return
 				}
 				if type_checking.IsTypeAnyType(restType) ||
-					noUnsafeAssignmentIsAnyArray(ctx, restType) {
-					ctx.ReportNode(node, messageNoUnsafeAssignmentArraySpread(
-						noUnsafeAssignmentSenderText(ctx, restType)))
+					noUnsafeAssignmentIsAnyArray(ruleContext, restType) {
+					ruleContext.ReportNode(node, messageNoUnsafeAssignmentArraySpread(
+						noUnsafeAssignmentSenderText(ruleContext, restType)))
 				}
 			},
 
 			// `<div id={value} />`. The attribute's own type comes from the component's props, so
 			// the comparison is contextual.
 			ast.KindJsxAttribute: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 				attribute := node.AsJsxAttribute()
@@ -338,14 +338,14 @@ var NoUnsafeAssignment = rule.Rule{
 				if name == nil {
 					return
 				}
-				noUnsafeAssignmentCheck(ctx, name, expression, expression,
+				noUnsafeAssignmentCheck(ruleContext, name, expression, expression,
 					noUnsafeAssignmentComparisonContextual)
 			},
 
 			// `function f(x: T = value)`. Upstream's `AssignmentPattern`, which TSESTree uses for a
 			// defaulted parameter and for a defaulted destructuring element alike.
 			ast.KindParameter: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 				parameter := node.AsParameterDeclaration()
@@ -356,29 +356,29 @@ var NoUnsafeAssignment = rule.Rule{
 				if name == nil {
 					return
 				}
-				// The finding points at the ASSIGNMENT rather than at the parameter, which matters
+				// The finding points at the assignment rather than at the parameter, which matters
 				// for a parameter property: `constructor(private a = 1 as any)` is one node here
 				// and two upstream, where the modifier lives on a TSParameterProperty wrapping an
 				// AssignmentPattern. Reporting the parameter would underline `private a = 1 as any`
 				// where upstream underlines `a = 1 as any`, and only a span assertion sees it.
-				// A parameter PROPERTY carries an accessibility modifier that upstream's tree keeps
+				// A parameter property carries an accessibility modifier that upstream's tree keeps
 				// on a separate `TSParameterProperty` wrapper, so its finding covers only the
 				// assignment inside: `constructor(private a = 1 as any)` underlines `a = 1 as any`
 				// upstream, and reporting the parameter node here would underline the modifier too.
 				// Only a span assertion sees the difference.
-				reportRange := rule.TokenRange(ctx.SourceFile, node)
+				reportRange := rule.TokenRange(ruleContext.SourceFile, node)
 				if modifiers := node.Modifiers(); modifiers != nil && len(modifiers.Nodes) > 0 {
-					reportRange = rule.TokenRange(ctx.SourceFile, name).
+					reportRange = rule.TokenRange(ruleContext.SourceFile, name).
 						WithEnd(parameter.Initializer.End())
 				}
-				noUnsafeAssignmentCheckWithDestructuringAtRange(ctx, name, parameter.Initializer,
+				noUnsafeAssignmentCheckWithDestructuringAtRange(ruleContext, name, parameter.Initializer,
 					reportRange, noUnsafeAssignmentComparisonBasic)
 			},
 
 			// A defaulted element inside a destructuring pattern, `const { a = value } = x`, which
 			// TSESTree also calls an AssignmentPattern and which is a binding element here.
 			ast.KindBindingElement: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 				element := node.AsBindingElement()
@@ -389,7 +389,7 @@ var NoUnsafeAssignment = rule.Rule{
 				if name == nil {
 					return
 				}
-				noUnsafeAssignmentCheckWithDestructuring(ctx, name, element.Initializer, node,
+				noUnsafeAssignmentCheckWithDestructuring(ruleContext, name, element.Initializer, node,
 					noUnsafeAssignmentComparisonBasic)
 			},
 		}
@@ -418,7 +418,7 @@ func noUnsafeAssignmentIsDestructuringTarget(node *ast.Node) bool {
 			// Keep walking: a nested literal is a target exactly when its container is.
 			current = parent
 		case ast.KindArrayLiteralExpression, ast.KindObjectLiteralExpression:
-			// An object literal nested directly in an ARRAY literal, which is how
+			// An object literal nested directly in an array literal, which is how
 			// `[{ x }] = source` is written. The loop's own kind test then continues from that
 			// literal, so the answer comes from whatever the outermost one is assigned to.
 			current = parent
@@ -434,9 +434,9 @@ func noUnsafeAssignmentIsDestructuringTarget(node *ast.Node) bool {
 // A written annotation is something to compare against; without one the variable's type is inferred
 // from the value, so the two agree by construction and the comparison is skipped.
 //
-// The skip is an OPTIMIZATION rather than a behavioral filter here, and the verdict is recorded
+// The skip is an optimization rather than a behavioral filter here, and the verdict is recorded
 // rather than left for the next reader to rediscover. A mutant forcing the Basic mode on every
-// declaration survives the whole corpus, because an inferred receiver's type IS the sender's and
+// declaration survives the whole corpus, because an inferred receiver's type is the sender's and
 // `IsUnsafeAssignment` comparing a type against itself finds nothing to disagree about. Traced over
 // five shapes designed to break it, including an inferred `Set<any>`, an inferred generic call, an
 // inferred array of `any` and an inferred class field: all five report zero under the mutant, and
@@ -457,58 +457,58 @@ func noUnsafeAssignmentComparisonFor(typeAnnotation *ast.Node) noUnsafeAssignmen
 // It exists because one anchor needs a span no node in this tree covers: the assignment inside a
 // parameter property. Everything else routes through the node-taking form above it.
 func noUnsafeAssignmentCheckWithDestructuringAtRange(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	receiverNode *ast.Node,
 	senderNode *ast.Node,
 	reportRange shimcore.TextRange,
 	comparison noUnsafeAssignmentComparison,
 ) {
-	if noUnsafeAssignmentCheckAtRange(ctx, receiverNode, senderNode, reportRange, comparison) {
+	if noUnsafeAssignmentCheckAtRange(ruleContext, receiverNode, senderNode, reportRange, comparison) {
 		return
 	}
-	if noUnsafeAssignmentCheckArrayDestructureHelper(ctx, receiverNode, senderNode) {
+	if noUnsafeAssignmentCheckArrayDestructureHelper(ruleContext, receiverNode, senderNode) {
 		return
 	}
-	noUnsafeAssignmentCheckObjectDestructureHelper(ctx, receiverNode, senderNode)
+	noUnsafeAssignmentCheckObjectDestructureHelper(ruleContext, receiverNode, senderNode)
 }
 
 // noUnsafeAssignmentCheckWithDestructuring runs the plain check and then, only if it stayed silent,
 // the two destructuring walks.
 //
-// The ordering is upstream's `didReport` threading and it decides finding COUNTS rather than
+// The ordering is upstream's `didReport` threading and it decides finding counts rather than
 // verdicts: `const { a } = 1 as any` reports once, on the assignment, rather than once per name the
 // pattern binds.
 func noUnsafeAssignmentCheckWithDestructuring(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	receiverNode *ast.Node,
 	senderNode *ast.Node,
 	reportingNode *ast.Node,
 	comparison noUnsafeAssignmentComparison,
 ) {
-	if noUnsafeAssignmentCheck(ctx, receiverNode, senderNode, reportingNode, comparison) {
+	if noUnsafeAssignmentCheck(ruleContext, receiverNode, senderNode, reportingNode, comparison) {
 		return
 	}
-	if noUnsafeAssignmentCheckArrayDestructureHelper(ctx, receiverNode, senderNode) {
+	if noUnsafeAssignmentCheckArrayDestructureHelper(ruleContext, receiverNode, senderNode) {
 		return
 	}
-	noUnsafeAssignmentCheckObjectDestructureHelper(ctx, receiverNode, senderNode)
+	noUnsafeAssignmentCheckObjectDestructureHelper(ruleContext, receiverNode, senderNode)
 }
 
 // noUnsafeAssignmentCheck is upstream's `checkAssignment`, and it answers whether it reported.
 func noUnsafeAssignmentCheck(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	receiverNode *ast.Node,
 	senderNode *ast.Node,
 	reportingNode *ast.Node,
 	comparison noUnsafeAssignmentComparison,
 ) bool {
-	return noUnsafeAssignmentCheckAtRange(ctx, receiverNode, senderNode,
-		rule.TokenRange(ctx.SourceFile, reportingNode), comparison)
+	return noUnsafeAssignmentCheckAtRange(ruleContext, receiverNode, senderNode,
+		rule.TokenRange(ruleContext.SourceFile, reportingNode), comparison)
 }
 
 // noUnsafeAssignmentCheckAtRange is the body both entry points share.
 func noUnsafeAssignmentCheckAtRange(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	receiverNode *ast.Node,
 	senderNode *ast.Node,
 	reportRange shimcore.TextRange,
@@ -518,14 +518,14 @@ func noUnsafeAssignmentCheckAtRange(
 	// IsUnsafeAssignment could find unsafe, so it is resolved only then: for a JSX attribute it
 	// resolves the element's props, which was 0.8s of CPU on ahra for attributes whose value could
 	// never be unsafe (#hekjpw3).
-	senderType := ctx.TypeChecker.GetTypeAtLocation(senderNode)
-	if senderType == nil || !type_checking.CanBeUnsafeAssignment(ctx.TypeChecker, senderType) {
+	senderType := ruleContext.TypeChecker.GetTypeAtLocation(senderNode)
+	if senderType == nil || !type_checking.CanBeUnsafeAssignment(ruleContext.TypeChecker, senderType) {
 		return false
 	}
 	if comparison == noUnsafeAssignmentComparisonNone && !type_checking.IsTypeAnyType(senderType) {
 		return false
 	}
-	receiverType := noUnsafeAssignmentReceiverType(ctx, receiverNode, comparison)
+	receiverType := noUnsafeAssignmentReceiverType(ruleContext, receiverNode, comparison)
 
 	if type_checking.IsTypeAnyType(senderType) {
 		// `unknown` is what a receiver is supposed to declare when the value cannot be trusted, so
@@ -534,12 +534,12 @@ func noUnsafeAssignmentCheckAtRange(
 			return false
 		}
 
-		message := messageNoUnsafeAssignmentAny(noUnsafeAssignmentSenderText(ctx, senderType))
-		if noUnsafeAssignmentThisIsAny(ctx, senderNode) {
+		message := messageNoUnsafeAssignmentAny(noUnsafeAssignmentSenderText(ruleContext, senderType))
+		if noUnsafeAssignmentThisIsAny(ruleContext, senderNode) {
 			message = messageNoUnsafeAssignmentAnyThis(
-				noUnsafeAssignmentSenderText(ctx, senderType))
+				noUnsafeAssignmentSenderText(ruleContext, senderType))
 		}
-		ctx.ReportRange(reportRange, message)
+		ruleContext.ReportRange(reportRange, message)
 		return true
 	}
 
@@ -554,29 +554,29 @@ func noUnsafeAssignmentCheckAtRange(
 	// answers whether the sender smuggles an `any` into a generic position the receiver declared
 	// otherwise, and returns the two types whose disagreement it found.
 	receiver, sender, unsafe := type_checking.IsUnsafeAssignment(senderType, receiverType,
-		ctx.TypeChecker, senderNode)
+		ruleContext.TypeChecker, senderNode)
 	if !unsafe {
 		return false
 	}
 
-	ctx.ReportRange(reportRange, messageNoUnsafeAssignmentUnsafe(
-		"`"+ctx.TypeChecker.TypeToString(sender)+"`",
-		"`"+ctx.TypeChecker.TypeToString(receiver)+"`"))
+	ruleContext.ReportRange(reportRange, messageNoUnsafeAssignmentUnsafe(
+		"`"+ruleContext.TypeChecker.TypeToString(sender)+"`",
+		"`"+ruleContext.TypeChecker.TypeToString(receiver)+"`"))
 	return true
 }
 
 // noUnsafeAssignmentReceiverType answers the type the receiver declares, by comparison mode.
 func noUnsafeAssignmentReceiverType(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	receiverNode *ast.Node,
 	comparison noUnsafeAssignmentComparison,
 ) *shimchecker.Type {
 	if comparison == noUnsafeAssignmentComparisonContextual {
-		if contextual := type_checking.GetContextualType(ctx.TypeChecker, receiverNode); contextual != nil {
+		if contextual := type_checking.GetContextualType(ruleContext.TypeChecker, receiverNode); contextual != nil {
 			return contextual
 		}
 	}
-	return ctx.TypeChecker.GetTypeAtLocation(receiverNode)
+	return ruleContext.TypeChecker.GetTypeAtLocation(receiverNode)
 }
 
 // noUnsafeAssignmentThisIsAny answers upstream's `anyAssignmentThis` condition.
@@ -585,19 +585,19 @@ func noUnsafeAssignmentReceiverType(
 // the plain message is the accurate one. Upstream reads the option the same way, and the second line
 // of that message is advice about the compiler option rather than a repair, since there is no edit
 // to propose.
-func noUnsafeAssignmentThisIsAny(ctx rule.Context, senderNode *ast.Node) bool {
-	if ctx.Program == nil || ctx.Program.Options() == nil {
+func noUnsafeAssignmentThisIsAny(ruleContext rule.Context, senderNode *ast.Node) bool {
+	if ruleContext.Program == nil || ruleContext.Program.Options() == nil {
 		return false
 	}
 	if type_checking.IsStrictCompilerOptionEnabled(
-		ctx.Program.Options(), ctx.Program.Options().NoImplicitThis) {
+		ruleContext.Program.Options(), ruleContext.Program.Options().NoImplicitThis) {
 		return false
 	}
 	thisExpression := type_checking.GetThisExpression(senderNode)
 	if thisExpression == nil {
 		return false
 	}
-	thisType := type_checking.GetConstrainedTypeAtLocation(ctx.TypeChecker, thisExpression)
+	thisType := type_checking.GetConstrainedTypeAtLocation(ruleContext.TypeChecker, thisExpression)
 	return thisType != nil && type_checking.IsTypeAnyType(thisType)
 }
 
@@ -605,7 +605,7 @@ func noUnsafeAssignmentThisIsAny(ctx rule.Context, senderNode *ast.Node) bool {
 //
 // A type the checker could not resolve renders as the words `error typed` rather than as a
 // backticked name, because printing the error type would show a name that does not exist.
-func noUnsafeAssignmentSenderText(ctx rule.Context, senderType *shimchecker.Type) string {
+func noUnsafeAssignmentSenderText(ruleContext rule.Context, senderType *shimchecker.Type) string {
 	if type_checking.IsIntrinsicErrorType(senderType) {
 		return "error typed"
 	}
@@ -615,21 +615,21 @@ func noUnsafeAssignmentSenderText(ctx rule.Context, senderType *shimchecker.Type
 // noUnsafeAssignmentIsAnyArray guards the shelf helper's unchecked index.
 //
 // `type_checking.IsTypeAnyArrayType` reads `getTypeArguments(t)[0]` with no length test, so an array
-// type carrying no type arguments panics one call in. The walk recovers per FILE rather than per
+// type carrying no type arguments panics one call in. The walk recovers per file rather than per
 // rule, so that would cost every rule in the package every finding in that file while the run still
 // printed a plausible summary.
 //
 // Guarded here rather than in the shelf because three sibling rules already call that helper on
 // types they have narrowed differently, and widening the shared function is a change to their
 // behavior rather than to this rule's.
-func noUnsafeAssignmentIsAnyArray(ctx rule.Context, candidate *shimchecker.Type) bool {
+func noUnsafeAssignmentIsAnyArray(ruleContext rule.Context, candidate *shimchecker.Type) bool {
 	if candidate == nil {
 		return false
 	}
-	if !shimchecker.Checker_isArrayType(ctx.TypeChecker, candidate) {
+	if !shimchecker.Checker_isArrayType(ruleContext.TypeChecker, candidate) {
 		return false
 	}
-	arguments := shimchecker.Checker_getTypeArguments(ctx.TypeChecker, candidate)
+	arguments := shimchecker.Checker_getTypeArguments(ruleContext.TypeChecker, candidate)
 	if len(arguments) == 0 {
 		return false
 	}
@@ -638,7 +638,7 @@ func noUnsafeAssignmentIsAnyArray(ctx rule.Context, candidate *shimchecker.Type)
 
 // noUnsafeAssignmentCheckArrayDestructureHelper is upstream's helper of the same name.
 func noUnsafeAssignmentCheckArrayDestructureHelper(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	receiverNode *ast.Node,
 	senderNode *ast.Node,
 ) bool {
@@ -646,39 +646,39 @@ func noUnsafeAssignmentCheckArrayDestructureHelper(
 		receiverNode.Kind != ast.KindArrayLiteralExpression {
 		return false
 	}
-	senderType := ctx.TypeChecker.GetTypeAtLocation(senderNode)
+	senderType := ruleContext.TypeChecker.GetTypeAtLocation(senderNode)
 	if senderType == nil {
 		return false
 	}
-	return noUnsafeAssignmentCheckArrayDestructure(ctx, receiverNode, senderType, senderNode)
+	return noUnsafeAssignmentCheckArrayDestructure(ruleContext, receiverNode, senderType, senderNode)
 }
 
 // noUnsafeAssignmentCheckArrayDestructure is upstream's `checkArrayDestructure`.
 //
 // Note the return value on the first branch: upstream reports the whole pattern for an `any[]` and
-// then returns FALSE rather than true, which lets the object walk run afterwards on the same node.
+// then returns false rather than true, which lets the object walk run afterwards on the same node.
 // That reads like an oversight and is reproduced, because the alternative is a port that reports
 // differently from the rule it claims to be.
 func noUnsafeAssignmentCheckArrayDestructure(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	receiverNode *ast.Node,
 	senderType *shimchecker.Type,
 	senderNode *ast.Node,
 ) bool {
-	if noUnsafeAssignmentIsAnyArray(ctx, senderType) {
-		ctx.ReportNode(receiverNode, messageNoUnsafeAssignmentArrayPattern(
-			noUnsafeAssignmentSenderText(ctx, senderType)))
+	if noUnsafeAssignmentIsAnyArray(ruleContext, senderType) {
+		ruleContext.ReportNode(receiverNode, messageNoUnsafeAssignmentArrayPattern(
+			noUnsafeAssignmentSenderText(ruleContext, senderType)))
 		return false
 	}
 
-	// Upstream returns TRUE here, which is `didReport` saying "stop", not "reported". The caller
+	// Upstream returns true here, which is `didReport` saying "stop", not "reported". The caller
 	// reads it as a suppression, so a non-tuple sender ends the destructuring walk for this node.
 	//
-	// The guard is SUBSUMED by what follows and the verdict is recorded rather than the line
+	// The guard is subsumed by what follows and the verdict is recorded rather than the line
 	// deleted. A mutant removing it survives, because every non-tuple that reaches this point has
 	// already failed the any-array branch above, and `getTypeArguments` on such a type yields no
 	// `any` at a destructured position. Probed over five shapes chosen to break that: a
-	// `ReadonlyArray<any>` is caught by the branch above, a `readonly [any]` IS a tuple, and a
+	// `ReadonlyArray<any>` is caught by the branch above, a `readonly [any]` is a tuple, and a
 	// `Set<any>`, a `Map<string, any>` and an `any[][]` all reach the loop and report nothing,
 	// upstream and here alike.
 	//
@@ -689,7 +689,7 @@ func noUnsafeAssignmentCheckArrayDestructure(
 		return true
 	}
 
-	tupleElements := shimchecker.Checker_getTypeArguments(ctx.TypeChecker, senderType)
+	tupleElements := shimchecker.Checker_getTypeArguments(ruleContext.TypeChecker, senderType)
 	didReport := false
 
 	for index, receiverElement := range noUnsafeAssignmentPatternElements(receiverNode) {
@@ -709,12 +709,12 @@ func noUnsafeAssignmentCheckArrayDestructure(
 			continue
 		}
 
-		// The `any` test comes FIRST so `[[[x]]] = [any]` reports once on the outer element rather
+		// The `any` test comes first so `[[[x]]] = [any]` reports once on the outer element rather
 		// than descending three times into a type that is already the answer.
 		if type_checking.IsTypeAnyType(elementSenderType) {
-			ctx.ReportNode(noUnsafeAssignmentElementTarget(receiverElement),
+			ruleContext.ReportNode(noUnsafeAssignmentElementTarget(receiverElement),
 				messageNoUnsafeAssignmentArrayPatternFromTuple(
-					noUnsafeAssignmentSenderText(ctx, elementSenderType)))
+					noUnsafeAssignmentSenderText(ruleContext, elementSenderType)))
 			// Every invalid element in the tuple is reported, so this does not return early.
 			didReport = true
 			continue
@@ -723,9 +723,9 @@ func noUnsafeAssignmentCheckArrayDestructure(
 		target := noUnsafeAssignmentElementTarget(receiverElement)
 		switch target.Kind {
 		case ast.KindArrayBindingPattern, ast.KindArrayLiteralExpression:
-			didReport = noUnsafeAssignmentCheckArrayDestructure(ctx, target, elementSenderType, senderNode)
+			didReport = noUnsafeAssignmentCheckArrayDestructure(ruleContext, target, elementSenderType, senderNode)
 		case ast.KindObjectBindingPattern, ast.KindObjectLiteralExpression:
-			didReport = noUnsafeAssignmentCheckObjectDestructure(ctx, target, elementSenderType, senderNode)
+			didReport = noUnsafeAssignmentCheckObjectDestructure(ruleContext, target, elementSenderType, senderNode)
 		}
 	}
 
@@ -734,7 +734,7 @@ func noUnsafeAssignmentCheckArrayDestructure(
 
 // noUnsafeAssignmentCheckObjectDestructureHelper is upstream's helper of the same name.
 func noUnsafeAssignmentCheckObjectDestructureHelper(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	receiverNode *ast.Node,
 	senderNode *ast.Node,
 ) bool {
@@ -742,27 +742,27 @@ func noUnsafeAssignmentCheckObjectDestructureHelper(
 		receiverNode.Kind != ast.KindObjectLiteralExpression {
 		return false
 	}
-	senderType := ctx.TypeChecker.GetTypeAtLocation(senderNode)
+	senderType := ruleContext.TypeChecker.GetTypeAtLocation(senderNode)
 	if senderType == nil {
 		return false
 	}
-	return noUnsafeAssignmentCheckObjectDestructure(ctx, receiverNode, senderType, senderNode)
+	return noUnsafeAssignmentCheckObjectDestructure(ruleContext, receiverNode, senderType, senderNode)
 }
 
 // noUnsafeAssignmentCheckObjectDestructure is upstream's `checkObjectDestructure`.
 //
-// The sender's properties are looked up by NAME, so a key the rule cannot read statically is skipped
+// The sender's properties are looked up by name, so a key the rule cannot read statically is skipped
 // rather than guessed at. Upstream reads an identifier, a literal and a single-quasi template, and
 // declines anything else.
 func noUnsafeAssignmentCheckObjectDestructure(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	receiverNode *ast.Node,
 	senderType *shimchecker.Type,
 	senderNode *ast.Node,
 ) bool {
 	properties := map[string]*shimchecker.Type{}
-	for _, property := range shimchecker.Checker_getPropertiesOfType(ctx.TypeChecker, senderType) {
-		propertyType := ctx.TypeChecker.GetTypeOfSymbolAtLocation(property, senderNode)
+	for _, property := range shimchecker.Checker_getPropertiesOfType(ruleContext.TypeChecker, senderType) {
+		propertyType := ruleContext.TypeChecker.GetTypeOfSymbolAtLocation(property, senderNode)
 		if propertyType != nil {
 			properties[property.Name] = propertyType
 		}
@@ -777,7 +777,7 @@ func noUnsafeAssignmentCheckObjectDestructure(
 			continue
 		}
 
-		key, keyed := noUnsafeAssignmentPropertyKey(ctx, receiverProperty)
+		key, keyed := noUnsafeAssignmentPropertyKey(ruleContext, receiverProperty)
 		if !keyed {
 			continue
 		}
@@ -790,17 +790,17 @@ func noUnsafeAssignmentCheckObjectDestructure(
 
 		// The `any` test first, so `{x: {y: z}} = {x: any}` reports on `x` rather than descending.
 		if type_checking.IsTypeAnyType(elementSenderType) {
-			ctx.ReportNode(target, messageNoUnsafeAssignmentObjectPattern(
-				noUnsafeAssignmentSenderText(ctx, elementSenderType)))
+			ruleContext.ReportNode(target, messageNoUnsafeAssignmentObjectPattern(
+				noUnsafeAssignmentSenderText(ruleContext, elementSenderType)))
 			didReport = true
 			continue
 		}
 
 		switch target.Kind {
 		case ast.KindArrayBindingPattern, ast.KindArrayLiteralExpression:
-			didReport = noUnsafeAssignmentCheckArrayDestructure(ctx, target, elementSenderType, senderNode)
+			didReport = noUnsafeAssignmentCheckArrayDestructure(ruleContext, target, elementSenderType, senderNode)
 		case ast.KindObjectBindingPattern, ast.KindObjectLiteralExpression:
-			didReport = noUnsafeAssignmentCheckObjectDestructure(ctx, target, elementSenderType, senderNode)
+			didReport = noUnsafeAssignmentCheckObjectDestructure(ruleContext, target, elementSenderType, senderNode)
 		}
 	}
 
@@ -809,12 +809,12 @@ func noUnsafeAssignmentCheckObjectDestructure(
 
 // noUnsafeAssignmentPatternElements returns the elements of a destructuring target.
 //
-// Four shapes reach here and they come in two families. A `const [a] = x` target is a BINDING
-// pattern, and an `[a] = x` target is an array or object LITERAL reinterpreted as a pattern, which
+// Four shapes reach here and they come in two families. A `const [a] = x` target is a binding
+// pattern, and an `[a] = x` target is an array or object literal reinterpreted as a pattern, which
 // is a distinction TSESTree does not make and typescript-go does. Both families are walked so the
 // declaration form and the assignment form behave the same.
 //
-// `Elements()` and `Properties()` PANIC on a kind that has neither, so the kinds are named rather
+// `Elements()` and `Properties()` panic on a kind that has neither, so the kinds are named rather
 // than tried. The walk recovers per file, not per rule.
 func noUnsafeAssignmentPatternElements(node *ast.Node) []*ast.Node {
 	switch node.Kind {
@@ -843,7 +843,7 @@ func noUnsafeAssignmentIsRestElement(element *ast.Node) bool {
 //
 // Upstream reports `receiverProperty.value` for an object property and `receiverElement` for an
 // array element, so a nested pattern is reported at the pattern rather than at the key naming it.
-// The binding-element arm returns its NAME for that reason: for `{ a: { b } }` the name is the inner
+// The binding-element arm returns its name for that reason: for `{ a: { b } }` the name is the inner
 // pattern, which is what upstream underlines.
 func noUnsafeAssignmentElementTarget(element *ast.Node) *ast.Node {
 	switch element.Kind {
@@ -864,7 +864,7 @@ func noUnsafeAssignmentElementTarget(element *ast.Node) *ast.Node {
 // Upstream's four arms: a non-computed identifier or private name answers its own text, a literal
 // answers its cooked value, a single-quasi template answers its cooked text, and anything else is
 // declined rather than guessed at.
-func noUnsafeAssignmentPropertyKey(ctx rule.Context, element *ast.Node) (string, bool) {
+func noUnsafeAssignmentPropertyKey(ruleContext rule.Context, element *ast.Node) (string, bool) {
 	var key *ast.Node
 	switch element.Kind {
 	case ast.KindBindingElement:

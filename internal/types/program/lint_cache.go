@@ -15,11 +15,11 @@ import (
 // one file's bytes. Same bytes, same rule, same findings, with nothing else in the world able
 // to change the answer. So the key is a content hash and there is no invalidation graph.
 //
-// The word doing the work there is "pure". A rule that reads other files is not, and caching
-// it under one file's hash serves a stale result forever when the OTHER file changes. Two live
-// rules are cross-file today, and a third case is latent: the upstream adapter hands the whole
-// program to every rule it wraps and cannot inspect what it wrapped, so it can never truthfully
-// declare purity for a body it does not own.
+// The word doing the work there is "pure". A rule that reads other files is not, and caching it
+// under one file's hash serves a stale result forever when the other file, the one the hash never
+// covered, changes. Two live rules are cross-file today, and a third case is latent: the upstream
+// adapter hands the whole program to every rule it wraps and cannot inspect what it wrapped, so it
+// can never truthfully declare purity for a body it does not own.
 //
 // That is what CacheableRules exists to decide, and why it defaults to excluding rather than
 // including. The asymmetry is the same one the codebase already chose for the type checker:
@@ -170,22 +170,6 @@ type LintCacheWithheld struct {
 	Directive int32
 }
 
-// AdamicRecord is one file's Adamic readiness measurement, kept per rule so an entry whose type-aware rules
-// ran again can be merged rule by rule (refreshClasses), as its findings are.
-//
-// Measure-only findings are counts, never LintCacheFindings: they cannot be printed, cannot fail a run and
-// carry no fixes, so nothing about them needs replaying beyond how many there were.
-type AdamicRecord struct {
-	// Counts is every cacheable cohere:adamic rule that ran on the file with how many findings it had at the
-	// set's own options, before suppression, sorted by rule. A rule that found nothing has a zero pair, so a
-	// rule that ran clean and one that did not run can be told apart.
-	Counts []AdamicCount
-
-	// Skipped is the cacheable cohere:adamic rules that skipped the file, sorted. A skip leaves the file
-	// unmeasured, not ready.
-	Skipped []string
-}
-
 // AdamicCount is one rule's measure-only finding count on one file.
 type AdamicCount struct {
 	Rule     string
@@ -222,7 +206,10 @@ func mergeAdamic(first *AdamicRecord, second *AdamicRecord) *AdamicRecord {
 		Counts:  append(append([]AdamicCount{}, first.Counts...), second.Counts...),
 		Skipped: append(append([]string{}, first.Skipped...), second.Skipped...),
 	}
-	sort.Slice(merged.Counts, func(left, right int) bool { return merged.Counts[left].Rule < merged.Counts[right].Rule })
+	sort.Slice(
+		merged.Counts,
+		func(left, right int) bool { return merged.Counts[left].Rule < merged.Counts[right].Rule },
+	)
 	sort.Strings(merged.Skipped)
 	if len(merged.Counts) == 0 {
 		merged.Counts = nil
@@ -231,56 +218,6 @@ func mergeAdamic(first *AdamicRecord, second *AdamicRecord) *AdamicRecord {
 		merged.Skipped = nil
 	}
 	return merged
-}
-
-// LintCacheFinding is one finding, flattened.
-//
-// rule.Diagnostic carries a *ast.SourceFile belonging to a program that no longer exists by
-// the time this is read back, so the file is implied by the entry rather than stored per
-// finding.
-//
-// MessageDescription holds the rendered text. An earlier version of this comment said text was
-// "derived from the id when a finding is rendered" and therefore safe to omit. That was untrue,
-// and the field was absent because of it. Nothing in this tree derives text from an id: there is
-// no id-to-text table, and `printRuleDiagnostic` prints `Message.Description` directly. Measured
-// 2026-08-25 over `internal/rules`: 340 message ids, of which 11 build their description with
-// `fmt.Sprintf` from runtime values, so for those one id maps to many strings and no table could
-// exist. A cached finding replaying only the id would print an empty or wrong sentence beside a
-// correct file, range and rule — the right metadata carrying the wrong message, which is the one
-// failure here that looks exactly like success.
-//
-// The text is stored rather than the 11 being refused because refusing them buys bytes with a
-// standing per-rule obligation, and this format already depends on `ProgramReads` carrying one.
-// The size scales the right way: the artifact grows with a dirty tree, which is the run where
-// this cache saves least, because changed files are recomputed anyway.
-//
-// Message ids are not unique on their own, which is a second reason the id could never have been
-// the key. `unexpected` carries five distinct descriptions across six core rules, colliding across
-// rules and never within one, so the honest identity of a message is the pair (RuleName,
-// MessageId). Lookups key on the pair even though the text is now stored, so nobody later assumes
-// ids are unique.
-//
-// Fixes and suggestions are counted rather than stored, and that omission IS sound: a fix is a
-// replacement over a byte range, and replaying one computed against different bytes would corrupt
-// the file it claims to repair. A cached finding is a report, never an edit.
-type LintCacheFinding struct {
-	RuleName string
-	Start    int32
-	End      int32
-
-	// MessageId identifies the message within its rule. Not unique across rules; see above.
-	MessageId string
-
-	// MessageDescription is the rendered sentence, stored because nothing can rebuild it.
-	MessageDescription string
-
-	FixCount        int32
-	SuggestionCount int32
-}
-
-// MessageKey is the honest identity of a message: the pair, never the id alone.
-func (f LintCacheFinding) MessageKey() (string, string) {
-	return f.RuleName, f.MessageId
 }
 
 // HashContent is the key a cached entry is stored under.
@@ -296,7 +233,7 @@ func HashContent(content string) [sha256.Size]byte {
 // (sortDiagnostics in walk.go); rule order never decided it.
 //
 // The conclusion survives the correction on different grounds. A reordered rule set can change
-// which findings EXIST rather than merely their sequence, because fixes applied by an earlier
+// which findings exist at all, not merely their sequence, because fixes applied by an earlier
 // rule change the text a later rule reads, and suppression directives are consumed in the order
 // rules run. So a cache keyed without rule order could replay a set the current configuration
 // would not produce, which is what this hash prevents.
@@ -354,16 +291,21 @@ const lintCacheVersion = 10
 //
 // A hit needs the key, the path, the bytes and the applied rule list all to match. The index is built
 // on first use, so a caller that loads a cache and discards it on a key mismatch never pays for it.
-func (c *LintCache) Lookup(path string, contentHash [sha256.Size]byte, key [sha256.Size]byte, rules []string) (LintCacheEntry, bool) {
-	if c == nil || c.Key != key {
+func (cache *LintCache) Lookup(
+	path string,
+	contentHash [sha256.Size]byte,
+	key [sha256.Size]byte,
+	rules []string,
+) (LintCacheEntry, bool) {
+	if cache == nil || cache.Key != key {
 		return LintCacheEntry{}, false
 	}
-	c.ensureIndex()
-	position, found := c.index[path]
+	cache.ensureIndex()
+	position, found := cache.index[path]
 	if !found {
 		return LintCacheEntry{}, false
 	}
-	entry := c.Entries[position]
+	entry := cache.Entries[position]
 	// The path matching is not enough. A file whose contents changed has a stale entry under the same
 	// path, and returning it is precisely the silent failure this cache must not have.
 	if entry.ContentHash != contentHash || !equalStrings(entry.Rules, rules) {
@@ -374,23 +316,23 @@ func (c *LintCache) Lookup(path string, contentHash [sha256.Size]byte, key [sha2
 
 // holds reports whether the cache has an entry for path at all, matching or not, so a miss can say whether the
 // file was never recorded or recorded at other bytes. The index must already be built (ensureIndex).
-func (c *LintCache) holds(path string) bool {
-	if c == nil || c.index == nil {
+func (cache *LintCache) holds(path string) bool {
+	if cache == nil || cache.index == nil {
 		return false
 	}
-	_, found := c.index[path]
+	_, found := cache.index[path]
 	return found
 }
 
 // ensureIndex builds the path index if it is missing. A caller about to share the cache across
 // goroutines calls it first, since building it lazily inside concurrent lookups would race.
-func (c *LintCache) ensureIndex() {
-	if c.index != nil {
+func (cache *LintCache) ensureIndex() {
+	if cache.index != nil {
 		return
 	}
-	c.index = make(map[string]int, len(c.Entries))
-	for position := range c.Entries {
-		c.index[c.Entries[position].Path] = position
+	cache.index = make(map[string]int, len(cache.Entries))
+	for position := range cache.Entries {
+		cache.index[cache.Entries[position].Path] = position
 	}
 }
 
@@ -417,25 +359,25 @@ func equalStrings(first []string, second []string) bool {
 // because most files are clean, and an entry saying "these bytes produce nothing" is a real answer.
 // Skipping it would make a clean file indistinguishable from an unknown one, which is the exact
 // ambiguity Lookup's second return exists to destroy.
-func (c *LintCache) Store(entry LintCacheEntry) {
-	if c == nil {
+func (cache *LintCache) Store(entry LintCacheEntry) {
+	if cache == nil {
 		return
 	}
-	if c.index != nil {
-		if position, found := c.index[entry.Path]; found {
-			c.Entries[position] = entry
+	if cache.index != nil {
+		if position, found := cache.index[entry.Path]; found {
+			cache.Entries[position] = entry
 			return
 		}
 	}
-	for position := range c.Entries {
-		if c.Entries[position].Path == entry.Path {
-			c.Entries[position] = entry
-			c.index = nil
+	for position := range cache.Entries {
+		if cache.Entries[position].Path == entry.Path {
+			cache.Entries[position] = entry
+			cache.index = nil
 			return
 		}
 	}
-	c.Entries = append(c.Entries, entry)
-	c.index = nil
+	cache.Entries = append(cache.Entries, entry)
+	cache.index = nil
 }
 
 // CacheClasses splits a rule set five ways, in order: rules whose findings depend only on the file's
@@ -466,14 +408,14 @@ func (c *LintCache) Store(entry LintCacheEntry) {
 // The asymmetry still holds. Including a rule wrongly serves stale findings silently and forever;
 // excluding one wrongly costs a cache miss. A rule that reads other files and the checker both is
 // excluded, since other files are the larger reach.
-func CacheClasses(rules []rule.Rule) (pure []rule.Rule, typeAware []rule.Rule, design []rule.Rule, derived []rule.Rule,
-	uncacheable []rule.Rule) {
+func CacheClasses(rules []rule.Entry) (pure []rule.Entry, typeAware []rule.Entry, design []rule.Entry,
+	derived []rule.Entry, uncacheable []rule.Entry) {
 	for _, subject := range rules {
 		readsTypes := subject.NeedsTypeChecker || subject.ProgramReads&rule.ReadsModuleResolution != 0
 		readsDesignSystem := subject.ProgramReads&rule.ReadsDesignSystem != 0
 		readsOtherFiles := subject.ProgramReads&rule.ReadsOtherFiles != 0
 		switch {
-		case readsOtherFiles && subject.ProgramFingerprint != nil && !readsDesignSystem:
+		case readsOtherFiles && subject.HasProgramFingerprint && !readsDesignSystem:
 			derived = append(derived, subject)
 		case readsOtherFiles, readsDesignSystem && readsTypes:
 			uncacheable = append(uncacheable, subject)
@@ -490,7 +432,69 @@ func CacheClasses(rules []rule.Rule) (pure []rule.Rule, typeAware []rule.Rule, d
 
 // CacheableRules splits a rule set into the rules whose findings depend on nothing but the file's
 // bytes, and everything else. See CacheClasses for the three-way split the walk uses.
-func CacheableRules(rules []rule.Rule) (cacheable []rule.Rule, uncacheable []rule.Rule) {
+func CacheableRules(rules []rule.Entry) (cacheable []rule.Entry, uncacheable []rule.Entry) {
 	pure, typeAware, design, derived, never := CacheClasses(rules)
 	return pure, append(append(append(typeAware, design...), derived...), never...)
+}
+
+// wire interns the findings cache's rule lists. It is stamped with this build's lintCacheVersion: a cache in
+// memory always means what this build means.
+func (cache *LintCache) wire() *lintCacheWire {
+	wire := &lintCacheWire{
+		Version:      lintCacheVersion,
+		Key:          cache.Key,
+		KeyParts:     cache.KeyParts,
+		DesignSystem: cache.DesignSystem,
+	}
+	// Interned by a cheap key, the length and the two ends, and confirmed by comparing names, never by joining
+	// a list into one string: ahra's entries hold about 18,000 lists of up to ~250 names, and joining each cost
+	// about 25ms of every recording run to find 31 distinct ones (#a66sfmh).
+	type listKey struct {
+		length      int
+		first, last string
+	}
+	positions := map[listKey][]int{}
+	intern := func(list []string) int {
+		key := listKey{length: len(list)}
+		if len(list) > 0 {
+			key.first, key.last = list[0], list[len(list)-1]
+		}
+		for _, position := range positions[key] {
+			if equalStrings(wire.Lists[position], list) {
+				return position
+			}
+		}
+		positions[key] = append(positions[key], len(wire.Lists))
+		wire.Lists = append(wire.Lists, append([]string{}, list...))
+		return len(wire.Lists) - 1
+	}
+	for _, entry := range cache.Entries {
+		wire.Entries = append(wire.Entries, lintCacheWireEntry{
+			Path:            entry.Path,
+			ContentHash:     entry.ContentHash,
+			Rules:           intern(entry.Rules),
+			TypedRules:      intern(entry.TypedRules),
+			TypeFingerprint: entry.TypeFingerprint,
+			Listening:       intern(entry.Listening),
+			VisitedNodes:    entry.VisitedNodes,
+			Findings:        entry.Findings,
+
+			ShapedRules:      intern(entry.ShapedRules),
+			ShapeFingerprint: entry.ShapeFingerprint,
+
+			DesignRules:       intern(entry.DesignRules),
+			DesignFingerprint: entry.DesignFingerprint,
+
+			DerivedRules:       intern(entry.DerivedRules),
+			DerivedFingerprint: entry.DerivedFingerprint,
+
+			Notes: wireNotes(entry.Notes),
+
+			Directives: entry.Directives,
+			Withheld:   entry.Withheld,
+
+			Adamic: entry.Adamic,
+		})
+	}
+	return wire
 }

@@ -13,7 +13,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // because it defaults to false, and the explicit path is written anyway so a later default change
 // cannot invert the rule without anything saying so.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[NoMultiAssignOptions]{
 		Rule:   NoMultiAssign,
 		Decode: DecodeNoMultiAssignOptions,
 	})

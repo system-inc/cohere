@@ -12,7 +12,10 @@ const correctnessNoGlobalListenerTargetAssertionId = "globalListenerTargetAssert
 
 // correctnessNoGlobalListenerTargetAssertionText is the rule's message, whose wording lives in
 // `policy/messages/correctness-no-global-listener-target-assertion.json`.
-var correctnessNoGlobalListenerTargetAssertionText = policy.MessageOf("nexus/correctness-no-global-listener-target-assertion", correctnessNoGlobalListenerTargetAssertionId)
+var correctnessNoGlobalListenerTargetAssertionText = policy.MessageOf(
+	"nexus/correctness-no-global-listener-target-assertion",
+	correctnessNoGlobalListenerTargetAssertionId,
+)
 
 func correctnessNoGlobalListenerTargetAssertionMessage() rule.Message {
 	return rule.Message{
@@ -25,12 +28,17 @@ func correctnessNoGlobalListenerTargetAssertionMessage() rule.Message {
 // element type inside a handler registered with `document.addEventListener` or
 // `window.addEventListener`.
 //
-//	invalid: document.addEventListener('keydown', function(event) { const target = event.target as HTMLTextAreaElement; use(target.selectionStart); });
+//	invalid: document.addEventListener('keydown', function(event) {
+//	         const target = event.target as HTMLTextAreaElement; use(target.selectionStart); });
 //	invalid: window.addEventListener('click', (event) => { (event.target as HTMLInputElement).select(); });
-//	invalid: function handleKeyDown(event: KeyboardEvent) { (<HTMLInputElement>event.target).value; } document.addEventListener('keydown', handleKeyDown);
-//	valid:   document.addEventListener('keydown', function(event) { if(!(event.target instanceof HTMLTextAreaElement)) return; use(event.target.selectionStart); });
-//	valid:   document.addEventListener('click', function(event) { const target = event.target as HTMLElement; target.closest('[data-menu]'); });
-//	valid:   textarea.addEventListener('keydown', function(event) { (event.target as HTMLTextAreaElement).selectionStart; });
+//	invalid: function handleKeyDown(event: KeyboardEvent) { (<HTMLInputElement>event.target).value; }
+//	         document.addEventListener('keydown', handleKeyDown);
+//	valid:   document.addEventListener('keydown', function(event) {
+//	         if(!(event.target instanceof HTMLTextAreaElement)) return; use(event.target.selectionStart); });
+//	valid:   document.addEventListener('click', function(event) {
+//	         const target = event.target as HTMLElement; target.closest('[data-menu]'); });
+//	valid:   textarea.addEventListener('keydown', function(event) {
+//	         (event.target as HTMLTextAreaElement).selectionStart; });
 //	valid:   document.addEventListener('click', function(event) { (event.currentTarget as Document).title; });
 //
 // # Where it came from
@@ -82,7 +90,7 @@ func correctnessNoGlobalListenerTargetAssertionMessage() rule.Message {
 //
 // Whether to guard with `instanceof`, return early, or move the listener onto the element is the
 // author's call, and an inserted guard would change which events the handler acts on.
-var CorrectnessNoGlobalListenerTargetAssertion = rule.Rule{
+var CorrectnessNoGlobalListenerTargetAssertion = rule.Rule[rule.NoOptions]{
 	Name: "nexus/correctness-no-global-listener-target-assertion",
 
 	// `document`, `window`, `addEventListener`, `Event.target` and the element types are each told
@@ -95,13 +103,13 @@ var CorrectnessNoGlobalListenerTargetAssertion = rule.Rule{
 	// Left on the default, Contents: the dispatch scan cannot prove the handler resolution stops short of
 	// an imported body, so a shape-keyed replay is not claimed (TestRulesClaimShapesOnlyWhereTheScanAllowsIt).
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.TypeChecker == nil || ctx.Program == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		if ruleContext.TypeChecker == nil || ruleContext.Program == nil {
 			return nil
 		}
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
-				handler := correctnessNoGlobalListenerTargetAssertionHandler(ctx, node)
+				handler := correctnessNoGlobalListenerTargetAssertionHandler(ruleContext, node)
 				if handler == nil {
 					return
 				}
@@ -113,7 +121,7 @@ var CorrectnessNoGlobalListenerTargetAssertion = rule.Rule{
 				if name == nil || name.Kind != ast.KindIdentifier || name.Text() == "this" {
 					return
 				}
-				event := ctx.TypeChecker.GetSymbolAtLocation(name)
+				event := ruleContext.TypeChecker.GetSymbolAtLocation(name)
 				body := handler.Body()
 				if event == nil || body == nil {
 					return
@@ -121,8 +129,12 @@ var CorrectnessNoGlobalListenerTargetAssertion = rule.Rule{
 				var visit func(current *ast.Node) bool
 				visit = func(current *ast.Node) bool {
 					if current.Kind == ast.KindPropertyAccessExpression {
-						if assertion := correctnessNoGlobalListenerTargetAssertionAt(ctx, current, event); assertion != nil {
-							ctx.ReportNode(assertion, correctnessNoGlobalListenerTargetAssertionMessage())
+						if assertion := correctnessNoGlobalListenerTargetAssertionAt(
+							ruleContext,
+							current,
+							event,
+						); assertion != nil {
+							ruleContext.ReportNode(assertion, correctnessNoGlobalListenerTargetAssertionMessage())
 						}
 					}
 					current.ForEachChild(visit)
@@ -143,10 +155,12 @@ var correctnessNoGlobalListenerTargetAssertionGeneralTypes = map[string]bool{
 // correctnessNoGlobalListenerTargetAssertionHandler is the function a call registers as a listener
 // on the global `document` or `window`, or nil when the call is anything else or the handler is not a
 // function this file declares.
-func correctnessNoGlobalListenerTargetAssertionHandler(ctx rule.Context, call *ast.Node) *ast.Node {
+func correctnessNoGlobalListenerTargetAssertionHandler(ruleContext rule.Context, call *ast.Node) *ast.Node {
 	expression := call.AsCallExpression()
 	callee := ast.SkipParentheses(expression.Expression)
-	if callee.Kind != ast.KindPropertyAccessExpression || expression.Arguments == nil || len(expression.Arguments.Nodes) < 2 {
+	if callee.Kind != ast.KindPropertyAccessExpression ||
+		expression.Arguments == nil ||
+		len(expression.Arguments.Nodes) < 2 {
 		return nil
 	}
 	access := callee.AsPropertyAccessExpression()
@@ -157,8 +171,14 @@ func correctnessNoGlobalListenerTargetAssertionHandler(ctx rule.Context, call *a
 	if receiver.Kind != ast.KindIdentifier || (receiver.Text() != "document" && receiver.Text() != "window") {
 		return nil
 	}
-	if !correctnessNoGlobalListenerTargetAssertionIsGlobalVariable(ctx, ctx.TypeChecker.GetSymbolAtLocation(receiver)) ||
-		!correctnessNoGlobalListenerTargetAssertionFromDefaultLibrary(ctx, ctx.TypeChecker.GetSymbolAtLocation(access.Name())) {
+	if !correctnessNoGlobalListenerTargetAssertionIsGlobalVariable(
+		ruleContext,
+		ruleContext.TypeChecker.GetSymbolAtLocation(receiver),
+	) ||
+		!correctnessNoGlobalListenerTargetAssertionFromDefaultLibrary(
+			ruleContext,
+			ruleContext.TypeChecker.GetSymbolAtLocation(access.Name()),
+		) {
 		return nil
 	}
 	handler := ast.SkipParentheses(expression.Arguments.Nodes[1])
@@ -169,11 +189,11 @@ func correctnessNoGlobalListenerTargetAssertionHandler(ctx rule.Context, call *a
 	default:
 		return nil
 	}
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(handler)
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(handler)
 	if symbol == nil || symbol.Flags&ast.SymbolFlagsAlias != 0 {
 		return nil
 	}
-	declarations := rule.DeclarationsIn(ctx.SourceFile, symbol)
+	declarations := rule.DeclarationsIn(ruleContext.SourceFile, symbol)
 	if len(declarations) != 1 || len(symbol.Declarations) != 1 {
 		return nil
 	}
@@ -184,7 +204,10 @@ func correctnessNoGlobalListenerTargetAssertionHandler(ctx rule.Context, call *a
 	case ast.KindVariableDeclaration:
 		list := declaration.Parent
 		initializer := declaration.AsVariableDeclaration().Initializer
-		if list == nil || list.Kind != ast.KindVariableDeclarationList || list.Flags&ast.NodeFlagsConst == 0 || initializer == nil {
+		if list == nil ||
+			list.Kind != ast.KindVariableDeclarationList ||
+			list.Flags&ast.NodeFlagsConst == 0 ||
+			initializer == nil {
 			return nil
 		}
 		initializer = ast.SkipParentheses(initializer)
@@ -197,8 +220,8 @@ func correctnessNoGlobalListenerTargetAssertionHandler(ctx rule.Context, call *a
 
 // correctnessNoGlobalListenerTargetAssertionIsGlobalVariable says whether a symbol is a variable
 // declared only in the default library: lib.dom's `declare var document` and `declare var window`.
-func correctnessNoGlobalListenerTargetAssertionIsGlobalVariable(ctx rule.Context, symbol *ast.Symbol) bool {
-	if !correctnessNoGlobalListenerTargetAssertionFromDefaultLibrary(ctx, symbol) {
+func correctnessNoGlobalListenerTargetAssertionIsGlobalVariable(ruleContext rule.Context, symbol *ast.Symbol) bool {
+	if !correctnessNoGlobalListenerTargetAssertionFromDefaultLibrary(ruleContext, symbol) {
 		return false
 	}
 	for _, declaration := range symbol.Declarations {
@@ -212,13 +235,13 @@ func correctnessNoGlobalListenerTargetAssertionIsGlobalVariable(ctx rule.Context
 // correctnessNoGlobalListenerTargetAssertionFromDefaultLibrary says whether a symbol has declarations
 // and every one of them is in a default library file. Every rather than any, so a project
 // declaration merged into a library one makes the symbol something this rule has not read.
-func correctnessNoGlobalListenerTargetAssertionFromDefaultLibrary(ctx rule.Context, symbol *ast.Symbol) bool {
+func correctnessNoGlobalListenerTargetAssertionFromDefaultLibrary(ruleContext rule.Context, symbol *ast.Symbol) bool {
 	if symbol == nil || len(symbol.Declarations) == 0 {
 		return false
 	}
 	for _, declaration := range symbol.Declarations {
 		file := ast.GetSourceFileOfNode(declaration)
-		if file == nil || !rule.IsSourceFileDefaultLibrary(ctx.Program, file) {
+		if file == nil || !rule.IsSourceFileDefaultLibrary(ruleContext.Program, file) {
 			return false
 		}
 	}
@@ -228,19 +251,28 @@ func correctnessNoGlobalListenerTargetAssertionFromDefaultLibrary(ctx rule.Conte
 // correctnessNoGlobalListenerTargetAssertionAt is the assertion to report around one property access,
 // when the access is the event's own `target` and an assertion around it names a specific element
 // type the checker does not already know the target to be.
-func correctnessNoGlobalListenerTargetAssertionAt(ctx rule.Context, access *ast.Node, event *ast.Symbol) *ast.Node {
+func correctnessNoGlobalListenerTargetAssertionAt(
+	ruleContext rule.Context,
+	access *ast.Node,
+	event *ast.Symbol,
+) *ast.Node {
 	property := access.AsPropertyAccessExpression()
 	if property.Name().Kind != ast.KindIdentifier || property.Name().Text() != "target" {
 		return nil
 	}
 	object := ast.SkipParentheses(property.Expression)
-	if object.Kind != ast.KindIdentifier || object.Text() != event.Name || ctx.TypeChecker.GetSymbolAtLocation(object) != event {
+	if object.Kind != ast.KindIdentifier ||
+		object.Text() != event.Name ||
+		ruleContext.TypeChecker.GetSymbolAtLocation(object) != event {
 		return nil
 	}
-	if !correctnessNoGlobalListenerTargetAssertionFromDefaultLibrary(ctx, ctx.TypeChecker.GetSymbolAtLocation(property.Name())) {
+	if !correctnessNoGlobalListenerTargetAssertionFromDefaultLibrary(
+		ruleContext,
+		ruleContext.TypeChecker.GetSymbolAtLocation(property.Name()),
+	) {
 		return nil
 	}
-	known := ctx.TypeChecker.GetTypeAtLocation(access)
+	known := ruleContext.TypeChecker.GetTypeAtLocation(access)
 	for outer := access.Parent; outer != nil; outer = outer.Parent {
 		switch outer.Kind {
 		case ast.KindParenthesizedExpression, ast.KindNonNullExpression:
@@ -250,11 +282,14 @@ func correctnessNoGlobalListenerTargetAssertionAt(ctx rule.Context, access *ast.
 			if typeNode == nil {
 				return nil
 			}
-			asserted := ctx.TypeChecker.GetTypeFromTypeNode(typeNode)
-			if asserted == nil || !correctnessNoGlobalListenerTargetAssertionIsSpecific(ctx, asserted) {
+			asserted := ruleContext.TypeChecker.GetTypeFromTypeNode(typeNode)
+			if asserted == nil || !correctnessNoGlobalListenerTargetAssertionIsSpecific(ruleContext, asserted) {
 				continue
 			}
-			if known != nil && ctx.TypeChecker.IsTypeAssignableTo(ctx.TypeChecker.GetNonNullableType(known), ctx.TypeChecker.GetNonNullableType(asserted)) {
+			if known != nil && ruleContext.TypeChecker.IsTypeAssignableTo(
+				ruleContext.TypeChecker.GetNonNullableType(known),
+				ruleContext.TypeChecker.GetNonNullableType(asserted),
+			) {
 				return nil
 			}
 			return outer
@@ -266,17 +301,17 @@ func correctnessNoGlobalListenerTargetAssertionAt(ctx rule.Context, access *ast.
 
 // correctnessNoGlobalListenerTargetAssertionIsSpecific says whether every non-nullish member of a type
 // is a specific element type, with at least one such member.
-func correctnessNoGlobalListenerTargetAssertionIsSpecific(ctx rule.Context, asserted *checker.Type) bool {
+func correctnessNoGlobalListenerTargetAssertionIsSpecific(ruleContext rule.Context, asserted *checker.Type) bool {
 	specific := false
-	for part := range type_checking.UnionTypePartsSeq(asserted) {
+	for part := range type_checking.UnionTypePartsSequence(asserted) {
 		if type_checking.IsTypeFlagSet(part, checker.TypeFlagsNull|checker.TypeFlagsUndefined) {
 			continue
 		}
 		symbol := checker.Type_symbol(part)
 		if symbol == nil || symbol.Flags&ast.SymbolFlagsInterface == 0 ||
 			correctnessNoGlobalListenerTargetAssertionGeneralTypes[symbol.Name] ||
-			!correctnessNoGlobalListenerTargetAssertionFromDefaultLibrary(ctx, symbol) ||
-			!correctnessNoGlobalListenerTargetAssertionExtendsElement(ctx, symbol) {
+			!correctnessNoGlobalListenerTargetAssertionFromDefaultLibrary(ruleContext, symbol) ||
+			!correctnessNoGlobalListenerTargetAssertionExtendsElement(ruleContext, symbol) {
 			return false
 		}
 		specific = true
@@ -286,22 +321,24 @@ func correctnessNoGlobalListenerTargetAssertionIsSpecific(ctx rule.Context, asse
 
 // correctnessNoGlobalListenerTargetAssertionExtendsElement says whether a default-library interface
 // has the default library's `Element` among its bases, at any depth.
-func correctnessNoGlobalListenerTargetAssertionExtendsElement(ctx rule.Context, symbol *ast.Symbol) bool {
+func correctnessNoGlobalListenerTargetAssertionExtendsElement(ruleContext rule.Context, symbol *ast.Symbol) bool {
 	seen := map[*ast.Symbol]bool{symbol: true}
 	queue := []*ast.Symbol{symbol}
 	for len(queue) > 0 {
 		current := queue[0]
 		queue = queue[1:]
-		declared := checker.Checker_getDeclaredTypeOfSymbol(ctx.TypeChecker, current)
-		if declared == nil || checker.Type_objectFlags(declared)&(checker.ObjectFlagsInterface|checker.ObjectFlagsClass) == 0 {
+		declared := checker.Checker_getDeclaredTypeOfSymbol(ruleContext.TypeChecker, current)
+		if declared == nil ||
+			checker.Type_objectFlags(declared)&(checker.ObjectFlagsInterface|checker.ObjectFlagsClass) == 0 {
 			continue
 		}
-		for _, base := range checker.Checker_getBaseTypes(ctx.TypeChecker, declared) {
+		for _, base := range checker.Checker_getBaseTypes(ruleContext.TypeChecker, declared) {
 			baseSymbol := checker.Type_symbol(base)
 			if baseSymbol == nil || seen[baseSymbol] {
 				continue
 			}
-			if baseSymbol.Name == "Element" && correctnessNoGlobalListenerTargetAssertionFromDefaultLibrary(ctx, baseSymbol) {
+			if baseSymbol.Name == "Element" &&
+				correctnessNoGlobalListenerTargetAssertionFromDefaultLibrary(ruleContext, baseSymbol) {
 				return true
 			}
 			seen[baseSymbol] = true

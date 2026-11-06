@@ -9,10 +9,10 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // changing.
 //
 // `Decode` names the rule's own hand-written decoder rather than `rule.DecodeOptionsInto`. Neither
-// of this rule's two defaults is a Go zero value, and `readonly` falls back to the RESOLVED value of
+// of this rule's two defaults is a Go zero value, and `readonly` falls back to the resolved value of
 // `default` rather than to a constant, which is a dependency between two fields no struct tag can
 // express. A generic decode would hand the rule two empty settings that match no arm, and the rule
 // would register on every file and report nothing while every fixture stayed green.
 func init() {
-	rule.Register(rule.Registration{Rule: ArrayType, Decode: DecodeArrayTypeOptions})
+	rule.Register(rule.Registration[ArrayTypeOptions]{Rule: ArrayType, Decode: DecodeArrayTypeOptions})
 }

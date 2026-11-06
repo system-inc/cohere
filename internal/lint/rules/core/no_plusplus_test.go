@@ -21,7 +21,7 @@ type noPlusplusCase struct {
 	// source is upstream's `code`, byte for byte.
 	source string
 
-	// options is the RAW JSON of upstream's options object, routed through the rule's own
+	// options is the raw JSON of upstream's options object, routed through the rule's own
 	// exported decoder rather than built as a struct, so the decoder's defaults and its
 	// empty-input path are under test.
 	options string
@@ -166,50 +166,50 @@ var noPlusplusSilentCases = []noPlusplusCase{
 }
 
 // decodedNoPlusplus routes a row's raw JSON through the rule's own exported decoder.
-func decodedNoPlusplus(t *testing.T, raw string) any {
-	t.Helper()
-	decoded, err := DecodeNoPlusplusOptions([]byte(raw))
-	if err != nil {
-		t.Fatalf("decoding options %q: %v", raw, err)
+func decodedNoPlusplus(test *testing.T, raw string) NoPlusplusOptions {
+	test.Helper()
+	decoded, decodeNoPlusplusOptionsError := DecodeNoPlusplusOptions([]byte(raw))
+	if decodeNoPlusplusOptionsError != nil {
+		test.Fatalf("decoding options %q: %v", raw, decodeNoPlusplusOptionsError)
 	}
 	return decoded
 }
 
-func TestNoPlusplusFires(t *testing.T) {
-	t.Parallel()
+func TestNoPlusplusFires(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range noPlusplusFiresCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoPlusplus, noPlusplusFile, testCase.source,
-				decodedNoPlusplus(t, testCase.options))
-			rule_testing.ExpectFindings(t, result, testCase.ids...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoPlusplus, noPlusplusFile, testCase.source,
+				decodedNoPlusplus(test, testCase.options))
+			rule_testing.ExpectFindings(test, result, testCase.ids...)
 		})
 	}
 }
 
-func TestNoPlusplusStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoPlusplusStaysSilent(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range noPlusplusSilentCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoPlusplus, noPlusplusFile, testCase.source,
-				decodedNoPlusplus(t, testCase.options))
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoPlusplus, noPlusplusFile, testCase.source,
+				decodedNoPlusplus(test, testCase.options))
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
 
-// TestNoPlusplusNamesTheOperator asserts the message TEXT, not just the id.
+// TestNoPlusplusNamesTheOperator asserts the message text, not just the id.
 //
 // The generated tables above compare message ids, so the operator this rule interpolates is never
 // read and a port that always said `++` would pass all 23 cases. Mutating the operator renderer to
-// return `++` unconditionally SURVIVES those tables for exactly that reason.
+// return `++` unconditionally survives those tables for exactly that reason.
 //
 // The coverage was already paid for: upstream's corpus asserts `Unary operator '--' used.` on three
 // cases. This reads it. Widening an assertion is cheaper than adding a fixture, and it is the first
 // thing to check when a mutant survives a corpus that looks like it should catch it.
-func TestNoPlusplusNamesTheOperator(t *testing.T) {
-	t.Parallel()
+func TestNoPlusplusNamesTheOperator(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name     string
@@ -223,17 +223,17 @@ func TestNoPlusplusNamesTheOperator(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoPlusplus, noPlusplusFile, testCase.source,
-				decodedNoPlusplus(t, ""))
-			rule_testing.ExpectFindings(t, result, "unexpectedUnaryOp")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoPlusplus, noPlusplusFile, testCase.source,
+				decodedNoPlusplus(test, ""))
+			rule_testing.ExpectFindings(test, result, "unexpectedUnaryOp")
 			if len(result.Diagnostics) != 1 {
 				return
 			}
 			wanted := "Unary operator `" + testCase.operator + "` used."
 			if !strings.HasPrefix(result.Diagnostics[0].Message.Description, wanted) {
-				t.Errorf("rendered %q, expected it to name the operator as %q",
+				test.Errorf("rendered %q, expected it to name the operator as %q",
 					result.Diagnostics[0].Message.Description, testCase.operator)
 			}
 		})
@@ -242,27 +242,27 @@ func TestNoPlusplusNamesTheOperator(t *testing.T) {
 
 // TestNoPlusplusSurvivesNilOptions covers the path a bare `"error"` configuration takes.
 //
-// A rule configured without options is handed nil rather than the decoded default, and
-// `options.(T)` on nil yields the zero value silently. Every generated row above routes through
-// `DecodeNoPlusplusOptions`, which always returns a real `NoPlusplusOptions`, so the type assertion
-// always succeeds and the fallback beside it is never exercised by them.
+// A rule configured without options is handed none rather than the decoded default, and reading
+// them yields the zero value silently. Every generated row above routes through
+// `DecodeNoPlusplusOptions`, so the rule is always configured and the fallback beside the read is
+// never exercised by them.
 //
 // That is why flipping the fallback's default to `true` survives the whole 23-case corpus. The
 // survivor was read as equivalent and then checked against the code rather than inferred from the
-// mutation: the fallback is reachable only through nil options, which only the config layer
-// produces. This test is that path.
+// mutation: the fallback is reachable only with no options, which only the config layer produces.
+// This test is that path.
 //
 // For this rule the zero value happens to be the right answer, so the consequence of getting it
 // wrong is narrow. It is pinned anyway, because the failure it guards against is the inert-rule
 // shape: a rule that registers on every file and silently judges with the wrong default reads
 // exactly like a clean tree.
-func TestNoPlusplusSurvivesNilOptions(t *testing.T) {
-	t.Parallel()
+func TestNoPlusplusSurvivesNilOptions(test *testing.T) {
+	test.Parallel()
 
 	// A for-loop update, which is exempt under `allowForLoopAfterthoughts: true` and reports under
 	// the default. So this input separates the two defaults rather than merely exercising the path.
 	const source = "for (i = 0; i < l; i++) { console.log(i); }\n"
 
-	result := rule_testing.RunWithOptions(t, NoPlusplus, noPlusplusFile, source, nil)
-	rule_testing.ExpectFindings(t, result, "unexpectedUnaryOp")
+	result := rule_testing.Run(test, NoPlusplus, noPlusplusFile, source)
+	rule_testing.ExpectFindings(test, result, "unexpectedUnaryOp")
 }

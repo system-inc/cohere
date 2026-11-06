@@ -20,7 +20,7 @@ type classMethodsUseThisCase struct {
 	// source is upstream's `code`, byte for byte.
 	source string
 
-	// options is the RAW JSON of upstream's options object, routed through the rule's own
+	// options is the raw JSON of upstream's options object, routed through the rule's own
 	// exported decoder rather than built as a struct, so the decoder's defaults and its
 	// empty-input path are under test.
 	options string
@@ -101,7 +101,17 @@ var classMethodsUseThisFiresCases = []classMethodsUseThisCase{
 		name:    "invalid-11",
 		source:  "class A { foo(){} 'bar'(){} 123(){} [`baz`](){} [a](){} [f(a)](){} get quux(){} set[a](b){} *quuux(){} }",
 		options: "",
-		ids:     []string{"missingThis", "missingThis", "missingThis", "missingThis", "missingThis", "missingThis", "missingThis", "missingThis", "missingThis"},
+		ids: []string{
+			"missingThis",
+			"missingThis",
+			"missingThis",
+			"missingThis",
+			"missingThis",
+			"missingThis",
+			"missingThis",
+			"missingThis",
+			"missingThis",
+		},
 	},
 	{
 		name:    "invalid-12",
@@ -285,35 +295,35 @@ var classMethodsUseThisSilentCases = []classMethodsUseThisCase{
 }
 
 // decodedClassMethodsUseThis routes a row's raw JSON through the rule's own exported decoder.
-func decodedClassMethodsUseThis(t *testing.T, raw string) any {
-	t.Helper()
-	decoded, err := DecodeClassMethodsUseThisOptions([]byte(raw))
-	if err != nil {
-		t.Fatalf("decoding options %q: %v", raw, err)
+func decodedClassMethodsUseThis(test *testing.T, raw string) ClassMethodsUseThisOptions {
+	test.Helper()
+	decoded, decodeClassMethodsUseThisOptionsError := DecodeClassMethodsUseThisOptions([]byte(raw))
+	if decodeClassMethodsUseThisOptionsError != nil {
+		test.Fatalf("decoding options %q: %v", raw, decodeClassMethodsUseThisOptionsError)
 	}
 	return decoded
 }
 
-func TestClassMethodsUseThisFires(t *testing.T) {
-	t.Parallel()
+func TestClassMethodsUseThisFires(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range classMethodsUseThisFiresCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, ClassMethodsUseThis, classMethodsUseThisFile, testCase.source,
-				decodedClassMethodsUseThis(t, testCase.options))
-			rule_testing.ExpectFindings(t, result, testCase.ids...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, ClassMethodsUseThis, classMethodsUseThisFile, testCase.source,
+				decodedClassMethodsUseThis(test, testCase.options))
+			rule_testing.ExpectFindings(test, result, testCase.ids...)
 		})
 	}
 }
 
-func TestClassMethodsUseThisStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestClassMethodsUseThisStaysSilent(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range classMethodsUseThisSilentCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, ClassMethodsUseThis, classMethodsUseThisFile, testCase.source,
-				decodedClassMethodsUseThis(t, testCase.options))
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, ClassMethodsUseThis, classMethodsUseThisFile, testCase.source,
+				decodedClassMethodsUseThis(test, testCase.options))
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -328,12 +338,12 @@ func TestClassMethodsUseThisStaysSilent(t *testing.T) {
 //
 // Found by differential rather than by fixtures. Driving ESLint over the 1,163 files this rule
 // touches on the real tree gave 217 against an earlier draft's 226, and every one of the nine extras
-// was bodiless. The overload case is the sharper half, because the same NAME then reports twice and
+// was bodiless. The overload case is the sharper half, because the same name then reports twice and
 // reads as a duplicated finding rather than as a wrong verdict.
 //
 // After the fix the two agree on all 1,163 files with zero disagreements.
-func TestClassMethodsUseThisSkipsBodilessMembers(t *testing.T) {
-	t.Parallel()
+func TestClassMethodsUseThisSkipsBodilessMembers(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name    string
@@ -362,15 +372,15 @@ func TestClassMethodsUseThisSkipsBodilessMembers(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, ClassMethodsUseThis, classMethodsUseThisFile,
-				testCase.source, decodedClassMethodsUseThis(t, ""))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, ClassMethodsUseThis, classMethodsUseThisFile,
+				testCase.source, decodedClassMethodsUseThis(test, ""))
 			if !testCase.reports {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, "missingThis")
+			rule_testing.ExpectFindings(test, result, "missingThis")
 		})
 	}
 }

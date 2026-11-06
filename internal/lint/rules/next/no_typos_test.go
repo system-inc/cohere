@@ -12,8 +12,8 @@ import (
 //
 // The corpus is nine passing inputs and four failing ones producing five diagnostics, because one
 // failing input declares two typo'd exports.
-func TestNoTyposReports(t *testing.T) {
-	t.Parallel()
+func TestNoTyposReports(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name     string
@@ -74,20 +74,20 @@ func TestNoTyposReports(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoTypos, testCase.fileName, testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoTypos, testCase.fileName, testCase.source)
 			expected := make([]string, testCase.findings)
 			for index := range expected {
 				expected[index] = messageNoTypos.Id
 			}
-			rule_testing.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(test, result, expected...)
 		})
 	}
 }
 
-func TestNoTyposIsSilent(t *testing.T) {
-	t.Parallel()
+func TestNoTyposIsSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name     string
@@ -187,10 +187,10 @@ func TestNoTyposIsSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoTypos, testCase.fileName, testCase.source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoTypos, testCase.fileName, testCase.source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -202,8 +202,8 @@ func TestNoTyposIsSilent(t *testing.T) {
 // The declaration-list case is here for the same reason at a different scale: reporting the
 // statement would underline `export const a = 1, getStaticPropss = 2` entirely, which names the
 // clean declarator as part of the problem.
-func TestNoTyposPointsAtTheIdentifier(t *testing.T) {
-	t.Parallel()
+func TestNoTyposPointsAtTheIdentifier(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name     string
@@ -233,16 +233,16 @@ func TestNoTyposPointsAtTheIdentifier(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoTypos, "pages/test.tsx", testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoTypos, "pages/test.tsx", testCase.source)
 			if len(result.Diagnostics) != len(testCase.reported) {
-				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.reported))
+				test.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.reported))
 			}
 			for index, diagnostic := range result.Diagnostics {
 				got := testCase.source[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if got != testCase.reported[index] {
-					t.Fatalf("finding %d underlines %q, want %q", index, got, testCase.reported[index])
+					test.Fatalf("finding %d underlines %q, want %q", index, got, testCase.reported[index])
 				}
 			}
 		})
@@ -253,8 +253,8 @@ func TestNoTyposPointsAtTheIdentifier(t *testing.T) {
 // whole value, so a message that said only "this may be a typo" would satisfy every id assertion
 // while withholding the one thing the reader needs. Equality rather than `strings.Contains`, because
 // a predicate weaker than the property it guards is not a guard.
-func TestNoTyposNamesBothTheTypoAndTheCorrection(t *testing.T) {
-	t.Parallel()
+func TestNoTyposNamesBothTheTypoAndTheCorrection(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		source string
@@ -275,16 +275,16 @@ func TestNoTyposNamesBothTheTypoAndTheCorrection(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.want, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoTypos, "pages/test.tsx", testCase.source)
+		test.Run(testCase.want, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoTypos, "pages/test.tsx", testCase.source)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
+				test.Fatalf("got %d findings, want 1", len(result.Diagnostics))
 			}
 			got := result.Diagnostics[0].Message.Description
 			want := testCase.want + messageNoTypos.Description
 			if got != want {
-				t.Fatalf("message is\n  %q\nwant\n  %q", got, want)
+				test.Fatalf("message is\n  %q\nwant\n  %q", got, want)
 			}
 		})
 	}
@@ -294,8 +294,8 @@ func TestNoTyposNamesBothTheTypoAndTheCorrection(t *testing.T) {
 // than inferred from the AST. Upstream matches a named export holding a function declaration or a
 // variable declarator whose binding is a plain identifier, and nothing else. None of these is
 // implied by the others and a port can plausibly get any of them wrong in either direction.
-func TestNoTyposOnlyReadsNamedExportsOfTwoShapes(t *testing.T) {
-	t.Parallel()
+func TestNoTyposOnlyReadsNamedExportsOfTwoShapes(test *testing.T) {
+	test.Parallel()
 
 	reports := []struct {
 		name   string
@@ -323,10 +323,10 @@ func TestNoTyposOnlyReadsNamedExportsOfTwoShapes(t *testing.T) {
 		},
 	}
 	for _, testCase := range reports {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoTypos, "pages/test.tsx", testCase.source)
-			rule_testing.ExpectFindings(t, result, messageNoTypos.Id)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoTypos, "pages/test.tsx", testCase.source)
+			rule_testing.ExpectFindings(test, result, messageNoTypos.Id)
 		})
 	}
 
@@ -382,10 +382,10 @@ func TestNoTyposOnlyReadsNamedExportsOfTwoShapes(t *testing.T) {
 		},
 	}
 	for _, testCase := range silent {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoTypos, "pages/test.tsx", testCase.source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoTypos, "pages/test.tsx", testCase.source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -397,8 +397,8 @@ func TestNoTyposOnlyReadsNamedExportsOfTwoShapes(t *testing.T) {
 // The transposition case is the one that separates Levenshtein from Damerau. Upstream would report
 // it under Damerau and does not, so a port reaching for a nicer-looking distance function changes
 // the rule here and nowhere the imported corpus can see.
-func TestNoTyposAppliesThresholdOne(t *testing.T) {
-	t.Parallel()
+func TestNoTyposAppliesThresholdOne(test *testing.T) {
+	test.Parallel()
 
 	reports := []struct {
 		name   string
@@ -411,10 +411,10 @@ func TestNoTyposAppliesThresholdOne(t *testing.T) {
 		{"a leading insertion", "export const xgetStaticProps = 1;"},
 	}
 	for _, testCase := range reports {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoTypos, "pages/test.tsx", testCase.source)
-			rule_testing.ExpectFindings(t, result, messageNoTypos.Id)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoTypos, "pages/test.tsx", testCase.source)
+			rule_testing.ExpectFindings(test, result, messageNoTypos.Id)
 		})
 	}
 
@@ -451,10 +451,10 @@ func TestNoTyposAppliesThresholdOne(t *testing.T) {
 		},
 	}
 	for _, testCase := range silent {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoTypos, "pages/test.tsx", testCase.source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoTypos, "pages/test.tsx", testCase.source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -462,8 +462,8 @@ func TestNoTyposAppliesThresholdOne(t *testing.T) {
 // The path gate, whose four disagreements with the ESLint original were pinned against the release
 // oxlint binary. Upstream's own corpus covers only three of these shapes, and the two that separate
 // oxc from ESLint appear in neither corpus.
-func TestNoTyposGatesOnThePagesDirectory(t *testing.T) {
-	t.Parallel()
+func TestNoTyposGatesOnThePagesDirectory(test *testing.T) {
+	test.Parallel()
 
 	const typo = "export const getStaticpaths = async () => {};"
 
@@ -487,10 +487,10 @@ func TestNoTyposGatesOnThePagesDirectory(t *testing.T) {
 		},
 	}
 	for _, testCase := range reports {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoTypos, testCase.fileName, typo)
-			rule_testing.ExpectFindings(t, result, messageNoTypos.Id)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoTypos, testCase.fileName, typo)
+			rule_testing.ExpectFindings(test, result, messageNoTypos.Id)
 		})
 	}
 
@@ -515,10 +515,10 @@ func TestNoTyposGatesOnThePagesDirectory(t *testing.T) {
 		},
 	}
 	for _, testCase := range silent {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoTypos, testCase.fileName, typo)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoTypos, testCase.fileName, typo)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }

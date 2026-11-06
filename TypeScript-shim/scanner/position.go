@@ -8,8 +8,8 @@ import (
 // GetLineAndCharacterOfPosition turns a byte offset into a zero-based line and column.
 //
 // This is hand-written rather than generated because upstream no longer has a function of this
-// shape. `microsoft/TypeScript` split the old one-call helper into two primitives — a line-start
-// table for the file, and a binary search over it — so that a caller converting many positions in
+// shape. `microsoft/TypeScript` split the old one-call helper into two primitives (a line-start
+// table for the file, and a binary search over it), so that a caller converting many positions in
 // one file builds the table once instead of per lookup.
 //
 // We keep the old signature because our callers convert one position at a time, at the moment a

@@ -7,8 +7,8 @@
 //
 // # The defect, measured on a design system that shares nothing with ours
 //
-// `internal/lint/rules/tailwind/tools/generate_descriptor_base/testdata/independent_theme.css` exists because the two corpus
-// repositories cannot answer a framework-versus-repository question: they both vendor
+// `internal/lint/rules/tailwind/tools/generate_descriptor_base/testdata/independent_theme.css` exists because the two
+// corpus repositories cannot answer a framework-versus-repository question: they both vendor
 // `libraries/structure`, so a fact they agree on may be a fact about the submodule. It declares
 // `@utility synthetic-static` and `@utility synthetic-fn-*`, names no framework contains.
 //
@@ -20,7 +20,7 @@
 //
 // The first two are the failure the task names: a repository's own `@utility` classes read as
 // unknown, so the rule reports correct code on every repository except the one the table was
-// generated from. The third is the same defect seen from the other side — 27 of `KnownStatics`'s
+// generated from. The third is the same defect seen from the other side: 27 of `KnownStatics`'s
 // 895 entries and 20 of `KnownRoots`'s 315 are names ahra or www-connected-app declared, so the
 // table vouches for them everywhere.
 //
@@ -34,7 +34,7 @@
 // can read it as at least one candidate.
 //
 // That replaces the hand-written prefix walk this file's predecessor did over `KnownRoots`. The walk
-// had to re-derive the value boundary itself — `remainder[0] == '-' || '/' || '[' || '('` — which is
+// had to re-derive the value boundary itself (`remainder[0] == '-' || '/' || '[' || '('`), which is
 // an approximation of what `parseCandidate` does properly, and the same approximation in a different
 // guise is what lost `border-x` during the migration.
 //

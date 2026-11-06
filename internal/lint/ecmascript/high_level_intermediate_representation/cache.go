@@ -18,18 +18,18 @@ import (
 // a state setter, and a JSX tag was lowered three times and converted to single-assignment form
 // three times. Measured with `cohere --timing` before this existed: set-state-in-effect 829ms,
 // set-state-in-render 535ms, static-components 494ms, against every syntactic react rule under
-// 20ms. The author of the most expensive one named the cause exactly — "a property of lowering, not
-// this rule" — and a shared per-file cache as the fix.
+// 20ms. The author of the most expensive one named the cause exactly ("a property of lowering, not
+// this rule") and a shared per-file cache as the fix.
 //
 // # Why Construct is inside the cached value rather than left to the caller
 //
 // This is the part that makes a shared lowering safe, and getting it wrong would have been silent.
-// `Construct` mutates in place: it renames identifiers and appends phis. It is NOT idempotent.
+// `Construct` mutates in place: it renames identifiers and appends phis. It is not idempotent.
 // Measured on `let y = 2; if (y > 1) { y = 1; } else { y = 2; } let x = y; return x;`, a second
 // Construct over the same graph moved it from 1 phi and 5 named values to 2 phis and 6 named
 // values.
 //
-// The dangerous part is that the doubly-constructed graph is still WELL-FORMED — `VerifySSA`
+// The dangerous part is that the doubly-constructed graph is still well-formed: `VerifySsa`
 // reports zero violations on it. So a cache that handed out a raw lowering and let each of the
 // three callers run its own Construct would have given the second and third caller a graph carrying
 // phis that correspond to no branch in the source, with no verifier, no panic, and no test
@@ -40,9 +40,9 @@ import (
 // exactly once per function. That also answers whether construction wants a cache of its own: it
 // does not, because it is not separable from the lowering it mutates. Measured on the probe
 // component in cache_test.go, construction is about 18% of the combined cost (23µs against 102µs
-// for lowering), and all of it is now paid once rather than three times. Callers read it and must not mutate it; the three callers today only
-// read, deriving their own maps (`UnconditionalBlocks` builds a fresh map, the taint passes build
-// their own).
+// for lowering), and all of it is now paid once rather than three times. Callers read it and must not mutate it; the
+// three callers today only read, deriving their own maps (`UnconditionalBlocks` builds a fresh map, the taint passes
+// build their own).
 //
 // # Why the function node alone is the key
 //
@@ -60,7 +60,7 @@ import (
 // and the findings cache stays correct: nothing here can make one file's result depend on another
 // file's contents beyond what the checker already answers, which is the failure `ProgramReads`
 // exists to declare.
-func ForFunction(ctx rule.Context, node *ast.Node) *Function {
+func ForFunction(ruleContext rule.Context, node *ast.Node) *Function {
 	if node == nil {
 		return nil
 	}
@@ -69,11 +69,11 @@ func ForFunction(ctx rule.Context, node *ast.Node) *Function {
 	// resolves every reference as a global, making the result well-formed and meaningless, and two
 	// of the three callers already refused to run in that state. Deciding it once means a cached
 	// entry cannot depend on rule order.
-	if ctx.TypeChecker == nil {
+	if ruleContext.TypeChecker == nil {
 		return nil
 	}
-	return rule.Cached(ctx.FileCache, cacheKeyFor(node), func() *Function {
-		lowered := Lower(node, ctx.TypeChecker)
+	return rule.Cached(ruleContext.FileCache, cacheKeyFor(node), func() *Function {
+		lowered := Lower(node, ruleContext.TypeChecker)
 		if lowered == nil {
 			return nil
 		}
@@ -88,9 +88,9 @@ func ForFunction(ctx rule.Context, node *ast.Node) *Function {
 //
 // The compiler rules lower the outermost function on each branch and, when that is not a component
 // or hook, look for one among the functions nested in its lowering. A unit found that way was then
-// analyzed as a NESTED function, with the function around it as its enclosing builder, so a variable
+// analyzed as a nested function, with the function around it as its enclosing builder, so a variable
 // that function declared became a capture: a local of the component, as far as the analysis could
-// tell. React Compiler compiles such a component as a unit of its own, and its HIR builder resolves
+// tell. React Compiler compiles such a component as a unit of its own, and its `HIR` builder resolves
 // any binding outside the unit as it resolves a module-level one (`resolveIdentifier` asks the unit's
 // parent scope, and Babel's `getBinding` walks every enclosing scope).
 //
@@ -104,14 +104,14 @@ func ForFunction(ctx rule.Context, node *ast.Node) *Function {
 // hook is unaffected. A component nested in a unit is not reached here at all: it is part of its
 // parent's graph, as upstream lowers it.
 func AsCompilationUnit(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	function *Function,
 	lower func(rule.Context, *ast.Node) *Function,
 ) *Function {
 	if function == nil || function.Node == nil {
 		return function
 	}
-	if standalone := lower(ctx, function.Node); standalone != nil {
+	if standalone := lower(ruleContext, function.Node); standalone != nil {
 		return standalone
 	}
 	return function
@@ -135,7 +135,7 @@ func AsCompilationUnit(
 // during render, and with the call erased the first shape becomes the second, so two fixtures
 // reported twice. `refs` misnamed a finding on `error.maybe-mutable-ref-not-preserved`, and
 // `immutability` failed too. The pass mutates in place, so sharing it silently changes what every
-// later rule sees — the same hazard the Construct note above describes, in a form no verifier
+// later rule sees: the same hazard the Construct note above describes, in a form no verifier
 // catches.
 //
 // So the erasure is one rule family's view of the graph, not the representation's, and it gets its
@@ -175,8 +175,8 @@ func AsCompilationUnit(
 // terminal, so the control-flow graph is bit-identical and single-assignment form is undisturbed.
 // Only one instruction value per memo call changes, toward fewer operands.
 // `AnalyzePreservedManualMemoization` already sequences it post-Construct for the same reason.
-func ForFunctionWithoutManualMemoization(ctx rule.Context, node *ast.Node) *Function {
-	if node == nil || ctx.TypeChecker == nil {
+func ForFunctionWithoutManualMemoization(ruleContext rule.Context, node *ast.Node) *Function {
+	if node == nil || ruleContext.TypeChecker == nil {
 		return nil
 	}
 	// A function with no memo call anywhere in its text lowers to a graph the erasure cannot
@@ -190,10 +190,10 @@ func ForFunctionWithoutManualMemoization(ctx rule.Context, node *ast.Node) *Func
 	// The numbers this buys are in the header above rather than repeated here, so there is one
 	// place to correct when they go stale.
 	if !mentionsManualMemoization(node) {
-		return ForFunction(ctx, node)
+		return ForFunction(ruleContext, node)
 	}
-	return rule.Cached(ctx.FileCache, cacheKeyFor(node)+":no-manual-memo", func() *Function {
-		lowered := Lower(node, ctx.TypeChecker)
+	return rule.Cached(ruleContext.FileCache, cacheKeyFor(node)+":no-manual-memo", func() *Function {
+		lowered := Lower(node, ruleContext.TypeChecker)
 		if lowered == nil {
 			return nil
 		}

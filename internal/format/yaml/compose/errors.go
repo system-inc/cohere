@@ -9,39 +9,22 @@ import (
 	"strings"
 )
 
-// YAMLError is a YAMLParseError or a YAMLWarning.
-type YAMLError struct {
-	// Name is "YAMLParseError" or "YAMLWarning".
-	Name string
-	// Code is upstream's ErrorCode, such as "BAD_INDENT" or "MISSING_CHAR".
-	Code    string
-	Message string
-	// Pos is the [start, end] of the error in UTF-16 code units.
-	Pos [2]int
+func newYamlParseError(position [2]int, code string, message string) *YamlError {
+	return &YamlError{Name: "YAMLParseError", Code: code, Message: message, Position: position}
 }
 
-func (yamlError *YAMLError) Error() string { return yamlError.Message }
-
-func newYAMLParseError(pos [2]int, code string, message string) *YAMLError {
-	return &YAMLError{Name: "YAMLParseError", Code: code, Message: message, Pos: pos}
+func newYamlWarning(position [2]int, code string, message string) *YamlError {
+	return &YamlError{Name: "YAMLWarning", Code: code, Message: message, Position: position}
 }
-
-func newYAMLWarning(pos [2]int, code string, message string) *YAMLError {
-	return &YAMLError{Name: "YAMLWarning", Code: code, Message: message, Pos: pos}
-}
-
-// errorString is an Error upstream throws, whose message a caller catches and reports.
-type errorString string
-
-func (message errorString) Error() string { return string(message) }
 
 // containsSameValueZero is `array.includes(value)`: SameValueZero, so NaN finds NaN and objects (a
 // MergeKey, Date or Binary here) find only themselves.
-func containsSameValueZero(values []any, value any) bool {
+func containsSameValueZero(values []ScalarValue, value ScalarValue) bool {
 	for _, each := range values {
-		switch v := value.(type) {
-		case float64:
-			if e, isNumber := each.(float64); isNumber && (e == v || math.IsNaN(e) && math.IsNaN(v)) {
+		switch typed := value.(type) {
+		case ScalarNumber:
+			number, isNumber := each.(ScalarNumber)
+			if isNumber && (number == typed || math.IsNaN(float64(number)) && math.IsNaN(float64(typed))) {
 				return true
 			}
 		case Date, Binary:
@@ -57,20 +40,23 @@ func containsSameValueZero(values []any, value any) bool {
 
 // javaScriptString is `${value}` for a primitive scalar value: null, a boolean, a number or a string.
 // Only those can be found again by containsSameValueZero, so only those reach it.
-func javaScriptString(value any) string {
-	switch v := value.(type) {
+func javaScriptString(value ScalarValue) string {
+	switch typed := value.(type) {
 	case nil:
 		return "null"
-	case bool:
-		if v {
+	case ScalarBoolean:
+		if typed {
 			return "true"
 		}
 		return "false"
-	case float64:
-		return numberToString(v)
-	case string:
-		return v
+	case ScalarNumber:
+		return numberToString(float64(typed))
+	case ScalarString:
+		return string(typed)
 	}
+	// Invariant: the one caller, omapTag, converts a key's value only once containsSameValueZero has
+	// found it among the earlier keys, and a MergeKey, Date or Binary is a fresh object for every scalar,
+	// found by no other, so only the four primitives above get here.
 	panic("compose: no string conversion for this value")
 }
 
@@ -88,31 +74,34 @@ func numberToString(value float64) string {
 		return "-Infinity"
 	}
 	sign := ""
+	magnitude := value
 	if value < 0 {
 		sign = "-"
-		value = -value
+		magnitude = -value
 	}
-	// d.dddde±x: the digits without the dot, and n, the decimal point's position after the first.
-	formatted := strconv.FormatFloat(value, 'e', -1, 64)
+	// d.dddde±x: the digits without the dot, and pointPosition, the decimal point's position after the first.
+	formatted := strconv.FormatFloat(magnitude, 'e', -1, 64)
 	mantissa, exponentText, _ := strings.Cut(formatted, "e")
 	digits := strings.Replace(mantissa, ".", "", 1)
+	// Ignored: exponentText is the exponent strconv.FormatFloat just wrote in its 'e' format, a sign
+	// and decimal digits, which Atoi always reads.
 	exponent, _ := strconv.Atoi(exponentText)
-	n := exponent + 1
-	k := len(digits)
+	pointPosition := exponent + 1
+	digitCount := len(digits)
 	switch {
-	case k <= n && n <= 21:
-		return sign + digits + strings.Repeat("0", n-k)
-	case 0 < n && n <= 21:
-		return sign + digits[:n] + "." + digits[n:]
-	case -6 < n && n <= 0:
-		return sign + "0." + strings.Repeat("0", -n) + digits
+	case digitCount <= pointPosition && pointPosition <= 21:
+		return sign + digits + strings.Repeat("0", pointPosition-digitCount)
+	case 0 < pointPosition && pointPosition <= 21:
+		return sign + digits[:pointPosition] + "." + digits[pointPosition:]
+	case -6 < pointPosition && pointPosition <= 0:
+		return sign + "0." + strings.Repeat("0", -pointPosition) + digits
 	}
 	exponentSign := "+"
-	if n-1 < 0 {
+	if pointPosition-1 < 0 {
 		exponentSign = "-"
 	}
-	exponentDigits := strconv.Itoa(int(math.Abs(float64(n - 1))))
-	if k == 1 {
+	exponentDigits := strconv.Itoa(int(math.Abs(float64(pointPosition - 1))))
+	if digitCount == 1 {
 		return sign + digits + "e" + exponentSign + exponentDigits
 	}
 	return sign + digits[:1] + "." + digits[1:] + "e" + exponentSign + exponentDigits

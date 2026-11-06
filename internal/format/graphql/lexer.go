@@ -26,24 +26,6 @@ import (
 // Token offsets are bytes. Error positions are bytes too, and an error's line and column are computed
 // as graphql-js's getLocation computes them, the column in UTF-16 units, so the message matches.
 
-// SyntaxError is graphql-js's GraphQLError from syntaxError(source, position, description), as Prettier
-// reports it: createParseError reads the error's first location into Prettier's createError, whose
-// message appends " (line:column)".
-type SyntaxError struct {
-	// Description is syntaxError's description, without graphql-js's "Syntax Error: " prefix.
-	Description string
-	// Position is the byte offset in the text where graphql-js's error points.
-	Position int
-	// Line and Column are graphql-js's error.locations[0]: 1-indexed, the column in UTF-16 code units.
-	Line   int
-	Column int
-}
-
-// Error is Prettier's message for the error: GraphQLError's message, then the location.
-func (syntaxError *SyntaxError) Error() string {
-	return fmt.Sprintf("Syntax Error: %s (%d:%d)", syntaxError.Description, syntaxError.Line, syntaxError.Column)
-}
-
 // syntaxError produces a GraphQLError representing a syntax error, containing useful descriptive
 // information about the syntax error's position in the source. The lexer and parser throw it, so here
 // they panic with it, and Parse recovers it into its error return: threading an error through every
@@ -108,7 +90,7 @@ type lexer struct {
 }
 
 func newLexer(body string) *lexer {
-	startOfFileToken := newToken(tokenKindSOF, 0, 0, 0, 0)
+	startOfFileToken := newToken(tokenKindSof, 0, 0, 0, 0)
 
 	return &lexer{
 		body:      body,
@@ -129,7 +111,7 @@ func (lexer *lexer) advance() *token {
 // lookahead looks ahead and returns the next non-ignored token, but does not change the state of Lexer.
 func (lexer *lexer) lookahead() *token {
 	token := lexer.token
-	if token.kind != tokenKindEOF {
+	if token.kind != tokenKindEof {
 		for {
 			if token.next != nil {
 				token = token.next
@@ -137,7 +119,7 @@ func (lexer *lexer) lookahead() *token {
 				// Read the next token and form a link in the token linked-list.
 				nextToken := readNextToken(lexer, token.end)
 				token.next = nextToken
-				nextToken.prev = token
+				nextToken.previous = token
 				token = nextToken
 			}
 			if token.kind != tokenKindComment {
@@ -166,9 +148,9 @@ func isPunctuatorTokenKind(kind tokenKind) bool {
 		kind == tokenKindBraceR
 }
 
-// charCodeAt is body.charCodeAt(position) for the lexer's ASCII tests: the byte there, or -1 (NaN in
+// characterCodeAt is body.charCodeAt(position) for the lexer's ASCII tests: the byte there, or -1 (NaN in
 // graphql-js) past the end.
-func charCodeAt(body string, position int) int {
+func characterCodeAt(body string, position int) int {
 	if position < 0 || position >= len(body) {
 		return -1
 	}
@@ -188,16 +170,17 @@ func codePointAt(body string, position int) (int, int) {
 // U+FFFD, which is what Node writes for it when the message leaves as UTF-8.
 func sliceUnits(body string, start int, units int) string {
 	end := start
+	remaining := units
 	for end < len(body) {
 		character, size := utf8.DecodeRuneInString(body[end:])
-		if units < utf16.RuneLen(character) {
-			if units > 0 {
+		if remaining < utf16.RuneLen(character) {
+			if remaining > 0 {
 				return body[start:end] + string(utf8.RuneError)
 			}
 			break
 		}
 		end += size
-		units -= utf16.RuneLen(character)
+		remaining -= utf16.RuneLen(character)
 	}
 	return body[start:end]
 }
@@ -220,8 +203,8 @@ func isUnicodeScalarValue(code int) bool {
 // UTF-8 text holds no surrogates, so this is false for every position in Go; it stays so the branches
 // that call it read as upstream's.
 func isSupplementaryCodePoint(body string, location int) bool {
-	return isLeadingSurrogate(charCodeAt(body, location)) &&
-		isTrailingSurrogate(charCodeAt(body, location+1))
+	return isLeadingSurrogate(characterCodeAt(body, location)) &&
+		isTrailingSurrogate(characterCodeAt(body, location+1))
 }
 
 func isLeadingSurrogate(code int) bool {
@@ -239,7 +222,7 @@ func isTrailingSurrogate(code int) bool {
 // U+1234).
 func printCodePointAt(lexer *lexer, location int) string {
 	if location >= len(lexer.body) {
-		return string(tokenKindEOF)
+		return string(tokenKindEof)
 	}
 	code, _ := codePointAt(lexer.body, location)
 	if code >= 0x0020 && code <= 0x007e {
@@ -257,22 +240,24 @@ func printCodePointAt(lexer *lexer, location int) string {
 
 // createToken creates a token with line and column location information.
 func createToken(lexer *lexer, kind tokenKind, start int, end int, value ...string) *token {
-	line := lexer.line
 	column := 1 + start - lexer.lineStart
-	return newToken(kind, start, end, line, column, value...)
+	return newToken(kind, start, end, lexer.line, column, value...)
 }
 
 // readNextToken gets the next token from the source starting at the given position.
 //
 // This skips over whitespace until it finds the next lexable token, then lexes punctuators immediately
 // or calls the appropriate helper function for more complicated tokens.
+//
+// Mutates: lexer the whitespace it skips moves the lexer's line and lineStart past each line terminator,
+// as graphql-js's readNextToken writes them, so the next token's line and column count from there
 func readNextToken(lexer *lexer, start int) *token {
 	body := lexer.body
 	bodyLength := len(body)
 	position := start
 
 	for position < bodyLength {
-		code := charCodeAt(body, position)
+		code := characterCodeAt(body, position)
 
 		// SourceCharacter
 		switch code {
@@ -310,7 +295,7 @@ func readNextToken(lexer *lexer, start int) *token {
 			lexer.lineStart = position
 			continue
 		case 0x000d: // \r
-			if charCodeAt(body, position+1) == 0x000a {
+			if characterCodeAt(body, position+1) == 0x000a {
 				position += 2
 			} else {
 				position++
@@ -340,15 +325,23 @@ func readNextToken(lexer *lexer, start int) *token {
 		case 0x0029: // )
 			return createToken(lexer, tokenKindParenR, position, position+1)
 		case 0x002e: // .
-			nextCode := charCodeAt(body, position+1)
-			if nextCode == 0x002e && charCodeAt(body, position+2) == 0x002e {
+			nextCode := characterCodeAt(body, position+1)
+			if nextCode == 0x002e && characterCodeAt(body, position+2) == 0x002e {
 				return createToken(lexer, tokenKindSpread, position, position+3)
 			}
 			if nextCode == 0x002e {
+				// Invariant: this is graphql-js's throw of a syntax error, which malformed input reaches; Parse
+				// recovers every *SyntaxError into its error return, so the panic never leaves the package.
 				panic(syntaxError(body, position, `Unexpected "..", did you mean "..."?`))
 			} else if isDigit(nextCode) {
 				digits := body[position+1 : readDigits(lexer, position+1, nextCode)]
-				panic(syntaxError(body, position, `Invalid number, expected digit before ".", did you mean "0.`+digits+`"?`))
+				// Invariant: this is graphql-js's throw of a syntax error, which malformed input reaches; Parse
+				// recovers every *SyntaxError into its error return, so the panic never leaves the package.
+				panic(syntaxError(
+					body,
+					position,
+					`Invalid number, expected digit before ".", did you mean "0.`+digits+`"?`,
+				))
 			}
 		case 0x003a: // :
 			return createToken(lexer, tokenKindColon, position, position+1)
@@ -368,8 +361,8 @@ func readNextToken(lexer *lexer, start int) *token {
 			return createToken(lexer, tokenKindBraceR, position, position+1)
 		// StringValue
 		case 0x0022: // "
-			if charCodeAt(body, position+1) == 0x0022 &&
-				charCodeAt(body, position+2) == 0x0022 {
+			if characterCodeAt(body, position+1) == 0x0022 &&
+				characterCodeAt(body, position+2) == 0x0022 {
 				return readBlockString(lexer, position)
 			}
 			return readString(lexer, position)
@@ -388,15 +381,25 @@ func readNextToken(lexer *lexer, start int) *token {
 		character, _ := codePointAt(body, position)
 		switch {
 		case code == 0x0027:
-			panic(syntaxError(body, position, `Unexpected single quote character ('), did you mean to use a double quote (")?`))
+			// Invariant: this is graphql-js's throw of a syntax error, which malformed input reaches; Parse
+			// recovers every *SyntaxError into its error return, so the panic never leaves the package.
+			panic(syntaxError(
+				body,
+				position,
+				`Unexpected single quote character ('), did you mean to use a double quote (")?`,
+			))
 		case isUnicodeScalarValue(character) || isSupplementaryCodePoint(body, position):
+			// Invariant: this is graphql-js's throw of a syntax error, which malformed input reaches; Parse
+			// recovers every *SyntaxError into its error return, so the panic never leaves the package.
 			panic(syntaxError(body, position, "Unexpected character: "+printCodePointAt(lexer, position)+"."))
 		default:
+			// Invariant: this is graphql-js's throw of a syntax error, which malformed input reaches; Parse
+			// recovers every *SyntaxError into its error return, so the panic never leaves the package.
 			panic(syntaxError(body, position, "Invalid character: "+printCodePointAt(lexer, position)+"."))
 		}
 	}
 
-	return createToken(lexer, tokenKindEOF, bodyLength, bodyLength)
+	return createToken(lexer, tokenKindEof, bodyLength, bodyLength)
 }
 
 // readComment reads a comment token from the source file.
@@ -410,7 +413,7 @@ func readComment(lexer *lexer, start int) *token {
 	position := start + 1
 
 	for position < bodyLength {
-		code := charCodeAt(body, position)
+		code := characterCodeAt(body, position)
 
 		// LineTerminator (\n | \r)
 		if code == 0x000a || code == 0x000d {
@@ -464,19 +467,25 @@ func readNumber(lexer *lexer, start int, firstCode int) *token {
 	// NegativeSign (-)
 	if code == 0x002d {
 		position++
-		code = charCodeAt(body, position)
+		code = characterCodeAt(body, position)
 	}
 
 	// Zero (0)
 	if code == 0x0030 {
 		position++
-		code = charCodeAt(body, position)
+		code = characterCodeAt(body, position)
 		if isDigit(code) {
-			panic(syntaxError(body, position, "Invalid number, unexpected digit after 0: "+printCodePointAt(lexer, position)+"."))
+			// Invariant: this is graphql-js's throw of a syntax error, which malformed input reaches; Parse
+			// recovers every *SyntaxError into its error return, so the panic never leaves the package.
+			panic(syntaxError(
+				body,
+				position,
+				"Invalid number, unexpected digit after 0: "+printCodePointAt(lexer, position)+".",
+			))
 		}
 	} else {
 		position = readDigits(lexer, position, code)
-		code = charCodeAt(body, position)
+		code = characterCodeAt(body, position)
 	}
 
 	// Full stop (.)
@@ -484,9 +493,9 @@ func readNumber(lexer *lexer, start int, firstCode int) *token {
 		isFloat = true
 
 		position++
-		code = charCodeAt(body, position)
+		code = characterCodeAt(body, position)
 		position = readDigits(lexer, position, code)
-		code = charCodeAt(body, position)
+		code = characterCodeAt(body, position)
 	}
 
 	// E e
@@ -494,19 +503,25 @@ func readNumber(lexer *lexer, start int, firstCode int) *token {
 		isFloat = true
 
 		position++
-		code = charCodeAt(body, position)
+		code = characterCodeAt(body, position)
 		// + -
 		if code == 0x002b || code == 0x002d {
 			position++
-			code = charCodeAt(body, position)
+			code = characterCodeAt(body, position)
 		}
 		position = readDigits(lexer, position, code)
-		code = charCodeAt(body, position)
+		code = characterCodeAt(body, position)
 	}
 
 	// Numbers cannot be followed by . or NameStart
 	if code == 0x002e || isNameStart(code) {
-		panic(syntaxError(body, position, "Invalid number, expected digit but got: "+printCodePointAt(lexer, position)+"."))
+		// Invariant: this is graphql-js's throw of a syntax error, which malformed input reaches; Parse
+		// recovers every *SyntaxError into its error return, so the panic never leaves the package.
+		panic(syntaxError(
+			body,
+			position,
+			"Invalid number, expected digit but got: "+printCodePointAt(lexer, position)+".",
+		))
 	}
 
 	kind := tokenKindInt
@@ -519,13 +534,19 @@ func readNumber(lexer *lexer, start int, firstCode int) *token {
 // readDigits returns the new position in the source after reading one or more digits.
 func readDigits(lexer *lexer, start int, firstCode int) int {
 	if !isDigit(firstCode) {
-		panic(syntaxError(lexer.body, start, "Invalid number, expected digit but got: "+printCodePointAt(lexer, start)+"."))
+		// Invariant: this is graphql-js's throw of a syntax error, which malformed input reaches; Parse
+		// recovers every *SyntaxError into its error return, so the panic never leaves the package.
+		panic(syntaxError(
+			lexer.body,
+			start,
+			"Invalid number, expected digit but got: "+printCodePointAt(lexer, start)+".",
+		))
 	}
 
 	body := lexer.body
 	position := start + 1 // +1 to skip first firstCode
 
-	for isDigit(charCodeAt(body, position)) {
+	for isDigit(characterCodeAt(body, position)) {
 		position++
 	}
 
@@ -556,7 +577,7 @@ func readString(lexer *lexer, start int) *token {
 	value := ""
 
 	for position < bodyLength {
-		code := charCodeAt(body, position)
+		code := characterCodeAt(body, position)
 
 		// Closing Quote (")
 		if code == 0x0022 {
@@ -568,8 +589,8 @@ func readString(lexer *lexer, start int) *token {
 		if code == 0x005c {
 			value += body[chunkStart:position]
 			var escape escapeSequence
-			if charCodeAt(body, position+1) == 0x0075 { // u
-				if charCodeAt(body, position+2) == 0x007b { // {
+			if characterCodeAt(body, position+1) == 0x0075 { // u
+				if characterCodeAt(body, position+2) == 0x007b { // {
 					escape = readEscapedUnicodeVariableWidth(lexer, position)
 				} else {
 					escape = readEscapedUnicodeFixedWidth(lexer, position)
@@ -594,10 +615,16 @@ func readString(lexer *lexer, start int) *token {
 		} else if isSupplementaryCodePoint(body, position) {
 			position += 2
 		} else {
-			panic(syntaxError(body, position, "Invalid character within String: "+printCodePointAt(lexer, position)+"."))
+			// Invariant: this is graphql-js's throw of a syntax error, which malformed input reaches; Parse
+			// recovers every *SyntaxError into its error return, so the panic never leaves the package.
+			panic(
+				syntaxError(body, position, "Invalid character within String: "+printCodePointAt(lexer, position)+"."),
+			)
 		}
 	}
 
+	// Invariant: this is graphql-js's throw of a syntax error, which malformed input reaches; Parse
+	// recovers every *SyntaxError into its error return, so the panic never leaves the package.
 	panic(syntaxError(body, position, "Unterminated string."))
 }
 
@@ -616,7 +643,7 @@ func readEscapedUnicodeVariableWidth(lexer *lexer, position int) escapeSequence 
 	size := 3
 	// Cannot be larger than 12 chars (\u{00000000}).
 	for size < 12 {
-		code := charCodeAt(body, position+size)
+		code := characterCodeAt(body, position+size)
 		size++
 		// Closing Brace (})
 		if code == 0x007d {
@@ -633,6 +660,8 @@ func readEscapedUnicodeVariableWidth(lexer *lexer, position int) escapeSequence 
 		}
 	}
 
+	// Invariant: this is graphql-js's throw of a syntax error, which malformed input reaches; Parse
+	// recovers every *SyntaxError into its error return, so the panic never leaves the package.
 	panic(syntaxError(body, position, `Invalid Unicode escape sequence: "`+sliceUnits(body, position, size)+`".`))
 }
 
@@ -647,8 +676,8 @@ func readEscapedUnicodeFixedWidth(lexer *lexer, position int) escapeSequence {
 	// GraphQL allows JSON-style surrogate pair escape sequences, but only when a valid pair is formed.
 	if isLeadingSurrogate(code) {
 		// \u
-		if charCodeAt(body, position+6) == 0x005c &&
-			charCodeAt(body, position+7) == 0x0075 {
+		if characterCodeAt(body, position+6) == 0x005c &&
+			characterCodeAt(body, position+7) == 0x0075 {
 			trailingCode := read16BitHexCode(body, position+8)
 			if isTrailingSurrogate(trailingCode) {
 				// JavaScript defines strings as a sequence of UTF-16 code units and encodes Unicode code
@@ -663,6 +692,8 @@ func readEscapedUnicodeFixedWidth(lexer *lexer, position int) escapeSequence {
 		}
 	}
 
+	// Invariant: this is graphql-js's throw of a syntax error, which malformed input reaches; Parse
+	// recovers every *SyntaxError into its error return, so the panic never leaves the package.
 	panic(syntaxError(body, position, `Invalid Unicode escape sequence: "`+sliceUnits(body, position, 6)+`".`))
 }
 
@@ -673,10 +704,10 @@ func readEscapedUnicodeFixedWidth(lexer *lexer, position int) escapeSequence {
 func read16BitHexCode(body string, position int) int {
 	// readHexDigit() returns -1 on error. ORing a negative value with any other value always produces a
 	// negative value.
-	return (readHexDigit(charCodeAt(body, position)) << 12) |
-		(readHexDigit(charCodeAt(body, position+1)) << 8) |
-		(readHexDigit(charCodeAt(body, position+2)) << 4) |
-		readHexDigit(charCodeAt(body, position+3))
+	return (readHexDigit(characterCodeAt(body, position)) << 12) |
+		(readHexDigit(characterCodeAt(body, position+1)) << 8) |
+		(readHexDigit(characterCodeAt(body, position+2)) << 4) |
+		readHexDigit(characterCodeAt(body, position+3))
 }
 
 // readHexDigit reads a hexadecimal character and returns its positive integer value (0-15).
@@ -717,7 +748,7 @@ func readHexDigit(code int) int {
 // | `t`               | U+0009     | horizontal tab               |
 func readEscapedCharacter(lexer *lexer, position int) escapeSequence {
 	body := lexer.body
-	code := charCodeAt(body, position+1)
+	code := characterCodeAt(body, position+1)
 	switch code {
 	case 0x0022: // "
 		return escapeSequence{value: "\x22", size: 2}
@@ -736,6 +767,8 @@ func readEscapedCharacter(lexer *lexer, position int) escapeSequence {
 	case 0x0074: // t
 		return escapeSequence{value: "\t", size: 2}
 	}
+	// Invariant: this is graphql-js's throw of a syntax error, which malformed input reaches; Parse
+	// recovers every *SyntaxError into its error return, so the panic never leaves the package.
 	panic(syntaxError(body, position, `Invalid character escape sequence: "`+sliceUnits(body, position, 2)+`".`))
 }
 
@@ -747,6 +780,9 @@ func readEscapedCharacter(lexer *lexer, position int) escapeSequence {
 //	BlockStringCharacter ::
 //	  - SourceCharacter but not `"""` or `\"""`
 //	  - `\"""`
+//
+// Mutates: lexer a block string spans lines, so it moves the lexer's line and lineStart past its own
+// line terminators, as graphql-js's readBlockString writes them
 func readBlockString(lexer *lexer, start int) *token {
 	body := lexer.body
 	bodyLength := len(body)
@@ -758,12 +794,12 @@ func readBlockString(lexer *lexer, start int) *token {
 
 	var blockLines []string
 	for position < bodyLength {
-		code := charCodeAt(body, position)
+		code := characterCodeAt(body, position)
 
 		// Closing Triple-Quote (""")
 		if code == 0x0022 &&
-			charCodeAt(body, position+1) == 0x0022 &&
-			charCodeAt(body, position+2) == 0x0022 {
+			characterCodeAt(body, position+1) == 0x0022 &&
+			characterCodeAt(body, position+2) == 0x0022 {
 			currentLine += body[chunkStart:position]
 			blockLines = append(blockLines, currentLine)
 
@@ -783,9 +819,9 @@ func readBlockString(lexer *lexer, start int) *token {
 
 		// Escaped Triple-Quote (\""")
 		if code == 0x005c &&
-			charCodeAt(body, position+1) == 0x0022 &&
-			charCodeAt(body, position+2) == 0x0022 &&
-			charCodeAt(body, position+3) == 0x0022 {
+			characterCodeAt(body, position+1) == 0x0022 &&
+			characterCodeAt(body, position+2) == 0x0022 &&
+			characterCodeAt(body, position+3) == 0x0022 {
 			currentLine += body[chunkStart:position]
 			chunkStart = position + 1 // skip only slash
 			position += 4
@@ -797,7 +833,7 @@ func readBlockString(lexer *lexer, start int) *token {
 			currentLine += body[chunkStart:position]
 			blockLines = append(blockLines, currentLine)
 
-			if code == 0x000d && charCodeAt(body, position+1) == 0x000a {
+			if code == 0x000d && characterCodeAt(body, position+1) == 0x000a {
 				position += 2
 			} else {
 				position++
@@ -815,10 +851,16 @@ func readBlockString(lexer *lexer, start int) *token {
 		} else if isSupplementaryCodePoint(body, position) {
 			position += 2
 		} else {
-			panic(syntaxError(body, position, "Invalid character within String: "+printCodePointAt(lexer, position)+"."))
+			// Invariant: this is graphql-js's throw of a syntax error, which malformed input reaches; Parse
+			// recovers every *SyntaxError into its error return, so the panic never leaves the package.
+			panic(
+				syntaxError(body, position, "Invalid character within String: "+printCodePointAt(lexer, position)+"."),
+			)
 		}
 	}
 
+	// Invariant: this is graphql-js's throw of a syntax error, which malformed input reaches; Parse
+	// recovers every *SyntaxError into its error return, so the panic never leaves the package.
 	panic(syntaxError(body, position, "Unterminated string."))
 }
 
@@ -832,7 +874,7 @@ func readName(lexer *lexer, start int) *token {
 	position := start + 1
 
 	for position < bodyLength {
-		code := charCodeAt(body, position)
+		code := characterCodeAt(body, position)
 		if isNameContinue(code) {
 			position++
 		} else {

@@ -30,9 +30,9 @@ var messageUnexpectedSparseArray = rule.Message{
 //
 // No fix. The rule cannot know whether the author meant one comma or an explicit undefined, and
 // those produce arrays of different lengths. Guessing would silently change the data.
-var NoSparseArrays = rule.Rule{
+var NoSparseArrays = rule.Rule[rule.NoOptions]{
 	Name: "no-sparse-arrays",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindArrayLiteralExpression: func(node *ast.Node) {
 				literal := node.AsArrayLiteralExpression()
@@ -50,7 +50,7 @@ var NoSparseArrays = rule.Rule{
 				// all, which is why it does not reach this loop and does not report.
 				for _, element := range literal.Elements.Nodes {
 					if element.Kind == ast.KindOmittedExpression {
-						ctx.ReportNode(node, messageUnexpectedSparseArray)
+						ruleContext.ReportNode(node, messageUnexpectedSparseArray)
 						return
 					}
 				}

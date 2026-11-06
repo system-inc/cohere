@@ -20,8 +20,8 @@ func preferFunctionTypeCaseName(index int) string {
 // Each one is a distinct reason to decline: a second member, a supertype that is not Function, a
 // construct signature beside a call signature, and a call signature with no annotated return type.
 // Skipping any of them ships that class of false positive.
-func TestPreferFunctionTypeStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestPreferFunctionTypeStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		"interface Foo {\n  (): void;\n  bar: number;\n}\n",
@@ -31,9 +31,9 @@ func TestPreferFunctionTypeStaysSilent(t *testing.T) {
 		"interface Foo {\n  bar: string;\n}\ninterface Bar extends Function, Foo {\n  (): void;\n}\n",
 	}
 	for index, sourceText := range cases {
-		t.Run(preferFunctionTypeCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, PreferFunctionType,
+		test.Run(preferFunctionTypeCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, PreferFunctionType,
 				preferFunctionTypeFile, sourceText))
 		})
 	}
@@ -50,7 +50,7 @@ type preferFunctionTypeFinding struct {
 	wantId      string
 	wantMessage string
 
-	// wantPosition is the byte offset the finding starts at, asserted only where the span TEXT
+	// wantPosition is the byte offset the finding starts at, asserted only where the span text
 	// cannot separate two candidates. The `this` message points at one of several `this` tokens and
 	// every one of them slices to the same four characters, so a port reporting the last instead of
 	// the first satisfies every span assertion. Zero means "not asserted", which is safe because no
@@ -66,8 +66,8 @@ type preferFunctionTypeFinding struct {
 //
 // The repair is half this rule and the corpus asserts it, so `wantOutput` is the specification
 // rather than a convenience. Three findings carry no repair and say so.
-func TestPreferFunctionTypeFires(t *testing.T) {
-	t.Parallel()
+func TestPreferFunctionTypeFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText   string
@@ -277,8 +277,8 @@ func TestPreferFunctionTypeFires(t *testing.T) {
 		},
 
 		{
-			// Measured, not imported. A `declare` modifier does not change the judgment or the repair, and the rebuilt alias correctly
-			// drops it, which is what upstream produces.
+			// Measured, not imported. A `declare` modifier does not change the judgment or the repair, and the rebuilt
+			// alias correctly drops it, which is what upstream produces.
 			sourceText: "declare interface Foo {\n  (): string;\n}\n",
 			wantFindings: []preferFunctionTypeFinding{
 				{
@@ -290,9 +290,9 @@ func TestPreferFunctionTypeFires(t *testing.T) {
 			wantOutput: "type Foo = () => string;\n",
 		},
 		{
-			// Measured, not imported. A comment ABOVE the interface is not a comment on the member and must not be moved. It survives
-			// here because it sits outside the declaration's token range; an earlier version of this rule
-			// filtered on `node.Pos()`, which reaches back over leading trivia, and duplicated it.
+			// Measured, not imported. A comment above the interface is not a comment on the member and must not be
+			// moved. It survives here because it sits outside the declaration's token range; an earlier version of this
+			// rule filtered on `node.Pos()`, which reaches back over leading trivia, and duplicated it.
 			sourceText: "/** docs */\ninterface Foo {\n  (): string;\n}\n",
 			wantFindings: []preferFunctionTypeFinding{
 				{
@@ -304,9 +304,9 @@ func TestPreferFunctionTypeFires(t *testing.T) {
 			wantOutput: "/** docs */\ntype Foo = () => string;\n",
 		},
 		{
-			// Measured, not imported. Export, generics, and a moved comment at once. The comment goes ABOVE the `export` because it
-			// cannot sit between `export` and `type`, and the type parameter list survives with its closing
-			// angle bracket, which sits one byte past what the parameter list's own End reports.
+			// Measured, not imported. Export, generics, and a moved comment at once. The comment goes above the
+			// `export` because it cannot sit between `export` and `type`, and the type parameter list survives with its
+			// closing angle bracket, which sits one byte past what the parameter list's own End reports.
 			sourceText: "export interface Foo<T> {\n  // c\n  (a: T): T;\n}\n",
 			wantFindings: []preferFunctionTypeFinding{
 				{
@@ -318,9 +318,9 @@ func TestPreferFunctionTypeFires(t *testing.T) {
 			wantOutput: "// c\nexport type Foo<T> = (a: T) => T;\n",
 		},
 		{
-			// Measured, not imported. A construct signature alone is reported and rewritten to a constructor type. Upstream's corpus
-			// only writes a construct signature BESIDE a call signature, where it is a passing case, so
-			// nothing imported exercises the reporting half.
+			// Measured, not imported. A construct signature alone is reported and rewritten to a constructor type.
+			// Upstream's corpus only writes a construct signature beside a call signature, where it is a passing case,
+			// so nothing imported exercises the reporting half.
 			sourceText: "interface Foo {\n  new (): string;\n}\n",
 			wantFindings: []preferFunctionTypeFinding{
 				{
@@ -332,8 +332,8 @@ func TestPreferFunctionTypeFires(t *testing.T) {
 			wantOutput: "type Foo = new () => string;\n",
 		},
 		{
-			// Measured, not imported. An array type wraps, like a union and an intersection. The corpus writes the other two and not
-			// this one, so the third arm of the wrapping test was unexercised.
+			// Measured, not imported. An array type wraps, like a union and an intersection. The corpus writes the
+			// other two and not this one, so the third arm of the wrapping test was unexercised.
 			sourceText: "type X = { (): void }[];\n",
 			wantFindings: []preferFunctionTypeFinding{
 				{
@@ -345,8 +345,8 @@ func TestPreferFunctionTypeFires(t *testing.T) {
 			wantOutput: "type X = (() => void)[];\n",
 		},
 		{
-			// Measured, not imported. The call signature carries its OWN type parameters while the interface has none, which is a
-			// different path through the alias rebuild than an interface with type parameters.
+			// Measured, not imported. The call signature carries its own type parameters while the interface has none,
+			// which is a different path through the alias rebuild than an interface with type parameters.
 			sourceText: "interface Foo {\n  <T>(a: T): T;\n}\n",
 			wantFindings: []preferFunctionTypeFinding{
 				{
@@ -358,8 +358,8 @@ func TestPreferFunctionTypeFires(t *testing.T) {
 			wantOutput: "type Foo = <T>(a: T) => T;\n",
 		},
 		{
-			// Measured, not imported. No separator at all after the member. The semicolon strip has nothing to remove and the alias
-			// still ends correctly.
+			// Measured, not imported. No separator at all after the member. The semicolon strip has nothing to remove
+			// and the alias still ends correctly.
 			sourceText: "type Foo = {\n  (): string\n};\n",
 			wantFindings: []preferFunctionTypeFinding{
 				{
@@ -371,8 +371,8 @@ func TestPreferFunctionTypeFires(t *testing.T) {
 			wantOutput: "type Foo = () => string;\n",
 		},
 		{
-			// Measured, not imported. An exported interface nested in a namespace, which is where most exported interfaces in this
-			// tree actually live.
+			// Measured, not imported. An exported interface nested in a namespace, which is where most exported
+			// interfaces in this tree actually live.
 			sourceText: "namespace N {\n  export interface Foo {\n    (): string;\n  }\n}\n",
 			wantFindings: []preferFunctionTypeFinding{
 				{
@@ -384,9 +384,9 @@ func TestPreferFunctionTypeFires(t *testing.T) {
 			wantOutput: "namespace N {\n  export type Foo = () => string;\n}\n",
 		},
 		{
-			// Measured, not imported. The shape this rule actually finds in the tree, taken from the audit's first violation site. A
-			// construct signature returning a type literal, exported. Every piece of the fixer is exercised
-			// at once and the output is upstream's byte for byte.
+			// Measured, not imported. The shape this rule actually finds in the tree, taken from the audit's first
+			// violation site. A construct signature returning a type literal, exported. Every piece of the fixer is
+			// exercised at once and the output is upstream's byte for byte.
 			sourceText: "export interface UseEyeDropperOptions {\n  new (): {\n    open(): Promise<{ sRGBHex: string }>;\n  };\n}\n",
 			wantFindings: []preferFunctionTypeFinding{
 				{
@@ -419,7 +419,7 @@ func TestPreferFunctionTypeFires(t *testing.T) {
 		},
 
 		{
-			// Measured, and it exists because a mutant reporting the LAST `this` instead of the
+			// Measured, and it exists because a mutant reporting the last `this` instead of the
 			// first survived every fixture: both tokens slice to the same four characters, so the
 			// span text cannot tell them apart and only the offset can. Driven on the installed
 			// 8.67.0 build, which reports at line 2 column 9, the first one.
@@ -455,16 +455,16 @@ func TestPreferFunctionTypeFires(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(preferFunctionTypeCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, PreferFunctionType, preferFunctionTypeFile,
+		test.Run(preferFunctionTypeCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, PreferFunctionType, preferFunctionTypeFile,
 				testCase.sourceText)
 
 			wantIds := make([]string, len(testCase.wantFindings))
 			for position, want := range testCase.wantFindings {
 				wantIds[position] = want.wantId
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 
 			onDisk := strings.TrimSpace(testCase.sourceText) + "\n"
 			anyFixExpected := false
@@ -473,18 +473,18 @@ func TestPreferFunctionTypeFires(t *testing.T) {
 
 				gotSpan := onDisk[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if gotSpan != want.wantSpan {
-					t.Fatalf("finding %d span: expected %q, got %q", position, want.wantSpan, gotSpan)
+					test.Fatalf("finding %d span: expected %q, got %q", position, want.wantSpan, gotSpan)
 				}
 				if want.wantPosition != 0 && diagnostic.Range.Pos() != want.wantPosition {
-					t.Fatalf("finding %d position: expected %d, got %d", position, want.wantPosition,
+					test.Fatalf("finding %d position: expected %d, got %d", position, want.wantPosition,
 						diagnostic.Range.Pos())
 				}
 				if diagnostic.Message.Id != want.wantId {
-					t.Fatalf("finding %d id: expected %q, got %q", position, want.wantId,
+					test.Fatalf("finding %d id: expected %q, got %q", position, want.wantId,
 						diagnostic.Message.Id)
 				}
 				if diagnostic.Message.Description != want.wantMessage {
-					t.Fatalf("finding %d message: expected %q, got %q", position, want.wantMessage,
+					test.Fatalf("finding %d message: expected %q, got %q", position, want.wantMessage,
 						diagnostic.Message.Description)
 				}
 
@@ -497,15 +497,15 @@ func TestPreferFunctionTypeFires(t *testing.T) {
 					anyFixExpected = true
 				}
 				if len(diagnostic.Fixes) != wantFixes {
-					t.Fatalf("finding %d fixes: expected %d, got %d", position, wantFixes,
+					test.Fatalf("finding %d fixes: expected %d, got %d", position, wantFixes,
 						len(diagnostic.Fixes))
 				}
 			}
 
 			if anyFixExpected {
-				rule_testing.ExpectFixedSource(t, result, strings.TrimSpace(testCase.wantOutput)+"\n")
+				rule_testing.ExpectFixedSource(test, result, strings.TrimSpace(testCase.wantOutput)+"\n")
 			} else if strings.TrimSpace(testCase.wantOutput)+"\n" != onDisk {
-				t.Fatalf("a case expecting no repair must expect the source unchanged")
+				test.Fatalf("a case expecting no repair must expect the source unchanged")
 			}
 		})
 	}
@@ -519,8 +519,8 @@ func TestPreferFunctionTypeFires(t *testing.T) {
 // explicitly. `declare` is dropped, as upstream's installed build drops it; a type alias emits
 // nothing either way, so that is a spelling and not a meaning. Both outputs are byte-identical to
 // upstream's.
-func TestPreferFunctionTypeKeepsTheExport(t *testing.T) {
-	t.Parallel()
+func TestPreferFunctionTypeKeepsTheExport(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -530,9 +530,9 @@ func TestPreferFunctionTypeKeepsTheExport(t *testing.T) {
 		{"/** Doc. */\nexport interface Foo {\n  (): void;\n}\n", "/** Doc. */\nexport type Foo = () => void;\n"},
 	}
 	for _, testCase := range cases {
-		result := rule_testing.Run(t, PreferFunctionType, preferFunctionTypeFile, testCase.sourceText)
-		rule_testing.ExpectFindings(t, result, "functionTypeOverCallableType")
-		rule_testing.ExpectFixedSource(t, result, testCase.want)
+		result := rule_testing.Run(test, PreferFunctionType, preferFunctionTypeFile, testCase.sourceText)
+		rule_testing.ExpectFindings(test, result, "functionTypeOverCallableType")
+		rule_testing.ExpectFixedSource(test, result, testCase.want)
 	}
 }
 
@@ -542,8 +542,8 @@ func TestPreferFunctionTypeKeepsTheExport(t *testing.T) {
 // `type Options<TDef, TFlags extends object = {}, = ...` and did not parse (TS1139, #kq9vtva).
 // Upstream slices from the name through the list's own closing bracket, so the comma and the newline
 // survive into the alias, as they do here.
-func TestPreferFunctionTypeKeepsATypeParameterListWrittenOnePerLine(t *testing.T) {
-	t.Parallel()
+func TestPreferFunctionTypeKeepsATypeParameterListWrittenOnePerLine(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -559,8 +559,8 @@ func TestPreferFunctionTypeKeepsATypeParameterListWrittenOnePerLine(t *testing.T
 		},
 	}
 	for _, testCase := range cases {
-		result := rule_testing.Run(t, PreferFunctionType, preferFunctionTypeFile, testCase.sourceText)
-		rule_testing.ExpectFindings(t, result, "functionTypeOverCallableType")
-		rule_testing.ExpectFixedSource(t, result, testCase.want)
+		result := rule_testing.Run(test, PreferFunctionType, preferFunctionTypeFile, testCase.sourceText)
+		rule_testing.ExpectFindings(test, result, "functionTypeOverCallableType")
+		rule_testing.ExpectFixedSource(test, result, testCase.want)
 	}
 }

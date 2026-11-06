@@ -23,15 +23,15 @@ var (
 	keyed = "package user\n\nimport \"example.com/root/other\"\n\nvar Span = other.Range{Start: 1, End: 2}\n"
 )
 
-func writeFiles(t *testing.T, directory string, files map[string]string) {
-	t.Helper()
+func writeFiles(test *testing.T, directory string, files map[string]string) {
+	test.Helper()
 	for name, contents := range files {
 		path := filepath.Join(directory, name)
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			t.Fatal(err)
+		if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
+			test.Fatal(createDirectoryError)
 		}
-		if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
-			t.Fatal(err)
+		if writeError := os.WriteFile(path, []byte(contents), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 	}
 }
@@ -39,55 +39,62 @@ func writeFiles(t *testing.T, directory string, files map[string]string) {
 // The landing gate runs every check plain go vet runs: an unkeyed literal of another package's struct
 // refuses the landing, and the same landing lands once its fields are keyed. This runs the real go through
 // the land fixture.
-func TestTheGateRefusesWhatPlainGoVetReports(t *testing.T) {
-	t.Parallel()
-	fixture := newLandFixture(t)
+func TestTheGateRefusesWhatPlainGoVetReports(test *testing.T) {
+	test.Parallel()
+	fixture := newLandFixture(test)
 	// The real go: the stand-in's directory comes off the front of PATH.
 	fixture.environment = append(fixture.environment, "PATH="+os.Getenv("PATH"))
-	a := fixture.worktree("a")
-	writeFiles(t, a, unkeyedLiteral)
-	fixture.git(a, "add", "go.mod", "other", "user")
-	fixture.git(a, "commit", "-q", "-m", "an unkeyed literal of another package's struct")
+	worktreeA := fixture.worktree("a")
+	writeFiles(test, worktreeA, unkeyedLiteral)
+	fixture.git(worktreeA, "add", "go.mod", "other", "user")
+	fixture.git(worktreeA, "commit", "-q", "-m", "an unkeyed literal of another package's struct")
 	land := func() (string, error) {
 		landing := exec.Command(fixture.wrapper, "land")
-		landing.Dir, landing.Env = a, fixture.environment
-		output, err := landing.CombinedOutput()
-		return string(output), err
+		landing.Dir, landing.Env = worktreeA, fixture.environment
+		output, outputError := landing.CombinedOutput()
+		return string(output), outputError
 	}
-	if output, err := land(); err == nil || !strings.Contains(output, "struct literal uses unkeyed fields") {
-		t.Fatalf("an unkeyed literal of another package's struct did not refuse the landing (%v):\n%s", err, output)
+	if output, landError := land(); landError == nil ||
+		!strings.Contains(output, "struct literal uses unkeyed fields") {
+		test.Fatalf(
+			"an unkeyed literal of another package's struct did not refuse the landing (%v):\n%s",
+			landError,
+			output,
+		)
 	}
-	writeFiles(t, a, map[string]string{"user/user.go": keyed})
-	fixture.git(a, "add", "user/user.go")
-	fixture.git(a, "commit", "-q", "-m", "its fields keyed")
-	if output, err := land(); err != nil || !strings.Contains(output, "landed") {
-		t.Errorf("the landing did not land once the fields were keyed (%v):\n%s", err, output)
+	writeFiles(test, worktreeA, map[string]string{"user/user.go": keyed})
+	fixture.git(worktreeA, "add", "user/user.go")
+	fixture.git(worktreeA, "commit", "-q", "-m", "its fields keyed")
+	if output, landError := land(); landError != nil || !strings.Contains(output, "landed") {
+		test.Errorf("the landing did not land once the fields were keyed (%v):\n%s", landError, output)
 	}
 }
 
 // cohere-dev test vets with every check the gate's go vet runs, not go test's curated subset, so the edit
 // loop fails where the gate would: 130 unkeyed literals passed cohere-dev test and failed plain go vet
 // (#kr2yp54). A caller's own -vet is kept.
-func TestCohereDevTestVetsWithEveryCheck(t *testing.T) {
-	t.Parallel()
-	wrapper := filepath.Join(t.TempDir(), "cohere-dev")
-	if output, err := exec.Command("go", "build", "-o", wrapper, ".").CombinedOutput(); err != nil {
-		t.Fatalf("building: %v\n%s", err, output)
+func TestCohereDevTestVetsWithEveryCheck(test *testing.T) {
+	test.Parallel()
+	wrapper := filepath.Join(test.TempDir(), "cohere-dev")
+	if output, outputError := exec.Command("go", "build", "-o", wrapper, ".").CombinedOutput(); outputError != nil {
+		test.Fatalf("building: %v\n%s", outputError, output)
 	}
-	module := t.TempDir()
-	writeFiles(t, module, unkeyedLiteral)
-	home := privatePool(t)
-	test := func(arguments ...string) (string, error) {
+	module := test.TempDir()
+	writeFiles(test, module, unkeyedLiteral)
+	home := privatePool(test)
+	runTest := func(arguments ...string) (string, error) {
 		command := exec.Command(wrapper, append([]string{"test"}, arguments...)...)
 		command.Dir = module
 		command.Env = append(outsideThePool(os.Environ()), homeVariable+"="+home, "GOWORK=off")
-		output, err := command.CombinedOutput()
-		return string(output), err
+		output, outputError := command.CombinedOutput()
+		return string(output), outputError
 	}
-	if output, err := test("./user"); err == nil || !strings.Contains(output, "struct literal uses unkeyed fields") {
-		t.Errorf("cohere-dev test passed an unkeyed literal that go vet reports (%v):\n%s", err, output)
+	if output, testError := runTest(
+		"./user",
+	); testError == nil || !strings.Contains(output, "struct literal uses unkeyed fields") {
+		test.Errorf("cohere-dev test passed an unkeyed literal that go vet reports (%v):\n%s", testError, output)
 	}
-	if output, err := test("-vet=off", "./user"); err != nil {
-		t.Errorf("cohere-dev test did not keep the caller's -vet=off (%v):\n%s", err, output)
+	if output, testError := runTest("-vet=off", "./user"); testError != nil {
+		test.Errorf("cohere-dev test did not keep the caller's -vet=off (%v):\n%s", testError, output)
 	}
 }

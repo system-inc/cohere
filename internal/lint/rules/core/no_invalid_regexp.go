@@ -37,29 +37,31 @@ type NoInvalidRegexpOptions struct {
 // `uniqueItems`, which the generic decoder has no way to know about. A repeated string allows
 // nothing a single one does not, but upstream refuses the config outright, and a config cohere loads
 // where ESLint would not is a config that only works in one of them.
-func DecodeNoInvalidRegexpOptions(raw []byte) (any, error) {
-	decoded, err := rule.DecodeOptionsInto[NoInvalidRegexpOptions]()(raw)
-	if err != nil {
-		return NoInvalidRegexpOptions{}, err
+func DecodeNoInvalidRegexpOptions(raw []byte) (NoInvalidRegexpOptions, error) {
+	decoded, decodeOptionsError := rule.DecodeOptionsInto[NoInvalidRegexpOptions]()(raw)
+	if decodeOptionsError != nil {
+		return NoInvalidRegexpOptions{}, decodeOptionsError
 	}
-	options, _ := decoded.(NoInvalidRegexpOptions)
 
-	seen := make(map[string]bool, len(options.AllowConstructorFlags))
-	for _, flags := range options.AllowConstructorFlags {
+	seen := make(map[string]bool, len(decoded.AllowConstructorFlags))
+	for _, flags := range decoded.AllowConstructorFlags {
 		if seen[flags] {
-			return NoInvalidRegexpOptions{}, fmt.Errorf("allowConstructorFlags lists %q more than once, and its items must be unique", flags)
+			return NoInvalidRegexpOptions{}, fmt.Errorf(
+				"allowConstructorFlags lists %q more than once, and its items must be unique",
+				flags,
+			)
 		}
 		seen[flags] = true
 	}
-	return options, nil
+	return decoded, nil
 }
 
 // allowedConstructorFlags is the set of extra flags the options license, as upstream builds it: every
 // character of every string, less the flags the language already defines. Dropping those is what
 // keeps an allowed `u` from being struck twice, which would let `uu` through.
-func allowedConstructorFlags(options any) map[rune]bool {
+func allowedConstructorFlags(options rule.Given[NoInvalidRegexpOptions]) map[rune]bool {
 	allowed := map[rune]bool{}
-	parsed, isParsed := rule.OptionsAs[NoInvalidRegexpOptions](options)
+	parsed, isParsed := options.Read()
 	if !isParsed {
 		return allowed
 	}
@@ -123,24 +125,25 @@ func allowedConstructorFlags(options any) map[rune]bool {
 // that `u` and `v` cannot meet. With nothing configured the list is empty and every flag outside
 // `validRegExpFlags` reports. The schema's `uniqueItems` is held at decode, so `["a", "a"]` is refused
 // as upstream refuses it.
-var NoInvalidRegexp = rule.Rule{
+var NoInvalidRegexp = rule.Rule[NoInvalidRegexpOptions]{
 	Name: "no-invalid-regexp",
 
 	// Whether `RegExp` is the global
 	NeedsTypeChecker: true,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoInvalidRegexpOptions]) rule.Listeners {
 		allowedFlags := allowedConstructorFlags(options)
 
 		check := func(node *ast.Node, callee *ast.Node, arguments *ast.NodeList) {
-			callee = ast.SkipParentheses(callee)
-			if callee == nil || callee.Kind != ast.KindIdentifier {
+			unwrapped := ast.SkipParentheses(callee)
+			if unwrapped == nil || unwrapped.Kind != ast.KindIdentifier {
 				return
 			}
-			if callee.AsIdentifier().Text != "RegExp" {
+			if unwrapped.AsIdentifier().Text != "RegExp" {
 				return
 			}
-			if ctx.TypeChecker == nil || !rule.IsDeclaredOnlyInDeclarationFiles(ctx.TypeChecker.GetSymbolAtLocation(callee)) {
+			if ruleContext.TypeChecker == nil ||
+				!rule.IsDeclaredOnlyInDeclarationFiles(ruleContext.TypeChecker.GetSymbolAtLocation(unwrapped)) {
 				return
 			}
 			// `RegExp()` with no arguments produces the empty pattern and cannot fail.
@@ -164,7 +167,7 @@ var NoInvalidRegexp = rule.Rule{
 
 			if flags != nil {
 				if message := invalidFlagsMessage(*flags, allowedFlags); message != "" {
-					ctx.ReportNode(node, rule.Message{Id: messageInvalidRegexp.Id, Description: message})
+					ruleContext.ReportNode(node, rule.Message{Id: messageInvalidRegexp.Id, Description: message})
 					return
 				}
 			}
@@ -181,7 +184,7 @@ var NoInvalidRegexp = rule.Rule{
 					return
 				}
 				if message := invalidPatternMessage(pattern, *flags); message != "" {
-					ctx.ReportNode(node, rule.Message{Id: messageInvalidRegexp.Id, Description: message})
+					ruleContext.ReportNode(node, rule.Message{Id: messageInvalidRegexp.Id, Description: message})
 				}
 				return
 			}
@@ -192,7 +195,7 @@ var NoInvalidRegexp = rule.Rule{
 			withUnicode := invalidPatternMessage(pattern, "u")
 			withNeither := invalidPatternMessage(pattern, "")
 			if withUnicode != "" && withNeither != "" {
-				ctx.ReportNode(node, rule.Message{Id: messageInvalidRegexp.Id, Description: withNeither})
+				ruleContext.ReportNode(node, rule.Message{Id: messageInvalidRegexp.Id, Description: withNeither})
 			}
 		}
 
@@ -260,13 +263,14 @@ func invalidPatternMessage(pattern string, flags string) string {
 		compileFlags += "u"
 	}
 
-	if _, err := esregexp.Compile(pattern, compileFlags); err != nil {
-		text := err.Error()
+	if _, compileError := esregexp.Compile(pattern, compileFlags); compileError != nil {
+		text := compileError.Error()
 		// The underlying engine prefixes "error parsing regexp: ", which repeats what the message
 		// already says. Trimming to the first ": " drops it. Our parser's own refusals put the
 		// refused construct after that same separator, so trimming there would keep the construct
 		// and throw away the explanation, which is why they are excluded.
-		if !errors.Is(err, esregexp.ErrUnsupportedSyntax) && !errors.Is(err, esregexp.ErrUnsupportedFlag) {
+		if !errors.Is(compileError, esregexp.ErrUnsupportedSyntax) &&
+			!errors.Is(compileError, esregexp.ErrUnsupportedFlag) {
 			if separator := strings.Index(text, ": "); separator != -1 {
 				text = text[separator+2:]
 			}

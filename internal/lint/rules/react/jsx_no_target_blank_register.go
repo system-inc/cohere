@@ -8,5 +8,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // string enum whose absent value is `always`, and `links` defaults to true. The generic decoder
 // also errors on empty input, where this rule must answer upstream's defaults instead.
 func init() {
-	rule.Register(rule.Registration{Rule: JsxNoTargetBlank, Decode: DecodeJsxNoTargetBlankOptions})
+	rule.Register(
+		rule.Registration[JsxNoTargetBlankOptions]{Rule: JsxNoTargetBlank, Decode: DecodeJsxNoTargetBlankOptions},
+	)
 }

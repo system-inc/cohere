@@ -15,27 +15,6 @@ var messageUnexpectedCommaExpression = rule.Message{
 		"statements, or wrap it in its own parentheses to say the sequencing was deliberate.",
 }
 
-// NoSequencesOptions configures whether an explicitly parenthesized sequence is excused.
-type NoSequencesOptions struct {
-	// AllowInParentheses is upstream's only option and it defaults to TRUE, which is why it is a
-	// pointer rather than a bool.
-	//
-	// A zero-value struct would read as `false` and silently invert the rule: every `var foo = (1,
-	// 2)` in the tree would report, and no fixture built by handing `RunWithOptions` a struct could
-	// see it, because such a fixture states the value it is testing. The nil case is the one the
-	// live config actually produces, since a rule configured as bare "error" is handed no options at
-	// all, and it is the case the default has to survive.
-	AllowInParentheses *bool `json:"allowInParentheses"`
-}
-
-// allowInParentheses reads the option, supplying upstream's default for an absent or nil value.
-func (options NoSequencesOptions) allowInParentheses() bool {
-	if options.AllowInParentheses == nil {
-		return true
-	}
-	return *options.AllowInParentheses
-}
-
 // NoSequences flags the comma operator outside the two places it is idiomatic.
 //
 //	valid:   var arr = [1, 2];
@@ -99,7 +78,7 @@ func (options NoSequencesOptions) allowInParentheses() bool {
 // Under `allowInParentheses: false` a nested pair like `(a, b), c` reports twice, and upstream emits
 // the inner finding before the outer one while this emits the outer first. Both walks are pre-order;
 // what differs is which node is outer. Upstream's outer node is the flattened sequence whose reported
-// comma is the LATER one, and its inner node is the parenthesized child whose comma is earlier, so
+// comma is the later one, and its inner node is the parenthesized child whose comma is earlier, so
 // pre-order and source order happen to agree there and disagree here.
 //
 // Five of 264 differential rows differ this way and no row differs in content: same count, same
@@ -113,10 +92,10 @@ func (options NoSequencesOptions) allowInParentheses() bool {
 // No fix. Upstream ships none, and the repair is a judgment the rule cannot make: splitting a
 // sequence into statements is only correct where the expression is already a statement, and the
 // alternative repair of adding parentheses silences the finding without addressing it.
-var NoSequences = rule.Rule{
+var NoSequences = rule.Rule[NoSequencesOptions]{
 	Name: "no-sequences",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[NoSequencesOptions]) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -125,7 +104,7 @@ var NoSequences = rule.Rule{
 		// value of NoSequencesOptions. Its AllowInParentheses is a nil pointer, which the accessor
 		// reads as upstream's `true`.
 		var settings NoSequencesOptions
-		if parsed, ok := rule.OptionsAs[NoSequencesOptions](options); ok {
+		if parsed, ok := options.Read(); ok {
 			settings = parsed
 		}
 		allowInParentheses := settings.allowInParentheses()
@@ -136,7 +115,7 @@ var NoSequences = rule.Rule{
 					return
 				}
 
-				// One report per chain, taken at the OUTERMOST node. `a, b, c` is one node upstream
+				// One report per chain, taken at the outermost node. `a, b, c` is one node upstream
 				// and two here, and it is the outermost of ours that occupies the position
 				// upstream's flattened node occupies -- which is what every check below reads. A
 				// parenthesized inner sequence is a separate node upstream as well, so a
@@ -149,9 +128,9 @@ var NoSequences = rule.Rule{
 				// against the installed rule, that spelling reports five inputs upstream is silent
 				// on, including `for (a, b, c;;)` and `(a, b, c);`. Found by a mutation sweep and by
 				// nothing in the imported corpus, which never writes a three-element chain.
-				// No check for WHICH side of the parent this is, and that omission is measured. A
+				// No check for which side of the parent this is, and that omission is measured. A
 				// mutant weakening it to a tautology survived every fixture, so the question was
-				// whether a comma expression can be the direct RIGHT operand of another. It cannot:
+				// whether a comma expression can be the direct right operand of another. It cannot:
 				// comma is left-associative, so `a, b, c` parses as `(a, b), c` and reaching the
 				// right side needs parentheses, which interpose a node and end the chain. Probed
 				// over 17 shapes including assignments, ternaries, `yield`, and five-element chains,
@@ -171,11 +150,11 @@ var NoSequences = rule.Rule{
 					return
 				}
 
-				comma := leftmostCommaOf(ctx, node)
+				comma := leftmostCommaOf(ruleContext, node)
 				if comma == nil {
 					return
 				}
-				ctx.ReportRange(*comma, messageUnexpectedCommaExpression)
+				ruleContext.ReportRange(*comma, messageUnexpectedCommaExpression)
 			},
 		}
 	},
@@ -185,7 +164,7 @@ var NoSequences = rule.Rule{
 //
 // The climb through parentheses is not a convenience. Upstream compares `node === node.parent.init`
 // on a tree where parentheses are not nodes, so its comparison sees through any number of them, and
-// it makes that comparison BEFORE the paren allowance rather than after. Two of upstream's own clean
+// it makes that comparison before the paren allowance rather than after. Two of upstream's own clean
 // cases turn on exactly that ordering, and both are written with `allowInParentheses: false` so the
 // allowance cannot be what excuses them:
 //
@@ -245,7 +224,7 @@ func parenthesizedEnough(node *ast.Node) bool {
 //
 // No `Body == node` comparison, and that omission is measured rather than assumed. A mutant that
 // weakened the comparison to a tautology survived every fixture, so the question was whether a
-// PARENTHESIZED EXPRESSION whose parent is an arrow can ever be something other than that arrow's
+// parenthesized expression whose parent is an arrow can ever be something other than that arrow's
 // body. Probed over 21 shapes -- parenthesized and destructured and defaulted parameters, generics,
 // `async`, a parenthesized return type, an arrow inside a default value, an arrow as a class
 // property -- and it cannot. An arrow's parameters parse as `KindParameter` and their parentheses
@@ -272,7 +251,7 @@ func isArrowBody(node *ast.Node) bool {
 // starting at the space rather than at the comma. `rule.TokenRange` scans past it, which is the same
 // correction `ctx.ReportNode` applies and the reason this does not build the range from `Pos()`
 // directly.
-func leftmostCommaOf(ctx rule.Context, node *ast.Node) *core.TextRange {
+func leftmostCommaOf(ruleContext rule.Context, node *ast.Node) *core.TextRange {
 	current := node
 	for isCommaExpression(current.AsBinaryExpression().Left) {
 		current = current.AsBinaryExpression().Left
@@ -281,7 +260,7 @@ func leftmostCommaOf(ctx rule.Context, node *ast.Node) *core.TextRange {
 	if operator == nil {
 		return nil
 	}
-	commaRange := rule.TokenRange(ctx.SourceFile, operator)
+	commaRange := rule.TokenRange(ruleContext.SourceFile, operator)
 	return &commaRange
 }
 
@@ -291,13 +270,13 @@ func leftmostCommaOf(ctx rule.Context, node *ast.Node) *core.TextRange {
 // input and the config layer turns the error into nil, so a rule reached through it can never see
 // the difference between "no options were written" and "an option was written as false". For an
 // option defaulting to false that distinction is invisible; for this one it inverts the rule.
-func DecodeNoSequencesOptions(raw []byte) (any, error) {
+func DecodeNoSequencesOptions(raw []byte) (NoSequencesOptions, error) {
 	var options NoSequencesOptions
 	if len(raw) == 0 {
 		return options, nil
 	}
-	if err := rule.UnmarshalOptions(raw, &options); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &options); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 	return options, nil
 }

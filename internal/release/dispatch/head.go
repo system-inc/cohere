@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-// readHead returns the commit a checkout's HEAD names, read from the repository's own files.
+// readHead returns the commit a checkout's `HEAD` names, read from the repository's own files.
 //
 // The launcher asks this on every run, and asking git cost a process each time for an answer that sits
 // in two small files. A cache hit now execs the cached binary without starting any git: the commit names
@@ -17,25 +17,27 @@ import (
 // short of git reads a packfile).
 //
 // It follows what a clone, a worktree and a submodule each lay out: `.git` as a directory or as a
-// `gitdir:` file, a worktree's `commondir`, HEAD as a commit or as a symbolic ref, and the ref as a loose
+// `gitdir:` file, a worktree's `commondir`, `HEAD` as a commit or as a symbolic ref, and the ref as a loose
 // file or a line of `packed-refs`. Anything else, such as the reftable ref store, is an error that names
 // it, never a guess: a wrong commit builds and runs the wrong rules while looking like the right ones.
 func readHead(repository string) (string, error) {
-	gitDirectory, err := gitDirectoryOf(repository)
-	if err != nil {
-		return "", err
+	gitDirectory, gitDirectoryOfError := gitDirectoryOf(repository)
+	if gitDirectoryOfError != nil {
+		return "", gitDirectoryOfError
 	}
 	commonDirectory := gitDirectory
-	if contents, err := os.ReadFile(filepath.Join(gitDirectory, "commondir")); err == nil {
+	if contents, readError := os.ReadFile(filepath.Join(gitDirectory, "commondir")); readError == nil {
 		commonDirectory = resolveFrom(gitDirectory, strings.TrimSpace(string(contents)))
 	}
-	if config, err := os.ReadFile(filepath.Join(commonDirectory, "config")); err == nil && strings.Contains(string(config), "reftable") {
+	if configuration, readError := os.ReadFile(
+		filepath.Join(commonDirectory, "config"),
+	); readError == nil && strings.Contains(string(configuration), "reftable") {
 		return "", fmt.Errorf("%s keeps its refs in the reftable store, which cohere does not read", repository)
 	}
 
-	head, err := os.ReadFile(filepath.Join(gitDirectory, "HEAD"))
-	if err != nil {
-		return "", fmt.Errorf("reading HEAD in %s: %w", repository, err)
+	head, readError := os.ReadFile(filepath.Join(gitDirectory, "HEAD"))
+	if readError != nil {
+		return "", fmt.Errorf("reading HEAD in %s: %w", repository, readError)
 	}
 	value := strings.TrimSpace(string(head))
 	// A symbolic ref can name another, so the chain is followed, and bounded so a loop is an error.
@@ -47,9 +49,10 @@ func readHead(repository string) (string, error) {
 			}
 			return value, nil
 		}
-		value, err = readReference(gitDirectory, commonDirectory, strings.TrimSpace(reference))
-		if err != nil {
-			return "", fmt.Errorf("reading HEAD in %s: %w", repository, err)
+		var readReferenceError error
+		value, readReferenceError = readReference(gitDirectory, commonDirectory, strings.TrimSpace(reference))
+		if readReferenceError != nil {
+			return "", fmt.Errorf("reading HEAD in %s: %w", repository, readReferenceError)
 		}
 	}
 	return "", fmt.Errorf("HEAD in %s is a chain of symbolic refs that does not end", repository)
@@ -58,16 +61,16 @@ func readHead(repository string) (string, error) {
 // gitDirectoryOf finds a checkout's git directory: `.git` itself, or where a `.git` file points.
 func gitDirectoryOf(repository string) (string, error) {
 	dotGit := filepath.Join(repository, ".git")
-	information, err := os.Stat(dotGit)
-	if err != nil {
-		return "", fmt.Errorf("%s is not a git checkout: %w", repository, err)
+	information, statError := os.Stat(dotGit)
+	if statError != nil {
+		return "", fmt.Errorf("%s is not a git checkout: %w", repository, statError)
 	}
 	if information.IsDir() {
 		return dotGit, nil
 	}
-	contents, err := os.ReadFile(dotGit)
-	if err != nil {
-		return "", fmt.Errorf("reading %s: %w", dotGit, err)
+	contents, readError := os.ReadFile(dotGit)
+	if readError != nil {
+		return "", fmt.Errorf("reading %s: %w", dotGit, readError)
 	}
 	target, found := strings.CutPrefix(strings.TrimSpace(string(contents)), "gitdir: ")
 	if !found {
@@ -83,20 +86,20 @@ func readReference(gitDirectory string, commonDirectory string, reference string
 		return "", fmt.Errorf("%q is not a ref name", reference)
 	}
 	for _, directory := range []string{gitDirectory, commonDirectory} {
-		contents, err := os.ReadFile(filepath.Join(directory, filepath.FromSlash(reference)))
-		if err == nil {
+		contents, readError := os.ReadFile(filepath.Join(directory, filepath.FromSlash(reference)))
+		if readError == nil {
 			return strings.TrimSpace(string(contents)), nil
 		}
-		if !errors.Is(err, os.ErrNotExist) {
-			return "", fmt.Errorf("reading %s: %w", reference, err)
+		if !errors.Is(readError, os.ErrNotExist) {
+			return "", fmt.Errorf("reading %s: %w", reference, readError)
 		}
 	}
 
-	packed, err := os.Open(filepath.Join(commonDirectory, "packed-refs"))
-	if err != nil {
-		return "", fmt.Errorf("%s is neither a loose ref nor packed (%v)", reference, err)
+	packed, openError := os.Open(filepath.Join(commonDirectory, "packed-refs"))
+	if openError != nil {
+		return "", fmt.Errorf("%s is neither a loose ref nor packed (%w)", reference, openError)
 	}
-	defer packed.Close()
+	defer packed.Close() // Ignored: the file was only read, so a failed close loses nothing.
 	lines := bufio.NewScanner(packed)
 	for lines.Scan() {
 		// `<object> <ref>`, with `#` headers and `^<object>` peel lines that name no ref.
@@ -105,8 +108,8 @@ func readReference(gitDirectory string, commonDirectory string, reference string
 			return object, nil
 		}
 	}
-	if err := lines.Err(); err != nil {
-		return "", fmt.Errorf("reading packed-refs: %w", err)
+	if scanError := lines.Err(); scanError != nil {
+		return "", fmt.Errorf("reading packed-refs: %w", scanError)
 	}
 	return "", fmt.Errorf("%s is neither a loose ref nor packed", reference)
 }

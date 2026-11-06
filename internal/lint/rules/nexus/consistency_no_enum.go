@@ -22,9 +22,9 @@ func messageNoEnum() rule.Message {
 //
 // No fix, deliberately. Migrating an enum means choosing the replacement name and updating every
 // reference, which is a judgment the rule cannot make from one declaration.
-var ConsistencyNoEnum = rule.Rule{
+var ConsistencyNoEnum = rule.Rule[rule.NoOptions]{
 	Name: "nexus/consistency-no-enum",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindEnumDeclaration: func(node *ast.Node) {
 				declaration := node.AsEnumDeclaration()
@@ -38,7 +38,7 @@ var ConsistencyNoEnum = rule.Rule{
 				if target == nil {
 					target = node
 				}
-				ctx.ReportNode(target, messageNoEnum())
+				ruleContext.ReportNode(target, messageNoEnum())
 			},
 		}
 	},

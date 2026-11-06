@@ -10,7 +10,7 @@ import (
 // DisplayNameOptions configures the rule.
 //
 // Both keys default to false upstream, so the zero value is the correct default and the decoder
-// stays simple. That is worth stating because the sibling `self-closing-comp` defaults BOTH of its
+// stays simple. That is worth stating because the sibling `self-closing-comp` defaults both of its
 // options to true, where the same generic decoder would silently invert the rule.
 type DisplayNameOptions struct {
 	// IgnoreTranspilerName requires an explicit `displayName` even when the transpiler would infer
@@ -32,13 +32,13 @@ func DefaultDisplayNameOptions() DisplayNameOptions {
 // Our config layer unwraps the severity tuple before dispatch, so this receives upstream's option
 // object rather than upstream's one-element array. Empty input is a rule configured as a bare
 // `"error"` and resolves to the default.
-func DecodeDisplayNameOptions(raw []byte) (any, error) {
+func DecodeDisplayNameOptions(raw []byte) (DisplayNameOptions, error) {
 	options := DefaultDisplayNameOptions()
 	if len(raw) == 0 {
 		return options, nil
 	}
-	if err := rule.UnmarshalOptions(raw, &options); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &options); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 	return options, nil
 }
@@ -68,7 +68,7 @@ var messageNoContextDisplayName = rule.Message{
 //
 // The two therefore agree on the common cases and are not duplicates: a named function needs no
 // assignment and gets none, and an anonymous `memo(...)` needs one and is allowed one. They meet on
-// a narrower class, a NAMED component carrying a redundant assignment, which the in-house rule
+// a narrower class, a named component carrying a redundant assignment, which the in-house rule
 // reports and this one is silent on. That is the in-house rule's own judgment and this rule does
 // not contradict it, because silence is not disagreement.
 //
@@ -85,7 +85,7 @@ var messageNoContextDisplayName = rule.Message{
 // # No fix
 //
 // The repair is to name a thing, which means choosing the name. Upstream ships no fixer either.
-var DisplayName = rule.Rule{
+var DisplayName = rule.Rule[DisplayNameOptions]{
 	Name: "react/display-name",
 
 	// The checker resolves the object of a `C.displayName` write back to its declaration, which is
@@ -94,13 +94,13 @@ var DisplayName = rule.Rule{
 	// and not the other, so a name comparison would be wrong.
 	NeedsTypeChecker: true,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[DisplayNameOptions]) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
 		settings := DefaultDisplayNameOptions()
-		if configured, isConfigured := rule.OptionsAs[DisplayNameOptions](options); isConfigured {
+		if configured, isConfigured := options.Read(); isConfigured {
 			settings = configured
 		}
 
@@ -110,10 +110,10 @@ var DisplayName = rule.Rule{
 				// more dangerous failure because every quiet fixture then passes vacuously.
 				// `TestDisplayNameRequiresTheTypedHarness` fails loudly if this is reached without
 				// one.
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
-				reportMissingDisplayNames(ctx, node, settings)
+				reportMissingDisplayNames(ruleContext, node, settings)
 			},
 		}
 	},
@@ -125,8 +125,8 @@ var DisplayName = rule.Rule{
 // `displayName` assignment in the file has been seen, and those can appear far below the definition.
 // Our walk is pre-order, so a source-file listener fires before its children and gathering has to
 // happen here rather than in per-kind listeners.
-func reportMissingDisplayNames(ctx rule.Context, sourceFile *ast.Node, settings DisplayNameOptions) {
-	components := collectDetectedComponents(ctx, sourceFile)
+func reportMissingDisplayNames(ruleContext rule.Context, sourceFile *ast.Node, settings DisplayNameOptions) {
+	components := collectDetectedComponents(ruleContext, sourceFile)
 
 	// named is the set of component nodes that have a display name by either route.
 	named := map[*ast.Node]bool{}
@@ -140,7 +140,7 @@ func reportMissingDisplayNames(ctx rule.Context, sourceFile *ast.Node, settings 
 	// `Ctx.displayName = ...` write resolves back to that same declaration through the checker.
 	contexts := map[*ast.Node]*ast.Node{}
 	if settings.CheckContextObjects {
-		collectContextObjects(ctx, sourceFile, contexts)
+		collectContextObjects(ruleContext, sourceFile, contexts)
 	}
 	namedContexts := map[*ast.Node]bool{}
 
@@ -150,7 +150,7 @@ func reportMissingDisplayNames(ctx rule.Context, sourceFile *ast.Node, settings 
 	}
 
 	// One walk for every display-name declaration in the file, whatever form it takes.
-	markDeclaredDisplayNames(ctx, sourceFile, byNode, named, contexts, namedContexts)
+	markDeclaredDisplayNames(ruleContext, sourceFile, byNode, named, contexts, namedContexts)
 
 	for _, component := range components {
 		if named[component.node] {
@@ -161,10 +161,10 @@ func reportMissingDisplayNames(ctx rule.Context, sourceFile *ast.Node, settings 
 			// skips the inner one so a single anonymous component does not produce two findings.
 			continue
 		}
-		if isShadowedPragmaWrapper(ctx, component.node) {
+		if isShadowedPragmaWrapper(ruleContext, component.node) {
 			continue
 		}
-		reportComponentNode(ctx, component.node)
+		reportComponentNode(ruleContext, component.node)
 	}
 
 	// No second `CheckContextObjects` test here: the collection above is already gated on it, so
@@ -175,7 +175,7 @@ func reportMissingDisplayNames(ctx rule.Context, sourceFile *ast.Node, settings 
 		if namedContexts[declaration] {
 			continue
 		}
-		ctx.ReportNode(anchor, messageNoContextDisplayName)
+		ruleContext.ReportNode(anchor, messageNoContextDisplayName)
 	}
 }
 
@@ -186,19 +186,19 @@ func reportMissingDisplayNames(ctx rule.Context, sourceFile *ast.Node, settings 
 //
 // The `module.exports` exclusion in the object-assignment branch is upstream's and is the opposite
 // of what the sibling `no-multi-comp` does with the same identifier: there `module.exports = fn`
-// COUNTS as naming a component, here `module.exports = {...}` does NOT supply a transpiler name.
+// counts as naming a component, here `module.exports = {...}` does not supply a transpiler name.
 // Both are measured and both are upstream's, so the two rules disagree about `module.exports` on
 // purpose.
 func hasTranspilerName(node *ast.Node) bool {
 	parent := semanticParentOf(node)
 
-	// A pragma wrapper call is judged by its wrapped ARGUMENT rather than by the call, because
+	// A pragma wrapper call is judged by its wrapped argument rather than by the call, because
 	// upstream's CallExpression handler asks `hasTranspilerName(node.arguments[0])`. So
 	// `memo(function Hello(){})` is named by the inner function's own name, and
 	// `const C = memo(() => ...)` is not named by the `const C` binding at all. Measured: the first
 	// is silent and the second reports.
 	if node.Kind == ast.KindCallExpression && isPragmaComponentWrapper(node, map[string]bool{}) {
-		// A wrapper that is ITSELF wrapped is treated as named without asking about its argument.
+		// A wrapper that is itself wrapped is treated as named without asking about its argument.
 		// Upstream's condition is `!isWrappedInAnotherPragma && (... || !hasTranspilerName(arg))`,
 		// so being wrapped short-circuits the early return and the call is marked as declared.
 		//
@@ -255,10 +255,10 @@ func hasTranspilerName(node *ast.Node) bool {
 
 	// The remaining shape is a function-like expression whose binding names it: a variable
 	// declaration, an object property, or a method shorthand. Upstream additionally requires the
-	// grandparent NOT to be an ES5 component factory call, so an anonymous `render` inside
+	// grandparent not to be an ES5 component factory call, so an anonymous `render` inside
 	// `createReactClass({...})` does not name the component that surrounds it.
 	// A method shorthand in an object literal is its own node kind here rather than a function
-	// expression under a property, so the component node IS the method and its name is the key.
+	// expression under a property, so the component node is the method and its name is the key.
 	// Upstream reaches the same answer through `node.parent.method === true`.
 	if node.Kind == ast.KindMethodDeclaration {
 		return node.Name() != nil && !isEs5ComponentFactoryArgument(semanticParentOf(node))
@@ -283,11 +283,11 @@ func hasTranspilerName(node *ast.Node) bool {
 
 // isModuleExportsAssignmentTarget reports whether an assignment target is `module.exports`.
 func isModuleExportsAssignmentTarget(target *ast.Node) bool {
-	target = skipParenthesesOptional(target)
-	if target == nil || target.Kind != ast.KindPropertyAccessExpression {
+	unwrapped := skipParenthesesOptional(target)
+	if unwrapped == nil || unwrapped.Kind != ast.KindPropertyAccessExpression {
 		return false
 	}
-	access := target.AsPropertyAccessExpression()
+	access := unwrapped.AsPropertyAccessExpression()
 	object := skipParenthesesOptional(access.Expression)
 	if object == nil || object.Kind != ast.KindIdentifier || object.Text() != "module" {
 		return false
@@ -311,8 +311,11 @@ func isEs5ComponentFactoryArgument(node *ast.Node) bool {
 // Upstream spreads this across four listeners: a class property, a member expression assignment, a
 // class method, and a property inside an ES5 factory object. All four are folded into one walk here
 // because the gathering has to happen inside the source-file listener anyway.
+//
+// Mutates: named gains every component the walk finds a display name for
+// Mutates: namedContexts gains every context object a `displayName` write names
 func markDeclaredDisplayNames(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	sourceFile *ast.Node,
 	componentNodes map[*ast.Node]bool,
 	named map[*ast.Node]bool,
@@ -360,11 +363,11 @@ func markDeclaredDisplayNames(
 			if !isDisplayNameKey(access.Name()) {
 				break
 			}
-			target := relatedComponentFor(ctx, access.Expression, componentNodes)
+			target := relatedComponentFor(ruleContext, access.Expression, componentNodes)
 			if target != nil {
 				named[target] = true
 			}
-			for _, declaration := range resolvedDeclarationsOf(ctx, access.Expression) {
+			for _, declaration := range resolvedDeclarationsOf(ruleContext, access.Expression) {
 				if _, isContext := contexts[declaration]; isContext {
 					namedContexts[declaration] = true
 				}
@@ -402,7 +405,7 @@ func isDisplayNameKey(key *ast.Node) bool {
 // This is what separates a write against the component from a write against a shadowing binding of
 // the same name, and it is why the rule declares the checker. Measured on 2026-08-27: upstream
 // reports `const C = memo(...)` when an inner scope declares its own `C` and writes displayName on
-// THAT, and stays silent when the write is against the outer one. A name comparison cannot tell
+// that inner `C`, and stays silent when the write is against the outer one. A name comparison cannot tell
 // those apart; the checker hands back declarations at different positions.
 //
 // # Why this returns a list rather than one declaration
@@ -410,18 +413,18 @@ func isDisplayNameKey(key *ast.Node) bool {
 // A symbol can carry several declarations through declaration merging, and the callers here are
 // asking "does ANY declaration match this component", not "what single thing is this name". An
 // earlier draft took the earliest by position, which reads as the careful choice and is wrong:
-// probed on 2026-08-27, `interface C {}` written ABOVE `const C = memo(...)` puts the interface at
+// probed on 2026-08-27, `interface C {}` written above `const C = memo(...)` puts the interface at
 // index zero and at the earlier position, so the component would never be found and its
 // `C.displayName` write would stop registering. Upstream is silent on that input, measured, and it
 // stays silent here only because every declaration is offered.
 //
 // Never index blindly either way; the list is what the question wants.
-func resolvedDeclarationsOf(ctx rule.Context, expression *ast.Node) []*ast.Node {
-	expression = skipParenthesesOptional(expression)
-	if expression == nil || ctx.TypeChecker == nil {
+func resolvedDeclarationsOf(ruleContext rule.Context, expression *ast.Node) []*ast.Node {
+	unwrapped := skipParenthesesOptional(expression)
+	if unwrapped == nil || ruleContext.TypeChecker == nil {
 		return nil
 	}
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(expression)
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(unwrapped)
 	if symbol == nil {
 		return nil
 	}
@@ -435,10 +438,10 @@ func resolvedDeclarationsOf(ctx rule.Context, expression *ast.Node) []*ast.Node 
 // component whose node is that declaration's initializer or the declaration itself.
 //
 // Reproducing the reference walk would be reproducing a workaround for a constraint we do not have.
-// What has to match is the DECISION about which writes count, and that is what the shadowing
+// What has to match is the decision about which writes count, and that is what the shadowing
 // measurement above pins.
-func relatedComponentFor(ctx rule.Context, object *ast.Node, componentNodes map[*ast.Node]bool) *ast.Node {
-	for _, declaration := range resolvedDeclarationsOf(ctx, object) {
+func relatedComponentFor(ruleContext rule.Context, object *ast.Node, componentNodes map[*ast.Node]bool) *ast.Node {
+	for _, declaration := range resolvedDeclarationsOf(ruleContext, object) {
 		if found := componentForDeclaration(declaration, componentNodes); found != nil {
 			return found
 		}
@@ -448,7 +451,7 @@ func relatedComponentFor(ctx rule.Context, object *ast.Node, componentNodes map[
 
 // componentForDeclaration finds the component a single declaration stands for, or nil.
 func componentForDeclaration(declaration *ast.Node, componentNodes map[*ast.Node]bool) *ast.Node {
-	// The component may BE the declaration, for a function or class declaration.
+	// The component may be the declaration, for a function or class declaration.
 	if componentNodes[declaration] {
 		return declaration
 	}
@@ -464,7 +467,7 @@ func componentForDeclaration(declaration *ast.Node, componentNodes map[*ast.Node
 			return value
 		}
 	}
-	// A method shorthand in an object literal IS the component node, so the declaration matches
+	// A method shorthand in an object literal is the component node, so the declaration matches
 	// directly through the check above; this branch is for the property-with-a-function form.
 
 	// Or it may be what the declaration initializes, for `const C = memo(...)` and friends.
@@ -473,7 +476,7 @@ func componentForDeclaration(declaration *ast.Node, componentNodes map[*ast.Node
 		if initializer != nil && componentNodes[initializer] {
 			return initializer
 		}
-		// A pragma wrapper's component node is the wrapping call, and the initializer IS that call,
+		// A pragma wrapper's component node is the wrapping call, and the initializer is that call,
 		// so the branch above already covers it. An object literal handed to the ES5 factory is the
 		// component instead, so the call's first argument is checked too.
 		if initializer != nil && initializer.Kind == ast.KindCallExpression {
@@ -493,7 +496,7 @@ func componentForDeclaration(declaration *ast.Node, componentNodes map[*ast.Node
 // the argument of another pragma wrapper.
 //
 // `memo(forwardRef(fn))` is two components to the detector, because the wrapper detector fires at
-// every level of a nest, and upstream reports it once rather than twice. So the INNER call is
+// every level of a nest, and upstream reports it once rather than twice. So the inner call is
 // skipped and the outer one carries the finding.
 //
 // Measured on 2026-08-27: `memo(forwardRef(anon))`, `memo(memo(anon))` and `forwardRef(memo(anon))`
@@ -510,7 +513,7 @@ func isNestedPragmaWrapperArgument(component *ast.Node) bool {
 	if parent == nil || parent.Kind != ast.KindCallExpression {
 		return false
 	}
-	// The component has to be the wrapped first ARGUMENT rather than the callee or a later
+	// The component has to be the wrapped first argument rather than the callee or a later
 	// argument.
 	//
 	// # This check is inert today, and it is kept rather than deleted
@@ -518,7 +521,7 @@ func isNestedPragmaWrapperArgument(component *ast.Node) bool {
 	// A mutation neutralising it survived, and an A/B on `memo(x, forwardRef(anon))` and
 	// `memo(a, b, forwardRef(anon))` produced byte-identical output with and without it on
 	// 2026-08-27. The reason is upstream's own gate one level up: a wrapper call is only added as a
-	// component when ITS first argument is function-like, and the detector never offers a call
+	// component when its own first argument is function-like, and the detector never offers a call
 	// sitting in a later argument slot, so this line is not reached on any input tried.
 	//
 	// The grammar does produce the shape, measured with a probe that found calls at argument
@@ -547,7 +550,7 @@ func isNestedPragmaWrapperArgument(component *ast.Node) bool {
 // installed build, which is what our gate compares against, only has the bare half.
 //
 // Measured on 2026-08-27, both trees reporting version 7.37.5: a shadowed bare `memo` is silent
-// installed, and a shadowed `React.memo` REPORTS installed while the clone's three corpus cases
+// installed, and a shadowed `React.memo` reports installed while the clone's three corpus cases
 // covering it expect silence. Those three cases are the only ones in the whole 116-case corpus
 // where the installed build disagrees with the clone.
 //
@@ -556,7 +559,7 @@ func isNestedPragmaWrapperArgument(component *ast.Node) bool {
 //
 // The bare half is answered by resolution rather than by a scope walk: if the callee identifier
 // resolves to a declaration in this file, it is a local binding and not React's.
-func isShadowedPragmaWrapper(ctx rule.Context, component *ast.Node) bool {
+func isShadowedPragmaWrapper(ruleContext rule.Context, component *ast.Node) bool {
 	if component.Kind != ast.KindCallExpression {
 		return false
 	}
@@ -568,7 +571,7 @@ func isShadowedPragmaWrapper(ctx rule.Context, component *ast.Node) bool {
 		return false
 	}
 
-	declarations := resolvedDeclarationsOf(ctx, callee)
+	declarations := resolvedDeclarationsOf(ruleContext, callee)
 	if len(declarations) == 0 {
 		return false
 	}
@@ -587,9 +590,11 @@ func isShadowedPragmaWrapper(ctx rule.Context, component *ast.Node) bool {
 // collectContextObjects records every `createContext` result in the file, keyed by the declaration
 // a later `displayName` write will resolve to.
 //
-// Upstream matches on the CALLEE NAME alone for the member form, so `other.createContext()` counts
+// Upstream matches on the callee name alone for the member form, so `other.createContext()` counts
 // as a context object exactly as `React.createContext()` does. Measured, and reproduced rather than
 // narrowed: the receiver is never checked.
+//
+// Mutates: contexts gains every `createContext` result, keyed by the declaration it resolves to
 func collectContextObjects(contextCheckerHolder rule.Context, sourceFile *ast.Node, contexts map[*ast.Node]*ast.Node) {
 	var visit func(*ast.Node)
 	visit = func(node *ast.Node) {
@@ -604,7 +609,7 @@ func collectContextObjects(contextCheckerHolder rule.Context, sourceFile *ast.No
 			// `Hello = createContext()`, an assignment rather than a declaration, which the corpus
 			// writes three times against a `let` or `var` declared above.
 			//
-			// The map is keyed on the TARGET's declaration rather than on this assignment node,
+			// The map is keyed on the target's declaration rather than on this assignment node,
 			// because a later `Hello.displayName = ...` resolves through the checker to that
 			// declaration and to nothing else. Keying on the assignment made all three cases
 			// report despite carrying a display name, since the two lookups could never meet.
@@ -638,11 +643,11 @@ func collectContextObjects(contextCheckerHolder rule.Context, sourceFile *ast.No
 // isCreateContextCall reports whether an expression is a call to `createContext`, bare or through
 // any receiver.
 func isCreateContextCall(expression *ast.Node) bool {
-	expression = skipParenthesesOptional(expression)
-	if expression == nil || expression.Kind != ast.KindCallExpression {
+	unwrapped := skipParenthesesOptional(expression)
+	if unwrapped == nil || unwrapped.Kind != ast.KindCallExpression {
 		return false
 	}
-	callee := skipParenthesesOptional(expression.AsCallExpression().Expression)
+	callee := skipParenthesesOptional(unwrapped.AsCallExpression().Expression)
 	if callee == nil {
 		return false
 	}
@@ -669,21 +674,21 @@ func isCreateContextCall(expression *ast.Node) bool {
 // TestDisplayNameAnchorsOnTheComponent.
 //
 // Every other component shape has no modifiers and is reported unchanged.
-func reportComponentNode(ctx rule.Context, component *ast.Node) {
+func reportComponentNode(ruleContext rule.Context, component *ast.Node) {
 	modifiers := component.Modifiers()
 	if modifiers == nil || len(modifiers.Nodes) == 0 {
-		ctx.ReportNode(component, messageNoDisplayName)
+		ruleContext.ReportNode(component, messageNoDisplayName)
 		return
 	}
 	last := modifiers.Nodes[len(modifiers.Nodes)-1]
 	if last.End() >= component.End() {
-		ctx.ReportNode(component, messageNoDisplayName)
+		ruleContext.ReportNode(component, messageNoDisplayName)
 		return
 	}
 	// The modifier's end sits before the whitespace preceding the keyword, so the range is scanned
 	// forward to the next token rather than taken raw. Without that the span carries a leading
 	// space and the assertion fails by one byte, which reads exactly like an off-by-one in the
 	// rule.
-	start := scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, last.End()).Pos()
-	ctx.ReportRange(core.NewTextRange(start, component.End()), messageNoDisplayName)
+	start := scanner.GetRangeOfTokenAtPosition(ruleContext.SourceFile, last.End()).Pos()
+	ruleContext.ReportRange(core.NewTextRange(start, component.End()), messageNoDisplayName)
 }

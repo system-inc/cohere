@@ -73,8 +73,8 @@ func CheckSettings(base rule.OptionsBase) error {
 		if len(written) == 0 {
 			continue
 		}
-		if err := checkNamespace(registration, written[0], base); err != nil {
-			return err
+		if checkNamespaceError := checkNamespace(registration, written[0], base); checkNamespaceError != nil {
+			return checkNamespaceError
 		}
 	}
 	return nil
@@ -82,13 +82,15 @@ func CheckSettings(base rule.OptionsBase) error {
 
 // checkNamespace decodes and schema-checks the part of one namespace's settings each rule reads.
 func checkNamespace(registration rule.SettingsRegistration, namespace string, base rule.OptionsBase) error {
-	parts, err := registration.Split(base.Settings[namespace])
-	if err != nil {
-		return fmt.Errorf("settings[%q]: %w", namespace, err)
+	parts, splitError := registration.Split(base.Settings[namespace])
+	if splitError != nil {
+		return fmt.Errorf("settings[%q]: %w", namespace, splitError)
 	}
-	decoders := map[string]func(raw []byte, base rule.OptionsBase) (any, error){}
+	decoders := map[string]func(raw []byte, base rule.OptionsBase) (rule.Bound, error){}
 	for _, registered := range rule.Registered() {
-		decoders[registered.Rule.Name] = registered.DecodeAt
+		if registered.Arity == rule.OptionArityAt {
+			decoders[registered.Name] = registered.Bind
+		}
 	}
 	// Decoded against the anchors alone, so the decoder reads the part as it would an option element
 	// rather than merging the settings into it a second time.
@@ -102,12 +104,12 @@ func checkNamespace(registration rule.SettingsRegistration, namespace string, ba
 	for _, ruleName := range ruleNames {
 		part := parts[ruleName]
 		if decode := decoders[ruleName]; decode != nil {
-			if _, err := decode(part, anchors); err != nil {
-				return fmt.Errorf("settings[%q], as %s reads it: %w", namespace, ruleName, err)
+			if _, decodeError := decode(part, anchors); decodeError != nil {
+				return fmt.Errorf("settings[%q], as %s reads it: %w", namespace, ruleName, decodeError)
 			}
 		}
-		if err := optionschema.Check(ruleName, []json.RawMessage{part}); err != nil {
-			return fmt.Errorf("settings[%q], as %s reads it: %w", namespace, ruleName, err)
+		if checkError := optionschema.Check(ruleName, []json.RawMessage{part}); checkError != nil {
+			return fmt.Errorf("settings[%q], as %s reads it: %w", namespace, ruleName, checkError)
 		}
 	}
 	return nil

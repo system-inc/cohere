@@ -7,7 +7,7 @@
 // in internal/format/css. Parse here is only postcss.
 //
 // ParseSCSS is postcss-scss 4.0.9's parser over the same machinery (scss_parse.go, scss_parser.go,
-// scss_tokenize.go, nested_declaration.go), as Prettier's parseScss calls it.
+// scss_tokenizer.go, nested_declaration.go), as Prettier's parseScss calls it.
 //
 // # Units
 //
@@ -21,7 +21,6 @@
 package postcss
 
 import (
-	"strconv"
 	"unicode/utf16"
 	"unicode/utf8"
 )
@@ -38,8 +37,8 @@ import (
 type input struct {
 	// css is this.css, the text after the byte order mark.
 	css string
-	// hasBOM is this.hasBOM.
-	hasBOM bool
+	// hasBom is this.hasBom.
+	hasBom bool
 
 	// units are css's UTF-16 code units, what charCodeAt reads. A byte that is not UTF-8 is one unit,
 	// U+FFFD, as Node decodes it.
@@ -56,12 +55,14 @@ type input struct {
 func newInput(css string) *input {
 	in := &input{css: css}
 
-	// if (this.css[0] === '\uFEFF' || this.css[0] === '\uFFFE'): U+FEFF is EF BB BF in UTF-8, U+FFFE EF BF BE.
-	if len(in.css) >= 3 && in.css[0] == 0xEF && ((in.css[1] == 0xBB && in.css[2] == 0xBF) || (in.css[1] == 0xBF && in.css[2] == 0xBE)) {
-		in.hasBOM = true
+	// if (this.css[0] === '\uFEFF' || this.css[0] === '\uFFFE'): `U+FEFF` is EF BB BF in UTF-8, `U+FFFE` EF BF be.
+	if len(in.css) >= 3 &&
+		in.css[0] == 0xEF &&
+		((in.css[1] == 0xBB && in.css[2] == 0xBF) || (in.css[1] == 0xBF && in.css[2] == 0xBE)) {
+		in.hasBom = true
 		in.css = in.css[3:]
 	} else {
-		in.hasBOM = false
+		in.hasBom = false
 	}
 
 	in.units = make([]uint16, 0, len(in.css))
@@ -94,27 +95,27 @@ func newInput(css string) *input {
 
 // slice is css.slice(start, end) on unit offsets, clamped and emptied the way String.prototype.slice
 // treats a reversed or out-of-range pair.
-func (in *input) slice(start int, end int) string {
-	length := len(in.units)
-	start = min(max(start, 0), length)
-	end = min(max(end, 0), length)
-	if end <= start {
+func (input *input) slice(start int, end int) string {
+	length := len(input.units)
+	clampedStart := min(max(start, 0), length)
+	clampedEnd := min(max(end, 0), length)
+	if clampedEnd <= clampedStart {
 		return ""
 	}
-	return in.css[in.byteOffsets[start]:in.byteOffsets[end]]
+	return input.css[input.byteOffsets[clampedStart]:input.byteOffsets[clampedEnd]]
 }
 
 // byteOffset converts a unit offset to bytes. postcss can report an offset past the end (freeSemicolon
 // adds the length of the spaces before a semicolon to the semicolon's own offset), so an offset beyond
 // the text keeps its distance past the end, the spaces it counts being one byte each.
-func (in *input) byteOffset(offset int) int {
+func (input *input) byteOffset(offset int) int {
 	if offset < 0 {
 		return offset
 	}
-	if offset > len(in.units) {
-		return len(in.css) + offset - len(in.units)
+	if offset > len(input.units) {
+		return len(input.css) + offset - len(input.units)
 	}
-	return in.byteOffsets[offset]
+	return input.byteOffsets[offset]
 }
 
 // lineAndColumn is the result of fromOffset: { col, line }.
@@ -125,8 +126,8 @@ type lineAndColumn struct {
 
 // fromOffset finds the line holding a unit offset by binary search over lineToIndex, as upstream does,
 // with an offset past the last line's start landing on the last line.
-func (in *input) fromOffset(offset int) lineAndColumn {
-	lineToIndex := in.lineToIndex
+func (input *input) fromOffset(offset int) lineAndColumn {
+	lineToIndex := input.lineToIndex
 	lastLine := lineToIndex[len(lineToIndex)-1]
 
 	low := 0
@@ -154,76 +155,47 @@ func (in *input) fromOffset(offset int) lineAndColumn {
 }
 
 // fromLineAndColumn is the unit offset of a one-based line and column.
-func (in *input) fromLineAndColumn(line int, column int) int {
+func (input *input) fromLineAndColumn(line int, column int) int {
 	index := 0
-	if line-1 >= 0 && line-1 < len(in.lineToIndex) {
-		index = in.lineToIndex[line-1]
+	if line-1 >= 0 && line-1 < len(input.lineToIndex) {
+		index = input.lineToIndex[line-1]
 	}
 	return index + column - 1
 }
 
 // errorAt is input.error(message, offset): a position given as one unit offset.
-func (in *input) errorAt(message string, offset int) *CssSyntaxError {
-	position := in.fromOffset(offset)
+func (input *input) errorAt(message string, offset int) *CssSyntaxError {
+	position := input.fromOffset(offset)
 	return &CssSyntaxError{
 		Reason: message,
 		Line:   position.line,
 		Column: position.column,
-		Offset: in.byteOffset(offset),
+		Offset: input.byteOffset(offset),
 	}
 }
 
 // errorBetween is input.error(message, { offset: start }, { offset: end }): a range of unit offsets.
-func (in *input) errorBetween(message string, start int, end int) *CssSyntaxError {
-	startPosition := in.fromOffset(start)
-	endPosition := in.fromOffset(end)
+func (input *input) errorBetween(message string, start int, end int) *CssSyntaxError {
+	startPosition := input.fromOffset(start)
+	endPosition := input.fromOffset(end)
 	return &CssSyntaxError{
 		Reason:    message,
 		Line:      startPosition.line,
 		Column:    startPosition.column,
 		EndLine:   endPosition.line,
 		EndColumn: endPosition.column,
-		Offset:    in.byteOffset(start),
-		EndOffset: in.byteOffset(end),
+		Offset:    input.byteOffset(start),
+		EndOffset: input.byteOffset(end),
 		HasEnd:    true,
 	}
 }
 
 // errorAtLineAndColumn is input.error(message, line, column).
-func (in *input) errorAtLineAndColumn(message string, line int, column int) *CssSyntaxError {
+func (input *input) errorAtLineAndColumn(message string, line int, column int) *CssSyntaxError {
 	return &CssSyntaxError{
 		Reason: message,
 		Line:   line,
 		Column: column,
-		Offset: in.byteOffset(in.fromLineAndColumn(line, column)),
+		Offset: input.byteOffset(input.fromLineAndColumn(line, column)),
 	}
-}
-
-// CssSyntaxError is lib/css-syntax-error.js's error as the parser throws it, with the input fields
-// Input.error attaches (offset and endOffset, here in bytes).
-//
-// Prettier reads name, reason, line and column from it to build its own error
-// (`${name}: ${reason}` at { line, column }), so those are kept exactly; Column and EndColumn are in
-// UTF-16 units, as postcss counts them.
-type CssSyntaxError struct {
-	// Reason is error.reason, the message without the position.
-	Reason string
-	// Line and Column are where the problem starts, one-based.
-	Line   int
-	Column int
-	// EndLine and EndColumn are where it ends, when HasEnd.
-	EndLine   int
-	EndColumn int
-	// Offset and EndOffset are error.input.offset and error.input.endOffset, in bytes.
-	Offset    int
-	EndOffset int
-	HasEnd    bool
-}
-
-// Name is error.name.
-func (*CssSyntaxError) Name() string { return "CssSyntaxError" }
-
-// Error is setMessage's message: no plugin, no file, so "<css input>:line:column: reason".
-func (syntaxError *CssSyntaxError) Error() string {
-	return "<css input>:" + strconv.Itoa(syntaxError.Line) + ":" + strconv.Itoa(syntaxError.Column) + ": " + syntaxError.Reason
 }

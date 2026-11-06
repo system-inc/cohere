@@ -1,7 +1,6 @@
 package core
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -28,7 +27,7 @@ var messageIncorrectCause = rule.Message{
 		"has no way to tell that the chain was cut here. Attach the caught error itself.",
 }
 
-var messageMissingCatchErrorParam = rule.Message{
+var messageMissingCatchErrorParameter = rule.Message{
 	Id: "missingCatchErrorParam",
 	Description: "This throws a new error out of a catch clause that declares no parameter, so the " +
 		"error it caught cannot be reached at all. Nothing in the block can log it, inspect it, or " +
@@ -69,45 +68,6 @@ type PreserveCaughtErrorOptions struct {
 	// ErrorClassNames adds constructors beyond the built-in error types, each with the position its
 	// options argument takes. A bare name takes position 2, the built-in Error's own shape.
 	ErrorClassNames []PreserveCaughtErrorClassName `json:"errorClassNames"`
-}
-
-// PreserveCaughtErrorClassName is one entry of `errorClassNames`, in either of its two spellings.
-type PreserveCaughtErrorClassName struct {
-	Name string
-
-	// ArgumentPosition is one-based, as ESLint's schema writes it: 2 means the second argument.
-	ArgumentPosition int
-}
-
-// UnmarshalJSON accepts a bare string or a `{ name, argumentPosition }` object, which is ESLint's
-// `oneOf`.
-//
-// The object is read strictly, which is ESLint's `additionalProperties: false`, and both keys are
-// required. A position below 1 is refused rather than clamped: it would index the arguments at -1,
-// and ESLint's schema sets `minimum: 1` for the same reason.
-func (entry *PreserveCaughtErrorClassName) UnmarshalJSON(raw []byte) error {
-	var name string
-	if err := rule.UnmarshalOptions(raw, &name); err == nil {
-		entry.Name = name
-		entry.ArgumentPosition = 2
-		return nil
-	}
-	var object struct {
-		Name             *string `json:"name"`
-		ArgumentPosition *int    `json:"argumentPosition"`
-	}
-	if err := rule.UnmarshalOptions(raw, &object); err != nil {
-		return err
-	}
-	if object.Name == nil || object.ArgumentPosition == nil {
-		return fmt.Errorf("an errorClassNames object needs both name and argumentPosition")
-	}
-	if *object.ArgumentPosition < 1 {
-		return fmt.Errorf("errorClassNames argumentPosition is %d, and the first argument is 1", *object.ArgumentPosition)
-	}
-	entry.Name = *object.Name
-	entry.ArgumentPosition = *object.ArgumentPosition
-	return nil
 }
 
 // builtInErrorTypes are the global constructors that take a `cause` option, which is ESLint's list
@@ -163,7 +123,7 @@ var builtInErrorTypes = map[string]bool{
 //
 // # Reading the options argument
 //
-// The `cause` is the LAST property whose static key is `cause`, because the last one is what the
+// The `cause` is the last property whose static key is `cause`, because the last one is what the
 // object holds at runtime. A quoted key, a template key and a bracketed literal (`{ ["cause"]: err }`)
 // all name it; a bracketed variable does not, since it names whatever the variable holds. The port
 // this replaced read only a plain identifier key and the first match, as oxc does, so
@@ -209,17 +169,17 @@ var builtInErrorTypes = map[string]bool{
 // `new Error<() => void>()`, ESLint inserts at the first parenthesis after the callee, which is the
 // one inside the type arguments, and writes `new Error<("", { cause: err }) => void>()`. This inserts
 // at the argument list the parser found, which is the code ESLint meant to write.
-var PreserveCaughtError = rule.Rule{
+var PreserveCaughtError = rule.Rule[PreserveCaughtErrorOptions]{
 	Name: "preserve-caught-error",
 
 	// Whether a constructor is the global and whether a `cause` names the caught binding are both
 	// symbol questions.
 	NeedsTypeChecker: true,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[PreserveCaughtErrorOptions]) rule.Listeners {
 		// A rule configured as bare `"error"` is handed nil options, and the zero struct is the
 		// documented default for both options.
-		parsed, _ := rule.OptionsAs[PreserveCaughtErrorOptions](options)
+		parsed, _ := options.Read()
 
 		// Later entries win, as ESLint's Map.set does: naming one class twice with two positions
 		// takes the second.
@@ -233,10 +193,10 @@ var PreserveCaughtError = rule.Rule{
 				// Without a checker neither the global test nor the cause comparison can answer, and
 				// a file whose program failed to build should read as a rule that could not run, not
 				// as one complaining only about the findings that need no types. Silence throughout.
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
-				checkThrowInCatch(ctx, node, parsed.RequireCatchParameter, errorClassPositions)
+				checkThrowInCatch(ruleContext, node, parsed.RequireCatchParameter, errorClassPositions)
 			},
 		}
 	},
@@ -256,22 +216,22 @@ type constructedError struct {
 // An optional call is declined: ESLint's tree wraps it in a chain expression, which is neither a new
 // expression nor a call, so `throw Error?.("m")` is silent there.
 func thrownConstruction(thrown *ast.Node) (constructedError, bool) {
-	thrown = ast.SkipParentheses(thrown)
-	if thrown == nil {
+	unwrapped := ast.SkipParentheses(thrown)
+	if unwrapped == nil {
 		return constructedError{}, false
 	}
-	construction := constructedError{node: thrown}
-	switch thrown.Kind {
+	construction := constructedError{node: unwrapped}
+	switch unwrapped.Kind {
 	case ast.KindNewExpression:
-		expression := thrown.AsNewExpression()
+		expression := unwrapped.AsNewExpression()
 		construction.callee = expression.Expression
 		construction.typeArguments = expression.TypeArguments
 		construction.argumentList = expression.Arguments
 	case ast.KindCallExpression:
-		if ast.IsOptionalChain(thrown) {
+		if ast.IsOptionalChain(unwrapped) {
 			return constructedError{}, false
 		}
-		expression := thrown.AsCallExpression()
+		expression := unwrapped.AsCallExpression()
 		construction.callee = expression.Expression
 		construction.typeArguments = expression.TypeArguments
 		construction.argumentList = expression.Arguments
@@ -316,7 +276,12 @@ func errorClassName(callee *ast.Node) string {
 }
 
 // checkThrowInCatch decides whether one throw statement reports, and with what.
-func checkThrowInCatch(ctx rule.Context, throwStatement *ast.Node, requireCatchParameter bool, errorClassPositions map[string]int) {
+func checkThrowInCatch(
+	ruleContext rule.Context,
+	throwStatement *ast.Node,
+	requireCatchParameter bool,
+	errorClassPositions map[string]int,
+) {
 	construction, isConstruction := thrownConstruction(throwStatement.AsThrowStatement().Expression)
 	if !isConstruction {
 		return
@@ -333,7 +298,9 @@ func checkThrowInCatch(ctx rule.Context, throwStatement *ast.Node, requireCatchP
 	if className == "" {
 		return
 	}
-	builtIn := callee.Kind == ast.KindIdentifier && builtInErrorTypes[className] && resolvesToAGlobal(ctx, callee)
+	builtIn := callee.Kind == ast.KindIdentifier &&
+		builtInErrorTypes[className] &&
+		resolvesToAGlobal(ruleContext, callee)
 	customPosition, isCustom := errorClassPositions[className]
 	if !builtIn && !isCustom {
 		return
@@ -342,13 +309,13 @@ func checkThrowInCatch(ctx rule.Context, throwStatement *ast.Node, requireCatchP
 	declaration := catchClause.AsCatchClause().VariableDeclaration
 	if declaration == nil {
 		if requireCatchParameter {
-			ctx.ReportNode(throwStatement, messageMissingCatchErrorParam)
+			ruleContext.ReportNode(throwStatement, messageMissingCatchErrorParameter)
 		}
 		return
 	}
 	binding := declaration.Name()
 	if binding.Kind != ast.KindIdentifier {
-		ctx.ReportNode(catchClause, messagePartiallyLostError)
+		ruleContext.ReportNode(catchClause, messagePartiallyLostError)
 		return
 	}
 
@@ -366,30 +333,37 @@ func checkThrowInCatch(ctx rule.Context, throwStatement *ast.Node, requireCatchP
 	}
 
 	if causeProperty == nil {
-		fix, hasFix := missingCauseFix(ctx, construction, builtIn, className == "AggregateError", optionsIndex, binding.Text())
+		fix, hasFix := missingCauseFix(
+			ruleContext,
+			construction,
+			builtIn,
+			className == "AggregateError",
+			optionsIndex,
+			binding.Text(),
+		)
 		if !hasFix {
-			ctx.ReportNode(throwStatement, messageMissingCause)
+			ruleContext.ReportNode(throwStatement, messageMissingCause)
 			return
 		}
-		ctx.ReportNodeWithSuggestions(throwStatement, messageMissingCause,
+		ruleContext.ReportNodeWithSuggestions(throwStatement, messageMissingCause,
 			rule.Suggestion{Message: messageIncludeCause, Fixes: []rule.Fix{fix}})
 		return
 	}
 
 	value := causePropertyValue(causeProperty)
 	if value == nil || value.Kind != ast.KindIdentifier || value.Text() != binding.Text() {
-		reportIncorrectCause(ctx, causeProperty, value, multipleDefinitions, binding.Text())
+		reportIncorrectCause(ruleContext, causeProperty, value, multipleDefinitions, binding.Text())
 		return
 	}
 
 	var valueSymbol *ast.Symbol
 	if causeProperty.Kind == ast.KindShorthandPropertyAssignment {
-		valueSymbol = ctx.TypeChecker.GetShorthandAssignmentValueSymbol(causeProperty)
+		valueSymbol = ruleContext.TypeChecker.GetShorthandAssignmentValueSymbol(causeProperty)
 	} else {
-		valueSymbol = ctx.TypeChecker.GetSymbolAtLocation(value)
+		valueSymbol = ruleContext.TypeChecker.GetSymbolAtLocation(value)
 	}
-	if valueSymbol != nil && valueSymbol != ctx.TypeChecker.GetSymbolAtLocation(binding) {
-		ctx.ReportNode(throwStatement, messageCaughtErrorShadowed)
+	if valueSymbol != nil && valueSymbol != ruleContext.TypeChecker.GetSymbolAtLocation(binding) {
+		ruleContext.ReportNode(throwStatement, messageCaughtErrorShadowed)
 	}
 }
 
@@ -398,7 +372,10 @@ func checkThrowInCatch(ctx rule.Context, throwStatement *ast.Node, requireCatchP
 // It answers known false where ESLint answers UNKNOWN_CAUSE and stays silent: a spread argument at or
 // before the options position, a spread property in the options, or options that are not an object
 // literal. Known with a nil property is "no cause at all".
-func errorCauseProperty(arguments []*ast.Node, optionsIndex int) (causeProperty *ast.Node, known bool, multipleDefinitions bool) {
+func errorCauseProperty(
+	arguments []*ast.Node,
+	optionsIndex int,
+) (causeProperty *ast.Node, known bool, multipleDefinitions bool) {
 	for index, argument := range arguments {
 		if argument.Kind == ast.KindSpreadElement && index <= optionsIndex {
 			return nil, false, false
@@ -418,7 +395,10 @@ func errorCauseProperty(arguments []*ast.Node, optionsIndex int) (causeProperty 
 		if member.Kind == ast.KindSpreadAssignment {
 			return nil, false, false
 		}
-		if name, isStatic := property.Name(member.Name(), property.Named|property.Quoted|property.Templated|property.Computed); isStatic && name == "cause" {
+		if name, isStatic := property.Name(
+			member.Name(),
+			property.Named|property.Quoted|property.Templated|property.Computed,
+		); isStatic && name == "cause" {
 			causeProperty = member
 			count++
 		}
@@ -441,7 +421,13 @@ func causePropertyValue(causeProperty *ast.Node) *ast.Node {
 
 // reportIncorrectCause reports a `cause` that names something other than the caught error, at its
 // value, with the suggestion to attach the caught one unless there are two `cause` keys.
-func reportIncorrectCause(ctx rule.Context, causeProperty *ast.Node, value *ast.Node, multipleDefinitions bool, caughtName string) {
+func reportIncorrectCause(
+	ruleContext rule.Context,
+	causeProperty *ast.Node,
+	value *ast.Node,
+	multipleDefinitions bool,
+	caughtName string,
+) {
 	var reported core.TextRange
 	var fix rule.Fix
 	switch {
@@ -453,26 +439,33 @@ func reportIncorrectCause(ctx rule.Context, causeProperty *ast.Node, value *ast.
 			start = typeParameters.Pos() - 1
 		}
 		reported = core.NewTextRange(start, causeProperty.End())
-		fix = ctx.ReplaceNode(causeProperty, "cause: "+caughtName)
+		fix = ruleContext.ReplaceNode(causeProperty, "cause: "+caughtName)
 	case causeProperty.Kind == ast.KindShorthandPropertyAssignment:
-		reported = rule.TokenRange(ctx.SourceFile, value)
-		fix = ctx.ReplaceNode(causeProperty, "cause: "+caughtName)
+		reported = rule.TokenRange(ruleContext.SourceFile, value)
+		fix = ruleContext.ReplaceNode(causeProperty, "cause: "+caughtName)
 	default:
-		reported = rule.TokenRange(ctx.SourceFile, value)
-		fix = ctx.ReplaceNode(value, caughtName)
+		reported = rule.TokenRange(ruleContext.SourceFile, value)
+		fix = ruleContext.ReplaceNode(value, caughtName)
 	}
 
 	if multipleDefinitions {
-		ctx.ReportRange(reported, messageIncorrectCause)
+		ruleContext.ReportRange(reported, messageIncorrectCause)
 		return
 	}
-	ctx.ReportRangeWithSuggestions(reported, messageIncorrectCause,
+	ruleContext.ReportRangeWithSuggestions(reported, messageIncorrectCause,
 		rule.Suggestion{Message: messageIncludeCause, Fixes: []rule.Fix{fix}})
 }
 
 // missingCauseFix builds the edit that attaches the caught error to a construction carrying none, or
 // answers false where ESLint offers nothing.
-func missingCauseFix(ctx rule.Context, construction constructedError, builtIn bool, aggregate bool, optionsIndex int, caughtName string) (rule.Fix, bool) {
+func missingCauseFix(
+	ruleContext rule.Context,
+	construction constructedError,
+	builtIn bool,
+	aggregate bool,
+	optionsIndex int,
+	caughtName string,
+) (rule.Fix, bool) {
 	causeObject := "{ cause: " + caughtName + " }"
 	arguments := construction.arguments
 

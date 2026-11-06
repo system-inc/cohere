@@ -8,5 +8,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // shared edit. The decoder is hand-written rather than `rule.DecodeOptionsInto` because one key
 // has to be distinguishable as absent; see DecodeNoStringRefsOptions.
 func init() {
-	rule.Register(rule.Registration{Rule: NoStringRefs, Decode: DecodeNoStringRefsOptions})
+	rule.Register(rule.Registration[NoStringRefsOptions]{Rule: NoStringRefs, Decode: DecodeNoStringRefsOptions})
 }

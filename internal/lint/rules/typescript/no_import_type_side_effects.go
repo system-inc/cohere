@@ -74,13 +74,13 @@ var messageUseTopLevelQualifier = rule.Message{
 // inserted qualifier lands immediately after the `import` keyword rather than before the brace, so
 // the result carries `import type   {`.
 //
-// The imported name is the SOURCE side of a rename, not the local binding. In `type A as AA`, upstream
+// The imported name is the source side of a rename, not the local binding. In `type A as AA`, upstream
 // removes up to `A`. Here that is `PropertyName` when a rename is present and the specifier's own name
 // otherwise, which is the opposite of the reflexive choice: `Name()` alone would remove `type A as `
 // and produce `import type { AA } from 'mod'`, silently changing which export is imported.
-var NoImportTypeSideEffects = rule.Rule{
+var NoImportTypeSideEffects = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/no-import-type-side-effects",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindImportDeclaration: func(node *ast.Node) {
 				declaration := node.AsImportDeclaration()
@@ -114,26 +114,26 @@ var NoImportTypeSideEffects = rule.Rule{
 					// separates them, so ending the removal there leaves that whitespace behind and
 					// writes `{  A }` for `{ type A }`. The token range starts at the name itself.
 					fixes = append(fixes, rule.RemoveRange(
-						rule.TokenRange(ctx.SourceFile, element).
-							WithEnd(rule.TokenRange(ctx.SourceFile, importedNameOf(element)).Pos()),
+						rule.TokenRange(ruleContext.SourceFile, element).
+							WithEnd(rule.TokenRange(ruleContext.SourceFile, importedNameOf(element)).Pos()),
 					))
 				}
 				// The qualifier goes immediately after the `import` keyword, which is the first
 				// token of the declaration, so its own token range's end is the insertion point.
-				importKeyword := rule.TokenRange(ctx.SourceFile, node)
+				importKeyword := rule.TokenRange(ruleContext.SourceFile, node)
 				fixes = append(fixes, rule.ReplaceRange(
 					importKeyword.WithEnd(importKeyword.Pos()+len("import")).
 						WithPos(importKeyword.Pos()+len("import")),
 					" type",
 				))
 
-				ctx.ReportNodeWithFixes(node, messageUseTopLevelQualifier, fixes...)
+				ruleContext.ReportNodeWithFixes(node, messageUseTopLevelQualifier, fixes...)
 			},
 		}
 	},
 }
 
-// importedNameOf returns the SOURCE-side name of an import specifier, which is what upstream's
+// importedNameOf returns the source-side name of an import specifier, which is what upstream's
 // `specifier.imported` names.
 //
 // For `A as AA` that is `A`, carried on PropertyName; for a bare `A` there is no PropertyName and the

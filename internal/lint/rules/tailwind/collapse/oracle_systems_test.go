@@ -24,7 +24,8 @@ import (
 //	    node $T/generate_functional/$w.mjs $P --resolve-root ahra: > $D/${w}_fixtures_public.json
 //	done
 //	node $T/generate_descriptor_table/fixtures.mjs $P --resolve-root ahra: > $D/descriptor_fixtures_public.json
-//	node $T/generate_descriptors/extract.mjs $P --json $D/descriptor_table_public.json --resolve-root ahra: --no-corpus > /dev/null
+//	node $T/generate_descriptors/extract.mjs $P --json $D/descriptor_table_public.json --resolve-root ahra: \
+//	    --no-corpus > /dev/null
 //	node $T/generate_descriptor_table/context.mjs $P --resolve-root ahra: > $D/descriptor_context_public.json
 //	node $T/generate_utility/enumerate.mjs $P --resolve-root ahra: > $D/utility_fixtures_public.json
 var oracleCopies = []struct {
@@ -37,16 +38,16 @@ var oracleCopies = []struct {
 
 // forEachOracleCopy runs an oracle assertion once per copy, each as its own subtest, handing it the
 // copy's fixture file name: base with the copy's suffix before its extension.
-func forEachOracleCopy(t *testing.T, base string, run func(t *testing.T, fixtureName string)) {
-	t.Helper()
+func forEachOracleCopy(test *testing.T, base string, run func(test *testing.T, fixtureName string)) {
+	test.Helper()
 	stem, isJson := strings.CutSuffix(base, ".json")
 	if !isJson {
-		t.Fatalf("%s is not a .json fixture", base)
+		test.Fatalf("%s is not a .json fixture", base)
 	}
 	for _, oracleCopy := range oracleCopies {
-		t.Run(oracleCopy.name, func(t *testing.T) {
-			t.Parallel()
-			run(t, stem+oracleCopy.suffix+".json")
+		test.Run(oracleCopy.name, func(test *testing.T) {
+			test.Parallel()
+			run(test, stem+oracleCopy.suffix+".json")
 		})
 	}
 }
@@ -54,11 +55,11 @@ func forEachOracleCopy(t *testing.T, base string, run func(t *testing.T, fixture
 // oracleSibling is the copy of the oracle named base that belongs with fixtureName, the copy
 // forEachOracleCopy handed a test: base itself for ahra's, base_public.json for the public theme's. A test
 // whose oracle is several files reads each through this, so its copies never mix.
-func oracleSibling(t *testing.T, fixtureName, base string) string {
-	t.Helper()
+func oracleSibling(test *testing.T, fixtureName, base string) string {
+	test.Helper()
 	stem, isJson := strings.CutSuffix(base, ".json")
 	if !isJson {
-		t.Fatalf("%s is not a .json fixture", base)
+		test.Fatalf("%s is not a .json fixture", base)
 	}
 	for _, oracleCopy := range oracleCopies {
 		if oracleCopy.suffix != "" && strings.HasSuffix(fixtureName, oracleCopy.suffix+".json") {
@@ -73,17 +74,17 @@ func oracleSibling(t *testing.T, fixtureName, base string) string {
 // machine; a corpus spelling skips naming its variable when the corpus is unset. Loading what the
 // fixture names, rather than a system the test picks, is what keeps an oracle from being compared
 // against a design system it never measured.
-func oracleSystem(t *testing.T, entryPoint string) *LoadedDesignSystem {
-	t.Helper()
+func oracleSystem(test *testing.T, entryPoint string) *LoadedDesignSystem {
+	test.Helper()
 	if entryPoint == "" {
-		t.Fatal("the fixture records no entry point, so nothing says which design system it measured")
+		test.Fatal("the fixture records no entry point, so nothing says which design system it measured")
 	}
-	system, err := LoadDesignSystem(LoadOptions{
-		EntryPoint:          corpus.Resolve(t, entryPoint),
-		TailwindPackageRoot: vendored.TailwindPackageRoot(),
+	system, loadDesignSystemError := LoadDesignSystem(LoadOptions{
+		EntryPoint:          corpus.Resolve(test, entryPoint),
+		TailwindPackageRoot: vendored.TailwindPackageRootForTest(test),
 	})
-	if err != nil {
-		t.Fatalf("%s resolves, but its design system does not load: %v", entryPoint, err)
+	if loadDesignSystemError != nil {
+		test.Fatalf("%s resolves, but its design system does not load: %v", entryPoint, loadDesignSystemError)
 	}
 	return system
 }

@@ -19,9 +19,9 @@ import (
  * says how it was built.
  */
 
-// noUnusedVarsFixCorpusDivergences are the rows cohere answers differently, by row index, with the reason
+// noUnusedVariablesFixCorpusDivergences are the rows cohere answers differently, by row index, with the reason
 // and cohere's answer, so each difference is asserted rather than skipped.
-var noUnusedVarsFixCorpusDivergences = map[int]struct {
+var noUnusedVariablesFixCorpusDivergences = map[int]struct {
 	reason string
 	cohere []noUnusedVarsFixCorpusFinding
 	output string
@@ -32,36 +32,53 @@ var noUnusedVarsFixCorpusDivergences = map[int]struct {
 	17: {"React is exempt in every JSX file, whatever the pragma", []noUnusedVarsFixCorpusFinding{}, ""},
 	// Upstream attaches the removal to the usedIgnoredVar finding and deletes an import the file reads,
 	// leaving `console.log(_a)` reading nothing. See no_unused_vars_fix.go.
-	53: {"upstream's autofix deletes a used ignored import", []noUnusedVarsFixCorpusFinding{{"usedIgnoredVar", "_a", nil}}, ""},
+	53: {
+		"upstream's autofix deletes a used ignored import",
+		[]noUnusedVarsFixCorpusFinding{{"usedIgnoredVar", "_a", nil}},
+		"",
+	},
 	// Upstream removes a namespace import's whole declaration, deleting the used default beside it.
-	55: {"upstream's autofix deletes a used default beside an unused namespace", []noUnusedVarsFixCorpusFinding{{"unusedVar", "Unused", nil}}, ""},
+	55: {
+		"upstream's autofix deletes a used default beside an unused namespace",
+		[]noUnusedVarsFixCorpusFinding{{"unusedVar", "Unused", nil}},
+		"",
+	},
 }
 
-// noUnusedVarsFixTsconfig is the corpus tsconfig, for a JSX row with the pragma and fragment name upstream's
+// noUnusedVariablesFixTsconfig is the corpus tsconfig, for a JSX row with the pragma and fragment name upstream's
 // parser options gave and the .tsx file in its include.
-func noUnusedVarsFixTsconfig(t *testing.T, row noUnusedVarsFixCorpusCase) string {
-	t.Helper()
+func noUnusedVariablesFixTsconfig(test *testing.T, row noUnusedVarsFixCorpusCase) string {
+	test.Helper()
 	if !row.jsx {
 		return noUnusedVarsOptionsCorpusTsconfig
 	}
+	// Each compiler option is kept as the JSON it was written as, so the ones this does not set pass through
+	// untouched, whatever their type.
 	var configuration struct {
-		CompilerOptions map[string]any `json:"compilerOptions"`
-		Include         []string       `json:"include"`
+		CompilerOptions map[string]json.RawMessage `json:"compilerOptions"`
+		Include         []string                   `json:"include"`
 	}
-	if err := json.Unmarshal([]byte(noUnusedVarsOptionsCorpusTsconfig), &configuration); err != nil {
-		t.Fatal(err)
+	if decodeError := json.Unmarshal([]byte(noUnusedVarsOptionsCorpusTsconfig), &configuration); decodeError != nil {
+		test.Fatal(decodeError)
 	}
-	configuration.CompilerOptions["jsx"] = "react"
+	setOption := func(name string, text string) {
+		encoded, encodeError := json.Marshal(text)
+		if encodeError != nil {
+			test.Fatal(encodeError)
+		}
+		configuration.CompilerOptions[name] = encoded
+	}
+	setOption("jsx", "react")
 	if row.jsxFactory != "" {
-		configuration.CompilerOptions["jsxFactory"] = row.jsxFactory
+		setOption("jsxFactory", row.jsxFactory)
 	}
 	if row.jsxFragmentFactory != "" {
-		configuration.CompilerOptions["jsxFragmentFactory"] = row.jsxFragmentFactory
+		setOption("jsxFragmentFactory", row.jsxFragmentFactory)
 	}
 	configuration.Include = []string{"file.tsx"}
-	encoded, err := json.Marshal(configuration)
-	if err != nil {
-		t.Fatal(err)
+	encoded, encodeError := json.Marshal(configuration)
+	if encodeError != nil {
+		test.Fatal(encodeError)
 	}
 	return string(encoded)
 }
@@ -89,8 +106,8 @@ func applyFixesOnce(source string, fixes []rule.Fix) string {
 	return output + source[cursor:]
 }
 
-func TestNoUnusedVarsFixUpstreamCorpus(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedVariablesFixUpstreamCorpus(test *testing.T) {
+	test.Parallel()
 
 	upstream := 0
 	for _, row := range noUnusedVarsFixCorpus {
@@ -99,7 +116,11 @@ func TestNoUnusedVarsFixUpstreamCorpus(t *testing.T) {
 		}
 	}
 	if upstream != noUnusedVarsFixCorpusUpstreamRows {
-		t.Fatalf("the corpus holds %d upstream rows, and upstream has %d", upstream, noUnusedVarsFixCorpusUpstreamRows)
+		test.Fatalf(
+			"the corpus holds %d upstream rows, and upstream has %d",
+			upstream,
+			noUnusedVarsFixCorpusUpstreamRows,
+		)
 	}
 
 	for _, row := range noUnusedVarsFixCorpus {
@@ -107,21 +128,27 @@ func TestNoUnusedVarsFixUpstreamCorpus(t *testing.T) {
 		if row.edge != "" {
 			name = row.edge
 		}
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			options, err := DecodeNoUnusedVarsOptions(json.RawMessage(row.options))
-			if err != nil {
-				t.Fatalf("decoding %q: %v", row.options, err)
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+			options, decodeNoUnusedVariablesOptionsError := DecodeNoUnusedVariablesOptions(json.RawMessage(row.options))
+			if decodeNoUnusedVariablesOptionsError != nil {
+				test.Fatalf("decoding %q: %v", row.options, decodeNoUnusedVariablesOptionsError)
 			}
 			fileName := "file.ts"
 			if row.jsx {
 				fileName = "file.tsx"
 			}
-			configuration := noUnusedVarsFixTsconfig(t, row)
-			result := rule_testing.RunTypedFilesWithSetupAndOptions(t, NoUnusedVars, map[string]string{fileName: row.source}, fileName, options,
+			configuration := noUnusedVariablesFixTsconfig(test, row)
+			result := rule_testing.RunTypedFilesWithSetupAndOptions(test, NoUnusedVariables, map[string]string{
+				fileName: row.source,
+			}, fileName, options,
 				func(directory string) {
-					if err := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(configuration), 0o644); err != nil {
-						t.Fatal(err)
+					if writeError := os.WriteFile(
+						filepath.Join(directory, "tsconfig.json"),
+						[]byte(configuration),
+						0o644,
+					); writeError != nil {
+						test.Fatal(writeError)
 					}
 				})
 
@@ -133,10 +160,13 @@ func TestNoUnusedVarsFixUpstreamCorpus(t *testing.T) {
 			var fixes []rule.Fix
 			for _, diagnostic := range diagnostics {
 				id := diagnostic.Message.Id
-				if upstreamId, renamed := noUnusedVarsUpstreamIds[id]; renamed {
+				if upstreamId, renamed := noUnusedVariablesUpstreamIds[id]; renamed {
 					id = upstreamId
 				}
-				finding := noUnusedVarsFixCorpusFinding{id: id, text: row.source[diagnostic.Range.Pos():diagnostic.Range.End()]}
+				finding := noUnusedVarsFixCorpusFinding{
+					id:   id,
+					text: row.source[diagnostic.Range.Pos():diagnostic.Range.End()],
+				}
 				for _, suggestion := range diagnostic.Suggestions {
 					finding.suggestions = append(finding.suggestions, noUnusedVarsFixCorpusSuggestion{
 						id:     suggestion.Message.Id,
@@ -152,16 +182,16 @@ func TestNoUnusedVarsFixUpstreamCorpus(t *testing.T) {
 			}
 
 			want, wantOutput := row.findings, row.output
-			if divergence, diverges := noUnusedVarsFixCorpusDivergences[row.index]; diverges {
+			if divergence, diverges := noUnusedVariablesFixCorpusDivergences[row.index]; diverges {
 				want, wantOutput = divergence.cohere, divergence.output
 			}
 			if fmt.Sprint(reported) != fmt.Sprint(want) {
-				t.Fatalf("the rule reports %q, and the corpus records %q", reported, want)
+				test.Fatalf("the rule reports %q, and the corpus records %q", reported, want)
 			}
 			if output != wantOutput {
-				t.Fatalf("one pass of the fixes writes %q, and the corpus records %q", output, wantOutput)
+				test.Fatalf("one pass of the fixes writes %q, and the corpus records %q", output, wantOutput)
 			}
-			rule_testing.RecordAssertedCase(t, result)
+			rule_testing.RecordAssertedCase(test, result)
 		})
 	}
 }

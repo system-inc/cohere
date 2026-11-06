@@ -1,8 +1,6 @@
 package typescript
 
 import (
-	"encoding/json"
-
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/checking"
 	"github.com/system-inc/cohere/internal/lint/rule"
@@ -11,14 +9,14 @@ import (
 // PreferPromiseRejectErrorsOptions is upstream's option struct, plus the one split our wire format
 // forces on any rule carrying a TypeOrValueSpecifier list.
 //
-// `allow` arrives as ONE heterogeneous array whose entries are either a bare string matched against
+// `allow` arrives as one heterogeneous array whose entries are either a bare string matched against
 // the type's own name or a specifier object. `Allow` and `AllowInline` are the two typed halves,
 // exactly as only-throw-error and no-floating-promises split theirs.
 //
-// The three booleans are plain `bool` rather than pointers, and that is the OPPOSITE of
+// The three booleans are plain `bool` rather than pointers, and that is the opposite of
 // only-throw-error's shape for the same-looking fields. It is correct for this rule and it is worth
-// stating why, because copying the neighbour would be wrong: every default here is FALSE, so the
-// zero value a nil-options rule receives already IS the default. only-throw-error needs pointers
+// stating why, because copying the neighbour would be wrong: every default here is false, so the
+// zero value a nil-options rule receives already is the default. only-throw-error needs pointers
 // because its defaults are true and absent has to stay distinguishable from false.
 type PreferPromiseRejectErrorsOptions struct {
 	Allow                []type_checking.TypeOrValueSpecifier
@@ -53,13 +51,13 @@ func buildPreferPromiseRejectErrorsMessage() rule.Message {
 //
 // # Two anchors, and they answer different questions
 //
-// `KindCallExpression` catches the STATIC form, `Promise.reject(x)`. `KindNewExpression` catches the
-// EXECUTOR form, `new Promise((resolve, reject) => reject(x))`, where the thing being called is a
+// `KindCallExpression` catches the static form, `Promise.reject(x)`. `KindNewExpression` catches the
+// executor form, `new Promise((resolve, reject) => reject(x))`, where the thing being called is a
 // local binding rather than a member of Promise.
 //
 // # What decides a finding on the static form
 //
-// The callee must be a property access, its property must be named `reject`, and the RECEIVER's
+// The callee must be a property access, its property must be named `reject`, and the receiver's
 // type must be promise-like or a promise constructor. The receiver test is what keeps a plain
 // object with a `reject` method silent, and it is load-bearing rather than an optimization:
 // measured, `const o = { reject(x: unknown) {} }; o.reject(5)` is clean upstream while a
@@ -82,24 +80,24 @@ func buildPreferPromiseRejectErrorsMessage() rule.Message {
 //	the reject binding must be the SECOND parameter `new Promise(resolve => ...)` is clean
 //	it must be a plain identifier parameter         a destructured or rest second parameter is clean
 //
-// Then every REFERENCE to that binding which appears as a call's callee is checked. Two properties
+// Then every reference to that binding which appears as a call's callee is checked. Two properties
 // of that scan were measured rather than assumed, and both rule out a name-based shortcut:
 //
 //	new Promise((resolve, reject) => { const f = () => reject(5); f(); })   REPORTS
 //	new Promise((resolve, reject) => { take(reject); })                     CLEAN
 //
-// The first says the scan must reach into NESTED functions, so it is not "calls directly in the
+// The first says the scan must reach into nested functions, so it is not "calls directly in the
 // executor body". The second says the reference must be the CALLEE, so it is not "any mention".
 //
 // And shadowing must be respected, which is the reason this resolves symbols instead of comparing
-// text. Measured CLEAN upstream:
+// text. Measured clean upstream:
 //
 //	new Promise((resolve, reject) => {
 //	  const inner = (reject: (r: unknown) => void) => reject(5);
 //	  inner(() => {});
 //	});
 //
-// The inner `reject` is a different binding, and a port matching on the NAME would report it.
+// The inner `reject` is a different binding, and a port matching on the name would report it.
 // Upstream gets this from its scope manager's resolved references; we get the same answer from
 // `GetSymbolAtLocation`, which resolves the identifier to the declaration it actually binds to.
 //
@@ -115,12 +113,12 @@ func buildPreferPromiseRejectErrorsMessage() rule.Message {
 //	everything else  reported
 //
 // The any/unknown defaults are the trap for anyone reading only-throw-error first: there they
-// default to TRUE and a bare `throw someAny` is silent, while here `Promise.reject(someAny)`
-// REPORTS with no configuration. Measured both ways rather than inherited.
+// default to true and a bare `throw someAny` is silent, while here `Promise.reject(someAny)`
+// reports with no configuration. Measured both ways rather than inherited.
 //
 // # A spread argument is reported rather than skipped
 //
-// `Promise.reject(...args)` REPORTS. Upstream reads `arguments.at(0)` without testing its kind, so
+// `Promise.reject(...args)` reports. Upstream reads `arguments.at(0)` without testing its kind, so
 // a spread element is handed to the type check like any other argument and its type is not
 // Error-like. Reproduced rather than improved on; measured.
 //
@@ -131,21 +129,21 @@ func buildPreferPromiseRejectErrorsMessage() rule.Message {
 //
 // # One unresolved real-tree difference, recorded rather than left for the next reader to find
 //
-// On `modules/samsung/frame-tv/FrameTvApi.ts` the full `cohere` run produces FIVE findings and
-// upstream, driven over the same file against the repository's root tsconfig, produces SIX. The
+// On `modules/samsung/frame-tv/FrameTvApi.ts` the full `cohere` run produces five findings and
+// upstream, driven over the same file against the repository's root tsconfig, produces six. The
 // missing one is line 644, a `reject(error)` inside an immediately-invoked async function nested
 // under a `function (resolve, reject)` executor.
 //
 // What has been established, so the next person does not repeat it:
 //
 //   - It is not the rule's shape. Handed that file's own text through `rule_testing.RunTyped`, this
-//     rule finds all SIX, at exactly upstream's lines. Reduced versions of the nesting -- arrow
+//     rule finds all six, at exactly upstream's lines. Reduced versions of the nesting -- arrow
 //     executor and function executor, each wrapping a `socket.connect` callback around an async
 //     IIFE -- both report here.
 //   - It is not the rule's reach into nested functions generally, since lines 591, 597 and 601 in
 //     the same file are found and sit inside the same kind of nesting.
 //   - It is not a suppression comment; the file has none.
-//   - The whole TAIL of that 765-line file is silent in the full run: 601 is the highest line any
+//   - The whole tail of that 765-line file is silent in the full run: 601 is the highest line any
 //     rule at all reports there. That points at the program or file boundary the full run builds
 //     rather than at this rule, and it is why this is recorded as unresolved rather than as a
 //     divergence in the rule's judgment.
@@ -159,7 +157,7 @@ func buildPreferPromiseRejectErrorsMessage() rule.Message {
 // property name before asking the checker anything, and the new arm tests the argument shape before
 // resolving. The reference scan runs only for a `new Promise` whose executor has a named second
 // parameter.
-var PreferPromiseRejectErrors = rule.Rule{
+var PreferPromiseRejectErrors = rule.Rule[PreferPromiseRejectErrorsOptions]{
 	Name: "@typescript-eslint/prefer-promise-reject-errors",
 
 	// Every arm reads a type: the receiver's, the callee's, or the rejection reason's.
@@ -168,11 +166,11 @@ var PreferPromiseRejectErrors = rule.Rule{
 	// Compiler options and the default library, through type_checking's builtin and specifier helpers.
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, _ := rule.OptionsAs[PreferPromiseRejectErrorsOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[PreferPromiseRejectErrorsOptions]) rule.Listeners {
+		settings, _ := options.Read()
 
 		// A rule configured as bare `"error"` is handed nil options, and `options.(T)` on nil yields
-		// the zero value. Every default here is FALSE, so the zero value is already correct and no
+		// the zero value. Every default here is false, so the zero value is already correct and no
 		// defaulting is needed. This is asserted by a fixture that bypasses the decoder, because the
 		// day a default flips to true this line becomes wrong silently.
 
@@ -183,19 +181,24 @@ var PreferPromiseRejectErrors = rule.Rule{
 				if settings.AllowEmptyReject {
 					return
 				}
-				ctx.ReportNode(call, buildPreferPromiseRejectErrorsMessage())
+				ruleContext.ReportNode(call, buildPreferPromiseRejectErrorsMessage())
 				return
 			}
 
-			// Upstream reads `arguments.at(0)` with no kind test, so a SPREAD element is type-checked
+			// Upstream reads `arguments.at(0)` with no kind test, so a spread element is type-checked
 			// like any other argument. Measured: `Promise.reject(...args)` reports.
 			argument := arguments[0]
-			argumentType := ctx.TypeChecker.GetTypeAtLocation(argument)
+			argumentType := ruleContext.TypeChecker.GetTypeAtLocation(argument)
 			if argumentType == nil {
 				return
 			}
 
-			if type_checking.TypeMatchesSomeSpecifier(argumentType, settings.Allow, settings.AllowInline, ctx.Program) {
+			if type_checking.TypeMatchesSomeSpecifier(
+				argumentType,
+				settings.Allow,
+				settings.AllowInline,
+				ruleContext.Program,
+			) {
 				return
 			}
 			if settings.AllowThrowingAny && type_checking.IsTypeAnyType(argumentType) {
@@ -204,22 +207,22 @@ var PreferPromiseRejectErrors = rule.Rule{
 			if settings.AllowThrowingUnknown && type_checking.IsTypeUnknownType(argumentType) {
 				return
 			}
-			if type_checking.IsErrorLike(ctx.Program, ctx.TypeChecker, argumentType) {
+			if type_checking.IsErrorLike(ruleContext.Program, ruleContext.TypeChecker, argumentType) {
 				return
 			}
 			// A readonly Error-like is a separate predicate upstream and not subsumed by the one
 			// above: `Readonly<Error>` is not assignable through the same path.
-			if type_checking.IsReadonlyErrorLike(ctx.Program, ctx.TypeChecker, argumentType) {
+			if type_checking.IsReadonlyErrorLike(ruleContext.Program, ruleContext.TypeChecker, argumentType) {
 				return
 			}
 
-			ctx.ReportNode(call, buildPreferPromiseRejectErrorsMessage())
+			ruleContext.ReportNode(call, buildPreferPromiseRejectErrorsMessage())
 		}
 
 		return rule.Listeners{
 			// The static form: Promise.reject(x)
 			ast.KindCallExpression: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 
@@ -233,14 +236,18 @@ var PreferPromiseRejectErrors = rule.Rule{
 					return
 				}
 
-				// The NAME alone is not enough: any object can have a `reject` method. Measured, a
+				// The name alone is not enough: any object can have a `reject` method. Measured, a
 				// plain object literal with one is clean upstream.
-				receiverType := ctx.TypeChecker.GetTypeAtLocation(receiver)
+				receiverType := ruleContext.TypeChecker.GetTypeAtLocation(receiver)
 				if receiverType == nil {
 					return
 				}
-				if !type_checking.IsPromiseConstructorLike(ctx.Program, ctx.TypeChecker, receiverType) &&
-					!type_checking.IsPromiseLike(ctx.Program, ctx.TypeChecker, receiverType) {
+				if !type_checking.IsPromiseConstructorLike(
+					ruleContext.Program,
+					ruleContext.TypeChecker,
+					receiverType,
+				) &&
+					!type_checking.IsPromiseLike(ruleContext.Program, ruleContext.TypeChecker, receiverType) {
 					return
 				}
 
@@ -249,7 +256,7 @@ var PreferPromiseRejectErrors = rule.Rule{
 
 			// The executor form: new Promise((resolve, reject) => reject(x))
 			ast.KindNewExpression: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 
@@ -257,8 +264,9 @@ var PreferPromiseRejectErrors = rule.Rule{
 				if callee == nil {
 					return
 				}
-				calleeType := ctx.TypeChecker.GetTypeAtLocation(callee)
-				if calleeType == nil || !type_checking.IsPromiseConstructorLike(ctx.Program, ctx.TypeChecker, calleeType) {
+				calleeType := ruleContext.TypeChecker.GetTypeAtLocation(callee)
+				if calleeType == nil ||
+					!type_checking.IsPromiseConstructorLike(ruleContext.Program, ruleContext.TypeChecker, calleeType) {
 					return
 				}
 
@@ -271,7 +279,7 @@ var PreferPromiseRejectErrors = rule.Rule{
 					return
 				}
 
-				// The reject binding is the SECOND parameter, and it has to be a plain identifier.
+				// The reject binding is the second parameter, and it has to be a plain identifier.
 				// A destructured or rest second parameter binds something other than the rejection
 				// callback, and upstream declines both; measured.
 				parameters := executor.Parameters()
@@ -282,10 +290,10 @@ var PreferPromiseRejectErrors = rule.Rule{
 				if rejectParameter.AsParameterDeclaration().DotDotDotToken != nil {
 					return
 				}
-				// The identifier half of this test is SUBSUMED and kept deliberately. Mutating it
+				// The identifier half of this test is subsumed and kept deliberately. Mutating it
 				// away survives the whole suite, and that verdict is correct: a destructured second
 				// parameter has a `KindObjectBindingPattern` name, and `GetSymbolAtLocation` on a
-				// binding pattern returns NIL, so the guard immediately below already declines every
+				// binding pattern returns nil, so the guard immediately below already declines every
 				// input this one could. Probed directly on
 				// `new Promise((resolve, { reject }: any) => reject(5))`, printing the name's kind
 				// and the resolved symbol: `KindObjectBindingPattern`, symbol nil.
@@ -298,15 +306,15 @@ var PreferPromiseRejectErrors = rule.Rule{
 					return
 				}
 
-				// Resolving the binding to a SYMBOL rather than matching its text is what makes
+				// Resolving the binding to a symbol rather than matching its text is what makes
 				// shadowing work. A nested parameter with the same name resolves to a different
 				// symbol, and upstream is silent on it.
 				//
-				// A DUPLICATE parameter name is a stated divergence, and it is a difference between
-				// the two SUBSTRATES rather than between the two rules.
+				// A duplicate parameter name is a stated divergence, and it is a difference between
+				// the two substrates rather than between the two rules.
 				//
 				// Upstream's invalid case 49 is `new Promise(function (reject, reject) { reject(5); })`,
-				// which it reports. ESLint's scope manager merges same-named parameters into ONE
+				// which it reports. ESLint's scope manager merges same-named parameters into one
 				// variable whose `identifiers` list holds both, so asking for the variable
 				// containing the second parameter finds the same variable the call site resolves
 				// through, and the reference is found.
@@ -328,14 +336,14 @@ var PreferPromiseRejectErrors = rule.Rule{
 				// So: this input is silent here and reports upstream, deliberately. The test file
 				// pins it as silent with the reasoning at the line, so it fails loudly if the
 				// checker ever starts merging.
-				rejectSymbol := ctx.TypeChecker.GetSymbolAtLocation(rejectName)
+				rejectSymbol := ruleContext.TypeChecker.GetSymbolAtLocation(rejectName)
 				if rejectSymbol == nil {
 					return
 				}
 
 				// The scan reaches into nested functions, because a reject called from a closure
 				// inside the executor still rejects this promise. Measured reporting upstream.
-				preferPromiseRejectErrorsForEachCallOfSymbol(ctx, executor, rejectSymbol, checkRejectCall)
+				preferPromiseRejectErrorsForEachCallOfSymbol(ruleContext, executor, rejectSymbol, checkRejectCall)
 			},
 		}
 	},
@@ -392,12 +400,12 @@ func preferPromiseRejectErrorsIsFunction(node *ast.Node) bool {
 //
 // Two properties are deliberate and both are pinned by fixtures:
 //
-//   - It recurses into NESTED functions. A reject called from a closure inside the executor still
+//   - It recurses into nested functions. A reject called from a closure inside the executor still
 //     rejects this promise, and upstream reports it.
-//   - It only considers an identifier in CALLEE position. Passing reject somewhere as a value is not
+//   - It only considers an identifier in callee position. Passing reject somewhere as a value is not
 //     a rejection, and upstream is silent on it.
 func preferPromiseRejectErrorsForEachCallOfSymbol(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	root *ast.Node,
 	target *ast.Symbol,
 	visit func(call *ast.Node),
@@ -411,7 +419,7 @@ func preferPromiseRejectErrorsForEachCallOfSymbol(
 		if ast.IsCallExpression(node) {
 			callee := ast.SkipParentheses(node.Expression())
 
-			// The `IsIdentifier` half is INERT and kept as documentation of the intent. Mutating
+			// The `IsIdentifier` half is inert and kept as documentation of the intent. Mutating
 			// it away survives the suite, and that is correct rather than a fixture gap: the symbol
 			// comparison below already does all the work. Probed over four non-identifier callee
 			// shapes inside an executor, printing each callee's kind and whether it resolved to the
@@ -427,7 +435,7 @@ func preferPromiseRejectErrorsForEachCallOfSymbol(
 			if callee != nil && ast.IsIdentifier(callee) {
 				// Symbol identity rather than name equality: this is what declines a shadowing
 				// inner parameter that happens to be spelled the same.
-				if ctx.TypeChecker.GetSymbolAtLocation(callee) == target {
+				if ruleContext.TypeChecker.GetSymbolAtLocation(callee) == target {
 					visit(node)
 				}
 			}
@@ -449,73 +457,23 @@ type preferPromiseRejectErrorsRawOptions struct {
 	AllowThrowingUnknown bool                                    `json:"allowThrowingUnknown"`
 }
 
-// preferPromiseRejectErrorsRawSpecifier is one entry of the allowlist, in either wire form.
-type preferPromiseRejectErrorsRawSpecifier struct {
-	inline string
-
-	From    string
-	Name    []string
-	Path    string
-	Package string
-}
-
-// UnmarshalJSON accepts both wire forms: a bare string, or the specifier object.
-//
-// `name` is itself two shapes, a string or an array of strings. An unrecognized `from` is dropped
-// rather than erroring, matching how the sibling rules treat the same field: the specifier then
-// matches nothing instead of failing the run, and dropping it says nothing rather than silently
-// meaning `file`, which is the zero value.
-func (s *preferPromiseRejectErrorsRawSpecifier) UnmarshalJSON(raw []byte) error {
-	var asString string
-	if err := json.Unmarshal(raw, &asString); err == nil {
-		*s = preferPromiseRejectErrorsRawSpecifier{inline: asString}
-		return nil
-	}
-
-	var object struct {
-		From    string          `json:"from"`
-		Name    json.RawMessage `json:"name"`
-		Path    string          `json:"path"`
-		Package string          `json:"package"`
-	}
-	if err := rule.UnmarshalOptions(raw, &object); err != nil {
-		return err
-	}
-
-	*s = preferPromiseRejectErrorsRawSpecifier{From: object.From, Path: object.Path, Package: object.Package}
-
-	var names []string
-	if err := json.Unmarshal(object.Name, &names); err == nil {
-		s.Name = names
-		return nil
-	}
-	var name string
-	if err := json.Unmarshal(object.Name, &name); err != nil {
-		return err
-	}
-	s.Name = []string{name}
-	return nil
-}
-
 // DecodePreferPromiseRejectErrorsOptions maps upstream's JSON onto the struct the rule reads.
 //
 // Hand-written rather than `rule.DecodeOptionsInto` because `allow` arrives as one heterogeneous
 // array and leaves as two typed fields, and because `from` is a string on the wire and an integer
 // enum in the struct.
-func DecodePreferPromiseRejectErrorsOptions(raw []byte) (any, error) {
-	decoded, err := rule.DecodeOptionsInto[preferPromiseRejectErrorsRawOptions]()(raw)
-	if err != nil {
-		return PreferPromiseRejectErrorsOptions{}, err
+func DecodePreferPromiseRejectErrorsOptions(raw []byte) (PreferPromiseRejectErrorsOptions, error) {
+	decoded, decodeOptionsError := rule.DecodeOptionsInto[preferPromiseRejectErrorsRawOptions]()(raw)
+	if decodeOptionsError != nil {
+		return PreferPromiseRejectErrorsOptions{}, decodeOptionsError
 	}
-
-	wire, _ := decoded.(preferPromiseRejectErrorsRawOptions)
 
 	options := PreferPromiseRejectErrorsOptions{
-		AllowEmptyReject:     wire.AllowEmptyReject,
-		AllowThrowingAny:     wire.AllowThrowingAny,
-		AllowThrowingUnknown: wire.AllowThrowingUnknown,
+		AllowEmptyReject:     decoded.AllowEmptyReject,
+		AllowThrowingAny:     decoded.AllowThrowingAny,
+		AllowThrowingUnknown: decoded.AllowThrowingUnknown,
 	}
-	for _, entry := range wire.Allow {
+	for _, entry := range decoded.Allow {
 		if entry.inline != "" {
 			options.AllowInline = append(options.AllowInline, entry.inline)
 			continue
@@ -527,7 +485,7 @@ func DecodePreferPromiseRejectErrorsOptions(raw []byte) (any, error) {
 			specifier.From = type_checking.TypeOrValueSpecifierFromFile
 		case "lib":
 			specifier.From = type_checking.TypeOrValueSpecifierFromLib
-		// This arm has no fixture that can see it, and the reason is a HARNESS limit rather than a
+		// This arm has no fixture that can see it, and the reason is a harness limit rather than a
 		// gap. A `from: package` specifier resolves against a package declaration, which upstream's
 		// own corpus writes as an ambient `declare module 'errors'`, and ruletest pins
 		// `moduleDetection: "force"` (internal/rule_testing/program.go:27), under which that module is

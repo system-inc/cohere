@@ -8,13 +8,13 @@ import (
 	"testing"
 )
 
-// compilerFixture is a module whose HEAD pins a compiler at TypeScript, with the compiler checked out at
+// compilerFixture is a module whose `HEAD` pins a compiler at TypeScript, with the compiler checked out at
 // that pin.
 type compilerFixture struct {
 	// Module is the module's directory.
 	Module string
 
-	// Recorded is the compiler commit the module's HEAD pins.
+	// Recorded is the compiler commit the module's `HEAD` pins.
 	Recorded string
 
 	// Later is a second compiler commit, which the submodule can be moved to without a commit.
@@ -25,16 +25,17 @@ type compilerFixture struct {
 // Building it takes eleven git commands, about 8s under load, and every test here wants the same module, so
 // it is built once and each test reads it or a copy of it. TestMain removes it.
 var compilerTemplate struct {
-	once    sync.Once
-	root    string
-	fixture compilerFixture
-	err     error
+	once       sync.Once
+	root       string
+	fixture    compilerFixture
+	buildError error
 }
 
 // TestMain removes the compiler template once every test is done with it.
-func TestMain(m *testing.M) {
-	code := m.Run()
+func TestMain(suite *testing.M) {
+	code := suite.Run()
 	if compilerTemplate.root != "" {
+		// Ignored: the template is under the system's temporary directory, and one left there decides no test.
 		os.RemoveAll(compilerTemplate.root)
 	}
 	os.Exit(code)
@@ -42,17 +43,17 @@ func TestMain(m *testing.M) {
 
 // sharedModuleWithCompiler is the template itself, for a test that only reads it. A test that changes
 // anything in the module or its compiler takes its own copy with moduleWithCompiler.
-func sharedModuleWithCompiler(t *testing.T) compilerFixture {
-	t.Helper()
+func sharedModuleWithCompiler(test *testing.T) compilerFixture {
+	test.Helper()
 
 	compilerTemplate.once.Do(func() {
-		compilerTemplate.root, compilerTemplate.err = os.MkdirTemp("", "cohere-compiler-pin-")
-		if compilerTemplate.err == nil {
-			compilerTemplate.fixture, compilerTemplate.err = buildModuleWithCompiler(compilerTemplate.root)
+		compilerTemplate.root, compilerTemplate.buildError = os.MkdirTemp("", "cohere-compiler-pin-")
+		if compilerTemplate.buildError == nil {
+			compilerTemplate.fixture, compilerTemplate.buildError = buildModuleWithCompiler(compilerTemplate.root)
 		}
 	})
-	if compilerTemplate.err != nil {
-		t.Fatalf("building the compiler fixture: %v", compilerTemplate.err)
+	if compilerTemplate.buildError != nil {
+		test.Fatalf("building the compiler fixture: %v", compilerTemplate.buildError)
 	}
 	return compilerTemplate.fixture
 }
@@ -60,13 +61,13 @@ func sharedModuleWithCompiler(t *testing.T) compilerFixture {
 // moduleWithCompiler is a copy of the template the test owns, so it can move, patch or remove the
 // compiler without another test seeing it. Both repositories are copied whole, .git directories and all,
 // and the compiler's origin still names the template's compiler, a local path, as a fresh clone's does.
-func moduleWithCompiler(t *testing.T) compilerFixture {
-	t.Helper()
+func moduleWithCompiler(test *testing.T) compilerFixture {
+	test.Helper()
 
-	template := sharedModuleWithCompiler(t)
-	module := filepath.Join(t.TempDir(), "module")
-	if err := os.CopyFS(module, os.DirFS(template.Module)); err != nil {
-		t.Fatalf("copying the compiler fixture: %v", err)
+	template := sharedModuleWithCompiler(test)
+	module := filepath.Join(test.TempDir(), "module")
+	if copyFileSystemError := os.CopyFS(module, os.DirFS(template.Module)); copyFileSystemError != nil {
+		test.Fatalf("copying the compiler fixture: %v", copyFileSystemError)
 	}
 	return compilerFixture{Module: module, Recorded: template.Recorded, Later: template.Later}
 }
@@ -81,8 +82,8 @@ func buildModuleWithCompiler(root string) (compilerFixture, error) {
 		if failed != nil {
 			return ""
 		}
-		output, err := gitRun(directory, arguments...)
-		failed = err
+		output, gitRunError := gitRun(directory, arguments...)
+		failed = gitRunError
 		return output
 	}
 	write := func(path string, contents string) {
@@ -94,8 +95,8 @@ func buildModuleWithCompiler(root string) (compilerFixture, error) {
 	compiler := filepath.Join(root, "compiler")
 	module := filepath.Join(root, "module")
 	for _, directory := range []string{compiler, module} {
-		if err := os.MkdirAll(directory, 0o755); err != nil {
-			return compilerFixture{}, err
+		if createDirectoryError := os.MkdirAll(directory, 0o755); createDirectoryError != nil {
+			return compilerFixture{}, createDirectoryError
 		}
 	}
 
@@ -133,17 +134,17 @@ func buildModuleWithCompiler(root string) (compilerFixture, error) {
 
 // TestCompilerPinIsTheCommitsGitlink is the positive half. Without it, a check that refused everything
 // would pass the controls below.
-func TestCompilerPinIsTheCommitsGitlink(t *testing.T) {
-	t.Parallel()
+func TestCompilerPinIsTheCommitsGitlink(test *testing.T) {
+	test.Parallel()
 
-	fixture := sharedModuleWithCompiler(t)
+	fixture := sharedModuleWithCompiler(test)
 
-	pin, err := readCompilerPin(fixture.Module)
-	if err != nil {
-		t.Fatalf("a compiler checked out at its pin was refused: %v", err)
+	pin, readCompilerPinError := readCompilerPin(fixture.Module)
+	if readCompilerPinError != nil {
+		test.Fatalf("a compiler checked out at its pin was refused: %v", readCompilerPinError)
 	}
 	if pin.Commit != fixture.Recorded {
-		t.Fatalf("the pin is %s, and the commit records %s", pin.Commit, fixture.Recorded)
+		test.Fatalf("the pin is %s, and the commit records %s", pin.Commit, fixture.Recorded)
 	}
 }
 
@@ -151,112 +152,127 @@ func TestCompilerPinIsTheCommitsGitlink(t *testing.T) {
 // directory. git answers the checkout's top level as an absolute path, and the first version of this
 // check compared it against the relative one and refused the real checkout as never initialized,
 // while every fixture, all absolute, passed.
-func TestCompilerPinAcceptsARelativeModuleDirectory(t *testing.T) {
-	t.Parallel()
+func TestCompilerPinAcceptsARelativeModuleDirectory(test *testing.T) {
+	test.Parallel()
 
-	fixture := sharedModuleWithCompiler(t)
-	workingDirectory, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
+	fixture := sharedModuleWithCompiler(test)
+	workingDirectory, workingDirectoryError := os.Getwd()
+	if workingDirectoryError != nil {
+		test.Fatal(workingDirectoryError)
 	}
-	relative, err := filepath.Rel(workingDirectory, fixture.Module)
-	if err != nil || filepath.IsAbs(relative) {
-		t.Fatalf("could not name the fixture relatively (%q, %v), so this test would prove nothing", relative, err)
+	relative, relativePathError := filepath.Rel(workingDirectory, fixture.Module)
+	if relativePathError != nil || filepath.IsAbs(relative) {
+		test.Fatalf(
+			"could not name the fixture relatively (%q, %v), so this test would prove nothing",
+			relative,
+			relativePathError,
+		)
 	}
 
-	if _, err := readCompilerPin(relative); err != nil {
-		t.Fatalf("a compiler checked out at its pin was refused when named as %s: %v", relative, err)
+	if _, readCompilerPinError := readCompilerPin(relative); readCompilerPinError != nil {
+		test.Fatalf(
+			"a compiler checked out at its pin was refused when named as %s: %v",
+			relative,
+			readCompilerPinError,
+		)
 	}
 }
 
 // TestReleaseRefusesACompilerMovedWithoutACommit is the known-dirty control: the checkout is at a real
-// compiler commit, just not the one cohere's HEAD records. The refusal names both, since either could
+// compiler commit, just not the one cohere's `HEAD` records. The refusal names both, since either could
 // be the one someone meant.
-func TestReleaseRefusesACompilerMovedWithoutACommit(t *testing.T) {
-	t.Parallel()
+func TestReleaseRefusesACompilerMovedWithoutACommit(test *testing.T) {
+	test.Parallel()
 
-	fixture := moduleWithCompiler(t)
-	gitIn(t, filepath.Join(fixture.Module, "TypeScript"), "checkout", "--quiet", fixture.Later)
+	fixture := moduleWithCompiler(test)
+	gitIn(test, filepath.Join(fixture.Module, "TypeScript"), "checkout", "--quiet", fixture.Later)
 
-	_, err := readCompilerPin(fixture.Module)
-	if err == nil {
-		t.Fatal("a compiler moved without a commit was released")
+	_, readCompilerPinError := readCompilerPin(fixture.Module)
+	if readCompilerPinError == nil {
+		test.Fatal("a compiler moved without a commit was released")
 	}
 	for _, commit := range []string{fixture.Recorded, fixture.Later} {
-		if !strings.Contains(err.Error(), commit) {
-			t.Fatalf("the refusal does not name %s: %v", commit, err)
+		if !strings.Contains(readCompilerPinError.Error(), commit) {
+			test.Fatalf("the refusal does not name %s: %v", commit, readCompilerPinError)
 		}
 	}
 }
 
 // TestPatchedCompilerAtThePinProceeds holds the compatibility the compiler patches need. They change
-// files in the checkout without moving its HEAD, so a check that compared trees would refuse every
+// files in the checkout without moving its `HEAD`, so a check that compared trees would refuse every
 // patched release, which is every correct one.
-func TestPatchedCompilerAtThePinProceeds(t *testing.T) {
-	t.Parallel()
+func TestPatchedCompilerAtThePinProceeds(test *testing.T) {
+	test.Parallel()
 
-	fixture := moduleWithCompiler(t)
-	writeFile(t, filepath.Join(fixture.Module, "TypeScript", "checker.go"), "package checker\n\n// patched\n")
-	if status := gitIn(t, filepath.Join(fixture.Module, "TypeScript"), "status", "--porcelain"); status == "" {
-		t.Fatal("the patch did not change the checkout, so this test would prove nothing")
+	fixture := moduleWithCompiler(test)
+	writeFile(test, filepath.Join(fixture.Module, "TypeScript", "checker.go"), "package checker\n\n// patched\n")
+	if status := gitIn(test, filepath.Join(fixture.Module, "TypeScript"), "status", "--porcelain"); status == "" {
+		test.Fatal("the patch did not change the checkout, so this test would prove nothing")
 	}
 
-	pin, err := readCompilerPin(fixture.Module)
-	if err != nil {
-		t.Fatalf("a patched compiler at its pin was refused: %v", err)
+	pin, readCompilerPinError := readCompilerPin(fixture.Module)
+	if readCompilerPinError != nil {
+		test.Fatalf("a patched compiler at its pin was refused: %v", readCompilerPinError)
 	}
 	if pin.Commit != fixture.Recorded {
-		t.Fatalf("the pin is %s, and the commit records %s", pin.Commit, fixture.Recorded)
+		test.Fatalf("the pin is %s, and the commit records %s", pin.Commit, fixture.Recorded)
 	}
 }
 
 // TestUncheckedOutCompilerIsNamedAsSuch covers the empty directory a submodule that was never initialized
-// leaves. `git -C` from there walks up and answers with the module's own HEAD, which would be reported
+// leaves. `git -C` from there walks up and answers with the module's own `HEAD`, which would be reported
 // as a moved compiler naming a commit that is not a compiler.
-func TestUncheckedOutCompilerIsNamedAsSuch(t *testing.T) {
-	t.Parallel()
+func TestUncheckedOutCompilerIsNamedAsSuch(test *testing.T) {
+	test.Parallel()
 
-	fixture := moduleWithCompiler(t)
+	fixture := moduleWithCompiler(test)
 	submodule := filepath.Join(fixture.Module, "TypeScript")
 	for _, name := range []string{".git", "checker.go"} {
-		if err := os.RemoveAll(filepath.Join(submodule, name)); err != nil {
-			t.Fatal(err)
+		if removeError := os.RemoveAll(filepath.Join(submodule, name)); removeError != nil {
+			test.Fatal(removeError)
 		}
 	}
 
-	_, err := readCompilerPin(fixture.Module)
-	if err == nil {
-		t.Fatal("a compiler that is not checked out was released")
+	_, readCompilerPinError := readCompilerPin(fixture.Module)
+	if readCompilerPinError == nil {
+		test.Fatal("a compiler that is not checked out was released")
 	}
-	if !strings.Contains(err.Error(), "not checked out") {
-		t.Fatalf("an uninitialized submodule was reported as something else: %v", err)
+	if !strings.Contains(readCompilerPinError.Error(), "not checked out") {
+		test.Fatalf("an uninitialized submodule was reported as something else: %v", readCompilerPinError)
 	}
 }
 
 // TestUpstreamIsReadFromTheCommittedGitmodules is the control for a checkout cloned before the pin moved
 // to the fork: its origin still names Microsoft, and its working `.gitmodules` has been edited without a
 // commit. Only the committed file is a fact about the release, so both have to lose.
-func TestUpstreamIsReadFromTheCommittedGitmodules(t *testing.T) {
-	t.Parallel()
+func TestUpstreamIsReadFromTheCommittedGitmodules(test *testing.T) {
+	test.Parallel()
 
-	fixture := moduleWithCompiler(t)
-	gitIn(t, filepath.Join(fixture.Module, "TypeScript"), "remote", "set-url", "origin", "git@github.com:microsoft/TypeScript.git")
-	writeFile(t, filepath.Join(fixture.Module, ".gitmodules"),
+	fixture := moduleWithCompiler(test)
+	gitIn(
+		test,
+		filepath.Join(fixture.Module, "TypeScript"),
+		"remote",
+		"set-url",
+		"origin",
+		"git@github.com:microsoft/TypeScript.git",
+	)
+	writeFile(test, filepath.Join(fixture.Module, ".gitmodules"),
 		"[submodule \"TypeScript\"]\n\tpath = TypeScript\n\turl = https://github.com/someone/else.git\n")
 
-	pin, err := readCompilerPin(fixture.Module)
-	if err != nil {
-		t.Fatal(err)
+	pin, readCompilerPinError := readCompilerPin(fixture.Module)
+	if readCompilerPinError != nil {
+		test.Fatal(readCompilerPinError)
 	}
 	if pin.Upstream != "system-inc/TypeScript" {
-		t.Fatalf("the upstream is %q, and the commit's .gitmodules names system-inc/TypeScript", pin.Upstream)
+		test.Fatalf("the upstream is %q, and the commit's .gitmodules names system-inc/TypeScript", pin.Upstream)
 	}
 }
 
 // TestCompilerUpstreamFromGitmodules finds the entry whose path is the compiler's directory, whatever its
 // name or position, in either url shape, and says "unknown" when the file does not say.
-func TestCompilerUpstreamFromGitmodules(t *testing.T) {
-	t.Parallel()
+func TestCompilerUpstreamFromGitmodules(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name       string
@@ -264,34 +280,46 @@ func TestCompilerUpstreamFromGitmodules(t *testing.T) {
 		want       string
 	}{
 		{"the fork, after another submodule, over ssh",
-			"[submodule \"libraries/other\"]\n\tpath = libraries/other\n\turl = https://github.com/someone/other.git\n" +
+			"[submodule \"libraries/other\"]\n\tpath = libraries/other\n" +
+				"\turl = https://github.com/someone/other.git\n" +
 				"[submodule \"compiler\"]\n\tpath = TypeScript\n\turl = git@github.com:system-inc/TypeScript.git\n",
 			"system-inc/TypeScript"},
-		{"over https, quoted", "[submodule \"TypeScript\"]\n\tpath = \"TypeScript\"\n\turl = \"https://github.com/system-inc/TypeScript.git\"\n\tbranch = adamic\n",
-			"system-inc/TypeScript"},
-		{"no entry for the compiler", "[submodule \"other\"]\n\tpath = other\n\turl = https://github.com/someone/other.git\n", "unknown"},
-		{"a url that names no repository", "[submodule \"TypeScript\"]\n\tpath = TypeScript\n\turl = https://github.com/\n", "unknown"},
+		{
+			"over https, quoted",
+			"[submodule \"TypeScript\"]\n\tpath = \"TypeScript\"\n\turl = \"https://github.com/system-inc/TypeScript.git\"\n\tbranch = adamic\n",
+			"system-inc/TypeScript",
+		},
+		{
+			"no entry for the compiler",
+			"[submodule \"other\"]\n\tpath = other\n\turl = https://github.com/someone/other.git\n",
+			"unknown",
+		},
+		{
+			"a url that names no repository",
+			"[submodule \"TypeScript\"]\n\tpath = TypeScript\n\turl = https://github.com/\n",
+			"unknown",
+		},
 		{"empty", "", "unknown"},
 	} {
 		if got := CompilerUpstreamFromGitmodules(testCase.gitmodules); got != testCase.want {
-			t.Errorf("%s: named %q, want %q", testCase.name, got, testCase.want)
+			test.Errorf("%s: named %q, want %q", testCase.name, got, testCase.want)
 		}
 	}
 }
 
 // TestBuildRefusesAMovedCompiler proves Build calls the check, which the tests above cannot: they drive
 // readCompilerPin directly and would pass with the call deleted from Build.
-func TestBuildRefusesAMovedCompiler(t *testing.T) {
-	t.Parallel()
+func TestBuildRefusesAMovedCompiler(test *testing.T) {
+	test.Parallel()
 
-	fixture := moduleWithCompiler(t)
-	gitIn(t, filepath.Join(fixture.Module, "TypeScript"), "checkout", "--quiet", fixture.Later)
+	fixture := moduleWithCompiler(test)
+	gitIn(test, filepath.Join(fixture.Module, "TypeScript"), "checkout", "--quiet", fixture.Later)
 
-	_, err := Build(Options{Version: "1.0.0", ModuleDirectory: fixture.Module, OutputDirectory: t.TempDir()})
-	if err == nil {
-		t.Fatal("Build released a compiler moved without a commit")
+	_, buildError := Build(Options{Version: "1.0.0", ModuleDirectory: fixture.Module, OutputDirectory: test.TempDir()})
+	if buildError == nil {
+		test.Fatal("Build released a compiler moved without a commit")
 	}
-	if !strings.Contains(err.Error(), fixture.Later) {
-		t.Fatalf("Build failed, but not on the moved compiler: %v", err)
+	if !strings.Contains(buildError.Error(), fixture.Later) {
+		test.Fatalf("Build failed, but not on the moved compiler: %v", buildError)
 	}
 }

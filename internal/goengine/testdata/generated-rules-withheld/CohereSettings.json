@@ -1,0 +1,7 @@
+{
+	"go": {
+		"rules": {
+			"cohere-go/consistency-no-long-file": ["error", {"max": 40}]
+		}
+	}
+}

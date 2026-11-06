@@ -37,18 +37,19 @@ var dataStructureConstructors = map[string]bool{
 // const gql = gqlImplementation as unknown as UnifiedGqlType` is a function reached through a double
 // cast, and the identifier underneath is what says so.
 func unwrapAssertions(node *ast.Node) *ast.Node {
-	for node != nil {
-		switch node.Kind {
+	current := node
+	for current != nil {
+		switch current.Kind {
 		case ast.KindAsExpression:
-			node = node.AsAsExpression().Expression
+			current = current.AsAsExpression().Expression
 		case ast.KindSatisfiesExpression:
-			node = node.AsSatisfiesExpression().Expression
+			current = current.AsSatisfiesExpression().Expression
 		case ast.KindNonNullExpression:
-			node = node.AsNonNullExpression().Expression
+			current = current.AsNonNullExpression().Expression
 		case ast.KindParenthesizedExpression:
-			node = node.AsParenthesizedExpression().Expression
+			current = current.AsParenthesizedExpression().Expression
 		default:
-			return node
+			return current
 		}
 	}
 	return nil
@@ -57,15 +58,15 @@ func unwrapAssertions(node *ast.Node) *ast.Node {
 // calleeName reads the name a call is made through, whether it is bare or reached through an object.
 // `createContext(...)` and `React.createContext(...)` both answer "createContext".
 func calleeName(callee *ast.Node) string {
-	callee = unwrapAssertions(callee)
-	if callee == nil {
+	unwrapped := unwrapAssertions(callee)
+	if unwrapped == nil {
 		return ""
 	}
-	if callee.Kind == ast.KindIdentifier {
-		return callee.Text()
+	if unwrapped.Kind == ast.KindIdentifier {
+		return unwrapped.Text()
 	}
-	if callee.Kind == ast.KindPropertyAccessExpression {
-		if name := callee.AsPropertyAccessExpression().Name(); name != nil {
+	if unwrapped.Kind == ast.KindPropertyAccessExpression {
+		if name := unwrapped.AsPropertyAccessExpression().Name(); name != nil {
 			return name.Text()
 		}
 	}
@@ -74,8 +75,8 @@ func calleeName(callee *ast.Node) string {
 
 // isFunctionNode reports the two shapes a function literal takes.
 func isFunctionNode(node *ast.Node) bool {
-	node = unwrapAssertions(node)
-	return node != nil && (node.Kind == ast.KindArrowFunction || node.Kind == ast.KindFunctionExpression)
+	unwrapped := unwrapAssertions(node)
+	return unwrapped != nil && (unwrapped.Kind == ast.KindArrowFunction || unwrapped.Kind == ast.KindFunctionExpression)
 }
 
 // returnsAFunction reports whether a function literal hands back a function.
@@ -175,13 +176,13 @@ func isReactComponentFactory(initializer *ast.Node) bool {
 	}
 	firstArgument := call.Arguments.Nodes[0]
 
-	// `memo(function MenuSearch(...))` — the wrapped function names the component.
+	// `memo(function MenuSearch(...))`: the wrapped function names the component.
 	if firstArgument.Kind == ast.KindFunctionExpression {
 		if named := firstArgument.AsFunctionExpression().Name(); named != nil && startsUppercase(named.Text()) {
 			return true
 		}
 	}
-	// `useMemo(function () { return function FormNotice(...) {} }, [])` — read one level deeper.
+	// `useMemo(function () { return function FormNotice(...) {} }, [])`: read one level deeper.
 	if name == "useMemo" && firstArgument.Kind == ast.KindFunctionExpression {
 		return blockReturnsMatching(firstArgument.AsFunctionExpression().Body, func(returned *ast.Node) bool {
 			if returned == nil || returned.Kind != ast.KindFunctionExpression {
@@ -304,15 +305,15 @@ func isPascalCaseReBinding(initializer *ast.Node) bool {
 //
 // One arm is enough, since a fallback chain is picking between spellings of the same thing.
 func anyBranchReadsPascalCaseProperty(node *ast.Node) bool {
-	node = unwrapAssertions(node)
-	if node == nil {
+	unwrapped := unwrapAssertions(node)
+	if unwrapped == nil {
 		return false
 	}
 
-	switch node.Kind {
+	switch unwrapped.Kind {
 	case ast.KindBinaryExpression:
-		// `a ?? b` and `a || b` — either side may hold the constructor.
-		binary := node.AsBinaryExpression()
+		// `a ?? b` and `a || b`: either side may hold the constructor.
+		binary := unwrapped.AsBinaryExpression()
 		if binary.OperatorToken == nil {
 			return false
 		}
@@ -324,12 +325,12 @@ func anyBranchReadsPascalCaseProperty(node *ast.Node) bool {
 
 	case ast.KindConditionalExpression:
 		// The condition is a guard, so only the arms matter.
-		conditional := node.AsConditionalExpression()
+		conditional := unwrapped.AsConditionalExpression()
 		return anyBranchReadsPascalCaseProperty(conditional.WhenTrue) ||
 			anyBranchReadsPascalCaseProperty(conditional.WhenFalse)
 
 	case ast.KindPropertyAccessExpression:
-		name := node.AsPropertyAccessExpression().Name()
+		name := unwrapped.AsPropertyAccessExpression().Name()
 		return name != nil && startsUppercase(name.Text())
 	}
 	return false

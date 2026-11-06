@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"strings"
 	"testing"
 	"time"
@@ -13,13 +14,16 @@ import (
 // was correct, and the sentence they composed was wrong. A fragment check cannot see that.
 func render(report *pipelineReport) string {
 	builder := &strings.Builder{}
-	report.Write(builder)
+	stream := bufio.NewWriter(builder)
+	report.Write(stream)
+	// Ignored: a stream over a strings.Builder cannot fail to flush, since the builder's writes never do.
+	_ = stream.Flush()
 	return builder.String()
 }
 
 // A run where all three phases ran says so, and says nothing else.
-func TestACompleteRunPrintsNoWarning(t *testing.T) {
-	t.Parallel()
+func TestACompleteRunPrintsNoWarning(test *testing.T) {
+	test.Parallel()
 	report := &pipelineReport{}
 	report.record(phaseFix, outcomeRan, 4*time.Millisecond, "")
 	report.record(phaseTypes, outcomeRan, 12*time.Millisecond, "")
@@ -28,7 +32,7 @@ func TestACompleteRunPrintsNoWarning(t *testing.T) {
 	got := render(report)
 	want := "phases: fix ran in 4ms · types ran in 12ms · lint ran in 7ms\n"
 	if got != want {
-		t.Fatalf("the phase line reads wrong:\n  want %q\n  got  %q", want, got)
+		test.Fatalf("the phase line reads wrong:\n  want %q\n  got  %q", want, got)
 	}
 }
 
@@ -36,8 +40,8 @@ func TestACompleteRunPrintsNoWarning(t *testing.T) {
 //
 // This is the case the whole file exists for. A run that bailed at types and a run that linted
 // cleanly both produce zero lint findings, and only this line separates them.
-func TestABailNamesTheUnreachedPhasesAndWarns(t *testing.T) {
-	t.Parallel()
+func TestABailNamesTheUnreachedPhasesAndWarns(test *testing.T) {
+	test.Parallel()
 	report := &pipelineReport{}
 	report.record(phaseFix, outcomeRan, 4*time.Millisecond, "")
 	report.record(phaseTypes, outcomeRan, 12*time.Millisecond, "")
@@ -48,21 +52,21 @@ func TestABailNamesTheUnreachedPhasesAndWarns(t *testing.T) {
 	// takes nothing from an opt-in phase that was never requested, and saying it did would
 	// manufacture a gap out of an ordinary run.
 	want := "phases: fix ran in 4ms · types ran in 12ms · lint did not run (types bailed: 4 type diagnostics)" +
-		" · unused skipped (not requested — this is a report, ask for it with --unused)\n" +
-		"  this run did not check everything — the phases above say what was not checked\n"
+		" · unused skipped (not requested \u2014 this is a report, ask for it with --unused)\n" +
+		"  this run did not check everything: the phases above say what was not checked\n"
 	if got != want {
-		t.Fatalf("the bail line reads wrong:\n  want %q\n  got  %q", want, got)
+		test.Fatalf("the bail line reads wrong:\n  want %q\n  got  %q", want, got)
 	}
 }
 
-// An opt-in phase the caller DID ask for and that a bail then cut off is a real gap, and must read
+// An opt-in phase the caller did ask for and that a bail then cut off is a real gap, and must read
 // as one.
 //
 // This is the other half of the distinction above, and it is the half that would be easy to lose:
 // exempting unused from the coverage warning is correct when nobody asked for it and wrong when
 // somebody did. Somebody who typed --unused and got no report has had something withheld.
-func TestARequestedUnusedPhaseCutOffByABailIsAGap(t *testing.T) {
-	t.Parallel()
+func TestARequestedUnusedPhaseCutOffByABailIsAGap(test *testing.T) {
+	test.Parallel()
 	report := &pipelineReport{}
 	report.record(phaseFix, outcomeRan, 4*time.Millisecond, "")
 	report.record(phaseTypes, outcomeRan, 12*time.Millisecond, "")
@@ -70,17 +74,17 @@ func TestARequestedUnusedPhaseCutOffByABailIsAGap(t *testing.T) {
 
 	got := render(report)
 	if !strings.Contains(got, "unused did not run (types bailed: 4 type diagnostics)") {
-		t.Fatalf("a requested unused phase that was cut off did not read as cut off: %q", got)
+		test.Fatalf("a requested unused phase that was cut off did not read as cut off: %q", got)
 	}
 	if !warnsAboutCoverage(got) {
-		t.Fatalf("a requested phase that was withheld did not warn about coverage: %q", got)
+		test.Fatalf("a requested phase that was withheld did not warn about coverage: %q", got)
 	}
 }
 
 // A bare run must not warn merely because unused was not requested, or the warning appears on every
-// ordinary run and people stop reading it — which costs exactly the case it exists for.
-func TestAnUnrequestedUnusedPhaseDoesNotWarn(t *testing.T) {
-	t.Parallel()
+// ordinary run and people stop reading it, which costs exactly the case it exists for.
+func TestAnUnrequestedUnusedPhaseDoesNotWarn(test *testing.T) {
+	test.Parallel()
 	report := &pipelineReport{}
 	report.record(phaseFix, outcomeRan, time.Millisecond, "")
 	report.record(phaseTypes, outcomeRan, time.Millisecond, "")
@@ -89,27 +93,27 @@ func TestAnUnrequestedUnusedPhaseDoesNotWarn(t *testing.T) {
 
 	got := render(report)
 	if warnsAboutCoverage(got) {
-		t.Fatalf("an ordinary run warned about coverage because unused was not requested: %q", got)
+		test.Fatalf("an ordinary run warned about coverage because unused was not requested: %q", got)
 	}
 	// The absence is still stated, which is what keeps the exemption honest.
 	if !strings.Contains(got, "unused skipped") {
-		t.Fatalf("the phase line did not state that unused was skipped: %q", got)
+		test.Fatalf("the phase line did not state that unused was skipped: %q", got)
 	}
 }
 
 // A bail at the first phase must mark everything after it, not just the next one.
-func TestABailAtFixMarksBothLaterPhases(t *testing.T) {
-	t.Parallel()
+func TestABailAtFixMarksBothLaterPhases(test *testing.T) {
+	test.Parallel()
 	report := &pipelineReport{}
 	report.record(phaseFix, outcomeRan, time.Millisecond, "")
 	report.markRemainingNotReached(phaseFix, "the rewrite did not parse")
 
 	got := render(report)
 	if !strings.Contains(got, "types did not run") || !strings.Contains(got, "lint did not run") {
-		t.Fatalf("a bail at fix left a later phase unaccounted for: %q", got)
+		test.Fatalf("a bail at fix left a later phase unaccounted for: %q", got)
 	}
 	if !warnsAboutCoverage(got) {
-		t.Fatalf("a bail did not warn: %q", got)
+		test.Fatalf("a bail did not warn: %q", got)
 	}
 }
 
@@ -120,10 +124,10 @@ func warnsAboutCoverage(line string) bool {
 
 // `--no-fix` checks the fix phase rather than skipping it, and says how many files would change, zero
 // included. It must not warn: it withheld nothing. This is the continuous-integration path and a
-// warning that fires on every green run is one people stop reading — which costs exactly the case
+// warning that fires on every green run is one people stop reading, which costs exactly the case
 // the warning exists for.
-func TestNoFixChecksAndDoesNotWarn(t *testing.T) {
-	t.Parallel()
+func TestNoFixChecksAndDoesNotWarn(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range []struct {
 		wouldChange int
 		want        string
@@ -137,15 +141,15 @@ func TestNoFixChecksAndDoesNotWarn(t *testing.T) {
 		report.record(phaseLint, outcomeRan, 7*time.Millisecond, "")
 
 		if got := render(report); got != testCase.want {
-			t.Fatalf("--no-fix warned or read wrong:\n  want %q\n  got  %q", testCase.want, got)
+			test.Fatalf("--no-fix warned or read wrong:\n  want %q\n  got  %q", testCase.want, got)
 		}
 	}
 }
 
 // A reporting phase that was turned off is a real hole in the verdict and must warn, because its
 // findings are absent from the output and a reader cannot tell that from having none.
-func TestSkippingAReportingPhaseWarns(t *testing.T) {
-	t.Parallel()
+func TestSkippingAReportingPhaseWarns(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range []struct {
 		name    string
 		skipped phaseName
@@ -153,8 +157,8 @@ func TestSkippingAReportingPhaseWarns(t *testing.T) {
 		{"types skipped", phaseTypes},
 		{"lint skipped", phaseLint},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			report := &pipelineReport{}
 			for _, name := range phaseOrder {
 				if name == testCase.skipped {
@@ -165,7 +169,7 @@ func TestSkippingAReportingPhaseWarns(t *testing.T) {
 			}
 
 			if !warnsAboutCoverage(render(report)) {
-				t.Fatalf("skipping %s did not warn: %q", testCase.skipped, render(report))
+				test.Fatalf("skipping %s did not warn: %q", testCase.skipped, render(report))
 			}
 		})
 	}
@@ -173,8 +177,8 @@ func TestSkippingAReportingPhaseWarns(t *testing.T) {
 
 // The warning must be able to fire and able to stay silent. A check that has only ever done one of
 // those has not been shown to discriminate.
-func TestTheWarningDiscriminates(t *testing.T) {
-	t.Parallel()
+func TestTheWarningDiscriminates(test *testing.T) {
+	test.Parallel()
 	complete := &pipelineReport{}
 	for _, name := range phaseOrder {
 		complete.record(name, outcomeRan, time.Millisecond, "")
@@ -185,17 +189,17 @@ func TestTheWarningDiscriminates(t *testing.T) {
 	incomplete.markRemainingNotReached(phaseFix, "control")
 
 	if warnsAboutCoverage(render(complete)) {
-		t.Fatalf("the warning fired on a complete run")
+		test.Fatalf("the warning fired on a complete run")
 	}
 	if !warnsAboutCoverage(render(incomplete)) {
-		t.Fatalf("the warning did not fire on an incomplete run")
+		test.Fatalf("the warning did not fire on an incomplete run")
 	}
 }
 
 // Phases print in pipeline order regardless of the order they were recorded in. The line is read as
 // a sequence, so a report that listed them by completion time would misdescribe the pipeline.
-func TestPhasesPrintInPipelineOrder(t *testing.T) {
-	t.Parallel()
+func TestPhasesPrintInPipelineOrder(test *testing.T) {
+	test.Parallel()
 	report := &pipelineReport{}
 	report.record(phaseLint, outcomeRan, time.Millisecond, "")
 	report.record(phaseFix, outcomeRan, time.Millisecond, "")
@@ -206,14 +210,14 @@ func TestPhasesPrintInPipelineOrder(t *testing.T) {
 	typesAt := strings.Index(got, "types ran")
 	lintAt := strings.Index(got, "lint ran")
 	if !(fixAt < typesAt && typesAt < lintAt) {
-		t.Fatalf("phases printed out of pipeline order: %q", got)
+		test.Fatalf("phases printed out of pipeline order: %q", got)
 	}
 }
 
 // markRemainingNotReached must never overwrite a phase that already reported an outcome. The phase
 // that bailed ran, and recording it twice would print it twice.
-func TestMarkingDoesNotDuplicateAnAlreadyRecordedPhase(t *testing.T) {
-	t.Parallel()
+func TestMarkingDoesNotDuplicateAnAlreadyRecordedPhase(test *testing.T) {
+	test.Parallel()
 	report := &pipelineReport{}
 	report.record(phaseFix, outcomeRan, time.Millisecond, "")
 	report.record(phaseTypes, outcomeRan, time.Millisecond, "")
@@ -222,10 +226,10 @@ func TestMarkingDoesNotDuplicateAnAlreadyRecordedPhase(t *testing.T) {
 
 	got := render(report)
 	if strings.Count(got, "types") != 1 || strings.Count(got, "lint") != 1 {
-		t.Fatalf("a phase was recorded twice: %q", got)
+		test.Fatalf("a phase was recorded twice: %q", got)
 	}
 	if warnsAboutCoverage(got) {
-		t.Fatalf("marking after the fact turned a complete run incomplete: %q", got)
+		test.Fatalf("marking after the fact turned a complete run incomplete: %q", got)
 	}
 }
 
@@ -234,9 +238,9 @@ func TestMarkingDoesNotDuplicateAnAlreadyRecordedPhase(t *testing.T) {
 // `lint ran in 0s` was the first version of this line and it stated two false things at once: that
 // the walk happened in the lint phase, and that it was free. The walk happened in the fix phase and
 // cost about a second. The counts printed beside it were real, which is what made the zero hard to
-// see — everything around it checked out.
-func TestAReusedPhaseNamesWhatItReused(t *testing.T) {
-	t.Parallel()
+// see: everything around it checked out.
+func TestAReusedPhaseNamesWhatItReused(test *testing.T) {
+	test.Parallel()
 	report := &pipelineReport{}
 	report.record(phaseFix, outcomeRan, 1500*time.Millisecond, "")
 	report.record(phaseTypes, outcomeRan, 200*time.Millisecond, "")
@@ -245,7 +249,7 @@ func TestAReusedPhaseNamesWhatItReused(t *testing.T) {
 	got := render(report)
 	want := "phases: fix ran in 1.5s · types ran in 200ms · lint reused the fix phase's walk (nothing was rewritten)\n"
 	if got != want {
-		t.Fatalf("the phase line reads wrong:\n  want %q\n  got  %q", want, got)
+		test.Fatalf("the phase line reads wrong:\n  want %q\n  got  %q", want, got)
 	}
 }
 
@@ -255,15 +259,15 @@ func TestAReusedPhaseNamesWhatItReused(t *testing.T) {
 // opposite things: one has findings that are complete, the other has none at all. A warning on a
 // reused phase would send a reader looking for a gap that is not there, which is the same
 // false-alarm failure this file's warnings exist to avoid in the other direction.
-func TestAReusedPhaseDoesNotWarn(t *testing.T) {
-	t.Parallel()
+func TestAReusedPhaseDoesNotWarn(test *testing.T) {
+	test.Parallel()
 	report := &pipelineReport{}
 	report.record(phaseFix, outcomeRan, 1500*time.Millisecond, "")
 	report.record(phaseTypes, outcomeRan, 200*time.Millisecond, "")
 	report.record(phaseLint, outcomeReused, 0, "the fix phase's walk (nothing was rewritten)")
 
 	if got := render(report); strings.Contains(got, "warning") {
-		t.Fatalf("a reused phase warned, but its findings are complete:\n  %q", got)
+		test.Fatalf("a reused phase warned, but its findings are complete:\n  %q", got)
 	}
 }
 
@@ -272,8 +276,8 @@ func TestAReusedPhaseDoesNotWarn(t *testing.T) {
 // One walk billed to two rows is the defect this whole change exists to remove. Adding a reused
 // phase's elapsed time back into the sum would reintroduce it in the accounting line while the
 // phase line reads correctly, which is the harder half to notice.
-func TestAReusedPhaseIsNotDoubleCounted(t *testing.T) {
-	t.Parallel()
+func TestAReusedPhaseIsNotDoubleCounted(test *testing.T) {
+	test.Parallel()
 	withReuse := &pipelineReport{processStart: time.Now().Add(-3 * time.Second)}
 	withReuse.graph = 500 * time.Millisecond
 	withReuse.record(phaseFix, outcomeRan, 1500*time.Millisecond, "")
@@ -284,12 +288,12 @@ func TestAReusedPhaseIsNotDoubleCounted(t *testing.T) {
 	//
 	// Asserted on the exact phases figure rather than on the absence of a wrong one. The first
 	// version of this check looked for a string the buggy version would not have printed either, so
-	// it passed against the defect it was written to catch — a guard that could not fail, which is
+	// it passed against the defect it was written to catch: a guard that could not fail, which is
 	// the shape this tree keeps producing. The value is checked directly now: fix's 1.5s and nothing
 	// from the reused row.
 	got := render(withReuse)
 	if !strings.Contains(got, "phases 1.5s") {
-		t.Fatalf("expected the accounted phases to be fix's 1.5s alone, with the reused row "+
+		test.Fatalf("expected the accounted phases to be fix's 1.5s alone, with the reused row "+
 			"contributing nothing:\n  %q", got)
 	}
 }
@@ -298,18 +302,18 @@ func TestAReusedPhaseIsNotDoubleCounted(t *testing.T) {
 //
 // A run narrowed to one file runs every phase it was asked for, so the phase lines report a
 // complete run and the existing sentence points at them. On the ahra tree that reads as
-// `this run did not check everything — the phases above say what was not checked` for a run that
+// `this run did not check everything: the phases above say what was not checked` for a run that
 // visited 1 file of 3,542, and the phases say nothing about the other 3,541.
 //
 // The gap is the larger of the two: skipping a phase withholds one kind of finding, and skipping
 // files withholds every kind on every file skipped.
-func TestCoverageNamesTheFilesItDidNotLookAt(t *testing.T) {
-	t.Parallel()
+func TestCoverageNamesTheFilesItDidNotLookAt(test *testing.T) {
+	test.Parallel()
 	scoped := &pipelineReport{filesInScope: 5, filesInProgram: 3542}
 	scoped.record(phaseLint, outcomeRan, 8*time.Millisecond, "")
 
 	if rendered := render(scoped); !strings.Contains(rendered, "checked 5 of 3542 files") {
-		t.Errorf("a scoped run should name both numbers:\n%s", rendered)
+		test.Errorf("a scoped run should name both numbers:\n%s", rendered)
 	}
 
 	// The control, and it is what stops this from becoming a line on every run. A run over the whole
@@ -318,15 +322,15 @@ func TestCoverageNamesTheFilesItDidNotLookAt(t *testing.T) {
 	whole.record(phaseLint, outcomeRan, 8*time.Millisecond, "")
 
 	if rendered := render(whole); strings.Contains(rendered, "of 3542 files") {
-		t.Errorf("an unscoped run should say nothing about file scope:\n%s", rendered)
+		test.Errorf("an unscoped run should say nothing about file scope:\n%s", rendered)
 	}
 
 	// A report that was never told the numbers says nothing either, rather than reporting 0 of 0.
 	silent := &pipelineReport{}
 	silent.record(phaseLint, outcomeRan, 8*time.Millisecond, "")
 
-	if rendered := render(silent); strings.Contains(rendered, "files — the rest") {
-		t.Errorf("a report with no scope numbers should not invent them:\n%s", rendered)
+	if rendered := render(silent); strings.Contains(rendered, "files: the rest") {
+		test.Errorf("a report with no scope numbers should not invent them:\n%s", rendered)
 	}
 }
 
@@ -340,19 +344,23 @@ func TestCoverageNamesTheFilesItDidNotLookAt(t *testing.T) {
 //
 // Both directions, because a warning on every run is one people learn to skip, which would cost
 // exactly the case it exists for.
-func TestProvenanceWarningFiresOnlyOnAModifiedTree(t *testing.T) {
-	t.Parallel()
+func TestProvenanceWarningFiresOnlyOnAModifiedTree(test *testing.T) {
+	test.Parallel()
 	report := &pipelineReport{}
 
 	modified := &strings.Builder{}
-	report.writeProvenanceWarning(modified, true)
+	modifiedStream := bufio.NewWriter(modified)
+	report.writeProvenanceWarning(modifiedStream, true)
+	flushStream(test, modifiedStream)
 	if !strings.Contains(modified.String(), "no commit reproduces these findings") {
-		t.Errorf("a modified tree should disclose itself: %q", modified.String())
+		test.Errorf("a modified tree should disclose itself: %q", modified.String())
 	}
 
 	clean := &strings.Builder{}
-	report.writeProvenanceWarning(clean, false)
+	cleanStream := bufio.NewWriter(clean)
+	report.writeProvenanceWarning(cleanStream, false)
+	flushStream(test, cleanStream)
 	if clean.String() != "" {
-		t.Errorf("a clean build should say nothing: %q", clean.String())
+		test.Errorf("a clean build should say nothing: %q", clean.String())
 	}
 }

@@ -8,8 +8,8 @@ import (
 
 const assignModuleFile = "/repository/source/Thing.ts"
 
-func TestNoAssignModuleVariableFires(t *testing.T) {
-	t.Parallel()
+func TestNoAssignModuleVariableFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -27,16 +27,19 @@ func TestNoAssignModuleVariableFires(t *testing.T) {
 		{"inside a function body", "export function run() {\n    let module = {};\n}\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.Run(t, NoAssignModuleVariable, assignModuleFile, testCase.sourceText),
-				"noAssignModuleVariable")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(
+				test,
+				rule_testing.Run(test, NoAssignModuleVariable, assignModuleFile, testCase.sourceText),
+				"noAssignModuleVariable",
+			)
 		})
 	}
 }
 
-func TestNoAssignModuleVariableStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoAssignModuleVariableStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -52,13 +55,19 @@ func TestNoAssignModuleVariableStaysSilent(t *testing.T) {
 		{"an import binding", "import module from 'node:module';\nexport const Loaded = module;\n"},
 		// A destructured binding never introduces the name by spelling it, so a rule that read the
 		// name off a binding pattern rather than off an identifier would fire here wrongly.
-		{"a destructured property named module", "const { module: renamed } = imported;\nexport const Value = renamed;\n"},
+		{
+			"a destructured property named module",
+			"const { module: renamed } = imported;\nexport const Value = renamed;\n",
+		},
 		{"a function parameter named module", "export function run(module: unknown) {\n    return module;\n}\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoAssignModuleVariable, assignModuleFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(
+				test,
+				rule_testing.Run(test, NoAssignModuleVariable, assignModuleFile, testCase.sourceText),
+			)
 		})
 	}
 }

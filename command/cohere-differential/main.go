@@ -3,7 +3,7 @@
 // This is the acceptance instrument for the whole project. cohere replaces the gate only when it
 // can be shown to find what the gate finds and stay silent where the gate is silent, and until this
 // command existed that claim was established by a person running two commands and comparing counts
-// by eye — which is not a harness, does not survive that person, and cannot answer the question it
+// by eye, which is not a harness, does not survive that person, and cannot answer the question it
 // appears to answer.
 //
 // The question it appears to answer is "do the two gates agree." The question it has to answer
@@ -20,64 +20,93 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/system-inc/cohere/internal/differential"
 	"github.com/system-inc/cohere/internal/lint/configuration"
 )
 
+// ruleListProbeFile is the file `-explain` is pointed at to enumerate the measured binary's rules.
+//
+// Any file in the program works, because every compiled rule is accounted for in that output
+// whether it listened to the file, declined it, or was never configured. This one is chosen for
+// being unremarkable: a file no rule finds interesting still names all of them.
+const ruleListProbeFile = "modules/mcp/McpApi.ts"
+
+// gateRunnerPath is the gate as it actually ships, run through its own cached runner rather than by
+// invoking oxlint directly. Comparing against a hand-rolled oxlint invocation would measure a gate
+// nobody runs.
+var gateRunnerPath = filepath.Join(
+	"libraries", "structure", "libraries", "nexus", "code-quality", "oxlint", "RunCachedOxlint.ts",
+)
+
+// defaultRoot is the tree this instrument was commissioned to measure.
+var defaultRoot = filepath.Join(os.Getenv("HOME"), "Projects", "ahra")
+
 func main() {
-	if err := run(); err != nil {
-		fmt.Fprintf(os.Stderr, "cohere-differential: %v\n", err)
+	if runError := run(); runError != nil {
+		// Ignored: the exit code below says the run failed even when standard error cannot.
+		fmt.Fprintf(os.Stderr, "cohere-differential: %v\n", runError)
 		os.Exit(1)
 	}
 }
 
 func run() error {
-	options, err := parseArguments(os.Args[1:])
-	if err != nil {
-		return err
+	options, parseArgumentsError := parseArguments(os.Args[1:])
+	if parseArgumentsError != nil {
+		return parseArgumentsError
 	}
 
-	lintConfig, err := configuration.Load(filepath.Join(options.root, ".oxlintrc.json"))
-	if err != nil {
-		return fmt.Errorf("loading the lint config: %w", err)
+	lintConfiguration, loadError := configuration.Load(filepath.Join(options.root, ".oxlintrc.json"))
+	if loadError != nil {
+		return fmt.Errorf("loading the lint config: %w", loadError)
 	}
 
-	if err := checkControlsAreLintable(lintConfig, options.controls, cohereOnlyRuleSettings(options.root)); err != nil {
-		return err
+	suppliedRules := slices.Collect(maps.Keys(cohereOnlyRuleSettings(options.root)))
+	if checkControlsAreLintableError := checkControlsAreLintable(
+		lintConfiguration,
+		options.controls,
+		suppliedRules,
+	); checkControlsAreLintableError != nil {
+		return checkControlsAreLintableError
 	}
 
 	// Asked of the binary being measured, not of this one. `registry.All()` is the registry linked
 	// into the harness, and when the two builds differ every classification describes the wrong
 	// tool. That produced a real wrong answer: 128 findings reported as both-active, meaning both
 	// sides had the rule and disagreed, when the measured binary had no such rule at all.
-	cohereRules, err := differential.CompiledRulesOf(
+	cohereRules, compiledRulesOfError := differential.CompiledRulesOf(
 		context.Background(), options.cohereCommand, ruleListProbeFile,
 	)
-	if err != nil {
-		return err
+	if compiledRulesOfError != nil {
+		return compiledRulesOfError
 	}
 
-	report, err := differential.Run(context.Background(), differential.RunOptions{
+	report, runError := differential.Run(context.Background(), differential.RunOptions{
 		Root:                    options.root,
 		Cohere:                  options.cohereCommand,
 		Gate:                    options.gateCommand,
 		CohereRules:             cohereRules,
-		ConfiguredRules:         configuredRuleNames(lintConfig),
+		ConfiguredRules:         configuredRuleNames(lintConfiguration),
 		Controls:                options.controls,
 		ExtraCohereRuleSettings: cohereOnlyRuleSettings(options.root),
+		Diagnostics:             os.Stderr,
 	})
-	if err != nil {
-		return err
+	if runError != nil {
+		return runError
 	}
 
 	rendered := &strings.Builder{}
 	differential.Write(rendered, report)
-	fmt.Print(rendered.String())
+	if _, printError := fmt.Print(rendered.String()); printError != nil {
+		return fmt.Errorf("printing the report: %w", printError)
+	}
 
 	// The exit code comes from the same value the reader sees rather than being recomputed, so the
 	// two cannot disagree. Agreed() is false for a disagreement and equally false for a run that
@@ -87,13 +116,6 @@ func run() error {
 	}
 	return nil
 }
-
-// ruleListProbeFile is the file `-explain` is pointed at to enumerate the measured binary's rules.
-//
-// Any file in the program works, because every compiled rule is accounted for in that output
-// whether it listened to the file, declined it, or was never configured. This one is chosen for
-// being unremarkable: a file no rule finds interesting still names all of them.
-const ruleListProbeFile = "modules/mcp/McpApi.ts"
 
 // configuredRuleNames is every rule the lint config switches on.
 //
@@ -107,7 +129,7 @@ const ruleListProbeFile = "modules/mcp/McpApi.ts"
 //
 // **The rules block is not the whole configuration.** Forty rules are enforced by the `plugins` declarations
 // and named in no rules block, proven with planted violations rather than read from a file. Reading
-// only `lintConfig.Rules` therefore reported a denominator of 159 when the real one is 214, and it
+// only `lintConfiguration.Rules` therefore reported a denominator of 159 when the real one is 214, and it
 // did so in the summary line a reader uses to decide whether cohere is safe to trust yet.
 //
 // An understated denominator here makes a clean result mean less than it claims, in the one harness
@@ -119,9 +141,9 @@ const ruleListProbeFile = "modules/mcp/McpApi.ts"
 // has been. The plugin-default knowledge it carried lives in `configuration.PluginDefaultRules`,
 // which the resolver already applies before this function sees the config, so those rules arrive
 // here as ordinary configured rules rather than as a second source to union in.
-func configuredRuleNames(lintConfig *configuration.Config) map[string]bool {
+func configuredRuleNames(lintConfiguration *configuration.Configuration) map[string]bool {
 	names := map[string]bool{}
-	for name, setting := range lintConfig.Rules {
+	for name, setting := range lintConfiguration.Rules {
 		normalized := differential.NormalizeRuleName(name)
 		// A rule turned off ran over no files, so it is not part of what this comparison covers.
 		if setting.Severity == configuration.SeverityOff {
@@ -165,9 +187,9 @@ func parseArguments(rest []string) (arguments, error) {
 		}
 	}
 
-	absoluteRoot, err := filepath.Abs(parsed.root)
-	if err != nil {
-		return parsed, fmt.Errorf("resolving the root %s: %w", parsed.root, err)
+	absoluteRoot, absolutePathError := filepath.Abs(parsed.root)
+	if absolutePathError != nil {
+		return parsed, fmt.Errorf("resolving the root %s: %w", parsed.root, absolutePathError)
 	}
 	parsed.root = absoluteRoot
 
@@ -197,7 +219,7 @@ func parseArguments(rest []string) (arguments, error) {
 //
 // The first version of this planted an enum and expected cohere alone to see it. It missed, and the
 // miss was correct: `consistency-no-enum` is implemented on both sides and enabled in the config, so
-// both gates saw the plant and it matched. The control was wrong, not the harness — and the harness
+// both gates saw the plant and it matched. The control was wrong, not the harness, and the harness
 // caught it, refused a verdict, and printed the difference list as not-a-measurement, which is the
 // behavior it was built for.
 //
@@ -218,8 +240,8 @@ func parseArguments(rest []string) (arguments, error) {
 //
 // What is planted instead is a shared control: a violation both gates must see. It does not prove
 // direction, and `ControlsProven` still returns false because of that. It does prove the pipeline
-// end to end — process launched, output parsed, paths normalized, rule names collapsed across two
-// decoration schemes, comparison run — which is the layer where a silent total mismatch lives. A
+// end to end (process launched, output parsed, paths normalized, rule names collapsed across two
+// decoration schemes, comparison run), which is the layer where a silent total mismatch lives. A
 // plant that both sides report as one shared finding, rather than as two one-sided ones, is
 // positive evidence that path normalization and rule-name normalization both worked.
 //
@@ -242,8 +264,8 @@ func defaultControls() []differential.Control {
 		// The cohere-only control. Verified against the tree at 03:17 rather than assumed:
 		//
 		//   registry.go:52                 cohere has import-require-path-alias compiled in
-		//   NexusLintConfiguration.ts:31   the ESLINT plugin defines it
-		//   OxlintNexusPlugin.mjs          the OXLINT plugin does not, at all
+		//   NexusLintConfiguration.ts:31   the ESLint plugin defines it
+		//   OxlintNexusPlugin.mjs          the oxlint plugin does not, at all
 		//   .oxlintrc.json                 no mention of the rule
 		//
 		// The gate we diff against runs oxlint, so it is structurally incapable of producing this
@@ -337,7 +359,7 @@ export function PlantedEffect(properties: { label: string }) {
 // the shared config, because configuring it differently per side manufactures differences that say
 // nothing about either implementation. `Run` refuses a rule the tree's config already configures,
 // which is the mechanical version of that boundary rather than a comment asking for care.
-func cohereOnlyRuleSettings(root string) map[string]any {
+func cohereOnlyRuleSettings(root string) map[string]json.RawMessage {
 	// The alias is scoped to the control's own directory rather than to a real source root.
 	//
 	// A first version aliased `modules`, which is a real directory, and the rule fired 95 times
@@ -348,31 +370,24 @@ func cohereOnlyRuleSettings(root string) map[string]any {
 	//
 	// Aliasing the control directory means the only relative import that can climb into an aliased
 	// directory is the one in the planted file.
-	return map[string]any{
-		"nexus/import-require-path-alias": []any{
-			"error",
-			map[string]any{
-				"repositoryRoot": root,
-				"aliases": []any{
-					map[string]any{
-						"directory": filepath.Join("code-quality", "differential-control"),
-						"alias":     "@differential-control",
-					},
+	pathAliasSetting, encodeError := json.Marshal([]any{
+		"error",
+		map[string]any{
+			"repositoryRoot": root,
+			"aliases": []any{
+				map[string]any{
+					"directory": filepath.Join("code-quality", "differential-control"),
+					"alias":     "@differential-control",
 				},
 			},
 		},
+	})
+	if encodeError != nil {
+		// Invariant: the setting holds only strings, and slices and maps of them, which always encode.
+		panic(encodeError)
 	}
+	return map[string]json.RawMessage{"nexus/import-require-path-alias": pathAliasSetting}
 }
-
-// gateRunnerPath is the gate as it actually ships, run through its own cached runner rather than by
-// invoking oxlint directly. Comparing against a hand-rolled oxlint invocation would measure a gate
-// nobody runs.
-var gateRunnerPath = filepath.Join(
-	"libraries", "structure", "libraries", "nexus", "code-quality", "oxlint", "RunCachedOxlint.ts",
-)
-
-// defaultRoot is the tree this instrument was commissioned to measure.
-var defaultRoot = filepath.Join(os.Getenv("HOME"), "Projects", "ahra")
 
 // checkControlsAreLintable refuses to run when a control was placed where its rule cannot fire.
 //
@@ -390,14 +405,18 @@ var defaultRoot = filepath.Join(os.Getenv("HOME"), "Projects", "ahra")
 //
 // The check runs before either gate is launched, so a misplaced control costs a second rather than
 // two full lint runs and a misleading verdict.
-func checkControlsAreLintable(lintConfig *configuration.Config, controls []differential.Control, extraVerifyRules map[string]any) error {
+func checkControlsAreLintable(
+	lintConfiguration *configuration.Configuration,
+	controls []differential.Control,
+	extraVerifyRules []string,
+) error {
 	// The rules supplied to cohere alone, reduced to bare names. A control naming one of these is
 	// enabled for cohere's run even though the tree's own config says nothing about it, so the
 	// check below has to know about them or it rejects exactly the directional control it should
 	// be admitting. The ignore check still applies to them: an ignored path is ignored by both
 	// sides regardless of which config names the rule.
 	suppliedToVerify := map[string]bool{}
-	for name := range extraVerifyRules {
+	for _, name := range extraVerifyRules {
 		suppliedToVerify[differential.NormalizeRuleName(name)] = true
 	}
 
@@ -409,7 +428,7 @@ func checkControlsAreLintable(lintConfig *configuration.Config, controls []diffe
 			continue
 		}
 
-		resolved := lintConfig.Resolve(filepath.Join(lintConfig.Root, control.RelativePath))
+		resolved := lintConfiguration.Resolve(filepath.Join(lintConfiguration.Root, control.RelativePath))
 
 		if resolved.Ignored {
 			return fmt.Errorf(
@@ -421,7 +440,7 @@ func checkControlsAreLintable(lintConfig *configuration.Config, controls []diffe
 		// The rule has to be enabled for that specific path, not merely present in the config: an
 		// override can scope a rule off for exactly the directory a control was written to, and
 		// that override is invisible from the base rule list.
-		if !resolved.Enabled(pluginQualified(lintConfig, control.Rule)) && !suppliedToVerify[control.Rule] {
+		if !resolved.Enabled(pluginQualified(lintConfiguration, control.Rule)) && !suppliedToVerify[control.Rule] {
 			return fmt.Errorf(
 				"control %q expects rule %s to fire at %s, but the lint config does not enable it there, so the control would miss for a reason unrelated to the harness",
 				control.Name, control.Rule, control.RelativePath,
@@ -442,8 +461,8 @@ func checkControlsAreLintable(lintConfig *configuration.Config, controls []diffe
 // Returning the bare name when nothing matches is deliberate. It makes Enabled report unconfigured,
 // which is the correct answer for a rule the config genuinely does not mention, and it keeps this
 // helper from being the thing that decides a control is valid.
-func pluginQualified(lintConfig *configuration.Config, bareRuleName string) string {
-	for name := range lintConfig.Rules {
+func pluginQualified(lintConfiguration *configuration.Configuration, bareRuleName string) string {
+	for name := range lintConfiguration.Rules {
 		if differential.NormalizeRuleName(name) == bareRuleName {
 			return name
 		}

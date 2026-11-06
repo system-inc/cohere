@@ -19,22 +19,24 @@ import (
 // package's claim has to be measured through this package's code.
 //
 //	COHERE_CORPUS_LIST=/path/to/list COHERE_CORPUS_OUT=/path/to/dir go test ./internal/prettier/ -run TestCorpus -v
-func TestCorpus(t *testing.T) {
-	t.Parallel()
+func TestCorpus(test *testing.T) {
+	test.Parallel()
 
 	listPath := os.Getenv("COHERE_CORPUS_LIST")
 	outDirectory := os.Getenv("COHERE_CORPUS_OUT")
 	if listPath == "" || outDirectory == "" {
-		t.Skip("set COHERE_CORPUS_LIST and COHERE_CORPUS_OUT")
+		test.Skip("set COHERE_CORPUS_LIST and COHERE_CORPUS_OUT")
 	}
 
-	engine := newTestEngine(t)
-	listBytes, err := os.ReadFile(listPath)
-	if err != nil {
-		t.Fatalf("reading the list: %v", err)
+	engine := newTestEngine(test)
+	listBytes, readError := os.ReadFile(listPath)
+	if readError != nil {
+		test.Fatalf("reading the list: %v", readError)
 	}
 
-	var formatted, failed, refused int
+	var formatted int
+	var failed int
+	var refused int
 	for _, path := range strings.Split(strings.TrimSpace(string(listBytes)), "\n") {
 		path = strings.TrimSpace(path)
 		if path == "" {
@@ -44,26 +46,26 @@ func TestCorpus(t *testing.T) {
 			refused++
 			continue
 		}
-		source, err := os.ReadFile(path)
-		if err != nil {
+		source, readError := os.ReadFile(path)
+		if readError != nil {
 			continue
 		}
 		text, formatError := engine.Format(path, string(source))
 		if formatError != nil {
 			failed++
-			t.Errorf("%s: %v", path, formatError)
+			test.Errorf("%s: %v", path, formatError)
 			continue
 		}
 		flat := strings.ReplaceAll(strings.TrimPrefix(path, "/"), "/", "_")
-		if err := os.WriteFile(filepath.Join(outDirectory, flat), []byte(text), 0o644); err != nil {
-			t.Fatalf("writing %s: %v", flat, err)
+		if writeError := os.WriteFile(filepath.Join(outDirectory, flat), []byte(text), 0o644); writeError != nil {
+			test.Fatalf("writing %s: %v", flat, writeError)
 		}
 		formatted++
 	}
 
 	// A corpus run that formatted nothing is vacuous, and it reads exactly like a clean one.
 	if formatted == 0 {
-		t.Fatalf("the corpus formatted no files at all (refused %d, failed %d)", refused, failed)
+		test.Fatalf("the corpus formatted no files at all (refused %d, failed %d)", refused, failed)
 	}
-	t.Logf("formatted=%d failed=%d refused=%d", formatted, failed, refused)
+	test.Logf("formatted=%d failed=%d refused=%d", formatted, failed, refused)
 }

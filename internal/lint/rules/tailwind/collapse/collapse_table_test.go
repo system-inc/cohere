@@ -19,8 +19,8 @@ import (
 // Each of these was a real finding at some point, several of them the specific finding a cheaper
 // approach silently lost. A regeneration that drops one is a regression in what the rule can see,
 // and without this test it would land as a quiet diff in a generated file.
-func TestTableContainsTheKnownFamilies(t *testing.T) {
-	t.Parallel()
+func TestTableContainsTheKnownFamilies(test *testing.T) {
+	test.Parallel()
 	required := []CollapseFamily{
 		// The canonical example, and the one that proves collapsing is on at all.
 		{First: "px", Second: "py", Output: "p"},
@@ -52,7 +52,7 @@ func TestTableContainsTheKnownFamilies(t *testing.T) {
 
 	for _, want := range required {
 		if !tableContains(want) {
-			t.Errorf("the table is missing %s + %s => %s, so the rule can no longer report it",
+			test.Errorf("the table is missing %s + %s => %s, so the rule can no longer report it",
 				want.First, want.Second, want.Output)
 		}
 	}
@@ -70,16 +70,16 @@ func TestTableContainsTheKnownFamilies(t *testing.T) {
 // roots share no axis. This asserts the size, because 1,326 and 38 are not close enough to be
 // confused by anyone reading the number, and a future generator change that reintroduces the bug
 // will fail here rather than ship.
-func TestTableHasNoSoloRewrites(t *testing.T) {
-	t.Parallel()
+func TestTableHasNoSoloRewrites(test *testing.T) {
+	test.Parallel()
 	if len(CollapseFamilies) == 0 {
-		t.Fatal("the table is empty, so every test in this file passes for the wrong reason")
+		test.Fatal("the table is empty, so every test in this file passes for the wrong reason")
 	}
 
 	// The real table is a few dozen entries. An order of magnitude more means the pair test has
 	// stopped requiring both inputs to matter.
 	if len(CollapseFamilies) > 200 {
-		t.Fatalf("the table holds %d families, which is far more than the real count. That is the "+
+		test.Fatalf("the table holds %d families, which is far more than the real count. That is the "+
 			"signature of counting invented class names instead of testing that both inputs are "+
 			"load-bearing, which produced 1,326 entries including `-bg-conic + -end`.",
 			len(CollapseFamilies))
@@ -96,23 +96,23 @@ func TestTableHasNoSoloRewrites(t *testing.T) {
 	// it was an order of magnitude too large rather than subtly wrong.
 	for _, entry := range CollapseFamilies {
 		if entry.First == entry.Second {
-			t.Errorf("%+v pairs a root with itself", entry)
+			test.Errorf("%+v pairs a root with itself", entry)
 		}
 	}
 }
 
 // TestTableEntriesAreWellFormed guards the shape rather than the content.
-func TestTableEntriesAreWellFormed(t *testing.T) {
-	t.Parallel()
+func TestTableEntriesAreWellFormed(test *testing.T) {
+	test.Parallel()
 	seen := map[string]bool{}
 
 	for _, entry := range CollapseFamilies {
 		if entry.First == "" || entry.Second == "" || entry.Output == "" {
-			t.Errorf("incomplete entry %+v", entry)
+			test.Errorf("incomplete entry %+v", entry)
 			continue
 		}
 		if entry.First == entry.Second {
-			t.Errorf("%+v pairs a root with itself", entry)
+			test.Errorf("%+v pairs a root with itself", entry)
 		}
 		// The output may equal one of its inputs, and `max-w + max-w-screen => max-w` is the case
 		// that proves it rather than an entry to be filtered out.
@@ -134,18 +134,18 @@ func TestTableEntriesAreWellFormed(t *testing.T) {
 		// What remains guarded is the shape that would actually be meaningless, an output equal to
 		// both inputs at once, which cannot happen while First and Second differ.
 		if entry.Output == entry.First && entry.Output == entry.Second {
-			t.Errorf("%+v collapses into both of its inputs, which names no merge at all", entry)
+			test.Errorf("%+v collapses into both of its inputs, which names no merge at all", entry)
 		}
 
 		key := entry.First + " " + entry.Second
 		if seen[key] {
-			t.Errorf("%s appears twice, so the table would answer the same question twice", key)
+			test.Errorf("%s appears twice, so the table would answer the same question twice", key)
 		}
 		seen[key] = true
 	}
 
 	if TailwindVersion == "" {
-		t.Fatal("the table records no Tailwind version, so a reader cannot tell which engine's opinion it holds")
+		test.Fatal("the table records no Tailwind version, so a reader cannot tell which engine's opinion it holds")
 	}
 }
 
@@ -183,26 +183,26 @@ func tableContains(want CollapseFamily) bool {
 // So this asserts the both-readings names specifically, and that the display utilities agree with
 // each other, because a table where `flex` and `block` disagree about their property cannot report
 // the conflict between them however correct each entry looks alone.
-func TestDeclaredPropertiesCoverBothReadings(t *testing.T) {
-	t.Parallel()
+func TestDeclaredPropertiesCoverBothReadings(test *testing.T) {
+	test.Parallel()
 	// Names that are genuinely both. Their static reading is what `no-conflicting-classes` needs.
 	bothReadings := []string{"flex", "block"}
 	for _, name := range bothReadings {
 		staticProperties, hasStatic := declaredPropertiesOfStatic(name)
 		if !hasStatic {
-			t.Errorf("%q is missing from the static table. It is both a static utility and a "+
+			test.Errorf("%q is missing from the static table. It is both a static utility and a "+
 				"functional root, and a generator that classifies rather than records loses whichever "+
 				"reading it checks second.", name)
 			continue
 		}
 		if !containsProperty(staticProperties, "display") {
-			t.Errorf("%q declares %v as a static utility, want display", name, staticProperties)
+			test.Errorf("%q declares %v as a static utility, want display", name, staticProperties)
 		}
 
-		// The functional reading should also be present, and should NOT be display.
+		// The functional reading should also be present, and should not be display.
 		if functionalProperties, hasFunctional := declaredPropertiesOfRoot(name); hasFunctional {
 			if containsProperty(functionalProperties, "display") {
-				t.Errorf("%q as a functional root declares display, which means the static reading "+
+				test.Errorf("%q as a functional root declares display, which means the static reading "+
 					"overwrote the functional one rather than both being recorded", name)
 			}
 		}
@@ -213,11 +213,11 @@ func TestDeclaredPropertiesCoverBothReadings(t *testing.T) {
 	for _, name := range displayUtilities {
 		properties, isPresent := declaredPropertiesOfStatic(name)
 		if !isPresent {
-			t.Errorf("%q has no computed static reading, so a conflict involving it is invisible", name)
+			test.Errorf("%q has no computed static reading, so a conflict involving it is invisible", name)
 			continue
 		}
 		if !containsProperty(properties, "display") {
-			t.Errorf("%q declares %v, want display. Two display utilities that disagree about their "+
+			test.Errorf("%q declares %v, want display. Two display utilities that disagree about their "+
 				"property cannot be reported as conflicting.", name, properties)
 		}
 	}
@@ -226,10 +226,10 @@ func TestDeclaredPropertiesCoverBothReadings(t *testing.T) {
 	width, hasWidth := declaredPropertiesOfRoot("w")
 	height, hasHeight := declaredPropertiesOfRoot("h")
 	if !hasWidth || !hasHeight {
-		t.Fatal("w or h has no computed reading")
+		test.Fatal("w or h has no computed reading")
 	}
 	if containsProperty(width, "height") || containsProperty(height, "width") {
-		t.Error("w and h share a property, so `w-8 h-8` would be reported as a conflict when it is a " +
+		test.Error("w and h share a property, so `w-8 h-8` would be reported as a conflict when it is a " +
 			"collapse into `size-8`")
 	}
 
@@ -237,11 +237,11 @@ func TestDeclaredPropertiesCoverBothReadings(t *testing.T) {
 	padding, hasPadding := declaredPropertiesOfRoot("p")
 	paddingInline, hasPaddingInline := declaredPropertiesOfRoot("px")
 	if !hasPadding || !hasPaddingInline {
-		t.Fatal("p or px has no computed reading")
+		test.Fatal("p or px has no computed reading")
 	}
 	for _, property := range padding {
 		if containsProperty(paddingInline, property) {
-			t.Errorf("p and px share the property %q, so `p-4 px-8` would be reported as a conflict. "+
+			test.Errorf("p and px share the property %q, so `p-4 px-8` would be reported as a conflict. "+
 				"Upstream reports no conflict there: `padding` and `padding-inline` are different "+
 				"property names even though they visually overlap.", property)
 		}
@@ -333,8 +333,8 @@ func containsProperty(properties []string, want string) bool {
 // The tell was that `border-l-4` and `border-r-4` shared properties, which they must not: they are
 // different edges. Caught by the rule's own known-dirty control rather than by reading the table,
 // which is the order this should happen in.
-func TestPropertiesExcludeAtRuleDescriptors(t *testing.T) {
-	t.Parallel()
+func TestPropertiesExcludeAtRuleDescriptors(test *testing.T) {
+	test.Parallel()
 	descriptors := []string{"syntax", "inherits", "initial-value"}
 
 	for _, table := range []struct {
@@ -346,7 +346,7 @@ func TestPropertiesExcludeAtRuleDescriptors(t *testing.T) {
 		for utility, properties := range table.entries {
 			for _, descriptor := range descriptors {
 				if containsProperty(properties, descriptor) {
-					t.Errorf("%s table: %q declares %q, which is an @property descriptor rather than a "+
+					test.Errorf("%s table: %q declares %q, which is an @property descriptor rather than a "+
 						"CSS property. Every utility carrying it would falsely conflict with every other one.",
 						table.name, utility, descriptor)
 				}
@@ -358,11 +358,11 @@ func TestPropertiesExcludeAtRuleDescriptors(t *testing.T) {
 	left, hasLeft := declaredPropertiesOfRoot("border-l")
 	right, hasRight := declaredPropertiesOfRoot("border-r")
 	if !hasLeft || !hasRight {
-		t.Fatal("border-l or border-r has no computed reading")
+		test.Fatal("border-l or border-r has no computed reading")
 	}
 	for _, property := range left {
 		if containsProperty(right, property) {
-			t.Errorf("border-l and border-r share %q, so opposite edges would be reported as "+
+			test.Errorf("border-l and border-r share %q, so opposite edges would be reported as "+
 				"conflicting", property)
 		}
 	}
@@ -376,7 +376,7 @@ func TestPropertiesExcludeAtRuleDescriptors(t *testing.T) {
 //
 //	`.slide-in-from-end:dir(ltr) { --enter-translate-x: 100%; }`
 //
-// declares only a custom property, and the regex matched the SELECTOR `slide-in-from-end` out of
+// declares only a custom property, and the regex matched the selector `slide-in-from-end` out of
 // `:dir(ltr)` as if it were a property name. A class declaring nothing was recorded as declaring
 // itself, and any two such classes would have read as conflicting.
 //
@@ -390,8 +390,8 @@ func TestPropertiesExcludeAtRuleDescriptors(t *testing.T) {
 //
 // This asserts the outcome rather than the mechanism, because the mechanism has been wrong in three
 // different ways and the outcome is what a rule reads.
-func TestPropertyExtractionRejectsSelectorsAndKeyframes(t *testing.T) {
-	t.Parallel()
+func TestPropertyExtractionRejectsSelectorsAndKeyframes(test *testing.T) {
+	test.Parallel()
 	// A property name is a CSS property, never a selector, an element name or an animation name.
 	notProperties := []string{
 		"p", "code", "pre", "div", "span", "h1", "li", "table",
@@ -406,13 +406,13 @@ func TestPropertyExtractionRejectsSelectorsAndKeyframes(t *testing.T) {
 		{name: "computed", entries: computedPropertyTables()},
 	} {
 		if len(table.entries) == 0 {
-			t.Fatalf("the %s table is empty, so this assertion passes for the wrong reason", table.name)
+			test.Fatalf("the %s table is empty, so this assertion passes for the wrong reason", table.name)
 		}
 		for utility, properties := range table.entries {
 			for _, property := range properties {
 				for _, forbidden := range notProperties {
 					if property == forbidden {
-						t.Errorf("%s table: %q declares %q, which is a selector, element or animation "+
+						test.Errorf("%s table: %q declares %q, which is a selector, element or animation "+
 							"name rather than a CSS property. The extraction is reading outside a rule body.",
 							table.name, utility, forbidden)
 					}
@@ -424,7 +424,7 @@ func TestPropertyExtractionRejectsSelectorsAndKeyframes(t *testing.T) {
 	// Multi-rule component classes are skipped entirely rather than merged, so they must be absent.
 	for _, componentClass := range []string{"markdown-content", "prose", "typing-dots"} {
 		if properties, isPresent := declaredPropertiesOfStatic(componentClass); isPresent {
-			t.Errorf("%q is a component class emitting several rules targeting descendants, so its "+
+			test.Errorf("%q is a component class emitting several rules targeting descendants, so its "+
 				"declarations belong to children rather than to the element. It should be absent, not "+
 				"recorded as %v.", componentClass, properties)
 		}
@@ -432,7 +432,7 @@ func TestPropertyExtractionRejectsSelectorsAndKeyframes(t *testing.T) {
 
 	// A class that declares only custom properties records nothing rather than recording itself.
 	if properties, isPresent := declaredPropertiesOfStatic("slide-in-from-end"); isPresent {
-		t.Errorf("slide-in-from-end declares only a custom property and should be absent, got %v", properties)
+		test.Errorf("slide-in-from-end declares only a custom property and should be absent, got %v", properties)
 	}
 }
 
@@ -445,8 +445,8 @@ func TestPropertyExtractionRejectsSelectorsAndKeyframes(t *testing.T) {
 //
 // Colors are the same shape at a different scale, handled per root because the palette is large and
 // uniform: `border` is width plus style with a number and `border-color` with a color.
-func TestValueDependentReadingsAreRecorded(t *testing.T) {
-	t.Parallel()
+func TestValueDependentReadingsAreRecorded(test *testing.T) {
+	test.Parallel()
 	// The named-value distinctions, computed rather than excepted.
 	//
 	// `ClassDeclaredProperties` held these as thirteen per-class overrides because a root-keyed table
@@ -471,11 +471,11 @@ func TestValueDependentReadingsAreRecorded(t *testing.T) {
 			Value: &ParsedValue{Kind: ParsedValueKindNamed, Value: value},
 		}, expectation.resolution)
 		if !resolved {
-			t.Errorf("%q computes no properties, so it would be skipped rather than compared", expectation.className)
+			test.Errorf("%q computes no properties, so it would be skipped rather than compared", expectation.className)
 			continue
 		}
 		if !containsProperty(properties, expectation.wantProperty) {
-			t.Errorf("%q computes %v, want %q. Without this distinction `font-medium font-mono` reads as "+
+			test.Errorf("%q computes %v, want %q. Without this distinction `font-medium font-mono` reads as "+
 				"a conflict on correct code, which is what the deleted overrides existed to prevent",
 				expectation.className, properties, expectation.wantProperty)
 		}
@@ -489,15 +489,15 @@ func TestValueDependentReadingsAreRecorded(t *testing.T) {
 	// `object-position` while `object-cover` was correct only because it read the root's row. Asking
 	// the two registrations separately gives both answers with no override at all.
 	if properties, resolved := declaredPropertiesOfRoot("object"); !resolved {
-		t.Error("root `object` computes nothing")
+		test.Error("root `object` computes nothing")
 	} else if !containsProperty(properties, "object-position") {
-		t.Errorf("root `object` computes %v, want object-position. The functional registration is a "+
+		test.Errorf("root `object` computes %v, want object-position. The functional registration is a "+
 			"position; the fits are separate statics", properties)
 	}
 	if properties, resolved := declaredPropertiesOfStatic("object-cover"); !resolved {
-		t.Error("static `object-cover` computes nothing")
+		test.Error("static `object-cover` computes nothing")
 	} else if !containsProperty(properties, "object-fit") {
-		t.Errorf("static `object-cover` computes %v, want object-fit", properties)
+		test.Errorf("static `object-cover` computes %v, want object-fit", properties)
 	}
 
 	// And the two arms of one root must still disagree, or the distinction is not being made.
@@ -512,11 +512,11 @@ func TestValueDependentReadingsAreRecorded(t *testing.T) {
 		Value: &ParsedValue{Kind: ParsedValueKindNamed, Value: "red-500"},
 	}, ValueResolution{IsColor: true})
 	if !hasWidth || !hasColour {
-		t.Fatal("root `border` computes nothing on one of its two arms")
+		test.Fatal("root `border` computes nothing on one of its two arms")
 	}
 	for _, property := range width {
 		if containsProperty(colour, property) {
-			t.Errorf("border's width arm and colour arm share %q, which means one answer is being "+
+			test.Errorf("border's width arm and colour arm share %q, which means one answer is being "+
 				"returned for both values rather than the branch being taken", property)
 		}
 	}
@@ -545,16 +545,16 @@ func TestValueDependentReadingsAreRecorded(t *testing.T) {
 // registry matches the first, which is the guard that makes an invariance claim mean something.
 //
 // This test asserts the property-shorthand structure rather than the count, so a family added upstream
-// that is NOT a shorthand relationship fails here and reopens the question.
-func TestCollapseFamiliesAreCssShorthandRelationships(t *testing.T) {
-	t.Parallel()
+// that is not a shorthand relationship fails here and reopens the question.
+func TestCollapseFamiliesAreCssShorthandRelationships(test *testing.T) {
+	test.Parallel()
 	withProperties := 0
 	for _, family := range CollapseFamilies {
 		first, _ := declaredPropertiesOfRoot(strings.TrimPrefix(family.First, "-"))
 		second, _ := declaredPropertiesOfRoot(strings.TrimPrefix(family.Second, "-"))
 		output, _ := declaredPropertiesOfRoot(strings.TrimPrefix(family.Output, "-"))
 		if len(first) == 0 || len(second) == 0 || len(output) == 0 {
-			t.Errorf("%s + %s => %s: one of the three declares no properties, so this family is not a "+
+			test.Errorf("%s + %s => %s: one of the three declares no properties, so this family is not a "+
 				"shorthand relationship and the reasoning in this test does not cover it",
 				family.First, family.Second, family.Output)
 			continue
@@ -563,11 +563,14 @@ func TestCollapseFamiliesAreCssShorthandRelationships(t *testing.T) {
 	}
 
 	if withProperties != len(CollapseFamilies) {
-		t.Errorf("%d of %d families are property-shorthand relationships; the rest need their own account",
+		test.Errorf("%d of %d families are property-shorthand relationships; the rest need their own account",
 			withProperties, len(CollapseFamilies))
 	}
 	if len(CollapseFamilies) < 40 {
-		t.Fatalf("the table holds %d families; expected around 45, so this assertion measured far less than it appears to", len(CollapseFamilies))
+		test.Fatalf(
+			"the table holds %d families; expected around 45, so this assertion measured far less than it appears to",
+			len(CollapseFamilies),
+		)
 	}
-	t.Logf("all %d collapse families relate the properties their roots declare", withProperties)
+	test.Logf("all %d collapse families relate the properties their roots declare", withProperties)
 }

@@ -16,8 +16,8 @@ import (
  * no_empty_object_type_corpus_data_test.go says how it was built.
  */
 
-func TestNoEmptyObjectTypeUpstreamCorpus(t *testing.T) {
-	t.Parallel()
+func TestNoEmptyObjectTypeUpstreamCorpus(test *testing.T) {
+	test.Parallel()
 
 	valid, invalid := 0, 0
 	for _, row := range noEmptyObjectTypeCorpus {
@@ -31,7 +31,7 @@ func TestNoEmptyObjectTypeUpstreamCorpus(t *testing.T) {
 		}
 	}
 	if valid != noEmptyObjectTypeCorpusUpstreamValid || invalid != noEmptyObjectTypeCorpusUpstreamInvalid {
-		t.Fatalf("the corpus holds %d valid and %d invalid upstream rows, and upstream has %d and %d",
+		test.Fatalf("the corpus holds %d valid and %d invalid upstream rows, and upstream has %d and %d",
 			valid, invalid, noEmptyObjectTypeCorpusUpstreamValid, noEmptyObjectTypeCorpusUpstreamInvalid)
 	}
 
@@ -40,16 +40,22 @@ func TestNoEmptyObjectTypeUpstreamCorpus(t *testing.T) {
 		if row.edge != "" {
 			name = row.edge
 		}
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			options, err := DecodeNoEmptyObjectTypeOptions([]byte(row.options))
-			if err != nil {
-				t.Fatalf("decoding %q: %v", row.options, err)
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+			options, decodeNoEmptyObjectTypeOptionsError := DecodeNoEmptyObjectTypeOptions([]byte(row.options))
+			if decodeNoEmptyObjectTypeOptionsError != nil {
+				test.Fatalf("decoding %q: %v", row.options, decodeNoEmptyObjectTypeOptionsError)
 			}
-			result := rule_testing.RunTypedFilesWithSetupAndOptions(t, NoEmptyObjectType, map[string]string{"file.ts": row.source}, "file.ts", options,
+			result := rule_testing.RunTypedFilesWithSetupAndOptions(test, NoEmptyObjectType, map[string]string{
+				"file.ts": row.source,
+			}, "file.ts", options,
 				func(directory string) {
-					if err := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(noEmptyObjectTypeCorpusTsconfig), 0o644); err != nil {
-						t.Fatal(err)
+					if writeError := os.WriteFile(
+						filepath.Join(directory, "tsconfig.json"),
+						[]byte(noEmptyObjectTypeCorpusTsconfig),
+						0o644,
+					); writeError != nil {
+						test.Fatal(writeError)
 					}
 				})
 
@@ -60,21 +66,24 @@ func TestNoEmptyObjectTypeUpstreamCorpus(t *testing.T) {
 			reported := []noEmptyObjectTypeCorpusFinding{}
 			for _, diagnostic := range diagnostics {
 				if len(diagnostic.Fixes) > 0 {
-					t.Fatalf("the rule proposes a fix, and upstream only ever suggests")
+					test.Fatalf("the rule proposes a fix, and upstream only ever suggests")
 				}
-				finding := noEmptyObjectTypeCorpusFinding{id: diagnostic.Message.Id, text: row.source[diagnostic.Range.Pos():diagnostic.Range.End()]}
+				finding := noEmptyObjectTypeCorpusFinding{
+					id:   diagnostic.Message.Id,
+					text: row.source[diagnostic.Range.Pos():diagnostic.Range.End()],
+				}
 				for _, suggestion := range diagnostic.Suggestions {
 					finding.suggestions = append(finding.suggestions, noEmptyObjectTypeCorpusSuggestion{
 						id:     suggestion.Message.Id,
-						output: applySuggestion(t, row.source, suggestion),
+						output: applySuggestion(test, row.source, suggestion),
 					})
 				}
 				reported = append(reported, finding)
 			}
 			if fmt.Sprint(reported) != fmt.Sprint(row.findings) {
-				t.Fatalf("the rule reports %q, and typescript-eslint 8.71.0 reports %q", reported, row.findings)
+				test.Fatalf("the rule reports %q, and typescript-eslint 8.71.0 reports %q", reported, row.findings)
 			}
-			rule_testing.RecordAssertedCase(t, result)
+			rule_testing.RecordAssertedCase(test, result)
 		})
 	}
 }

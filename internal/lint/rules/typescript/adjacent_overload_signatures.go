@@ -42,7 +42,7 @@ func messageAdjacentOverloadSignatures(name string) rule.Message {
 // # The algorithm, which is not "compare adjacent pairs"
 //
 // The name suggests a pairwise walk and the implementation is not one. Each container keeps a list
-// of every member name SEEN SO FAR and the name of the IMMEDIATELY PRECEDING member. A member
+// of every member name seen so far and the name of the immediately preceding member. A member
 // reports when its name is already in the seen list and it does not match the preceding member,
 // which is exactly "this set was closed and has been reopened". A name is appended to the seen list
 // only the first time it appears.
@@ -69,7 +69,7 @@ func messageAdjacentOverloadSignatures(name string) rule.Message {
 // listeners for upstream's six because a class expression is a separate kind here and a class body
 // is not; the containers reached are the same set.
 //
-// `Members()` PANICS on a kind with no member list, and `Statements()` likewise. The listener map is
+// `Members()` panics on a kind with no member list, and `Statements()` likewise. The listener map is
 // what keeps each call on a kind that has one, so the split above is a crash guard rather than a
 // tidy grouping. Probed: `Members()` on a `KindSourceFile` panics with
 // `Unhandled case in Node.MemberList`, and the walk recovers per file rather than per rule, so one
@@ -91,7 +91,7 @@ func messageAdjacentOverloadSignatures(name string) rule.Message {
 //
 // # A name is not a string, and the four ways it is built
 //
-// `getNameFromMember` returns a name AND a kind, and two members are the same only when both agree.
+// `getNameFromMember` returns a name and a kind, and two members are the same only when both agree.
 // The kind exists so that a key needing quotes cannot collide with one that does not. Read off the
 // installed build on eight spellings:
 //
@@ -104,14 +104,14 @@ func messageAdjacentOverloadSignatures(name string) rule.Message {
 //	['lit'](): void        lit           computed literal, keyed like a bare literal
 //	[Symbol.iterator]()    Symbol.iterator   anything else, the key's own source text
 //
-// So `'foo'` and `foo` ARE the same member and report, while `'a-b'` and a hypothetical bare `a-b`
+// So `'foo'` and `foo` are the same member and report, while `'a-b'` and a hypothetical bare `a-b`
 // cannot both exist. The kind is carried anyway because it is upstream's, and because a mutant
 // dropping it is caught by the quoted cases.
 //
-// # `static` is part of the identity, it is THREE-valued, and a sibling rule ignores it entirely
+// # `static` is part of the identity, it is three-valued, and a sibling rule ignores it entirely
 //
 // A static and an instance member of the same name are different methods, so
-// `static foo, bar, foo` is CLEAN. Worth stating because `related-getter-setter-pairs` in this same
+// `static foo, bar, foo` is clean. Worth stating because `related-getter-setter-pairs` in this same
 // package makes the opposite choice: there `static` is not part of the key at all, so a static
 // getter pairs with an instance setter. Both are upstream's own behavior for their own rule, and
 // the two must not be reconciled.
@@ -124,27 +124,27 @@ func messageAdjacentOverloadSignatures(name string) rule.Message {
 // member spelled `new`, which nothing else would, because `new` carries no call-signature flag.
 // The field's own note carries the five measured inputs, three clean and two controls.
 //
-// # TSESTree folds four member shapes into one, and one of them is an EXCLUSION
+// # TSESTree folds four member shapes into one, and one of them is an exclusion
 //
 // `MethodDefinition` covers a method, a getter, a setter and a constructor there; here those are
 // four kinds. All four are methods to this rule, a getter and a setter share one name with each
 // other and with a plain method of that name, and a constructor is named `constructor`. Every one
 // measured on the installed build; the table is at the arm that handles them.
 //
-// `TSAbstractMethodDefinition` is a FIFTH type there and upstream's switch does not name it, so an
+// `TSAbstractMethodDefinition` is a fifth type there and upstream's switch does not name it, so an
 // abstract member is not a method at all: it falls through and clears the preceding name the way a
 // property does. Here `abstract` is a modifier on the ordinary member, so the exclusion has to be
 // written rather than inherited, and it was measured with a concrete control so that "silent" could
 // be told apart from "never reached".
 //
-// # A call signature and a construct signature are named, not skipped, and the flag is INERT
+// # A call signature and a construct signature are named, not skipped, and the flag is inert
 //
 // `(): void` is the name `call` with a call-signature flag set, and `new (): void` is the name `new`
-// with the flag CLEAR. The flag reads as the thing keeping a call signature from colliding with a
+// with the flag clear. The flag reads as the thing keeping a call signature from colliding with a
 // member literally named `call`, and the asymmetry looks like upstream forgetting to protect `new`
 // the same way. Both readings are wrong here, and only a survivor made that visible.
 //
-// Mutants clearing the flag on the call arm and setting it on the construct arm BOTH survive, and
+// Mutants clearing the flag on the call arm and setting it on the construct arm both survive, and
 // both are correct survivals. The staticness field already separates these shapes from any method:
 // a call signature and a construct signature are unset, and every method and accessor is instance,
 // so the two can never be equal whatever the flag says. For the flag to decide anything, a call
@@ -165,18 +165,18 @@ func messageAdjacentOverloadSignatures(name string) rule.Message {
 // The flag is reproduced anyway because it is upstream's, but it is recorded as inert rather than
 // left to read as load-bearing. The verdict names the containers this rule listens on: adding a
 // listener for a container that could hold both shapes would void it.
-var AdjacentOverloadSignatures = rule.Rule{
+var AdjacentOverloadSignatures = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/adjacent-overload-signatures",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
 		checkMembers := func(node *ast.Node) {
-			reportAdjacentOverloadSignatures(ctx, node.Members())
+			reportAdjacentOverloadSignatures(ruleContext, node.Members())
 		}
 		checkStatements := func(node *ast.Node) {
-			reportAdjacentOverloadSignatures(ctx, node.Statements())
+			reportAdjacentOverloadSignatures(ruleContext, node.Statements())
 		}
 
 		return rule.Listeners{
@@ -201,7 +201,7 @@ type adjacentOverloadMethod struct {
 	name     string
 	nameKind adjacentOverloadNameKind
 
-	// staticness is THREE-valued, and that is not over-engineering. Upstream's `static` field is
+	// staticness is three-valued, and that is not over-engineering. Upstream's `static` field is
 	// `boolean | undefined`, and its comparison is `===`, so `undefined` does not equal `false`.
 	// Only the member arms set it at all: a function declaration, a call signature and a construct
 	// signature each build their object without the key, leaving it undefined, while a method
@@ -237,7 +237,7 @@ const (
 	//
 	// Written out at all three sites rather than left to the Go zero value, and the reason is a
 	// measurement rather than style. It was originally implicit, and a mutant rewriting the
-	// INSTANCE arm to this value then SURVIVED the whole suite: the mutation moved `Instance` onto
+	// instance arm to this value then survived the whole suite: the mutation moved `Instance` onto
 	// a constant nothing assigned, which was still distinct from the empty string the three arms
 	// were actually producing, so the two values that upstream conflates stayed apart by accident.
 	// The rule was right and the sweep could not see it, which is the shape a later reader would
@@ -255,9 +255,9 @@ const (
 // adjacentOverloadNameKind is upstream's `MemberNameType`.
 //
 // It is carried rather than folded into the name because upstream carries it, and it is measured
-// to be INERT today. A mutant making the quoted arm answer `Normal` survives the whole suite, and
+// to be inert today. A mutant making the quoted arm answer `Normal` survives the whole suite, and
 // that is a correct survival rather than a fixture gap: for the field to decide anything, two
-// members would have to key to the same STRING under different kinds, and none can.
+// members would have to key to the same string under different kinds, and none can.
 //
 // Enumerated rather than argued, over fifteen key spellings covering all four arms
 // (`foo`, `"foo"`, `"a-b"`, `12`, `"12"`, `[foo]`, `["foo"]`, `["a-b"]`, `[a.b]`, a template, a
@@ -283,12 +283,12 @@ const (
 // The two pieces of state are upstream's and their difference is the whole algorithm. `seen` is
 // every distinct method met so far in this container and only grows. `previous` is the method
 // immediately before the current one, and it is cleared by any member that is not a method at all.
-func reportAdjacentOverloadSignatures(ctx rule.Context, members []*ast.Node) {
+func reportAdjacentOverloadSignatures(ruleContext rule.Context, members []*ast.Node) {
 	var seen []adjacentOverloadMethod
 	var previous *adjacentOverloadMethod
 
 	for _, member := range members {
-		method, isMethod := adjacentOverloadMethodOf(ctx, member)
+		method, isMethod := adjacentOverloadMethodOf(ruleContext, member)
 		if !isMethod {
 			// Upstream's `lastMethod = null; return;`. Clearing rather than skipping is what makes
 			// a property between two signatures separate them, and it decides several of upstream's
@@ -307,7 +307,7 @@ func reportAdjacentOverloadSignatures(ctx rule.Context, members []*ast.Node) {
 
 		switch {
 		case alreadySeen && (previous == nil || *previous != method):
-			ctx.ReportNode(member, messageAdjacentOverloadSignatures(
+			ruleContext.ReportNode(member, messageAdjacentOverloadSignatures(
 				adjacentOverloadDisplayName(method)))
 		case !alreadySeen:
 			seen = append(seen, method)
@@ -338,7 +338,7 @@ func adjacentOverloadDisplayName(method adjacentOverloadMethod) string {
 // Upstream's export-unwrapping arms have no counterpart here and their absence is explained on the
 // rule: typescript-go carries `export` as a modifier on the declaration rather than as a wrapping
 // node, so there is nothing to unwrap, and `export { a }` is a kind this switch does not name.
-func adjacentOverloadMethodOf(ctx rule.Context, member *ast.Node) (adjacentOverloadMethod, bool) {
+func adjacentOverloadMethodOf(ruleContext rule.Context, member *ast.Node) (adjacentOverloadMethod, bool) {
 	switch member.Kind {
 	// Upstream's `TSDeclareFunction` and `FunctionDeclaration` are one kind here: a body-less
 	// overload signature and an implementation are both `KindFunctionDeclaration`, distinguished by
@@ -403,7 +403,7 @@ func adjacentOverloadMethodOf(ctx rule.Context, member *ast.Node) (adjacentOverl
 			}, true
 		}
 
-		name, nameKind, named := adjacentOverloadNameOf(ctx, member.Name())
+		name, nameKind, named := adjacentOverloadNameOf(ruleContext, member.Name())
 		if !named {
 			return adjacentOverloadMethod{}, false
 		}
@@ -422,7 +422,7 @@ func adjacentOverloadMethodOf(ctx rule.Context, member *ast.Node) (adjacentOverl
 		}, true
 
 	case ast.KindConstructSignature:
-		// `new` with the call-signature flag CLEAR, which is upstream's asymmetry rather than an
+		// `new` with the call-signature flag clear, which is upstream's asymmetry rather than an
 		// oversight here. See the rule's note.
 		return adjacentOverloadMethod{
 			name:     "new",
@@ -453,7 +453,7 @@ func adjacentOverloadStaticnessOf(member *ast.Node) adjacentOverloadStaticness {
 //
 // Two callers, asking two different questions that TSESTree answers two different ways.
 // `static` is a boolean field on a `MethodDefinition` there and a modifier here; `abstract` is a
-// distinct NODE TYPE there and a modifier here. Both become the same question against this parser,
+// distinct node type there and a modifier here. Both become the same question against this parser,
 // which is why one helper serves both, and both are reproductions of a parser difference rather
 // than of a decision.
 //
@@ -479,35 +479,36 @@ func adjacentOverloadHasModifier(member *ast.Node, keyword ast.Kind) bool {
 // its own rule and the two agree; they are not shared because the helper is small and because
 // sharing would invite a later caller to "fix" one rule's behavior into the other's, and the two
 // rules disagree about `static` on purpose.
-func adjacentOverloadNameOf(ctx rule.Context, key *ast.Node) (string, adjacentOverloadNameKind, bool) {
+func adjacentOverloadNameOf(ruleContext rule.Context, key *ast.Node) (string, adjacentOverloadNameKind, bool) {
 	if key == nil {
 		return "", "", false
 	}
 
-	// A computed key is read THROUGH the brackets, because TSESTree's `member.key` for a computed
+	// A computed key is read through the brackets, because TSESTree's `member.key` for a computed
 	// member is the inner expression rather than the bracket node. Measured: `[k]()` keys as `k` and
 	// `['lit']()` keys as `lit`, so a computed key can collide with a plain one.
+	nameNode := key
 	if key.Kind == ast.KindComputedPropertyName {
-		key = key.AsComputedPropertyName().Expression
-		if key == nil {
+		nameNode = key.AsComputedPropertyName().Expression
+		if nameNode == nil {
 			return "", "", false
 		}
 	}
 
-	switch key.Kind {
+	switch nameNode.Kind {
 	case ast.KindIdentifier:
-		return key.Text(), adjacentOverloadNameNormal, true
+		return nameNode.Text(), adjacentOverloadNameNormal, true
 
 	case ast.KindPrivateIdentifier:
 		// `Text()` already carries the leading hash here, the same way TSESTree's arm prepends one
 		// to a name that does not, so `#p` answers `#p` on both sides.
-		return key.Text(), adjacentOverloadNamePrivate, true
+		return nameNode.Text(), adjacentOverloadNamePrivate, true
 
 	case ast.KindStringLiteral, ast.KindNumericLiteral:
 		// `${member.key.value}` on the JavaScript side, which cooks the literal: a numeric key is
 		// rendered as its canonical number, so `1e1` and `10` are one key. `Text()` on our numeric
 		// literal already holds that same canonical rendering.
-		text := key.Text()
+		text := nameNode.Text()
 		// `requiresQuoting` is exactly "this string is not a valid identifier", so
 		// `IsIdentifierText` answers it inverted. `LanguageVariantStandard` rather than the JSX
 		// variant, because upstream calls `ts.isIdentifierPart` with no variant.
@@ -524,6 +525,6 @@ func adjacentOverloadNameOf(ctx rule.Context, key *ast.Node) (string, adjacentOv
 	// `Pos()` includes leading trivia, which upstream's `range` does not, so a key written after a
 	// newline would carry the whitespace and stop matching the same key written inline.
 	// `rule.TokenRange` is the same token-start walk `ReportNode` uses.
-	trimmed := rule.TokenRange(ctx.SourceFile, key)
-	return ctx.SourceFile.Text()[trimmed.Pos():trimmed.End()], adjacentOverloadNameExpression, true
+	trimmed := rule.TokenRange(ruleContext.SourceFile, nameNode)
+	return ruleContext.SourceFile.Text()[trimmed.Pos():trimmed.End()], adjacentOverloadNameExpression, true
 }

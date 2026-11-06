@@ -17,11 +17,11 @@ const noAwaitInLoopFile = "/repository/source/NoAwaitInLoop.ts"
 // way in, and every verdict was reproduced by driving the installed eslint at 10.8.1 first.
 //
 // Four of the clean cases are the ones a port is most likely to get wrong, and each is here for a
-// different reason: an await on a for-of ITERABLE runs once, a for-await-of that is not itself
+// different reason: an await on a for-of iterable runs once, a for-await-of that is not itself
 // nested is deliberate asynchronous iteration, a plain `using` does not wait, and an `await using`
-// in a for-loop INITIALIZER runs once.
-func TestNoAwaitInLoopFires(t *testing.T) {
-	t.Parallel()
+// in a for-loop initializer runs once.
+func TestNoAwaitInLoopFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -40,23 +40,26 @@ func TestNoAwaitInLoopFires(t *testing.T) {
 		{"an await in a do-while test", "async function foo() { do { } while (await bar); }"},
 		{"an await deep in a loop body", "async function foo() { while (true) { if (bar) { foo(await bar); } } }"},
 		{"an await deep in a loop condition", "async function foo() { while (xyz || 5 > await x) {  } }"},
-		{"an await in a while nested inside a for-await-of", "async function foo() { for await (var x of xs) { while (1) await f(x) } }"},
+		{
+			"an await in a while nested inside a for-await-of",
+			"async function foo() { for await (var x of xs) { while (1) await f(x) } }",
+		},
 		{"an await using in a while body", "while (true) { await using resource = getResource(); }"},
 		{"an await using in a for body", "for (;;) { await using resource = getResource(); }"},
 		{"an await using in a for-of left position", "for (await using resource of resources) {}"},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoAwaitInLoop, noAwaitInLoopFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "unexpectedAwait")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoAwaitInLoop, noAwaitInLoopFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "unexpectedAwait")
 		})
 	}
 }
 
-func TestNoAwaitInLoopStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoAwaitInLoopStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -67,28 +70,43 @@ func TestNoAwaitInLoopStaysSilent(t *testing.T) {
 		{"an await on the for-of iterable", "async function foo() { for (var bar of await baz) { } }"},
 		{"an await on a for-await-of iterable", "async function foo() { for await (var bar of await baz) { } }"},
 		{"an await in a legacy for-in initializer", "async function foo() { for (var bar = await baz in qux) {} }"},
-		{"blocked by a function declaration", "async function foo() { while (true) { async function foo() { await bar; } } }"},
+		{
+			"blocked by a function declaration",
+			"async function foo() { while (true) { async function foo() { await bar; } } }",
+		},
 		{"an await in a for-loop initializer", "async function foo() { for (var i = await bar; i < n; i++) {  } }"},
 		{"a do-while with no await at all", "async function foo() { do { } while (bar); }"},
-		{"blocked by a function expression", "async function foo() { while (true) { var y = async function() { await bar; } } }"},
+		{
+			"blocked by a function expression",
+			"async function foo() { while (true) { var y = async function() { await bar; } } }",
+		},
 		{"blocked by a concise arrow", "async function foo() { while (true) { var y = async () => await foo; } }"},
-		{"blocked by a block-bodied arrow", "async function foo() { while (true) { var y = async () => { await foo; } } }"},
-		{"blocked by a class method", "async function foo() { while (true) { class Foo { async foo() { await bar; } } } }"},
+		{
+			"blocked by a block-bodied arrow",
+			"async function foo() { while (true) { var y = async () => { await foo; } } }",
+		},
+		{
+			"blocked by a class method",
+			"async function foo() { while (true) { class Foo { async foo() { await bar; } } } }",
+		},
 		{"a for-await-of that is not itself nested", "async function foo() { for await (var x of xs) { await f(x) } }"},
 		{"a const declaration in a loop", "while (true) { const value = 0; }"},
 		{"a let declaration in a loop", "while (true) { let value = 0; }"},
 		{"a var declaration in a loop", "while (true) { var value = 0; }"},
 		{"an await using outside any loop", "await using resource = getResource();"},
 		{"a plain using in a loop", "while (true) { using resource = getResource(); }"},
-		{"an await using blocked by a function declaration", "async function foo() { while (true) { async function foo() { await using resource = getResource(); } } }"},
+		{
+			"an await using blocked by a function declaration",
+			"async function foo() { while (true) { async function foo() { await using resource = getResource(); } } }",
+		},
 		{"an await using in a for-loop initializer", "for (await using resource = getResource(); ;) {}"},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoAwaitInLoop, noAwaitInLoopFile, testCase.sourceText)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoAwaitInLoop, noAwaitInLoopFile, testCase.sourceText)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -96,7 +114,7 @@ func TestNoAwaitInLoopStaysSilent(t *testing.T) {
 // TestNoAwaitInLoopSpans pins where each of the three waiting shapes points.
 //
 // The `await using` rows are the reason this test exists. Upstream reports ESTree's
-// `VariableDeclaration`, whose span INCLUDES a trailing semicolon in a statement and has none to
+// `VariableDeclaration`, whose span includes a trailing semicolon in a statement and has none to
 // include in a for-of header. Those are two different nodes in this parser, so the rule chooses
 // between them, and a port always taking one is off by one character on half the cases while every
 // message-id fixture stays green.
@@ -104,8 +122,8 @@ func TestNoAwaitInLoopStaysSilent(t *testing.T) {
 // The offsets were checked by converting each to a line and column and comparing against the
 // installed build, and the semicolon question specifically was settled by running the same source
 // with the semicolon removed and watching upstream's end column move.
-func TestNoAwaitInLoopSpans(t *testing.T) {
-	t.Parallel()
+func TestNoAwaitInLoopSpans(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -114,29 +132,59 @@ func TestNoAwaitInLoopSpans(t *testing.T) {
 		wantEnd    int
 		wantText   string
 	}{
-		{"an await using statement keeps its semicolon", "while (true) { await using resource = getResource(); }", 15, 52, "await using resource = getResource();"},
-		{"an await using in a for body keeps its semicolon", "for (;;) { await using resource = getResource(); }", 11, 48, "await using resource = getResource();"},
-		{"an await using in a for-of header has no semicolon to keep", "for (await using resource of resources) {}", 5, 25, "await using resource"},
-		{"a plain await reports the await expression", "async function foo() { while (baz) { await bar; } }", 37, 46, "await bar"},
-		{"a nested for-await-of reports the loop", "async function foo() { while (baz) { for await (x of xs); } }", 37, 57, "for await (x of xs);"},
+		{
+			"an await using statement keeps its semicolon",
+			"while (true) { await using resource = getResource(); }",
+			15,
+			52,
+			"await using resource = getResource();",
+		},
+		{
+			"an await using in a for body keeps its semicolon",
+			"for (;;) { await using resource = getResource(); }",
+			11,
+			48,
+			"await using resource = getResource();",
+		},
+		{
+			"an await using in a for-of header has no semicolon to keep",
+			"for (await using resource of resources) {}",
+			5,
+			25,
+			"await using resource",
+		},
+		{
+			"a plain await reports the await expression",
+			"async function foo() { while (baz) { await bar; } }",
+			37,
+			46,
+			"await bar",
+		},
+		{
+			"a nested for-await-of reports the loop",
+			"async function foo() { while (baz) { for await (x of xs); } }",
+			37,
+			57,
+			"for await (x of xs);",
+		},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoAwaitInLoop, noAwaitInLoopFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoAwaitInLoop, noAwaitInLoopFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("expected one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("expected one finding, got %d", len(result.Diagnostics))
 			}
 			reported := result.Diagnostics[0].Range
 			got := testCase.sourceText[reported.Pos():reported.End()]
 			if reported.Pos() != testCase.wantStart || reported.End() != testCase.wantEnd {
-				t.Fatalf("expected [%d,%d) which is %q, got [%d,%d) which is %q",
+				test.Fatalf("expected [%d,%d) which is %q, got [%d,%d) which is %q",
 					testCase.wantStart, testCase.wantEnd, testCase.wantText,
 					reported.Pos(), reported.End(), got)
 			}
 			if got != testCase.wantText {
-				t.Fatalf("expected the finding to cover %q, got %q", testCase.wantText, got)
+				test.Fatalf("expected the finding to cover %q, got %q", testCase.wantText, got)
 			}
 		})
 	}
@@ -147,19 +195,19 @@ func TestNoAwaitInLoopSpans(t *testing.T) {
 // Nothing is interpolated, so this is equality on a constant rather than a guard against a format
 // string. It is here because the rule has one message and three entry points, and a reworded
 // description would otherwise be invisible.
-func TestNoAwaitInLoopMessage(t *testing.T) {
-	t.Parallel()
+func TestNoAwaitInLoopMessage(test *testing.T) {
+	test.Parallel()
 
 	if messageUnexpectedAwaitInLoop.Id != "unexpectedAwait" {
-		t.Fatalf("expected id %q, got %q", "unexpectedAwait", messageUnexpectedAwaitInLoop.Id)
+		test.Fatalf("expected id %q, got %q", "unexpectedAwait", messageUnexpectedAwaitInLoop.Id)
 	}
-	result := rule_testing.Run(t, NoAwaitInLoop, noAwaitInLoopFile,
+	result := rule_testing.Run(test, NoAwaitInLoop, noAwaitInLoopFile,
 		"async function foo() { while (baz) { await bar; } }")
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("expected one finding, got %d", len(result.Diagnostics))
+		test.Fatalf("expected one finding, got %d", len(result.Diagnostics))
 	}
 	if result.Diagnostics[0].Message.Description != messageUnexpectedAwaitInLoop.Description {
-		t.Fatalf("the reported description is not the rule's own")
+		test.Fatalf("the reported description is not the rule's own")
 	}
 }
 
@@ -174,13 +222,13 @@ func TestNoAwaitInLoopMessage(t *testing.T) {
 // clean for a constructor, a getter, a setter and a static block each containing a bare `await`,
 // and all four are clean upstream for a reason that has nothing to do with this rule: `await` is not
 // legal in a non-async constructor, accessor or static initialization block, so eslint fails at
-// PARSE and no rule runs. That is the brief's "a case whose verdict is decided above the rule",
+// parse and no rule runs. That is the brief's "a case whose verdict is decided above the rule",
 // arriving as a syntax error rather than as a suppression, and the tell was that eslint returned a
 // fatal rather than an empty list. The cases below are legal source, so the boundary is what makes
 // them clean, and a firing control was run alongside them to prove the measurement could see a
 // report at all.
-func TestNoAwaitInLoopBoundariesBeyondUpstreamsThree(t *testing.T) {
-	t.Parallel()
+func TestNoAwaitInLoopBoundariesBeyondUpstreamsThree(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name       string
@@ -189,26 +237,41 @@ func TestNoAwaitInLoopBoundariesBeyondUpstreamsThree(t *testing.T) {
 		{"an async object method", "async function f(){ while (true) { var o = { async m() { await bar; } }; } }"},
 		{"an async class method", "async function f(){ while (true) { class C { async m() { await bar; } } } }"},
 		{"an async generator method", "async function f(){ while (true) { class C { async *m() { await bar; } } } }"},
-		{"an async arrow returned from a method", "async function f(){ while (true) { class C { m() { return async () => await bar; } } } }"},
+		{
+			"an async arrow returned from a method",
+			"async function f(){ while (true) { class C { m() { return async () => await bar; } } } }",
+		},
 
-		// These four are ILLEGAL source and are here for that reason rather than in spite of it.
+		// These four are illegal source and are here for that reason rather than in spite of it.
 		// `await` is not allowed in a non-async constructor, accessor or static initialization
 		// block, so eslint fails at parse and upstream can never reach its boundary check with
 		// them. typescript-go recovers instead and hands the rule a real await expression inside a
-		// real accessor, so the arms naming those kinds are load-bearing HERE and in no upstream
+		// real accessor, so the arms naming those kinds are load-bearing here and in no upstream
 		// test. Measured both ways: with the four kinds removed from the boundary list, every one
 		// of these reports; with them present, all four are clean and a firing control still
 		// reports. That is the grammar and the parser disagreeing, which is exactly the case a
 		// surviving mutant on an arm like this is telling you about.
-		{"an await in a constructor, which is illegal and recovered", "async function f(){ while (true) { class C { constructor() { foo(await bar); } } } }"},
-		{"an await in a getter, which is illegal and recovered", "async function f(){ while (true) { class C { get x() { return foo(await bar); } } } }"},
-		{"an await in a setter, which is illegal and recovered", "async function f(){ while (true) { class C { set x(v) { foo(await bar); } } } }"},
-		{"an await in a static block, which is illegal and recovered", "async function f(){ while (true) { class C { static { foo(await bar); } } } }"},
+		{
+			"an await in a constructor, which is illegal and recovered",
+			"async function f(){ while (true) { class C { constructor() { foo(await bar); } } } }",
+		},
+		{
+			"an await in a getter, which is illegal and recovered",
+			"async function f(){ while (true) { class C { get x() { return foo(await bar); } } } }",
+		},
+		{
+			"an await in a setter, which is illegal and recovered",
+			"async function f(){ while (true) { class C { set x(v) { foo(await bar); } } } }",
+		},
+		{
+			"an await in a static block, which is illegal and recovered",
+			"async function f(){ while (true) { class C { static { foo(await bar); } } } }",
+		},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoAwaitInLoop, noAwaitInLoopFile, testCase.sourceText)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoAwaitInLoop, noAwaitInLoopFile, testCase.sourceText)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -218,8 +281,8 @@ func TestNoAwaitInLoopBoundariesBeyondUpstreamsThree(t *testing.T) {
 //
 // A loop header has parts that run once and parts the loop re-enters, and being anywhere inside a
 // loop node is not the question. Every row was measured against the installed build at 10.8.1.
-func TestNoAwaitInLoopLoopPositions(t *testing.T) {
-	t.Parallel()
+func TestNoAwaitInLoopLoopPositions(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name       string
@@ -239,14 +302,14 @@ func TestNoAwaitInLoopLoopPositions(t *testing.T) {
 		{"do-while test is re-entered", "async function f(){ do {} while (await bar); }", true},
 		{"do-while body is re-entered", "async function f(){ do { await bar; } while (baz); }", true},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoAwaitInLoop, noAwaitInLoopFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoAwaitInLoop, noAwaitInLoopFile, testCase.sourceText)
 			if testCase.wantReport {
-				rule_testing.ExpectFindings(t, result, "unexpectedAwait")
+				rule_testing.ExpectFindings(test, result, "unexpectedAwait")
 				return
 			}
-			rule_testing.ExpectClean(t, result)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }

@@ -52,30 +52,20 @@ type Node struct {
 
 type property struct {
 	key   string
-	value any
+	value Value
 }
 
-// TemplateValue is a TemplateElement's value: Cooked is nil where the escape is invalid in a tagged
-// template, the way upstream's cooked is null.
-type TemplateValue struct {
-	Cooked *string
-	Raw    string
-}
+func (*Node) isValue() {}
 
-// Regex is a regular expression literal's regex property.
-type Regex struct {
-	Pattern string
-	Flags   string
-}
-
-// New makes a node with its properties in the order given, key then value.
+// New makes a node with its properties in the order given.
 //
 // The properties are allocated at their final length, rather than grown one Set at a time: growing them
-// was 3.5M of the conversion's 11.9M allocations on ahra's 3,926 program files (#k8cht0w).
-func New(nodeType string, start int, end int, keysAndValues ...any) *Node {
-	node := &Node{nodeType: nodeType, Range: [2]int{start, end}, properties: make([]property, 0, len(keysAndValues)/2)}
-	for index := 0; index+1 < len(keysAndValues); index += 2 {
-		node.Set(keysAndValues[index].(string), keysAndValues[index+1])
+// was 3.5M of the conversion's 11.9M allocations on ahra's 3,926 program files (#k8cht0w). The slice is only
+// read, so a caller's literal stays on its stack.
+func New(nodeType string, start int, end int, properties []Property) *Node {
+	node := &Node{nodeType: nodeType, Range: [2]int{start, end}, properties: make([]property, 0, len(properties))}
+	for _, given := range properties {
+		node.Set(given.Key, given.Value)
 	}
 	return node
 }
@@ -105,7 +95,7 @@ func (node *Node) Type() string {
 func (node *Node) SetType(nodeType string) { node.nodeType = nodeType }
 
 // Get is node[key]: the property's value, or nil when it is absent.
-func (node *Node) Get(key string) any {
+func (node *Node) Get(key string) Value {
 	if node == nil {
 		return nil
 	}
@@ -119,14 +109,41 @@ func (node *Node) Get(key string) any {
 
 // Field is node[name] for the shared print core. "comments" is the attached comments, which live in
 // CommentFields rather than among the properties.
-func (node *Node) Field(name string) any {
+//
+// The core navigates only to children, lists of them, and css's url() string among a paren group's groups,
+// so a string is a leaf and any other value reads as missing, which no printer reaches: the core asks only
+// for visitor keys, "comments" and the children a printer names.
+func (node *Node) Field(name string) printing.Value[*Node] {
 	if name == "comments" {
 		if node == nil || len(node.Comments) == 0 {
-			return nil
+			return printing.Value[*Node]{}
 		}
-		return node.Comments
+		return printing.ListValue(node.Comments)
 	}
-	return node.Get(name)
+	switch typed := node.Get(name).(type) {
+	case *Node:
+		return printing.NodeValue(typed)
+	case Nodes:
+		return printing.ListValue([]*Node(typed))
+	case Values:
+		// A nil list stays nil, which the core reads as nothing, as it read the nil slice.
+		var values []printing.Value[*Node]
+		if typed != nil {
+			values = make([]printing.Value[*Node], len(typed))
+		}
+		for index, element := range typed {
+			switch typedElement := element.(type) {
+			case *Node:
+				values[index] = printing.NodeValue(typedElement)
+			case String:
+				values[index] = printing.LeafValue[*Node](string(typedElement))
+			}
+		}
+		return printing.MixedListValue(values)
+	case String:
+		return printing.LeafValue[*Node](string(typed))
+	}
+	return printing.Value[*Node]{}
 }
 
 // CommentData is the shared print core's access to the comment bookkeeping.
@@ -146,25 +163,26 @@ func (node *Node) Has(key string) bool {
 }
 
 // Set writes node[key], appending a new property at the end the way JavaScript does.
-func (node *Node) Set(key string, value any) {
+func (node *Node) Set(key string, value Value) {
 	// A typed nil stored in an interface is not == nil, which would make a missing child look present.
+	stored := value
 	switch typed := value.(type) {
 	case *Node:
 		if typed == nil {
-			value = nil
+			stored = nil
 		}
 	case *TemplateValue:
 		if typed == nil {
-			value = nil
+			stored = nil
 		}
 	}
 	for index := range node.properties {
 		if node.properties[index].key == key {
-			node.properties[index].value = value
+			node.properties[index].value = stored
 			return
 		}
 	}
-	node.properties = append(node.properties, property{key: key, value: value})
+	node.properties = append(node.properties, property{key: key, value: stored})
 }
 
 // Delete removes node[key].
@@ -197,20 +215,20 @@ func (node *Node) Child(key string) *Node {
 
 // List is node[key] when it is an array of nodes. Elements may be nil, as array holes are.
 func (node *Node) List(key string) []*Node {
-	list, _ := node.Get(key).([]*Node)
+	list, _ := node.Get(key).(Nodes)
 	return list
 }
 
 // String is node[key] when it is a string.
 func (node *Node) String(key string) string {
-	text, _ := node.Get(key).(string)
-	return text
+	text, _ := node.Get(key).(String)
+	return string(text)
 }
 
 // Bool is node[key] when it is a boolean, JavaScript's `node.key === true`.
 func (node *Node) Bool(key string) bool {
-	value, _ := node.Get(key).(bool)
-	return value
+	value, _ := node.Get(key).(Boolean)
+	return bool(value)
 }
 
 // Truthy is JavaScript's truthiness of node[key].
@@ -218,18 +236,19 @@ func (node *Node) Truthy(key string) bool {
 	return IsTruthy(node.Get(key))
 }
 
-// IsTruthy is JavaScript's truthiness for the values a node holds.
-func IsTruthy(value any) bool {
+// IsTruthy is JavaScript's truthiness for the values a node holds. An array and an object are truthy
+// empty or nil, as JavaScript's are.
+func IsTruthy(value Value) bool {
 	switch typed := value.(type) {
 	case nil:
 		return false
-	case bool:
-		return typed
-	case string:
+	case Boolean:
+		return bool(typed)
+	case String:
 		return typed != ""
-	case float64:
+	case Number:
 		return typed != 0 && typed == typed
-	case int:
+	case Integer:
 		return typed != 0
 	case *Node:
 		return typed != nil
@@ -262,7 +281,7 @@ func ChildNodes(node *Node) []*Node {
 		switch value := node.Get(key).(type) {
 		case *Node:
 			children = append(children, value)
-		case []*Node:
+		case Nodes:
 			for _, child := range value {
 				if child != nil {
 					children = append(children, child)

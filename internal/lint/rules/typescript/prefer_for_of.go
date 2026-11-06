@@ -5,6 +5,11 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
+var preferForOfMessage = rule.Message{
+	Id:          "preferForOf",
+	Description: "Expected a `for-of` loop instead of a `for` loop with this simple iteration.",
+}
+
 // PreferForOf flags a counted `for` loop whose index is only ever used to index one array.
 //
 //	valid:   for (let i = 0; i < arr.length; i++) { doMath(i); }      the index itself is used
@@ -31,13 +36,13 @@ import (
 // written rather than read, where a for-of rewrite would change what the code does rather than how
 // it reads.
 //
-// # The receiver is compared as TEXT, not as a symbol
+// # The receiver is compared as text, not as a symbol
 //
 // Upstream compares `getText(node.object)` against `getText(arrayExpression)`. That is a string
 // comparison and it is reproduced as one, deliberately. Comparing symbols would be a different rule:
 // it would report `for (let i = 0; i < a.length; i++) { b[i]; }` where `a` and `b` are aliases of one
 // array, which upstream leaves alone, and it would decline where two spellings of the same object
-// differ by whitespace. The rule is a readability judgment about what the source SAYS, so the source
+// differ by whitespace. The rule is a readability judgment about what the source says, so the source
 // text is the right thing to compare.
 //
 // # Where our tree spells things differently
@@ -63,7 +68,7 @@ import (
 // the body is walked and every identifier resolved with `GetSymbolAtLocation`, keeping the ones whose
 // symbol carries the loop's own declarator among its declarations. That is the technique in
 // `no_class_assign.go`, and it is what makes the shadowing case work: upstream's own corpus has a
-// loop nested inside a loop where the inner index has the SAME NAME as the outer, and a port matching
+// loop nested inside a loop where the inner index has the same name as the outer, and a port matching
 // on the name would attribute the inner references to the outer loop and go silent on both.
 //
 // The loop over `symbol.Declarations` is deliberate rather than an index into the first. The question
@@ -75,7 +80,7 @@ import (
 // One listener on a rare anchor, and the body walk runs only after the initializer, test and update
 // have all matched, which is a syntactic filter that declines almost every for loop in a real tree
 // before a single type question is asked.
-var PreferForOf = rule.Rule{
+var PreferForOf = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/prefer-for-of",
 
 	// Resolving a body identifier back to the loop's own declarator is the only way to tell a
@@ -83,10 +88,10 @@ var PreferForOf = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindForStatement: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 
@@ -115,25 +120,20 @@ var PreferForOf = rule.Rule{
 					return
 				}
 
-				if !isIndexOnlyUsedToSubscript(ctx, statement.Statement, declarator, arrayExpression) {
+				if !isIndexOnlyUsedToSubscript(ruleContext, statement.Statement, declarator, arrayExpression) {
 					return
 				}
 
-				ctx.ReportNode(node, preferForOfMessage)
+				ruleContext.ReportNode(node, preferForOfMessage)
 			},
 		}
 	},
 }
 
-var preferForOfMessage = rule.Message{
-	Id:          "preferForOf",
-	Description: "Expected a `for-of` loop instead of a `for` loop with this simple iteration.",
-}
-
 // singleNonConstDeclarator is upstream's `isSingleVariableDeclaration` plus its declarator lookup.
 //
 // Upstream reads `node.kind !== 'const'` off the declaration itself. Our parser puts that on the
-// declaration LIST as a flag rather than as a field, so the test is a flag test. `var` is flagless
+// declaration list as a flag rather than as a field, so the test is a flag test. `var` is flagless
 // and passes, which matches upstream reading a kind that is neither const nor absent.
 func singleNonConstDeclarator(initializer *ast.Node) *ast.Node {
 	if initializer == nil || initializer.Kind != ast.KindVariableDeclarationList {
@@ -160,7 +160,7 @@ func isZeroInitialized(declaration *ast.VariableDeclaration) bool {
 
 // isNumericLiteralWithText is upstream's `isLiteral(node, value)`.
 //
-// Upstream compares the parsed VALUE, so any spelling of the number matches. Our parser has already
+// Upstream compares the parsed value, so any spelling of the number matches. Our parser has already
 // done that normalization: a numeric literal's `.Text` holds the canonical rendering of the double it
 // denotes, so `0x0`, `0.0` and `0e0` all arrive as "0", and comparing that text is comparing the
 // value rather than the spelling.
@@ -179,7 +179,7 @@ func isIdentifierWithText(node *ast.Node, name string) bool {
 // It answers the receiver of the `.length` when the test reads `index < <receiver>.length`, and nil
 // otherwise. The receiver is what every body reference then has to match textually.
 //
-// An OPTIONAL access disqualifies, and that is not an accident of the node kind. `i < arr?.length` is
+// An optional access disqualifies, and that is not an accident of the node kind. `i < arr?.length` is
 // silent upstream because its parser gives an optional member expression a flag this rule does not
 // look for, so the property is reached through a shape the equality test rejects. Ours gives an
 // optional chain the same kind with a question-dot token, so the token is what has to be checked.
@@ -267,11 +267,11 @@ func isIncrementOfIndex(update *ast.Node, indexName string) bool {
 // `no_class_assign.go` uses and which is what makes the shadowing case work.
 //
 // Upstream's `!contains(body, id)` clause has no counterpart here, and its absence is not a
-// simplification. That clause exists because upstream is handed EVERY reference to the variable,
+// simplification. That clause exists because upstream is handed every reference to the variable,
 // including the ones in the loop header, and has to skip them. Walking the body reaches only the
 // references inside it, so there is nothing to skip.
 func isIndexOnlyUsedToSubscript(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	body *ast.Node,
 	declarator *ast.Node,
 	arrayExpression *ast.Node,
@@ -280,8 +280,8 @@ func isIndexOnlyUsedToSubscript(
 		return true
 	}
 
-	arrayRange := rule.TokenRange(ctx.SourceFile, arrayExpression)
-	arrayText := ctx.SourceFile.Text()[arrayRange.Pos():arrayRange.End()]
+	arrayRange := rule.TokenRange(ruleContext.SourceFile, arrayExpression)
+	arrayText := ruleContext.SourceFile.Text()[arrayRange.Pos():arrayRange.End()]
 
 	onlySubscripts := true
 	var walk func(node *ast.Node)
@@ -289,8 +289,8 @@ func isIndexOnlyUsedToSubscript(
 		if node == nil || !onlySubscripts {
 			return
 		}
-		if node.Kind == ast.KindIdentifier && resolvesToDeclarator(ctx, node, declarator) {
-			if !isSubscriptOfArray(ctx, node, arrayText) {
+		if node.Kind == ast.KindIdentifier && resolvesToDeclarator(ruleContext, node, declarator) {
+			if !isSubscriptOfArray(ruleContext, node, arrayText) {
 				onlySubscripts = false
 				return
 			}
@@ -310,20 +310,20 @@ func isIndexOnlyUsedToSubscript(
 // is asking: "does ANY declaration of this symbol belong to this loop". Node identity rather than
 // kind comparison, because a kind comparison passes every corpus case and fails on exactly the
 // shadowing shape upstream tests, where both declarations are the same kind.
-func resolvesToDeclarator(ctx rule.Context, identifier *ast.Node, declarator *ast.Node) bool {
-	return rule.HasDeclaration(ctx.TypeChecker.GetSymbolAtLocation(identifier), declarator)
+func resolvesToDeclarator(ruleContext rule.Context, identifier *ast.Node, declarator *ast.Node) bool {
+	return rule.HasDeclaration(ruleContext.TypeChecker.GetSymbolAtLocation(identifier), declarator)
 }
 
 // isSubscriptOfArray answers upstream's condition on one reference.
 //
-// The identifier has to be the SUBSCRIPT of an element access, the receiver has to read exactly like
+// The identifier has to be the subscript of an element access, the receiver has to read exactly like
 // the array in the loop test, the receiver must not be a bare `this`, and the access must not be
 // being assigned to.
 //
 // The bare-`this` exclusion looks arbitrary and is upstream's: `for (let i = 0; i < test.length; ++i)
 // { this[i]; }` is a passing case there. `this.item[i]` against `this.item.length` reports, so what is
 // excluded is `this` standing alone as the whole receiver rather than `this` appearing in it.
-func isSubscriptOfArray(ctx rule.Context, identifier *ast.Node, arrayText string) bool {
+func isSubscriptOfArray(ruleContext rule.Context, identifier *ast.Node, arrayText string) bool {
 	parent := identifier.Parent
 	if parent == nil || parent.Kind != ast.KindElementAccessExpression {
 		return false
@@ -333,10 +333,10 @@ func isSubscriptOfArray(ctx rule.Context, identifier *ast.Node, arrayText string
 	// Upstream's `node.property === id`. Ours cannot confuse a subscript with a dotted property,
 	// because the two are different node kinds, so this is the whole of that test.
 	//
-	// It is SUBSUMED by the receiver comparison below, and kept anyway. A mutation removing it
+	// It is subsumed by the receiver comparison below, and kept anyway. A mutation removing it
 	// survives every fixture, including one written specifically to kill it, which is what sent this
 	// to an argument rather than to a third fixture. For this line to decide anything the identifier
-	// would have to be the RECEIVER of the access while the receiver's text still equalled the
+	// would have to be the receiver of the access while the receiver's text still equalled the
 	// array's, which means the index and the array are spelled the same; and a loop whose test reads
 	// `i < i.length` cannot have `i` resolve to its own zero-initialized declarator and also be the
 	// array. So no input separates the two versions, and `i[arr]` is declined below by text rather
@@ -351,8 +351,8 @@ func isSubscriptOfArray(ctx rule.Context, identifier *ast.Node, arrayText string
 		return false
 	}
 
-	receiverRange := rule.TokenRange(ctx.SourceFile, access.Expression)
-	if ctx.SourceFile.Text()[receiverRange.Pos():receiverRange.End()] != arrayText {
+	receiverRange := rule.TokenRange(ruleContext.SourceFile, access.Expression)
+	if ruleContext.SourceFile.Text()[receiverRange.Pos():receiverRange.End()] != arrayText {
 		return false
 	}
 
@@ -361,7 +361,7 @@ func isSubscriptOfArray(ctx rule.Context, identifier *ast.Node, arrayText string
 
 // isAssignedTo is upstream's `isAssignee`.
 //
-// Every shape where the indexed element is being WRITTEN rather than read, which is what makes a
+// Every shape where the indexed element is being written rather than read, which is what makes a
 // for-of rewrite wrong rather than merely different. Recursive through the assertion wrappers,
 // because `(arr[i] as number)++` writes through the assertion.
 func isAssignedTo(node *ast.Node) bool {
@@ -396,7 +396,7 @@ func isAssignedTo(node *ast.Node) bool {
 
 	// `[arr[i]] = [0]` and `[...arr[i]] = [0]`. Upstream reads an ArrayPattern and a RestElement,
 	// which its parser produces because it knows the array literal is a destructuring target. Ours
-	// parses the same source as an array LITERAL with a spread element until the assignment says
+	// parses the same source as an array literal with a spread element until the assignment says
 	// otherwise, so the kinds differ while the question is the same: is this element position part
 	// of something being assigned to.
 	case ast.KindArrayLiteralExpression:
@@ -404,14 +404,14 @@ func isAssignedTo(node *ast.Node) bool {
 	case ast.KindSpreadElement:
 		return isAssignedTo(parent)
 
-	// `({ foo: arr[i] }) = { foo: 0 }`, and NOT `({ foo: arr[i] } = { foo: 0 })`.
+	// `({ foo: arr[i] }) = { foo: 0 }`, and not `({ foo: arr[i] } = { foo: 0 })`.
 	//
 	// The asymmetry is upstream's and it looks like a defect, so it is written down rather than
 	// corrected. Upstream requires the enclosing object be an `ObjectExpression`, and its parser
 	// gives a real destructuring target the distinct type `ObjectPattern` instead, so this arm fires
-	// only on the form where the parentheses sit INSIDE the assignment and the object is therefore
+	// only on the form where the parentheses sit inside the assignment and the object is therefore
 	// not a pattern at all. Measured against the installed build: with the parentheses around the
-	// whole assignment the loop REPORTS, and with them around the object alone it is silent, which is
+	// whole assignment the loop reports, and with them around the object alone it is silent, which is
 	// the opposite of what the two shapes do at runtime.
 	//
 	// Our parser has no ObjectPattern, so both spellings arrive as an object literal and this arm
@@ -419,7 +419,7 @@ func isAssignedTo(node *ast.Node) bool {
 	// the check below reads. Upstream's own corpus contains only the parenthesized-object form, so
 	// nothing imported can see the difference; it was found by measuring the other spelling.
 	case ast.KindPropertyAssignment:
-		// Upstream's `parent.value === node`, and it is SUBSUMED here rather than deciding anything.
+		// Upstream's `parent.value === node`, and it is subsumed here rather than deciding anything.
 		//
 		// A mutation removing it survives every fixture, including a computed-key case written to
 		// kill it. Four parses answer why: a property assignment has exactly two children, its name
@@ -432,7 +432,7 @@ func isAssignedTo(node *ast.Node) bool {
 		if parent.AsPropertyAssignment().Initializer != node {
 			return false
 		}
-		// The object-literal kind test is upstream's and it is REDUNDANT here, kept for the reason
+		// The object-literal kind test is upstream's and it is redundant here, kept for the reason
 		// below rather than because it decides anything.
 		//
 		// A mutation removing it survives every fixture, including one written to kill it. Fifteen
@@ -450,7 +450,7 @@ func isAssignedTo(node *ast.Node) bool {
 			return false
 		}
 		// Upstream's ObjectExpression requirement, expressed through the parenthesis our parser keeps
-		// and its parser drops. An object literal sitting DIRECTLY on the left of an assignment is a
+		// and its parser drops. An object literal sitting directly on the left of an assignment is a
 		// destructuring pattern, which upstream types as ObjectPattern and this arm therefore
 		// declines; one reached through a parenthesis is an ordinary object expression and is where
 		// upstream fires.
@@ -485,7 +485,7 @@ func isAssignedTo(node *ast.Node) bool {
 // parenthesis is an expression. The distinction only matters because upstream's isAssignee tests for
 // ObjectExpression, which makes it fire on the parenthesized form and not on the real destructuring.
 //
-// ANY assignment operator makes it a pattern, not only a plain equals. That was wrong here first: a
+// Any assignment operator makes it a pattern, not only a plain equals. That was wrong here first: a
 // mutation widening this test survived, the fixture written to kill it disagreed with upstream, and
 // running upstream's own parser on `({ foo: a[i] } += x)` settled it, which reports ObjectPattern for
 // a compound assignment exactly as it does for a plain one. The narrow version made this rule go
@@ -496,13 +496,13 @@ func objectLiteralIsADestructuringTarget(objectLiteral *ast.Node) bool {
 		return false
 	}
 	binary := parent.AsBinaryExpression()
-	// The left-side test is SUBSUMED: this function is called only from the property-assignment arm,
-	// which is itself reached only while walking UP from an indexed access, and the very next thing
+	// The left-side test is subsumed: this function is called only from the property-assignment arm,
+	// which is itself reached only while walking up from an indexed access, and the very next thing
 	// that arm does with a non-target object is recurse into isAssignedTo, which applies its own
 	// left-side test to the same binary. So an object on the right of an assignment is declined
 	// either way, and a mutation removing this clause produces identical output on every shape tried,
 	// including the two where an indexed read sits inside the right-hand object. Written out because
-	// it states what a destructuring target IS rather than relying on a caller two frames away to
+	// it states what a destructuring target is rather than relying on a caller two frames away to
 	// notice.
 	return binary.OperatorToken != nil &&
 		ast.IsAssignmentOperator(binary.OperatorToken.Kind) &&

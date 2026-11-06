@@ -21,7 +21,10 @@ const AdamicExtension = ".a"
 // TreatedAs is the name a file's TypeScript decisions read: an Adamic `.a` name with `.ts` in place of
 // its extension, so `Dog.test.a` reads as `Dog.test.ts`, and any other name as it is.
 func TreatedAs(fileName string) string {
-	if stem, isAdamic := strings.CutSuffix(fileName, AdamicExtension); isAdamic && stem != "" && !strings.HasSuffix(stem, "/") {
+	if stem, isAdamic := strings.CutSuffix(
+		fileName,
+		AdamicExtension,
+	); isAdamic && stem != "" && !strings.HasSuffix(stem, "/") {
 		return stem + ".ts"
 	}
 	return fileName

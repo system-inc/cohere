@@ -28,11 +28,35 @@ func tokenizeHtmlTextOverride(self *Self, effects *Effects, ok State, nok State)
 	var index int
 	var returnState State
 
-	var start, open, declarationOpen, commentOpenInside, comment, commentClose, commentEnd, cdataOpenInside,
-		cdata, cdataClose, cdataEnd, declaration, instruction, instructionClose, tagCloseStart, tagClose,
-		tagCloseBetween, tagOpen, tagOpenBetween, tagOpenAttributeName, tagOpenAttributeNameAfter,
-		tagOpenAttributeValueBefore, tagOpenAttributeValueQuoted, tagOpenAttributeValueUnquoted,
-		tagOpenAttributeValueQuotedAfter, end, lineEndingBefore, lineEndingAfter, lineEndingAfterPrefix State
+	var start State
+	var open State
+	var declarationOpen State
+	var commentOpenInside State
+	var comment State
+	var commentClose State
+	var commentEnd State
+	var cdataOpenInside State
+	var cdata State
+	var cdataClose State
+	var cdataEnd State
+	var declaration State
+	var instruction State
+	var instructionClose State
+	var tagCloseStart State
+	var tagClose State
+	var tagCloseBetween State
+	var tagOpen State
+	var tagOpenBetween State
+	var tagOpenAttributeName State
+	var tagOpenAttributeNameAfter State
+	var tagOpenAttributeValueBefore State
+	var tagOpenAttributeValueQuoted State
+	var tagOpenAttributeValueUnquoted State
+	var tagOpenAttributeValueQuotedAfter State
+	var end State
+	var lineEndingBefore State
+	var lineEndingAfter State
+	var lineEndingAfterPrefix State
 
 	// Start of HTML (text).
 	//
@@ -506,7 +530,7 @@ func tokenizeHtmlTextOverride(self *Self, effects *Effects, ok State, nok State)
 	//	> | b-->
 	//	    ^
 	//
-	// THE FORK'S CHANGE, the only one in the state machine. Core html-text.js eats the whitespace at the
+	// The fork's change, the only one in the state machine. Core html-text.js eats the whitespace at the
 	// start of the line here with factorySpace, as a `linePrefix` token outside htmlTextData (at most 3
 	// columns, factorySpace's max of 4 less one, unless codeIndented is disabled; the rest falls to
 	// returnState, which consumes it as data).

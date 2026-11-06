@@ -25,7 +25,6 @@ import (
 	"github.com/system-inc/cohere/internal/format/doc"
 	"github.com/system-inc/cohere/internal/format/formatoptions"
 	"github.com/system-inc/cohere/internal/format/printing"
-	ecmascripttext "github.com/system-inc/cohere/internal/lint/ecmascript/text"
 )
 
 // Print formats one file's text with the options its repository resolves to.
@@ -37,7 +36,12 @@ type Print func(fileName string, text string, options formatoptions.Options) (st
 // PrintParsed is a Print that can take a tree of the text someone already parsed, rather than parsing it
 // again, and parses as Print does when the tree is nil or not the one it would build. Only the TypeScript
 // printer has one: its parse is typescript-go's, the same one the fix engine's guard runs first (#dk2502g).
-type PrintParsed func(fileName string, text string, parsed *ast.SourceFile, options formatoptions.Options) (string, error)
+type PrintParsed func(
+	fileName string,
+	text string,
+	parsed *ast.SourceFile,
+	options formatoptions.Options,
+) (string, error)
 
 // PrintDoc is a printer's textToDoc (src/main/multiparser.js): the doc for text embedded in another
 // language's file, with the trailing hardline stripped, for the outer printer to lay out at its own
@@ -55,16 +59,21 @@ var (
 	rawDocPrinters = map[string]bool{}
 )
 
+// byteOrderMark is the mark core.js takes off a file's text before parsing and puts back on after.
+const byteOrderMark = "\ufeff"
+
 // RegisterDoc routes an extension to a printer's doc entry, for embedding. A printer without one is
 // embedded through its Print, as text.
 func RegisterDoc(extension string, printDoc PrintDoc) {
 	mutex.Lock()
 	defer mutex.Unlock()
-	extension = strings.ToLower(extension)
-	if _, taken := docPrinters[extension]; taken {
-		panic(fmt.Sprintf("native: %s is registered twice for embedding", extension))
+	lowercaseExtension := strings.ToLower(extension)
+	if _, taken := docPrinters[lowercaseExtension]; taken {
+		// Invariant: every caller outside the tests that prove this refusal is an init function in this package
+		// naming a fixed extension, so a second claim fails at startup, never in a file being formatted.
+		panic(fmt.Sprintf("native: %s is registered twice for embedding", lowercaseExtension))
 	}
-	docPrinters[extension] = printDoc
+	docPrinters[lowercaseExtension] = printDoc
 }
 
 // RegisterRawDoc is RegisterDoc for a doc entry that returns its doc with the trailing hardline still on:
@@ -130,15 +139,22 @@ func TextToDoc(options formatoptions.Options, parentParser string, docs *arena.S
 		printDoc, raw := docPrinters[extension], rawDocPrinters[extension]
 		mutex.RUnlock()
 		if printDoc != nil {
-			printed, err := printDoc(fileName, text, options, parser, parentParser, TextToDoc(options, parser, docs))
-			if err != nil || !raw {
-				return printed, err
+			printed, printDocError := printDoc(
+				fileName,
+				text,
+				options,
+				parser,
+				parentParser,
+				TextToDoc(options, parser, docs),
+			)
+			if printDocError != nil || !raw {
+				return printed, printDocError
 			}
 			return doc.StripTrailingHardlineWith(printed, docs), nil
 		}
-		formatted, err := Formatter{Options: options}.Format(fileName, text)
-		if err != nil {
-			return nil, err
+		formatted, formatError := Formatter{Options: options}.Format(fileName, text)
+		if formatError != nil {
+			return nil, formatError
 		}
 		// textToDoc strips the trailing hardline the embedded printer ends with.
 		return doc.Text(strings.TrimSuffix(formatted, "\n")), nil
@@ -157,11 +173,13 @@ func lookupParsed(fileName string) (PrintParsed, bool) {
 func RegisterParsed(extension string, printParsed PrintParsed) {
 	mutex.Lock()
 	defer mutex.Unlock()
-	extension = strings.ToLower(extension)
-	if _, taken := parsedPrinters[extension]; taken {
-		panic(fmt.Sprintf("native: %s is registered twice to take a tree", extension))
+	lowercaseExtension := strings.ToLower(extension)
+	if _, taken := parsedPrinters[lowercaseExtension]; taken {
+		// Invariant: every caller outside the tests that prove this refusal is an init function in this package
+		// naming a fixed extension, so a second claim fails at startup, never in a file being formatted.
+		panic(fmt.Sprintf("native: %s is registered twice to take a tree", lowercaseExtension))
 	}
-	parsedPrinters[extension] = printParsed
+	parsedPrinters[lowercaseExtension] = printParsed
 }
 
 // Register routes an extension (".tsx", with the dot) to a printer. Registering one twice is a
@@ -170,11 +188,13 @@ func RegisterParsed(extension string, printParsed PrintParsed) {
 func Register(extension string, print Print) {
 	mutex.Lock()
 	defer mutex.Unlock()
-	extension = strings.ToLower(extension)
-	if _, taken := printers[extension]; taken {
-		panic(fmt.Sprintf("native: %s is registered twice", extension))
+	lowercaseExtension := strings.ToLower(extension)
+	if _, taken := printers[lowercaseExtension]; taken {
+		// Invariant: every caller outside the tests that prove this refusal is an init function in this package
+		// naming a fixed extension, so a second claim fails at startup, never in a file being formatted.
+		panic(fmt.Sprintf("native: %s is registered twice", lowercaseExtension))
 	}
-	printers[extension] = print
+	printers[lowercaseExtension] = print
 }
 
 // Extensions lists what is registered, for a report to say which languages the native side covers.
@@ -188,64 +208,6 @@ func Extensions() []string {
 	sort.Strings(extensions)
 	return extensions
 }
-
-// Formatter formats with the registered printers and one set of options.
-type Formatter struct {
-	Options formatoptions.Options
-}
-
-// Handles reports whether a printer is registered for the file's type.
-func (formatter Formatter) Handles(fileName string) bool {
-	_, present := lookup(fileName)
-	return present
-}
-
-// Format formats a file, or refuses one no printer handles.
-func (formatter Formatter) Format(fileName string, text string) (string, error) {
-	return formatter.FormatParsed(fileName, text, nil)
-}
-
-// FormatParsed is Format with a tree of the text someone already parsed, or nil. A printer that parses
-// with typescript-go takes it where it is the tree it would build, and every other printer ignores it.
-func (formatter Formatter) FormatParsed(fileName string, text string, parsed *ast.SourceFile) (string, error) {
-	print, present := lookup(fileName)
-	if !present {
-		return "", fmt.Errorf("native: no printer for %s yet", fileName)
-	}
-
-	// main/core.js's formatWithCursor, once for every language as upstream does it: the byte order mark
-	// comes off before parsing and goes back on after, and carriage returns become newlines. endOfLine
-	// is always "lf" (formatoptions.Resolve refuses anything else), so nothing converts them back.
-	hasByteOrderMark := strings.HasPrefix(text, byteOrderMark)
-	text = strings.TrimPrefix(text, byteOrderMark)
-	if strings.Contains(text, "\r") {
-		text = strings.ReplaceAll(strings.ReplaceAll(text, "\r\n", "\n"), "\r", "\n")
-	}
-
-	// The tree is of the text as given, so a byte order mark or a carriage return taken off above leaves it
-	// describing other bytes, and the printer is then not offered it. It would refuse it anyway, by comparing
-	// texts, but not handing it over says why.
-	var formatted string
-	var err error
-	if ecmascripttext.TrimWhitespace(text) == "" {
-		// core.js's coreFormat: empty or whitespace-only text formats to nothing before any parser sees it,
-		// in every language. A parser that refuses empty input (JSON's) is never asked (#w6vtsrn).
-		formatted = ""
-	} else if printParsed, takesTree := lookupParsed(fileName); takesTree && parsed != nil && parsed.Text() == text {
-		formatted, err = printParsed(fileName, text, parsed, formatter.Options)
-	} else {
-		formatted, err = print(fileName, text, formatter.Options)
-	}
-	if err != nil {
-		return "", err
-	}
-	if hasByteOrderMark {
-		formatted = byteOrderMark + formatted
-	}
-	return formatted, nil
-}
-
-const byteOrderMark = "\ufeff"
 
 func lookup(fileName string) (Print, bool) {
 	mutex.RLock()

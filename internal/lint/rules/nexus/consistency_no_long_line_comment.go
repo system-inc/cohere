@@ -27,7 +27,10 @@ const consistencyNoLongLineCommentId = "longLineComment"
 
 // consistencyNoLongLineCommentText is the rule's message, whose wording lives in
 // `policy/messages/consistency-no-long-line-comment.json`.
-var consistencyNoLongLineCommentText = policy.MessageOf("nexus/consistency-no-long-line-comment", consistencyNoLongLineCommentId)
+var consistencyNoLongLineCommentText = policy.MessageOf(
+	"nexus/consistency-no-long-line-comment",
+	consistencyNoLongLineCommentId,
+)
 
 // ConsistencyNoLongLineComment requires a block comment for a long run of line comments.
 //
@@ -37,29 +40,29 @@ var consistencyNoLongLineCommentText = policy.MessageOf("nexus/consistency-no-lo
 // The fix preserves each line's text verbatim and changes only the delimiters, which is what makes
 // it safe to apply unattended. It is withheld when the run contains a star-slash sequence, since
 // that would close the block early and change what the rest of the run means.
-var ConsistencyNoLongLineComment = rule.Rule{
+var ConsistencyNoLongLineComment = rule.Rule[ConsistencyNoLongLineCommentOptions]{
 	Name: "nexus/consistency-no-long-line-comment",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[ConsistencyNoLongLineCommentOptions]) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
 		maximumLineCount := defaultMaximumLineCount
-		if settings, hasSettings := rule.OptionsAs[ConsistencyNoLongLineCommentOptions](options); hasSettings && settings.MaximumLineCount > 0 {
+		if settings, hasSettings := options.Read(); hasSettings && settings.MaximumLineCount > 0 {
 			maximumLineCount = settings.MaximumLineCount
 		}
 
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
-				sourceLines := strings.Split(ctx.SourceFile.Text(), "\n")
+				sourceLines := strings.Split(ruleContext.SourceFile.Text(), "\n")
 
 				var run []comments.Comment
 				flush := func() {
-					reportLineCommentRun(ctx, run, maximumLineCount)
+					reportLineCommentRun(ruleContext, run, maximumLineCount)
 					run = nil
 				}
 
-				for _, comment := range comments.ForFile(ctx) {
+				for _, comment := range comments.ForFile(ruleContext) {
 					if !isFoldableLineComment(comment, sourceLines) {
 						flush()
 						continue
@@ -124,7 +127,7 @@ func isConsecutiveComment(previous comments.Comment, current comments.Comment) b
 }
 
 // reportLineCommentRun reports a run that is too long, with a fix when one is safe.
-func reportLineCommentRun(ctx rule.Context, run []comments.Comment, maximumLineCount int) {
+func reportLineCommentRun(ruleContext rule.Context, run []comments.Comment, maximumLineCount int) {
 	if len(run) <= maximumLineCount {
 		return
 	}
@@ -141,15 +144,15 @@ func reportLineCommentRun(ctx rule.Context, run []comments.Comment, maximumLineC
 	// let a human decide how to phrase it.
 	for _, comment := range run {
 		if strings.Contains(comment.Text, "*/") {
-			ctx.ReportRange(runRange, message)
+			ruleContext.ReportRange(runRange, message)
 			return
 		}
 	}
 
-	ctx.Report(rule.Diagnostic{
+	ruleContext.Report(rule.Diagnostic{
 		Range:      runRange,
 		Message:    message,
-		SourceFile: ctx.SourceFile,
+		SourceFile: ruleContext.SourceFile,
 		Fixes:      []rule.Fix{rule.ReplaceRange(runRange, blockCommentFromRun(run))},
 	})
 }

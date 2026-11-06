@@ -6,8 +6,8 @@ import (
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
-func TestNoUselessCatchReportsBareRethrows(t *testing.T) {
-	t.Parallel()
+func TestNoUselessCatchReportsBareRethrows(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name   string
@@ -15,25 +15,37 @@ func TestNoUselessCatchReportsBareRethrows(t *testing.T) {
 		wantId string
 	}{
 		{"plain rethrow", `try { foo(); } catch (err) { throw err; }`, "unnecessaryCatch"},
-		{"rethrow with a finally", `try { foo(); } catch (err) { throw err; } finally { cleanUp(); }`, "unnecessaryCatchClause"},
+		{
+			"rethrow with a finally",
+			`try { foo(); } catch (err) { throw err; } finally { cleanUp(); }`,
+			"unnecessaryCatchClause",
+		},
 		{"comment before the rethrow", `try { foo(); } catch (err) { /* comment */ throw err; }`, "unnecessaryCatch"},
 		{"typed catch binding", `try { foo(); } catch (err: unknown) { throw err; }`, "unnecessaryCatch"},
 		{"parenthesized rethrow", `try { foo(); } catch (err) { throw (err); }`, "unnecessaryCatch"},
 		{"non-null assertion is erased", `try { foo(); } catch (err) { throw err!; }`, "unnecessaryCatch"},
 		{"as expression is erased", `try { foo(); } catch (err) { throw err as Error; }`, "unnecessaryCatch"},
-		{"statements after the rethrow are unreachable", `try { foo(); } catch (err) { throw err; unreachable(); }`, "unnecessaryCatch"},
-		{"nested inside another try", `try { try { foo(); } catch (err) { throw err; } } catch (outer) { log(outer); }`, "unnecessaryCatch"},
+		{
+			"statements after the rethrow are unreachable",
+			`try { foo(); } catch (err) { throw err; unreachable(); }`,
+			"unnecessaryCatch",
+		},
+		{
+			"nested inside another try",
+			`try { try { foo(); } catch (err) { throw err; } } catch (outer) { log(outer); }`,
+			"unnecessaryCatch",
+		},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoUselessCatch, "file.ts", testCase.source)
-			rule_testing.ExpectFindings(t, result, testCase.wantId)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoUselessCatch, "file.ts", testCase.source)
+			rule_testing.ExpectFindings(test, result, testCase.wantId)
 		})
 	}
 }
 
-func TestNoUselessCatchAcceptsClausesThatDoWork(t *testing.T) {
-	t.Parallel()
+func TestNoUselessCatchAcceptsClausesThatDoWork(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name   string
@@ -54,9 +66,9 @@ func TestNoUselessCatchAcceptsClausesThatDoWork(t *testing.T) {
 		{"throw inside a nested block, not first", `try { foo(); } catch (err) { if (a) { throw err; } log(err); }`},
 		{"a throw elsewhere in the function", `function f() { throw error; }`},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoUselessCatch, "file.ts", testCase.source))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoUselessCatch, "file.ts", testCase.source))
 		})
 	}
 }
@@ -64,21 +76,22 @@ func TestNoUselessCatchAcceptsClausesThatDoWork(t *testing.T) {
 // Without a finally the whole try is dead, so the range must cover the try statement; with one, only
 // the catch clause is, so the range must start at `catch`. Reporting the wrong node would name a
 // repair that deletes a finally the author needs.
-func TestNoUselessCatchReportsTheNodeMatchingTheRepair(t *testing.T) {
-	t.Parallel()
+func TestNoUselessCatchReportsTheNodeMatchingTheRepair(test *testing.T) {
+	test.Parallel()
 
 	const withoutFinally = `try { foo(); } catch (err) { throw err; }`
-	result := rule_testing.Run(t, NoUselessCatch, "file.ts", withoutFinally)
-	rule_testing.ExpectFindings(t, result, "unnecessaryCatch")
-	if got := withoutFinally[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]; got != withoutFinally {
-		t.Fatalf("reported range = %q, want the whole try statement", got)
+	result := rule_testing.Run(test, NoUselessCatch, "file.ts", withoutFinally)
+	rule_testing.ExpectFindings(test, result, "unnecessaryCatch")
+	reported := withoutFinally[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
+	if reported != withoutFinally {
+		test.Fatalf("reported range = %q, want the whole try statement", reported)
 	}
 
 	const withFinally = `try { foo(); } catch (err) { throw err; } finally { cleanUp(); }`
-	result = rule_testing.Run(t, NoUselessCatch, "file.ts", withFinally)
-	rule_testing.ExpectFindings(t, result, "unnecessaryCatchClause")
+	result = rule_testing.Run(test, NoUselessCatch, "file.ts", withFinally)
+	rule_testing.ExpectFindings(test, result, "unnecessaryCatchClause")
 	const wantClause = `catch (err) { throw err; }`
 	if got := withFinally[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]; got != wantClause {
-		t.Fatalf("reported range = %q, want %q", got, wantClause)
+		test.Fatalf("reported range = %q, want %q", got, wantClause)
 	}
 }

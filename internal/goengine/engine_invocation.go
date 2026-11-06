@@ -1,0 +1,143 @@
+package goengine
+
+import (
+	"fmt"
+	"slices"
+	"strconv"
+	"strings"
+
+	"github.com/system-inc/cohere/internal/goengine/contract"
+)
+
+// switchNames are the switches the front door forwards, each `--name` or `--name=true|false`.
+var switchNames = []string{
+	"no-fix", "fix", "types", "lint", "format", "format-all", "format-only", "no-format", "single-threaded",
+	"rules", "rules-enabled", "version",
+}
+
+// notImplementedFlags are the contract's flags this engine does not do yet. Each is refused by name, because a
+// flag accepted and ignored reads as a run that did what was asked.
+var notImplementedFlags = []string{"unused", "unused-all", "unused-deep", "timing", "explain"}
+
+// valuedFlags are the flags that take a value, as `--name value` or `--name=value`.
+var valuedFlags = []string{"contract", "root", "lint-config"}
+
+// refusedTogether are the combinations the contract refuses, each switch with the switches it cannot be named
+// beside. `--format-only` asks for formatting alone, so asking it for a phase or for no formatting asks two
+// opposite things; `--no-format` leaves formatting out, so asking it for formatting does too.
+var refusedTogether = []struct {
+	name    string
+	besides []string
+}{
+	{name: "format-only", besides: []string{"fix", "types", "lint", "no-format"}},
+	{name: "no-format", besides: []string{"format", "format-all"}},
+}
+
+// mode is which question a run answers, and so which records it writes.
+type mode string
+
+const (
+	modeCheck        mode = "Check"
+	modeVersion      mode = "Version"
+	modeRules        mode = "Rules"
+	modeRulesEnabled mode = "RulesEnabled"
+)
+
+// parseInvocation reads the command line, and refuses one the engine cannot honor in full.
+//
+// A contract mismatch is the refusal named whenever there is one, even beside a flag this engine does not
+// know: a front door speaking another version may well send flags this one has never heard of, and the
+// version is the reason.
+func parseInvocation(arguments []string) (invocation, error) {
+	request := invocation{switches: map[string]bool{}}
+	contractValue := ""
+	contractGiven := false
+	var firstRefusal error
+	refuseOnce := func(refusal error) {
+		if firstRefusal == nil {
+			firstRefusal = refusal
+		}
+	}
+
+	pathsOnly := false
+	for index := 0; index < len(arguments); index++ {
+		argument := arguments[index]
+		if pathsOnly || !strings.HasPrefix(argument, "-") {
+			request.paths = append(request.paths, argument)
+			continue
+		}
+		if argument == "--" {
+			pathsOnly = true
+			continue
+		}
+		spelled, isLong := strings.CutPrefix(argument, "--")
+		if !isLong {
+			refuseOnce(fmt.Errorf("%s is not a flag the Go engine takes, whose flags are spelled with two dashes",
+				argument))
+			continue
+		}
+		name, value, hasValue := strings.Cut(spelled, "=")
+		switch {
+		case slices.Contains(valuedFlags, name):
+			if !hasValue {
+				if index+1 >= len(arguments) {
+					refuseOnce(fmt.Errorf("--%s needs a value, and it was the last argument", name))
+					continue
+				}
+				index++
+				value = arguments[index]
+			}
+			switch name {
+			case "contract":
+				contractValue, contractGiven = value, true
+			case "root":
+				request.root = value
+			case "lint-config":
+				request.lintConfiguration = value
+			}
+		case slices.Contains(switchNames, name):
+			switch {
+			case !hasValue || value == "true":
+				request.switches[name] = true
+			case value == "false":
+				request.switches[name] = false
+			default:
+				refuseOnce(fmt.Errorf("--%s=%s: a switch takes true or false", name, value))
+			}
+		case slices.Contains(notImplementedFlags, name):
+			refuseOnce(fmt.Errorf("--%s is not implemented for Go yet, so the run was refused rather than run "+
+				"without it", name))
+		default:
+			refuseOnce(fmt.Errorf("--%s is not a flag the Go engine takes", name))
+		}
+	}
+
+	if contractError := checkContract(contractValue, contractGiven); contractError != nil {
+		return invocation{}, contractError
+	}
+	if firstRefusal != nil {
+		return invocation{}, firstRefusal
+	}
+	if checkError := request.check(); checkError != nil {
+		return invocation{}, checkError
+	}
+	return request, nil
+}
+
+// checkContract refuses a command line that does not speak this engine's contract version.
+func checkContract(value string, given bool) error {
+	if !given {
+		return fmt.Errorf("no --contract was given, so the engine cannot tell whether it speaks the front door's "+
+			"version (it speaks contract %d)", contract.Version)
+	}
+	spoken, parseError := strconv.Atoi(value)
+	if parseError != nil {
+		return fmt.Errorf("--contract %q is not a version number (this engine speaks contract %d)", value,
+			contract.Version)
+	}
+	if spoken != contract.Version {
+		return fmt.Errorf("the front door speaks contract %d and this engine speaks contract %d", spoken,
+			contract.Version)
+	}
+	return nil
+}

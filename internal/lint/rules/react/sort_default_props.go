@@ -24,9 +24,9 @@ func DefaultSortDefaultPropsOptions() SortDefaultPropsOptions {
 // DecodeSortDefaultPropsOptions reads this rule's configuration from the config layer.
 //
 // Our config layer unwraps the severity tuple before dispatch, so this receives upstream's option
-// OBJECT rather than upstream's one-element array. Empty input is a rule configured as a bare
+// object rather than upstream's one-element array. Empty input is a rule configured as a bare
 // `"error"` and resolves to the default.
-func DecodeSortDefaultPropsOptions(raw []byte) (any, error) {
+func DecodeSortDefaultPropsOptions(raw []byte) (SortDefaultPropsOptions, error) {
 	options := DefaultSortDefaultPropsOptions()
 	if len(raw) == 0 {
 		return options, nil
@@ -34,8 +34,8 @@ func DecodeSortDefaultPropsOptions(raw []byte) (any, error) {
 	var wire struct {
 		IgnoreCase bool `json:"ignoreCase"`
 	}
-	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &wire); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 	options.IgnoreCase = wire.IgnoreCase
 	return options, nil
@@ -48,7 +48,7 @@ var messageDefaultPropsNotSorted = rule.Message{
 		"adding a default in the same week from colliding in the same spot.",
 }
 
-// SortDefaultProps reports a defaultProps object whose keys are not in ascending order.
+// SortDefaultProperties reports a defaultProps object whose keys are not in ascending order.
 //
 //	valid:   static defaultProps = {a: 1, b: 2}
 //	valid:   static defaultProps = {b: 1, ...rest, a: 2}   a spread restarts the comparison
@@ -68,7 +68,7 @@ var messageDefaultPropsNotSorted = rule.Message{
 // through the plugin's metadata. It is recorded here because it is the kind of thing a later reader
 // deserves to know before building on this rule.
 //
-// # The comparison is on RAW SOURCE TEXT, not on the resolved key
+// # The comparison is on raw source text, not on the resolved key
 //
 // Upstream's `getKey` calls `getText` on the key node, so the string being compared includes any
 // quotes the source wrote. That produces an ordering nobody would design:
@@ -83,14 +83,14 @@ var messageDefaultPropsNotSorted = rule.Message{
 //
 // # A spread restarts the comparison rather than being skipped
 //
-// Upstream's reduce returns `decls[idx + 1]` when it meets a spread, so the element AFTER the
+// Upstream's reduce returns `decls[idx + 1]` when it meets a spread, so the element after the
 // spread becomes the accumulator without being compared to anything. That means a spread splits the
 // object into independently sorted runs, and `{b: 1, ...x, a: 2}` is clean. Measured.
 //
 // # Which objects are reached
 //
 // A class field or an assignment named `defaultProps` or `getDefaultProps`, whose value is either
-// an object literal directly or an identifier naming one. A `getDefaultProps` METHOD returning an
+// an object literal directly or an identifier naming one. A `getDefaultProps` method returning an
 // object is silent, because the rule looks at the value rather than at a return statement, measured
 // against the installed build even though the name suggests otherwise.
 //
@@ -98,40 +98,40 @@ var messageDefaultPropsNotSorted = rule.Message{
 // `const o = {defaultProps: {b: 1, a: 2}}` is silent only because the member arm requires an
 // assignment, while any class field named `defaultProps` is judged regardless of what the class
 // extends. Reproduced.
-var SortDefaultProps = rule.Rule{
+var SortDefaultProperties = rule.Rule[SortDefaultPropsOptions]{
 	Name:             "react/sort-default-props",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[SortDefaultPropsOptions]) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
 		settings := DefaultSortDefaultPropsOptions()
-		if configured, isConfigured := rule.OptionsAs[SortDefaultPropsOptions](options); isConfigured {
+		if configured, isConfigured := options.Read(); isConfigured {
 			settings = configured
 		}
 
 		check := func(value *ast.Node) {
-			if value == nil || ctx.TypeChecker == nil {
+			if value == nil || ruleContext.TypeChecker == nil {
 				return
 			}
 			switch value.Kind {
 			case ast.KindObjectLiteralExpression:
-				sortDefaultPropsReportUnsorted(ctx, settings, value)
+				sortDefaultPropsReportUnsorted(ruleContext, settings, value)
 
 			case ast.KindIdentifier:
 				// `C.defaultProps = someObject`. Upstream resolves the name and reads the
 				// initializer of its first definition; the checker answers the same question, and
 				// the loop over declarations rather than an index is the standing hazard here.
-				symbol := ctx.TypeChecker.GetSymbolAtLocation(value)
+				symbol := ruleContext.TypeChecker.GetSymbolAtLocation(value)
 				if symbol == nil {
 					return
 				}
 				for _, declaration := range symbol.Declarations {
 					if initializer := sortDefaultPropsInitializerOf(declaration); initializer != nil &&
 						initializer.Kind == ast.KindObjectLiteralExpression {
-						sortDefaultPropsReportUnsorted(ctx, settings, initializer)
+						sortDefaultPropsReportUnsorted(ruleContext, settings, initializer)
 						return
 					}
 				}
@@ -200,18 +200,18 @@ func sortDefaultPropsInitializerOf(declaration *ast.Node) *ast.Node {
 // This is upstream's `reduce`, written as a loop. Three behaviours in it are load-bearing and none
 // is obvious from the shape:
 //
-// The accumulator starts at element ZERO and element zero is also the first thing compared, so the
+// The accumulator starts at element zero and element zero is also the first thing compared, so the
 // first property is compared against itself. That comparison can never fail, so it costs nothing,
 // and it is kept rather than skipped because skipping it would change which element the spread
 // handling below sees first.
 //
-// A spread does not advance the accumulator to itself; it advances to the element AFTER it, which
+// A spread does not advance the accumulator to itself; it advances to the element after it, which
 // is then never compared to anything. So a spread splits the object into independently sorted runs.
 //
-// When a property IS out of order the accumulator does NOT advance past it. So `{c, b, a}` reports
+// When a property is out of order the accumulator does not advance past it. So `{c, b, a}` reports
 // twice, both against `c`, rather than reporting once and resyncing. Measured.
 func sortDefaultPropsReportUnsorted(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	settings SortDefaultPropsOptions,
 	object *ast.Node,
 ) {
@@ -231,7 +231,7 @@ func sortDefaultPropsReportUnsorted(
 			// iteration's `getKey` would then read. It never gets the chance, because there is no
 			// next iteration when the spread is last.
 			//
-			// Setting the accumulator to the spread ITSELF is an EQUIVALENT mutation, verified by
+			// Setting the accumulator to the spread itself is an equivalent mutation, verified by
 			// enumeration over nine spread arrangements rather than argued: a spread has no name
 			// node, so its key text is the empty string, and the empty string is less than every
 			// other string, so the next key can never report against it and then becomes the
@@ -243,15 +243,15 @@ func sortDefaultPropsReportUnsorted(
 			continue
 		}
 
-		previousKey := sortDefaultPropsKeyText(ctx, previous)
-		currentKey := sortDefaultPropsKeyText(ctx, current)
+		previousKey := sortDefaultPropsKeyText(ruleContext, previous)
+		currentKey := sortDefaultPropsKeyText(ruleContext, current)
 		if settings.IgnoreCase {
 			previousKey = strings.ToLower(previousKey)
 			currentKey = strings.ToLower(currentKey)
 		}
 
 		if currentKey < previousKey {
-			ctx.ReportNode(current, messageDefaultPropsNotSorted)
+			ruleContext.ReportNode(current, messageDefaultPropsNotSorted)
 			// The accumulator deliberately does not advance, matching upstream's `return prev`.
 			continue
 		}
@@ -259,7 +259,7 @@ func sortDefaultPropsReportUnsorted(
 	}
 }
 
-// sortDefaultPropsKeyText renders the text upstream compares, which is the RAW SOURCE of the key.
+// sortDefaultPropsKeyText renders the text upstream compares, which is the raw source of the key.
 //
 // Upstream calls `getText(context, node.key || node.argument)`, so quotes, whitespace inside a
 // computed key, and everything else the author wrote is part of the comparison. Reading the source
@@ -267,13 +267,13 @@ func sortDefaultPropsReportUnsorted(
 //
 // `node.argument` is the spread's operand upstream; spreads never reach here because the caller
 // skips them, and the fallback is kept for a property whose name node is absent.
-func sortDefaultPropsKeyText(ctx rule.Context, property *ast.Node) string {
+func sortDefaultPropsKeyText(ruleContext rule.Context, property *ast.Node) string {
 	name := property.Name()
 	if name == nil {
 		return ""
 	}
 	// A computed key is where the two trees disagree about what "the key node" is. ESTree's `key`
-	// for `{[x]: 1}` is the INNER expression `x`, and upstream renders that, while our parser wraps
+	// for `{[x]: 1}` is the inner expression `x`, and upstream renders that, while our parser wraps
 	// it in a ComputedPropertyName whose own text carries the brackets. Rendering the wrapper would
 	// compare `[x]`, and the bracket sorts between uppercase and lowercase, so `{[x]: 1, a: 2}`
 	// would go silent where upstream reports. Measured against the installed build: that input
@@ -285,16 +285,16 @@ func sortDefaultPropsKeyText(ctx rule.Context, property *ast.Node) string {
 	}
 	// `Pos()` includes leading trivia, so a raw slice carries the newline, the indentation and any
 	// comment written before the key. Whitespace and `/` sort below every letter, so an untrimmed
-	// key compares as less than almost anything and a correctly SORTED object reports. Upstream's
+	// key compares as less than almost anything and a correctly sorted object reports. Upstream's
 	// `getText(node)` returns the node's own text with trivia already excluded, which is what
-	// `rule.TokenRange` reproduces; trimming whitespace by hand is NOT enough, because a comment
+	// `rule.TokenRange` reproduces; trimming whitespace by hand is not enough, because a comment
 	// between two keys survives it. Both shapes measured silent upstream and both reported here
 	// before this used the token range.
-	keyRange := rule.TokenRange(ctx.SourceFile, name)
-	text := ctx.SourceFile.Text()
-	pos, end := keyRange.Pos(), keyRange.End()
-	if pos < 0 || end > len(text) || pos > end {
+	keyRange := rule.TokenRange(ruleContext.SourceFile, name)
+	text := ruleContext.SourceFile.Text()
+	position, end := keyRange.Pos(), keyRange.End()
+	if position < 0 || end > len(text) || position > end {
 		return ""
 	}
-	return text[pos:end]
+	return text[position:end]
 }

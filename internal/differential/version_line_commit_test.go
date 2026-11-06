@@ -11,8 +11,8 @@ import (
 //
 // The text below is what the global cohere printed on 2026-10-02 at 7b434bb4105b, verbatim apart from
 // the patch line.
-func TestACommittedBuildIsIdentifiedByItsCommitLine(t *testing.T) {
-	t.Parallel()
+func TestACommittedBuildIsIdentifiedByItsCommitLine(test *testing.T) {
+	test.Parallel()
 	committed := versionLineFrom(
 		"cohere dev\n" +
 			"  platform:       darwin/arm64\n" +
@@ -22,13 +22,13 @@ func TestACommittedBuildIsIdentifiedByItsCommitLine(t *testing.T) {
 			"  note:           a local build of the commit above, with nothing uncommitted in it, so that commit reproduces it\n",
 	)
 	if !strings.Contains(committed, "7b434bb4105b") {
-		t.Fatalf("a committed build's own commit was lost, got %q", committed)
+		test.Fatalf("a committed build's own commit was lost, got %q", committed)
 	}
 	if !strings.Contains(committed, "so that commit reproduces it") {
-		t.Fatalf("the build's note did not travel with its commit, got %q", committed)
+		test.Fatalf("the build's note did not travel with its commit, got %q", committed)
 	}
 	if strings.Contains(committed, "1f70213d4922") {
-		t.Fatalf("the compiler commit was taken for the binary's own, got %q", committed)
+		test.Fatalf("the compiler commit was taken for the binary's own, got %q", committed)
 	}
 
 	// A binary that prints both lines is identified by the one naming itself. Before the `commit:`
@@ -42,6 +42,6 @@ func TestACommittedBuildIsIdentifiedByItsCommitLine(t *testing.T) {
 			"  note:           a local build, so the rules are whatever was on disk when it was compiled\n",
 	)
 	if !strings.HasPrefix(both, "commit:") || !strings.Contains(both, "whatever was on disk") {
-		t.Fatalf("a binary naming its commit was not identified by that line, or lost its disclaimer, got %q", both)
+		test.Fatalf("a binary naming its commit was not identified by that line, or lost its disclaimer, got %q", both)
 	}
 }

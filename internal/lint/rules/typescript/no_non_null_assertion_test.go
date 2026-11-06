@@ -11,8 +11,8 @@ import (
 
 const nonNullAssertionFile = "/repository/source/Thing.ts"
 
-func TestNoNonNullAssertionFires(t *testing.T) {
-	t.Parallel()
+func TestNoNonNullAssertionFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -21,12 +21,24 @@ func TestNoNonNullAssertionFires(t *testing.T) {
 	}{
 		{"a bare assertion", "declare const foo: any;\nexport const r = foo!;\n", 1},
 		{"an assertion before a member", "declare const foo: any;\nexport const r = foo!.bar;\n", 1},
-		{"an assertion before a computed member", "declare const foo: any;\ndeclare const k: any;\nexport const r = foo![k];\n", 1},
+		{
+			"an assertion before a computed member",
+			"declare const foo: any;\ndeclare const k: any;\nexport const r = foo![k];\n",
+			1,
+		},
 		{"an assertion before a call", "declare const foo: any;\nexport const r = foo!();\n", 1},
 		{"an assertion before an optional member", "declare const foo: any;\nexport const r = foo!?.bar;\n", 1},
 		{"an assertion before an optional call", "declare const foo: any;\nexport const r = foo!?.();\n", 1},
-		{"an assertion in an argument", "declare const foo: any;\ndeclare const x: any;\nexport const r = foo(x!);\n", 1},
-		{"an assertion in a computed index", "declare const foo: any;\ndeclare const k: any;\nexport const r = foo[k!];\n", 1},
+		{
+			"an assertion in an argument",
+			"declare const foo: any;\ndeclare const x: any;\nexport const r = foo(x!);\n",
+			1,
+		},
+		{
+			"an assertion in a computed index",
+			"declare const foo: any;\ndeclare const k: any;\nexport const r = foo[k!];\n",
+			1,
+		},
 		// Every assertion is its own finding, including redundant ones. This rule reports the
 		// construct; whether one duplicates another is a different rule's judgment.
 		{"two assertions", "declare const foo: any;\nexport const r = foo!!;\n", 2},
@@ -39,20 +51,20 @@ func TestNoNonNullAssertionFires(t *testing.T) {
 		{"an assertion under increment", "declare const foo: any;\nfoo!.bar++;\nexport const r = foo;\n", 1},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoNonNullAssertion, nonNullAssertionFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoNonNullAssertion, nonNullAssertionFile, testCase.sourceText)
 			expected := make([]string, testCase.count)
 			for index := range expected {
 				expected[index] = "noNonNull"
 			}
-			rule_testing.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(test, result, expected...)
 		})
 	}
 }
 
-func TestNoNonNullAssertionStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoNonNullAssertionStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -64,7 +76,10 @@ func TestNoNonNullAssertionStaysSilent(t *testing.T) {
 		{"a definite assignment on a property", "export class Thing {\n    value!: number;\n}\n"},
 		// Type positions. `NonNullable<T>` is the type-level spelling of the same intent and is not
 		// this rule's business.
-		{"a NonNullable type", "declare const thing: string | null;\nexport const r: NonNullable<typeof thing> = 'x';\n"},
+		{
+			"a NonNullable type",
+			"declare const thing: string | null;\nexport const r: NonNullable<typeof thing> = 'x';\n",
+		},
 		{"a non-null type operator in a generic", "export type Thing<T> = NonNullable<T>;\n"},
 		// An optional chain is the repair this rule suggests, so it must not itself report.
 		{"an optional chain", "declare const foo: any;\nexport const r = foo?.bar;\n"},
@@ -79,12 +94,18 @@ func TestNoNonNullAssertionStaysSilent(t *testing.T) {
 		{"an exclamation in a template", "export const r = `hello!${1}`;\n"},
 		// A GraphQL non-null marker inside a string literal, which is what the tree this gates is
 		// actually full of.
-		{"a graphql non-null marker", "export const query = 'mutation M($input: Thing!) { m(input: $input) { id } }';\n"},
+		{
+			"a graphql non-null marker",
+			"export const query = 'mutation M($input: Thing!) { m(input: $input) { id } }';\n",
+		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoNonNullAssertion, nonNullAssertionFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(
+				test,
+				rule_testing.Run(test, NoNonNullAssertion, nonNullAssertionFile, testCase.sourceText),
+			)
 		})
 	}
 }
@@ -94,8 +115,8 @@ func TestNoNonNullAssertionStaysSilent(t *testing.T) {
 // The finding is unconditional, so a defect in the suggestion logic is invisible to the fixture pair
 // above: every case there passes whether or not a suggestion is attached, and whether or not the
 // suggestion would parse. This is the guard for the half that ships silently.
-func TestNoNonNullAssertionSuggestions(t *testing.T) {
-	t.Parallel()
+func TestNoNonNullAssertionSuggestions(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -103,28 +124,36 @@ func TestNoNonNullAssertionSuggestions(t *testing.T) {
 		want       string
 	}{
 		{"a dot access", "declare const foo: any;\nexport const r = foo!.bar;\n", "foo?.bar"},
-		{"a computed access", "declare const foo: any;\ndeclare const k: any;\nexport const r = foo![k];\n", "foo?.[k]"},
+		{
+			"a computed access",
+			"declare const foo: any;\ndeclare const k: any;\nexport const r = foo![k];\n",
+			"foo?.[k]",
+		},
 		{"a call", "declare const foo: any;\nexport const r = foo!();\n", "foo?.()"},
 		{"an already-optional access", "declare const foo: any;\nexport const r = foo!?.bar;\n", "foo?.bar"},
 		{"an already-optional call", "declare const foo: any;\nexport const r = foo!?.();\n", "foo?.()"},
 		// A comment between the assertion and the dot. The repair edits the two tokens separately,
 		// so whatever sits between them survives. Rewriting the span would eat the comment.
-		{"a comment between the tokens", "declare const foo: any;\nexport const r = foo!\n    // why\n    .bar;\n", "foo\n    // why\n    ?.bar"},
+		{
+			"a comment between the tokens",
+			"declare const foo: any;\nexport const r = foo!\n    // why\n    .bar;\n",
+			"foo\n    // why\n    ?.bar",
+		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoNonNullAssertion, nonNullAssertionFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoNonNullAssertion, nonNullAssertionFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
+				test.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
 			}
 			suggestions := result.Diagnostics[0].Suggestions
 			if len(suggestions) != 1 {
-				t.Fatalf("want 1 suggestion, got %d", len(suggestions))
+				test.Fatalf("want 1 suggestion, got %d", len(suggestions))
 			}
 			got := applyFixes(testCase.sourceText, suggestions[0].Fixes)
 			if !containsLine(got, testCase.want) {
-				t.Fatalf("want repaired source to contain %q, got:\n%s", testCase.want, got)
+				test.Fatalf("want repaired source to contain %q, got:\n%s", testCase.want, got)
 			}
 		})
 	}
@@ -138,8 +167,8 @@ func TestNoNonNullAssertionSuggestions(t *testing.T) {
 // parse, which is worse than offering nothing because the suggestion reads as checked.
 //
 // The reference implementation consulted for this port recognizes only the first of these.
-func TestNoNonNullAssertionWithholdsSuggestionsThatWouldNotParse(t *testing.T) {
-	t.Parallel()
+func TestNoNonNullAssertionWithholdsSuggestionsThatWouldNotParse(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -152,21 +181,30 @@ func TestNoNonNullAssertionWithholdsSuggestionsThatWouldNotParse(t *testing.T) {
 		{"a prefix decrement", "declare const foo: any;\n--foo!.bar;\nexport const r = foo;\n"},
 		{"an array destructuring target", "declare const foo: any;\n[foo!.bar] = [0];\nexport const r = foo;\n"},
 		{"a rest destructuring target", "declare const foo: any;\n[...foo!.bar] = [0];\nexport const r = foo;\n"},
-		{"an object destructuring target", "declare const foo: any;\n({ k: foo!.bar } = { k: 0 });\nexport const r = foo;\n"},
-		{"a target behind a type assertion", "declare const foo: any;\n(foo!.bar as number)++;\nexport const r = foo;\n"},
-		{"a target behind a further assertion", "declare const foo: any;\n[...foo!.bar!] = [0];\nexport const r = foo;\n"},
+		{
+			"an object destructuring target",
+			"declare const foo: any;\n({ k: foo!.bar } = { k: 0 });\nexport const r = foo;\n",
+		},
+		{
+			"a target behind a type assertion",
+			"declare const foo: any;\n(foo!.bar as number)++;\nexport const r = foo;\n",
+		},
+		{
+			"a target behind a further assertion",
+			"declare const foo: any;\n[...foo!.bar!] = [0];\nexport const r = foo;\n",
+		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoNonNullAssertion, nonNullAssertionFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoNonNullAssertion, nonNullAssertionFile, testCase.sourceText)
 			if len(result.Diagnostics) == 0 {
-				t.Fatalf("want a finding, got none")
+				test.Fatalf("want a finding, got none")
 			}
 			// The assertion nearest the target is the one whose suggestion would not parse. Later
 			// assertions in the same statement are a different position and may carry one.
 			if suggestions := result.Diagnostics[0].Suggestions; len(suggestions) != 0 {
-				t.Fatalf("want no suggestion on an assignment target, got %d", len(suggestions))
+				test.Fatalf("want no suggestion on an assignment target, got %d", len(suggestions))
 			}
 		})
 	}
@@ -180,31 +218,46 @@ func TestNoNonNullAssertionWithholdsSuggestionsThatWouldNotParse(t *testing.T) {
 // `foo[k!]` does not become `foo?.[k]`, it becomes a different expression that indexes something
 // else. Mutation testing found this check unpinned by every other fixture here, which is why it has
 // its own.
-func TestNoNonNullAssertionWithholdsSuggestionsOutsideTheObjectPosition(t *testing.T) {
-	t.Parallel()
+func TestNoNonNullAssertionWithholdsSuggestionsOutsideTheObjectPosition(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
 		sourceText string
 	}{
-		{"an assertion in a computed index", "declare const foo: any;\ndeclare const k: any;\nexport const r = foo[k!];\n"},
-		{"an assertion in an optional computed index", "declare const foo: any;\ndeclare const k: any;\nexport const r = foo?.[k!];\n"},
-		{"an assertion in a call argument", "declare const foo: any;\ndeclare const x: any;\nexport const r = foo(x!);\n"},
-		{"an assertion in an optional call argument", "declare const foo: any;\ndeclare const x: any;\nexport const r = foo?.(x!);\n"},
+		{
+			"an assertion in a computed index",
+			"declare const foo: any;\ndeclare const k: any;\nexport const r = foo[k!];\n",
+		},
+		{
+			"an assertion in an optional computed index",
+			"declare const foo: any;\ndeclare const k: any;\nexport const r = foo?.[k!];\n",
+		},
+		{
+			"an assertion in a call argument",
+			"declare const foo: any;\ndeclare const x: any;\nexport const r = foo(x!);\n",
+		},
+		{
+			"an assertion in an optional call argument",
+			"declare const foo: any;\ndeclare const x: any;\nexport const r = foo?.(x!);\n",
+		},
 		// A bare assertion with nothing after it. There is no `?.` that means the same thing, so
 		// the original attaches no suggestion either.
 		{"a bare assertion", "declare const foo: any;\nexport const r = foo!;\n"},
-		{"an assertion in a return position", "declare const foo: any;\nexport function get() {\n    return foo!;\n}\n"},
+		{
+			"an assertion in a return position",
+			"declare const foo: any;\nexport function get() {\n    return foo!;\n}\n",
+		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoNonNullAssertion, nonNullAssertionFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoNonNullAssertion, nonNullAssertionFile, testCase.sourceText)
 			if len(result.Diagnostics) == 0 {
-				t.Fatalf("want a finding, got none")
+				test.Fatalf("want a finding, got none")
 			}
 			if suggestions := result.Diagnostics[0].Suggestions; len(suggestions) != 0 {
-				t.Fatalf("want no suggestion outside the object position, got %d", len(suggestions))
+				test.Fatalf("want no suggestion outside the object position, got %d", len(suggestions))
 			}
 		})
 	}
@@ -215,11 +268,12 @@ func TestNoNonNullAssertionWithholdsSuggestionsOutsideTheObjectPosition(t *testi
 func applyFixes(sourceText string, fixes []rule.Fix) string {
 	ordered := make([]rule.Fix, len(fixes))
 	copy(ordered, fixes)
-	sort.Slice(ordered, func(i, j int) bool { return ordered[i].Range.Pos() > ordered[j].Range.Pos() })
+	sort.Slice(ordered, func(left, right int) bool { return ordered[left].Range.Pos() > ordered[right].Range.Pos() })
+	edited := sourceText
 	for _, fix := range ordered {
-		sourceText = sourceText[:fix.Range.Pos()] + fix.Text + sourceText[fix.Range.End():]
+		edited = edited[:fix.Range.Pos()] + fix.Text + edited[fix.Range.End():]
 	}
-	return sourceText
+	return edited
 }
 
 func containsLine(haystack string, needle string) bool {
@@ -230,27 +284,38 @@ func containsLine(haystack string, needle string) bool {
 // word: the finding names the four repairs in the order the house's migration waves ranked them, and
 // the suggestion offers `?.` only with its condition attached. Upstream's text recommended `?.` as a
 // repair outright, and a reworded message that drifted back to that would pass an id-only test.
-func TestNoNonNullAssertionMessageGivesTheRepairsInOrder(t *testing.T) {
-	t.Parallel()
+func TestNoNonNullAssertionMessageGivesTheRepairsInOrder(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, NoNonNullAssertion, nonNullAssertionFile, "declare const foo: any;\nexport const r = foo!.bar;\n")
+	result := rule_testing.Run(
+		test,
+		NoNonNullAssertion,
+		nonNullAssertionFile,
+		"declare const foo: any;\nexport const r = foo!.bar;\n",
+	)
 	if len(result.Diagnostics) != 1 || len(result.Diagnostics[0].Suggestions) != 1 {
-		t.Fatalf("want 1 finding with 1 suggestion, got %d findings", len(result.Diagnostics))
+		test.Fatalf("want 1 finding with 1 suggestion, got %d findings", len(result.Diagnostics))
 	}
-	noNonNullAssertionExpectInOrder(t, result.Diagnostics[0].Message.Description,
-		"guard it", "fix the type", "restructure so the index goes away", "`required(value, 'why it holds')` from `@nexus/source/errors/Assert`")
-	noNonNullAssertionExpectInOrder(t, result.Diagnostics[0].Suggestions[0].Message.Description,
+	noNonNullAssertionExpectInOrder(
+		test,
+		result.Diagnostics[0].Message.Description,
+		"guard it",
+		"fix the type",
+		"restructure so the index goes away",
+		"`required(value, 'why it holds')` from `@nexus/source/errors/Assert`",
+	)
+	noNonNullAssertionExpectInOrder(test, result.Diagnostics[0].Suggestions[0].Message.Description,
 		"`?.`", "only where a missing value is really possible")
 }
 
 // noNonNullAssertionExpectInOrder fails unless each part appears in text after the one before it.
-func noNonNullAssertionExpectInOrder(t *testing.T, text string, parts ...string) {
-	t.Helper()
+func noNonNullAssertionExpectInOrder(test *testing.T, text string, parts ...string) {
+	test.Helper()
 	rest := text
 	for _, part := range parts {
 		index := strings.Index(rest, part)
 		if index < 0 {
-			t.Fatalf("message lacks %q after the parts before it:\n%s", part, text)
+			test.Fatalf("message lacks %q after the parts before it:\n%s", part, text)
 		}
 		rest = rest[index+len(part):]
 	}

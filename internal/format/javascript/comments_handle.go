@@ -12,7 +12,7 @@ import (
 // commentContext is upstream's CommentContext: the comment, its preceding, enclosing and following
 // nodes, the text, the options, the ast, whether it is the last comment, and its placement
 // ("ownLine" | "endOfLine" | "remaining"). An absent node is nil.
-type commentContext = printing.CommentContext[*estree.Node]
+type commentContext = printing.CommentContext[*estree.Node, *settings, printArguments]
 
 // commentHandler is one of upstream's handlers. Upstream's handlers that fall off the end return
 // undefined, which `.some` reads as false; here they return false.
@@ -51,7 +51,7 @@ func handleOwnLineComment(context *commentContext) bool {
 		handleLabeledStatementComments,
 		handleNestedConditionalExpressionComments,
 		handleCommentsInDestructuringPattern,
-		handleTSMappedTypeComments,
+		handleTsMappedTypeComments,
 		handleBinaryCastExpressionComment,
 		handleUnionTypeLeadingComments,
 	)
@@ -79,7 +79,7 @@ func handleEndOfLineComment(context *commentContext) bool {
 		handleSwitchDefaultCaseComments,
 		handleLastUnionElementInExpression,
 		handleLastBinaryOperatorOperand,
-		handleTSMappedTypeComments,
+		handleTsMappedTypeComments,
 		handleArrowExpressionComments,
 		handleParenthesizedExpressionTrailingComment,
 		handlePropertySignatureComments,
@@ -99,10 +99,10 @@ func handleRemainingComment(context *commentContext) bool {
 		handleMethodNameComments,
 		handleOnlyComments,
 		handleAssignmentLikeComments,
-		handleTSMappedTypeComments,
-		handleCommentAfterArrowParams,
+		handleTsMappedTypeComments,
+		handleCommentAfterArrowParameters,
 		handleFunctionNameComments,
-		handleTSFunctionTrailingComments,
+		handleTsFunctionTrailingComments,
 		handleParenthesizedExpressionTrailingComment,
 		handleBinaryCastExpressionComment,
 		handleUnionTypeLeadingComments,
@@ -226,10 +226,10 @@ func handleClassComments(context *commentContext) bool {
 				return true
 			}
 
-			for _, prop := range []string{"implements", "extends", "mixins"} {
+			for _, property := range []string{"implements", "extends", "mixins"} {
 				// `enclosingNode[prop] && followingNode === enclosingNode[prop][0]`: an empty list's [0] is
 				// undefined, which a present followingNode never equals.
-				list := enclosingNode.List(prop)
+				list := enclosingNode.List(property)
 				if len(list) > 0 && followingNode == list[0] {
 					if precedingNode != nil &&
 						(precedingNode == enclosingNode.Child("id") ||
@@ -237,7 +237,7 @@ func handleClassComments(context *commentContext) bool {
 							precedingNode == superClass) {
 						printing.AddTrailingComment(precedingNode, comment)
 					} else {
-						printing.AddDanglingComment(enclosingNode, comment, prop)
+						printing.AddDanglingComment(enclosingNode, comment, property)
 					}
 					return true
 				}
@@ -249,9 +249,19 @@ func handleClassComments(context *commentContext) bool {
 
 // isPropertyLikeNode is upstream's createTypeCheckFunction of that name.
 func isPropertyLikeNode(node Node) bool {
-	return node.Is("ClassMethod", "ClassProperty", "PropertyDefinition", "TSAbstractPropertyDefinition",
-		"TSAbstractMethodDefinition", "TSDeclareMethod", "MethodDefinition", "ClassAccessorProperty", "AccessorProperty",
-		"TSAbstractAccessorProperty", "TSParameterProperty")
+	return node.Is(
+		"ClassMethod",
+		"ClassProperty",
+		"PropertyDefinition",
+		"TSAbstractPropertyDefinition",
+		"TSAbstractMethodDefinition",
+		"TSDeclareMethod",
+		"MethodDefinition",
+		"ClassAccessorProperty",
+		"AccessorProperty",
+		"TSAbstractAccessorProperty",
+		"TSParameterProperty",
+	)
 }
 
 // handleMethodNameComments is upstream's handleMethodNameComments.
@@ -316,8 +326,8 @@ func handleFunctionNameComments(context *commentContext) bool {
 	return false
 }
 
-// handleCommentAfterArrowParams is upstream's handleCommentAfterArrowParams.
-func handleCommentAfterArrowParams(context *commentContext) bool {
+// handleCommentAfterArrowParameters is upstream's handleCommentAfterArrowParameters.
+func handleCommentAfterArrowParameters(context *commentContext) bool {
 	comment, enclosingNode, text := context.Comment, context.Enclosing, context.Text
 	if !enclosingNode.Is("ArrowFunctionExpression") {
 		return false
@@ -495,8 +505,8 @@ func handleUnionTypeComments(context *commentContext) bool {
 		context.Following
 	if isUnionType(enclosingNode) {
 		if isPrettierIgnoreComment(comment) {
-			followingNode.Set("prettierIgnore", true)
-			comment.Set("unignore", true)
+			followingNode.Set("prettierIgnore", estree.Boolean(true))
+			comment.Set("unignore", estree.Boolean(true))
 		}
 		if precedingNode != nil {
 			printing.AddTrailingComment(precedingNode, comment)
@@ -506,8 +516,8 @@ func handleUnionTypeComments(context *commentContext) bool {
 	}
 
 	if isUnionType(followingNode) && isPrettierIgnoreComment(comment) {
-		followingNode.List("types")[0].Set("prettierIgnore", true)
-		comment.Set("unignore", true)
+		followingNode.List("types")[0].Set("prettierIgnore", estree.Boolean(true))
+		comment.Set("unignore", estree.Boolean(true))
 	}
 
 	return false
@@ -520,8 +530,8 @@ func handleMatchOrPatternComments(context *commentContext) bool {
 		context.Following
 	if enclosingNode != nil && enclosingNode.Is("MatchOrPattern") {
 		if isPrettierIgnoreComment(comment) {
-			followingNode.Set("prettierIgnore", true)
-			comment.Set("unignore", true)
+			followingNode.Set("prettierIgnore", estree.Boolean(true))
+			comment.Set("unignore", estree.Boolean(true))
 		}
 		if precedingNode != nil {
 			printing.AddTrailingComment(precedingNode, comment)
@@ -533,8 +543,8 @@ func handleMatchOrPatternComments(context *commentContext) bool {
 	if followingNode != nil &&
 		followingNode.Is("MatchOrPattern") &&
 		isPrettierIgnoreComment(comment) {
-		followingNode.List("types")[0].Set("prettierIgnore", true)
-		comment.Set("unignore", true)
+		followingNode.List("types")[0].Set("prettierIgnore", estree.Boolean(true))
+		comment.Set("unignore", estree.Boolean(true))
 	}
 
 	return false
@@ -556,7 +566,7 @@ func handleOnlyComments(context *commentContext) bool {
 		context.IsLastComment
 	// With Flow the enclosingNode is undefined so use the AST instead.
 	// `ast?.body?.length === 0`: body must be present and an array.
-	if body, isList := ast.Get("body").([]Node); isList && len(body) == 0 {
+	if body, isList := ast.Get("body").(estree.Nodes); isList && len(body) == 0 {
 		if isLastComment {
 			printing.AddDanglingComment(ast, comment, "")
 		} else {

@@ -65,8 +65,8 @@ const (
 // That is the same shape as the port brief's warning about a case decided above the rule, arriving
 // in the opposite direction. `rule_testing.Run` has no panic-threshold layer, so the honest recording
 // is the finding, with the reason at the line.
-func TestGatingFiresOnUpstreamCorpus(t *testing.T) {
-	t.Parallel()
+func TestGatingFiresOnUpstreamCorpus(test *testing.T) {
+	test.Parallel()
 
 	testCases := []struct {
 		name       string
@@ -89,10 +89,10 @@ func TestGatingFiresOnUpstreamCorpus(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, Gating, gatingFile, testCase.sourceText), testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, Gating, gatingFile, testCase.sourceText), testCase.wantIds...)
 		})
 	}
 }
@@ -100,8 +100,8 @@ func TestGatingFiresOnUpstreamCorpus(t *testing.T) {
 // Upstream's clean gating fixtures. Both write a well formed directive, which is the case the rule
 // must not report, and they are the only inputs in the corpus that prove the grammar is being
 // matched rather than every `use memo` prefix being flagged.
-func TestGatingStaysSilentOnUpstreamCorpus(t *testing.T) {
-	t.Parallel()
+func TestGatingStaysSilentOnUpstreamCorpus(test *testing.T) {
+	test.Parallel()
 
 	testCases := []struct {
 		name       string
@@ -112,9 +112,9 @@ func TestGatingStaysSilentOnUpstreamCorpus(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, Gating, gatingFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, Gating, gatingFile, testCase.sourceText))
 		})
 	}
 }
@@ -122,8 +122,8 @@ func TestGatingStaysSilentOnUpstreamCorpus(t *testing.T) {
 // Cases upstream does not ship, each written from reading the grammar rather than by analogy with a
 // neighbouring rule. The imported corpus writes exactly four inputs and covers none of the
 // boundaries below, so without these the rule's discriminations are untested.
-func TestGatingFiresOnCasesUpstreamDoesNotShip(t *testing.T) {
-	t.Parallel()
+func TestGatingFiresOnCasesUpstreamDoesNotShip(test *testing.T) {
+	test.Parallel()
 
 	testCases := []struct {
 		name       string
@@ -239,18 +239,18 @@ func TestGatingFiresOnCasesUpstreamDoesNotShip(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, Gating, gatingFile, testCase.sourceText), testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, Gating, gatingFile, testCase.sourceText), testCase.wantIds...)
 		})
 	}
 }
 
 // The silent side of the boundaries. Every case here is a string that either fails the grammar or
 // is not a directive at all, and each one would report under a plausible wrong implementation.
-func TestGatingStaysSilentOnCasesUpstreamDoesNotShip(t *testing.T) {
-	t.Parallel()
+func TestGatingStaysSilentOnCasesUpstreamDoesNotShip(test *testing.T) {
+	test.Parallel()
 
 	testCases := []struct {
 		name       string
@@ -383,9 +383,9 @@ func TestGatingStaysSilentOnCasesUpstreamDoesNotShip(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, Gating, gatingFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, Gating, gatingFile, testCase.sourceText))
 		})
 	}
 }
@@ -401,8 +401,8 @@ func TestGatingStaysSilentOnCasesUpstreamDoesNotShip(t *testing.T) {
 // `directive.expression.span`, the string literal alone, which is twenty two bytes and excludes the
 // semicolon. Both message ids are identical under either choice, so nothing above this test can see
 // which one shipped.
-func TestGatingReportsTheWholeDirectiveIncludingTheSemicolon(t *testing.T) {
-	t.Parallel()
+func TestGatingReportsTheWholeDirectiveIncludingTheSemicolon(test *testing.T) {
+	test.Parallel()
 
 	testCases := []struct {
 		name       string
@@ -427,15 +427,15 @@ func TestGatingReportsTheWholeDirectiveIncludingTheSemicolon(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, Gating, gatingFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, Gating, gatingFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("want 1 diagnostic, got %d", len(result.Diagnostics))
+				test.Fatalf("want 1 diagnostic, got %d", len(result.Diagnostics))
 			}
 			reported := testCase.sourceText[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 			if reported != testCase.want {
-				t.Fatalf("reported span = %q, want %q", reported, testCase.want)
+				test.Fatalf("reported span = %q, want %q", reported, testCase.want)
 			}
 		})
 	}
@@ -443,19 +443,19 @@ func TestGatingReportsTheWholeDirectiveIncludingTheSemicolon(t *testing.T) {
 
 // Each invalid directive points at itself rather than all findings landing on the first one, which
 // a loop reporting the wrong variable would produce with the right count and the right ids.
-func TestGatingPointsEachInvalidFindingAtItsOwnDirective(t *testing.T) {
-	t.Parallel()
+func TestGatingPointsEachInvalidFindingAtItsOwnDirective(test *testing.T) {
+	test.Parallel()
 
 	const sourceText = "function Foo() {\n  'use memo if(true)';\n  'use memo if(false)';\n  return 1;\n}\n"
 
-	result := rule_testing.Run(t, Gating, gatingFile, sourceText)
-	rule_testing.ExpectFindings(t, result, "invalidGatingDirective", "invalidGatingDirective")
+	result := rule_testing.Run(test, Gating, gatingFile, sourceText)
+	rule_testing.ExpectFindings(test, result, "invalidGatingDirective", "invalidGatingDirective")
 
 	want := []string{"'use memo if(true)';", "'use memo if(false)';"}
 	for index, diagnostic := range result.Diagnostics {
 		reported := sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
 		if reported != want[index] {
-			t.Fatalf("finding %d reported %q, want %q", index, reported, want[index])
+			test.Fatalf("finding %d reported %q, want %q", index, reported, want[index])
 		}
 	}
 }
@@ -463,15 +463,15 @@ func TestGatingPointsEachInvalidFindingAtItsOwnDirective(t *testing.T) {
 // The message text, asserted by equality against literals typed here rather than against the rule's
 // own message constants. Comparing to the constants is equality, it looks correct, and both sides
 // move together under mutation, so it guards nothing.
-func TestGatingMessageText(t *testing.T) {
-	t.Parallel()
+func TestGatingMessageText(test *testing.T) {
+	test.Parallel()
 
-	invalid := rule_testing.Run(t, Gating, gatingFile, gatingUpstreamInvalidIdentifier)
+	invalid := rule_testing.Run(test, Gating, gatingFile, gatingUpstreamInvalidIdentifier)
 	if len(invalid.Diagnostics) != 1 {
-		t.Fatalf("want 1 diagnostic, got %d", len(invalid.Diagnostics))
+		test.Fatalf("want 1 diagnostic, got %d", len(invalid.Diagnostics))
 	}
 	if invalid.Diagnostics[0].Message.Id != "invalidGatingDirective" {
-		t.Fatalf("message id = %q", invalid.Diagnostics[0].Message.Id)
+		test.Fatalf("message id = %q", invalid.Diagnostics[0].Message.Id)
 	}
 	const wantInvalid = "The condition inside `use memo if(...)` is not a JavaScript identifier. " +
 		"React Compiler imports that exact name from the gating module and calls it to decide " +
@@ -480,22 +480,22 @@ func TestGatingMessageText(t *testing.T) {
 		"imported, and the compiler rejects the whole file rather than guessing. Name the flag " +
 		"getter and write that identifier instead."
 	if invalid.Diagnostics[0].Message.Description != wantInvalid {
-		t.Fatalf("invalid description = %q", invalid.Diagnostics[0].Message.Description)
+		test.Fatalf("invalid description = %q", invalid.Diagnostics[0].Message.Description)
 	}
 
-	multiple := rule_testing.Run(t, Gating, gatingFile, gatingUpstreamMultiple)
+	multiple := rule_testing.Run(test, Gating, gatingFile, gatingUpstreamMultiple)
 	if len(multiple.Diagnostics) != 1 {
-		t.Fatalf("want 1 diagnostic, got %d", len(multiple.Diagnostics))
+		test.Fatalf("want 1 diagnostic, got %d", len(multiple.Diagnostics))
 	}
 	if multiple.Diagnostics[0].Message.Id != "multipleGatingDirectives" {
-		t.Fatalf("message id = %q", multiple.Diagnostics[0].Message.Id)
+		test.Fatalf("message id = %q", multiple.Diagnostics[0].Message.Id)
 	}
 	const wantMultiple = "This function body carries more than one `use memo if(...)` directive. " +
 		"Gating resolves to a single imported condition per function, so a second directive is " +
 		"not an additional condition, it is an ambiguity the compiler cannot resolve. Keep the " +
 		"one directive that describes when this function should be memoized and delete the rest."
 	if multiple.Diagnostics[0].Message.Description != wantMultiple {
-		t.Fatalf("multiple description = %q", multiple.Diagnostics[0].Message.Description)
+		test.Fatalf("multiple description = %q", multiple.Diagnostics[0].Message.Description)
 	}
 }
 
@@ -503,45 +503,46 @@ func TestGatingMessageText(t *testing.T) {
 // struct here. That is what puts the default under test: this rule inverts upstream's precondition,
 // so the default is the single line most likely to have no upstream counterpart, and handing
 // `RunWithOptions` a struct directly would leave the decode path unexercised.
-func TestGatingOptionDecodesAndDefaultsToChecking(t *testing.T) {
-	t.Parallel()
+func TestGatingOptionDecodesAndDefaultsToChecking(test *testing.T) {
+	test.Parallel()
 
 	decode := rule.DecodeOptionsInto[GatingOptions]()
 
-	// A bare severity hands the rule nil options, which is how it is configured in practice. The
-	// zero value must be the checking one, or the rule is inert everywhere it is actually used.
-	rule_testing.ExpectFindings(t,
-		rule_testing.RunWithOptions(t, Gating, gatingFile, gatingUpstreamInvalidIdentifier, nil),
+	// A bare severity hands the rule the zero `rule.Given`, which is how it is configured in practice,
+	// so `Read` returns false and the zero value. That must be the checking one, or the rule is inert
+	// everywhere it is actually used.
+	rule_testing.ExpectFindings(test,
+		rule_testing.Run(test, Gating, gatingFile, gatingUpstreamInvalidIdentifier),
 		"invalidGatingDirective")
 
 	// An empty object is the same default arriving through the decoder rather than past it.
-	empty, err := decode(json.RawMessage(`{}`))
-	if err != nil {
-		t.Fatalf("decoding an empty object: %v", err)
+	empty, decodeError := decode(json.RawMessage(`{}`))
+	if decodeError != nil {
+		test.Fatalf("decoding an empty object: %v", decodeError)
 	}
-	rule_testing.ExpectFindings(t,
-		rule_testing.RunWithOptions(t, Gating, gatingFile, gatingUpstreamInvalidIdentifier, empty),
+	rule_testing.ExpectFindings(test,
+		rule_testing.RunWithOptions(test, Gating, gatingFile, gatingUpstreamInvalidIdentifier, empty),
 		"invalidGatingDirective")
 
 	// Set explicitly false, which must not be read as unset.
-	off, err := decode(json.RawMessage(`{"requireDynamicGatingOption": false}`))
-	if err != nil {
-		t.Fatalf("decoding an explicit false: %v", err)
+	off, decodeError := decode(json.RawMessage(`{"requireDynamicGatingOption": false}`))
+	if decodeError != nil {
+		test.Fatalf("decoding an explicit false: %v", decodeError)
 	}
-	rule_testing.ExpectFindings(t,
-		rule_testing.RunWithOptions(t, Gating, gatingFile, gatingUpstreamInvalidIdentifier, off),
+	rule_testing.ExpectFindings(test,
+		rule_testing.RunWithOptions(test, Gating, gatingFile, gatingUpstreamInvalidIdentifier, off),
 		"invalidGatingDirective")
 
 	// Set true, restoring upstream's silence. This is the only configuration under which React and
 	// oxc's own behavior is reproduced exactly, and it must reach the rule through the decoder.
-	on, err := decode(json.RawMessage(`{"requireDynamicGatingOption": true}`))
-	if err != nil {
-		t.Fatalf("decoding an explicit true: %v", err)
+	on, decodeError := decode(json.RawMessage(`{"requireDynamicGatingOption": true}`))
+	if decodeError != nil {
+		test.Fatalf("decoding an explicit true: %v", decodeError)
 	}
-	rule_testing.ExpectClean(t,
-		rule_testing.RunWithOptions(t, Gating, gatingFile, gatingUpstreamInvalidIdentifier, on))
-	rule_testing.ExpectClean(t,
-		rule_testing.RunWithOptions(t, Gating, gatingFile, gatingUpstreamMultiple, on))
+	rule_testing.ExpectClean(test,
+		rule_testing.RunWithOptions(test, Gating, gatingFile, gatingUpstreamInvalidIdentifier, on))
+	rule_testing.ExpectClean(test,
+		rule_testing.RunWithOptions(test, Gating, gatingFile, gatingUpstreamMultiple, on))
 }
 
 // The transcribed fixture bodies are guarded against escape cooking, which is the failure this
@@ -558,8 +559,8 @@ func TestGatingOptionDecodesAndDefaultsToChecking(t *testing.T) {
 // in-process is the property the cooking would destroy: each body must still contain the exact
 // directive text, spelled with the quote style upstream used, and the two multi-directive bodies
 // must hold two distinct conditions rather than one repeated.
-func TestGatingTranscriptionsStillHoldTheirDirectives(t *testing.T) {
-	t.Parallel()
+func TestGatingTranscriptionsStillHoldTheirDirectives(test *testing.T) {
+	test.Parallel()
 
 	testCases := []struct {
 		name     string
@@ -592,17 +593,17 @@ func TestGatingTranscriptionsStillHoldTheirDirectives(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			for _, want := range testCase.contains {
 				if !strings.Contains(testCase.body, want) {
-					t.Fatalf("body no longer contains %q:\n%s", want, testCase.body)
+					test.Fatalf("body no longer contains %q:\n%s", want, testCase.body)
 				}
 			}
 			// Single quotes, which is what upstream writes. A tool normalizing quote style would
 			// leave every verdict unchanged and the transcription no longer upstream's.
 			if strings.Contains(testCase.body, "\"use memo") {
-				t.Fatalf("body was renormalized to double quotes:\n%s", testCase.body)
+				test.Fatalf("body was renormalized to double quotes:\n%s", testCase.body)
 			}
 		})
 	}

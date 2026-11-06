@@ -10,7 +10,10 @@ import (
 
 // consistencyRequirePaginationArgumentNameText is the rule's message, whose wording lives in
 // `policy/messages/consistency-require-pagination-argument-name.json`.
-var consistencyRequirePaginationArgumentNameText = policy.MessageOf("base/consistency-require-pagination-argument-name", "invalidName")
+var consistencyRequirePaginationArgumentNameText = policy.MessageOf(
+	"base/consistency-require-pagination-argument-name",
+	"invalidName",
+)
 
 func messagePaginationDecoratorInvalidName() rule.Message {
 	return rule.Message{
@@ -29,7 +32,8 @@ var paginationInputTypeName = regexp.MustCompile(`PaginationInput$`)
 // paginationArgumentName matches the disambiguating form, `prefixPagination`.
 var paginationArgumentName = regexp.MustCompile(`Pagination$`)
 
-// ConsistencyRequirePaginationArgumentName requires a GraphQlArgument of PaginationInput type to be named for what it is.
+// ConsistencyRequirePaginationArgumentName requires a GraphQlArgument of PaginationInput type to be named for what it
+// is.
 //
 //	valid:   m(@GraphQlArgument(() => UserPaginationInput) pagination: UserPaginationInput)
 //	valid:   m(@GraphQlArgument('postsPagination') p: PaginationInput)
@@ -39,7 +43,8 @@ var paginationArgumentName = regexp.MustCompile(`Pagination$`)
 //
 // # A base rule rather than an upstream port, so the source is the spec
 //
-// This comes from `api-phi-health/libraries/base/code-quality/lint/rules/ConsistencyRequirePaginationArgumentNameRule.ts`
+// This comes from
+// `api-phi-health/libraries/base/code-quality/lint/rules/ConsistencyRequirePaginationArgumentNameRule.ts`
 // and there is no upstream corpus to import. That inverts the usual fixture advice: the cases below
 // are written rather than imported, so they carry the same beliefs as this file and cannot catch a
 // wrong belief on their own. The mitigation is the source repository, which is a real oracle: this
@@ -79,7 +84,7 @@ var paginationArgumentName = regexp.MustCompile(`Pagination$`)
 // its parent. This is fidelity to the decision rather than to the workaround; the original's walk
 // exists for a parser difference we do not have.
 //
-// The kind guard IS load bearing, and it is the one thing the simplification must keep. A decorator
+// The kind guard is load bearing, and it is the one thing the simplification must keep. A decorator
 // can sit on a class, a method, a property or an accessor, and all four were measured reaching this
 // listener with a parent of that kind rather than `KindParameter`.
 //
@@ -87,19 +92,19 @@ var paginationArgumentName = regexp.MustCompile(`Pagination$`)
 //
 // The correct name is a naming judgment. `pagination` is right when there is one paginator and wrong
 // when there are several, and the rule cannot tell which query it is looking at.
-var ConsistencyRequirePaginationArgumentName = rule.Rule{
+var ConsistencyRequirePaginationArgumentName = rule.Rule[rule.NoOptions]{
 	Name: "base/consistency-require-pagination-argument-name",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindDecorator: func(node *ast.Node) {
-				checkPaginationDecorator(ctx, node)
+				checkPaginationDecorator(ruleContext, node)
 			},
 		}
 	},
 }
 
 // checkPaginationDecorator judges one decorator.
-func checkPaginationDecorator(ctx rule.Context, node *ast.Node) {
+func checkPaginationDecorator(ruleContext rule.Context, node *ast.Node) {
 	decorator := node.AsDecorator()
 	if decorator == nil || decorator.Expression == nil ||
 		decorator.Expression.Kind != ast.KindCallExpression {
@@ -150,7 +155,7 @@ func checkPaginationDecorator(ctx rule.Context, node *ast.Node) {
 	if name == "pagination" || paginationArgumentName.MatchString(name) {
 		return
 	}
-	ctx.ReportNode(reported, messagePaginationDecoratorInvalidName())
+	ruleContext.ReportNode(reported, messagePaginationDecoratorInvalidName())
 }
 
 // isAPaginationArgument says whether a decorated parameter is a paginator.

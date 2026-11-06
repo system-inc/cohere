@@ -18,21 +18,26 @@ import (
 	"github.com/system-inc/cohere/internal/format/printing"
 )
 
+var javaScriptWhitespaceCharacters = javaScriptWhitespaceClass[1 : len(javaScriptWhitespaceClass)-1]
+
 var (
-	declarationBeforePattern       = regexp.MustCompile(`[` + javaScriptWhitespaceCharacters + `;]`)
-	importantPattern               = regexp.MustCompile(`(?i)` + javaScriptWhitespaceClass + `*!` + javaScriptWhitespaceClass + `*important`)
-	scssDefaultPattern             = regexp.MustCompile(`(?i)` + javaScriptWhitespaceClass + `*!default`)
-	scssGlobalPattern              = regexp.MustCompile(`(?i)` + javaScriptWhitespaceClass + `*!global`)
-	afterNameTwoNewlinesPattern    = regexp.MustCompile(`^` + javaScriptWhitespaceClass + `*\n` + javaScriptWhitespaceClass + `*\n`)
-	afterNameNewlinePattern        = regexp.MustCompile(`^` + javaScriptWhitespaceClass + `*\n`)
-	mediaFeatureSpacesPattern      = regexp.MustCompile(` +`)
-	mediaURLOpeningPattern         = regexp.MustCompile(`(?i)^url\(` + javaScriptWhitespaceClass + `+`)
-	mediaURLClosingPattern         = regexp.MustCompile(javaScriptWhitespaceClass + `+\)$`)
-	valueAllSpacePattern           = regexp.MustCompile(`^ *$`)
-	javaScriptWhitespaceCharacters = javaScriptWhitespaceClass[1 : len(javaScriptWhitespaceClass)-1]
+	declarationBeforePattern = regexp.MustCompile(`[` + javaScriptWhitespaceCharacters + `;]`)
+	importantPattern         = regexp.MustCompile(
+		`(?i)` + javaScriptWhitespaceClass + `*!` + javaScriptWhitespaceClass + `*important`,
+	)
+	scssDefaultPattern          = regexp.MustCompile(`(?i)` + javaScriptWhitespaceClass + `*!default`)
+	scssGlobalPattern           = regexp.MustCompile(`(?i)` + javaScriptWhitespaceClass + `*!global`)
+	afterNameTwoNewlinesPattern = regexp.MustCompile(
+		`^` + javaScriptWhitespaceClass + `*\n` + javaScriptWhitespaceClass + `*\n`,
+	)
+	afterNameNewlinePattern   = regexp.MustCompile(`^` + javaScriptWhitespaceClass + `*\n`)
+	mediaFeatureSpacesPattern = regexp.MustCompile(` +`)
+	mediaUrlOpeningPattern    = regexp.MustCompile(`(?i)^url\(` + javaScriptWhitespaceClass + `+`)
+	mediaUrlClosingPattern    = regexp.MustCompile(javaScriptWhitespaceClass + `+\)$`)
+	valueAllSpacePattern      = regexp.MustCompile(`^ *$`)
 )
 
-func genericPrint(path *astPath, options *printerOptions, print printing.PrintFunc, _ any) doc.Doc {
+func genericPrint(path *astPath, options *printerOptions, print printFunc, _ *printing.NoArguments) doc.Doc {
 	node := currentNode(path)
 
 	// The core's front matter support prints front matter that is not embedded as written
@@ -65,7 +70,7 @@ func genericPrint(path *astPath, options *printerOptions, print printing.PrintFu
 		}
 
 	case "css-comment":
-		isInlineComment := node.Truthy("inline") || estree.IsTruthy(rawsOf(node)["inline"])
+		isInlineComment := node.Truthy("inline") || isRawTruthy(node, "inline")
 
 		text := sliceText(options.OriginalText, locStart(node), locEnd(node))
 
@@ -110,12 +115,12 @@ func genericPrint(path *astPath, options *printerOptions, print printing.PrintFu
 	// postcss-media-query-parser
 	case "media-query-list":
 		parts := []doc.Doc{}
-		path.Each(func(path *astPath, _ int, _ any) {
+		path.Each(func(path *astPath, _ int) {
 			node := currentNode(path)
 			if node.Type() == "media-query" && node.String("value") == "" {
 				return
 			}
-			parts = append(parts, print(nil, nil))
+			parts = append(parts, print("", nil))
 		}, "nodes")
 
 		return doc.NewGroup(doc.NewIndent(doc.Join(doc.LineDoc, parts)), doc.GroupOptions{})
@@ -150,8 +155,8 @@ func genericPrint(path *astPath, options *printerOptions, print printing.PrintFu
 		return doc.Text(adjustStrings(node.String("value"), options))
 
 	case "media-url":
-		value := mediaURLOpeningPattern.ReplaceAllString(node.String("value"), "url(")
-		value = mediaURLClosingPattern.ReplaceAllString(value, ")")
+		value := mediaUrlOpeningPattern.ReplaceAllString(node.String("value"), "url(")
+		value = mediaUrlClosingPattern.ReplaceAllString(value, ")")
 		return doc.Text(adjustStrings(value, options))
 
 	case "media-unknown":
@@ -254,7 +259,10 @@ func genericPrint(path *astPath, options *printerOptions, print printing.PrintFu
 			choose(len(node.List("nodes")) > 0, func() doc.Doc {
 				return doc.NewGroup(doc.Concat{
 					doc.Text("("),
-					doc.NewIndent(doc.Concat{doc.Softline, doc.Join(doc.Concat{doc.Text(","), doc.LineDoc}, printAll(path, print, "nodes"))}),
+					doc.NewIndent(doc.Concat{
+						doc.Softline,
+						doc.Join(doc.Concat{doc.Text(","), doc.LineDoc}, printAll(path, print, "nodes")),
+					}),
 					doc.Softline,
 					doc.Text(")"),
 				}, doc.GroupOptions{})
@@ -287,7 +295,10 @@ func genericPrint(path *astPath, options *printerOptions, print printing.PrintFu
 	case "value-func":
 		return doc.Concat{
 			doc.Text(node.String("value")),
-			choose(insideAtRuleNode(path, "supports") && isMediaAndSupportsKeywords(node), func() doc.Doc { return doc.Text(" ") }),
+			choose(
+				insideAtRuleNode(path, "supports") && isMediaAndSupportsKeywords(node),
+				func() doc.Doc { return doc.Text(" ") },
+			),
 			print("group", nil),
 		}
 
@@ -309,7 +320,7 @@ func genericPrint(path *astPath, options *printerOptions, print printing.PrintFu
 
 	case "value-colon":
 		previous, _ := path.Previous()
-		previousValue, previousValueIsString := previous.Get("value").(string)
+		previousValue, previousValueIsString := asString(previous.Get("value"))
 		var after doc.Doc = doc.LineDoc
 		// Don't add spaces on escaped colon `:`, e.g: grid-template-rows: [row-1-00\:00] auto;
 		if (previousValueIsString && strings.HasSuffix(previousValue, `\`)) ||
@@ -334,10 +345,12 @@ func genericPrint(path *astPath, options *printerOptions, print printing.PrintFu
 	}
 
 	// "front-matter" is handled in core, "value-comma" in `value-comma_group`.
+	// Invariant: every type the glue's parsers make has an arm above; one they missed is upstream's throw,
+	// which Format and PrintToDoc recover into their error, as upstream's caller catches it.
 	panic(fmt.Sprintf("Unexpected PostCSS node type: %q.", node.Type()))
 }
 
-func printDeclaration(path *astPath, options *printerOptions, print printing.PrintFunc) doc.Doc {
+func printDeclaration(path *astPath, options *printerOptions, print printFunc) doc.Doc {
 	node := currentNode(path)
 	parentNode, _ := path.Parent()
 
@@ -345,7 +358,7 @@ func printDeclaration(path *astPath, options *printerOptions, print printing.Pri
 	trimmedBetween := trim(rawBetween)
 	isColon := trimmedBetween == ":"
 	hasSpaceAfterColon := strings.HasSuffix(rawBetween, " ") && isColon
-	stringValue, valueIsString := node.Get("value").(string)
+	stringValue, valueIsString := asString(node.Get("value"))
 	isValueAllSpace := valueIsString && valueAllSpacePattern.MatchString(stringValue)
 	var value doc.Doc
 	if valueIsString {
@@ -364,9 +377,9 @@ func printDeclaration(path *astPath, options *printerOptions, print printing.Pri
 		value = doc.NewIndent(doc.Concat{doc.Hardline, doc.Dedent(value)})
 	}
 
-	prop := node.String("prop")
+	property := node.String("prop")
 	if !((parentNode.Type() == "css-atrule" && parentNode.Truthy("variable")) || insideIcssRuleNode(path)) {
-		prop = maybeToLowerCase(prop)
+		property = maybeToLowerCase(property)
 	}
 
 	var space doc.Doc = doc.Text(" ")
@@ -377,7 +390,9 @@ func printDeclaration(path *astPath, options *printerOptions, print printing.Pri
 			// node.value.group.group reads without optional chaining, a TypeError upstream where a
 			// link is missing (mustNode); only .groups?.[0] is guarded.
 			(isAtWordPlaceholderNode(mustNode(node.Child("value").Child("group")).Child("group")) ||
-				isAtWordPlaceholderNode(firstNode(mustNode(node.Child("value").Child("group").Child("group")).List("groups"))))) {
+				isAtWordPlaceholderNode(
+					firstNode(mustNode(node.Child("value").Child("group").Child("group")).List("groups")),
+				))) {
 		space = doc.Text("")
 	}
 
@@ -414,7 +429,7 @@ func printDeclaration(path *astPath, options *printerOptions, print printing.Pri
 			doc.Text("}"),
 		}
 	case isTemplatePropNode(node) &&
-		!estree.IsTruthy(rawsOf(parentNode)["semicolon"]) &&
+		!isRawTruthy(parentNode, "semicolon") &&
 		characterBefore(options.OriginalText, locEnd(node)) != ";":
 		ending = doc.Text("")
 	default:
@@ -423,7 +438,7 @@ func printDeclaration(path *astPath, options *printerOptions, print printing.Pri
 
 	return doc.Concat{
 		doc.Text(declarationBeforePattern.ReplaceAllString(rawString(node, "before"), "")),
-		doc.Text(prop),
+		doc.Text(property),
 		choose(strings.HasPrefix(trimmedBetween, "//"), func() doc.Doc { return doc.Text(" ") }),
 		doc.Text(trimmedBetween),
 		space,
@@ -436,18 +451,18 @@ func printDeclaration(path *astPath, options *printerOptions, print printing.Pri
 	}
 }
 
-func printAtRule(path *astPath, options *printerOptions, print printing.PrintFunc) doc.Doc {
+func printAtRule(path *astPath, options *printerOptions, print printFunc) doc.Doc {
 	node := currentNode(path)
 	parentNode, _ := path.Parent()
 	isTemplatePlaceholderNodeWithoutSemiColon := isTemplatePlaceholderNode(node) &&
-		!estree.IsTruthy(rawsOf(parentNode)["semicolon"]) &&
+		!isRawTruthy(parentNode, "semicolon") &&
 		characterBefore(options.OriginalText, locEnd(node)) != ";"
 
 	// Less mixins, functions and variables are gated on options.parser === "less".
 
 	name := node.String("name")
-	params := node.Get("params")
-	stringParams, paramsIsString := params.(string)
+	parameters := node.Get("params")
+	stringParameters, parametersIsString := asString(parameters)
 	isImportUnknownValueEndsWithSemiColon := name == "import" &&
 		node.Child("params").Type() == "value-unknown" &&
 		strings.HasSuffix(node.Child("params").String("value"), ";")
@@ -460,8 +475,8 @@ func printAtRule(path *astPath, options *printerOptions, print printing.PrintFun
 		printedName = maybeToLowerCase(name)
 	}
 
-	var printedParams doc.Doc = doc.Text("")
-	if estree.IsTruthy(params) {
+	var printedParameters doc.Doc = doc.Text("")
+	if estree.IsTruthy(parameters) {
 		var leading doc.Doc = doc.Text(" ")
 		if isDetachedRulesetCallNode(node) {
 			leading = doc.Text("")
@@ -478,13 +493,13 @@ func printAtRule(path *astPath, options *printerOptions, print printing.PrintFun
 				leading = doc.Hardline
 			}
 		}
-		var paramsDoc doc.Doc
-		if paramsIsString {
-			paramsDoc = doc.Text(stringParams)
+		var parametersDoc doc.Doc
+		if parametersIsString {
+			parametersDoc = doc.Text(stringParameters)
 		} else {
-			paramsDoc = print("params", nil)
+			parametersDoc = print("params", nil)
 		}
-		printedParams = doc.Concat{leading, paramsDoc}
+		printedParameters = doc.Concat{leading, parametersDoc}
 	}
 
 	selector := node.Child("selector")
@@ -496,7 +511,7 @@ func printAtRule(path *astPath, options *printerOptions, print printing.PrintFun
 	var printedValue doc.Doc = doc.Text("")
 	if estree.IsTruthy(node.Get("value")) {
 		var after doc.Doc = doc.Text("")
-		if isSCSSControlDirectiveNode(node, options) {
+		if isScssControlDirectiveNode(node, options) {
 			if hasParensAroundNode(node) {
 				after = doc.Text(" ")
 			} else {
@@ -511,16 +526,16 @@ func printAtRule(path *astPath, options *printerOptions, print printing.PrintFun
 	var ending doc.Doc
 	if isPresent(node.Get("nodes")) {
 		var opening doc.Doc = doc.Text(" ")
-		_, selectorValueIsString := selector.Get("value").(string)
-		if isSCSSControlDirectiveNode(node, options) {
+		_, selectorValueIsString := asString(selector.Get("value"))
+		if isScssControlDirectiveNode(node, options) {
 			opening = doc.Text("")
 		} else if (selector != nil &&
 			!isPresent(selector.Get("nodes")) &&
 			selectorValueIsString &&
 			lastLineHasInlineComment(selector.String("value"))) ||
 			(selector == nil &&
-				paramsIsString &&
-				lastLineHasInlineComment(stringParams)) {
+				parametersIsString &&
+				lastLineHasInlineComment(stringParameters)) {
 			opening = doc.LineDoc
 		}
 		ending = doc.Concat{
@@ -541,7 +556,7 @@ func printAtRule(path *astPath, options *printerOptions, print printing.PrintFun
 	return doc.Concat{
 		doc.Text("@"),
 		doc.Text(printedName),
-		printedParams,
+		printedParameters,
 		printedSelector,
 		printedValue,
 		ending,
@@ -590,9 +605,9 @@ func printNamespace(node *estree.Node) doc.Doc {
 	if !estree.IsTruthy(namespace) {
 		return doc.Text("")
 	}
-	if namespace == true {
+	if namespace == estree.Boolean(true) {
 		return doc.Text("|")
 	}
-	text, _ := namespace.(string)
+	text, _ := asString(namespace)
 	return doc.Concat{doc.Text(trim(text)), doc.Text("|")}
 }

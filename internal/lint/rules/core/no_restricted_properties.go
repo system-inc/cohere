@@ -15,7 +15,7 @@ import (
 // `allowObjects` with `object` or `allowProperties` with `property`, because each pair is
 // self-contradictory: an entry naming one object has nothing to allow other objects for.
 type NoRestrictedPropertiesRestriction struct {
-	// Object restricts accesses through a receiver spelled this way. Compared by NAME, not by
+	// Object restricts accesses through a receiver spelled this way. Compared by name, not by
 	// binding: a local `foo` shadowing an import still matches, because this is a spelling rule.
 	Object string `json:"object"`
 
@@ -55,21 +55,21 @@ type NoRestrictedPropertiesOptions struct {
 // `allowObjects` would otherwise be accepted and silently have no effect. The `{"restrictions": [...]}`
 // wrapper this decoder used to read, when the config layer could deliver only one element, is gone
 // with it: it was never upstream's spelling.
-func DecodeNoRestrictedPropertiesOptions(list []byte) (any, error) {
+func DecodeNoRestrictedPropertiesOptions(list []byte) (NoRestrictedPropertiesOptions, error) {
 	var options NoRestrictedPropertiesOptions
 	if len(list) == 0 {
 		return options, nil
 	}
 	var elements []json.RawMessage
-	if err := json.Unmarshal(list, &elements); err != nil {
+	if decodeError := json.Unmarshal(list, &elements); decodeError != nil {
 		return options, fmt.Errorf(
-			"no-restricted-properties: the option list is not a JSON array: %w", err)
+			"no-restricted-properties: the option list is not a JSON array: %w", decodeError)
 	}
 	for index, element := range elements {
 		var restriction NoRestrictedPropertiesRestriction
-		if err := rule.UnmarshalOptions(element, &restriction); err != nil {
+		if unmarshalOptionsError := rule.UnmarshalOptions(element, &restriction); unmarshalOptionsError != nil {
 			return NoRestrictedPropertiesOptions{}, fmt.Errorf(
-				"no-restricted-properties element %d: %w", index+1, err)
+				"no-restricted-properties element %d: %w", index+1, unmarshalOptionsError)
 		}
 		options.Restrictions = append(options.Restrictions, restriction)
 	}
@@ -112,7 +112,7 @@ func DecodeNoRestrictedPropertiesOptions(list []byte) (any, error) {
 // codebase full of whatever it would have banned. Verified against the installed build --
 // `foo.bar; baz.qux;` with no options reports nothing.
 //
-// So it is registered here and NOT enabled. Enabling it means choosing restrictions, which is a
+// So it is registered here and not enabled. Enabling it means choosing restrictions, which is a
 // decision about this codebase rather than a porting question.
 //
 // # Three kinds of restriction, checked in one order
@@ -122,7 +122,7 @@ func DecodeNoRestrictedPropertiesOptions(list []byte) (any, error) {
 //	property only       that property on every receiver, minus `allowObjects`
 //
 // An object-specific match takes priority over a property-only one, so the two never both report on
-// one access. That ordering is upstream's and it decides which MESSAGE a reader sees.
+// one access. That ordering is upstream's and it decides which message a reader sees.
 //
 // # Names, not bindings
 //
@@ -130,12 +130,12 @@ func DecodeNoRestrictedPropertiesOptions(list []byte) (any, error) {
 // is right for a rule a project configures by name: the restriction is written as a string.
 //
 // A consequence worth stating because it looks like a bug: `foo.bar.baz` with `object: "bar"` is
-// CLEAN, because the receiver of `.baz` is a member expression rather than an identifier and has no
+// clean, because the receiver of `.baz` is a member expression rather than an identifier and has no
 // name to compare. Measured against the installed build.
-var NoRestrictedProperties = rule.Rule{
+var NoRestrictedProperties = rule.Rule[NoRestrictedPropertiesOptions]{
 	Name: "no-restricted-properties",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, configured := rule.OptionsAs[NoRestrictedPropertiesOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[NoRestrictedPropertiesOptions]) rule.Listeners {
+		settings, configured := options.Read()
 		if !configured || len(settings.Restrictions) == 0 {
 			// Upstream returns an empty visitor object here rather than a no-op listener, so the
 			// rule costs nothing at all when it has nothing to enforce.
@@ -145,18 +145,18 @@ var NoRestrictedProperties = rule.Rule{
 
 		return rule.Listeners{
 			ast.KindPropertyAccessExpression: func(node *ast.Node) {
-				checkNoRestrictedPropertiesAccess(ctx, node, index)
+				checkNoRestrictedPropertiesAccess(ruleContext, node, index)
 			},
 			ast.KindElementAccessExpression: func(node *ast.Node) {
-				checkNoRestrictedPropertiesAccess(ctx, node, index)
+				checkNoRestrictedPropertiesAccess(ruleContext, node, index)
 			},
 			ast.KindObjectBindingPattern: func(node *ast.Node) {
-				checkNoRestrictedPropertiesPattern(ctx, node, index)
+				checkNoRestrictedPropertiesPattern(ruleContext, node, index)
 			},
-			// Destructuring in an ASSIGNMENT position, which our parser gives a different node
+			// Destructuring in an assignment position, which our parser gives a different node
 			// kind than destructuring in a declaration. See the doc on the checker below.
 			ast.KindObjectLiteralExpression: func(node *ast.Node) {
-				checkNoRestrictedPropertiesAssignmentPattern(ctx, node, index)
+				checkNoRestrictedPropertiesAssignmentPattern(ruleContext, node, index)
 			},
 		}
 	},
@@ -203,7 +203,7 @@ func buildNoRestrictedPropertiesIndex(
 
 // checkNoRestrictedPropertiesAccess judges one member access.
 func checkNoRestrictedPropertiesAccess(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	node *ast.Node,
 	index noRestrictedPropertiesIndex,
 ) {
@@ -211,7 +211,7 @@ func checkNoRestrictedPropertiesAccess(
 	if !named {
 		return
 	}
-	reportNoRestrictedProperties(ctx, node, index,
+	reportNoRestrictedProperties(ruleContext, node, index,
 		noRestrictedPropertiesReceiverName(node), propertyName)
 }
 
@@ -221,10 +221,10 @@ func checkNoRestrictedPropertiesAccess(
 // second entry point into the same judgment. The receiver is the initializer when it is a bare
 // identifier, and nothing otherwise -- `var { bar } = foo.baz` is clean, measured.
 //
-// Every finding points at the PATTERN rather than at the property, which is upstream's `node` and
+// Every finding points at the pattern rather than at the property, which is upstream's `node` and
 // is why one pattern restricting two properties reports twice on the same span.
 func checkNoRestrictedPropertiesPattern(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	node *ast.Node,
 	index noRestrictedPropertiesIndex,
 ) {
@@ -234,7 +234,7 @@ func checkNoRestrictedPropertiesPattern(
 			return false
 		}
 		binding := element.AsBindingElement()
-		// A shorthand `{ bar }` has no property name node, so the binding name IS the property
+		// A shorthand `{ bar }` has no property name node, so the binding name is the property
 		// read. A rest element `{ ...rest }` reads no single property and is skipped, which is
 		// upstream's behaviour rather than an omission: it has no key to compare.
 		key := binding.PropertyName
@@ -248,7 +248,7 @@ func checkNoRestrictedPropertiesPattern(
 		if !named {
 			return false
 		}
-		reportNoRestrictedProperties(ctx, node, index, objectName, propertyName)
+		reportNoRestrictedProperties(ruleContext, node, index, objectName, propertyName)
 		return false
 	})
 }
@@ -259,7 +259,7 @@ func checkNoRestrictedPropertiesPattern(
 //
 // ESTree calls both `var {bar} = foo` and `({bar} = foo)` an `ObjectPattern`, so upstream needs one
 // listener. Our parser only knows a declaration is a pattern; in an assignment it has already
-// committed to parsing `{bar}` as an object LITERAL, whose members are property assignments rather
+// committed to parsing `{bar}` as an object literal, whose members are property assignments rather
 // than binding elements. So the same judgment needs a second entry point over a different shape.
 //
 // This is invisible from upstream's source and invisible from its corpus verdicts. It surfaced as
@@ -271,7 +271,7 @@ func checkNoRestrictedPropertiesPattern(
 // is an ordinary literal. The test is positional, walking up through the nesting a pattern can
 // have -- a nested property, an array element -- to an assignment's left side.
 func checkNoRestrictedPropertiesAssignmentPattern(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	node *ast.Node,
 	index noRestrictedPropertiesIndex,
 ) {
@@ -294,7 +294,7 @@ func checkNoRestrictedPropertiesAssignmentPattern(
 		if !named {
 			return false
 		}
-		reportNoRestrictedProperties(ctx, node, index, objectName, propertyName)
+		reportNoRestrictedProperties(ruleContext, node, index, objectName, propertyName)
 		return false
 	})
 }
@@ -311,7 +311,7 @@ func noRestrictedPropertiesIsAssignmentTarget(node *ast.Node) bool {
 		case ast.KindPropertyAssignment, ast.KindArrayLiteralExpression,
 			ast.KindShorthandPropertyAssignment, ast.KindSpreadAssignment,
 			ast.KindSpreadElement, ast.KindParenthesizedExpression,
-			// An enclosing object literal, which is what a NESTED pattern sits inside:
+			// An enclosing object literal, which is what a nested pattern sits inside:
 			// `({ bar: { bad } } = foo)` walks inner literal, property, outer literal, assignment.
 			// Omitting this arm left exactly that shape silent while every flat pattern passed.
 			ast.KindObjectLiteralExpression:
@@ -330,7 +330,7 @@ func noRestrictedPropertiesIsAssignmentTarget(node *ast.Node) bool {
 
 // noRestrictedPropertiesAssignmentSource returns the name of the object an assignment pattern reads.
 //
-// Only the OUTERMOST pattern has one: in `({ bar: { bad } } = foo)` the inner pattern reads
+// Only the outermost pattern has one: in `({ bar: { bad } } = foo)` the inner pattern reads
 // `foo.bar`, whose name is not an identifier, so it answers "" and matches only a property-only
 // restriction. Measured -- upstream reports `bad` there with the property-only message.
 func noRestrictedPropertiesAssignmentSource(node *ast.Node) string {
@@ -382,13 +382,13 @@ func noRestrictedPropertiesPatternSource(node *ast.Node) string {
 // reportNoRestrictedProperties applies the three lookups in upstream's order and reports at most
 // once.
 //
-// The object-specific arms are consulted first and, crucially, an object-specific MATCH suppresses
+// The object-specific arms are consulted first and, crucially, an object-specific match suppresses
 // the property-only arm even when the specific one is exempted by `allowProperties`. That is
 // upstream's `else if` and it is a real decision rather than a shortcut: a project that restricts
 // an object while allowing one property has said that property is fine on that object, and a
 // property-only rule should not then override it.
 func reportNoRestrictedProperties(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	node *ast.Node,
 	index noRestrictedPropertiesIndex,
 	objectName string,
@@ -405,7 +405,7 @@ func reportNoRestrictedProperties(
 
 	if matchedObject {
 		if noRestrictedPropertiesListed(propertyName, matched.AllowProperties) {
-			// Exempted, and the property-only arm is NOT consulted. See the doc above.
+			// Exempted, and the property-only arm is not consulted. See the doc above.
 			return
 		}
 		allowance := ""
@@ -413,7 +413,7 @@ func reportNoRestrictedProperties(
 			allowance = fmt.Sprintf(" Only these properties are allowed: %s.",
 				strings.Join(matched.AllowProperties, ", "))
 		}
-		ctx.ReportNode(node, rule.Message{
+		ruleContext.ReportNode(node, rule.Message{
 			Id: "restrictedObjectProperty",
 			Description: fmt.Sprintf("`%s.%s` is restricted from being used.%s%s",
 				objectName, propertyName, allowance,
@@ -432,7 +432,7 @@ func reportNoRestrictedProperties(
 		allowance = fmt.Sprintf(" Property `%s` is only allowed on these objects: %s.",
 			propertyName, strings.Join(globalMatch.AllowObjects, ", "))
 	}
-	ctx.ReportNode(node, rule.Message{
+	ruleContext.ReportNode(node, rule.Message{
 		Id: "restrictedProperty",
 		Description: fmt.Sprintf("`%s` is restricted from being used.%s%s",
 			propertyName, allowance, noRestrictedPropertiesSuffix(globalMatch.Message)),
@@ -464,7 +464,7 @@ func noRestrictedPropertiesListed(name string, allowed []string) bool {
 // noRestrictedPropertiesReceiverName returns the spelling of an access's receiver, or "".
 //
 // Upstream reads `node.object && node.object.name`, which is undefined for anything but an
-// identifier. So `foo.bar.baz` has no receiver name for its outer access, and `(foo).bar` DOES have
+// identifier. So `foo.bar.baz` has no receiver name for its outer access, and `(foo).bar` does have
 // one, because espree gives parentheses no node. The parenthesis skip here is what reproduces that
 // second case rather than widening the rule.
 func noRestrictedPropertiesReceiverName(node *ast.Node) string {
@@ -499,7 +499,7 @@ func noRestrictedPropertiesReceiverName(node *ast.Node) string {
 //	`foo[1n]`           "1", reports        nothing, so it would go silent
 //
 // Two of those cost findings and one adds a false one, and the private-name row is in upstream's own
-// corpus as a REPORTING case for `foo['#foo']` beside a clean `this.#foo`. Widening the shelf helper
+// corpus as a reporting case for `foo['#foo']` beside a clean `this.#foo`. Widening the shelf helper
 // would change four other rules, so this rule carries its own predicate and the shelf keeps its.
 func noRestrictedPropertiesAccessedName(node *ast.Node) (string, bool) {
 	switch node.Kind {
@@ -539,7 +539,7 @@ func noRestrictedPropertiesKeyName(key *ast.Node) (string, bool) {
 // noRestrictedPropertiesLiteralName renders a literal the way upstream's `getStaticStringValue`
 // does.
 //
-// Upstream stringifies the literal's VALUE, which is why a regular expression answers its own source
+// Upstream stringifies the literal's value, which is why a regular expression answers its own source
 // including the slashes, `null` answers "null", and a bigint answers its digits without the `n`.
 // Each of those is a spelling somebody could plausibly restrict, and each was measured against the
 // installed build rather than inferred.

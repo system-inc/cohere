@@ -1,11 +1,24 @@
 {
   "rules": {
     "TypeScript": "nexus/consistency-no-stuttering-name",
-    "Swift": "cohere-swift/consistency-no-stuttering-name"
+    "Swift": "cohere-swift/consistency-no-stuttering-name",
+    "Go": "cohere-go/consistency-no-stuttering-name"
   },
   "messages": {
     "stutteringName": {
-      "text": "\"{{name}}.{{name}}\" stutters, which means the name is carrying nothing: it repeats the field instead of saying which {{name}} this is. Rename the value for what it holds, the type it came back as or whatever distinguishes it from another {{name}} in this scope, so a reader forty lines down does not have to find the declaration."
+      "text": "\"[[stutter]]\" stutters, which means the name is carrying nothing: it repeats the [[member]] instead of saying which {{name}} this is. Rename the value for what it holds, the type it came back as or whatever distinguishes it from another {{name}} in this scope, so a reader forty lines down does not have to find the declaration.",
+      "terms": {
+        "stutter": {
+          "TypeScript": "{{name}}.{{name}}",
+          "Swift": "{{name}}.{{name}}",
+          "Go": "{{name}}.{{member}}"
+        },
+        "member": {
+          "TypeScript": "field",
+          "Swift": "field",
+          "Go": "field or method"
+        }
+      }
     }
   }
 }

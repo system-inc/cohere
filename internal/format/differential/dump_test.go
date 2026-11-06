@@ -34,11 +34,11 @@ import (
 //
 // The candidate is always native. It reads the cache TestCorpora warms under the same identity, so a
 // dump costs the candidate's time once the corpus has been measured.
-func TestDumpDifferences(t *testing.T) {
-	t.Parallel()
+func TestDumpDifferences(test *testing.T) {
+	test.Parallel()
 	roots, output := os.Getenv("COHERE_FORMAT_CORPORA"), os.Getenv("COHERE_FORMAT_DUMP")
 	if roots == "" || output == "" {
-		t.Skip("set COHERE_FORMAT_CORPORA and COHERE_FORMAT_DUMP to dump every difference")
+		test.Skip("set COHERE_FORMAT_CORPORA and COHERE_FORMAT_DUMP to dump every difference")
 	}
 	extensions := map[string]bool{}
 	for _, extension := range strings.Split(os.Getenv("COHERE_FORMAT_EXTENSIONS"), ",") {
@@ -47,25 +47,25 @@ func TestDumpDifferences(t *testing.T) {
 		}
 	}
 
-	bundles, err := prettier.Bundles()
-	if err != nil {
-		t.Fatal(err)
+	bundles, bundlesError := prettier.Bundles()
+	if bundlesError != nil {
+		test.Fatal(bundlesError)
 	}
-	digest, err := prettier.DigestBundles(bundles.Files)
-	if err != nil {
-		t.Fatal(err)
+	digest, digestBundlesError := prettier.DigestBundles(bundles.Files)
+	if digestBundlesError != nil {
+		test.Fatal(digestBundlesError)
 	}
 	directory := os.Getenv("COHERE_FORMAT_CACHE")
 	if directory == "" {
-		base, err := os.UserCacheDir()
-		if err != nil {
-			t.Fatal(err)
+		base, userCacheDirectoryError := os.UserCacheDir()
+		if userCacheDirectoryError != nil {
+			test.Fatal(userCacheDirectoryError)
 		}
 		directory = filepath.Join(base, "cohere", "prettier-oracle")
 	}
-	enumerator, err := prettier.New(formatoptions.Default())
-	if err != nil {
-		t.Fatal(err)
+	enumerator, newPrettierError := prettier.New(formatoptions.Default())
+	if newPrettierError != nil {
+		test.Fatal(newPrettierError)
 	}
 
 	pending := strings.Split(roots, ":")
@@ -80,32 +80,32 @@ func TestDumpDifferences(t *testing.T) {
 
 		// Nested repositories regardless of root's own ignore lists, before anything can skip root, as
 		// TestCorpora finds them (#k6vebep).
-		nestedRepositories, err := formatfiles.NestedRepositoriesBelow(root)
-		if err != nil {
-			t.Fatalf("finding the repositories nested in %s: %v", root, err)
+		nestedRepositories, nestedRepositoriesBelowError := formatfiles.NestedRepositoriesBelow(root)
+		if nestedRepositoriesBelowError != nil {
+			test.Fatalf("finding the repositories nested in %s: %v", root, nestedRepositoriesBelowError)
 		}
 		for _, nested := range nestedRepositories {
 			pending = append(pending, filepath.Join(root, nested))
 		}
 
-		resolution, err := formatoptions.Resolve(root)
-		if errors.Is(err, formatoptions.ErrPrettierConfigRemains) {
+		resolution, resolveError := formatoptions.Resolve(root)
+		if errors.Is(resolveError, formatoptions.ErrPrettierConfigRemains) {
 			// A repository still carrying Prettier config, pinned to its own adoption (www-ahra-ai). The
 			// differential's TestCorpora refuses this for a named corpus; here it is named and skipped.
-			t.Logf("skipping %s, not yet adopted: %v", root, err)
+			test.Logf("skipping %s, not yet adopted: %v", root, resolveError)
 			continue
 		}
-		if err != nil {
-			t.Fatalf("resolving the format options for %s: %v", root, err)
+		if resolveError != nil {
+			test.Fatalf("resolving the format options for %s: %v", root, resolveError)
 		}
 
-		enumeration, err := enumerator.Enumerate(root)
-		if errors.Is(err, formatoptions.ErrPrettierConfigRemains) {
-			t.Logf("skipping %s, not yet adopted: %v", root, err)
+		enumeration, enumerateError := enumerator.Enumerate(root)
+		if errors.Is(enumerateError, formatoptions.ErrPrettierConfigRemains) {
+			test.Logf("skipping %s, not yet adopted: %v", root, enumerateError)
 			continue
 		}
-		if err != nil {
-			t.Fatalf("enumerating %s: %v", root, err)
+		if enumerateError != nil {
+			test.Fatalf("enumerating %s: %v", root, enumerateError)
 		}
 		files := enumeration.Files
 		if len(extensions) > 0 {
@@ -119,8 +119,8 @@ func TestDumpDifferences(t *testing.T) {
 
 		options := resolution.Options
 		if width := os.Getenv("COHERE_FORMAT_PRINT_WIDTH"); width != "" {
-			if _, err := fmt.Sscan(width, &options.PrintWidth); err != nil {
-				t.Fatalf("COHERE_FORMAT_PRINT_WIDTH %q: %v", width, err)
+			if _, scanError := fmt.Sscan(width, &options.PrintWidth); scanError != nil {
+				test.Fatalf("COHERE_FORMAT_PRINT_WIDTH %q: %v", width, scanError)
 			}
 		}
 		newOracle := func() (Formatter, error) { return prettier.New(options) }
@@ -131,59 +131,69 @@ func TestDumpDifferences(t *testing.T) {
 			Identity:  digest + "|" + string(bundles.Origin) + "|filepath|" + describeOptions(options),
 		}
 
-		report, err := Compare(root, files, newOracle, newCandidate, runtime.NumCPU(), cache)
-		if err != nil {
-			t.Fatalf("comparing %s: %v", root, err)
+		report, compareError := Compare(root, files, newOracle, newCandidate, runtime.NumCPU(), cache)
+		if compareError != nil {
+			test.Fatalf("comparing %s: %v", root, compareError)
 		}
-		t.Log(report.Summary())
+		test.Log(report.Summary())
 
 		// The whole root names the directory, because nested corpora share basenames (three are nexus).
-		corpus := filepath.Join(output, strings.ReplaceAll(strings.Trim(root, string(filepath.Separator)), string(filepath.Separator), "_"))
+		corpus := filepath.Join(
+			output,
+			strings.ReplaceAll(strings.Trim(root, string(filepath.Separator)), string(filepath.Separator), "_"),
+		)
 		var summary strings.Builder
 		summary.WriteString(report.Summary())
 		results := append([]FileResult(nil), report.Files...)
 		sort.Slice(results, func(left, right int) bool { return results[left].Path < results[right].Path })
-		oracle, err := newOracle()
-		if err != nil {
-			t.Fatal(err)
+		oracle, newOracleError := newOracle()
+		if newOracleError != nil {
+			test.Fatal(newOracleError)
 		}
 		for _, result := range results {
 			if result.Outcome != Different && result.Outcome != CandidateRefused {
 				continue
 			}
-			relative, _ := filepath.Rel(root, result.Path)
+			relative, relativeError := filepath.Rel(root, result.Path)
+			if relativeError != nil {
+				test.Fatalf("naming %s under %s: %v", result.Path, root, relativeError)
+			}
 			fmt.Fprintf(&summary, "%s\t%s\t%s\n", result.Outcome, relative, firstLine(result.Detail))
 			if result.Outcome != Different {
 				continue
 			}
-			source, err := os.ReadFile(result.Path)
-			if err != nil {
-				t.Fatal(err)
+			source, readError := os.ReadFile(result.Path)
+			if readError != nil {
+				test.Fatal(readError)
 			}
-			expected, err := cache.format(oracle, result.Path, string(source))
-			if err != nil {
-				t.Fatal(err)
+			expected, formatError := cache.format(oracle, result.Path, string(source))
+			if formatError != nil {
+				test.Fatal(formatError)
 			}
-			actual, err := native.Formatter{Options: options}.Format(result.Path, string(source))
-			if err != nil {
-				t.Fatal(err)
+			actual, formatError := native.Formatter{Options: options}.Format(result.Path, string(source))
+			if formatError != nil {
+				test.Fatal(formatError)
 			}
 			base := filepath.Join(corpus, "files", relative)
-			if err := os.MkdirAll(filepath.Dir(base), 0o755); err != nil {
-				t.Fatal(err)
+			if createDirectoryError := os.MkdirAll(filepath.Dir(base), 0o755); createDirectoryError != nil {
+				test.Fatal(createDirectoryError)
 			}
-			if err := os.WriteFile(base+".expected", []byte(expected), 0o644); err != nil {
-				t.Fatal(err)
+			if writeError := os.WriteFile(base+".expected", []byte(expected), 0o644); writeError != nil {
+				test.Fatal(writeError)
 			}
-			if err := os.WriteFile(base+".actual", []byte(actual), 0o644); err != nil {
-				t.Fatal(err)
+			if writeError := os.WriteFile(base+".actual", []byte(actual), 0o644); writeError != nil {
+				test.Fatal(writeError)
 			}
 		}
-		if err := os.MkdirAll(corpus, 0o755); err != nil {
-			t.Fatal(err)
+		if createDirectoryError := os.MkdirAll(corpus, 0o755); createDirectoryError != nil {
+			test.Fatal(createDirectoryError)
 		}
-		if err := os.WriteFile(filepath.Join(corpus, "summary.txt"), []byte(summary.String()), 0o644); err != nil {
-			t.Fatal(err)
+		if writeError := os.WriteFile(
+			filepath.Join(corpus, "summary.txt"),
+			[]byte(summary.String()),
+			0o644,
+		); writeError != nil {
+			test.Fatal(writeError)
 		}
 	}
 }

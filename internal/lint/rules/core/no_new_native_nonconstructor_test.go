@@ -18,8 +18,8 @@ const nonconstructorFile = "/repository/source/Nonconstructor.ts"
 // `NeedsTypeChecker`, and the plain harness supplies no checker, so a fixture written against it
 // would take the nil path and prove nothing while passing. The typed harness fails loudly when it
 // cannot build one, which is what makes these fixtures evidence.
-func TestNoNewNativeNonconstructorFires(t *testing.T) {
-	t.Parallel()
+func TestNoNewNativeNonconstructorFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -36,10 +36,10 @@ func TestNoNewNativeNonconstructorFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.RunTypedFiles(t, NoNewNativeNonconstructor,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.RunTypedFiles(test, NoNewNativeNonconstructor,
 					map[string]string{nonconstructorFile: testCase.sourceText}, nonconstructorFile),
 				"noNewNativeNonconstructor")
 		})
@@ -52,8 +52,8 @@ func TestNoNewNativeNonconstructorFires(t *testing.T) {
 // different naive implementation. A spelling test reports the first two; a test that checked only
 // the callee position would still be wrong about them; and the argument forms are not `new`
 // expressions on these names at all, so they pin that the callee is what is read.
-func TestNoNewNativeNonconstructorStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoNewNativeNonconstructorStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -74,10 +74,10 @@ func TestNoNewNativeNonconstructorStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.RunTypedFiles(t, NoNewNativeNonconstructor,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.RunTypedFiles(test, NoNewNativeNonconstructor,
 					map[string]string{nonconstructorFile: testCase.sourceText}, nonconstructorFile))
 		})
 	}
@@ -89,14 +89,14 @@ func TestNoNewNativeNonconstructorStaysSilent(t *testing.T) {
 // likely in real code: a module exporting its own `Symbol` helper. It reaches the same predicate,
 // because the declaration lives in source rather than in the standard library, and pinning it here
 // is what keeps that generality from being accidental.
-func TestNoNewNativeNonconstructorDeclinesAnImportedShadow(t *testing.T) {
-	t.Parallel()
+func TestNoNewNativeNonconstructorDeclinesAnImportedShadow(test *testing.T) {
+	test.Parallel()
 
 	const helperFile = "/repository/source/Helper.ts"
 	files := map[string]string{
 		helperFile:         "export class Symbol { constructor(_name: string) {} }\n",
 		nonconstructorFile: "import { Symbol } from './Helper';\nexport const a = new Symbol('x');\n",
 	}
-	rule_testing.ExpectClean(t,
-		rule_testing.RunTypedFiles(t, NoNewNativeNonconstructor, files, nonconstructorFile))
+	rule_testing.ExpectClean(test,
+		rule_testing.RunTypedFiles(test, NoNewNativeNonconstructor, files, nonconstructorFile))
 }

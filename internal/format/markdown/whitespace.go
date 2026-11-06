@@ -10,20 +10,20 @@ import (
 
 var singleLineNodeTypes = map[string]bool{"tableCell": true, "link": true, "wikiLink": true}
 
-// lineBreakBetweenTheseAndCJConvertsToSpace: a line break between a character from this set and CJ can
+// lineBreakBetweenTheseAndCjConvertsToSpace: a line break between a character from this set and CJ can
 // be converted to a space. Includes only ASCII punctuation marks for now.
-const lineBreakBetweenTheseAndCJConvertsToSpace = "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~"
+const lineBreakBetweenTheseAndCjConvertsToSpace = "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~"
 
-// convertsToSpaceAroundCJ is the Set's has() of one UTF-16 unit; an empty value's unit is undefined.
-func convertsToSpaceAroundCJ(unit rune) bool {
-	return unit >= 0 && unit < 0x80 && strings.ContainsRune(lineBreakBetweenTheseAndCJConvertsToSpace, unit)
+// convertsToSpaceAroundCj is the Set's has() of one UTF-16 unit; an empty value's unit is undefined.
+func convertsToSpaceAroundCj(unit rune) bool {
+	return unit >= 0 && unit < 0x80 && strings.ContainsRune(lineBreakBetweenTheseAndCjConvertsToSpace, unit)
 }
 
-// isInSentenceWithCJSpaces determines the preferred style of spacing between Chinese or Japanese and
+// isInSentenceWithCjSpaces determines the preferred style of spacing between Chinese or Japanese and
 // non-CJK characters in the parent sentence node: true if a space tends to be inserted between them.
-func isInSentenceWithCJSpaces(path *astPath) bool {
+func isInSentenceWithCjSpaces(path *astPath) bool {
 	sentenceNode := parentNode(path)
-	if sentenceNode.UsesCJSpaces == nil {
+	if sentenceNode.UsesCjSpaces == nil {
 		spaces, empties := 0, 0
 		children := sentenceNode.Children
 
@@ -32,8 +32,8 @@ func isInSentenceWithCJSpaces(path *astPath) bool {
 			if node.NodeType == "whitespace" && (node.Value == " " || node.Value == "") {
 				previousKind := children[index-1].Kind
 				nextKind := children[index+1].Kind
-				if (previousKind == kindCJLetter && nextKind == kindNonCJK) ||
-					(previousKind == kindNonCJK && nextKind == kindCJLetter) {
+				if (previousKind == kindCjLetter && nextKind == kindNonCjk) ||
+					(previousKind == kindNonCjk && nextKind == kindCjLetter) {
 					if node.Value == " " {
 						spaces++
 					} else {
@@ -44,11 +44,11 @@ func isInSentenceWithCJSpaces(path *astPath) bool {
 		}
 
 		// Inject a property to cache the result.
-		usesCJSpaces := spaces > empties
-		sentenceNode.UsesCJSpaces = &usesCJSpaces
+		usesCjSpaces := spaces > empties
+		sentenceNode.UsesCjSpaces = &usesCjSpaces
 	}
 
-	return *sentenceNode.UsesCJSpaces
+	return *sentenceNode.UsesCjSpaces
 }
 
 // lineBreakCanBeConvertedToSpace checks whether the given "\n" node can be converted to a space.
@@ -72,20 +72,20 @@ func lineBreakCanBeConvertedToSpace(path *astPath, isLink bool) bool {
 	if
 	// "\n" between non-CJK or Korean characters always can be converted to a space. Korean Hangul
 	// simulates Latin words. See https://github.com/prettier/prettier/issues/6516
-	(isNonCJKOrKoreanLetter(previousKind) && isNonCJKOrKoreanLetter(nextKind)) ||
+	(isNonCjkOrKoreanLetter(previousKind) && isNonCjkOrKoreanLetter(nextKind)) ||
 		// Han & Hangul: same way preferred
-		(previousKind == kindKLetter && nextKind == kindCJLetter) ||
-		(nextKind == kindKLetter && previousKind == kindCJLetter) {
+		(previousKind == kindKLetter && nextKind == kindCjLetter) ||
+		(nextKind == kindKLetter && previousKind == kindCjLetter) {
 		return true
 	}
 
 	// Do not convert \n to a space:
 	if
 	// around CJK punctuation
-	previousKind == kindCJKPunctuation ||
-		nextKind == kindCJKPunctuation ||
+	previousKind == kindCjkPunctuation ||
+		nextKind == kindCjkPunctuation ||
 		// between CJ
-		(previousKind == kindCJLetter && nextKind == kindCJLetter) {
+		(previousKind == kindCjLetter && nextKind == kindCjLetter) {
 		return false
 	}
 
@@ -95,7 +95,7 @@ func lineBreakCanBeConvertedToSpace(path *astPath, isLink bool) bool {
 	// space. E.g. :::\n句子句子句子\n::: → ::: 句子句子句子 :::
 	//
 	// Note: line breaks like "(\n句子句子\n)" or "句子\n." are suppressed in `isBreakable(...)`.
-	if convertsToSpaceAroundCJ(firstUnit(next.Value)) || convertsToSpaceAroundCJ(lastUnit(previous.Value)) {
+	if convertsToSpaceAroundCj(firstUnit(next.Value)) || convertsToSpaceAroundCj(lastUnit(previous.Value)) {
 		return true
 	}
 
@@ -107,12 +107,12 @@ func lineBreakCanBeConvertedToSpace(path *astPath, isLink bool) bool {
 
 	// If the sentence uses the style with spaces between CJ and non-CJK, "\n" can be converted to a
 	// space.
-	return isInSentenceWithCJSpaces(path)
+	return isInSentenceWithCjSpaces(path)
 }
 
-// isNonCJKOrKoreanLetter is true if kind is Korean letter or non-CJK.
-func isNonCJKOrKoreanLetter(kind string) bool {
-	return kind == kindNonCJK || kind == kindKLetter
+// isNonCjkOrKoreanLetter is true if kind is Korean letter or non-CJK.
+func isNonCjkOrKoreanLetter(kind string) bool {
+	return kind == kindNonCjk || kind == kindKLetter
 }
 
 // isBreakable checks whether whitespace can be printed as a line break.
@@ -150,13 +150,13 @@ func isBreakable(path *astPath, value string, proseWrap string, isLink bool) boo
 		return false
 	}
 
-	if (previous.Kind == kindKLetter && next.Kind == kindCJLetter) ||
-		(next.Kind == kindKLetter && previous.Kind == kindCJLetter) {
+	if (previous.Kind == kindKLetter && next.Kind == kindCjLetter) ||
+		(next.Kind == kindKLetter && previous.Kind == kindCjLetter) {
 		return true
 	}
 
 	// [1] & [2]
-	if previous.IsCJ || next.IsCJ {
+	if previous.IsCj || next.IsCj {
 		return false
 	}
 

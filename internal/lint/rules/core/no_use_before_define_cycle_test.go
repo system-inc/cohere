@@ -8,8 +8,8 @@ import (
 
 // The shapes api's 15 waiting sites take, reduced: declarations that reference each other, where no
 // ordering removes the forward reference and the forward reference cannot run before its target.
-func TestNoUseBeforeDefineExemptsAnUnorderableCycleThatCannotRunEarly(t *testing.T) {
-	t.Parallel()
+func TestNoUseBeforeDefineExemptsAnUnorderableCycleThatCannotRunEarly(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -62,17 +62,20 @@ export function buildSchema(): unknown[] {
 `},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoUseBeforeDefine, "fixture.ts", testCase.source))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(
+				test,
+				rule_testing.RunTyped(test, NoUseBeforeDefine, "fixture.ts", testCase.source),
+			)
 		})
 	}
 }
 
 // What the exemption must not reach: a forward reference that can be reordered away, or one that can
 // run before its target exists and so lands in the temporal dead zone.
-func TestNoUseBeforeDefineStillReportsWhatCanRunEarlyOrBeReordered(t *testing.T) {
-	t.Parallel()
+func TestNoUseBeforeDefineStillReportsWhatCanRunEarlyOrBeReordered(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -129,10 +132,13 @@ export const second = (): unknown => first;
 `},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoUseBeforeDefine, "fixture.ts", testCase.source),
-				"usedBeforeDefined")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(
+				test,
+				rule_testing.RunTyped(test, NoUseBeforeDefine, "fixture.ts", testCase.source),
+				"usedBeforeDefined",
+			)
 		})
 	}
 }

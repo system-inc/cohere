@@ -67,7 +67,7 @@ type cssFixtureNode struct {
 	Kind         string            `json:"kind"`
 	Selector     string            `json:"selector"`
 	Name         string            `json:"name"`
-	Params       string            `json:"params"`
+	Parameters   string            `json:"params"`
 	Property     string            `json:"property"`
 	Value        *string           `json:"value"`
 	ValuePresent bool              `json:"valuePresent"`
@@ -75,24 +75,24 @@ type cssFixtureNode struct {
 	Nodes        []*cssFixtureNode `json:"nodes"`
 }
 
-func loadCSSParserCorpus(t *testing.T) cssParserCorpus {
-	t.Helper()
+func loadCssParserCorpus(test *testing.T) cssParserCorpus {
+	test.Helper()
 
 	path := filepath.Join("testdata", "cssparser_fixtures.json")
-	contents, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("read %s: %v", path, err)
+	contents, readError := os.ReadFile(path)
+	if readError != nil {
+		test.Fatalf("read %s: %v", path, readError)
 	}
 
 	var corpus cssParserCorpus
-	if err := json.Unmarshal(contents, &corpus); err != nil {
-		t.Fatalf("parse %s: %v", path, err)
+	if decodeError := json.Unmarshal(contents, &corpus); decodeError != nil {
+		test.Fatalf("parse %s: %v", path, decodeError)
 	}
 	if len(corpus.Cases) == 0 {
-		t.Fatalf("%s holds no cases", path)
+		test.Fatalf("%s holds no cases", path)
 	}
 	if !corpus.ParseResolvedByIdentity {
-		t.Fatalf("%s was captured without resolving parse() by identity", path)
+		test.Fatalf("%s was captured without resolving parse() by identity", path)
 	}
 	return corpus
 }
@@ -108,7 +108,9 @@ func describeNodes(nodes []*Node, indent string) string {
 		case KindRule:
 			builder.WriteString("rule " + quoteForDiff(node.Selector) + "\n")
 		case KindAtRule:
-			builder.WriteString("at-rule " + quoteForDiff(node.Name) + " params=" + quoteForDiff(node.Params) + "\n")
+			builder.WriteString(
+				"at-rule " + quoteForDiff(node.Name) + " params=" + quoteForDiff(node.Parameters) + "\n",
+			)
 		case KindDeclaration:
 			value := "<absent>"
 			if node.ValuePresent {
@@ -134,8 +136,8 @@ func describeNodes(nodes []*Node, indent string) string {
 // quoteForDiff quotes a string so whitespace differences are visible in a failure message.
 func quoteForDiff(value string) string {
 	quoted := "\""
-	for _, r := range value {
-		switch r {
+	for _, character := range value {
+		switch character {
 		case '\n':
 			quoted += "\\n"
 		case '\t':
@@ -145,7 +147,7 @@ func quoteForDiff(value string) string {
 		case '"':
 			quoted += "\\\""
 		default:
-			quoted += string(r)
+			quoted += string(character)
 		}
 	}
 	return quoted + "\""
@@ -162,7 +164,7 @@ func nodesFromFixture(fixtures []*cssFixtureNode) []*Node {
 			Kind:         NodeKind(fixture.Kind),
 			Selector:     fixture.Selector,
 			Name:         fixture.Name,
-			Params:       fixture.Params,
+			Parameters:   fixture.Parameters,
 			Property:     fixture.Property,
 			ValuePresent: fixture.ValuePresent,
 			Important:    fixture.Important,
@@ -176,14 +178,14 @@ func nodesFromFixture(fixtures []*cssFixtureNode) []*Node {
 	return nodes
 }
 
-// TestParseCSSMatchesEngine is the whole contract: for every stylesheet in the corpus, the tree
+// TestParseCssMatchesEngine is the whole contract: for every stylesheet in the corpus, the tree
 // this port builds is the tree the engine built.
 //
 // The count is printed on success rather than only on failure, because a suite that ran six cases
 // and a suite that ran ninety are indistinguishable from a green line.
-func TestParseCSSMatchesEngine(t *testing.T) {
-	t.Parallel()
-	corpus := loadCSSParserCorpus(t)
+func TestParseCssMatchesEngine(test *testing.T) {
+	test.Parallel()
+	corpus := loadCssParserCorpus(test)
 
 	comparedNodes := 0
 	var countNodes func(nodes []*Node)
@@ -195,106 +197,109 @@ func TestParseCSSMatchesEngine(t *testing.T) {
 	}
 
 	for _, testCase := range corpus.Cases {
-		t.Run(testCase.Name, func(t *testing.T) {
-			t.Parallel()
-			parsed, err := ParseCSS(testCase.Input)
-			if err != nil {
-				t.Fatalf("ParseCSS returned %v; the engine parsed this input successfully", err)
+		test.Run(testCase.Name, func(test *testing.T) {
+			test.Parallel()
+			parsed, parseCssError := ParseCss(testCase.Input)
+			if parseCssError != nil {
+				test.Fatalf("ParseCSS returned %v; the engine parsed this input successfully", parseCssError)
 			}
 
 			expected := nodesFromFixture(testCase.Nodes)
 			got := describeNodes(parsed, "")
 			want := describeNodes(expected, "")
 			if got != want {
-				t.Errorf("tree mismatch for %q\n--- input ---\n%s\n--- got ---\n%s\n--- want (engine) ---\n%s",
+				test.Errorf("tree mismatch for %q\n--- input ---\n%s\n--- got ---\n%s\n--- want (engine) ---\n%s",
 					testCase.Name, testCase.Input, got, want)
 			}
 			countNodes(parsed)
 		})
 	}
 
-	t.Logf(
+	test.Logf(
 		"tailwind %s: compared %d stylesheets and %d nodes against the engine's parser (found by identity as %s)",
 		corpus.TailwindVersion, len(corpus.Cases), comparedNodes, corpus.ParseExportName,
 	)
 }
 
-// TestParseCSSRejectsWhatTheEngineRejects pins the error behaviour.
+// TestParseCssRejectsWhatTheEngineRejects pins the error behaviour.
 //
 // A parser that quietly accepts malformed input is the failure mode that hides: it builds a
 // plausible tree from a stylesheet the engine refuses, and every reading taken from that tree is
 // invented. Only the fact of rejection is asserted, not the message text, because the messages
 // carry a source location upstream that this port deliberately does not reproduce.
-func TestParseCSSRejectsWhatTheEngineRejects(t *testing.T) {
-	t.Parallel()
-	corpus := loadCSSParserCorpus(t)
+func TestParseCssRejectsWhatTheEngineRejects(test *testing.T) {
+	test.Parallel()
+	corpus := loadCssParserCorpus(test)
 
 	rejected := 0
 	for _, testCase := range corpus.ErrorCases {
 		// Not parallel: its subtests add to totals the test checks after them, and a parallel subtest would run
 		// only after the test had returned, so the check would pass on nothing.
-		t.Run(testCase.Name, func(t *testing.T) {
+		test.Run(testCase.Name, func(test *testing.T) {
 			if testCase.Message == nil {
-				t.Skipf("the engine accepted this input, so it pins nothing about rejection")
+				test.Skipf("the engine accepted this input, so it pins nothing about rejection")
 			}
 
-			_, err := ParseCSS(testCase.Input)
-			if err == nil {
-				t.Fatalf("ParseCSS accepted %q; the engine rejected it with %q", testCase.Input, *testCase.Message)
+			_, parseCssError := ParseCss(testCase.Input)
+			if parseCssError == nil {
+				test.Fatalf("ParseCSS accepted %q; the engine rejected it with %q", testCase.Input, *testCase.Message)
 			}
 
-			var syntaxError *CSSSyntaxError
-			if !errors.As(err, &syntaxError) {
-				t.Fatalf("ParseCSS returned %T, want *CSSSyntaxError", err)
+			var syntaxError *CssSyntaxError
+			if !errors.As(parseCssError, &syntaxError) {
+				test.Fatalf("ParseCSS returned %T, want *CSSSyntaxError", parseCssError)
 			}
 			rejected++
 		})
 	}
 
-	t.Logf("rejected %d malformed stylesheets that the engine also rejects", rejected)
+	test.Logf("rejected %d malformed stylesheets that the engine also rejects", rejected)
 }
 
-// TestParseCSSCustomPropertyWhitespaceIsRaw states, on its own, the behaviour this component exists
+// TestParseCssCustomPropertyWhitespaceIsRaw states, on its own, the behaviour this component exists
 // to get right.
 //
 // It is covered by the corpus above, but a mismatch there reads as one of ninety trees differing.
 // Here it reads as what it is: a custom property's value is sliced from the source and keeps its
 // interior whitespace, while an ordinary declaration's value is collapsed. A port that treats
 // `--foo` as an ordinary declaration passes every other test in this file.
-func TestParseCSSCustomPropertyWhitespaceIsRaw(t *testing.T) {
-	t.Parallel()
+func TestParseCssCustomPropertyWhitespaceIsRaw(test *testing.T) {
+	test.Parallel()
 	input := ":root {\n  --font-sans:\n        var(--f), -apple-system,\n        sans-serif;\n  font-family:\n        var(--f),\n        sans-serif;\n}"
 
-	nodes, err := ParseCSS(input)
-	if err != nil {
-		t.Fatalf("ParseCSS: %v", err)
+	nodes, parseCssError := ParseCss(input)
+	if parseCssError != nil {
+		test.Fatalf("ParseCSS: %v", parseCssError)
 	}
 	if len(nodes) != 1 || len(nodes[0].Nodes) != 2 {
-		t.Fatalf("expected one rule holding two declarations, got:\n%s", describeNodes(nodes, ""))
+		test.Fatalf("expected one rule holding two declarations, got:\n%s", describeNodes(nodes, ""))
 	}
 
 	custom, ordinary := nodes[0].Nodes[0], nodes[0].Nodes[1]
 
 	// The custom property keeps the newline and the indentation that followed it.
 	if !strings.Contains(custom.Value, "\n        sans-serif") {
-		t.Errorf("custom property value lost its raw whitespace: %s", quoteForDiff(custom.Value))
+		test.Errorf("custom property value lost its raw whitespace: %s", quoteForDiff(custom.Value))
 	}
 
 	// The ordinary declaration does not, which is what makes the difference above load-bearing
 	// rather than incidental.
 	if strings.Contains(ordinary.Value, "\n") {
-		t.Errorf("ordinary declaration value kept a newline it should have collapsed: %s", quoteForDiff(ordinary.Value))
+		test.Errorf(
+			"ordinary declaration value kept a newline it should have collapsed: %s",
+			quoteForDiff(ordinary.Value),
+		)
 	}
 }
 
-// TestParseCSSReadsRealStylesheets states the exit criterion as a test: the port reproduces what
+// TestParseCssReadsRealStylesheets states the exit criterion as a test: the port reproduces what
 // the engine sees across a real repository's theme and its whole @import graph.
 //
 // The counts are the engine's, recorded at generation time, and are recomputed here from this
 // port's own trees. Asserting they agree is what makes "it parsed without erroring" mean something.
-func TestParseCSSReadsRealStylesheets(t *testing.T) {
-	t.Parallel()
-	corpus := loadCSSParserCorpus(t)
+func TestParseCssReadsRealStylesheets(test *testing.T) {
+	test.Parallel()
+	corpus := loadCssParserCorpus(test)
 
 	stylesheets, themeEntries, utilityBlocks, customVariants := 0, 0, 0, 0
 
@@ -304,9 +309,9 @@ func TestParseCSSReadsRealStylesheets(t *testing.T) {
 		}
 		stylesheets++
 
-		nodes, err := ParseCSS(testCase.Input)
-		if err != nil {
-			t.Fatalf("ParseCSS(%s): %v", testCase.Name, err)
+		nodes, parseCssError := ParseCss(testCase.Input)
+		if parseCssError != nil {
+			test.Fatalf("ParseCSS(%s): %v", testCase.Name, parseCssError)
 		}
 
 		Walk(nodes, func(node *Node) WalkAction {
@@ -330,19 +335,19 @@ func TestParseCSSReadsRealStylesheets(t *testing.T) {
 	}
 
 	if stylesheets != corpus.StylesheetCount {
-		t.Errorf("read %d stylesheets, corpus holds %d", stylesheets, corpus.StylesheetCount)
+		test.Errorf("read %d stylesheets, corpus holds %d", stylesheets, corpus.StylesheetCount)
 	}
 	if themeEntries != corpus.ThemeEntryCount {
-		t.Errorf("found %d @theme entries, the engine found %d", themeEntries, corpus.ThemeEntryCount)
+		test.Errorf("found %d @theme entries, the engine found %d", themeEntries, corpus.ThemeEntryCount)
 	}
 	if utilityBlocks != corpus.UtilityBlockCount {
-		t.Errorf("found %d @utility blocks, the engine found %d", utilityBlocks, corpus.UtilityBlockCount)
+		test.Errorf("found %d @utility blocks, the engine found %d", utilityBlocks, corpus.UtilityBlockCount)
 	}
 	if customVariants != corpus.CustomVariantCount {
-		t.Errorf("found %d @custom-variant rules, the engine found %d", customVariants, corpus.CustomVariantCount)
+		test.Errorf("found %d @custom-variant rules, the engine found %d", customVariants, corpus.CustomVariantCount)
 	}
 
-	t.Logf(
+	test.Logf(
 		"across %d real stylesheets: %d @theme entries, %d @utility blocks, %d @custom-variant rules, each matching the engine",
 		stylesheets, themeEntries, utilityBlocks, customVariants,
 	)

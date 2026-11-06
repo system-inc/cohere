@@ -10,7 +10,10 @@ import (
 
 // reactComponentNoConstAssignmentText is the rule's message, whose wording lives in
 // `policy/messages/react-component-no-const-assignment.json`.
-var reactComponentNoConstAssignmentText = policy.MessageOf("structure/react-component-no-const-assignment", "noConstAssignment")
+var reactComponentNoConstAssignmentText = policy.MessageOf(
+	"structure/react-component-no-const-assignment",
+	"noConstAssignment",
+)
 
 // messageNoConstAssignment names the component and what to write instead. The declaration to write is
 // one value, code the rule builds, since whether it is exported changes the code and not the wording.
@@ -20,8 +23,10 @@ func messageNoConstAssignment(identifierName string, isExported bool) rule.Messa
 		prefix = "export "
 	}
 	return rule.Message{
-		Id:          reactComponentNoConstAssignmentText.Id,
-		Description: reactComponentNoConstAssignmentText.Render(map[string]string{"declaration": prefix + "function " + identifierName + "()"}),
+		Id: reactComponentNoConstAssignmentText.Id,
+		Description: reactComponentNoConstAssignmentText.Render(
+			map[string]string{"declaration": prefix + "function " + identifierName + "()"},
+		),
 	}
 }
 
@@ -71,10 +76,10 @@ func messageNoConstAssignment(identifierName string, isExported bool) rule.Messa
 // two checks rather than by its own logic: widening the kind test to accept calls, which a later
 // rule about component factories might want, silently makes this exemption load-bearing at a line
 // that change does not touch. A reader who found it deleted would have no way to learn that.
-var ReactComponentNoConstAssignment = rule.Rule{
+var ReactComponentNoConstAssignment = rule.Rule[rule.NoOptions]{
 	Name: "structure/react-component-no-const-assignment",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil || !FileContextFor(ctx.SourceFile.FileName().AsString()).IsReactFile {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		if ruleContext.SourceFile == nil || !FileContextFor(ruleContext.SourceFile.FileName().AsString()).IsReactFile {
 			return nil
 		}
 
@@ -91,7 +96,8 @@ var ReactComponentNoConstAssignment = rule.Rule{
 				// export status is read from the modifier list.
 				isExported := module.IsExportedByName(statement.Modifiers())
 
-				for _, declarationNode := range statement.DeclarationList.AsVariableDeclarationList().Declarations.Nodes {
+				declarationList := statement.DeclarationList.AsVariableDeclarationList()
+				for _, declarationNode := range declarationList.Declarations.Nodes {
 					declaration := declarationNode.AsVariableDeclaration()
 					name := declaration.Name()
 					if name == nil || name.Kind != ast.KindIdentifier {
@@ -112,7 +118,7 @@ var ReactComponentNoConstAssignment = rule.Rule{
 					if initializer.Kind != ast.KindFunctionExpression && initializer.Kind != ast.KindArrowFunction {
 						continue
 					}
-					ctx.ReportNode(name, messageNoConstAssignment(name.Text(), isExported))
+					ruleContext.ReportNode(name, messageNoConstAssignment(name.Text(), isExported))
 				}
 			},
 		}

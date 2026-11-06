@@ -53,9 +53,9 @@ func checkSwiftBlockPlacement(path string, chain []string, present map[string]bo
 // named file from the one found beside a project, and refusing every file away from a Swift project would
 // refuse that one wrongly.
 func CheckSwiftBlockHasAReader(path string) error {
-	contents, err := os.ReadFile(path)
-	if err != nil {
-		return fmt.Errorf("reading lint config %s: %w", path, err)
+	contents, readError := os.ReadFile(path)
+	if readError != nil {
+		return fmt.Errorf("reading lint config %s: %w", path, readError)
 	}
 	var keyed map[string]json.RawMessage
 	if json.Unmarshal(contents, &keyed) != nil {
@@ -65,9 +65,9 @@ func CheckSwiftBlockHasAReader(path string) error {
 		return nil
 	}
 	directory := filepath.Dir(path)
-	holds, err := holdsSwiftProject(directory)
-	if err != nil {
-		return err
+	holds, holdsSwiftProjectError := holdsSwiftProject(directory)
+	if holdsSwiftProjectError != nil {
+		return holdsSwiftProjectError
 	}
 	if holds {
 		return nil
@@ -84,13 +84,15 @@ func CheckSwiftBlockHasAReader(path string) error {
 // engine refuses, so they are no project.
 func holdsSwiftProject(directory string) (bool, error) {
 	for _, name := range []string{"Package.swift", "project.yml"} {
-		if information, err := os.Stat(filepath.Join(directory, name)); err == nil && information.Mode().IsRegular() {
+		if information, statError := os.Stat(
+			filepath.Join(directory, name),
+		); statError == nil && information.Mode().IsRegular() {
 			return true, nil
 		}
 	}
-	entries, err := os.ReadDir(directory)
-	if err != nil {
-		return false, fmt.Errorf("reading %s: %w", directory, err)
+	entries, readDirectoryError := os.ReadDir(directory)
+	if readDirectoryError != nil {
+		return false, fmt.Errorf("reading %s: %w", directory, readDirectoryError)
 	}
 	bundles := 0
 	for _, entry := range entries {

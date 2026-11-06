@@ -6,5 +6,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 //
 // No Decode entry: `schema: []` in the source and the rule reads no options.
 func init() {
-	rule.Register(rule.Registration{Rule: CorrectnessRequireSerializableNullableParity})
+	rule.Register(rule.Registration[rule.NoOptions]{Rule: CorrectnessRequireSerializableNullableParity})
 }

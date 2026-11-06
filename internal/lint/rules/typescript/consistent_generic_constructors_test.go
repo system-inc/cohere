@@ -20,23 +20,23 @@ func consistentGenericConstructorsCaseName(index int) string {
 // the two lines most likely to be wrong live: the bare-string wire shape cohere actually delivers,
 // and the fallback that keeps a bare `"error"` meaning upstream's default rather than meaning an
 // empty mode that matches no arm.
-func consistentGenericConstructorsSettingsFor(t *testing.T, wire string) any {
-	t.Helper()
-	decoded, err := DecodeConsistentGenericConstructorsOptions([]byte(wire))
-	if err != nil {
-		t.Fatalf("decoding %q: %v", wire, err)
+func consistentGenericConstructorsSettingsFor(test *testing.T, wire string) ConsistentGenericConstructorsOptions {
+	test.Helper()
+	decoded, decodeConsistentGenericConstructorsOptionsError := DecodeConsistentGenericConstructorsOptions([]byte(wire))
+	if decodeConsistentGenericConstructorsOptionsError != nil {
+		test.Fatalf("decoding %q: %v", wire, decodeConsistentGenericConstructorsOptionsError)
 	}
 	return decoded
 }
 
 // TestConsistentGenericConstructorsStaysSilent is upstream's passing cases verbatim, in both modes.
 //
-// One of upstream's forty six is NOT here and its absence is deliberate: it is clean only because
+// One of upstream's forty six is not here and its absence is deliberate: it is clean only because
 // `isolatedDeclarations` is on, which this harness cannot express. It is recorded in
 // TestConsistentGenericConstructorsCannotExpressIsolatedDeclarations below rather than quietly
 // dropped or forced green.
-func TestConsistentGenericConstructorsStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestConsistentGenericConstructorsStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -60,14 +60,38 @@ func TestConsistentGenericConstructorsStaysSilent(t *testing.T) {
 		{sourceText: "\nfunction foo([a]: Foo = new Foo<string>()) {}\n    ", wire: "\"constructor\""},
 		{sourceText: "\nclass A {\n  constructor(a: Foo = new Foo<string>()) {}\n}\n    ", wire: "\"constructor\""},
 		{sourceText: "\nconst a = function (a: Foo = new Foo<string>()) {};\n    ", wire: "\"constructor\""},
-		{sourceText: "\nconst a: Float32Array<ArrayBufferLike> = new Float32Array();\nexport {};\n    ", wire: "\"constructor\""},
-		{sourceText: "\nconst a: Float64Array<ArrayBufferLike> = new Float64Array();\nexport {};\n    ", wire: "\"constructor\""},
-		{sourceText: "\nconst a: Int16Array<ArrayBufferLike> = new Int16Array();\nexport {};\n    ", wire: "\"constructor\""},
-		{sourceText: "\nconst a: Int8Array<ArrayBufferLike> = new Int8Array();\nexport {};\n    ", wire: "\"constructor\""},
-		{sourceText: "\nconst a: Uint16Array<ArrayBufferLike> = new Uint16Array();\nexport {};\n    ", wire: "\"constructor\""},
-		{sourceText: "\nconst a: Uint32Array<ArrayBufferLike> = new Uint32Array();\nexport {};\n    ", wire: "\"constructor\""},
-		{sourceText: "\nconst a: Uint8Array<ArrayBufferLike> = new Uint8Array();\nexport {};\n    ", wire: "\"constructor\""},
-		{sourceText: "\nconst a: Uint8ClampedArray<ArrayBufferLike> = new Uint8ClampedArray();\nexport {};\n    ", wire: "\"constructor\""},
+		{
+			sourceText: "\nconst a: Float32Array<ArrayBufferLike> = new Float32Array();\nexport {};\n    ",
+			wire:       "\"constructor\"",
+		},
+		{
+			sourceText: "\nconst a: Float64Array<ArrayBufferLike> = new Float64Array();\nexport {};\n    ",
+			wire:       "\"constructor\"",
+		},
+		{
+			sourceText: "\nconst a: Int16Array<ArrayBufferLike> = new Int16Array();\nexport {};\n    ",
+			wire:       "\"constructor\"",
+		},
+		{
+			sourceText: "\nconst a: Int8Array<ArrayBufferLike> = new Int8Array();\nexport {};\n    ",
+			wire:       "\"constructor\"",
+		},
+		{
+			sourceText: "\nconst a: Uint16Array<ArrayBufferLike> = new Uint16Array();\nexport {};\n    ",
+			wire:       "\"constructor\"",
+		},
+		{
+			sourceText: "\nconst a: Uint32Array<ArrayBufferLike> = new Uint32Array();\nexport {};\n    ",
+			wire:       "\"constructor\"",
+		},
+		{
+			sourceText: "\nconst a: Uint8Array<ArrayBufferLike> = new Uint8Array();\nexport {};\n    ",
+			wire:       "\"constructor\"",
+		},
+		{
+			sourceText: "\nconst a: Uint8ClampedArray<ArrayBufferLike> = new Uint8ClampedArray();\nexport {};\n    ",
+			wire:       "\"constructor\"",
+		},
 		// The isolatedDeclarations case lives in its own test: see the note above.
 		{sourceText: "const a = new Foo();", wire: "\"type-annotation\""},
 		{sourceText: "const a: Foo<string> = new Foo();", wire: "\"type-annotation\""},
@@ -84,12 +108,15 @@ func TestConsistentGenericConstructorsStaysSilent(t *testing.T) {
 		{sourceText: "\nfunction foo(a: Foo<string> = new Foo()) {}\n      ", wire: "\"type-annotation\""},
 		{sourceText: "\nfunction foo({ a }: Foo<string> = new Foo()) {}\n      ", wire: "\"type-annotation\""},
 		{sourceText: "\nfunction foo([a]: Foo<string> = new Foo()) {}\n      ", wire: "\"type-annotation\""},
-		{sourceText: "\nclass A {\n  constructor(a: Foo<string> = new Foo()) {}\n}\n      ", wire: "\"type-annotation\""},
+		{
+			sourceText: "\nclass A {\n  constructor(a: Foo<string> = new Foo()) {}\n}\n      ",
+			wire:       "\"type-annotation\"",
+		},
 		{sourceText: "\nconst a = function (a: Foo<string> = new Foo()) {};\n      ", wire: "\"type-annotation\""},
 		{sourceText: "\nconst [a = new Foo<string>()] = [];\n      ", wire: "\"type-annotation\""},
 		{sourceText: "\nfunction a([a = new Foo<string>()]) {}\n      ", wire: "\"type-annotation\""},
 
-		// The ARROW function default parameter, which upstream's corpus does not write in either
+		// The arrow function default parameter, which upstream's corpus does not write in either
 		// mode and which its selector excludes. `:matches(FunctionDeclaration,FunctionExpression) >
 		// AssignmentPattern` never reaches an arrow, so both spellings are silent, measured on the
 		// installed build. A port widening the parameter gate to every parent passes the whole
@@ -101,10 +128,10 @@ func TestConsistentGenericConstructorsStaysSilent(t *testing.T) {
 		// A getter is not a construction site at all, so the return annotation is out of scope.
 		{sourceText: "class A {\n  get foo(): Foo<string> {\n    return new Foo();\n  }\n}\n", wire: "\"constructor\""},
 
-		// A function TYPE's parameter annotation has no initializer, so there is nothing to move.
+		// A function type's parameter annotation has no initializer, so there is nothing to move.
 		{sourceText: "declare const f: (a: Foo<string>) => void;\n", wire: "\"constructor\""},
 
-		// Annotations that are NOT a plain type reference, so there is no single name to compare
+		// Annotations that are not a plain type reference, so there is no single name to compare
 		// against the callee and nothing safe to move. Upstream's corpus writes none of these, and
 		// a port dropping the type-reference gate reports all four while passing every imported
 		// case. Each measured silent on the installed build.
@@ -114,11 +141,11 @@ func TestConsistentGenericConstructorsStaysSilent(t *testing.T) {
 		{sourceText: "const a: readonly Foo<string>[] = new Foo();\n", wire: "\"constructor\""},
 	}
 	for index, testCase := range cases {
-		t.Run(consistentGenericConstructorsCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t,
+		test.Run(consistentGenericConstructorsCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test,
 				ConsistentGenericConstructors, consistentGenericConstructorsFile, testCase.sourceText,
-				consistentGenericConstructorsSettingsFor(t, testCase.wire)))
+				consistentGenericConstructorsSettingsFor(test, testCase.wire)))
 		})
 	}
 }
@@ -130,8 +157,8 @@ func TestConsistentGenericConstructorsStaysSilent(t *testing.T) {
 // the fix assertions worth more than the id assertions here: `new Map <string, number> ()` and
 // `new \n Foo<string> \n ()` both report, and a fixer computing ranges by arithmetic rather than by
 // scanning for the brackets writes the wrong text on both while satisfying every id.
-func TestConsistentGenericConstructorsFires(t *testing.T) {
-	t.Parallel()
+func TestConsistentGenericConstructorsFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -386,7 +413,7 @@ func TestConsistentGenericConstructorsFires(t *testing.T) {
 			wantFixed:  "\nclass Float32Array<T> {}\nconst a = new Float32Array<ArrayBufferLike>();\nexport {};\n      ",
 		},
 
-		// A class METHOD's default parameter, which reports where the arrow above does not. In
+		// A class method's default parameter, which reports where the arrow above does not. In
 		// estree a method is a MethodDefinition whose value is a FunctionExpression, so upstream's
 		// selector reaches it through its second branch. This case and the arrow ones above are the
 		// pair that holds the parameter gate in place from both sides. Upstream writes neither.
@@ -398,7 +425,7 @@ func TestConsistentGenericConstructorsFires(t *testing.T) {
 			wantFixed:  "class A {\n  foo(a = new Foo<string>()) {}\n}\n",
 		},
 
-		// A PARENTHESIZED annotation, which reports upstream and was silent here until the type
+		// A parenthesized annotation, which reports upstream and was silent here until the type
 		// position unwrap existed. estree has no parenthesized-type node so upstream's rule never
 		// sees one; our parser produces a real KindParenthesizedType and the type-reference gate
 		// declined it. The corpus writes no parenthesized annotation anywhere, which is why this
@@ -415,13 +442,13 @@ func TestConsistentGenericConstructorsFires(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(consistentGenericConstructorsCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, ConsistentGenericConstructors,
+		test.Run(consistentGenericConstructorsCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, ConsistentGenericConstructors,
 				consistentGenericConstructorsFile, testCase.sourceText,
-				consistentGenericConstructorsSettingsFor(t, testCase.wire))
+				consistentGenericConstructorsSettingsFor(test, testCase.wire))
 
-			rule_testing.ExpectFindings(t, result, testCase.wantId)
+			rule_testing.ExpectFindings(test, result, testCase.wantId)
 
 			// RunTyped writes the fixture trimmed, so both the span slice and the expected rewrite
 			// are taken against that text rather than against the Go literal above.
@@ -430,10 +457,10 @@ func TestConsistentGenericConstructorsFires(t *testing.T) {
 
 			gotSpan := onDisk[diagnostic.Range.Pos():diagnostic.Range.End()]
 			if gotSpan != testCase.wantSpan {
-				t.Fatalf("span: expected %q, got %q", testCase.wantSpan, gotSpan)
+				test.Fatalf("span: expected %q, got %q", testCase.wantSpan, gotSpan)
 			}
 
-			rule_testing.ExpectFixedSource(t, result, strings.TrimSpace(testCase.wantFixed)+"\n")
+			rule_testing.ExpectFixedSource(test, result, strings.TrimSpace(testCase.wantFixed)+"\n")
 		})
 	}
 }
@@ -442,13 +469,13 @@ func TestConsistentGenericConstructorsFires(t *testing.T) {
 // corpus that this harness cannot reproduce, with the controls that establish why.
 //
 // Upstream's forty sixth passing case is `const foo: Foo<string> = new Foo();` under
-// `parserOptions.isolatedDeclarations`. It is clean ONLY because of that setting: without it the
+// `parserOptions.isolatedDeclarations`. It is clean only because of that setting: without it the
 // same source reports, which the first assertion below shows. Under isolated declarations the
 // annotation has to stay explicit, so the repair that deletes it would break the file, and upstream
 // declines rather than proposing it.
 //
 // The rule reads the real compiler option off the program rather than a lint-config field, which is
-// the right instrument here and is why no fixture can set it: rule_testing writes its tsconfig AFTER
+// the right instrument here and is why no fixture can set it: rule_testing writes its tsconfig after
 // the setup hook runs and always with the default settings, so a hook writing its own tsconfig is
 // overwritten. Measured, with a hook writing `"isolatedDeclarations": true` and the rule still
 // observing the option unset.
@@ -456,22 +483,22 @@ func TestConsistentGenericConstructorsFires(t *testing.T) {
 // So the case is recorded as a fact about the harness rather than hidden by relaxing the rule to
 // make it green. The branch it guards is the one part of this port no fixture covers, and saying so
 // here is more useful than a mutation score that quietly counts it as unreachable.
-func TestConsistentGenericConstructorsCannotExpressIsolatedDeclarations(t *testing.T) {
-	t.Parallel()
+func TestConsistentGenericConstructorsCannotExpressIsolatedDeclarations(test *testing.T) {
+	test.Parallel()
 
 	sourceText := "const foo: Foo<string> = new Foo();\n"
 
 	// Control one: without the option, this source reports. So the case upstream lists as clean is
 	// clean because of the setting rather than because of anything in the source.
-	rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t,
+	rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test,
 		ConsistentGenericConstructors, consistentGenericConstructorsFile, sourceText,
-		consistentGenericConstructorsSettingsFor(t, "\"constructor\"")), "preferConstructor")
+		consistentGenericConstructorsSettingsFor(test, "\"constructor\"")), "preferConstructor")
 
 	// Control two: the same source is clean in the other mode, which shows the finding above is the
 	// constructor-mode judgment rather than the rule reporting on anything it sees.
-	rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t,
+	rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test,
 		ConsistentGenericConstructors, consistentGenericConstructorsFile, sourceText,
-		consistentGenericConstructorsSettingsFor(t, "\"type-annotation\"")))
+		consistentGenericConstructorsSettingsFor(test, "\"type-annotation\"")))
 }
 
 // TestConsistentGenericConstructorsDecoderReadsEveryWireShape pins the option surface, including the
@@ -481,8 +508,8 @@ func TestConsistentGenericConstructorsCannotExpressIsolatedDeclarations(t *testi
 // bytes, and a decoder returning a zero-value struct there gives Mode the empty string, which
 // matches neither arm and makes the rule silently inert while every fixture built from an explicit
 // struct still passes.
-func TestConsistentGenericConstructorsDecoderReadsEveryWireShape(t *testing.T) {
-	t.Parallel()
+func TestConsistentGenericConstructorsDecoderReadsEveryWireShape(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		wire string
@@ -503,28 +530,26 @@ func TestConsistentGenericConstructorsDecoderReadsEveryWireShape(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.wire, func(t *testing.T) {
-			t.Parallel()
-			decoded, err := DecodeConsistentGenericConstructorsOptions([]byte(testCase.wire))
-			if err != nil {
-				t.Fatalf("decoding %q: %v", testCase.wire, err)
+		test.Run(testCase.wire, func(test *testing.T) {
+			test.Parallel()
+			decoded, decodeConsistentGenericConstructorsOptionsError := DecodeConsistentGenericConstructorsOptions(
+				[]byte(testCase.wire),
+			)
+			if decodeConsistentGenericConstructorsOptionsError != nil {
+				test.Fatalf("decoding %q: %v", testCase.wire, decodeConsistentGenericConstructorsOptionsError)
 			}
-			settings, isSettings := decoded.(ConsistentGenericConstructorsOptions)
-			if !isSettings {
-				t.Fatalf("decoding %q produced %T rather than the options struct", testCase.wire, decoded)
-			}
-			if settings.Mode != testCase.want {
-				t.Fatalf("decoding %q: expected mode %q, got %q", testCase.wire, testCase.want,
-					settings.Mode)
+			if decoded.Mode != testCase.want {
+				test.Fatalf("decoding %q: expected mode %q, got %q", testCase.wire, testCase.want,
+					decoded.Mode)
 			}
 		})
 	}
 
 	// And the nil-options path the rule itself takes when the config layer hands it nothing, which
 	// is a different route than the decoder and has its own fallback.
-	rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t,
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test,
 		ConsistentGenericConstructors, consistentGenericConstructorsFile,
-		"const a: Map<string, number> = new Map();\n", nil), "preferConstructor")
+		"const a: Map<string, number> = new Map();\n"), "preferConstructor")
 }
 
 // TestConsistentGenericConstructorsDecoderRefusesAValueUpstreamRefuses pins the other half (#p9s1131).
@@ -533,8 +558,8 @@ func TestConsistentGenericConstructorsDecoderReadsEveryWireShape(t *testing.T) {
 // and ran a mode nobody wrote. Upstream's schema is a string enum and refuses every one at load. The
 // error must name the value, because the config layer prefixes the rule's name and the value is the
 // half the author needs to find the line.
-func TestConsistentGenericConstructorsDecoderRefusesAValueUpstreamRefuses(t *testing.T) {
-	t.Parallel()
+func TestConsistentGenericConstructorsDecoderRefusesAValueUpstreamRefuses(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		wire, named string
@@ -548,14 +573,21 @@ func TestConsistentGenericConstructorsDecoderRefusesAValueUpstreamRefuses(t *tes
 		{wire: `["constructor", "type-annotation"]`, named: "type-annotation"},
 		{wire: `[]`, named: "[]"},
 	} {
-		t.Run(testCase.wire, func(t *testing.T) {
-			t.Parallel()
-			_, err := DecodeConsistentGenericConstructorsOptions([]byte(testCase.wire))
-			if err == nil {
-				t.Fatalf("%s decoded, so the configured mode is silently not the one written", testCase.wire)
+		test.Run(testCase.wire, func(test *testing.T) {
+			test.Parallel()
+			_, decodeConsistentGenericConstructorsOptionsError := DecodeConsistentGenericConstructorsOptions(
+				[]byte(testCase.wire),
+			)
+			if decodeConsistentGenericConstructorsOptionsError == nil {
+				test.Fatalf("%s decoded, so the configured mode is silently not the one written", testCase.wire)
 			}
-			if !strings.Contains(err.Error(), testCase.named) {
-				t.Fatalf("%s was refused without naming %q: %v", testCase.wire, testCase.named, err)
+			if !strings.Contains(decodeConsistentGenericConstructorsOptionsError.Error(), testCase.named) {
+				test.Fatalf(
+					"%s was refused without naming %q: %v",
+					testCase.wire,
+					testCase.named,
+					decodeConsistentGenericConstructorsOptionsError,
+				)
 			}
 		})
 	}

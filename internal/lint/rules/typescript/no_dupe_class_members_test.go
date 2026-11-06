@@ -20,11 +20,11 @@ func noDupeClassMembersCaseName(index int) string {
 // that separate this wrapper from the core rule it extends.
 //
 // The imported half of this list cannot see the wrapper at all. Driven through the installed 8.67.0
-// build, upstream's own corpus for this rule produces BYTE-IDENTICAL output from the wrapper and
+// build, upstream's own corpus for this rule produces byte-identical output from the wrapper and
 // from the bare core on all twenty-one cases, because it writes no literal computed key anywhere.
 // Everything below the imported cases is measured for that reason.
-func TestNoDupeClassMembersStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoDupeClassMembersStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		"class A {\n  foo() {}\n  bar() {}\n}\n",
@@ -40,13 +40,13 @@ func TestNoDupeClassMembersStaysSilent(t *testing.T) {
 		"class Foo {\n  foo(a: string): string;\n  foo(a: number): number;\n  foo(a: any): any {}\n}\n",
 
 		// Measured, not imported. A computed key is never a duplicate here, even when it resolves
-		// to a literal the core rule can and does compare. All three report under the CORE rule and
+		// to a literal the core rule can and does compare. All three report under the core rule and
 		// are silent under the wrapper, measured on the installed build by driving both over the
 		// same inputs, and silent here.
 		"class A {\n  ['foo']() {}\n  ['foo']() {}\n}\n",
 		"class A {\n  [1]() {}\n  [1]() {}\n}\n",
 
-		// The case that decides HOW the filter is expressed rather than merely whether it exists.
+		// The case that decides how the filter is expressed rather than merely whether it exists.
 		// The first member is computed and the second is not, so an implementation that dropped
 		// findings after the core produced them would report on `foo`, whose own key is plain.
 		// Upstream skips the computed member before it is keyed, so it never seeds a collision.
@@ -66,9 +66,9 @@ func TestNoDupeClassMembersStaysSilent(t *testing.T) {
 		"abstract class A {\n  abstract foo(): void;\n  abstract foo(): void;\n}\n",
 	}
 	for index, sourceText := range cases {
-		t.Run(noDupeClassMembersCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoDupeClassMembers,
+		test.Run(noDupeClassMembersCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoDupeClassMembers,
 				noDupeClassMembersFile, sourceText))
 		})
 	}
@@ -76,7 +76,7 @@ func TestNoDupeClassMembersStaysSilent(t *testing.T) {
 
 // noDupeClassMembersFinding is one expected finding with the layers it can be wrong at.
 //
-// The core rule owns the message text, so this asserts the id and the SPAN. The span is what
+// The core rule owns the message text, so this asserts the id and the span. The span is what
 // separates this wrapper from a broken filter: with the computed members removed on the input side
 // a finding lands on the surviving duplicate, and a port filtering the output instead lands it on a
 // member upstream never reports.
@@ -86,8 +86,8 @@ type noDupeClassMembersFinding struct {
 
 // TestNoDupeClassMembersFires is upstream's ten reporting cases verbatim, plus measured rows where
 // a computed member sits beside a real duplicate.
-func TestNoDupeClassMembersFires(t *testing.T) {
-	t.Parallel()
+func TestNoDupeClassMembersFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText   string
@@ -173,23 +173,23 @@ func TestNoDupeClassMembersFires(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(noDupeClassMembersCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoDupeClassMembers, noDupeClassMembersFile,
+		test.Run(noDupeClassMembersCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoDupeClassMembers, noDupeClassMembersFile,
 				testCase.sourceText)
 
 			wantIds := make([]string, len(testCase.wantFindings))
 			for position := range testCase.wantFindings {
 				wantIds[position] = "noDupeClassMembers"
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 
 			onDisk := strings.TrimSpace(testCase.sourceText) + "\n"
 			for position, want := range testCase.wantFindings {
 				diagnostic := result.Diagnostics[position]
 				gotSpan := onDisk[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if gotSpan != want.wantSpan {
-					t.Fatalf("finding %d span: expected %q, got %q", position, want.wantSpan, gotSpan)
+					test.Fatalf("finding %d span: expected %q, got %q", position, want.wantSpan, gotSpan)
 				}
 			}
 		})
@@ -208,8 +208,8 @@ func TestNoDupeClassMembersFires(t *testing.T) {
 // which is the only shape that can tell a scoped swap from a permanent one. The second row is the
 // control: a class with nothing computed takes the no-swap path, and without it this test would
 // pass against a rule that never swapped at all.
-func TestNoDupeClassMembersRestoresTheMemberList(t *testing.T) {
-	t.Parallel()
+func TestNoDupeClassMembersRestoresTheMemberList(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name        string
@@ -228,17 +228,17 @@ func TestNoDupeClassMembersRestoresTheMemberList(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			observed := 0
-			observer := rule.Rule{
+			observer := rule.Rule[rule.NoOptions]{
 				Name: "test/no-dupe-class-members-restore",
-				Run: func(ctx rule.Context, options any) rule.Listeners {
-					wrapped := NoDupeClassMembers.Run(ctx, options)
+				Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+					wrapped := NoDupeClassMembers.Run(ruleContext, options)
 					return rule.Listeners{
 						ast.KindClassDeclaration: func(node *ast.Node) {
 							wrapped[ast.KindClassDeclaration](node)
-							// Read AFTER the rule has run, on the same node it just handled.
+							// Read after the rule has run, on the same node it just handled.
 							if members := node.AsClassDeclaration().Members; members != nil {
 								observed = len(members.Nodes)
 							}
@@ -246,9 +246,9 @@ func TestNoDupeClassMembersRestoresTheMemberList(t *testing.T) {
 					}
 				},
 			}
-			rule_testing.Run(t, observer, noDupeClassMembersFile, testCase.sourceText)
+			rule_testing.Run(test, observer, noDupeClassMembersFile, testCase.sourceText)
 			if observed != testCase.wantMembers {
-				t.Fatalf("members after the rule ran: expected %d, got %d", testCase.wantMembers,
+				test.Fatalf("members after the rule ran: expected %d, got %d", testCase.wantMembers,
 					observed)
 			}
 		})

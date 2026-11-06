@@ -9,12 +9,22 @@ import (
 // The rule's messages, one handle per id, whose wording lives in
 // `policy/messages/network-no-invalidate-cache-literal-key.json`.
 var (
-	networkNoInvalidateCacheLiteralKeyNoStringLiteralInvalidateCacheText          = policy.MessageOf("structure/network-no-invalidate-cache-literal-key", "noStringLiteralInvalidateCache")
-	networkNoInvalidateCacheLiteralKeyNoTemplateLiteralInvalidateCacheText        = policy.MessageOf("structure/network-no-invalidate-cache-literal-key", "noTemplateLiteralInvalidateCache")
-	networkNoInvalidateCacheLiteralKeyNoArrayWithStringLiteralInvalidateCacheText = policy.MessageOf("structure/network-no-invalidate-cache-literal-key", "noArrayWithStringLiteralInvalidateCache")
+	networkNoInvalidateCacheLiteralKeyNoStringLiteralInvalidateCacheText = policy.MessageOf(
+		"structure/network-no-invalidate-cache-literal-key",
+		"noStringLiteralInvalidateCache",
+	)
+	networkNoInvalidateCacheLiteralKeyNoTemplateLiteralInvalidateCacheText = policy.MessageOf(
+		"structure/network-no-invalidate-cache-literal-key",
+		"noTemplateLiteralInvalidateCache",
+	)
+	networkNoInvalidateCacheLiteralKeyNoArrayWithStringLiteralInvalidateCacheText = policy.MessageOf(
+		"structure/network-no-invalidate-cache-literal-key",
+		"noArrayWithStringLiteralInvalidateCache",
+	)
 )
 
-// messageNoStringLiteralInvalidateCache is the finding, rendered when it is reported so the text comes from the current catalog.
+// messageNoStringLiteralInvalidateCache is the finding, rendered when it is reported so the text comes from the current
+// catalog.
 func messageNoStringLiteralInvalidateCache() rule.Message {
 	return rule.Message{
 		Id:          networkNoInvalidateCacheLiteralKeyNoStringLiteralInvalidateCacheText.Id,
@@ -22,7 +32,8 @@ func messageNoStringLiteralInvalidateCache() rule.Message {
 	}
 }
 
-// messageNoTemplateLiteralInvalidateCache is the finding, rendered when it is reported so the text comes from the current catalog.
+// messageNoTemplateLiteralInvalidateCache is the finding, rendered when it is reported so the text comes from the
+// current catalog.
 func messageNoTemplateLiteralInvalidateCache() rule.Message {
 	return rule.Message{
 		Id:          networkNoInvalidateCacheLiteralKeyNoTemplateLiteralInvalidateCacheText.Id,
@@ -30,7 +41,8 @@ func messageNoTemplateLiteralInvalidateCache() rule.Message {
 	}
 }
 
-// messageNoArrayWithStringLiteralInvalidateCache is the finding, rendered when it is reported so the text comes from the current catalog.
+// messageNoArrayWithStringLiteralInvalidateCache is the finding, rendered when it is reported so the text comes from
+// the current catalog.
 func messageNoArrayWithStringLiteralInvalidateCache() rule.Message {
 	return rule.Message{
 		Id:          networkNoInvalidateCacheLiteralKeyNoArrayWithStringLiteralInvalidateCacheText.Id,
@@ -58,9 +70,9 @@ func messageNoArrayWithStringLiteralInvalidateCache() rule.Message {
 //
 // No fix. The repair is to export a key from wherever the cache is created and import it, which
 // means creating a binding in another file.
-var NetworkNoInvalidateCacheLiteralKey = rule.Rule{
+var NetworkNoInvalidateCacheLiteralKey = rule.Rule[rule.NoOptions]{
 	Name: "structure/network-no-invalidate-cache-literal-key",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				call := node.AsCallExpression()
@@ -78,10 +90,10 @@ var NetworkNoInvalidateCacheLiteralKey = rule.Rule{
 
 				switch firstArgument.Kind {
 				case ast.KindStringLiteral:
-					ctx.ReportNode(firstArgument, messageNoStringLiteralInvalidateCache())
+					ruleContext.ReportNode(firstArgument, messageNoStringLiteralInvalidateCache())
 
 				case ast.KindTemplateExpression, ast.KindNoSubstitutionTemplateLiteral:
-					ctx.ReportNode(firstArgument, messageNoTemplateLiteralInvalidateCache())
+					ruleContext.ReportNode(firstArgument, messageNoTemplateLiteralInvalidateCache())
 
 				case ast.KindArrayLiteralExpression:
 					// Reported per element, so an array of five keys with one literal among them
@@ -89,9 +101,9 @@ var NetworkNoInvalidateCacheLiteralKey = rule.Rule{
 					for _, element := range firstArgument.AsArrayLiteralExpression().Elements.Nodes {
 						switch ast.SkipParentheses(element).Kind {
 						case ast.KindStringLiteral:
-							ctx.ReportNode(element, messageNoArrayWithStringLiteralInvalidateCache())
+							ruleContext.ReportNode(element, messageNoArrayWithStringLiteralInvalidateCache())
 						case ast.KindTemplateExpression, ast.KindNoSubstitutionTemplateLiteral:
-							ctx.ReportNode(element, messageNoTemplateLiteralInvalidateCache())
+							ruleContext.ReportNode(element, messageNoTemplateLiteralInvalidateCache())
 						}
 					}
 				}

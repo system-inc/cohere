@@ -44,7 +44,8 @@ func printWord(path *astPath, options *options) doc.Doc {
 	}
 
 	// escape internal `*` or `_` that can open or close emphasis/strong
-	var previousValue, nextValue string
+	var previousValue string
+	var nextValue string
 	if previous := previousNode(path); previous != nil {
 		previousValue = previous.Value
 	}

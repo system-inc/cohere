@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -22,35 +23,55 @@ const unsafeNegationFile = "/repository/source/UnsafeNegation.ts"
 // on both sides of the corpus, differing only in whether the option is set: `if (! a < b) {}` is
 // clean by default and reports with the option on. That pairing is the whole reason the option
 // cases have to carry their options.
-func TestNoUnsafeNegationFires(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeNegationFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
 		sourceText string
-		options    any
+		options    rule.Given[NoUnsafeNegationOptions]
 	}{
-		{"in", "!a in b", nil},
-		{"in inside parentheses", "(!a in b)", nil},
-		{"in with a parenthesised operand", "!(a) in b", nil},
-		{"instanceof", "!a instanceof b", nil},
-		{"instanceof inside parentheses", "(!a instanceof b)", nil},
-		{"instanceof with a parenthesised operand", "!(a) instanceof b", nil},
+		{"in", "!a in b", rule.Given[NoUnsafeNegationOptions]{}},
+		{"in inside parentheses", "(!a in b)", rule.Given[NoUnsafeNegationOptions]{}},
+		{"in with a parenthesised operand", "!(a) in b", rule.Given[NoUnsafeNegationOptions]{}},
+		{"instanceof", "!a instanceof b", rule.Given[NoUnsafeNegationOptions]{}},
+		{"instanceof inside parentheses", "(!a instanceof b)", rule.Given[NoUnsafeNegationOptions]{}},
+		{"instanceof with a parenthesised operand", "!(a) instanceof b", rule.Given[NoUnsafeNegationOptions]{}},
 		// A regex literal as the negated operand. A naive tokenizer lexes the leading `/` as
 		// division and never sees a binary `in` here at all.
-		{"a regex operand", "(y=>{if(!/s/ in(l)){}})", nil},
-		{"less than, option on", "if (! a < b) {}", NoUnsafeNegationOptions{EnforceForOrderingRelations: true}},
-		{"greater than, option on", "while (! a > b) {}", NoUnsafeNegationOptions{EnforceForOrderingRelations: true}},
-		{"less or equal, option on", "foo = ! a <= b;", NoUnsafeNegationOptions{EnforceForOrderingRelations: true}},
-		{"greater or equal, option on", "foo = ! a >= b;", NoUnsafeNegationOptions{EnforceForOrderingRelations: true}},
-		{"less or equal bare, option on", "! a <= b", NoUnsafeNegationOptions{EnforceForOrderingRelations: true}},
+		{"a regex operand", "(y=>{if(!/s/ in(l)){}})", rule.Given[NoUnsafeNegationOptions]{}},
+		{
+			"less than, option on",
+			"if (! a < b) {}",
+			rule.Configured(NoUnsafeNegationOptions{EnforceForOrderingRelations: true}),
+		},
+		{
+			"greater than, option on",
+			"while (! a > b) {}",
+			rule.Configured(NoUnsafeNegationOptions{EnforceForOrderingRelations: true}),
+		},
+		{
+			"less or equal, option on",
+			"foo = ! a <= b;",
+			rule.Configured(NoUnsafeNegationOptions{EnforceForOrderingRelations: true}),
+		},
+		{
+			"greater or equal, option on",
+			"foo = ! a >= b;",
+			rule.Configured(NoUnsafeNegationOptions{EnforceForOrderingRelations: true}),
+		},
+		{
+			"less or equal bare, option on",
+			"! a <= b",
+			rule.Configured(NoUnsafeNegationOptions{EnforceForOrderingRelations: true}),
+		},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.RunWithOptions(t, NoUnsafeNegation, unsafeNegationFile, testCase.sourceText,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.RunGiven(test, NoUnsafeNegation, unsafeNegationFile, testCase.sourceText,
 					testCase.options), "unexpected")
 		})
 	}
@@ -69,41 +90,61 @@ func TestNoUnsafeNegationFires(t *testing.T) {
 //
 // The second is the option gate. The four ordering operators are silent by default, including under
 // an explicitly empty options object, and including under an explicit false.
-func TestNoUnsafeNegationStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeNegationStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
 		sourceText string
-		options    any
+		options    rule.Given[NoUnsafeNegationOptions]
 	}{
-		{"a plain in", "a in b", nil},
-		{"in compared to false", "a in b === false", nil},
-		{"the whole in negated", "!(a in b)", nil},
-		{"a parenthesised negation before in", "(!a) in b", nil},
-		{"a plain instanceof", "a instanceof b", nil},
-		{"instanceof compared to false", "a instanceof b === false", nil},
-		{"the whole instanceof negated", "!(a instanceof b)", nil},
-		{"a parenthesised negation before instanceof", "(!a) instanceof b", nil},
-		{"less than, option off by default", "if (! a < b) {}", nil},
-		{"greater than, option off by default", "while (! a > b) {}", nil},
-		{"less or equal, option off by default", "foo = ! a <= b;", nil},
-		{"greater or equal, option off by default", "foo = ! a >= b;", nil},
+		{"a plain in", "a in b", rule.Given[NoUnsafeNegationOptions]{}},
+		{"in compared to false", "a in b === false", rule.Given[NoUnsafeNegationOptions]{}},
+		{"the whole in negated", "!(a in b)", rule.Given[NoUnsafeNegationOptions]{}},
+		{"a parenthesised negation before in", "(!a) in b", rule.Given[NoUnsafeNegationOptions]{}},
+		{"a plain instanceof", "a instanceof b", rule.Given[NoUnsafeNegationOptions]{}},
+		{"instanceof compared to false", "a instanceof b === false", rule.Given[NoUnsafeNegationOptions]{}},
+		{"the whole instanceof negated", "!(a instanceof b)", rule.Given[NoUnsafeNegationOptions]{}},
+		{"a parenthesised negation before instanceof", "(!a) instanceof b", rule.Given[NoUnsafeNegationOptions]{}},
+		{"less than, option off by default", "if (! a < b) {}", rule.Given[NoUnsafeNegationOptions]{}},
+		{"greater than, option off by default", "while (! a > b) {}", rule.Given[NoUnsafeNegationOptions]{}},
+		{"less or equal, option off by default", "foo = ! a <= b;", rule.Given[NoUnsafeNegationOptions]{}},
+		{"greater or equal, option off by default", "foo = ! a >= b;", rule.Given[NoUnsafeNegationOptions]{}},
 		// An empty options object still has to default the option to false, which a decoder that
 		// treated "present but unset" as true would get wrong.
-		{"less or equal, empty options object", "! a <= b", NoUnsafeNegationOptions{}},
-		{"greater or equal, option explicitly off", "foo = ! a >= b;", NoUnsafeNegationOptions{EnforceForOrderingRelations: false}},
-		{"a parenthesised negation before an ordering operator", "foo = (!a) >= b;", NoUnsafeNegationOptions{EnforceForOrderingRelations: true}},
-		{"an ordering comparison with no negation", "a <= b", NoUnsafeNegationOptions{EnforceForOrderingRelations: true}},
-		{"the whole ordering comparison negated", "!(a < b)", NoUnsafeNegationOptions{EnforceForOrderingRelations: true}},
-		{"greater than with no negation", "foo = a > b;", NoUnsafeNegationOptions{EnforceForOrderingRelations: true}},
+		{"less or equal, empty options object", "! a <= b", rule.Configured(NoUnsafeNegationOptions{})},
+		{
+			"greater or equal, option explicitly off",
+			"foo = ! a >= b;",
+			rule.Configured(NoUnsafeNegationOptions{EnforceForOrderingRelations: false}),
+		},
+		{
+			"a parenthesised negation before an ordering operator",
+			"foo = (!a) >= b;",
+			rule.Configured(NoUnsafeNegationOptions{EnforceForOrderingRelations: true}),
+		},
+		{
+			"an ordering comparison with no negation",
+			"a <= b",
+			rule.Configured(NoUnsafeNegationOptions{EnforceForOrderingRelations: true}),
+		},
+		{
+			"the whole ordering comparison negated",
+			"!(a < b)",
+			rule.Configured(NoUnsafeNegationOptions{EnforceForOrderingRelations: true}),
+		},
+		{
+			"greater than with no negation",
+			"foo = a > b;",
+			rule.Configured(NoUnsafeNegationOptions{EnforceForOrderingRelations: true}),
+		},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.RunWithOptions(t, NoUnsafeNegation, unsafeNegationFile, testCase.sourceText,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.RunGiven(test, NoUnsafeNegation, unsafeNegationFile, testCase.sourceText,
 					testCase.options))
 		})
 	}
@@ -122,35 +163,43 @@ func TestNoUnsafeNegationStaysSilent(t *testing.T) {
 //
 // `typeof a === "x"` is the shape a reader worries about most when they hear "negation before a
 // relational operator", and `typeof` is a prefix unary too. It is exempt for both reasons at once.
-func TestNoUnsafeNegationDeclinesOtherOperatorsAndOtherUnaries(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeNegationDeclinesOtherOperatorsAndOtherUnaries(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
 		sourceText string
-		options    any
+		options    rule.Given[NoUnsafeNegationOptions]
 	}{
-		{"strict equality is not relational", "!a === b", nil},
-		{"loose equality is not relational", "!a == b", nil},
-		{"strict inequality is not relational", "!a !== b", nil},
-		{"addition is not relational", "!a + b", nil},
-		{"equality stays out with the option on", "!a === b", NoUnsafeNegationOptions{EnforceForOrderingRelations: true}},
-		{"unary minus is not a logical not", "-a in b", nil},
-		{"bitwise not is not a logical not", "~a in b", nil},
-		{"unary plus is not a logical not", "+a in b", nil},
-		{"typeof is not a logical not", "typeof a in b", nil},
-		{"void is not a logical not", "void a in b", nil},
-		{"a double negation before an ordering operator, option off", "!!a < b", nil},
+		{"strict equality is not relational", "!a === b", rule.Given[NoUnsafeNegationOptions]{}},
+		{"loose equality is not relational", "!a == b", rule.Given[NoUnsafeNegationOptions]{}},
+		{"strict inequality is not relational", "!a !== b", rule.Given[NoUnsafeNegationOptions]{}},
+		{"addition is not relational", "!a + b", rule.Given[NoUnsafeNegationOptions]{}},
+		{
+			"equality stays out with the option on",
+			"!a === b",
+			rule.Configured(NoUnsafeNegationOptions{EnforceForOrderingRelations: true}),
+		},
+		{"unary minus is not a logical not", "-a in b", rule.Given[NoUnsafeNegationOptions]{}},
+		{"bitwise not is not a logical not", "~a in b", rule.Given[NoUnsafeNegationOptions]{}},
+		{"unary plus is not a logical not", "+a in b", rule.Given[NoUnsafeNegationOptions]{}},
+		{"typeof is not a logical not", "typeof a in b", rule.Given[NoUnsafeNegationOptions]{}},
+		{"void is not a logical not", "void a in b", rule.Given[NoUnsafeNegationOptions]{}},
+		{"a double negation before an ordering operator, option off", "!!a < b", rule.Given[NoUnsafeNegationOptions]{}},
 		// The negation on the right operand is not the hazard: `a in !b` groups as written.
-		{"a negation on the right operand", "a in !b", nil},
-		{"a negation on the right of an ordering operator", "a < !b", NoUnsafeNegationOptions{EnforceForOrderingRelations: true}},
+		{"a negation on the right operand", "a in !b", rule.Given[NoUnsafeNegationOptions]{}},
+		{
+			"a negation on the right of an ordering operator",
+			"a < !b",
+			rule.Configured(NoUnsafeNegationOptions{EnforceForOrderingRelations: true}),
+		},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.RunWithOptions(t, NoUnsafeNegation, unsafeNegationFile, testCase.sourceText,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.RunGiven(test, NoUnsafeNegation, unsafeNegationFile, testCase.sourceText,
 					testCase.options))
 		})
 	}
@@ -163,11 +212,11 @@ func TestNoUnsafeNegationDeclinesOtherOperatorsAndOtherUnaries(t *testing.T) {
 // expression reports once by construction. Pinned because a port that listened on the unary instead
 // and walked up to its parent would report twice here, and the message-id fixtures above use inputs
 // where the two designs agree.
-func TestNoUnsafeNegationReportsADoubleNegationOnce(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeNegationReportsADoubleNegationOnce(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectFindings(t,
-		rule_testing.Run(t, NoUnsafeNegation, unsafeNegationFile, "!!a in b"), "unexpected")
+	rule_testing.ExpectFindings(test,
+		rule_testing.Run(test, NoUnsafeNegation, unsafeNegationFile, "!!a in b"), "unexpected")
 }
 
 // Where the finding points, which the message-id fixtures above cannot see.
@@ -180,35 +229,45 @@ func TestNoUnsafeNegationReportsADoubleNegationOnce(t *testing.T) {
 //
 // `! a <= b` is the case that catches an anchor on the `!` token alone: the operand is a space away,
 // so the correct span is three characters and a token-only span is one.
-func TestNoUnsafeNegationPointsAtTheNegatedOperand(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeNegationPointsAtTheNegatedOperand(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
 		sourceText string
-		options    any
+		options    rule.Given[NoUnsafeNegationOptions]
 		want       string
 	}{
-		{"in", "!a in b", nil, "!a"},
-		{"inside parentheses", "(!a in b)", nil, "!a"},
-		{"a parenthesised operand", "!(a) in b", nil, "!(a)"},
-		{"instanceof", "!a instanceof b", nil, "!a"},
-		{"a regex operand", "(y=>{if(!/s/ in(l)){}})", nil, "!/s/"},
-		{"a space after the bang", "! a <= b", NoUnsafeNegationOptions{EnforceForOrderingRelations: true}, "! a"},
-		{"inside an if", "if (! a < b) {}", NoUnsafeNegationOptions{EnforceForOrderingRelations: true}, "! a"},
+		{"in", "!a in b", rule.Given[NoUnsafeNegationOptions]{}, "!a"},
+		{"inside parentheses", "(!a in b)", rule.Given[NoUnsafeNegationOptions]{}, "!a"},
+		{"a parenthesised operand", "!(a) in b", rule.Given[NoUnsafeNegationOptions]{}, "!(a)"},
+		{"instanceof", "!a instanceof b", rule.Given[NoUnsafeNegationOptions]{}, "!a"},
+		{"a regex operand", "(y=>{if(!/s/ in(l)){}})", rule.Given[NoUnsafeNegationOptions]{}, "!/s/"},
+		{
+			"a space after the bang",
+			"! a <= b",
+			rule.Configured(NoUnsafeNegationOptions{EnforceForOrderingRelations: true}),
+			"! a",
+		},
+		{
+			"inside an if",
+			"if (! a < b) {}",
+			rule.Configured(NoUnsafeNegationOptions{EnforceForOrderingRelations: true}),
+			"! a",
+		},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoUnsafeNegation, unsafeNegationFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunGiven(test, NoUnsafeNegation, unsafeNegationFile,
 				testCase.sourceText, testCase.options)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 			}
 			reported := testCase.sourceText[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 			if reported != testCase.want {
-				t.Fatalf("the finding points at %q, wanted %q", reported, testCase.want)
+				test.Fatalf("the finding points at %q, wanted %q", reported, testCase.want)
 			}
 		})
 	}
@@ -224,33 +283,76 @@ func TestNoUnsafeNegationPointsAtTheNegatedOperand(t *testing.T) {
 // string over the wrong span passes a text comparison. `(!a in b)` is the case that needs it: the
 // correct rewrite touches only the inner binary and leaves the outer parentheses alone, and a repair
 // that replaced one character too many either way would still carry the text `!(a in b)`.
-func TestNoUnsafeNegationSuggestsBothRewrites(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeNegationSuggestsBothRewrites(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name         string
 		sourceText   string
-		options      any
+		options      rule.Given[NoUnsafeNegationOptions]
 		wantNegated  string
 		wantExplicit string
 	}{
 		// The first six are upstream's fix column verbatim, in its order.
-		{"in", "!a in b", nil, "!(a in b)", "(!a) in b"},
-		{"inside parentheses", "(!a in b)", nil, "(!(a in b))", "((!a) in b)"},
-		{"a parenthesised operand", "!(a) in b", nil, "!((a) in b)", "(!(a)) in b"},
-		{"instanceof", "!a instanceof b", nil, "!(a instanceof b)", "(!a) instanceof b"},
-		{"instanceof in parentheses", "(!a instanceof b)", nil, "(!(a instanceof b))", "((!a) instanceof b)"},
-		{"a parenthesised operand before instanceof", "!(a) instanceof b", nil, "!((a) instanceof b)", "(!(a)) instanceof b"},
-		{"less than, option on", "if (! a < b) {}",
-			NoUnsafeNegationOptions{EnforceForOrderingRelations: true}, "if (!(a < b)) {}", "if ((! a) < b) {}"},
-		{"greater than, option on", "while (! a > b) {}",
-			NoUnsafeNegationOptions{EnforceForOrderingRelations: true}, "while (!(a > b)) {}", "while ((! a) > b) {}"},
-		{"less or equal, option on", "foo = ! a <= b;",
-			NoUnsafeNegationOptions{EnforceForOrderingRelations: true}, "foo = !(a <= b);", "foo = (! a) <= b;"},
-		{"greater or equal, option on", "foo = ! a >= b;",
-			NoUnsafeNegationOptions{EnforceForOrderingRelations: true}, "foo = !(a >= b);", "foo = (! a) >= b;"},
-		{"less or equal bare, option on", "!a <= b",
-			NoUnsafeNegationOptions{EnforceForOrderingRelations: true}, "!(a <= b)", "(!a) <= b"},
+		{"in", "!a in b", rule.Given[NoUnsafeNegationOptions]{}, "!(a in b)", "(!a) in b"},
+		{"inside parentheses", "(!a in b)", rule.Given[NoUnsafeNegationOptions]{}, "(!(a in b))", "((!a) in b)"},
+		{"a parenthesised operand", "!(a) in b", rule.Given[NoUnsafeNegationOptions]{}, "!((a) in b)", "(!(a)) in b"},
+		{
+			"instanceof",
+			"!a instanceof b",
+			rule.Given[NoUnsafeNegationOptions]{},
+			"!(a instanceof b)",
+			"(!a) instanceof b",
+		},
+		{
+			"instanceof in parentheses",
+			"(!a instanceof b)",
+			rule.Given[NoUnsafeNegationOptions]{},
+			"(!(a instanceof b))",
+			"((!a) instanceof b)",
+		},
+		{
+			"a parenthesised operand before instanceof",
+			"!(a) instanceof b",
+			rule.Given[NoUnsafeNegationOptions]{},
+			"!((a) instanceof b)",
+			"(!(a)) instanceof b",
+		},
+		{
+			"less than, option on",
+			"if (! a < b) {}",
+			rule.Configured(NoUnsafeNegationOptions{EnforceForOrderingRelations: true}),
+			"if (!(a < b)) {}",
+			"if ((! a) < b) {}",
+		},
+		{
+			"greater than, option on",
+			"while (! a > b) {}",
+			rule.Configured(NoUnsafeNegationOptions{EnforceForOrderingRelations: true}),
+			"while (!(a > b)) {}",
+			"while ((! a) > b) {}",
+		},
+		{
+			"less or equal, option on",
+			"foo = ! a <= b;",
+			rule.Configured(NoUnsafeNegationOptions{EnforceForOrderingRelations: true}),
+			"foo = !(a <= b);",
+			"foo = (! a) <= b;",
+		},
+		{
+			"greater or equal, option on",
+			"foo = ! a >= b;",
+			rule.Configured(NoUnsafeNegationOptions{EnforceForOrderingRelations: true}),
+			"foo = !(a >= b);",
+			"foo = (! a) >= b;",
+		},
+		{
+			"less or equal bare, option on",
+			"!a <= b",
+			rule.Configured(NoUnsafeNegationOptions{EnforceForOrderingRelations: true}),
+			"!(a <= b)",
+			"(!a) <= b",
+		},
 		// A regex operand, which upstream's fix column skips: it is a fail-only case there, so this
 		// expectation is ours and had to be derived rather than copied. Slicing the operand's
 		// source text is the only thing that gets `/s/` back; anything reconstructing it from the
@@ -261,35 +363,35 @@ func TestNoUnsafeNegationSuggestsBothRewrites(t *testing.T) {
 		// normalises the author's `in(l)` to `in (l)`, exactly as upstream's `format!` does. That is
 		// a whitespace change inside an expression the suggestion is already rewriting, and pinning
 		// it here is better than pretending the rebuild preserves spacing it cannot see.
-		{"a regex operand", "(y=>{if(!/s/ in(l)){}})", nil,
+		{"a regex operand", "(y=>{if(!/s/ in(l)){}})", rule.Given[NoUnsafeNegationOptions]{},
 			"(y=>{if(!(/s/ in (l))){}})", "(y=>{if((!/s/) in(l)){}})"},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoUnsafeNegation, unsafeNegationFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunGiven(test, NoUnsafeNegation, unsafeNegationFile,
 				testCase.sourceText, testCase.options)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 			}
 			if len(result.Diagnostics[0].Fixes) != 0 {
-				t.Fatalf("wanted no unattended fixes, got %d", len(result.Diagnostics[0].Fixes))
+				test.Fatalf("wanted no unattended fixes, got %d", len(result.Diagnostics[0].Fixes))
 			}
 			suggestions := result.Diagnostics[0].Suggestions
 			if len(suggestions) != 2 {
-				t.Fatalf("wanted two suggestions, got %d", len(suggestions))
+				test.Fatalf("wanted two suggestions, got %d", len(suggestions))
 			}
 
 			for index, want := range []string{testCase.wantNegated, testCase.wantExplicit} {
 				if len(suggestions[index].Fixes) != 1 {
-					t.Fatalf("suggestion %d carries %d fixes, wanted one", index, len(suggestions[index].Fixes))
+					test.Fatalf("suggestion %d carries %d fixes, wanted one", index, len(suggestions[index].Fixes))
 				}
 				fix := suggestions[index].Fixes[0]
 				rewritten := testCase.sourceText[:fix.Range.Pos()] + fix.Text +
 					testCase.sourceText[fix.Range.End():]
 				if rewritten != want {
-					t.Fatalf("suggestion %d rewrites to %q, wanted %q", index, rewritten, want)
+					test.Fatalf("suggestion %d rewrites to %q, wanted %q", index, rewritten, want)
 				}
 			}
 		})
@@ -302,20 +404,20 @@ func TestNoUnsafeNegationSuggestsBothRewrites(t *testing.T) {
 // source: one rewrite changes what the code does and the other pins what it already does. A port
 // that emitted the same message for both, or that built the second from the first, would leave a
 // human choosing between two identical-looking options.
-func TestNoUnsafeNegationLabelsItsSuggestionsDistinctly(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeNegationLabelsItsSuggestionsDistinctly(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, NoUnsafeNegation, unsafeNegationFile, "!a in b")
+	result := rule_testing.Run(test, NoUnsafeNegation, unsafeNegationFile, "!a in b")
 	if len(result.Diagnostics) != 1 || len(result.Diagnostics[0].Suggestions) != 2 {
-		t.Fatalf("wanted one diagnostic carrying two suggestions")
+		test.Fatalf("wanted one diagnostic carrying two suggestions")
 	}
 	first := result.Diagnostics[0].Suggestions[0].Message
 	second := result.Diagnostics[0].Suggestions[1].Message
 	if first.Id == second.Id {
-		t.Fatalf("both suggestions carry the message id %q", first.Id)
+		test.Fatalf("both suggestions carry the message id %q", first.Id)
 	}
 	if first.Description == second.Description {
-		t.Fatalf("both suggestions carry the description %q", first.Description)
+		test.Fatalf("both suggestions carry the description %q", first.Description)
 	}
 }
 
@@ -323,30 +425,30 @@ func TestNoUnsafeNegationLabelsItsSuggestionsDistinctly(t *testing.T) {
 //
 // Two operators rather than one, because a rule quoting a constant string passes a single-operator
 // assertion.
-func TestNoUnsafeNegationNamesTheOperator(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeNegationNamesTheOperator(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
-		options    any
+		options    rule.Given[NoUnsafeNegationOptions]
 		want       string
 	}{
-		{"!a in b", nil, "in"},
-		{"!a instanceof b", nil, "instanceof"},
-		{"!a <= b", NoUnsafeNegationOptions{EnforceForOrderingRelations: true}, "<="},
+		{"!a in b", rule.Given[NoUnsafeNegationOptions]{}, "in"},
+		{"!a instanceof b", rule.Given[NoUnsafeNegationOptions]{}, "instanceof"},
+		{"!a <= b", rule.Configured(NoUnsafeNegationOptions{EnforceForOrderingRelations: true}), "<="},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.want, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoUnsafeNegation, unsafeNegationFile,
+		test.Run(testCase.want, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunGiven(test, NoUnsafeNegation, unsafeNegationFile,
 				testCase.sourceText, testCase.options)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 			}
 			description := result.Diagnostics[0].Message.Description
 			if !strings.Contains(description, "`"+testCase.want+"`") {
-				t.Fatalf("the description %q does not name the operator %q", description, testCase.want)
+				test.Fatalf("the description %q does not name the operator %q", description, testCase.want)
 			}
 		})
 	}

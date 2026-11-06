@@ -4,10 +4,6 @@ import (
 	"os"
 	"strings"
 	"sync"
-	"sync/atomic"
-
-	"github.com/microsoft/TypeScript/tsc/shim/tspath"
-	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 )
 
 // StatSnapshot holds what the run cache's check found at every path it statted: a file or a directory with its
@@ -45,25 +41,25 @@ func NewStatSnapshot() *StatSnapshot {
 
 // note keeps what a stat already taken said about path: its information, or that nothing is there. An error
 // other than nothing being there, a permission error, notes nothing, so a build asks the disk itself.
-func (s *StatSnapshot) note(path string, information os.FileInfo, err error) {
+func (snapshot *StatSnapshot) note(path string, information os.FileInfo, statError error) {
 	switch {
-	case err == nil:
-		s.answers.Store(path, information)
-	case os.IsNotExist(err):
-		s.answers.Store(path, absentAnswer{})
+	case statError == nil:
+		snapshot.answers.Store(path, information)
+	case os.IsNotExist(statError):
+		snapshot.answers.Store(path, absentAnswer{})
 	}
 }
 
 // answer is what the check found at path: present with its information, absent, or not statted at all. Any
 // spelling the check did not stat, a trailing slash, a doubled separator or a dot segment, is not found here and
 // goes to the disk.
-func (s *StatSnapshot) answer(path string) (information os.FileInfo, present bool, known bool) {
+func (snapshot *StatSnapshot) answer(path string) (information os.FileInfo, present bool, known bool) {
 	// The disk refuses a name with a trailing slash, the root excepted: since typed file paths (#64159) a stat
 	// goes through io/fs, whose paths have none, where before the separator was removed first.
-	if s == nil || len(path) > 1 && strings.HasSuffix(path, "/") {
+	if snapshot == nil || len(path) > 1 && strings.HasSuffix(path, "/") {
 		return nil, false, false
 	}
-	value, found := s.answers.Load(path)
+	value, found := snapshot.answers.Load(path)
 	if !found {
 		return nil, false, false
 	}
@@ -74,47 +70,10 @@ func (s *StatSnapshot) answer(path string) (information os.FileInfo, present boo
 }
 
 // identityOf is the identity noted for path, if the check statted a file there.
-func (s *StatSnapshot) identityOf(path string) (fileIdentity, bool) {
-	information, present, _ := s.answer(path)
+func (snapshot *StatSnapshot) identityOf(path string) (fileIdentity, bool) {
+	information, present, _ := snapshot.answer(path)
 	if !present || information.IsDir() {
 		return fileIdentity{}, false
 	}
 	return identityFromInfo(information)
-}
-
-// checkedStatsFS answers existence checks and stats from the run cache's check where it statted the path, and
-// asks the disk beneath for everything else. It answers as the disk does (vfs's Common): a stat follows a
-// symbolic link, a file exists when something that is not a directory is there, and a directory when a directory
-// is. Listings, reads and realpaths pass through.
-type checkedStatsFS struct {
-	vfs.FS
-	snapshot *StatSnapshot
-	answered *atomic.Int64
-}
-
-func (f *checkedStatsFS) FileExists(path tspath.RootedFilePath) bool {
-	if information, present, known := f.snapshot.answer(path.AsString()); known {
-		f.answered.Add(1)
-		return present && !information.IsDir()
-	}
-	return f.FS.FileExists(path)
-}
-
-func (f *checkedStatsFS) DirectoryExists(path tspath.RootedDirectoryPath) bool {
-	if information, present, known := f.snapshot.answer(path.AsString()); known {
-		f.answered.Add(1)
-		return present && information.IsDir()
-	}
-	return f.FS.DirectoryExists(path)
-}
-
-func (f *checkedStatsFS) Stat(path tspath.RootedPath) vfs.FileInfo {
-	if information, present, known := f.snapshot.answer(path.AsString()); known {
-		f.answered.Add(1)
-		if !present {
-			return nil
-		}
-		return information
-	}
-	return f.FS.Stat(path)
 }

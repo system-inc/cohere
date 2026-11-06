@@ -32,8 +32,8 @@ const preferEs6ClassFile = "/repository/source/PreferEs6Class.tsx"
 // decoder in upstream's spelling, so the decoder is under test rather than bypassed.
 
 // TestPreferEs6ClassFires runs the three failing cases from upstream, one finding each.
-func TestPreferEs6ClassFires(t *testing.T) {
-	t.Parallel()
+func TestPreferEs6ClassFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -66,17 +66,17 @@ func TestPreferEs6ClassFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runPreferEs6Class(t, testCase.mode, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runPreferEs6Class(test, testCase.mode, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
 
 // TestPreferEs6ClassStaysSilent runs the five passing cases from upstream.
-func TestPreferEs6ClassStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestPreferEs6ClassStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -120,10 +120,10 @@ func TestPreferEs6ClassStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runPreferEs6Class(t, testCase.mode, testCase.sourceText)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runPreferEs6Class(test, testCase.mode, testCase.sourceText)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -133,13 +133,15 @@ func TestPreferEs6ClassStaysSilent(t *testing.T) {
 // Routing through DecodePreferEs6ClassOptions rather than building the options struct directly is
 // what puts the decoder under test: each mode reaches the rule as upstream writes it, `"always"` or
 // `"never"`.
-func runPreferEs6Class(t *testing.T, mode PreferEs6ClassMode, sourceText string) rule_testing.Result {
-	t.Helper()
-	decoded, err := DecodePreferEs6ClassOptions([]byte(`"` + strings.ToLower(string(mode)) + `"`))
-	if err != nil {
-		t.Fatalf("decoding mode %q: %v", mode, err)
+func runPreferEs6Class(test *testing.T, mode PreferEs6ClassMode, sourceText string) rule_testing.Result {
+	test.Helper()
+	decoded, decodePreferEs6ClassOptionsError := DecodePreferEs6ClassOptions(
+		[]byte(`"` + strings.ToLower(string(mode)) + `"`),
+	)
+	if decodePreferEs6ClassOptionsError != nil {
+		test.Fatalf("decoding mode %q: %v", mode, decodePreferEs6ClassOptionsError)
 	}
-	return rule_testing.RunWithOptions(t, PreferEs6Class, preferEs6ClassFile, sourceText, decoded)
+	return rule_testing.RunWithOptions(test, PreferEs6Class, preferEs6ClassFile, sourceText, decoded)
 }
 
 // TestPreferEs6ClassReportsWithoutOptions pins the nil-options fallback.
@@ -148,12 +150,12 @@ func runPreferEs6Class(t *testing.T, mode PreferEs6ClassMode, sourceText string)
 // matches neither arm. Without the explicit fallback the rule would register, pass every fixture
 // above, and report nothing on the real tree. Every other fixture here reaches the rule through the
 // decoder, so nothing else in this file can see it.
-func TestPreferEs6ClassReportsWithoutOptions(t *testing.T) {
-	t.Parallel()
+func TestPreferEs6ClassReportsWithoutOptions(test *testing.T) {
+	test.Parallel()
 
 	source := "var Hello = createReactClass({ render: function() { return null; } });\n"
-	result := rule_testing.Run(t, PreferEs6Class, preferEs6ClassFile, source)
-	rule_testing.ExpectFindings(t, result, "shouldUseES6Class")
+	result := rule_testing.Run(test, PreferEs6Class, preferEs6ClassFile, source)
+	rule_testing.ExpectFindings(test, result, "shouldUseES6Class")
 }
 
 // TestPreferEs6ClassHasNoFileSuffixGate pins the absence of the gate three siblings carry.
@@ -161,8 +163,8 @@ func TestPreferEs6ClassReportsWithoutOptions(t *testing.T) {
 // Those siblings were ported from oxc, which gates on the file being read as JSX. The authority
 // here has no such gate. The source deliberately holds no JSX so a .ts file parses and the parser's
 // opinion cannot be mistaken for the rule's.
-func TestPreferEs6ClassHasNoFileSuffixGate(t *testing.T) {
-	t.Parallel()
+func TestPreferEs6ClassHasNoFileSuffixGate(test *testing.T) {
+	test.Parallel()
 
 	source := "var Hello = createReactClass({ render: function() { return null; } });\n"
 	for _, fileName := range []string{
@@ -171,10 +173,10 @@ func TestPreferEs6ClassHasNoFileSuffixGate(t *testing.T) {
 		"/repository/source/Suffix.ts",
 		"/repository/source/Suffix.js",
 	} {
-		t.Run(fileName, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, PreferEs6Class, fileName, source)
-			rule_testing.ExpectFindings(t, result, "shouldUseES6Class")
+		test.Run(fileName, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, PreferEs6Class, fileName, source)
+			rule_testing.ExpectFindings(test, result, "shouldUseES6Class")
 		})
 	}
 }
@@ -188,8 +190,8 @@ func TestPreferEs6ClassHasNoFileSuffixGate(t *testing.T) {
 // alone, and the corpus could not see it: it writes `createReactClass` and nothing else.
 //
 // Every row measured against the installed build.
-func TestPreferEs6ClassFactoryNames(t *testing.T) {
-	t.Parallel()
+func TestPreferEs6ClassFactoryNames(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -198,7 +200,11 @@ func TestPreferEs6ClassFactoryNames(t *testing.T) {
 	}{
 		// The control. If this stops reporting the rest of the table measures nothing.
 		{"the bare factory", `var H = createReactClass({ render() { return null; } });`, []string{"shouldUseES6Class"}},
-		{"the namespaced factory", `var H = React.createReactClass({ render() { return null; } });`, []string{"shouldUseES6Class"}},
+		{
+			"the namespaced factory",
+			`var H = React.createReactClass({ render() { return null; } });`,
+			[]string{"shouldUseES6Class"},
+		},
 
 		// The shelf accepts these two and upstream does not.
 		{"bare createClass", `var H = createClass({ render() { return null; } });`, nil},
@@ -213,56 +219,68 @@ func TestPreferEs6ClassFactoryNames(t *testing.T) {
 
 		// Parenthesised spellings, all measured reporting upstream. ESLint's tree does not
 		// materialise these, so upstream never thinks about them and the corpus writes none.
-		{"a parenthesised bare callee", `var H = (createReactClass)({ render() { return null; } });`, []string{"shouldUseES6Class"}},
-		{"a parenthesised namespaced callee", `var H = (React.createReactClass)({ render() { return null; } });`, []string{"shouldUseES6Class"}},
-		{"a parenthesised receiver", `var H = (React).createReactClass({ render() { return null; } });`, []string{"shouldUseES6Class"}},
+		{
+			"a parenthesised bare callee",
+			`var H = (createReactClass)({ render() { return null; } });`,
+			[]string{"shouldUseES6Class"},
+		},
+		{
+			"a parenthesised namespaced callee",
+			`var H = (React.createReactClass)({ render() { return null; } });`,
+			[]string{"shouldUseES6Class"},
+		},
+		{
+			"a parenthesised receiver",
+			`var H = (React).createReactClass({ render() { return null; } });`,
+			[]string{"shouldUseES6Class"},
+		},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runPreferEs6Class(t, PreferEs6ClassAlways, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runPreferEs6Class(test, PreferEs6ClassAlways, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
 
 // TestPreferEs6ClassArgumentPosition pins that the rule asks about the object's parent.
 //
-// Upstream anchors on the object expression and tests whether its PARENT is a matching call, so the
+// Upstream anchors on the object expression and tests whether its parent is a matching call, so the
 // object's position among the arguments does not matter and a nested object is clean because its
 // parent is the enclosing object. A port asking "is this the factory's first argument" would pass
 // the whole corpus and get both rows below wrong. Both measured.
-func TestPreferEs6ClassArgumentPosition(t *testing.T) {
-	t.Parallel()
+func TestPreferEs6ClassArgumentPosition(test *testing.T) {
+	test.Parallel()
 
-	t.Run("an object in second position still reports", func(t *testing.T) {
-		t.Parallel()
+	test.Run("an object in second position still reports", func(test *testing.T) {
+		test.Parallel()
 		source := `var H = createReactClass(x, { render() { return null; } });`
-		result := runPreferEs6Class(t, PreferEs6ClassAlways, source)
-		rule_testing.ExpectFindings(t, result, "shouldUseES6Class")
+		result := runPreferEs6Class(test, PreferEs6ClassAlways, source)
+		rule_testing.ExpectFindings(test, result, "shouldUseES6Class")
 	})
 
-	t.Run("a nested object reports once, for the outer one", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a nested object reports once, for the outer one", func(test *testing.T) {
+		test.Parallel()
 		source := `var H = createReactClass({ a: { b: 1 }, render() { return null; } });`
-		result := runPreferEs6Class(t, PreferEs6ClassAlways, source)
-		rule_testing.ExpectFindings(t, result, "shouldUseES6Class")
+		result := runPreferEs6Class(test, PreferEs6ClassAlways, source)
+		rule_testing.ExpectFindings(test, result, "shouldUseES6Class")
 	})
 
-	t.Run("a factory call assigned to nothing still reports", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a factory call assigned to nothing still reports", func(test *testing.T) {
+		test.Parallel()
 		source := `createReactClass({ render() { return null; } });`
-		result := runPreferEs6Class(t, PreferEs6ClassAlways, source)
-		rule_testing.ExpectFindings(t, result, "shouldUseES6Class")
+		result := runPreferEs6Class(test, PreferEs6ClassAlways, source)
+		rule_testing.ExpectFindings(test, result, "shouldUseES6Class")
 	})
 
-	t.Run("two components report twice", func(t *testing.T) {
-		t.Parallel()
+	test.Run("two components report twice", func(test *testing.T) {
+		test.Parallel()
 		source := "var A = createReactClass({ render() { return null; } });\n" +
 			"var B = createReactClass({ render() { return null; } });\n"
-		result := runPreferEs6Class(t, PreferEs6ClassAlways, source)
-		rule_testing.ExpectFindings(t, result, "shouldUseES6Class", "shouldUseES6Class")
+		result := runPreferEs6Class(test, PreferEs6ClassAlways, source)
+		rule_testing.ExpectFindings(test, result, "shouldUseES6Class", "shouldUseES6Class")
 	})
 }
 
@@ -275,21 +293,21 @@ func TestPreferEs6ClassArgumentPosition(t *testing.T) {
 //
 // Reproduced rather than improved on. A port that helpfully added class expressions would report on
 // code upstream leaves alone and no imported fixture could see it. Both rows measured.
-func TestPreferEs6ClassNeverAnchorsOnDeclarationsOnly(t *testing.T) {
-	t.Parallel()
+func TestPreferEs6ClassNeverAnchorsOnDeclarationsOnly(test *testing.T) {
+	test.Parallel()
 
-	t.Run("a class declaration reports", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a class declaration reports", func(test *testing.T) {
+		test.Parallel()
 		source := "class Hello extends React.Component { render() { return null; } }\n"
-		result := runPreferEs6Class(t, PreferEs6ClassNever, source)
-		rule_testing.ExpectFindings(t, result, "shouldUseCreateClass")
+		result := runPreferEs6Class(test, PreferEs6ClassNever, source)
+		rule_testing.ExpectFindings(test, result, "shouldUseCreateClass")
 	})
 
-	t.Run("a class expression is silent", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a class expression is silent", func(test *testing.T) {
+		test.Parallel()
 		source := "const Hello = class extends React.Component { render() { return null; } };\n"
-		result := runPreferEs6Class(t, PreferEs6ClassNever, source)
-		rule_testing.ExpectClean(t, result)
+		result := runPreferEs6Class(test, PreferEs6ClassNever, source)
+		rule_testing.ExpectClean(test, result)
 	})
 }
 
@@ -298,8 +316,8 @@ func TestPreferEs6ClassNeverAnchorsOnDeclarationsOnly(t *testing.T) {
 // The pattern is anchored at both ends, so the two near-miss rows are the ones that show the
 // anchors doing work: a port testing for a `Component` substring would pass every corpus case and
 // report on both. Every row measured against the installed build.
-func TestPreferEs6ClassBaseNames(t *testing.T) {
-	t.Parallel()
+func TestPreferEs6ClassBaseNames(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name     string
@@ -333,11 +351,11 @@ func TestPreferEs6ClassBaseNames(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			source := "class Hello " + testCase.heritage + " { render() { return null; } }\n"
-			result := runPreferEs6Class(t, PreferEs6ClassNever, source)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			result := runPreferEs6Class(test, PreferEs6ClassNever, source)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -357,8 +375,8 @@ func TestPreferEs6ClassBaseNames(t *testing.T) {
 // So this rule implements no JSDoc path and these cases assert the silence. If a later ESLint
 // revives the path they become the fixtures that fail, which is the point of writing them down
 // rather than leaving the absence unrecorded.
-func TestPreferEs6ClassIgnoresJsDocComponents(t *testing.T) {
-	t.Parallel()
+func TestPreferEs6ClassIgnoresJsDocComponents(test *testing.T) {
+	test.Parallel()
 
 	for _, tag := range []string{
 		"@extends React.Component",
@@ -366,11 +384,11 @@ func TestPreferEs6ClassIgnoresJsDocComponents(t *testing.T) {
 		"@extends React.PureComponent",
 		"@extends Something.Else",
 	} {
-		t.Run(tag, func(t *testing.T) {
-			t.Parallel()
+		test.Run(tag, func(test *testing.T) {
+			test.Parallel()
 			source := "/**\n * " + tag + "\n */\nclass Hello { render() { return null; } }\n"
-			result := runPreferEs6Class(t, PreferEs6ClassNever, source)
-			rule_testing.ExpectClean(t, result)
+			result := runPreferEs6Class(test, PreferEs6ClassNever, source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -380,66 +398,66 @@ func TestPreferEs6ClassIgnoresJsDocComponents(t *testing.T) {
 // The corpus states this for two of the four pairings and this completes the square. It is the
 // cheapest guard against a dispatch that registers both listeners regardless of mode, which would
 // report twice on a file holding both styles while every corpus case still passed.
-func TestPreferEs6ClassArmsAreDisjoint(t *testing.T) {
-	t.Parallel()
+func TestPreferEs6ClassArmsAreDisjoint(test *testing.T) {
+	test.Parallel()
 
 	factory := "var Hello = createReactClass({ render() { return null; } });\n"
 	class := "class Hello extends React.Component { render() { return null; } }\n"
 
-	t.Run("Always is silent on an es6 class", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectClean(t, runPreferEs6Class(t, PreferEs6ClassAlways, class))
+	test.Run("Always is silent on an es6 class", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectClean(test, runPreferEs6Class(test, PreferEs6ClassAlways, class))
 	})
-	t.Run("Never is silent on a factory call", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectClean(t, runPreferEs6Class(t, PreferEs6ClassNever, factory))
+	test.Run("Never is silent on a factory call", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectClean(test, runPreferEs6Class(test, PreferEs6ClassNever, factory))
 	})
-	t.Run("Always reports only the factory when both are present", func(t *testing.T) {
-		t.Parallel()
-		result := runPreferEs6Class(t, PreferEs6ClassAlways, factory+class)
-		rule_testing.ExpectFindings(t, result, "shouldUseES6Class")
+	test.Run("Always reports only the factory when both are present", func(test *testing.T) {
+		test.Parallel()
+		result := runPreferEs6Class(test, PreferEs6ClassAlways, factory+class)
+		rule_testing.ExpectFindings(test, result, "shouldUseES6Class")
 	})
-	t.Run("Never reports only the class when both are present", func(t *testing.T) {
-		t.Parallel()
-		result := runPreferEs6Class(t, PreferEs6ClassNever, factory+class)
-		rule_testing.ExpectFindings(t, result, "shouldUseCreateClass")
+	test.Run("Never reports only the class when both are present", func(test *testing.T) {
+		test.Parallel()
+		result := runPreferEs6Class(test, PreferEs6ClassNever, factory+class)
+		rule_testing.ExpectFindings(test, result, "shouldUseCreateClass")
 	})
 }
 
 // TestPreferEs6ClassSpans asserts where each finding points.
 //
 // The two arms report different node kinds and therefore different spans, which is the one thing a
-// message-id assertion cannot see. The Always arm reports the OBJECT EXPRESSION, so the span starts
+// message-id assertion cannot see. The Always arm reports the object expression, so the span starts
 // at the brace and excludes `createReactClass(` entirely; the Never arm reports the whole class
 // declaration. Measured by reading the reported columns from the installed build.
-func TestPreferEs6ClassSpans(t *testing.T) {
-	t.Parallel()
+func TestPreferEs6ClassSpans(test *testing.T) {
+	test.Parallel()
 
-	t.Run("Always underlines the object, not the call", func(t *testing.T) {
-		t.Parallel()
+	test.Run("Always underlines the object, not the call", func(test *testing.T) {
+		test.Parallel()
 		source := "var Hello = createReactClass({ render() { return null; } });\n"
-		result := runPreferEs6Class(t, PreferEs6ClassAlways, source)
+		result := runPreferEs6Class(test, PreferEs6ClassAlways, source)
 		if len(result.Diagnostics) != 1 {
-			t.Fatalf("wanted exactly one finding, got %d", len(result.Diagnostics))
+			test.Fatalf("wanted exactly one finding, got %d", len(result.Diagnostics))
 		}
 		got := source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 		want := "{ render() { return null; } }"
 		if got != want {
-			t.Errorf("span text = %q, wanted %q", got, want)
+			test.Errorf("span text = %q, wanted %q", got, want)
 		}
 	})
 
-	t.Run("Never underlines the whole class declaration", func(t *testing.T) {
-		t.Parallel()
+	test.Run("Never underlines the whole class declaration", func(test *testing.T) {
+		test.Parallel()
 		source := "class Hello extends React.Component { render() { return null; } }\n"
-		result := runPreferEs6Class(t, PreferEs6ClassNever, source)
+		result := runPreferEs6Class(test, PreferEs6ClassNever, source)
 		if len(result.Diagnostics) != 1 {
-			t.Fatalf("wanted exactly one finding, got %d", len(result.Diagnostics))
+			test.Fatalf("wanted exactly one finding, got %d", len(result.Diagnostics))
 		}
 		got := source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 		want := "class Hello extends React.Component { render() { return null; } }"
 		if got != want {
-			t.Errorf("span text = %q, wanted %q", got, want)
+			test.Errorf("span text = %q, wanted %q", got, want)
 		}
 	})
 }
@@ -449,29 +467,29 @@ func TestPreferEs6ClassSpans(t *testing.T) {
 // Asserting the ids against literals typed here rather than against the rule's own constants is
 // deliberate: comparing a finding to the constant it was reported with is an equality that moves on
 // both sides under mutation and cannot fail.
-func TestPreferEs6ClassMessages(t *testing.T) {
-	t.Parallel()
+func TestPreferEs6ClassMessages(test *testing.T) {
+	test.Parallel()
 
 	if messagePreferEs6ClassShouldUseEs6Class.Id != "shouldUseES6Class" {
-		t.Errorf("Always arm id = %q", messagePreferEs6ClassShouldUseEs6Class.Id)
+		test.Errorf("Always arm id = %q", messagePreferEs6ClassShouldUseEs6Class.Id)
 	}
 	if messagePreferEs6ClassShouldUseCreateClass.Id != "shouldUseCreateClass" {
-		t.Errorf("Never arm id = %q", messagePreferEs6ClassShouldUseCreateClass.Id)
+		test.Errorf("Never arm id = %q", messagePreferEs6ClassShouldUseCreateClass.Id)
 	}
 	for _, message := range []rule.Message{
 		messagePreferEs6ClassShouldUseEs6Class,
 		messagePreferEs6ClassShouldUseCreateClass,
 	} {
 		if len(message.Description) < 80 {
-			t.Errorf("message %q has a description too short to say why: %q", message.Id, message.Description)
+			test.Errorf("message %q has a description too short to say why: %q", message.Id, message.Description)
 		}
 	}
 }
 
 // TestDecodePreferEs6ClassOptions pins the decoder against upstream's schema,
 // `[{ enum: ["always", "never"] }]`.
-func TestDecodePreferEs6ClassOptions(t *testing.T) {
-	t.Parallel()
+func TestDecodePreferEs6ClassOptions(test *testing.T) {
+	test.Parallel()
 
 	accepted := []struct {
 		name string
@@ -483,14 +501,14 @@ func TestDecodePreferEs6ClassOptions(t *testing.T) {
 		{"upstream's never", `"never"`, PreferEs6ClassNever},
 	}
 	for _, testCase := range accepted {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			decoded, err := DecodePreferEs6ClassOptions([]byte(testCase.raw))
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			decoded, decodePreferEs6ClassOptionsError := DecodePreferEs6ClassOptions([]byte(testCase.raw))
+			if decodePreferEs6ClassOptionsError != nil {
+				test.Fatalf("unexpected error: %v", decodePreferEs6ClassOptionsError)
 			}
-			if decoded.(PreferEs6ClassOptions).Mode != testCase.want {
-				t.Errorf("mode = %q, wanted %q", decoded.(PreferEs6ClassOptions).Mode, testCase.want)
+			if decoded.Mode != testCase.want {
+				test.Errorf("mode = %q, wanted %q", decoded.Mode, testCase.want)
 			}
 		})
 	}
@@ -510,10 +528,12 @@ func TestDecodePreferEs6ClassOptions(t *testing.T) {
 		{"null", `null`},
 	}
 	for _, testCase := range refused {
-		t.Run(testCase.name+" is refused", func(t *testing.T) {
-			t.Parallel()
-			if _, err := DecodePreferEs6ClassOptions([]byte(testCase.raw)); err == nil {
-				t.Errorf("%s decoded; upstream's schema refuses it", testCase.raw)
+		test.Run(testCase.name+" is refused", func(test *testing.T) {
+			test.Parallel()
+			if _, decodePreferEs6ClassOptionsError := DecodePreferEs6ClassOptions(
+				[]byte(testCase.raw),
+			); decodePreferEs6ClassOptionsError == nil {
+				test.Errorf("%s decoded; upstream's schema refuses it", testCase.raw)
 			}
 		})
 	}

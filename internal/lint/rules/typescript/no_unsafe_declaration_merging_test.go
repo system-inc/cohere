@@ -12,24 +12,30 @@ const unsafeDeclarationMergingFile = "/repository/source/Merged.ts"
 // snapshot records as producing exactly one diagnostic.
 //
 // One is the count worth noticing rather than the obvious two. Both listeners see the same pair, and
-// only the one visiting the LATER declaration reports, because the earlier declaration is the one
+// only the one visiting the later declaration reports, because the earlier declaration is the one
 // the symbol records first and the opposite-kind test is asked against it. The rule note explains
 // why that asymmetry is upstream's decision rather than an artifact.
-func TestNoUnsafeDeclarationMergingFires(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeDeclarationMergingFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
 		sourceText string
 	}{
 		{"an interface then a class", "\n            interface Foo {}\n            class Foo {}\n                  "},
-		{"a class then an interface", "\n                     class Foo {}\n                     interface Foo {}\n                           "},
-		{"an interface and a class inside declare global", "\n                     declare global {\n                       interface Foo {}\n                       class Foo {}\n                     }\n                           "},
+		{
+			"a class then an interface",
+			"\n                     class Foo {}\n                     interface Foo {}\n                           ",
+		},
+		{
+			"an interface and a class inside declare global",
+			"\n                     declare global {\n                       interface Foo {}\n                       class Foo {}\n                     }\n                           ",
+		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoUnsafeDeclarationMerging,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoUnsafeDeclarationMerging,
 				unsafeDeclarationMergingFile, testCase.sourceText), "unsafeMerging")
 		})
 	}
@@ -43,26 +49,47 @@ func TestNoUnsafeDeclarationMergingFires(t *testing.T) {
 // implements scoping; typescript-go's binder gives each of those its own symbol, and the
 // opposite-kind test then finds a single declaration of the same kind as the node. These fixtures are
 // what pins that, since the rule reads as though it would merge them.
-func TestNoUnsafeDeclarationMergingStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeDeclarationMergingStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
 		sourceText string
 	}{
-		{"an interface implemented by a differently named class", "\n            interface Foo {}\n            class Bar implements Foo {}\n                "},
-		{"two namespaces", "\n                     namespace Foo {}\n                     namespace Foo {}\n                         "},
-		{"an enum and a namespace", "\n                     enum Foo {}\n                     namespace Foo {}\n                         "},
-		{"a namespace and a differently named function", "\n                     namespace Fooo {}\n                     function Foo() {}\n                         "},
+		{
+			"an interface implemented by a differently named class",
+			"\n            interface Foo {}\n            class Bar implements Foo {}\n                ",
+		},
+		{
+			"two namespaces",
+			"\n                     namespace Foo {}\n                     namespace Foo {}\n                         ",
+		},
+		{
+			"an enum and a namespace",
+			"\n                     enum Foo {}\n                     namespace Foo {}\n                         ",
+		},
+		{
+			"a namespace and a differently named function",
+			"\n                     namespace Fooo {}\n                     function Foo() {}\n                         ",
+		},
 		{"an anonymous class expression", "\n                     const Foo = class {};\n                         "},
-		{"a class returned from a function body", "\n                     interface Foo {\n                       props: string;\n                     }\n\n                     function bar() {\n                       return class Foo {};\n                     }\n                         "},
-		{"a class inside an immediately invoked function", "\n                     interface Foo {\n                       props: string;\n                     }\n\n                     (function bar() {\n                       class Foo {}\n                     })();\n                         "},
-		{"an interface in declare global and a class outside it", "\n                     declare global {\n                       interface Foo {}\n                     }\n\n                     class Foo {}\n                         "},
+		{
+			"a class returned from a function body",
+			"\n                     interface Foo {\n                       props: string;\n                     }\n\n                     function bar() {\n                       return class Foo {};\n                     }\n                         ",
+		},
+		{
+			"a class inside an immediately invoked function",
+			"\n                     interface Foo {\n                       props: string;\n                     }\n\n                     (function bar() {\n                       class Foo {}\n                     })();\n                         ",
+		},
+		{
+			"an interface in declare global and a class outside it",
+			"\n                     declare global {\n                       interface Foo {}\n                     }\n\n                     class Foo {}\n                         ",
+		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoUnsafeDeclarationMerging,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoUnsafeDeclarationMerging,
 				unsafeDeclarationMergingFile, testCase.sourceText))
 		})
 	}
@@ -73,11 +100,11 @@ func TestNoUnsafeDeclarationMergingStaysSilent(t *testing.T) {
 //
 // Both verdicts were measured on the release oxlint binary before being written here, per the rule
 // that a hypothesis about upstream is not evidence about upstream. They are the two directions of
-// the same mechanism: only the declarations that are NOT first report, and only when the first one
+// the same mechanism: only the declarations that are not first report, and only when the first one
 // is of the opposite kind. So three interfaces after a class produce two findings, and two
 // interfaces before a class produce one.
-func TestNoUnsafeDeclarationMergingCountsFindingsPerDeclaration(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeDeclarationMergingCountsFindingsPerDeclaration(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -96,9 +123,9 @@ func TestNoUnsafeDeclarationMergingCountsFindingsPerDeclaration(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoUnsafeDeclarationMerging,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoUnsafeDeclarationMerging,
 				unsafeDeclarationMergingFile, testCase.sourceText), testCase.want...)
 		})
 	}
@@ -115,20 +142,26 @@ func TestNoUnsafeDeclarationMergingCountsFindingsPerDeclaration(t *testing.T) {
 //
 // If this test ever fails, the port has been improved rather than broken, and the question is
 // whether the differential harness wants the improvement, not whether the rule is wrong.
-func TestNoUnsafeDeclarationMergingGoesSilentWhenAThirdKindIsFirst(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeDeclarationMergingGoesSilentWhenAThirdKindIsFirst(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
 		sourceText string
 	}{
-		{"a namespace declared first", "namespace Foo { export const value = 1; }\ninterface Foo {}\nclass Foo {}\nexport { Foo };\n"},
-		{"an import declared first", "import { Foo } from './Other';\ninterface Foo {}\nclass Foo {}\nexport { Foo };\n"},
+		{
+			"a namespace declared first",
+			"namespace Foo { export const value = 1; }\ninterface Foo {}\nclass Foo {}\nexport { Foo };\n",
+		},
+		{
+			"an import declared first",
+			"import { Foo } from './Other';\ninterface Foo {}\nclass Foo {}\nexport { Foo };\n",
+		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoUnsafeDeclarationMerging,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoUnsafeDeclarationMerging,
 				unsafeDeclarationMergingFile, testCase.sourceText))
 		})
 	}
@@ -141,8 +174,8 @@ func TestNoUnsafeDeclarationMergingGoesSilentWhenAThirdKindIsFirst(t *testing.T)
 // The rule reads as "two declarations of one name", and it is not: it is "a class and an interface",
 // specifically. An interface beside a function, a namespace beside a class, and an interface beside
 // an interface are all merges and all silent.
-func TestNoUnsafeDeclarationMergingStaysSilentOnUnpairedKinds(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeDeclarationMergingStaysSilentOnUnpairedKinds(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -158,9 +191,9 @@ func TestNoUnsafeDeclarationMergingStaysSilentOnUnpairedKinds(t *testing.T) {
 		{"a class in a nested block", "interface Foo {}\n{\n    class Foo {}\n}\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoUnsafeDeclarationMerging,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoUnsafeDeclarationMerging,
 				unsafeDeclarationMergingFile, testCase.sourceText))
 		})
 	}
@@ -173,8 +206,8 @@ func TestNoUnsafeDeclarationMergingStaysSilentOnUnpairedKinds(t *testing.T) {
 // comparison against `messageUnsafeDeclarationMerging.Id` is an equality that looks correct and
 // guards nothing, because a mutation to the constant moves both sides of it at once. These strings
 // are the independent copy that makes the assertion mean something.
-func TestNoUnsafeDeclarationMergingPointsAtTheName(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeDeclarationMergingPointsAtTheName(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name         string
@@ -188,19 +221,24 @@ func TestNoUnsafeDeclarationMergingPointsAtTheName(t *testing.T) {
 		{"a class then an interface", "class Bar {}\ninterface Bar {}\nexport { Bar };\n", []string{"Bar"}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoUnsafeDeclarationMerging, unsafeDeclarationMergingFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(
+				test,
+				NoUnsafeDeclarationMerging,
+				unsafeDeclarationMergingFile,
+				testCase.sourceText,
+			)
 			if len(result.Diagnostics) != len(testCase.wantReported) {
-				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.wantReported))
+				test.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.wantReported))
 			}
 			for index, diagnostic := range result.Diagnostics {
 				reported := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if reported != testCase.wantReported[index] {
-					t.Errorf("finding %d covers %q, want %q", index, reported, testCase.wantReported[index])
+					test.Errorf("finding %d covers %q, want %q", index, reported, testCase.wantReported[index])
 				}
 				if diagnostic.Message.Id != "unsafeMerging" {
-					t.Errorf("finding %d has id %q, want %q", index, diagnostic.Message.Id, "unsafeMerging")
+					test.Errorf("finding %d has id %q, want %q", index, diagnostic.Message.Id, "unsafeMerging")
 				}
 			}
 		})
@@ -210,19 +248,19 @@ func TestNoUnsafeDeclarationMergingPointsAtTheName(t *testing.T) {
 // TestNoUnsafeDeclarationMergingPointsAtTheFirstDeclaration is the offset half of the span
 // assertion, and it is the whole reason the span was measured rather than assumed.
 //
-// The two candidate spans hold the SAME TEXT, `Foo` either way, so the text comparison above passes
+// The two candidate spans hold the same text, `Foo` either way, so the text comparison above passes
 // over whichever node the rule picked and cannot tell them apart. Only the position separates them.
 //
-// Upstream attaches two labels and sorts them, so its primary is the declaration written FIRST,
-// while the listener arm that fires is always visiting the SECOND. Reporting the visited node is the
+// Upstream attaches two labels and sorts them, so its primary is the declaration written first,
+// while the listener arm that fires is always visiting the second. Reporting the visited node is the
 // natural way to write this rule and puts every finding one declaration too late. Pinned on the
 // release binary at 1:7 for `class Bar {}; interface Bar {}` and 1:11 for
 // `interface Foo {}; class Foo {}`, which is the first declaration in both directions.
 //
 // Both offsets below are computed from the source by hand rather than read back from the rule, so
 // the assertion has an independent copy of the answer.
-func TestNoUnsafeDeclarationMergingPointsAtTheFirstDeclaration(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeDeclarationMergingPointsAtTheFirstDeclaration(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name         string
@@ -236,14 +274,19 @@ func TestNoUnsafeDeclarationMergingPointsAtTheFirstDeclaration(t *testing.T) {
 		{"the class written first", "class Bar {}\ninterface Bar {}\nexport { Bar };\n", 6, 23},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoUnsafeDeclarationMerging, unsafeDeclarationMergingFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(
+				test,
+				NoUnsafeDeclarationMerging,
+				unsafeDeclarationMergingFile,
+				testCase.sourceText,
+			)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
+				test.Fatalf("got %d findings, want 1", len(result.Diagnostics))
 			}
 			if got := result.Diagnostics[0].Range.Pos(); got != testCase.wantPosition {
-				t.Errorf("finding starts at %d, want %d (the second declaration's name is at %d)",
+				test.Errorf("finding starts at %d, want %d (the second declaration's name is at %d)",
 					got, testCase.wantPosition, testCase.wrongAt)
 			}
 		})
@@ -257,18 +300,31 @@ func TestNoUnsafeDeclarationMergingPointsAtTheFirstDeclaration(t *testing.T) {
 // passing vacuously, and only the Fires half announces itself. Measured rather than assumed:
 // `node.Symbol()` is nil for all of these inputs under the untyped harness, because typescript-go
 // populates symbol tables when the program is built.
-func TestNoUnsafeDeclarationMergingNeedsTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeDeclarationMergingNeedsTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	if !NoUnsafeDeclarationMerging.NeedsTypeChecker {
-		t.Fatal("the rule resolves through the checker and must declare NeedsTypeChecker")
+		test.Fatal("the rule resolves through the checker and must declare NeedsTypeChecker")
 	}
 	const sourceText = "interface Foo {}\nclass Foo {}\nexport { Foo };\n"
-	if result := rule_testing.Run(t, NoUnsafeDeclarationMerging, unsafeDeclarationMergingFile, sourceText); len(result.Diagnostics) != 0 {
-		t.Fatalf("the untyped harness produced %d findings, so the nil-checker guard is not being taken", len(result.Diagnostics))
+	if result := rule_testing.Run(
+		test,
+		NoUnsafeDeclarationMerging,
+		unsafeDeclarationMergingFile,
+		sourceText,
+	); len(result.Diagnostics) != 0 {
+		test.Fatalf(
+			"the untyped harness produced %d findings, so the nil-checker guard is not being taken",
+			len(result.Diagnostics),
+		)
 	}
-	if result := rule_testing.RunTyped(t, NoUnsafeDeclarationMerging, unsafeDeclarationMergingFile, sourceText); len(result.Diagnostics) != 1 {
-		t.Fatalf("the typed harness produced %d findings, want 1", len(result.Diagnostics))
+	if result := rule_testing.RunTyped(
+		test,
+		NoUnsafeDeclarationMerging,
+		unsafeDeclarationMergingFile,
+		sourceText,
+	); len(result.Diagnostics) != 1 {
+		test.Fatalf("the typed harness produced %d findings, want 1", len(result.Diagnostics))
 	}
 }
 
@@ -277,20 +333,20 @@ func TestNoUnsafeDeclarationMergingNeedsTheTypedHarness(t *testing.T) {
 // The literal is typed here rather than read from the rule, for the same reason the id assertion
 // above is: comparing a message to its own constant is an equality that moves on both sides at once
 // and catches nothing.
-func TestNoUnsafeDeclarationMergingDescriptionExplainsTheHazard(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeDeclarationMergingDescriptionExplainsTheHazard(test *testing.T) {
+	test.Parallel()
 
 	const want = "A class and an interface sharing a name are merged into one type, and the members " +
 		"the interface contributes are never initialized by the class constructor. TypeScript does " +
 		"not check them, so reading one compiles and returns undefined at runtime. Give the " +
 		"interface a different name, or declare the members on the class."
 	const sourceText = "interface Foo {}\nclass Foo {}\nexport { Foo };\n"
-	result := rule_testing.RunTyped(t, NoUnsafeDeclarationMerging, unsafeDeclarationMergingFile, sourceText)
+	result := rule_testing.RunTyped(test, NoUnsafeDeclarationMerging, unsafeDeclarationMergingFile, sourceText)
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
+		test.Fatalf("got %d findings, want 1", len(result.Diagnostics))
 	}
 	if got := result.Diagnostics[0].Message.Description; got != want {
-		t.Errorf("description is\n%q\nwant\n%q", got, want)
+		test.Errorf("description is\n%q\nwant\n%q", got, want)
 	}
 }
 
@@ -306,22 +362,22 @@ func TestNoUnsafeDeclarationMergingDescriptionExplainsTheHazard(t *testing.T) {
 // is a named default export, it merges with the interface exactly as a plain class does, and it
 // reports. So the guard has to decline the anonymous form specifically rather than decline default
 // exports as a family.
-func TestNoUnsafeDeclarationMergingHandlesAnAnonymousClass(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeDeclarationMergingHandlesAnAnonymousClass(test *testing.T) {
+	test.Parallel()
 
-	t.Run("an anonymous default export beside an interface", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoUnsafeDeclarationMerging,
+	test.Run("an anonymous default export beside an interface", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoUnsafeDeclarationMerging,
 			unsafeDeclarationMergingFile, "interface Foo {}\nexport default class {}\n"))
 	})
-	t.Run("an anonymous default export alone", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoUnsafeDeclarationMerging,
+	test.Run("an anonymous default export alone", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoUnsafeDeclarationMerging,
 			unsafeDeclarationMergingFile, "export default class {}\n"))
 	})
-	t.Run("a named default export beside an interface", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoUnsafeDeclarationMerging,
+	test.Run("a named default export beside an interface", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoUnsafeDeclarationMerging,
 			unsafeDeclarationMergingFile, "interface Foo {}\nexport default class Foo {}\n"), "unsafeMerging")
 	})
 }
@@ -332,14 +388,14 @@ func TestNoUnsafeDeclarationMergingHandlesAnAnonymousClass(t *testing.T) {
 // Upstream writes no `export` in any of its eleven cases, so nothing in the corpus exercises what an
 // export does to symbol resolution. It does something substantial: typescript-go hands an exported
 // declaration its own symbol carrying only itself and puts the merged list on that declaration's
-// LOCAL symbol, while the non-exported partner sees both through the ordinary lookup. A rule reading
+// local symbol, while the non-exported partner sees both through the ordinary lookup. A rule reading
 // only GetSymbolAtLocation therefore goes silent on three of the six export arrangements below,
 // every one of which upstream reports.
 //
 // All six were pinned on the release oxlint binary at exactly one finding before being written here,
 // which is what makes this a fidelity test rather than an opinion about what the rule should do.
-func TestNoUnsafeDeclarationMergingSeesThroughAnExport(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeDeclarationMergingSeesThroughAnExport(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -357,9 +413,9 @@ func TestNoUnsafeDeclarationMergingSeesThroughAnExport(t *testing.T) {
 		{"both exported", "export interface Foo {}\nexport class Foo {}\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoUnsafeDeclarationMerging,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoUnsafeDeclarationMerging,
 				unsafeDeclarationMergingFile, testCase.sourceText), "unsafeMerging")
 		})
 	}

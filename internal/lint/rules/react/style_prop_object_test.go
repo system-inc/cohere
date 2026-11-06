@@ -30,21 +30,21 @@ const stylePropObjectFile = "/repository/source/StylePropObject.tsx"
 
 // stylePropObjectOptions decodes a raw option body the way the config layer does.
 //
-// An empty body is the nil-options case, which here means an EMPTY allow list and therefore full
+// An empty body is the bare-severity case, which here means an empty allow list and therefore full
 // enforcement. That is the opposite direction from the sibling forbid rules, where an empty list
 // means the rule declines everything.
-func stylePropObjectOptions(t *testing.T, raw string) any {
-	t.Helper()
-	decoded, err := DecodeStylePropObjectOptions([]byte(raw))
-	if err != nil {
-		t.Fatalf("decoding %q: %v", raw, err)
+func stylePropObjectOptions(test *testing.T, raw string) StylePropObjectOptions {
+	test.Helper()
+	decoded, decodeStylePropertyObjectOptionsError := DecodeStylePropObjectOptions([]byte(raw))
+	if decodeStylePropertyObjectOptionsError != nil {
+		test.Fatalf("decoding %q: %v", raw, decodeStylePropertyObjectOptionsError)
 	}
 	return decoded
 }
 
 // TestStylePropObjectFires runs every case this port reports on.
-func TestStylePropObjectFires(t *testing.T) {
-	t.Parallel()
+func TestStylePropObjectFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -74,12 +74,17 @@ func TestStylePropObjectFires(t *testing.T) {
         }
       `, ``, 1},
 		{"invalid 6", `<MyComponent style="myStyle" />`, `{"allow":["MyOtherComponent"]}`, 1},
-		{"invalid 7", `React.createElement(MyComponent, { style: "mySpecialStyle" })`, `{"allow":["MyOtherComponent"]}`, 1},
+		{
+			"invalid 7",
+			`React.createElement(MyComponent, { style: "mySpecialStyle" })`,
+			`{"allow":["MyOtherComponent"]}`,
+			1,
+		},
 
 		// Cases upstream's corpus does not write, each measured against the installed build.
 
 		// Our parser keeps parenthesis nodes and upstream's folds them away, so without unwrapping
-		// this port would be SILENT on every shape below while the installed build reports each
+		// this port would be silent on every shape below while the installed build reports each
 		// one. No imported fixture can catch this, because upstream's corpus cannot express a node
 		// its own parser deletes.
 		{"a parenthesized string value", `<div style={('x')} />`, ``, 1},
@@ -94,14 +99,14 @@ func TestStylePropObjectFires(t *testing.T) {
 		{"a regular expression is a literal upstream", `<div style={/x/} />`, ``, 1},
 		{"a false keyword", `<div style={false} />`, ``, 1},
 
-		// The allow list only SKIPS, so a tag with no plain name to match is still examined. This
+		// The allow list only skips, so a tag with no plain name to match is still examined. This
 		// is the opposite of the sibling forbid rules, where an unreadable tag ends the check.
 		{"a member tag is still examined", `<a.b style="x" />`, ``, 1},
 		{"a namespaced tag is still examined", `<svg:a style="x" />`, ``, 1},
 		{"naming a member tag in the allow list does not exempt it", `<a.b style="x" />`, `{"allow":["a.b"]}`, 1},
 		{"an empty allow list exempts nothing", `<div style="x" />`, `{"allow":[]}`, 1},
 
-		// Upstream reads the FIRST declaration, so a name declared twice is judged by the one
+		// Upstream reads the first declaration, so a name declared twice is judged by the one
 		// written first. Its partner in the silent table is the same pair in the other order, and
 		// the two together are what separate index zero from a loop.
 		{"two declarations, the first is a string", "var s = 'x';\nvar s = {};\nconst q = <div style={s} />;", ``, 1},
@@ -115,7 +120,12 @@ func TestStylePropObjectFires(t *testing.T) {
 		{"a createElement shorthand property", "const style = 'x';\nReact.createElement(\"div\", { style });", ``, 1},
 
 		// A string first argument has no name, so the allow list cannot match it.
-		{"allowing div does not exempt the string element", `React.createElement("div", { style: "x" });`, `{"allow":["div"]}`, 1},
+		{
+			"allowing div does not exempt the string element",
+			`React.createElement("div", { style: "x" });`,
+			`{"allow":["div"]}`,
+			1,
+		},
 
 		// A member first argument is neither a name nor a match, so the element is examined.
 		{"a createElement member first argument", `React.createElement(a.b, { style: 'x' });`, ``, 1},
@@ -125,22 +135,28 @@ func TestStylePropObjectFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			options := stylePropObjectOptions(t, testCase.rawOptions)
-			result := rule_testing.RunTypedWithOptions(t, StylePropObject, stylePropObjectFile, testCase.sourceText, options)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			options := stylePropObjectOptions(test, testCase.rawOptions)
+			result := rule_testing.RunTypedWithOptions(
+				test,
+				StylePropObject,
+				stylePropObjectFile,
+				testCase.sourceText,
+				options,
+			)
 			wantIds := make([]string, testCase.wantCount)
 			for index := range wantIds {
 				wantIds[index] = "stylePropNotObject"
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 		})
 	}
 }
 
 // TestStylePropObjectStaysSilent runs every case this port declines.
-func TestStylePropObjectStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestStylePropObjectStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -287,24 +303,30 @@ func TestStylePropObjectStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			options := stylePropObjectOptions(t, testCase.rawOptions)
-			result := rule_testing.RunTypedWithOptions(t, StylePropObject, stylePropObjectFile, testCase.sourceText, options)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			options := stylePropObjectOptions(test, testCase.rawOptions)
+			result := rule_testing.RunTypedWithOptions(
+				test,
+				StylePropObject,
+				stylePropObjectFile,
+				testCase.sourceText,
+				options,
+			)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
 
-// TestStylePropObjectAnchors pins WHERE each finding points, and the two arms differ.
+// TestStylePropObjectAnchors pins where each finding points, and the two arms differ.
 //
-// The JSX arm reports on the whole attribute, and the createElement arm reports on the VALUE
+// The JSX arm reports on the whole attribute, and the createElement arm reports on the value
 // expression rather than on the property or the call. A port using one anchor for both would pass
 // every message-id fixture above while pointing somewhere the reader was never shown in half the
 // cases. The identifier arm reports on the identifier in the value position, not on its
 // declaration, which is a third anchor again.
-func TestStylePropObjectAnchors(t *testing.T) {
-	t.Parallel()
+func TestStylePropObjectAnchors(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -318,10 +340,16 @@ func TestStylePropObjectAnchors(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, StylePropObject, stylePropObjectFile, testCase.sourceText, stylePropObjectOptions(t, ``))
-			rule_testing.ExpectFindings(t, result, "stylePropNotObject")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(
+				test,
+				StylePropObject,
+				stylePropObjectFile,
+				testCase.sourceText,
+				stylePropObjectOptions(test, ``),
+			)
+			rule_testing.ExpectFindings(test, result, "stylePropNotObject")
 
 			// RunTyped trims the fixture and appends a newline, so the literal above and the file
 			// on disk differ by any leading whitespace. Slicing the transformed source rather than
@@ -329,7 +357,7 @@ func TestStylePropObjectAnchors(t *testing.T) {
 			source := strings.TrimSpace(testCase.sourceText) + "\n"
 			span := result.Diagnostics[0].Range
 			if got := source[span.Pos():span.End()]; got != testCase.want {
-				t.Fatalf("finding spans %q, want %q", got, testCase.want)
+				test.Fatalf("finding spans %q, want %q", got, testCase.want)
 			}
 		})
 	}
@@ -339,20 +367,26 @@ func TestStylePropObjectAnchors(t *testing.T) {
 //
 // The message carries no format verbs, so the assertion is equality against a literal typed here
 // rather than against the rule's own constant, which would move with any mutation of it.
-func TestStylePropObjectMessageText(t *testing.T) {
-	t.Parallel()
+func TestStylePropObjectMessageText(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTypedWithOptions(t, StylePropObject, stylePropObjectFile, `<div style="x" />`, stylePropObjectOptions(t, ``))
-	rule_testing.ExpectFindings(t, result, "stylePropNotObject")
+	result := rule_testing.RunTypedWithOptions(
+		test,
+		StylePropObject,
+		stylePropObjectFile,
+		`<div style="x" />`,
+		stylePropObjectOptions(test, ``),
+	)
+	rule_testing.ExpectFindings(test, result, "stylePropNotObject")
 
 	if got := stylePropObjectMessage.Description; got != "Style prop value must be an object" {
-		t.Fatalf("message description is %q", got)
+		test.Fatalf("message description is %q", got)
 	}
 	if got := stylePropObjectMessage.Id; got != "stylePropNotObject" {
-		t.Fatalf("message id is %q", got)
+		test.Fatalf("message id is %q", got)
 	}
 	if got := result.Diagnostics[0].Message.Description; got != "Style prop value must be an object" {
-		t.Fatalf("reported message is %q", got)
+		test.Fatalf("reported message is %q", got)
 	}
 }
 
@@ -362,16 +396,22 @@ func TestStylePropObjectMessageText(t *testing.T) {
 // such gate anywhere. The createElement arm needs no JSX, so unlike a JSX-only rule this one can
 // state the point on `.ts` directly, where TypeScript would read an opening angle bracket as a type
 // assertion rather than as an element.
-func TestStylePropObjectHasNoFileSuffixGate(t *testing.T) {
-	t.Parallel()
+func TestStylePropObjectHasNoFileSuffixGate(test *testing.T) {
+	test.Parallel()
 
 	const source = `React.createElement("div", { style: "x" });`
 
 	for _, suffix := range []string{".tsx", ".ts"} {
-		t.Run(suffix, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, StylePropObject, "/repository/source/SuffixProbe"+suffix, source, stylePropObjectOptions(t, ``))
-			rule_testing.ExpectFindings(t, result, "stylePropNotObject")
+		test.Run(suffix, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(
+				test,
+				StylePropObject,
+				"/repository/source/SuffixProbe"+suffix,
+				source,
+				stylePropObjectOptions(test, ``),
+			)
+			rule_testing.ExpectFindings(test, result, "stylePropNotObject")
 		})
 	}
 }
@@ -382,23 +422,23 @@ func TestStylePropObjectHasNoFileSuffixGate(t *testing.T) {
 // rather than crashing, and a silent rule looks exactly like a correct one to a StaysSilent
 // fixture. This asserts the difference directly, so a later revert of the declaration fails loudly
 // instead of turning every Fires case into a vacuous pass.
-func TestStylePropObjectRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestStylePropObjectRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	const source = `React.createElement("div", { style: "x" });`
-	options := stylePropObjectOptions(t, ``)
+	options := stylePropObjectOptions(test, ``)
 
-	untyped := rule_testing.RunWithOptions(t, StylePropObject, stylePropObjectFile, source, options)
-	rule_testing.ExpectClean(t, untyped)
+	untyped := rule_testing.RunWithOptions(test, StylePropObject, stylePropObjectFile, source, options)
+	rule_testing.ExpectClean(test, untyped)
 
-	typed := rule_testing.RunTypedWithOptions(t, StylePropObject, stylePropObjectFile, source, options)
-	rule_testing.ExpectFindings(t, typed, "stylePropNotObject")
+	typed := rule_testing.RunTypedWithOptions(test, StylePropObject, stylePropObjectFile, source, options)
+	rule_testing.ExpectFindings(test, typed, "stylePropNotObject")
 
 	// The JSX arm needs the checker only for the identifier case, so a plain literal attribute
 	// reports either way. Without this row the test above would read as "the rule does nothing
 	// untyped", which is true of the createElement arm and false of the rule.
-	jsxUntyped := rule_testing.RunWithOptions(t, StylePropObject, stylePropObjectFile, `<div style="x" />`, options)
-	rule_testing.ExpectFindings(t, jsxUntyped, "stylePropNotObject")
+	jsxUntyped := rule_testing.RunWithOptions(test, StylePropObject, stylePropObjectFile, `<div style="x" />`, options)
+	rule_testing.ExpectFindings(test, jsxUntyped, "stylePropNotObject")
 }
 
 // TestStylePropObjectIsNonNullLiteral probes the literal predicate directly.
@@ -406,8 +446,8 @@ func TestStylePropObjectRequiresTheTypedHarness(t *testing.T) {
 // The set of nodes upstream's parser calls a Literal is not obvious, and the two answers a port is
 // most likely to get wrong, a regular expression and a bigint, are written nowhere in the corpus.
 // Each expectation was measured by driving the installed rule on the corresponding value.
-func TestStylePropObjectIsNonNullLiteral(t *testing.T) {
-	t.Parallel()
+func TestStylePropObjectIsNonNullLiteral(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -429,46 +469,49 @@ func TestStylePropObjectIsNonNullLiteral(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, StylePropObject, stylePropObjectFile, testCase.sourceText, stylePropObjectOptions(t, ``))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(
+				test,
+				StylePropObject,
+				stylePropObjectFile,
+				testCase.sourceText,
+				stylePropObjectOptions(test, ``),
+			)
 			if testCase.wantFires {
-				rule_testing.ExpectFindings(t, result, "stylePropNotObject")
+				rule_testing.ExpectFindings(test, result, "stylePropNotObject")
 			} else {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 			}
 		})
 	}
 }
 
-// TestDecodeStylePropObjectOptions covers the allow list and the nil-options path.
-func TestDecodeStylePropObjectOptions(t *testing.T) {
-	t.Parallel()
+// TestDecodeStylePropObjectOptions covers the allow list and the empty-body path.
+func TestDecodeStylePropObjectOptions(test *testing.T) {
+	test.Parallel()
 
-	t.Run("an empty body allows nothing", func(t *testing.T) {
-		t.Parallel()
-		decoded, err := DecodeStylePropObjectOptions(nil)
-		if err != nil {
-			t.Fatalf("decoding an empty body: %v", err)
+	test.Run("an empty body allows nothing", func(test *testing.T) {
+		test.Parallel()
+		decoded, decodeStylePropertyObjectOptionsError := DecodeStylePropObjectOptions(nil)
+		if decodeStylePropertyObjectOptionsError != nil {
+			test.Fatalf("decoding an empty body: %v", decodeStylePropertyObjectOptionsError)
 		}
-		options, ok := decoded.(StylePropObjectOptions)
-		if !ok {
-			t.Fatalf("decoded to %T, want StylePropObjectOptions", decoded)
-		}
-		if len(options.Allow) != 0 {
-			t.Fatalf("allow list is %v, want empty", options.Allow)
+		if len(decoded.Allow) != 0 {
+			test.Fatalf("allow list is %v, want empty", decoded.Allow)
 		}
 	})
 
-	t.Run("a named allow list", func(t *testing.T) {
-		t.Parallel()
-		decoded, err := DecodeStylePropObjectOptions([]byte(`{"allow":["MyComponent","Other"]}`))
-		if err != nil {
-			t.Fatalf("decoding a named allow list: %v", err)
+	test.Run("a named allow list", func(test *testing.T) {
+		test.Parallel()
+		decoded, decodeStylePropertyObjectOptionsError := DecodeStylePropObjectOptions(
+			[]byte(`{"allow":["MyComponent","Other"]}`),
+		)
+		if decodeStylePropertyObjectOptionsError != nil {
+			test.Fatalf("decoding a named allow list: %v", decodeStylePropertyObjectOptionsError)
 		}
-		options := decoded.(StylePropObjectOptions)
-		if len(options.Allow) != 2 || options.Allow[0] != "MyComponent" || options.Allow[1] != "Other" {
-			t.Fatalf("allow list is %v", options.Allow)
+		if len(decoded.Allow) != 2 || decoded.Allow[0] != "MyComponent" || decoded.Allow[1] != "Other" {
+			test.Fatalf("allow list is %v", decoded.Allow)
 		}
 	})
 }

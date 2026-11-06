@@ -43,21 +43,22 @@ func asTheAssertionsHarnessWroteIt(text string) string {
 // Back to front so an earlier edit cannot move a later one's offsets, which is what the fix engine
 // does. These suggestions carry two fixes each, so the ordering is load-bearing here rather than
 // incidental.
-func applyConsistentTypeAssertionsSuggestion(t *testing.T, source string, suggestion rule.Suggestion) string {
-	t.Helper()
+func applyConsistentTypeAssertionsSuggestion(test *testing.T, source string, suggestion rule.Suggestion) string {
+	test.Helper()
 	fixes := append([]rule.Fix(nil), suggestion.Fixes...)
 	sort.Slice(fixes, func(first, second int) bool {
 		return fixes[first].Range.Pos() > fixes[second].Range.Pos()
 	})
+	edited := source
 	for _, fix := range fixes {
 		start, end := fix.Range.Pos(), fix.Range.End()
-		if start < 0 || end > len(source) || start > end {
-			t.Fatalf("the suggestion proposes an out-of-range edit [%d,%d) over %d bytes",
-				start, end, len(source))
+		if start < 0 || end > len(edited) || start > end {
+			test.Fatalf("the suggestion proposes an out-of-range edit [%d,%d) over %d bytes",
+				start, end, len(edited))
 		}
-		source = source[:start] + fix.Text + source[end:]
+		edited = edited[:start] + fix.Text + edited[end:]
 	}
-	return source
+	return edited
 }
 
 // decodeConsistentTypeAssertionsOptionsForTest routes a fixture through the rule's own decoder.
@@ -65,23 +66,28 @@ func applyConsistentTypeAssertionsSuggestion(t *testing.T, source string, sugges
 // The option surface is a discriminated union upstream: `{assertionStyle: "never"}` admits no other
 // key, while the two style values that are not never carry two independent literal-assertion
 // settings. Nothing but the decoder can tell a port that reads that shape from one that guesses.
-func decodeConsistentTypeAssertionsOptionsForTest(t *testing.T, raw string) any {
-	t.Helper()
-	decoded, err := DecodeConsistentTypeAssertionsOptions(json.RawMessage(raw))
-	if err != nil {
-		t.Fatalf("the decoder refused %s: %v", raw, err)
+func decodeConsistentTypeAssertionsOptionsForTest(test *testing.T, raw string) ConsistentTypeAssertionsOptions {
+	test.Helper()
+	decoded, decodeConsistentTypeAssertionsOptionsError := DecodeConsistentTypeAssertionsOptions(json.RawMessage(raw))
+	if decodeConsistentTypeAssertionsOptionsError != nil {
+		test.Fatalf("the decoder refused %s: %v", raw, decodeConsistentTypeAssertionsOptionsError)
 	}
 	return decoded
 }
 
 // runConsistentTypeAssertions runs one case, with or without options.
-func runConsistentTypeAssertions(t *testing.T, fileName string, sourceText string, options string) rule_testing.Result {
-	t.Helper()
+func runConsistentTypeAssertions(
+	test *testing.T,
+	fileName string,
+	sourceText string,
+	options string,
+) rule_testing.Result {
+	test.Helper()
 	if options == "" {
-		return rule_testing.RunTyped(t, ConsistentTypeAssertions, fileName, sourceText)
+		return rule_testing.RunTyped(test, ConsistentTypeAssertions, fileName, sourceText)
 	}
-	return rule_testing.RunTypedWithOptions(t, ConsistentTypeAssertions, fileName, sourceText,
-		decodeConsistentTypeAssertionsOptionsForTest(t, options))
+	return rule_testing.RunTypedWithOptions(test, ConsistentTypeAssertions, fileName, sourceText,
+		decodeConsistentTypeAssertionsOptionsForTest(test, options))
 }
 
 // TestConsistentTypeAssertionsStaysSilentOnUpstreamPassCases is the imported clean corpus, verbatim.
@@ -93,104 +99,440 @@ func runConsistentTypeAssertions(t *testing.T, fileName string, sourceText strin
 // The options travel with each row rather than being set once, because this rule's corpus is mostly
 // an option matrix: the same source is valid under one assertion style and invalid under another,
 // and the two literal-assertion settings cross that independently.
-func TestConsistentTypeAssertionsStaysSilentOnUpstreamPassCases(t *testing.T) {
-	t.Parallel()
+func TestConsistentTypeAssertionsStaysSilentOnUpstreamPassCases(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
 		options    string
 		fileName   string
 	}{
-		{sourceText: "const x = new Generic<int>() as Foo;", options: "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "const x = b as A;", options: "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "const x = [1] as readonly number[];", options: "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "const x = 'string' as a | b;", options: "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "const x = !'string' as A;", options: "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "const x = (a as A) + b;", options: "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "const x = new Generic<string>() as Foo;", options: "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "const x = new (Generic<string> as Foo)();", options: "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "const x = new (Generic<string> as Foo)('string');", options: "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "const x = () => ({ bar: 5 }) as Foo;", options: "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "const x = () => bar as Foo;", options: "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "const x = bar<string>`${'baz'}` as Foo;", options: "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "const x = { key: 'value' } as const;", options: "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "const x = <Foo>new Generic<int>();", options: "{\"assertionStyle\": \"angle-bracket\", \"objectLiteralTypeAssertions\": \"allow\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "const x = <A>b;", options: "{\"assertionStyle\": \"angle-bracket\", \"objectLiteralTypeAssertions\": \"allow\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "const x = <readonly number[]>[1];", options: "{\"assertionStyle\": \"angle-bracket\", \"objectLiteralTypeAssertions\": \"allow\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "const x = <a | b>'string';", options: "{\"assertionStyle\": \"angle-bracket\", \"objectLiteralTypeAssertions\": \"allow\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "const x = <A>!'string';", options: "{\"assertionStyle\": \"angle-bracket\", \"objectLiteralTypeAssertions\": \"allow\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "const x = <A>a + b;", options: "{\"assertionStyle\": \"angle-bracket\", \"objectLiteralTypeAssertions\": \"allow\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "const x = <Foo>new Generic<string>();", options: "{\"assertionStyle\": \"angle-bracket\", \"objectLiteralTypeAssertions\": \"allow\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "const x = new (<Foo>Generic<string>)();", options: "{\"assertionStyle\": \"angle-bracket\", \"objectLiteralTypeAssertions\": \"allow\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "const x = new (<Foo>Generic<string>)('string');", options: "{\"assertionStyle\": \"angle-bracket\", \"objectLiteralTypeAssertions\": \"allow\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "const x = () => <Foo>{ bar: 5 };", options: "{\"assertionStyle\": \"angle-bracket\", \"objectLiteralTypeAssertions\": \"allow\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "const x = () => <Foo>bar;", options: "{\"assertionStyle\": \"angle-bracket\", \"objectLiteralTypeAssertions\": \"allow\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "const x = <Foo>bar<string>`${'baz'}`;", options: "{\"assertionStyle\": \"angle-bracket\", \"objectLiteralTypeAssertions\": \"allow\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "const x = <const>{ key: 'value' };", options: "{\"assertionStyle\": \"angle-bracket\", \"objectLiteralTypeAssertions\": \"allow\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "const x = {} as Foo<int>;", options: "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "const x = {} as a | b;", options: "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "const x = ({} as A) + b;", options: "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "print({ bar: 5 } as Foo);", options: "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "new print({ bar: 5 } as Foo);", options: "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "\nfunction foo() {\n  throw { bar: 5 } as Foo;\n}\n      ", options: "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "function b(x = {} as Foo.Bar) {}", options: "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "function c(x = {} as Foo) {}", options: "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "print?.({ bar: 5 } as Foo);", options: "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "print?.call({ bar: 5 } as Foo);", options: "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "print`${{ bar: 5 } as Foo}`;", options: "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "const x = <Foo<int>>{};", options: "{\"assertionStyle\": \"angle-bracket\", \"objectLiteralTypeAssertions\": \"allow\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "const x = <a | b>{};", options: "{\"assertionStyle\": \"angle-bracket\", \"objectLiteralTypeAssertions\": \"allow\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "const x = <A>{} + b;", options: "{\"assertionStyle\": \"angle-bracket\", \"objectLiteralTypeAssertions\": \"allow\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "print(<Foo>{ bar: 5 });", options: "{\"assertionStyle\": \"angle-bracket\", \"objectLiteralTypeAssertions\": \"allow\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "new print(<Foo>{ bar: 5 });", options: "{\"assertionStyle\": \"angle-bracket\", \"objectLiteralTypeAssertions\": \"allow\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "\nfunction foo() {\n  throw <Foo>{ bar: 5 };\n}\n      ", options: "{\"assertionStyle\": \"angle-bracket\", \"objectLiteralTypeAssertions\": \"allow\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "print?.(<Foo>{ bar: 5 });", options: "{\"assertionStyle\": \"angle-bracket\", \"objectLiteralTypeAssertions\": \"allow\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "print?.call(<Foo>{ bar: 5 });", options: "{\"assertionStyle\": \"angle-bracket\", \"objectLiteralTypeAssertions\": \"allow\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "print`${<Foo>{ bar: 5 }}`;", options: "{\"assertionStyle\": \"angle-bracket\", \"objectLiteralTypeAssertions\": \"allow\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "print({ bar: 5 } as Foo);", options: "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow-as-parameter\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "new print({ bar: 5 } as Foo);", options: "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow-as-parameter\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "\nfunction foo() {\n  throw { bar: 5 } as Foo;\n}\n      ", options: "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow-as-parameter\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "function b(x = {} as Foo.Bar) {}", options: "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow-as-parameter\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "function c(x = {} as Foo) {}", options: "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow-as-parameter\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "print?.({ bar: 5 } as Foo);", options: "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow-as-parameter\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "print?.call({ bar: 5 } as Foo);", options: "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow-as-parameter\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "print`${{ bar: 5 } as Foo}`;", options: "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow-as-parameter\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "print(<Foo>{ bar: 5 });", options: "{\"assertionStyle\": \"angle-bracket\", \"objectLiteralTypeAssertions\": \"allow-as-parameter\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "new print(<Foo>{ bar: 5 });", options: "{\"assertionStyle\": \"angle-bracket\", \"objectLiteralTypeAssertions\": \"allow-as-parameter\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "\nfunction foo() {\n  throw <Foo>{ bar: 5 };\n}\n      ", options: "{\"assertionStyle\": \"angle-bracket\", \"objectLiteralTypeAssertions\": \"allow-as-parameter\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "print?.(<Foo>{ bar: 5 });", options: "{\"assertionStyle\": \"angle-bracket\", \"objectLiteralTypeAssertions\": \"allow-as-parameter\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "print?.call(<Foo>{ bar: 5 });", options: "{\"assertionStyle\": \"angle-bracket\", \"objectLiteralTypeAssertions\": \"allow-as-parameter\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "print`${<Foo>{ bar: 5 }}`;", options: "{\"assertionStyle\": \"angle-bracket\", \"objectLiteralTypeAssertions\": \"allow-as-parameter\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "const x = [] as string[];", options: "{\"assertionStyle\": \"as\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "const x = ['a'] as Array<string>;", options: "{\"assertionStyle\": \"as\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "const x = <string[]>[];", options: "{\"assertionStyle\": \"angle-bracket\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "const x = <Array<string>>[];", options: "{\"assertionStyle\": \"angle-bracket\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "print([5] as Foo);", options: "{\"arrayLiteralTypeAssertions\": \"allow-as-parameter\", \"assertionStyle\": \"as\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "\nfunction foo() {\n  throw [5] as Foo;\n}\n      ", options: "{\"arrayLiteralTypeAssertions\": \"allow-as-parameter\", \"assertionStyle\": \"as\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "function b(x = [5] as Foo.Bar) {}", options: "{\"arrayLiteralTypeAssertions\": \"allow-as-parameter\", \"assertionStyle\": \"as\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "print?.([5] as Foo);", options: "{\"arrayLiteralTypeAssertions\": \"allow-as-parameter\", \"assertionStyle\": \"as\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "print?.call([5] as Foo);", options: "{\"arrayLiteralTypeAssertions\": \"allow-as-parameter\", \"assertionStyle\": \"as\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "print`${[5] as Foo}`;", options: "{\"arrayLiteralTypeAssertions\": \"allow-as-parameter\", \"assertionStyle\": \"as\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "new Print([5] as Foo);", options: "{\"arrayLiteralTypeAssertions\": \"allow-as-parameter\", \"assertionStyle\": \"as\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "const bar = <Foo style={[5] as Bar} />;", options: "{\"arrayLiteralTypeAssertions\": \"allow-as-parameter\", \"assertionStyle\": \"as\"}", fileName: consistentTypeAssertionsJsxFile},
-		{sourceText: "print(<Foo>[5]);", options: "{\"arrayLiteralTypeAssertions\": \"allow-as-parameter\", \"assertionStyle\": \"angle-bracket\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "\nfunction foo() {\n  throw <Foo>[5];\n}\n      ", options: "{\"arrayLiteralTypeAssertions\": \"allow-as-parameter\", \"assertionStyle\": \"angle-bracket\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "function b(x = <Foo.Bar>[5]) {}", options: "{\"arrayLiteralTypeAssertions\": \"allow-as-parameter\", \"assertionStyle\": \"angle-bracket\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "print?.(<Foo>[5]);", options: "{\"arrayLiteralTypeAssertions\": \"allow-as-parameter\", \"assertionStyle\": \"angle-bracket\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "print?.call(<Foo>[5]);", options: "{\"arrayLiteralTypeAssertions\": \"allow-as-parameter\", \"assertionStyle\": \"angle-bracket\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "print`${<Foo>[5]}`;", options: "{\"arrayLiteralTypeAssertions\": \"allow-as-parameter\", \"assertionStyle\": \"angle-bracket\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "new Print(<Foo>[5]);", options: "{\"arrayLiteralTypeAssertions\": \"allow-as-parameter\", \"assertionStyle\": \"angle-bracket\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "const x = <const>[1];", options: "{\"assertionStyle\": \"never\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "const x = [1] as const;", options: "{\"assertionStyle\": \"never\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "const bar = <Foo style={{ bar: 5 } as Bar} />;", options: "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow-as-parameter\"}", fileName: consistentTypeAssertionsJsxFile},
+		{
+			sourceText: "const x = new Generic<int>() as Foo;",
+			options:    "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "const x = b as A;",
+			options:    "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "const x = [1] as readonly number[];",
+			options:    "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "const x = 'string' as a | b;",
+			options:    "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "const x = !'string' as A;",
+			options:    "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "const x = (a as A) + b;",
+			options:    "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "const x = new Generic<string>() as Foo;",
+			options:    "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "const x = new (Generic<string> as Foo)();",
+			options:    "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "const x = new (Generic<string> as Foo)('string');",
+			options:    "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "const x = () => ({ bar: 5 }) as Foo;",
+			options:    "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "const x = () => bar as Foo;",
+			options:    "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "const x = bar<string>`${'baz'}` as Foo;",
+			options:    "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "const x = { key: 'value' } as const;",
+			options:    "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "const x = <Foo>new Generic<int>();",
+			options:    "{\"assertionStyle\": \"angle-bracket\", \"objectLiteralTypeAssertions\": \"allow\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "const x = <A>b;",
+			options:    "{\"assertionStyle\": \"angle-bracket\", \"objectLiteralTypeAssertions\": \"allow\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "const x = <readonly number[]>[1];",
+			options:    "{\"assertionStyle\": \"angle-bracket\", \"objectLiteralTypeAssertions\": \"allow\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "const x = <a | b>'string';",
+			options:    "{\"assertionStyle\": \"angle-bracket\", \"objectLiteralTypeAssertions\": \"allow\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "const x = <A>!'string';",
+			options:    "{\"assertionStyle\": \"angle-bracket\", \"objectLiteralTypeAssertions\": \"allow\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "const x = <A>a + b;",
+			options:    "{\"assertionStyle\": \"angle-bracket\", \"objectLiteralTypeAssertions\": \"allow\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "const x = <Foo>new Generic<string>();",
+			options:    "{\"assertionStyle\": \"angle-bracket\", \"objectLiteralTypeAssertions\": \"allow\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "const x = new (<Foo>Generic<string>)();",
+			options:    "{\"assertionStyle\": \"angle-bracket\", \"objectLiteralTypeAssertions\": \"allow\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "const x = new (<Foo>Generic<string>)('string');",
+			options:    "{\"assertionStyle\": \"angle-bracket\", \"objectLiteralTypeAssertions\": \"allow\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "const x = () => <Foo>{ bar: 5 };",
+			options:    "{\"assertionStyle\": \"angle-bracket\", \"objectLiteralTypeAssertions\": \"allow\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "const x = () => <Foo>bar;",
+			options:    "{\"assertionStyle\": \"angle-bracket\", \"objectLiteralTypeAssertions\": \"allow\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "const x = <Foo>bar<string>`${'baz'}`;",
+			options:    "{\"assertionStyle\": \"angle-bracket\", \"objectLiteralTypeAssertions\": \"allow\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "const x = <const>{ key: 'value' };",
+			options:    "{\"assertionStyle\": \"angle-bracket\", \"objectLiteralTypeAssertions\": \"allow\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "const x = {} as Foo<int>;",
+			options:    "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "const x = {} as a | b;",
+			options:    "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "const x = ({} as A) + b;",
+			options:    "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "print({ bar: 5 } as Foo);",
+			options:    "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "new print({ bar: 5 } as Foo);",
+			options:    "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "\nfunction foo() {\n  throw { bar: 5 } as Foo;\n}\n      ",
+			options:    "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "function b(x = {} as Foo.Bar) {}",
+			options:    "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "function c(x = {} as Foo) {}",
+			options:    "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "print?.({ bar: 5 } as Foo);",
+			options:    "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "print?.call({ bar: 5 } as Foo);",
+			options:    "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "print`${{ bar: 5 } as Foo}`;",
+			options:    "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "const x = <Foo<int>>{};",
+			options:    "{\"assertionStyle\": \"angle-bracket\", \"objectLiteralTypeAssertions\": \"allow\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "const x = <a | b>{};",
+			options:    "{\"assertionStyle\": \"angle-bracket\", \"objectLiteralTypeAssertions\": \"allow\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "const x = <A>{} + b;",
+			options:    "{\"assertionStyle\": \"angle-bracket\", \"objectLiteralTypeAssertions\": \"allow\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "print(<Foo>{ bar: 5 });",
+			options:    "{\"assertionStyle\": \"angle-bracket\", \"objectLiteralTypeAssertions\": \"allow\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "new print(<Foo>{ bar: 5 });",
+			options:    "{\"assertionStyle\": \"angle-bracket\", \"objectLiteralTypeAssertions\": \"allow\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "\nfunction foo() {\n  throw <Foo>{ bar: 5 };\n}\n      ",
+			options:    "{\"assertionStyle\": \"angle-bracket\", \"objectLiteralTypeAssertions\": \"allow\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "print?.(<Foo>{ bar: 5 });",
+			options:    "{\"assertionStyle\": \"angle-bracket\", \"objectLiteralTypeAssertions\": \"allow\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "print?.call(<Foo>{ bar: 5 });",
+			options:    "{\"assertionStyle\": \"angle-bracket\", \"objectLiteralTypeAssertions\": \"allow\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "print`${<Foo>{ bar: 5 }}`;",
+			options:    "{\"assertionStyle\": \"angle-bracket\", \"objectLiteralTypeAssertions\": \"allow\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "print({ bar: 5 } as Foo);",
+			options:    "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow-as-parameter\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "new print({ bar: 5 } as Foo);",
+			options:    "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow-as-parameter\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "\nfunction foo() {\n  throw { bar: 5 } as Foo;\n}\n      ",
+			options:    "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow-as-parameter\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "function b(x = {} as Foo.Bar) {}",
+			options:    "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow-as-parameter\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "function c(x = {} as Foo) {}",
+			options:    "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow-as-parameter\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "print?.({ bar: 5 } as Foo);",
+			options:    "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow-as-parameter\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "print?.call({ bar: 5 } as Foo);",
+			options:    "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow-as-parameter\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "print`${{ bar: 5 } as Foo}`;",
+			options:    "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow-as-parameter\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "print(<Foo>{ bar: 5 });",
+			options:    "{\"assertionStyle\": \"angle-bracket\", \"objectLiteralTypeAssertions\": \"allow-as-parameter\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "new print(<Foo>{ bar: 5 });",
+			options:    "{\"assertionStyle\": \"angle-bracket\", \"objectLiteralTypeAssertions\": \"allow-as-parameter\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "\nfunction foo() {\n  throw <Foo>{ bar: 5 };\n}\n      ",
+			options:    "{\"assertionStyle\": \"angle-bracket\", \"objectLiteralTypeAssertions\": \"allow-as-parameter\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "print?.(<Foo>{ bar: 5 });",
+			options:    "{\"assertionStyle\": \"angle-bracket\", \"objectLiteralTypeAssertions\": \"allow-as-parameter\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "print?.call(<Foo>{ bar: 5 });",
+			options:    "{\"assertionStyle\": \"angle-bracket\", \"objectLiteralTypeAssertions\": \"allow-as-parameter\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "print`${<Foo>{ bar: 5 }}`;",
+			options:    "{\"assertionStyle\": \"angle-bracket\", \"objectLiteralTypeAssertions\": \"allow-as-parameter\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "const x = [] as string[];",
+			options:    "{\"assertionStyle\": \"as\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "const x = ['a'] as Array<string>;",
+			options:    "{\"assertionStyle\": \"as\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "const x = <string[]>[];",
+			options:    "{\"assertionStyle\": \"angle-bracket\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "const x = <Array<string>>[];",
+			options:    "{\"assertionStyle\": \"angle-bracket\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "print([5] as Foo);",
+			options:    "{\"arrayLiteralTypeAssertions\": \"allow-as-parameter\", \"assertionStyle\": \"as\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "\nfunction foo() {\n  throw [5] as Foo;\n}\n      ",
+			options:    "{\"arrayLiteralTypeAssertions\": \"allow-as-parameter\", \"assertionStyle\": \"as\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "function b(x = [5] as Foo.Bar) {}",
+			options:    "{\"arrayLiteralTypeAssertions\": \"allow-as-parameter\", \"assertionStyle\": \"as\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "print?.([5] as Foo);",
+			options:    "{\"arrayLiteralTypeAssertions\": \"allow-as-parameter\", \"assertionStyle\": \"as\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "print?.call([5] as Foo);",
+			options:    "{\"arrayLiteralTypeAssertions\": \"allow-as-parameter\", \"assertionStyle\": \"as\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "print`${[5] as Foo}`;",
+			options:    "{\"arrayLiteralTypeAssertions\": \"allow-as-parameter\", \"assertionStyle\": \"as\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "new Print([5] as Foo);",
+			options:    "{\"arrayLiteralTypeAssertions\": \"allow-as-parameter\", \"assertionStyle\": \"as\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "const bar = <Foo style={[5] as Bar} />;",
+			options:    "{\"arrayLiteralTypeAssertions\": \"allow-as-parameter\", \"assertionStyle\": \"as\"}",
+			fileName:   consistentTypeAssertionsJsxFile,
+		},
+		{
+			sourceText: "print(<Foo>[5]);",
+			options:    "{\"arrayLiteralTypeAssertions\": \"allow-as-parameter\", \"assertionStyle\": \"angle-bracket\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "\nfunction foo() {\n  throw <Foo>[5];\n}\n      ",
+			options:    "{\"arrayLiteralTypeAssertions\": \"allow-as-parameter\", \"assertionStyle\": \"angle-bracket\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "function b(x = <Foo.Bar>[5]) {}",
+			options:    "{\"arrayLiteralTypeAssertions\": \"allow-as-parameter\", \"assertionStyle\": \"angle-bracket\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "print?.(<Foo>[5]);",
+			options:    "{\"arrayLiteralTypeAssertions\": \"allow-as-parameter\", \"assertionStyle\": \"angle-bracket\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "print?.call(<Foo>[5]);",
+			options:    "{\"arrayLiteralTypeAssertions\": \"allow-as-parameter\", \"assertionStyle\": \"angle-bracket\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "print`${<Foo>[5]}`;",
+			options:    "{\"arrayLiteralTypeAssertions\": \"allow-as-parameter\", \"assertionStyle\": \"angle-bracket\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "new Print(<Foo>[5]);",
+			options:    "{\"arrayLiteralTypeAssertions\": \"allow-as-parameter\", \"assertionStyle\": \"angle-bracket\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "const x = <const>[1];",
+			options:    "{\"assertionStyle\": \"never\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "const x = [1] as const;",
+			options:    "{\"assertionStyle\": \"never\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "const bar = <Foo style={{ bar: 5 } as Bar} />;",
+			options:    "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"allow-as-parameter\"}",
+			fileName:   consistentTypeAssertionsJsxFile,
+		},
 		{sourceText: "123;", options: "", fileName: consistentTypeAssertionsFile},
-		{sourceText: "\nconst x = { key: 'value' } as any;\n      ", options: "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"never\"}", fileName: consistentTypeAssertionsFile},
-		{sourceText: "\nconst x = { key: 'value' } as unknown;\n      ", options: "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"never\"}", fileName: consistentTypeAssertionsFile},
+		{
+			sourceText: "\nconst x = { key: 'value' } as any;\n      ",
+			options:    "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"never\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
+		{
+			sourceText: "\nconst x = { key: 'value' } as unknown;\n      ",
+			options:    "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"never\"}",
+			fileName:   consistentTypeAssertionsFile,
+		},
 	}
 	for index, testCase := range cases {
-		t.Run(consistentTypeAssertionsCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, runConsistentTypeAssertions(t, testCase.fileName,
+		test.Run(consistentTypeAssertionsCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, runConsistentTypeAssertions(test, testCase.fileName,
 				testCase.sourceText, testCase.options))
 		})
 	}
@@ -204,11 +546,11 @@ func TestConsistentTypeAssertionsStaysSilentOnUpstreamPassCases(t *testing.T) {
 // with their own output. A message id assertion sees none of that, and a wrong repair applied
 // unattended is the failure this project has paid for twice tonight.
 //
-// The fix is the angle-bracket to as conversion and it reasons about operator PRECEDENCE to decide
+// The fix is the angle-bracket to as conversion and it reasons about operator precedence to decide
 // parenthesization, so a case like `<string>(foo + bar)` is where a naive text swap breaks. Those
 // rows are in here rather than left to inference.
-func TestConsistentTypeAssertionsFiresOnUpstreamFailCases(t *testing.T) {
-	t.Parallel()
+func TestConsistentTypeAssertionsFiresOnUpstreamFailCases(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText      string
@@ -1170,27 +1512,27 @@ func TestConsistentTypeAssertionsFiresOnUpstreamFailCases(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(consistentTypeAssertionsCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := runConsistentTypeAssertions(t, testCase.fileName,
+		test.Run(consistentTypeAssertionsCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := runConsistentTypeAssertions(test, testCase.fileName,
 				testCase.sourceText, testCase.options)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
-				t.Fatalf("wanted %d findings, got %d", len(testCase.wantSpans), len(result.Diagnostics))
+				test.Fatalf("wanted %d findings, got %d", len(testCase.wantSpans), len(result.Diagnostics))
 			}
 			written := asTheAssertionsHarnessWroteIt(testCase.sourceText)
 			for findingIndex, wantSpan := range testCase.wantSpans {
 				reported := result.Diagnostics[findingIndex]
 				if gotSpan := written[reported.Range.Pos():reported.Range.End()]; gotSpan != wantSpan {
-					t.Errorf("finding %d points at %q, wanted %q", findingIndex, gotSpan, wantSpan)
+					test.Errorf("finding %d points at %q, wanted %q", findingIndex, gotSpan, wantSpan)
 				}
 				if reported.Message.Description != testCase.wantMessages[findingIndex] {
-					t.Errorf("finding %d reads %q, wanted %q", findingIndex,
+					test.Errorf("finding %d reads %q, wanted %q", findingIndex,
 						reported.Message.Description, testCase.wantMessages[findingIndex])
 				}
 			}
 			if testCase.wantFixed != "" {
-				rule_testing.ExpectFixedSource(t, result,
+				rule_testing.ExpectFixedSource(test, result,
 					asTheAssertionsHarnessWroteIt(testCase.wantFixed))
 			}
 			for findingIndex, wantOutputs := range testCase.wantSuggestions {
@@ -1199,14 +1541,14 @@ func TestConsistentTypeAssertionsFiresOnUpstreamFailCases(t *testing.T) {
 				}
 				reported := result.Diagnostics[findingIndex]
 				if len(reported.Suggestions) != len(wantOutputs) {
-					t.Fatalf("finding %d offers %d suggestions, wanted %d",
+					test.Fatalf("finding %d offers %d suggestions, wanted %d",
 						findingIndex, len(reported.Suggestions), len(wantOutputs))
 				}
 				for suggestionIndex, wantOutput := range wantOutputs {
-					applied := applyConsistentTypeAssertionsSuggestion(t, written,
+					applied := applyConsistentTypeAssertionsSuggestion(test, written,
 						reported.Suggestions[suggestionIndex])
 					if applied != asTheAssertionsHarnessWroteIt(wantOutput) {
-						t.Errorf("finding %d suggestion %d writes %q, wanted %q",
+						test.Errorf("finding %d suggestion %d writes %q, wanted %q",
 							findingIndex, suggestionIndex, applied,
 							asTheAssertionsHarnessWroteIt(wantOutput))
 					}
@@ -1228,12 +1570,12 @@ func TestConsistentTypeAssertionsFiresOnUpstreamFailCases(t *testing.T) {
 // source, one program per case.
 //
 // The nested-assertion case is asserted separately, in the test below this one, because two
-// assertions on one expression produce two OVERLAPPING fixes and the harness refuses to apply
+// assertions on one expression produce two overlapping fixes and the harness refuses to apply
 // overlapping edits rather than guessing which wins. That refusal is right: the fix engine has an
 // overlap policy and a fixture reimplementing it would assert a result the real pipeline never
 // produces. So that case is pinned on the fix text it proposes instead.
-func TestConsistentTypeAssertionsOnPrecedenceShapesUpstreamsCorpusDoesNotWrite(t *testing.T) {
-	t.Parallel()
+func TestConsistentTypeAssertionsOnPrecedenceShapesUpstreamsCorpusDoesNotWrite(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -1273,12 +1615,12 @@ func TestConsistentTypeAssertionsOnPrecedenceShapesUpstreamsCorpusDoesNotWrite(t
 	}
 	const options = `{"assertionStyle": "as"}`
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runConsistentTypeAssertions(t, consistentTypeAssertionsFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runConsistentTypeAssertions(test, consistentTypeAssertionsFile,
 				testCase.sourceText, options)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
-			rule_testing.ExpectFixedSource(t, result,
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
+			rule_testing.ExpectFixedSource(test, result,
 				asTheAssertionsHarnessWroteIt(testCase.wantFixed))
 		})
 	}
@@ -1291,8 +1633,8 @@ func TestConsistentTypeAssertionsOnPrecedenceShapesUpstreamsCorpusDoesNotWrite(t
 // gives an assertion style matching no branch and the rule reports nothing at all. That is the
 // failure mode this whole file would otherwise pass through silently, since every fixture above
 // names its options explicitly.
-func TestConsistentTypeAssertionsDecoderReadsUpstreamsUnion(t *testing.T) {
-	t.Parallel()
+func TestConsistentTypeAssertionsDecoderReadsUpstreamsUnion(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		raw  string
@@ -1324,15 +1666,11 @@ func TestConsistentTypeAssertionsDecoderReadsUpstreamsUnion(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.raw, func(t *testing.T) {
-			t.Parallel()
-			decoded := decodeConsistentTypeAssertionsOptionsForTest(t, testCase.raw)
-			settings, isSettings := decoded.(ConsistentTypeAssertionsOptions)
-			if !isSettings {
-				t.Fatalf("the decoder returned %T rather than the rule's own options type", decoded)
-			}
-			if settings != testCase.want {
-				t.Errorf("decoded to %+v, wanted %+v", settings, testCase.want)
+		test.Run(testCase.raw, func(test *testing.T) {
+			test.Parallel()
+			decoded := decodeConsistentTypeAssertionsOptionsForTest(test, testCase.raw)
+			if decoded != testCase.want {
+				test.Errorf("decoded to %+v, wanted %+v", decoded, testCase.want)
 			}
 		})
 	}
@@ -1342,36 +1680,36 @@ func TestConsistentTypeAssertionsDecoderReadsUpstreamsUnion(t *testing.T) {
 //
 // A rule named as "error" with no object is handed nil, and the fallback is the only thing between
 // that and an empty assertion style that matches no branch.
-func TestConsistentTypeAssertionsFallsBackWhenHandedNilOptions(t *testing.T) {
-	t.Parallel()
+func TestConsistentTypeAssertionsFallsBackWhenHandedNilOptions(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTypedWithOptions(t, ConsistentTypeAssertions,
-		consistentTypeAssertionsFile, "declare const foo: any;\nconst x = <Foo>foo;\n", nil)
-	rule_testing.ExpectFindings(t, result, "as")
+	result := rule_testing.RunTyped(test, ConsistentTypeAssertions,
+		consistentTypeAssertionsFile, "declare const foo: any;\nconst x = <Foo>foo;\n")
+	rule_testing.ExpectFindings(test, result, "as")
 }
 
 // TestConsistentTypeAssertionsWrapsAnOperandOfEqualPrecedence pins the one comparison the imported
 // corpus cannot separate, at the layer that decides it.
 //
-// An assertion whose operand is ANOTHER assertion puts the two at equal precedence, and upstream
+// An assertion whose operand is another assertion puts the two at equal precedence, and upstream
 // wraps: measured, `<Foo><Bar>foo` fixes to `(foo as Bar) as Foo`. That is what makes the comparison
 // a strict greater-than rather than greater-or-equal, and relaxing it survives all 186 imported
 // cases because none of them nests two assertions.
 //
-// It cannot go through ExpectFixedSource: the two findings propose OVERLAPPING edits, and the
+// It cannot go through ExpectFixedSource: the two findings propose overlapping edits, and the
 // harness refuses those rather than guessing which wins. That refusal is right, and upstream reaches
 // its final text by running the fixer repeatedly rather than by resolving the overlap in one pass.
 //
-// So the assertion is on what each finding PROPOSES, which is the layer this rule decides. The inner
+// So the assertion is on what each finding proposes, which is the layer this rule decides. The inner
 // assertion is wrapped because its parent is the outer one, at equal precedence: that is the
 // comparison under test. The outer one is not wrapped, because its own parent is a declarator.
-func TestConsistentTypeAssertionsWrapsAnOperandOfEqualPrecedence(t *testing.T) {
-	t.Parallel()
+func TestConsistentTypeAssertionsWrapsAnOperandOfEqualPrecedence(test *testing.T) {
+	test.Parallel()
 
 	const sourceText = "declare const foo: any;\nconst x = <Foo><Bar>foo;\n"
-	result := runConsistentTypeAssertions(t, consistentTypeAssertionsFile, sourceText,
+	result := runConsistentTypeAssertions(test, consistentTypeAssertionsFile, sourceText,
 		`{"assertionStyle": "as"}`)
-	rule_testing.ExpectFindings(t, result, "as", "as")
+	rule_testing.ExpectFindings(test, result, "as", "as")
 
 	written := asTheAssertionsHarnessWroteIt(sourceText)
 	wanted := map[string]string{
@@ -1382,19 +1720,19 @@ func TestConsistentTypeAssertionsWrapsAnOperandOfEqualPrecedence(t *testing.T) {
 		"<Bar>foo": "(foo as Bar)",
 	}
 	if len(result.Diagnostics) != 2 {
-		t.Fatalf("wanted two findings, got %d", len(result.Diagnostics))
+		test.Fatalf("wanted two findings, got %d", len(result.Diagnostics))
 	}
 	for _, diagnostic := range result.Diagnostics {
 		span := written[diagnostic.Range.Pos():diagnostic.Range.End()]
 		wantText, known := wanted[span]
 		if !known {
-			t.Fatalf("a finding points at %q, which is neither assertion", span)
+			test.Fatalf("a finding points at %q, which is neither assertion", span)
 		}
 		if len(diagnostic.Fixes) != 1 {
-			t.Fatalf("the finding at %q proposes %d fixes, wanted one", span, len(diagnostic.Fixes))
+			test.Fatalf("the finding at %q proposes %d fixes, wanted one", span, len(diagnostic.Fixes))
 		}
 		if diagnostic.Fixes[0].Text != wantText {
-			t.Errorf("the fix for %q writes %q, wanted %q", span, diagnostic.Fixes[0].Text, wantText)
+			test.Errorf("the fix for %q writes %q, wanted %q", span, diagnostic.Fixes[0].Text, wantText)
 		}
 	}
 }
@@ -1406,12 +1744,12 @@ func TestConsistentTypeAssertionsWrapsAnOperandOfEqualPrecedence(t *testing.T) {
 // every one of upstream's suggestion-bearing cases has an unannotated declarator, so dropping that
 // guard survives all 186 and then offers a repair that writes two types onto one binding.
 //
-// The parameter-position exemption treats a TAGGED template as a parameter and an untagged one as
+// The parameter-position exemption treats a tagged template as a parameter and an untagged one as
 // an ordinary expression, and upstream writes only the tagged form.
 //
 // Measured against the installed 8.x build, one program per case, suggestions included.
-func TestConsistentTypeAssertionsOnSuggestionAndTemplateShapes(t *testing.T) {
-	t.Parallel()
+func TestConsistentTypeAssertionsOnSuggestionAndTemplateShapes(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name            string
@@ -1430,12 +1768,15 @@ func TestConsistentTypeAssertionsOnSuggestionAndTemplateShapes(t *testing.T) {
 			wantSuggestions: []string{"replaceObjectTypeAssertionWithSatisfies"},
 		},
 		{
-			name:            "declarator-without-annotation",
-			why:             "the unannotated half, offered both suggestions, kept beside the row above so the guard is measured in both directions",
-			sourceText:      "declare type Foo = {};\nconst x = {} as Foo;\n",
-			options:         "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"never\"}",
-			wantIds:         []string{"unexpectedObjectTypeAssertion"},
-			wantSuggestions: []string{"replaceObjectTypeAssertionWithAnnotation", "replaceObjectTypeAssertionWithSatisfies"},
+			name:       "declarator-without-annotation",
+			why:        "the unannotated half, offered both suggestions, kept beside the row above so the guard is measured in both directions",
+			sourceText: "declare type Foo = {};\nconst x = {} as Foo;\n",
+			options:    "{\"assertionStyle\": \"as\", \"objectLiteralTypeAssertions\": \"never\"}",
+			wantIds:    []string{"unexpectedObjectTypeAssertion"},
+			wantSuggestions: []string{
+				"replaceObjectTypeAssertionWithAnnotation",
+				"replaceObjectTypeAssertionWithSatisfies",
+			},
 		},
 		{
 			name:            "untagged-template",
@@ -1455,11 +1796,11 @@ func TestConsistentTypeAssertionsOnSuggestionAndTemplateShapes(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runConsistentTypeAssertions(t, consistentTypeAssertionsFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runConsistentTypeAssertions(test, consistentTypeAssertionsFile,
 				testCase.sourceText, testCase.options)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 			var offered []string
 			for _, diagnostic := range result.Diagnostics {
 				for _, suggestion := range diagnostic.Suggestions {
@@ -1467,12 +1808,12 @@ func TestConsistentTypeAssertionsOnSuggestionAndTemplateShapes(t *testing.T) {
 				}
 			}
 			if len(offered) != len(testCase.wantSuggestions) {
-				t.Fatalf("offered %v suggestions, wanted %v (%s)",
+				test.Fatalf("offered %v suggestions, wanted %v (%s)",
 					offered, testCase.wantSuggestions, testCase.why)
 			}
 			for index, wanted := range testCase.wantSuggestions {
 				if offered[index] != wanted {
-					t.Errorf("suggestion %d is %q, wanted %q (%s)",
+					test.Errorf("suggestion %d is %q, wanted %q (%s)",
 						index, offered[index], wanted, testCase.why)
 				}
 			}

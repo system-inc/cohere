@@ -9,5 +9,8 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // list shapes, `["never", {...}]` among them, rather than a single object; see
 // DecodeFuncNameMatchingOptions.
 func init() {
-	rule.Register(rule.Registration{Rule: FuncNameMatching, DecodeOptionList: DecodeFuncNameMatchingOptions})
+	rule.Register(rule.Registration[FuncNameMatchingOptions]{
+		Rule:             FuncNameMatching,
+		DecodeOptionList: DecodeFuncNameMatchingOptions,
+	})
 }

@@ -17,7 +17,7 @@ import (
 //
 // Copied entry for entry from the clone. Two entries need a note because they look like mistakes:
 //
-//   - `shortcut` is listed as valid on `link` AND is a key of the pair table below, so it is
+//   - `shortcut` is listed as valid on `link` and is a key of the pair table below, so it is
 //     accepted by the value check and then rejected by the pair check unless `icon` follows it.
 //     Upstream's own comment says "generally allowed but needs pair with icon".
 //   - `shortcut icon` is a single key containing a space, spelled `shortcut icon` upstream.
@@ -69,7 +69,7 @@ var noInvalidHtmlAttributeRelPairs = map[string]map[string]bool{
 // noInvalidHtmlAttributeTags is upstream's `COMPONENT_ATTRIBUTE_MAP`: which tags an attribute is
 // meaningful on at all.
 //
-// The ORDER of the tags matters, because the `onlyMeaningfulFor` message lists them and upstream
+// The order of the tags matters, because the `onlyMeaningfulFor` message lists them and upstream
 // builds that list by iterating a JavaScript `Set`, which preserves insertion order. A Go map does
 // not, so the order is carried in a slice beside the set rather than recovered by sorting; sorting
 // would render `"<a>", "<area>", "<form>", "<link>"` where upstream renders
@@ -98,13 +98,13 @@ type NoInvalidHtmlAttributeOptions struct {
 
 // DecodeNoInvalidHtmlAttributeOptions reads upstream's list, refusing what its schema refuses: an
 // item other than "rel", and a duplicate, which `uniqueItems` forbids.
-func DecodeNoInvalidHtmlAttributeOptions(raw []byte) (any, error) {
+func DecodeNoInvalidHtmlAttributeOptions(raw []byte) (NoInvalidHtmlAttributeOptions, error) {
 	options := NoInvalidHtmlAttributeOptions{Attributes: noInvalidHtmlAttributeDefaultAttributes}
 	if len(raw) == 0 {
 		return options, nil
 	}
 	var attributes []string
-	if err := json.Unmarshal(raw, &attributes); err != nil || attributes == nil {
+	if decodeError := json.Unmarshal(raw, &attributes); decodeError != nil || attributes == nil {
 		return options, fmt.Errorf(`expected a list of attributes, [] or ["rel"], got %s`, raw)
 	}
 	seen := map[string]bool{}
@@ -156,7 +156,7 @@ var noInvalidHtmlAttributeHtmlElements = map[string]bool{
 }
 
 // The nine messages, one per distinct judgment. Upstream's `messages` block carries eleven entries;
-// the two omitted here are `suggestRemove*` texts, which label SUGGESTIONS rather than findings.
+// the two omitted here are `suggestRemove*` texts, which label suggestions rather than findings.
 //
 // Upstream renders quotes as typographic characters (U+201C/U+201D and their reversed forms, which
 // it uses inconsistently: `neverValid` opens with U+201C and `onlyMeaningfulFor` with U+201D). The
@@ -320,14 +320,14 @@ func noInvalidHtmlAttributeSpaceDelimited(attributeName string) rule.Message {
 // # The rule is `hasSuggestions`, not `fixable`, and the difference is the whole repair story
 //
 // `meta.fixable` is absent and `meta.hasSuggestions` is true. Every repair upstream offers is a
-// SUGGESTION, which a human chooses, rather than a fix, which the edit engine applies unattended.
+// suggestion, which a human chooses, rather than a fix, which the edit engine applies unattended.
 // 75 of the corpus's 78 reporting cases carry one.
 //
 // This port ships the findings and not the suggestions, and that is a stated decline rather than an
 // unfinished port. Two of upstream's suggestion bodies remove a whole JSX attribute or a whole
 // object property, and a third rewrites a raw string by replacing the matched value with the empty
-// string. That third one is a substring replacement on the SOURCE text: for
-// `rel="alternate alternatex"` it deletes the FIRST occurrence of the matched substring rather than
+// string. That third one is a substring replacement on the source text: for
+// `rel="alternate alternatex"` it deletes the first occurrence of the matched substring rather than
 // the token that was reported, so a value whose bad token contains a good one as a prefix repairs
 // the wrong span. Reporting without a repair is the subset that
 // can be shown correct, and a wrong repair is worse than none because it is applied to real code.
@@ -340,11 +340,11 @@ func noInvalidHtmlAttributeSpaceDelimited(attributeName string) rule.Message {
 // attribute at all. This port read the three as one rule until #d21war2 measured them, because
 // every one of the 265 corpus cases carries no options and so none could tell.
 //
-// # Two tables whose ITERATION ORDER reaches the message
+// # Two tables whose iteration order reaches the message
 //
 // `onlyMeaningfulFor` renders the list of tags an attribute is meaningful on, and upstream builds it
 // by iterating a JavaScript `Set`, which preserves insertion order. Go's map iteration is
-// randomised, so the tag list lives in a SLICE (`noInvalidHtmlAttributeTags`) rather than being
+// randomised, so the tag list lives in a slice (`noInvalidHtmlAttributeTags`) rather than being
 // recovered from a set. Sorting instead would render the tags alphabetically and disagree with the
 // three corpus cases that assert the order.
 //
@@ -353,49 +353,49 @@ func noInvalidHtmlAttributeSpaceDelimited(attributeName string) rule.Message {
 // here anyway, because a table that grows a second entry would otherwise turn a passing rule into an
 // intermittently-failing one, and a test that fails sometimes reads as green and gets trusted.
 //
-// # The whitespace check reads the RAW attribute text, and for JSX that turns out not to matter
+// # The whitespace check reads the raw attribute text, and for JSX that turns out not to matter
 //
 // Upstream computes its whitespace ranges from `node.range[0] + 1`, one past the opening quote, so
-// its arithmetic is over SOURCE bytes. This port reads the same raw slice rather than the cooked
+// its arithmetic is over source bytes. This port reads the same raw slice rather than the cooked
 // `Text()`, on the reasoning that an escape resolves to a different length and the positions would
 // not correspond.
 //
-// A mutation sweep then showed that reasoning is unfalsifiable HERE, and the finding is worth
+// A mutation sweep then showed that reasoning is unfalsifiable here, and the finding is worth
 // recording rather than leaving as a bare survivor: replacing the raw read with the cooked text
-// survives the whole 265-case corpus AND every input written to break it. The reason is a fact
+// survives the whole 265-case corpus and every input written to break it. The reason is a fact
 // about JSX rather than about this rule -- **a JSX attribute value is not escape-processed**, so
 // `rel="a\tb"` contains a literal backslash and a literal `t`, and raw and cooked are the same
 // string for every JSX attribute there is.
 //
 // Measured on the installed build, with a control that fires: `rel="noreferrer\tnoopener"` written
-// with a backslash reports `neverValid` naming a token that CONTAINS the backslash, while the same
+// with a backslash reports `neverValid` naming a token that contains the backslash, while the same
 // value written with a real tab reports `spaceDelimited`. So the escape really is two characters to
 // upstream, and this port agrees on all four shapes.
 //
 // The raw read is kept anyway. It costs nothing, it is what upstream's arithmetic actually does,
-// and the equivalence is a property of the JSX arm alone -- a future attribute source that IS
+// and the equivalence is a property of the JSX arm alone -- a future attribute source that is
 // escape-processed would separate them again.
-var NoInvalidHtmlAttribute = rule.Rule{
+var NoInvalidHtmlAttribute = rule.Rule[NoInvalidHtmlAttributeOptions]{
 	Name: "react/no-invalid-html-attribute",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoInvalidHtmlAttributeOptions]) rule.Listeners {
 		// The only list besides the default is the empty one, which checks nothing, so the default
 		// check below is the whole rule whenever any attribute is configured.
-		if settings, configured := rule.OptionsAs[NoInvalidHtmlAttributeOptions](options); configured && len(settings.Attributes) == 0 {
+		if settings, configured := options.Read(); configured && len(settings.Attributes) == 0 {
 			return rule.Listeners{}
 		}
 		return rule.Listeners{
 			ast.KindJsxAttribute: func(node *ast.Node) {
-				noInvalidHtmlAttributeCheckJsxAttribute(ctx, node)
+				noInvalidHtmlAttributeCheckJsxAttribute(ruleContext, node)
 			},
 			ast.KindCallExpression: func(node *ast.Node) {
-				noInvalidHtmlAttributeCheckCreateElement(ctx, node)
+				noInvalidHtmlAttributeCheckCreateElement(ruleContext, node)
 			},
 		}
 	},
 }
 
 // noInvalidHtmlAttributeCheckJsxAttribute is upstream's `JSXAttribute` listener plus `checkAttribute`.
-func noInvalidHtmlAttributeCheckJsxAttribute(ctx rule.Context, node *ast.Node) {
+func noInvalidHtmlAttributeCheckJsxAttribute(ruleContext rule.Context, node *ast.Node) {
 	attribute := node.AsJsxAttribute()
 	if attribute == nil || attribute.Name() == nil {
 		return
@@ -422,18 +422,18 @@ func noInvalidHtmlAttributeCheckJsxAttribute(ctx rule.Context, node *ast.Node) {
 		return
 	}
 
-	// The attribute is configured but not meaningful on this element at all. Note this fires BEFORE
+	// The attribute is configured but not meaningful on this element at all. Note this fires before
 	// the value is looked at, so `<html rel="alternate">` reports `onlyMeaningfulFor` rather than
 	// anything about `alternate`.
 	if !noInvalidHtmlAttributeIsMeaningfulOn(attributeName, elementName) {
-		ctx.ReportNode(attribute.Name(), noInvalidHtmlAttributeOnlyMeaningfulFor(
+		ruleContext.ReportNode(attribute.Name(), noInvalidHtmlAttributeOnlyMeaningfulFor(
 			attributeName, noInvalidHtmlAttributeRenderTagNames(attributeName)))
 		return
 	}
 
 	// A bare `<a rel>` with no value at all.
 	if attribute.Initializer == nil {
-		ctx.ReportNode(attribute.Name(), noInvalidHtmlAttributeEmptyIsMeaningless(attributeName))
+		ruleContext.ReportNode(attribute.Name(), noInvalidHtmlAttributeEmptyIsMeaningless(attributeName))
 		return
 	}
 
@@ -441,7 +441,7 @@ func noInvalidHtmlAttributeCheckJsxAttribute(ctx rule.Context, node *ast.Node) {
 
 	// `rel="..."`, a string literal directly.
 	if initializer.Kind == ast.KindStringLiteral {
-		noInvalidHtmlAttributeCheckLiteralValue(ctx, attributeName, initializer, elementName)
+		noInvalidHtmlAttributeCheckLiteralValue(ruleContext, attributeName, initializer, elementName)
 		return
 	}
 
@@ -455,10 +455,10 @@ func noInvalidHtmlAttributeCheckJsxAttribute(ctx rule.Context, node *ast.Node) {
 	}
 	inner := expression.Expression
 
-	// `rel={"..."}`. Upstream checks `node.value.expression.type === 'Literal'` BEFORE its
+	// `rel={"..."}`. Upstream checks `node.value.expression.type === 'Literal'` before its
 	// JSXExpressionContainer guard, so a string inside braces takes the literal path.
 	if inner.Kind == ast.KindStringLiteral {
-		noInvalidHtmlAttributeCheckLiteralValue(ctx, attributeName, inner, elementName)
+		noInvalidHtmlAttributeCheckLiteralValue(ruleContext, attributeName, inner, elementName)
 		return
 	}
 
@@ -467,7 +467,7 @@ func noInvalidHtmlAttributeCheckJsxAttribute(ctx rule.Context, node *ast.Node) {
 	// the literal itself rather than on the expression container, because it recurses into
 	// `checkLiteralValueNode` with `node.value.expression`.
 	if noInvalidHtmlAttributeIsNonStringLiteral(inner) {
-		ctx.ReportNode(inner, noInvalidHtmlAttributeOnlyStrings(attributeName))
+		ruleContext.ReportNode(inner, noInvalidHtmlAttributeOnlyStrings(attributeName))
 		return
 	}
 
@@ -475,7 +475,7 @@ func noInvalidHtmlAttributeCheckJsxAttribute(ctx rule.Context, node *ast.Node) {
 	// expression container rather than on the expression, which is upstream reporting `node.value`.
 	if inner.Kind == ast.KindObjectLiteralExpression ||
 		(inner.Kind == ast.KindIdentifier && inner.Text() == "undefined") {
-		ctx.ReportNode(initializer, noInvalidHtmlAttributeOnlyStrings(attributeName))
+		ruleContext.ReportNode(initializer, noInvalidHtmlAttributeOnlyStrings(attributeName))
 	}
 }
 
@@ -483,11 +483,16 @@ func noInvalidHtmlAttributeCheckJsxAttribute(ctx rule.Context, node *ast.Node) {
 //
 // Four passes over one attribute value, in upstream's order, and each can report independently, so
 // one attribute can produce several findings.
-func noInvalidHtmlAttributeCheckLiteralValue(ctx rule.Context, attributeName string, node *ast.Node, elementName string) {
+func noInvalidHtmlAttributeCheckLiteralValue(
+	ruleContext rule.Context,
+	attributeName string,
+	node *ast.Node,
+	elementName string,
+) {
 	attributeValue := node.Text()
 
 	if text.TrimWhitespace(attributeValue) == "" {
-		ctx.ReportNode(node, noInvalidHtmlAttributeNoEmpty(attributeName))
+		ruleContext.ReportNode(node, noInvalidHtmlAttributeNoEmpty(attributeName))
 		return
 	}
 
@@ -496,17 +501,17 @@ func noInvalidHtmlAttributeCheckLiteralValue(ctx rule.Context, attributeName str
 	for _, token := range text.WhitespaceFields(attributeValue) {
 		allowedTags, isKnownValue := allowedValues[token]
 		if !isKnownValue {
-			ctx.ReportNode(node, noInvalidHtmlAttributeNeverValid(token, attributeName))
+			ruleContext.ReportNode(node, noInvalidHtmlAttributeNeverValid(token, attributeName))
 			continue
 		}
 		if !allowedTags[elementName] {
-			ctx.ReportNode(node, noInvalidHtmlAttributeNotValidFor(token, attributeName, elementName))
+			ruleContext.ReportNode(node, noInvalidHtmlAttributeNotValidFor(token, attributeName, elementName))
 		}
 	}
 
 	// Pass two: the pair check. Upstream scans with `/(?=(\b\S+\s*\S+))/g`, a zero-width lookahead
 	// that yields every position where a word begins followed by another word, so it sees each
-	// adjacent PAIR rather than each token. Go's RE2 has no lookahead, and reproducing the scan
+	// adjacent pair rather than each token. Go's RE2 has no lookahead, and reproducing the scan
 	// literally is unnecessary: the only thing upstream does with each match is split it on a single
 	// space and compare the first and last pieces, which is the same question as "for each token
 	// that is a pairing key, what token follows it".
@@ -522,28 +527,28 @@ func noInvalidHtmlAttributeCheckLiteralValue(ctx rule.Context, attributeName str
 		}
 		missing := noInvalidHtmlAttributeRenderSiblings(siblings)
 		if index+1 >= len(tokens) {
-			ctx.ReportNode(node, noInvalidHtmlAttributeNotAlone(token, missing))
+			ruleContext.ReportNode(node, noInvalidHtmlAttributeNotAlone(token, missing))
 			continue
 		}
 		following := tokens[index+1]
 		if !siblings[following] {
-			ctx.ReportNode(node, noInvalidHtmlAttributeNotPaired(token, following, missing))
+			ruleContext.ReportNode(node, noInvalidHtmlAttributeNotPaired(token, following, missing))
 		}
 	}
 
 	// Pass three: whitespace. Upstream flags a run of whitespace that touches either end of the
 	// value, and any interior run that is not exactly one space.
 	//
-	// This reads the RAW source bytes rather than the cooked `Text()`, because upstream's own
+	// This reads the raw source bytes rather than the cooked `Text()`, because upstream's own
 	// arithmetic is over source positions and an escape sequence makes the two lengths differ.
-	raw := noInvalidHtmlAttributeRawValue(ctx, node)
+	raw := noInvalidHtmlAttributeRawValue(ruleContext, node)
 	for _, run := range noInvalidHtmlAttributeWhitespaceRuns(raw) {
 		if run.start == 0 || run.end == len(raw) {
-			ctx.ReportNode(node, noInvalidHtmlAttributeSpaceDelimited(attributeName))
+			ruleContext.ReportNode(node, noInvalidHtmlAttributeSpaceDelimited(attributeName))
 			continue
 		}
 		if run.text != " " {
-			ctx.ReportNode(node, noInvalidHtmlAttributeSpaceDelimited(attributeName))
+			ruleContext.ReportNode(node, noInvalidHtmlAttributeSpaceDelimited(attributeName))
 		}
 	}
 }
@@ -558,15 +563,15 @@ type noInvalidHtmlAttributeWhitespaceRun struct {
 // noInvalidHtmlAttributeWhitespaceRuns finds every maximal whitespace run, matching upstream's
 // `/(\s+)/g`.
 //
-// Maximal runs rather than individual characters is the whole point: `"a  b"` is ONE finding for a
+// Maximal runs rather than individual characters is the whole point: `"a  b"` is one finding for a
 // two-space run, not two findings for two spaces, and the corpus asserts exactly one finding for
 // each of its irregular-spacing cases.
 //
-// The scan is over RUNES rather than bytes, and that is not a stylistic choice. An earlier version
+// The scan is over runes rather than bytes, and that is not a stylistic choice. An earlier version
 // scanned bytes with an ASCII-only predicate and documented the non-ASCII gap as a deliberate
 // narrowing, on the reasoning that a value containing an exotic space would fail the token check
 // instead. That reasoning was wrong and the corpus said so: `invalid[23]` is
-// `<a rel="noreferrer\u00a0\u00a0noopener"></a>`, where two NO-BREAK SPACEs separate two tokens that
+// `<a rel="noreferrer\u00a0\u00a0noopener"></a>`, where two no-break spaces separate two tokens that
 // are individually valid, so nothing else reports and the finding is lost entirely. It is the one
 // case in 265 that separates the two implementations, and it was found by running the fixtures
 // rather than by reading.
@@ -594,10 +599,10 @@ func noInvalidHtmlAttributeWhitespaceRuns(text string) []noInvalidHtmlAttributeW
 // noInvalidHtmlAttributeIsSpaceRune answers JavaScript's `\s`, which is a specific list rather than
 // Unicode's general whitespace property.
 //
-// The two differ in both directions, so `unicode.IsSpace` is NOT a substitute:
+// The two differ in both directions, so `unicode.IsSpace` is not a substitute:
 //
-//   - `unicode.IsSpace` includes U+0085 NEXT LINE, which JavaScript's `\s` does not.
-//   - JavaScript's `\s` includes U+FEFF BYTE ORDER MARK, which `unicode.IsSpace` does not.
+//   - `unicode.IsSpace` includes `U+0085 NEXT LINE`, which JavaScript's `\s` does not.
+//   - JavaScript's `\s` includes `U+FEFF BYTE ORDER MARK`, which `unicode.IsSpace` does not.
 //
 // The list below is the ECMAScript definition: WhiteSpace (tab, vertical tab, form feed, space,
 // no-break space, BOM, and the Unicode Space_Separator category) plus LineTerminator (line feed,
@@ -618,11 +623,11 @@ func noInvalidHtmlAttributeIsSpaceRune(character rune) bool {
 // Falls back to the cooked text when the range cannot be read, which keeps the whitespace pass
 // working rather than silently skipping it. The two differ only for a value containing an escape,
 // and no corpus case writes one.
-func noInvalidHtmlAttributeRawValue(ctx rule.Context, node *ast.Node) string {
-	if ctx.SourceFile == nil {
+func noInvalidHtmlAttributeRawValue(ruleContext rule.Context, node *ast.Node) string {
+	if ruleContext.SourceFile == nil {
 		return node.Text()
 	}
-	source := ctx.SourceFile.Text()
+	source := ruleContext.SourceFile.Text()
 	start := node.Pos()
 	end := node.End()
 	if start < 0 || end > len(source) || start >= end {
@@ -639,14 +644,14 @@ func noInvalidHtmlAttributeRawValue(ctx rule.Context, node *ast.Node) string {
 }
 
 // noInvalidHtmlAttributeCheckCreateElement is upstream's `CallExpression` listener.
-func noInvalidHtmlAttributeCheckCreateElement(ctx rule.Context, node *ast.Node) {
+func noInvalidHtmlAttributeCheckCreateElement(ruleContext rule.Context, node *ast.Node) {
 	call := node.AsCallExpression()
 	if call == nil {
 		return
 	}
 	// Upstream's `isValidCreateElement` is purely syntactic: the callee is a property access whose
-	// object is the IDENTIFIER `React` and whose property is the identifier `createElement`. It does
-	// NOT resolve the name through scope, so a bare `createElement(...)` and a `Preact.createElement`
+	// object is the identifier `React` and whose property is the identifier `createElement`. It does
+	// not resolve the name through scope, so a bare `createElement(...)` and a `Preact.createElement`
 	// both decline, and this rule needs no type checker. That is narrower than this package's
 	// `isPragmaCreateElementCall`, which accepts the bare form, and the difference is upstream's.
 	if !noInvalidHtmlAttributeIsReactCreateElement(call) {
@@ -665,17 +670,17 @@ func noInvalidHtmlAttributeCheckCreateElement(ctx rule.Context, node *ast.Node) 
 		return
 	}
 
-	// The HTML-element gate is guarded by a STRING test upstream:
+	// The HTML-element gate is guarded by a string test upstream:
 	//
 	//	if (typeof elemNameArg.value === 'string' && !HTML_ELEMENTS.has(elemNameArg.value))
 	//
-	// so a NON-string literal skips the gate entirely and falls through to the props check, where
+	// so a non-string literal skips the gate entirely and falls through to the props check, where
 	// it is compared against the attribute's permitted tags and fails. That is why
 	// `React.createElement(5, {rel: 'alternatex'})` reports `onlyMeaningfulFor` rather than being
 	// silent, which an earlier version of this port got wrong: it required a string literal here
 	// and went quiet on that input.
 	//
-	// The mutation sweep is what surfaced it. Dropping this gate SURVIVED the whole 265-case
+	// The mutation sweep is what surfaced it. Dropping this gate survived the whole 265-case
 	// corpus, so the survivor was investigated rather than written off, and driving the installed
 	// build on the three shapes the corpus does not write -- an identifier, a template, and a
 	// numeric literal -- disagreed on the third.
@@ -685,20 +690,25 @@ func noInvalidHtmlAttributeCheckCreateElement(ctx rule.Context, node *ast.Node) 
 	}
 
 	for _, attributeName := range noInvalidHtmlAttributeDefaultAttributes {
-		noInvalidHtmlAttributeCheckCreateProps(ctx, call, attributeName, elementName)
+		noInvalidHtmlAttributeCheckCreateProperties(ruleContext, call, attributeName, elementName)
 	}
 }
 
-// noInvalidHtmlAttributeCheckCreateProps is upstream's `checkCreateProps`.
-func noInvalidHtmlAttributeCheckCreateProps(ctx rule.Context, call *ast.CallExpression, attributeName string, elementName string) {
+// noInvalidHtmlAttributeCheckCreateProperties is upstream's `checkCreateProps`.
+func noInvalidHtmlAttributeCheckCreateProperties(
+	ruleContext rule.Context,
+	call *ast.CallExpression,
+	attributeName string,
+	elementName string,
+) {
 	if len(call.Arguments.Nodes) < 2 {
 		return
 	}
-	props := call.Arguments.Nodes[1]
-	if props.Kind != ast.KindObjectLiteralExpression {
+	properties := call.Arguments.Nodes[1]
+	if properties.Kind != ast.KindObjectLiteralExpression {
 		return
 	}
-	literal := props.AsObjectLiteralExpression()
+	literal := properties.AsObjectLiteralExpression()
 	if literal == nil || literal.Properties == nil {
 		return
 	}
@@ -712,7 +722,7 @@ func noInvalidHtmlAttributeCheckCreateProps(ctx rule.Context, call *ast.CallExpr
 		}
 
 		if !noInvalidHtmlAttributeIsMeaningfulOn(attributeName, elementName) {
-			ctx.ReportNode(property.Name(), noInvalidHtmlAttributeOnlyMeaningfulFor(
+			ruleContext.ReportNode(property.Name(), noInvalidHtmlAttributeOnlyMeaningfulFor(
 				attributeName, noInvalidHtmlAttributeRenderTagNames(attributeName)))
 			continue
 		}
@@ -720,7 +730,7 @@ func noInvalidHtmlAttributeCheckCreateProps(ctx rule.Context, call *ast.CallExpr
 		// Upstream's `prop.method`. Anchored on the whole property rather than its key, which is
 		// upstream reporting `node: prop`.
 		if property.Kind == ast.KindMethodDeclaration {
-			ctx.ReportNode(property, noInvalidHtmlAttributeNoMethod(attributeName))
+			ruleContext.ReportNode(property, noInvalidHtmlAttributeNoMethod(attributeName))
 			continue
 		}
 
@@ -744,24 +754,29 @@ func noInvalidHtmlAttributeCheckCreateProps(ctx rule.Context, call *ast.CallExpr
 				continue
 			}
 			for _, element := range array.Elements.Nodes {
-				noInvalidHtmlAttributeCheckPropValue(ctx, element, attributeName, elementName)
+				noInvalidHtmlAttributeCheckPropValue(ruleContext, element, attributeName, elementName)
 			}
 			continue
 		}
 
-		noInvalidHtmlAttributeCheckPropValue(ctx, value, attributeName, elementName)
+		noInvalidHtmlAttributeCheckPropValue(ruleContext, value, attributeName, elementName)
 	}
 }
 
 // noInvalidHtmlAttributeCheckPropValue is upstream's `checkPropValidValue`.
 //
-// Note what this does NOT do, and the difference from the JSX path is upstream's rather than a
-// simplification here: it looks the WHOLE value up in the table rather than splitting it on
-// whitespace first. So `React.createElement("a", {rel: "alternate alternatex"})` reports ONE
+// Note what this does not do, and the difference from the JSX path is upstream's rather than a
+// simplification here: it looks the whole value up in the table rather than splitting it on
+// whitespace first. So `React.createElement("a", {rel: "alternate alternatex"})` reports one
 // `neverValid` naming the entire string, where the JSX spelling of the same value reports one
 // finding for the bad token alone. Corpus cases invalid[4] through invalid[8] pin both halves of
 // that asymmetry.
-func noInvalidHtmlAttributeCheckPropValue(ctx rule.Context, value *ast.Node, attributeName string, elementName string) {
+func noInvalidHtmlAttributeCheckPropValue(
+	ruleContext rule.Context,
+	value *ast.Node,
+	attributeName string,
+	elementName string,
+) {
 	// Upstream's `value.type !== 'Literal'` declines anything it cannot read, including a template
 	// literal, an identifier and a nested call.
 	if !noInvalidHtmlAttributeIsLiteral(value) {
@@ -770,7 +785,7 @@ func noInvalidHtmlAttributeCheckPropValue(ctx rule.Context, value *ast.Node, att
 	if value.Kind != ast.KindStringLiteral {
 		// A numeric or boolean literal reaches upstream's `validTags.get(value.value)` with a
 		// non-string key, which misses, so it reports `neverValid` naming the rendered value.
-		ctx.ReportNode(value, noInvalidHtmlAttributeNeverValid(
+		ruleContext.ReportNode(value, noInvalidHtmlAttributeNeverValid(
 			noInvalidHtmlAttributeLiteralText(value), attributeName))
 		return
 	}
@@ -778,11 +793,11 @@ func noInvalidHtmlAttributeCheckPropValue(ctx rule.Context, value *ast.Node, att
 	text := value.Text()
 	allowedTags, isKnownValue := noInvalidHtmlAttributeRelValues[text]
 	if !isKnownValue {
-		ctx.ReportNode(value, noInvalidHtmlAttributeNeverValid(text, attributeName))
+		ruleContext.ReportNode(value, noInvalidHtmlAttributeNeverValid(text, attributeName))
 		return
 	}
 	if !allowedTags[elementName] {
-		ctx.ReportNode(value, noInvalidHtmlAttributeNotValidFor(text, attributeName, elementName))
+		ruleContext.ReportNode(value, noInvalidHtmlAttributeNotValidFor(text, attributeName, elementName))
 	}
 }
 
@@ -886,7 +901,7 @@ func noInvalidHtmlAttributeJsxParentTagName(attribute *ast.Node) (string, bool) 
 //
 // The kind guard before the text read is load-bearing rather than defensive: `Node.Text()` panics on
 // several kinds rather than returning empty, and a computed property key reaches here. The walk
-// recovers per FILE rather than per rule, so one such key would cost every rule in this package its
+// recovers per file rather than per rule, so one such key would cost every rule in this package its
 // verdict on that file.
 func noInvalidHtmlAttributeIdentifierName(name *ast.Node) string {
 	if name == nil {

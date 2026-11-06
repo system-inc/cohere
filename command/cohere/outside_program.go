@@ -20,9 +20,9 @@ var programExtensions = map[string]bool{
 	sourcename.AdamicExtension: true,
 }
 
-// errNamedPathsOutsideProgram is the refusal for a named-path run that reached no program file,
+// namedPathsOutsideProgramError is the refusal for a named-path run that reached no program file,
 // carrying explainNamedPathsOutsideProgram's reason.
-func errNamedPathsOutsideProgram(location projectLocation, names []string) error {
+func namedPathsOutsideProgramError(location projectLocation, names []string) error {
 	return errors.New(explainNamedPathsOutsideProgram(location, names))
 }
 
@@ -37,9 +37,12 @@ func errNamedPathsOutsideProgram(location projectLocation, names []string) error
 // which is what a reader needs to change it. See ignoreSource.
 func explainNamedPathsOutsideProgram(location projectLocation, names []string) string {
 	sentences := make([]string, 0, len(names))
-	configName := location.ConfigFileName
-	if relative, err := filepath.Rel(location.Root, configName); err == nil && !strings.HasPrefix(relative, "..") {
-		configName = relative
+	configurationName := location.ConfigFileName
+	if relative, relativePathError := filepath.Rel(
+		location.Root,
+		configurationName,
+	); relativePathError == nil && !strings.HasPrefix(relative, "..") {
+		configurationName = relative
 	}
 
 	for _, name := range names {
@@ -50,15 +53,15 @@ func explainNamedPathsOutsideProgram(location projectLocation, names []string) s
 		path = filepath.Clean(path)
 
 		var sentence string
-		information, err := os.Stat(path)
+		information, statError := os.Stat(path)
 		switch {
-		case err == nil && information.IsDir():
+		case statError == nil && information.IsDir():
 			sentence = name + " is a directory holding no file the program contains, because the tsconfig at " +
-				configName + " leaves every file in it out with its `include` and `exclude` lists"
+				configurationName + " leaves every file in it out with its `include` and `exclude` lists"
 		case !programExtensions[strings.ToLower(filepath.Ext(path))]:
 			sentence = name + " is not a TypeScript or JavaScript file, so no tsconfig can put it in the program"
 		default:
-			sentence = name + " is not one of the program's files, because the tsconfig at " + configName +
+			sentence = name + " is not one of the program's files, because the tsconfig at " + configurationName +
 				" leaves it out with its `include` and `exclude` lists"
 		}
 
@@ -79,17 +82,20 @@ func explainNamedPathsOutsideProgram(location projectLocation, names []string) s
 // excluded a directory above the path. Only the user's global excludes file is not read. The clause is
 // part of an explanation and decides nothing.
 func ignoreSource(root string, path string) string {
-	relative, err := filepath.Rel(root, path)
-	if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+	relative, relativePathError := filepath.Rel(root, path)
+	if relativePathError != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
 		return ""
 	}
-	matcher, err := gitignore.New(root)
-	if err != nil {
+	matcher, newGitignoreError := gitignore.New(root)
+	if newGitignoreError != nil {
 		return ""
 	}
 	information, statError := os.Lstat(path)
-	ignored, source, err := matcher.IgnoredPath(filepath.ToSlash(relative), statError == nil && information.IsDir())
-	if err != nil || !ignored {
+	ignored, source, ignoredPathError := matcher.IgnoredPath(
+		filepath.ToSlash(relative),
+		statError == nil && information.IsDir(),
+	)
+	if ignoredPathError != nil || !ignored {
 		return ""
 	}
 	return fmt.Sprintf("%s line %d, `%s`", source.File, source.Line, source.Pattern)

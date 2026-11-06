@@ -12,9 +12,18 @@ import (
 // The rule's messages, one handle per id, whose wording lives in
 // `policy/messages/network-no-forbidden-import.json`.
 var (
-	networkNoForbiddenImportNoDirectTanStackQueryText = policy.MessageOf("structure/network-no-forbidden-import", "noDirectTanStackQuery")
-	networkNoForbiddenImportNoDirectApolloText        = policy.MessageOf("structure/network-no-forbidden-import", "noDirectApollo")
-	networkNoForbiddenImportNoDirectGraphqlImportText = policy.MessageOf("structure/network-no-forbidden-import", "noDirectGraphqlImport")
+	networkNoForbiddenImportNoDirectTanStackQueryText = policy.MessageOf(
+		"structure/network-no-forbidden-import",
+		"noDirectTanStackQuery",
+	)
+	networkNoForbiddenImportNoDirectApolloText = policy.MessageOf(
+		"structure/network-no-forbidden-import",
+		"noDirectApollo",
+	)
+	networkNoForbiddenImportNoDirectGraphqlImportText = policy.MessageOf(
+		"structure/network-no-forbidden-import",
+		"noDirectGraphqlImport",
+	)
 )
 
 // messageNoDirectTanStackQuery is the finding, rendered when it is reported so the text comes from the current catalog.
@@ -60,17 +69,17 @@ func messageNoDirectGraphqlImport() rule.Message {
 //
 // No fix. Each of the three wants a different replacement, and choosing it means knowing what the
 // call site was doing with the import.
-var NetworkNoForbiddenImport = rule.Rule{
+var NetworkNoForbiddenImport = rule.Rule[rule.NoOptions]{
 	Name: "structure/network-no-forbidden-import",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
 		// TanStack is allowed where it is configured: NetworkService's module, by where it lives. It
 		// once also exempted any Providers.tsx, after Structure's providers stopped importing
 		// TanStack, which left a hole the ban was meant to close.
-		fileContext := FileContextFor(ctx.SourceFile.FileName().AsString())
+		fileContext := FileContextFor(ruleContext.SourceFile.FileName().AsString())
 		isTanStackExempt := fileContext.IsNetworkServiceFile
 
 		return rule.Listeners{
@@ -82,19 +91,19 @@ var NetworkNoForbiddenImport = rule.Rule{
 				source := declaration.ModuleSpecifier.Text()
 
 				if source == "@tanstack/react-query" && !isTanStackExempt {
-					ctx.ReportNode(node, messageNoDirectTanStackQuery())
+					ruleContext.ReportNode(node, messageNoDirectTanStackQuery())
 				}
 
 				// A prefix match rather than an exact one, so every package in the scope is
 				// caught rather than only the client entry point.
 				if strings.HasPrefix(source, "@apollo/") {
-					ctx.ReportNode(node, messageNoDirectApollo())
+					ruleContext.ReportNode(node, messageNoDirectApollo())
 				}
 
 				// Only when the graphql specifier is actually named. A generated path is an
 				// ordinary place to import types from, so the path alone is not the defect.
 				if strings.Contains(source, "/generated") && importsGraphqlSpecifier(declaration) {
-					ctx.ReportNode(node, messageNoDirectGraphqlImport())
+					ruleContext.ReportNode(node, messageNoDirectGraphqlImport())
 				}
 			},
 		}

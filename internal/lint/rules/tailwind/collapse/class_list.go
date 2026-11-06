@@ -56,33 +56,12 @@ type SuggestionGroup struct {
 	Modifiers SuggestionList
 }
 
-// ClassListEntry is one class the class list holds, with the modifiers it is offered with.
-type ClassListEntry struct {
-	// Name is the class, without a prefix.
-	Name string
-	// Modifiers are the modifiers offered with it, deduplicated, in the order first offered.
-	Modifiers []string
-	// sources are what offered the class: a static, or a functional root and value, each recorded once.
-	// Usually one; a static and a functional suggestion of the same name are two.
-	sources []classListSource
-}
-
 // classListSource is one registration that offers a class: a static by its name, or a functional root,
 // negated or not, with the value it suggested, empty for the bare root.
 type classListSource struct {
 	static bool
 	root   string
 	value  string
-}
-
-// addSource records a source once.
-func (entry *ClassListEntry) addSource(source classListSource) {
-	for _, existing := range entry.sources {
-		if existing == source {
-			return
-		}
-	}
-	entry.sources = append(entry.sources, source)
 }
 
 // legacyNumericKey is upstream's LEGACY_NUMERIC_KEY: a theme key spelled `2_5` is suggested as `2.5`.
@@ -114,7 +93,8 @@ func BuildClassList(system *LoadedDesignSystem) []ClassListEntry {
 	// A repository static is listed the same way: upstream asks the root's completions, and a
 	// framework `suggest` that returns nothing still answers for a name the repository redeclares.
 	for name, kinds := range system.utilityRoots {
-		if suggested, isFramework := FrameworkStaticSuggested[name]; kinds[UtilityKindStatic] && (suggested || !isFramework) {
+		if suggested, isFramework := FrameworkStaticSuggested[name]; kinds[UtilityKindStatic] &&
+			(suggested || !isFramework) {
 			entry(name).addSource(classListSource{static: true, root: name})
 		}
 	}
@@ -151,25 +131,10 @@ func BuildClassList(system *LoadedDesignSystem) []ClassListEntry {
 	return list
 }
 
-// suggestionGroups is every functional root's groups in this design system: the framework's, with
-// each repository `@utility` root's appended, as upstream's `suggest` appends a second registration's
-// groups to the first.
-func (system *LoadedDesignSystem) suggestionGroups() map[string][]SuggestionGroup {
-	groups := make(map[string][]SuggestionGroup, len(FrameworkSuggestions))
-	for root, framework := range FrameworkSuggestions {
-		groups[root] = framework
-	}
-	if system.utility == nil {
-		return groups
-	}
-	for root, definition := range system.utility.Definitions {
-		groups[root] = append(append([]SuggestionGroup(nil), groups[root]...), repositorySuggestionGroup(definition))
-	}
-	return groups
-}
-
 // suggestionValues is one list resolved against the theme, in upstream's order: the default as the
 // empty string first, then the literals, the spacing scale, the theme's keys and the fractions.
+//
+// Mutates: keys is the caller's memo of each namespace list's resolved keys, filled for the next list that shares it
 func suggestionValues(list SuggestionList, theme *Theme, keys map[string][]string) []string {
 	var values []string
 	if list.HasDefault {
@@ -202,6 +167,8 @@ func suggestionValues(list SuggestionList, theme *Theme, keys map[string][]strin
 
 // addModifiers merges modifiers into an entry, keeping the first occurrence of each. An entry with none
 // yet shares the group's slice, which no caller writes into, and copies only when a second source merges.
+//
+// Mutates: entry gains the modifiers it lacked, which is the merge the caller asks for
 func addModifiers(entry *ClassListEntry, modifiers []string) {
 	if len(entry.Modifiers) == 0 {
 		entry.Modifiers = modifiers
@@ -261,32 +228,6 @@ func repositorySuggestionGroup(definition *UtilityDefinition) SuggestionGroup {
 		Values:    tracked["--value"].list(),
 		Modifiers: tracked["--modifier"].list(),
 	}
-}
-
-// repositorySuggestionTracking is upstream's per-function storage: what one of `--value` and
-// `--modifier` was seen naming.
-type repositorySuggestionTracking struct {
-	usedSpacingInteger bool
-	usedSpacingNumber  bool
-	namespaces         []string
-	literals           []string
-}
-
-// list is the tracking as a recipe. The spacing scale goes in as literals, the whole scale for a
-// `number` argument and its integers for an `integer` one, since unlike the framework's it does not
-// depend on the theme.
-func (tracking *repositorySuggestionTracking) list() SuggestionList {
-	list := SuggestionList{Literals: append([]string(nil), tracking.literals...), Namespaces: tracking.namespaces}
-	if tracking.usedSpacingNumber {
-		list.Literals = append(list.Literals, DefaultSpacingSuggestions...)
-	} else if tracking.usedSpacingInteger {
-		for _, value := range DefaultSpacingSuggestions {
-			if isPositiveInteger(value) {
-				list.Literals = append(list.Literals, value)
-			}
-		}
-	}
-	return list
 }
 
 // trackValueFunctions walks one declaration value as upstream's tracking walk does: a `--spacing()`

@@ -1,7 +1,8 @@
 {
   "rules": {
     "TypeScript": "nexus/security-no-interpolated-sql-string",
-    "Swift": "cohere-swift/security-no-interpolated-sql-string"
+    "Swift": "cohere-swift/security-no-interpolated-sql-string",
+    "Go": "cohere-go/security-no-interpolated-sql-string"
   },
   "messages": {
     "interpolatedSqlString": {
@@ -9,18 +10,27 @@
       "terms": {
         "example": {
           "TypeScript": "`O'Brien`",
-          "Swift": "O'Brien"
+          "Swift": "O'Brien",
+          "Go": "`O'Brien`"
         },
         "repair": {
           "TypeScript": "Pass it as a bound parameter (`WHERE name LIKE ?` with the value beside the query). Where the query language has no parameters, give the value a type that cannot hold a quote (a number, a union of literals, a template literal type such as `${number}-${number}-${number}`), or escape it in place with `.replace(/\\\\/g, '\\\\\\\\').replace(/'/g, \"''\")`, which doubles backslashes as well as quotes.",
-          "Swift": "Bind it as a parameter instead (WHERE name = ? with the value in the parameters beside the statement). Where the query cannot take parameters, give the value a type that cannot hold a quote (an integer, a closed enum's case), or escape it in place by doubling backslashes and quotes: .replacingOccurrences(of: \"\\\\\", with: \"\\\\\\\\\").replacingOccurrences(of: \"'\", with: \"''\")."
+          "Swift": "Bind it as a parameter instead (WHERE name = ? with the value in the parameters beside the statement). Where the query cannot take parameters, give the value a type that cannot hold a quote (an integer, a closed enum's case), or escape it in place by doubling backslashes and quotes: .replacingOccurrences(of: \"\\\\\", with: \"\\\\\\\\\").replacingOccurrences(of: \"'\", with: \"''\").",
+          "Go": "Pass it as a bound parameter instead: put a placeholder where the value goes (`WHERE name = ?`, or `$1` on Postgres) and hand the value to the same call after the query, so it never becomes part of the SQL's text."
         }
       }
     },
     "interpolatedSqlValue": {
-      "text": "This value is written into a SQL statement without quotes, right after a comparison, so it becomes part of the SQL rather than a value: a space, a keyword or a quote in it changes what the query does, and a crafted value runs as SQL. Quoting it does not help, since the value can close the quote. Pass it as a bound parameter (`WHERE id = ?` with the value beside the query). Where the query language has no parameters, as with GAQL, give the value a type that holds only fixed text: a number, a union of literals, or a template literal type such as `${number}`.",
+      "text": "This value is written into a SQL statement without quotes, right after a comparison, so it becomes part of the SQL rather than a value: a space, a keyword or a quote in it changes what the query does, and a crafted value runs as SQL. Quoting it does not help, since the value can close the quote. [[repair]]",
+      "terms": {
+        "repair": {
+          "TypeScript": "Pass it as a bound parameter (`WHERE id = ?` with the value beside the query). Where the query language has no parameters, as with GAQL, give the value a type that holds only fixed text: a number, a union of literals, or a template literal type such as `${number}`.",
+          "Go": "Pass it as a bound parameter instead (`WHERE id = ?`, or `$1` on Postgres, with the value handed to the same call after the query), or, when it is a number, give it a numeric type, which cannot carry SQL."
+        }
+      },
       "languages": [
-        "TypeScript"
+        "TypeScript",
+        "Go"
       ]
     }
   }

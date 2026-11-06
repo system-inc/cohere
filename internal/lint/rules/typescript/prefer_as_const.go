@@ -67,10 +67,10 @@ var messagePreferAsConst = rule.Message{
 // rendering of the double it parsed to, so string equality on Text is the float comparison, and a
 // StringLiteral's Text is the cooked value rather than the source spelling. Both were probed on the
 // inputs above before this comparison was written.
-var PreferAsConst = rule.Rule{
+var PreferAsConst = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/prefer-as-const",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -85,7 +85,7 @@ var PreferAsConst = rule.Rule{
 					return
 				}
 				// A binding pattern reports without a repair. See reportAnnotation.
-				reportAnnotation(ctx, declaration.Name(), declaration.Type, declaration.Initializer,
+				reportAnnotation(ruleContext, declaration.Name(), declaration.Type, declaration.Initializer,
 					declaration.Name() != nil && declaration.Name().Kind == ast.KindIdentifier)
 			},
 			ast.KindPropertyDeclaration: func(node *ast.Node) {
@@ -95,7 +95,7 @@ var PreferAsConst = rule.Rule{
 				}
 				// Upstream passes `true` unconditionally here: a property name is never a binding
 				// pattern, so the repair is always well formed.
-				reportAnnotation(ctx, property.Name(), property.Type, property.Initializer, true)
+				reportAnnotation(ruleContext, property.Name(), property.Type, property.Initializer, true)
 			},
 			ast.KindAsExpression: func(node *ast.Node) {
 				expression := node.AsAsExpression()
@@ -107,8 +107,8 @@ var PreferAsConst = rule.Rule{
 				// resolver. `'bar' as 'bar'` and `'bar' as const` mean the same thing to the
 				// compiler, so nothing about the program changes and it is a fix rather than a
 				// suggestion.
-				ctx.ReportNodeWithFixes(literalType, messagePreferAsConst,
-					ctx.ReplaceNode(literalType, "const"))
+				ruleContext.ReportNodeWithFixes(literalType, messagePreferAsConst,
+					ruleContext.ReplaceNode(literalType, "const"))
 			},
 		}
 	},
@@ -156,14 +156,20 @@ var PreferAsConst = rule.Rule{
 // and appending `as const` leaves a destructure of a string, which is a different program and would
 // not compile. The absence of that input from upstream's fourteen fix vectors is the corpus saying
 // the same thing.
-func reportAnnotation(ctx rule.Context, name *ast.Node, typeNode *ast.Node, initializer *ast.Node, canRepair bool) {
+func reportAnnotation(
+	ruleContext rule.Context,
+	name *ast.Node,
+	typeNode *ast.Node,
+	initializer *ast.Node,
+	canRepair bool,
+) {
 	literalType := literalTypeRestatingValue(typeNode, initializer)
 	if literalType == nil {
 		return
 	}
 
 	if !canRepair {
-		ctx.ReportNode(literalType, messagePreferAsConst)
+		ruleContext.ReportNode(literalType, messagePreferAsConst)
 		return
 	}
 
@@ -171,9 +177,9 @@ func reportAnnotation(ctx rule.Context, name *ast.Node, typeNode *ast.Node, init
 	// initializer's own end, before any trailing trivia. Both match upstream byte for byte,
 	// measured on inputs carrying a tab before the colon, a comment after the type, and a comment
 	// after the value.
-	ctx.ReportNodeWithFixes(literalType, messagePreferAsConst,
-		rule.RemoveRange(annotationRange(ctx, name, typeNode)),
-		ctx.InsertAfter(initializer, " as const"))
+	ruleContext.ReportNodeWithFixes(literalType, messagePreferAsConst,
+		rule.RemoveRange(annotationRange(ruleContext, name, typeNode)),
+		ruleContext.InsertAfter(initializer, " as const"))
 }
 
 // literalTypeRestatingValue returns the literal type node when it restates the value beside it, and
@@ -240,7 +246,7 @@ func literalTypeRestatingValue(typeNode *ast.Node, initializer *ast.Node) *ast.N
 //
 // Callers guard the definite-assignment token before reaching here, so the token found is a colon
 // rather than a `!`.
-func annotationRange(ctx rule.Context, name *ast.Node, typeNode *ast.Node) core.TextRange {
-	colon := scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, name.End())
+func annotationRange(ruleContext rule.Context, name *ast.Node, typeNode *ast.Node) core.TextRange {
+	colon := scanner.GetRangeOfTokenAtPosition(ruleContext.SourceFile, name.End())
 	return colon.WithEnd(typeNode.End())
 }

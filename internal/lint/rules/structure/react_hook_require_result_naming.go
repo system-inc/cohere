@@ -11,32 +11,50 @@ import (
 
 // messageHookResultNamingGenericText is the rule's `hookResultNamingGeneric` message, whose wording
 // lives in `policy/messages/react-hook-require-result-naming.json`.
-var messageHookResultNamingGenericText = policy.MessageOf("structure/react-hook-require-result-naming", "hookResultNamingGeneric")
+var messageHookResultNamingGenericText = policy.MessageOf(
+	"structure/react-hook-require-result-naming",
+	"hookResultNamingGeneric",
+)
 
 // messageHookResultNamingGeneric is the finding, rendered when it is reported so the text comes
 // from the current catalog.
 func messageHookResultNamingGeneric() rule.Message {
-	return rule.Message{Id: messageHookResultNamingGenericText.Id, Description: messageHookResultNamingGenericText.Render(nil)}
+	return rule.Message{
+		Id:          messageHookResultNamingGenericText.Id,
+		Description: messageHookResultNamingGenericText.Render(nil),
+	}
 }
 
 // messageHookResultNamingBadSuffixText is the rule's `hookResultNamingBadSuffix` message, whose
 // wording lives in `policy/messages/react-hook-require-result-naming.json`.
-var messageHookResultNamingBadSuffixText = policy.MessageOf("structure/react-hook-require-result-naming", "hookResultNamingBadSuffix")
+var messageHookResultNamingBadSuffixText = policy.MessageOf(
+	"structure/react-hook-require-result-naming",
+	"hookResultNamingBadSuffix",
+)
 
 // messageHookResultNamingBadSuffix is the finding, rendered when it is reported so the text comes
 // from the current catalog.
 func messageHookResultNamingBadSuffix() rule.Message {
-	return rule.Message{Id: messageHookResultNamingBadSuffixText.Id, Description: messageHookResultNamingBadSuffixText.Render(nil)}
+	return rule.Message{
+		Id:          messageHookResultNamingBadSuffixText.Id,
+		Description: messageHookResultNamingBadSuffixText.Render(nil),
+	}
 }
 
 // messageHookResultNamingMismatchText is the rule's `hookResultNamingMismatch` message, whose
 // wording lives in `policy/messages/react-hook-require-result-naming.json`.
-var messageHookResultNamingMismatchText = policy.MessageOf("structure/react-hook-require-result-naming", "hookResultNamingMismatch")
+var messageHookResultNamingMismatchText = policy.MessageOf(
+	"structure/react-hook-require-result-naming",
+	"hookResultNamingMismatch",
+)
 
 // messageHookResultNamingMismatch is the finding, rendered when it is reported so the text comes
 // from the current catalog.
 func messageHookResultNamingMismatch() rule.Message {
-	return rule.Message{Id: messageHookResultNamingMismatchText.Id, Description: messageHookResultNamingMismatchText.Render(nil)}
+	return rule.Message{
+		Id:          messageHookResultNamingMismatchText.Id,
+		Description: messageHookResultNamingMismatchText.Render(nil),
+	}
 }
 
 // emptySuffixes are the endings that describe a variable rather than its contents.
@@ -61,11 +79,11 @@ var emptySuffixes = []string{"Result", "Data", "Value", "State", "Hook"}
 //
 // Three message ids for three different complaints about the same name, so the message says which
 // one applies rather than making a reader work out why their name was rejected.
-var ReactHookRequireResultNaming = rule.Rule{
+var ReactHookRequireResultNaming = rule.Rule[rule.NoOptions]{
 	Name:       "structure/react-hook-require-result-naming",
 	NoListener: rule.NoListenerAnswersInRun,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if !FileContextFor(ctx.SourceFile.FileName().AsString()).IsReactFile {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		if !FileContextFor(ruleContext.SourceFile.FileName().AsString()).IsReactFile {
 			return nil
 		}
 
@@ -75,7 +93,7 @@ var ReactHookRequireResultNaming = rule.Rule{
 		invocationCounts := map[string]int{}
 		var results []hookResultBinding
 
-		sourceFile := ctx.SourceFile.AsNode()
+		sourceFile := ruleContext.SourceFile.AsNode()
 		countHookInvocations(sourceFile, invocationCounts, &results)
 
 		for _, result := range results {
@@ -85,7 +103,7 @@ var ReactHookRequireResultNaming = rule.Rule{
 			if isRelatedHookResultName(result.variableName, result.hookName) {
 				continue
 			}
-			ctx.ReportNode(result.node, hookResultNamingMessage(result.variableName))
+			ruleContext.ReportNode(result.node, hookResultNamingMessage(result.variableName))
 		}
 
 		return nil
@@ -103,6 +121,9 @@ type hookResultBinding struct {
 //
 // Both facts come from the same walk because they are found at the same nodes and a second traversal
 // would double the cost for nothing.
+//
+// Mutates: counts the walk adds one for each hook call it meets, so one map counts the whole file
+// Mutates: results the walk appends each hook result binding it meets, so one slice gathers the whole file
 func countHookInvocations(node *ast.Node, counts map[string]int, results *[]hookResultBinding) {
 	if node == nil {
 		return

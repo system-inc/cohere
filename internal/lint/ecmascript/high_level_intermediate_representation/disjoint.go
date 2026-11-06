@@ -11,7 +11,7 @@
 // Two values that alias the same underlying object cannot be memoized independently. If `a` is
 // pushed into `b` and then `b` is mutated, caching `a` across a render where `b` changed hands back
 // a stale object. Upstream's answer is not "track the alias graph at every consumer" -- it is to
-// collapse the entangled values into ONE equivalence class up front, and let every consumer ask a
+// collapse the entangled values into one equivalence class up front, and let every consumer ask a
 // single question: what is this value's representative? That is what makes this a union-find rather
 // than a reachability walk. The structure is chosen because the consumers only ever ask for a
 // canonical name, never for a path.
@@ -20,12 +20,12 @@
 // `inferReactiveScopeVariables` (line 32233) turns each class into a reactive scope.
 // `inferReactivePlaces` (line 42887) wraps the result in a `ReactivityMap` whose whole use of it is
 // `aliasedIdentifiers.find(place.identifier) ?? place.identifier` (line 43011) -- a representative
-// lookup with a fallback to the value itself. `reactive.go` in this package already declares
+// lookup with a fallback to the value itself. `reactivity.go` in this package already declares
 // `ReactiveGapAliasing` for exactly that missing input, quoting `findDisjointMutableValues` by name.
 // `Find` below is that lookup and `RepresentativeOf` is the fallback form, so the gap closes on the
 // API rather than on a comment.
 //
-// # The input, measured rather than assumed, because an earlier attempt at this stage DECLINED
+// # The input, measured rather than assumed, because an earlier attempt at this stage declined
 //
 // Stage 3 was dispatched once before and correctly refused to build. At that point the widening half
 // of `InferMutableRanges` did not exist, so every mutable range had width exactly one, every
@@ -33,7 +33,7 @@
 // members in 23,256 singleton classes: an identity function that compiles, passes fixtures, and
 // tells every consumer that nothing is entangled with anything.
 //
-// The gates this file reads are NOT the width gate Stage 2.5 measured, so the input was re-measured
+// The gates this file reads are not the width gate Stage 2.5 measured, so the input was re-measured
 // against these predicates specifically, with a checker present -- a lowering without one never
 // emits `StoreContext` and reports zeroes that are facts about the harness rather than the code.
 // Over 400 corpus files, 685 outermost functions:
@@ -54,7 +54,7 @@
 // classes, largest 47, mean 2.91. That test is the guard against this pass silently reverting to the
 // identity function if a future change to ranges narrows them back.
 //
-// # DIVERGENCE FROM oxc: the loop-carried phi disjunct is NOT applied
+// # Divergence from oxc: the loop-carried phi disjunct is not applied
 //
 // oxc's phi predicate carries a third term React has no counterpart for
 // (`infer_reactive_scope_variables.rs:264-269`): a phi whose operand is defined at or after the
@@ -68,7 +68,7 @@
 // failing React's test, so applying it would union 13 additional phi groups across 400 files. Should
 // this ever need revisiting, the term is one `||` and the measurement is here.
 //
-// # PARTIAL DIVERGENCE: call-result types are projected from effect signatures
+// # Partial divergence: call-result types are projected from effect signatures
 //
 // Upstream's `mayAllocate` returns `lvalue.identifier.type.kind !== 'Primitive'` for
 // `CallExpression`, `MethodCall` and `TaggedTemplateExpression`. `InferTypes` obtains that result
@@ -95,7 +95,7 @@
 // one piece of upstream's phi handling that is absent rather than reproduced, and a reader diffing
 // against the bundle would otherwise find it missing with no explanation.
 //
-// # Termination is NOT a fixpoint, and the proof is structural
+// # Termination is not a fixpoint, and the proof is structural
 //
 // There is no worklist here and no iteration to convergence. The pass makes exactly one ordered walk
 // over blocks, phis and instructions, and every `Union` it performs is a monotone merge of two
@@ -115,16 +115,14 @@
 // # Iteration order
 //
 // `Phi.Operands` is kept sorted by predecessor block id, and it is read through
-// `PhiOperandsInOrder` here exactly as `reactive.go` reads it. Union is order-INDEPENDENT in its
+// `PhiOperandsInOrder` here exactly as `reactivity.go` reads it. Union is order-independent in its
 // final partition -- the classes are the same whichever order the merges happen in -- but the chosen
-// REPRESENTATIVE is not, and the representative is what a consumer keys on. A pass whose answer is
+// representative is not, and the representative is what a consumer keys on. A pass whose answer is
 // stable but whose key varies between runs produces a table that differs between runs, which is the
 // shape that makes a cache non-deterministic. Reading in a fixed order removes it.
 package high_level_intermediate_representation
 
 import (
-	"sort"
-
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/mutation_aliasing"
 	"github.com/system-inc/cohere/static_single_assignment"
@@ -157,158 +155,13 @@ func DisjointGaps() []DisjointGap {
 	return []DisjointGap{DisjointGapPrimitiveCallResult}
 }
 
-// DisjointSet is a union-find over values, keyed by IdentifierId.
-//
-// This is React's `DisjointSet` (line 32144) with the same two operations and the same path
-// compression. Membership is sparse: a value that was never passed to `Union` is absent, and `Find`
-// answers `0, false` for it rather than inventing a singleton class. That absence is meaningful --
-// upstream's consumer spells it `find(id) ?? id`, falling back to the value itself -- and
-// `RepresentativeOf` is that fallback written once so every consumer does not re-spell it.
-//
-// The zero value is an empty set and is ready to use.
-type DisjointSet struct {
-	parent map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId
-}
-
-// Union merges every value in items into one class.
-//
-// The first item becomes the class representative when none of the items is already in the set,
-// which is upstream's rule exactly: it takes `items.shift()`, finds its root, and adopts the rest
-// under that root. An empty list is a no-op here; upstream raises an invariant on it, and the
-// difference is deliberate because every call site below builds the list conditionally and an empty
-// one is the ordinary outcome rather than a bug.
-//
-// Note that upstream's `union` MUTATES the caller's array through `shift()`. This takes the slice by
-// value and never writes to it, which is a difference in the implementation rather than in what it
-// decides; the call sites below would be correct under either.
-func (d *DisjointSet) Union(items []static_single_assignment.IdentifierId) {
-	if len(items) == 0 {
-		return
-	}
-	if d.parent == nil {
-		d.parent = map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{}
-	}
-
-	first := items[0]
-	root, ok := d.Find(first)
-	if !ok {
-		root = first
-		d.parent[first] = first
-	}
-
-	for _, item := range items[1:] {
-		itemParent, present := d.parent[item]
-		if !present {
-			d.parent[item] = root
-			continue
-		}
-		if itemParent == root {
-			continue
-		}
-		// Walk this item's chain to the root, repointing every link at the new root. Upstream's
-		// loop, transcribed: it rewrites the whole path rather than only the item, which is what
-		// keeps the structure flat when two established classes merge.
-		current := item
-		for itemParent != root {
-			d.parent[current] = root
-			current = itemParent
-			itemParent = d.parent[current]
-		}
-	}
-}
-
-// Find returns the representative of a value's class, and whether the value is in the set at all.
-//
-// Path compression is applied on the way out, which is what keeps the structure flat and what makes
-// the recursion depth safe. Upstream returns `null` for an absent value; the second return is that
-// null, kept separate from the id because zero is a usable IdentifierId and conflating them would
-// make an absent value read as a member of class zero.
-func (d *DisjointSet) Find(item static_single_assignment.IdentifierId) (static_single_assignment.IdentifierId, bool) {
-	if d.parent == nil {
-		return 0, false
-	}
-	parent, ok := d.parent[item]
-	if !ok {
-		return 0, false
-	}
-	if parent == item {
-		return item, true
-	}
-	root, ok := d.Find(parent)
-	if !ok {
-		return 0, false
-	}
-	d.parent[item] = root
-	return root, true
-}
-
-// RepresentativeOf returns a value's class representative, falling back to the value itself.
-//
-// This is upstream's consumer spelling, `aliasedIdentifiers.find(place.identifier) ?? place.identifier`
-// (line 43011), written once here so that every consumer does not re-derive the fallback. A value
-// that was never unified is its own representative, which is the answer that lets a caller key a map
-// on the result without first asking whether the value is a member.
-func (d *DisjointSet) RepresentativeOf(item static_single_assignment.IdentifierId) static_single_assignment.IdentifierId {
-	if root, ok := d.Find(item); ok {
-		return root
-	}
-	return item
-}
-
-// Has reports whether a value was ever unified into a class.
-func (d *DisjointSet) Has(item static_single_assignment.IdentifierId) bool {
-	if d.parent == nil {
-		return false
-	}
-	_, ok := d.parent[item]
-	return ok
-}
-
-// Size reports how many values are members of some class.
-func (d *DisjointSet) Size() int { return len(d.parent) }
-
-// Sets returns the classes, each sorted, with the outer list ordered by first member.
-//
-// This is upstream's `buildSets` with a determinism guarantee added. Upstream iterates a `Map` whose
-// order is insertion order and therefore stable for it; the backing map here is a Go map, so the
-// order is randomised and would leak into anything a caller derived from the result. Both levels are
-// sorted for that reason. The classes themselves are identical either way -- only the order is
-// pinned, and it is pinned because a non-deterministic ordering is the shape that makes a cache
-// non-reproducible without ever producing a wrong answer.
-func (d *DisjointSet) Sets() [][]static_single_assignment.IdentifierId {
-	if len(d.parent) == 0 {
-		return nil
-	}
-	members := make([]static_single_assignment.IdentifierId, 0, len(d.parent))
-	for item := range d.parent {
-		members = append(members, item)
-	}
-	sort.Slice(members, func(i, j int) bool { return members[i] < members[j] })
-
-	grouped := map[static_single_assignment.IdentifierId][]static_single_assignment.IdentifierId{}
-	var order []static_single_assignment.IdentifierId
-	for _, item := range members {
-		root := d.RepresentativeOf(item)
-		if _, seen := grouped[root]; !seen {
-			order = append(order, root)
-		}
-		grouped[root] = append(grouped[root], item)
-	}
-
-	sets := make([][]static_single_assignment.IdentifierId, 0, len(order))
-	for _, root := range order {
-		sets = append(sets, grouped[root])
-	}
-	return sets
-}
-
 // FindDisjointMutableValues groups the values of function that must be treated as one unit.
 //
 // Requires evaluation order and single-assignment form: call `Construct` first, or take a function
 // from `ForFunction`, which does. Infers ranges for itself; a caller holding a range table already
 // passes it to `FindDisjointMutableValuesWithRanges` and avoids the second inference.
 //
-// Nested functions are NOT included, for the same reason `InferMutableRanges` excludes them: an
+// Nested functions are not included, for the same reason `InferMutableRanges` excludes them: an
 // IdentifierId names one value in this function and a different value in a nested one, so a set
 // spanning two functions would confidently unify two unrelated values. Upstream runs this per
 // function for the same reason.
@@ -334,7 +187,7 @@ func FindDisjointMutableValuesWithRanges(function *Function, ranges *mutation_al
 		return scopeIdentifiers
 	}
 
-	// declarations maps a source binding to the FIRST value it took, which is what lets a phi reach
+	// declarations maps a source binding to the first value it took, which is what lets a phi reach
 	// back to the declaration that introduced the variable. Upstream keys it on `declarationId` and
 	// writes only when absent (`declareIdentifier`, line 32381); `DeclarationId` is this graph's
 	// counterpart and carries the same meaning, one entry per source-level binding.
@@ -356,7 +209,7 @@ func FindDisjointMutableValuesWithRanges(function *Function, ranges *mutation_al
 			// React's two-term test, line 32387. The first term asks whether the range is wider than
 			// a single instruction, and it is written as `start + 1 !== end` rather than
 			// `end > start + 1` because upstream means "not exactly one wide" -- on an unset range,
-			// both fields zero, `start + 1 !== end` is TRUE while `end > start + 1` is false. The
+			// both fields zero, `start + 1 !== end` is true while `end > start + 1` is false. The
 			// second term then rejects it, since an unset end of zero is never greater than a
 			// block's first order. Transcribed in upstream's spelling rather than the tidier one, so
 			// that the two terms keep their independent meanings.
@@ -376,7 +229,7 @@ func FindDisjointMutableValuesWithRanges(function *Function, ranges *mutation_al
 			// Read through PhiOperandsInOrder, ascending predecessor order, the order
 			// `Phi.Operands` keeps.
 			//
-			// # The order is DEFENSIVE rather than load-bearing
+			// # The order is defensive rather than load-bearing
 			//
 			// Neither the partition nor the representative depends on this loop's order, a property
 			// of `Union`: the class representative is taken from `items[0]`, which is the phi, and
@@ -384,11 +237,11 @@ func FindDisjointMutableValuesWithRanges(function *Function, ranges *mutation_al
 			//
 			// Verified directly rather than reasoned about: `Union([phi, decl, opA, opB])` and
 			// `Union([phi, decl, opB, opA])` produce the same class and the same root. The order
-			// that CAN move a representative is the order of separate `Union` CALLS -- `{1,2}` then
+			// that can move a representative is the order of separate `Union` calls -- `{1,2}` then
 			// `{3,2}` roots at 3, while `{3,2}` then `{1,2}` roots at 1 -- and that ordering is the
 			// block and instruction walk, which is deterministic already.
 			//
-			// A fixed order is kept because it is what `reactive.go` does too, and because the
+			// A fixed order is kept because it is what `reactivity.go` does too, and because the
 			// equivalence rests on `Union` keeping its current representative rule. A future change
 			// there would make the order load-bearing with nothing to announce it.
 			for _, blockId := range PhiOperandsInOrder(phi) {
@@ -410,15 +263,31 @@ func FindDisjointMutableValuesWithRanges(function *Function, ranges *mutation_al
 				operands = append(operands, instruction.LValue.Identifier)
 			}
 
-			switch value := instruction.Value.(type) {
+			switch instructionValue := instruction.Value.(type) {
 			case *DeclareLocal:
-				declareIdentifier(value.LValue)
+				declareIdentifier(instructionValue.LValue)
 			case *DeclareContext:
-				declareIdentifier(value.LValue)
+				declareIdentifier(instructionValue.LValue)
 			case *StoreLocal:
-				operands = appendStore(function, ranges, instruction, declareIdentifier, operands, value.LValue, value.Value)
+				operands = appendStore(
+					function,
+					ranges,
+					instruction,
+					declareIdentifier,
+					operands,
+					instructionValue.LValue,
+					instructionValue.Value,
+				)
 			case *StoreContext:
-				operands = appendStore(function, ranges, instruction, declareIdentifier, operands, value.LValue, value.Value)
+				operands = appendStore(
+					function,
+					ranges,
+					instruction,
+					declareIdentifier,
+					operands,
+					instructionValue.LValue,
+					instructionValue.Value,
+				)
 			case *Destructure:
 				// Upstream walks `eachPatternOperand` of the pattern, declaring each bound place and
 				// adding the ones whose range is wider than one. `Destructure` here carries both a
@@ -430,7 +299,7 @@ func FindDisjointMutableValuesWithRanges(function *Function, ranges *mutation_al
 				// Destructure now emits CreateFrom for every ordinary binding. A later mutation
 				// through a LoadLocal therefore reaches the bound place, giving this width test the
 				// same input upstream reads rather than leaving every pattern range one instruction.
-				eachPatternPlace(value.Pattern, func(place Place, role PlaceRole) {
+				eachPatternPlace(instructionValue.Pattern, func(place Place, role PlaceRole) {
 					if role != PlaceRoleDefine {
 						return
 					}
@@ -440,15 +309,15 @@ func FindDisjointMutableValuesWithRanges(function *Function, ranges *mutation_al
 						operands = append(operands, place.Identifier)
 					}
 				})
-				operands = appendMutableOperand(ranges, instruction, operands, value.Value)
+				operands = appendMutableOperand(ranges, instruction, operands, instructionValue.Value)
 			case *MethodCall:
 				operands = appendMutableOperands(instruction, ranges, operands)
-				// The property is added UNCONDITIONALLY, with no range test and no mutability test
+				// The property is added unconditionally, with no range test and no mutability test
 				// (line 32411). It is the only place in the whole pass where an operand joins the
 				// class on its identity alone. Upstream's reason is that a method call's receiver
 				// and the function it resolves to are inseparable: `o.f()` can mutate through `f`,
 				// so the property cannot be memoized apart from the call that reaches it.
-				operands = append(operands, value.Property.Identifier)
+				operands = append(operands, instructionValue.Property.Identifier)
 			default:
 				operands = appendMutableOperands(instruction, ranges, operands)
 			}
@@ -477,18 +346,19 @@ func appendStore(
 	value Place,
 ) []static_single_assignment.IdentifierId {
 	declareIdentifier(lvalue)
+	extended := operands
 	lvalueRange := ranges.Get(lvalue.Identifier)
 	if lvalueRange.End > lvalueRange.Start+1 {
-		operands = append(operands, lvalue.Identifier)
+		extended = append(extended, lvalue.Identifier)
 	}
-	return appendMutableOperand(ranges, instruction, operands, value)
+	return appendMutableOperand(ranges, instruction, extended, value)
 }
 
 // appendMutableOperand adds one operand when it is still being written at this instruction.
 //
 // This is upstream's paired test, `isMutable(instr, operand) && operand.mutableRange.start > 0`.
 // The two halves are not redundant: `isMutable` is `inRange`, which is already false for an unset
-// range, but a range legitimately STARTING at zero would pass `inRange` while naming a value with no
+// range, but a range legitimately starting at zero would pass `inRange` while naming a value with no
 // definition point. Upstream carries both and so does this.
 func appendMutableOperand(
 	ranges *mutation_aliasing.MutableRanges,
@@ -498,14 +368,14 @@ func appendMutableOperand(
 ) []static_single_assignment.IdentifierId {
 	operandRange := ranges.Get(operand.Identifier)
 	if operandRange.Contains(instruction.Order) && operandRange.Start > 0 {
-		operands = append(operands, operand.Identifier)
+		return append(operands, operand.Identifier)
 	}
 	return operands
 }
 
 // appendMutableOperands adds every non-defining operand of the instruction that is still mutable.
 //
-// This is upstream's `eachInstructionOperand` loop, which yields the value's operands and NOT the
+// This is upstream's `eachInstructionOperand` loop, which yields the value's operands and not the
 // instruction's own lvalue -- the lvalue is handled by the range test above it and adding it here
 // would double-count. `PlaceRoleDefine` is the role that names an lvalue in this graph, so the two
 // remaining roles, Use and Receiver, are exactly upstream's operand set.
@@ -514,13 +384,14 @@ func appendMutableOperands(
 	ranges *mutation_aliasing.MutableRanges,
 	operands []static_single_assignment.IdentifierId,
 ) []static_single_assignment.IdentifierId {
+	extended := operands
 	EachPlace(instruction.Value, func(place Place, role PlaceRole) {
 		if role == PlaceRoleDefine {
 			return
 		}
-		operands = appendMutableOperand(ranges, instruction, operands, place)
+		extended = appendMutableOperand(ranges, instruction, extended, place)
 	})
-	return operands
+	return extended
 }
 
 // declarationOf returns the source binding a value belongs to.
@@ -530,7 +401,10 @@ func appendMutableOperands(
 // answers zero, which groups every such value together -- acceptable because the only consumer is
 // the `declarations` map, whose entries are written from real places and read for phis of real
 // bindings.
-func declarationOf(function *Function, id static_single_assignment.IdentifierId) static_single_assignment.DeclarationId {
+func declarationOf(
+	function *Function,
+	id static_single_assignment.IdentifierId,
+) static_single_assignment.DeclarationId {
 	if function == nil {
 		return 0
 	}
@@ -638,21 +512,21 @@ func taggedTemplateCalleeSyntaxName(instruction *Instruction) string {
 // rebinding. Nested patterns are walked, because `const {a: {...rest}} = o` allocates just as much
 // as the flat form does.
 func patternContainsSpread(pattern Pattern) bool {
-	switch p := pattern.(type) {
+	switch typed := pattern.(type) {
 	case *ObjectPattern:
-		if p.Rest != nil {
+		if typed.Rest != nil {
 			return true
 		}
-		for _, property := range p.Properties {
+		for _, property := range typed.Properties {
 			if patternContainsSpread(property.Value) {
 				return true
 			}
 		}
 	case *ArrayPattern:
-		if p.Rest != nil {
+		if typed.Rest != nil {
 			return true
 		}
-		for _, element := range p.Elements {
+		for _, element := range typed.Elements {
 			if patternContainsSpread(element.Value) {
 				return true
 			}

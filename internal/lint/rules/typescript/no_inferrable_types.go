@@ -41,13 +41,13 @@ type NoInferrableTypesOptions struct {
 // Empty input is legal and means both flags off, which is upstream's `defaultOptions`. The generic
 // decoder errors on empty input, which is the only reason this is hand written: the defaults here
 // really are the zero value.
-func DecodeNoInferrableTypesOptions(raw []byte) (any, error) {
+func DecodeNoInferrableTypesOptions(raw []byte) (NoInferrableTypesOptions, error) {
 	var options NoInferrableTypesOptions
 	if len(raw) == 0 {
 		return options, nil
 	}
-	if err := rule.UnmarshalOptions(raw, &options); err != nil {
-		return options, fmt.Errorf("no-inferrable-types takes an options object: %w", err)
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &options); unmarshalOptionsError != nil {
+		return options, fmt.Errorf("no-inferrable-types takes an options object: %w", unmarshalOptionsError)
 	}
 	return options, nil
 }
@@ -75,7 +75,7 @@ func DecodeNoInferrableTypesOptions(raw []byte) (any, error) {
 //
 // # `readonly` is exempt for a compiler reason, not a stylistic one
 //
-// `class C { readonly a: number = 5 }` is CLEAN. Upstream cites Microsoft/TypeScript#14416: without
+// `class C { readonly a: number = 5 }` is clean. Upstream cites Microsoft/TypeScript#14416: without
 // the annotation a readonly property's type narrows to the literal `5` rather than to `number`, so
 // removing it changes what the class means and can break every assignment elsewhere. `optional` is
 // exempt for the same family of reason. This is the `output: null` situation one level up -- a case
@@ -93,10 +93,10 @@ func DecodeNoInferrableTypesOptions(raw []byte) (any, error) {
 // `function f(a? = 5)`, which does not parse. Upstream reaches them with `getTokenBefore`; here they
 // are their own nodes on the parameter and the property, measured, so each is removed by its own
 // range rather than by scanning.
-var NoInferrableTypes = rule.Rule{
+var NoInferrableTypes = rule.Rule[NoInferrableTypesOptions]{
 	Name: "@typescript-eslint/no-inferrable-types",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, configured := rule.OptionsAs[NoInferrableTypesOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[NoInferrableTypesOptions]) rule.Listeners {
+		settings, configured := options.Read()
 		if !configured {
 			settings = NoInferrableTypesOptions{}
 		}
@@ -107,14 +107,14 @@ var NoInferrableTypes = rule.Rule{
 				if declaration == nil {
 					return
 				}
-				reportNoInferrableType(ctx, node, declaration.Type, declaration.Initializer, nil)
+				reportNoInferrableType(ruleContext, node, declaration.Type, declaration.Initializer, nil)
 			},
 		}
 
 		if !settings.IgnoreParameters {
 			parameterVisitor := func(node *ast.Node) {
 				for _, parameter := range node.Parameters() {
-					checkNoInferrableTypesParameter(ctx, parameter)
+					checkNoInferrableTypesParameter(ruleContext, parameter)
 				}
 			}
 			// Upstream listens on the three function forms that can carry a defaulted parameter.
@@ -132,7 +132,7 @@ var NoInferrableTypes = rule.Rule{
 
 		if !settings.IgnoreProperties {
 			listeners[ast.KindPropertyDeclaration] = func(node *ast.Node) {
-				checkNoInferrableTypesProperty(ctx, node)
+				checkNoInferrableTypesProperty(ruleContext, node)
 			}
 		}
 
@@ -145,12 +145,12 @@ var NoInferrableTypes = rule.Rule{
 // Upstream unwraps a `TSParameterProperty` to its inner parameter and then requires an
 // `AssignmentPattern`, which is its shape for a parameter with a default. Here a parameter property
 // is an ordinary `KindParameter` carrying modifiers and the default is its `Initializer`, so the
-// FIELD reads collapse into reading the parameter directly.
+// field reads collapse into reading the parameter directly.
 //
 // # The report span does not collapse with them, and that difference was measured rather than
 // reasoned
 //
-// Unwrapping to `param.parameter` also moves where upstream REPORTS: the finding starts at the
+// Unwrapping to `param.parameter` also moves where upstream reports: the finding starts at the
 // parameter's name, after `public readonly`, not at the modifiers. A first draft reported the whole
 // parameter node, which is what this tree's flat shape hands you, and a differential over real files
 // caught it -- 202 of 204 findings matched position exactly and the two that did not were both
@@ -162,7 +162,7 @@ var NoInferrableTypes = rule.Rule{
 // Neither the 99-case corpus nor any message-id fixture can see this. Upstream's corpus has
 // parameter-property cases, but `RuleTester` compares a column only when a case declares one, and
 // none of them do. The span is anchored on the name for that reason.
-func checkNoInferrableTypesParameter(ctx rule.Context, parameter *ast.Node) {
+func checkNoInferrableTypesParameter(ruleContext rule.Context, parameter *ast.Node) {
 	if parameter == nil || parameter.Kind != ast.KindParameter {
 		return
 	}
@@ -173,7 +173,7 @@ func checkNoInferrableTypesParameter(ctx rule.Context, parameter *ast.Node) {
 	}
 
 	// A parameter carrying an accessibility or `readonly` modifier is upstream's
-	// TSParameterProperty, and upstream reports its INNER parameter. The equivalent here is to
+	// TSParameterProperty, and upstream reports its inner parameter. The equivalent here is to
 	// anchor on the name, since the modifiers are the only thing between the two.
 	anchor := parameter
 	if parameter.Modifiers() != nil && len(parameter.Modifiers().Nodes) > 0 {
@@ -184,12 +184,12 @@ func checkNoInferrableTypesParameter(ctx rule.Context, parameter *ast.Node) {
 
 	// The `?` on an optional parameter is removed alongside the annotation, because
 	// `function f(a? = 5)` does not parse.
-	reportNoInferrableType(ctx, anchor, declaration.Type, declaration.Initializer,
+	reportNoInferrableType(ruleContext, anchor, declaration.Type, declaration.Initializer,
 		declaration.QuestionToken)
 }
 
 // checkNoInferrableTypesProperty handles a class property with an initializer.
-func checkNoInferrableTypesProperty(ctx rule.Context, node *ast.Node) {
+func checkNoInferrableTypesProperty(ruleContext rule.Context, node *ast.Node) {
 	declaration := node.AsPropertyDeclaration()
 	if declaration == nil || declaration.Initializer == nil {
 		return
@@ -211,14 +211,14 @@ func checkNoInferrableTypesProperty(ctx rule.Context, node *ast.Node) {
 	if declaration.PostfixToken != nil && declaration.PostfixToken.Kind == ast.KindExclamationToken {
 		definite = declaration.PostfixToken
 	}
-	reportNoInferrableType(ctx, node, declaration.Type, declaration.Initializer, definite)
+	reportNoInferrableType(ruleContext, node, declaration.Type, declaration.Initializer, definite)
 }
 
 // reportNoInferrableType is upstream's `reportInferrableType`.
 //
 // `extraToken` is the `?` or `!` that has to be removed alongside the annotation, or nil.
 func reportNoInferrableType(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	node *ast.Node,
 	annotation *ast.Node,
 	initializer *ast.Node,
@@ -234,13 +234,13 @@ func reportNoInferrableType(
 
 	fixes := []rule.Fix{}
 	if extraToken != nil {
-		fixes = append(fixes, rule.RemoveRange(rule.TokenRange(ctx.SourceFile, extraToken)))
+		fixes = append(fixes, rule.RemoveRange(rule.TokenRange(ruleContext.SourceFile, extraToken)))
 	}
 	// The annotation's own span does not include the `:` that introduces it, so the removal runs
 	// from just past the preceding token. Leaving the colon behind writes `const a: = 5`.
-	fixes = append(fixes, rule.RemoveRange(noInferrableTypesAnnotationSpan(ctx, annotation)))
+	fixes = append(fixes, rule.RemoveRange(noInferrableTypesAnnotationSpan(ruleContext, annotation)))
 
-	ctx.ReportNodeWithFixes(node, noInferrableTypesMessage(typeName), fixes...)
+	ruleContext.ReportNodeWithFixes(node, noInferrableTypesMessage(typeName), fixes...)
 }
 
 // noInferrableTypesAnnotationSpan is the span to delete for an annotation, colon included.
@@ -249,12 +249,12 @@ func reportNoInferrableType(
 // nothing else can sit between a name and its type annotation. Comments are deliberately not skipped
 // past, matching upstream, which removes the annotation node and its preceding token rather than a
 // computed range.
-func noInferrableTypesAnnotationSpan(ctx rule.Context, annotation *ast.Node) core.TextRange {
-	annotationRange := rule.TokenRange(ctx.SourceFile, annotation)
-	if ctx.SourceFile == nil {
+func noInferrableTypesAnnotationSpan(ruleContext rule.Context, annotation *ast.Node) core.TextRange {
+	annotationRange := rule.TokenRange(ruleContext.SourceFile, annotation)
+	if ruleContext.SourceFile == nil {
 		return annotationRange
 	}
-	text := ctx.SourceFile.Text()
+	text := ruleContext.SourceFile.Text()
 	offset := annotationRange.Pos() - 1
 	for offset >= 0 && noInferrableTypesIsSpaceByte(text[offset]) {
 		offset--
@@ -266,8 +266,13 @@ func noInferrableTypesAnnotationSpan(ctx rule.Context, annotation *ast.Node) cor
 }
 
 // noInferrableTypesIsSpaceByte answers whether a byte is ASCII whitespace.
-func noInferrableTypesIsSpaceByte(b byte) bool {
-	return b == ' ' || b == '\t' || b == '\n' || b == '\r' || b == '\v' || b == '\f'
+func noInferrableTypesIsSpaceByte(character byte) bool {
+	return character == ' ' ||
+		character == '\t' ||
+		character == '\n' ||
+		character == '\r' ||
+		character == '\v' ||
+		character == '\f'
 }
 
 // noInferrableTypesAnnotationName answers upstream's `isInferrable`, and the type name to report.
@@ -299,7 +304,7 @@ func noInferrableTypesAnnotationName(
 			unwrapped.Kind == ast.KindNumericLiteral
 
 	case ast.KindLiteralType:
-		// `null` in TYPE position is a literal type wrapping the keyword here, not a bare keyword
+		// `null` in type position is a literal type wrapping the keyword here, not a bare keyword
 		// node -- measured, and the reason a kind check against KindNullKeyword alone is silent on
 		// `const a: null = null`, which upstream reports and repairs.
 		//

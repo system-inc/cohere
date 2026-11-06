@@ -13,7 +13,7 @@ import (
 // Every source body was byte-checked against that file, and the check was itself controlled by
 // corrupting one body and confirming it went red.
 //
-// Spans are asserted as the TEXT a finding covers rather than as line and column. The harness
+// Spans are asserted as the text a finding covers rather than as line and column. The harness
 // normalises a fixture to `strings.TrimSpace(contents)+"\n"` while the corpus writes its sources as
 // indented template literals starting with a newline, so every upstream line number is one greater
 // than ours. Text spans do not care: they are computed once from upstream's line/column against
@@ -33,12 +33,12 @@ func asTheHarnessWroteIt(sourceText string) string {
 }
 
 // unifiedSignaturesOptionsAsDecoded hands the rule what the config layer hands it: the options struct
-// by value, or nil when nothing was configured. The table keeps pointers only so a row can say nil.
-func unifiedSignaturesOptionsAsDecoded(options *UnifiedSignaturesOptions) any {
+// by value, or none when nothing was configured. The table keeps pointers only so a row can say nil.
+func unifiedSignaturesOptionsAsDecoded(options *UnifiedSignaturesOptions) rule.Given[UnifiedSignaturesOptions] {
 	if options == nil {
-		return nil
+		return rule.Given[UnifiedSignaturesOptions]{}
 	}
-	return *options
+	return rule.Configured(*options)
 }
 
 func unifiedSignaturesFileFor(isJsx bool) string {
@@ -57,13 +57,13 @@ type unifiedSignaturesCase struct {
 	wantStarts []string
 }
 
-func TestUnifiedSignaturesValid(t *testing.T) {
-	t.Parallel()
+func TestUnifiedSignaturesValid(test *testing.T) {
+	test.Parallel()
 
 	cases := []unifiedSignaturesCase{
 		{
 			// Scope containment. Both members are named `f` and neither reports on its own, so this
-			// only stays silent if the nested type literal's member is attributed to the LITERAL
+			// only stays silent if the nested type literal's member is attributed to the literal
 			// rather than to the enclosing interface. A walk that descended into nested scopes while
 			// collecting the outer one would group these two and report.
 			sourceText: "interface I {\n  f(x: number): void;\n  a: { f(x: string): void };\n}\n",
@@ -331,18 +331,23 @@ func TestUnifiedSignaturesValid(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		result := rule_testing.RunWithOptions(t, UnifiedSignatures,
-			unifiedSignaturesFileFor(testCase.isJsx), testCase.sourceText, unifiedSignaturesOptionsAsDecoded(testCase.options))
-		rule_testing.ExpectClean(t, result)
+		result := rule_testing.RunGiven(
+			test,
+			UnifiedSignatures,
+			unifiedSignaturesFileFor(testCase.isJsx),
+			testCase.sourceText,
+			unifiedSignaturesOptionsAsDecoded(testCase.options),
+		)
+		rule_testing.ExpectClean(test, result)
 	}
 }
 
-func TestUnifiedSignaturesInvalid(t *testing.T) {
-	t.Parallel()
+func TestUnifiedSignaturesInvalid(test *testing.T) {
+	test.Parallel()
 
 	cases := []unifiedSignaturesCase{
 		{
-			// Two reporting GROUPS in one scope, which is the only shape that can observe the order
+			// Two reporting groups in one scope, which is the only shape that can observe the order
 			// findings come out in: every other fixture asserts a single finding. Groups are
 			// iterated in first-seen order rather than over the map, and this row asserts source
 			// order. It is worth knowing that this catches a map-order mutation only ~8% of the
@@ -360,7 +365,7 @@ func TestUnifiedSignaturesInvalid(t *testing.T) {
 		},
 		{
 			// The control for the containment case in the valid table: the same two signatures
-			// INSIDE one type literal DO group, so the rule is not simply ignoring nested members.
+			// inside one type literal do group, so the rule is not simply ignoring nested members.
 			sourceText: "interface I {\n  a: { f(x: number): void; f(x: string): void };\n}\n",
 			options:    nil,
 			isJsx:      false,
@@ -369,7 +374,7 @@ func TestUnifiedSignaturesInvalid(t *testing.T) {
 			wantStarts: []string{"These overloads can be combined into one signature taking `number | string`."},
 		},
 		{
-			// The control for the row above: two computed members with the SAME key text do group,
+			// The control for the row above: two computed members with the same key text do group,
 			// so the digit is not simply suppressing every computed member.
 			sourceText: "interface I {\n  [`a`](x: number): void;\n  [`a`](x: string): void;\n}\n",
 			options:    nil,
@@ -377,6 +382,20 @@ func TestUnifiedSignaturesInvalid(t *testing.T) {
 			wantIds:    []string{"singleParameterDifference"},
 			wantSpans:  []string{"x: string"},
 			wantStarts: []string{"These overloads can be combined into one signature taking `number | string`."},
+		},
+		{
+			// The control for the decoder test's same-line rows: a block comment after the last
+			// overload's semicolon precedes the implementation, not either overload, so both read as
+			// undocumented and the pair still reports. A lookup that reached past a signature's own
+			// end for its comment would go quiet here. The installed build reports this row.
+			sourceText: "function f(a: string): void;\n" +
+				"function f(a: number): void; /** documents the implementation */\n" +
+				"function f(a: unknown): void {}\n",
+			options:    &UnifiedSignaturesOptions{IgnoreOverloadsWithDifferentJsDoc: true},
+			isJsx:      false,
+			wantIds:    []string{"singleParameterDifference"},
+			wantSpans:  []string{"a: number"},
+			wantStarts: []string{"These overloads can be combined into one signature taking `string | number`."},
 		},
 		{
 			sourceText: "declare function f(a: number): void;\ndeclare function f(a: number): void;\n",
@@ -392,7 +411,9 @@ func TestUnifiedSignaturesInvalid(t *testing.T) {
 			isJsx:      false,
 			wantIds:    []string{"allParametersAreSame"},
 			wantSpans:  []string{"declare function f(a: number): void;"},
-			wantStarts: []string{"This overload and the one on line 1 can be combined into one signature with identical parameters."},
+			wantStarts: []string{
+				"This overload and the one on line 1 can be combined into one signature with identical parameters.",
+			},
 		},
 		{
 			sourceText: "function f(a: number): void;\nfunction f(a: number): void;\nfunction f(a: number): void {}\n",
@@ -448,7 +469,9 @@ func TestUnifiedSignaturesInvalid(t *testing.T) {
 			isJsx:      false,
 			wantIds:    []string{"omittingSingleParameter"},
 			wantSpans:  []string{"x: number"},
-			wantStarts: []string{"This overload and the one on line 2 can be combined into one signature with an optional parameter."},
+			wantStarts: []string{
+				"This overload and the one on line 2 can be combined into one signature with an optional parameter.",
+			},
 		},
 		{
 			sourceText: "interface I {\n  a0(): void;\n  a0(x: string): string;\n  a0(x: number): void;\n}\n",
@@ -456,7 +479,9 @@ func TestUnifiedSignaturesInvalid(t *testing.T) {
 			isJsx:      false,
 			wantIds:    []string{"omittingSingleParameter"},
 			wantSpans:  []string{"x: number"},
-			wantStarts: []string{"This overload and the one on line 2 can be combined into one signature with an optional parameter."},
+			wantStarts: []string{
+				"This overload and the one on line 2 can be combined into one signature with an optional parameter.",
+			},
 		},
 		{
 			sourceText: "interface I {\n  a1(): void;\n  a1(x: number): void;\n}\n",
@@ -536,7 +561,9 @@ func TestUnifiedSignaturesInvalid(t *testing.T) {
 			isJsx:      false,
 			wantIds:    []string{"singleParameterDifference"},
 			wantSpans:  []string{"x: string | boolean"},
-			wantStarts: []string{"These overloads can be combined into one signature taking `number | string | boolean`."},
+			wantStarts: []string{
+				"These overloads can be combined into one signature taking `number | string | boolean`.",
+			},
 		},
 		{
 			sourceText: "interface I {\n  f(x: number);\n  f(x: [string, boolean]);\n}\n",
@@ -544,7 +571,9 @@ func TestUnifiedSignaturesInvalid(t *testing.T) {
 			isJsx:      false,
 			wantIds:    []string{"singleParameterDifference"},
 			wantSpans:  []string{"x: [string, boolean]"},
-			wantStarts: []string{"These overloads can be combined into one signature taking `number | [string, boolean]`."},
+			wantStarts: []string{
+				"These overloads can be combined into one signature taking `number | [string, boolean]`.",
+			},
 		},
 		{
 			sourceText: "interface Generic<T> {\n  y(x: T[]): void;\n  y(x: T): void;\n}\n",
@@ -648,7 +677,9 @@ func TestUnifiedSignaturesInvalid(t *testing.T) {
 			isJsx:      false,
 			wantIds:    []string{"singleParameterDifference"},
 			wantSpans:  []string{"x: boolean"},
-			wantStarts: []string{"This overload and the one on line 5 can be combined into one signature taking `number | boolean`."},
+			wantStarts: []string{
+				"This overload and the one on line 5 can be combined into one signature taking `number | boolean`.",
+			},
 		},
 		{
 			sourceText: "/**\n * @deprecate\n */\ndeclare function f(x: string): void;\n/**\n * @deprecate\n */\ndeclare function f(x: number): void;\ndeclare function f(x: boolean): void;\n",
@@ -656,7 +687,9 @@ func TestUnifiedSignaturesInvalid(t *testing.T) {
 			isJsx:      false,
 			wantIds:    []string{"singleParameterDifference"},
 			wantSpans:  []string{"x: number"},
-			wantStarts: []string{"This overload and the one on line 4 can be combined into one signature taking `string | number`."},
+			wantStarts: []string{
+				"This overload and the one on line 4 can be combined into one signature taking `string | number`.",
+			},
 		},
 		{
 			sourceText: "declare function f(x: string): void;\n/**\n * @deprecate\n */\ndeclare function f(x: number): void;\n/**\n * @deprecate\n */\ndeclare function f(x: boolean): void;\n",
@@ -664,7 +697,9 @@ func TestUnifiedSignaturesInvalid(t *testing.T) {
 			isJsx:      false,
 			wantIds:    []string{"singleParameterDifference"},
 			wantSpans:  []string{"x: boolean"},
-			wantStarts: []string{"This overload and the one on line 5 can be combined into one signature taking `number | boolean`."},
+			wantStarts: []string{
+				"This overload and the one on line 5 can be combined into one signature taking `number | boolean`.",
+			},
 		},
 		{
 			sourceText: "export function f(x: string): void;\n/**\n * @deprecate\n */\nexport function f(x: number): void;\n/**\n * @deprecate\n */\nexport function f(x: boolean): void;\n",
@@ -672,7 +707,9 @@ func TestUnifiedSignaturesInvalid(t *testing.T) {
 			isJsx:      false,
 			wantIds:    []string{"singleParameterDifference"},
 			wantSpans:  []string{"x: boolean"},
-			wantStarts: []string{"This overload and the one on line 5 can be combined into one signature taking `number | boolean`."},
+			wantStarts: []string{
+				"This overload and the one on line 5 can be combined into one signature taking `number | boolean`.",
+			},
 		},
 		{
 			sourceText: "/**\n * This signature does something.\n */\n\n/**\n * This signature does something else.\n */\nfunction f(x: number): void;\n\n/**\n * This signature does something else.\n */\nfunction f(x: string): void;\n",
@@ -688,7 +725,9 @@ func TestUnifiedSignaturesInvalid(t *testing.T) {
 			isJsx:      false,
 			wantIds:    []string{"singleParameterDifference"},
 			wantSpans:  []string{"x: boolean"},
-			wantStarts: []string{"This overload and the one on line 6 can be combined into one signature taking `number | boolean`."},
+			wantStarts: []string{
+				"This overload and the one on line 6 can be combined into one signature taking `number | boolean`.",
+			},
 		},
 		{
 			sourceText: "// a line comment\ndeclare function f(x: number): unknown;\ndeclare function f(x: boolean): unknown;\n",
@@ -736,7 +775,9 @@ func TestUnifiedSignaturesInvalid(t *testing.T) {
 			isJsx:      false,
 			wantIds:    []string{"singleParameterDifference"},
 			wantSpans:  []string{"x: number | boolean"},
-			wantStarts: []string{"These overloads can be combined into one signature taking `string | number | boolean`."},
+			wantStarts: []string{
+				"These overloads can be combined into one signature taking `string | number | boolean`.",
+			},
 		},
 		{
 			sourceText: "function f(value): void;\nfunction f(value: string): void;\n",
@@ -808,7 +849,9 @@ func TestUnifiedSignaturesInvalid(t *testing.T) {
 			isJsx:      false,
 			wantIds:    []string{"singleParameterDifference"},
 			wantSpans:  []string{"x: number | string & /* brand */ { brand: true }"},
-			wantStarts: []string{"These overloads can be combined into one signature taking `string & { brand: true } | number | string & /* brand */ { brand: true }`."},
+			wantStarts: []string{
+				"These overloads can be combined into one signature taking `string & { brand: true } | number | string & /* brand */ { brand: true }`.",
+			},
 		},
 		{
 			sourceText: "function f(x: string & { brand: true }): void;\nfunction f(x: number | string & { brand: true }): void;\n",
@@ -816,7 +859,9 @@ func TestUnifiedSignaturesInvalid(t *testing.T) {
 			isJsx:      false,
 			wantIds:    []string{"singleParameterDifference"},
 			wantSpans:  []string{"x: number | string & { brand: true }"},
-			wantStarts: []string{"These overloads can be combined into one signature taking `string & { brand: true } | number`."},
+			wantStarts: []string{
+				"These overloads can be combined into one signature taking `string & { brand: true } | number`.",
+			},
 		},
 		{
 			sourceText: "function f<T, U>(x: () => void): void;\nfunction f<T, U>(x: T extends U ? string : number): void;\n",
@@ -824,7 +869,9 @@ func TestUnifiedSignaturesInvalid(t *testing.T) {
 			isJsx:      false,
 			wantIds:    []string{"singleParameterDifference"},
 			wantSpans:  []string{"x: T extends U ? string : number"},
-			wantStarts: []string{"These overloads can be combined into one signature taking `(() => void) | (T extends U ? string : number)`."},
+			wantStarts: []string{
+				"These overloads can be combined into one signature taking `(() => void) | (T extends U ? string : number)`.",
+			},
 		},
 		{
 			sourceText: "interface Value {}\nfunction f(x: new () => Value): void;\nfunction f(x: string): void;\n",
@@ -832,7 +879,9 @@ func TestUnifiedSignaturesInvalid(t *testing.T) {
 			isJsx:      false,
 			wantIds:    []string{"singleParameterDifference"},
 			wantSpans:  []string{"x: string"},
-			wantStarts: []string{"These overloads can be combined into one signature taking `(new () => Value) | string`."},
+			wantStarts: []string{
+				"These overloads can be combined into one signature taking `(new () => Value) | string`.",
+			},
 		},
 		{
 			sourceText: "interface I {\n  f(x: string | number): void;\n  f(x: number | boolean): void;\n  f(x: symbol): string;\n}\n",
@@ -840,7 +889,9 @@ func TestUnifiedSignaturesInvalid(t *testing.T) {
 			isJsx:      false,
 			wantIds:    []string{"singleParameterDifference"},
 			wantSpans:  []string{"x: number | boolean"},
-			wantStarts: []string{"This overload and the one on line 2 can be combined into one signature taking `string | number | boolean`."},
+			wantStarts: []string{
+				"This overload and the one on line 2 can be combined into one signature taking `string | number | boolean`.",
+			},
 		},
 		{
 			sourceText: "function f(x: 'a' | 'b'): void;\nfunction f(x: 'b' | 'c'): void;\n",
@@ -856,7 +907,9 @@ func TestUnifiedSignaturesInvalid(t *testing.T) {
 			isJsx:      false,
 			wantIds:    []string{"singleParameterDifference"},
 			wantSpans:  []string{"x: Array<number> | boolean"},
-			wantStarts: []string{"These overloads can be combined into one signature taking `Array<string> | boolean | Array<number>`."},
+			wantStarts: []string{
+				"These overloads can be combined into one signature taking `Array<string> | boolean | Array<number>`.",
+			},
 		},
 		{
 			sourceText: "function f(x: Promise | boolean): void;\nfunction f(x: Promise<string> | boolean): void;\n",
@@ -864,7 +917,9 @@ func TestUnifiedSignaturesInvalid(t *testing.T) {
 			isJsx:      false,
 			wantIds:    []string{"singleParameterDifference"},
 			wantSpans:  []string{"x: Promise<string> | boolean"},
-			wantStarts: []string{"These overloads can be combined into one signature taking `Promise | boolean | Promise<string>`."},
+			wantStarts: []string{
+				"These overloads can be combined into one signature taking `Promise | boolean | Promise<string>`.",
+			},
 		},
 		{
 			sourceText: "namespace Namespace {\n  export type Value = string;\n}\nfunction f(x: Namespace.Value): void;\nfunction f(x: Namespace.Value | string): void;\n",
@@ -872,16 +927,23 @@ func TestUnifiedSignaturesInvalid(t *testing.T) {
 			isJsx:      false,
 			wantIds:    []string{"singleParameterDifference"},
 			wantSpans:  []string{"x: Namespace.Value | string"},
-			wantStarts: []string{"These overloads can be combined into one signature taking `Namespace.Value | string`."},
+			wantStarts: []string{
+				"These overloads can be combined into one signature taking `Namespace.Value | string`.",
+			},
 		},
 	}
 	for _, testCase := range cases {
-		result := rule_testing.RunWithOptions(t, UnifiedSignatures,
-			unifiedSignaturesFileFor(testCase.isJsx), testCase.sourceText, unifiedSignaturesOptionsAsDecoded(testCase.options))
-		rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		result := rule_testing.RunGiven(
+			test,
+			UnifiedSignatures,
+			unifiedSignaturesFileFor(testCase.isJsx),
+			testCase.sourceText,
+			unifiedSignaturesOptionsAsDecoded(testCase.options),
+		)
+		rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 
 		if len(result.Diagnostics) != len(testCase.wantSpans) {
-			t.Fatalf("wanted %d findings, got %d, on %q",
+			test.Fatalf("wanted %d findings, got %d, on %q",
 				len(testCase.wantSpans), len(result.Diagnostics), testCase.sourceText)
 		}
 		written := asTheHarnessWroteIt(testCase.sourceText)
@@ -889,41 +951,42 @@ func TestUnifiedSignaturesInvalid(t *testing.T) {
 			reported := result.Diagnostics[findingIndex]
 			gotSpan := written[reported.Range.Pos():reported.Range.End()]
 			if gotSpan != wantSpan {
-				t.Errorf("finding %d points at %q, wanted %q, on %q",
+				test.Errorf("finding %d points at %q, wanted %q, on %q",
 					findingIndex, gotSpan, wantSpan, testCase.sourceText)
 			}
-			// The WHOLE rendered message, not merely the id. Two halves carry real judgment: the
+			// The whole rendered message, not merely the id. Two halves carry real judgment: the
 			// opening says which other overload this one joins, and for a union it names the type
 			// the pair would become. Asserting only the prefix left the union text unchecked, which
 			// a mutation sweep caught by deleting the parenthesising branch without a fixture
 			// noticing.
 			if want := testCase.wantStarts[findingIndex]; want != "" &&
 				reported.Message.Description != want {
-				t.Errorf("finding %d message is %q, wanted %q",
+				test.Errorf("finding %d message is %q, wanted %q",
 					findingIndex, reported.Message.Description, want)
 			}
 		}
 	}
 }
 
-// TestUnifiedSignaturesOptionsArriveThroughTheDecoder starts from JSON and the registration's own
-// Decode, which is the only path a configured option takes in a real run.
+// TestUnifiedSignaturesOptionsArriveThroughTheDecoder starts from JSON and the registered entry's own
+// Bind, which decodes through the registration's Decode and is the only path a configured option takes
+// in a real run.
 //
 // Every other test here builds the options struct directly, so they all passed while the rule
 // asserted a pointer and the decoder returned a value: both options read false for every
 // configuration, and nothing in this file could see it. These rows pair each option's default with
 // its configured value on the same source, so a rule that ignores the option fails one of the pair.
-func TestUnifiedSignaturesOptionsArriveThroughTheDecoder(t *testing.T) {
-	t.Parallel()
+func TestUnifiedSignaturesOptionsArriveThroughTheDecoder(test *testing.T) {
+	test.Parallel()
 
-	var decode func(raw []byte) (any, error)
-	for _, registration := range rule.Registered() {
-		if registration.Rule.Name == UnifiedSignatures.Name {
-			decode = registration.Decode
+	var entry rule.Entry
+	for _, candidate := range rule.Registered() {
+		if candidate.Name == UnifiedSignatures.Name {
+			entry = candidate
 		}
 	}
-	if decode == nil {
-		t.Fatalf("%s is not registered with a Decode", UnifiedSignatures.Name)
+	if entry.Bind == nil {
+		test.Fatalf("%s is not registered with a Decode", UnifiedSignatures.Name)
 	}
 
 	cases := []struct {
@@ -941,24 +1004,50 @@ func TestUnifiedSignaturesOptionsArriveThroughTheDecoder(t *testing.T) {
 			sourceText: "/** @deprecated */\ndeclare function f(x: number): unknown;\ndeclare function f(x: boolean): unknown;\n",
 			option:     "ignoreOverloadsWithDifferentJSDoc",
 		},
+		{
+			// The block comment still documents the first overload past the line comment after it, as
+			// upstream's `.reverse().find(...)` over every comment before the signature finds it.
+			name: "ignoreOverloadsWithDifferentJSDoc past a line comment",
+			sourceText: "/** @deprecated */ // kept for old callers\ndeclare function f(x: number): unknown;\n" +
+				"declare function f(x: boolean): unknown;\n",
+			option: "ignoreOverloadsWithDifferentJSDoc",
+		},
+		{
+			// A JSDoc block on the first overload's line, after its semicolon, documents the second:
+			// upstream's `getCommentsBefore` is every comment after the previous token, the `;`. The
+			// scanner's leading ranges at that position start after the first newline, so they alone
+			// miss it and the second overload read as undocumented. The installed build is clean here.
+			name: "ignoreOverloadsWithDifferentJSDoc on the previous overload's line",
+			sourceText: "function f(a: string): void; /** doc for the next */\nfunction f(a: number): void;\n" +
+				"function f(a: unknown): void {}\n",
+			option: "ignoreOverloadsWithDifferentJSDoc",
+		},
+		{
+			// Upstream finds any block comment, not only a JSDoc one (`comment.type === Block`), so a plain
+			// block in the same place documents the second overload too.
+			name: "ignoreOverloadsWithDifferentJSDoc plain block on the previous overload's line",
+			sourceText: "function f(a: string): void; /* plain */\nfunction f(a: number): void;\n" +
+				"function f(a: unknown): void {}\n",
+			option: "ignoreOverloadsWithDifferentJSDoc",
+		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 
 			for _, value := range []string{"false", "true"} {
 				raw := `{"` + testCase.option + `": ` + value + `}`
-				decoded, err := decode([]byte(raw))
-				if err != nil {
-					t.Fatalf("decoding %s: %v", raw, err)
+				bound, bindError := entry.Bind([]byte(raw), rule.OptionsBase{})
+				if bindError != nil {
+					test.Fatalf("decoding %s: %v", raw, bindError)
 				}
-				result := rule_testing.RunWithOptions(t, UnifiedSignatures, "file.ts", testCase.sourceText, decoded)
+				result := rule_testing.RunBound(test, bound, "file.ts", testCase.sourceText)
 				if value == "false" {
 					// The baseline: without the option this source reports, so the true row below
 					// can only go quiet because the option reached the rule.
-					rule_testing.ExpectFindings(t, result, "singleParameterDifference")
+					rule_testing.ExpectFindings(test, result, "singleParameterDifference")
 				} else {
-					rule_testing.ExpectClean(t, result)
+					rule_testing.ExpectClean(test, result)
 				}
 			}
 		})

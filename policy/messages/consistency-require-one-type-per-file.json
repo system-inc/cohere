@@ -1,0 +1,10 @@
+{
+  "rules": {
+    "Go": "cohere-go/consistency-require-one-type-per-file"
+  },
+  "messages": {
+    "extraType": {
+      "text": "This file already serves `{{firstTypeName}}`, and `{{typeName}}` is a second type with methods in it. When each file serves one type, its name is an index: a reader looking for `{{typeName}}` opens the file named for it and finds its declaration and its methods together, and a change to one type never scrolls past another. Move what this file holds of `{{typeName}}` into a file that serves it alone. A type's methods may still be split by theme across files, as long as each file serves that one type."
+    }
+  }
+}

@@ -43,9 +43,9 @@ import (
 // same way, which is why its 57 failing inputs produce 34 diagnostics. A port reporting per
 // character disagrees with the snapshot on every multi-character case while passing any fixture
 // written from the input list alone.
-var NoControlRegex = rule.Rule{
+var NoControlRegex = rule.Rule[rule.NoOptions]{
 	Name: "no-control-regex",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindRegularExpressionLiteral: func(node *ast.Node) {
 				text := node.Text()
@@ -75,7 +75,7 @@ var NoControlRegex = rule.Rule{
 
 				// The whole literal rather than one character, because the finding is about the
 				// pattern and the characters it names may be far apart inside it.
-				ctx.ReportRange(core.NewTextRange(literalStart, node.End()), rule.Message{
+				ruleContext.ReportRange(core.NewTextRange(literalStart, node.End()), rule.Message{
 					Id: "noControlRegex",
 					Description: fmt.Sprintf(
 						"This regular expression spells out the control character %s. A control code "+

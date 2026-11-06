@@ -11,10 +11,16 @@ import (
 )
 
 // astPath is upstream's AstPath over postcss nodes.
-type astPath = printing.AstPath[*estree.Node]
+type astPath = printing.AstPath[*estree.Node, printSettings]
 
 // printerOptions is upstream's options object for one format.
-type printerOptions = printing.Options[*estree.Node]
+type printerOptions = printing.Options[*estree.Node, printSettings, printing.NoArguments]
+
+// printFunc is upstream's print(selector), which the css printer passes no args.
+type printFunc = printing.PrintFunc[printing.NoArguments]
+
+// pathValue is a value on the path, what a path.match predicate is given.
+type pathValue = printing.Value[*estree.Node]
 
 // currentNode is upstream's path.node.
 func currentNode(path *astPath) *estree.Node {
@@ -23,14 +29,14 @@ func currentNode(path *astPath) *estree.Node {
 }
 
 // asNode is a path.match predicate's node argument as a node, or nil.
-func asNode(value any) *estree.Node {
-	node, _ := value.(*estree.Node)
+func asNode(value pathValue) *estree.Node {
+	node, _ := value.Node()
 	return node
 }
 
 // printAll is upstream's path.map(print, ...names).
-func printAll(path *astPath, print printing.PrintFunc, names ...any) []doc.Doc {
-	return printing.Map(path, func(*astPath, int, any) doc.Doc { return print(nil, nil) }, names...)
+func printAll(path *astPath, print printFunc, names ...string) []doc.Doc {
+	return printing.Map(path, func(*astPath, int) doc.Doc { return print("", nil) }, names...)
 }
 
 // choose is upstream's `condition ? doc : ""`, printing the doc only when it is chosen.
@@ -41,25 +47,20 @@ func choose(condition bool, document func() doc.Doc) doc.Doc {
 	return doc.Text("")
 }
 
-// rawsOf is node.raws, postcss's and the sub-parsers' plain object of source details.
-func rawsOf(node *estree.Node) map[string]any {
-	raws, _ := node.Get("raws").(map[string]any)
-	return raws
-}
-
-// rawString is node.raws[key] when it is a string, and "" otherwise.
+// rawString is node.raws[key] when it is a string, and "" otherwise. node.raws is postcss's and the
+// sub-parsers' plain object of source details.
 func rawString(node *estree.Node, key string) string {
-	value, _ := rawsOf(node)[key].(string)
+	value, _ := rawStringIn(node, key)
 	return value
 }
 
 // isPresent is JavaScript's truthiness for a property that holds an array, where an empty array is
 // truthy: a nil slice stands for an absent one.
-func isPresent(value any) bool {
+func isPresent(value estree.Value) bool {
 	switch typed := value.(type) {
-	case []*estree.Node:
+	case estree.Nodes:
 		return typed != nil
-	case []any:
+	case estree.Values:
 		return typed != nil
 	}
 	return estree.IsTruthy(value)
@@ -96,6 +97,8 @@ func everyNode(list []*estree.Node, predicate func(*estree.Node) bool) bool {
 // throws a TypeError, and so does the port, so a source the fork fails on fails here too.
 func mustNode(node *estree.Node) *estree.Node {
 	if node == nil {
+		// Invariant: this is upstream's TypeError, not a crash: Format and PrintToDoc recover it into
+		// their error, as upstream's caller catches it.
 		panic("TypeError: Cannot read properties of undefined (reading 'type')")
 	}
 	return node
@@ -104,12 +107,12 @@ func mustNode(node *estree.Node) *estree.Node {
 // sliceText is String.prototype.slice for the non-negative offsets the printer passes, clamped as
 // JavaScript clamps them.
 func sliceText(text string, start int, end int) string {
-	start = min(max(start, 0), len(text))
-	end = min(max(end, 0), len(text))
-	if start >= end {
+	clampedStart := min(max(start, 0), len(text))
+	clampedEnd := min(max(end, 0), len(text))
+	if clampedStart >= clampedEnd {
 		return ""
 	}
-	return text[start:end]
+	return text[clampedStart:clampedEnd]
 }
 
 // characterBefore is originalText[offset - 1] for the ASCII comparisons the printer makes.
@@ -122,15 +125,15 @@ func characterBefore(text string, offset int) string {
 
 // sourceStartLine is node.source.start.line, and whether the node has a source.
 func sourceStartLine(node *estree.Node) (int, bool) {
-	source, _ := node.Get("source").(map[string]any)
+	source, _ := node.Get("source").(estree.Record)
 	if source == nil {
 		return 0, false
 	}
-	start, _ := source["start"].(map[string]any)
+	start, _ := source["start"].(estree.Record)
 	switch line := start["line"].(type) {
-	case int:
-		return line, true
-	case float64:
+	case estree.Integer:
+		return int(line), true
+	case estree.Number:
 		return int(line), true
 	}
 	return 0, true

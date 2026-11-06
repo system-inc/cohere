@@ -72,6 +72,8 @@ func TraverseDoc(root Doc, onEnter func(Doc) bool, onExit func(Doc), shouldTrave
 		default:
 			parts, isArray := Parts(current)
 			if !isArray {
+				// Invariant: the cases above, nil among them, and Parts cover every Doc this package defines
+				// but fillProgress, which lives only on the printer's stack and never in a doc handed here.
 				panic(fmt.Sprintf("invalid doc %T", current))
 			}
 			for index := len(parts) - 1; index >= 0; index-- {
@@ -82,14 +84,14 @@ func TraverseDoc(root Doc, onEnter func(Doc) bool, onExit func(Doc), shouldTrave
 }
 
 // FindInDoc is upstream's findInDoc: the first non-nil answer fn gives, in traversal order.
-func FindInDoc[T any](root Doc, fn func(Doc) (T, bool), defaultValue T) T {
+func FindInDoc[T any](root Doc, callback func(Doc) (T, bool), defaultValue T) T {
 	result := defaultValue
 	found := false
 	TraverseDoc(root, func(document Doc) bool {
 		if found {
 			return false
 		}
-		if value, ok := fn(document); ok {
+		if value, ok := callback(document); ok {
 			found = true
 			result = value
 		}
@@ -128,9 +130,9 @@ func CanBreak(document Doc) bool {
 }
 
 // MapDoc is upstream's mapDoc: children first, then fn on the rebuilt node.
-func MapDoc(root Doc, fn func(Doc) Doc) Doc {
+func MapDoc(root Doc, transform func(Doc) Doc) Doc {
 	if text, isText := root.(Text); isText {
-		return fn(text)
+		return transform(text)
 	}
 	mapped := map[Doc]Doc{}
 	var rec func(Doc) Doc
@@ -141,7 +143,7 @@ func MapDoc(root Doc, fn func(Doc) Doc) Doc {
 				return result
 			}
 		}
-		result := mapOne(document, rec, fn)
+		result := mapOne(document, rec, transform)
 		if cacheable {
 			mapped[document] = result
 		}
@@ -164,37 +166,37 @@ func isPointerDoc(document Doc) bool {
 // one identity upstream's mapped tree is read for, a conditional group's states (sameStates), is still
 // rebuilt every time. The printer writes break marks onto groups in place, but a mark follows from the
 // group's contents alone, so a group the mapped doc shares with its source is marked as a copy would be.
-func mapOne(document Doc, rec func(Doc) Doc, fn func(Doc) Doc) Doc {
+func mapOne(document Doc, rec func(Doc) Doc, transform func(Doc) Doc) Doc {
 	if original, isArray := Parts(document); isArray {
 		parts := mapParts(original, rec)
 		if sameParts(parts, original) {
 			// The doc itself: putting a slice back in an interface allocates.
-			return fn(document)
+			return transform(document)
 		}
-		return fn(Concat(parts))
+		return transform(Concat(parts))
 	}
 	switch typed := document.(type) {
 	case *Fill:
 		parts := mapParts(typed.Parts, rec)
 		if sameParts(parts, typed.Parts) {
-			return fn(typed)
+			return transform(typed)
 		}
-		return fn(&Fill{Parts: parts})
+		return transform(&Fill{Parts: parts})
 	case *IfBreak:
 		breakContents, flatContents := rec(typed.BreakContents), rec(typed.FlatContents)
 		if sameDoc(breakContents, typed.BreakContents) && sameDoc(flatContents, typed.FlatContents) {
-			return fn(typed)
+			return transform(typed)
 		}
-		return fn(&IfBreak{BreakContents: breakContents, FlatContents: flatContents, GroupID: typed.GroupID})
+		return transform(&IfBreak{BreakContents: breakContents, FlatContents: flatContents, GroupId: typed.GroupId})
 	case *Group:
 		if typed.ExpandedStates == nil {
 			contents := rec(typed.Contents)
 			if sameDoc(contents, typed.Contents) {
-				return fn(typed)
+				return transform(typed)
 			}
 			copied := *typed
 			copied.Contents = contents
-			return fn(&copied)
+			return transform(&copied)
 		}
 		copied := *typed
 		states := make([]Doc, len(typed.ExpandedStates))
@@ -203,44 +205,46 @@ func mapOne(document Doc, rec func(Doc) Doc, fn func(Doc) Doc) Doc {
 		}
 		copied.ExpandedStates = states
 		copied.Contents = states[0]
-		return fn(&copied)
+		return transform(&copied)
 	case *Align:
 		contents := rec(typed.Contents)
 		if sameDoc(contents, typed.Contents) {
-			return fn(typed)
+			return transform(typed)
 		}
 		copied := *typed
 		copied.Contents = contents
-		return fn(&copied)
+		return transform(&copied)
 	case *Indent:
 		contents := rec(typed.Contents)
 		if sameDoc(contents, typed.Contents) {
-			return fn(typed)
+			return transform(typed)
 		}
-		return fn(&Indent{Contents: contents})
+		return transform(&Indent{Contents: contents})
 	case *IndentIfBreak:
 		contents := rec(typed.Contents)
 		if sameDoc(contents, typed.Contents) {
-			return fn(typed)
+			return transform(typed)
 		}
 		copied := *typed
 		copied.Contents = contents
-		return fn(&copied)
+		return transform(&copied)
 	case *Label:
 		contents := rec(typed.Contents)
 		if sameDoc(contents, typed.Contents) {
-			return fn(typed)
+			return transform(typed)
 		}
-		return fn(&Label{Label: typed.Label, Contents: contents})
+		return transform(&Label{Label: typed.Label, Contents: contents})
 	case *LineSuffix:
 		contents := rec(typed.Contents)
 		if sameDoc(contents, typed.Contents) {
-			return fn(typed)
+			return transform(typed)
 		}
-		return fn(&LineSuffix{Contents: contents})
+		return transform(&LineSuffix{Contents: contents})
 	case Text, trimDoc, lineSuffixBoundaryDoc, *Line, breakParentDoc, nil:
-		return fn(document)
+		return transform(document)
 	}
+	// Invariant: Parts and the cases above cover every Doc this package defines but fillProgress and
+	// traverseExit, which live only on the printer's and the traversal's stacks and never in a doc mapped here.
 	panic(fmt.Sprintf("invalid doc %T", document))
 }
 
@@ -275,7 +279,10 @@ func sameDoc(left Doc, right Doc) bool {
 	leftParts, leftIsArray := Parts(left)
 	rightParts, rightIsArray := Parts(right)
 	if leftIsArray || rightIsArray {
-		return leftIsArray && rightIsArray && (leftParts == nil) == (rightParts == nil) && sameParts(leftParts, rightParts)
+		return leftIsArray &&
+			rightIsArray &&
+			(leftParts == nil) == (rightParts == nil) &&
+			sameParts(leftParts, rightParts)
 	}
 	return left == right
 }
@@ -293,7 +300,7 @@ func isFalsy(document Doc) bool {
 // same nodes, cleaned in the same order, with fewer copies (#r89mksm).
 func CleanDoc(document Doc) Doc {
 	if text, isText := document.(Text); isText {
-		return cleanDocFn(text)
+		return cleanDoc(text)
 	}
 	return cleanDocInto(document, nil)
 }
@@ -301,73 +308,14 @@ func CleanDoc(document Doc) Doc {
 // cleanDocInto is CleanDoc with the concats it rebuilds cut from slab, which may be nil to allocate each.
 func cleanDocInto(document Doc, slab *arena.Slab[Doc]) Doc {
 	if text, isText := document.(Text); isText {
-		return cleanDocFn(text)
+		return cleanDoc(text)
 	}
 	cleaner := &docCleaner{slab: slab}
 	cleaner.rec = cleaner.clean
 	return cleaner.clean(document)
 }
 
-// docCleaner is CleanDoc's walk. It is MapDoc with cleanDocFn, with one difference: a concat's cleaned
-// children are gathered in buffer, one stretch per concat on the walk's path, and the concat is built
-// once, at its cleaned length, or handed back as it is when cleaning leaves it unchanged. MapDoc builds
-// the mapped concat, then cleanDocFn builds the cleaned one by appending.
-type docCleaner struct {
-	// mapped is MapDoc's cache by identity, made at the first node that can carry one.
-	mapped map[Doc]Doc
-	buffer []Doc
-	rec    func(Doc) Doc
-	// slab is where the concats cleaning rebuilds come from, nil to allocate each (#v6ksqg3).
-	slab *arena.Slab[Doc]
-}
-
-func (cleaner *docCleaner) clean(document Doc) Doc {
-	cacheable := isPointerDoc(document)
-	if cacheable {
-		if result, present := cleaner.mapped[document]; present {
-			return result
-		}
-	}
-	var result Doc
-	if parts, isArray := Parts(document); isArray {
-		result = cleaner.cleanConcat(document, parts)
-	} else {
-		result = mapOne(document, cleaner.rec, cleanDocFn)
-	}
-	if cacheable {
-		if cleaner.mapped == nil {
-			cleaner.mapped = map[Doc]Doc{}
-		}
-		cleaner.mapped[document] = result
-	}
-	return result
-}
-
-// cleanConcat is mapOne and cleanDocFn for a concat. Each child's own walk leaves buffer as it found it,
-// so the concat's children are buffer[start:] once they are all cleaned.
-func (cleaner *docCleaner) cleanConcat(document Doc, parts []Doc) Doc {
-	start := len(cleaner.buffer)
-	changed := false
-	for _, part := range parts {
-		cleaned := cleaner.clean(part)
-		if !sameDoc(cleaned, part) {
-			changed = true
-		}
-		cleaner.buffer = append(cleaner.buffer, cleaned)
-	}
-	children := cleaner.buffer[start:]
-	var result Doc
-	if !changed && isCleanConcat(parts) {
-		result = document
-	} else {
-		result = cleanParts(children, cleaner.slab)
-	}
-	clear(children)
-	cleaner.buffer = cleaner.buffer[:start]
-	return result
-}
-
-func cleanDocFn(document Doc) Doc {
+func cleanDoc(document Doc) Doc {
 	if parts, isArray := Parts(document); isArray {
 		if isCleanConcat(parts) {
 			// The doc itself: putting a slice back in an interface allocates.
@@ -391,10 +339,10 @@ func cleanDocFn(document Doc) Doc {
 			return typed.Parts[0]
 		}
 	case *Group:
-		if isFalsy(typed.Contents) && typed.ID == nil && !typed.Break && typed.ExpandedStates == nil {
+		if isFalsy(typed.Contents) && typed.Id == nil && !typed.Break && typed.ExpandedStates == nil {
 			return Text("")
 		}
-		if inner, isGroup := typed.Contents.(*Group); isGroup && inner.ID == typed.ID && inner.Break == typed.Break &&
+		if inner, isGroup := typed.Contents.(*Group); isGroup && inner.Id == typed.Id && inner.Break == typed.Break &&
 			sameStates(inner.ExpandedStates, typed.ExpandedStates) {
 			return inner
 		}
@@ -505,8 +453,9 @@ func sameStates(left []Doc, right []Doc) bool {
 // ReplaceEndOfLine is upstream's replaceEndOfLine: every newline in every string becomes replacement,
 // literalline by default.
 func ReplaceEndOfLine(document Doc, replacement Doc) Doc {
+	separator := replacement
 	if replacement == nil {
-		replacement = Literalline
+		separator = Literalline
 	}
 	return MapDoc(document, func(current Doc) Doc {
 		text, isText := current.(Text)
@@ -518,7 +467,7 @@ func ReplaceEndOfLine(document Doc, replacement Doc) Doc {
 		for index, line := range lines {
 			parts[index] = Text(line)
 		}
-		return Join(replacement, parts)
+		return Join(separator, parts)
 	})
 }
 
@@ -573,19 +522,19 @@ func StripTrailingHardlineWith(document Doc, slab *arena.Slab[Doc]) Doc {
 }
 
 func stripTrailingHardlineFromParts(parts []Doc) []Doc {
-	parts = append([]Doc(nil), parts...)
-	for len(parts) >= 2 {
-		_, isLine := parts[len(parts)-2].(*Line)
-		_, isBreakParent := parts[len(parts)-1].(breakParentDoc)
+	stripped := append([]Doc(nil), parts...)
+	for len(stripped) >= 2 {
+		_, isLine := stripped[len(stripped)-2].(*Line)
+		_, isBreakParent := stripped[len(stripped)-1].(breakParentDoc)
 		if !isLine || !isBreakParent {
 			break
 		}
-		parts = parts[:len(parts)-2]
+		stripped = stripped[:len(stripped)-2]
 	}
-	if len(parts) > 0 {
-		parts[len(parts)-1] = stripTrailingHardlineFromDoc(parts[len(parts)-1])
+	if len(stripped) > 0 {
+		stripped[len(stripped)-1] = stripTrailingHardlineFromDoc(stripped[len(stripped)-1])
 	}
-	return parts
+	return stripped
 }
 
 func stripTrailingHardlineFromDoc(document Doc) Doc {
@@ -611,7 +560,7 @@ func stripTrailingHardlineFromDoc(document Doc) Doc {
 		return &IfBreak{
 			BreakContents: stripTrailingHardlineFromDoc(typed.BreakContents),
 			FlatContents:  stripTrailingHardlineFromDoc(typed.FlatContents),
-			GroupID:       typed.GroupID,
+			GroupId:       typed.GroupId,
 		}
 	case *Fill:
 		return &Fill{Parts: stripTrailingHardlineFromParts(typed.Parts)}

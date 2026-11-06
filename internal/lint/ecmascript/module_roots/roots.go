@@ -10,7 +10,6 @@
 package module_roots
 
 import (
-	"slices"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -34,8 +33,8 @@ const (
 	// ReasonNextInstrumentation is a framework hook Next.js calls by name at process start.
 	ReasonNextInstrumentation Reason = "Next.js framework hook"
 
-	// ReasonBuildConfig is a config file a build tool loads by name.
-	ReasonBuildConfig Reason = "build configuration, loaded by name"
+	// ReasonBuildConfiguration is a config file a build tool loads by name.
+	ReasonBuildConfiguration Reason = "build configuration, loaded by name"
 
 	// ReasonTest is a test file, which a runner loads by glob rather than by import.
 	ReasonTest Reason = "test file"
@@ -49,7 +48,7 @@ const (
 	// files under `translations/` directories are loaded exclusively as
 	// `import(`.../translations/${localeCode}`)`, so no static import to them exists and a naive
 	// reference index reports every one as unused. The specifier is computed at runtime, so no
-	// static analysis can resolve it — which means the honest answer is to treat the directory a
+	// static analysis can resolve it, which means the honest answer is to treat the directory a
 	// computed specifier points into as rooted, rather than to pretend the reference was found.
 	ReasonDynamicImportTarget Reason = "reachable only through a computed import() specifier"
 
@@ -90,8 +89,8 @@ var nextAppRouterFiles = map[string]bool{
 // buildConfigFiles are files a build tool loads by name from a project root.
 //
 // The Next.js and OpenNext entries are the framework's. The capitalized ones are this codebase's own
-// convention — ProjectSettings.tsx, TailwindConfiguration.ts, LintConfiguration.ts and their
-// neighbours are read by Structure's tooling rather than imported by application code — and they are
+// convention (ProjectSettings.tsx, TailwindConfiguration.ts, LintConfiguration.ts and their
+// neighbours are read by Structure's tooling rather than imported by application code), and they are
 // here because measuring the tree found them, not because a framework document lists them.
 var buildConfigFiles = map[string]bool{
 	"next.config":             true,
@@ -107,75 +106,6 @@ var buildConfigFiles = map[string]bool{
 	"TypeScriptConfiguration": true,
 	"CohereSettings":          true,
 	"next-env":                true,
-}
-
-// Set decides which files are alive by definition.
-//
-// A file in the root set is never reported as unreferenced, whatever the reference index says about
-// it. Getting this wrong in the permissive direction costs a missed finding; getting it wrong in the
-// strict direction reports a live homepage as dead, which is the failure that makes a reader close
-// the report and never open it again. So where the two are in tension this errs permissive, and says
-// so at every site where it does.
-type Set struct {
-	// dynamicImportDirectories are directory prefixes that a computed `import()` specifier can reach.
-	//
-	// Collected from the program rather than configured, so a new dynamically-loaded directory is
-	// covered the day it is written rather than the day someone remembers to list it.
-	dynamicImportDirectories []string
-}
-
-// IsRoot reports whether a file is alive by definition, and why.
-//
-// The second result is empty when the file is not a root, so a caller can print the reason beside
-// the decision rather than restating the rule.
-func (set *Set) IsRoot(fileName string) (bool, Reason) {
-	base := baseName(fileName)
-	stem := stripExtension(base)
-
-	// A declaration file declares rather than defines. Ambient ones are referenced by nothing and
-	// affect the whole program, and the ones that are imported are already covered by the index, so
-	// nothing is gained by reporting either.
-	if strings.HasSuffix(base, ".d.ts") {
-		return true, ReasonDeclaration
-	}
-
-	// A test runner loads test files by glob. They import the code under test and nothing imports
-	// them, which is exactly the shape the reference index reports as unused.
-	if isTestFile(stem) {
-		return true, ReasonTest
-	}
-
-	if buildConfigFiles[stem] {
-		return true, ReasonBuildConfig
-	}
-
-	// The App Router's reserved names only mean anything inside an app directory. Checking the
-	// directory as well as the name keeps a utility genuinely called `error.ts` reportable.
-	if nextAppRouterFiles[stem] && withinRouteDirectory(fileName) {
-		return true, ReasonNextAppRoute
-	}
-
-	if withinPagesDirectory(fileName) {
-		return true, ReasonNextPagesRoute
-	}
-
-	// Contains rather than HasPrefix. The collected entry is a directory SEGMENT (`/translations/`)
-	// because a computed specifier's literal prefix is an alias path that this analysis deliberately
-	// does not resolve, so the match has to be against the middle of an absolute path rather than
-	// its start. HasPrefix here silently spared nothing and the locale fixture caught it.
-	for _, directory := range set.dynamicImportDirectories {
-		if strings.Contains(fileName, directory) {
-			return true, ReasonDynamicImportTarget
-		}
-	}
-
-	return false, ""
-}
-
-// DynamicImportDirectories returns the directories a computed `import()` roots, sorted, for a
-// fingerprint of what IsRoot decides by besides the file's own name.
-func (set *Set) DynamicImportDirectories() []string {
-	return slices.Sorted(slices.Values(set.dynamicImportDirectories))
 }
 
 // isTestFile reports whether a stem names a test, by the suffixes actually in use.
@@ -202,7 +132,7 @@ func withinRouteDirectory(fileName string) bool {
 // route regardless of its name.
 //
 // The `_components` and similar underscore-prefixed directories are private by Next.js convention
-// and are NOT routes, so they are excluded: a component parked in `pages/_components/` really can be
+// and are not routes, so they are excluded: a component parked in `pages/_components/` really can be
 // unused, and rooting it would hide the finding.
 func withinPagesDirectory(fileName string) bool {
 	if !hasPathSegment(fileName, "pages") {
@@ -318,7 +248,7 @@ func templateHeadText(node *ast.Node) string {
 // resolveSpecifierDirectory turns the literal prefix of a computed specifier into a directory
 // suffix that a file path can be matched against.
 //
-// It deliberately returns a path SUFFIX rather than a resolved absolute path. Resolving the alias
+// It deliberately returns a path suffix rather than a resolved absolute path. Resolving the alias
 // (`@structure/...`) would mean reimplementing module resolution for a specifier that is not fully
 // known, and getting that wrong fails silently in the direction that reports live files as dead.
 // Matching on the trailing directory is coarser and cannot make that mistake.

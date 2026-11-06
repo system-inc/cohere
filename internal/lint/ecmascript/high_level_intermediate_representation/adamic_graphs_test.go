@@ -18,7 +18,11 @@ import (
 
 // exportGraphs names the directory TestExportGraphsForAdamic writes to. Only a test flag sets it, so
 // nothing in a cohere run can reach the export.
-var exportGraphs = flag.String("export-graphs", "", "write the functions React Compiler's vendored fixtures lower to into this directory, in the cases format of Adamic's static_single_assignment slice")
+var exportGraphs = flag.String(
+	"export-graphs",
+	"",
+	"write the functions React Compiler's vendored fixtures lower to into this directory, in the cases format of Adamic's static_single_assignment slice",
+)
 
 // TestExportGraphsForAdamic writes every function React Compiler's own fixtures lower to, as this IR
 // hands it to static_single_assignment.Construct, for Adamic's port of that module (#dnv6f2c), which
@@ -26,7 +30,8 @@ var exportGraphs = flag.String("export-graphs", "", "write the functions React C
 //
 // It skips unless -export-graphs names a directory:
 //
-//	go test -count=1 -run '^TestExportGraphsForAdamic$' ./internal/lint/ecmascript/high_level_intermediate_representation -args -export-graphs <dir>
+//	go test -count=1 -run '^TestExportGraphsForAdamic$' \
+//		./internal/lint/ecmascript/high_level_intermediate_representation -args -export-graphs <dir>
 //
 // Each fixture becomes one file of cases, named for the fixture, with its outermost functions and every
 // function nested in them, each read through ssaGraph and the module's Graph, as construction reads it.
@@ -38,19 +43,22 @@ var exportGraphs = flag.String("export-graphs", "", "write the functions React C
 // named value is named for its declaration, and every place carries one tag. Nothing the passes read is
 // lost: which values share a binding, which bindings a closure captures, every edge and its kind, and
 // every place with its role.
-func TestExportGraphsForAdamic(t *testing.T) {
-	t.Parallel()
+func TestExportGraphsForAdamic(test *testing.T) {
+	test.Parallel()
 	if *exportGraphs == "" {
-		t.Skip("writes Adamic's corpus only when -export-graphs names a directory")
+		test.Skip("writes Adamic's corpus only when -export-graphs names a directory")
 	}
-	if err := os.MkdirAll(*exportGraphs, 0o755); err != nil {
-		t.Fatal(err)
+	if createDirectoryError := os.MkdirAll(*exportGraphs, 0o755); createDirectoryError != nil {
+		test.Fatal(createDirectoryError)
 	}
 
 	fixtures, functions := 0, 0
-	for _, fixture := range reactCompilerFixtures(t) {
-		lowered := lowerReactCompilerFixture(t, fixture.source, func(ctx rule.Context, node *ast.Node) *Function {
-			return Lower(node, ctx.TypeChecker)
+	for _, fixture := range reactCompilerFixtures(test) {
+		lowered := lowerReactCompilerFixture(test, fixture.source, func(
+			ruleContext rule.Context,
+			node *ast.Node,
+		) *Function {
+			return Lower(node, ruleContext.TypeChecker)
 		})
 		name := fixture.name
 
@@ -71,14 +79,18 @@ func TestExportGraphsForAdamic(t *testing.T) {
 		if index == 0 {
 			continue
 		}
-		if err := os.WriteFile(filepath.Join(*exportGraphs, name+".txt"), []byte(out.String()), 0o644); err != nil {
-			t.Fatal(err)
+		if writeError := os.WriteFile(
+			filepath.Join(*exportGraphs, name+".txt"),
+			[]byte(out.String()),
+			0o644,
+		); writeError != nil {
+			test.Fatal(writeError)
 		}
 		fixtures++
 	}
-	t.Logf("%d fixtures, %d functions, written to %s", fixtures, functions, *exportGraphs)
+	test.Logf("%d fixtures, %d functions, written to %s", fixtures, functions, *exportGraphs)
 	if fixtures == 0 {
-		t.Fatal("no fixture lowered to anything, so the export holds nothing")
+		test.Fatal("no fixture lowered to anything, so the export holds nothing")
 	}
 }
 
@@ -90,71 +102,83 @@ type reactCompilerFixture struct {
 
 // reactCompilerFixtures are React Compiler's vendored fixtures in path order, Flow left out, as the
 // conformance corpus leaves them out: the parser can't read them.
-func reactCompilerFixtures(t *testing.T) []reactCompilerFixture {
-	t.Helper()
+func reactCompilerFixtures(test *testing.T) []reactCompilerFixture {
+	test.Helper()
 	root := filepath.Join("..", "..", "rules", "react", "conformance", "testdata", "fixtures")
 	var paths []string
-	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
-		if err != nil {
-			return err
+	walkError := filepath.WalkDir(root, func(path string, entry fs.DirEntry, pathError error) error {
+		if pathError != nil {
+			return pathError
 		}
 		if !entry.IsDir() && !strings.HasSuffix(path, ".md") {
 			paths = append(paths, path)
 		}
 		return nil
 	})
-	if err != nil {
-		t.Fatal(err)
+	if walkError != nil {
+		test.Fatal(walkError)
 	}
 	sort.Strings(paths)
 	var fixtures []reactCompilerFixture
 	for _, path := range paths {
-		contents, err := os.ReadFile(path)
-		if err != nil {
-			t.Fatal(err)
+		contents, readError := os.ReadFile(path)
+		if readError != nil {
+			test.Fatal(readError)
 		}
 		source := string(contents)
 		if strings.Contains(source, "@flow") {
 			continue
 		}
-		name, err := filepath.Rel(root, path)
-		if err != nil {
-			t.Fatal(err)
+		name, relativePathError := filepath.Rel(root, path)
+		if relativePathError != nil {
+			test.Fatal(relativePathError)
 		}
-		fixtures = append(fixtures, reactCompilerFixture{name: strings.NewReplacer("/", "-", " ", "-").Replace(name), source: source})
+		fixtures = append(
+			fixtures,
+			reactCompilerFixture{name: strings.NewReplacer("/", "-", " ", "-").Replace(name), source: source},
+		)
 	}
 	return fixtures
 }
 
 // lowerReactCompilerFixture lowers every outermost function in a fixture's source through lower, with a
 // real type checker.
-func lowerReactCompilerFixture(t *testing.T, source string, lower func(rule.Context, *ast.Node) *Function) []*Function {
-	t.Helper()
+func lowerReactCompilerFixture(
+	test *testing.T,
+	source string,
+	lower func(rule.Context, *ast.Node) *Function,
+) []*Function {
+	test.Helper()
 	var lowered []*Function
-	probe := rule.Rule{
+	probe := rule.Rule[rule.NoOptions]{
 		Name:             "adamic-graphs-export",
 		NeedsTypeChecker: true,
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
-					if ctx.TypeChecker == nil {
-						t.Fatal("the harness produced no type checker, so every reference would lower as a global")
+					if ruleContext.TypeChecker == nil {
+						test.Fatal("the harness produced no type checker, so every reference would lower as a global")
 					}
 					forEachFunctionLike(node, func(function *ast.Node) {
-						if fn := lower(ctx, function); fn != nil {
-							lowered = append(lowered, fn)
+						if loweredFunction := lower(ruleContext, function); loweredFunction != nil {
+							lowered = append(lowered, loweredFunction)
 						}
 					})
 				},
 			}
 		},
 	}
-	rule_testing.RunTyped(t, probe, "fixture.tsx", source)
+	rule_testing.RunTyped(test, probe, "fixture.tsx", source)
 	return lowered
 }
 
 // writeAdamicCase writes one function as Adamic's cases records, read through any IR's Graph.
-func writeAdamicCase[G static_single_assignment.Graph[F, B, P], F any, B comparable, P any](out *strings.Builder, name string, graph G, function F) {
+func writeAdamicCase[G static_single_assignment.Graph[F, B, P], F any, B comparable, P any](
+	out *strings.Builder,
+	name string,
+	graph G,
+	function F,
+) {
 	identifiers := map[static_single_assignment.IdentifierId]int{}
 	var order []static_single_assignment.IdentifierId
 	identifier := func(place P) int {
@@ -184,15 +208,19 @@ func writeAdamicCase[G static_single_assignment.Graph[F, B, P], F any, B compara
 		instructions []instructionRecord
 		terminal     []placeRecord
 	}
-	var params []int
-	for _, param := range graph.Params(function) {
-		params = append(params, identifier(param))
+	var parameters []int
+	for _, parameter := range graph.Parameters(function) {
+		parameters = append(parameters, identifier(parameter))
 	}
 	returns := -1
 	if place := graph.Returns(function); place != nil {
 		returns = identifier(*place)
 	}
-	edgeNames := map[static_single_assignment.Edge]string{static_single_assignment.Real: "Real", static_single_assignment.Fallthrough: "Fallthrough", static_single_assignment.Exceptional: "Exceptional"}
+	edgeNames := map[static_single_assignment.Edge]string{
+		static_single_assignment.Real:        "Real",
+		static_single_assignment.Fallthrough: "Fallthrough",
+		static_single_assignment.Exceptional: "Exceptional",
+	}
 	var blocks []blockRecord
 	for _, block := range graph.Blocks(function) {
 		record := blockRecord{id: graph.Id(block), returns: graph.EndsInReturn(block)}
@@ -206,7 +234,9 @@ func writeAdamicCase[G static_single_assignment.Graph[F, B, P], F any, B compara
 				number := identifier(*place)
 				if role == static_single_assignment.Define {
 					instruction.places = append(instruction.places, placeRecord{"define", number})
-					if instruction.context && instruction.result == -1 && graph.ContextStoreDefines(function, block, index, *place) {
+					if instruction.context &&
+						instruction.result == -1 &&
+						graph.ContextStoreDefines(function, block, index, *place) {
 						instruction.result = number
 					}
 					return
@@ -225,7 +255,13 @@ func writeAdamicCase[G static_single_assignment.Graph[F, B, P], F any, B compara
 		blocks = append(blocks, record)
 	}
 
-	fmt.Fprintf(out, "function %s\nentry %d\nbound %d\nidentifier 0 -\n", name, graph.Entry(function), graph.BlockBound(function))
+	fmt.Fprintf(
+		out,
+		"function %s\nentry %d\nbound %d\nidentifier 0 -\n",
+		name,
+		graph.Entry(function),
+		graph.BlockBound(function),
+	)
 	declarations := map[static_single_assignment.DeclarationId]int{}
 	var declarationOrder []static_single_assignment.DeclarationId
 	for _, id := range order {
@@ -247,8 +283,8 @@ func writeAdamicCase[G static_single_assignment.Graph[F, B, P], F any, B compara
 			fmt.Fprintf(out, "contextual %d\n", declarations[declaration])
 		}
 	}
-	for _, param := range params {
-		fmt.Fprintf(out, "param %d v\n", param)
+	for _, parameter := range parameters {
+		fmt.Fprintf(out, "param %d v\n", parameter)
 	}
 	if returns >= 0 {
 		fmt.Fprintf(out, "returns %d v\n", returns)

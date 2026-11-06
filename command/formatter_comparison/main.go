@@ -19,45 +19,52 @@ import (
 
 func main() {
 	root := flag.String("root", "", "the tree to measure (must already be formatted by our Prettier)")
-	fileList := flag.String("files", "", "a newline-delimited file of paths to measure, relative to -root; without it the tree is walked")
+	fileList := flag.String(
+		"files",
+		"",
+		"a newline-delimited file of paths to measure, relative to -root; without it the tree is walked",
+	)
 	limit := flag.Int("limit", 0, "stop after this many files (0 means all)")
 	samples := flag.Int("samples", 3, "how many example lines to print per difference kind")
 	flag.Parse()
 
 	if *root == "" {
+		// Ignored: the exit code below says the run failed even when standard error cannot.
 		fmt.Fprintln(os.Stderr, "formatdiff: -root is required")
 		os.Exit(1)
 	}
 
 	var files []string
-	var err error
+	var listError error
 	if *fileList != "" {
-		files, err = readList(*root, *fileList, *limit)
+		files, listError = readList(*root, *fileList, *limit)
 	} else {
-		files, err = collect(*root, *limit)
+		files, listError = collect(*root, *limit)
 	}
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "formatdiff: %v\n", err)
+	if listError != nil {
+		// Ignored: the exit code below says the run failed even when standard error cannot.
+		fmt.Fprintf(os.Stderr, "formatdiff: %v\n", listError)
 		os.Exit(1)
 	}
 	if len(files) == 0 {
 		// An empty corpus reads exactly like a clean one, and that is the failure this whole repo
 		// exists to make impossible.
+		// Ignored: the exit code below says the run failed even when standard error cannot.
 		fmt.Fprintln(os.Stderr, "formatdiff: found no files to measure, refusing to report a clean run")
 		os.Exit(1)
 	}
 
-	var (
-		parsed, identical, differing int
-		unparseable                  []string
-		panicked                     []string
-		kinds                        = map[string]int{}
-		examples                     = map[string][]string{}
-	)
+	parsed := 0
+	identical := 0
+	differing := 0
+	var unparseable []string
+	var panicked []string
+	kinds := map[string]int{}
+	examples := map[string][]string{}
 
 	for _, file := range files {
-		raw, readErr := os.ReadFile(file)
-		if readErr != nil {
+		raw, readError := os.ReadFile(file)
+		if readError != nil {
 			continue
 		}
 		text := string(raw)
@@ -87,41 +94,49 @@ func main() {
 		}
 	}
 
-	fmt.Printf(
+	// The report is written whole and printed in one call, so a reader who never got it is told by the exit code.
+	report := &strings.Builder{}
+	fmt.Fprintf(
+		report,
 		"corpus:      %d files found, %d parsed, %d unparseable, %d panicked the formatter\n",
 		len(files), parsed, len(unparseable), len(panicked),
 	)
-	fmt.Printf("agreement:   %d identical, %d differing", identical, differing)
+	fmt.Fprintf(report, "agreement:   %d identical, %d differing", identical, differing)
 	if parsed > 0 {
-		fmt.Printf("  (%.1f%% of parsed files differ)", 100*float64(differing)/float64(parsed))
+		fmt.Fprintf(report, "  (%.1f%% of parsed files differ)", 100*float64(differing)/float64(parsed))
 	}
-	fmt.Println()
+	fmt.Fprintln(report)
 
 	if len(panicked) > 0 {
-		fmt.Printf("\nthe formatter panicked on %d files:\n", len(panicked))
+		fmt.Fprintf(report, "\nthe formatter panicked on %d files:\n", len(panicked))
 		for _, entry := range panicked[:min(len(panicked), 10)] {
-			fmt.Printf("  %s\n", entry)
+			fmt.Fprintf(report, "  %s\n", entry)
 		}
 	}
 
 	if len(unparseable) > 0 {
-		fmt.Printf("\nunparseable (%d):\n", len(unparseable))
+		fmt.Fprintf(report, "\nunparseable (%d):\n", len(unparseable))
 		for _, file := range unparseable[:min(len(unparseable), 10)] {
-			fmt.Printf("  %s\n", rel(*root, file))
+			fmt.Fprintf(report, "  %s\n", rel(*root, file))
 		}
 	}
 
-	fmt.Println("\ndifference kinds, by how many files each appears in:")
+	fmt.Fprintln(report, "\ndifference kinds, by how many files each appears in:")
 	ordered := make([]string, 0, len(kinds))
 	for kind := range kinds {
 		ordered = append(ordered, kind)
 	}
-	sort.Slice(ordered, func(a, b int) bool { return kinds[ordered[a]] > kinds[ordered[b]] })
+	sort.Slice(ordered, func(left, right int) bool { return kinds[ordered[left]] > kinds[ordered[right]] })
 	for _, kind := range ordered {
-		fmt.Printf("\n  %-28s %5d files\n", kind, kinds[kind])
+		fmt.Fprintf(report, "\n  %-28s %5d files\n", kind, kinds[kind])
 		for _, example := range examples[kind] {
-			fmt.Printf("      %s\n", example)
+			fmt.Fprintf(report, "      %s\n", example)
 		}
+	}
+	if _, printError := fmt.Print(report.String()); printError != nil {
+		// Ignored: the exit code below says the report never arrived even when standard error cannot.
+		fmt.Fprintf(os.Stderr, "formatdiff: printing the report: %v\n", printError)
+		os.Exit(1)
 	}
 }
 
@@ -142,29 +157,32 @@ func classify(before string, after string) map[string]string {
 	}
 
 	for index := range beforeLines {
-		b, a := beforeLines[index], afterLines[index]
-		if b == a {
+		beforeLine, afterLine := beforeLines[index], afterLines[index]
+		if beforeLine == afterLine {
 			continue
 		}
 
 		lineNumber := index + 1
-		bIndent := len(b) - len(strings.TrimLeft(b, " \t"))
-		aIndent := len(a) - len(strings.TrimLeft(a, " \t"))
+		bIndent := len(beforeLine) - len(strings.TrimLeft(beforeLine, " \t"))
+		aIndent := len(afterLine) - len(strings.TrimLeft(afterLine, " \t"))
 
 		switch {
 		case bIndent != aIndent:
 			record(found, "indentation", fmt.Sprintf("line %d: indent %d -> %d", lineNumber, bIndent, aIndent))
-		case strings.TrimRight(b, " \t") == strings.TrimRight(a, " \t"):
+		case strings.TrimRight(beforeLine, " \t") == strings.TrimRight(afterLine, " \t"):
 			record(found, "trailing-whitespace", fmt.Sprintf("line %d", lineNumber))
-		case collapse(b) == collapse(a):
-			record(found, "interior-spacing", fmt.Sprintf("line %d: %s", lineNumber, trim(a)))
+		case collapse(beforeLine) == collapse(afterLine):
+			record(found, "interior-spacing", fmt.Sprintf("line %d: %s", lineNumber, trim(afterLine)))
 		default:
-			record(found, "other", fmt.Sprintf("line %d: %s  ->  %s", lineNumber, trim(b), trim(a)))
+			record(found, "other", fmt.Sprintf("line %d: %s  ->  %s", lineNumber, trim(beforeLine), trim(afterLine)))
 		}
 	}
 	return found
 }
 
+// record keeps the first example of a kind in found, so a kind seen again on a later line adds nothing.
+//
+// Mutates: found is classify's tally of the kinds in one file, and recording a kind into it is this helper's job
 func record(found map[string]string, kind string, example string) {
 	if _, seen := found[kind]; !seen {
 		found[kind] = example
@@ -178,15 +196,15 @@ func collapse(line string) string {
 }
 
 func trim(line string) string {
-	line = strings.TrimSpace(line)
-	if len(line) > 72 {
-		return line[:72] + "..."
+	trimmed := strings.TrimSpace(line)
+	if len(trimmed) > 72 {
+		return trimmed[:72] + "..."
 	}
-	return line
+	return trimmed
 }
 
 func rel(root string, file string) string {
-	if relative, err := filepath.Rel(root, file); err == nil {
+	if relative, relativePathError := filepath.Rel(root, file); relativePathError == nil {
 		return relative
 	}
 	return file
@@ -197,9 +215,9 @@ func rel(root string, file string) string {
 // and Structure's defaults, and a corpus that includes ignored files measures a formatter against
 // text nobody formats, producing a real-looking number about the wrong question.
 func readList(root string, listPath string, limit int) ([]string, error) {
-	raw, err := os.ReadFile(listPath)
-	if err != nil {
-		return nil, err
+	raw, readError := os.ReadFile(listPath)
+	if readError != nil {
+		return nil, readError
 	}
 	var files []string
 	for _, line := range strings.Split(string(raw), "\n") {
@@ -230,8 +248,8 @@ func collect(root string, limit int) ([]string, error) {
 		"dist": true, "build": true, "out": true,
 	}
 
-	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
+	walkError := filepath.Walk(root, func(path string, info os.FileInfo, pathError error) error {
+		if pathError != nil {
 			return nil
 		}
 		if info.IsDir() {
@@ -252,5 +270,5 @@ func collect(root string, limit int) ([]string, error) {
 		}
 		return nil
 	})
-	return files, err
+	return files, walkError
 }

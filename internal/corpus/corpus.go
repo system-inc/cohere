@@ -5,7 +5,8 @@
 // coverage existed only on that machine and nobody could tell. A test asks for a corpus by name instead.
 // The corpus's variable says where it is. When the variable is unset the test skips with a line naming it,
 // and `cohere-dev test` ends every run by naming the corpora it did not cover, so a green run says what it
-// left out. No test names a path: internal/testpolicy fails one that names a home directory.
+// left out. No test names a path: the Go engine's cohere-go/testing-no-machine-path fails one that names a home
+// directory.
 //
 // `cohere-dev test` sets each unset variable from the user's corpora file, so a developer who has the
 // checkouts writes the file once and every gate covers them, without exporting anything.
@@ -37,12 +38,24 @@ var (
 	// design system's stylesheets, and its installed packages.
 	Ahra = Corpus{Name: "ahra", Variable: "COHERE_CORPUS_AHRA", What: "a checkout of ahra (private)"}
 	// Structure is a checkout of Structure, which is private, for the TypeScript under its source/.
-	Structure = Corpus{Name: "structure", Variable: "COHERE_CORPUS_STRUCTURE", What: "a checkout of Structure (private)"}
+	Structure = Corpus{
+		Name:     "structure",
+		Variable: "COHERE_CORPUS_STRUCTURE",
+		What:     "a checkout of Structure (private)",
+	}
 	// Connected is a checkout of www-connected-app, which is private, for its design system.
-	Connected = Corpus{Name: "connected", Variable: "COHERE_CORPUS_CONNECTED", What: "a checkout of www-connected-app (private)"}
+	Connected = Corpus{
+		Name:     "connected",
+		Variable: "COHERE_CORPUS_CONNECTED",
+		What:     "a checkout of www-connected-app (private)",
+	}
 	// PrettierFork is a checkout of the Prettier fork cohere's formatter is held to, with its node_modules
 	// installed, for the oracles that run its parsers.
-	PrettierFork = Corpus{Name: "prettier-fork", Variable: "COHERE_PRETTIER_FORK", What: "a checkout of the Prettier fork, with node_modules"}
+	PrettierFork = Corpus{
+		Name:     "prettier-fork",
+		Variable: "COHERE_PRETTIER_FORK",
+		What:     "a checkout of the Prettier fork, with node_modules",
+	}
 )
 
 // All is every corpus, in the order the gate names them.
@@ -50,15 +63,20 @@ var All = []Corpus{Ahra, Structure, Connected, PrettierFork}
 
 // Root is the corpus's directory, or a skip naming the variable to set when it is unset. A variable set to
 // something that is not a directory fails the test: the developer asked for coverage they are not getting.
-func (corpus Corpus) Root(t testing.TB) string {
-	t.Helper()
+func (corpus Corpus) Root(test testing.TB) string {
+	test.Helper()
 	root := os.Getenv(corpus.Variable)
 	if root == "" {
-		t.Skipf("%s: set %s to %s to cover this test", corpus.Name, corpus.Variable, corpus.What)
+		test.Skipf("%s: set %s to %s to cover this test", corpus.Name, corpus.Variable, corpus.What)
 	}
-	information, err := os.Stat(root)
-	if err != nil || !information.IsDir() {
-		t.Fatalf("%s is set to %s, which is not a directory, so this test cannot read %s", corpus.Variable, root, corpus.What)
+	information, statError := os.Stat(root)
+	if statError != nil || !information.IsDir() {
+		test.Fatalf(
+			"%s is set to %s, which is not a directory, so this test cannot read %s",
+			corpus.Variable,
+			root,
+			corpus.What,
+		)
 	}
 	return root
 }
@@ -70,9 +88,9 @@ func (corpus Corpus) Covered() bool {
 }
 
 // Path is a path inside the corpus, or the skip or failure Root gives.
-func (corpus Corpus) Path(t testing.TB, elements ...string) string {
-	t.Helper()
-	return filepath.Join(append([]string{corpus.Root(t)}, elements...)...)
+func (corpus Corpus) Path(test testing.TB, elements ...string) string {
+	test.Helper()
+	return filepath.Join(append([]string{corpus.Root(test)}, elements...)...)
 }
 
 // A file that records a path inside a corpus, such as a fixture's entry point, spells it
@@ -84,7 +102,7 @@ var spellingPattern = regexp.MustCompile(`^([a-z][a-z0-9-]+):(.*)$`)
 // Spelled splits a "<corpus>:<path in it>" spelling into the corpus and the slash-separated path inside
 // it. spelled is false for anything else, such as an absolute path. A spelling whose name is no corpus
 // is an error, never a relative path, so a typo cannot read some other file.
-func Spelled(spelling string) (corpus Corpus, inside string, spelled bool, err error) {
+func Spelled(spelling string) (corpus Corpus, inside string, spelled bool, spelledError error) {
 	match := spellingPattern.FindStringSubmatch(spelling)
 	if match == nil {
 		return Corpus{}, "", false, nil
@@ -94,7 +112,12 @@ func Spelled(spelling string) (corpus Corpus, inside string, spelled bool, err e
 			return candidate, match[2], true, nil
 		}
 	}
-	return Corpus{}, "", true, fmt.Errorf("%s names the corpus %q, which is no corpus; the corpora are %s", spelling, match[1], corpusNames())
+	return Corpus{}, "", true, fmt.Errorf(
+		"%s names the corpus %q, which is no corpus; the corpora are %s",
+		spelling,
+		match[1],
+		corpusNames(),
+	)
 }
 
 // Resolve is the path a "<corpus>:<path in it>" spelling names. When the corpus is unset it skips naming
@@ -105,36 +128,39 @@ func Spelled(spelling string) (corpus Corpus, inside string, spelled bool, err e
 // too and never skips, which is how a fixture generated from a public theme records its entry point
 // (#f598zk0). An absolute path fails, and so does a relative one that climbs out of the repository:
 // neither reads the same on another machine.
-func Resolve(t testing.TB, spelling string) string {
-	t.Helper()
-	corpus, inside, spelled, err := Spelled(spelling)
-	if err != nil {
-		t.Fatal(err)
+func Resolve(test testing.TB, spelling string) string {
+	test.Helper()
+	corpus, inside, spelled, spelledError := Spelled(spelling)
+	if spelledError != nil {
+		test.Fatal(spelledError)
 	}
 	if !spelled {
 		if filepath.IsAbs(spelling) {
-			t.Fatalf("%q is an absolute path, which reads the same on no other machine: spell it "+
+			test.Fatalf("%q is an absolute path, which reads the same on no other machine: spell it "+
 				"<corpus>:<path in it>, or give it relative to this repository", spelling)
 		}
-		root, err := RepositoryRoot()
-		if err != nil {
-			t.Fatal(err)
+		root, repositoryRootError := RepositoryRoot()
+		if repositoryRootError != nil {
+			test.Fatal(repositoryRootError)
 		}
 		path := filepath.Join(root, filepath.FromSlash(spelling))
 		// A path that climbs out of the repository would let a fixture depend on a sibling checkout
 		// while looking portable, and read nothing on a machine without one.
-		if inside, err := filepath.Rel(root, path); err != nil || inside == ".." || strings.HasPrefix(inside, ".."+string(filepath.Separator)) {
-			t.Fatalf("%q climbs out of this repository, so it reads the same on no other machine: spell it "+
+		if inside, relativePathError := filepath.Rel(
+			root,
+			path,
+		); relativePathError != nil || inside == ".." || strings.HasPrefix(inside, ".."+string(filepath.Separator)) {
+			test.Fatalf("%q climbs out of this repository, so it reads the same on no other machine: spell it "+
 				"<corpus>:<path in it>, or give a path inside this repository", spelling)
 		}
-		if _, err := os.Stat(path); err != nil {
-			t.Fatalf("%q is neither spelled <corpus>:<path in it> nor in this repository: %v", spelling, err)
+		if _, statError := os.Stat(path); statError != nil {
+			test.Fatalf("%q is neither spelled <corpus>:<path in it> nor in this repository: %v", spelling, statError)
 		}
 		return path
 	}
-	path := corpus.Path(t, filepath.FromSlash(inside))
-	if _, err := os.Stat(path); err != nil {
-		t.Fatalf("%s is set, but %s is not in it: %v", corpus.Variable, spelling, err)
+	path := corpus.Path(test, filepath.FromSlash(inside))
+	if _, statError := os.Stat(path); statError != nil {
+		test.Fatalf("%s is set, but %s is not in it: %v", corpus.Variable, spelling, statError)
 	}
 	return path
 }
@@ -147,15 +173,18 @@ const repositoryModule = "github.com/system-inc/cohere"
 // go.mod declares this module. A test runs in its package's directory, so it finds the root from any
 // package.
 func RepositoryRoot() (string, error) {
-	directory, err := os.Getwd()
-	if err != nil {
-		return "", err
+	directory, workingDirectoryError := os.Getwd()
+	if workingDirectoryError != nil {
+		return "", workingDirectoryError
 	}
 	for {
-		contents, err := os.ReadFile(filepath.Join(directory, "go.mod"))
-		if err == nil {
+		contents, readError := os.ReadFile(filepath.Join(directory, "go.mod"))
+		if readError == nil {
 			for _, line := range strings.Split(string(contents), "\n") {
-				if module, isModule := strings.CutPrefix(strings.TrimSpace(line), "module "); isModule && strings.TrimSpace(module) == repositoryModule {
+				if module, isModule := strings.CutPrefix(
+					strings.TrimSpace(line),
+					"module ",
+				); isModule && strings.TrimSpace(module) == repositoryModule {
 					return directory, nil
 				}
 			}
@@ -175,25 +204,31 @@ func Locate(spelling string) (string, error) {
 	return locate(spelling, os.Getenv, ConfigPath)
 }
 
-func locate(spelling string, lookup func(string) string, configPath func() (string, error)) (string, error) {
-	corpus, inside, spelled, err := Spelled(spelling)
-	if err != nil || !spelled {
-		return spelling, err
+func locate(spelling string, lookup func(string) string, configurationPath func() (string, error)) (string, error) {
+	corpus, inside, spelled, spelledError := Spelled(spelling)
+	if spelledError != nil || !spelled {
+		return spelling, spelledError
 	}
 	root := lookup(corpus.Variable)
 	if root == "" {
-		path, err := configPath()
-		if err != nil {
-			return "", err
+		path, configurationPathError := configurationPath()
+		if configurationPathError != nil {
+			return "", configurationPathError
 		}
-		config, err := ReadConfig(path)
-		if err != nil {
-			return "", err
+		configuration, readConfigurationError := ReadConfiguration(path)
+		if readConfigurationError != nil {
+			return "", readConfigurationError
 		}
-		root = config[corpus.Name]
+		root = configuration[corpus.Name]
 	}
 	if root == "" {
-		return "", fmt.Errorf("%s needs %s: set %s, or name %q in the corpora file", spelling, corpus.What, corpus.Variable, corpus.Name)
+		return "", fmt.Errorf(
+			"%s needs %s: set %s, or name %q in the corpora file",
+			spelling,
+			corpus.What,
+			corpus.Variable,
+			corpus.Name,
+		)
 	}
 	return filepath.Join(root, filepath.FromSlash(inside)), nil
 }
@@ -218,30 +253,30 @@ func ConfigPath() (string, error) {
 	if path := os.Getenv(ConfigVariable); path != "" {
 		return path, nil
 	}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
+	home, homeDirectoryError := os.UserHomeDir()
+	if homeDirectoryError != nil {
+		return "", homeDirectoryError
 	}
 	return filepath.Join(home, ".config", "cohere", "corpora.json"), nil
 }
 
-// ReadConfig reads a corpora file, a JSON object from corpus name to absolute path:
+// ReadConfiguration reads a corpora file, a JSON object from corpus name to absolute path:
 //
 //	{ "ahra": "/path/to/ahra", "structure": "/path/to/ahra/libraries/structure" }
 //
 // A file that does not exist is no corpora. A name no corpus has, or a relative path, is refused, so a
 // typo cannot quietly leave a corpus uncovered.
-func ReadConfig(path string) (map[string]string, error) {
-	contents, err := os.ReadFile(path)
-	if os.IsNotExist(err) {
+func ReadConfiguration(path string) (map[string]string, error) {
+	contents, readError := os.ReadFile(path)
+	if os.IsNotExist(readError) {
 		return map[string]string{}, nil
 	}
-	if err != nil {
-		return nil, err
+	if readError != nil {
+		return nil, readError
 	}
 	paths := map[string]string{}
-	if err := json.Unmarshal(contents, &paths); err != nil {
-		return nil, fmt.Errorf("reading %s: %w", path, err)
+	if decodeError := json.Unmarshal(contents, &paths); decodeError != nil {
+		return nil, fmt.Errorf("reading %s: %w", path, decodeError)
 	}
 	known := map[string]bool{}
 	for _, corpus := range All {
@@ -265,10 +300,10 @@ func ReadConfig(path string) (map[string]string, error) {
 
 // Environment is the variables to add to a test run's environment: each corpus the config names whose
 // variable lookup leaves unset. A variable already set wins, so one run can point a corpus elsewhere.
-func Environment(config map[string]string, lookup func(string) string) []string {
+func Environment(configuration map[string]string, lookup func(string) string) []string {
 	environment := []string{}
 	for _, corpus := range All {
-		if path, found := config[corpus.Name]; found && lookup(corpus.Variable) == "" {
+		if path, found := configuration[corpus.Name]; found && lookup(corpus.Variable) == "" {
 			environment = append(environment, corpus.Variable+"="+path)
 		}
 	}

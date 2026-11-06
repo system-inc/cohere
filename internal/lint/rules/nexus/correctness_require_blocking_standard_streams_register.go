@@ -11,5 +11,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // the program's imports can reach, and an option naming another blocking function would let a
 // configuration silence an entry that does not block, or report one that does.
 func init() {
-	rule.Register(rule.Registration{Rule: CorrectnessRequireBlockingStandardStreams})
+	rule.Register(rule.Registration[rule.NoOptions]{Rule: CorrectnessRequireBlockingStandardStreams})
 }

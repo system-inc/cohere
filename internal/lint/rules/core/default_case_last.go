@@ -48,9 +48,9 @@ var messageDefaultCaseLastNotLast = rule.Message{
 // on all fourteen reporting cases rather than the column of `switch`. A port reporting the whole
 // statement satisfies every message-id assertion and points the reader at the wrong line in a long
 // switch, which is exactly the case where the finding is worth having.
-var DefaultCaseLast = rule.Rule{
+var DefaultCaseLast = rule.Rule[rule.NoOptions]{
 	Name: "default-case-last",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindSwitchStatement: func(node *ast.Node) {
 				clauses := node.AsSwitchStatement().CaseBlock.AsCaseBlock().Clauses.Nodes
@@ -58,11 +58,11 @@ var DefaultCaseLast = rule.Rule{
 					if clause.Kind != ast.KindDefaultClause {
 						continue
 					}
-					// Upstream takes the FIRST clause with no test and stops. A switch holding two
+					// Upstream takes the first clause with no test and stops. A switch holding two
 					// `default` clauses is a syntax error the parser still recovers from, so the
 					// shape is reachable here, and upstream would report it once rather than twice.
 					if index != len(clauses)-1 {
-						ctx.ReportNode(clause, messageDefaultCaseLastNotLast)
+						ruleContext.ReportNode(clause, messageDefaultCaseLastNotLast)
 					}
 					return
 				}

@@ -20,21 +20,31 @@ type ConsistencyNoScreamingSnakeCaseOptions struct {
 // The reasoning is identical for both, so it is written once there as the `reasoning` phrase. A rule
 // that says only what is wrong gets disabled the first time it is inconvenient.
 var (
-	consistencyNoScreamingSnakeCaseExportedText = policy.MessageOf("nexus/consistency-no-screaming-snake-case", "noScreamingSnakeCaseExported")
-	consistencyNoScreamingSnakeCaseLocalText    = policy.MessageOf("nexus/consistency-no-screaming-snake-case", "noScreamingSnakeCaseLocal")
+	consistencyNoScreamingSnakeCaseExportedText = policy.MessageOf(
+		"nexus/consistency-no-screaming-snake-case",
+		"noScreamingSnakeCaseExported",
+	)
+	consistencyNoScreamingSnakeCaseLocalText = policy.MessageOf(
+		"nexus/consistency-no-screaming-snake-case",
+		"noScreamingSnakeCaseLocal",
+	)
 )
 
 func messageScreamingSnakeCaseExported(name string, suggestion string) rule.Message {
 	return rule.Message{
-		Id:          consistencyNoScreamingSnakeCaseExportedText.Id,
-		Description: consistencyNoScreamingSnakeCaseExportedText.Render(map[string]string{"name": name, "suggestion": suggestion}),
+		Id: consistencyNoScreamingSnakeCaseExportedText.Id,
+		Description: consistencyNoScreamingSnakeCaseExportedText.Render(
+			map[string]string{"name": name, "suggestion": suggestion},
+		),
 	}
 }
 
 func messageScreamingSnakeCaseLocal(name string, suggestion string) rule.Message {
 	return rule.Message{
-		Id:          consistencyNoScreamingSnakeCaseLocalText.Id,
-		Description: consistencyNoScreamingSnakeCaseLocalText.Render(map[string]string{"name": name, "suggestion": suggestion}),
+		Id: consistencyNoScreamingSnakeCaseLocalText.Id,
+		Description: consistencyNoScreamingSnakeCaseLocalText.Render(
+			map[string]string{"name": name, "suggestion": suggestion},
+		),
 	}
 }
 
@@ -54,11 +64,11 @@ func messageScreamingSnakeCaseLocal(name string, suggestion string) rule.Message
 // No fix. The suggested name is offered in the message rather than applied, because the right name
 // depends on whether the value is exported and may collide with a binding already in scope, and
 // because MAX_RETRY_COUNT to maximumRetryCount is a rename the casing conversion cannot do.
-var ConsistencyNoScreamingSnakeCase = rule.Rule{
+var ConsistencyNoScreamingSnakeCase = rule.Rule[ConsistencyNoScreamingSnakeCaseOptions]{
 	Name: "nexus/consistency-no-screaming-snake-case",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[ConsistencyNoScreamingSnakeCaseOptions]) rule.Listeners {
 		allowed := map[string]bool{}
-		if settings, hasSettings := rule.OptionsAs[ConsistencyNoScreamingSnakeCaseOptions](options); hasSettings {
+		if settings, hasSettings := options.Read(); hasSettings {
 			for _, name := range settings.Allow {
 				allowed[name] = true
 			}
@@ -89,10 +99,13 @@ var ConsistencyNoScreamingSnakeCase = rule.Rule{
 				}
 
 				if module.IsExported(declarationList.Parent) {
-					ctx.ReportNode(name, messageScreamingSnakeCaseExported(name.Text(), toPascalCase(name.Text())))
+					ruleContext.ReportNode(
+						name,
+						messageScreamingSnakeCaseExported(name.Text(), toPascalCase(name.Text())),
+					)
 					return
 				}
-				ctx.ReportNode(name, messageScreamingSnakeCaseLocal(name.Text(), toCamelCase(name.Text())))
+				ruleContext.ReportNode(name, messageScreamingSnakeCaseLocal(name.Text(), toCamelCase(name.Text())))
 			},
 		}
 	},
@@ -101,7 +114,7 @@ var ConsistencyNoScreamingSnakeCase = rule.Rule{
 // isScreamingSnakeCase reports the shouting shape: uppercase letters, digits, and underscores, with
 // at least one underscore.
 //
-// The underscore is required on purpose. A single all-caps word like RED is a different naming
+// The underscore is required on purpose. A single all-caps word like `RED` is a different naming
 // choice, and flagging it here would put this rule in an argument it was not written to have.
 func isScreamingSnakeCase(name string) bool {
 	if !strings.Contains(name, "_") {

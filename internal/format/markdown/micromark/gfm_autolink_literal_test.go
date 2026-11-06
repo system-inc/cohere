@@ -161,7 +161,7 @@ var gfmAutolinkLiteralFixtures = []string{
 	"a_@b.c",
 }
 
-func TestGfmAutolinkLiteralEvents(t *testing.T) {
-	t.Parallel()
-	compareEvents(t, gfmAutolinkLiteralFixtures)
+func TestGfmAutolinkLiteralEvents(test *testing.T) {
+	test.Parallel()
+	compareEvents(test, gfmAutolinkLiteralFixtures)
 }

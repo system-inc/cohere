@@ -9,7 +9,7 @@ import (
 
 // sortCompFile is where the fixtures pretend to live.
 //
-// A `.tsx` name because most cases are JSX and 24 of the 53 carry TypeScript syntax. It is NOT
+// A `.tsx` name because most cases are JSX and 24 of the 53 carry TypeScript syntax. It is not
 // load-bearing: this rule has no file gate, and TestSortCompHasNoFileGate pins that by running
 // one reporting source under two extensions.
 const sortCompFile = "/repository/source/SortComp.tsx"
@@ -23,7 +23,7 @@ type sortCompCase struct {
 	// source is upstream's `code`, byte for byte.
 	source string
 
-	// options is the RAW JSON of upstream's options object, routed through DecodeSortCompOptions
+	// options is the raw JSON of upstream's options object, routed through DecodeSortCompOptions
 	// rather than built as a struct, so the decoder's own nil path and defaults are under test.
 	options string
 
@@ -185,7 +185,7 @@ var sortCompFiresCases = []sortCompCase{
 		},
 	},
 	// #7mztrdd: an order pattern is upstream's `new RegExp(body, flags)`, read as JavaScript reads
-	// it. Each group below sits AFTER render, so a member the pattern claims reports, and a member
+	// it. Each group below sits after render, so a member the pattern claims reports, and a member
 	// it does not claim falls to `everything-else` and is clean. Their silent counterparts are at
 	// the end of sortCompSilentCases.
 	{
@@ -432,28 +432,28 @@ var sortCompSilentCases = []sortCompCase{
 // is what the config layer calls and it carries two behaviours nothing else would test: the
 // empty-input path a bare `"error"` configuration takes, and the pointer fields that keep an
 // explicitly empty `order` distinct from an absent one.
-func decodedSortCompOptions(t *testing.T, raw string) any {
-	t.Helper()
-	decoded, err := DecodeSortCompOptions([]byte(raw))
-	if err != nil {
-		t.Fatalf("decoding options %q: %v", raw, err)
+func decodedSortCompOptions(test *testing.T, raw string) SortCompOptions {
+	test.Helper()
+	decoded, decodeSortCompOptionsError := DecodeSortCompOptions([]byte(raw))
+	if decodeSortCompOptionsError != nil {
+		test.Fatalf("decoding options %q: %v", raw, decodeSortCompOptionsError)
 	}
 	return decoded
 }
 
-func TestSortCompFires(t *testing.T) {
-	t.Parallel()
+func TestSortCompFires(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range sortCompFiresCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, SortComp, sortCompFile, testCase.source,
-				decodedSortCompOptions(t, testCase.options))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, SortComp, sortCompFile, testCase.source,
+				decodedSortCompOptions(test, testCase.options))
 
 			expectedIds := make([]string, len(testCase.messages))
 			for index := range expectedIds {
 				expectedIds[index] = "unsortedProps"
 			}
-			rule_testing.ExpectFindings(t, result, expectedIds...)
+			rule_testing.ExpectFindings(test, result, expectedIds...)
 
 			if len(result.Diagnostics) != len(testCase.messages) {
 				return
@@ -462,7 +462,7 @@ func TestSortCompFires(t *testing.T) {
 				// The whole message, not a prefix: the member names and the direction are the
 				// computed half, and a prefix assertion cannot see them.
 				if !strings.HasPrefix(diagnostic.Message.Description, testCase.messages[index]+".") {
-					t.Errorf("finding %d: rendered %q, upstream said %q",
+					test.Errorf("finding %d: rendered %q, upstream said %q",
 						index, diagnostic.Message.Description, testCase.messages[index])
 				}
 			}
@@ -470,14 +470,14 @@ func TestSortCompFires(t *testing.T) {
 	}
 }
 
-func TestSortCompStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestSortCompStaysSilent(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range sortCompSilentCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, SortComp, sortCompFile, testCase.source,
-				decodedSortCompOptions(t, testCase.options))
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, SortComp, sortCompFile, testCase.source,
+				decodedSortCompOptions(test, testCase.options))
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -487,35 +487,35 @@ func TestSortCompStaysSilent(t *testing.T) {
 // Three siblings in this package once declined every file not ending `.tsx`/`.jsx`, which was oxc
 // residue rather than upstream behaviour. `eslint-plugin-react` gates this rule nowhere, and a
 // React class in a `.ts` file is ordinary and legal.
-func TestSortCompHasNoFileGate(t *testing.T) {
-	t.Parallel()
+func TestSortCompHasNoFileGate(test *testing.T) {
+	test.Parallel()
 
 	const reporting = "class Hello extends React.Component {\n  render() { return <div>Hello</div>; }\n  componentDidMount() {}\n}\n"
 
 	for _, fileName := range []string{"/repository/source/Gate.tsx", "/repository/source/Gate.ts"} {
-		t.Run(fileName, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, SortComp, fileName, reporting,
-				decodedSortCompOptions(t, ""))
-			rule_testing.ExpectFindings(t, result, "unsortedProps")
+		test.Run(fileName, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, SortComp, fileName, reporting,
+				decodedSortCompOptions(test, ""))
+			rule_testing.ExpectFindings(test, result, "unsortedProps")
 		})
 	}
 }
 
 // TestSortCompSurvivesNilOptions covers the path a bare `"error"` configuration takes.
 //
-// A rule configured without options is handed nil rather than the decoded default, and `options.(T)`
-// on nil yields the zero value silently. For this rule the zero value is an EMPTY order, which
+// A rule configured without options is handed the zero `rule.Given` rather than the decoded default, and
+// its `Read` returns false and the zero value silently. For this rule the zero value is an empty order, which
 // matches nothing and reports nothing, so without the explicit fallback in `Run` this rule would
 // register on every file in the tree and judge none of them. That is the inert-rule shape that
 // reads exactly like a clean tree, so it is pinned here rather than trusted.
-func TestSortCompSurvivesNilOptions(t *testing.T) {
-	t.Parallel()
+func TestSortCompSurvivesNilOptions(test *testing.T) {
+	test.Parallel()
 
 	const reporting = "class Hello extends React.Component {\n  render() { return <div>Hello</div>; }\n  componentDidMount() {}\n}\n"
 
-	result := rule_testing.RunWithOptions(t, SortComp, sortCompFile, reporting, nil)
-	rule_testing.ExpectFindings(t, result, "unsortedProps")
+	result := rule_testing.Run(test, SortComp, sortCompFile, reporting)
+	rule_testing.ExpectFindings(test, result, "unsortedProps")
 }
 
 // TestSortCompReportsWhereItSays asserts the span rather than only the message.
@@ -523,14 +523,14 @@ func TestSortCompSurvivesNilOptions(t *testing.T) {
 // `ExpectFindings` checks ids and count and nothing else, so a rule that points at the wrong member
 // passes a complete fixture pair while being wrong. Upstream anchors on the misplaced member itself,
 // which for a method is the whole declaration including its body.
-func TestSortCompReportsWhereItSays(t *testing.T) {
-	t.Parallel()
+func TestSortCompReportsWhereItSays(test *testing.T) {
+	test.Parallel()
 
 	const source = "class Hello extends React.Component {\n  render() { return <div>Hello</div>; }\n  componentDidMount() {}\n}\n"
 
-	result := rule_testing.RunWithOptions(t, SortComp, sortCompFile, source,
-		decodedSortCompOptions(t, ""))
-	rule_testing.ExpectFindings(t, result, "unsortedProps")
+	result := rule_testing.RunWithOptions(test, SortComp, sortCompFile, source,
+		decodedSortCompOptions(test, ""))
+	rule_testing.ExpectFindings(test, result, "unsortedProps")
 	if len(result.Diagnostics) != 1 {
 		return
 	}
@@ -538,26 +538,26 @@ func TestSortCompReportsWhereItSays(t *testing.T) {
 	reported := source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 	const wanted = "render() { return <div>Hello</div>; }"
 	if reported != wanted {
-		t.Errorf("finding spans %q, expected %q", reported, wanted)
+		test.Errorf("finding spans %q, expected %q", reported, wanted)
 	}
 }
 
 // TestSortCompDeclinesAMemberItCannotName covers a computed member key.
 //
 // `Node.Text()` panics on several name kinds rather than returning empty, and the walk recovers per
-// FILE rather than per rule, so one such member costs every rule in this package its verdict on that
+// file rather than per rule, so one such member costs every rule in this package its verdict on that
 // file. Upstream reads an unreadable key as the empty string, which matches no order entry and falls
 // through to `everything-else`, so the member stays in the comparison rather than being skipped.
-func TestSortCompDeclinesAMemberItCannotName(t *testing.T) {
-	t.Parallel()
+func TestSortCompDeclinesAMemberItCannotName(test *testing.T) {
+	test.Parallel()
 
 	const source = "const key = 'x';\nclass Hello extends React.Component {\n  [key]() {}\n  render() { return <div>Hello</div>; }\n}\n"
 
 	// The assertion that matters is that this does not panic and produces a verdict at all. The
 	// computed member sorts into `everything-else`, which is before `render`, so this is clean.
-	result := rule_testing.RunWithOptions(t, SortComp, sortCompFile, source,
-		decodedSortCompOptions(t, ""))
-	rule_testing.ExpectClean(t, result)
+	result := rule_testing.RunWithOptions(test, SortComp, sortCompFile, source,
+		decodedSortCompOptions(test, ""))
+	rule_testing.ExpectClean(test, result)
 }
 
 // The three tests below exist because a mutation sweep found three discriminations upstream's own
@@ -566,7 +566,7 @@ func TestSortCompDeclinesAMemberItCannotName(t *testing.T) {
 
 // TestSortCompNamesTheFirstMemberAtAReferenceIndex covers `storeError`'s name guard.
 //
-// Upstream stops updating an error's named partner once a DIFFERENT member has been recorded at the
+// Upstream stops updating an error's named partner once a different member has been recorded at the
 // same reference index: `getPropertyName(errors[propA.index].node) !== getPropertyName(propA.node)`
 // returns early. Reaching it needs two or more members that share a reference index, which upstream's
 // corpus never writes, so deleting the guard survived all 52 imported cases.
@@ -575,8 +575,8 @@ func TestSortCompDeclinesAMemberItCannotName(t *testing.T) {
 // build: with `alpha` and `beta` after `render` the message names `beta`, and adding `gamma` moves it
 // to `gamma`. A control with a single such member reports and names `alpha`, so the harness is
 // demonstrably live on this shape.
-func TestSortCompNamesTheFirstMemberAtAReferenceIndex(t *testing.T) {
-	t.Parallel()
+func TestSortCompNamesTheFirstMemberAtAReferenceIndex(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name    string
@@ -601,16 +601,16 @@ func TestSortCompNamesTheFirstMemberAtAReferenceIndex(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, SortComp, sortCompFile, testCase.source,
-				decodedSortCompOptions(t, ""))
-			rule_testing.ExpectFindings(t, result, "unsortedProps")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, SortComp, sortCompFile, testCase.source,
+				decodedSortCompOptions(test, ""))
+			rule_testing.ExpectFindings(test, result, "unsortedProps")
 			if len(result.Diagnostics) != 1 {
 				return
 			}
 			if !strings.HasPrefix(result.Diagnostics[0].Message.Description, testCase.message+".") {
-				t.Errorf("rendered %q, upstream said %q",
+				test.Errorf("rendered %q, upstream said %q",
 					result.Diagnostics[0].Message.Description, testCase.message)
 			}
 		})
@@ -624,49 +624,49 @@ func TestSortCompNamesTheFirstMemberAtAReferenceIndex(t *testing.T) {
 // and is not, so collapsing the two is the obvious "cleanup" a later reader would make.
 //
 // Measured on the installed build, with a control that fires: a class whose plain `classMethod()`
-// sits AFTER `render` under an `instance-methods`-first order is CLEAN, while the same shape with an
-// arrow property `foo = () => {}` REPORTS. So upstream genuinely does not count a plain method.
+// sits after `render` under an `instance-methods`-first order is clean, while the same shape with an
+// arrow property `foo = () => {}` reports. So upstream genuinely does not count a plain method.
 //
 // Mutation-checked, and the first attempt at this test proved nothing. Widening the instance arm to
 // `(isPropertyLike || isMethodDeclaration) && initializedToFunction` survives, and re-running it
 // against these cases showed why: `initializedToFunction` already requires `isPropertyLike`, so that
-// mutant is EQUIVALENT rather than uncaught. The predicate that genuinely differs -- dropping the
+// mutant is equivalent rather than uncaught. The predicate that genuinely differs -- dropping the
 // initializer requirement -- is caught by 7 assertions, these two among them.
-func TestSortCompDoesNotTreatAPlainMethodAsAnInstanceMethod(t *testing.T) {
-	t.Parallel()
+func TestSortCompDoesNotTreatAPlainMethodAsAnInstanceMethod(test *testing.T) {
+	test.Parallel()
 
 	const instanceMethodsFirst = `{"order":["instance-methods","lifecycle","render"]}`
 
-	t.Run("plain-method-is-not-an-instance-method", func(t *testing.T) {
-		t.Parallel()
+	test.Run("plain-method-is-not-an-instance-method", func(test *testing.T) {
+		test.Parallel()
 		const source = "class Hello extends React.Component {\n  render() { return <div/>; }\n  classMethod() {}\n}\n"
-		result := rule_testing.RunWithOptions(t, SortComp, sortCompFile, source,
-			decodedSortCompOptions(t, instanceMethodsFirst))
-		rule_testing.ExpectClean(t, result)
+		result := rule_testing.RunWithOptions(test, SortComp, sortCompFile, source,
+			decodedSortCompOptions(test, instanceMethodsFirst))
+		rule_testing.ExpectClean(test, result)
 	})
 
 	// The control. Without it the case above passes for a rule that has stopped judging anything.
-	t.Run("control-arrow-property-is-an-instance-method", func(t *testing.T) {
-		t.Parallel()
+	test.Run("control-arrow-property-is-an-instance-method", func(test *testing.T) {
+		test.Parallel()
 		const source = "class Hello extends React.Component {\n  render() { return <div/>; }\n  foo = () => {};\n}\n"
-		result := rule_testing.RunWithOptions(t, SortComp, sortCompFile, source,
-			decodedSortCompOptions(t, instanceMethodsFirst))
-		rule_testing.ExpectFindings(t, result, "unsortedProps")
+		result := rule_testing.RunWithOptions(test, SortComp, sortCompFile, source,
+			decodedSortCompOptions(test, instanceMethodsFirst))
+		rule_testing.ExpectFindings(test, result, "unsortedProps")
 	})
 }
 
-// TestSortCompLifecycleNamesCannotReachTheRegexBranch records an EQUIVALENT mutant rather than
+// TestSortCompLifecycleNamesCannotReachTheRegexBranch records an equivalent mutant rather than
 // killing it, because the equivalence is provable.
 //
-// `sortCompGroupMatches` tests membership in the known-lifecycle-name list BEFORE trying the regex
+// `sortCompGroupMatches` tests membership in the known-lifecycle-name list before trying the regex
 // production, and reordering those two survived the whole corpus. That is not a fixture gap: the
 // production is `/(.*)/([gimsuy]*)`, which requires a literal `/`, and no lifecycle name contains
 // one, so no input can take a different path under either ordering.
 //
 // Asserted here rather than argued in a comment, so a future upstream that adds a lifecycle name
 // with a slash in it fails this test instead of silently changing the rule's meaning.
-func TestSortCompLifecycleNamesCannotReachTheRegexBranch(t *testing.T) {
-	t.Parallel()
+func TestSortCompLifecycleNamesCannotReachTheRegexBranch(test *testing.T) {
+	test.Parallel()
 
 	both := []string{}
 	for name := range sortCompKnownLifecycleNames {
@@ -675,15 +675,15 @@ func TestSortCompLifecycleNamesCannotReachTheRegexBranch(t *testing.T) {
 		}
 	}
 	if len(both) != 0 {
-		t.Errorf("these lifecycle names also parse as regex entries, so the branch ordering in "+
+		test.Errorf("these lifecycle names also parse as regex entries, so the branch ordering in "+
 			"sortCompGroupMatches now changes a verdict and needs a real fixture: %v", both)
 	}
 
 	// The control. Without it a matcher that answered false for everything would pass the above.
 	if !sortCompRegexPattern.MatchString("/on.*/") {
-		t.Fatal("the regex production matches nothing, so the check above proved nothing")
+		test.Fatal("the regex production matches nothing, so the check above proved nothing")
 	}
 	if len(sortCompKnownLifecycleNames) == 0 {
-		t.Fatal("the lifecycle name list is empty, so the check above proved nothing")
+		test.Fatal("the lifecycle name list is empty, so the check above proved nothing")
 	}
 }

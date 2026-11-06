@@ -9,95 +9,151 @@ import (
 )
 
 // parseNodes parses with Prettier's options and returns the Value's children.
-func parseNodes(t *testing.T, text string) []*estree.Node {
-	t.Helper()
-	root, err := Parse(text, Options{Loose: true})
-	if err != nil {
-		t.Fatalf("Parse(%q): %v", text, err)
+func parseNodes(test *testing.T, text string) []*estree.Node {
+	test.Helper()
+	root, parseError := Parse(text, Options{Loose: true})
+	if parseError != nil {
+		test.Fatalf("Parse(%q): %v", text, parseError)
 	}
 	if !root.Is("root") || len(root.List("nodes")) != 1 || !root.List("nodes")[0].Is("value") {
-		t.Fatalf("Parse(%q): want a root holding one value, got %v", text, root.Keys())
+		test.Fatalf("Parse(%q): want a root holding one value, got %v", text, root.Keys())
 	}
 	return root.List("nodes")[0].List("nodes")
 }
 
-func sourceColumn(node *estree.Node, edge string) any {
-	return node.Get("source").(map[string]any)[edge].(map[string]any)["column"]
+// sourceColumn is node.source[edge].column, which the library holds as an Integer or a NaN Number: the
+// column, or isNaN for NaN. Any other value fails the test.
+func sourceColumn(test *testing.T, node *estree.Node, edge string) (int, bool) {
+	test.Helper()
+	nodeSource, isMap := node.Get("source").(estree.Record)
+	if !isMap {
+		test.Fatalf("%s source %v, want a {start, end} object", node.Type(), node.Get("source"))
+	}
+	edgePosition, isMap := nodeSource[edge].(estree.Record)
+	if !isMap {
+		test.Fatalf("%s source %s %v, want a {line, column} object", node.Type(), edge, nodeSource[edge])
+	}
+	switch column := edgePosition["column"].(type) {
+	case estree.Integer:
+		return int(column), false
+	case estree.Number:
+		if math.IsNaN(float64(column)) {
+			return 0, true
+		}
+	}
+	test.Fatalf("%s source %s column %#v, want an Integer or NaN", node.Type(), edge, edgePosition["column"])
+	return 0, false
 }
 
 // TestParseShapes checks, without node, the fields the oracle found that are easiest to get wrong:
 // the shapes Prettier's printer and loc.js lean on, and upstream's quirks.
-func TestParseShapes(t *testing.T) {
-	t.Parallel()
-	nodes := parseNodes(t, "-5px --foo calc(1px + 2px) #fff \"a\" /* c */")
+func TestParseShapes(test *testing.T) {
+	test.Parallel()
+	nodes := parseNodes(test, "-5px --foo calc(1px + 2px) #fff \"a\" /* c */")
 	types := []string{"number", "word", "func", "word", "string", "comment"}
 	if len(nodes) != len(types) {
-		t.Fatalf("want %d nodes, got %d", len(types), len(nodes))
+		test.Fatalf("want %d nodes, got %d", len(types), len(nodes))
 	}
 	for index, nodeType := range types {
 		if !nodes[index].Is(nodeType) {
-			t.Errorf("node %d: want %s, got %s", index, nodeType, nodes[index].Type())
+			test.Errorf("node %d: want %s, got %s", index, nodeType, nodes[index].Type())
 		}
 	}
 
 	// A signed number splits into value and unit, and its sourceIndex is the merged word's last token.
-	if nodes[0].String("value") != "-5" || nodes[0].String("unit") != "px" || nodes[0].Get("sourceIndex") != 1 {
-		t.Errorf("-5px: got value %q unit %q sourceIndex %v", nodes[0].String("value"), nodes[0].String("unit"), nodes[0].Get("sourceIndex"))
+	if nodes[0].String("value") != "-5" || nodes[0].String("unit") != "px" ||
+		nodes[0].Get("sourceIndex") != estree.Integer(1) {
+		test.Errorf(
+			"-5px: got value %q unit %q sourceIndex %v",
+			nodes[0].String("value"),
+			nodes[0].String("unit"),
+			nodes[0].Get("sourceIndex"),
+		)
 	}
 	// --foo is "--" and "foo" merged, indexed at "foo"; loc.js's fixValueWordLoc undoes that.
-	if nodes[1].String("value") != "--foo" || nodes[1].Get("sourceIndex") != 7 || raws(nodes[1])["before"] != " " {
-		t.Errorf("--foo: got value %q sourceIndex %v raws %v", nodes[1].String("value"), nodes[1].Get("sourceIndex"), raws(nodes[1]))
+	if nodes[1].String("value") != "--foo" || nodes[1].Get("sourceIndex") != estree.Integer(7) ||
+		rawString(nodes[1], "before") != " " {
+		test.Errorf(
+			"--foo: got value %q sourceIndex %v raws %v",
+			nodes[1].String("value"),
+			nodes[1].Get("sourceIndex"),
+			nodes[1].Get("raws"),
+		)
 	}
 	// A function holds its parens and arguments, and is balanced again at the end.
 	function := nodes[2].List("nodes")
-	if len(function) != 5 || !function[0].Is("paren") || !function[2].Is("operator") || !function[4].Is("paren") || nodes[2].Get("unbalanced") != float64(0) {
-		t.Errorf("calc: got %d children, unbalanced %v", len(function), nodes[2].Get("unbalanced"))
+	if len(function) != 5 ||
+		!function[0].Is("paren") ||
+		!function[2].Is("operator") ||
+		!function[4].Is("paren") ||
+		nodes[2].Get("unbalanced") != estree.Number(0) {
+		test.Errorf("calc: got %d children, unbalanced %v", len(function), nodes[2].Get("unbalanced"))
 	}
 	// The operator's sourceIndex is its token's end line, 1, not its index.
-	if function[2].Get("sourceIndex") != 1 {
-		t.Errorf("operator sourceIndex: want 1 (the line), got %v", function[2].Get("sourceIndex"))
+	if function[2].Get("sourceIndex") != estree.Integer(1) {
+		test.Errorf("operator sourceIndex: want 1 (the line), got %v", function[2].Get("sourceIndex"))
 	}
 	if !nodes[3].Bool("isHex") || !nodes[3].Bool("isColor") {
-		t.Errorf("#fff: want isHex and isColor")
+		test.Errorf("#fff: want isHex and isColor")
 	}
-	if nodes[4].String("value") != "a" || !nodes[4].Bool("quoted") || raws(nodes[4])["quote"] != "\"" {
-		t.Errorf("string: got %q quoted %v raws %v", nodes[4].String("value"), nodes[4].Get("quoted"), raws(nodes[4]))
+	if nodes[4].String("value") != "a" || !nodes[4].Bool("quoted") || rawString(nodes[4], "quote") != "\"" {
+		test.Errorf(
+			"string: got %q quoted %v raws %v",
+			nodes[4].String("value"),
+			nodes[4].Get("quoted"),
+			nodes[4].Get("raws"),
+		)
 	}
 	if nodes[5].String("value") != " c " || nodes[5].Bool("inline") {
-		t.Errorf("comment: got %q inline %v", nodes[5].String("value"), nodes[5].Get("inline"))
+		test.Errorf("comment: got %q inline %v", nodes[5].String("value"), nodes[5].Get("inline"))
 	}
 
 	// A value opening with a paren ends that paren at column NaN; the next paren reuses a stale end.
-	parens := parseNodes(t, "(a)")
-	if column, isFloat := sourceColumn(parens[0], "end").(float64); !isFloat || !math.IsNaN(column) {
-		t.Errorf("first paren end column: want NaN, got %v", sourceColumn(parens[0], "end"))
+	parens := parseNodes(test, "(a)")
+	if column, isNaN := sourceColumn(test, parens[0], "end"); !isNaN {
+		test.Errorf("first paren end column: want NaN, got %v", column)
 	}
-	if sourceColumn(parens[2], "end") != 2 {
-		t.Errorf("closing paren end column: want 2, got %v", sourceColumn(parens[2], "end"))
+	if column, isNaN := sourceColumn(test, parens[2], "end"); isNaN || column != 2 {
+		test.Errorf("closing paren end column: want 2, got %v (NaN %v)", column, isNaN)
 	}
 
 	// sourceIndex is bytes; columns stay UTF-16 units.
-	multibyte := parseNodes(t, "\xc3\xa9 \xf0\x9f\x98\x80x b")
-	if multibyte[1].Get("sourceIndex") != 3 || multibyte[2].Get("sourceIndex") != 9 || sourceColumn(multibyte[2], "start") != 7 {
-		t.Errorf("non-ASCII: got sourceIndex %v and %v, column %v", multibyte[1].Get("sourceIndex"), multibyte[2].Get("sourceIndex"), sourceColumn(multibyte[2], "start"))
+	multibyte := parseNodes(test, "\xc3\xa9 \xf0\x9f\x98\x80x b")
+	column, isNaN := sourceColumn(test, multibyte[2], "start")
+	if multibyte[1].Get("sourceIndex") != estree.Integer(3) ||
+		multibyte[2].Get("sourceIndex") != estree.Integer(9) ||
+		isNaN ||
+		column != 7 {
+		test.Errorf(
+			"non-ASCII: got sourceIndex %v and %v, column %v (NaN %v)",
+			multibyte[1].Get("sourceIndex"),
+			multibyte[2].Get("sourceIndex"),
+			column,
+			isNaN,
+		)
 	}
 
 	// Inline comments only in loose mode.
-	if comment := parseNodes(t, "a // b")[1]; !comment.Is("comment") || !comment.Bool("inline") || comment.String("value") != " b" {
-		t.Errorf("inline comment: got %s %q", comment.Type(), comment.String("value"))
+	if comment := parseNodes(
+		test,
+		"a // b",
+	)[1]; !comment.Is("comment") || !comment.Bool("inline") || comment.String("value") != " b" {
+		test.Errorf("inline comment: got %s %q", comment.Type(), comment.String("value"))
 	}
 	// Outside loose mode url() arguments become one word.
-	strict, err := Parse("url(a b)", Options{})
-	if err != nil {
-		t.Fatal(err)
+	strict, parseError := Parse("url(a b)", Options{})
+	if parseError != nil {
+		test.Fatal(parseError)
 	}
-	if url := strict.List("nodes")[0].List("nodes")[0].List("nodes"); len(url) != 3 || url[1].String("value") != "a b" || url[1].Has("isHex") {
-		t.Errorf("strict url: got %d children", len(url))
+	if url := strict.List("nodes")[0].List("nodes")[0].List(
+		"nodes",
+	); len(url) != 3 || url[1].String("value") != "a b" || url[1].Has("isHex") {
+		test.Errorf("strict url: got %d children", len(url))
 	}
 }
 
-func TestParseRefusals(t *testing.T) {
-	t.Parallel()
+func TestParseRefusals(test *testing.T) {
+	test.Parallel()
 	for text, want := range map[string]string{
 		"a(b":   "ParserError: Expected closing parenthesis at line: 1, column 2",
 		"a) b":  "ParserError: Expected opening parenthesis at line: 1, column 2",
@@ -106,15 +162,15 @@ func TestParseRefusals(t *testing.T) {
 		" ":     "TypeError: Cannot read properties of undefined (reading 'raws')",
 		"a + +": "TypeError: Cannot read properties of undefined (reading '0')",
 	} {
-		_, err := Parse(text, Options{Loose: true})
-		if err == nil || !printing.IsSyntax(err) || err.Error() != want {
-			t.Errorf("Parse(%q): want the syntax error %q, got %v", text, want, err)
+		_, parseError := Parse(text, Options{Loose: true})
+		if parseError == nil || !printing.IsSyntax(parseError) || parseError.Error() != want {
+			test.Errorf("Parse(%q): want the syntax error %q, got %v", text, want, parseError)
 		}
 	}
-	if _, err := Parse("calc(1 -2)", Options{}); err == nil {
-		t.Errorf("calc(1 -2) without loose: want a refusal")
+	if _, parseError := Parse("calc(1 -2)", Options{}); parseError == nil {
+		test.Errorf("calc(1 -2) without loose: want a refusal")
 	}
-	if _, err := Parse("calc(1 -2)", Options{Loose: true}); err != nil {
-		t.Errorf("calc(1 -2) with loose: %v", err)
+	if _, parseError := Parse("calc(1 -2)", Options{Loose: true}); parseError != nil {
+		test.Errorf("calc(1 -2) with loose: %v", parseError)
 	}
 }

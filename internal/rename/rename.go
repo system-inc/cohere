@@ -6,7 +6,7 @@
 // Every other write in this tool is reactive. A rule finds something wrong and proposes a repair,
 // the blast radius is one file, and the engine's parse guard is a sufficient backstop because the
 // rule already decided the edit was safe. A rename is the opposite shape: the user asserts an
-// intention, nothing is wrong with the code, and the blast radius is wherever the symbol lives —
+// intention, nothing is wrong with the code, and the blast radius is wherever the symbol lives,
 // which is a program-wide answer no rule is in a position to give. `internal/rule/rule.go` states
 // the consequence at length and from experience: a rename that updates a usage and misses its
 // declaration produces a file that parses and does not compile, and the engine's guard has no
@@ -59,7 +59,7 @@ import (
 
 // Edit is one replacement of one identifier's own span.
 //
-// Deliberately NOT a rule.Diagnostic. That type carries exactly one Range and has no secondary-span
+// Deliberately not a rule.Diagnostic. That type carries exactly one Range and has no secondary-span
 // field, so a rename touching fourteen sites across six files would have to be either fourteen
 // unrelated diagnostics with no way to say they are one act, or one diagnostic pointing at the
 // declaration while thirteen edits happen somewhere the reader was never shown. Both readings are
@@ -113,7 +113,7 @@ const (
 //
 // This exists because of the failure it prevents, which is the worst one available here: a rename
 // that silently misses a string-keyed use produces a codebase that compiles and is broken at
-// runtime. Nothing downstream catches that — not the parse guard, not the type phase, not the
+// runtime. Nothing downstream catches that: not the parse guard, not the type phase, not the
 // tests, until something reads the property at runtime and gets undefined.
 type Blindness struct {
 	FileName string
@@ -176,17 +176,36 @@ func ParsePosition(argument string) (Position, bool) {
 	if secondColon <= 0 {
 		return Position{}, false
 	}
-	var line, column int
-	if _, err := fmt.Sscanf(argument[secondColon+1:lastColon], "%d", &line); err != nil {
+	var line int
+	var column int
+	if _, scanError := fmt.Sscanf(argument[secondColon+1:lastColon], "%d", &line); scanError != nil {
 		return Position{}, false
 	}
-	if _, err := fmt.Sscanf(argument[lastColon+1:], "%d", &column); err != nil {
+	if _, scanError := fmt.Sscanf(argument[lastColon+1:], "%d", &column); scanError != nil {
 		return Position{}, false
 	}
 	if line < 1 || column < 1 {
 		return Position{}, false
 	}
 	return Position{FileName: argument[:secondColon], Line: line, Column: column}, true
+}
+
+// reservedWords are the names that cannot be a binding, so renaming to one produces source that
+// does not parse or that parses as something else entirely.
+//
+// The strict-mode reserved words are included because our tree is modules, which are strict by
+// construction. Contextual keywords like `type` and `as` are deliberately absent: they are legal
+// identifiers and refusing them would be a false refusal.
+var reservedWords = map[string]bool{
+	"break": true, "case": true, "catch": true, "class": true, "const": true,
+	"continue": true, "debugger": true, "default": true, "delete": true, "do": true,
+	"else": true, "enum": true, "export": true, "extends": true, "false": true,
+	"finally": true, "for": true, "function": true, "if": true, "import": true,
+	"in": true, "instanceof": true, "new": true, "null": true, "return": true,
+	"super": true, "switch": true, "this": true, "throw": true, "true": true,
+	"try": true, "typeof": true, "var": true, "void": true, "while": true,
+	"with": true, "implements": true, "interface": true, "let": true, "package": true,
+	"private": true, "protected": true, "public": true, "static": true, "yield": true,
 }
 
 // IsValidIdentifier reports whether a name can be written as a plain identifier.
@@ -217,22 +236,4 @@ func IsValidIdentifier(name string) bool {
 		}
 	}
 	return !reservedWords[name]
-}
-
-// reservedWords are the names that cannot be a binding, so renaming to one produces source that
-// does not parse or that parses as something else entirely.
-//
-// The strict-mode reserved words are included because our tree is modules, which are strict by
-// construction. Contextual keywords like `type` and `as` are deliberately absent: they are legal
-// identifiers and refusing them would be a false refusal.
-var reservedWords = map[string]bool{
-	"break": true, "case": true, "catch": true, "class": true, "const": true,
-	"continue": true, "debugger": true, "default": true, "delete": true, "do": true,
-	"else": true, "enum": true, "export": true, "extends": true, "false": true,
-	"finally": true, "for": true, "function": true, "if": true, "import": true,
-	"in": true, "instanceof": true, "new": true, "null": true, "return": true,
-	"super": true, "switch": true, "this": true, "throw": true, "true": true,
-	"try": true, "typeof": true, "var": true, "void": true, "while": true,
-	"with": true, "implements": true, "interface": true, "let": true, "package": true,
-	"private": true, "protected": true, "public": true, "static": true, "yield": true,
 }

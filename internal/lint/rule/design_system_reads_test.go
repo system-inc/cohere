@@ -16,32 +16,36 @@ import (
 // mean no rule asked on this program, because the findings cache records a program whose design system was
 // never loaded as independent of every stylesheet. When this was one slot, a second program took it and the
 // first then read as never loaded (#35nqkwc, @system_cohere_lint's review).
-func TestDesignSystemReadsAreKeptPerProgram(t *testing.T) {
-	t.Parallel()
-	directory := t.TempDir()
+func TestDesignSystemReadsAreKeptPerProgram(test *testing.T) {
+	test.Parallel()
+	directory := test.TempDir()
 	theme := filepath.Join(directory, "theme.css")
-	if err := os.WriteFile(theme, []byte("@theme {}\n"), 0o644); err != nil {
-		t.Fatal(err)
+	if writeError := os.WriteFile(theme, []byte("@theme {}\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 	first, second, neither := &compiler.Program{}, &compiler.Program{}, &compiler.Program{}
 
-	firstRecorder := NewRecordingFS(osvfs.FS())
-	recordDesignSystemFS(first, firstRecorder)
+	firstRecorder := NewRecordingFileSystem(osvfs.FS())
+	recordDesignSystemFileSystem(first, firstRecorder)
 	firstRecorder.ReadFile(tspath.RootedFilePath(theme))
-	secondRecorder := NewRecordingFS(osvfs.FS())
-	recordDesignSystemFS(second, secondRecorder)
+	secondRecorder := NewRecordingFileSystem(osvfs.FS())
+	recordDesignSystemFileSystem(second, secondRecorder)
 	secondRecorder.FileExists(tspath.RootedFilePath(filepath.Join(directory, "missing.css")))
 
 	reads, loaded := DesignSystemReads(first)
 	if !loaded || len(reads) != 1 || reads[0].Path != theme || !reads[0].Present {
-		t.Errorf("the first program's reads after a second program asked: %v, loaded %v; want theme.css present", reads, loaded)
+		test.Errorf(
+			"the first program's reads after a second program asked: %v, loaded %v; want theme.css present",
+			reads,
+			loaded,
+		)
 	}
 	reads, loaded = DesignSystemReads(second)
 	if !loaded || len(reads) != 1 || reads[0].Present {
-		t.Errorf("the second program's reads: %v, loaded %v; want missing.css absent", reads, loaded)
+		test.Errorf("the second program's reads: %v, loaded %v; want missing.css absent", reads, loaded)
 	}
 	if reads, loaded := DesignSystemReads(neither); loaded || len(reads) != 0 {
-		t.Errorf("a program that never asked reads as loaded: %v", reads)
+		test.Errorf("a program that never asked reads as loaded: %v", reads)
 	}
 	runtime.KeepAlive(first)
 	runtime.KeepAlive(second)
@@ -49,26 +53,26 @@ func TestDesignSystemReadsAreKeptPerProgram(t *testing.T) {
 
 // An entry does not keep its program alive, and an entry whose program is gone is swept on the next
 // registration, so a test process that builds thousands of programs does not hold them all.
-func TestDesignSystemReadsDoNotHoldTheirProgram(t *testing.T) {
-	t.Parallel()
+func TestDesignSystemReadsDoNotHoldTheirProgram(test *testing.T) {
+	test.Parallel()
 	gone := weak.Make(func() *compiler.Program {
 		program := &compiler.Program{}
-		recordDesignSystemFS(program, NewRecordingFS(osvfs.FS()))
+		recordDesignSystemFileSystem(program, NewRecordingFileSystem(osvfs.FS()))
 		return program
 	}())
 	for attempt := 0; attempt < 5 && gone.Value() != nil; attempt++ {
 		runtime.GC()
 	}
 	if gone.Value() != nil {
-		t.Fatal("a program held only by its design system entry was not collected")
+		test.Fatal("a program held only by its design system entry was not collected")
 	}
 	kept := &compiler.Program{}
-	recordDesignSystemFS(kept, NewRecordingFS(osvfs.FS()))
+	recordDesignSystemFileSystem(kept, NewRecordingFileSystem(osvfs.FS()))
 	designSystemRecordings.Lock()
 	_, stillThere := designSystemRecordings.byProgram[gone]
 	designSystemRecordings.Unlock()
 	if stillThere {
-		t.Error("the entry of a collected program was not swept by the next registration")
+		test.Error("the entry of a collected program was not swept by the next registration")
 	}
 	runtime.KeepAlive(kept)
 }

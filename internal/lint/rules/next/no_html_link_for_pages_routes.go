@@ -21,7 +21,7 @@ import (
 // The quirks a reader is most likely to "fix", each pinned by a fixture:
 //
 //   - A pages index file pushes two routes, `dir/` and `dir/index`, so `/blog/index` is a route too.
-//   - Below the top of an app directory the walk uses the PAGES parser, so a nested `layout.tsx`
+//   - Below the top of an app directory the walk uses the pages parser, so a nested `layout.tsx`
 //     becomes the route `/about/layout` and a nested `index.tsx` pushes two, as in pages.
 //   - App routes are anchored with no trailing slash while every href is normalized with one, so a
 //     static app route other than `/` never matches. Only `/` and routes with a dynamic segment do.
@@ -59,7 +59,11 @@ var noHtmlLinkForPagesRouteModels struct {
 
 // noHtmlLinkForPagesRouteModelFor returns the route model for one root and one setting of the option,
 // building it on the first ask in this program.
-func noHtmlLinkForPagesRouteModelFor(program rule.Program, root string, settings NoHtmlLinkForPagesOptions) *noHtmlLinkForPagesRouteModel {
+func noHtmlLinkForPagesRouteModelFor(
+	program rule.Program,
+	root string,
+	settings NoHtmlLinkForPagesOptions,
+) *noHtmlLinkForPagesRouteModel {
 	key := root + "\x00" + noHtmlLinkForPagesSettingsKey(settings)
 
 	noHtmlLinkForPagesRouteModels.Lock()
@@ -72,7 +76,7 @@ func noHtmlLinkForPagesRouteModelFor(program rule.Program, root string, settings
 	if model, built := noHtmlLinkForPagesRouteModels.models[key]; built {
 		return model
 	}
-	model := buildNoHtmlLinkForPagesRouteModel(program.FS(), root, settings)
+	model := buildNoHtmlLinkForPagesRouteModel(program.FileSystem(), root, settings)
 	noHtmlLinkForPagesRouteModels.models[key] = model
 	return model
 }
@@ -89,8 +93,11 @@ func noHtmlLinkForPagesRouteModelFor(program rule.Program, root string, settings
 // can tell them apart. A route that does not compile is dropped before any anchor sees it. The root
 // reaches a record only through the routes, and is in the findings key besides. A page's contents are
 // never read, so an edit inside one leaves the fingerprint alone.
-func noHtmlLinkForPagesFingerprint(program rule.Program, options any) [sha256.Size]byte {
-	settings, _ := rule.OptionsAs[NoHtmlLinkForPagesOptions](options)
+func noHtmlLinkForPagesFingerprint(
+	program rule.Program,
+	options rule.Given[NoHtmlLinkForPagesOptions],
+) [sha256.Size]byte {
+	settings, _ := options.Read()
 	model := noHtmlLinkForPagesRouteModelFor(program, program.GetCurrentDirectory(), settings)
 	hash := sha256.New()
 	if model.found {
@@ -117,9 +124,13 @@ func noHtmlLinkForPagesSettingsKey(settings NoHtmlLinkForPagesOptions) string {
 // walk them, compile the routes.
 //
 // One reading differs, on input upstream crashes on. Upstream asks `fs.existsSync`, which is true for
-// a file as well as a directory, and then `readdirSync` throws ENOTDIR and the rule fails to load. A
+// a file as well as a directory, and then `readdirSync` throws `ENOTDIR` and the rule fails to load. A
 // file named `pages` is not a pages directory, so here it is simply not found.
-func buildNoHtmlLinkForPagesRouteModel(fileSystem vfs.FS, root string, settings NoHtmlLinkForPagesOptions) *noHtmlLinkForPagesRouteModel {
+func buildNoHtmlLinkForPagesRouteModel(
+	fileSystem vfs.FS,
+	root string,
+	settings NoHtmlLinkForPagesOptions,
+) *noHtmlLinkForPagesRouteModel {
 	pagesDirectories := settings.PagesDirectories
 	if !settings.Configured {
 		pagesDirectories = []string{filepath.Join(root, "pages"), filepath.Join(root, "src", "pages")}
@@ -135,7 +146,7 @@ func buildNoHtmlLinkForPagesRouteModel(fileSystem vfs.FS, root string, settings 
 	var pageUrls []string
 	for _, directory := range foundPagesDirectories {
 		for _, url := range parseUrlForPages(fileSystem, "/", directory) {
-			normalized, _ := normalizeURL(url)
+			normalized, _ := normalizeUrl(url)
 			pageUrls = append(pageUrls, "^"+normalized+"$")
 		}
 	}
@@ -163,7 +174,7 @@ func existingDirectories(fileSystem vfs.FS, directories []string) []string {
 	return found
 }
 
-// pageFileExtension and the two leaf names are upstream's patterns, which its own TODO says should
+// pageFileExtension and the two leaf names are upstream's patterns, which its own `TODO` says should
 // account for every page extension and do not.
 var (
 	pageFileExtension = regexp.MustCompile(`\.[jt]sx?$`)
@@ -232,25 +243,25 @@ func parseUrlForAppDirectory(fileSystem vfs.FS, urlPrefix string, directory stri
 	return urls
 }
 
-// normalizeURL is upstream's `normalizeURL`. The second return is false where upstream returns
+// normalizeUrl is upstream's `normalizeURL`. The second return is false where upstream returns
 // undefined, for an empty url.
-func normalizeURL(url string) (string, bool) {
+func normalizeUrl(url string) (string, bool) {
 	if url == "" {
 		return "", false
 	}
-	url, _, _ = strings.Cut(url, "?")
-	url, _, _ = strings.Cut(url, "#")
-	if strings.HasSuffix(url, "/index.html") {
-		url = strings.TrimSuffix(url, "index.html")
+	normalized, _, _ := strings.Cut(url, "?")
+	normalized, _, _ = strings.Cut(normalized, "#")
+	if strings.HasSuffix(normalized, "/index.html") {
+		normalized = strings.TrimSuffix(normalized, "index.html")
 	}
 	// An href that was only a query or a fragment stays empty rather than becoming `/`.
-	if url == "" {
-		return url, true
+	if normalized == "" {
+		return normalized, true
 	}
-	if !strings.HasSuffix(url, "/") {
-		url += "/"
+	if !strings.HasSuffix(normalized, "/") {
+		normalized += "/"
 	}
-	return url, true
+	return normalized, true
 }
 
 // normalizeAppPath is upstream's `normalizeAppPath`: groups, parallel slots and a trailing `page` or
@@ -297,8 +308,11 @@ func compileRouteSources(sources []string) []*esregexp.RegExp {
 			continue
 		}
 		seen[source] = true
-		compiled, err := esregexp.Compile(dynamicSegments.ReplaceAllLiteralString(source, dynamicSegmentPattern), "")
-		if err != nil {
+		compiled, compileError := esregexp.Compile(
+			dynamicSegments.ReplaceAllLiteralString(source, dynamicSegmentPattern),
+			"",
+		)
+		if compileError != nil {
 			continue
 		}
 		routes = append(routes, compiled)

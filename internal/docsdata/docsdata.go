@@ -3,10 +3,11 @@
 //
 // Nothing here is typed in. Each output reads one source the build already trusts: the rule registry
 // and what each registration declares, the rule sets cohere carries as the loader resolves them, the
-// Swift registry and verdict catalog, the settings schemas internal/settingsschema renders, CHANGELOG.md, the flag
-// set as the binary prints it, the cases the rule tests assert, recorded by the capture hook in
-// internal/lint/testing, and the benchmark runs bench/quiet_machine.sh recorded in bench/results. A field no source holds yet is left out rather than guessed, and the
-// sourceNotes in rules.json say where each field comes from.
+// Swift registry and verdict catalog, the Go engine's registry, the settings schemas
+// internal/settingsschema renders, CHANGELOG.md, the flag set as the binary prints it, the cases the rule
+// tests assert, recorded by the capture hook in internal/lint/testing, and the benchmark runs
+// bench/quiet_machine.sh recorded in bench/results. A field no source holds yet is left out rather than
+// guessed, and the sourceNotes in rules.json say where each field comes from.
 //
 // The per-rule .md files beside the rules are internal working notes and are never read here.
 //
@@ -25,32 +26,33 @@ import (
 	"sort"
 
 	"github.com/system-inc/cohere/internal/benchresults"
+	goenginerule "github.com/system-inc/cohere/internal/goengine/rule"
 	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
 // The files Build produces, relative to the module root.
 const (
-	Directory          = "docs/data"
-	RulesPath          = Directory + "/rules.json"
-	SetsPath           = Directory + "/sets.json"
-	CliPath            = Directory + "/cli.json"
-	ChangelogPath      = Directory + "/changelog.json"
-	BenchmarksPath     = Directory + "/benchmarks.json"
-	ExamplesDirectory  = Directory + "/examples"
-	settingsSchemaName = "CohereSettings.schema.json"
+	Directory                = "docs/data"
+	RulesPath                = Directory + "/rules.json"
+	SetsPath                 = Directory + "/sets.json"
+	CommandLineInterfacePath = Directory + "/cli.json"
+	ChangelogPath            = Directory + "/changelog.json"
+	BenchmarksPath           = Directory + "/benchmarks.json"
+	ExamplesDirectory        = Directory + "/examples"
+	settingsSchemaName       = "CohereSettings.schema.json"
 )
 
 // Inputs is every source Build reads, gathered by the generator, so a test can hand it a changed
 // registry or a changed set and watch the output move.
 type Inputs struct {
 	// Registrations is every registered rule, as rule.Registered returns them.
-	Registrations []rule.Registration
+	Registrations []rule.Entry
 
 	// SetNames is every rule set cohere carries, prefixed (`cohere:typescript`), and LoadSet resolves
 	// one the way a project extending it alone would see it. SetContents is a set's own text.
 	SetNames    []string
-	LoadSet     func(name string) (*configuration.Config, error)
+	LoadSet     func(name string) (*configuration.Configuration, error)
 	SetContents func(name string) ([]byte, error)
 
 	// SwiftVerdicts is swift/HouseRuleVerdicts.json.
@@ -59,6 +61,10 @@ type Inputs struct {
 	// SwiftRules is swift/Rules.json, the Swift engine's registry as data, which a Swift test holds to
 	// the registry in both directions.
 	SwiftRules []byte
+
+	// GoRules is the Go engine's registry, read in process rather than from a data file, since that
+	// engine is Go and compiled into the same binary as this package.
+	GoRules []goenginerule.Rule
 
 	// SettingsSchemas is what internal/settingsschema renders, keyed by its path relative to the module
 	// root. The *.schema.json files are copied beside the rest, so the site reads one directory.
@@ -86,7 +92,7 @@ func Build(inputs Inputs) (map[string][]byte, error) {
 
 	registered := map[string]bool{}
 	for _, registration := range inputs.Registrations {
-		registered[registration.Rule.Name] = true
+		registered[registration.Name] = true
 	}
 	for name, examples := range inputs.Examples {
 		if !registered[name] {
@@ -94,63 +100,63 @@ func Build(inputs Inputs) (map[string][]byte, error) {
 			// published under a name the binary no longer answers to.
 			continue
 		}
-		encoded, err := encode(examples)
-		if err != nil {
-			return nil, err
+		encoded, encodeError := encode(examples)
+		if encodeError != nil {
+			return nil, encodeError
 		}
 		files[ExamplePath(name)] = encoded
 	}
 
-	sets, err := buildSets(inputs)
-	if err != nil {
-		return nil, err
+	sets, buildSetsError := buildSets(inputs)
+	if buildSetsError != nil {
+		return nil, buildSetsError
 	}
-	encodedSets, err := encode(sets)
-	if err != nil {
-		return nil, err
+	encodedSets, encodeError := encode(sets)
+	if encodeError != nil {
+		return nil, encodeError
 	}
 	files[SetsPath] = encodedSets
 
-	rules, err := buildRules(inputs, sets)
-	if err != nil {
-		return nil, err
+	rules, buildRulesError := buildRules(inputs, sets)
+	if buildRulesError != nil {
+		return nil, buildRulesError
 	}
-	encodedRules, err := encode(rules)
-	if err != nil {
-		return nil, err
+	encodedRules, encodeError := encode(rules)
+	if encodeError != nil {
+		return nil, encodeError
 	}
 	files[RulesPath] = encodedRules
 
-	changelog, err := parseChangelog(inputs.Changelog)
-	if err != nil {
-		return nil, err
+	changelog, parseChangelogError := parseChangelog(inputs.Changelog)
+	if parseChangelogError != nil {
+		return nil, parseChangelogError
 	}
-	encodedChangelog, err := encode(changelog)
-	if err != nil {
-		return nil, err
+	encodedChangelog, encodeError := encode(changelog)
+	if encodeError != nil {
+		return nil, encodeError
 	}
 	files[ChangelogPath] = encodedChangelog
 
-	benchmarks, err := buildBenchmarks(inputs.Benchmarks)
-	if err != nil {
-		return nil, err
+	benchmarks, buildBenchmarksError := buildBenchmarks(inputs.Benchmarks)
+	if buildBenchmarksError != nil {
+		return nil, buildBenchmarksError
 	}
-	encodedBenchmarks, err := encode(benchmarks)
-	if err != nil {
-		return nil, err
+	encodedBenchmarks, encodeError := encode(benchmarks)
+	if encodeError != nil {
+		return nil, encodeError
 	}
 	files[BenchmarksPath] = encodedBenchmarks
 
 	if inputs.Help != nil {
-		cli, err := parseCli(inputs.Help, inputs.VerbHelp)
-		if err != nil {
-			return nil, err
+		cli, parseCommandLineInterfaceError := parseCommandLineInterface(inputs.Help, inputs.VerbHelp)
+		if parseCommandLineInterfaceError != nil {
+			return nil, parseCommandLineInterfaceError
 		}
-		encodedCli, err := encode(cli)
-		if err != nil {
-			return nil, err
+		encodedCommandLineInterface, encodeError := encode(cli)
+		if encodeError != nil {
+			return nil, encodeError
 		}
-		files[CliPath] = encodedCli
+		files[CommandLineInterfacePath] = encodedCommandLineInterface
 	}
 
 	for path, contents := range inputs.SettingsSchemas {
@@ -176,14 +182,16 @@ func ExamplePath(ruleName string) string {
 func Stale(root string, files map[string][]byte) ([]string, error) {
 	var stale []string
 	for path, contents := range files {
+		// Ignored: a file missing or unreadable is not what Build produced, so its nil contents read as stale,
+		// which is the answer either way.
 		existing, _ := os.ReadFile(filepath.Join(root, path))
 		if !bytes.Equal(existing, contents) {
 			stale = append(stale, path)
 		}
 	}
-	orphans, err := OrphanedExamples(root, files)
-	if err != nil {
-		return nil, err
+	orphans, orphanedExamplesError := OrphanedExamples(root, files)
+	if orphanedExamplesError != nil {
+		return nil, orphanedExamplesError
 	}
 	stale = append(stale, orphans...)
 	sort.Strings(stale)
@@ -194,16 +202,16 @@ func Stale(root string, files map[string][]byte) ([]string, error) {
 func OrphanedExamples(root string, files map[string][]byte) ([]string, error) {
 	var orphans []string
 	directory := filepath.Join(root, ExamplesDirectory)
-	err := filepath.WalkDir(directory, func(path string, entry os.DirEntry, err error) error {
-		if os.IsNotExist(err) && path == directory {
+	walkError := filepath.WalkDir(directory, func(path string, entry os.DirEntry, pathError error) error {
+		if os.IsNotExist(pathError) && path == directory {
 			return filepath.SkipDir
 		}
-		if err != nil || entry.IsDir() {
-			return err
+		if pathError != nil || entry.IsDir() {
+			return pathError
 		}
-		relative, err := filepath.Rel(root, path)
-		if err != nil {
-			return err
+		relative, relativePathError := filepath.Rel(root, path)
+		if relativePathError != nil {
+			return relativePathError
 		}
 		relative = filepath.ToSlash(relative)
 		if _, produced := files[relative]; !produced {
@@ -212,19 +220,20 @@ func OrphanedExamples(root string, files map[string][]byte) ([]string, error) {
 		return nil
 	})
 	sort.Strings(orphans)
-	return orphans, err
+	return orphans, walkError
 }
 
 // encode writes a value with four-space indentation and no HTML escaping, so a regeneration diffs
 // cleanly. Every value Build encodes is a struct or a slice in a fixed order, and a map only where
-// encoding/json sorts its keys, so two runs give the same bytes.
-func encode(value any) ([]byte, error) {
+// encoding/json sorts its keys, so two runs give the same bytes. Value is whichever of those types a file
+// holds.
+func encode[Value any](value Value) ([]byte, error) {
 	var buffer bytes.Buffer
 	encoder := json.NewEncoder(&buffer)
 	encoder.SetEscapeHTML(false)
 	encoder.SetIndent("", "    ")
-	if err := encoder.Encode(value); err != nil {
-		return nil, err
+	if encodeError := encoder.Encode(value); encodeError != nil {
+		return nil, encodeError
 	}
 	return buffer.Bytes(), nil
 }

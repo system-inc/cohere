@@ -947,6 +947,10 @@
                 "severity": "error"
             },
             {
+                "name": "nexus/consistency-no-warning-comment",
+                "severity": "error"
+            },
+            {
                 "name": "nexus/consistency-require-matching-return-type",
                 "severity": "error"
             },
@@ -1561,14 +1565,7 @@
             },
             {
                 "name": "no-warning-comments",
-                "severity": "error",
-                "options": [
-                    {
-                        "decoration": [
-                            "*"
-                        ]
-                    }
-                ]
+                "severity": "off"
             },
             {
                 "name": "no-with",
@@ -2412,6 +2409,10 @@
                 "severity": "error"
             },
             {
+                "name": "nexus/consistency-no-warning-comment",
+                "severity": "error"
+            },
+            {
                 "name": "nexus/consistency-require-matching-return-type",
                 "severity": "error"
             },
@@ -3022,14 +3023,7 @@
             },
             {
                 "name": "no-warning-comments",
-                "severity": "error",
-                "options": [
-                    {
-                        "decoration": [
-                            "*"
-                        ]
-                    }
-                ]
+                "severity": "off"
             },
             {
                 "name": "no-with",
@@ -3931,6 +3925,10 @@
                 "severity": "error"
             },
             {
+                "name": "nexus/consistency-no-warning-comment",
+                "severity": "error"
+            },
+            {
                 "name": "nexus/consistency-require-matching-return-type",
                 "severity": "error"
             },
@@ -4164,14 +4162,7 @@
             },
             {
                 "name": "no-warning-comments",
-                "severity": "error",
-                "options": [
-                    {
-                        "decoration": [
-                            "*"
-                        ]
-                    }
-                ]
+                "severity": "off"
             },
             {
                 "name": "no-with",
@@ -4294,7 +4285,7 @@
         "extends": [
             "cohere:typescript"
         ],
-        "rulesOn": 292,
+        "rulesOn": 293,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -5216,7 +5207,15 @@
                 "severity": "error"
             },
             {
+                "name": "nexus/consistency-no-warning-comment",
+                "severity": "error"
+            },
+            {
                 "name": "nexus/consistency-require-constant-casing",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/consistency-require-identifier-casing",
                 "severity": "error"
             },
             {
@@ -5849,14 +5848,7 @@
             },
             {
                 "name": "no-warning-comments",
-                "severity": "error",
-                "options": [
-                    {
-                        "decoration": [
-                            "*"
-                        ]
-                    }
-                ]
+                "severity": "off"
             },
             {
                 "name": "no-with",
@@ -6110,7 +6102,7 @@
         "plugins": [
             "@typescript-eslint"
         ],
-        "rulesOn": 301,
+        "rulesOn": 302,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -6884,6 +6876,10 @@
                 "severity": "error"
             },
             {
+                "name": "nexus/consistency-no-warning-comment",
+                "severity": "error"
+            },
+            {
                 "name": "nexus/consistency-require-constant-casing",
                 "severity": "error",
                 "options": [
@@ -6908,6 +6904,10 @@
                         ]
                     }
                 ]
+            },
+            {
+                "name": "nexus/consistency-require-identifier-casing",
+                "severity": "error"
             },
             {
                 "name": "nexus/consistency-require-matching-return-type",
@@ -7548,14 +7548,7 @@
             },
             {
                 "name": "no-warning-comments",
-                "severity": "error",
-                "options": [
-                    {
-                        "decoration": [
-                            "*"
-                        ]
-                    }
-                ]
+                "severity": "off"
             },
             {
                 "name": "no-with",
@@ -8554,6 +8547,10 @@
                 "severity": "error"
             },
             {
+                "name": "nexus/consistency-no-warning-comment",
+                "severity": "error"
+            },
+            {
                 "name": "nexus/consistency-require-matching-return-type",
                 "severity": "error"
             },
@@ -9164,14 +9161,7 @@
             },
             {
                 "name": "no-warning-comments",
-                "severity": "error",
-                "options": [
-                    {
-                        "decoration": [
-                            "*"
-                        ]
-                    }
-                ]
+                "severity": "off"
             },
             {
                 "name": "no-with",
@@ -9998,6 +9988,10 @@
                 "severity": "error"
             },
             {
+                "name": "nexus/consistency-no-warning-comment",
+                "severity": "error"
+            },
+            {
                 "name": "nexus/consistency-require-matching-return-type",
                 "severity": "error"
             },
@@ -10608,14 +10602,7 @@
             },
             {
                 "name": "no-warning-comments",
-                "severity": "error",
-                "options": [
-                    {
-                        "decoration": [
-                            "*"
-                        ]
-                    }
-                ]
+                "severity": "off"
             },
             {
                 "name": "no-with",

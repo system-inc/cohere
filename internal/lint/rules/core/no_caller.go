@@ -45,9 +45,9 @@ var forbiddenArgumentsProperties = map[string]bool{
 // and referring to it, which requires choosing a name, and `arguments.caller` has no replacement at
 // all: the information it carried is not available another way. A rule offering a fix here would be
 // offering to guess.
-var NoCaller = rule.Rule{
+var NoCaller = rule.Rule[rule.NoOptions]{
 	Name: "no-caller",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindPropertyAccessExpression: func(node *ast.Node) {
 				access := node.AsPropertyAccessExpression()
@@ -63,7 +63,7 @@ var NoCaller = rule.Rule{
 				// The property rather than the whole access, matching upstream, so the finding
 				// points at `callee` rather than at `arguments.callee`. That also puts it where a
 				// suppressing comment on the line above can reach it.
-				ctx.ReportNode(name, rule.Message{
+				ruleContext.ReportNode(name, rule.Message{
 					Id: "noCaller",
 					Description: fmt.Sprintf(
 						"This uses `arguments.%s`. Both properties throw in strict mode, which "+

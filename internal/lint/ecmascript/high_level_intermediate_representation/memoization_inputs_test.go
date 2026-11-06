@@ -11,20 +11,20 @@ import "testing"
 //
 // This package already discovers the closed set by scanning source for the marker method, so the
 // guard costs nothing beyond naming the one kind that is legitimately in the default.
-func TestMemoizationLevelOfCoversEveryInstructionValue(t *testing.T) {
-	t.Parallel()
+func TestMemoizationLevelOfCoversEveryInstructionValue(test *testing.T) {
+	test.Parallel()
 
 	// The only value upstream classifies as Never. Anything else reaching the default is a gap.
 	legitimateDefaults := map[string]string{
 		"UnsupportedNode": "upstream's only Never arm: a node the compiler does not model",
 	}
 
-	declared := markerImplementers(t, "instructionValue")
+	declared := markerImplementers(test, "instructionValue")
 	if len(declared) < 40 {
-		t.Fatalf("found only %d instruction values, expected the full set; the source scan is broken",
+		test.Fatalf("found only %d instruction values, expected the full set; the source scan is broken",
 			len(declared))
 	}
-	covered := typeSwitchCases(t, "memoization_inputs.go", "MemoizationLevelOf")
+	covered := typeSwitchCases(test, "memoization_inputs.go", "MemoizationLevelOf")
 
 	uncovered := 0
 	for _, name := range declared {
@@ -32,11 +32,11 @@ func TestMemoizationLevelOfCoversEveryInstructionValue(t *testing.T) {
 			continue
 		}
 		if reason, known := legitimateDefaults[name]; known {
-			t.Logf("%s falls through to Never on purpose: %s", name, reason)
+			test.Logf("%s falls through to Never on purpose: %s", name, reason)
 			continue
 		}
 		uncovered++
-		t.Errorf("MemoizationLevelOf has no case for %s, so it silently classifies as Never -- a "+
+		test.Errorf("MemoizationLevelOf has no case for %s, so it silently classifies as Never -- a "+
 			"value that escapes and is not held", name)
 	}
 
@@ -44,11 +44,11 @@ func TestMemoizationLevelOfCoversEveryInstructionValue(t *testing.T) {
 	// second entry there would mean someone decided another kind is never worth memoizing, and that
 	// is a decision upstream did not make.
 	if len(legitimateDefaults) != 1 {
-		t.Errorf("%d kinds are excused from coverage; upstream excuses exactly one",
+		test.Errorf("%d kinds are excused from coverage; upstream excuses exactly one",
 			len(legitimateDefaults))
 	}
 	if uncovered != 0 {
-		t.Logf("%d instruction values are unclassified", uncovered)
+		test.Logf("%d instruction values are unclassified", uncovered)
 	}
 }
 
@@ -61,8 +61,8 @@ func TestMemoizationLevelOfCoversEveryInstructionValue(t *testing.T) {
 // The primitive group is the one most likely to be got wrong, because `Conditional` is its forced
 // branch and `Never` is its default one. A port reading the first level in the arm gets the right
 // answer for the wrong reason and would flip the day the flag default changes.
-func TestMemoizationLevelOfMatchesUpstreamGroups(t *testing.T) {
-	t.Parallel()
+func TestMemoizationLevelOfMatchesUpstreamGroups(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name  string
@@ -83,10 +83,18 @@ func TestMemoizationLevelOfMatchesUpstreamGroups(t *testing.T) {
 		{name: "declare context", want: MemoizationMemoized, value: &DeclareContext{}},
 		{name: "store context", want: MemoizationMemoized, value: &StoreContext{}},
 
-		{name: "primitive under forceMemoizePrimitives", want: MemoizationConditional, value: &Primitive{}},
+		{
+			name:  "primitive under forceMemoizePrimitives",
+			want:  MemoizationConditional,
+			value: &Primitive{Value: PrimitiveUndefined{}},
+		},
 		{name: "binary under forceMemoizePrimitives", want: MemoizationConditional, value: &BinaryExpression{}},
 		{name: "unary under forceMemoizePrimitives", want: MemoizationConditional, value: &UnaryExpression{}},
-		{name: "template literal under forceMemoizePrimitives", want: MemoizationConditional, value: &TemplateLiteral{}},
+		{
+			name:  "template literal under forceMemoizePrimitives",
+			want:  MemoizationConditional,
+			value: &TemplateLiteral{},
+		},
 		{name: "load global under forceMemoizePrimitives", want: MemoizationConditional, value: &LoadGlobal{}},
 		{name: "jsx text under forceMemoizePrimitives", want: MemoizationConditional, value: &JsxText{}},
 
@@ -100,10 +108,10 @@ func TestMemoizationLevelOfMatchesUpstreamGroups(t *testing.T) {
 		{name: "declare local", want: MemoizationUnmemoized, value: &DeclareLocal{}},
 		{name: "store global", want: MemoizationUnmemoized, value: &StoreGlobal{}},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			if got := MemoizationLevelOf(testCase.value); got != testCase.want {
-				t.Errorf("got %s, want %s", got, testCase.want)
+				test.Errorf("got %s, want %s", got, testCase.want)
 			}
 		})
 	}
@@ -115,8 +123,8 @@ func TestMemoizationLevelOfMatchesUpstreamGroups(t *testing.T) {
 // They are terminals in the graph and values in the tree, so they have no `InstructionValue` to
 // classify. Upstream gives all four the same answer in separate arms, which matches what they are:
 // none produces an identity of its own.
-func TestMemoizationLevelOfReactiveValueHandlesComposites(t *testing.T) {
-	t.Parallel()
+func TestMemoizationLevelOfReactiveValueHandlesComposites(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name  string
@@ -138,32 +146,32 @@ func TestMemoizationLevelOfReactiveValueHandlesComposites(t *testing.T) {
 			value: &ReactiveInstructionValue{},
 		},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			if got := MemoizationLevelOfReactiveValue(testCase.value); got != testCase.want {
-				t.Errorf("got %s, want %s", got, testCase.want)
+				test.Errorf("got %s, want %s", got, testCase.want)
 			}
 		})
 	}
 
 	if got := MemoizationLevelOfReactiveValue(nil); got != MemoizationNever {
-		t.Errorf("a nil value answered %s, want never", got)
+		test.Errorf("a nil value answered %s, want never", got)
 	}
 }
 
 // TestMemoizationInputsGapsAreDeclared pins the gap list so closing one is a visible event.
-func TestMemoizationInputsGapsAreDeclared(t *testing.T) {
-	t.Parallel()
+func TestMemoizationInputsGapsAreDeclared(test *testing.T) {
+	test.Parallel()
 
 	gaps := MemoizationInputsGaps()
 	if len(gaps) != 2 {
-		t.Fatalf("expected 2 declared gaps, found %d; a gap was added or closed without this test "+
+		test.Fatalf("expected 2 declared gaps, found %d; a gap was added or closed without this test "+
 			"and its consumers being updated", len(gaps))
 	}
 	seen := map[MemoizationInputsGap]bool{}
 	for _, gap := range gaps {
 		if seen[gap] {
-			t.Errorf("gap %v is listed twice", gap)
+			test.Errorf("gap %v is listed twice", gap)
 		}
 		seen[gap] = true
 	}
@@ -172,7 +180,7 @@ func TestMemoizationInputsGapsAreDeclared(t *testing.T) {
 		MemoizationInputsGapOperandMutability,
 	} {
 		if !seen[required] {
-			t.Errorf("gap %v is declared as a constant but not returned, so nothing asserts on it",
+			test.Errorf("gap %v is declared as a constant but not returned, so nothing asserts on it",
 				required)
 		}
 	}

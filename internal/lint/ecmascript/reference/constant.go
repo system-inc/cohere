@@ -18,8 +18,8 @@ import (
 // It takes the rule's context rather than a checker and a file so that every declaration it reads is
 // visibly the rule's own file's, which the type-reach scan checks: a rule keyed on its imports' shapes
 // may ask this.
-func ConstantStringIn(ctx rule.Context, expression *ast.Node) (string, bool) {
-	if ctx.TypeChecker == nil || ctx.SourceFile == nil {
+func ConstantStringIn(ruleContext rule.Context, expression *ast.Node) (string, bool) {
+	if ruleContext.TypeChecker == nil || ruleContext.SourceFile == nil {
 		return ConstantString(expression)
 	}
 	following := map[*ast.Symbol]bool{}
@@ -28,7 +28,7 @@ func ConstantStringIn(ctx rule.Context, expression *ast.Node) (string, bool) {
 		if node.Kind == ast.KindRegularExpressionLiteral {
 			return node.Text(), true, true
 		}
-		initializer, symbol := constantInitializer(ctx, node)
+		initializer, symbol := constantInitializer(ruleContext, node)
 		// A binding read inside its own initializer, `const a = a + 'x'`, has no value to give.
 		if initializer == nil || following[symbol] {
 			return "", false, false
@@ -43,9 +43,9 @@ func ConstantStringIn(ctx rule.Context, expression *ast.Node) (string, bool) {
 
 // constantInitializer returns the initializer a name's binding was declared with, when the binding
 // counts as constant, and the symbol it read.
-func constantInitializer(ctx rule.Context, name *ast.Node) (*ast.Node, *ast.Symbol) {
-	symbol := ReadSymbol(ctx.TypeChecker, name)
-	declarations := rule.DeclarationsIn(ctx.SourceFile, symbol)
+func constantInitializer(ruleContext rule.Context, name *ast.Node) (*ast.Node, *ast.Symbol) {
+	symbol := ReadSymbol(ruleContext.TypeChecker, name)
+	declarations := rule.DeclarationsIn(ruleContext.SourceFile, symbol)
 	if symbol == nil || len(declarations) != 1 || rule.IsDeclaredOnlyInDeclarationFiles(symbol) {
 		return nil, nil
 	}
@@ -63,7 +63,7 @@ func constantInitializer(ctx rule.Context, name *ast.Node) (*ast.Node, *ast.Symb
 	if list == nil || list.Kind != ast.KindVariableDeclarationList {
 		return nil, nil
 	}
-	if list.Flags&ast.NodeFlagsConst == 0 && isWrittenAfterDeclaration(ctx, symbol, variable.Name()) {
+	if list.Flags&ast.NodeFlagsConst == 0 && isWrittenAfterDeclaration(ruleContext, symbol, variable.Name()) {
 		return nil, nil
 	}
 	return variable.Initializer, symbol
@@ -72,7 +72,7 @@ func constantInitializer(ctx rule.Context, name *ast.Node) (*ast.Node, *ast.Symb
 // isWrittenAfterDeclaration reports whether anything in the file writes the binding, the declaration's
 // own name aside: eslint-utils' isEffectivelyConst, one initializing write and every other reference a
 // read.
-func isWrittenAfterDeclaration(ctx rule.Context, symbol *ast.Symbol, declarationName *ast.Node) bool {
+func isWrittenAfterDeclaration(ruleContext rule.Context, symbol *ast.Symbol, declarationName *ast.Node) bool {
 	written := false
 	var visit func(*ast.Node) bool
 	visit = func(node *ast.Node) bool {
@@ -80,13 +80,13 @@ func isWrittenAfterDeclaration(ctx rule.Context, symbol *ast.Symbol, declaration
 			return true
 		}
 		if node.Kind == ast.KindIdentifier && node != declarationName && node.Text() == declarationName.Text() &&
-			WritesToBinding(node) && ReadSymbol(ctx.TypeChecker, node) == symbol {
+			WritesToBinding(node) && ReadSymbol(ruleContext.TypeChecker, node) == symbol {
 			written = true
 			return true
 		}
 		return node.ForEachChild(visit)
 	}
-	ctx.SourceFile.AsNode().ForEachChild(visit)
+	ruleContext.SourceFile.AsNode().ForEachChild(visit)
 	return written
 }
 
@@ -95,23 +95,25 @@ func isWrittenAfterDeclaration(ctx rule.Context, symbol *ast.Symbol, declaration
 // initialized with one, followed through any number of such names. eslint-utils' getStaticValue answers
 // a RegExp there, which a rule that wants a pattern's text, not the String() of a RegExp, has to tell
 // apart from a string constant.
-func IsConstantRegExpIn(ctx rule.Context, expression *ast.Node) bool {
+func IsConstantRegExpIn(ruleContext rule.Context, expression *ast.Node) bool {
 	following := map[*ast.Symbol]bool{}
-	for expression != nil {
-		expression = ast.SkipParentheses(expression)
-		switch expression.Kind {
+	// The walk follows the expression through each name's initializer, one binding at a time.
+	current := expression
+	for current != nil {
+		current = ast.SkipParentheses(current)
+		switch current.Kind {
 		case ast.KindRegularExpressionLiteral:
 			return true
 		case ast.KindIdentifier:
-			if ctx.TypeChecker == nil || ctx.SourceFile == nil {
+			if ruleContext.TypeChecker == nil || ruleContext.SourceFile == nil {
 				return false
 			}
-			initializer, symbol := constantInitializer(ctx, expression)
+			initializer, symbol := constantInitializer(ruleContext, current)
 			if initializer == nil || following[symbol] {
 				return false
 			}
 			following[symbol] = true
-			expression = initializer
+			current = initializer
 		default:
 			return false
 		}

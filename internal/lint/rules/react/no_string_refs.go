@@ -104,10 +104,10 @@ type noStringRefsWireOptions struct {
 // `18.2.0` and `17.0.0` report, `18.3.0` and `19.0.0` report nothing.
 //
 // cohere reads no React settings. The loader reads `settings` for better-tailwindcss only and
-// refuses `settings.react` by name, so no React version can reach a rule here by any route. The faithful reading of that is not "pick a version" but "reproduce the answer
-// upstream gives under this repository's configuration", and that answer is silence: this tree
-// configures no React version, and it runs React 19.2.8, where the deprecation is genuinely not in
-// force.
+// refuses `settings.react` by name, so no React version can reach a rule here by any route. The faithful reading of
+// that is not "pick a version" but "reproduce the answer upstream gives under this repository's configuration", and
+// that answer is silence: this tree configures no React version, and it runs React 19.2.8, where the deprecation is
+// genuinely not in force.
 //
 // So the half is off by default and reachable by an option this rule adds. Shipping it always-on
 // would report on every `this.refs` in the tree where upstream reports on none, and shipping it
@@ -150,7 +150,7 @@ type noStringRefsWireOptions struct {
 // keeps the parenthesis as a real node, so reproducing upstream means skipping it deliberately.
 // Measured; the previous port was silent on this input.
 //
-// # The enclosing component is found by SCOPE, not by walking parents
+// # The enclosing component is found by scope, not by walking parents
 //
 // `getParentES6Component` walks *scopes* to the first `class` scope and asks whether that one class
 // is a component. It does not keep climbing. `getParentES5Component` walks scopes upward asking, at
@@ -193,7 +193,7 @@ type noStringRefsWireOptions struct {
 // reason, which is the same resolution `no-unsafe` in this package reached for the same helper.
 //
 // `utilsreact.IsEs6ComponentClass` is used as-is, and that is measured rather than assumed. It
-// skips parentheses on the heritage receiver, which is a divergence from oxc and is NOT one from
+// skips parentheses on the heritage receiver, which is a divergence from oxc and is not one from
 // this authority: `(React.Component)` and `(React).Component` both report upstream, because ESTree
 // has no parenthesized node for the check to trip over. Its accepted base names, `Component` and
 // `PureComponent` bare or under the React namespace, are `/^(Pure)?Component$/` at
@@ -225,16 +225,16 @@ type noStringRefsWireOptions struct {
 //
 // The finding underlines the whole attribute, `ref="hello"`, which is the node handed to `report`,
 // rather than the name span that `no-children-prop` in this same package reports.
-var NoStringRefs = rule.Rule{
+var NoStringRefs = rule.Rule[NoStringRefsOptions]{
 	// No namespace prefix. The config writes `react/no-string-refs` and the parity guard strips the
 	// namespace on a `/` boundary, so `react-no-string-refs` would match no inventory entry and lint
 	// no files while passing every fixture in this package.
 	Name: "react/no-string-refs",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoStringRefsOptions]) rule.Listeners {
 		// An unconfigured rule is handed nil, and the zero value is upstream's answer under this
 		// repository's configuration: template refs unreported, and the `this.refs` half off
 		// because no configured React version means `999.999.999`.
-		settings, _ := rule.OptionsAs[NoStringRefsOptions](options)
+		settings, _ := options.Read()
 
 		listeners := rule.Listeners{
 			ast.KindJsxAttribute: func(node *ast.Node) {
@@ -251,7 +251,7 @@ var NoStringRefs = rule.Rule{
 				}
 				// The whole attribute, not its name. Upstream passes `node` to `report`, and `node`
 				// here is the JSXAttribute.
-				ctx.ReportNode(node, messageStringInRefDeprecated)
+				ruleContext.ReportNode(node, messageStringInRefDeprecated)
 			},
 		}
 
@@ -269,7 +269,7 @@ var NoStringRefs = rule.Rule{
 			if name == nil || name.Text() != "refs" {
 				return
 			}
-			reportRefsUsage(ctx, node, access.Expression)
+			reportRefsUsage(ruleContext, node, access.Expression)
 		}
 
 		// A computed access is upstream's `MemberExpression` with `computed: true`, and it reaches
@@ -282,7 +282,7 @@ var NoStringRefs = rule.Rule{
 			if argument == nil || argument.Kind != ast.KindIdentifier || argument.Text() != "refs" {
 				return
 			}
-			reportRefsUsage(ctx, node, access.Expression)
+			reportRefsUsage(ruleContext, node, access.Expression)
 		}
 
 		return listeners
@@ -295,15 +295,15 @@ var NoStringRefs = rule.Rule{
 // there an enclosing component. Both halves of the object check come from `node.object.type ===
 // 'ThisExpression'`, where the parenthesis skip is what reproduces ESTree rather than what widens
 // past it.
-func reportRefsUsage(ctx rule.Context, node *ast.Node, object *ast.Node) {
-	object = ast.SkipParentheses(object)
-	if object == nil || object.Kind != ast.KindThisKeyword {
+func reportRefsUsage(ruleContext rule.Context, node *ast.Node, object *ast.Node) {
+	unwrapped := ast.SkipParentheses(object)
+	if unwrapped == nil || unwrapped.Kind != ast.KindThisKeyword {
 		return
 	}
 	if !hasEnclosingComponent(node) {
 		return
 	}
-	ctx.ReportNode(node, messageThisRefsDeprecated)
+	ruleContext.ReportNode(node, messageThisRefsDeprecated)
 }
 
 // hasEnclosingComponent is upstream's `getParentES6Component(...) || getParentES5Component(...)`.
@@ -314,7 +314,7 @@ func hasEnclosingComponent(node *ast.Node) bool {
 	return hasEnclosingEs6Component(node) || hasEnclosingEs5Component(node)
 }
 
-// hasEnclosingEs6Component reproduces `getParentES6Component`, whose walk STOPS at the first class.
+// hasEnclosingEs6Component reproduces `getParentES6Component`, whose walk stops at the first class.
 //
 // Upstream walks scopes to the nearest one whose type is `class` and then asks whether that single
 // class is a component, returning null rather than continuing if it is not. So a plain class nested
@@ -335,7 +335,7 @@ func hasEnclosingEs6Component(node *ast.Node) bool {
 	return false
 }
 
-// hasEnclosingEs5Component reproduces `getParentES5Component`, which walks FUNCTION scopes.
+// hasEnclosingEs5Component reproduces `getParentES5Component`, which walks function scopes.
 //
 // Upstream's loop is four lines and every one of them matters:
 //
@@ -347,7 +347,7 @@ func hasEnclosingEs6Component(node *ast.Node) bool {
 // is the `ObjectExpression`. That object is the node handed to `isES5Component`, which then reads
 // `node.parent.callee` at `componentUtil.js:43`. So the question asked at each function scope is
 // really "is this function a property of an object literal that is the argument of a factory call",
-// and the chain from the function to the call is FOUR hops rather than two.
+// and the chain from the function to the call is four hops rather than two.
 //
 // Our parser spells the same chain `FunctionExpression -> PropertyAssignment ->
 // ObjectLiteralExpression -> CallExpression`, read off the tree rather than assumed: an earlier
@@ -386,7 +386,7 @@ func hasEnclosingEs5Component(node *ast.Node) bool {
 // correct constant there.
 //
 // Our parser does not have it. A property holding a function expression or an arrow goes through a
-// `PropertyAssignment`, which is two hops, but a shorthand method or an accessor IS the member, so
+// `PropertyAssignment`, which is two hops, but a shorthand method or an accessor is itself the member, so
 // the object literal is one hop up:
 //
 //	{ m: function() {} }    FunctionExpression -> PropertyAssignment -> ObjectLiteralExpression
@@ -440,6 +440,13 @@ func opensFunctionScope(kind ast.Kind) bool {
 	return false
 }
 
+// createReactClassPragma is upstream's default `createClass` pragma.
+//
+// Configurable upstream through `settings.react.createClass`, which cannot reach a rule here for
+// the same reason the React version cannot. Fixed to the default, which is what an unconfigured
+// upstream uses.
+const createReactClassPragma = "createReactClass"
+
 // isEs5FactoryCall is upstream's `isES5Component`, and its narrowness is the point.
 //
 // `componentUtil.js:39` reads the `createClass` pragma, which defaults to `createReactClass`, and
@@ -476,13 +483,6 @@ func isEs5FactoryCall(node *ast.Node) bool {
 	}
 	return false
 }
-
-// createReactClassPragma is upstream's default `createClass` pragma.
-//
-// Configurable upstream through `settings.react.createClass`, which cannot reach a rule here for
-// the same reason the React version cannot. Fixed to the default, which is what an unconfigured
-// upstream uses.
-const createReactClassPragma = "createReactClass"
 
 // isStringRefValue reports whether a ref attribute's value is a string this rule refuses.
 //
@@ -527,13 +527,13 @@ func isStringRefValue(initializer *ast.Node, noTemplateLiterals bool) bool {
 // resolution is a decision rather than a bind. It happens to land on the same value as the zero
 // value today, and it is written out anyway so that the reasoning is at the line if the config ever
 // grows a settings surface.
-func DecodeNoStringRefsOptions(raw []byte) (any, error) {
+func DecodeNoStringRefsOptions(raw []byte) (NoStringRefsOptions, error) {
 	var wire noStringRefsWireOptions
 	if len(raw) == 0 {
 		return NoStringRefsOptions{}, nil
 	}
-	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
-		return NoStringRefsOptions{}, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &wire); unmarshalOptionsError != nil {
+		return NoStringRefsOptions{}, unmarshalOptionsError
 	}
 
 	options := NoStringRefsOptions{NoTemplateLiterals: wire.NoTemplateLiterals}

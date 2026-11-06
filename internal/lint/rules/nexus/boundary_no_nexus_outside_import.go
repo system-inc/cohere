@@ -14,7 +14,10 @@ var outsideNexusAliases = []string{"@project", "@structure", "@base"}
 
 // boundaryNoNexusOutsideImportText is the rule's message, whose wording lives in
 // `policy/messages/boundary-no-nexus-outside-import.json`.
-var boundaryNoNexusOutsideImportText = policy.MessageOf("nexus/boundary-no-nexus-outside-import", "forbiddenOutsideImport")
+var boundaryNoNexusOutsideImportText = policy.MessageOf(
+	"nexus/boundary-no-nexus-outside-import",
+	"forbiddenOutsideImport",
+)
 
 func messageForbiddenOutsideImport() rule.Message {
 	return rule.Message{
@@ -30,18 +33,18 @@ func messageForbiddenOutsideImport() rule.Message {
 //
 // No fix, and there is no plausible one: the repair is either to move the imported code down into
 // nexus or to invert the dependency, and neither is a text edit.
-var BoundaryNoNexusOutsideImport = rule.Rule{
+var BoundaryNoNexusOutsideImport = rule.Rule[rule.NoOptions]{
 	Name: "nexus/boundary-no-nexus-outside-import",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// The whole rule is a question about where the file lives, so a file outside nexus declines
 		// before a single node is visited. This is the cheapest a rule gets.
-		if !strings.Contains(imports.NormalizedFileName(ctx.SourceFile), "/libraries/nexus/") {
+		if !strings.Contains(imports.NormalizedFileName(ruleContext.SourceFile), "/libraries/nexus/") {
 			return nil
 		}
 
 		return imports.SourceVisitors(func(source string, node *ast.Node) {
 			if isOutsideNexusAlias(source) {
-				ctx.ReportNode(imports.SpecifierNode(node), messageForbiddenOutsideImport())
+				ruleContext.ReportNode(imports.SpecifierNode(node), messageForbiddenOutsideImport())
 			}
 		})
 	},

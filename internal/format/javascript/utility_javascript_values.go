@@ -63,24 +63,25 @@ func javaScriptNumberString(value float64) string {
 	scientific := strconv.FormatFloat(value, 'e', -1, 64)
 	mantissa, exponentText, _ := strings.Cut(scientific, "e")
 	digits := strings.Replace(mantissa, ".", "", 1)
+	// Ignored: FormatFloat's 'e' form always writes its exponent as a sign and decimal digits, which Atoi reads.
 	exponent, _ := strconv.Atoi(exponentText)
-	// The specification's n: the value is 0.digits × 10^n.
-	n := exponent + 1
-	k := len(digits)
+	// The specification's n and k: the value is 0.digits × 10^pointPosition, of digitCount digits.
+	pointPosition := exponent + 1
+	digitCount := len(digits)
 	switch {
-	case k <= n && n <= 21:
-		return digits + strings.Repeat("0", n-k)
-	case 0 < n && n <= 21:
-		return digits[:n] + "." + digits[n:]
-	case -6 < n && n <= 0:
-		return "0." + strings.Repeat("0", -n) + digits
+	case digitCount <= pointPosition && pointPosition <= 21:
+		return digits + strings.Repeat("0", pointPosition-digitCount)
+	case 0 < pointPosition && pointPosition <= 21:
+		return digits[:pointPosition] + "." + digits[pointPosition:]
+	case -6 < pointPosition && pointPosition <= 0:
+		return "0." + strings.Repeat("0", -pointPosition) + digits
 	}
 	sign := "+"
-	if n-1 < 0 {
+	if pointPosition-1 < 0 {
 		sign = "-"
 	}
-	power := strconv.Itoa(int(math.Abs(float64(n - 1))))
-	if k == 1 {
+	power := strconv.Itoa(int(math.Abs(float64(pointPosition - 1))))
+	if digitCount == 1 {
 		return digits + "e" + sign + power
 	}
 	return digits[:1] + "." + digits[1:] + "e" + sign + power

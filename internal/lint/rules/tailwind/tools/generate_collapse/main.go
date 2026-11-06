@@ -2,7 +2,8 @@
 //
 // Usage:
 //
-//	go run ./internal/lint/rules/tailwind/tools/generate_collapse -entry-point <theme.css> [-output <file.go>] [-check]
+//	go run ./internal/lint/rules/tailwind/tools/generate_collapse \
+//	    -entry-point <theme.css> [-output <file.go>] [-check] \
 //	    [-resolve-root <dir>] [-verify-invariance-against <theme.css>[:<resolve-root>]]
 //
 // # The one invariance claim in this file, and how to re-measure it
@@ -15,7 +16,7 @@
 // ~/Projects/connected/www-connected-app and diffing to zero. The instrument could not support the
 // conclusion: both vendor the Structure submodule and import its `global.css`, so they share its
 // `@theme` and `@utility` blocks and are one observation wearing two names. Re-measured against a
-// system sharing nothing, the claim does hold — the same 44 families, identical down to the value
+// system sharing nothing, the claim does hold: the same 44 families, identical down to the value
 // each was discovered at, across a registry differing by 25 functional roots and 7,850 probed
 // pairs. `-verify-invariance-against` is that measurement made repeatable, and it refuses a second
 // system whose registry matches the first, since two systems that cannot differ cannot detect a
@@ -98,21 +99,6 @@ type enumeration struct {
 	VerifiedAgainst []string `json:"-"`
 }
 
-// utilityProperties is one utility and the CSS property names it declares.
-type utilityProperties struct {
-	Root       string   `json:"root"`
-	Name       string   `json:"name"`
-	Properties []string `json:"properties"`
-}
-
-// key returns whichever identifier the producer supplied.
-func (u utilityProperties) key() string {
-	if u.Name != "" {
-		return u.Name
-	}
-	return u.Root
-}
-
 // family is one collapse: two roots that merge into a third when everything else about them agrees.
 type family struct {
 	Inputs            []string `json:"inputs"`
@@ -124,22 +110,18 @@ type family struct {
 }
 
 // signature is one family as the invariance check and the difference report compare it.
-func (f family) signature() string {
+func (family family) signature() string {
 	logical := ""
-	if f.RequiresLogicalToPhysical {
+	if family.RequiresLogicalToPhysical {
 		logical = " (logical)"
 	}
-	return fmt.Sprintf("%s => %s @ %s%s", strings.Join(f.Inputs, " + "), f.Output, f.DiscoveredAtValue, logical)
-}
-
-// pathList collects a repeatable flag.
-type pathList []string
-
-func (p *pathList) String() string { return strings.Join(*p, ", ") }
-
-func (p *pathList) Set(value string) error {
-	*p = append(*p, value)
-	return nil
+	return fmt.Sprintf(
+		"%s => %s @ %s%s",
+		strings.Join(family.Inputs, " + "),
+		family.Output,
+		family.DiscoveredAtValue,
+		logical,
+	)
 }
 
 // designSystemInput is one design system to enumerate: a CSS entry point, and where its bare
@@ -161,7 +143,7 @@ type designSystemInput struct {
 func parseDesignSystemInput(value string) designSystemInput {
 	if index := strings.LastIndex(value, ":"); index > 0 {
 		candidate := value[:index]
-		if _, err := os.Stat(candidate); err == nil {
+		if _, statError := os.Stat(candidate); statError == nil {
 			return designSystemInput{entryPoint: candidate, resolveRoot: value[index+1:]}
 		}
 	}
@@ -205,7 +187,9 @@ func invarianceProvenance(verifiedAgainst []string) string {
 	for _, system := range verifiedAgainst {
 		fmt.Fprintf(&buffer, "//\t%s\n", system)
 	}
-	buffer.WriteString("//\n// Identical families, down to the value each was discovered at and whether it needs logicalToPhysical.\n")
+	buffer.WriteString(
+		"//\n// Identical families, down to the value each was discovered at and whether it needs logicalToPhysical.\n",
+	)
 	return buffer.String()
 }
 
@@ -215,11 +199,14 @@ func invarianceProvenance(verifiedAgainst []string) string {
 // header is a diff every other machine produces on regeneration, which makes `-check` fail for a
 // reason that has nothing to do with Tailwind.
 func portablePath(path string) string {
-	home, err := os.UserHomeDir()
-	if err != nil || home == "" {
+	home, homeDirectoryError := os.UserHomeDir()
+	if homeDirectoryError != nil || home == "" {
 		return path
 	}
-	if relative, err := filepath.Rel(home, path); err == nil && !strings.HasPrefix(relative, "..") {
+	if relative, relativePathError := filepath.Rel(
+		home,
+		path,
+	); relativePathError == nil && !strings.HasPrefix(relative, "..") {
 		return filepath.Join("~", relative)
 	}
 	return path
@@ -255,23 +242,45 @@ func differingFamilies(left, right []family) []string {
 }
 
 func main() {
-	entryPoint := flag.String("entry-point", "", "path to the Tailwind CSS entry point, such as app/_theme/styles/theme.css")
-	resolveRoot := flag.String("resolve-root", "", "directory bare specifiers such as `tailwindcss` resolve from; defaults to the entry point's directory")
-	output := flag.String("output", "internal/lint/rules/tailwind/collapse/collapse_table.go", "where to write the generated table")
+	entryPoint := flag.String(
+		"entry-point",
+		"",
+		"path to the Tailwind CSS entry point, such as app/_theme/styles/theme.css",
+	)
+	resolveRoot := flag.String(
+		"resolve-root",
+		"",
+		"directory bare specifiers such as `tailwindcss` resolve from; defaults to the entry point's directory",
+	)
+	output := flag.String(
+		"output",
+		"internal/lint/rules/tailwind/collapse/collapse_table.go",
+		"where to write the generated table",
+	)
 	check := flag.Bool("check", false, "regenerate and fail if the committed table disagrees, instead of writing it")
 	var invarianceInputs pathList
-	flag.Var(&invarianceInputs, "verify-invariance-against", "a second design system, as `<theme.css>[:<resolve-root>]`, whose CollapseFamilies must match; repeatable")
+	flag.Var(
+		&invarianceInputs,
+		"verify-invariance-against",
+		"a second design system, as `<theme.css>[:<resolve-root>]`, whose CollapseFamilies must match; repeatable",
+	)
 	flag.Parse()
 
 	if *entryPoint == "" {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 		fmt.Fprintln(os.Stderr, "generate_collapse: -entry-point is required")
-		fmt.Fprintln(os.Stderr, "  example: go run ./internal/lint/rules/tailwind/tools/generate_collapse -entry-point ~/Projects/ahra/app/_theme/styles/theme.css")
+		// Ignored: the rest of the same message, and the same exit code says it either way.
+		fmt.Fprintln(
+			os.Stderr,
+			"  example: go run ./internal/lint/rules/tailwind/tools/generate_collapse -entry-point ~/Projects/ahra/app/_theme/styles/theme.css",
+		)
 		os.Exit(2)
 	}
 
-	result, err := enumerate(*entryPoint, *resolveRoot)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "generate_collapse: %v\n", err)
+	result, enumerateError := enumerate(*entryPoint, *resolveRoot)
+	if enumerateError != nil {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
+		fmt.Fprintf(os.Stderr, "generate_collapse: %v\n", enumerateError)
 		os.Exit(1)
 	}
 
@@ -280,21 +289,39 @@ func main() {
 	// called without `collapse: true`, so an options mistake enumerates zero families and writes an
 	// empty table that no test would obviously reject.
 	if len(result.Families) == 0 {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 		fmt.Fprintln(os.Stderr, "generate_collapse: the engine reported no collapse families at all.")
-		fmt.Fprintln(os.Stderr, "  That is almost certainly a broken enumeration rather than a Tailwind with no shorthands.")
+		// Ignored: the rest of the same message, and the same exit code says it either way.
+		fmt.Fprintln(
+			os.Stderr,
+			"  That is almost certainly a broken enumeration rather than a Tailwind with no shorthands.",
+		)
+		// Ignored: the rest of the same message, and the same exit code says it either way.
 		fmt.Fprintln(os.Stderr, "  Check that canonicalizeCandidates is being called with {collapse: true}.")
 		os.Exit(1)
 	}
 	if len(result.PhysicalOnlyFamilies) > 0 {
-		fmt.Fprintln(os.Stderr, "generate_collapse: these pairs collapse only with logicalToPhysical off, which the table cannot record:")
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
+		fmt.Fprintln(
+			os.Stderr,
+			"generate_collapse: these pairs collapse only with logicalToPhysical off, which the table cannot record:",
+		)
 		for _, entry := range result.PhysicalOnlyFamilies {
+			// Ignored: the rest of the same message, and the same exit code says it either way.
 			fmt.Fprintf(os.Stderr, "  %s\n", entry.signature())
 		}
+		// Ignored: the rest of the same message, and the same exit code says it either way.
 		fmt.Fprintln(os.Stderr, "  CollapseFamily needs a way to say so before this Tailwind can be enumerated.")
 		os.Exit(1)
 	}
 	if result.FunctionalRoots < 100 {
-		fmt.Fprintf(os.Stderr, "generate_collapse: only %d functional roots discovered, which is too few to be the real registry.\n", result.FunctionalRoots)
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
+		fmt.Fprintf(
+			os.Stderr,
+			"generate_collapse: only %d functional roots discovered, which is too few to be the real registry.\n",
+			result.FunctionalRoots,
+		)
+		// Ignored: the rest of the same message, and the same exit code says it either way.
 		fmt.Fprintln(os.Stderr, "  A table built from a partial registry is silently missing families.")
 		os.Exit(1)
 	}
@@ -307,8 +334,8 @@ func main() {
 	// submodule and both import its global.css, so they share its `@theme` and its `@utility`
 	// blocks: that diff measured a shared dependency, and two repositories that cannot differ
 	// cannot detect a table that varies. Re-measured against
-	// internal/lint/rules/tailwind/tools/generate_descriptor_base/testdata/independent_theme.css, which shares nothing, the
-	// families do hold — the same 44, identical down to the value each was discovered at, across a
+	// internal/lint/rules/tailwind/tools/generate_descriptor_base/testdata/independent_theme.css, which shares nothing,
+	// the families do hold: the same 44, identical down to the value each was discovered at, across a
 	// registry that differs by 25 functional roots and 7,850 probed pairs. The claim is true. The
 	// instrument that had been asserting it was not measuring it.
 	//
@@ -322,14 +349,27 @@ func main() {
 	verifiedAgainst := make([]string, 0, len(invarianceInputs))
 	for _, raw := range invarianceInputs {
 		other := parseDesignSystemInput(raw)
-		otherResult, err := enumerate(other.entryPoint, other.resolveRoot)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "generate_collapse: enumerating %s for the invariance check: %v\n", other.entryPoint, err)
+		otherResult, enumerateError := enumerate(other.entryPoint, other.resolveRoot)
+		if enumerateError != nil {
+			// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
+			fmt.Fprintf(
+				os.Stderr,
+				"generate_collapse: enumerating %s for the invariance check: %v\n",
+				other.entryPoint,
+				enumerateError,
+			)
 			os.Exit(1)
 		}
 		if otherResult.TailwindVersion != result.TailwindVersion {
-			fmt.Fprintf(os.Stderr, "generate_collapse: %s is Tailwind %s and %s is Tailwind %s; refusing to compare engines.\n",
-				*entryPoint, result.TailwindVersion, other.entryPoint, otherResult.TailwindVersion)
+			// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
+			fmt.Fprintf(
+				os.Stderr,
+				"generate_collapse: %s is Tailwind %s and %s is Tailwind %s; refusing to compare engines.\n",
+				*entryPoint,
+				result.TailwindVersion,
+				other.entryPoint,
+				otherResult.TailwindVersion,
+			)
 			os.Exit(1)
 		}
 
@@ -337,37 +377,64 @@ func main() {
 		// names, which is the exact failure this check exists to have caught. Refused rather than
 		// counted, because a zero from it looks identical to a real one.
 		if otherResult.FunctionalRoots == result.FunctionalRoots && otherResult.PairsProbed == result.PairsProbed {
+			// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 			fmt.Fprintf(os.Stderr, "generate_collapse: %s and %s produce the same registry (%d roots, %d pairs).\n",
 				*entryPoint, other.entryPoint, result.FunctionalRoots, result.PairsProbed)
-			fmt.Fprintln(os.Stderr, "  Two design systems that cannot differ cannot cohere invariance; they are one observation under two names.")
-			fmt.Fprintln(os.Stderr, "  Every repository here vendors the Structure submodule and imports its global.css, so any two of them share a @theme.")
-			fmt.Fprintln(os.Stderr, "  Use internal/lint/rules/tailwind/tools/generate_descriptor_base/testdata/independent_theme.css, which shares nothing.")
+			// Ignored: the rest of the same message, and the same exit code says it either way.
+			fmt.Fprintln(
+				os.Stderr,
+				"  Two design systems that cannot differ cannot cohere invariance; they are one observation under two names.",
+			)
+			// Ignored: the rest of the same message, and the same exit code says it either way.
+			fmt.Fprintln(
+				os.Stderr,
+				"  Every repository here vendors the Structure submodule and imports its global.css, so any two of them share a @theme.",
+			)
+			// Ignored: the rest of the same message, and the same exit code says it either way.
+			fmt.Fprintln(
+				os.Stderr,
+				"  Use internal/lint/rules/tailwind/tools/generate_descriptor_base/testdata/independent_theme.css, which shares nothing.",
+			)
 			os.Exit(1)
 		}
 
 		if familySignature(otherResult.Families) != familySignature(result.Families) {
+			// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 			fmt.Fprintf(os.Stderr, "generate_collapse: CollapseFamilies is NOT repository-invariant.\n")
+			// Ignored: the rest of the same message, and the same exit code says it either way.
 			fmt.Fprintf(os.Stderr, "  %s reports %d families; %s reports %d.\n",
 				*entryPoint, len(result.Families), other.entryPoint, len(otherResult.Families))
 			for _, line := range differingFamilies(result.Families, otherResult.Families) {
+				// Ignored: the rest of the same message, and the same exit code says it either way.
 				fmt.Fprintf(os.Stderr, "  %s\n", line)
 			}
-			fmt.Fprintln(os.Stderr, "  The table cannot ship as a framework fact. This finding is worth more than the confirmation.")
+			// Ignored: the rest of the same message, and the same exit code says it either way.
+			fmt.Fprintln(
+				os.Stderr,
+				"  The table cannot ship as a framework fact. This finding is worth more than the confirmation.",
+			)
 			os.Exit(1)
 		}
-		verifiedAgainst = append(verifiedAgainst, fmt.Sprintf("%s (%d roots, %d pairs)", portablePath(other.entryPoint), otherResult.FunctionalRoots, otherResult.PairsProbed))
+		verifiedAgainst = append(verifiedAgainst, fmt.Sprintf(
+			"%s (%d roots, %d pairs)",
+			portablePath(other.entryPoint),
+			otherResult.FunctionalRoots,
+			otherResult.PairsProbed,
+		))
 	}
 	result.VerifiedAgainst = verifiedAgainst
 
-	rendered, err := render(result)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "generate_collapse: %v\n", err)
+	rendered, renderError := render(result)
+	if renderError != nil {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
+		fmt.Fprintf(os.Stderr, "generate_collapse: %v\n", renderError)
 		os.Exit(1)
 	}
 
-	orderRendered, err := renderOrder(result)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "generate_collapse: %v\n", err)
+	orderRendered, renderOrderError := renderOrder(result)
+	if renderOrderError != nil {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
+		fmt.Fprintf(os.Stderr, "generate_collapse: %v\n", renderOrderError)
 		os.Exit(1)
 	}
 	orderPath := filepath.Join(filepath.Dir(*output), "property_order_table.go")
@@ -389,33 +456,68 @@ func main() {
 			stale    string
 		}
 		for _, file := range []generatedFile{
-			{*output, rendered, "The installed Tailwind collapses a different set of families than the committed table records."},
-			{orderPath, orderRendered, "The installed Tailwind sorts by a different property order than the committed table records."},
+			{
+				*output,
+				rendered,
+				"The installed Tailwind collapses a different set of families than the committed table records.",
+			},
+			{
+				orderPath,
+				orderRendered,
+				"The installed Tailwind sorts by a different property order than the committed table records.",
+			},
 		} {
-			committed, err := os.ReadFile(file.path)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "generate_collapse: cannot read %s to check it: %v\n", file.path, err)
+			committed, readError := os.ReadFile(file.path)
+			if readError != nil {
+				// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this
+				// lands.
+				fmt.Fprintf(os.Stderr, "generate_collapse: cannot read %s to check it: %v\n", file.path, readError)
 				os.Exit(1)
 			}
 			if !bytes.Equal(committed, file.rendered) {
-				fmt.Fprintf(os.Stderr, "generate_collapse: %s is stale for Tailwind %s.\n", file.path, result.TailwindVersion)
+				// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this
+				// lands.
+				fmt.Fprintf(
+					os.Stderr,
+					"generate_collapse: %s is stale for Tailwind %s.\n",
+					file.path,
+					result.TailwindVersion,
+				)
+				// Ignored: the rest of the same message, and the same exit code says it either way.
 				fmt.Fprintf(os.Stderr, "  %s\n", file.stale)
+				// Ignored: the rest of the same message, and the same exit code says it either way.
 				fmt.Fprintln(os.Stderr, "  Regenerate it and read the diff: what changed is what this upgrade changed.")
 				os.Exit(1)
 			}
 		}
-		fmt.Fprintf(os.Stderr, "generate_collapse: %s and %s are current for Tailwind %s (%d families, %d ordered properties).\n",
-			*output, orderPath, result.TailwindVersion, len(result.Families), len(result.PropertyOrder))
+		// Ignored: the check has passed, and the exit code says so whether or not this lands.
+		fmt.Fprintf(
+			os.Stderr,
+			"generate_collapse: %s and %s are current for Tailwind %s (%d families, %d ordered properties).\n",
+			*output,
+			orderPath,
+			result.TailwindVersion,
+			len(result.Families),
+			len(result.PropertyOrder),
+		)
 		return
 	}
-	if err := os.WriteFile(orderPath, orderRendered, 0o644); err != nil {
-		fmt.Fprintf(os.Stderr, "generate_collapse: %v\n", err)
+	if writeError := os.WriteFile(orderPath, orderRendered, 0o644); writeError != nil {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
+		fmt.Fprintf(os.Stderr, "generate_collapse: %v\n", writeError)
 		os.Exit(1)
 	}
-	fmt.Fprintf(os.Stderr, "generate_collapse: wrote %s — %d ordered properties.\n", orderPath, len(result.PropertyOrder))
+	// Ignored: what it reports is already written, and a summary that cannot reach the terminal changes none of it.
+	fmt.Fprintf(
+		os.Stderr,
+		"generate_collapse: wrote %s \u2014 %d ordered properties.\n",
+		orderPath,
+		len(result.PropertyOrder),
+	)
 
-	if err := os.WriteFile(*output, rendered, 0o644); err != nil {
-		fmt.Fprintf(os.Stderr, "generate_collapse: %v\n", err)
+	if writeError := os.WriteFile(*output, rendered, 0o644); writeError != nil {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
+		fmt.Fprintf(os.Stderr, "generate_collapse: %v\n", writeError)
 		os.Exit(1)
 	}
 
@@ -423,14 +525,25 @@ func main() {
 	// a reason nobody could infer from its absence. Four bugs in this generator were exactly that,
 	// so the count is printed rather than left for someone to notice.
 	if len(result.UnreachableRoots) > 0 {
-		fmt.Fprintf(os.Stderr, "generate_collapse: %d roots were unreachable by every probe value and are absent from the tables:\n", len(result.UnreachableRoots))
+		// Ignored: what it reports is already written, and a summary that cannot reach the terminal changes none of it.
+		fmt.Fprintf(
+			os.Stderr,
+			"generate_collapse: %d roots were unreachable by every probe value and are absent from the tables:\n",
+			len(result.UnreachableRoots),
+		)
 		for _, root := range result.UnreachableRoots {
+			// Ignored: the rest of the same summary, which changes nothing already written.
 			fmt.Fprintf(os.Stderr, "  %s\n", root)
 		}
-		fmt.Fprintln(os.Stderr, "  Each needs a probe value it accepts, or it is silently missing rather than known to have nothing.")
+		// Ignored: the rest of the same summary, which changes nothing already written.
+		fmt.Fprintln(
+			os.Stderr,
+			"  Each needs a probe value it accepts, or it is silently missing rather than known to have nothing.",
+		)
 	}
 
-	fmt.Fprintf(os.Stderr, "generate_collapse: wrote %s — Tailwind %s, %d families from %d pairs over %d roots.\n",
+	// Ignored: what it reports is already written, and a summary that cannot reach the terminal changes none of it.
+	fmt.Fprintf(os.Stderr, "generate_collapse: wrote %s \u2014 Tailwind %s, %d families from %d pairs over %d roots.\n",
 		*output, result.TailwindVersion, len(result.Families), result.PairsProbed, result.FunctionalRoots)
 }
 
@@ -439,17 +552,17 @@ func main() {
 // Node's stderr is passed through rather than captured, so a resolution failure inside the script
 // reaches the operator instead of being swallowed into a parse error about empty input.
 func enumerate(entryPoint string, resolveRoot string) (*enumeration, error) {
-	absoluteEntryPoint, err := filepath.Abs(entryPoint)
-	if err != nil {
-		return nil, fmt.Errorf("resolving %s: %w", entryPoint, err)
+	absoluteEntryPoint, absolutePathError := filepath.Abs(entryPoint)
+	if absolutePathError != nil {
+		return nil, fmt.Errorf("resolving %s: %w", entryPoint, absolutePathError)
 	}
-	if _, err := os.Stat(absoluteEntryPoint); err != nil {
-		return nil, fmt.Errorf("entry point %s is not readable: %w", absoluteEntryPoint, err)
+	if _, statError := os.Stat(absoluteEntryPoint); statError != nil {
+		return nil, fmt.Errorf("entry point %s is not readable: %w", absoluteEntryPoint, statError)
 	}
 
-	scriptPath, err := scriptBesideThisTool()
-	if err != nil {
-		return nil, err
+	scriptPath, scriptBesideThisToolError := scriptBesideThisTool()
+	if scriptBesideThisToolError != nil {
+		return nil, scriptBesideThisToolError
 	}
 
 	// The resolve root defaults to the entry point's directory, which is what every repository
@@ -458,12 +571,16 @@ func enumerate(entryPoint string, resolveRoot string) (*enumeration, error) {
 	// the checked-in independent theme and nothing else so far.
 	arguments := []string{scriptPath, absoluteEntryPoint}
 	if resolveRoot != "" {
-		absoluteResolveRoot, err := filepath.Abs(resolveRoot)
-		if err != nil {
-			return nil, fmt.Errorf("resolving %s: %w", resolveRoot, err)
+		absoluteResolveRoot, absolutePathError := filepath.Abs(resolveRoot)
+		if absolutePathError != nil {
+			return nil, fmt.Errorf("resolving %s: %w", resolveRoot, absolutePathError)
 		}
-		if _, err := os.Stat(filepath.Join(absoluteResolveRoot, "node_modules")); err != nil {
-			return nil, fmt.Errorf("resolve root %s has no node_modules, so `tailwindcss` cannot resolve from it: %w", absoluteResolveRoot, err)
+		if _, statError := os.Stat(filepath.Join(absoluteResolveRoot, "node_modules")); statError != nil {
+			return nil, fmt.Errorf(
+				"resolve root %s has no node_modules, so `tailwindcss` cannot resolve from it: %w",
+				absoluteResolveRoot,
+				statError,
+			)
 		}
 		arguments = append(arguments, absoluteResolveRoot)
 	}
@@ -471,14 +588,14 @@ func enumerate(entryPoint string, resolveRoot string) (*enumeration, error) {
 	command := exec.Command("node", arguments...)
 	command.Stderr = os.Stderr
 
-	stdout, err := command.Output()
-	if err != nil {
-		return nil, fmt.Errorf("running the enumeration: %w", err)
+	stdout, outputError := command.Output()
+	if outputError != nil {
+		return nil, fmt.Errorf("running the enumeration: %w", outputError)
 	}
 
 	var result enumeration
-	if err := json.Unmarshal(stdout, &result); err != nil {
-		return nil, fmt.Errorf("parsing the enumeration: %w", err)
+	if decodeError := json.Unmarshal(stdout, &result); decodeError != nil {
+		return nil, fmt.Errorf("parsing the enumeration: %w", decodeError)
 	}
 	return &result, nil
 }
@@ -490,7 +607,7 @@ func enumerate(entryPoint string, resolveRoot string) (*enumeration, error) {
 // would silently pick up a different checkout when run from a subdirectory.
 func scriptBesideThisTool() (string, error) {
 	candidate := filepath.Join("tools", "generate_collapse", "enumerate.mjs")
-	if _, err := os.Stat(candidate); err == nil {
+	if _, statError := os.Stat(candidate); statError == nil {
 		return candidate, nil
 	}
 	return "", fmt.Errorf("cannot find %s; run this from the repository root", candidate)
@@ -544,15 +661,15 @@ type CollapseFamily struct {
 // CollapseFamilies is every family the installed Tailwind knows, sorted by input roots.
 //
 // Upstream ships shorthand data and it does not derive this. Two maps keyed on CSS property,
-// `+"`"+`padding-inline: [padding-left, padding-right]`+"`"+` and its kin, cover inset, margin, padding,
+// `+"`padding-inline: [padding-left, padding-right]`"+` and its kin, cover inset, margin, padding,
 // scroll-margin, scroll-padding, border width/style/colour, gap, overflow, overscroll-behavior and
-// ten logical block/inline pairs. This is keyed on utility roots, `+"`"+`pl + pr => px`+"`"+`, and bridging the
-// two key spaces is `+"`"+`canonicalizeCandidates`+"`"+`, the signature-equivalence search `+"`"+`enumerate.mjs`+"`"+`
+// ten logical block/inline pairs. This is keyed on utility roots, `+"`pl + pr => px`"+`, and bridging the
+// two key spaces is `+"`canonicalizeCandidates`, the signature-equivalence search `enumerate.mjs`"+`
 // prices at eight to ten thousand lines that changes every Tailwind minor.
 //
 // It also holds families no CSS shorthand covers, which is the half that makes the two genuinely
-// different questions rather than one restated: `+"`"+`h + w => size`+"`"+`, `+"`"+`skew`+"`"+`, `+"`"+`translate`+"`"+`, the `+"`"+`rounded-*`+"`"+`
-// corners, the `+"`"+`mask-*`+"`"+` edges and `+"`"+`border-spacing`+"`"+` collapse through a utility relationship rather
+// different questions rather than one restated: `+"`h + w => size`, `skew`, `translate`, the `rounded-*`"+`
+// corners, the `+"`mask-*` edges and `border-spacing`"+` collapse through a utility relationship rather
 // than a property one.
 var CollapseFamilies = []CollapseFamily{
 `,
@@ -596,9 +713,9 @@ var CollapseFamilies = []CollapseFamily{
 const TailwindVersion = %q
 `, result.TailwindVersion)
 
-	formatted, err := format.Source(buffer.Bytes())
-	if err != nil {
-		return nil, fmt.Errorf("formatting the generated table: %w", err)
+	formatted, sourceError := format.Source(buffer.Bytes())
+	if sourceError != nil {
+		return nil, fmt.Errorf("formatting the generated table: %w", sourceError)
 	}
 	return formatted, nil
 }
@@ -646,7 +763,7 @@ var PropertyOrder = map[string]int{
 // SortOverrideProperties used to be printed here and is not any more.
 //
 // It held the twelve values a `+"`--tw-sort`"+` declaration can carry, and nothing read it. The latch it
-// describes is real and is implemented in walk.go: `+"`PropertySort`"+` reads a `+"`--tw-sort`"+` declaration's
+// describes is real and is implemented in walk.go: `+"`PropertySort` reads a `--tw-sort`"+` declaration's
 // value and looks it up in `+"`PropertyOrder`"+`, so a value that names a known property latches the order
 // there and a value that does not falls through. Neither branch consults a list of which values are
 // legal, because the lookup answers that by hitting or missing.
@@ -676,15 +793,6 @@ var VariantOrder = map[string]int{
 	fmt.Fprintln(&buffer, "}")
 
 	return format.Source(buffer.Bytes())
-}
-
-// quotedList renders a string slice as Go literal elements.
-func quotedList(values []string) string {
-	quoted := make([]string, 0, len(values))
-	for _, value := range values {
-		quoted = append(quoted, fmt.Sprintf("%q", value))
-	}
-	return strings.Join(quoted, ", ")
 }
 
 // exampleFamily names a real entry in the doc comment, so the file explains itself with something

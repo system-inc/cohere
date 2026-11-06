@@ -9,8 +9,8 @@ import (
 const apiParameterPageFile = "/repository/app/account/page.tsx"
 const apiParameterLayoutFile = "/repository/app/account/layout.tsx"
 
-func TestNextRequireApiParameterNameFires(t *testing.T) {
-	t.Parallel()
+func TestNextRequireApiParameterNameFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -62,16 +62,16 @@ func TestNextRequireApiParameterNameFires(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.Run(t, NextRequireApiParameterName, testCase.fileName,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.Run(test, NextRequireApiParameterName, testCase.fileName,
 				testCase.sourceText), testCase.wantId)
 		})
 	}
 }
 
-func TestNextRequireApiParameterNameStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNextRequireApiParameterNameStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -139,9 +139,9 @@ func TestNextRequireApiParameterNameStaysSilent(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NextRequireApiParameterName, testCase.fileName,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NextRequireApiParameterName, testCase.fileName,
 				testCase.sourceText))
 		})
 	}
@@ -152,33 +152,33 @@ func TestNextRequireApiParameterNameStaysSilent(t *testing.T) {
 // Asserted rather than assumed, because a fix is the one part of a rule that changes source: a
 // wrong range here silently rewrites something else, and no fixture that only checks message ids
 // would notice.
-func TestNextRequireApiParameterNameFixesTheFieldName(t *testing.T) {
-	t.Parallel()
+func TestNextRequireApiParameterNameFixesTheFieldName(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, NextRequireApiParameterName, apiParameterPageFile,
+	result := rule_testing.Run(test, NextRequireApiParameterName, apiParameterPageFile,
 		"export async function generateMetadata(argument: { parameters: unknown }) {\n    return argument;\n}\n")
 
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("want one finding, got %d", len(result.Diagnostics))
+		test.Fatalf("want one finding, got %d", len(result.Diagnostics))
 	}
 	fixes := result.Diagnostics[0].Fixes
 	if len(fixes) != 1 {
-		t.Fatalf("want one fix, got %d", len(fixes))
+		test.Fatalf("want one fix, got %d", len(fixes))
 	}
 	if fixes[0].Text != "params" {
-		t.Fatalf("want the fix to write params, got %q", fixes[0].Text)
+		test.Fatalf("want the fix to write params, got %q", fixes[0].Text)
 	}
 
 	// The text is half the fix and the range is the other half. Writing "params" over the wrong span
 	// produces the right characters in the wrong place, and every assertion above still passes.
-	rule_testing.ExpectFixedSource(t, result,
+	rule_testing.ExpectFixedSource(test, result,
 		"export async function generateMetadata(argument: { params: unknown }) {\n    return argument;\n}\n")
 
-	searchResult := rule_testing.Run(t, NextRequireApiParameterName, apiParameterPageFile,
+	searchResult := rule_testing.Run(test, NextRequireApiParameterName, apiParameterPageFile,
 		"export async function generateMetadata(argument: { searchParameters: unknown }) {\n    return argument;\n}\n")
 	if text := searchResult.Diagnostics[0].Fixes[0].Text; text != "searchParams" {
-		t.Fatalf("want the fix to write searchParams, got %q", text)
+		test.Fatalf("want the fix to write searchParams, got %q", text)
 	}
-	rule_testing.ExpectFixedSource(t, searchResult,
+	rule_testing.ExpectFixedSource(test, searchResult,
 		"export async function generateMetadata(argument: { searchParams: unknown }) {\n    return argument;\n}\n")
 }

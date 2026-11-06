@@ -28,7 +28,7 @@ func StringWidth(text string) int {
 	if text == "" {
 		return 0
 	}
-	if isPrintableASCII(text) {
+	if isPrintableAscii(text) {
 		return len(text)
 	}
 
@@ -61,9 +61,9 @@ func StringWidth(text string) int {
 	return width
 }
 
-// isPrintableASCII is upstream's shortcut, !/[^\x20-\x7F]/.test(text). A tab or newline is outside the
+// isPrintableAscii is upstream's shortcut, !/[^\x20-\x7F]/.test(text). A tab or newline is outside the
 // range and takes the slow path, as it does upstream.
-func isPrintableASCII(text string) bool {
+func isPrintableAscii(text string) bool {
 	for index := 0; index < len(text); index++ {
 		if text[index] < 0x20 || text[index] > 0x7F {
 			return false
@@ -100,7 +100,11 @@ func codePoints(mapped string) []rune {
 	result := make([]rune, 0, len(units))
 	for index := 0; index < len(units); index++ {
 		unit := units[index]
-		if utf16.IsSurrogate(rune(unit)) && unit < 0xDC00 && index+1 < len(units) && units[index+1] >= 0xDC00 && units[index+1] <= 0xDFFF {
+		if utf16.IsSurrogate(rune(unit)) &&
+			unit < 0xDC00 &&
+			index+1 < len(units) &&
+			units[index+1] >= 0xDC00 &&
+			units[index+1] <= 0xDFFF {
 			result = append(result, utf16.DecodeRune(rune(unit), rune(units[index+1])))
 			index++
 			continue

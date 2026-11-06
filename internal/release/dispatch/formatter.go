@@ -36,19 +36,21 @@ const formatterPackage = "./internal/format/native"
 const FormatterPassLoop = "command/cohere/format.go"
 
 // FormatterIdentity hashes the formatter's inputs in moduleDirectory. environment is added to the `go
-// list` that finds them, which a snapshot needs to point GOWORK at its own workspace.
+// list` that finds them, which a snapshot needs to point `GOWORK` at its own workspace.
 //
 // A module with no formatter package answers empty, and the binary is built unstamped: its format record
 // is then keyed by the binary itself, which is always sound and only slower. The package moving is
 // caught by TestFormatterInputsCoverWhatCanChangeTheOutput, which needs the real module's list to be
 // whole.
 func FormatterIdentity(moduleDirectory string, goVersion string, environment []string) (string, error) {
-	if _, err := os.Stat(filepath.Join(moduleDirectory, filepath.FromSlash(formatterPackage))); errors.Is(err, os.ErrNotExist) {
+	if _, statError := os.Stat(
+		filepath.Join(moduleDirectory, filepath.FromSlash(formatterPackage)),
+	); errors.Is(statError, os.ErrNotExist) {
 		return "", nil
 	}
-	inputs, err := FormatterInputs(moduleDirectory, environment)
-	if err != nil {
-		return "", err
+	inputs, formatterInputsError := FormatterInputs(moduleDirectory, environment)
+	if formatterInputsError != nil {
+		return "", formatterInputsError
 	}
 	return hashFormatterInputs(goVersion, inputs), nil
 }
@@ -69,13 +71,13 @@ func FormatterInputs(moduleDirectory string, environment []string) ([]FormatterI
 	command := exec.Command("go", "list", "-deps", "-f", template, formatterPackage)
 	command.Dir = moduleDirectory
 	command.Env = append(os.Environ(), environment...)
-	output, err := command.Output()
-	if err != nil {
+	output, outputError := command.Output()
+	if outputError != nil {
 		var exitError *exec.ExitError
-		if errors.As(err, &exitError) {
-			return nil, fmt.Errorf("listing the formatter's inputs: %w\n%s", err, exitError.Stderr)
+		if errors.As(outputError, &exitError) {
+			return nil, fmt.Errorf("listing the formatter's inputs: %w\n%s", outputError, exitError.Stderr)
 		}
-		return nil, fmt.Errorf("listing the formatter's inputs: %w", err)
+		return nil, fmt.Errorf("listing the formatter's inputs: %w", outputError)
 	}
 
 	inputs := []FormatterInput{}
@@ -84,21 +86,25 @@ func FormatterInputs(moduleDirectory string, environment []string) ([]FormatterI
 		if len(fields) != 3 {
 			continue
 		}
-		sum, err := fileSum(filepath.Join(fields[1], fields[2]))
-		if err != nil {
-			return nil, err
+		sum, fileSumError := fileSum(filepath.Join(fields[1], fields[2]))
+		if fileSumError != nil {
+			return nil, fileSumError
 		}
 		inputs = append(inputs, FormatterInput{Name: fields[0] + "/" + filepath.ToSlash(fields[2]), Sum: sum})
 	}
 	// The printers alone are dozens of files, so a short list is a `go list` that answered about
 	// something else, and an identity hashed from it would match a formatter it does not describe.
 	if len(inputs) < 10 {
-		return nil, fmt.Errorf("go list found %d formatter inputs in %s, which cannot be right", len(inputs), moduleDirectory)
+		return nil, fmt.Errorf(
+			"go list found %d formatter inputs in %s, which cannot be right",
+			len(inputs),
+			moduleDirectory,
+		)
 	}
 
-	sum, err := fileSum(filepath.Join(moduleDirectory, FormatterPassLoop))
-	if err != nil {
-		return nil, err
+	sum, fileSumError := fileSum(filepath.Join(moduleDirectory, FormatterPassLoop))
+	if fileSumError != nil {
+		return nil, fileSumError
 	}
 	return append(inputs, FormatterInput{Name: FormatterPassLoop, Sum: sum}), nil
 }
@@ -119,9 +125,9 @@ func hashFormatterInputs(goVersion string, inputs []FormatterInput) string {
 }
 
 func fileSum(path string) (string, error) {
-	contents, err := os.ReadFile(path)
-	if err != nil {
-		return "", fmt.Errorf("reading formatter input %s: %w", path, err)
+	contents, readError := os.ReadFile(path)
+	if readError != nil {
+		return "", fmt.Errorf("reading formatter input %s: %w", path, readError)
 	}
 	sum := sha256.Sum256(contents)
 	return hex.EncodeToString(sum[:]), nil

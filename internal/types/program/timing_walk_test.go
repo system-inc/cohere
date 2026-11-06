@@ -15,6 +15,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/lint/testing"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
@@ -32,19 +33,19 @@ func spin(iterations int) {
 	spinSink.Add(value)
 }
 
-// threadCPU is the calling thread's CPU, by the kernel's thread clock: the same clock the meter reads, read
+// threadCpu is the calling thread's CPU, by the kernel's thread clock: the same clock the meter reads, read
 // here by the planted rule about itself, on its own thread at its own moment. It panics rather than taking
 // a *testing.T, because the planted rules call it from the walk's workers, where t.Fatal may not be
 // called; a rule's panic is contained and shows up below as a rule that ran on fewer files.
-func threadCPU() time.Duration {
+func threadCpu() time.Duration {
 	var spec unix.Timespec
-	if err := unix.ClockGettime(unix.CLOCK_THREAD_CPUTIME_ID, &spec); err != nil {
-		panic(fmt.Sprintf("reading the thread CPU clock: %v", err))
+	if clockGettimeError := unix.ClockGettime(unix.CLOCK_THREAD_CPUTIME_ID, &spec); clockGettimeError != nil {
+		panic(fmt.Sprintf("reading the thread CPU clock: %v", clockGettimeError))
 	}
 	return time.Duration(spec.Nano())
 }
 
-// TestATimedWalkBillsCPUNotWaiting is the control the instrument is trusted on (#8qyzmxw).
+// TestATimedWalkBillsCpuNotWaiting is the control the instrument is trusted on (#8qyzmxw).
 //
 // The table it replaced charged each listener call its wall time, so a rule descheduled mid-call was
 // billed for the time it spent off the CPU, and the better-tailwindcss family read about 1.2s when its
@@ -57,8 +58,8 @@ func threadCPU() time.Duration {
 // billed 2.39ms after sleeping 7.69s, past an absolute 2ms bound, at 0.03% of its sleep). And neither
 // reads process-wide CPU, which a parallel test beside this one would add to. Shown able to fail: with the
 // meter reading the wall clock in place of the thread clock, the sleeper is billed nearly all of its sleep.
-func TestATimedWalkBillsCPUNotWaiting(t *testing.T) {
-	t.Parallel()
+func TestATimedWalkBillsCpuNotWaiting(test *testing.T) {
+	test.Parallel()
 	const fileCount = 80
 	const sleepPerFile = 5 * time.Millisecond
 
@@ -66,31 +67,32 @@ func TestATimedWalkBillsCPUNotWaiting(t *testing.T) {
 	runtime.LockOSThread()
 	iterations := 1_000_000
 	for {
-		before := threadCPU()
+		before := threadCpu()
 		spin(iterations)
-		if threadCPU()-before >= 4*time.Millisecond {
+		if threadCpu()-before >= 4*time.Millisecond {
 			break
 		}
 		iterations *= 2
 	}
 	runtime.UnlockOSThread()
 
-	files := map[string]string{"tsconfig.json": minimalConfig}
+	files := map[string]string{"tsconfig.json": minimalConfiguration}
 	for index := range fileCount {
 		files[fmt.Sprintf("file%02d.ts", index)] = fmt.Sprintf("export const value%d = %d;\n", index, index)
 	}
-	root := writeProject(t, files)
-	graph, err := program.Build(program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json")})
-	if err != nil {
-		t.Fatalf("build: %v", err)
+	root := writeProject(test, files)
+	graph, buildError := program.Build(program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json")})
+	if buildError != nil {
+		test.Fatalf("build: %v", buildError)
 	}
 
 	// The walk locks each worker to its thread for the walk, so a listener's own reads of the thread
 	// clock are of the thread the meter reads.
-	var sleptTotal, spunTotal atomic.Int64
-	sleeper := rule.Rule{
+	var sleptTotal atomic.Int64
+	var spunTotal atomic.Int64
+	sleeper := rule.Rule[rule.NoOptions]{
 		Name: "planted-sleeper",
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
 				start := time.Now()
 				time.Sleep(sleepPerFile)
@@ -98,24 +100,28 @@ func TestATimedWalkBillsCPUNotWaiting(t *testing.T) {
 			}}
 		},
 	}
-	spinner := rule.Rule{
+	spinner := rule.Rule[rule.NoOptions]{
 		Name: "planted-spinner",
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
-				start := threadCPU()
+				start := threadCpu()
 				spin(iterations)
-				spunTotal.Add(int64(threadCPU() - start))
+				spunTotal.Add(int64(threadCpu() - start))
 			}}
 		},
 	}
 
 	graph.CollectTimings = true
-	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), []rule.Rule{sleeper, spinner})
-	if err != nil {
-		t.Fatalf("walk: %v", err)
+	result, walkError := graph.Walk(
+		context.Background(),
+		graph.ProjectFiles(),
+		rule_testing.EntriesOf(test, sleeper, spinner),
+	)
+	if walkError != nil {
+		test.Fatalf("walk: %v", walkError)
 	}
 	if result.Timings.Account.Unavailable != "" {
-		t.Fatalf("the walk was not measured, so this proves nothing: %s", result.Timings.Account.Unavailable)
+		test.Fatalf("the walk was not measured, so this proves nothing: %s", result.Timings.Account.Unavailable)
 	}
 
 	byName := map[string]program.RuleTiming{}
@@ -126,27 +132,32 @@ func TestATimedWalkBillsCPUNotWaiting(t *testing.T) {
 
 	// Both rules ran in every file, or a zero below would be a rule that never ran.
 	if slept.NodesOffered != fileCount || spun.NodesOffered != fileCount {
-		t.Fatalf("the planted rules ran on %d and %d files, want %d each", slept.NodesOffered, spun.NodesOffered, fileCount)
+		test.Fatalf(
+			"the planted rules ran on %d and %d files, want %d each",
+			slept.NodesOffered,
+			spun.NodesOffered,
+			fileCount,
+		)
 	}
 	sleptWall := time.Duration(sleptTotal.Load())
 	if sleptWall < fileCount*sleepPerFile {
-		t.Fatalf("the sleeper slept %v, under the %v it was planted with, so it cannot show a wall clock's error",
+		test.Fatalf("the sleeper slept %v, under the %v it was planted with, so it cannot show a wall clock's error",
 			sleptWall, fileCount*sleepPerFile)
 	}
 
 	// The sleeper's CPU is the few instructions around each sleep: about 28µs per 50ms slept on
 	// darwin/arm64, a twentieth of a percent. A twentieth of the sleep is a hundred times that, and a wall
 	// clock bills twenty times more again.
-	if slept.TotalCPU() > sleptWall/20 {
-		t.Fatalf("a rule that only sleeps was billed %v of CPU, having slept %v", slept.TotalCPU(), sleptWall)
+	if slept.TotalCpu() > sleptWall/20 {
+		test.Fatalf("a rule that only sleeps was billed %v of CPU, having slept %v", slept.TotalCpu(), sleptWall)
 	}
 
 	// The spinner's own reads bracket its work inside the meter's, so the meter bills it what it measured,
 	// less the calibrated cost of measuring a call, plus the few instructions between the two pairs of reads.
 	spunSelf := time.Duration(spunTotal.Load())
-	if got := spun.TotalCPU(); got < spunSelf*9/10 || got > spunSelf*11/10+2*time.Millisecond {
-		t.Fatalf("a rule that measured %v of its own CPU was billed %v", spunSelf, got)
+	if got := spun.TotalCpu(); got < spunSelf*9/10 || got > spunSelf*11/10+2*time.Millisecond {
+		test.Fatalf("a rule that measured %v of its own CPU was billed %v", spunSelf, got)
 	}
-	t.Logf("spinner billed %v against %v it measured itself; sleeper billed %v after %v asleep",
-		spun.TotalCPU(), spunSelf, slept.TotalCPU(), sleptWall)
+	test.Logf("spinner billed %v against %v it measured itself; sleeper billed %v after %v asleep",
+		spun.TotalCpu(), spunSelf, slept.TotalCpu(), sleptWall)
 }

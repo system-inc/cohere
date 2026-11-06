@@ -13,9 +13,9 @@ import (
 )
 
 // exportOriginFiles is a program whose main.ts reaches React's hooks every way the lowering follows: a
-// renamed re-export behind an `export *`, an `export *` of React itself, a const alias in another file, a cycle of `export *`s, an ambient
-// module's re-export, a namespace import, and a default import. Every file but main.ts also holds a
-// function whose body names React, so a test can rewrite those bodies and see whether any answer moves.
+// renamed re-export behind an `export *`, an `export *` of React itself, a const alias in another file, a cycle of
+// `export *`s, an ambient module's re-export, a namespace import, and a default import. Every file but main.ts also
+// holds a function whose body names React, so a test can rewrite those bodies and see whether any answer moves.
 var exportOriginFiles = map[string]string{
 	"tsconfig.json":                   `{"compilerOptions": {"strict": true, "target": "ES2022", "lib": ["ES2022"], "types": [], "module": "esnext", "moduleResolution": "bundler"}, "include": ["*.ts"]}`,
 	"node_modules/react/package.json": `{"name": "react", "types": "index.d.ts"}`,
@@ -34,9 +34,11 @@ var exportOriginFiles = map[string]string{
 	"hooks.d.ts":    "declare module 'hooks' {\n  export { useMemo as useHook } from 'react';\n}\n",
 	"body.ts": "import * as React from 'react';\n" +
 		"export function make() { return 5; }\nexport const viaBody = make();\n",
-	"main.ts": "import * as React from 'react';\nimport ReactDefault from 'react';\nimport { useMemo as memo } from 'react';\n" +
+	"main.ts": "import * as React from 'react';\nimport ReactDefault from 'react';\n" +
+		"import { useMemo as memo } from 'react';\n" +
 		"import { useLocalState } from './star';\nimport { useAliased } from './alias';\n" +
-		"import { useMemo as starMemo } from './star_react';\nimport { useCycled } from './cycle_b';\nimport { useHook } from 'hooks';\nimport { viaBody } from './body';\n" +
+		"import { useMemo as starMemo } from './star_react';\nimport { useCycled } from './cycle_b';\n" +
+		"import { useHook } from 'hooks';\nimport { viaBody } from './body';\n" +
 		"const localThing = (value: number) => value;\n" +
 		"starMemo(() => 1, []);\nuseLocalState(1);\nuseAliased(() => 1, []);\nuseCycled(1);\nuseHook(() => 1, []);\n" +
 		"React.useState(1);\nReact['useMemo'](() => 1, []);\nReactDefault.useMemo(() => 1, []);\n" +
@@ -46,21 +48,28 @@ var exportOriginFiles = map[string]string{
 // exportOriginAnswers builds files and returns what ExportNameIn answers for the callee of each
 // expression statement in main.ts, keyed by the callee's text, and what ImportBindingOf answers for each
 // identifier callee.
-func exportOriginAnswers(t *testing.T, files map[string]string) (exports map[string]string, bindings map[string]rule.ImportBinding) {
-	t.Helper()
-	directory := t.TempDir()
+func exportOriginAnswers(
+	test *testing.T,
+	files map[string]string,
+) (exports map[string]string, bindings map[string]rule.ImportBinding) {
+	test.Helper()
+	directory := test.TempDir()
 	for name, contents := range files {
 		path := filepath.Join(directory, name)
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			t.Fatal(err)
+		if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
+			test.Fatal(createDirectoryError)
 		}
-		if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
-			t.Fatal(err)
+		if writeError := os.WriteFile(path, []byte(contents), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 	}
-	graph, err := program.Build(program.Options{ConfigFileName: filepath.Join(directory, "tsconfig.json"), CurrentDirectory: directory, SingleThreaded: true})
-	if err != nil {
-		t.Fatal(err)
+	graph, buildError := program.Build(program.Options{
+		ConfigFileName:   filepath.Join(directory, "tsconfig.json"),
+		CurrentDirectory: directory,
+		SingleThreaded:   true,
+	})
+	if buildError != nil {
+		test.Fatal(buildError)
 	}
 	var main *ast.SourceFile
 	for _, sourceFile := range graph.ProjectFiles() {
@@ -69,7 +78,7 @@ func exportOriginAnswers(t *testing.T, files map[string]string) (exports map[str
 		}
 	}
 	if main == nil {
-		t.Fatal("the probe program does not hold main.ts")
+		test.Fatal("the probe program does not hold main.ts")
 	}
 	checker, release := graph.CheckerForFile(context.Background(), main)
 	defer release()
@@ -94,9 +103,9 @@ func exportOriginAnswers(t *testing.T, files map[string]string) (exports map[str
 
 // ExportNameIn follows each way a callee can come from React to the export it names, and answers nothing
 // for what does not come from React.
-func TestExportNameInFollowsReExportsToTheExport(t *testing.T) {
-	t.Parallel()
-	exports, _ := exportOriginAnswers(t, exportOriginFiles)
+func TestExportNameInFollowsReExportsToTheExport(test *testing.T) {
+	test.Parallel()
+	exports, _ := exportOriginAnswers(test, exportOriginFiles)
 	want := map[string]string{
 		"useLocalState":        "useState",
 		"useAliased":           "useMemo",
@@ -116,11 +125,11 @@ func TestExportNameInFollowsReExportsToTheExport(t *testing.T) {
 	for callee, export := range want {
 		got, found := exports[callee]
 		if !found {
-			t.Errorf("main.ts has no callee %q", callee)
+			test.Errorf("main.ts has no callee %q", callee)
 			continue
 		}
 		if got != export {
-			t.Errorf("ExportNameIn(%s) = %q, want %q", callee, got, export)
+			test.Errorf("ExportNameIn(%s) = %q, want %q", callee, got, export)
 		}
 	}
 }
@@ -128,33 +137,46 @@ func TestExportNameInFollowsReExportsToTheExport(t *testing.T) {
 // Every answer comes from the files' shapes: rewriting the body of every function outside main.ts, to one
 // that names a different React export, moves none of them. Editing export syntax does move one, so the
 // comparison is not blind.
-func TestExportNameInReadsOnlyTheShapesOfOtherFiles(t *testing.T) {
-	t.Parallel()
-	before, _ := exportOriginAnswers(t, exportOriginFiles)
+func TestExportNameInReadsOnlyTheShapesOfOtherFiles(test *testing.T) {
+	test.Parallel()
+	before, _ := exportOriginAnswers(test, exportOriginFiles)
 
 	rewritten := map[string]string{}
 	bodies := 0
 	for name, contents := range exportOriginFiles {
 		if name != "main.ts" {
-			for _, body := range []string{"{ return 1; }", "{ return 2; }", "{ return 3; }", "{ return 4; }", "{ return 5; }", "{ return 6; }"} {
+			for _, body := range []string{
+				"{ return 1; }",
+				"{ return 2; }",
+				"{ return 3; }",
+				"{ return 4; }",
+				"{ return 5; }",
+				"{ return 6; }",
+			} {
 				if strings.Contains(contents, body) {
 					contents = strings.Replace(contents, body, "{ const inner = React.useState; return inner; }", 1)
 					bodies++
 				}
 			}
-			if strings.Contains(contents, "React.useState; return inner") && !strings.Contains(contents, "import * as React") {
+			if strings.Contains(contents, "React.useState; return inner") &&
+				!strings.Contains(contents, "import * as React") {
 				contents = "import * as React from 'react';\n" + contents
 			}
 		}
 		rewritten[name] = contents
 	}
 	if bodies != 6 {
-		t.Fatalf("rewrote %d function bodies, want all 6", bodies)
+		test.Fatalf("rewrote %d function bodies, want all 6", bodies)
 	}
-	after, _ := exportOriginAnswers(t, rewritten)
+	after, _ := exportOriginAnswers(test, rewritten)
 	for callee, export := range before {
 		if after[callee] != export {
-			t.Errorf("rewriting function bodies in other files moved ExportNameIn(%s) from %q to %q", callee, export, after[callee])
+			test.Errorf(
+				"rewriting function bodies in other files moved ExportNameIn(%s) from %q to %q",
+				callee,
+				export,
+				after[callee],
+			)
 		}
 	}
 
@@ -162,18 +184,26 @@ func TestExportNameInReadsOnlyTheShapesOfOtherFiles(t *testing.T) {
 	for name, contents := range exportOriginFiles {
 		reshaped[name] = contents
 	}
-	reshaped["barrel.ts"] = strings.Replace(reshaped["barrel.ts"], "useState as useLocalState", "useMemo as useLocalState", 1)
-	moved, _ := exportOriginAnswers(t, reshaped)
+	reshaped["barrel.ts"] = strings.Replace(
+		reshaped["barrel.ts"],
+		"useState as useLocalState",
+		"useMemo as useLocalState",
+		1,
+	)
+	moved, _ := exportOriginAnswers(test, reshaped)
 	if moved["useLocalState"] != "useMemo" {
-		t.Errorf("re-exporting useMemo as useLocalState left ExportNameIn(useLocalState) at %q, want useMemo", moved["useLocalState"])
+		test.Errorf(
+			"re-exporting useMemo as useLocalState left ExportNameIn(useLocalState) at %q, want useMemo",
+			moved["useLocalState"],
+		)
 	}
 }
 
 // ImportBindingOf says how each name is bound in main.ts: imported and from where, declared there, or a
 // global.
-func TestImportBindingOfReadsTheFilesOwnBinding(t *testing.T) {
-	t.Parallel()
-	_, bindings := exportOriginAnswers(t, exportOriginFiles)
+func TestImportBindingOfReadsTheFilesOwnBinding(test *testing.T) {
+	test.Parallel()
+	_, bindings := exportOriginAnswers(test, exportOriginFiles)
 	want := map[string]rule.ImportBinding{
 		"useLocalState": {Kind: rule.ImportBindingSpecifier, Source: "./star", Imported: "useLocalState"},
 		"useCycled":     {Kind: rule.ImportBindingSpecifier, Source: "./cycle_b", Imported: "useCycled"},
@@ -185,7 +215,7 @@ func TestImportBindingOfReadsTheFilesOwnBinding(t *testing.T) {
 	}
 	for name, binding := range want {
 		if bindings[name] != binding {
-			t.Errorf("ImportBindingOf(%s) = %+v, want %+v", name, bindings[name], binding)
+			test.Errorf("ImportBindingOf(%s) = %+v, want %+v", name, bindings[name], binding)
 		}
 	}
 }

@@ -10,7 +10,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // `Decode` names the rule's own decoder rather than `rule.DecodeOptionsInto`, so an explicitly
 // configured `false` stays distinguishable from an absent key and the default lives in one place.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[NoUnsafeMemberAccessOptions]{
 		Rule:   NoUnsafeMemberAccess,
 		Decode: DecodeNoUnsafeMemberAccessOptions,
 	})

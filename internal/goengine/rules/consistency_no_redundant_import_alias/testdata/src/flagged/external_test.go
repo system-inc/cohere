@@ -1,0 +1,6 @@
+package flagged_test
+
+// An external test importing the package under test by the name it already has.
+import flagged "flagged" // want "`flagged` renames"
+
+var reached = flagged.Exported

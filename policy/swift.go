@@ -43,6 +43,9 @@ var swiftPolicyFiles = []struct {
 	{"Abbreviations.json", "PolicyAbbreviations", func() ([]byte, error) {
 		return swiftSource("Abbreviations.json", "PolicyAbbreviations", abbreviationsFile)
 	}},
+	{"Brands.json", "PolicyBrands", func() ([]byte, error) {
+		return swiftSource("Brands.json", "PolicyBrands", brandsFile)
+	}},
 	{"messages/", "RuleMessages", func() ([]byte, error) {
 		return swiftMessagesSource(Messages, swiftMessagesDigest(Messages))
 	}},
@@ -52,11 +55,14 @@ var swiftPolicyFiles = []struct {
 func SwiftFiles() ([]SwiftFile, error) {
 	files := make([]SwiftFile, 0, len(swiftPolicyFiles))
 	for _, policyFile := range swiftPolicyFiles {
-		contents, err := policyFile.generate()
-		if err != nil {
-			return nil, fmt.Errorf("policy/%s: %w", policyFile.source, err)
+		contents, generateError := policyFile.generate()
+		if generateError != nil {
+			return nil, fmt.Errorf("policy/%s: %w", policyFile.source, generateError)
 		}
-		files = append(files, SwiftFile{Path: swiftDirectory + policyFile.typeName + ".generated.swift", Contents: contents})
+		files = append(
+			files,
+			SwiftFile{Path: swiftDirectory + policyFile.typeName + ".generated.swift", Contents: contents},
+		)
 	}
 	return files, nil
 }
@@ -81,7 +87,11 @@ func swiftSource(name string, typeName string, contents []byte) ([]byte, error) 
 	delimiter := strings.Repeat("#", longestRun(contents, '#')+1)
 
 	var source bytes.Buffer
-	fmt.Fprintf(&source, "/*\n Generated from cohere's policy/%s by `go run ./policy/tools/generate`. Do not edit it here:\n", name)
+	fmt.Fprintf(
+		&source,
+		"/*\n Generated from cohere's policy/%s by `go run ./policy/tools/generate`. Do not edit it here:\n",
+		name,
+	)
 	source.WriteString(" edit the JSON and run that again. While the two differ, a test in each engine fails.\n */\n")
 	fmt.Fprintf(&source, "enum %s {\n", typeName)
 	fmt.Fprintf(&source, "    /* policy/%s, byte for byte. */\n", name)

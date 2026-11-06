@@ -27,7 +27,7 @@ type Tables struct {
 	Aliases    map[string]string
 }
 
-// ECMAScript's table of binary Unicode properties, not every binary UCD property.
+// ECMAScript's table of binary Unicode properties, not every binary `UCD` property.
 // https://tc39.es/ecma262/#table-binary-unicode-properties
 const binaryNames = `ASCII ASCII_Hex_Digit Alphabetic Any Assigned Bidi_Control Bidi_Mirrored Case_Ignorable Cased Changes_When_Casefolded Changes_When_Casemapped Changes_When_Lowercased Changes_When_NFKC_Casefolded Changes_When_Titlecased Changes_When_Uppercased Dash Default_Ignorable_Code_Point Deprecated Diacritic Emoji Emoji_Component Emoji_Modifier Emoji_Modifier_Base Emoji_Presentation Extended_Pictographic Extender Grapheme_Base Grapheme_Extend Hex_Digit ID_Continue ID_Start Ideographic IDS_Binary_Operator IDS_Trinary_Operator Join_Control Logical_Order_Exception Lowercase Math Noncharacter_Code_Point Pattern_Syntax Pattern_White_Space Quotation_Mark Radical Regional_Indicator Sentence_Terminal Soft_Dotted Terminal_Punctuation Unified_Ideograph Uppercase Variation_Selector White_Space XID_Continue XID_Start`
 
@@ -39,36 +39,40 @@ func fields(data []byte) [][]string {
 			continue
 		}
 		row := strings.Split(line, ";")
-		for i := range row {
-			row[i] = strings.TrimSpace(row[i])
+		for index := range row {
+			row[index] = strings.TrimSpace(row[index])
 		}
 		rows = append(rows, row)
 	}
 	return rows
 }
-func span(s string) Range {
-	lo, hi, ok := strings.Cut(s, "..")
+func span(text string) Range {
+	lo, hi, ok := strings.Cut(text, "..")
 	if !ok {
 		hi = lo
 	}
-	a, e := strconv.ParseInt(lo, 16, 32)
-	if e != nil {
-		panic(e)
+	first, parseError := strconv.ParseInt(lo, 16, 32)
+	if parseError != nil {
+		// Invariant: every row span reads comes from the Unicode Character Database zip embedded at build
+		// time, whose code points are all hex within 32 bits.
+		panic(parseError)
 	}
-	b, e := strconv.ParseInt(hi, 16, 32)
-	if e != nil {
-		panic(e)
+	last, parseError := strconv.ParseInt(hi, 16, 32)
+	if parseError != nil {
+		// Invariant: every row span reads comes from the Unicode Character Database zip embedded at build
+		// time, whose code points are all hex within 32 bits.
+		panic(parseError)
 	}
-	return Range{rune(a), rune(b)}
+	return Range{rune(first), rune(last)}
 }
 func merge(rs []Range) []Range {
-	slices.SortFunc(rs, func(a, b Range) int { return int(a.Lo - b.Lo) })
+	slices.SortFunc(rs, func(left, right Range) int { return int(left.Lo - right.Lo) })
 	out := []Range{}
-	for _, r := range rs {
-		if len(out) > 0 && r.Lo <= out[len(out)-1].Hi+1 {
-			out[len(out)-1].Hi = max(out[len(out)-1].Hi, r.Hi)
+	for _, span := range rs {
+		if len(out) > 0 && span.Lo <= out[len(out)-1].Hi+1 {
+			out[len(out)-1].Hi = max(out[len(out)-1].Hi, span.Hi)
 		} else {
-			out = append(out, r)
+			out = append(out, span)
 		}
 	}
 	return out
@@ -76,11 +80,11 @@ func merge(rs []Range) []Range {
 func Complement(rs []Range) []Range {
 	var out []Range
 	next := rune(0)
-	for _, r := range merge(slices.Clone(rs)) {
-		if next < r.Lo {
-			out = append(out, Range{next, r.Lo - 1})
+	for _, span := range merge(slices.Clone(rs)) {
+		if next < span.Lo {
+			out = append(out, Range{next, span.Lo - 1})
 		}
-		next = r.Hi + 1
+		next = span.Hi + 1
 	}
 	if next <= 0x10ffff {
 		out = append(out, Range{next, 0x10ffff})
@@ -89,25 +93,28 @@ func Complement(rs []Range) []Range {
 }
 
 func Build() (Tables, error) {
-	z, err := zip.NewReader(bytes.NewReader(source), int64(len(source)))
-	if err != nil {
-		return Tables{}, err
+	z, newReaderError := zip.NewReader(bytes.NewReader(source), int64(len(source)))
+	if newReaderError != nil {
+		return Tables{}, newReaderError
 	}
 	files := map[string][]byte{}
-	for _, f := range z.File {
-		r, e := f.Open()
-		if e != nil {
-			return Tables{}, e
+	for _, file := range z.File {
+		reader, openError := file.Open()
+		if openError != nil {
+			return Tables{}, openError
 		}
-		b, e := io.ReadAll(r)
-		r.Close()
-		if e != nil {
-			return Tables{}, e
+		content, readError := io.ReadAll(reader)
+		closeError := reader.Close()
+		if readError != nil {
+			return Tables{}, readError
 		}
-		files[f.Name] = b
+		if closeError != nil {
+			return Tables{}, fmt.Errorf("closing %s: %w", file.Name, closeError)
+		}
+		files[file.Name] = content
 	}
-	t := Tables{map[string]Property{}, map[string]string{}}
-	add := func(id, family string, rs []Range) { t.Properties[id] = Property{family, merge(rs)} }
+	tables := Tables{map[string]Property{}, map[string]string{}}
+	add := func(id, family string, rs []Range) { tables.Properties[id] = Property{family, merge(rs)} }
 	gc := map[string][]Range{}
 	for _, row := range fields(files["extracted/DerivedGeneralCategory.txt"]) {
 		gc[row[1]] = append(gc[row[1]], span(row[0]))
@@ -126,7 +133,7 @@ func Build() (Tables, error) {
 			add(id, "General_Category", gc[row[1]])
 			for _, alias := range row[1:] {
 				for _, prefix := range []string{"", "gc=", "General_Category="} {
-					t.Aliases[prefix+alias] = id
+					tables.Aliases[prefix+alias] = id
 				}
 			}
 		case "sc":
@@ -138,45 +145,45 @@ func Build() (Tables, error) {
 	scripts := map[string][]Range{}
 	var assignedScript []Range
 	for _, row := range fields(files["Scripts.txt"]) {
-		r := span(row[0])
-		scripts[row[1]] = append(scripts[row[1]], r)
-		assignedScript = append(assignedScript, r)
+		rowRange := span(row[0])
+		scripts[row[1]] = append(scripts[row[1]], rowRange)
+		assignedScript = append(assignedScript, rowRange)
 	}
 	scripts["Unknown"] = Complement(assignedScript)
 	// Script_Extensions defaults to Script, except for explicit overrides.
 	overrides := []Range{}
 	extensions := map[string][]Range{}
 	for _, row := range fields(files["ScriptExtensions.txt"]) {
-		r := span(row[0])
-		overrides = append(overrides, r)
+		rowRange := span(row[0])
+		overrides = append(overrides, rowRange)
 		for _, alias := range strings.Fields(row[1]) {
 			name := scriptAlias[alias]
-			extensions[name] = append(extensions[name], r)
+			extensions[name] = append(extensions[name], rowRange)
 		}
 	}
 	overrides = merge(overrides)
 	for name, rs := range scripts {
-		for _, r := range rs {
-			next := r.Lo
-			for _, o := range overrides {
-				if o.Hi < next {
+		for _, span := range rs {
+			next := span.Lo
+			for _, override := range overrides {
+				if override.Hi < next {
 					continue
 				}
-				if o.Lo > r.Hi {
+				if override.Lo > span.Hi {
 					break
 				}
-				if next < o.Lo {
-					extensions[name] = append(extensions[name], Range{next, o.Lo - 1})
+				if next < override.Lo {
+					extensions[name] = append(extensions[name], Range{next, override.Lo - 1})
 				}
-				next = max(next, o.Hi+1)
+				next = max(next, override.Hi+1)
 			}
-			if next <= r.Hi {
-				extensions[name] = append(extensions[name], Range{next, r.Hi})
+			if next <= span.Hi {
+				extensions[name] = append(extensions[name], Range{next, span.Hi})
 			}
 		}
 	}
 	for _, row := range fields(files["PropertyValueAliases.txt"]) {
-		// Hrkt is a UCD aggregate alias, excluded by ECMAScript's Script/Script_Extensions table.
+		// Hrkt is a `UCD` aggregate alias, excluded by ECMAScript's Script/Script_Extensions table.
 		if row[0] != "sc" || row[1] == "Hrkt" {
 			continue
 		}
@@ -191,14 +198,20 @@ func Build() (Tables, error) {
 			id := family + "=" + name
 			add(id, long, rs)
 			for _, alias := range row[1:] {
-				t.Aliases[family+"="+alias] = id
-				t.Aliases[long+"="+alias] = id
+				tables.Aliases[family+"="+alias] = id
+				tables.Aliases[long+"="+alias] = id
 			}
 		}
 	}
 	binaries := map[string][]Range{}
-	for _, f := range []string{"PropList.txt", "DerivedCoreProperties.txt", "extracted/DerivedBinaryProperties.txt", "emoji/emoji-data.txt", "DerivedNormalizationProps.txt"} {
-		for _, row := range fields(files[f]) {
+	for _, filename := range []string{
+		"PropList.txt",
+		"DerivedCoreProperties.txt",
+		"extracted/DerivedBinaryProperties.txt",
+		"emoji/emoji-data.txt",
+		"DerivedNormalizationProps.txt",
+	} {
+		for _, row := range fields(files[filename]) {
 			binaries[row[1]] = append(binaries[row[1]], span(row[0]))
 		}
 	}
@@ -211,14 +224,14 @@ func Build() (Tables, error) {
 			return Tables{}, fmt.Errorf("missing binary property %s", name)
 		}
 		add(name, "Binary", rs)
-		t.Aliases[name] = name
+		tables.Aliases[name] = name
 		for _, row := range fields(files["PropertyAliases.txt"]) {
 			if row[1] == name {
 				for _, alias := range row {
-					t.Aliases[alias] = name
+					tables.Aliases[alias] = name
 				}
 			}
 		}
 	}
-	return t, nil
+	return tables, nil
 }

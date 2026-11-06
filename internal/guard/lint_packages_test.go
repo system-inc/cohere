@@ -25,16 +25,23 @@ var lintTypes = gotypes.Product{
 
 // Not parallel: it builds the product every other test here reads, so it finishes before they resume. A
 // runner of prebuilt tests skips it and finds the product Workshop built.
-func TestProduct_LintTypes(t *testing.T) {
-	exports, err := lintTypes.Build()
-	if err != nil {
-		t.Fatal(err)
+//
+//cohere:ignore consistency-no-screaming-snake-case loom finds product tests by the name TestProduct_<name>
+func TestProduct_LintTypes(test *testing.T) {
+	exports, buildError := lintTypes.Build()
+	if buildError != nil {
+		test.Fatal(buildError)
 	}
-	t.Logf("the lint types product is %s", exports.Key()[:12])
+	test.Logf("the lint types product is %s", exports.Key()[:12])
 }
 
 // lintExports is lintTypes found once per test binary.
 var lintExports = sync.OnceValues(lintTypes.Find)
+
+var lintLoads = struct {
+	sync.Mutex
+	byOverlay map[string]*lintLoad
+}{byOverlay: map[string]*lintLoad{}}
 
 // lintPackages is ./internal/lint/... loaded with its syntax and types, read with overlay in place of the
 // files it names: cohere's own packages from source, and every other from lintTypes. The creating-getter
@@ -46,8 +53,8 @@ var lintExports = sync.OnceValues(lintTypes.Find)
 // The packages it returns are the named roots, each with its syntax and type information, so the scans see
 // the same calls they saw when every dependency was type-checked from source too: a dependency's types are
 // the same read either way, and no scan reads a dependency's syntax.
-func lintPackages(t *testing.T, overlay map[string][]byte) []*gotypes.Package {
-	t.Helper()
+func lintPackages(test *testing.T, overlay map[string][]byte) []*gotypes.Package {
+	test.Helper()
 
 	key := overlayKey(overlay)
 	lintLoads.Lock()
@@ -60,15 +67,10 @@ func lintPackages(t *testing.T, overlay map[string][]byte) []*gotypes.Package {
 
 	load.once.Do(func() { load.packages, load.failure = loadLintPackages(overlay) })
 	if load.failure != "" {
-		t.Fatal(load.failure)
+		test.Fatal(load.failure)
 	}
 	return load.packages
 }
-
-var lintLoads = struct {
-	sync.Mutex
-	byOverlay map[string]*lintLoad
-}{byOverlay: map[string]*lintLoad{}}
 
 type lintLoad struct {
 	once     sync.Once
@@ -95,23 +97,26 @@ func overlayKey(overlay map[string][]byte) string {
 }
 
 func loadLintPackages(overlay map[string][]byte) ([]*gotypes.Package, string) {
-	root, err := filepath.Abs("../..")
-	if err != nil {
-		return nil, err.Error()
+	root, absolutePathError := filepath.Abs("../..")
+	if absolutePathError != nil {
+		return nil, absolutePathError.Error()
 	}
-	exports, err := lintExports()
-	if err != nil {
-		return nil, err.Error()
+	exports, lintExportsError := lintExports()
+	if lintExportsError != nil {
+		return nil, lintExportsError.Error()
 	}
-	loaded, err := gotypes.Load(gotypes.Config{Directory: root, Overlay: overlay, Exports: exports}, "./internal/lint/...")
-	if err != nil {
-		return nil, fmt.Sprintf("loading the rule packages: %v", err)
+	loaded, loadError := gotypes.Load(
+		gotypes.Configuration{Directory: root, Overlay: overlay, Exports: exports},
+		"./internal/lint/...",
+	)
+	if loadError != nil {
+		return nil, fmt.Sprintf("loading the rule packages: %v", loadError)
 	}
 	// Every package read from source, a dependency of the rule packages too: one that does not type-check
 	// would hand the scans a partial tree.
-	for _, pkg := range loaded.Source {
-		if len(pkg.Errors) > 0 {
-			return nil, fmt.Sprintf("loading %s: %v", pkg.ImportPath, pkg.Errors[0])
+	for _, sourcePackage := range loaded.Source {
+		if len(sourcePackage.Errors) > 0 {
+			return nil, fmt.Sprintf("loading %s: %v", sourcePackage.ImportPath, sourcePackage.Errors[0])
 		}
 	}
 	return loaded.Roots, ""

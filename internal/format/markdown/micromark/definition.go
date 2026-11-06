@@ -9,7 +9,14 @@ var definitionTitleBefore = &Construct{Partial: true, Tokenize: tokenizeDefiniti
 func tokenizeDefinition(self *Self, effects *Effects, ok State, nok State) State {
 	var identifier string
 
-	var start, before, labelAfter, markerAfter, destinationBefore, destinationAfter, after, afterWhitespace State
+	var start State
+	var before State
+	var labelAfter State
+	var markerAfter State
+	var destinationBefore State
+	var destinationAfter State
+	var after State
+	var afterWhitespace State
 
 	// At start of a definition.
 	start = func(code Code) State {
@@ -57,11 +64,19 @@ func tokenizeDefinition(self *Self, effects *Effects, ok State, nok State) State
 
 	// Before destination.
 	destinationBefore = func(code Code) State {
-		return factoryDestination(effects, destinationAfter,
+		return factoryDestination(
+			effects,
+			destinationAfter,
 			// Note: we don’t need to reset the way `markdown-rs` does.
-			nok, TypeDefinitionDestination, TypeDefinitionDestinationLiteral, TypeDefinitionDestinationLiteralMarker, TypeDefinitionDestinationRaw, TypeDefinitionDestinationString,
+			nok,
+			TypeDefinitionDestination,
+			TypeDefinitionDestinationLiteral,
+			TypeDefinitionDestinationLiteralMarker,
+			TypeDefinitionDestinationRaw,
+			TypeDefinitionDestinationString,
 			// Upstream passes no max: no limit.
-			0)(code)
+			0,
+		)(code)
 	}
 
 	// After destination.
@@ -100,7 +115,10 @@ func tokenizeDefinition(self *Self, effects *Effects, ok State, nok State) State
 }
 
 func tokenizeDefinitionTitleBefore(self *Self, effects *Effects, ok State, nok State) State {
-	var titleBefore, beforeMarker, titleAfter, titleAfterOptionalWhitespace State
+	var titleBefore State
+	var beforeMarker State
+	var titleAfter State
+	var titleAfterOptionalWhitespace State
 
 	// After destination, at whitespace.
 	titleBefore = func(code Code) State {
@@ -112,7 +130,14 @@ func tokenizeDefinitionTitleBefore(self *Self, effects *Effects, ok State, nok S
 
 	// At title.
 	beforeMarker = func(code Code) State {
-		return factoryTitle(effects, titleAfter, nok, TypeDefinitionTitle, TypeDefinitionTitleMarker, TypeDefinitionTitleString)(code)
+		return factoryTitle(
+			effects,
+			titleAfter,
+			nok,
+			TypeDefinitionTitle,
+			TypeDefinitionTitleMarker,
+			TypeDefinitionTitleString,
+		)(code)
 	}
 
 	// After title.

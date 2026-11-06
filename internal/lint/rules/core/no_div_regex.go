@@ -48,24 +48,24 @@ var messageDivRegex = rule.Message{
 // That is what makes it a fix the engine may apply unattended rather than a suggestion needing an
 // author, and it is the same reasoning `no-regex-spaces` records for its own repair.
 //
-// The span of the FINDING is the whole literal including its flags, which upstream's corpus states
-// as columns 29 through 35 for `/=foo/`. The span of the FIX is the single equals sign. Those
+// The span of the finding is the whole literal including its flags, which upstream's corpus states
+// as columns 29 through 35 for `/=foo/`. The span of the fix is the single equals sign. Those
 // differ deliberately, and asserting only the first would not notice a repair that rewrote the
 // wrong byte, which is why the tests assert the rewritten source rather than the fix text.
 //
 // # Only a literal, never a constructor
 //
-// Upstream reads the first TOKEN of the node and requires its type to be `RegularExpression`, so
+// Upstream reads the first token of the node and requires its type to be `RegularExpression`, so
 // `new RegExp('=foo')` never qualifies: its first token is `new`. Measured, that input is clean.
 // Here the listener key is the regular expression kind, which asks the same question at the parser
 // instead. `no-regex-spaces` handles both spellings and this one does not, and the difference is
 // upstream's rather than an omission.
-var NoDivRegex = rule.Rule{
+var NoDivRegex = rule.Rule[rule.NoOptions]{
 	Name: "no-div-regex",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindRegularExpressionLiteral: func(node *ast.Node) {
-				literalRange := rule.TokenRange(ctx.SourceFile, node)
+				literalRange := rule.TokenRange(ruleContext.SourceFile, node)
 				// Sliced from the range rather than read off the node, though for this kind the
 				// two are the same string. A mutation swapping in `node.Text()` survived the whole
 				// fixture set, and probing eight shapes including ones with leading block and line
@@ -73,7 +73,7 @@ var NoDivRegex = rule.Rule{
 				// than a blind spot. The range form is kept because the fix offset below has to
 				// come from the range in any case, and reading both from one place means an
 				// offset and the text it indexes cannot drift apart.
-				text := ctx.SourceFile.Text()[literalRange.Pos():literalRange.End()]
+				text := ruleContext.SourceFile.Text()[literalRange.Pos():literalRange.End()]
 
 				// Index 1 is the character after the opening slash.
 				//
@@ -93,7 +93,7 @@ var NoDivRegex = rule.Rule{
 				// still points at the whole literal, matching upstream.
 				equalsRange := core.NewTextRange(literalRange.Pos()+1, literalRange.Pos()+2)
 
-				ctx.ReportNodeWithFixes(node, messageDivRegex,
+				ruleContext.ReportNodeWithFixes(node, messageDivRegex,
 					rule.ReplaceRange(equalsRange, "[=]"))
 			},
 		}

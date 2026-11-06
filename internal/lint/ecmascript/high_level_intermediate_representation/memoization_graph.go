@@ -58,14 +58,14 @@ func NewMemoizationGraph() *MemoizationGraph {
 // Upstream's `declare`, used for the function's own id and its parameters. Later classification
 // raises the level through `Record`; a declaration that is never classified stays at `Never`, which
 // is the right answer for a parameter nothing writes to.
-func (g *MemoizationGraph) Declare(declaration static_single_assignment.DeclarationId) {
-	if g == nil || g.identifiers == nil {
+func (graph *MemoizationGraph) Declare(declaration static_single_assignment.DeclarationId) {
+	if graph == nil || graph.identifiers == nil {
 		return
 	}
-	if _, exists := g.identifiers[declaration]; exists {
+	if _, exists := graph.identifiers[declaration]; exists {
 		return
 	}
-	g.identifiers[declaration] = &memoizationNode{
+	graph.identifiers[declaration] = &memoizationNode{
 		level:        MemoizationNever,
 		dependencies: map[static_single_assignment.DeclarationId]bool{},
 		scopes:       map[ScopeId]bool{},
@@ -77,13 +77,13 @@ func (g *MemoizationGraph) Declare(declaration static_single_assignment.Declarat
 // The level is joined rather than assigned, because one declaration can be an lvalue more than once
 // -- reassigned, or destructured alongside another binding -- and the final level is the strongest
 // any assignment demanded. Assigning instead would make the answer depend on visit order.
-func (g *MemoizationGraph) Record(declaration static_single_assignment.DeclarationId, level MemoizationLevel,
+func (graph *MemoizationGraph) Record(declaration static_single_assignment.DeclarationId, level MemoizationLevel,
 	dependencies []static_single_assignment.DeclarationId) {
-	if g == nil {
+	if graph == nil {
 		return
 	}
-	g.Declare(declaration)
-	node := g.identifiers[declaration]
+	graph.Declare(declaration)
+	node := graph.identifiers[declaration]
 	node.level = JoinMemoizationLevels(node.level, level)
 	for _, dependency := range dependencies {
 		if dependency == declaration {
@@ -99,15 +99,15 @@ func (g *MemoizationGraph) Record(declaration static_single_assignment.Declarati
 //
 // Both halves matter. The declaration-to-scope edge is how marking a value memoized forces the
 // scope's other dependencies; the scope-to-dependencies edge is what that forcing walks.
-func (g *MemoizationGraph) AssociateScope(declaration static_single_assignment.DeclarationId, scope ScopeId,
+func (graph *MemoizationGraph) AssociateScope(declaration static_single_assignment.DeclarationId, scope ScopeId,
 	scopeDependencies []static_single_assignment.DeclarationId) {
-	if g == nil {
+	if graph == nil {
 		return
 	}
-	g.Declare(declaration)
-	g.identifiers[declaration].scopes[scope] = true
-	if _, recorded := g.scopes[scope]; !recorded {
-		g.scopes[scope] = append([]static_single_assignment.DeclarationId(nil), scopeDependencies...)
+	graph.Declare(declaration)
+	graph.identifiers[declaration].scopes[scope] = true
+	if _, recorded := graph.scopes[scope]; !recorded {
+		graph.scopes[scope] = append([]static_single_assignment.DeclarationId(nil), scopeDependencies...)
 	}
 }
 
@@ -116,12 +116,12 @@ func (g *MemoizationGraph) AssociateScope(declaration static_single_assignment.D
 // Upstream collects two kinds. A returned value escapes because the caller holds it. A value passed
 // to a hook escapes because React may retain it -- the closure handed to `useEffect` is the standard
 // case, and it is why `IsHookCallee` was lifted to the shelf.
-func (g *MemoizationGraph) MarkEscaping(declaration static_single_assignment.DeclarationId) {
-	if g == nil {
+func (graph *MemoizationGraph) MarkEscaping(declaration static_single_assignment.DeclarationId) {
+	if graph == nil {
 		return
 	}
-	g.Declare(declaration)
-	g.escaping[declaration] = true
+	graph.Declare(declaration)
+	graph.escaping[declaration] = true
 }
 
 // ComputeMemoized walks outward from the escaping roots and returns everything that must be held.
@@ -130,13 +130,13 @@ func (g *MemoizationGraph) MarkEscaping(declaration static_single_assignment.Dec
 // `Conditional` with a memoized dependency, or `Unmemoized` under forcing. Marking a node forces
 // every dependency of every scope it belongs to, which is the second case the pass exists for: a
 // value that does not itself escape still needs holding when it feeds a scope whose output does.
-func (g *MemoizationGraph) ComputeMemoized() map[static_single_assignment.DeclarationId]bool {
+func (graph *MemoizationGraph) ComputeMemoized() map[static_single_assignment.DeclarationId]bool {
 	memoized := map[static_single_assignment.DeclarationId]bool{}
-	if g == nil {
+	if graph == nil {
 		return memoized
 	}
 	// Reset traversal state so the graph can be walked more than once.
-	for _, node := range g.identifiers {
+	for _, node := range graph.identifiers {
 		node.seen = false
 		node.memoized = false
 	}
@@ -146,7 +146,7 @@ func (g *MemoizationGraph) ComputeMemoized() map[static_single_assignment.Declar
 	var forceScope func(scope ScopeId)
 
 	visit = func(declaration static_single_assignment.DeclarationId, force bool) bool {
-		node, exists := g.identifiers[declaration]
+		node, exists := graph.identifiers[declaration]
 		if !exists {
 			// Upstream raises an invariant. A linter answers false: a declaration nothing recorded
 			// cannot be shown to need memoizing, and refusing to hold it is the direction that
@@ -194,12 +194,12 @@ func (g *MemoizationGraph) ComputeMemoized() map[static_single_assignment.Declar
 			return
 		}
 		seenScopes[scope] = true
-		for _, dependency := range g.scopes[scope] {
+		for _, dependency := range graph.scopes[scope] {
 			visit(dependency, true)
 		}
 	}
 
-	for _, declaration := range sortedDeclarations(g.escaping) {
+	for _, declaration := range sortedDeclarations(graph.escaping) {
 		visit(declaration, false)
 	}
 	return memoized
@@ -211,7 +211,7 @@ func sortedDeclarations(set map[static_single_assignment.DeclarationId]bool) []s
 	for key := range set {
 		keys = append(keys, key)
 	}
-	sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
+	sort.Slice(keys, func(left, right int) bool { return keys[left] < keys[right] })
 	return keys
 }
 
@@ -221,22 +221,22 @@ func sortedScopes(set map[ScopeId]bool) []ScopeId {
 	for key := range set {
 		keys = append(keys, key)
 	}
-	sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
+	sort.Slice(keys, func(left, right int) bool { return keys[left] < keys[right] })
 	return keys
 }
 
-// Len reports how many declarations the graph holds, for measurement.
-func (g *MemoizationGraph) Len() int {
-	if g == nil {
+// Length reports how many declarations the graph holds, for measurement.
+func (graph *MemoizationGraph) Length() int {
+	if graph == nil {
 		return 0
 	}
-	return len(g.identifiers)
+	return len(graph.identifiers)
 }
 
 // EscapingCount reports how many roots the graph holds, for measurement.
-func (g *MemoizationGraph) EscapingCount() int {
-	if g == nil {
+func (graph *MemoizationGraph) EscapingCount() int {
+	if graph == nil {
 		return 0
 	}
-	return len(g.escaping)
+	return len(graph.escaping)
 }

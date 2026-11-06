@@ -9,7 +9,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // so a bare `"error"` is a working configuration. Measured: the same input reports identically with
 // no options and with an empty object.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[DefaultPropsMatchPropTypesOptions]{
 		Rule:   DefaultPropsMatchPropTypes,
 		Decode: DecodeDefaultPropsMatchPropTypesOptions,
 	})

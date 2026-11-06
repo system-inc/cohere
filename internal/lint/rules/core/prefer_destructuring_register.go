@@ -11,7 +11,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // `enforceForRenamedProperties` lives in the second. Registered with Decode, the config layer would
 // refuse that second element; with DecodeOptionList the decoder is handed both.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[PreferDestructuringOptions]{
 		Rule:             PreferDestructuring,
 		DecodeOptionList: DecodePreferDestructuringOptions,
 	})

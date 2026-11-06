@@ -23,7 +23,7 @@ import (
 //	name in a type      a type reference, naming a type this file may not own
 //	<name />, name=     a JSX tag or attribute
 //
-// # A property read off `this` is deliberately NOT foreign
+// # A property read off `this` is deliberately not foreign
 //
 // The property belongs to the class being read, which this file owns, and its declaration is a
 // property declaration that no member check protects. Treating it like any other property read is

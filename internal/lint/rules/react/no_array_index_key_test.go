@@ -30,21 +30,49 @@ const noArrayIndexKeyFile = "/repository/source/Keys.tsx"
 // place this file departs from raw strings and the reason is mechanical.
 
 // TestNoArrayIndexKeyFires runs the forty-one failing cases from upstream.
-func TestNoArrayIndexKeyFires(t *testing.T) {
-	t.Parallel()
+func TestNoArrayIndexKeyFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
 		sourceText string
 		wantIds    []string
 	}{
-		{"invalid 0 foo.map((bar, i) => <Foo key={i} />)", `foo.map((bar, i) => <Foo key={i} />)`, []string{"noArrayIndex"}},
-		{"invalid 1 [{}, {}].map((bar, i) => <Foo key={i} />)", `[{}, {}].map((bar, i) => <Foo key={i} />)`, []string{"noArrayIndex"}},
-		{"invalid 2 foo.map((bar, anything) => <Foo key={anything} />)", `foo.map((bar, anything) => <Foo key={anything} />)`, []string{"noArrayIndex"}},
-		{"invalid 3 foo.map((bar, i) => <Foo key={`foo-${i}`} />)", "foo.map((bar, i) => <Foo key={`foo-${i}`} />)", []string{"noArrayIndex"}},
-		{"invalid 4 foo.map((bar, i) => <Foo key={'foo-' + i} />)", `foo.map((bar, i) => <Foo key={'foo-' + i} />)`, []string{"noArrayIndex"}},
-		{"invalid 5 foo.map((bar, i) => <Foo key={'foo-' + i + '-bar'} />)", `foo.map((bar, i) => <Foo key={'foo-' + i + '-bar'} />)`, []string{"noArrayIndex"}},
-		{"invalid 6 foo.map((baz, i) => React.cloneElement(someChild, { ...someChi", `foo.map((baz, i) => React.cloneElement(someChild, { ...someChild.props, key: i }))`, []string{"noArrayIndex"}},
+		{
+			"invalid 0 foo.map((bar, i) => <Foo key={i} />)",
+			`foo.map((bar, i) => <Foo key={i} />)`,
+			[]string{"noArrayIndex"},
+		},
+		{
+			"invalid 1 [{}, {}].map((bar, i) => <Foo key={i} />)",
+			`[{}, {}].map((bar, i) => <Foo key={i} />)`,
+			[]string{"noArrayIndex"},
+		},
+		{
+			"invalid 2 foo.map((bar, anything) => <Foo key={anything} />)",
+			`foo.map((bar, anything) => <Foo key={anything} />)`,
+			[]string{"noArrayIndex"},
+		},
+		{
+			"invalid 3 foo.map((bar, i) => <Foo key={`foo-${i}`} />)",
+			"foo.map((bar, i) => <Foo key={`foo-${i}`} />)",
+			[]string{"noArrayIndex"},
+		},
+		{
+			"invalid 4 foo.map((bar, i) => <Foo key={'foo-' + i} />)",
+			`foo.map((bar, i) => <Foo key={'foo-' + i} />)`,
+			[]string{"noArrayIndex"},
+		},
+		{
+			"invalid 5 foo.map((bar, i) => <Foo key={'foo-' + i + '-bar'} />)",
+			`foo.map((bar, i) => <Foo key={'foo-' + i + '-bar'} />)`,
+			[]string{"noArrayIndex"},
+		},
+		{
+			"invalid 6 foo.map((baz, i) => React.cloneElement(someChild, { ...someChi",
+			`foo.map((baz, i) => React.cloneElement(someChild, { ...someChild.props, key: i }))`,
+			[]string{"noArrayIndex"},
+		},
 		{"invalid 7 import { cloneElement } from 'react'; foo.map((baz, i) => clon", `
         import { cloneElement } from 'react';
 
@@ -66,25 +94,101 @@ func TestNoArrayIndexKeyFires(t *testing.T) {
           })
         })
       `, []string{"noArrayIndex"}},
-		{"invalid 10 foo.forEach((bar, i) => { baz.push(<Foo key={i} />); })", `foo.forEach((bar, i) => { baz.push(<Foo key={i} />); })`, []string{"noArrayIndex"}},
-		{"invalid 11 foo.filter((bar, i) => { baz.push(<Foo key={i} />); })", `foo.filter((bar, i) => { baz.push(<Foo key={i} />); })`, []string{"noArrayIndex"}},
-		{"invalid 12 foo.some((bar, i) => { baz.push(<Foo key={i} />); })", `foo.some((bar, i) => { baz.push(<Foo key={i} />); })`, []string{"noArrayIndex"}},
-		{"invalid 13 foo.every((bar, i) => { baz.push(<Foo key={i} />); })", `foo.every((bar, i) => { baz.push(<Foo key={i} />); })`, []string{"noArrayIndex"}},
-		{"invalid 14 foo.find((bar, i) => { baz.push(<Foo key={i} />); })", `foo.find((bar, i) => { baz.push(<Foo key={i} />); })`, []string{"noArrayIndex"}},
-		{"invalid 15 foo.findIndex((bar, i) => { baz.push(<Foo key={i} />); })", `foo.findIndex((bar, i) => { baz.push(<Foo key={i} />); })`, []string{"noArrayIndex"}},
-		{"invalid 16 foo.reduce((a, b, i) => a.concat(<Foo key={i} />), [])", `foo.reduce((a, b, i) => a.concat(<Foo key={i} />), [])`, []string{"noArrayIndex"}},
-		{"invalid 17 foo.flatMap((a, i) => <Foo key={i} />)", `foo.flatMap((a, i) => <Foo key={i} />)`, []string{"noArrayIndex"}},
-		{"invalid 18 foo.reduceRight((a, b, i) => a.concat(<Foo key={i} />), [])", `foo.reduceRight((a, b, i) => a.concat(<Foo key={i} />), [])`, []string{"noArrayIndex"}},
-		{"invalid 19 foo.map((bar, i) => React.createElement('Foo', { key: i }))", `foo.map((bar, i) => React.createElement('Foo', { key: i }))`, []string{"noArrayIndex"}},
-		{"invalid 20 foo.map((bar, i) => React.createElement('Foo', { key: `foo-${i", "foo.map((bar, i) => React.createElement('Foo', { key: `foo-${i}` }))", []string{"noArrayIndex"}},
-		{"invalid 21 foo.map((bar, i) => React.createElement('Foo', { key: 'foo-' +", `foo.map((bar, i) => React.createElement('Foo', { key: 'foo-' + i }))`, []string{"noArrayIndex"}},
-		{"invalid 22 foo.map((bar, i) => React.createElement('Foo', { key: 'foo-' +", `foo.map((bar, i) => React.createElement('Foo', { key: 'foo-' + i + '-bar' }))`, []string{"noArrayIndex"}},
-		{"invalid 23 foo.forEach((bar, i) => { baz.push(React.createElement('Foo', ", `foo.forEach((bar, i) => { baz.push(React.createElement('Foo', { key: i })); })`, []string{"noArrayIndex"}},
-		{"invalid 24 foo.filter((bar, i) => { baz.push(React.createElement('Foo', {", `foo.filter((bar, i) => { baz.push(React.createElement('Foo', { key: i })); })`, []string{"noArrayIndex"}},
-		{"invalid 25 foo.some((bar, i) => { baz.push(React.createElement('Foo', { k", `foo.some((bar, i) => { baz.push(React.createElement('Foo', { key: i })); })`, []string{"noArrayIndex"}},
-		{"invalid 26 foo.every((bar, i) => { baz.push(React.createElement('Foo', { ", `foo.every((bar, i) => { baz.push(React.createElement('Foo', { key: i })); })`, []string{"noArrayIndex"}},
-		{"invalid 27 foo.find((bar, i) => { baz.push(React.createElement('Foo', { k", `foo.find((bar, i) => { baz.push(React.createElement('Foo', { key: i })); })`, []string{"noArrayIndex"}},
-		{"invalid 28 foo.findIndex((bar, i) => { baz.push(React.createElement('Foo'", `foo.findIndex((bar, i) => { baz.push(React.createElement('Foo', { key: i })); })`, []string{"noArrayIndex"}},
+		{
+			"invalid 10 foo.forEach((bar, i) => { baz.push(<Foo key={i} />); })",
+			`foo.forEach((bar, i) => { baz.push(<Foo key={i} />); })`,
+			[]string{"noArrayIndex"},
+		},
+		{
+			"invalid 11 foo.filter((bar, i) => { baz.push(<Foo key={i} />); })",
+			`foo.filter((bar, i) => { baz.push(<Foo key={i} />); })`,
+			[]string{"noArrayIndex"},
+		},
+		{
+			"invalid 12 foo.some((bar, i) => { baz.push(<Foo key={i} />); })",
+			`foo.some((bar, i) => { baz.push(<Foo key={i} />); })`,
+			[]string{"noArrayIndex"},
+		},
+		{
+			"invalid 13 foo.every((bar, i) => { baz.push(<Foo key={i} />); })",
+			`foo.every((bar, i) => { baz.push(<Foo key={i} />); })`,
+			[]string{"noArrayIndex"},
+		},
+		{
+			"invalid 14 foo.find((bar, i) => { baz.push(<Foo key={i} />); })",
+			`foo.find((bar, i) => { baz.push(<Foo key={i} />); })`,
+			[]string{"noArrayIndex"},
+		},
+		{
+			"invalid 15 foo.findIndex((bar, i) => { baz.push(<Foo key={i} />); })",
+			`foo.findIndex((bar, i) => { baz.push(<Foo key={i} />); })`,
+			[]string{"noArrayIndex"},
+		},
+		{
+			"invalid 16 foo.reduce((a, b, i) => a.concat(<Foo key={i} />), [])",
+			`foo.reduce((a, b, i) => a.concat(<Foo key={i} />), [])`,
+			[]string{"noArrayIndex"},
+		},
+		{
+			"invalid 17 foo.flatMap((a, i) => <Foo key={i} />)",
+			`foo.flatMap((a, i) => <Foo key={i} />)`,
+			[]string{"noArrayIndex"},
+		},
+		{
+			"invalid 18 foo.reduceRight((a, b, i) => a.concat(<Foo key={i} />), [])",
+			`foo.reduceRight((a, b, i) => a.concat(<Foo key={i} />), [])`,
+			[]string{"noArrayIndex"},
+		},
+		{
+			"invalid 19 foo.map((bar, i) => React.createElement('Foo', { key: i }))",
+			`foo.map((bar, i) => React.createElement('Foo', { key: i }))`,
+			[]string{"noArrayIndex"},
+		},
+		{
+			"invalid 20 foo.map((bar, i) => React.createElement('Foo', { key: `foo-${i",
+			"foo.map((bar, i) => React.createElement('Foo', { key: `foo-${i}` }))",
+			[]string{"noArrayIndex"},
+		},
+		{
+			"invalid 21 foo.map((bar, i) => React.createElement('Foo', { key: 'foo-' +",
+			`foo.map((bar, i) => React.createElement('Foo', { key: 'foo-' + i }))`,
+			[]string{"noArrayIndex"},
+		},
+		{
+			"invalid 22 foo.map((bar, i) => React.createElement('Foo', { key: 'foo-' +",
+			`foo.map((bar, i) => React.createElement('Foo', { key: 'foo-' + i + '-bar' }))`,
+			[]string{"noArrayIndex"},
+		},
+		{
+			"invalid 23 foo.forEach((bar, i) => { baz.push(React.createElement('Foo', ",
+			`foo.forEach((bar, i) => { baz.push(React.createElement('Foo', { key: i })); })`,
+			[]string{"noArrayIndex"},
+		},
+		{
+			"invalid 24 foo.filter((bar, i) => { baz.push(React.createElement('Foo', {",
+			`foo.filter((bar, i) => { baz.push(React.createElement('Foo', { key: i })); })`,
+			[]string{"noArrayIndex"},
+		},
+		{
+			"invalid 25 foo.some((bar, i) => { baz.push(React.createElement('Foo', { k",
+			`foo.some((bar, i) => { baz.push(React.createElement('Foo', { key: i })); })`,
+			[]string{"noArrayIndex"},
+		},
+		{
+			"invalid 26 foo.every((bar, i) => { baz.push(React.createElement('Foo', { ",
+			`foo.every((bar, i) => { baz.push(React.createElement('Foo', { key: i })); })`,
+			[]string{"noArrayIndex"},
+		},
+		{
+			"invalid 27 foo.find((bar, i) => { baz.push(React.createElement('Foo', { k",
+			`foo.find((bar, i) => { baz.push(React.createElement('Foo', { key: i })); })`,
+			[]string{"noArrayIndex"},
+		},
+		{
+			"invalid 28 foo.findIndex((bar, i) => { baz.push(React.createElement('Foo'",
+			`foo.findIndex((bar, i) => { baz.push(React.createElement('Foo', { key: i })); })`,
+			[]string{"noArrayIndex"},
+		},
 		{"invalid 29 Children.map(this.props.children, (child, index) => { return R", `
         Children.map(this.props.children, (child, index) => {
           return React.cloneElement(child, { key: index });
@@ -133,7 +237,11 @@ func TestNoArrayIndexKeyFires(t *testing.T) {
           return cloneElement(child, { key: index });
         })
       `, []string{"noArrayIndex"}},
-		{"invalid 37 foo?.map((child, i) => <Foo key={i} />)", `foo?.map((child, i) => <Foo key={i} />)`, []string{"noArrayIndex"}},
+		{
+			"invalid 37 foo?.map((child, i) => <Foo key={i} />)",
+			`foo?.map((child, i) => <Foo key={i} />)`,
+			[]string{"noArrayIndex"},
+		},
 		{"invalid 38 foo.map((bar, index) => ( <Element key={index.toString()} bar=", `
         foo.map((bar, index) => (
           <Element key={index.toString()} bar={bar} />
@@ -152,10 +260,10 @@ func TestNoArrayIndexKeyFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoArrayIndexKey, noArrayIndexKeyFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoArrayIndexKey, noArrayIndexKeyFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -165,8 +273,8 @@ func TestNoArrayIndexKeyFires(t *testing.T) {
 // These are the false positives upstream already thought about, and several are near misses rather
 // than obvious passes: a key built from the item rather than the index, an index used as a
 // subscript rather than as the key, and a callback with too few parameters to have an index at all.
-func TestNoArrayIndexKeyStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoArrayIndexKeyStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -182,9 +290,18 @@ func TestNoArrayIndexKeyStaysSilent(t *testing.T) {
 		{"valid 7 foo.bar((bar, i) => <Foo key={'foo-' + i} />)", `foo.bar((bar, i) => <Foo key={'foo-' + i} />)`},
 		{"valid 8 foo.map((baz) => <Foo key={baz.id} />)", `foo.map((baz) => <Foo key={baz.id} />)`},
 		{"valid 9 foo.map((baz, i) => <Foo key={baz.id} />)", `foo.map((baz, i) => <Foo key={baz.id} />)`},
-		{"valid 10 foo.map((baz, i) => <Foo key={'foo' + baz.id} />)", `foo.map((baz, i) => <Foo key={'foo' + baz.id} />)`},
-		{"valid 11 foo.map((baz, i) => React.cloneElement(someChild, { ...someChi", `foo.map((baz, i) => React.cloneElement(someChild, { ...someChild.props }))`},
-		{"valid 12 foo.map((baz, i) => cloneElement(someChild, { ...someChild.pro", `foo.map((baz, i) => cloneElement(someChild, { ...someChild.props }))`},
+		{
+			"valid 10 foo.map((baz, i) => <Foo key={'foo' + baz.id} />)",
+			`foo.map((baz, i) => <Foo key={'foo' + baz.id} />)`,
+		},
+		{
+			"valid 11 foo.map((baz, i) => React.cloneElement(someChild, { ...someChi",
+			`foo.map((baz, i) => React.cloneElement(someChild, { ...someChild.props }))`,
+		},
+		{
+			"valid 12 foo.map((baz, i) => cloneElement(someChild, { ...someChild.pro",
+			`foo.map((baz, i) => cloneElement(someChild, { ...someChild.props }))`,
+		},
 		{"valid 13 foo.map((item, i) => { return React.cloneElement(someChild, { ", `
         foo.map((item, i) => {
           return React.cloneElement(someChild, {
@@ -200,15 +317,30 @@ func TestNoArrayIndexKeyStaysSilent(t *testing.T) {
         })
       `},
 		{"valid 15 foo.map((baz, i) => <Foo key />)", `foo.map((baz, i) => <Foo key />)`},
-		{"valid 16 foo.reduce((a, b) => a.concat(<Foo key={b.id} />), [])", `foo.reduce((a, b) => a.concat(<Foo key={b.id} />), [])`},
-		{"valid 17 foo.map((bar, i) => <Foo key={i.baz.toString()} />)", `foo.map((bar, i) => <Foo key={i.baz.toString()} />)`},
+		{
+			"valid 16 foo.reduce((a, b) => a.concat(<Foo key={b.id} />), [])",
+			`foo.reduce((a, b) => a.concat(<Foo key={b.id} />), [])`,
+		},
+		{
+			"valid 17 foo.map((bar, i) => <Foo key={i.baz.toString()} />)",
+			`foo.map((bar, i) => <Foo key={i.baz.toString()} />)`,
+		},
 		{"valid 18 foo.map((bar, i) => <Foo key={i.toString} />)", `foo.map((bar, i) => <Foo key={i.toString} />)`},
 		{"valid 19 foo.map((bar, i) => <Foo key={String()} />)", `foo.map((bar, i) => <Foo key={String()} />)`},
 		{"valid 20 foo.map((bar, i) => <Foo key={String(baz)} />)", `foo.map((bar, i) => <Foo key={String(baz)} />)`},
 		{"valid 21 foo.flatMap((a) => <Foo key={a} />)", `foo.flatMap((a) => <Foo key={a} />)`},
-		{"valid 22 foo.reduce((a, b, i) => a.concat(<Foo key={b.id} />), [])", `foo.reduce((a, b, i) => a.concat(<Foo key={b.id} />), [])`},
-		{"valid 23 foo.reduceRight((a, b) => a.concat(<Foo key={b.id} />), [])", `foo.reduceRight((a, b) => a.concat(<Foo key={b.id} />), [])`},
-		{"valid 24 foo.reduceRight((a, b, i) => a.concat(<Foo key={b.id} />), [])", `foo.reduceRight((a, b, i) => a.concat(<Foo key={b.id} />), [])`},
+		{
+			"valid 22 foo.reduce((a, b, i) => a.concat(<Foo key={b.id} />), [])",
+			`foo.reduce((a, b, i) => a.concat(<Foo key={b.id} />), [])`,
+		},
+		{
+			"valid 23 foo.reduceRight((a, b) => a.concat(<Foo key={b.id} />), [])",
+			`foo.reduceRight((a, b) => a.concat(<Foo key={b.id} />), [])`,
+		},
+		{
+			"valid 24 foo.reduceRight((a, b, i) => a.concat(<Foo key={b.id} />), [])",
+			`foo.reduceRight((a, b, i) => a.concat(<Foo key={b.id} />), [])`,
+		},
 		{"valid 25 React.Children.map(this.props.children, (child, index, arr) =>", `
         React.Children.map(this.props.children, (child, index, arr) => {
           return React.cloneElement(child, { key: child.id });
@@ -233,10 +365,10 @@ func TestNoArrayIndexKeyStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoArrayIndexKey, noArrayIndexKeyFile, testCase.sourceText)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoArrayIndexKey, noArrayIndexKeyFile, testCase.sourceText)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -247,16 +379,16 @@ func TestNoArrayIndexKeyStaysSilent(t *testing.T) {
 // later revert of the declaration would leave most fixtures green while silently losing that arm.
 // The listener guards on a nil checker, so the plain harness makes the whole rule silent rather
 // than crashing, which is the quieter and more dangerous failure.
-func TestNoArrayIndexKeyRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestNoArrayIndexKeyRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	source := "foo.map((bar, i) => <Foo key={i} />)\n"
 
-	typed := rule_testing.RunTyped(t, NoArrayIndexKey, noArrayIndexKeyFile, source)
-	rule_testing.ExpectFindings(t, typed, "noArrayIndex")
+	typed := rule_testing.RunTyped(test, NoArrayIndexKey, noArrayIndexKeyFile, source)
+	rule_testing.ExpectFindings(test, typed, "noArrayIndex")
 
-	untyped := rule_testing.Run(t, NoArrayIndexKey, noArrayIndexKeyFile, source)
-	rule_testing.ExpectClean(t, untyped)
+	untyped := rule_testing.Run(test, NoArrayIndexKey, noArrayIndexKeyFile, source)
+	rule_testing.ExpectClean(test, untyped)
 }
 
 // TestNoArrayIndexKeyHasNoFileSuffixGate pins that no filename decides anything.
@@ -270,12 +402,12 @@ func TestNoArrayIndexKeyRequiresTheTypedHarness(t *testing.T) {
 // (internal/rule_testing/program.go:30), so a .jsx or .js fixture is not in the program at all and
 // the run fails before any rule is offered a file. Weakening the rule to make such a fixture pass
 // would turn a fact about the harness into a fact about the rule.
-func TestNoArrayIndexKeyHasNoFileSuffixGate(t *testing.T) {
-	t.Parallel()
+func TestNoArrayIndexKeyHasNoFileSuffixGate(test *testing.T) {
+	test.Parallel()
 
 	source := "foo.map((bar, i) => <Foo key={i} />)\n"
-	result := rule_testing.RunTyped(t, NoArrayIndexKey, "/repository/source/Suffix.tsx", source)
-	rule_testing.ExpectFindings(t, result, "noArrayIndex")
+	result := rule_testing.RunTyped(test, NoArrayIndexKey, "/repository/source/Suffix.tsx", source)
+	rule_testing.ExpectFindings(test, result, "noArrayIndex")
 }
 
 // TestNoArrayIndexKeyIteratorMethods pins the ten methods and the position each one's index sits at.
@@ -284,8 +416,8 @@ func TestNoArrayIndexKeyHasNoFileSuffixGate(t *testing.T) {
 // index is the third parameter, and a port using position one everywhere is silent exactly where
 // upstream is silent, so only the two-parameter fold separates them. The corpus does test both
 // folds, and the near-miss rows below are not in it.
-func TestNoArrayIndexKeyIteratorMethods(t *testing.T) {
-	t.Parallel()
+func TestNoArrayIndexKeyIteratorMethods(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -303,10 +435,14 @@ func TestNoArrayIndexKeyIteratorMethods(t *testing.T) {
 
 		// The folds take the accumulator first, so their index is at position two.
 		{"reduce at position two", "foo.reduce((acc, bar, i) => <Foo key={i} />)\n", []string{"noArrayIndex"}},
-		{"reduceRight at position two", "foo.reduceRight((acc, bar, i) => <Foo key={i} />)\n", []string{"noArrayIndex"}},
+		{
+			"reduceRight at position two",
+			"foo.reduceRight((acc, bar, i) => <Foo key={i} />)\n",
+			[]string{"noArrayIndex"},
+		},
 
 		// The row that separates a table from a constant: a two-parameter fold's second parameter
-		// is the ITEM, not an index, so nothing is pushed.
+		// is the item, not an index, so nothing is pushed.
 		{"reduce with only two parameters", "foo.reduce((acc, bar) => <Foo key={bar} />)\n", nil},
 
 		// Not in the set at all.
@@ -318,10 +454,10 @@ func TestNoArrayIndexKeyIteratorMethods(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoArrayIndexKey, noArrayIndexKeyFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoArrayIndexKey, noArrayIndexKeyFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -330,7 +466,7 @@ func TestNoArrayIndexKeyIteratorMethods(t *testing.T) {
 // rather than where it mis-decides.
 //
 // `ast.Node.Text()` panics on a property access and on a call expression, and the walk recovers per
-// FILE rather than per rule, so one such node costs every rule in the package every finding in that
+// file rather than per rule, so one such node costs every rule in the package every finding in that
 // file while the run still prints a plausible summary. Each row below reaches the callee inspection
 // with a different node kind, and two of them would panic if the kind were not checked before the
 // text was read.
@@ -338,8 +474,8 @@ func TestNoArrayIndexKeyIteratorMethods(t *testing.T) {
 // No `ExpectFindings` fixture can see a panic, so these are as much a crash test as a behaviour
 // test, and the two answers differ: the computed form is silent upstream and the call-as-callee
 // form reports, so a guard that declined both would be wrong in one direction.
-func TestNoArrayIndexKeyCalleeShapes(t *testing.T) {
-	t.Parallel()
+func TestNoArrayIndexKeyCalleeShapes(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -364,10 +500,10 @@ func TestNoArrayIndexKeyCalleeShapes(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoArrayIndexKey, noArrayIndexKeyFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoArrayIndexKey, noArrayIndexKeyFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -378,8 +514,8 @@ func TestNoArrayIndexKeyCalleeShapes(t *testing.T) {
 // so a destructuring pattern and a default value are both silent. The default row is the surprising
 // one: `(bar, i = 0)` reads as an index to a human and is an assignment pattern to the parser.
 // Both measured against the installed build.
-func TestNoArrayIndexKeyParameterShapes(t *testing.T) {
-	t.Parallel()
+func TestNoArrayIndexKeyParameterShapes(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -393,10 +529,10 @@ func TestNoArrayIndexKeyParameterShapes(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoArrayIndexKey, noArrayIndexKeyFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoArrayIndexKey, noArrayIndexKeyFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -408,8 +544,8 @@ func TestNoArrayIndexKeyParameterShapes(t *testing.T) {
 // index to a key; and an element access is not one of the five shapes even though the index is
 // plainly inside it. A port that generalized any of these would report on code upstream leaves
 // alone, and nothing in the corpus writes `Number(i)` or `i.toFixed()`.
-func TestNoArrayIndexKeyKeyExpressionShapes(t *testing.T) {
-	t.Parallel()
+func TestNoArrayIndexKeyKeyExpressionShapes(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name    string
@@ -422,7 +558,7 @@ func TestNoArrayIndexKeyKeyExpressionShapes(t *testing.T) {
 		{"a binary expression", "{'x-' + i}", []string{"noArrayIndex"}},
 		{"a nested binary expression", "{'x-' + i + '-y'}", []string{"noArrayIndex"}},
 
-		// A LOGICAL operator is a different node type upstream and is not dispatched to the binary
+		// A logical operator is a different node type upstream and is not dispatched to the binary
 		// arm, so all three of these are silent there while being `KindBinaryExpression` here.
 		// Found on the real tree rather than in a fixture: the dry run produced four findings
 		// ESLint does not, every one of them `key={item.id ?? index}`, which is an ordinary thing
@@ -448,15 +584,15 @@ func TestNoArrayIndexKeyKeyExpressionShapes(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			attribute := "key"
 			if testCase.key != "" {
 				attribute = "key=" + testCase.key
 			}
 			source := "foo.map((bar, i) => <Foo " + attribute + " />)\n"
-			result := rule_testing.RunTyped(t, NoArrayIndexKey, noArrayIndexKeyFile, source)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			result := rule_testing.RunTyped(test, NoArrayIndexKey, noArrayIndexKeyFile, source)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -467,8 +603,8 @@ func TestNoArrayIndexKeyKeyExpressionShapes(t *testing.T) {
 // every imported case and gets the first row here wrong. The last two rows are the other half of
 // the stack: a name is in scope only inside its own callback, so the same identifier is clean
 // before and after.
-func TestNoArrayIndexKeyStackBehaviour(t *testing.T) {
-	t.Parallel()
+func TestNoArrayIndexKeyStackBehaviour(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -503,22 +639,22 @@ func TestNoArrayIndexKeyStackBehaviour(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoArrayIndexKey, noArrayIndexKeyFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoArrayIndexKey, noArrayIndexKeyFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
 
 // TestNoArrayIndexKeyReactChildren pins the argument shift for the React children iterator.
 //
-// `Children.map(collection, callback)` takes the callback SECOND, so a port reading argument zero
+// `Children.map(collection, callback)` takes the callback second, so a port reading argument zero
 // finds the collection and pushes nothing. Upstream detects this by the receiver's name, and the
 // last row shows how narrow that test is: any other receiver keeps the ordinary argument order, so
 // the same two-argument shape is silent.
-func TestNoArrayIndexKeyReactChildren(t *testing.T) {
-	t.Parallel()
+func TestNoArrayIndexKeyReactChildren(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -527,7 +663,11 @@ func TestNoArrayIndexKeyReactChildren(t *testing.T) {
 	}{
 		{"Children.map", "Children.map(c, (child, i) => <Foo key={i} />)\n", []string{"noArrayIndex"}},
 		{"React.Children.map", "React.Children.map(c, (child, i) => <Foo key={i} />)\n", []string{"noArrayIndex"}},
-		{"React.Children.forEach", "React.Children.forEach(c, (child, i) => <Foo key={i} />)\n", []string{"noArrayIndex"}},
+		{
+			"React.Children.forEach",
+			"React.Children.forEach(c, (child, i) => <Foo key={i} />)\n",
+			[]string{"noArrayIndex"},
+		},
 
 		// The callback in argument zero is not read for a Children call.
 		{"Children.map with the callback first", "Children.map((child, i) => <Foo key={i} />)\n", nil},
@@ -535,7 +675,7 @@ func TestNoArrayIndexKeyReactChildren(t *testing.T) {
 		// Any other receiver keeps the ordinary order, so argument zero is the collection.
 		{"another receiver with two arguments", "Other.map(c, (child, i) => <Foo key={i} />)\n", nil},
 
-		// Upstream restricts the argument shift to `map` and `forEach`, which is NARROWER than the
+		// Upstream restricts the argument shift to `map` and `forEach`, which is narrower than the
 		// ten-method set the caller has already matched. So a Children receiver with any other
 		// iterator method keeps the ordinary order, reads argument zero, finds the collection
 		// rather than a callback, and pushes nothing. A mutation removing that restriction survived
@@ -548,10 +688,10 @@ func TestNoArrayIndexKeyReactChildren(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoArrayIndexKey, noArrayIndexKeyFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoArrayIndexKey, noArrayIndexKeyFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -561,8 +701,8 @@ func TestNoArrayIndexKeyReactChildren(t *testing.T) {
 // The imported form is the only part of this rule that needs the type checker: upstream resolves
 // the bare name through its own variable index and requires the import's source to be exactly
 // `react`. The last row is what that requirement buys, and nothing in the corpus writes it.
-func TestNoArrayIndexKeyCreateElement(t *testing.T) {
-	t.Parallel()
+func TestNoArrayIndexKeyCreateElement(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -625,24 +765,24 @@ func TestNoArrayIndexKeyCreateElement(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoArrayIndexKey, noArrayIndexKeyFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoArrayIndexKey, noArrayIndexKeyFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
 
 // TestNoArrayIndexKeySpans asserts where each finding points.
 //
-// Four of the five shapes report the whole key expression and `String(i)` reports the ARGUMENT,
+// Four of the five shapes report the whole key expression and `String(i)` reports the argument,
 // which is upstream passing a different node at that one site. A message-id fixture cannot see the
 // difference and the corpus asserts none of it.
 //
 // `RunTyped` writes `strings.TrimSpace(source) + "\n"` to disk, so the expectation is sliced from
 // the same transform rather than from the Go literal, which would be one byte off.
-func TestNoArrayIndexKeySpans(t *testing.T) {
-	t.Parallel()
+func TestNoArrayIndexKeySpans(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -651,7 +791,11 @@ func TestNoArrayIndexKeySpans(t *testing.T) {
 	}{
 		{"the index itself", "foo.map((bar, i) => <Foo key={i} />)\n", "i"},
 		{"a template underlines the whole template", "foo.map((bar, i) => <Foo key={`x-${i}`} />)\n", "`x-${i}`"},
-		{"a binary expression underlines the whole expression", "foo.map((bar, i) => <Foo key={'x-' + i} />)\n", "'x-' + i"},
+		{
+			"a binary expression underlines the whole expression",
+			"foo.map((bar, i) => <Foo key={'x-' + i} />)\n",
+			"'x-' + i",
+		},
 		{"toString underlines the whole call", "foo.map((bar, i) => <Foo key={i.toString()} />)\n", "i.toString()"},
 
 		// The one site that differs: the argument rather than the call.
@@ -666,17 +810,17 @@ func TestNoArrayIndexKeySpans(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoArrayIndexKey, noArrayIndexKeyFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoArrayIndexKey, noArrayIndexKeyFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted exactly one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted exactly one finding, got %d", len(result.Diagnostics))
 			}
 			written := strings.TrimSpace(testCase.sourceText) + "\n"
 			diagnostic := result.Diagnostics[0]
 			got := written[diagnostic.Range.Pos():diagnostic.Range.End()]
 			if got != testCase.wantText {
-				t.Errorf("span text = %q, wanted %q", got, testCase.wantText)
+				test.Errorf("span text = %q, wanted %q", got, testCase.wantText)
 			}
 		})
 	}
@@ -687,13 +831,13 @@ func TestNoArrayIndexKeySpans(t *testing.T) {
 // A rule.Message is {Id, Description} with no interpolation, so there is nothing to render.
 // Asserted against a literal typed here rather than against the rule's own constant, which would
 // move on both sides under mutation and could not fail.
-func TestNoArrayIndexKeyMessage(t *testing.T) {
-	t.Parallel()
+func TestNoArrayIndexKeyMessage(test *testing.T) {
+	test.Parallel()
 
 	if messageNoArrayIndexKey.Id != "noArrayIndex" {
-		t.Errorf("message id = %q", messageNoArrayIndexKey.Id)
+		test.Errorf("message id = %q", messageNoArrayIndexKey.Id)
 	}
 	if len(messageNoArrayIndexKey.Description) < 80 {
-		t.Errorf("description is too short to say why: %q", messageNoArrayIndexKey.Description)
+		test.Errorf("description is too short to say why: %q", messageNoArrayIndexKey.Description)
 	}
 }

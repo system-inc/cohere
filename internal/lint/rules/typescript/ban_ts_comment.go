@@ -103,7 +103,7 @@ func messageBanTsCommentDescriptionFormat(directive string, pattern string) rule
 //   - A description's length is counted in characters as a reader sees them (getStringLength:
 //     `Intl.Segmenter` graphemes for anything not ASCII, here `text.GraphemeCount`). oxc counted
 //     bytes, so two accented letters passed a minimum of three.
-//   - The description is trimmed as JavaScript trims, which keeps U+0085 and strips U+FEFF; Go's
+//   - The description is trimmed as JavaScript trims, which keeps `U+0085` and strips `U+FEFF`; Go's
 //     `strings.TrimSpace` does the reverse for both.
 //   - A finding covers the whole comment, delimiters included, where oxc's covered its interior.
 //   - Replacing `@ts-ignore` is a suggestion, not a fix, and it rewrites the first occurrence only:
@@ -139,14 +139,14 @@ func messageBanTsCommentDescriptionFormat(directive string, pattern string) rule
 //
 // The first is tried first, and only on a line comment. A block comment's value is split into lines
 // and only the last is read, so a directive above the closing line is invisible.
-var BanTsComment = rule.Rule{
+var BanTsComment = rule.Rule[BanTsCommentOptions]{
 	Name: "@typescript-eslint/ban-ts-comment",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[BanTsCommentOptions]) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 		// See "A JavaScript file is still declined" above.
-		if !isTypeScriptSourceFile(ctx.SourceFile.FileName().AsString()) {
+		if !isTypeScriptSourceFile(ruleContext.SourceFile.FileName().AsString()) {
 			return nil
 		}
 
@@ -155,30 +155,57 @@ var BanTsComment = rule.Rule{
 		// errors on empty input and the config layer turns that into nil. A bare type assertion
 		// would then yield four zero-valued directive settings, which match no arm, and the rule
 		// would register on every file and report nothing while every fixture stayed green.
-		parsed, decoded := rule.OptionsAs[BanTsCommentOptions](options)
+		parsed, decoded := options.Read()
 		if !decoded {
 			parsed = DefaultBanTsCommentOptions()
 		}
 
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
-				reportBanTsComments(ctx, parsed)
+				reportBanTsComments(ruleContext, parsed)
 			},
 		}
 	},
 }
 
+// The four directives, spelled once.
+const (
+	banTsCommentExpectError = "expect-error"
+	banTsCommentIgnore      = "ignore"
+	banTsCommentNoCheck     = "nocheck"
+	banTsCommentCheck       = "check"
+)
+
+// BanTsCommentSettingKind names which of the three shapes a directive's configuration took.
+//
+// A Go struct rather than an interface because the three carry different payloads and the rule
+// switches on all three, which is exactly what upstream's enum does.
+type BanTsCommentSettingKind string
+
+const (
+	// BanTsCommentBoolean is `true` or `false`: ban the directive outright, or allow it.
+	BanTsCommentBoolean BanTsCommentSettingKind = "Boolean"
+
+	// BanTsCommentRequireDescription is `"allow-with-description"`: allow it when it carries an
+	// explanation of at least the minimum length.
+	BanTsCommentRequireDescription BanTsCommentSettingKind = "RequireDescription"
+
+	// BanTsCommentDescriptionFormat is `{ "descriptionFormat": "<regex>" }`: allow it when the
+	// explanation both reaches the minimum length and matches the pattern.
+	BanTsCommentDescriptionFormat BanTsCommentSettingKind = "DescriptionFormat"
+)
+
 // reportBanTsComments is upstream's `Program` listener.
-func reportBanTsComments(ctx rule.Context, options BanTsCommentOptions) {
+func reportBanTsComments(ruleContext rule.Context, options BanTsCommentOptions) {
 	// Upstream compares the line the first statement's first token is on with the comment's own,
 	// so a `@ts-nocheck` sharing the first statement's line is as late as one below it.
 	firstStatementLine := -1
-	if statements := ctx.SourceFile.Statements.Nodes; len(statements) > 0 {
-		start := scanner.GetTokenPosOfNode(statements[0], ctx.SourceFile, false)
-		firstStatementLine, _ = scanner.GetLineAndCharacterOfPosition(ctx.SourceFile, start)
+	if statements := ruleContext.SourceFile.Statements.Nodes; len(statements) > 0 {
+		start := scanner.GetTokenPosOfNode(statements[0], ruleContext.SourceFile, false)
+		firstStatementLine, _ = scanner.GetLineAndCharacterOfPosition(ruleContext.SourceFile, start)
 	}
 
-	for _, comment := range comments.ForFile(ctx) {
+	for _, comment := range comments.ForFile(ruleContext) {
 		value, readable := banTsCommentValue(comment)
 		if !readable {
 			continue
@@ -189,7 +216,7 @@ func reportBanTsComments(ctx rule.Context, options BanTsCommentOptions) {
 		}
 
 		if directive == banTsCommentNoCheck && firstStatementLine >= 0 {
-			commentLine, _ := scanner.GetLineAndCharacterOfPosition(ctx.SourceFile, comment.Range.Pos())
+			commentLine, _ := scanner.GetLineAndCharacterOfPosition(ruleContext.SourceFile, comment.Range.Pos())
 			if firstStatementLine <= commentLine {
 				continue
 			}
@@ -207,14 +234,14 @@ func reportBanTsComments(ctx rule.Context, options BanTsCommentOptions) {
 				if comment.IsBlock {
 					repaired = "/*" + replaced + "*/"
 				}
-				ctx.ReportRangeWithSuggestions(comment.Range, messageBanTsCommentPreferExpectError(),
+				ruleContext.ReportRangeWithSuggestions(comment.Range, messageBanTsCommentPreferExpectError(),
 					rule.Suggestion{
 						Message: messageBanTsCommentReplaceIgnore(),
 						Fixes:   []rule.Fix{{Range: comment.Range, Text: repaired}},
 					})
 				continue
 			}
-			ctx.ReportRange(comment.Range, messageBanTsCommentBanned(directive))
+			ruleContext.ReportRange(comment.Range, messageBanTsCommentBanned(directive))
 
 		case BanTsCommentRequireDescription, BanTsCommentDescriptionFormat:
 			// An object setting is only a description setting when its format is set and non-empty:
@@ -225,7 +252,7 @@ func reportBanTsComments(ctx rule.Context, options BanTsCommentOptions) {
 			}
 			if banTsCommentLength(strings.TrimFunc(description, type_checking.IsStrWhiteSpace)) <
 				options.MinimumDescriptionLength {
-				ctx.ReportRange(comment.Range, messageBanTsCommentRequiresDescription(
+				ruleContext.ReportRange(comment.Range, messageBanTsCommentRequiresDescription(
 					directive, options.MinimumDescriptionLength))
 				continue
 			}
@@ -234,7 +261,7 @@ func reportBanTsComments(ctx rule.Context, options BanTsCommentOptions) {
 			// esregexp's time bound counts as a match, so a pathological pattern is silent rather
 			// than reporting every description.
 			if setting.DescriptionFormat != nil && !setting.DescriptionFormat.TestOrTimeout(description) {
-				ctx.ReportRange(comment.Range, messageBanTsCommentDescriptionFormat(
+				ruleContext.ReportRange(comment.Range, messageBanTsCommentDescriptionFormat(
 					directive, setting.DescriptionFormat.Source()))
 			}
 		}
@@ -266,14 +293,6 @@ func banTsCommentValue(comment comments.Comment) (string, bool) {
 	return comment.Text[2 : len(comment.Text)-2], true
 }
 
-// The four directives, spelled once.
-const (
-	banTsCommentExpectError = "expect-error"
-	banTsCommentIgnore      = "ignore"
-	banTsCommentNoCheck     = "nocheck"
-	banTsCommentCheck       = "check"
-)
-
 // findBanTsCommentDirective is upstream's `findDirectiveInComment`, returning the directive and the
 // description after it. The three patterns it reads are set out on the rule.
 func findBanTsCommentDirective(value string, isBlock bool) (string, string, bool) {
@@ -282,7 +301,11 @@ func findBanTsCommentDirective(value string, isBlock bool) (string, string, bool
 		// slash, then whitespace. A line comment holds no line terminator, so `.*$` is the rest.
 		rest := strings.TrimPrefix(value, "/")
 		rest = strings.TrimLeftFunc(rest, type_checking.IsStrWhiteSpace)
-		if directive, description, found := banTsCommentDirectiveAt(rest, banTsCommentCheck, banTsCommentNoCheck); found {
+		if directive, description, found := banTsCommentDirectiveAt(
+			rest,
+			banTsCommentCheck,
+			banTsCommentNoCheck,
+		); found {
 			return directive, description, true
 		}
 		// `^\/*\s*@ts-(expect-error|ignore)(.*)` over the value: any number of slashes, then
@@ -326,25 +349,6 @@ func banTsCommentDirectiveAt(text string, first string, second string) (string, 
 	return "", "", false
 }
 
-// BanTsCommentSettingKind names which of the three shapes a directive's configuration took.
-//
-// A Go struct rather than an interface because the three carry different payloads and the rule
-// switches on all three, which is exactly what upstream's enum does.
-type BanTsCommentSettingKind string
-
-const (
-	// BanTsCommentBoolean is `true` or `false`: ban the directive outright, or allow it.
-	BanTsCommentBoolean BanTsCommentSettingKind = "Boolean"
-
-	// BanTsCommentRequireDescription is `"allow-with-description"`: allow it when it carries an
-	// explanation of at least the minimum length.
-	BanTsCommentRequireDescription BanTsCommentSettingKind = "RequireDescription"
-
-	// BanTsCommentDescriptionFormat is `{ "descriptionFormat": "<regex>" }`: allow it when the
-	// explanation both reaches the minimum length and matches the pattern.
-	BanTsCommentDescriptionFormat BanTsCommentSettingKind = "DescriptionFormat"
-)
-
 // BanTsCommentSetting is how one directive is configured.
 //
 // `RequireDescription` is not `DescriptionFormat` with a nil pattern: the first checks the length,
@@ -362,49 +366,6 @@ type BanTsCommentSetting struct {
 	// Compiled as JavaScript compiles it, because upstream builds it with `new RegExp(descriptionFormat)`:
 	// a pattern with a lookahead is one ESLint accepts and Go's regexp cannot compile.
 	DescriptionFormat *esregexp.RegExp
-}
-
-// BanTsCommentOptions configures which directives report and what an acceptable description is.
-//
-// typescript-eslint's five keys and its `defaultOptions`. A default that binds and does nothing is
-// the failure this rule is most exposed to, so the corpus's default-options rows pin every one.
-type BanTsCommentOptions struct {
-	// TsExpectError defaults to allow-with-description, the only directive not defaulting to a
-	// boolean. This is why a bare `"error"` config reports an undescribed `@ts-expect-error` and
-	// stays silent on a described one.
-	TsExpectError BanTsCommentSetting
-
-	// TsIgnore defaults to banned, and it is the only directive offering a repair.
-	TsIgnore BanTsCommentSetting
-
-	// TsNoCheck defaults to banned.
-	TsNoCheck BanTsCommentSetting
-
-	// TsCheck defaults to ALLOWED. `@ts-check` turns checking on rather than off, so banning it by
-	// default would be backwards, and this is the one default a reader is likely to guess wrong.
-	TsCheck BanTsCommentSetting
-
-	// MinimumDescriptionLength defaults to 3, counted in graphemes of the trimmed description.
-	MinimumDescriptionLength int
-}
-
-// settingFor is upstream's `options[fullDirective]`, mapping a directive name onto its setting.
-//
-// The fallback is unreachable, because `findBanTsCommentDirective` returns only the four names the
-// switch covers, and a mutant flipping it to a ban survives for that reason. Go requires a return,
-// and the allowing setting is the one that cannot report on input this rule never produces.
-func (o BanTsCommentOptions) settingFor(directive string) BanTsCommentSetting {
-	switch directive {
-	case banTsCommentIgnore:
-		return o.TsIgnore
-	case banTsCommentCheck:
-		return o.TsCheck
-	case banTsCommentNoCheck:
-		return o.TsNoCheck
-	case banTsCommentExpectError:
-		return o.TsExpectError
-	}
-	return BanTsCommentSetting{Kind: BanTsCommentBoolean, Banned: false}
 }
 
 // DefaultBanTsCommentOptions is upstream's configured-nothing behavior.
@@ -447,13 +408,12 @@ type banTsCommentRawOptions struct {
 // the rule, so the fallback only hid a typo (ruled on #pd2chkx). The config layer checks the shape
 // against typescript-eslint's schema before this runs, so the first two refusals are this
 // decoder's own guard for a caller that reaches it directly.
-func DecodeBanTsCommentOptions(raw []byte) (any, error) {
-	decoded, err := rule.DecodeOptionsInto[banTsCommentRawOptions]()(raw)
-	if err != nil {
-		return DefaultBanTsCommentOptions(), err
+func DecodeBanTsCommentOptions(raw []byte) (BanTsCommentOptions, error) {
+	decoded, decodeOptionsError := rule.DecodeOptionsInto[banTsCommentRawOptions]()(raw)
+	if decodeOptionsError != nil {
+		return DefaultBanTsCommentOptions(), decodeOptionsError
 	}
 
-	wire, _ := decoded.(banTsCommentRawOptions)
 	options := DefaultBanTsCommentOptions()
 
 	for _, directive := range []struct {
@@ -461,20 +421,20 @@ func DecodeBanTsCommentOptions(raw []byte) (any, error) {
 		raw     json.RawMessage
 		setting *BanTsCommentSetting
 	}{
-		{"ts-expect-error", wire.TsExpectError, &options.TsExpectError},
-		{"ts-ignore", wire.TsIgnore, &options.TsIgnore},
-		{"ts-nocheck", wire.TsNoCheck, &options.TsNoCheck},
-		{"ts-check", wire.TsCheck, &options.TsCheck},
+		{"ts-expect-error", decoded.TsExpectError, &options.TsExpectError},
+		{"ts-ignore", decoded.TsIgnore, &options.TsIgnore},
+		{"ts-nocheck", decoded.TsNoCheck, &options.TsNoCheck},
+		{"ts-check", decoded.TsCheck, &options.TsCheck},
 	} {
-		setting, err := settingOrDefaultBanTsComment(directive.raw, *directive.setting)
-		if err != nil {
-			return DefaultBanTsCommentOptions(), fmt.Errorf("%s: %w", directive.key, err)
+		setting, settingOrDefaultBanTsCommentError := settingOrDefaultBanTsComment(directive.raw, *directive.setting)
+		if settingOrDefaultBanTsCommentError != nil {
+			return DefaultBanTsCommentOptions(), fmt.Errorf("%s: %w", directive.key, settingOrDefaultBanTsCommentError)
 		}
 		*directive.setting = setting
 	}
 
-	if wire.MinimumDescriptionLength != nil {
-		options.MinimumDescriptionLength = *wire.MinimumDescriptionLength
+	if decoded.MinimumDescriptionLength != nil {
+		options.MinimumDescriptionLength = *decoded.MinimumDescriptionLength
 	}
 
 	return options, nil
@@ -502,7 +462,10 @@ func settingOrDefaultBanTsComment(raw json.RawMessage, fallback BanTsCommentSett
 		if asString == "allow-with-description" {
 			return BanTsCommentSetting{Kind: BanTsCommentRequireDescription}, nil
 		}
-		return fallback, fmt.Errorf("expected true, false, \"allow-with-description\" or {\"descriptionFormat\": ...}, got %s", raw)
+		return fallback, fmt.Errorf(
+			"expected true, false, \"allow-with-description\" or {\"descriptionFormat\": ...}, got %s",
+			raw,
+		)
 	}
 
 	var asObject struct {
@@ -510,8 +473,8 @@ func settingOrDefaultBanTsComment(raw json.RawMessage, fallback BanTsCommentSett
 	}
 	// Go whitespace: JSON wire bytes, whose whitespace is space, tab, LF and CR in either set.
 	if trimmed := strings.TrimSpace(string(raw)); strings.HasPrefix(trimmed, "{") {
-		if err := rule.UnmarshalOptions(raw, &asObject); err != nil {
-			return fallback, err
+		if unmarshalOptionsError := rule.UnmarshalOptions(raw, &asObject); unmarshalOptionsError != nil {
+			return fallback, unmarshalOptionsError
 		}
 		// An empty pattern is falsy to upstream's `option.descriptionFormat` test, so it sets nothing,
 		// as an absent or null one does.
@@ -520,7 +483,11 @@ func settingOrDefaultBanTsComment(raw json.RawMessage, fallback BanTsCommentSett
 		}
 		compiled, compileError := esregexp.Compile(*asObject.DescriptionFormat, "")
 		if compileError != nil {
-			return fallback, fmt.Errorf("descriptionFormat %q is not a pattern JavaScript can compile: %w", *asObject.DescriptionFormat, compileError)
+			return fallback, fmt.Errorf(
+				"descriptionFormat %q is not a pattern JavaScript can compile: %w",
+				*asObject.DescriptionFormat,
+				compileError,
+			)
 		}
 		return BanTsCommentSetting{
 			Kind:              BanTsCommentDescriptionFormat,
@@ -528,5 +495,8 @@ func settingOrDefaultBanTsComment(raw json.RawMessage, fallback BanTsCommentSett
 		}, nil
 	}
 
-	return fallback, fmt.Errorf("expected true, false, \"allow-with-description\" or {\"descriptionFormat\": ...}, got %s", raw)
+	return fallback, fmt.Errorf(
+		"expected true, false, \"allow-with-description\" or {\"descriptionFormat\": ...}, got %s",
+		raw,
+	)
 }

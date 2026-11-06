@@ -5,7 +5,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
-var messageMultiStr = rule.Message{
+var messageMultiString = rule.Message{
 	Id: "multilineString",
 	Description: "This string is continued onto the next line with a trailing backslash, which " +
 		"the language accepts and almost no reader expects. Whatever indentation the next line " +
@@ -14,7 +14,7 @@ var messageMultiStr = rule.Message{
 		"parsing. Concatenation or a template literal says the same thing without either hazard.",
 }
 
-// NoMultiStr flags a string literal continued across a line break with a trailing backslash.
+// NoMultiString flags a string literal continued across a line break with a trailing backslash.
 //
 //	valid:   'Line 1 Line 2'
 //	valid:   'Line 1 \n Line 2'      // an escape, so no real line break is in the source
@@ -41,7 +41,7 @@ var messageMultiStr = rule.Message{
 // a Windows break as one match; since this rule only asks whether a break is present at all, that
 // branch makes no difference here and the membership test below says the same thing.
 //
-// # The JSX exemption is real, and it is about the PARENT
+// # The JSX exemption is real, and it is about the parent
 //
 // Upstream declines when `node.parent.type` starts with `JSX`. The shape that reaches it is a
 // string-valued JSX attribute, whose parent is a `JSXAttribute`, and the exemption is why a
@@ -88,21 +88,21 @@ var messageMultiStr = rule.Message{
 // `frozen`. Any repair would have to choose between concatenation and a template and would have to
 // decide what happens to the leading whitespace on the continued line, which is exactly the value
 // the author may or may not have meant to include.
-var NoMultiStr = rule.Rule{
+var NoMultiString = rule.Rule[rule.NoOptions]{
 	Name: "no-multi-str",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindStringLiteral: func(node *ast.Node) {
 				if isPartOfJsxSyntax(node.Parent) {
 					return
 				}
 
-				literalRange := rule.TokenRange(ctx.SourceFile, node)
-				if !containsLineTerminator(ctx.SourceFile.Text()[literalRange.Pos():literalRange.End()]) {
+				literalRange := rule.TokenRange(ruleContext.SourceFile, node)
+				if !containsLineTerminator(ruleContext.SourceFile.Text()[literalRange.Pos():literalRange.End()]) {
 					return
 				}
 
-				ctx.ReportNode(node, messageMultiStr)
+				ruleContext.ReportNode(node, messageMultiString)
 			},
 		}
 	},

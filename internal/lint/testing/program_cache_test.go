@@ -7,14 +7,14 @@ import (
 )
 
 // withProgramCacheCapacity runs the test at a capacity of its own, restoring the package's after.
-func withProgramCacheCapacity(t *testing.T, capacity int) {
-	t.Helper()
+func withProgramCacheCapacity(test *testing.T, capacity int) {
+	test.Helper()
 	programCacheMutex.Lock()
 	previous := programCacheCapacity
 	programCacheCapacity = capacity
 	evictBeyondCapacity()
 	programCacheMutex.Unlock()
-	t.Cleanup(func() {
+	test.Cleanup(func() {
 		programCacheMutex.Lock()
 		programCacheCapacity = previous
 		programCacheMutex.Unlock()
@@ -22,12 +22,12 @@ func withProgramCacheCapacity(t *testing.T, capacity int) {
 }
 
 // cachedFixture builds the index'th of a family of distinct one-file fixtures through the cache.
-func cachedFixture(t *testing.T, index int) string {
-	t.Helper()
+func cachedFixture(test *testing.T, index int) string {
+	test.Helper()
 	files := map[string]string{"bound.ts": fmt.Sprintf("export const planted%d = %d;\n", index, index)}
-	_, directory, err := buildCachedProgram(files, "bound.ts", false)
-	if err != nil {
-		t.Fatalf("building planted fixture %d: %v", index, err)
+	_, directory, buildCachedProgramError := buildCachedProgram(files, "bound.ts", false)
+	if buildCachedProgramError != nil {
+		test.Fatalf("building planted fixture %d: %v", index, buildCachedProgramError)
 	}
 	return directory
 }
@@ -49,14 +49,14 @@ func cachedEntries() (held int, ordered int) {
 //
 // Not parallel: it sets the package-wide cache capacity and counts what the shared cache holds, which
 // another test building fixtures at the same time would change.
-func TestTheProgramCacheHoldsNoMoreThanItsBound(t *testing.T) {
+func TestTheProgramCacheHoldsNoMoreThanItsBound(test *testing.T) {
 	const bound = 4
-	withProgramCacheCapacity(t, bound)
+	withProgramCacheCapacity(test, bound)
 
 	for index := range 3 * bound {
-		cachedFixture(t, index)
+		cachedFixture(test, index)
 		if held, ordered := cachedEntries(); held > bound || held != ordered {
-			t.Fatalf("after %d planted fixtures the cache holds %d (its recency list %d) against a bound of %d",
+			test.Fatalf("after %d planted fixtures the cache holds %d (its recency list %d) against a bound of %d",
 				index+1, held, ordered, bound)
 		}
 	}
@@ -64,20 +64,20 @@ func TestTheProgramCacheHoldsNoMoreThanItsBound(t *testing.T) {
 	// The last bound fixtures are the ones held, so asking for the newest again builds nothing new,
 	// and the first is gone.
 	builds := programCacheBuilds
-	cachedFixture(t, 3*bound-1)
+	cachedFixture(test, 3*bound-1)
 	if programCacheBuilds != builds {
-		t.Fatal("the most recently used fixture was evicted instead of the least")
+		test.Fatal("the most recently used fixture was evicted instead of the least")
 	}
-	cachedFixture(t, 0)
+	cachedFixture(test, 0)
 	if programCacheBuilds != builds+1 {
-		t.Fatal("the least recently used fixture was still held past the bound")
+		test.Fatal("the least recently used fixture was still held past the bound")
 	}
 }
 
 // TestAFixtureHasOneRootWhateverWasBuiltBeforeIt is the guard on #jdkmmhs. A fixture's root is its key
 // alone, so a fixture built first and the same fixture built again after another has evicted it get one
 // root. A root that counted builds made every path a fixture reads, and every message naming one, follow
-// t.Parallel's scheduling, which gave Adamic's traced builds a fresh key on every run for identical bytes.
+// test.Parallel's scheduling, which gave Adamic's traced builds a fresh key on every run for identical bytes.
 //
 // It also covers what sharing that root must not break. A test can still hold the graph the cache evicted,
 // and the rebuild is a second graph at the same root, so the evicted graph must keep reading its own files.
@@ -87,33 +87,39 @@ func TestTheProgramCacheHoldsNoMoreThanItsBound(t *testing.T) {
 // build's root differs from the first's.
 //
 // Not parallel: it sets the package-wide cache capacity to one, which would evict other tests' builds.
-func TestAFixtureHasOneRootWhateverWasBuiltBeforeIt(t *testing.T) {
-	withProgramCacheCapacity(t, 1)
+func TestAFixtureHasOneRootWhateverWasBuiltBeforeIt(test *testing.T) {
+	withProgramCacheCapacity(test, 1)
 
 	files := map[string]string{"bound.ts": "export const planted100 = 100;\n"}
-	firstGraph, first, err := buildCachedProgram(files, "bound.ts", false)
-	if err != nil {
-		t.Fatal(err)
+	firstGraph, first, buildCachedProgramError := buildCachedProgram(files, "bound.ts", false)
+	if buildCachedProgramError != nil {
+		test.Fatal(buildCachedProgramError)
 	}
-	cachedFixture(t, 101)
+	cachedFixture(test, 101)
 	builds := programCacheBuilds
-	secondGraph, second, err := buildCachedProgram(files, "bound.ts", false)
-	if err != nil {
-		t.Fatal(err)
+	secondGraph, second, buildCachedProgramError := buildCachedProgram(files, "bound.ts", false)
+	if buildCachedProgramError != nil {
+		test.Fatal(buildCachedProgramError)
 	}
 
 	// The second ask must be a real build, or the two roots agree because one entry answered both.
 	if programCacheBuilds != builds+1 || secondGraph == firstGraph {
-		t.Fatal("the fixture was not evicted and built again, so this proves nothing about its root")
+		test.Fatal("the fixture was not evicted and built again, so this proves nothing about its root")
 	}
 	if want := memoryFixtureRoot + "/" + programCacheKey(files, "bound.ts", false); first != want || second != want {
-		t.Fatalf("a fixture's root is not its key alone: first build %s, after another fixture %s, want %s", first, second, want)
+		test.Fatalf(
+			"a fixture's root is not its key alone: first build %s, after another fixture %s, want %s",
+			first,
+			second,
+			want,
+		)
 	}
 	held := false
 	for _, sourceFile := range firstGraph.ProjectFiles() {
-		held = held || (sourceFile.FileName().AsString() == first+"/bound.ts" && strings.Contains(sourceFile.Text(), "planted100"))
+		held = held ||
+			(sourceFile.FileName().AsString() == first+"/bound.ts" && strings.Contains(sourceFile.Text(), "planted100"))
 	}
 	if !held {
-		t.Fatalf("the evicted graph no longer holds its own bound.ts under %s", first)
+		test.Fatalf("the evicted graph no longer holds its own bound.ts under %s", first)
 	}
 }

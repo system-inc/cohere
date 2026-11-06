@@ -15,8 +15,8 @@ import (
 // through the shared factory, checks they were all found, and then that the factory is still the
 // zero value. If the scanner ever starts counting or pooling on its factory, this fails, and the
 // sharing has to become one factory per caller.
-func TestCommentRangeFactoryStaysUntouched(t *testing.T) {
-	t.Parallel()
+func TestCommentRangeFactoryStaysUntouched(test *testing.T) {
+	test.Parallel()
 	text := "a /* one */ // two\n/* three */ b;"
 	fileName := tspath.NormalizePath("/repository/source/Thing.ts")
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
@@ -24,16 +24,16 @@ func TestCommentRangeFactoryStaysUntouched(t *testing.T) {
 		PathKey:  tspath.PathKey(fileName),
 	}, text, core.ScriptKindTS)
 	if sourceFile == nil {
-		t.Fatal("could not parse")
+		test.Fatal("could not parse")
 	}
 	var found []string
 	for comment := range GetCommentsInRange(sourceFile, core.NewTextRange(1, len(text))) {
 		found = append(found, text[comment.Pos():comment.End()])
 	}
 	if want := []string{"/* one */", "// two", "/* three */"}; !reflect.DeepEqual(found, want) {
-		t.Fatalf("found %q, want %q", found, want)
+		test.Fatalf("found %q, want %q", found, want)
 	}
 	if !reflect.DeepEqual(commentRangeFactory, ast.NodeFactory{}) {
-		t.Fatal("the scanner wrote to the shared comment range factory, so sharing it across goroutines is a race")
+		test.Fatal("the scanner wrote to the shared comment range factory, so sharing it across goroutines is a race")
 	}
 }

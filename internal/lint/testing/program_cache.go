@@ -18,7 +18,7 @@ import (
 // fast.
 //
 // The memo is bounded, because unbounded it was the largest memory cost in the suite (#7nx3z1n): measured
-// at GOMAXPROCS=3 it peaked at 69 GB in registry, 31 GB in rules/core and 29 GB in rules/typescript, past
+// at `GOMAXPROCS=3` it peaked at 69 GB in registry, 31 GB in rules/core and 29 GB in rules/typescript, past
 // a 7 GB CI runner, which then swapped into the test timeout. Most of it held nothing a later test would
 // ask for. Counted per package, rules/core asked 8,269 times for 6,923 distinct fixtures, and registry
 // 20,046 times for 16,353, so nearly every entry was used once and kept forever.
@@ -28,15 +28,15 @@ import (
 // fixture itself. So every build here, cached or not, takes its lib files from one shared parse
 // (libraryParses, #0rj7wvg), and an entry is only what its fixture adds.
 //
-// Together, measured interleaved against the unbounded memo at GOMAXPROCS=3: every package peaks under
+// Together, measured interleaved against the unbounded memo at `GOMAXPROCS=3`: every package peaks under
 // 1.6 GB and runs no slower, registry 69 GB and 41s to 372 MB and 10s, rules/core 30 GB and 18.6s to
 // 99 MB and 5.7s. The corpus walkers in `high_level_intermediate_representation` were the case a bound
 // alone could not serve: thirty-seven walks of one pinned corpus ask 14,730 times for 1,529 fixtures,
-// but each recurs only after the whole corpus has gone by, which no affordable LRU reaches. Bounded
-// without the shared parse they ran 66s to about 93s; with it, 76.5s to 69.4s at 117 MB against 9.9 GB,
-// because a rebuild now costs the fixture and not its libs.
+// but each recurs only after the whole corpus has gone by, which no affordable least-recently-used cache
+// reaches. Bounded without the shared parse they ran 66s to about 93s; with it, 76.5s to 69.4s at 117 MB
+// against 9.9 GB, because a rebuild now costs the fixture and not its libs.
 //
-// What is deliberately NOT shared is the checker. Upstream owns a checker per worker, keyed by the
+// What is deliberately not shared is the checker. Upstream owns a checker per worker, keyed by the
 // file's position in the program's file list, and it is thread-affine: reaching one from two
 // goroutines produced `fatal error: concurrent map read and map write` inside `core.LinkStore.Get`,
 // which is a runtime fatal rather than a recoverable panic. `checker_concurrency_test.go` records
@@ -49,15 +49,23 @@ import (
 // The error is cached alongside the graph so a fixture that cannot build fails the same way for
 // every caller instead of being rebuilt on each attempt.
 type programCacheEntry struct {
-	once      sync.Once
-	graph     *program.Graph
-	buildErr  error
-	directory string
+	once       sync.Once
+	graph      *program.Graph
+	buildError error
+	directory  string
 
 	// key is the entry's key in programCache, and recency its place in programCacheRecency.
 	key     string
 	recency *list.Element
 }
+
+// defaultProgramCacheCapacity is how many built programs a test binary keeps. Sixteen, chosen by
+// measurement before the shared lib parse (#7nx3z1n), when an entry still held its libs: every rule
+// package and registry peaked under 1 GB at sixteen and ran no slower than unbounded, while rules/nexus,
+// whose fixtures are the largest, reached 2.1 GB at sixty-four, and the corpus walkers ran no faster at
+// 128 than at sixteen. With the shared parse an entry is far smaller, rules/nexus peaking at 151 MB, so
+// sixteen now has room; it was not raised, because no package measured slower at it.
+const defaultProgramCacheCapacity = 16
 
 var (
 	// libraryParses is the bundled lib files, parsed once for every program this test binary builds,
@@ -115,7 +123,11 @@ func programCacheKey(files map[string]string, subjectFileName string, verbatim b
 // filesystem of its own, the shared lib parse covers only bundled paths, and every run-scoped rule
 // cache (the theme, design system, importer, import-cycle and standard-streams caches, and the design
 // system's recordings) is keyed by the program's identity, so two graphs at one root are two keys.
-func buildCachedProgram(files map[string]string, subjectFileName string, verbatim bool) (*program.Graph, string, error) {
+func buildCachedProgram(
+	files map[string]string,
+	subjectFileName string,
+	verbatim bool,
+) (*program.Graph, string, error) {
 	key := programCacheKey(files, subjectFileName, verbatim)
 
 	programCacheMutex.Lock()
@@ -134,19 +146,16 @@ func buildCachedProgram(files map[string]string, subjectFileName string, verbati
 	// Outside the map lock, so one slow build does not stall every other fixture, and `sync.Once`
 	// still guarantees exactly one build per key even when several tests race for the same one.
 	entry.once.Do(func() {
-		entry.graph, entry.directory, entry.buildErr = buildProgramInto(entry.directory, files, subjectFileName, verbatim)
+		entry.graph, entry.directory, entry.buildError = buildProgramInto(
+			entry.directory,
+			files,
+			subjectFileName,
+			verbatim,
+		)
 	})
 
-	return entry.graph, entry.directory, entry.buildErr
+	return entry.graph, entry.directory, entry.buildError
 }
-
-// defaultProgramCacheCapacity is how many built programs a test binary keeps. Sixteen, chosen by
-// measurement before the shared lib parse (#7nx3z1n), when an entry still held its libs: every rule
-// package and registry peaked under 1 GB at sixteen and ran no slower than unbounded, while rules/nexus,
-// whose fixtures are the largest, reached 2.1 GB at sixty-four, and the corpus walkers ran no faster at
-// 128 than at sixteen. With the shared parse an entry is far smaller, rules/nexus peaking at 151 MB, so
-// sixteen now has room; it was not raised, because no package measured slower at it.
-const defaultProgramCacheCapacity = 16
 
 // evictBeyondCapacity drops the least recently used entries until the cache is within its capacity.
 // The caller holds programCacheMutex. An evicted graph lives on in any test still holding it, and is
@@ -154,7 +163,11 @@ const defaultProgramCacheCapacity = 16
 func evictBeyondCapacity() {
 	for len(programCache) > programCacheCapacity {
 		oldest := programCacheRecency.Back()
-		evicted := oldest.Value.(*programCacheEntry)
+		evicted, isEntry := oldest.Value.(*programCacheEntry)
+		if !isEntry {
+			// Invariant: the one push onto programCacheRecency is an entry, so every element holds one
+			panic(fmt.Sprintf("the program cache's recency list holds a %T", oldest.Value))
+		}
 		programCacheRecency.Remove(oldest)
 		delete(programCache, evicted.key)
 	}
@@ -171,7 +184,12 @@ const memoryFixtureRoot = "/cohere-fixture"
 // 16,000 for a registry run, and three costs came with them: the writes, deleting them at exit (3.7s of
 // registry's 7.6s), and the module resolution's stats and opens around them, which went into the test log
 // Go replays on every cached run (about 420,000 lines for registry, 6.5s to say "cached") (#nxgt2ca).
-func buildProgramInto(directoryName string, files map[string]string, subjectFileName string, verbatim bool) (*program.Graph, string, error) {
+func buildProgramInto(
+	directoryName string,
+	files map[string]string,
+	subjectFileName string,
+	verbatim bool,
+) (*program.Graph, string, error) {
 	directory := memoryFixtureRoot + "/" + directoryName
 	contents := make(map[string]string, len(files)+1)
 	for name, text := range files {
@@ -180,20 +198,20 @@ func buildProgramInto(directoryName string, files map[string]string, subjectFile
 		}
 		contents[directory+"/"+filepath.ToSlash(name)] = text
 	}
-	configPath := directory + "/tsconfig.json"
-	contents[configPath] = defaultTsConfig
+	configurationPath := directory + "/tsconfig.json"
+	contents[configurationPath] = defaultTsConfiguration
 
-	graph, err := program.Build(program.Options{
-		ConfigFileName:   configPath,
+	graph, buildError := program.Build(program.Options{
+		ConfigFileName:   configurationPath,
 		CurrentDirectory: directory,
 		LibraryParses:    libraryParses,
-		FileSystem:       program.NewMemoryFS(contents),
+		FileSystem:       program.NewMemoryFileSystem(contents),
 		// One checker rather than several: a fixture is one file, and the parallel path adds
 		// scheduling nondeterminism to a test whose whole value is being deterministic.
 		SingleThreaded: true,
 	})
-	if err != nil {
-		return nil, directory, fmt.Errorf("building the type graph: %w", err)
+	if buildError != nil {
+		return nil, directory, fmt.Errorf("building the type graph: %w", buildError)
 	}
 	return graph, directory, nil
 }

@@ -36,7 +36,7 @@ import (
 // # The `Function` branch, whose asymmetry is upstream's and is not obvious
 //
 // A type that is or extends `Function` is judged by which signatures it has, and construction and
-// calling ask DIFFERENT questions. Upstream's own comment says it does not understand why, and it
+// calling ask different questions. Upstream's own comment says it does not understand why, and it
 // is reproduced rather than tidied:
 //
 //	any construct signature            safe to both call and construct
@@ -55,10 +55,10 @@ import (
 //
 // # The `this` branch, and why no fixture in this package can reach it
 //
-// When `noImplicitThis` is OFF, an unannotated `this` is implicitly `any`, and upstream swaps the
+// When `noImplicitThis` is off, an unannotated `this` is implicitly `any`, and upstream swaps the
 // message for one that says so and suggests turning the compiler option on. That branch is ported
-// below and it is UNREACHABLE THROUGH THIS PACKAGE'S TESTS, because the harness writes its own
-// tsconfig with `strict: true` and no override, and it writes it AFTER the setup hook runs, so
+// below and it is unreachable through this package'S tests, because the harness writes its own
+// tsconfig with `strict: true` and no override, and it writes it after the setup hook runs, so
 // nothing a fixture can do changes the option. Probed rather than assumed, with a control: a rule
 // reading `ctx.Program.Options()` under both `RunTyped` and `RunTypedFilesWithSetup` reports
 // `strict true, noImplicitThis isTrueOrUnknown true` identically, and the hook's write of a
@@ -66,7 +66,7 @@ import (
 //
 // Upstream's entire corpus for this rule runs under `tsconfig.noImplicitThis.json`, so its two
 // `this` cases assert message ids our harness cannot produce. Both were measured on the installed
-// 8.67.0 build under BOTH settings rather than dropped:
+// 8.67.0 build under both settings rather than dropped:
 //
 //	                                      noImplicitThis false     noImplicitThis true (ours)
 //	object literal `this.methodB()`       unsafeCallThis x2        SILENT
@@ -82,7 +82,7 @@ import (
 // Three anchors, all common, and each one asks the checker immediately. That is upstream's shape
 // too, and there is no cheaper pre-test available: whether a callee is `any` is precisely the
 // question, so nothing syntactic can decline first.
-var NoUnsafeCall = rule.Rule{
+var NoUnsafeCall = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/no-unsafe-call",
 
 	// Every finding is a type question about the callee. The checker is required.
@@ -92,41 +92,42 @@ var NoUnsafeCall = rule.Rule{
 	// Compiler options and the default library, through type_checking's builtin and specifier helpers.
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// checkCall is upstream's single body, shared by all three anchors.
 		//
 		// `subject` is the thing being called and `reportOn` is where the finding points. They are
 		// the same node for a call and for a tagged template, and they differ for `new`, where
 		// upstream reports the whole NewExpression while typing its callee.
 		checkCall := func(subject *ast.Node, reportOn *ast.Node, unsafeId string, errorId string) {
-			if ctx.TypeChecker == nil {
+			if ruleContext.TypeChecker == nil {
 				return
 			}
 
-			subjectType := type_checking.GetConstrainedTypeAtLocation(ctx.TypeChecker, subject)
+			subjectType := type_checking.GetConstrainedTypeAtLocation(ruleContext.TypeChecker, subject)
 			if subjectType == nil {
 				return
 			}
 
 			if type_checking.IsTypeAnyType(subjectType) {
+				reportedUnsafeId, reportedErrorId := unsafeId, errorId
 				// The `this` swap, gated on the compiler option. See the doc comment: this arm is
 				// correct and unreachable through this package's fixtures, because the harness
 				// pins the option above the rule.
 				if !type_checking.IsStrictCompilerOptionEnabled(
-					ctx.Program.Options(), ctx.Program.Options().NoImplicitThis) {
-					// A mutation replacing this call with `subject` SURVIVES the whole fixture set,
+					ruleContext.Program.Options(), ruleContext.Program.Options().NoImplicitThis) {
+					// A mutation replacing this call with `subject` survives the whole fixture set,
 					// and it is not a blind spot: the enclosing gate is false under this harness's
 					// tsconfig, so nothing reaches the line at all. Scored both ways to be sure of
 					// the reason rather than assuming it. Mutating this line alone survives;
-					// mutating it TOGETHER with the gate above fails 20 lines, which is the
+					// mutating it together with the gate above fails 20 lines, which is the
 					// control proving the line is load-bearing and only the gate is unreachable.
 					// A single-site sweep structurally cannot see this.
 					thisExpression := type_checking.GetThisExpression(subject)
 					if thisExpression != nil {
-						thisType := type_checking.GetConstrainedTypeAtLocation(ctx.TypeChecker, thisExpression)
+						thisType := type_checking.GetConstrainedTypeAtLocation(ruleContext.TypeChecker, thisExpression)
 						if thisType != nil && type_checking.IsTypeAnyType(thisType) {
-							unsafeId = "unsafeCallThis"
-							errorId = "errorCallThis"
+							reportedUnsafeId = "unsafeCallThis"
+							reportedErrorId = "errorCallThis"
 						}
 					}
 				}
@@ -135,28 +136,33 @@ var NoUnsafeCall = rule.Rule{
 				// intrinsic name does. Getting this backwards renames every unresolved-type finding
 				// into one claiming an `any` the reader never wrote.
 				if type_checking.IsIntrinsicErrorType(subjectType) {
-					ctx.ReportNode(reportOn, unsafeCallMessageFor(errorId, ""))
+					ruleContext.ReportNode(reportOn, unsafeCallMessageFor(reportedErrorId, ""))
 					return
 				}
-				ctx.ReportNode(reportOn, unsafeCallMessageFor(unsafeId, "an `any`"))
+				ruleContext.ReportNode(reportOn, unsafeCallMessageFor(reportedUnsafeId, "an `any`"))
 				return
 			}
 
-			if !type_checking.IsBuiltinSymbolLike(ctx.Program, ctx.TypeChecker, subjectType, "Function") {
+			if !type_checking.IsBuiltinSymbolLike(
+				ruleContext.Program,
+				ruleContext.TypeChecker,
+				subjectType,
+				"Function",
+			) {
 				return
 			}
 
 			// The asymmetry, reproduced from upstream including its own admission that the reason
 			// is unclear. A construct signature makes every use safe; otherwise calling and tagging
 			// want any call signature at all, while constructing wants one that returns something.
-			if len(type_checking.GetConstructSignatures(ctx.TypeChecker, subjectType)) > 0 {
+			if len(type_checking.GetConstructSignatures(ruleContext.TypeChecker, subjectType)) > 0 {
 				return
 			}
 
-			callSignatures := type_checking.GetCallSignatures(ctx.TypeChecker, subjectType)
+			callSignatures := type_checking.GetCallSignatures(ruleContext.TypeChecker, subjectType)
 			if unsafeId == "unsafeNew" {
 				for _, signature := range callSignatures {
-					returnType := checker.Checker_getReturnTypeOfSignature(ctx.TypeChecker, signature)
+					returnType := checker.Checker_getReturnTypeOfSignature(ruleContext.TypeChecker, signature)
 					if returnType != nil && !type_checking.IsIntrinsicVoidType(returnType) {
 						return
 					}
@@ -165,10 +171,10 @@ var NoUnsafeCall = rule.Rule{
 				return
 			}
 
-			// Note the id: the `Function` branch reports the UNSAFE message even for a type the
+			// Note the id: the `Function` branch reports the unsafe message even for a type the
 			// checker resolved perfectly well, because the type is known and the problem is what it
 			// permits. There is no error-type path here at all.
-			ctx.ReportNode(reportOn, unsafeCallMessageFor(unsafeId, "a `Function`"))
+			ruleContext.ReportNode(reportOn, unsafeCallMessageFor(unsafeId, "a `Function`"))
 		}
 
 		return rule.Listeners{
@@ -177,18 +183,18 @@ var NoUnsafeCall = rule.Rule{
 				if call.Expression == nil {
 					return
 				}
-				// A dynamic `import(...)` is a call expression in OUR parser and is not one in
+				// A dynamic `import(...)` is a call expression in our parser and is not one in
 				// estree, which models it as its own ImportExpression, so upstream's
 				// `CallExpression > *.callee` selector never sees it. Left alone here for that
 				// reason rather than by preference.
 				//
 				// The consequence of dropping this is not subtle and is not a difference of taste:
 				// probed, the callee is a bare `KindImportKeyword` whose type is the checker's
-				// ERROR type, so it satisfies the any test AND the error-type test, and every
+				// error type, so it satisfies the any test and the error-type test, and every
 				// dynamic import in the tree would report "Unsafe call of a type that could not be
 				// resolved". Measured on the installed build, `import('./foo')` and
 				// `await import('./nowhere')` are both silent, and upstream's corpus carries the
-				// first as a PASSING case, which is how this was found.
+				// first as a passing case, which is how this was found.
 				if call.Expression.Kind == ast.KindImportKeyword {
 					return
 				}
@@ -236,11 +242,17 @@ func unsafeCallMessageFor(messageId string, typeText string) rule.Message {
 	case "errorNew":
 		return rule.Message{Id: messageId, Description: "Unsafe construction of a type that could not be resolved."}
 	case "errorTemplateTag":
-		return rule.Message{Id: messageId, Description: "Unsafe use of a template tag whose type could not be resolved."}
+		return rule.Message{
+			Id:          messageId,
+			Description: "Unsafe use of a template tag whose type could not be resolved.",
+		}
 	case "unsafeCallThis":
-		return rule.Message{Id: messageId, Description: "Unsafe call of " + typeText + " typed value. `this` is typed as " +
-			typeText + ".\nYou can try to fix this by turning on the `noImplicitThis` compiler option, " +
-			"or adding a `this` parameter to the function."}
+		return rule.Message{
+			Id: messageId,
+			Description: "Unsafe call of " + typeText + " typed value. `this` is typed as " +
+				typeText + ".\nYou can try to fix this by turning on the `noImplicitThis` compiler option, " +
+				"or adding a `this` parameter to the function.",
+		}
 	case "unsafeNew":
 		return rule.Message{Id: messageId, Description: "Unsafe construction of " + typeText + " typed value."}
 	case "unsafeTemplateTag":
@@ -253,8 +265,8 @@ func unsafeCallMessageFor(messageId string, typeText string) rule.Message {
 // skipCalleeParentheses unwraps a parenthesized callee, tag, or construction target.
 //
 // estree has no parenthesized-expression node, so upstream's selectors bind to the inner expression
-// and the parentheses never reach the rule. Our parser does produce one, and both the TYPE and the
-// SPAN would differ without this: the checker answers the same type either way, but the finding
+// and the parentheses never reach the rule. Our parser does produce one, and both the type and the
+// span would differ without this: the checker answers the same type either way, but the finding
 // would underline `(x)` where upstream underlines `x`.
 //
 // Measured on the installed 8.67.0 build rather than reasoned about, because the corpus writes no

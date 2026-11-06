@@ -107,15 +107,15 @@ var messageNoRenderReturnValue = rule.Message{
 // in its body, so it declines every input this rule exists to catch. Its parenthesis-skipping is
 // also a divergence here, since oxc matches `Expression::Identifier` against the object directly
 // and a parenthesized receiver is a different node there.
-var NoRenderReturnValue = rule.Rule{
+var NoRenderReturnValue = rule.Rule[rule.NoOptions]{
 	// No namespace prefix. The config writes `react/no-render-return-value` and the parity guard
 	// strips the namespace on a `/` boundary, so `react-no-render-return-value` would match no
 	// inventory entry, lint no files, and still pass every fixture in this package.
 	Name: "react/no-render-return-value",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
-				callee := reactDOMRenderCallee(node.AsCallExpression().Expression)
+				callee := reactDomRenderCallee(node.AsCallExpression().Expression)
 				if callee == nil {
 					return
 				}
@@ -126,21 +126,46 @@ var NoRenderReturnValue = rule.Rule{
 				}
 
 				if isReturnValueConsumingParent(parent) {
-					ctx.ReportNode(callee, messageNoRenderReturnValue)
+					ruleContext.ReportNode(callee, messageNoRenderReturnValue)
 				}
 
 				// Deliberately not an `else`. Upstream runs both checks unconditionally, so an
 				// input satisfying both reports twice, and that duplicate is measured on oxlint
 				// rather than assumed. See the doc comment above.
 				if isInsideAnArrowExpressionBody(parent) {
-					ctx.ReportNode(callee, messageNoRenderReturnValue)
+					ruleContext.ReportNode(callee, messageNoRenderReturnValue)
 				}
 			},
 		}
 	},
 }
 
-// reactDOMRenderCallee returns the member access when a callee reads `render` off `ReactDOM`, and
+// The one receiver and the one method this rule is about. `React.render` is a deliberate upstream
+// pass; see the doc comment on the rule.
+const (
+	reactDomReceiver = "ReactDOM"
+	renderMethod     = "render"
+)
+
+// reactDomRenderAcceptedKeys is the set of key spellings that can name `render` the way upstream
+// reads one.
+//
+// `Numeric` and `Private` are excluded because no number and no `#name` can render as `render`, so
+// including them would change no answer while overstating what was checked. `Computed` is excluded
+// because there are no brackets in the tree to see through here: `AccessedName` reads an element
+// access's subscript directly, and a bare identifier subscript names whatever the variable holds,
+// which upstream declines too. Measured on oxlint: `ReactDOM[render](...)` is silent.
+//
+// Widening this to `property.Static` survives every fixture, and that survivor is equivalent rather
+// than a blind spot. Distinguishing the two versions needs a key that is numeric, private, or a
+// computed-property-name node whose text is nonetheless `render`, and no such input exists: the
+// first two spellings cannot produce those letters, and `AccessedName` never routes a
+// `KindComputedPropertyName` into `Name` at all, reading a property access's name node and an
+// element access's subscript expression directly. Read out of the accessor's body rather than
+// inferred from the flag's name, since the flag reads as though it should apply here.
+const reactDomRenderAcceptedKeys = property.Named | property.Quoted | property.Templated
+
+// reactDomRenderCallee returns the member access when a callee reads `render` off `ReactDOM`, and
 // nil otherwise.
 //
 // The returned node is the member access rather than a boolean because it is also the report
@@ -161,7 +186,7 @@ var NoRenderReturnValue = rule.Rule{
 // `Node.Text()` panics on a `KindComputedPropertyName`, and this rule anchors on the shape most
 // likely to meet one, so the read goes through the shelf function that guards it rather than
 // through `Name()` directly.
-func reactDOMRenderCallee(callee *ast.Node) *ast.Node {
+func reactDomRenderCallee(callee *ast.Node) *ast.Node {
 	if callee == nil {
 		return nil
 	}
@@ -180,41 +205,16 @@ func reactDOMRenderCallee(callee *ast.Node) *ast.Node {
 	// `member_expr.object()` directly, so `(ReactDOM).render(...)` is a `ParenthesizedExpression`
 	// there and does not match. `react.IsNamespacedMember` skips them, which is one of two reasons
 	// it cannot serve this rule even setting its hardcoded receiver aside.
-	if receiver == nil || receiver.Kind != ast.KindIdentifier || receiver.Text() != reactDOMReceiver {
+	if receiver == nil || receiver.Kind != ast.KindIdentifier || receiver.Text() != reactDomReceiver {
 		return nil
 	}
 
-	name, ok := property.AccessedName(callee, reactDOMRenderAcceptedKeys)
+	name, ok := property.AccessedName(callee, reactDomRenderAcceptedKeys)
 	if !ok || name != renderMethod {
 		return nil
 	}
 	return callee
 }
-
-// The one receiver and the one method this rule is about. `React.render` is a deliberate upstream
-// pass; see the doc comment on the rule.
-const (
-	reactDOMReceiver = "ReactDOM"
-	renderMethod     = "render"
-)
-
-// reactDOMRenderAcceptedKeys is the set of key spellings that can name `render` the way upstream
-// reads one.
-//
-// `Numeric` and `Private` are excluded because no number and no `#name` can render as `render`, so
-// including them would change no answer while overstating what was checked. `Computed` is excluded
-// because there are no brackets in the tree to see through here: `AccessedName` reads an element
-// access's subscript directly, and a bare identifier subscript names whatever the variable holds,
-// which upstream declines too. Measured on oxlint: `ReactDOM[render](...)` is silent.
-//
-// Widening this to `property.Static` survives every fixture, and that survivor is equivalent rather
-// than a blind spot. Distinguishing the two versions needs a key that is numeric, private, or a
-// computed-property-name node whose text is nonetheless `render`, and no such input exists: the
-// first two spellings cannot produce those letters, and `AccessedName` never routes a
-// `KindComputedPropertyName` into `Name` at all, reading a property access's name node and an
-// element access's subscript expression directly. Read out of the accessor's body rather than
-// inferred from the flag's name, since the flag reads as though it should apply here.
-const reactDOMRenderAcceptedKeys = property.Named | property.Quoted | property.Templated
 
 // isReturnValueConsumingParent reports whether the call's parent is one of the five node kinds
 // upstream matches.

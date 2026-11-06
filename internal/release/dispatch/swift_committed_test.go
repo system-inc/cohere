@@ -1,6 +1,7 @@
 package dispatch
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -17,118 +18,159 @@ const testToolchain = "swiftlang-6.4.0.34.1"
 
 // Not parallel: newSwiftFixture swaps the package variable buildSwiftProduct for its own stand-in, and two
 // fixtures at once would build with each other's.
-func TestTheCommittedSwiftEngineIsBuiltFromTheCommitNotTheWorkingTree(t *testing.T) {
-	fixture := newSwiftFixture(t)
+func TestTheCommittedSwiftEngineIsBuiltFromTheCommitNotTheWorkingTree(test *testing.T) {
+	fixture := newSwiftFixture(test)
 
-	first, built, err := resolveCommittedSwiftEngine(fixture.paths, fixture.head(t), testToolchain, 2)
-	if err != nil {
-		t.Fatalf("building from the first commit: %v", err)
+	first, built, resolveCommittedSwiftEngineError := resolveCommittedSwiftEngine(
+		fixture.paths,
+		fixture.head(test),
+		testToolchain,
+		2,
+	)
+	if resolveCommittedSwiftEngineError != nil {
+		test.Fatalf("building from the first commit: %v", resolveCommittedSwiftEngineError)
 	}
 	if !built {
-		t.Fatal("an empty cache reported no build")
+		test.Fatal("an empty cache reported no build")
 	}
-	if output := run(t, first); output != "rule=one\n" {
-		t.Fatalf("the first engine printed %q", output)
+	if output := run(test, first); output != "rule=one\n" {
+		test.Fatalf("the first engine printed %q", output)
 	}
 
 	// An uncommitted edit in the checkout is not part of the commit, so the same engine serves.
-	writeFile(t, fixture.rule(), "one, uncommitted\n")
-	again, built, err := resolveCommittedSwiftEngine(fixture.paths, fixture.head(t), testToolchain, 2)
-	if err != nil {
-		t.Fatalf("resolving with an uncommitted edit on disk: %v", err)
+	writeFile(test, fixture.rule(), "one, uncommitted\n")
+	again, built, resolveCommittedSwiftEngineError := resolveCommittedSwiftEngine(
+		fixture.paths,
+		fixture.head(test),
+		testToolchain,
+		2,
+	)
+	if resolveCommittedSwiftEngineError != nil {
+		test.Fatalf("resolving with an uncommitted edit on disk: %v", resolveCommittedSwiftEngineError)
 	}
 	if built || again != first {
-		t.Fatalf("an uncommitted Swift edit changed the engine (built=%v)", built)
+		test.Fatalf("an uncommitted Swift edit changed the engine (built=%v)", built)
 	}
 
 	// A committed edit builds a new engine, and the build reads the commit even while the checkout
 	// holds a different uncommitted edit. A cache hit above could not show that; this fresh build can.
-	writeFile(t, fixture.rule(), "two\n")
-	fixture.commit(t, "swift")
-	writeFile(t, fixture.rule(), "two, uncommitted\n")
-	second, built, err := resolveCommittedSwiftEngine(fixture.paths, fixture.head(t), testToolchain, 2)
-	if err != nil {
-		t.Fatalf("building from the second commit: %v", err)
+	writeFile(test, fixture.rule(), "two\n")
+	fixture.commit(test, "swift")
+	writeFile(test, fixture.rule(), "two, uncommitted\n")
+	second, built, resolveCommittedSwiftEngineError := resolveCommittedSwiftEngine(
+		fixture.paths,
+		fixture.head(test),
+		testToolchain,
+		2,
+	)
+	if resolveCommittedSwiftEngineError != nil {
+		test.Fatalf("building from the second commit: %v", resolveCommittedSwiftEngineError)
 	}
 	if !built || second == first {
-		t.Fatalf("a committed Swift edit did not build a new engine (built=%v)", built)
+		test.Fatalf("a committed Swift edit did not build a new engine (built=%v)", built)
 	}
-	if output := run(t, second); output != "rule=two\n" {
-		t.Fatalf("the engine for the second commit printed %q, so it was not built from that commit", output)
+	if output := run(test, second); output != "rule=two\n" {
+		test.Fatalf("the engine for the second commit printed %q, so it was not built from that commit", output)
 	}
 
 	// A commit that changes only the engine's tests changes nothing compiled in, so it reuses the engine.
-	writeFile(t, filepath.Join(fixture.repository, "swift", "Tests", "RuleTests.swift"), "// a new test\n")
-	fixture.commit(t, "swift/Tests")
-	third, built, err := resolveCommittedSwiftEngine(fixture.paths, fixture.head(t), testToolchain, 2)
-	if err != nil {
-		t.Fatalf("resolving a tests-only commit: %v", err)
+	writeFile(test, filepath.Join(fixture.repository, "swift", "Tests", "RuleTests.swift"), "// a new test\n")
+	fixture.commit(test, "swift/Tests")
+	third, built, resolveCommittedSwiftEngineError := resolveCommittedSwiftEngine(
+		fixture.paths,
+		fixture.head(test),
+		testToolchain,
+		2,
+	)
+	if resolveCommittedSwiftEngineError != nil {
+		test.Fatalf("resolving a tests-only commit: %v", resolveCommittedSwiftEngineError)
 	}
 	if built || third != second {
-		t.Fatalf("a tests-only commit rebuilt the engine (built=%v)", built)
+		test.Fatalf("a tests-only commit rebuilt the engine (built=%v)", built)
 	}
 
-	if status := gitCommand(t, fixture.paths.SwiftSourceWorktree(), "status", "--porcelain"); status != "" {
-		t.Fatalf("the worktree was left dirty:\n%s", status)
+	if status := gitCommand(test, fixture.paths.SwiftSourceWorktree(), "status", "--porcelain"); status != "" {
+		test.Fatalf("the worktree was left dirty:\n%s", status)
 	}
 }
 
 // Not parallel: newSwiftFixture swaps the package variable buildSwiftProduct for its own stand-in, and two
 // fixtures at once would build with each other's.
-func TestAnOlderCommitGetsItsOwnEngineWhileTheCheckoutIsCleanAtANewerOne(t *testing.T) {
+func TestAnOlderCommitGetsItsOwnEngineWhileTheCheckoutIsCleanAtANewerOne(test *testing.T) {
 	// The case no provenance check can catch. A member commits, the checkout is clean at the new
 	// commit, and a gate still running the cohere built from the previous one asks for its engine. A
 	// working-tree build would hand it the newer engine, and that engine would honestly report a clean
 	// tree. Only building the commit asked for gets this right.
-	fixture := newSwiftFixture(t)
-	older := fixture.head(t)
-	writeFile(t, fixture.rule(), "two\n")
-	fixture.commit(t, "swift")
+	fixture := newSwiftFixture(test)
+	older := fixture.head(test)
+	writeFile(test, fixture.rule(), "two\n")
+	fixture.commit(test, "swift")
 
-	engine, _, err := resolveCommittedSwiftEngine(fixture.paths, older, testToolchain, 2)
-	if err != nil {
-		t.Fatalf("building the older commit's engine: %v", err)
+	engine, _, resolveCommittedSwiftEngineError := resolveCommittedSwiftEngine(fixture.paths, older, testToolchain, 2)
+	if resolveCommittedSwiftEngineError != nil {
+		test.Fatalf("building the older commit's engine: %v", resolveCommittedSwiftEngineError)
 	}
-	if output := run(t, engine); output != "rule=one\n" {
-		t.Fatalf("the older commit got an engine printing %q, which is the newer commit's", output)
+	if output := run(test, engine); output != "rule=one\n" {
+		test.Fatalf("the older commit got an engine printing %q, which is the newer commit's", output)
 	}
 }
 
 // Not parallel: newSwiftFixture swaps the package variable buildSwiftProduct for its own stand-in, and two
 // fixtures at once would build with each other's.
-func TestADirtySwiftWorktreeIsRefusedNotForced(t *testing.T) {
-	fixture := newSwiftFixture(t)
-	if _, _, err := resolveCommittedSwiftEngine(fixture.paths, fixture.head(t), testToolchain, 2); err != nil {
-		t.Fatalf("first build: %v", err)
+func TestADirtySwiftWorktreeIsRefusedNotForced(test *testing.T) {
+	fixture := newSwiftFixture(test)
+	if _, _, resolveCommittedSwiftEngineError := resolveCommittedSwiftEngine(
+		fixture.paths,
+		fixture.head(test),
+		testToolchain,
+		2,
+	); resolveCommittedSwiftEngineError != nil {
+		test.Fatalf("first build: %v", resolveCommittedSwiftEngineError)
 	}
 
 	stray := filepath.Join(fixture.paths.SwiftSourceWorktree(), "swift", "Sources", "Stray.swift")
-	writeFile(t, stray, "// someone wrote here\n")
-	writeFile(t, fixture.rule(), "two\n")
-	fixture.commit(t, "swift")
+	writeFile(test, stray, "// someone wrote here\n")
+	writeFile(test, fixture.rule(), "two\n")
+	fixture.commit(test, "swift")
 
-	_, _, err := resolveCommittedSwiftEngine(fixture.paths, fixture.head(t), testToolchain, 2)
-	if err == nil || !strings.Contains(err.Error(), "changes nobody should have made") {
-		t.Fatalf("a dirty worktree was moved or built from: %v", err)
+	_, _, resolveCommittedSwiftEngineError := resolveCommittedSwiftEngine(
+		fixture.paths,
+		fixture.head(test),
+		testToolchain,
+		2,
+	)
+	if resolveCommittedSwiftEngineError == nil ||
+		!strings.Contains(resolveCommittedSwiftEngineError.Error(), "changes nobody should have made") {
+		test.Fatalf("a dirty worktree was moved or built from: %v", resolveCommittedSwiftEngineError)
 	}
-	if _, statErr := os.Stat(stray); statErr != nil {
-		t.Fatalf("the refusal discarded the stray file, which forcing would do: %v", statErr)
+	if _, statError := os.Stat(stray); statError != nil {
+		test.Fatalf("the refusal discarded the stray file, which forcing would do: %v", statError)
 	}
 }
 
 // Not parallel: newSwiftFixture swaps the package variable buildSwiftProduct for its own stand-in, and two
 // fixtures at once would build with each other's.
-func TestACommittedSwiftEngineReportingAModifiedTreeIsNotCached(t *testing.T) {
-	fixture := newSwiftFixture(t)
+func TestACommittedSwiftEngineReportingAModifiedTreeIsNotCached(test *testing.T) {
+	fixture := newSwiftFixture(test)
 	fixture.reportModified = true
 
-	_, _, err := resolveCommittedSwiftEngine(fixture.paths, fixture.head(t), testToolchain, 2)
-	if err == nil || !strings.Contains(err.Error(), "modified source tree") {
-		t.Fatalf("an engine reporting a modified tree was accepted: %v", err)
+	_, _, resolveCommittedSwiftEngineError := resolveCommittedSwiftEngine(
+		fixture.paths,
+		fixture.head(test),
+		testToolchain,
+		2,
+	)
+	if resolveCommittedSwiftEngineError == nil ||
+		!strings.Contains(resolveCommittedSwiftEngineError.Error(), "modified source tree") {
+		test.Fatalf("an engine reporting a modified tree was accepted: %v", resolveCommittedSwiftEngineError)
 	}
-	entries, _ := os.ReadDir(fixture.paths.BinaryDirectory())
+	// A cache that was never created holds nothing a refused engine could have left.
+	entries, readDirectoryError := os.ReadDir(fixture.paths.BinaryDirectory())
+	if readDirectoryError != nil && !errors.Is(readDirectoryError, os.ErrNotExist) {
+		test.Fatalf("reading the binary cache: %v", readDirectoryError)
+	}
 	for _, entry := range entries {
-		t.Errorf("a refused engine left %s in the cache", entry.Name())
+		test.Errorf("a refused engine left %s in the cache", entry.Name())
 	}
 }
 
@@ -139,18 +181,18 @@ type swiftFixture struct {
 	reportModified bool
 }
 
-func newSwiftFixture(t *testing.T) *swiftFixture {
-	t.Helper()
-	root := t.TempDir()
+func newSwiftFixture(test *testing.T) *swiftFixture {
+	test.Helper()
+	root := test.TempDir()
 	repository := filepath.Join(root, "cohere")
-	writeFile(t, filepath.Join(repository, "swift", "Package.swift"), "// swift-tools-version:6.0\n")
-	writeFile(t, filepath.Join(repository, "swift", "Package.resolved"), "{}\n")
-	writeFile(t, filepath.Join(repository, "swift", "Sources", "Rule.swift"), "one\n")
-	writeFile(t, filepath.Join(repository, "swift", "Tests", "RuleTests.swift"), "// tests\n")
-	writeFile(t, filepath.Join(repository, ".gitignore"), "/.cache/\n")
-	gitCommand(t, repository, "init", "-q")
-	gitCommand(t, repository, "add", "swift", ".gitignore")
-	gitCommand(t, repository, "commit", "-q", "-m", "first")
+	writeFile(test, filepath.Join(repository, "swift", "Package.swift"), "// swift-tools-version:6.0\n")
+	writeFile(test, filepath.Join(repository, "swift", "Package.resolved"), "{}\n")
+	writeFile(test, filepath.Join(repository, "swift", "Sources", "Rule.swift"), "one\n")
+	writeFile(test, filepath.Join(repository, "swift", "Tests", "RuleTests.swift"), "// tests\n")
+	writeFile(test, filepath.Join(repository, ".gitignore"), "/.cache/\n")
+	gitCommand(test, repository, "init", "-q")
+	gitCommand(test, repository, "add", "swift", ".gitignore")
+	gitCommand(test, repository, "commit", "-q", "-m", "first")
 
 	fixture := &swiftFixture{
 		repository: repository,
@@ -159,27 +201,30 @@ func newSwiftFixture(t *testing.T) *swiftFixture {
 
 	original := buildSwiftProduct
 	buildSwiftProduct = fixture.fakeBuild
-	t.Cleanup(func() { buildSwiftProduct = original })
+	test.Cleanup(func() { buildSwiftProduct = original })
 	return fixture
 }
 
 // fakeBuild writes an engine that prints the rule it was built from and the provenance the real
 // manifest would compute for packageDirectory.
 func (fixture *swiftFixture) fakeBuild(packageDirectory string, scratchDirectory string, binaryPath string) error {
-	rule, err := os.ReadFile(filepath.Join(packageDirectory, "Sources", "Rule.swift"))
-	if err != nil {
-		return err
+	rule, readError := os.ReadFile(filepath.Join(packageDirectory, "Sources", "Rule.swift"))
+	if readError != nil {
+		return readError
 	}
-	status, err := gitOutput(packageDirectory, "status", "--porcelain")
-	if err != nil {
-		return err
+	status, gitOutputError := gitOutput(packageDirectory, "status", "--porcelain")
+	if gitOutputError != nil {
+		return gitOutputError
 	}
 	modified := strings.TrimSpace(status) != "" || fixture.reportModified
 
-	script := fmt.Sprintf("#!/bin/sh\nif [ \"$3\" = \"--version\" ]; then\n  echo '{\"kind\":\"provenance\",\"sourceTreeModified\":%t}'\n  exit 0\nfi\necho 'rule=%s'\n",
-		modified, strings.TrimSpace(string(rule)))
-	if err := os.MkdirAll(filepath.Dir(binaryPath), 0o755); err != nil {
-		return err
+	script := fmt.Sprintf(
+		"#!/bin/sh\nif [ \"$3\" = \"--version\" ]; then\n  echo '{\"kind\":\"provenance\",\"sourceTreeModified\":%t}'\n  exit 0\nfi\necho 'rule=%s'\n",
+		modified,
+		strings.TrimSpace(string(rule)),
+	)
+	if createDirectoryError := os.MkdirAll(filepath.Dir(binaryPath), 0o755); createDirectoryError != nil {
+		return createDirectoryError
 	}
 	return os.WriteFile(binaryPath, []byte(script), 0o755)
 }
@@ -188,13 +233,13 @@ func (fixture *swiftFixture) rule() string {
 	return filepath.Join(fixture.repository, "swift", "Sources", "Rule.swift")
 }
 
-func (fixture *swiftFixture) head(t *testing.T) string {
-	t.Helper()
-	return strings.TrimSpace(gitCommand(t, fixture.repository, "rev-parse", "HEAD"))
+func (fixture *swiftFixture) head(test *testing.T) string {
+	test.Helper()
+	return strings.TrimSpace(gitCommand(test, fixture.repository, "rev-parse", "HEAD"))
 }
 
-func (fixture *swiftFixture) commit(t *testing.T, paths ...string) {
-	t.Helper()
-	gitCommand(t, fixture.repository, append([]string{"add"}, paths...)...)
-	gitCommand(t, fixture.repository, "commit", "-q", "-m", "next")
+func (fixture *swiftFixture) commit(test *testing.T, paths ...string) {
+	test.Helper()
+	gitCommand(test, fixture.repository, append([]string{"add"}, paths...)...)
+	gitCommand(test, fixture.repository, "commit", "-q", "-m", "next")
 }

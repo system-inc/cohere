@@ -1,4 +1,4 @@
-// Command notices writes NOTICE and THIRD_PARTY_NOTICES.md at the module root, from cohere's build graph
+// Command notices writes `NOTICE` and THIRD_PARTY_NOTICES.md at the module root, from cohere's build graph
 // and the curated upstreams in internal/release/notices.
 //
 //	go run ./internal/release/tools/notices
@@ -18,9 +18,10 @@ import (
 )
 
 func main() {
-	files, err := notices.Generate(".")
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "notices: %v\n", err)
+	files, generateError := notices.Generate(".")
+	if generateError != nil {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
+		fmt.Fprintf(os.Stderr, "notices: %v\n", generateError)
 		os.Exit(1)
 	}
 	names := make([]string, 0, len(files))
@@ -29,10 +30,12 @@ func main() {
 	}
 	slices.Sort(names)
 	for _, name := range names {
-		if err := os.WriteFile(filepath.Join(".", name), files[name], 0o644); err != nil {
-			fmt.Fprintf(os.Stderr, "notices: writing %s: %v\n", name, err)
+		if writeError := os.WriteFile(filepath.Join(".", name), files[name], 0o644); writeError != nil {
+			// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
+			fmt.Fprintf(os.Stderr, "notices: writing %s: %v\n", name, writeError)
 			os.Exit(1)
 		}
+		// Ignored: the file is written, which is the command's whole work, and this line only reports it.
 		fmt.Printf("wrote %s (%d bytes)\n", name, len(files[name]))
 	}
 }

@@ -20,8 +20,14 @@ const verifyDecoratorPrefix = "Verify"
 
 // The rule's messages, whose wording lives in `policy/messages/correctness-require-verify-optional-parity.json`.
 var (
-	correctnessRequireVerifyOptionalParityOptionalButTypeNotText      = policy.MessageOf("base/correctness-require-verify-optional-parity", "optionalButTypeNot")
-	correctnessRequireVerifyOptionalParityTypeOptionalButNoVerifyText = policy.MessageOf("base/correctness-require-verify-optional-parity", "typeOptionalButNoVerify")
+	correctnessRequireVerifyOptionalParityOptionalButTypeNotText = policy.MessageOf(
+		"base/correctness-require-verify-optional-parity",
+		"optionalButTypeNot",
+	)
+	correctnessRequireVerifyOptionalParityTypeOptionalButNoVerifyText = policy.MessageOf(
+		"base/correctness-require-verify-optional-parity",
+		"typeOptionalButNoVerify",
+	)
 )
 
 // CorrectnessRequireVerifyOptionalParity requires the optional sentinel and the declared type to agree.
@@ -37,7 +43,7 @@ var (
 // `@VerifyIsOptional()` present with a non-nullable type is always a finding: the validator would
 // accept a missing value the compiler forbids.
 //
-// The reverse only fires when the property carries at least one OTHER `Verify*` decorator. A
+// The reverse only fires when the property carries at least one other `Verify*` decorator. A
 // nullable property with `@VerifyIsOptional()` alone is not a problem, and a nullable property with
 // no validation at all is outside the rule's scope entirely. That "at least one other" test is what
 // separates the two, and it is easy to drop into "has any Verify decorator", which would report
@@ -55,7 +61,7 @@ var (
 // they erase the distinction rather than answering it. A type of `any` beside a validator that
 // forbids missing values is not a claim anyone checked.
 //
-// Measured before this rule was written: a union carrying `undefined` does NOT answer
+// Measured before this rule was written: a union carrying `undefined` does not answer
 // `IsTypeFlagSet` directly. `string | undefined` reports the union's own flags, and only its member
 // carries `Undefined`. So the recursion inside `IsNullableType` is load-bearing rather than
 // defensive, and a port testing the top-level flags alone goes silent on every optional property.
@@ -64,19 +70,19 @@ var (
 //
 // The original ships none and none is possible: the repair is either to widen the type or to add
 // the sentinel, and which one is right depends on what the field means.
-var CorrectnessRequireVerifyOptionalParity = rule.Rule{
+var CorrectnessRequireVerifyOptionalParity = rule.Rule[rule.NoOptions]{
 	Name: "base/correctness-require-verify-optional-parity",
 
-	// The judgment is about the resolved TYPE of the property, not about its annotation. A property
+	// The judgment is about the resolved type of the property, not about its annotation. A property
 	// written `name?: string` and one written `name: string | undefined` are the same question, and
 	// only the checker collapses them.
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindPropertyDeclaration: func(node *ast.Node) {
-				checkVerifyOptionalParity(ctx, node, node.Name())
+				checkVerifyOptionalParity(ruleContext, node, node.Name())
 			},
 			// A constructor parameter property, `constructor(@VerifyIsString() public name: string)`.
 			// The original hooks `TSParameterProperty`, which our parser does not have: it gives a
@@ -86,15 +92,15 @@ var CorrectnessRequireVerifyOptionalParity = rule.Rule{
 				if !isBaseParameterProperty(node) {
 					return
 				}
-				checkVerifyOptionalParity(ctx, node, node.Name())
+				checkVerifyOptionalParity(ruleContext, node, node.Name())
 			},
 		}
 	},
 }
 
 // checkVerifyOptionalParity judges one property or parameter property.
-func checkVerifyOptionalParity(ctx rule.Context, node *ast.Node, key *ast.Node) {
-	if ctx.TypeChecker == nil || key == nil || !ast.IsIdentifier(key) {
+func checkVerifyOptionalParity(ruleContext rule.Context, node *ast.Node, key *ast.Node) {
+	if ruleContext.TypeChecker == nil || key == nil || !ast.IsIdentifier(key) {
 		return
 	}
 
@@ -117,25 +123,27 @@ func checkVerifyOptionalParity(ctx rule.Context, node *ast.Node, key *ast.Node) 
 		return
 	}
 
-	keyType := ctx.TypeChecker.GetTypeAtLocation(key)
+	keyType := ruleContext.TypeChecker.GetTypeAtLocation(key)
 	typeIsNullable := decorators.IsNullableType(keyType)
-	typeText := ctx.TypeChecker.TypeToString(keyType)
+	typeText := ruleContext.TypeChecker.TypeToString(keyType)
 
 	if hasOptionalSentinel && !typeIsNullable {
-		ctx.ReportNode(key, rule.Message{
-			Id:          correctnessRequireVerifyOptionalParityOptionalButTypeNotText.Id,
-			Description: correctnessRequireVerifyOptionalParityOptionalButTypeNotText.Render(map[string]string{"typeText": typeText}),
+		ruleContext.ReportNode(key, rule.Message{
+			Id: correctnessRequireVerifyOptionalParityOptionalButTypeNotText.Id,
+			Description: correctnessRequireVerifyOptionalParityOptionalButTypeNotText.Render(
+				map[string]string{"typeText": typeText},
+			),
 		})
 		return
 	}
 
-	// The `hasOtherVerifyRule` test is the original's, and it is SUBSUMED here rather than
+	// The `hasOtherVerifyRule` test is the original's, and it is subsumed here rather than
 	// load-bearing. The line above already requires `!hasOptionalSentinel`, and the guard further up
 	// already returned for a property with no Verify decorator at all, so by this point "not the
 	// sentinel" and "some other rule" are the same fact.
 	//
 	// Measured rather than argued, because a single-site mutation cannot see it: dropping this test
-	// SURVIVES, dropping the unvalidated-property guard SURVIVES, and dropping both together fails
+	// survives, dropping the unvalidated-property guard survives, and dropping both together fails
 	// 8 lines. Kept because it states the original's condition at the line a reader compares
 	// against, and because deleting it would make the two implementations differ textually for no
 	// behavioural gain.
@@ -144,9 +152,11 @@ func checkVerifyOptionalParity(ctx rule.Context, node *ast.Node, key *ast.Node) 
 	// reporting. That was wrong -- such a property cannot reach this line at all -- and the sweep
 	// is what caught it.
 	if typeIsNullable && !hasOptionalSentinel && hasOtherVerifyRule {
-		ctx.ReportNode(key, rule.Message{
-			Id:          correctnessRequireVerifyOptionalParityTypeOptionalButNoVerifyText.Id,
-			Description: correctnessRequireVerifyOptionalParityTypeOptionalButNoVerifyText.Render(map[string]string{"typeText": typeText}),
+		ruleContext.ReportNode(key, rule.Message{
+			Id: correctnessRequireVerifyOptionalParityTypeOptionalButNoVerifyText.Id,
+			Description: correctnessRequireVerifyOptionalParityTypeOptionalButNoVerifyText.Render(
+				map[string]string{"typeText": typeText},
+			),
 		})
 	}
 }

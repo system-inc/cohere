@@ -18,7 +18,7 @@ func asTheRelationHarnessWroteIt(text string) string {
 	return strings.TrimSpace(text) + "\n"
 }
 
-// TestRelationMustBeOptional measures this port against the SOURCE rule, shape by shape.
+// TestRelationMustBeOptional measures this port against the source rule, shape by shape.
 //
 // These are our rules, so there is no corpus to import and inventing fixtures would encode the
 // same belief as the port. Every row below was measured by driving the real rule from
@@ -27,8 +27,8 @@ func asTheRelationHarnessWroteIt(text string) string {
 // Three rows taught this port something it would not have written from the source alone: `| null`
 // reports where `| null | undefined` does not, `void` reports while `any` and `unknown` do not,
 // and a decorator written without parentheses does not match at all.
-func TestRelationMustBeOptional(t *testing.T) {
-	t.Parallel()
+func TestRelationMustBeOptional(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name         string
@@ -55,20 +55,24 @@ func TestRelationMustBeOptional(t *testing.T) {
 			wantMessages: []string{},
 		},
 		{
-			name:         "bare-required",
-			why:          "the ordinary violation",
-			sourceText:   "declare const OrmManyToOne: any;\ndeclare const OrmOneToMany: any;\ndeclare const OrmOneToOne: any;\ndeclare const OrmColumn: any;\ndeclare class Profile {}\nclass E { @OrmManyToOne() profile: Profile; }\n",
-			wantIds:      []string{"mustBeOptional"},
-			wantSpans:    []string{"profile"},
-			wantMessages: []string{"Relation property must be optional ('profile?: Profile') because TypeORM relations are undefined when not loaded"},
+			name:       "bare-required",
+			why:        "the ordinary violation",
+			sourceText: "declare const OrmManyToOne: any;\ndeclare const OrmOneToMany: any;\ndeclare const OrmOneToOne: any;\ndeclare const OrmColumn: any;\ndeclare class Profile {}\nclass E { @OrmManyToOne() profile: Profile; }\n",
+			wantIds:    []string{"mustBeOptional"},
+			wantSpans:  []string{"profile"},
+			wantMessages: []string{
+				"Relation property must be optional ('profile?: Profile') because TypeORM relations are undefined when not loaded",
+			},
 		},
 		{
-			name:         "null-only",
-			why:          "`| null` ALONE, which reports. The runtime gives undefined for an unloaded relation and never null, so this type is still lying about its load state; the source library keeps a narrower mask than its nullable sibling for exactly this",
-			sourceText:   "declare const OrmManyToOne: any;\ndeclare const OrmOneToMany: any;\ndeclare const OrmOneToOne: any;\ndeclare const OrmColumn: any;\ndeclare class Profile {}\nclass E { @OrmManyToOne() profile: Profile | null; }\n",
-			wantIds:      []string{"mustBeOptional"},
-			wantSpans:    []string{"profile"},
-			wantMessages: []string{"Relation property must be optional ('profile?: Profile | null') because TypeORM relations are undefined when not loaded"},
+			name:       "null-only",
+			why:        "`| null` ALONE, which reports. The runtime gives undefined for an unloaded relation and never null, so this type is still lying about its load state; the source library keeps a narrower mask than its nullable sibling for exactly this",
+			sourceText: "declare const OrmManyToOne: any;\ndeclare const OrmOneToMany: any;\ndeclare const OrmOneToOne: any;\ndeclare const OrmColumn: any;\ndeclare class Profile {}\nclass E { @OrmManyToOne() profile: Profile | null; }\n",
+			wantIds:    []string{"mustBeOptional"},
+			wantSpans:  []string{"profile"},
+			wantMessages: []string{
+				"Relation property must be optional ('profile?: Profile | null') because TypeORM relations are undefined when not loaded",
+			},
 		},
 		{
 			name:         "null-and-undefined",
@@ -95,20 +99,24 @@ func TestRelationMustBeOptional(t *testing.T) {
 			wantMessages: []string{},
 		},
 		{
-			name:         "one-to-many",
-			why:          "the second relation decorator in the set",
-			sourceText:   "declare const OrmManyToOne: any;\ndeclare const OrmOneToMany: any;\ndeclare const OrmOneToOne: any;\ndeclare const OrmColumn: any;\ndeclare class Profile {}\nclass E { @OrmOneToMany() items: Profile[]; }\n",
-			wantIds:      []string{"mustBeOptional"},
-			wantSpans:    []string{"items"},
-			wantMessages: []string{"Relation property must be optional ('items?: Profile[]') because TypeORM relations are undefined when not loaded"},
+			name:       "one-to-many",
+			why:        "the second relation decorator in the set",
+			sourceText: "declare const OrmManyToOne: any;\ndeclare const OrmOneToMany: any;\ndeclare const OrmOneToOne: any;\ndeclare const OrmColumn: any;\ndeclare class Profile {}\nclass E { @OrmOneToMany() items: Profile[]; }\n",
+			wantIds:    []string{"mustBeOptional"},
+			wantSpans:  []string{"items"},
+			wantMessages: []string{
+				"Relation property must be optional ('items?: Profile[]') because TypeORM relations are undefined when not loaded",
+			},
 		},
 		{
-			name:         "one-to-one",
-			why:          "the third",
-			sourceText:   "declare const OrmManyToOne: any;\ndeclare const OrmOneToMany: any;\ndeclare const OrmOneToOne: any;\ndeclare const OrmColumn: any;\ndeclare class Profile {}\nclass E { @OrmOneToOne() other: Profile; }\n",
-			wantIds:      []string{"mustBeOptional"},
-			wantSpans:    []string{"other"},
-			wantMessages: []string{"Relation property must be optional ('other?: Profile') because TypeORM relations are undefined when not loaded"},
+			name:       "one-to-one",
+			why:        "the third",
+			sourceText: "declare const OrmManyToOne: any;\ndeclare const OrmOneToMany: any;\ndeclare const OrmOneToOne: any;\ndeclare const OrmColumn: any;\ndeclare class Profile {}\nclass E { @OrmOneToOne() other: Profile; }\n",
+			wantIds:    []string{"mustBeOptional"},
+			wantSpans:  []string{"other"},
+			wantMessages: []string{
+				"Relation property must be optional ('other?: Profile') because TypeORM relations are undefined when not loaded",
+			},
 		},
 		{
 			name:         "non-relation-decorator",
@@ -143,38 +151,44 @@ func TestRelationMustBeOptional(t *testing.T) {
 			wantMessages: []string{},
 		},
 		{
-			name:         "declare-modifier",
-			why:          "a declare modifier, which changes nothing here; this rule is about the type, not the field emit",
-			sourceText:   "declare const OrmManyToOne: any;\ndeclare const OrmOneToMany: any;\ndeclare const OrmOneToOne: any;\ndeclare const OrmColumn: any;\ndeclare class Profile {}\nclass E { @OrmManyToOne() declare profile: Profile; }\n",
-			wantIds:      []string{"mustBeOptional"},
-			wantSpans:    []string{"profile"},
-			wantMessages: []string{"Relation property must be optional ('profile?: Profile') because TypeORM relations are undefined when not loaded"},
+			name:       "declare-modifier",
+			why:        "a declare modifier, which changes nothing here; this rule is about the type, not the field emit",
+			sourceText: "declare const OrmManyToOne: any;\ndeclare const OrmOneToMany: any;\ndeclare const OrmOneToOne: any;\ndeclare const OrmColumn: any;\ndeclare class Profile {}\nclass E { @OrmManyToOne() declare profile: Profile; }\n",
+			wantIds:    []string{"mustBeOptional"},
+			wantSpans:  []string{"profile"},
+			wantMessages: []string{
+				"Relation property must be optional ('profile?: Profile') because TypeORM relations are undefined when not loaded",
+			},
 		},
 		{
-			name:         "void-type",
-			why:          "void, which REPORTS. It reads as a surprise and is deliberate: void is absent from the narrow mask even though the nullable sibling includes it",
-			sourceText:   "declare const OrmManyToOne: any;\ndeclare const OrmOneToMany: any;\ndeclare const OrmOneToOne: any;\ndeclare const OrmColumn: any;\ndeclare class Profile {}\nclass E { @OrmManyToOne() profile: void; }\n",
-			wantIds:      []string{"mustBeOptional"},
-			wantSpans:    []string{"profile"},
-			wantMessages: []string{"Relation property must be optional ('profile?: void') because TypeORM relations are undefined when not loaded"},
+			name:       "void-type",
+			why:        "void, which REPORTS. It reads as a surprise and is deliberate: void is absent from the narrow mask even though the nullable sibling includes it",
+			sourceText: "declare const OrmManyToOne: any;\ndeclare const OrmOneToMany: any;\ndeclare const OrmOneToOne: any;\ndeclare const OrmColumn: any;\ndeclare class Profile {}\nclass E { @OrmManyToOne() profile: void; }\n",
+			wantIds:    []string{"mustBeOptional"},
+			wantSpans:  []string{"profile"},
+			wantMessages: []string{
+				"Relation property must be optional ('profile?: void') because TypeORM relations are undefined when not loaded",
+			},
 		},
 		{
-			name:         "two-relation-decorators",
-			why:          "a column decorator alongside a relation one, where the relation still decides",
-			sourceText:   "declare const OrmManyToOne: any;\ndeclare const OrmOneToMany: any;\ndeclare const OrmOneToOne: any;\ndeclare const OrmColumn: any;\ndeclare class Profile {}\nclass E { @OrmColumn() @OrmManyToOne() profile: Profile; }\n",
-			wantIds:      []string{"mustBeOptional"},
-			wantSpans:    []string{"profile"},
-			wantMessages: []string{"Relation property must be optional ('profile?: Profile') because TypeORM relations are undefined when not loaded"},
+			name:       "two-relation-decorators",
+			why:        "a column decorator alongside a relation one, where the relation still decides",
+			sourceText: "declare const OrmManyToOne: any;\ndeclare const OrmOneToMany: any;\ndeclare const OrmOneToOne: any;\ndeclare const OrmColumn: any;\ndeclare class Profile {}\nclass E { @OrmColumn() @OrmManyToOne() profile: Profile; }\n",
+			wantIds:    []string{"mustBeOptional"},
+			wantSpans:  []string{"profile"},
+			wantMessages: []string{
+				"Relation property must be optional ('profile?: Profile') because TypeORM relations are undefined when not loaded",
+			},
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, CorrectnessRequireOptionalRelation,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, CorrectnessRequireOptionalRelation,
 				correctnessRequireOptionalRelationFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
-				t.Fatalf("wanted %d findings, got %d, on the case that covers: %s",
+				test.Fatalf("wanted %d findings, got %d, on the case that covers: %s",
 					len(testCase.wantSpans), len(result.Diagnostics), testCase.why)
 			}
 			written := asTheRelationHarnessWroteIt(testCase.sourceText)
@@ -182,11 +196,11 @@ func TestRelationMustBeOptional(t *testing.T) {
 				reported := result.Diagnostics[findingIndex]
 				gotSpan := written[reported.Range.Pos():reported.Range.End()]
 				if gotSpan != wantSpan {
-					t.Errorf("finding %d points at %q, wanted %q (%s)",
+					test.Errorf("finding %d points at %q, wanted %q (%s)",
 						findingIndex, gotSpan, wantSpan, testCase.why)
 				}
 				if reported.Message.Description != testCase.wantMessages[findingIndex] {
-					t.Errorf("finding %d reads %q, wanted %q", findingIndex,
+					test.Errorf("finding %d reads %q, wanted %q", findingIndex,
 						reported.Message.Description, testCase.wantMessages[findingIndex])
 				}
 			}
@@ -199,13 +213,13 @@ func TestRelationMustBeOptional(t *testing.T) {
 // The listener starts with a nil check, and the shim answers nil from a type query on a nil checker
 // rather than panicking, so a rule missing that guard goes silent rather than crashing. A vacuous
 // green is the more dangerous of the two because nothing announces it.
-func TestRelationMustBeOptionalRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestRelationMustBeOptionalRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	const sourceText = "declare const OrmManyToOne: any;\ndeclare class Profile {}\n" +
 		"class E { @OrmManyToOne() profile: Profile; }\n"
-	rule_testing.ExpectClean(t, rule_testing.Run(t, CorrectnessRequireOptionalRelation,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, CorrectnessRequireOptionalRelation,
 		correctnessRequireOptionalRelationFile, sourceText))
-	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, CorrectnessRequireOptionalRelation,
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, CorrectnessRequireOptionalRelation,
 		correctnessRequireOptionalRelationFile, sourceText), "mustBeOptional")
 }

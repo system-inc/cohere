@@ -17,7 +17,7 @@ import (
 // than dropping: one file can produce many findings under one id, and the quoted before-and-after is
 // the only thing that separates them or tells a reader what the repair will write.
 //
-// The `type` slot is NOT the element type's source text in general. Upstream renders the text only
+// The `type` slot is not the element type's source text in general. Upstream renders the text only
 // when the element is a simple type and renders the single letter `T` otherwise, so
 // `Array<string | number>` reads as `Array<T>`. That collapse is reproduced; see `arrayTypeMessageType`.
 
@@ -119,7 +119,7 @@ func messageArrayTypeGenericSimple(className string, elementType string, readonl
 // `readonly` falls back to `default` rather than to a fixed value. That fallback is why the decoder
 // is hand-rolled; see `DecodeArrayTypeOptions`.
 //
-// # The element type in the message is COLLAPSED to `T` unless it is simple
+// # The element type in the message is collapsed to `T` unless it is simple
 //
 // `getMessageType` renders the element's source text for a simple type and the bare letter `T`
 // otherwise, so `Array<string | number>` reports as `Array<T>`. Measured on the installed build over
@@ -130,11 +130,11 @@ func messageArrayTypeGenericSimple(className string, elementType string, readonl
 //
 // A keyword, an identifier, a qualified name and a suffix array are simple. A type reference is
 // simple when its name is `Array` and it either takes no arguments or takes one simple argument, and
-// otherwise only when it takes NO arguments at all. So `Array<string>` is simple, `Foo<string>` is
+// otherwise only when it takes no arguments at all. So `Array<string>` is simple, `Foo<string>` is
 // not, and `Foo` alone is. Reproduced exactly, including that `Array` gets a recursion no other name
 // gets.
 //
-// # Our parser keeps parentheses and TSESTree does not, which changes the ELEMENT and the REPAIR
+// # Our parser keeps parentheses and TSESTree does not, which changes the element and the repair
 //
 // TSESTree has no parenthesized-type node: `(string)[]`'s element type is the string keyword itself,
 // with the parentheses surviving only as tokens between the ranges. typescript-go produces a real
@@ -144,7 +144,7 @@ func messageArrayTypeGenericSimple(className string, elementType string, readonl
 // gone, which is what skipping reproduces.
 //
 // The skip is therefore fidelity to a parser difference rather than a convenience, and it runs in
-// only one direction: the element is skipped for the JUDGMENT and for the START of the fix range,
+// only one direction: the element is skipped for the judgment and for the start of the fix range,
 // while `isParenthesized` on the type-reference side asks the opposite question and is answered by
 // looking for a real parenthesized node.
 //
@@ -160,10 +160,10 @@ func messageArrayTypeGenericSimple(className string, elementType string, readonl
 //	function f() { type Array<Y> = Y; const y: Array<2>; }       clean, function scope
 //	type G<Array> = { a: Array<string> };                        clean, type parameter
 //	{ type Array<Y> = Y; } const y: Array<2>;                    REPORTS, a sibling block does not shadow
-var ArrayType = rule.Rule{
+var ArrayType = rule.Rule[ArrayTypeOptions]{
 	Name: "@typescript-eslint/array-type",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[ArrayTypeOptions]) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -172,24 +172,39 @@ var ArrayType = rule.Rule{
 		// errors on empty input and the config layer turns that into nil. A bare type assertion
 		// would then yield an empty `default`, which matches no arm below, and the rule would
 		// register on every file and report nothing while every fixture stayed green.
-		parsed, decoded := rule.OptionsAs[ArrayTypeOptions](options)
+		parsed, decoded := options.Read()
 		if !decoded {
 			parsed = DefaultArrayTypeOptions()
 		}
 
 		return rule.Listeners{
 			ast.KindArrayType: func(node *ast.Node) {
-				reportArrayTypeSuffixForm(ctx, node, parsed)
+				reportArrayTypeSuffixForm(ruleContext, node, parsed)
 			},
 			ast.KindTypeReference: func(node *ast.Node) {
-				reportArrayTypeGenericForm(ctx, node, parsed)
+				reportArrayTypeGenericForm(ruleContext, node, parsed)
 			},
 		}
 	},
 }
 
+// ArrayTypeSetting is one of upstream's three spellings for one axis.
+type ArrayTypeSetting string
+
+const (
+	// ArrayTypeArray is `"array"`: always write the suffix form.
+	ArrayTypeArray ArrayTypeSetting = "array"
+
+	// ArrayTypeArraySimple is `"array-simple"`: write the suffix form for a simple element type and
+	// the generic form for anything else, so the brackets never trail a complicated type.
+	ArrayTypeArraySimple ArrayTypeSetting = "array-simple"
+
+	// ArrayTypeGeneric is `"generic"`: always write `Array<T>`.
+	ArrayTypeGeneric ArrayTypeSetting = "generic"
+)
+
 // reportArrayTypeSuffixForm is upstream's `TSArrayType` visitor.
-func reportArrayTypeSuffixForm(ctx rule.Context, node *ast.Node, options ArrayTypeOptions) {
+func reportArrayTypeSuffixForm(ruleContext rule.Context, node *ast.Node, options ArrayTypeOptions) {
 	elementType := node.AsArrayTypeNode().ElementType
 	if elementType == nil {
 		return
@@ -217,26 +232,26 @@ func reportArrayTypeSuffixForm(ctx rule.Context, node *ast.Node, options ArrayTy
 		readonlyPrefix = "readonly "
 	}
 
-	messageType := arrayTypeMessageType(ctx, elementType)
+	messageType := arrayTypeMessageType(ruleContext, elementType)
 	message := messageArrayTypeGeneric(className, messageType, readonlyPrefix)
 	if current == ArrayTypeArraySimple {
 		message = messageArrayTypeGenericSimple(className, messageType, readonlyPrefix)
 	}
 
-	// The element for the fix is the element AFTER skipping parentheses, matching TSESTree, whose
+	// The element for the fix is the element after skipping parentheses, matching TSESTree, whose
 	// element type is already the inner node. Without the skip the repair would open its generic
 	// inside the parentheses and leave the closing one stranded.
 	inner := arrayTypeSkipParentheses(elementType)
-	errorRange := rule.TokenRange(ctx.SourceFile, errorNode)
-	innerRange := rule.TokenRange(ctx.SourceFile, inner)
+	errorRange := rule.TokenRange(ruleContext.SourceFile, errorNode)
+	innerRange := rule.TokenRange(ruleContext.SourceFile, inner)
 
-	ctx.ReportRangeWithFixes(errorRange, message,
+	ruleContext.ReportRangeWithFixes(errorRange, message,
 		rule.ReplaceRange(shimcore.NewTextRange(errorRange.Pos(), innerRange.Pos()), className+"<"),
 		rule.ReplaceRange(shimcore.NewTextRange(innerRange.End(), errorRange.End()), ">"))
 }
 
 // reportArrayTypeGenericForm is upstream's `TSTypeReference` visitor.
-func reportArrayTypeGenericForm(ctx rule.Context, node *ast.Node, options ArrayTypeOptions) {
+func reportArrayTypeGenericForm(ruleContext rule.Context, node *ast.Node, options ArrayTypeOptions) {
 	reference := node.AsTypeReferenceNode()
 	typeName := reference.TypeName
 	if typeName == nil || typeName.Kind != ast.KindIdentifier {
@@ -321,7 +336,7 @@ func reportArrayTypeGenericForm(ctx rule.Context, node *ast.Node, options ArrayT
 	}
 
 	argument := typeArguments[0]
-	messageType := arrayTypeMessageType(ctx, argument)
+	messageType := arrayTypeMessageType(ruleContext, argument)
 
 	var message rule.Message
 	switch {
@@ -342,7 +357,7 @@ func reportArrayTypeGenericForm(ctx rule.Context, node *ast.Node, options ArrayT
 	// type, an intersection, a type operator, an infer, a constructor type, a conditional, or a
 	// reference literally named `ReadonlyArray`.
 	//
-	// `parentParens` covers the OUTER context: a readonly rewrite sitting directly inside another
+	// `parentParens` covers the outer context: a readonly rewrite sitting directly inside another
 	// suffix array needs its own parentheses, because `readonly string[][]` would read as an array
 	// of readonly arrays only by accident. It is skipped when the element is already parenthesized.
 	typeParens := arrayTypeNeedsParentheses(argument)
@@ -368,10 +383,10 @@ func reportArrayTypeGenericForm(ctx rule.Context, node *ast.Node, options ArrayT
 		end += ")"
 	}
 
-	nodeRange := rule.TokenRange(ctx.SourceFile, node)
-	argumentRange := rule.TokenRange(ctx.SourceFile, argument)
+	nodeRange := rule.TokenRange(ruleContext.SourceFile, node)
+	argumentRange := rule.TokenRange(ruleContext.SourceFile, argument)
 
-	ctx.ReportRangeWithFixes(nodeRange, message,
+	ruleContext.ReportRangeWithFixes(nodeRange, message,
 		rule.ReplaceRange(shimcore.NewTextRange(nodeRange.Pos(), argumentRange.Pos()), start),
 		rule.ReplaceRange(shimcore.NewTextRange(argumentRange.End(), nodeRange.End()), end))
 }
@@ -396,7 +411,7 @@ func arrayTypeReadonlyOperatorParentOf(node *ast.Node) *ast.Node {
 // arrayTypeSkipParentheses is `ast.SkipTypeParentheses` with a nil guard.
 //
 // The shim helper dereferences its argument on the first loop test, so a nil reaches it as a panic
-// rather than as a nil result. The walk recovers per FILE rather than per rule, so one such panic
+// rather than as a nil result. The walk recovers per file rather than per rule, so one such panic
 // would cost every rule that file. The callers here all read a field that the parser can leave nil
 // on malformed input, which is exactly the shape error recovery produces.
 func arrayTypeSkipParentheses(node *ast.Node) *ast.Node {
@@ -413,12 +428,12 @@ func arrayTypeSkipParentheses(node *ast.Node) *ast.Node {
 // node because it has none, so without the skip every `(string)` would answer false where upstream
 // answers true.
 func arrayTypeIsSimple(node *ast.Node) bool {
-	node = arrayTypeSkipParentheses(node)
-	if node == nil {
+	unparenthesized := arrayTypeSkipParentheses(node)
+	if unparenthesized == nil {
 		return false
 	}
 
-	switch node.Kind {
+	switch unparenthesized.Kind {
 	case ast.KindIdentifier,
 		ast.KindAnyKeyword,
 		ast.KindBooleanKeyword,
@@ -438,7 +453,7 @@ func arrayTypeIsSimple(node *ast.Node) bool {
 		return true
 
 	case ast.KindTypeReference:
-		reference := node.AsTypeReferenceNode()
+		reference := unparenthesized.AsTypeReferenceNode()
 		typeName := reference.TypeName
 		if typeName == nil {
 			return false
@@ -481,14 +496,14 @@ func arrayTypeIsSimple(node *ast.Node) bool {
 // parenthesized union arrives here as a real node and would answer false, where TSESTree hands
 // upstream the union itself.
 func arrayTypeNeedsParentheses(node *ast.Node) bool {
-	node = arrayTypeSkipParentheses(node)
-	if node == nil {
+	unparenthesized := arrayTypeSkipParentheses(node)
+	if unparenthesized == nil {
 		return false
 	}
 
-	switch node.Kind {
+	switch unparenthesized.Kind {
 	case ast.KindTypeReference:
-		typeName := node.AsTypeReferenceNode().TypeName
+		typeName := unparenthesized.AsTypeReferenceNode().TypeName
 		if typeName == nil {
 			return false
 		}
@@ -504,7 +519,7 @@ func arrayTypeNeedsParentheses(node *ast.Node) bool {
 		return true
 
 	case ast.KindIdentifier:
-		return node.Text() == "ReadonlyArray"
+		return unparenthesized.Text() == "ReadonlyArray"
 	}
 
 	return false
@@ -513,17 +528,17 @@ func arrayTypeNeedsParentheses(node *ast.Node) bool {
 // arrayTypeIsDirectElementOfAnArray is upstream's `node.parent.type === TSArrayType &&
 // !isParenthesized(node.parent.elementType, sourceCode)`.
 //
-// Upstream asks its `isParenthesized` helper, which looks for surrounding parenthesis TOKENS,
+// Upstream asks its `isParenthesized` helper, which looks for surrounding parenthesis tokens,
 // because its tree has no node for them. Ours does, so the same question is "is the parent array's
 // element a parenthesized node".
 //
-// # The parenthesis test is SUBSUMED here, and the subsumption is a parser difference
+// # The parenthesis test is subsumed here, and the subsumption is a parser difference
 //
 // A mutant forcing the last line to true survives, and the reason is not a fixture gap. TSESTree
-// flattens parentheses, so `(ReadonlyArray<string>)[]` gives upstream a type reference whose PARENT
-// IS the array, and its token-level `isParenthesized` is the only thing that can tell the two apart.
+// flattens parentheses, so `(ReadonlyArray<string>)[]` gives upstream a type reference whose parent
+// is the array, and its token-level `isParenthesized` is the only thing that can tell the two apart.
 // Our parser keeps a `KindParenthesizedType` in between, so the same input gives this function a
-// node whose parent is that parenthesized node, and the FIRST guard declines before the last line
+// node whose parent is that parenthesized node, and the first guard declines before the last line
 // runs. Traced by running the mutant: the fixes it proposes for both parenthesized shapes are byte
 // for byte the ones the unmutated rule proposes.
 //
@@ -552,52 +567,15 @@ func arrayTypeIsDirectElementOfAnArray(node *ast.Node) bool {
 // letter `T`, so `Array<string | number>` reports as `Array<T>`. The collapse is invisible to a
 // message-id assertion, which is why every reporting fixture asserts the rendered text.
 //
-// The text is taken from the node AS WRITTEN, parentheses included, because upstream slices the
+// The text is taken from the node as written, parentheses included, because upstream slices the
 // range of the node TSESTree gave it and that range covers whatever the source held. Only the
-// simplicity JUDGMENT skips parentheses.
-func arrayTypeMessageType(ctx rule.Context, node *ast.Node) string {
+// simplicity judgment skips parentheses.
+func arrayTypeMessageType(ruleContext rule.Context, node *ast.Node) string {
 	if !arrayTypeIsSimple(node) {
 		return "T"
 	}
-	trimmed := rule.TokenRange(ctx.SourceFile, node)
-	return ctx.SourceFile.Text()[trimmed.Pos():trimmed.End()]
-}
-
-// ArrayTypeSetting is one of upstream's three spellings for one axis.
-type ArrayTypeSetting string
-
-const (
-	// ArrayTypeArray is `"array"`: always write the suffix form.
-	ArrayTypeArray ArrayTypeSetting = "array"
-
-	// ArrayTypeArraySimple is `"array-simple"`: write the suffix form for a simple element type and
-	// the generic form for anything else, so the brackets never trail a complicated type.
-	ArrayTypeArraySimple ArrayTypeSetting = "array-simple"
-
-	// ArrayTypeGeneric is `"generic"`: always write `Array<T>`.
-	ArrayTypeGeneric ArrayTypeSetting = "generic"
-)
-
-// ArrayTypeOptions is the rule's configuration.
-//
-// Upstream's schema is one object with `default` and `readonly`, both drawn from the three
-// spellings above, `additionalProperties: false`, and `defaultOptions` of `{ default: 'array' }`.
-type ArrayTypeOptions struct {
-	// Default governs a mutable array and is upstream's `default`, whose own default is `array`.
-	Default ArrayTypeSetting
-
-	// Readonly governs `readonly T[]`, `ReadonlyArray<T>` and `Readonly<T[]>`. Upstream's `readonly`
-	// is optional and falls back to `default` rather than to a fixed value, so this field holds the
-	// resolved answer and the decoder does the falling back.
-	Readonly ArrayTypeSetting
-}
-
-// settingFor picks the axis a node is judged on.
-func (o ArrayTypeOptions) settingFor(isReadonly bool) ArrayTypeSetting {
-	if isReadonly {
-		return o.Readonly
-	}
-	return o.Default
+	trimmed := rule.TokenRange(ruleContext.SourceFile, node)
+	return ruleContext.SourceFile.Text()[trimmed.Pos():trimmed.End()]
 }
 
 // DefaultArrayTypeOptions is upstream's configured-nothing behavior.
@@ -627,41 +605,50 @@ type arrayTypeRawOptions struct {
 // Hand-written rather than `rule.DecodeOptionsInto` for two reasons, and the second is the one that
 // would have shipped silently. Neither default is a Go zero value, so a generic decode over a
 // non-pointer struct yields two empty strings that match no arm and silence the rule. And `readonly`
-// falls back to the RESOLVED `default` rather than to a constant, which is a dependency between two
+// falls back to the resolved `default` rather than to a constant, which is a dependency between two
 // fields that no struct tag can express.
 //
 // Empty input and `null` are upstream's defaults. A spelling outside upstream's three is refused,
 // naming the key and the value. This used to fall back to the default for an unknown spelling, which
 // ran a setting nobody wrote and loaded clean doing it; upstream's schema is an enum and refuses it at
 // load, and the config layer now refuses a decoder's error by rule name (#rfbha44).
-func DecodeArrayTypeOptions(raw []byte) (any, error) {
+func DecodeArrayTypeOptions(raw []byte) (ArrayTypeOptions, error) {
 	// Go whitespace: raw JSON bytes of a rule's options, whose whitespace is the same in both sets.
 	trimmed := strings.TrimSpace(string(raw))
 	if trimmed == "" || trimmed == "null" {
 		return DefaultArrayTypeOptions(), nil
 	}
-	decoded, err := rule.DecodeOptionsInto[arrayTypeRawOptions]()(raw)
-	if err != nil {
-		return DefaultArrayTypeOptions(), fmt.Errorf("expected an object of default and readonly, got %s: %w", trimmed, err)
+	decoded, decodeOptionsError := rule.DecodeOptionsInto[arrayTypeRawOptions]()(raw)
+	if decodeOptionsError != nil {
+		return DefaultArrayTypeOptions(), fmt.Errorf(
+			"expected an object of default and readonly, got %s: %w",
+			trimmed,
+			decodeOptionsError,
+		)
 	}
 
-	wire, _ := decoded.(arrayTypeRawOptions)
 	options := DefaultArrayTypeOptions()
 
-	if wire.Default != nil {
-		setting, recognized := arrayTypeSettingFromWire(*wire.Default)
+	if decoded.Default != nil {
+		setting, recognized := arrayTypeSettingFromWire(*decoded.Default)
 		if !recognized {
-			return DefaultArrayTypeOptions(), fmt.Errorf(`default %q is not "array", "array-simple" or "generic"`, *wire.Default)
+			return DefaultArrayTypeOptions(), fmt.Errorf(
+				`default %q is not "array", "array-simple" or "generic"`,
+				*decoded.Default,
+			)
 		}
 		options.Default = setting
 	}
 
 	// Resolved after `default`, and from it, which is upstream's `options.readonly ?? defaultOption`.
 	options.Readonly = options.Default
-	if wire.Readonly != nil {
-		setting, recognized := arrayTypeSettingFromWire(*wire.Readonly)
+	if decoded.Readonly != nil {
+		setting, recognized := arrayTypeSettingFromWire(*decoded.Readonly)
 		if !recognized {
-			return DefaultArrayTypeOptions(), fmt.Errorf(`readonly %q is not "array", "array-simple" or "generic"`, *wire.Readonly)
+			return DefaultArrayTypeOptions(), fmt.Errorf(
+				`readonly %q is not "array", "array-simple" or "generic"`,
+				*decoded.Readonly,
+			)
 		}
 		options.Readonly = setting
 	}
@@ -682,13 +669,13 @@ func arrayTypeSettingFromWire(value string) (ArrayTypeSetting, bool) {
 	return "", false
 }
 
-// arrayTypeNameIsShadowed answers upstream's scope walk: does any ENCLOSING scope bind this name?
+// arrayTypeNameIsShadowed answers upstream's scope walk: does any enclosing scope bind this name?
 //
 // Upstream writes `for (let scope = getScope(node); scope.upper; scope = scope.upper) if
 // (scope.set.has(name)) return;`, which is eslint-scope. There is no scope shelf in this tree, so
 // the walk is over the syntax tree instead, and the two have to agree about three things: which
 // nodes open a scope, which declarations bind a name into the scope they sit in, and that only
-// ENCLOSING scopes count.
+// enclosing scopes count.
 //
 // All three were measured against the installed build rather than derived, because a scope model
 // written from intuition is exactly the thing that looks right and is wrong in one arm.
@@ -696,7 +683,7 @@ func arrayTypeSettingFromWire(value string) (ArrayTypeSetting, bool) {
 // # Every declaration form that binds, measured
 //
 // Upstream's `scope.set` holds variables regardless of whether the name is a type or a value, so a
-// value declaration shadows a type position. All of these are CLEAN upstream with `default: array`,
+// value declaration shadows a type position. All of these are clean upstream with `default: array`,
 // against a control of `const y: Array<2>;` which reports:
 //
 //	type Array<Y> = Y;                 declare const Array: unknown;
@@ -706,9 +693,9 @@ func arrayTypeSettingFromWire(value string) (ArrayTypeSetting, bool) {
 //	namespace Array { ... }            function f(Array: unknown) { ... }
 //	type G<Array> = ...                a type parameter
 //
-// # And what does NOT bind
+// # And what does not bind
 //
-// A member is not a variable, so none of these shadow and all three REPORT:
+// A member is not a variable, so none of these shadow and all three report:
 //
 //	class C { Array: unknown; m(): Array<2> { ... } }
 //	interface I { Array: unknown; m(): Array<2>; }
@@ -722,11 +709,11 @@ func arrayTypeSettingFromWire(value string) (ArrayTypeSetting, bool) {
 // The second is why this collects a scope's declarations rather than only those written above the
 // reference: the binding is lexical, not positional.
 func arrayTypeNameIsShadowed(node *ast.Node, name string) bool {
-	// Upstream's loop condition is `scope.upper`, so the OUTERMOST scope is never examined. That
-	// outermost scope is eslint-scope's GLOBAL scope, where the real `Array` lives, and skipping it
+	// Upstream's loop condition is `scope.upper`, so the outermost scope is never examined. That
+	// outermost scope is eslint-scope's global scope, where the real `Array` lives, and skipping it
 	// is what keeps the rule from declining every input.
 	//
-	// The file is NOT that scope. A file gets its own module or script scope whose `upper` is the
+	// The file is not that scope. A file gets its own module or script scope whose `upper` is the
 	// global one, so the file's own declarations are examined and a file-scope `type Array<Y>` does
 	// shadow. An earlier draft stopped at the source file on the reasoning that it was the
 	// outermost scope, and eleven measured rows disagreed: every file-scope shadowing form reported
@@ -781,14 +768,14 @@ func arrayTypeOpensAScope(node *ast.Node) bool {
 //
 // Four sources, matching what eslint-scope puts in a scope's variable set: a type parameter, a
 // function or catch parameter, a variable or declaration statement in the scope's body, and a
-// binding pattern inside any of those. A class or interface MEMBER is deliberately absent, measured
+// binding pattern inside any of those. A class or interface member is deliberately absent, measured
 // on the installed build and pinned by three fixtures.
 //
 // # Every list accessor here is kind-gated, and that is a crash guard
 //
 // `Parameters()` reaches `FunctionLikeData()` and dereferences it, and `TypeParameterList()` panics
 // on its default arm, so both take the run down on a node that has no such list. The walk recovers
-// per FILE rather than per rule, so one panic costs every rule that file. This was not theoretical:
+// per file rather than per rule, so one panic costs every rule that file. This was not theoretical:
 // an ungated `Parameters()` panicked on upstream's own sixty-third passing case the first time the
 // corpus ran, which is a shape a hand-written fixture would not have reached.
 func arrayTypeScopeBinds(scope *ast.Node, name string) bool {
@@ -870,7 +857,7 @@ func arrayTypeDeclarationListBinds(node *ast.Node, name string) bool {
 
 // arrayTypeStatementsOf returns the statements a scope holds, or nothing for a scope that has none.
 //
-// `Statements()` PANICS on a kind with no statement list, so the kinds are named rather than tried.
+// `Statements()` panics on a kind with no statement list, so the kinds are named rather than tried.
 // A function's own body is a Block, which the walk reaches on its own as an ancestor, so nothing is
 // read for a function-like node here: it opens a scope for its parameters and type parameters, which
 // the switch above already read.
@@ -942,7 +929,7 @@ func arrayTypeImportBinds(statement *ast.Node, name string) bool {
 
 // arrayTypeDeclarationNameIs answers whether a declaration binds this name.
 //
-// A plain declaration answers on its own identifier. A DESTRUCTURING pattern binds names that are
+// A plain declaration answers on its own identifier. A destructuring pattern binds names that are
 // not the declaration's name, so the pattern is walked. That arm is here because it was measured
 // rather than reasoned about: an earlier draft returned false for a pattern with the gap recorded at
 // this line, and the installed build disagrees.

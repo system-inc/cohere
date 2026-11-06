@@ -9,21 +9,21 @@ import (
 )
 
 // firstStatement parses source text and returns its first statement.
-func firstStatement(t *testing.T, sourceText string) *ast.Node {
-	t.Helper()
+func firstStatement(test *testing.T, sourceText string) *ast.Node {
+	test.Helper()
 	file := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/repository/source/Thing.tsx",
 		PathKey:  "/repository/source/Thing.tsx",
 	}, sourceText, core.ScriptKindTSX)
 	if file == nil || file.Statements == nil || len(file.Statements.Nodes) == 0 {
-		t.Fatalf("no statement in %q", sourceText)
+		test.Fatalf("no statement in %q", sourceText)
 	}
 	return file.Statements.Nodes[0]
 }
 
 // Both modifiers are required rather than either, which is the whole decision this makes.
-func TestIsDefaultExported(t *testing.T) {
-	t.Parallel()
+func TestIsDefaultExported(test *testing.T) {
+	test.Parallel()
 	cases := []struct {
 		name       string
 		sourceText string
@@ -40,10 +40,10 @@ func TestIsDefaultExported(t *testing.T) {
 		{"a default switch label", "switch (value) {\n    default:\n        break;\n}\n", false},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			if got := IsDefaultExported(firstStatement(t, testCase.sourceText)); got != testCase.want {
-				t.Fatalf("want %v, got %v", testCase.want, got)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			if got := IsDefaultExported(firstStatement(test, testCase.sourceText)); got != testCase.want {
+				test.Fatalf("want %v, got %v", testCase.want, got)
 			}
 		})
 	}
@@ -51,28 +51,28 @@ func TestIsDefaultExported(t *testing.T) {
 
 // A nil node and a nil modifier list both answer rather than panic. A panic in a shared package
 // takes the whole run down instead of one rule's finding.
-func TestSurvivesNilInput(t *testing.T) {
-	t.Parallel()
+func TestSurvivesNilInput(test *testing.T) {
+	test.Parallel()
 	if IsDefaultExported(nil) {
-		t.Fatal("want nil to answer false")
+		test.Fatal("want nil to answer false")
 	}
 	if HasDefaultModifier(nil) {
-		t.Fatal("want a nil modifier list to answer false")
+		test.Fatal("want a nil modifier list to answer false")
 	}
 }
 
 // The two spellings must agree, since they exist only because two call shapes did. A divergence
 // here would recreate the drift the lift removed.
-func TestBothSpellingsAgree(t *testing.T) {
-	t.Parallel()
+func TestBothSpellingsAgree(test *testing.T) {
+	test.Parallel()
 	for _, sourceText := range []string{
 		"export default function run() {}\n",
 		"export function run() {}\n",
 		"function run() {}\n",
 	} {
-		statement := firstStatement(t, sourceText)
+		statement := firstStatement(test, sourceText)
 		if IsDefaultExported(statement) != HasDefaultModifier(statement.Modifiers()) {
-			t.Fatalf("the two spellings disagree on %q", sourceText)
+			test.Fatalf("the two spellings disagree on %q", sourceText)
 		}
 	}
 }
@@ -80,8 +80,8 @@ func TestBothSpellingsAgree(t *testing.T) {
 // The three predicates answer three questions, and the pairwise disagreements are the whole reason
 // they are separate functions. This table asserts all three against one corpus so a change to any
 // one of them has to face what it does to the others.
-func TestTheThreeExportQuestionsDisagreeWhereTheyShould(t *testing.T) {
-	t.Parallel()
+func TestTheThreeExportQuestionsDisagreeWhereTheyShould(test *testing.T) {
+	test.Parallel()
 	cases := []struct {
 		name                string
 		sourceText          string
@@ -96,17 +96,17 @@ func TestTheThreeExportQuestionsDisagreeWhereTheyShould(t *testing.T) {
 		{"a default exported class", "export default class Thing {}\n", true, true, false},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			statement := firstStatement(t, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			statement := firstStatement(test, testCase.sourceText)
 			if got := IsExported(statement); got != testCase.wantExported {
-				t.Fatalf("IsExported: want %v, got %v", testCase.wantExported, got)
+				test.Fatalf("IsExported: want %v, got %v", testCase.wantExported, got)
 			}
 			if got := IsDefaultExported(statement); got != testCase.wantDefaultExported {
-				t.Fatalf("IsDefaultExported: want %v, got %v", testCase.wantDefaultExported, got)
+				test.Fatalf("IsDefaultExported: want %v, got %v", testCase.wantDefaultExported, got)
 			}
 			if got := IsExportedByName(statement.Modifiers()); got != testCase.wantExportedByName {
-				t.Fatalf("IsExportedByName: want %v, got %v", testCase.wantExportedByName, got)
+				test.Fatalf("IsExportedByName: want %v, got %v", testCase.wantExportedByName, got)
 			}
 		})
 	}
@@ -115,20 +115,20 @@ func TestTheThreeExportQuestionsDisagreeWhereTheyShould(t *testing.T) {
 // The row that matters most, stated alone because it is the one a future simplification would break:
 // a default export is exported and is not exported by name. Collapsing the two predicates would
 // silence `react-component-require-named-export` on exactly the shape it exists to flag.
-func TestADefaultExportIsExportedAndNotNamed(t *testing.T) {
-	t.Parallel()
-	statement := firstStatement(t, "export default function Thing() {}\n")
+func TestADefaultExportIsExportedAndNotNamed(test *testing.T) {
+	test.Parallel()
+	statement := firstStatement(test, "export default function Thing() {}\n")
 	if !IsExported(statement) {
-		t.Fatal("want a default export to count as exported")
+		test.Fatal("want a default export to count as exported")
 	}
 	if IsExportedByName(statement.Modifiers()) {
-		t.Fatal("want a default export not to count as a named export")
+		test.Fatal("want a default export not to count as a named export")
 	}
 }
 
-func TestExportPredicatesSurviveNilInput(t *testing.T) {
-	t.Parallel()
+func TestExportPredicatesSurviveNilInput(test *testing.T) {
+	test.Parallel()
 	if IsExported(nil) || HasExportModifier(nil) || IsExportedByName(nil) {
-		t.Fatal("want nil to answer false everywhere")
+		test.Fatal("want nil to answer false everywhere")
 	}
 }

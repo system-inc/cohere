@@ -4,7 +4,7 @@
 //
 // React's compiler ships 1,810 expectation files under `fixtures/compiler/`. Each pairs an input
 // with a `.expect.md` holding either `## Code` (the transformed output) or `## Error` (the
-// diagnostics) — never both, measured at the pinned sha as 1,485 `## Code` plus 325 `## Error`,
+// diagnostics), never both, measured at the pinned sha as 1,485 `## Code` plus 325 `## Error`,
 // zero overlap and zero neither. The 325 error goldens are plain text: a message, a
 // `file:line:col`, and a caret span. Nothing in them is JavaScript-shaped, so a Go implementation
 // can be scored against them without emitting a byte of JavaScript.
@@ -42,7 +42,7 @@
 // network-dependent. It is neither, and both properties come from the same decision: the corpus is
 // vendored, so there is no fetch, and the work is reading 650 small files and splitting strings.
 // Measured at about 0.3-0.8s for the whole package, which is inside the noise of the ordinary gate.
-// Gating it would cost more than it saves — a suite behind a tag is a suite that stops being run,
+// Gating it would cost more than it saves: a suite behind a tag is a suite that stops being run,
 // and the first thing it would stop catching is a vendored corpus that quietly changed size.
 //
 // `internal/lint/rules/react/tools/vendor_fixtures` is the network-touching half, and it is a command run deliberately
@@ -81,8 +81,8 @@ type Fixture struct {
 // 325, so 290 need no Flow parser. Restricting the search to the first line instead reports 20,
 // which is wrong in the direction that matters: it would hand 15 unparseable fixtures to a
 // TypeScript parser and read their parse failures as rule failures.
-func (f Fixture) RequiresFlow() bool {
-	return strings.Contains(f.Source, "@flow")
+func (fixture Fixture) RequiresFlow() bool {
+	return strings.Contains(fixture.Source, "@flow")
 }
 
 // Expectation is the parsed `## Error` block.
@@ -112,12 +112,12 @@ type ExpectedError struct {
 	// without notice; asserting on them would turn documentation edits into rule regressions.
 	Message string
 
-	// File, Line, Column come from the FIRST `path:line:col` line after the message, which is the
+	// File, Line, Column come from the first `path:line:col` line after the message, which is the
 	// primary span. A diagnostic can carry more than one: 31 of the 429 have a secondary location
 	// underneath the primary, captioned separately (`This modifies `cache``) to point at the
 	// contributing site. Taking the first is what upstream's `file:line:col` header means, and
 	// counting them all would report 427 locations for 429 diagnostics while 31 diagnostics
-	// actually have none — a number that is wrong in both directions at once and looks reasonable.
+	// actually have none, a number that is wrong in both directions at once and looks reasonable.
 	//
 	// Line and Column are 0 with HasLocation false when absent. Measured at the pinned sha: 398 of
 	// the 429 carry a primary location, 31 do not.
@@ -150,9 +150,9 @@ type ReportedError struct {
 // run, which is the failure this package exists to make impossible.
 func Load(root string) ([]Fixture, error) {
 	var inputPaths []string
-	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
-		if err != nil {
-			return err
+	walkError := filepath.WalkDir(root, func(path string, entry os.DirEntry, pathError error) error {
+		if pathError != nil {
+			return pathError
 		}
 		if entry.IsDir() || strings.HasSuffix(path, ".expect.md") {
 			return nil
@@ -160,8 +160,8 @@ func Load(root string) ([]Fixture, error) {
 		inputPaths = append(inputPaths, path)
 		return nil
 	})
-	if err != nil {
-		return nil, err
+	if walkError != nil {
+		return nil, walkError
 	}
 	sort.Strings(inputPaths)
 
@@ -180,7 +180,8 @@ func Load(root string) ([]Fixture, error) {
 	// fixtures by copying them into one directory loses any whose basenames collide, and four of the
 	// clean ones do -- that collection returned 66 of 70 and errored on nothing. A check for "some
 	// clean fixtures exist" passes on 66 as happily as on 70.
-	var errorNamed, clean int
+	var errorNamed int
+	var clean int
 	for _, path := range inputPaths {
 		if base := filepath.Base(path); strings.HasPrefix(base, "error.") ||
 			strings.HasPrefix(base, "todo.error.") {
@@ -199,24 +200,28 @@ func Load(root string) ([]Fixture, error) {
 
 	fixtures := make([]Fixture, 0, len(inputPaths))
 	for _, inputPath := range inputPaths {
-		name, err := filepath.Rel(root, inputPath)
-		if err != nil {
-			return nil, err
+		name, relativePathError := filepath.Rel(root, inputPath)
+		if relativePathError != nil {
+			return nil, relativePathError
 		}
 		// Slashed, because the stated divergences are keyed `new-mutability/error.x.js`, and on Windows
 		// Rel answers with `\`, so every lookup missed and a known divergence scored as a new one.
 		name = filepath.ToSlash(name)
 
-		sourceBytes, err := os.ReadFile(inputPath)
-		if err != nil {
-			return nil, err
+		sourceBytes, readError := os.ReadFile(inputPath)
+		if readError != nil {
+			return nil, readError
 		}
 		source := string(sourceBytes)
 
 		expectPath := strings.TrimSuffix(inputPath, filepath.Ext(inputPath)) + ".expect.md"
-		expectBytes, err := os.ReadFile(expectPath)
-		if err != nil {
-			return nil, fmt.Errorf("%s: expectation missing; upstream pairs these 1:1 and a fixture without one cannot be scored: %w", name, err)
+		expectBytes, readError := os.ReadFile(expectPath)
+		if readError != nil {
+			return nil, fmt.Errorf(
+				"%s: expectation missing; upstream pairs these 1:1 and a fixture without one cannot be scored: %w",
+				name,
+				readError,
+			)
 		}
 
 		// The `## Error` invariant is conditional on the fixture being error-named, rather than
@@ -230,9 +235,10 @@ func Load(root string) ([]Fixture, error) {
 
 		var expectation Expectation
 		if errorNamed {
-			expectation, err = ParseExpectation(string(expectBytes))
-			if err != nil {
-				return nil, fmt.Errorf("%s: %w", name, err)
+			var parseExpectationError error
+			expectation, parseExpectationError = ParseExpectation(string(expectBytes))
+			if parseExpectationError != nil {
+				return nil, fmt.Errorf("%s: %w", name, parseExpectationError)
 			}
 		} else if strings.Contains("\n"+string(expectBytes), "\n## Error") {
 			// The other direction of the same set equality, and it is the one that matters for a
@@ -258,14 +264,17 @@ func Load(root string) ([]Fixture, error) {
 // ParseExpectation reads the `## Error` block out of a `.expect.md`.
 //
 // An expectation with no `## Error` section is an error, not an empty result. Error-named fixtures
-// and `## Error` sections are the same set at the pinned sha — verified as exact set equality in
-// both directions, 325 each way, zero counterexamples — so a missing section means the corpus is
+// and `## Error` sections are the same set at the pinned sha (verified as exact set equality in
+// both directions, 325 each way, zero counterexamples), so a missing section means the corpus is
 // not what this runner believes it is, and continuing would score a transform fixture as a rule
 // that found nothing.
 func ParseExpectation(text string) (Expectation, error) {
 	_, after, found := strings.Cut(text, "\n## Error\n")
 	if !found {
-		return Expectation{}, fmt.Errorf("no `## Error` section; error-named fixtures always have one at sha %s", UpstreamSha)
+		return Expectation{}, fmt.Errorf(
+			"no `## Error` section; error-named fixtures always have one at sha %s",
+			UpstreamSha,
+		)
 	}
 
 	block, found := fencedBlock(after)
@@ -329,7 +338,7 @@ func ParseExpectation(text string) (Expectation, error) {
 // one of these or failing to compile.
 //
 // This cost a defect worth recording. The parser first matched `Error: ` only, and read 302 of the
-// 429 diagnostics — a 70% read that produced a fully green parse and a runner that would have
+// 429 diagnostics, a 70% read that produced a fully green parse and a runner that would have
 // scored 37 fixtures as expecting nothing at all. Nothing about the output looked partial. It was
 // caught by `TestDeclaredCountMatchesParsedErrors`, which compares the parser's count against the
 // `Found N errors` header the goldens carry independently, and that test exists solely because two
@@ -384,8 +393,8 @@ func parseFoundHeader(line string) (int, bool) {
 	if rest != "error" && rest != "errors" && !strings.HasPrefix(rest, "error") {
 		return 0, false
 	}
-	count, err := strconv.Atoi(digits)
-	if err != nil {
+	count, parseError := strconv.Atoi(digits)
+	if parseError != nil {
 		return 0, false
 	}
 	return count, true
@@ -404,8 +413,8 @@ func parseLocation(line string) (file string, lineNumber int, column int, ok boo
 	if lastColon < 0 {
 		return "", 0, 0, false
 	}
-	column, err := strconv.Atoi(line[lastColon+1:])
-	if err != nil {
+	column, parseError := strconv.Atoi(line[lastColon+1:])
+	if parseError != nil {
 		return "", 0, 0, false
 	}
 	rest := line[:lastColon]
@@ -413,8 +422,8 @@ func parseLocation(line string) (file string, lineNumber int, column int, ok boo
 	if secondColon < 0 {
 		return "", 0, 0, false
 	}
-	lineNumber, err = strconv.Atoi(rest[secondColon+1:])
-	if err != nil {
+	lineNumber, parseError = strconv.Atoi(rest[secondColon+1:])
+	if parseError != nil {
 		return "", 0, 0, false
 	}
 	file = rest[:secondColon]
@@ -422,4 +431,55 @@ func parseLocation(line string) (file string, lineNumber int, column int, ok boo
 		return "", 0, 0, false
 	}
 	return file, lineNumber, column, true
+}
+
+// Categories returns the categories a fixture's diagnostics belong to, and whether every one was
+// attributed.
+//
+// The bool is not decoration. A fixture with an unattributed diagnostic must not be scored against
+// any rule, because the rule that owns it is exactly the unknown; scoring it would credit or blame
+// whichever rule happened to be running.
+func (fixture Fixture) Categories() (categories []string, complete bool) {
+	seen := map[string]bool{}
+	complete = true
+	for _, expectedError := range fixture.Expected.Errors {
+		category, found := CategoryForMessage(expectedError.Message)
+		if !found {
+			complete = false
+			continue
+		}
+		if !seen[category] {
+			seen[category] = true
+			categories = append(categories, category)
+		}
+	}
+	return categories, complete
+}
+
+// Rules returns the upstream rule names a fixture's diagnostics belong to.
+func (fixture Fixture) Rules() (rules []string, complete bool) {
+	categories, complete := fixture.Categories()
+	seen := map[string]bool{}
+	for _, category := range categories {
+		rule, found := RuleForCategory(category)
+		if !found {
+			complete = false
+			continue
+		}
+		if !seen[rule] {
+			seen[rule] = true
+			rules = append(rules, rule)
+		}
+	}
+	return rules, complete
+}
+
+// ResolvesReactTypes reports whether a fixture could resolve `@types/react`.
+func (fixture Fixture) ResolvesReactTypes() bool {
+	return reactImportPattern.MatchString(fixture.Source)
+}
+
+// CallsHook reports whether a fixture calls anything named like a hook.
+func (fixture Fixture) CallsHook() bool {
+	return hookCallPattern.MatchString(fixture.Source)
 }

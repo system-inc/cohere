@@ -14,18 +14,18 @@ import (
 //
 // A probe rule is the harness: it reports one finding per hook found, so the fixtures read the
 // analysis through the same path a real rule will.
-var networkAnalysisProbe = rule.Rule{
+var networkAnalysisProbe = rule.Rule[rule.NoOptions]{
 	Name: "network-analysis-probe",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
-				analysis := NetworkFileAnalysisFor(ctx)
+				analysis := NetworkFileAnalysisFor(ruleContext)
 				for _, hook := range analysis.HookDeclarations {
 					exported := "local"
 					if hook.IsExported {
 						exported = "exported"
 					}
-					ctx.ReportNode(hook.NameNode, rule.Message{
+					ruleContext.ReportNode(hook.NameNode, rule.Message{
 						Id:          "hook",
 						Description: hook.Name + " " + exported + " parameters=" + strconv.Itoa(len(hook.Parameters)),
 					})
@@ -37,8 +37,8 @@ var networkAnalysisProbe = rule.Rule{
 
 const networkImport = "import { networkService } from '@structure/source/services/network/NetworkService';\n"
 
-func TestNetworkFileAnalysisFindsHooks(t *testing.T) {
-	t.Parallel()
+func TestNetworkFileAnalysisFindsHooks(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -54,16 +54,20 @@ func TestNetworkFileAnalysisFindsHooks(t *testing.T) {
 				"export const useThingRequest = () => networkService.useGraphQlQuery('q');\n", 1,
 		},
 		{
-			"a function expression hook", networkImport +
-				"export const useThingRequest = function () {\n    return networkService.useGraphQlMutation('m');\n};\n", 1,
+			"a function expression hook",
+			networkImport +
+				"export const useThingRequest = function () {\n    return networkService.useGraphQlMutation('m');\n};\n",
+			1,
 		},
 		// A call inside a callback still counts: the hook is what the caller sees, so the walk does
 		// not stop at nested function boundaries. This is the opposite of the JSX walk's rule and
 		// the difference is deliberate.
 		{
-			"a call nested inside a callback", networkImport +
+			"a call nested inside a callback",
+			networkImport +
 				"declare function wrap(callback: () => unknown): unknown;\n" +
-				"export function useThingRequest() {\n    return wrap(() => networkService.graphQlRequest('q'));\n}\n", 1,
+				"export function useThingRequest() {\n    return wrap(() => networkService.graphQlRequest('q'));\n}\n",
+			1,
 		},
 		{
 			"two hooks in one file", networkImport +
@@ -72,18 +76,18 @@ func TestNetworkFileAnalysisFindsHooks(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, networkAnalysisProbe, networkFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, networkAnalysisProbe, networkFile, testCase.sourceText)
 			if len(result.Diagnostics) != testCase.wantCount {
-				t.Fatalf("want %d hooks, got %d", testCase.wantCount, len(result.Diagnostics))
+				test.Fatalf("want %d hooks, got %d", testCase.wantCount, len(result.Diagnostics))
 			}
 		})
 	}
 }
 
-func TestNetworkFileAnalysisStaysEmpty(t *testing.T) {
-	t.Parallel()
+func TestNetworkFileAnalysisStaysEmpty(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -131,17 +135,20 @@ func TestNetworkFileAnalysisStaysEmpty(t *testing.T) {
 		{"an empty file", "export const Value = 1;\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, networkAnalysisProbe, networkFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(
+				test,
+				rule_testing.Run(test, networkAnalysisProbe, networkFile, testCase.sourceText),
+			)
 		})
 	}
 }
 
 // Export detection and parameter capture are what the dependent rules read, so they are pinned here
 // rather than discovered three times.
-func TestNetworkFileAnalysisRecordsShape(t *testing.T) {
-	t.Parallel()
+func TestNetworkFileAnalysisRecordsShape(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -166,14 +173,14 @@ func TestNetworkFileAnalysisRecordsShape(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, networkAnalysisProbe, networkFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, networkAnalysisProbe, networkFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("want one hook, got %d", len(result.Diagnostics))
+				test.Fatalf("want one hook, got %d", len(result.Diagnostics))
 			}
 			if got := result.Diagnostics[0].Message.Description; got != testCase.want {
-				t.Fatalf("got %q, want %q", got, testCase.want)
+				test.Fatalf("got %q, want %q", got, testCase.want)
 			}
 		})
 	}

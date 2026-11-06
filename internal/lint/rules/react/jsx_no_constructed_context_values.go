@@ -133,7 +133,7 @@ func jsxNoConstructedContextValuesMessage(
 // Upstream calls `utils.getParentComponent(node)`, which is the plugin's 959-line component
 // detector. That detector is not in this tree, and reproducing it would be a substrate build rather
 // than a rule port. It does not have to be reproduced here, and the reason is specific to this rule:
-// the node being classified is ALREADY a JSX element, so every question the detector would ask
+// the node being classified is already a JSX element, so every question the detector would ask
 // about whether a function returns JSX is answered before it is asked. What is left is the name and
 // the class heritage.
 //
@@ -161,7 +161,7 @@ func jsxNoConstructedContextValuesMessage(
 //	React.forwardRef(() => ...)                      REPORTS
 //
 // Two of those rows are where the shelf disagrees with upstream and this rule cannot use it
-// directly. `scope.NameOf` prefers a function expression's OWN name over its binding, which is the
+// directly. `scope.NameOf` prefers a function expression's own name over its binding, which is the
 // opposite of rows eight and nine; and it answers a method's name, where rows ten through sixteen
 // show the class is what decides. Both are correct for the rules `scope.NameOf` was lifted from and
 // wrong here, so the walk below is written out rather than delegated. That is a divergence in
@@ -187,7 +187,7 @@ func jsxNoConstructedContextValuesMessage(
 //
 // # Where the finding points, and it is not the value expression
 //
-// Every finding is anchored on the CONSTRUCTION, which for an indirect case is somewhere else
+// Every finding is anchored on the construction, which for an indirect case is somewhere else
 // entirely: `const v = {x:1}` two lines above the provider reports on `{x:1}`, not on `v`. Measured
 // by slicing the reported range on twenty-six inputs. A message-id fixture cannot see this and the
 // corpus does not assert it, so the span cases below do.
@@ -206,19 +206,19 @@ func jsxNoConstructedContextValuesMessage(
 // (`memoWithoutDependenciesMsg`). Kirk's ruling, 2026-10-01. The analysis and its one-sided
 // definition of "proven" live in jsx_no_constructed_context_values_stability.go, and the divergence
 // is recorded in jsx_no_constructed_context_values.md.
-var JsxNoConstructedContextValues = rule.Rule{
+var JsxNoConstructedContextValues = rule.Rule[rule.NoOptions]{
 	Name:             "react/jsx-no-constructed-context-values",
 	NeedsTypeChecker: true,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.TypeChecker == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		if ruleContext.TypeChecker == nil {
 			return nil
 		}
 
 		check := func(node *ast.Node, tagName *ast.Node, attributes *ast.Node) {
-			if ctx.TypeChecker == nil {
+			if ruleContext.TypeChecker == nil {
 				return
 			}
-			if !jsxNoConstructedContextValuesIsProvider(ctx, tagName) {
+			if !jsxNoConstructedContextValuesIsProvider(ruleContext, tagName) {
 				return
 			}
 
@@ -227,18 +227,18 @@ var JsxNoConstructedContextValues = rule.Rule{
 				return
 			}
 
-			construction := jsxNoConstructedContextValuesConstructionOf(ctx, value, 0)
+			construction := jsxNoConstructedContextValuesConstructionOf(ruleContext, value, 0)
 			if construction == nil {
 				// Upstream stops here. cohere goes one level further: a memoized value whose inputs
 				// change every render is not stable either. See
 				// jsx_no_constructed_context_values_stability.go.
 				if jsxNoConstructedContextValuesInComponent(node) {
-					jsxNoConstructedContextValuesCheckMemo(ctx, value, node)
+					jsxNoConstructedContextValuesCheckMemo(ruleContext, value, node)
 				}
 				return
 			}
 
-			// The component test runs LAST, matching upstream, which calls getParentComponent only
+			// The component test runs last, matching upstream, which calls getParentComponent only
 			// after a construction has been found. Order is not observable in the verdict but it is
 			// observable in cost, and this is the cheaper arrangement on a tree where most
 			// providers are fine.
@@ -248,25 +248,25 @@ var JsxNoConstructedContextValues = rule.Rule{
 
 			// `rule.TokenRange` rather than `node.Pos()`. A node's Pos includes its leading
 			// trivia, so a declaration written on its own line after a blank line or a comment
-			// reports the line the trivia STARTS on rather than the line the reader sees. Measured:
+			// reports the line the trivia starts on rather than the line the reader sees. Measured:
 			// `function v() {}` on line 2 of its component rendered "at line 1" through Pos, where
 			// upstream renders line 2. The span assertions could not see it, because
 			// `ctx.ReportNode` already routes through TokenRange and so was pointing correctly all
 			// along; only the interpolated line number was wrong, which is exactly the failure the
 			// brief describes for any message built with a format string.
-			nodeLine, _ := scanner.GetLineAndCharacterOfPosition(ctx.SourceFile,
-				rule.TokenRange(ctx.SourceFile, construction.node).Pos())
+			nodeLine, _ := scanner.GetLineAndCharacterOfPosition(ruleContext.SourceFile,
+				rule.TokenRange(ruleContext.SourceFile, construction.node).Pos())
 			usageLine, variableName := 0, ""
 			if construction.usage != nil {
-				usageLine, _ = scanner.GetLineAndCharacterOfPosition(ctx.SourceFile,
-					rule.TokenRange(ctx.SourceFile, construction.usage).Pos())
+				usageLine, _ = scanner.GetLineAndCharacterOfPosition(ruleContext.SourceFile,
+					rule.TokenRange(ruleContext.SourceFile, construction.usage).Pos())
 				usageLine++
 				if construction.usage.Kind == ast.KindIdentifier {
 					variableName = construction.usage.Text()
 				}
 			}
 
-			ctx.ReportNode(construction.node, jsxNoConstructedContextValuesMessage(
+			ruleContext.ReportNode(construction.node, jsxNoConstructedContextValuesMessage(
 				*construction, nodeLine+1, usageLine, variableName,
 			))
 		}
@@ -289,7 +289,7 @@ var JsxNoConstructedContextValues = rule.Rule{
 // The two paths are not symmetric and the asymmetry is upstream's. A qualified name only has to end
 // in `Provider`, with the object never examined, so `<Anything.Provider>` qualifies. A bare
 // identifier has to resolve to a `createContext` call. Both measured on the installed build.
-func jsxNoConstructedContextValuesIsProvider(ctx rule.Context, tagName *ast.Node) bool {
+func jsxNoConstructedContextValuesIsProvider(ruleContext rule.Context, tagName *ast.Node) bool {
 	if tagName == nil {
 		return false
 	}
@@ -300,7 +300,7 @@ func jsxNoConstructedContextValuesIsProvider(ctx rule.Context, tagName *ast.Node
 		return name != nil && name.Kind == ast.KindIdentifier && name.Text() == "Provider"
 
 	case ast.KindIdentifier:
-		return jsxNoConstructedContextValuesResolvesToCreateContext(ctx, tagName)
+		return jsxNoConstructedContextValuesResolvesToCreateContext(ruleContext, tagName)
 	}
 	return false
 }
@@ -316,8 +316,8 @@ func jsxNoConstructedContextValuesIsProvider(ctx rule.Context, tagName *ast.Node
 // index-zero read goes silent on merged shapes. Upstream reads `defs[0]`; looping can only be
 // wider, and for this predicate wider means "any declaration initializes it as a context", which is
 // the same answer whenever only one declaration has an initializer at all.
-func jsxNoConstructedContextValuesResolvesToCreateContext(ctx rule.Context, identifier *ast.Node) bool {
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(identifier)
+func jsxNoConstructedContextValuesResolvesToCreateContext(ruleContext rule.Context, identifier *ast.Node) bool {
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(identifier)
 	if symbol == nil {
 		return false
 	}
@@ -359,19 +359,20 @@ func jsxNoConstructedContextValuesIsCreateContextCallee(callee *ast.Node) bool {
 	if callee == nil {
 		return false
 	}
-	for callee.Kind == ast.KindParenthesizedExpression {
-		callee = callee.AsParenthesizedExpression().Expression
-		if callee == nil {
+	unwrapped := callee
+	for unwrapped.Kind == ast.KindParenthesizedExpression {
+		unwrapped = unwrapped.AsParenthesizedExpression().Expression
+		if unwrapped == nil {
 			return false
 		}
 	}
 
-	switch callee.Kind {
+	switch unwrapped.Kind {
 	case ast.KindIdentifier:
-		return callee.Text() == "createContext"
+		return unwrapped.Text() == "createContext"
 
 	case ast.KindPropertyAccessExpression:
-		access := callee.AsPropertyAccessExpression()
+		access := unwrapped.AsPropertyAccessExpression()
 		receiver := access.Expression
 		for receiver != nil && receiver.Kind == ast.KindParenthesizedExpression {
 			receiver = receiver.AsParenthesizedExpression().Expression
@@ -429,10 +430,10 @@ const jsxNoConstructedContextValuesRecursionLimit = 16
 //
 // Every arm was measured against the installed build; see the rule doc for the table. The arms that
 // recurse rather than answer are the interesting ones, and the order inside a conditional or a
-// logical expression is observable: the LEFT side is tried first, so `c ? {a:1} : {b:2}` reports on
+// logical expression is observable: the left side is tried first, so `c ? {a:1} : {b:2}` reports on
 // `{a:1}`.
 func jsxNoConstructedContextValuesConstructionOf(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	node *ast.Node,
 	depth int,
 ) *jsxNoConstructedContextValuesConstruction {
@@ -473,13 +474,13 @@ func jsxNoConstructedContextValuesConstructionOf(
 		// Recursing through it reproduces upstream's verdict on source upstream cannot represent,
 		// and `({a:1})` as a value is ordinary in this tree.
 		return jsxNoConstructedContextValuesConstructionOf(
-			ctx, node.AsParenthesizedExpression().Expression, depth+1,
+			ruleContext, node.AsParenthesizedExpression().Expression, depth+1,
 		)
 
 	case ast.KindAsExpression:
 		// Upstream's `TSAsExpression` arm.
 		return jsxNoConstructedContextValuesConstructionOf(
-			ctx, node.AsAsExpression().Expression, depth+1,
+			ruleContext, node.AsAsExpression().Expression, depth+1,
 		)
 
 	case ast.KindSatisfiesExpression:
@@ -488,22 +489,26 @@ func jsxNoConstructedContextValuesConstructionOf(
 		// reproduction. It has its own arm because its node is not an AsExpression: reading it as one
 		// panicked on `value={({} satisfies object)}`.
 		return jsxNoConstructedContextValuesConstructionOf(
-			ctx, node.AsSatisfiesExpression().Expression, depth+1,
+			ruleContext, node.AsSatisfiesExpression().Expression, depth+1,
 		)
 
 	case ast.KindConditionalExpression:
 		conditional := node.AsConditionalExpression()
-		if found := jsxNoConstructedContextValuesConstructionOf(ctx, conditional.WhenTrue, depth+1); found != nil {
+		if found := jsxNoConstructedContextValuesConstructionOf(
+			ruleContext,
+			conditional.WhenTrue,
+			depth+1,
+		); found != nil {
 			return found
 		}
-		return jsxNoConstructedContextValuesConstructionOf(ctx, conditional.WhenFalse, depth+1)
+		return jsxNoConstructedContextValuesConstructionOf(ruleContext, conditional.WhenFalse, depth+1)
 
 	case ast.KindBinaryExpression:
 		binary := node.AsBinaryExpression()
 		if ast.IsAssignmentOperator(binary.OperatorToken.Kind) {
 			// Upstream's AssignmentExpression arm: recurse into the right side, then relabel the
 			// kind and set the whole assignment as the usage.
-			found := jsxNoConstructedContextValuesConstructionOf(ctx, binary.Right, depth+1)
+			found := jsxNoConstructedContextValuesConstructionOf(ruleContext, binary.Right, depth+1)
 			if found == nil {
 				return nil
 			}
@@ -518,19 +523,19 @@ func jsxNoConstructedContextValuesConstructionOf(
 			// LogicalExpression arm and no BinaryExpression one.
 			return nil
 		}
-		if found := jsxNoConstructedContextValuesConstructionOf(ctx, binary.Left, depth+1); found != nil {
+		if found := jsxNoConstructedContextValuesConstructionOf(ruleContext, binary.Left, depth+1); found != nil {
 			return found
 		}
-		return jsxNoConstructedContextValuesConstructionOf(ctx, binary.Right, depth+1)
+		return jsxNoConstructedContextValuesConstructionOf(ruleContext, binary.Right, depth+1)
 
 	case ast.KindPropertyAccessExpression:
 		found := jsxNoConstructedContextValuesConstructionOf(
-			ctx, node.AsPropertyAccessExpression().Expression, depth+1,
+			ruleContext, node.AsPropertyAccessExpression().Expression, depth+1,
 		)
 		if found == nil {
 			return nil
 		}
-		// Upstream sets the usage to the OBJECT rather than to the whole member expression.
+		// Upstream sets the usage to the object rather than to the whole member expression.
 		return &jsxNoConstructedContextValuesConstruction{
 			kind:  found.kind,
 			node:  found.node,
@@ -538,7 +543,7 @@ func jsxNoConstructedContextValuesConstructionOf(
 		}
 
 	case ast.KindIdentifier:
-		return jsxNoConstructedContextValuesFollowIdentifier(ctx, node, depth)
+		return jsxNoConstructedContextValuesFollowIdentifier(ruleContext, node, depth)
 	}
 
 	return nil
@@ -562,7 +567,7 @@ func jsxNoConstructedContextValuesIsLogicalOperator(kind ast.Kind) bool {
 // jsxNoConstructedContextValuesFollowIdentifier resolves an identifier to what it was declared as
 // and recurses into that.
 //
-// Upstream reads its scope's binding, takes the LAST definition, and bails out unless that
+// Upstream reads its scope's binding, takes the last definition, and bails out unless that
 // definition is a variable or a function name. A parameter is the case that bail-out exists for and
 // it is measured silent.
 //
@@ -570,11 +575,11 @@ func jsxNoConstructedContextValuesIsLogicalOperator(kind ast.Kind) bool {
 // `GetSymbolAtLocation` is truncated on an exported declaration, which would otherwise go silent on
 // `export const v = {a:1}`, a shape the corpus does not write and this tree does constantly.
 func jsxNoConstructedContextValuesFollowIdentifier(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	identifier *ast.Node,
 	depth int,
 ) *jsxNoConstructedContextValuesConstruction {
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(identifier)
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(identifier)
 	if symbol == nil {
 		return nil
 	}
@@ -584,7 +589,7 @@ func jsxNoConstructedContextValuesFollowIdentifier(
 		return nil
 	}
 
-	// Upstream takes the LAST definition rather than the first, which matters for a name declared
+	// Upstream takes the last definition rather than the first, which matters for a name declared
 	// more than once. Reproduced rather than looped, because this arm asks "what single thing is
 	// this name" and a loop would be wider than upstream.
 	declaration := declarations[len(declarations)-1]
@@ -603,7 +608,9 @@ func jsxNoConstructedContextValuesFollowIdentifier(
 	// used by a provider inside an `if` block, which is a true positive upstream misses because the
 	// block is its own scope. cohere compares functions rather than scopes, so it stays silent on the
 	// first three and reports the fourth. The divergence is recorded in the rule's `.md`.
-	if jsxNoConstructedContextValuesNearestFunction(declaration) != jsxNoConstructedContextValuesNearestFunction(identifier) {
+	if jsxNoConstructedContextValuesNearestFunction(
+		declaration,
+	) != jsxNoConstructedContextValuesNearestFunction(identifier) {
 		return nil
 	}
 
@@ -620,7 +627,7 @@ func jsxNoConstructedContextValuesFollowIdentifier(
 		if initializer == nil {
 			return nil
 		}
-		found := jsxNoConstructedContextValuesConstructionOf(ctx, initializer, depth+1)
+		found := jsxNoConstructedContextValuesConstructionOf(ruleContext, initializer, depth+1)
 		if found == nil {
 			return nil
 		}
@@ -642,7 +649,7 @@ func jsxNoConstructedContextValuesFollowIdentifier(
 // `scope.NameOf` cannot be used: it prefers a function expression's own name over its binding, and
 // it answers a method's name where the enclosing class is what decides.
 //
-// The walk stops at the FIRST function-like ancestor, which is upstream's behaviour rather than an
+// The walk stops at the first function-like ancestor, which is upstream's behaviour rather than an
 // optimization: a provider inside a lowercase helper nested in a real component is silent, measured.
 func jsxNoConstructedContextValuesInComponent(node *ast.Node) bool {
 	for current := node.Parent; current != nil; current = current.Parent {

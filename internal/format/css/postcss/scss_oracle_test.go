@@ -13,6 +13,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/system-inc/cohere/internal/corpus"
+	"github.com/system-inc/cohere/internal/json_value"
 )
 
 // postcssScssParseScript is the scss oracle: postcss-scss 4.0.9's lib/scss-parse from the fork's
@@ -122,8 +123,14 @@ var scssParseFixtures = []parseFixture{
 	// Interpolation.
 	{name: "interpolation in selectors", text: ".a-#{$b} { c: d }\n#{$sel} > a {}\n.a #{&}__b {}\n#{'.x'} {}"},
 	{name: "interpolation in property names", text: "a { #{$prop}: 1px; border-#{$side}: 0; #{$a}-#{$b}: c; }"},
-	{name: "interpolation in values", text: "a { width: calc(100% - #{$x}); content: \"#{$a}\"; b: #{$c}px; d: a#{$e}b; }"},
-	{name: "interpolation in at-rule params", text: "@media #{$q} and (min-width: #{$w}) {}\n@include x(#{$y});\n@if #{$a} == b {}"},
+	{
+		name: "interpolation in values",
+		text: "a { width: calc(100% - #{$x}); content: \"#{$a}\"; b: #{$c}px; d: a#{$e}b; }",
+	},
+	{
+		name: "interpolation in at-rule params",
+		text: "@media #{$q} and (min-width: #{$w}) {}\n@include x(#{$y});\n@if #{$a} == b {}",
+	},
 	{name: "interpolation in at-rule names", text: "@#{$name} foo;\n@media#{$q}{}\n@a#{$b}#{$c} d;\n@a #{$b};"},
 	{name: "nested interpolation", text: "a { b: #{ #{$x} } }"},
 	{name: "interpolation holding a brace in a string", text: "a { b: #{'}'}; c: #{\"a\\\"}\"}; }"},
@@ -144,7 +151,10 @@ var scssParseFixtures = []parseFixture{
 	{name: "bad paren content", text: "a{b:x(a\n);c:y(\"q\");d:z(a/b);e:w(a\\b)}"},
 
 	// Variables.
-	{name: "variables with flags", text: "$a: 1px;\n$b: red !default;\n$c: 2 !global;\n$d: 3 !default !global;\n.x { $e: 1 !global; $f : 2; }"},
+	{
+		name: "variables with flags",
+		text: "$a: 1px;\n$b: red !default;\n$c: 2 !global;\n$d: 3 !default !global;\n.x { $e: 1 !global; $f : 2; }",
+	},
 	{name: "maps", text: "$map: (key1: value1, key2: value2, key3: value3);"},
 	{name: "multiline nested map", text: "$map: (\n  key1: value1,\n  key2: (a: b, c: d),\n  'key3': value3,\n);"},
 	{name: "lists", text: "$list: 1px 2px, 3px;\n$l2: (a, b, c);\n$l3: [a b];"},
@@ -161,7 +171,10 @@ var scssParseFixtures = []parseFixture{
 	{name: "nested property important with spaces", text: "a { margin: 0 ! important { left: 1px } }"},
 	{name: "nested property important alone", text: "a { margin: !important { left: 1px } b: x !important { c: d } }"},
 	{name: "nested property important uppercase", text: "a { margin: 0 !IMPORTANT { left: 1px } }"},
-	{name: "nested property important word", text: "a { margin: 0 important { left: 1px } b: 0 ! /* c */ important { d: e } }"},
+	{
+		name: "nested property important word",
+		text: "a { margin: 0 important { left: 1px } b: 0 ! /* c */ important { d: e } }",
+	},
 	{name: "nested property hack", text: "a { _margin: 0 { left: 1px } *b: 1 { c: d } }"},
 	{name: "nested property with comments", text: "a { margin /* c */ : /* d */ 0 { left: 1px } }"},
 	{name: "nested property with an inline comment", text: "a { margin: 0 // c\n { left: 1px } }"},
@@ -176,14 +189,32 @@ var scssParseFixtures = []parseFixture{
 	{name: "colon inside parens", text: "a { b(c: d) { } }"},
 
 	// Mixins, functions and control directives.
-	{name: "mixin and include", text: "@mixin foo($a, $b: 10px) { width: $a; }\n.x { @include foo(1px, $b: 2px); @include bar; @include baz { color: red; } @include qux($args...); }"},
-	{name: "include with a block and arguments", text: ".a { @include breakpoint(md) { b: c } @include x() using ($y) { z: $y } }"},
+	{
+		name: "mixin and include",
+		text: "@mixin foo($a, $b: 10px) { width: $a; }\n.x { @include foo(1px, $b: 2px); @include bar; @include baz { color: red; } @include qux($args...); }",
+	},
+	{
+		name: "include with a block and arguments",
+		text: ".a { @include breakpoint(md) { b: c } @include x() using ($y) { z: $y } }",
+	},
 	{name: "function and return", text: "@function double($n) { @return $n * 2; }"},
-	{name: "content, use, forward, extend", text: "@use 'sass:math';\n@use \"a\" as b with ($c: d);\n@forward 'src/list' hide list-reset;\n@mixin m { @content; @content(1); }\n.a { @extend %placeholder; @extend .b !optional; }"},
+	{
+		name: "content, use, forward, extend",
+		text: "@use 'sass:math';\n@use \"a\" as b with ($c: d);\n@forward 'src/list' hide list-reset;\n@mixin m { @content; @content(1); }\n.a { @extend %placeholder; @extend .b !optional; }",
+	},
 	{name: "debug, warn, error", text: "@debug 'x';\n@warn \"y #{$z}\";\n@error 'bad';"},
-	{name: "if and else", text: "@if $a == 1 { b: c } @else if $a == 2 { d: e } @else { f: g }\n@if not index($list, $x) {}\n.a{@if $x{b:c}@else{d:e}}"},
-	{name: "each", text: "@each $name, $glyph in $icons { .icon-#{$name}:before { content: $glyph; } }\n@each $key, $value in (a: 1, b: 2) {}"},
-	{name: "for and while", text: "@for $i from 1 through 3 { .item-#{$i} { width: 2em * $i; } }\n@while $i > 0 { .item-#{$i} { width: 2em * $i; } $i: $i - 2; }"},
+	{
+		name: "if and else",
+		text: "@if $a == 1 { b: c } @else if $a == 2 { d: e } @else { f: g }\n@if not index($list, $x) {}\n.a{@if $x{b:c}@else{d:e}}",
+	},
+	{
+		name: "each",
+		text: "@each $name, $glyph in $icons { .icon-#{$name}:before { content: $glyph; } }\n@each $key, $value in (a: 1, b: 2) {}",
+	},
+	{
+		name: "for and while",
+		text: "@for $i from 1 through 3 { .item-#{$i} { width: 2em * $i; } }\n@while $i > 0 { .item-#{$i} { width: 2em * $i; } $i: $i - 2; }",
+	},
 	{name: "at-root and nested media", text: ".a { @at-root .b { c: d } @media (min-width: $md) { e: f } }"},
 	{name: "import list", text: "@import 'a', 'b';\n@import url(foo.css);"},
 
@@ -205,16 +236,38 @@ var scssParseFixtures = []parseFixture{
 
 	// Prettier's css-in-js placeholders.
 	{name: "placeholder as a selector", text: "@prettier-placeholder-0-id {\n  color: red;\n}"},
-	{name: "placeholder with a pseudo class", text: "@prettier-placeholder-0-id:hover { }\n@prettier-placeholder-1-id @prettier-placeholder-2-id {}"},
-	{name: "placeholder inside a selector", text: ".a @prettier-placeholder-0-id { }\n.b@prettier-placeholder-1-id, .c { }"},
-	{name: "placeholder as a value", text: "a { color: @prettier-placeholder-0-id; margin: @prettier-placeholder-0-id @prettier-placeholder-1-id; width: calc(100% - @prettier-placeholder-2-id); transition: opacity @prettier-placeholder-3-idms; }"},
-	{name: "placeholder as a property", text: "@prettier-placeholder-0-id: 1px;\na { @prettier-placeholder-1-id: 1px; @prettier-placeholder-2-id-x: y }"},
-	{name: "placeholder after a word in a property", text: "a { border-@prettier-placeholder-1-id: 1px; }", malformed: true},
+	{
+		name: "placeholder with a pseudo class",
+		text: "@prettier-placeholder-0-id:hover { }\n@prettier-placeholder-1-id @prettier-placeholder-2-id {}",
+	},
+	{
+		name: "placeholder inside a selector",
+		text: ".a @prettier-placeholder-0-id { }\n.b@prettier-placeholder-1-id, .c { }",
+	},
+	{
+		name: "placeholder as a value",
+		text: "a { color: @prettier-placeholder-0-id; margin: @prettier-placeholder-0-id @prettier-placeholder-1-id; width: calc(100% - @prettier-placeholder-2-id); transition: opacity @prettier-placeholder-3-idms; }",
+	},
+	{
+		name: "placeholder as a property",
+		text: "@prettier-placeholder-0-id: 1px;\na { @prettier-placeholder-1-id: 1px; @prettier-placeholder-2-id-x: y }",
+	},
+	{
+		name:      "placeholder after a word in a property",
+		text:      "a { border-@prettier-placeholder-1-id: 1px; }",
+		malformed: true,
+	},
 	{name: "placeholder standalone", text: "@prettier-placeholder-0-id;\n@prettier-placeholder-1-id\n"},
-	{name: "placeholder standalone in a block", text: "a { @prettier-placeholder-0-id; color: red; @prettier-placeholder-1-id }"},
+	{
+		name: "placeholder standalone in a block",
+		text: "a { @prettier-placeholder-0-id; color: red; @prettier-placeholder-1-id }",
+	},
 	{name: "placeholder in media params", text: "@media (max-width: @prettier-placeholder-0-id) { a { b: c } }"},
 	{name: "placeholder in a comment", text: "/* @prettier-placeholder-0-id */\n// @prettier-placeholder-1-id\n"},
-	{name: "placeholder template", text: "\n  display: flex;\n  @prettier-placeholder-0-id;\n  color: @prettier-placeholder-1-id;\n  &:hover { @prettier-placeholder-2-id }\n"},
+	{
+		name: "placeholder template",
+		text: "\n  display: flex;\n  @prettier-placeholder-0-id;\n  color: @prettier-placeholder-1-id;\n  &:hover { @prettier-placeholder-2-id }\n",
+	},
 
 	// Malformed.
 	{name: "unclosed interpolation", text: "a { b: #{c", malformed: true},
@@ -231,16 +284,16 @@ var scssParseFixtures = []parseFixture{
 	{name: "unexpected close", text: "a{}}", malformed: true},
 }
 
-// TestParseSCSSAgreesWithPostcssScss is the scss parser's acceptance test, TestParseAgreesWithPostcss's
+// TestParseScssAgreesWithPostcssScss is the scss parser's acceptance test, TestParseAgreesWithPostcss's
 // twin: every Prettier tests/format/scss/**/*.scss file under COHERE_PRETTIER_FORK, the css-in-js
 // templates of Prettier's styled-components and styled-jsx tests (built as Prettier's embed builds
 // them, @prettier-placeholder-N-id and all), and every inline fixture must parse to postcss-scss's tree
 // or be refused by both with the same error. Off unless COHERE_PRETTIER_FORK names the fork.
 //
 // A .scss file postcss-scss refuses is counted, and the test fails if that passes a tenth of them.
-func TestParseSCSSAgreesWithPostcssScss(t *testing.T) {
-	t.Parallel()
-	root := corpus.PrettierFork.Root(t)
+func TestParseScssAgreesWithPostcssScss(test *testing.T) {
+	test.Parallel()
+	root := corpus.PrettierFork.Root(test)
 
 	type input struct {
 		Name string `json:"name"`
@@ -250,16 +303,21 @@ func TestParseSCSSAgreesWithPostcssScss(t *testing.T) {
 	var inputs []input
 	malformed := map[string]bool{}
 	corpusFiles := map[string]bool{}
-	err := filepath.WalkDir(filepath.Join(root, "tests", "format", "scss"), func(path string, entry fs.DirEntry, err error) error {
-		if err != nil {
-			return err
+	walkError := filepath.WalkDir(filepath.Join(
+		root,
+		"tests",
+		"format",
+		"scss",
+	), func(path string, entry fs.DirEntry, pathError error) error {
+		if pathError != nil {
+			return pathError
 		}
 		if entry.IsDir() || filepath.Ext(path) != ".scss" {
 			return nil
 		}
-		source, err := os.ReadFile(path)
-		if err != nil {
-			return err
+		source, readError := os.ReadFile(path)
+		if readError != nil {
+			return readError
 		}
 		if !utf8.Valid(source) {
 			return fmt.Errorf("%s is not UTF-8, which the comparison cannot carry through JSON", path)
@@ -268,15 +326,18 @@ func TestParseSCSSAgreesWithPostcssScss(t *testing.T) {
 		corpusFiles[path] = true
 		return nil
 	})
-	if err != nil {
-		t.Fatal(err)
+	if walkError != nil {
+		test.Fatal(walkError)
 	}
 	if len(corpusFiles) == 0 {
-		t.Fatalf("no .scss files under %s/tests/format/scss", root)
+		test.Fatalf("no .scss files under %s/tests/format/scss", root)
 	}
 	javaScriptFiles := []string{}
 	for _, pattern := range []string{"tests/format/js/multiparser-css/*.js", "tests/format/js/template-literals/*.js"} {
-		matches, _ := filepath.Glob(filepath.Join(root, pattern))
+		matches, globError := filepath.Glob(filepath.Join(root, pattern))
+		if globError != nil {
+			test.Fatal(globError)
+		}
 		for _, match := range matches {
 			if filepath.Base(match) != "format.test.js" {
 				javaScriptFiles = append(javaScriptFiles, match)
@@ -292,9 +353,9 @@ func TestParseSCSSAgreesWithPostcssScss(t *testing.T) {
 
 	var stdin bytes.Buffer
 	for _, each := range inputs {
-		encoded, err := json.Marshal(each)
-		if err != nil {
-			t.Fatal(err)
+		encoded, encodeError := json.Marshal(each)
+		if encodeError != nil {
+			test.Fatal(encodeError)
 		}
 		stdin.Write(encoded)
 		stdin.WriteByte('\n')
@@ -302,27 +363,31 @@ func TestParseSCSSAgreesWithPostcssScss(t *testing.T) {
 	command := exec.Command("node", "--input-type=module", "-e", postcssScssParseScript)
 	command.Dir = root
 	command.Stdin = &stdin
-	var stdout, stderr bytes.Buffer
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
 	command.Stdout, command.Stderr = &stdout, &stderr
-	if err := command.Run(); err != nil {
-		t.Fatalf("node: %v\n%s", err, stderr.String())
+	if runError := command.Run(); runError != nil {
+		test.Fatalf("node: %v\n%s", runError, stderr.String())
 	}
-	var records []map[string]any
+	var records []oracleRecord
 	seen := map[string]bool{}
 	for _, line := range strings.Split(stdout.String(), "\n") {
 		if line == "" {
 			continue
 		}
-		var record map[string]any
-		if err := json.Unmarshal([]byte(line), &record); err != nil {
-			t.Fatal(err)
+		var record oracleRecord
+		if decodeError := json.Unmarshal([]byte(line), &record); decodeError != nil {
+			test.Fatal(decodeError)
+		}
+		if record.Name == nil {
+			test.Fatalf("the oracle printed a record without a name: %s", line)
 		}
 		records = append(records, record)
-		seen[record["name"].(string)] = true
+		seen[*record.Name] = true
 	}
 	for _, each := range inputs {
 		if each.Js == "" && !seen[each.Name] {
-			t.Fatalf("the oracle printed nothing for %s", each.Name)
+			test.Fatalf("the oracle printed nothing for %s", each.Name)
 		}
 	}
 
@@ -330,23 +395,30 @@ func TestParseSCSSAgreesWithPostcssScss(t *testing.T) {
 	fail := func(format string, arguments ...any) {
 		different++
 		if different <= 20 {
-			t.Errorf(format, arguments...)
+			test.Errorf(format, arguments...)
 		}
 	}
 	for _, want := range records {
-		name := want["name"].(string)
-		text := want["text"].(string)
+		if want.Name == nil || want.Text == nil {
+			test.Fatalf("the oracle printed a record without a name and text: %s", want.describe())
+		}
+		name := *want.Name
 		if !corpusFiles[name] && !strings.HasPrefix(name, "fixture: ") {
 			templates++
 		}
-		wantError, oracleRefused := want["error"]
+		oracleRefused := want.refused()
 		if expectMalformed, isFixture := malformed[name]; isFixture && expectMalformed != oracleRefused {
-			fail("%s: the fixture says malformed=%v and postcss-scss says %v", name, expectMalformed, want)
+			fail("%s: the fixture says malformed=%v and postcss-scss says %s", name, expectMalformed, want.describe())
 			continue
 		}
-		got, gotError := dumpParseWith(ParseSCSS, text)
+		got, gotError := dumpParseWith(ParseScss, *want.Text)
 		switch {
 		case oracleRefused && gotError != nil:
+			wantError, readError := json_value.Parse(want.Error)
+			if readError != nil {
+				fail("%s: postcss-scss's error does not read as JSON: %v", name, readError)
+				continue
+			}
 			if difference := firstParseDifference(wantError, gotError, "error"); difference != "" {
 				fail("%s: both refuse, differently: %s", name, difference)
 				continue
@@ -356,63 +428,105 @@ func TestParseSCSSAgreesWithPostcssScss(t *testing.T) {
 				corpusRefused++
 			}
 		case oracleRefused:
-			fail("%s: postcss-scss refuses it (%v) and Go parsed it", name, wantError)
+			fail("%s: postcss-scss refuses it (%s) and Go parsed it", name, want.Error)
 		case gotError != nil:
 			fail("%s: postcss-scss parses it and Go refused: %v", name, gotError)
 		default:
-			if difference := firstParseDifference(want["root"], got, "root"); difference != "" {
+			wantRoot, readError := json_value.Parse(want.Root)
+			if readError != nil {
+				fail("%s: postcss-scss's tree does not read as JSON: %v", name, readError)
+				continue
+			}
+			if difference := firstParseDifference(wantRoot, got, "root"); difference != "" {
 				fail("%s: %s", name, difference)
 				continue
 			}
 			identical++
 		}
 	}
-	t.Logf("%d compared (%d .scss files, %d css-in-js templates from %d JavaScript files, %d fixtures): %d identical, %d refused by both with the same error, %d different; %d .scss files refused",
-		len(records), len(corpusFiles), templates, len(javaScriptFiles), len(scssParseFixtures), identical, refusedByBoth, different, corpusRefused)
+	test.Logf(
+		"%d compared (%d .scss files, %d css-in-js templates from %d JavaScript files, %d fixtures): %d identical, %d refused by both with the same error, %d different; %d .scss files refused",
+		len(records),
+		len(corpusFiles),
+		templates,
+		len(javaScriptFiles),
+		len(scssParseFixtures),
+		identical,
+		refusedByBoth,
+		different,
+		corpusRefused,
+	)
 	if corpusRefused > len(corpusFiles)/10 {
-		t.Errorf("postcss-scss refused %d of %d .scss files; the comparison is thinner than it looks", corpusRefused, len(corpusFiles))
+		test.Errorf(
+			"postcss-scss refused %d of %d .scss files; the comparison is thinner than it looks",
+			corpusRefused,
+			len(corpusFiles),
+		)
 	}
 	if templates == 0 {
-		t.Errorf("no css-in-js templates came out of %d JavaScript files", len(javaScriptFiles))
+		test.Errorf("no css-in-js templates came out of %d JavaScript files", len(javaScriptFiles))
 	}
 
 	// What postcss-scss adds must be in the trees compared, or agreement says nothing about it.
 	features := map[string]int{}
 	for _, want := range records {
-		if root, parsed := want["root"]; parsed {
+		if want.Root != nil {
+			root, readError := json_value.Parse(want.Root)
+			if readError != nil {
+				test.Fatalf("%s: postcss-scss's tree does not read as JSON: %v", *want.Name, readError)
+			}
 			countScssFeatures(root, features)
-		} else if wantError, isMap := want["error"].(map[string]any); isMap && wantError["notCssSyntaxError"] != nil {
-			features["TypeError refusal"]++
+		} else if want.refused() {
+			wantError, readError := json_value.Parse(want.Error)
+			if readError != nil {
+				test.Fatalf("%s: postcss-scss's error does not read as JSON: %v", *want.Name, readError)
+			}
+			// A refusal that is not a CssSyntaxError dumps its message as a string under notCssSyntaxError.
+			if object, isObject := wantError.(json_value.Object); isObject {
+				if message, present := object["notCssSyntaxError"]; present && message != (json_value.Null{}) {
+					features["TypeError refusal"]++
+				}
+			}
 		}
 	}
-	t.Logf("postcss-scss features compared: %v", features)
-	for _, feature := range []string{"inline comment", "inline comment raws.text", "nested declaration", "raws.selector.scss", "raws.value.scss", "raws.params.scss", "TypeError refusal"} {
+	test.Logf("postcss-scss features compared: %v", features)
+	for _, feature := range []string{
+		"inline comment",
+		"inline comment raws.text",
+		"nested declaration",
+		"raws.selector.scss",
+		"raws.value.scss",
+		"raws.params.scss",
+		"TypeError refusal",
+	} {
 		if features[feature] == 0 {
-			t.Errorf("no input exercises %s", feature)
+			test.Errorf("no input exercises %s", feature)
 		}
 	}
 }
 
 // countScssFeatures counts, in an oracle dump, the nodes and raws only postcss-scss makes.
-func countScssFeatures(value any, features map[string]int) {
+//
+// Mutates: features the walk adds every feature it finds to the count, so one map gathers a whole corpus.
+func countScssFeatures(value json_value.Value, features map[string]int) {
 	switch typed := value.(type) {
-	case []any:
+	case json_value.Array:
 		for _, each := range typed {
 			countScssFeatures(each, features)
 		}
-	case map[string]any:
-		raws, _ := typed["raws"].(map[string]any)
-		if typed["type"] == "comment" && raws["inline"] == true {
+	case json_value.Object:
+		raws, _ := typed["raws"].(json_value.Object)
+		if typed["type"] == json_value.String("comment") && raws["inline"] == json_value.Boolean(true) {
 			features["inline comment"]++
 			if _, hasText := raws["text"]; hasText {
 				features["inline comment raws.text"]++
 			}
 		}
-		if typed["type"] == "decl" && typed["isNested"] == true {
+		if typed["type"] == json_value.String("decl") && typed["isNested"] == json_value.Boolean(true) {
 			features["nested declaration"]++
 		}
 		for _, field := range []string{"selector", "value", "params"} {
-			if raw, isMap := raws[field].(map[string]any); isMap {
+			if raw, isMap := raws[field].(json_value.Object); isMap {
 				if _, hasScss := raw["scss"]; hasScss {
 					features["raws."+field+".scss"]++
 				}

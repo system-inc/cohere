@@ -8,5 +8,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // shared edit. The decoder is hand-written so a bare `"error"` and `{}` both resolve to the
 // documented default of `props: true`; see DecodeNoSelfAssignOptions.
 func init() {
-	rule.Register(rule.Registration{Rule: NoSelfAssign, Decode: DecodeNoSelfAssignOptions})
+	rule.Register(rule.Registration[NoSelfAssignOptions]{Rule: NoSelfAssign, Decode: DecodeNoSelfAssignOptions})
 }

@@ -16,25 +16,25 @@ import (
 // The fixtures share the class-order suite's harness for the reason that file states at length: the
 // rule declares `ProgramReads` and reaches for a real stylesheet, so a fixture running through
 // `rule_testing.Run` would exercise the nil-Program decline path and pass while proving nothing.
-func runVariantOrderFixture(t *testing.T, fileName string, source string) rule_testing.Result {
-	t.Helper()
+func runVariantOrderFixture(test *testing.T, fileName string, source string) rule_testing.Result {
+	test.Helper()
 
-	packageRoot := classOrderFixturePackageRoot()
+	packageRoot := classOrderFixturePackageRoot(test)
 	if packageRoot == "" {
-		t.Skip("no installed tailwindcss on this machine, so the rule's design system cannot be " +
+		test.Skip("no installed tailwindcss on this machine, so the rule's design system cannot be " +
 			"built and these fixtures would measure a decline rather than an order")
 	}
 
-	return rule_testing.RunTypedFilesWithSetup(t, EnforceConsistentVariantOrder, map[string]string{
+	return rule_testing.RunTypedFilesWithSetup(test, EnforceConsistentVariantOrder, map[string]string{
 		fileName:                        source,
 		classOrderFixtureStylesheetPath: classOrderFixtureStylesheet,
 	}, fileName, func(root string) {
 		modules := filepath.Join(root, "node_modules")
-		if err := os.MkdirAll(modules, 0o755); err != nil {
-			t.Fatalf("creating the fixture node_modules: %v", err)
+		if createDirectoryError := os.MkdirAll(modules, 0o755); createDirectoryError != nil {
+			test.Fatalf("creating the fixture node_modules: %v", createDirectoryError)
 		}
-		if err := os.Symlink(packageRoot, filepath.Join(modules, "tailwindcss")); err != nil {
-			t.Fatalf("linking the installed tailwindcss into the fixture: %v", err)
+		if symlinkError := os.Symlink(packageRoot, filepath.Join(modules, "tailwindcss")); symlinkError != nil {
+			test.Fatalf("linking the installed tailwindcss into the fixture: %v", symlinkError)
 		}
 	})
 }
@@ -43,8 +43,8 @@ func runVariantOrderFixture(t *testing.T, fileName string, source string) rule_t
 //
 // Every source here was run through upstream on the ahra tree and reported, with the replacement
 // this rule prints matching upstream's character for character.
-func TestEnforceConsistentVariantOrderReports(t *testing.T) {
-	t.Parallel()
+func TestEnforceConsistentVariantOrderReports(test *testing.T) {
+	test.Parallel()
 	testCases := []struct {
 		name   string
 		source string
@@ -96,9 +96,13 @@ func TestEnforceConsistentVariantOrderReports(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, runVariantOrderFixture(t, "Component.tsx", testCase.source), "variantOrder")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(
+				test,
+				runVariantOrderFixture(test, "Component.tsx", testCase.source),
+				"variantOrder",
+			)
 		})
 	}
 }
@@ -108,8 +112,8 @@ func TestEnforceConsistentVariantOrderReports(t *testing.T) {
 // The first two are the restraint the rule is built around, and a version of this file that used
 // the registry's full `Compare` reported both. Upstream's `compareVariantOrder` answers 0 when both
 // variants sort below the global flag, so two element-scoped variants are accepted in either order.
-func TestEnforceConsistentVariantOrderStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestEnforceConsistentVariantOrderStaysSilent(test *testing.T) {
+	test.Parallel()
 	testCases := []struct {
 		name   string
 		source string
@@ -160,9 +164,9 @@ func TestEnforceConsistentVariantOrderStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, runVariantOrderFixture(t, "Component.tsx", testCase.source))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, runVariantOrderFixture(test, "Component.tsx", testCase.source))
 		})
 	}
 }
@@ -171,18 +175,18 @@ func TestEnforceConsistentVariantOrderStaysSilent(t *testing.T) {
 //
 // The replacement is the whole content of the finding: a reader told only that the order is wrong
 // has to work out the permutation themselves, and the permutation is what the rule computed.
-func TestEnforceConsistentVariantOrderNamesBothSpellings(t *testing.T) {
-	t.Parallel()
-	result := runVariantOrderFixture(t, "Component.tsx", `const element = <div className="dark:md:flex" />;`)
-	rule_testing.ExpectFindings(t, result, "variantOrder")
+func TestEnforceConsistentVariantOrderNamesBothSpellings(test *testing.T) {
+	test.Parallel()
+	result := runVariantOrderFixture(test, "Component.tsx", `const element = <div className="dark:md:flex" />;`)
+	rule_testing.ExpectFindings(test, result, "variantOrder")
 
 	if len(result.Diagnostics) == 0 {
-		t.Fatal("expected a finding")
+		test.Fatal("expected a finding")
 	}
 	message := result.Diagnostics[0].Message.Description
 	for _, want := range []string{"dark:md:flex", "md:dark:flex"} {
 		if !strings.Contains(message, want) {
-			t.Errorf("the message does not name %q: %s", want, message)
+			test.Errorf("the message does not name %q: %s", want, message)
 		}
 	}
 }

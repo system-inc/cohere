@@ -29,7 +29,7 @@ import (
 // not start failing because the binary was renamed. New code writes `cohere-disable`.
 //
 // Honoring the old spellings is not deference to the old tools. It is refusing to make a mechanical
-// rename the price of switching linters — the same reasoning that keeps a rule enabled by giving it
+// rename the price of switching linters, the same reasoning that keeps a rule enabled by giving it
 // a narrow escape hatch, applied one level up to the tool itself.
 //
 // The grammar does not vary by spelling, so nothing downstream of parsing knows which one it read.
@@ -37,7 +37,7 @@ import (
 //
 // Whitespace in this grammar is JavaScript's, because ESLint's is: it trims with
 // `String.prototype.trim` and ends the directive word at `\s`. Go's `strings.TrimSpace` counts the
-// next-line character (U+0085) as space and the byte order mark (U+FEFF) as not, and JavaScript does
+// next-line character (`U+0085`) as space and the byte order mark (`U+FEFF`) as not, and JavaScript does
 // the reverse, so a Go trim read 15 of 19 comments holding one of them, a no-break space after the
 // word included, differently from ESLint (#z4nssqs, found by @system_adamic's stream P2).
 const (
@@ -194,7 +194,7 @@ func splitDirective(body string) (rest string, found bool) {
 //
 // The order of these cases is load-bearing and is the highest-consequence bug available in this
 // file. `-next-line` must be tested before the bare form, or all 372 next-line directives in the
-// corpus read as file-level disables — each one silencing every rule for the remainder of its file,
+// corpus read as file-level disables, each one silencing every rule for the remainder of its file,
 // with nothing in the output saying so. Go's switch does not fall through, but the cases are still
 // written longest-first so the ordering is visible to a reader rather than incidental.
 func splitScope(rest string) (scope Scope, remainder string, valid bool) {
@@ -208,7 +208,7 @@ func splitScope(rest string) (scope Scope, remainder string, valid bool) {
 		return ScopeFile, rest, true
 	}
 
-	// The directive is a prefix of a longer word — `eslint-disable-nonsense`, or `eslint-disabled`.
+	// The directive is a prefix of a longer word: `eslint-disable-nonsense`, or `eslint-disabled`.
 	// Prose that merely contains a directive word must not silence a rule.
 	return ScopeFile, "", false
 }
@@ -244,7 +244,7 @@ func splitReason(rest string) (rules string, reason string) {
 //
 // The corpus writes multi-rule lines: `nexus/consistency-require-type-suffix,
 // nexus/consistency-no-abbreviated-identifier` on one comment. Splitting on comma rather than
-// whitespace matters because that is what the corpus and ESLint both do — a whitespace split reads
+// whitespace matters because that is what the corpus and ESLint both do: a whitespace split reads
 // two rules as one unknown name, which matches nothing and silences nothing while looking like it
 // silenced something.
 func parseRuleNames(list string) []string {

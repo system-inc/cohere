@@ -13,7 +13,7 @@ import (
  * rule tag landed on a continuation line carrying no position.
  *
  * The cost is silent and it is biased. Any reader keyed on `position ... [rule]` drops those
- * findings, and it drops the LONGEST messages, which are the ones carrying advice. Four of 5,312
+ * findings, and it drops the longest messages, which are the ones carrying advice. Four of 5,312
  * findings on the ahra tree wrapped that way. An extractor of mine missed them and I spent four
  * hours instrumenting a rule that was working correctly, chasing a gap that existed only in the
  * tool reading the output.
@@ -22,8 +22,8 @@ import (
  * paragraph should not have to know about it. The message is the rule's to write; the line
  * discipline is the printer's to keep.
  */
-func TestDiagnosticDescriptionIsASingleLine(t *testing.T) {
-	t.Parallel()
+func TestDiagnosticDescriptionIsASingleLine(test *testing.T) {
+	test.Parallel()
 
 	for name, testCase := range map[string]struct {
 		description string
@@ -44,14 +44,14 @@ func TestDiagnosticDescriptionIsASingleLine(t *testing.T) {
 			want:        "first second third",
 		},
 	} {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
 			got := singleLineDescription(testCase.description)
 			if got != testCase.want {
-				t.Errorf("description = %q, want %q", got, testCase.want)
+				test.Errorf("description = %q, want %q", got, testCase.want)
 			}
 			if strings.Contains(got, "\n") {
-				t.Errorf("description still contains a newline: %q", got)
+				test.Errorf("description still contains a newline: %q", got)
 			}
 		})
 	}

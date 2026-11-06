@@ -11,6 +11,7 @@ import (
 	"github.com/system-inc/cohere/internal/edit"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/rules/typescript"
+	"github.com/system-inc/cohere/internal/lint/testing"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
@@ -26,25 +27,36 @@ import (
 
 // TestTheFixPathsReLintComputesEachDerivationOncePerText: every rule re-linting a text shares one cache, so a
 // derivation asked for at every node by two rules is computed once.
-func TestTheFixPathsReLintComputesEachDerivationOncePerText(t *testing.T) {
-	t.Parallel()
+func TestTheFixPathsReLintComputesEachDerivationOncePerText(test *testing.T) {
+	test.Parallel()
 	computed := 0
-	asking := func(name string) rule.Rule {
-		return rule.Rule{Name: name, Run: func(ctx rule.Context, options any) rule.Listeners {
-			return rule.Listeners{ast.KindIdentifier: func(node *ast.Node) {
-				rule.Cached(ctx.FileCache, "fix-file-cache-probe", func() int {
-					computed++
-					return computed
-				})
-			}}
-		}}
+	asking := func(name string) rule.Rule[rule.NoOptions] {
+		return rule.Rule[rule.NoOptions]{
+			Name: name,
+			Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+				return rule.Listeners{ast.KindIdentifier: func(node *ast.Node) {
+					rule.Cached(ruleContext.FileCache, "fix-file-cache-probe", func() int {
+						computed++
+						return computed
+					})
+				}}
+			},
+		}
 	}
 	text := "const first = second;\nconst third = first + second;\n"
-	if _, err := proposalsForText("/Probe.ts", text, &program.Graph{}, []rule.Rule{asking("probe-a"), asking("probe-b")}); err != nil {
-		t.Fatalf("proposalsForText: %v", err)
+	if _, proposalsForTextError := proposalsForText(
+		"/Probe.ts",
+		text,
+		&program.Graph{},
+		rule_testing.EntriesOf(test, asking("probe-a"), asking("probe-b")),
+	); proposalsForTextError != nil {
+		test.Fatalf("proposalsForText: %v", proposalsForTextError)
 	}
 	if computed != 1 {
-		t.Errorf("the derivation was computed %d times for one text asked at every identifier by two rules, want once", computed)
+		test.Errorf(
+			"the derivation was computed %d times for one text asked at every identifier by two rules, want once",
+			computed,
+		)
 	}
 }
 
@@ -54,7 +66,13 @@ func bundle(count int) string {
 	var text strings.Builder
 	text.WriteString("\"use strict\";\n(() => {\n")
 	for index := range count {
-		fmt.Fprintf(&text, "  // module %d\n  var module%d = function() {\n    /* the module's body */\n    return this.value%d;\n  };\n", index, index, index)
+		fmt.Fprintf(
+			&text,
+			"  // module %d\n  var module%d = function() {\n    /* the module's body */\n    return this.value%d;\n  };\n",
+			index,
+			index,
+			index,
+		)
 	}
 	text.WriteString("})();\n")
 	return text.String()
@@ -65,20 +83,29 @@ func bundle(count int) string {
 //
 // Not parallel: testing.AllocsPerRun reads the process's allocation count, which a parallel test would add to,
 // and it refuses to run inside one.
-func TestTheFixPathsReLintGrowsLinearlyOnABundle(t *testing.T) {
-	rules := []rule.Rule{typescript.NoInvalidThis}
+func TestTheFixPathsReLintGrowsLinearlyOnABundle(test *testing.T) {
+	rules := []rule.Entry{rule_testing.EntryOf(test, typescript.NoInvalidThis)}
 	allocations := func(count int) float64 {
 		text := bundle(count)
 		return testing.AllocsPerRun(3, func() {
-			if _, err := proposalsForText("/main.js", text, &program.Graph{}, rules); err != nil {
-				t.Fatalf("proposalsForText: %v", err)
+			if _, proposalsForTextError := proposalsForText(
+				"/main.js",
+				text,
+				&program.Graph{},
+				rules,
+			); proposalsForTextError != nil {
+				test.Fatalf("proposalsForText: %v", proposalsForTextError)
 			}
 		})
 	}
 	small, large := allocations(100), allocations(400)
 	if ratio := large / small; ratio > 6 {
-		t.Errorf("four times the bundle allocated %.1f times as much (%.0f against %.0f objects), want about four: the re-lint is quadratic in the file",
-			ratio, large, small)
+		test.Errorf(
+			"four times the bundle allocated %.1f times as much (%.0f against %.0f objects), want about four: the re-lint is quadratic in the file",
+			ratio,
+			large,
+			small,
+		)
 	}
 }
 
@@ -88,47 +115,54 @@ type lockedBuffer struct {
 	text  strings.Builder
 }
 
-func (b *lockedBuffer) Write(bytes []byte) (int, error) {
-	b.mutex.Lock()
-	defer b.mutex.Unlock()
-	return b.text.Write(bytes)
+func (buffer *lockedBuffer) Write(bytes []byte) (int, error) {
+	buffer.mutex.Lock()
+	defer buffer.mutex.Unlock()
+	return buffer.text.Write(bytes)
 }
 
-func (b *lockedBuffer) String() string {
-	b.mutex.Lock()
-	defer b.mutex.Unlock()
-	return b.text.String()
+func (buffer *lockedBuffer) String() string {
+	buffer.mutex.Lock()
+	defer buffer.mutex.Unlock()
+	return buffer.text.String()
 }
 
 // TestAFileStillInTheFixPhaseIsNamedWhileItRuns: a file that outlasts the notice is named, with where to
 // report it, while it is still running, and a file that finishes first says nothing (#xn1k1gz). The runaway
 // that found this sat 26 minutes on one core with nothing on screen.
-func TestAFileStillInTheFixPhaseIsNamedWhileItRuns(t *testing.T) {
-	t.Parallel()
+func TestAFileStillInTheFixPhaseIsNamedWhileItRuns(test *testing.T) {
+	test.Parallel()
 	for name, testCase := range map[string]struct {
 		after, takes time.Duration
 		named        bool
 	}{
-		"a file that outlasts the notice is named": {after: time.Millisecond, takes: 200 * time.Millisecond, named: true},
-		"a file that finishes first says nothing":  {after: time.Minute, takes: 0, named: false},
+		"a file that outlasts the notice is named": {
+			after: time.Millisecond,
+			takes: 200 * time.Millisecond,
+			named: true,
+		},
+		"a file that finishes first says nothing": {after: time.Minute, takes: 0, named: false},
 	} {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
 			out := &lockedBuffer{}
 			seenWhileRunning := false
-			result, err := watchedFile(out, testCase.after, "/bundle/main.js", func() (edit.FileResult, error) {
+			result, watchedFileError := watchedFile(out, testCase.after, "/bundle/main.js", func() (
+				edit.FileResult,
+				error,
+			) {
 				time.Sleep(testCase.takes)
 				seenWhileRunning = strings.Contains(out.String(), "/bundle/main.js")
 				return edit.FileResult{FileName: "/bundle/main.js"}, nil
 			})
-			if err != nil || result.FileName != "/bundle/main.js" {
-				t.Fatalf("the file's own result did not come back: %+v, %v", result, err)
+			if watchedFileError != nil || result.FileName != "/bundle/main.js" {
+				test.Fatalf("the file's own result did not come back: %+v, %v", result, watchedFileError)
 			}
 			if seenWhileRunning != testCase.named {
-				t.Errorf("named while running %t, want %t: %q", seenWhileRunning, testCase.named, out.String())
+				test.Errorf("named while running %t, want %t: %q", seenWhileRunning, testCase.named, out.String())
 			}
 			if testCase.named && !strings.Contains(out.String(), reportBugsAt) {
-				t.Errorf("the notice does not say where to report it: %q", out.String())
+				test.Errorf("the notice does not say where to report it: %q", out.String())
 			}
 		})
 	}

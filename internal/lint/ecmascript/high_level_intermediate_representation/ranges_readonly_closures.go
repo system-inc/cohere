@@ -5,7 +5,11 @@ import (
 	"github.com/system-inc/cohere/static_single_assignment"
 )
 
-func hasReadOnlyClosureEffectsForCaptures(function *Function, captures []Place, kinds map[static_single_assignment.IdentifierId]mutation_aliasing.EffectValueKind) bool {
+func hasReadOnlyClosureEffectsForCaptures(
+	function *Function,
+	captures []Place,
+	kinds map[static_single_assignment.IdentifierId]mutation_aliasing.EffectValueKind,
+) bool {
 	if hasReadOnlyClosureEffects(function, map[*Function]bool{}) {
 		return true
 	}
@@ -45,11 +49,21 @@ func hasReadOnlyClosureEffectsForCaptures(function *Function, captures []Place, 
 				return false
 			}
 		case *MethodCall:
-			if _, known := lookupSignature(function, calleeProducers, instruction, calleeName(function, instruction, value.Property)); !known {
+			if _, known := lookupSignature(
+				function,
+				calleeProducers,
+				instruction,
+				calleeName(function, instruction, value.Property),
+			); !known {
 				return false
 			}
 		case *CallExpression:
-			if _, known := lookupSignature(function, calleeProducers, instruction, calleeName(function, instruction, value.Callee)); !known {
+			if _, known := lookupSignature(
+				function,
+				calleeProducers,
+				instruction,
+				calleeName(function, instruction, value.Callee),
+			); !known {
 				if _, global := producers[value.Callee.Identifier].(*LoadGlobal); !global {
 					return false
 				}
@@ -66,6 +80,10 @@ func hasReadOnlyClosureEffectsForCaptures(function *Function, captures []Place, 
 	return graph.MutationCount() == 0
 }
 
+// hasReadOnlyClosureEffects reports whether a function, and every closure it creates or holds, is free of the
+// instructions and effects (a mutation, a freeze) that rule out a read-only closure.
+//
+// Mutates: seen the recursion marks each function it is inside so a cycle stops, and unmarks it on the way out
 func hasReadOnlyClosureEffects(function *Function, seen map[*Function]bool) bool {
 	if function == nil || seen[function] {
 		return false
@@ -81,11 +99,15 @@ func hasReadOnlyClosureEffects(function *Function, seen map[*Function]bool) bool
 		case *Await, *StoreGlobal, *StoreContext, *ObjectMethod:
 			return false
 		case *FunctionExpression:
-			if int(value.Function) >= len(function.Functions) || !hasReadOnlyClosureEffects(function.Functions[value.Function], seen) {
+			if int(value.Function) >= len(function.Functions) ||
+				!hasReadOnlyClosureEffects(function.Functions[value.Function], seen) {
 				return false
 			}
 		case *LoadGlobal:
-			if nested := nestedFunctionHeldBy(function, instruction.LValue.Identifier); nested != nil && !hasReadOnlyClosureEffects(nested, seen) {
+			if nested := nestedFunctionHeldBy(
+				function,
+				instruction.LValue.Identifier,
+			); nested != nil && !hasReadOnlyClosureEffects(nested, seen) {
 				return false
 			}
 		}
@@ -98,7 +120,7 @@ func hasReadOnlyClosureEffects(function *Function, seen map[*Function]bool) bool
 	return true
 }
 
-func refDerivedValues(function *Function) map[static_single_assignment.IdentifierId]bool {
+func referenceDerivedValues(function *Function) map[static_single_assignment.IdentifierId]bool {
 	refs := useRefResultValues(function)
 	for {
 		changed := false
@@ -122,16 +144,16 @@ func refDerivedValues(function *Function) map[static_single_assignment.Identifie
 				if instruction == nil {
 					continue
 				}
-				switch value := instruction.Value.(type) {
+				switch shape := instruction.Value.(type) {
 				case *LoadLocal:
-					mark(value.Place.Identifier, instruction.LValue.Identifier)
+					mark(shape.Place.Identifier, instruction.LValue.Identifier)
 				case *StoreLocal:
-					mark(value.Value.Identifier, value.LValue.Identifier)
-					mark(value.Value.Identifier, instruction.LValue.Identifier)
+					mark(shape.Value.Identifier, shape.LValue.Identifier)
+					mark(shape.Value.Identifier, instruction.LValue.Identifier)
 				case *PropertyLoad:
-					mark(value.Object.Identifier, instruction.LValue.Identifier)
+					mark(shape.Object.Identifier, instruction.LValue.Identifier)
 				case *ComputedLoad:
-					mark(value.Object.Identifier, instruction.LValue.Identifier)
+					mark(shape.Object.Identifier, instruction.LValue.Identifier)
 				}
 			}
 		}

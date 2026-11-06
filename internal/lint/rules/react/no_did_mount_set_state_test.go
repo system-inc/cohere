@@ -30,7 +30,7 @@ const didMountFile = "/repository/source/DidMount.tsx"
 // files rather than by assuming the totals lined up.
 //
 // The second block is the same rule under `["disallow-in-func"]`, which decodes to
-// `DisallowInFunc: true`. Three of its four failing cases are byte-identical to cases that PASS in
+// `DisallowInFunc: true`. Three of its four failing cases are byte-identical to cases that pass in
 // the first block, which is the single most useful thing the corpus says about this rule: the
 // option is not an edge refinement, it is the switch that moves half the passing set into the
 // failing one.
@@ -42,8 +42,8 @@ const didMountFile = "/repository/source/DidMount.tsx"
 // written directly in the lifecycle body and one inside an event callback, and reports exactly
 // once by default. A port that ignored the function count would report twice here and still look
 // plausible, because the case is in the failing list either way.
-func TestNoDidMountSetStateFires(t *testing.T) {
-	t.Parallel()
+func TestNoDidMountSetStateFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name           string
@@ -156,11 +156,11 @@ func TestNoDidMountSetStateFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoDidMountSetState, didMountFile, testCase.sourceText,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoDidMountSetState, didMountFile, testCase.sourceText,
 				NoMethodSetStateOptions{DisallowInFunc: testCase.disallowInFunc})
-			rule_testing.ExpectFindings(t, result, "noDidMountSetState")
+			rule_testing.ExpectFindings(test, result, "noDidMountSetState")
 		})
 	}
 }
@@ -172,8 +172,8 @@ func TestNoDidMountSetStateFires(t *testing.T) {
 // a `setTimeout` or a promise continuation. Those five are the corpus doing the work: they are what
 // a port asking only "is this inside componentDidMount" gets wrong, and three of them reappear as
 // failures in the option table above.
-func TestNoDidMountSetStateStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoDidMountSetStateStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name           string
@@ -291,11 +291,11 @@ func TestNoDidMountSetStateStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoDidMountSetState, didMountFile, testCase.sourceText,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoDidMountSetState, didMountFile, testCase.sourceText,
 				NoMethodSetStateOptions{DisallowInFunc: testCase.disallowInFunc})
-			rule_testing.ExpectClean(t, result)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -308,8 +308,8 @@ func TestNoDidMountSetStateStaysSilent(t *testing.T) {
 // never check that the finding points anywhere in particular. Every case below exists because a
 // mutation to the rule survived the imported corpus, or because reading the reference implementation
 // showed a branch nothing upstream reaches.
-func TestNoDidMountSetStateOwnCases(t *testing.T) {
-	t.Parallel()
+func TestNoDidMountSetStateOwnCases(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name           string
@@ -489,7 +489,7 @@ class Hello extends React.Component {
 }
 `, didMountFile, false, []string{"noDidMountSetState"}},
 
-		// The computed lifecycle key REPORTS. An earlier version of this file asserted silence
+		// The computed lifecycle key reports. An earlier version of this file asserted silence
 		// here and defended it in a doc comment as a deliberate divergence; it was a defect. oxc's
 		// `key.static_name()` resolves a computed string key, and the release oxlint binary reports
 		// on this exact source. Measured, not reasoned.
@@ -518,7 +518,7 @@ var Hello = createReactClass({
   }
 });
 `, didMountFile, false, nil},
-		// A getter REPORTS. oxc matches `MethodDefinition` without asking the method kind, and a
+		// A getter reports. oxc matches `MethodDefinition` without asking the method kind, and a
 		// getter is one in its tree. An earlier version excluded accessors on a guess and its doc
 		// comment said upstream had no such node, which was wrong. Confirmed on the release binary.
 		{"getter named for the lifecycle method", `
@@ -537,7 +537,7 @@ class Hello extends React.Component {
   }
 }
 `, didMountFile, false, []string{"noDidMountSetState"}},
-		// A method the walk merely PASSES THROUGH is a function scope too. This shipped as a false
+		// A method the walk merely passes through is a function scope too. This shipped as a false
 		// positive: the latch counted the lifecycle method's own scope by hand, and `isFunctionScope`
 		// omitted method kinds entirely, so `setState` inside an object method declared in the
 		// lifecycle body came out one scope shallow and reported. Silent at the release binary,
@@ -583,7 +583,7 @@ class Hello extends React.Component {
 }
 `, didMountFile, false, []string{"noDidMountSetState"}},
 
-		// The ES5 factory name set, which is NARROWER than the shelf helper this rule calls.
+		// The ES5 factory name set, which is narrower than the shelf helper this rule calls.
 		// `internal/utilities/react.IsEs5ComponentCall` accepts `createClass` as well, and oxc's
 		// `CREATE_CLASS` at `oxc_linter/src/utils/react.rs:554` is the single constant
 		// `createReactClass`. Both of these are clean on the release binary and a port following
@@ -602,7 +602,7 @@ var Hello = React.createClass({
   }
 });
 `, didMountFile, false, nil},
-		// The namespaced spelling that IS accepted, so the narrowing above is a name check rather
+		// The namespaced spelling that is accepted, so the narrowing above is a name check rather
 		// than the member arm being dropped wholesale.
 		{"React.createReactClass is accepted", `
 var Hello = React.createReactClass({
@@ -622,7 +622,7 @@ var Hello = (createReactClass)({
 });
 `, didMountFile, false, []string{"noDidMountSetState"}},
 
-		// A parenthesized `this` is SILENT, the opposite answer to the parenthesized factory above,
+		// A parenthesized `this` is silent, the opposite answer to the parenthesized factory above,
 		// because oxc destructures `Expression::ThisExpression` and a parenthesis is a different
 		// variant. Both directions were measured rather than reasoned.
 		{"parenthesized this", `
@@ -641,7 +641,7 @@ class Hello extends React.Component {
 `, didMountFile, false, nil},
 
 		// The component gate is looser than it looks: nothing requires the lifecycle property to be
-		// a member OF the component, only that a component is somewhere further out. A plain object
+		// a member of the component, only that a component is somewhere further out. A plain object
 		// literal declared inside a real component's render method reports on the release binary.
 		// Reproduced rather than improved on.
 		{"plain object literal nested inside a component", `
@@ -709,15 +709,15 @@ class Hello extends React.Component {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoDidMountSetState, testCase.fileName, testCase.sourceText,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoDidMountSetState, testCase.fileName, testCase.sourceText,
 				NoMethodSetStateOptions{DisallowInFunc: testCase.disallowInFunc})
 			if len(testCase.findings) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.findings...)
+			rule_testing.ExpectFindings(test, result, testCase.findings...)
 		})
 	}
 }
@@ -734,8 +734,8 @@ class Hello extends React.Component {
 // The message text is asserted with an exact prefix rather than with `strings.Contains` on an
 // interpolated value, because a containment check on a rendered string passes for a string that has
 // the needle plus a defect.
-func TestNoDidMountSetStateReportsTheCallee(t *testing.T) {
-	t.Parallel()
+func TestNoDidMountSetStateReportsTheCallee(test *testing.T) {
+	test.Parallel()
 
 	sourceText := `
 class Hello extends React.Component {
@@ -744,18 +744,18 @@ class Hello extends React.Component {
   }
 }
 `
-	result := rule_testing.RunWithOptions(t, NoDidMountSetState, didMountFile, sourceText,
+	result := rule_testing.RunWithOptions(test, NoDidMountSetState, didMountFile, sourceText,
 		NoMethodSetStateOptions{})
-	rule_testing.ExpectFindings(t, result, "noDidMountSetState")
+	rule_testing.ExpectFindings(test, result, "noDidMountSetState")
 
 	diagnostic := result.Diagnostics[0]
 	reported := sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
 	if reported != "this.setState" {
-		t.Errorf("finding points at %q, want %q", reported, "this.setState")
+		test.Errorf("finding points at %q, want %q", reported, "this.setState")
 	}
 
 	if !strings.HasPrefix(diagnostic.Message.Description, "`setState` is called in `componentDidMount`.") {
-		t.Errorf("message description = %q, want it to open with the finding", diagnostic.Message.Description)
+		test.Errorf("message description = %q, want it to open with the finding", diagnostic.Message.Description)
 	}
 }
 
@@ -765,8 +765,8 @@ class Hello extends React.Component {
 // rather than `PropertyAccessExpression`, and a rule reporting the access's own name node rather
 // than the callee would point at four characters in one spelling and sixteen in the other while
 // passing an id assertion in both.
-func TestNoDidMountSetStateReportsTheCalleeOnASubscript(t *testing.T) {
-	t.Parallel()
+func TestNoDidMountSetStateReportsTheCalleeOnASubscript(test *testing.T) {
+	test.Parallel()
 
 	sourceText := `
 class Hello extends React.Component {
@@ -775,13 +775,13 @@ class Hello extends React.Component {
   }
 }
 `
-	result := rule_testing.RunWithOptions(t, NoDidMountSetState, didMountFile, sourceText,
+	result := rule_testing.RunWithOptions(test, NoDidMountSetState, didMountFile, sourceText,
 		NoMethodSetStateOptions{})
-	rule_testing.ExpectFindings(t, result, "noDidMountSetState")
+	rule_testing.ExpectFindings(test, result, "noDidMountSetState")
 
 	diagnostic := result.Diagnostics[0]
 	reported := sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
 	if reported != `this["setState"]` {
-		t.Errorf("finding points at %q, want %q", reported, `this["setState"]`)
+		test.Errorf("finding points at %q, want %q", reported, `this["setState"]`)
 	}
 }

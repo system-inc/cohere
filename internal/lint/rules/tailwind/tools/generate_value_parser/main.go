@@ -4,7 +4,8 @@
 //
 // Usage:
 //
-//	go run ./internal/lint/rules/tailwind/tools/generate_value_parser -package-root <tailwindcss package> [-output <file.json>] [-check]
+//	go run ./internal/lint/rules/tailwind/tools/generate_value_parser \
+//	    -package-root <tailwindcss package> [-output <file.json>] [-check]
 //
 // The distinction this tool exists to enforce is the same one generate_data_type enforces:
 // reading the source and asking the engine are different claims. For this parser they disagree in
@@ -34,41 +35,60 @@ import (
 )
 
 func main() {
-	packageRoot := flag.String("package-root", "", "path to the tailwindcss package root (the directory holding package.json)")
-	output := flag.String("output", filepath.Join("internal", "tailwind", "testdata", "valueparser_fixtures.json"), "where to write the fixture")
+	packageRoot := flag.String(
+		"package-root",
+		"",
+		"path to the tailwindcss package root (the directory holding package.json)",
+	)
+	output := flag.String(
+		"output",
+		filepath.Join("internal", "tailwind", "testdata", "valueparser_fixtures.json"),
+		"where to write the fixture",
+	)
 	check := flag.Bool("check", false, "regenerate and fail if the committed fixture disagrees")
 	flag.Parse()
 
 	if *packageRoot == "" {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 		fmt.Fprintln(os.Stderr, "-package-root is required")
 		os.Exit(2)
 	}
 
-	generated, err := enumerate(*packageRoot)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "enumerate: %v\n", err)
+	generated, enumerateError := enumerate(*packageRoot)
+	if enumerateError != nil {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
+		fmt.Fprintf(os.Stderr, "enumerate: %v\n", enumerateError)
 		os.Exit(1)
 	}
 
 	if *check {
-		committed, err := os.ReadFile(*output)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "read %s: %v\n", *output, err)
+		committed, readError := os.ReadFile(*output)
+		if readError != nil {
+			// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
+			fmt.Fprintf(os.Stderr, "read %s: %v\n", *output, readError)
 			os.Exit(1)
 		}
 		// Go whitespace: this tool comparing its own committed fixture with its own output.
 		if !bytes.Equal(bytes.TrimSpace(committed), bytes.TrimSpace(generated)) {
-			fmt.Fprintf(os.Stderr, "%s is stale: the engine now parses differently. Re-run without -check and read the diff.\n", *output)
+			// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
+			fmt.Fprintf(
+				os.Stderr,
+				"%s is stale: the engine now parses differently. Re-run without -check and read the diff.\n",
+				*output,
+			)
 			os.Exit(1)
 		}
+		// Ignored: the check has passed, and the exit code says so whether or not this lands.
 		fmt.Fprintf(os.Stderr, "%s matches the engine\n", *output)
 		return
 	}
 
-	if err := os.WriteFile(*output, generated, 0o644); err != nil {
-		fmt.Fprintf(os.Stderr, "write %s: %v\n", *output, err)
+	if writeError := os.WriteFile(*output, generated, 0o644); writeError != nil {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
+		fmt.Fprintf(os.Stderr, "write %s: %v\n", *output, writeError)
 		os.Exit(1)
 	}
+	// Ignored: what it reports is already written, and a summary that cannot reach the terminal changes none of it.
 	fmt.Fprintf(os.Stderr, "wrote %s\n", *output)
 }
 
@@ -78,26 +98,27 @@ func main() {
 // failure mode this whole approach exists to prevent, and it would otherwise look like a passing
 // run.
 func enumerate(packageRoot string) ([]byte, error) {
-	directory, err := toolDirectory()
-	if err != nil {
-		return nil, err
+	directory, toolDirectoryError := toolDirectory()
+	if toolDirectoryError != nil {
+		return nil, toolDirectoryError
 	}
 	script := filepath.Join(directory, "enumerate.mjs")
 
 	command := exec.Command("node", script, packageRoot)
 	command.Stderr = os.Stderr
-	out, err := command.Output()
-	if err != nil {
-		return nil, fmt.Errorf("node %s: %w", script, err)
+	out, outputError := command.Output()
+	if outputError != nil {
+		return nil, fmt.Errorf("node %s: %w", script, outputError)
 	}
 
 	var parsed struct {
 		TailwindVersion string `json:"tailwindVersion"`
 		ParseSymbol     string `json:"parseSymbol"`
-		Cases           []any  `json:"cases"`
+		// Cases is only counted here, so each case stays undecoded.
+		Cases []json.RawMessage `json:"cases"`
 	}
-	if err := json.Unmarshal(out, &parsed); err != nil {
-		return nil, fmt.Errorf("parse enumeration: %w", err)
+	if decodeError := json.Unmarshal(out, &parsed); decodeError != nil {
+		return nil, fmt.Errorf("parse enumeration: %w", decodeError)
 	}
 	if parsed.TailwindVersion == "" {
 		return nil, fmt.Errorf("enumeration reported no Tailwind version")
@@ -106,7 +127,10 @@ func enumerate(packageRoot string) ([]byte, error) {
 		return nil, fmt.Errorf("enumeration did not report which bundle symbol it extracted")
 	}
 	if len(parsed.Cases) < 250 {
-		return nil, fmt.Errorf("enumeration produced only %d cases; the corpus is meant to be several hundred shapes", len(parsed.Cases))
+		return nil, fmt.Errorf(
+			"enumeration produced only %d cases; the corpus is meant to be several hundred shapes",
+			len(parsed.Cases),
+		)
 	}
 	return out, nil
 }

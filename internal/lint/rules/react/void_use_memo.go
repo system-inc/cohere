@@ -109,7 +109,7 @@ var messageUseMemoResultUnused = rule.Message{
 //
 // # Where reading was wrong, both times
 //
-// **A bare `return;` is CLEAN.** React's `ReturnStatement` lowering hardcodes `returnVariant:
+// **A bare `return;` is clean.** React's `ReturnStatement` lowering hardcodes `returnVariant:
 // 'Explicit'` whether or not an argument is present, minting `undefined` as the value, so a
 // callback whose only return is `return;` satisfies `hasNonVoidReturn` and does not report. This
 // contradicts React's own pass documentation, which states at
@@ -177,12 +177,12 @@ var messageUseMemoResultUnused = rule.Message{
 // real `useMemo` and neither authority reports it, because both test the written name rather than
 // resolving it. cohere has a whole-program checker and could resolve it. Deliberately not done: it
 // would report a class of finding neither authority produces, and a differential would show it.
-var VoidUseMemo = rule.Rule{
+var VoidUseMemo = rule.Rule[CompilerRuleOptions]{
 	// No namespace prefix. The config writes `react/void-use-memo`, and the parity guard strips the
 	// namespace on a `/` boundary, so a self-namespaced `react-void-use-memo` would match no
 	// inventory entry and lint nothing.
 	Name: "react-hooks/void-use-memo",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[CompilerRuleOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				call := node.AsCallExpression()
@@ -206,11 +206,11 @@ var VoidUseMemo = rule.Rule{
 				// unused. Measured on React, which gives one finding for
 				// `useMemo(() => { foo(); }, []);` and not two.
 				if !hasNonVoidReturn(callback) {
-					ctx.ReportNode(callback, messageUseMemoCallbackReturnsNothing)
+					ruleContext.ReportNode(callback, messageUseMemoCallbackReturnsNothing)
 					return
 				}
 				if isValueDiscarded(node) {
-					ctx.ReportNode(ast.SkipParentheses(call.Expression), messageUseMemoResultUnused)
+					ruleContext.ReportNode(ast.SkipParentheses(call.Expression), messageUseMemoResultUnused)
 				}
 			},
 		}
@@ -229,19 +229,19 @@ var VoidUseMemo = rule.Rule{
 // is excluded and an optional *call* is not, which is upstream's asymmetry rather than an
 // approximation here. All four measured.
 func isUseMemoCallee(callee *ast.Node, enclosing *ast.Node) bool {
-	callee = ast.SkipParentheses(callee)
-	if callee == nil {
+	unwrapped := ast.SkipParentheses(callee)
+	if unwrapped == nil {
 		return false
 	}
 
-	if callee.Kind == ast.KindIdentifier {
-		return callee.Text() == "useMemo" && !isShadowedWithin("useMemo", callee, enclosing)
+	if unwrapped.Kind == ast.KindIdentifier {
+		return unwrapped.Text() == "useMemo" && !isShadowedWithin("useMemo", unwrapped, enclosing)
 	}
 
-	if callee.Kind != ast.KindPropertyAccessExpression {
+	if unwrapped.Kind != ast.KindPropertyAccessExpression {
 		return false
 	}
-	access := callee.AsPropertyAccessExpression()
+	access := unwrapped.AsPropertyAccessExpression()
 	// `React?.useMemo(...)` is clean upstream while `useMemo?.(...)` reports, so the optional token
 	// is declined here and never at the call. Measured both ways.
 	if access.QuestionDotToken != nil {
@@ -276,7 +276,7 @@ func isUseMemoCallee(callee *ast.Node, enclosing *ast.Node) bool {
 // A binding in a scope the call site is not inside is never consulted, which is what makes the
 // sibling block and the nested function report.
 //
-// The outer boundary is the counterintuitive half and it is measured: a binding at MODULE scope
+// The outer boundary is the counterintuitive half and it is measured: a binding at module scope
 // does not shadow, because the compiled unit is the function rather than the file. The loop
 // therefore stops at `enclosing` rather than walking to the source file.
 func isShadowedWithin(name string, callee *ast.Node, enclosing *ast.Node) bool {
@@ -290,7 +290,7 @@ func isShadowedWithin(name string, callee *ast.Node, enclosing *ast.Node) bool {
 			// The compiled function is the last scope consulted. Anything above it, module scope
 			// included, is a global as far as this rule is concerned.
 			//
-			// This `break` is REDUNDANT and is kept because it states the boundary where a reader
+			// This `break` is redundant and is kept because it states the boundary where a reader
 			// looks for it. Measured by mutation: removing it alone changes nothing, because the
 			// kind gate above declines a source file (it is neither a block nor function-like) and
 			// `scopeStatements` declines it a second time. Three guards defend the module-scope
@@ -430,7 +430,7 @@ func inlineUseMemoCallback(call *ast.CallExpression) *ast.Node {
 		return nil
 	}
 	first := call.Arguments.Nodes[0]
-	// The spread decline is upstream's own branch, transcribed, and it is INERT here. Measured by
+	// The spread decline is upstream's own branch, transcribed, and it is inert here. Measured by
 	// mutation three ways: replacing the kind, deleting the guard, and even adding
 	// `KindSpreadElement` to the accepting switch below all leave every fixture green. The cause is
 	// a parse shape rather than another branch: a spread argument is `KindSpreadElement`, which is
@@ -549,11 +549,11 @@ func isValueDiscarded(call *ast.Node) bool {
 // driver: measured, `function use()` is clean under this rule. So the bare form is excluded here,
 // and the exclusion is written as an extra decline rather than by changing the shared predicate,
 // which several rules depend on.
-func isVoidUseMemoCompiledFunction(fn *ast.Node) bool {
-	if !isReactCompiledFunction(fn) {
+func isVoidUseMemoCompiledFunction(function *ast.Node) bool {
+	if !isReactCompiledFunction(function) {
 		return false
 	}
-	name, named := reactFunctionNameOf(fn)
+	name, named := reactFunctionNameOf(function)
 	if named && name == "use" {
 		return false
 	}

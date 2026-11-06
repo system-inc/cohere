@@ -23,8 +23,8 @@ import (
  * And `x += JSON`, which ESLint follows into x and the tracker does not, since x then holds a string.
  * Their own tests say what the rule does instead.
  */
-func TestNoObjCallsAgreesWithESLint(t *testing.T) {
-	t.Parallel()
+func TestNoObjCallsAgreesWithEsLint(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		origin string
@@ -54,9 +54,17 @@ func TestNoObjCallsAgreesWithESLint(t *testing.T) {
 		{"corpus", "globalThis.Math().foo;\n", []string{"unexpectedCall globalThis.Math()"}},
 		{"corpus", "var x = globalThis.JSON();\n", []string{"unexpectedCall globalThis.JSON()"}},
 		{"corpus", "x = globalThis.JSON(str);\n", []string{"unexpectedCall globalThis.JSON(str)"}},
-		{"corpus", "globalThis.Math( globalThis.JSON() );\n", []string{"unexpectedCall globalThis.Math( globalThis.JSON() )", "unexpectedCall globalThis.JSON()"}},
+		{
+			"corpus",
+			"globalThis.Math( globalThis.JSON() );\n",
+			[]string{"unexpectedCall globalThis.Math( globalThis.JSON() )", "unexpectedCall globalThis.JSON()"},
+		},
 		{"corpus", "var x = globalThis.Reflect();\n", []string{"unexpectedCall globalThis.Reflect()"}},
-		{"corpus", "/*globals Reflect: true*/ globalThis.Reflect();\n", []string{"unexpectedCall globalThis.Reflect()"}},
+		{
+			"corpus",
+			"/*globals Reflect: true*/ globalThis.Reflect();\n",
+			[]string{"unexpectedCall globalThis.Reflect()"},
+		},
 		{"corpus", "var x = globalThis.Atomics();\n", []string{"unexpectedCall globalThis.Atomics()"}},
 		{"corpus", "var x = globalThis.Intl();\n", []string{"unexpectedCall globalThis.Intl()"}},
 		{"corpus", "const x = globalThis.Temporal();\n", []string{"unexpectedCall globalThis.Temporal()"}},
@@ -134,7 +142,11 @@ func TestNoObjCallsAgreesWithESLint(t *testing.T) {
 		{"edge", "globalThis[\"JSON\"]();\n", []string{"unexpectedCall globalThis[\"JSON\"]()"}},
 		{"edge", "globalThis[`Math`]();\n", []string{"unexpectedCall globalThis[`Math`]()"}},
 		{"edge", "globalThis[\"JS\" + \"ON\"]();\n", []string{"unexpectedRefCall globalThis[\"JS\" + \"ON\"]()"}},
-		{"edge", "(a ? JSON : Math)();\n", []string{"unexpectedRefCall (a ? JSON : Math)()", "unexpectedRefCall (a ? JSON : Math)()"}},
+		{
+			"edge",
+			"(a ? JSON : Math)();\n",
+			[]string{"unexpectedRefCall (a ? JSON : Math)()", "unexpectedRefCall (a ? JSON : Math)()"},
+		},
 		{"edge", "(0, JSON)();\n", []string{"unexpectedRefCall (0, JSON)()"}},
 		{"edge", "(a || JSON)();\n", []string{"unexpectedRefCall (a || JSON)()"}},
 		{"edge", "(JSON && a)();\n", []string{"unexpectedRefCall (JSON && a)()"}},
@@ -173,7 +185,11 @@ func TestNoObjCallsAgreesWithESLint(t *testing.T) {
 		{"edge", "function f({ JSON: j } = globalThis) { j(); }\n", []string{"unexpectedRefCall j()"}},
 		{"edge", "function f(a = b, c = a) {} const q = JSON; q``;\n", []string{}},
 		{"edge", "JSON``;\n", []string{}},
-		{"edge", "let a = JSON; let b = a; let c = b; b(); c();\n", []string{"unexpectedRefCall b()", "unexpectedRefCall c()"}},
+		{
+			"edge",
+			"let a = JSON; let b = a; let c = b; b(); c();\n",
+			[]string{"unexpectedRefCall b()", "unexpectedRefCall c()"},
+		},
 		{"edge", "export const getConfig = getConfig; getConfig();\n", []string{}},
 		{"edge", "let a = b, b = a; a();\n", []string{}},
 		{"edge", "var x = (JSON as any) as any; x();\n", []string{"unexpectedRefCall x()"}},
@@ -197,14 +213,21 @@ func TestNoObjCallsAgreesWithESLint(t *testing.T) {
 	}
 
 	for index, testCase := range cases {
-		result := rule_testing.RunTyped(t, NoObjCalls, "input.ts", testCase.code)
+		result := rule_testing.RunTyped(test, NoObjCalls, "input.ts", testCase.code)
 		source := result.SourceFile.Text()
 		var got []string
 		for _, diagnostic := range result.Diagnostics {
 			got = append(got, diagnostic.Message.Id+" "+source[diagnostic.Range.Pos():diagnostic.Range.End()])
 		}
 		if strings.Join(got, "\n") != strings.Join(testCase.want, "\n") {
-			t.Errorf("case %d (%s): %q\n got: %q\nwant: %q", index, testCase.origin, testCase.code, got, testCase.want)
+			test.Errorf(
+				"case %d (%s): %q\n got: %q\nwant: %q",
+				index,
+				testCase.origin,
+				testCase.code,
+				got,
+				testCase.want,
+			)
 		}
 	}
 }

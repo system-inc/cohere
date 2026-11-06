@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -30,17 +31,18 @@ type consistentReturnCase struct {
 	findings    []consistentReturnExpectation
 }
 
-// decodeConsistentReturnOptionsForTest routes a case's options through the shipped decoder.
-func decodeConsistentReturnOptionsForTest(t *testing.T, optionsJson string) any {
-	t.Helper()
+// decodeConsistentReturnOptionsForTest routes a case's options through the shipped decoder. An empty
+// optionsJson is a rule configured as a bare severity, so it comes back unconfigured.
+func decodeConsistentReturnOptionsForTest(test *testing.T, optionsJson string) rule.Given[ConsistentReturnSettings] {
+	test.Helper()
 	if optionsJson == "" {
-		return nil
+		return rule.Given[ConsistentReturnSettings]{}
 	}
-	decoded, err := DecodeConsistentReturnOptions(json.RawMessage(optionsJson))
-	if err != nil {
-		t.Fatalf("decoding options %q: %v", optionsJson, err)
+	decoded, decodeConsistentReturnOptionsError := DecodeConsistentReturnOptions(json.RawMessage(optionsJson))
+	if decodeConsistentReturnOptionsError != nil {
+		test.Fatalf("decoding options %q: %v", optionsJson, decodeConsistentReturnOptionsError)
 	}
-	return decoded
+	return rule.Configured(decoded)
 }
 
 var consistentReturnCleanCases = []consistentReturnCase{
@@ -57,12 +59,30 @@ var consistentReturnCleanCases = []consistentReturnCase{
 	{source: "function Foo() { if (!(this instanceof Foo)) return new Foo(); }", optionsJson: ""},
 	{source: "function foo() { if (true) return 5; else return undefined; }", optionsJson: ""},
 	{source: "function foo() { if (true) return 5; else return void 0; }", optionsJson: ""},
-	{source: "function foo() { if (true) return; else return undefined; }", optionsJson: "{\"treatUndefinedAsUnspecified\":true}"},
-	{source: "function foo() { if (true) return; else return void 0; }", optionsJson: "{\"treatUndefinedAsUnspecified\":true}"},
-	{source: "function foo() { if (true) return undefined; else return; }", optionsJson: "{\"treatUndefinedAsUnspecified\":true}"},
-	{source: "function foo() { if (true) return undefined; else return void 0; }", optionsJson: "{\"treatUndefinedAsUnspecified\":true}"},
-	{source: "function foo() { if (true) return void 0; else return; }", optionsJson: "{\"treatUndefinedAsUnspecified\":true}"},
-	{source: "function foo() { if (true) return void 0; else return undefined; }", optionsJson: "{\"treatUndefinedAsUnspecified\":true}"},
+	{
+		source:      "function foo() { if (true) return; else return undefined; }",
+		optionsJson: "{\"treatUndefinedAsUnspecified\":true}",
+	},
+	{
+		source:      "function foo() { if (true) return; else return void 0; }",
+		optionsJson: "{\"treatUndefinedAsUnspecified\":true}",
+	},
+	{
+		source:      "function foo() { if (true) return undefined; else return; }",
+		optionsJson: "{\"treatUndefinedAsUnspecified\":true}",
+	},
+	{
+		source:      "function foo() { if (true) return undefined; else return void 0; }",
+		optionsJson: "{\"treatUndefinedAsUnspecified\":true}",
+	},
+	{
+		source:      "function foo() { if (true) return void 0; else return; }",
+		optionsJson: "{\"treatUndefinedAsUnspecified\":true}",
+	},
+	{
+		source:      "function foo() { if (true) return void 0; else return undefined; }",
+		optionsJson: "{\"treatUndefinedAsUnspecified\":true}",
+	},
 	{source: "var x = () => {  return {}; };", optionsJson: ""},
 	{source: "if (true) { return 1; } return 0;", optionsJson: ""},
 	{source: "class Foo { constructor() { if (true) return foo; } }", optionsJson: ""},
@@ -70,27 +90,129 @@ var consistentReturnCleanCases = []consistentReturnCase{
 }
 
 var consistentReturnFiringCases = []consistentReturnCase{
-	{source: "function foo() { if (true) return true; else return; }", optionsJson: "", findings: []consistentReturnExpectation{{id: "missingReturnValue", name: "Function 'foo'", line: 1, column: 46}}},
-	{source: "var foo = () => { if (true) return true; else return; }", optionsJson: "", findings: []consistentReturnExpectation{{id: "missingReturnValue", name: "Arrow function", line: 1, column: 47}}},
-	{source: "function foo() { if (true) return; else return false; }", optionsJson: "", findings: []consistentReturnExpectation{{id: "unexpectedReturnValue", name: "Function 'foo'", line: 1, column: 41}}},
-	{source: "f(function() { if (true) return true; else return; })", optionsJson: "", findings: []consistentReturnExpectation{{id: "missingReturnValue", name: "Function", line: 1, column: 44}}},
-	{source: "f(function() { if (true) return; else return false; })", optionsJson: "", findings: []consistentReturnExpectation{{id: "unexpectedReturnValue", name: "Function", line: 1, column: 39}}},
-	{source: "f(a => { if (true) return; else return false; })", optionsJson: "", findings: []consistentReturnExpectation{{id: "unexpectedReturnValue", name: "Arrow function", line: 1, column: 33}}},
-	{source: "function foo() { if (true) return true; return undefined; }", optionsJson: "{\"treatUndefinedAsUnspecified\":true}", findings: []consistentReturnExpectation{{id: "missingReturnValue", name: "Function 'foo'", line: 1, column: 41}}},
-	{source: "function foo() { if (true) return true; return void 0; }", optionsJson: "{\"treatUndefinedAsUnspecified\":true}", findings: []consistentReturnExpectation{{id: "missingReturnValue", name: "Function 'foo'", line: 1, column: 41}}},
-	{source: "function foo() { if (true) return undefined; return true; }", optionsJson: "{\"treatUndefinedAsUnspecified\":true}", findings: []consistentReturnExpectation{{id: "unexpectedReturnValue", name: "Function 'foo'", line: 1, column: 46}}},
-	{source: "function foo() { if (true) return void 0; return true; }", optionsJson: "{\"treatUndefinedAsUnspecified\":true}", findings: []consistentReturnExpectation{{id: "unexpectedReturnValue", name: "Function 'foo'", line: 1, column: 43}}},
-	{source: "if (true) { return 1; } return;", optionsJson: "", findings: []consistentReturnExpectation{{id: "missingReturnValue", name: "Program", line: 1, column: 25}}},
-	{source: "function foo() { if (a) return true; }", optionsJson: "", findings: []consistentReturnExpectation{{id: "missingReturn", name: "function 'foo'", line: 1, column: 10}}},
-	{source: "function _foo() { if (a) return true; }", optionsJson: "", findings: []consistentReturnExpectation{{id: "missingReturn", name: "function '_foo'", line: 1, column: 10}}},
-	{source: "f(function foo() { if (a) return true; });", optionsJson: "", findings: []consistentReturnExpectation{{id: "missingReturn", name: "function 'foo'", line: 1, column: 12}}},
-	{source: "f(function() { if (a) return true; });", optionsJson: "", findings: []consistentReturnExpectation{{id: "missingReturn", name: "function", line: 1, column: 3}}},
-	{source: "f(() => { if (a) return true; });", optionsJson: "", findings: []consistentReturnExpectation{{id: "missingReturn", name: "arrow function", line: 1, column: 6}}},
-	{source: "var obj = {foo() { if (a) return true; }};", optionsJson: "", findings: []consistentReturnExpectation{{id: "missingReturn", name: "method 'foo'", line: 1, column: 12}}},
-	{source: "class A {foo() { if (a) return true; }};", optionsJson: "", findings: []consistentReturnExpectation{{id: "missingReturn", name: "method 'foo'", line: 1, column: 10}}},
-	{source: "if (a) return true;", optionsJson: "", findings: []consistentReturnExpectation{{id: "missingReturn", name: "program", line: 1, column: 1}}},
-	{source: "class A { CapitalizedFunction() { if (a) return true; } }", optionsJson: "", findings: []consistentReturnExpectation{{id: "missingReturn", name: "method 'CapitalizedFunction'", line: 1, column: 11}}},
-	{source: "({ constructor() { if (a) return true; } });", optionsJson: "", findings: []consistentReturnExpectation{{id: "missingReturn", name: "method 'constructor'", line: 1, column: 4}}},
+	{
+		source:      "function foo() { if (true) return true; else return; }",
+		optionsJson: "",
+		findings: []consistentReturnExpectation{
+			{id: "missingReturnValue", name: "Function 'foo'", line: 1, column: 46},
+		},
+	},
+	{
+		source:      "var foo = () => { if (true) return true; else return; }",
+		optionsJson: "",
+		findings: []consistentReturnExpectation{
+			{id: "missingReturnValue", name: "Arrow function", line: 1, column: 47},
+		},
+	},
+	{
+		source:      "function foo() { if (true) return; else return false; }",
+		optionsJson: "",
+		findings: []consistentReturnExpectation{
+			{id: "unexpectedReturnValue", name: "Function 'foo'", line: 1, column: 41},
+		},
+	},
+	{
+		source:      "f(function() { if (true) return true; else return; })",
+		optionsJson: "",
+		findings:    []consistentReturnExpectation{{id: "missingReturnValue", name: "Function", line: 1, column: 44}},
+	},
+	{
+		source:      "f(function() { if (true) return; else return false; })",
+		optionsJson: "",
+		findings: []consistentReturnExpectation{
+			{id: "unexpectedReturnValue", name: "Function", line: 1, column: 39},
+		},
+	},
+	{
+		source:      "f(a => { if (true) return; else return false; })",
+		optionsJson: "",
+		findings: []consistentReturnExpectation{
+			{id: "unexpectedReturnValue", name: "Arrow function", line: 1, column: 33},
+		},
+	},
+	{
+		source:      "function foo() { if (true) return true; return undefined; }",
+		optionsJson: "{\"treatUndefinedAsUnspecified\":true}",
+		findings: []consistentReturnExpectation{
+			{id: "missingReturnValue", name: "Function 'foo'", line: 1, column: 41},
+		},
+	},
+	{
+		source:      "function foo() { if (true) return true; return void 0; }",
+		optionsJson: "{\"treatUndefinedAsUnspecified\":true}",
+		findings: []consistentReturnExpectation{
+			{id: "missingReturnValue", name: "Function 'foo'", line: 1, column: 41},
+		},
+	},
+	{
+		source:      "function foo() { if (true) return undefined; return true; }",
+		optionsJson: "{\"treatUndefinedAsUnspecified\":true}",
+		findings: []consistentReturnExpectation{
+			{id: "unexpectedReturnValue", name: "Function 'foo'", line: 1, column: 46},
+		},
+	},
+	{
+		source:      "function foo() { if (true) return void 0; return true; }",
+		optionsJson: "{\"treatUndefinedAsUnspecified\":true}",
+		findings: []consistentReturnExpectation{
+			{id: "unexpectedReturnValue", name: "Function 'foo'", line: 1, column: 43},
+		},
+	},
+	{
+		source:      "if (true) { return 1; } return;",
+		optionsJson: "",
+		findings:    []consistentReturnExpectation{{id: "missingReturnValue", name: "Program", line: 1, column: 25}},
+	},
+	{
+		source:      "function foo() { if (a) return true; }",
+		optionsJson: "",
+		findings:    []consistentReturnExpectation{{id: "missingReturn", name: "function 'foo'", line: 1, column: 10}},
+	},
+	{
+		source:      "function _foo() { if (a) return true; }",
+		optionsJson: "",
+		findings:    []consistentReturnExpectation{{id: "missingReturn", name: "function '_foo'", line: 1, column: 10}},
+	},
+	{
+		source:      "f(function foo() { if (a) return true; });",
+		optionsJson: "",
+		findings:    []consistentReturnExpectation{{id: "missingReturn", name: "function 'foo'", line: 1, column: 12}},
+	},
+	{
+		source:      "f(function() { if (a) return true; });",
+		optionsJson: "",
+		findings:    []consistentReturnExpectation{{id: "missingReturn", name: "function", line: 1, column: 3}},
+	},
+	{
+		source:      "f(() => { if (a) return true; });",
+		optionsJson: "",
+		findings:    []consistentReturnExpectation{{id: "missingReturn", name: "arrow function", line: 1, column: 6}},
+	},
+	{
+		source:      "var obj = {foo() { if (a) return true; }};",
+		optionsJson: "",
+		findings:    []consistentReturnExpectation{{id: "missingReturn", name: "method 'foo'", line: 1, column: 12}},
+	},
+	{
+		source:      "class A {foo() { if (a) return true; }};",
+		optionsJson: "",
+		findings:    []consistentReturnExpectation{{id: "missingReturn", name: "method 'foo'", line: 1, column: 10}},
+	},
+	{
+		source:      "if (a) return true;",
+		optionsJson: "",
+		findings:    []consistentReturnExpectation{{id: "missingReturn", name: "program", line: 1, column: 1}},
+	},
+	{
+		source:      "class A { CapitalizedFunction() { if (a) return true; } }",
+		optionsJson: "",
+		findings: []consistentReturnExpectation{
+			{id: "missingReturn", name: "method 'CapitalizedFunction'", line: 1, column: 11},
+		},
+	},
+	{source: "({ constructor() { if (a) return true; } });", optionsJson: "", findings: []consistentReturnExpectation{
+		{id: "missingReturn", name: "method 'constructor'", line: 1, column: 4},
+	}},
 }
 
 // TestConsistentReturnFires runs upstream's 21 invalid cases.
@@ -100,23 +222,23 @@ var consistentReturnFiringCases = []consistentReturnCase{
 // them and not to the third -- and a port collapsing the two would pass every id assertion. The
 // span is asserted because upstream computes four different locations by node kind, and pointing
 // at the whole function instead would also pass every id assertion.
-func TestConsistentReturnFires(t *testing.T) {
-	t.Parallel()
+func TestConsistentReturnFires(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range consistentReturnFiringCases {
-		t.Run(testCase.source, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, ConsistentReturn, consistentReturnFile,
-				testCase.source, decodeConsistentReturnOptionsForTest(t, testCase.optionsJson))
+		test.Run(testCase.source, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunGiven(test, ConsistentReturn, consistentReturnFile,
+				testCase.source, decodeConsistentReturnOptionsForTest(test, testCase.optionsJson))
 
 			wantIds := make([]string, len(testCase.findings))
-			for i, finding := range testCase.findings {
-				wantIds[i] = finding.id
+			for index, finding := range testCase.findings {
+				wantIds[index] = finding.id
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 
-			for i, finding := range testCase.findings {
-				got := result.Diagnostics[i].Message.Description
+			for index, finding := range testCase.findings {
+				got := result.Diagnostics[index].Message.Description
 				// Upstream's three message templates, rendered with the name it asserts.
 				var want string
 				switch finding.id {
@@ -127,21 +249,21 @@ func TestConsistentReturnFires(t *testing.T) {
 				case "unexpectedReturnValue":
 					want = finding.name + " expected no return value."
 				default:
-					t.Fatalf("unknown message id %q", finding.id)
+					test.Fatalf("unknown message id %q", finding.id)
 				}
 				if !strings.HasPrefix(got, want) {
-					t.Errorf("finding %d: message should begin %q, got %q", i, want, got)
+					test.Errorf("finding %d: message should begin %q, got %q", index, want, got)
 				}
 
 				// The span. Upstream asserts a line and a column; `Run` does not trim its input, so
 				// the literal above is byte for byte what is on disk and the offset can be turned
 				// into a one-based line and column directly.
 				line, column := consistentReturnLineAndColumn(testCase.source,
-					result.Diagnostics[i].Range.Pos())
+					result.Diagnostics[index].Range.Pos())
 				if line != finding.line || column != finding.column {
-					t.Errorf("finding %d should point at line %d column %d, got line %d column %d "+
-						"(reported text %q)", i, finding.line, finding.column, line, column,
-						testCase.source[result.Diagnostics[i].Range.Pos():result.Diagnostics[i].Range.End()])
+					test.Errorf("finding %d should point at line %d column %d, got line %d column %d "+
+						"(reported text %q)", index, finding.line, finding.column, line, column,
+						testCase.source[result.Diagnostics[index].Range.Pos():result.Diagnostics[index].Range.End()])
 				}
 			}
 		})
@@ -154,8 +276,8 @@ func TestConsistentReturnFires(t *testing.T) {
 // the Program case asserts column 1 for offset 0 while the rule's own `loc` says column 0.
 func consistentReturnLineAndColumn(source string, offset int) (int, int) {
 	line, column := 1, 1
-	for i := 0; i < offset && i < len(source); i++ {
-		if source[i] == '\n' {
+	for index := 0; index < offset && index < len(source); index++ {
+		if source[index] == '\n' {
 			line++
 			column = 1
 			continue
@@ -166,15 +288,15 @@ func consistentReturnLineAndColumn(source string, offset int) (int, int) {
 }
 
 // TestConsistentReturnStaysSilent runs upstream's 23 valid cases.
-func TestConsistentReturnStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestConsistentReturnStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range consistentReturnCleanCases {
-		t.Run(testCase.source, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, ConsistentReturn,
+		test.Run(testCase.source, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunGiven(test, ConsistentReturn,
 				consistentReturnFile, testCase.source,
-				decodeConsistentReturnOptionsForTest(t, testCase.optionsJson)))
+				decodeConsistentReturnOptionsForTest(test, testCase.optionsJson)))
 		})
 	}
 }
@@ -383,36 +505,36 @@ var consistentReturnAddedCases = []struct {
 }
 
 // TestConsistentReturnAddedCases covers what upstream's corpus does not write.
-func TestConsistentReturnAddedCases(t *testing.T) {
-	t.Parallel()
+func TestConsistentReturnAddedCases(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range consistentReturnAddedCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, ConsistentReturn, consistentReturnFile,
-				testCase.source, decodeConsistentReturnOptionsForTest(t, testCase.optionsJson))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunGiven(test, ConsistentReturn, consistentReturnFile,
+				testCase.source, decodeConsistentReturnOptionsForTest(test, testCase.optionsJson))
 
 			if testCase.message == "" {
 				if len(result.Diagnostics) != 0 {
-					t.Fatalf("expected no findings, got %d %v (%s)",
+					test.Fatalf("expected no findings, got %d %v (%s)",
 						len(result.Diagnostics), result.MessageIds(), testCase.reason)
 				}
 				return
 			}
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("expected 1 finding, got %d %v (%s)",
+				test.Fatalf("expected 1 finding, got %d %v (%s)",
 					len(result.Diagnostics), result.MessageIds(), testCase.reason)
 			}
 			if got := result.Diagnostics[0].Message.Description; !strings.HasPrefix(got, testCase.message) {
-				t.Errorf("message should begin %q, got %q (%s)", testCase.message, got, testCase.reason)
+				test.Errorf("message should begin %q, got %q (%s)", testCase.message, got, testCase.reason)
 			}
 		})
 	}
 }
 
 // TestConsistentReturnDecoderRoundTrip pins the option surface through the shipped decoder.
-func TestConsistentReturnDecoderRoundTrip(t *testing.T) {
-	t.Parallel()
+func TestConsistentReturnDecoderRoundTrip(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name        string
@@ -423,38 +545,40 @@ func TestConsistentReturnDecoderRoundTrip(t *testing.T) {
 		{"an explicit false", `{"treatUndefinedAsUnspecified":false}`, false},
 		{"an explicit true", `{"treatUndefinedAsUnspecified":true}`, true},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			decoded, err := DecodeConsistentReturnOptions(json.RawMessage(testCase.optionsJson))
-			if err != nil {
-				t.Fatalf("decoding %q: %v", testCase.optionsJson, err)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			decoded, decodeConsistentReturnOptionsError := DecodeConsistentReturnOptions(
+				json.RawMessage(testCase.optionsJson),
+			)
+			if decodeConsistentReturnOptionsError != nil {
+				test.Fatalf("decoding %q: %v", testCase.optionsJson, decodeConsistentReturnOptionsError)
 			}
-			if got := decoded.(ConsistentReturnSettings).TreatUndefinedAsUnspecified; got != testCase.want {
-				t.Errorf("treatUndefinedAsUnspecified should be %v, got %v", testCase.want, got)
+			if got := decoded.TreatUndefinedAsUnspecified; got != testCase.want {
+				test.Errorf("treatUndefinedAsUnspecified should be %v, got %v", testCase.want, got)
 			}
 		})
 	}
 
-	// A rule configured as a bare severity is handed nil options rather than a struct. Asserted by
+	// A rule configured as a bare severity is handed no options rather than a struct. Asserted by
 	// bypassing the decoder entirely, which is the path no other fixture here takes.
-	result := rule_testing.RunWithOptions(t, ConsistentReturn, consistentReturnFile,
-		"function foo() { if (true) return true; else return; }", nil)
-	rule_testing.ExpectFindings(t, result, "missingReturnValue")
+	result := rule_testing.Run(test, ConsistentReturn, consistentReturnFile,
+		"function foo() { if (true) return true; else return; }")
+	rule_testing.ExpectFindings(test, result, "missingReturnValue")
 }
 
 // TestConsistentReturnSpanPointsAtTheKeyNotTheFirstToken pins the method arm of the report range.
 //
 // A mutation replacing the key span with the whole method node survived every fixture here,
 // including upstream's four method cases at columns 12, 10, 11 and 4. The reason is that
-// `TokenRange` trims leading trivia, so for `class A { foo() {} }` the method node's first token IS
+// `TokenRange` trims leading trivia, so for `class A { foo() {} }` the method node's first token is
 // the key and the two spans start at the same byte. The corpus writes no method carrying a
 // modifier, so nothing in it can separate them.
 //
 // A modifier does separate them. Measured against the installed rule: `class A { static foo() }`
 // reports at column 18, which is `foo`, while the method node begins at column 11 on `static`.
 // Same for `get`, `async` and the generator asterisk.
-func TestConsistentReturnSpanPointsAtTheKeyNotTheFirstToken(t *testing.T) {
-	t.Parallel()
+func TestConsistentReturnSpanPointsAtTheKeyNotTheFirstToken(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		source string
@@ -467,13 +591,13 @@ func TestConsistentReturnSpanPointsAtTheKeyNotTheFirstToken(t *testing.T) {
 		{"class A { *foo() { if (a) return true; } }", "foo"},
 		{"var o = { async foo() { if (a) return true; } };", "foo"},
 	} {
-		t.Run(testCase.source, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ConsistentReturn, consistentReturnFile, testCase.source)
-			rule_testing.ExpectFindings(t, result, "missingReturn")
+		test.Run(testCase.source, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ConsistentReturn, consistentReturnFile, testCase.source)
+			rule_testing.ExpectFindings(test, result, "missingReturn")
 			reported := testCase.source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 			if reported != testCase.wantText {
-				t.Errorf("finding should point at %q, got %q", testCase.wantText, reported)
+				test.Errorf("finding should point at %q, got %q", testCase.wantText, reported)
 			}
 		})
 	}
@@ -486,14 +610,14 @@ func TestConsistentReturnSpanPointsAtTheKeyNotTheFirstToken(t *testing.T) {
 // variable declaration when the statement also has a `finally`, even though every path through it
 // returns or throws. Removing either the declaration or the `finally` gives the right answer.
 //
-// Pinned as REPORTING rather than as clean, because that is what the rule does today. It is written
+// Pinned as reporting rather than as clean, because that is what the rule does today. It is written
 // down so the divergence is visible in the suite rather than only in a dry run, and so that fixing
 // the shelf turns this test red and brings whoever fixes it straight here.
 //
 // Measured cost on the ahra tree: 141 findings against the installed rule's 130, with all 130
 // agreeing exactly and nothing missing in the other direction.
-func TestConsistentReturnHandlesATryWithADeclarationAndAFinally(t *testing.T) {
-	t.Parallel()
+func TestConsistentReturnHandlesATryWithADeclarationAndAFinally(test *testing.T) {
+	test.Parallel()
 
 	// Was an over-report and is now correct. The function returns on every path: the `try` returns
 	// a value and the `catch` rethrows, so nothing falls off the end.
@@ -505,17 +629,17 @@ func TestConsistentReturnHandlesATryWithADeclarationAndAFinally(t *testing.T) {
 	// try and catch positions; ours had a separate branch for the catch case. Removing it brought
 	// the tree from 141 findings to eslint's 131, exactly, with no other rule moving.
 	reporting := "async function f() { try { const r = g(); return r; } catch (e) { throw e; } finally { k(); } }"
-	rule_testing.ExpectClean(t,
-		rule_testing.Run(t, ConsistentReturn, consistentReturnFile, reporting))
+	rule_testing.ExpectClean(test,
+		rule_testing.Run(test, ConsistentReturn, consistentReturnFile, reporting))
 
 	// The two controls that localised the cause, kept because they are what proves the repair did
 	// not simply silence the rule on every try/finally shape. Each differs from the case above by
 	// exactly one element and each was already correct.
 	withoutDeclaration := "async function f() { try { return 1; } catch (e) { throw e; } finally { k(); } }"
-	rule_testing.ExpectClean(t,
-		rule_testing.Run(t, ConsistentReturn, consistentReturnFile, withoutDeclaration))
+	rule_testing.ExpectClean(test,
+		rule_testing.Run(test, ConsistentReturn, consistentReturnFile, withoutDeclaration))
 
 	withoutFinally := "async function f() { try { const r = g(); return r; } catch (e) { throw e; } }"
-	rule_testing.ExpectClean(t,
-		rule_testing.Run(t, ConsistentReturn, consistentReturnFile, withoutFinally))
+	rule_testing.ExpectClean(test,
+		rule_testing.Run(test, ConsistentReturn, consistentReturnFile, withoutFinally))
 }

@@ -37,8 +37,8 @@ func preferIncludesOnDisk(sourceText string) string {
 // Four of them turn on the parameter comparison alone and are the reason that comparison is on
 // source text rather than on types: a user type declaring `indexOf(x, fromIndex?)` beside
 // `includes(x)` is clean, and so is one whose `includes` is a boolean property rather than a method.
-func TestPreferIncludesStaysSilentOnUpstreamPassCases(t *testing.T) {
-	t.Parallel()
+func TestPreferIncludesStaysSilentOnUpstreamPassCases(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		"\nfunction f(a: string): void {\n  a.indexOf(b);\n}\n    ",
@@ -56,9 +56,9 @@ func TestPreferIncludesStaysSilentOnUpstreamPassCases(t *testing.T) {
 		"\nconst pattern = new RegExp('bar');\nfunction f(a) {\n  return pattern.test(a);\n}\n    ",
 	}
 	for index, sourceText := range cases {
-		t.Run(preferIncludesCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, PreferIncludes,
+		test.Run(preferIncludesCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, PreferIncludes,
 				preferIncludesFile, sourceText))
 		})
 	}
@@ -76,8 +76,8 @@ func TestPreferIncludesStaysSilentOnUpstreamPassCases(t *testing.T) {
 // the finding points, which for the comparison half is the whole comparison rather than the call.
 // And the applied source says what the edit engine will write unattended, which no message-id
 // assertion can see.
-func TestPreferIncludesFiresOnUpstreamFailCases(t *testing.T) {
-	t.Parallel()
+func TestPreferIncludesFiresOnUpstreamFailCases(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -261,16 +261,16 @@ func TestPreferIncludesFiresOnUpstreamFailCases(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(preferIncludesCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, PreferIncludes, preferIncludesFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(preferIncludesCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, PreferIncludes, preferIncludesFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 
 			onDisk := preferIncludesOnDisk(testCase.sourceText)
 			for index, wantSpan := range testCase.wantSpans {
 				reported := onDisk[result.Diagnostics[index].Range.Pos():result.Diagnostics[index].Range.End()]
 				if reported != wantSpan {
-					t.Errorf("finding %d covers %q, want %q", index, reported, wantSpan)
+					test.Errorf("finding %d covers %q, want %q", index, reported, wantSpan)
 				}
 			}
 
@@ -278,13 +278,13 @@ func TestPreferIncludesFiresOnUpstreamFailCases(t *testing.T) {
 				// Upstream's `output: null`: reported, deliberately not repaired.
 				for index, diagnostic := range result.Diagnostics {
 					if len(diagnostic.Fixes) != 0 {
-						t.Errorf("finding %d carries %d fixes, want none because upstream declines to repair it",
+						test.Errorf("finding %d carries %d fixes, want none because upstream declines to repair it",
 							index, len(diagnostic.Fixes))
 					}
 				}
 				return
 			}
-			rule_testing.ExpectFixedSource(t, result, preferIncludesOnDisk(testCase.wantFixed))
+			rule_testing.ExpectFixedSource(test, result, preferIncludesOnDisk(testCase.wantFixed))
 		})
 	}
 }
@@ -301,8 +301,8 @@ func TestPreferIncludesFiresOnUpstreamFailCases(t *testing.T) {
 // So the reader is written on `regexsyntax` primitives instead, which is what the shelf's own doc
 // says a caller wanting alternation should do. These rows are what proves it discriminates. Every
 // verdict is the installed 8.67.0 build's, measured over a real program.
-func TestPreferIncludesReadsAPatternTheShelfCannot(t *testing.T) {
-	t.Parallel()
+func TestPreferIncludesReadsAPatternTheShelfCannot(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -402,16 +402,16 @@ func TestPreferIncludesReadsAPatternTheShelfCannot(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(preferIncludesCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, PreferIncludes, preferIncludesFile, testCase.sourceText)
+		test.Run(preferIncludesCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, PreferIncludes, preferIncludesFile, testCase.sourceText)
 			wantIds := make([]string, testCase.wantCount)
 			for index := range wantIds {
 				wantIds[index] = "preferStringIncludes"
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 			if testCase.wantCount > 0 && testCase.wantFixed != "" {
-				rule_testing.ExpectFixedSource(t, result, preferIncludesOnDisk(testCase.wantFixed))
+				rule_testing.ExpectFixedSource(test, result, preferIncludesOnDisk(testCase.wantFixed))
 			}
 		})
 	}
@@ -422,8 +422,8 @@ func TestPreferIncludesReadsAPatternTheShelfCannot(t *testing.T) {
 // Upstream's corpus writes no shadowed sentinel, no computed `test` access, and only one shape of
 // receiver for the regex half. Each row was run through the installed build and carries the verdict
 // that build produced.
-func TestPreferIncludesDiscriminatesOnCasesUpstreamDoesNotWrite(t *testing.T) {
-	t.Parallel()
+func TestPreferIncludesDiscriminatesOnCasesUpstreamDoesNotWrite(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -476,9 +476,9 @@ func TestPreferIncludesDiscriminatesOnCasesUpstreamDoesNotWrite(t *testing.T) {
 			reason:     "an argument whose type has no includes declines",
 		},
 		{
-			// The function-like test is the ONLY thing declining this, and it took a survivor to
+			// The function-like test is the only thing declining this, and it took a survivor to
 			// find an input that can see it. Upstream's own clean case pairs `includes: boolean`
-			// with a two-parameter `indexOf`, so the parameter COUNT guard declines it first and a
+			// with a two-parameter `indexOf`, so the parameter count guard declines it first and a
 			// mutant treating a property as a zero-parameter function survives the whole corpus.
 			// Giving `indexOf` no parameters makes both counts zero, so only the function-like test
 			// is left. Measured clean upstream against the control below, which reports.
@@ -498,10 +498,10 @@ func TestPreferIncludesDiscriminatesOnCasesUpstreamDoesNotWrite(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(preferIncludesCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, PreferIncludes, preferIncludesFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(preferIncludesCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, PreferIncludes, preferIncludesFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -512,11 +512,11 @@ func TestPreferIncludesDiscriminatesOnCasesUpstreamDoesNotWrite(t *testing.T) {
 // listener turns that into silence rather than a panic. Silence is the more dangerous failure: every
 // clean case passes vacuously and every reporting case fails in a way that reads as a rule bug. This
 // asserts the guard holds, so a later revert fails loudly here rather than going quiet everywhere.
-func TestPreferIncludesRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestPreferIncludesRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	source := "function f(a: string): void {\n  a.indexOf(b) !== -1;\n}"
-	rule_testing.ExpectClean(t, rule_testing.Run(t, PreferIncludes, preferIncludesFile, source))
-	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, PreferIncludes, preferIncludesFile, source),
+	rule_testing.ExpectClean(test, rule_testing.Run(test, PreferIncludes, preferIncludesFile, source))
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, PreferIncludes, preferIncludesFile, source),
 		"preferIncludes")
 }

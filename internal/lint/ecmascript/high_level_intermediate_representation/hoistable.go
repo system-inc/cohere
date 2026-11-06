@@ -14,7 +14,7 @@
 //
 // The reason a path may not simply be kept is the one the whole analysis exists for: reading
 // `props.a.b` before the scope runs is safe only if `props.a` is known non-null at that point.
-// Hoisting an access past a place where the value might be null MOVES A CRASH, or invents one that
+// Hoisting an access past a place where the value might be null moves A crash, or invents one that
 // the original program never had. So each step of a path has to be proven reachable-without-throwing
 // before the dependency may name it.
 //
@@ -29,9 +29,9 @@
 // `TestHoistablePathsAreAlwaysPrefixesOfRealAccesses` pins the invariant that a derived path
 // is always a prefix of a real access rather than an invention.
 //
-// # Termination: TWO stories, and neither is a fixpoint proof
+// # Termination: two stories, and neither is a fixpoint proof
 //
-// This is the first pass in this package whose termination is a BOUND rather than an argument, and
+// This is the first pass in this package whose termination is a bound rather than an argument, and
 // it is worth being exact about, because a bound that is silently exceeded produces a truncated
 // answer that looks like a converged one.
 //
@@ -39,14 +39,14 @@
 //	the chain reduction an unbounded do/while inside `reduceMaybeOptionalChains`
 //
 // The outer loop is monotone in practice -- each pass can only union new nodes into a block's set --
-// but `reduceMaybeOptionalChains` REPLACES nodes rather than adding them, so the `changed` flag is
+// but `reduceMaybeOptionalChains` replaces nodes rather than adding them, so the `changed` flag is
 // computed by set comparison rather than by size, and the monotonicity argument does not close. That
 // is why upstream caps it, and it is why the cap is reproduced here rather than removed.
 //
-// # DIVERGENCE FROM oxc: the bound must be LOUD, not silent
+// # Divergence from oxc: the bound must be loud, not silent
 //
 // React raises a hard `CompilerError.invariant(i++ < 100)` naming the pass when the loop fails to
-// converge (bundle 46820). oxc writes `for _ in 0..100` and simply EXITS at the cap, so a function
+// converge (bundle 46820). oxc writes `for _ in 0..100` and simply exits at the cap, so a function
 // that needed a 101st pass silently gets a truncated answer that is indistinguishable from a
 // converged one.
 //
@@ -71,7 +71,7 @@
 // That argument is upstream's own by construction rather than stated by it, and
 // `TestOptionalChainReductionTerminates` pins it on the shape that would loop if it were wrong.
 //
-// # DIVERGENCE FROM React: `terminalPreds` is dead code and is not reproduced
+// # Divergence from React: `terminalPreds` is dead code and is not reproduced
 //
 // React's `propagateNonNull` builds a `terminalPreds` set of every block ending in `throw` or
 // `return` (bundle 46777) and never reads it again. oxc does not build it. Verified by reading every
@@ -99,78 +99,8 @@ type pathNode struct {
 	hasOptional        bool
 }
 
-// pathRegistry interns every access path seen, upstream's `PropertyPathRegistry`.
-//
-// This lives here rather than in `dependencies.go` because it belongs to this machinery: upstream
-// declares it inside `CollectHoistablePropertyLoads.ts`, which is this pass, and the dependency tree
-// in `dependencies.go` is a DIFFERENT structure that happens to also be a property trie. Conflating
-// them is easy and was the seam error that sent one agent back; the registry indexes paths for this
-// dataflow, the dependency tree reduces accesses to a minimal set.
-type pathRegistry struct {
-	nodes []pathNode
-	roots map[static_single_assignment.IdentifierId]int
-}
-
 func newPathRegistry() *pathRegistry {
 	return &pathRegistry{roots: map[static_single_assignment.IdentifierId]int{}}
-}
-
-// identifierNode returns the interned node for a bare root, creating it if absent.
-func (r *pathRegistry) identifierNode(id static_single_assignment.IdentifierId, reactive bool) int {
-	if index, ok := r.roots[id]; ok {
-		return index
-	}
-	index := len(r.nodes)
-	r.nodes = append(r.nodes, pathNode{
-		properties:         map[string]int{},
-		optionalProperties: map[string]int{},
-		fullPath:           ReactiveScopeDependency{Identifier: id, Reactive: reactive},
-	})
-	r.roots[id] = index
-	return index
-}
-
-// propertyNode returns the interned node one step below parent, creating it if absent.
-//
-// The new node's `fullPath` is the parent's path with the entry appended, COPIED rather than shared:
-// two children of one parent must not alias a backing array, or extending one would corrupt the
-// other.
-func (r *pathRegistry) propertyNode(parent int, entry DependencyPathEntry) int {
-	table := r.nodes[parent].properties
-	if entry.Optional {
-		table = r.nodes[parent].optionalProperties
-	}
-	if index, ok := table[entry.Property]; ok {
-		return index
-	}
-
-	parentPath := r.nodes[parent].fullPath
-	path := make([]DependencyPathEntry, len(parentPath.Path), len(parentPath.Path)+1)
-	copy(path, parentPath.Path)
-	path = append(path, entry)
-
-	index := len(r.nodes)
-	r.nodes = append(r.nodes, pathNode{
-		properties:         map[string]int{},
-		optionalProperties: map[string]int{},
-		fullPath: ReactiveScopeDependency{
-			Identifier: parentPath.Identifier,
-			Reactive:   parentPath.Reactive,
-			Path:       path,
-		},
-		hasOptional: r.nodes[parent].hasOptional || entry.Optional,
-	})
-	table[entry.Property] = index
-	return index
-}
-
-// pathIndex interns a whole dependency, returning the node naming it.
-func (r *pathRegistry) pathIndex(dep ReactiveScopeDependency) int {
-	current := r.identifierNode(dep.Identifier, dep.Reactive)
-	for _, entry := range dep.Path {
-		current = r.propertyNode(current, entry)
-	}
-	return current
 }
 
 // ---------------------------------------------------------------------------
@@ -186,7 +116,7 @@ func (r *pathRegistry) pathIndex(dep ReactiveScopeDependency) int {
 // # Termination, which is unbounded upstream and unbounded here
 //
 // The loop has no iteration cap, unlike the outer dataflow. It terminates because each replacement
-// strictly decreases the number of OPTIONAL entries in the rewritten path -- an entry flips from
+// strictly decreases the number of optional entries in the rewritten path -- an entry flips from
 // optional to non-optional and never back -- and a path has finitely many entries. So a node can be
 // replaced at most as many times as its path is long, and the loop runs at most that many times
 // over the whole set.
@@ -194,6 +124,8 @@ func (r *pathRegistry) pathIndex(dep ReactiveScopeDependency) int {
 // That argument is implicit in upstream's construction rather than stated by it, which is why it is
 // pinned by `TestOptionalChainReductionTerminates` on the shape that would spin if the flip were
 // ever reversible.
+//
+// Mutates: nodes each reducible path is replaced in place by its non-optional form, the set the caller merged
 func reduceOptionalChains(nodes map[int]bool, registry *pathRegistry) {
 	hasOptional := false
 	for index := range nodes {
@@ -209,7 +141,7 @@ func reduceOptionalChains(nodes map[int]bool, registry *pathRegistry) {
 	for {
 		changed := false
 		// Sorted rather than ranged: this mutates `nodes` while deciding what to replace, and a Go
-		// map's randomised order would make WHICH node is rewritten first vary between runs. The
+		// map's randomised order would make which node is rewritten first vary between runs. The
 		// answer converges either way, but the intermediate states differ and a caller diffing two
 		// runs would see noise.
 		for _, original := range sortedNodeIndices(nodes) {
@@ -268,9 +200,9 @@ const (
 
 // propagationDirection selects which neighbours a pass reads from.
 //
-// Forward reads PREDECESSORS: a value is non-null here if it was non-null on every path into this
-// block. Backward reads SUCCESSORS: if every path out of this block dereferences a value, that
-// dereference must have been safe here too, which is what lets an access hoist ABOVE the branch
+// Forward reads predecessors: a value is non-null here if it was non-null on every path into this
+// block. Backward reads successors: if every path out of this block dereferences a value, that
+// dereference must have been safe here too, which is what lets an access hoist above the branch
 // that uses it. The backward direction is the half that makes this analysis worth its cost.
 type propagationDirection uint8
 
@@ -286,54 +218,6 @@ const (
 // showing real code converges in at most 3.
 const hoistableIterationCap = 100
 
-// HoistableAnalysis is what this pass produces: the non-null accesses at every block, and whether
-// the analysis actually converged.
-//
-// `Converged` is the field that does not exist upstream in a readable form, and it is the point of
-// this type. React throws when the loop hits the cap; oxc silently exits and returns a truncated
-// answer indistinguishable from a real one. A linter can do neither, so it reports.
-type HoistableAnalysis struct {
-	blocks    map[static_single_assignment.BlockId]map[int]bool
-	registry  *pathRegistry
-	converged bool
-	// iterations is how many outer passes ran, for measuring how close real code comes to the cap.
-	iterations int
-}
-
-// Converged reports whether the fixed point was reached inside the iteration cap.
-//
-// A false result means the answer is PARTIAL: correct as far as it goes, because every pass only
-// adds proven-non-null accesses, but potentially missing some. A caller that needs upstream's
-// behaviour treats false as an error; a caller that prefers a shallower dependency treats it as a
-// smaller hoistable set, which is the safe direction.
-func (h *HoistableAnalysis) Converged() bool {
-	return h != nil && h.converged
-}
-
-// Iterations reports how many outer passes ran, for measurement.
-func (h *HoistableAnalysis) Iterations() int {
-	if h == nil {
-		return 0
-	}
-	return h.iterations
-}
-
-// hoistableAt returns the non-null access paths proven at one block.
-func (h *HoistableAnalysis) hoistableAt(block static_single_assignment.BlockId) []ReactiveScopeDependency {
-	if h == nil || h.blocks == nil {
-		return nil
-	}
-	set, ok := h.blocks[block]
-	if !ok {
-		return nil
-	}
-	paths := make([]ReactiveScopeDependency, 0, len(set))
-	for _, index := range sortedNodeIndices(set) {
-		paths = append(paths, h.registry.nodes[index].fullPath)
-	}
-	return paths
-}
-
 // collectNonNullsInBlocks seeds each block with the accesses it proves non-null by itself.
 //
 // Upstream's `collectNonNullsInBlocks`. Sources of seed:
@@ -345,13 +229,19 @@ func (h *HoistableAnalysis) hoistableAt(block static_single_assignment.BlockId) 
 // The second is the load-bearing one and it is a deduction rather than an assumption: if
 // `props.a.b` executed without throwing, then `props.a` was not nullish at that point, so `props.a`
 // is hoistable to anywhere that dominates it.
-func collectNonNullsInBlocks(function *Function, temporaries temporaries, ranges *mutation_aliasing.MutableRanges,
-	identity ScopeIdentity, scopes *ReactiveScopes, registry *pathRegistry,
-	hoistableFromOptionals map[static_single_assignment.BlockId]ReactiveScopeDependency) map[static_single_assignment.BlockId]map[int]bool {
+func collectNonNullsInBlocks(
+	function *Function,
+	temporaries temporaries,
+	ranges *mutation_aliasing.MutableRanges,
+	identity ScopeIdentity,
+	scopes *ReactiveScopes,
+	registry *pathRegistry,
+	hoistableFromOptionals map[static_single_assignment.BlockId]ReactiveScopeDependency,
+) map[static_single_assignment.BlockId]map[int]bool {
 	known := map[int]bool{}
 	invoked := CollectAssumedInvokedFunctions(function)
 
-	// # DIVERGENCE FROM React: the component test is a NAME here, not an inferred function type
+	// # Divergence from React: the component test is a name here, not an inferred function type
 	//
 	// Upstream gates this on `func.fn_type == ReactFunctionType::Component`, a value produced by an
 	// inference pass this tree does not have. `IsLikelyComponentName` is the same test React's own
@@ -359,22 +249,22 @@ func collectNonNullsInBlocks(function *Function, temporaries temporaries, ranges
 	//
 	// The exposure was measured rather than assumed: of 677 corpus functions, 262 are
 	// capital-initial and 254 of those take a parameter, so this seeds at most 254 roots. Getting it
-	// WRONG in the permissive direction would be the dangerous one, since it asserts a parameter is
+	// wrong in the permissive direction would be the dangerous one, since it asserts a parameter is
 	// non-null without proof -- so the gate additionally requires the function to be a plausible
-	// component by name AND to have a parameter, matching upstream's `!func.params.is_empty()`.
+	// component by name and to have a parameter, matching upstream's `!func.params.is_empty()`.
 	//
-	// A mutation dropping the NAME half of this gate -- seeding every function that takes a
-	// parameter -- SURVIVES, and it is reachable: 152 of 278 corpus functions take a parameter
+	// A mutation dropping the name half of this gate -- seeding every function that takes a
+	// parameter -- survives, and it is reachable: 152 of 278 corpus functions take a parameter
 	// without being capital-initial. It makes no difference to the output because the seed only
 	// asserts the first parameter non-null, and every corpus dependency that would benefit already
 	// proves its root non-null through an actual dereference instead.
 	//
 	// The gate is kept because it is upstream's and because its direction matters: seeding a
-	// non-component asserts a parameter is non-null WITHOUT proof, which is the over-approximating
-	// direction. The verdict EXPIRES if the seed ever becomes load-bearing, which it would the
+	// non-component asserts a parameter is non-null without proof, which is the over-approximating
+	// direction. The verdict expires if the seed ever becomes load-bearing, which it would the
 	// moment a component reads a parameter property that nothing else dereferences.
 	if isLikelyComponentFunction(function) {
-		known[registry.identifierNode(function.Params[0].Identifier, true)] = true
+		known[registry.identifierNode(function.Parameters[0].Identifier, true)] = true
 	}
 
 	// The loads that exist only to build a memo call's dependency array, which must not be read as
@@ -397,7 +287,7 @@ func collectNonNullsInBlocks(function *Function, temporaries temporaries, ranges
 		// further loads are safe to read unconditionally.
 		//
 		// Without it the analysis truncates exactly the paths those fixtures turn on, which is
-		// measurable: wiring the optional lowering and collector WITHOUT this seed takes goldens
+		// measurable: wiring the optional lowering and collector without this seed takes goldens
 		// from 28 to 21, and every one of the seven lost is an optional-chain fixture.
 		if base, ok := hoistableFromOptionals[block.Id]; ok {
 			node := registry.identifierNode(base.Identifier, base.Reactive)
@@ -413,7 +303,7 @@ func collectNonNullsInBlocks(function *Function, temporaries temporaries, ranges
 				continue
 			}
 			if expression, isFunction := instruction.Value.(*FunctionExpression); isFunction {
-				// A callback that is assumed to run contributes what IT proves non-null, because
+				// A callback that is assumed to run contributes what it proves non-null, because
 				// the enclosing scope reaches those reads through the call. Upstream does the same
 				// at `CollectHoistablePropertyLoads.ts:432`, merging the inner analysis's
 				// `assumedNonNullObjects` into the outer block's.
@@ -482,13 +372,13 @@ func collectNonNullsInBlocks(function *Function, temporaries temporaries, ranges
 // approximated here by name as `isLikelyComponentFunction` already does -- see the divergence note
 // at `collectNonNullsInBlocks` for why a name rather than an inferred function type.
 func isKnownImmutableParameter(function *Function, id static_single_assignment.IdentifierId) bool {
-	if function == nil || len(function.Params) == 0 {
+	if function == nil || len(function.Parameters) == 0 {
 		return false
 	}
 	if !isLikelyComponentFunction(function) && !isHookName(function.Name) {
 		return false
 	}
-	for _, parameter := range function.Params {
+	for _, parameter := range function.Parameters {
 		if parameter.Identifier == id {
 			return true
 		}
@@ -498,7 +388,7 @@ func isKnownImmutableParameter(function *Function, id static_single_assignment.I
 
 // isLikelyComponentFunction reports whether this function is one React would seed as a component.
 func isLikelyComponentFunction(function *Function) bool {
-	if function == nil || len(function.Params) == 0 || function.Name == "" {
+	if function == nil || len(function.Parameters) == 0 || function.Name == "" {
 		return false
 	}
 	runes := []rune(function.Name)
@@ -520,7 +410,7 @@ func maybeNonNullInInstruction(value InstructionValue,
 	switch shape := value.(type) {
 	case *PropertyLoad:
 		if shape.Optional {
-			// An OPTIONAL load proves nothing about its object. `arg?.items` is the guard against
+			// An optional load proves nothing about its object. `arg?.items` is the guard against
 			// `arg` being null, so reading it is not evidence that `arg` is non-null -- it is
 			// evidence the program expects it might be.
 			//
@@ -530,9 +420,9 @@ func maybeNonNullInInstruction(value InstructionValue,
 			// that wrote `arg?.items`, which is a disagreement this pass manufactured.
 			//
 			// Upstream reaches the same answer differently. Its hoistable set is keyed by optional
-			// BLOCK -- `collectOptionalChainSidemap` builds `optionalBlock -> baseObject?.a`
+			// block -- `collectOptionalChainSidemap` builds `optionalBlock -> baseObject?.a`
 			// (`CollectHoistablePropertyLoads.ts:94`) -- so the guard survives into the tree and the
-			// optional arm fires. That 418-line pass is driven by `Optional` TERMINALS, which this
+			// optional arm fires. That 418-line pass is driven by `Optional` terminals, which this
 			// lowering does not produce: measured on the fixture, the only terminals are `Return`.
 			// Optionality lives on the instruction here, so the same fact is read from the flag.
 			return ReactiveScopeDependency{}, false
@@ -562,16 +452,22 @@ func maybeNonNullInInstruction(value InstructionValue,
 // # Which of the two ranges this reads, which is the question `scopes.go` flagged
 //
 // Upstream compares `identifier.mutableRange` against `identifier.scope.range` -- and after the
-// scope pass those are DIFFERENT tables. `mutableRange` has been rewritten to the class hull, which
-// is `MemberRanges()` here, while `scope.range` is the FINAL range after alignment and merging,
+// scope pass those are different tables. `mutableRange` has been rewritten to the class hull, which
+// is `MemberRanges()` here, while `scope.range` is the final range after alignment and merging,
 // which is `identity.RangeOf`. Reading the pre-entanglement range for the first would understate the
 // mutable window and wrongly declare a value settled, which is the dangerous direction.
 //
 // The `end > start + 1` test is upstream's and is not a tidy-up of `end > start`: a range spanning a
 // single instruction describes a value written once and never mutated, which is immutable for this
 // purpose despite having a non-empty range.
-func isImmutableAtInstruction(function *Function, id static_single_assignment.IdentifierId, order static_single_assignment.EvaluationOrder,
-	ranges *mutation_aliasing.MutableRanges, identity ScopeIdentity, scopes *ReactiveScopes) bool {
+func isImmutableAtInstruction(
+	function *Function,
+	id static_single_assignment.IdentifierId,
+	order static_single_assignment.EvaluationOrder,
+	ranges *mutation_aliasing.MutableRanges,
+	identity ScopeIdentity,
+	scopes *ReactiveScopes,
+) bool {
 	if isKnownImmutableParameter(function, id) {
 		return true
 	}
@@ -592,10 +488,10 @@ func isImmutableAtInstruction(function *Function, id static_single_assignment.Id
 //
 // Upstream's `propagateNonNull`. Each outer iteration is one forward pass followed by one backward
 // pass, and the loop stops when neither changed anything. See this file's header for the termination
-// story, which is a BOUND rather than a proof, and for the measured convergence distribution.
+// story, which is a bound rather than a proof, and for the measured convergence distribution.
 //
 // The successor map is built here rather than read off the terminals deliberately: it is the
-// TRANSPOSE of the predecessor lists, so it agrees with them by construction. Deriving it from
+// transpose of the predecessor lists, so it agrees with them by construction. Deriving it from
 // `EachSuccessor` instead would let the two disagree wherever a fallthrough is involved -- and
 // `terminal.go` is explicit that a fallthrough is not an edge, which is exactly the case a hand-built
 // successor map gets wrong.
@@ -611,8 +507,8 @@ func propagateNonNull(function *Function, blocks map[static_single_assignment.Bl
 		}
 	}
 	for predecessor := range successors {
-		sort.Slice(successors[predecessor], func(i, j int) bool {
-			return successors[predecessor][i] < successors[predecessor][j]
+		sort.Slice(successors[predecessor], func(left, right int) bool {
+			return successors[predecessor][left] < successors[predecessor][right]
 		})
 	}
 
@@ -667,11 +563,11 @@ func propagateNonNull(function *Function, blocks map[static_single_assignment.Bl
 	// `Converged() == false`. See this file's header on why the difference from oxc matters: oxc
 	// exits silently and the truncated answer is indistinguishable from a real one.
 	//
-	// A mutation reporting `true` here SURVIVES, and unlike the other survivors in this file that is
+	// A mutation reporting `true` here survives, and unlike the other survivors in this file that is
 	// plain unreachability rather than an equivalence: the cap is reached zero times across the
 	// corpus, whose measured maximum is 3 iterations against a bound of 100. No fixture can reach
 	// this line without constructing a graph that fails to converge, which is a shape nobody has
-	// produced. Recorded rather than covered, and the verdict EXPIRES if the convergence
+	// produced. Recorded rather than covered, and the verdict expires if the convergence
 	// distribution ever moves -- which `TestHoistableCorpusDistribution` asserts on exactly.
 	return working, false, iterations
 }
@@ -685,12 +581,21 @@ func propagateNonNull(function *Function, blocks map[static_single_assignment.Bl
 // the back edge contributes nothing.
 //
 // The intersection, not the union, is what makes the forward direction sound: a value is non-null
-// here only if it was non-null on EVERY path that reaches here. An empty neighbour list therefore
+// here only if it was non-null on every path that reaches here. An empty neighbour list therefore
 // contributes the empty set rather than everything, which is why `doneSets` being empty short
 // circuits to no contribution rather than to a universal one.
-func recursivelyPropagateNonNull(id static_single_assignment.BlockId, direction propagationDirection,
-	state map[static_single_assignment.BlockId]traversalState, working map[static_single_assignment.BlockId]map[int]bool, function *Function,
-	successors map[static_single_assignment.BlockId][]static_single_assignment.BlockId, registry *pathRegistry) bool {
+//
+// Mutates: state each block is marked active on entry and done on exit, threaded through the whole walk
+// Mutates: working each block's merged set is stored, so one map holds every block's answer
+func recursivelyPropagateNonNull(
+	id static_single_assignment.BlockId,
+	direction propagationDirection,
+	state map[static_single_assignment.BlockId]traversalState,
+	working map[static_single_assignment.BlockId]map[int]bool,
+	function *Function,
+	successors map[static_single_assignment.BlockId][]static_single_assignment.BlockId,
+	registry *pathRegistry,
+) bool {
 	if _, seen := state[id]; seen {
 		return false
 	}
@@ -716,7 +621,7 @@ func recursivelyPropagateNonNull(id static_single_assignment.BlockId, direction 
 		}
 	}
 
-	// # A mutation admitting ACTIVE neighbours here SURVIVES, and it is reachable code
+	// # A mutation admitting active neighbours here survives, and it is reachable code
 	//
 	// The corpus holds 1,832 back edges across 278 functions, so `active` neighbours genuinely
 	// occur -- this is not the `Optional` shape of a branch that never runs. The filter nonetheless
@@ -728,7 +633,7 @@ func recursivelyPropagateNonNull(id static_single_assignment.BlockId, direction 
 	// active neighbour lets a loop assert a value non-null on the strength of an assumption derived
 	// from itself, which is the over-approximating direction -- the one that invents crashes. A
 	// verdict of "makes no difference today" is not a licence to remove a soundness guard, and this
-	// one EXPIRES the moment a seeded set is non-empty at a back edge, which any richer seeding
+	// one expires the moment a seeded set is non-empty at a back edge, which any richer seeding
 	// (optional chains, interprocedural non-null) would produce.
 	var doneSets []map[int]bool
 	for _, neighbour := range neighbours {
@@ -769,17 +674,17 @@ func recursivelyPropagateNonNull(id static_single_assignment.BlockId, direction 
 	working[id] = merged
 	state[id] = traversalDone
 
-	// Compared as SETS rather than by size, because `reduceOptionalChains` replaces nodes rather
+	// Compared as sets rather than by size, because `reduceOptionalChains` replaces nodes rather
 	// than adding them: a reduction that swaps `a?.b` for `a.b` leaves the count identical while
 	// changing the answer, and a size comparison would call that converged.
 	//
-	// A mutation replacing this with a length comparison SURVIVES, and the measurement says why: the
+	// A mutation replacing this with a length comparison survives, and the measurement says why: the
 	// swap-without-size-change case occurs zero times on this corpus, because `reduceOptionalChains`
 	// only fires on paths carrying an optional entry and the optional-chain analysis that would
 	// produce them is `DependencyGapOptionalChains`, unbuilt. So the two spellings are
 	// indistinguishable here for exactly the reason the reduction is currently inert.
 	//
-	// The set comparison is kept because it is upstream's, and because this verdict EXPIRES the day
+	// The set comparison is kept because it is upstream's, and because this verdict expires the day
 	// optional chains are reconstructed -- at which point the size comparison silently reports a
 	// changed analysis as converged, which is the failure this whole file is written to avoid.
 	if !sameNodeSet(previous, merged) {
@@ -790,7 +695,7 @@ func recursivelyPropagateNonNull(id static_single_assignment.BlockId, direction 
 
 // blockById finds a block by id.
 //
-// A linear scan rather than an index, because `BlockId` is explicitly NOT an index into `Blocks` --
+// A linear scan rather than an index, because `BlockId` is explicitly not an index into `Blocks` --
 // the slice is held in reverse postorder and the two move independently. See the doc on `BlockId`.
 func blockById(function *Function, id static_single_assignment.BlockId) *BasicBlock {
 	for _, block := range function.Blocks {
@@ -802,12 +707,12 @@ func blockById(function *Function, id static_single_assignment.BlockId) *BasicBl
 }
 
 // sameNodeSet reports whether two node sets hold exactly the same members.
-func sameNodeSet(a, b map[int]bool) bool {
-	if len(a) != len(b) {
+func sameNodeSet(left, right map[int]bool) bool {
+	if len(left) != len(right) {
 		return false
 	}
-	for index := range a {
-		if !b[index] {
+	for index := range left {
+		if !right[index] {
 			return false
 		}
 	}
@@ -821,7 +726,7 @@ func sameNodeSet(a, b map[int]bool) bool {
 // CollectHoistablePropertyLoads computes which accesses each reactive scope may read early.
 //
 // Requires a graph whose scopes are built into `Scope` terminals: call `BuildReactiveScopeTerminals`
-// first, exactly as `CollectScopeDependencies` does. The result is keyed by SCOPE, taking each
+// first, exactly as `CollectScopeDependencies` does. The result is keyed by scope, taking each
 // scope's set from the block its terminal names as the body -- upstream's `keyByScopeId`.
 func CollectHoistablePropertyLoads(function *Function, scopes *ReactiveScopes,
 	identity ScopeIdentity, ranges *mutation_aliasing.MutableRanges,
@@ -852,7 +757,7 @@ func CollectHoistablePropertyLoads(function *Function, scopes *ReactiveScopes,
 		// Upstream reads the block the scope begins in, and so does this: `keyByScopeId` sets
 		// `source.get(block.terminal.block)`. The keying is faithful and is not what differs.
 		//
-		// What differs is where a scope BEGINS. A scope whose first block sits inside a branch can be
+		// What differs is where a scope begins. A scope whose first block sits inside a branch can be
 		// handed that branch's facts, and a fact true only under an `if` then licenses the dependency
 		// walk to descend past a property that may never have been loaded.
 		//
@@ -863,7 +768,7 @@ func CollectHoistablePropertyLoads(function *Function, scopes *ReactiveScopes,
 		// fixture exists to test. Upstream's own scope for that value begins after the branch
 		// closes, where the fact is not available.
 		//
-		// The fallback is restricted to a branch scope DOMINATED BY an earlier reactive scope. That
+		// The fallback is restricted to a branch scope dominated by an earlier reactive scope. That
 		// is the structural residue of the wider scope upstream keeps around the allocation and
 		// mutation in the fixture above. A top-level branch scope is different: in
 		// `useMemo-conditional-access-own-scope`, upstream starts the object scope inside the branch
@@ -929,16 +834,16 @@ func analyseHoistableLoads(function *Function, scopes *ReactiveScopes,
 // This is the seam `dependencies.go` left open. Its `hoistableNode` tree is the shape
 // `ReactiveScopeDependencyTreeHIR` wants; this builds one from the flat path list above.
 //
-// # DIVERGENCE FROM oxc, now observable, resolved in React's favour
+// # Divergence from oxc, now observable, resolved in React's favour
 //
-// `dependencies.go` recorded that oxc SORTS its hoistable objects so optional-first entries precede
+// `dependencies.go` recorded that oxc sorts its hoistable objects so optional-first entries precede
 // non-optional ones, claiming it "matches the TS behavior" -- and that React does no such sort
 // (bundle 46967), iterating in insertion order and raising `CompilerError.invariant('Conflicting
 // access types')` when two entries disagree about a property, where oxc silently takes first-wins.
 //
 // That divergence was unobservable while the hoistable set was empty. This pass fills it, so it is
 // live now, and React wins: there is no sort, insertion order is the paths' sorted-by-node-index
-// order from `hoistableAt`, and a conflict is REPORTED rather than silently resolved. A linter must
+// order from `hoistableAt`, and a conflict is reported rather than silently resolved. A linter must
 // not raise, so `conflicts` is returned for a caller that wants upstream's strictness; the value
 // stored on a conflict is the first, which is oxc's behaviour, chosen only because something must be
 // stored and the caller has been told.
@@ -990,11 +895,11 @@ func invokedNonNullPaths(parent *Function, expression *FunctionExpression,
 	if nested == nil || len(expression.Captures) != len(nested.Context) {
 		return nil
 	}
-	// The captures that are immutable AT THE CALL SITE, computed once. Upstream's
+	// The captures that are immutable at the call site, computed once. Upstream's
 	// `nestedFnImmutableContext`, and its comment gives the reason it is a set rather than a test
 	// repeated inside: "comparing instruction ids across inner-outer function bodies is not valid,
 	// as they are numbered [separately]". So the question is asked once, here, in the outer
-	// numbering, and inside the callback membership in this set IS the answer.
+	// numbering, and inside the callback membership in this set is the answer.
 	//
 	// Asked of the capture rather than of each path root, which is the same subject upstream uses:
 	// `innerFn.func.context.filter(place => isImmutableAtInstr(place.identifier, instr.id, ...))`.
@@ -1010,7 +915,7 @@ func invokedNonNullPaths(parent *Function, expression *FunctionExpression,
 		return nil
 	}
 
-	// # What the callback proves is read at its ENTRY block, not gathered from all of them
+	// # What the callback proves is read at its entry block, not gathered from all of them
 	//
 	// Upstream runs the whole analysis on the callback and takes one block's answer:
 	//
@@ -1151,17 +1056,17 @@ func dependencyArrayInstructions(function *Function) map[InstructionId]bool {
 		// A value read more than once is not the array's private copy: something else consumes it,
 		// so upstream's elimination would keep it and so does this.
 		//
-		// # A mutation removing this guard SURVIVES, and it is recorded rather than covered
+		// # A mutation removing this guard survives, and it is recorded rather than covered
 		//
 		// Measured: dropping it moves nothing on this corpus, because a dependency array's elements
 		// are lowered fresh for the array in every fixture here -- the callback body's own read of
 		// the same property is a separate instruction inside the nested function, which this walk
-		// never reaches. So no load is currently reachable from an array AND read elsewhere.
+		// never reaches. So no load is currently reachable from an array and read elsewhere.
 		//
 		// Kept because the property it protects is soundness rather than score, and because the
 		// direction matters: without it, a load that real code also consumes would stop being
 		// evidence, which is the under-approximating direction and would drop dependency depth that
-		// upstream keeps. The verdict EXPIRES the moment a lowering shares one load between an
+		// upstream keeps. The verdict expires the moment a lowering shares one load between an
 		// array element and a body read, which is what upstream's own elimination already assumes
 		// can happen -- it prunes by use count rather than by position.
 		if reads[id] > 1 {
@@ -1177,7 +1082,7 @@ func dependencyArrayInstructions(function *Function) map[InstructionId]bool {
 			// Any other value is a real computation the array merely names, and it is evidence in
 			// its own right.
 			//
-			// A mutation widening this list SURVIVES on this corpus, since no fixture writes a
+			// A mutation widening this list survives on this corpus, since no fixture writes a
 			// dependency array over anything but a load -- `[props.a, x]` rather than
 			// `[f(x)]`, which upstream's own dependency extraction refuses to parse anyway. It is
 			// still the list rather than a bare accept, because the walk exists to find loads that

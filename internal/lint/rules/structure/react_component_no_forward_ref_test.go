@@ -8,8 +8,8 @@ import (
 
 const forwardRefFile = "/repository/source/components/Field.tsx"
 
-func TestReactComponentNoForwardRefFires(t *testing.T) {
-	t.Parallel()
+func TestReactComponentNoForwardRefFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -63,16 +63,16 @@ func TestReactComponentNoForwardRefFires(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.Run(t, ReactComponentNoForwardRef, forwardRefFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.Run(test, ReactComponentNoForwardReference, forwardRefFile,
 				testCase.sourceText), testCase.wantIds...)
 		})
 	}
 }
 
-func TestReactComponentNoForwardRefStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestReactComponentNoForwardRefStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -126,9 +126,12 @@ func TestReactComponentNoForwardRefStaysSilent(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, ReactComponentNoForwardRef, forwardRefFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(
+				test,
+				rule_testing.Run(test, ReactComponentNoForwardReference, forwardRefFile, testCase.sourceText),
+			)
 		})
 	}
 }

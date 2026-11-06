@@ -3,6 +3,7 @@ package release
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -17,12 +18,12 @@ import (
 //   - An unsigned binary with no quarantine attribute runs normally. This is what an `npm install`
 //     produces today: package managers extract tarballs without setting `com.apple.quarantine`, so
 //     a consumer installing cohere from the registry is not blocked.
-//   - The same binary with the quarantine attribute set is killed by the kernel: exit 137, SIGKILL,
+//   - The same binary with the quarantine attribute set is killed by the kernel: exit 137, `SIGKILL`,
 //     and zero bytes on both stdout and stderr. Measured directly on a staged darwin/arm64 build.
 //
 // That second case is the reason to sign. It is reached whenever the binary travels as a file
-// rather than as a package — a release asset downloaded from a browser or curl, a tarball someone
-// forwards, a binary copied out of CI — and it fails in the worst available way: silently, with no
+// rather than as a package (a release asset downloaded from a browser or curl, a tarball someone
+// forwards, a binary copied out of CI), and it fails in the worst available way: silently, with no
 // output to explain it. A developer seeing an empty result would reasonably read it as a clean run,
 // which is precisely the confusion cohere exists to eliminate.
 //
@@ -67,7 +68,7 @@ func (signing Signing) IsConfigured() bool {
 // CanNotarize reports whether notarization can run.
 //
 // Signing and notarizing are separate steps with separate credentials, and a release can legitimately
-// do the first without the second — a signed binary still fails a quarantined launch until the
+// do the first without the second: a signed binary still fails a quarantined launch until the
 // notary service has seen it, but it fails differently and it is a strictly better state than
 // unsigned. Treating them as one step would mean losing the signature when only the notary
 // credentials are missing.
@@ -78,7 +79,7 @@ func (signing Signing) CanNotarize() bool {
 // Sign codesigns a macOS binary in place.
 //
 // The signature is applied with a hardened runtime and a timestamp because the notary service
-// rejects binaries without either, and it rejects them after the upload rather than before — so
+// rejects binaries without either, and it rejects them after the upload rather than before, so
 // omitting these turns a fast local error into a slow remote one.
 func Sign(binaryPath string, signing Signing) error {
 	if !signing.IsConfigured() {
@@ -98,8 +99,8 @@ func Sign(binaryPath string, signing Signing) error {
 	)
 	command.Stderr = os.Stderr
 
-	if err := command.Run(); err != nil {
-		return fmt.Errorf("codesigning %s: %w", binaryPath, err)
+	if runError := command.Run(); runError != nil {
+		return fmt.Errorf("codesigning %s: %w", binaryPath, runError)
 	}
 
 	return VerifySignature(binaryPath)
@@ -114,22 +115,22 @@ func Sign(binaryPath string, signing Signing) error {
 func VerifySignature(binaryPath string) error {
 	command := exec.Command("codesign", "--verify", "--strict", "--verbose=2", binaryPath)
 
-	output, err := command.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("the signature on %s did not verify: %w\n%s", binaryPath, err, output)
+	output, outputError := command.CombinedOutput()
+	if outputError != nil {
+		return fmt.Errorf("the signature on %s did not verify: %w\n%s", binaryPath, outputError, output)
 	}
 
 	// An ad-hoc signature verifies successfully and is worth nothing to Gatekeeper. Go's linker
 	// applies one to every arm64 binary, so a signing step that silently did nothing leaves a
 	// binary that passes `codesign --verify` and is still killed on a quarantined launch. Checking
 	// for it is what separates "verified" from "verified as actually signed by us".
-	details, err := exec.Command("codesign", "--display", "--verbose=2", binaryPath).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("reading the signature on %s: %w", binaryPath, err)
+	details, outputError := exec.Command("codesign", "--display", "--verbose=2", binaryPath).CombinedOutput()
+	if outputError != nil {
+		return fmt.Errorf("reading the signature on %s: %w", binaryPath, outputError)
 	}
 	if strings.Contains(string(details), "Signature=adhoc") {
 		return fmt.Errorf(
-			"%s carries only an ad-hoc signature, which Gatekeeper does not accept — the signing step did not take",
+			"%s carries only an ad-hoc signature, which Gatekeeper does not accept, so the signing step did not take",
 			binaryPath,
 		)
 	}
@@ -150,24 +151,38 @@ func VerifySignature(binaryPath string) error {
 // check against Apple's service on first launch instead. This is a real limitation rather than an
 // oversight: a machine that is entirely offline the first time it runs a quarantined cohere will be
 // blocked. The npm install path does not set quarantine at all, so this does not affect it.
-func Notarize(binaryPath string, signing Signing) error {
+//
+// Each submission is announced to progress as it starts and as it is accepted, since it waits minutes on Apple's
+// service; a nil progress announces nothing, and an announcement that cannot be written stops the release.
+func Notarize(binaryPath string, signing Signing, progress io.Writer) error {
 	if !signing.CanNotarize() {
 		return fmt.Errorf("no notarytool keychain profile configured")
 	}
 
-	directory, err := os.MkdirTemp("", "cohere-notarize-")
-	if err != nil {
-		return fmt.Errorf("making a directory for the notary archive: %w", err)
+	directory, temporaryDirectoryError := os.MkdirTemp("", "cohere-notarize-")
+	if temporaryDirectoryError != nil {
+		return fmt.Errorf("making a directory for the notary archive: %w", temporaryDirectoryError)
 	}
+	// Ignored: the directory is under the system's temporary directory, and an archive left there is a copy of a
+	// signed binary that nothing reads again.
 	defer os.RemoveAll(directory)
 	zipPath := filepath.Join(directory, filepath.Base(binaryPath)+".zip")
 	// ditto rather than zip, as Apple's notarization guide uses: it keeps the signature's extended
 	// attributes, which zip can drop.
-	if output, err := exec.Command("ditto", "-c", "-k", "--keepParent", binaryPath, zipPath).CombinedOutput(); err != nil {
-		return fmt.Errorf("archiving %s for the notary service: %w\n%s", binaryPath, err, output)
+	if output, outputError := exec.Command(
+		"ditto",
+		"-c",
+		"-k",
+		"--keepParent",
+		binaryPath,
+		zipPath,
+	).CombinedOutput(); outputError != nil {
+		return fmt.Errorf("archiving %s for the notary service: %w\n%s", binaryPath, outputError, output)
 	}
 
-	fmt.Printf("notarizing %s\n", binaryPath)
+	if announceError := announce(progress, "notarizing %s\n", binaryPath); announceError != nil {
+		return announceError
+	}
 	arguments := append([]string{"notarytool", "submit", zipPath},
 		notaryCredentials(signing)...)
 	// Without --wait the command returns as soon as the upload finishes, and a release would
@@ -175,23 +190,37 @@ func Notarize(binaryPath string, signing Signing) error {
 	arguments = append(arguments, "--wait", "--output-format", "json")
 	command := exec.Command("xcrun", arguments...)
 	command.Stderr = os.Stderr
-	output, err := command.Output()
-	if err != nil {
-		return fmt.Errorf("notarizing %s: %w\n%s", binaryPath, err, output)
+	output, outputError := command.Output()
+	if outputError != nil {
+		return fmt.Errorf("notarizing %s: %w\n%s", binaryPath, outputError, output)
 	}
 
-	verdict, err := readNotaryVerdict(output)
-	if err != nil {
-		return fmt.Errorf("notarizing %s: %w", binaryPath, err)
+	verdict, readNotaryVerdictError := readNotaryVerdict(output)
+	if readNotaryVerdictError != nil {
+		return fmt.Errorf("notarizing %s: %w", binaryPath, readNotaryVerdictError)
 	}
 	if verdict.Status != "Accepted" {
 		// Apple's log names each problem by file and reason, which is the only place the cause is.
 		logArguments := append([]string{"notarytool", "log", verdict.Identifier}, notaryCredentials(signing)...)
-		notaryLog, _ := exec.Command("xcrun", logArguments...).CombinedOutput()
+		notaryLog, logError := exec.Command("xcrun", logArguments...).CombinedOutput()
+		if logError != nil {
+			return fmt.Errorf("the notary service answered %q for %s (submission %s), and its log was not read: %w\n%s",
+				verdict.Status, binaryPath, verdict.Identifier, logError, notaryLog)
+		}
 		return fmt.Errorf("the notary service answered %q for %s (submission %s)\n%s",
 			verdict.Status, binaryPath, verdict.Identifier, notaryLog)
 	}
-	fmt.Printf("notarized %s: Accepted, submission %s\n", binaryPath, verdict.Identifier)
+	return announce(progress, "notarized %s: Accepted, submission %s\n", binaryPath, verdict.Identifier)
+}
+
+// announce writes one line of a release's progress, or nothing to a nil progress.
+func announce(progress io.Writer, format string, arguments ...any) error {
+	if progress == nil {
+		return nil
+	}
+	if _, writeError := fmt.Fprintf(progress, format, arguments...); writeError != nil {
+		return fmt.Errorf("announcing the notarization: %w", writeError)
+	}
 	return nil
 }
 
@@ -214,8 +243,8 @@ type notaryVerdict struct {
 // anything, since the status is the whole point of waiting for it.
 func readNotaryVerdict(output []byte) (notaryVerdict, error) {
 	var verdict notaryVerdict
-	if err := json.Unmarshal(output, &verdict); err != nil {
-		return notaryVerdict{}, fmt.Errorf("reading the notary service's answer: %w\n%s", err, output)
+	if decodeError := json.Unmarshal(output, &verdict); decodeError != nil {
+		return notaryVerdict{}, fmt.Errorf("reading the notary service's answer: %w\n%s", decodeError, output)
 	}
 	if verdict.Status == "" {
 		return notaryVerdict{}, fmt.Errorf("the notary service's answer carries no status\n%s", output)
@@ -233,8 +262,10 @@ func DescribeSigningState(signing Signing) string {
 	case signing.CanNotarize():
 		return "macOS binaries: signed and notarized"
 	case signing.IsConfigured():
-		return "macOS binaries: signed, NOT notarized — a quarantined launch will still be blocked until the notary service has seen this build"
+		return "macOS binaries: signed but not notarized, so a quarantined launch will still be blocked " +
+			"until the notary service has seen this build"
 	default:
-		return "macOS binaries: NOT signed — fine for an npm install, but a copied or downloaded binary will be killed by Gatekeeper with no output"
+		return "macOS binaries: not signed, which is fine for an npm install, but a copied or downloaded " +
+			"binary will be killed by Gatekeeper with no output"
 	}
 }

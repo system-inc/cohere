@@ -137,44 +137,51 @@ var gfmTableFixtures = []string{
 	"|a|b|\r\n|:-|-:|\r\n\r\n|c|",
 }
 
-func TestGfmTableEvents(t *testing.T) {
-	t.Parallel()
-	compareEvents(t, gfmTableFixtures)
+func TestGfmTableEvents(test *testing.T) {
+	test.Parallel()
+	compareEvents(test, gfmTableFixtures)
 }
 
 // gfmTableAlignOracleScript is the event oracle's script, describing only each table's `_align`, which the
 // event descriptions leave out and mdast-util-gfm-table reads.
-var gfmTableAlignOracleScript = strings.Replace(oracleScript,
+var gfmTableAlignOracleScript = strings.Replace(
+	oracleScript,
 	`return events.map(([kind, token]) => describe(kind, token));`,
-	`return events.filter(([kind, token]) => kind === "enter" && token.type === "table").map(([, token]) => token._align.join(","));`, 1)
+	`return events.filter(([kind, token]) => kind === "enter" && token.type === "table").map(([, token]) => token._align.join(","));`,
+	1,
+)
 
 // TestGfmTableAlignMatchesUpstream compares every fixture's table alignments with upstream's `_align`.
-func TestGfmTableAlignMatchesUpstream(t *testing.T) {
-	t.Parallel()
+func TestGfmTableAlignMatchesUpstream(test *testing.T) {
+	test.Parallel()
 	if !strings.Contains(gfmTableAlignOracleScript, "_align") {
-		t.Fatal("the align oracle script no longer matches the event oracle's")
+		test.Fatal("the align oracle script no longer matches the event oracle's")
 	}
-	if _, err := exec.LookPath("node"); err != nil {
-		t.Skip("node is not installed; the event oracle needs it")
+	if _, lookPathError := exec.LookPath("node"); lookPathError != nil {
+		test.Skip("node is not installed; the event oracle needs it")
 	}
-	directory := t.TempDir()
+	directory := test.TempDir()
 	script := filepath.Join(directory, "align.mjs")
-	if err := os.WriteFile(script, []byte(strings.ReplaceAll(gfmTableAlignOracleScript, "FORK", forkRoot(t))), 0o644); err != nil {
-		t.Fatal(err)
+	if writeError := os.WriteFile(
+		script,
+		[]byte(strings.ReplaceAll(gfmTableAlignOracleScript, "FORK", forkRoot(test))),
+		0o644,
+	); writeError != nil {
+		test.Fatal(writeError)
 	}
-	encoded, err := json.Marshal(gfmTableFixtures)
-	if err != nil {
-		t.Fatal(err)
+	encoded, encodeError := json.Marshal(gfmTableFixtures)
+	if encodeError != nil {
+		test.Fatal(encodeError)
 	}
 	command := exec.Command("node", script)
 	command.Stdin = strings.NewReader(string(encoded))
-	output, err := command.Output()
-	if err != nil {
-		t.Fatal(err)
+	output, outputError := command.Output()
+	if outputError != nil {
+		test.Fatal(outputError)
 	}
 	var expected [][]string
-	if err := json.Unmarshal(output, &expected); err != nil {
-		t.Fatal(err)
+	if decodeError := json.Unmarshal(output, &expected); decodeError != nil {
+		test.Fatal(decodeError)
 	}
 	tables := 0
 	for index, input := range gfmTableFixtures {
@@ -186,11 +193,11 @@ func TestGfmTableAlignMatchesUpstream(t *testing.T) {
 		}
 		tables += len(actual)
 		if fmt.Sprint(expected[index]) != fmt.Sprint(actual) {
-			t.Errorf("input %q: want aligns %q, got %q", truncateInput(input), expected[index], actual)
+			test.Errorf("input %q: want aligns %q, got %q", truncateInput(input), expected[index], actual)
 		}
 	}
 	if tables == 0 {
-		t.Fatal("no fixture produced a table")
+		test.Fatal("no fixture produced a table")
 	}
-	t.Logf("%d tables across %d fixtures", tables, len(gfmTableFixtures))
+	test.Logf("%d tables across %d fixtures", tables, len(gfmTableFixtures))
 }

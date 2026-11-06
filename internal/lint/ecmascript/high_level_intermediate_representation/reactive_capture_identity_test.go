@@ -2,8 +2,8 @@ package high_level_intermediate_representation
 
 import "testing"
 
-func TestNestedReactivityUsesCaptureIdentity(t *testing.T) {
-	t.Parallel()
+func TestNestedReactivityUsesCaptureIdentity(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name   string
@@ -24,12 +24,13 @@ return () => (argument: number) => [reactiveValue, stableValue, argument];
 }`,
 		},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			function := lowerTypedFunctions(t, "captures.tsx", testCase.source)[0]
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			function := lowerTypedFunctions(test, "captures.tsx", testCase.source)[0]
 			Construct(function)
 			InferReactive(function, nil)
-			var reactiveCaptures, stableCaptures int
+			var reactiveCaptures int
+			var stableCaptures int
 			var check func(*Function)
 			check = func(parent *Function) {
 				for _, instruction := range parent.Instructions {
@@ -43,7 +44,7 @@ return () => (argument: number) => [reactiveValue, stableValue, argument];
 						continue
 					}
 					if len(captures) != len(nested.Context) {
-						t.Fatal("the fixture lost positional capture pairing")
+						test.Fatal("the fixture lost positional capture pairing")
 					}
 					for index, capture := range captures {
 						context := nested.Context[index]
@@ -53,14 +54,17 @@ return () => (argument: number) => [reactiveValue, stableValue, argument];
 							stableCaptures++
 						}
 						if context.Reactive != capture.Reactive {
-							t.Errorf("capture %s: parent id=%d reactive=%t, child id=%d reactive=%t",
+							test.Errorf("capture %s: parent id=%d reactive=%t, child id=%d reactive=%t",
 								parent.Identifier(capture.Identifier).Name, capture.Identifier,
 								capture.Reactive, context.Identifier, context.Reactive)
 						}
 					}
-					for _, parameter := range nested.Params {
+					for _, parameter := range nested.Parameters {
 						if parameter.Reactive {
-							t.Errorf("nested parameter id=%d inherited unrelated outer reactivity", parameter.Identifier)
+							test.Errorf(
+								"nested parameter id=%d inherited unrelated outer reactivity",
+								parameter.Identifier,
+							)
 						}
 					}
 					check(nested)
@@ -68,7 +72,11 @@ return () => (argument: number) => [reactiveValue, stableValue, argument];
 			}
 			check(function)
 			if reactiveCaptures == 0 || stableCaptures == 0 {
-				t.Fatalf("fixture requires both capture kinds, got reactive=%d stable=%d", reactiveCaptures, stableCaptures)
+				test.Fatalf(
+					"fixture requires both capture kinds, got reactive=%d stable=%d",
+					reactiveCaptures,
+					stableCaptures,
+				)
 			}
 		})
 	}

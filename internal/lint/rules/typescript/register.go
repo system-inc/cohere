@@ -17,57 +17,57 @@ import (
 // rules that vanished rather than as a quieter run.
 func init() {
 	rule.Register(
-		rule.Registration{Rule: AwaitThenable},
-		rule.Registration{
+		rule.Registration[rule.NoOptions]{Rule: AwaitThenable},
+		rule.Registration[BanTsCommentOptions]{
 			Rule:   BanTsComment,
 			Decode: DecodeBanTsCommentOptions,
 		},
-		rule.Registration{
+		rule.Registration[ConsistentTypeImportsOptions]{
 			Rule:   ConsistentTypeImports,
 			Decode: DecodeConsistentTypeImportsOptions,
 		},
-		rule.Registration{Rule: NoArrayDelete},
-		rule.Registration{Rule: NoDuplicateEnumValues},
-		rule.Registration{
+		rule.Registration[rule.NoOptions]{Rule: NoArrayDelete},
+		rule.Registration[rule.NoOptions]{Rule: NoDuplicateEnumValues},
+		rule.Registration[NoExplicitAnyOptions]{
 			Rule:   NoExplicitAny,
 			Decode: rule.DecodeOptionsInto[NoExplicitAnyOptions](),
 		},
-		rule.Registration{Rule: NoExtraNonNullAssertion},
-		rule.Registration{Rule: NoImpliedEval},
-		rule.Registration{
+		rule.Registration[rule.NoOptions]{Rule: NoExtraNonNullAssertion},
+		rule.Registration[rule.NoOptions]{Rule: NoImpliedEval},
+		rule.Registration[NoFloatingPromisesOptions]{
 			Rule:   NoFloatingPromises,
 			Decode: DecodeNoFloatingPromisesOptions,
 		},
-		rule.Registration{Rule: NoForInArray},
-		rule.Registration{Rule: NoMisusedNew},
-		rule.Registration{
+		rule.Registration[rule.NoOptions]{Rule: NoForInArray},
+		rule.Registration[rule.NoOptions]{Rule: NoMisusedNew},
+		rule.Registration[NoMisusedPromisesOptions]{
 			Rule:   NoMisusedPromises,
 			Decode: rule.DecodeOptionsInto[NoMisusedPromisesOptions](),
 		},
-		rule.Registration{Rule: NoNonNullAssertedOptionalChain},
-		rule.Registration{Rule: NoNonNullAssertion},
-		rule.Registration{
+		rule.Registration[rule.NoOptions]{Rule: NoNonNullAssertedOptionalChain},
+		rule.Registration[rule.NoOptions]{Rule: NoNonNullAssertion},
+		rule.Registration[NoRequireImportsOptions]{
 			Rule:   NoRequireImports,
 			Decode: DecodeNoRequireImportsOptions,
 		},
-		rule.Registration{
+		rule.Registration[NoThisAliasOptions]{
 			Rule:   NoThisAlias,
 			Decode: DecodeNoThisAliasOptions,
 		},
-		rule.Registration{Rule: NoUnnecessaryParameterPropertyAssignment},
-		rule.Registration{Rule: NoUnnecessaryTypeConstraint},
-		rule.Registration{Rule: NoUnsafeDeclarationMerging},
-		rule.Registration{Rule: NoUnsafeFunctionType},
-		rule.Registration{Rule: NoUnsafeUnaryMinus},
-		rule.Registration{Rule: NoUselessEmptyExport},
-		rule.Registration{Rule: NoWrapperObjectTypes},
-		rule.Registration{Rule: PreferAsConst},
-		rule.Registration{Rule: PreferNamespaceKeyword},
-		rule.Registration{
+		rule.Registration[rule.NoOptions]{Rule: NoUnnecessaryParameterPropertyAssignment},
+		rule.Registration[rule.NoOptions]{Rule: NoUnnecessaryTypeConstraint},
+		rule.Registration[rule.NoOptions]{Rule: NoUnsafeDeclarationMerging},
+		rule.Registration[rule.NoOptions]{Rule: NoUnsafeFunctionType},
+		rule.Registration[rule.NoOptions]{Rule: NoUnsafeUnaryMinus},
+		rule.Registration[rule.NoOptions]{Rule: NoUselessEmptyExport},
+		rule.Registration[rule.NoOptions]{Rule: NoWrapperObjectTypes},
+		rule.Registration[rule.NoOptions]{Rule: PreferAsConst},
+		rule.Registration[rule.NoOptions]{Rule: PreferNamespaceKeyword},
+		rule.Registration[TripleSlashReferenceOptions]{
 			Rule:   TripleSlashReference,
 			Decode: DecodeTripleSlashReferenceOptions,
 		},
-		rule.Registration{
+		rule.Registration[SwitchExhaustivenessCheckOptions]{
 			Rule:   SwitchExhaustivenessCheck,
 			Decode: rule.DecodeOptionsInto[SwitchExhaustivenessCheckOptions](),
 		},

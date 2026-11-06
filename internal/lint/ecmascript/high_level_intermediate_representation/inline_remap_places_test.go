@@ -9,10 +9,10 @@ import (
 // `TestCopyNestedBodyLeavesTheNestedFunctionUntouched`, and it exists because that test's shape was
 // not enough.
 //
-// That test asserts over block REFERENCES. It caught a shared terminal pointer, which is real. But
+// That test asserts over block references. It caught a shared terminal pointer, which is real. But
 // the same aliasing existed one field over and it was invisible to a block-reference assertion:
 // `Instruction.Value` is an interface holding a pointer, the copy assigned it directly, and
-// `EachInstructionPlacePointer` then rewrote the operands of the NESTED function's instruction
+// `EachInstructionPlacePointer` then rewrote the operands of the nested function's instruction
 // rather than the copy's.
 //
 // Measured before the fix, on the fixture below: ten of nineteen places in the nested body had been
@@ -23,10 +23,10 @@ import (
 // The assertion is therefore over places, and over the nested function rather than the parent. The
 // nested function is the control: `CopyNestedBodyInto` promises to copy, and a copy that renames its
 // source has not copied.
-func TestCopyNestedBodyLeavesTheNestedFunctionsPlacesUntouched(t *testing.T) {
-	t.Parallel()
+func TestCopyNestedBodyLeavesTheNestedFunctionsPlacesUntouched(test *testing.T) {
+	test.Parallel()
 
-	// The body must hold a value with a SLICE of places -- a method call's arguments here. A
+	// The body must hold a value with a slice of places -- a method call's arguments here. A
 	// one-level struct copy duplicates a slice header while both headers point at one backing
 	// array, so a body of only single-place values would be copied correctly by a shallow copier
 	// and this test would pass against the defect it exists to catch.
@@ -43,9 +43,9 @@ func TestCopyNestedBodyLeavesTheNestedFunctionsPlacesUntouched(t *testing.T) {
 			return compute();
 		}
 	`
-	parent, nested, captures := loweredParentAndNested(t, source)
+	parent, nested, captures := loweredParentAndNested(test, source)
 	if parent == nil || nested == nil {
-		t.Fatal("the fixture lowered no nested function")
+		test.Fatal("the fixture lowered no nested function")
 	}
 
 	type key struct {
@@ -64,11 +64,11 @@ func TestCopyNestedBodyLeavesTheNestedFunctionsPlacesUntouched(t *testing.T) {
 		})
 	}
 	if len(before) == 0 {
-		t.Fatal("the nested body holds no places, so this test asserts nothing")
+		test.Fatal("the nested body holds no places, so this test asserts nothing")
 	}
 
 	if _, ok := CopyNestedBodyInto(parent, nested, captures); !ok {
-		t.Fatal("the copy declined a fixture it should accept")
+		test.Fatal("the copy declined a fixture it should accept")
 	}
 
 	for id, instruction := range nested.Instructions {
@@ -81,7 +81,7 @@ func TestCopyNestedBodyLeavesTheNestedFunctionsPlacesUntouched(t *testing.T) {
 			index++
 			was, known := before[position]
 			if known && was != place.Identifier {
-				t.Errorf("nested instruction %d place %d named identifier %d before the copy and "+
+				test.Errorf("nested instruction %d place %d named identifier %d before the copy and "+
 					"names %d after it; the copy shares an instruction value with the function it "+
 					"was copying and renamed the source instead of the copy",
 					position.instruction, position.index, was, place.Identifier)
@@ -98,7 +98,7 @@ func TestCopyNestedBodyLeavesTheNestedFunctionsPlacesUntouched(t *testing.T) {
 		}
 		EachInstructionPlacePointer(instruction, func(place *Place, role PlaceRole) {
 			if int(place.Identifier) >= len(nested.Identifiers) {
-				t.Errorf("the nested body names identifier %d, past its own table of %d; the copy "+
+				test.Errorf("the nested body names identifier %d, past its own table of %d; the copy "+
 					"wrote the parent's ids into the function it was copying",
 					place.Identifier, len(nested.Identifiers))
 			}

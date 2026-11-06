@@ -94,9 +94,16 @@ const (
 // prefixes is carried here as a reminder that the list is a fact about Tailwind's own namespace
 // choices, not a general rule that can be derived.
 var ignoredThemeKeys = map[string][]string{
-	"--font":        {"--font-weight", "--font-size"},
-	"--inset":       {"--inset-shadow", "--inset-ring"},
-	"--text":        {"--text-color", "--text-decoration-color", "--text-decoration-thickness", "--text-indent", "--text-shadow", "--text-underline-offset"},
+	"--font":  {"--font-weight", "--font-size"},
+	"--inset": {"--inset-shadow", "--inset-ring"},
+	"--text": {
+		"--text-color",
+		"--text-decoration-color",
+		"--text-decoration-thickness",
+		"--text-indent",
+		"--text-shadow",
+		"--text-underline-offset",
+	},
 	"--grid-column": {"--grid-column-start", "--grid-column-end"},
 	"--grid-row":    {"--grid-row-start", "--grid-row-end"},
 }
@@ -180,7 +187,7 @@ func (theme *Theme) Size() int {
 func (theme *Theme) Add(key, value string, options ThemeOptions) error {
 	if strings.HasSuffix(key, "-*") {
 		if value != "initial" {
-			return &CSSSyntaxError{Message: "Invalid theme value `" + value + "` for namespace `" + key + "`"}
+			return &CssSyntaxError{Message: "Invalid theme value `" + value + "` for namespace `" + key + "`"}
 		}
 		if key == "--*" {
 			theme.clearAll()
@@ -299,11 +306,11 @@ type ThemeEntry struct {
 // The stored keys are unprefixed; see PrefixKey.
 func (theme *Theme) Entries() []ThemeEntry {
 	entries := make([]ThemeEntry, 0, len(theme.values))
-	theme.liveKeys(func(key string, value themeValue) bool {
+	theme.liveKeys(func(key string, declaration themeValue) bool {
 		entries = append(entries, ThemeEntry{
 			Key:     theme.PrefixKey(key),
-			Value:   value.value,
-			Options: value.options,
+			Value:   declaration.value,
+			Options: declaration.options,
 		})
 		return true
 	})
@@ -351,8 +358,8 @@ func (theme *Theme) KeysInNamespaces(themeKeys []string) []string {
 // value, and applies no ignored-key filtering: it is a direct lookup.
 func (theme *Theme) Get(themeKeys []string) (string, bool) {
 	for _, key := range themeKeys {
-		if value, ok := theme.values[key]; ok {
-			return value.value, true
+		if declaration, ok := theme.values[key]; ok {
+			return declaration.value, true
 		}
 	}
 	return "", false
@@ -369,8 +376,8 @@ func (theme *Theme) HasDefault(key string) bool {
 // rather than as it is stored. That asymmetry is upstream's: Entries hands out prefixed keys, and
 // this takes them back.
 func (theme *Theme) GetOptions(key string) ThemeOptions {
-	key = unescapeCSSIdentifier(theme.unprefixKey(key))
-	if value, ok := theme.values[key]; ok {
+	storedKey := unescapeCssIdentifier(theme.unprefixKey(key))
+	if value, ok := theme.values[storedKey]; ok {
 		return value.options
 	}
 	return ThemeOptionNone
@@ -484,14 +491,14 @@ func (theme *Theme) resolveKey(candidateValue string, candidateValuePresent bool
 // `@reference` cannot assume the browser will have one, and without the fallback the declaration
 // would resolve to nothing at runtime.
 func (theme *Theme) variableReference(themeKey string) (string, bool) {
-	value, ok := theme.values[themeKey]
+	declaration, ok := theme.values[themeKey]
 	if !ok {
 		return "", false
 	}
 
-	reference := "var(" + escapeCSSIdentifier(theme.PrefixKey(themeKey))
-	if value.options&ThemeOptionReference != 0 && value.value != "" {
-		reference += ", " + value.value
+	reference := "var(" + escapeCssIdentifier(theme.PrefixKey(themeKey))
+	if declaration.options&ThemeOptionReference != 0 && declaration.value != "" {
+		reference += ", " + declaration.value
 	}
 	return reference + ")", true
 }
@@ -504,7 +511,7 @@ func (theme *Theme) variableReference(themeKey string) (string, bool) {
 // first-caller-wins signal that is easy to get backwards when written later from memory. The key is
 // unprefixed and unescaped first, matching GetOptions.
 func (theme *Theme) MarkUsedVariable(themeKey string) bool {
-	key := unescapeCSSIdentifier(theme.unprefixKey(themeKey))
+	key := unescapeCssIdentifier(theme.unprefixKey(themeKey))
 	value, ok := theme.values[key]
 	if !ok {
 		return false
@@ -522,15 +529,20 @@ func (theme *Theme) MarkUsedVariable(themeKey string) bool {
 // so a caller passing inline gets the literal even for an entry that did not declare it.
 //
 // candidateValuePresent has the meaning documented on resolveKey.
-func (theme *Theme) Resolve(candidateValue string, candidateValuePresent bool, themeKeys []string, options ThemeOptions) (string, bool) {
+func (theme *Theme) Resolve(
+	candidateValue string,
+	candidateValuePresent bool,
+	themeKeys []string,
+	options ThemeOptions,
+) (string, bool) {
 	themeKey, ok := theme.resolveKey(candidateValue, candidateValuePresent, themeKeys)
 	if !ok {
 		return "", false
 	}
 
-	value := theme.values[themeKey]
-	if (options|value.options)&ThemeOptionInline != 0 {
-		return value.value, true
+	declaration := theme.values[themeKey]
+	if (options|declaration.options)&ThemeOptionInline != 0 {
+		return declaration.value, true
 	}
 
 	return theme.variableReference(themeKey)
@@ -562,7 +574,11 @@ func (theme *Theme) ResolveValue(candidateValue string, candidateValuePresent bo
 //
 // Each nested value independently honours ThemeOptionInline, so a theme can inline a line-height
 // while leaving the size a `var()`.
-func (theme *Theme) ResolveWith(candidateValue string, themeKeys []string, nestedKeys []string) (string, map[string]string, bool) {
+func (theme *Theme) ResolveWith(
+	candidateValue string,
+	themeKeys []string,
+	nestedKeys []string,
+) (string, map[string]string, bool) {
 	themeKey, ok := theme.resolveKey(candidateValue, true, themeKeys)
 	if !ok {
 		return "", nil, false
@@ -584,9 +600,9 @@ func (theme *Theme) ResolveWith(candidateValue string, themeKeys []string, neste
 		}
 	}
 
-	value := theme.values[themeKey]
-	if value.options&ThemeOptionInline != 0 {
-		return value.value, extra, true
+	declaration := theme.values[themeKey]
+	if declaration.options&ThemeOptionInline != 0 {
+		return declaration.value, extra, true
 	}
 
 	reference, _ := theme.variableReference(themeKey)
@@ -623,15 +639,15 @@ func (theme *Theme) Namespace(namespace string) []NamespaceEntry {
 	var entries []NamespaceEntry
 	prefix := namespace + "-"
 
-	theme.liveKeys(func(key string, value themeValue) bool {
+	theme.liveKeys(func(key string, declaration themeValue) bool {
 		switch {
 		case key == namespace:
-			entries = append(entries, NamespaceEntry{KeyIsNull: true, Value: value.value})
+			entries = append(entries, NamespaceEntry{KeyIsNull: true, Value: declaration.value})
 		case strings.HasPrefix(key, prefix+"-"):
 			// Preserve the `--` prefix for sub-variables, e.g. `--font-size-sm--line-height`.
-			entries = append(entries, NamespaceEntry{Key: key[len(namespace):], Value: value.value})
+			entries = append(entries, NamespaceEntry{Key: key[len(namespace):], Value: declaration.value})
 		case strings.HasPrefix(key, prefix):
-			entries = append(entries, NamespaceEntry{Key: key[len(prefix):], Value: value.value})
+			entries = append(entries, NamespaceEntry{Key: key[len(prefix):], Value: declaration.value})
 		}
 		return true
 	})
@@ -639,7 +655,7 @@ func (theme *Theme) Namespace(namespace string) []NamespaceEntry {
 	return entries
 }
 
-// escapeCSSIdentifier serializes a string as a CSS identifier, and is a port of `CSS.escape` from
+// escapeCssIdentifier serializes a string as a CSS identifier, and is a port of `CSS.escape` from
 // `src/utils/escape.ts`.
 //
 // Ported rather than approximated because it runs on every `var()` this file builds, and the escape
@@ -651,7 +667,7 @@ func (theme *Theme) Namespace(namespace string) []NamespaceEntry {
 // reachable for a non-ASCII byte is the `>= 0x80` passthrough, and every byte of a multi-byte UTF-8
 // sequence has its high bit set. So a multi-byte character is copied through byte by byte and
 // reassembles unchanged, exactly as upstream copies it code unit by code unit.
-func escapeCSSIdentifier(value string) string {
+func escapeCssIdentifier(value string) string {
 	if len(value) == 1 && value[0] == '-' {
 		return "\\-"
 	}
@@ -691,7 +707,7 @@ func escapeCSSIdentifier(value string) string {
 	return builder.String()
 }
 
-// unescapeCSSIdentifier reverses escapeCSSIdentifier, and is a port of `unescape` from
+// unescapeCssIdentifier reverses escapeCSSIdentifier, and is a port of `unescape` from
 // `src/utils/escape.ts`.
 //
 // Upstream is a regex, `/\\([\dA-Fa-f]{1,6}[\t\n\f\r ]?|[\S\s])/g`, and this is the same grammar as
@@ -704,7 +720,7 @@ func escapeCSSIdentifier(value string) string {
 // one *rune* rather than one byte for the same reason: upstream's `[\S\s]` matches a whole code
 // unit, and taking a byte would split a multi-byte character after a backslash. Everything else
 // scans bytes, since the hex digits and whitespace terminators are all ASCII.
-func unescapeCSSIdentifier(escaped string) string {
+func unescapeCssIdentifier(escaped string) string {
 	if !strings.Contains(escaped, "\\") {
 		return escaped
 	}
@@ -740,7 +756,7 @@ func unescapeCSSIdentifier(escaped string) string {
 			continue
 		}
 
-		codePoint, err := strconv.ParseUint(escaped[index+1:index+1+digitCount], 16, 32)
+		codePoint, parseError := strconv.ParseUint(escaped[index+1:index+1+digitCount], 16, 32)
 		consumed := 1 + digitCount
 		// One optional whitespace character terminates the escape and is consumed with it.
 		if index+consumed < len(escaped) && isEscapeTerminator(escaped[index+consumed]) {
@@ -748,7 +764,7 @@ func unescapeCSSIdentifier(escaped string) string {
 		}
 		index += consumed
 
-		if err != nil || codePoint == 0 || codePoint > 0x10FFFF || (codePoint >= 0xD800 && codePoint <= 0xDFFF) {
+		if parseError != nil || codePoint == 0 || codePoint > 0x10FFFF || (codePoint >= 0xD800 && codePoint <= 0xDFFF) {
 			builder.WriteRune('�')
 			continue
 		}

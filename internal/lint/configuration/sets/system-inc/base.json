@@ -153,6 +153,7 @@
         "base/correctness-require-verify-optional-parity": "error",
         "nexus/consistency-no-abbreviated-identifier": "error",
         "nexus/consistency-require-constant-casing": "error",
+        "nexus/consistency-require-identifier-casing": "error",
         "@typescript-eslint/no-extraneous-class": [
             "error",
             {

@@ -8,8 +8,8 @@ import (
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
-func TestRefStabilityRecognizesNamespaceCalls(t *testing.T) {
-	t.Parallel()
+func TestRefStabilityRecognizesNamespaceCalls(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range []struct {
 		name     string
 		source   string
@@ -47,22 +47,22 @@ return reference; }`,
 			reactive: true,
 		},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			reactivity := reactivityByName(t, testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			reactivity := reactivityByName(test, testCase.source)
 			actual, found := reactivity["reference"]
 			if !found {
-				t.Fatal("the typed fixture did not produce the reference binding")
+				test.Fatal("the typed fixture did not produce the reference binding")
 			}
 			if actual != testCase.reactive {
-				t.Fatalf("reference reactive=%t, want %t", actual, testCase.reactive)
+				test.Fatalf("reference reactive=%t, want %t", actual, testCase.reactive)
 			}
 		})
 	}
 }
 
-func TestManualMemoizationPreservesNamespaceRefCallbacks(t *testing.T) {
-	t.Parallel()
+func TestManualMemoizationPreservesNamespaceRefCallbacks(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name   string
@@ -104,26 +104,28 @@ return <button onClick={callback}>{values.length}{busy}</button>;
 }`,
 		},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			var visited, findings, markers int
-			probe := rule.Rule{
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			var visited int
+			var findings int
+			var markers int
+			probe := rule.Rule[rule.NoOptions]{
 				Name:             "namespace-ref-memoization",
 				NeedsTypeChecker: true,
-				Run: func(ctx rule.Context, options any) rule.Listeners {
+				Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 					return rule.Listeners{
 						ast.KindSourceFile: func(node *ast.Node) {
-							if ctx.TypeChecker == nil {
-								t.Fatal("the fixture requires a type checker")
+							if ruleContext.TypeChecker == nil {
+								test.Fatal("the fixture requires a type checker")
 							}
 							forEachFunctionLike(node, func(functionNode *ast.Node) {
-								function := Lower(functionNode, ctx.TypeChecker)
+								function := Lower(functionNode, ruleContext.TypeChecker)
 								if function == nil {
-									t.Fatal("the fixture did not lower")
+									test.Fatal("the fixture did not lower")
 								}
 								visited++
 								Construct(function)
-								findings += len(AnalyzePreservedManualMemoization(function, ctx.TypeChecker))
+								findings += len(AnalyzePreservedManualMemoization(function, ruleContext.TypeChecker))
 								for _, instruction := range function.Instructions {
 									if _, isMarker := instruction.Value.(*StartMemoize); isMarker {
 										markers++
@@ -134,7 +136,7 @@ return <button onClick={callback}>{values.length}{busy}</button>;
 					}
 				},
 			}
-			rule_testing.RunTypedFiles(t, probe, map[string]string{
+			rule_testing.RunTypedFiles(test, probe, map[string]string{
 				"/react.d.ts": reactiveDeclarations + `
 declare module 'react' {
 export function useCallback<T extends (...args: any[]) => any>(callback: T, deps: unknown[]): T;
@@ -142,17 +144,17 @@ export function useCallback<T extends (...args: any[]) => any>(callback: T, deps
 				"/fixture.tsx": testCase.source,
 			}, "/fixture.tsx")
 			if visited == 0 || markers == 0 {
-				t.Fatal("the fixture did not exercise manual memoization analysis")
+				test.Fatal("the fixture did not exercise manual memoization analysis")
 			}
 			if (findings != 0) != testCase.fires {
-				t.Fatalf("findings=%d, want fires=%t", findings, testCase.fires)
+				test.Fatalf("findings=%d, want fires=%t", findings, testCase.fires)
 			}
 		})
 	}
 }
 
-func TestStableTupleHookPositionsRecognizeNamespaceCalls(t *testing.T) {
-	t.Parallel()
+func TestStableTupleHookPositionsRecognizeNamespaceCalls(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name   string
@@ -175,16 +177,16 @@ function useFoo() { const [value, update] = React.useReducer((state: number, act
 return [value, update]; }`,
 		},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			reactivity := reactivityByName(t, testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			reactivity := reactivityByName(test, testCase.source)
 			for name, expected := range map[string]bool{"value": true, "update": false} {
 				actual, found := reactivity[name]
 				if !found {
-					t.Fatalf("the fixture did not produce %s", name)
+					test.Fatalf("the fixture did not produce %s", name)
 				}
 				if actual != expected {
-					t.Errorf("%s reactive=%t, want %t", name, actual, expected)
+					test.Errorf("%s reactive=%t, want %t", name, actual, expected)
 				}
 			}
 		})

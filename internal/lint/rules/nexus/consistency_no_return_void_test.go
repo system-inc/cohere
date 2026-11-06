@@ -13,11 +13,11 @@ func consistencyNoReturnVoidSource(lines ...string) string {
 	return strings.Join(lines, "\n") + "\n"
 }
 
-// The real sites are the ten in `modules/phi/PhiSocialMediaCommandLineInterface.ts` at HEAD on
+// The real sites are the ten in `modules/phi/PhiSocialMediaCommandLineInterface.ts` at `HEAD` on
 // 2026-10-01, in its two shapes: the braceless `if` (eight of them) and the braced one (two). Each case
 // asserts the finding and the whole rewritten source.
-func TestConsistencyNoReturnVoidFixes(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoReturnVoidFixes(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -158,32 +158,32 @@ func TestConsistencyNoReturnVoidFixes(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ConsistencyNoReturnVoid, consistencyNoReturnVoidFile, testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ConsistencyNoReturnVoid, consistencyNoReturnVoidFile, testCase.source)
 			want := strings.Count(testCase.source, "return void")
 			wantIds := make([]string, 0, want)
 			for range want {
 				wantIds = append(wantIds, consistencyNoReturnVoidId)
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 			if testCase.fixed == "" {
 				for _, diagnostic := range result.Diagnostics {
 					if len(diagnostic.Fixes) != 0 {
-						t.Fatalf("expected no fix, got %q", diagnostic.Fixes[0].Text)
+						test.Fatalf("expected no fix, got %q", diagnostic.Fixes[0].Text)
 					}
 				}
 				return
 			}
-			rule_testing.ExpectFixedSource(t, result, testCase.fixed)
+			rule_testing.ExpectFixedSource(test, result, testCase.fixed)
 		})
 	}
 }
 
 // The statements this rule reports and must not rewrite, because the rewritten text would not parse as
 // what it says or would eat something the author wrote.
-func TestConsistencyNoReturnVoidReportsWithoutAFix(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoReturnVoidReportsWithoutAFix(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name  string
@@ -192,37 +192,51 @@ func TestConsistencyNoReturnVoidReportsWithoutAFix(t *testing.T) {
 		// `return 0` is a number; the operand here is a digit, which cannot start an identifier.
 		{"a numeric operand", []string{"function run() {", "    return void 0;", "}"}},
 		// As a statement, `(a, b)` would join the previous line when it has no semicolon.
-		{"a parenthesized operand", []string{"function run() {", "    start()", "    return void (first(), second());", "}"}},
+		{
+			"a parenthesized operand",
+			[]string{"function run() {", "    start()", "    return void (first(), second());", "}"},
+		},
 		{"an array operand", []string{"function run() {", "    return void [first(), second()];", "}"}},
 		{"a template operand", []string{"function run() {", "    return void `${first()}`;", "}"}},
 		{"a unary operand", []string{"function run(count: number) {", "    return void -count;", "}"}},
 		// As a statement, `function () {}()` is a declaration followed by a stray call.
-		{"a function expression operand", []string{"function run() {", "    return void function() { start(); }();", "}"}},
-		{"an async arrow operand", []string{"function run() {", "    return void async function() { start(); }();", "}"}},
+		{
+			"a function expression operand",
+			[]string{"function run() {", "    return void function() { start(); }();", "}"},
+		},
+		{
+			"an async arrow operand",
+			[]string{"function run() {", "    return void async function() { start(); }();", "}"},
+		},
 		{"parentheses around the void", []string{"function run() {", "    return (void start());", "}"}},
 		{"a comment between the tokens", []string{"function run() {", "    return void /* log it */ start();", "}"}},
 		{"no closing semicolon", []string{"function run() {", "    return void start()", "}"}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ConsistencyNoReturnVoid, consistencyNoReturnVoidFile, consistencyNoReturnVoidSource(testCase.lines...))
-			rule_testing.ExpectFindings(t, result, consistencyNoReturnVoidId)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(
+				test,
+				ConsistencyNoReturnVoid,
+				consistencyNoReturnVoidFile,
+				consistencyNoReturnVoidSource(testCase.lines...),
+			)
+			rule_testing.ExpectFindings(test, result, consistencyNoReturnVoidId)
 			if len(result.Diagnostics[0].Fixes) != 0 {
-				t.Fatalf("expected no fix, got %q", result.Diagnostics[0].Fixes[0].Text)
+				test.Fatalf("expected no fix, got %q", result.Diagnostics[0].Fixes[0].Text)
 			}
 		})
 	}
 }
 
-func TestConsistencyNoReturnVoidStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoReturnVoidStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name  string
 		lines []string
 	}{
-		// SeeClusterCard.tsx:254 at HEAD. The callback idiom: an arrow body, not a return statement.
+		// SeeClusterCard.tsx:254 at `HEAD`. The callback idiom: an arrow body, not a return statement.
 		{"the arrow-shorthand callback idiom", []string{
 			"const element = <Button onClick={() => void handleEnroll()} disabled={isEnrolling}>Enroll</Button>;",
 		}},
@@ -259,10 +273,15 @@ func TestConsistencyNoReturnVoidStaysSilent(t *testing.T) {
 		}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ConsistencyNoReturnVoid, "/repository/source/ConsistencyNoReturnVoid.tsx", consistencyNoReturnVoidSource(testCase.lines...))
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(
+				test,
+				ConsistencyNoReturnVoid,
+				"/repository/source/ConsistencyNoReturnVoid.tsx",
+				consistencyNoReturnVoidSource(testCase.lines...),
+			)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }

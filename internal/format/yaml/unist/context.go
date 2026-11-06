@@ -48,31 +48,24 @@ type context struct {
 	memory *parseMemory
 }
 
+// newContext is the context of one parse of text.
+//
+// Mutates: memory gets its positionsByNode map the first time it serves a parse, so every later parse
+// that takes this memory from parseMemories reuses the room the map grew to.
 func newContext(text []uint16, lineCounter *cst.LineCounter, nodes *arena.Arena[Node], memory *parseMemory) *context {
 	if memory.positionsByNode == nil {
 		// Sized for about a node per eight units of text, so the map is not rebuilt as it grows. Later
 		// parses reuse it cleared, with the room it grew to.
 		memory.positionsByNode = make(map[*Node]*position, len(text)/8)
 	}
-	return &context{text: text, comments: []*Node{}, lineCounter: lineCounter, positions: memory.positionsByNode, nodes: nodes, memory: memory}
-}
-
-// parseMemory is what one Parse uses only while it runs, kept for the next (#vbjv3d6): its point and
-// position objects, which Parse copies into each node's Position before it returns, and its tables: the
-// text as UTF-16 units, each unit's byte offset, and the nodes' positions (#v6ksqg3).
-type parseMemory struct {
-	points    arena.Arena[point]
-	positions arena.Arena[position]
-
-	units           []uint16
-	offsets         unitOffsets
-	positionsByNode map[*Node]*position
-
-	// tokens and composeNodes are the CST's tokens and the composer's scalars, pairs and collections.
-	// Both die with the parse: a unist node keeps neither, only strings and positions copied out of them
-	// (#v6ksqg3).
-	tokens       arena.Arena[cst.Token]
-	composeNodes arena.Arena[compose.Node]
+	return &context{
+		text:        text,
+		comments:    []*Node{},
+		lineCounter: lineCounter,
+		positions:   memory.positionsByNode,
+		nodes:       nodes,
+		memory:      memory,
+	}
 }
 
 // parseMemories hold the memory of parses that have finished, one per caller at a time.
@@ -87,18 +80,6 @@ var parseMemories = sync.Pool{New: func() any {
 	}
 }}
 
-func (memory *parseMemory) reset() {
-	memory.points.Reset()
-	memory.positions.Reset()
-	memory.tokens.Reset()
-	memory.composeNodes.Reset()
-	// Under cohere_poison a released table reads a noncharacter and an offset past any text, so a parse that
-	// read one after its release prints wrong or stops. A cleared map answers nil, which stops it too.
-	arena.Release(memory.units, 0xFFFF)
-	arena.Release(memory.offsets, 1<<40)
-	clear(memory.positionsByNode)
-}
-
 // position is node.position.
 func (context *context) position(node *Node) *position {
 	return context.positions[node]
@@ -106,7 +87,7 @@ func (context *context) position(node *Node) *position {
 
 // transformOffset is upstream's transformOffset: a new point.
 func (context *context) transformOffset(offset int) *point {
-	line, col := context.lineCounter.LinePos(offset)
+	line, col := context.lineCounter.LinePosition(offset)
 	return context.memory.points.New(point{line: line, column: col, offset: offset})
 }
 
@@ -168,43 +149,29 @@ func unitsToString(units []uint16) string {
 	return string(utf16.Decode(units))
 }
 
-// ThrownError is an Error yaml-unist-parser throws that is not a YAMLSyntaxError: one of its own
-// "Unexpected ..." checks (Name "Error"), or a TypeError the JavaScript engine raises where upstream
-// reads a property of undefined or null (on a !!pairs or !!omap sequence, say), whose message is V8's.
-type ThrownError struct {
-	Name    string
-	Message string
-}
-
-func (thrown *ThrownError) Error() string { return thrown.Name + ": " + thrown.Message }
-
 // throwError is `throw new Error(message)`.
 func throwError(format string, arguments ...any) {
+	// Invariant: upstream throws here, and Parse recovers this panic into a returned *ThrownError, so it never
+	// leaves the package.
 	panic(&ThrownError{Name: "Error", Message: fmt.Sprintf(format, arguments...)})
 }
 
 // throwTypeError is the TypeError V8 raises reading property of undefined or null (missing names
 // which).
 func throwTypeError(missing string, property string) {
-	panic(&ThrownError{Name: "TypeError", Message: fmt.Sprintf("Cannot read properties of %s (reading '%s')", missing, property)})
+	// Invariant: upstream throws here, and Parse recovers this panic into a returned *ThrownError, so it never
+	// leaves the package.
+	panic(&ThrownError{
+		Name:    "TypeError",
+		Message: fmt.Sprintf("Cannot read properties of %s (reading '%s')", missing, property),
+	})
 }
 
-// SyntaxError is upstream's YAMLSyntaxError: the first error of the first document that has one, with
-// the message and code eemeli/yaml gave it and its position in the text. Position is in Node.Position's
-// units: byte offsets, 1-based lines, columns in UTF-16 units.
-type SyntaxError struct {
-	Message  string
-	Code     string
-	Position Position
-}
-
-func (syntaxError *SyntaxError) Error() string { return syntaxError.Message }
-
-// newYAMLSyntaxError is `new YAMLSyntaxError(context, error)`.
-func (context *context) newYAMLSyntaxError(yamlError *compose.YAMLError, offsets unitOffsets) *SyntaxError {
+// newYamlSyntaxError is `new YAMLSyntaxError(context, error)`.
+func (context *context) newYamlSyntaxError(yamlError *compose.YamlError, offsets unitOffsets) *SyntaxError {
 	return &SyntaxError{
 		Message:  yamlError.Message,
 		Code:     yamlError.Code,
-		Position: offsets.convert(context.transformRange(yamlError.Pos[0], yamlError.Pos[1])),
+		Position: offsets.convert(context.transformRange(yamlError.Position[0], yamlError.Position[1])),
 	}
 }

@@ -14,7 +14,7 @@ import (
 // One mechanical transformation was applied and it is the reason this file needs a note. Upstream
 // configures `settings.react.pragma` to `Act` and `settings.react.fragment` to `Frag`, and every
 // one of its cases writes those names. cohere reads no React settings, so the two names were
-// rewritten to `React` and `Fragment` by a whole-word substitution, and then ALL TWENTY TWO cases
+// rewritten to `React` and `Fragment` by a whole-word substitution, and then all twenty-two cases
 // were replayed against the installed build under default settings before anything was written
 // down. Nineteen reproduced their upstream verdict exactly, including the fixer output on all
 // thirteen `output` assertions. The three that did not are upstream's `fragmentsNotSupported`
@@ -22,70 +22,166 @@ import (
 // build answers `preferFragment` for the two named forms and silence for the shorthand, and those
 // are the verdicts recorded below.
 //
-// So every row here is a MEASURED verdict from the installed build rather than a copied assertion,
+// So every row here is a measured verdict from the installed build rather than a copied assertion,
 // which is what makes the pragma substitution safe to have made.
 const jsxFragmentsFile = "/repository/source/JsxFragments.tsx"
 
-func TestJsxFragmentsStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestJsxFragmentsStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name, sourceText string
 		options          JsxFragmentsOptions
 	}{
 		{"upstream valid 0", "<><Foo /></>", JsxFragmentsOptions{Mode: JsxFragmentsSyntax}},
-		{"upstream valid 1", "<React.Fragment><Foo /></React.Fragment>", JsxFragmentsOptions{Mode: JsxFragmentsElement}},
+		{
+			"upstream valid 1",
+			"<React.Fragment><Foo /></React.Fragment>",
+			JsxFragmentsOptions{Mode: JsxFragmentsElement},
+		},
 		{"upstream valid 2", "<React.Fragment />", JsxFragmentsOptions{Mode: JsxFragmentsElement}},
-		{"upstream valid 3", "\n        import React, { Fragment as F } from 'react';\n        <F><Foo /></F>;\n      ", JsxFragmentsOptions{Mode: JsxFragmentsElement}},
-		{"upstream valid 4", "\n        const F = React.Fragment;\n        <F><Foo /></F>;\n      ", JsxFragmentsOptions{Mode: JsxFragmentsElement}},
-		{"upstream valid 5", "\n        const { Fragment } = React;\n        <Fragment><Foo /></Fragment>;\n      ", JsxFragmentsOptions{Mode: JsxFragmentsElement}},
-		{"upstream valid 6", "\n        const { Fragment } = require('react');\n        <Fragment><Foo /></Fragment>;\n      ", JsxFragmentsOptions{Mode: JsxFragmentsElement}},
-		{"upstream valid 7", "<React.Fragment key=\"key\"><Foo /></React.Fragment>", JsxFragmentsOptions{Mode: JsxFragmentsSyntax}},
+		{
+			"upstream valid 3",
+			"\n        import React, { Fragment as F } from 'react';\n        <F><Foo /></F>;\n      ",
+			JsxFragmentsOptions{Mode: JsxFragmentsElement},
+		},
+		{
+			"upstream valid 4",
+			"\n        const F = React.Fragment;\n        <F><Foo /></F>;\n      ",
+			JsxFragmentsOptions{Mode: JsxFragmentsElement},
+		},
+		{
+			"upstream valid 5",
+			"\n        const { Fragment } = React;\n        <Fragment><Foo /></Fragment>;\n      ",
+			JsxFragmentsOptions{Mode: JsxFragmentsElement},
+		},
+		{
+			"upstream valid 6",
+			"\n        const { Fragment } = require('react');\n        <Fragment><Foo /></Fragment>;\n      ",
+			JsxFragmentsOptions{Mode: JsxFragmentsElement},
+		},
+		{
+			"upstream valid 7",
+			"<React.Fragment key=\"key\"><Foo /></React.Fragment>",
+			JsxFragmentsOptions{Mode: JsxFragmentsSyntax},
+		},
 		{"upstream valid 8", "<React.Fragment key=\"key\" />", JsxFragmentsOptions{Mode: JsxFragmentsSyntax}},
 		{"upstream invalid 0", "<><Foo /></>", JsxFragmentsOptions{Mode: JsxFragmentsSyntax}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, JsxFragments, jsxFragmentsFile, testCase.sourceText, testCase.options)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(
+				test,
+				JsxFragments,
+				jsxFragmentsFile,
+				testCase.sourceText,
+				testCase.options,
+			)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
 
-func TestJsxFragmentsFires(t *testing.T) {
-	t.Parallel()
+func TestJsxFragmentsFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name, sourceText string
 		options          JsxFragmentsOptions
 		messageIds       []string
 	}{
-		{"upstream invalid 1", "<React.Fragment><Foo /></React.Fragment>", JsxFragmentsOptions{Mode: JsxFragmentsSyntax}, []string{"preferFragment"}},
-		{"upstream invalid 2", "<React.Fragment />", JsxFragmentsOptions{Mode: JsxFragmentsSyntax}, []string{"preferFragment"}},
-		{"upstream invalid 3", "<><Foo /></>", JsxFragmentsOptions{Mode: JsxFragmentsElement}, []string{"preferPragma"}},
-		{"upstream invalid 4", "<><Foo /></>", JsxFragmentsOptions{Mode: JsxFragmentsElement}, []string{"preferPragma"}},
-		{"upstream invalid 5", "<React.Fragment><Foo /></React.Fragment>", JsxFragmentsOptions{Mode: JsxFragmentsSyntax}, []string{"preferFragment"}},
-		{"upstream invalid 6", "<React.Fragment />", JsxFragmentsOptions{Mode: JsxFragmentsSyntax}, []string{"preferFragment"}},
-		{"upstream invalid 7", "\n        import React, { Fragment as F } from 'react';\n        <F />;\n      ", JsxFragmentsOptions{Mode: JsxFragmentsSyntax}, []string{"preferFragment"}},
-		{"upstream invalid 8", "\n        import React, { Fragment as F } from 'react';\n        <F><Foo /></F>;\n      ", JsxFragmentsOptions{Mode: JsxFragmentsSyntax}, []string{"preferFragment"}},
-		{"upstream invalid 9", "\n        import React, { Fragment } from 'react';\n        <Fragment><Foo /></Fragment>;\n      ", JsxFragmentsOptions{Mode: JsxFragmentsSyntax}, []string{"preferFragment"}},
-		{"upstream invalid 10", "\n        const F = React.Fragment;\n        <F><Foo /></F>;\n      ", JsxFragmentsOptions{Mode: JsxFragmentsSyntax}, []string{"preferFragment"}},
-		{"upstream invalid 11", "\n        const { Fragment } = React;\n        <Fragment><Foo /></Fragment>;\n      ", JsxFragmentsOptions{Mode: JsxFragmentsSyntax}, []string{"preferFragment"}},
-		{"upstream invalid 12", "\n        const { Fragment } = require('react');\n        <Fragment><Foo /></Fragment>;\n      ", JsxFragmentsOptions{Mode: JsxFragmentsSyntax}, []string{"preferFragment"}},
+		{
+			"upstream invalid 1",
+			"<React.Fragment><Foo /></React.Fragment>",
+			JsxFragmentsOptions{Mode: JsxFragmentsSyntax},
+			[]string{"preferFragment"},
+		},
+		{
+			"upstream invalid 2",
+			"<React.Fragment />",
+			JsxFragmentsOptions{Mode: JsxFragmentsSyntax},
+			[]string{"preferFragment"},
+		},
+		{
+			"upstream invalid 3",
+			"<><Foo /></>",
+			JsxFragmentsOptions{Mode: JsxFragmentsElement},
+			[]string{"preferPragma"},
+		},
+		{
+			"upstream invalid 4",
+			"<><Foo /></>",
+			JsxFragmentsOptions{Mode: JsxFragmentsElement},
+			[]string{"preferPragma"},
+		},
+		{
+			"upstream invalid 5",
+			"<React.Fragment><Foo /></React.Fragment>",
+			JsxFragmentsOptions{Mode: JsxFragmentsSyntax},
+			[]string{"preferFragment"},
+		},
+		{
+			"upstream invalid 6",
+			"<React.Fragment />",
+			JsxFragmentsOptions{Mode: JsxFragmentsSyntax},
+			[]string{"preferFragment"},
+		},
+		{
+			"upstream invalid 7",
+			"\n        import React, { Fragment as F } from 'react';\n        <F />;\n      ",
+			JsxFragmentsOptions{Mode: JsxFragmentsSyntax},
+			[]string{"preferFragment"},
+		},
+		{
+			"upstream invalid 8",
+			"\n        import React, { Fragment as F } from 'react';\n        <F><Foo /></F>;\n      ",
+			JsxFragmentsOptions{Mode: JsxFragmentsSyntax},
+			[]string{"preferFragment"},
+		},
+		{
+			"upstream invalid 9",
+			"\n        import React, { Fragment } from 'react';\n        <Fragment><Foo /></Fragment>;\n      ",
+			JsxFragmentsOptions{Mode: JsxFragmentsSyntax},
+			[]string{"preferFragment"},
+		},
+		{
+			"upstream invalid 10",
+			"\n        const F = React.Fragment;\n        <F><Foo /></F>;\n      ",
+			JsxFragmentsOptions{Mode: JsxFragmentsSyntax},
+			[]string{"preferFragment"},
+		},
+		{
+			"upstream invalid 11",
+			"\n        const { Fragment } = React;\n        <Fragment><Foo /></Fragment>;\n      ",
+			JsxFragmentsOptions{Mode: JsxFragmentsSyntax},
+			[]string{"preferFragment"},
+		},
+		{
+			"upstream invalid 12",
+			"\n        const { Fragment } = require('react');\n        <Fragment><Foo /></Fragment>;\n      ",
+			JsxFragmentsOptions{Mode: JsxFragmentsSyntax},
+			[]string{"preferFragment"},
+		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, JsxFragments, jsxFragmentsFile, testCase.sourceText, testCase.options)
-			rule_testing.ExpectFindings(t, result, testCase.messageIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(
+				test,
+				JsxFragments,
+				jsxFragmentsFile,
+				testCase.sourceText,
+				testCase.options,
+			)
+			rule_testing.ExpectFindings(test, result, testCase.messageIds...)
 		})
 	}
 }
 
 // TestJsxFragmentsTypeArgumentsAreReportedAndNotRewritten pins the deliberate decline of the fixer.
 //
-// Upstream ships a repair for both directions and it DELETES TYPE ARGUMENTS. A JSX tag can carry
+// Upstream ships a repair for both directions and it deletes type arguments. A JSX tag can carry
 // them, they live inside the opening tag but outside the attributes list, and upstream's only guard
 // is `attrs && attrs.length > 0`, which cannot see them. Measured against the installed build with
 // the TypeScript parser on 2026-08-27:
@@ -99,8 +195,8 @@ func TestJsxFragmentsFires(t *testing.T) {
 // This rule reports both and proposes nothing. The assertion that no fix is attached is the point:
 // a message-id assertion alone cannot see a repair, which is exactly how the two rules this tree
 // has already lost type information to got through review.
-func TestJsxFragmentsTypeArgumentsAreReportedAndNotRewritten(t *testing.T) {
-	t.Parallel()
+func TestJsxFragmentsTypeArgumentsAreReportedAndNotRewritten(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct{ name, sourceText string }{
 		{"type argument on a paired tag", "<React.Fragment<T>><Foo /></React.Fragment>;"},
@@ -108,17 +204,17 @@ func TestJsxFragmentsTypeArgumentsAreReportedAndNotRewritten(t *testing.T) {
 		{"no type argument, the ordinary shape", "<React.Fragment><Foo /></React.Fragment>;"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, JsxFragments, jsxFragmentsFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, JsxFragments, jsxFragmentsFile,
 				testCase.sourceText, JsxFragmentsOptions{Mode: JsxFragmentsSyntax})
-			rule_testing.ExpectFindings(t, result, "preferFragment")
+			rule_testing.ExpectFindings(test, result, "preferFragment")
 			for _, diagnostic := range result.Diagnostics {
 				if len(diagnostic.Fixes) != 0 {
-					t.Fatalf("this rule must propose no fix, got %d", len(diagnostic.Fixes))
+					test.Fatalf("this rule must propose no fix, got %d", len(diagnostic.Fixes))
 				}
 				if len(diagnostic.Suggestions) != 0 {
-					t.Fatalf("this rule must propose no suggestion, got %d",
+					test.Fatalf("this rule must propose no suggestion, got %d",
 						len(diagnostic.Suggestions))
 				}
 			}
@@ -132,8 +228,8 @@ func TestJsxFragmentsTypeArgumentsAreReportedAndNotRewritten(t *testing.T) {
 // build spans column 1 through 41 for `<React.Fragment><Foo /></React.Fragment>`, which is the
 // entire element. A message-id assertion cannot see this, and the two spellings of the named form
 // are different node kinds here, so an anchor mistake on one would be invisible from the other.
-func TestJsxFragmentsSpans(t *testing.T) {
-	t.Parallel()
+func TestJsxFragmentsSpans(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name, sourceText, reported string
@@ -159,12 +255,12 @@ func TestJsxFragmentsSpans(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, JsxFragments, jsxFragmentsFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, JsxFragments, jsxFragmentsFile,
 				testCase.sourceText, testCase.options)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
 			}
 			// The typed harness writes `strings.TrimSpace(contents)+"\n"`, so slicing the Go
 			// literal would be off by one against the file on disk for any fixture with a leading
@@ -173,7 +269,7 @@ func TestJsxFragmentsSpans(t *testing.T) {
 			onDisk := strings.TrimSpace(testCase.sourceText) + "\n"
 			reported := onDisk[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 			if reported != testCase.reported {
-				t.Fatalf("finding points at %q, wanted %q", reported, testCase.reported)
+				test.Fatalf("finding points at %q, wanted %q", reported, testCase.reported)
 			}
 		})
 	}
@@ -185,42 +281,42 @@ func TestJsxFragmentsSpans(t *testing.T) {
 // against a literal typed here rather than against the rule's own constant is what keeps a message
 // mutation visible: comparing a finding to the constant it was reported with moves both sides
 // together and passes either way.
-func TestJsxFragmentsMessageText(t *testing.T) {
-	t.Parallel()
+func TestJsxFragmentsMessageText(test *testing.T) {
+	test.Parallel()
 
-	shorthand := rule_testing.RunTypedWithOptions(t, JsxFragments, jsxFragmentsFile,
+	shorthand := rule_testing.RunTypedWithOptions(test, JsxFragments, jsxFragmentsFile,
 		"<React.Fragment><Foo /></React.Fragment>;", JsxFragmentsOptions{Mode: JsxFragmentsSyntax})
 	if len(shorthand.Diagnostics) != 1 {
-		t.Fatalf("wanted one finding, got %d", len(shorthand.Diagnostics))
+		test.Fatalf("wanted one finding, got %d", len(shorthand.Diagnostics))
 	}
 	wantShorthand := "Prefer fragment shorthand over React.Fragment. The shorthand `<>` says the " +
 		"same thing with less to read, and a named fragment that carries no props is only the " +
 		"long spelling of it."
 	if shorthand.Diagnostics[0].Message.Description != wantShorthand {
-		t.Fatalf("shorthand message is %q", shorthand.Diagnostics[0].Message.Description)
+		test.Fatalf("shorthand message is %q", shorthand.Diagnostics[0].Message.Description)
 	}
 	if shorthand.Diagnostics[0].Message.Id != "preferFragment" {
-		t.Fatalf("shorthand id is %q", shorthand.Diagnostics[0].Message.Id)
+		test.Fatalf("shorthand id is %q", shorthand.Diagnostics[0].Message.Id)
 	}
 
-	pragma := rule_testing.RunTypedWithOptions(t, JsxFragments, jsxFragmentsFile,
+	pragma := rule_testing.RunTypedWithOptions(test, JsxFragments, jsxFragmentsFile,
 		"<><Foo /></>;", JsxFragmentsOptions{Mode: JsxFragmentsElement})
 	if len(pragma.Diagnostics) != 1 {
-		t.Fatalf("wanted one finding, got %d", len(pragma.Diagnostics))
+		test.Fatalf("wanted one finding, got %d", len(pragma.Diagnostics))
 	}
 	wantPragma := "Prefer React.Fragment over fragment shorthand. The named form is the one this " +
 		"file is configured to use, and it is the only spelling that can carry a `key`."
 	if pragma.Diagnostics[0].Message.Description != wantPragma {
-		t.Fatalf("pragma message is %q", pragma.Diagnostics[0].Message.Description)
+		test.Fatalf("pragma message is %q", pragma.Diagnostics[0].Message.Description)
 	}
 	if pragma.Diagnostics[0].Message.Id != "preferPragma" {
-		t.Fatalf("pragma id is %q", pragma.Diagnostics[0].Message.Id)
+		test.Fatalf("pragma id is %q", pragma.Diagnostics[0].Message.Id)
 	}
 }
 
 // TestDecodeJsxFragmentsOptions routes configuration through the rule's own decoder.
 //
-// The option is a bare enum STRING rather than an object, which is the line most likely to have no
+// The option is a bare enum string rather than an object, which is the line most likely to have no
 // upstream counterpart: our config layer unwraps the severity tuple, so what arrives is `"element"`
 // on its own rather than upstream's `["element"]`. Building the options struct directly in a
 // fixture would leave that untested.
@@ -228,8 +324,8 @@ func TestJsxFragmentsMessageText(t *testing.T) {
 // The nil case matters separately. A rule configured as a bare `"error"` is handed empty input, and
 // a decoder that did not fall back would hand the rule a zero-value mode matching neither arm, so
 // the rule would register on every file and report nothing.
-func TestDecodeJsxFragmentsOptions(t *testing.T) {
-	t.Parallel()
+func TestDecodeJsxFragmentsOptions(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name string
@@ -241,18 +337,14 @@ func TestDecodeJsxFragmentsOptions(t *testing.T) {
 		{"the element mode", `"element"`, JsxFragmentsElement},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			decoded, err := DecodeJsxFragmentsOptions([]byte(testCase.raw))
-			if err != nil {
-				t.Fatalf("decode returned %v", err)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			decoded, decodeJsxFragmentsOptionsError := DecodeJsxFragmentsOptions([]byte(testCase.raw))
+			if decodeJsxFragmentsOptionsError != nil {
+				test.Fatalf("decode returned %v", decodeJsxFragmentsOptionsError)
 			}
-			options, isOptions := decoded.(JsxFragmentsOptions)
-			if !isOptions {
-				t.Fatalf("decode returned %T", decoded)
-			}
-			if options.Mode != testCase.want {
-				t.Fatalf("mode is %q, wanted %q", options.Mode, testCase.want)
+			if decoded.Mode != testCase.want {
+				test.Fatalf("mode is %q, wanted %q", decoded.Mode, testCase.want)
 			}
 		})
 	}
@@ -263,12 +355,12 @@ func TestDecodeJsxFragmentsOptions(t *testing.T) {
 // A rule handed nil options reaches `options.(JsxFragmentsOptions)`, which fails, and the fallback
 // is what keeps the rule working. Every other fixture in this file reaches the rule through an
 // options struct, so nothing else here can see this line.
-func TestJsxFragmentsNilOptionsUsesTheDefault(t *testing.T) {
-	t.Parallel()
+func TestJsxFragmentsNilOptionsUsesTheDefault(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTyped(t, JsxFragments, jsxFragmentsFile,
+	result := rule_testing.RunTyped(test, JsxFragments, jsxFragmentsFile,
 		"<React.Fragment><Foo /></React.Fragment>;")
-	rule_testing.ExpectFindings(t, result, "preferFragment")
+	rule_testing.ExpectFindings(test, result, "preferFragment")
 }
 
 // TestJsxFragmentsRequiresTheTypedHarness asserts the checker is genuinely needed.
@@ -278,21 +370,21 @@ func TestJsxFragmentsNilOptionsUsesTheDefault(t *testing.T) {
 // namespaced spelling is matched structurally and survives, while the bare-identifier route needs
 // resolution and goes silent, so a later revert to the untyped harness fails here rather than
 // passing vacuously.
-func TestJsxFragmentsRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestJsxFragmentsRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	if !JsxFragments.NeedsTypeChecker {
-		t.Fatal("this rule resolves a bare tag name through the checker and must declare it")
+		test.Fatal("this rule resolves a bare tag name through the checker and must declare it")
 	}
-	untyped := rule_testing.RunWithOptions(t, JsxFragments, jsxFragmentsFile,
+	untyped := rule_testing.RunWithOptions(test, JsxFragments, jsxFragmentsFile,
 		"import React, { Fragment } from 'react';\n<Fragment><Foo /></Fragment>;",
 		JsxFragmentsOptions{Mode: JsxFragmentsSyntax})
-	rule_testing.ExpectClean(t, untyped)
+	rule_testing.ExpectClean(test, untyped)
 
-	typed := rule_testing.RunTypedWithOptions(t, JsxFragments, jsxFragmentsFile,
+	typed := rule_testing.RunTypedWithOptions(test, JsxFragments, jsxFragmentsFile,
 		"import React, { Fragment } from 'react';\n<Fragment><Foo /></Fragment>;",
 		JsxFragmentsOptions{Mode: JsxFragmentsSyntax})
-	rule_testing.ExpectFindings(t, typed, "preferFragment")
+	rule_testing.ExpectFindings(test, typed, "preferFragment")
 }
 
 // TestJsxFragmentsShapesUpstreamDoesNotWrite covers inputs measured against the installed build
@@ -300,10 +392,10 @@ func TestJsxFragmentsRequiresTheTypedHarness(t *testing.T) {
 //
 // Every verdict below was measured on 2026-08-27 rather than reasoned about. The nested pair is the
 // one that matters most: upstream's corpus never nests two fragments, and the installed build
-// reports BOTH, so a rule that stopped descending after the outer one would pass every imported
+// reports both, so a rule that stopped descending after the outer one would pass every imported
 // case.
-func TestJsxFragmentsShapesUpstreamDoesNotWrite(t *testing.T) {
-	t.Parallel()
+func TestJsxFragmentsShapesUpstreamDoesNotWrite(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name, sourceText string
@@ -372,15 +464,15 @@ func TestJsxFragmentsShapesUpstreamDoesNotWrite(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, JsxFragments, jsxFragmentsFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, JsxFragments, jsxFragmentsFile,
 				testCase.sourceText, testCase.options)
 			if len(testCase.messageIds) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.messageIds...)
+			rule_testing.ExpectFindings(test, result, testCase.messageIds...)
 		})
 	}
 }
@@ -393,15 +485,15 @@ func TestJsxFragmentsShapesUpstreamDoesNotWrite(t *testing.T) {
 // `testReactVersion` comparison passes and the arm is unreachable.
 //
 // Measured on the installed build with no react settings, which is upstream's three version cases
-// replayed: `<><Foo /></>` is SILENT and both named forms answer `preferFragment` rather than
+// replayed: `<><Foo /></>` is silent and both named forms answer `preferFragment` rather than
 // `fragmentsNotSupported`. Those are the verdicts the imported rows above record, and this test
 // exists so the substitution is stated where a reader will look rather than inferred from three
 // rows whose upstream ids do not match.
 //
 // The `json` import is used here to spell the decoder's wire shape once, which keeps this test
 // honest about what the config layer actually delivers.
-func TestJsxFragmentsVersionArmIsNotPorted(t *testing.T) {
-	t.Parallel()
+func TestJsxFragmentsVersionArmIsNotPorted(test *testing.T) {
+	test.Parallel()
 
 	for _, messageId := range []string{"fragmentsNotSupported"} {
 		for _, source := range []string{
@@ -410,11 +502,11 @@ func TestJsxFragmentsVersionArmIsNotPorted(t *testing.T) {
 			"<React.Fragment />;",
 		} {
 			for _, mode := range []JsxFragmentsMode{JsxFragmentsSyntax, JsxFragmentsElement} {
-				result := rule_testing.RunTypedWithOptions(t, JsxFragments, jsxFragmentsFile,
+				result := rule_testing.RunTypedWithOptions(test, JsxFragments, jsxFragmentsFile,
 					source, JsxFragmentsOptions{Mode: mode})
 				for _, diagnostic := range result.Diagnostics {
 					if diagnostic.Message.Id == messageId {
-						t.Fatalf("this rule must not produce %q; it has no version input",
+						test.Fatalf("this rule must not produce %q; it has no version input",
 							messageId)
 					}
 				}
@@ -424,16 +516,16 @@ func TestJsxFragmentsVersionArmIsNotPorted(t *testing.T) {
 
 	// The decoder receives the bare enum, not upstream's array. Spelled through the JSON layer so
 	// the assertion is about the wire shape rather than about a Go literal.
-	raw, err := json.Marshal("element")
-	if err != nil {
-		t.Fatalf("marshal returned %v", err)
+	raw, encodeError := json.Marshal("element")
+	if encodeError != nil {
+		test.Fatalf("marshal returned %v", encodeError)
 	}
-	decoded, err := DecodeJsxFragmentsOptions(raw)
-	if err != nil {
-		t.Fatalf("decode returned %v", err)
+	decoded, decodeJsxFragmentsOptionsError := DecodeJsxFragmentsOptions(raw)
+	if decodeJsxFragmentsOptionsError != nil {
+		test.Fatalf("decode returned %v", decodeJsxFragmentsOptionsError)
 	}
-	if decoded.(JsxFragmentsOptions).Mode != JsxFragmentsElement {
-		t.Fatal("the bare enum did not decode")
+	if decoded.Mode != JsxFragmentsElement {
+		test.Fatal("the bare enum did not decode")
 	}
 }
 
@@ -442,19 +534,19 @@ func TestJsxFragmentsVersionArmIsNotPorted(t *testing.T) {
 // Neither shape appears in upstream's corpus, and each was measured against the installed build
 // before the fixture was written rather than after.
 //
-// The MERGED case is the index-zero trap this tree names for six other rules. Declaration merging
+// The merged case is the index-zero trap this tree names for six other rules. Declaration merging
 // puts an `interface Fragment` written above the import at declaration index 0, so a rule reading
 // `symbol.Declarations[0]` instead of looping goes silent on it. Measured: the installed build
 // reports `preferFragment` for both orderings, so the loop is what reproduces upstream and the
 // index would be a silent false negative. Both orderings are pinned because only one of them can
 // distinguish the two versions.
 //
-// The MEMBER ACCESS case pins the pragma name itself. `<Foo.Fragment>` is silent upstream, measured,
+// The member access case pins the pragma name itself. `<Foo.Fragment>` is silent upstream, measured,
 // because upstream compares the rendered element type against the string `React.Fragment` rather
 // than checking only the property half. A guard that dropped the object comparison would report
 // every `Something.Fragment` in the tree.
-func TestJsxFragmentsSurvivorShapes(t *testing.T) {
-	t.Parallel()
+func TestJsxFragmentsSurvivorShapes(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name, sourceText string
@@ -477,15 +569,15 @@ func TestJsxFragmentsSurvivorShapes(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, JsxFragments, jsxFragmentsFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, JsxFragments, jsxFragmentsFile,
 				testCase.sourceText, JsxFragmentsOptions{Mode: JsxFragmentsSyntax})
 			if len(testCase.messageIds) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.messageIds...)
+			rule_testing.ExpectFindings(test, result, testCase.messageIds...)
 		})
 	}
 }
@@ -499,8 +591,8 @@ func TestJsxFragmentsSurvivorShapes(t *testing.T) {
 //
 // The other two rows pin the pragma half of the same question for the identifier and member-access
 // initializers, both measured silent.
-func TestJsxFragmentsNonReactSources(t *testing.T) {
-	t.Parallel()
+func TestJsxFragmentsNonReactSources(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct{ name, sourceText string }{
 		{
@@ -517,11 +609,11 @@ func TestJsxFragmentsNonReactSources(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, JsxFragments, jsxFragmentsFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, JsxFragments, jsxFragmentsFile,
 				testCase.sourceText, JsxFragmentsOptions{Mode: JsxFragmentsSyntax})
-			rule_testing.ExpectClean(t, result)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -530,8 +622,8 @@ func TestJsxFragmentsNonReactSources(t *testing.T) {
 // itself, and refuses anything else, naming the value (#rfbha44). Upstream's schema is
 // `[{ enum: ["syntax", "element"] }]` on the installed build and refuses each of these at load, the
 // empty string included; they used to decode to the default here.
-func TestJsxFragmentsDecoderRefusesWhatUpstreamRefuses(t *testing.T) {
-	t.Parallel()
+func TestJsxFragmentsDecoderRefusesWhatUpstreamRefuses(test *testing.T) {
+	test.Parallel()
 
 	for _, accepted := range []struct {
 		wire string
@@ -542,13 +634,13 @@ func TestJsxFragmentsDecoderRefusesWhatUpstreamRefuses(t *testing.T) {
 		{`"syntax"`, JsxFragmentsSyntax},
 		{`"element"`, JsxFragmentsElement},
 	} {
-		decoded, err := DecodeJsxFragmentsOptions([]byte(accepted.wire))
-		if err != nil {
-			t.Errorf("%s was refused: %v", accepted.wire, err)
+		decoded, decodeJsxFragmentsOptionsError := DecodeJsxFragmentsOptions([]byte(accepted.wire))
+		if decodeJsxFragmentsOptionsError != nil {
+			test.Errorf("%s was refused: %v", accepted.wire, decodeJsxFragmentsOptionsError)
 			continue
 		}
-		if got := decoded.(JsxFragmentsOptions).Mode; got != accepted.want {
-			t.Errorf("%s decoded to %s, want %s", accepted.wire, got, accepted.want)
+		if got := decoded.Mode; got != accepted.want {
+			test.Errorf("%s decoded to %s, want %s", accepted.wire, got, accepted.want)
 		}
 	}
 	for _, refused := range []struct{ wire, named string }{
@@ -558,13 +650,18 @@ func TestJsxFragmentsDecoderRefusesWhatUpstreamRefuses(t *testing.T) {
 		{`{"mode": "element"}`, "mode"},
 		{`true`, "true"},
 	} {
-		_, err := DecodeJsxFragmentsOptions([]byte(refused.wire))
-		if err == nil {
-			t.Errorf("%s decoded; it must be refused", refused.wire)
+		_, decodeJsxFragmentsOptionsError := DecodeJsxFragmentsOptions([]byte(refused.wire))
+		if decodeJsxFragmentsOptionsError == nil {
+			test.Errorf("%s decoded; it must be refused", refused.wire)
 			continue
 		}
-		if !strings.Contains(err.Error(), refused.named) {
-			t.Errorf("%s was refused without naming %s: %v", refused.wire, refused.named, err)
+		if !strings.Contains(decodeJsxFragmentsOptionsError.Error(), refused.named) {
+			test.Errorf(
+				"%s was refused without naming %s: %v",
+				refused.wire,
+				refused.named,
+				decodeJsxFragmentsOptionsError,
+			)
 		}
 	}
 }

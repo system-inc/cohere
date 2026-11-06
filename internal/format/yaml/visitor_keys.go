@@ -66,6 +66,8 @@ var visitorKeys = func() map[string][]string {
 func getVisitorKeys(node *unist.Node) []string {
 	keys, known := visitorKeys[node.NodeType]
 	if !known {
+		// Invariant: unist's transform builds only the node types visitorKeys lists. printDocFile recovers
+		// this into an error, as upstream throws it.
 		panic(fmt.Sprintf("Unexpected node type %q in YAML", node.NodeType))
 	}
 	return keys

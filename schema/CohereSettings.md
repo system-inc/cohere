@@ -40,6 +40,7 @@ never something it silently ignores.
 | [`departures`](#departures) | object of reasons | any settings file |
 | [`extends`](#extends) | string or array of strings | any settings file |
 | [`format`](#format) | object | any settings file outside our tiers; in a chain extending a cohere:system-inc set, the Nexus tier only |
+| [`go`](#go) | object | the file beside go.work or go.mod, or the one --lint-config names |
 | [`ignorePatterns`](#ignorepatterns) | array of strings | any settings file |
 | [`jsPlugins`](#jsplugins) | array | any settings file |
 | [`output`](#output) | object | the file cohere reads first |
@@ -116,6 +117,14 @@ The formatter's options and the house ignore list. With no block anywhere in the
 
 ```json
 { "format": { "printWidth": 120, "tabWidth": 4, "singleQuote": true, "ignore": ["pnpm-lock.yaml", "*.sqlite"] } }
+```
+
+### `go`
+
+Which of the Go engine's rules run, and how strictly, read from the file beside go.work or go.mod, or the one --lint-config names. Its rules map each cohere-go/<rule> to a severity (error, warn, warning or off, exactly as written) or [severity, options] with one options object. With no go block, every Go rule runs at error and every run says so. A rule name the engine does not know, any key besides rules, and a format key are refused: gofmt is the house format for Go and is not configured. The TypeScript linter leaves this block alone.
+
+```json
+{ "go": { "rules": { "cohere-go/performance-require-parallel-test": ["warn", {}] } } }
 ```
 
 ### `ignorePatterns`
@@ -203,7 +212,7 @@ A rule's value is a severity, or `[severity, ...options]` for a rule that takes 
 
 ## Rules
 
-cohere implements 497 rules. `cohere --rules` lists them for your project's language, and
+cohere implements 499 rules. `cohere --rules` lists them for your project's language, and
 `cohere --rules-enabled` lists the ones your settings turn on. A name cohere does not implement is accepted:
 it records a decision about a rule, and is reported as unported rather than refused.
 
@@ -578,7 +587,7 @@ it records a decision about a rule, and is reported as unported rather than refu
 
 </details>
 
-<details><summary><code>nexus</code>, 52 rules</summary>
+<details><summary><code>nexus</code>, 54 rules</summary>
 
 - `nexus/boundary-no-internal-import`
 - `nexus/boundary-no-nexus-outside-import`
@@ -601,7 +610,9 @@ it records a decision about a rule, and is reported as unported rather than refu
 - `nexus/consistency-no-single-line-jsdoc`
 - `nexus/consistency-no-stuttering-name`
 - `nexus/consistency-no-utils-folder`
+- `nexus/consistency-no-warning-comment`
 - `nexus/consistency-require-constant-casing`
+- `nexus/consistency-require-identifier-casing`
 - `nexus/consistency-require-matching-return-type`
 - `nexus/consistency-require-type-suffix`
 - `nexus/correctness-no-callback-in-parse-try`

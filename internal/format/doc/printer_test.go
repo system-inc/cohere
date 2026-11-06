@@ -29,39 +29,59 @@ import (
 
 // spec is a doc in a form both languages can build. Only the fields a kind uses are set.
 type spec struct {
-	Kind     string  `json:"k"`
-	Text     string  `json:"v,omitempty"`
-	Children []*spec `json:"c,omitempty"`
-	Number   int     `json:"n,omitempty"`
-	Flag     bool    `json:"f,omitempty"`
-	ID       string  `json:"id,omitempty"`
-	Ref      int     `json:"r,omitempty"`
+	Kind      string  `json:"k"`
+	Text      string  `json:"v,omitempty"`
+	Children  []*spec `json:"c,omitempty"`
+	Number    int     `json:"n,omitempty"`
+	Flag      bool    `json:"f,omitempty"`
+	Id        string  `json:"id,omitempty"`
+	Reference int     `json:"r,omitempty"`
 }
 
 type specGenerator struct {
 	random   *rand.Rand
-	groupIDs []string
+	groupIds []string
 	shared   int
 	depth    int
 }
 
-var specWords = []string{"a", "bc", "def", "word", "longer", "identifier", "x", "", "中文", "😀", "trailing  ", "tab\t", "é"}
+var specWords = []string{
+	"a",
+	"bc",
+	"def",
+	"word",
+	"longer",
+	"identifier",
+	"x",
+	"",
+	"中文",
+	"😀",
+	"trailing  ",
+	"tab\t",
+	"é",
+}
 
 func (generator *specGenerator) text() *spec {
 	return &spec{Kind: "text", Text: specWords[generator.random.Intn(len(specWords))]}
 }
 
 func (generator *specGenerator) line() *spec {
-	return &spec{Kind: []string{"line", "softline", "hardline", "literalline", "hardlineWithoutBreakParent"}[generator.random.Intn(5)]}
+	return &spec{Kind: []string{
+		"line",
+		"softline",
+		"hardline",
+		"literalline",
+		"hardlineWithoutBreakParent",
+	}[generator.random.Intn(5)]}
 }
 
-func (generator *specGenerator) groupID() string {
-	if len(generator.groupIDs) == 0 || generator.random.Intn(3) == 0 {
-		id := fmt.Sprintf("g%d", len(generator.groupIDs))
-		generator.groupIDs = append(generator.groupIDs, id)
+func (generator *specGenerator) groupId() string {
+	if len(generator.groupIds) == 0 || generator.random.Intn(3) == 0 {
+		id := fmt.Sprintf("g%d", len(generator.groupIds))
+		generator.groupIds = append(generator.groupIds, id)
 		return id
 	}
-	return generator.groupIDs[generator.random.Intn(len(generator.groupIDs))]
+	return generator.groupIds[generator.random.Intn(len(generator.groupIds))]
 }
 
 func (generator *specGenerator) node() *spec {
@@ -93,7 +113,11 @@ func (generator *specGenerator) node() *spec {
 		case 0:
 			return &spec{Kind: "alignWidth", Number: generator.random.Intn(5) - 1, Children: []*spec{generator.node()}}
 		case 1:
-			return &spec{Kind: "alignString", Text: []string{"> ", "- ", "  ", "", "→ ", "中 "}[generator.random.Intn(6)], Children: []*spec{generator.node()}}
+			return &spec{
+				Kind:     "alignString",
+				Text:     []string{"> ", "- ", "  ", "", "→ ", "中 "}[generator.random.Intn(6)],
+				Children: []*spec{generator.node()},
+			}
 		case 2:
 			return &spec{Kind: "markAsRoot", Children: []*spec{generator.node()}}
 		default:
@@ -102,12 +126,12 @@ func (generator *specGenerator) node() *spec {
 	case 7, 8:
 		group := &spec{Kind: "group", Flag: generator.random.Intn(6) == 0, Children: []*spec{generator.node()}}
 		if generator.random.Intn(3) == 0 {
-			group.ID = generator.groupID()
+			group.Id = generator.groupId()
 		}
 		if generator.random.Intn(5) == 0 {
 			generator.shared++
-			group.Ref = generator.shared
-			return &spec{Kind: "concat", Children: []*spec{group, {Kind: "sharedGroup", Ref: group.Ref}}}
+			group.Reference = generator.shared
+			return &spec{Kind: "concat", Children: []*spec{group, {Kind: "sharedGroup", Reference: group.Reference}}}
 		}
 		return group
 	case 9:
@@ -130,11 +154,16 @@ func (generator *specGenerator) node() *spec {
 	case 11:
 		ifBreak := &spec{Kind: "ifBreak", Children: []*spec{generator.node(), generator.node()}}
 		if generator.random.Intn(2) == 0 {
-			ifBreak.ID = generator.groupID()
+			ifBreak.Id = generator.groupId()
 		}
 		return ifBreak
 	case 12:
-		return &spec{Kind: "indentIfBreak", ID: generator.groupID(), Flag: generator.random.Intn(2) == 0, Children: []*spec{generator.node()}}
+		return &spec{
+			Kind:     "indentIfBreak",
+			Id:       generator.groupId(),
+			Flag:     generator.random.Intn(2) == 0,
+			Children: []*spec{generator.node()},
+		}
 	case 13:
 		return &spec{Kind: "lineSuffix", Children: []*spec{generator.node()}}
 	case 14:
@@ -151,14 +180,14 @@ func buildSpec(root *spec) Doc { return buildSpecAs(root, false) }
 
 // buildSpecAs is buildSpec, building each concat as a *Sequence of its parts when asSequences is set.
 func buildSpecAs(root *spec, asSequences bool) Doc {
-	ids := map[string]*GroupID{}
+	ids := map[string]*GroupId{}
 	groups := map[int]*Group{}
-	id := func(name string) *GroupID {
+	id := func(name string) *GroupId {
 		if name == "" {
 			return nil
 		}
 		if ids[name] == nil {
-			ids[name] = NewGroupID(name)
+			ids[name] = NewGroupId(name)
 		}
 		return ids[name]
 	}
@@ -200,21 +229,21 @@ func buildSpecAs(root *spec, asSequences bool) Doc {
 		case "dedentToRoot":
 			return DedentToRoot(build(node.Children[0]))
 		case "group":
-			group := NewGroup(build(node.Children[0]), GroupOptions{ID: id(node.ID), ShouldBreak: node.Flag})
-			if node.Ref != 0 {
-				groups[node.Ref] = group
+			group := NewGroup(build(node.Children[0]), GroupOptions{Id: id(node.Id), ShouldBreak: node.Flag})
+			if node.Reference != 0 {
+				groups[node.Reference] = group
 			}
 			return group
 		case "sharedGroup":
-			return groups[node.Ref]
+			return groups[node.Reference]
 		case "conditionalGroup":
 			return ConditionalGroup(children(node), GroupOptions{ShouldBreak: node.Flag})
 		case "fill":
 			return NewFill(children(node))
 		case "ifBreak":
-			return NewIfBreak(build(node.Children[0]), build(node.Children[1]), id(node.ID))
+			return NewIfBreak(build(node.Children[0]), build(node.Children[1]), id(node.Id))
 		case "indentIfBreak":
-			return NewIndentIfBreak(build(node.Children[0]), id(node.ID), node.Flag)
+			return NewIndentIfBreak(build(node.Children[0]), id(node.Id), node.Flag)
 		case "lineSuffix":
 			return NewLineSuffix(build(node.Children[0]))
 		case "lineSuffixBoundary":
@@ -280,11 +309,18 @@ process.stdin.on("end", () => {
 `
 
 type printCase struct {
-	Spec    *spec          `json:"spec"`
-	Options map[string]any `json:"options"`
+	Spec    *spec                 `json:"spec"`
+	Options *upstreamPrintOptions `json:"options"`
 }
 
-type printResultJSON struct {
+// upstreamPrintOptions are the options the script spreads into printDocToString's, spelled as upstream's are.
+type upstreamPrintOptions struct {
+	PrintWidth int  `json:"printWidth"`
+	TabWidth   int  `json:"tabWidth"`
+	UseTabs    bool `json:"useTabs"`
+}
+
+type printResultJson struct {
 	Formatted string `json:"formatted"`
 	Error     string `json:"error"`
 }
@@ -301,9 +337,18 @@ func boundaryCases() ([]*spec, []Options) {
 	for width := 3; width <= 8; width++ {
 		word := strings.Repeat("w", width)
 		shapes := []*spec{
-			{Kind: "concat", Children: []*spec{{Kind: "group", Children: []*spec{{Kind: "concat", Children: []*spec{text(word), {Kind: "line"}, text("")}}}}, {Kind: "hardline"}}},
-			{Kind: "concat", Children: []*spec{{Kind: "group", Children: []*spec{{Kind: "concat", Children: []*spec{text(word), {Kind: "line"}, text(""), text("x")}}}}, {Kind: "hardline"}}},
-			{Kind: "concat", Children: []*spec{{Kind: "group", Children: []*spec{{Kind: "concat", Children: []*spec{text(word[:width-1]), {Kind: "line"}, text("")}}}}, {Kind: "softline"}, text("y")}},
+			{Kind: "concat", Children: []*spec{{
+				Kind:     "group",
+				Children: []*spec{{Kind: "concat", Children: []*spec{text(word), {Kind: "line"}, text("")}}},
+			}, {Kind: "hardline"}}},
+			{Kind: "concat", Children: []*spec{{
+				Kind:     "group",
+				Children: []*spec{{Kind: "concat", Children: []*spec{text(word), {Kind: "line"}, text(""), text("x")}}},
+			}, {Kind: "hardline"}}},
+			{Kind: "concat", Children: []*spec{{
+				Kind:     "group",
+				Children: []*spec{{Kind: "concat", Children: []*spec{text(word[:width-1]), {Kind: "line"}, text("")}}},
+			}, {Kind: "softline"}, text("y")}},
 			{Kind: "fill", Children: []*spec{text(word), {Kind: "line"}, text(""), {Kind: "line"}, text("z")}},
 		}
 		for _, shape := range shapes {
@@ -317,43 +362,55 @@ func boundaryCases() ([]*spec, []Options) {
 }
 
 // TestPrintAgreesWithUpstream is the differential. Off unless COHERE_PRETTIER_FORK names the fork.
-func TestPrintAgreesWithUpstream(t *testing.T) {
-	t.Parallel()
-	root := corpus.PrettierFork.Root(t)
+func TestPrintAgreesWithUpstream(test *testing.T) {
+	test.Parallel()
+	root := corpus.PrettierFork.Root(test)
 	const count = 5000
 	random := rand.New(rand.NewSource(20261001))
 	cases := make([]printCase, count)
 	options := make([]Options, count)
 	for index := range cases {
 		generator := &specGenerator{random: random}
-		options[index] = Options{PrintWidth: 8 + random.Intn(40), TabWidth: []int{2, 4}[random.Intn(2)], UseTabs: random.Intn(4) == 0}
+		options[index] = Options{
+			PrintWidth: 8 + random.Intn(40),
+			TabWidth:   []int{2, 4}[random.Intn(2)],
+			UseTabs:    random.Intn(4) == 0,
+		}
 		cases[index] = printCase{
-			Spec:    generator.node(),
-			Options: map[string]any{"printWidth": options[index].PrintWidth, "tabWidth": options[index].TabWidth, "useTabs": options[index].UseTabs},
+			Spec: generator.node(),
+			Options: &upstreamPrintOptions{
+				PrintWidth: options[index].PrintWidth,
+				TabWidth:   options[index].TabWidth,
+				UseTabs:    options[index].UseTabs,
+			},
 		}
 	}
 
 	boundarySpecs, boundaryOptions := boundaryCases()
 	for index, boundary := range boundarySpecs {
 		options = append(options, boundaryOptions[index])
-		cases = append(cases, printCase{Spec: boundary, Options: map[string]any{"printWidth": boundaryOptions[index].PrintWidth, "tabWidth": 2, "useTabs": false}})
+		cases = append(cases, printCase{
+			Spec:    boundary,
+			Options: &upstreamPrintOptions{PrintWidth: boundaryOptions[index].PrintWidth, TabWidth: 2, UseTabs: false},
+		})
 	}
 
-	encoded, err := json.Marshal(cases)
-	if err != nil {
-		t.Fatal(err)
+	encoded, encodeError := json.Marshal(cases)
+	if encodeError != nil {
+		test.Fatal(encodeError)
 	}
 	command := exec.Command("node", "--input-type=module", "-e", upstreamScript)
 	command.Dir = root
 	command.Stdin = bytes.NewReader(encoded)
-	var stdout, stderr bytes.Buffer
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
 	command.Stdout, command.Stderr = &stdout, &stderr
-	if err := command.Run(); err != nil {
-		t.Fatalf("node: %v\n%s", err, stderr.String())
+	if runError := command.Run(); runError != nil {
+		test.Fatalf("node: %v\n%s", runError, stderr.String())
 	}
-	var upstream []printResultJSON
-	if err := json.Unmarshal(stdout.Bytes(), &upstream); err != nil {
-		t.Fatal(err)
+	var upstream []printResultJson
+	if decodeError := json.Unmarshal(stdout.Bytes(), &upstream); decodeError != nil {
+		test.Fatal(decodeError)
 	}
 
 	mismatches, upstreamErrors, rewrites := 0, 0, 0
@@ -361,7 +418,7 @@ func TestPrintAgreesWithUpstream(t *testing.T) {
 		if upstream[index].Error != "" {
 			upstreamErrors++
 			if upstreamErrors <= 3 {
-				t.Logf("upstream refused case %d: %s", index, upstream[index].Error)
+				test.Logf("upstream refused case %d: %s", index, upstream[index].Error)
 			}
 			continue
 		}
@@ -372,14 +429,35 @@ func TestPrintAgreesWithUpstream(t *testing.T) {
 		if got != upstream[index].Formatted {
 			mismatches++
 			if mismatches <= 5 {
-				specJSON, _ := json.Marshal(testCase.Spec)
-				t.Errorf("case %d (%+v)\nspec %s\nwant %q\ngot  %q", index, options[index], specJSON, upstream[index].Formatted, got)
+				specJson, marshalError := json.Marshal(testCase.Spec)
+				if marshalError != nil {
+					test.Fatalf("encoding case %d's spec: %v", index, marshalError)
+				}
+				test.Errorf(
+					"case %d (%+v)\nspec %s\nwant %q\ngot  %q",
+					index,
+					options[index],
+					specJson,
+					upstream[index].Formatted,
+					got,
+				)
 			}
 		}
 	}
-	t.Logf("%d docs printed (%d random, %d at the width boundary), %d upstream refused, %d with line breaks, %d mismatches",
-		len(cases), count, len(boundarySpecs), upstreamErrors, rewrites, mismatches)
+	test.Logf(
+		"%d docs printed (%d random, %d at the width boundary), %d upstream refused, %d with line breaks, %d mismatches",
+		len(cases),
+		count,
+		len(boundarySpecs),
+		upstreamErrors,
+		rewrites,
+		mismatches,
+	)
 	if upstreamErrors > count/10 {
-		t.Errorf("upstream refused %d of %d generated docs; the generator is producing invalid docs and the comparison is thinner than it looks", upstreamErrors, count)
+		test.Errorf(
+			"upstream refused %d of %d generated docs; the generator is producing invalid docs and the comparison is thinner than it looks",
+			upstreamErrors,
+			count,
+		)
 	}
 }

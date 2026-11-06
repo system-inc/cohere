@@ -8,7 +8,7 @@ import (
 // DefaultPropsMatchPropTypesOptions configures the rule.
 //
 // One key, defaulting to false, so the zero value is the correct default and the decoder stays
-// simple. Stated because two siblings in this package default an option to TRUE, where the same
+// simple. Stated because two siblings in this package default an option to `true`, where the same
 // shape would silently invert the rule.
 type DefaultPropsMatchPropTypesOptions struct {
 	// AllowRequiredDefaults permits a default on a prop declared `isRequired`. Absent means false.
@@ -19,7 +19,7 @@ type DefaultPropsMatchPropTypesOptions struct {
 //
 // Upstream reads `configuration.allowRequiredDefaults || false`, so an absent options object, an
 // empty one, and an explicit false are the same rule. Unlike `boolean-prop-naming`, this rule reads
-// nothing else from its options, so it is NOT inert without them: measured, a bare `"error"` reports
+// nothing else from its options, so it is not inert without them: measured, a bare `"error"` reports
 // exactly as `{}` does.
 func DefaultDefaultPropsMatchPropTypesOptions() DefaultPropsMatchPropTypesOptions {
 	return DefaultPropsMatchPropTypesOptions{}
@@ -30,20 +30,20 @@ func DefaultDefaultPropsMatchPropTypesOptions() DefaultPropsMatchPropTypesOption
 // Our config layer unwraps the severity tuple before dispatch, so this receives upstream's option
 // object rather than upstream's one-element array. Empty input is a bare `"error"` and resolves to
 // the default, which is the correct behaviour here precisely because the rule works without options.
-func DecodeDefaultPropsMatchPropTypesOptions(raw []byte) (any, error) {
+func DecodeDefaultPropsMatchPropTypesOptions(raw []byte) (DefaultPropsMatchPropTypesOptions, error) {
 	options := DefaultDefaultPropsMatchPropTypesOptions()
 	if len(raw) == 0 {
 		return options, nil
 	}
-	if err := rule.UnmarshalOptions(raw, &options); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &options); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 	return options, nil
 }
 
 // messageRequiredHasDefault is the arm for a default on a required prop.
 //
-// The finding is reported on the DEFAULT rather than on the propType, because the repair is to drop
+// The finding is reported on the default rather than on the propType, because the repair is to drop
 // one of the two and the default is the half that is redundant. Measured against the installed build
 // by slicing its reported range: the span is `a: 1`, not `a: PropTypes.string.isRequired`.
 func messageRequiredHasDefault(name string) rule.Message {
@@ -76,11 +76,11 @@ func messageDefaultHasNoType(name string) rule.Message {
 //
 // Upstream returns early when propTypes is absent or empty, and when either object carries a
 // spread. Both exist so a component whose props are assembled elsewhere is not judged on a partial
-// view, and both are measured: a spread in EITHER object silences the component entirely.
+// view, and both are measured: a spread in either object silences the component entirely.
 //
 // # One declaration form is deliberately not read, and the reason is a measurement
 //
-// Upstream also reads props from a TYPE ANNOTATION rather than from a `propTypes` object, in two
+// Upstream also reads props from a type annotation rather than from a `propTypes` object, in two
 // spellings that are one question:
 //
 //	class C extends React.Component { props: { foo: string }; }   the Flow-era class property
@@ -93,35 +93,37 @@ func messageDefaultHasNoType(name string) rule.Message {
 // and declaring `NeedsTypeChecker` costs the per-file checker lock on every file in the tree.
 //
 // Measured on 2026-08-28 before deciding, with a seeded control to prove the counter worked: the
-// tree contains ZERO occurrences of `defaultProps`, `propTypes` or `getDefaultProps` across every
+// tree contains zero occurrences of `defaultProps`, `propTypes` or `getDefaultProps` across every
 // TypeScript and JavaScript file, against 56 files naming `React.Component`. React 18.3 deprecated
 // `defaultProps` on function components and this codebase has moved past it entirely.
 //
 // So the trade is a checker lock on 3,516 files against five corpus cases and no real input. The
 // five are recorded in the test file rather than expressed, and if `defaultProps` ever returns to
 // this tree the annotation arm is the piece to add.
-var DefaultPropsMatchPropTypes = rule.Rule{
+var DefaultPropsMatchPropTypes = rule.Rule[DefaultPropsMatchPropTypesOptions]{
 	Name: "react/default-props-match-prop-types",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[DefaultPropsMatchPropTypesOptions]) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
 		settings := DefaultDefaultPropsMatchPropTypesOptions()
-		if configured, isConfigured := rule.OptionsAs[DefaultPropsMatchPropTypesOptions](options); isConfigured {
+		if configured, isConfigured := options.Read(); isConfigured {
 			settings = configured
 		}
 
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
-				checkDefaultPropsAgainstPropTypes(ctx, node, settings)
+				checkDefaultPropsAgainstPropTypes(ruleContext, node, settings)
 			},
 		}
 	},
 }
 
-// propTypeEntry is one declared prop: where it was written and whether it is required.
-type propTypeEntry struct {
+// propertyTypeEntry is one declared prop: where it was written and whether it is required.
+//
+// Upstream reads it from a component's propTypes.
+type propertyTypeEntry struct {
 	isRequired bool
 }
 
@@ -137,13 +139,13 @@ type defaultPropEntry struct {
 // exit because both objects can be declared in separate statements and either one can be the
 // spread that disqualifies the component.
 type componentPropDeclarations struct {
-	propTypes           map[string]propTypeEntry
-	propTypeOrder       []string
-	sawPropTypes        bool
-	propTypesUnresolved bool
-	defaults            []defaultPropEntry
-	sawDefaults         bool
-	defaultsUnresolved  bool
+	propertyTypes           map[string]propertyTypeEntry
+	propertyTypeOrder       []string
+	sawPropTypes            bool
+	propertyTypesUnresolved bool
+	defaults                []defaultPropEntry
+	sawDefaults             bool
+	defaultsUnresolved      bool
 }
 
 // checkDefaultPropsAgainstPropTypes runs the whole analysis for one file.
@@ -153,7 +155,7 @@ type componentPropDeclarations struct {
 // first. Our walk is pre-order, so a source-file listener fires before its children and the
 // gathering has to happen here.
 //
-// # Why declarations are keyed by OWNER rather than by detected component
+// # Why declarations are keyed by owner rather than by detected component
 //
 // Upstream hangs both objects off its component record, so two components in one file keep their
 // props apart. The three shapes that reach this rule all name their owner: a class property belongs
@@ -161,7 +163,7 @@ type componentPropDeclarations struct {
 // component's propTypes from satisfying the first component's defaults, and it costs nothing that a
 // detected-component walk would have bought.
 func checkDefaultPropsAgainstPropTypes(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	sourceFile *ast.Node,
 	settings DefaultPropsMatchPropTypesOptions,
 ) {
@@ -172,7 +174,7 @@ func checkDefaultPropsAgainstPropTypes(
 		if found {
 			return existing
 		}
-		created := &componentPropDeclarations{propTypes: map[string]propTypeEntry{}}
+		created := &componentPropDeclarations{propertyTypes: map[string]propertyTypeEntry{}}
 		byOwner[owner] = created
 		order = append(order, owner)
 		return created
@@ -227,7 +229,7 @@ func checkDefaultPropsAgainstPropTypes(
 				break
 			}
 
-			// `C.defaultProps.baz = "baz"` adds ONE default to an object declared elsewhere, and
+			// `C.defaultProps.baz = "baz"` adds one default to an object declared elsewhere, and
 			// upstream folds it into the same component. The receiver is then itself a
 			// `C.defaultProps` access, so the owner is one level further up and the member name is
 			// the prop rather than the declaration.
@@ -239,10 +241,8 @@ func checkDefaultPropsAgainstPropTypes(
 						switch innerName.Text() {
 						case "propTypes":
 							addSinglePropType(declarationsFor(owner), member.Text(), binary.Right)
-							break
 						case "defaultProps", "getDefaultProps":
-							addSingleDefaultProp(declarationsFor(owner), member.Text(), node)
-							break
+							addSingleDefaultProperty(declarationsFor(owner), member.Text(), node)
 						}
 					}
 				}
@@ -265,7 +265,7 @@ func checkDefaultPropsAgainstPropTypes(
 	// Reported in declaration order rather than map order, so two components in one file report
 	// deterministically. A map walk here would make the finding order depend on Go's randomisation.
 	for _, owner := range order {
-		reportMismatchedDefaults(ctx, byOwner[owner], settings)
+		reportMismatchedDefaults(ruleContext, byOwner[owner], settings)
 	}
 }
 
@@ -273,7 +273,7 @@ func checkDefaultPropsAgainstPropTypes(
 //
 // An anonymous class expression has no name, and its members are keyed on the empty string, which
 // groups every anonymous class in a file together. That is wider than upstream, which keys on the
-// node, and it can only make the rule QUIETER: two anonymous classes sharing a bucket means one's
+// node, and it can only make the rule quieter: two anonymous classes sharing a bucket means one's
 // propTypes can satisfy the other's defaults. No corpus case writes two anonymous component classes
 // in one file, and the alternative is a per-node key that the assignment arm cannot produce, since
 // `C.defaultProps = ...` names its owner by identifier rather than by node.
@@ -291,8 +291,10 @@ func enclosingClassOwnerName(member *ast.Node) string {
 // readPropDeclaration folds one `propTypes` or `defaultProps` declaration into a component's record.
 //
 // The name is read through `ast.TryGetTextOfPropertyName` rather than `Text()`, which panics on
-// several name shapes. The walk recovers per FILE rather than per rule, so one such call would cost
+// several name shapes. The walk recovers per file rather than per rule, so one such call would cost
 // every rule in this package its verdict on that file.
+//
+// Mutates: declarations records which of the two the component declared, on the record the caller keeps for it
 func readPropDeclaration(declarations *componentPropDeclarations, name *ast.Node, value *ast.Node) {
 	if name == nil {
 		return
@@ -319,29 +321,31 @@ func readPropDeclaration(declarations *componentPropDeclarations, name *ast.Node
 // A spread marks the whole component unresolved, which silences it. Upstream's reason is that a
 // spread hides names the rule would otherwise call missing, so judging on a partial view would
 // manufacture false positives. Measured: a spread in propTypes silences the component entirely.
+//
+// Mutates: declarations gains each declared prop in source order, or is marked unresolved by a spread
 func readPropTypesObject(declarations *componentPropDeclarations, value *ast.Node) {
-	value = resolveToObjectLiteral(value)
-	if value == nil {
+	object := resolveToObjectLiteral(value)
+	if object == nil {
 		// A propTypes assigned from anything we cannot resolve to an object is a partial view,
 		// which is the same situation a spread creates.
-		declarations.propTypesUnresolved = true
+		declarations.propertyTypesUnresolved = true
 		return
 	}
 
-	// A spread inside propTypes does NOT disqualify the component, unlike a spread inside
+	// A spread inside propTypes does not disqualify the component, unlike a spread inside
 	// defaultProps. Upstream's propTypes reader takes what it can see and moves on, while its
 	// defaults reader returns the string "unresolved" for the whole object.
 	//
 	// The asymmetry is the rule working as intended rather than an oversight. A spread in
 	// defaultProps may supply a name the rule would then call undeclared, which is a false positive;
-	// a spread in propTypes can only DECLARE more, so the worst case is a missed finding. Measured
+	// a spread in propTypes can only declare more, so the worst case is a missed finding. Measured
 	// on 2026-08-28: `{...base, a: PropTypes.string}` beside a default named `b` reports one
 	// finding, while a spread alone reports none because the map is then empty and the
 	// empty-propTypes guard fires.
 	//
 	// An earlier draft marked propTypes unresolved on a spread and went silent on that first input,
 	// which the whole imported corpus missed: no case there mixes a spread with a real prop.
-	for _, property := range value.AsObjectLiteralExpression().Properties.Nodes {
+	for _, property := range object.AsObjectLiteralExpression().Properties.Nodes {
 		if property.Kind != ast.KindPropertyAssignment &&
 			property.Kind != ast.KindShorthandPropertyAssignment {
 			continue
@@ -350,22 +354,22 @@ func readPropTypesObject(declarations *componentPropDeclarations, value *ast.Nod
 		if !readable {
 			continue
 		}
-		if _, already := declarations.propTypes[text]; !already {
-			declarations.propTypeOrder = append(declarations.propTypeOrder, text)
+		if _, already := declarations.propertyTypes[text]; !already {
+			declarations.propertyTypeOrder = append(declarations.propertyTypeOrder, text)
 		}
-		declarations.propTypes[text] = propTypeEntry{
-			isRequired: propTypeIsRequired(property),
+		declarations.propertyTypes[text] = propertyTypeEntry{
+			isRequired: propertyTypeIsRequired(property),
 		}
 	}
 }
 
-// propTypeIsRequired reports whether a declared prop type ends in `.isRequired`.
+// propertyTypeIsRequired reports whether a declared prop type ends in `.isRequired`.
 //
-// Upstream's propTypes reader sets the flag from the ANNOTATION rather than from the value, but for
+// Upstream's propTypes reader sets the flag from the annotation rather than from the value, but for
 // the shapes this rule meets the two coincide: a required prop is written `PropTypes.string.isRequired`
 // and the flag is the trailing member name. A shorthand property carries no value at all and is
 // therefore never required.
-func propTypeIsRequired(property *ast.Node) bool {
+func propertyTypeIsRequired(property *ast.Node) bool {
 	if property.Kind != ast.KindPropertyAssignment {
 		return false
 	}
@@ -373,14 +377,16 @@ func propTypeIsRequired(property *ast.Node) bool {
 }
 
 // readDefaultPropsObject records each default, in source order.
+//
+// Mutates: declarations gains each default in source order, or is marked unresolved when one cannot be read
 func readDefaultPropsObject(declarations *componentPropDeclarations, value *ast.Node) {
-	value = resolveToObjectLiteral(value)
-	if value == nil {
+	object := resolveToObjectLiteral(value)
+	if object == nil {
 		declarations.defaultsUnresolved = true
 		return
 	}
 
-	for _, property := range value.AsObjectLiteralExpression().Properties.Nodes {
+	for _, property := range object.AsObjectLiteralExpression().Properties.Nodes {
 		if property.Kind != ast.KindPropertyAssignment &&
 			property.Kind != ast.KindShorthandPropertyAssignment &&
 			property.Kind != ast.KindMethodDeclaration {
@@ -401,7 +407,7 @@ func readDefaultPropsObject(declarations *componentPropDeclarations, value *ast.
 
 // reportMismatchedDefaults applies the two arms to one component.
 func reportMismatchedDefaults(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	declarations *componentPropDeclarations,
 	settings DefaultPropsMatchPropTypesOptions,
 ) {
@@ -412,23 +418,23 @@ func reportMismatchedDefaults(
 	if !declarations.sawDefaults || declarations.defaultsUnresolved {
 		return
 	}
-	if declarations.propTypesUnresolved {
+	if declarations.propertyTypesUnresolved {
 		return
 	}
-	if !declarations.sawPropTypes || len(declarations.propTypes) == 0 {
+	if !declarations.sawPropTypes || len(declarations.propertyTypes) == 0 {
 		return
 	}
 
-	for _, defaultProp := range declarations.defaults {
-		declared, isDeclared := declarations.propTypes[defaultProp.name]
+	for _, defaultProperty := range declarations.defaults {
+		declared, isDeclared := declarations.propertyTypes[defaultProperty.name]
 		if isDeclared && (settings.AllowRequiredDefaults || !declared.isRequired) {
 			continue
 		}
 		if isDeclared {
-			ctx.ReportNode(defaultProp.node, messageRequiredHasDefault(defaultProp.name))
+			ruleContext.ReportNode(defaultProperty.node, messageRequiredHasDefault(defaultProperty.name))
 			continue
 		}
-		ctx.ReportNode(defaultProp.node, messageDefaultHasNoType(defaultProp.name))
+		ruleContext.ReportNode(defaultProperty.node, messageDefaultHasNoType(defaultProperty.name))
 	}
 }
 
@@ -438,15 +444,15 @@ func reportMismatchedDefaults(
 // path is rendered rather than resolved because the two arms have to agree on a key and one of them
 // starts from an identifier with no declaration to resolve.
 func ownerPathOf(expression *ast.Node) (string, bool) {
-	expression = skipParenthesesOptional(expression)
-	if expression == nil {
+	unwrapped := skipParenthesesOptional(expression)
+	if unwrapped == nil {
 		return "", false
 	}
-	switch expression.Kind {
+	switch unwrapped.Kind {
 	case ast.KindIdentifier:
-		return expression.Text(), true
+		return unwrapped.Text(), true
 	case ast.KindPropertyAccessExpression:
-		access := expression.AsPropertyAccessExpression()
+		access := unwrapped.AsPropertyAccessExpression()
 		name := access.Name()
 		if name == nil || name.Kind != ast.KindIdentifier {
 			return "", false
@@ -505,19 +511,23 @@ func enclosingObjectOwnerName(member *ast.Node) string {
 }
 
 // addSinglePropType folds a `C.propTypes.foo = ...` assignment into a component's record.
+//
+// Mutates: declarations gains the prop, as a `propTypes` member would add it
 func addSinglePropType(declarations *componentPropDeclarations, name string, value *ast.Node) {
 	declarations.sawPropTypes = true
-	if _, already := declarations.propTypes[name]; !already {
-		declarations.propTypeOrder = append(declarations.propTypeOrder, name)
+	if _, already := declarations.propertyTypes[name]; !already {
+		declarations.propertyTypeOrder = append(declarations.propertyTypeOrder, name)
 	}
-	declarations.propTypes[name] = propTypeEntry{isRequired: expressionIsRequired(value)}
+	declarations.propertyTypes[name] = propertyTypeEntry{isRequired: expressionIsRequired(value)}
 }
 
-// addSingleDefaultProp folds a `C.defaultProps.foo = ...` assignment into a component's record.
+// addSingleDefaultProperty folds a `C.defaultProps.foo = ...` assignment into a component's record.
 //
 // The node reported on is the whole assignment statement, because there is no property node to
 // point at: the default is written as a statement rather than as a member of an object literal.
-func addSingleDefaultProp(declarations *componentPropDeclarations, name string, assignment *ast.Node) {
+//
+// Mutates: declarations gains the default, as a `defaultProps` member would add it
+func addSingleDefaultProperty(declarations *componentPropDeclarations, name string, assignment *ast.Node) {
 	declarations.sawDefaults = true
 	declarations.defaults = append(declarations.defaults,
 		defaultPropEntry{node: assignment, name: name})
@@ -525,16 +535,23 @@ func addSingleDefaultProp(declarations *componentPropDeclarations, name string, 
 
 // expressionIsRequired reports whether a prop-type expression ends in `.isRequired`.
 //
-// The same test `propTypeIsRequired` applies to a property's value, lifted so the single-assignment
+// The same test `propertyTypeIsRequired` applies to a property's value, lifted so the single-assignment
 // arm can reuse it rather than reconstruct a property node to ask about.
 func expressionIsRequired(value *ast.Node) bool {
-	value = skipParenthesesOptional(value)
-	if value == nil || value.Kind != ast.KindPropertyAccessExpression {
+	unwrapped := skipParenthesesOptional(value)
+	if unwrapped == nil || unwrapped.Kind != ast.KindPropertyAccessExpression {
 		return false
 	}
-	name := value.AsPropertyAccessExpression().Name()
+	name := unwrapped.AsPropertyAccessExpression().Name()
 	return name != nil && name.Kind == ast.KindIdentifier && name.Text() == "isRequired"
 }
+
+// objectResolutionDepthLimit bounds `const a = b; const b = a;`, which resolves forever otherwise.
+//
+// A limit rather than a visited set because the chain is short in every real spelling and the limit
+// states the expectation. Reaching it answers unresolved, which is the safe direction: the component
+// is not judged rather than judged on a guess.
+const objectResolutionDepthLimit = 8
 
 // resolveToObjectLiteral follows an identifier to the object literal it was declared with.
 //
@@ -546,36 +563,30 @@ func expressionIsRequired(value *ast.Node) bool {
 // inner scope cannot be mistaken for the outer one. Returning nil is the unresolved answer, which
 // the callers turn into the same silence a spread produces.
 func resolveToObjectLiteral(value *ast.Node) *ast.Node {
+	current := value
 	for step := 0; step < objectResolutionDepthLimit; step++ {
-		value = skipParenthesesOptional(value)
-		if value == nil {
+		current = skipParenthesesOptional(current)
+		if current == nil {
 			return nil
 		}
-		if value.Kind == ast.KindObjectLiteralExpression {
-			return value
+		if current.Kind == ast.KindObjectLiteralExpression {
+			return current
 		}
-		if value.Kind != ast.KindIdentifier {
+		if current.Kind != ast.KindIdentifier {
 			return nil
 		}
-		declaration := declarationOfIdentifier(value)
+		declaration := declarationOfIdentifier(current)
 		if declaration == nil {
 			return nil
 		}
 		next := sortDefaultPropsInitializerOf(declaration)
-		if next == nil || next == value {
+		if next == nil || next == current {
 			return nil
 		}
-		value = next
+		current = next
 	}
 	return nil
 }
-
-// objectResolutionDepthLimit bounds `const a = b; const b = a;`, which resolves forever otherwise.
-//
-// A limit rather than a visited set because the chain is short in every real spelling and the limit
-// states the expectation. Reaching it answers unresolved, which is the safe direction: the component
-// is not judged rather than judged on a guess.
-const objectResolutionDepthLimit = 8
 
 // declarationOfIdentifier finds the declaration an identifier names, within this file.
 //
@@ -584,7 +595,7 @@ const objectResolutionDepthLimit = 8
 // every file in the tree the checker lock. Upstream resolves through scope analysis, which is
 // closer to this than to the checker.
 //
-// The nearest ENCLOSING declaration wins, which is what makes a shadowing binding shadow. A
+// The nearest enclosing declaration wins, which is what makes a shadowing binding shadow. A
 // declaration in a sibling scope is invisible, matching upstream's `findVariableByName`.
 func declarationOfIdentifier(identifier *ast.Node) *ast.Node {
 	wanted := identifier.Text()

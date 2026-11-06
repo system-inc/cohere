@@ -67,11 +67,11 @@ func printMemberChain(path *Path, options *Options, print PrintFunc) Doc {
 	shouldInsertEmptyLineAfter := func(node Node) bool {
 		originalText := options.OriginalText
 		nextCharIndex := getNextNonSpaceNonCommentCharacterIndex(originalText, locEnd(node))
-		nextChar := charAt(originalText, nextCharIndex)
+		nextCharacter := characterAt(originalText, nextCharIndex)
 
 		// if it is cut off by a parenthesis, we only account for one typed empty
 		// line after that parenthesis
-		if nextChar == ")" {
+		if nextCharacter == ")" {
 			// upstream's `nextCharIndex !== false`: the core's false position is notFound.
 			return nextCharIndex != notFound &&
 				isNextLineEmpty(originalText, nextCharIndex+1)
@@ -122,13 +122,13 @@ func printMemberChain(path *Path, options *Options, print PrintFunc) Doc {
 		} else if current.Is("TSNonNullExpression") && !needsParentheses(path, options) {
 			unshift(printedNode{
 				node:    current,
-				printed: printing.PrintComments(path, concatIn(path, "!"), options, nil),
+				printed: printing.PrintComments(path, concatIn(path, doc.Text("!")), options, nil),
 			})
 			call(path, rec, "expression")
 		} else {
 			unshift(printedNode{
 				node:    current,
-				printed: print(nil, nil),
+				printed: print("", nil),
 			})
 		}
 		return struct{}{}
@@ -176,24 +176,24 @@ func printMemberChain(path *Path, options *Options, print PrintFunc) Doc {
 	//       < this.items >.something()
 	groups := make([][]printedNode, 0, len(printedNodes))
 	currentGroup := []printedNode{printedNodes[0]}
-	i := 1
-	for ; i < len(printedNodes); i++ {
-		if printedNodes[i].node.Is("TSNonNullExpression") ||
-			printedNodes[i].node.Is("ChainExpression") ||
-			isCallExpression(printedNodes[i].node) ||
-			(isMemberExpression(printedNodes[i].node) &&
-				printedNodes[i].node.Bool("computed") &&
-				isNumericLiteral(printedNodes[i].node.Child("property"))) {
-			currentGroup = append(currentGroup, printedNodes[i])
+	index := 1
+	for ; index < len(printedNodes); index++ {
+		if printedNodes[index].node.Is("TSNonNullExpression") ||
+			printedNodes[index].node.Is("ChainExpression") ||
+			isCallExpression(printedNodes[index].node) ||
+			(isMemberExpression(printedNodes[index].node) &&
+				printedNodes[index].node.Bool("computed") &&
+				isNumericLiteral(printedNodes[index].node.Child("property"))) {
+			currentGroup = append(currentGroup, printedNodes[index])
 		} else {
 			break
 		}
 	}
 	if !isCallExpression(printedNodes[0].node) {
-		for ; i+1 < len(printedNodes); i++ {
-			if isMemberish(printedNodes[i].node) &&
-				isMemberish(printedNodes[i+1].node) {
-				currentGroup = append(currentGroup, printedNodes[i])
+		for ; index+1 < len(printedNodes); index++ {
+			if isMemberish(printedNodes[index].node) &&
+				isMemberish(printedNodes[index+1].node) {
+				currentGroup = append(currentGroup, printedNodes[index])
 			} else {
 				break
 			}
@@ -207,13 +207,13 @@ func printMemberChain(path *Path, options *Options, print PrintFunc) Doc {
 	// group until we has seen a CallExpression in the past and reach a
 	// MemberExpression
 	hasSeenCallExpression := false
-	for ; i < len(printedNodes); i++ {
-		if hasSeenCallExpression && isMemberish(printedNodes[i].node) {
+	for ; index < len(printedNodes); index++ {
+		if hasSeenCallExpression && isMemberish(printedNodes[index].node) {
 			// [0] should be appended at the end of the group instead of the
 			// beginning of the next one
-			if printedNodes[i].node.Bool("computed") &&
-				isNumericLiteral(printedNodes[i].node.Child("property")) {
-				currentGroup = append(currentGroup, printedNodes[i])
+			if printedNodes[index].node.Bool("computed") &&
+				isNumericLiteral(printedNodes[index].node.Child("property")) {
+				currentGroup = append(currentGroup, printedNodes[index])
 				continue
 			}
 
@@ -222,13 +222,13 @@ func printMemberChain(path *Path, options *Options, print PrintFunc) Doc {
 			hasSeenCallExpression = false
 		}
 
-		if isCallExpression(printedNodes[i].node) ||
-			printedNodes[i].node.Is("ImportExpression") {
+		if isCallExpression(printedNodes[index].node) ||
+			printedNodes[index].node.Is("ImportExpression") {
 			hasSeenCallExpression = true
 		}
-		currentGroup = append(currentGroup, printedNodes[i])
+		currentGroup = append(currentGroup, printedNodes[index])
 
-		if hasComment(printedNodes[i].node, commentTrailing, nil) {
+		if hasComment(printedNodes[index].node, commentTrailing, nil) {
 			groups = append(groups, currentGroup)
 			currentGroup = nil
 			hasSeenCallExpression = false
@@ -447,7 +447,8 @@ func printMemberChain(path *Path, options *Options, print PrintFunc) Doc {
 	// We don't want to print in one line if at least one of these conditions occurs:
 	//  * the chain has comments,
 	//  * the chain is an expression statement and all the arguments are literal-like ("fluent configuration" pattern),
-	//  * the chain is longer than 2 calls and has non-trivial arguments or more than 2 arguments in any call but the first one,
+	//  * the chain is longer than 2 calls and has non-trivial arguments or more than 2 arguments in any call but the
+	//    first one,
 	//  * any group but the last one has a hard line,
 	//  * the last call's arguments have a hard line and other calls have non-trivial arguments.
 	if nodeHasComment ||

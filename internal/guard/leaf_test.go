@@ -32,6 +32,34 @@ var allowedRuleImports = map[string]bool{
 	// the high-level IR already, which is under the shelf's prefix, so naming it directly adds no
 	// package to any rule edit's rebuild.
 	"github.com/system-inc/cohere/static_single_assignment": true,
+	// The house vocabularies both Go engines read: the abbreviation words' loader and finder, and the shouting
+	// safe list and masks. Each moved out of package nexus so the Go engine's rules could read the same data
+	// without linking the TypeScript checker (#ec8mvbg). internal/naming/abbreviation imports only the standard
+	// library and policy, and internal/shouting only the standard library and internal/lint/ecmascript/text, which
+	// is under the shelf's prefix, so both are leaves by their imports and change only when the house vocabulary
+	// does. Measured on 2026-11-05, three warm rounds each of `go build ./internal/lint/registry` after a one-comment
+	// edit, under a load average of about 44: editing internal/shouting rebuilds in 0.27 to 0.39s and
+	// internal/naming/abbreviation in 0.32 to 0.73s, with nothing past them rebuilt; editing a nexus rule, which
+	// imports both, 6.92 to 8.27s, and a base rule, which imports neither, 4.61 to 6.19s. nexus holds 89 source files
+	// to base's 33, so the load and the package's own size dominate that gap; it does not isolate the imports.
+	"github.com/system-inc/cohere/internal/naming/abbreviation": true,
+	"github.com/system-inc/cohere/internal/shouting":            true,
+	// The SQL reading nexus/security-no-interpolated-sql-string and its Go engine twin share: which holes in SQL
+	// text sit inside a quoted value or bare after a comparison. It moved out of package nexus so the Go rule reads
+	// SQL as the TypeScript one does without linking the TypeScript checker, the move internal/shouting made. It
+	// imports only `strings`, and `go list -deps` names nothing past the standard library, so it is a leaf by its
+	// imports, and it changes only when the shared reading does. Measured on 2026-11-05, three warm rounds each of
+	// `go build ./internal/lint/registry` after a one-comment edit, under a load average of about 19 to 20 (31 over
+	// fifteen minutes): editing internal/sqltext rebuilds in 0.12 to 0.13s, and `go build -v` shows it is the only
+	// package rebuilt, since a comment leaves its export data unchanged; editing the nexus rule that imports it,
+	// 2.57 to 2.76s.
+	"github.com/system-inc/cohere/internal/sqltext": true,
+	// The warning-comment judgment nexus/consistency-no-warning-comment and its Go engine twin share: the words, the
+	// whole-word test and the masks (#jmx59gd). It imports only the standard library and internal/shouting, a leaf
+	// on this list, so it is a leaf by its imports, and it changes only when the shared judgment does. Measured on
+	// 2026-11-06, three rounds of `go build ./internal/lint/registry` after a one-comment edit, under a load average
+	// of about 30: 0.20 to 0.25s, and `go build -v` shows it is the only package rebuilt.
+	"github.com/system-inc/cohere/internal/warningcomment": true,
 }
 
 // allowedRuleImportPrefixes are subtrees a rule package may depend on wholesale.
@@ -52,8 +80,8 @@ var allowedRuleImports = map[string]bool{
 // ~1.9s band it was in before the import existed. Editing the parser itself costs 3.24s, which is
 // the real depth cost and is paid by whoever edits the parser rather than by rule authors.
 //
-// `internal/lint/rules/tailwind/collapse/` is the generated collapse table and its gate. It is regenerated when Tailwind
-// releases and at no other time, which is the movement property this list is about rather than an
+// `internal/lint/rules/tailwind/collapse/` is the generated collapse table and its gate. It is regenerated when
+// Tailwind releases and at no other time, which is the movement property this list is about rather than an
 // exception to it. Measured on 2026-08-23, three warm rounds each: editing a tailwind rule that
 // imports it rebuilds in 0.06s against 0.07s for a rule that imports nothing, which is noise. Editing
 // the table itself costs 1.34s for a full binary rebuild, and that is paid by whoever regenerates it
@@ -82,7 +110,7 @@ var allowedRuleImportPrefixes = []string{
 // convention because the cost of losing it is measured and large.
 //
 // Measured on this tree: editing a rule package rebuilds in about 1.8s, while editing something
-// deep in the import graph costs 8.52s — a 4.2x cliff on the loop a rule author sits in all day.
+// deep in the import graph costs 8.52s, a 4.2x cliff on the loop a rule author sits in all day.
 // The depth that causes it is invisible in review, because the import that does it looks completely
 // reasonable in the file that adds it. So it is asserted here, where it fails loudly the moment it
 // stops being true.
@@ -91,11 +119,11 @@ var allowedRuleImportPrefixes = []string{
 // not depend on anything." Those came apart the first time a rule package legitimately needed
 // vendored upstream: the simpler rule would have rejected an import that costs nothing, which is
 // how a guard stops being trusted and starts being worked around.
-func TestRulePackagesStayLeaves(t *testing.T) {
-	t.Parallel()
+func TestRulePackagesStayLeaves(test *testing.T) {
+	test.Parallel()
 
 	/*
-	 * A rule package is one that REGISTERS rules, not merely one that lives under `rules/`.
+	 * A rule package is one that registers rules, not merely one that lives under `rules/`.
 	 *
 	 * The two were the same thing while every directory under `rules/` held rules and nothing else.
 	 * They came apart when each namespace's own machinery moved in beside its rules: the Tailwind
@@ -107,15 +135,15 @@ func TestRulePackagesStayLeaves(t *testing.T) {
 	 * `registry` imports every registering package, so a deep import inside one is on the rebuild
 	 * path for all of them. A package that registers nothing is not.
 	 */
-	rulePackages := registeringPackages(t, listPackages(t, "./internal/lint/rules/..."))
+	rulePackages := registeringPackages(test, listPackages(test, "./internal/lint/rules/..."))
 	if len(rulePackages) == 0 {
 		// A check that found nothing to check passes for the wrong reason, which is the same shape
 		// as the defect it guards against.
-		t.Fatal("found no rule packages, so this test proved nothing")
+		test.Fatal("found no rule packages, so this test proved nothing")
 	}
 
 	for _, rulePackage := range rulePackages {
-		for _, imported := range listImports(t, rulePackage) {
+		for _, imported := range listImports(test, rulePackage) {
 			if !strings.HasPrefix(imported, "github.com/system-inc/cohere/") {
 				// Third-party and standard-library imports are not what this guards: the compiler
 				// shim is most of what a rule touches, and it is not ours to be deep in.
@@ -125,8 +153,9 @@ func TestRulePackagesStayLeaves(t *testing.T) {
 				continue
 			}
 
-			t.Errorf(
-				"rule package %s imports %s, which pushes rules off the leaf — a leaf edit rebuilds in about 1.8s, a deep one in about 8.5s",
+			// The message's em-dash is spelled as its escape, so the text it prints stays byte for byte.
+			test.Errorf(
+				"rule package %s imports %s, which pushes rules off the leaf \u2014 a leaf edit rebuilds in about 1.8s, a deep one in about 8.5s",
 				rulePackage, imported,
 			)
 		}
@@ -144,29 +173,29 @@ func hasAllowedPrefix(imported string) bool {
 }
 
 // listPackages returns the import paths matching a pattern.
-func listPackages(t *testing.T, pattern string) []string {
-	t.Helper()
-	return runGoList(t, "-f", "{{.ImportPath}}", pattern)
+func listPackages(test *testing.T, pattern string) []string {
+	test.Helper()
+	return runGoList(test, "-f", "{{.ImportPath}}", pattern)
 }
 
 // listImports returns everything a package imports directly.
-func listImports(t *testing.T, packagePath string) []string {
-	t.Helper()
-	return runGoList(t, "-f", `{{range .Imports}}{{.}}{{"\n"}}{{end}}`, packagePath)
+func listImports(test *testing.T, packagePath string) []string {
+	test.Helper()
+	return runGoList(test, "-f", `{{range .Imports}}{{.}}{{"\n"}}{{end}}`, packagePath)
 }
 
 // runGoList runs `go list` from the module root and returns its non-empty lines.
-func runGoList(t *testing.T, arguments ...string) []string {
-	t.Helper()
+func runGoList(test *testing.T, arguments ...string) []string {
+	test.Helper()
 
 	command := exec.Command("go", append([]string{"list"}, arguments...)...)
 	// Tests run in their own package directory, and the patterns here are written relative to the
 	// module root.
 	command.Dir = filepath.Join("..", "..")
 
-	output, err := command.Output()
-	if err != nil {
-		t.Fatalf("go list %s: %v", strings.Join(arguments, " "), err)
+	output, outputError := command.Output()
+	if outputError != nil {
+		test.Fatalf("go list %s: %v", strings.Join(arguments, " "), outputError)
 	}
 
 	lines := []string{}
@@ -182,16 +211,16 @@ func runGoList(t *testing.T, arguments ...string) []string {
 //
 // Measured by the presence of a `*_register.go` file, which is the convention every rule in this
 // tree follows and which `TestEveryRuleIsRegistered` independently holds to.
-func registeringPackages(t *testing.T, packages []string) []string {
-	t.Helper()
+func registeringPackages(test *testing.T, packages []string) []string {
+	test.Helper()
 
 	const modulePrefix = "github.com/system-inc/cohere/"
 	registering := make([]string, 0, len(packages))
 	for _, importPath := range packages {
 		directory := strings.TrimPrefix(importPath, modulePrefix)
-		matches, err := filepath.Glob(filepath.Join("..", "..", directory, "*_register.go"))
-		if err != nil {
-			t.Fatalf("looking for registrations in %s: %v", importPath, err)
+		matches, globError := filepath.Glob(filepath.Join("..", "..", directory, "*_register.go"))
+		if globError != nil {
+			test.Fatalf("looking for registrations in %s: %v", importPath, globError)
 		}
 		if len(matches) > 0 {
 			registering = append(registering, importPath)

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -14,8 +15,8 @@ var baseLibraryOptions = BoundaryNoProjectImportOptions{
 	Allowed:          []string{"@project/ProjectSettings"},
 }
 
-func TestBoundaryNoProjectImportFires(t *testing.T) {
-	t.Parallel()
+func TestBoundaryNoProjectImportFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -29,39 +30,86 @@ func TestBoundaryNoProjectImportFires(t *testing.T) {
 		{"near miss on whitelist", "import { secret } from '@project/ProjectSettingsSecret';\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, BoundaryNoProjectImport, baseLibraryFile, testCase.source, baseLibraryOptions)
-			rule_testing.ExpectFindings(t, result, "forbiddenProjectImport")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(
+				test,
+				BoundaryNoProjectImport,
+				baseLibraryFile,
+				testCase.source,
+				baseLibraryOptions,
+			)
+			rule_testing.ExpectFindings(test, result, "forbiddenProjectImport")
 		})
 	}
 }
 
-func TestBoundaryNoProjectImportStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestBoundaryNoProjectImportStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name     string
 		fileName string
 		source   string
-		options  any
+		options  rule.Given[BoundaryNoProjectImportOptions]
 	}{
-		{"whitelisted specifier", baseLibraryFile, "import { settings } from '@project/ProjectSettings';\n", baseLibraryOptions},
-		{"relative import", baseLibraryFile, "import { Thing } from './Thing';\n", baseLibraryOptions},
-		{"sibling alias", baseLibraryFile, "import { Thing } from '@structure/source/Thing';\n", baseLibraryOptions},
-		{"unrelated package", baseLibraryFile, "import { Thing } from '@projector/Thing';\n", baseLibraryOptions},
-		{"outside the guarded library", "/repo/application/source/Thing.ts", "import { helper } from '@project/source/Helper';\n", baseLibraryOptions},
+		{
+			"whitelisted specifier",
+			baseLibraryFile,
+			"import { settings } from '@project/ProjectSettings';\n",
+			rule.Configured(baseLibraryOptions),
+		},
+		{
+			"relative import",
+			baseLibraryFile,
+			"import { Thing } from './Thing';\n",
+			rule.Configured(baseLibraryOptions),
+		},
+		{
+			"sibling alias",
+			baseLibraryFile,
+			"import { Thing } from '@structure/source/Thing';\n",
+			rule.Configured(baseLibraryOptions),
+		},
+		{
+			"unrelated package",
+			baseLibraryFile,
+			"import { Thing } from '@projector/Thing';\n",
+			rule.Configured(baseLibraryOptions),
+		},
+		{
+			"outside the guarded library",
+			"/repo/application/source/Thing.ts",
+			"import { helper } from '@project/source/Helper';\n",
+			rule.Configured(baseLibraryOptions),
+		},
 		// A rule registered without its required option must guard nothing rather than guard
 		// everything. Failing open here would have been a silent tree-wide false positive; the
 		// liveness harness in ahra reports exactly this rule as its one dead fixture.
-		{"no options at all", baseLibraryFile, "import { helper } from '@project/source/Helper';\n", nil},
-		{"empty library directory", baseLibraryFile, "import { helper } from '@project/source/Helper';\n", BoundaryNoProjectImportOptions{}},
+		{
+			"no options at all",
+			baseLibraryFile,
+			"import { helper } from '@project/source/Helper';\n",
+			rule.Given[BoundaryNoProjectImportOptions]{},
+		},
+		{
+			"empty library directory",
+			baseLibraryFile,
+			"import { helper } from '@project/source/Helper';\n",
+			rule.Configured(BoundaryNoProjectImportOptions{}),
+		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, BoundaryNoProjectImport, testCase.fileName, testCase.source, testCase.options)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunGiven(
+				test,
+				BoundaryNoProjectImport,
+				testCase.fileName,
+				testCase.source,
+				testCase.options,
+			)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -69,19 +117,25 @@ func TestBoundaryNoProjectImportStaysSilent(t *testing.T) {
 // A finding has to land on the line the author can suppress. A node's Pos() includes its leading
 // trivia, so reporting the declaration anchors the finding at the first comment above the import,
 // where no `eslint-disable-next-line` can reach it.
-func TestBoundaryNoProjectImportReportsAtTheSpecifier(t *testing.T) {
-	t.Parallel()
+func TestBoundaryNoProjectImportReportsAtTheSpecifier(test *testing.T) {
+	test.Parallel()
 
 	sourceText := "// Dependencies\n// a second comment\nimport { helper } from '@project/source/Helper';\\n"
 
-	result := rule_testing.RunWithOptions(t, BoundaryNoProjectImport, baseLibraryFile, sourceText, baseLibraryOptions)
+	result := rule_testing.RunWithOptions(
+		test,
+		BoundaryNoProjectImport,
+		baseLibraryFile,
+		sourceText,
+		baseLibraryOptions,
+	)
 	if len(result.Diagnostics) == 0 {
-		t.Fatalf("expected a finding, got none")
+		test.Fatalf("expected a finding, got none")
 	}
 
 	line, _ := scanner.GetECMALineAndByteOffsetOfPosition(result.SourceFile, result.Diagnostics[0].Range.Pos())
 	const importLine = 2 // zero-based, so the third line
 	if line != importLine {
-		t.Fatalf("expected the finding on the import line (%d), got line %d", importLine+1, line+1)
+		test.Fatalf("expected the finding on the import line (%d), got line %d", importLine+1, line+1)
 	}
 }

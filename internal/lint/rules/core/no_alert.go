@@ -49,7 +49,7 @@ var noAlertProhibited = map[string]bool{
 // # Two call shapes, and a shadow test on each
 //
 // A bare `alert(foo)` reports unless something in source declares the name. A member call reports
-// only when the object is the global object, spelled `window` or `globalThis`, and only when THAT
+// only when the object is the global object, spelled `window` or `globalThis`, and only when that
 // name is itself unshadowed. So `function foo() { var window = bar; window.alert(); }` is clean
 // while the same call at file scope reports, and upstream ships both halves as one case.
 //
@@ -60,32 +60,32 @@ var noAlertProhibited = map[string]bool{
 //
 // # `window[alert]()` is clean and `window['alert']()` reports
 //
-// The first is a computed access through a VARIABLE named `alert`, so the property read is whatever
+// The first is a computed access through a variable named `alert`, so the property read is whatever
 // that variable holds. The second is a string subscript, which is the same property as the dotted
 // form. `property.AccessedName` already draws exactly this line and is what `no-iterator` uses, so
 // the distinction is inherited rather than re-derived.
 //
-// # `this.alert()` is decided ABOVE this rule, by source type
+// # `this.alert()` is decided above this rule, by source type
 //
-// Upstream reports `this.alert(foo)` at the top level of a SCRIPT, where `this` is the global
+// Upstream reports `this.alert(foo)` at the top level of a script, where `this` is the global
 // object, and its `isGlobalThisReferenceOrGlobalWindow` has an arm for exactly that. Our harness and
 // our tree are modules: `internal/rule_testing/program.go` pins `moduleDetection: "force"`, and in a
 // module top-level `this` is `undefined` rather than the global.
 //
 // Measured rather than reasoned: driving the installed rule with `sourceType: "module"` returns
-// CLEAN for both `this.alert(foo)` and `this['alert'](foo)`, and `unexpected` for both under
-// `sourceType: "script"`. So the two `this` cases in upstream's corpus are clean HERE for the same
+// clean for both `this.alert(foo)` and `this['alert'](foo)`, and `unexpected` for both under
+// `sourceType: "script"`. So the two `this` cases in upstream's corpus are clean here for the same
 // reason they are clean in any module, and reproducing them as reporting would require a script-mode
 // file this tree cannot produce. There is deliberately no `this` arm below, and the two cases sit in
 // the silent list with this reasoning at the line.
-var NoAlert = rule.Rule{
+var NoAlert = rule.Rule[rule.NoOptions]{
 	Name:             "no-alert",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 				callee := ast.SkipParentheses(node.AsCallExpression().Expression)
@@ -97,13 +97,13 @@ var NoAlert = rule.Rule{
 				// whatever it is spelled.
 				if callee.Kind == ast.KindIdentifier {
 					name := callee.Text()
-					if noAlertProhibited[name] && !identifierIsShadowed(ctx, callee) {
-						ctx.ReportNode(node, buildNoAlertMessage(name))
+					if noAlertProhibited[name] && !identifierIsShadowed(ruleContext, callee) {
+						ruleContext.ReportNode(node, buildNoAlertMessage(name))
 					}
 					return
 				}
 
-				// The member form, which needs the receiver to BE the global object before the
+				// The member form, which needs the receiver to be the global object before the
 				// property name matters at all.
 				//
 				// A callee that is neither an identifier nor a member access has no receiver to ask
@@ -111,7 +111,7 @@ var NoAlert = rule.Rule{
 				// are the two that occur constantly: both are call expressions whose callee is a bare
 				// keyword, and every subclass constructor in the tree carries a `super()`. Feeding
 				// that nil to `ast.SkipParentheses` dereferences it, and because the walk recovers
-				// per file rather than per rule, the panic took the WHOLE file away from every rule.
+				// per file rather than per rule, the panic took the whole file away from every rule.
 				// It cost 167 files, about five percent of the tree, silently unchecked while the run
 				// still printed green.
 				object := memberAccessObject(callee)
@@ -119,7 +119,7 @@ var NoAlert = rule.Rule{
 					return
 				}
 				object = ast.SkipParentheses(object)
-				if !isGlobalObjectReference(ctx, object) {
+				if !isGlobalObjectReference(ruleContext, object) {
 					return
 				}
 
@@ -128,7 +128,7 @@ var NoAlert = rule.Rule{
 				// `window[alert]()` a clean case rather than a missed finding.
 				name, _ := property.AccessedName(callee, property.Static)
 				if noAlertProhibited[name] {
-					ctx.ReportNode(node, buildNoAlertMessage(name))
+					ruleContext.ReportNode(node, buildNoAlertMessage(name))
 				}
 			},
 		}
@@ -145,7 +145,7 @@ var NoAlert = rule.Rule{
 //
 // The `this` arm upstream carries is deliberately absent; see the rule's doc comment for the
 // measurement.
-func isGlobalObjectReference(ctx rule.Context, node *ast.Node) bool {
+func isGlobalObjectReference(ruleContext rule.Context, node *ast.Node) bool {
 	if node == nil || node.Kind != ast.KindIdentifier {
 		return false
 	}
@@ -153,5 +153,5 @@ func isGlobalObjectReference(ctx rule.Context, node *ast.Node) bool {
 	if name != "window" && name != "globalThis" {
 		return false
 	}
-	return !identifierIsShadowed(ctx, node)
+	return !identifierIsShadowed(ruleContext, node)
 }

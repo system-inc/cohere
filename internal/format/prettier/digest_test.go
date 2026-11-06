@@ -7,12 +7,12 @@ import (
 
 // embeddedBundleCopy returns the embedded bundles as a map the test owns, so mutating it cannot
 // reach the copy another parallel test is reading.
-func embeddedBundleCopy(t *testing.T) map[string][]byte {
-	t.Helper()
+func embeddedBundleCopy(test *testing.T) map[string][]byte {
+	test.Helper()
 
-	source, err := Bundles()
-	if err != nil {
-		t.Fatalf("reading the embedded bundles: %v", err)
+	source, bundlesError := Bundles()
+	if bundlesError != nil {
+		test.Fatalf("reading the embedded bundles: %v", bundlesError)
 	}
 
 	files := make(map[string][]byte, len(source.Files))
@@ -29,44 +29,44 @@ func embeddedBundleCopy(t *testing.T) map[string][]byte {
 //
 // The byte is flipped in the last bundle, so a digest that stopped reading after the first would
 // still pass a stability check and fail here.
-func TestDigestDetectsOneChangedByte(t *testing.T) {
-	t.Parallel()
+func TestDigestDetectsOneChangedByte(test *testing.T) {
+	test.Parallel()
 
-	files := embeddedBundleCopy(t)
+	files := embeddedBundleCopy(test)
 
-	before, err := DigestBundles(files)
-	if err != nil {
-		t.Fatalf("digesting before: %v", err)
+	before, digestBundlesError := DigestBundles(files)
+	if digestBundlesError != nil {
+		test.Fatalf("digesting before: %v", digestBundlesError)
 	}
 
 	last := BundleFiles[len(BundleFiles)-1]
 	files[last][0] ^= 0x01
 
-	after, err := DigestBundles(files)
-	if err != nil {
-		t.Fatalf("digesting after: %v", err)
+	after, digestBundlesError := DigestBundles(files)
+	if digestBundlesError != nil {
+		test.Fatalf("digesting after: %v", digestBundlesError)
 	}
 
 	if after == before {
-		t.Fatalf("one flipped byte in %s produced the same digest, so the digest does not cover it", last)
+		test.Fatalf("one flipped byte in %s produced the same digest, so the digest does not cover it", last)
 	}
 }
 
 // TestDigestRefusesAnAbsentBundle holds the loud-failure rule: absence names the file rather than
 // digesting the bundles that are there.
-func TestDigestRefusesAnAbsentBundle(t *testing.T) {
-	t.Parallel()
+func TestDigestRefusesAnAbsentBundle(test *testing.T) {
+	test.Parallel()
 
-	files := embeddedBundleCopy(t)
+	files := embeddedBundleCopy(test)
 	missing := BundleFiles[len(BundleFiles)-1]
 	delete(files, missing)
 
-	digest, err := DigestBundles(files)
-	if err == nil {
-		t.Fatalf("a set missing %s digested to %s instead of failing", missing, digest)
+	digest, digestBundlesError := DigestBundles(files)
+	if digestBundlesError == nil {
+		test.Fatalf("a set missing %s digested to %s instead of failing", missing, digest)
 	}
-	if !strings.Contains(err.Error(), missing) {
-		t.Fatalf("the error does not name the absent bundle: %v", err)
+	if !strings.Contains(digestBundlesError.Error(), missing) {
+		test.Fatalf("the error does not name the absent bundle: %v", digestBundlesError)
 	}
 }
 
@@ -81,22 +81,28 @@ func TestDigestRefusesAnAbsentBundle(t *testing.T) {
 // It goes through digestNamedBundles rather than re-implementing the hash, because an earlier
 // version hashed inline and passed while a mutation dropping the name from the real function went
 // undetected -- a test of its own arithmetic rather than of the code.
-func TestDigestKeysByName(t *testing.T) {
-	t.Parallel()
+func TestDigestKeysByName(test *testing.T) {
+	test.Parallel()
 
 	content := []byte("the same bytes under either name")
 
-	before, err := digestNamedBundles([]string{"plugins/yaml.js"}, map[string][]byte{"plugins/yaml.js": content})
-	if err != nil {
-		t.Fatalf("digesting under the first name: %v", err)
+	before, digestNamedBundlesError := digestNamedBundles(
+		[]string{"plugins/yaml.js"},
+		map[string][]byte{"plugins/yaml.js": content},
+	)
+	if digestNamedBundlesError != nil {
+		test.Fatalf("digesting under the first name: %v", digestNamedBundlesError)
 	}
 
-	after, err := digestNamedBundles([]string{"plugins/yml.js"}, map[string][]byte{"plugins/yml.js": content})
-	if err != nil {
-		t.Fatalf("digesting under the second name: %v", err)
+	after, digestNamedBundlesError := digestNamedBundles(
+		[]string{"plugins/yml.js"},
+		map[string][]byte{"plugins/yml.js": content},
+	)
+	if digestNamedBundlesError != nil {
+		test.Fatalf("digesting under the second name: %v", digestNamedBundlesError)
 	}
 
 	if before == after {
-		t.Fatal("the same bytes under two different names digested identically, so the name is not in the hash")
+		test.Fatal("the same bytes under two different names digested identically, so the name is not in the hash")
 	}
 }

@@ -3,11 +3,10 @@ package docsdata
 import (
 	"encoding/json"
 	"fmt"
-	"reflect"
-	"runtime"
 	"sort"
 	"strings"
 
+	goenginerule "github.com/system-inc/cohere/internal/goengine/rule"
 	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/policy"
@@ -71,13 +70,19 @@ type SwiftVerdict struct {
 }
 
 var ruleSourceNotes = map[string]string{
-	"name":            "the rule registry (internal/lint/registry), as `cohere --rules` lists it",
-	"language":        "the registry the row comes from: the Go engine's for TypeScript, swift/Rules.json for Swift",
-	"namespace":       "the registered name, before its last slash",
-	"origin":          "for TypeScript, the registered namespace, and for a bare name the Go package that registers it; for Swift, the origin each rule declares (swift/Rules.json)",
-	"upstreamName":    "for TypeScript, the registered name, for a rule ported from a plugin or ESLint core; for Swift, the id a ported rule declares (swift/Rules.json)",
-	"category":        "a house rule's name, split by the naming scheme's closed lists (policy/RuleNaming.json)",
-	"typeAware":       "the rule's NeedsTypeChecker declaration, or for Swift the typeAware swift/Rules.json declares",
+	"name": "the rule registry (internal/lint/registry), as `cohere --rules` lists it",
+	"language": "the registry the row comes from: the TypeScript engine's (internal/lint/registry), " +
+		"the Go engine's (internal/goengine/rules), swift/Rules.json for Swift",
+	"namespace": "the registered name, before its last slash",
+	"origin": "for TypeScript, the registered namespace, and for a bare name the Go package that registers it; " +
+		"for Swift, the origin each rule declares (swift/Rules.json); " +
+		"for Go, the origin each rule declares (internal/goengine/rules)",
+	"upstreamName": "for TypeScript, the registered name, for a rule ported from a plugin or ESLint core; " +
+		"for Swift, the id a ported rule declares (swift/Rules.json); " +
+		"for Go, the analyzer or check a ported rule names (internal/goengine/rules)",
+	"category": "a house rule's name, split by the naming scheme's closed lists (policy/RuleNaming.json)",
+	"typeAware": "the rule's NeedsTypeChecker declaration, or for Swift the typeAware swift/Rules.json declares, " +
+		"or for Go the TypeAware its registration declares",
 	"options":         "the rule's registration: which decoder it carries and whether it requires options",
 	"messageIds":      "the message ids the rule's own tests assert (examples/<rule>.json)",
 	"fixKind":         "whether the rule's own tests show a fix, a suggestion, or both (examples/<rule>.json)",
@@ -85,6 +90,9 @@ var ruleSourceNotes = map[string]string{
 	"swift":           "swift/HouseRuleVerdicts.json",
 	"typeScriptRules": "swift/HouseRuleVerdicts.json, read from the Swift side: the TypeScript rules whose verdict names this rule",
 }
+
+// houseOrigin is the origin of a rule this organization wrote rather than ported.
+const houseOrigin = "house"
 
 // swiftOrigins are the origins a Swift rule may declare. One outside them refuses the build, so a new
 // upstream tool cannot publish without being named here.
@@ -109,18 +117,15 @@ var namespaceOrigins = map[string]string{
 	"adamic":                            "house",
 }
 
-// houseOrigin is the origin of a rule this organization wrote rather than ported.
-const houseOrigin = "house"
-
 // corePackage is the Go package ESLint core's ports register from. A bare name registered anywhere else
 // is a house rule.
 const corePackage = "github.com/system-inc/cohere/internal/lint/rules/core"
 
 // buildRules renders one row per registration, in name order.
 func buildRules(inputs Inputs, sets []RuleSet) (Rules, error) {
-	verdicts, err := swiftVerdicts(inputs.SwiftVerdicts)
-	if err != nil {
-		return Rules{}, err
+	verdicts, swiftVerdictsError := swiftVerdicts(inputs.SwiftVerdicts)
+	if swiftVerdictsError != nil {
+		return Rules{}, swiftVerdictsError
 	}
 	enabledBy := map[string][]RuleSetSeverity{}
 	for _, set := range sets {
@@ -128,34 +133,40 @@ func buildRules(inputs Inputs, sets []RuleSet) (Rules, error) {
 			if setRule.Severity == configuration.SeverityOff.String() {
 				continue
 			}
-			enabledBy[setRule.Name] = append(enabledBy[setRule.Name], RuleSetSeverity{Set: set.Name, Severity: setRule.Severity})
+			enabledBy[setRule.Name] = append(
+				enabledBy[setRule.Name],
+				RuleSetSeverity{Set: set.Name, Severity: setRule.Severity},
+			)
 		}
 	}
 
 	rows := make([]RuleRow, 0, len(inputs.Registrations))
 	for _, registration := range inputs.Registrations {
-		name := registration.Rule.Name
+		name := registration.Name
 		row := RuleRow{
 			Name:      name,
 			Language:  "TypeScript",
-			TypeAware: registration.Rule.NeedsTypeChecker,
+			TypeAware: registration.NeedsTypeChecker,
 			Sets:      enabledBy[name],
 		}
 		if slash := strings.LastIndex(name, "/"); slash >= 0 {
 			row.Namespace = name[:slash]
 		}
-		origin, err := originOf(row.Namespace, registeringPackage(registration.Rule))
-		if err != nil {
-			return Rules{}, fmt.Errorf("docsdata: %s: %w", name, err)
+		origin, originOfError := originOf(row.Namespace, registration.RunPackage)
+		if originOfError != nil {
+			return Rules{}, fmt.Errorf("docsdata: %s: %w", name, originOfError)
 		}
 		row.Origin = origin
 		if origin != houseOrigin {
 			row.UpstreamName = name
 		} else {
 			// A house rule whose name does not fit the scheme refuses the build, so it cannot publish.
-			parsed, err := policy.Naming.ParseRuleName(row.Namespace, name[strings.LastIndex(name, "/")+1:])
-			if err != nil {
-				return Rules{}, fmt.Errorf("docsdata: %s: %w", name, err)
+			parsed, parseRuleNameError := policy.Naming.ParseRuleName(
+				row.Namespace,
+				name[strings.LastIndex(name, "/")+1:],
+			)
+			if parseRuleNameError != nil {
+				return Rules{}, fmt.Errorf("docsdata: %s: %w", name, parseRuleNameError)
 			}
 			row.Category = parsed.Category
 		}
@@ -169,11 +180,16 @@ func buildRules(inputs Inputs, sets []RuleSet) (Rules, error) {
 		}
 		rows = append(rows, row)
 	}
-	swiftRows, err := buildSwiftRows(inputs.SwiftRules, verdicts)
-	if err != nil {
-		return Rules{}, err
+	swiftRows, buildSwiftRowsError := buildSwiftRows(inputs.SwiftRules, verdicts)
+	if buildSwiftRowsError != nil {
+		return Rules{}, buildSwiftRowsError
 	}
 	rows = append(rows, swiftRows...)
+	goRows, buildGoRowsError := buildGoRows(inputs.GoRules)
+	if buildGoRowsError != nil {
+		return Rules{}, buildGoRowsError
+	}
+	rows = append(rows, goRows...)
 	sort.Slice(rows, func(left, right int) bool { return rows[left].Name < rows[right].Name })
 	return Rules{SourceNotes: ruleSourceNotes, Count: len(rows), Rules: rows}, nil
 }
@@ -187,8 +203,8 @@ func buildSwiftRows(registry []byte, verdicts map[string]SwiftVerdict) ([]RuleRo
 		UpstreamName string `json:"upstreamName"`
 		TypeAware    bool   `json:"typeAware"`
 	}
-	if err := rule.UnmarshalOptions(registry, &entries); err != nil {
-		return nil, fmt.Errorf("docsdata: reading swift/Rules.json: %w", err)
+	if unmarshalOptionsError := rule.UnmarshalOptions(registry, &entries); unmarshalOptionsError != nil {
+		return nil, fmt.Errorf("docsdata: reading swift/Rules.json: %w", unmarshalOptionsError)
 	}
 	carries := map[string][]string{}
 	for typeScriptRule, verdict := range verdicts {
@@ -204,7 +220,11 @@ func buildSwiftRows(registry []byte, verdicts map[string]SwiftVerdict) ([]RuleRo
 			return nil, fmt.Errorf("docsdata: the Swift rule %s is not under %s/", entry.Name, swiftNamespace)
 		}
 		if !swiftOrigins[entry.Origin] {
-			return nil, fmt.Errorf("docsdata: %s: the origin %q is not one of house, swiftlint, swift-format", entry.Name, entry.Origin)
+			return nil, fmt.Errorf(
+				"docsdata: %s: the origin %q is not one of house, swiftlint, swift-format",
+				entry.Name,
+				entry.Origin,
+			)
 		}
 		row := RuleRow{
 			Name:         entry.Name,
@@ -215,9 +235,9 @@ func buildSwiftRows(registry []byte, verdicts map[string]SwiftVerdict) ([]RuleRo
 			TypeAware:    entry.TypeAware,
 		}
 		if entry.Origin == houseOrigin {
-			parsed, err := policy.Naming.ParseRuleName(swiftNamespace, leaf)
-			if err != nil {
-				return nil, fmt.Errorf("docsdata: %s: %w", entry.Name, err)
+			parsed, parseRuleNameError := policy.Naming.ParseRuleName(swiftNamespace, leaf)
+			if parseRuleNameError != nil {
+				return nil, fmt.Errorf("docsdata: %s: %w", entry.Name, parseRuleNameError)
 			}
 			row.Category = parsed.Category
 		}
@@ -237,6 +257,37 @@ func buildSwiftRows(registry []byte, verdicts map[string]SwiftVerdict) ([]RuleRo
 	return rows, nil
 }
 
+// buildGoRows renders one row per Go engine rule. The registry's own Validate refuses a rule outside the
+// namespace, with an origin it does not know, or with an upstream name its origin forbids or lacks, and a
+// house rule outside the naming scheme refuses the build here, as a TypeScript or Swift one does.
+func buildGoRows(registered []goenginerule.Rule) ([]RuleRow, error) {
+	namespace := strings.TrimSuffix(goenginerule.Namespace, "/")
+	rows := make([]RuleRow, 0, len(registered))
+	for _, goRule := range registered {
+		if validateError := goRule.Validate(); validateError != nil {
+			return nil, fmt.Errorf("docsdata: %w", validateError)
+		}
+		row := RuleRow{
+			Name:         goRule.Name,
+			Language:     "Go",
+			Namespace:    namespace,
+			Origin:       string(goRule.Origin),
+			UpstreamName: goRule.UpstreamName,
+			TypeAware:    goRule.TypeAware,
+		}
+		if goRule.Origin == goenginerule.OriginHouse {
+			leaf := strings.TrimPrefix(goRule.Name, goenginerule.Namespace)
+			parsed, parseError := policy.Naming.ParseRuleName(namespace, leaf)
+			if parseError != nil {
+				return nil, fmt.Errorf("docsdata: %s: %w", goRule.Name, parseError)
+			}
+			row.Category = parsed.Category
+		}
+		rows = append(rows, row)
+	}
+	return rows, nil
+}
+
 // originOf is where a rule comes from, by its namespace, or for a bare name by the package registering it.
 func originOf(namespace string, packagePath string) (string, error) {
 	if namespace == "" {
@@ -252,33 +303,17 @@ func originOf(namespace string, packagePath string) (string, error) {
 	return origin, nil
 }
 
-// registeringPackage is the import path of the package whose code a rule's Run is, read off the function
-// itself, so a bare house rule is told from an ESLint core port by where it lives rather than by a list.
-func registeringPackage(subject rule.Rule) string {
-	function := runtime.FuncForPC(reflect.ValueOf(subject.Run).Pointer())
-	if function == nil {
-		return ""
-	}
-	// A function's name is its import path, then a dot, then the symbol and any closure suffixes. The
-	// path's last segment may hold dots of its own only in a domain, which comes before the last slash.
-	name := function.Name()
-	slash := strings.LastIndex(name, "/")
-	dot := strings.Index(name[slash+1:], ".")
-	if dot < 0 {
-		return name
-	}
-	return name[:slash+1+dot]
-}
-
 // optionsOf reads what a registration declares about its options, or nil for a rule that takes none.
-func optionsOf(registration rule.Registration) *RuleOptions {
-	switch {
-	case registration.DecodeOptionList != nil:
+func optionsOf(registration rule.Entry) *RuleOptions {
+	switch registration.Arity {
+	case rule.OptionArityList:
 		return &RuleOptions{Elements: "many", Required: registration.RequiresOptions}
-	case registration.DecodeAt != nil:
+	case rule.OptionArityAt:
 		return &RuleOptions{Elements: "one", AnchorsPaths: true, Required: registration.RequiresOptions}
-	case registration.Decode != nil:
+	case rule.OptionArityOne:
 		return &RuleOptions{Elements: "one", Required: registration.RequiresOptions}
+	case rule.OptionArityNone:
+		// A rule that takes no options has no options row.
 	}
 	return nil
 }
@@ -290,8 +325,8 @@ func swiftVerdicts(catalog []byte) (map[string]SwiftVerdict, error) {
 		Verdict        string  `json:"verdict"`
 		SwiftRule      *string `json:"swiftRule"`
 	}
-	if err := json.Unmarshal(catalog, &entries); err != nil {
-		return nil, fmt.Errorf("docsdata: reading the Swift verdict catalog: %w", err)
+	if decodeError := json.Unmarshal(catalog, &entries); decodeError != nil {
+		return nil, fmt.Errorf("docsdata: reading the Swift verdict catalog: %w", decodeError)
 	}
 	verdicts := make(map[string]SwiftVerdict, len(entries))
 	for _, entry := range entries {

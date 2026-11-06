@@ -33,8 +33,8 @@ var arrayCallbackTargetMethods = map[string]bool{
 
 // arrayMethodNameFor reports which array method a function is the callback of, if any.
 //
-// This is upstream's `getArrayMethodName`, and it is the half of the rule that decides WHETHER to
-// judge at all. It walks UP from the function, because the callback can be nested inside expressions
+// This is upstream's `getArrayMethodName`, and it is the half of the rule that decides whether to
+// judge at all. It walks up from the function, because the callback can be nested inside expressions
 // that choose between callbacks without changing which method receives one:
 //
 //	foo.every(cb || function(){})         a logical expression picks one
@@ -94,7 +94,7 @@ func arrayMethodNameFor(node *ast.Node) (string, bool) {
 			if enclosing == nil {
 				return "", false
 			}
-			// Upstream writes `currentNode = func.parent`, which in ESLint's tree IS the call,
+			// Upstream writes `currentNode = func.parent`, which in ESLint's tree is the call,
 			// because that tree has no parenthesized-expression node at all. Ours does, so the
 			// wrapper's parent is the paren and the call is one step further up. Climbing to the
 			// call itself is the same position in both trees.
@@ -137,13 +137,13 @@ func arrayMethodNameForCall(call *ast.Node, argument *ast.Node, isAsync bool) (s
 	arguments := callExpression.Arguments
 
 	if !isAsync {
-		// `Array.from(iterable, mapFn)` takes its callback SECOND, which is the whole reason this
+		// `Array.from(iterable, mapFn)` takes its callback second, which is the whole reason this
 		// arm is separate from the target-method one below.
 		if isArrayStaticMethod(callee, "from") &&
 			arguments != nil && len(arguments.Nodes) >= 2 && arguments.Nodes[1] == argument {
 			return "from", true
 		}
-		// Every prototype method in the set takes its callback FIRST.
+		// Every prototype method in the set takes its callback first.
 		if name, isTarget := targetMethodNameOf(callee); isTarget &&
 			arguments != nil && len(arguments.Nodes) >= 1 && arguments.Nodes[0] == argument {
 			return name, true
@@ -164,18 +164,18 @@ func arrayMethodNameForCall(call *ast.Node, argument *ast.Node, isAsync bool) (s
 // targetMethodNameOf returns the method name a callee accesses, when it is one this rule checks.
 //
 // Upstream asks `astUtils.isSpecificMemberAccess(node, null, TARGET_METHODS)` with a null object
-// pattern, so the RECEIVER is not constrained at all: `foo.every`, `foo.bar().every` and
+// pattern, so the receiver is not constrained at all: `foo.every`, `foo.bar().every` and
 // `[1,2].every` all match, and so does anything else with a `.every`. That is deliberate upstream,
 // since the receiver's type is not knowable from syntax, and it is reproduced rather than narrowed.
 //
 // Both member forms are accepted because upstream's helper reads a static property name, which
 // covers `foo['every']` as well as `foo.every`.
 func targetMethodNameOf(callee *ast.Node) (string, bool) {
-	callee = skipParenthesesAndChain(callee)
-	if callee == nil {
+	unwrapped := skipParenthesesAndChain(callee)
+	if unwrapped == nil {
 		return "", false
 	}
-	name, hasName := staticMemberNameOf(callee)
+	name, hasName := staticMemberNameOf(unwrapped)
 	if !hasName || !arrayCallbackTargetMethods[name] {
 		return "", false
 	}
@@ -188,15 +188,15 @@ func targetMethodNameOf(callee *ast.Node) (string, bool) {
 // `Array.from` both match; the object it requires at the head is spelled `Array`. Reproduced at the
 // spelling upstream keys on, which is the identifier `Array`.
 func isArrayStaticMethod(callee *ast.Node, methodName string) bool {
-	callee = skipParenthesesAndChain(callee)
-	if callee == nil {
+	unwrapped := skipParenthesesAndChain(callee)
+	if unwrapped == nil {
 		return false
 	}
-	name, hasName := staticMemberNameOf(callee)
+	name, hasName := staticMemberNameOf(unwrapped)
 	if !hasName || name != methodName {
 		return false
 	}
-	object := skipParenthesesAndChain(memberObjectOf(callee))
+	object := skipParenthesesAndChain(memberObjectOf(unwrapped))
 	if object == nil || object.Kind != ast.KindIdentifier {
 		return false
 	}
@@ -205,7 +205,7 @@ func isArrayStaticMethod(callee *ast.Node, methodName string) bool {
 		return object.Text() == "Array"
 	}
 	// `isArrayFromMethod` uses `arrayOrTypedArrayPattern`, which is `/Array$/u`: any identifier
-	// ENDING in `Array`, so every typed-array constructor matches. `Int32Array.from(x, fn)` is in
+	// ending in `Array`, so every typed-array constructor matches. `Int32Array.from(x, fn)` is in
 	// the corpus and is what makes this a suffix test rather than an equality one.
 	return strings.HasSuffix(object.Text(), "Array")
 }
@@ -217,14 +217,15 @@ func isArrayStaticMethod(callee *ast.Node, methodName string) bool {
 // `(foo?.filter)(cb)` and `(Array?.from)([], cb)` are both in the corpus and both reach a callee
 // wrapped this way.
 func skipParenthesesAndChain(node *ast.Node) *ast.Node {
-	for node != nil {
-		switch node.Kind {
+	current := node
+	for current != nil {
+		switch current.Kind {
 		case ast.KindParenthesizedExpression:
-			node = node.AsParenthesizedExpression().Expression
+			current = current.AsParenthesizedExpression().Expression
 		case ast.KindNonNullExpression:
-			node = node.AsNonNullExpression().Expression
+			current = current.AsNonNullExpression().Expression
 		default:
-			return node
+			return current
 		}
 	}
 	return nil
@@ -303,28 +304,21 @@ func enclosingFunctionOf(node *ast.Node) *ast.Node {
 	return nil
 }
 
-// isCalleeOfCall reports whether a node is the thing being called.
-//
-// Upstream's `isCallee`. It is what separates an immediately invoked wrapper, whose return value
-// becomes the callback, from an ordinary function whose return value goes to its own caller.
-func isCalleeOfCall(node *ast.Node) bool {
-	return callConsuming(node) != nil
-}
-
 // callConsuming returns the call expression that invokes a node, or nil when nothing does.
 //
 // Parentheses around the callee are skipped on the way up, since `(function(){})()` and
 // `function(){}()` are the same call and only the first has a paren node in our tree.
 func callConsuming(node *ast.Node) *ast.Node {
+	current := node
 	parent := node.Parent
 	for parent != nil && parent.Kind == ast.KindParenthesizedExpression {
-		node = parent
+		current = parent
 		parent = parent.Parent
 	}
 	if parent == nil || parent.Kind != ast.KindCallExpression {
 		return nil
 	}
-	if parent.AsCallExpression().Expression != node {
+	if parent.AsCallExpression().Expression != current {
 		return nil
 	}
 	return parent

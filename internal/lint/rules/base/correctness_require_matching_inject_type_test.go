@@ -26,8 +26,8 @@ func correctnessRequireMatchingInjectTypeCaseName(index int) string {
 // rather than through a string, and the probe captured non-rule messages alongside the findings. It
 // found no instrument noise on any of the twelve, which is worth saying because the sibling rule's
 // first measurement produced three false zeros that read exactly like clean results.
-func TestInjectTypeMatchesParameterStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestInjectTypeMatchesParameterStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		// The correct pairing. This row is what the undefined-strip exists for: the brand field is
@@ -49,7 +49,7 @@ func TestInjectTypeMatchesParameterStaysSilent(t *testing.T) {
 		"type TypedParameterDecorator<TResolved> = ParameterDecorator & {\n    readonly __resolvedType?: TResolved;\n};\ndeclare function TypedInject<T>(): TypedParameterDecorator<T>;\ndeclare function PlainInject(): ParameterDecorator;\ndeclare const Namespace: { inject<T>(): TypedParameterDecorator<T> };\nclass Service { serviceMarker = 1; }\nclass Other { otherMarker = 'x'; }\nclass SubService extends Service { extra = true; }\nexport class C { constructor(@TypedInject<Service>() private u) {} }\n",
 		// A union parameter that includes the resolved type.
 		"type TypedParameterDecorator<TResolved> = ParameterDecorator & {\n    readonly __resolvedType?: TResolved;\n};\ndeclare function TypedInject<T>(): TypedParameterDecorator<T>;\ndeclare function PlainInject(): ParameterDecorator;\ndeclare const Namespace: { inject<T>(): TypedParameterDecorator<T> };\nclass Service { serviceMarker = 1; }\nclass Other { otherMarker = 'x'; }\nclass SubService extends Service { extra = true; }\nexport class C { constructor(@TypedInject<Service>() private u: Service | Other) {} }\n",
-		// A branded decorator on something that is NOT a parameter. The contract only means anything
+		// A branded decorator on something that is not a parameter. The contract only means anything
 		// on a parameter, and no other case here places one elsewhere, so a mutant dropping the
 		// parameter-kind test survived the whole suite. All three placements measured clean against
 		// the original.
@@ -58,9 +58,9 @@ func TestInjectTypeMatchesParameterStaysSilent(t *testing.T) {
 		"type TypedParameterDecorator<TResolved> = ParameterDecorator & {\n    readonly __resolvedType?: TResolved;\n};\ndeclare function TypedInject<T>(): TypedParameterDecorator<T>;\nclass Service { serviceMarker = 1; }\nclass Other { otherMarker = 'x'; }\n@TypedInject<Service>() export class C { x = 1; }\n",
 	}
 	for index, sourceText := range cases {
-		t.Run(correctnessRequireMatchingInjectTypeCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, CorrectnessRequireMatchingInjectType,
+		test.Run(correctnessRequireMatchingInjectTypeCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, CorrectnessRequireMatchingInjectType,
 				correctnessRequireMatchingInjectTypeFile, sourceText))
 		})
 	}
@@ -68,12 +68,12 @@ func TestInjectTypeMatchesParameterStaysSilent(t *testing.T) {
 
 // TestInjectTypeMatchesParameterFires covers the shapes the original reports.
 //
-// Every row asserts the rendered message as well as the span. The message names BOTH types by their
+// Every row asserts the rendered message as well as the span. The message names both types by their
 // printed names and the decorator by its own, so it is where a port comparing the wrong pair, or
 // printing the namespace instead of the member, shows itself. The span is the parameter rather than
 // the decorator, which is the original's choice and is the half a reader changes.
-func TestInjectTypeMatchesParameterFires(t *testing.T) {
-	t.Parallel()
+func TestInjectTypeMatchesParameterFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText  string
@@ -108,7 +108,7 @@ func TestInjectTypeMatchesParameterFires(t *testing.T) {
 			wantSpan:    "plain: Other",
 			wantMessage: "@TypedInject resolves to 'Service' but parameter is typed as 'Other'",
 		},
-		// A NAMESPACED decorator, which prints the property name rather than the namespace. The
+		// A namespaced decorator, which prints the property name rather than the namespace. The
 		// message says `@inject` and not `@Namespace`, which no other row can distinguish.
 		{
 			sourceText:  "type TypedParameterDecorator<TResolved> = ParameterDecorator & {\n    readonly __resolvedType?: TResolved;\n};\ndeclare function TypedInject<T>(): TypedParameterDecorator<T>;\ndeclare function PlainInject(): ParameterDecorator;\ndeclare const Namespace: { inject<T>(): TypedParameterDecorator<T> };\nclass Service { serviceMarker = 1; }\nclass Other { otherMarker = 'x'; }\nclass SubService extends Service { extra = true; }\nexport class C { constructor(@Namespace.inject<Service>() private n: Other) {} }\n",
@@ -117,20 +117,20 @@ func TestInjectTypeMatchesParameterFires(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(correctnessRequireMatchingInjectTypeCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, CorrectnessRequireMatchingInjectType,
+		test.Run(correctnessRequireMatchingInjectTypeCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, CorrectnessRequireMatchingInjectType,
 				correctnessRequireMatchingInjectTypeFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "mismatch")
+			rule_testing.ExpectFindings(test, result, "mismatch")
 
 			onDisk := strings.TrimSpace(testCase.sourceText) + "\n"
 			diagnostic := result.Diagnostics[0]
 			gotSpan := onDisk[diagnostic.Range.Pos():diagnostic.Range.End()]
 			if gotSpan != testCase.wantSpan {
-				t.Fatalf("span: expected %q, got %q", testCase.wantSpan, gotSpan)
+				test.Fatalf("span: expected %q, got %q", testCase.wantSpan, gotSpan)
 			}
 			if diagnostic.Message.Description != testCase.wantMessage {
-				t.Fatalf("message: expected %q, got %q", testCase.wantMessage,
+				test.Fatalf("message: expected %q, got %q", testCase.wantMessage,
 					diagnostic.Message.Description)
 			}
 		})
@@ -140,21 +140,21 @@ func TestInjectTypeMatchesParameterFires(t *testing.T) {
 // TestInjectTypeMatchesParameterRequiresTheTypedHarness pins the nil-checker guard.
 //
 // A mutant removing that guard survives every other fixture here, and structurally so: the guard
-// prevents a PANIC and no findings assertion can see one. It matters more than usual for a rule in
-// this package, because the walk recovers per FILE rather than per rule, so one nil dereference
+// prevents a panic and no findings assertion can see one. It matters more than usual for a rule in
+// this package, because the walk recovers per file rather than per rule, so one nil dereference
 // costs every rule its verdict on that whole file.
 //
 // The untyped harness hands the rule a nil checker, so silence there is the guard working. The
 // second half is the control: without something that fires, a rule which can never report at all
 // satisfies the first half.
-func TestInjectTypeMatchesParameterRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestInjectTypeMatchesParameterRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	const sourceText = "type TypedParameterDecorator<TResolved> = ParameterDecorator & {\n    readonly __resolvedType?: TResolved;\n};\ndeclare function TypedInject<T>(): TypedParameterDecorator<T>;\nclass Service { serviceMarker = 1; }\nclass Other { otherMarker = 'x'; }\nexport class C { constructor(@TypedInject<Service>() private wrong: Other) {} }\n"
 
-	rule_testing.ExpectClean(t, rule_testing.Run(t, CorrectnessRequireMatchingInjectType,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, CorrectnessRequireMatchingInjectType,
 		correctnessRequireMatchingInjectTypeFile, sourceText))
 
-	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, CorrectnessRequireMatchingInjectType,
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, CorrectnessRequireMatchingInjectType,
 		correctnessRequireMatchingInjectTypeFile, sourceText), "mismatch")
 }

@@ -59,17 +59,18 @@ var markdownPerturbations = []markdownPerturbation{
 var tableCellPadding = regexp.MustCompile(`[ \t]*\|[ \t]*`)
 
 func perturbMarkdown(text string) string {
+	perturbed := text
 	for _, perturbation := range markdownPerturbations {
 		if perturbation.rows {
-			text = perturbation.pattern.ReplaceAllStringFunc(text, func(row string) string {
+			perturbed = perturbation.pattern.ReplaceAllStringFunc(perturbed, func(row string) string {
 				return tableCellPadding.ReplaceAllString(row, "|")
 			})
 			continue
 		}
-		text = perturbation.pattern.ReplaceAllString(text, perturbation.replacement)
+		perturbed = perturbation.pattern.ReplaceAllString(perturbed, perturbation.replacement)
 	}
 	// Trailing spaces on every third line, which Prettier strips outside hard breaks.
-	lines := strings.Split(text, "\n")
+	lines := strings.Split(perturbed, "\n")
 	for index := range lines {
 		if index%3 == 2 && strings.TrimSpace(lines[index]) != "" {
 			lines[index] += " "
@@ -87,11 +88,11 @@ type markdownCorpus struct {
 
 // markdownCorpora enumerates the .md files of each root the way TestCorpora does: through the engine's
 // ignore layers, and into each nested repository as a corpus of its own, with its own config.
-func markdownCorpora(t *testing.T, roots string) []markdownCorpus {
-	t.Helper()
-	enumerator, err := prettier.New(formatoptions.Default())
-	if err != nil {
-		t.Fatal(err)
+func markdownCorpora(test *testing.T, roots string) []markdownCorpus {
+	test.Helper()
+	enumerator, newPrettierError := prettier.New(formatoptions.Default())
+	if newPrettierError != nil {
+		test.Fatal(newPrettierError)
 	}
 	var corpora []markdownCorpus
 	pending := strings.Split(roots, ":")
@@ -100,7 +101,10 @@ func markdownCorpora(t *testing.T, roots string) []markdownCorpus {
 		root := strings.TrimSpace(pending[0])
 		pending = pending[1:]
 		if strings.HasPrefix(root, "~/") {
-			home, _ := os.UserHomeDir()
+			home, homeError := os.UserHomeDir()
+			if homeError != nil {
+				test.Fatalf("finding the home directory to expand %s: %v", root, homeError)
+			}
 			root = filepath.Join(home, root[2:])
 		}
 		if root == "" || seen[root] {
@@ -110,21 +114,21 @@ func markdownCorpora(t *testing.T, roots string) []markdownCorpus {
 
 		// Nested repositories regardless of root's own ignore lists, as the differential finds them
 		// (#k6vebep): a repository under a path root never formats is still a corpus.
-		nestedRepositories, err := formatfiles.NestedRepositoriesBelow(root)
-		if err != nil {
-			t.Fatalf("finding the repositories nested in %s: %v", root, err)
+		nestedRepositories, nestedRepositoriesBelowError := formatfiles.NestedRepositoriesBelow(root)
+		if nestedRepositoriesBelowError != nil {
+			test.Fatalf("finding the repositories nested in %s: %v", root, nestedRepositoriesBelowError)
 		}
 		for _, nested := range nestedRepositories {
 			pending = append(pending, filepath.Join(root, nested))
 		}
 
-		enumeration, err := enumerator.Enumerate(root)
-		if errors.Is(err, formatoptions.ErrPrettierConfigRemains) {
-			t.Logf("skipping %s, not yet adopted: %v", root, err)
+		enumeration, enumerateError := enumerator.Enumerate(root)
+		if errors.Is(enumerateError, formatoptions.ErrPrettierConfigRemains) {
+			test.Logf("skipping %s, not yet adopted: %v", root, enumerateError)
 			continue
 		}
-		if err != nil {
-			t.Fatalf("enumerating %s: %v", root, err)
+		if enumerateError != nil {
+			test.Fatalf("enumerating %s: %v", root, enumerateError)
 		}
 		var files []string
 		for _, file := range enumeration.Files {
@@ -135,15 +139,15 @@ func markdownCorpora(t *testing.T, roots string) []markdownCorpus {
 				files = append(files, file)
 			}
 		}
-		resolution, err := formatoptions.Resolve(root)
-		if errors.Is(err, formatoptions.ErrPrettierConfigRemains) {
+		resolution, resolveError := formatoptions.Resolve(root)
+		if errors.Is(resolveError, formatoptions.ErrPrettierConfigRemains) {
 			// A repository still carrying Prettier config, pinned to its own adoption (www-ahra-ai). The
 			// differential's TestCorpora refuses this for a named corpus; here it is named and skipped.
-			t.Logf("skipping %s, not yet adopted: %v", root, err)
+			test.Logf("skipping %s, not yet adopted: %v", root, resolveError)
 			continue
 		}
-		if err != nil {
-			t.Fatalf("resolving the format options for %s: %v", root, err)
+		if resolveError != nil {
+			test.Fatalf("resolving the format options for %s: %v", root, resolveError)
 		}
 		corpora = append(corpora, markdownCorpus{root: root, files: files, options: resolution.Options})
 	}
@@ -152,7 +156,7 @@ func markdownCorpora(t *testing.T, roots string) []markdownCorpus {
 	for _, corpus := range corpora {
 		measured = append(measured, fmt.Sprintf("%s (%d .md)", corpus.root, len(corpus.files)))
 	}
-	t.Logf("markdown corpora: %d\n  %s", len(corpora), strings.Join(measured, "\n  "))
+	test.Logf("markdown corpora: %d\n  %s", len(corpora), strings.Join(measured, "\n  "))
 	return corpora
 }
 
@@ -161,10 +165,17 @@ func markdownCorpora(t *testing.T, roots string) []markdownCorpus {
 // markdown then matches, the miss belongs to those languages' missing printers. A native printer is kept
 // rather than replaced because it knows its host, as the oracle run standalone does not (a lone JSX
 // element in a tsx fence keeps no semicolon only when the printer knows its parent is markdown).
-func standInEmbeds(options formatoptions.Options, engine *prettier.Engine, fellBack map[string]bool) printing.TextToDoc {
+//
+// Mutates: fellBack gains each parser the oracle stood in for, which the caller reads after the format
+// to name the languages a miss belongs to.
+func standInEmbeds(
+	options formatoptions.Options,
+	engine *prettier.Engine,
+	fellBack map[string]bool,
+) printing.TextToDoc {
 	native := TextToDoc(options, "markdown", nil)
 	return func(text string, parserOrFile string) (doc.Doc, error) {
-		if printed, err := native(text, parserOrFile); err == nil {
+		if printed, nativeError := native(text, parserOrFile); nativeError == nil {
 			return printed, nil
 		}
 		fileName := parserOrFile
@@ -174,20 +185,20 @@ func standInEmbeds(options formatoptions.Options, engine *prettier.Engine, fellB
 		if fileName == "" {
 			return nil, fmt.Errorf("no file name for parser %s", parserOrFile)
 		}
-		formatted, err := engine.Format(fileName, text)
-		if err != nil {
-			return nil, err
+		formatted, formatError := engine.Format(fileName, text)
+		if formatError != nil {
+			return nil, formatError
 		}
 		fellBack[parserOrFile] = true
 		return doc.Text(strings.TrimSuffix(formatted, "\n")), nil
 	}
 }
 
-func TestPerturbedMarkdownCorpus(t *testing.T) {
-	t.Parallel()
+func TestPerturbedMarkdownCorpus(test *testing.T) {
+	test.Parallel()
 	roots := os.Getenv("COHERE_MARKDOWN_PERTURB_CORPORA")
 	if roots == "" {
-		t.Skip("set COHERE_MARKDOWN_PERTURB_CORPORA to measure; this is a measuring run, not a unit test")
+		test.Skip("set COHERE_MARKDOWN_PERTURB_CORPORA to measure; this is a measuring run, not a unit test")
 	}
 
 	type job struct {
@@ -201,7 +212,7 @@ func TestPerturbedMarkdownCorpus(t *testing.T) {
 	}
 
 	var jobs []job
-	for _, corpus := range markdownCorpora(t, roots) {
+	for _, corpus := range markdownCorpora(test, roots) {
 		narrow := corpus.options
 		narrow.PrintWidth, narrow.TabWidth = 40, 2
 		tabs := corpus.options
@@ -224,40 +235,44 @@ func TestPerturbedMarkdownCorpus(t *testing.T) {
 			for job := range queue {
 				engine := engines[job.options]
 				if engine == nil {
-					var err error
-					if engine, err = prettier.New(job.options); err != nil {
-						outcomes <- outcome{job: job, detail: "engine: " + err.Error()}
+					var newPrettierError error
+					if engine, newPrettierError = prettier.New(job.options); newPrettierError != nil {
+						outcomes <- outcome{job: job, detail: "engine: " + newPrettierError.Error()}
 						continue
 					}
 					engines[job.options] = engine
 				}
-				source, err := os.ReadFile(job.path)
-				if err != nil {
-					outcomes <- outcome{job: job, detail: err.Error()}
+				source, readError := os.ReadFile(job.path)
+				if readError != nil {
+					outcomes <- outcome{job: job, detail: readError.Error()}
 					continue
 				}
 				input := perturbMarkdown(string(source))
-				expected, err := engine.Format(job.path, input)
-				if err != nil {
-					outcomes <- outcome{job: job, oracleFailed: true, detail: err.Error()}
+				expected, formatError := engine.Format(job.path, input)
+				if formatError != nil {
+					outcomes <- outcome{job: job, oracleFailed: true, detail: formatError.Error()}
 					continue
 				}
-				actual, err := (Formatter{Options: job.options}).Format(job.path, input)
-				if err == nil && actual == expected {
+				actual, formatError := (Formatter{Options: job.options}).Format(job.path, input)
+				if formatError == nil && actual == expected {
 					outcomes <- outcome{job: job, identical: true}
 					continue
 				}
 				result := outcome{job: job}
-				if err != nil {
-					result.detail = "error: " + err.Error()
+				if formatError != nil {
+					result.detail = "error: " + formatError.Error()
 				} else {
 					result.detail = differential.FirstDifference(expected, actual)
 				}
 				// Attribution: with the oracle's embedded output, does markdown match?
 				if len(markdown.EmbeddedParsers(input)) > 0 {
 					fellBack := map[string]bool{}
-					standIn, err := markdown.Format(input, job.options, standInEmbeds(job.options, engine, fellBack))
-					if err == nil && standIn == expected && len(fellBack) > 0 {
+					standIn, formatError := markdown.Format(
+						input,
+						job.options,
+						standInEmbeds(job.options, engine, fellBack),
+					)
+					if formatError == nil && standIn == expected && len(fellBack) > 0 {
 						var parsers []string
 						for parser := range fellBack {
 							parsers = append(parsers, parser)
@@ -282,7 +297,8 @@ func TestPerturbedMarkdownCorpus(t *testing.T) {
 
 	identical, measured, oracleFailures := 0, 0, 0
 	attributed := map[string]int{}
-	var unattributed, misses []string
+	var unattributed []string
+	var misses []string
 	for result := range outcomes {
 		if result.oracleFailed {
 			oracleFailures++
@@ -306,19 +322,19 @@ func TestPerturbedMarkdownCorpus(t *testing.T) {
 	sort.Strings(unattributed)
 	sort.Strings(misses)
 
-	t.Logf("perturbed markdown: %d/%d identical over %d inputs, %d oracle failures excluded; attributed %v",
+	test.Logf("perturbed markdown: %d/%d identical over %d inputs, %d oracle failures excluded; attributed %v",
 		identical, measured, len(jobs), oracleFailures, attributed)
 	if path := os.Getenv("COHERE_MARKDOWN_PERTURB_REPORT"); path != "" {
-		if err := os.WriteFile(path, []byte(strings.Join(misses, "\n")+"\n"), 0o644); err != nil {
-			t.Fatal(err)
+		if writeError := os.WriteFile(path, []byte(strings.Join(misses, "\n")+"\n"), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 	}
 	for index, line := range unattributed {
 		if index == 20 {
-			t.Errorf("... and %d more", len(unattributed)-20)
+			test.Errorf("... and %d more", len(unattributed)-20)
 			break
 		}
-		t.Errorf("markdown's own: %s", line)
+		test.Errorf("markdown's own: %s", line)
 	}
 }
 

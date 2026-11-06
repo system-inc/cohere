@@ -14,20 +14,22 @@ import (
 // one spelling works in both engines with no table in cohere. The core spelling keeps working too: cohere
 // ships to users with no Nexus, whose core-spelled directives must not change meaning. Flagging a
 // core-spelled directive in a house repo is the parity tool's job, which knows the twins are loaded.
-func TestTwinSpelledAndCoreSpelledDirectivesBothSilenceTheCoreRule(t *testing.T) {
-	t.Parallel()
+func TestTwinSpelledAndCoreSpelledDirectivesBothSilenceTheCoreRule(test *testing.T) {
+	test.Parallel()
 
 	for _, named := range []string{"nexus/no-use-before-define", "no-use-before-define"} {
-		t.Run(named, func(t *testing.T) {
-			t.Parallel()
+		test.Run(named, func(test *testing.T) {
+			test.Parallel()
 
-			source := "export function run() {\n    // eslint-disable-next-line " + named + " -- the cycle cannot run early\n    return later();\n}\nfunction later() {\n    return 1;\n}\n"
+			source := "export function run() {\n    // eslint-disable-next-line " +
+				named +
+				" -- the cycle cannot run early\n    return later();\n}\nfunction later() {\n    return 1;\n}\n"
 			index := Build(source)
 			if !index.Suppresses("no-use-before-define", strings.Index(source, "later();")) {
-				t.Fatalf("a directive naming %s did not silence no-use-before-define on the line below", named)
+				test.Fatalf("a directive naming %s did not silence no-use-before-define on the line below", named)
 			}
 			if index.AppliedCount(0) != 1 || len(index.Unused()) != 0 {
-				t.Fatalf("the directive naming %s applied %d times and %d directives read unused, want 1 and 0",
+				test.Fatalf("the directive naming %s applied %d times and %d directives read unused, want 1 and 0",
 					named, index.AppliedCount(0), len(index.Unused()))
 			}
 		})
@@ -37,9 +39,9 @@ func TestTwinSpelledAndCoreSpelledDirectivesBothSilenceTheCoreRule(t *testing.T)
 	source := "export function run() {\n    // eslint-disable-next-line nexus/no-use-before-define -- the cycle cannot run early\n    return later();\n}\nfunction later() {\n    return 1;\n}\n"
 	index := Build(source)
 	if index.Suppresses("require-await", strings.Index(source, "later();")) {
-		t.Fatal("a directive naming nexus/no-use-before-define silenced require-await")
+		test.Fatal("a directive naming nexus/no-use-before-define silenced require-await")
 	}
 	if len(index.Unused()) != 1 {
-		t.Fatalf("a directive that silenced nothing read as used: %d unused", len(index.Unused()))
+		test.Fatalf("a directive that silenced nothing read as used: %d unused", len(index.Unused()))
 	}
 }

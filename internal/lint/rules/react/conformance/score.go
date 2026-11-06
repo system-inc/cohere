@@ -22,11 +22,6 @@ type Implementation interface {
 	Analyze(fixture Fixture) (Result, error)
 }
 
-// ErrUnsupported is what an Implementation returns for a fixture it cannot handle.
-type ErrUnsupported struct{ Reason string }
-
-func (e *ErrUnsupported) Error() string { return "unsupported: " + e.Reason }
-
 // Outcome is what happened to one fixture.
 type Outcome string
 
@@ -43,7 +38,7 @@ const (
 	OutcomeDeclined Outcome = "Declined"
 
 	// OutcomeExcluded means the runner itself declined the fixture before the implementation saw
-	// it — today only for requiring a Flow parser. A stated exclusion with a count, never a skip.
+	// it, today only for requiring a Flow parser. A stated exclusion with a count, never a skip.
 	OutcomeExcluded Outcome = "Excluded"
 
 	// OutcomeRefused means an unrecognised pragma stopped the fixture from being scored at all.
@@ -67,7 +62,7 @@ type FixtureScore struct {
 //
 // The counters exist because "0 passed" and "found nothing to run" print the same digit. Considered
 // is the denominator the score is honest about, and every fixture lands in exactly one outcome
-// bucket, asserted rather than assumed — see `Score.Check`.
+// bucket, asserted rather than assumed; see `Score.Check`.
 type Score struct {
 	// Considered is every fixture loaded, including ones never handed to the implementation.
 	Considered int
@@ -86,16 +81,20 @@ type Score struct {
 // This is the guard on the guard. If a future outcome is added and its counter is not summed here,
 // the arithmetic stops adding up and says so, rather than quietly under-reporting the denominator
 // and making a partial run look like a complete one.
-func (s Score) Check() error {
-	sum := s.Passed + s.Failed + s.Declined + s.Excluded + s.Refused
-	if sum != s.Considered {
+func (score Score) Check() error {
+	sum := score.Passed + score.Failed + score.Declined + score.Excluded + score.Refused
+	if sum != score.Considered {
 		return fmt.Errorf(
 			"score does not partition the corpus: considered %d but outcomes sum to %d (passed %d, failed %d, declined %d, excluded %d, refused %d)",
-			s.Considered, sum, s.Passed, s.Failed, s.Declined, s.Excluded, s.Refused,
+			score.Considered, sum, score.Passed, score.Failed, score.Declined, score.Excluded, score.Refused,
 		)
 	}
-	if s.Considered != len(s.Fixtures) {
-		return fmt.Errorf("score considered %d fixtures but recorded %d verdicts", s.Considered, len(s.Fixtures))
+	if score.Considered != len(score.Fixtures) {
+		return fmt.Errorf(
+			"score considered %d fixtures but recorded %d verdicts",
+			score.Considered,
+			len(score.Fixtures),
+		)
 	}
 	return nil
 }
@@ -104,10 +103,10 @@ func (s Score) Check() error {
 //
 // It always states the denominator and always states what was not scored, because "0 / 325" and
 // "0 / 0" differ by exactly the fact this suite is built to keep visible.
-func (s Score) Summary() string {
+func (score Score) Summary() string {
 	return fmt.Sprintf(
 		"%d / %d passed (failed %d, declined %d, excluded %d, refused %d) against facebook/react@%s",
-		s.Passed, s.Considered, s.Failed, s.Declined, s.Excluded, s.Refused, UpstreamSha[:12],
+		score.Passed, score.Considered, score.Failed, score.Declined, score.Excluded, score.Refused, UpstreamSha[:12],
 	)
 }
 
@@ -128,8 +127,8 @@ func Run(fixtures []Fixture, implementation Implementation, options Options) (Sc
 	score := Score{Considered: len(fixtures)}
 
 	for _, fixture := range fixtures {
-		if err := CheckPragmas(fixture.Name, fixture.Pragmas); err != nil {
-			return Score{}, err
+		if checkPragmasError := CheckPragmas(fixture.Name, fixture.Pragmas); checkPragmasError != nil {
+			return Score{}, checkPragmasError
 		}
 	}
 
@@ -144,10 +143,10 @@ func Run(fixtures []Fixture, implementation Implementation, options Options) (Sc
 			continue
 		}
 
-		result, err := implementation.Analyze(fixture)
-		if err != nil {
+		result, analyzeError := implementation.Analyze(fixture)
+		if analyzeError != nil {
 			var unsupported *ErrUnsupported
-			if asUnsupported(err, &unsupported) {
+			if asUnsupported(analyzeError, &unsupported) {
 				score.Declined++
 				score.Fixtures = append(score.Fixtures, FixtureScore{
 					Name:           fixture.Name,
@@ -157,7 +156,7 @@ func Run(fixtures []Fixture, implementation Implementation, options Options) (Sc
 				})
 				continue
 			}
-			return Score{}, fmt.Errorf("%s: %w", fixture.Name, err)
+			return Score{}, fmt.Errorf("%s: %w", fixture.Name, analyzeError)
 		}
 
 		verdict := Compare(fixture.Expected, result)
@@ -171,23 +170,27 @@ func Run(fixtures []Fixture, implementation Implementation, options Options) (Sc
 		score.Fixtures = append(score.Fixtures, verdict)
 	}
 
-	if err := score.Check(); err != nil {
-		return Score{}, err
+	if checkError := score.Check(); checkError != nil {
+		return Score{}, checkError
 	}
 	return score, nil
 }
 
-func asUnsupported(err error, target **ErrUnsupported) bool {
-	for err != nil {
-		if unsupported, ok := err.(*ErrUnsupported); ok {
+// asUnsupported reports whether an *ErrUnsupported is in the chain err unwraps to.
+//
+// Mutates: target receives the *ErrUnsupported found, as errors.As fills its target
+func asUnsupported(candidateError error, target **ErrUnsupported) bool {
+	current := candidateError
+	for current != nil {
+		if unsupported, ok := current.(*ErrUnsupported); ok {
 			*target = unsupported
 			return true
 		}
-		unwrapper, ok := err.(interface{ Unwrap() error })
+		unwrapper, ok := current.(interface{ Unwrap() error })
 		if !ok {
 			return false
 		}
-		err = unwrapper.Unwrap()
+		current = unwrapper.Unwrap()
 	}
 	return false
 }
@@ -225,18 +228,25 @@ func Compare(expected Expectation, result Result) FixtureScore {
 	}
 	got := map[pair]int{}
 	for _, reportedError := range result.Errors {
-		got[pair{reportedError.Heading, reportedError.Message, reportedError.Line}]++
+		got[pair(reportedError)]++
 	}
 
-	var missing, unexpected []string
+	var missing []string
+	var unexpected []string
 	for key, count := range want {
 		if got[key] < count {
-			missing = append(missing, fmt.Sprintf("%s: %s (line %d) x%d", key.Heading, key.Message, key.Line, count-got[key]))
+			missing = append(
+				missing,
+				fmt.Sprintf("%s: %s (line %d) x%d", key.Heading, key.Message, key.Line, count-got[key]),
+			)
 		}
 	}
 	for key, count := range got {
 		if want[key] < count {
-			unexpected = append(unexpected, fmt.Sprintf("%s: %s (line %d) x%d", key.Heading, key.Message, key.Line, count-want[key]))
+			unexpected = append(
+				unexpected,
+				fmt.Sprintf("%s: %s (line %d) x%d", key.Heading, key.Message, key.Line, count-want[key]),
+			)
 		}
 	}
 	sort.Strings(missing)
@@ -261,18 +271,4 @@ func Compare(expected Expectation, result Result) FixtureScore {
 	}
 	verdict.Detail = strings.Join(detail, " | ")
 	return verdict
-}
-
-// NothingImplemented is the Implementation used until a real one exists.
-//
-// It declines every fixture. It does NOT return an empty result, and the difference is the whole
-// reason the type is written out rather than left as a nil check: an empty result asserts "no
-// errors here", which is a wrong answer on a corpus where every fixture expects at least one, and
-// would score as 325 failures — a number that looks like a working implementation doing badly
-// rather than an absent one.
-type NothingImplemented struct{}
-
-// Analyze declines.
-func (NothingImplemented) Analyze(Fixture) (Result, error) {
-	return Result{}, &ErrUnsupported{Reason: "no React compiler rules are implemented in cohere yet"}
 }

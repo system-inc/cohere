@@ -32,12 +32,9 @@ package differential
 
 import (
 	"bufio"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"sync"
 
@@ -91,64 +88,6 @@ type FileResult struct {
 	Detail string
 }
 
-// Tally counts outcomes for one language.
-type Tally struct {
-	Identical        int
-	Different        int
-	CandidateRefused int
-	OracleFailed     int
-
-	// RewriteIdentical and RewriteTotal are the same count restricted to files the oracle rewrites.
-	RewriteIdentical int
-	RewriteTotal     int
-}
-
-// Measured is the denominator: every file with a correct answer to match.
-func (tally Tally) Measured() int {
-	return tally.Identical + tally.Different + tally.CandidateRefused
-}
-
-// Percent is the identity rate over measured files. A tally with nothing measured reports zero rather
-// than dividing by zero or claiming a perfect score over an empty set.
-func (tally Tally) Percent() float64 {
-	if tally.Measured() == 0 {
-		return 0
-	}
-	return 100 * float64(tally.Identical) / float64(tally.Measured())
-}
-
-// RewritePercent is the identity rate over files the oracle rewrites.
-func (tally Tally) RewritePercent() float64 {
-	if tally.RewriteTotal == 0 {
-		return 0
-	}
-	return 100 * float64(tally.RewriteIdentical) / float64(tally.RewriteTotal)
-}
-
-// Report is one corpus measured.
-type Report struct {
-	// Root is the corpus that was walked. A percentage means nothing without the root it was taken
-	// against, which is how a measurement silently covers half a tree.
-	Root string
-
-	ByLanguage map[string]*Tally
-	Files      []FileResult
-}
-
-// Total sums every language.
-func (report Report) Total() Tally {
-	total := Tally{}
-	for _, tally := range report.ByLanguage {
-		total.Identical += tally.Identical
-		total.Different += tally.Different
-		total.CandidateRefused += tally.CandidateRefused
-		total.OracleFailed += tally.OracleFailed
-		total.RewriteIdentical += tally.RewriteIdentical
-		total.RewriteTotal += tally.RewriteTotal
-	}
-	return total
-}
-
 // Language buckets a file by what parses it, which is what the port is organized by. An Adamic `.a` file is
 // parsed as TypeScript, so it buckets with `.ts` (#6mhafvb).
 func Language(fileName string) string {
@@ -179,28 +118,34 @@ func Language(fileName string) string {
 // The oracle side goes through the cache when one is given, because the oracle is deterministic in its
 // bundle digest, its options and the file's bytes, and it is by far the slower side. Re-reading the
 // progress number should cost the candidate's time, not Prettier's.
-func Compare(root string, files []string, newOracle NewFormatter, newCandidate NewFormatter, workers int, cache *OracleCache) (Report, error) {
-	if workers < 1 {
-		workers = 1
-	}
+func Compare(
+	root string,
+	files []string,
+	newOracle NewFormatter,
+	newCandidate NewFormatter,
+	workers int,
+	cache *OracleCache,
+) (Report, error) {
+	// At least one worker, so a zero or negative count still compares every file.
+	workerCount := max(workers, 1)
 
 	results := make([]FileResult, len(files))
 	indexes := make(chan int)
-	errs := make(chan error, workers)
+	errs := make(chan error, workerCount)
 	var group sync.WaitGroup
 
-	for worker := 0; worker < workers; worker++ {
+	for worker := 0; worker < workerCount; worker++ {
 		group.Add(1)
 		go func() {
 			defer group.Done()
-			oracle, err := newOracle()
-			if err != nil {
-				errs <- fmt.Errorf("building the oracle: %w", err)
+			oracle, newOracleError := newOracle()
+			if newOracleError != nil {
+				errs <- fmt.Errorf("building the oracle: %w", newOracleError)
 				return
 			}
-			candidate, err := newCandidate()
-			if err != nil {
-				errs <- fmt.Errorf("building the candidate: %w", err)
+			candidate, newCandidateError := newCandidate()
+			if newCandidateError != nil {
+				errs <- fmt.Errorf("building the candidate: %w", newCandidateError)
 				return
 			}
 			for index := range indexes {
@@ -211,18 +156,18 @@ func Compare(root string, files []string, newOracle NewFormatter, newCandidate N
 
 	for index := range files {
 		select {
-		case err := <-errs:
+		case receivedError := <-errs:
 			close(indexes)
 			group.Wait()
-			return Report{}, err
+			return Report{}, receivedError
 		case indexes <- index:
 		}
 	}
 	close(indexes)
 	group.Wait()
 	select {
-	case err := <-errs:
-		return Report{}, err
+	case receivedError := <-errs:
+		return Report{}, receivedError
 	default:
 	}
 
@@ -258,18 +203,18 @@ func Compare(root string, files []string, newOracle NewFormatter, newCandidate N
 func compareOne(path string, oracle Formatter, candidate Formatter, cache *OracleCache) FileResult {
 	result := FileResult{Path: path, Language: Language(path)}
 
-	source, err := os.ReadFile(path)
-	if err != nil {
+	source, readError := os.ReadFile(path)
+	if readError != nil {
 		result.Outcome = OracleFailed
-		result.Detail = "reading the file: " + err.Error()
+		result.Detail = "reading the file: " + readError.Error()
 		return result
 	}
 	text := string(source)
 
-	expected, err := cache.format(oracle, path, text)
-	if err != nil {
+	expected, formatError := cache.format(oracle, path, text)
+	if formatError != nil {
 		result.Outcome = OracleFailed
-		result.Detail = err.Error()
+		result.Detail = formatError.Error()
 		return result
 	}
 	result.OracleRewrites = expected != text
@@ -279,10 +224,10 @@ func compareOne(path string, oracle Formatter, candidate Formatter, cache *Oracl
 		result.Detail = "the candidate does not handle this file type"
 		return result
 	}
-	actual, err := candidate.Format(path, text)
-	if err != nil {
+	actual, formatError := candidate.Format(path, text)
+	if formatError != nil {
 		result.Outcome = CandidateRefused
-		result.Detail = err.Error()
+		result.Detail = formatError.Error()
 		return result
 	}
 
@@ -303,7 +248,8 @@ func FirstDifference(expected string, actual string) string {
 	expectedLines := strings.Split(expected, "\n")
 	actualLines := strings.Split(actual, "\n")
 	for line := 0; line < len(expectedLines) || line < len(actualLines); line++ {
-		var want, got string
+		var want string
+		var got string
 		if line < len(expectedLines) {
 			want = expectedLines[line]
 		}
@@ -325,89 +271,10 @@ func truncate(line string) string {
 	return line[:limit] + "…"
 }
 
-// Summary renders a report for a terminal: per language, then the total, then failures by name.
-func (report Report) Summary() string {
-	var builder strings.Builder
-	fmt.Fprintf(&builder, "corpus %s\n", report.Root)
-
-	languages := make([]string, 0, len(report.ByLanguage))
-	for language := range report.ByLanguage {
-		languages = append(languages, language)
-	}
-	sort.Strings(languages)
-
-	row := func(name string, tally Tally) {
-		fmt.Fprintf(&builder, "  %-8s %6.2f%%  %5d/%-5d identical  rewrites %6.2f%% (%d/%d)  refused %d  oracle failed %d\n",
-			name, tally.Percent(), tally.Identical, tally.Measured(),
-			tally.RewritePercent(), tally.RewriteIdentical, tally.RewriteTotal,
-			tally.CandidateRefused, tally.OracleFailed)
-	}
-	for _, language := range languages {
-		row(language, *report.ByLanguage[language])
-	}
-	row("total", report.Total())
-
-	for _, result := range report.Files {
-		if result.Outcome == OracleFailed {
-			fmt.Fprintf(&builder, "  oracle failed: %s: %s\n", result.Path, firstLine(result.Detail))
-		}
-	}
-	return builder.String()
-}
-
 func firstLine(text string) string {
 	scanner := bufio.NewScanner(strings.NewReader(text))
 	if scanner.Scan() {
 		return scanner.Text()
 	}
 	return text
-}
-
-// OracleCache stores oracle output on disk, keyed by everything the output depends on.
-//
-// The key is the bundle digest, a description of the options, the file name (the parser is chosen by
-// it) and the file's bytes. Leave any of those out and a stale answer is served for a changed input,
-// which would make the harness report a match against an oracle that no longer exists. A nil cache
-// formats every time.
-type OracleCache struct {
-	Directory string
-
-	// Identity is the bundle digest plus the options, everything about the oracle that is not the file.
-	Identity string
-}
-
-func (cache *OracleCache) format(oracle Formatter, path string, text string) (string, error) {
-	if cache == nil {
-		return oracle.Format(path, text)
-	}
-
-	hash := sha256.New()
-	fmt.Fprintf(hash, "%s\x00%s\x00%d\x00", cache.Identity, filepath.Base(path), len(text))
-	hash.Write([]byte(text))
-	key := hex.EncodeToString(hash.Sum(nil))
-	entry := filepath.Join(cache.Directory, key[:2], key)
-
-	if cached, err := os.ReadFile(entry); err == nil {
-		return string(cached), nil
-	}
-
-	formatted, err := oracle.Format(path, text)
-	if err != nil {
-		return "", err
-	}
-	// A unique temporary per writer, then rename. Two workers can hold the same file (a duplicated
-	// fixture, a copied config) and would otherwise write one shared temporary at the same instant.
-	// The cache is an optimization, so any failure here is swallowed and the answer still returned.
-	if err := os.MkdirAll(filepath.Dir(entry), 0o755); err == nil {
-		if temporary, err := os.CreateTemp(filepath.Dir(entry), key+".*.tmp"); err == nil {
-			_, writeError := temporary.WriteString(formatted)
-			closeError := temporary.Close()
-			if writeError == nil && closeError == nil {
-				_ = os.Rename(temporary.Name(), entry)
-			} else {
-				_ = os.Remove(temporary.Name())
-			}
-		}
-	}
-	return formatted, nil
 }

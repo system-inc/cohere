@@ -10,7 +10,10 @@ import (
 
 // consistencyNoHandBuiltDeclaredErrorText is the rule's message, whose wording lives in
 // `policy/messages/consistency-no-hand-built-declared-error.json`.
-var consistencyNoHandBuiltDeclaredErrorText = policy.MessageOf("base/consistency-no-hand-built-declared-error", "consistencyNoHandBuiltDeclaredError")
+var consistencyNoHandBuiltDeclaredErrorText = policy.MessageOf(
+	"base/consistency-no-hand-built-declared-error",
+	"consistencyNoHandBuiltDeclaredError",
+)
 
 // messageNoHandBuiltDeclaredError is the rule's single finding.
 //
@@ -68,14 +71,14 @@ func messageNoHandBuiltDeclaredError() rule.Message {
 //
 // One kind test per `new` expression, and the checker is never consulted: the judgment is entirely
 // syntactic. The filename exemption is two suffix comparisons per file.
-var ConsistencyNoHandBuiltDeclaredError = rule.Rule{
+var ConsistencyNoHandBuiltDeclaredError = rule.Rule[rule.NoOptions]{
 	Name: "base/consistency-no-hand-built-declared-error",
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
-		if isNoHandBuiltDeclaredErrorExemptFile(ctx.SourceFile.FileName().AsString()) {
+		if isNoHandBuiltDeclaredErrorExemptFile(ruleContext.SourceFile.FileName().AsString()) {
 			return nil
 		}
 
@@ -106,7 +109,7 @@ var ConsistencyNoHandBuiltDeclaredError = rule.Rule{
 
 				// The finding points at the whole `new` expression, which is the original's
 				// `node`, rather than at the option that triggered it.
-				ctx.ReportNode(node, messageNoHandBuiltDeclaredError())
+				ruleContext.ReportNode(node, messageNoHandBuiltDeclaredError())
 			},
 		}
 	},
@@ -125,7 +128,7 @@ func isNoHandBuiltDeclaredErrorExemptFile(fileName string) bool {
 // objectLiteralNamesIdentifier answers whether an options object has an `identifier` property.
 //
 // The original tests `property.type === 'Property' && property.key.type === 'Identifier' &&
-// property.key.name === 'identifier'`, so three shapes it does NOT count are reproduced here: a
+// property.key.name === 'identifier'`, so three shapes it does not count are reproduced here: a
 // spread carrying the option, a computed key, and a string-literal key. Each is a place the rule
 // knowingly misses, and widening any of them would report inputs the original is silent on.
 func objectLiteralNamesIdentifier(options *ast.Node) bool {
@@ -134,7 +137,7 @@ func objectLiteralNamesIdentifier(options *ast.Node) bool {
 		return false
 	}
 	for _, property := range properties.Nodes {
-		// A shorthand `{ identifier }` is a different node kind here and IS counted, because in
+		// A shorthand `{ identifier }` is a different node kind here and is counted, because in
 		// estree it is a `Property` whose key is an Identifier named `identifier`, exactly what the
 		// original tests. Our parser splits the two spellings across two kinds.
 		switch property.Kind {

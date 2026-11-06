@@ -20,14 +20,14 @@ import (
 // `app/_theme/styles/theme.css`, is probed and missed and must be recorded absent: creating it would
 // change which stylesheet is the entry. The entry imports `extra.css`, which only the engine reads,
 // and which must be recorded present.
-func TestDesignSystemReadsAreRunCacheInputs(t *testing.T) {
-	t.Parallel()
-	packageRoot := classOrderFixturePackageRoot()
+func TestDesignSystemReadsAreRunCacheInputs(test *testing.T) {
+	test.Parallel()
+	packageRoot := classOrderFixturePackageRoot(test)
 	if packageRoot == "" {
-		t.Skip("no installed tailwindcss on this machine, so there is no design system to load")
+		test.Skip("no installed tailwindcss on this machine, so there is no design system to load")
 	}
 
-	directory := t.TempDir()
+	directory := test.TempDir()
 	files := map[string]string{
 		"tsconfig.json":   `{"compilerOptions": {"strict": true, "target": "ES2022", "lib": ["ES2022"], "jsx": "preserve", "types": []}, "include": ["**/*.tsx"]}`,
 		"Component.tsx":   `export const element = <div className="flex" />;`,
@@ -36,34 +36,40 @@ func TestDesignSystemReadsAreRunCacheInputs(t *testing.T) {
 	}
 	for name, contents := range files {
 		path := filepath.Join(directory, name)
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			t.Fatal(err)
+		if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
+			test.Fatal(createDirectoryError)
 		}
-		if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
-			t.Fatal(err)
+		if writeError := os.WriteFile(path, []byte(contents), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 	}
-	if err := os.MkdirAll(filepath.Join(directory, "node_modules"), 0o755); err != nil {
-		t.Fatal(err)
+	if createDirectoryError := os.MkdirAll(
+		filepath.Join(directory, "node_modules"),
+		0o755,
+	); createDirectoryError != nil {
+		test.Fatal(createDirectoryError)
 	}
-	if err := os.Symlink(packageRoot, filepath.Join(directory, "node_modules", "tailwindcss")); err != nil {
-		t.Fatal(err)
+	if symlinkError := os.Symlink(
+		packageRoot,
+		filepath.Join(directory, "node_modules", "tailwindcss"),
+	); symlinkError != nil {
+		test.Fatal(symlinkError)
 	}
 
 	recorder := program.NewInputRecorder()
-	graph, err := program.Build(program.Options{
+	graph, buildError := program.Build(program.Options{
 		ConfigFileName:   filepath.Join(directory, "tsconfig.json"),
 		CurrentDirectory: directory,
 		SingleThreaded:   true,
 		Inputs:           recorder,
 	})
-	if err != nil {
-		t.Fatalf("building the program: %v", err)
+	if buildError != nil {
+		test.Fatalf("building the program: %v", buildError)
 	}
 
 	result := DesignSystemForProgram(designSystemProgram(graph.Program))
-	if result.Err != nil {
-		t.Fatalf("the design system did not load, so this proves nothing: %v", result.Err)
+	if result.Error != nil {
+		test.Fatalf("the design system did not load, so this proves nothing: %v", result.Error)
 	}
 
 	present, absent, _ := recorder.Inputs()
@@ -78,16 +84,16 @@ func TestDesignSystemReadsAreRunCacheInputs(t *testing.T) {
 
 	for _, stylesheet := range []string{"/app/globals.css", "/app/extra.css"} {
 		if !hasSuffix(present, stylesheet) {
-			t.Errorf("%s was read by the design system and is not a recorded input, so editing it would "+
+			test.Errorf("%s was read by the design system and is not a recorded input, so editing it would "+
 				"replay a stale run", stylesheet)
 		}
 	}
 	if !hasSuffix(absent, "/app/_theme/styles/theme.css") {
-		t.Errorf("the first entry-point candidate was probed and missed and is not recorded absent, so " +
+		test.Errorf("the first entry-point candidate was probed and missed and is not recorded absent, so " +
 			"creating it would not invalidate a run whose entry it would replace")
 	}
 	if hasSuffix(present, "/app/_theme/styles/theme.css") {
-		t.Errorf("a candidate that does not exist is recorded present")
+		test.Errorf("a candidate that does not exist is recorded present")
 	}
 
 	// The design system's own read set, which the findings cache keys the Tailwind rules on
@@ -103,12 +109,12 @@ func TestDesignSystemReadsAreRunCacheInputs(t *testing.T) {
 	}
 	for _, stylesheet := range []string{"/app/globals.css", "/app/extra.css"} {
 		if !hasSuffix(readPresent, stylesheet) {
-			t.Errorf("%s is missing from the design system's read set, so a cache keyed on it would replay "+
+			test.Errorf("%s is missing from the design system's read set, so a cache keyed on it would replay "+
 				"the Tailwind rules after it changed", stylesheet)
 		}
 	}
 	if !hasSuffix(readAbsent, "/app/_theme/styles/theme.css") {
-		t.Errorf("the missed entry-point candidate is missing from the design system's read set as absent")
+		test.Errorf("the missed entry-point candidate is missing from the design system's read set as absent")
 	}
 	recorded := map[string]bool{}
 	for _, path := range append(present, absent...) {
@@ -116,7 +122,7 @@ func TestDesignSystemReadsAreRunCacheInputs(t *testing.T) {
 	}
 	for _, read := range result.Reads {
 		if !recorded[read.Path] {
-			t.Errorf("the design system read %s and the run cache's recorder did not see it", read.Path)
+			test.Errorf("the design system read %s and the run cache's recorder did not see it", read.Path)
 		}
 	}
 }

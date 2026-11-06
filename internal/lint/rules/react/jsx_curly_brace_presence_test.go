@@ -14,19 +14,19 @@ import (
 // because two of the three defaults are not zero values and one of the two accepted wire shapes is
 // a bare string. A fixture that built `JsxCurlyBracePresenceOptions` directly would exercise
 // neither, and both are exactly the lines with no upstream counterpart.
-func jsxCurlyBracePresenceRun(t *testing.T, source string, optionsJson string) rule_testing.Result {
-	t.Helper()
+func jsxCurlyBracePresenceRun(test *testing.T, source string, optionsJson string) rule_testing.Result {
+	test.Helper()
 
-	decoded, err := DecodeJsxCurlyBracePresenceOptions([]byte(optionsJson))
-	if err != nil {
-		t.Fatalf("decoding options %q: %v", optionsJson, err)
+	decoded, decodeJsxCurlyBracePresenceOptionsError := DecodeJsxCurlyBracePresenceOptions([]byte(optionsJson))
+	if decodeJsxCurlyBracePresenceOptionsError != nil {
+		test.Fatalf("decoding options %q: %v", optionsJson, decodeJsxCurlyBracePresenceOptionsError)
 	}
-	return rule_testing.RunWithOptions(t, JsxCurlyBracePresence, "component.tsx", source, decoded)
+	return rule_testing.RunWithOptions(test, JsxCurlyBracePresence, "component.tsx", source, decoded)
 }
 
 // Clean cases, imported verbatim from upstream's corpus.
-func TestJsxCurlyBracePresenceStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestJsxCurlyBracePresenceStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	for index, testCase := range []struct {
 		source  string
@@ -45,8 +45,14 @@ func TestJsxCurlyBracePresenceStaysSilent(t *testing.T) {
 		{source: "<App>{'        '}</App>", options: "{\"children\":\"always\"}"},
 		{source: "<App {...props}>foo</App>", options: "{\"props\":\"always\"}"},
 		{source: "<App>{`Hello ${word} World`}</App>", options: "{\"children\":\"never\"}"},
-		{source: "\n        <React.Fragment>\n          foo{' '}\n          <span>bar</span>\n        </React.Fragment>\n      ", options: "{\"children\":\"never\"}"},
-		{source: "\n        <>\n          foo{' '}\n          <span>bar</span>\n        </>\n      ", options: "{\"children\":\"never\"}"},
+		{
+			source:  "\n        <React.Fragment>\n          foo{' '}\n          <span>bar</span>\n        </React.Fragment>\n      ",
+			options: "{\"children\":\"never\"}",
+		},
+		{
+			source:  "\n        <>\n          foo{' '}\n          <span>bar</span>\n        </>\n      ",
+			options: "{\"children\":\"never\"}",
+		},
 		{source: "<App>{`Hello \\n World`}</App>", options: "{\"children\":\"never\"}"},
 		{source: "<App>{`Hello ${word} World`}{`foo`}</App>", options: "{\"children\":\"never\"}"},
 		{source: "<App prop={`foo ${word} bar`}>foo</App>", options: "{\"props\":\"never\"}"},
@@ -74,8 +80,14 @@ func TestJsxCurlyBracePresenceStaysSilent(t *testing.T) {
 		{source: "<MyComponent>foo</MyComponent>", options: "{\"children\":\"ignore\"}"},
 		{source: "<MyComponent prop='bar'>foo</MyComponent>", options: "{\"props\":\"ignore\"}"},
 		{source: "<MyComponent prop=\"bar\">foo</MyComponent>", options: "{\"props\":\"ignore\"}"},
-		{source: "<MyComponent prop='bar'>{'foo'}</MyComponent>", options: "{\"children\":\"always\",\"props\":\"never\"}"},
-		{source: "<MyComponent prop={'bar'}>foo</MyComponent>", options: "{\"children\":\"never\",\"props\":\"always\"}"},
+		{
+			source:  "<MyComponent prop='bar'>{'foo'}</MyComponent>",
+			options: "{\"children\":\"always\",\"props\":\"never\"}",
+		},
+		{
+			source:  "<MyComponent prop={'bar'}>foo</MyComponent>",
+			options: "{\"children\":\"never\",\"props\":\"always\"}",
+		},
 		{source: "<MyComponent prop={'bar'}>{'foo'}</MyComponent>", options: "\"always\""},
 		{source: "<MyComponent prop={\"bar\"}>{\"foo\"}</MyComponent>", options: "\"always\""},
 		{source: "<MyComponent prop={\"bar\"} attr={'foo'} />", options: "\"always\""},
@@ -96,43 +108,79 @@ func TestJsxCurlyBracePresenceStaysSilent(t *testing.T) {
 		{source: "<a a={\"start\\/n\\/nend\"}/>", options: "\"never\""},
 		{source: "\n        <App prop={`\n          a\n          b\n        `} />\n      ", options: "\"never\""},
 		{source: "\n        <App prop={`\n          a\n          b\n        `} />\n      ", options: "\"always\""},
-		{source: "\n        <App>\n          {`\n            a\n            b\n          `}\n        </App>\n      ", options: "\"never\""},
+		{
+			source:  "\n        <App>\n          {`\n            a\n            b\n          `}\n        </App>\n      ",
+			options: "\"never\"",
+		},
 		{source: "\n        <App>{`\n          a\n          b\n        `}</App>\n      ", options: "\"always\""},
-		{source: "\n        <MyComponent>\n          %\n        </MyComponent>\n      ", options: "{\"children\":\"never\"}"},
-		{source: "\n        <MyComponent>\n          { 'space after ' }\n          <b>foo</b>\n          { ' space before' }\n        </MyComponent>\n      ", options: "{\"children\":\"never\"}"},
-		{source: "\n        <MyComponent>\n          { `space after ` }\n          <b>foo</b>\n          { ` space before` }\n        </MyComponent>\n      ", options: "{\"children\":\"never\"}"},
-		{source: "\n        <MyComponent>\n          foo\n          <div>bar</div>\n        </MyComponent>\n      ", options: "{\"children\":\"never\"}"},
+		{
+			source:  "\n        <MyComponent>\n          %\n        </MyComponent>\n      ",
+			options: "{\"children\":\"never\"}",
+		},
+		{
+			source:  "\n        <MyComponent>\n          { 'space after ' }\n          <b>foo</b>\n          { ' space before' }\n        </MyComponent>\n      ",
+			options: "{\"children\":\"never\"}",
+		},
+		{
+			source:  "\n        <MyComponent>\n          { `space after ` }\n          <b>foo</b>\n          { ` space before` }\n        </MyComponent>\n      ",
+			options: "{\"children\":\"never\"}",
+		},
+		{
+			source:  "\n        <MyComponent>\n          foo\n          <div>bar</div>\n        </MyComponent>\n      ",
+			options: "{\"children\":\"never\"}",
+		},
 		{source: "\n        <MyComponent p={<Foo>Bar</Foo>}>\n        </MyComponent>\n      ", options: ""},
-		{source: "\n        <MyComponent>\n          <div>\n            <p>\n              <span>\n                {\"foo\"}\n              </span>\n            </p>\n          </div>\n        </MyComponent>\n      ", options: "{\"children\":\"always\"}"},
-		{source: "\n        <App>\n          <Component />&nbsp;\n          &nbsp;\n        </App>\n      ", options: "{\"children\":\"always\"}"},
-		{source: "\n        const Component2 = () => {\n          return <span>/*</span>;\n        };\n      ", options: ""},
-		{source: "\n        const Component2 = () => {\n          return <span>/*</span>;\n        };\n      ", options: "{\"props\":\"never\",\"children\":\"never\"}"},
-		{source: "\n        import React from \"react\";\n\n        const Component = () => {\n          return <span>{\"/*\"}</span>;\n        };\n      ", options: "{\"props\":\"never\",\"children\":\"never\"}"},
+		{
+			source:  "\n        <MyComponent>\n          <div>\n            <p>\n              <span>\n                {\"foo\"}\n              </span>\n            </p>\n          </div>\n        </MyComponent>\n      ",
+			options: "{\"children\":\"always\"}",
+		},
+		{
+			source:  "\n        <App>\n          <Component />&nbsp;\n          &nbsp;\n        </App>\n      ",
+			options: "{\"children\":\"always\"}",
+		},
+		{
+			source:  "\n        const Component2 = () => {\n          return <span>/*</span>;\n        };\n      ",
+			options: "",
+		},
+		{
+			source:  "\n        const Component2 = () => {\n          return <span>/*</span>;\n        };\n      ",
+			options: "{\"props\":\"never\",\"children\":\"never\"}",
+		},
+		{
+			source:  "\n        import React from \"react\";\n\n        const Component = () => {\n          return <span>{\"/*\"}</span>;\n        };\n      ",
+			options: "{\"props\":\"never\",\"children\":\"never\"}",
+		},
 		{source: "<App>{/* comment */}</App>", options: ""},
 		{source: "<App>{/* comment */ <Foo />}</App>", options: ""},
 		{source: "<App>{/* comment */ 'foo'}</App>", options: ""},
 		{source: "<App prop={/* comment */ 'foo'} />", options: ""},
-		{source: "\n          <App>\n            {\n              // comment\n              <Foo />\n            }\n          </App>\n        ", options: ""},
+		{
+			source:  "\n          <App>\n            {\n              // comment\n              <Foo />\n            }\n          </App>\n        ",
+			options: "",
+		},
 		{source: "<App horror=<div /> />", options: ""},
 		{source: "<App horror={<div />} />", options: ""},
 		{source: "<App horror=<div /> />", options: "{\"propElementValues\":\"ignore\"}"},
 		{source: "<App horror={<div />} />", options: "{\"propElementValues\":\"ignore\"}"},
 		{source: "\n        <script>{`window.foo = \"bar\"`}</script>\n      ", options: ""},
-		{source: "\n        <CollapsibleTitle\n          extra={<span className=\"activity-type\">{activity.type}</span>}\n        />\n      ", options: "\"never\""},
+		{
+			source:  "\n        <CollapsibleTitle\n          extra={<span className=\"activity-type\">{activity.type}</span>}\n        />\n      ",
+			options: "\"never\"",
+		},
 		{source: "<App label={`${label}`} />", options: "\"never\""},
 		{source: "<App>{`${label}`}</App>", options: "\"never\""},
 	} {
-		result := jsxCurlyBracePresenceRun(t, testCase.source, testCase.options)
+		result := jsxCurlyBracePresenceRun(test, testCase.source, testCase.options)
 		if len(result.Diagnostics) != 0 {
-			t.Errorf("case %d: expected no findings for %q with options %q, got %v",
+			test.Errorf("case %d: expected no findings for %q with options %q, got %v",
 				index, testCase.source, testCase.options, result.MessageIds())
 		}
 	}
 }
 
 // Reporting cases, imported verbatim from upstream's corpus, with the repair each asserts.
-func TestJsxCurlyBracePresenceFires(t *testing.T) {
-	t.Parallel()
+func TestJsxCurlyBracePresenceFires(test *testing.T) {
+	test.Parallel()
 
 	for index, testCase := range []struct {
 		source  string
@@ -423,15 +471,15 @@ func TestJsxCurlyBracePresenceFires(t *testing.T) {
 			wantFix: "\n        <Foo help='The maximum time range for searches. (i.e. \"P30D\" for 30 days, \"PT24H\" for 24 hours)' />\n      ",
 		},
 	} {
-		result := jsxCurlyBracePresenceRun(t, testCase.source, testCase.options)
+		result := jsxCurlyBracePresenceRun(test, testCase.source, testCase.options)
 		got := result.MessageIds()
 		if len(got) != len(testCase.wantIds) {
-			t.Errorf("case %d: expected %v for %q, got %v", index, testCase.wantIds, testCase.source, got)
+			test.Errorf("case %d: expected %v for %q, got %v", index, testCase.wantIds, testCase.source, got)
 			continue
 		}
 		for position, want := range testCase.wantIds {
 			if got[position] != want {
-				t.Errorf("case %d: finding %d expected %q, got %q (source %q)",
+				test.Errorf("case %d: finding %d expected %q, got %q (source %q)",
 					index, position, want, got[position], testCase.source)
 			}
 		}
@@ -445,9 +493,9 @@ func TestJsxCurlyBracePresenceFires(t *testing.T) {
 // repairs the right span with the wrong text fails here and passes everywhere else.
 //
 // A case whose upstream `output` equals its input is excluded, because upstream writes that
-// when the fixer DECLINES; those are asserted separately by name below.
-func TestJsxCurlyBracePresenceRepairsSource(t *testing.T) {
-	t.Parallel()
+// when the fixer declines; those are asserted separately by name below.
+func TestJsxCurlyBracePresenceRepairsSource(test *testing.T) {
+	test.Parallel()
 
 	for index, testCase := range []struct {
 		source  string
@@ -690,10 +738,10 @@ func TestJsxCurlyBracePresenceRepairsSource(t *testing.T) {
 			want:    "\n        <Foo help='The maximum time range for searches. (i.e. \"P30D\" for 30 days, \"PT24H\" for 24 hours)' />\n      ",
 		},
 	} {
-		t.Run(strconv.Itoa(index), func(t *testing.T) {
-			t.Parallel()
-			result := jsxCurlyBracePresenceRun(t, testCase.source, testCase.options)
-			rule_testing.ExpectFixedSource(t, result, testCase.want)
+		test.Run(strconv.Itoa(index), func(test *testing.T) {
+			test.Parallel()
+			result := jsxCurlyBracePresenceRun(test, testCase.source, testCase.options)
+			rule_testing.ExpectFixedSource(test, result, testCase.want)
 		})
 	}
 }
@@ -703,8 +751,8 @@ func TestJsxCurlyBracePresenceRepairsSource(t *testing.T) {
 // The span matters twice over on this rule: it is where the reader is sent, and it is the range the
 // repair writes over. It is asserted by slicing the source with the finding's own range, which is
 // the only form that catches a fix anchored one node away from the thing it describes.
-func TestJsxCurlyBracePresenceSpansTheBraces(t *testing.T) {
-	t.Parallel()
+func TestJsxCurlyBracePresenceSpansTheBraces(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		source  string
@@ -718,13 +766,13 @@ func TestJsxCurlyBracePresenceSpansTheBraces(t *testing.T) {
 		{source: `<App prop='bar' />`, options: `{"props":"always"}`, want: `'bar'`},
 		{source: `<App>foo</App>`, options: `{"children":"always"}`, want: `foo`},
 	} {
-		result := jsxCurlyBracePresenceRun(t, testCase.source, testCase.options)
+		result := jsxCurlyBracePresenceRun(test, testCase.source, testCase.options)
 		if len(result.Diagnostics) != 1 {
-			t.Fatalf("expected exactly one finding for %q, got %v", testCase.source, result.MessageIds())
+			test.Fatalf("expected exactly one finding for %q, got %v", testCase.source, result.MessageIds())
 		}
 		reported := testCase.source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 		if reported != testCase.want {
-			t.Errorf("for %q the finding spans %q, want %q", testCase.source, reported, testCase.want)
+			test.Errorf("for %q the finding spans %q, want %q", testCase.source, reported, testCase.want)
 		}
 	}
 }
@@ -733,27 +781,27 @@ func TestJsxCurlyBracePresenceSpansTheBraces(t *testing.T) {
 //
 // Comparing a diagnostic to the very constant the rule reports with is equality that moves on both
 // sides under mutation, so it proves nothing about what a reader sees.
-func TestJsxCurlyBracePresenceMessages(t *testing.T) {
-	t.Parallel()
+func TestJsxCurlyBracePresenceMessages(test *testing.T) {
+	test.Parallel()
 
-	unnecessary := jsxCurlyBracePresenceRun(t, `<App>{'foo'}</App>`, "")
-	rule_testing.ExpectFindings(t, unnecessary, "UnnecessaryCurly")
+	unnecessary := jsxCurlyBracePresenceRun(test, `<App>{'foo'}</App>`, "")
+	rule_testing.ExpectFindings(test, unnecessary, "UnnecessaryCurly")
 	if got := unnecessary.Diagnostics[0].Message.Id; got != "UnnecessaryCurly" {
-		t.Errorf("id is %q", got)
+		test.Errorf("id is %q", got)
 	}
 	if got := unnecessary.Diagnostics[0].Message.Description; !strings.HasPrefix(got,
 		"These curly braces wrap a plain string and do nothing.") {
-		t.Errorf("description is %q", got)
+		test.Errorf("description is %q", got)
 	}
 
-	missing := jsxCurlyBracePresenceRun(t, `<App>foo</App>`, `{"children":"always"}`)
-	rule_testing.ExpectFindings(t, missing, "MissingCurly")
+	missing := jsxCurlyBracePresenceRun(test, `<App>foo</App>`, `{"children":"always"}`)
+	rule_testing.ExpectFindings(test, missing, "MissingCurly")
 	if got := missing.Diagnostics[0].Message.Id; got != "MissingCurly" {
-		t.Errorf("id is %q", got)
+		test.Errorf("id is %q", got)
 	}
 	if got := missing.Diagnostics[0].Message.Description; !strings.HasPrefix(got,
 		"This literal is written as bare markup") {
-		t.Errorf("description is %q", got)
+		test.Errorf("description is %q", got)
 	}
 }
 
@@ -764,8 +812,8 @@ func TestJsxCurlyBracePresenceMessages(t *testing.T) {
 // the unwrap every shape here goes silent while upstream reports and repairs it, and no imported
 // fixture can catch that, because the node does not exist in the tree the corpus was written
 // against. Each expectation below was measured against the installed build, 7.37.5.
-func TestJsxCurlyBracePresenceSeesThroughParentheses(t *testing.T) {
-	t.Parallel()
+func TestJsxCurlyBracePresenceSeesThroughParentheses(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		source  string
@@ -776,9 +824,9 @@ func TestJsxCurlyBracePresenceSeesThroughParentheses(t *testing.T) {
 		{source: `<App p={('bar')} />`, options: "", want: `<App p="bar" />`},
 		{source: `<App>{(('bar'))}</App>`, options: "", want: `<App>bar</App>`},
 	} {
-		result := jsxCurlyBracePresenceRun(t, testCase.source, testCase.options)
-		rule_testing.ExpectFindings(t, result, "UnnecessaryCurly")
-		rule_testing.ExpectFixedSource(t, result, testCase.want)
+		result := jsxCurlyBracePresenceRun(test, testCase.source, testCase.options)
+		rule_testing.ExpectFindings(test, result, "UnnecessaryCurly")
+		rule_testing.ExpectFixedSource(test, result, testCase.want)
 	}
 }
 
@@ -791,8 +839,8 @@ func TestJsxCurlyBracePresenceSeesThroughParentheses(t *testing.T) {
 // property worth pinning rather than assuming: the alternative was a rule that reports
 // `{'bar' as string}` and repairs it to `"bar"`. Measured against the installed build, which is
 // silent on all four for the same reason.
-func TestJsxCurlyBracePresenceLeavesTypeScriptExpressionsAlone(t *testing.T) {
-	t.Parallel()
+func TestJsxCurlyBracePresenceLeavesTypeScriptExpressionsAlone(test *testing.T) {
+	test.Parallel()
 
 	for _, source := range []string{
 		`<App p={'bar' as string} />`,
@@ -801,7 +849,7 @@ func TestJsxCurlyBracePresenceLeavesTypeScriptExpressionsAlone(t *testing.T) {
 		`<App>{'bar' as string}</App>`,
 		"<App p={`bar` as const} />",
 	} {
-		rule_testing.ExpectClean(t, jsxCurlyBracePresenceRun(t, source, ""))
+		rule_testing.ExpectClean(test, jsxCurlyBracePresenceRun(test, source, ""))
 	}
 }
 
@@ -809,41 +857,41 @@ func TestJsxCurlyBracePresenceLeavesTypeScriptExpressionsAlone(t *testing.T) {
 //
 // Upstream's missing-curly fixer returns null rather than guessing, and a declined repair is part
 // of what is being ported: a rule that repairs a case upstream refuses to touch is a defect no
-// message-id fixture can see. Each row must REPORT and must carry no fix.
+// message-id fixture can see. Each row must report and must carry no fix.
 //
 // Which shapes actually reach the decline was measured rather than read, and the reading would have
-// been wrong. `containsOnlyHtmlEntities` runs on the literal's RAW text, which for an attribute
+// been wrong. `containsOnlyHtmlEntities` runs on the literal's raw text, which for an attribute
 // includes its own surrounding quotes, so an attribute is never "only character references" and
 // `<App p="&middot;" />` is repaired rather than declined. The reference arm is reachable only
-// through a CHILD, and a child that is only references is already declined one level earlier by
+// through a child, and a child that is only references is already declined one level earlier by
 // `shouldCheckForMissingCurly`, so it never reports at all. That leaves the line-terminator arm as
 // the only decline this rule can produce, and the entity arm as reachable-but-subsumed. Both were
 // driven through the installed build.
-func TestJsxCurlyBracePresenceDeclinesSomeRepairs(t *testing.T) {
-	t.Parallel()
+func TestJsxCurlyBracePresenceDeclinesSomeRepairs(test *testing.T) {
+	test.Parallel()
 
-	result := jsxCurlyBracePresenceRun(t, "<App p=\"a\nb\" />", `{"props":"always"}`)
+	result := jsxCurlyBracePresenceRun(test, "<App p=\"a\nb\" />", `{"props":"always"}`)
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("expected one finding, got %v", result.MessageIds())
+		test.Fatalf("expected one finding, got %v", result.MessageIds())
 	}
 	if fixes := result.Diagnostics[0].Fixes; len(fixes) != 0 {
-		t.Errorf("an attribute holding a line terminator must report without a repair, got %q", fixes[0].Text)
+		test.Errorf("an attribute holding a line terminator must report without a repair, got %q", fixes[0].Text)
 	}
 
-	// The neighbouring shapes that DO carry a repair, so the decline above is shown to be narrow
+	// The neighbouring shapes that do carry a repair, so the decline above is shown to be narrow
 	// rather than the fixer being broken for attributes generally.
 	for _, testCase := range []struct{ source, want string }{
 		{`<App p="&middot;" />`, `<App p={"&middot;"} />`},
 		{`<App p="foo&#10;bar" />`, `<App p={"foo&#10;bar"} />`},
 	} {
-		repaired := jsxCurlyBracePresenceRun(t, testCase.source, `{"props":"always"}`)
-		rule_testing.ExpectFindings(t, repaired, "MissingCurly")
-		rule_testing.ExpectFixedSource(t, repaired, testCase.want)
+		repaired := jsxCurlyBracePresenceRun(test, testCase.source, `{"props":"always"}`)
+		rule_testing.ExpectFindings(test, repaired, "MissingCurly")
+		rule_testing.ExpectFixedSource(test, repaired, testCase.want)
 	}
 
 	// And the two shapes that are declined a level earlier, so they never report.
-	rule_testing.ExpectClean(t, jsxCurlyBracePresenceRun(t, `<App>&middot;</App>`, `{"children":"always"}`))
-	rule_testing.ExpectClean(t, jsxCurlyBracePresenceRun(t, "<App>\n</App>", `{"children":"always"}`))
+	rule_testing.ExpectClean(test, jsxCurlyBracePresenceRun(test, `<App>&middot;</App>`, `{"children":"always"}`))
+	rule_testing.ExpectClean(test, jsxCurlyBracePresenceRun(test, "<App>\n</App>", `{"children":"always"}`))
 }
 
 // Shapes upstream's corpus does not write, each measured against the installed build first.
@@ -851,10 +899,10 @@ func TestJsxCurlyBracePresenceDeclinesSomeRepairs(t *testing.T) {
 // A mutation sweep found each of these: the code discriminated on something no imported case could
 // reach, so the branch survived being neutered. Every row below was run through 7.37.5 before it
 // was written here, and the expectation is what that run produced rather than what the code does.
-func TestJsxCurlyBracePresenceShapesTheCorpusDoesNotWrite(t *testing.T) {
-	t.Parallel()
+func TestJsxCurlyBracePresenceShapesTheCorpusDoesNotWrite(test *testing.T) {
+	test.Parallel()
 
-	// Character references. Upstream's corpus only ever writes the NAMED form, so the digits and
+	// Character references. Upstream's corpus only ever writes the named form, so the digits and
 	// the hash in the reference grammar are unreached by it and a scanner accepting only letters
 	// would pass every imported case while repairing source it must decline.
 	for _, source := range []string{
@@ -863,7 +911,7 @@ func TestJsxCurlyBracePresenceShapesTheCorpusDoesNotWrite(t *testing.T) {
 		`<App>{'&#x2014;'}</App>`,
 		`<App>{'&middot;'}</App>`,
 	} {
-		rule_testing.ExpectClean(t, jsxCurlyBracePresenceRun(t, source, ""))
+		rule_testing.ExpectClean(test, jsxCurlyBracePresenceRun(test, source, ""))
 	}
 
 	// A non-breaking space is whitespace to this rule, which is why it cannot borrow the
@@ -871,20 +919,20 @@ func TestJsxCurlyBracePresenceShapesTheCorpusDoesNotWrite(t *testing.T) {
 	// U+00A0 deliberately for a different rule. Built from its code point rather than typed, so
 	// no editor or transfer can turn it into an ordinary space and make the case vacuous.
 	nonBreakingSpace := string(rune(0x00a0))
-	rule_testing.ExpectClean(t, jsxCurlyBracePresenceRun(t, "<App>{'"+nonBreakingSpace+"'}</App>", ""))
-	rule_testing.ExpectClean(t, jsxCurlyBracePresenceRun(t, "<App p={'"+nonBreakingSpace+"'} />", ""))
+	rule_testing.ExpectClean(test, jsxCurlyBracePresenceRun(test, "<App>{'"+nonBreakingSpace+"'}</App>", ""))
+	rule_testing.ExpectClean(test, jsxCurlyBracePresenceRun(test, "<App p={'"+nonBreakingSpace+"'} />", ""))
 
 	// A blank line inside a repaired multi-line child stays blank rather than being wrapped.
-	blankLine := jsxCurlyBracePresenceRun(t, "<App>\n  a\n\n  b\n</App>", `{"children":"always"}`)
-	rule_testing.ExpectFindings(t, blankLine, "MissingCurly")
-	rule_testing.ExpectFixedSource(t, blankLine, "<App>\n  {\"a\"}\n\n  {\"b\"}\n</App>")
+	blankLine := jsxCurlyBracePresenceRun(test, "<App>\n  a\n\n  b\n</App>", `{"children":"always"}`)
+	rule_testing.ExpectFindings(test, blankLine, "MissingCurly")
+	rule_testing.ExpectFixedSource(test, blankLine, "<App>\n  {\"a\"}\n\n  {\"b\"}\n</App>")
 }
 
 // The one rune where Go's idea of whitespace is wider than JavaScript's.
 //
 // A multi-line child is repaired line by line, and a line upstream considers blank is left as it is
 // while any other line is wrapped. "Blank" there is `String.prototype.trim`, whose character set is
-// the same as the regular expression's, and NOT `strings.TrimSpace`, whose set also contains U+0085.
+// the same as the regular expression's, and not `strings.TrimSpace`, whose set also contains U+0085.
 // Written with the Go-native spelling, a line holding only that character was skipped and written
 // back bare, where the installed build wraps it in an empty container. That is the whole difference
 // between the two spellings and nothing in upstream's corpus can reach it.
@@ -892,16 +940,16 @@ func TestJsxCurlyBracePresenceShapesTheCorpusDoesNotWrite(t *testing.T) {
 // The expectation was taken from the installed build as raw bytes, so the container holds the
 // character itself, rather than read off a terminal: this character prints as nothing and a lone
 // one reads as an empty string. That misreading cost a round trip here, because `trim()` on it
-// LOOKS empty and the comparison against the empty string is false.
-func TestJsxCurlyBracePresenceUsesJavaScriptWhitespaceWhenTrimming(t *testing.T) {
-	t.Parallel()
+// looks empty and the comparison against the empty string is false.
+func TestJsxCurlyBracePresenceUsesJavaScriptWhitespaceWhenTrimming(test *testing.T) {
+	test.Parallel()
 
 	nextLine := string(rune(0x0085))
 	source := "<App>\n  a\n" + nextLine + "\n  b\n</App>"
 
-	result := jsxCurlyBracePresenceRun(t, source, `{"children":"always"}`)
-	rule_testing.ExpectFindings(t, result, "MissingCurly")
-	rule_testing.ExpectFixedSource(t, result,
+	result := jsxCurlyBracePresenceRun(test, source, `{"children":"always"}`)
+	rule_testing.ExpectFindings(test, result, "MissingCurly")
+	rule_testing.ExpectFixedSource(test, result,
 		"<App>\n  {\"a\"}\n{\""+nextLine+"\"}\n  {\"b\"}\n</App>")
 }
 
@@ -911,8 +959,8 @@ func TestJsxCurlyBracePresenceUsesJavaScriptWhitespaceWhenTrimming(t *testing.T)
 // against `/^\s*$/` alone, which an empty string satisfies, and fell silent where ESLint reported
 // two sites in www-phi-health (#t5dwy1t). Every row was run through 7.37.5 first, and the expected
 // repair is what that run wrote.
-func TestJsxCurlyBracePresenceReportsAnEmptyString(t *testing.T) {
-	t.Parallel()
+func TestJsxCurlyBracePresenceReportsAnEmptyString(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		source string
@@ -924,13 +972,13 @@ func TestJsxCurlyBracePresenceReportsAnEmptyString(t *testing.T) {
 		{`<div>{''}</div>`, `<div></div>`},
 		{`<div>x{''}</div>`, `<div>x</div>`},
 	} {
-		result := jsxCurlyBracePresenceRun(t, testCase.source, "")
-		rule_testing.ExpectFindings(t, result, "UnnecessaryCurly")
-		rule_testing.ExpectFixedSource(t, result, testCase.fixed)
+		result := jsxCurlyBracePresenceRun(test, testCase.source, "")
+		rule_testing.ExpectFindings(test, result, "UnnecessaryCurly")
+		rule_testing.ExpectFixedSource(test, result, testCase.fixed)
 	}
 
 	// The nearest shapes that keep their braces: a value that is only whitespace, and a template
 	// holding an expression.
-	rule_testing.ExpectClean(t, jsxCurlyBracePresenceRun(t, `<X label={' '} />`, ""))
-	rule_testing.ExpectClean(t, jsxCurlyBracePresenceRun(t, "<X label={`${b}`} />", ""))
+	rule_testing.ExpectClean(test, jsxCurlyBracePresenceRun(test, `<X label={' '} />`, ""))
+	rule_testing.ExpectClean(test, jsxCurlyBracePresenceRun(test, "<X label={`${b}`} />", ""))
 }

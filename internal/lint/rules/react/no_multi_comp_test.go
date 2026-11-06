@@ -17,8 +17,8 @@ const noMultiCompFile = "/repository/source/NoMultiComp.tsx"
 
 // TestNoMultiCompStaysSilent is every passing case upstream ships, grouped by the options it runs
 // them under.
-func TestNoMultiCompStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoMultiCompStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -108,18 +108,24 @@ func TestNoMultiCompStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoMultiComp, noMultiCompFile, testCase.sourceText, testCase.options)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(
+				test,
+				NoMultiComp,
+				noMultiCompFile,
+				testCase.sourceText,
+				testCase.options,
+			)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
 
 // TestNoMultiCompFires is every reporting case upstream ships. The finding count per case is
 // upstream's own `errors` length, which is 2 for the one file holding three components.
-func TestNoMultiCompFires(t *testing.T) {
-	t.Parallel()
+func TestNoMultiCompFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -244,10 +250,16 @@ func TestNoMultiCompFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoMultiComp, noMultiCompFile, testCase.sourceText, testCase.options)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(
+				test,
+				NoMultiComp,
+				noMultiCompFile,
+				testCase.sourceText,
+				testCase.options,
+			)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -276,8 +288,8 @@ func TestNoMultiCompFires(t *testing.T) {
 // Six of those eight are places where a shelf helper or an obvious improvement was the wrong answer,
 // which is why the table is kept rather than deleted once green: it is the only thing standing
 // between this rule and a later simplification back to any of them.
-func TestNoMultiCompMatchesTheInstalledRuleOnInputsTheCorpusDoesNotWrite(t *testing.T) {
-	t.Parallel()
+func TestNoMultiCompMatchesTheInstalledRuleOnInputsTheCorpusDoesNotWrite(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name            string
@@ -299,106 +311,441 @@ func TestNoMultiCompMatchesTheInstalledRuleOnInputsTheCorpusDoesNotWrite(t *test
 		{"returns null", "const Ref = (props) => <div/>;\nconst A = (props) => null;\n", 1, false},
 		{"returns undefined", "const Ref = (props) => <div/>;\nconst A = (props) => undefined;\n", 0, false},
 		{"returns number", "const Ref = (props) => <div/>;\nconst A = (props) => 5;\n", 0, false},
-		{"returns conditional jsx/null", "const Ref = (props) => <div/>;\nconst A = (props) => props.x ? <div/> : null;\n", 1, false},
+		{
+			"returns conditional jsx/null",
+			"const Ref = (props) => <div/>;\nconst A = (props) => props.x ? <div/> : null;\n",
+			1,
+			false,
+		},
 		{"returns logical and", "const Ref = (props) => <div/>;\nconst A = (props) => props.x && <div/>;\n", 1, false},
 		{"returns nullish", "const Ref = (props) => <div/>;\nconst A = (props) => props.x ?? <div/>;\n", 1, false},
-		{"returns parenthesized jsx", "const Ref = (props) => <div/>;\nconst A = (props) => { return (<div/>); };\n", 1, false},
-		{"returns double parenthesized", "const Ref = (props) => <div/>;\nconst A = (props) => { return ((<div/>)); };\n", 1, false},
-		{"returns createElement", "const Ref = (props) => <div/>;\nconst A = (props) => React.createElement(\"div\");\n", 1, false},
-		{"returns bare createElement", "const Ref = (props) => <div/>;\nconst A = (props) => createElement(\"div\");\n", 0, false},
+		{
+			"returns parenthesized jsx",
+			"const Ref = (props) => <div/>;\nconst A = (props) => { return (<div/>); };\n",
+			1,
+			false,
+		},
+		{
+			"returns double parenthesized",
+			"const Ref = (props) => <div/>;\nconst A = (props) => { return ((<div/>)); };\n",
+			1,
+			false,
+		},
+		{
+			"returns createElement",
+			"const Ref = (props) => <div/>;\nconst A = (props) => React.createElement(\"div\");\n",
+			1,
+			false,
+		},
+		{
+			"returns bare createElement",
+			"const Ref = (props) => <div/>;\nconst A = (props) => createElement(\"div\");\n",
+			0,
+			false,
+		},
 		{"returns fragment", "const Ref = (props) => <div/>;\nconst A = (props) => <></>;\n", 1, false},
-		{"return inside if", "const Ref = (props) => <div/>;\nconst A = (props) => { if (props.x) { return <div/>; } return null; };\n", 1, false},
-		{"return inside for", "const Ref = (props) => <div/>;\nconst A = (props) => { for(;;){ return <div/>; } };\n", 1, false},
-		{"return inside switch", "const Ref = (props) => <div/>;\nconst A = (props) => { switch(1){ case 1: return <div/>; } };\n", 1, false},
-		{"return only in NESTED fn", "const Ref = (props) => <div/>;\nconst A = (props) => { function inner(){ return <div/>; } };\n", 0, false},
-		{"class extends React.Component", "class A extends React.Component { render(){return <div/>;} }\nclass B extends React.Component { render(){return <div/>;} }\n", 1, false},
-		{"class extends Component bare", "import {Component} from 'react';\nclass A extends Component { render(){return <div/>;} }\nclass B extends Component { render(){return <div/>;} }\n", 1, false},
-		{"class extends PureComponent", "class A extends React.PureComponent {}\nclass B extends React.PureComponent {}\n", 1, false},
+		{
+			"return inside if",
+			"const Ref = (props) => <div/>;\nconst A = (props) => { if (props.x) { return <div/>; } return null; };\n",
+			1,
+			false,
+		},
+		{
+			"return inside for",
+			"const Ref = (props) => <div/>;\nconst A = (props) => { for(;;){ return <div/>; } };\n",
+			1,
+			false,
+		},
+		{
+			"return inside switch",
+			"const Ref = (props) => <div/>;\nconst A = (props) => { switch(1){ case 1: return <div/>; } };\n",
+			1,
+			false,
+		},
+		{
+			"return only in NESTED fn",
+			"const Ref = (props) => <div/>;\nconst A = (props) => { function inner(){ return <div/>; } };\n",
+			0,
+			false,
+		},
+		{
+			"class extends React.Component",
+			"class A extends React.Component { render(){return <div/>;} }\nclass B extends React.Component { render(){return <div/>;} }\n",
+			1,
+			false,
+		},
+		{
+			"class extends Component bare",
+			"import {Component} from 'react';\nclass A extends Component { render(){return <div/>;} }\nclass B extends Component { render(){return <div/>;} }\n",
+			1,
+			false,
+		},
+		{
+			"class extends PureComponent",
+			"class A extends React.PureComponent {}\nclass B extends React.PureComponent {}\n",
+			1,
+			false,
+		},
 		{"class no heritage", "class A { render(){return <div/>;} }\nclass B { render(){return <div/>;} }\n", 0, false},
-		{"class extends parenthesized", "class A extends (React.Component) {}\nclass B extends (React.Component) {}\n", 1, false},
-		{"class extends Other.Component", "class A extends Other.Component {}\nclass B extends Other.Component {}\n", 0, false},
-		{"class expression", "const A = class extends React.Component {};\nconst B = class extends React.Component {};\n", 1, false},
-		{"createReactClass x2", "var A = createReactClass({render(){return <div/>;}});\nvar B = createReactClass({render(){return <div/>;}});\n", 1, false},
-		{"React.createClass x2", "var A = React.createClass({render(){return <div/>;}});\nvar B = React.createClass({render(){return <div/>;}});\n", 0, false},
-		{"bare createClass x2", "var A = createClass({render(){return <div/>;}});\nvar B = createClass({render(){return <div/>;}});\n", 0, false},
+		{
+			"class extends parenthesized",
+			"class A extends (React.Component) {}\nclass B extends (React.Component) {}\n",
+			1,
+			false,
+		},
+		{
+			"class extends Other.Component",
+			"class A extends Other.Component {}\nclass B extends Other.Component {}\n",
+			0,
+			false,
+		},
+		{
+			"class expression",
+			"const A = class extends React.Component {};\nconst B = class extends React.Component {};\n",
+			1,
+			false,
+		},
+		{
+			"createReactClass x2",
+			"var A = createReactClass({render(){return <div/>;}});\nvar B = createReactClass({render(){return <div/>;}});\n",
+			1,
+			false,
+		},
+		{
+			"React.createClass x2",
+			"var A = React.createClass({render(){return <div/>;}});\nvar B = React.createClass({render(){return <div/>;}});\n",
+			0,
+			false,
+		},
+		{
+			"bare createClass x2",
+			"var A = createClass({render(){return <div/>;}});\nvar B = createClass({render(){return <div/>;}});\n",
+			0,
+			false,
+		},
 		{"async generator fn", "const Ref = (props) => <div/>;\nasync function* A(){ return <div/>; }\n", 0, false},
 		{"async fn", "const Ref = (props) => <div/>;\nasync function A(){ return <div/>; }\n", 1, false},
 		{"generator fn", "const Ref = (props) => <div/>;\nfunction* A(){ return <div/>; }\n", 1, false},
-		{"memo nested in forwardRef", "import {memo, forwardRef} from 'react';\nconst A = (p)=><div/>;\nconst B = memo(forwardRef((p,r)=><span/>));\n", 2, false},
-		{"React.memo wrapping unknown", "class A extends React.PureComponent {}\nconst B = React.memo((p)=><Unknown/>);\n", 1, false},
-		{"React.memo wrapping known", "class A extends React.PureComponent {}\nconst B = React.memo((p)=><A/>);\n", 0, false},
-		{"React.memo wrapping known in div", "class A extends React.PureComponent {}\nconst B = React.memo((p)=><div><A/></div>);\n", 1, false},
-		{"React.memo wrapping fragment", "class A extends React.PureComponent {}\nconst B = React.memo((p)=><></>);\n", 1, false},
-		{"fn + class ignoreStateless", "function A(p){return <div/>;}\nclass B extends React.Component { render(){return <div/>;} }\n", 0, true},
-		{"class + class ignoreStateless", "class A extends React.Component {}\nclass B extends React.Component {}\n", 1, true},
-		{"fn + fn + class ignoreStateless", "function A(p){return <div/>;}\nfunction B(p){return <div/>;}\nclass C extends React.Component {}\n", 0, true},
-		{"wrapper + class ignoreStateless", "import {memo} from 'react';\nconst A = memo((p)=><span/>);\nclass B extends React.Component {}\n", 0, true},
-		{"three fn comps", "function A(){return <div/>;}\nfunction B(){return <div/>;}\nfunction C(){return <div/>;}\n", 2, false},
+		{
+			"memo nested in forwardRef",
+			"import {memo, forwardRef} from 'react';\nconst A = (p)=><div/>;\nconst B = memo(forwardRef((p,r)=><span/>));\n",
+			2,
+			false,
+		},
+		{
+			"React.memo wrapping unknown",
+			"class A extends React.PureComponent {}\nconst B = React.memo((p)=><Unknown/>);\n",
+			1,
+			false,
+		},
+		{
+			"React.memo wrapping known",
+			"class A extends React.PureComponent {}\nconst B = React.memo((p)=><A/>);\n",
+			0,
+			false,
+		},
+		{
+			"React.memo wrapping known in div",
+			"class A extends React.PureComponent {}\nconst B = React.memo((p)=><div><A/></div>);\n",
+			1,
+			false,
+		},
+		{
+			"React.memo wrapping fragment",
+			"class A extends React.PureComponent {}\nconst B = React.memo((p)=><></>);\n",
+			1,
+			false,
+		},
+		{
+			"fn + class ignoreStateless",
+			"function A(p){return <div/>;}\nclass B extends React.Component { render(){return <div/>;} }\n",
+			0,
+			true,
+		},
+		{
+			"class + class ignoreStateless",
+			"class A extends React.Component {}\nclass B extends React.Component {}\n",
+			1,
+			true,
+		},
+		{
+			"fn + fn + class ignoreStateless",
+			"function A(p){return <div/>;}\nfunction B(p){return <div/>;}\nclass C extends React.Component {}\n",
+			0,
+			true,
+		},
+		{
+			"wrapper + class ignoreStateless",
+			"import {memo} from 'react';\nconst A = memo((p)=><span/>);\nclass B extends React.Component {}\n",
+			0,
+			true,
+		},
+		{
+			"three fn comps",
+			"function A(){return <div/>;}\nfunction B(){return <div/>;}\nfunction C(){return <div/>;}\n",
+			2,
+			false,
+		},
 		{"obj methods x2", "export default { A(p){return <div/>;}, B(p){return <div/>;} };\n", 1, false},
 		{"obj arrow props x2", "export default { A: (p)=><div/>, B: (p)=><div/> };\n", 1, false},
 		{"obj lowercase keys", "export default { a: (p)=><div/>, b: (p)=><div/> };\n", 0, false},
 		{"obj computed key", "export default { [k]: (p)=><div/>, B: (p)=><div/> };\n", 0, false},
-		{"export default arrow returning null", "const Ref = (props) => <div/>;\nexport default () => null;\n", 0, false},
-		{"export default arrow returning jsx", "const Ref = (props) => <div/>;\nexport default () => <div/>;\n", 1, false},
-		{"memo(SomeComponent) identifier arg", "import {memo} from 'react';\nconst A=(p)=><div/>;\nconst B = memo(A);\n", 0, false},
+		{
+			"export default arrow returning null",
+			"const Ref = (props) => <div/>;\nexport default () => null;\n",
+			0,
+			false,
+		},
+		{
+			"export default arrow returning jsx",
+			"const Ref = (props) => <div/>;\nexport default () => <div/>;\n",
+			1,
+			false,
+		},
+		{
+			"memo(SomeComponent) identifier arg",
+			"import {memo} from 'react';\nconst A=(p)=><div/>;\nconst B = memo(A);\n",
+			0,
+			false,
+		},
 		{"memo() no args", "import {memo} from 'react';\nconst A=(p)=><div/>;\nconst B = memo();\n", 0, false},
-		{"memo(fn) fn returns nothing", "import {memo} from 'react';\nconst A=(p)=><div/>;\nconst B = memo((p)=>{});\n", 1, false},
-		{"memo(fn) fn returns null", "import {memo} from 'react';\nconst A=(p)=><div/>;\nconst B = memo((p)=>null);\n", 1, false},
-		{"triple nest memo(memo(forwardRef))", "import {memo, forwardRef} from 'react';\nconst A=(p)=><div/>;\nconst B = memo(memo(forwardRef((p,r)=><span/>)));\n", 2, false},
-		{"React.memo(React.forwardRef(fn))", "const A=(p)=><div/>;\nconst B = React.memo(React.forwardRef((p,r)=><span/>));\n", 2, false},
-		{"import memo aliased", "import {memo as m} from 'react';\nconst A=(p)=><div/>;\nconst B = m((p)=><span/>);\n", 0, false},
-		{"component inside component", "function Outer(){ function Inner(){ return <div/>; } return <div/>; }\n", 1, false},
-		{"arrow inside arrow returning jsx", "const Outer = () => { const Inner = () => <div/>; return <div/>; };\n", 1, false},
-		{"iife component", "const Ref = (props) => <div/>;\nconst A = (function(){ return () => <div/>; })();\n", 1, false},
-		{"return in try block", "const Ref = (props) => <div/>;\nconst A = (p) => { try { return <div/>; } catch(e){} };\n", 0, false},
-		{"return in labeled stmt", "const Ref = (props) => <div/>;\nconst A = (p) => { lbl: { return <div/>; } };\n", 0, false},
-		{"return in nested block", "const Ref = (props) => <div/>;\nconst A = (p) => { { { return <div/>; } } };\n", 1, false},
-		{"return in while", "const Ref = (props) => <div/>;\nconst A = (p) => { while(1){ return <div/>; } };\n", 1, false},
-		{"return in do-while", "const Ref = (props) => <div/>;\nconst A = (p) => { do { return <div/>; } while(0); };\n", 0, false},
-		{"return in for-of", "const Ref = (props) => <div/>;\nconst A = (p) => { for (const x of y){ return <div/>; } };\n", 0, false},
+		{
+			"memo(fn) fn returns nothing",
+			"import {memo} from 'react';\nconst A=(p)=><div/>;\nconst B = memo((p)=>{});\n",
+			1,
+			false,
+		},
+		{
+			"memo(fn) fn returns null",
+			"import {memo} from 'react';\nconst A=(p)=><div/>;\nconst B = memo((p)=>null);\n",
+			1,
+			false,
+		},
+		{
+			"triple nest memo(memo(forwardRef))",
+			"import {memo, forwardRef} from 'react';\nconst A=(p)=><div/>;\nconst B = memo(memo(forwardRef((p,r)=><span/>)));\n",
+			2,
+			false,
+		},
+		{
+			"React.memo(React.forwardRef(fn))",
+			"const A=(p)=><div/>;\nconst B = React.memo(React.forwardRef((p,r)=><span/>));\n",
+			2,
+			false,
+		},
+		{
+			"import memo aliased",
+			"import {memo as m} from 'react';\nconst A=(p)=><div/>;\nconst B = m((p)=><span/>);\n",
+			0,
+			false,
+		},
+		{
+			"component inside component",
+			"function Outer(){ function Inner(){ return <div/>; } return <div/>; }\n",
+			1,
+			false,
+		},
+		{
+			"arrow inside arrow returning jsx",
+			"const Outer = () => { const Inner = () => <div/>; return <div/>; };\n",
+			1,
+			false,
+		},
+		{
+			"iife component",
+			"const Ref = (props) => <div/>;\nconst A = (function(){ return () => <div/>; })();\n",
+			1,
+			false,
+		},
+		{
+			"return in try block",
+			"const Ref = (props) => <div/>;\nconst A = (p) => { try { return <div/>; } catch(e){} };\n",
+			0,
+			false,
+		},
+		{
+			"return in labeled stmt",
+			"const Ref = (props) => <div/>;\nconst A = (p) => { lbl: { return <div/>; } };\n",
+			0,
+			false,
+		},
+		{
+			"return in nested block",
+			"const Ref = (props) => <div/>;\nconst A = (p) => { { { return <div/>; } } };\n",
+			1,
+			false,
+		},
+		{
+			"return in while",
+			"const Ref = (props) => <div/>;\nconst A = (p) => { while(1){ return <div/>; } };\n",
+			1,
+			false,
+		},
+		{
+			"return in do-while",
+			"const Ref = (props) => <div/>;\nconst A = (p) => { do { return <div/>; } while(0); };\n",
+			0,
+			false,
+		},
+		{
+			"return in for-of",
+			"const Ref = (props) => <div/>;\nconst A = (p) => { for (const x of y){ return <div/>; } };\n",
+			0,
+			false,
+		},
 		{"returns self-closing", "const Ref = (props) => <div/>;\nconst A = (p) => <div/>;\n", 1, false},
-		{"returns nested ternary", "const Ref = (props) => <div/>;\nconst A = (p) => a ? (b ? <div/> : null) : null;\n", 1, false},
+		{
+			"returns nested ternary",
+			"const Ref = (props) => <div/>;\nconst A = (p) => a ? (b ? <div/> : null) : null;\n",
+			1,
+			false,
+		},
 		{"returns sequence ending jsx", "const Ref = (props) => <div/>;\nconst A = (p) => (0, <div/>);\n", 1, false},
 		{"returns sequence ending null", "const Ref = (props) => <div/>;\nconst A = (p) => (0, null);\n", 1, false},
 		{"returns jsx member tag", "const Ref = (props) => <div/>;\nconst A = (p) => <Foo.Bar/>;\n", 1, false},
-		{"class extends bare Component no import", "class A extends Component {}\nclass B extends Component {}\n", 1, false},
-		{"class expression const", "const A = class extends React.Component {};\nconst B = class extends React.Component {};\n", 1, false},
-		{"createReactClass non-object arg", "var A = createReactClass(x);\nvar B = createReactClass({render(){return <div/>;}});\n", 0, false},
-		{"createReactClass no args", "var A = createReactClass();\nvar B = createReactClass({render(){return <div/>;}});\n", 0, false},
+		{
+			"class extends bare Component no import",
+			"class A extends Component {}\nclass B extends Component {}\n",
+			1,
+			false,
+		},
+		{
+			"class expression const",
+			"const A = class extends React.Component {};\nconst B = class extends React.Component {};\n",
+			1,
+			false,
+		},
+		{
+			"createReactClass non-object arg",
+			"var A = createReactClass(x);\nvar B = createReactClass({render(){return <div/>;}});\n",
+			0,
+			false,
+		},
+		{
+			"createReactClass no args",
+			"var A = createReactClass();\nvar B = createReactClass({render(){return <div/>;}});\n",
+			0,
+			false,
+		},
 		{"single component ignoreStateless", "function A(p){return <div/>;}\n", 0, true},
-		{"two wrappers ignoreStateless", "import {memo} from 'react';\nconst A = memo((p)=><span/>);\nconst B = memo((p)=><span/>);\n", 0, true},
-		{"class+fn+fn ignoreStateless", "class A extends React.Component {}\nfunction B(p){return <div/>;}\nfunction C(p){return <div/>;}\n", 0, true},
+		{
+			"two wrappers ignoreStateless",
+			"import {memo} from 'react';\nconst A = memo((p)=><span/>);\nconst B = memo((p)=><span/>);\n",
+			0,
+			true,
+		},
+		{
+			"class+fn+fn ignoreStateless",
+			"class A extends React.Component {}\nfunction B(p){return <div/>;}\nfunction C(p){return <div/>;}\n",
+			0,
+			true,
+		},
 		{"nested obj methods", "export default { outer: { A(p){return <div/>;}, B(p){return <div/>;} } };\n", 1, false},
-		{"obj shorthand fn expression", "export default { A: function(){ return <div/>; }, B: function(){ return <div/>; } };\n", 1, false},
-		{"obj named fn expressions lowercase", "export default { a: function A(){ return <div/>; }, b: function B(){ return <div/>; } };\n", 1, false},
+		{
+			"obj shorthand fn expression",
+			"export default { A: function(){ return <div/>; }, B: function(){ return <div/>; } };\n",
+			1,
+			false,
+		},
+		{
+			"obj named fn expressions lowercase",
+			"export default { a: function A(){ return <div/>; }, b: function B(){ return <div/>; } };\n",
+			1,
+			false,
+		},
 		{"this.Foo = fn", "const Ref = (props) => <div/>;\nthis.Foo = function(){ return <div/>; };\n", 1, false},
 		{"a.b.Foo = fn", "const Ref = (props) => <div/>;\na.b.Foo = function(){ return <div/>; };\n", 1, false},
-		{"namespaced wrapper returning a member tag is not exempted", "class A extends React.PureComponent {}\nconst C = React.memo((p)=><A.B/>);\n", 1, false},
-		{"namespaced wrapper returning a plain known tag is exempted", "class A extends React.PureComponent {}\nconst C = React.memo((p)=><A/>);\n", 0, false},
-		{"member tag against an arrow component of the same head", "const A = (p)=><div/>;\nconst C = React.memo((p)=><A.B/>);\n", 1, false},
-		{"arrow as the first operand of a comma is not the value", "const Ref=(p)=><div/>;\nconst A = ((p) => <div/>, 0);\n", 0, false},
-		{"arrow as the last operand of a comma is the value", "const Ref=(p)=><div/>;\nconst A = (0, (p) => <div/>);\n", 1, false},
-		{"only the last of two arrow operands counts", "const Ref=(p)=><div/>;\nconst A = ((p) => <div/>, (p) => <span/>);\n", 1, false},
-		{"exports.Foo capitalized member", "const Ref = (props) => <div/>;\nexports.Foo = function () { return <div/>; };\n", 1, false},
-		{"exports.foo lowercase member", "const Ref = (props) => <div/>;\nexports.foo = function () { return <div/>; };\n", 0, false},
-		{"module.exports assignment", "const Ref = (props) => <div/>;\nmodule.exports = function () { return <div/>; };\n", 1, false},
+		{
+			"namespaced wrapper returning a member tag is not exempted",
+			"class A extends React.PureComponent {}\nconst C = React.memo((p)=><A.B/>);\n",
+			1,
+			false,
+		},
+		{
+			"namespaced wrapper returning a plain known tag is exempted",
+			"class A extends React.PureComponent {}\nconst C = React.memo((p)=><A/>);\n",
+			0,
+			false,
+		},
+		{
+			"member tag against an arrow component of the same head",
+			"const A = (p)=><div/>;\nconst C = React.memo((p)=><A.B/>);\n",
+			1,
+			false,
+		},
+		{
+			"arrow as the first operand of a comma is not the value",
+			"const Ref=(p)=><div/>;\nconst A = ((p) => <div/>, 0);\n",
+			0,
+			false,
+		},
+		{
+			"arrow as the last operand of a comma is the value",
+			"const Ref=(p)=><div/>;\nconst A = (0, (p) => <div/>);\n",
+			1,
+			false,
+		},
+		{
+			"only the last of two arrow operands counts",
+			"const Ref=(p)=><div/>;\nconst A = ((p) => <div/>, (p) => <span/>);\n",
+			1,
+			false,
+		},
+		{
+			"exports.Foo capitalized member",
+			"const Ref = (props) => <div/>;\nexports.Foo = function () { return <div/>; };\n",
+			1,
+			false,
+		},
+		{
+			"exports.foo lowercase member",
+			"const Ref = (props) => <div/>;\nexports.foo = function () { return <div/>; };\n",
+			0,
+			false,
+		},
+		{
+			"module.exports assignment",
+			"const Ref = (props) => <div/>;\nmodule.exports = function () { return <div/>; };\n",
+			1,
+			false,
+		},
 		{"module.exports arrow", "const Ref = (props) => <div/>;\nmodule.exports = () => <div/>;\n", 1, false},
 		{"plain Foo assignment", "const Ref = (props) => <div/>;\nFoo = function () { return <div/>; };\n", 1, false},
 		{"plain foo assignment", "const Ref = (props) => <div/>;\nfoo = function () { return <div/>; };\n", 0, false},
-		{"exports.Foo returning only null", "const Ref = (props) => <div/>;\nexports.Foo = function () { return null; };\n", 1, false},
-		{"a.b.Foo deep member", "const Ref = (props) => <div/>;\na.b.Foo = function () { return <div/>; };\n", 1, false},
-		{"a.b.foo deep member lowercase", "const Ref = (props) => <div/>;\na.b.foo = function () { return <div/>; };\n", 0, false},
-		{"named fn expression name beats a lowercase key", "const Ref = (props) => <div/>;\nexports.foo = function Bar() { return <div/>; };\n", 1, false},
+		{
+			"exports.Foo returning only null",
+			"const Ref = (props) => <div/>;\nexports.Foo = function () { return null; };\n",
+			1,
+			false,
+		},
+		{
+			"a.b.Foo deep member",
+			"const Ref = (props) => <div/>;\na.b.Foo = function () { return <div/>; };\n",
+			1,
+			false,
+		},
+		{
+			"a.b.foo deep member lowercase",
+			"const Ref = (props) => <div/>;\na.b.foo = function () { return <div/>; };\n",
+			0,
+			false,
+		},
+		{
+			"named fn expression name beats a lowercase key",
+			"const Ref = (props) => <div/>;\nexports.foo = function Bar() { return <div/>; };\n",
+			1,
+			false,
+		},
 		{"exports.Foo = arrow", "const Ref = (props) => <div/>;\nexports.Foo = () => <div/>;\n", 1, false},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoMultiComp, noMultiCompFile, testCase.sourceText,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, NoMultiComp, noMultiCompFile, testCase.sourceText,
 				NoMultiCompOptions{IgnoreStateless: testCase.ignoreStateless})
 			if len(result.Diagnostics) != testCase.wantFindings {
-				t.Errorf("installed build reports %d findings, this rule reports %d",
+				test.Errorf("installed build reports %d findings, this rule reports %d",
 					testCase.wantFindings, len(result.Diagnostics))
 			}
 		})
@@ -409,14 +756,14 @@ func TestNoMultiCompMatchesTheInstalledRuleOnInputsTheCorpusDoesNotWrite(t *test
 //
 // `ExpectFindings` asserts ids and counts and can see none of this, and the anchor is not a detail:
 // upstream returns a different node per shape and the rule reports whatever it returns. A function
-// declaration reports on itself, an arrow assigned to a const reports on the ARROW rather than the
+// declaration reports on itself, an arrow assigned to a const reports on the arrow rather than the
 // declaration, a class reports on itself, a factory reports on its object literal argument, and a
 // pragma wrapper reports on the whole wrapping call.
 //
 // Every expected span was measured against the installed build on 2026-08-27 by slicing its
 // reported range out of the source.
-func TestNoMultiCompAnchorsOnTheComponentNotTheDeclaration(t *testing.T) {
-	t.Parallel()
+func TestNoMultiCompAnchorsOnTheComponentNotTheDeclaration(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -459,12 +806,12 @@ func TestNoMultiCompAnchorsOnTheComponentNotTheDeclaration(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoMultiComp, noMultiCompFile, testCase.sourceText,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, NoMultiComp, noMultiCompFile, testCase.sourceText,
 				DefaultNoMultiCompOptions())
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
-				t.Fatalf("want %d findings, got %d", len(testCase.wantSpans), len(result.Diagnostics))
+				test.Fatalf("want %d findings, got %d", len(testCase.wantSpans), len(result.Diagnostics))
 			}
 			// The harness writes the fixture as it received it here, since this rule does not need
 			// the trim-sensitive path, but the source is sliced rather than the literal so the
@@ -472,7 +819,7 @@ func TestNoMultiCompAnchorsOnTheComponentNotTheDeclaration(t *testing.T) {
 			for index, diagnostic := range result.Diagnostics {
 				reported := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if reported != testCase.wantSpans[index] {
-					t.Errorf("finding %d points at %q, want %q", index, reported, testCase.wantSpans[index])
+					test.Errorf("finding %d points at %q, want %q", index, reported, testCase.wantSpans[index])
 				}
 			}
 		})
@@ -484,14 +831,14 @@ func TestNoMultiCompAnchorsOnTheComponentNotTheDeclaration(t *testing.T) {
 // The message has no format verbs, so there is nothing to interpolate and nothing to render wrong,
 // but the text is upstream's own string and a paraphrase would diverge silently. Asserted against a
 // literal typed here rather than against the rule's own constant, so the two cannot move together.
-func TestNoMultiCompMessage(t *testing.T) {
-	t.Parallel()
+func TestNoMultiCompMessage(test *testing.T) {
+	test.Parallel()
 
 	if messageOnlyOneComponent.Id != "onlyOneComponent" {
-		t.Errorf("message id is %q, want %q", messageOnlyOneComponent.Id, "onlyOneComponent")
+		test.Errorf("message id is %q, want %q", messageOnlyOneComponent.Id, "onlyOneComponent")
 	}
 	if messageOnlyOneComponent.Description != "Declare only one React component per file" {
-		t.Errorf("message description is %q, want upstream's own text",
+		test.Errorf("message description is %q, want upstream's own text",
 			messageOnlyOneComponent.Description)
 	}
 }
@@ -503,8 +850,8 @@ func TestNoMultiCompMessage(t *testing.T) {
 // authority has no filename condition anywhere, and copying one by pattern-matching a neighbour
 // would blind the rule to every `.ts` file in the tree. The source deliberately holds no JSX, so a
 // `.ts` file parses cleanly and the parser's opinion cannot be mistaken for the rule's.
-func TestNoMultiCompHasNoFileSuffixGate(t *testing.T) {
-	t.Parallel()
+func TestNoMultiCompHasNoFileSuffixGate(test *testing.T) {
+	test.Parallel()
 
 	// Only the two TypeScript suffixes are listed, and that is a fact about the harness rather than
 	// about the rule. The typed harness builds a real program, and its tsconfig includes only
@@ -516,11 +863,11 @@ func TestNoMultiCompHasNoFileSuffixGate(t *testing.T) {
 		"/repository/source/Suffix.tsx",
 		"/repository/source/Suffix.ts",
 	} {
-		t.Run(fileName, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoMultiComp, fileName, sourceText,
+		test.Run(fileName, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, NoMultiComp, fileName, sourceText,
 				DefaultNoMultiCompOptions())
-			rule_testing.ExpectFindings(t, result, "onlyOneComponent")
+			rule_testing.ExpectFindings(test, result, "onlyOneComponent")
 		})
 	}
 }
@@ -529,43 +876,39 @@ func TestNoMultiCompHasNoFileSuffixGate(t *testing.T) {
 //
 // Building the options struct directly would leave the decoder untested, and the decoder is where a
 // default inversion would live. The empty-input row is the one that matters: a rule configured as a
-// bare `"error"` is handed nil, and this asserts that resolves to the documented default rather
+// bare `"error"` hands its decoder empty input, and this asserts that resolves to the documented default rather
 // than to an error or a surprise.
-func TestDecodeNoMultiCompOptions(t *testing.T) {
-	t.Parallel()
+func TestDecodeNoMultiCompOptions(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
-		name    string
-		raw     string
-		want    bool
-		wantErr bool
+		name      string
+		raw       string
+		want      bool
+		wantError bool
 	}{
 		{name: "empty input is the bare error configuration", raw: "", want: false},
 		{name: "explicit false", raw: `{"ignoreStateless": false}`, want: false},
 		{name: "explicit true", raw: `{"ignoreStateless": true}`, want: true},
 		{name: "absent key falls back to the default", raw: `{}`, want: false},
-		{name: "wrong type is an error", raw: `{"ignoreStateless": "yes"}`, wantErr: true},
+		{name: "wrong type is an error", raw: `{"ignoreStateless": "yes"}`, wantError: true},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			decoded, err := DecodeNoMultiCompOptions([]byte(testCase.raw))
-			if testCase.wantErr {
-				if err == nil {
-					t.Fatalf("want an error, got %#v", decoded)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			decoded, decodeNoMultiCompOptionsError := DecodeNoMultiCompOptions([]byte(testCase.raw))
+			if testCase.wantError {
+				if decodeNoMultiCompOptionsError == nil {
+					test.Fatalf("want an error, got %#v", decoded)
 				}
 				return
 			}
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
+			if decodeNoMultiCompOptionsError != nil {
+				test.Fatalf("unexpected error: %v", decodeNoMultiCompOptionsError)
 			}
-			options, isOptions := decoded.(NoMultiCompOptions)
-			if !isOptions {
-				t.Fatalf("decoder returned %T, want NoMultiCompOptions", decoded)
-			}
-			if options.IgnoreStateless != testCase.want {
-				t.Errorf("IgnoreStateless is %v, want %v", options.IgnoreStateless, testCase.want)
+			if decoded.IgnoreStateless != testCase.want {
+				test.Errorf("IgnoreStateless is %v, want %v", decoded.IgnoreStateless, testCase.want)
 			}
 		})
 	}
@@ -573,16 +916,16 @@ func TestDecodeNoMultiCompOptions(t *testing.T) {
 
 // TestNoMultiCompNilOptionsFallsBackToTheDefault bypasses the decoder entirely.
 //
-// A rule configured as a bare `"error"` can reach `Run` with nil options rather than with a decoded
-// struct, and `options.(T)` on nil yields the zero value. The zero value happens to be correct here,
+// A rule configured as a bare `"error"` can reach `Run` with the zero `rule.Given` rather than a decoded
+// struct, and its `Read` returns false and the zero value. The zero value happens to be correct here,
 // which is exactly why this is pinned: nothing else in the suite would notice if the fallback were
 // removed and a later option defaulted the other way.
-func TestNoMultiCompNilOptionsFallsBackToTheDefault(t *testing.T) {
-	t.Parallel()
+func TestNoMultiCompNilOptionsFallsBackToTheDefault(test *testing.T) {
+	test.Parallel()
 
 	sourceText := "function A(){ return <div/>; }\nfunction B(){ return <div/>; }\n"
-	result := rule_testing.RunTypedWithOptions(t, NoMultiComp, noMultiCompFile, sourceText, nil)
-	rule_testing.ExpectFindings(t, result, "onlyOneComponent")
+	result := rule_testing.RunTyped(test, NoMultiComp, noMultiCompFile, sourceText)
+	rule_testing.ExpectFindings(test, result, "onlyOneComponent")
 }
 
 // TestNoMultiCompRequiresTheTypedHarness asserts the rule declines rather than reports when it has
@@ -592,20 +935,20 @@ func TestNoMultiCompNilOptionsFallsBackToTheDefault(t *testing.T) {
 // package's `isPragmaCreateElementCall`. A typed rule run on the plain harness receives a nil
 // checker and, without the guard, would silently answer a narrower question while every quiet
 // fixture passed vacuously. This fails loudly if the guard is ever removed.
-func TestNoMultiCompRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestNoMultiCompRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	sourceText := "function A(){ return <div/>; }\nfunction B(){ return <div/>; }\n"
 
 	// The control. On the typed harness this input reports, so a zero below means the guard fired
 	// rather than that the input was uninteresting.
-	typed := rule_testing.RunTypedWithOptions(t, NoMultiComp, noMultiCompFile, sourceText,
+	typed := rule_testing.RunTypedWithOptions(test, NoMultiComp, noMultiCompFile, sourceText,
 		DefaultNoMultiCompOptions())
-	rule_testing.ExpectFindings(t, typed, "onlyOneComponent")
+	rule_testing.ExpectFindings(test, typed, "onlyOneComponent")
 
-	untyped := rule_testing.RunWithOptions(t, NoMultiComp, noMultiCompFile, sourceText,
+	untyped := rule_testing.RunWithOptions(test, NoMultiComp, noMultiCompFile, sourceText,
 		DefaultNoMultiCompOptions())
-	rule_testing.ExpectClean(t, untyped)
+	rule_testing.ExpectClean(test, untyped)
 }
 
 // TestNoMultiCompCustomPragmaIsNotReproduced records the one upstream case this port does not
@@ -619,17 +962,17 @@ func TestNoMultiCompRequiresTheTypedHarness(t *testing.T) {
 // The equivalent input under the default pragma is asserted instead, which pins that the wrapper
 // machinery works while being explicit that the pragma dimension is untested. If a settings surface
 // is ever added, this is the case to bring back.
-func TestNoMultiCompCustomPragmaIsNotReproduced(t *testing.T) {
-	t.Parallel()
+func TestNoMultiCompCustomPragmaIsNotReproduced(test *testing.T) {
+	test.Parallel()
 
 	sourceText := "import React, { memo, forwardRef } from 'react';\n" +
 		"const Text = forwardRef(({ text }, ref) => {\n" +
 		"  return <div ref={ref}>{text}</div>;\n" +
 		"})\n" +
 		"const Label = memo(() => <Text />);\n"
-	result := rule_testing.RunTypedWithOptions(t, NoMultiComp, noMultiCompFile, sourceText,
+	result := rule_testing.RunTypedWithOptions(test, NoMultiComp, noMultiCompFile, sourceText,
 		DefaultNoMultiCompOptions())
-	rule_testing.ExpectFindings(t, result, "onlyOneComponent")
+	rule_testing.ExpectFindings(test, result, "onlyOneComponent")
 }
 
 // TestNoMultiCompCurriedFunctionsAreNotComponents pins a defect this rule shipped with.
@@ -643,8 +986,8 @@ func TestNoMultiCompCustomPragmaIsNotReproduced(t *testing.T) {
 // rule's own corpus writes no curried function at all, so nothing in the imported fixture set
 // could see it; it surfaced while porting `display-name`, whose corpus has five passing cases of
 // exactly this shape.
-func TestNoMultiCompCurriedFunctionsAreNotComponents(t *testing.T) {
-	t.Parallel()
+func TestNoMultiCompCurriedFunctionsAreNotComponents(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -669,11 +1012,11 @@ func TestNoMultiCompCurriedFunctionsAreNotComponents(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoMultiComp, noMultiCompFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, NoMultiComp, noMultiCompFile,
 				testCase.sourceText, DefaultNoMultiCompOptions())
-			rule_testing.ExpectClean(t, result)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -683,11 +1026,11 @@ func TestNoMultiCompCurriedFunctionsAreNotComponents(t *testing.T) {
 // The arm declines on real JSX rather than on JSX-or-null, so an inner function that returns an
 // element is still a component. Without this row, narrowing the arm to decline everything returned
 // by a function would pass the test above while losing a component upstream counts.
-func TestNoMultiCompCurriedInnerReturningJsxIsStillAComponent(t *testing.T) {
-	t.Parallel()
+func TestNoMultiCompCurriedInnerReturningJsxIsStillAComponent(test *testing.T) {
+	test.Parallel()
 
 	sourceText := "const make = () => (props) => <div/>;\nfunction Other(){ return <div/>; }\n"
-	result := rule_testing.RunTypedWithOptions(t, NoMultiComp, noMultiCompFile, sourceText,
+	result := rule_testing.RunTypedWithOptions(test, NoMultiComp, noMultiCompFile, sourceText,
 		DefaultNoMultiCompOptions())
-	rule_testing.ExpectFindings(t, result, "onlyOneComponent")
+	rule_testing.ExpectFindings(test, result, "onlyOneComponent")
 }

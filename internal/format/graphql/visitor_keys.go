@@ -18,18 +18,25 @@ import (
 //
 // Unable to produce https://github.com/prettier/prettier/issues/18212#issuecomment-3506234429
 var visitorKeys = map[string][]string{
-	"Name":                      {},
-	"Document":                  {"definitions"},
-	"OperationDefinition":       {"description", "name", "variableDefinitions", "directives", "selectionSet"},
-	"VariableDefinition":        {"description", "variable", "type", "defaultValue", "directives"},
-	"Variable":                  {"name"},
-	"SelectionSet":              {"selections"},
-	"Field":                     {"alias", "name", "arguments", "directives", "selectionSet"},
-	"Argument":                  {"name", "value"},
-	"FragmentArgument":          {"name", "value"},
-	"FragmentSpread":            {"name", "arguments", "directives"},
-	"InlineFragment":            {"typeCondition", "directives", "selectionSet"},
-	"FragmentDefinition":        {"description", "name", "variableDefinitions", "typeCondition", "directives", "selectionSet"},
+	"Name":                {},
+	"Document":            {"definitions"},
+	"OperationDefinition": {"description", "name", "variableDefinitions", "directives", "selectionSet"},
+	"VariableDefinition":  {"description", "variable", "type", "defaultValue", "directives"},
+	"Variable":            {"name"},
+	"SelectionSet":        {"selections"},
+	"Field":               {"alias", "name", "arguments", "directives", "selectionSet"},
+	"Argument":            {"name", "value"},
+	"FragmentArgument":    {"name", "value"},
+	"FragmentSpread":      {"name", "arguments", "directives"},
+	"InlineFragment":      {"typeCondition", "directives", "selectionSet"},
+	"FragmentDefinition": {
+		"description",
+		"name",
+		"variableDefinitions",
+		"typeCondition",
+		"directives",
+		"selectionSet",
+	},
 	"IntValue":                  {},
 	"FloatValue":                {},
 	"StringValue":               {},
@@ -71,6 +78,8 @@ var visitorKeys = map[string][]string{
 func getVisitorKeys(node *estree.Node) []string {
 	keys, known := visitorKeys[node.Type()]
 	if !known {
+		// Invariant: visitorKeys lists every kind the parser builds, and the core asks only about nodes of
+		// the tree; Format and PrintToDoc recover the panic into their error.
 		panic(fmt.Sprintf("Missing visitor keys for '%s'.", node.Type()))
 	}
 	return keys

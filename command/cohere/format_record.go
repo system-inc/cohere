@@ -46,9 +46,9 @@ import (
 // The record is a section of the project's cache table (see run_cache.go), keyed by the formatter's
 // identity: a hash of the printers and everything they import, the pass loop, and the toolchain,
 // stamped at build time. A cohere whose formatter changed starts with an empty record and formats every
-// file once; one that changed only a lint rule keeps it. Each entry carries the options its file formats with, so a config edit sends exactly the
-// files it reaches back through the formatter. Any doubt, an unreadable record, a version it does not
-// know, is an empty record: the cost is one run that formats everything, never a file skipped on a
+// file once; one that changed only a lint rule keeps it. Each entry carries the options its file formats with, so a
+// config edit sends exactly the files it reaches back through the formatter. Any doubt, an unreadable record, a version
+// it does not know, is an empty record: the cost is one run that formats everything, never a file skipped on a
 // guess.
 //
 // # Reading it cheaply
@@ -82,9 +82,12 @@ type formatRecord struct {
 // be read is an empty one, and absent says why.
 func loadFormatRecord(root string) *formatRecord {
 	record := &formatRecord{root: root, entries: map[string]program.FormatEntry{}}
-	key, err := formatRecordKey(root)
-	if err != nil {
-		record.absent = fmt.Sprintf("cohere could not identify its own binary (%v)", firstLine(err.Error()))
+	key, formatRecordKeyError := formatRecordKey(root)
+	if formatRecordKeyError != nil {
+		record.absent = fmt.Sprintf(
+			"cohere could not identify its own binary (%v)",
+			firstLine(formatRecordKeyError.Error()),
+		)
 		return record
 	}
 	record.key = key
@@ -164,16 +167,16 @@ func (record *formatRecord) formatted(fileName string, optionsFor func(fileName 
 	if !present {
 		return false
 	}
-	options, err := optionsFor(fileName)
-	if err != nil || options != entry.Options {
+	options, optionsForError := optionsFor(fileName)
+	if optionsForError != nil || options != entry.Options {
 		return false
 	}
 
 	// Stat before reading. A write after the stat moves the modification time past the one about to be
 	// recorded, so the next run sees a mismatch and reads again; the other order could record a
 	// signature taken after bytes it never read.
-	information, err := os.Stat(fileName)
-	if err != nil || !information.Mode().IsRegular() {
+	information, statError := os.Stat(fileName)
+	if statError != nil || !information.Mode().IsRegular() {
 		return false
 	}
 	if entry.ModifiedNanoseconds != 0 &&
@@ -181,8 +184,8 @@ func (record *formatRecord) formatted(fileName string, optionsFor func(fileName 
 		return true
 	}
 
-	contents, err := os.ReadFile(fileName)
-	if err != nil || formatRecordSum(contents) != entry.Sum {
+	contents, readError := os.ReadFile(fileName)
+	if readError != nil || formatRecordSum(contents) != entry.Sum {
 		return false
 	}
 
@@ -202,32 +205,41 @@ func (record *formatRecord) formatted(fileName string, optionsFor func(fileName 
 // vouches reports whether text is the bytes the record holds as formatted for a file, under the options
 // it formats with now. Unlike formatted, it is asked about text in hand, such as a fixer's output, rather
 // than the file on disk.
-func (record *formatRecord) vouches(fileName string, text string, optionsFor func(fileName string) (string, error)) bool {
+func (record *formatRecord) vouches(
+	fileName string,
+	text string,
+	optionsFor func(fileName string) (string, error),
+) bool {
 	record.mutex.Lock()
 	entry, present := record.entries[fileName]
 	record.mutex.Unlock()
 	if !present {
 		return false
 	}
-	options, err := optionsFor(fileName)
-	return err == nil && options == entry.Options && formatRecordSum([]byte(text)) == entry.Sum
+	options, optionsForError := optionsFor(fileName)
+	return optionsForError == nil && options == entry.Options && formatRecordSum([]byte(text)) == entry.Sum
 }
 
 // observe wraps a format transform so every text it returns is recorded as formatted. A nil record or
 // transform is handed back unchanged.
-func (record *formatRecord) observe(inner edit.Transform, optionsFor func(fileName string) (string, error)) edit.Transform {
+func (record *formatRecord) observe(
+	inner edit.Transform,
+	optionsFor func(fileName string) (string, error),
+) edit.Transform {
 	if record == nil || inner == nil || record.key == "" {
 		return inner
 	}
 	return func(fileName string, text string, parsed *ast.SourceFile) (string, error) {
-		formatted, err := inner(fileName, text, parsed)
-		if err != nil {
-			return formatted, err
+		formatted, innerError := inner(fileName, text, parsed)
+		if innerError != nil {
+			return formatted, innerError
 		}
 		if options, optionsError := optionsFor(fileName); optionsError == nil {
 			entry := program.FormatEntry{Sum: formatRecordSum([]byte(formatted)), Options: options}
 			record.mutex.Lock()
-			if previous, present := record.entries[fileName]; !present || previous.Sum != entry.Sum || previous.Options != entry.Options {
+			if previous, present := record.entries[fileName]; !present ||
+				previous.Sum != entry.Sum ||
+				previous.Options != entry.Options {
 				record.entries[fileName] = entry
 				record.changed = true
 			}
@@ -298,37 +310,21 @@ func formatRecordSum(contents []byte) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// formatUniverse is every file the default format scope is drawn from: what the formatter handles in
-// the repository the run writes, and nowhere else.
-//
-// It stops at the repository's own boundary. Writes stay inside one repository (@system_cohere,
-// 2026-10-03): a submodule is formatted by a run inside it, which leaves the commit in the submodule,
-// and a run here reads the submodules it declares and reports their drift instead of writing it (see
-// checkNestedRepositories). The universe used to descend into every declared submodule, so a default
-// run in ahra rewrote Structure and Nexus whenever their files were not on record, and the change
-// landed in repositories nobody running here was committing to.
-type formatUniverse struct {
-	// root is the repository's own walk; its nested repositories are named and not walked.
-	root formatfiles.Enumeration
-
-	files []string
-}
-
 func enumerateFormatUniverse(engine formatEngine, root string) (formatUniverse, error) {
-	rootEnumeration, err := enumerateFormatTree(engine, root)
-	if err != nil {
-		return formatUniverse{}, err
+	rootEnumeration, enumerateFormatTreeError := enumerateFormatTree(engine, root)
+	if enumerateFormatTreeError != nil {
+		return formatUniverse{}, enumerateFormatTreeError
 	}
 	return formatUniverse{root: rootEnumeration, files: append([]string(nil), rootEnumeration.Files...)}, nil
 }
 
 // formatWalkAhead is the format walk begun before the graph build, for the fix phase to take.
 type formatWalkAhead struct {
-	engine      formatEngine
-	root        string
-	done        chan struct{}
-	enumeration formatfiles.Enumeration
-	err         error
+	engine           formatEngine
+	root             string
+	done             chan struct{}
+	enumeration      formatfiles.Enumeration
+	enumerationError error
 }
 
 // aheadFormatWalk is the walk startFormatWalkAhead began, nil once taken or when none was.
@@ -349,9 +345,9 @@ func startFormatWalkAhead(engine formatEngine, root string, listing gitignore.Li
 	go func() {
 		defer close(ahead.done)
 		if listed, ok := engine.(listedEnumerator); ok && listing != nil {
-			ahead.enumeration, ahead.err = listed.EnumerateListed(root, listing)
+			ahead.enumeration, ahead.enumerationError = listed.EnumerateListed(root, listing)
 		} else {
-			ahead.enumeration, ahead.err = engine.Enumerate(root)
+			ahead.enumeration, ahead.enumerationError = engine.Enumerate(root)
 		}
 		ahead.enumeration = withoutYieldedDirectories(ahead.enumeration)
 	}()
@@ -369,11 +365,11 @@ func enumerateFormatTree(engine formatEngine, root string) (formatfiles.Enumerat
 	if ahead := aheadFormatWalk; ahead != nil && ahead.engine == engine && ahead.root == root {
 		aheadFormatWalk = nil
 		<-ahead.done
-		return ahead.enumeration, ahead.err
+		return ahead.enumeration, ahead.enumerationError
 	}
 	// Less what the projects below this one format, when it is one project of several. See ownership.go.
-	enumeration, err := engine.Enumerate(root)
-	return withoutYieldedDirectories(enumeration), err
+	enumeration, enumerateError := engine.Enumerate(root)
+	return withoutYieldedDirectories(enumeration), enumerateError
 }
 
 // declaredSubmodules reads the submodule paths a repository's `.gitmodules` declares. A repository with
@@ -384,13 +380,14 @@ func enumerateFormatTree(engine formatEngine, root string) (formatfiles.Enumerat
 // stranger than that names a path no read would find, which costs a submodule its drift check.
 func declaredSubmodules(directory string) (map[string]struct{}, error) {
 	declared := map[string]struct{}{}
-	file, err := os.Open(filepath.Join(directory, ".gitmodules"))
-	if errors.Is(err, os.ErrNotExist) {
+	file, openError := os.Open(filepath.Join(directory, ".gitmodules"))
+	if errors.Is(openError, os.ErrNotExist) {
 		return declared, nil
 	}
-	if err != nil {
-		return nil, fmt.Errorf("reading the submodules %s declares: %w", directory, err)
+	if openError != nil {
+		return nil, fmt.Errorf("reading the submodules %s declares: %w", directory, openError)
 	}
+	// Ignored: only read, so its close loses nothing.
 	defer file.Close()
 	lines := bufio.NewScanner(file)
 	for lines.Scan() {
@@ -404,30 +401,25 @@ func declaredSubmodules(directory string) (map[string]struct{}, error) {
 		}
 		declared[strings.TrimSuffix(value, "/")] = struct{}{}
 	}
-	if err := lines.Err(); err != nil {
-		return nil, fmt.Errorf("reading the submodules %s declares: %w", directory, err)
+	if scanError := lines.Err(); scanError != nil {
+		return nil, fmt.Errorf("reading the submodules %s declares: %w", directory, scanError)
 	}
 	return declared, nil
-}
-
-// describe says what the universe walked, in the words describeEnumeration uses for one walk.
-func (universe formatUniverse) describe() string {
-	return describeEnumeration(universe.root, len(universe.root.Files))
 }
 
 // unformattedScope is the default format scope: every file in the universe whose bytes are not on record
 // as formatted. It returns the universe's files too, so the record can drop entries outside it.
 func unformattedScope(engine formatEngine, record *formatRecord, root string) (formatScope, []string) {
-	universe, err := enumerateFormatUniverse(engine, root)
-	if err != nil {
+	universe, enumerateFormatUniverseError := enumerateFormatUniverse(engine, root)
+	if enumerateFormatUniverseError != nil {
 		// A failed walk withholds formatting and says why, rather than falling back to a universe that
 		// would format the wrong set. Fixing still runs. No universe means nothing is pruned, and nothing
 		// says what the walk read, so the run is not replayed.
 		declineRunCache("the format walk failed")
 		return formatScope{
 			index:       map[string]struct{}{},
-			Description: fmt.Sprintf("nothing (could not enumerate the tree: %v)", err),
-			failure:     err,
+			Description: fmt.Sprintf("nothing (could not enumerate the tree: %v)", enumerateFormatUniverseError),
+			failure:     enumerateFormatUniverseError,
 		}, nil
 	}
 

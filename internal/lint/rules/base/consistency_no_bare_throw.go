@@ -51,7 +51,7 @@ var consistencyNoBareThrowConstructors = map[string]bool{
 // pasting a comment.
 //
 // The leading slash is load-bearing rather than decorative. Measured against the running rule:
-// `NotBaseError.ts` REPORTS, so the suffix test is on the path separator and not on the bare name.
+// `NotBaseError.ts` reports, so the suffix test is on the path separator and not on the bare name.
 var consistencyNoBareThrowCapturePathFiles = []string{
 	"/BaseError.ts",
 	"/BaseLog.ts",
@@ -107,7 +107,7 @@ var consistencyNoBareThrowBelowVocabularyPaths = []string{
 // branches on.
 //
 // The slashes on both sides matter and are measured: `source/latest/Thing.ts` and
-// `source/protest/Thing.ts` both contain the letters `test` and both REPORT, because the test is on
+// `source/protest/Thing.ts` both contain the letters `test` and both report, because the test is on
 // a path segment rather than on a substring.
 var consistencyNoBareThrowTestPaths = []string{"/test/", "/tests/", "/testing/"}
 
@@ -121,7 +121,7 @@ var consistencyNoBareThrowTestPaths = []string{"/test/", "/tests/", "/testing/"}
 //	invalid: throw new TypeError('x');
 //
 // Ported from `base/consistency-no-bare-throw` in `api-phi-health`, at
-// `libraries/base/code-quality/lint/rules/ConsistencyNoBareThrowRule.ts`. This is one of OUR rules rather than
+// `libraries/base/code-quality/lint/rules/ConsistencyNoBareThrowRule.ts`. This is one of our rules rather than
 // an upstream one, so there is no corpus to import and the source file is the specification. Every
 // verdict below was measured by driving that rule through the ESLint 10.8.1 Linter API over
 // thirty-nine inputs, twenty-two of which exist to prove a gate declines rather than that the rule
@@ -142,16 +142,16 @@ var consistencyNoBareThrowTestPaths = []string{"/test/", "/tests/", "/testing/"}
 // `NotBaseError.ts` reports because the capture-path test keeps its leading slash. All four measured
 // against the running rule.
 //
-// # The span is the NEW EXPRESSION rather than the throw statement
+// # The span is the `new` expression rather than the throw statement
 //
 // The original reports `node.argument`, so the finding covers `new Error('x')` and not the `throw`
 // keyword. Measured on three constructors. That is worth stating because reporting the statement
 // would read as equally correct and would put the finding one token to the left, where a reader
 // looking for the constructor name would not find it underlined.
-var ConsistencyNoBareThrow = rule.Rule{
+var ConsistencyNoBareThrow = rule.Rule[rule.NoOptions]{
 	Name: "base/consistency-no-bare-throw",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -159,7 +159,7 @@ var ConsistencyNoBareThrow = rule.Rule{
 		// path written with forward slashes, and the original ran on a filename ESLint had already
 		// normalized. Without this a Windows-shaped path would decline every gate and the rule would
 		// report inside the capture path.
-		fileName := imports.NormalizedFileName(ctx.SourceFile)
+		fileName := imports.NormalizedFileName(ruleContext.SourceFile)
 
 		if consistencyNoBareThrowFileIsExempt(fileName) {
 			// Returning no listeners rather than guarding at each report, matching the original's
@@ -170,7 +170,7 @@ var ConsistencyNoBareThrow = rule.Rule{
 
 		return rule.Listeners{
 			ast.KindThrowStatement: func(node *ast.Node) {
-				reportNoBareThrow(ctx, node)
+				reportNoBareThrow(ruleContext, node)
 			},
 		}
 	},
@@ -210,7 +210,7 @@ func consistencyNoBareThrowFileIsExempt(fileName string) bool {
 }
 
 // reportNoBareThrow judges one throw statement.
-func reportNoBareThrow(ctx rule.Context, node *ast.Node) {
+func reportNoBareThrow(ruleContext rule.Context, node *ast.Node) {
 	thrown := node.AsThrowStatement().Expression
 	if thrown == nil {
 		// Error recovery produces a throw with nothing thrown, from source as ordinary as a
@@ -231,9 +231,9 @@ func reportNoBareThrow(ctx rule.Context, node *ast.Node) {
 	}
 
 	// `Text()` is read only after the kind is known to be an identifier, which is the whole reason
-	// the kind test sits above it rather than beside it. `ast.Node.Text()` PANICS on a property
+	// the kind test sits above it rather than beside it. `ast.Node.Text()` panics on a property
 	// access and on a call expression, and both are shapes this rule meets: `throw someError.message`
-	// and `throw makeError()` are ordinary source. The walk recovers per FILE rather than per rule,
+	// and `throw makeError()` are ordinary source. The walk recovers per file rather than per rule,
 	// so one such node would cost every rule in the package every finding in that file while the run
 	// still printed a plausible summary.
 	constructorName := callee.Text()
@@ -242,5 +242,5 @@ func reportNoBareThrow(ctx rule.Context, node *ast.Node) {
 	}
 
 	// The new expression rather than the statement, matching the original's `node: thrown`.
-	ctx.ReportNode(thrown, messageNoBareThrow(constructorName))
+	ruleContext.ReportNode(thrown, messageNoBareThrow(constructorName))
 }

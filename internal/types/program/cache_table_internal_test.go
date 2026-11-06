@@ -13,74 +13,198 @@ import (
 	"testing"
 )
 
-var internalTestIdentity = CacheTableIdentity{SelfCommit: "test", CompilerCommit: "test", GoToolchain: "go-test", Platform: "test/test"}
+var internalTestIdentity = CacheTableIdentity{
+	SelfCommit:     "test",
+	CompilerCommit: "test",
+	GoToolchain:    "go-test",
+	Platform:       "test/test",
+}
 
 // encodeRaw writes a header and a body exactly as given, so a test can produce what no current encoder
-// would: an old version, a wrong magic, another commit, a list index past its table.
-func encodeRaw(t *testing.T, header cacheTableHeader, body any) []byte {
-	t.Helper()
+// would: an old version, a wrong magic, another commit, a list index past its table. The body is of whichever
+// section's type the test writes.
+func encodeRaw[Body any](test *testing.T, header cacheTableHeader, body Body) []byte {
+	test.Helper()
 	var buffer bytes.Buffer
 	encoder := gob.NewEncoder(&buffer)
-	if err := encoder.Encode(header); err != nil {
-		t.Fatal(err)
+	if encodeError := encoder.Encode(header); encodeError != nil {
+		test.Fatal(encodeError)
 	}
-	if err := encoder.Encode(body); err != nil {
-		t.Fatal(err)
+	if encodeError := encoder.Encode(body); encodeError != nil {
+		test.Fatal(encodeError)
 	}
 	return buffer.Bytes()
 }
 
 func currentHeader(section string) cacheTableHeader {
-	return cacheTableHeader{Magic: cacheTableMagic, Version: cacheTableVersion, Identity: internalTestIdentity, Section: section}
+	return cacheTableHeader{
+		Magic:    cacheTableMagic,
+		Version:  cacheTableVersion,
+		Identity: internalTestIdentity,
+		Section:  section,
+	}
 }
 
 // writeRaw puts a raw file into a table's directory.
-func writeRaw(t *testing.T, directory string, name string, contents []byte) {
-	t.Helper()
-	if err := os.WriteFile(filepath.Join(directory, name), contents, 0o644); err != nil {
-		t.Fatal(err)
+func writeRaw(test *testing.T, directory string, name string, contents []byte) {
+	test.Helper()
+	if writeError := os.WriteFile(filepath.Join(directory, name), contents, 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 }
 
 // TestCacheTableRefusesAnotherFormat covers the header fields no other build of this code can get wrong,
 // and so only a raw write can: whatever the version is now, never a number someone must remember to
 // update, the magic, and the section a file says it holds.
-func TestCacheTableRefusesAnotherFormat(t *testing.T) {
-	t.Parallel()
+func TestCacheTableRefusesAnotherFormat(test *testing.T) {
+	test.Parallel()
 	for name, header := range map[string]cacheTableHeader{
-		"an older version":  {Magic: cacheTableMagic, Version: cacheTableVersion - 1, Identity: internalTestIdentity, Section: cacheTableTypesSection},
-		"a newer version":   {Magic: cacheTableMagic, Version: cacheTableVersion + 1, Identity: internalTestIdentity, Section: cacheTableTypesSection},
-		"another magic":     {Magic: "something else", Version: cacheTableVersion, Identity: internalTestIdentity, Section: cacheTableTypesSection},
-		"another section":   {Magic: cacheTableMagic, Version: cacheTableVersion, Identity: internalTestIdentity, Section: cacheTableFormatSection},
-		"another toolchain": {Magic: cacheTableMagic, Version: cacheTableVersion, Identity: CacheTableIdentity{SelfCommit: "test", CompilerCommit: "test", GoToolchain: "other", Platform: "test/test"}, Section: cacheTableTypesSection},
+		"an older version": {
+			Magic:    cacheTableMagic,
+			Version:  cacheTableVersion - 1,
+			Identity: internalTestIdentity,
+			Section:  cacheTableTypesSection,
+		},
+		"a newer version": {
+			Magic:    cacheTableMagic,
+			Version:  cacheTableVersion + 1,
+			Identity: internalTestIdentity,
+			Section:  cacheTableTypesSection,
+		},
+		"another magic": {
+			Magic:    "something else",
+			Version:  cacheTableVersion,
+			Identity: internalTestIdentity,
+			Section:  cacheTableTypesSection,
+		},
+		"another section": {
+			Magic:    cacheTableMagic,
+			Version:  cacheTableVersion,
+			Identity: internalTestIdentity,
+			Section:  cacheTableFormatSection,
+		},
+		"another toolchain": {Magic: cacheTableMagic, Version: cacheTableVersion, Identity: CacheTableIdentity{
+			SelfCommit:     "test",
+			CompilerCommit: "test",
+			GoToolchain:    "other",
+			Platform:       "test/test",
+		}, Section: cacheTableTypesSection},
 	} {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			directory := t.TempDir()
-			writeRaw(t, directory, cacheTableFile(cacheTableTypesSection), encodeRaw(t, header, &TypesSection{Version: typesSectionVersion}))
-			table, err := ReadCacheTable(directory, internalTestIdentity, CacheTableSections{Types: true}, PathAnchor{})
-			if !errors.Is(err, ErrCacheTableUnreadable) || table.Types != nil {
-				t.Fatalf("read %s: section %v, error %v", name, table.Types, err)
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+			directory := test.TempDir()
+			writeRaw(
+				test,
+				directory,
+				cacheTableFile(cacheTableTypesSection),
+				encodeRaw(test, header, &TypesSection{Version: typesSectionVersion}),
+			)
+			table, readCacheTableError := ReadCacheTable(
+				directory,
+				internalTestIdentity,
+				CacheTableSections{Types: true},
+				PathAnchor{},
+			)
+			if !errors.Is(readCacheTableError, ErrCacheTableUnreadable) || table.Types != nil {
+				test.Fatalf("read %s: section %v, error %v", name, table.Types, readCacheTableError)
 			}
 		})
 	}
 }
 
+// formatFifteenStoredDiagnostic is a stored type diagnostic as format 15 encoded it, before its offset read
+// Start and its arguments MessageArguments. gob matches fields by name, so this shape decoded by the current
+// one would leave both at their zero value without an error.
+type formatFifteenStoredDiagnostic struct {
+	//cohere:ignore consistency-no-abbreviated-identifier gob reads the name, and format 15 wrote this one
+	Pos, End   int
+	Code       int32
+	MessageKey string
+	//cohere:ignore consistency-no-abbreviated-identifier gob reads the name, and format 15 wrote this one
+	MessageArgs []string
+}
+
+// formatFifteenTypesSection is the types section as format 15 encoded it, around its diagnostics.
+type formatFifteenTypesSection struct {
+	Version int
+	Entries map[string]formatFifteenTypesEntry
+}
+
+// formatFifteenTypesEntry is one file's diagnostics as format 15 encoded them.
+type formatFifteenTypesEntry struct {
+	Diagnostics []formatFifteenStoredDiagnostic
+}
+
+// TestCacheTableRebuildsATypesSectionOfFormatFifteen: a table written before the stored diagnostic's fields
+// were spelled out is discarded on its version, never read into a diagnostic at offset zero with no
+// arguments, and the section written in its place reads back whole.
+func TestCacheTableRebuildsATypesSectionOfFormatFifteen(test *testing.T) {
+	test.Parallel()
+	directory := test.TempDir()
+	formatFifteenHeader := currentHeader(cacheTableTypesSection)
+	formatFifteenHeader.Version = 15
+	writeRaw(test, directory, cacheTableFile(cacheTableTypesSection), encodeRaw(test, formatFifteenHeader,
+		&formatFifteenTypesSection{
+			Version: typesSectionVersion,
+			Entries: map[string]formatFifteenTypesEntry{
+				"/a.ts": {Diagnostics: []formatFifteenStoredDiagnostic{
+					{Pos: 7, End: 9, Code: 2322, MessageKey: "key", MessageArgs: []string{"string"}},
+				}},
+			},
+		}))
+	sections := CacheTableSections{Types: true}
+	discarded, readFormatFifteenError := ReadCacheTable(directory, internalTestIdentity, sections, PathAnchor{})
+	if !errors.Is(readFormatFifteenError, ErrCacheTableUnreadable) || discarded.Types != nil {
+		test.Fatalf("a format 15 types section was read: section %v, error %v", discarded.Types, readFormatFifteenError)
+	}
+
+	rebuilt := &TypesSection{Version: typesSectionVersion, Entries: map[string]TypesEntry{
+		"/a.ts": {Diagnostics: []StoredDiagnostic{
+			{Start: 7, End: 9, Code: 2322, MessageKey: "key", MessageArguments: []string{"string"}},
+		}},
+	}}
+	writeError := WriteCacheTable(directory, &CacheTable{Types: rebuilt}, internalTestIdentity, sections, PathAnchor{})
+	if writeError != nil {
+		test.Fatal(writeError)
+	}
+	read, readRebuiltError := ReadCacheTable(directory, internalTestIdentity, sections, PathAnchor{})
+	if readRebuiltError != nil {
+		test.Fatal(readRebuiltError)
+	}
+	if !reflect.DeepEqual(read.Types, rebuilt) {
+		test.Fatalf("the rebuilt types section read back as %+v, written as %+v", read.Types, rebuilt)
+	}
+}
+
 // TestCacheTableRefusesAListIndexPastItsTable pins the one check gob cannot make for us. The rule lists
 // are interned by hand, and an index trusted past its table would hand an entry another file's rules.
-func TestCacheTableRefusesAListIndexPastItsTable(t *testing.T) {
-	t.Parallel()
+func TestCacheTableRefusesAListIndexPastItsTable(test *testing.T) {
+	test.Parallel()
 	for _, field := range []string{"Rules", "TypedRules", "Listening", "ShapedRules"} {
-		t.Run(field, func(t *testing.T) {
-			t.Parallel()
+		test.Run(field, func(test *testing.T) {
+			test.Parallel()
 			entry := lintCacheWireEntry{Path: "/a.ts"}
 			reflect.ValueOf(&entry).Elem().FieldByName(field).SetInt(1)
-			wire := &lintCacheWire{Version: lintCacheVersion, Lists: [][]string{{"no-debugger"}}, Entries: []lintCacheWireEntry{entry}}
-			directory := t.TempDir()
-			writeRaw(t, directory, cacheTableFile(cacheTableFindingsSection), encodeRaw(t, currentHeader(cacheTableFindingsSection), wire))
-			table, err := ReadCacheTable(directory, internalTestIdentity, CacheTableSections{Findings: true}, PathAnchor{})
-			if !errors.Is(err, ErrCacheTableUnreadable) || table.Findings != nil {
-				t.Fatalf("an entry whose %s index is past the list table was read: %v", field, err)
+			wire := &lintCacheWire{
+				Version: lintCacheVersion,
+				Lists:   [][]string{{"no-debugger"}},
+				Entries: []lintCacheWireEntry{entry},
+			}
+			directory := test.TempDir()
+			writeRaw(
+				test,
+				directory,
+				cacheTableFile(cacheTableFindingsSection),
+				encodeRaw(test, currentHeader(cacheTableFindingsSection), wire),
+			)
+			table, readCacheTableError := ReadCacheTable(
+				directory,
+				internalTestIdentity,
+				CacheTableSections{Findings: true},
+				PathAnchor{},
+			)
+			if !errors.Is(readCacheTableError, ErrCacheTableUnreadable) || table.Findings != nil {
+				test.Fatalf("an entry whose %s index is past the list table was read: %v", field, readCacheTableError)
 			}
 		})
 	}
@@ -89,39 +213,63 @@ func TestCacheTableRefusesAListIndexPastItsTable(t *testing.T) {
 // TestCacheTableDropsAFindingsSectionOfAnotherMeaning: the findings section keeps its own version, for
 // changes in what an entry means rather than in its shape. One of another version is dropped, which is a
 // miss, and the run beside it is kept, since each is proven by its own key.
-func TestCacheTableDropsAFindingsSectionOfAnotherMeaning(t *testing.T) {
-	t.Parallel()
-	directory := t.TempDir()
-	writeRaw(t, directory, cacheTableRunFile("--no-fix"),
-		encodeRaw(t, currentHeader(cacheTableRunSection), cacheTableRunBody{Invocation: "--no-fix", Run: &RunCache{Key: "kept"}}))
-	writeRaw(t, directory, cacheTableFile(cacheTableFindingsSection), encodeRaw(t, currentHeader(cacheTableFindingsSection),
-		&lintCacheWire{Version: lintCacheVersion - 1, Lists: [][]string{{}}, Entries: []lintCacheWireEntry{{Path: "/a.ts"}}}))
-	table, err := ReadCacheTable(directory, internalTestIdentity, CacheTableSections{Runs: []string{"--no-fix"}, Findings: true}, PathAnchor{})
-	if err != nil {
-		t.Fatalf("reading: %v", err)
+func TestCacheTableDropsAFindingsSectionOfAnotherMeaning(test *testing.T) {
+	test.Parallel()
+	directory := test.TempDir()
+	writeRaw(test, directory, cacheTableRunFile("--no-fix"),
+		encodeRaw(
+			test,
+			currentHeader(cacheTableRunSection),
+			cacheTableRunBody{Invocation: "--no-fix", Run: &RunCache{Key: "kept"}},
+		))
+	writeRaw(
+		test,
+		directory,
+		cacheTableFile(cacheTableFindingsSection),
+		encodeRaw(test, currentHeader(cacheTableFindingsSection),
+			&lintCacheWire{
+				Version: lintCacheVersion - 1,
+				Lists:   [][]string{{}},
+				Entries: []lintCacheWireEntry{{Path: "/a.ts"}},
+			}),
+	)
+	table, readCacheTableError := ReadCacheTable(
+		directory,
+		internalTestIdentity,
+		CacheTableSections{Runs: []string{"--no-fix"}, Findings: true},
+		PathAnchor{},
+	)
+	if readCacheTableError != nil {
+		test.Fatalf("reading: %v", readCacheTableError)
 	}
 	if table.Findings != nil {
-		t.Error("a findings section of another version was used")
+		test.Error("a findings section of another version was used")
 	}
 	if table.Runs["--no-fix"] == nil {
-		t.Error("the run was thrown away with the findings")
+		test.Error("the run was thrown away with the findings")
 	}
 }
 
 // A file written by another cohere commit is discarded alone (#45ekc65): planted beside current files, it
 // takes nothing else with it, and the error names it. The format record from another commit is the one file
 // kept, for its own key to decide. A run file answering for another invocation than its name is dropped too.
-func TestAFileFromAnotherCohereCommitIsDiscardedAlone(t *testing.T) {
-	t.Parallel()
-	directory := t.TempDir()
+func TestAFileFromAnotherCohereCommitIsDiscardedAlone(test *testing.T) {
+	test.Parallel()
+	directory := test.TempDir()
 	current := &CacheTable{
 		Runs:       map[string]*RunCache{"": {Key: "bare"}, "--no-fix": {Key: "no-fix"}},
 		Findings:   &LintCache{Version: lintCacheVersion, Entries: []LintCacheEntry{{Path: "/a.ts"}}},
 		Signatures: map[string]SignatureEntry{"/a.ts": {Version: "1"}},
 		Types:      &TypesSection{Version: typesSectionVersion},
 	}
-	if err := WriteCacheTable(directory, current, internalTestIdentity, EveryCacheTableSection, PathAnchor{}); err != nil {
-		t.Fatal(err)
+	if writeCacheTableError := WriteCacheTable(
+		directory,
+		current,
+		internalTestIdentity,
+		EveryCacheTableSection,
+		PathAnchor{},
+	); writeCacheTableError != nil {
+		test.Fatal(writeCacheTableError)
 	}
 	other := internalTestIdentity
 	other.SelfCommit = "another"
@@ -130,47 +278,65 @@ func TestAFileFromAnotherCohereCommitIsDiscardedAlone(t *testing.T) {
 		header.Identity = other
 		return header
 	}
-	writeRaw(t, directory, cacheTableFile(cacheTableSignaturesSection),
-		encodeRaw(t, otherHeader(cacheTableSignaturesSection), map[string]SignatureEntry{"/a.ts": {Version: "stale"}}))
-	writeRaw(t, directory, cacheTableFile(cacheTableFormatSection),
-		encodeRaw(t, otherHeader(cacheTableFormatSection), &FormatSection{Key: "formatter"}))
+	writeRaw(test, directory, cacheTableFile(cacheTableSignaturesSection),
+		encodeRaw(
+			test,
+			otherHeader(cacheTableSignaturesSection),
+			map[string]SignatureEntry{"/a.ts": {Version: "stale"}},
+		))
+	writeRaw(test, directory, cacheTableFile(cacheTableFormatSection),
+		encodeRaw(test, otherHeader(cacheTableFormatSection), &FormatSection{Key: "formatter"}))
 
-	table, err := ReadCacheTable(directory, internalTestIdentity, EveryCacheTableSection, PathAnchor{})
-	if !errors.Is(err, ErrCacheTablePartlyKept) || !strings.Contains(err.Error(), cacheTableFile(cacheTableSignaturesSection)) {
-		t.Fatalf("the planted file was not reported as another commit's: %v", err)
+	table, readCacheTableError := ReadCacheTable(directory, internalTestIdentity, EveryCacheTableSection, PathAnchor{})
+	if !errors.Is(readCacheTableError, ErrCacheTablePartlyKept) ||
+		!strings.Contains(readCacheTableError.Error(), cacheTableFile(cacheTableSignaturesSection)) {
+		test.Fatalf("the planted file was not reported as another commit's: %v", readCacheTableError)
 	}
 	if table.Signatures != nil {
-		t.Error("another commit's signatures were used")
+		test.Error("another commit's signatures were used")
 	}
 	if table.Formatted == nil || table.Formatted.Key != "formatter" {
-		t.Error("another commit's format record was not kept for its key to decide")
+		test.Error("another commit's format record was not kept for its key to decide")
 	}
 	if table.Runs[""] == nil || table.Runs["--no-fix"] == nil || table.Findings == nil || table.Types == nil {
-		t.Errorf("a current file went with the planted one: runs %v, findings %v, types %v", table.Runs, table.Findings != nil, table.Types != nil)
+		test.Errorf(
+			"a current file went with the planted one: runs %v, findings %v, types %v",
+			table.Runs,
+			table.Findings != nil,
+			table.Types != nil,
+		)
 	}
 
 	// A run file under the wrong name is refused, whatever it holds.
-	if err := os.Rename(filepath.Join(directory, cacheTableRunFile("")), filepath.Join(directory, cacheTableRunFile("--fix"))); err != nil {
-		t.Fatal(err)
+	if renameError := os.Rename(
+		filepath.Join(directory, cacheTableRunFile("")),
+		filepath.Join(directory, cacheTableRunFile("--fix")),
+	); renameError != nil {
+		test.Fatal(renameError)
 	}
-	table, err = ReadCacheTable(directory, internalTestIdentity, CacheTableSections{Runs: []string{"--fix"}}, PathAnchor{})
-	if !errors.Is(err, ErrCacheTableUnreadable) || table.Runs["--fix"] != nil {
-		t.Fatalf("a run recorded for the bare invocation answered for --fix: %v", err)
+	table, readCacheTableError = ReadCacheTable(
+		directory,
+		internalTestIdentity,
+		CacheTableSections{Runs: []string{"--fix"}},
+		PathAnchor{},
+	)
+	if !errors.Is(readCacheTableError, ErrCacheTableUnreadable) || table.Runs["--fix"] != nil {
+		test.Fatalf("a run recorded for the bare invocation answered for --fix: %v", readCacheTableError)
 	}
 }
 
 // The single file the table was before format 8 is removed on sight and never read: a table.gob of any
 // content is gone after a read, and the read reports nothing found.
-func TestTheSingleFileTableIsRemovedUnread(t *testing.T) {
-	t.Parallel()
-	directory := t.TempDir()
-	writeRaw(t, directory, legacyCacheTableFile, []byte("whatever an older cohere wrote"))
-	_, err := ReadCacheTable(directory, internalTestIdentity, EveryCacheTableSection, PathAnchor{})
-	if !errors.Is(err, os.ErrNotExist) {
-		t.Errorf("reading a directory holding only table.gob: %v", err)
+func TestTheSingleFileTableIsRemovedUnread(test *testing.T) {
+	test.Parallel()
+	directory := test.TempDir()
+	writeRaw(test, directory, legacyCacheTableFile, []byte("whatever an older cohere wrote"))
+	_, readCacheTableError := ReadCacheTable(directory, internalTestIdentity, EveryCacheTableSection, PathAnchor{})
+	if !errors.Is(readCacheTableError, os.ErrNotExist) {
+		test.Errorf("reading a directory holding only table.gob: %v", readCacheTableError)
 	}
 	if _, statError := os.Stat(filepath.Join(directory, legacyCacheTableFile)); !errors.Is(statError, os.ErrNotExist) {
-		t.Errorf("table.gob is still there: %v", statError)
+		test.Errorf("table.gob is still there: %v", statError)
 	}
 }
 
@@ -194,15 +360,18 @@ var pinnedCacheTableShapes = map[int]string{
 	13: "92cec94e75987f5af469a8fe4e611c4e95ee9d56a41ad9003db764354922a60c",
 	14: "5c81e8d748ea0cf87759a0e7de3d205cbc70a6ab930d09b7a827d34e2dd9eb4b",
 	15: "5b2612f8b8bd8ec1aefe9b94d18dd81bf2a05115282a3c2e80edc8b6fe40abd5",
+	16: "f63ccb50b6678d64a2e10aac7265ffa0d4711bbde7839a073e86015b41cf3dc9",
 }
 
-func TestCacheTableShapeIsPinnedToItsVersion(t *testing.T) {
-	t.Parallel()
-	shape := describeShape(reflect.TypeOf(cacheTableHeader{})) + "\n" + describeShape(reflect.TypeOf(cacheTableBodies{}))
+func TestCacheTableShapeIsPinnedToItsVersion(test *testing.T) {
+	test.Parallel()
+	shape := describeShape(reflect.TypeOf(cacheTableHeader{})) +
+		"\n" +
+		describeShape(reflect.TypeOf(cacheTableBodies{}))
 	sum := fmt.Sprintf("%x", sha256.Sum256([]byte(shape)))
 	pinned, found := pinnedCacheTableShapes[cacheTableVersion]
 	if !found || pinned != sum {
-		t.Fatalf("the cache table's encoded shape is %s under version %d, pinned as %q.\n"+
+		test.Fatalf("the cache table's encoded shape is %s under version %d, pinned as %q.\n"+
 			"If a field changed, bump cacheTableVersion and pin %s under the new version: an old table would "+
 			"otherwise decode into zero values without an error.\nThe shape:\n%s",
 			sum, cacheTableVersion, pinned, sum, shape)
@@ -256,8 +425,8 @@ func describeShape(subject reflect.Type) string {
 
 // Rule lists are interned by their length and their two ends, and that key is only a filter: two lists that
 // share it and differ in the middle stay two lists, and every entry resolves back to exactly its own.
-func TestInterningKeepsListsThatShareTheirEndsApart(t *testing.T) {
-	t.Parallel()
+func TestInterningKeepsListsThatShareTheirEndsApart(test *testing.T) {
+	test.Parallel()
 	cache := &LintCache{Version: lintCacheVersion}
 	lists := [][]string{
 		{"a", "b", "c"},
@@ -272,15 +441,15 @@ func TestInterningKeepsListsThatShareTheirEndsApart(t *testing.T) {
 	}
 	wire := cache.wire()
 	if len(wire.Lists) != 4 {
-		t.Errorf("%d distinct lists interned from 4 distinct ones: %v", len(wire.Lists), wire.Lists)
+		test.Errorf("%d distinct lists interned from 4 distinct ones: %v", len(wire.Lists), wire.Lists)
 	}
-	back, err := wire.cache()
-	if err != nil {
-		t.Fatal(err)
+	back, cacheError := wire.cache()
+	if cacheError != nil {
+		test.Fatal(cacheError)
 	}
 	for index, list := range lists {
 		if strings.Join(back.Entries[index].Rules, ",") != strings.Join(list, ",") {
-			t.Errorf("entry %d came back with %v, want %v", index, back.Entries[index].Rules, list)
+			test.Errorf("entry %d came back with %v, want %v", index, back.Entries[index].Rules, list)
 		}
 	}
 }

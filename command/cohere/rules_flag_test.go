@@ -12,14 +12,19 @@ import (
 
 // The flag exists so a caller can tell a binary that lacks a rule from one whose rule found
 // nothing. Those produce identical finding lists, and only this can separate them.
-func TestRulesFlagListsEveryRegisteredRule(t *testing.T) {
-	t.Parallel()
+func TestRulesFlagListsEveryRegisteredRule(test *testing.T) {
+	test.Parallel()
 
-	binary := buildCohere(t)
+	binary := buildCohere(test)
 
-	output, err := exec.Command(binary, "-rules").Output()
-	if err != nil {
-		t.Fatalf("running -rules: %v", err)
+	// Run outside every project: this package's directory is inside cohere's own Go workspace, and `-rules`
+	// there lists the Go engine's rules, as it lists Swift's in a Swift package. This test is about the
+	// TypeScript registry, which a run in no project lists.
+	command := exec.Command(binary, "-rules")
+	command.Dir = test.TempDir()
+	output, outputError := command.Output()
+	if outputError != nil {
+		test.Fatalf("running -rules: %v", outputError)
 	}
 	printed := strings.Fields(string(output))
 
@@ -30,15 +35,15 @@ func TestRulesFlagListsEveryRegisteredRule(t *testing.T) {
 	sort.Strings(expected)
 
 	if len(printed) != len(expected) {
-		t.Fatalf("printed %d rules, registry has %d", len(printed), len(expected))
+		test.Fatalf("printed %d rules, registry has %d", len(printed), len(expected))
 	}
 	for index := range expected {
 		if printed[index] != expected[index] {
-			t.Fatalf("at %d: printed %q, registry has %q", index, printed[index], expected[index])
+			test.Fatalf("at %d: printed %q, registry has %q", index, printed[index], expected[index])
 		}
 	}
 	if len(printed) == 0 {
-		t.Fatal("printed nothing, which would pass every comparison vacuously")
+		test.Fatal("printed nothing, which would pass every comparison vacuously")
 	}
 }
 
@@ -52,17 +57,19 @@ func TestRulesFlagListsEveryRegisteredRule(t *testing.T) {
 //
 // The split matters as much as the note. The list stays on stdout so two binaries can still be
 // diffed directly, and the note goes to stderr so it cannot corrupt that diff.
-func TestRulesFlagDisclosesADevelopmentBuildBesideTheList(t *testing.T) {
-	t.Parallel()
+func TestRulesFlagDisclosesADevelopmentBuildBesideTheList(test *testing.T) {
+	test.Parallel()
 
-	binary := buildCohere(t)
+	binary := buildCohere(test)
 
 	command := exec.Command(binary, "-rules")
+	// Outside every project, for the reason TestRulesFlagListsEveryRegisteredRule gives.
+	command.Dir = test.TempDir()
 	var standardError strings.Builder
 	command.Stderr = &standardError
-	standardOutput, err := command.Output()
-	if err != nil {
-		t.Fatalf("running -rules: %v", err)
+	standardOutput, outputError := command.Output()
+	if outputError != nil {
+		test.Fatalf("running -rules: %v", outputError)
 	}
 
 	// A test binary is built from the working tree, so it is always a development build. If this
@@ -70,27 +77,32 @@ func TestRulesFlagDisclosesADevelopmentBuildBesideTheList(t *testing.T) {
 	// quietly.
 	note := standardError.String()
 	if note == "" {
-		t.Fatal("a locally built binary printed no provenance note, so the disclosure is not reaching the surface people quote")
+		test.Fatal(
+			"a locally built binary printed no provenance note, so the disclosure is not reaching the surface people quote",
+		)
 	}
 	if !strings.Contains(note, "local build") {
-		t.Fatalf("the note does not say the build is local: %q", note)
+		test.Fatalf("the note does not say the build is local: %q", note)
 	}
 	// Built from the working tree, the binary is either dirty (the disclaimer) or a clean named
 	// commit (which reproduces it). Either way the note must say which, so one of the two must hold.
 	if !strings.Contains(note, "not necessarily what is committed") && !strings.Contains(note, "reproduces them") {
-		t.Fatalf("the note says neither that the count may differ from the repository nor which commit reproduces it: %q", note)
+		test.Fatalf(
+			"the note says neither that the count may differ from the repository nor which commit reproduces it: %q",
+			note,
+		)
 	}
 
 	// The count has to appear in the note itself. A note that qualifies "the rules" in the abstract
 	// is the same disclosure-to-the-side this exists to remove; the reader carries away a number.
 	if !strings.Contains(note, strconv.Itoa(len(strings.Fields(string(standardOutput))))) {
-		t.Fatalf("the note does not carry the rule count it qualifies: %q", note)
+		test.Fatalf("the note does not carry the rule count it qualifies: %q", note)
 	}
 
 	// stdout must remain exactly the list, or the diff-two-binaries use stops working.
 	for _, line := range strings.Split(strings.TrimSpace(string(standardOutput)), "\n") {
 		if strings.Contains(line, "note:") || strings.Contains(line, "local build") {
-			t.Fatalf("provenance leaked onto stdout and would corrupt a diff: %q", line)
+			test.Fatalf("provenance leaked onto stdout and would corrupt a diff: %q", line)
 		}
 	}
 }

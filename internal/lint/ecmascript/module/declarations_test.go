@@ -10,28 +10,28 @@ import (
 )
 
 // withSourceFile parses a source and hands the file to `ask`.
-func withSourceFile(t *testing.T, source string, ask func(sourceFile *ast.SourceFile)) {
-	t.Helper()
+func withSourceFile(test *testing.T, source string, ask func(sourceFile *ast.SourceFile)) {
+	test.Helper()
 	called := false
-	rule_testing.Run(t, rule.Rule{
+	rule_testing.Run(test, rule.Rule[rule.NoOptions]{
 		Name: "declaration-probe",
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
 					called = true
-					ask(ctx.SourceFile)
+					ask(ruleContext.SourceFile)
 				},
 			}
 		},
 	}, "p.ts", source)
 	if !called {
-		t.Fatalf("%q: the source-file listener never fired", source)
+		test.Fatalf("%q: the source-file listener never fired", source)
 	}
 }
 
 // TestEveryTypeDeclarationKindCounts covers the four kinds that introduce a type name.
-func TestEveryTypeDeclarationKindCounts(t *testing.T) {
-	t.Parallel()
+func TestEveryTypeDeclarationKindCounts(test *testing.T) {
+	test.Parallel()
 	for _, source := range []string{
 		"interface Thing { a: string }",
 		"type Thing = string;",
@@ -40,9 +40,9 @@ func TestEveryTypeDeclarationKindCounts(t *testing.T) {
 		// implementations omitted it, and the omission was a live false positive in two rules.
 		"enum Thing { A }",
 	} {
-		withSourceFile(t, source, func(sourceFile *ast.SourceFile) {
+		withSourceFile(test, source, func(sourceFile *ast.SourceFile) {
 			if !module.DeclaresTypeNamed(sourceFile, "Thing") {
-				t.Errorf("%q: DeclaresTypeNamed said no", source)
+				test.Errorf("%q: DeclaresTypeNamed said no", source)
 			}
 		})
 	}
@@ -50,16 +50,16 @@ func TestEveryTypeDeclarationKindCounts(t *testing.T) {
 
 // TestValueDeclarationsDoNotCount pins the other direction. Neither shadows a type in a type
 // position, so a file containing one is still linted.
-func TestValueDeclarationsDoNotCount(t *testing.T) {
-	t.Parallel()
+func TestValueDeclarationsDoNotCount(test *testing.T) {
+	test.Parallel()
 	for _, source := range []string{
 		"const Thing = 1;",
 		"function Thing() {}",
 		"let Thing: string;",
 	} {
-		withSourceFile(t, source, func(sourceFile *ast.SourceFile) {
+		withSourceFile(test, source, func(sourceFile *ast.SourceFile) {
 			if module.DeclaresTypeNamed(sourceFile, "Thing") {
-				t.Errorf("%q: a value declaration counted as a type declaration", source)
+				test.Errorf("%q: a value declaration counted as a type declaration", source)
 			}
 		})
 	}
@@ -70,17 +70,17 @@ func TestValueDeclarationsDoNotCount(t *testing.T) {
 // oxc's own passing case for no-unsafe-function-type is a block-scoped type alias, and a scan of
 // top-level statements alone reports it as a violation. That shipped in this tree before the corpus
 // was read.
-func TestNestedDeclarationsCount(t *testing.T) {
-	t.Parallel()
+func TestNestedDeclarationsCount(test *testing.T) {
+	test.Parallel()
 	for _, source := range []string{
 		"{ type Thing = string; }",
 		"function outer() { interface Thing { a: string } }",
 		"namespace N { type Thing = string; }",
 		"if (true) { class Thing {} }",
 	} {
-		withSourceFile(t, source, func(sourceFile *ast.SourceFile) {
+		withSourceFile(test, source, func(sourceFile *ast.SourceFile) {
 			if !module.DeclaresTypeNamed(sourceFile, "Thing") {
-				t.Errorf("%q: a nested declaration was missed", source)
+				test.Errorf("%q: a nested declaration was missed", source)
 			}
 		})
 	}
@@ -88,51 +88,51 @@ func TestNestedDeclarationsCount(t *testing.T) {
 
 // TestDeclaredTypeNamesAnswersForEveryName covers the multi-name form, which walks once rather than
 // once per name.
-func TestDeclaredTypeNamesAnswersForEveryName(t *testing.T) {
-	t.Parallel()
+func TestDeclaredTypeNamesAnswersForEveryName(test *testing.T) {
+	test.Parallel()
 	const source = "type Alpha = string; interface Beta { a: string } enum Gamma { A }"
-	withSourceFile(t, source, func(sourceFile *ast.SourceFile) {
+	withSourceFile(test, source, func(sourceFile *ast.SourceFile) {
 		got := module.DeclaredTypeNames(sourceFile, map[string]bool{
 			"Alpha": true, "Beta": true, "Gamma": true, "Delta": true,
 		})
 		for _, want := range []string{"Alpha", "Beta", "Gamma"} {
 			if !got[want] {
-				t.Errorf("DeclaredTypeNames missed %q", want)
+				test.Errorf("DeclaredTypeNames missed %q", want)
 			}
 		}
 		if got["Delta"] {
-			t.Error("DeclaredTypeNames reported a name the file does not declare")
+			test.Error("DeclaredTypeNames reported a name the file does not declare")
 		}
 	})
 }
 
 // TestAllDeclaredTypeNamesCollects covers the collecting form, for a caller refusing to rename onto
 // a name already taken.
-func TestAllDeclaredTypeNamesCollects(t *testing.T) {
-	t.Parallel()
-	withSourceFile(t, "type Alpha = string; class Beta {}", func(sourceFile *ast.SourceFile) {
+func TestAllDeclaredTypeNamesCollects(test *testing.T) {
+	test.Parallel()
+	withSourceFile(test, "type Alpha = string; class Beta {}", func(sourceFile *ast.SourceFile) {
 		got := module.AllDeclaredTypeNames(sourceFile)
 		if !got["Alpha"] || !got["Beta"] {
-			t.Errorf("AllDeclaredTypeNames = %v, want Alpha and Beta", got)
+			test.Errorf("AllDeclaredTypeNames = %v, want Alpha and Beta", got)
 		}
 	})
 }
 
 // TestNilSourceFile covers the guard a shared function needs and a rule-local one did not.
-func TestNilSourceFile(t *testing.T) {
-	t.Parallel()
+func TestNilSourceFile(test *testing.T) {
+	test.Parallel()
 	if module.DeclaresTypeNamed(nil, "Thing") {
-		t.Error("DeclaresTypeNamed(nil) = true")
+		test.Error("DeclaresTypeNamed(nil) = true")
 	}
 	if len(module.DeclaredTypeNames(nil, map[string]bool{"Thing": true})) != 0 {
-		t.Error("DeclaredTypeNames(nil) returned entries")
+		test.Error("DeclaredTypeNames(nil) returned entries")
 	}
 	if len(module.AllDeclaredTypeNames(nil)) != 0 {
-		t.Error("AllDeclaredTypeNames(nil) returned entries")
+		test.Error("AllDeclaredTypeNames(nil) returned entries")
 	}
-	withSourceFile(t, "type Thing = string;", func(sourceFile *ast.SourceFile) {
+	withSourceFile(test, "type Thing = string;", func(sourceFile *ast.SourceFile) {
 		if module.DeclaresTypeNamed(sourceFile, "") {
-			t.Error("DeclaresTypeNamed with an empty name = true")
+			test.Error("DeclaresTypeNamed with an empty name = true")
 		}
 	})
 }

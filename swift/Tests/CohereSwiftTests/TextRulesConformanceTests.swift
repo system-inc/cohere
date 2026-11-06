@@ -37,9 +37,9 @@ struct TextRulesConformanceTests {
 
     static let engine = "swift"
 
-    /* An engine's entry for a family: its rule's registered name, why the language has no such idea, or a rule it should have and does not yet. */
+    /* An engine's entry for a family: its rules' registered names, one written as a string or several as a list, whose findings for the family are their union; why the language has no such idea; or a rule it should have and does not yet. */
     enum EngineRule: Decodable {
-        case rule(String)
+        case rules([String])
         case none(String)
         case missing
 
@@ -51,7 +51,17 @@ struct TextRulesConformanceTests {
         init(from decoder: any Decoder) throws {
             let container = try decoder.singleValueContainer()
             if let name = try? container.decode(String.self) {
-                self = .rule(name)
+                self = .rules([name])
+                return
+            }
+            if let names = try? container.decode([String].self) {
+                guard !names.isEmpty else {
+                    throw DecodingError.dataCorruptedError(
+                        in: container,
+                        debugDescription: "an empty list of rules names none; write none or missing instead",
+                    )
+                }
+                self = .rules(names)
                 return
             }
             let entry = try container.decode(Entry.self)
@@ -64,13 +74,14 @@ struct TextRulesConformanceTests {
             else {
                 throw DecodingError.dataCorruptedError(
                     in: container,
-                    debugDescription: "an engine's entry is a rule name, {\"none\": ...} or {\"missing\": true}",
+                    debugDescription:
+                        "an engine's entry is a rule name, a list of them, {\"none\": ...} or {\"missing\": true}",
                 )
             }
         }
     }
 
-    /* Which occurrence of a span's text it covers, from 1: one for every language, or one per language. */
+    /* Which occurrence of a span's text it covers, from 1: one for every language, or one per language, where 0 says that language's form has no such text, since its grammar can't express the construct. */
     enum Occurrence: Decodable {
         case all(Int)
         case byLanguage([String: Int])
@@ -185,7 +196,7 @@ struct TextRulesConformanceTests {
                 everyCaseId.insert("\(family)/\(name)")
                 guard file.languages.contains(engine) else { continue }
                 swiftCaseIds.insert("\(family)/\(name)")
-                guard case .rule = families[family]?[engine] else { continue }
+                guard case .rules = families[family]?[engine] else { continue }
                 let source = try String(
                     contentsOf: caseDirectory.appendingPathComponent("case.swift"),
                     encoding: .utf8,
@@ -297,7 +308,7 @@ struct TextRulesConformanceTests {
         let starts = lineStarts(bytes)
         /* Each expected range with whether its span covers text, which holds a control to its line. */
         var expected: [(range: ByteRange, coversText: Bool)] = []
-        for (index, span) in expect.enumerated() {
+        for (index, span) in expect.enumerated() where span.occurrence?.for(engine) != 0 {
             guard let resolved = resolve(span, in: bytes) else {
                 return Comparison(
                     failure: "verdict",
@@ -328,26 +339,29 @@ struct TextRulesConformanceTests {
         return comparison
     }
 
-    /* The rule a family names for Swift, found by its name among the registered rules, built with the given options as the engine builds it from a project's settings. */
-    static func rule(for family: String, in corpus: Corpus, options: [String: Int] = [:]) throws -> any FileRule {
-        guard case let .rule(name) = corpus.families[family]?[engine] else {
+    /* The rules a family names for Swift, found by their names among the registered rules, each built with the options it reads of the given ones, as the engine builds it from a project's settings. */
+    static func rules(for family: String, in corpus: Corpus, options: [String: Int] = [:]) throws -> [any FileRule] {
+        guard case let .rules(names) = corpus.families[family]?[engine] else {
             throw ConformanceError("family \(family) has no Swift rule, and has a Swift case")
         }
-        let configuration = RuleConfiguration(
-            severities: [:],
-            options: options.isEmpty ? [:] : [name: options],
-            note: "",
-        )
-        let rules = RuleRegistry.fileRules(
-            vocabulary: try AbbreviationVocabulary.compiledIn(),
-            configuration: configuration,
-        )
-        guard let found = rules.first(where: { $0.name == name }) else {
-            throw ConformanceError(
-                "families.json names \(name) for Swift in \(family), and no rule is registered by that name"
+        return try names.map { name in
+            let read = options.filter { RuleConfiguration.optionsRead[name]?[$0.key] != nil }
+            let configuration = RuleConfiguration(
+                severities: [:],
+                options: read.isEmpty ? [:] : [name: read],
+                note: "",
             )
+            let registered = RuleRegistry.fileRules(
+                vocabulary: try AbbreviationVocabulary.compiledIn(),
+                configuration: configuration,
+            )
+            guard let found = registered.first(where: { $0.name == name }) else {
+                throw ConformanceError(
+                    "families.json names \(name) for Swift in \(family), and no rule is registered by that name"
+                )
+            }
+            return found
         }
-        return found
     }
 
     struct ConformanceError: Error, CustomStringConvertible {
@@ -355,9 +369,9 @@ struct TextRulesConformanceTests {
         init(_ description: String) { self.description = description }
     }
 
-    /* A case's findings from its family's rule, built with the case's options, as byte ranges of its source. */
+    /* A case's findings from its family's rules, the union of each one's, built with the case's options, as byte ranges of its source. */
     static func run(_ testCase: Case, in corpus: Corpus, options: [String: Int] = [:]) throws -> [ByteRange] {
-        let rule = try rule(for: testCase.family, in: corpus, options: options)
+        let rules = try rules(for: testCase.family, in: corpus, options: options)
         let root = testCase.file.root ?? "/project"
         let file = ParsedFile(
             url: URL(fileURLWithPath: "\(root)/\(testCase.file.path ?? "case").swift"),
@@ -369,8 +383,9 @@ struct TextRulesConformanceTests {
             packageRoot: URL(fileURLWithPath: root),
         )
         let starts = lineStarts(Array(testCase.source.utf8))
-        let findings = rule.applies(to: file) ? rule.findings(in: file) : []
-        return findings.map { byteRange(of: $0, starts: starts) }
+        return rules.flatMap { rule in
+            (rule.applies(to: file) ? rule.findings(in: file) : []).map { byteRange(of: $0, starts: starts) }
+        }
     }
 
     /*
@@ -379,18 +394,21 @@ struct TextRulesConformanceTests {
      the engine can't take it.
      */
     static func judge(_ testCase: Case, in corpus: Corpus) throws -> Comparison {
-        guard case let .rule(name) = corpus.families[testCase.family]?[engine] else {
+        guard case let .rules(names) = corpus.families[testCase.family]?[engine] else {
             throw ConformanceError(
                 "family \(testCase.family) has no Swift rule, and its case \(testCase.id) was compared"
             )
         }
         var options: [String: Int] = [:]
         for (key, value) in testCase.file.options ?? [:] {
-            guard RuleConfiguration.optionsRead[name]?[key] != nil, case let .number(number) = value else {
+            guard names.contains(where: { RuleConfiguration.optionsRead[$0]?[key] != nil }),
+                case let .number(number) = value
+            else {
                 return Comparison(
                     failure: "verdict",
                     controlHeld: false,
-                    detail: "the case gives the option \(key), and \(name) takes no such option",
+                    detail:
+                        "the case gives the option \(key), and \(names.joined(separator: ", ")) takes no such option",
                 )
             }
             options[key] = number
@@ -453,9 +471,9 @@ struct TextRulesConformanceTests {
                 switch entry {
                     case .missing:
                         break
-                    case let .rule(name):
+                    case let .rules(names):
                         Issue.record(
-                            "\(row.family) has a family-level Swift row, and families.json names \(name) there now, so the row is stale: delete it and let the cases run"
+                            "\(row.family) has a family-level Swift row, and families.json names \(names.joined(separator: ", ")) there now, so the row is stale: delete it and let the cases run"
                         )
                     case .none:
                         Issue.record("\(row.family) has a family-level Swift row where Swift has no such idea")

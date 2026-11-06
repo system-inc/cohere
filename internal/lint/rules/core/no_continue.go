@@ -40,12 +40,12 @@ var messageNoContinueUnexpected = rule.Message{
 // the fixtures: there is one branch, so there is one thing to mutate. The fixtures compensate by
 // covering the shapes the corpus does not write -- a labeled continue, and each loop kind -- so that
 // a port which somehow saw only one of them would be caught.
-var NoContinue = rule.Rule{
+var NoContinue = rule.Rule[rule.NoOptions]{
 	Name: "no-continue",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindContinueStatement: func(node *ast.Node) {
-				ctx.ReportNode(node, messageNoContinueUnexpected)
+				ruleContext.ReportNode(node, messageNoContinueUnexpected)
 			},
 		}
 	},

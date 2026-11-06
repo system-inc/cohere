@@ -15,9 +15,9 @@ var topLevelDescriptions = map[string]string{
 		"outermost.",
 
 	"rules": "Each rule's severity, or [severity, ...options] for a rule that takes options. Inside our tiers (a " +
-		"chain extending a cohere:system-inc set), a rule this file sets differently from the file it extends must be " +
-		"named under departures with the reason, and a rule it turns off otherwise says why under reasons. Outside " +
-		"them, turning a rule off needs no reason, and coverage counts each unreasoned off by rule.",
+		"chain extending a cohere:system-inc set), a rule this file sets differently from the file it extends must " +
+		"be named under departures with the reason, and a rule it turns off otherwise says why under reasons. " +
+		"Outside them, turning a rule off needs no reason, and coverage counts each unreasoned off by rule.",
 
 	"departures": "For each rule this file sets differently from the file it extends, the reason why, in a " +
 		"sentence. Required inside our tiers, optional outside them. cohere reports every departure on every run, " +
@@ -47,6 +47,13 @@ var topLevelDescriptions = map[string]string{
 	"jsPlugins": "Accepted and ignored: paths to the JavaScript rule implementations oxlint loads. cohere's " +
 		"rules are compiled in, so there is nothing to load.",
 
+	"go": "Which of the Go engine's rules run, and how strictly, read from the file beside go.work or go.mod, or the " +
+		"one --lint-config names. Its rules map each cohere-go/<rule> to a severity (error, warn, warning or off, " +
+		"exactly as written) or [severity, options] with one options object. With no go block, every Go rule runs at " +
+		"error and every run says so. A rule name the engine does not know, any key besides rules, and a format key " +
+		"are refused: gofmt is the house format for Go and is not configured. The TypeScript linter leaves this " +
+		"block alone.",
+
 	"output": "How a run prints, for this repository. phases: true puts where the time went (graph, fix, format, " +
 		"types, lint) first in the footer's parentheses, as --phases does. Read only from the file cohere reads " +
 		"first, and a key outside this block's is refused.",
@@ -67,7 +74,8 @@ var topLevelDescriptions = map[string]string{
 	SwiftKey: "The Swift engine's rules, read by cohere-swift itself: under rules, each Swift rule's severity, " +
 		"error, warning or off, or an array of one and, for a rule that reads options, an object of them, which may " +
 		"only make the rule stricter: cohere-swift/file-length reads max, at or below the house's 2,000 lines. An " +
-		"option a rule does not read is refused by name. A house rule the block does not name runs at error. The engine reads the block from the settings file beside a Swift project's root (its " +
+		"option a rule does not read is refused by name. A house rule the block does not name runs at error. " +
+		"The engine reads the block from the settings file beside a Swift project's root (its " +
 		"Package.swift, project.yml or .xcodeproj), or the file --lint-config names, and never follows extends, " +
 		"so a block in a file another extends, or beside no Swift project, is refused by name. Formatting is not " +
 		"configured here: Swift has one house format, and a format key in this block is refused.",

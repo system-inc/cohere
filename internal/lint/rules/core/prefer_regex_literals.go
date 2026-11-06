@@ -105,7 +105,7 @@ func messageReplaceWithIntendedLiteralAndFlags(flags string) rule.Message {
 // The String.raw arm is the one that carries real weight, because it is the only shape whose
 // value differs from what `Text()` answers. `String.raw` + backtick + `\d` reads as a
 // two-character pattern, while the same characters in a plain template literal cook to a
-// single `\d` control character. The rule takes the RAW text there and the COOKED text
+// single `\d` control character. The rule takes the raw text there and the cooked text
 // everywhere else, and getting that backwards silently changes every backslash in the output.
 // Reached by slicing the source with the token range and stripping the backticks, since
 // `Text()` on a template literal is always cooked.
@@ -144,7 +144,7 @@ func messageReplaceWithIntendedLiteralAndFlags(flags string) rule.Message {
 //
 // # One divergence, measured, and it is about ecmaVersion
 //
-// Upstream withholds a suggestion when the pattern or flags are invalid AT THE CONFIGURED
+// Upstream withholds a suggestion when the pattern or flags are invalid at the configured
 // ecmaVersion, so `new RegExp('abc', 'd')` reports with no suggestion under ecmaVersion 2021
 // and with one under 2022. cohere has no per-file ecmaVersion: the program is compiled once
 // against one set of compiler options and a rule cannot ask what language edition a file
@@ -156,7 +156,7 @@ func messageReplaceWithIntendedLiteralAndFlags(flags string) rule.Message {
 // tables with the version that decides them. The direction is worth stating: offering a
 // suggestion is the safe side of this divergence, because a suggestion is never applied
 // without a human, and the code it proposes is valid in every edition this codebase targets.
-var PreferRegexLiterals = rule.Rule{
+var PreferRegexLiterals = rule.Rule[PreferRegexLiteralsOptions]{
 	TypeReach: rule.TypeReachShapes,
 	Name:      "prefer-regex-literals",
 
@@ -164,37 +164,37 @@ var PreferRegexLiterals = rule.Rule{
 	// by where its symbol is declared: eleven of upstream's clean cases are exactly that shadow.
 	NeedsTypeChecker: true,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[PreferRegexLiteralsOptions]) rule.Listeners {
 		// Declining once per file rather than once per node, following `await_thenable`: the
 		// registration path will not hand a typed rule a file with no checker, but a Context built
 		// by hand can, and `TestNoRegisteredRuleCrashesOnAbsentOptionalNodes` builds one.
-		if ctx.TypeChecker == nil {
+		if ruleContext.TypeChecker == nil {
 			return nil
 		}
 
-		settings, _ := rule.OptionsAs[PreferRegexLiteralsOptions](options)
+		settings, _ := options.Read()
 
 		check := func(node *ast.Node) {
 			argumentNodes := node.Arguments()
 
-			if settings.DisallowRedundantWrapping && wrapsARegexLiteral(ctx, argumentNodes) {
-				reportRedundantWrapping(ctx, node, argumentNodes)
+			if settings.DisallowRedundantWrapping && wrapsARegexLiteral(ruleContext, argumentNodes) {
+				reportRedundantWrapping(ruleContext, node, argumentNodes)
 				return
 			}
-			if !hasOnlyStaticStringArguments(ctx, argumentNodes) {
+			if !hasOnlyStaticStringArguments(ruleContext, argumentNodes) {
 				return
 			}
-			reportConstructedFromStrings(ctx, node, argumentNodes)
+			reportConstructedFromStrings(ruleContext, node, argumentNodes)
 		}
 
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
 				// Every trace starts at a reference to RegExp, so a file that never spells it has
 				// nothing to follow, and the tracker's index is never built.
-				if !strings.Contains(ctx.SourceFile.Text(), "RegExp") {
+				if !strings.Contains(ruleContext.SourceFile.Text(), "RegExp") {
 					return
 				}
-				tracker := reference.NewTracker(ctx.SourceFile, ctx.TypeChecker, nil)
+				tracker := reference.NewTracker(ruleContext.SourceFile, ruleContext.TypeChecker, nil)
 				for _, tracked := range tracker.GlobalReferences(regExpCallTraceMap) {
 					check(tracked.Node)
 				}
@@ -209,13 +209,13 @@ var PreferRegexLiterals = rule.Rule{
 // The three accepted shapes are upstream's, and the second return distinguishes "this is a constant
 // empty string" from "this is not constant", which matters because `new RegExp(”)` reports and
 // suggests `/(?:)/` while `new RegExp(x)` is clean.
-func staticStringValue(ctx rule.Context, node *ast.Node) (string, bool) {
+func staticStringValue(ruleContext rule.Context, node *ast.Node) (string, bool) {
 	if node == nil {
 		return "", false
 	}
 	switch node.Kind {
 	case ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral:
-		// Cooked, which is what both of these evaluate to. A template literal WITH substitutions is
+		// Cooked, which is what both of these evaluate to. A template literal with substitutions is
 		// a different kind and never arrives here, which is upstream's `isStaticTemplateLiteral`
 		// answered by the parser instead of by a quasi count.
 		return node.Text(), true
@@ -224,10 +224,10 @@ func staticStringValue(ctx rule.Context, node *ast.Node) (string, bool) {
 		if tagged.Template == nil || tagged.Template.Kind != ast.KindNoSubstitutionTemplateLiteral {
 			return "", false
 		}
-		if !isStringRawTag(ctx, tagged.Tag) {
+		if !isStringRawTag(ruleContext, tagged.Tag) {
 			return "", false
 		}
-		return rawTemplateText(ctx, tagged.Template), true
+		return rawTemplateText(ruleContext, tagged.Template), true
 	}
 	return "", false
 }
@@ -237,33 +237,34 @@ func staticStringValue(ctx rule.Context, node *ast.Node) (string, bool) {
 // The receiver must resolve to the global, which is upstream's `isGlobalReference` check and is
 // load-bearing rather than decorative: the corpus carries a clean case where a local `String`
 // shadows it, and without this test that case reports.
-func isStringRawTag(ctx rule.Context, tag *ast.Node) bool {
+func isStringRawTag(ruleContext rule.Context, tag *ast.Node) bool {
 	if tag == nil {
 		return false
 	}
 	// Upstream runs the tag through `skipChainExpression` before testing it, which in ESTree strips
 	// the wrapper an optional chain puts around the whole expression. Our parser has no such
-	// wrapper, but it DOES keep parentheses as real nodes where upstream's has already folded them
+	// wrapper, but it does keep parentheses as real nodes where upstream's has already folded them
 	// away, so `(String?.raw)` arrives here as a parenthesized expression and would otherwise be
 	// declined. Unwrapped in a loop because `((String.raw))` nests.
 	//
 	// Not `ast.SkipParentheses`: it dereferences its argument, and this one is optional.
-	for tag != nil && tag.Kind == ast.KindParenthesizedExpression {
-		tag = tag.AsParenthesizedExpression().Expression
+	unwrapped := tag
+	for unwrapped != nil && unwrapped.Kind == ast.KindParenthesizedExpression {
+		unwrapped = unwrapped.AsParenthesizedExpression().Expression
 	}
-	if tag == nil {
+	if unwrapped == nil {
 		return false
 	}
 	var receiver *ast.Node
-	switch tag.Kind {
+	switch unwrapped.Kind {
 	case ast.KindPropertyAccessExpression:
-		access := tag.AsPropertyAccessExpression()
+		access := unwrapped.AsPropertyAccessExpression()
 		if access.Name() == nil || access.Name().Text() != "raw" {
 			return false
 		}
 		receiver = access.Expression
 	case ast.KindElementAccessExpression:
-		access := tag.AsElementAccessExpression()
+		access := unwrapped.AsElementAccessExpression()
 		argument := access.ArgumentExpression
 		if argument == nil {
 			return false
@@ -285,7 +286,7 @@ func isStringRawTag(ctx rule.Context, tag *ast.Node) bool {
 	if receiver == nil || receiver.Kind != ast.KindIdentifier || receiver.Text() != "String" {
 		return false
 	}
-	return resolvesToAGlobal(ctx, receiver)
+	return resolvesToAGlobal(ruleContext, receiver)
 }
 
 // rawTemplateText returns a no-substitution template literal's text exactly as written.
@@ -293,12 +294,12 @@ func isStringRawTag(ctx rule.Context, tag *ast.Node) bool {
 // `Text()` is cooked, so it cannot serve here: `String.raw` + backtick + `\d` cooks to one control
 // character and the rule needs the two characters the author typed. The raw form is the source
 // between the backticks, which the token range locates.
-func rawTemplateText(ctx rule.Context, template *ast.Node) string {
-	if ctx.SourceFile == nil {
+func rawTemplateText(ruleContext rule.Context, template *ast.Node) string {
+	if ruleContext.SourceFile == nil {
 		return template.Text()
 	}
-	span := rule.TokenRange(ctx.SourceFile, template)
-	text := ctx.SourceFile.Text()
+	span := rule.TokenRange(ruleContext.SourceFile, template)
+	text := ruleContext.SourceFile.Text()
 	if span.Pos() < 0 || span.End() > len(text) || span.Pos() >= span.End() {
 		return template.Text()
 	}
@@ -314,12 +315,12 @@ func rawTemplateText(ctx rule.Context, template *ast.Node) string {
 // The arity test is upstream's and it is why `new RegExp()` with no arguments is clean: zero
 // arguments builds `/(?:)/` and the rule says nothing about it, presumably because nobody writes
 // that by accident.
-func hasOnlyStaticStringArguments(ctx rule.Context, arguments []*ast.Node) bool {
+func hasOnlyStaticStringArguments(ruleContext rule.Context, arguments []*ast.Node) bool {
 	if len(arguments) != 1 && len(arguments) != 2 {
 		return false
 	}
 	for _, argument := range arguments {
-		if _, ok := staticStringValue(ctx, argument); !ok {
+		if _, ok := staticStringValue(ruleContext, argument); !ok {
 			return false
 		}
 	}
@@ -328,7 +329,7 @@ func hasOnlyStaticStringArguments(ctx rule.Context, arguments []*ast.Node) bool 
 
 // wrapsARegexLiteral reports the `disallowRedundantWrapping` shape: a regex literal as the first
 // argument, optionally followed by a constant string of flags.
-func wrapsARegexLiteral(ctx rule.Context, arguments []*ast.Node) bool {
+func wrapsARegexLiteral(ruleContext rule.Context, arguments []*ast.Node) bool {
 	if len(arguments) == 0 || arguments[0].Kind != ast.KindRegularExpressionLiteral {
 		return false
 	}
@@ -338,11 +339,11 @@ func wrapsARegexLiteral(ctx rule.Context, arguments []*ast.Node) bool {
 	if len(arguments) != 2 {
 		return false
 	}
-	_, ok := staticStringValue(ctx, arguments[1])
+	_, ok := staticStringValue(ruleContext, arguments[1])
 	return ok
 }
 
-func reportRedundantWrapping(ctx rule.Context, node *ast.Node, arguments []*ast.Node) {
+func reportRedundantWrapping(ruleContext rule.Context, node *ast.Node, arguments []*ast.Node) {
 	literal := arguments[0]
 	literalPattern, literalFlags := regexsyntax.PatternAndFlags(literal.Text())
 
@@ -352,44 +353,44 @@ func reportRedundantWrapping(ctx rule.Context, node *ast.Node, arguments []*ast.
 		// pattern-and-flags, matching upstream, which reaches for `getText` here and constructs
 		// the string only on the two-argument arm. The difference is visible: a literal written
 		// with a redundant escape keeps it.
-		if canSuggestLiteral(ctx, node, literalPattern, literalFlags) {
+		if canSuggestLiteral(ruleContext, node, literalPattern, literalFlags) {
 			suggestions = append(suggestions, rule.Suggestion{
 				Message: messageReplaceWithLiteral,
-				Fixes:   []rule.Fix{replacementFix(ctx, node, literal.Text())},
+				Fixes:   []rule.Fix{replacementFix(ruleContext, node, literal.Text())},
 			})
 		}
-		ctx.ReportNodeWithSuggestions(node, messageUnexpectedRedundantRegExp, suggestions...)
+		ruleContext.ReportNodeWithSuggestions(node, messageUnexpectedRedundantRegExp, suggestions...)
 		return
 	}
 
-	argumentFlags, _ := staticStringValue(ctx, arguments[1])
+	argumentFlags, _ := staticStringValue(ruleContext, arguments[1])
 
 	var suggestions []rule.Suggestion
-	if canSuggestLiteral(ctx, node, literalPattern, argumentFlags) {
+	if canSuggestLiteral(ruleContext, node, literalPattern, argumentFlags) {
 		suggestions = append(suggestions, rule.Suggestion{
 			Message: messageReplaceWithLiteralAndFlags(argumentFlags),
-			Fixes: []rule.Fix{replacementFix(ctx, node,
+			Fixes: []rule.Fix{replacementFix(ruleContext, node,
 				"/"+literalPattern+"/"+argumentFlags)},
 		})
 	}
 	merged := mergeRegexFlags(literalFlags, argumentFlags)
-	if !flagsAreEqual(merged, argumentFlags) && canSuggestLiteral(ctx, node, literalPattern, merged) {
+	if !flagsAreEqual(merged, argumentFlags) && canSuggestLiteral(ruleContext, node, literalPattern, merged) {
 		suggestions = append(suggestions, rule.Suggestion{
 			Message: messageReplaceWithIntendedLiteralAndFlags(merged),
-			Fixes:   []rule.Fix{replacementFix(ctx, node, "/"+literalPattern+"/"+merged)},
+			Fixes:   []rule.Fix{replacementFix(ruleContext, node, "/"+literalPattern+"/"+merged)},
 		})
 	}
-	ctx.ReportNodeWithSuggestions(node, messageUnexpectedRedundantRegExpWithFlags, suggestions...)
+	ruleContext.ReportNodeWithSuggestions(node, messageUnexpectedRedundantRegExpWithFlags, suggestions...)
 }
 
-func reportConstructedFromStrings(ctx rule.Context, node *ast.Node, arguments []*ast.Node) {
-	pattern, _ := staticStringValue(ctx, arguments[0])
+func reportConstructedFromStrings(ruleContext rule.Context, node *ast.Node, arguments []*ast.Node) {
+	pattern, _ := staticStringValue(ruleContext, arguments[0])
 	flags := ""
 	if len(arguments) == 2 {
-		flags, _ = staticStringValue(ctx, arguments[1])
+		flags, _ = staticStringValue(ruleContext, arguments[1])
 	}
 
-	withhold := !canSuggestLiteral(ctx, node, pattern, flags) || !isRewritablePattern(pattern)
+	withhold := !canSuggestLiteral(ruleContext, node, pattern, flags) || !isRewritablePattern(pattern)
 
 	var suggestions []rule.Suggestion
 	if !withhold {
@@ -402,19 +403,19 @@ func reportConstructedFromStrings(ctx rule.Context, node *ast.Node, arguments []
 		}
 		suggestions = append(suggestions, rule.Suggestion{
 			Message: messageReplaceWithLiteral,
-			Fixes:   []rule.Fix{replacementFix(ctx, node, "/"+rewritten+"/"+flags)},
+			Fixes:   []rule.Fix{replacementFix(ruleContext, node, "/"+rewritten+"/"+flags)},
 		})
 	}
-	ctx.ReportNodeWithSuggestions(node, messageUnexpectedRegExp, suggestions...)
+	ruleContext.ReportNodeWithSuggestions(node, messageUnexpectedRegExp, suggestions...)
 }
 
 // replacementFix builds the edit replacing the whole call with a literal.
 //
 // `rule.TokenRange` rather than `node.Pos()`, because a node's Pos includes its leading trivia and a
 // fix built from it eats the whitespace and comments before the call.
-func replacementFix(ctx rule.Context, node *ast.Node, text string) rule.Fix {
-	span := rule.TokenRange(ctx.SourceFile, node)
-	return rule.ReplaceRange(span, padSoTokensStayApart(ctx, span, text))
+func replacementFix(ruleContext rule.Context, node *ast.Node, text string) rule.Fix {
+	span := rule.TokenRange(ruleContext.SourceFile, node)
+	return rule.ReplaceRange(span, padSoTokensStayApart(ruleContext, span, text))
 }
 
 // padSoTokensStayApart adds a space on either side of the replacement where removing one would
@@ -428,26 +429,27 @@ func replacementFix(ctx rule.Context, node *ast.Node, text string) rule.Fix {
 //	a/RegExp(/foo/);      ->  a/ /foo/;    a `/` directly before would start a comment
 //	RegExp(/foo/)in a;    ->  /foo/ in a;  a word directly after would run into the flags
 //
-// Upstream also gates on the neighbour actually TOUCHING the node, `tokenBefore.range[1] ===
+// Upstream also gates on the neighbour actually touching the node, `tokenBefore.range[1] ===
 // node.range[0]`, so a space already in the source is not doubled. That gate is reproduced by
 // looking at the byte immediately outside the span rather than at the previous token.
-func padSoTokensStayApart(ctx rule.Context, span core.TextRange, text string) string {
-	if ctx.SourceFile == nil || text == "" {
+func padSoTokensStayApart(ruleContext rule.Context, span core.TextRange, text string) string {
+	if ruleContext.SourceFile == nil || text == "" {
 		return text
 	}
-	source := ctx.SourceFile.Text()
+	source := ruleContext.SourceFile.Text()
+	padded := text
 
-	// No hashbang arm here, deliberately. Upstream pads only when the neighbour actually TOUCHES
+	// No hashbang arm here, deliberately. Upstream pads only when the neighbour actually touches
 	// the node, `tokenBefore.range[1] === node.range[0]`, and a hashbang is a whole line above the
-	// call, so the newline already separates them. Only the ALLOWLIST gate in
+	// call, so the newline already separates them. Only the allowlist gate in
 	// `precedingTokenAllowsALiteral` needs to know a hashbang is one token; padding does not, and
 	// adding it there produced a leading space upstream's expected output does not carry.
-	if span.Pos() > 0 && span.Pos() <= len(source) && text[0] == '/' {
+	if span.Pos() > 0 && span.Pos() <= len(source) && padded[0] == '/' {
 		// A `/` before a `/` opens a line comment, and a `*` before one closes a block comment
 		// that was never opened. Both are upstream's `canTokensBeAdjacent` answering no for a
 		// left `/` against a regular expression.
 		if previous := source[span.Pos()-1]; previous == '/' {
-			text = " " + text
+			padded = " " + padded
 		}
 	}
 	if span.End() >= 0 && span.End() < len(source) {
@@ -455,15 +457,15 @@ func padSoTokensStayApart(ctx rule.Context, span core.TextRange, text string) st
 		// tokenizes as one literal with flags `in`. Upstream reaches the same answer by asking
 		// whether two identifier-ish tokens can sit together.
 		if next := source[span.End()]; isWordByteForRegexAdjacency(next) {
-			text = text + " "
+			padded += " "
 		}
 	}
-	return text
+	return padded
 }
 
 // sourceStartsWithHashbangBefore reports whether everything before offset is a single hashbang line.
 //
-// Only the FIRST line can be a hashbang, and only when the file opens with `#!`, so this cannot
+// Only the first line can be a hashbang, and only when the file opens with `#!`, so this cannot
 // match a `#!` appearing anywhere else.
 func sourceStartsWithHashbangBefore(source string, offset int) bool {
 	if offset <= 0 || offset > len(source) || !strings.HasPrefix(source, "#!") {
@@ -476,9 +478,9 @@ func sourceStartsWithHashbangBefore(source string, offset int) bool {
 	return text.TrimWhitespace(source[firstNewline+1:offset]) == ""
 }
 
-func isWordByteForRegexAdjacency(b byte) bool {
-	return b == '_' || b == '$' || (b >= '0' && b <= '9') ||
-		(b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z')
+func isWordByteForRegexAdjacency(character byte) bool {
+	return character == '_' || character == '$' || (character >= '0' && character <= '9') ||
+		(character >= 'a' && character <= 'z') || (character >= 'A' && character <= 'Z')
 }
 
 func mergeRegexFlags(first string, second string) string {
@@ -500,11 +502,11 @@ func flagsAreEqual(first string, second string) bool {
 
 func sortedFlags(flags string) string {
 	runes := []rune(flags)
-	sort.Slice(runes, func(a int, b int) bool { return runes[a] < runes[b] })
+	sort.Slice(runes, func(first int, second int) bool { return runes[first] < runes[second] })
 	return string(runes)
 }
 
-// isRewritablePattern is upstream's printable allowlist, and it is a gate on the REWRITER rather
+// isRewritablePattern is upstream's printable allowlist, and it is a gate on the rewriter rather
 // than on the pattern's validity.
 //
 // Upstream spells it as a regular expression over the pattern text, and its effect is that anything
@@ -550,7 +552,7 @@ func isRewritableCharacter(character rune) bool {
 // literal, so it has to become the two characters backslash-n. Same for the other line and space
 // controls, and for `/`, which would otherwise close the literal early.
 //
-// Upstream walks the parsed regex and rewrites each CHARACTER node, which matters for a reason that
+// Upstream walks the parsed regex and rewrites each character node, which matters for a reason that
 // is not obvious: it means a control character reached through an identity escape, a backslash
 // directly before a real newline, collapses to the same two characters rather than becoming a
 // backslash followed by an escape. The walk here is `regexpattern.Walk`, which reports the same
@@ -619,7 +621,7 @@ func escapeSpelling(written string) (string, bool) {
 
 // validPrecedingTokens is upstream's allowlist of tokens a regex literal may sit directly after.
 //
-// Copied rather than re-derived, and the reason is that it is a list of JUDGMENTS rather than a
+// Copied rather than re-derived, and the reason is that it is a list of judgments rather than a
 // grammar. A `/` after an identifier or a closing paren is division, so the rewrite would silently
 // change meaning; a `/` after `(` or `=` or `return` can only open a literal. Upstream enumerates
 // the safe side and treats everything else as unsafe, which is the conservative direction, and it
@@ -648,11 +650,11 @@ var validPrecedingTokens = map[string]bool{
 // Three gates, all upstream's, and each withholds the suggestion rather than the finding. The
 // finding is about the constructor call and stands either way; only the proposed rewrite is at
 // stake, which is why a doubtful case loses its suggestion instead of its report.
-func canSuggestLiteral(ctx rule.Context, node *ast.Node, pattern string, flags string) bool {
-	if commentsInside(ctx, node) {
+func canSuggestLiteral(ruleContext rule.Context, node *ast.Node, pattern string, flags string) bool {
+	if commentsInside(ruleContext, node) {
 		return false
 	}
-	if !precedingTokenAllowsALiteral(ctx, node) {
+	if !precedingTokenAllowsALiteral(ruleContext, node) {
 		return false
 	}
 	return patternIsValid(pattern, flags)
@@ -663,9 +665,9 @@ func canSuggestLiteral(ctx rule.Context, node *ast.Node, pattern string, flags s
 // The replacement text is built from the pattern and the flags, so a comment anywhere in the call
 // would be deleted by the repair. Upstream withholds for exactly this reason and the corpus carries
 // two cases, one of which spells out in the comment text that it is explaining the pattern's safety.
-func commentsInside(ctx rule.Context, node *ast.Node) bool {
-	span := rule.TokenRange(ctx.SourceFile, node)
-	for _, comment := range comments.ForFile(ctx) {
+func commentsInside(ruleContext rule.Context, node *ast.Node) bool {
+	span := rule.TokenRange(ruleContext.SourceFile, node)
+	for _, comment := range comments.ForFile(ruleContext) {
 		if comment.Range.Pos() >= span.Pos() && comment.Range.End() <= span.End() {
 			return true
 		}
@@ -682,12 +684,12 @@ func commentsInside(ctx rule.Context, node *ast.Node) bool {
 //
 // A call at the very start of a file has no preceding token and upstream permits the suggestion
 // there, which is the `!tokenBefore` arm of its condition.
-func precedingTokenAllowsALiteral(ctx rule.Context, node *ast.Node) bool {
-	if ctx.SourceFile == nil {
+func precedingTokenAllowsALiteral(ruleContext rule.Context, node *ast.Node) bool {
+	if ruleContext.SourceFile == nil {
 		return false
 	}
-	text := ctx.SourceFile.Text()
-	start := rule.TokenRange(ctx.SourceFile, node).Pos()
+	text := ruleContext.SourceFile.Text()
+	start := rule.TokenRange(ruleContext.SourceFile, node).Pos()
 	if start <= 0 || start > len(text) {
 		return true
 	}
@@ -697,11 +699,11 @@ func precedingTokenAllowsALiteral(ctx rule.Context, node *ast.Node) bool {
 		return true
 	}
 
-	// A hashbang is ONE token to upstream's tokenizer, so the token before a call on the next line
+	// A hashbang is one token to upstream's tokenizer, so the token before a call on the next line
 	// is the whole `#!/usr/bin/sh` line rather than the `sh` this backwards scan would otherwise
 	// read. Reading `sh` puts an identifier in front of the call and the allowlist declines it,
 	// which withholds a suggestion upstream offers. Measured against eslint 10.8.1, which reports
-	// the case WITH a suggestion and pads it with a leading space.
+	// the case with a suggestion and pads it with a leading space.
 	if sourceStartsWithHashbangBefore(text, start) {
 		return true
 	}
@@ -817,10 +819,10 @@ func lineCommentContaining(text string, index int) int {
 // Upstream asks regexpp to validate at the configured ecmaVersion. There is no ecmaVersion here, so
 // this asks the same question at the latest edition, which is the divergence recorded on the rule.
 //
-// `esregexp.Compile` is deliberately NOT used, measured: it refuses the `v` flag outright and
+// `esregexp.Compile` is deliberately not used, measured: it refuses the `v` flag outright and
 // refuses `\p{Script=Greek}`, both of which are valid JavaScript that upstream accepts, and it
 // accepts a bare `]` under `u` which JavaScript rejects. It answers a different question, whether
-// the pattern can be EXECUTED by the vendored engine, and a rule deciding whether to offer a
+// the pattern can be executed by the vendored engine, and a rule deciding whether to offer a
 // rewrite must not withhold one because our engine cannot run the pattern.
 //
 // So validity is answered structurally by the pattern walk, which returns false on a construct the
@@ -876,7 +878,7 @@ func quantifiersAndGroupsBalance(pattern string, flags string) bool {
 		character := pattern[index]
 		switch character {
 		case '\\':
-			// `SkipPatternEscape` returns the escape's LENGTH in bytes, while `ClassEnd` below
+			// `SkipPatternEscape` returns the escape's length in bytes, while `ClassEnd` below
 			// returns an absolute index. Two helpers on the same shelf answering the same shape of
 			// question in different units, and conflating them here spun this loop forever on
 			// `RegExp('\\b')`: the length 2 was assigned as an index and the scan restarted at
@@ -924,11 +926,11 @@ func quantifiersAndGroupsBalance(pattern string, flags string) bool {
 				previousWasRepeatable = false
 				continue
 			}
-			// A `{` that opens no quantifier is a LITERAL brace under annex B and a syntax error
+			// A `{` that opens no quantifier is a literal brace under annex B and a syntax error
 			// under `u` or `v`, which drop annex B entirely. Upstream reaches the same split
 			// through regexpp's own unicode mode, and the corpus states it: `String.raw` + `\w{1, 2`
 			// under `u` withholds its suggestion because the pattern does not parse.
-			if parsedFlags.UV() {
+			if parsedFlags.UnicodeMode() {
 				return false
 			}
 			previousWasRepeatable = true

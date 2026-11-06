@@ -33,7 +33,7 @@ var messageUnsafeDeclarationMerging = rule.Message{
 // silent, so the pairing is exactly the two kinds and nothing else. Interface beside interface is
 // silent too, which is the intended TypeScript feature.
 //
-// # Why this reads only the FIRST declaration, and why that is a loop rather than an index
+// # Why this reads only the first declaration, and why that is a loop rather than an index
 //
 // Upstream reaches exactly one node. `ctx.scoping().get_binding(scope, name)` yields the symbol and
 // `symbol_declaration(symbol_id)` yields the single declaration oxc's binder recorded first, which
@@ -55,7 +55,7 @@ var messageUnsafeDeclarationMerging = rule.Message{
 //
 // # Where typescript-eslint disagrees, and it is not a small disagreement
 //
-// The original asks `defs.some(def => def.node.type === unsafeKind)`, which examines EVERY
+// The original asks `defs.some(def => def.node.type === unsafeKind)`, which examines every
 // definition rather than the first one. So the two implementations part company on exactly the
 // inputs above where oxc goes silent: under typescript-eslint,
 // `namespace Foo {}; interface Foo {}; class Foo {}` reports twice, once from each arm, because
@@ -71,7 +71,7 @@ var messageUnsafeDeclarationMerging = rule.Message{
 // The standing advice in this tree is never to index `symbol.Declarations[0]` and to loop instead,
 // because merging can put an unexpected declaration at index zero. Both halves of that matter here
 // and they point in different directions, so this was measured rather than assumed. Probed in
-// typescript-go on this rule's own shapes, `Declarations` IS in strict source-position order for
+// typescript-go on this rule's own shapes, `Declarations` is in strict source-position order for
 // every one of them, including the two above where the surprising entry (a module declaration, an
 // import specifier) lands at index zero exactly as its source position says. So an index-zero read
 // would in fact reproduce upstream here.
@@ -101,14 +101,14 @@ var messageUnsafeDeclarationMerging = rule.Message{
 // declares NeedsTypeChecker, its fixtures use RunTyped, and both listeners guard against a nil
 // checker: a rule that dereferences a checker result without that guard panics rather than going
 // quiet.
-var NoUnsafeDeclarationMerging = rule.Rule{
+var NoUnsafeDeclarationMerging = rule.Rule[rule.NoOptions]{
 	Name:             "@typescript-eslint/no-unsafe-declaration-merging",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		report := func(node *ast.Node, opposite ast.Kind) {
 			// The nil-checker guard, kept even though it is inert on today's shim, and the
-			// measurement is here because the standing advice says a missing one PANICS.
+			// measurement is here because the standing advice says a missing one panics.
 			//
 			// Probed rather than believed: under the untyped harness `ctx.TypeChecker` is nil and an
 			// unguarded `GetSymbolAtLocation` on it returns nil rather than crashing, so a mutant
@@ -117,7 +117,7 @@ var NoUnsafeDeclarationMerging = rule.Rule{
 			// receiver, not a promise, and the failure it would produce if it changed is a crash
 			// rather than a quiet wrong answer. It also keeps a `.TypeChecker` selector in this
 			// file, which is what the registry's declaration guard reads.
-			if ctx.TypeChecker == nil {
+			if ruleContext.TypeChecker == nil {
 				return
 			}
 			name := node.Name()
@@ -127,12 +127,12 @@ var NoUnsafeDeclarationMerging = rule.Rule{
 			if name == nil {
 				return
 			}
-			symbol := ctx.TypeChecker.GetSymbolAtLocation(name)
+			symbol := ruleContext.TypeChecker.GetSymbolAtLocation(name)
 			if symbol == nil {
 				return
 			}
 
-			// An EXPORTED declaration is handed its own symbol carrying only itself, while the
+			// An exported declaration is handed its own symbol carrying only itself, while the
 			// merged list lives on its local symbol. This is the single most surprising thing about
 			// porting this rule and no imported fixture can see it, because upstream's corpus writes
 			// no `export` anywhere. Probed on three shapes:
@@ -161,7 +161,7 @@ var NoUnsafeDeclarationMerging = rule.Rule{
 				declarations = local.Declarations
 			}
 
-			// Upstream consults exactly ONE declaration, the earliest, and reports only when that
+			// Upstream consults exactly one declaration, the earliest, and reports only when that
 			// one is of the opposite kind. That single test carries three behaviors at once, all
 			// pinned on the release binary:
 			//
@@ -171,12 +171,12 @@ var NoUnsafeDeclarationMerging = rule.Rule{
 			//	namespace Foo {}; interface Foo {}; class Foo {}    0  everything sees a namespace
 			//
 			// The last is upstream going quiet on a genuinely unsafe merge, reproduced rather than
-			// corrected. A predicate asking whether ANY declaration is the opposite kind reads as an
+			// corrected. A predicate asking whether any declaration is the opposite kind reads as an
 			// improvement and gets the second and fourth lines wrong.
 			//
 			// This is a loop rather than `declarations[0]`, and the standing advice to loop is right
 			// here for a reason that had to be measured rather than assumed. Probed over eighteen
-			// class-and-interface shapes in typescript-go, `Declarations` IS in strict source-position
+			// class-and-interface shapes in typescript-go, `Declarations` is in strict source-position
 			// order, including the two where a third kind lands at index zero, so an index read would
 			// in fact agree today. It stays a loop because a neighbouring rule measured the opposite
 			// for its own shape, where a value declaration sorted ahead of a type one written above
@@ -199,7 +199,7 @@ var NoUnsafeDeclarationMerging = rule.Rule{
 			// anonymous default forms: no merged declaration of either kind ever has a nil name. A
 			// guard written here survived the whole fixture set because nothing can reach it, which
 			// is a different thing from nothing covering it.
-			ctx.ReportNode(earliest.Name(), messageUnsafeDeclarationMerging)
+			ruleContext.ReportNode(earliest.Name(), messageUnsafeDeclarationMerging)
 		}
 
 		return rule.Listeners{

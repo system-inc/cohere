@@ -33,7 +33,14 @@ var arenas = sync.Pool{New: func() any {
 
 // AcquireArena is an arena for one format, from the pool. Release it once the file is printed and nothing
 // will read its tree again.
-func AcquireArena() *Arena { return arenas.Get().(*Arena) }
+func AcquireArena() *Arena {
+	nodes, ok := arenas.Get().(*Arena)
+	if !ok {
+		// Invariant: the pool's only writers are its New and Release, and both store an *Arena.
+		panic("estree: the arena pool held something other than an *Arena")
+	}
+	return nodes
+}
 
 // Release resets the arena and returns it to the pool. Every node it handed out is gone.
 func (nodes *Arena) Release() {
@@ -46,9 +53,9 @@ func (nodes *Arena) Release() {
 	arenas.Put(nodes)
 }
 
-// Len is how many nodes the arena has handed out since it was acquired: a file's tree, and any node the
+// Length is how many nodes the arena has handed out since it was acquired: a file's tree, and any node the
 // postprocess made and dropped. Zero for a nil arena.
-func (nodes *Arena) Len() int {
+func (nodes *Arena) Length() int {
 	if nodes == nil {
 		return 0
 	}
@@ -56,14 +63,16 @@ func (nodes *Arena) Len() int {
 }
 
 // node is New, from the arena.
-func (nodes *Arena) node(nodeType string, start int, end int, keysAndValues []any) *Node {
+func (nodes *Arena) node(nodeType string, start int, end int, properties []Property) *Node {
 	if nodes == nil {
-		return New(nodeType, start, end, keysAndValues...)
+		return New(nodeType, start, end, properties)
 	}
 	nodes.count++
-	created := nodes.nodes.New(Node{nodeType: nodeType, Range: [2]int{start, end}, properties: nodes.properties.Make(len(keysAndValues) / 2)})
-	for index := 0; index+1 < len(keysAndValues); index += 2 {
-		created.Set(keysAndValues[index].(string), keysAndValues[index+1])
+	created := nodes.nodes.New(
+		Node{nodeType: nodeType, Range: [2]int{start, end}, properties: nodes.properties.Make(len(properties))},
+	)
+	for _, given := range properties {
+		created.Set(given.Key, given.Value)
 	}
 	return created
 }

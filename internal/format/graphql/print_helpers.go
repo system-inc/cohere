@@ -48,8 +48,8 @@ func currentNode(path *astPath) *estree.Node {
 }
 
 // printAll is upstream's path.map(print, ...names).
-func printAll(path *astPath, print printing.PrintFunc, names ...any) []doc.Doc {
-	return printing.Map(path, func(*astPath, int, any) doc.Doc { return print(nil, nil) }, names...)
+func printAll(path *astPath, print printFunc, names ...string) []doc.Doc {
+	return printing.Map(path, func(*astPath, int) doc.Doc { return print("", nil) }, names...)
 }
 
 // isNextLineEmpty is utilities/is-next-line-empty.js. It skips JavaScript's comment syntax, not
@@ -73,7 +73,7 @@ func isNextLineEmpty(text string, startIndex int) bool {
 
 // print/arguments.js
 
-func printArguments(path *astPath, options *printerOptions, print printing.PrintFunc) doc.Doc {
+func printArguments(path *astPath, options *printerOptions, print printFunc) doc.Doc {
 	node := currentNode(path)
 	if !isNonEmptyArray(node, "arguments") {
 		return empty
@@ -95,7 +95,7 @@ func printArguments(path *astPath, options *printerOptions, print printing.Print
 
 // print/description.js
 
-func printDescription(path *astPath, options *printerOptions, print printing.PrintFunc) doc.Doc {
+func printDescription(path *astPath, options *printerOptions, print printFunc) doc.Doc {
 	node := currentNode(path)
 	if node.Child("description") == nil {
 		return empty
@@ -113,7 +113,7 @@ func printDescription(path *astPath, options *printerOptions, print printing.Pri
 
 // print/directives.js
 
-func printDirectives(path *astPath, print printing.PrintFunc) doc.Doc {
+func printDirectives(path *astPath, print printFunc) doc.Doc {
 	node := currentNode(path)
 
 	if !isNonEmptyArray(node, "directives") {
@@ -132,9 +132,9 @@ func printDirectives(path *astPath, print printing.PrintFunc) doc.Doc {
 
 // print/sequence.js
 
-func printSequence(path *astPath, options *printerOptions, print printing.PrintFunc, property string) []doc.Doc {
-	return printing.Map(path, func(path *astPath, _ int, _ any) doc.Doc {
-		printed := print(nil, nil)
+func printSequence(path *astPath, options *printerOptions, print printFunc, property string) []doc.Doc {
+	return printing.Map(path, func(path *astPath, _ int) doc.Doc {
+		printed := print("", nil)
 
 		if !path.IsLast() && isNextLineEmpty(options.OriginalText, locEnd(currentNode(path))) {
 			return doc.Concat{printed, hardline}
@@ -146,7 +146,7 @@ func printSequence(path *astPath, options *printerOptions, print printing.PrintF
 
 // print/variable-definitions.js
 
-func printVariableDefinitions(path *astPath, print printing.PrintFunc) doc.Doc {
+func printVariableDefinitions(path *astPath, print printFunc) doc.Doc {
 	node := currentNode(path)
 	if !isNonEmptyArray(node, "variableDefinitions") {
 		return empty

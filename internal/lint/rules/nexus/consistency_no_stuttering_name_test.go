@@ -9,8 +9,8 @@ import (
 
 const stutterFile = "/repository/source/Thing.ts"
 
-func TestConsistencyNoStutteringNameFires(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoStutteringNameFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -27,16 +27,16 @@ func TestConsistencyNoStutteringNameFires(t *testing.T) {
 		{"inside a comparison", "export const a = outcome.outcome === 'Unreadable';\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ConsistencyNoStutteringName, stutterFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "stutteringName")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ConsistencyNoStutteringName, stutterFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "stutteringName")
 		})
 	}
 }
 
-func TestConsistencyNoStutteringNameStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoStutteringNameStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	// The whole design of this rule is that it stays silent on generic names that are doing their
 	// job. The declaration-site version of this idea measured 1,355 hits and roughly forty were
@@ -56,38 +56,38 @@ func TestConsistencyNoStutteringNameStaysSilent(t *testing.T) {
 		{"no member access at all", "export const a = 1;\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ConsistencyNoStutteringName, stutterFile, testCase.sourceText)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ConsistencyNoStutteringName, stutterFile, testCase.sourceText)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
 
-func TestConsistencyNoStutteringNameRespectsTheGenericNamesOption(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoStutteringNameRespectsTheGenericNamesOption(test *testing.T) {
+	test.Parallel()
 
 	// The option replaces the default set rather than adding to it, so a name on the default list
 	// stops being checked once a caller names its own vocabulary.
 	options := ConsistencyNoStutteringNameOptions{GenericNames: []string{"payload"}}
 
-	custom := rule_testing.RunWithOptions(t, ConsistencyNoStutteringName, stutterFile,
+	custom := rule_testing.RunWithOptions(test, ConsistencyNoStutteringName, stutterFile,
 		"export const a = payload.payload;\n", options)
-	rule_testing.ExpectFindings(t, custom, "stutteringName")
+	rule_testing.ExpectFindings(test, custom, "stutteringName")
 
-	replaced := rule_testing.RunWithOptions(t, ConsistencyNoStutteringName, stutterFile,
+	replaced := rule_testing.RunWithOptions(test, ConsistencyNoStutteringName, stutterFile,
 		"export const a = result.result;\n", options)
-	rule_testing.ExpectClean(t, replaced)
+	rule_testing.ExpectClean(test, replaced)
 }
 
-func TestConsistencyNoStutteringNameNamesTheWord(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoStutteringNameNamesTheWord(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, ConsistencyNoStutteringName, stutterFile, "export const a = outcome.outcome;\n")
-	rule_testing.ExpectFindings(t, result, "stutteringName")
+	result := rule_testing.Run(test, ConsistencyNoStutteringName, stutterFile, "export const a = outcome.outcome;\n")
+	rule_testing.ExpectFindings(test, result, "stutteringName")
 
 	description := result.Diagnostics[0].Message.Description
 	if !strings.Contains(description, `"outcome.outcome"`) {
-		t.Fatalf("expected the message to name the stutter, got: %s", description)
+		test.Fatalf("expected the message to name the stutter, got: %s", description)
 	}
 }

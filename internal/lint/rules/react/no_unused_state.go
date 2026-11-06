@@ -36,7 +36,7 @@ func messageUnusedStateField(name string) rule.Message {
 //
 // # The four give-up conditions, and why they are the point of the rule
 //
-// When the rule cannot see through an access it abandons the WHOLE class rather than reporting.
+// When the rule cannot see through an access it abandons the whole class rather than reporting.
 // Each was measured against the installed build on 2026-08-27:
 //
 //	this.state[key]           computed with a non-literal property   gives up
@@ -44,7 +44,7 @@ func messageUnusedStateField(name string) rule.Message {
 //	<D {...this.state} />     spread as JSX attributes               gives up
 //	({...this.state})         spread into an object                  gives up
 //
-// A computed access with a LITERAL property is not a give-up, it is an ordinary read of that key:
+// A computed access with a literal property is not a give-up, it is an ordinary read of that key:
 // `this.state["a"]` reads `a`, and `this.state["b"]` still reports `a`. Both measured.
 //
 // Giving up is the difference between a rule people keep and one they turn off. Reporting a key
@@ -66,7 +66,7 @@ func messageUnusedStateField(name string) rule.Message {
 // # The setState updater
 //
 // `this.setState(prev => ({b: prev.a}))` reads `a` through the parameter. Upstream tests for an
-// ARROW function specifically, so `this.setState(function(prev) {...})` does NOT alias and its
+// arrow function specifically, so `this.setState(function(prev) {...})` does not alias and its
 // reads are lost. Measured: the arrow form is silent and the function-expression form reports.
 // Reproduced, because it is a decision the corpus records rather than an oversight this port can
 // see is wrong.
@@ -76,7 +76,7 @@ func messageUnusedStateField(name string) rule.Message {
 // The second parameter of `shouldComponentUpdate`, `componentWillUpdate`,
 // `UNSAFE_componentWillUpdate`, `getSnapshotBeforeUpdate`, `componentDidUpdate` and static
 // `getDerivedStateFromProps` receives state, so reads through it count. The list is exact: a method
-// with the same shape and a different name does NOT alias its second parameter, measured.
+// with the same shape and a different name does not alias its second parameter, measured.
 //
 // Upstream reaches this by walking the scope chain from each identifier. This walks the enclosing
 // function chain from the identifier instead, which answers the same question without a scope
@@ -93,19 +93,19 @@ func messageUnusedStateField(name string) rule.Message {
 // `meta.fixable` is unset upstream. Deleting a state field is not a spelling change: the write that
 // set it may have a side effect, and the right repair is usually to delete the code that computes
 // the value too, which only the author can decide.
-var NoUnusedState = rule.Rule{
+var NoUnusedState = rule.Rule[rule.NoOptions]{
 	Name: "react/no-unused-state",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
 		return rule.Listeners{
 			ast.KindSourceFile: func(sourceFile *ast.Node) {
 				// One walk, driven by this rule rather than by the dispatcher, because the
-				// algorithm is stateful across node kinds and depends on entering and LEAVING a
+				// algorithm is stateful across node kinds and depends on entering and leaving a
 				// class. There is no exit listener in this tree, so the traversal is written here.
-				noUnusedStateWalk(ctx, sourceFile)
+				noUnusedStateWalk(ruleContext, sourceFile)
 			},
 		}
 	},
@@ -140,9 +140,9 @@ type noUnusedStateField struct {
 // noUnusedStateWalk traverses the file, maintaining the per-class accumulator.
 //
 // Written as an explicit recursion rather than as listeners because the rule needs to act on
-// LEAVING a class and a method, and the dispatcher offers no exit hook. The pre-order call
+// leaving a class and a method, and the dispatcher offers no exit hook. The pre-order call
 // corresponds to upstream's plain visitor and the post-order call to its `:exit` handler.
-func noUnusedStateWalk(ctx rule.Context, sourceFile *ast.Node) {
+func noUnusedStateWalk(ruleContext rule.Context, sourceFile *ast.Node) {
 	var classInfo *noUnusedStateClassInfo
 
 	var visit func(*ast.Node)
@@ -169,14 +169,14 @@ func noUnusedStateWalk(ctx rule.Context, sourceFile *ast.Node) {
 
 		case ast.KindMethodDeclaration:
 			if classInfo != nil {
-				// The factory's `getInitialState` can be written as an object method SHORTHAND,
+				// The factory's `getInitialState` can be written as an object method shorthand,
 				// which our parser spells as a method declaration while ESTree spells it as a
 				// property holding a function expression. Upstream's `FunctionExpression` arm
 				// therefore covers a shape that never reaches it here, and without this the
 				// shorthand form records no state fields at all. Measured: upstream reports on
 				// `createReactClass({getInitialState() {return {foo: 0};}})` and this port was
 				// silent on it until the shorthand was routed here too.
-				noUnusedStateVisitFunctionExpression(ctx, classInfo, node)
+				noUnusedStateVisitFunctionExpression(ruleContext, classInfo, node)
 				if !noUnusedStateIsGetInitialState(node) {
 					restoredAliases, restoresAliases = classInfo.aliases, true
 					classInfo.aliases = map[string]bool{}
@@ -193,7 +193,7 @@ func noUnusedStateWalk(ctx rule.Context, sourceFile *ast.Node) {
 
 		case ast.KindPropertyDeclaration:
 			if classInfo != nil {
-				noUnusedStateVisitClassProperty(ctx, classInfo, node)
+				noUnusedStateVisitClassProperty(ruleContext, classInfo, node)
 				// A property holding an arrow function gets its own alias scope, matching
 				// upstream's ClassProperty handler. `getDerivedStateFromProps` written as a static
 				// property is excluded there, and it is excluded here for the same reason: its own
@@ -206,7 +206,7 @@ func noUnusedStateWalk(ctx rule.Context, sourceFile *ast.Node) {
 
 		case ast.KindFunctionExpression:
 			if classInfo != nil {
-				noUnusedStateVisitFunctionExpression(ctx, classInfo, node)
+				noUnusedStateVisitFunctionExpression(ruleContext, classInfo, node)
 				restoredAliases, restoresAliases = classInfo.aliases, true
 				if noUnusedStateIsGetInitialState(node) {
 					// `getInitialState` does not open an alias scope upstream; its arm returns
@@ -220,26 +220,26 @@ func noUnusedStateWalk(ctx rule.Context, sourceFile *ast.Node) {
 
 		case ast.KindCallExpression:
 			if classInfo != nil {
-				noUnusedStateVisitCall(ctx, classInfo, node)
+				noUnusedStateVisitCall(ruleContext, classInfo, node)
 			}
 
 		case ast.KindBinaryExpression:
 			if classInfo != nil {
-				noUnusedStateVisitAssignment(ctx, classInfo, node)
+				noUnusedStateVisitAssignment(ruleContext, classInfo, node)
 			}
 
 		case ast.KindVariableDeclaration:
 			if classInfo != nil {
 				declaration := node.AsVariableDeclaration()
 				if declaration.Initializer != nil {
-					noUnusedStateHandleAssignment(ctx, classInfo, declaration.Name(),
+					noUnusedStateHandleAssignment(ruleContext, classInfo, declaration.Name(),
 						noUnusedStateUnwrap(declaration.Initializer))
 				}
 			}
 
 		case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
 			if classInfo != nil {
-				if noUnusedStateVisitMemberAccess(ctx, classInfo, node) {
+				if noUnusedStateVisitMemberAccess(ruleContext, classInfo, node) {
 					// The access was a give-up. Upstream sets classInfo to null, which abandons
 					// the class without reporting, and the accumulator stays nil for the rest of
 					// the file until a new component opens one.
@@ -280,7 +280,7 @@ func noUnusedStateWalk(ctx rule.Context, sourceFile *ast.Node) {
 		}
 		if enteredClass {
 			if classInfo != nil {
-				noUnusedStateReport(ctx, classInfo)
+				noUnusedStateReport(ruleContext, classInfo)
 			}
 			classInfo = nil
 		}
@@ -289,18 +289,18 @@ func noUnusedStateWalk(ctx rule.Context, sourceFile *ast.Node) {
 }
 
 // noUnusedStateReport emits one finding per written key nothing read.
-func noUnusedStateReport(ctx rule.Context, classInfo *noUnusedStateClassInfo) {
+func noUnusedStateReport(ruleContext rule.Context, classInfo *noUnusedStateClassInfo) {
 	for _, field := range classInfo.stateFields {
 		if classInfo.usedStateFields[field.name] {
 			continue
 		}
-		ctx.ReportNode(field.node, messageUnusedStateField(field.name))
+		ruleContext.ReportNode(field.node, messageUnusedStateField(field.name))
 	}
 }
 
 // noUnusedStateIsFactoryObject reports whether an object literal is the argument to the factory.
 //
-// Upstream's `isES5Component` asks whether the object's PARENT is a `createReactClass` call, which
+// Upstream's `isES5Component` asks whether the object's parent is a `createReactClass` call, which
 // is the same question asked from the other end.
 func noUnusedStateIsFactoryObject(node *ast.Node) bool {
 	parent := node.Parent
@@ -316,7 +316,7 @@ func noUnusedStateIsFactoryObject(node *ast.Node) bool {
 
 // noUnusedStateVisitClassProperty handles `state = {}` and the lifecycle state parameter.
 func noUnusedStateVisitClassProperty(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	classInfo *noUnusedStateClassInfo,
 	node *ast.Node,
 ) {
@@ -331,8 +331,8 @@ func noUnusedStateVisitClassProperty(
 
 	// `static getDerivedStateFromProps = (props, state) => ...` written as a property. Upstream has
 	// a separate handler for it that reads the state parameter's references directly.
-	if noUnusedStateIsDerivedStateFromProps(node) && initializer != nil {
-		noUnusedStateRecordParameterReads(ctx, classInfo, initializer, 1)
+	if noUnusedStateIsDerivedStateFromProperties(node) && initializer != nil {
+		noUnusedStateRecordParameterReads(ruleContext, classInfo, initializer, 1)
 	}
 }
 
@@ -350,9 +350,11 @@ func noUnusedStatePropertyOpensAnAliasScope(node *ast.Node) bool {
 	return initializer != nil && initializer.Kind == ast.KindArrowFunction
 }
 
-// noUnusedStateIsDerivedStateFromProps reports whether a member is the static lifecycle hook that
+// noUnusedStateIsDerivedStateFromProperties reports whether a member is the static lifecycle hook that
 // receives state as its second parameter.
-func noUnusedStateIsDerivedStateFromProps(node *ast.Node) bool {
+//
+// React names the hook getDerivedStateFromProps.
+func noUnusedStateIsDerivedStateFromProperties(node *ast.Node) bool {
 	if !noUnusedStateIsStatic(node) {
 		return false
 	}
@@ -372,7 +374,7 @@ func noUnusedStateIsDerivedStateFromProps(node *ast.Node) bool {
 	}
 	// Upstream requires at least two parameters, so a one-parameter hook records nothing.
 	//
-	// This check is SUBSUMED and the sweep correctly scores its removal as surviving. The only
+	// This check is subsumed and the sweep correctly scores its removal as surviving. The only
 	// caller is the class-property arm, which passes index 1 to
 	// `noUnusedStateRecordParameterReads`, and that function opens with `len(parameters) <= index`.
 	// So any input reaching here with fewer than two parameters is declined one call later by the
@@ -388,7 +390,7 @@ func noUnusedStateIsDerivedStateFromProps(node *ast.Node) bool {
 
 // noUnusedStateVisitFunctionExpression handles the factory's `getInitialState`.
 func noUnusedStateVisitFunctionExpression(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	classInfo *noUnusedStateClassInfo,
 	node *ast.Node,
 ) {
@@ -403,7 +405,7 @@ func noUnusedStateVisitFunctionExpression(
 	if len(statements) == 0 {
 		return
 	}
-	// Upstream reads only the LAST statement of the body, so a return written earlier contributes
+	// Upstream reads only the last statement of the body, so a return written earlier contributes
 	// nothing. Reproduced rather than widened.
 	last := statements[len(statements)-1]
 	if last.Kind != ast.KindReturnStatement {
@@ -460,7 +462,7 @@ func noUnusedStateBodyOf(node *ast.Node) *ast.Node {
 }
 
 // noUnusedStateVisitCall handles `this.setState(...)` in both of its argument shapes.
-func noUnusedStateVisitCall(ctx rule.Context, classInfo *noUnusedStateClassInfo, node *ast.Node) {
+func noUnusedStateVisitCall(ruleContext rule.Context, classInfo *noUnusedStateClassInfo, node *ast.Node) {
 	if !noUnusedStateIsSetStateCall(node) {
 		return
 	}
@@ -478,7 +480,7 @@ func noUnusedStateVisitCall(ctx rule.Context, classInfo *noUnusedStateClassInfo,
 		return
 	}
 
-	// The updater form. Upstream tests for an ARROW function specifically, so a function expression
+	// The updater form. Upstream tests for an arrow function specifically, so a function expression
 	// handed to setState contributes neither fields nor an alias. Measured against the installed
 	// build: the arrow form is silent and the function-expression form reports.
 	if first.Kind != ast.KindArrowFunction {
@@ -506,7 +508,7 @@ func noUnusedStateVisitCall(ctx rule.Context, classInfo *noUnusedStateClassInfo,
 		noUnusedStateHandleStateDestructuring(classInfo, firstParameterName)
 		return
 	}
-	// The kind guard is load-bearing rather than defensive: `Node.Text()` PANICS on a binding
+	// The kind guard is load-bearing rather than defensive: `Node.Text()` panics on a binding
 	// pattern rather than returning a name, measured directly, and a panic costs every rule its
 	// verdict on the whole file because the walk recovers per file rather than per rule. An array
 	// pattern reaches this line and must not be read.
@@ -517,7 +519,7 @@ func noUnusedStateVisitCall(ctx rule.Context, classInfo *noUnusedStateClassInfo,
 
 // noUnusedStateVisitAssignment handles `this.state = {}` and alias-creating assignments.
 func noUnusedStateVisitAssignment(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	classInfo *noUnusedStateClassInfo,
 	node *ast.Node,
 ) {
@@ -540,14 +542,14 @@ func noUnusedStateVisitAssignment(
 		}
 		return
 	}
-	noUnusedStateHandleAssignment(ctx, classInfo, left, right)
+	noUnusedStateHandleAssignment(ruleContext, classInfo, left, right)
 }
 
 // noUnusedStateInConstructor reports whether a node sits inside a constructor body.
 //
 // Upstream climbs to the nearest FunctionExpression and asks whether its parent is a
 // MethodDefinition of kind `constructor`. Our parser gives a constructor its own node kind, so the
-// climb stops at the first function-like ancestor and asks whether that ancestor IS one.
+// climb stops at the first function-like ancestor and asks whether that ancestor is itself a constructor.
 func noUnusedStateInConstructor(node *ast.Node) bool {
 	for current := node.Parent; current != nil; current = current.Parent {
 		switch current.Kind {
@@ -565,7 +567,7 @@ func noUnusedStateInConstructor(node *ast.Node) bool {
 // noUnusedStateHandleAssignment records aliases and destructured reads, for both an assignment
 // expression and a variable declarator.
 func noUnusedStateHandleAssignment(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	classInfo *noUnusedStateClassInfo,
 	left *ast.Node,
 	right *ast.Node,
@@ -649,14 +651,14 @@ func noUnusedStateHandleStateDestructuring(
 	}
 }
 
-// noUnusedStateBindingKey returns the node naming the PROPERTY a binding element reads.
+// noUnusedStateBindingKey returns the node naming the property a binding element reads.
 //
 // This is the shape difference that a port written from ESTree gets wrong. There, a destructuring
 // property carries `key` and `value` as separate fields whether or not the source renames. Here a
-// shorthand `{foo}` produces a binding element whose `PropertyName` is NIL and whose `Name` is the
+// shorthand `{foo}` produces a binding element whose `PropertyName` is `nil` and whose `Name` is the
 // identifier, while a renaming `{foo: bar}` fills both. So the property being read is `PropertyName`
 // when it is present and `Name` otherwise, and reading `Name` unconditionally would record the
-// LOCAL name of a renamed binding as a state key.
+// local name of a renamed binding as a state key.
 func noUnusedStateBindingKey(element *ast.Node) *ast.Node {
 	binding := element.AsBindingElement()
 	if binding.PropertyName != nil {
@@ -689,11 +691,12 @@ func noUnusedStateBindingElements(pattern *ast.Node) []*ast.Node {
 // The boolean return is the give-up signal. Upstream writes `classInfo = null` in two places here
 // and the caller reproduces that by dropping the accumulator.
 func noUnusedStateVisitMemberAccess(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	classInfo *noUnusedStateClassInfo,
 	node *ast.Node,
 ) bool {
-	var object, property *ast.Node
+	var object *ast.Node
+	var property *ast.Node
 	computed := false
 	switch node.Kind {
 	case ast.KindPropertyAccessExpression:
@@ -729,7 +732,7 @@ func noUnusedStateVisitMemberAccess(
 // noUnusedStateIsLiteralKey reports whether a computed property is a literal upstream accepts.
 //
 // Upstream's give-up test is `node.property.type !== 'Literal'`, and its ESTree Literal covers a
-// string and a number. A template literal is NOT a Literal there, so `this.state[`+"`a`"+`]` gives
+// string and a number. A template literal is not a Literal there, so `this.state[`+"`a`"+`]` gives
 // up even though its value is knowable; reproduced.
 func noUnusedStateIsLiteralKey(property *ast.Node) bool {
 	if property == nil {
@@ -779,7 +782,7 @@ func noUnusedStateIsThisStateAccess(node *ast.Node) bool {
 	return name != nil && name.Kind == ast.KindIdentifier && name.Text() == "state"
 }
 
-// noUnusedStateLifecycleMethodsReceivingState is the exact list whose SECOND parameter is state.
+// noUnusedStateLifecycleMethodsReceivingState is the exact list whose second parameter is state.
 //
 // Exact rather than approximate: a method with the same shape and a different name does not alias
 // its second parameter, measured against the installed build.
@@ -795,13 +798,13 @@ var noUnusedStateLifecycleMethodsReceivingState = map[string]bool{
 // noUnusedStateIsLifecycleStateParameter reports whether an identifier names the state parameter of
 // a lifecycle method.
 //
-// Upstream walks the SCOPE chain outward asking, at each level, whether the enclosing block is one
+// Upstream walks the scope chain outward asking, at each level, whether the enclosing block is one
 // of these methods and whether the identifier's name matches its second parameter. This walks the
 // enclosing function chain instead, which answers the same question without a scope table: at every
 // function-like ancestor, ask whether that function is such a method and whether the name matches.
 //
 // The name comparison is upstream's own and it is looser than resolution: an identifier that merely
-// SHARES the parameter's spelling matches, even where a nested declaration shadows it. Reproduced,
+// shares the parameter's spelling matches, even where a nested declaration shadows it. Reproduced,
 // because the alternative reports differently from the tool this is compared against.
 func noUnusedStateIsLifecycleStateParameter(identifier *ast.Node) bool {
 	name := identifier.Text()
@@ -857,7 +860,7 @@ func noUnusedStateEnclosingMember(node *ast.Node) *ast.Node {
 // each. This walks the function body for member accesses whose object is an identifier matching the
 // parameter's name, which answers the same question for the shapes the corpus writes.
 func noUnusedStateRecordParameterReads(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	classInfo *noUnusedStateClassInfo,
 	function *ast.Node,
 	index int,
@@ -897,6 +900,8 @@ func noUnusedStateRecordParameterReads(
 // Upstream accepts a key that is a literal, a substitution-free template, or a non-computed
 // identifier, and skips everything else. A spread inside the object is not a property and
 // contributes nothing.
+//
+// Mutates: classInfo appends each named key to its state fields, which the class's usage check reads.
 func noUnusedStateAddStateFields(classInfo *noUnusedStateClassInfo, object *ast.Node) {
 	literal := object.AsObjectLiteralExpression()
 	if literal == nil || literal.Properties == nil {
@@ -987,13 +992,13 @@ func noUnusedStateLiteralText(node *ast.Node) (string, bool) {
 // This is upstream's `unwrapTSAsExpression`, plus a parenthesis skip upstream does not need. Two
 // separate reasons, and conflating them would leave a gap:
 //
-// The ASSERTION half is upstream's. `this.state = {a: 1} as unknown` writes an object through an
+// The assertion half is upstream's. `this.state = {a: 1} as unknown` writes an object through an
 // `as` expression, and without the strip the right-hand side is not an object literal and no field
 // is recorded. Upstream strips `TSAsExpression` in eight places for exactly this.
 //
-// The PARENTHESIS half is ours. Our parser keeps `KindParenthesizedExpression` as a real node and
+// The parenthesis half is ours. Our parser keeps `KindParenthesizedExpression` as a real node and
 // the tree upstream walks folds it away, so `(this as unknown).state` arrives here as a property
-// access whose object is a PARENTHESIZED node wrapping the assertion. Stripping only the assertion
+// access whose object is a parenthesized node wrapping the assertion. Stripping only the assertion
 // would still leave the parenthesis and the receiver would not read as `this`.
 //
 // The loop matters rather than a single step, because the two wrappers nest and repeat:
@@ -1003,20 +1008,21 @@ func noUnusedStateLiteralText(node *ast.Node) (string, bool) {
 // verdict: the right side of a state assignment, the receiver of the assignment target, the object
 // of a read, a setState argument, a setState callee, and the right side of an alias assignment.
 func noUnusedStateUnwrap(node *ast.Node) *ast.Node {
-	for node != nil {
-		switch node.Kind {
+	unwrapped := node
+	for unwrapped != nil {
+		switch unwrapped.Kind {
 		case ast.KindParenthesizedExpression:
-			node = node.AsParenthesizedExpression().Expression
+			unwrapped = unwrapped.AsParenthesizedExpression().Expression
 		case ast.KindAsExpression:
-			node = node.AsAsExpression().Expression
+			unwrapped = unwrapped.AsAsExpression().Expression
 		case ast.KindSatisfiesExpression:
-			node = node.AsSatisfiesExpression().Expression
+			unwrapped = unwrapped.AsSatisfiesExpression().Expression
 		case ast.KindTypeAssertionExpression:
-			node = node.AsTypeAssertion().Expression
+			unwrapped = unwrapped.AsTypeAssertion().Expression
 		case ast.KindNonNullExpression:
-			node = node.AsNonNullExpression().Expression
+			unwrapped = unwrapped.AsNonNullExpression().Expression
 		default:
-			return node
+			return unwrapped
 		}
 	}
 	return nil
@@ -1029,7 +1035,7 @@ func noUnusedStateIsSetStateCall(node *ast.Node) bool {
 		return false
 	}
 	access := callee.AsPropertyAccessExpression()
-	// The RECEIVER needs unwrapping too, not only the callee. `((this as unknown).setState as
+	// The receiver needs unwrapping too, not only the callee. `((this as unknown).setState as
 	// unknown)({...})` unwraps at the callee to a property access whose object is still a
 	// parenthesized assertion, and reading it raw fails the `this` test. Measured: upstream reports
 	// on that shape and this port was silent on it until the receiver was unwrapped as well.

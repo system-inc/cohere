@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
-	"os"
 
+	"github.com/system-inc/cohere/internal/streams"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
@@ -32,10 +32,11 @@ func openContentPack(root string) *program.ContentPack {
 	}
 	// Created before anything is read, for the reason prepareCacheDirectory gives.
 	prepareCacheDirectory(root)
-	pack, err := program.OpenContentPack(cacheDirectory(root))
-	if err != nil {
+	pack, openContentPackError := program.OpenContentPack(cacheDirectory(root))
+	if openContentPackError != nil {
 		// A fact about this invocation, never about the tree, so a replay never says it again.
-		fmt.Fprintf(accountOutput(invocationOutput(os.Stderr)), "note: %v\n", err)
+		printInvocation(accountOutput(streams.Errors), "note: %v\n", openContentPackError)
+		showWarning()
 	}
 	pack.TrustStats(runCacheCheckStats)
 	activeContentPack, activeContentPackRoot = pack, root
@@ -64,12 +65,15 @@ func saveContentPack() {
 	activeContentPack = nil
 	directory := cacheDirectory(activeContentPackRoot)
 	if _, _, damaged := pack.Counts(); damaged > 0 {
-		cacheNote(directory, fmt.Sprintf("%d files in the content pack failed their checksum or bounds and were read from disk; the pack is rewritten without them", damaged))
+		cacheNote(directory, fmt.Sprintf(
+			"%d files in the content pack failed their checksum or bounds and were read from disk; the pack is rewritten without them",
+			damaged,
+		))
 	}
 	release := holdTableLock(directory)
-	err := pack.Save()
+	saveError := pack.Save()
 	release()
-	if err != nil {
-		cacheNote(directory, fmt.Sprintf("the content pack could not be written: %v", firstLine(err.Error())))
+	if saveError != nil {
+		cacheNote(directory, fmt.Sprintf("the content pack could not be written: %v", firstLine(saveError.Error())))
 	}
 }

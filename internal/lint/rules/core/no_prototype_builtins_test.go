@@ -16,8 +16,8 @@ const prototypeBuiltinsFile = "/repository/source/PrototypeBuiltins.ts"
 // 20 fail inputs, so one finding per input is measured here rather than assumed. Copied because a
 // fixture a porter invents encodes the same belief as the port, and the case that catches a bug is
 // the one nobody would think to write.
-func TestNoPrototypeBuiltinsFires(t *testing.T) {
-	t.Parallel()
+func TestNoPrototypeBuiltinsFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -58,10 +58,10 @@ func TestNoPrototypeBuiltinsFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoPrototypeBuiltins, prototypeBuiltinsFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, NoPrototypeBuiltins, prototypeBuiltinsFile, testCase.sourceText),
 				"noPrototypeBuiltins")
 		})
 	}
@@ -73,8 +73,8 @@ func TestNoPrototypeBuiltinsFires(t *testing.T) {
 // with no call is not a call. A dynamic key is not knowably this property. A key that merely
 // resembles one of the three names is a different property. And a private field spelling the same
 // word cannot reach the builtin at all.
-func TestNoPrototypeBuiltinsStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoPrototypeBuiltinsStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -86,7 +86,10 @@ func TestNoPrototypeBuiltinsStaysSilent(t *testing.T) {
 		{"propertyIsEnumerable through the prototype", "Object.prototype.propertyIsEnumerable.call(foo, 'bar')"},
 		{"hasOwnProperty applied through the prototype", "Object.prototype.hasOwnProperty.apply(foo, ['bar'])"},
 		{"isPrototypeOf applied through the prototype", "Object.prototype.isPrototypeOf.apply(foo, ['bar'])"},
-		{"propertyIsEnumerable applied through the prototype", "Object.prototype.propertyIsEnumerable.apply(foo, ['bar'])"},
+		{
+			"propertyIsEnumerable applied through the prototype",
+			"Object.prototype.propertyIsEnumerable.apply(foo, ['bar'])",
+		},
 		// An access is not a call, and the call that matters is the outermost property.
 		{"a bare access with no call", "foo.hasOwnProperty"},
 		{"a call on a different property beyond it", "foo.hasOwnProperty.bar()"},
@@ -112,17 +115,20 @@ func TestNoPrototypeBuiltinsStaysSilent(t *testing.T) {
 		{"a numeric subscript", "foo[1]('bar')"},
 		{"a null subscript", "foo[null]('bar')"},
 		// A private field is a different property that merely spells the same word.
-		{"a private field spelling the same name", "class C { #hasOwnProperty; foo() { obj.#hasOwnProperty('bar'); } }"},
+		{
+			"a private field spelling the same name",
+			"class C { #hasOwnProperty; foo() { obj.#hasOwnProperty('bar'); } }",
+		},
 		// A key computed at runtime is not statically knowable, even when its value would match.
 		{"a concatenated key", "foo['hasOwn' + 'Property']('bar')"},
 		{"a substituting template key", "foo[`hasOwnProperty${''}`]('bar')"},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.Run(t, NoPrototypeBuiltins, prototypeBuiltinsFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.Run(test, NoPrototypeBuiltins, prototypeBuiltinsFile, testCase.sourceText))
 		})
 	}
 }
@@ -134,8 +140,8 @@ func TestNoPrototypeBuiltinsStaysSilent(t *testing.T) {
 // for, and a port reaching for the callee without seeing through the wrapper would miss the first
 // and report on the wrong thing for the rest. `this` and a call-returned receiver are the shapes
 // our own code most plausibly writes.
-func TestNoPrototypeBuiltinsHandlesTypeScriptReceivers(t *testing.T) {
-	t.Parallel()
+func TestNoPrototypeBuiltinsHandlesTypeScriptReceivers(test *testing.T) {
+	test.Parallel()
 
 	fires := []struct {
 		name       string
@@ -148,10 +154,10 @@ func TestNoPrototypeBuiltinsHandlesTypeScriptReceivers(t *testing.T) {
 	}
 
 	for _, testCase := range fires {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoPrototypeBuiltins, prototypeBuiltinsFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, NoPrototypeBuiltins, prototypeBuiltinsFile, testCase.sourceText),
 				"noPrototypeBuiltins")
 		})
 	}
@@ -159,17 +165,17 @@ func TestNoPrototypeBuiltinsHandlesTypeScriptReceivers(t *testing.T) {
 	// A method *definition* named for one of the three is a declaration, not a call through a
 	// receiver, and defining `hasOwnProperty` on your own class is how you would legitimately
 	// provide it. Nothing in the imported corpus covers a class body.
-	t.Run("a class declaring the method itself", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectClean(t, rule_testing.Run(t, NoPrototypeBuiltins, prototypeBuiltinsFile,
+	test.Run("a class declaring the method itself", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectClean(test, rule_testing.Run(test, NoPrototypeBuiltins, prototypeBuiltinsFile,
 			"class C { hasOwnProperty(key: string) { return false; } }"))
 	})
 
 	// Two receivers in one file report twice. Nothing upstream carries more than one finding per
 	// input, so the rule's per-call behavior is otherwise unmeasured.
-	t.Run("two calls in one file report twice", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectFindings(t, rule_testing.Run(t, NoPrototypeBuiltins, prototypeBuiltinsFile,
+	test.Run("two calls in one file report twice", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectFindings(test, rule_testing.Run(test, NoPrototypeBuiltins, prototypeBuiltinsFile,
 			"foo.hasOwnProperty('a');\nbar.isPrototypeOf(baz);\n"),
 			"noPrototypeBuiltins", "noPrototypeBuiltins")
 	})
@@ -182,8 +188,8 @@ func TestNoPrototypeBuiltinsHandlesTypeScriptReceivers(t *testing.T) {
 // whole call, or the receiver, or the argument would pass all 47 verbatim fixtures while pointing
 // somewhere useless. Sliced out of the source with the finding's own range so the assertion cannot
 // agree with the code by sharing its arithmetic.
-func TestNoPrototypeBuiltinsPointsAtTheMemberExpression(t *testing.T) {
-	t.Parallel()
+func TestNoPrototypeBuiltinsPointsAtTheMemberExpression(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -211,15 +217,15 @@ func TestNoPrototypeBuiltinsPointsAtTheMemberExpression(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoPrototypeBuiltins, prototypeBuiltinsFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoPrototypeBuiltins, prototypeBuiltinsFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 			}
 			reported := testCase.sourceText[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 			if reported != testCase.wantText {
-				t.Fatalf("finding pointed at %q, wanted %q", reported, testCase.wantText)
+				test.Fatalf("finding pointed at %q, wanted %q", reported, testCase.wantText)
 			}
 		})
 	}
@@ -229,10 +235,10 @@ func TestNoPrototypeBuiltinsPointsAtTheMemberExpression(t *testing.T) {
 //
 // If a later change reaches for `ctx.TypeChecker`, the rule goes silent under `rule_testing.Run` and
 // every clean case above starts passing vacuously. This asserts the plain harness still fires.
-func TestNoPrototypeBuiltinsNeedsNoTypeChecker(t *testing.T) {
-	t.Parallel()
+func TestNoPrototypeBuiltinsNeedsNoTypeChecker(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectFindings(t,
-		rule_testing.Run(t, NoPrototypeBuiltins, prototypeBuiltinsFile, "foo.hasOwnProperty('bar')"),
+	rule_testing.ExpectFindings(test,
+		rule_testing.Run(test, NoPrototypeBuiltins, prototypeBuiltinsFile, "foo.hasOwnProperty('bar')"),
 		"noPrototypeBuiltins")
 }

@@ -25,7 +25,7 @@ var messageNoRestrictedExportsRestrictedDefault = rule.Message{
 
 // noRestrictedExportsRestrictedNamedMessage renders the finding for a banned exported name.
 //
-// The name is interpolated because a reader needs to know WHICH of the configured names this
+// The name is interpolated because a reader needs to know which of the configured names this
 // export matched, and with a pattern configured the matching name is not in the config at all.
 func noRestrictedExportsRestrictedNamedMessage(name string) rule.Message {
 	return rule.Message{
@@ -88,20 +88,20 @@ type NoRestrictedExportsOptions struct {
 // The pattern is compiled here rather than per file so a project that misspells it learns at
 // configuration time. Upstream compiles per report and would throw at lint time instead; failing
 // earlier is strictly better and changes no verdict.
-func DecodeNoRestrictedExportsOptions(raw []byte) (any, error) {
+func DecodeNoRestrictedExportsOptions(raw []byte) (NoRestrictedExportsOptions, error) {
 	var options NoRestrictedExportsOptions
 	if len(raw) == 0 {
 		return options, nil
 	}
-	if err := rule.UnmarshalOptions(raw, &options); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &options); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 
 	if options.RestrictedNamedExportsPattern != "" {
-		if _, err := esregexp.Compile(options.RestrictedNamedExportsPattern, "u"); err != nil {
+		if _, compileError := esregexp.Compile(options.RestrictedNamedExportsPattern, "u"); compileError != nil {
 			return options, fmt.Errorf(
 				"no-restricted-exports: restrictedNamedExportsPattern %q is not a valid regular "+
-					"expression: %w", options.RestrictedNamedExportsPattern, err)
+					"expression: %w", options.RestrictedNamedExportsPattern, compileError)
 		}
 	}
 
@@ -140,28 +140,28 @@ func DecodeNoRestrictedExportsOptions(raw []byte) (any, error) {
 // installed ESLint 10.8.1, the 95 cases upstream annotates valid include `export var a;` under no
 // options at all.
 //
-// So it is registered here and NOT enabled. Enabling it means choosing which names a project bans,
+// So it is registered here and not enabled. Enabling it means choosing which names a project bans,
 // which is a decision about this codebase rather than a porting question.
 //
 // # The exported name is the one the importer types, never the local one
 //
 // Every check in this rule reads the name a consumer of the module would write, and that is the
 // distinction the corpus spends most of its cases on. `export { b as a }` exports `a` and binds `b`,
-// so `restrictedNamedExports: ['b']` is CLEAN and `['a']` reports; `export { a as b }` is the
+// so `restrictedNamedExports: ['b']` is clean and `['a']` reports; `export { a as b }` is the
 // mirror. Measured across sixteen corpus cases that differ only in which side of `as` carries the
 // restricted name.
 //
 // This tree spells that pair the opposite way round from the field names in ESTree, which is worth
 // stating because reading either one as "the name" gives a rule that is exactly backwards on every
-// aliased export. On an `ExportSpecifier` here, `PropertyName` is the LOCAL name and `Name()` is the
-// EXPORTED one, and `PropertyName` is nil for the unaliased `export { a }`. Measured with an
+// aliased export. On an `ExportSpecifier` here, `PropertyName` is the local name and `Name()` is the
+// exported one, and `PropertyName` is nil for the unaliased `export { a }`. Measured with an
 // ancestry probe over `export { b as 'a' } from 'foo'`.
 //
 // # A string literal is a legal export name and carries the cooked value
 //
 // `export { b as 'a' }` and `export { b as 'a' }` both export the name `a`, and the corpus
 // tests both. `Node.Text()` answers with the cooked value for a string literal as well as for an
-// identifier, so the two shapes need no separate arm. What they DO need is that the empty string and
+// identifier, so the two shapes need no separate arm. What they do need is that the empty string and
 // a string with spaces are real names: `export { ” } from 'foo'` under `restrictedNamedExports:
 // [”]` reports, and under `[' ']` is clean. A port comparing against a zero value rather than
 // against the configured list gets both of those wrong.
@@ -172,7 +172,7 @@ func DecodeNoRestrictedExportsOptions(raw []byte) (any, error) {
 // `d` nor `e`. Upstream reaches that through `sourceCode.getDeclaredVariables(declaration)`, which
 // is the scope analyser's answer to "what did this statement bind". There is no scope analyser in
 // this walk, so the equivalent is a walk of the binding pattern collecting the names in binding
-// POSITION, and the two agree on all fourteen destructuring cases in the corpus.
+// position, and the two agree on all fourteen destructuring cases in the corpus.
 //
 // The shapes that separate a correct walk from a plausible one are all in the corpus, and each of
 // them is a place a name appears without being bound:
@@ -195,10 +195,10 @@ func DecodeNoRestrictedExportsOptions(raw []byte) (any, error) {
 // `export = foo` is TypeScript's own construct and shares `KindExportAssignment` with the default
 // export, separated by `IsExportEquals`. It is not a default export and upstream, which has no such
 // syntax, has nothing to say about it.
-var NoRestrictedExports = rule.Rule{
+var NoRestrictedExports = rule.Rule[NoRestrictedExportsOptions]{
 	Name: "no-restricted-exports",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, configured := rule.OptionsAs[NoRestrictedExportsOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[NoRestrictedExportsOptions]) rule.Listeners {
+		settings, configured := options.Read()
 		if !configured {
 			return rule.Listeners{}
 		}
@@ -213,8 +213,8 @@ var NoRestrictedExports = rule.Rule{
 			// rule was handed options that never went through it. Falling back to no pattern is the
 			// quiet answer and the wrong one; there is nothing to report against, so the rule simply
 			// does not apply the pattern rather than pretending it matched nothing.
-			compiled, err := esregexp.Compile(settings.RestrictedNamedExportsPattern, "u")
-			if err == nil {
+			compiled, compileError := esregexp.Compile(settings.RestrictedNamedExportsPattern, "u")
+			if compileError == nil {
 				pattern = compiled
 			}
 		}
@@ -227,15 +227,15 @@ var NoRestrictedExports = rule.Rule{
 		}
 
 		checker := &noRestrictedExportsChecker{
-			ctx:        ctx,
-			restricted: restricted,
-			pattern:    pattern,
-			defaults:   settings.RestrictDefaultExports,
+			ruleContext: ruleContext,
+			restricted:  restricted,
+			pattern:     pattern,
+			defaults:    settings.RestrictDefaultExports,
 		}
 
 		return rule.Listeners{
 			// `export var a;`, `export function a() {}`, `export class A {}` -- a declaration
-			// carrying an export modifier, which is upstream's ExportNamedDeclaration WITH a
+			// carrying an export modifier, which is upstream's ExportNamedDeclaration with a
 			// declaration.
 			ast.KindVariableStatement:    checker.checkDeclarationStatement,
 			ast.KindFunctionDeclaration:  checker.checkDeclarationStatement,
@@ -255,187 +255,6 @@ var NoRestrictedExports = rule.Rule{
 	},
 }
 
-// noRestrictedExportsChecker carries the resolved configuration across the listeners.
-type noRestrictedExportsChecker struct {
-	ctx        rule.Context
-	restricted map[string]bool
-	pattern    *esregexp.RegExp
-	defaults   *NoRestrictedExportsRestrictDefaultExports
-}
-
-// checkDeclarationStatement handles a declaration that carries its own export modifier.
-//
-// This is upstream's `ExportNamedDeclaration` arm for the case where `node.declaration` is set, plus
-// its `ExportDefaultDeclaration` arm for the declaration forms, because this tree does not separate
-// the two: `export default function foo() {}` is a function declaration with two modifiers on it,
-// not a distinct node.
-func (c *noRestrictedExportsChecker) checkDeclarationStatement(node *ast.Node) {
-	if !noRestrictedExportsHasModifier(node, ast.KindExportKeyword) {
-		return
-	}
-
-	if noRestrictedExportsHasModifier(node, ast.KindDefaultKeyword) {
-		// `export default function foo() {}`. Upstream's ExportDefaultDeclaration arm reports the
-		// whole statement and never consults the name, so `restrictedNamedExports: ['foo']` is
-		// clean on it while `restrictDefaultExports.direct` reports. Both measured.
-		c.reportDefaultIf(node, c.defaults != nil && noRestrictedExportsIsOn(c.defaults.Direct))
-		return
-	}
-
-	if node.Kind == ast.KindVariableStatement {
-		// Upstream maps `getDeclaredVariables` over the declaration and checks each bound name.
-		// Every declarator in the list contributes, so `export const b = 1, a = 2;` checks both.
-		list := node.AsVariableStatement().DeclarationList
-		if list == nil {
-			return
-		}
-		declarations := list.AsVariableDeclarationList().Declarations
-		if declarations == nil {
-			return
-		}
-		for _, declaration := range declarations.Nodes {
-			name := declaration.Name()
-			if name == nil {
-				continue
-			}
-			noRestrictedExportsForEachBoundName(name, func(bound *ast.Node) {
-				c.checkExportedName(bound)
-			})
-		}
-		return
-	}
-
-	// A function, class, interface, type alias, enum or namespace exports exactly its own name.
-	if name := node.Name(); name != nil {
-		c.checkExportedName(name)
-	}
-}
-
-// checkExportDeclaration handles every `export ... from`-shaped statement and the bare
-// `export { ... }`.
-//
-// This is upstream's ExportNamedDeclaration-without-declaration arm and its ExportAllDeclaration arm
-// at once, because this tree gives both the same node kind and separates them by what hangs off it:
-// a `KindNamedExports` child for the specifier list, a `KindNamespaceExport` child for
-// `export * as a`, and neither for the bare `export * from 'm'`.
-func (c *noRestrictedExportsChecker) checkExportDeclaration(node *ast.Node) {
-	declaration := node.AsExportDeclaration()
-	if declaration == nil || declaration.ExportClause == nil {
-		// `export * from 'foo';` exports no name of its own. Upstream's ExportAllDeclaration arm
-		// guards on `node.exported`, which is null here, so it checks nothing. The corpus tests
-		// `export * from 'a'` under `restrictedNamedExports: ['a']` and it is clean: `a` there is
-		// the module, not an exported name.
-		return
-	}
-
-	switch declaration.ExportClause.Kind {
-	case ast.KindNamespaceExport:
-		// `export * as a from 'm'`. Upstream's ExportAllDeclaration arm with `node.exported` set.
-		if name := declaration.ExportClause.AsNamespaceExport().Name(); name != nil {
-			c.checkExportedName(name)
-		}
-
-	case ast.KindNamedExports:
-		elements := declaration.ExportClause.AsNamedExports().Elements
-		if elements == nil {
-			return
-		}
-		for _, specifier := range elements.Nodes {
-			if name := specifier.Name(); name != nil {
-				c.checkExportedName(name)
-			}
-		}
-	}
-}
-
-// checkExportAssignment handles `export default <expression>;`.
-//
-// `export = foo` shares this node kind and is not a default export. Upstream has no such syntax and
-// therefore no opinion, so it is skipped rather than reported.
-func (c *noRestrictedExportsChecker) checkExportAssignment(node *ast.Node) {
-	assignment := node.AsExportAssignment()
-	if assignment == nil || assignment.IsExportEquals {
-		return
-	}
-	c.reportDefaultIf(node, c.defaults != nil && noRestrictedExportsIsOn(c.defaults.Direct))
-}
-
-// checkExportedName is upstream's `checkExportedName`, and the order of its arms decides which
-// message a reader sees.
-//
-// A name matching the restricted list or the pattern reports `restrictedNamed` and RETURNS, so the
-// default arms below never run for it. That ordering is upstream's and it is observable: with both
-// `restrictedNamedExports: ['default']` and a `restrictDefaultExports` flag configured, the named
-// message wins. Upstream's schema forbids exactly that combination, which is why the decoder here
-// refuses it too.
-func (c *noRestrictedExportsChecker) checkExportedName(node *ast.Node) {
-	name := noRestrictedExportsNameText(node)
-
-	// The pattern deliberately does not apply to `default`. Upstream guards with
-	// `name !== "default"` before testing, so `restrictedNamedExportsPattern: 'default'` is clean on
-	// every one of the five default forms -- five corpus cases turn on this, and a port that tested
-	// the pattern unconditionally would report all five under the wrong message.
-	matchesPattern := false
-	if c.pattern != nil && name != "default" {
-		matchesPattern = c.pattern.Test(name)
-	}
-
-	if matchesPattern || c.restricted[name] {
-		c.ctx.ReportNode(node, noRestrictedExportsRestrictedNamedMessage(name))
-		return
-	}
-
-	if name != "default" || c.defaults == nil {
-		return
-	}
-
-	parent := node.Parent
-	if parent == nil {
-		return
-	}
-
-	if parent.Kind == ast.KindNamespaceExport {
-		// `export * as default from 'mod';`
-		c.reportDefaultIf(node, noRestrictedExportsIsOn(c.defaults.NamespaceFrom))
-		return
-	}
-
-	if parent.Kind != ast.KindExportSpecifier {
-		return
-	}
-
-	// Which of the three specifier flags applies turns on two questions: whether the statement has
-	// a source module, and what the LOCAL side of the specifier is. Upstream reads the local name
-	// through `node.parent.local`, which for an unaliased `export { default }` is the same node as
-	// the exported name.
-	hasSource := noRestrictedExportsSpecifierHasSource(parent)
-	localName := name
-	if propertyName := parent.AsExportSpecifier().PropertyName; propertyName != nil {
-		localName = noRestrictedExportsNameText(propertyName)
-	}
-
-	if !hasSource {
-		// `export { foo as default };` -- a local binding re-exported as the default.
-		c.reportDefaultIf(node, noRestrictedExportsIsOn(c.defaults.Named))
-		return
-	}
-
-	if localName == "default" {
-		// `export { default } from 'mod';` and `export { default as default } from 'mod';`
-		c.reportDefaultIf(node, noRestrictedExportsIsOn(c.defaults.DefaultFrom))
-		return
-	}
-	// `export { foo as default } from 'mod';`
-	c.reportDefaultIf(node, noRestrictedExportsIsOn(c.defaults.NamedFrom))
-}
-
-// reportDefaultIf reports the restricted-default message when the flag that selects this form is on.
-func (c *noRestrictedExportsChecker) reportDefaultIf(node *ast.Node, restricted bool) {
-	if restricted {
-		c.ctx.ReportNode(node, messageNoRestrictedExportsRestrictedDefault)
-	}
-}
-
 // noRestrictedExportsIsOn reads an optional boolean, where absent means off.
 //
 // Every one of upstream's five flags defaults to off, so a nil pointer and an explicit `false` mean
@@ -449,7 +268,7 @@ func noRestrictedExportsIsOn(flag *bool) bool {
 // noRestrictedExportsNameText reads the name an identifier or a string literal spells.
 //
 // A string literal is a legal module export name -- `export { b as 'a' }` -- and `Text()` answers
-// with the COOKED value for one, so `'a'` reads as `a` exactly as upstream's
+// with the cooked value for one, so `'a'` reads as `a` exactly as upstream's
 // `getModuleExportName` does. The empty string is a legal name too, so an unreadable node and an
 // empty name are not distinguished here; the caller compares against a configured list where `""`
 // may legitimately appear.
@@ -509,7 +328,7 @@ func noRestrictedExportsHasModifier(node *ast.Node, kind ast.Kind) bool {
 //	Name()         the binding, `b` in `{ a: b }` or `a` in `{ a }`          BOUND
 //	Initializer    the default value, `a` in `{ b = a }`                     NOT bound
 //
-// So only `Name()` is followed, and it is followed RECURSIVELY, because a nested pattern is itself
+// So only `Name()` is followed, and it is followed recursively, because a nested pattern is itself
 // a name: `export var [{ a }] = [];` binds `a` two levels down. Reading only the top level reports
 // nothing on four corpus cases, and reading every identifier in the subtree reports `a` twice on
 // `export var [a = a] = [];`, where upstream reports once.

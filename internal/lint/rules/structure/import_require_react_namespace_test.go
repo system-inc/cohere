@@ -8,8 +8,8 @@ import (
 
 const reactImportFile = "/repository/source/components/Field.tsx"
 
-func TestReactImportNoDestructuringFires(t *testing.T) {
-	t.Parallel()
+func TestReactImportNoDestructuringFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -81,16 +81,16 @@ func TestReactImportNoDestructuringFires(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.Run(t, ImportRequireReactNamespace, reactImportFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.Run(test, ImportRequireReactNamespace, reactImportFile,
 				testCase.sourceText), testCase.wantIds...)
 		})
 	}
 }
 
-func TestReactImportNoDestructuringStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestReactImportNoDestructuringStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -135,9 +135,12 @@ func TestReactImportNoDestructuringStaysSilent(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, ImportRequireReactNamespace, reactImportFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(
+				test,
+				rule_testing.Run(test, ImportRequireReactNamespace, reactImportFile, testCase.sourceText),
+			)
 		})
 	}
 }
@@ -148,11 +151,11 @@ func TestReactImportNoDestructuringStaysSilent(t *testing.T) {
 // tested because the rule reads a set that an earlier listener fills, which makes the behavior
 // depend on traversal order rather than on any single node, and a change to how listeners are
 // dispatched would move it silently.
-func TestReactImportNoDestructuringDependsOnImportOrder(t *testing.T) {
-	t.Parallel()
+func TestReactImportNoDestructuringDependsOnImportOrder(test *testing.T) {
+	test.Parallel()
 
 	// The ordinary case: the import is above the use, and both are reported.
-	rule_testing.ExpectFindings(t, rule_testing.Run(t, ImportRequireReactNamespace, reactImportFile,
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, ImportRequireReactNamespace, reactImportFile,
 		"import React, { useState } from 'react';\nexport function Field() { return useState(0); }\n"),
 		"noNamedImport", "noCallWithoutPrefix")
 
@@ -160,7 +163,7 @@ func TestReactImportNoDestructuringDependsOnImportOrder(t *testing.T) {
 	// depend on anything earlier, but the call is not, because the set was empty when it was
 	// visited. Recorded as the rule's behavior rather than defended as correct: the shape is not
 	// one anyone writes, and matching the original matters more than improving on it here.
-	rule_testing.ExpectFindings(t, rule_testing.Run(t, ImportRequireReactNamespace, reactImportFile,
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, ImportRequireReactNamespace, reactImportFile,
 		"export function Field() { return useState(0); }\nimport React, { useState } from 'react';\n"),
 		"noNamedImport")
 }

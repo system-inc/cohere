@@ -107,18 +107,18 @@ func messageTripleSlashReference(referenceName string) rule.Message {
 // `import()`, a bare `require()` call, an `export * from`, and an import nested inside a
 // `declare module` are all silent, each measured. That is why this does not reach for
 // `imports.SourceVisitors`, which would widen the rule to the two call shapes upstream ignores.
-var TripleSlashReference = rule.Rule{
+var TripleSlashReference = rule.Rule[TripleSlashReferenceOptions]{
 	// No namespace prefix. The config writes `typescript/triple-slash-reference` and the parity
 	// guard strips the namespace on a `/` boundary.
 	Name: "@typescript-eslint/triple-slash-reference",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[TripleSlashReferenceOptions]) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
 		// Upstream's `should_run` reads `ctx.source_type().is_typescript()`. A directive in a
 		// JavaScript file is silent there, so the gate is fidelity rather than an optimization.
-		if !isTypeScriptSourceFile(ctx.SourceFile.FileName().AsString()) {
+		if !isTypeScriptSourceFile(ruleContext.SourceFile.FileName().AsString()) {
 			return nil
 		}
 
@@ -131,31 +131,52 @@ var TripleSlashReference = rule.Rule{
 		// the rule goes silent on every file while every fixture stays green because fixtures reach
 		// the rule through the decoder. Found by the dry run rather than by the suite: 3,407 files,
 		// 3,407 registrations, zero findings, and a seeded probe tree that also reported nothing.
-		parsed, decoded := rule.OptionsAs[TripleSlashReferenceOptions](options)
+		parsed, decoded := options.Read()
 		if !decoded {
 			parsed = DefaultTripleSlashReferenceOptions()
 		}
 
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
-				reportTripleSlashReferences(ctx, parsed)
+				reportTripleSlashReferences(ruleContext, parsed)
 			},
 		}
 	},
 }
 
+// TripleSlashReferenceSetting is what to enforce for one kind of reference directive.
+//
+// Spelled as a string type rather than a bool pair because the surface has three values and only
+// one of the three keys accepts all of them, which a bool cannot express and which the decoder has
+// to be able to refuse.
+type TripleSlashReferenceSetting string
+
+const (
+	// TripleSlashReferenceAlways permits the directive.
+	TripleSlashReferenceAlways TripleSlashReferenceSetting = "always"
+
+	// TripleSlashReferenceNever reports the directive outright.
+	TripleSlashReferenceNever TripleSlashReferenceSetting = "never"
+
+	// TripleSlashReferencePreferImport reports a `types` directive only when the same module is
+	// also imported normally. It is accepted for `types` alone: the release binary refuses a
+	// configuration naming it for `path` or `lib`, which is what settles that this is one value of
+	// a three-valued key rather than a shared vocabulary.
+	TripleSlashReferencePreferImport TripleSlashReferenceSetting = "prefer-import"
+)
+
 // reportTripleSlashReferences is upstream's `run_once` body.
 //
 // It is a function rather than a closure so the two halves of the rule, the directive scan and the
 // import match, read as the two passes they are.
-func reportTripleSlashReferences(ctx rule.Context, options TripleSlashReferenceOptions) {
-	cutoff := directiveScanCutoff(ctx)
+func reportTripleSlashReferences(ruleContext rule.Context, options TripleSlashReferenceOptions) {
+	cutoff := directiveScanCutoff(ruleContext)
 
 	// Keyed by reference name, holding the directive to blame. A map rather than a list, matching
 	// upstream's `FxHashMap`, so a repeated name keeps only the last position. See the doc comment.
 	referencesAwaitingImport := make(map[string]comments.Comment)
 
-	for _, comment := range comments.ForFile(ctx) {
+	for _, comment := range comments.ForFile(ruleContext) {
 		// `break` rather than `continue`, and the two are equivalent here rather than one being a
 		// cost optimization. They differ only on an input where a comment starting before the
 		// cutoff appears in the slice after one starting at or past it, and `comments.All` sorts by
@@ -177,7 +198,7 @@ func reportTripleSlashReferences(ctx rule.Context, options TripleSlashReferenceO
 		if (attributeKey == "types" && options.Types == TripleSlashReferenceNever) ||
 			(attributeKey == "path" && options.Path == TripleSlashReferenceNever) ||
 			(attributeKey == "lib" && options.Lib == TripleSlashReferenceNever) {
-			ctx.ReportRange(comment.Range, messageTripleSlashReference(attributeValue))
+			ruleContext.ReportRange(comment.Range, messageTripleSlashReference(attributeValue))
 		}
 
 		if attributeKey == "types" && options.Types == TripleSlashReferencePreferImport {
@@ -191,13 +212,13 @@ func reportTripleSlashReferences(ctx rule.Context, options TripleSlashReferenceO
 
 	// Top-level statements only. Upstream iterates `program.body`, so an import nested inside a
 	// namespace never matches, which is measured in the doc comment.
-	for _, statement := range ctx.SourceFile.Statements.Nodes {
+	for _, statement := range ruleContext.SourceFile.Statements.Nodes {
 		specifier, isImport := topLevelImportSpecifier(statement)
 		if !isImport {
 			continue
 		}
 		if comment, awaiting := referencesAwaitingImport[specifier]; awaiting {
-			ctx.ReportRange(comment.Range, messageTripleSlashReference(specifier))
+			ruleContext.ReportRange(comment.Range, messageTripleSlashReference(specifier))
 		}
 	}
 }
@@ -208,12 +229,12 @@ func reportTripleSlashReferences(ctx rule.Context, options TripleSlashReferenceO
 // `span().start` onto `rule.TokenRange(...).Pos()` rather than `Pos()` is the whole content of this
 // function, and it is the difference between reporting and silence for every directive written
 // above a statement. See the doc comment on the rule.
-func directiveScanCutoff(ctx rule.Context) int {
-	statements := ctx.SourceFile.Statements
+func directiveScanCutoff(ruleContext rule.Context) int {
+	statements := ruleContext.SourceFile.Statements
 	if statements == nil || len(statements.Nodes) == 0 {
-		return ctx.SourceFile.End()
+		return ruleContext.SourceFile.End()
 	}
-	return rule.TokenRange(ctx.SourceFile, statements.Nodes[0]).Pos()
+	return rule.TokenRange(ruleContext.SourceFile, statements.Nodes[0]).Pos()
 }
 
 // topLevelImportSpecifier returns the module specifier a statement imports, when it is one of the
@@ -315,27 +336,6 @@ func referenceAttribute(commentText string) (string, string, bool) {
 	return "", "", false
 }
 
-// TripleSlashReferenceSetting is what to enforce for one kind of reference directive.
-//
-// Spelled as a string type rather than a bool pair because the surface has three values and only
-// one of the three keys accepts all of them, which a bool cannot express and which the decoder has
-// to be able to refuse.
-type TripleSlashReferenceSetting string
-
-const (
-	// TripleSlashReferenceAlways permits the directive.
-	TripleSlashReferenceAlways TripleSlashReferenceSetting = "always"
-
-	// TripleSlashReferenceNever reports the directive outright.
-	TripleSlashReferenceNever TripleSlashReferenceSetting = "never"
-
-	// TripleSlashReferencePreferImport reports a `types` directive only when the same module is
-	// also imported normally. It is accepted for `types` alone: the release binary refuses a
-	// configuration naming it for `path` or `lib`, which is what settles that this is one value of
-	// a three-valued key rather than a shared vocabulary.
-	TripleSlashReferencePreferImport TripleSlashReferenceSetting = "prefer-import"
-)
-
 // TripleSlashReferenceOptions configures which directives report.
 //
 // The authoritative surface is oxc's `TripleSlashReferenceConfig`, which derives `JsonSchema` under
@@ -391,18 +391,17 @@ type tripleSlashReferenceRawOptions struct {
 // key. Upstream refuses such a configuration outright; there is no error channel that reaches a
 // user here, so the default is used and the rule keeps its documented behavior instead of going
 // quiet on a typo.
-func DecodeTripleSlashReferenceOptions(raw []byte) (any, error) {
-	decoded, err := rule.DecodeOptionsInto[tripleSlashReferenceRawOptions]()(raw)
-	if err != nil {
-		return DefaultTripleSlashReferenceOptions(), err
+func DecodeTripleSlashReferenceOptions(raw []byte) (TripleSlashReferenceOptions, error) {
+	decoded, decodeOptionsError := rule.DecodeOptionsInto[tripleSlashReferenceRawOptions]()(raw)
+	if decodeOptionsError != nil {
+		return DefaultTripleSlashReferenceOptions(), decodeOptionsError
 	}
 
-	wire, _ := decoded.(tripleSlashReferenceRawOptions)
 	options := DefaultTripleSlashReferenceOptions()
 
-	options.Lib = settingOrDefault(wire.Lib, options.Lib, false)
-	options.Path = settingOrDefault(wire.Path, options.Path, false)
-	options.Types = settingOrDefault(wire.Types, options.Types, true)
+	options.Lib = settingOrDefault(decoded.Lib, options.Lib, false)
+	options.Path = settingOrDefault(decoded.Path, options.Path, false)
+	options.Types = settingOrDefault(decoded.Types, options.Types, true)
 
 	return options, nil
 }
@@ -413,7 +412,11 @@ func DecodeTripleSlashReferenceOptions(raw []byte) (any, error) {
 // allowPreferImport is what encodes the asymmetry: `types` takes three values and the other two
 // take two. Reproducing that matters because `path: prefer-import` would otherwise silently behave
 // like a fourth state the rule never checks for, where upstream refuses the config outright.
-func settingOrDefault(wire *string, fallback TripleSlashReferenceSetting, allowPreferImport bool) TripleSlashReferenceSetting {
+func settingOrDefault(
+	wire *string,
+	fallback TripleSlashReferenceSetting,
+	allowPreferImport bool,
+) TripleSlashReferenceSetting {
 	if wire == nil {
 		return fallback
 	}

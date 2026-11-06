@@ -87,7 +87,9 @@ func compileGlob(pattern string, path bool) glob {
 			if path && runEnd > index {
 				segmentStart := index == 0 || pattern[index-1] == '/'
 				followedBySlash := runEnd+1 < len(pattern) && pattern[runEnd+1] == '/'
-				followedByEscapedSlash := runEnd+2 < len(pattern) && pattern[runEnd+1] == '\\' && pattern[runEnd+2] == '/'
+				followedByEscapedSlash := runEnd+2 < len(pattern) &&
+					pattern[runEnd+1] == '\\' &&
+					pattern[runEnd+2] == '/'
 				switch {
 				case segmentStart && runEnd+1 == len(pattern):
 					kind = everythingToken
@@ -211,6 +213,8 @@ func compileSet(pattern string, start int) (set *[256]bool, end int, ok bool) {
 }
 
 // addClass adds a `[:name:]` class's bytes, reporting false for a name fnmatch does not define.
+//
+// Mutates: members the caller's set is the one being built, and the class's bytes are added to it in place
 func addClass(members *[256]bool, name string) bool {
 	var in func(character byte) bool
 	switch name {
@@ -276,9 +280,13 @@ func (compiled *glob) matches(text string, path bool) bool {
 	// stack; a longer pattern allocates.
 	words := (len(compiled.tokens) + 1 + 63) / 64
 	var storage [4][2]uint64
-	var current, inside, nextPositions, nextInside positionSet
+	var current positionSet
+	var inside positionSet
+	var nextPositions positionSet
+	var nextInside positionSet
 	if words <= 2 {
-		current, inside, nextPositions, nextInside = storage[0][:words], storage[1][:words], storage[2][:words], storage[3][:words]
+		current, inside = storage[0][:words], storage[1][:words]
+		nextPositions, nextInside = storage[2][:words], storage[3][:words]
 	} else {
 		current, inside = make(positionSet, words), make(positionSet, words)
 		nextPositions, nextInside = make(positionSet, words), make(positionSet, words)
@@ -341,25 +349,17 @@ func (compiled *glob) matches(text string, path bool) bool {
 
 // reach marks position, and every position after it that a token matching nothing passes straight on to.
 func (compiled *glob) reach(positions positionSet, position int) {
+	current := position
 	for {
-		positions.add(position)
-		if position >= len(compiled.tokens) {
+		positions.add(current)
+		if current >= len(compiled.tokens) {
 			return
 		}
-		switch compiled.tokens[position].kind {
+		switch compiled.tokens[current].kind {
 		case starToken, everythingToken, directoriesToken:
-			position++
+			current++
 		default:
 			return
 		}
 	}
 }
-
-// positionSet is a bit set over a glob's positions.
-type positionSet []uint64
-
-func (positions positionSet) add(position int) { positions[position/64] |= 1 << (position % 64) }
-func (positions positionSet) has(position int) bool {
-	return positions[position/64]&(1<<(position%64)) != 0
-}
-func (positions positionSet) clear() { clear(positions) }

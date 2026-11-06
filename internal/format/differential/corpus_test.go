@@ -32,36 +32,36 @@ import (
 // A repository containing other repositories is measured as several corpora, one per root, because
 // the format phase refuses to walk into a nested repository and a percentage taken across a boundary
 // nobody can see is the 08-25 mistake: a root that silently measures half its tree.
-func TestCorpora(t *testing.T) {
-	t.Parallel()
+func TestCorpora(test *testing.T) {
+	test.Parallel()
 	roots := os.Getenv("COHERE_FORMAT_CORPORA")
 	if roots == "" {
-		t.Skip("set COHERE_FORMAT_CORPORA to measure; this is a measuring run, not a unit test")
+		test.Skip("set COHERE_FORMAT_CORPORA to measure; this is a measuring run, not a unit test")
 	}
 
 	candidateName := os.Getenv("COHERE_FORMAT_CANDIDATE")
 
-	bundles, err := prettier.Bundles()
-	if err != nil {
-		t.Fatal(err)
+	bundles, bundlesError := prettier.Bundles()
+	if bundlesError != nil {
+		test.Fatal(bundlesError)
 	}
-	digest, err := prettier.DigestBundles(bundles.Files)
-	if err != nil {
-		t.Fatal(err)
+	digest, digestBundlesError := prettier.DigestBundles(bundles.Files)
+	if digestBundlesError != nil {
+		test.Fatal(digestBundlesError)
 	}
 	directory := os.Getenv("COHERE_FORMAT_CACHE")
 	if directory == "" {
-		base, err := os.UserCacheDir()
-		if err != nil {
-			t.Fatal(err)
+		base, userCacheDirectoryError := os.UserCacheDir()
+		if userCacheDirectoryError != nil {
+			test.Fatal(userCacheDirectoryError)
 		}
 		directory = filepath.Join(base, "cohere", "prettier-oracle")
 	}
-	t.Logf("oracle cache %s, bundles %s from %s", directory, digest[:12], bundles.Origin)
+	test.Logf("oracle cache %s, bundles %s from %s", directory, digest[:12], bundles.Origin)
 
-	enumerator, err := prettier.New(formatoptions.Default())
-	if err != nil {
-		t.Fatal(err)
+	enumerator, newPrettierError := prettier.New(formatoptions.Default())
+	if newPrettierError != nil {
+		test.Fatal(newPrettierError)
 	}
 
 	pending := strings.Split(roots, ":")
@@ -72,7 +72,8 @@ func TestCorpora(t *testing.T) {
 	seen := map[string]bool{}
 	// Every corpus measured, and every one skipped, logged together at the end, so a run that measures
 	// fewer repositories than the last one says so in one place rather than in a smaller total.
-	var measured, skipped []string
+	var measured []string
+	var skipped []string
 	offeredTotal := 0
 	for len(pending) > 0 {
 		root := expandHome(strings.TrimSpace(pending[0]))
@@ -86,9 +87,9 @@ func TestCorpora(t *testing.T) {
 		// skip root: a repository under a path root never formats (ahra's projects/**) is still evidence
 		// for the printers, and dropping it shrank the corpus by about 1,950 files with every line still
 		// reading 100% (#k6vebep).
-		nestedRepositories, err := formatfiles.NestedRepositoriesBelow(root)
-		if err != nil {
-			t.Fatalf("finding the repositories nested in %s: %v", root, err)
+		nestedRepositories, nestedRepositoriesBelowError := formatfiles.NestedRepositoriesBelow(root)
+		if nestedRepositoriesBelowError != nil {
+			test.Fatalf("finding the repositories nested in %s: %v", root, nestedRepositoriesBelowError)
 		}
 		for _, nested := range nestedRepositories {
 			pending = append(pending, filepath.Join(root, nested))
@@ -100,31 +101,31 @@ func TestCorpora(t *testing.T) {
 		// A nested repository still carrying Prettier config is one pinned to its own adoption (www-ahra-ai,
 		// #j3nk2zk): measuring it would mean guessing its options, so it is named and skipped. A named
 		// corpus refusing is a migration that did not happen, and stops the run.
-		resolution, err := formatoptions.Resolve(root)
-		if errors.Is(err, formatoptions.ErrPrettierConfigRemains) && !named[root] {
-			t.Logf("skipping %s, a nested repository not yet adopted: %v", root, err)
+		resolution, resolveError := formatoptions.Resolve(root)
+		if errors.Is(resolveError, formatoptions.ErrPrettierConfigRemains) && !named[root] {
+			test.Logf("skipping %s, a nested repository not yet adopted: %v", root, resolveError)
 			skipped = append(skipped, root)
 			continue
 		}
-		if err != nil {
-			t.Fatalf("resolving the format options for %s: %v", root, err)
+		if resolveError != nil {
+			test.Fatalf("resolving the format options for %s: %v", root, resolveError)
 		}
 
 		// A leftover .prettierignore is Prettier config too, refused by the walk rather than the resolver,
 		// and skipped or fatal on the same terms.
-		enumeration, err := enumerator.Enumerate(root)
-		if errors.Is(err, formatoptions.ErrPrettierConfigRemains) && !named[root] {
-			t.Logf("skipping %s, a nested repository not yet adopted: %v", root, err)
+		enumeration, enumerateError := enumerator.Enumerate(root)
+		if errors.Is(enumerateError, formatoptions.ErrPrettierConfigRemains) && !named[root] {
+			test.Logf("skipping %s, a nested repository not yet adopted: %v", root, enumerateError)
 			skipped = append(skipped, root)
 			continue
 		}
-		if err != nil {
-			t.Fatalf("enumerating %s: %v", root, err)
+		if enumerateError != nil {
+			test.Fatalf("enumerating %s: %v", root, enumerateError)
 		}
 
 		options := resolution.Options
 		newOracle := func() (Formatter, error) { return prettier.New(options) }
-		newCandidate := candidateFor(t, candidateName, newOracle, options)
+		newCandidate := candidateFor(test, candidateName, newOracle, options)
 		cache := &OracleCache{
 			Directory: directory,
 			// "filepath" marks oracle output computed with the file name passed to Prettier. Answers
@@ -132,27 +133,27 @@ func TestCorpora(t *testing.T) {
 			Identity: digest + "|" + string(bundles.Origin) + "|filepath|" + describeOptions(options),
 		}
 
-		report, err := Compare(root, enumeration.Files, newOracle, newCandidate, runtime.NumCPU(), cache)
-		if err != nil {
-			t.Fatalf("comparing %s: %v", root, err)
+		report, compareError := Compare(root, enumeration.Files, newOracle, newCandidate, runtime.NumCPU(), cache)
+		if compareError != nil {
+			test.Fatalf("comparing %s: %v", root, compareError)
 		}
-		t.Logf("walked %d, offered %d, nested repositories %v\nconfig %s\n%s",
+		test.Logf("walked %d, offered %d, nested repositories %v\nconfig %s\n%s",
 			enumeration.Walked, len(enumeration.Files), nestedRepositories,
 			resolution.Source, report.Summary())
-		logSampleDifferences(t, report)
+		logSampleDifferences(test, report)
 		measured = append(measured, fmt.Sprintf("%s (%d)", root, len(enumeration.Files)))
 		offeredTotal += len(enumeration.Files)
 	}
-	t.Logf("measured %d corpora, %d files offered in all:\n  %s\nskipped %d: %v",
+	test.Logf("measured %d corpora, %d files offered in all:\n  %s\nskipped %d: %v",
 		len(measured), offeredTotal, strings.Join(measured, "\n  "), len(skipped), skipped)
 }
 
-func candidateFor(t *testing.T, name string, newOracle NewFormatter, options formatoptions.Options) NewFormatter {
+func candidateFor(test *testing.T, name string, newOracle NewFormatter, options formatoptions.Options) NewFormatter {
 	switch name {
 	case "native":
 		// The printers that replace Prettier. A file type with no printer yet is refused, so this reads
 		// 0% for it rather than crediting work that has not been done.
-		t.Logf("native printers registered for %v", native.Extensions())
+		test.Logf("native printers registered for %v", native.Extensions())
 		return func() (Formatter, error) { return native.Formatter{Options: options}, nil }
 	case "", "none":
 		return func() (Formatter, error) { return refuser{}, nil }
@@ -161,7 +162,7 @@ func candidateFor(t *testing.T, name string, newOracle NewFormatter, options for
 	case "oracle":
 		return newOracle
 	default:
-		t.Fatalf("unknown COHERE_FORMAT_CANDIDATE %q: native, none, unchanged or oracle", name)
+		test.Fatalf("unknown COHERE_FORMAT_CANDIDATE %q: native, none, unchanged or oracle", name)
 		return nil
 	}
 }
@@ -176,7 +177,7 @@ func describeOptions(options formatoptions.Options) string {
 
 func expandHome(path string) string {
 	if strings.HasPrefix(path, "~/") {
-		if home, err := os.UserHomeDir(); err == nil {
+		if home, homeDirectoryError := os.UserHomeDir(); homeDirectoryError == nil {
 			return filepath.Join(home, path[2:])
 		}
 	}
@@ -184,7 +185,7 @@ func expandHome(path string) string {
 }
 
 // logSampleDifferences prints a few differences per language, so a run teaches something beyond a count.
-func logSampleDifferences(t *testing.T, report Report) {
+func logSampleDifferences(test *testing.T, report Report) {
 	byLanguage := map[string][]FileResult{}
 	for _, result := range report.Files {
 		if result.Outcome == Different {
@@ -199,7 +200,7 @@ func logSampleDifferences(t *testing.T, report Report) {
 	for _, language := range languages {
 		results := byLanguage[language]
 		for index := 0; index < len(results) && index < 3; index++ {
-			t.Logf("  %s differs: %s: %s", language, results[index].Path, results[index].Detail)
+			test.Logf("  %s differs: %s: %s", language, results[index].Path, results[index].Detail)
 		}
 	}
 }

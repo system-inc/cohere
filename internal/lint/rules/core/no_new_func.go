@@ -45,7 +45,7 @@ var functionConstructorMethods = map[string]bool{
 // # Where the finding points, measured rather than inferred
 //
 // The report is on the invoking expression, which for the indirect form is the `apply`/`bind`/`call`
-// call and NOT the outer call it may be part of. Measured on eslint 10.8.1:
+// call and not the outer call it may be part of. Measured on eslint 10.8.1:
 //
 //	Function.bind(null, "b")()    reports columns 1 through 20, which ends at the bind call's
 //	                              closing paren rather than at the trailing ()
@@ -78,7 +78,7 @@ var functionConstructorMethods = map[string]bool{
 // Upstream additionally requires `variable.defs.length === 0`, which excludes a global that source
 // redeclares. That is the same judgment from the other side and `resolvesToAGlobal` answers it
 // alike, since a redeclaration in source puts a non-declaration-file declaration on the symbol.
-var NoNewFunc = rule.Rule{
+var NoNewFunc = rule.Rule[rule.NoOptions]{
 	Name: "no-new-func",
 
 	// See the doc above: the whole discrimination is whether `Function` is the global or a local
@@ -86,9 +86,9 @@ var NoNewFunc = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		reportIfFunctionConstructor := func(node *ast.Node) {
-			if ctx.TypeChecker == nil {
+			if ruleContext.TypeChecker == nil {
 				return
 			}
 
@@ -115,8 +115,8 @@ var NoNewFunc = rule.Rule{
 
 			// The direct forms: `Function(...)` and `new Function(...)`.
 			if callee.Kind == ast.KindIdentifier {
-				if callee.Text() == "Function" && resolvesToAGlobal(ctx, callee) {
-					ctx.ReportNode(node, messageNoFunctionConstructor)
+				if callee.Text() == "Function" && resolvesToAGlobal(ruleContext, callee) {
+					ruleContext.ReportNode(node, messageNoFunctionConstructor)
 				}
 				return
 			}
@@ -134,10 +134,10 @@ var NoNewFunc = rule.Rule{
 			}
 			object = ast.SkipParentheses(object)
 			if object == nil || object.Kind != ast.KindIdentifier ||
-				object.Text() != "Function" || !resolvesToAGlobal(ctx, object) {
+				object.Text() != "Function" || !resolvesToAGlobal(ruleContext, object) {
 				return
 			}
-			ctx.ReportNode(node, messageNoFunctionConstructor)
+			ruleContext.ReportNode(node, messageNoFunctionConstructor)
 		}
 
 		return rule.Listeners{

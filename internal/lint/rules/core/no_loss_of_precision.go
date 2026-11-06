@@ -68,15 +68,15 @@ var messageNoLossOfPrecision = rule.Message{
 // rule sees never carries a sign. Upstream trims `+` and `-` anyway; that trim is unreachable here
 // and is therefore not reproduced, which is why the corpus's signed cases still report: they report
 // on the unsigned literal inside them.
-var NoLossOfPrecision = rule.Rule{
+var NoLossOfPrecision = rule.Rule[rule.NoOptions]{
 	Name: "no-loss-of-precision",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindNumericLiteral: func(node *ast.Node) {
-				literalRange := rule.TokenRange(ctx.SourceFile, node)
-				raw := ctx.SourceFile.Text()[literalRange.Pos():literalRange.End()]
+				literalRange := rule.TokenRange(ruleContext.SourceFile, node)
+				raw := ruleContext.SourceFile.Text()[literalRange.Pos():literalRange.End()]
 				if numericLiteralLosesPrecision(raw) {
-					ctx.ReportNode(node, messageNoLossOfPrecision)
+					ruleContext.ReportNode(node, messageNoLossOfPrecision)
 				}
 			},
 		}
@@ -135,8 +135,8 @@ func nonBaseTenLiteralLosesPrecision(raw string) bool {
 
 	digits := stripNumericSeparators(raw)
 	radix, withoutPrefix := nonBaseTenRadixAndDigits(digits)
-	value, err := strconv.ParseUint(withoutPrefix, radix, 64)
-	if err != nil {
+	value, parseError := strconv.ParseUint(withoutPrefix, radix, 64)
+	if parseError != nil {
 		// Wider than 64 bits, so the exactness check above has already established it does not
 		// fit in 53 and this is unreachable for a literal the parser accepted. Reported rather
 		// than ignored, because a literal this rule cannot evaluate is not a literal it has
@@ -267,6 +267,11 @@ func bitsPerDigit(radix int) int {
 	}
 }
 
+// maximumComparableSignificantDigits is the largest significant-digit count the comparison can be
+// performed at. It matches the ceiling upstream applies for the same reason: past this the stored
+// side cannot be rendered to the requested width.
+const maximumComparableSignificantDigits = 100
+
 // baseTenLiteralLosesPrecision answers for a decimal literal.
 //
 // The literal is parsed to the float the program will run with, then that float is formatted back
@@ -275,12 +280,12 @@ func bitsPerDigit(radix int) int {
 func baseTenLiteralLosesPrecision(raw string) bool {
 	withoutSeparators := stripNumericSeparators(raw)
 
-	value, err := strconv.ParseFloat(withoutSeparators, 64)
-	if err != nil {
+	value, parseError := strconv.ParseFloat(withoutSeparators, 64)
+	if parseError != nil {
 		// `ParseFloat` reports a range error for `2e999` while still returning the infinity, and
 		// that is a real finding rather than a parse failure: the literal names a value the format
 		// cannot hold at all. Any other error is a literal this rule cannot evaluate.
-		if !isRangeError(err) {
+		if !isRangeError(parseError) {
 			return false
 		}
 	}
@@ -314,11 +319,6 @@ func baseTenLiteralLosesPrecision(raw string) bool {
 	return storedDigits != writtenDigits || storedExponent != writtenExponent
 }
 
-// maximumComparableSignificantDigits is the largest significant-digit count the comparison can be
-// performed at. It matches the ceiling upstream applies for the same reason: past this the stored
-// side cannot be rendered to the requested width.
-const maximumComparableSignificantDigits = 100
-
 // scientificFormOfDecimal reduces a decimal literal to its significant digits and an exponent, so
 // that two spellings of one number compare equal.
 //
@@ -339,8 +339,8 @@ func scientificFormOfDecimal(raw string, keepTrailingZeros bool) (string, int, b
 	significand := raw
 	exponent := 0
 	if index := strings.IndexAny(significand, "eE"); index >= 0 {
-		parsed, err := strconv.Atoi(significand[index+1:])
-		if err != nil {
+		parsed, parseError := strconv.Atoi(significand[index+1:])
+		if parseError != nil {
 			return "", 0, false
 		}
 		exponent = parsed
@@ -348,9 +348,10 @@ func scientificFormOfDecimal(raw string, keepTrailingZeros bool) (string, int, b
 	}
 
 	integerPart, fractionPart := significand, ""
+	pointWritten := false
 	if index := strings.IndexByte(significand, '.'); index >= 0 {
 		integerPart, fractionPart = significand[:index], significand[index+1:]
-		keepTrailingZeros = true
+		pointWritten = true
 	}
 
 	digits := integerPart + fractionPart
@@ -367,7 +368,8 @@ func scientificFormOfDecimal(raw string, keepTrailingZeros bool) (string, int, b
 	exponent += len(integerPart) - leadingZeros - 1
 	digits = digits[leadingZeros:]
 
-	if !keepTrailingZeros {
+	// A written point keeps the trailing zeros on its own, as the doc comment says.
+	if !keepTrailingZeros && !pointWritten {
 		digits = strings.TrimRight(digits, "0")
 	}
 
@@ -385,10 +387,10 @@ func stripNumericSeparators(raw string) string {
 // isRangeError says whether a `strconv` failure was an overflow rather than a malformed literal.
 //
 // An overflow still returns a usable infinity, which is exactly what the rule wants for `2e999`.
-func isRangeError(err error) bool {
-	var numError *strconv.NumError
-	if !errors.As(err, &numError) {
+func isRangeError(parseError error) bool {
+	var numberError *strconv.NumError
+	if !errors.As(parseError, &numberError) {
 		return false
 	}
-	return numError.Err == strconv.ErrRange
+	return numberError.Err == strconv.ErrRange
 }

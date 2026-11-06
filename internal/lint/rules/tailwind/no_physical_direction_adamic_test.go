@@ -7,10 +7,10 @@ import (
 )
 
 // An Adamic `.a` file's class strings are checked as a `.ts` file's are (#kwt1htp).
-func TestNoPhysicalDirectionChecksAnAdamicFileAsTypeScript(t *testing.T) {
-	t.Parallel()
+func TestNoPhysicalDirectionChecksAnAdamicFileAsTypeScript(test *testing.T) {
+	test.Parallel()
 	source := "export const c = cn('flex ml-4');\n"
-	rule_testing.ExpectSameFindings(t,
-		rule_testing.Run(t, NoPhysicalDirection, "/repository/source/components/Thing.ts", source),
-		rule_testing.Run(t, NoPhysicalDirection, "/repository/source/components/Thing.a", source))
+	rule_testing.ExpectSameFindings(test,
+		rule_testing.Run(test, NoPhysicalDirection, "/repository/source/components/Thing.ts", source),
+		rule_testing.Run(test, NoPhysicalDirection, "/repository/source/components/Thing.a", source))
 }

@@ -14,7 +14,7 @@ package postcss
 
 type node struct {
 	nodeType string
-	raws     map[string]any
+	raws     map[string]rawEntry
 	keys     []string
 
 	parent *node
@@ -24,10 +24,10 @@ type node struct {
 	// Rule.
 	selector string
 	// AtRule.
-	name   string
-	params string
+	name       string
+	parameters string
 	// Declaration.
-	prop      string
+	property  string
 	value     string
 	important bool
 	// Comment.
@@ -61,6 +61,20 @@ type rawValue struct {
 	hasScss bool
 }
 
+// rawEntry is one value of a node's raws: text (rawText), a flag (rawFlag), or the {raw, value} pair
+// Parser.raw stores (*rawValue). parse.go hands each out as the string, bool or object postcss holds.
+type rawEntry interface{ rawEntry() }
+
+// rawText is a raw that is text: before, after, between, afterName, important, left, right and the like.
+type rawText string
+
+// rawFlag is a raw that is a boolean: semicolon, and postcss-scss's inline.
+type rawFlag bool
+
+func (rawText) rawEntry()   {}
+func (rawFlag) rawEntry()   {}
+func (*rawValue) rawEntry() {}
+
 // mark records that the field exists, the first time it is assigned.
 func (each *node) mark(key string) {
 	for _, existing := range each.keys {
@@ -73,28 +87,30 @@ func (each *node) mark(key string) {
 
 // Root's constructor: `if (!this.nodes) this.nodes = []`.
 func newRoot() *node {
-	return &node{nodeType: "root", raws: map[string]any{}, keys: []string{"nodes"}, nodes: []*node{}}
+	return &node{nodeType: "root", raws: map[string]rawEntry{}, keys: []string{"nodes"}, nodes: []*node{}}
 }
 
 // Rule's constructor: `if (!this.nodes) this.nodes = []`.
 func newRule() *node {
-	return &node{nodeType: "rule", raws: map[string]any{}, keys: []string{"nodes"}, nodes: []*node{}}
+	return &node{nodeType: "rule", raws: map[string]rawEntry{}, keys: []string{"nodes"}, nodes: []*node{}}
 }
 
 // AtRule's constructor leaves nodes unset; the parser creates them when a block opens.
 func newAtRule() *node {
-	return &node{nodeType: "atrule", raws: map[string]any{}}
+	return &node{nodeType: "atrule", raws: map[string]rawEntry{}}
 }
 
 func newDeclaration() *node {
-	return &node{nodeType: "decl", raws: map[string]any{}}
+	return &node{nodeType: "decl", raws: map[string]rawEntry{}}
 }
 
 func newComment() *node {
-	return &node{nodeType: "comment", raws: map[string]any{}}
+	return &node{nodeType: "comment", raws: map[string]rawEntry{}}
 }
 
 // push is Container's push: the child joins this node's nodes with this node as its parent.
+//
+// Mutates: child its parent becomes this node, as Container's push sets it on the node it is handed.
 func (each *node) push(child *node) {
 	child.parent = each
 	each.nodes = append(each.nodes, child)
@@ -107,23 +123,26 @@ func (each *node) hasNodes() bool {
 
 // rawString is `this.raws[key] || ""` read as a string: the empty string where it is unset.
 func (each *node) rawString(key string) string {
-	text, _ := each.raws[key].(string)
-	return text
+	text, _ := each.raws[key].(rawText)
+	return string(text)
 }
 
 // setField is `node[prop] = value` for the three fields Parser.raw writes.
-func (each *node) setField(prop string, value string) {
-	switch prop {
+func (each *node) setField(property string, value string) {
+	switch property {
 	case "selector":
 		each.selector = value
 	case "params":
-		each.params = value
+		each.parameters = value
 	case "value":
 		each.value = value
 	default:
-		panic("postcss: raw writes selector, params or value, not " + prop)
+		// Invariant: Parser.raw, the only caller, is handed "selector" by rule, "params" by atrule and
+		// "value" by decl and postcss-scss's nested rule, and no other property; Parse recovers the panic
+		// into an error.
+		panic("postcss: raw writes selector, params or value, not " + property)
 	}
-	each.mark(prop)
+	each.mark(property)
 }
 
 // emptyNodes is `[]`, for a parser method whose local variable is named node, as upstream's is.

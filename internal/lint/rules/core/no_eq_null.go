@@ -28,7 +28,7 @@ var messageNoEqNull = rule.Message{
 //
 // # The literal, not the value
 //
-// Upstream's predicate is `node.right.raw === "null"`, which is the SOURCE TEXT of the operand
+// Upstream's predicate is `node.right.raw === "null"`, which is the source text of the operand
 // rather than anything about its value. So `x == undefined` is clean even though the comparison it
 // performs is identical, and `let n = null; x == n` is clean because the operand is an identifier.
 // Both measured against the installed build. That looks like an oversight and is the rule: it is a
@@ -39,7 +39,7 @@ var messageNoEqNull = rule.Message{
 //
 // Upstream reads `node.right` directly with no parenthesis skip, which reads as though
 // `x == (null)` must be clean. It is not: espree does not produce a node for a parenthesized
-// expression at all, so `node.right` there IS the literal. typescript-go does produce one, so
+// expression at all, so `node.right` there is the literal. typescript-go does produce one, so
 // reading `binary.Right` directly would go silent on a case upstream reports.
 //
 // Measured against ESLint 10.8.1 with `sourceType: "script"`:
@@ -49,9 +49,9 @@ var messageNoEqNull = rule.Message{
 //
 // So the skip is required for fidelity rather than being an improvement on upstream, and the span
 // stays on the whole binary expression, parentheses included, which is what those columns say.
-var NoEqNull = rule.Rule{
+var NoEqNull = rule.Rule[rule.NoOptions]{
 	Name: "no-eq-null",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindBinaryExpression: func(node *ast.Node) {
 				binary := node.AsBinaryExpression()
@@ -71,7 +71,7 @@ var NoEqNull = rule.Rule{
 					return
 				}
 
-				ctx.ReportNode(node, messageNoEqNull)
+				ruleContext.ReportNode(node, messageNoEqNull)
 			},
 		}
 	},

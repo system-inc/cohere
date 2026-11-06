@@ -48,8 +48,8 @@ func structureFixture(importerSource string) map[string]string {
 }
 
 // derivedOptions turns the derivation on, rooted at the fixture's own directory.
-func derivedOptions(written ...PathAlias) func(directory string) any {
-	return func(directory string) any {
+func derivedOptions(written ...PathAlias) func(directory string) ImportRequirePathAliasOptions {
+	return func(directory string) ImportRequirePathAliasOptions {
 		return ImportRequirePathAliasOptions{
 			RepositoryRoot:           directory,
 			Aliases:                  written,
@@ -67,16 +67,16 @@ func descriptions(result rule_testing.Result) []string {
 	return texts
 }
 
-func TestImportRequirePathAliasDerivesTheAliasesFromPaths(t *testing.T) {
-	t.Parallel()
+func TestImportRequirePathAliasDerivesTheAliasesFromPaths(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTypedFilesWithOptionsFor(t, ImportRequirePathAlias, structureFixture(
+	result := rule_testing.RunTypedFilesWithOptionsFor(test, ImportRequirePathAlias, structureFixture(
 		"import { Helper } from '../../../libraries/structure/source/Helper';\n"+
 			"import { Tool } from '../../../libraries/structure/libraries/nexus/source/Tool';\n"+
 			"import { Shared } from '../../shared/Shared';\n"+
 			"import { Sibling } from './Sibling';\n"),
 		derivedImporter, derivedOptions())
-	rule_testing.ExpectFindings(t, result, "useAlias", "useAlias", "useAlias")
+	rule_testing.ExpectFindings(test, result, "useAlias", "useAlias", "useAlias")
 
 	texts := descriptions(result)
 	for index, want := range []string{
@@ -87,33 +87,33 @@ func TestImportRequirePathAliasDerivesTheAliasesFromPaths(t *testing.T) {
 		"'@project/app/shared/Shared'",
 	} {
 		if !strings.Contains(texts[index], want) {
-			t.Errorf("finding %d suggests the wrong alias, want %s: %s", index, want, texts[index])
+			test.Errorf("finding %d suggests the wrong alias, want %s: %s", index, want, texts[index])
 		}
 	}
 }
 
 // The fixer writes the derived alias, which resolves by construction.
-func TestImportRequirePathAliasFixesWithADerivedAlias(t *testing.T) {
-	t.Parallel()
+func TestImportRequirePathAliasFixesWithADerivedAlias(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectFixedSource(t,
-		rule_testing.RunTypedFilesWithOptionsFor(t, ImportRequirePathAlias, structureFixture(
+	rule_testing.ExpectFixedSource(test,
+		rule_testing.RunTypedFilesWithOptionsFor(test, ImportRequirePathAlias, structureFixture(
 			"import { Helper } from '../../../libraries/structure/source/Helper';\n"),
 			derivedImporter, derivedOptions()),
 		"import { Helper } from '@structure/source/Helper';\n")
 }
 
 // A written alias is kept beside the derived ones, and wins a tie on the same directory.
-func TestImportRequirePathAliasPrefersAWrittenAliasOnTheSameDirectory(t *testing.T) {
-	t.Parallel()
+func TestImportRequirePathAliasPrefersAWrittenAliasOnTheSameDirectory(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTypedFilesWithOptionsFor(t, ImportRequirePathAlias, structureFixture(
+	result := rule_testing.RunTypedFilesWithOptionsFor(test, ImportRequirePathAlias, structureFixture(
 		"import { Helper } from '../../../libraries/structure/source/Helper';\n"),
 		derivedImporter, derivedOptions(PathAlias{Directory: "libraries/structure", Alias: "@written"}))
-	rule_testing.ExpectFindings(t, result, "useAlias")
+	rule_testing.ExpectFindings(test, result, "useAlias")
 
 	if text := descriptions(result)[0]; !strings.Contains(text, "'@written/source/Helper'") {
-		t.Errorf("the derived alias beat the written one on the same directory: %s", text)
+		test.Errorf("the derived alias beat the written one on the same directory: %s", text)
 	}
 }
 
@@ -125,18 +125,24 @@ func TestImportRequirePathAliasPrefersAWrittenAliasOnTheSameDirectory(t *testing
  * import, with only the option unset, must stay silent, beside a firing control so the silence is the
  * option's and not the fixture's.
  */
-func TestImportRequirePathAliasDerivesNothingUnlessAsked(t *testing.T) {
-	t.Parallel()
+func TestImportRequirePathAliasDerivesNothingUnlessAsked(test *testing.T) {
+	test.Parallel()
 
 	fixture := structureFixture("import { Helper } from '../../../libraries/structure/source/Helper';\n")
 
-	rule_testing.ExpectFindings(t,
-		rule_testing.RunTypedFilesWithOptionsFor(t, ImportRequirePathAlias, fixture, derivedImporter, derivedOptions()),
+	rule_testing.ExpectFindings(test,
+		rule_testing.RunTypedFilesWithOptionsFor(
+			test,
+			ImportRequirePathAlias,
+			fixture,
+			derivedImporter,
+			derivedOptions(),
+		),
 		"useAlias")
 
-	rule_testing.ExpectClean(t,
-		rule_testing.RunTypedFilesWithOptionsFor(t, ImportRequirePathAlias, fixture, derivedImporter,
-			func(directory string) any {
+	rule_testing.ExpectClean(test,
+		rule_testing.RunTypedFilesWithOptionsFor(test, ImportRequirePathAlias, fixture, derivedImporter,
+			func(directory string) ImportRequirePathAliasOptions {
 				return ImportRequirePathAliasOptions{RepositoryRoot: directory}
 			}))
 }
@@ -147,8 +153,8 @@ func TestImportRequirePathAliasDerivesNothingUnlessAsked(t *testing.T) {
  * Each left-out shape is paired with a control in the same tsconfig that does fire, `@kept`, so a
  * derivation that dropped everything would fail the control rather than pass every silent case.
  */
-func TestImportRequirePathAliasLeavesOutPathsThatNameNoDirectory(t *testing.T) {
-	t.Parallel()
+func TestImportRequirePathAliasLeavesOutPathsThatNameNoDirectory(test *testing.T) {
+	test.Parallel()
 
 	const base = `{
 		"compilerOptions": {
@@ -174,12 +180,12 @@ func TestImportRequirePathAliasLeavesOutPathsThatNameNoDirectory(t *testing.T) {
 		}
 	}
 
-	result := rule_testing.RunTypedFilesWithOptionsFor(t, ImportRequirePathAlias, fixture(
+	result := rule_testing.RunTypedFilesWithOptionsFor(test, ImportRequirePathAlias, fixture(
 		"import { Kept } from '../../../kept/Kept';\n"),
 		derivedImporter, derivedOptions())
-	rule_testing.ExpectFindings(t, result, "useAlias")
+	rule_testing.ExpectFindings(test, result, "useAlias")
 	if text := descriptions(result)[0]; !strings.Contains(text, "'@kept/Kept'") {
-		t.Errorf("the control suggests the wrong alias: %s", text)
+		test.Errorf("the control suggests the wrong alias: %s", text)
 	}
 
 	for _, testCase := range []struct {
@@ -194,9 +200,9 @@ func TestImportRequirePathAliasLeavesOutPathsThatNameNoDirectory(t *testing.T) {
 		// A wildcard that is not a trailing `/*` maps no directory onto a prefix.
 		{"a wildcard that is not a directory", "import { Legacy } from '../../../legacy/Legacy';\n"},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTypedFilesWithOptionsFor(t, ImportRequirePathAlias,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTypedFilesWithOptionsFor(test, ImportRequirePathAlias,
 				fixture(testCase.source), derivedImporter, derivedOptions()))
 		})
 	}
@@ -206,26 +212,26 @@ func TestImportRequirePathAliasLeavesOutPathsThatNameNoDirectory(t *testing.T) {
 //
 // Left in, it would not merely be wrong about one directory: an outside path has no repository-relative
 // spelling, the empty string is the root's, and the alias would claim every file in the tree.
-func TestAliasesFromCompilerPathsLeavesOutATargetOutsideTheRepository(t *testing.T) {
-	t.Parallel()
+func TestAliasesFromCompilerPathsLeavesOutATargetOutsideTheRepository(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTypedFilesWithOptionsFor(t, ImportRequirePathAlias, map[string]string{
+	result := rule_testing.RunTypedFilesWithOptionsFor(test, ImportRequirePathAlias, map[string]string{
 		"tsconfig.json": structureProjectTsconfig,
 		"libraries/structure/TypeScriptConfiguration.json": strings.Replace(structurePathsBase,
 			`"@project/*": ["../../*"]`, `"@outside/*": ["../../../*"]`, 1),
 		derivedImporter: "import { Shared } from '../../shared/Shared';\n",
-	}, derivedImporter, func(directory string) any {
+	}, derivedImporter, func(directory string) ImportRequirePathAliasOptions {
 		// Rooted one level down, at app/, so `@outside` lands above the root and `@project` is gone.
 		return ImportRequirePathAliasOptions{RepositoryRoot: directory + "/app", AliasesFromTsconfigPaths: true}
 	})
-	rule_testing.ExpectClean(t, result)
+	rule_testing.ExpectClean(test, result)
 }
 
 // Without a program there are no paths to read, and the rule declines rather than crash.
-func TestImportRequirePathAliasDerivesNothingWithoutAProgram(t *testing.T) {
-	t.Parallel()
+func TestImportRequirePathAliasDerivesNothingWithoutAProgram(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, ImportRequirePathAlias, aliasImporter,
+	rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, ImportRequirePathAlias, aliasImporter,
 		"import { Thing } from '../../foundation/Thing';\n",
 		ImportRequirePathAliasOptions{RepositoryRoot: "/repository", AliasesFromTsconfigPaths: true}))
 }

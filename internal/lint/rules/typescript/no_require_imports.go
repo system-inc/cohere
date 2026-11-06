@@ -117,7 +117,7 @@ var messageNoRequireImports = rule.Message{
 // parenthesized form, so guessing either way would have cost nothing at fixture time and shipped a
 // divergence.
 //
-// # The `allow` option matches a template on RAW text and a string on COOKED text
+// # The `allow` option matches a template on raw text and a string on cooked text
 //
 // One option, two answers, split by literal kind, and this is invisible from the corpus because
 // every corpus path is escape-free. oxc reads `quasi.value.raw` for a template and
@@ -147,7 +147,7 @@ var messageNoRequireImports = rule.Message{
 // require('y')` into an import moves a statement to the top of the file, changes when the module is
 // evaluated, and has no correct answer when the call sits inside a function or a conditional. That
 // is a change of meaning at a site the rule does not own, so it is not even a suggestion here.
-var NoRequireImports = rule.Rule{
+var NoRequireImports = rule.Rule[NoRequireImportsOptions]{
 	Name: "@typescript-eslint/no-require-imports",
 
 	// See the doc above: telling the CommonJS `require` from a local binding of that name is name
@@ -155,8 +155,8 @@ var NoRequireImports = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, _ := rule.OptionsAs[NoRequireImportsOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[NoRequireImportsOptions]) rule.Listeners {
+		settings, _ := options.Read()
 
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
@@ -164,7 +164,7 @@ var NoRequireImports = rule.Rule{
 				// rule does not crash, it goes quiet: GetSymbolAtLocation on a nil checker returns
 				// nil, which this rule reads as "not locally bound" and would report on every
 				// `require` in the file regardless of shadowing.
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 
@@ -177,7 +177,7 @@ var NoRequireImports = rule.Rule{
 				if callee.Text() != "require" {
 					return
 				}
-				if isLocallyBound(ctx, callee) {
+				if isLocallyBound(ruleContext, callee) {
 					return
 				}
 
@@ -189,21 +189,21 @@ var NoRequireImports = rule.Rule{
 				// by the inverse mutation: making the whole check unreachable fails twelve lines,
 				// while relaxing this test to `>= 0` fails none.
 				if len(settings.Allow) > 0 && call.Arguments != nil && len(call.Arguments.Nodes) > 0 {
-					if path, isStatic := requiredPathForAllow(ctx, call.Arguments.Nodes[0]); isStatic {
+					if path, isStatic := requiredPathForAllow(ruleContext, call.Arguments.Nodes[0]); isStatic {
 						if matchesAnyAllowPattern(settings.Allow, path) {
 							return
 						}
 					}
 				}
 
-				ctx.ReportNode(node, messageNoRequireImports)
+				ruleContext.ReportNode(node, messageNoRequireImports)
 			},
 
 			ast.KindExternalModuleReference: func(node *ast.Node) {
 				// Present for symmetry with the call arm and because the registry guard reads this
 				// file textually; this arm asks the checker nothing, since `require` here is not an
 				// identifier that anything could shadow.
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 
@@ -238,7 +238,7 @@ var NoRequireImports = rule.Rule{
 					return
 				}
 
-				ctx.ReportNode(declaration, messageNoRequireImports)
+				ruleContext.ReportNode(declaration, messageNoRequireImports)
 			},
 		}
 	},
@@ -258,7 +258,7 @@ var NoRequireImports = rule.Rule{
 //
 // The first version of this asked `IsDeclarationFile` on the declaration's own source file, which
 // is what `resolvesToAGlobal` does. That is wrong in one measurable place and a mutation sweep
-// found it: `declare global { function require(...) }` puts a declaration in a SOURCE file without
+// found it: `declare global { function require(...) }` puts a declaration in a source file without
 // introducing a binding, and upstream reports the call beside it while staying silent beside a
 // plain `function require(...)`. Both were pinned on the release binary.
 //
@@ -274,8 +274,8 @@ var NoRequireImports = rule.Rule{
 // implementation in one source file gives `[ambient, real]`, putting the only genuine binding at
 // index 1, and upstream is silent on it. An index-zero read reports that input and is wrong; both
 // orderings are pinned by fixtures.
-func isLocallyBound(ctx rule.Context, identifier *ast.Node) bool {
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(identifier)
+func isLocallyBound(ruleContext rule.Context, identifier *ast.Node) bool {
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(identifier)
 	if symbol == nil {
 		return false
 	}
@@ -283,7 +283,7 @@ func isLocallyBound(ctx rule.Context, identifier *ast.Node) bool {
 		// An ambient declaration declares a name that already exists rather than introducing a
 		// binding, so it is not a shadow however it is spelled. This matters because `declare
 		// global { function require(...) }` sits in a source file and would otherwise read as one:
-		// measured on the release binary, upstream REPORTS a `require('lib')` beside such a block
+		// measured on the release binary, upstream reports a `require('lib')` beside such a block
 		// and is silent beside a plain `function require(...)`, and the ambient flag is what
 		// separates them. Every genuine shadow probed here carries ambient=false and both halves of
 		// the declare-global pair carry ambient=true.
@@ -302,7 +302,7 @@ func isLocallyBound(ctx rule.Context, identifier *ast.Node) bool {
 // an oversight: a string is compared on its cooked value and a template on its raw source text,
 // which diverge the moment either carries an escape. See the rule doc for the pinned measurement.
 //
-// A template carrying a substitution compares only its FIRST QUASI, which is upstream's behavior
+// A template carrying a substitution compares only its first quasi, which is upstream's behavior
 // and reads as a defect until it is measured. oxc takes `template_literal.quasis.first()` with no
 // check that the template is static, so `require(`./a${b}c`)` under `allow: ["^\\./a"]` compares
 // `./a` and is permitted even though the assembled path is unknown. The intuitive reading is that a
@@ -310,18 +310,18 @@ func isLocallyBound(ctx rule.Context, identifier *ast.Node) bool {
 // intuition; the release binary is silent on that exact input, so the intuition was wrong and this
 // reproduces upstream instead. Recorded at the line because the next reader will have the same
 // instinct.
-func requiredPathForAllow(ctx rule.Context, argument *ast.Node) (string, bool) {
+func requiredPathForAllow(ruleContext rule.Context, argument *ast.Node) (string, bool) {
 	if argument == nil {
 		return "", false
 	}
-	sourceText := ctx.SourceFile.Text()
+	sourceText := ruleContext.SourceFile.Text()
 	switch argument.Kind {
 	case ast.KindStringLiteral:
 		return argument.AsStringLiteral().Text, true
 	case ast.KindNoSubstitutionTemplateLiteral:
 		// The raw source, with the backticks stripped. Slicing the file rather than reading `.Text`
 		// is the whole point; `.Text` is cooked and upstream compares raw.
-		literalRange := rule.TokenRange(ctx.SourceFile, argument)
+		literalRange := rule.TokenRange(ruleContext.SourceFile, argument)
 		raw := sourceText[literalRange.Pos():literalRange.End()]
 		if len(raw) < 2 {
 			return "", false
@@ -334,7 +334,7 @@ func requiredPathForAllow(ctx rule.Context, argument *ast.Node) (string, bool) {
 		if head == nil {
 			return "", false
 		}
-		headRange := rule.TokenRange(ctx.SourceFile, head)
+		headRange := rule.TokenRange(ruleContext.SourceFile, head)
 		raw := sourceText[headRange.Pos():headRange.End()]
 		if len(raw) < 3 {
 			return "", false
@@ -366,16 +366,14 @@ func matchesAnyAllowPattern(allow []*esregexp.RegExp, path string) bool {
 // entry in a configuration file reports a clean tree, which is the failure this tool exists to
 // remove. The dropped pattern simply permits nothing, so the rule stays strict rather than silently
 // going permissive.
-func DecodeNoRequireImportsOptions(raw []byte) (any, error) {
-	decoded, err := rule.DecodeOptionsInto[noRequireImportsRawOptions]()(raw)
-	if err != nil {
-		return NoRequireImportsOptions{}, err
+func DecodeNoRequireImportsOptions(raw []byte) (NoRequireImportsOptions, error) {
+	decoded, decodeOptionsError := rule.DecodeOptionsInto[noRequireImportsRawOptions]()(raw)
+	if decodeOptionsError != nil {
+		return NoRequireImportsOptions{}, decodeOptionsError
 	}
 
-	wire, _ := decoded.(noRequireImportsRawOptions)
-
-	options := NoRequireImportsOptions{AllowAsImport: wire.AllowAsImport}
-	for _, pattern := range wire.Allow {
+	options := NoRequireImportsOptions{AllowAsImport: decoded.AllowAsImport}
+	for _, pattern := range decoded.Allow {
 		compiled, compileError := esregexp.Compile(pattern, "u")
 		if compileError != nil {
 			continue

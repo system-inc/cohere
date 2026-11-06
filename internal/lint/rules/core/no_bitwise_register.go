@@ -11,5 +11,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // reach the rule as a raw value the type assertion rejects, and the rule would run exempting
 // nothing while the config said otherwise.
 func init() {
-	rule.Register(rule.Registration{Rule: NoBitwise, Decode: DecodeNoBitwiseOptions})
+	rule.Register(rule.Registration[NoBitwiseOptions]{Rule: NoBitwise, Decode: DecodeNoBitwiseOptions})
 }

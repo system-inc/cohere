@@ -15,13 +15,15 @@ const filesLock = true
 // kernel drops the lock when the process exits, however it exits, so a slot is never held by a run that
 // is gone.
 func tryLockFile(file *os.File) (bool, error) {
-	err := syscall.Flock(int(file.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
-	if errors.Is(err, syscall.EWOULDBLOCK) {
+	flockError := syscall.Flock(int(file.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
+	if errors.Is(flockError, syscall.EWOULDBLOCK) {
 		return false, nil
 	}
-	return err == nil, err
+	return flockError == nil, flockError
 }
 
 func unlockFile(file *os.File) {
-	syscall.Flock(int(file.Fd()), syscall.LOCK_UN)
+	// Ignored: an unlock fails only on a descriptor that is not open, and every caller closes the file next,
+	// which drops the lock whatever this returned.
+	_ = syscall.Flock(int(file.Fd()), syscall.LOCK_UN)
 }

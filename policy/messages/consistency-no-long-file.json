@@ -1,0 +1,10 @@
+{
+  "rules": {
+    "Go": "cohere-go/consistency-no-long-file"
+  },
+  "messages": {
+    "tooManyLines": {
+      "text": "This file is {{lineCount}} lines, over the {{max}} a file may hold. The size of a file is what a reader pays for, and a file this long is one nobody can hold whole, so it has seams in it. Split it along them, each concern or each type into a file of its own in the same package, so every part is one a reader can hold whole and finds by its name."
+    }
+  }
+}

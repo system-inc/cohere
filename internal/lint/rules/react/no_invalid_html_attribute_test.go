@@ -9,7 +9,7 @@ import (
 
 // noInvalidHtmlAttributeFile is where the fixtures pretend to live.
 //
-// A `.tsx` name because every JSX case needs a parser that reads JSX. It is NOT load-bearing:
+// A `.tsx` name because every JSX case needs a parser that reads JSX. It is not load-bearing:
 // this rule has no file gate, and TestNoInvalidHtmlAttributeHasNoFileGate pins that by running
 // one reporting createElement source under two extensions.
 const noInvalidHtmlAttributeFile = "/repository/source/NoInvalidHtmlAttribute.tsx"
@@ -1175,24 +1175,24 @@ var noInvalidHtmlAttributeSilentCases = []noInvalidHtmlAttributeCase{
 	},
 }
 
-func TestNoInvalidHtmlAttributeFires(t *testing.T) {
-	t.Parallel()
+func TestNoInvalidHtmlAttributeFires(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range noInvalidHtmlAttributeFiresCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoInvalidHtmlAttribute, noInvalidHtmlAttributeFile, testCase.source)
-			rule_testing.ExpectFindings(t, result, testCase.ids...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoInvalidHtmlAttribute, noInvalidHtmlAttributeFile, testCase.source)
+			rule_testing.ExpectFindings(test, result, testCase.ids...)
 		})
 	}
 }
 
-func TestNoInvalidHtmlAttributeStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoInvalidHtmlAttributeStaysSilent(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range noInvalidHtmlAttributeSilentCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoInvalidHtmlAttribute, noInvalidHtmlAttributeFile, testCase.source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoInvalidHtmlAttribute, noInvalidHtmlAttributeFile, testCase.source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -1204,14 +1204,14 @@ func TestNoInvalidHtmlAttributeStaysSilent(t *testing.T) {
 // reported twice for one input would still satisfy a per-case id list built by zipping. If a
 // future corpus import brings in a multi-finding case, this fails and says so rather than
 // letting the table silently under-assert.
-func TestNoInvalidHtmlAttributeCorpusIsSingleFinding(t *testing.T) {
-	t.Parallel()
+func TestNoInvalidHtmlAttributeCorpusIsSingleFinding(test *testing.T) {
+	test.Parallel()
 	if len(noInvalidHtmlAttributeFiresCases) == 0 {
-		t.Fatal("no reporting cases, so this check proved nothing")
+		test.Fatal("no reporting cases, so this check proved nothing")
 	}
 	for _, testCase := range noInvalidHtmlAttributeFiresCases {
 		if len(testCase.ids) != 1 {
-			t.Errorf("%s asserts %d findings; the tables assume exactly one", testCase.name, len(testCase.ids))
+			test.Errorf("%s asserts %d findings; the tables assume exactly one", testCase.name, len(testCase.ids))
 		}
 	}
 }
@@ -1223,16 +1223,16 @@ func TestNoInvalidHtmlAttributeCorpusIsSingleFinding(t *testing.T) {
 // reporting source here is a `React.createElement` call rather than JSX, because that is the arm
 // that is legal in a plain `.ts` file and therefore the one that can tell a working gate from an
 // absent one.
-func TestNoInvalidHtmlAttributeHasNoFileGate(t *testing.T) {
-	t.Parallel()
+func TestNoInvalidHtmlAttributeHasNoFileGate(test *testing.T) {
+	test.Parallel()
 
 	const reporting = "React.createElement(\"a\", { rel: \"alternatex\" });\n"
 
 	for _, fileName := range []string{"/repository/source/Gate.tsx", "/repository/source/Gate.ts"} {
-		t.Run(fileName, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoInvalidHtmlAttribute, fileName, reporting)
-			rule_testing.ExpectFindings(t, result, "neverValid")
+		test.Run(fileName, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoInvalidHtmlAttribute, fileName, reporting)
+			rule_testing.ExpectFindings(test, result, "neverValid")
 		})
 	}
 }
@@ -1242,8 +1242,8 @@ func TestNoInvalidHtmlAttributeHasNoFileGate(t *testing.T) {
 // `ExpectFindings` checks ids and count and nothing else, so a rule whose defect is where it points
 // passes a complete fixture pair while being wrong. This rule anchors on four different node kinds
 // depending on the arm, which is exactly the situation where an id-only fixture set is blind.
-func TestNoInvalidHtmlAttributeReportsWhereItSays(t *testing.T) {
-	t.Parallel()
+func TestNoInvalidHtmlAttributeReportsWhereItSays(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -1265,7 +1265,7 @@ func TestNoInvalidHtmlAttributeReportsWhereItSays(t *testing.T) {
 			span:   "\"canonical\"",
 		},
 		{
-			// A bare attribute anchors on the NAME, not the whole attribute.
+			// A bare attribute anchors on the name, not the whole attribute.
 			name:   "emptyIsMeaningless-anchors-on-the-name",
 			source: "<a rel></a>;\n",
 			id:     "emptyIsMeaningless",
@@ -1295,16 +1295,16 @@ func TestNoInvalidHtmlAttributeReportsWhereItSays(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoInvalidHtmlAttribute, noInvalidHtmlAttributeFile, testCase.source)
-			rule_testing.ExpectFindings(t, result, testCase.id)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoInvalidHtmlAttribute, noInvalidHtmlAttributeFile, testCase.source)
+			rule_testing.ExpectFindings(test, result, testCase.id)
 			if len(result.Diagnostics) != 1 {
 				return
 			}
 			reported := testCase.source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 			if reported != testCase.span {
-				t.Errorf("finding spans %q, expected %q", reported, testCase.span)
+				test.Errorf("finding spans %q, expected %q", reported, testCase.span)
 			}
 		})
 	}
@@ -1317,12 +1317,12 @@ func TestNoInvalidHtmlAttributeReportsWhereItSays(t *testing.T) {
 // iterating a JavaScript Set, which preserves insertion order. Go map iteration is randomised, so
 // the tags live in a slice; sorting instead would render them alphabetically. Three corpus cases
 // assert this text, but they assert it through a message ID, which cannot see the order at all.
-func TestNoInvalidHtmlAttributeRendersTheTagListInUpstreamOrder(t *testing.T) {
-	t.Parallel()
+func TestNoInvalidHtmlAttributeRendersTheTagListInUpstreamOrder(test *testing.T) {
+	test.Parallel()
 
 	const wanted = "<link>, <a>, <area>, <form>"
 	if rendered := noInvalidHtmlAttributeRenderTagNames("rel"); rendered != wanted {
-		t.Errorf("rendered %q, upstream renders %q", rendered, wanted)
+		test.Errorf("rendered %q, upstream renders %q", rendered, wanted)
 	}
 }
 
@@ -1330,33 +1330,33 @@ func TestNoInvalidHtmlAttributeRendersTheTagListInUpstreamOrder(t *testing.T) {
 //
 // The JSX arm splits a value on whitespace and judges each token, so
 // `rel="alternate alternatex"` reports once for the bad token alone. The createElement arm looks the
-// WHOLE string up in the table, so the same value reports once naming the entire string. That is
+// whole string up in the table, so the same value reports once naming the entire string. That is
 // upstream's, not a simplification here, and corpus cases invalid[4] through invalid[8] pin both
 // halves; this test states the contrast in one place because reading it out of eight scattered rows
 // is how a later reader "fixes" one arm to match the other.
-func TestNoInvalidHtmlAttributeSeparatesTheTwoValueArms(t *testing.T) {
-	t.Parallel()
+func TestNoInvalidHtmlAttributeSeparatesTheTwoValueArms(test *testing.T) {
+	test.Parallel()
 
-	t.Run("jsx-splits-on-whitespace", func(t *testing.T) {
-		t.Parallel()
+	test.Run("jsx-splits-on-whitespace", func(test *testing.T) {
+		test.Parallel()
 		const source = "<a rel=\"alternate alternatex\"></a>;\n"
-		result := rule_testing.Run(t, NoInvalidHtmlAttribute, noInvalidHtmlAttributeFile, source)
-		rule_testing.ExpectFindings(t, result, "neverValid")
+		result := rule_testing.Run(test, NoInvalidHtmlAttribute, noInvalidHtmlAttributeFile, source)
+		rule_testing.ExpectFindings(test, result, "neverValid")
 		if len(result.Diagnostics) == 1 &&
 			!strings.Contains(result.Diagnostics[0].Message.Description, "`alternatex`") {
-			t.Errorf("expected the message to name the bad token alone, got %q",
+			test.Errorf("expected the message to name the bad token alone, got %q",
 				result.Diagnostics[0].Message.Description)
 		}
 	})
 
-	t.Run("createElement-looks-up-the-whole-string", func(t *testing.T) {
-		t.Parallel()
+	test.Run("createElement-looks-up-the-whole-string", func(test *testing.T) {
+		test.Parallel()
 		const source = "React.createElement(\"a\", { rel: \"alternate alternatex\" });\n"
-		result := rule_testing.Run(t, NoInvalidHtmlAttribute, noInvalidHtmlAttributeFile, source)
-		rule_testing.ExpectFindings(t, result, "neverValid")
+		result := rule_testing.Run(test, NoInvalidHtmlAttribute, noInvalidHtmlAttributeFile, source)
+		rule_testing.ExpectFindings(test, result, "neverValid")
 		if len(result.Diagnostics) == 1 &&
 			!strings.Contains(result.Diagnostics[0].Message.Description, "`alternate alternatex`") {
-			t.Errorf("expected the message to name the whole string, got %q",
+			test.Errorf("expected the message to name the whole string, got %q",
 				result.Diagnostics[0].Message.Description)
 		}
 	})
@@ -1364,12 +1364,12 @@ func TestNoInvalidHtmlAttributeSeparatesTheTwoValueArms(t *testing.T) {
 
 // TestNoInvalidHtmlAttributeSurvivesAMemberItCannotName covers the shapes whose names cannot be read.
 //
-// `Node.Text()` panics on several kinds rather than returning empty, and the walk recovers per FILE
+// `Node.Text()` panics on several kinds rather than returning empty, and the walk recovers per file
 // rather than per rule, so one unguarded read costs every rule in this package its verdict on that
 // file. Each shape below reaches a different name read: a computed property key, a namespaced JSX
 // attribute, a member-expression tag name, and a spread with no name at all.
-func TestNoInvalidHtmlAttributeSurvivesAMemberItCannotName(t *testing.T) {
-	t.Parallel()
+func TestNoInvalidHtmlAttributeSurvivesAMemberItCannotName(test *testing.T) {
+	test.Parallel()
 
 	sources := map[string]string{
 		"computed-property-key":  "const k = \"rel\";\nReact.createElement(\"a\", { [k]: \"alternatex\" });\n",
@@ -1379,12 +1379,12 @@ func TestNoInvalidHtmlAttributeSurvivesAMemberItCannotName(t *testing.T) {
 	}
 
 	for name, source := range sources {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
 			// The assertion that matters is that this returns a verdict at all rather than panicking.
 			// All four are shapes the rule cannot read, so all four are clean.
-			result := rule_testing.Run(t, NoInvalidHtmlAttribute, noInvalidHtmlAttributeFile, source)
-			rule_testing.ExpectClean(t, result)
+			result := rule_testing.Run(test, NoInvalidHtmlAttribute, noInvalidHtmlAttributeFile, source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -1402,16 +1402,16 @@ func TestNoInvalidHtmlAttributeSurvivesAMemberItCannotName(t *testing.T) {
 //
 // Measured on the installed build with a control that fires: `Preact.createElement`,
 // `h.createElement` and a bare `createElement` are all silent on a value that reports under
-// `React.createElement`. This is deliberately NARROWER than this package's shared
+// `React.createElement`. This is deliberately narrower than this package's shared
 // `isPragmaCreateElementCall`, which accepts the bare form; the difference is upstream's.
-func TestNoInvalidHtmlAttributeChecksTheCreateElementReceiver(t *testing.T) {
-	t.Parallel()
+func TestNoInvalidHtmlAttributeChecksTheCreateElementReceiver(test *testing.T) {
+	test.Parallel()
 
-	t.Run("control-React-receiver-reports", func(t *testing.T) {
-		t.Parallel()
-		result := rule_testing.Run(t, NoInvalidHtmlAttribute, noInvalidHtmlAttributeFile,
+	test.Run("control-React-receiver-reports", func(test *testing.T) {
+		test.Parallel()
+		result := rule_testing.Run(test, NoInvalidHtmlAttribute, noInvalidHtmlAttributeFile,
 			"React.createElement(\"a\", { rel: \"alternatex\" });\n")
-		rule_testing.ExpectFindings(t, result, "neverValid")
+		rule_testing.ExpectFindings(test, result, "neverValid")
 	})
 
 	for name, source := range map[string]string{
@@ -1419,17 +1419,17 @@ func TestNoInvalidHtmlAttributeChecksTheCreateElementReceiver(t *testing.T) {
 		"lowercase-h":     "h.createElement(\"a\", { rel: \"alternatex\" });\n",
 		"bare-call":       "createElement(\"a\", { rel: \"alternatex\" });\n",
 	} {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoInvalidHtmlAttribute, noInvalidHtmlAttributeFile, source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoInvalidHtmlAttribute, noInvalidHtmlAttributeFile, source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
 
 // TestNoInvalidHtmlAttributeGatesTheCreateElementElementName covers a real defect this sweep found.
 //
-// Upstream's HTML-element gate is guarded by a STRING test:
+// Upstream's HTML-element gate is guarded by a string test:
 //
 //	if (typeof elemNameArg.value === 'string' && !HTML_ELEMENTS.has(elemNameArg.value))
 //
@@ -1437,11 +1437,11 @@ func TestNoInvalidHtmlAttributeChecksTheCreateElementReceiver(t *testing.T) {
 // against the attribute's permitted tags. An earlier version of this port required a string literal
 // and went silent on `React.createElement(5, ...)`, which upstream reports.
 //
-// Dropping the gate entirely SURVIVED the whole 265-case corpus, so the survivor was investigated
+// Dropping the gate entirely survived the whole 265-case corpus, so the survivor was investigated
 // rather than written off. Driving the installed build on the three shapes the corpus does not
 // write settled it, and the numeric one is where the two disagreed.
-func TestNoInvalidHtmlAttributeGatesTheCreateElementElementName(t *testing.T) {
-	t.Parallel()
+func TestNoInvalidHtmlAttributeGatesTheCreateElementElementName(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -1460,14 +1460,14 @@ func TestNoInvalidHtmlAttributeGatesTheCreateElementElementName(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoInvalidHtmlAttribute, noInvalidHtmlAttributeFile, testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoInvalidHtmlAttribute, noInvalidHtmlAttributeFile, testCase.source)
 			if testCase.id == "" {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.id)
+			rule_testing.ExpectFindings(test, result, testCase.id)
 		})
 	}
 }
@@ -1475,21 +1475,21 @@ func TestNoInvalidHtmlAttributeGatesTheCreateElementElementName(t *testing.T) {
 // TestNoInvalidHtmlAttributeWhitespaceIsJavaScriptWhitespace pins the predicate that one corpus case
 // caught and that two mutants could not.
 //
-// `invalid[23]` separates two valid tokens with NO-BREAK SPACEs, so nothing else reports and the
+// `invalid[23]` separates two valid tokens with no-break spaces, so nothing else reports and the
 // whole finding is lost if the predicate is ASCII-only. An earlier version of this rule scanned
 // bytes with an ASCII predicate and documented the gap as a deliberate narrowing; the corpus proved
 // that reasoning wrong.
 //
-// Two mutants on this predicate SURVIVE and both are equivalent rather than uncaught: U+00A0 is in
+// Two mutants on this predicate survive and both are equivalent rather than uncaught: U+00A0 is in
 // `unicode.Zs`, so removing it from the explicit list leaves the category fallback catching it, and
-// removing only the fallback leaves the explicit entry. Removing BOTH is caught by 5 assertions,
+// removing only the fallback leaves the explicit entry. Removing both is caught by 5 assertions,
 // which is what establishes the predicate is load-bearing.
 //
 // Every code point below is written as an escape rather than as a literal character, because the
 // whole file is scanned for non-ASCII bytes and because an editing tool has twice in this repository
 // silently rewritten a non-ASCII byte in Go source.
-func TestNoInvalidHtmlAttributeWhitespaceIsJavaScriptWhitespace(t *testing.T) {
-	t.Parallel()
+func TestNoInvalidHtmlAttributeWhitespaceIsJavaScriptWhitespace(test *testing.T) {
+	test.Parallel()
 
 	// What JavaScript's `\s` matches that a naive ASCII predicate would miss.
 	for name, character := range map[string]rune{
@@ -1502,33 +1502,33 @@ func TestNoInvalidHtmlAttributeWhitespaceIsJavaScriptWhitespace(t *testing.T) {
 		"ogham-space-mark":    '\u1680',
 		"narrow-no-break":     '\u202f',
 	} {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
 			if !noInvalidHtmlAttributeIsSpaceRune(character) {
-				t.Errorf("U+%04X is JavaScript whitespace and the predicate says it is not", character)
+				test.Errorf("U+%04X is JavaScript whitespace and the predicate says it is not", character)
 			}
 		})
 	}
 
 	// The controls. Without these an always-true predicate would pass everything above.
 	//
-	// U+200B ZERO WIDTH SPACE is the sharp one: it looks like whitespace, is named like whitespace,
-	// and is NOT matched by JavaScript's `\s`, because it is in category Cf rather than Zs.
-	t.Run("control-these-are-not-javascript-whitespace", func(t *testing.T) {
-		t.Parallel()
+	// U+200B `ZERO WIDTH SPACE` is the sharp one: it looks like whitespace, is named like whitespace,
+	// and is not matched by JavaScript's `\s`, because it is in category Cf rather than Zs.
+	test.Run("control-these-are-not-javascript-whitespace", func(test *testing.T) {
+		test.Parallel()
 		for _, character := range []rune{'a', '-', '\u200b', '\u0085'} {
 			if noInvalidHtmlAttributeIsSpaceRune(character) {
-				t.Errorf("U+%04X is not JavaScript whitespace and the predicate says it is", character)
+				test.Errorf("U+%04X is not JavaScript whitespace and the predicate says it is", character)
 			}
 		}
 	})
 }
 
-// TestNoInvalidHtmlAttributeTreatsAJsxEscapeAsLiteralText records an EQUIVALENT mutant and pins the
+// TestNoInvalidHtmlAttributeTreatsAJsxEscapeAsLiteralText records an equivalent mutant and pins the
 // behaviour that makes it equivalent.
 //
 // Replacing this rule's raw-source read with the cooked `Text()` survives the whole corpus and every
-// input written to break it. That is not a fixture gap: a JSX attribute value is NOT
+// input written to break it. That is not a fixture gap: a JSX attribute value is not
 // escape-processed, so `rel="a\tb"` holds a literal backslash and a literal `t`, and raw and cooked
 // are the same string for every JSX attribute there is.
 //
@@ -1537,8 +1537,8 @@ func TestNoInvalidHtmlAttributeWhitespaceIsJavaScriptWhitespace(t *testing.T) {
 // `spaceDelimited`, because a tab really is whitespace. Both are asserted here so that a future
 // change which starts unescaping JSX attribute values fails loudly rather than silently converging
 // on the wrong arm.
-func TestNoInvalidHtmlAttributeTreatsAJsxEscapeAsLiteralText(t *testing.T) {
-	t.Parallel()
+func TestNoInvalidHtmlAttributeTreatsAJsxEscapeAsLiteralText(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -1555,10 +1555,10 @@ func TestNoInvalidHtmlAttributeTreatsAJsxEscapeAsLiteralText(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoInvalidHtmlAttribute, noInvalidHtmlAttributeFile, testCase.source)
-			rule_testing.ExpectFindings(t, result, testCase.id)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoInvalidHtmlAttribute, noInvalidHtmlAttributeFile, testCase.source)
+			rule_testing.ExpectFindings(test, result, testCase.id)
 		})
 	}
 }
@@ -1566,8 +1566,8 @@ func TestNoInvalidHtmlAttributeTreatsAJsxEscapeAsLiteralText(t *testing.T) {
 // TestNoInvalidHtmlAttributeOptions pins the option's three spellings and its refusals, measured
 // against the installed build (7.37.5) on the same source: `["rel"]` and no option report twice,
 // and `[]` reports nothing, because upstream keeps an empty array over its default.
-func TestNoInvalidHtmlAttributeOptions(t *testing.T) {
-	t.Parallel()
+func TestNoInvalidHtmlAttributeOptions(test *testing.T) {
+	test.Parallel()
 
 	const source = `<a rel="bogus" />; React.createElement("a", {rel: "bogus"});`
 	cases := []struct {
@@ -1579,24 +1579,34 @@ func TestNoInvalidHtmlAttributeOptions(t *testing.T) {
 		{`[]`, 0},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.raw, func(t *testing.T) {
-			t.Parallel()
-			decoded, err := DecodeNoInvalidHtmlAttributeOptions([]byte(testCase.raw))
-			if err != nil {
-				t.Fatalf("decoding %q: %v", testCase.raw, err)
+		test.Run(testCase.raw, func(test *testing.T) {
+			test.Parallel()
+			decoded, decodeNoInvalidHtmlAttributeOptionsError := DecodeNoInvalidHtmlAttributeOptions(
+				[]byte(testCase.raw),
+			)
+			if decodeNoInvalidHtmlAttributeOptionsError != nil {
+				test.Fatalf("decoding %q: %v", testCase.raw, decodeNoInvalidHtmlAttributeOptionsError)
 			}
-			result := rule_testing.RunWithOptions(t, NoInvalidHtmlAttribute, noInvalidHtmlAttributeFile, source, decoded)
+			result := rule_testing.RunWithOptions(
+				test,
+				NoInvalidHtmlAttribute,
+				noInvalidHtmlAttributeFile,
+				source,
+				decoded,
+			)
 			if len(result.Diagnostics) != testCase.wantCount {
-				t.Errorf("got %d findings, want %d", len(result.Diagnostics), testCase.wantCount)
+				test.Errorf("got %d findings, want %d", len(result.Diagnostics), testCase.wantCount)
 			}
 		})
 	}
 
 	for _, raw := range []string{`["rel", "rel"]`, `["href"]`, `"rel"`, `{}`, `null`} {
-		t.Run(raw+" is refused", func(t *testing.T) {
-			t.Parallel()
-			if _, err := DecodeNoInvalidHtmlAttributeOptions([]byte(raw)); err == nil {
-				t.Errorf("%s decoded; upstream's schema refuses it", raw)
+		test.Run(raw+" is refused", func(test *testing.T) {
+			test.Parallel()
+			if _, decodeNoInvalidHtmlAttributeOptionsError := DecodeNoInvalidHtmlAttributeOptions(
+				[]byte(raw),
+			); decodeNoInvalidHtmlAttributeOptionsError == nil {
+				test.Errorf("%s decoded; upstream's schema refuses it", raw)
 			}
 		})
 	}

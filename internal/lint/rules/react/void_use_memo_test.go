@@ -34,8 +34,8 @@ type voidUseMemoCase struct {
 	want   []string
 }
 
-func TestVoidUseMemoFires(t *testing.T) {
-	t.Parallel()
+func TestVoidUseMemoFires(test *testing.T) {
+	test.Parallel()
 
 	// Message ids are written as literals rather than referenced through the rule's own message
 	// constants, so an assertion cannot move together with the code it guards.
@@ -74,7 +74,7 @@ func TestVoidUseMemoFires(t *testing.T) {
 			source: "function Component() {\n  const x = useMemo(() => { throw new Error('x'); }, []);\n  return <div>{x}</div>;\n}\n",
 			want:   []string{voidReturn},
 		},
-		// An async callback with no return reports HERE too, separately from the
+		// An async callback with no return reports here too, separately from the
 		// `use-memo` rule's own async finding. Measured: this rule alone gives one finding.
 		{
 			name:   "voidCallbackAsync",
@@ -119,7 +119,7 @@ func TestVoidUseMemoFires(t *testing.T) {
 			source: "function Component() {\n  const x = React.useMemo(() => { foo(); }, []);\n  return <div>{x}</div>;\n}\n",
 			want:   []string{voidReturn},
 		},
-		// An optional CALL still lowers to a CallExpression on the same callee. Measured.
+		// An optional call still lowers to a CallExpression on the same callee. Measured.
 		{
 			name:   "voidCallbackOptionalCall",
 			source: "function Component() {\n  const x = useMemo?.(() => { foo(); }, []);\n  return <div>{x}</div>;\n}\n",
@@ -158,7 +158,7 @@ func TestVoidUseMemoFires(t *testing.T) {
 			source: "function Component(props, ref) {\n  const x = useMemo(() => { foo(); }, []);\n  return <div>{x}</div>;\n}\n",
 			want:   []string{voidReturn},
 		},
-		// A MODULE-level binding named useMemo still reports. LoadGlobal means `not bound
+		// A module-level binding named useMemo still reports. LoadGlobal means `not bound
 		// inside the compiled function`, and module scope is outside it. Measured, and it
 		// is the opposite of what the name LoadGlobal suggests.
 		{
@@ -172,7 +172,7 @@ func TestVoidUseMemoFires(t *testing.T) {
 			source: "function Component() {\n  { const useMemo = (f) => f(); }\n  const x = useMemo(() => { foo(); }, []);\n  return <div>{x}</div>;\n}\n",
 			want:   []string{voidReturn},
 		},
-		// A return inside a NESTED function does not count, because it cannot terminate the
+		// A return inside a nested function does not count, because it cannot terminate the
 		// callback. Added after a mutation removing the nested-function skip survived the whole
 		// fixture set; both shapes were measured on React as reporting before either was written.
 		{
@@ -203,7 +203,7 @@ func TestVoidUseMemoFires(t *testing.T) {
 			source: "function Component() {\n  (useMemo(() => { return 1; }, []));\n  return <div />;\n}\n",
 			want:   []string{unusedResult},
 		},
-		// The LEFT operand of a comma is discarded, so it reports. The right operand does
+		// The left operand of a comma is discarded, so it reports. The right operand does
 		// not; that pair is the sharpest evidence the test is about value discard.
 		{
 			name:   "resultUnusedCommaLeftOperand",
@@ -243,16 +243,16 @@ func TestVoidUseMemoFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, VoidUseMemo, "component.tsx", testCase.source)
-			rule_testing.ExpectFindings(t, result, testCase.want...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, VoidUseMemo, "component.tsx", testCase.source)
+			rule_testing.ExpectFindings(test, result, testCase.want...)
 		})
 	}
 }
 
-func TestVoidUseMemoStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestVoidUseMemoStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []voidUseMemoCase{
 		// oxc's only pass case. A concise arrow body lowers to an Implicit return.
@@ -265,7 +265,7 @@ func TestVoidUseMemoStaysSilent(t *testing.T) {
 			name:   "explicitReturnValue",
 			source: "function Component() {\n  const x = useMemo(() => { return 1; }, []);\n  return <div>{x}</div>;\n}\n",
 		},
-		// THE decisive case. A bare `return;` returns undefined and is still CLEAN, because
+		// The decisive case. A bare `return;` returns undefined and is still clean, because
 		// React's ReturnStatement lowering hardcodes returnVariant Explicit whether or not an
 		// argument is present. React's own pass documentation states the opposite; the
 		// executable is the authority and it was measured. See the note on the rule.
@@ -278,7 +278,7 @@ func TestVoidUseMemoStaysSilent(t *testing.T) {
 			name:   "conciseArrowBody",
 			source: "function Component() {\n  const x = useMemo(() => 1, []);\n  return <div>{x}</div>;\n}\n",
 		},
-		// ANY return terminal suffices; there is no all-paths requirement. Measured clean
+		// Any return terminal suffices; there is no all-paths requirement. Measured clean
 		// even though the callback returns undefined whenever `a` is falsy.
 		{
 			name:   "conditionalReturnOnOnePath",
@@ -317,13 +317,13 @@ func TestVoidUseMemoStaysSilent(t *testing.T) {
 			name:   "noArgumentsAtAll",
 			source: "function Component() {\n  const x = useMemo();\n  return <div>{x}</div>;\n}\n",
 		},
-		// A binding INSIDE the compiled function is a local, not a global, so neither
+		// A binding inside the compiled function is a local, not a global, so neither
 		// diagnostic fires. Contrast the module-scope case, which reports.
 		{
 			name:   "functionScopeShadowOfUseMemo",
 			source: "function Component() {\n  const useMemo = (f) => f;\n  useMemo(() => { foo(); }, []);\n  return <div />;\n}\n",
 		},
-		// A shadow in a BLOCK that encloses the call site covers it, which is finer-grained than
+		// A shadow in a block that encloses the call site covers it, which is finer-grained than
 		// "does this function declare the name". Added after a mutation dropping blocks from the
 		// scope walk survived; both shapes measured clean on React before either was written.
 		{
@@ -334,7 +334,7 @@ func TestVoidUseMemoStaysSilent(t *testing.T) {
 			name:   "loopBodyShadowEnclosingTheCall",
 			source: "function Component({items}) {\n  for (const i of items) {\n    const useMemo = (f) => f();\n    useMemo(() => { foo(); }, []);\n  }\n  return <div />;\n}\n",
 		},
-		// A FUNCTION DECLARATION shadows as well as a variable does. Added after a mutation
+		// A function declaration shadows as well as a variable does. Added after a mutation
 		// ignoring function declarations in the shadow test survived the whole set.
 		{
 			name:   "functionDeclarationShadowInComponent",
@@ -349,7 +349,7 @@ func TestVoidUseMemoStaysSilent(t *testing.T) {
 			name:   "parameterShadowOfUseMemo",
 			source: "function Component({useMemo}) {\n  const x = useMemo(() => { foo(); }, []);\n  return <div>{x}</div>;\n}\n",
 		},
-		// An enclosing FUNCTION's binding shadows, which is what draws the line at module
+		// An enclosing function's binding shadows, which is what draws the line at module
 		// scope rather than at the component boundary.
 		{
 			name:   "outerFunctionScopeShadow",
@@ -370,12 +370,12 @@ func TestVoidUseMemoStaysSilent(t *testing.T) {
 			name:   "deeperMemberChain",
 			source: "function Component() {\n  const x = A.React.useMemo(() => { foo(); }, []);\n  return <div>{x}</div>;\n}\n",
 		},
-		// An optional MEMBER access does not, unlike an optional call. Measured both ways.
+		// An optional member access does not, unlike an optional call. Measured both ways.
 		{
 			name:   "optionalMemberAccess",
 			source: "function Component() {\n  const x = React?.useMemo(() => { foo(); }, []);\n  return <div>{x}</div>;\n}\n",
 		},
-		// A DIFFERENT property of React is not useMemo. Added after a mutation dropping the
+		// A different property of React is not useMemo. Added after a mutation dropping the
 		// property-name test survived the whole fixture set: without this case nothing distinguished
 		// `React.useMemo` from `React.anything`. Measured clean on React before it was written.
 		{
@@ -396,7 +396,7 @@ func TestVoidUseMemoStaysSilent(t *testing.T) {
 			name:   "aliasedImport",
 			source: "import {useMemo as useM} from 'react';\nfunction Component() {\n  const x = useM(() => { foo(); }, []);\n  return <div>{x}</div>;\n}\n",
 		},
-		// Assigning to a never-read variable is CLEAN. `result is unused` is not liveness:
+		// Assigning to a never-read variable is clean. `result is unused` is not liveness:
 		// the store consumes the value. This is the case that decides the rule needs no
 		// dataflow, and it would be the natural wrong guess.
 		{
@@ -404,7 +404,7 @@ func TestVoidUseMemoStaysSilent(t *testing.T) {
 			source: "function Component() {\n  const x = useMemo(() => { return 1; }, []);\n  return <div />;\n}\n",
 		},
 		// `void` emits an instruction taking the value as an operand, so it consumes it.
-		// Semantically this DISCARDS the result and upstream is arguably wrong to be silent,
+		// Semantically this discards the result and upstream is arguably wrong to be silent,
 		// but it is silent and that is reproduced.
 		{
 			name:   "resultDiscardedByVoidOperator",
@@ -453,7 +453,7 @@ func TestVoidUseMemoStaysSilent(t *testing.T) {
 			name:   "lowercaseUseNameIsNotAHook",
 			source: "function usething() {\n  const x = useMemo(() => { foo(); }, []);\n  return x;\n}\n",
 		},
-		// Measured clean. This package's isHookIdentifierName answers TRUE for bare `use`,
+		// Measured clean. This package's isHookIdentifierName answers `true` for bare `use`,
 		// which is right for rules-of-hooks and wrong for this driver gate, so this rule
 		// requires the uppercase-or-digit suffix. Pinned because the two disagree.
 		{
@@ -499,10 +499,10 @@ func TestVoidUseMemoStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, VoidUseMemo, "component.tsx", testCase.source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, VoidUseMemo, "component.tsx", testCase.source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -510,8 +510,8 @@ func TestVoidUseMemoStaysSilent(t *testing.T) {
 // Spans are asserted because `ExpectFindings` sees message ids and counts and nothing else.
 //
 // The two diagnostics point at different things, and both were byte-measured on React through the
-// Linter API before this rule was written. The void-return finding points at the CALLBACK; the
-// unused-result finding points at the CALLEE, which is a bare identifier for `useMemo(...)` and the
+// Linter API before this rule was written. The void-return finding points at the callback; the
+// unused-result finding points at the callee, which is a bare identifier for `useMemo(...)` and the
 // whole member expression for `React.useMemo(...)`. oxc's snapshot independently confirms the
 // callback span, logging column 25 for `() => {}` on its own fail case.
 //
@@ -519,8 +519,8 @@ func TestVoidUseMemoStaysSilent(t *testing.T) {
 // makes a mandatory measurement rather than an assumption. Measured on React: the parenthesized
 // callback reports at column 22 rather than 21, and the parenthesized callee at column 4 rather
 // than 3.
-func TestVoidUseMemoSpans(t *testing.T) {
-	t.Parallel()
+func TestVoidUseMemoSpans(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -560,16 +560,16 @@ func TestVoidUseMemoSpans(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, VoidUseMemo, "component.tsx", testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, VoidUseMemo, "component.tsx", testCase.source)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("expected exactly one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("expected exactly one finding, got %d", len(result.Diagnostics))
 			}
 			finding := result.Diagnostics[0]
 			reported := testCase.source[finding.Range.Pos():finding.Range.End()]
 			if reported != testCase.want {
-				t.Errorf("finding points at %q, want %q", reported, testCase.want)
+				test.Errorf("finding points at %q, want %q", reported, testCase.want)
 			}
 		})
 	}
@@ -578,20 +578,23 @@ func TestVoidUseMemoSpans(t *testing.T) {
 // `rule.Message` is `{Id, Description}` with no interpolation layer, so there is no rendered text
 // to guard and the assertion is on the two fields directly. Literals are typed here rather than
 // compared against the rule's own constants, which would move together with the code.
-func TestVoidUseMemoMessages(t *testing.T) {
-	t.Parallel()
+func TestVoidUseMemoMessages(test *testing.T) {
+	test.Parallel()
 
 	if messageUseMemoCallbackReturnsNothing.Id != "useMemoCallbackReturnsNothing" {
-		t.Errorf("void-return id is %q", messageUseMemoCallbackReturnsNothing.Id)
+		test.Errorf("void-return id is %q", messageUseMemoCallbackReturnsNothing.Id)
 	}
 	if messageUseMemoResultUnused.Id != "useMemoResultUnused" {
-		t.Errorf("unused-result id is %q", messageUseMemoResultUnused.Id)
+		test.Errorf("unused-result id is %q", messageUseMemoResultUnused.Id)
 	}
 	if !strings.Contains(messageUseMemoCallbackReturnsNothing.Description, "does not return a value") {
-		t.Errorf("void-return description does not say what is wrong: %q", messageUseMemoCallbackReturnsNothing.Description)
+		test.Errorf(
+			"void-return description does not say what is wrong: %q",
+			messageUseMemoCallbackReturnsNothing.Description,
+		)
 	}
 	if !strings.Contains(messageUseMemoResultUnused.Description, "nothing reads it") {
-		t.Errorf("unused-result description does not say what is wrong: %q", messageUseMemoResultUnused.Description)
+		test.Errorf("unused-result description does not say what is wrong: %q", messageUseMemoResultUnused.Description)
 	}
 }
 
@@ -600,18 +603,18 @@ func TestVoidUseMemoMessages(t *testing.T) {
 //
 // Upstream collects unused-result findings into a separate list and flushes it after the whole
 // walk, so internally every void-return finding precedes every unused-result one. That order is
-// NOT observable: measured on React, the two findings come back in source order in both
+// not observable: measured on React, the two findings come back in source order in both
 // arrangements, because the reporting layer sorts by position before handing them over. The
 // collection order was asserted here first and the measurement corrected it, which is why the
 // claim is now about source order.
-func TestVoidUseMemoReportsBothKindsInSourceOrder(t *testing.T) {
-	t.Parallel()
+func TestVoidUseMemoReportsBothKindsInSourceOrder(test *testing.T) {
+	test.Parallel()
 
 	unusedFirst := "function Component() {\n  useMemo(() => { return 1; }, []);\n  const x = useMemo(() => { foo(); }, []);\n  return <div>{x}</div>;\n}\n"
-	result := rule_testing.Run(t, VoidUseMemo, "component.tsx", unusedFirst)
-	rule_testing.ExpectFindings(t, result, "useMemoResultUnused", "useMemoCallbackReturnsNothing")
+	result := rule_testing.Run(test, VoidUseMemo, "component.tsx", unusedFirst)
+	rule_testing.ExpectFindings(test, result, "useMemoResultUnused", "useMemoCallbackReturnsNothing")
 
 	voidFirst := "function Component() {\n  const x = useMemo(() => { foo(); }, []);\n  useMemo(() => { return 1; }, []);\n  return <div>{x}</div>;\n}\n"
-	result = rule_testing.Run(t, VoidUseMemo, "component.tsx", voidFirst)
-	rule_testing.ExpectFindings(t, result, "useMemoCallbackReturnsNothing", "useMemoResultUnused")
+	result = rule_testing.Run(test, VoidUseMemo, "component.tsx", voidFirst)
+	rule_testing.ExpectFindings(test, result, "useMemoCallbackReturnsNothing", "useMemoResultUnused")
 }

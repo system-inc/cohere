@@ -25,44 +25,68 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
-// Result is what one rule saw in one file.
-type Result struct {
-	Diagnostics []rule.Diagnostic
-	SourceFile  *ast.SourceFile
-
-	// capture is the case the docs capture records when an assertion passes on this result; see
-	// docs_capture.go. Nil unless COHERE_DOCS_CAPTURE is set.
-	capture *capturedRun
-}
-
-// MessageIds returns the ids of every finding, in the order they were reported.
-func (r Result) MessageIds() []string {
-	ids := make([]string, 0, len(r.Diagnostics))
-	for _, diagnostic := range r.Diagnostics {
-		ids = append(ids, diagnostic.Message.Id)
-	}
-	return ids
-}
-
 // Run parses source text and walks it with one rule, with no type information.
 //
 // Rules that need a checker are exercised against a real program elsewhere; this path exists for
 // the syntax-only majority, where a full program would cost seconds to prove something a parse can
 // prove in microseconds.
-func Run(t *testing.T, subject rule.Rule, fileName string, sourceText string) Result {
-	t.Helper()
-	return RunWithOptions(t, subject, fileName, sourceText, nil)
+//
+// The rule runs unconfigured, as a config writing its bare severity runs it.
+func Run[Options any](test *testing.T, subject rule.Rule[Options], fileName string, sourceText string) Result {
+	test.Helper()
+	return RunGiven(test, subject, fileName, sourceText, rule.Given[Options]{})
 }
 
-// RunWithOptions is Run for a rule that reads configuration.
+// RunWithOptions is Run for a rule that reads configuration, handed options as a config that wrote them
+// would hand them.
+func RunWithOptions[Options any](
+	test *testing.T,
+	subject rule.Rule[Options],
+	fileName string,
+	sourceText string,
+	options Options,
+) Result {
+	test.Helper()
+	return RunGiven(test, subject, fileName, sourceText, rule.Configured(options))
+}
+
+// RunGiven is Run with the options exactly as the rule receives them, configured or not, for a table whose
+// cases hold both.
 //
 // A configurable rule has a failure mode an unconfigured one does not: it can be registered without
 // its required option and then guard either everything or nothing. Which of those it does is a real
 // decision that belongs in fixtures, so the harness has to be able to hand a rule no options at all
 // as deliberately as it hands it good ones.
-func RunWithOptions(t *testing.T, subject rule.Rule, fileName string, sourceText string, options any) Result {
-	t.Helper()
-	captured := newCapturedRun(subject, fileName, 0, options)
+func RunGiven[Options any](
+	test *testing.T,
+	subject rule.Rule[Options],
+	fileName string,
+	sourceText string,
+	options rule.Given[Options],
+) Result {
+	test.Helper()
+	// Bound as the framework binds a rule, so the fixture runs the rule as the walk would.
+	captured := newCapturedRun(subject.Name, fileName, 0, options)
+	return runParsed(test, rule.Bind(subject, options), fileName, sourceText, captured)
+}
+
+// RunBound is Run for a rule already bound to its options, as a registration's Bind returns it, for a test
+// that drives the registry's own decoders. No case it runs is captured for the docs, since its options are not
+// known here to be shown.
+func RunBound(test *testing.T, subject rule.Bound, fileName string, sourceText string) Result {
+	test.Helper()
+	return runParsed(test, subject, fileName, sourceText, nil)
+}
+
+// runParsed is the body Run's forms share: parse the file and walk it with the bound rule.
+func runParsed(
+	test *testing.T,
+	subject rule.Bound,
+	fileName string,
+	sourceText string,
+	captured *capturedRun,
+) Result {
+	test.Helper()
 
 	// A `.jsx` fixture has to parse as JSX too, and it did not until a fixture asked it to.
 	//
@@ -87,17 +111,18 @@ func RunWithOptions(t *testing.T, subject rule.Rule, fileName string, sourceText
 	// typescript-go panics on a relative filename: the parser stores it as an identity and expects
 	// it to be normalized and absolute. A fixture names a file for readability rather than for the
 	// disk, so it is rooted here instead of at every call site.
+	rootedFileName := fileName
 	if !tspath.IsRootedDiskPath(fileName) {
-		fileName = "/" + strings.TrimPrefix(fileName, "/")
+		rootedFileName = "/" + strings.TrimPrefix(fileName, "/")
 	}
-	fileName = tspath.NormalizePath(fileName)
+	rootedFileName = tspath.NormalizePath(rootedFileName)
 
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
-		FileName: tspath.RootedFilePath(fileName),
-		PathKey:  tspath.PathKey(fileName),
+		FileName: tspath.RootedFilePath(rootedFileName),
+		PathKey:  tspath.PathKey(rootedFileName),
 	}, sourceText, scriptKind)
 	if sourceFile == nil {
-		t.Fatalf("could not parse %s", fileName)
+		test.Fatalf("could not parse %s", rootedFileName)
 	}
 
 	var diagnostics []rule.Diagnostic
@@ -110,12 +135,12 @@ func RunWithOptions(t *testing.T, subject rule.Rule, fileName string, sourceText
 		},
 	}
 
-	listeners := subject.Run(context, options)
+	listeners := subject.Run(context)
 	if listeners != nil {
 		walk(sourceFile.AsNode(), listeners)
 	}
 
-	expectEachFixParses(t, sourceFile, diagnostics)
+	expectEachFixParses(test, sourceFile, diagnostics)
 	return Result{Diagnostics: diagnostics, SourceFile: sourceFile, capture: captured}
 }
 
@@ -140,52 +165,52 @@ func walk(node *ast.Node, listeners rule.Listeners) {
 //
 // Order matters because a rule reporting the right findings in the wrong place is still wrong, and
 // because two defects on one line must both be reported rather than one hiding the other.
-func ExpectFindings(t *testing.T, result Result, wantIds ...string) {
-	t.Helper()
+func ExpectFindings(test *testing.T, result Result, wantIds ...string) {
+	test.Helper()
 
 	gotIds := result.MessageIds()
 	if len(gotIds) != len(wantIds) {
-		t.Fatalf("expected %d findings %v, got %d %v", len(wantIds), wantIds, len(gotIds), gotIds)
+		test.Fatalf("expected %d findings %v, got %d %v", len(wantIds), wantIds, len(gotIds), gotIds)
 	}
 	for index, want := range wantIds {
 		if gotIds[index] != want {
-			t.Fatalf("finding %d: expected %q, got %q (all: %v)", index, want, gotIds[index], gotIds)
+			test.Fatalf("finding %d: expected %q, got %q (all: %v)", index, want, gotIds[index], gotIds)
 		}
 	}
-	recordCase(t, result, capture.OutcomeFindings, "")
+	recordCase(test, result, capture.OutcomeFindings, "")
 }
 
 // ExpectClean asserts that a rule stayed silent.
 //
 // This is the half the old corpus never had, and the half that catches a rule which fires on
 // correct code. A rule with no clean fixture has been shown to detect, never to discriminate.
-func ExpectClean(t *testing.T, result Result) {
-	t.Helper()
+func ExpectClean(test *testing.T, result Result) {
+	test.Helper()
 
 	if len(result.Diagnostics) != 0 {
-		t.Fatalf("expected no findings, got %d: %v", len(result.Diagnostics), result.MessageIds())
+		test.Fatalf("expected no findings, got %d: %v", len(result.Diagnostics), result.MessageIds())
 	}
-	recordCase(t, result, capture.OutcomeClean, "")
+	recordCase(test, result, capture.OutcomeClean, "")
 }
 
 // ExpectSameFindings asserts that two runs of a rule reported the same findings: the same message
 // ids, in the same order, over the same spans. It is how a fixture shows an Adamic `.a` file is
 // linted exactly as the same source named `.ts` (#kwt1htp), so the control run must report at least
 // one finding, or the comparison would pass with the rule silent on both.
-func ExpectSameFindings(t *testing.T, control Result, treatment Result) {
-	t.Helper()
+func ExpectSameFindings(test *testing.T, control Result, treatment Result) {
+	test.Helper()
 
 	if len(control.Diagnostics) == 0 {
-		t.Fatal("the control run reported nothing, so agreeing with it proves nothing")
+		test.Fatal("the control run reported nothing, so agreeing with it proves nothing")
 	}
 	if len(control.Diagnostics) != len(treatment.Diagnostics) {
-		t.Fatalf("expected %d findings %v, got %d %v",
+		test.Fatalf("expected %d findings %v, got %d %v",
 			len(control.Diagnostics), control.MessageIds(), len(treatment.Diagnostics), treatment.MessageIds())
 	}
 	for index, want := range control.Diagnostics {
 		got := treatment.Diagnostics[index]
 		if got.Message.Id != want.Message.Id || got.Range != want.Range {
-			t.Fatalf("finding %d: expected %q at %v, got %q at %v",
+			test.Fatalf("finding %d: expected %q at %v, got %q at %v",
 				index, want.Message.Id, want.Range, got.Message.Id, got.Range)
 		}
 	}
@@ -206,8 +231,8 @@ func ExpectSameFindings(t *testing.T, control Result, treatment Result) {
 // Overlapping fixes are refused rather than resolved. The engine has an overlap policy and this is
 // not the place to reimplement it: a fixture that silently applied one of two conflicting fixes
 // would assert a result the real pipeline never produces.
-func ExpectFixedSource(t *testing.T, result Result, wantSource string) {
-	t.Helper()
+func ExpectFixedSource(test *testing.T, result Result, wantSource string) {
+	test.Helper()
 
 	type pending struct {
 		start, end int
@@ -224,7 +249,7 @@ func ExpectFixedSource(t *testing.T, result Result, wantSource string) {
 		// A rule that proposed no fix cannot have its rewrite asserted, and passing here would make
 		// this function agree with any expectation at all. That is the vacuous shape the fixture
 		// pair exists to refuse, arriving through the assertion meant to close it.
-		t.Fatalf("the rule proposed no fixes, so there is no rewrite to check against %q", wantSource)
+		test.Fatalf("the rule proposed no fixes, so there is no rewrite to check against %q", wantSource)
 	}
 
 	sort.Slice(fixes, func(first, second int) bool {
@@ -235,20 +260,48 @@ func ExpectFixedSource(t *testing.T, result Result, wantSource string) {
 	previousStart := len(source)
 	for _, fix := range fixes {
 		if fix.end > previousStart {
-			t.Fatalf("fixes overlap at [%d,%d): the engine resolves overlaps and a fixture must not guess which one wins",
-				fix.start, fix.end)
+			test.Fatalf(
+				"fixes overlap at [%d,%d): the engine resolves overlaps and a fixture must not guess which one wins",
+				fix.start,
+				fix.end,
+			)
 		}
 		if fix.start < 0 || fix.end > len(source) || fix.start > fix.end {
-			t.Fatalf("fix range [%d,%d) is outside the source, which is a defect in the rule rather than in the test",
-				fix.start, fix.end)
+			test.Fatalf(
+				"fix range [%d,%d) is outside the source, which is a defect in the rule rather than in the test",
+				fix.start,
+				fix.end,
+			)
 		}
 		source = source[:fix.start] + fix.text + source[fix.end:]
 		previousStart = fix.start
 	}
 
 	if source != wantSource {
-		t.Errorf("the applied fixes produced:\n  %q\nwant:\n  %q", source, wantSource)
+		test.Errorf("the applied fixes produced:\n  %q\nwant:\n  %q", source, wantSource)
 		return
 	}
-	recordCase(t, result, capture.OutcomeFixed, source)
+	recordCase(test, result, capture.OutcomeFixed, source)
+}
+
+// EntryOf is a rule as the registry would hold it, for a test that hands the framework a rule it wrote or
+// picked rather than the registered catalog. It carries no decoder, so the rule runs as its Unconfigured unless
+// the test's own RuleOptions binds options for it.
+func EntryOf[Options any](test testing.TB, subject rule.Rule[Options]) rule.Entry {
+	test.Helper()
+	entry, entryError := rule.EntryOf(rule.Registration[Options]{Rule: subject})
+	if entryError != nil {
+		test.Fatalf("making the entry for %s: %v", subject.Name, entryError)
+	}
+	return entry
+}
+
+// EntriesOf is EntryOf for rules that take no options, in the order given.
+func EntriesOf(test testing.TB, subjects ...rule.Rule[rule.NoOptions]) []rule.Entry {
+	test.Helper()
+	entries := make([]rule.Entry, 0, len(subjects))
+	for _, subject := range subjects {
+		entries = append(entries, EntryOf(test, subject))
+	}
+	return entries
 }

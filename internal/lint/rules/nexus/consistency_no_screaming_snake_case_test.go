@@ -9,8 +9,8 @@ import (
 
 const screamingFile = "/repository/source/Thing.ts"
 
-func TestConsistencyNoScreamingSnakeCaseFires(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoScreamingSnakeCaseFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -25,22 +25,26 @@ func TestConsistencyNoScreamingSnakeCaseFires(t *testing.T) {
 		// the case that separates "rooted at process" from "reads the environment": it is a plain
 		// property access, so it reaches the env check rather than exiting early the way
 		// process.argv[2] does as an element access.
-		{"process.platform is not an env read", "const SOME_PLATFORM = process.platform;\n", "noScreamingSnakeCaseLocal"},
+		{
+			"process.platform is not an env read",
+			"const SOME_PLATFORM = process.platform;\n",
+			"noScreamingSnakeCaseLocal",
+		},
 		{"process.argv is not an env read", "const SOME_ARGUMENT = process.argv[2];\n", "noScreamingSnakeCaseLocal"},
 		// An env-shaped name whose value comes from somewhere else is still ours to name.
 		{"env-looking name from a literal", "const DATABASE_URL = 'postgres://local';\n", "noScreamingSnakeCaseLocal"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ConsistencyNoScreamingSnakeCase, screamingFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.wantId)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ConsistencyNoScreamingSnakeCase, screamingFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, testCase.wantId)
 		})
 	}
 }
 
-func TestConsistencyNoScreamingSnakeCaseStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoScreamingSnakeCaseStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -65,46 +69,51 @@ func TestConsistencyNoScreamingSnakeCaseStaysSilent(t *testing.T) {
 		{"no declarations", "export function run() {\n    return 1;\n}\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ConsistencyNoScreamingSnakeCase, screamingFile, testCase.sourceText)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ConsistencyNoScreamingSnakeCase, screamingFile, testCase.sourceText)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
 
-func TestConsistencyNoScreamingSnakeCaseRespectsTheAllowOption(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoScreamingSnakeCaseRespectsTheAllowOption(test *testing.T) {
+	test.Parallel()
 
 	sourceText := "const STRIPE_WEBHOOK_SECRET = readSecret();\n"
 
-	withoutOption := rule_testing.Run(t, ConsistencyNoScreamingSnakeCase, screamingFile, sourceText)
-	rule_testing.ExpectFindings(t, withoutOption, "noScreamingSnakeCaseLocal")
+	withoutOption := rule_testing.Run(test, ConsistencyNoScreamingSnakeCase, screamingFile, sourceText)
+	rule_testing.ExpectFindings(test, withoutOption, "noScreamingSnakeCaseLocal")
 
-	withOption := rule_testing.RunWithOptions(t, ConsistencyNoScreamingSnakeCase, screamingFile, sourceText,
+	withOption := rule_testing.RunWithOptions(test, ConsistencyNoScreamingSnakeCase, screamingFile, sourceText,
 		ConsistencyNoScreamingSnakeCaseOptions{Allow: []string{"STRIPE_WEBHOOK_SECRET"}})
-	rule_testing.ExpectClean(t, withOption)
+	rule_testing.ExpectClean(test, withOption)
 
 	// Exact match only. An allowlist that matched by prefix would admit names nobody approved.
-	nearMiss := rule_testing.RunWithOptions(t, ConsistencyNoScreamingSnakeCase, screamingFile,
+	nearMiss := rule_testing.RunWithOptions(test, ConsistencyNoScreamingSnakeCase, screamingFile,
 		"const STRIPE_WEBHOOK_SECRET_OLD = readSecret();\n",
 		ConsistencyNoScreamingSnakeCaseOptions{Allow: []string{"STRIPE_WEBHOOK_SECRET"}})
-	rule_testing.ExpectFindings(t, nearMiss, "noScreamingSnakeCaseLocal")
+	rule_testing.ExpectFindings(test, nearMiss, "noScreamingSnakeCaseLocal")
 }
 
 // The message has to carry a name the author can actually use, and the two forms differ by export.
-func TestConsistencyNoScreamingSnakeCaseSuggestsTheRightCasing(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoScreamingSnakeCaseSuggestsTheRightCasing(test *testing.T) {
+	test.Parallel()
 
-	local := rule_testing.Run(t, ConsistencyNoScreamingSnakeCase, screamingFile, "const MAX_RETRY_COUNT = 3;\n")
-	rule_testing.ExpectFindings(t, local, "noScreamingSnakeCaseLocal")
+	local := rule_testing.Run(test, ConsistencyNoScreamingSnakeCase, screamingFile, "const MAX_RETRY_COUNT = 3;\n")
+	rule_testing.ExpectFindings(test, local, "noScreamingSnakeCaseLocal")
 	if !strings.Contains(local.Diagnostics[0].Message.Description, `"maxRetryCount"`) {
-		t.Fatalf("expected a camelCase suggestion, got: %s", local.Diagnostics[0].Message.Description)
+		test.Fatalf("expected a camelCase suggestion, got: %s", local.Diagnostics[0].Message.Description)
 	}
 
-	exported := rule_testing.Run(t, ConsistencyNoScreamingSnakeCase, screamingFile, "export const MAX_RETRY_COUNT = 3;\n")
-	rule_testing.ExpectFindings(t, exported, "noScreamingSnakeCaseExported")
+	exported := rule_testing.Run(
+		test,
+		ConsistencyNoScreamingSnakeCase,
+		screamingFile,
+		"export const MAX_RETRY_COUNT = 3;\n",
+	)
+	rule_testing.ExpectFindings(test, exported, "noScreamingSnakeCaseExported")
 	if !strings.Contains(exported.Diagnostics[0].Message.Description, `"MaxRetryCount"`) {
-		t.Fatalf("expected a PascalCase suggestion, got: %s", exported.Diagnostics[0].Message.Description)
+		test.Fatalf("expected a PascalCase suggestion, got: %s", exported.Diagnostics[0].Message.Description)
 	}
 }

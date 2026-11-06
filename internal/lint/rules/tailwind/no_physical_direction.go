@@ -21,8 +21,10 @@ var tailwindNoPhysicalDirectionText = policy.MessageOf("structure/tailwind-no-ph
 // documentation; "use `ms-4` instead of `ml-4`" is the edit.
 func messagePhysicalDirection(original string, replacement string) rule.Message {
 	return rule.Message{
-		Id:          tailwindNoPhysicalDirectionText.Id,
-		Description: tailwindNoPhysicalDirectionText.Render(map[string]string{"original": original, "replacement": replacement}),
+		Id: tailwindNoPhysicalDirectionText.Id,
+		Description: tailwindNoPhysicalDirectionText.Render(
+			map[string]string{"original": original, "replacement": replacement},
+		),
 	}
 }
 
@@ -127,21 +129,22 @@ var physicalToLogical = []directionMapping{
 // The lesson generalises past this rule: a ported name is not cosmetic, because the suppression
 // surface is keyed on it. A rule renamed in the port silently ignores every disable comment written
 // for it, and the symptom is extra findings rather than an error.
-var NoPhysicalDirection = rule.Rule{
+var NoPhysicalDirection = rule.Rule[rule.NoOptions]{
 	Name: "structure/tailwind-no-physical-direction",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 		// An Adamic `.a` file is checked as the `.ts` it is (#kwt1htp).
-		fileName := ctx.SourceFile.FileName()
-		if !strings.HasSuffix(sourcename.TreatedAs(fileName.AsString()), ".ts") && !strings.HasSuffix(fileName.AsString(), ".tsx") {
+		fileName := ruleContext.SourceFile.FileName()
+		if !strings.HasSuffix(sourcename.TreatedAs(fileName.AsString()), ".ts") &&
+			!strings.HasSuffix(fileName.AsString(), ".tsx") {
 			return nil
 		}
 
 		report := func(node *ast.Node, text string) {
 			for _, violation := range physicalDirectionViolationsIn(text) {
-				ctx.ReportNode(node, messagePhysicalDirection(violation.original, violation.replacement))
+				ruleContext.ReportNode(node, messagePhysicalDirection(violation.original, violation.replacement))
 			}
 		}
 

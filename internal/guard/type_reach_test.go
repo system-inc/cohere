@@ -36,26 +36,26 @@ import (
 // that no helper is called that way, any rule that reaches an interface method taking an *ast.Node fails:
 // a future visitor-style helper turns this red instead of blind.
 //
-// It reads the overlay GOFLAGS names, if any (guardOverlay), never the one `go test -overlay` names.
-func TestRulesClaimShapesOnlyWhereTheScanAllowsIt(t *testing.T) {
-	t.Parallel()
+// It reads the overlay `GOFLAGS` names, if any (guardOverlay), never the one `go test -overlay` names.
+func TestRulesClaimShapesOnlyWhereTheScanAllowsIt(test *testing.T) {
+	test.Parallel()
 
-	scan := scanTypeReach(t, guardOverlay(t))
+	scan := scanTypeReach(test, guardOverlay(test))
 	if len(scan.claims) == 0 && len(scan.mayReadImportedBodies) == 0 {
-		t.Fatal("the scan found no rules at all, so this test proved nothing")
+		test.Fatal("the scan found no rules at all, so this test proved nothing")
 	}
 	if len(scan.mayReadImportedBodies) == 0 {
 		// Dozens of rules reach a declaration and descend today. Zero would mean the scan stopped seeing
 		// the accessors, which would admit every claim.
-		t.Fatal("no rule reaches both an imported declaration and a body, which is implausible: the scan is blind")
+		test.Fatal("no rule reaches both an imported declaration and a body, which is implausible: the scan is blind")
 	}
 	for _, path := range scan.callsNodeInterfaces {
-		t.Errorf("%s reaches a call through an interface that takes an *ast.Node, which this scan cannot follow, "+
+		test.Errorf("%s reaches a call through an interface that takes an *ast.Node, which this scan cannot follow, "+
 			"so what it reads of an imported declaration is unknown; call the helper directly", path)
 	}
 	for _, name := range scan.claims {
 		if scan.mayReadImportedBodies[name] {
-			t.Errorf("rule %q claims TypeReach Shapes and can reach both an imported declaration and a body "+
+			test.Errorf("rule %q claims TypeReach Shapes and can reach both an imported declaration and a body "+
 				"(%s), so a shape-keyed replay could serve a finding computed against a body that changed; "+
 				"leave it on Contents", name, scan.reason[name])
 		}
@@ -120,34 +120,38 @@ var ownFileDeclarationReaders = map[string]bool{
 //   - rule.IsReactPragmaBinding checks the identifier's home and each foreign header against the
 //     exact cut ranges shared with SignatureEntry.Syntax. The scan also requires ctx.SourceFile as
 //     its home argument. Wrong-file, cut-region and cache-invalidation tests hold both boundaries.
-var shapeReaders = map[string]bool{"rule.IsReactPragmaBinding": true, "rule.ExportNameIn": true, "rule.ImportBindingOf": true}
+var shapeReaders = map[string]bool{
+	"rule.IsReactPragmaBinding": true,
+	"rule.ExportNameIn":         true,
+	"rule.ImportBindingOf":      true,
+}
 
 // A shape reader's answer is plain data. A result that could carry a compiler value would let a caller
 // take a node from another file and descend into its body, which is the read the scan exists to see, so
 // the trust in shapeReaders rests on this.
-func TestShapeReadersHandBackNoSyntax(t *testing.T) {
-	t.Parallel()
+func TestShapeReadersHandBackNoSyntax(test *testing.T) {
+	test.Parallel()
 
 	var rulePackage *gotypes.Package
-	for _, pkg := range lintPackages(t, guardOverlay(t)) {
-		if strings.HasSuffix(pkg.ImportPath, "/internal/lint/rule") {
-			rulePackage = pkg
+	for _, lintPackage := range lintPackages(test, guardOverlay(test)) {
+		if strings.HasSuffix(lintPackage.ImportPath, "/internal/lint/rule") {
+			rulePackage = lintPackage
 		}
 	}
 	if rulePackage == nil || rulePackage.Types == nil || len(rulePackage.Errors) > 0 {
-		t.Fatalf("loading the rule package: %v", rulePackage)
+		test.Fatalf("loading the rule package: %v", rulePackage)
 	}
 	scope := rulePackage.Types.Scope()
 	for name := range shapeReaders {
 		function, ok := scope.Lookup(strings.TrimPrefix(name, "rule.")).(*types.Func)
 		if !ok {
-			t.Errorf("shapeReaders names %s, which is not a function in the rule package", name)
+			test.Errorf("shapeReaders names %s, which is not a function in the rule package", name)
 			continue
 		}
-		results := function.Type().(*types.Signature).Results()
+		results := function.Signature().Results()
 		for index := range results.Len() {
 			if carried := carriesCompilerValue(results.At(index).Type(), map[types.Type]bool{}); carried != "" {
-				t.Errorf("%s hands back %s, which carries %s: a caller could descend from it into another file",
+				test.Errorf("%s hands back %s, which carries %s: a caller could descend from it into another file",
 					name, types.TypeString(results.At(index).Type(), nil), carried)
 			}
 		}
@@ -156,18 +160,20 @@ func TestShapeReadersHandBackNoSyntax(t *testing.T) {
 
 // carriesCompilerValue names the first compiler type subject can hold, through pointers, slices, arrays,
 // maps, channels, struct fields, functions and interfaces, or "" when it holds none.
+//
+// Mutates: seen the caller's set of types already walked, shared down the recursion so a cycle ends
 func carriesCompilerValue(subject types.Type, seen map[types.Type]bool) string {
 	// The shim's types are aliases of the compiler's, which only name their package once unaliased.
-	subject = types.Unalias(subject)
-	if seen[subject] {
+	unaliased := types.Unalias(subject)
+	if seen[unaliased] {
 		return ""
 	}
-	seen[subject] = true
-	if named, ok := subject.(*types.Named); ok && named.Obj().Pkg() != nil &&
+	seen[unaliased] = true
+	if named, ok := unaliased.(*types.Named); ok && named.Obj().Pkg() != nil &&
 		strings.Contains(named.Obj().Pkg().Path(), "TypeScript/tsc") {
-		return types.TypeString(subject, nil)
+		return types.TypeString(unaliased, nil)
 	}
-	switch typed := subject.Underlying().(type) {
+	switch typed := unaliased.Underlying().(type) {
 	case *types.Pointer:
 		return carriesCompilerValue(typed.Elem(), seen)
 	case *types.Slice:
@@ -189,7 +195,7 @@ func carriesCompilerValue(subject types.Type, seen map[types.Type]bool) string {
 		}
 	case *types.Signature, *types.Interface:
 		// A function or an interface value can close over anything.
-		return types.TypeString(subject, nil)
+		return types.TypeString(unaliased, nil)
 	}
 	return ""
 }
@@ -245,19 +251,20 @@ func isDeclarationSource(subject types.Type) bool {
 // rule's variable can carry the alias rather than the named type, and a check that missed it went blind
 // to every such read.
 func isCompilerType(subject types.Type, packageName string, typeName string) bool {
+	current := subject
 	for {
-		subject = types.Unalias(subject)
-		if pointer, ok := subject.(*types.Pointer); ok {
-			subject = pointer.Elem()
+		current = types.Unalias(current)
+		if pointer, ok := current.(*types.Pointer); ok {
+			current = pointer.Elem()
 			continue
 		}
-		if slice, ok := subject.(*types.Slice); ok {
-			subject = slice.Elem()
+		if slice, ok := current.(*types.Slice); ok {
+			current = slice.Elem()
 			continue
 		}
 		break
 	}
-	named, ok := subject.(*types.Named)
+	named, ok := current.(*types.Named)
 	if !ok || named.Obj().Pkg() == nil {
 		return false
 	}
@@ -268,9 +275,17 @@ func isCompilerType(subject types.Type, packageName string, typeName string) boo
 // isDescentAccessor reports the ways a rule reads below a node it was handed: its body, its children, its
 // statements, or its text.
 func isDescentAccessor(name string) bool {
-	return name == "Body" || name == "FunctionBody" || name == "GetFunctionBody" || name == "Statements" ||
-		name == "Children" || name == "IterChildren" || name == "VisitEachChild" || strings.HasPrefix(name, "ForEachChild") ||
-		name == "GetTextOfNode" || name == "GetSourceTextOfNodeFromSourceFile" || name == "GetTextOfNodeFromSourceText"
+	return name == "Body" ||
+		name == "FunctionBody" ||
+		name == "GetFunctionBody" ||
+		name == "Statements" ||
+		name == "Children" ||
+		name == "IterChildren" ||
+		name == "VisitEachChild" ||
+		strings.HasPrefix(name, "ForEachChild") ||
+		name == "GetTextOfNode" ||
+		name == "GetSourceTextOfNodeFromSourceFile" ||
+		name == "GetTextOfNodeFromSourceText"
 }
 
 // isOwnSourceFile reports whether an expression is the rule context's own file, `<context>.SourceFile`,
@@ -294,9 +309,9 @@ func isOwnSourceFile(expression ast.Expr, info *types.Info) bool {
 }
 
 // scanTypeReach reads the rule packages with overlay in place of the files it names.
-func scanTypeReach(t *testing.T, overlay map[string][]byte) typeReachScan {
-	t.Helper()
-	loaded := lintPackages(t, overlay)
+func scanTypeReach(test *testing.T, overlay map[string][]byte) typeReachScan {
+	test.Helper()
+	loaded := lintPackages(test, overlay)
 
 	type body struct {
 		node ast.Node
@@ -309,24 +324,24 @@ func scanTypeReach(t *testing.T, overlay map[string][]byte) typeReachScan {
 		info *types.Info
 	}
 	var ruleFiles []ruleFile
-	for _, pkg := range loaded {
-		for _, file := range pkg.Syntax {
-			path := pkg.Fset.Position(file.Pos()).Filename
+	for _, loadedPackage := range loaded {
+		for _, file := range loadedPackage.Syntax {
+			path := loadedPackage.Fset.Position(file.Pos()).Filename
 			if strings.Contains(path, "/internal/lint/rules/") && !strings.HasSuffix(path, "_test.go") {
-				ruleFiles = append(ruleFiles, ruleFile{path, file, pkg.TypesInfo})
+				ruleFiles = append(ruleFiles, ruleFile{path, file, loadedPackage.TypesInfo})
 			}
 			for _, declaration := range file.Decls {
 				switch typed := declaration.(type) {
 				case *ast.FuncDecl:
-					if object := pkg.TypesInfo.Defs[typed.Name]; object != nil && typed.Body != nil {
-						bodies[object] = body{typed, pkg.TypesInfo}
+					if object := loadedPackage.TypesInfo.Defs[typed.Name]; object != nil && typed.Body != nil {
+						bodies[object] = body{typed, loadedPackage.TypesInfo}
 					}
 				case *ast.GenDecl:
 					for _, spec := range typed.Specs {
 						if value, ok := spec.(*ast.ValueSpec); ok {
 							for _, name := range value.Names {
-								if object := pkg.TypesInfo.Defs[name]; object != nil {
-									bodies[object] = body{value, pkg.TypesInfo}
+								if object := loadedPackage.TypesInfo.Defs[name]; object != nil {
+									bodies[object] = body{value, loadedPackage.TypesInfo}
 								}
 							}
 						}
@@ -342,11 +357,14 @@ func scanTypeReach(t *testing.T, overlay map[string][]byte) typeReachScan {
 	// reaches answers, for one predicate, whether a node or anything it refers to touches a matching
 	// compiler accessor, memoized per object and safe on recursion. matchesSelector, when set, decides a
 	// selector on its own, for a match that depends on the receiver as well as the accessor.
-	reaches := func(matches func(types.Object) bool, matchesSelector func(*ast.SelectorExpr, *types.Selection, *types.Info) bool, matchesCall func(*ast.CallExpr, *types.Info) bool) func(ast.Node, *types.Info) bool {
+	reaches := func(
+		matches func(types.Object) bool,
+		matchesSelector func(*ast.SelectorExpr, *types.Selection, *types.Info) bool,
+		matchesCall func(*ast.CallExpr, *types.Info) bool,
+	) func(ast.Node, *types.Info) bool {
 		memo := map[types.Object]int{} // 1 visiting, 2 no, 3 yes
 		var walk func(ast.Node, *types.Info) bool
-		var follow func(types.Object) bool
-		follow = func(object types.Object) bool {
+		follow := func(object types.Object) bool {
 			switch memo[object] {
 			case 1, 2:
 				return false
@@ -412,7 +430,10 @@ func scanTypeReach(t *testing.T, overlay map[string][]byte) typeReachScan {
 				return false
 			}
 			object := info.Uses[selector.Sel]
-			if object == nil || object.Pkg() == nil || (object.Pkg().Name()+"."+object.Name() != "rule.DeclarationsIn" && object.Pkg().Name()+"."+object.Name() != "rule.IsReactPragmaBinding") {
+			if object == nil ||
+				object.Pkg() == nil ||
+				(object.Pkg().Name()+"."+object.Name() != "rule.DeclarationsIn" &&
+					object.Pkg().Name()+"."+object.Name() != "rule.IsReactPragmaBinding") {
 				return false
 			}
 			return len(call.Args) == 0 || !isOwnSourceFile(call.Args[0], info)
@@ -420,8 +441,11 @@ func scanTypeReach(t *testing.T, overlay map[string][]byte) typeReachScan {
 	reachesDescent := reaches(
 		func(object types.Object) bool { return isDescentAccessor(object.Name()) },
 		func(selector *ast.SelectorExpr, selection *types.Selection, info *types.Info) bool {
-			return selector.Sel.Name == "Text" && compiler(selection.Obj()) && selection.Kind() == types.MethodVal &&
-				strings.Contains(types.TypeString(selection.Recv(), nil), "SourceFile") && !isOwnSourceFile(selector.X, info)
+			return selector.Sel.Name == "Text" &&
+				compiler(selection.Obj()) &&
+				selection.Kind() == types.MethodVal &&
+				strings.Contains(types.TypeString(selection.Recv(), nil), "SourceFile") &&
+				!isOwnSourceFile(selector.X, info)
 		},
 		nil,
 	)
@@ -458,7 +482,10 @@ func scanTypeReach(t *testing.T, overlay map[string][]byte) typeReachScan {
 			scan.reason[name] = filepath.Base(filepath.Dir(entry.path)) + "/" + filepath.Base(entry.path)
 		}
 		if reachesNodeInterface(entry.file, entry.info) {
-			scan.callsNodeInterfaces = append(scan.callsNodeInterfaces, filepath.Base(filepath.Dir(entry.path))+"/"+filepath.Base(entry.path))
+			scan.callsNodeInterfaces = append(
+				scan.callsNodeInterfaces,
+				filepath.Base(filepath.Dir(entry.path))+"/"+filepath.Base(entry.path),
+			)
 		}
 	}
 	sort.Strings(scan.claims)
@@ -477,7 +504,7 @@ func ruleLiteralTypeReach(file *ast.File) (string, bool) {
 		if !ok {
 			return true
 		}
-		if selector, ok := literal.Type.(*ast.SelectorExpr); !ok || selector.Sel.Name != "Rule" {
+		if _, isRule := ruleLiteralSelector(literal.Type); !isRule {
 			return true
 		}
 		for _, element := range literal.Elts {
@@ -491,8 +518,11 @@ func ruleLiteralTypeReach(file *ast.File) (string, bool) {
 			}
 			switch key.Name {
 			case "Name":
-				if value, ok := pair.Value.(*ast.BasicLit); ok {
-					name, _ = strconv.Unquote(value.Value)
+				// A Name that is not a string literal names nothing, and the scan goes on as if it were unset.
+				if nameLiteral, ok := pair.Value.(*ast.BasicLit); ok {
+					if unquoted, unquoteError := strconv.Unquote(nameLiteral.Value); unquoteError == nil {
+						name = unquoted
+					}
 				}
 			case "TypeReach":
 				if value, ok := pair.Value.(*ast.SelectorExpr); ok && value.Sel.Name == "TypeReachShapes" {

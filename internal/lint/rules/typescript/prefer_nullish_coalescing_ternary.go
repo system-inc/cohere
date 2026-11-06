@@ -32,7 +32,7 @@ import (
 // expected output on all 221 ternary and if-statement cases. Two behaviours a reader might "fix"
 // are upstream's, measured, and kept:
 //
-//   - `getTextWithParentheses` keeps ONE pair of parentheses around the subject, the innermost, so
+//   - `getTextWithParentheses` keeps one pair of parentheses around the subject, the innermost, so
 //     `((a)) ? ((a)) : b` suggests `(a) ?? b`.
 //   - The if-statement arm accepts any assignment operator in its body, not only `=`, because
 //     ESTree's AssignmentExpression covers `+=` too. `if (!a) a += b` reports and suggests
@@ -65,7 +65,7 @@ var messagePreferNullishOverAssignment = rule.Message{
 }
 
 // preferNullishCoalescingJudgeTernary is upstream's `ConditionalExpression` listener.
-func preferNullishCoalescingJudgeTernary(ctx rule.Context, node *ast.Node,
+func preferNullishCoalescingJudgeTernary(ruleContext rule.Context, node *ast.Node,
 	settings PreferNullishCoalescingOptions) (preferNullishCoalescingFinding, bool) {
 
 	if settings.IgnoreTernaryTests {
@@ -78,7 +78,7 @@ func preferNullishCoalescingJudgeTernary(ctx rule.Context, node *ast.Node,
 		return preferNullishCoalescingFinding{}, false
 	}
 
-	// upstream's `getBranchNodes`: which branch runs when the subject is NOT nullish.
+	// upstream's `getBranchNodes`: which branch runs when the subject is not nullish.
 	nonNullishBranch, nullishBranch := conditional.WhenTrue, conditional.WhenFalse
 	switch reading.operator {
 	case "", "!=", "!==":
@@ -86,7 +86,7 @@ func preferNullishCoalescingJudgeTernary(ctx rule.Context, node *ast.Node,
 		nonNullishBranch, nullishBranch = conditional.WhenFalse, conditional.WhenTrue
 	}
 
-	subject, fixable := preferNullishCoalescingParams(ctx, node, test,
+	subject, fixable := preferNullishCoalescingParameters(ruleContext, node, test,
 		preferNullishCoalescingUnwrap(nonNullishBranch), reading, settings)
 	if !fixable {
 		return preferNullishCoalescingFinding{}, false
@@ -97,13 +97,13 @@ func preferNullishCoalescingJudgeTernary(ctx rule.Context, node *ast.Node,
 	// That is upstream's `getWrappedCode` against `OperatorPrecedence.Coalesce`, which is strict, so a
 	// `||` operand (LogicalOR, one above Coalesce) is written bare, exactly as upstream writes it.
 	nullishInner := preferNullishCoalescingUnwrap(nullishBranch)
-	rightOperand := preferNullishCoalescingTextWithParentheses(ctx, nullishInner)
+	rightOperand := preferNullishCoalescingTextWithParentheses(ruleContext, nullishInner)
 	if nullishInner == nullishBranch &&
 		ast.GetExpressionPrecedence(nullishInner) <= ast.OperatorPrecedenceCoalesce {
 		rightOperand = "(" + rightOperand + ")"
 	}
 
-	reportRange := rule.TokenRange(ctx.SourceFile, node)
+	reportRange := rule.TokenRange(ruleContext.SourceFile, node)
 	return preferNullishCoalescingFinding{
 		reportRange: reportRange,
 		message:     messagePreferNullishOverTernary,
@@ -112,7 +112,7 @@ func preferNullishCoalescingJudgeTernary(ctx rule.Context, node *ast.Node,
 			Description: preferNullishCoalescingSuggestion("??"),
 		},
 		fixes: []rule.Fix{rule.ReplaceRange(reportRange,
-			preferNullishCoalescingTextWithParentheses(ctx, subject)+" ?? "+rightOperand)},
+			preferNullishCoalescingTextWithParentheses(ruleContext, subject)+" ?? "+rightOperand)},
 	}, true
 }
 
@@ -130,7 +130,7 @@ func preferNullishCoalescingJudgeTernary(ctx rule.Context, node *ast.Node,
 // same reason, through the same `IsInsideComponentOrHook`, so the two rules no longer pull one site in
 // opposite directions. The ternary and `||` checks are not gated: `??` is an ordinary expression the
 // compiler lowers, and a `||=` it would rewrite was already refused before the rewrite.
-func preferNullishCoalescingJudgeIf(ctx rule.Context, node *ast.Node,
+func preferNullishCoalescingJudgeIf(ruleContext rule.Context, node *ast.Node,
 	settings PreferNullishCoalescingOptions) (preferNullishCoalescingFinding, bool) {
 
 	ifStatement := node.AsIfStatement()
@@ -172,7 +172,7 @@ func preferNullishCoalescingJudgeIf(ctx rule.Context, node *ast.Node,
 	if !ok {
 		return preferNullishCoalescingFinding{}, false
 	}
-	// Only the tests that are true when the subject IS nullish guard an assignment that `??=` can
+	// Only the tests that are true when the subject is nullish guard an assignment that `??=` can
 	// replace. `if (a != null) a = b` assigns when `a` is present, the opposite of `??=`.
 	switch reading.operator {
 	case "!", "==", "===":
@@ -184,7 +184,7 @@ func preferNullishCoalescingJudgeIf(ctx rule.Context, node *ast.Node,
 	// shadows its `nullishCoalescingLeftNode` with the target here, so `if (foo?.a == null) foo.a = b`
 	// suggests `foo.a ??= b`: the left side of an assignment cannot carry `?.`, and the test's
 	// spelling would be a syntax error. Measured: two corpus cases differ only in this.
-	if _, fixable := preferNullishCoalescingParams(ctx, node, test, target, reading, settings); !fixable {
+	if _, fixable := preferNullishCoalescingParameters(ruleContext, node, test, target, reading, settings); !fixable {
 		return preferNullishCoalescingFinding{}, false
 	}
 	// Asked last, at a finding: the ancestor walk is paid only where the rule has something to say.
@@ -199,21 +199,21 @@ func preferNullishCoalescingJudgeIf(ctx rule.Context, node *ast.Node,
 	if isBlock {
 		separator = "\n"
 	}
-	before := preferNullishCoalescingCommentsIn(ctx,
-		assignment.Pos(), rule.TokenRange(ctx.SourceFile, assignment).Pos(), separator)
+	before := preferNullishCoalescingCommentsIn(ruleContext,
+		assignment.Pos(), rule.TokenRange(ruleContext.SourceFile, assignment).Pos(), separator)
 	after := ""
 	if isBlock {
-		after = preferNullishCoalescingCommentsIn(ctx, statement.End(), consequent.End()-1, "\n")
+		after = preferNullishCoalescingCommentsIn(ruleContext, statement.End(), consequent.End()-1, "\n")
 	}
 
-	replacement := before + preferNullishCoalescingTextWithParentheses(ctx, target) + " ??= " +
-		preferNullishCoalescingTextWithParentheses(ctx,
+	replacement := before + preferNullishCoalescingTextWithParentheses(ruleContext, target) + " ??= " +
+		preferNullishCoalescingTextWithParentheses(ruleContext,
 			preferNullishCoalescingUnwrap(assignment.AsBinaryExpression().Right)) + ";"
 	if after != "" {
 		replacement += " " + after[:len(after)-1]
 	}
 
-	reportRange := rule.TokenRange(ctx.SourceFile, node)
+	reportRange := rule.TokenRange(ruleContext.SourceFile, node)
 	return preferNullishCoalescingFinding{
 		reportRange: reportRange,
 		message:     messagePreferNullishOverAssignment,
@@ -304,7 +304,7 @@ func preferNullishCoalescingReadTest(test *ast.Node) (preferNullishCoalescingTes
 	}}, true
 }
 
-// preferNullishCoalescingParams is upstream's `getNullishCoalescingParams`: given the test and the
+// preferNullishCoalescingParameters is upstream's `getNullishCoalescingParams`: given the test and the
 // branch that runs when the subject is present, find the subject and decide whether `??` would
 // mean the same thing.
 //
@@ -319,7 +319,7 @@ func preferNullishCoalescingReadTest(test *ast.Node) (preferNullishCoalescingTes
 //
 // and an `any` or `unknown` subject is never fixable on a one-sided strict check, since either
 // could be in it.
-func preferNullishCoalescingParams(ctx rule.Context, node *ast.Node, test *ast.Node,
+func preferNullishCoalescingParameters(ruleContext rule.Context, node *ast.Node, test *ast.Node,
 	nonNullish *ast.Node, reading preferNullishCoalescingTest,
 	settings PreferNullishCoalescingOptions) (*ast.Node, bool) {
 
@@ -331,7 +331,7 @@ func preferNullishCoalescingParams(ctx rule.Context, node *ast.Node, test *ast.N
 		if !preferNullishCoalescingSimilarMemberAccess(subject, nonNullish) {
 			return nil, false
 		}
-		return subject, preferNullishCoalescingEligible(ctx, node, subject, settings)
+		return subject, preferNullishCoalescingEligible(ruleContext, node, subject, settings)
 	}
 
 	var subject *ast.Node
@@ -362,10 +362,10 @@ func preferNullishCoalescingParams(ctx rule.Context, node *ast.Node, test *ast.N
 	if reading.operator == "==" || reading.operator == "!=" {
 		return subject, true
 	}
-	if ctx.TypeChecker == nil {
+	if ruleContext.TypeChecker == nil {
 		return nil, false
 	}
-	flags := preferNullishCoalescingUnionFlags(ctx.TypeChecker.GetTypeAtLocation(subject))
+	flags := preferNullishCoalescingUnionFlags(ruleContext.TypeChecker.GetTypeAtLocation(subject))
 	if flags&(checker.TypeFlagsAny|checker.TypeFlagsUnknown) != 0 {
 		return nil, false
 	}
@@ -449,10 +449,10 @@ func preferNullishCoalescingIsUndefinedIdentifier(node *ast.Node) bool {
 // ChainExpression that upstream has to skip; ours marks the access itself, so two chains differing
 // only in their `?.` links are already two property accesses with the same names.
 func preferNullishCoalescingSimilarMemberAccess(left *ast.Node, right *ast.Node) bool {
-	left, right = preferNullishCoalescingUnwrap(left), preferNullishCoalescingUnwrap(right)
-	if preferNullishCoalescingIsMemberAccess(left) && preferNullishCoalescingIsMemberAccess(right) {
-		leftObject, leftProperty, leftComputed := preferNullishCoalescingMemberParts(left)
-		rightObject, rightProperty, rightComputed := preferNullishCoalescingMemberParts(right)
+	unwrappedLeft, unwrappedRight := preferNullishCoalescingUnwrap(left), preferNullishCoalescingUnwrap(right)
+	if preferNullishCoalescingIsMemberAccess(unwrappedLeft) && preferNullishCoalescingIsMemberAccess(unwrappedRight) {
+		leftObject, leftProperty, leftComputed := preferNullishCoalescingMemberParts(unwrappedLeft)
+		rightObject, rightProperty, rightComputed := preferNullishCoalescingMemberParts(unwrappedRight)
 		if !preferNullishCoalescingSimilarMemberAccess(leftObject, rightObject) {
 			return false
 		}
@@ -468,43 +468,43 @@ func preferNullishCoalescingSimilarMemberAccess(left *ast.Node, right *ast.Node)
 		return computed.Kind == ast.KindStringLiteral && named.Kind == ast.KindIdentifier &&
 			computed.Text() == named.Text()
 	}
-	return preferNullishCoalescingNodesEqual(left, right)
+	return preferNullishCoalescingNodesEqual(unwrappedLeft, unwrappedRight)
 }
 
 // preferNullishCoalescingNodesEqual is typescript-eslint's `isNodeEqual`, and it is deliberately
 // narrow: `this`, a literal, an identifier, or a member access built from those. Anything else, a
 // call, a non-null assertion, a template, a private name, is never equal, even to itself.
 //
-// A member access compares its property and its object and IGNORES whether the access is computed,
+// A member access compares its property and its object and ignores whether the access is computed,
 // as upstream's does. It is reached only for a property that is itself an access (`a[b.c]` against
 // `a[b.c]`), where that quirk cannot change a verdict on real code, and is kept rather than tidied
 // so the two implementations answer alike.
 func preferNullishCoalescingNodesEqual(left *ast.Node, right *ast.Node) bool {
-	left, right = preferNullishCoalescingUnwrap(left), preferNullishCoalescingUnwrap(right)
-	if left == nil || right == nil {
+	unwrappedLeft, unwrappedRight := preferNullishCoalescingUnwrap(left), preferNullishCoalescingUnwrap(right)
+	if unwrappedLeft == nil || unwrappedRight == nil {
 		return false
 	}
-	if preferNullishCoalescingIsMemberAccess(left) && preferNullishCoalescingIsMemberAccess(right) {
-		leftObject, leftProperty, _ := preferNullishCoalescingMemberParts(left)
-		rightObject, rightProperty, _ := preferNullishCoalescingMemberParts(right)
+	if preferNullishCoalescingIsMemberAccess(unwrappedLeft) && preferNullishCoalescingIsMemberAccess(unwrappedRight) {
+		leftObject, leftProperty, _ := preferNullishCoalescingMemberParts(unwrappedLeft)
+		rightObject, rightProperty, _ := preferNullishCoalescingMemberParts(unwrappedRight)
 		return preferNullishCoalescingNodesEqual(leftProperty, rightProperty) &&
 			preferNullishCoalescingNodesEqual(leftObject, rightObject)
 	}
-	if left.Kind != right.Kind {
+	if unwrappedLeft.Kind != unwrappedRight.Kind {
 		return false
 	}
-	switch left.Kind {
+	switch unwrappedLeft.Kind {
 	case ast.KindThisKeyword, ast.KindNullKeyword, ast.KindTrueKeyword, ast.KindFalseKeyword:
 		return true
 	case ast.KindIdentifier, ast.KindStringLiteral, ast.KindBigIntLiteral:
-		return left.Text() == right.Text()
+		return unwrappedLeft.Text() == unwrappedRight.Text()
 	case ast.KindNumericLiteral:
-		// ESTree compares the literal's VALUE, so `1` and `1.0` are one key. Parsed rather than
+		// ESTree compares the literal's value, so `1` and `1.0` are one key. Parsed rather than
 		// trusted to arrive normalized; an unparsable spelling falls back to its text.
-		leftValue, leftError := strconv.ParseFloat(left.Text(), 64)
-		rightValue, rightError := strconv.ParseFloat(right.Text(), 64)
+		leftValue, leftError := strconv.ParseFloat(unwrappedLeft.Text(), 64)
+		rightValue, rightError := strconv.ParseFloat(unwrappedRight.Text(), 64)
 		if leftError != nil || rightError != nil {
-			return left.Text() == right.Text()
+			return unwrappedLeft.Text() == unwrappedRight.Text()
 		}
 		return leftValue == rightValue
 	}
@@ -533,7 +533,7 @@ func preferNullishCoalescingUnionFlags(subject *checker.Type) checker.TypeFlags 
 	if subject == nil {
 		return combined
 	}
-	for part := range type_checking.UnionTypePartsSeq(subject) {
+	for part := range type_checking.UnionTypePartsSequence(subject) {
 		if part != nil {
 			combined |= checker.Type_flags(part)
 		}
@@ -542,22 +542,22 @@ func preferNullishCoalescingUnionFlags(subject *checker.Type) checker.TypeFlags 
 }
 
 // preferNullishCoalescingTextWithParentheses is typescript-eslint's `getTextWithParentheses`: the
-// node's text with the ONE pair of parentheses directly around it, if it has one. Not every pair:
+// node's text with the one pair of parentheses directly around it, if it has one. Not every pair:
 // `((a))` gives `(a)`, measured against the installed build.
-func preferNullishCoalescingTextWithParentheses(ctx rule.Context, node *ast.Node) string {
+func preferNullishCoalescingTextWithParentheses(ruleContext rule.Context, node *ast.Node) string {
 	spanned := node
 	if node.Parent != nil && node.Parent.Kind == ast.KindParenthesizedExpression {
 		spanned = node.Parent
 	}
-	textRange := rule.TokenRange(ctx.SourceFile, spanned)
-	return ctx.SourceFile.Text()[textRange.Pos():textRange.End()]
+	textRange := rule.TokenRange(ruleContext.SourceFile, spanned)
+	return ruleContext.SourceFile.Text()[textRange.Pos():textRange.End()]
 }
 
 // preferNullishCoalescingCommentsIn renders the comments wholly inside [start, end) as upstream's
 // `formatComments` does: each comment's own text followed by the separator.
-func preferNullishCoalescingCommentsIn(ctx rule.Context, start int, end int, separator string) string {
+func preferNullishCoalescingCommentsIn(ruleContext rule.Context, start int, end int, separator string) string {
 	rendered := ""
-	for _, comment := range comments.ForFile(ctx) {
+	for _, comment := range comments.ForFile(ruleContext) {
 		if comment.Range.Pos() >= start && comment.Range.End() <= end {
 			rendered += comment.Text + separator
 		}

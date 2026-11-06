@@ -16,6 +16,15 @@ var (
 	nominalClassTypeArgumentsDifferText = policy.MessageOf("adamic/nominal-class", "typeArgumentsDiffer")
 )
 
+type nominal int
+
+const (
+	nominalAccepted nominal = iota
+	nominalUndecided
+	nominalNotAnInstance
+	nominalTypeArgumentsDiffer
+)
+
 /*
  * NominalClass reports a value accepted as a class type that is not an instance of that class, or is one
  * with different type arguments (#drbrp8c).
@@ -56,16 +65,16 @@ var (
  *
  * The repair is a different type or a different value, and only the author can pick it.
  */
-var NominalClass = rule.Rule{
+var NominalClass = rule.Rule[rule.NoOptions]{
 	Name:             "adamic/nominal-class",
 	NeedsTypeChecker: true,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.TypeChecker == nil || ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		if ruleContext.TypeChecker == nil || ruleContext.SourceFile == nil {
 			return nil
 		}
-		typeChecker := ctx.TypeChecker
-		walker := flow.WalkerFor(ctx)
+		typeChecker := ruleContext.TypeChecker
+		walker := flow.WalkerFor(ruleContext)
 		// The judge and the message it picks are made once per file and set at each site, not a closure per
 		// site (#m6tyg79).
 		var handle policy.MessageHandle
@@ -102,10 +111,10 @@ var NominalClass = rule.Rule{
 			if !wrong {
 				return
 			}
-			ctx.ReportNode(site.Node, rule.Message{
+			ruleContext.ReportNode(site.Node, rule.Message{
 				Id: handle.Id,
 				Description: handle.Render(map[string]string{
-					"slot":   slotText(ctx.SourceFile, site.Node, found.Path),
+					"slot":   slotText(ruleContext.SourceFile, site.Node, found.Path),
 					"source": typeChecker.TypeToString(found.Source),
 					"target": typeChecker.TypeToString(found.Target),
 				}),
@@ -166,15 +175,6 @@ func walkSite(walker *flow.Walker, site flow.Site, judge flow.Judge) (flow.Pair,
 	}
 	return first, failed
 }
-
-type nominal int
-
-const (
-	nominalAccepted nominal = iota
-	nominalUndecided
-	nominalNotAnInstance
-	nominalTypeArgumentsDiffer
-)
 
 // nominalVerdict judges a source against a class instance type.
 func nominalVerdict(typeChecker *checker.Checker, source *checker.Type, target *checker.Type) nominal {
@@ -243,7 +243,14 @@ func typeArgumentsVerdict(typeChecker *checker.Checker, source *checker.Type, ta
 
 // inheritedVerdict walks an instance's bases, with its own type arguments mapped into them, for the target's class,
 // and judges the base it reaches as an instance of that class. found is false when no base is the class.
-func inheritedVerdict(typeChecker *checker.Checker, instance *checker.Type, target *checker.Type, targetClass *ast.Symbol, seen map[*ast.Symbol]bool) (verdict nominal, found bool) {
+// Mutates: seen the walk marks each base class it passes, so a class reached twice in the hierarchy is walked once
+func inheritedVerdict(
+	typeChecker *checker.Checker,
+	instance *checker.Type,
+	target *checker.Type,
+	targetClass *ast.Symbol,
+	seen map[*ast.Symbol]bool,
+) (verdict nominal, found bool) {
 	bases, mapped := instantiatedBases(typeChecker, instance)
 	for _, base := range bases {
 		baseClass := classSymbol(base)
@@ -300,11 +307,11 @@ func instantiatedBases(typeChecker *checker.Checker, instance *checker.Type) (ba
 }
 
 // classSymbol is the class an instance type is an instance of.
-func classSymbol(t *checker.Type) *ast.Symbol {
-	if t.ObjectFlags()&checker.ObjectFlagsReference != 0 && t.Target() != nil {
-		return t.Target().Symbol()
+func classSymbol(instance *checker.Type) *ast.Symbol {
+	if instance.ObjectFlags()&checker.ObjectFlagsReference != 0 && instance.Target() != nil {
+		return instance.Target().Symbol()
 	}
-	return t.Symbol()
+	return instance.Symbol()
 }
 
 // declaredClassType is the class's own declared type, whose base types the checker resolves.
@@ -316,7 +323,13 @@ func declaredClassType(typeChecker *checker.Checker, instance *checker.Type) *ch
 }
 
 // derivesFrom walks a class's base types for the target class.
-func derivesFrom(typeChecker *checker.Checker, declared *checker.Type, targetClass *ast.Symbol, seen map[*ast.Symbol]bool) bool {
+// Mutates: seen the walk marks each base class it passes, so a class reached twice in the hierarchy is walked once
+func derivesFrom(
+	typeChecker *checker.Checker,
+	declared *checker.Type,
+	targetClass *ast.Symbol,
+	seen map[*ast.Symbol]bool,
+) bool {
 	if declared == nil || declared.ObjectFlags()&(checker.ObjectFlagsClass|checker.ObjectFlagsInterface) == 0 {
 		return false
 	}

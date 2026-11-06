@@ -15,7 +15,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // The same function also supplies the default mode, which upstream carries as `defaultOptions` and
 // which a nil handed to a bare-severity rule would otherwise leave empty.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[ArrowBodyStyleOptions]{
 		Rule:             ArrowBodyStyle,
 		DecodeOptionList: DecodeArrowBodyStyleOptions,
 	})

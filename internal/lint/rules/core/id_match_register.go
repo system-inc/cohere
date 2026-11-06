@@ -11,11 +11,11 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // string followed by a flag object: `["error", "^[a-z]+$", {"properties": true}]`. The decoder is
 // hand rolled because that heterogeneous list is something no single Go struct decodes.
 //
-// `RequiresOptions` is deliberately NOT set. Upstream's default pattern is `^.+$`, which every
+// `RequiresOptions` is deliberately not set. Upstream's default pattern is `^.+$`, which every
 // non-empty name matches, so an unconfigured rule reporting nothing is upstream's own behaviour
 // rather than an inert-rule defect.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[IdMatchSettings]{
 		Rule:             IdMatch,
 		DecodeOptionList: DecodeIdMatchOptions,
 	})

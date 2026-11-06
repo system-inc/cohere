@@ -36,7 +36,7 @@ import (
  * status` names every boundary in one line.
  */
 
-// bundleFS holds the vendored bundles.
+// bundleFileSystem holds the vendored bundles.
 //
 // The eight paths are named rather than globbed, and that is load-bearing. `go:embed bundles` would
 // take whatever happens to be in the directory, so a bundle deleted from the tree would produce a
@@ -57,7 +57,7 @@ import (
 //go:embed bundles/plugins/markdown.js
 //go:embed bundles/plugins/graphql.js
 //go:embed bundles/plugins/yaml.js
-var bundleFS embed.FS
+var bundleFileSystem embed.FS
 
 // BundleOrigin says which copy of the bundles a BundleSource carries.
 //
@@ -97,7 +97,8 @@ type BundleSource struct {
 // changed mid-run -- which is exactly the case Disk mode exists to serve. Caching here would
 // optimize the mode that does not need it at the cost of correctness in the mode that does.
 func Bundles() (BundleSource, error) {
-	forkPath := strings.TrimSpace(os.Getenv(ForkPathVariable)) // Go whitespace: a path from the environment, which no JavaScript tool reads.
+	// Go whitespace: a path from the environment, which no JavaScript tool reads.
+	forkPath := strings.TrimSpace(os.Getenv(ForkPathVariable))
 	if forkPath == "" {
 		return embeddedBundles()
 	}
@@ -112,9 +113,9 @@ func Bundles() (BundleSource, error) {
 func embeddedBundles() (BundleSource, error) {
 	files := make(map[string][]byte, len(BundleFiles))
 	for _, name := range BundleFiles {
-		content, err := fs.ReadFile(bundleFS, "bundles/"+name)
-		if err != nil {
-			return BundleSource{}, fmt.Errorf("the embedded prettier bundle %s is missing: %w", name, err)
+		content, readFileError := fs.ReadFile(bundleFileSystem, "bundles/"+name)
+		if readFileError != nil {
+			return BundleSource{}, fmt.Errorf("the embedded prettier bundle %s is missing: %w", name, readFileError)
 		}
 		files[name] = content
 	}
@@ -129,11 +130,11 @@ func embeddedBundles() (BundleSource, error) {
 func diskBundles(directory string) (BundleSource, error) {
 	files := make(map[string][]byte, len(BundleFiles))
 	for _, name := range BundleFiles {
-		content, err := os.ReadFile(filepath.Join(directory, filepath.FromSlash(name)))
-		if err != nil {
+		content, readError := os.ReadFile(filepath.Join(directory, filepath.FromSlash(name)))
+		if readError != nil {
 			return BundleSource{}, fmt.Errorf(
 				"reading prettier bundle %s from %s: %w\nUnset %s to use the embedded bundles",
-				name, directory, err, ForkPathVariable,
+				name, directory, readError, ForkPathVariable,
 			)
 		}
 		files[name] = content

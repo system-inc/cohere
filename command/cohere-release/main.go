@@ -4,7 +4,7 @@
 // It exists as a Go command rather than a shell script so that the platform list, the npm `os` and
 // `cpu` fields, the launcher, and the binary that gets built all read from one set of definitions
 // in `internal/release`. The classic packaging bug is a matrix in CI that drifts from the manifest
-// it publishes, producing a package that installs on the wrong platform or on none — and either one
+// it publishes, producing a package that installs on the wrong platform or on none, and either one
 // looks like an unsupported platform rather than like the mistake it is.
 //
 // It stages and never publishes. Publishing is `npm publish` against the staged directories, run
@@ -22,21 +22,34 @@ import (
 )
 
 func main() {
-	if err := run(); err != nil {
-		fmt.Fprintf(os.Stderr, "cohere-release: %v\n", err)
+	if runError := run(); runError != nil {
+		// Ignored: the exit code below says the run failed even when standard error cannot.
+		fmt.Fprintf(os.Stderr, "cohere-release: %v\n", runError)
 		os.Exit(1)
 	}
 }
 
 func run() error {
-	version := flag.String("version", "", "the version to stamp and publish, like 0.1.0; anything below 0.1.0, or not semver, is refused")
+	version := flag.String(
+		"version",
+		"",
+		"the version to stamp and publish, like 0.1.0; anything below 0.1.0, or not semver, is refused",
+	)
 	outputDirectory := flag.String("output", "dist", "where to stage the packages")
 	moduleDirectory := flag.String("module", ".", "the root of the cohere module")
 	only := flag.String("only", "", "build just these platforms, comma separated, as os/arch")
 	signingIdentity := flag.String("signing-identity", "", "the macOS codesigning identity; unsigned when empty")
 	keychainProfile := flag.String("notary-profile", "", "the notarytool keychain profile; not notarized when empty")
-	notaryKeychain := flag.String("notary-keychain", "", "the path of the keychain file holding --notary-profile; the user's own keychains when empty")
-	swiftScratch := flag.String("swift-scratch", "", "where SwiftPM builds the Swift engine; the user cache directory when empty, never inside --output")
+	notaryKeychain := flag.String(
+		"notary-keychain",
+		"",
+		"the path of the keychain file holding --notary-profile; the user's own keychains when empty",
+	)
+	swiftScratch := flag.String(
+		"swift-scratch",
+		"",
+		"where SwiftPM builds the Swift engine; the user cache directory when empty, never inside --output",
+	)
 	flag.Parse()
 
 	if *version == "" {
@@ -45,25 +58,31 @@ func run() error {
 		return fmt.Errorf("--version is required: a release that cannot name itself is not a release")
 	}
 
-	moduleRoot, err := filepath.Abs(*moduleDirectory)
-	if err != nil {
-		return fmt.Errorf("resolving the module directory: %w", err)
+	moduleRoot, absolutePathError := filepath.Abs(*moduleDirectory)
+	if absolutePathError != nil {
+		return fmt.Errorf("resolving the module directory: %w", absolutePathError)
 	}
-	outputRoot, err := filepath.Abs(*outputDirectory)
-	if err != nil {
-		return fmt.Errorf("resolving the output directory: %w", err)
-	}
-
-	targets, err := selectTargets(*only)
-	if err != nil {
-		return err
+	outputRoot, absolutePathError := filepath.Abs(*outputDirectory)
+	if absolutePathError != nil {
+		return fmt.Errorf("resolving the output directory: %w", absolutePathError)
 	}
 
-	fmt.Printf("staging cohere %s into %s\n", *version, outputRoot)
+	targets, selectTargetsError := selectTargets(*only)
+	if selectTargetsError != nil {
+		return selectTargetsError
+	}
 
-	signing := release.Signing{Identity: *signingIdentity, KeychainProfile: *keychainProfile, NotaryKeychain: *notaryKeychain}
+	if _, printError := fmt.Printf("staging cohere %s into %s\n", *version, outputRoot); printError != nil {
+		return fmt.Errorf("printing what is being staged: %w", printError)
+	}
 
-	result, err := release.Build(release.Options{
+	signing := release.Signing{
+		Identity:        *signingIdentity,
+		KeychainProfile: *keychainProfile,
+		NotaryKeychain:  *notaryKeychain,
+	}
+
+	result, buildError := release.Build(release.Options{
 		ModuleDirectory: moduleRoot,
 		OutputDirectory: outputRoot,
 		Version:         *version,
@@ -71,12 +90,15 @@ func run() error {
 		Signing:         signing,
 
 		SwiftScratchDirectory: *swiftScratch,
+		Progress:              os.Stdout,
 	})
-	if err != nil {
-		return err
+	if buildError != nil {
+		return buildError
 	}
 
-	printSummary(result, targets, signing)
+	if printSummaryError := printSummary(result, targets, signing); printSummaryError != nil {
+		return fmt.Errorf("printing the summary: %w", printSummaryError)
+	}
 	return nil
 }
 
@@ -106,7 +128,11 @@ func selectTargets(only string) ([]release.Target, error) {
 			}
 		}
 		if !found {
-			return nil, fmt.Errorf("%q is not a shipped platform; the shipped platforms are %s", requested, describeTargets(release.Targets))
+			return nil, fmt.Errorf(
+				"%q is not a shipped platform; the shipped platforms are %s",
+				requested,
+				describeTargets(release.Targets),
+			)
 		}
 	}
 
@@ -132,32 +158,39 @@ func describeTargets(targets []release.Target) string {
 // of its siblings is a build that failed into something that still packages perfectly.
 //
 // Every size says which build produced it. A stripped release binary and a plain `go build` of the
-// same commit differ by roughly 18 MB — measured at 43.1 against 61.9 — so a bare megabyte figure
+// same commit differ by roughly 18 MB (measured at 43.1 against 61.9), so a bare megabyte figure
 // is not a measurement, it is two possible measurements sharing a label. Two people quoting sizes
 // from different builds spent real time reconciling numbers that were both correct.
-func printSummary(result release.Result, requested []release.Target, signing release.Signing) {
-	fmt.Println()
+//
+// It is written whole and printed in one call, whose failure it returns: a summary that never reached its
+// reader is a release nobody checked.
+func printSummary(result release.Result, requested []release.Target, signing release.Signing) error {
+	summary := &strings.Builder{}
+	fmt.Fprintln(summary)
 	for _, staged := range result.Packages {
 		if staged.SizeInBytes == 0 {
-			fmt.Printf("  %-32s %s\n", staged.Name, staged.Directory)
+			fmt.Fprintf(summary, "  %-32s %s\n", staged.Name, staged.Directory)
 			continue
 		}
-		fmt.Printf("  %-32s %6.1f MB  %s\n", staged.Name, float64(staged.SizeInBytes)/(1<<20), staged.Directory)
+		fmt.Fprintf(summary, "  %-32s %6.1f MB  %s\n",
+			staged.Name, float64(staged.SizeInBytes)/(1<<20), staged.Directory)
 	}
-	fmt.Printf("\nsizes are stripped release builds: %s\n", release.DescribeBuild())
+	fmt.Fprintf(summary, "\nsizes are stripped release builds: %s\n", release.DescribeBuild())
 
 	platformCount := len(requested)
 	if platformCount == 0 {
 		platformCount = len(release.Targets)
 	}
 
-	fmt.Printf("\nstaged %d platform packages and the dispatcher.\n", platformCount)
-	fmt.Println(release.DescribeSigningState(signing))
+	fmt.Fprintf(summary, "\nstaged %d platform packages and the dispatcher.\n", platformCount)
+	fmt.Fprintln(summary, release.DescribeSigningState(signing))
 
 	if requested != nil {
 		// A partial release published as if it were whole leaves the missing platforms resolving to
 		// nothing, and the dispatcher's loud failure gets reported as a bug against a version that
 		// looked fine everywhere else. Saying so here is the only place it can be caught.
-		fmt.Printf("this is a partial build (--only): do not publish it as a release.\n")
+		fmt.Fprintf(summary, "this is a partial build (--only): do not publish it as a release.\n")
 	}
+	_, printError := fmt.Print(summary.String())
+	return printError
 }

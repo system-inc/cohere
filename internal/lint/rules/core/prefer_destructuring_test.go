@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	rule_testing "github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -32,283 +33,42 @@ type preferDestructuringCase struct {
 	// reports and deliberately declines to repair.
 	output   string
 	findings []preferDestructuringExpectation
-	reason   string
 }
 
-// decodePreferDestructuringOptionsForTest routes a case's options through the SHIPPED decoder.
-func decodePreferDestructuringOptionsForTest(t *testing.T, optionsJson string) any {
-	t.Helper()
+// decodePreferDestructuringOptionsForTest routes a case's options through the shipped decoder.
+func decodePreferDestructuringOptionsForTest(
+	test *testing.T,
+	optionsJson string,
+) rule.Given[PreferDestructuringOptions] {
+	test.Helper()
 	if optionsJson == "" {
-		return nil
+		return rule.Given[PreferDestructuringOptions]{}
 	}
-	decoded, err := DecodePreferDestructuringOptions(json.RawMessage(optionsJson))
-	if err != nil {
-		t.Fatalf("the decoder refused %s: %v", optionsJson, err)
+	decoded, decodePreferDestructuringOptionsError := DecodePreferDestructuringOptions(json.RawMessage(optionsJson))
+	if decodePreferDestructuringOptionsError != nil {
+		test.Fatalf("the decoder refused %s: %v", optionsJson, decodePreferDestructuringOptionsError)
 	}
-	return decoded
+	return rule.Configured(decoded)
 }
 
 // preferDestructuringOffsetOf converts a 1-based line and column into a byte offset.
-func preferDestructuringOffsetOf(t *testing.T, source string, line int, column int) int {
-	t.Helper()
+func preferDestructuringOffsetOf(test *testing.T, source string, line int, column int) int {
+	test.Helper()
 	offset := 0
 	for current := 1; current < line; current++ {
 		next := strings.IndexByte(source[offset:], '\n')
 		if next < 0 {
-			t.Fatalf("the fixture has no line %d", line)
+			test.Fatalf("the fixture has no line %d", line)
 		}
 		offset += next + 1
 	}
 	return offset + column - 1
 }
 
-func runPreferDestructuring(t *testing.T, testCase preferDestructuringCase) rule_testing.Result {
-	t.Helper()
-	return rule_testing.RunWithOptions(t, PreferDestructuring, preferDestructuringFile,
-		testCase.source, decodePreferDestructuringOptionsForTest(t, testCase.optionsJson))
-}
-
-// TestPreferDestructuringStaysSilent runs upstream's whole `valid` list.
-func TestPreferDestructuringStaysSilent(t *testing.T) {
-	t.Parallel()
-	for _, testCase := range preferDestructuringCleanCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, runPreferDestructuring(t, testCase))
-		})
-	}
-}
-
-// TestPreferDestructuringFires runs upstream's whole `invalid` list, asserting spans and kinds.
-func TestPreferDestructuringFires(t *testing.T) {
-	t.Parallel()
-	for _, testCase := range preferDestructuringReportingCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runPreferDestructuring(t, testCase)
-
-			wantIds := make([]string, 0, len(testCase.findings))
-			for range testCase.findings {
-				wantIds = append(wantIds, messagePreferDestructuring.Id)
-			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
-
-			for index, expected := range testCase.findings {
-				diagnostic := result.Diagnostics[index]
-				wantPos := preferDestructuringOffsetOf(t, testCase.source, expected.line, expected.column)
-				wantEnd := preferDestructuringOffsetOf(t, testCase.source, expected.endLine, expected.endColumn)
-				if diagnostic.Range.Pos() != wantPos || diagnostic.Range.End() != wantEnd {
-					t.Errorf("finding %d: expected span [%d,%d), got [%d,%d) %q",
-						index, wantPos, wantEnd, diagnostic.Range.Pos(), diagnostic.Range.End(),
-						testCase.source[diagnostic.Range.Pos():diagnostic.Range.End()])
-				}
-				want := "Use " + expected.kind + " destructuring."
-				if !strings.HasPrefix(diagnostic.Message.Description, want) {
-					t.Errorf("finding %d: expected %q, got %q",
-						index, want, diagnostic.Message.Description)
-				}
-			}
-		})
-	}
-}
-
-// TestPreferDestructuringRewrites asserts the eighteen `output` vectors upstream ships.
-//
-// These are before-and-after pairs on the whole file rather than message ids, so they catch a fixer
-// that repairs the right span with the wrong text. Fourteen of the eighteen are about comments.
-func TestPreferDestructuringRewrites(t *testing.T) {
-	t.Parallel()
-	asserted := 0
-	for _, testCase := range preferDestructuringReportingCases {
-		if testCase.output == "" {
-			continue
-		}
-		asserted++
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFixedSource(t, runPreferDestructuring(t, testCase), testCase.output)
-		})
-	}
-	// A table-driven fix assertion that silently matched nothing would pass while checking no
-	// rewrite at all, which is the shape this repository keeps finding.
-	if asserted != 18 {
-		t.Fatalf("expected upstream's eighteen fix vectors, ran %d", asserted)
-	}
-}
-
-// TestPreferDestructuringDeclinesEveryRepairUpstreamDeclines is the other half of the fixer.
-//
-// Thirty of upstream's forty-eight reporting cases carry `output: null`: reported, deliberately not
-// repaired. A fixer that repaired any of them would pass every message-id assertion and every one of
-// the eighteen rewrite vectors, because none of those cases is in either set.
-//
-// The count is asserted for the same reason as above: a loop that matched nothing would pass.
-func TestPreferDestructuringDeclinesEveryRepairUpstreamDeclines(t *testing.T) {
-	t.Parallel()
-	declined := 0
-	for _, testCase := range preferDestructuringReportingCases {
-		if testCase.output != "" {
-			continue
-		}
-		declined++
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runPreferDestructuring(t, testCase)
-			for index, diagnostic := range result.Diagnostics {
-				if len(diagnostic.Fixes) != 0 {
-					t.Errorf("finding %d proposed a repair upstream declines (output: null): %q",
-						index, diagnostic.Fixes[0].Text)
-				}
-			}
-		})
-	}
-	if declined != 30 {
-		t.Fatalf("expected upstream's thirty declines, checked %d", declined)
-	}
-}
-
-// TestPreferDestructuringDecoderReadsBothSchemaElements is the config-boundary contract.
-//
-// Upstream's `meta.schema` has TWO elements and reads `context.options[1].enforceForRenamedProperties`.
-// The config layer used to keep `tuple[1]` and drop the rest without an error, so a config written
-// the upstream way ran with that option permanently off while the file said otherwise. The rule now
-// registers with `DecodeOptionList`, and these rows are the list shapes the config layer delivers.
-//
-// No fixture can prove the config layer delivers them, because every fixture hands the decoder bytes
-// this file built. `TestPreferDestructuringSecondElementCrossesTheConfigBoundary` is the one that
-// goes through the real layer.
-func TestPreferDestructuringDecoderReadsBothSchemaElements(t *testing.T) {
-	t.Parallel()
-	cases := []struct {
-		name    string
-		raw     string
-		check   func(*testing.T, PreferDestructuringOptions)
-		wantErr bool
-	}{
-		{
-			name: "absent options turn every arm on, which is upstream's default",
-			check: func(t *testing.T, o PreferDestructuringOptions) {
-				if !o.VariableDeclarator.enabled(true) || !o.VariableDeclarator.enabled(false) ||
-					!o.AssignmentExpression.enabled(true) || !o.AssignmentExpression.enabled(false) {
-					t.Errorf("all four switches default on: %#v", o)
-				}
-				if o.EnforceForRenamedProperties {
-					t.Error("enforceForRenamedProperties defaults off")
-				}
-			},
-		},
-		{
-			name: "enforceForRenamedProperties arrives as the SECOND element, upstream's spelling",
-			raw:  `[{"VariableDeclarator":{"object":true}},{"enforceForRenamedProperties":true}]`,
-			check: func(t *testing.T, o PreferDestructuringOptions) {
-				if !o.EnforceForRenamedProperties {
-					t.Error("the second schema element was handed over and not read")
-				}
-				if !o.VariableDeclarator.enabled(false) {
-					t.Error("the enabling keys must survive alongside it")
-				}
-				if o.AssignmentExpression.enabled(false) {
-					t.Error("naming only VariableDeclarator disables the other kind, which is " +
-						"upstream replacing normalizedOptions wholesale")
-				}
-			},
-		},
-		{
-			name: "the flat spelling applies to both node kinds",
-			raw:  `[{"object":true}]`,
-			check: func(t *testing.T, o PreferDestructuringOptions) {
-				if !o.VariableDeclarator.enabled(false) || !o.AssignmentExpression.enabled(false) {
-					t.Error("a top-level object/array key is upstream's flat form and covers both")
-				}
-				if o.VariableDeclarator.enabled(true) || o.AssignmentExpression.enabled(true) {
-					t.Error("the flat form replaces both pairs, so an unnamed switch is OFF")
-				}
-				if o.EnforceForRenamedProperties {
-					t.Error("enforceForRenamedProperties defaults off when the second element is absent")
-				}
-			},
-		},
-		{
-			name: "an explicit false in the second element stays false",
-			raw:  `[{"object":true},{"enforceForRenamedProperties":false}]`,
-			check: func(t *testing.T, o PreferDestructuringOptions) {
-				if o.EnforceForRenamedProperties {
-					t.Error("an explicit false was read as true")
-				}
-			},
-		},
-		{
-			// The workaround spelling from when the config layer could deliver one element. It was
-			// never upstream's, and upstream's `additionalProperties: false` refuses the key there.
-			name:    "enforceForRenamedProperties inside the FIRST element is refused",
-			raw:     `[{"object":true,"enforceForRenamedProperties":true}]`,
-			wantErr: true,
-		},
-		{
-			name:    "a third element is refused rather than dropped",
-			raw:     `[{"object":true},{"enforceForRenamedProperties":true},{"object":false}]`,
-			wantErr: true,
-		},
-		{
-			name:    "a bare object, which the config layer never delivers to a list rule, is refused",
-			raw:     `{"object":true}`,
-			wantErr: true,
-		},
-		{
-			name:    "a first element that is not an object must error rather than decode to a default",
-			raw:     `["object"]`,
-			wantErr: true,
-		},
-		{
-			name:    "an unknown key in the second element is refused, matching additionalProperties:false",
-			raw:     `[{"object":true},{"enforceForRenamedProperty":true}]`,
-			wantErr: true,
-		},
-	}
-
-	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			decoded, err := DecodePreferDestructuringOptions(json.RawMessage(testCase.raw))
-			if testCase.wantErr {
-				if err == nil {
-					t.Fatalf("expected the decoder to refuse %s, got %#v", testCase.raw, decoded)
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("the decoder refused %s: %v", testCase.raw, err)
-			}
-			options, ok := decoded.(PreferDestructuringOptions)
-			if !ok {
-				t.Fatalf("the decoder returned %T rather than PreferDestructuringOptions", decoded)
-			}
-			if testCase.check != nil {
-				testCase.check(t, options)
-			}
-		})
-	}
-}
-
-// TestPreferDestructuringEnforceForRenamedPropertiesReachesTheRule is the moving control.
-//
-// A decoder that round-trips and a rule that ignores what it decoded look identical from the test
-// above. One source, two configurations, opposite verdicts.
-func TestPreferDestructuringEnforceForRenamedPropertiesReachesTheRule(t *testing.T) {
-	t.Parallel()
-	const source = `var foobar = object.bar;`
-
-	off := runPreferDestructuring(t, preferDestructuringCase{source: source})
-	if len(off.Diagnostics) != 0 {
-		t.Errorf("the names differ, so nothing is repeated and this is clean by default, got %v",
-			off.MessageIds())
-	}
-
-	on := runPreferDestructuring(t, preferDestructuringCase{
-		source:      source,
-		optionsJson: `[{"object": true}, {"enforceForRenamedProperties": true}]`,
-	})
-	rule_testing.ExpectFindings(t, on, messagePreferDestructuring.Id)
+func runPreferDestructuring(test *testing.T, testCase preferDestructuringCase) rule_testing.Result {
+	test.Helper()
+	return rule_testing.RunGiven(test, PreferDestructuring, preferDestructuringFile,
+		testCase.source, decodePreferDestructuringOptionsForTest(test, testCase.optionsJson))
 }
 
 // preferDestructuringCleanCases are upstream's `valid` list, verbatim.
@@ -319,38 +79,130 @@ var preferDestructuringCleanCases = []preferDestructuringCase{
 	{name: "upstream valid[0]", source: `var [foo] = array;`, optionsJson: ""},
 	{name: "upstream valid[1]", source: `var { foo } = object;`, optionsJson: ""},
 	{name: "upstream valid[2]", source: `var foo;`, optionsJson: ""},
-	{name: "upstream valid[3]", source: `var foo = object.bar;`, optionsJson: `[{"VariableDeclarator": {"object": true}}]`},
+	{
+		name:        "upstream valid[3]",
+		source:      `var foo = object.bar;`,
+		optionsJson: `[{"VariableDeclarator": {"object": true}}]`,
+	},
 	{name: "upstream valid[4]", source: `var foo = object.bar;`, optionsJson: `[{"object": true}]`},
-	{name: "upstream valid[5]", source: `var foo = object.bar;`, optionsJson: `[{"VariableDeclarator": {"object": true}}, {"enforceForRenamedProperties": false}]`},
-	{name: "upstream valid[6]", source: `var foo = object.bar;`, optionsJson: `[{"object": true}, {"enforceForRenamedProperties": false}]`},
-	{name: "upstream valid[7]", source: `var foo = object['bar'];`, optionsJson: `[{"VariableDeclarator": {"object": true}}, {"enforceForRenamedProperties": false}]`},
-	{name: "upstream valid[8]", source: `var foo = object[bar];`, optionsJson: `[{"object": true}, {"enforceForRenamedProperties": false}]`},
-	{name: "upstream valid[9]", source: `var { bar: foo } = object;`, optionsJson: `[{"VariableDeclarator": {"object": true}}, {"enforceForRenamedProperties": true}]`},
-	{name: "upstream valid[10]", source: `var { bar: foo } = object;`, optionsJson: `[{"object": true}, {"enforceForRenamedProperties": true}]`},
-	{name: "upstream valid[11]", source: `var { [bar]: foo } = object;`, optionsJson: `[{"VariableDeclarator": {"object": true}}, {"enforceForRenamedProperties": true}]`},
-	{name: "upstream valid[12]", source: `var { [bar]: foo } = object;`, optionsJson: `[{"object": true}, {"enforceForRenamedProperties": true}]`},
-	{name: "upstream valid[13]", source: `var foo = array[0];`, optionsJson: `[{"VariableDeclarator": {"array": false}}]`},
+	{
+		name:        "upstream valid[5]",
+		source:      `var foo = object.bar;`,
+		optionsJson: `[{"VariableDeclarator": {"object": true}}, {"enforceForRenamedProperties": false}]`,
+	},
+	{
+		name:        "upstream valid[6]",
+		source:      `var foo = object.bar;`,
+		optionsJson: `[{"object": true}, {"enforceForRenamedProperties": false}]`,
+	},
+	{
+		name:        "upstream valid[7]",
+		source:      `var foo = object['bar'];`,
+		optionsJson: `[{"VariableDeclarator": {"object": true}}, {"enforceForRenamedProperties": false}]`,
+	},
+	{
+		name:        "upstream valid[8]",
+		source:      `var foo = object[bar];`,
+		optionsJson: `[{"object": true}, {"enforceForRenamedProperties": false}]`,
+	},
+	{
+		name:        "upstream valid[9]",
+		source:      `var { bar: foo } = object;`,
+		optionsJson: `[{"VariableDeclarator": {"object": true}}, {"enforceForRenamedProperties": true}]`,
+	},
+	{
+		name:        "upstream valid[10]",
+		source:      `var { bar: foo } = object;`,
+		optionsJson: `[{"object": true}, {"enforceForRenamedProperties": true}]`,
+	},
+	{
+		name:        "upstream valid[11]",
+		source:      `var { [bar]: foo } = object;`,
+		optionsJson: `[{"VariableDeclarator": {"object": true}}, {"enforceForRenamedProperties": true}]`,
+	},
+	{
+		name:        "upstream valid[12]",
+		source:      `var { [bar]: foo } = object;`,
+		optionsJson: `[{"object": true}, {"enforceForRenamedProperties": true}]`,
+	},
+	{
+		name:        "upstream valid[13]",
+		source:      `var foo = array[0];`,
+		optionsJson: `[{"VariableDeclarator": {"array": false}}]`,
+	},
 	{name: "upstream valid[14]", source: `var foo = array[0];`, optionsJson: `[{"array": false}]`},
-	{name: "upstream valid[15]", source: `var foo = object.foo;`, optionsJson: `[{"VariableDeclarator": {"object": false}}]`},
-	{name: "upstream valid[16]", source: `var foo = object['foo'];`, optionsJson: `[{"VariableDeclarator": {"object": false}}]`},
+	{
+		name:        "upstream valid[15]",
+		source:      `var foo = object.foo;`,
+		optionsJson: `[{"VariableDeclarator": {"object": false}}]`,
+	},
+	{
+		name:        "upstream valid[16]",
+		source:      `var foo = object['foo'];`,
+		optionsJson: `[{"VariableDeclarator": {"object": false}}]`,
+	},
 	{name: "upstream valid[17]", source: `({ foo } = object);`, optionsJson: ""},
-	{name: "upstream valid[18]", source: `var foo = array[0];`, optionsJson: `[{"VariableDeclarator": {"array": false}}, {"enforceForRenamedProperties": true}]`},
-	{name: "upstream valid[19]", source: `var foo = array[0];`, optionsJson: `[{"array": false}, {"enforceForRenamedProperties": true}]`},
+	{
+		name:        "upstream valid[18]",
+		source:      `var foo = array[0];`,
+		optionsJson: `[{"VariableDeclarator": {"array": false}}, {"enforceForRenamedProperties": true}]`,
+	},
+	{
+		name:        "upstream valid[19]",
+		source:      `var foo = array[0];`,
+		optionsJson: `[{"array": false}, {"enforceForRenamedProperties": true}]`,
+	},
 	{name: "upstream valid[20]", source: `[foo] = array;`, optionsJson: ""},
 	{name: "upstream valid[21]", source: `foo += array[0]`, optionsJson: ""},
 	{name: "upstream valid[22]", source: `foo &&= array[0]`, optionsJson: ""},
 	{name: "upstream valid[23]", source: `foo += bar.foo`, optionsJson: ""},
 	{name: "upstream valid[24]", source: `foo ||= bar.foo`, optionsJson: ""},
 	{name: "upstream valid[25]", source: `foo ??= bar['foo']`, optionsJson: ""},
-	{name: "upstream valid[26]", source: `foo = object.foo;`, optionsJson: `[{"AssignmentExpression": {"object": false}}, {"enforceForRenamedProperties": true}]`},
-	{name: "upstream valid[27]", source: `foo = object.foo;`, optionsJson: `[{"AssignmentExpression": {"object": false}}, {"enforceForRenamedProperties": false}]`},
-	{name: "upstream valid[28]", source: `foo = array[0];`, optionsJson: `[{"AssignmentExpression": {"array": false}}, {"enforceForRenamedProperties": true}]`},
-	{name: "upstream valid[29]", source: `foo = array[0];`, optionsJson: `[{"AssignmentExpression": {"array": false}}, {"enforceForRenamedProperties": false}]`},
-	{name: "upstream valid[30]", source: `foo = array[0];`, optionsJson: `[{"VariableDeclarator": {"array": true}, "AssignmentExpression": {"array": false}}, {"enforceForRenamedProperties": false}]`},
-	{name: "upstream valid[31]", source: `var foo = array[0];`, optionsJson: `[{"VariableDeclarator": {"array": false}, "AssignmentExpression": {"array": true}}, {"enforceForRenamedProperties": false}]`},
-	{name: "upstream valid[32]", source: `foo = object.foo;`, optionsJson: `[{"VariableDeclarator": {"object": true}, "AssignmentExpression": {"object": false}}]`},
-	{name: "upstream valid[33]", source: `var foo = object.foo;`, optionsJson: `[{"VariableDeclarator": {"object": false}, "AssignmentExpression": {"object": true}}]`},
-	{name: "upstream valid[34]", source: `class Foo extends Bar { static foo() {var foo = super.foo} }`, optionsJson: ""},
+	{
+		name:        "upstream valid[26]",
+		source:      `foo = object.foo;`,
+		optionsJson: `[{"AssignmentExpression": {"object": false}}, {"enforceForRenamedProperties": true}]`,
+	},
+	{
+		name:        "upstream valid[27]",
+		source:      `foo = object.foo;`,
+		optionsJson: `[{"AssignmentExpression": {"object": false}}, {"enforceForRenamedProperties": false}]`,
+	},
+	{
+		name:        "upstream valid[28]",
+		source:      `foo = array[0];`,
+		optionsJson: `[{"AssignmentExpression": {"array": false}}, {"enforceForRenamedProperties": true}]`,
+	},
+	{
+		name:        "upstream valid[29]",
+		source:      `foo = array[0];`,
+		optionsJson: `[{"AssignmentExpression": {"array": false}}, {"enforceForRenamedProperties": false}]`,
+	},
+	{
+		name:        "upstream valid[30]",
+		source:      `foo = array[0];`,
+		optionsJson: `[{"VariableDeclarator": {"array": true}, "AssignmentExpression": {"array": false}}, {"enforceForRenamedProperties": false}]`,
+	},
+	{
+		name:        "upstream valid[31]",
+		source:      `var foo = array[0];`,
+		optionsJson: `[{"VariableDeclarator": {"array": false}, "AssignmentExpression": {"array": true}}, {"enforceForRenamedProperties": false}]`,
+	},
+	{
+		name:        "upstream valid[32]",
+		source:      `foo = object.foo;`,
+		optionsJson: `[{"VariableDeclarator": {"object": true}, "AssignmentExpression": {"object": false}}]`,
+	},
+	{
+		name:        "upstream valid[33]",
+		source:      `var foo = object.foo;`,
+		optionsJson: `[{"VariableDeclarator": {"object": false}, "AssignmentExpression": {"object": true}}]`,
+	},
+	{
+		name:        "upstream valid[34]",
+		source:      `class Foo extends Bar { static foo() {var foo = super.foo} }`,
+		optionsJson: "",
+	},
 	{name: "upstream valid[35]", source: `foo = bar[foo];`, optionsJson: ""},
 	{name: "upstream valid[36]", source: `var foo = bar[foo];`, optionsJson: ""},
 	{name: "upstream valid[37]", source: `var {foo: {bar}} = object;`, optionsJson: `[{"object": true}]`},
@@ -360,13 +212,41 @@ var preferDestructuringCleanCases = []preferDestructuringCase{
 	{name: "upstream valid[41]", source: `class C { #x; foo() { const x = this.#x; } }`, optionsJson: ""},
 	{name: "upstream valid[42]", source: `class C { #x; foo() { x = this.#x; } }`, optionsJson: ""},
 	{name: "upstream valid[43]", source: `class C { #x; foo(a) { x = a.#x; } }`, optionsJson: ""},
-	{name: "upstream valid[44]", source: `class C { #x; foo() { const x = this.#x; } }`, optionsJson: `[{"array": true, "object": true}, {"enforceForRenamedProperties": true}]`},
-	{name: "upstream valid[45]", source: `class C { #x; foo() { const y = this.#x; } }`, optionsJson: `[{"array": true, "object": true}, {"enforceForRenamedProperties": true}]`},
-	{name: "upstream valid[46]", source: `class C { #x; foo() { x = this.#x; } }`, optionsJson: `[{"array": true, "object": true}, {"enforceForRenamedProperties": true}]`},
-	{name: "upstream valid[47]", source: `class C { #x; foo() { y = this.#x; } }`, optionsJson: `[{"array": true, "object": true}, {"enforceForRenamedProperties": true}]`},
-	{name: "upstream valid[48]", source: `class C { #x; foo(a) { x = a.#x; } }`, optionsJson: `[{"array": true, "object": true}, {"enforceForRenamedProperties": true}]`},
-	{name: "upstream valid[49]", source: `class C { #x; foo(a) { y = a.#x; } }`, optionsJson: `[{"array": true, "object": true}, {"enforceForRenamedProperties": true}]`},
-	{name: "upstream valid[50]", source: `class C { #x; foo() { x = this.a.#x; } }`, optionsJson: `[{"array": true, "object": true}, {"enforceForRenamedProperties": true}]`},
+	{
+		name:        "upstream valid[44]",
+		source:      `class C { #x; foo() { const x = this.#x; } }`,
+		optionsJson: `[{"array": true, "object": true}, {"enforceForRenamedProperties": true}]`,
+	},
+	{
+		name:        "upstream valid[45]",
+		source:      `class C { #x; foo() { const y = this.#x; } }`,
+		optionsJson: `[{"array": true, "object": true}, {"enforceForRenamedProperties": true}]`,
+	},
+	{
+		name:        "upstream valid[46]",
+		source:      `class C { #x; foo() { x = this.#x; } }`,
+		optionsJson: `[{"array": true, "object": true}, {"enforceForRenamedProperties": true}]`,
+	},
+	{
+		name:        "upstream valid[47]",
+		source:      `class C { #x; foo() { y = this.#x; } }`,
+		optionsJson: `[{"array": true, "object": true}, {"enforceForRenamedProperties": true}]`,
+	},
+	{
+		name:        "upstream valid[48]",
+		source:      `class C { #x; foo(a) { x = a.#x; } }`,
+		optionsJson: `[{"array": true, "object": true}, {"enforceForRenamedProperties": true}]`,
+	},
+	{
+		name:        "upstream valid[49]",
+		source:      `class C { #x; foo(a) { y = a.#x; } }`,
+		optionsJson: `[{"array": true, "object": true}, {"enforceForRenamedProperties": true}]`,
+	},
+	{
+		name:        "upstream valid[50]",
+		source:      `class C { #x; foo() { x = this.a.#x; } }`,
+		optionsJson: `[{"array": true, "object": true}, {"enforceForRenamedProperties": true}]`,
+	},
 	{name: "upstream valid[51]", source: `using foo = array[0];`, optionsJson: ""},
 	{name: "upstream valid[52]", source: `using foo = object.foo;`, optionsJson: ""},
 	{name: "upstream valid[53]", source: `await using foo = array[0];`, optionsJson: ""},
@@ -376,7 +256,7 @@ var preferDestructuringCleanCases = []preferDestructuringCase{
 // preferDestructuringReportingCases are upstream's `invalid` list, verbatim.
 //
 // `output` is upstream's fixed source where it asserts one, and "" where it asserts `null`,
-// meaning the case is reported and deliberately NOT repaired. Thirty of the forty-eight are
+// meaning the case is reported and deliberately not repaired. Thirty of the forty-eight are
 // declines, and they are the fixer's real specification.
 var preferDestructuringReportingCases = []preferDestructuringCase{
 	{
@@ -783,9 +663,250 @@ var preferDestructuringReportingCases = []preferDestructuringCase{
 	},
 }
 
-// TestPreferDestructuringArrayIndexIsIntegerByVALUE pins the array arm's discriminator.
+// TestPreferDestructuringStaysSilent runs upstream's whole `valid` list.
+func TestPreferDestructuringStaysSilent(test *testing.T) {
+	test.Parallel()
+	for _, testCase := range preferDestructuringCleanCases {
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, runPreferDestructuring(test, testCase))
+		})
+	}
+}
+
+// TestPreferDestructuringFires runs upstream's whole `invalid` list, asserting spans and kinds.
+func TestPreferDestructuringFires(test *testing.T) {
+	test.Parallel()
+	for _, testCase := range preferDestructuringReportingCases {
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runPreferDestructuring(test, testCase)
+
+			wantIds := make([]string, 0, len(testCase.findings))
+			for range testCase.findings {
+				wantIds = append(wantIds, messagePreferDestructuring.Id)
+			}
+			rule_testing.ExpectFindings(test, result, wantIds...)
+
+			for index, expected := range testCase.findings {
+				diagnostic := result.Diagnostics[index]
+				wantPosition := preferDestructuringOffsetOf(test, testCase.source, expected.line, expected.column)
+				wantEnd := preferDestructuringOffsetOf(test, testCase.source, expected.endLine, expected.endColumn)
+				if diagnostic.Range.Pos() != wantPosition || diagnostic.Range.End() != wantEnd {
+					test.Errorf("finding %d: expected span [%d,%d), got [%d,%d) %q",
+						index, wantPosition, wantEnd, diagnostic.Range.Pos(), diagnostic.Range.End(),
+						testCase.source[diagnostic.Range.Pos():diagnostic.Range.End()])
+				}
+				want := "Use " + expected.kind + " destructuring."
+				if !strings.HasPrefix(diagnostic.Message.Description, want) {
+					test.Errorf("finding %d: expected %q, got %q",
+						index, want, diagnostic.Message.Description)
+				}
+			}
+		})
+	}
+}
+
+// TestPreferDestructuringRewrites asserts the eighteen `output` vectors upstream ships.
 //
-// Upstream tests `Number.isInteger(node.property.value)`, which is a question about the VALUE rather
+// These are before-and-after pairs on the whole file rather than message ids, so they catch a fixer
+// that repairs the right span with the wrong text. Fourteen of the eighteen are about comments.
+func TestPreferDestructuringRewrites(test *testing.T) {
+	test.Parallel()
+	asserted := 0
+	for _, testCase := range preferDestructuringReportingCases {
+		if testCase.output == "" {
+			continue
+		}
+		asserted++
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFixedSource(test, runPreferDestructuring(test, testCase), testCase.output)
+		})
+	}
+	// A table-driven fix assertion that silently matched nothing would pass while checking no
+	// rewrite at all, which is the shape this repository keeps finding.
+	if asserted != 18 {
+		test.Fatalf("expected upstream's eighteen fix vectors, ran %d", asserted)
+	}
+}
+
+// TestPreferDestructuringDeclinesEveryRepairUpstreamDeclines is the other half of the fixer.
+//
+// Thirty of upstream's forty-eight reporting cases carry `output: null`: reported, deliberately not
+// repaired. A fixer that repaired any of them would pass every message-id assertion and every one of
+// the eighteen rewrite vectors, because none of those cases is in either set.
+//
+// The count is asserted for the same reason as above: a loop that matched nothing would pass.
+func TestPreferDestructuringDeclinesEveryRepairUpstreamDeclines(test *testing.T) {
+	test.Parallel()
+	declined := 0
+	for _, testCase := range preferDestructuringReportingCases {
+		if testCase.output != "" {
+			continue
+		}
+		declined++
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runPreferDestructuring(test, testCase)
+			for index, diagnostic := range result.Diagnostics {
+				if len(diagnostic.Fixes) != 0 {
+					test.Errorf("finding %d proposed a repair upstream declines (output: null): %q",
+						index, diagnostic.Fixes[0].Text)
+				}
+			}
+		})
+	}
+	if declined != 30 {
+		test.Fatalf("expected upstream's thirty declines, checked %d", declined)
+	}
+}
+
+// TestPreferDestructuringDecoderReadsBothSchemaElements is the config-boundary contract.
+//
+// Upstream's `meta.schema` has two elements and reads `context.options[1].enforceForRenamedProperties`.
+// The config layer used to keep `tuple[1]` and drop the rest without an error, so a config written
+// the upstream way ran with that option permanently off while the file said otherwise. The rule now
+// registers with `DecodeOptionList`, and these rows are the list shapes the config layer delivers.
+//
+// No fixture can prove the config layer delivers them, because every fixture hands the decoder bytes
+// this file built. `TestPreferDestructuringSecondElementCrossesTheConfigBoundary` is the one that
+// goes through the real layer.
+func TestPreferDestructuringDecoderReadsBothSchemaElements(test *testing.T) {
+	test.Parallel()
+	cases := []struct {
+		name      string
+		raw       string
+		check     func(*testing.T, PreferDestructuringOptions)
+		wantError bool
+	}{
+		{
+			name: "absent options turn every arm on, which is upstream's default",
+			check: func(test *testing.T, options PreferDestructuringOptions) {
+				if !options.VariableDeclarator.enabled(true) || !options.VariableDeclarator.enabled(false) ||
+					!options.AssignmentExpression.enabled(true) || !options.AssignmentExpression.enabled(false) {
+					test.Errorf("all four switches default on: %#v", options)
+				}
+				if options.EnforceForRenamedProperties {
+					test.Error("enforceForRenamedProperties defaults off")
+				}
+			},
+		},
+		{
+			name: "enforceForRenamedProperties arrives as the SECOND element, upstream's spelling",
+			raw:  `[{"VariableDeclarator":{"object":true}},{"enforceForRenamedProperties":true}]`,
+			check: func(test *testing.T, options PreferDestructuringOptions) {
+				if !options.EnforceForRenamedProperties {
+					test.Error("the second schema element was handed over and not read")
+				}
+				if !options.VariableDeclarator.enabled(false) {
+					test.Error("the enabling keys must survive alongside it")
+				}
+				if options.AssignmentExpression.enabled(false) {
+					test.Error("naming only VariableDeclarator disables the other kind, which is " +
+						"upstream replacing normalizedOptions wholesale")
+				}
+			},
+		},
+		{
+			name: "the flat spelling applies to both node kinds",
+			raw:  `[{"object":true}]`,
+			check: func(test *testing.T, options PreferDestructuringOptions) {
+				if !options.VariableDeclarator.enabled(false) || !options.AssignmentExpression.enabled(false) {
+					test.Error("a top-level object/array key is upstream's flat form and covers both")
+				}
+				if options.VariableDeclarator.enabled(true) || options.AssignmentExpression.enabled(true) {
+					test.Error("the flat form replaces both pairs, so an unnamed switch is OFF")
+				}
+				if options.EnforceForRenamedProperties {
+					test.Error("enforceForRenamedProperties defaults off when the second element is absent")
+				}
+			},
+		},
+		{
+			name: "an explicit false in the second element stays false",
+			raw:  `[{"object":true},{"enforceForRenamedProperties":false}]`,
+			check: func(test *testing.T, options PreferDestructuringOptions) {
+				if options.EnforceForRenamedProperties {
+					test.Error("an explicit false was read as true")
+				}
+			},
+		},
+		{
+			// The workaround spelling from when the config layer could deliver one element. It was
+			// never upstream's, and upstream's `additionalProperties: false` refuses the key there.
+			name:      "enforceForRenamedProperties inside the FIRST element is refused",
+			raw:       `[{"object":true,"enforceForRenamedProperties":true}]`,
+			wantError: true,
+		},
+		{
+			name:      "a third element is refused rather than dropped",
+			raw:       `[{"object":true},{"enforceForRenamedProperties":true},{"object":false}]`,
+			wantError: true,
+		},
+		{
+			name:      "a bare object, which the config layer never delivers to a list rule, is refused",
+			raw:       `{"object":true}`,
+			wantError: true,
+		},
+		{
+			name:      "a first element that is not an object must error rather than decode to a default",
+			raw:       `["object"]`,
+			wantError: true,
+		},
+		{
+			name:      "an unknown key in the second element is refused, matching additionalProperties:false",
+			raw:       `[{"object":true},{"enforceForRenamedProperty":true}]`,
+			wantError: true,
+		},
+	}
+
+	for _, testCase := range cases {
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			decoded, decodePreferDestructuringOptionsError := DecodePreferDestructuringOptions(
+				json.RawMessage(testCase.raw),
+			)
+			if testCase.wantError {
+				if decodePreferDestructuringOptionsError == nil {
+					test.Fatalf("expected the decoder to refuse %s, got %#v", testCase.raw, decoded)
+				}
+				return
+			}
+			if decodePreferDestructuringOptionsError != nil {
+				test.Fatalf("the decoder refused %s: %v", testCase.raw, decodePreferDestructuringOptionsError)
+			}
+			if testCase.check != nil {
+				testCase.check(test, decoded)
+			}
+		})
+	}
+}
+
+// TestPreferDestructuringEnforceForRenamedPropertiesReachesTheRule is the moving control.
+//
+// A decoder that round-trips and a rule that ignores what it decoded look identical from the test
+// above. One source, two configurations, opposite verdicts.
+func TestPreferDestructuringEnforceForRenamedPropertiesReachesTheRule(test *testing.T) {
+	test.Parallel()
+	const source = `var foobar = object.bar;`
+
+	off := runPreferDestructuring(test, preferDestructuringCase{source: source})
+	if len(off.Diagnostics) != 0 {
+		test.Errorf("the names differ, so nothing is repeated and this is clean by default, got %v",
+			off.MessageIds())
+	}
+
+	on := runPreferDestructuring(test, preferDestructuringCase{
+		source:      source,
+		optionsJson: `[{"object": true}, {"enforceForRenamedProperties": true}]`,
+	})
+	rule_testing.ExpectFindings(test, on, messagePreferDestructuring.Id)
+}
+
+// TestPreferDestructuringArrayIndexIsIntegerByValue pins the array arm's discriminator.
+//
+// Upstream tests `Number.isInteger(node.property.value)`, which is a question about the value rather
 // than the spelling. Its corpus writes only `array[0]`, so a mutation loosening the digit test
 // survives every imported case.
 //
@@ -793,8 +914,8 @@ var preferDestructuringReportingCases = []preferDestructuringCase{
 // here rather than merely convenient: `0x1` arrives as `1`, `1e2` as `100`, and `1.0` as `1`, so the
 // canonical forms are exactly the integers and the non-integers keep a `.` or a `-`. Every verdict
 // below was measured against the installed 10.8.1 build.
-func TestPreferDestructuringArrayIndexIsIntegerByVALUE(t *testing.T) {
-	t.Parallel()
+func TestPreferDestructuringArrayIndexIsIntegerByValue(test *testing.T) {
+	test.Parallel()
 	reporting := []struct {
 		name   string
 		source string
@@ -810,12 +931,12 @@ func TestPreferDestructuringArrayIndexIsIntegerByVALUE(t *testing.T) {
 				"on the value rather than on whether the source contains a dot."},
 	}
 	for _, testCase := range reporting {
-		t.Run(testCase.name+" reports", func(t *testing.T) {
-			t.Parallel()
-			result := runPreferDestructuring(t, preferDestructuringCase{source: testCase.source})
-			rule_testing.ExpectFindings(t, result, messagePreferDestructuring.Id)
+		test.Run(testCase.name+" reports", func(test *testing.T) {
+			test.Parallel()
+			result := runPreferDestructuring(test, preferDestructuringCase{source: testCase.source})
+			rule_testing.ExpectFindings(test, result, messagePreferDestructuring.Id)
 			if !strings.HasPrefix(result.Diagnostics[0].Message.Description, "Use array") {
-				t.Errorf("expected the ARRAY arm, got %q. %s",
+				test.Errorf("expected the ARRAY arm, got %q. %s",
 					result.Diagnostics[0].Message.Description, testCase.reason)
 			}
 		})
@@ -837,11 +958,11 @@ func TestPreferDestructuringArrayIndexIsIntegerByVALUE(t *testing.T) {
 				"a Literal at all"},
 	}
 	for _, testCase := range clean {
-		t.Run(testCase.name+" is clean", func(t *testing.T) {
-			t.Parallel()
-			result := runPreferDestructuring(t, preferDestructuringCase{source: testCase.source})
+		test.Run(testCase.name+" is clean", func(test *testing.T) {
+			test.Parallel()
+			result := runPreferDestructuring(test, preferDestructuringCase{source: testCase.source})
 			if len(result.Diagnostics) != 0 {
-				t.Errorf("expected silence, got %v. %s", result.MessageIds(), testCase.reason)
+				test.Errorf("expected silence, got %v. %s", result.MessageIds(), testCase.reason)
 			}
 		})
 	}
@@ -851,19 +972,19 @@ func TestPreferDestructuringArrayIndexIsIntegerByVALUE(t *testing.T) {
 //
 // In ESTree `object?.foo` is a ChainExpression wrapping the member access, so upstream's
 // `rightNode.type !== "MemberExpression"` guard declines it and both of its optional-chaining cases
-// are VALID. Our parser keeps one node kind and marks the token, so without an explicit exclusion
+// are valid. Our parser keeps one node kind and marks the token, so without an explicit exclusion
 // this rule reports two of upstream's own passing cases.
 //
 // Both directions are asserted, because a guard that declined ALL property access would also pass
 // the two clean rows.
-func TestPreferDestructuringOptionalChainingIsExcluded(t *testing.T) {
-	t.Parallel()
+func TestPreferDestructuringOptionalChainingIsExcluded(test *testing.T) {
+	test.Parallel()
 	for _, source := range []string{`var foo = object?.foo;`, `var foo = array?.[0];`} {
-		t.Run(source+" is clean", func(t *testing.T) {
-			t.Parallel()
-			result := runPreferDestructuring(t, preferDestructuringCase{source: source})
+		test.Run(source+" is clean", func(test *testing.T) {
+			test.Parallel()
+			result := runPreferDestructuring(test, preferDestructuringCase{source: source})
 			if len(result.Diagnostics) != 0 {
-				t.Errorf("optional chaining is excluded upstream, got %v", result.MessageIds())
+				test.Errorf("optional chaining is excluded upstream, got %v", result.MessageIds())
 			}
 		})
 	}
@@ -871,10 +992,10 @@ func TestPreferDestructuringOptionalChainingIsExcluded(t *testing.T) {
 	// The control: the same shapes without the `?.` must still report, or the two rows above pass
 	// for the wrong reason.
 	for _, source := range []string{`var foo = object.foo;`, `var foo = array[0];`} {
-		t.Run(source+" still reports", func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				runPreferDestructuring(t, preferDestructuringCase{source: source}),
+		test.Run(source+" still reports", func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				runPreferDestructuring(test, preferDestructuringCase{source: source}),
 				messagePreferDestructuring.Id)
 		})
 	}
@@ -889,18 +1010,18 @@ func TestPreferDestructuringOptionalChainingIsExcluded(t *testing.T) {
 //
 // Found by a dry run through the real config layer against a seeded tree, not by a test. This makes
 // it a test.
-func TestPreferDestructuringWorksOnConstAndLet(t *testing.T) {
-	t.Parallel()
+func TestPreferDestructuringWorksOnConstAndLet(test *testing.T) {
+	test.Parallel()
 	for _, keyword := range []string{"var", "let", "const"} {
-		t.Run(keyword+" reports", func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, runPreferDestructuring(t,
+		test.Run(keyword+" reports", func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, runPreferDestructuring(test,
 				preferDestructuringCase{source: keyword + ` foo = object.foo;`}),
 				messagePreferDestructuring.Id)
 		})
-		t.Run(keyword+" is repaired", func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFixedSource(t, runPreferDestructuring(t,
+		test.Run(keyword+" is repaired", func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFixedSource(test, runPreferDestructuring(test,
 				preferDestructuringCase{source: keyword + ` foo = object.foo;`}),
 				keyword+` {foo} = object;`)
 		})
@@ -913,11 +1034,11 @@ func TestPreferDestructuringWorksOnConstAndLet(t *testing.T) {
 		`using foo = object.foo;`,
 		`async function f() { await using foo = object.foo; }`,
 	} {
-		t.Run("using stays exempt: "+source, func(t *testing.T) {
-			t.Parallel()
-			result := runPreferDestructuring(t, preferDestructuringCase{source: source})
+		test.Run("using stays exempt: "+source, func(test *testing.T) {
+			test.Parallel()
+			result := runPreferDestructuring(test, preferDestructuringCase{source: source})
 			if len(result.Diagnostics) != 0 {
-				t.Errorf("a `using` declaration cannot be destructured, so it must be exempt, got %v",
+				test.Errorf("a `using` declaration cannot be destructured, so it must be exempt, got %v",
 					result.MessageIds())
 			}
 		})

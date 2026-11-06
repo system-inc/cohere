@@ -32,13 +32,13 @@ var (
 	testTableError error
 )
 
-func testTable(t *testing.T) *Table {
-	t.Helper()
+func testTable(test *testing.T) *Table {
+	test.Helper()
 	testTableOnce.Do(func() {
 		testTableValue, testTableError = loadTestTable("descriptor_table.json", "descriptor_context.json")
 	})
 	if testTableError != nil {
-		t.Fatalf("building the test table: %v", testTableError)
+		test.Fatalf("building the test table: %v", testTableError)
 	}
 	return testTableValue
 }
@@ -86,12 +86,12 @@ type extractedContextFile struct {
 
 func loadTestTable(tableName, contextName string) (*Table, error) {
 	var tableFile extractedTableFile
-	if err := readJSON(filepath.Join("testdata", tableName), &tableFile); err != nil {
-		return nil, err
+	if readJsonError := readJson(filepath.Join("testdata", tableName), &tableFile); readJsonError != nil {
+		return nil, readJsonError
 	}
 	var contextFile extractedContextFile
-	if err := readJSON(filepath.Join("testdata", contextName), &contextFile); err != nil {
-		return nil, err
+	if readJsonError := readJson(filepath.Join("testdata", contextName), &contextFile); readJsonError != nil {
+		return nil, readJsonError
 	}
 
 	perDeclaration := make(map[string]bool, len(contextFile.PerDeclarationRoots))
@@ -226,10 +226,10 @@ func readingPointer(value *extractedReading) *Reading {
 	return &Reading{Order: value.Order, Count: value.Count}
 }
 
-func readJSON(path string, into any) error {
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		return err
+func readJson[Contents any](path string, into *Contents) error {
+	raw, readError := os.ReadFile(path)
+	if readError != nil {
+		return readError
 	}
 	return json.Unmarshal(raw, into)
 }

@@ -18,14 +18,14 @@ import (
 //	invalid: [1, 2, 3].reduce((a, s) => a.concat(s * 2), <number[]>[]);
 //
 // `reduce` is generic in its accumulator, so `reduce<T>(callback, initial)` tells the checker what
-// the accumulator is and then checks the initial value AGAINST it. Writing `initial as T` instead
+// the accumulator is and then checks the initial value against it. Writing `initial as T` instead
 // tells the checker to stop checking: the assertion is believed rather than verified, so a mistake
 // in the initial value survives to run time. The two spellings look equivalent and only one of them
 // is still type-checked.
 //
 // # Why some assertions are left alone, and it is not a style judgment
 //
-// Upstream reports only when the assertion is UNNECESSARY, meaning the un-asserted initial value is
+// Upstream reports only when the assertion is unnecessary, meaning the un-asserted initial value is
 // already assignable to the asserted type. When it is not assignable, the assertion is doing real
 // widening work and rewriting it into a type parameter would produce code that does not compile,
 // so the rule declines rather than proposing a fix it knows is broken.
@@ -73,7 +73,7 @@ import (
 //
 // # Two divergences from the installed build, both measured, both stated
 //
-// A computed member key folded through a variable is a FALSE NEGATIVE here:
+// A computed member key folded through a variable is a false negative here:
 //
 //	const key = 'reduce'; a[key](cb, [] as number[])   REPORTS upstream, SILENT here
 //
@@ -82,7 +82,7 @@ import (
 // key `['reduce']` are both handled, and the corpus exercises the literal form in both lists. The
 // gap is one shape wide and it costs findings rather than inventing them.
 //
-// `[] as const` is a defect upstream ships and this port does NOT reproduce:
+// `[] as const` is a defect upstream ships and this port does not reproduce:
 //
 //	a.reduce(cb, [] as const)   REPORTS upstream, writing `a.reduce<const>(cb, [])`
 //
@@ -97,7 +97,7 @@ import (
 // The anchor is a call expression, which is common, so the body exits on the argument count and the
 // member name before touching the checker. The two type queries run only for a call to something
 // named `reduce` whose second argument is a type assertion.
-var PreferReduceTypeParameter = rule.Rule{
+var PreferReduceTypeParameter = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/prefer-reduce-type-parameter",
 
 	// Both halves of the judgment are type questions: whether the receiver is an array, and whether
@@ -105,16 +105,16 @@ var PreferReduceTypeParameter = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// isArrayOrTupleThroughout answers upstream's `isArrayType`: every union constituent, and
 		// within each, every intersection constituent, must be an array or a tuple.
 		//
 		// A non-union is its own single constituent and a non-intersection likewise, so the two
 		// nested loops read the same for a plain `number[]` as for `[number] | number[]`.
 		isArrayOrTupleThroughout := func(receiverType *checker.Type) bool {
-			for unionPart := range type_checking.UnionTypePartsSeq(receiverType) {
+			for unionPart := range type_checking.UnionTypePartsSequence(receiverType) {
 				for _, part := range type_checking.IntersectionTypeParts(unionPart) {
-					if !checker.Checker_isArrayType(ctx.TypeChecker, part) &&
+					if !checker.Checker_isArrayType(ruleContext.TypeChecker, part) &&
 						!checker.IsTupleType(part) {
 						return false
 					}
@@ -125,7 +125,7 @@ var PreferReduceTypeParameter = rule.Rule{
 
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 
@@ -170,25 +170,25 @@ var PreferReduceTypeParameter = rule.Rule{
 
 				// `x as const` is a const assertion rather than a type assertion to a named type.
 				// Upstream does not exclude it and its fixer writes `reduce<const>`, which does not
-				// parse. Declined here rather than reproduced, because this rule's repair is a FIX
+				// parse. Declined here rather than reproduced, because this rule's repair is a fix
 				// and a fix is applied with nobody watching.
 				if isConstAssertionType(assertedType) {
 					return
 				}
 
-				// Upstream: report only when the assertion is UNNECESSARY, meaning the value is
+				// Upstream: report only when the assertion is unnecessary, meaning the value is
 				// already assignable to the asserted type. An assertion doing real work is left
 				// alone because rewriting it into a type parameter would stop compiling.
-				initializerType := ctx.TypeChecker.GetTypeAtLocation(assertedValue)
-				assertedTypeValue := ctx.TypeChecker.GetTypeAtLocation(assertedType)
+				initializerType := ruleContext.TypeChecker.GetTypeAtLocation(assertedValue)
+				assertedTypeValue := ruleContext.TypeChecker.GetTypeAtLocation(assertedType)
 				if initializerType == nil || assertedTypeValue == nil {
 					return
 				}
-				if !checker.Checker_isTypeAssignableTo(ctx.TypeChecker, initializerType, assertedTypeValue) {
+				if !checker.Checker_isTypeAssignableTo(ruleContext.TypeChecker, initializerType, assertedTypeValue) {
 					return
 				}
 
-				receiverType := type_checking.GetConstrainedTypeAtLocation(ctx.TypeChecker, receiver)
+				receiverType := type_checking.GetConstrainedTypeAtLocation(ruleContext.TypeChecker, receiver)
 				if receiverType == nil || !isArrayOrTupleThroughout(receiverType) {
 					return
 				}
@@ -201,8 +201,8 @@ var PreferReduceTypeParameter = rule.Rule{
 				// Ranges are taken from the trimmed token bounds rather than Pos(), which includes
 				// leading trivia and would make the first removal swallow the whitespace or the
 				// comment before the argument.
-				assertionRange := rule.TokenRange(ctx.SourceFile, secondArgument)
-				valueRange := rule.TokenRange(ctx.SourceFile, assertedValue)
+				assertionRange := rule.TokenRange(ruleContext.SourceFile, secondArgument)
+				valueRange := rule.TokenRange(ruleContext.SourceFile, assertedValue)
 
 				fixes := []rule.Fix{
 					rule.RemoveRange(core.NewTextRange(assertionRange.Pos(), valueRange.Pos())),
@@ -215,14 +215,17 @@ var PreferReduceTypeParameter = rule.Rule{
 				// written rather than gaining a second.
 				if call.TypeArguments == nil {
 					// The asserted type's own source text, copied rather than re-rendered. The
-					// insert anchors on the callee BEFORE parentheses were skipped only in the
+					// insert anchors on the callee before parentheses were skipped only in the
 					// sense that upstream anchors on the member expression; measured, that puts the
 					// text inside a parenthesized callee, which is what the installed build writes.
-					typeText := ctx.SourceFile.Text()[rule.TokenRange(ctx.SourceFile, assertedType).Pos():assertedType.End()]
-					fixes = append(fixes, ctx.InsertAfter(callee, "<"+typeText+">"))
+					typeText := ruleContext.SourceFile.Text()[rule.TokenRange(
+						ruleContext.SourceFile,
+						assertedType,
+					).Pos():assertedType.End()]
+					fixes = append(fixes, ruleContext.InsertAfter(callee, "<"+typeText+">"))
 				}
 
-				ctx.ReportNodeWithFixes(secondArgument, buildPreferTypeParameterMessage(), fixes...)
+				ruleContext.ReportNodeWithFixes(secondArgument, buildPreferTypeParameterMessage(), fixes...)
 			},
 		}
 	},
@@ -262,7 +265,7 @@ func reduceMemberAccessOf(callee *ast.Node) (receiver *ast.Node, memberName stri
 // typeAssertionParts reads either spelling of a type assertion, returning the value and the type.
 //
 // `x as T` and `<T>x` are different nodes with the same meaning, and upstream's `isTypeAssertion`
-// accepts both. `x satisfies T` is deliberately NOT one: it checks without changing the type, so
+// accepts both. `x satisfies T` is deliberately not one: it checks without changing the type, so
 // there is nothing unnecessary to remove, and the installed build is silent on it. Measured.
 func typeAssertionParts(node *ast.Node) (value *ast.Node, assertedType *ast.Node, isAssertion bool) {
 	switch node.Kind {

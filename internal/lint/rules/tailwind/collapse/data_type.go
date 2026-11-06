@@ -12,7 +12,7 @@
 // # Two details decide correctness
 //
 // A value starting with `var(` returns no type at all, before any check runs. Not "unknown, try the
-// checks anyway" — the short-circuit is the whole behavior, because `var(--x)` could hold anything
+// checks anyway": the short-circuit is the whole behavior, because `var(--x)` could hold anything
 // and Tailwind declines to guess. `IsColor` on its own would happily say `var(--color-red)` is not a
 // color and `isLength` would say it is not a length, but the short-circuit means callers never get
 // far enough to ask.
@@ -49,7 +49,7 @@ const (
 	DataTypeRatio          DataType = "ratio"
 	DataTypeNumber         DataType = "number"
 	DataTypeInteger        DataType = "integer"
-	DataTypeURL            DataType = "url"
+	DataTypeUrl            DataType = "url"
 	DataTypePosition       DataType = "position"
 	DataTypeBackgroundSize DataType = "bg-size"
 	DataTypeLineWidth      DataType = "line-width"
@@ -76,7 +76,7 @@ func AllDataTypes() []DataType {
 		DataTypeRatio,
 		DataTypeNumber,
 		DataTypeInteger,
-		DataTypeURL,
+		DataTypeUrl,
 		DataTypePosition,
 		DataTypeBackgroundSize,
 		DataTypeLineWidth,
@@ -129,8 +129,8 @@ func matchesDataType(value string, dataType DataType) bool {
 		return isNumber(value)
 	case DataTypeInteger:
 		return IsPositiveInteger(value)
-	case DataTypeURL:
-		return isURL(value)
+	case DataTypeUrl:
+		return isUrl(value)
 	case DataTypePosition:
 		return isBackgroundPosition(value)
 	case DataTypeBackgroundSize:
@@ -157,12 +157,12 @@ func matchesDataType(value string, dataType DataType) bool {
 
 /* -------------------------------------------------------------------------- */
 
-// isURL ports `IS_URL = /^url\(.*\)$/`.
+// isUrl ports `IS_URL = /^url\(.*\)$/`.
 //
 // `.` in JavaScript regexps without the `s` flag does not match a newline, so a value containing one
 // between the parens is not a url to the engine even though the string plainly starts with `url(`
 // and ends with `)`. Reproduced rather than tidied, because "the obvious reading" is how ports drift.
-func isURL(value string) bool {
+func isUrl(value string) bool {
 	if !strings.HasPrefix(value, "url(") || !strings.HasSuffix(value, ")") {
 		return false
 	}
@@ -224,7 +224,7 @@ func isImage(value string) bool {
 		if strings.HasPrefix(part, "var(") {
 			continue
 		}
-		if isURL(part) {
+		if isUrl(part) {
 			count++
 			continue
 		}
@@ -320,7 +320,7 @@ func scanNumber(value string) int {
 	for index < len(value) && value[index] >= '0' && value[index] <= '9' {
 		index++
 	}
-	// `\.?\d+` — the fractional digits are required, whether or not a dot appeared.
+	// `\.?\d+`: the fractional digits are required, whether or not a dot appeared.
 	if index < len(value) && value[index] == '.' {
 		index++
 		digitsStart := index
@@ -388,11 +388,11 @@ func isNumber(value string) bool {
 	return hasMathFunction(value)
 }
 
+var percentSuffix = []string{"%"}
+
 func isPercentage(value string) bool {
 	return numberWithSuffix(value, percentSuffix) || hasMathFunction(value)
 }
-
-var percentSuffix = []string{"%"}
 
 // isFraction ports `^<number>\s*/\s*<number>$`.
 //

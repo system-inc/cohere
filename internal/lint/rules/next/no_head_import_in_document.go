@@ -130,15 +130,15 @@ var messageNoHeadImportInDocument = rule.Message{
 // TokenRange and already strips it, so `imports.SpecifierNode` is not reached for here. That helper
 // exists to solve the leading-trivia anchor, and using it would move the finding off upstream's
 // span onto the specifier for no gain.
-var NoHeadImportInDocument = rule.Rule{
+var NoHeadImportInDocument = rule.Rule[rule.NoOptions]{
 	// No family prefix. The config writes `nextjs/no-head-import-in-document` and matching strips
 	// the namespace on a `/` boundary, so a prefixed name matches nothing and runs on no files.
 	Name:       "@next/next/no-head-import-in-document",
 	NoListener: rule.NoListenerDeclinesIrrelevantFiles,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// Every file that is not the document registers no listener at all rather than testing the
 		// path at every import, which is how upstream spells it too.
-		if !nextjs.IsDocumentFile(ctx.SourceFile.FileName().AsString()) {
+		if !nextjs.IsDocumentFile(ruleContext.SourceFile.FileName().AsString()) {
 			return nil
 		}
 
@@ -158,7 +158,7 @@ var NoHeadImportInDocument = rule.Rule{
 				}
 				// Unconditional. The import clause is never examined, so a type-only import and an
 				// import binding nothing both report.
-				ctx.ReportNode(node, messageNoHeadImportInDocument)
+				ruleContext.ReportNode(node, messageNoHeadImportInDocument)
 			},
 		}
 	},

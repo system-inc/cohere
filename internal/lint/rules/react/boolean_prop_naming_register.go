@@ -9,7 +9,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // entirely inert when configured as a bare `"error"`. Marking it required turns that silence into a
 // configuration failure instead of a rule that passes every fixture and lints nothing.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[BooleanPropNamingOptions]{
 		Rule:            BooleanPropNaming,
 		Decode:          DecodeBooleanPropNamingOptions,
 		RequiresOptions: true,

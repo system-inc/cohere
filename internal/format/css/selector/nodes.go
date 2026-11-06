@@ -21,7 +21,7 @@ const (
 	typeRoot       = "root"
 	typePseudo     = "pseudo"
 	typeNesting    = "nesting"
-	typeID         = "id"
+	typeId         = "id"
 	typeComment    = "comment"
 	typeCombinator = "combinator"
 	typeClass      = "class"
@@ -29,53 +29,84 @@ const (
 	typeUniversal  = "universal"
 )
 
-// newSelectorNode is node.js's constructor followed by the subclass's: opts are the options object's
+// newSelectorNode is node.js's constructor followed by the subclass's: options are the options object's
 // keys and values in order.
-func newSelectorNode(nodeType string, opts ...any) *estree.Node {
-	node := estree.New(nodeType, 0, 0, opts...)
+func newSelectorNode(nodeType string, options []estree.Property) *estree.Node {
+	node := estree.New(nodeType, 0, 0, options)
 	// Prettier's parser never passes opts.spaces, so before and after are always the '' defaults.
-	node.Set("spaces", map[string]any{"before": "", "after": ""})
+	node.Set("spaces", estree.Record{"before": estree.String(""), "after": estree.String("")})
 	switch nodeType {
 	case typeRoot, typeSelector, typePseudo:
 		// container.js: if (!this.nodes) this.nodes = [].
 		if node.Get("nodes") == nil {
-			node.Set("nodes", []*estree.Node{})
+			node.Set("nodes", estree.Nodes{})
 		}
 	case typeNesting:
-		node.Set("value", "&")
+		node.Set("value", estree.String("&"))
 	case typeUniversal:
-		node.Set("value", "*")
+		node.Set("value", estree.String("*"))
 	case typeAttribute:
-		node.Set("raws", map[string]any{})
+		node.Set("raws", estree.Record{})
 	}
 	return node
 }
 
-// source is the {start: {line, column}, end: {line, column}} object the parser passes as opts.source.
-// Each is an int, except where splitWord reads past a space token: nil for undefined, or NaN.
-func source(startLine any, startColumn any, endLine any, endColumn any) map[string]any {
-	return map[string]any{
-		"start": map[string]any{"line": startLine, "column": startColumn},
-		"end":   map[string]any{"line": endLine, "column": endColumn},
+// sourceRange is the {start: {line, column}, end: {line, column}} object the parser passes as
+// opts.source, which sourceRecord writes out as upstream's object. Every line and column is a token's
+// number, except where pseudo reads a space token's [5], past its end: endColumnUndefined marks that
+// undefined.
+type sourceRange struct {
+	startLine          int
+	startColumn        int
+	endLine            int
+	endColumn          int
+	endColumnUndefined bool
+}
+
+// source is upstream's opts.source object of a token's numbers.
+func source(startLine int, startColumn int, endLine int, endColumn int) estree.Record {
+	return sourceRecord(
+		sourceRange{startLine: startLine, startColumn: startColumn, endLine: endLine, endColumn: endColumn},
+	)
+}
+
+// sourceRecord is a sourceRange as upstream's object, its end column nil where it is undefined.
+func sourceRecord(nodeSource sourceRange) estree.Record {
+	end := estree.Record{"line": estree.Integer(nodeSource.endLine), "column": estree.Integer(nodeSource.endColumn)}
+	if nodeSource.endColumnUndefined {
+		end["column"] = nil
+	}
+	return estree.Record{
+		"start": estree.Record{
+			"line":   estree.Integer(nodeSource.startLine),
+			"column": estree.Integer(nodeSource.startColumn),
+		},
+		"end": end,
 	}
 }
 
-// sourceOf is node.source, mutated in place where the parser moves a start or an end.
-func sourceOf(node *estree.Node) map[string]any {
-	value, _ := node.Get("source").(map[string]any)
-	return value
+// setSourceEdge is `node.source[edge][key] = value`, the parser moving a start or an end in place.
+func setSourceEdge(node *estree.Node, edge string, key string, value int) {
+	nodeSource, _ := node.Get("source").(estree.Record)
+	position, isRecord := nodeSource[edge].(estree.Record)
+	if !isRecord {
+		// Invariant: the parser moves an edge only on a combinator or pseudo it built with a source
+		// record, which sets both edges to a record; Parse recovers the panic into an error.
+		panic("css selector parser: node.source." + edge + " is not a {line, column} object")
+	}
+	position[key] = estree.Integer(value)
 }
 
-// spacesOf is node.spaces.
-func spacesOf(node *estree.Node) map[string]any {
-	value, _ := node.Get("spaces").(map[string]any)
-	return value
+// setSpace is `node.spaces[side] = text`, side being before or after.
+func setSpace(node *estree.Node, side string, text string) {
+	spaces, _ := node.Get("spaces").(estree.Record)
+	spaces[side] = estree.String(text)
 }
 
-// rawsOf is attribute.raws.
-func rawsOf(node *estree.Node) map[string]any {
-	value, _ := node.Get("raws").(map[string]any)
-	return value
+// setRaw is `attribute.raws[key] = text`.
+func setRaw(node *estree.Node, key string, text string) {
+	raws, _ := node.Get("raws").(estree.Record)
+	raws[key] = estree.String(text)
 }
 
 // lastOf is container.last, nil where JavaScript has undefined.

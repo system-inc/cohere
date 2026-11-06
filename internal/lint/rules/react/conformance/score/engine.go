@@ -2,11 +2,11 @@ package react_conformance_score
 
 // This file is the rule engine the conformance harness was missing.
 //
-// `internal/react_conformance` could decide which fixtures a shipped rule is RESPONSIBLE for, and
+// `internal/react_conformance` could decide which fixtures a shipped rule is responsible for, and
 // then reported every one of them as `not scored: no rule engine run`. That category was honest and
 // it was the whole gap: a taxonomy that had never once asked a rule a question. This file supplies
-// the missing input — fixture in, real rule over a real type graph, `{heading, message, line}` out
-// — so that `Classify` has something to classify.
+// the missing input (fixture in, real rule over a real type graph, `{heading, message, line}` out)
+// so that `Classify` has something to classify.
 //
 // # The join, and why it is by message id rather than by text
 //
@@ -14,9 +14,9 @@ package react_conformance_score
 // should it. So a finding is joined to the golden through the rule's own message id, which is the
 // same join upstream's `RustBackendComparison-test.ts` makes between two backends. `Rules` below
 // is that table, and every entry was checked against a message some golden in this corpus actually
-// contains — `TestUpstreamMessageJoinIsNotByResemblance` fails an entry that was not.
+// contains; `TestUpstreamMessageJoinIsNotByResemblance` fails an entry that was not.
 //
-// An id absent from the table reports NOTHING rather than being mapped by resemblance. That is
+// An id absent from the table reports nothing rather than being mapped by resemblance. That is
 // deliberate and it costs recall: a rule can find the right thing under an id nobody joined and
 // score as silent. The alternative is worse, because a wrong join produces a specific, confident,
 // wrong failure, and this harness exists to stop exactly that.
@@ -41,7 +41,7 @@ package react_conformance_score
 // those 22 and scored the silence as correct, because their validator is on by default and the
 // pragma is a restatement.
 //
-// The sharpest case is `incompatible-library`: all three of its fixtures LACK
+// The sharpest case is `incompatible-library`: all three of its fixtures lack
 // `@validateBlocklistedImports`, and the single fixture that carries it attributes to a different
 // rule entirely. A pragma gate there scores zero fixtures and reads as a clean run.
 //
@@ -49,7 +49,7 @@ package react_conformance_score
 // validator is ever wired (`purity` via `@validateNoImpureFunctionsInRender`, `error-boundaries`
 // via `@validateNoJSXInTryStatements`, `immutability` via
 // `@validateNoFreezingKnownMutableFunctions`) the gate becomes load-bearing, because upstream
-// recorded those goldens with the validator OFF unless the pragma turned it on. Those three are
+// recorded those goldens with the validator off unless the pragma turned it on. Those three are
 // the reason this paragraph is here rather than a bare "pragmas do not matter".
 
 import (
@@ -65,13 +65,26 @@ import (
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
+// The three Hooks messages the corpus uses, spelled once because they are long and because a typo
+// in one copy of a 200-character literal is invisible in review.
+//
+// Upstream emits four distinct Hooks messages and cohere's rule carries nine message ids, so the
+// join is many-to-one in both directions. That asymmetry is real rather than a modelling shortcut:
+// React's `Hooks` category makes one distinction (called conditionally / referenced as a value /
+// called somewhere that is not a component body / not stable across renders) where cohere's rule
+// makes nine, because cohere's messages were written to tell a developer which shape they wrote.
+const (
+	hooksConditional    = "Hooks must always be called in a consistent order, and may not be called conditionally. See the Rules of Hooks (https://react.dev/warnings/invalid-hook-call-warning)"
+	hooksNestedFunction = "Hooks must be called at the top level in the body of a function component or custom hook, and may not be called within function expressions. See the Rules of Hooks (https://react.dev/warnings/invalid-hook-call-warning)"
+)
+
 // Rules are the cohere rules wired to upstream rule names, with the message join for each.
 //
-// Keyed by UPSTREAM's rule name, which is what `Fixture.Rules()` reports and what `ShippedRules` is
+// Keyed by upstream's rule name, which is what `Fixture.Rules()` reports and what `ShippedRules` is
 // keyed by, so the three tables join without a translation step.
 //
 // Seven rules rather than the fifteen cohere ships. `globals` is here rather than in `score_test.go`
-// so there is ONE mechanism rather than two that can drift; its own test still pins its numbers. The
+// so there is one mechanism rather than two that can drift; its own test still pins its numbers. The
 // other eight are absent for stated reasons rather than by omission:
 //
 //	set-state-in-effect   zero error-named fixtures in this corpus, so nothing to score
@@ -86,14 +99,17 @@ import (
 var Rules = map[string]RuleUnderTest{
 	"globals": {
 		Upstream: "globals",
-		Rule:     react.Globals,
+		Rule:     unconfigured(react.Globals),
 		Messages: map[string]UpstreamMessage{
-			"globalReassignment": {Heading: "Error", Text: "Cannot reassign variables declared outside of the component/hook"},
+			"globalReassignment": {
+				Heading: "Error",
+				Text:    "Cannot reassign variables declared outside of the component/hook",
+			},
 		},
 	},
 	"hooks": {
 		Upstream: "hooks",
-		Rule:     react.RulesOfHooks,
+		Rule:     unconfigured(react.RulesOfHooks),
 		Messages: map[string]UpstreamMessage{
 			"rulesOfHooksConditional": {Heading: "Error", Text: hooksConditional},
 			"rulesOfHooksLoop":        {Heading: "Error", Text: hooksConditional},
@@ -108,7 +124,7 @@ var Rules = map[string]RuleUnderTest{
 	},
 	"set-state-in-render": {
 		Upstream: "set-state-in-render",
-		Rule:     react.SetStateInRender,
+		Rule:     unconfigured(react.SetStateInRender),
 		Messages: map[string]UpstreamMessage{
 			"setStateInRender":  {Heading: "Error", Text: "Cannot call setState during render"},
 			"setStateInUseMemo": {Heading: "Error", Text: "Calling setState from useMemo may trigger an infinite loop"},
@@ -116,32 +132,50 @@ var Rules = map[string]RuleUnderTest{
 	},
 	"use-memo": {
 		Upstream: "use-memo",
-		Rule:     react.UseMemo,
+		Rule:     unconfigured(react.UseMemo),
 		Messages: map[string]UpstreamMessage{
-			"useMemoCallbackNotInline":              {Heading: "Error", Text: "Expected the first argument to be an inline function expression"},
-			"useMemoDependencyListNotArrayLiteral":  {Heading: "Error", Text: "Expected the dependency list for useMemo to be an array literal"},
-			"useMemoCallbackHasParameters":          {Heading: "Error", Text: "useMemo() callbacks may not accept parameters"},
-			"useMemoCallbackAsyncOrGenerator":       {Heading: "Error", Text: "useMemo() callbacks may not be async or generator functions"},
-			"useMemoCallbackReassignsOuterVariable": {Heading: "Error", Text: "useMemo() callbacks may not reassign variables declared outside of the callback"},
+			"useMemoCallbackNotInline": {
+				Heading: "Error",
+				Text:    "Expected the first argument to be an inline function expression",
+			},
+			"useMemoDependencyListNotArrayLiteral": {
+				Heading: "Error",
+				Text:    "Expected the dependency list for useMemo to be an array literal",
+			},
+			"useMemoCallbackHasParameters": {
+				Heading: "Error",
+				Text:    "useMemo() callbacks may not accept parameters",
+			},
+			"useMemoCallbackAsyncOrGenerator": {
+				Heading: "Error",
+				Text:    "useMemo() callbacks may not be async or generator functions",
+			},
+			"useMemoCallbackReassignsOuterVariable": {
+				Heading: "Error",
+				Text:    "useMemo() callbacks may not reassign variables declared outside of the callback",
+			},
 		},
 	},
 	"config": {
 		Upstream: "config",
-		Rule:     react.Config,
+		Rule:     unconfigured(react.Configuration),
 		Messages: map[string]UpstreamMessage{
 			"invalidTypeConfiguration": {Heading: "Error", Text: "Invalid type configuration for module"},
 		},
 	},
 	"gating": {
 		Upstream: "gating",
-		Rule:     react.Gating,
+		Rule:     unconfigured(react.Gating),
 		Messages: map[string]UpstreamMessage{
-			"invalidGatingDirective": {Heading: "Error", Text: "Dynamic gating directive is not a valid JavaScript identifier"},
+			"invalidGatingDirective": {
+				Heading: "Error",
+				Text:    "Dynamic gating directive is not a valid JavaScript identifier",
+			},
 		},
 	},
 	"unsupported-syntax": {
 		Upstream: "unsupported-syntax",
-		Rule:     react.UnsupportedSyntax,
+		Rule:     unconfigured(react.UnsupportedSyntax),
 		Messages: map[string]UpstreamMessage{
 			"unsupportedEval": {Heading: "Compilation Skipped", Text: "The 'eval' function is not supported"},
 		},
@@ -155,8 +189,8 @@ var Rules = map[string]RuleUnderTest{
 // partition cleanly into four causes, every one hand-checked against the golden.
 //
 // The root cause of the first three is one fact stated in the rule's own doc comment: cohere's
-// `rules-of-hooks` is a port of **ESLint's** `rules-of-hooks`, whose subject is where a hook CALL
-// sits in the control-flow graph. React's `Hooks` ERROR CATEGORY is emitted by the COMPILER, which
+// `rules-of-hooks` is a port of **ESLint's** `rules-of-hooks`, whose subject is where a hook call
+// sits in the control-flow graph. React's `Hooks` error category is emitted by the compiler, which
 // runs a wider analysis over its own intermediate representation. The two share a name and a
 // message vocabulary and are not the same validator, so a fixture can be a true Hooks violation
 // upstream and outside the ported rule's subject entirely.
@@ -173,7 +207,7 @@ var Rules = map[string]RuleUnderTest{
 //	   rules-of-hooks/error.invalid-hook-reassigned-in-conditional.js
 //
 //	8  a conditional call the ported rule cannot SEE as a hook call
-//	   Two shapes. An optional call — `useConditionalHook?.()` — and a hook reached through an
+//	   Two shapes. An optional call, `useConditionalHook?.()`, and a hook reached through an
 //	   ALIAS, either an aliased import (`import {useState as state}`) or a property of a local. The
 //	   ported rule decides hook-ness from the callee's spelling, deliberately and for fidelity
 //	   (`rules_of_hooks.go` records that it answers nothing by resolution because oxc reads the
@@ -181,7 +215,7 @@ var Rules = map[string]RuleUnderTest{
 //	   The compiler resolves through the module graph and knows it is `useState`.
 //
 //	4  hook identity not stable across renders
-//	   `const useMedia = useVideoPlayer(); useMedia();` — a hook obtained from another hook's return
+//	   `const useMedia = useVideoPlayer(); useMedia();`: a hook obtained from another hook's return
 //	   value or from a prop. Upstream's message is "must be the same function on every render", an
 //	   inter-procedural value-tracking judgment. ESLint's rule has no counterpart.
 //
@@ -208,24 +242,11 @@ var Rules = map[string]RuleUnderTest{
 //
 // These are recorded here, in prose, rather than moved into `statedDivergences`. The distinction is
 // deliberate and it is the same one `verdict.go` draws: a stated divergence is a boundary somebody
-// DECIDED and a test holds in place, whereas these 25 are an unclosed gap between two validators
+// decided and a test holds in place, whereas these 25 are an unclosed gap between two validators
 // that share a name. Parking them in the excluded column would turn a real 32-of-57 into a
 // decorative 32-of-32, which is exactly the pressure `verdict.go` warns that a scoring harness
 // creates. They should stay failures until somebody decides to widen the rule or to state the
 // boundary formally.
-
-// The three Hooks messages the corpus uses, spelled once because they are long and because a typo
-// in one copy of a 200-character literal is invisible in review.
-//
-// Upstream emits four distinct Hooks messages and cohere's rule carries nine message ids, so the
-// join is many-to-one in both directions. That asymmetry is real rather than a modelling shortcut:
-// React's `Hooks` category makes one distinction (called conditionally / referenced as a value /
-// called somewhere that is not a component body / not stable across renders) where cohere's rule
-// makes nine, because cohere's messages were written to tell a developer which shape they wrote.
-const (
-	hooksConditional    = "Hooks must always be called in a consistent order, and may not be called conditionally. See the Rules of Hooks (https://react.dev/warnings/invalid-hook-call-warning)"
-	hooksNestedFunction = "Hooks must be called at the top level in the body of a function component or custom hook, and may not be called within function expressions. See the Rules of Hooks (https://react.dev/warnings/invalid-hook-call-warning)"
-)
 
 // UpstreamMessage is the golden-side text a cohere message id corresponds to.
 type UpstreamMessage struct {
@@ -234,10 +255,18 @@ type UpstreamMessage struct {
 }
 
 // RuleUnderTest pairs a cohere rule with the upstream rule name it implements and the message join.
+//
+// Rule is bound with no options, as a config naming it with a bare severity runs it: the table holds rules
+// whose options types differ, and the corpus scores each rule's default behaviour.
 type RuleUnderTest struct {
 	Upstream string
-	Rule     rule.Rule
+	Rule     rule.Bound
 	Messages map[string]UpstreamMessage
+}
+
+// unconfigured is subject as a bare severity runs it, handed no options.
+func unconfigured[Options any](subject rule.Rule[Options]) rule.Bound {
+	return rule.Bind(subject, rule.Given[Options]{})
 }
 
 // tsConfigText is the compiler configuration each fixture is built under.
@@ -263,17 +292,21 @@ const tsConfigText = `{
 // conformance comparison expects.
 //
 // It returns `ErrUnsupported` rather than an empty Result for anything that stopped the rule from
-// being asked at all — a parse failure, a missing checker. An empty Result is the claim "this rule
+// being asked at all: a parse failure, a missing checker. An empty Result is the claim "this rule
 // found nothing here", which on this corpus is a wrong answer rather than an absent one, and the
 // two have to stay in different columns.
-func Analyze(subject RuleUnderTest, fixture react_conformance.Fixture, directory string) (react_conformance.Result, error) {
-	// The fixture is written under ITS OWN filename, never under the one the golden's location line
+func Analyze(
+	subject RuleUnderTest,
+	fixture react_conformance.Fixture,
+	directory string,
+) (react_conformance.Result, error) {
+	// The fixture is written under its own filename, never under the one the golden's location line
 	// names, and this is the opposite of what this function did until 2026-08-24.
 	//
 	// The inherited comment read: "The golden's location line names a `.ts` or `.tsx` file even when
 	// the input is `.js`, and the extension decides how the parser reads JSX. Following the golden
 	// keeps the parse the same one upstream made." The first clause is true and the conclusion is
-	// backwards. Upstream parsed the `.js` INPUT, with JSX enabled; the `.ts` in the golden is what
+	// backwards. Upstream parsed the `.js` input, with JSX enabled; the `.ts` in the golden is what
 	// upstream's error printer rendered, not what it read. Following it hands a JSX file to a parser
 	// that reads `<div />` as a type assertion, and the resulting parse damage is silent.
 	//
@@ -284,31 +317,35 @@ func Analyze(subject RuleUnderTest, fixture react_conformance.Fixture, directory
 	// a failure for a rule that was right.
 	//
 	// This is the failure this whole package is built against, arriving inside the instrument: a
-	// silent parse difference reads as a rule defect, and it reads as one CONFIDENTLY, with a
+	// silent parse difference reads as a rule defect, and it reads as one confidently, with a
 	// specific missing diagnostic named.
 	name := filepath.Base(fixture.Name)
 
 	path := filepath.Join(directory, name)
-	if err := os.WriteFile(path, []byte(fixture.Source), 0o644); err != nil {
-		return react_conformance.Result{}, err
+	if writeError := os.WriteFile(path, []byte(fixture.Source), 0o644); writeError != nil {
+		return react_conformance.Result{}, writeError
 	}
-	configPath := filepath.Join(directory, "tsconfig.json")
-	if err := os.WriteFile(configPath, []byte(tsConfigText), 0o644); err != nil {
-		return react_conformance.Result{}, err
+	configurationPath := filepath.Join(directory, "tsconfig.json")
+	if writeError := os.WriteFile(configurationPath, []byte(tsConfigText), 0o644); writeError != nil {
+		return react_conformance.Result{}, writeError
 	}
 
-	graph, err := program.Build(program.Options{
-		ConfigFileName:   configPath,
+	graph, buildError := program.Build(program.Options{
+		ConfigFileName:   configurationPath,
 		CurrentDirectory: directory,
 		SingleThreaded:   true,
 	})
-	if err != nil {
-		return react_conformance.Result{}, &react_conformance.ErrUnsupported{Reason: "the fixture does not parse: " + err.Error()}
+	if buildError != nil {
+		return react_conformance.Result{}, &react_conformance.ErrUnsupported{
+			Reason: "the fixture does not parse: " + buildError.Error(),
+		}
 	}
 
 	projectFiles := graph.ProjectFiles()
 	if len(projectFiles) == 0 {
-		return react_conformance.Result{}, &react_conformance.ErrUnsupported{Reason: "the fixture produced no project files"}
+		return react_conformance.Result{}, &react_conformance.ErrUnsupported{
+			Reason: "the fixture produced no project files",
+		}
 	}
 
 	var sourceFile *ast.SourceFile
@@ -319,7 +356,9 @@ func Analyze(subject RuleUnderTest, fixture react_conformance.Fixture, directory
 		}
 	}
 	if sourceFile == nil {
-		return react_conformance.Result{}, &react_conformance.ErrUnsupported{Reason: "the fixture is not in the built program"}
+		return react_conformance.Result{}, &react_conformance.ErrUnsupported{
+			Reason: "the fixture is not in the built program",
+		}
 	}
 
 	fileChecker, release := graph.CheckerForFile(context.Background(), sourceFile)
@@ -333,14 +372,14 @@ func Analyze(subject RuleUnderTest, fixture react_conformance.Fixture, directory
 		// function body, and it returned non-nil for all four. A mutation replacing this decline
 		// with an empty Result therefore survives the suite, because nothing can reach it. Kept
 		// rather than deleted: the cost is one comparison and the branch is what stands between a
-		// future construction that CAN produce a nil checker and a silent wrong answer.
+		// future construction that can produce a nil checker and a silent wrong answer.
 		return react_conformance.Result{}, &react_conformance.ErrUnsupported{Reason: "no type checker for the fixture"}
 	}
 
 	var diagnostics []rule.Diagnostic
 	ruleContext := rule.Context{
 		SourceFile:  sourceFile,
-		Program:     rule.ViewProgram(graph.Program, sourceFile, subject.Rule),
+		Program:     rule.ViewProgram(graph.Program, sourceFile, subject.Rule.Traits),
 		TypeChecker: fileChecker,
 		FileCache:   rule.NewFileCache(),
 		Report: func(diagnostic rule.Diagnostic) {
@@ -352,7 +391,7 @@ func Analyze(subject RuleUnderTest, fixture react_conformance.Fixture, directory
 		},
 	}
 
-	listeners := subject.Rule.Run(ruleContext, nil)
+	listeners := subject.Rule.Run(ruleContext)
 	if listeners != nil {
 		walk(sourceFile.AsNode(), listeners)
 	}
@@ -368,8 +407,8 @@ func Analyze(subject RuleUnderTest, fixture react_conformance.Fixture, directory
 			//
 			// Measured: 48 findings across the wired rules on this corpus, drawn from 9 distinct
 			// ids, and none of them lands here. A mutation making this branch assign a default
-			// message instead of skipping therefore SURVIVES the suite, and that is an equivalent
-			// mutant rather than a fixture gap — no input in this corpus can reach the branch. The
+			// message instead of skipping therefore survives the suite, and that is an equivalent
+			// mutant rather than a fixture gap: no input in this corpus can reach the branch. The
 			// nine exercised ids are globalReassignment, rulesOfHooksConditional (27),
 			// rulesOfHooksLoop (7), rulesOfHooksNotComponent (5), rulesOfHooksCallback (4),
 			// invalidGatingDirective, unsupportedEval, useMemoCallbackNotInline,
@@ -397,21 +436,21 @@ func Analyze(subject RuleUnderTest, fixture react_conformance.Fixture, directory
 func collectMessageIds(subject RuleUnderTest, fixture react_conformance.Fixture, directory string) ([]string, error) {
 	name := filepath.Base(fixture.Name)
 	path := filepath.Join(directory, name)
-	if err := os.WriteFile(path, []byte(fixture.Source), 0o644); err != nil {
-		return nil, err
+	if writeError := os.WriteFile(path, []byte(fixture.Source), 0o644); writeError != nil {
+		return nil, writeError
 	}
-	configPath := filepath.Join(directory, "tsconfig.json")
-	if err := os.WriteFile(configPath, []byte(tsConfigText), 0o644); err != nil {
-		return nil, err
+	configurationPath := filepath.Join(directory, "tsconfig.json")
+	if writeError := os.WriteFile(configurationPath, []byte(tsConfigText), 0o644); writeError != nil {
+		return nil, writeError
 	}
 
-	graph, err := program.Build(program.Options{
-		ConfigFileName:   configPath,
+	graph, buildError := program.Build(program.Options{
+		ConfigFileName:   configurationPath,
 		CurrentDirectory: directory,
 		SingleThreaded:   true,
 	})
-	if err != nil {
-		return nil, &react_conformance.ErrUnsupported{Reason: "the fixture does not parse: " + err.Error()}
+	if buildError != nil {
+		return nil, &react_conformance.ErrUnsupported{Reason: "the fixture does not parse: " + buildError.Error()}
 	}
 
 	var sourceFile *ast.SourceFile
@@ -431,14 +470,14 @@ func collectMessageIds(subject RuleUnderTest, fixture react_conformance.Fixture,
 	var ids []string
 	ruleContext := rule.Context{
 		SourceFile:  sourceFile,
-		Program:     rule.ViewProgram(graph.Program, sourceFile, subject.Rule),
+		Program:     rule.ViewProgram(graph.Program, sourceFile, subject.Rule.Traits),
 		TypeChecker: fileChecker,
 		FileCache:   rule.NewFileCache(),
 		Report: func(diagnostic rule.Diagnostic) {
 			ids = append(ids, diagnostic.Message.Id)
 		},
 	}
-	listeners := subject.Rule.Run(ruleContext, nil)
+	listeners := subject.Rule.Run(ruleContext)
 	if listeners != nil {
 		walk(sourceFile.AsNode(), listeners)
 	}
@@ -447,23 +486,23 @@ func collectMessageIds(subject RuleUnderTest, fixture react_conformance.Fixture,
 
 // analyzeRaw runs a rule and returns the raw message ids it reported, before the message join.
 //
-// It exists so the join's DROPS can be enumerated rather than merely trusted. `Analyze` silently
+// It exists so the join's drops can be enumerated rather than merely trusted. `Analyze` silently
 // skips a finding whose id is not in the rule's table, which is the correct default and is also
 // invisible; this is the instrument that makes it visible. Used by
 // `TestUnjoinedMessageIdsAreEnumerated`.
 func analyzeRaw(subject RuleUnderTest, fixture react_conformance.Fixture, directory string) ([]string, error) {
 	probe := subject
 	probe.Messages = nil
-	ids, err := collectMessageIds(probe, fixture, directory)
-	if err != nil {
-		return nil, err
+	ids, collectMessageIdsError := collectMessageIds(probe, fixture, directory)
+	if collectMessageIdsError != nil {
+		return nil, collectMessageIdsError
 	}
 	return ids, nil
 }
 
 // SelectFixtures returns the flow-free fixtures whose every diagnostic belongs to one upstream rule.
 //
-// Selecting on the ATTRIBUTED rule rather than on the filename is the whole reason attribution
+// Selecting on the attributed rule rather than on the filename is the whole reason attribution
 // exists: the `error.` prefix names the fixture author's intent, not the validator that ran. For
 // `globals` the two differ by 11 against 23.
 func SelectFixtures(fixtures []react_conformance.Fixture, upstream string) []react_conformance.Fixture {
@@ -508,19 +547,17 @@ func walk(node *ast.Node, listeners rule.Listeners) {
 // lineAndCharacterOfPosition converts an offset into a zero-based line and column.
 //
 // Written here rather than taken from the shim because the shim's spelling has moved before, and a
-// scoring harness that stops compiling for a rename is worse than twelve lines of arithmetic.
+// scoring harness that stops compiling for a rename is worse than a few lines of arithmetic.
 func lineAndCharacterOfPosition(sourceFile *ast.SourceFile, position int) (line int, character int) {
 	text := sourceFile.Text()
-	if position > len(text) {
-		position = len(text)
-	}
+	clamped := min(position, len(text))
 	line = 0
 	lastNewline := -1
-	for index := 0; index < position; index++ {
+	for index := 0; index < clamped; index++ {
 		if text[index] == '\n' {
 			line++
 			lastNewline = index
 		}
 	}
-	return line, position - lastNewline - 1
+	return line, clamped - lastNewline - 1
 }

@@ -30,7 +30,7 @@ func noInnerDeclarationsMessage(declarationType string, bodyDescription string) 
 
 // NoInnerDeclarationsOptions carries upstream's two positional options.
 //
-// The first says WHAT to check and the second says whether block scoped functions are allowed. Both
+// The first says what to check and the second says whether block scoped functions are allowed. Both
 // are pointers so an absent key stays distinguishable from an explicitly configured one, which
 // matters because one of the two defaults is not the zero value of its type.
 type NoInnerDeclarationsOptions struct {
@@ -40,7 +40,7 @@ type NoInnerDeclarationsOptions struct {
 
 	// BlockScopedFunctions allows a function declaration inside a block when the surrounding code
 	// is strict and the language edition gives such a declaration block scope. Upstream's default
-	// is "allow", so this defaults to TRUE and a zero-value struct would invert it.
+	// is "allow", so this defaults to `true` and a zero-value struct would invert it.
 	BlockScopedFunctions *bool
 }
 
@@ -60,35 +60,35 @@ type noInnerDeclarationsSecondOption struct {
 // DecodeNoInnerDeclarationsOptions turns upstream's option list into options.
 //
 // Hand-rolled rather than `rule.DecodeOptionsInto` for the reason the brief names: one default is
-// TRUE, so a zero-value struct silently inverts the rule and every fixture built from a struct
+// `true`, so a zero-value struct silently inverts the rule and every fixture built from a struct
 // rather than routed through here would pass anyway.
 //
 // The wire shape is upstream's own positional list minus the severity: the rule registers with
 // `DecodeOptionList`, so `["error", "both", {...}]` reaches this as `["both", {...}]` and
 // `["error", "both"]` as `["both"]`. A key the second element's schema does not declare is refused,
 // which is upstream's `additionalProperties: false`, and so is a third element.
-func DecodeNoInnerDeclarationsOptions(list []byte) (any, error) {
+func DecodeNoInnerDeclarationsOptions(list []byte) (NoInnerDeclarationsOptions, error) {
 	settings := DefaultNoInnerDeclarationsSettings()
-	positional, err := rule.OptionElements(list, 2)
-	if err != nil {
-		return settings, err
+	positional, optionElementsError := rule.OptionElements(list, 2)
+	if optionElementsError != nil {
+		return settings, optionElementsError
 	}
 	if len(positional) > 0 {
 		var first string
-		if err := json.Unmarshal(positional[0], &first); err != nil {
-			return DefaultNoInnerDeclarationsSettings(), err
+		if decodeError := json.Unmarshal(positional[0], &first); decodeError != nil {
+			return DefaultNoInnerDeclarationsSettings(), decodeError
 		}
-		applied, err := noInnerDeclarationsApplyFirst(settings, first)
-		if err != nil {
-			return DefaultNoInnerDeclarationsSettings(), err
+		applied, noInnerDeclarationsApplyFirstError := noInnerDeclarationsApplyFirst(settings, first)
+		if noInnerDeclarationsApplyFirstError != nil {
+			return DefaultNoInnerDeclarationsSettings(), noInnerDeclarationsApplyFirstError
 		}
-		settings = applied.(NoInnerDeclarationsOptions)
+		settings = applied
 	}
 	if len(positional) > 1 {
 		var second noInnerDeclarationsSecondOption
-		if err := rule.UnmarshalOptions(positional[1], &second); err != nil {
+		if unmarshalOptionsError := rule.UnmarshalOptions(positional[1], &second); unmarshalOptionsError != nil {
 			return DefaultNoInnerDeclarationsSettings(),
-				fmt.Errorf("no-inner-declarations element 2: %w", err)
+				fmt.Errorf("no-inner-declarations element 2: %w", unmarshalOptionsError)
 		}
 		if second.BlockScopedFunctions != nil {
 			switch *second.BlockScopedFunctions {
@@ -109,7 +109,10 @@ func DecodeNoInnerDeclarationsOptions(list []byte) (any, error) {
 }
 
 // noInnerDeclarationsApplyFirst reads upstream's first enum, which is "functions" or "both".
-func noInnerDeclarationsApplyFirst(settings NoInnerDeclarationsOptions, value string) (any, error) {
+func noInnerDeclarationsApplyFirst(
+	settings NoInnerDeclarationsOptions,
+	value string,
+) (NoInnerDeclarationsOptions, error) {
 	switch value {
 	case "functions":
 		both := false
@@ -143,7 +146,7 @@ func noInnerDeclarationsApplyFirst(settings NoInnerDeclarationsOptions, value st
 // with no statement attached to it.
 //
 // The parent test is deliberately two-step. A block is a legal home only when the block itself is a
-// FUNCTION BODY, so `function f() { function g() {} }` is clean while `{ function g() {} }` is not,
+// function body, so `function f() { function g() {} }` is clean while `{ function g() {} }` is not,
 // and both spell the parent `Block`. A single-step check on the parent kind would accept every bare
 // block in the tree.
 //
@@ -174,15 +177,15 @@ func noInnerDeclarationsApplyFirst(settings NoInnerDeclarationsOptions, value st
 // analysis has already answered. The corpus varies `sourceType` and `ecmaVersion` case by case to
 // exercise it, and those cases are reproduced by writing the directive or the export into the
 // source rather than by configuring the harness, which cannot vary either.
-var NoInnerDeclarations = rule.Rule{
+var NoInnerDeclarations = rule.Rule[NoInnerDeclarationsOptions]{
 	Name: "no-inner-declarations",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, isSettings := rule.OptionsAs[NoInnerDeclarationsOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[NoInnerDeclarationsOptions]) rule.Listeners {
+		settings, isSettings := options.Read()
 		if !isSettings {
 			settings = DefaultNoInnerDeclarationsSettings()
 		}
 		checkVariables := settings.Both != nil && *settings.Both
-		// Defaults to TRUE, which is why a nil here has to mean allow rather than disallow.
+		// Defaults to `true`, which is why a nil here has to mean allow rather than disallow.
 		allowBlockScopedFunctions := settings.BlockScopedFunctions == nil ||
 			*settings.BlockScopedFunctions
 
@@ -190,7 +193,7 @@ var NoInnerDeclarations = rule.Rule{
 			if noInnerDeclarationsIsAtARoot(node) {
 				return
 			}
-			ctx.ReportNode(node, noInnerDeclarationsMessage(declarationType,
+			ruleContext.ReportNode(node, noInnerDeclarationsMessage(declarationType,
 				noInnerDeclarationsAllowedBodyDescription(node)))
 		}
 
@@ -198,7 +201,7 @@ var NoInnerDeclarations = rule.Rule{
 			ast.KindFunctionDeclaration: func(node *ast.Node) {
 				// The language gives a block scoped function declaration well defined semantics in
 				// strict code, so upstream's default declines to report it there.
-				if allowBlockScopedFunctions && noInnerDeclarationsIsInStrictCode(ctx, node) {
+				if allowBlockScopedFunctions && noInnerDeclarationsIsInStrictCode(ruleContext, node) {
 					return
 				}
 				check(node, "function")
@@ -226,7 +229,7 @@ var NoInnerDeclarations = rule.Rule{
 
 // noInnerDeclarationsIsAtARoot answers upstream's two acceptance sets.
 //
-// The block arm is the load-bearing one: a block is a legal home only when it IS a function body,
+// The block arm is the load-bearing one: a block is a legal home only when it is a function body,
 // which is why the grandparent is consulted rather than only the parent.
 func noInnerDeclarationsIsAtARoot(node *ast.Node) bool {
 	parent := node.Parent
@@ -251,7 +254,7 @@ func noInnerDeclarationsIsAtARoot(node *ast.Node) bool {
 			// A parser difference rather than a rule one. Upstream's static block holds its
 			// statements directly, so a declaration at its root has the static block as its parent
 			// and is accepted by the parent set below. Ours wraps them in a Block, so the same
-			// declaration arrives here with the static block as its GRANDPARENT and the parent set
+			// declaration arrives here with the static block as its grandparent and the parent set
 			// never sees it.
 			//
 			// Without this arm `class C { static { var x; } }` reports, which is one of upstream's
@@ -287,9 +290,9 @@ func noInnerDeclarationsAllowedBodyDescription(node *ast.Node) string {
 //
 // Upstream asks its scope analysis, which has already computed this. Recomputed here from the three
 // things the language says make code strict, in the order that decides fastest.
-func noInnerDeclarationsIsInStrictCode(ctx rule.Context, node *ast.Node) bool {
+func noInnerDeclarationsIsInStrictCode(ruleContext rule.Context, node *ast.Node) bool {
 	// Every module is strict, whatever is written inside it.
-	if ast.IsExternalModule(ctx.SourceFile) {
+	if ast.IsExternalModule(ruleContext.SourceFile) {
 		return true
 	}
 
@@ -310,7 +313,7 @@ func noInnerDeclarationsIsInStrictCode(ctx rule.Context, node *ast.Node) bool {
 		}
 	}
 
-	return noInnerDeclarationsHasUseStrictPrologue(ctx.SourceFile.Statements)
+	return noInnerDeclarationsHasUseStrictPrologue(ruleContext.SourceFile.Statements)
 }
 
 // noInnerDeclarationsHasUseStrictPrologue answers whether a statement list opens with a `'use

@@ -1,13 +1,9 @@
 package javascript
 
-import (
-	"strings"
-
-	"github.com/system-inc/cohere/internal/format/estree"
-)
+import "github.com/system-inc/cohere/internal/format/estree"
 
 // utilities/is-next-line-empty.js, utilities/is-previous-line-empty.js, utilities/strip-comments.js,
-// utilities/get-shebang.js, utilities/should-print-trailing-comma.js.
+// utilities/should-print-trailing-comma.js.
 
 // isNextLineEmptyAfter is language-js's isNextLineEmpty(node, options). utility_text.go already holds
 // src/utilities' isNextLineEmpty(text, index), which upstream imports here as isNextLineEmptyAfterIndex,
@@ -42,18 +38,6 @@ func stripComments(options *Options) string {
 		settingsOf(options).strippedText = estree.NewStrippedText(options.OriginalText, options.Comments)
 	}
 	return settingsOf(options).strippedText.Text()
-}
-
-// getShebang is upstream's getShebang.
-func getShebang(text string) string {
-	if !strings.HasPrefix(text, "#!") {
-		return ""
-	}
-	index := strings.IndexByte(text, '\n')
-	if index == -1 {
-		return text
-	}
-	return text[:index]
 }
 
 // shouldPrintTrailingComma is upstream's shouldPrintTrailingComma. Upstream's default level is

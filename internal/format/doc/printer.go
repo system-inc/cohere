@@ -5,7 +5,6 @@ import (
 	"strings"
 	"sync"
 	"unicode/utf16"
-	"unsafe"
 )
 
 // Options are the layout settings the printer reads. Upstream's endOfLine is always "lf" in our
@@ -133,6 +132,8 @@ func generateIndent(base *indentation, command indentCommand, options Options) *
 			lastTabs++
 			lastSpaces += queued.width
 		default:
+			// Invariant: the queue holds only indent, string and width commands, since a dedent pops the
+			// base's last command above rather than being queued itself.
 			panic(fmt.Sprintf("unexpected indent command %d", queued.kind))
 		}
 	}
@@ -141,26 +142,9 @@ func generateIndent(base *indentation, command indentCommand, options Options) *
 	return &indentation{value: value.String(), length: length, queue: queue, root: base.root}
 }
 
-// indentations is one Print's indentations, each built once from its base and command. An indentation is
-// immutable, and one print's options are fixed, so the same base and command always build the same one;
-// building it again for every indent and align the printer met was 3.0M of the JavaScript printer's
-// allocations on ahra (#fyw36kf). Per print rather than global, because the options differ between prints.
-type indentations map[indentKey]*indentation
-
 type indentKey struct {
 	base    *indentation
 	command indentCommand
-}
-
-// generate is generateIndent, from the print's indentations when this base and command were built before.
-func (built indentations) generate(base *indentation, command indentCommand, options Options) *indentation {
-	key := indentKey{base: base, command: command}
-	if known, present := built[key]; present {
-		return known
-	}
-	generated := generateIndent(base, command, options)
-	built[key] = generated
-	return generated
 }
 
 // makeIndent is upstream's makeIndent.
@@ -209,49 +193,6 @@ func trailingIndentation(text string, previous int) int {
 	return previous + count
 }
 
-// printResult is upstream's PrintResult without cursor tracking.
-//
-// The settled and unsettled split is kept to read against upstream, not because output depends on it.
-// Upstream needs it for cursor positions. For text it is unobservable: everything settled was settled
-// by a trim, so it ends in a non-space, and a trim reaching past it would remove nothing. A mutation
-// that stopped settling survived 5,000 differential docs, and that is why this comment says so.
-//
-// Both halves are one buffer, with the settled length marked, so settling copies nothing and the unsettled
-// half keeps its memory from line to line: two builders, one reset on every settle, regrew it each line,
-// and were 2.7M of the JavaScript printer's allocations on ahra (#fyw36kf).
-type printResult struct {
-	buffer  []byte
-	settled int
-}
-
-func (result *printResult) write(text string) { result.buffer = append(result.buffer, text...) }
-
-func (result *printResult) settle() { result.settled = len(result.buffer) }
-
-// trim is upstream's trimIndentation over the unsettled half: its trailing spaces and tabs, and their count.
-func (result *printResult) trim() int {
-	count := 0
-	for index := len(result.buffer) - 1; index >= result.settled; index-- {
-		if result.buffer[index] != ' ' && result.buffer[index] != '\t' {
-			break
-		}
-		count++
-	}
-	result.buffer = result.buffer[:len(result.buffer)-count]
-	result.settle()
-	return count
-}
-
-// finish is the printed text. It hands back the buffer itself rather than a copy: nothing writes to a
-// printResult once it is finished, so the bytes can't change under the string.
-func (result *printResult) finish() string {
-	result.settle()
-	if len(result.buffer) == 0 {
-		return ""
-	}
-	return unsafe.String(&result.buffer[0], len(result.buffer))
-}
-
 // command is one entry of the printer's stack.
 type command struct {
 	indent *indentation
@@ -273,10 +214,21 @@ func (*fillProgress) isDoc() {}
 // trailing whitespace is ever read, so it is kept instead of the text: the builder was 1.7M of the
 // JavaScript printer's allocations on ahra (#fyw36kf). The command stack comes from a pool for the same
 // reason.
-func fits(next command, rest []command, remainingWidth int, hasLineSuffix bool, groupModes map[*GroupID]mode, mustBeFlat bool) bool {
+func fits(
+	next command,
+	rest []command,
+	remainingWidth int,
+	hasLineSuffix bool,
+	groupModes map[*GroupId]mode,
+	mustBeFlat bool,
+) bool {
 	restIndex := len(rest)
 	hasPendingSpace := false
-	pooled := fitsCommands.Get().(*[]command)
+	pooled, isCommands := fitsCommands.Get().(*[]command)
+	if !isCommands {
+		// Invariant: fitsCommands makes only *[]command, and fits is the only code that puts one back.
+		panic("fitsCommands held something other than a command stack")
+	}
 	commands := append((*pooled)[:0], next)
 	defer func() {
 		*pooled = commands[:0]
@@ -285,8 +237,12 @@ func fits(next command, rest []command, remainingWidth int, hasLineSuffix bool, 
 	// trailing is how many spaces and tabs the text measured so far ends in, which is what upstream's trimIndentation
 	// would remove from it.
 	trailing := 0
+	// widthLeft is the room remaining on the line as the text measured so far uses it up.
+	widthLeft := remainingWidth
+	// sawLineSuffix is whether a line suffix is pending: one the caller had, or one met while measuring.
+	sawLineSuffix := hasLineSuffix
 
-	for remainingWidth >= 0 {
+	for widthLeft >= 0 {
 		if len(commands) == 0 {
 			if restIndex == 0 {
 				return true
@@ -304,11 +260,11 @@ func fits(next command, rest []command, remainingWidth int, hasLineSuffix bool, 
 			if document != "" {
 				if hasPendingSpace {
 					trailing++
-					remainingWidth--
+					widthLeft--
 					hasPendingSpace = false
 				}
 				trailing = trailingIndentation(string(document), trailing)
-				remainingWidth -= StringWidth(string(document))
+				widthLeft -= StringWidth(string(document))
 			}
 
 		case *Fill:
@@ -331,7 +287,7 @@ func fits(next command, rest []command, remainingWidth int, hasLineSuffix bool, 
 			commands = append(commands, command{mode: current.mode, doc: document.Contents})
 
 		case trimDoc:
-			remainingWidth += trailing
+			widthLeft += trailing
 			trailing = 0
 
 		case *Group:
@@ -350,8 +306,8 @@ func fits(next command, rest []command, remainingWidth int, hasLineSuffix bool, 
 
 		case *IfBreak:
 			groupMode := current.mode
-			if document.GroupID != nil {
-				groupMode = groupModes[document.GroupID]
+			if document.GroupId != nil {
+				groupMode = groupModes[document.GroupId]
 				if groupMode == modeUnset {
 					groupMode = modeFlat
 				}
@@ -373,10 +329,10 @@ func fits(next command, rest []command, remainingWidth int, hasLineSuffix bool, 
 			}
 
 		case *LineSuffix:
-			hasLineSuffix = true
+			sawLineSuffix = true
 
 		case lineSuffixBoundaryDoc:
-			if hasLineSuffix {
+			if sawLineSuffix {
 				return false
 			}
 
@@ -404,7 +360,7 @@ func isEmpty(document Doc) bool {
 
 // Print is upstream's printDocToString, printer/printer.js.
 func Print(document Doc, options Options) string {
-	groupModes := map[*GroupID]mode{}
+	groupModes := map[*GroupId]mode{}
 	width := options.PrintWidth
 	position := 0
 	commands := []command{{indent: rootIndentation, mode: modeBreak, doc: document}}
@@ -429,42 +385,70 @@ func Print(document Doc, options Options) string {
 			}
 
 		case *Indent:
-			commands = append(commands, command{indent: makeIndent(current.indent, options, built), mode: current.mode, doc: document.Contents})
+			commands = append(
+				commands,
+				command{indent: makeIndent(current.indent, options, built), mode: current.mode, doc: document.Contents},
+			)
 
 		case *Align:
-			commands = append(commands, command{indent: makeAlign(current.indent, document, options, built), mode: current.mode, doc: document.Contents})
+			commands = append(commands, command{
+				indent: makeAlign(current.indent, document, options, built),
+				mode:   current.mode,
+				doc:    document.Contents,
+			})
 
 		case trimDoc:
 			position -= result.trim()
 
 		case *Group:
-			next := printGroup(document, current, commands, width-position, len(lineSuffix) > 0, groupModes, &shouldRemeasure)
+			next := printGroup(
+				document,
+				current,
+				commands,
+				width-position,
+				len(lineSuffix) > 0,
+				groupModes,
+				&shouldRemeasure,
+			)
 			commands = append(commands, next)
-			if document.ID != nil {
-				groupModes[document.ID] = next.mode
+			if document.Id != nil {
+				groupModes[document.Id] = next.mode
 			}
 
 		case *Fill:
-			commands = printFill(&fillProgress{fill: document}, current, commands, width-position, len(lineSuffix) > 0, groupModes)
+			commands = printFill(
+				&fillProgress{fill: document},
+				current,
+				commands,
+				width-position,
+				len(lineSuffix) > 0,
+				groupModes,
+			)
 		case *fillProgress:
 			commands = printFill(document, current, commands, width-position, len(lineSuffix) > 0, groupModes)
 
 		case *IfBreak:
 			groupMode := current.mode
-			if document.GroupID != nil {
-				groupMode = groupModes[document.GroupID]
+			if document.GroupId != nil {
+				groupMode = groupModes[document.GroupId]
 			}
 			if groupMode == modeBreak && !isEmpty(document.BreakContents) {
-				commands = append(commands, command{indent: current.indent, mode: current.mode, doc: document.BreakContents})
+				commands = append(
+					commands,
+					command{indent: current.indent, mode: current.mode, doc: document.BreakContents},
+				)
 			}
 			if groupMode == modeFlat && !isEmpty(document.FlatContents) {
-				commands = append(commands, command{indent: current.indent, mode: current.mode, doc: document.FlatContents})
+				commands = append(
+					commands,
+					command{indent: current.indent, mode: current.mode, doc: document.FlatContents},
+				)
 			}
 
 		case *IndentIfBreak:
 			groupMode := current.mode
-			if document.GroupID != nil {
-				groupMode = groupModes[document.GroupID]
+			if document.GroupId != nil {
+				groupMode = groupModes[document.GroupId]
 			}
 			if groupMode == modeBreak {
 				contents := document.Contents
@@ -486,7 +470,10 @@ func Print(document Doc, options Options) string {
 
 		case lineSuffixBoundaryDoc:
 			if len(lineSuffix) > 0 {
-				commands = append(commands, command{indent: current.indent, mode: current.mode, doc: HardlineWithoutBreakParent})
+				commands = append(
+					commands,
+					command{indent: current.indent, mode: current.mode, doc: HardlineWithoutBreakParent},
+				)
 			}
 
 		case *Line:
@@ -538,6 +525,9 @@ func Print(document Doc, options Options) string {
 		default:
 			parts, isArray := Parts(document)
 			if !isArray {
+				// Invariant: the cases above and Parts cover every Doc this package defines, so only a nil doc
+				// lands here, which is a bug in the printer that built it and which upstream's
+				// printDocToString throws InvalidDocError for.
 				panic(fmt.Sprintf("invalid doc %T", current.doc))
 			}
 			for index := len(parts) - 1; index >= 0; index-- {
@@ -558,7 +548,18 @@ func Print(document Doc, options Options) string {
 }
 
 // printGroup is the immediately-invoked printGroup in upstream's DOC_TYPE_GROUP case.
-func printGroup(group *Group, current command, rest []command, remainingWidth int, hasLineSuffix bool, groupModes map[*GroupID]mode, shouldRemeasure *bool) command {
+//
+// Mutates: shouldRemeasure is Print's own flag, which upstream's printGroup clears in its enclosing scope
+// once a group has been measured.
+func printGroup(
+	group *Group,
+	current command,
+	rest []command,
+	remainingWidth int,
+	hasLineSuffix bool,
+	groupModes map[*GroupId]mode,
+	shouldRemeasure *bool,
+) command {
 	if current.mode == modeFlat && !*shouldRemeasure {
 		groupMode := modeFlat
 		if group.Break {
@@ -589,7 +590,14 @@ func printGroup(group *Group, current command, rest []command, remainingWidth in
 }
 
 // printFill is upstream's DOC_TYPE_FILL case, returning the command stack it leaves.
-func printFill(progress *fillProgress, current command, commands []command, remainingWidth int, hasLineSuffix bool, groupModes map[*GroupID]mode) []command {
+func printFill(
+	progress *fillProgress,
+	current command,
+	commands []command,
+	remainingWidth int,
+	hasLineSuffix bool,
+	groupModes map[*GroupId]mode,
+) []command {
 	parts := progress.fill.Parts
 	offset := progress.offset
 	length := len(parts) - offset
@@ -621,17 +629,21 @@ func printFill(progress *fillProgress, current command, commands []command, rema
 	}
 
 	secondContent := parts[offset+2]
-	remaining := command{indent: current.indent, mode: current.mode, doc: &fillProgress{fill: progress.fill, offset: offset + 2}}
+	remaining := command{
+		indent: current.indent,
+		mode:   current.mode,
+		doc:    &fillProgress{fill: progress.fill, offset: offset + 2},
+	}
 	firstAndSecond := command{indent: current.indent, mode: modeFlat, doc: Concat{content, whitespace, secondContent}}
 	firstAndSecondFit := fits(firstAndSecond, nil, remainingWidth, hasLineSuffix, groupModes, true)
 
-	commands = append(commands, remaining)
+	withRemaining := append(commands, remaining)
 	switch {
 	case firstAndSecondFit:
-		return append(commands, whitespaceFlat, contentFlat)
+		return append(withRemaining, whitespaceFlat, contentFlat)
 	case contentFits:
-		return append(commands, whitespaceBreak, contentFlat)
+		return append(withRemaining, whitespaceBreak, contentFlat)
 	default:
-		return append(commands, whitespaceBreak, contentBreak)
+		return append(withRemaining, whitespaceBreak, contentBreak)
 	}
 }

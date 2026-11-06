@@ -17,7 +17,7 @@ import (
 // wrapper reads `options?.treatUndefinedAsUnspecified === true` and passes everything else through.
 type ConsistentReturnSettings struct {
 	// TreatUndefinedAsUnspecified makes a return of `undefined` count as returning nothing. In the
-	// extension this is a question about the argument's TYPE as well as its spelling.
+	// extension this is a question about the argument's type as well as its spelling.
 	TreatUndefinedAsUnspecified bool
 }
 
@@ -29,9 +29,9 @@ type consistentReturnWire struct {
 //
 // # The config layer hands this a different shape than a fixture does
 //
-// `internal/lint/configuration/configuration.go` keeps `setting.Options = tuple[1]`, a single JSON
+// `internal/lint/configuration/load.go` keeps `setting.Options = tuple[1]`, a single JSON
 // value after the severity, while ESLint's `context.options` is every element after it. This rule's
-// `meta.schema` declares ONE element, so the two shapes coincide here and the object arrives whole.
+// `meta.schema` declares one element, so the two shapes coincide here and the object arrives whole.
 // Written out rather than assumed, because a decoder that is wrong for the config shape passes every
 // fixture: a fixture hands the decoder bytes the test built, never bytes the config layer sliced.
 // Pinned by `TestConsistentReturnDecoderAcceptsTheShapesTheConfigLayerDelivers`, which crosses that
@@ -40,14 +40,14 @@ type consistentReturnWire struct {
 // A malformed configuration is refused rather than decoded to an empty one. A decoder answering "no
 // options" to a shape it did not understand produces a rule that registers, reports, and enforces
 // something other than what the config says, which is the failure this repository exists to catch.
-func DecodeConsistentReturnOptions(raw []byte) (any, error) {
+func DecodeConsistentReturnOptions(raw []byte) (ConsistentReturnSettings, error) {
 	settings := ConsistentReturnSettings{}
 	if len(raw) == 0 {
 		return settings, nil
 	}
 	var wire consistentReturnWire
-	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
-		return settings, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &wire); unmarshalOptionsError != nil {
+		return settings, unmarshalOptionsError
 	}
 	if wire.TreatUndefinedAsUnspecified != nil {
 		settings.TreatUndefinedAsUnspecified = *wire.TreatUndefinedAsUnspecified
@@ -94,21 +94,21 @@ var messageConsistentReturnUnexpectedReturnValue = rule.Message{
 //	identical verdicts   17 of 30
 //	divergent            13 of 30
 //
-// Every one of the thirteen is the extension going SILENT where the core reports, and every one
+// Every one of the thirteen is the extension going silent where the core reports, and every one
 // needs the type checker to reach. Twelve are the `void` suppression below and one is the typed
 // `undefined` argument. A bare port of the core rule under this name would report on thirteen of
 // upstream's nineteen passing cases.
 //
 // # The first filter: a bare `return` in a void-returning function is not a decision
 //
-// Upstream's `isReturnVoidOrThenableVoid`. It reads the FUNCTION's type, takes its call signatures,
+// Upstream's `isReturnVoidOrThenableVoid`. It reads the function's type, takes its call signatures,
 // and asks whether any signature returns `void` -- or, for an `async` function, whether the
 // signature's return type is a thenable whose awaited type is `void`, recursing through nested
 // promises. If so, a `return;` inside it is dropped before the core rule ever sees it.
 //
 // `.some()` over the call signatures rather than the first is load bearing: an overloaded function
 // carries one signature per overload, and upstream's own corpus asserts that
-// `function foo(): boolean; function foo(flag: boolean): void;` is clean because ONE of the two is
+// `function foo(): boolean; function foo(flag: boolean): void;` is clean because one of the two is
 // void. Measured through the probe: the checker hands that implementation two signatures, `boolean`
 // and `void`, and only the second suppresses.
 //
@@ -116,7 +116,7 @@ var messageConsistentReturnUnexpectedReturnValue = rule.Message{
 //
 // Upstream intercepts the `ReturnStatement` listener and returns early, so the suppressed return
 // never reaches the core at all. That is not the same as dropping the finding it would produce,
-// because the FIRST return in a function sets the expectation every later return is measured
+// because the first return in a function sets the expectation every later return is measured
 // against. Suppress it as an input and a later `return 1;` is the first return and reports nothing;
 // suppress it as an output and the bare return still sets a no-value expectation that the `return 1`
 // then contradicts. The shared judgment therefore takes the question as a hook, asked while the
@@ -127,19 +127,19 @@ var messageConsistentReturnUnexpectedReturnValue = rule.Message{
 //
 // # The second filter: `treatUndefinedAsUnspecified` becomes a question about types
 //
-// The core rule reads the SPELLING: a bare identifier `undefined`, or any `void` expression. The
+// The core rule reads the spelling: a bare identifier `undefined`, or any `void` expression. The
 // extension additionally asks the checker whether the argument's type is exactly `undefined`, which
 // catches `return undef;` for a `declare const undef: undefined`. Upstream expresses this by handing
 // the core a synthesised return whose argument is null; the shared judgment reaches the same answer
 // by treating the argument as absent, because nothing downstream reads it again.
 //
-// `flags === ts.TypeFlags.Undefined` is an EQUALITY on the whole flag word rather than a mask, so a
+// `flags === ts.TypeFlags.Undefined` is an equality on the whole flag word rather than a mask, so a
 // union containing undefined does not qualify. Upstream's own corpus pins the difference: the
-// `declare const undefOrNum: undefined | number` case REPORTS while the `declare const undef:
+// `declare const undefOrNum: undefined | number` case reports while the `declare const undef:
 // undefined` case is clean, and only an equality separates them. Reproduced as an equality, with a
 // fixture on each side.
 //
-// # The shelf's IsTypeFlagSet is the WRONG helper here, and using it costs upstream's own cases
+// # The shelf's IsTypeFlagSet is the wrong helper here, and using it costs upstream's own cases
 //
 // `type_checking.IsTypeFlagSet` reads the type's own flags. typescript-eslint's `isTypeFlagSet` first
 // decomposes a union and ORs its constituents' flags, which is a different question. Measured on the
@@ -149,7 +149,7 @@ var messageConsistentReturnUnexpectedReturnValue = rule.Message{
 //	void | number            voidFlag=F   voidUnionFlag=T    DISAGREE
 //	Promise<void | number>   arg0 void=F  arg0 union void=T  DISAGREE
 //
-// Both disagreements are upstream PASSING cases -- `function foo(flag?: boolean): number | void` and
+// Both disagreements are upstream passing cases -- `function foo(flag?: boolean): number | void` and
 // the `PromiseVoidNumber` alias -- so reaching for the shelf helper by name would have reported two
 // of the nineteen clean cases while every other fixture stayed green. That is the failure the
 // standard describes as probing a helper against its doc comment rather than against upstream: the
@@ -160,11 +160,11 @@ var messageConsistentReturnUnexpectedReturnValue = rule.Message{
 //
 // # The name is not checkable from this package, and a sweep here says nothing about it
 //
-// A mutation renaming this rule survives a mutation sweep scoped to its own tests AND a sweep over
+// A mutation renaming this rule survives a mutation sweep scoped to its own tests and a sweep over
 // the whole `typescript` package, because every instrument in both is a fixture that names the rule
 // variable rather than its string. `internal/lint/registry` is what catches it, and it catches it
 // twice: `TestEveryRuleShipsAFixturePair` loses the rule's test file, and
-// `TestEveryRegisteredRuleIsReachableFromTheLiveConfig` reports the renamed name as unreachable.
+// `TestEveryRegisteredRuleIsReachableFromTheLiveConfiguration` reports the renamed name as unreachable.
 //
 // Measured, because "unscoped" reads as "sees everything" and does not: the sweep tool builds and
 // tests one package, so widening its scope from one test pattern to the whole package widens nothing
@@ -177,11 +177,11 @@ var messageConsistentReturnUnexpectedReturnValue = rule.Message{
 // boundary, and `IsThenableType` walks to the `Promise` declaration in the default library. Both are
 // the checker's answers, not reads of ctx.Program, and the findings cache keys them on the type
 // fingerprint, which covers the import closure, and on the binary, which holds the default library.
-var ConsistentReturn = rule.Rule{
+var ConsistentReturn = rule.Rule[ConsistentReturnSettings]{
 	Name:             "@typescript-eslint/consistent-return",
 	NeedsTypeChecker: true,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, ok := rule.OptionsAs[ConsistentReturnSettings](options)
+	Run: func(ruleContext rule.Context, options rule.Given[ConsistentReturnSettings]) rule.Listeners {
+		settings, ok := options.Read()
 		if !ok {
 			settings = ConsistentReturnSettings{}
 		}
@@ -197,13 +197,13 @@ var ConsistentReturn = rule.Rule{
 					},
 					consistentreturn.Hooks{
 						SuppressBareReturn: func(scope *ast.Node, _ *ast.Node) bool {
-							return consistentReturnIsVoidOrThenableVoid(ctx, scope)
+							return consistentReturnIsVoidOrThenableVoid(ruleContext, scope)
 						},
 						TreatsArgumentAsUnspecified: func(argument *ast.Node) bool {
-							return consistentReturnArgumentIsExactlyUndefined(ctx, argument)
+							return consistentReturnArgumentIsExactlyUndefined(ruleContext, argument)
 						},
 					},
-					consistentReturnReporter(ctx),
+					consistentReturnReporter(ruleContext),
 					consistentReturnDescribe)
 			},
 		}
@@ -211,16 +211,16 @@ var ConsistentReturn = rule.Rule{
 }
 
 // consistentReturnReporter wires the shared judgment's findings into this rule's context.
-func consistentReturnReporter(ctx rule.Context) consistentreturn.Reporter {
+func consistentReturnReporter(ruleContext rule.Context) consistentreturn.Reporter {
 	return consistentreturn.Reporter{
 		ReportNode: func(node *ast.Node, messageId string, description string) {
-			ctx.ReportNode(node, rule.Message{Id: messageId, Description: description})
+			ruleContext.ReportNode(node, rule.Message{Id: messageId, Description: description})
 		},
 		ReportRange: func(textRange core.TextRange, messageId string, description string) {
-			ctx.ReportRange(textRange, rule.Message{Id: messageId, Description: description})
+			ruleContext.ReportRange(textRange, rule.Message{Id: messageId, Description: description})
 		},
 		TokenRange: func(node *ast.Node) core.TextRange {
-			return rule.TokenRange(ctx.SourceFile, node)
+			return rule.TokenRange(ruleContext.SourceFile, node)
 		},
 	}
 }
@@ -248,32 +248,32 @@ func consistentReturnDescribe(messageId string, name string) string {
 //
 // The `async` branch is chosen by the function's own `async` modifier rather than by whether the
 // return type happens to be thenable, because that is what upstream reads (`node.async`). A
-// non-async function declared to return `Promise<void>` therefore takes the plain branch and is NOT
+// non-async function declared to return `Promise<void>` therefore takes the plain branch and is not
 // suppressed, which upstream's corpus pins directly: `function foo(flag?: boolean): Promise<void>`
-// with a bare return REPORTS, while the same signature with `async` is clean.
-func consistentReturnIsVoidOrThenableVoid(ctx rule.Context, scope *ast.Node) bool {
+// with a bare return reports, while the same signature with `async` is clean.
+func consistentReturnIsVoidOrThenableVoid(ruleContext rule.Context, scope *ast.Node) bool {
 	// The Program is a scope for the judgment but has no type, and upstream's wrapper only ever
 	// receives the three function kinds.
 	if !consistentreturn.IsScope(scope) {
 		return false
 	}
-	if ctx.TypeChecker == nil {
+	if ruleContext.TypeChecker == nil {
 		return false
 	}
 
-	functionType := ctx.TypeChecker.GetTypeAtLocation(scope)
+	functionType := ruleContext.TypeChecker.GetTypeAtLocation(scope)
 	if functionType == nil {
 		return false
 	}
 	isAsync := scope.ModifierFlags()&ast.ModifierFlagsAsync != 0
 
-	for _, signature := range type_checking.GetCallSignatures(ctx.TypeChecker, functionType) {
-		returnType := checker.Checker_getReturnTypeOfSignature(ctx.TypeChecker, signature)
+	for _, signature := range type_checking.GetCallSignatures(ruleContext.TypeChecker, functionType) {
+		returnType := checker.Checker_getReturnTypeOfSignature(ruleContext.TypeChecker, signature)
 		if returnType == nil {
 			continue
 		}
 		if isAsync {
-			if consistentReturnIsPromiseVoid(ctx, scope, returnType) {
+			if consistentReturnIsPromiseVoid(ruleContext, scope, returnType) {
 				return true
 			}
 			continue
@@ -291,27 +291,28 @@ func consistentReturnIsVoidOrThenableVoid(ctx rule.Context, scope *ast.Node) boo
 // `Promise<Promise<void | undefined>>` is one of upstream's passing cases and only the recursion
 // reaches it.
 //
-// The type-reference guard is not defensive. `Checker_getTypeArguments` PANICS on a type that is not
+// The type-reference guard is not defensive. `Checker_getTypeArguments` panics on a type that is not
 // a reference, reproduced directly in `internal/consistent_return_ext_probe` on a plain `void`
 // return type, and a panic costs every rule in the package its verdict on that file. Upstream gets
 // the same guard from `tsutils.isTypeReference` and can afford to treat it as a type narrowing;
 // here it is a crash guard as well.
-func consistentReturnIsPromiseVoid(ctx rule.Context, node *ast.Node, subject *checker.Type) bool {
+func consistentReturnIsPromiseVoid(ruleContext rule.Context, node *ast.Node, subject *checker.Type) bool {
 	// A depth bound rather than an unbounded recursion. Upstream has none, because its recursion is
 	// over resolved type arguments which terminate; the bound is here because a self-referential
 	// alias would otherwise be a hang rather than a finding, and 32 is far past any real promise
 	// nesting.
+	currentType := subject
 	for depth := 0; depth < 32; depth++ {
-		if subject == nil {
+		if currentType == nil {
 			return false
 		}
-		if !type_checking.IsThenableType(ctx.TypeChecker, node, subject) {
+		if !type_checking.IsThenableType(ruleContext.TypeChecker, node, currentType) {
 			return false
 		}
-		if !consistentReturnIsTypeReference(subject) {
+		if !consistentReturnIsTypeReference(currentType) {
 			return false
 		}
-		arguments := checker.Checker_getTypeArguments(ctx.TypeChecker, subject)
+		arguments := checker.Checker_getTypeArguments(ruleContext.TypeChecker, currentType)
 		if len(arguments) == 0 {
 			return false
 		}
@@ -322,7 +323,7 @@ func consistentReturnIsPromiseVoid(ctx rule.Context, node *ast.Node, subject *ch
 		if consistentReturnUnionFlagSet(awaited, checker.TypeFlagsVoid) {
 			return true
 		}
-		subject = awaited
+		currentType = awaited
 	}
 	return false
 }
@@ -334,11 +335,11 @@ func consistentReturnIsTypeReference(subject *checker.Type) bool {
 		checker.Type_objectFlags(subject)&checker.ObjectFlagsReference != 0
 }
 
-// consistentReturnUnionFlagSet is typescript-eslint's `isTypeFlagSet`, which is NOT the shelf's.
+// consistentReturnUnionFlagSet is typescript-eslint's `isTypeFlagSet`, which is not the shelf's.
 //
 // Upstream's `getTypeFlags` ORs the flags of every union constituent before masking, so
 // `void | number` answers true for Void where the shelf's `type_checking.IsTypeFlagSet` answers false.
-// Both of the corpus cases that separate the two readings are upstream PASSING cases, so the shelf
+// Both of the corpus cases that separate the two readings are upstream passing cases, so the shelf
 // helper would have reported them. See the rule's doc comment for the measurement.
 //
 // Not added to `internal/lint/checking` under a new name, because the shelf already has a function
@@ -349,7 +350,7 @@ func consistentReturnUnionFlagSet(subject *checker.Type, flags checker.TypeFlags
 		return false
 	}
 	var combined checker.TypeFlags
-	for part := range type_checking.UnionTypePartsSeq(subject) {
+	for part := range type_checking.UnionTypePartsSequence(subject) {
 		if part == nil {
 			continue
 		}
@@ -366,7 +367,7 @@ func consistentReturnUnionFlagSet(subject *checker.Type, flags checker.TypeFlags
 // # The equality and a mask are indistinguishable here, and that was measured rather than argued
 //
 // The obvious reading is that the equality is load bearing: a union containing undefined would carry
-// extra bits and a mask would wrongly accept it. That reading is WRONG, and a first draft of this
+// extra bits and a mask would wrongly accept it. That reading is wrong, and a first draft of this
 // file shipped it as a documented decision with a test on each side.
 //
 // A union does not carry its constituents' bits. `undefined | number` has flags 134217728, which is
@@ -378,7 +379,7 @@ func consistentReturnUnionFlagSet(subject *checker.Type, flags checker.TypeFlags
 //	any                                          flags 1          equality F   mask F
 //	never                                        flags 262144     equality F   mask F
 //
-// No input separates them, and a mutation turning the equality into a mask SURVIVES the whole
+// No input separates them, and a mutation turning the equality into a mask survives the whole
 // fixture set for that reason. The survival is genuine equivalence rather than a blind spot, which
 // is a different claim from "the fixtures cannot see it" and is why it is written down here instead
 // of chased with another fixture.
@@ -386,11 +387,11 @@ func consistentReturnUnionFlagSet(subject *checker.Type, flags checker.TypeFlags
 // Kept as an equality anyway, because it is upstream's spelling and the two are equivalent only as
 // long as the checker keeps representing unions this way. Nothing is asserted about the difference,
 // since there is none to assert.
-func consistentReturnArgumentIsExactlyUndefined(ctx rule.Context, argument *ast.Node) bool {
-	if ctx.TypeChecker == nil || argument == nil {
+func consistentReturnArgumentIsExactlyUndefined(ruleContext rule.Context, argument *ast.Node) bool {
+	if ruleContext.TypeChecker == nil || argument == nil {
 		return false
 	}
-	argumentType := ctx.TypeChecker.GetTypeAtLocation(argument)
+	argumentType := ruleContext.TypeChecker.GetTypeAtLocation(argument)
 	if argumentType == nil {
 		return false
 	}

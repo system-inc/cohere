@@ -85,13 +85,10 @@ func isLastDescendantNode(path *astPath) bool {
 
 	stack := path.Stack()
 	for index := 1; index < len(stack); index++ {
-		item := stack[index]
-		parentItem := stack[index-1]
-
-		// Every list a YAML node holds is a []*unist.Node (children and the comment lists), and an
-		// index on the stack is an int.
-		if list, isList := parentItem.([]*unist.Node); isList {
-			if position, isNumber := item.(int); isNumber && position != len(list)-1 {
+		// Every list a YAML node holds is a list of nodes (children and the comment lists), and the frame
+		// under one is reached by an index.
+		if list, isList := stack[index-1].Value.Nodes(); isList {
+			if stack[index].Name.IsIndex && stack[index].Name.Index != len(list)-1 {
 				return false
 			}
 		}
@@ -271,7 +268,13 @@ var trailingSpacesAndTabsPattern = regexp.MustCompile(`[ \t]+$`)
 
 // getBlockValueLineContents is upstream's getBlockValueLineContents: the words of each line of a block
 // scalar, with the indentation removed and the trailing empty lines its chomping keeps.
-func getBlockValueLineContents(node *unist.Node, parentIndent int, isLastDescendant bool, options *options, settings *settings) [][]string {
+func getBlockValueLineContents(
+	node *unist.Node,
+	parentIndent int,
+	isLastDescendant bool,
+	options *options,
+	settings *settings,
+) [][]string {
 	content := ""
 	if node.Position.Start.Line != node.Position.End.Line {
 		// exclude open line `>` or `|`
@@ -357,7 +360,12 @@ func getBlockValueLineContents(node *unist.Node, parentIndent int, isLastDescend
 }
 
 // removeUnnecessaryTrailingNewlines is the closure of that name inside getBlockValueLineContents.
-func removeUnnecessaryTrailingNewlines(lineContents [][]string, node *unist.Node, content string, isLastDescendant bool) [][]string {
+func removeUnnecessaryTrailingNewlines(
+	lineContents [][]string,
+	node *unist.Node,
+	content string,
+	isLastDescendant bool,
+) [][]string {
 	if node.Chomping == "keep" {
 		if strings.HasSuffix(content, "\n") && len(lineContents[len(lineContents)-1]) == 0 {
 			return lineContents[:len(lineContents)-1]

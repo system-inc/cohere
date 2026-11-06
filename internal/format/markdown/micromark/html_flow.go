@@ -112,7 +112,7 @@ func resolveToHtmlFlow(events []Event, context *TokenizeContext) []Event {
 		// Add the prefix start to the HTML line token.
 		events[index+1].Token.Start = events[index-2].Token.Start
 		// Remove the line prefix.
-		events = splice(events, index-2, 2, nil)
+		return splice(events, index-2, 2, nil)
 	}
 
 	return events
@@ -128,13 +128,36 @@ func tokenizeHtmlFlow(self *Self, effects *Effects, ok State, nok State) State {
 	// closing quote, which no state reads before setting it again.
 	var markerB Code
 
-	var start, before, open, declarationOpen, commentOpenInside, cdataOpenInside, tagCloseStart, tagName,
-		basicSelfClosing, completeClosingTagAfter, completeAttributeNameBefore, completeAttributeName,
-		completeAttributeNameAfter, completeAttributeValueBefore, completeAttributeValueQuoted,
-		completeAttributeValueUnquoted, completeAttributeValueQuotedAfter, completeEnd, completeAfter,
-		continuation, continuationStart, continuationStartNonLazy, continuationBefore,
-		continuationCommentInside, continuationRawTagOpen, continuationRawEndTag, continuationCdataInside,
-		continuationDeclarationInside, continuationClose, continuationAfter State
+	var start State
+	var before State
+	var open State
+	var declarationOpen State
+	var commentOpenInside State
+	var cdataOpenInside State
+	var tagCloseStart State
+	var tagName State
+	var basicSelfClosing State
+	var completeClosingTagAfter State
+	var completeAttributeNameBefore State
+	var completeAttributeName State
+	var completeAttributeNameAfter State
+	var completeAttributeValueBefore State
+	var completeAttributeValueQuoted State
+	var completeAttributeValueUnquoted State
+	var completeAttributeValueQuotedAfter State
+	var completeEnd State
+	var completeAfter State
+	var continuation State
+	var continuationStart State
+	var continuationStartNonLazy State
+	var continuationBefore State
+	var continuationCommentInside State
+	var continuationRawTagOpen State
+	var continuationRawEndTag State
+	var continuationCdataInside State
+	var continuationDeclarationInside State
+	var continuationClose State
+	var continuationAfter State
 
 	// Start of HTML (flow).
 	start = func(code Code) State {
@@ -376,7 +399,11 @@ func tokenizeHtmlFlow(self *Self, effects *Effects, ok State, nok State) State {
 	// In attribute name.
 	completeAttributeName = func(code Code) State {
 		// ASCII alphanumerical and `-`, `.`, `:`, and `_`.
-		if code == CodeDash || code == CodeDot || code == CodeColon || code == CodeUnderscore || asciiAlphanumeric(code) {
+		if code == CodeDash ||
+			code == CodeDot ||
+			code == CodeColon ||
+			code == CodeUnderscore ||
+			asciiAlphanumeric(code) {
 			effects.Consume(code)
 			return completeAttributeName
 		}
@@ -401,7 +428,11 @@ func tokenizeHtmlFlow(self *Self, effects *Effects, ok State, nok State) State {
 
 	// Before unquoted, double quoted, or single quoted attribute value, allowing whitespace.
 	completeAttributeValueBefore = func(code Code) State {
-		if code == CodeEof || code == CodeLessThan || code == CodeEqualsTo || code == CodeGreaterThan || code == CodeGraveAccent {
+		if code == CodeEof ||
+			code == CodeLessThan ||
+			code == CodeEqualsTo ||
+			code == CodeGreaterThan ||
+			code == CodeGraveAccent {
 			return nok(code)
 		}
 
@@ -586,7 +617,7 @@ func tokenizeHtmlFlow(self *Self, effects *Effects, ok State, nok State) State {
 			return continuation(code)
 		}
 
-		if asciiAlpha(code) && len(buffer) < htmlRawSizeMax {
+		if asciiAlpha(code) && len(buffer) < htmlRawSizeMaximum {
 			// Always the case.
 			effects.Consume(code)
 			buffer += string(rune(code))
@@ -647,7 +678,8 @@ func tokenizeHtmlFlow(self *Self, effects *Effects, ok State, nok State) State {
 }
 
 func tokenizeHtmlFlowNonLazyContinuationStart(self *Self, effects *Effects, ok State, nok State) State {
-	var start, after State
+	var start State
+	var after State
 
 	// At eol, before continuation.
 	start = func(code Code) State {
@@ -673,10 +705,8 @@ func tokenizeHtmlFlowNonLazyContinuationStart(self *Self, effects *Effects, ok S
 }
 
 func tokenizeHtmlFlowBlankLineBefore(self *Self, effects *Effects, ok State, nok State) State {
-	var start State
-
 	// Before eol, expecting blank line.
-	start = func(code Code) State {
+	start := func(code Code) State {
 		effects.Enter(TypeLineEnding, nil)
 		effects.Consume(code)
 		effects.Exit(TypeLineEnding)

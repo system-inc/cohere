@@ -12,20 +12,20 @@ import (
 const uselessRenameFile = "/repository/source/UselessRename.ts"
 
 // uselessRenameOptions routes the options through the rule's own exported decoder.
-func uselessRenameOptions(t *testing.T, ignoreDestructuring bool, ignoreImport bool,
-	ignoreExport bool) any {
-	t.Helper()
-	raw, err := json.Marshal(map[string]bool{
+func uselessRenameOptions(test *testing.T, ignoreDestructuring bool, ignoreImport bool,
+	ignoreExport bool) NoUselessRenameSettings {
+	test.Helper()
+	raw, encodeError := json.Marshal(map[string]bool{
 		"ignoreDestructuring": ignoreDestructuring,
 		"ignoreImport":        ignoreImport,
 		"ignoreExport":        ignoreExport,
 	})
-	if err != nil {
-		t.Fatalf("could not marshal the options: %v", err)
+	if encodeError != nil {
+		test.Fatalf("could not marshal the options: %v", encodeError)
 	}
-	decoded, err := DecodeNoUselessRenameOptions(raw)
-	if err != nil {
-		t.Fatalf("the decoder refused %s: %v", raw, err)
+	decoded, decodeNoUselessRenameOptionsError := DecodeNoUselessRenameOptions(raw)
+	if decodeNoUselessRenameOptionsError != nil {
+		test.Fatalf("the decoder refused %s: %v", raw, decodeNoUselessRenameOptionsError)
 	}
 	return decoded
 }
@@ -35,12 +35,12 @@ func uselessRenameOptions(t *testing.T, ignoreDestructuring bool, ignoreImport b
 //
 // Extracted by loading upstream's tester with a stubbed RuleTester and rendering these literals
 // from that JSON, so nothing was retyped and no escape sequence was hand-written. That matters
-// more here than usual: five cases turn on a unicode ESCAPE being preserved as an escape, and a
+// more here than usual: five cases turn on a unicode escape being preserved as an escape, and a
 // tool that cooked \\u0061 into a would leave them asserting the opposite of upstream while still
 // passing. The generator refuses any byte outside printable ASCII, and TestNoUselessRenameCorpus
 // ByteCheck compares the escape cases against upstream's own bytes.
-func TestNoUselessRenameFires(t *testing.T) {
-	t.Parallel()
+func TestNoUselessRenameFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText          string
@@ -159,14 +159,14 @@ func TestNoUselessRenameFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
 			expected := make([]string, testCase.findings)
 			for index := range expected {
 				expected[index] = "unnecessarilyRenamed"
 			}
-			rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoUselessRename,
-				uselessRenameFile, testCase.sourceText, uselessRenameOptions(t,
+			rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoUselessRename,
+				uselessRenameFile, testCase.sourceText, uselessRenameOptions(test,
 					testCase.ignoreDestructuring, testCase.ignoreImport, testCase.ignoreExport)),
 				expected...)
 		})
@@ -179,8 +179,8 @@ func TestNoUselessRenameFires(t *testing.T) {
 // two names without those tests reports every shorthand destructuring in the tree. The three
 // option rows are the other half: the same source is a finding without the option and clean with
 // it.
-func TestNoUselessRenameStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoUselessRenameStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText          string
@@ -246,10 +246,10 @@ func TestNoUselessRenameStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoUselessRename,
-				uselessRenameFile, testCase.sourceText, uselessRenameOptions(t,
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoUselessRename,
+				uselessRenameFile, testCase.sourceText, uselessRenameOptions(test,
 					testCase.ignoreDestructuring, testCase.ignoreImport, testCase.ignoreExport)))
 		})
 	}
@@ -257,13 +257,13 @@ func TestNoUselessRenameStaysSilent(t *testing.T) {
 
 // The fix vectors, which are upstream's own output fields.
 //
-// These assert what the repair WRITES rather than that a finding appeared, and they are the only
+// These assert what the repair writes rather than that a finding appeared, and they are the only
 // thing that can see a fixer repairing the right span with the wrong text. The escape rows are
 // the sharpest: let {a: \\u0061} = obj fixes to let {\\u0061} = obj, keeping the escape, while
 // let {\\u0061: a} = obj fixes to let {a} = obj. Which side survives is decided by the repair
-// keeping the LOCAL text, and nothing but an output comparison could tell the two apart.
-func TestNoUselessRenameFixes(t *testing.T) {
-	t.Parallel()
+// keeping the local text, and nothing but an output comparison could tell the two apart.
+func TestNoUselessRenameFixes(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText          string
@@ -289,8 +289,20 @@ func TestNoUselessRenameFixes(t *testing.T) {
 		{"let {'foo': foo, 'bar': bar} = obj;", "let {foo, bar} = obj;", false, false, false},
 		{"let {'foo': {'bar': bar}} = obj;", "let {'foo': {bar}} = obj;", false, false, false},
 		{"let {'foo': {'bar': bar}, 'baz': baz} = obj;", "let {'foo': {bar}, baz} = obj;", false, false, false},
-		{"let {foo: foo = 1, 'bar': bar = 1, baz: baz} = obj;", "let {foo = 1, bar = 1, baz} = obj;", false, false, false},
-		{"let {foo: {bar: bar = 1, 'baz': baz = 1}} = obj;", "let {foo: {bar = 1, baz = 1}} = obj;", false, false, false},
+		{
+			"let {foo: foo = 1, 'bar': bar = 1, baz: baz} = obj;",
+			"let {foo = 1, bar = 1, baz} = obj;",
+			false,
+			false,
+			false,
+		},
+		{
+			"let {foo: {bar: bar = 1, 'baz': baz = 1}} = obj;",
+			"let {foo: {bar = 1, baz = 1}} = obj;",
+			false,
+			false,
+			false,
+		},
 		{"let {foo: {bar: bar = {}} = {}} = obj;", "let {foo: {bar = {}} = {}} = obj;", false, false, false},
 		{"let {foo: foo = (a)} = obj;", "let {foo = (a)} = obj;", false, false, false},
 		{"let {foo: foo = (a, b)} = obj;", "let {foo = (a, b)} = obj;", false, false, false},
@@ -298,9 +310,27 @@ func TestNoUselessRenameFixes(t *testing.T) {
 		{"function func({foo: foo, bar: baz}) {}", "function func({foo, bar: baz}) {}", false, false, false},
 		{"function func({foo: bar, baz: baz}) {}", "function func({foo: bar, baz}) {}", false, false, false},
 		{"function func({foo: foo, bar: bar}) {}", "function func({foo, bar}) {}", false, false, false},
-		{"function func({foo: foo = 1, 'bar': bar = 1, baz: baz}) {}", "function func({foo = 1, bar = 1, baz}) {}", false, false, false},
-		{"function func({foo: {bar: bar = 1, 'baz': baz = 1}}) {}", "function func({foo: {bar = 1, baz = 1}}) {}", false, false, false},
-		{"function func({foo: {bar: bar = {}} = {}}) {}", "function func({foo: {bar = {}} = {}}) {}", false, false, false},
+		{
+			"function func({foo: foo = 1, 'bar': bar = 1, baz: baz}) {}",
+			"function func({foo = 1, bar = 1, baz}) {}",
+			false,
+			false,
+			false,
+		},
+		{
+			"function func({foo: {bar: bar = 1, 'baz': baz = 1}}) {}",
+			"function func({foo: {bar = 1, baz = 1}}) {}",
+			false,
+			false,
+			false,
+		},
+		{
+			"function func({foo: {bar: bar = {}} = {}}) {}",
+			"function func({foo: {bar = {}} = {}}) {}",
+			false,
+			false,
+			false,
+		},
 		{"({foo: foo}) => {}", "({foo}) => {}", false, false, false},
 		{"({foo: foo, bar: baz}) => {}", "({foo, bar: baz}) => {}", false, false, false},
 		{"({foo: bar, baz: baz}) => {}", "({foo: bar, baz}) => {}", false, false, false},
@@ -309,8 +339,20 @@ func TestNoUselessRenameFixes(t *testing.T) {
 		{"({foo: {bar: bar = 1, 'baz': baz = 1}}) => {}", "({foo: {bar = 1, baz = 1}}) => {}", false, false, false},
 		{"({foo: {bar: bar = {}} = {}}) => {}", "({foo: {bar = {}} = {}}) => {}", false, false, false},
 		{"const {foo: foo, ...stuff} = myObject;", "const {foo, ...stuff} = myObject;", false, false, false},
-		{"const {foo: foo, bar: baz, ...stuff} = myObject;", "const {foo, bar: baz, ...stuff} = myObject;", false, false, false},
-		{"const {foo: foo, bar: bar, ...stuff} = myObject;", "const {foo, bar, ...stuff} = myObject;", false, false, false},
+		{
+			"const {foo: foo, bar: baz, ...stuff} = myObject;",
+			"const {foo, bar: baz, ...stuff} = myObject;",
+			false,
+			false,
+			false,
+		},
+		{
+			"const {foo: foo, bar: bar, ...stuff} = myObject;",
+			"const {foo, bar, ...stuff} = myObject;",
+			false,
+			false,
+			false,
+		},
 		{"import {foo as foo} from 'foo';", "import {foo} from 'foo';", false, false, false},
 		{"import {'foo' as foo} from 'foo';", "import {foo} from 'foo';", false, false, false},
 		{"import {\\u0061 as a} from 'foo';", "import {a} from 'foo';", false, false, false},
@@ -324,20 +366,50 @@ func TestNoUselessRenameFixes(t *testing.T) {
 		{"export {foo as 'foo'} from 'bar';", "export {foo} from 'bar';", false, false, false},
 		{"export {'foo' as foo} from 'bar';", "export {'foo'} from 'bar';", false, false, false},
 		{"export {'foo' as 'foo'} from 'bar';", "export {'foo'} from 'bar';", false, false, false},
-		{"export {' \U0001f44d ' as ' \U0001f44d '} from 'bar';", "export {' \U0001f44d '} from 'bar';", false, false, false},
+		{
+			"export {' \U0001f44d ' as ' \U0001f44d '} from 'bar';",
+			"export {' \U0001f44d '} from 'bar';",
+			false,
+			false,
+			false,
+		},
 		{"export {'' as ''} from 'bar';", "export {''} from 'bar';", false, false, false},
 		{"var a = 0; export {a as \\u0061};", "var a = 0; export {a};", false, false, false},
 		{"var \\u0061 = 0; export {\\u0061 as a};", "var \\u0061 = 0; export {\\u0061};", false, false, false},
 		{"var \\u0061 = 0; export {\\u0061 as \\u0061};", "var \\u0061 = 0; export {\\u0061};", false, false, false},
-		{"var foo = 0; var bar = 0; export {foo as foo, bar as baz};", "var foo = 0; var bar = 0; export {foo, bar as baz};", false, false, false},
-		{"var foo = 0; var baz = 0; export {foo as bar, baz as baz};", "var foo = 0; var baz = 0; export {foo as bar, baz};", false, false, false},
-		{"var foo = 0; var bar = 0;export {foo as foo, bar as bar};", "var foo = 0; var bar = 0;export {foo, bar};", false, false, false},
+		{
+			"var foo = 0; var bar = 0; export {foo as foo, bar as baz};",
+			"var foo = 0; var bar = 0; export {foo, bar as baz};",
+			false,
+			false,
+			false,
+		},
+		{
+			"var foo = 0; var baz = 0; export {foo as bar, baz as baz};",
+			"var foo = 0; var baz = 0; export {foo as bar, baz};",
+			false,
+			false,
+			false,
+		},
+		{
+			"var foo = 0; var bar = 0;export {foo as foo, bar as bar};",
+			"var foo = 0; var bar = 0;export {foo, bar};",
+			false,
+			false,
+			false,
+		},
 		{"export {foo as foo} from 'foo';", "export {foo} from 'foo';", false, false, false},
 		{"export {a as \\u0061} from 'foo';", "export {a} from 'foo';", false, false, false},
 		{"export {\\u0061 as a} from 'foo';", "export {\\u0061} from 'foo';", false, false, false},
 		{"export {\\u0061 as \\u0061} from 'foo';", "export {\\u0061} from 'foo';", false, false, false},
 		{"export {foo as foo, bar as baz} from 'foo';", "export {foo, bar as baz} from 'foo';", false, false, false},
-		{"var foo = 0; var bar = 0; export {foo as bar, baz as baz} from 'foo';", "var foo = 0; var bar = 0; export {foo as bar, baz} from 'foo';", false, false, false},
+		{
+			"var foo = 0; var bar = 0; export {foo as bar, baz as baz} from 'foo';",
+			"var foo = 0; var bar = 0; export {foo as bar, baz} from 'foo';",
+			false,
+			false,
+			false,
+		},
 		{"export {foo as foo, bar as bar} from 'foo';", "export {foo, bar} from 'foo';", false, false, false},
 		{"({/* comment */foo: foo} = {});", "({/* comment */foo} = {});", false, false, false},
 		{"({/* comment */foo: foo = 1} = {});", "({/* comment */foo = 1} = {});", false, false, false},
@@ -350,21 +422,51 @@ func TestNoUselessRenameFixes(t *testing.T) {
 		{"({foo: foo = // comment\n 1} = {});", "({foo = // comment\n 1} = {});", false, false, false},
 		{"({foo: foo = (1/* comment */)} = {});", "({foo = (1/* comment */)} = {});", false, false, false},
 		{"import {/* comment */foo as foo} from 'foo';", "import {/* comment */foo} from 'foo';", false, false, false},
-		{"import {foo,/* comment */bar as bar} from 'foo';", "import {foo,/* comment */bar} from 'foo';", false, false, false},
+		{
+			"import {foo,/* comment */bar as bar} from 'foo';",
+			"import {foo,/* comment */bar} from 'foo';",
+			false,
+			false,
+			false,
+		},
 		{"import {foo as foo/* comment */} from 'foo';", "import {foo/* comment */} from 'foo';", false, false, false},
-		{"import {foo as foo/* comment */,bar} from 'foo';", "import {foo/* comment */,bar} from 'foo';", false, false, false},
+		{
+			"import {foo as foo/* comment */,bar} from 'foo';",
+			"import {foo/* comment */,bar} from 'foo';",
+			false,
+			false,
+			false,
+		},
 		{"let foo; export {/* comment */foo as foo};", "let foo; export {/* comment */foo};", false, false, false},
-		{"let foo, bar; export {foo,/* comment */bar as bar};", "let foo, bar; export {foo,/* comment */bar};", false, false, false},
+		{
+			"let foo, bar; export {foo,/* comment */bar as bar};",
+			"let foo, bar; export {foo,/* comment */bar};",
+			false,
+			false,
+			false,
+		},
 		{"let foo; export {foo as foo/* comment*/};", "let foo; export {foo/* comment*/};", false, false, false},
-		{"let foo, bar; export {foo as foo/* comment*/,bar};", "let foo, bar; export {foo/* comment*/,bar};", false, false, false},
-		{"let foo, bar; export {foo as foo//comment\n,bar};", "let foo, bar; export {foo//comment\n,bar};", false, false, false},
+		{
+			"let foo, bar; export {foo as foo/* comment*/,bar};",
+			"let foo, bar; export {foo/* comment*/,bar};",
+			false,
+			false,
+			false,
+		},
+		{
+			"let foo, bar; export {foo as foo//comment\n,bar};",
+			"let foo, bar; export {foo//comment\n,bar};",
+			false,
+			false,
+			false,
+		},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFixedSource(t, rule_testing.RunWithOptions(t, NoUselessRename,
-				uselessRenameFile, testCase.sourceText, uselessRenameOptions(t,
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFixedSource(test, rule_testing.RunWithOptions(test, NoUselessRename,
+				uselessRenameFile, testCase.sourceText, uselessRenameOptions(test,
 					testCase.ignoreDestructuring, testCase.ignoreImport, testCase.ignoreExport)),
 				testCase.wantSource)
 		})
@@ -378,11 +480,11 @@ func TestNoUselessRenameFixes(t *testing.T) {
 // parenthesized left side of a default cannot become a shorthand property, because parentheses
 // are not legal there.
 //
-// Asserted as the ABSENCE of a proposal rather than through ExpectFixedSource, which refuses a
+// Asserted as the absence of a proposal rather than through ExpectFixedSource, which refuses a
 // result carrying no fixes rather than treating it as an unchanged rewrite. The count is what
 // separates a withheld repair from one that lands and happens to write the same bytes.
-func TestNoUselessRenameDeclinesToFix(t *testing.T) {
-	t.Parallel()
+func TestNoUselessRenameDeclinesToFix(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText          string
@@ -415,19 +517,19 @@ func TestNoUselessRenameDeclinesToFix(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoUselessRename, uselessRenameFile,
-				testCase.sourceText, uselessRenameOptions(t, testCase.ignoreDestructuring,
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoUselessRename, uselessRenameFile,
+				testCase.sourceText, uselessRenameOptions(test, testCase.ignoreDestructuring,
 					testCase.ignoreImport, testCase.ignoreExport))
 			expected := make([]string, testCase.findings)
 			for index := range expected {
 				expected[index] = "unnecessarilyRenamed"
 			}
-			rule_testing.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(test, result, expected...)
 			for _, diagnostic := range result.Diagnostics {
 				if len(diagnostic.Fixes) != 0 {
-					t.Errorf("expected no repair to be offered, got %d", len(diagnostic.Fixes))
+					test.Errorf("expected no repair to be offered, got %d", len(diagnostic.Fixes))
 				}
 			}
 		})
@@ -437,11 +539,11 @@ func TestNoUselessRenameDeclinesToFix(t *testing.T) {
 // The escape cases still hold real escape sequences on disk.
 //
 // Five corpus cases turn on a unicode escape being preserved rather than cooked, and a tool that
-// cooked one would leave the fixture asserting the opposite of upstream WHILE STILL PASSING,
+// cooked one would leave the fixture asserting the opposite of upstream while still passing,
 // because a cooked and an uncooked name compare equal through this rule. So the bytes are checked
 // rather than the behaviour: the literal must still contain a backslash-u sequence.
-func TestNoUselessRenameCorpusByteCheck(t *testing.T) {
-	t.Parallel()
+func TestNoUselessRenameCorpusByteCheck(test *testing.T) {
+	test.Parallel()
 
 	escapeCases := []string{
 		"let {\\u0061: a} = obj;",
@@ -458,11 +560,11 @@ func TestNoUselessRenameCorpusByteCheck(t *testing.T) {
 		"export {\\u0061 as \\u0061} from 'foo';",
 	}
 	if len(escapeCases) != 12 {
-		t.Fatalf("expected 12 escape cases, got %d", len(escapeCases))
+		test.Fatalf("expected 12 escape cases, got %d", len(escapeCases))
 	}
 	for _, sourceText := range escapeCases {
 		if !strings.Contains(sourceText, "\\u") {
-			t.Errorf("the escape was cooked away in %q, so this case no longer tests what "+
+			test.Errorf("the escape was cooked away in %q, so this case no longer tests what "+
 				"upstream asserts", sourceText)
 		}
 	}
@@ -475,8 +577,8 @@ func TestNoUselessRenameCorpusByteCheck(t *testing.T) {
 // 14, which is `foo: foo` and not `foo`. Every message-id assertion above is satisfied by a rule
 // reporting only one of the two names, and on a fixable rule the span is what says the repair lands
 // where the reader was shown.
-func TestNoUselessRenamePointsAtTheWholeRename(t *testing.T) {
-	t.Parallel()
+func TestNoUselessRenamePointsAtTheWholeRename(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -489,18 +591,18 @@ func TestNoUselessRenamePointsAtTheWholeRename(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoUselessRename, uselessRenameFile,
-				testCase.sourceText, uselessRenameOptions(t, false, false, false))
-			rule_testing.ExpectFindings(t, result, "unnecessarilyRenamed")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoUselessRename, uselessRenameFile,
+				testCase.sourceText, uselessRenameOptions(test, false, false, false))
+			rule_testing.ExpectFindings(test, result, "unnecessarilyRenamed")
 			source := result.SourceFile.Text()
 			reported := source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 			if reported != testCase.want {
-				t.Errorf("expected the finding on %q, pointed at %q", testCase.want, reported)
+				test.Errorf("expected the finding on %q, pointed at %q", testCase.want, reported)
 			}
 			if result.Diagnostics[0].Message.Id != "unnecessarilyRenamed" {
-				t.Errorf("expected the message id \"unnecessarilyRenamed\", got %q",
+				test.Errorf("expected the message id \"unnecessarilyRenamed\", got %q",
 					result.Diagnostics[0].Message.Id)
 			}
 		})
@@ -509,15 +611,15 @@ func TestNoUselessRenamePointsAtTheWholeRename(t *testing.T) {
 
 // Which of the two names the repair keeps differs between an import and an export.
 //
-// Upstream writes the text of node.local in both cases, and local is the name AFTER `as` in an
-// import and the name BEFORE it in an export. So the same-looking pair of inputs repairs to
+// Upstream writes the text of node.local in both cases, and local is the name after `as` in an
+// import and the name before it in an export. So the same-looking pair of inputs repairs to
 // opposite sides, and a port keeping one consistent side passes every message-id assertion while
 // writing the wrong text half the time. It did exactly that here until these vectors ran.
 //
 // Both rows are upstream's own outputs; this test states them side by side because the asymmetry
 // reads as an inconsistency when the two are pages apart in a generated table.
-func TestNoUselessRenameKeepsTheLocalNameAtBothSites(t *testing.T) {
-	t.Parallel()
+func TestNoUselessRenameKeepsTheLocalNameAtBothSites(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -533,11 +635,11 @@ func TestNoUselessRenameKeepsTheLocalNameAtBothSites(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFixedSource(t, rule_testing.RunWithOptions(t, NoUselessRename,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFixedSource(test, rule_testing.RunWithOptions(test, NoUselessRename,
 				uselessRenameFile, testCase.sourceText,
-				uselessRenameOptions(t, false, false, false)), testCase.wantSource)
+				uselessRenameOptions(test, false, false, false)), testCase.wantSource)
 		})
 	}
 }
@@ -548,24 +650,24 @@ func TestNoUselessRenameKeepsTheLocalNameAtBothSites(t *testing.T) {
 // specifier is leading trivia rather than content. Our Pos() reaches back over that trivia, so
 // counting from it withheld seven of upstream's fix vectors. The rows here pin both directions:
 // a comment before the rename fixes, a comment inside the discarded half does not.
-func TestNoUselessRenameCountsOnlyContainedComments(t *testing.T) {
-	t.Parallel()
+func TestNoUselessRenameCountsOnlyContainedComments(test *testing.T) {
+	test.Parallel()
 
-	t.Run("a comment before the specifier still fixes", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectFixedSource(t, rule_testing.RunWithOptions(t, NoUselessRename,
+	test.Run("a comment before the specifier still fixes", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectFixedSource(test, rule_testing.RunWithOptions(test, NoUselessRename,
 			uselessRenameFile, "import {/* comment */foo as foo} from 'foo';",
-			uselessRenameOptions(t, false, false, false)),
+			uselessRenameOptions(test, false, false, false)),
 			"import {/* comment */foo} from 'foo';")
 	})
 
-	t.Run("a comment inside the discarded half withholds the repair", func(t *testing.T) {
-		t.Parallel()
-		result := rule_testing.RunWithOptions(t, NoUselessRename, uselessRenameFile,
-			"({foo/**/ : foo} = {});", uselessRenameOptions(t, false, false, false))
-		rule_testing.ExpectFindings(t, result, "unnecessarilyRenamed")
+	test.Run("a comment inside the discarded half withholds the repair", func(test *testing.T) {
+		test.Parallel()
+		result := rule_testing.RunWithOptions(test, NoUselessRename, uselessRenameFile,
+			"({foo/**/ : foo} = {});", uselessRenameOptions(test, false, false, false))
+		rule_testing.ExpectFindings(test, result, "unnecessarilyRenamed")
 		if len(result.Diagnostics[0].Fixes) != 0 {
-			t.Errorf("expected no repair over a discarded comment, got %d",
+			test.Errorf("expected no repair over a discarded comment, got %d",
 				len(result.Diagnostics[0].Fixes))
 		}
 	})
@@ -576,47 +678,45 @@ func TestNoUselessRenameCountsOnlyContainedComments(t *testing.T) {
 // All three options default to false, so the zero value is right here and the usual
 // default-inversion hazard does not apply. They are decoded through pointers anyway, and this test
 // is what would notice if a default moved and the pointers were dropped as redundant.
-func TestDecodeNoUselessRenameOptions(t *testing.T) {
-	t.Parallel()
+func TestDecodeNoUselessRenameOptions(test *testing.T) {
+	test.Parallel()
 
-	t.Run("an absent option leaves all three off", func(t *testing.T) {
-		t.Parallel()
-		decoded, err := DecodeNoUselessRenameOptions(nil)
-		if err != nil {
-			t.Fatalf("the decoder refused an absent option: %v", err)
+	test.Run("an absent option leaves all three off", func(test *testing.T) {
+		test.Parallel()
+		decoded, decodeNoUselessRenameOptionsError := DecodeNoUselessRenameOptions(nil)
+		if decodeNoUselessRenameOptionsError != nil {
+			test.Fatalf("the decoder refused an absent option: %v", decodeNoUselessRenameOptionsError)
 		}
-		settings := decoded.(NoUselessRenameSettings)
-		if settings.IgnoreDestructuring || settings.IgnoreImport || settings.IgnoreExport {
-			t.Errorf("expected every option to default to false, got %+v", settings)
+		if decoded.IgnoreDestructuring || decoded.IgnoreImport || decoded.IgnoreExport {
+			test.Errorf("expected every option to default to false, got %+v", decoded)
 		}
 	})
 
-	t.Run("each option is read independently", func(t *testing.T) {
-		t.Parallel()
-		decoded, err := DecodeNoUselessRenameOptions(
+	test.Run("each option is read independently", func(test *testing.T) {
+		test.Parallel()
+		decoded, decodeNoUselessRenameOptionsError := DecodeNoUselessRenameOptions(
 			json.RawMessage(`{"ignoreImport":true}`))
-		if err != nil {
-			t.Fatalf("the decoder refused a partial object: %v", err)
+		if decodeNoUselessRenameOptionsError != nil {
+			test.Fatalf("the decoder refused a partial object: %v", decodeNoUselessRenameOptionsError)
 		}
-		settings := decoded.(NoUselessRenameSettings)
-		if !settings.IgnoreImport || settings.IgnoreDestructuring || settings.IgnoreExport {
-			t.Errorf("expected only ignoreImport to be set, got %+v", settings)
+		if !decoded.IgnoreImport || decoded.IgnoreDestructuring || decoded.IgnoreExport {
+			test.Errorf("expected only ignoreImport to be set, got %+v", decoded)
 		}
 	})
 
-	t.Run("a bare severity leaves the rule on its defaults", func(t *testing.T) {
-		t.Parallel()
-		// A rule configured as "error" is handed nil options, which arrives at Run as an untyped
-		// nil rather than as settings. Asserting through the rule covers the fallback inside Run,
-		// which no decoder test can reach.
-		rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoUselessRename,
-			uselessRenameFile, "let {foo: foo} = obj;", nil), "unnecessarilyRenamed")
+	test.Run("a bare severity leaves the rule on its defaults", func(test *testing.T) {
+		test.Parallel()
+		// A rule configured as "error" is handed no options, which arrives at Run unconfigured rather
+		// than as settings. Asserting through the rule covers the fallback inside Run, which no
+		// decoder test can reach.
+		rule_testing.ExpectFindings(test, rule_testing.Run(test, NoUselessRename,
+			uselessRenameFile, "let {foo: foo} = obj;"), "unnecessarilyRenamed")
 	})
 }
 
 // An ordinary object literal is not a destructuring pattern, and only the context says which.
 //
-// Our parser produces an object LITERAL for `({foo: foo} = obj)` and only the surrounding assignment
+// Our parser produces an object literal for `({foo: foo} = obj)` and only the surrounding assignment
 // makes it a pattern, where upstream's parser reinterprets and hands the rule an ObjectPattern. So
 // this port has to ask whether the literal is an assignment target, and a port that skipped the
 // question would report every `{foo: foo}` written as a value.
@@ -624,8 +724,8 @@ func TestDecodeNoUselessRenameOptions(t *testing.T) {
 // Measured against the installed rule: the first three rows are clean upstream and only the fourth
 // reports. Written for a surviving mutant, since the imported corpus does not pair a reporting
 // destructuring assignment with a non-target literal of the same shape.
-func TestNoUselessRenameIgnoresAnOrdinaryObjectLiteral(t *testing.T) {
-	t.Parallel()
+func TestNoUselessRenameIgnoresAnOrdinaryObjectLiteral(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -643,11 +743,11 @@ func TestNoUselessRenameIgnoresAnOrdinaryObjectLiteral(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoUselessRename,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoUselessRename,
 				uselessRenameFile, testCase.sourceText,
-				uselessRenameOptions(t, false, false, false)), testCase.messages...)
+				uselessRenameOptions(test, false, false, false)), testCase.messages...)
 		})
 	}
 }

@@ -78,17 +78,17 @@ var (
  * Every repair changes a type (add `readonly`, or copy), so none preserves meaning, and the edit engine
  * applies only fixes that do.
  */
-var InvariantMutable = rule.Rule{
+var InvariantMutable = rule.Rule[rule.NoOptions]{
 	Name:             "adamic/invariant-mutable",
 	NeedsTypeChecker: true,
 	ProgramReads:     rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.TypeChecker == nil || ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		if ruleContext.TypeChecker == nil || ruleContext.SourceFile == nil {
 			return nil
 		}
-		typeChecker := ctx.TypeChecker
-		walker := flow.WalkerFor(ctx)
+		typeChecker := ruleContext.TypeChecker
+		walker := flow.WalkerFor(ruleContext)
 		// Made once per file, not per site: a judge made per site was a closure per site (#m6tyg79).
 		judge := func(pair flow.Pair) (bool, bool) {
 			// What a class instance is, is nominal-class's, so the walk does not go into one. The slot holding it
@@ -100,7 +100,8 @@ var InvariantMutable = rule.Rule{
 			// under strictFunctionTypes, so only a method's are judged here. The parameter is judged whole, as tsc
 			// judges a function's, and the walk goes no further into it: below a callback parameter is the value it is
 			// called with, and Promise's `then` read every promise's value as a slot written through the wider type,
-			// about a hundred findings on fresh values, an async function's literal or `Promise.resolve([])` (#bbtfx99).
+			// about a hundred findings on fresh values, an async function's literal or `Promise.resolve([])`
+			// (#bbtfx99).
 			if pair.MethodParameter {
 				return !walker.IsAssignableToParameter(pair.Source, pair.Target, pair.Defaulted), false
 			}
@@ -114,7 +115,7 @@ var InvariantMutable = rule.Rule{
 			}
 			// Writing through the wider type stores a target value where the original reads a source
 			// value, so every target value must be a source value too.
-			wrong := readonlyMadeWritable(ctx.Program, pair) || !walker.IsAssignable(pair.Target, pair.Source)
+			wrong := readonlyMadeWritable(ruleContext.Program, pair) || !walker.IsAssignable(pair.Target, pair.Source)
 			if wrong && !descend && nominalReports(typeChecker, pair.Source, pair.Target) {
 				// Not an instance of the class, or one with other type arguments: nominal-class's finding, on
 				// this pair, and one hole is one finding.
@@ -132,15 +133,15 @@ var InvariantMutable = rule.Rule{
 			switch {
 			case found.MethodParameter:
 				handle, id = methodParameterText, "methodParameterNarrowed"
-			case readonlyMadeWritable(ctx.Program, found) && walker.IsAssignable(found.Target, found.Source):
+			case readonlyMadeWritable(ruleContext.Program, found) && walker.IsAssignable(found.Target, found.Source):
 				handle, id = readonlyMadeWritableText, "readonlyMadeWritable"
 			}
-			ctx.ReportNode(site.Node, rule.Message{
+			ruleContext.ReportNode(site.Node, rule.Message{
 				Id: id,
 				Description: handle.Render(map[string]string{
 					"source":     type_checking.StableTypeText(typeChecker, site.Source),
 					"target":     type_checking.StableTypeText(typeChecker, site.Target),
-					"slot":       slotText(ctx.SourceFile, site.Node, found.Path),
+					"slot":       slotText(ruleContext.SourceFile, site.Node, found.Path),
 					"sourcePart": type_checking.StableTypeText(typeChecker, found.Source),
 					"targetPart": type_checking.StableTypeText(typeChecker, found.Target),
 				}),
@@ -164,7 +165,9 @@ func readonlyMadeWritable(program rule.Program, pair flow.Pair) bool {
 		return false
 	}
 	for _, declaration := range pair.SourceProperty.Declarations {
-		if file := ast.GetSourceFileOfNode(declaration); file != nil && program != nil && rule.IsSourceFileDefaultLibrary(program, file) {
+		if file := ast.GetSourceFileOfNode(
+			declaration,
+		); file != nil && program != nil && rule.IsSourceFileDefaultLibrary(program, file) {
 			return false
 		}
 	}

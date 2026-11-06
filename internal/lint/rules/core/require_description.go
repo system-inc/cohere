@@ -44,50 +44,6 @@ type RequireDescriptionOptions struct {
 	AdditionalDirectives []string `json:"additionalDirectives"`
 }
 
-// DecodeRequireDescriptionOptions reads the option object, refusing what upstream's schema refuses.
-//
-// The schema says `additionalProperties: false`, an `ignore` enum, and `uniqueItems`. There is no
-// schema layer here, so each is checked by hand: a misspelled key or kind would otherwise decode
-// silently to "ignore nothing", which reports more than the author asked for and says nothing.
-// A bare severity hands this no bytes, which is the zero options and not an error.
-func DecodeRequireDescriptionOptions(raw []byte) (any, error) {
-	options := RequireDescriptionOptions{}
-	if len(raw) == 0 {
-		return options, nil
-	}
-	if err := rule.UnmarshalOptions(raw, &options); err != nil {
-		return options, fmt.Errorf("%s: %w", RequireDescription.Name, err)
-	}
-	seen := map[string]bool{}
-	for _, kind := range options.Ignore {
-		known := false
-		for _, ignorable := range RequireDescriptionIgnorable {
-			if kind == ignorable {
-				known = true
-				break
-			}
-		}
-		if !known {
-			return options, fmt.Errorf("%s: ignore names %q, wanted one of %s",
-				RequireDescription.Name, kind, strings.Join(RequireDescriptionIgnorable, ", "))
-		}
-		if seen[kind] {
-			return options, fmt.Errorf("%s: ignore names %q twice", RequireDescription.Name, kind)
-		}
-		seen[kind] = true
-	}
-	return options, nil
-}
-
-// messageRequireDescriptionMissing is upstream's `missingDescription`, with the repair spelled out.
-var messageRequireDescriptionMissing = rule.Message{
-	Id: "missingDescription",
-	Description: "Unexpected undescribed directive comment. Include descriptions to explain why the " +
-		"comment is necessary: write the reason after ` -- ` at the end of the directive, as in " +
-		"`// eslint-disable-next-line some-rule -- why this line is the exception`. A suppression " +
-		"that does not say why cannot be told apart from one nobody remembers adding.",
-}
-
 // RequireDescription reports a directive comment that carries no ` -- reason`.
 //
 //	valid:   // eslint-disable-next-line eqeqeq -- comparing against a DOM attribute
@@ -142,35 +98,79 @@ var messageRequireDescriptionMissing = rule.Message{
 // # Not fixable
 //
 // `meta.fixable` is null upstream. Only the author knows the reason.
-var RequireDescription = rule.Rule{
+var RequireDescription = rule.Rule[RequireDescriptionOptions]{
 	// Upstream's plugin-qualified name, so the same config key means the same thing in ESLint and
 	// in cohere.
 	Name: "@eslint-community/eslint-comments/require-description",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[RequireDescriptionOptions]) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 		// A bare severity decodes to the zero options, and a harness that bypasses the decoder hands
 		// nil. Both mean upstream's defaults: ignore nothing, no additional directives.
-		configured, _ := rule.OptionsAs[RequireDescriptionOptions](options)
+		configured, _ := options.Read()
 
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
-				reportRequireDescription(ctx, configured)
+				reportRequireDescription(ruleContext, configured)
 			},
 		}
 	},
 }
 
+// DecodeRequireDescriptionOptions reads the option object, refusing what upstream's schema refuses.
+//
+// The schema says `additionalProperties: false`, an `ignore` enum, and `uniqueItems`. There is no
+// schema layer here, so each is checked by hand: a misspelled key or kind would otherwise decode
+// silently to "ignore nothing", which reports more than the author asked for and says nothing.
+// A bare severity hands this no bytes, which is the zero options and not an error.
+func DecodeRequireDescriptionOptions(raw []byte) (RequireDescriptionOptions, error) {
+	options := RequireDescriptionOptions{}
+	if len(raw) == 0 {
+		return options, nil
+	}
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &options); unmarshalOptionsError != nil {
+		return options, fmt.Errorf("%s: %w", RequireDescription.Name, unmarshalOptionsError)
+	}
+	seen := map[string]bool{}
+	for _, kind := range options.Ignore {
+		known := false
+		for _, ignorable := range RequireDescriptionIgnorable {
+			if kind == ignorable {
+				known = true
+				break
+			}
+		}
+		if !known {
+			return options, fmt.Errorf("%s: ignore names %q, wanted one of %s",
+				RequireDescription.Name, kind, strings.Join(RequireDescriptionIgnorable, ", "))
+		}
+		if seen[kind] {
+			return options, fmt.Errorf("%s: ignore names %q twice", RequireDescription.Name, kind)
+		}
+		seen[kind] = true
+	}
+	return options, nil
+}
+
+// messageRequireDescriptionMissing is upstream's `missingDescription`, with the repair spelled out.
+var messageRequireDescriptionMissing = rule.Message{
+	Id: "missingDescription",
+	Description: "Unexpected undescribed directive comment. Include descriptions to explain why the " +
+		"comment is necessary: write the reason after ` -- ` at the end of the directive, as in " +
+		"`// eslint-disable-next-line some-rule -- why this line is the exception`. A suppression " +
+		"that does not say why cannot be told apart from one nobody remembers adding.",
+}
+
 // reportRequireDescription is upstream's `create` body, run once per file.
-func reportRequireDescription(ctx rule.Context, options RequireDescriptionOptions) {
+func reportRequireDescription(ruleContext rule.Context, options RequireDescriptionOptions) {
 	ignored := map[string]bool{}
 	for _, kind := range options.Ignore {
 		ignored[kind] = true
 	}
 	additional := requireDescriptionAdditionalPattern(options.AdditionalDirectives)
 
-	for _, comment := range comments.ForFile(ctx) {
+	for _, comment := range comments.ForFile(ruleContext) {
 		interior, readable := requireDescriptionInterior(comment)
 		if !readable {
 			continue
@@ -178,7 +178,12 @@ func reportRequireDescription(ctx rule.Context, options RequireDescriptionOption
 
 		kind, isDirective := "", false
 		if requireDescriptionCouldBeUpstream(interior, options.AdditionalDirectives) {
-			kind, isDirective = requireDescriptionUpstreamKind(comment, interior, options.AdditionalDirectives, additional)
+			kind, isDirective = requireDescriptionUpstreamKind(
+				comment,
+				interior,
+				options.AdditionalDirectives,
+				additional,
+			)
 		}
 		if !isDirective {
 			kind, isDirective = directives.Recognize(comment.Text)
@@ -189,7 +194,7 @@ func reportRequireDescription(ctx rule.Context, options RequireDescriptionOption
 		if requireDescriptionHasDescription(interior) {
 			continue
 		}
-		ctx.ReportRange(comment.Range, messageRequireDescriptionMissing)
+		ruleContext.ReportRange(comment.Range, messageRequireDescriptionMissing)
 	}
 }
 
@@ -233,7 +238,13 @@ func requireDescriptionAdditionalPattern(additional []string) *regexp.Regexp {
 	for index, directive := range additional {
 		quoted[index] = regexp.QuoteMeta(directive)
 	}
-	return regexp.MustCompile(`^(` + strings.Join(quoted, "|") + `)(?:` + jsWhitespace + `|$)`)
+	pattern, compileError := regexp.Compile(`^(` + strings.Join(quoted, "|") + `)(?:` + jsWhitespace + `|$)`)
+	if compileError != nil {
+		// Invariant: every directive is quoted by QuoteMeta and jsWhitespace is a constant class, so the
+		// pattern always compiles; returning nil instead would quietly drop the configured directives.
+		panic(fmt.Sprintf("require-description's additional-directive pattern: %v", compileError))
+	}
+	return pattern
 }
 
 // requireDescriptionCouldBeUpstream reports whether upstream's parser could read a directive here at all,

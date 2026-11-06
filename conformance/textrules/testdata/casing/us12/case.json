@@ -1,0 +1,10 @@
+{
+    "why": "us12: a type opening with a brand policy/Brands.json lists, spelled exactly as its owner spells it (`iMessage`, Apple's), followed by an UpperCamel rest, is UpperCamel, so it is clean. Go has no form: an unexported Go type opens lowercase whatever it spells, and an exported one must open with a capital, so no Go name tests the brand",
+    "expect": [],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "swift"
+    ]
+}

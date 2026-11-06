@@ -15,7 +15,7 @@ import (
 // can prove its name dead; an unselected name stays in the comment, including on a filtered run.
 // Report directly, so a blanket disable cannot silence a finding about itself. These findings are
 // rebuilt even on a findings-cache hit, after its withheld findings have been marked by rule.
-func reportDeadDirectives(sourceFile *ast.SourceFile, index *suppression.Index, ran []rule.Rule,
+func reportDeadDirectives(sourceFile *ast.SourceFile, index *suppression.Index, ran []rule.Entry,
 	measureOnly map[string]bool, crashes []RuleCrash, report func(rule.Diagnostic)) {
 	if len(index.Directives()) == 0 {
 		return
@@ -46,7 +46,13 @@ func reportDeadDirectives(sourceFile *ast.SourceFile, index *suppression.Index, 
 // skipped type-aware rules, unselected rules and crashed rules cannot prove a directive dead.
 // complete says every selected rule completed: without it a blanket may still be live for a
 // skipped rule. The fix relint path uses this too, so dead names settle in one invocation.
-func ReportDeadDirectives(sourceFile *ast.SourceFile, index *suppression.Index, ran []string, complete bool, report func(rule.Diagnostic)) {
+func ReportDeadDirectives(
+	sourceFile *ast.SourceFile,
+	index *suppression.Index,
+	ran []string,
+	complete bool,
+	report func(rule.Diagnostic),
+) {
 	if len(ran) == 0 {
 		return
 	}
@@ -78,14 +84,18 @@ func ReportDeadDirectives(sourceFile *ast.SourceFile, index *suppression.Index, 
 
 		description := "Unused disable directive (no findings were suppressed)."
 		if len(dead) > 0 {
-			description = "Unused disable directive for " + strings.Join(dead, ", ") + " (no findings from these rules were suppressed)."
+			description = "Unused disable directive for " +
+				strings.Join(dead, ", ") +
+				" (no findings from these rules were suppressed)."
 		}
-		comment := sourceFile.Text()[directive.Pos:directive.End]
+		comment := sourceFile.Text()[directive.Position:directive.End]
 		report(rule.Diagnostic{
 			RuleName: "unused-disable", SourceFile: sourceFile,
-			Range:   core.NewTextRange(directive.Pos, directive.End),
+			Range:   core.NewTextRange(directive.Position, directive.End),
 			Message: rule.Message{Id: "unusedDisable", Description: description},
-			Fixes:   []rule.Fix{{Range: core.NewTextRange(directive.Pos, directive.End), Text: withoutDeadNames(comment, kept)}},
+			Fixes: []rule.Fix{
+				{Range: core.NewTextRange(directive.Position, directive.End), Text: withoutDeadNames(comment, kept)},
+			},
 		})
 	}
 }

@@ -12,8 +12,8 @@ const nonoctalDecimalEscapeFile = "/repository/source/Thing.ts"
 // more than for most: every case is a sequence of backslashes and a digit, and a porter writing
 // their own fixtures tends to write the parities they already understand.
 
-func TestNoNonoctalDecimalEscapeFires(t *testing.T) {
-	t.Parallel()
+func TestNoNonoctalDecimalEscapeFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -32,10 +32,13 @@ func TestNoNonoctalDecimalEscapeFires(t *testing.T) {
 		{"before an escaped backslash", "export const A = '\\8\\\\9';\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.Run(t, NoNonoctalDecimalEscape, nonoctalDecimalEscapeFile, testCase.sourceText),
-				"nonoctalDecimalEscape")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(
+				test,
+				rule_testing.Run(test, NoNonoctalDecimalEscape, nonoctalDecimalEscapeFile, testCase.sourceText),
+				"nonoctalDecimalEscape",
+			)
 		})
 	}
 }
@@ -44,8 +47,8 @@ func TestNoNonoctalDecimalEscapeFires(t *testing.T) {
 // contain the exact bytes of a violation, and none of them is one. A rule that searches for the
 // pair rather than walking escape by escape fires on most of these.
 
-func TestNoNonoctalDecimalEscapeStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoNonoctalDecimalEscapeStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -69,9 +72,12 @@ func TestNoNonoctalDecimalEscapeStaysSilent(t *testing.T) {
 		{"an escaped backslash before a hex escape", "export const A = '\\\\\\x38';\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoNonoctalDecimalEscape, nonoctalDecimalEscapeFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(
+				test,
+				rule_testing.Run(test, NoNonoctalDecimalEscape, nonoctalDecimalEscapeFile, testCase.sourceText),
+			)
 		})
 	}
 }
@@ -79,8 +85,8 @@ func TestNoNonoctalDecimalEscapeStaysSilent(t *testing.T) {
 // Each escape is its own finding. A rule reporting once per literal agrees with every
 // single-violation case above and undercounts the moment a string holds two, which is exactly the
 // shape a scan that stops at the first match produces.
-func TestNoNonoctalDecimalEscapeReportsEachEscape(t *testing.T) {
-	t.Parallel()
+func TestNoNonoctalDecimalEscapeReportsEachEscape(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -92,11 +98,11 @@ func TestNoNonoctalDecimalEscapeReportsEachEscape(t *testing.T) {
 		{"separated by an escaped backslash", "export const A = '\\8\\\\9';\n", 1},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoNonoctalDecimalEscape, nonoctalDecimalEscapeFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoNonoctalDecimalEscape, nonoctalDecimalEscapeFile, testCase.sourceText)
 			if len(result.Diagnostics) != testCase.want {
-				t.Fatalf("want %d findings, got %d: %v", testCase.want, len(result.Diagnostics), result.MessageIds())
+				test.Fatalf("want %d findings, got %d: %v", testCase.want, len(result.Diagnostics), result.MessageIds())
 			}
 		})
 	}
@@ -109,25 +115,25 @@ func TestNoNonoctalDecimalEscapeReportsEachEscape(t *testing.T) {
 // a literal backslash before it. They are not interchangeable, which is why these are suggestions
 // rather than fixes. An engine picking one unattended would silently change the string every time
 // the other was intended.
-func TestNoNonoctalDecimalEscapeOffersBothReadings(t *testing.T) {
-	t.Parallel()
+func TestNoNonoctalDecimalEscapeOffersBothReadings(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, NoNonoctalDecimalEscape, nonoctalDecimalEscapeFile,
+	result := rule_testing.Run(test, NoNonoctalDecimalEscape, nonoctalDecimalEscapeFile,
 		"export const A = 'foo\\8bar';\n")
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("want one finding, got %d", len(result.Diagnostics))
+		test.Fatalf("want one finding, got %d", len(result.Diagnostics))
 	}
 	suggestions := result.Diagnostics[0].Suggestions
 	if len(suggestions) != 2 {
-		t.Fatalf("want two suggestions, got %d", len(suggestions))
+		test.Fatalf("want two suggestions, got %d", len(suggestions))
 	}
 	if text := suggestions[0].Fixes[0].Text; text != "8" {
-		t.Fatalf("want the digit reading to write %q, got %q", "8", text)
+		test.Fatalf("want the digit reading to write %q, got %q", "8", text)
 	}
 	// Two source characters before the digit: an escaped backslash. Upstream fixes
 	// `'foo\\8bar'` to `'foo\\\\8bar'`, which is this same replacement written out.
 	if text := suggestions[1].Fixes[0].Text; text != `\\8` {
-		t.Fatalf("want the backslash reading to write %q, got %q", `\\8`, text)
+		test.Fatalf("want the backslash reading to write %q, got %q", `\\8`, text)
 	}
 }
 
@@ -137,38 +143,38 @@ func TestNoNonoctalDecimalEscapeOffersBothReadings(t *testing.T) {
 // direction: a rule that populated Fixes alongside Suggestions would still pass every assertion
 // above, and the engine applies Fixes unattended. That would turn a repair only the author can
 // choose into a silent rewrite of their string.
-func TestNoNonoctalDecimalEscapeProposesNoAutomaticFix(t *testing.T) {
-	t.Parallel()
+func TestNoNonoctalDecimalEscapeProposesNoAutomaticFix(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, NoNonoctalDecimalEscape, nonoctalDecimalEscapeFile,
+	result := rule_testing.Run(test, NoNonoctalDecimalEscape, nonoctalDecimalEscapeFile,
 		"export const A = '\\8';\n")
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("want one finding, got %d", len(result.Diagnostics))
+		test.Fatalf("want one finding, got %d", len(result.Diagnostics))
 	}
 	if fixes := result.Diagnostics[0].Fixes; len(fixes) != 0 {
-		t.Fatalf("want no automatic fixes, got %d", len(fixes))
+		test.Fatalf("want no automatic fixes, got %d", len(fixes))
 	}
 }
 
 // `\0\8` is the case where the obvious repair is wrong: dropping the backslash yields `\08`, which
 // is a legacy octal escape, so fixing one legacy escape would produce another. The suggestion set
 // changes shape here rather than the rule declining to help.
-func TestNoNonoctalDecimalEscapeAvoidsCreatingAnOctalEscape(t *testing.T) {
-	t.Parallel()
+func TestNoNonoctalDecimalEscapeAvoidsCreatingAnOctalEscape(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, NoNonoctalDecimalEscape, nonoctalDecimalEscapeFile,
+	result := rule_testing.Run(test, NoNonoctalDecimalEscape, nonoctalDecimalEscapeFile,
 		"export const A = '\\0\\8';\n")
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("want one finding, got %d", len(result.Diagnostics))
+		test.Fatalf("want one finding, got %d", len(result.Diagnostics))
 	}
 	suggestions := result.Diagnostics[0].Suggestions
 	if len(suggestions) != 3 {
-		t.Fatalf("want three suggestions for the null-escape case, got %d", len(suggestions))
+		test.Fatalf("want three suggestions for the null-escape case, got %d", len(suggestions))
 	}
 	// Not one of them may write the bare digit, because that is the repair that creates `\08`.
 	for index, suggestion := range suggestions {
 		if suggestion.Fixes[0].Text == "8" {
-			t.Fatalf("suggestion %d writes the bare digit, which would produce a legacy octal escape", index)
+			test.Fatalf("suggestion %d writes the bare digit, which would produce a legacy octal escape", index)
 		}
 	}
 }
@@ -176,16 +182,16 @@ func TestNoNonoctalDecimalEscapeAvoidsCreatingAnOctalEscape(t *testing.T) {
 // The null-escape shape applies only to a real `\0`, not to `\01`, which is already a legacy octal
 // escape of a different kind. Getting this wrong is invisible: the finding still fires and only the
 // suggested repair is wrong.
-func TestNoNonoctalDecimalEscapeTreatsOctalZeroAsOrdinary(t *testing.T) {
-	t.Parallel()
+func TestNoNonoctalDecimalEscapeTreatsOctalZeroAsOrdinary(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, NoNonoctalDecimalEscape, nonoctalDecimalEscapeFile,
+	result := rule_testing.Run(test, NoNonoctalDecimalEscape, nonoctalDecimalEscapeFile,
 		"export const A = '\\01\\8';\n")
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("want one finding, got %d", len(result.Diagnostics))
+		test.Fatalf("want one finding, got %d", len(result.Diagnostics))
 	}
 	if count := len(result.Diagnostics[0].Suggestions); count != 2 {
-		t.Fatalf("want the ordinary two suggestions after an octal escape, got %d", count)
+		test.Fatalf("want the ordinary two suggestions after an octal escape, got %d", count)
 	}
 }
 
@@ -197,8 +203,8 @@ func TestNoNonoctalDecimalEscapeTreatsOctalZeroAsOrdinary(t *testing.T) {
 // which rule fired and not what it offered. The only visible symptom is `'\1\9'` gaining a third
 // suggestion that rewrites a `\1` nobody asked about. A finding with a wrong repair still reads as
 // a correct finding, so this needs asserting directly.
-func TestNoNonoctalDecimalEscapeOffersTheNullShapeOnlyAfterNull(t *testing.T) {
-	t.Parallel()
+func TestNoNonoctalDecimalEscapeOffersTheNullShapeOnlyAfterNull(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -212,14 +218,14 @@ func TestNoNonoctalDecimalEscapeOffersTheNullShapeOnlyAfterNull(t *testing.T) {
 		{"with nothing before it", "export const A = '\\8';\n", 2},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoNonoctalDecimalEscape, nonoctalDecimalEscapeFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoNonoctalDecimalEscape, nonoctalDecimalEscapeFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("want one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("want one finding, got %d", len(result.Diagnostics))
 			}
 			if count := len(result.Diagnostics[0].Suggestions); count != testCase.want {
-				t.Fatalf("want %d suggestions, got %d", testCase.want, count)
+				test.Fatalf("want %d suggestions, got %d", testCase.want, count)
 			}
 		})
 	}

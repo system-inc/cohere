@@ -34,9 +34,9 @@ func messageNoDestructuringInHook() rule.Message {
 // and so exclude nothing this linter would ever see. Reproduced as no gate at all rather than as
 // two flags whose disjunction is always true, since a guard that cannot fail reads as a guard that
 // might.
-var ReactHookNoDestructuring = rule.Rule{
+var ReactHookNoDestructuring = rule.Rule[rule.NoOptions]{
 	Name: "structure/react-hook-no-destructuring",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindVariableDeclaration: func(node *ast.Node) {
 				declaration := node.AsVariableDeclaration()
@@ -65,7 +65,7 @@ var ReactHookNoDestructuring = rule.Rule{
 					return
 				}
 
-				ctx.ReportNode(name, messageNoDestructuringInHook())
+				ruleContext.ReportNode(name, messageNoDestructuringInHook())
 			},
 		}
 	},

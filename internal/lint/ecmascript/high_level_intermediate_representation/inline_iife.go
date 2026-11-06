@@ -21,7 +21,7 @@
 // A fused scope reads exactly like a broken memo. The rule compares inferred memoization against
 // the `useMemo` the programmer wrote, and when one scope spans what the programmer wrote as three,
 // the dependencies disagree for all three -- so the rule fires three times on correct code. That is
-// why this pass has to run BEFORE `InferMutableRanges` and not merely somewhere in the pipeline;
+// why this pass has to run before `InferMutableRanges` and not merely somewhere in the pipeline;
 // running it afterwards inlines a body whose damage has already been recorded.
 package high_level_intermediate_representation
 
@@ -42,7 +42,7 @@ import (
 // parameter this pass does not lower, and an async body's `await` points would need the caller's
 // continuation to become a suspension point.
 //
-// The callee must also be a TEMPORARY -- an unnamed value. A named binding can be read again later,
+// The callee must also be a temporary -- an unnamed value. A named binding can be read again later,
 // and upstream's `functions` map is keyed on that: a `FunctionExpression` stored into a name is
 // never entered, and any use of a function-valued temporary that is not the callee of a call
 // removes it from the map. That last part is the one a reader skips, and it is what keeps
@@ -176,7 +176,7 @@ func inlineInvokedFunctions(function *Function, includeMemoCallbacks bool) int {
 					forgetFunctionOperands(instruction.Value, functions)
 					continue
 				}
-				if !eligible || len(value.Args) != 0 {
+				if !eligible || len(value.Arguments) != 0 {
 					// Not a call of a local function expression, or a call with arguments this
 					// pass does not bind. Either way the callee is still a plain use of the
 					// function value, so it stops being an IIFE candidate.
@@ -184,7 +184,7 @@ func inlineInvokedFunctions(function *Function, includeMemoCallbacks bool) int {
 					continue
 				}
 				nested := nestedFunctionOf(function, expression)
-				if nested == nil || len(nested.Params) != 0 ||
+				if nested == nil || len(nested.Parameters) != 0 ||
 					nested.IsAsync || nested.IsGenerator {
 					forgetFunctionOperands(instruction.Value, functions)
 					continue
@@ -281,6 +281,9 @@ func dropSplicedFunctionExpressions(function *Function, spliced map[static_singl
 // It declines rather than half-applying: a copy that cannot complete leaves the caller's block
 // untouched, because a block cut at the call with no body spliced in is a function with a dangling
 // terminal, which is worse than an uninlined IIFE.
+//
+// Mutates: block it is cut at the call and its terminal enters the spliced body
+// Mutates: queue the continuation is appended, since a later IIFE in the same statement now lives there
 func spliceInlinedCall(function *Function, block *BasicBlock, index int,
 	instruction *Instruction, expression *FunctionExpression, nested *Function,
 	queue *[]*BasicBlock) bool {
@@ -329,7 +332,7 @@ func spliceInlinedCall(function *Function, block *BasicBlock, index int,
 //
 // `direct` selects between the two forms. On the single-exit path the return's value is loaded
 // straight into the call's lvalue, which is a definition of that value and needs no prior
-// declaration. On the labeled path the lvalue was declared before the body, so a return REASSIGNS
+// declaration. On the labeled path the lvalue was declared before the body, so a return reassigns
 // it: several returns are several stores to one binding, which is precisely what a `let` plus
 // reassignments expresses and what a `const` would not.
 //
@@ -465,7 +468,12 @@ func nestedFunctionOf(function *Function, expression *FunctionExpression) *Funct
 // of one -- passed as an argument, stored into an object, returned -- means the value escapes, and
 // a splice would then leave the escaped reference pointing at a function whose body also runs
 // inline. Upstream deletes on every operand of every non-call instruction for this reason.
-func forgetFunctionOperands(value InstructionValue, functions map[static_single_assignment.IdentifierId]*FunctionExpression) {
+//
+// Mutates: functions every operand the value reads is deleted, so one set narrows across a whole function
+func forgetFunctionOperands(
+	value InstructionValue,
+	functions map[static_single_assignment.IdentifierId]*FunctionExpression,
+) {
 	if len(functions) == 0 {
 		return
 	}

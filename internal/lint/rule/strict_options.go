@@ -28,45 +28,50 @@ import (
 // (`URLPatterns` is `urlPatterns`, not `uRLPatterns`). Measured 2026-10-02: ahra's and phi's own
 // configs reach untagged fields this way, so enforcing case on them would refuse working configs. An
 // unknown key is refused either way.
-func UnmarshalOptions(raw []byte, target any) error {
+func UnmarshalOptions[Options any](raw []byte, target *Options) error {
 	decoder := json.NewDecoder(bytes.NewReader(raw))
 	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(target); err != nil {
-		return err
+	if decodeError := decoder.Decode(target); decodeError != nil {
+		return decodeError
 	}
 
-	var generic any
-	if err := json.Unmarshal(raw, &generic); err != nil {
-		return err
+	// The whole input is checked once more, as one JSON value: Decode above reads only the first value, and
+	// trailing text after it is refused here, as it always was.
+	var document json.RawMessage
+	if decodeError := json.Unmarshal(raw, &document); decodeError != nil {
+		return decodeError
 	}
-	return checkKeyCase(generic, reflect.TypeOf(target), "")
+	return checkKeyCase(document, reflect.TypeFor[*Options](), "")
 }
 
 var jsonUnmarshalerType = reflect.TypeFor[json.Unmarshaler]()
 
-// checkKeyCase walks decoded JSON beside the Go type it was decoded into and refuses an object key
-// that only matched its field case-insensitively.
-func checkKeyCase(value any, valueType reflect.Type, path string) error {
+// checkKeyCase walks JSON beside the Go type it was decoded into and refuses an object key that only matched
+// its field case-insensitively. The JSON stays raw and is decoded one level at a time, as an object or a list
+// where the type expects one, so no part of it is held untyped; anything else has no keys to check.
+func checkKeyCase(value json.RawMessage, valueType reflect.Type, path string) error {
 	if valueType == nil {
 		return nil
 	}
-	for valueType.Kind() == reflect.Pointer {
-		if valueType.Implements(jsonUnmarshalerType) {
+	// baseType is valueType with its pointers walked off, so valueType still names what the caller passed.
+	baseType := valueType
+	for baseType.Kind() == reflect.Pointer {
+		if baseType.Implements(jsonUnmarshalerType) {
 			return nil
 		}
-		valueType = valueType.Elem()
+		baseType = baseType.Elem()
 	}
-	if valueType.Implements(jsonUnmarshalerType) || reflect.PointerTo(valueType).Implements(jsonUnmarshalerType) {
+	if baseType.Implements(jsonUnmarshalerType) || reflect.PointerTo(baseType).Implements(jsonUnmarshalerType) {
 		return nil
 	}
 
-	switch valueType.Kind() {
+	switch baseType.Kind() {
 	case reflect.Struct:
-		object, isObject := value.(map[string]any)
+		object, isObject := decodeObject(value)
 		if !isObject {
 			return nil
 		}
-		fields := declaredFields(valueType)
+		fields := declaredFields(baseType)
 		for key, member := range object {
 			field, exact := fields[key]
 			if !exact {
@@ -75,8 +80,11 @@ func checkKeyCase(value any, valueType reflect.Type, path string) error {
 						continue
 					}
 					if candidate.tagged {
-						return fmt.Errorf("option %q is spelled %q: keys are matched exactly, as upstream's schema matches them",
-							path+key, path+declared)
+						return fmt.Errorf(
+							"option %q is spelled %q: keys are matched exactly, as upstream's schema matches them",
+							path+key,
+							path+declared,
+						)
 					}
 					field, exact = candidate, true
 				}
@@ -84,32 +92,47 @@ func checkKeyCase(value any, valueType reflect.Type, path string) error {
 					continue
 				}
 			}
-			if err := checkKeyCase(member, field.Type, path+key+"."); err != nil {
-				return err
+			if checkKeyCaseError := checkKeyCase(member, field.Type, path+key+"."); checkKeyCaseError != nil {
+				return checkKeyCaseError
 			}
 		}
 	case reflect.Slice, reflect.Array:
-		list, isList := value.([]any)
-		if !isList {
+		var list []json.RawMessage
+		if json.Unmarshal(value, &list) != nil {
+			// Not a list, so it holds no keys to check, as a non-list never did.
 			return nil
 		}
 		for index, element := range list {
-			if err := checkKeyCase(element, valueType.Elem(), fmt.Sprintf("%s%d.", path, index)); err != nil {
-				return err
+			if checkKeyCaseError := checkKeyCase(
+				element,
+				baseType.Elem(),
+				fmt.Sprintf("%s%d.", path, index),
+			); checkKeyCaseError != nil {
+				return checkKeyCaseError
 			}
 		}
 	case reflect.Map:
-		object, isObject := value.(map[string]any)
+		object, isObject := decodeObject(value)
 		if !isObject {
 			return nil
 		}
 		for key, member := range object {
-			if err := checkKeyCase(member, valueType.Elem(), path+key+"."); err != nil {
-				return err
+			if checkKeyCaseError := checkKeyCase(member, baseType.Elem(), path+key+"."); checkKeyCaseError != nil {
+				return checkKeyCaseError
 			}
 		}
 	}
 	return nil
+}
+
+// decodeObject reads value as a JSON object, its members left raw, and reports whether it is one. `null`
+// decodes into a nil map without an error, and it is no object, which is why the map's nil-ness is checked.
+func decodeObject(value json.RawMessage) (map[string]json.RawMessage, bool) {
+	var object map[string]json.RawMessage
+	if json.Unmarshal(value, &object) != nil || object == nil {
+		return nil, false
+	}
+	return object, true
 }
 
 // declaredField is a struct field and whether a `json` tag declared its key's spelling.

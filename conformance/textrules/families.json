@@ -10,9 +10,10 @@
         "swift": "cohere-swift/consistency-no-ambiguous-identifier"
     },
     "casing": {
-        "typescript": {
-            "missing": true
-        },
+        "typescript": [
+            "nexus/consistency-no-screaming-snake-case",
+            "nexus/consistency-require-identifier-casing"
+        ],
         "go": "cohere-go/consistency-no-screaming-snake-case",
         "swift": "cohere-swift/always-use-lower-camel-case"
     },
@@ -34,7 +35,7 @@
         "swift": "cohere-swift/consistency-no-utils-folder"
     },
     "warning-comments": {
-        "typescript": "no-warning-comments",
+        "typescript": "nexus/consistency-no-warning-comment",
         "go": "cohere-go/consistency-no-warning-comment",
         "swift": "cohere-swift/todo"
     }

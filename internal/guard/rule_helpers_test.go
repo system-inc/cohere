@@ -26,19 +26,19 @@ import (
 // guard that refused them outright would be worked around within a week. What it refuses is a
 // helper whose name matches something the shared utility layer already exports, because that is a
 // second implementation of a decision that already has a home.
-func TestRulePackagesDoNotShadowSharedUtilities(t *testing.T) {
-	t.Parallel()
+func TestRulePackagesDoNotShadowSharedUtilities(test *testing.T) {
+	test.Parallel()
 
-	shared := exportedUtilityNames(t)
+	shared := exportedUtilityNames(test)
 	if len(shared) == 0 {
 		// A census with nothing to compare against passes for the wrong reason, which is the same
 		// shape as the defect it guards against. The utility layer is never legitimately empty.
-		t.Fatal("found no exported utilities, so this test compared nothing")
+		test.Fatal("found no exported utilities, so this test compared nothing")
 	}
 
-	local := ruleLocalFunctionNames(t)
+	local := ruleLocalFunctionNames(test)
 	if len(local) == 0 {
-		t.Fatal("found no rule-package functions, so this test compared nothing")
+		test.Fatal("found no rule-package functions, so this test compared nothing")
 	}
 
 	for _, candidate := range local {
@@ -46,7 +46,7 @@ func TestRulePackagesDoNotShadowSharedUtilities(t *testing.T) {
 		// unexported while the shelf exports `HasAttributeNamed`, and those are the same decision
 		// spelled for two different scopes, which is exactly the collision worth catching.
 		if owner, taken := shared[strings.ToLower(candidate.name)]; taken {
-			t.Errorf("%s declares %s, which the shared layer already provides as %s; "+
+			test.Errorf("%s declares %s, which the shared layer already provides as %s; "+
 				"two implementations of one decision drift permanently, and both will keep passing "+
 				"their own tests while they do",
 				candidate.file, candidate.name, owner)
@@ -59,12 +59,12 @@ func TestRulePackagesDoNotShadowSharedUtilities(t *testing.T) {
 // It never fails. The number is the point: it is the size of the retrofit, it is not visible in any
 // rule count, and it grows silently every time a porter needs something the shelf does not have
 // yet. Printed with `-v` so the figure in a task body can be re-derived rather than remembered.
-func TestRulePackageHelperCensus(t *testing.T) {
-	t.Parallel()
+func TestRulePackageHelperCensus(test *testing.T) {
+	test.Parallel()
 
-	files, err := filepath.Glob("../lint/rules/*/*.go")
-	if err != nil {
-		t.Fatalf("globbing rule files: %v", err)
+	files, globError := filepath.Glob("../lint/rules/*/*.go")
+	if globError != nil {
+		test.Fatalf("globbing rule files: %v", globError)
 	}
 
 	byPackage := map[string][]string{}
@@ -73,7 +73,7 @@ func TestRulePackageHelperCensus(t *testing.T) {
 		if strings.HasSuffix(base, "_test.go") || base == "register.go" {
 			continue
 		}
-		if declaresARule(t, path) {
+		if declaresARule(test, path) {
 			continue
 		}
 		packageName := filepath.Base(filepath.Dir(path))
@@ -88,10 +88,10 @@ func TestRulePackageHelperCensus(t *testing.T) {
 	}
 	sort.Strings(names)
 
-	t.Logf("helper files inside rule packages: %d across %d packages", total, len(names))
+	test.Logf("helper files inside rule packages: %d across %d packages", total, len(names))
 	for _, packageName := range names {
 		sort.Strings(byPackage[packageName])
-		t.Logf("  %-12s %s", packageName, strings.Join(byPackage[packageName], " "))
+		test.Logf("  %-12s %s", packageName, strings.Join(byPackage[packageName], " "))
 	}
 }
 
@@ -105,16 +105,16 @@ type ruleLocalFunction struct {
 //
 // Only files that declare no rule are read. A helper living beside the rule that uses it, inside a
 // file that is that rule, is not the drift this looks for.
-func ruleLocalFunctionNames(t *testing.T) []ruleLocalFunction {
-	t.Helper()
+func ruleLocalFunctionNames(test *testing.T) []ruleLocalFunction {
+	test.Helper()
 
-	files, err := filepath.Glob("../lint/rules/*/*.go")
-	if err != nil {
-		t.Fatalf("globbing rule files: %v", err)
+	files, globError := filepath.Glob("../lint/rules/*/*.go")
+	if globError != nil {
+		test.Fatalf("globbing rule files: %v", globError)
 	}
 	if len(files) == 0 {
 		// A glob that matched nothing finds no helper to refuse, which passes for the wrong reason.
-		t.Fatal("found no rule files, so this test read nothing")
+		test.Fatal("found no rule files, so this test read nothing")
 	}
 
 	var found []ruleLocalFunction
@@ -123,10 +123,10 @@ func ruleLocalFunctionNames(t *testing.T) []ruleLocalFunction {
 		if strings.HasSuffix(base, "_test.go") || base == "register.go" {
 			continue
 		}
-		if declaresARule(t, path) {
+		if declaresARule(test, path) {
 			continue
 		}
-		for _, name := range functionNamesIn(t, path) {
+		for _, name := range functionNamesIn(test, path) {
 			found = append(found, ruleLocalFunction{
 				file: filepath.Join(filepath.Base(filepath.Dir(path)), base),
 				name: name,
@@ -138,21 +138,21 @@ func ruleLocalFunctionNames(t *testing.T) []ruleLocalFunction {
 
 // exportedUtilityNames returns every exported function the shared utility layer provides, keyed by
 // lowercased name so a comparison can ignore the exported/unexported spelling.
-func exportedUtilityNames(t *testing.T) map[string]string {
-	t.Helper()
+func exportedUtilityNames(test *testing.T) map[string]string {
+	test.Helper()
 
-	files, err := filepath.Glob("../lint/ecmascript/*/*/*.go")
-	if err != nil {
-		t.Fatalf("globbing utility files: %v", err)
+	files, globError := filepath.Glob("../lint/ecmascript/*/*/*.go")
+	if globError != nil {
+		test.Fatalf("globbing utility files: %v", globError)
 	}
-	nested, err := filepath.Glob("../lint/ecmascript/*/*.go")
-	if err != nil {
-		t.Fatalf("globbing utility files: %v", err)
+	nested, globError := filepath.Glob("../lint/ecmascript/*/*.go")
+	if globError != nil {
+		test.Fatalf("globbing utility files: %v", globError)
 	}
 	files = append(files, nested...)
 	if len(files) == 0 {
 		// With no utility names, no helper can shadow one, which passes for the wrong reason.
-		t.Fatal("found no shared utility files, so this test read nothing")
+		test.Fatal("found no shared utility files, so this test read nothing")
 	}
 
 	names := map[string]string{}
@@ -160,7 +160,7 @@ func exportedUtilityNames(t *testing.T) map[string]string {
 		if strings.HasSuffix(path, "_test.go") {
 			continue
 		}
-		for _, name := range functionNamesIn(t, path) {
+		for _, name := range functionNamesIn(test, path) {
 			if !ast.IsExported(name) {
 				continue
 			}
@@ -170,19 +170,19 @@ func exportedUtilityNames(t *testing.T) map[string]string {
 	return names
 }
 
-// declaresARule reports whether a file contains a `var Name = rule.Rule{...}` declaration.
-func declaresARule(t *testing.T, path string) bool {
-	t.Helper()
+// declaresARule reports whether a file contains a `var Name = rule.Rule[Options]{...}` declaration.
+func declaresARule(test *testing.T, path string) bool {
+	test.Helper()
 
-	parsed := parseGoFile(t, path)
+	parsed := parseGoFile(test, path)
 	found := false
 	ast.Inspect(parsed, func(node ast.Node) bool {
 		composite, isComposite := node.(*ast.CompositeLit)
 		if !isComposite {
 			return true
 		}
-		selector, isSelector := composite.Type.(*ast.SelectorExpr)
-		if !isSelector {
+		selector, isRule := ruleLiteralSelector(composite.Type)
+		if !isRule {
 			return true
 		}
 		identifier, isIdentifier := selector.X.(*ast.Ident)
@@ -199,10 +199,10 @@ func declaresARule(t *testing.T, path string) bool {
 //
 // Methods are excluded because a method's name is scoped by its receiver, so `(*Walker).Next` and a
 // shared `Next` are not the same decision and flagging them would be noise.
-func functionNamesIn(t *testing.T, path string) []string {
-	t.Helper()
+func functionNamesIn(test *testing.T, path string) []string {
+	test.Helper()
 
-	parsed := parseGoFile(t, path)
+	parsed := parseGoFile(test, path)
 	var names []string
 	for _, declaration := range parsed.Decls {
 		function, isFunction := declaration.(*ast.FuncDecl)
@@ -215,12 +215,12 @@ func functionNamesIn(t *testing.T, path string) []string {
 }
 
 // parseGoFile parses one file or fails the test naming it.
-func parseGoFile(t *testing.T, path string) *ast.File {
-	t.Helper()
+func parseGoFile(test *testing.T, path string) *ast.File {
+	test.Helper()
 
-	parsed, err := parser.ParseFile(token.NewFileSet(), path, nil, 0)
-	if err != nil {
-		t.Fatalf("parsing %s: %v", path, err)
+	parsed, parseFileError := parser.ParseFile(token.NewFileSet(), path, nil, 0)
+	if parseFileError != nil {
+		test.Fatalf("parsing %s: %v", path, parseFileError)
 	}
 	return parsed
 }
@@ -285,17 +285,17 @@ var wrappedAccessors = []wrappedAccessor{
 // escape hatch in the file that needs it rather than in a list here that nobody reads, and it accepts
 // the comment where an author naturally writes one: the first exemption this guard demanded was
 // written above the line, and requiring it trailing would have made the guard shape the prose.
-func TestRulePackagesDoNotReachPastWrappedAccessors(t *testing.T) {
-	t.Parallel()
+func TestRulePackagesDoNotReachPastWrappedAccessors(test *testing.T) {
+	test.Parallel()
 
-	files, err := filepath.Glob("../lint/rules/*/*.go")
-	if err != nil {
-		t.Fatalf("globbing rule files: %v", err)
+	files, globError := filepath.Glob("../lint/rules/*/*.go")
+	if globError != nil {
+		test.Fatalf("globbing rule files: %v", globError)
 	}
 	if len(files) == 0 {
 		// A sweep with nothing to read passes for the wrong reason, which is the same shape as the
 		// defect it guards against.
-		t.Fatal("found no rule files, so this test read nothing")
+		test.Fatal("found no rule files, so this test read nothing")
 	}
 
 	checked := 0
@@ -303,9 +303,9 @@ func TestRulePackagesDoNotReachPastWrappedAccessors(t *testing.T) {
 		if strings.HasSuffix(filepath.Base(path), "_test.go") {
 			continue
 		}
-		contents, err := os.ReadFile(path)
-		if err != nil {
-			t.Fatalf("reading %s: %v", path, err)
+		contents, readError := os.ReadFile(path)
+		if readError != nil {
+			test.Fatalf("reading %s: %v", path, readError)
 		}
 		checked++
 
@@ -323,7 +323,7 @@ func TestRulePackagesDoNotReachPastWrappedAccessors(t *testing.T) {
 				if !strings.Contains(line, accessor.call) {
 					continue
 				}
-				t.Errorf("%s:%d reaches for %s, which %s already answers by deciding %s; "+
+				test.Errorf("%s:%d reaches for %s, which %s already answers by deciding %s; "+
 					"call the utility, or write the reason on this line if this case is genuinely "+
 					"different",
 					filepath.Base(path), lineNumber+1, accessor.call, accessor.utility, accessor.decision)
@@ -332,6 +332,6 @@ func TestRulePackagesDoNotReachPastWrappedAccessors(t *testing.T) {
 	}
 
 	if checked == 0 {
-		t.Fatal("every rule file was skipped, so this test compared nothing")
+		test.Fatal("every rule file was skipped, so this test compared nothing")
 	}
 }

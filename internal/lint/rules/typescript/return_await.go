@@ -27,11 +27,11 @@ type ReturnAwaitOptions struct {
 	Mode ReturnAwaitMode
 }
 
-// DefaultReturnAwaitSettings is upstream's `defaultOptions`, which is NOT "always".
+// DefaultReturnAwaitSettings is upstream's `defaultOptions`, which is not "always".
 //
 // Worth stating because the natural guess is wrong in a way that disagrees with the reference
 // implementation on almost every input: under `always` every unawaited returned promise reports,
-// while under the real default an unawaited return outside a try block is correct and an AWAITED
+// while under the real default an unawaited return outside a try block is correct and an awaited
 // one reports instead. A port that assumed `always` would invert the rule for ordinary code.
 func DefaultReturnAwaitSettings() ReturnAwaitOptions {
 	return ReturnAwaitOptions{Mode: ReturnAwaitInTryCatch}
@@ -42,17 +42,16 @@ func DefaultReturnAwaitSettings() ReturnAwaitOptions {
 // The option is a bare JSON string, not an object, so upstream's `["error"]` tuple becomes a lone
 // string once cohere's config layer strips the severity. An unrecognised value keeps the default
 // rather than silently selecting a mode nobody asked for.
-func DecodeReturnAwaitOptions(raw []byte) (any, error) {
-	decoded, err := rule.DecodeOptionsInto[string]()(raw)
-	if err != nil {
-		return DefaultReturnAwaitSettings(), err
+func DecodeReturnAwaitOptions(raw []byte) (ReturnAwaitOptions, error) {
+	decoded, decodeOptionsError := rule.DecodeOptionsInto[string]()(raw)
+	if decodeOptionsError != nil {
+		return DefaultReturnAwaitSettings(), decodeOptionsError
 	}
 
-	wire, _ := decoded.(string)
-	switch ReturnAwaitMode(wire) {
+	switch ReturnAwaitMode(decoded) {
 	case ReturnAwaitAlways, ReturnAwaitErrorHandlingCorrectnessOnly,
 		ReturnAwaitInTryCatch, ReturnAwaitNever:
-		return ReturnAwaitOptions{Mode: ReturnAwaitMode(wire)}, nil
+		return ReturnAwaitOptions{Mode: ReturnAwaitMode(decoded)}, nil
 	}
 	return DefaultReturnAwaitSettings(), nil
 }
@@ -95,7 +94,7 @@ func dispositionsFor(mode ReturnAwaitMode) (errorHandling returnAwaitDisposition
 //
 // # Why this is a correctness rule and not a style rule
 //
-// `return promise` inside a `try` hands the promise to the CALLER before it settles, so a rejection
+// `return promise` inside a `try` hands the promise to the caller before it settles, so a rejection
 // arrives after this function's frame is gone and the local `catch` never runs. `return await
 // promise` keeps the frame alive until it settles, so the local `catch` sees the rejection. The two
 // spellings differ in which handler runs, which is why the rule's default forbids the await in
@@ -135,7 +134,7 @@ func dispositionsFor(mode ReturnAwaitMode) (errorHandling returnAwaitDisposition
 // same answer because a `using` is a block-scoped declaration.
 //
 // The position test is the part worth reading twice. Upstream requires the declaration to end
-// BEFORE the return begins, and `node.Pos()` in our tree includes leading trivia, so it starts
+// before the return begins, and `node.Pos()` in our tree includes leading trivia, so it starts
 // where the previous statement ended. Comparing against it makes a `using` on the line directly
 // above the return read as "not before", which is the single most common shape this feature has.
 // Probed: three of the corpus's `using` cases answered wrongly until the comparison moved to
@@ -144,14 +143,14 @@ func dispositionsFor(mode ReturnAwaitMode) (errorHandling returnAwaitDisposition
 //
 // # A fix or a suggestion, decided by whether the edit can change behaviour
 //
-// When the position does NOT affect error handling, adding or removing the await cannot change
-// which handler runs, so upstream ships a fix and the engine applies it unattended. When it DOES
+// When the position does not affect error handling, adding or removing the await cannot change
+// which handler runs, so upstream ships a fix and the engine applies it unattended. When it does
 // affect error handling, the same edit is a judgment about control flow and upstream ships a
 // suggestion instead. Collapsing the two would have the edit engine silently rewriting which frame
 // catches a rejection. `nonPromiseAwait` is always a fix, because removing an await from a
 // non-thenable cannot change control flow at all.
 //
-// # This port follows the CLONE's fixer, not the installed build's, and that is deliberate
+// # This port follows the clone's fixer, not the installed build's, and that is deliberate
 //
 // The clone is 8.68.0 and the installed build our differential compares against is 8.67.0. 8.68
 // added a guard to the await removal: when the operand starts with `{` and the await is the whole
@@ -171,32 +170,31 @@ func dispositionsFor(mode ReturnAwaitMode) (errorHandling returnAwaitDisposition
 //
 // The anchor is a return statement plus the concise body of an async arrow, and the body exits
 // before touching the checker unless the enclosing function is async and there is an argument.
-var ReturnAwait = rule.Rule{
+var ReturnAwait = rule.Rule[ReturnAwaitOptions]{
 	Name: "@typescript-eslint/return-await",
 
 	// Whether the returned expression is thenable decides every finding.
 	NeedsTypeChecker: true,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[ReturnAwaitOptions]) rule.Listeners {
 		// NeedsTypeChecker governs registration; the harness builds a Context by hand and can hand
 		// this rule a nil checker, which is how a sibling rule panicked. Declining the file once
 		// here is cheaper than a guard in every listener.
-		if ctx.TypeChecker == nil {
+		if ruleContext.TypeChecker == nil {
 			return nil
 		}
 
-		settings, isSettings := rule.OptionsAs[ReturnAwaitOptions](options)
+		settings, isSettings := options.Read()
 		if !isSettings {
 			settings = DefaultReturnAwaitSettings()
 		}
 		errorHandlingDisposition, ordinaryDisposition := dispositionsFor(settings.Mode)
 
 		// test is upstream's `test`, run once per possibly-returned expression.
-		var test func(node *ast.Node)
-		test = func(node *ast.Node) {
+		test := func(node *ast.Node) {
 			isAwait := node.Kind == ast.KindAwaitExpression
 
-			// Upstream types the await's OPERAND when there is one and the node itself otherwise,
+			// Upstream types the await's operand when there is one and the node itself otherwise,
 			// then asks `needsToBeAwaited` about the outer node. The two arguments are different on
 			// purpose: the type describes what is being returned, and the node supplies the
 			// location the checker resolves against.
@@ -208,11 +206,11 @@ var ReturnAwait = rule.Rule{
 				}
 			}
 
-			subjectType := ctx.TypeChecker.GetTypeAtLocation(subject)
+			subjectType := ruleContext.TypeChecker.GetTypeAtLocation(subject)
 			if subjectType == nil {
 				return
 			}
-			certainty := type_checking.NeedsToBeAwaited(ctx.TypeChecker, node, subjectType)
+			certainty := type_checking.NeedsToBeAwaited(ruleContext.TypeChecker, node, subjectType)
 
 			if certainty != type_checking.TypeAwaitableAlways {
 				if !isAwait {
@@ -226,16 +224,16 @@ var ReturnAwait = rule.Rule{
 				}
 				// Removing an await from something that cannot be a thenable cannot change control
 				// flow, so this repair is always a fix rather than a suggestion.
-				if fixes, canFix := removeAwaitFixes(ctx, node); canFix {
-					ctx.ReportNodeWithFixes(node, returnAwaitMessage("nonPromiseAwait"), fixes...)
+				if fixes, canFix := removeAwaitFixes(ruleContext, node); canFix {
+					ruleContext.ReportNodeWithFixes(node, returnAwaitMessage("nonPromiseAwait"), fixes...)
 				} else {
-					ctx.ReportNode(node, returnAwaitMessage("nonPromiseAwait"))
+					ruleContext.ReportNode(node, returnAwaitMessage("nonPromiseAwait"))
 				}
 				return
 			}
 
 			affectsErrorHandling := affectsExplicitErrorHandling(node) ||
-				usingDeclarationInScope(ctx, node)
+				usingDeclarationInScope(ruleContext, node)
 
 			disposition := ordinaryDisposition
 			if affectsErrorHandling {
@@ -249,35 +247,35 @@ var ReturnAwait = rule.Rule{
 				if isAwait {
 					return
 				}
-				insertion := insertAwaitFixes(ctx, node)
+				insertion := insertAwaitFixes(ruleContext, node)
 				if affectsErrorHandling {
 					// The edit changes which frame catches a rejection, so a person chooses it.
-					ctx.ReportNodeWithSuggestions(node, returnAwaitMessage("requiredPromiseAwait"),
+					ruleContext.ReportNodeWithSuggestions(node, returnAwaitMessage("requiredPromiseAwait"),
 						rule.Suggestion{
 							Message: returnAwaitMessage("requiredPromiseAwaitSuggestion"),
 							Fixes:   insertion,
 						})
 					return
 				}
-				ctx.ReportNodeWithFixes(node, returnAwaitMessage("requiredPromiseAwait"), insertion...)
+				ruleContext.ReportNodeWithFixes(node, returnAwaitMessage("requiredPromiseAwait"), insertion...)
 			case returnAwaitForbid:
 				if !isAwait {
 					return
 				}
-				fixes, canFix := removeAwaitFixes(ctx, node)
+				fixes, canFix := removeAwaitFixes(ruleContext, node)
 				if !canFix {
-					ctx.ReportNode(node, returnAwaitMessage("disallowedPromiseAwait"))
+					ruleContext.ReportNode(node, returnAwaitMessage("disallowedPromiseAwait"))
 					return
 				}
 				if affectsErrorHandling {
-					ctx.ReportNodeWithSuggestions(node, returnAwaitMessage("disallowedPromiseAwait"),
+					ruleContext.ReportNodeWithSuggestions(node, returnAwaitMessage("disallowedPromiseAwait"),
 						rule.Suggestion{
 							Message: returnAwaitMessage("disallowedPromiseAwaitSuggestion"),
 							Fixes:   fixes,
 						})
 					return
 				}
-				ctx.ReportNodeWithFixes(node, returnAwaitMessage("disallowedPromiseAwait"), fixes...)
+				ruleContext.ReportNodeWithFixes(node, returnAwaitMessage("disallowedPromiseAwait"), fixes...)
 			}
 		}
 
@@ -297,30 +295,31 @@ var ReturnAwait = rule.Rule{
 			// A loop rather than one step, because `((x))` nests. Not `ast.SkipParentheses`, which
 			// dereferences its argument and would panic on the nil this function is handed for an
 			// omitted return argument.
-			for node.Kind == ast.KindParenthesizedExpression {
-				inner := node.AsParenthesizedExpression().Expression
+			unwrapped := node
+			for unwrapped.Kind == ast.KindParenthesizedExpression {
+				inner := unwrapped.AsParenthesizedExpression().Expression
 				if inner == nil {
 					return
 				}
-				node = inner
+				unwrapped = inner
 			}
 
-			if node.Kind == ast.KindConditionalExpression {
-				conditional := node.AsConditionalExpression()
+			if unwrapped.Kind == ast.KindConditionalExpression {
+				conditional := unwrapped.AsConditionalExpression()
 				// Upstream builds `[...findPossiblyReturnedNodes(alternate),
 				// ...findPossiblyReturnedNodes(consequent)]` and then reports over that array, so
-				// the ALTERNATE's findings are collected first. But the reports come out in source
+				// the alternate's findings are collected first. But the reports come out in source
 				// order because ESLint sorts diagnostics by position before emitting them, and our
 				// harness preserves emission order instead.
 				//
 				// Measured against the installed build: `(await foo()) ? bar() : baz()` reports
 				// bar() first. So the consequent is visited first here, which reproduces the
-				// OBSERVED order rather than upstream's array order.
+				// observed order rather than upstream's array order.
 				testPossiblyReturned(conditional.WhenTrue)
 				testPossiblyReturned(conditional.WhenFalse)
 				return
 			}
-			test(node)
+			test(unwrapped)
 		}
 
 		return rule.Listeners{
@@ -364,6 +363,16 @@ func enclosingFunctionOfReturn(node *ast.Node) *ast.Node {
 	return nil
 }
 
+// tryPart names which of a try statement's three children contains the node.
+type tryPart int
+
+const (
+	tryPartNone tryPart = iota
+	tryPartTry
+	tryPartCatch
+	tryPartFinally
+)
+
 // affectsExplicitErrorHandling answers whether an exception from this position changes control flow.
 //
 // Upstream's recursion, reproduced. A `try` block always qualifies because a try is always followed
@@ -391,16 +400,6 @@ func affectsExplicitErrorHandling(node *ast.Node) bool {
 	}
 	return false
 }
-
-// tryPart names which of a try statement's three children contains the node.
-type tryPart int
-
-const (
-	tryPartNone tryPart = iota
-	tryPartTry
-	tryPartCatch
-	tryPartFinally
-)
 
 // containingTryStatement finds the nearest enclosing try statement, without crossing a function.
 //
@@ -435,25 +434,25 @@ func containingTryStatement(node *ast.Node) (*ast.Node, tryPart) {
 // before the node, and the search stops at the function boundary because a `using` in an outer
 // function disposes on that function's exit rather than this one's.
 //
-// The comparison uses the node's TOKEN start rather than `Pos()`: `Pos()` includes leading trivia
+// The comparison uses the node's token start rather than `Pos()`: `Pos()` includes leading trivia
 // and begins where the previous statement ended, which makes a `using` on the line directly above
 // read as "not before". See the rule's doc comment for the measurement.
-func usingDeclarationInScope(ctx rule.Context, node *ast.Node) bool {
-	// TokenRange rather than Pos, and the difference is EQUIVALENT for every input this rule can
+func usingDeclarationInScope(ruleContext rule.Context, node *ast.Node) bool {
+	// TokenRange rather than Pos, and the difference is equivalent for every input this rule can
 	// produce rather than merely untested. Stated because a mutation swapping them survives the
 	// whole suite, and the honest reason is not "no fixture covers it".
 	//
-	// `Pos()` includes leading trivia, so for a RETURN STATEMENT it starts where the previous
+	// `Pos()` includes leading trivia, so for a return statement it starts where the previous
 	// statement ended, and comparing a `using` against that reads "not before". Measured: 97
 	// against 100 on a return directly below a `using`. But this function is handed the returned
-	// EXPRESSION, never the statement, and an expression's leading trivia can only reach back to
+	// expression, never the statement, and an expression's leading trivia can only reach back to
 	// the `return` keyword, which always sits between it and any preceding statement. Measured on
-	// the tightest shape available, a `using` and a return on ONE line: the using ends at 97 while
+	// the tightest shape available, a `using` and a return on one line: the using ends at 97 while
 	// the expression's Pos is 104 and its TokenRange 105, both after it.
 	//
 	// So no input separates the two spellings here. TokenRange is kept because it states the
 	// intent and because a later caller passing the statement would make the difference real.
-	nodeStart := rule.TokenRange(ctx.SourceFile, node).Pos()
+	nodeStart := rule.TokenRange(ruleContext.SourceFile, node).Pos()
 
 	for ancestor := node.Parent; ancestor != nil; ancestor = ancestor.Parent {
 		for _, statement := range blockStatementsOf(ancestor) {
@@ -464,7 +463,7 @@ func usingDeclarationInScope(ctx rule.Context, node *ast.Node) bool {
 			if list == nil {
 				continue
 			}
-			// Test the Using bit ALONE. `NodeFlagsAwaitUsing` is not a separate bit: it is
+			// Test the Using bit alone. `NodeFlagsAwaitUsing` is not a separate bit: it is
 			// defined as `NodeFlagsConst | NodeFlagsUsing`, because on one node those two are
 			// otherwise mutually exclusive. So a mask of `Using|AwaitUsing` reduces to
 			// `Const|Using` and matches every `const` declaration in the file.
@@ -519,7 +518,7 @@ func blockStatementsOf(node *ast.Node) []*ast.Node {
 // removing the keyword leaves a body that parses as a Block rather than an object literal, so the
 // function silently returns nothing. Confirmed with the compiler and against the running 8.67 rule,
 // which produces exactly that corruption.
-func removeAwaitFixes(ctx rule.Context, node *ast.Node) ([]rule.Fix, bool) {
+func removeAwaitFixes(ruleContext rule.Context, node *ast.Node) ([]rule.Fix, bool) {
 	if node.Kind != ast.KindAwaitExpression {
 		return nil, false
 	}
@@ -528,26 +527,26 @@ func removeAwaitFixes(ctx rule.Context, node *ast.Node) ([]rule.Fix, bool) {
 		return nil, false
 	}
 
-	awaitStart := rule.TokenRange(ctx.SourceFile, node).Pos()
-	operandStart := rule.TokenRange(ctx.SourceFile, operand).Pos()
+	awaitStart := rule.TokenRange(ruleContext.SourceFile, node).Pos()
+	operandStart := rule.TokenRange(ruleContext.SourceFile, operand).Pos()
 	if operandStart <= awaitStart {
 		return nil, false
 	}
 
-	// Upstream removes to the start of the next token INCLUDING COMMENTS, not to the operand's
+	// Upstream removes to the start of the next token including comments, not to the operand's
 	// token start, so a comment between the keyword and the operand survives the repair:
 	//
 	//	await /* comment */ 1   ->   /* comment */ 1
 	//
 	// Removing to the operand's token start instead swallows it. Two of upstream's own cases assert
 	// the comment is kept, and both failed before this.
-	// The scan starts at the OPERAND's Pos rather than at the await keyword's start. `Pos()`
+	// The scan starts at the operand's Pos rather than at the await keyword's start. `Pos()`
 	// includes leading trivia, so for `await /* c */ 1` it sits just after the keyword, which is
 	// where the comment actually is. Starting at the keyword instead makes the scanner read the
 	// keyword's own text and find nothing: probed, it returned zero comments for a gap that
 	// visibly contained one.
 	removalEnd := operandStart
-	for comment := range type_checking.GetCommentsInRange(ctx.SourceFile,
+	for comment := range type_checking.GetCommentsInRange(ruleContext.SourceFile,
 		core.NewTextRange(operand.Pos(), operandStart)) {
 		if comment.Pos() > awaitStart && comment.Pos() < removalEnd {
 			removalEnd = comment.Pos()
@@ -556,7 +555,7 @@ func removeAwaitFixes(ctx rule.Context, node *ast.Node) ([]rule.Fix, bool) {
 
 	fixes := []rule.Fix{rule.RemoveRange(core.NewTextRange(awaitStart, removalEnd))}
 
-	if operandNeedsParenthesesAfterAwaitRemoval(ctx, node, operand) {
+	if operandNeedsParenthesesAfterAwaitRemoval(ruleContext, node, operand) {
 		fixes = append(fixes,
 			rule.ReplaceRange(core.NewTextRange(operandStart, operandStart), "("),
 			rule.ReplaceRange(core.NewTextRange(operand.End(), operand.End()), ")"))
@@ -570,12 +569,12 @@ func removeAwaitFixes(ctx rule.Context, node *ast.Node) ([]rule.Fix, bool) {
 // concise body of an arrow function. Either alone is harmless, since `{` elsewhere in an expression
 // position stays an object literal and an arrow body that is not an object literal cannot be
 // reparsed as a block.
-func operandNeedsParenthesesAfterAwaitRemoval(ctx rule.Context, node *ast.Node, operand *ast.Node) bool {
-	// Upstream tests the operand's FIRST TOKEN, not the operand's kind, and the difference is a
+func operandNeedsParenthesesAfterAwaitRemoval(ruleContext rule.Context, node *ast.Node, operand *ast.Node) bool {
+	// Upstream tests the operand's first token, not the operand's kind, and the difference is a
 	// real case rather than a nicety: `await { a: 1 }.a` is a property access whose first token is
 	// still `{`, so dropping the keyword leaves an arrow body that parses as a block. A kind test
 	// misses it, which one of upstream's own fix vectors caught.
-	if !operandStartsWithBrace(ctx, operand) {
+	if !operandStartsWithBrace(ruleContext, operand) {
 		return false
 	}
 	parent := node.Parent
@@ -590,9 +589,9 @@ func operandNeedsParenthesesAfterAwaitRemoval(ctx rule.Context, node *ast.Node, 
 // Reading the source rather than walking down the leftmost child: the leftmost node of
 // `{ a: 1 }.a` is the object literal, but so is the leftmost node of shapes that do not start with
 // a brace at all once parentheses are involved, and the question upstream asks is purely textual.
-func operandStartsWithBrace(ctx rule.Context, operand *ast.Node) bool {
-	start := rule.TokenRange(ctx.SourceFile, operand).Pos()
-	text := ctx.SourceFile.Text()
+func operandStartsWithBrace(ruleContext rule.Context, operand *ast.Node) bool {
+	start := rule.TokenRange(ruleContext.SourceFile, operand).Pos()
+	text := ruleContext.SourceFile.Text()
 	return start >= 0 && start < len(text) && text[start] == '{'
 }
 
@@ -601,8 +600,8 @@ func operandStartsWithBrace(ctx rule.Context, operand *ast.Node) bool {
 // An operand that binds more tightly than `await` takes the keyword and a space. Anything looser
 // has to be parenthesised, or `await a || b` would parse as `(await a) || b` and change what is
 // returned.
-func insertAwaitFixes(ctx rule.Context, node *ast.Node) []rule.Fix {
-	start := rule.TokenRange(ctx.SourceFile, node).Pos()
+func insertAwaitFixes(ruleContext rule.Context, node *ast.Node) []rule.Fix {
+	start := rule.TokenRange(ruleContext.SourceFile, node).Pos()
 	if type_checking.IsHigherPrecedenceThanAwait(node) {
 		return []rule.Fix{rule.ReplaceRange(core.NewTextRange(start, start), "await ")}
 	}

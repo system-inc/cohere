@@ -33,23 +33,23 @@ var messageNoInvalidThisUnexpectedThis = rule.Message{
 // # This rule already ships under another name, and porting it anyway was a measured decision
 //
 // `@typescript-eslint/no-invalid-this` is registered and enabled in this tree, and upstream's
-// extension is a WRAPPER: its source opens with `getESLintCoreRule('no-invalid-this')` and every
+// extension is a wrapper: its source opens with `getESLintCoreRule('no-invalid-this')` and every
 // finding comes from the core rule underneath. The standard's usual reading of that shape is that
 // the core algorithm necessarily already lives inside the namespaced port, so a bare port is a
 // second implementation of code already present.
 //
-// That reading is right about the algorithm and wrong about the VERDICTS, and the difference was
+// That reading is right about the algorithm and wrong about the verdicts, and the difference was
 // measured rather than argued. Both installed rules -- ESLint 10.8.1's core and
 // @typescript-eslint 8.67.0's extension -- were driven over all 572 cases of upstream's core corpus
 // through the ESLint Linter interface. The two agree on 566 and disagree on 6, and the six are one
-// class: a `this` inside the COMPUTED KEY of a class field.
+// class: a `this` inside the computed key of a class field.
 //
 //	class C { [this.foo]; }                          core reports, the extension is silent
 //	class C { static {} [this]; }                    core reports, the extension is silent
 //	function foo() { class C { accessor [this.a] = foo; } }   core reports, extension silent
 //
 // The cause is in the wrapper. It pushes `true` onto its validity stack for `PropertyDefinition`
-// and `AccessorProperty`, which in ESTree is the whole member INCLUDING its key, so a `this` in the
+// and `AccessorProperty`, which in ESTree is the whole member including its key, so a `this` in the
 // key is exempted along with one in the value. Core has no such arm and judges the key against the
 // enclosing function, which is correct: a computed key is evaluated at class-definition time, where
 // the instance does not exist yet.
@@ -59,7 +59,7 @@ var messageNoInvalidThisUnexpectedThis = rule.Message{
 // it, and it is the answer to the standard's "expect such a port to add no new findings" -- here it
 // adds six shapes, and they are real.
 //
-// # This rule is ENABLED on the live tree, and `--rules-enabled` says it is not
+// # This rule is enabled on the live tree, and `--rules-enabled` says it is not
 //
 // Read this before you conclude anything about whether this rule runs. It was landed deliberately
 // unenabled, `CohereSettings.json` contains no `no-invalid-this` key, and it runs anyway.
@@ -68,7 +68,7 @@ var messageNoInvalidThisUnexpectedThis = rule.Message{
 // and failing that by trimming each configured key by the rule name and requiring what remains to
 // end in `/`. The live config carries `"@typescript-eslint/no-invalid-this": "error"`. Trim that
 // by this rule's name and `"@typescript-eslint/"` remains, which ends on the boundary, so the
-// namespaced sibling's key resolves THIS rule too:
+// namespaced sibling's key resolves this rule too:
 //
 //	config key : @typescript-eslint/no-invalid-this
 //	rule name  : no-invalid-this
@@ -76,7 +76,7 @@ var messageNoInvalidThisUnexpectedThis = rule.Message{
 //
 // That suffix rule exists for a good reason and is documented at its own line: it lets one config
 // entry configure a rule whichever namespace it is spelled under. The case it did not anticipate is
-// an `extendsBaseRule` PAIR, where the two names are a genuine suffix of each other and are two
+// an `extendsBaseRule` pair, where the two names are a genuine suffix of each other and are two
 // different rules with two different verdicts.
 //
 // # The instrument disagrees with the behaviour, and the instrument is the one people read
@@ -89,7 +89,7 @@ var messageNoInvalidThisUnexpectedThis = rule.Message{
 // either: ahra is clean for this rule, and a zero there cannot separate "did not run" from "ran and
 // found nothing". That was tried and it could not distinguish the two.
 //
-// What does settle it is a probe tree with a PLANTED violation, whose config names only the
+// What does settle it is a probe tree with a planted violation, whose config names only the
 // namespaced key:
 //
 //	<scratch>/probetree/CohereSettings.json   { "rules": { "@typescript-eslint/no-invalid-this": "error" } }
@@ -99,13 +99,13 @@ var messageNoInvalidThisUnexpectedThis = rule.Message{
 //
 //	cd <scratch>/probetree && <your build> --no-fix --lint
 //
-// Measured: TWO findings at the identical line and column, one tagged
+// Measured: two findings at the identical line and column, one tagged
 // `[@typescript-eslint/no-invalid-this/unexpectedThis]` and one tagged `[no-invalid-this/...]`.
 // That is the standard's documented "a core rule and its extension can both be on, and both will
 // fire" doubling, arriving through a spelling suffix rather than through anyone writing a second
 // key.
 //
-// Of the registered rules absent from `--rules-enabled`, this is the ONLY one in this state.
+// Of the registered rules absent from `--rules-enabled`, this is the only one in this state.
 // Checked mechanically rather than assumed: every bare-named one was tested for an enabled
 // namespaced rule ending in `/<that name>`, and only this rule matched. The other unenabled rules
 // have no enabled namespaced twin, so their bare names resolve to nothing and they really are off.
@@ -123,11 +123,11 @@ var messageNoInvalidThisUnexpectedThis = rule.Message{
 // namespaced sibling is configured. That is a design decision about the resolver rather than a
 // config edit, and it is left open here on purpose. Both are recorded rather than resolved.
 //
-// # The same defect is present in this tree's namespaced port, and is NOT repaired here
+// # The same defect is present in this tree's namespaced port, and is not repaired here
 //
 // `internal/lint/rules/typescript/no_invalid_this.go` reproduces the wrapper faithfully, including
 // this arm, so it is silent on all six shapes. Measured directly against it with a probe rather
-// than read off its source. It is additionally silent on a seventh shape where the EXTENSION does
+// than read off its source. It is additionally silent on a seventh shape where the extension does
 // report:
 //
 //	class C { [this.a]() {} }        core reports, the extension reports, our port is silent
@@ -137,11 +137,11 @@ var messageNoInvalidThisUnexpectedThis = rule.Message{
 // binding. Upstream's wrapper has no method arm at all, so it never had the chance to make this
 // mistake.
 //
-// Repairing that is a change to another author's committed and ENABLED rule, which would alter what
+// Repairing that is a change to another author's committed and enabled rule, which would alter what
 // the tree reports, and it is not this port's business to make. It is recorded here, with what
 // established it, so the next reader finds it rather than re-deriving it.
 //
-// The shapes are pinned as EXECUTABLE assertions rather than as prose, in this package's own
+// The shapes are pinned as executable assertions rather than as prose, in this package's own
 // tests, so a later change to either rule fails loudly instead of quietly agreeing with a comment:
 //
 //	go test -run TestNoInvalidThisComputedKeysAreOutsideTheMember ./internal/lint/rules/core/
@@ -167,10 +167,10 @@ var messageNoInvalidThisUnexpectedThis = rule.Message{
 // every one of them is a sloppy-mode case where `this` was the global object.
 //
 // So the fixtures assert what the installed core rule answers under `sourceType: module` with the
-// TypeScript parser, not what the corpus file annotates. The corpus's four conditions -- NORMAL,
-// USE_STRICT, IMPLIED_STRICT and MODULES -- collapse to one configuration here, and that collapse
+// TypeScript parser, not what the corpus file annotates. The corpus's four conditions -- `NORMAL`,
+// `USE_STRICT`, `IMPLIED_STRICT` and `MODULES` -- collapse to one configuration here, and that collapse
 // was checked rather than assumed: grouping the 569 distinct (source, options) pairs by their
-// source with the condition markers stripped gives 215 groups, and ZERO of those groups contain
+// source with the condition markers stripped gives 215 groups, and zero of those groups contain
 // members that disagree. A group whose members disagreed would have meant a marker was doing real
 // work and the collapse was hiding it.
 //
@@ -192,35 +192,35 @@ var messageNoInvalidThisUnexpectedThis = rule.Message{
 //
 // # The computed-key discriminator is a node here, which is what makes this portable
 //
-// Upstream has to reason about which CHILD of the member it is in, because in ESTree the key hangs
+// Upstream has to reason about which child of the member it is in, because in ESTree the key hangs
 // directly off the member node. Here a computed key is its own `KindComputedPropertyName` node
 // sitting between the member and the key expression, measured with an ancestry probe over eight
 // class shapes. So the walk gets an arm on that node rather than a test against the member's
 // fields, and needs no knowledge of which slot the key occupies.
 //
-// That arm POPS the member's push for the duration of the key and restores it afterwards, rather
+// That arm pops the member's push for the duration of the key and restores it afterwards, rather
 // than forcing a report. The difference is load-bearing and cost a draft:
-// `class C { static { class D { [this.x]; } } }` is a PASSING corpus case, because popping D's
+// `class C { static { class D { [this.x]; } } }` is a passing corpus case, because popping D's
 // member exposes the static block's binding underneath, which is valid. A version that reported
 // whenever it found a computed property name in the ancestry reported that case.
 //
 // # capIsConstructor is on by default, so the zero-value struct is the wrong configuration
 //
-// The option surface is one boolean and its default is TRUE, which means a decoder that fills a
+// The option surface is one boolean and its default is `true`, which means a decoder that fills a
 // zero-value struct inverts it and silently reports every `function Foo() { this.x = 1; }` in the
 // tree. Forty-five corpus cases carry the option explicitly, and the decoder below is hand written
 // for exactly this reason.
-var NoInvalidThis = rule.Rule{
+var NoInvalidThis = rule.Rule[noInvalidThisSettings]{
 	Name: "no-invalid-this",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[noInvalidThisSettings]) rule.Listeners {
 		settings := noInvalidThisSettingsFrom(options)
 
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
 				// The walk is done here rather than through per-kind listeners because the rule
-				// needs to know what it is INSIDE when it meets a `this`, and the listener walk is
+				// needs to know what it is inside when it meets a `this`, and the listener walk is
 				// pre-order with no exit hook to pop a stack on.
-				walker := &noInvalidThisWalker{ctx: ctx, settings: settings}
+				walker := &noInvalidThisWalker{ruleContext: ruleContext, settings: settings}
 				walker.walk(node)
 			},
 		}
@@ -254,131 +254,41 @@ type noInvalidThisRawOptions struct {
 // the resulting zero-value struct would say capIsConstructor is false. That is not a weaker
 // configuration, it is a different rule, and it reports every capitalized constructor function in
 // the tree.
-func DecodeNoInvalidThisOptions(raw []byte) (any, error) {
+func DecodeNoInvalidThisOptions(raw []byte) (noInvalidThisSettings, error) {
 	settings := DefaultNoInvalidThisSettings()
 
-	decoded, err := rule.DecodeOptionsInto[noInvalidThisRawOptions]()(raw)
-	if err != nil {
-		return settings, err
+	decoded, decodeOptionsError := rule.DecodeOptionsInto[noInvalidThisRawOptions]()(raw)
+	if decodeOptionsError != nil {
+		return settings, decodeOptionsError
 	}
-	wire, _ := decoded.(noInvalidThisRawOptions)
 
-	if wire.CapIsConstructor != nil {
-		settings.CapIsConstructor = *wire.CapIsConstructor
+	if decoded.CapIsConstructor != nil {
+		settings.CapIsConstructor = *decoded.CapIsConstructor
 	}
 	return settings, nil
 }
 
 // noInvalidThisSettingsFrom recovers the settings from whatever the config layer handed over,
 // falling back to the documented defaults for nil.
-func noInvalidThisSettingsFrom(options any) noInvalidThisSettings {
-	if settings, ok := rule.OptionsAs[noInvalidThisSettings](options); ok {
+func noInvalidThisSettingsFrom(options rule.Given[noInvalidThisSettings]) noInvalidThisSettings {
+	if settings, ok := options.Read(); ok {
 		return settings
 	}
 	return DefaultNoInvalidThisSettings()
 }
 
-// noInvalidThisWalker carries the validity stack across the recursive walk.
-type noInvalidThisWalker struct {
-	ctx      rule.Context
-	settings noInvalidThisSettings
-
-	// thisIsValid's top is the binding in force for the `this` being visited, and an empty stack
-	// means top level, where a module's `this` is `undefined` and therefore invalid.
-	thisIsValid []bool
-}
-
-func (w *noInvalidThisWalker) walk(node *ast.Node) {
-	if node == nil {
-		return
-	}
-
-	pushed := false
-	// popped records that a computed key temporarily removed its member's push, so the walk can
-	// put it back on the way out. Restoring `true` rather than the saved value is correct because
-	// only the member arms push here, and every one of them pushes true.
-	popped := false
-	switch node.Kind {
-	case ast.KindThisKeyword:
-		if !w.currentlyValid() {
-			w.ctx.ReportNode(node, messageNoInvalidThisUnexpectedThis)
-		}
-
-	case ast.KindComputedPropertyName:
-		// A computed key is evaluated when the class or object literal is DEFINED, before any
-		// instance exists, so the member that encloses it binds nothing: `class C { [this.a]; }`
-		// throws. The walk has already pushed for that member, so the push has to be UNDONE for
-		// the key -- the member's value genuinely is valid and both live under the same node.
-		//
-		// Undoing is a pop rather than a forced report, and that distinction is load-bearing.
-		// `class C { static { class D { [this.x]; } } }` is a PASSING corpus case: popping D's
-		// member exposes the static block's binding underneath, which is valid. Forcing a report
-		// here instead reported it, and forcing one is what an earlier draft did.
-		if len(w.thisIsValid) > 0 {
-			w.thisIsValid = w.thisIsValid[:len(w.thisIsValid)-1]
-			popped = true
-		}
-
-	case ast.KindFunctionDeclaration, ast.KindFunctionExpression:
-		w.thisIsValid = append(w.thisIsValid, !thisIsDefaultBoundIn(w.ctx, node, w.settings))
-		pushed = true
-
-	case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor,
-		ast.KindConstructor, ast.KindClassStaticBlockDeclaration:
-		// A method's `this` is the receiver and a static block's is the class. Core reaches these
-		// through the same default-binding test, which answers false for all of them.
-		w.thisIsValid = append(w.thisIsValid, true)
-		pushed = true
-
-	case ast.KindPropertyDeclaration:
-		// A field initializer is an implicit function whose `this` is the instance. `accessor` is a
-		// modifier here rather than a separate node, so upstream's PropertyDefinition and
-		// AccessorProperty both arrive as this kind.
-		w.thisIsValid = append(w.thisIsValid, true)
-		pushed = true
-
-	case ast.KindArrowFunction:
-		// Deliberately no push. An arrow has no `this` of its own, so the enclosing binding stays
-		// in force and a `this` inside it is judged exactly as one outside it would be.
-	}
-
-	node.ForEachChild(func(child *ast.Node) bool {
-		w.walk(child)
-		return false
-	})
-
-	if pushed {
-		w.thisIsValid = w.thisIsValid[:len(w.thisIsValid)-1]
-	}
-	if popped {
-		w.thisIsValid = append(w.thisIsValid, true)
-	}
-}
-
-// currentlyValid reads the top of the stack.
-//
-// An empty stack is top level. Every file cohere lints is a TypeScript module, where top-level
-// `this` is `undefined`, so the answer there is false. Core reaches the same answer through
-// `node.sourceType === "module"`.
-func (w *noInvalidThisWalker) currentlyValid() bool {
-	if len(w.thisIsValid) == 0 {
-		return false
-	}
-	return w.thisIsValid[len(w.thisIsValid)-1]
-}
-
 // thisIsDefaultBoundIn is ESLint's `astUtils.isDefaultThisBinding`, which is where the judgment lives.
 //
 // It answers "would calling this function leave `this` as the default binding", and the rule reports
-// exactly when it says yes. The traversal walks OUTWARD from the function looking for something that
+// exactly when it says yes. The traversal walks outward from the function looking for something that
 // binds a receiver, and every arm below is upstream's, in upstream's order.
 //
 // The direction is worth stating because it inverts twice on the way to the report site: this returns
-// true when `this` is UNBOUND, the stack stores whether `this` is VALID, and the report fires when
+// true when `this` is unbound, the stack stores whether `this` is valid, and the report fires when
 // the stack says invalid.
-func thisIsDefaultBoundIn(ctx rule.Context, node *ast.Node, settings noInvalidThisSettings) bool {
+func thisIsDefaultBoundIn(ruleContext rule.Context, node *ast.Node, settings noInvalidThisSettings) bool {
 	// A declared `this` parameter binds `this` by contract, and the checker enforces it at every
-	// call site. This lives in CORE, not only in the typescript-eslint extension: ESLint 10.8.1's
+	// call site. This lives in core, not only in the typescript-eslint extension: ESLint 10.8.1's
 	// own `isDefaultThisBinding` opens with it, and four corpus cases in upstream's TypeScript
 	// block depend on it, including `z(function (x, this: context) { ... })`. Upstream tests every
 	// parameter rather than only the first, and that width is reproduced: the grammar allows `this`
@@ -394,7 +304,7 @@ func thisIsDefaultBoundIn(ctx rule.Context, node *ast.Node, settings noInvalidTh
 	if settings.CapIsConstructor && noInvalidThisStartsWithUpperCase(noInvalidThisFunctionOwnName(node)) {
 		return false
 	}
-	if noInvalidThisHasJSDocThisTag(ctx, node) {
+	if noInvalidThisHasJsDocThisTag(ruleContext, node) {
 		return false
 	}
 
@@ -447,10 +357,10 @@ func thisIsDefaultBoundIn(ctx rule.Context, node *ast.Node, settings noInvalidTh
 
 		// If the enclosing function is immediately invoked, follow its return value out.
 		//
-		// The step out is to the CALL, not to the function's own parent, and the two differ here
+		// The step out is to the call, not to the function's own parent, and the two differ here
 		// where they do not upstream: `(function () { return function () {}; })()` gives the inner
 		// function a parenthesized parent, so `enclosing.Parent` is the parenthesis rather than the
-		// call. Upstream's `func.parent` IS the call because its parser drops the node.
+		// call. Upstream's `func.parent` is the call because its parser drops the node.
 		case ast.KindReturnStatement:
 			enclosing := noInvalidThisEnclosingFunctionOf(parent)
 			if enclosing == nil {
@@ -476,8 +386,8 @@ func thisIsDefaultBoundIn(ctx rule.Context, node *ast.Node, settings noInvalidTh
 
 		// A method or a property's value has a receiver; anything else in these nodes does not.
 		//
-		// BOTH of these arms are INERT here, and both were measured rather than argued after their
-		// mutants survived the whole 215-case corpus AND thirteen shapes hand-built to attack them.
+		// Both of these arms are inert here, and both were measured rather than argued after their
+		// mutants survived the whole 215-case corpus and thirteen shapes hand-built to attack them.
 		// The cause is one parser difference in two costumes: typescript-go puts a computed key in
 		// its own ComputedPropertyName node and folds a method's body into the method node, where
 		// ESTree hangs both directly off the member.
@@ -496,7 +406,7 @@ func thisIsDefaultBoundIn(ctx rule.Context, node *ast.Node, settings noInvalidTh
 		//
 		// Both are kept because fidelity is to upstream's decision and because the arms cost nothing,
 		// but a reader should know they are unreachable rather than deleting them as dead or, worse,
-		// trusting them to make a distinction they cannot make. The distinction they LOOK like they
+		// trusting them to make a distinction they cannot make. The distinction they look like they
 		// draw is real and is drawn instead by the KindComputedPropertyName arm of the walk above.
 		//
 		// An earlier revision of this comment asserted the class-field case was "NOT inert and is
@@ -523,7 +433,7 @@ func thisIsDefaultBoundIn(ctx rule.Context, node *ast.Node, settings noInvalidTh
 		case ast.KindPropertyAccessExpression:
 			if parent.Expression() == current && noInvalidThisIsBindCallOrApply(parent) {
 				// The call is read back through noInvalidThisCallOf rather than from
-				// `parent.Parent`, so the parenthesis skip that decides whether this IS a callee
+				// `parent.Parent`, so the parenthesis skip that decides whether this is a callee
 				// and the lookup of the call's arguments cannot disagree about which node the call
 				// is. Reading `parent.Parent` here was wrong for `(fn.bind)(obj)`: the skip found
 				// the call and the argument read found the parenthesis.
@@ -547,7 +457,7 @@ func thisIsDefaultBoundIn(ctx rule.Context, node *ast.Node, settings noInvalidTh
 // one.
 //
 // Upstream reads `node.id`, which exists only for a declaration or a named function expression. A
-// name inherited from a variable or a property is deliberately NOT this: upstream handles that
+// name inherited from a variable or a property is deliberately not this: upstream handles that
 // separately in the VariableDeclaration and AssignmentExpression arms, and only for anonymous
 // functions, so folding it in here would report differently on `var Foo = function bar() { this.x; };`.
 func noInvalidThisFunctionOwnName(node *ast.Node) string {
@@ -573,13 +483,13 @@ func noInvalidThisStartsWithUpperCase(name string) bool {
 	return unicode.ToLower(first) != first
 }
 
-// noInvalidThisHasJSDocThisTag answers whether a `@this` tag documents this function.
+// noInvalidThisHasJsDocThisTag answers whether a `@this` tag documents this function.
 //
 // Upstream asks two questions and reports if either says yes, and both are reproduced because both
 // were measured to matter. This is the largest single piece of machinery behind a rule whose own
 // file is under two hundred lines, and it is a good example of the rule file being a thin caller.
 //
-// The first question is `getJSDocComment`, which walks OUTWARD from the function to whatever node
+// The first question is `getJSDocComment`, which walks outward from the function to whatever node
 // the documentation would sit on, and then requires the token immediately before that node to be a
 // real JSDoc block. The walk is why the boundary is not a token gap, measured at ESLint 10.8.1:
 //
@@ -587,23 +497,23 @@ func noInvalidThisStartsWithUpperCase(name string) bool {
 //	function foo() { /** @this*/ var q = function () { this.x; }; }       silent
 //	function foo() { /** @this*/ q(function () { this.x; }); }            REPORTS
 //
-// The third is the one that pins the shape: a function passed as a CALL ARGUMENT does not walk out
+// The third is the one that pins the shape: a function passed as a call argument does not walk out
 // at all, because upstream excludes a call or new parent before the loop starts.
 //
 // The second question is `getCommentsBefore`, upstream's stated fallback for callbacks, which reads
 // every comment token in the gap before the function itself, block or line, and asks the same
 // pattern of each. The pattern is `/^[\s*]*@this/mu`: anchored per line, allowing asterisks in the
-// prefix, and with NO closing word boundary, so `@thisx` satisfies it and `@nothis` does not. That
+// prefix, and with no closing word boundary, so `@thisx` satisfies it and `@nothis` does not. That
 // reads as a defect and is reproduced rather than corrected, because fidelity is to the authority
 // where upstream gives no reasoning.
-func noInvalidThisHasJSDocThisTag(ctx rule.Context, node *ast.Node) bool {
-	if ctx.SourceFile == nil {
+func noInvalidThisHasJsDocThisTag(ruleContext rule.Context, node *ast.Node) bool {
+	if ruleContext.SourceFile == nil {
 		return false
 	}
-	if noInvalidThisCommentTextHasThisTag(noInvalidThisJSDocCommentFor(ctx, node)) {
+	if noInvalidThisCommentTextHasThisTag(noInvalidThisJsDocCommentFor(ruleContext, node)) {
 		return true
 	}
-	for _, comment := range noInvalidThisCommentsImmediatelyBefore(ctx, node) {
+	for _, comment := range noInvalidThisCommentsImmediatelyBefore(ruleContext, node) {
 		if noInvalidThisCommentTextHasThisTag(comment.Text) {
 			return true
 		}
@@ -611,26 +521,26 @@ func noInvalidThisHasJSDocThisTag(ctx rule.Context, node *ast.Node) bool {
 	return false
 }
 
-// noInvalidThisJSDocCommentFor is upstream's `getJSDocComment` for the function shapes this rule
+// noInvalidThisJsDocCommentFor is upstream's `getJSDocComment` for the function shapes this rule
 // reaches, which are a declaration and an expression. It returns the documenting comment's text, or
 // empty.
-func noInvalidThisJSDocCommentFor(ctx rule.Context, node *ast.Node) string {
+func noInvalidThisJsDocCommentFor(ruleContext rule.Context, node *ast.Node) string {
 	if node.Kind == ast.KindFunctionDeclaration {
-		return noInvalidThisJSDocBlockBefore(ctx, node)
+		return noInvalidThisJsDocBlockBefore(ruleContext, node)
 	}
 
 	parent := node.Parent
 	if parent == nil {
-		return noInvalidThisJSDocBlockBefore(ctx, node)
+		return noInvalidThisJsDocBlockBefore(ruleContext, node)
 	}
 	// A function handed straight to a call does not walk out. This is what separates
 	// `q(function () {...})` from `var q = function () {...}` and it is upstream's own guard.
 	if parent.Kind == ast.KindCallExpression || parent.Kind == ast.KindNewExpression {
-		return noInvalidThisJSDocBlockBefore(ctx, node)
+		return noInvalidThisJsDocBlockBefore(ruleContext, node)
 	}
 
 	for parent != nil {
-		if len(noInvalidThisCommentsImmediatelyBefore(ctx, parent)) > 0 ||
+		if len(noInvalidThisCommentsImmediatelyBefore(ruleContext, parent)) > 0 ||
 			noInvalidThisIsFunctionLike(parent) ||
 			parent.Kind == ast.KindMethodDeclaration || parent.Kind == ast.KindPropertyAssignment {
 			break
@@ -638,16 +548,16 @@ func noInvalidThisJSDocCommentFor(ctx rule.Context, node *ast.Node) string {
 		parent = parent.Parent
 	}
 	if parent != nil && parent.Kind != ast.KindFunctionDeclaration && parent.Kind != ast.KindSourceFile {
-		return noInvalidThisJSDocBlockBefore(ctx, parent)
+		return noInvalidThisJsDocBlockBefore(ruleContext, parent)
 	}
-	return noInvalidThisJSDocBlockBefore(ctx, node)
+	return noInvalidThisJsDocBlockBefore(ruleContext, node)
 }
 
-// noInvalidThisJSDocBlockBefore is upstream's `findJSDocComment`: the token immediately before the
+// noInvalidThisJsDocBlockBefore is upstream's `findJSDocComment`: the token immediately before the
 // node has to be a block comment whose text opens with an asterisk, and it has to end no more than
 // one line above.
-func noInvalidThisJSDocBlockBefore(ctx rule.Context, node *ast.Node) string {
-	preceding := noInvalidThisCommentsImmediatelyBefore(ctx, node)
+func noInvalidThisJsDocBlockBefore(ruleContext rule.Context, node *ast.Node) string {
+	preceding := noInvalidThisCommentsImmediatelyBefore(ruleContext, node)
 	if len(preceding) == 0 {
 		return ""
 	}
@@ -655,9 +565,9 @@ func noInvalidThisJSDocBlockBefore(ctx rule.Context, node *ast.Node) string {
 	if !last.IsBlock || !strings.HasPrefix(strings.TrimPrefix(last.Text, "/*"), "*") {
 		return ""
 	}
-	nodeLine, _ := scanner.GetLineAndCharacterOfPosition(ctx.SourceFile,
-		rule.TokenRange(ctx.SourceFile, node).Pos())
-	commentLine, _ := scanner.GetLineAndCharacterOfPosition(ctx.SourceFile, last.Range.End())
+	nodeLine, _ := scanner.GetLineAndCharacterOfPosition(ruleContext.SourceFile,
+		rule.TokenRange(ruleContext.SourceFile, node).Pos())
+	commentLine, _ := scanner.GetLineAndCharacterOfPosition(ruleContext.SourceFile, last.Range.End())
 	if nodeLine-commentLine > 1 {
 		return ""
 	}
@@ -670,16 +580,16 @@ func noInvalidThisJSDocBlockBefore(ctx rule.Context, node *ast.Node) string {
 // Other comments in the gap do not close it, which is why the span is scanned for comments rather
 // than merely tested for whitespace. Any non-comment text does close it, and that is what makes the
 // gap belong to `1` rather than to the callback in `z(/* @this */ 1, function () {})`.
-func noInvalidThisCommentsImmediatelyBefore(ctx rule.Context, node *ast.Node) []comments.Comment {
-	tokenStart := rule.TokenRange(ctx.SourceFile, node).Pos()
-	sourceText := ctx.SourceFile.Text()
+func noInvalidThisCommentsImmediatelyBefore(ruleContext rule.Context, node *ast.Node) []comments.Comment {
+	tokenStart := rule.TokenRange(ruleContext.SourceFile, node).Pos()
+	sourceText := ruleContext.SourceFile.Text()
 	if tokenStart > len(sourceText) {
 		return nil
 	}
 
 	found := []comments.Comment{}
 	cursor := tokenStart
-	all := comments.ForFile(ctx)
+	all := comments.ForFile(ruleContext)
 	for index := len(all) - 1; index >= 0; index-- {
 		comment := all[index]
 		if comment.Range.End() > cursor {
@@ -730,7 +640,7 @@ func noInvalidThisCommentTextHasThisTag(text string) bool {
 
 // noInvalidThisIsLogicalOperator answers whether a binary expression is `||`, `&&` or `??`.
 //
-// These are upstream's LogicalExpression, which it looks THROUGH rather than deciding on, because
+// These are upstream's LogicalExpression, which it looks through rather than deciding on, because
 // `obj.foo = cached || function () {}` still assigns the function to `obj.foo`. Every other binary
 // operator, assignment included, is a decision point.
 func noInvalidThisIsLogicalOperator(node *ast.Node) bool {
@@ -748,11 +658,11 @@ func noInvalidThisIsLogicalOperator(node *ast.Node) bool {
 // by naming convention, but only for an anonymous function -- a named one has already been judged on
 // its own name.
 //
-// Upstream tests NEITHER the operator NOR which side the function is on, and both omissions are
+// Upstream tests neither the operator nor which side the function is on, and both omissions are
 // reproduced because both were measured to matter. An earlier draft here required
 // `KindEqualsToken` and `Right == current`, which is the intuitive reading and is wrong: the three
 // logical assignment operators `&&=`, `||=` and `??=` are AssignmentExpression too, and
-// `obj.method &&= function () { this.x; };` is a PASSING corpus case that the operator test turned
+// `obj.method &&= function () { this.x; };` is a passing corpus case that the operator test turned
 // into two false findings. Measured against ESLint 10.8.1, all three report zero.
 func noInvalidThisAssignmentBindsThis(parent *ast.Node, current *ast.Node, isAnonymous bool,
 	settings noInvalidThisSettings) bool {
@@ -809,12 +719,12 @@ func noInvalidThisIsBindCallOrApply(node *ast.Node) bool {
 // parentheses between the node and the call.
 //
 // Upstream's own `isCallee` reads `node.parent` directly and needs no skip, because its parser drops
-// parentheses; where it DOES need to look through something -- a `ChainExpression` for `?.` -- it
+// parentheses; where it does need to look through something -- a `ChainExpression` for `?.` -- it
 // says so explicitly at the MemberExpression arm. typescript-go has no ChainExpression (optional
 // chaining is a flag on the access node) and does keep parentheses, so both of upstream's cases
 // arrive here as the same shape and one skip answers both.
 //
-// This answers with the CALL rather than with a boolean, because the caller needs the call's
+// This answers with the call rather than with a boolean, because the caller needs the call's
 // arguments too and reading them from `parent.Parent` separately let the two disagree: the skip
 // found the call while the argument read found the parenthesis, which is what made
 // `(function () { this.x; }.bind)(obj)` report twice.
@@ -844,7 +754,7 @@ func noInvalidThisCallOf(node *ast.Node) *ast.Node {
 // is neither `null` nor `undefined` nor `void 0`.
 //
 // Upstream's test is `isNullOrUndefined`, and it is what makes `.bind(null)` and `.call(undefined)`
-// REPORT while `.bind(obj)` does not: binding to a nullish value leaves `this` undefined in strict
+// report while `.bind(obj)` does not: binding to a nullish value leaves `this` undefined in strict
 // mode, so the call supplies no receiver. Four corpus cases turn on this.
 func noInvalidThisCallHasNonNullishArgument(call *ast.Node, index int) bool {
 	if call == nil {
@@ -860,17 +770,18 @@ func noInvalidThisCallHasNonNullishArgument(call *ast.Node, index int) bool {
 // noInvalidThisIsNullOrUndefined is upstream's `isNullOrUndefined`: the `null` literal, the
 // identifier `undefined`, or a `void` expression of any operand.
 func noInvalidThisIsNullOrUndefined(node *ast.Node) bool {
-	for node != nil && node.Kind == ast.KindParenthesizedExpression {
-		node = node.AsParenthesizedExpression().Expression
+	unwrapped := node
+	for unwrapped != nil && unwrapped.Kind == ast.KindParenthesizedExpression {
+		unwrapped = unwrapped.AsParenthesizedExpression().Expression
 	}
-	if node == nil {
+	if unwrapped == nil {
 		return false
 	}
-	switch node.Kind {
+	switch unwrapped.Kind {
 	case ast.KindNullKeyword:
 		return true
 	case ast.KindIdentifier:
-		return node.Text() == "undefined"
+		return unwrapped.Text() == "undefined"
 	case ast.KindVoidExpression:
 		return true
 	}
@@ -887,7 +798,7 @@ func noInvalidThisIsNullOrUndefined(node *ast.Node) bool {
 //
 // Anything else supplies no receiver, so the answer there is that `this` stays default-bound.
 //
-// The argument counts are EXACT upstream (`arguments.length !== 3`), not minimums, and that is
+// The argument counts are exact upstream (`arguments.length !== 3`), not minimums, and that is
 // reproduced. A minimum reads as the safer choice and is a different rule: `Array.from([], fn, obj,
 // extra)` is not the two-argument-plus-thisArg form upstream recognises.
 func noInvalidThisCallDoesNotBindThis(call *ast.Node, current *ast.Node) bool {
@@ -930,7 +841,7 @@ func noInvalidThisCallDoesNotBindThis(call *ast.Node, current *ast.Node) bool {
 			noInvalidThisIsNullOrUndefined(arguments[2])
 	}
 
-	if noInvalidThisIsArrayMethodTakingThisArg(methodName) {
+	if noInvalidThisIsArrayMethodTakingThisArgument(methodName) {
 		return len(arguments) != 2 || arguments[0] != current ||
 			noInvalidThisIsNullOrUndefined(arguments[1])
 	}
@@ -938,7 +849,7 @@ func noInvalidThisCallDoesNotBindThis(call *ast.Node, current *ast.Node) bool {
 	return true
 }
 
-// noInvalidThisArrayMethodsTakingThisArg is upstream's `arrayMethodWithThisArgPattern`: the array
+// noInvalidThisArrayMethodsTakingThisArgument is upstream's `arrayMethodWithThisArgPattern`: the array
 // methods whose second argument becomes the callback's `this`.
 //
 // Upstream writes it as `/^(?:every|filter|find(?:Last)?(?:Index)?|flatMap|forEach|map|some)$/u`,
@@ -947,12 +858,12 @@ func noInvalidThisCallDoesNotBindThis(call *ast.Node, current *ast.Node) bool {
 //
 // The name is prefixed rather than bare because internal/lint/rules/core is one Go namespace shared
 // with every committed rule beside it, and a bare `arrayMethods` would collide with a sibling.
-var noInvalidThisArrayMethodsTakingThisArg = map[string]bool{
+var noInvalidThisArrayMethodsTakingThisArgument = map[string]bool{
 	"every": true, "filter": true, "find": true, "findIndex": true,
 	"findLast": true, "findLastIndex": true, "flatMap": true,
 	"forEach": true, "map": true, "some": true,
 }
 
-func noInvalidThisIsArrayMethodTakingThisArg(name string) bool {
-	return noInvalidThisArrayMethodsTakingThisArg[name]
+func noInvalidThisIsArrayMethodTakingThisArgument(name string) bool {
+	return noInvalidThisArrayMethodsTakingThisArgument[name]
 }

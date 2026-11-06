@@ -20,7 +20,7 @@ type noInlineCommentsCase struct {
 	// source is upstream's `code`, byte for byte.
 	source string
 
-	// options is the RAW JSON of upstream's options object, routed through the rule's own
+	// options is the raw JSON of upstream's options object, routed through the rule's own
 	// exported decoder rather than built as a struct, so the decoder's defaults and its
 	// empty-input path are under test.
 	options string
@@ -343,35 +343,35 @@ var noInlineCommentsSilentCases = []noInlineCommentsCase{
 }
 
 // decodedNoInlineComments routes a row's raw JSON through the rule's own exported decoder.
-func decodedNoInlineComments(t *testing.T, raw string) any {
-	t.Helper()
-	decoded, err := DecodeNoInlineCommentsOptions([]byte(raw))
-	if err != nil {
-		t.Fatalf("decoding options %q: %v", raw, err)
+func decodedNoInlineComments(test *testing.T, raw string) NoInlineCommentsOptions {
+	test.Helper()
+	decoded, decodeNoInlineCommentsOptionsError := DecodeNoInlineCommentsOptions([]byte(raw))
+	if decodeNoInlineCommentsOptionsError != nil {
+		test.Fatalf("decoding options %q: %v", raw, decodeNoInlineCommentsOptionsError)
 	}
 	return decoded
 }
 
-func TestNoInlineCommentsFires(t *testing.T) {
-	t.Parallel()
+func TestNoInlineCommentsFires(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range noInlineCommentsFiresCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoInlineComments, noInlineCommentsFile, testCase.source,
-				decodedNoInlineComments(t, testCase.options))
-			rule_testing.ExpectFindings(t, result, testCase.ids...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoInlineComments, noInlineCommentsFile, testCase.source,
+				decodedNoInlineComments(test, testCase.options))
+			rule_testing.ExpectFindings(test, result, testCase.ids...)
 		})
 	}
 }
 
-func TestNoInlineCommentsStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoInlineCommentsStaysSilent(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range noInlineCommentsSilentCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoInlineComments, noInlineCommentsFile, testCase.source,
-				decodedNoInlineComments(t, testCase.options))
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoInlineComments, noInlineCommentsFile, testCase.source,
+				decodedNoInlineComments(test, testCase.options))
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -384,14 +384,14 @@ func TestNoInlineCommentsStaysSilent(t *testing.T) {
 //	Block comment   /^(?:eslint[- ]|(?:globals?|exported) )/
 //
 // So a block `/* global foo */` is a directive and a line `// global foo` is not. Collapsing the two
-// into the block pattern SURVIVES the whole 49-case corpus, because it contains three block-form
-// `global`/`exported` cases and ZERO line-form ones. The corpus tests the shape it happens to use.
+// into the block pattern survives the whole 49-case corpus, because it contains three block-form
+// `global`/`exported` cases and zero line-form ones. The corpus tests the shape it happens to use.
 //
 // Measured on the installed rule with two controls that fire: `/* global foo */` is clean,
 // `// global foo` reports, `// exported a` reports, `// eslint-disable-line no-debugger` is clean,
-// and `// eslint disable` -- a SPACE where the line test requires a hyphen -- reports.
-func TestNoInlineCommentsDirectiveTestDiffersByCommentKind(t *testing.T) {
-	t.Parallel()
+// and `// eslint disable` -- a space where the line test requires a hyphen -- reports.
+func TestNoInlineCommentsDirectiveTestDiffersByCommentKind(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name    string
@@ -410,15 +410,15 @@ func TestNoInlineCommentsDirectiveTestDiffersByCommentKind(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoInlineComments, noInlineCommentsFile,
-				testCase.source, decodedNoInlineComments(t, ""))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoInlineComments, noInlineCommentsFile,
+				testCase.source, decodedNoInlineComments(test, ""))
 			if testCase.reports {
-				rule_testing.ExpectFindings(t, result, "unexpectedInlineComment")
+				rule_testing.ExpectFindings(test, result, "unexpectedInlineComment")
 				return
 			}
-			rule_testing.ExpectClean(t, result)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }

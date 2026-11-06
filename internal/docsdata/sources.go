@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 
 	"github.com/system-inc/cohere/internal/benchresults"
+	"github.com/system-inc/cohere/internal/goengine/rules"
 	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/registry"
 	"github.com/system-inc/cohere/internal/lint/rule"
@@ -19,25 +20,34 @@ func SourceInputs(root string) (Inputs, error) {
 	inputs := Inputs{
 		Registrations: rule.Registered(),
 		SetNames:      configuration.SetNames(),
-		LoadSet:       func(name string) (*configuration.Config, error) { return configuration.LoadFor(name, names) },
-		SetContents:   configuration.SourceContents,
+		LoadSet: func(
+			name string,
+		) (*configuration.Configuration, error) {
+			return configuration.LoadFor(name, names)
+		},
+		SetContents: configuration.SourceContents,
+		GoRules:     rules.All(),
 	}
-	var err error
-	if inputs.SwiftVerdicts, err = os.ReadFile(filepath.Join(root, "swift", "HouseRuleVerdicts.json")); err != nil {
-		return inputs, err
+	var readError error
+	if inputs.SwiftVerdicts, readError = os.ReadFile(
+		filepath.Join(root, "swift", "HouseRuleVerdicts.json"),
+	); readError != nil {
+		return inputs, readError
 	}
-	if inputs.SwiftRules, err = os.ReadFile(filepath.Join(root, "swift", "Rules.json")); err != nil {
-		return inputs, err
+	if inputs.SwiftRules, readError = os.ReadFile(filepath.Join(root, "swift", "Rules.json")); readError != nil {
+		return inputs, readError
 	}
-	if inputs.Changelog, err = os.ReadFile(filepath.Join(root, "CHANGELOG.md")); err != nil {
-		return inputs, err
+	if inputs.Changelog, readError = os.ReadFile(filepath.Join(root, "CHANGELOG.md")); readError != nil {
+		return inputs, readError
 	}
-	if inputs.SettingsSchemas, err = settingsschema.Build(names); err != nil {
-		return inputs, err
+	var buildError error
+	if inputs.SettingsSchemas, buildError = settingsschema.Build(names); buildError != nil {
+		return inputs, buildError
 	}
-	if inputs.Benchmarks, err = benchresults.Read(filepath.Join(root, benchresults.Directory)); err != nil {
-		return inputs, err
+	if inputs.Benchmarks, readError = benchresults.Read(filepath.Join(root, benchresults.Directory)); readError != nil {
+		return inputs, readError
 	}
-	inputs.Examples, err = ReadCommittedExamples(root)
-	return inputs, err
+	var readCommittedExamplesError error
+	inputs.Examples, readCommittedExamplesError = ReadCommittedExamples(root)
+	return inputs, readCommittedExamplesError
 }

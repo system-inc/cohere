@@ -8,8 +8,8 @@ import (
 
 const propertiesParameterFile = "/repository/source/components/Button.tsx"
 
-func TestReactComponentRequirePropertiesParameterFires(t *testing.T) {
-	t.Parallel()
+func TestReactComponentRequirePropertiesParameterFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -45,16 +45,16 @@ func TestReactComponentRequirePropertiesParameterFires(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.Run(t, ReactComponentRequirePropertiesParameter,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.Run(test, ReactComponentRequirePropertiesParameter,
 				propertiesParameterFile, testCase.sourceText), "usePropertiesNotProps")
 		})
 	}
 }
 
-func TestReactComponentRequirePropertiesParameterStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestReactComponentRequirePropertiesParameterStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -122,9 +122,9 @@ func TestReactComponentRequirePropertiesParameterStaysSilent(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, ReactComponentRequirePropertiesParameter,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, ReactComponentRequirePropertiesParameter,
 				testCase.fileName, testCase.sourceText))
 		})
 	}
@@ -144,30 +144,30 @@ func TestReactComponentRequirePropertiesParameterStaysSilent(t *testing.T) {
 //
 // Asserted through the suggestion rather than through ExpectFixedSource, which reads only the
 // automatic fixes and correctly refuses to check a rule that proposes none.
-func TestReactComponentRequirePropertiesParameterSuggestsRenamingTheDeclaration(t *testing.T) {
-	t.Parallel()
+func TestReactComponentRequirePropertiesParameterSuggestsRenamingTheDeclaration(test *testing.T) {
+	test.Parallel()
 
 	const source = "export function Button(props: { label: string }) {\n" +
 		"    return <button>{props.label}</button>;\n}\n"
 	const wanted = "export function Button(properties: { label: string }) {\n" +
 		"    return <button>{props.label}</button>;\n}\n"
 
-	result := rule_testing.Run(t, ReactComponentRequirePropertiesParameter, propertiesParameterFile, source)
+	result := rule_testing.Run(test, ReactComponentRequirePropertiesParameter, propertiesParameterFile, source)
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
+		test.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
 	}
 	if len(result.Diagnostics[0].Fixes) != 0 {
-		t.Fatalf("wanted no automatic fix, got %d", len(result.Diagnostics[0].Fixes))
+		test.Fatalf("wanted no automatic fix, got %d", len(result.Diagnostics[0].Fixes))
 	}
 
 	suggestions := result.Diagnostics[0].Suggestions
 	if len(suggestions) != 1 || len(suggestions[0].Fixes) != 1 {
-		t.Fatalf("wanted one suggestion carrying one fix, got %d suggestions", len(suggestions))
+		test.Fatalf("wanted one suggestion carrying one fix, got %d suggestions", len(suggestions))
 	}
 
 	fix := suggestions[0].Fixes[0]
 	rewritten := source[:fix.Range.Pos()] + fix.Text + source[fix.Range.End():]
 	if rewritten != wanted {
-		t.Fatalf("applying the suggestion gave %q, wanted %q", rewritten, wanted)
+		test.Fatalf("applying the suggestion gave %q, wanted %q", rewritten, wanted)
 	}
 }

@@ -2,7 +2,6 @@ package configuration
 
 import (
 	"embed"
-	"encoding/json"
 	"fmt"
 	"io/fs"
 	"os"
@@ -51,11 +50,6 @@ func InOurTiers(sources []string) bool {
 	return false
 }
 
-// InOurTiers reports whether this configuration's chain reaches one of our tier sets. See InOurTiers.
-func (c *Config) InOurTiers() bool {
-	return c != nil && InOurTiers(c.Sources)
-}
-
 // SourceContents returns the bytes of one source in a configuration's chain: an embedded set's text,
 // or a file's.
 //
@@ -65,8 +59,8 @@ func SourceContents(source string) ([]byte, error) {
 	if !IsSet(source) {
 		return os.ReadFile(source)
 	}
-	contents, err := setFiles.ReadFile(setFilePath(strings.TrimPrefix(source, SetPrefix)))
-	if err != nil {
+	contents, readFileError := setFiles.ReadFile(setFilePath(strings.TrimPrefix(source, SetPrefix)))
+	if readFileError != nil {
 		return nil, fmt.Errorf("%s is not a rule set cohere carries; the sets are %s",
 			source, strings.Join(SetNames(), ", "))
 	}
@@ -90,10 +84,10 @@ func SourcesOnDisk(sources []string) []string {
 // SetNames returns every embedded set's name, prefixed and sorted.
 func SetNames() []string {
 	var names []string
-	// The walk reads only the embedded tree, which the build checked exists, so it cannot fail.
-	_ = fs.WalkDir(setFiles, "sets", func(path string, entry fs.DirEntry, err error) error {
-		if err != nil || entry.IsDir() || !strings.HasSuffix(path, ".json") {
-			return err
+	// Ignored: the walk reads only the embedded tree, which the build checked exists, so it cannot fail.
+	_ = fs.WalkDir(setFiles, "sets", func(path string, entry fs.DirEntry, pathError error) error {
+		if pathError != nil || entry.IsDir() || !strings.HasSuffix(path, ".json") {
+			return pathError
 		}
 		names = append(names, SetPrefix+strings.TrimSuffix(strings.TrimPrefix(path, "sets/"), ".json"))
 		return nil
@@ -104,32 +98,4 @@ func SetNames() []string {
 
 func setFilePath(name string) string {
 	return "sets/" + name + ".json"
-}
-
-// extendsList is what `extends` names: one source, or a list of them, applied in order.
-//
-// A list is how a project composes sets that each sit on the same base (`cohere:react` and
-// `cohere:next` both extend `cohere:typescript`). The shared base is read once, where it first
-// appears, so it stays the outermost layer.
-type extendsList []string
-
-func (list *extendsList) UnmarshalJSON(data []byte) error {
-	var single string
-	if err := json.Unmarshal(data, &single); err == nil {
-		if single != "" {
-			*list = extendsList{single}
-		}
-		return nil
-	}
-	var many []string
-	if err := json.Unmarshal(data, &many); err != nil {
-		return fmt.Errorf("\"extends\" names a path or a rule set, or a list of them: %w", err)
-	}
-	for _, entry := range many {
-		if entry == "" {
-			return fmt.Errorf("\"extends\" lists an empty entry")
-		}
-	}
-	*list = many
-	return nil
 }

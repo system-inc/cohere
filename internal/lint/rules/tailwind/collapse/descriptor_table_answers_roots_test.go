@@ -42,21 +42,25 @@ type wave3Fixture struct {
 // wider descriptor.
 //
 // Run on the public theme's oracle and on ahra's (#f598zk0), each against the design system it records.
-func TestWave3RootsAreAlreadyAnsweredByTheDescriptorTable(t *testing.T) {
-	t.Parallel()
-	forEachOracleCopy(t, "wave3_fixtures.json", func(t *testing.T, fixtureName string) {
-		fixture := loadWave3Fixture(t, fixtureName)
-		expectWave3RootsAnswered(t, fixture, oracleSystem(t, fixture.EntryPoint))
+func TestWave3RootsAreAlreadyAnsweredByTheDescriptorTable(test *testing.T) {
+	test.Parallel()
+	forEachOracleCopy(test, "wave3_fixtures.json", func(test *testing.T, fixtureName string) {
+		fixture := loadWave3Fixture(test, fixtureName)
+		expectWave3RootsAnswered(test, fixture, oracleSystem(test, fixture.EntryPoint))
 	})
 }
 
 // expectWave3RootsAnswered compares one wave-3 oracle with the descriptor table over the design system
 // it was captured from.
-func expectWave3RootsAnswered(t *testing.T, fixture wave3Fixture, system *LoadedDesignSystem) {
-	t.Helper()
+func expectWave3RootsAnswered(test *testing.T, fixture wave3Fixture, system *LoadedDesignSystem) {
+	test.Helper()
 	table := NewTable(system)
 
-	var agreed, bothDeclined, tableSilent, inventedOnRegistry, inventedOnProbe int
+	var agreed int
+	var bothDeclined int
+	var tableSilent int
+	var inventedOnRegistry int
+	var inventedOnProbe int
 	var disagreements []string
 
 	for _, testCase := range fixture.Cases {
@@ -79,41 +83,62 @@ func expectWave3RootsAnswered(t *testing.T, fixture wave3Fixture, system *Loaded
 			// buries the second under 418 of the first.
 			if testCase.FromRegistry {
 				inventedOnRegistry++
-				disagreements = append(disagreements, testCase.ClassName+": registry class the engine declines, table read "+formatReading(reading))
+				disagreements = append(
+					disagreements,
+					testCase.ClassName+": registry class the engine declines, table read "+formatReading(reading),
+				)
 			} else {
 				inventedOnProbe++
 			}
 		case testCase.Reading != nil && !answered:
 			tableSilent++
-			disagreements = append(disagreements, testCase.ClassName+": engine reads "+formatReading(Reading{Order: testCase.Reading.Order, Count: testCase.Reading.Count})+", table declined")
+			disagreements = append(disagreements, testCase.ClassName+
+				": engine reads "+
+				formatReading(Reading{Order: testCase.Reading.Order, Count: testCase.Reading.Count})+
+				", table declined")
 		default:
 			expected := Reading{Order: testCase.Reading.Order, Count: testCase.Reading.Count}
 			if readingsEqual(expected, reading) {
 				agreed++
 				continue
 			}
-			disagreements = append(disagreements, testCase.ClassName+": engine "+formatReading(expected)+", table "+formatReading(reading))
+			disagreements = append(
+				disagreements,
+				testCase.ClassName+": engine "+formatReading(expected)+", table "+formatReading(reading),
+			)
 		}
 	}
 
 	sort.Strings(disagreements)
-	t.Logf("wave 3: %d roots, %d cases, agreed %d, both-declined %d, table-silent %d, invented on registry %d, invented on probe %d",
-		fixture.RootCount, fixture.CaseCount, agreed, bothDeclined, tableSilent, inventedOnRegistry, inventedOnProbe)
+	test.Logf(
+		"wave 3: %d roots, %d cases, agreed %d, both-declined %d, table-silent %d, invented on registry %d, invented on probe %d",
+		fixture.RootCount,
+		fixture.CaseCount,
+		agreed,
+		bothDeclined,
+		tableSilent,
+		inventedOnRegistry,
+		inventedOnProbe,
+	)
 
 	// A share of what the engine answered rather than a count, so the floor holds each copy to the same
 	// standard: it was 7,000 of ahra's 7,621, and 92% is that, rounded up.
 	if agreed*100 < fixture.Answered*92 {
-		t.Errorf("only %d of %d cases agreed; a lookup that stopped answering scores perfectly on any comparison counting disagreements alone", agreed, fixture.Answered)
+		test.Errorf(
+			"only %d of %d cases agreed; a lookup that stopped answering scores perfectly on any comparison counting disagreements alone",
+			agreed,
+			fixture.Answered,
+		)
 	}
 	if inventedOnRegistry > 0 {
-		t.Errorf("%d registry classes are answered by the table and declined by the engine", inventedOnRegistry)
+		test.Errorf("%d registry classes are answered by the table and declined by the engine", inventedOnRegistry)
 	}
 	for index, disagreement := range disagreements {
 		if index >= 20 {
-			t.Errorf("... and %d more", len(disagreements)-20)
+			test.Errorf("... and %d more", len(disagreements)-20)
 			break
 		}
-		t.Error(disagreement)
+		test.Error(disagreement)
 	}
 }
 
@@ -122,9 +147,9 @@ func expectWave3RootsAnswered(t *testing.T, fixture wave3Fixture, system *Loaded
 // Seventeen of these roots answer differently for a color than for a length, and the descriptor model
 // is what expresses that. Asserted on the pairs rather than on the count, because a count keeps
 // passing while the pairs underneath it change.
-func TestWave3ValueDependentRootsReadByType(t *testing.T) {
-	t.Parallel()
-	forEachEngineSystem(t, func(t *testing.T, system *LoadedDesignSystem) {
+func TestWave3ValueDependentRootsReadByType(test *testing.T) {
+	test.Parallel()
+	forEachEngineSystem(test, func(test *testing.T, system *LoadedDesignSystem) {
 		table := NewTable(system)
 
 		cases := []struct {
@@ -139,22 +164,28 @@ func TestWave3ValueDependentRootsReadByType(t *testing.T) {
 		}
 
 		for _, testCase := range cases {
-			colorReading, colorFound := lookupClass(t, system, table, testCase.colorClass)
-			otherReading, otherFound := lookupClass(t, system, table, testCase.otherClass)
+			colorReading, colorFound := lookupClass(test, system, table, testCase.colorClass)
+			otherReading, otherFound := lookupClass(test, system, table, testCase.otherClass)
 			if !colorFound || !otherFound {
-				t.Errorf("%s: one side did not resolve (%v, %v)", testCase.description, colorFound, otherFound)
+				test.Errorf("%s: one side did not resolve (%v, %v)", testCase.description, colorFound, otherFound)
 				continue
 			}
 			if readingsEqual(colorReading, otherReading) {
-				t.Errorf("%s: %s and %s read identically as %v#%d; the type partition is what lets one root answer both",
-					testCase.description, testCase.colorClass, testCase.otherClass, colorReading.Order, colorReading.Count)
+				test.Errorf(
+					"%s: %s and %s read identically as %v#%d; the type partition is what lets one root answer both",
+					testCase.description,
+					testCase.colorClass,
+					testCase.otherClass,
+					colorReading.Order,
+					colorReading.Count,
+				)
 			}
 		}
 	})
 }
 
-func lookupClass(t *testing.T, system *LoadedDesignSystem, table *Table, className string) (Reading, bool) {
-	t.Helper()
+func lookupClass(test *testing.T, system *LoadedDesignSystem, table *Table, className string) (Reading, bool) {
+	test.Helper()
 	candidates := ParseCandidate(className, system)
 	if len(candidates) == 0 {
 		return Reading{}, false
@@ -162,18 +193,23 @@ func lookupClass(t *testing.T, system *LoadedDesignSystem, table *Table, classNa
 	return table.Lookup(&candidates[0])
 }
 
-func loadWave3Fixture(t *testing.T, name string) wave3Fixture {
-	t.Helper()
-	raw, err := os.ReadFile(filepath.Join("testdata", name))
-	if err != nil {
-		t.Fatalf("read %s: %v", name, err)
+func loadWave3Fixture(test *testing.T, name string) wave3Fixture {
+	test.Helper()
+	raw, readError := os.ReadFile(filepath.Join("testdata", name))
+	if readError != nil {
+		test.Fatalf("read %s: %v", name, readError)
 	}
 	var fixture wave3Fixture
-	if err := json.Unmarshal(raw, &fixture); err != nil {
-		t.Fatalf("parse %s: %v", name, err)
+	if decodeError := json.Unmarshal(raw, &fixture); decodeError != nil {
+		test.Fatalf("parse %s: %v", name, decodeError)
 	}
 	if fixture.CaseCount == 0 || fixture.Answered == 0 {
-		t.Fatalf("%s carries %d cases and %d answered; a comparison over it would pass by comparing nothing", name, fixture.CaseCount, fixture.Answered)
+		test.Fatalf(
+			"%s carries %d cases and %d answered; a comparison over it would pass by comparing nothing",
+			name,
+			fixture.CaseCount,
+			fixture.Answered,
+		)
 	}
 	return fixture
 }
@@ -184,7 +220,7 @@ func loadWave3Fixture(t *testing.T, name string) wave3Fixture {
 // of the contract. Reversing it to shortest-first changes no answer, in wave 3 or in the full
 // differential, and this is the measurement behind that rather than a shrug.
 //
-// The order is observable only when a key belongs to two namespaces AND some root consumes both. The
+// The order is observable only when a key belongs to two namespaces and some root consumes both. The
 // second half nearly holds: `font` consumes `--font-weight` and `--font`, the only such root of the
 // 84 namespaces here. The first half does not. `bold` and `medium` are keys of `--font-weight`
 // alone, `sans` of `--font` alone, so the loop's membership guard admits exactly one namespace per
@@ -194,9 +230,9 @@ func loadWave3Fixture(t *testing.T, name string) wave3Fixture {
 // alongside the framework's `--font-weight-bold` would make it load-bearing immediately, and this
 // test is what turns that from a silent behaviour change into a failure. It fails when the corpus
 // gains an ambiguous key, which is the moment the mutation becomes possible and is owed.
-func TestNamespacePrecedenceIsUnobservableInThisCorpus(t *testing.T) {
-	t.Parallel()
-	system := loadWave1DesignSystem(t)
+func TestNamespacePrecedenceIsUnobservableInThisCorpus(test *testing.T) {
+	test.Parallel()
+	system := loadWave1DesignSystem(test)
 	table := NewTable(system)
 
 	ambiguous := map[string][]string{}
@@ -227,8 +263,11 @@ func TestNamespacePrecedenceIsUnobservableInThisCorpus(t *testing.T) {
 	}
 
 	if len(ambiguous) > 0 {
-		t.Errorf("%d keys are now claimed by two namespaces a single root consumes, so namespace precedence is observable and the longest-first order needs a mutation covering it: %v",
-			len(ambiguous), ambiguous)
+		test.Errorf(
+			"%d keys are now claimed by two namespaces a single root consumes, so namespace precedence is observable and the longest-first order needs a mutation covering it: %v",
+			len(ambiguous),
+			ambiguous,
+		)
 	}
-	t.Logf("no key is claimed by two namespaces of one root, so namespace order is unobservable in this corpus")
+	test.Logf("no key is claimed by two namespaces of one root, so namespace order is unobservable in this corpus")
 }

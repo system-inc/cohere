@@ -10,7 +10,7 @@ import (
 
 // SelfClosingCompOptions configures which element kinds the rule judges.
 //
-// Both keys default to TRUE upstream, which is why this does not use `rule.DecodeOptionsInto`: the
+// Both keys default to `true` upstream, which is why this does not use `rule.DecodeOptionsInto`: the
 // generic helper would hand back a zero-value struct on absent input, both fields false, and the
 // rule would silently report nothing while every fixture built from a struct still passed.
 type SelfClosingCompOptions struct {
@@ -45,16 +45,16 @@ func DefaultSelfClosingCompOptions() SelfClosingCompOptions {
 // DecodeSelfClosingCompOptions reads this rule's configuration from the config layer.
 //
 // Our config layer unwraps the severity tuple before dispatch, so this receives upstream's option
-// OBJECT rather than upstream's one-element array. Empty input is a rule configured as a bare
+// object rather than upstream's one-element array. Empty input is a rule configured as a bare
 // `"error"` and resolves to the default.
-func DecodeSelfClosingCompOptions(raw []byte) (any, error) {
+func DecodeSelfClosingCompOptions(raw []byte) (SelfClosingCompOptions, error) {
 	options := DefaultSelfClosingCompOptions()
 	if len(raw) == 0 {
 		return options, nil
 	}
 	var wire selfClosingCompWire
-	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &wire); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 	if wire.Component != nil {
 		options.Component = *wire.Component
@@ -90,7 +90,7 @@ var messageNotSelfClosing = rule.Message{
 //
 // # Which children count as empty
 //
-// Either no children at all, or exactly one text child that CONTAINS A NEWLINE and is otherwise
+// Either no children at all, or exactly one text child that contains a newline and is otherwise
 // whitespace. The newline requirement is not decoration: `<div> </div>` on one line is silent while
 // `<div>\n</div>` reports, measured both ways.
 //
@@ -106,15 +106,15 @@ var messageNotSelfClosing = rule.Message{
 // Upstream replaces from the opening tag's own `>` through the closing tag's `>` with ` />`, which
 // collapses the whole `></div>` tail in one edit and normalizes the spacing before the slash. The
 // corpus asserts the resulting text on all twelve reporting cases and every one is reproduced.
-var SelfClosingComp = rule.Rule{
+var SelfClosingComp = rule.Rule[SelfClosingCompOptions]{
 	Name: "react/self-closing-comp",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[SelfClosingCompOptions]) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
 		settings := DefaultSelfClosingCompOptions()
-		if configured, isConfigured := rule.OptionsAs[SelfClosingCompOptions](options); isConfigured {
+		if configured, isConfigured := options.Read(); isConfigured {
 			settings = configured
 		}
 
@@ -142,7 +142,7 @@ var SelfClosingComp = rule.Rule{
 				// Taking it from the node ends rather than by scanning for the character keeps it
 				// correct when the tag spans lines.
 				replaced := core.NewTextRange(opening.End()-1, closing.End())
-				ctx.ReportNodeWithFixes(opening, messageNotSelfClosing,
+				ruleContext.ReportNodeWithFixes(opening, messageNotSelfClosing,
 					rule.ReplaceRange(replaced, " />"))
 			},
 		}
@@ -174,7 +174,7 @@ func selfClosingCompJudges(settings SelfClosingCompOptions, tagName *ast.Node) b
 // selfClosingCompIsDomTag reports whether a tag name begins with a lowercase letter, which is
 // upstream's `COMPAT_TAG_REGEX` of `/^[a-z]/` applied to the rendered element type.
 //
-// The test is on the FIRST character of the whole rendered name, so a member expression is judged
+// The test is on the first character of the whole rendered name, so a member expression is judged
 // by its leftmost segment: `<foo.bar>` is a DOM component and `<Foo.Bar>` is not. Both measured.
 //
 // The range is ASCII a through z specifically, matching the regular expression rather than Unicode
@@ -236,8 +236,8 @@ func selfClosingCompElementType(tagName *ast.Node) string {
 //
 // Probed on 2026-08-27 across seven text shapes with the two predicates side by side. They agree on
 // every row except a text child of newline, non-breaking space, newline, where the parser answers
-// TRUE and upstream is silent. Taking the parser's answer would report that element and then apply
-// a fix that DELETES the non-breaking space along with the closing tag, which is the one character
+// `true` and upstream is silent. Taking the parser's answer would report that element and then apply
+// a fix that deletes the non-breaking space along with the closing tag, which is the one character
 // upstream's negative lookahead exists to protect and the one somebody typed on purpose.
 //
 // So the predicate is hand-rolled, and the divergence is recorded rather than the helper adopted.
@@ -253,7 +253,7 @@ func selfClosingCompChildrenAreEmpty(children *ast.NodeList) bool {
 	if child.Kind != ast.KindJsxText {
 		return false
 	}
-	// `ast.Node.Text()` PANICS on a JsxText node, and the walk recovers per file rather than per
+	// `ast.Node.Text()` panics on a JsxText node, and the walk recovers per file rather than per
 	// rule, so one such call costs every rule in this package every finding in that file while the
 	// run still prints a plausible summary. The field is read directly instead. Pinned by
 	// TestSelfClosingCompDoesNotPanicOnJsxText, because no findings assertion can see a panic.
@@ -262,7 +262,7 @@ func selfClosingCompChildrenAreEmpty(children *ast.NodeList) bool {
 		return false
 	}
 
-	// Upstream's `/(?!\xA0)\s/g` removes every whitespace character EXCEPT the non-breaking space,
+	// Upstream's `/(?!\xA0)\s/g` removes every whitespace character except the non-breaking space,
 	// then requires the remainder to be empty. So a non-breaking space survives the strip and makes
 	// the child non-empty, which is how a deliberate one is preserved rather than deleted by the
 	// fix. Reproduced by treating it as a non-whitespace character here.
@@ -287,7 +287,7 @@ func selfClosingCompChildrenAreEmpty(children *ast.NodeList) bool {
 // whitespace character written into Go source is invisible to review and, in the byte order mark's
 // case, does not compile at all.
 //
-// The non-breaking space, U+00A0, is deliberately ABSENT from this set even though JavaScript's
+// The non-breaking space, U+00A0, is deliberately absent from this set even though JavaScript's
 // class matches it, because upstream's negative lookahead spares it. Its exclusion is what makes a
 // deliberate non-breaking space count as content; see the caller.
 func isJavaScriptWhitespace(character rune) bool {

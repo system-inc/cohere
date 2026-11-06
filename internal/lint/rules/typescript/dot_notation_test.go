@@ -20,28 +20,28 @@ import (
 
 // dotNotationTsconfig is the corpus tsconfig, with noPropertyAccessFromIndexSignature turned on for a
 // row that sets flag, as upstream's tsconfig.noPropertyAccessFromIndexSignature.json does
-func dotNotationTsconfig(t *testing.T, flag bool) string {
-	t.Helper()
+func dotNotationTsconfig(test *testing.T, flag bool) string {
+	test.Helper()
 	if !flag {
 		return dotNotationCorpusTsconfig
 	}
 	var configuration struct {
-		CompilerOptions map[string]any `json:"compilerOptions"`
-		Include         []string       `json:"include"`
+		CompilerOptions map[string]json.RawMessage `json:"compilerOptions"`
+		Include         []string                   `json:"include"`
 	}
-	if err := json.Unmarshal([]byte(dotNotationCorpusTsconfig), &configuration); err != nil {
-		t.Fatal(err)
+	if decodeError := json.Unmarshal([]byte(dotNotationCorpusTsconfig), &configuration); decodeError != nil {
+		test.Fatal(decodeError)
 	}
-	configuration.CompilerOptions["noPropertyAccessFromIndexSignature"] = true
-	encoded, err := json.Marshal(configuration)
-	if err != nil {
-		t.Fatal(err)
+	configuration.CompilerOptions["noPropertyAccessFromIndexSignature"] = json.RawMessage("true")
+	encoded, encodeError := json.Marshal(configuration)
+	if encodeError != nil {
+		test.Fatal(encodeError)
 	}
 	return string(encoded)
 }
 
-func TestDotNotationUpstreamCorpus(t *testing.T) {
-	t.Parallel()
+func TestDotNotationUpstreamCorpus(test *testing.T) {
+	test.Parallel()
 
 	valid, invalid := 0, 0
 	for _, row := range dotNotationCorpus {
@@ -55,7 +55,7 @@ func TestDotNotationUpstreamCorpus(t *testing.T) {
 		}
 	}
 	if valid != dotNotationCorpusUpstreamValid || invalid != dotNotationCorpusUpstreamInvalid {
-		t.Fatalf("the corpus holds %d valid and %d invalid upstream rows, and upstream has %d and %d",
+		test.Fatalf("the corpus holds %d valid and %d invalid upstream rows, and upstream has %d and %d",
 			valid, invalid, dotNotationCorpusUpstreamValid, dotNotationCorpusUpstreamInvalid)
 	}
 
@@ -64,17 +64,23 @@ func TestDotNotationUpstreamCorpus(t *testing.T) {
 		if row.edge != "" {
 			name = row.edge
 		}
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			options, err := DecodeDotNotationOptions([]byte(row.options))
-			if err != nil {
-				t.Fatalf("decoding %q: %v", row.options, err)
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+			options, decodeDotNotationOptionsError := DecodeDotNotationOptions([]byte(row.options))
+			if decodeDotNotationOptionsError != nil {
+				test.Fatalf("decoding %q: %v", row.options, decodeDotNotationOptionsError)
 			}
-			configuration := dotNotationTsconfig(t, row.flag)
-			result := rule_testing.RunTypedFilesWithSetupAndOptions(t, DotNotation, map[string]string{"file.ts": row.source}, "file.ts", options,
+			configuration := dotNotationTsconfig(test, row.flag)
+			result := rule_testing.RunTypedFilesWithSetupAndOptions(test, DotNotation, map[string]string{
+				"file.ts": row.source,
+			}, "file.ts", options,
 				func(directory string) {
-					if err := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(configuration), 0o644); err != nil {
-						t.Fatal(err)
+					if writeError := os.WriteFile(
+						filepath.Join(directory, "tsconfig.json"),
+						[]byte(configuration),
+						0o644,
+					); writeError != nil {
+						test.Fatal(writeError)
 					}
 				})
 
@@ -90,16 +96,16 @@ func TestDotNotationUpstreamCorpus(t *testing.T) {
 				})
 			}
 			if fmt.Sprint(reported) != fmt.Sprint(row.findings) {
-				t.Fatalf("the rule reports %q, and typescript-eslint 8.71.0 reports %q", reported, row.findings)
+				test.Fatalf("the rule reports %q, and typescript-eslint 8.71.0 reports %q", reported, row.findings)
 			}
 
 			if row.output != "" {
-				rule_testing.ExpectFixedSource(t, result, row.output)
+				rule_testing.ExpectFixedSource(test, result, row.output)
 				return
 			}
 			for _, diagnostic := range result.Diagnostics {
 				if len(diagnostic.Fixes) > 0 {
-					t.Errorf("the rule proposes a fix typescript-eslint 8.71.0 does not: %+v", diagnostic.Fixes)
+					test.Errorf("the rule proposes a fix typescript-eslint 8.71.0 does not: %+v", diagnostic.Fixes)
 				}
 			}
 		})
@@ -108,8 +114,8 @@ func TestDotNotationUpstreamCorpus(t *testing.T) {
 
 // The fixture pair through the default harness, on api's shape: a test reaching a protected hook through
 // brackets, which the dot form would make a type error (#qv7evaa)
-func TestDotNotationFixturePair(t *testing.T) {
-	t.Parallel()
+func TestDotNotationFixturePair(test *testing.T) {
+	test.Parallel()
 
 	source := `
 class Entity {
@@ -118,34 +124,44 @@ class Entity {
 const entity = new Entity();
 entity['clearChangedFields']();
 `
-	unconfigured, err := DecodeDotNotationOptions(nil)
-	if err != nil {
-		t.Fatal(err)
+	unconfigured, decodeDotNotationOptionsError := DecodeDotNotationOptions(nil)
+	if decodeDotNotationOptionsError != nil {
+		test.Fatal(decodeDotNotationOptionsError)
 	}
-	rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, DotNotation, "Case.ts", source, unconfigured), "useDot")
+	rule_testing.ExpectFindings(
+		test,
+		rule_testing.RunTypedWithOptions(test, DotNotation, "Case.ts", source, unconfigured),
+		"useDot",
+	)
 
-	allowed, err := DecodeDotNotationOptions([]byte(`{"allowProtectedClassPropertyAccess": true}`))
-	if err != nil {
-		t.Fatal(err)
+	allowed, decodeDotNotationOptionsError := DecodeDotNotationOptions(
+		[]byte(`{"allowProtectedClassPropertyAccess": true}`),
+	)
+	if decodeDotNotationOptionsError != nil {
+		test.Fatal(decodeDotNotationOptionsError)
 	}
-	rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, DotNotation, "Case.ts", source, allowed))
+	rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, DotNotation, "Case.ts", source, allowed))
 }
 
 // Upstream's schema refuses a key it does not name, and an empty configuration is the defaults:
 // keywords allowed and every typed exemption off
-func TestDotNotationOptionsDecode(t *testing.T) {
-	t.Parallel()
+func TestDotNotationOptionsDecode(test *testing.T) {
+	test.Parallel()
 
-	if _, err := DecodeDotNotationOptions([]byte(`{"allowProtectedPropertyAccess": true}`)); err == nil {
-		t.Error("a misspelled option decoded, so it would silently do nothing")
+	if _, decodeDotNotationOptionsError := DecodeDotNotationOptions(
+		[]byte(`{"allowProtectedPropertyAccess": true}`),
+	); decodeDotNotationOptionsError == nil {
+		test.Error("a misspelled option decoded, so it would silently do nothing")
 	}
-	decoded, err := DecodeDotNotationOptions(nil)
-	if err != nil {
-		t.Fatal(err)
+	decoded, decodeDotNotationOptionsError := DecodeDotNotationOptions(nil)
+	if decodeDotNotationOptionsError != nil {
+		test.Fatal(decodeDotNotationOptionsError)
 	}
-	options := decoded.(DotNotationOptions)
-	if options.AllowKeywords == nil || !*options.AllowKeywords ||
-		options.AllowIndexSignaturePropertyAccess || options.AllowPrivateClassPropertyAccess || options.AllowProtectedClassPropertyAccess {
-		t.Errorf("the defaults are %+v", options)
+	if decoded.AllowKeywords == nil ||
+		!*decoded.AllowKeywords ||
+		decoded.AllowIndexSignaturePropertyAccess ||
+		decoded.AllowPrivateClassPropertyAccess ||
+		decoded.AllowProtectedClassPropertyAccess {
+		test.Errorf("the defaults are %+v", decoded)
 	}
 }

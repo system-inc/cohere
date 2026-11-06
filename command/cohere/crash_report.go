@@ -1,8 +1,8 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
-	"io"
 	"sort"
 
 	"github.com/system-inc/cohere/internal/types/program"
@@ -11,25 +11,6 @@ import (
 // reportBugsAt is where a user reports a bug in cohere. The README's "Reporting bugs" names the same
 // place, and the two change together.
 const reportBugsAt = "https://github.com/system-inc/cohere/issues"
-
-// runCrash is a rule that could not finish a file, or a file nothing could check, because cohere crashed.
-//
-// A crash is cohere's bug, never the user's, and a verdict it leaves missing fails the run (#v1ah2qq).
-// It used to be named only under --verbose while the run ended green: TanStack/query's six react-hooks
-// crashes printed a footer marker and nothing else, so a missing verdict read like a clean one. The README
-// already promised that a run which could not check a file never exits 0.
-type runCrash struct {
-	Path string `json:"path"`
-	// Rule is the rule that crashed, empty when the whole file was lost.
-	Rule  string `json:"rule,omitempty"`
-	Cause string `json:"cause"`
-	// SwiftEngine marks a file the Swift engine could not finish, whose Cause is the engine's own sentence. It
-	// is never a panic: the engine reports a file its typed rules had no index for, and says which rules that
-	// cost and that every other rule ran. Wrapping that in cohere's crash words would say nothing was checked
-	// and call it a bug to report, both false, so message says the engine's sentence instead. Kept out of
-	// `--json`, where the cause already is that sentence.
-	SwiftEngine bool `json:"-"`
-}
 
 // crashesFrom is a walk's crashes, whole files first, each group in the order the coverage names them.
 func crashesFrom(coverage program.Coverage) []runCrash {
@@ -43,35 +24,18 @@ func crashesFrom(coverage program.Coverage) []runCrash {
 	return crashes
 }
 
-// message says what crashed, that it is cohere's bug, what is missing because of it, and where to report it.
-// For a file the Swift engine could not finish, it says the engine's sentence, which already names what is
-// missing.
-func (crash runCrash) message() string {
-	if crash.SwiftEngine {
-		return "the Swift engine could not finish this file: " + crash.Cause
-	}
-	what := fmt.Sprintf("cohere's rule %s crashed on this file (%s). This is a bug in cohere, not in your code: "+
-		"the rule's verdict on this file is missing, and the file's other rules ran.", crash.Rule, crash.Cause)
-	if crash.Rule == "" {
-		what = fmt.Sprintf("cohere crashed on this file (%s). This is a bug in cohere, not in your code: "+
-			"nothing in this file was checked.", crash.Cause)
-	}
-	return what + fmt.Sprintf(" Please report it at %s with the output of `cohere --version`, the rule, "+
-		"the code that crashed it, and this message.", reportBugsAt)
-}
-
 // printCrash prints one crash as a line of JSON under `--json`. The human view names crashes grouped by what
 // crashed (printCrashGroups), and `--verbose` names each in its coverage notes, in the same words.
-func printCrash(out io.Writer, crash runCrash) {
-	if activeOutput.Mode == outputJSON {
-		writeJSONLine(out, crashJSON{Kind: "crash", runCrash: crash})
+func printCrash(out *bufio.Writer, crash runCrash) {
+	if activeOutput.Mode == outputJson {
+		writeJsonLine(out, crashJson{Kind: "crash", runCrash: crash})
 	}
 }
 
-// printCrashGroups names a run's crashes in the human view, for either engine. `--verbose` names each crash
+// printCrashGroups names a run's crashes in the human view, for every engine. `--verbose` names each crash
 // on its own line in its coverage notes, and printing these as well would say every crash twice; `--json`
 // lists them in the summary's gaps.
-func printCrashGroups(out io.Writer, crashes []runCrash) {
+func printCrashGroups(out *bufio.Writer, crashes []runCrash) {
 	if activeOutput.Mode == outputHuman {
 		writeCrashGroups(out, crashes)
 	}
@@ -95,7 +59,7 @@ const crashedNamedLimit = 5
 // files to one cause, and a line per file buries the one sentence a reader must act on. A few files are
 // named so the defect can be reproduced, and the rest counted. The cause is the message itself, so a rule
 // crash groups apart from the same panic in another rule, or in a whole file. Largest group first.
-func writeCrashGroups(out io.Writer, crashes []runCrash) {
+func writeCrashGroups(out *bufio.Writer, crashes []runCrash) {
 	type crashGroup struct {
 		message string
 		crashes []runCrash
@@ -119,7 +83,10 @@ func writeCrashGroups(out io.Writer, crashes []runCrash) {
 		return groups[first].message < groups[second].message
 	})
 	for _, group := range groups {
-		sort.Slice(group.crashes, func(first, second int) bool { return group.crashes[first].Path < group.crashes[second].Path })
+		sort.Slice(
+			group.crashes,
+			func(first, second int) bool { return group.crashes[first].Path < group.crashes[second].Path },
+		)
 		if len(group.crashes) == 1 {
 			writeCrashedNote(out, group.crashes[0])
 			continue
@@ -134,8 +101,8 @@ func writeCrashGroups(out io.Writer, crashes []runCrash) {
 	}
 }
 
-// crashJSON is one crash's line under `--json`.
-type crashJSON struct {
+// crashJson is one crash's line under `--json`.
+type crashJson struct {
 	Kind string `json:"kind"`
 	runCrash
 }

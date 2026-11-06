@@ -21,18 +21,18 @@ import (
 // produces `undefined` typed as non-null, and a non-optional field whose type admits undefined
 // passes validation for missing values that downstream code treats as required.
 //
-// # BOTH directions, unlike its ORM sibling
+// # Both directions, unlike its ORM sibling
 //
 // `orm-column-nullable-parity` checks one direction only, because the pre-insert pattern needs the
 // other. This one checks both, and the two rules sit beside each other in this package with that
 // difference being the whole distinction between them. Worth stating because they otherwise read as
 // the same rule with different decorator names.
 //
-// # An ABSENT `optional` is read as false, which is the row most likely to surprise
+// # An absent `optional` is read as false, which is the row most likely to surprise
 //
 // The source calls `getBooleanOption`, whose absent case returns `false` rather than a skip, and
 // then guards on `=== null` which absent does not satisfy. So a bare `@SerializableField()` on a
-// nullable property REPORTS:
+// nullable property reports:
 //
 //	@SerializableField() x?: string      REPORTS, typeOptionalButDecoratorNot
 //	@SerializableField() x!: string      clean
@@ -41,7 +41,7 @@ import (
 // it is not: absent and explicitly-false are the same claim here, and the shelf's three-value return
 // is what lets this file express that deliberately rather than by accident.
 //
-// A NON-BOOLEAN value is different and does skip: `optional: 'items'` is not a claim this rule can
+// A non-boolean value is different and does skip: `optional: 'items'` is not a claim this rule can
 // check, so it declines rather than reading it as false.
 //
 // # `defaultValue` suppresses the whole check
@@ -58,17 +58,17 @@ import (
 //
 // Anchored on a decorator, and the checker is consulted only after the name, the `defaultValue`
 // absence and the `optional` value have all been settled syntactically.
-var CorrectnessRequireSerializableNullableParity = rule.Rule{
+var CorrectnessRequireSerializableNullableParity = rule.Rule[rule.NoOptions]{
 	Name: "base/correctness-require-serializable-nullable-parity",
 
 	// The property's type decides every finding.
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindDecorator: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 
@@ -82,7 +82,7 @@ var CorrectnessRequireSerializableNullableParity = rule.Rule{
 					return
 				}
 
-				// A non-boolean `optional` is not this rule's question. An ABSENT one is: it means
+				// A non-boolean `optional` is not this rule's question. An absent one is: it means
 				// the same as an explicit false, which is why `found` is not tested here and is
 				// tested in the ORM sibling.
 				declaredOptional, skip, _ := decorators.BooleanOption(node, "optional")
@@ -99,18 +99,18 @@ var CorrectnessRequireSerializableNullableParity = rule.Rule{
 					return
 				}
 
-				propertyType := ctx.TypeChecker.GetTypeAtLocation(name)
+				propertyType := ruleContext.TypeChecker.GetTypeAtLocation(name)
 				if propertyType == nil {
 					return
 				}
 				typeIsNullable := decorators.IsNullableType(propertyType)
-				typeText := ctx.TypeChecker.TypeToString(propertyType)
+				typeText := ruleContext.TypeChecker.TypeToString(propertyType)
 
 				switch {
 				case declaredOptional && !typeIsNullable:
-					ctx.ReportNode(name, buildDecoratorOptionalButTypeNotMessage(typeText))
+					ruleContext.ReportNode(name, buildDecoratorOptionalButTypeNotMessage(typeText))
 				case !declaredOptional && typeIsNullable:
-					ctx.ReportNode(name, buildTypeOptionalButDecoratorNotMessage(typeText))
+					ruleContext.ReportNode(name, buildTypeOptionalButDecoratorNotMessage(typeText))
 				}
 			},
 		}
@@ -119,20 +119,30 @@ var CorrectnessRequireSerializableNullableParity = rule.Rule{
 
 // The rule's messages, whose wording lives in `policy/messages/correctness-require-serializable-nullable-parity.json`.
 var (
-	correctnessRequireSerializableNullableParityDecoratorOptionalButTypeNotText = policy.MessageOf("base/correctness-require-serializable-nullable-parity", "decoratorOptionalButTypeNot")
-	correctnessRequireSerializableNullableParityTypeOptionalButDecoratorNotText = policy.MessageOf("base/correctness-require-serializable-nullable-parity", "typeOptionalButDecoratorNot")
+	correctnessRequireSerializableNullableParityDecoratorOptionalButTypeNotText = policy.MessageOf(
+		"base/correctness-require-serializable-nullable-parity",
+		"decoratorOptionalButTypeNot",
+	)
+	correctnessRequireSerializableNullableParityTypeOptionalButDecoratorNotText = policy.MessageOf(
+		"base/correctness-require-serializable-nullable-parity",
+		"typeOptionalButDecoratorNot",
+	)
 )
 
 func buildDecoratorOptionalButTypeNotMessage(typeText string) rule.Message {
 	return rule.Message{
-		Id:          correctnessRequireSerializableNullableParityDecoratorOptionalButTypeNotText.Id,
-		Description: correctnessRequireSerializableNullableParityDecoratorOptionalButTypeNotText.Render(map[string]string{"typeText": typeText}),
+		Id: correctnessRequireSerializableNullableParityDecoratorOptionalButTypeNotText.Id,
+		Description: correctnessRequireSerializableNullableParityDecoratorOptionalButTypeNotText.Render(
+			map[string]string{"typeText": typeText},
+		),
 	}
 }
 
 func buildTypeOptionalButDecoratorNotMessage(typeText string) rule.Message {
 	return rule.Message{
-		Id:          correctnessRequireSerializableNullableParityTypeOptionalButDecoratorNotText.Id,
-		Description: correctnessRequireSerializableNullableParityTypeOptionalButDecoratorNotText.Render(map[string]string{"typeText": typeText}),
+		Id: correctnessRequireSerializableNullableParityTypeOptionalButDecoratorNotText.Id,
+		Description: correctnessRequireSerializableNullableParityTypeOptionalButDecoratorNotText.Render(
+			map[string]string{"typeText": typeText},
+		),
 	}
 }

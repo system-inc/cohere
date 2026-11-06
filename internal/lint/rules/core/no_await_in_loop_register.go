@@ -9,5 +9,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 //
 // No decoder: upstream declares `schema: []`, so the rule takes no options at all.
 func init() {
-	rule.Register(rule.Registration{Rule: NoAwaitInLoop})
+	rule.Register(rule.Registration[rule.NoOptions]{Rule: NoAwaitInLoop})
 }

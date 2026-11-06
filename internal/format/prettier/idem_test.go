@@ -10,31 +10,36 @@ import (
 //
 // A formatter whose second pass differs from its first would report writes forever, and the count
 // would be honest while the tree never converged.
-func TestFormatIsIdempotent(t *testing.T) {
-	t.Parallel()
+func TestFormatIsIdempotent(test *testing.T) {
+	test.Parallel()
 
 	listPath := os.Getenv("COHERE_IDEM_LIST")
 	if listPath == "" {
-		t.Skip("set COHERE_IDEM_LIST")
+		test.Skip("set COHERE_IDEM_LIST")
 	}
-	engine := newTestEngine(t)
-	listBytes, _ := os.ReadFile(listPath)
-	var checked, unstable, changedFromSource int
+	engine := newTestEngine(test)
+	listBytes, listReadError := os.ReadFile(listPath)
+	if listReadError != nil {
+		test.Fatalf("reading the list: %v", listReadError)
+	}
+	var checked int
+	var unstable int
+	var changedFromSource int
 	for _, path := range strings.Split(strings.TrimSpace(string(listBytes)), "\n") {
 		path = strings.TrimSpace(path)
 		if path == "" || !engine.Handles(path) {
 			continue
 		}
-		source, err := os.ReadFile(path)
-		if err != nil {
+		source, readError := os.ReadFile(path)
+		if readError != nil {
 			continue
 		}
-		once, err := engine.Format(path, string(source))
-		if err != nil {
+		once, formatError := engine.Format(path, string(source))
+		if formatError != nil {
 			continue
 		}
-		twice, err := engine.Format(path, once)
-		if err != nil {
+		twice, formatError := engine.Format(path, once)
+		if formatError != nil {
 			continue
 		}
 		checked++
@@ -43,8 +48,8 @@ func TestFormatIsIdempotent(t *testing.T) {
 		}
 		if once != twice {
 			unstable++
-			t.Errorf("%s: second pass differs from first", path)
+			test.Errorf("%s: second pass differs from first", path)
 		}
 	}
-	t.Logf("checked=%d changedFromSource=%d unstable=%d", checked, changedFromSource, unstable)
+	test.Logf("checked=%d changedFromSource=%d unstable=%d", checked, changedFromSource, unstable)
 }

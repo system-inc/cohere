@@ -10,16 +10,16 @@ import (
 // A pass that keeps every statement must leave the block identical, not merely equal. Asserted by
 // slice identity rather than by contents, because a copy with the same elements passes any contents
 // check and still costs an allocation per block on every pass that touches the tree.
-func TestReactiveTransformKeepDoesNotReallocate(t *testing.T) {
-	t.Parallel()
+func TestReactiveTransformKeepDoesNotReallocate(test *testing.T) {
+	test.Parallel()
 
-	function, _ := rangesFor(t, `function f(a) { if (a) { return 1; } return 2; }`)
+	function, _ := rangesFor(test, `function f(a) { if (a) { return 1; } return 2; }`)
 	tree, _ := BuildReactiveFunction(function)
 	if tree == nil {
-		t.Fatal("no tree was built")
+		test.Fatal("no tree was built")
 	}
 	if len(tree.Body) == 0 {
-		t.Fatal("the tree body is empty, so identity below is trivially preserved")
+		test.Fatal("the tree body is empty, so identity below is trivially preserved")
 	}
 
 	before := tree.Body
@@ -33,10 +33,10 @@ func TestReactiveTransformKeepDoesNotReallocate(t *testing.T) {
 	})
 
 	if seen == 0 {
-		t.Fatal("the transform reached no terminal, so keeping everything proves nothing")
+		test.Fatal("the transform reached no terminal, so keeping everything proves nothing")
 	}
 	if &before[0] != &tree.Body[0] {
-		t.Error("a transform that kept every statement reallocated the block; the lazy rebuild " +
+		test.Error("a transform that kept every statement reallocated the block; the lazy rebuild " +
 			"exists so an unchanged block costs nothing")
 	}
 }
@@ -45,18 +45,18 @@ func TestReactiveTransformKeepDoesNotReallocate(t *testing.T) {
 //
 // `replace-many` is the one that matters most: it is how `pruneNonEscapingScopes` flattens a scope,
 // splicing the body into the enclosing block and dropping the wrapper.
-func TestReactiveTransformRemovesAndReplaces(t *testing.T) {
-	t.Parallel()
+func TestReactiveTransformRemovesAndReplaces(test *testing.T) {
+	test.Parallel()
 
 	source := `function f(a) { const x = a + 1; const y = x + 2; return y; }`
 
-	t.Run("remove drops the statement", func(t *testing.T) {
-		t.Parallel()
-		function, _ := rangesFor(t, source)
+	test.Run("remove drops the statement", func(test *testing.T) {
+		test.Parallel()
+		function, _ := rangesFor(test, source)
 		tree, _ := BuildReactiveFunction(function)
 		before := countStatements(tree.Body)
 		if before < 2 {
-			t.Fatalf("the tree holds %d statements; this case needs at least two", before)
+			test.Fatalf("the tree holds %d statements; this case needs at least two", before)
 		}
 
 		removed := false
@@ -70,16 +70,16 @@ func TestReactiveTransformRemovesAndReplaces(t *testing.T) {
 			},
 		})
 		if !removed {
-			t.Fatal("the transform reached no instruction statement")
+			test.Fatal("the transform reached no instruction statement")
 		}
 		if after := countStatements(tree.Body); after != before-1 {
-			t.Errorf("removing one statement left %d of %d", after, before)
+			test.Errorf("removing one statement left %d of %d", after, before)
 		}
 	})
 
-	t.Run("replace-many splices", func(t *testing.T) {
-		t.Parallel()
-		function, _ := rangesFor(t, source)
+	test.Run("replace-many splices", func(test *testing.T) {
+		test.Parallel()
+		function, _ := rangesFor(test, source)
 		tree, _ := BuildReactiveFunction(function)
 		before := countStatements(tree.Body)
 
@@ -95,16 +95,16 @@ func TestReactiveTransformRemovesAndReplaces(t *testing.T) {
 			},
 		})
 		if !replaced {
-			t.Fatal("the transform reached no instruction statement")
+			test.Fatal("the transform reached no instruction statement")
 		}
 		if after := countStatements(tree.Body); after != before+1 {
-			t.Errorf("replacing one statement with two left %d, want %d", after, before+1)
+			test.Errorf("replacing one statement with two left %d, want %d", after, before+1)
 		}
 	})
 
-	t.Run("replace-many with nothing removes", func(t *testing.T) {
-		t.Parallel()
-		function, _ := rangesFor(t, source)
+	test.Run("replace-many with nothing removes", func(test *testing.T) {
+		test.Parallel()
+		function, _ := rangesFor(test, source)
 		tree, _ := BuildReactiveFunction(function)
 		before := countStatements(tree.Body)
 
@@ -119,7 +119,7 @@ func TestReactiveTransformRemovesAndReplaces(t *testing.T) {
 			},
 		})
 		if after := countStatements(tree.Body); after != before-1 {
-			t.Errorf("replacing one statement with none left %d of %d", after, before)
+			test.Errorf("replacing one statement with none left %d of %d", after, before)
 		}
 	})
 }
@@ -129,8 +129,8 @@ func TestReactiveTransformRemovesAndReplaces(t *testing.T) {
 // Each of its arms assigns the rewritten block back onto the terminal. A missing assignment leaves
 // the terminal holding the pre-rewrite slice, which is invisible to any test that only counts what
 // the walk reached -- the walk did reach it, and the result was thrown away.
-func TestReactiveTransformRewritesNestedBlocks(t *testing.T) {
-	t.Parallel()
+func TestReactiveTransformRewritesNestedBlocks(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name   string
@@ -140,20 +140,23 @@ func TestReactiveTransformRewritesNestedBlocks(t *testing.T) {
 		{name: "for-of body", source: `function f(xs) { let t = 0; for (const x of xs) { t = t + x; } return t; }`},
 		{name: "while body", source: `function f(a) { let i = 0; while (i < a) { i = i + 1; } return i; }`},
 		{name: "try blocks", source: `function f(a) { try { const x = a.b; return x; } catch (e) { return 0; } }`},
-		{name: "switch arms", source: `function f(a) { switch (a) { case 1: { const x = 1; return x; } default: return 2; } }`},
+		{
+			name:   "switch arms",
+			source: `function f(a) { switch (a) { case 1: { const x = 1; return x; } default: return 2; } }`,
+		},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			function, _ := rangesFor(t, testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			function, _ := rangesFor(test, testCase.source)
 			tree, _ := BuildReactiveFunction(function)
 			if tree == nil {
-				t.Fatal("no tree was built")
+				test.Fatal("no tree was built")
 			}
 
 			before := countStatements(tree.Body)
 			nested := before - len(tree.Body)
 			if nested <= 0 {
-				t.Fatalf("this source puts all %d statements at the top level, so nothing nested "+
+				test.Fatalf("this source puts all %d statements at the top level, so nothing nested "+
 					"is rewritten and the assertion is vacuous", before)
 			}
 
@@ -175,7 +178,7 @@ func TestReactiveTransformRewritesNestedBlocks(t *testing.T) {
 			})
 
 			if remaining := countInstructionStatements(tree.Body); remaining != 0 {
-				t.Errorf("%d instruction statement(s) survived a transform that removed every one; "+
+				test.Errorf("%d instruction statement(s) survived a transform that removed every one; "+
 					"a nested block's rewrite was computed and discarded", remaining)
 			}
 		})
@@ -187,12 +190,16 @@ func TestReactiveTransformRewritesNestedBlocks(t *testing.T) {
 // The hand-written cases above each hold one construct. This is the only thing that would catch a
 // terminal arm no case happens to produce, which is exactly the failure `transformTerminalBlocks`
 // invites by being written out by hand.
-func TestReactiveTransformCorpus(t *testing.T) {
-	t.Parallel()
+func TestReactiveTransformCorpus(test *testing.T) {
+	test.Parallel()
 
 	converted, survived, totalRemoved := 0, 0, 0
 
-	forEachCorpusFunction(t, 400, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
+	forEachCorpusFunction(test, 400, func(
+		function *Function,
+		ranges *mutation_aliasing.MutableRanges,
+		scopes *ReactiveScopes,
+	) {
 		aligned, merged := AlignThenMergeReactiveScopes(function, scopes)
 		BuildReactiveScopeTerminals(function, scopes, MergedScopeIdentity{Aligned: aligned, Merged: merged})
 
@@ -224,17 +231,17 @@ func TestReactiveTransformCorpus(t *testing.T) {
 	})
 
 	if converted < 100 {
-		t.Fatalf("only %d functions converted; the corpus walk is not reaching real source", converted)
+		test.Fatalf("only %d functions converted; the corpus walk is not reaching real source", converted)
 	}
 	if totalRemoved == 0 {
-		t.Fatal("no instruction statements were removed, so a zero survivor count proves nothing")
+		test.Fatal("no instruction statements were removed, so a zero survivor count proves nothing")
 	}
 	if survived != 0 {
-		t.Errorf("%d of %d functions kept an instruction statement through a transform that "+
+		test.Errorf("%d of %d functions kept an instruction statement through a transform that "+
 			"removed every one; a nested block's rewrite was discarded", survived, converted)
 	}
 
-	t.Logf("converted=%d removed=%d survived=%d", converted, totalRemoved, survived)
+	test.Logf("converted=%d removed=%d survived=%d", converted, totalRemoved, survived)
 }
 
 // countStatements counts every statement in a tree, at any depth.

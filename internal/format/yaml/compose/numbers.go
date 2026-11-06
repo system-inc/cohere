@@ -56,6 +56,8 @@ func parseInt(text []uint16, radix int) float64 {
 	}
 	var magnitude float64
 	if radix == 10 {
+		// Ignored: digits is a nonempty run of decimal digits, so the only error is the range error,
+		// whose value, +Inf, is the Infinity parseInt gives for a number that long.
 		magnitude, _ = strconv.ParseFloat(digits, 64)
 	} else {
 		integer, _ := new(big.Int).SetString(digits, radix)
@@ -75,7 +77,7 @@ func parseFloat(text []uint16) float64 {
 	if index < len(text) && (text[index] == '+' || text[index] == '-') {
 		index++
 	}
-	if hasPrefixASCII(text[index:], "Infinity") {
+	if hasPrefixAscii(text[index:], "Infinity") {
 		if text[start] == '-' {
 			return negativeInfinity()
 		}
@@ -110,14 +112,15 @@ func parseFloat(text []uint16) float64 {
 			end = index
 		}
 	}
-	// A huge exponent overflows to ±Infinity and a tiny one underflows to ±0, as upstream's does;
-	// strconv's range error is the same value.
+	// Ignored: the text is the decimal literal the loops above measured, so the only error is the range
+	// error, whose value is upstream's: a huge exponent overflows to ±Infinity and a tiny one underflows
+	// to ±0.
 	value, _ := strconv.ParseFloat(asciiView(text[start:end]), 64)
 	return value
 }
 
-func hasPrefixASCII(text []uint16, prefix string) bool {
-	return len(text) >= len(prefix) && equalsASCII(text[:len(prefix)], prefix)
+func hasPrefixAscii(text []uint16, prefix string) bool {
+	return len(text) >= len(prefix) && equalsAscii(text[:len(prefix)], prefix)
 }
 
 // number is the global `Number(text)` for a string of digits with perhaps a dot: the empty string is 0.
@@ -126,8 +129,8 @@ func number(text []uint16) float64 {
 	if len(trimmed) == 0 {
 		return 0
 	}
-	value, err := strconv.ParseFloat(asciiView(trimmed), 64)
-	if err != nil && value == 0 {
+	value, parseError := strconv.ParseFloat(asciiView(trimmed), 64)
+	if parseError != nil && value == 0 {
 		return nan()
 	}
 	return value

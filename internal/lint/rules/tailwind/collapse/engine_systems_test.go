@@ -7,7 +7,7 @@ import "testing"
 // one these tests were written against, opt-in through its corpus.
 var engineSystems = []struct {
 	name string
-	load func(t *testing.T) *LoadedDesignSystem
+	load func(test *testing.T) *LoadedDesignSystem
 }{
 	{name: "public", load: unseenDesignSystem},
 	{name: "ahra", load: loadWave1DesignSystem},
@@ -15,12 +15,12 @@ var engineSystems = []struct {
 
 // forEachEngineSystem runs an engine assertion once per design system, each as its own subtest, so a
 // machine without the ahra corpus skips that subtest by name and still runs the public one.
-func forEachEngineSystem(t *testing.T, run func(t *testing.T, system *LoadedDesignSystem)) {
-	t.Helper()
+func forEachEngineSystem(test *testing.T, run func(test *testing.T, system *LoadedDesignSystem)) {
+	test.Helper()
 	for _, engineSystem := range engineSystems {
-		t.Run(engineSystem.name, func(t *testing.T) {
-			t.Parallel()
-			run(t, engineSystem.load(t))
+		test.Run(engineSystem.name, func(test *testing.T) {
+			test.Parallel()
+			run(test, engineSystem.load(test))
 		})
 	}
 }

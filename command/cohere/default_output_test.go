@@ -15,11 +15,11 @@ import (
 // footer. A table from another format and a table that is not one take the same path and print the same
 // note, so the table here is overwritten rather than written by an older build. Both halves are held: the
 // default run read the table and rewrote it, so the note had something to say, and --verbose says it.
-func TestADefaultRunPrintsNoNotes(t *testing.T) {
-	t.Parallel()
-	binary := buildCohere(t)
-	root := t.TempDir()
-	writeTree(t, root, map[string]string{
+func TestADefaultRunPrintsNoNotes(test *testing.T) {
+	test.Parallel()
+	binary := buildCohere(test)
+	root := test.TempDir()
+	writeTree(test, root, map[string]string{
 		"tsconfig.json":       `{"compilerOptions":{"strict":true,"noEmit":true,"target":"es2022","module":"esnext","moduleResolution":"bundler"},"include":["source"]}`,
 		"CohereSettings.json": `{"rules":{}}`,
 		"source/index.ts":     "export const value = 1;\n",
@@ -28,63 +28,73 @@ func TestADefaultRunPrintsNoNotes(t *testing.T) {
 	})
 	for _, arguments := range [][]string{
 		{"init", "--quiet"},
-		{"-c", "user.email=fixture@example.com", "-c", "user.name=fixture", "commit", "--quiet", "--allow-empty", "-m", "initial"},
+		{
+			"-c",
+			"user.email=fixture@example.com",
+			"-c",
+			"user.name=fixture",
+			"commit",
+			"--quiet",
+			"--allow-empty",
+			"-m",
+			"initial",
+		},
 	} {
 		command := exec.Command("git", arguments...)
 		command.Dir = root
-		if output, err := command.CombinedOutput(); err != nil {
-			t.Fatalf("git %v: %v\n%s", arguments, err, output)
+		if output, outputError := command.CombinedOutput(); outputError != nil {
+			test.Fatalf("git %v: %v\n%s", arguments, outputError, output)
 		}
 	}
 
 	// The fixture's JSON is not in the house format, and a run that rewrites it lists the files it cohered
 	// above the footer. Formatting is not this test's subject.
 	run := func(arguments ...string) (string, int) {
-		t.Helper()
+		test.Helper()
 		command := exec.Command(binary, append([]string{"--no-format"}, arguments...)...)
 		command.Dir = root
-		output, err := command.CombinedOutput()
-		if err == nil {
+		output, outputError := command.CombinedOutput()
+		if outputError == nil {
 			return string(output), 0
 		}
-		exitError, isExit := err.(*exec.ExitError)
+		exitError, isExit := outputError.(*exec.ExitError)
 		if !isExit {
-			t.Fatalf("running cohere: %v\n%s", err, output)
+			test.Fatalf("running cohere: %v\n%s", outputError, output)
 		}
-		return string(output), childExitCode(t, exitError)
+		return string(output), childExitCode(test, exitError)
 	}
 	discardTable := func() {
-		t.Helper()
-		tables := cacheTableFiles(t, root)
+		test.Helper()
+		tables := cacheTableFiles(test, root)
 		if len(tables) == 0 {
-			t.Fatalf("no cache table in %s, so there is nothing for a run to discard", root)
+			test.Fatalf("no cache table in %s, so there is nothing for a run to discard", root)
 		}
 		for _, table := range tables {
-			if err := os.WriteFile(table, []byte("not a cache table"), 0o600); err != nil {
-				t.Fatal(err)
+			if writeError := os.WriteFile(table, []byte("not a cache table"), 0o600); writeError != nil {
+				test.Fatal(writeError)
 			}
 		}
 	}
 
 	if output, code := run(); code != 0 {
-		t.Fatalf("exit %d from the first run of a clean project:\n%s", code, output)
+		test.Fatalf("exit %d from the first run of a clean project:\n%s", code, output)
 	}
 	discardTable()
 
 	output, code := run()
 	if code != 0 {
-		t.Fatalf("exit %d from the run after the discard:\n%s", code, output)
+		test.Fatalf("exit %d from the run after the discard:\n%s", code, output)
 	}
 	lines := strings.Split(strings.TrimRight(output, "\n"), "\n")
 	if len(lines) != 1 || !strings.HasPrefix(lines[0], "✓ 💎 ") {
-		t.Errorf("the default run after a discard printed more than its footer:\n%s", output)
+		test.Errorf("the default run after a discard printed more than its footer:\n%s", output)
 	}
 	if strings.Contains(output, "note:") {
-		t.Errorf("the default run printed a note:\n%s", output)
+		test.Errorf("the default run printed a note:\n%s", output)
 	}
-	for _, table := range cacheTableFiles(t, root) {
-		if contents, err := os.ReadFile(table); err == nil && string(contents) == "not a cache table" {
-			t.Fatalf("the run never read the discarded table, so its silence proves nothing: %s", table)
+	for _, table := range cacheTableFiles(test, root) {
+		if contents, readError := os.ReadFile(table); readError == nil && string(contents) == "not a cache table" {
+			test.Fatalf("the run never read the discarded table, so its silence proves nothing: %s", table)
 		}
 	}
 
@@ -93,7 +103,7 @@ func TestADefaultRunPrintsNoNotes(t *testing.T) {
 	verbose, _ := run("--verbose")
 	for _, want := range []string{"note: cache table discarded", "does not ignore .cache/"} {
 		if !strings.Contains(verbose, want) {
-			t.Errorf("--verbose did not say %q after a discard:\n%s", want, verbose)
+			test.Errorf("--verbose did not say %q after a discard:\n%s", want, verbose)
 		}
 	}
 }

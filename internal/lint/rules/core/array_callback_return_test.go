@@ -10,8 +10,8 @@ import (
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
-// arrayCallbackReturnCorpusProvenance records where the imported cases came from and how they were
-// checked, because a fixture table is only worth what its provenance is.
+// The corpus's provenance: where the imported cases came from and how they were checked, because a
+// fixture table is only worth what its provenance is.
 //
 // Source: ESLint's own tests at `tests/lib/rules/array-callback-return.js`, extracted by hooking its
 // `RuleTester` and capturing the case objects rather than by parsing the file, so no case was
@@ -29,7 +29,6 @@ import (
 // Ten upstream errors carry only rendered message text rather than a `messageId`. Those were mapped
 // back to their id by the sentence upstream's own `meta.messages` associates with it, which is a
 // one-to-one mapping across the four ids this rule can report.
-const arrayCallbackReturnCorpusProvenance = "eslint/tests/lib/rules/array-callback-return.js"
 
 // TestArrayCallbackReturnStaysSilent runs every clean case upstream ships.
 //
@@ -37,14 +36,14 @@ const arrayCallbackReturnCorpusProvenance = "eslint/tests/lib/rules/array-callba
 // catches a port matching too many callee shapes, which is the direction this rule fails in: the
 // method-name set is permissive by design, so any widening of the argument-position or async tests
 // reports on correct code while every reporting case stays green.
-func TestArrayCallbackReturnStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestArrayCallbackReturnStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range arrayCallbackReturnCleanCases {
-		result := rule_testing.RunWithOptions(
-			t, ArrayCallbackReturn, "clean.ts", testCase.source, testCase.options)
+		result := rule_testing.RunGiven(
+			test, ArrayCallbackReturn, "clean.ts", testCase.source, testCase.options)
 		if len(result.Diagnostics) != 0 {
-			t.Errorf("reported %v on a clean case\n%s", result.MessageIds(), testCase.source)
+			test.Errorf("reported %v on a clean case\n%s", result.MessageIds(), testCase.source)
 		}
 	}
 }
@@ -56,20 +55,20 @@ func TestArrayCallbackReturnStaysSilent(t *testing.T) {
 // `foo.every(function() { if (a) return; })` reports twice, and upstream orders the function-level
 // finding before the per-return one because ESLint sorts its messages by position. A port emitting
 // in traversal order gets the reverse and every count assertion still passes.
-func TestArrayCallbackReturnFires(t *testing.T) {
-	t.Parallel()
+func TestArrayCallbackReturnFires(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range arrayCallbackReturnReportingCases {
-		result := rule_testing.RunWithOptions(
-			t, ArrayCallbackReturn, "fires.ts", testCase.source, testCase.options)
+		result := rule_testing.RunGiven(
+			test, ArrayCallbackReturn, "fires.ts", testCase.source, testCase.options)
 		got := result.MessageIds()
 		if len(got) != len(testCase.wantIds) {
-			t.Errorf("reported %v, want %v\n%s", got, testCase.wantIds, testCase.source)
+			test.Errorf("reported %v, want %v\n%s", got, testCase.wantIds, testCase.source)
 			continue
 		}
 		for index, want := range testCase.wantIds {
 			if got[index] != want {
-				t.Errorf("finding %d was %q, want %q\n%s",
+				test.Errorf("finding %d was %q, want %q\n%s",
 					index, got[index], want, testCase.source)
 			}
 		}
@@ -88,39 +87,39 @@ func TestArrayCallbackReturnFires(t *testing.T) {
 // from its token stream and the corpus pins with `foo.forEach((x) => { return(x); })`. And a
 // concise arrow under `checkForEach` offers one suggestion or two depending on `allowVoid`, so the
 // count per finding is asserted rather than only the ids.
-func TestArrayCallbackReturnSuggestions(t *testing.T) {
-	t.Parallel()
+func TestArrayCallbackReturnSuggestions(test *testing.T) {
+	test.Parallel()
 
 	checked := 0
 	for _, testCase := range arrayCallbackReturnReportingCases {
 		if testCase.suggestions == nil {
 			continue
 		}
-		result := rule_testing.RunWithOptions(
-			t, ArrayCallbackReturn, "suggest.ts", testCase.source, testCase.options)
+		result := rule_testing.RunGiven(
+			test, ArrayCallbackReturn, "suggest.ts", testCase.source, testCase.options)
 		written := result.SourceFile.Text()
 
 		if len(result.Diagnostics) != len(testCase.suggestions) {
-			t.Errorf("reported %d findings, want %d suggestion groups\n%s",
+			test.Errorf("reported %d findings, want %d suggestion groups\n%s",
 				len(result.Diagnostics), len(testCase.suggestions), testCase.source)
 			continue
 		}
 		for index, want := range testCase.suggestions {
 			got := result.Diagnostics[index].Suggestions
 			if len(got) != len(want) {
-				t.Errorf("finding %d offers %d suggestions, want %d\n%s",
+				test.Errorf("finding %d offers %d suggestions, want %d\n%s",
 					index, len(got), len(want), testCase.source)
 				continue
 			}
 			for offset, wantSuggestion := range want {
 				if got[offset].Message.Id != wantSuggestion.id {
-					t.Errorf("suggestion %d is %q, want %q\n%s",
+					test.Errorf("suggestion %d is %q, want %q\n%s",
 						offset, got[offset].Message.Id, wantSuggestion.id, testCase.source)
 					continue
 				}
 				applied := applyArrayCallbackFixes(written, got[offset].Fixes)
 				if applied != wantSuggestion.output {
-					t.Errorf("applying %q produced\n  %q\nwant\n  %q\nfor %s",
+					test.Errorf("applying %q produced\n  %q\nwant\n  %q\nfor %s",
 						wantSuggestion.id, applied, wantSuggestion.output, testCase.source)
 					continue
 				}
@@ -131,7 +130,7 @@ func TestArrayCallbackReturnSuggestions(t *testing.T) {
 	// The count is pinned so a corpus regeneration that silently drops the suggestion field fails
 	// here rather than passing vacuously.
 	if checked != 24 {
-		t.Errorf("checked %d suggestions, want 24", checked)
+		test.Errorf("checked %d suggestions, want 24", checked)
 	}
 }
 
@@ -146,13 +145,14 @@ func applyArrayCallbackFixes(source string, fixes []rule.Fix) string {
 	sort.SliceStable(ordered, func(left, right int) bool {
 		return ordered[left].Range.Pos() > ordered[right].Range.Pos()
 	})
+	fixed := source
 	for _, fix := range ordered {
-		source = source[:fix.Range.Pos()] + fix.Text + source[fix.Range.End():]
+		fixed = fixed[:fix.Range.Pos()] + fix.Text + fixed[fix.Range.End():]
 	}
-	return source
+	return fixed
 }
 
-// TestArrayCallbackReturnSpan asserts WHERE each finding points.
+// TestArrayCallbackReturnSpan asserts where each finding points.
 //
 // Upstream passes an explicit `loc: getFunctionHeadLoc(node, sourceCode)` for the function-level
 // findings, so a callback body hundreds of lines long does not become the highlighted range. The
@@ -161,8 +161,8 @@ func applyArrayCallbackFixes(source string, fixes []rule.Fix) string {
 //
 // A port reporting on the whole function passes every id fixture in this file while highlighting the
 // entire callback.
-func TestArrayCallbackReturnSpan(t *testing.T) {
-	t.Parallel()
+func TestArrayCallbackReturnSpan(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -200,11 +200,11 @@ func TestArrayCallbackReturnSpan(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, ArrayCallbackReturn, "span.ts", testCase.source, nil)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ArrayCallbackReturn, "span.ts", testCase.source)
 			if len(result.Diagnostics) != len(testCase.want) {
-				t.Fatalf("reported %d findings, want %d: %v",
+				test.Fatalf("reported %d findings, want %d: %v",
 					len(result.Diagnostics), len(testCase.want), result.MessageIds())
 			}
 			written := result.SourceFile.Text()
@@ -212,7 +212,7 @@ func TestArrayCallbackReturnSpan(t *testing.T) {
 				diagnostic := result.Diagnostics[index]
 				got := written[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if got != want {
-					t.Errorf("finding %d spans %q, want %q", index, got, want)
+					test.Errorf("finding %d spans %q, want %q", index, got, want)
 				}
 			}
 		})
@@ -226,8 +226,8 @@ func TestArrayCallbackReturnSpan(t *testing.T) {
 // `arrayMethodName` and `name`, spelled the same way so a reader moving between the linters sees the
 // same words. Asserted against literals typed here rather than against the rule's message constants,
 // because comparing to the constant moves both sides together under mutation.
-func TestArrayCallbackReturnMessageText(t *testing.T) {
-	t.Parallel()
+func TestArrayCallbackReturnMessageText(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -259,21 +259,21 @@ func TestArrayCallbackReturnMessageText(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, ArrayCallbackReturn, "text.ts", testCase.source, nil)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ArrayCallbackReturn, "text.ts", testCase.source)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("reported %d findings, want 1", len(result.Diagnostics))
+				test.Fatalf("reported %d findings, want 1", len(result.Diagnostics))
 			}
 			got := result.Diagnostics[0].Message.Description
 			if !strings.HasSuffix(got, testCase.want) {
-				t.Errorf("description tail is wrong\n got %q\nwant suffix %q", got, testCase.want)
+				test.Errorf("description tail is wrong\n got %q\nwant suffix %q", got, testCase.want)
 			}
 		})
 	}
 
-	t.Run("message ids are the four upstream names", func(t *testing.T) {
-		t.Parallel()
+	test.Run("message ids are the four upstream names", func(test *testing.T) {
+		test.Parallel()
 		ids := []string{
 			messageArrayCallbackExpectedAtEnd.Id,
 			messageArrayCallbackExpectedInside.Id,
@@ -288,7 +288,7 @@ func TestArrayCallbackReturnMessageText(t *testing.T) {
 		}
 		for index := range want {
 			if ids[index] != want[index] {
-				t.Errorf("message %d is %q, want %q", index, ids[index], want[index])
+				test.Errorf("message %d is %q, want %q", index, ids[index], want[index])
 			}
 		}
 	})
@@ -300,91 +300,90 @@ func TestArrayCallbackReturnMessageText(t *testing.T) {
 // are the lines with no upstream counterpart. The nil case is the one that has shipped a broken rule
 // in this tree before: a rule configured as a bare severity is handed nil, and a port relying on the
 // zero value arriving by accident cannot tell that from a decoder that never ran.
-func TestArrayCallbackReturnOptionsDecode(t *testing.T) {
-	t.Parallel()
+func TestArrayCallbackReturnOptionsDecode(test *testing.T) {
+	test.Parallel()
 
 	decode := rule.DecodeOptionsInto[ArrayCallbackReturnOptions]()
 
-	t.Run("allowImplicit accepts a bare return", func(t *testing.T) {
-		t.Parallel()
-		decoded, err := decode(json.RawMessage(`{"allowImplicit": true}`))
-		if err != nil {
-			t.Fatalf("decode: %v", err)
+	test.Run("allowImplicit accepts a bare return", func(test *testing.T) {
+		test.Parallel()
+		decoded, decodeError := decode(json.RawMessage(`{"allowImplicit": true}`))
+		if decodeError != nil {
+			test.Fatalf("decode: %v", decodeError)
 		}
-		if !decoded.(ArrayCallbackReturnOptions).AllowImplicit {
-			t.Fatalf("decoded %#v", decoded)
+		if !decoded.AllowImplicit {
+			test.Fatalf("decoded %#v", decoded)
 		}
-		result := rule_testing.RunWithOptions(t, ArrayCallbackReturn, "o.ts",
+		result := rule_testing.RunWithOptions(test, ArrayCallbackReturn, "o.ts",
 			`foo.filter(function() { return; })`, decoded)
-		rule_testing.ExpectClean(t, result)
+		rule_testing.ExpectClean(test, result)
 	})
 
-	t.Run("without allowImplicit a bare return reports", func(t *testing.T) {
-		t.Parallel()
-		result := rule_testing.RunWithOptions(t, ArrayCallbackReturn, "o.ts",
-			`foo.filter(function() { return; })`, nil)
-		rule_testing.ExpectFindings(t, result, "expectedReturnValue")
+	test.Run("without allowImplicit a bare return reports", func(test *testing.T) {
+		test.Parallel()
+		result := rule_testing.Run(test, ArrayCallbackReturn, "o.ts",
+			`foo.filter(function() { return; })`)
+		rule_testing.ExpectFindings(test, result, "expectedReturnValue")
 	})
 
-	t.Run("checkForEach turns the judgment around", func(t *testing.T) {
-		t.Parallel()
-		decoded, err := decode(json.RawMessage(`{"checkForEach": true}`))
-		if err != nil {
-			t.Fatalf("decode: %v", err)
+	test.Run("checkForEach turns the judgment around", func(test *testing.T) {
+		test.Parallel()
+		decoded, decodeError := decode(json.RawMessage(`{"checkForEach": true}`))
+		if decodeError != nil {
+			test.Fatalf("decode: %v", decodeError)
 		}
-		result := rule_testing.RunWithOptions(t, ArrayCallbackReturn, "o.ts",
+		result := rule_testing.RunWithOptions(test, ArrayCallbackReturn, "o.ts",
 			`foo.forEach(x => x)`, decoded)
-		rule_testing.ExpectFindings(t, result, "expectedNoReturnValue")
+		rule_testing.ExpectFindings(test, result, "expectedNoReturnValue")
 	})
 
-	t.Run("without checkForEach a forEach returning a value is clean", func(t *testing.T) {
-		t.Parallel()
-		result := rule_testing.RunWithOptions(t, ArrayCallbackReturn, "o.ts", `foo.forEach(x => x)`, nil)
-		rule_testing.ExpectClean(t, result)
+	test.Run("without checkForEach a forEach returning a value is clean", func(test *testing.T) {
+		test.Parallel()
+		result := rule_testing.Run(test, ArrayCallbackReturn, "o.ts", `foo.forEach(x => x)`)
+		rule_testing.ExpectClean(test, result)
 	})
 
-	t.Run("allowVoid accepts void and adds a second suggestion", func(t *testing.T) {
-		t.Parallel()
-		decoded, err := decode(json.RawMessage(`{"checkForEach": true, "allowVoid": true}`))
-		if err != nil {
-			t.Fatalf("decode: %v", err)
+	test.Run("allowVoid accepts void and adds a second suggestion", func(test *testing.T) {
+		test.Parallel()
+		decoded, decodeError := decode(json.RawMessage(`{"checkForEach": true, "allowVoid": true}`))
+		if decodeError != nil {
+			test.Fatalf("decode: %v", decodeError)
 		}
-		clean := rule_testing.RunWithOptions(t, ArrayCallbackReturn, "o.ts",
+		clean := rule_testing.RunWithOptions(test, ArrayCallbackReturn, "o.ts",
 			`foo.forEach(x => void x)`, decoded)
-		rule_testing.ExpectClean(t, clean)
+		rule_testing.ExpectClean(test, clean)
 
-		// The option changes what is OFFERED, not only what is reported, and only asserting the
+		// The option changes what is offered, not only what is reported, and only asserting the
 		// finding would miss half of it.
-		offered := rule_testing.RunWithOptions(t, ArrayCallbackReturn, "o.ts",
+		offered := rule_testing.RunWithOptions(test, ArrayCallbackReturn, "o.ts",
 			`foo.forEach(x => x)`, decoded)
-		rule_testing.ExpectFindings(t, offered, "expectedNoReturnValue")
+		rule_testing.ExpectFindings(test, offered, "expectedNoReturnValue")
 		if len(offered.Diagnostics[0].Suggestions) != 2 {
-			t.Fatalf("offered %d suggestions under allowVoid, want 2",
+			test.Fatalf("offered %d suggestions under allowVoid, want 2",
 				len(offered.Diagnostics[0].Suggestions))
 		}
 	})
 
-	t.Run("nil options bypass the decoder and keep every default off", func(t *testing.T) {
-		t.Parallel()
+	test.Run("nil options bypass the decoder and keep every default off", func(test *testing.T) {
+		test.Parallel()
 		// This is the shape a bare `"error"` produces. It reaches the rule without passing through
 		// the decoder above, so no fixture routed through `decode` can see it.
-		result := rule_testing.RunWithOptions(t, ArrayCallbackReturn, "o.ts", `foo.forEach(x => x)`, nil)
-		rule_testing.ExpectClean(t, result)
+		result := rule_testing.Run(test, ArrayCallbackReturn, "o.ts", `foo.forEach(x => x)`)
+		rule_testing.ExpectClean(test, result)
 
-		reports := rule_testing.RunWithOptions(t, ArrayCallbackReturn, "o.ts",
-			`foo.filter(function() { return; })`, nil)
-		rule_testing.ExpectFindings(t, reports, "expectedReturnValue")
+		reports := rule_testing.Run(test, ArrayCallbackReturn, "o.ts",
+			`foo.filter(function() { return; })`)
+		rule_testing.ExpectFindings(test, reports, "expectedReturnValue")
 	})
 
-	t.Run("an empty object decodes to all three defaults off", func(t *testing.T) {
-		t.Parallel()
-		decoded, err := decode(json.RawMessage(`{}`))
-		if err != nil {
-			t.Fatalf("decode: %v", err)
+	test.Run("an empty object decodes to all three defaults off", func(test *testing.T) {
+		test.Parallel()
+		decoded, decodeError := decode(json.RawMessage(`{}`))
+		if decodeError != nil {
+			test.Fatalf("decode: %v", decodeError)
 		}
-		settings := decoded.(ArrayCallbackReturnOptions)
-		if settings.AllowImplicit || settings.CheckForEach || settings.AllowVoid {
-			t.Fatalf("empty object did not default every option off: %#v", settings)
+		if decoded.AllowImplicit || decoded.CheckForEach || decoded.AllowVoid {
+			test.Fatalf("empty object did not default every option off: %#v", decoded)
 		}
 	})
 }
@@ -396,8 +395,8 @@ func TestArrayCallbackReturnOptionsDecode(t *testing.T) {
 // `control_flow_graph.Graph.EndReachable`, which is documented as answering that question.
 //
 // The third case is the one a naive "does the body end with a return" test gets wrong.
-func TestArrayCallbackReturnReachability(t *testing.T) {
-	t.Parallel()
+func TestArrayCallbackReturnReachability(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -426,14 +425,14 @@ func TestArrayCallbackReturnReachability(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, ArrayCallbackReturn, "reach.ts", testCase.source, nil)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ArrayCallbackReturn, "reach.ts", testCase.source)
 			if len(testCase.want) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.want...)
+			rule_testing.ExpectFindings(test, result, testCase.want...)
 		})
 	}
 }
@@ -443,8 +442,8 @@ func TestArrayCallbackReturnReachability(t *testing.T) {
 // Each pair is a shape and its control, because the walk up from the callback is the half of this
 // rule that decides whether to judge at all, and a widening there reports on correct code while
 // every reporting fixture stays green.
-func TestArrayCallbackReturnCalleeShapes(t *testing.T) {
-	t.Parallel()
+func TestArrayCallbackReturnCalleeShapes(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -471,7 +470,7 @@ func TestArrayCallbackReturnCalleeShapes(t *testing.T) {
 			// The control for the row above. Without the trailing call the returned function is an
 			// ordinary return value rather than the callback, so the inner function is not judged.
 			//
-			// The OUTER function is the callback here and it is clean, which is worth stating
+			// The outer function is the callback here and it is clean, which is worth stating
 			// because the intuitive reading is that it should report: it returns on its only path,
 			// so nothing is missing. Measured against the installed rule, which is silent on it.
 			source: `foo.every(function(){ return function() {}; })`,
@@ -488,7 +487,7 @@ func TestArrayCallbackReturnCalleeShapes(t *testing.T) {
 		},
 		{
 			name: "a typed array constructor is an Array.from receiver",
-			// Upstream's pattern is `/Array$/u`, any identifier ENDING in Array, so every typed
+			// Upstream's pattern is `/Array$/u`, any identifier ending in Array, so every typed
 			// array constructor matches.
 			source: `Int32Array.from(x, function() {})`,
 			want:   []string{"expectedInside"},
@@ -510,14 +509,14 @@ func TestArrayCallbackReturnCalleeShapes(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, ArrayCallbackReturn, "callee.ts", testCase.source, nil)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ArrayCallbackReturn, "callee.ts", testCase.source)
 			if len(testCase.want) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.want...)
+			rule_testing.ExpectFindings(test, result, testCase.want...)
 		})
 	}
 }
@@ -527,8 +526,8 @@ func TestArrayCallbackReturnCalleeShapes(t *testing.T) {
 // A generator is never checked. An async function is checked only for `Array.fromAsync`, because
 // upstream's `!node.async` guard wraps the `Array.from` and prototype-method arms and leaves the
 // `fromAsync` arm outside it. Measured against the installed rule in all four directions.
-func TestArrayCallbackReturnAsyncAndGenerator(t *testing.T) {
-	t.Parallel()
+func TestArrayCallbackReturnAsyncAndGenerator(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -558,14 +557,14 @@ func TestArrayCallbackReturnAsyncAndGenerator(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, ArrayCallbackReturn, "async.ts", testCase.source, nil)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ArrayCallbackReturn, "async.ts", testCase.source)
 			if len(testCase.want) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.want...)
+			rule_testing.ExpectFindings(test, result, testCase.want...)
 		})
 	}
 }
@@ -587,15 +586,15 @@ func TestArrayCallbackReturnAsyncAndGenerator(t *testing.T) {
 //	foo.forEach((x) => { return a ? b : c; })  -> return void (a ? b : c);
 //	foo.forEach((x) => { return x; })          -> return void x;
 //
-// The last row is the control: a tight expression must NOT gain parentheses, which is what keeps a
+// The last row is the control: a tight expression must not gain parentheses, which is what keeps a
 // port that always wraps from passing the first three.
-func TestArrayCallbackReturnVoidParenthesization(t *testing.T) {
-	t.Parallel()
+func TestArrayCallbackReturnVoidParenthesization(test *testing.T) {
+	test.Parallel()
 
 	decode := rule.DecodeOptionsInto[ArrayCallbackReturnOptions]()
-	options, err := decode(json.RawMessage(`{"checkForEach": true, "allowVoid": true}`))
-	if err != nil {
-		t.Fatalf("decode: %v", err)
+	options, decodeError := decode(json.RawMessage(`{"checkForEach": true, "allowVoid": true}`))
+	if decodeError != nil {
+		test.Fatalf("decode: %v", decodeError)
 	}
 
 	cases := []struct {
@@ -627,12 +626,12 @@ func TestArrayCallbackReturnVoidParenthesization(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			result := rule_testing.RunWithOptions(
-				t, ArrayCallbackReturn, "void.ts", testCase.source, options)
+				test, ArrayCallbackReturn, "void.ts", testCase.source, options)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("reported %d findings, want 1", len(result.Diagnostics))
+				test.Fatalf("reported %d findings, want 1", len(result.Diagnostics))
 			}
 			var prependVoid *rule.Suggestion
 			for index := range result.Diagnostics[0].Suggestions {
@@ -641,11 +640,11 @@ func TestArrayCallbackReturnVoidParenthesization(t *testing.T) {
 				}
 			}
 			if prependVoid == nil {
-				t.Fatalf("no prependVoid suggestion was offered")
+				test.Fatalf("no prependVoid suggestion was offered")
 			}
 			applied := applyArrayCallbackFixes(result.SourceFile.Text(), prependVoid.Fixes)
 			if applied != testCase.want {
-				t.Errorf("applying prependVoid produced\n  %q\nwant\n  %q", applied, testCase.want)
+				test.Errorf("applying prependVoid produced\n  %q\nwant\n  %q", applied, testCase.want)
 			}
 		})
 	}

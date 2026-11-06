@@ -58,10 +58,10 @@ var negativeZeroComparisonOperators = map[ast.Kind]string{
 // No fix. `Object.is(x, -0)` is the likely intent but not the certain one, since an author who
 // wrote `x < -0` may have meant `x < 0`, and a rewrite that guessed would silently change a
 // condition.
-var NoCompareNegZero = rule.Rule{
+var NoCompareNegZero = rule.Rule[rule.NoOptions]{
 	Name: "no-compare-neg-zero",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -84,7 +84,7 @@ var NoCompareNegZero = rule.Rule{
 					return
 				}
 
-				ctx.ReportNode(node, rule.Message{
+				ruleContext.ReportNode(node, rule.Message{
 					Id: "unexpected",
 					Description: "Comparing against `-0` with `" + operatorText + "`: every comparison " +
 						"operator treats `-0` and `0` as the same number, so this is true for positive " +

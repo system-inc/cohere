@@ -9,10 +9,10 @@ import (
 
 const consistencyNoHandRolledDelayFile = "/repository/source/ConsistencyNoHandRolledDelay.ts"
 
-// Each case is a real ahra site at HEAD on 2026-10-01, trimmed to the wait, plus the spelling variants
+// Each case is a real ahra site at `HEAD` on 2026-10-01, trimmed to the wait, plus the spelling variants
 // the rule names. One finding per case, anchored on the `new` expression.
-func TestConsistencyNoHandRolledDelayReports(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoHandRolledDelayReports(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name  string
@@ -166,16 +166,19 @@ func TestConsistencyNoHandRolledDelayReports(t *testing.T) {
 		}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			sourceText := strings.Join(testCase.lines, "\n") + "\n"
-			result := rule_testing.Run(t, ConsistencyNoHandRolledDelay, consistencyNoHandRolledDelayFile, sourceText)
-			rule_testing.ExpectFindings(t, result, consistencyNoHandRolledDelayId)
+			result := rule_testing.Run(test, ConsistencyNoHandRolledDelay, consistencyNoHandRolledDelayFile, sourceText)
+			rule_testing.ExpectFindings(test, result, consistencyNoHandRolledDelayId)
 			if !strings.HasPrefix(sourceText[result.Diagnostics[0].Range.Pos():], "new Promise") {
-				t.Fatalf("finding starts at %q, not at the new expression", sourceText[result.Diagnostics[0].Range.Pos():][:12])
+				test.Fatalf(
+					"finding starts at %q, not at the new expression",
+					sourceText[result.Diagnostics[0].Range.Pos():][:12],
+				)
 			}
 			if len(result.Diagnostics[0].Fixes) != 0 {
-				t.Fatalf("expected no fix, got %d", len(result.Diagnostics[0].Fixes))
+				test.Fatalf("expected no fix, got %d", len(result.Diagnostics[0].Fixes))
 			}
 		})
 	}
@@ -183,14 +186,14 @@ func TestConsistencyNoHandRolledDelayReports(t *testing.T) {
 
 // Promises that wait on a timer and do something `delay` does not, each a real site or the reason a
 // condition exists.
-func TestConsistencyNoHandRolledDelayStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoHandRolledDelayStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name  string
 		lines []string
 	}{
-		// Delay.ts at HEAD: the definition of the primitive. The promise is the function's single
+		// Delay.ts at `HEAD`: the definition of the primitive. The promise is the function's single
 		// return and the duration is the function's own parameter.
 		{"Delay.ts, the definition of delay", []string{
 			"export function delay(durationInMilliseconds: number): Promise<void> {",
@@ -307,10 +310,15 @@ func TestConsistencyNoHandRolledDelayStaysSilent(t *testing.T) {
 		}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ConsistencyNoHandRolledDelay, consistencyNoHandRolledDelayFile, strings.Join(testCase.lines, "\n")+"\n")
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(
+				test,
+				ConsistencyNoHandRolledDelay,
+				consistencyNoHandRolledDelayFile,
+				strings.Join(testCase.lines, "\n")+"\n",
+			)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }

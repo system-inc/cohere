@@ -18,8 +18,8 @@ const queryDeclarations = "declare const networkService: {\n" +
 	"declare function gql(document: unknown): unknown;\n" +
 	"declare const identifier: string;\n"
 
-func TestNetworkNoStringLiteralQueryFires(t *testing.T) {
-	t.Parallel()
+func TestNetworkNoStringLiteralQueryFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -85,16 +85,16 @@ func TestNetworkNoStringLiteralQueryFires(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.Run(t, NetworkNoStringLiteralQuery, queryFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.Run(test, NetworkNoStringLiteralQuery, queryFile,
 				queryDeclarations+testCase.sourceText), "noStringLiteralGraphQlQuery")
 		})
 	}
 }
 
-func TestNetworkNoStringLiteralQueryStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNetworkNoStringLiteralQueryStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -148,9 +148,9 @@ func TestNetworkNoStringLiteralQueryStaysSilent(t *testing.T) {
 		{"no calls at all", "export const Value = 1;\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NetworkNoStringLiteralQuery, queryFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NetworkNoStringLiteralQuery, queryFile,
 				queryDeclarations+testCase.sourceText))
 		})
 	}

@@ -6,8 +6,8 @@ import (
 	"testing"
 )
 
-func TestManualMemoizationPreservesMixedValueClosure(t *testing.T) {
-	t.Parallel()
+func TestManualMemoizationPreservesMixedValueClosure(test *testing.T) {
+	test.Parallel()
 	const source = `import React from 'react';
 function Component(props) {
  const items = props.items ?? [];
@@ -42,23 +42,33 @@ function Component(props) {
 		{"mutable", strings.Replace(source, "props.items ?? []", "getItems() ?? []", 1), true, true},
 		{"global", strings.Replace(source, "props.items ?? []", "props.flag ? externalItems : []", 1), true, true},
 		{"primitive mutable", strings.Replace(source, "props.items ?? []", "props.flag ? [] : null", 1), true, true},
-		{"missing dependency", strings.Replace(source, "() => setState(1)", "() => [props.value, setState(1)]", 1), true, false},
-		{"direct method", strings.Replace(source, "function findItem(id) { return items.find(item => item.id === id); }\n const item = findItem(props.id);", "const item = items.find(item => item.id === props.id);", 1), false, false},
+		{
+			"missing dependency",
+			strings.Replace(source, "() => setState(1)", "() => [props.value, setState(1)]", 1),
+			true,
+			false,
+		},
+		{"direct method", strings.Replace(
+			source,
+			"function findItem(id) { return items.find(item => item.id === id); }\n const item = findItem(props.id);",
+			"const item = items.find(item => item.id === props.id);",
+			1,
+		), false, false},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			findings, lowered := findingsForSource(t, testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			findings, lowered := findingsForSource(test, testCase.source)
 			reported := testCase.fires && !testCase.reactivityGap
 			if !lowered || (len(findings) > 0) != reported {
-				t.Fatalf("lowered=%t findings=%v; want reported=%t (upstream fires=%t, reactivity gap=%t)",
+				test.Fatalf("lowered=%t findings=%v; want reported=%t (upstream fires=%t, reactivity gap=%t)",
 					lowered, findings, reported, testCase.fires, testCase.reactivityGap)
 			}
 		})
 	}
 }
 
-func TestReadOnlyClosureEffectsRejectUnprovenBodies(t *testing.T) {
-	t.Parallel()
+func TestReadOnlyClosureEffectsRejectUnprovenBodies(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range []struct {
 		name, body string
 		readOnly   bool
@@ -72,19 +82,19 @@ func TestReadOnlyClosureEffectsRejectUnprovenBodies(t *testing.T) {
 		{"nested mutation", "return values.find(value => {value.id = id; return true});", false},
 		{"object method", "return {run() {consume(values)}};", false},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			function, _ := rangesFor(t, "function helper(values, id) {"+testCase.body+"}")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			function, _ := rangesFor(test, "function helper(values, id) {"+testCase.body+"}")
 			if got := hasReadOnlyClosureEffects(function, map[*Function]bool{}); got != testCase.readOnly {
-				t.Fatalf("read-only=%t, want %t", got, testCase.readOnly)
+				test.Fatalf("read-only=%t, want %t", got, testCase.readOnly)
 			}
 		})
 	}
 }
 
-func TestClosureRefExclusionFollowsDerivedValues(t *testing.T) {
-	t.Parallel()
-	function, _ := rangesFor(t, `import React from 'react'; function Component(props) {
+func TestClosureRefExclusionFollowsDerivedValues(test *testing.T) {
+	test.Parallel()
+	function, _ := rangesFor(test, `import React from 'react'; function Component(props) {
 const reference = React.useRef(null);
 const copied = reference;
 const current = copied.current;
@@ -93,7 +103,7 @@ const selected = props.flag ? nested : null;
 const unrelated = props.value;
 return {reference, copied, current, nested, selected, unrelated};
 }`)
-	refs := refDerivedValues(function)
+	refs := referenceDerivedValues(function)
 	active := map[static_single_assignment.IdentifierId]bool{}
 	for _, instruction := range function.Instructions {
 		if instruction != nil {
@@ -111,12 +121,12 @@ return {reference, copied, current, nested, selected, unrelated};
 			if identifier != nil && active[identifier.Id] && identifier.Name == name {
 				found = true
 				if refs[identifier.Id] != want {
-					t.Errorf("%s ref-derived=%t, want %t", name, refs[identifier.Id], want)
+					test.Errorf("%s ref-derived=%t, want %t", name, refs[identifier.Id], want)
 				}
 			}
 		}
 		if !found {
-			t.Errorf("missing %s", name)
+			test.Errorf("missing %s", name)
 		}
 	}
 }

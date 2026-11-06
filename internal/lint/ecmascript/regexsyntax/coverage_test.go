@@ -15,8 +15,8 @@ import "testing"
 // They are separate fields rather than one mode because a pattern can be neither, and the class
 // parser branches on each: `v` enables nested classes and set operations, `u` changes what an
 // escape means. A parser that collapsed them would accept `v` syntax under `u`.
-func TestParseRegexFlagsReadsBothModeFlags(t *testing.T) {
-	t.Parallel()
+func TestParseRegexFlagsReadsBothModeFlags(test *testing.T) {
+	test.Parallel()
 	cases := []struct {
 		flags               string
 		unicode, unicodeSet bool
@@ -32,12 +32,12 @@ func TestParseRegexFlagsReadsBothModeFlags(t *testing.T) {
 	for _, testCase := range cases {
 		got := ParseRegexFlags(testCase.flags)
 		if got.Unicode != testCase.unicode || got.UnicodeSets != testCase.unicodeSet {
-			t.Errorf("ParseRegexFlags(%q) = {u:%v v:%v}, want {u:%v v:%v}",
+			test.Errorf("ParseRegexFlags(%q) = {u:%v v:%v}, want {u:%v v:%v}",
 				testCase.flags, got.Unicode, got.UnicodeSets, testCase.unicode, testCase.unicodeSet)
 		}
 		// UV is what every caller branches on, so it is asserted rather than assumed to follow.
-		if want := testCase.unicode || testCase.unicodeSet; got.UV() != want {
-			t.Errorf("ParseRegexFlags(%q).UV() = %v, want %v", testCase.flags, got.UV(), want)
+		if want := testCase.unicode || testCase.unicodeSet; got.UnicodeMode() != want {
+			test.Errorf("ParseRegexFlags(%q).UV() = %v, want %v", testCase.flags, got.UnicodeMode(), want)
 		}
 	}
 }
@@ -48,27 +48,27 @@ func TestParseRegexFlagsReadsBothModeFlags(t *testing.T) {
 // The empty case is the one worth stating: AllHexDigits("") is false rather than vacuously true,
 // because the callers are asking whether an escape has digits after it, and `\x` with nothing
 // following is not a valid escape.
-func TestHexHelpers(t *testing.T) {
-	t.Parallel()
-	for _, b := range []byte{'0', '9', 'a', 'f', 'A', 'F'} {
-		if !IsHexDigit(b) {
-			t.Errorf("IsHexDigit(%q) = false, want true", b)
+func TestHexHelpers(test *testing.T) {
+	test.Parallel()
+	for _, character := range []byte{'0', '9', 'a', 'f', 'A', 'F'} {
+		if !IsHexDigit(character) {
+			test.Errorf("IsHexDigit(%q) = false, want true", character)
 		}
 	}
-	for _, b := range []byte{'g', 'G', 'z', ' ', '-', 0} {
-		if IsHexDigit(b) {
-			t.Errorf("IsHexDigit(%q) = true, want false", b)
+	for _, character := range []byte{'g', 'G', 'z', ' ', '-', 0} {
+		if IsHexDigit(character) {
+			test.Errorf("IsHexDigit(%q) = true, want false", character)
 		}
 	}
 
-	for _, s := range []string{"0", "ff", "FF", "1a2B3c"} {
-		if !AllHexDigits(s) {
-			t.Errorf("AllHexDigits(%q) = false, want true", s)
+	for _, text := range []string{"0", "ff", "FF", "1a2B3c"} {
+		if !AllHexDigits(text) {
+			test.Errorf("AllHexDigits(%q) = false, want true", text)
 		}
 	}
-	for _, s := range []string{"", "0g", "xyz", "1 2"} {
-		if AllHexDigits(s) {
-			t.Errorf("AllHexDigits(%q) = true, want false", s)
+	for _, text := range []string{"", "0g", "xyz", "1 2"} {
+		if AllHexDigits(text) {
+			test.Errorf("AllHexDigits(%q) = true, want false", text)
 		}
 	}
 
@@ -79,15 +79,15 @@ func TestHexHelpers(t *testing.T) {
 		{"0", 0}, {"f", 15}, {"F", 15}, {"ff", 255}, {"1F600", 0x1F600}, {"0000", 0},
 	} {
 		if got := ParseHexUint(testCase.text); got != testCase.want {
-			t.Errorf("ParseHexUint(%q) = %d, want %d", testCase.text, got, testCase.want)
+			test.Errorf("ParseHexUint(%q) = %d, want %d", testCase.text, got, testCase.want)
 		}
 	}
 }
 
 // TestPatternAndFlags pins the split on the last slash rather than the first, which is what makes
 // an escaped slash inside a pattern come apart correctly.
-func TestPatternAndFlags(t *testing.T) {
-	t.Parallel()
+func TestPatternAndFlags(test *testing.T) {
+	test.Parallel()
 	cases := []struct{ text, pattern, flags string }{
 		{`/a/`, "a", ""},
 		{`/a/g`, "a", "g"},
@@ -100,7 +100,7 @@ func TestPatternAndFlags(t *testing.T) {
 	for _, testCase := range cases {
 		pattern, flags := PatternAndFlags(testCase.text)
 		if pattern != testCase.pattern || flags != testCase.flags {
-			t.Errorf("PatternAndFlags(%q) = (%q, %q), want (%q, %q)",
+			test.Errorf("PatternAndFlags(%q) = (%q, %q), want (%q, %q)",
 				testCase.text, pattern, flags, testCase.pattern, testCase.flags)
 		}
 	}

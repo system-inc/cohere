@@ -38,7 +38,7 @@ var messageExtraLabel = rule.Message{
 // some enclosing label reports every one of upstream's fifteen passing cases, because in all of
 // them the label does enclose the jump. The scope stack is the whole rule.
 //
-// # A labeled statement whose body is breakable contributes ONE scope, not two
+// # A labeled statement whose body is breakable contributes one scope, not two
 //
 // In `A: while (a) ...` the label and the loop are one target: an unlabeled break leaves that loop,
 // and the loop is what `A` names. Upstream builds the stack so a labeled breakable statement pushes
@@ -52,7 +52,7 @@ var messageExtraLabel = rule.Message{
 //
 // # A divergence our parser creates, and upstream cannot express
 //
-// `A: switch (a) { case 0: continue A; }` reports here and is a SYNTAX ERROR upstream, because
+// `A: switch (a) { case 0: continue A; }` reports here and is a syntax error upstream, because
 // `continue` may only target a loop and ESLint refuses to parse it. Our parser recovers and hands
 // the rule a continue statement, so the rule judges it and finds the label redundant against the
 // switch frame. The same applies to any duplicate label in one scope, which is likewise illegal.
@@ -82,15 +82,15 @@ var messageExtraLabel = rule.Message{
 // `output: null` for exactly this reason, and a comment written just outside the span still fixes,
 // which is what separates `break/**/ A` (declines) from `/*comment*/break A` (fixes).
 //
-// The span runs from the keyword's END rather than from the label's start, so a comment written
+// The span runs from the keyword's end rather than from the label's start, so a comment written
 // after the label survives: upstream rewrites `continue A/*comment*/;` to `continue/*comment*/;`.
 //
 // The verdict at any jump depends on every enclosing statement, which the pre-order walk has not
 // visited yet when the jump's own listener would fire. So the scope stack is built and read inside
 // one source-file listener, which fires before its children and lets this rule own its own descent.
-var NoExtraLabel = rule.Rule{
+var NoExtraLabel = rule.Rule[rule.NoOptions]{
 	Name: "no-extra-label",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
 				// The enclosing scope stack, innermost last. Built during the descent and read at
@@ -116,7 +116,7 @@ var NoExtraLabel = rule.Rule{
 						// A labeled breakable statement is handled by the branch above when the
 						// walk reaches the body, so this pushes only for the other bodies.
 						//
-						// The breakable half of that guard is EQUIVALENT rather than load bearing,
+						// The breakable half of that guard is equivalent rather than load bearing,
 						// and it is kept because it states the intent. Dropping it makes a labeled
 						// loop push two frames, the label frame first and the breakable frame for
 						// its own body second; the search runs innermost first and always stops at
@@ -125,7 +125,7 @@ var NoExtraLabel = rule.Rule{
 						// label names, both jump kinds and both targets produced byte identical
 						// findings under both spellings.
 						//
-						// The OTHER half is load bearing and its mutant is caught. A labeled block
+						// The other half is load bearing and its mutant is caught. A labeled block
 						// must push, so that a jump naming it stops there instead of reaching an
 						// outer loop of the same name. That shape needs a function boundary to be
 						// legal source, which is why upstream's corpus cannot reach it and why
@@ -137,10 +137,10 @@ var NoExtraLabel = rule.Rule{
 						}
 
 					case current.Kind == ast.KindBreakStatement:
-						reportIfLabelIsRedundant(ctx, current, current.AsBreakStatement().Label, scopes)
+						reportIfLabelIsRedundant(ruleContext, current, current.AsBreakStatement().Label, scopes)
 
 					case current.Kind == ast.KindContinueStatement:
-						reportIfLabelIsRedundant(ctx, current, current.AsContinueStatement().Label, scopes)
+						reportIfLabelIsRedundant(ruleContext, current, current.AsContinueStatement().Label, scopes)
 					}
 
 					current.ForEachChild(visit)
@@ -190,7 +190,7 @@ func isBreakableStatement(node *ast.Node) bool {
 // frame is both, which is exactly upstream's condition and the reason a plain outward name search
 // is wrong: in `A: while (a) { while (b) { break A; } }` the inner loop is the first breakable frame
 // and it carries no label, so the search stops there having reported nothing.
-func reportIfLabelIsRedundant(ctx rule.Context, jump *ast.Node, label *ast.Node, scopes []labelScope) {
+func reportIfLabelIsRedundant(ruleContext rule.Context, jump *ast.Node, label *ast.Node, scopes []labelScope) {
 	if label == nil {
 		return
 	}
@@ -203,10 +203,10 @@ func reportIfLabelIsRedundant(ctx rule.Context, jump *ast.Node, label *ast.Node,
 			continue
 		}
 		if scope.breakable && namesThisScope {
-			if removal, ok := extraLabelRemovalFix(ctx, jump, label); ok {
-				ctx.ReportNodeWithFixes(label, messageExtraLabel, removal)
+			if removal, ok := extraLabelRemovalFix(ruleContext, jump, label); ok {
+				ruleContext.ReportNodeWithFixes(label, messageExtraLabel, removal)
 			} else {
-				ctx.ReportNode(label, messageExtraLabel)
+				ruleContext.ReportNode(label, messageExtraLabel)
 			}
 		}
 		// Either way this frame is where the jump lands, so nothing above it can matter.
@@ -223,8 +223,8 @@ func reportIfLabelIsRedundant(ctx rule.Context, jump *ast.Node, label *ast.Node,
 // It declines when a comment sits inside that span, because the removal would delete it with no
 // warning and the engine applies a fix unattended. A comment outside the span is untouched and the
 // repair is still offered, which is why `/*comment*/break A;` fixes and `break/**/ A;` does not.
-func extraLabelRemovalFix(ctx rule.Context, jump *ast.Node, label *ast.Node) (rule.Fix, bool) {
-	keywordStart := scanner.GetTokenPosOfNode(jump, ctx.SourceFile, false)
+func extraLabelRemovalFix(ruleContext rule.Context, jump *ast.Node, label *ast.Node) (rule.Fix, bool) {
+	keywordStart := scanner.GetTokenPosOfNode(jump, ruleContext.SourceFile, false)
 	keywordEnd := keywordStart + len(jumpKeywordText(jump))
 	labelEnd := label.End()
 
@@ -238,12 +238,12 @@ func extraLabelRemovalFix(ctx rule.Context, jump *ast.Node, label *ast.Node) (ru
 	// those callers, so adding another caller voids it.
 	//
 	// It stays because a fix is applied unattended and an inverted range is the one repair the edit
-	// engine's parse check cannot refuse, and because keywordEnd is computed from a token LENGTH
+	// engine's parse check cannot refuse, and because keywordEnd is computed from a token length
 	// rather than scanned, so a future jump kind reaching jumpKeywordText would land here silently.
 	if keywordEnd >= labelEnd {
 		return rule.Fix{}, false
 	}
-	for _, comment := range comments.ForFile(ctx) {
+	for _, comment := range comments.ForFile(ruleContext) {
 		if comment.Range.Pos() < labelEnd && comment.Range.End() > keywordEnd {
 			return rule.Fix{}, false
 		}

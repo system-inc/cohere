@@ -142,14 +142,8 @@
         "@typescript-eslint/no-unnecessary-boolean-literal-compare": "error",
         "no-useless-constructor": "error",
         "yoda": "error",
-        "no-warning-comments": [
-            "error",
-            {
-                "decoration": [
-                    "*"
-                ]
-            }
-        ],
+        "no-warning-comments": "off",
+        "nexus/consistency-no-warning-comment": "error",
         "@typescript-eslint/consistent-type-exports": "error",
         "@typescript-eslint/consistent-type-assertions": "error",
         "@typescript-eslint/no-confusing-void-expression": "error",
@@ -216,6 +210,7 @@
         "@typescript-eslint/no-restricted-types": "With no ban list it checks nothing, and no type is banned yet.",
         "prefer-arrow-callback": "We write .map(function(item) { ... }) on purpose (#e4cn6wq Block 4).",
         "no-inline-comments": "We write trailing comments on purpose (#e4cn6wq Block 4).",
+        "no-warning-comments": "nexus/consistency-no-warning-comment runs in its place, with the judgment the Go engine's twin reads: TODO, FIXME and XXX in capitals, as whole words, anywhere in any comment, outside backticks and code. This rule matched case-insensitively and only at a comment's start, so it reported a lowercase todo and missed a word mid-sentence or on a block comment's second line (#jmx59gd).",
         "prefer-destructuring": "Destructuring turns a property into a naked local, the opposite of Reach Over Alias (#e4cn6wq Block 4).",
         "@typescript-eslint/consistent-return": "Kirk's ruling on core consistent-return holds for its typed twin: noImplicitReturns and nexus/consistency-require-matching-return-type carry it (#e4cn6wq Block 4).",
         "default-case": "@typescript-eslint/switch-exhaustiveness-check is the type-aware version, and a default would hide a missed union member (#e4cn6wq Block 4).",

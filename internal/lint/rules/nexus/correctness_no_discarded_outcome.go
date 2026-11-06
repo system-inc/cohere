@@ -13,7 +13,10 @@ const correctnessNoDiscardedOutcomeId = "outcomeDiscarded"
 
 // correctnessNoDiscardedOutcomeText is the rule's message, whose wording lives in
 // `policy/messages/correctness-no-discarded-outcome.json`.
-var correctnessNoDiscardedOutcomeText = policy.MessageOf("nexus/correctness-no-discarded-outcome", correctnessNoDiscardedOutcomeId)
+var correctnessNoDiscardedOutcomeText = policy.MessageOf(
+	"nexus/correctness-no-discarded-outcome",
+	correctnessNoDiscardedOutcomeId,
+)
 
 func correctnessNoDiscardedOutcomeMessage(typeName string) rule.Message {
 	return rule.Message{
@@ -104,7 +107,7 @@ func correctnessNoDiscardedOutcomeMessage(typeName string) rule.Message {
 // # No fix
 //
 // What a failure should do is the author's call: warn, exit, retry, or return the outcome upward.
-var CorrectnessNoDiscardedOutcome = rule.Rule{
+var CorrectnessNoDiscardedOutcome = rule.Rule[rule.NoOptions]{
 	Name: "nexus/correctness-no-discarded-outcome",
 
 	// The type of the call is what makes it an outcome, and the declaration behind each arm is what
@@ -115,8 +118,8 @@ var CorrectnessNoDiscardedOutcome = rule.Rule{
 	// body, so its findings key on imports' shapes.
 	TypeReach: rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.TypeChecker == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		if ruleContext.TypeChecker == nil {
 			return nil
 		}
 		return rule.Listeners{
@@ -130,12 +133,12 @@ var CorrectnessNoDiscardedOutcome = rule.Rule{
 				if expression.Kind != ast.KindCallExpression {
 					return
 				}
-				valueType := ctx.TypeChecker.GetTypeAtLocation(expression)
+				valueType := ruleContext.TypeChecker.GetTypeAtLocation(expression)
 				if valueType != nil && awaited {
-					valueType = checker.Checker_getAwaitedType(ctx.TypeChecker, valueType)
+					valueType = checker.Checker_getAwaitedType(ruleContext.TypeChecker, valueType)
 				}
 				if typeName := correctnessNoDiscardedOutcomeTypeName(valueType); typeName != "" {
-					ctx.ReportNode(node, correctnessNoDiscardedOutcomeMessage(typeName))
+					ruleContext.ReportNode(node, correctnessNoDiscardedOutcomeMessage(typeName))
 				}
 			},
 		}
@@ -226,7 +229,9 @@ func correctnessNoDiscardedOutcomeAliasName(union *ast.Node) string {
 		return ""
 	}
 	declaration := alias.AsTypeAliasDeclaration()
-	if declaration.Name() == nil || declaration.Type == nil || correctnessNoDiscardedOutcomeSkipParenthesizedType(declaration.Type) != union {
+	if declaration.Name() == nil ||
+		declaration.Type == nil ||
+		correctnessNoDiscardedOutcomeSkipParenthesizedType(declaration.Type) != union {
 		return ""
 	}
 	if alias.Parent == nil || alias.Parent.Kind != ast.KindSourceFile {
@@ -247,16 +252,18 @@ func correctnessNoDiscardedOutcomeAliasName(union *ast.Node) string {
 
 // correctnessNoDiscardedOutcomeSkipParenthesizedTypeUp walks up out of parenthesized type nodes.
 func correctnessNoDiscardedOutcomeSkipParenthesizedTypeUp(node *ast.Node) *ast.Node {
-	for node != nil && node.Kind == ast.KindParenthesizedType {
-		node = node.Parent
+	current := node
+	for current != nil && current.Kind == ast.KindParenthesizedType {
+		current = current.Parent
 	}
-	return node
+	return current
 }
 
 // correctnessNoDiscardedOutcomeSkipParenthesizedType walks down into parenthesized type nodes.
 func correctnessNoDiscardedOutcomeSkipParenthesizedType(node *ast.Node) *ast.Node {
-	for node != nil && node.Kind == ast.KindParenthesizedType {
-		node = node.AsParenthesizedTypeNode().Type
+	current := node
+	for current != nil && current.Kind == ast.KindParenthesizedType {
+		current = current.AsParenthesizedTypeNode().Type
 	}
-	return node
+	return current
 }

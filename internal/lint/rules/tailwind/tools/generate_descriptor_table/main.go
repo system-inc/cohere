@@ -3,7 +3,8 @@
 //
 // Usage:
 //
-//	go run ./internal/lint/rules/tailwind/tools/generate_descriptor_table -input <table.json> -output <table.go> [-package <name>] [-variable <name>]
+//	go run ./internal/lint/rules/tailwind/tools/generate_descriptor_table \
+//	    -input <table.json> -output <table.go> [-package <name>] [-variable <name>]
 //
 // The input is what `internal/lint/rules/tailwind/tools/generate_descriptors/extract.mjs --json` writes, which is the
 // uncompacted diagnostic shape: a full `{order, count}` per bucket per root across all three
@@ -117,19 +118,22 @@ func main() {
 	flag.Parse()
 
 	if *inputPath == "" || *outputPath == "" || *contextPath == "" {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 		fmt.Fprintln(os.Stderr, "generate_descriptor_table: -input, -context and -output are required")
 		os.Exit(2)
 	}
 
-	inputBytes, err := os.ReadFile(*inputPath)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "generate_descriptor_table: reading input: %v\n", err)
+	inputBytes, readError := os.ReadFile(*inputPath)
+	if readError != nil {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
+		fmt.Fprintf(os.Stderr, "generate_descriptor_table: reading input: %v\n", readError)
 		os.Exit(1)
 	}
 
 	var table extractedTable
-	if err := json.Unmarshal(inputBytes, &table); err != nil {
-		fmt.Fprintf(os.Stderr, "generate_descriptor_table: parsing input: %v\n", err)
+	if decodeError := json.Unmarshal(inputBytes, &table); decodeError != nil {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
+		fmt.Fprintf(os.Stderr, "generate_descriptor_table: parsing input: %v\n", decodeError)
 		os.Exit(1)
 	}
 
@@ -138,26 +142,39 @@ func main() {
 	// which is the failure mode the volume assertions in the extractor exist to prevent and there
 	// is no reason to drop the guard at the boundary between the two tools.
 	if len(table.Roots) == 0 || len(table.Statics) == 0 || table.TailwindVersion == "" {
-		fmt.Fprintf(os.Stderr, "generate_descriptor_table: input looks empty (%d roots, %d statics, version %q); refusing to generate\n",
-			len(table.Roots), len(table.Statics), table.TailwindVersion)
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
+		fmt.Fprintf(
+			os.Stderr,
+			"generate_descriptor_table: input looks empty (%d roots, %d statics, version %q); refusing to generate\n",
+			len(table.Roots),
+			len(table.Statics),
+			table.TailwindVersion,
+		)
 		os.Exit(3)
 	}
 
-	contextBytes, err := os.ReadFile(*contextPath)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "generate_descriptor_table: reading context: %v\n", err)
+	contextBytes, readError := os.ReadFile(*contextPath)
+	if readError != nil {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
+		fmt.Fprintf(os.Stderr, "generate_descriptor_table: reading context: %v\n", readError)
 		os.Exit(1)
 	}
 
 	var tableContext extractedContext
-	if err := json.Unmarshal(contextBytes, &tableContext); err != nil {
-		fmt.Fprintf(os.Stderr, "generate_descriptor_table: parsing context: %v\n", err)
+	if decodeError := json.Unmarshal(contextBytes, &tableContext); decodeError != nil {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
+		fmt.Fprintf(os.Stderr, "generate_descriptor_table: parsing context: %v\n", decodeError)
 		os.Exit(1)
 	}
 
 	if len(tableContext.Namespaces) == 0 || len(tableContext.PropertyOrder) == 0 {
-		fmt.Fprintf(os.Stderr, "generate_descriptor_table: context looks empty (%d namespaces, %d properties); refusing to generate\n",
-			len(tableContext.Namespaces), len(tableContext.PropertyOrder))
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
+		fmt.Fprintf(
+			os.Stderr,
+			"generate_descriptor_table: context looks empty (%d namespaces, %d properties); refusing to generate\n",
+			len(tableContext.Namespaces),
+			len(tableContext.PropertyOrder),
+		)
 		os.Exit(3)
 	}
 
@@ -165,31 +182,57 @@ func main() {
 	// nothing but this check stops a stale readings file being paired with a fresh context and
 	// generating a table that is internally inconsistent in a way no test would name.
 	if tableContext.TailwindVersion != table.TailwindVersion {
-		fmt.Fprintf(os.Stderr, "generate_descriptor_table: input is Tailwind %s and context is Tailwind %s; refusing to generate\n",
-			table.TailwindVersion, tableContext.TailwindVersion)
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
+		fmt.Fprintf(
+			os.Stderr,
+			"generate_descriptor_table: input is Tailwind %s and context is Tailwind %s; refusing to generate\n",
+			table.TailwindVersion,
+			tableContext.TailwindVersion,
+		)
 		os.Exit(3)
 	}
 
 	generated, stats := generate(&table, &tableContext, *packageName, *variableName)
 
-	formatted, err := format.Source(generated)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "generate_descriptor_table: generated file does not parse: %v\n", err)
+	formatted, formatError := format.Source(generated)
+	if formatError != nil {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
+		fmt.Fprintf(os.Stderr, "generate_descriptor_table: generated file does not parse: %v\n", formatError)
 		os.Exit(1)
 	}
 
 	if *outputPath == "-" {
-		os.Stdout.Write(formatted)
-	} else if err := os.WriteFile(*outputPath, formatted, 0o644); err != nil {
-		fmt.Fprintf(os.Stderr, "generate_descriptor_table: writing output: %v\n", err)
+		if _, writeError := os.Stdout.Write(formatted); writeError != nil {
+			// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
+			fmt.Fprintf(os.Stderr, "generate_descriptor_table: writing output: %v\n", writeError)
+			os.Exit(1)
+		}
+	} else if writeError := os.WriteFile(*outputPath, formatted, 0o644); writeError != nil {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
+		fmt.Fprintf(os.Stderr, "generate_descriptor_table: writing output: %v\n", writeError)
 		os.Exit(1)
 	}
 
 	// Printed on every run, because the size of this table is a thing this slice has already got
 	// wrong twice and a number nobody looks at is a number nobody catches.
-	fmt.Printf("generate_descriptor_table: %d roots, %d statics (%d recovered from outside the registry), %d namespaces\n", len(table.Roots), stats.statics, len(tableContext.UnlistedStatics), stats.namespaces)
-	fmt.Printf("  buckets %d in, %d kept (%d dropped as equal to their axis fallback)\n", stats.bucketsIn, stats.bucketsKept, stats.bucketsIn-stats.bucketsKept)
+	// Ignored: what it reports is already written, and a summary that cannot reach the terminal changes none of it.
+	fmt.Printf(
+		"generate_descriptor_table: %d roots, %d statics (%d recovered from outside the registry), %d namespaces\n",
+		len(table.Roots),
+		stats.statics,
+		len(tableContext.UnlistedStatics),
+		stats.namespaces,
+	)
+	// Ignored: the rest of the same summary, which changes nothing already written.
+	fmt.Printf(
+		"  buckets %d in, %d kept (%d dropped as equal to their axis fallback)\n",
+		stats.bucketsIn,
+		stats.bucketsKept,
+		stats.bucketsIn-stats.bucketsKept,
+	)
+	// Ignored: the rest of the same summary, which changes nothing already written.
 	fmt.Printf("  readings %d interned, %d order integers\n", stats.distinctReadings, stats.orderIntegers)
+	// Ignored: the rest of the same summary, which changes nothing already written.
 	fmt.Printf("  input %s, output %s\n", humanSize(len(inputBytes)), humanSize(len(formatted)))
 }
 
@@ -241,7 +284,11 @@ func readingKey(value *reading) string {
 	return builder.String()
 }
 
-func generate(table *extractedTable, tableContext *extractedContext, packageName, variableName string) ([]byte, generationStats) {
+func generate(
+	table *extractedTable,
+	tableContext *extractedContext,
+	packageName, variableName string,
+) ([]byte, generationStats) {
 	stats := generationStats{}
 	stats.namespaces = len(tableContext.Namespaces)
 	pool := newReadingPool()
@@ -318,7 +365,13 @@ var generatedReadings = []Reading{
 		fmt.Fprintf(&body, "\t{Order: []int{%s}, Count: %d},\n", strings.Join(orderParts, ", "), value.Count)
 	}
 
-	fmt.Fprintf(&body, "}\n\n// %s is this repository's descriptor table.\nvar %s = &Table{\n\tTailwindVersion: %q,\n\tDescriptors: map[string]*Descriptor{\n", variableName, variableName, table.TailwindVersion)
+	fmt.Fprintf(
+		&body,
+		"}\n\n// %s is this repository's descriptor table.\nvar %s = &Table{\n\tTailwindVersion: %q,\n\tDescriptors: map[string]*Descriptor{\n",
+		variableName,
+		variableName,
+		table.TailwindVersion,
+	)
 	body.Write(rootsBuffer.Bytes())
 	fmt.Fprintf(&body, "\t},\n\tStatics: map[string]Reading{\n")
 	body.Write(staticsBuffer.Bytes())
@@ -367,7 +420,13 @@ func jsonPathComment(entryPoint string) string {
 	return ".../" + strings.Join(parts[len(parts)-3:], "/")
 }
 
-func writeDescriptor(out *bytes.Buffer, entry *rootEntry, perDeclaration bool, pool *readingPool, stats *generationStats) {
+func writeDescriptor(
+	out *bytes.Buffer,
+	entry *rootEntry,
+	perDeclaration bool,
+	pool *readingPool,
+	stats *generationStats,
+) {
 	fmt.Fprintf(out, "\t\t%q: {\n\t\t\tRoot: %q,\n", entry.Root, entry.Root)
 	if perDeclaration {
 		// A root the table cannot answer. See Descriptor.PerDeclaration.
@@ -387,13 +446,38 @@ func writeDescriptor(out *bytes.Buffer, entry *rootEntry, perDeclaration bool, p
 	writeStringReadingMap(out, "ByLiteral", entry.ReadingByLiteral, nil, pool, stats)
 
 	writeAxis(out, "Absent", entry.ReadingByType, entry.ReadingByNamespace, entry.Fallback, entry.Empty, pool, stats)
-	writeAxis(out, "Alpha", entry.ReadingByTypeWithModifier, entry.ReadingByNamespaceWithModifier, entry.FallbackWithModifier, entry.EmptyWithModifier, pool, stats)
-	writeAxis(out, "Themed", entry.ReadingByTypeWithThemedModifier, entry.ReadingByNamespaceWithThemedModifier, entry.FallbackWithThemedModifier, entry.EmptyWithThemedModifier, pool, stats)
+	writeAxis(
+		out,
+		"Alpha",
+		entry.ReadingByTypeWithModifier,
+		entry.ReadingByNamespaceWithModifier,
+		entry.FallbackWithModifier,
+		entry.EmptyWithModifier,
+		pool,
+		stats,
+	)
+	writeAxis(
+		out,
+		"Themed",
+		entry.ReadingByTypeWithThemedModifier,
+		entry.ReadingByNamespaceWithThemedModifier,
+		entry.FallbackWithThemedModifier,
+		entry.EmptyWithThemedModifier,
+		pool,
+		stats,
+	)
 
 	fmt.Fprintf(out, "\t\t},\n")
 }
 
-func writeAxis(out *bytes.Buffer, name string, byType, byNamespace map[string]*reading, fallback, empty *reading, pool *readingPool, stats *generationStats) {
+func writeAxis(
+	out *bytes.Buffer,
+	name string,
+	byType, byNamespace map[string]*reading,
+	fallback, empty *reading,
+	pool *readingPool,
+	stats *generationStats,
+) {
 	var axisBuffer bytes.Buffer
 	writeStringReadingMap(&axisBuffer, "ByType", byType, fallback, pool, stats)
 	// Namespaces keep their fallback-equal entries. A miss here continues the bare-value
@@ -420,7 +504,17 @@ func writeAxis(out *bytes.Buffer, name string, byType, byNamespace map[string]*r
 // and false of everything else. Pass a nil fallback to keep every entry, which is what ByNamespace
 // and ByLiteral need: a miss in either continues the bare-value precedence to a later step that
 // answers differently, so an elided entry is not the same answer as an absent one.
-func writeStringReadingMap(out *bytes.Buffer, name string, entries map[string]*reading, fallback *reading, pool *readingPool, stats *generationStats) {
+//
+// Mutates: stats every bucket read and every bucket kept is counted into the caller's totals, which the
+// summary prints as what the elision dropped
+func writeStringReadingMap(
+	out *bytes.Buffer,
+	name string,
+	entries map[string]*reading,
+	fallback *reading,
+	pool *readingPool,
+	stats *generationStats,
+) {
 	if len(entries) == 0 {
 		return
 	}

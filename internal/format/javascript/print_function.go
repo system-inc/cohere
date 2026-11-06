@@ -31,7 +31,7 @@ func isMethodValue(path *Path) bool {
 - `TSDeclareFunction`(TypeScript)
 */
 // printFunction is upstream's printFunction.
-func printFunction(path *Path, options *Options, print PrintFunc, args *printArguments) Doc {
+func printFunction(path *Path, options *Options, print PrintFunc, arguments *printArguments) Doc {
 	if isMethodValue(path) {
 		return printMethodValue(path, options, print)
 	}
@@ -39,13 +39,13 @@ func printFunction(path *Path, options *Options, print PrintFunc, args *printArg
 	current := node(path)
 
 	shouldExpandParameters := false
-	if current.Is("FunctionExpression") && args != nil && args.expandLastArg {
+	if current.Is("FunctionExpression") && arguments != nil && arguments.expandLastArgument {
 		parent := parentOf(path)
 		if isCallExpression(parent) &&
 			(len(getCallArguments(parent)) > 1 ||
-				!slices.ContainsFunc(getFunctionParameters(current), func(param Node) bool {
+				!slices.ContainsFunc(getFunctionParameters(current), func(parameter Node) bool {
 					// upstream's .every(param => param.type === "Identifier" && !param.typeAnnotation)
-					return !(param.Is("Identifier") && !param.Truthy("typeAnnotation"))
+					return !(parameter.Is("Identifier") && !parameter.Truthy("typeAnnotation"))
 				})) {
 			shouldExpandParameters = true
 		}
@@ -104,16 +104,16 @@ func printFunction(path *Path, options *Options, print PrintFunc, args *printArg
 	}
 
 	return concatIn(path, printDeclareToken(path),
-		async,
-		keyword,
-		generator,
-		idSpace,
+		textDoc(async),
+		textDoc(keyword),
+		textDoc(generator),
+		textDoc(idSpace),
 		idDoc,
 		print("typeParameters", nil),
 		groupIn(path, concatIn(path, parameters,
 			returnTypeDoc,
 		)),
-		bodySpace,
+		textDoc(bodySpace),
 		print("body", nil),
 		semicolon,
 	)
@@ -141,24 +141,26 @@ func printMethod(path *Path, options *Options, print PrintFunc) Doc {
 	if value == nil {
 		value = current
 	}
-	var parts []any
+	var parts []Doc
 
 	if kind == "" || kind == "init" || kind == "method" || kind == "constructor" {
 		if value.Truthy("async") {
-			parts = append(parts, "async ")
+			parts = append(parts, doc.Text("async "))
 		}
 	} else {
 		// upstream's assert.ok(kind === "get" || kind === "set")
 		if kind != "get" && kind != "set" {
+			// Invariant: estree builds a method's kind as init, method, constructor, get or set, as upstream's
+			// assert assumes.
 			panic(fmt.Sprintf("javascript: unexpected method kind %q", kind))
 		}
 
-		parts = append(parts, kind, " ")
+		parts = append(parts, textDoc(kind), doc.Text(" "))
 	}
 
 	// A `getter`/`setter` can't be a generator, but it's recoverable
 	if value.Truthy("generator") {
-		parts = append(parts, "*")
+		parts = append(parts, doc.Text("*"))
 	}
 
 	optional := ""
@@ -173,7 +175,7 @@ func printMethod(path *Path, options *Options, print PrintFunc) Doc {
 	}
 	parts = append(parts,
 		printKey(path, options, print),
-		optional,
+		textDoc(optional),
 		valueDoc,
 	)
 
@@ -209,7 +211,7 @@ func printMethodValue(path *Path, options *Options, print PrintFunc) Doc {
 	} else {
 		parameters = parametersDoc
 	}
-	parts := []any{
+	parts := []Doc{
 		print("typeParameters", nil),
 		groupIn(path, concatIn(path, parameters,
 			returnTypeDoc,
@@ -217,7 +219,7 @@ func printMethodValue(path *Path, options *Options, print PrintFunc) Doc {
 	}
 
 	if current.Truthy("body") {
-		parts = append(parts, " ", print("body", nil))
+		parts = append(parts, doc.Text(" "), print("body", nil))
 	} else {
 		parts = append(parts, printSemicolon(options))
 	}
@@ -260,7 +262,7 @@ func printReturnType(path *Path, print PrintFunc) Doc {
 	current := node(path)
 	returnType := printTypeAnnotationProperty(path, print, "returnType")
 
-	parts := []any{returnType}
+	parts := []Doc{returnType}
 
 	if current.Truthy("predicate") {
 		parts = append(parts, print("predicate", nil))

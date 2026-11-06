@@ -100,49 +100,178 @@ var noUselessAssignmentUpstreamFail = []struct {
 	source string
 	count  int
 }{
-	{source: "let v = 'used';\n                        console.log(v);\n                        v = 'unused'", count: 1},
-	{source: "function foo() {\n                            let v = 'used';\n                            console.log(v);\n                            v = 'unused';\n                        }", count: 1},
-	{source: "function foo() {\n                            let v = 'used';\n                            if (condition) {\n                                v = 'unused';\n                                return\n                            }\n                            console.log(v);\n                        }", count: 1},
-	{source: "function foo() {\n                            let v = 'used';\n                            if (condition) {\n                                console.log(v);\n                            } else {\n                                v = 'unused';\n                            }\n                        }", count: 1},
-	{source: "var foo = function () {\n                            let v = 'used';\n                            console.log(v);\n                            v = 'unused'\n                        }", count: 1},
-	{source: "var foo = () => {\n                            let v = 'used';\n                            console.log(v);\n                            v = 'unused'\n                        }", count: 1},
-	{source: "class foo {\n                            static {\n                                let v = 'used';\n                                console.log(v);\n                                v = 'unused'\n                            }\n                        }", count: 1},
-	{source: "function foo() {\n                            let v = 'unused';\n                            if (condition) {\n                                v = 'used';\n                                console.log(v);\n                                return\n                            }\n                        }", count: 1},
-	{source: "function foo() {\n                            let v = 'used';\n                            console.log(v);\n                            v = 'unused';\n                            v = 'unused';\n                        }", count: 2},
-	{source: "function foo() {\n                            let v = 'used';\n                            console.log(v);\n                            v = 'unused';\n                            v = 'used';\n                            console.log(v);\n                            v = 'used';\n                            console.log(v);\n                        }", count: 1},
-	{source: "\n                        let v;\n                        v = 'unused';\n                        if (foo) {\n                            v = 'used';\n                        } else {\n                            v = 'used';\n                        }\n                        console.log(v);", count: 1},
-	{source: "function foo() {\n                            let v = 'used';\n                            console.log(v);\n                            v = 'unused';\n                            v = 'unused';\n                            v = 'used';\n                            console.log(v);\n                        }", count: 2},
-	{source: "function foo() {\n                            let v = 'unused';\n                            if (condition) {\n                                if (condition2) {\n                                    v = 'used-2';\n                                } else {\n                                    v = 'used-3';\n                                }\n                            } else {\n                                v = 'used-4';\n                            }\n                            console.log(v);\n                        }", count: 1},
-	{source: "function foo() {\n                            let v;\n                            if (condition) {\n                                v = 'unused';\n                            } else {\n                                //\n                            }\n                            if (condition2) {\n                                v = 'used-1';\n                            } else {\n                                v = 'used-2';\n                            }\n                            console.log(v);\n                        }", count: 1},
-	{source: "function foo() {\n                            let v = 'used';\n                            if (condition) {\n                                v = 'unused';\n                                v = 'unused';\n                                v = 'used';\n                            }\n                            console.log(v);\n                        }", count: 2},
-	{source: "function foo() {\n                            let a = 42;\n                            console.log(a);\n                            a++;\n                        }", count: 1},
-	{source: "function foo() {\n                            let a = 42;\n                            console.log(a);\n                            a--;\n                        }", count: 1},
-	{source: "function foo() {\n                            let a = 'used', b = 'used', c = 'used', d = 'used';\n                            console.log(a, b, c, d);\n                            ({ a, arr: [b, c,, ...d] } = fn());\n                            console.log(c);\n                        }", count: 3},
-	{source: "function foo() {\n                            let a = 'used', b = 'used', c = 'used';\n                            console.log(a, b, c);\n                            ({ a = 'unused', foo: b, ...c } = fn());\n                        }", count: 3},
-	{source: "function foo () {\n                            let v = 'used';\n                            console.log(v);\n                            setTimeout(() => v = 42, 1);\n                            v = 'unused and variable is only updated in other scopes';\n                        }", count: 1},
-	{source: "function foo() {\n                            let v = 'used';\n                            if (condition) {\n                                let v = 'used';\n                                console.log(v);\n                                v = 'unused';\n                            }\n                            console.log(v);\n                            v = 'unused';\n                        }", count: 2},
-	{source: "function foo() {\n                            let v = 'used';\n                            if (condition) {\n                                console.log(v);\n                                v = 'unused';\n                            } else {\n                                v = 'unused';\n                            }\n                        }", count: 2},
-	{source: "function foo () {\n                            let v = 'used';\n                            console.log(v);\n                            v = 'unused';\n                            return;\n                            console.log(v);\n                        }", count: 1},
-	{source: "function foo () {\n                            let v = 'used';\n                            console.log(v);\n                            v = 'unused';\n                            throw new Error();\n                            console.log(v);\n                        }", count: 1},
-	{source: "function foo () {\n                            let v = 'used';\n                            console.log(v);\n                            for (let i = 0; i < 10; i++) {\n                                v = 'unused';\n                                continue;\n                                console.log(v);\n                            }\n                        }\n                        function bar () {\n                            let v = 'used';\n                            console.log(v);\n                            for (let i = 0; i < 10; i++) {\n                                v = 'unused';\n                                break;\n                                console.log(v);\n                            }\n                        }", count: 2},
-	{source: "function foo () {\n                            let v = 'used';\n                            console.log(v);\n                            for (let i = 0; i < 10; i++) {\n                                if (condition) {\n                                    v = 'unused';\n                                    break;\n                                }\n                                console.log(v);\n                            }\n                        }", count: 1},
-	{source: "let message = 'unused';\n                        try {\n                            const result = call();\n                            message = result.message;\n                        } catch (e) {\n                            message = 'used';\n                        }\n                        console.log(message)", count: 1},
-	{source: "let message = 'unused';\n                        try {\n                            message = 'used';\n                            console.log(message)\n                        } catch (e) {\n                        }", count: 1},
-	{source: "let message = 'unused';\n                        try {\n                            message = call();\n                        } catch (e) {\n                            message = 'used';\n                        }\n                        console.log(message)", count: 1},
-	{source: "let v = 'unused';\n                        try {\n                            v = callA();\n                            try {\n                                v = callB();\n                            } catch (e) {\n                                // ignore\n                            }\n                        } catch (e) {\n                            v = 'used';\n                        }\n                        console.log(v)", count: 1},
-	{source: "\n                        var x = 1; // used\n                        x = x + 1; // unused\n                        x = 5; // used\n                        f(x);", count: 1},
-	{source: "\n                        var x = 1; // used\n                        x = // used\n                            x++; // unused\n                        f(x);", count: 1},
-	{source: "const obj = { a: 1 };\n                        let {\n                            a,\n                            b = (a = 2)\n                        } = obj;\n                        a = 3\n                        console.log(a, b);", count: 1},
-	{source: "const arr = [1, 2];\n                        let [\n                            a,\n                            b\n                        ] = arr;\n                        a = 3\n                        console.log(a, b);", count: 1},
-	{source: "function App() {\n                        let A = \"unused\";\n                        A = \"used\";\n                        return <A/>;\n                        }", count: 1},
-	{source: "function App() {\n                        let A = \"unused\";\n                        A = \"used\";\n                        return <A></A>;\n                        }", count: 1},
-	{source: "function App() {\n                        let A = \"unused\";\n                        A = \"used\";\n                        return <A.B />;\n                        }", count: 1},
-	{source: "function App() {\n                        let x = \"used\";\n                        if (cond) {\n                          return <A prop={x} />;\n                        } else {\n                          x = \"unused\";\n                        }\n                        }", count: 1},
-	{source: "function App() {\n                        let A;\n                        A = \"unused\";\n                        if (cond) {\n                          A = \"used1\";\n                        } else {\n                          A = \"used2\";\n                        }\n                        return <A/>;\n                        }", count: 1},
-	{source: "function App() {\n                        let message = 'unused';\n                        try {\n                          const result = call();\n                          message = result.message;\n                        } catch (e) {\n                          message = 'used';\n                        }\n                        return <A prop={message} />;\n                        }", count: 1},
-	{source: "function App() {\n                        let x = 1;\n                        x = x + 1;\n                        x = 5;\n                        return <A prop={x} />;\n                        }", count: 1},
-	{source: "function App() {\n                        let x = 1;\n                        x = 2;\n                        return <A>{x}</A>;\n                        }", count: 1},
-	{source: "function App() {\n                        let x = 0;\n                        x = 1;\n                        x = 2;\n                        return <A prop={x} />;\n                        }", count: 2},
+	{
+		source: "let v = 'used';\n                        console.log(v);\n                        v = 'unused'",
+		count:  1,
+	},
+	{
+		source: "function foo() {\n                            let v = 'used';\n                            console.log(v);\n                            v = 'unused';\n                        }",
+		count:  1,
+	},
+	{
+		source: "function foo() {\n                            let v = 'used';\n                            if (condition) {\n                                v = 'unused';\n                                return\n                            }\n                            console.log(v);\n                        }",
+		count:  1,
+	},
+	{
+		source: "function foo() {\n                            let v = 'used';\n                            if (condition) {\n                                console.log(v);\n                            } else {\n                                v = 'unused';\n                            }\n                        }",
+		count:  1,
+	},
+	{
+		source: "var foo = function () {\n                            let v = 'used';\n                            console.log(v);\n                            v = 'unused'\n                        }",
+		count:  1,
+	},
+	{
+		source: "var foo = () => {\n                            let v = 'used';\n                            console.log(v);\n                            v = 'unused'\n                        }",
+		count:  1,
+	},
+	{
+		source: "class foo {\n                            static {\n                                let v = 'used';\n                                console.log(v);\n                                v = 'unused'\n                            }\n                        }",
+		count:  1,
+	},
+	{
+		source: "function foo() {\n                            let v = 'unused';\n                            if (condition) {\n                                v = 'used';\n                                console.log(v);\n                                return\n                            }\n                        }",
+		count:  1,
+	},
+	{
+		source: "function foo() {\n                            let v = 'used';\n                            console.log(v);\n                            v = 'unused';\n                            v = 'unused';\n                        }",
+		count:  2,
+	},
+	{
+		source: "function foo() {\n                            let v = 'used';\n                            console.log(v);\n                            v = 'unused';\n                            v = 'used';\n                            console.log(v);\n                            v = 'used';\n                            console.log(v);\n                        }",
+		count:  1,
+	},
+	{
+		source: "\n                        let v;\n                        v = 'unused';\n                        if (foo) {\n                            v = 'used';\n                        } else {\n                            v = 'used';\n                        }\n                        console.log(v);",
+		count:  1,
+	},
+	{
+		source: "function foo() {\n                            let v = 'used';\n                            console.log(v);\n                            v = 'unused';\n                            v = 'unused';\n                            v = 'used';\n                            console.log(v);\n                        }",
+		count:  2,
+	},
+	{
+		source: "function foo() {\n                            let v = 'unused';\n                            if (condition) {\n                                if (condition2) {\n                                    v = 'used-2';\n                                } else {\n                                    v = 'used-3';\n                                }\n                            } else {\n                                v = 'used-4';\n                            }\n                            console.log(v);\n                        }",
+		count:  1,
+	},
+	{
+		source: "function foo() {\n                            let v;\n                            if (condition) {\n                                v = 'unused';\n                            } else {\n                                //\n                            }\n                            if (condition2) {\n                                v = 'used-1';\n                            } else {\n                                v = 'used-2';\n                            }\n                            console.log(v);\n                        }",
+		count:  1,
+	},
+	{
+		source: "function foo() {\n                            let v = 'used';\n                            if (condition) {\n                                v = 'unused';\n                                v = 'unused';\n                                v = 'used';\n                            }\n                            console.log(v);\n                        }",
+		count:  2,
+	},
+	{
+		source: "function foo() {\n                            let a = 42;\n                            console.log(a);\n                            a++;\n                        }",
+		count:  1,
+	},
+	{
+		source: "function foo() {\n                            let a = 42;\n                            console.log(a);\n                            a--;\n                        }",
+		count:  1,
+	},
+	{
+		source: "function foo() {\n                            let a = 'used', b = 'used', c = 'used', d = 'used';\n                            console.log(a, b, c, d);\n                            ({ a, arr: [b, c,, ...d] } = fn());\n                            console.log(c);\n                        }",
+		count:  3,
+	},
+	{
+		source: "function foo() {\n                            let a = 'used', b = 'used', c = 'used';\n                            console.log(a, b, c);\n                            ({ a = 'unused', foo: b, ...c } = fn());\n                        }",
+		count:  3,
+	},
+	{
+		source: "function foo () {\n                            let v = 'used';\n                            console.log(v);\n                            setTimeout(() => v = 42, 1);\n                            v = 'unused and variable is only updated in other scopes';\n                        }",
+		count:  1,
+	},
+	{
+		source: "function foo() {\n                            let v = 'used';\n                            if (condition) {\n                                let v = 'used';\n                                console.log(v);\n                                v = 'unused';\n                            }\n                            console.log(v);\n                            v = 'unused';\n                        }",
+		count:  2,
+	},
+	{
+		source: "function foo() {\n                            let v = 'used';\n                            if (condition) {\n                                console.log(v);\n                                v = 'unused';\n                            } else {\n                                v = 'unused';\n                            }\n                        }",
+		count:  2,
+	},
+	{
+		source: "function foo () {\n                            let v = 'used';\n                            console.log(v);\n                            v = 'unused';\n                            return;\n                            console.log(v);\n                        }",
+		count:  1,
+	},
+	{
+		source: "function foo () {\n                            let v = 'used';\n                            console.log(v);\n                            v = 'unused';\n                            throw new Error();\n                            console.log(v);\n                        }",
+		count:  1,
+	},
+	{
+		source: "function foo () {\n                            let v = 'used';\n                            console.log(v);\n                            for (let i = 0; i < 10; i++) {\n                                v = 'unused';\n                                continue;\n                                console.log(v);\n                            }\n                        }\n                        function bar () {\n                            let v = 'used';\n                            console.log(v);\n                            for (let i = 0; i < 10; i++) {\n                                v = 'unused';\n                                break;\n                                console.log(v);\n                            }\n                        }",
+		count:  2,
+	},
+	{
+		source: "function foo () {\n                            let v = 'used';\n                            console.log(v);\n                            for (let i = 0; i < 10; i++) {\n                                if (condition) {\n                                    v = 'unused';\n                                    break;\n                                }\n                                console.log(v);\n                            }\n                        }",
+		count:  1,
+	},
+	{
+		source: "let message = 'unused';\n                        try {\n                            const result = call();\n                            message = result.message;\n                        } catch (e) {\n                            message = 'used';\n                        }\n                        console.log(message)",
+		count:  1,
+	},
+	{
+		source: "let message = 'unused';\n                        try {\n                            message = 'used';\n                            console.log(message)\n                        } catch (e) {\n                        }",
+		count:  1,
+	},
+	{
+		source: "let message = 'unused';\n                        try {\n                            message = call();\n                        } catch (e) {\n                            message = 'used';\n                        }\n                        console.log(message)",
+		count:  1,
+	},
+	{
+		source: "let v = 'unused';\n                        try {\n                            v = callA();\n                            try {\n                                v = callB();\n                            } catch (e) {\n                                // ignore\n                            }\n                        } catch (e) {\n                            v = 'used';\n                        }\n                        console.log(v)",
+		count:  1,
+	},
+	{
+		source: "\n                        var x = 1; // used\n                        x = x + 1; // unused\n                        x = 5; // used\n                        f(x);",
+		count:  1,
+	},
+	{
+		source: "\n                        var x = 1; // used\n                        x = // used\n                            x++; // unused\n                        f(x);",
+		count:  1,
+	},
+	{
+		source: "const obj = { a: 1 };\n                        let {\n                            a,\n                            b = (a = 2)\n                        } = obj;\n                        a = 3\n                        console.log(a, b);",
+		count:  1,
+	},
+	{
+		source: "const arr = [1, 2];\n                        let [\n                            a,\n                            b\n                        ] = arr;\n                        a = 3\n                        console.log(a, b);",
+		count:  1,
+	},
+	{
+		source: "function App() {\n                        let A = \"unused\";\n                        A = \"used\";\n                        return <A/>;\n                        }",
+		count:  1,
+	},
+	{
+		source: "function App() {\n                        let A = \"unused\";\n                        A = \"used\";\n                        return <A></A>;\n                        }",
+		count:  1,
+	},
+	{
+		source: "function App() {\n                        let A = \"unused\";\n                        A = \"used\";\n                        return <A.B />;\n                        }",
+		count:  1,
+	},
+	{
+		source: "function App() {\n                        let x = \"used\";\n                        if (cond) {\n                          return <A prop={x} />;\n                        } else {\n                          x = \"unused\";\n                        }\n                        }",
+		count:  1,
+	},
+	{
+		source: "function App() {\n                        let A;\n                        A = \"unused\";\n                        if (cond) {\n                          A = \"used1\";\n                        } else {\n                          A = \"used2\";\n                        }\n                        return <A/>;\n                        }",
+		count:  1,
+	},
+	{
+		source: "function App() {\n                        let message = 'unused';\n                        try {\n                          const result = call();\n                          message = result.message;\n                        } catch (e) {\n                          message = 'used';\n                        }\n                        return <A prop={message} />;\n                        }",
+		count:  1,
+	},
+	{
+		source: "function App() {\n                        let x = 1;\n                        x = x + 1;\n                        x = 5;\n                        return <A prop={x} />;\n                        }",
+		count:  1,
+	},
+	{
+		source: "function App() {\n                        let x = 1;\n                        x = 2;\n                        return <A>{x}</A>;\n                        }",
+		count:  1,
+	},
+	{
+		source: "function App() {\n                        let x = 0;\n                        x = 1;\n                        x = 2;\n                        return <A prop={x} />;\n                        }",
+		count:  2,
+	},
 }
 
 // noUselessAssignmentFile is where the fixtures pretend to live. The .tsx extension matters: the
@@ -157,31 +286,31 @@ const noUselessAssignmentFile = "/repository/source/Component.tsx"
 // does not have or deleting the cases that show the boundary. The two assertions that follow are
 // the contract; this one is the map. It fails only on a false positive, which is the direction that
 // costs a reader trust.
-func TestNoUselessAssignmentSurvey(t *testing.T) {
-	t.Parallel()
+func TestNoUselessAssignmentSurvey(test *testing.T) {
+	test.Parallel()
 
 	falsePositives := 0
 	for index, source := range noUselessAssignmentUpstreamPass {
-		result := rule_testing.RunTyped(t, NoUselessAssignment, noUselessAssignmentFile, source)
+		result := rule_testing.RunTyped(test, NoUselessAssignment, noUselessAssignmentFile, source)
 		if len(result.Diagnostics) != 0 {
 			falsePositives++
-			t.Errorf("clean upstream case %d reported %d findings; upstream reports none\n%s",
+			test.Errorf("clean upstream case %d reported %d findings; upstream reports none\n%s",
 				index, len(result.Diagnostics), source)
 		}
 	}
 
 	caught, expected := 0, 0
 	for _, entry := range noUselessAssignmentUpstreamFail {
-		result := rule_testing.RunTyped(t, NoUselessAssignment, noUselessAssignmentFile, entry.source)
+		result := rule_testing.RunTyped(test, NoUselessAssignment, noUselessAssignmentFile, entry.source)
 		expected += entry.count
 		if len(result.Diagnostics) > entry.count {
-			t.Errorf("failing upstream case reported %d findings against upstream's %d, which is a "+
+			test.Errorf("failing upstream case reported %d findings against upstream's %d, which is a "+
 				"false positive on an input upstream already bounds\n%s",
 				len(result.Diagnostics), entry.count, entry.source)
 		}
 		caught += len(result.Diagnostics)
 	}
-	t.Logf("upstream corpus: %d/%d diagnostics reproduced, %d false positives on %d clean cases",
+	test.Logf("upstream corpus: %d/%d diagnostics reproduced, %d false positives on %d clean cases",
 		caught, expected, falsePositives, len(noUselessAssignmentUpstreamPass))
 }
 
@@ -196,19 +325,19 @@ func TestNoUselessAssignmentSurvey(t *testing.T) {
 // Read from the imported corpus rather than retyped, so the assertion and the survey cannot drift,
 // and the expected count is the same snapshot-derived number the survey uses. This is stronger than
 // the survey's "does not exceed": it is a claim of exact agreement on every input.
-func TestNoUselessAssignmentFires(t *testing.T) {
-	t.Parallel()
+func TestNoUselessAssignmentFires(test *testing.T) {
+	test.Parallel()
 
 	for index := range noUselessAssignmentUpstreamFail {
 		entry := noUselessAssignmentUpstreamFail[index]
-		t.Run(fmt.Sprintf("upstream fail %d", index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoUselessAssignment, noUselessAssignmentFile, entry.source)
+		test.Run(fmt.Sprintf("upstream fail %d", index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoUselessAssignment, noUselessAssignmentFile, entry.source)
 			wantIds := make([]string, entry.count)
 			for position := range wantIds {
 				wantIds[position] = "noUselessAssignment"
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 		})
 	}
 }
@@ -219,14 +348,14 @@ func TestNoUselessAssignmentFires(t *testing.T) {
 // captured-read guard, three only to pin the try-block guard, three only the self-referential
 // right-hand side, and several the exported-binding guard, and every one of them reported a finding
 // at some point while this was being written.
-func TestNoUselessAssignmentStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoUselessAssignmentStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	for index, source := range noUselessAssignmentUpstreamPass {
-		t.Run(fmt.Sprintf("upstream pass %d", index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.RunTyped(t, NoUselessAssignment, noUselessAssignmentFile, source))
+		test.Run(fmt.Sprintf("upstream pass %d", index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.RunTyped(test, NoUselessAssignment, noUselessAssignmentFile, source))
 		})
 	}
 }
@@ -238,8 +367,8 @@ func TestNoUselessAssignmentStaysSilent(t *testing.T) {
 // at the whole statement passes every assertion above while being wrong about the only thing a
 // reader looks at. Asserted for a declarator, a plain assignment, and a compound assignment,
 // because the three take different paths through `writeTargetOf`.
-func TestNoUselessAssignmentPointsAtTheIdentifier(t *testing.T) {
-	t.Parallel()
+func TestNoUselessAssignmentPointsAtTheIdentifier(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -268,26 +397,26 @@ func TestNoUselessAssignmentPointsAtTheIdentifier(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoUselessAssignment, noUselessAssignmentFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoUselessAssignment, noUselessAssignmentFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.wantText) {
-				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.wantText))
+				test.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.wantText))
 			}
 			for position, diagnostic := range result.Diagnostics {
 				reported := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if reported != testCase.wantText[position] {
-					t.Errorf("finding %d underlines %q, want %q", position, reported, testCase.wantText[position])
+					test.Errorf("finding %d underlines %q, want %q", position, reported, testCase.wantText[position])
 				}
 				// Asserted by equality rather than by containment. A predicate weaker than the
 				// property it guards is not a guard, and a substring check on an interpolated
 				// message has shipped a doubled character in this tree before.
 				if diagnostic.Message.Id != messageNoUselessAssignment.Id {
-					t.Errorf("finding %d has id %q, want %q",
+					test.Errorf("finding %d has id %q, want %q",
 						position, diagnostic.Message.Id, messageNoUselessAssignment.Id)
 				}
 				if diagnostic.Message.Description != messageNoUselessAssignment.Description {
-					t.Errorf("finding %d renders a description this rule does not define", position)
+					test.Errorf("finding %d renders a description this rule does not define", position)
 				}
 			}
 		})
@@ -300,19 +429,23 @@ func TestNoUselessAssignmentPointsAtTheIdentifier(t *testing.T) {
 // returns early on that, so every clean case above would pass vacuously and every firing case would
 // fail in a way that reads like a rule bug rather than a harness one. Asserting the difference
 // directly means the two failure modes cannot be confused.
-func TestNoUselessAssignmentNeedsTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestNoUselessAssignmentNeedsTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	source := "function f() {\n\tlet value = 1;\n\tuse(value);\n\tvalue = 2;\n}"
 
 	if !NoUselessAssignment.NeedsTypeChecker {
-		t.Fatal("the rule no longer declares NeedsTypeChecker, so the fixtures below assert nothing")
+		test.Fatal("the rule no longer declares NeedsTypeChecker, so the fixtures below assert nothing")
 	}
-	if findings := len(rule_testing.RunTyped(t, NoUselessAssignment, noUselessAssignmentFile, source).Diagnostics); findings != 1 {
-		t.Fatalf("the typed harness produced %d findings, want 1", findings)
+	if findings := len(
+		rule_testing.RunTyped(test, NoUselessAssignment, noUselessAssignmentFile, source).Diagnostics,
+	); findings != 1 {
+		test.Fatalf("the typed harness produced %d findings, want 1", findings)
 	}
-	if findings := len(rule_testing.Run(t, NoUselessAssignment, noUselessAssignmentFile, source).Diagnostics); findings != 0 {
-		t.Errorf("the untyped harness produced %d findings; it hands a nil checker, so this rule "+
+	if findings := len(
+		rule_testing.Run(test, NoUselessAssignment, noUselessAssignmentFile, source).Diagnostics,
+	); findings != 0 {
+		test.Errorf("the untyped harness produced %d findings; it hands a nil checker, so this rule "+
 			"is silent there and a fixture using it would pass vacuously", findings)
 	}
 }
@@ -323,28 +456,44 @@ func TestNoUselessAssignmentNeedsTheTypedHarness(t *testing.T) {
 // measured, failing-loudly-if-it-moves fact rather than a sentence in a doc comment, and so that a
 // later porter extending the rule sees immediately which of these they have picked up. Each is a
 // silent miss, never a wrong report, which is the direction a partial port should miss in.
-func TestNoUselessAssignmentBoundary(t *testing.T) {
-	t.Parallel()
+func TestNoUselessAssignmentBoundary(test *testing.T) {
+	test.Parallel()
 
 	recovered := []struct {
 		name  string
 		why   string
 		index int
 	}{
-		{"an update expression", "the graph emits a real store for the increment, judged before the load half puts the bit back", 15},
-		{"a destructuring assignment target", "the graph places a pattern element's write where it happens, so no flow node has to line up", 17},
-		{"a write inside a try block", "still never reported itself, but it now kills the earlier write it overwrites", 26},
-		{"a self-referential write chain", "the graph emits the right-hand read before the store, so no reordering is needed", 30},
+		{
+			"an update expression",
+			"the graph emits a real store for the increment, judged before the load half puts the bit back",
+			15,
+		},
+		{
+			"a destructuring assignment target",
+			"the graph places a pattern element's write where it happens, so no flow node has to line up",
+			17,
+		},
+		{
+			"a write inside a try block",
+			"still never reported itself, but it now kills the earlier write it overwrites",
+			26,
+		},
+		{
+			"a self-referential write chain",
+			"the graph emits the right-hand read before the store, so no reordering is needed",
+			30,
+		},
 		{"a destructuring declarator", "the declarator is reached by walking up through the binding pattern", 33},
 	}
 
 	for _, entry := range recovered {
-		t.Run(entry.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(entry.name, func(test *testing.T) {
+			test.Parallel()
 			imported := noUselessAssignmentUpstreamFail[entry.index]
-			result := rule_testing.RunTyped(t, NoUselessAssignment, noUselessAssignmentFile, imported.source)
+			result := rule_testing.RunTyped(test, NoUselessAssignment, noUselessAssignmentFile, imported.source)
 			if len(result.Diagnostics) != imported.count {
-				t.Fatalf("got %d findings, want upstream's %d; this shape was declined by the "+
+				test.Fatalf("got %d findings, want upstream's %d; this shape was declined by the "+
 					"inverted implementation and is recovered because %s",
 					len(result.Diagnostics), imported.count, entry.why)
 			}
@@ -369,8 +518,8 @@ func TestNoUselessAssignmentBoundary(t *testing.T) {
 //
 // No imported case could see it: upstream's corpus writes the shape only with an else arm present,
 // where the kill is real and both implementations agree.
-func TestNoUselessAssignmentConditionalWritesDoNotKill(t *testing.T) {
-	t.Parallel()
+func TestNoUselessAssignmentConditionalWritesDoNotKill(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -415,7 +564,7 @@ func TestNoUselessAssignmentConditionalWritesDoNotKill(t *testing.T) {
 			wantCount:  0,
 		},
 		{
-			// The other half of the same arm: an update's STORE is a candidate, so a trailing
+			// The other half of the same arm: an update's store is a candidate, so a trailing
 			// compound assignment nothing reads is reported. Without this the two cases above would
 			// also pass a rule that had stopped judging updates entirely.
 			name:       "a trailing compound assignment nothing reads is reported",
@@ -423,7 +572,7 @@ func TestNoUselessAssignmentConditionalWritesDoNotKill(t *testing.T) {
 			wantCount:  1,
 		},
 		{
-			// The control: with BOTH arms writing, the initializer really is dead on every path and
+			// The control: with both arms writing, the initializer really is dead on every path and
 			// upstream reports it. Without this case the three above would also pass a rule that had
 			// simply stopped reporting initializers at all.
 			name:       "a write on every arm does kill the initializer",
@@ -433,11 +582,11 @@ func TestNoUselessAssignmentConditionalWritesDoNotKill(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoUselessAssignment, noUselessAssignmentFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoUselessAssignment, noUselessAssignmentFile, testCase.sourceText)
 			if len(result.Diagnostics) != testCase.wantCount {
-				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), testCase.wantCount)
+				test.Fatalf("got %d findings, want %d", len(result.Diagnostics), testCase.wantCount)
 			}
 		})
 	}
@@ -453,8 +602,8 @@ func TestNoUselessAssignmentConditionalWritesDoNotKill(t *testing.T) {
 // the second one is the reason the mutant mattered: an attempted simplification that started the
 // walk one step back instead of copying the blocker set passed the entire imported corpus, passed
 // six of these seven, and reported two false positives on this one.
-func TestNoUselessAssignmentSelfReferentialWritesStayLive(t *testing.T) {
-	t.Parallel()
+func TestNoUselessAssignmentSelfReferentialWritesStayLive(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -522,11 +671,11 @@ func TestNoUselessAssignmentSelfReferentialWritesStayLive(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoUselessAssignment, noUselessAssignmentFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoUselessAssignment, noUselessAssignmentFile, testCase.sourceText)
 			if len(result.Diagnostics) != testCase.wantCount {
-				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), testCase.wantCount)
+				test.Fatalf("got %d findings, want %d", len(result.Diagnostics), testCase.wantCount)
 			}
 		})
 	}
@@ -541,8 +690,8 @@ func TestNoUselessAssignmentSelfReferentialWritesStayLive(t *testing.T) {
 // all, so all 71 clean cases stayed green while the rule produced 223 false positives against the
 // real tree, 50 of them in a single file. The findings count went from 257 to 34 when this was
 // fixed, which is the ratio that makes this the most valuable test in the file.
-func TestNoUselessAssignmentShorthandPropertyIsARead(t *testing.T) {
-	t.Parallel()
+func TestNoUselessAssignmentShorthandPropertyIsARead(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -578,11 +727,11 @@ func TestNoUselessAssignmentShorthandPropertyIsARead(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoUselessAssignment, noUselessAssignmentFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoUselessAssignment, noUselessAssignmentFile, testCase.sourceText)
 			if len(result.Diagnostics) != testCase.wantCount {
-				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), testCase.wantCount)
+				test.Fatalf("got %d findings, want %d", len(result.Diagnostics), testCase.wantCount)
 			}
 		})
 	}
@@ -590,8 +739,8 @@ func TestNoUselessAssignmentShorthandPropertyIsARead(t *testing.T) {
 
 // TestNoUselessAssignmentSwitchFlow pins the control flow shapes a switch produces, which the
 // imported corpus does not cover at all and which the real tree is full of.
-func TestNoUselessAssignmentSwitchFlow(t *testing.T) {
-	t.Parallel()
+func TestNoUselessAssignmentSwitchFlow(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -619,21 +768,21 @@ func TestNoUselessAssignmentSwitchFlow(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoUselessAssignment, noUselessAssignmentFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoUselessAssignment, noUselessAssignmentFile, testCase.sourceText)
 			if len(result.Diagnostics) != testCase.wantCount {
-				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), testCase.wantCount)
+				test.Fatalf("got %d findings, want %d", len(result.Diagnostics), testCase.wantCount)
 			}
 		})
 	}
 }
 
-// TestNoUselessAssignmentLeavesANeverReadBindingToNoUnusedVars pins upstream's `is_used` guard on
+// TestNoUselessAssignmentLeavesANeverReadBindingToNoUnusedVariables pins upstream's `is_used` guard on
 // the shape that slipped past it.
 //
 // ESLint's rule says it "will not report variables that are never read", leaving them to
-// `no-unused-vars`, so a binding nothing reads gets ONE finding there and none here. cohere carried
+// `no-unused-vars`, so a binding nothing reads gets one finding there and none here. cohere carried
 // the same guard and still reported every write to `let provenance: string;` in
 // `modules/finance/FinancePositionCommandLineInterface.ts` (three writes, beside the one
 // `no-unused-vars` finding), because a declarator with no initializer is classified as a read for
@@ -642,8 +791,8 @@ func TestNoUselessAssignmentSwitchFlow(t *testing.T) {
 //
 // Both directions: the uninitialized never-read binding is silent, and the same binding read once
 // after a dead write still reports that write, so the guard cannot be swallowing the rule.
-func TestNoUselessAssignmentLeavesANeverReadBindingToNoUnusedVars(t *testing.T) {
-	t.Parallel()
+func TestNoUselessAssignmentLeavesANeverReadBindingToNoUnusedVariables(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -668,11 +817,11 @@ func TestNoUselessAssignmentLeavesANeverReadBindingToNoUnusedVars(t *testing.T) 
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoUselessAssignment, noUselessAssignmentFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoUselessAssignment, noUselessAssignmentFile, testCase.sourceText)
 			if len(result.Diagnostics) != testCase.wantCount {
-				t.Errorf("got %d findings, want %d", len(result.Diagnostics), testCase.wantCount)
+				test.Errorf("got %d findings, want %d", len(result.Diagnostics), testCase.wantCount)
 			}
 		})
 	}

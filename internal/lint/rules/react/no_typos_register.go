@@ -6,5 +6,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 //
 // No `Decode`, because `meta.schema` is the empty array and the rule takes no options.
 func init() {
-	rule.Register(rule.Registration{Rule: NoTypos})
+	rule.Register(rule.Registration[rule.NoOptions]{Rule: NoTypos})
 }

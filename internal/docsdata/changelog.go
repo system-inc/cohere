@@ -43,7 +43,10 @@ func parseChangelog(changelog []byte) ([]ChangelogEntry, error) {
 		}
 		match := releaseHeading.FindStringSubmatch(line)
 		if match == nil {
-			return nil, fmt.Errorf("docsdata: CHANGELOG.md heading %q is not a release (## <version> (<date>|unreleased))", line)
+			return nil, fmt.Errorf(
+				"docsdata: CHANGELOG.md heading %q is not a release (## <version> (<date>|unreleased))",
+				line,
+			)
 		}
 		flush()
 		entry := ChangelogEntry{Version: match[1], Anchor: headingAnchor(strings.TrimPrefix(line, "## "))}

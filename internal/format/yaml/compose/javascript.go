@@ -17,14 +17,14 @@ import (
 func unitsToString(units []uint16) string {
 	var builder strings.Builder
 	builder.Grow(len(units))
-	for i := 0; i < len(units); i++ {
-		unit := units[i]
+	for index := 0; index < len(units); index++ {
+		unit := units[index]
 		switch {
 		case unit < utf8.RuneSelf:
 			builder.WriteByte(byte(unit))
-		case isHighSurrogate(unit) && i+1 < len(units) && isLowSurrogate(units[i+1]):
-			builder.WriteRune(utf16.DecodeRune(rune(unit), rune(units[i+1])))
-			i++
+		case isHighSurrogate(unit) && index+1 < len(units) && isLowSurrogate(units[index+1]):
+			builder.WriteRune(utf16.DecodeRune(rune(unit), rune(units[index+1])))
+			index++
 		case isHighSurrogate(unit) || isLowSurrogate(unit):
 			builder.WriteByte(0xE0 | byte(unit>>12))
 			builder.WriteByte(0x80 | byte(unit>>6)&0x3F)
@@ -40,20 +40,24 @@ func unitsToString(units []uint16) string {
 // become U+FFFD, as Go's own conversion would make them.
 func stringToUnits(text string) []uint16 {
 	units := make([]uint16, 0, len(text))
-	for i := 0; i < len(text); {
-		if i+2 < len(text) && text[i] == 0xED && text[i+1] >= 0xA0 && text[i+1] <= 0xBF && text[i+2]&0xC0 == 0x80 {
-			units = append(units, 0xD000|uint16(text[i+1]&0x3F)<<6|uint16(text[i+2]&0x3F))
-			i += 3
+	for index := 0; index < len(text); {
+		if index+2 < len(text) &&
+			text[index] == 0xED &&
+			text[index+1] >= 0xA0 &&
+			text[index+1] <= 0xBF &&
+			text[index+2]&0xC0 == 0x80 {
+			units = append(units, 0xD000|uint16(text[index+1]&0x3F)<<6|uint16(text[index+2]&0x3F))
+			index += 3
 			continue
 		}
-		character, size := utf8.DecodeRuneInString(text[i:])
+		character, size := utf8.DecodeRuneInString(text[index:])
 		if character >= 0x10000 {
 			high, low := utf16.EncodeRune(character)
 			units = append(units, uint16(high), uint16(low))
 		} else {
 			units = append(units, uint16(character))
 		}
-		i += size
+		index += size
 	}
 	return units
 }
@@ -76,38 +80,41 @@ func characterAt(text []uint16, index int) int {
 
 // substring is `text.substring(start, end)`: both clamped to [0, length], swapped when start > end.
 func substring(text []uint16, start int, end int) []uint16 {
-	start = clamp(start, 0, len(text))
-	end = clamp(end, 0, len(text))
-	if start > end {
-		start, end = end, start
+	clampedStart := clamp(start, 0, len(text))
+	clampedEnd := clamp(end, 0, len(text))
+	if clampedStart > clampedEnd {
+		clampedStart, clampedEnd = clampedEnd, clampedStart
 	}
-	return text[start:end:end]
+	return text[clampedStart:clampedEnd:clampedEnd]
 }
 
 // substr is `text.substr(start, length)`: a negative start counts from the end, the length is clamped.
 func substr(text []uint16, start int, length int) []uint16 {
+	clampedStart := start
 	if start < 0 {
-		start = max(len(text)+start, 0)
+		clampedStart = max(len(text)+start, 0)
 	}
-	start = min(start, len(text))
-	end := clamp(start+length, start, len(text))
-	return text[start:end:end]
+	clampedStart = min(clampedStart, len(text))
+	end := clamp(clampedStart+length, clampedStart, len(text))
+	return text[clampedStart:end:end]
 }
 
 // slice is `text.slice(start, end)`: negatives count from the end, an end before the start is empty.
 func slice(text []uint16, start int, end int) []uint16 {
+	clampedStart := start
 	if start < 0 {
-		start = max(len(text)+start, 0)
+		clampedStart = max(len(text)+start, 0)
 	}
+	clampedEnd := end
 	if end < 0 {
-		end = max(len(text)+end, 0)
+		clampedEnd = max(len(text)+end, 0)
 	}
-	start = min(start, len(text))
-	end = min(end, len(text))
-	if end < start {
-		return text[start:start:start]
+	clampedStart = min(clampedStart, len(text))
+	clampedEnd = min(clampedEnd, len(text))
+	if clampedEnd < clampedStart {
+		return text[clampedStart:clampedStart:clampedStart]
 	}
-	return text[start:end:end]
+	return text[clampedStart:clampedEnd:clampedEnd]
 }
 
 func clamp(value int, low int, high int) int {
@@ -124,8 +131,8 @@ func includesUnit(text []uint16, character uint16) bool {
 	return false
 }
 
-// equalsASCII is `text === literal` for an ASCII literal.
-func equalsASCII(text []uint16, literal string) bool {
+// equalsAscii is `text === literal` for an ASCII literal.
+func equalsAscii(text []uint16, literal string) bool {
 	if len(text) != len(literal) {
 		return false
 	}
@@ -190,14 +197,14 @@ func trim(text []uint16) []uint16 {
 // lone surrogates as \udxxx, everything else as itself.
 func jsonStringify(units []uint16) string {
 	var builder strings.Builder
-	writeJSONString(&builder, units)
+	writeJsonString(&builder, units)
 	return builder.String()
 }
 
-func writeJSONString(builder *strings.Builder, units []uint16) {
+func writeJsonString(builder *strings.Builder, units []uint16) {
 	builder.WriteByte('"')
-	for i := 0; i < len(units); i++ {
-		unit := units[i]
+	for index := 0; index < len(units); index++ {
+		unit := units[index]
 		switch {
 		case unit == '"':
 			builder.WriteString(`\"`)
@@ -215,9 +222,9 @@ func writeJSONString(builder *strings.Builder, units []uint16) {
 			builder.WriteString(`\t`)
 		case unit < 0x20:
 			fmt.Fprintf(builder, `\u%04x`, unit)
-		case isHighSurrogate(unit) && i+1 < len(units) && isLowSurrogate(units[i+1]):
-			builder.WriteRune(utf16.DecodeRune(rune(unit), rune(units[i+1])))
-			i++
+		case isHighSurrogate(unit) && index+1 < len(units) && isLowSurrogate(units[index+1]):
+			builder.WriteRune(utf16.DecodeRune(rune(unit), rune(units[index+1])))
+			index++
 		case isHighSurrogate(unit) || isLowSurrogate(unit):
 			fmt.Fprintf(builder, `\u%04x`, unit)
 		default:

@@ -8,8 +8,8 @@
 //
 // # How coverage is established, and how it was got wrong first
 //
-// Terminals are counted out of the LOWERED IR rather than grepped out of the source text. The first
-// version of this grepped for "while (" and reported ZERO across 1,272 files, which is not credible
+// Terminals are counted out of the lowered IR rather than grepped out of the source text. The first
+// version of this grepped for "while (" and reported zero across 1,272 files, which is not credible
 // and was not true: this codebase writes "while(", with no space. That is the same wrong-by-a-
 // pattern answer lower_corpus_test.go documents finding for "switch", arrived at independently a
 // second time. A terminal count cannot make that mistake, because it is reading what was built.
@@ -29,13 +29,13 @@ import (
 )
 
 // Run SSA over a real tree with a real checker and cohere every function.
-func TestSSAOverRealCodebase(t *testing.T) {
-	t.Parallel()
+func TestSsaOverRealCodebase(test *testing.T) {
+	test.Parallel()
 
-	root := corpusRoot(t)
+	root := corpusRoot(test)
 	var files []string
-	filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-		if err != nil || info.IsDir() {
+	walkError := filepath.Walk(root, func(path string, info os.FileInfo, pathError error) error {
+		if pathError != nil || info.IsDir() {
 			return nil
 		}
 		if strings.HasSuffix(path, ".ts") || strings.HasSuffix(path, ".tsx") {
@@ -43,6 +43,9 @@ func TestSSAOverRealCodebase(t *testing.T) {
 		}
 		return nil
 	})
+	if walkError != nil {
+		test.Fatalf("walking the corpus: %v", walkError)
+	}
 	sort.Strings(files)
 	limit := 400
 	if len(files) > limit {
@@ -54,39 +57,39 @@ func TestSSAOverRealCodebase(t *testing.T) {
 	terminals := map[string]int{}
 
 	for _, path := range files {
-		contents, err := os.ReadFile(path)
-		if err != nil {
+		contents, readError := os.ReadFile(path)
+		if readError != nil {
 			continue
 		}
-		probe := rule.Rule{
+		probe := rule.Rule[rule.NoOptions]{
 			Name:             "ssa-corpus-harness",
 			NeedsTypeChecker: true,
-			Run: func(ctx rule.Context, options any) rule.Listeners {
+			Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 				return rule.Listeners{
 					ast.KindSourceFile: func(node *ast.Node) {
-						forEachFunctionLike(node, func(fnNode *ast.Node) {
-							fn := Lower(fnNode, ctx.TypeChecker)
-							if fn == nil {
+						forEachFunctionLike(node, func(functionNode *ast.Node) {
+							function := Lower(functionNode, ruleContext.TypeChecker)
+							if function == nil {
 								return
 							}
-							Construct(fn)
+							Construct(function)
 							var each func(*Function)
-							each = func(f *Function) {
+							each = func(lowered *Function) {
 								totalFns++
-								st := CollectSSAStats(f)
+								st := CollectSsaStats(lowered)
 								totalPhis += st.Phis
 								totalNamed += st.NamedValues
 								totalUses += st.Uses
 								if st.Phis > 0 {
 									withPhis++
 								}
-								for _, v := range VerifySSA(f) {
+								for _, violation := range VerifySsa(lowered) {
 									violations++
 									if violations <= 8 {
-										t.Errorf("%s: %s", filepath.Base(path), v.Detail)
+										test.Errorf("%s: %s", filepath.Base(path), violation.Detail)
 									}
-									switch v.Kind {
-									case static_single_assignment.SSAViolationMultipleDefinitions:
+									switch violation.Kind {
+									case static_single_assignment.StaticSingleAssignmentViolationMultipleDefinitions:
 										kinds["multiple-definitions"]++
 									default:
 										kinds["use-not-dominated"]++
@@ -95,8 +98,8 @@ func TestSSAOverRealCodebase(t *testing.T) {
 								// Coverage measured from the IR, not from grepping source text.
 								// A text grep for "while (" reports zero on this corpus because it
 								// is written "while(", which is the same wrong-by-a-pattern answer
-								// the HIR corpus test documents. Terminals cannot lie about this.
-								for _, blk := range f.Blocks {
+								// the `HIR` corpus test documents. Terminals cannot lie about this.
+								for _, blk := range lowered.Blocks {
 									switch blk.Terminal.(type) {
 									case *While:
 										terminals["While"]++
@@ -124,28 +127,28 @@ func TestSSAOverRealCodebase(t *testing.T) {
 										terminals["Label"]++
 									}
 								}
-								for _, n := range f.Functions {
-									each(n)
+								for _, nested := range lowered.Functions {
+									each(nested)
 								}
 							}
-							each(fn)
+							each(function)
 						})
 					},
 				}
 			},
 		}
-		rule_testing.RunTyped(t, probe, filepath.Base(path), string(contents))
+		rule_testing.RunTyped(test, probe, filepath.Base(path), string(contents))
 	}
 
-	t.Logf("files=%d functions=%d", len(files), totalFns)
-	t.Logf("phis=%d functionsWithPhis=%d namedValues=%d uses=%d", totalPhis, withPhis, totalNamed, totalUses)
-	t.Logf("violations=%d %v", violations, kinds)
+	test.Logf("files=%d functions=%d", len(files), totalFns)
+	test.Logf("phis=%d functionsWithPhis=%d namedValues=%d uses=%d", totalPhis, withPhis, totalNamed, totalUses)
+	test.Logf("violations=%d %v", violations, kinds)
 	keys := make([]string, 0, len(terminals))
-	for k := range terminals {
-		keys = append(keys, k)
+	for key := range terminals {
+		keys = append(keys, key)
 	}
 	sort.Strings(keys)
-	for _, k := range keys {
-		t.Logf("  terminal %-8s %d", k, terminals[k])
+	for _, key := range keys {
+		test.Logf("  terminal %-8s %d", key, terminals[key])
 	}
 }

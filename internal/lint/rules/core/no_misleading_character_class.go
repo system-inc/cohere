@@ -162,7 +162,7 @@ var messageMisleadingZeroWidthJoiner = rule.Message{
 //
 // An astral character split into its halves takes the spelling of the whole: `\u{1F44D}` in a
 // string is two escaped halves, and `\👍` is two plain ones.
-var NoMisleadingCharacterClass = rule.Rule{
+var NoMisleadingCharacterClass = rule.Rule[NoMisleadingCharacterClassOptions]{
 	Name: "no-misleading-character-class",
 
 	// The tracker tells the global RegExp from a local one by where its symbol is declared, and a
@@ -170,8 +170,8 @@ var NoMisleadingCharacterClass = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		settings, _ := rule.OptionsAs[NoMisleadingCharacterClassOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[NoMisleadingCharacterClassOptions]) rule.Listeners {
+		settings, _ := options.Read()
 		allowEscape := settings.AllowEscape
 		// The regex literals a RegExp call took with flags, so already checked under the call's.
 		// Filled from the file node, which the walk enters before any literal.
@@ -181,12 +181,12 @@ var NoMisleadingCharacterClass = rule.Rule{
 				checkedByACall = map[*ast.Node]bool{}
 				// Every trace starts at a reference to RegExp, so a file that never spells it has
 				// nothing to follow, and the tracker's index is never built.
-				if ctx.TypeChecker == nil || !strings.Contains(ctx.SourceFile.Text(), "RegExp") {
+				if ruleContext.TypeChecker == nil || !strings.Contains(ruleContext.SourceFile.Text(), "RegExp") {
 					return
 				}
-				tracker := reference.NewTracker(ctx.SourceFile, ctx.TypeChecker, nil)
+				tracker := reference.NewTracker(ruleContext.SourceFile, ruleContext.TypeChecker, nil)
 				for _, tracked := range tracker.GlobalReferences(regExpCallTraceMap) {
-					checkRegExpConstructorCall(ctx, tracked.Node, checkedByACall, allowEscape)
+					checkRegExpConstructorCall(ruleContext, tracked.Node, checkedByACall, allowEscape)
 				}
 			},
 			ast.KindRegularExpressionLiteral: func(node *ast.Node) {
@@ -199,7 +199,7 @@ var NoMisleadingCharacterClass = rule.Rule{
 					return
 				}
 				literalStart := node.End() - len(text)
-				checkRegexPattern(ctx, pattern, literalStart+1, flags, patternSource(pattern, allowEscape),
+				checkRegexPattern(ruleContext, pattern, literalStart+1, flags, patternSource(pattern, allowEscape),
 					func() []rule.Suggestion {
 						return unicodeFlagSuggestionForLiteral(node, text, flags)
 					})
@@ -231,8 +231,10 @@ func patternSource(pattern string, allowEscape bool) memberSource {
 }
 
 // checkRegExpConstructorCall checks a call or construction of RegExp, as ESLint's tracker loop does.
+//
+// Mutates: checkedByACall a literal this call checks is marked, so the literal listener steps aside for it
 func checkRegExpConstructorCall(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	call *ast.Node,
 	checkedByACall map[*ast.Node]bool,
 	allowEscape bool,
@@ -246,7 +248,7 @@ func checkRegExpConstructorCall(
 	flags := ""
 	flagsKnown := true
 	if hasFlags {
-		flags, flagsKnown = reference.ConstantStringIn(ctx, arguments[1])
+		flags, flagsKnown = reference.ConstantStringIn(ruleContext, arguments[1])
 	}
 
 	// A regex literal handed over with flags is checked under them, and the literal listener steps
@@ -265,21 +267,21 @@ func checkRegExpConstructorCall(
 		if pattern == "" {
 			return
 		}
-		checkRegexPattern(ctx, pattern, patternNode.End()-len(text)+1, flags,
+		checkRegexPattern(ruleContext, pattern, patternNode.End()-len(text)+1, flags,
 			patternSource(pattern, allowEscape), nil)
 		return
 	}
 
-	if !flagsKnown || reference.IsConstantRegExpIn(ctx, patternNode) {
+	if !flagsKnown || reference.IsConstantRegExpIn(ruleContext, patternNode) {
 		return
 	}
-	pattern, isConstant := reference.ConstantStringIn(ctx, patternNode)
+	pattern, isConstant := reference.ConstantStringIn(ruleContext, patternNode)
 	if !isConstant {
 		return
 	}
 	switch patternNode.Kind {
 	case ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral:
-		checkRegexPatternInStringLiteral(ctx, pattern, patternNode, flags, allowEscape)
+		checkRegexPatternInStringLiteral(ruleContext, pattern, patternNode, flags, allowEscape)
 	default:
 		reported := map[string]bool{}
 		checkRegexPatternWithReporter(pattern, flags, nil, func(finding pendingMisleadingFinding) {
@@ -287,7 +289,7 @@ func checkRegExpConstructorCall(
 				return
 			}
 			reported[finding.message.Id] = true
-			ctx.ReportNode(patternNode, finding.message)
+			ruleContext.ReportNode(patternNode, finding.message)
 		})
 	}
 }
@@ -310,14 +312,14 @@ func checkRegExpConstructorCall(
 // produced it. When the two are the same length the mapping is the identity and is skipped, which is
 // the common case.
 func checkRegexPatternInStringLiteral(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	pattern string,
 	node *ast.Node,
 	flags string,
 	allowEscape bool,
 ) {
-	textRange := rule.TokenRange(ctx.SourceFile, node)
-	raw := ctx.SourceFile.Text()[textRange.Pos():textRange.End()]
+	textRange := rule.TokenRange(ruleContext.SourceFile, node)
+	raw := ruleContext.SourceFile.Text()[textRange.Pos():textRange.End()]
 	// The raw text carries its quotes or backticks; the cooked value does not.
 	if len(raw) < 2 {
 		return
@@ -334,7 +336,7 @@ func checkRegexPatternInStringLiteral(
 	// Every string escape is wider than what it produces, so a raw text as long as the cooked one
 	// holds no escape and is the cooked text, which is why its members' source is the pattern itself.
 	if len(rawBody) == len(pattern) {
-		checkRegexPattern(ctx, pattern, bodyStart, flags, patternSource(pattern, allowEscape), nil)
+		checkRegexPattern(ruleContext, pattern, bodyStart, flags, patternSource(pattern, allowEscape), nil)
 		return
 	}
 
@@ -360,39 +362,21 @@ func checkRegexPatternInStringLiteral(
 			return rawBody[offsets[start]:offsets[end]]
 		}
 	}
-	checkRegexPatternMapped(ctx, pattern, bodyStart, flags, offsets, source)
+	checkRegexPatternMapped(ruleContext, pattern, bodyStart, flags, offsets, source)
 }
 
 // checkRegexPatternMapped is checkRegexPattern for a pattern whose offsets need translating back
 // into the raw source before anything is reported.
 func checkRegexPatternMapped(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	pattern string,
 	bodyStart int,
 	flagsText string,
 	offsets []int,
 	source memberSource,
 ) {
-	collector := &mappedFindingCollector{ctx: ctx, bodyStart: bodyStart, offsets: offsets}
+	collector := &mappedFindingCollector{ruleContext: ruleContext, bodyStart: bodyStart, offsets: offsets}
 	checkRegexPatternWithReporter(pattern, flagsText, source, collector.report)
-}
-
-// mappedFindingCollector reports a finding at the raw offsets its cooked span maps to.
-type mappedFindingCollector struct {
-	ctx       rule.Context
-	bodyStart int
-	offsets   []int
-}
-
-func (collector *mappedFindingCollector) report(finding pendingMisleadingFinding) {
-	if finding.start >= len(collector.offsets) || finding.end >= len(collector.offsets) {
-		return
-	}
-	collector.ctx.ReportRange(
-		core.NewTextRange(
-			collector.bodyStart+collector.offsets[finding.start],
-			collector.bodyStart+collector.offsets[finding.end]),
-		finding.message)
 }
 
 // checkRegexPattern reports every misleading sequence in every character class of a pattern.
@@ -401,7 +385,7 @@ func (collector *mappedFindingCollector) report(finding pendingMisleadingFinding
 // repair is known, and it is a function rather than a value so a literal's rewrite is not computed
 // for the patterns that never report.
 func checkRegexPattern(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	pattern string,
 	patternStart int,
 	flagsText string,
@@ -411,10 +395,10 @@ func checkRegexPattern(
 	checkRegexPatternWithReporter(pattern, flagsText, source, func(finding pendingMisleadingFinding) {
 		textRange := core.NewTextRange(patternStart+finding.start, patternStart+finding.end)
 		if finding.suggest && suggestions != nil {
-			ctx.ReportRangeWithSuggestions(textRange, finding.message, suggestions()...)
+			ruleContext.ReportRangeWithSuggestions(textRange, finding.message, suggestions()...)
 			return
 		}
-		ctx.ReportRange(textRange, finding.message)
+		ruleContext.ReportRange(textRange, finding.message)
 	})
 }
 
@@ -448,7 +432,7 @@ func checkRegexPatternWithReporter(
 	// flag entirely, and rejects `/[👍-￿]/` which upstream reports on. Trading two false
 	// positives for four false negatives is not a trade, so the one construct that matters is
 	// tested directly.
-	if flags.UV() && patternHasLoneQuantifierBrace(pattern, flags) {
+	if flags.UnicodeMode() && patternHasLoneQuantifierBrace(pattern, flags) {
 		return
 	}
 
@@ -549,7 +533,7 @@ func characterSequences(
 		// starts and the low half is the whole character. So a pair of halves points at the whole
 		// character, and a join ending at a high half, as in `👨‍👩` read without the flag, stops
 		// where 👩 starts, which is where ESLint's span stops too.
-		if !flags.UV() && value > 0xFFFF && !isCodePointEscape {
+		if !flags.UnicodeMode() && value > 0xFFFF && !isCodePointEscape {
 			high := 0xD800 + ((value - 0x10000) >> 10)
 			low := 0xDC00 + ((value - 0x10000) & 0x3FF)
 			current = append(current,
@@ -573,7 +557,7 @@ func characterSequences(
 			minimumEnd, maximumStart := rangeEndpointBounds(pattern, element, flags)
 			appendCharacter(element.Value, element.Start, minimumEnd, element.IsUBrace)
 			flush()
-			appendCharacter(element.Max, maximumStart, element.End, element.MaxIsUBrace)
+			appendCharacter(element.Maximum, maximumStart, element.End, element.MaxIsUBrace)
 		default:
 			appendCharacter(element.Value, element.Start, element.End, element.IsUBrace)
 		}
@@ -600,7 +584,7 @@ func rangeEndpointBounds(
 	switch {
 	case pattern[start] != '\\':
 		_, width = utf8.DecodeRuneInString(pattern[start:])
-	case flags.UV() && element.Value > 0xFFFF && start+2 < len(pattern) && pattern[start+1] == 'u' &&
+	case flags.UnicodeMode() && element.Value > 0xFFFF && start+2 < len(pattern) && pattern[start+1] == 'u' &&
 		pattern[start+2] != '{':
 		// `👍` under a unicode flag is two escapes the parser folded into one member.
 		width = 12
@@ -631,6 +615,9 @@ func isAcceptableEscape(source string, value uint32) bool {
 	}
 	return true
 }
+
+// zeroWidthJoiner is U+200D, the code point that splices emoji into one glyph.
+const zeroWidthJoiner = 0x200D
 
 // misleadingSequenceFindings runs every detector over one run of adjacent characters.
 //
@@ -765,6 +752,13 @@ func unicodeFlagSuggestionForLiteral(node *ast.Node, text string, flags string) 
 	}}
 }
 
+// unicodeFlagSafeEscapes are the escape characters whose meaning the `u` flag leaves alone.
+//
+// Everything here is either a syntax character that must be escaped in both modes, a named escape,
+// or a class shorthand. An identity escape of anything else is legal without the flag and rejected
+// with it, which is the case this list exists to exclude.
+const unicodeFlagSafeEscapes = `^$\.*+?()[]{}|/dDsSwWbBnrtvf0123456789xuck<>=!:,-`
+
 // patternMeaningChangesUnderUnicodeFlag reports whether adding `u` could change how a pattern parses.
 //
 // Three constructs are legal without the flag and are errors or mean something else with it: an
@@ -860,16 +854,6 @@ func quantifierBraceEnds(pattern string, index int) bool {
 	}
 	return scan < len(pattern) && pattern[scan] == '}'
 }
-
-// unicodeFlagSafeEscapes are the escape characters whose meaning the `u` flag leaves alone.
-//
-// Everything here is either a syntax character that must be escaped in both modes, a named escape,
-// or a class shorthand. An identity escape of anything else is legal without the flag and rejected
-// with it, which is the case this list exists to exclude.
-const unicodeFlagSafeEscapes = `^$\.*+?()[]{}|/dDsSwWbBnrtvf0123456789xuck<>=!:,-`
-
-// zeroWidthJoiner is U+200D, the code point that splices emoji into one glyph.
-const zeroWidthJoiner = 0x200D
 
 // isRegionalIndicatorSymbol reports whether a code point is one of the 26 letters that pair into a
 // flag. Each stands for one Latin letter, and two of them make an ISO 3166 country code.

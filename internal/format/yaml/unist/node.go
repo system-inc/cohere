@@ -89,51 +89,59 @@ func (node *Node) child(index int) *Node {
 
 // Field is upstream's node[name] for the keys the YAML printer's visitor keys name, the shortcuts its
 // preprocess defines included (print-preprocess.js), and "comments" for the print core.
-func (node *Node) Field(name string) any {
+func (node *Node) Field(name string) printing.Value[*Node] {
 	switch name {
 	case "children":
-		return node.Children
+		return printing.ListValue(node.Children)
 	case "head":
 		if node.NodeType == "document" {
-			return node.child(0)
+			return printing.NodeValue(node.child(0))
 		}
 	case "body":
 		if node.NodeType == "document" {
-			return node.child(1)
+			return printing.NodeValue(node.child(1))
 		}
 	case "key":
 		if node.NodeType == "mappingItem" || node.NodeType == "flowMappingItem" {
-			return node.child(0)
+			return printing.NodeValue(node.child(0))
 		}
 	case "value":
 		if node.NodeType == "mappingItem" || node.NodeType == "flowMappingItem" {
-			return node.child(1)
+			return printing.NodeValue(node.child(1))
 		}
 	case "content":
 		switch node.NodeType {
 		case "documentBody", "sequenceItem", "flowSequenceItem", "mappingKey", "mappingValue":
-			return node.child(0)
+			return printing.NodeValue(node.child(0))
 		}
 	case "tag":
-		return node.Tag
+		return printing.NodeValue(node.Tag)
 	case "anchor":
-		return node.Anchor
+		return printing.NodeValue(node.Anchor)
 	case "middleComments":
-		return node.MiddleComments
+		return printing.ListValue(node.MiddleComments)
 	case "leadingComments":
-		return node.LeadingComments
+		return printing.ListValue(node.LeadingComments)
 	case "trailingComment":
-		return node.TrailingComment
+		return printing.NodeValue(node.TrailingComment)
 	case "endComments":
-		return node.EndComments
+		return printing.ListValue(node.EndComments)
 	case "indicatorComment":
-		return node.IndicatorComment
+		return printing.NodeValue(node.IndicatorComment)
 	case "comments":
-		return node.comments.Comments
+		return printing.ListValue(node.comments.Comments)
 	}
-	return nil
+	return printing.Value[*Node]{}
 }
 
 // CommentData is the print core's comment bookkeeping. The YAML printer prints comments itself, so it
 // stays empty.
 func (node *Node) CommentData() *printing.CommentFields[*Node] { return &node.comments }
+
+// withContent is `...content`.
+func (node *Node) withContent(content content) *Node {
+	node.Anchor = content.anchor
+	node.Tag = content.tag
+	node.MiddleComments = content.middleComments
+	return node
+}

@@ -28,17 +28,17 @@ import (
 // The ordinary finding is `functionTypeOverCallableType`. But an interface whose signature mentions
 // `this` cannot be rewritten as a function type without changing what `this` means, so the rule
 // swaps in `unexpectedThisOnFunctionOnlyInterface`, points at the `this` rather than the member,
-// and offers no repair. Upstream reports only the FIRST `this` when there are several, deliberately,
+// and offers no repair. Upstream reports only the first `this` when there are several, deliberately,
 // so the reader gets one message instead of a pile.
 //
-// A `this` inside a NESTED type literal does not count, because that code is already invalid
+// A `this` inside a nested type literal does not count, because that code is already invalid
 // TypeScript and upstream declines to claim the `this` refers to the interface when the compiler
 // says it refers to nothing.
 //
 // # Three shape differences from the tree upstream walks, all measured
 //
 // `export interface Foo` is an ExportNamedDeclaration wrapping an interface upstream, and here it is
-// an interface CARRYING a modifier. Same for `export default`. Upstream's fixable test reads
+// an interface carrying a modifier. Same for `export default`. Upstream's fixable test reads
 // `node.parent.type === ExportDefaultDeclaration` and its comment relocation reads
 // `node.parent.type === ExportNamedDeclaration`; both are modifier tests here, and a port copying
 // the parent test would never fire either branch.
@@ -57,22 +57,22 @@ import (
 // The rewrite turns `(args): Return` into `(args) => Return`, wraps the result in parentheses when
 // the surrounding type is a union, intersection, or array, and for an interface rebuilds the whole
 // declaration as a type alias carrying the original type parameters. Comments attached to the
-// member move with it, and for an exported interface they move ABOVE the export rather than
+// member move with it, and for an exported interface they move above the export rather than
 // between `export` and `type`, which is the only place they are still legal.
 //
 // Upstream declines to fix `export default interface`, because the replacement would have to become
 // `export default type`, which is not a thing. That decline is reproduced.
 //
 // One further decline is this port's own, and it is stated rather than silent. A member separated by
-// a COMMA rather than a semicolon is legal, and upstream's fixer only strips a semicolon, so
+// a comma rather than a semicolon is legal, and upstream's fixer only strips a semicolon, so
 // `type Foo = { (): string, };` is rewritten to `type Foo = () => string,;`. Measured on the
 // installed 8.67.0 build and then handed to the TypeScript parser, which rejects it with
 // "';' expected". The finding is reproduced and the repair is withheld, because a fix is applied
 // unattended and this one turns working code into a syntax error.
-var PreferFunctionType = rule.Rule{
+var PreferFunctionType = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/prefer-function-type",
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindInterfaceDeclaration: func(node *ast.Node) {
 				declaration := node.AsInterfaceDeclaration()
@@ -82,7 +82,7 @@ var PreferFunctionType = rule.Rule{
 				if interfaceHasOneSupertype(declaration) {
 					return
 				}
-				checkPreferFunctionTypeMember(ctx, declaration.Members.Nodes[0], node,
+				checkPreferFunctionTypeMember(ruleContext, declaration.Members.Nodes[0], node,
 					collectInterfaceThisTypes(declaration.Members.Nodes[0]))
 			},
 			ast.KindTypeLiteral: func(node *ast.Node) {
@@ -92,14 +92,14 @@ var PreferFunctionType = rule.Rule{
 				}
 				// A type literal never reports the `this` message: upstream's tracking array is
 				// populated only while inside an interface, and it passes null here.
-				checkPreferFunctionTypeMember(ctx, literal.Members.Nodes[0], node, nil)
+				checkPreferFunctionTypeMember(ruleContext, literal.Members.Nodes[0], node, nil)
 			},
 		}
 	},
 }
 
 // interfaceHasOneSupertype is upstream's `hasOneSupertype`, whose name says the opposite of what it
-// answers: it returns true when the interface has a supertype that DISQUALIFIES it, so the caller
+// answers: it returns true when the interface has a supertype that disqualifies it, so the caller
 // declines. Reproduced under upstream's name so the two read the same.
 //
 // No supertypes means the interface is a candidate. More than one means it is not. Exactly one is a
@@ -170,7 +170,7 @@ func collectInterfaceThisTypes(member *ast.Node) []*ast.Node {
 
 // checkPreferFunctionTypeMember is upstream's `checkMember`, the single body both anchors share.
 func checkPreferFunctionTypeMember(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	member *ast.Node,
 	node *ast.Node,
 	thisTypes []*ast.Node,
@@ -188,7 +188,7 @@ func checkPreferFunctionTypeMember(
 	if isInterface && len(thisTypes) > 0 {
 		// Pointing at the whole member here would make the message confusing, and reporting every
 		// `this` would make it repetitive. Upstream picks the first and says why at the line.
-		ctx.ReportNode(thisTypes[0], rule.Message{
+		ruleContext.ReportNode(thisTypes[0], rule.Message{
 			Id: "unexpectedThisOnFunctionOnlyInterface",
 			Description: "`this` refers to the function type '" +
 				node.AsInterfaceDeclaration().Name().Text() +
@@ -208,12 +208,12 @@ func checkPreferFunctionTypeMember(
 			" only has a call signature, you should use a function type instead.",
 	}
 
-	fix, hasFix := preferFunctionTypeFix(ctx, member, node, returnType, isInterface)
+	fix, hasFix := preferFunctionTypeFix(ruleContext, member, node, returnType, isInterface)
 	if !hasFix {
-		ctx.ReportNode(member, message)
+		ruleContext.ReportNode(member, message)
 		return
 	}
-	ctx.ReportNodeWithFixes(member, message, fix)
+	ruleContext.ReportNodeWithFixes(member, message, fix)
 }
 
 // preferFunctionTypeReturnType answers the member's annotated return type, or nil when the member is
@@ -233,7 +233,7 @@ func preferFunctionTypeReturnType(member *ast.Node) *ast.Node {
 // The second return is false for `export default interface`, which upstream declines because the
 // only replacement would be `export default type`, and that is not valid TypeScript.
 func preferFunctionTypeFix(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	member *ast.Node,
 	node *ast.Node,
 	returnType *ast.Node,
@@ -243,17 +243,17 @@ func preferFunctionTypeFix(
 		return rule.Fix{}, false
 	}
 
-	source := ctx.SourceFile.Text()
+	source := ruleContext.SourceFile.Text()
 
 	// The member's own text, without the leading trivia. Upstream slices from `member.range[0]`,
 	// which is the token start; our `Pos()` would include the comment above it and the newline,
 	// and the comment is handled separately below.
-	memberRange := rule.TokenRange(ctx.SourceFile, member)
+	memberRange := rule.TokenRange(ruleContext.SourceFile, member)
 	memberText := source[memberRange.Pos():memberRange.End()]
 
 	// The colon that opens the return annotation becomes the arrow. Offsets are relative to the
 	// member's own start, as upstream's are.
-	colonOffset := rule.TokenRange(ctx.SourceFile, returnType).Pos() - memberRange.Pos() - 1
+	colonOffset := rule.TokenRange(ruleContext.SourceFile, returnType).Pos() - memberRange.Pos() - 1
 	for colonOffset > 0 && colonOffset < len(memberText) && memberText[colonOffset] != ':' {
 		// Upstream computes this as `returnType.range[0] - start - 1` and relies on the colon
 		// sitting exactly one character before the type. That holds when the annotation is written
@@ -294,7 +294,7 @@ func preferFunctionTypeFix(
 		suggestion = "(" + suggestion + ")"
 	}
 
-	memberComments := preferFunctionTypeCommentsFor(ctx, member, node)
+	memberComments := preferFunctionTypeCommentsFor(ruleContext, member, node)
 
 	if isInterface {
 		declaration := node.AsInterfaceDeclaration()
@@ -302,11 +302,11 @@ func preferFunctionTypeFix(
 		if declaration.TypeParameters != nil {
 			// The type parameters have to survive, so the alias is rebuilt from the source text
 			// spanning the name through the closing angle bracket rather than from the name alone.
-			nameStart := rule.TokenRange(ctx.SourceFile, name).Pos()
+			nameStart := rule.TokenRange(ruleContext.SourceFile, name).Pos()
 			// TypeParameters.End() is the last parameter's end, and the closing angle bracket is the
 			// next token after it, past any trivia and a trailing comma. Upstream's
 			// `node.typeParameters.range[1]` is past the bracket, because estree models the parameter
-			// LIST as a node with its own delimiters. Taking the bracket as one byte past End() held
+			// list as a node with its own delimiters. Taking the bracket as one byte past End() held
 			// for `interface Foo<T>` and broke on a list written one parameter per line, as Prettier
 			// writes a long one: `TFlags extends Flags = DefaultFlags,\n>` cut the alias at the comma
 			// and the fix did not parse (TS1139, trpc's mutationOptions.ts, #kq9vtva).
@@ -327,13 +327,13 @@ func preferFunctionTypeFix(
 	// The node being replaced is the whole declaration for an interface, and the literal for a type
 	// literal.
 	//
-	// Upstream replaces `node.range`, which for an exported interface EXCLUDES the `export` because
+	// Upstream replaces `node.range`, which for an exported interface excludes the `export` because
 	// estree puts the interface inside an ExportNamedDeclaration. Here the modifier is part of the
 	// interface, so its own token range already starts at `export` and covers exactly what upstream
 	// covers plus the keyword upstream leaves in place. The first version of this rule added a
 	// modifier adjustment on top of that and deleted the `export` from two of upstream's own
 	// outputs; the range needs no adjustment at all.
-	nodeRange := rule.TokenRange(ctx.SourceFile, node)
+	nodeRange := rule.TokenRange(ruleContext.SourceFile, node)
 
 	if isInterface && isExportedInterface(node) {
 		// A comment cannot sit between `export` and `type`, so it has to go above the whole
@@ -341,7 +341,7 @@ func preferFunctionTypeFix(
 		// declaration, because in estree the `export` is that parent and the node being replaced
 		// starts at `interface`.
 		//
-		// Here the `export` is a modifier ON the interface, so the node's own range already covers
+		// Here the `export` is a modifier on the interface, so the node's own range already covers
 		// it and there is no separate parent to insert before. One edit replacing the whole thing
 		// with the comment, the keyword, and the alias produces the identical text. The route
 		// differs because the trees differ; the output is upstream's, byte for byte, and the
@@ -356,7 +356,7 @@ func preferFunctionTypeFix(
 		// line when it was on its own line and inline when it was inline.
 		// The same helper the comments shelf uses to fill Comment.StartLine, so the two line
 		// numbers are computed the same way and are comparable.
-		memberLine, _ := scanner.GetECMALineAndByteOffsetOfPosition(ctx.SourceFile, memberRange.Pos())
+		memberLine, _ := scanner.GetECMALineAndByteOffsetOfPosition(ruleContext.SourceFile, memberRange.Pos())
 		for _, comment := range memberComments {
 			separator := "\n"
 			if comment.StartLine == memberLine {
@@ -375,18 +375,18 @@ func preferFunctionTypeFix(
 // comment lying inside the declaration's braces but outside the member's own text, which is the same
 // set for a one-member body and is expressible without a token-level comment index.
 func preferFunctionTypeCommentsFor(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	member *ast.Node,
 	node *ast.Node,
 ) []comments.Comment {
-	memberRange := rule.TokenRange(ctx.SourceFile, member)
+	memberRange := rule.TokenRange(ruleContext.SourceFile, member)
 	// The declaration's own token range, not its Pos: `Pos()` reaches back over leading trivia, so
-	// a comment written ABOVE the interface falls inside it. That is not a comment on the member and
+	// a comment written above the interface falls inside it. That is not a comment on the member and
 	// upstream does not move it; collecting it duplicated a file-leading comment in one of
 	// upstream's own outputs.
-	nodeRange := rule.TokenRange(ctx.SourceFile, node)
+	nodeRange := rule.TokenRange(ruleContext.SourceFile, node)
 	within := []comments.Comment{}
-	for _, comment := range comments.ForFile(ctx) {
+	for _, comment := range comments.ForFile(ruleContext) {
 		if comment.Range.Pos() < nodeRange.Pos() || comment.Range.End() > nodeRange.End() {
 			continue
 		}
@@ -431,7 +431,7 @@ func preferFunctionTypeHasModifier(node *ast.Node, kind ast.Kind) bool {
 
 // isExportedInterface answers whether the declaration carries an `export` modifier.
 //
-// Upstream asks whether the PARENT is an ExportNamedDeclaration. Here `export` is a modifier on the
+// Upstream asks whether the parent is an ExportNamedDeclaration. Here `export` is a modifier on the
 // interface itself, so the same question is a modifier test. A port copying the parent test would
 // never fire this branch and would leave a comment sitting between `export` and `type`, which does
 // not parse.

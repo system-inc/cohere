@@ -878,8 +878,9 @@ The API, so you do not have to guess. The package is
 in `rule_testing.go`; every `RunTyped*` variant lives in `program.go` beside the
 program cache.
 
-The rule struct is `rule.Rule{Name, Run, NeedsTypeChecker, ReadsProgram,
-ResolvesReactValueTypes}`. A porter once wrote a `Messages:` field from the shape of
+The rule struct is `rule.Rule[Options]{Name, Run, NeedsTypeChecker, ReadsProgram,
+ResolvesReactValueTypes}`, where `Options` is the struct the rule's options decode into,
+or `rule.NoOptions` for a rule that takes none. A porter once wrote a `Messages:` field from the shape of
 other linters; it does not exist. Messages are `rule.Message{Id, Description}` values
 passed at the report site.
 
@@ -887,15 +888,18 @@ passed at the report site.
 `RequiresOptions`, because `Rule` is what a rule author writes and a decoder is the
 config layer's business:
 
-    rule.Register(rule.Registration{
+    rule.Register(rule.Registration[EqeqeqOptions]{
         Rule:   Eqeqeq,
         Decode: rule.DecodeOptionsInto[EqeqeqOptions](),
     })
 
 If your rule takes no options, omit `Decode` entirely — that is the common case.
 
-`Run` is `func(ctx rule.Context, options any) rule.Listeners`. **Every rule takes the
-options parameter, including one with no option surface.**
+`Run` is `func(ctx rule.Context, options rule.Given[Options]) rule.Listeners`, and
+`options.Read()` returns the decoded options and whether the config gave any. **Every
+rule takes the options parameter, including one with no option surface.** The
+registration names the same `Options`, so a decoder returning another type does not
+compile.
 
 **There is no `rule.OnExit` and the walk is pre-order.** Two porters reached for one
 and neither found it. If your rule has to gather before it can judge, do both inside a
@@ -1391,7 +1395,7 @@ config layer and the rule, and a fixture never crosses that boundary: it hands t
 decoder a literal it wrote itself, so the decoder is exercised on the shape the fixture
 author already believed in.
 
-The measured instance was one line. `internal/lint/configuration/configuration.go` parsed a
+The measured instance was one line. `internal/lint/configuration/load.go` parsed a
 rule setting as `["severity", <options>]` and kept exactly one element, `tuple[1]`, while
 ESLint's `context.options` is **every** element after the severity. Every rule whose upstream
 option surface has more than one element was configured differently from upstream, and each
@@ -1803,11 +1807,14 @@ flat and does not scale with what the rule does with the checker.
     import "github.com/system-inc/cohere/internal/lint/rule"
 
     func init() {
-        rule.Register(rule.Registration{Rule: Eqeqeq})
+        rule.Register(rule.Registration[EqeqeqOptions]{
+            Rule:   Eqeqeq,
+            Decode: rule.DecodeOptionsInto[EqeqeqOptions](),
+        })
     }
 
-    // with options:
-    //   rule.Register(rule.Registration{Rule: Eqeqeq, Decode: rule.DecodeOptionsInto[EqeqeqOptions]()})
+    // a rule with no options, a rule.Rule[rule.NoOptions]:
+    //   rule.Register(rule.Registration[rule.NoOptions]{Rule: NoDebugger})
 
 `rule.Register` appends into a map keyed by name and is callable from any file's
 `init`, so a package may hold as many of these as it has rules. This is what makes a
@@ -2516,7 +2523,7 @@ built by hand — and `TestNoRegisteredRuleCrashesOnAbsentOptionalNodes` does ex
 A rule declared it correctly and still panicked with `resolveEntityName(0x0, ...)`, a nil
 receiver, because the declaration felt like the guard. It is not. Write both:
 
-    Run: func(ctx rule.Context, options any) rule.Listeners {
+    Run: func(ctx rule.Context, options rule.Given[Options]) rule.Listeners {
         if ctx.TypeChecker == nil {
             return nil
         }

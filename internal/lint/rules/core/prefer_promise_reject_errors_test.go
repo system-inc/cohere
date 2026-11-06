@@ -18,8 +18,8 @@ import (
 // 35 valid and 39 invalid upstream. Two valid cases are not reproduced here and are recorded in
 // TestGlobalsOffCasesHaveNoHarnessCounterpart below.
 
-func TestPreferPromiseRejectErrorsStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestPreferPromiseRejectErrorsStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	for _, source := range []string{
 		// ---- upstream valid, no options: 31 cases ----
@@ -55,13 +55,13 @@ func TestPreferPromiseRejectErrorsStaysSilent(t *testing.T) {
 		"function f(undefined) { Promise.reject(undefined); }",
 		"function f(undefined) { new Promise((resolve, reject) => reject(undefined)); }",
 	} {
-		result := rule_testing.RunTyped(t, core.PreferPromiseRejectErrors, "input.ts", source)
-		rule_testing.ExpectClean(t, result)
+		result := rule_testing.RunTyped(test, core.PreferPromiseRejectErrors, "input.ts", source)
+		rule_testing.ExpectClean(test, result)
 	}
 }
 
-func TestPreferPromiseRejectErrorsFires(t *testing.T) {
-	t.Parallel()
+func TestPreferPromiseRejectErrorsFires(test *testing.T) {
+	test.Parallel()
 
 	for _, source := range []string{
 		// ---- upstream invalid, no options: 36 cases ----
@@ -102,10 +102,10 @@ func TestPreferPromiseRejectErrorsFires(t *testing.T) {
 		"Promise.reject(foo && 5)",
 		"Promise.reject(foo &&= 5)",
 	} {
-		result := rule_testing.RunTyped(t, core.PreferPromiseRejectErrors, "input.ts", source)
+		result := rule_testing.RunTyped(test, core.PreferPromiseRejectErrors, "input.ts", source)
 		// Every invalid case in upstream's corpus carries exactly one error, because the tester
 		// maps a single `rejectAnError` entry onto all of them.
-		rule_testing.ExpectFindings(t, result, "rejectAnError")
+		rule_testing.ExpectFindings(test, result, "rejectAnError")
 	}
 }
 
@@ -115,29 +115,29 @@ func TestPreferPromiseRejectErrorsFires(t *testing.T) {
 // The wire shape is the bare object. Upstream writes `options: [{ allowEmptyReject: true }]`, and
 // cohere's config layer unwraps the severity tuple before dispatch, so the decoder receives what is
 // inside the array.
-func decodePreferPromiseRejectErrorsOptions(t *testing.T, wire string) any {
-	t.Helper()
+func decodePreferPromiseRejectErrorsOptions(test *testing.T, wire string) core.PreferPromiseRejectErrorsOptions {
+	test.Helper()
 	decode := rule.DecodeOptionsInto[core.PreferPromiseRejectErrorsOptions]()
-	decoded, err := decode(json.RawMessage(wire))
-	if err != nil {
-		t.Fatalf("decoding %s: %v", wire, err)
+	decoded, decodeError := decode(json.RawMessage(wire))
+	if decodeError != nil {
+		test.Fatalf("decoding %s: %v", wire, decodeError)
 	}
 	return decoded
 }
 
-func TestPreferPromiseRejectErrorsAllowEmptyReject(t *testing.T) {
-	t.Parallel()
+func TestPreferPromiseRejectErrorsAllowEmptyReject(test *testing.T) {
+	test.Parallel()
 
-	allowed := decodePreferPromiseRejectErrorsOptions(t, `{"allowEmptyReject": true}`)
-	denied := decodePreferPromiseRejectErrorsOptions(t, `{"allowEmptyReject": false}`)
+	allowed := decodePreferPromiseRejectErrorsOptions(test, `{"allowEmptyReject": true}`)
+	denied := decodePreferPromiseRejectErrorsOptions(test, `{"allowEmptyReject": false}`)
 
 	// allowEmptyReject exempts the no-argument call, in both the static and the executor shape.
 	for _, source := range []string{
 		"Promise.reject()",
 		"new Promise(function(resolve, reject) { reject() })",
 	} {
-		result := rule_testing.RunTypedWithOptions(t, core.PreferPromiseRejectErrors, "input.ts", source, allowed)
-		rule_testing.ExpectClean(t, result)
+		result := rule_testing.RunTypedWithOptions(test, core.PreferPromiseRejectErrors, "input.ts", source, allowed)
+		rule_testing.ExpectClean(test, result)
 	}
 
 	// Written out explicitly rather than relying on the default, because upstream's corpus carries
@@ -146,33 +146,29 @@ func TestPreferPromiseRejectErrorsAllowEmptyReject(t *testing.T) {
 		"Promise.reject()",
 		"new Promise(function(resolve, reject) { reject() })",
 	} {
-		result := rule_testing.RunTypedWithOptions(t, core.PreferPromiseRejectErrors, "input.ts", source, denied)
-		rule_testing.ExpectFindings(t, result, "rejectAnError")
+		result := rule_testing.RunTypedWithOptions(test, core.PreferPromiseRejectErrors, "input.ts", source, denied)
+		rule_testing.ExpectFindings(test, result, "rejectAnError")
 	}
 
-	// The option exempts only the EMPTY call. An explicit `undefined` still reports under it, which
+	// The option exempts only the empty call. An explicit `undefined` still reports under it, which
 	// is upstream's own case and the reason the argument-count test comes before the option test.
-	result := rule_testing.RunTypedWithOptions(t, core.PreferPromiseRejectErrors, "input.ts",
+	result := rule_testing.RunTypedWithOptions(test, core.PreferPromiseRejectErrors, "input.ts",
 		"Promise.reject(undefined)", allowed)
-	rule_testing.ExpectFindings(t, result, "rejectAnError")
+	rule_testing.ExpectFindings(test, result, "rejectAnError")
 }
 
 // A rule configured as a bare "error" is handed nil options, and `options.(T)` on nil yields the
 // zero value. That is correct here only because upstream's default for allowEmptyReject is false,
 // so this pins the coincidence rather than trusting it.
-func TestPreferPromiseRejectErrorsDefaultsWithoutADecoder(t *testing.T) {
-	t.Parallel()
+func TestPreferPromiseRejectErrorsDefaultsWithoutADecoder(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTyped(t, core.PreferPromiseRejectErrors, "input.ts", "Promise.reject()")
-	rule_testing.ExpectFindings(t, result, "rejectAnError")
+	result := rule_testing.RunTyped(test, core.PreferPromiseRejectErrors, "input.ts", "Promise.reject()")
+	rule_testing.ExpectFindings(test, result, "rejectAnError")
 
-	decoded := decodePreferPromiseRejectErrorsOptions(t, `{}`)
-	settings, ok := decoded.(core.PreferPromiseRejectErrorsOptions)
-	if !ok {
-		t.Fatalf("the decoder returned %T rather than the options type", decoded)
-	}
+	settings := decodePreferPromiseRejectErrorsOptions(test, `{}`)
 	if settings.AllowEmptyReject {
-		t.Errorf("an empty options object decoded allowEmptyReject to true, inverting the default")
+		test.Errorf("an empty options object decoded allowEmptyReject to true, inverting the default")
 	}
 }
 
@@ -181,28 +177,28 @@ func TestPreferPromiseRejectErrorsDefaultsWithoutADecoder(t *testing.T) {
 //	"/* global Promise:off */ Promise.reject('x')"
 //	{ code: "Promise.reject('x')", languageOptions: { globals: { Promise: "off" } } }
 //
-// cohere has no globals surface, so neither input can be expressed and both would REPORT here. That
+// cohere has no globals surface, so neither input can be expressed and both would report here. That
 // is a fact about the harness rather than about the rule: what those cases assert is that a
 // non-global Promise is exempt, and the five source-level shadowing cases in the silent list assert
 // exactly the same judgment through a mechanism this tree does have.
 //
 // Recorded as a test rather than dropped, so the next reader sees which two cases are missing and
 // why, instead of counting 33 against upstream's 35 and wondering.
-func TestGlobalsOffCasesHaveNoHarnessCounterpart(t *testing.T) {
-	t.Parallel()
+func TestGlobalsOffCasesHaveNoHarnessCounterpart(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTyped(t, core.PreferPromiseRejectErrors, "input.ts",
+	result := rule_testing.RunTyped(test, core.PreferPromiseRejectErrors, "input.ts",
 		"/* global Promise:off */ Promise.reject('x');")
 	if len(result.Diagnostics) != 1 {
-		t.Errorf("expected the globals comment to be inert here, giving 1 finding, got %d",
+		test.Errorf("expected the globals comment to be inert here, giving 1 finding, got %d",
 			len(result.Diagnostics))
 	}
 
 	// The control: the same judgment expressed the way this tree can express it stays silent, which
 	// is what makes the divergence a harness gap rather than a rule gap.
-	shadowed := rule_testing.RunTyped(t, core.PreferPromiseRejectErrors, "input.ts",
+	shadowed := rule_testing.RunTyped(test, core.PreferPromiseRejectErrors, "input.ts",
 		"let Promise; Promise.reject('x');")
-	rule_testing.ExpectClean(t, shadowed)
+	rule_testing.ExpectClean(test, shadowed)
 }
 
 // Where does the finding point, and what does it say?
@@ -211,8 +207,8 @@ func TestGlobalsOffCasesHaveNoHarnessCounterpart(t *testing.T) {
 // the wrong node passes a complete fixture pair while being wrong. Upstream anchors on the whole
 // CallExpression rather than on the argument, which is worth pinning because the argument is the
 // thing at fault and is the natural place to point.
-func TestPreferPromiseRejectErrorsSpanAndMessage(t *testing.T) {
-	t.Parallel()
+func TestPreferPromiseRejectErrorsSpanAndMessage(test *testing.T) {
+	test.Parallel()
 
 	rows := []struct {
 		source string
@@ -225,56 +221,58 @@ func TestPreferPromiseRejectErrorsSpanAndMessage(t *testing.T) {
 		{"new Promise((resolve, reject, somethingElse = reject(5)) => {})", "reject(5)"},
 	}
 	for _, row := range rows {
-		result := rule_testing.RunTyped(t, core.PreferPromiseRejectErrors, "input.ts", row.source)
+		result := rule_testing.RunTyped(test, core.PreferPromiseRejectErrors, "input.ts", row.source)
 		if len(result.Diagnostics) != 1 {
-			t.Errorf("%s: expected 1 finding, got %d", row.source, len(result.Diagnostics))
+			test.Errorf("%s: expected 1 finding, got %d", row.source, len(result.Diagnostics))
 			continue
 		}
 		diagnostic := result.Diagnostics[0]
 
-		// Sliced from the source the HARNESS wrote, not from the literal above: RunTyped trims the
+		// Sliced from the source the harness wrote, not from the literal above: RunTyped trims the
 		// fixture before writing it, so slicing the literal would be off by one on any case with
 		// leading whitespace.
 		written := strings.TrimSpace(row.source) + "\n"
 		reported := written[diagnostic.Range.Pos():diagnostic.Range.End()]
 		if reported != row.want {
-			t.Errorf("%s: the finding points at %q, expected %q", row.source, reported, row.want)
+			test.Errorf("%s: the finding points at %q, expected %q", row.source, reported, row.want)
 		}
 	}
 
 	// The message text, asserted by equality against a literal typed here rather than against the
 	// rule's own constant, which would move with any mutation of it.
-	result := rule_testing.RunTyped(t, core.PreferPromiseRejectErrors, "input.ts", "Promise.reject(5)")
+	result := rule_testing.RunTyped(test, core.PreferPromiseRejectErrors, "input.ts", "Promise.reject(5)")
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("expected 1 finding, got %d", len(result.Diagnostics))
+		test.Fatalf("expected 1 finding, got %d", len(result.Diagnostics))
 	}
 	wantMessage := "Expected the Promise rejection reason to be an Error. A rejection carrying a " +
 		"string or a plain object arrives at the catch with no stack, so the line that failed is " +
 		"lost and the handler cannot tell one failure from another."
 	if result.Diagnostics[0].Message.Description != wantMessage {
-		t.Errorf("message was %q", result.Diagnostics[0].Message.Description)
+		test.Errorf("message was %q", result.Diagnostics[0].Message.Description)
 	}
 	if result.Diagnostics[0].Message.Id != "rejectAnError" {
-		t.Errorf("message id was %q, expected rejectAnError", result.Diagnostics[0].Message.Id)
+		test.Errorf("message id was %q, expected rejectAnError", result.Diagnostics[0].Message.Id)
 	}
 }
 
 // The typed harness is required. A rule declaring NeedsTypeChecker and handed a nil checker goes
 // silent rather than crashing, so every Fires case would fail and every StaysSilent case would pass
 // vacuously. Pinned so a later revert of the guard fails loudly.
-func TestPreferPromiseRejectErrorsDeclinesWithoutAChecker(t *testing.T) {
-	t.Parallel()
+func TestPreferPromiseRejectErrorsDeclinesWithoutAChecker(test *testing.T) {
+	test.Parallel()
 
 	if !core.PreferPromiseRejectErrors.NeedsTypeChecker {
-		t.Errorf("the rule stopped declaring NeedsTypeChecker, so the registration path will hand it files with no checker")
+		test.Errorf(
+			"the rule stopped declaring NeedsTypeChecker, so the registration path will hand it files with no checker",
+		)
 	}
-	untyped := rule_testing.Run(t, core.PreferPromiseRejectErrors, "input.ts", "Promise.reject(5)")
-	rule_testing.ExpectClean(t, untyped)
+	untyped := rule_testing.Run(test, core.PreferPromiseRejectErrors, "input.ts", "Promise.reject(5)")
+	rule_testing.ExpectClean(test, untyped)
 
 	// The control: the same input through the typed harness reports, which is what makes the
 	// silence above a decline rather than a rule that cannot fire at all.
-	typed := rule_testing.RunTyped(t, core.PreferPromiseRejectErrors, "input.ts", "Promise.reject(5)")
-	rule_testing.ExpectFindings(t, typed, "rejectAnError")
+	typed := rule_testing.RunTyped(test, core.PreferPromiseRejectErrors, "input.ts", "Promise.reject(5)")
+	rule_testing.ExpectFindings(test, typed, "rejectAnError")
 }
 
 // Cases upstream's corpus cannot write, because its parser folds them away or because they are
@@ -283,8 +281,8 @@ func TestPreferPromiseRejectErrorsDeclinesWithoutAChecker(t *testing.T) {
 // The parenthesized receiver is the important one. Our parser keeps a KindParenthesizedExpression
 // that upstream's deletes before its rule ever sees it, so an unwrap that upstream has no reason to
 // write is load bearing here, in a place no imported fixture can reach.
-func TestPreferPromiseRejectErrorsShapesUpstreamCannotWrite(t *testing.T) {
-	t.Parallel()
+func TestPreferPromiseRejectErrorsShapesUpstreamCannotWrite(test *testing.T) {
+	test.Parallel()
 
 	reports := []string{
 		"(Promise).reject(5);",
@@ -298,9 +296,9 @@ func TestPreferPromiseRejectErrorsShapesUpstreamCannotWrite(t *testing.T) {
 		"Promise.reject(<string>'x');",
 	}
 	for _, source := range reports {
-		result := rule_testing.RunTyped(t, core.PreferPromiseRejectErrors, "input.tsx", source)
+		result := rule_testing.RunTyped(test, core.PreferPromiseRejectErrors, "input.tsx", source)
 		if len(result.Diagnostics) != 1 {
-			t.Errorf("%s: expected 1 finding, got %d", source, len(result.Diagnostics))
+			test.Errorf("%s: expected 1 finding, got %d", source, len(result.Diagnostics))
 		}
 	}
 
@@ -318,12 +316,12 @@ func TestPreferPromiseRejectErrorsShapesUpstreamCannotWrite(t *testing.T) {
 		"class Promise2 { static reject(x: string) { return x; } } Promise2.reject('x');",
 	}
 	for _, source := range clean {
-		result := rule_testing.RunTyped(t, core.PreferPromiseRejectErrors, "input.ts", source)
-		rule_testing.ExpectClean(t, result)
+		result := rule_testing.RunTyped(test, core.PreferPromiseRejectErrors, "input.ts", source)
+		rule_testing.ExpectClean(test, result)
 	}
 }
 
-// The receiver's NAME is load bearing, and upstream's corpus structurally cannot show it.
+// The receiver's name is load bearing, and upstream's corpus structurally cannot show it.
 //
 // Both arms test the receiver twice: it must be spelled `Promise`, and it must resolve to a
 // declaration file. Removing the name test survived the whole imported corpus, because upstream's
@@ -333,8 +331,8 @@ func TestPreferPromiseRejectErrorsShapesUpstreamCannotWrite(t *testing.T) {
 // Measured: `Reflect`, `JSON`, `Math` and `Object` all resolve entirely to declaration files, so
 // without the name test each of these reports. Upstream is silent on all six, confirmed by driving
 // the installed rule.
-func TestPreferPromiseRejectErrorsOtherAmbientGlobalsAreNotPromise(t *testing.T) {
-	t.Parallel()
+func TestPreferPromiseRejectErrorsOtherAmbientGlobalsAreNotPromise(test *testing.T) {
+	test.Parallel()
 
 	for _, source := range []string{
 		"Reflect.reject(5);",
@@ -344,20 +342,20 @@ func TestPreferPromiseRejectErrorsOtherAmbientGlobalsAreNotPromise(t *testing.T)
 		"new Reflect((resolve: any, reject: any) => reject(5));",
 		"new Object((resolve: any, reject: any) => reject(5));",
 	} {
-		result := rule_testing.RunTyped(t, core.PreferPromiseRejectErrors, "input.ts", source)
-		rule_testing.ExpectClean(t, result)
+		result := rule_testing.RunTyped(test, core.PreferPromiseRejectErrors, "input.ts", source)
+		rule_testing.ExpectClean(test, result)
 	}
 
 	// The control: the same shape with the right receiver reports, so the silence above is the name
 	// test declining rather than the rule being unable to fire on this shape at all.
-	control := rule_testing.RunTyped(t, core.PreferPromiseRejectErrors, "input.ts", "Promise.reject(5);")
-	rule_testing.ExpectFindings(t, control, "rejectAnError")
+	control := rule_testing.RunTyped(test, core.PreferPromiseRejectErrors, "input.ts", "Promise.reject(5);")
+	rule_testing.ExpectFindings(test, control, "rejectAnError")
 }
 
-// The executor kind test is CRASH PROTECTION, not only fidelity.
+// The executor kind test is crash protection, not only fidelity.
 //
 // `Parameters()` nil-dereferences on a node with no parameter list, so a `new Promise(executor)`
-// with a non-function argument takes the walk down. The walk recovers per FILE rather than per
+// with a non-function argument takes the walk down. The walk recovers per file rather than per
 // rule, so one such expression would cost every rule in the package its verdict on that file, and
 // `new Promise(executor)` is ordinary code.
 //
@@ -367,8 +365,8 @@ func TestPreferPromiseRejectErrorsOtherAmbientGlobalsAreNotPromise(t *testing.T)
 //
 // No ExpectFindings fixture can see a panic, which is why removing the guard survived the whole
 // imported corpus. These cases exist so a later revert crashes the suite instead of the tree.
-func TestPreferPromiseRejectErrorsSurvivesANonFunctionExecutor(t *testing.T) {
-	t.Parallel()
+func TestPreferPromiseRejectErrorsSurvivesANonFunctionExecutor(test *testing.T) {
+	test.Parallel()
 
 	for _, source := range []string{
 		"new Promise(executor);",
@@ -377,15 +375,15 @@ func TestPreferPromiseRejectErrorsSurvivesANonFunctionExecutor(t *testing.T) {
 		"new Promise(5);",
 		"declare const made: any; new Promise(made.executor);",
 	} {
-		result := rule_testing.RunTyped(t, core.PreferPromiseRejectErrors, "input.ts", source)
-		rule_testing.ExpectClean(t, result)
+		result := rule_testing.RunTyped(test, core.PreferPromiseRejectErrors, "input.ts", source)
+		rule_testing.ExpectClean(test, result)
 	}
 
 	// The control: a real executor through the same harness still reports, so the silence above is
 	// the guard declining rather than the listener never running.
-	control := rule_testing.RunTyped(t, core.PreferPromiseRejectErrors, "input.ts",
+	control := rule_testing.RunTyped(test, core.PreferPromiseRejectErrors, "input.ts",
 		"new Promise((resolve, reject) => reject(5));")
-	rule_testing.ExpectFindings(t, control, "rejectAnError")
+	rule_testing.ExpectFindings(test, control, "rejectAnError")
 }
 
 // Operator arms upstream's corpus does not exercise, with every verdict taken from driving the
@@ -395,23 +393,23 @@ func TestPreferPromiseRejectErrorsSurvivesANonFunctionExecutor(t *testing.T) {
 // three arms of couldBeError sit unexercised by the imported cases. Each of these pairs an input
 // where the deciding side could be an Error against one where it could not, so a mutation reading
 // the wrong side of any of the three fails here.
-func TestPreferPromiseRejectErrorsOperatorArmsUpstreamDoesNotWrite(t *testing.T) {
-	t.Parallel()
+func TestPreferPromiseRejectErrorsOperatorArmsUpstreamDoesNotWrite(test *testing.T) {
+	test.Parallel()
 
 	reports := []string{
-		// A sequence takes its LAST expression's value, so a trailing literal reports even when the
+		// A sequence takes its last expression's value, so a trailing literal reports even when the
 		// leading operand is opaque.
 		"Promise.reject((foo, 5));",
 		"Promise.reject((5, 6));",
-		// Nullish coalescing can yield either side, so it reports only when NEITHER could be an
+		// Nullish coalescing can yield either side, so it reports only when neither could be an
 		// Error.
 		"Promise.reject(5 ?? 6);",
 		// A conditional can yield either branch, same reasoning.
 		"Promise.reject(5 ? 6 : 7);",
 	}
 	for _, source := range reports {
-		result := rule_testing.RunTyped(t, core.PreferPromiseRejectErrors, "input.ts", source)
-		rule_testing.ExpectFindings(t, result, "rejectAnError")
+		result := rule_testing.RunTyped(test, core.PreferPromiseRejectErrors, "input.ts", source)
+		rule_testing.ExpectFindings(test, result, "rejectAnError")
 	}
 
 	clean := []string{
@@ -422,12 +420,12 @@ func TestPreferPromiseRejectErrorsOperatorArmsUpstreamDoesNotWrite(t *testing.T)
 		"Promise.reject(foo ? 5 : bar);",
 	}
 	for _, source := range clean {
-		result := rule_testing.RunTyped(t, core.PreferPromiseRejectErrors, "input.ts", source)
-		rule_testing.ExpectClean(t, result)
+		result := rule_testing.RunTyped(test, core.PreferPromiseRejectErrors, "input.ts", source)
+		rule_testing.ExpectClean(test, result)
 	}
 }
 
-// TypeScript's type-only wrappers are transparent, so the value INSIDE decides.
+// TypeScript's type-only wrappers are transparent, so the value inside decides.
 //
 // This is fidelity rather than an improvement. ESTree has no node for `as`, `satisfies`, a
 // bracket assertion or `!`, so upstream's switch never mentions them and never sees one. The
@@ -437,9 +435,9 @@ func TestPreferPromiseRejectErrorsOperatorArmsUpstreamDoesNotWrite(t *testing.T)
 //
 // Found by the dry run rather than by the corpus, which structurally cannot contain any of these.
 // Before the unwrap covered them, `reject(error as Error)` in modules/kingdom/pentair/PentairApi.ts
-// was reported: source asserting the value IS an Error, flagged for not being one.
-func TestPreferPromiseRejectErrorsSeesThroughTypeOnlyWrappers(t *testing.T) {
-	t.Parallel()
+// was reported: source asserting the value is an Error, flagged for not being one.
+func TestPreferPromiseRejectErrorsSeesThroughTypeOnlyWrappers(test *testing.T) {
+	test.Parallel()
 
 	// An opaque inner value stays clean through every wrapper.
 	for _, source := range []string{
@@ -451,8 +449,8 @@ func TestPreferPromiseRejectErrorsSeesThroughTypeOnlyWrappers(t *testing.T) {
 		"declare const error: unknown; new Promise((resolve, reject) => reject(error as Error));",
 		"declare const error: unknown; Promise.reject(error as unknown as Error);",
 	} {
-		result := rule_testing.RunTyped(t, core.PreferPromiseRejectErrors, "input.ts", source)
-		rule_testing.ExpectClean(t, result)
+		result := rule_testing.RunTyped(test, core.PreferPromiseRejectErrors, "input.ts", source)
+		rule_testing.ExpectClean(test, result)
 	}
 
 	// A literal inner value still reports through every wrapper, which is what makes the unwrap a
@@ -464,7 +462,7 @@ func TestPreferPromiseRejectErrorsSeesThroughTypeOnlyWrappers(t *testing.T) {
 		"Promise.reject((5 as any));",
 		"new Promise((resolve, reject) => reject(5 as any));",
 	} {
-		result := rule_testing.RunTyped(t, core.PreferPromiseRejectErrors, "input.ts", source)
-		rule_testing.ExpectFindings(t, result, "rejectAnError")
+		result := rule_testing.RunTyped(test, core.PreferPromiseRejectErrors, "input.ts", source)
+		rule_testing.ExpectFindings(test, result, "rejectAnError")
 	}
 }

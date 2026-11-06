@@ -18,17 +18,17 @@ func returnAwaitCaseName(index int) string {
 // returnAwaitOptionsFor routes a case through the rule's own decoder.
 //
 // Building the options struct directly would leave the decoder untested, and the decoder is where
-// the DEFAULT lives. That default is `in-try-catch` rather than `always`, so a rule configured as
+// the default lives. That default is `in-try-catch` rather than `always`, so a rule configured as
 // a plain "error" arrives with nil options and must land on it; the zero value is an empty mode
 // matching no arm, which would make the rule silently inert.
-func returnAwaitOptionsFor(t *testing.T, optionsJson string) any {
-	t.Helper()
+func returnAwaitOptionsFor(test *testing.T, optionsJson string) ReturnAwaitOptions {
+	test.Helper()
 	if optionsJson == "" || optionsJson == "null" {
 		return DefaultReturnAwaitSettings()
 	}
-	decoded, err := DecodeReturnAwaitOptions(json.RawMessage(optionsJson))
-	if err != nil {
-		t.Fatalf("decoding %s: %v", optionsJson, err)
+	decoded, decodeReturnAwaitOptionsError := DecodeReturnAwaitOptions(json.RawMessage(optionsJson))
+	if decodeReturnAwaitOptionsError != nil {
+		test.Fatalf("decoding %s: %v", optionsJson, decodeReturnAwaitOptionsError)
 	}
 	return decoded
 }
@@ -38,8 +38,8 @@ func returnAwaitOptionsFor(t *testing.T, optionsJson string) any {
 // Each carries its own option, because this rule's verdict for one input moves with the mode: the
 // same source is valid under `never` and reports under `always`. Measured one file per program
 // against the installed 8.67.0 build, using upstream's own fixture compilerOptions verbatim.
-func TestReturnAwaitStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestReturnAwaitStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText  string
@@ -251,11 +251,11 @@ func TestReturnAwaitStaysSilent(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(returnAwaitCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, ReturnAwait,
+		test.Run(returnAwaitCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, ReturnAwait,
 				returnAwaitFile, testCase.sourceText,
-				returnAwaitOptionsFor(t, testCase.optionsJson)))
+				returnAwaitOptionsFor(test, testCase.optionsJson)))
 		})
 	}
 }
@@ -274,12 +274,12 @@ type returnAwaitFinding struct {
 // separated only by whether the position affects error handling, and `nonPromiseAwait` is a third
 // answer about the type rather than the context.
 //
-// Cases whose repair upstream ships as a FIX assert the rewritten file in TestReturnAwaitFixes
-// below. Cases whose repair is a SUGGESTION are asserted separately, because the harness applies
+// Cases whose repair upstream ships as a fix assert the rewritten file in TestReturnAwaitFixes
+// below. Cases whose repair is a suggestion are asserted separately, because the harness applies
 // fixes and not suggestions, and collapsing the two would have the edit engine rewriting which
 // frame catches a rejection.
-func TestReturnAwaitFires(t *testing.T) {
-	t.Parallel()
+func TestReturnAwaitFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText   string
@@ -915,16 +915,16 @@ func TestReturnAwaitFires(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(returnAwaitCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, ReturnAwait, returnAwaitFile,
-				testCase.sourceText, returnAwaitOptionsFor(t, testCase.optionsJson))
+		test.Run(returnAwaitCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, ReturnAwait, returnAwaitFile,
+				testCase.sourceText, returnAwaitOptionsFor(test, testCase.optionsJson))
 
 			wantIds := make([]string, len(testCase.wantFindings))
 			for position, want := range testCase.wantFindings {
 				wantIds[position] = want.wantId
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 
 			// The harness writes the fixture trimmed, so span slices are against that text rather
 			// than the Go literal above.
@@ -934,14 +934,14 @@ func TestReturnAwaitFires(t *testing.T) {
 
 				gotSpan := onDisk[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if gotSpan != want.wantSpan {
-					t.Fatalf("finding %d span: expected %q, got %q", position, want.wantSpan, gotSpan)
+					test.Fatalf("finding %d span: expected %q, got %q", position, want.wantSpan, gotSpan)
 				}
 				if diagnostic.Message.Id != want.wantId {
-					t.Fatalf("finding %d id: expected %q, got %q", position, want.wantId,
+					test.Fatalf("finding %d id: expected %q, got %q", position, want.wantId,
 						diagnostic.Message.Id)
 				}
 				if diagnostic.Message.Description != want.wantMessage {
-					t.Fatalf("finding %d message: expected %q, got %q", position, want.wantMessage,
+					test.Fatalf("finding %d message: expected %q, got %q", position, want.wantMessage,
 						diagnostic.Message.Description)
 				}
 			}
@@ -952,10 +952,10 @@ func TestReturnAwaitFires(t *testing.T) {
 // TestReturnAwaitFixes asserts the repair on every case upstream applies unattended.
 //
 // These go through rule_testing.ExpectFixedSource, which replays the fixes into the source and
-// compares the WHOLE rewritten file, so a repair that edits the right span with the wrong text or
+// compares the whole rewritten file, so a repair that edits the right span with the wrong text or
 // the wrong span with the right text both fail here and neither is visible to a message id.
 //
-// Four rows below take their expected output from the CLONE rather than from the installed build,
+// Four rows below take their expected output from the clone rather than from the installed build,
 // and they are the only four where the two disagree. Enumerated rather than assumed: every other
 // fix vector is byte-identical between 8.67 and 8.68.
 //
@@ -963,8 +963,8 @@ func TestReturnAwaitFires(t *testing.T) {
 // 8.67 build. Removing `await` from an arrow body that begins with `{` leaves source parsing as a
 // Block rather than an object literal, so the function silently stops returning anything. The
 // installed build produces exactly that; these rows assert the corrected output.
-func TestReturnAwaitFixes(t *testing.T) {
-	t.Parallel()
+func TestReturnAwaitFixes(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText  string
@@ -1148,30 +1148,30 @@ func TestReturnAwaitFixes(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(returnAwaitCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, ReturnAwait, returnAwaitFile,
-				testCase.sourceText, returnAwaitOptionsFor(t, testCase.optionsJson))
+		test.Run(returnAwaitCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, ReturnAwait, returnAwaitFile,
+				testCase.sourceText, returnAwaitOptionsFor(test, testCase.optionsJson))
 
 			// The harness writes the fixture trimmed, so the expected rewrite is transformed the
 			// same way the input was rather than compared against the Go literal.
-			rule_testing.ExpectFixedSource(t, result, strings.TrimSpace(testCase.wantFixed)+"\n")
+			rule_testing.ExpectFixedSource(test, result, strings.TrimSpace(testCase.wantFixed)+"\n")
 		})
 	}
 }
 
 // TestReturnAwaitOffersSuggestionsRatherThanFixes covers the half the harness cannot apply.
 //
-// Where the position affects error handling, upstream ships the same edit as a SUGGESTION rather
+// Where the position affects error handling, upstream ships the same edit as a suggestion rather
 // than a fix, because adding or removing the await changes which frame catches a rejection. That
 // distinction is the whole safety property of this rule: shipping these as fixes would have the
 // edit engine silently rewriting control flow.
 //
 // ExpectFixedSource cannot see a suggestion, so these rows assert that the finding carries a
-// suggestion and NO fix, plus the suggestion text. A row that arrived as a fix would pass every
+// suggestion and no fix, plus the suggestion text. A row that arrived as a fix would pass every
 // message-id assertion in the firing test above.
-func TestReturnAwaitOffersSuggestionsRatherThanFixes(t *testing.T) {
-	t.Parallel()
+func TestReturnAwaitOffersSuggestionsRatherThanFixes(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText      string
@@ -1179,101 +1179,139 @@ func TestReturnAwaitOffersSuggestionsRatherThanFixes(t *testing.T) {
 		wantSuggestions []string
 	}{
 		{
-			sourceText:      "async function test() {\n  try {\n    return Promise.resolve(1);\n  } catch (e) {\n    return Promise.resolve(2);\n  } finally {\n    console.log('cleanup');\n  }\n}\n",
-			optionsJson:     "\"error-handling-correctness-only\"",
-			wantSuggestions: []string{"Add `await` before the expression. Use caution as this may impact control flow.", "Add `await` before the expression. Use caution as this may impact control flow."},
+			sourceText:  "async function test() {\n  try {\n    return Promise.resolve(1);\n  } catch (e) {\n    return Promise.resolve(2);\n  } finally {\n    console.log('cleanup');\n  }\n}\n",
+			optionsJson: "\"error-handling-correctness-only\"",
+			wantSuggestions: []string{
+				"Add `await` before the expression. Use caution as this may impact control flow.",
+				"Add `await` before the expression. Use caution as this may impact control flow.",
+			},
 		},
 		{
-			sourceText:      "async function test() {\n  try {\n    return Promise.resolve(1);\n  } catch (e) {\n    return Promise.resolve(2);\n  } finally {\n    console.log('cleanup');\n  }\n}\n",
-			optionsJson:     "\"always\"",
-			wantSuggestions: []string{"Add `await` before the expression. Use caution as this may impact control flow.", "Add `await` before the expression. Use caution as this may impact control flow."},
+			sourceText:  "async function test() {\n  try {\n    return Promise.resolve(1);\n  } catch (e) {\n    return Promise.resolve(2);\n  } finally {\n    console.log('cleanup');\n  }\n}\n",
+			optionsJson: "\"always\"",
+			wantSuggestions: []string{
+				"Add `await` before the expression. Use caution as this may impact control flow.",
+				"Add `await` before the expression. Use caution as this may impact control flow.",
+			},
 		},
 		{
-			sourceText:      "async function test() {\n  try {\n    return Promise.resolve(1);\n  } catch (e) {\n    return Promise.resolve(2);\n  } finally {\n    console.log('cleanup');\n  }\n}\n",
-			optionsJson:     "\"in-try-catch\"",
-			wantSuggestions: []string{"Add `await` before the expression. Use caution as this may impact control flow.", "Add `await` before the expression. Use caution as this may impact control flow."},
+			sourceText:  "async function test() {\n  try {\n    return Promise.resolve(1);\n  } catch (e) {\n    return Promise.resolve(2);\n  } finally {\n    console.log('cleanup');\n  }\n}\n",
+			optionsJson: "\"in-try-catch\"",
+			wantSuggestions: []string{
+				"Add `await` before the expression. Use caution as this may impact control flow.",
+				"Add `await` before the expression. Use caution as this may impact control flow.",
+			},
 		},
 		{
-			sourceText:      "async function test() {\n  try {\n    return await Promise.resolve(1);\n  } catch (e) {\n    return await Promise.resolve(2);\n  } finally {\n    console.log('cleanup');\n  }\n}\n",
-			optionsJson:     "\"never\"",
-			wantSuggestions: []string{"Remove `await` before the expression. Use caution as this may impact control flow.", "Remove `await` before the expression. Use caution as this may impact control flow."},
+			sourceText:  "async function test() {\n  try {\n    return await Promise.resolve(1);\n  } catch (e) {\n    return await Promise.resolve(2);\n  } finally {\n    console.log('cleanup');\n  }\n}\n",
+			optionsJson: "\"never\"",
+			wantSuggestions: []string{
+				"Remove `await` before the expression. Use caution as this may impact control flow.",
+				"Remove `await` before the expression. Use caution as this may impact control flow.",
+			},
 		},
 		{
-			sourceText:      "async function test<T>(): Promise<T> {\n  const res = await fetch('...');\n  try {\n    return res.json() as Promise<T>;\n  } catch (err) {\n    throw Error('Request Failed.');\n  }\n}\n",
-			optionsJson:     "",
-			wantSuggestions: []string{"Add `await` before the expression. Use caution as this may impact control flow."},
+			sourceText:  "async function test<T>(): Promise<T> {\n  const res = await fetch('...');\n  try {\n    return res.json() as Promise<T>;\n  } catch (err) {\n    throw Error('Request Failed.');\n  }\n}\n",
+			optionsJson: "",
+			wantSuggestions: []string{
+				"Add `await` before the expression. Use caution as this may impact control flow.",
+			},
 		},
 		{
-			sourceText:      "async function test() {\n  try {\n    const callback1 = function () {};\n    const callback2 = async function () {};\n    function callback3() {}\n    async function callback4() {}\n    const callback5 = () => {};\n    const callback6 = async () => {};\n    return Promise.resolve('try');\n  } finally {\n    return Promise.resolve('finally');\n  }\n}\n",
-			optionsJson:     "",
-			wantSuggestions: []string{"Add `await` before the expression. Use caution as this may impact control flow."},
+			sourceText:  "async function test() {\n  try {\n    const callback1 = function () {};\n    const callback2 = async function () {};\n    function callback3() {}\n    async function callback4() {}\n    const callback5 = () => {};\n    const callback6 = async () => {};\n    return Promise.resolve('try');\n  } finally {\n    return Promise.resolve('finally');\n  }\n}\n",
+			optionsJson: "",
+			wantSuggestions: []string{
+				"Add `await` before the expression. Use caution as this may impact control flow.",
+			},
 		},
 		{
-			sourceText:      "async function bar() {}\nasync function foo() {\n  try {\n    return undefined || bar();\n  } catch {}\n}\n",
-			optionsJson:     "",
-			wantSuggestions: []string{"Add `await` before the expression. Use caution as this may impact control flow."},
+			sourceText:  "async function bar() {}\nasync function foo() {\n  try {\n    return undefined || bar();\n  } catch {}\n}\n",
+			optionsJson: "",
+			wantSuggestions: []string{
+				"Add `await` before the expression. Use caution as this may impact control flow.",
+			},
 		},
 		{
-			sourceText:      "async function bar() {}\nasync function foo() {\n  try {\n    return bar() || undefined || bar();\n  } catch {}\n}\n",
-			optionsJson:     "",
-			wantSuggestions: []string{"Add `await` before the expression. Use caution as this may impact control flow."},
+			sourceText:  "async function bar() {}\nasync function foo() {\n  try {\n    return bar() || undefined || bar();\n  } catch {}\n}\n",
+			optionsJson: "",
+			wantSuggestions: []string{
+				"Add `await` before the expression. Use caution as this may impact control flow.",
+			},
 		},
 		{
-			sourceText:      "async function bar() {}\nasync function func1() {\n  try {\n    return null ?? bar();\n  } catch {}\n}\n",
-			optionsJson:     "",
-			wantSuggestions: []string{"Add `await` before the expression. Use caution as this may impact control flow."},
+			sourceText:  "async function bar() {}\nasync function func1() {\n  try {\n    return null ?? bar();\n  } catch {}\n}\n",
+			optionsJson: "",
+			wantSuggestions: []string{
+				"Add `await` before the expression. Use caution as this may impact control flow.",
+			},
 		},
 		{
-			sourceText:      "async function bar() {}\nasync function func2() {\n  try {\n    return 1 && bar();\n  } catch {}\n}\n",
-			optionsJson:     "",
-			wantSuggestions: []string{"Add `await` before the expression. Use caution as this may impact control flow."},
+			sourceText:  "async function bar() {}\nasync function func2() {\n  try {\n    return 1 && bar();\n  } catch {}\n}\n",
+			optionsJson: "",
+			wantSuggestions: []string{
+				"Add `await` before the expression. Use caution as this may impact control flow.",
+			},
 		},
 		{
-			sourceText:      "const foo = {\n  bar: async function () {},\n};\nasync function func3() {\n  try {\n    return foo.bar();\n  } catch {}\n}\n",
-			optionsJson:     "",
-			wantSuggestions: []string{"Add `await` before the expression. Use caution as this may impact control flow."},
+			sourceText:  "const foo = {\n  bar: async function () {},\n};\nasync function func3() {\n  try {\n    return foo.bar();\n  } catch {}\n}\n",
+			optionsJson: "",
+			wantSuggestions: []string{
+				"Add `await` before the expression. Use caution as this may impact control flow.",
+			},
 		},
 		{
-			sourceText:      "class X {\n  async bar() {\n    return;\n  }\n  async func2() {\n    try {\n      return this.bar();\n    } catch {}\n  }\n}\n",
-			optionsJson:     "",
-			wantSuggestions: []string{"Add `await` before the expression. Use caution as this may impact control flow."},
+			sourceText:  "class X {\n  async bar() {\n    return;\n  }\n  async func2() {\n    try {\n      return this.bar();\n    } catch {}\n  }\n}\n",
+			optionsJson: "",
+			wantSuggestions: []string{
+				"Add `await` before the expression. Use caution as this may impact control flow.",
+			},
 		},
 		{
-			sourceText:      "async function f() {\n  try {\n    try {\n    } finally {\n      // affects error handling of outer catch\n      return Promise.reject();\n    }\n  } catch {}\n}\n",
-			optionsJson:     "",
-			wantSuggestions: []string{"Add `await` before the expression. Use caution as this may impact control flow."},
+			sourceText:  "async function f() {\n  try {\n    try {\n    } finally {\n      // affects error handling of outer catch\n      return Promise.reject();\n    }\n  } catch {}\n}\n",
+			optionsJson: "",
+			wantSuggestions: []string{
+				"Add `await` before the expression. Use caution as this may impact control flow.",
+			},
 		},
 		{
-			sourceText:      "async function f() {\n  try {\n    try {\n    } catch {\n      // affects error handling of outer catch\n      return Promise.reject();\n    }\n  } catch {}\n}\n",
-			optionsJson:     "",
-			wantSuggestions: []string{"Add `await` before the expression. Use caution as this may impact control flow."},
+			sourceText:  "async function f() {\n  try {\n    try {\n    } catch {\n      // affects error handling of outer catch\n      return Promise.reject();\n    }\n  } catch {}\n}\n",
+			optionsJson: "",
+			wantSuggestions: []string{
+				"Add `await` before the expression. Use caution as this may impact control flow.",
+			},
 		},
 		{
-			sourceText:      "async function f() {\n  try {\n  } catch {\n    try {\n    } finally {\n      try {\n      } catch {\n        return Promise.reject();\n      }\n    }\n  } finally {\n  }\n}\n",
-			optionsJson:     "",
-			wantSuggestions: []string{"Add `await` before the expression. Use caution as this may impact control flow."},
+			sourceText:  "async function f() {\n  try {\n  } catch {\n    try {\n    } finally {\n      try {\n      } catch {\n        return Promise.reject();\n      }\n    }\n  } finally {\n  }\n}\n",
+			optionsJson: "",
+			wantSuggestions: []string{
+				"Add `await` before the expression. Use caution as this may impact control flow.",
+			},
 		},
 		{
-			sourceText:      "declare const bleh: any;\nasync function f() {\n  if (cond) {\n    using something = bleh;\n    if (anotherCondition) {\n      return Promise.resolve(2);\n    }\n  }\n}\n",
-			optionsJson:     "\"always\"",
-			wantSuggestions: []string{"Add `await` before the expression. Use caution as this may impact control flow."},
+			sourceText:  "declare const bleh: any;\nasync function f() {\n  if (cond) {\n    using something = bleh;\n    if (anotherCondition) {\n      return Promise.resolve(2);\n    }\n  }\n}\n",
+			optionsJson: "\"always\"",
+			wantSuggestions: []string{
+				"Add `await` before the expression. Use caution as this may impact control flow.",
+			},
 		},
 		{
-			sourceText:      "declare const bleh: any;\nasync function f() {\n  if (cond) {\n    await using something = bleh;\n    if (anotherCondition) {\n      return Promise.resolve(2);\n    }\n  }\n}\n",
-			optionsJson:     "\"always\"",
-			wantSuggestions: []string{"Add `await` before the expression. Use caution as this may impact control flow."},
+			sourceText:  "declare const bleh: any;\nasync function f() {\n  if (cond) {\n    await using something = bleh;\n    if (anotherCondition) {\n      return Promise.resolve(2);\n    }\n  }\n}\n",
+			optionsJson: "\"always\"",
+			wantSuggestions: []string{
+				"Add `await` before the expression. Use caution as this may impact control flow.",
+			},
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(returnAwaitCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, ReturnAwait, returnAwaitFile,
-				testCase.sourceText, returnAwaitOptionsFor(t, testCase.optionsJson))
+		test.Run(returnAwaitCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, ReturnAwait, returnAwaitFile,
+				testCase.sourceText, returnAwaitOptionsFor(test, testCase.optionsJson))
 
 			var got []string
 			for _, diagnostic := range result.Diagnostics {
 				if len(diagnostic.Fixes) != 0 {
-					t.Fatalf("finding %q carries a fix; upstream offers only a suggestion here, and a "+
+					test.Fatalf("finding %q carries a fix; upstream offers only a suggestion here, and a "+
 						"fix would let the engine rewrite control flow unattended", diagnostic.Message.Id)
 				}
 				for _, suggestion := range diagnostic.Suggestions {
@@ -1281,12 +1319,12 @@ func TestReturnAwaitOffersSuggestionsRatherThanFixes(t *testing.T) {
 				}
 			}
 			if len(got) != len(testCase.wantSuggestions) {
-				t.Fatalf("expected %d suggestions %q, got %d %q", len(testCase.wantSuggestions),
+				test.Fatalf("expected %d suggestions %q, got %d %q", len(testCase.wantSuggestions),
 					testCase.wantSuggestions, len(got), got)
 			}
 			for position, want := range testCase.wantSuggestions {
 				if got[position] != want {
-					t.Fatalf("suggestion %d: expected %q, got %q", position, want, got[position])
+					test.Fatalf("suggestion %d: expected %q, got %q", position, want, got[position])
 				}
 			}
 		})

@@ -23,7 +23,8 @@ var messageNoDerivingStateInEffects = rule.Message{
 //
 //	valid:   function C({a}) { const [v, setV] = useState(0); useEffect(() => { setV(a); log(); }, [a]); return v; }
 //	valid:   function C({a, b}) { const [v, setV] = useState(0); useEffect(() => { setV(a); }, [a, b]); return v; }
-//	invalid: function C({a, b}) { const [v, setV] = useState(''); useEffect(() => { setV(a + b); }, [a, b]); return v; }
+//	invalid: function C({a, b}) { const [v, setV] = useState(''); useEffect(() => { setV(a + b); }, [a, b]);
+//	         return v; }
 //
 // # The authority, and which of two passes it is
 //
@@ -32,13 +33,13 @@ var messageNoDerivingStateInEffects = rule.Message{
 // `ValidateNoDerivedComputationsInEffects_exp.ts`, 842 lines against the base pass's 229, and
 // choosing between them is the first decision this port makes.
 //
-// The shipped ESLint plugin runs the BASE pass. Measured in
+// The shipped ESLint plugin runs the base pass. Measured in
 // `node_modules/eslint-plugin-react-hooks/cjs/eslint-plugin-react-hooks.development.js`: its
 // `COMPILER_OPTIONS.environment` sets `validateNoDerivedComputationsInEffects: true` and never sets
 // the `_exp` flag, whose schema default is false. The pipeline prefers `_exp` when both are on, so
 // the flag that is absent is the one that decides. This rule is the base pass.
 //
-// That matters more than it sounds, because the CORPUS is the other way round. All 21 fixtures in
+// That matters more than it sounds, because the corpus is the other way round. All 21 fixtures in
 // `__tests__/fixtures/compiler/effect-derived-computations/` carry
 // `@validateNoDerivedComputationsInEffects_exp`, so their names describe the experimental pass's
 // verdict and not the shipped one. Exactly one fixture in the whole 2,688-fixture tree carries the
@@ -57,7 +58,7 @@ var messageNoDerivingStateInEffects = rule.Message{
 //	ArrayExpression    value -> the literal, so a dependency array can be recovered from an identifier
 //	FunctionExpression value -> the function, so an effect callback can be recovered from an identifier
 //
-// A call is a candidate when its callee is an effect hook AND it has exactly two arguments AND both
+// A call is a candidate when its callee is an effect hook and it has exactly two arguments and both
 // are plain identifiers. Both halves are load-bearing: `useEffect(cb)` with no dependency array is
 // never a candidate, because this rule's whole judgment is "the callback computes nothing the deps
 // did not already supply", which has no meaning without deps.
@@ -76,7 +77,7 @@ var messageNoDerivingStateInEffects = rule.Message{
 //
 // Within that, a taint map carries dep-ness forward through loads, property reads, binary
 // expressions, template literals and calls. A setter call reports only when its argument's taint
-// set has exactly as many distinct deps as the effect declared, so setting from ONE of two deps is
+// set has exactly as many distinct deps as the effect declared, so setting from one of two deps is
 // silent and setting from both reports. A setter call whose argument carries no taint at all
 // abandons the whole effect rather than skipping that one call.
 //
@@ -85,9 +86,9 @@ var messageNoDerivingStateInEffects = rule.Message{
 // `isUseEffectHookType` and `isSetStateType` both read `Identifier.type.shapeId`, a builtin shape
 // the compiler seeds when it sees an import from the literal module `react`. This tree has no such
 // registry, and the sibling rule `set-state-in-effect` already established the replacement: ask the
-// checker. `effectHookKind` resolves a callee to the name it was DECLARED as, which is what makes a
+// checker. `effectHookKind` resolves a callee to the name it was declared as, which is what makes a
 // renamed import report and a same-named local stay silent, and `isSetterTyped` reads the `Dispatch`
-// type ALIAS that `@types/react` puts on a `useState` setter and on nothing else. Both helpers are
+// type alias that `@types/react` puts on a `useState` setter and on nothing else. Both helpers are
 // this package's and are reused rather than rewritten, which is the whole reason these two rules
 // were batched.
 //
@@ -114,7 +115,7 @@ var messageNoDerivingStateInEffects = rule.Message{
 // and it is a different rule with a different verdict on a third of the corpus. When the shipped
 // plugin switches to it this rule is a re-port rather than an adjustment, and the fixture file's
 // recorded per-case verdicts are what will make that visible.
-var NoDerivingStateInEffects = rule.Rule{
+var NoDerivingStateInEffects = rule.Rule[CompilerRuleOptions]{
 	Name:             "react-hooks/no-deriving-state-in-effects",
 	NeedsTypeChecker: true,
 	// Reads other files only through shape readers (rule.ExportNameIn), so its findings key on imports' shapes.
@@ -122,28 +123,31 @@ var NoDerivingStateInEffects = rule.Rule{
 	// Same predicate as `set-state-in-effect`: the setter is recognised by its type alias, so a hook
 	// returning `any` takes every finding in the file with it. Declared so the tripwire can name it.
 	ResolvesReactValueTypes: true,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[CompilerRuleOptions]) rule.Listeners {
 		return rule.Listeners{
 			// The whole file at once, matching `set-state-in-effect` and `static-components`.
 			// Lowering already descends into nested functions through the function arena, so
 			// listening per function kind would lower every inner function twice.
 			ast.KindSourceFile: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 				// A file that cannot hold a component or a hook is not lowered at all; see
 				// high_level_intermediate_representation.MayHoldComponentOrHook for why that is exact.
-				if !high_level_intermediate_representation.MayHoldComponentOrHook(ctx) {
+				if !high_level_intermediate_representation.MayHoldComponentOrHook(ruleContext) {
 					return
 				}
 				forEachCompiledFunction(node, func(functionNode *ast.Node) {
 					// Manual memoization is erased first, because upstream validates a graph where
 					// `useMemo` and `useCallback` are already gone.
-					lowered := high_level_intermediate_representation.ForFunctionWithoutManualMemoization(ctx, functionNode)
+					lowered := high_level_intermediate_representation.ForFunctionWithoutManualMemoization(
+						ruleContext,
+						functionNode,
+					)
 					if lowered == nil {
 						return
 					}
-					analyzeDerivedComputationsSubject(ctx, lowered)
+					analyzeDerivedComputationsSubject(ruleContext, lowered)
 				})
 			},
 		}
@@ -155,33 +159,40 @@ var NoDerivingStateInEffects = rule.Rule{
 // The same gate and the same descent as `analyzeSetStateInEffectSubject`, for the same reason: the
 // effect is classified by its type, so only the component-or-hook test keeps this to the functions
 // upstream validates, and it is what makes `hir.MayHoldComponentOrHook` exact for this rule.
-func analyzeDerivedComputationsSubject(ctx rule.Context, function *high_level_intermediate_representation.Function) {
+func analyzeDerivedComputationsSubject(
+	ruleContext rule.Context,
+	function *high_level_intermediate_representation.Function,
+) {
 	if function == nil {
 		return
 	}
 	if function.Node == nil || !utilsreact.IsComponentOrHookLike(function.Node) {
 		for _, nested := range function.Functions {
-			analyzeDerivedComputationsSubject(ctx, nested)
+			analyzeDerivedComputationsSubject(ruleContext, nested)
 		}
 		return
 	}
 	// A unit found nested in a function that is not one is analyzed as React Compiler compiles it,
 	// on its own; see AsCompilationUnit.
-	function = high_level_intermediate_representation.AsCompilationUnit(ctx, function,
+	compilationUnit := high_level_intermediate_representation.AsCompilationUnit(ruleContext, function,
 		high_level_intermediate_representation.ForFunctionWithoutManualMemoization)
-	reportDerivedComputationsInEffects(ctx, function)
+	reportDerivedComputationsInEffects(ruleContext, compilationUnit)
 }
 
 // reportDerivedComputationsInEffects is upstream's `validateNoDerivedComputationsInEffects` over one
 // compiled function: the gather loop, then a judgment per candidate effect.
-func reportDerivedComputationsInEffects(ctx rule.Context, function *high_level_intermediate_representation.Function) {
+func reportDerivedComputationsInEffects(
+	ruleContext rule.Context,
+	function *high_level_intermediate_representation.Function,
+) {
 	if function == nil {
 		return
 	}
 
 	// Upstream's three maps, keyed the same way. Single-assignment form is what lets each be one
 	// entry per value rather than per binding.
-	candidateDependencies := map[static_single_assignment.IdentifierId]*high_level_intermediate_representation.ArrayExpression{}
+	candidateDependencies :=
+		map[static_single_assignment.IdentifierId]*high_level_intermediate_representation.ArrayExpression{}
 	functions := map[static_single_assignment.IdentifierId]*high_level_intermediate_representation.FunctionExpression{}
 	locals := map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{}
 
@@ -201,11 +212,27 @@ func reportDerivedComputationsInEffects(ctx rule.Context, function *high_level_i
 			case *high_level_intermediate_representation.FunctionExpression:
 				functions[target] = value
 			case *high_level_intermediate_representation.CallExpression:
-				derivedEffectCandidate(ctx, function, value.Callee, value.Args, candidateDependencies, functions, locals)
+				derivedEffectCandidate(
+					ruleContext,
+					function,
+					value.Callee,
+					value.Arguments,
+					candidateDependencies,
+					functions,
+					locals,
+				)
 			case *high_level_intermediate_representation.MethodCall:
 				// `React.useEffect(...)`. The property Place is the callee, exactly as upstream
 				// selects `instr.value.property` for a MethodCall.
-				derivedEffectCandidate(ctx, function, value.Property, value.Args, candidateDependencies, functions, locals)
+				derivedEffectCandidate(
+					ruleContext,
+					function,
+					value.Property,
+					value.Arguments,
+					candidateDependencies,
+					functions,
+					locals,
+				)
 			}
 		}
 	}
@@ -213,7 +240,7 @@ func reportDerivedComputationsInEffects(ctx rule.Context, function *high_level_i
 	// A nested function is lowered into this function's arena but its own body is a separate graph
 	// the walk above never entered. Same descent as `set-state-in-effect`.
 	for _, nested := range function.Functions {
-		reportDerivedComputationsInEffects(ctx, nested)
+		reportDerivedComputationsInEffects(ruleContext, nested)
 	}
 }
 
@@ -223,31 +250,31 @@ func reportDerivedComputationsInEffects(ctx rule.Context, function *high_level_i
 // dependency array is what this rule reasons about. Both plain identifiers, because upstream reads
 // them out of the maps above rather than off the call, so an inline function or an inline array
 // literal is not a candidate at all. Verified against the shipped rule: `useEffect(() => setV(a),
-// [a])` written inline is REPORTED, because lowering assigns the inline callback and the inline
+// [a])` written inline is reported, because lowering assigns the inline callback and the inline
 // array to temporaries first, so both arguments are identifiers by the time the pass sees them.
 // That is why this is not a syntactic test.
 func derivedEffectCandidate(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	function *high_level_intermediate_representation.Function,
 	callee high_level_intermediate_representation.Place,
-	args []high_level_intermediate_representation.Argument,
+	arguments []high_level_intermediate_representation.Argument,
 	candidateDependencies map[static_single_assignment.IdentifierId]*high_level_intermediate_representation.ArrayExpression,
 	functions map[static_single_assignment.IdentifierId]*high_level_intermediate_representation.FunctionExpression,
 	locals map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId,
 ) {
-	if len(args) != 2 || args[0].Spread || args[1].Spread {
+	if len(arguments) != 2 || arguments[0].Spread || arguments[1].Spread {
 		return
 	}
-	if !isUseEffectExactly(ctx, function, callee) {
+	if !isUseEffectExactly(ruleContext, function, callee) {
 		return
 	}
 
-	effectFunction, hasFunction := functions[args[0].Place.Identifier]
+	effectFunction, hasFunction := functions[arguments[0].Place.Identifier]
 	if !hasFunction {
 		return
 	}
-	deps, hasDeps := candidateDependencies[args[1].Place.Identifier]
-	// The `len == 0` half is upstream's `deps.elements.length !== 0` and it is SUBSUMED here,
+	deps, hasDeps := candidateDependencies[arguments[1].Place.Identifier]
+	// The `len == 0` half is upstream's `deps.elements.length !== 0` and it is subsumed here,
 	// deliberately kept rather than deleted. Its mutant survives the whole suite and no fixture can
 	// catch it, so the equivalence is stated with the measurement rather than left as a blind spot.
 	//
@@ -269,7 +296,7 @@ func derivedEffectCandidate(
 	// in the dependency array abandons the effect rather than being skipped.
 	dependencies := make([]static_single_assignment.IdentifierId, 0, len(deps.Elements))
 	for _, element := range deps.Elements {
-		// The `Hole` half is SUBSUMED and kept for fidelity, with the measurement recorded rather
+		// The `Hole` half is subsumed and kept for fidelity, with the measurement recorded rather
 		// than the branch deleted. A hole lowers to a real `<hole>` element, so this is reachable,
 		// but dropping the test changes no verdict: the hole's Place carries no live identifier, so
 		// it enters `dependencies` as a value nothing in the callback can capture, and the "every
@@ -283,7 +310,7 @@ func derivedEffectCandidate(
 			return
 		}
 		// `locals.get(dep) ?? dep`: a dependency written as an identifier lowered to a LoadLocal, so
-		// the taint has to be keyed on the value it READ rather than on the temporary that read it.
+		// the taint has to be keyed on the value it read rather than on the temporary that read it.
 		identifier := element.Place.Identifier
 		if origin, ok := locals[identifier]; ok {
 			identifier = origin
@@ -303,7 +330,7 @@ func derivedEffectCandidate(
 	if nested == nil {
 		return
 	}
-	validateDerivedEffect(ctx, function, nested, effectFunction, dependencies)
+	validateDerivedEffect(ruleContext, function, nested, effectFunction, dependencies)
 }
 
 // validateDerivedEffect is upstream's `validateEffect`: the capture check, then the taint walk.
@@ -312,13 +339,13 @@ func derivedEffectCandidate(
 // upstream's shape rather than an approximation of it. An effect that does one unrecognised thing
 // is not a pure derivation, so partial credit would report on effects upstream leaves alone.
 func validateDerivedEffect(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	enclosing *high_level_intermediate_representation.Function,
 	effectFunction *high_level_intermediate_representation.Function,
 	effectValue *high_level_intermediate_representation.FunctionExpression,
 	effectDeps []static_single_assignment.IdentifierId,
 ) {
-	// The captures are places in the ENCLOSING function, which is what makes them comparable to the
+	// The captures are places in the enclosing function, which is what makes them comparable to the
 	// dependency identifiers gathered there. `effectFunction.Context` holds the same values renamed
 	// into the nested function's own identifier space, so comparing those to `effectDeps` would
 	// compare two different numbering schemes and never match.
@@ -327,7 +354,7 @@ func validateDerivedEffect(
 	// Every capture is a setter or a dep. Anything else means the effect reads something the
 	// dependency array did not declare, and upstream leaves it alone.
 	for _, capture := range captures {
-		if isSetterTyped(ctx, enclosing, capture) {
+		if isSetterTyped(ruleContext, enclosing, capture) {
 			continue
 		}
 		if containsIdentifier(effectDeps, capture.Identifier) {
@@ -351,7 +378,7 @@ func validateDerivedEffect(
 		}
 	}
 
-	// The taint map is keyed in the NESTED function's identifier space, seeded from the captures.
+	// The taint map is keyed in the nested function's identifier space, seeded from the captures.
 	// Upstream seeds `values` directly from `effectDeps` because its context operands carry the same
 	// identifier ids inside and out; ours are renamed by lowering, so the seed is translated through
 	// the context list, which is index-aligned with the captures.
@@ -365,7 +392,7 @@ func validateDerivedEffect(
 			values[inner] = []static_single_assignment.IdentifierId{capture.Identifier}
 		}
 	}
-	// This guard is UNREACHABLE today and is kept deliberately, because what makes it unreachable
+	// This guard is unreachable today and is kept deliberately, because what makes it unreachable
 	// lives in another package.
 	//
 	// The seed can only come up short if `Captures` and `Context` stop corresponding index for
@@ -419,7 +446,9 @@ func validateDerivedEffect(
 
 			switch value := instruction.Value.(type) {
 			// Upstream's inert set: a constant contributes no taint and is not a reason to give up.
-			case *high_level_intermediate_representation.Primitive, *high_level_intermediate_representation.JsxText, *high_level_intermediate_representation.LoadGlobal:
+			case *high_level_intermediate_representation.Primitive,
+				*high_level_intermediate_representation.JsxText,
+				*high_level_intermediate_representation.LoadGlobal:
 
 			case *high_level_intermediate_representation.LoadLocal:
 				if deps, ok := values[value.Place.Identifier]; ok {
@@ -436,10 +465,17 @@ func validateDerivedEffect(
 					values[instruction.LValue.Identifier] = deps
 				}
 
-			case *high_level_intermediate_representation.ComputedLoad, *high_level_intermediate_representation.PropertyLoad, *high_level_intermediate_representation.BinaryExpression, *high_level_intermediate_representation.TemplateLiteral,
-				*high_level_intermediate_representation.CallExpression, *high_level_intermediate_representation.MethodCall:
+			case *high_level_intermediate_representation.ComputedLoad,
+				*high_level_intermediate_representation.PropertyLoad,
+				*high_level_intermediate_representation.BinaryExpression,
+				*high_level_intermediate_representation.TemplateLiteral,
+				*high_level_intermediate_representation.CallExpression,
+				*high_level_intermediate_representation.MethodCall:
 				aggregate := map[static_single_assignment.IdentifierId]bool{}
-				high_level_intermediate_representation.EachPlace(instruction.Value, func(place high_level_intermediate_representation.Place, _ high_level_intermediate_representation.PlaceRole) {
+				high_level_intermediate_representation.EachPlace(instruction.Value, func(
+					place high_level_intermediate_representation.Place,
+					_ high_level_intermediate_representation.PlaceRole,
+				) {
 					for _, dep := range values[place.Identifier] {
 						aggregate[dep] = true
 					}
@@ -449,30 +485,30 @@ func validateDerivedEffect(
 				}
 
 				call, isCall := instruction.Value.(*high_level_intermediate_representation.CallExpression)
-				// The `Spread` half is SUBSUMED, measured rather than assumed. `setV(...[x])`
+				// The `Spread` half is subsumed, measured rather than assumed. `setV(...[x])`
 				// does lower to a single spread argument, so the branch is reachable in the sense
 				// that matters, but the effect never gets this far: building the spread's operand
 				// requires an `ArrayExpression` instruction, which is not in the allowed set above
-				// and so hits `default: return` first. Spreading a NAMED array is the same story
+				// and so hits `default: return` first. Spreading a named array is the same story
 				// one step earlier, since the array is built in the enclosing function and the
 				// callback then captures a value that is neither a setter nor a dep.
 				//
-				// Measured both ways on the spread shape: pristine 0, mutant 0. The argument-COUNT
+				// Measured both ways on the spread shape: pristine 0, mutant 0. The argument-count
 				// half of this condition is load-bearing and its own mutant dies on
 				// `setterCalledWithTwoArguments`.
-				if !isCall || len(call.Args) != 1 || call.Args[0].Spread {
+				if !isCall || len(call.Arguments) != 1 || call.Arguments[0].Spread {
 					break
 				}
-				if !isSetterTyped(ctx, effectFunction, call.Callee) {
+				if !isSetterTyped(ruleContext, effectFunction, call.Callee) {
 					break
 				}
-				deps, hasDeps := values[call.Args[0].Place.Identifier]
+				deps, hasDeps := values[call.Arguments[0].Place.Identifier]
 				if hasDeps && distinctCount(deps) == len(effectDeps) {
 					setStateLocations = append(setStateLocations, call.Callee)
 					break
 				}
 				// A setter call whose argument carries no taint, or taint from only some of the
-				// deps, abandons the WHOLE effect rather than skipping this call. That is
+				// deps, abandons the whole effect rather than skipping this call. That is
 				// upstream's `return`, and it is why setting from one of two deps is silent even
 				// when a second call in the same effect sets from both.
 				return
@@ -487,7 +523,10 @@ func validateDerivedEffect(
 		// A derived value read by a terminal is a branch condition or a return, which is again more
 		// than a derivation.
 		abandon := false
-		high_level_intermediate_representation.EachTerminalPlace(block.Terminal, func(place high_level_intermediate_representation.Place, _ high_level_intermediate_representation.PlaceRole) {
+		high_level_intermediate_representation.EachTerminalPlace(block.Terminal, func(
+			place high_level_intermediate_representation.Place,
+			_ high_level_intermediate_representation.PlaceRole,
+		) {
 			if _, ok := values[place.Identifier]; ok {
 				abandon = true
 			}
@@ -500,24 +539,28 @@ func validateDerivedEffect(
 	}
 
 	for _, location := range setStateLocations {
-		reportDerivedSetter(ctx, effectFunction, location)
+		reportDerivedSetter(ruleContext, effectFunction, location)
 	}
 }
 
 // reportDerivedSetter points the finding at the setter's reference inside the effect.
 //
 // Same mechanism and same reasoning as `reportSetter` in `set_state_in_effect.go`: a Place carries
-// the span of the REFERENCE while `Identifier.Node` carries the span of the binding, so reporting
+// the span of the reference while `Identifier.Node` carries the span of the binding, so reporting
 // through the node points every finding at the `useState` destructure. The range is trimmed of
 // leading trivia because a Place's range starts at the raw start of the reference, which includes
 // the newline and indentation before it.
-func reportDerivedSetter(ctx rule.Context, function *high_level_intermediate_representation.Function, setter high_level_intermediate_representation.Place) {
-	if span := trimmedRange(ctx, setter.Range); span.Pos() < span.End() {
-		ctx.ReportRange(span, messageNoDerivingStateInEffects)
+func reportDerivedSetter(
+	ruleContext rule.Context,
+	function *high_level_intermediate_representation.Function,
+	setter high_level_intermediate_representation.Place,
+) {
+	if span := trimmedRange(ruleContext, setter.Range); span.Pos() < span.End() {
+		ruleContext.ReportRange(span, messageNoDerivingStateInEffects)
 		return
 	}
 	if node := setStateInEffectIdentifierNodeOf(function, setter.Identifier); node != nil {
-		ctx.ReportNode(node, messageNoDerivingStateInEffects)
+		ruleContext.ReportNode(node, messageNoDerivingStateInEffects)
 	}
 }
 
@@ -537,7 +580,7 @@ func reportDerivedSetter(ctx rule.Context, function *high_level_intermediate_rep
 // is now a fixture.
 //
 // The resolution mechanism is the sibling's and is correct to share: read the type's symbol rather
-// than `GetSymbolAtLocation`, so a renamed import reports under its DECLARED name and a same-named
+// than `GetSymbolAtLocation`, so a renamed import reports under its declared name and a same-named
 // local does not. Only the accepted set differs.
 // Kept in this file rather than lifted out of `effectHookKind`, and that is a deliberate scar
 // rather than duplication left by accident. That function is `set_state_in_effect.go`'s and encodes
@@ -546,16 +589,20 @@ func reportDerivedSetter(ctx rule.Context, function *high_level_intermediate_rep
 // lines of checker reads; when both rules are settled they want one shared
 // `declaredHookName(ctx, function, place) string` in the package, with each rule keeping only its
 // own accepted set. That is one commit, after, not a unilateral edit now.
-func isUseEffectExactly(ctx rule.Context, function *high_level_intermediate_representation.Function, callee high_level_intermediate_representation.Place) bool {
+func isUseEffectExactly(
+	ruleContext rule.Context,
+	function *high_level_intermediate_representation.Function,
+	callee high_level_intermediate_representation.Place,
+) bool {
 	node := setStateInEffectIdentifierNodeOf(function, callee.Identifier)
-	if node == nil || ctx.TypeChecker == nil {
+	if node == nil || ruleContext.TypeChecker == nil {
 		return false
 	}
-	// The TYPE's symbol, not `GetSymbolAtLocation`'s: for `import {useEffect as useFx}` the latter
+	// The type's symbol, not `GetSymbolAtLocation`'s: for `import {useEffect as useFx}` the latter
 	// returns the local name `useFx` while this returns the declared `useEffect`, which is the name
 	// React's `binding.imported` asks for. Reading the local spelling silently declines every
 	// renamed import, and a namespace member falls out of the same read with no extra case.
-	calleeType := ctx.TypeChecker.GetTypeAtLocation(node)
+	calleeType := ruleContext.TypeChecker.GetTypeAtLocation(node)
 	if calleeType == nil {
 		return false
 	}
@@ -592,19 +639,22 @@ func isUseEffectExactly(ctx rule.Context, function *high_level_intermediate_repr
 //	const lastName = 'Swift'   NOT listed as a dep REPORTS  (folded on both sides, so no mismatch)
 //
 // The last row is why this declines the whole effect rather than dropping the dep from the list: a
-// constant that is not named in the array changes nothing on either side, and a constant that IS
+// constant that is not named in the array changes nothing on either side, and a constant that is
 // named is precisely the mismatch that makes upstream give up.
 //
 // # What is deliberately not reproduced
 //
 // Only a directly-assigned literal is recognised, not the full fold. `const n = 40 + 2` is silent
-// upstream and REPORTS here, because our lowering leaves the addition as a `BinaryExpression` and
+// upstream and reports here, because our lowering leaves the addition as a `BinaryExpression` and
 // nothing folds it. That is a stated divergence in the reporting direction on a shape nobody writes
 // into a dependency array, and closing it means porting constant propagation, which is a pass for
 // the intermediate representation rather than a helper for this rule. Recorded here so the next
 // reader can see the limit was measured rather than assumed, and so it is findable when the fold
 // lands: this function should be deleted then, not extended.
-func dependencyIsFoldedConstant(function *high_level_intermediate_representation.Function, dependency static_single_assignment.IdentifierId) bool {
+func dependencyIsFoldedConstant(
+	function *high_level_intermediate_representation.Function,
+	dependency static_single_assignment.IdentifierId,
+) bool {
 	for _, block := range function.Blocks {
 		for _, instructionId := range block.Instructions {
 			instruction := function.Instructions[instructionId]
@@ -624,7 +674,10 @@ func dependencyIsFoldedConstant(function *high_level_intermediate_representation
 }
 
 // definesPrimitive answers whether a value was produced by a literal.
-func definesPrimitive(function *high_level_intermediate_representation.Function, identifier static_single_assignment.IdentifierId) bool {
+func definesPrimitive(
+	function *high_level_intermediate_representation.Function,
+	identifier static_single_assignment.IdentifierId,
+) bool {
 	for _, block := range function.Blocks {
 		for _, instructionId := range block.Instructions {
 			instruction := function.Instructions[instructionId]
@@ -640,7 +693,10 @@ func definesPrimitive(function *high_level_intermediate_representation.Function,
 
 // containsIdentifier is a linear scan because a dependency array is short. A map would cost a
 // build per effect to answer at most a handful of questions.
-func containsIdentifier(identifiers []static_single_assignment.IdentifierId, want static_single_assignment.IdentifierId) bool {
+func containsIdentifier(
+	identifiers []static_single_assignment.IdentifierId,
+	want static_single_assignment.IdentifierId,
+) bool {
 	for _, identifier := range identifiers {
 		if identifier == want {
 			return true
@@ -656,7 +712,10 @@ func containsIdentifier(identifiers []static_single_assignment.IdentifierId, wan
 // is how many distinct entries it holds. It is fixed anyway because an unordered slice stored into a
 // map that later feeds a phi aggregate makes the whole pass produce different intermediate values
 // between runs, which is the class of bug `TestLowerIsDeterministic` exists to catch one layer down.
-func identifiersOf(set map[static_single_assignment.IdentifierId]bool, order []static_single_assignment.IdentifierId) []static_single_assignment.IdentifierId {
+func identifiersOf(
+	set map[static_single_assignment.IdentifierId]bool,
+	order []static_single_assignment.IdentifierId,
+) []static_single_assignment.IdentifierId {
 	result := make([]static_single_assignment.IdentifierId, 0, len(set))
 	for _, identifier := range order {
 		if set[identifier] {
@@ -666,7 +725,7 @@ func identifiersOf(set map[static_single_assignment.IdentifierId]bool, order []s
 	return result
 }
 
-// distinctCount is upstream's `new Set(deps).size`, and here it is EQUIVALENT to `len`, which is
+// distinctCount is upstream's `new Set(deps).size`, and here it is equivalent to `len`, which is
 // stated rather than left as a surviving mutant.
 //
 // Replacing the body with `len(identifiers)` survives the whole suite. That is not a fixture gap:
@@ -686,7 +745,7 @@ func identifiersOf(set map[static_single_assignment.IdentifierId]bool, order []s
 // The reachability was probed rather than argued: six shapes that could plausibly produce a repeat
 // were run against both versions, including a ternary with identical arms, a logical operator over
 // one dep, and `a + a` in a single expression. Zero disagreements. The `a + a` case is the
-// interesting one, since it reports under both versions, proving the path IS reached and the count
+// interesting one, since it reports under both versions, proving the path is reached and the count
 // still agrees.
 //
 // Upstream's spelling is kept because it is upstream's, and because the property above is a

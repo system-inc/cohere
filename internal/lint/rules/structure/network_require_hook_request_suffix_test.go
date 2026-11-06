@@ -14,8 +14,8 @@ const requestSuffixDeclarations = "import { networkService } from './NetworkServ
 const requestSuffixFile = "/repository/source/api/UserRequest.ts"
 const plainNamedFile = "/repository/source/api/User.ts"
 
-func TestNetworkRequireHookRequestSuffixFires(t *testing.T) {
-	t.Parallel()
+func TestNetworkRequireHookRequestSuffixFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -116,16 +116,16 @@ func TestNetworkRequireHookRequestSuffixFires(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.Run(t, NetworkRequireHookRequestSuffix, testCase.fileName,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.Run(test, NetworkRequireHookRequestSuffix, testCase.fileName,
 				requestSuffixDeclarations+testCase.sourceText), testCase.wantIds...)
 		})
 	}
 }
 
-func TestNetworkRequireHookRequestSuffixStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNetworkRequireHookRequestSuffixStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -176,9 +176,9 @@ func TestNetworkRequireHookRequestSuffixStaysSilent(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NetworkRequireHookRequestSuffix, testCase.fileName,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NetworkRequireHookRequestSuffix, testCase.fileName,
 				requestSuffixDeclarations+testCase.sourceText))
 		})
 	}
@@ -187,7 +187,7 @@ func TestNetworkRequireHookRequestSuffixStaysSilent(t *testing.T) {
 // The base name is taken before the suffix test, and the two cases below pin that it is the last
 // path segment being judged.
 //
-// Worth saying what these do NOT prove, because the first version of this comment claimed it. I
+// Worth saying what these do not prove, because the first version of this comment claimed it. I
 // mutated the base-name extraction away (judging the whole path instead) and the suite stayed
 // green, then went looking for the fixture that would catch it and could not write one. The reason
 // is that the test is a suffix test: a path always ends with its own base name, so
@@ -197,17 +197,17 @@ func TestNetworkRequireHookRequestSuffixStaysSilent(t *testing.T) {
 //
 // Recorded rather than deleted: a mutant that survives is either a missing fixture or a line that
 // does not change behavior, and those look identical until someone works out which.
-func TestNetworkRequireHookRequestSuffixJudgesTheBaseName(t *testing.T) {
-	t.Parallel()
+func TestNetworkRequireHookRequestSuffixJudgesTheBaseName(test *testing.T) {
+	test.Parallel()
 
 	source := "export function useUserRequest() {\n    return networkService.useGraphQlQuery(gqlDocument);\n}\n"
 
 	// A correct file name inside an unrelated directory stays silent.
-	rule_testing.ExpectClean(t, rule_testing.Run(t, NetworkRequireHookRequestSuffix,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, NetworkRequireHookRequestSuffix,
 		"/repository/source/User/UserRequest.ts", requestSuffixDeclarations+source))
 
 	// A wrong file name inside a directory that ends in Request still fires.
-	rule_testing.ExpectFindings(t, rule_testing.Run(t, NetworkRequireHookRequestSuffix,
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, NetworkRequireHookRequestSuffix,
 		"/repository/source/UserRequest/Helper.ts", requestSuffixDeclarations+source),
 		"fileShouldEndWithRequest")
 }
@@ -219,21 +219,28 @@ func TestNetworkRequireHookRequestSuffixJudgesTheBaseName(t *testing.T) {
 //
 // Worth stating plainly because the first version of this file did put it in the table, and it
 // failed for that reason rather than for a defect in the rule.
-func TestNetworkRequireHookRequestSuffixNeedsTheImport(t *testing.T) {
-	t.Parallel()
+func TestNetworkRequireHookRequestSuffixNeedsTheImport(test *testing.T) {
+	test.Parallel()
 
 	// Identical to a firing case in every respect except where networkService comes from.
 	withoutImport := "declare const networkService: { useGraphQlQuery(document: unknown): unknown };\n" +
 		"declare const gqlDocument: unknown;\n" +
 		"export function useUser() {\n    return networkService.useGraphQlQuery(gqlDocument);\n}\n"
 
-	rule_testing.ExpectClean(t, rule_testing.Run(t, NetworkRequireHookRequestSuffix, plainNamedFile, withoutImport))
+	rule_testing.ExpectClean(
+		test,
+		rule_testing.Run(test, NetworkRequireHookRequestSuffix, plainNamedFile, withoutImport),
+	)
 
 	// The control: the same source with the import restored must fire both findings. Without this
 	// half the test above would pass on a rule that reports nothing at all.
 	withImport := requestSuffixDeclarations +
 		"export function useUser() {\n    return networkService.useGraphQlQuery(gqlDocument);\n}\n"
 
-	rule_testing.ExpectFindings(t, rule_testing.Run(t, NetworkRequireHookRequestSuffix, plainNamedFile, withImport),
-		"hookShouldEndWithRequest", "fileShouldEndWithRequest")
+	rule_testing.ExpectFindings(
+		test,
+		rule_testing.Run(test, NetworkRequireHookRequestSuffix, plainNamedFile, withImport),
+		"hookShouldEndWithRequest",
+		"fileShouldEndWithRequest",
+	)
 }

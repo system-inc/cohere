@@ -115,10 +115,11 @@ func DeclaredPropertiesFor(candidate *ParsedCandidate, resolution ValueResolutio
 // Whether those properties can conflict with another class's is `selectorShapeOf`'s question and is
 // answered beside this one. Both are read off the same nodes.
 func collectVisibleProperties(properties []string, nodes []*Node) []string {
+	collected := properties
 	for _, node := range nodes {
 		switch node.Kind {
 		case KindRule, KindAtRule:
-			properties = collectVisibleProperties(properties, node.Nodes)
+			collected = collectVisibleProperties(collected, node.Nodes)
 
 		case KindDeclaration:
 			// An absent value is not a declaration the browser sees, and PropertySort skips it for
@@ -128,11 +129,18 @@ func collectVisibleProperties(properties []string, nodes []*Node) []string {
 			if !node.ValuePresent {
 				continue
 			}
-			properties = appendVisibleProperty(properties, node.Property)
+			collected = appendVisibleProperty(collected, node.Property)
 		}
 	}
-	return properties
+	return collected
 }
+
+// declaredPropertiesSentinel is the value handed to the two value-independent slices.
+//
+// Their emitters carry it into every declaration they build and nothing here reads it back: this
+// file collects property names. Named rather than spelled inline so it is visibly the same
+// not-a-CSS-value the emitter tests use.
+const declaredPropertiesSentinel = "zzsentinel"
 
 // emitFunctionalRoot dispatches one candidate to whichever slice ported its handle body.
 //
@@ -144,7 +152,10 @@ func emitFunctionalRoot(candidate *ParsedCandidate, resolution ValueResolution) 
 	root := strings.TrimPrefix(candidate.Root, "-")
 
 	if _, isGapRoot := gapEmitters[root]; isGapRoot {
-		return EmitGapRoot(root, UtilityBranchFor(candidate, gapTypeListFor(root), resolution.IsColor, resolution.Namespace))
+		return EmitGapRoot(
+			root,
+			UtilityBranchFor(candidate, gapTypeListFor(root), resolution.IsColor, resolution.Namespace),
+		)
 	}
 
 	// The two value-independent slices take a resolved value. They emit one list per root, so the
@@ -178,13 +189,6 @@ func emitFunctionalRoot(candidate *ParsedCandidate, resolution ValueResolution) 
 	}
 	return nil
 }
-
-// declaredPropertiesSentinel is the value handed to the two value-independent slices.
-//
-// Their emitters carry it into every declaration they build and nothing here reads it back: this
-// file collects property names. Named rather than spelled inline so it is visibly the same
-// not-a-CSS-value the emitter tests use.
-const declaredPropertiesSentinel = "zzsentinel"
 
 // gapTypeListFor returns the ordered data types a gap root infers against.
 //
@@ -222,6 +226,15 @@ func appendVisibleProperty(properties []string, property string) []string {
 	}
 	return append(properties, property)
 }
+
+// The two probe values handed to the emitters, which are values no design system resolves to.
+//
+// Their content does not matter and their difference does. Named rather than spelled inline so it is
+// visible that the comparison turns on two values being distinct rather than on what they are.
+const (
+	composesProbeFirst  = "zzprobeone"
+	composesProbeSecond = "zzprobetwo"
+)
 
 // ComposesFor reports whether a root's utilities layer rather than overwrite each other.
 //
@@ -263,15 +276,6 @@ func ComposesFor(root string) (composes bool, ok bool) {
 	}
 	return first == second, true
 }
-
-// The two probe values handed to the emitters, which are values no design system resolves to.
-//
-// Their content does not matter and their difference does. Named rather than spelled inline so it is
-// visible that the comparison turns on two values being distinct rather than on what they are.
-const (
-	composesProbeFirst  = "zzprobeone"
-	composesProbeSecond = "zzprobetwo"
-)
 
 // emitRootWithValue emits a root's declarations for one concrete value.
 //

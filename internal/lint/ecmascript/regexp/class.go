@@ -6,8 +6,6 @@ import (
 	"strings"
 	"unicode"
 	"unicode/utf8"
-
-	"github.com/system-inc/cohere/unicodeproperties"
 )
 
 // classAtomKind says what one member of a character class is. Keeping the four
@@ -29,51 +27,10 @@ const (
 	classDash
 )
 
-type classAtom struct {
-	kind   classAtomKind
-	lo, hi rune
-	text   string
-	ranges []unicodeproperties.Range
-}
-
-// covers reports whether the atom already names r, which is what decides
-// whether widening the class has anything to add for it.
-func (a classAtom) covers(r rune) bool {
-	switch a.kind {
-	case classRune, classDash:
-		return r == a.lo
-	case classRange:
-		return r >= a.lo && r <= a.hi
-	case classSet:
-		_, ok := slices.BinarySearchFunc(a.ranges, r, func(span unicodeproperties.Range, r rune) int {
-			if span.Hi < r {
-				return -1
-			}
-			if span.Lo > r {
-				return 1
-			}
-			return 0
-		})
-		return ok
-	}
-	return false
-}
-
-func (a classAtom) write() string {
-	switch a.kind {
-	case classSet:
-		return a.text
-	case classRange:
-		return literalRune(a.lo) + "-" + literalRune(a.hi)
-	default:
-		return literalRune(a.lo)
-	}
-}
-
 // wordClassAtoms spells `\w` as class members, in ascending order. ECMAScript
 // builds the set out of ASCII whatever the flags say, and under `u` and `i`
-// together it gains the two characters that fold into it: U+017F LATIN SMALL
-// LETTER LONG S onto `s`, U+212A KELVIN SIGN onto `k`.
+// together it gains the two characters that fold into it:
+// `U+017F LATIN SMALL LETTER LONG S` onto `s`, `U+212A KELVIN SIGN` onto `k`.
 func wordClassAtoms(options rewriteOptions) []classAtom {
 	atoms := []classAtom{
 		{kind: classRange, lo: '0', hi: '9'},
@@ -119,23 +76,23 @@ func nonWordClassAtoms(options rewriteOptions) []classAtom {
 
 // readClass reads a character class off the front of source, which opens at
 // `[`, returning its body, whether it is negated and how many bytes it spans.
-func readClass(source string) (body string, negated bool, width int, err error) {
-	i := len("[")
-	if i < len(source) && source[i] == '^' {
+func readClass(source string) (body string, negated bool, width int, readClassError error) {
+	index := len("[")
+	if index < len(source) && source[index] == '^' {
 		negated = true
-		i++
+		index++
 	}
-	start := i
-	for i < len(source) {
-		switch source[i] {
+	start := index
+	for index < len(source) {
+		switch source[index] {
 		case '\\':
-			_, size := utf8.DecodeRuneInString(source[i+1:])
-			i += 1 + size
+			_, size := utf8.DecodeRuneInString(source[index+1:])
+			index += 1 + size
 		case ']':
-			return source[start:i], negated, i + 1, nil
+			return source[start:index], negated, index + 1, nil
 		default:
-			_, size := utf8.DecodeRuneInString(source[i:])
-			i += size
+			_, size := utf8.DecodeRuneInString(source[index:])
+			index += size
 		}
 	}
 	return "", false, 0, fmt.Errorf("%w: [ that no ] closes", ErrUnsupportedSyntax)
@@ -143,28 +100,28 @@ func readClass(source string) (body string, negated bool, width int, err error) 
 
 // classAtoms reads a class body into the members it names. The second result is
 // false when an escape cannot be widened exactly.
-func classAtoms(body string, options rewriteOptions, ctx escapeContext) ([]classAtom, bool, error) {
-	ctx.inClass = true
+func classAtoms(body string, options rewriteOptions, escaping escapeContext) ([]classAtom, bool, error) {
+	escaping.inClass = true
 	atoms := []classAtom{}
 	exact := true
 
-	for i := 0; i < len(body); {
-		r, size := utf8.DecodeRuneInString(body[i:])
-		if r != '\\' {
-			if r == '-' {
+	for index := 0; index < len(body); {
+		character, size := utf8.DecodeRuneInString(body[index:])
+		if character != '\\' {
+			if character == '-' {
 				atoms = append(atoms, classAtom{kind: classDash, lo: '-'})
 			} else {
-				atoms = append(atoms, classAtom{kind: classRune, lo: r})
+				atoms = append(atoms, classAtom{kind: classRune, lo: character})
 			}
-			i += size
+			index += size
 			continue
 		}
 
-		escape, err := decodeEscape(body, i+size, ctx)
-		if err != nil {
-			return nil, false, err
+		escape, decodeEscapeError := decodeEscape(body, index+size, escaping)
+		if decodeEscapeError != nil {
+			return nil, false, decodeEscapeError
 		}
-		end := i + size + escape.width
+		end := index + size + escape.width
 		switch escape.kind {
 		case escapeSet:
 			// regexp2 reads `\d` and `\s` the way ECMAScript does, and `\w`
@@ -177,17 +134,17 @@ func classAtoms(body string, options rewriteOptions, ctx escapeContext) ([]class
 			case escape.set == setNonWord && options.ignoreCase && options.unicode:
 				atoms = append(atoms, nonWordClassAtoms(options)...)
 			default:
-				atoms = append(atoms, classAtom{kind: classSet, text: body[i:end]})
+				atoms = append(atoms, classAtom{kind: classSet, text: body[index:end]})
 			}
 		default:
-			atoms = append(atoms, classAtom{kind: classRune, lo: escape.r})
+			atoms = append(atoms, classAtom{kind: classRune, lo: escape.character})
 		}
-		i = end
+		index = end
 	}
 
-	joined, err := joinRanges(atoms, options)
-	if err != nil {
-		return nil, false, err
+	joined, joinRangesError := joinRanges(atoms, options)
+	if joinRangesError != nil {
+		return nil, false, joinRangesError
 	}
 	return joined, exact, nil
 }
@@ -197,22 +154,22 @@ func classAtoms(body string, options rewriteOptions, ctx escapeContext) ([]class
 // and `u` rejects outright.
 func joinRanges(atoms []classAtom, options rewriteOptions) ([]classAtom, error) {
 	joined := make([]classAtom, 0, len(atoms))
-	for i := 0; i < len(atoms); i++ {
-		if i+2 < len(atoms) && atoms[i+1].kind == classDash {
-			lo, hi := atoms[i], atoms[i+2]
+	for index := 0; index < len(atoms); index++ {
+		if index+2 < len(atoms) && atoms[index+1].kind == classDash {
+			lo, hi := atoms[index], atoms[index+2]
 			if lo.kind == classRune && hi.kind == classRune {
 				if lo.lo > hi.lo {
 					return nil, fmt.Errorf("%w: a character range running backwards", ErrUnsupportedSyntax)
 				}
 				joined = append(joined, classAtom{kind: classRange, lo: lo.lo, hi: hi.lo})
-				i += 2
+				index += 2
 				continue
 			}
 			if options.unicode {
 				return nil, fmt.Errorf("%w: a set at the end of a character range", ErrUnsupportedSyntax)
 			}
 		}
-		joined = append(joined, atoms[i])
+		joined = append(joined, atoms[index])
 	}
 	return joined, nil
 }
@@ -220,7 +177,7 @@ func joinRanges(atoms []classAtom, options rewriteOptions) ([]classAtom, error) 
 // writeClass writes the members out as a class regexp2 reads the same way,
 // widening it first where the flags ask for it.
 func writeClass(atoms []classAtom, negated bool, options rewriteOptions) string {
-	if slices.ContainsFunc(atoms, func(a classAtom) bool { return a.kind == classSet && a.ranges != nil }) {
+	if slices.ContainsFunc(atoms, func(atom classAtom) bool { return atom.kind == classSet && atom.ranges != nil }) {
 		return writePropertyClass(atoms, negated, options)
 	}
 	if len(atoms) == 0 {
@@ -253,8 +210,8 @@ func writeClass(atoms []classAtom, negated bool, options rewriteOptions) string 
 // JavaScript reads one too: `[^a]` asks whether any member compares equal to
 // the character at hand, and answers no to `A`.
 func caseExtras(atoms []classAtom, unicodeMode bool) string {
-	covers := func(r rune) bool {
-		return slices.ContainsFunc(atoms, func(atom classAtom) bool { return atom.covers(r) })
+	covers := func(character rune) bool {
+		return slices.ContainsFunc(atoms, func(atom classAtom) bool { return atom.covers(character) })
 	}
 
 	var extras strings.Builder

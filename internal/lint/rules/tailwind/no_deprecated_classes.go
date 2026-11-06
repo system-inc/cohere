@@ -85,8 +85,18 @@ var deprecations = []deprecation{
 	{Pattern: regexp.MustCompile(`^flex-grow-(.*)$`), Replacement: "grow-$1", SinceMajor: 4, SinceMinor: 0},
 
 	{Pattern: regexp.MustCompile(`^overflow-ellipsis$`), Replacement: "text-ellipsis", SinceMajor: 4, SinceMinor: 0},
-	{Pattern: regexp.MustCompile(`^decoration-slice$`), Replacement: "box-decoration-slice", SinceMajor: 4, SinceMinor: 0},
-	{Pattern: regexp.MustCompile(`^decoration-clone$`), Replacement: "box-decoration-clone", SinceMajor: 4, SinceMinor: 0},
+	{
+		Pattern:     regexp.MustCompile(`^decoration-slice$`),
+		Replacement: "box-decoration-slice",
+		SinceMajor:  4,
+		SinceMinor:  0,
+	},
+	{
+		Pattern:     regexp.MustCompile(`^decoration-clone$`),
+		Replacement: "box-decoration-clone",
+		SinceMajor:  4,
+		SinceMinor:  0,
+	},
 
 	// Tailwind 4.1 reordered the two-axis position names so the block axis comes first.
 	{Pattern: regexp.MustCompile(`^bg-left-top$`), Replacement: "bg-top-left", SinceMajor: 4, SinceMinor: 1},
@@ -94,9 +104,19 @@ var deprecations = []deprecation{
 	{Pattern: regexp.MustCompile(`^bg-right-top$`), Replacement: "bg-top-right", SinceMajor: 4, SinceMinor: 1},
 	{Pattern: regexp.MustCompile(`^bg-right-bottom$`), Replacement: "bg-bottom-right", SinceMajor: 4, SinceMinor: 1},
 	{Pattern: regexp.MustCompile(`^object-left-top$`), Replacement: "object-top-left", SinceMajor: 4, SinceMinor: 1},
-	{Pattern: regexp.MustCompile(`^object-left-bottom$`), Replacement: "object-bottom-left", SinceMajor: 4, SinceMinor: 1},
+	{
+		Pattern:     regexp.MustCompile(`^object-left-bottom$`),
+		Replacement: "object-bottom-left",
+		SinceMajor:  4,
+		SinceMinor:  1,
+	},
 	{Pattern: regexp.MustCompile(`^object-right-top$`), Replacement: "object-top-right", SinceMajor: 4, SinceMinor: 1},
-	{Pattern: regexp.MustCompile(`^object-right-bottom$`), Replacement: "object-bottom-right", SinceMajor: 4, SinceMinor: 1},
+	{
+		Pattern:     regexp.MustCompile(`^object-right-bottom$`),
+		Replacement: "object-bottom-right",
+		SinceMajor:  4,
+		SinceMinor:  1,
+	},
 }
 
 // NoDeprecatedClasses reports class names a Tailwind release renamed or removed.
@@ -119,23 +139,23 @@ var deprecations = []deprecation{
 // the fix, so `sm:hover:flex-grow-2!` becomes `sm:hover:grow-2!`. Measured against upstream rather
 // than assumed: the plugin dissects the class and matches the base, and a port that matched the raw
 // name would miss every prefixed use, which is most of them in real markup.
-var NoDeprecatedClasses = rule.Rule{
+var NoDeprecatedClasses = rule.Rule[NoDeprecatedClassesOptions]{
 	Name: "better-tailwindcss/no-deprecated-classes",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[NoDeprecatedClassesOptions]) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
 		surfaces := DefaultClassLiteralSurfaces()
-		if configured, isConfigured := rule.OptionsAs[NoDeprecatedClassesOptions](options); isConfigured {
+		if configured, isConfigured := options.Read(); isConfigured {
 			surfaces = configured.ClassLiteralSurfaces()
 		}
 
-		reader := surfaces.ReaderFor(ctx.FileCache)
+		reader := surfaces.ReaderFor(ruleContext.FileCache)
 
 		report := func(node *ast.Node) {
 			for _, literal := range reader.ClassLiteralsIn(node) {
-				reportDeprecations(ctx, literal)
+				reportDeprecations(ruleContext, literal)
 			}
 		}
 
@@ -157,7 +177,7 @@ var NoDeprecatedClasses = rule.Rule{
 // A repeat of an earlier class is reported and not renamed: `no-duplicate-classes` deletes it, and
 // a rename of the same bytes would be refused as an overlap. Once it is gone there is nothing left
 // to rename.
-func reportDeprecations(ctx rule.Context, literal ClassLiteral) {
+func reportDeprecations(ruleContext rule.Context, literal ClassLiteral) {
 	classes := SplitClasses(literal.Text)
 	if len(classes) == 0 {
 		return
@@ -166,8 +186,8 @@ func reportDeprecations(ctx rule.Context, literal ClassLiteral) {
 	// The class tokens line up with `classes` one for one, or there is no fix to offer.
 	var tokens []classToken
 	tokenized := false
-	if ctx.SourceFile != nil {
-		tokens, tokenized = classTokensIn(ctx.SourceFile.Text(), literal.Range, literal.Text)
+	if ruleContext.SourceFile != nil {
+		tokens, tokenized = classTokensIn(ruleContext.SourceFile.Text(), literal.Range, literal.Text)
 	}
 	classTokens := classesOf(tokens)
 	if tokenized && len(classTokens) == len(classes) {
@@ -205,13 +225,13 @@ func reportDeprecations(ctx rule.Context, literal ClassLiteral) {
 		if found.replacement == "" {
 			// Removed outright: reported and left as written, because this rule has no rewrite to offer
 			// and dropping the class would change what renders.
-			ctx.ReportRange(literal.Range, messageDeprecatedClassIrreplaceable(found.className))
+			ruleContext.ReportRange(literal.Range, messageDeprecatedClassIrreplaceable(found.className))
 			continue
 		}
 
 		message := messageDeprecatedClassReplaceable(found.className, found.replacement)
 		if !canFix {
-			ctx.ReportRange(literal.Range, message)
+			ruleContext.ReportRange(literal.Range, message)
 			continue
 		}
 
@@ -222,10 +242,10 @@ func reportDeprecations(ctx rule.Context, literal ClassLiteral) {
 			fixes = []rule.Fix{rule.ReplaceRange(classTokens[found.index].Range, found.replacement)}
 		}
 
-		ctx.Report(rule.Diagnostic{
+		ruleContext.Report(rule.Diagnostic{
 			Range:      literal.Range,
 			Message:    message,
-			SourceFile: ctx.SourceFile,
+			SourceFile: ruleContext.SourceFile,
 			Fixes:      fixes,
 		})
 	}
@@ -291,6 +311,13 @@ func buildClass(variants string, base string, important bool) string {
 	return rebuilt
 }
 
+// tailwindVersionForDeprecations is indirected so a test can pin a version.
+//
+// It reads the version the collapse table was generated against rather than asking the filesystem,
+// so both tables describe the same Tailwind. A rule reporting renames from a newer release than the
+// one the tables were built from would be reporting an engine nobody here is running.
+var tailwindVersionForDeprecations = func() string { return tailwindengine.TailwindVersion }
+
 // tailwindAtLeast reports whether the Tailwind this table was generated against is new enough for a
 // deprecation to apply.
 //
@@ -304,13 +331,6 @@ func tailwindAtLeast(major int, minor int) bool {
 	}
 	return installedMinor >= minor
 }
-
-// tailwindVersionForDeprecations is indirected so a test can pin a version.
-//
-// It reads the version the collapse table was generated against rather than asking the filesystem,
-// so both tables describe the same Tailwind. A rule reporting renames from a newer release than the
-// one the tables were built from would be reporting an engine nobody here is running.
-var tailwindVersionForDeprecations = func() string { return tailwindengine.TailwindVersion }
 
 // parseTailwindVersion reads the leading major and minor out of a semantic version.
 //

@@ -40,7 +40,12 @@ func tokenizeListStart(self *Self, effects *Effects, ok State, nok State) State 
 	}
 	size := 0
 
-	var start, inside, atMarker, onBlank, otherPrefix, endOfPrefix State
+	var start State
+	var inside State
+	var atMarker State
+	var onBlank State
+	var otherPrefix State
+	var endOfPrefix State
 
 	start = func(code Code) State {
 		// Upstream's `containerState.type`, which is a reserved word here.
@@ -89,7 +94,7 @@ func tokenizeListStart(self *Self, effects *Effects, ok State, nok State) State 
 		// `asciiDigit(code) && ++size < 10`: the increment only happens on a digit.
 		if asciiDigit(code) {
 			size++
-			if size < listItemValueSizeMax {
+			if size < listItemValueSizeMaximum {
 				effects.Consume(code)
 				return inside
 			}
@@ -147,7 +152,8 @@ func tokenizeListStart(self *Self, effects *Effects, ok State, nok State) State 
 	}
 
 	endOfPrefix = func(code Code) State {
-		self.ContainerState.size = initialSize + utf16Length(self.SliceSerialize(effects.Exit(TypeListItemPrefix), true))
+		self.ContainerState.size = initialSize +
+			utf16Length(self.SliceSerialize(effects.Exit(TypeListItemPrefix), true))
 		return ok(code)
 	}
 
@@ -155,12 +161,15 @@ func tokenizeListStart(self *Self, effects *Effects, ok State, nok State) State 
 }
 
 func tokenizeListContinuation(self *Self, effects *Effects, ok State, nok State) State {
-	var onBlank, notBlank, notInCurrentItem State
+	var onBlank State
+	var notBlank State
+	var notInCurrentItem State
 
 	self.ContainerState.closeFlow = false
 
 	onBlank = func(code Code) State {
-		self.ContainerState.furtherBlankLines = self.ContainerState.furtherBlankLines || self.ContainerState.initialBlankLine
+		self.ContainerState.furtherBlankLines = self.ContainerState.furtherBlankLines ||
+			self.ContainerState.initialBlankLine
 
 		// We have a blank line.
 		// Still, try to consume at most the items size.
@@ -197,9 +206,7 @@ func tokenizeListContinuation(self *Self, effects *Effects, ok State, nok State)
 }
 
 func tokenizeListIndent(self *Self, effects *Effects, ok State, nok State) State {
-	var afterPrefix State
-
-	afterPrefix = func(code Code) State {
+	afterPrefix := func(code Code) State {
 		if len(self.Events) > 0 {
 			tail := self.Events[len(self.Events)-1]
 			if tail.Token.Type == TypeListItemIndent &&
@@ -218,9 +225,7 @@ func tokenizeListEnd(self *Self, effects *Effects) {
 }
 
 func tokenizeListItemPrefixWhitespace(self *Self, effects *Effects, ok State, nok State) State {
-	var afterPrefix State
-
-	afterPrefix = func(code Code) State {
+	afterPrefix := func(code Code) State {
 		if !markdownSpace(code) && len(self.Events) > 0 &&
 			self.Events[len(self.Events)-1].Token.Type == TypeListItemPrefixWhitespace {
 			return ok(code)

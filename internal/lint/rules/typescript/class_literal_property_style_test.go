@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -22,20 +23,25 @@ func classLiteralPropertyStyleCaseName(index int) string {
 // The decoder holds the only default in this rule and reads a bare JSON string rather than an
 // object, which is the one line with no upstream counterpart. A fixture constructing the options
 // struct by hand would leave it unexercised. An empty configuration is the bare `"error"` case,
-// which the config layer turns into nil options, and it reaches the rule the same way here.
-func decodeClassLiteralPropertyStyleOptions(t *testing.T, configuration string) any {
-	t.Helper()
+// which the config layer turns into no options, and it reaches the rule the same way here.
+func decodeClassLiteralPropertyStyleOptions(
+	test *testing.T,
+	configuration string,
+) rule.Given[ClassLiteralPropertyStyleOptions] {
+	test.Helper()
 
 	if configuration == "" {
-		// A rule configured as a bare `"error"` is handed nil, not an empty struct. Passing nil
-		// here is what puts the rule's own fallback under test rather than the decoder's.
-		return nil
+		// A rule configured as a bare `"error"` is handed no options, not an empty struct. Handing
+		// it none here is what puts the rule's own fallback under test rather than the decoder's.
+		return rule.Given[ClassLiteralPropertyStyleOptions]{}
 	}
-	options, err := DecodeClassLiteralPropertyStyleOptions([]byte(configuration))
-	if err != nil {
-		t.Fatalf("could not decode %s: %v", configuration, err)
+	options, decodeClassLiteralPropertyStyleOptionsError := DecodeClassLiteralPropertyStyleOptions(
+		[]byte(configuration),
+	)
+	if decodeClassLiteralPropertyStyleOptionsError != nil {
+		test.Fatalf("could not decode %s: %v", configuration, decodeClassLiteralPropertyStyleOptionsError)
 	}
-	return options
+	return rule.Configured(options)
 }
 
 // TestClassLiteralPropertyStyleStaysSilentOnUpstreamPassCases is the imported clean corpus.
@@ -48,8 +54,8 @@ func decodeClassLiteralPropertyStyleOptions(t *testing.T, configuration string) 
 //
 // The same source appears under both options in several places, which is the point: this rule's
 // verdict lives above the code as often as in it.
-func TestClassLiteralPropertyStyleStaysSilentOnUpstreamPassCases(t *testing.T) {
-	t.Parallel()
+func TestClassLiteralPropertyStyleStaysSilentOnUpstreamPassCases(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		configuration string
@@ -181,11 +187,11 @@ func TestClassLiteralPropertyStyleStaysSilentOnUpstreamPassCases(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(classLiteralPropertyStyleCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, ClassLiteralPropertyStyle,
+		test.Run(classLiteralPropertyStyleCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunGiven(test, ClassLiteralPropertyStyle,
 				classLiteralPropertyStyleFile, testCase.sourceText,
-				decodeClassLiteralPropertyStyleOptions(t, testCase.configuration)))
+				decodeClassLiteralPropertyStyleOptions(test, testCase.configuration)))
 		})
 	}
 }
@@ -198,12 +204,12 @@ func TestClassLiteralPropertyStyleStaysSilentOnUpstreamPassCases(t *testing.T) {
 // rather than assumed equal to the finding count.
 //
 // Four things are asserted on each row and each catches a different defect. The ids say which of the
-// two directions ran. The spans say where the finding points, which is the member's KEY rather than
+// two directions ran. The spans say where the finding points, which is the member's key rather than
 // the member, so a reader is shown the name while the repair rewrites the whole declaration. The
 // suggestion count says whether a repair was offered at all. And the applied source says what a
 // human accepting that suggestion would get, which no message-id assertion can see.
-func TestClassLiteralPropertyStyleFiresOnUpstreamFailCases(t *testing.T) {
-	t.Parallel()
+func TestClassLiteralPropertyStyleFiresOnUpstreamFailCases(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		configuration string
@@ -252,7 +258,9 @@ func TestClassLiteralPropertyStyleFiresOnUpstreamFailCases(t *testing.T) {
 			sourceText:    "\nclass Mx {\n  public static get n() /* before */ : 1 | 2 /* after */ {\n    return 1;\n  }\n}\n      ",
 			wantIds:       []string{"preferFieldStyle"},
 			wantSpans:     []string{"n"},
-			wantSuggested: []string{"\nclass Mx {\n  public static readonly n /* before */ : 1 | 2 /* after */ = 1;\n}\n      "},
+			wantSuggested: []string{
+				"\nclass Mx {\n  public static readonly n /* before */ : 1 | 2 /* after */ = 1;\n}\n      ",
+			},
 		},
 		{
 			configuration: "",
@@ -336,49 +344,60 @@ func TestClassLiteralPropertyStyleFiresOnUpstreamFailCases(t *testing.T) {
 			sourceText:    "\nclass Mx {\n  public get myValue() {\n    return gql`\n      {\n        user(id: 5) {\n          firstName\n          lastName\n        }\n      }\n    `;\n  }\n}\n      ",
 			wantIds:       []string{"preferFieldStyle"},
 			wantSpans:     []string{"myValue"},
-			wantSuggested: []string{"\nclass Mx {\n  public readonly myValue = gql`\n      {\n        user(id: 5) {\n          firstName\n          lastName\n        }\n      }\n    `;\n}\n      "},
+			wantSuggested: []string{
+				"\nclass Mx {\n  public readonly myValue = gql`\n      {\n        user(id: 5) {\n          firstName\n          lastName\n        }\n      }\n    `;\n}\n      ",
+			},
 		},
 		{
 			configuration: "\"getters\"",
 			sourceText:    "\nclass Mx {\n  public readonly myValue = gql`\n    {\n      user(id: 5) {\n        firstName\n        lastName\n      }\n    }\n  `;\n}\n      ",
 			wantIds:       []string{"preferGetterStyle"},
 			wantSpans:     []string{"myValue"},
-			wantSuggested: []string{"\nclass Mx {\n  public get myValue() { return gql`\n    {\n      user(id: 5) {\n        firstName\n        lastName\n      }\n    }\n  `; }\n}\n      "},
+			wantSuggested: []string{
+				"\nclass Mx {\n  public get myValue() { return gql`\n    {\n      user(id: 5) {\n        firstName\n        lastName\n      }\n    }\n  `; }\n}\n      ",
+			},
 		},
 		{
 			configuration: "\"getters\"",
 			sourceText:    "\nclass A {\n  private readonly foo: string = 'bar';\n  constructor(foo: string) {\n    const bar = new (class {\n      private readonly foo: string = 'baz';\n      constructor() {\n        this.foo = 'qux';\n      }\n    })();\n  }\n}\n      ",
 			wantIds:       []string{"preferGetterStyle"},
 			wantSpans:     []string{"foo"},
-			wantSuggested: []string{"\nclass A {\n  private get foo() { return 'bar'; }\n  constructor(foo: string) {\n    const bar = new (class {\n      private readonly foo: string = 'baz';\n      constructor() {\n        this.foo = 'qux';\n      }\n    })();\n  }\n}\n      "},
+			wantSuggested: []string{
+				"\nclass A {\n  private get foo() { return 'bar'; }\n  constructor(foo: string) {\n    const bar = new (class {\n      private readonly foo: string = 'baz';\n      constructor() {\n        this.foo = 'qux';\n      }\n    })();\n  }\n}\n      ",
+			},
 		},
 		{
 			configuration: "\"getters\"",
 			sourceText:    "\nclass A {\n  private readonly ['foo']: string = 'bar';\n  constructor(foo: string) {\n    const bar = new (class {\n      private readonly foo: string = 'baz';\n      constructor() {}\n    })();\n\n    if (bar) {\n      this.foo = 'baz';\n    }\n  }\n}\n      ",
 			wantIds:       []string{"preferGetterStyle"},
 			wantSpans:     []string{"foo"},
-			wantSuggested: []string{"\nclass A {\n  private readonly ['foo']: string = 'bar';\n  constructor(foo: string) {\n    const bar = new (class {\n      private get foo() { return 'baz'; }\n      constructor() {}\n    })();\n\n    if (bar) {\n      this.foo = 'baz';\n    }\n  }\n}\n      "},
+			wantSuggested: []string{
+				"\nclass A {\n  private readonly ['foo']: string = 'bar';\n  constructor(foo: string) {\n    const bar = new (class {\n      private get foo() { return 'baz'; }\n      constructor() {}\n    })();\n\n    if (bar) {\n      this.foo = 'baz';\n    }\n  }\n}\n      ",
+			},
 		},
 		{
 			configuration: "\"getters\"",
 			sourceText:    "\nclass A {\n  private readonly foo: string = 'bar';\n  constructor(foo: string) {\n    function func() {\n      this.foo = 'aa';\n    }\n  }\n}\n      ",
 			wantIds:       []string{"preferGetterStyle"},
 			wantSpans:     []string{"foo"},
-			wantSuggested: []string{"\nclass A {\n  private get foo() { return 'bar'; }\n  constructor(foo: string) {\n    function func() {\n      this.foo = 'aa';\n    }\n  }\n}\n      "},
+			wantSuggested: []string{
+				"\nclass A {\n  private get foo() { return 'bar'; }\n  constructor(foo: string) {\n    function func() {\n      this.foo = 'aa';\n    }\n  }\n}\n      ",
+			},
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(classLiteralPropertyStyleCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, ClassLiteralPropertyStyle,
+		test.Run(classLiteralPropertyStyleCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunGiven(test, ClassLiteralPropertyStyle,
 				classLiteralPropertyStyleFile, testCase.sourceText,
-				decodeClassLiteralPropertyStyleOptions(t, testCase.configuration))
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+				decodeClassLiteralPropertyStyleOptions(test, testCase.configuration))
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 
 			for index, wantSpan := range testCase.wantSpans {
-				reported := testCase.sourceText[result.Diagnostics[index].Range.Pos():result.Diagnostics[index].Range.End()]
+				reported :=
+					testCase.sourceText[result.Diagnostics[index].Range.Pos():result.Diagnostics[index].Range.End()]
 				if reported != wantSpan {
-					t.Errorf("finding %d covers %q, want %q", index, reported, wantSpan)
+					test.Errorf("finding %d covers %q, want %q", index, reported, wantSpan)
 				}
 			}
 
@@ -388,25 +407,25 @@ func TestClassLiteralPropertyStyleFiresOnUpstreamFailCases(t *testing.T) {
 				diagnostic := result.Diagnostics[index]
 				if wantSuggested == "" {
 					if len(diagnostic.Suggestions) != 0 {
-						t.Errorf("finding %d offers %d suggestions, want none",
+						test.Errorf("finding %d offers %d suggestions, want none",
 							index, len(diagnostic.Suggestions))
 					}
 					continue
 				}
 				if len(diagnostic.Suggestions) != 1 {
-					t.Fatalf("finding %d offers %d suggestions, want one",
+					test.Fatalf("finding %d offers %d suggestions, want one",
 						index, len(diagnostic.Suggestions))
 				}
 				suggestion := diagnostic.Suggestions[0]
 				if len(suggestion.Fixes) != 1 {
-					t.Fatalf("finding %d's suggestion carries %d fixes, want one",
+					test.Fatalf("finding %d's suggestion carries %d fixes, want one",
 						index, len(suggestion.Fixes))
 				}
 				fix := suggestion.Fixes[0]
 				rewritten := testCase.sourceText[:fix.Range.Pos()] + fix.Text +
 					testCase.sourceText[fix.Range.End():]
 				if rewritten != wantSuggested {
-					t.Errorf("finding %d's suggestion produces:\n  %q\nwant:\n  %q",
+					test.Errorf("finding %d's suggestion produces:\n  %q\nwant:\n  %q",
 						index, rewritten, wantSuggested)
 				}
 			}
@@ -420,7 +439,7 @@ func TestClassLiteralPropertyStyleFiresOnUpstreamFailCases(t *testing.T) {
 // shipped that way tonight: one widened eight declarations to `any` by stranding a type annotation,
 // and one dropped a `: void` return type it could not see from the parameter list.
 //
-// This rule does not rebuild the signature. It splices the RAW SOURCE between the parameter list's
+// This rule does not rebuild the signature. It splices the raw source between the parameter list's
 // closing parenthesis and the body's opening brace, so anything living there survives byte for byte
 // without being enumerated. These rows are what proves that: the annotation, its unusual spacing,
 // and a comment written in the same span all reach the rewritten source unchanged.
@@ -428,8 +447,8 @@ func TestClassLiteralPropertyStyleFiresOnUpstreamFailCases(t *testing.T) {
 // Upstream's corpus is TypeScript so it does carry annotated cases, but none with the spacing or the
 // comment, and those are the two that would survive an enumerating fixer while telling you nothing.
 // Every expectation is what the installed 8.67.0 build produced for that exact input.
-func TestClassLiteralPropertyStylePreservesTheReturnAnnotation(t *testing.T) {
-	t.Parallel()
+func TestClassLiteralPropertyStylePreservesTheReturnAnnotation(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText    string
@@ -468,19 +487,19 @@ func TestClassLiteralPropertyStylePreservesTheReturnAnnotation(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(classLiteralPropertyStyleCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, ClassLiteralPropertyStyle,
+		test.Run(classLiteralPropertyStyleCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunGiven(test, ClassLiteralPropertyStyle,
 				classLiteralPropertyStyleFile, testCase.sourceText,
-				decodeClassLiteralPropertyStyleOptions(t, "\"fields\""))
-			rule_testing.ExpectFindings(t, result, "preferFieldStyle")
+				decodeClassLiteralPropertyStyleOptions(test, "\"fields\""))
+			rule_testing.ExpectFindings(test, result, "preferFieldStyle")
 
 			suggestion := result.Diagnostics[0].Suggestions[0]
 			fix := suggestion.Fixes[0]
 			rewritten := testCase.sourceText[:fix.Range.Pos()] + fix.Text +
 				testCase.sourceText[fix.Range.End():]
 			if rewritten != testCase.wantSuggested {
-				t.Errorf("the suggestion produces:\n  %q\nwant:\n  %q",
+				test.Errorf("the suggestion produces:\n  %q\nwant:\n  %q",
 					rewritten, testCase.wantSuggested)
 			}
 		})
@@ -495,8 +514,8 @@ func TestClassLiteralPropertyStylePreservesTheReturnAnnotation(t *testing.T) {
 //
 // Each row was run through the installed 8.67.0 build and carries the verdict that build produced,
 // so a row asserting silence asserts upstream's silence rather than this port's.
-func TestClassLiteralPropertyStyleDiscriminatesOnCasesUpstreamDoesNotWrite(t *testing.T) {
-	t.Parallel()
+func TestClassLiteralPropertyStyleDiscriminatesOnCasesUpstreamDoesNotWrite(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		configuration string
@@ -656,11 +675,11 @@ func TestClassLiteralPropertyStyleDiscriminatesOnCasesUpstreamDoesNotWrite(t *te
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(classLiteralPropertyStyleCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, ClassLiteralPropertyStyle,
+		test.Run(classLiteralPropertyStyleCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunGiven(test, ClassLiteralPropertyStyle,
 				classLiteralPropertyStyleFile, testCase.sourceText,
-				decodeClassLiteralPropertyStyleOptions(t, testCase.configuration))
+				decodeClassLiteralPropertyStyleOptions(test, testCase.configuration))
 			wantIds := make([]string, testCase.wantCount)
 			for index := range wantIds {
 				if testCase.configuration == "\"getters\"" {
@@ -669,7 +688,7 @@ func TestClassLiteralPropertyStyleDiscriminatesOnCasesUpstreamDoesNotWrite(t *te
 					wantIds[index] = "preferFieldStyle"
 				}
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 		})
 	}
 }
@@ -685,17 +704,20 @@ func TestClassLiteralPropertyStyleDiscriminatesOnCasesUpstreamDoesNotWrite(t *te
 //
 // The other rows are what the suggestion keeps in both directions: the JSDoc above the member, which
 // sits outside the replaced span, and the accessibility and `static` modifiers, which are rebuilt.
-func TestClassLiteralPropertyStyleKeepsWhatTheMemberCarries(t *testing.T) {
-	t.Parallel()
+func TestClassLiteralPropertyStyleKeepsWhatTheMemberCarries(test *testing.T) {
+	test.Parallel()
 
-	t.Run("a decorated field is offered nothing", func(t *testing.T) {
-		t.Parallel()
-		result := rule_testing.RunWithOptions(t, ClassLiteralPropertyStyle, classLiteralPropertyStyleFile,
+	test.Run("a decorated field is offered nothing", func(test *testing.T) {
+		test.Parallel()
+		result := rule_testing.RunGiven(test, ClassLiteralPropertyStyle, classLiteralPropertyStyleFile,
 			"declare const dec: any;\nclass C {\n  @dec\n  public static readonly foo = 'x';\n}\n",
-			decodeClassLiteralPropertyStyleOptions(t, "\"getters\""))
-		rule_testing.ExpectFindings(t, result, "preferGetterStyle")
+			decodeClassLiteralPropertyStyleOptions(test, "\"getters\""))
+		rule_testing.ExpectFindings(test, result, "preferGetterStyle")
 		if suggestions := result.Diagnostics[0].Suggestions; len(suggestions) != 0 {
-			t.Fatalf("a decorated field was offered %d suggestion(s), which would delete the decorator", len(suggestions))
+			test.Fatalf(
+				"a decorated field was offered %d suggestion(s), which would delete the decorator",
+				len(suggestions),
+			)
 		}
 	})
 
@@ -719,22 +741,22 @@ func TestClassLiteralPropertyStyleKeepsWhatTheMemberCarries(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, ClassLiteralPropertyStyle, classLiteralPropertyStyleFile,
-				testCase.sourceText, decodeClassLiteralPropertyStyleOptions(t, testCase.configuration))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunGiven(test, ClassLiteralPropertyStyle, classLiteralPropertyStyleFile,
+				testCase.sourceText, decodeClassLiteralPropertyStyleOptions(test, testCase.configuration))
 			if len(result.Diagnostics) != 1 || len(result.Diagnostics[0].Suggestions) != 1 {
-				t.Fatalf("expected one finding carrying one suggestion, got %d findings", len(result.Diagnostics))
+				test.Fatalf("expected one finding carrying one suggestion, got %d findings", len(result.Diagnostics))
 			}
 			if len(result.Diagnostics[0].Fixes) != 0 {
-				t.Fatalf("expected a suggestion only, got %d fixes", len(result.Diagnostics[0].Fixes))
+				test.Fatalf("expected a suggestion only, got %d fixes", len(result.Diagnostics[0].Fixes))
 			}
 			applied := testCase.sourceText
 			for _, fix := range result.Diagnostics[0].Suggestions[0].Fixes {
 				applied = applied[:fix.Range.Pos()] + fix.Text + applied[fix.Range.End():]
 			}
 			if applied != testCase.wantApplied {
-				t.Fatalf("suggestion applied:\n  %q\nwant:\n  %q", applied, testCase.wantApplied)
+				test.Fatalf("suggestion applied:\n  %q\nwant:\n  %q", applied, testCase.wantApplied)
 			}
 		})
 	}
@@ -747,8 +769,8 @@ func TestClassLiteralPropertyStyleKeepsWhatTheMemberCarries(t *testing.T) {
 // Go zero value. Both are invisible to any fixture that builds the options struct directly, which
 // is why every other test in this file routes through the decoder and why this one asserts the
 // decoder's own output.
-func TestClassLiteralPropertyStyleDecoderResolvesTheStyle(t *testing.T) {
-	t.Parallel()
+func TestClassLiteralPropertyStyleDecoderResolvesTheStyle(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		configuration string
@@ -758,18 +780,16 @@ func TestClassLiteralPropertyStyleDecoderResolvesTheStyle(t *testing.T) {
 		{"\"getters\"", ClassLiteralPropertyStyleGetters},
 	}
 	for index, testCase := range cases {
-		t.Run(classLiteralPropertyStyleCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			decoded, err := DecodeClassLiteralPropertyStyleOptions([]byte(testCase.configuration))
-			if err != nil {
-				t.Fatalf("decoding %s: %v", testCase.configuration, err)
+		test.Run(classLiteralPropertyStyleCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			decoded, decodeClassLiteralPropertyStyleOptionsError := DecodeClassLiteralPropertyStyleOptions(
+				[]byte(testCase.configuration),
+			)
+			if decodeClassLiteralPropertyStyleOptionsError != nil {
+				test.Fatalf("decoding %s: %v", testCase.configuration, decodeClassLiteralPropertyStyleOptionsError)
 			}
-			options, ok := decoded.(ClassLiteralPropertyStyleOptions)
-			if !ok {
-				t.Fatalf("the decoder returned %T rather than ClassLiteralPropertyStyleOptions", decoded)
-			}
-			if options.Style != testCase.wantStyle {
-				t.Errorf("style resolved to %q, want %q", options.Style, testCase.wantStyle)
+			if decoded.Style != testCase.wantStyle {
+				test.Errorf("style resolved to %q, want %q", decoded.Style, testCase.wantStyle)
 			}
 		})
 	}
@@ -781,28 +801,28 @@ func TestClassLiteralPropertyStyleDecoderResolvesTheStyle(t *testing.T) {
 // zero value, which for this rule is an empty style matching neither arm. That shape registers on
 // every file and reports nothing while every decoder-routed fixture stays green, which is the exact
 // failure this project has shipped before.
-func TestClassLiteralPropertyStyleNilOptionsFallsBackToUpstreamDefault(t *testing.T) {
-	t.Parallel()
+func TestClassLiteralPropertyStyleNilOptionsFallsBackToUpstreamDefault(test *testing.T) {
+	test.Parallel()
 
 	// `fields` is the default, so a literal getter reports and a readonly field does not.
-	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, ClassLiteralPropertyStyle,
-		classLiteralPropertyStyleFile, "class C { get x() { return 1; } }", nil), "preferFieldStyle")
-	rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, ClassLiteralPropertyStyle,
-		classLiteralPropertyStyleFile, "class C { readonly x = 1; }", nil))
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, ClassLiteralPropertyStyle,
+		classLiteralPropertyStyleFile, "class C { get x() { return 1; } }"), "preferFieldStyle")
+	rule_testing.ExpectClean(test, rule_testing.Run(test, ClassLiteralPropertyStyle,
+		classLiteralPropertyStyleFile, "class C { readonly x = 1; }"))
 }
 
 // TestClassLiteralPropertyStyleSurvivesMalformedClassMembers is a crash fixture.
 //
 // The field direction scans backwards from the body for the parameter list's closing parenthesis,
 // and error recovery produces members that have a body and no parenthesis at all. The walk recovers
-// per FILE rather than per rule, so one panic would cost every rule that file rather than one
+// per file rather than per rule, so one panic would cost every rule that file rather than one
 // finding.
 //
 // There is no finding to assert; the assertion is that the run completes. Upstream cannot reach most
 // of these, since its parser rejects what ours recovers from, so asserting a verdict would be
 // inventing one.
-func TestClassLiteralPropertyStyleSurvivesMalformedClassMembers(t *testing.T) {
-	t.Parallel()
+func TestClassLiteralPropertyStyleSurvivesMalformedClassMembers(test *testing.T) {
+	test.Parallel()
 
 	for name, sourceText := range map[string]string{
 		"noParens":     "class C { get x { return 1; } }",
@@ -814,14 +834,14 @@ func TestClassLiteralPropertyStyleSurvivesMalformedClassMembers(t *testing.T) {
 		"getOnly":      "class C { get",
 		"readonlyOnly": "class C { readonly }",
 	} {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.RunWithOptions(t, ClassLiteralPropertyStyle,
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.RunGiven(test, ClassLiteralPropertyStyle,
 				classLiteralPropertyStyleFile, sourceText,
-				decodeClassLiteralPropertyStyleOptions(t, "\"fields\""))
-			rule_testing.RunWithOptions(t, ClassLiteralPropertyStyle,
+				decodeClassLiteralPropertyStyleOptions(test, "\"fields\""))
+			rule_testing.RunGiven(test, ClassLiteralPropertyStyle,
 				classLiteralPropertyStyleFile, sourceText,
-				decodeClassLiteralPropertyStyleOptions(t, "\"getters\""))
+				decodeClassLiteralPropertyStyleOptions(test, "\"getters\""))
 		})
 	}
 }
@@ -830,20 +850,20 @@ func TestClassLiteralPropertyStyleSurvivesMalformedClassMembers(t *testing.T) {
 // quieter than ESLint.
 //
 // Upstream skips a member written `override`, because converting an overriding member changes what
-// it overrides, but it only sees the KEYWORD. Without `noImplicitOverride` an override carries no
+// it overrides, but it only sees the keyword. Without `noImplicitOverride` an override carries no
 // keyword, and upstream reports a conversion the compiler rejects: a property overriding a concrete
-// base ACCESSOR is TS2610, and an accessor overriding a concrete base PROPERTY is TS2611 (the
+// base accessor is TS2610, and an accessor overriding a concrete base property is TS2611 (the
 // vendored checker's checkKindsOfPropertyMemberOverrides). cohere asks the checker for the base member
 // and stays silent exactly there.
 //
 // The first silent row is the real site: `nexus/source/validation/schema/StringSchema.ts:37` in ahra,
 // a `typeDefault` getter returning the empty string, overriding `BaseSchema`'s concrete getter.
 // ESLint reports it and its suggested field does not compile. The same class's `typeName`, which
-// implements an ABSTRACT getter, is a true positive (a field may implement an abstract accessor) and
+// implements an abstract getter, is a true positive (a field may implement an abstract accessor) and
 // stays in the reporting rows, as do overrides of abstract and interface-merged members, a member
 // with no base counterpart, and a static override, which the checker does not compare.
-func TestClassLiteralPropertyStyleDeclinesAConversionThatCannotCompile(t *testing.T) {
-	t.Parallel()
+func TestClassLiteralPropertyStyleDeclinesAConversionThatCannotCompile(test *testing.T) {
+	test.Parallel()
 
 	const schemaBase = "abstract class BaseSchema<TInput = unknown, TOutput = TInput> {\n" +
 		"    abstract get typeName(): string;\n" +
@@ -917,7 +937,7 @@ func TestClassLiteralPropertyStyleDeclinesAConversionThatCannotCompile(t *testin
 		{"a field over a mapped-type base property, getters style", "\"getters\"",
 			"type Shape = { [K in 'x']: number };\ndeclare const Base: new () => Shape;\nclass B extends Base { readonly x = 1; }\n",
 			[]string{"preferGetterStyle"}},
-		// An intersection base property is exempt when ANY of its declarations is abstract or from an
+		// An intersection base property is exempt when any of its declarations is abstract or from an
 		// interface, where an ordinary one needs all of them; the checker accepts the getter.
 		{"a field over an intersection property, one side an interface, getters style", "\"getters\"",
 			"interface I { readonly x: number; }\ndeclare class C { readonly x: number; }\ndeclare const Base: new () => I & C;\nclass D extends Base { readonly x = 1; }\n",
@@ -928,15 +948,15 @@ func TestClassLiteralPropertyStyleDeclinesAConversionThatCannotCompile(t *testin
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, ClassLiteralPropertyStyle, classLiteralPropertyStyleFile,
-				testCase.sourceText, decodeClassLiteralPropertyStyleOptions(t, testCase.configuration))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedGiven(test, ClassLiteralPropertyStyle, classLiteralPropertyStyleFile,
+				testCase.sourceText, decodeClassLiteralPropertyStyleOptions(test, testCase.configuration))
 			if len(testCase.wantIds) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -945,8 +965,8 @@ func TestClassLiteralPropertyStyleDeclinesAConversionThatCannotCompile(t *testin
 // itself, and refuses anything else, naming the value (#rfbha44). Each refused value used to decode to
 // the default, so a config naming one loaded clean and ran a style nobody wrote; upstream's schema is a
 // string enum and refuses every one at load.
-func TestClassLiteralPropertyStyleDecoderRefusesWhatUpstreamRefuses(t *testing.T) {
-	t.Parallel()
+func TestClassLiteralPropertyStyleDecoderRefusesWhatUpstreamRefuses(test *testing.T) {
+	test.Parallel()
 
 	for _, accepted := range []struct {
 		wire string
@@ -957,13 +977,15 @@ func TestClassLiteralPropertyStyleDecoderRefusesWhatUpstreamRefuses(t *testing.T
 		{`"fields"`, ClassLiteralPropertyStyleFields},
 		{`"getters"`, ClassLiteralPropertyStyleGetters},
 	} {
-		decoded, err := DecodeClassLiteralPropertyStyleOptions([]byte(accepted.wire))
-		if err != nil {
-			t.Errorf("%s was refused: %v", accepted.wire, err)
+		decoded, decodeClassLiteralPropertyStyleOptionsError := DecodeClassLiteralPropertyStyleOptions(
+			[]byte(accepted.wire),
+		)
+		if decodeClassLiteralPropertyStyleOptionsError != nil {
+			test.Errorf("%s was refused: %v", accepted.wire, decodeClassLiteralPropertyStyleOptionsError)
 			continue
 		}
-		if got := decoded.(ClassLiteralPropertyStyleOptions).Style; got != accepted.want {
-			t.Errorf("%s decoded to %s, want %s", accepted.wire, got, accepted.want)
+		if got := decoded.Style; got != accepted.want {
+			test.Errorf("%s decoded to %s, want %s", accepted.wire, got, accepted.want)
 		}
 	}
 	for _, refused := range []struct{ wire, named string }{
@@ -973,13 +995,18 @@ func TestClassLiteralPropertyStyleDecoderRefusesWhatUpstreamRefuses(t *testing.T
 		{`{"style": "getters"}`, "style"},
 		{`1`, "1"},
 	} {
-		_, err := DecodeClassLiteralPropertyStyleOptions([]byte(refused.wire))
-		if err == nil {
-			t.Errorf("%s decoded; it must be refused", refused.wire)
+		_, decodeClassLiteralPropertyStyleOptionsError := DecodeClassLiteralPropertyStyleOptions([]byte(refused.wire))
+		if decodeClassLiteralPropertyStyleOptionsError == nil {
+			test.Errorf("%s decoded; it must be refused", refused.wire)
 			continue
 		}
-		if !strings.Contains(err.Error(), refused.named) {
-			t.Errorf("%s was refused without naming %s: %v", refused.wire, refused.named, err)
+		if !strings.Contains(decodeClassLiteralPropertyStyleOptionsError.Error(), refused.named) {
+			test.Errorf(
+				"%s was refused without naming %s: %v",
+				refused.wire,
+				refused.named,
+				decodeClassLiteralPropertyStyleOptionsError,
+			)
 		}
 	}
 }

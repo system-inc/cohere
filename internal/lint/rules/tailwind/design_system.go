@@ -2,7 +2,7 @@
 //
 // This is the seam between `internal/tailwind`, which knows how to build a design system and
 // nothing about when, and the rules, which need one on every file and must not each build their
-// own. No rule reads it yet — swapping the rules over is #4q5dsn3 and #3r6cxrb. What lands here is
+// own. No rule reads it yet: swapping the rules over is #4q5dsn3 and #3r6cxrb. What lands here is
 // the seam and the proof that it is built once.
 //
 // # The pattern, and the failure history it carries
@@ -31,7 +31,7 @@
 // The design system build is the same shape. Measured on both corpus repositories: 0.68ms per build
 // on ~/Projects/ahra, over a 9-file `@import` graph resolving 744 theme entries and 37 `@utility`
 // blocks, and 0.64ms on www-connected-app for 748 entries. Per-file across 1,862 files that is 1.27
-// seconds, and across the 3,416-file tree the rule catalog is measured on, about 2.3 seconds —
+// seconds, and across the 3,416-file tree the rule catalog is measured on, about 2.3 seconds,
 // against a lint phase that currently runs in 0.19s. The tool would get twelve times slower and
 // every test would stay green.
 //
@@ -82,11 +82,11 @@ type DesignSystemResult struct {
 	// set. Built here for the reason Table is: it remembers its answers, and a run asks it about the same
 	// classes from every file (#15swfzq).
 	Canonicalizer *tailwindengine.Canonicalizer
-	// Err is why no design system could be built, nil when System is set.
+	// Error is why no design system could be built, nil when System is set.
 	//
 	// A rule holding this must decline rather than report zero findings. See the failing-safe note
 	// in the file comment.
-	Err error
+	Error error
 	// EntryPoint is the stylesheet the load was attempted from, empty when none was found.
 	EntryPoint string
 	// Reads is every path the load asked the file system about, present or absent: the entry point
@@ -120,28 +120,6 @@ var designSystemCache struct {
 	results map[DesignSystemLocation]DesignSystemResult
 }
 
-// DesignSystemLocation is where a rule's options say the design system is: upstream's `cwd`,
-// `entryPoint` and `tailwindConfig`, with the directory a relative path anchors to. The zero value is
-// the default, the project's own stylesheet found by FindEntryPoint.
-type DesignSystemLocation struct {
-	// Anchor is upstream's `ctx.cwd`, the directory ESLint runs from, which is the config file's
-	// directory here. Empty means the project root.
-	Anchor string
-	// Cwd is upstream's `cwd`, as written: where Tailwind and the stylesheet are looked for from,
-	// relative to Anchor when relative.
-	Cwd string
-	// ConfigPath is upstream's `entryPoint ?? tailwindConfig`, as written.
-	ConfigPath string
-	// Tsconfig is upstream's `tsconfig`, as written. It never chooses the stylesheet, only how its
-	// imports resolve, so it leaves a location default.
-	Tsconfig string
-}
-
-// isDefault reports whether no option named a location, so the project's own stylesheet is used.
-func (location DesignSystemLocation) isDefault() bool {
-	return location.Cwd == "" && location.ConfigPath == ""
-}
-
 // DesignSystemForProgram returns this run's design system, building it at most once.
 //
 // Every rule that calls this must declare `ReadsCompilerOptions | ReadsDesignSystem`. The program reaches every file in
@@ -168,7 +146,7 @@ func DesignSystemForProgram(program rule.Program) DesignSystemResult {
 // most once per program and location.
 func DesignSystemForProgramAt(program rule.Program, location DesignSystemLocation) DesignSystemResult {
 	if program == nil {
-		return DesignSystemResult{Err: fmt.Errorf("no program: a design system cannot be located without one")}
+		return DesignSystemResult{Error: fmt.Errorf("no program: a design system cannot be located without one")}
 	}
 
 	designSystemCache.Lock()
@@ -192,17 +170,21 @@ func DesignSystemForProgramAt(program rule.Program, location DesignSystemLocatio
 // Call `DesignSystemForProgram` rather than this: an uncached call re-walks the `@import` graph, and
 // the rules that will read it run on every file in the tree.
 func loadDesignSystemForProgram(program rule.Program, location DesignSystemLocation) DesignSystemResult {
-	fileSystem := program.DesignSystemFS()
+	fileSystem := program.DesignSystemFileSystem()
 	result := loadDesignSystemThrough(program, fileSystem, location)
 	result.Reads = fileSystem.Reads()
 	return result
 }
 
 // loadDesignSystemThrough is the load itself, asking fileSystem every question about the disk.
-func loadDesignSystemThrough(program rule.Program, fileSystem *rule.RecordingFS, location DesignSystemLocation) DesignSystemResult {
+func loadDesignSystemThrough(
+	program rule.Program,
+	fileSystem *rule.RecordingFileSystem,
+	location DesignSystemLocation,
+) DesignSystemResult {
 	projectRoot := projectRootOf(program)
 	if projectRoot == "" {
-		return DesignSystemResult{Err: fmt.Errorf("could not determine the project root from the program")}
+		return DesignSystemResult{Error: fmt.Errorf("determining the project root from the program")}
 	}
 	if !location.isDefault() {
 		return loadConfiguredDesignSystem(projectRoot, fileSystem, location)
@@ -219,31 +201,36 @@ func loadDesignSystemThrough(program rule.Program, fileSystem *rule.RecordingFS,
 
 	entryPoint := FindEntryPoint(projectRoot, fileExists)
 	if entryPoint == "" {
-		return DesignSystemResult{Err: fmt.Errorf("%w: looked under %s", ErrNoTailwindEntryPoint, projectRoot)}
+		return DesignSystemResult{Error: fmt.Errorf("%w: looked under %s", ErrNoTailwindEntryPoint, projectRoot)}
 	}
 
 	packageRoot := findTailwindPackageRoot(filepath.Dir(entryPoint), fileExists)
 	if packageRoot == "" {
 		return DesignSystemResult{
 			EntryPoint: entryPoint,
-			Err: fmt.Errorf(
+			Error: fmt.Errorf(
 				"%s: no installed tailwindcss package found, so `@import \"tailwindcss\"` cannot resolve",
 				entryPoint,
 			),
 		}
 	}
 
-	resolve, err := stylesheetResolverAt(location.cwdFrom(projectRoot), location.Tsconfig, packageRoot, fileSystem)
-	if err != nil {
-		return DesignSystemResult{EntryPoint: entryPoint, Err: err}
+	resolve, stylesheetResolverAtError := stylesheetResolverAt(
+		location.cwdFrom(projectRoot),
+		location.Tsconfig,
+		packageRoot,
+		fileSystem,
+	)
+	if stylesheetResolverAtError != nil {
+		return DesignSystemResult{EntryPoint: entryPoint, Error: stylesheetResolverAtError}
 	}
-	system, err := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
+	system, loadDesignSystemError := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
 		EntryPoint:          entryPoint,
 		TailwindPackageRoot: packageRoot,
 		Resolve:             resolve,
 	})
-	if err != nil {
-		return DesignSystemResult{EntryPoint: entryPoint, Err: err}
+	if loadDesignSystemError != nil {
+		return DesignSystemResult{EntryPoint: entryPoint, Error: loadDesignSystemError}
 	}
 	// The stylesheets themselves are read by the engine, which does not take a filesystem, so each
 	// one in the `@import` graph is stated through the program's afterwards. That records it as a
@@ -322,8 +309,8 @@ func FindEntryPoint(projectRoot string, fileExists func(path string) bool) strin
 
 // diskFileExists is fileExists for callers with no program to ask, which is the tests.
 func diskFileExists(path string) bool {
-	info, err := os.Stat(path)
-	return err == nil && !info.IsDir()
+	info, statError := os.Stat(path)
+	return statError == nil && !info.IsDir()
 }
 
 // findTailwindPackageRoot walks up from a directory looking for an installed `tailwindcss`.
@@ -360,7 +347,7 @@ func DesignSystemDeclineMessage(ruleName string, result DesignSystemResult) stri
 	return fmt.Sprintf(
 		"%s could not build this project's Tailwind design system%s, so it is reporting nothing rather "+
 			"than reporting a clean tree: %v",
-		ruleName, where, result.Err,
+		ruleName, where, result.Error,
 	)
 }
 
@@ -387,7 +374,10 @@ func stylesheetsUnder(root string, system *tailwindengine.LoadedDesignSystem) []
 	}
 	relative := make([]string, 0, len(system.Stylesheets))
 	for _, path := range system.Stylesheets {
-		if trimmed, err := filepath.Rel(root, path); err == nil && !strings.HasPrefix(trimmed, "..") {
+		if trimmed, relativePathError := filepath.Rel(
+			root,
+			path,
+		); relativePathError == nil && !strings.HasPrefix(trimmed, "..") {
 			relative = append(relative, trimmed)
 			continue
 		}

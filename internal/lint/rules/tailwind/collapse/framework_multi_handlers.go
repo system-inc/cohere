@@ -156,7 +156,12 @@ func declareComposing(aggregateProperty string, aggregateValue string, variables
 // `-webkit-backdrop-filter` carries the same constant as `backdrop-filter` and is a real declaration
 // PropertyOrder does not know, so it counts and contributes no position. Kept in upstream's source
 // order, which puts the prefixed one first.
-func declareComposingWebkit(prefixedProperty string, aggregateProperty string, aggregateValue string, variables ...string) FrameworkEmitter {
+func declareComposingWebkit(
+	prefixedProperty string,
+	aggregateProperty string,
+	aggregateValue string,
+	variables ...string,
+) FrameworkEmitter {
 	return func(resolved ResolvedUtilityValue) []*Node {
 		nodes := make([]*Node, 0, len(variables)+2)
 		for _, variable := range variables {
@@ -306,15 +311,60 @@ var frameworkMultiEmitters = map[string]FrameworkEmitter{
 	// The backdrop-filter family emits three, not two. `-webkit-backdrop-filter` is a real
 	// declaration that PropertyOrder does not know, so it counts and contributes no position, which
 	// is why these read two positions at count three where the plain filters read two at two.
-	"backdrop-blur":       declareComposingWebkit("-webkit-backdrop-filter", "backdrop-filter", cssBackdropFilterValue, "--tw-backdrop-blur"),
-	"backdrop-brightness": declareComposingWebkit("-webkit-backdrop-filter", "backdrop-filter", cssBackdropFilterValue, "--tw-backdrop-brightness"),
-	"backdrop-contrast":   declareComposingWebkit("-webkit-backdrop-filter", "backdrop-filter", cssBackdropFilterValue, "--tw-backdrop-contrast"),
-	"backdrop-grayscale":  declareComposingWebkit("-webkit-backdrop-filter", "backdrop-filter", cssBackdropFilterValue, "--tw-backdrop-grayscale"),
-	"backdrop-hue-rotate": declareComposingWebkit("-webkit-backdrop-filter", "backdrop-filter", cssBackdropFilterValue, "--tw-backdrop-hue-rotate"),
-	"backdrop-invert":     declareComposingWebkit("-webkit-backdrop-filter", "backdrop-filter", cssBackdropFilterValue, "--tw-backdrop-invert"),
-	"backdrop-opacity":    declareComposingWebkit("-webkit-backdrop-filter", "backdrop-filter", cssBackdropFilterValue, "--tw-backdrop-opacity"),
-	"backdrop-saturate":   declareComposingWebkit("-webkit-backdrop-filter", "backdrop-filter", cssBackdropFilterValue, "--tw-backdrop-saturate"),
-	"backdrop-sepia":      declareComposingWebkit("-webkit-backdrop-filter", "backdrop-filter", cssBackdropFilterValue, "--tw-backdrop-sepia"),
+	"backdrop-blur": declareComposingWebkit(
+		"-webkit-backdrop-filter",
+		"backdrop-filter",
+		cssBackdropFilterValue,
+		"--tw-backdrop-blur",
+	),
+	"backdrop-brightness": declareComposingWebkit(
+		"-webkit-backdrop-filter",
+		"backdrop-filter",
+		cssBackdropFilterValue,
+		"--tw-backdrop-brightness",
+	),
+	"backdrop-contrast": declareComposingWebkit(
+		"-webkit-backdrop-filter",
+		"backdrop-filter",
+		cssBackdropFilterValue,
+		"--tw-backdrop-contrast",
+	),
+	"backdrop-grayscale": declareComposingWebkit(
+		"-webkit-backdrop-filter",
+		"backdrop-filter",
+		cssBackdropFilterValue,
+		"--tw-backdrop-grayscale",
+	),
+	"backdrop-hue-rotate": declareComposingWebkit(
+		"-webkit-backdrop-filter",
+		"backdrop-filter",
+		cssBackdropFilterValue,
+		"--tw-backdrop-hue-rotate",
+	),
+	"backdrop-invert": declareComposingWebkit(
+		"-webkit-backdrop-filter",
+		"backdrop-filter",
+		cssBackdropFilterValue,
+		"--tw-backdrop-invert",
+	),
+	"backdrop-opacity": declareComposingWebkit(
+		"-webkit-backdrop-filter",
+		"backdrop-filter",
+		cssBackdropFilterValue,
+		"--tw-backdrop-opacity",
+	),
+	"backdrop-saturate": declareComposingWebkit(
+		"-webkit-backdrop-filter",
+		"backdrop-filter",
+		cssBackdropFilterValue,
+		"--tw-backdrop-saturate",
+	),
+	"backdrop-sepia": declareComposingWebkit(
+		"-webkit-backdrop-filter",
+		"backdrop-filter",
+		cssBackdropFilterValue,
+		"--tw-backdrop-sepia",
+	),
 
 	// The transform family. `transformProperties()` is atRoot, so only the `--tw-*` axes and the
 	// shared `transform` are visible.
@@ -366,7 +416,12 @@ var frameworkMultiEmitters = map[string]FrameworkEmitter{
 
 	// The border-spacing family writes both axes and then the shorthand, or one axis and the
 	// shorthand. Both `--tw-border-spacing-*` are outside PropertyOrder, so all three read [55].
-	"border-spacing":   declareComposing("border-spacing", cssBorderSpacingValue, "--tw-border-spacing-x", "--tw-border-spacing-y"),
+	"border-spacing": declareComposing(
+		"border-spacing",
+		cssBorderSpacingValue,
+		"--tw-border-spacing-x",
+		"--tw-border-spacing-y",
+	),
 	"border-spacing-x": declareComposing("border-spacing", cssBorderSpacingValue, "--tw-border-spacing-x"),
 	"border-spacing-y": declareComposing("border-spacing", cssBorderSpacingValue, "--tw-border-spacing-y"),
 
@@ -397,11 +452,30 @@ var frameworkMultiEmitters = map[string]FrameworkEmitter{
 	//
 	// The declarations after the latch are still emitted rather than elided. They cannot change
 	// Order, but each one is a declaration the engine counts, and Count is half the sort key.
-	"divide":   declareWrapped(cssChildrenSelector, declareSorted("divide-color", "border-color")),
-	"divide-x": declareWrapped(cssChildrenSelector, declareSorted("divide-x-width", "--tw-divide-x-reverse", "border-inline-style", "border-inline-start-width", "border-inline-end-width")),
-	"divide-y": declareWrapped(cssChildrenSelector, declareSorted("divide-y-width", "--tw-divide-y-reverse", "border-bottom-style", "border-top-style", "border-top-width", "border-bottom-width")),
-	"space-x":  declareWrapped(cssChildrenSelector, declareSorted("row-gap", "--tw-space-x-reverse", "margin-inline-start", "margin-inline-end")),
-	"space-y":  declareWrapped(cssChildrenSelector, declareSorted("column-gap", "--tw-space-y-reverse", "margin-block-start", "margin-block-end")),
+	"divide": declareWrapped(cssChildrenSelector, declareSorted("divide-color", "border-color")),
+	"divide-x": declareWrapped(cssChildrenSelector, declareSorted(
+		"divide-x-width",
+		"--tw-divide-x-reverse",
+		"border-inline-style",
+		"border-inline-start-width",
+		"border-inline-end-width",
+	)),
+	"divide-y": declareWrapped(cssChildrenSelector, declareSorted(
+		"divide-y-width",
+		"--tw-divide-y-reverse",
+		"border-bottom-style",
+		"border-top-style",
+		"border-top-width",
+		"border-bottom-width",
+	)),
+	"space-x": declareWrapped(
+		cssChildrenSelector,
+		declareSorted("row-gap", "--tw-space-x-reverse", "margin-inline-start", "margin-inline-end"),
+	),
+	"space-y": declareWrapped(
+		cssChildrenSelector,
+		declareSorted("column-gap", "--tw-space-y-reverse", "margin-block-start", "margin-block-end"),
+	),
 
 	// `placeholder` sorts at `placeholder-color` and declares plain `color` inside `&::placeholder`.
 	// Without the redirect it would read at 297 with the rest of the colour utilities.
@@ -440,28 +514,4 @@ var frameworkMultiLiteralEmitters = map[string]map[string]FrameworkEmitter{
 	"translate": {
 		"none": declareProperties("translate"),
 	},
-}
-
-// Emit returns the declarations this root's handle body produces for a resolved value.
-//
-// The literal branch runs first and on the candidate's own value rather than on the resolved one,
-// matching ReadingFor and matching upstream: a root-defined keyword is answered by the handler
-// directly and never reaches the theme. Checking after resolution would let a repository declaring
-// `--ease-initial` shadow the literal, which the engine does not allow.
-//
-// Returns nil for a root with no ported emitter, for the same reason the single-declaration Emit
-// does: a fallback would leave the acceptance test comparing a table against itself.
-func (utility FrameworkMultiDeclarationUtility) Emit(root string, literal string, resolved ResolvedUtilityValue) []*Node {
-	if literal != "" {
-		if byLiteral, found := frameworkMultiLiteralEmitters[root]; found {
-			if emitter, found := byLiteral[literal]; found {
-				return emitter(resolved)
-			}
-		}
-	}
-	emitter, ported := frameworkMultiEmitters[root]
-	if !ported {
-		return nil
-	}
-	return emitter(resolved)
 }

@@ -9,8 +9,8 @@ import (
 
 const moduleAliasFile = "/repository/source/Thing.tsx"
 
-func TestImportRequireModuleAliasFires(t *testing.T) {
-	t.Parallel()
+func TestImportRequireModuleAliasFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -60,10 +60,10 @@ func TestImportRequireModuleAliasFires(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ImportRequireModuleAlias, moduleAliasFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ImportRequireModuleAlias, moduleAliasFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -75,43 +75,43 @@ func TestImportRequireModuleAliasFires(t *testing.T) {
 // match the line after itself, so such a finding is unreachable by any suppression that could be
 // written while still reading as a real finding in every count. This rule reports the binding, which
 // is both on the import line and the text a reader has to change.
-func TestImportRequireModuleAliasReportsAtTheBinding(t *testing.T) {
-	t.Parallel()
+func TestImportRequireModuleAliasReportsAtTheBinding(test *testing.T) {
+	test.Parallel()
 
 	sourceText := "// Dependencies - React\n" +
 		"// The binding below is deliberately misnamed\n" +
 		"// eslint-disable-next-line nexus/import-require-module-alias\n" +
 		"import Reakt from 'react';\n"
 
-	result := rule_testing.Run(t, ImportRequireModuleAlias, moduleAliasFile, sourceText)
-	rule_testing.ExpectFindings(t, result, "requireAliasName")
+	result := rule_testing.Run(test, ImportRequireModuleAlias, moduleAliasFile, sourceText)
+	rule_testing.ExpectFindings(test, result, "requireAliasName")
 
 	line, _ := scanner.GetECMALineAndByteOffsetOfPosition(result.SourceFile, result.Diagnostics[0].Range.Pos())
 	const importLine = 3 // zero-based, so the fourth line
 	if line != importLine {
-		t.Fatalf("expected the finding on the import line (%d), got line %d", importLine+1, line+1)
+		test.Fatalf("expected the finding on the import line (%d), got line %d", importLine+1, line+1)
 	}
 }
 
 // The rule reports and never rewrites. See the doc comment for why: every fix the original offers
 // renames a binding without following its references, and the corrupted output still parses, so the
 // edit engine's parse guard cannot catch it.
-func TestImportRequireModuleAliasProposesNoFix(t *testing.T) {
-	t.Parallel()
+func TestImportRequireModuleAliasProposesNoFix(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, ImportRequireModuleAlias, moduleAliasFile, "import Reakt from 'react';\n")
-	rule_testing.ExpectFindings(t, result, "requireAliasName")
+	result := rule_testing.Run(test, ImportRequireModuleAlias, moduleAliasFile, "import Reakt from 'react';\n")
+	rule_testing.ExpectFindings(test, result, "requireAliasName")
 
 	if len(result.Diagnostics[0].Fixes) != 0 {
-		t.Fatalf("expected no fixes, got %d", len(result.Diagnostics[0].Fixes))
+		test.Fatalf("expected no fixes, got %d", len(result.Diagnostics[0].Fixes))
 	}
 	if len(result.Diagnostics[0].Suggestions) != 0 {
-		t.Fatalf("expected no suggestions, got %d", len(result.Diagnostics[0].Suggestions))
+		test.Fatalf("expected no suggestions, got %d", len(result.Diagnostics[0].Suggestions))
 	}
 }
 
-func TestImportRequireModuleAliasStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestImportRequireModuleAliasStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -139,10 +139,10 @@ func TestImportRequireModuleAliasStaysSilent(t *testing.T) {
 		{"no imports at all", "export const Value = 1;\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ImportRequireModuleAlias, moduleAliasFile, testCase.sourceText)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ImportRequireModuleAlias, moduleAliasFile, testCase.sourceText)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -151,8 +151,8 @@ func TestImportRequireModuleAliasStaysSilent(t *testing.T) {
 // it a distinct node type. A rule that walks identifiers therefore inherits an exemption the
 // original got from its AST for free. This rule keys on ImportDeclaration and so never sees them,
 // and this fixture is what keeps that true if the listener set ever widens.
-func TestImportRequireModuleAliasIgnoresJsxAndOtherIdentifiers(t *testing.T) {
-	t.Parallel()
+func TestImportRequireModuleAliasIgnoresJsxAndOtherIdentifiers(test *testing.T) {
+	test.Parallel()
 
 	sourceText := "import React from 'react';\n" +
 		"const Reakt = 1;\n" +
@@ -160,12 +160,12 @@ func TestImportRequireModuleAliasIgnoresJsxAndOtherIdentifiers(t *testing.T) {
 		"    return <Reakt.Thing ts={Reakt} />;\n" +
 		"}\n"
 
-	result := rule_testing.Run(t, ImportRequireModuleAlias, moduleAliasFile, sourceText)
-	rule_testing.ExpectClean(t, result)
+	result := rule_testing.Run(test, ImportRequireModuleAlias, moduleAliasFile, sourceText)
+	rule_testing.ExpectClean(test, result)
 }
 
-func TestImportRequireModuleAliasReadsOptions(t *testing.T) {
-	t.Parallel()
+func TestImportRequireModuleAliasReadsOptions(test *testing.T) {
+	test.Parallel()
 
 	options := ImportRequireModuleAliasOptions{
 		Modules: map[string]ModuleAlias{
@@ -176,57 +176,57 @@ func TestImportRequireModuleAliasReadsOptions(t *testing.T) {
 		},
 	}
 
-	t.Run("an added package is pinned", func(t *testing.T) {
-		t.Parallel()
+	test.Run("an added package is pinned", func(test *testing.T) {
+		test.Parallel()
 		result := rule_testing.RunWithOptions(
-			t, ImportRequireModuleAlias, moduleAliasFile, "import lodash from 'lodash';\n", options,
+			test, ImportRequireModuleAlias, moduleAliasFile, "import lodash from 'lodash';\n", options,
 		)
-		rule_testing.ExpectFindings(t, result, "requireAliasName")
+		rule_testing.ExpectFindings(test, result, "requireAliasName")
 	})
 
-	t.Run("an added package under its pinned name is clean", func(t *testing.T) {
-		t.Parallel()
+	test.Run("an added package under its pinned name is clean", func(test *testing.T) {
+		test.Parallel()
 		result := rule_testing.RunWithOptions(
-			t, ImportRequireModuleAlias, moduleAliasFile, "import Lodash from 'lodash';\n", options,
+			test, ImportRequireModuleAlias, moduleAliasFile, "import Lodash from 'lodash';\n", options,
 		)
-		rule_testing.ExpectClean(t, result)
+		rule_testing.ExpectClean(test, result)
 	})
 
 	// An omitted style means Default, so the shorthand pins the form as well as the name. If the
 	// style were left genuinely unset this case would pass silently, which is the drift the default
 	// exists to stop.
-	t.Run("an added package with no style still requires the default form", func(t *testing.T) {
-		t.Parallel()
+	test.Run("an added package with no style still requires the default form", func(test *testing.T) {
+		test.Parallel()
 		result := rule_testing.RunWithOptions(
-			t, ImportRequireModuleAlias, moduleAliasFile, "import * as Lodash from 'lodash';\n", options,
+			test, ImportRequireModuleAlias, moduleAliasFile, "import * as Lodash from 'lodash';\n", options,
 		)
-		rule_testing.ExpectFindings(t, result, "requireDefaultStyle")
+		rule_testing.ExpectFindings(test, result, "requireDefaultStyle")
 	})
 
 	// The override direction is the half a merge in the wrong order would break: react now wants the
 	// namespace form, so the built-in default entry must lose.
-	t.Run("a re-stated default is overridden", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a re-stated default is overridden", func(test *testing.T) {
+		test.Parallel()
 		result := rule_testing.RunWithOptions(
-			t, ImportRequireModuleAlias, moduleAliasFile, "import React from 'react';\n", options,
+			test, ImportRequireModuleAlias, moduleAliasFile, "import React from 'react';\n", options,
 		)
-		rule_testing.ExpectFindings(t, result, "requireNamespaceStyle")
+		rule_testing.ExpectFindings(test, result, "requireNamespaceStyle")
 	})
 
-	t.Run("the overridden form is clean", func(t *testing.T) {
-		t.Parallel()
+	test.Run("the overridden form is clean", func(test *testing.T) {
+		test.Parallel()
 		result := rule_testing.RunWithOptions(
-			t, ImportRequireModuleAlias, moduleAliasFile, "import * as React from 'react';\n", options,
+			test, ImportRequireModuleAlias, moduleAliasFile, "import * as React from 'react';\n", options,
 		)
-		rule_testing.ExpectClean(t, result)
+		rule_testing.ExpectClean(test, result)
 	})
 
 	// The rule guards the built-in packages with or without configuration, so unlike a rule that
 	// declines every file without its options, it is not Required in the registry. This is the
 	// fixture that says so.
-	t.Run("the built-in defaults apply with no options at all", func(t *testing.T) {
-		t.Parallel()
-		result := rule_testing.Run(t, ImportRequireModuleAlias, moduleAliasFile, "import ts from 'typescript';\n")
-		rule_testing.ExpectFindings(t, result, "requireNamespaceStyle")
+	test.Run("the built-in defaults apply with no options at all", func(test *testing.T) {
+		test.Parallel()
+		result := rule_testing.Run(test, ImportRequireModuleAlias, moduleAliasFile, "import ts from 'typescript';\n")
+		rule_testing.ExpectFindings(test, result, "requireNamespaceStyle")
 	})
 }

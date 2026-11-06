@@ -66,14 +66,14 @@ func printModifier(modifier *ParsedModifier) string {
 // bracketed prints an arbitrary value in brackets, or as the `(--a)` shorthand when it is exactly one
 // `var()`, which is how upstream writes it back.
 func bracketed(value string) string {
-	if isLoneVar(value) {
+	if isLoneVariable(value) {
 		return "(" + printArbitraryValue(value[len("var("):len(value)-1]) + ")"
 	}
 	return "[" + printArbitraryValue(value) + "]"
 }
 
-// isLoneVar reports whether a value parses to exactly one `var()` call.
-func isLoneVar(value string) bool {
+// isLoneVariable reports whether a value parses to exactly one `var()` call.
+func isLoneVariable(value string) bool {
 	nodes := ParseValue(value)
 	return len(nodes) == 1 && nodes[0].Kind == ValueNodeKindFunction && nodes[0].Value == "var"
 }

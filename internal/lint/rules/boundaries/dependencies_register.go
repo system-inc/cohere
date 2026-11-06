@@ -7,7 +7,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // DecodeAt because its element patterns are paths relative to where the config was written, and
 // RequiresOptions because without elements no file belongs to a layer and the rule decides nothing.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[DependenciesOptions]{
 		Rule:            Dependencies,
 		DecodeAt:        decodeDependenciesOptions,
 		RequiresOptions: true,

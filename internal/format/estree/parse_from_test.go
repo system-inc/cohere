@@ -10,6 +10,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/edit"
+	"github.com/system-inc/cohere/internal/json_value"
 )
 
 // parseFromCorpusVariable names more roots for the proof below, separated by the path list separator: a real
@@ -22,22 +23,22 @@ const parseFromCorpusVariable = "COHERE_PARSE_FROM_CORPUS"
 // equal, property for property and comment for comment, to the one a fresh parse converts to, and it is the
 // tree ParseTypeScriptFrom takes rather than one it refuses and parses again. The mutant is a tree of other
 // bytes: converted, it must differ, so the comparison could have failed, and ParseTypeScriptFrom must refuse it.
-func TestTheGuardsTreeIsTheTreeTheFormatterWouldParse(t *testing.T) {
-	t.Parallel()
-	roots := []string{moduleRoot(t)}
+func TestTheGuardsTreeIsTheTreeTheFormatterWouldParse(test *testing.T) {
+	test.Parallel()
+	roots := []string{moduleRoot(test)}
 	if extra := os.Getenv(parseFromCorpusVariable); extra != "" {
 		roots = append(roots, filepath.SplitList(extra)...)
 	}
 	files := typeScriptFiles(roots)
 	if len(files) < 50 {
-		t.Fatalf("the corpus holds %d files, too few for agreement to mean anything", len(files))
+		test.Fatalf("the corpus holds %d files, too few for agreement to mean anything", len(files))
 	}
 
 	compared, hashbangs, unparseable, mutantsCaught := 0, 0, 0, 0
 	for _, fileName := range files {
-		contents, err := os.ReadFile(fileName)
-		if err != nil {
-			t.Fatal(err)
+		contents, readError := os.ReadFile(fileName)
+		if readError != nil {
+			test.Fatal(readError)
 		}
 		text := string(contents)
 		if strings.HasPrefix(text, "#!") {
@@ -56,83 +57,101 @@ func TestTheGuardsTreeIsTheTreeTheFormatterWouldParse(t *testing.T) {
 			return given, nil
 		}
 		noProposals := func(string, string) ([]edit.Proposal, error) { return nil, nil }
-		if _, err := edit.FixAndTransformText(fileName, text, noProposals, capture, 1); err != nil {
-			t.Fatalf("%s: %v", fileName, err)
+		if _, fixAndTransformTextError := edit.FixAndTransformText(
+			fileName,
+			text,
+			noProposals,
+			capture,
+			1,
+		); fixAndTransformTextError != nil {
+			test.Fatalf("%s: %v", fileName, fixAndTransformTextError)
 		}
 		if guards == nil {
-			t.Errorf("%s: the engine handed the transform no tree", fileName)
+			test.Errorf("%s: the engine handed the transform no tree", fileName)
 			continue
 		}
 		if !treeIsFor(fileName, text, guards) {
-			t.Errorf("%s: ParseTypeScriptFrom refuses the guard's tree, so the file is still parsed twice", fileName)
+			test.Errorf("%s: ParseTypeScriptFrom refuses the guard's tree, so the file is still parsed twice", fileName)
 			continue
 		}
 
-		fresh := convertedDump(t, fileName, ParseSourceFile(fileName, text))
-		if taken := convertedDump(t, fileName, guards); taken != fresh {
-			t.Errorf("%s: the guard's tree converts to another ESTree than a fresh parse does", fileName)
+		fresh := convertedDump(test, fileName, ParseSourceFile(fileName, text))
+		if taken := convertedDump(test, fileName, guards); taken != fresh {
+			test.Errorf("%s: the guard's tree converts to another ESTree than a fresh parse does", fileName)
 		}
 		compared++
 
 		// The mutant: the tree of the text with one more space in front, every offset one past the file's own.
 		mutant := ParseSourceFile(fileName, " "+text)
 		if treeIsFor(fileName, text, mutant) {
-			t.Errorf("%s: ParseTypeScriptFrom would take a tree of other bytes", fileName)
+			test.Errorf("%s: ParseTypeScriptFrom would take a tree of other bytes", fileName)
 		}
-		if convertedDump(t, fileName, mutant) != fresh {
+		if convertedDump(test, fileName, mutant) != fresh {
 			mutantsCaught++
 		}
 	}
-	t.Logf("%d TypeScript files compared, %d with a hashbang left to their own parse, %d that do not parse, %d mutants caught",
-		compared, hashbangs, unparseable, mutantsCaught)
+	test.Logf(
+		"%d TypeScript files compared, %d with a hashbang left to their own parse, %d that do not parse, %d mutants caught",
+		compared,
+		hashbangs,
+		unparseable,
+		mutantsCaught,
+	)
 	if compared < 50 {
-		t.Fatalf("only %d files were compared", compared)
+		test.Fatalf("only %d files were compared", compared)
 	}
 	if mutantsCaught != compared {
-		t.Errorf("a tree of other bytes converted to the same ESTree on %d of %d files, so the comparison could not fail there",
-			compared-mutantsCaught, compared)
+		test.Errorf(
+			"a tree of other bytes converted to the same ESTree on %d of %d files, so the comparison could not fail there",
+			compared-mutantsCaught,
+			compared,
+		)
 	}
 }
 
 // convertedDump is the ESTree a tree converts to, with its comments, as JSON, postprocessed against the tree's
 // own text. A file that fails to convert dumps its error, so two trees that fail alike compare equal and one that
 // fails alone does not.
-func convertedDump(t *testing.T, fileName string, sourceFile *ast.SourceFile) string {
-	t.Helper()
+func convertedDump(test *testing.T, fileName string, sourceFile *ast.SourceFile) string {
+	test.Helper()
 	text := sourceFile.Text()
-	program, comments, _, err := convertTypeScript(sourceFile, text, nil)
-	if err != nil {
-		return "error: " + err.Error()
+	program, comments, _, convertTypeScriptError := convertTypeScript(sourceFile, text, nil)
+	if convertTypeScriptError != nil {
+		return "error: " + convertTypeScriptError.Error()
 	}
 	offsets := make([]int, len(text)+1)
 	for index := range offsets {
 		offsets[index] = index
 	}
-	dumped := make([]any, len(comments))
+	dumped := make(json_value.Array, len(comments))
 	for index, comment := range comments {
-		dumped[index] = map[string]any{"type": comment.Type(), "range": comment.Range, "value": comment.String("value")}
+		dumped[index] = json_value.Object{
+			"type":  jsonString(comment.Type()),
+			"range": json_value.Array{jsonInteger(comment.Range[0]), jsonInteger(comment.Range[1])},
+			"value": jsonString(comment.String("value")),
+		}
 	}
-	encoded, err := json.Marshal(map[string]any{"ast": dumpValue(program, offsets), "comments": dumped})
-	if err != nil {
-		t.Fatalf("%s: %v", fileName, err)
+	encoded, encodeError := json.Marshal(json_value.Object{"ast": dumpValue(program, offsets), "comments": dumped})
+	if encodeError != nil {
+		test.Fatalf("%s: %v", fileName, encodeError)
 	}
 	return string(encoded)
 }
 
 // moduleRoot is the module's root, where the fixtures are.
-func moduleRoot(t *testing.T) string {
-	t.Helper()
-	directory, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
+func moduleRoot(test *testing.T) string {
+	test.Helper()
+	directory, workingDirectoryError := os.Getwd()
+	if workingDirectoryError != nil {
+		test.Fatal(workingDirectoryError)
 	}
 	for {
-		if _, err := os.Stat(filepath.Join(directory, "go.mod")); err == nil {
+		if _, statError := os.Stat(filepath.Join(directory, "go.mod")); statError == nil {
 			return directory
 		}
 		parent := filepath.Dir(directory)
 		if parent == directory {
-			t.Fatal("no go.mod above the test's directory")
+			test.Fatal("no go.mod above the test's directory")
 		}
 		directory = parent
 	}
@@ -142,11 +161,20 @@ func moduleRoot(t *testing.T) string {
 // directories and the TypeScript checkout.
 func typeScriptFiles(roots []string) []string {
 	extensions := map[string]bool{".ts": true, ".tsx": true, ".mts": true, ".cts": true}
-	skipped := map[string]bool{"node_modules": true, ".git": true, ".cache": true, ".next": true, "dist": true, "TypeScript": true}
+	skipped := map[string]bool{
+		"node_modules": true,
+		".git":         true,
+		".cache":       true,
+		".next":        true,
+		"dist":         true,
+		"TypeScript":   true,
+	}
 	var files []string
 	for _, root := range roots {
-		filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
-			if err != nil {
+		// Ignored: the walk function returns nil for a path it cannot read, skipping it, so WalkDir has no
+		// error to return.
+		filepath.WalkDir(root, func(path string, entry fs.DirEntry, pathError error) error {
+			if pathError != nil {
 				return nil
 			}
 			if entry.IsDir() {

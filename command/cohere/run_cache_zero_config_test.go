@@ -10,9 +10,9 @@ import (
 // noticed (#e0tybvv). Zero config is a missing settings file, and the run declared the file as an input it
 // read, so recording stat'ed a file that was not there and refused the whole record: no zero-config project
 // ever replayed. The file is an input by its absence, since creating one changes what runs.
-func TestAZeroConfigProjectReplaysAndNoticesASettingsFileCreated(t *testing.T) {
-	t.Parallel()
-	fixture := newRunCacheFixture(t, buildCohere(t))
+func TestAZeroConfigProjectReplaysAndNoticesASettingsFileCreated(test *testing.T) {
+	test.Parallel()
+	fixture := newRunCacheFixture(test, buildCohere(test))
 	fixture.remove("CohereSettings.json")
 	fixture.write("source/debug.ts", "export function stop(): void {\n    debugger;\n}\n")
 	fixture.commit("zero config")
@@ -22,7 +22,7 @@ func TestAZeroConfigProjectReplaysAndNoticesASettingsFileCreated(t *testing.T) {
 	fixture.run(true, "--no-fix")
 	replayed, _ := fixture.run(true, "--no-fix")
 	if !isRunCacheReplay(replayed) {
-		t.Fatalf("an unchanged zero-config tree did not replay:\n%s", replayed)
+		test.Fatalf("an unchanged zero-config tree did not replay:\n%s", replayed)
 	}
 
 	// The settings file turns off a rule the house stack reports here.
@@ -30,14 +30,22 @@ func TestAZeroConfigProjectReplaysAndNoticesASettingsFileCreated(t *testing.T) {
 	warm, warmExit := fixture.run(true, "--no-fix")
 	cold, coldExit := fixture.run(false, "--no-fix")
 	if isRunCacheReplay(warm) {
-		t.Fatalf("a run after CohereSettings.json was created replayed the zero-config run:\n%s", warm)
+		test.Fatalf("a run after CohereSettings.json was created replayed the zero-config run:\n%s", warm)
 	}
 	finding := regexp.MustCompile(`(?m)^\S+:\d+:\d+ - .*$`)
 	findings := func(output string) string { return strings.Join(finding.FindAllString(output, -1), "\n") }
 	if findings(cold) == findings(replayed) {
-		t.Fatalf("the settings file changed nothing a run reports, so the miss above proves nothing:\n--- zero config\n%s\n--- with settings\n%s", replayed, cold)
+		test.Fatalf(
+			"the settings file changed nothing a run reports, so the miss above proves nothing:\n--- zero config\n%s\n--- with settings\n%s",
+			replayed,
+			cold,
+		)
 	}
 	if findings(warm) != findings(cold) || warmExit != coldExit {
-		t.Errorf("after CohereSettings.json was created the run reported other findings than a run with no cache:\n--- warm\n%s\n--- cold\n%s", warm, cold)
+		test.Errorf(
+			"after CohereSettings.json was created the run reported other findings than a run with no cache:\n--- warm\n%s\n--- cold\n%s",
+			warm,
+			cold,
+		)
 	}
 }

@@ -59,7 +59,7 @@ var optionsDiagnosticCodes = map[int32]string{
 	18035: "Invalid value for jsxFragmentFactory",
 }
 
-// configParsingOptionCodes are the codes reading a tsconfig raises about one option's name or value
+// configurationParsingOptionCodes are the codes reading a tsconfig raises about one option's name or value
 // (tsoptions, while it converts compilerOptions). Each is an options diagnostic, and the graph still
 // builds over it, the option ignored or left at its default, as tsc does (@system_cohere, 2026-10-04).
 //
@@ -68,30 +68,18 @@ var optionsDiagnosticCodes = map[int32]string{
 // TypeScript 5 tsconfigs fail to read before they could reach TS5102. Every other diagnostic from
 // reading a tsconfig still refuses the build: a JSON syntax error or an unreadable extends means the
 // options cohere would check against are not the ones written.
-var configParsingOptionCodes = map[int32]string{
+var configurationParsingOptionCodes = map[int32]string{
 	5023: "Unknown compiler option",
 	5024: "A compiler option requires a value of another type",
 	5025: "Unknown compiler option, with a suggestion",
 	6046: "An option's value is not one of the values it takes",
 }
 
-// IsOptionsDiagnostic reports whether a diagnostic is about the compiler options rather than about
-// source: a code from either list, located in no file or in one outside this program.
-func (g *Graph) IsOptionsDiagnostic(diagnostic *ast.Diagnostic) bool {
-	_, raisedByProgram := optionsDiagnosticCodes[diagnostic.Code()]
-	_, raisedByConfig := configParsingOptionCodes[diagnostic.Code()]
-	if !raisedByProgram && !raisedByConfig {
-		return false
-	}
-	sourceFile := diagnostic.File()
-	return sourceFile == nil || g.Program.GetSourceFile(sourceFile.FileName()) != sourceFile
-}
-
 // onlyOptionValueDiagnostics reports whether every diagnostic from reading a tsconfig is about one
-// option's name or value, so the graph can still be built. See configParsingOptionCodes.
+// option's name or value, so the graph can still be built. See configurationParsingOptionCodes.
 func onlyOptionValueDiagnostics(diagnostics []*ast.Diagnostic) bool {
 	for _, diagnostic := range diagnostics {
-		if _, isOptionValue := configParsingOptionCodes[diagnostic.Code()]; !isOptionValue {
+		if _, isOptionValue := configurationParsingOptionCodes[diagnostic.Code()]; !isOptionValue {
 			return false
 		}
 	}

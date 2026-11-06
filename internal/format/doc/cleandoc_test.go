@@ -9,8 +9,8 @@ import (
 // cleanDocFn), on the random specs the printer differential uses, without the fork (#r89mksm). Both
 // results are compared structurally and printed, and the doc CleanDoc was given must read the same
 // afterwards, since an unchanged part is now handed back rather than copied.
-func TestCleanDocMatchesMapDoc(t *testing.T) {
-	t.Parallel()
+func TestCleanDocMatchesMapDoc(test *testing.T) {
+	test.Parallel()
 	random := rand.New(rand.NewSource(20261005))
 	changed := 0
 	for index := range 3000 {
@@ -24,21 +24,21 @@ func TestCleanDocMatchesMapDoc(t *testing.T) {
 		// unchanged groups with the input. A mark follows from the group's contents alone, so a shared
 		// group is marked as each copy would have been.
 		if after := showDoc(document); after != before {
-			t.Fatalf("case %d: CleanDoc changed its input from\n%s\nto\n%s", index, before, after)
+			test.Fatalf("case %d: CleanDoc changed its input from\n%s\nto\n%s", index, before, after)
 		}
-		expected := MapDoc(buildSpec(spec), cleanDocFn)
+		expected := MapDoc(buildSpec(spec), cleanDoc)
 		if got, want := showDoc(cleaned), showDoc(expected); got != want {
-			t.Fatalf("case %d: CleanDoc built\n%s\nmapDoc(cleanDocFn) built\n%s", index, got, want)
+			test.Fatalf("case %d: CleanDoc built\n%s\nmapDoc(cleanDocFn) built\n%s", index, got, want)
 		}
 		if showDoc(cleaned) != before {
 			changed++
 		}
 		if got, want := printOrError(cleaned), printOrError(expected); got != want {
-			t.Fatalf("case %d: CleanDoc printed %q, mapDoc(cleanDocFn) %q", index, got, want)
+			test.Fatalf("case %d: CleanDoc printed %q, mapDoc(cleanDocFn) %q", index, got, want)
 		}
 	}
 	if changed == 0 {
-		t.Fatal("no spec was changed by cleaning, so the comparison never left the unchanged path")
+		test.Fatal("no spec was changed by cleaning, so the comparison never left the unchanged path")
 	}
 }
 

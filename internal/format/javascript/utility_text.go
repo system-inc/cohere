@@ -15,9 +15,8 @@ import (
 const notFound = -2
 
 var (
-	skipSpaces     = printing.SkipSpaces
-	skipWhitespace = printing.SkipWhitespace
-	skipToLineEnd  = printing.SkipToLineEnd
+	skipSpaces    = printing.SkipSpaces
+	skipToLineEnd = printing.SkipToLineEnd
 )
 
 // hasNewline is upstream's hasNewline(text, index).
@@ -28,13 +27,15 @@ func hasNewlineBackwards(text string, index int) bool { return printing.HasNewli
 
 // hasNewlineInRange is upstream's hasNewlineInRange: a "\n" in [start, end).
 func hasNewlineInRange(text string, start int, end int) bool {
-	if start < 0 {
-		start = 0
+	clampedStart := start
+	if clampedStart < 0 {
+		clampedStart = 0
 	}
-	if end > len(text) {
-		end = len(text)
+	clampedEnd := end
+	if clampedEnd > len(text) {
+		clampedEnd = len(text)
 	}
-	return start < end && strings.IndexByte(text[start:end], '\n') >= 0
+	return clampedStart < clampedEnd && strings.IndexByte(text[clampedStart:clampedEnd], '\n') >= 0
 }
 
 // isNextLineEmpty is upstream's isNextLineEmpty(text, startIndex), utilities/is-next-line-empty.js.
@@ -77,11 +78,11 @@ func getNextNonSpaceNonCommentCharacter(text string, startIndex int) string {
 	if index < 0 || index >= len(text) {
 		return ""
 	}
-	return charAt(text, index)
+	return characterAt(text, index)
 }
 
-// charAt is JavaScript's text.charAt(index) on a byte offset: the whole character starting there.
-func charAt(text string, index int) string {
+// characterAt is JavaScript's text.charAt(index) on a byte offset: the whole character starting there.
+func characterAt(text string, index int) string {
 	if index < 0 || index >= len(text) {
 		return ""
 	}

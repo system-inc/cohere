@@ -1,7 +1,7 @@
 // Asking the measured binary which rules it has, rather than assuming they match this one's.
 //
 // The classification split turns on whether cohere implements a rule, and that fact was read from
-// `registry.All()` — the registry linked into the harness, not into the binary under measurement.
+// `registry.All()`, the registry linked into the harness, not into the binary under measurement.
 // When the two differ, every classification describes the wrong tool, and it does so silently.
 //
 // It happened. A run at 03:22 measured a binary built before `react-component-no-multiple-primary`
@@ -41,8 +41,11 @@ var unconfiguredRulePattern = regexp.MustCompile(`^\s*([a-z][a-z0-9-]*) did not 
 // ruleCountPattern reads the rule count from the coverage line, which is the total this parse must
 // account for:
 //
-//	lint: 128 findings — 33 rules over 3407 files, ...
-var ruleCountPattern = regexp.MustCompile(`^lint: \d+ findings? — (\d+) rules? over`)
+//	lint: 128 findings <em-dash> 33 rules over 3407 files, ...
+//
+// where <em-dash> stands for the em-dash cohere prints there. The dash is cohere's own output, so the pattern holds
+// its exact bytes, spelled as an escape between the raw pieces because a raw string cannot hold one.
+var ruleCountPattern = regexp.MustCompile(`^lint: \d+ findings? ` + "\u2014" + ` (\d+) rules? over`)
 
 // CompiledRulesOf asks the binary which rules it has.
 //
@@ -51,11 +54,11 @@ var ruleCountPattern = regexp.MustCompile(`^lint: \d+ findings? — (\d+) rules?
 // the question, just less directly. Both are asked of the binary rather than derived from the
 // registry linked into this harness, which is the entire point: when the two builds differ, a
 // classification read from the wrong registry describes the wrong tool and says so confidently.
-func CompiledRulesOf(ctx context.Context, command GateCommand, explainFile string) (map[string]bool, error) {
-	if names, err := rulesFromRulesFlag(ctx, command); err == nil {
+func CompiledRulesOf(callerContext context.Context, command GateCommand, explainFile string) (map[string]bool, error) {
+	if names, rulesFromRulesFlagError := rulesFromRulesFlag(callerContext, command); rulesFromRulesFlagError == nil {
 		return names, nil
 	}
-	return rulesFromExplain(ctx, command, explainFile)
+	return rulesFromExplain(callerContext, command, explainFile)
 }
 
 // rulesFromRulesFlag reads `cohere -rules`, which prints one rule name per line.
@@ -64,18 +67,18 @@ func CompiledRulesOf(ctx context.Context, command GateCommand, explainFile strin
 // harness believing cohere implements no rules at all, under which every gate finding classifies
 // not-ported and every real disagreement is excused. That is the vacuous pass this package exists
 // to refuse, arriving through the door meant to prevent it.
-func rulesFromRulesFlag(ctx context.Context, command GateCommand) (map[string]bool, error) {
+func rulesFromRulesFlag(callerContext context.Context, command GateCommand) (map[string]bool, error) {
 	probe := command
 	probe.Arguments = []string{"-rules"}
 
-	output, err := runGate(ctx, probe)
-	if err != nil {
-		return nil, fmt.Errorf("%s does not answer -rules: %w", command.Program, err)
+	output, runGateError := runGate(callerContext, probe)
+	if runGateError != nil {
+		return nil, fmt.Errorf("%s does not answer -rules: %w", command.Program, runGateError)
 	}
 
-	names, err := namesFromRuleLines(output)
-	if err != nil {
-		return nil, fmt.Errorf("%s %w", command.Program, err)
+	names, namesFromRuleLinesError := namesFromRuleLines(output)
+	if namesFromRuleLinesError != nil {
+		return nil, fmt.Errorf("%s %w", command.Program, namesFromRuleLinesError)
 	}
 	return names, nil
 }
@@ -115,19 +118,19 @@ func namesFromRuleLines(output string) (map[string]bool, error) {
 // `-explain` names all three states a compiled rule can be in: it listened, it declined the file,
 // or the config never enabled it. Their sum is checked against the coverage line's own count, so a
 // parse that silently captured a subset fails loudly instead of producing a plausible short list.
-func rulesFromExplain(ctx context.Context, command GateCommand, explainFile string) (map[string]bool, error) {
+func rulesFromExplain(callerContext context.Context, command GateCommand, explainFile string) (map[string]bool, error) {
 	probe := command
 	probe.Arguments = []string{"-explain", explainFile}
 
-	output, err := runGate(ctx, probe)
-	if err != nil {
+	output, runGateError := runGate(callerContext, probe)
+	if runGateError != nil {
 		// A binary predating `-explain` cannot answer, and that is a real state rather than a
 		// broken one: the harness is measuring an older build. It is an error rather than a silent
 		// fallback to this harness's own registry, because that fallback is exactly the defect
 		// being fixed, and a caller that wants the old behavior should have to ask for it.
 		return nil, fmt.Errorf(
 			"%s cannot report its own rules, so classification would describe this harness rather than the binary being measured: %w",
-			command.Program, err,
+			command.Program, runGateError,
 		)
 	}
 
@@ -136,6 +139,8 @@ func rulesFromExplain(ctx context.Context, command GateCommand, explainFile stri
 
 	for _, line := range strings.Split(output, "\n") {
 		if match := ruleCountPattern.FindStringSubmatch(strings.TrimRight(line, "\r")); match != nil {
+			// Ignored: the pattern takes only digits, so this fails only past an int's range, where it gives the
+			// largest int and the check against the parsed names below refuses the list.
 			declaredCount, _ = strconv.Atoi(match[1])
 			continue
 		}

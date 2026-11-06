@@ -10,12 +10,18 @@ import (
 
 // reactHookNoPropertiesInDependenciesText is the rule's message, whose wording lives in
 // `policy/messages/react-hook-no-properties-in-dependencies.json`.
-var reactHookNoPropertiesInDependenciesText = policy.MessageOf("structure/react-hook-no-properties-in-dependencies", "extractPropertiesFirst")
+var reactHookNoPropertiesInDependenciesText = policy.MessageOf(
+	"structure/react-hook-no-properties-in-dependencies",
+	"extractPropertiesFirst",
+)
 
 // messageExtractPropertiesFirst is the finding, rendered when it is reported so the text comes from
 // the current catalog.
 func messageExtractPropertiesFirst() rule.Message {
-	return rule.Message{Id: reactHookNoPropertiesInDependenciesText.Id, Description: reactHookNoPropertiesInDependenciesText.Render(nil)}
+	return rule.Message{
+		Id:          reactHookNoPropertiesInDependenciesText.Id,
+		Description: reactHookNoPropertiesInDependenciesText.Render(nil),
+	}
 }
 
 // hooksWithDependencies are the React hooks that take a dependency array.
@@ -60,10 +66,10 @@ var hooksWithDependencies = map[string]bool{
 // On the offending element inside the array rather than on the call, matching the original. An array
 // listing `properties` twice reports twice, which is what the original does, and anchoring on the
 // call would collapse them into one finding at a line the author has to search.
-var ReactHookNoPropertiesInDependencies = rule.Rule{
+var ReactHookNoPropertiesInDependencies = rule.Rule[rule.NoOptions]{
 	Name: "structure/react-hook-no-properties-in-dependencies",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil || !FileContextFor(ctx.SourceFile.FileName().AsString()).IsReactFile {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		if ruleContext.SourceFile == nil || !FileContextFor(ruleContext.SourceFile.FileName().AsString()).IsReactFile {
 			return nil
 		}
 
@@ -100,7 +106,7 @@ var ReactHookNoPropertiesInDependencies = rule.Rule{
 					if element.Text() != "properties" {
 						continue
 					}
-					ctx.ReportNode(element, messageExtractPropertiesFirst())
+					ruleContext.ReportNode(element, messageExtractPropertiesFirst())
 				}
 			},
 		}

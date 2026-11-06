@@ -11,7 +11,7 @@ import (
 // (default empty). Our config layer unwraps the severity tuple before dispatch, so the decoder
 // receives that object directly rather than upstream's one-element array.
 //
-// `AllowKeywords` is a POINTER because its default is TRUE, and that is the one field in this
+// `AllowKeywords` is a pointer because its default is true, and that is the one field in this
 // package where the zero value is the wrong answer. A plain `bool` decodes an absent option to
 // false, which inverts the rule: every `a.class` in the tree would start reporting `useBrackets`.
 // The generic `rule.DecodeOptionsInto` would do exactly that, which is why the decoder below is
@@ -47,12 +47,12 @@ type DotNotationOptions struct {
 // # The corpus needs espree, and finding that out was the measurement
 //
 // Five of upstream's reporting cases are legacy octals: `01['prop']`, `08['prop']` and friends.
-// Driven through `@typescript-eslint/parser` all five come back as FATAL PARSE ERRORS, which read
+// Driven through `@typescript-eslint/parser` all five come back as fatal parse errors, which read
 // exactly like clean verdicts in a findings count -- the rule reports nothing and nothing says why.
 // Driving the same corpus through espree in script mode moves the oracle from 64 of 69 to 69 of 69
 // and from 34 findings to 39.
 //
-// That is a fact about the ORACLE rather than about this rule. What our own parser does with those
+// That is a fact about the oracle rather than about this rule. What our own parser does with those
 // five is measured separately and recorded in the test file, because a legacy octal is a syntax
 // error in TypeScript and this rule's verdict on it is therefore ours to establish rather than
 // upstream's to hand over.
@@ -79,23 +79,23 @@ type DotNotationOptions struct {
 // object is a plain decimal integer, which is `decimalInteger` in `ecmascript/dotnotation`;
 // `5.000_000` and `0b1010_1010` and `01` all take the no-space branch. Ten corpus cases pin the two
 // branches against each other.
-var DotNotation = rule.Rule{
+var DotNotation = rule.Rule[DotNotationOptions]{
 	Name: "dot-notation",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[DotNotationOptions]) rule.Listeners {
 		settings := dotnotation.Settings{AllowKeywords: true}
-		if resolved, isDotNotationOptions := rule.OptionsAs[DotNotationOptions](options); isDotNotationOptions {
+		if resolved, isDotNotationOptions := options.Read(); isDotNotationOptions {
 			if resolved.AllowKeywords != nil {
 				settings.AllowKeywords = *resolved.AllowKeywords
 			}
 			settings.AllowPattern = dotnotation.CompileAllowPattern(resolved.AllowPattern)
 		}
-		return dotnotation.Listeners(ctx, settings)
+		return dotnotation.Listeners(ruleContext, settings)
 	},
 }
 
 // DefaultDotNotationOptions is the unconfigured answer.
 //
-// `allowKeywords` defaults to TRUE, which is why the field is a pointer: an absent option must not
+// `allowKeywords` defaults to true, which is why the field is a pointer: an absent option must not
 // decode to the zero value. See the type's doc comment.
 func DefaultDotNotationOptions() DotNotationOptions {
 	allowKeywords := true
@@ -108,7 +108,7 @@ func DefaultDotNotationOptions() DotNotationOptions {
 // generic helper would ship: `allowKeywords` defaults to true, so decoding an absent option into a
 // plain bool would invert the rule and start reporting every `a.class` in the tree. The second is
 // that a bare `"error"` configuration arrives as empty input, which the generic decoder errors on.
-func DecodeDotNotationOptions(raw []byte) (any, error) {
+func DecodeDotNotationOptions(raw []byte) (DotNotationOptions, error) {
 	options := DefaultDotNotationOptions()
 	if len(raw) == 0 {
 		return options, nil
@@ -116,8 +116,8 @@ func DecodeDotNotationOptions(raw []byte) (any, error) {
 	// Decode into a fresh value rather than over the default, so an explicit `false` is
 	// distinguishable from an absent field by the pointer being non-nil.
 	var decoded DotNotationOptions
-	if err := rule.UnmarshalOptions(raw, &decoded); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &decoded); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 	if decoded.AllowKeywords == nil {
 		decoded.AllowKeywords = options.AllowKeywords

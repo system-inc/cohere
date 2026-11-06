@@ -30,9 +30,11 @@ var setStateInUseMemoMessage = rule.Message{
 
 // SetStateInRender flags a `useState` setter called unconditionally during render.
 //
-//	valid:   function Component() { const [x, setX] = useState(0); return <button onClick={() => setX(1)}>{x}</button>; }
+//	valid:   function Component() { const [x, setX] = useState(0);
+//	         return <button onClick={() => setX(1)}>{x}</button>; }
 //	valid:   function Component(props) { const [x, setX] = useState(0); if (props.c) { setX(1); } return x; }
-//	valid:   function Component(props) { const [x, setX] = useState(0); if (props.c) { return null; } setX(1); return x; }
+//	valid:   function Component(props) { const [x, setX] = useState(0);
+//	         if (props.c) { return null; } setX(1); return x; }
 //	valid:   function Component() { const [x, setX] = useState(0); try { setX(1); } catch (e) {} return x; }
 //	invalid: function Component() { const [x, setX] = useState(0); setX(1); return x; }
 //	invalid: function Component() { const [x, setX] = useState(0); const a = setX; a(1); return x; }
@@ -113,9 +115,9 @@ var setStateInUseMemoMessage = rule.Message{
 //	for (const p of props) { setState(true); }                    setState inside: CLEAN
 //
 // and an early return before the call makes it clean while leaving the syntax around the call
-// unchanged. `high_level_intermediate_representation.UnconditionalBlocks` is the port of upstream's `computeUnconditionalBlocks`; its
-// file explains why forward dominance, which this tree already had in two places, answers the wrong
-// question and would have reported the early-return case.
+// unchanged. `high_level_intermediate_representation.UnconditionalBlocks` is the port of upstream's
+// `computeUnconditionalBlocks`; its file explains why forward dominance, which this tree already had in two places,
+// answers the wrong question and would have reported the early-return case.
 //
 // This is therefore the opposite conclusion to `error-boundaries`, which read the same graph
 // machinery and used none of it. That rule's question was "is B written inside A", which is about
@@ -124,7 +126,7 @@ var setStateInUseMemoMessage = rule.Message{
 // # Two message ids from one validator
 //
 // Upstream's `validate_no_set_state_in_render` emits two diagnostics, and the branch order matters:
-// the `useMemo` arm is checked BEFORE the unconditional test, so a setter called inside a `useMemo`
+// the `useMemo` arm is checked before the unconditional test, so a setter called inside a `useMemo`
 // reports even when the call is conditional within that callback. Measured, `useMemo(() => { if
 // (props.c) { setX(1); } return 1; }, [])` reports.
 //
@@ -152,7 +154,7 @@ var setStateInUseMemoMessage = rule.Message{
 //     to React's parameter test, so nothing in it reports. Checked with a control in the same file:
 //     a second component beside it still reports, so this is a per-function decline rather than a
 //     whole-file bailout.
-var SetStateInRender = rule.Rule{
+var SetStateInRender = rule.Rule[CompilerRuleOptions]{
 	Name:             "react-hooks/set-state-in-render",
 	NeedsTypeChecker: true,
 	// Reads other files only through shape readers (rule.ExportNameIn), so its findings key on imports' shapes.
@@ -161,30 +163,30 @@ var SetStateInRender = rule.Rule{
 	// no alias and this rule declines the whole file in silence. `structure/react-hook-no-any-type`
 	// reads this flag to name that cost at the site where the types went bad.
 	ResolvesReactValueTypes: true,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[CompilerRuleOptions]) rule.Listeners {
 		return rule.Listeners{
 			// The whole file at once, for the reason `static_components.go` gives: lowering already
 			// descends into nested functions through the function arena, so listening per function
 			// kind would lower every inner function twice, the second time without the bindings its
 			// parent supplies.
 			ast.KindSourceFile: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 				// A file that cannot hold a component or a hook is not lowered at all; see
 				// high_level_intermediate_representation.MayHoldComponentOrHook for why that is exact.
-				if !high_level_intermediate_representation.MayHoldComponentOrHook(ctx) {
+				if !high_level_intermediate_representation.MayHoldComponentOrHook(ruleContext) {
 					return
 				}
 				forEachCompiledFunction(node, func(functionNode *ast.Node) {
-					// Shared with the other rules that lower this same function; see high_level_intermediate_representation.ForFunction.
-					// Construct runs inside the cached computation, because it mutates in place and is
-					// not idempotent.
-					lowered := high_level_intermediate_representation.ForFunction(ctx, functionNode)
+					// Shared with the other rules that lower this same function; see
+					// high_level_intermediate_representation.ForFunction. Construct runs inside the cached
+					// computation, because it mutates in place and is not idempotent.
+					lowered := high_level_intermediate_representation.ForFunction(ruleContext, functionNode)
 					if lowered == nil {
 						return
 					}
-					analyzeSetStateSubject(ctx, lowered)
+					analyzeSetStateSubject(ruleContext, lowered)
 				})
 			},
 		}
@@ -203,21 +205,27 @@ var SetStateInRender = rule.Rule{
 //
 // A function the gate declines is still descended into, because a component nested inside a plain
 // wrapper is a unit even when the wrapper is not.
-func analyzeSetStateSubject(ctx rule.Context, function *high_level_intermediate_representation.Function) {
+func analyzeSetStateSubject(ruleContext rule.Context, function *high_level_intermediate_representation.Function) {
 	if function == nil {
 		return
 	}
 	if function.Node == nil || !utilsreact.IsComponentOrHookLike(function.Node) {
 		for _, nested := range function.Functions {
-			analyzeSetStateSubject(ctx, nested)
+			analyzeSetStateSubject(ruleContext, nested)
 		}
 		return
 	}
 	// A unit found nested in a function that is not one is analyzed as React Compiler compiles it,
 	// on its own; see AsCompilationUnit.
-	function = high_level_intermediate_representation.AsCompilationUnit(ctx, function,
+	compilationUnit := high_level_intermediate_representation.AsCompilationUnit(ruleContext, function,
 		high_level_intermediate_representation.ForFunction)
-	reportSetStateInRender(ctx, function, function.Node, true, map[static_single_assignment.IdentifierId]bool{})
+	reportSetStateInRender(
+		ruleContext,
+		compilationUnit,
+		compilationUnit.Node,
+		true,
+		map[static_single_assignment.IdentifierId]bool{},
+	)
 }
 
 // reportSetStateInRender is upstream's `validate_impl` over one lowered function.
@@ -236,22 +244,24 @@ func analyzeSetStateSubject(ctx rule.Context, function *high_level_intermediate_
 //
 // `emit` separates reporting from detecting, and the separation is upstream's rather than an
 // optimization. `validate_impl` calls itself, binds the result to `inner_errors`, and then uses
-// only `!inner_errors.is_empty()`: the inner findings are DISCARDED and the finding that survives
+// only `!inner_errors.is_empty()`: the inner findings are discarded and the finding that survives
 // is the one at the outer call site. Measured on React, `const foo = () => { setX(1); }; foo();`
 // produces exactly one finding, pointing at `foo` and never at `setX`.
 //
 // Transcribing the recursion without this reports twice, which is what the lambda fixture caught.
 // The reason upstream does it is worth stating: the inner function is not itself render, so the
-// call inside it is not a call during render; what makes it a defect is that the OUTER call invokes
+// call inside it is not a call during render; what makes it a defect is that the outer call invokes
 // it unconditionally while rendering, and that is where a reader has to make the edit.
 //
-// `compiledUnit` stays pinned to the OUTERMOST component or hook across the recursion rather than
+// `compiledUnit` stays pinned to the outermost component or hook across the recursion rather than
 // following `function`. It is only used as the outer boundary for shadow resolution on a `useMemo`
 // callee, and that boundary is upstream's compiled unit: a `useMemo` binding at module scope does
 // not shadow, while one inside the component does. Passing the nested function instead would stop
 // the scope walk early and make a binding in the component invisible to a callback inside it.
+//
+// Mutates: unconditionalSetStateFunctions gains every value here proven to call a setter unconditionally.
 func reportSetStateInRender(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	function *high_level_intermediate_representation.Function,
 	compiledUnit *ast.Node,
 	emit bool,
@@ -267,28 +277,28 @@ func reportSetStateInRender(
 				continue
 			}
 
-			switch value := instruction.Value.(type) {
+			switch instructionValue := instruction.Value.(type) {
 			// Reading and writing carry the "this value calls a setter unconditionally" property
 			// along, which is what makes an alias chain of any length behave like its head. The
 			// setter's own type is followed by the checker instead, so these two arms exist only
 			// for values that are not setters themselves but call one.
 			case *high_level_intermediate_representation.LoadLocal:
-				if unconditionalSetStateFunctions[value.Place.Identifier] {
+				if unconditionalSetStateFunctions[instructionValue.Place.Identifier] {
 					unconditionalSetStateFunctions[instruction.LValue.Identifier] = true
 				}
-			// Reading a CAPTURED binding carries the property too. Upstream has no counterpart to
+			// Reading a captured binding carries the property too. Upstream has no counterpart to
 			// this arm, because its captures are ordinary values in one shared arena and a read of
 			// one is a `LoadLocal`. Here a capture is its own instruction, so a nested function
 			// calling something it closed over reaches the setter through `LoadContext` and nothing
 			// else. Without this arm the three-level fixture is silent: inside `bar`, the call is
 			// `Call $4()` where `$4 = LoadContext foo$1`.
 			case *high_level_intermediate_representation.LoadContext:
-				if unconditionalSetStateFunctions[value.Place.Identifier] {
+				if unconditionalSetStateFunctions[instructionValue.Place.Identifier] {
 					unconditionalSetStateFunctions[instruction.LValue.Identifier] = true
 				}
 			case *high_level_intermediate_representation.StoreLocal:
-				if unconditionalSetStateFunctions[value.Value.Identifier] {
-					unconditionalSetStateFunctions[value.LValue.Identifier] = true
+				if unconditionalSetStateFunctions[instructionValue.Value.Identifier] {
+					unconditionalSetStateFunctions[instructionValue.LValue.Identifier] = true
 					unconditionalSetStateFunctions[instruction.LValue.Identifier] = true
 				}
 
@@ -297,18 +307,24 @@ func reportSetStateInRender(
 			// callback in every component would be walked, and with it the walk is bounded by what
 			// the function can actually reach.
 			case *high_level_intermediate_representation.FunctionExpression:
-				nested := nestedFunction(function, value)
+				nested := nestedFunction(function, instructionValue)
 				if nested == nil {
 					continue
 				}
-				// The nested function names its captures with its OWN identifier ids, so the set
+				// The nested function names its captures with its own identifier ids, so the set
 				// built in this function's namespace means nothing inside it. Translate across the
 				// boundary rather than passing the map down; see setterCapturesOf.
-				nestedSetters, capturesOne := setterCapturesOf(ctx, function, value, nested, unconditionalSetStateFunctions)
+				nestedSetters, capturesOne := setterCapturesOf(
+					ruleContext,
+					function,
+					instructionValue,
+					nested,
+					unconditionalSetStateFunctions,
+				)
 
 				// A `useMemo` callback is analysed whatever it captures, and this is not an
 				// optimization waiver. Upstream inlines that callback into the render graph before
-				// validating, so a setter DECLARED INSIDE it is an ordinary value of the enclosing
+				// validating, so a setter declared inside it is an ordinary value of the enclosing
 				// function and needs no capture to be seen. Measured on React:
 				//
 				//	useMemo(() => { const [a, setA] = useState(1); setA(2); return a; }, [])
@@ -327,7 +343,7 @@ func reportSetStateInRender(
 				}
 				// A `useMemo` callback is the one nested function whose own findings survive, and
 				// it is not an exception to upstream's rule so much as a consequence of upstream
-				// never recursing into it at all: the callback is REPLACED by a direct call to
+				// never recursing into it at all: the callback is replaced by a direct call to
 				// itself before validation, so its body is inlined into the render graph and its
 				// setter call is an ordinary instruction of the enclosing function. There is no
 				// inner walk to discard. Reproduced here by emitting from the recursion for this
@@ -336,24 +352,29 @@ func reportSetStateInRender(
 				// A `useCallback` callback is replaced by a LoadLocal instead, so it is never
 				// invoked during render and reports nothing. That asymmetry is measured, not
 				// guessed; see the rule comment.
-				if reportSetStateInRender(ctx, nested, compiledUnit, emitFromNested, nestedSetters) {
+				if reportSetStateInRender(ruleContext, nested, compiledUnit, emitFromNested, nestedSetters) {
 					unconditionalSetStateFunctions[instruction.LValue.Identifier] = true
 				}
 
 			case *high_level_intermediate_representation.CallExpression:
 				// An optional call is silent upstream. See the rule comment.
-				if value.Optional {
+				if instructionValue.Optional {
 					continue
 				}
-				if !isStateSetter(ctx, function, value.Callee.Identifier) &&
-					!unconditionalSetStateFunctions[value.Callee.Identifier] {
+				if !isStateSetter(ruleContext, function, instructionValue.Callee.Identifier) &&
+					!unconditionalSetStateFunctions[instructionValue.Callee.Identifier] {
 					continue
 				}
 				// The memoized test comes first, matching upstream's branch order, so a call inside
 				// a `useMemo` reports even where it is conditional within that callback.
 				if isUseMemoCallbackOf(function.Node, compiledUnit) {
 					if emit {
-						reportSetterCall(ctx, function, value.Callee.Identifier, setStateInUseMemoMessage)
+						reportSetterCall(
+							ruleContext,
+							function,
+							instructionValue.Callee.Identifier,
+							setStateInUseMemoMessage,
+						)
 					}
 					reported = true
 					continue
@@ -362,7 +383,7 @@ func reportSetStateInRender(
 					continue
 				}
 				if emit {
-					reportSetterCall(ctx, function, value.Callee.Identifier, setStateInRenderMessage)
+					reportSetterCall(ruleContext, function, instructionValue.Callee.Identifier, setStateInRenderMessage)
 				}
 				reported = true
 			}
@@ -376,7 +397,10 @@ func reportSetStateInRender(
 //
 // The index is bounds-checked rather than trusted: `Functions` is populated by lowering and a
 // malformed or partially lowered function is exactly the input a linter is handed.
-func nestedFunction(function *high_level_intermediate_representation.Function, value *high_level_intermediate_representation.FunctionExpression) *high_level_intermediate_representation.Function {
+func nestedFunction(
+	function *high_level_intermediate_representation.Function,
+	value *high_level_intermediate_representation.FunctionExpression,
+) *high_level_intermediate_representation.Function {
 	if value == nil || int(value.Function) >= len(function.Functions) {
 		return nil
 	}
@@ -385,14 +409,14 @@ func nestedFunction(function *high_level_intermediate_representation.Function, v
 
 // setterCapturesOf translates the known-setter set across a function boundary.
 //
-// It returns the set expressed in the NESTED function's identifier namespace, plus whether that set
+// It returns the set expressed in the nested function's identifier namespace, plus whether that set
 // is non-empty, which is upstream's `has_set_state_operand` guard.
 //
 // # Two identifier namespaces, and why passing the map down is wrong
 //
 // Upstream shares one arena across every function in a compilation, so an `IdentifierId` means the
 // same value everywhere and `unconditional_set_state_functions` can simply be threaded through the
-// recursion. This IR gives each `Function` its OWN tables, which the package comment names as its
+// recursion. This IR gives each `Function` its own tables, which the package comment names as its
 // main deliberate divergence, so the same integer denotes different values in a parent and a child.
 // Passing the parent's map into the child asks about ids that happen to collide, which is not a
 // milder version of the right question but an unrelated one.
@@ -420,7 +444,7 @@ func nestedFunction(function *high_level_intermediate_representation.Function, v
 // `unconditionalSetStateFunctions` as well as the type, and why the walk must reach the definitions
 // in evaluation order, which `Function.Blocks` being in reverse postorder already guarantees.
 func setterCapturesOf(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	enclosing *high_level_intermediate_representation.Function,
 	value *high_level_intermediate_representation.FunctionExpression,
 	nested *high_level_intermediate_representation.Function,
@@ -429,7 +453,7 @@ func setterCapturesOf(
 	translated := map[static_single_assignment.IdentifierId]bool{}
 	for index, captured := range value.Captures {
 		isSetter := unconditionalSetStateFunctions[captured.Identifier] ||
-			isStateSetter(ctx, enclosing, captured.Identifier)
+			isStateSetter(ruleContext, enclosing, captured.Identifier)
 		if !isSetter {
 			continue
 		}
@@ -445,22 +469,26 @@ func setterCapturesOf(
 
 // isStateSetter reports whether a value's type is a React state setter.
 //
-// The predicate is the type's ALIAS, for the reasons in the rule comment: `Dispatch` is a type
+// The predicate is the type's alias, for the reasons in the rule comment: `Dispatch` is a type
 // alias so it lands there, while a ref's `RefObject` is an interface and lands in the symbol
 // instead. Reading the wrong field reports a genuine `useRef` as neither.
 //
 // `ActionDispatch`, which `useReducer` produces, is deliberately not accepted. Upstream gives it a
 // different built-in shape and its own diagnostics, and a dispatch called during render is not the
 // same defect.
-func isStateSetter(ctx rule.Context, function *high_level_intermediate_representation.Function, id static_single_assignment.IdentifierId) bool {
-	if ctx.TypeChecker == nil {
+func isStateSetter(
+	ruleContext rule.Context,
+	function *high_level_intermediate_representation.Function,
+	id static_single_assignment.IdentifierId,
+) bool {
+	if ruleContext.TypeChecker == nil {
 		return false
 	}
 	node := identifierNodeOf(function, id)
 	if node == nil {
 		return false
 	}
-	valueType := ctx.TypeChecker.GetTypeAtLocation(node)
+	valueType := ruleContext.TypeChecker.GetTypeAtLocation(node)
 	if valueType == nil {
 		return false
 	}
@@ -476,7 +504,10 @@ func isStateSetter(ctx rule.Context, function *high_level_intermediate_represent
 //
 // This is the seam `Identifier.Node` documents itself as existing for: the node goes to the checker
 // rather than to a local inference pass.
-func identifierNodeOf(function *high_level_intermediate_representation.Function, id static_single_assignment.IdentifierId) *ast.Node {
+func identifierNodeOf(
+	function *high_level_intermediate_representation.Function,
+	id static_single_assignment.IdentifierId,
+) *ast.Node {
 	if function == nil || int(id) >= len(function.Identifiers) {
 		return nil
 	}
@@ -493,14 +524,19 @@ func identifierNodeOf(function *high_level_intermediate_representation.Function,
 // golden for `setX(1)` underlines four characters and the one for `aliased(2)` underlines seven.
 // Reporting through `ctx.ReportNode` routes via `rule.TokenRange`, which trims leading trivia at
 // the harness.
-func reportSetterCall(ctx rule.Context, function *high_level_intermediate_representation.Function, id static_single_assignment.IdentifierId, message rule.Message) {
+func reportSetterCall(
+	ruleContext rule.Context,
+	function *high_level_intermediate_representation.Function,
+	id static_single_assignment.IdentifierId,
+	message rule.Message,
+) {
 	if node := identifierNodeOf(function, id); node != nil {
-		ctx.ReportNode(node, message)
+		ruleContext.ReportNode(node, message)
 		return
 	}
 	if int(id) < len(function.Identifiers) {
 		if identifier := function.Identifiers[id]; identifier != nil && identifier.Node != nil {
-			ctx.ReportNode(identifier.Node, message)
+			ruleContext.ReportNode(identifier.Node, message)
 		}
 	}
 }

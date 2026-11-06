@@ -13,22 +13,27 @@ type constantFoldCase struct {
 
 // runConstantFoldCases checks each case through constantFoldDeclaration with upstream's defaults: no
 // root font size, units normalized.
-func runConstantFoldCases(t *testing.T, cases []constantFoldCase) {
-	t.Helper()
+func runConstantFoldCases(test *testing.T, cases []constantFoldCase) {
+	test.Helper()
 	for _, testCase := range cases {
-		t.Run(testCase.input, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.input, func(test *testing.T) {
+			test.Parallel()
 			if actual := constantFoldDeclaration(testCase.input, nil); actual != testCase.expected {
-				t.Errorf("constantFoldDeclaration(%q) = %q, upstream gives %q", testCase.input, actual, testCase.expected)
+				test.Errorf(
+					"constantFoldDeclaration(%q) = %q, upstream gives %q",
+					testCase.input,
+					actual,
+					testCase.expected,
+				)
 			}
 		})
 	}
 }
 
 // TestConstantFoldExpressions ports upstream's "should constant fold %s into %s" table.
-func TestConstantFoldExpressions(t *testing.T) {
-	t.Parallel()
-	runConstantFoldCases(t, []constantFoldCase{
+func TestConstantFoldExpressions(test *testing.T) {
+	test.Parallel()
+	runConstantFoldCases(test, []constantFoldCase{
 		// Simple expression
 		{"calc(1 + 1)", "2"},
 		{"calc(3 - 2)", "1"},
@@ -82,8 +87,8 @@ func TestConstantFoldExpressions(t *testing.T) {
 
 // TestConstantFoldKeepsDifferentUnits ports upstream's "should not constant fold different units"
 // table: each input comes back exactly as written.
-func TestConstantFoldKeepsDifferentUnits(t *testing.T) {
-	t.Parallel()
+func TestConstantFoldKeepsDifferentUnits(test *testing.T) {
+	test.Parallel()
 	var cases []constantFoldCase
 	for _, input := range []string{
 		"calc(1rem * 2%)",
@@ -97,12 +102,12 @@ func TestConstantFoldKeepsDifferentUnits(t *testing.T) {
 	} {
 		cases = append(cases, constantFoldCase{input, input})
 	}
-	runConstantFoldCases(t, cases)
+	runConstantFoldCases(test, cases)
 }
 
 // TestConstantFoldToZero ports upstream's "should constant fold %s to 0" table.
-func TestConstantFoldToZero(t *testing.T) {
-	t.Parallel()
+func TestConstantFoldToZero(test *testing.T) {
+	test.Parallel()
 	var cases []constantFoldCase
 	for _, input := range []string{
 		"calc(0 * 100vw)",
@@ -132,14 +137,14 @@ func TestConstantFoldToZero(t *testing.T) {
 	} {
 		cases = append(cases, constantFoldCase{input, "0"})
 	}
-	runConstantFoldCases(t, cases)
+	runConstantFoldCases(test, cases)
 }
 
 // TestConstantFoldKeepsNonLengthZeroUnits ports upstream's "should not fold non-foldable units to 0"
 // table.
-func TestConstantFoldKeepsNonLengthZeroUnits(t *testing.T) {
-	t.Parallel()
-	runConstantFoldCases(t, []constantFoldCase{
+func TestConstantFoldKeepsNonLengthZeroUnits(test *testing.T) {
+	test.Parallel()
+	runConstantFoldCases(test, []constantFoldCase{
 		// Expressions, keep unit when they are nested
 		{"calc(calc(0px * -1) + 1rem)", "calc(0px + 1rem)"},
 		{"calc(calc(-1 * 0px) + 1rem)", "calc(0px + 1rem)"},
@@ -163,9 +168,9 @@ func TestConstantFoldKeepsNonLengthZeroUnits(t *testing.T) {
 }
 
 // TestConstantFoldDivision ports upstream's three single division cases.
-func TestConstantFoldDivision(t *testing.T) {
-	t.Parallel()
-	runConstantFoldCases(t, []constantFoldCase{
+func TestConstantFoldDivision(test *testing.T) {
+	test.Parallel()
+	runConstantFoldCases(test, []constantFoldCase{
 		// should not constant fold when dividing by `0`
 		{"calc(123rem / 0)", "calc(123rem / 0)"},
 		// should not constant fold when a computation has a high-precision result
@@ -178,8 +183,8 @@ func TestConstantFoldDivision(t *testing.T) {
 // TestConstantFoldJavaScriptNumberString holds javaScriptNumberString to `String(x)`, each expected
 // string printed by Node 24. Not an upstream test: it pins the exponent thresholds and the signs the
 // upstream tables never reach, since every folded number is printed through it.
-func TestConstantFoldJavaScriptNumberString(t *testing.T) {
-	t.Parallel()
+func TestConstantFoldJavaScriptNumberString(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range []struct {
 		value    float64
 		expected string
@@ -205,7 +210,12 @@ func TestConstantFoldJavaScriptNumberString(t *testing.T) {
 		{math.MaxFloat64, "1.7976931348623157e+308"},
 	} {
 		if actual := javaScriptNumberString(testCase.value); actual != testCase.expected {
-			t.Errorf("javaScriptNumberString(%v) = %q, JavaScript prints %q", testCase.value, actual, testCase.expected)
+			test.Errorf(
+				"javaScriptNumberString(%v) = %q, JavaScript prints %q",
+				testCase.value,
+				actual,
+				testCase.expected,
+			)
 		}
 	}
 }

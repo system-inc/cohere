@@ -56,19 +56,31 @@ require (
 
 	// cohere-dev reads go.work and each module's go.mod with the parser go itself uses, to gate every
 	// module the repository builds (command/cohere-dev/workspace.go).
-	golang.org/x/mod v0.39.0
-	golang.org/x/sys v0.47.0
+	golang.org/x/mod v0.41.0
+	golang.org/x/sys v0.48.0
 
-	// Tests only: the registry's option-decoding guard loads the rules tree with type information,
-	// because whether a decode is strict depends on the type it decodes into, which a regex over the
-	// source cannot see. It was already in the graph through stringer.
-	golang.org/x/tools v0.49.0
+	// The Go engine's analysis framework: every Go rule is a go/analysis analyzer (internal/goengine/rule),
+	// so vet's own suite, analysistest and facts across packages work unchanged, and the engine loads with
+	// go/packages and runs the rules with go/analysis/checker. Tests use it too: the registry's
+	// option-decoding guard loads the rules tree with type information, because whether a decode is strict
+	// depends on the type it decodes into, which a regex over the source cannot see.
+	golang.org/x/tools v0.50.0
+
+	// staticcheck's SA, S, ST and U1000 checks, which the Go engine registers as rules under their own codes
+	// (internal/goengine/rules). They are go/analysis analyzers already, so they run in the engine's one
+	// load with no runner of staticcheck's own. Minimal version selection keeps our x/tools over the older
+	// one staticcheck asks for, and the registry's tests prove its analyzers validate against ours.
+	honnef.co/go/tools v0.8.1
 )
 
 require (
+	// staticcheck's configuration reader parses staticcheck.conf with it, and the ST checks require that
+	// reader for their options (dot import and HTTP status code allow lists).
+	github.com/BurntSushi/toml v1.4.1-0.20240526193622-a339e1f7089c // indirect
 	github.com/dlclark/regexp2/v2 v2.5.2 // indirect
 	github.com/go-sourcemap/sourcemap v2.1.3+incompatible // indirect
 	github.com/google/pprof v0.0.0-20230207041349-798e818bf904 // indirect
-	golang.org/x/sync v0.22.0 // indirect
-	golang.org/x/text v0.41.0 // indirect
+	golang.org/x/exp/typeparams v0.0.0-20231108232855-2478ac86f678 // indirect
+	golang.org/x/sync v0.23.0 // indirect
+	golang.org/x/text v0.42.0 // indirect
 )

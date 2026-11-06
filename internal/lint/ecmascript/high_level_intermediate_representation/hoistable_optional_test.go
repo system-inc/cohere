@@ -6,7 +6,7 @@ import (
 
 // TestOptionalLoadsProveNothingAboutTheirObject pins that `a?.b` does not make `a` hoistable.
 //
-// An optional load is the guard AGAINST its object being null, so reading it is not evidence the
+// An optional load is the guard against its object being null, so reading it is not evidence the
 // object is non-null -- it is evidence the program expects it might be. Recording it as non-null
 // makes the dependency tree's cursor non-null at that step, which takes the
 // `hoistableCursor.nonNull` arm in `addDependency` and flattens `arg?.items` to `arg.items`. The
@@ -15,17 +15,17 @@ import (
 //
 // # Why this is read from a flag rather than ported
 //
-// Upstream keys its hoistable set by optional BLOCK: `collectOptionalChainSidemap` builds
+// Upstream keys its hoistable set by optional block: `collectOptionalChainSidemap` builds
 // `optionalBlock -> baseObject?.a` (`CollectHoistablePropertyLoads.ts:94`), so the guard survives
 // into the tree and the optional arm fires. That pass is 418 lines and is driven by `Optional`
-// TERMINALS. This lowering does not produce them -- measured on the fixture below, the only
+// terminals. This lowering does not produce them -- measured on the fixture below, the only
 // terminals are `Return` -- so the same fact is read from `PropertyLoad.Optional`, which upstream
 // does not have because its optionality lives in control flow.
 //
 // The two halves are atomic. Measured, neither alone moves anything: the hoistable change without
 // the flag reaching the tree is inert, and the flag without this change is flattened at the arm.
-func TestOptionalLoadsProveNothingAboutTheirObject(t *testing.T) {
-	t.Parallel()
+func TestOptionalLoadsProveNothingAboutTheirObject(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name       string
@@ -65,16 +65,16 @@ func TestOptionalLoadsProveNothingAboutTheirObject(t *testing.T) {
 			wantSilent: true,
 		},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			deps, ok := inferredDependencyStrings(t, testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			deps, ok := inferredDependencyStrings(test, testCase.source)
 			if !ok {
-				t.Fatal("the fixture did not lower, so this test asserts nothing")
+				test.Fatal("the fixture did not lower, so this test asserts nothing")
 			}
 			if len(deps) == 0 {
-				t.Fatal("no dependency was collected; the fixture stopped exercising the collector")
+				test.Fatal("no dependency was collected; the fixture stopped exercising the collector")
 			}
-			t.Logf("collected %v", deps)
+			test.Logf("collected %v", deps)
 		})
 	}
 }
@@ -83,8 +83,8 @@ func TestOptionalLoadsProveNothingAboutTheirObject(t *testing.T) {
 //
 // Kept separate from the fixture-level test above because it fails for one reason: an optional load
 // contributing a non-null fact. A rule-level assertion can go green for several.
-func TestOptionalHoistableIsNotRecorded(t *testing.T) {
-	t.Parallel()
+func TestOptionalHoistableIsNotRecorded(test *testing.T) {
+	test.Parallel()
 
 	optional := &PropertyLoad{
 		Object:   Place{Identifier: 7},
@@ -92,7 +92,7 @@ func TestOptionalHoistableIsNotRecorded(t *testing.T) {
 		Optional: true,
 	}
 	if _, recorded := maybeNonNullInInstruction(optional, temporaries{}); recorded {
-		t.Error("an optional load contributed a non-null fact about its object; `a?.b` is the " +
+		test.Error("an optional load contributed a non-null fact about its object; `a?.b` is the " +
 			"guard against `a` being null and proves the opposite")
 	}
 
@@ -102,10 +102,10 @@ func TestOptionalHoistableIsNotRecorded(t *testing.T) {
 	}
 	path, recorded := maybeNonNullInInstruction(unconditional, temporaries{})
 	if !recorded {
-		t.Fatal("an unconditional load contributed nothing; that is the whole input to this " +
+		test.Fatal("an unconditional load contributed nothing; that is the whole input to this " +
 			"analysis and the assertion above would pass vacuously without it")
 	}
 	if path.Identifier != 7 {
-		t.Errorf("recorded identifier %d, want 7", path.Identifier)
+		test.Errorf("recorded identifier %d, want 7", path.Identifier)
 	}
 }

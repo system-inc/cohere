@@ -41,7 +41,7 @@ var messageUnexpectedAwaitInLoop = rule.Message{
 // # The walk is upward from the waiting node, and where it stops is the rule
 //
 // From the node that waits, climb through parents until either a loop is found with this node in a
-// position the loop RE-ENTERS, or a boundary is reached. The boundaries are the three function
+// position the loop re-enters, or a boundary is reached. The boundaries are the three function
 // forms and a `for await...of` loop, the latter because asynchronous iteration is the deliberate
 // case rather than the mistake. That is why `while (true) { var y = async () => await foo; }` is
 // clean: the arrow function stops the climb before the while is seen.
@@ -51,7 +51,7 @@ var messageUnexpectedAwaitInLoop = rule.Message{
 // therefore names the method and accessor forms as well, which are the shapes the same source
 // parses into.
 //
-// # Which POSITION inside a loop counts, which is the half that is easy to get wrong
+// # Which position inside a loop counts, which is the half that is easy to get wrong
 //
 // Being inside a loop node is not enough, because parts of a loop header run once. Upstream's
 // `isLooped` names the re-entered positions explicitly and every one of these was measured against
@@ -67,7 +67,7 @@ var messageUnexpectedAwaitInLoop = rule.Message{
 // and both are in upstream's corpus for exactly this reason. A port testing only "is there a loop
 // above me" reports all three and passes nothing that would tell it.
 //
-// The one exception is an `await using` in a for-of or for-in LEFT position, which upstream adds to
+// The one exception is an `await using` in a for-of or for-in left position, which upstream adds to
 // `isLooped`: `for (await using resource of resources) {}` reports, because the resource is disposed
 // once per iteration. `for (await using resource = getResource(); ;) {}` is the for-loop initializer
 // and stays clean.
@@ -75,7 +75,7 @@ var messageUnexpectedAwaitInLoop = rule.Message{
 // # Where the finding points
 //
 // Upstream reports the waiting node itself. For an `await using` that node is ESTree's
-// `VariableDeclaration`, whose span INCLUDES a trailing semicolon when one is written and excludes
+// `VariableDeclaration`, whose span includes a trailing semicolon when one is written and excludes
 // it in a for-of header where none exists. Measured on all four shapes: our `VariableStatement`
 // reproduces the first and our `VariableDeclarationList` reproduces the second, so the report picks
 // between them by which parent the list has rather than always taking one.
@@ -85,14 +85,14 @@ var messageUnexpectedAwaitInLoop = rule.Message{
 // Upstream declares none, and the repair is a design decision: whether the iterations are actually
 // independent is not visible from the syntax, and rewriting a dependent loop into
 // `Promise.all` changes what the program does.
-var NoAwaitInLoop = rule.Rule{
+var NoAwaitInLoop = rule.Rule[rule.NoOptions]{
 	Name: "no-await-in-loop",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		report := func(waitingNode *ast.Node, reportNode *ast.Node) {
 			if !awaitInLoopIsInsideALoop(waitingNode) {
 				return
 			}
-			ctx.ReportNode(reportNode, messageUnexpectedAwaitInLoop)
+			ruleContext.ReportNode(reportNode, messageUnexpectedAwaitInLoop)
 		}
 
 		return rule.Listeners{
@@ -102,7 +102,7 @@ var NoAwaitInLoop = rule.Rule{
 
 			// A `for await...of` waits on its own iterator every iteration, so it reports when it
 			// is nested inside an ordinary loop. The climb starts at the loop itself, and the
-			// boundary test below stops at a `for await...of` PARENT rather than at this node, so
+			// boundary test below stops at a `for await...of` parent rather than at this node, so
 			// starting here does not immediately stop.
 			ast.KindForOfStatement: func(node *ast.Node) {
 				if node.AsForInOrOfStatement().AwaitModifier == nil {
@@ -111,7 +111,7 @@ var NoAwaitInLoop = rule.Rule{
 				report(node, node)
 			},
 
-			// `await using` waits at scope exit. The flag lives on the declaration LIST here rather
+			// `await using` waits at scope exit. The flag lives on the declaration list here rather
 			// than on the declaration, which is where ESTree carries `kind`, so this anchors on the
 			// list and reports whichever node reproduces upstream's span.
 			ast.KindVariableDeclarationList: func(node *ast.Node) {
@@ -209,9 +209,9 @@ func awaitInLoopIsReEntered(child *ast.Node, parent *ast.Node) bool {
 		if child == statement.Statement {
 			return true
 		}
-		// Upstream's one addition beyond the body: an `await using` in the LEFT position is
+		// Upstream's one addition beyond the body: an `await using` in the left position is
 		// disposed once per iteration, so `for (await using resource of resources) {}` reports
-		// while `for (var bar of await baz) {}` stays clean because its await is on the RIGHT.
+		// while `for (var bar of await baz) {}` stays clean because its await is on the right.
 		return child == statement.Initializer && ast.IsVarAwaitUsing(child)
 
 	case ast.KindWhileStatement:

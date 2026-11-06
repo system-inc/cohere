@@ -14,8 +14,8 @@ import (
 // control, because a probe config missing its `plugins` key makes every rule silent and a silent
 // probe is indistinguishable from a real decline.
 
-func TestNoUnwantedPolyfillioReports(t *testing.T) {
-	t.Parallel()
+func TestNoUnwantedPolyfillioReports(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -123,16 +123,16 @@ func TestNoUnwantedPolyfillioReports(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoUnwantedPolyfillio, "Component.tsx", testCase.source)
-			rule_testing.ExpectFindings(t, result, testCase.want...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoUnwantedPolyfillio, "Component.tsx", testCase.source)
+			rule_testing.ExpectFindings(test, result, testCase.want...)
 		})
 	}
 }
 
-func TestNoUnwantedPolyfillioIsSilent(t *testing.T) {
-	t.Parallel()
+func TestNoUnwantedPolyfillioIsSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -260,10 +260,10 @@ func TestNoUnwantedPolyfillioIsSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoUnwantedPolyfillio, "Component.tsx", testCase.source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoUnwantedPolyfillio, "Component.tsx", testCase.source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -272,17 +272,17 @@ func TestNoUnwantedPolyfillioIsSilent(t *testing.T) {
 // shows and what no message id assertion can see. Upstream's underline covers `src='...'` and stops
 // before the closing slash, so both ends are asserted here by slicing the source with the finding's
 // own range.
-func TestNoUnwantedPolyfillioPointsAtTheSourceAttribute(t *testing.T) {
-	t.Parallel()
+func TestNoUnwantedPolyfillioPointsAtTheSourceAttribute(test *testing.T) {
+	test.Parallel()
 
 	source := "export const A = () => <script src='https://polyfill.io/v3/polyfill.min.js' />;"
-	result := rule_testing.Run(t, NoUnwantedPolyfillio, "Component.tsx", source)
+	result := rule_testing.Run(test, NoUnwantedPolyfillio, "Component.tsx", source)
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
+		test.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
 	}
 	reported := source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 	if reported != "src='https://polyfill.io/v3/polyfill.min.js'" {
-		t.Fatalf("finding underlines %q", reported)
+		test.Fatalf("finding underlines %q", reported)
 	}
 
 	// The duplicate arm reports at its own call site, so asserting the security arm's span says
@@ -290,13 +290,14 @@ func TestNoUnwantedPolyfillioPointsAtTheSourceAttribute(t *testing.T) {
 	// carrying this test for the first arm alone, which is why both are asserted rather than one
 	// standing in for the other.
 	duplicateSource := "export const A = () => <script src='https://polyfill-fastly.io/v3/p.js?features=Promise' />;"
-	duplicateResult := rule_testing.Run(t, NoUnwantedPolyfillio, "Component.tsx", duplicateSource)
+	duplicateResult := rule_testing.Run(test, NoUnwantedPolyfillio, "Component.tsx", duplicateSource)
 	if len(duplicateResult.Diagnostics) != 1 {
-		t.Fatalf("wanted one finding on the duplicate arm, got %d", len(duplicateResult.Diagnostics))
+		test.Fatalf("wanted one finding on the duplicate arm, got %d", len(duplicateResult.Diagnostics))
 	}
-	duplicateReported := duplicateSource[duplicateResult.Diagnostics[0].Range.Pos():duplicateResult.Diagnostics[0].Range.End()]
+	duplicateDiagnostic := duplicateResult.Diagnostics[0]
+	duplicateReported := duplicateSource[duplicateDiagnostic.Range.Pos():duplicateDiagnostic.Range.End()]
 	if duplicateReported != "src='https://polyfill-fastly.io/v3/p.js?features=Promise'" {
-		t.Fatalf("duplicate finding underlines %q", duplicateReported)
+		test.Fatalf("duplicate finding underlines %q", duplicateReported)
 	}
 }
 
@@ -304,8 +305,8 @@ func TestNoUnwantedPolyfillioPointsAtTheSourceAttribute(t *testing.T) {
 // its verb with how many there are. Both are visible in upstream's snapshot and neither is visible
 // to an assertion on the message id, so the rendered text is compared exactly rather than with a
 // containment check: a containment check passes on a string carrying extra text.
-func TestNoUnwantedPolyfillioNamesTheFeaturesItFound(t *testing.T) {
-	t.Parallel()
+func TestNoUnwantedPolyfillioNamesTheFeaturesItFound(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -352,14 +353,14 @@ func TestNoUnwantedPolyfillioNamesTheFeaturesItFound(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoUnwantedPolyfillio, "Component.tsx", testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoUnwantedPolyfillio, "Component.tsx", testCase.source)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
 			}
 			if got := result.Diagnostics[0].Message.Description; got != testCase.want {
-				t.Fatalf("message was %q", got)
+				test.Fatalf("message was %q", got)
 			}
 		})
 	}
@@ -369,8 +370,8 @@ func TestNoUnwantedPolyfillioNamesTheFeaturesItFound(t *testing.T) {
 // constants. Asserting `messageNoUnwantedPolyfillioDuplicate.Id` looks like equality and is not a
 // guard: a mutation renaming the constant moves both sides of the comparison together, and that
 // mutant survived a suite whose every other assertion used the constant.
-func TestNoUnwantedPolyfillioUsesStableMessageIds(t *testing.T) {
-	t.Parallel()
+func TestNoUnwantedPolyfillioUsesStableMessageIds(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -390,14 +391,14 @@ func TestNoUnwantedPolyfillioUsesStableMessageIds(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoUnwantedPolyfillio, "Component.tsx", testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoUnwantedPolyfillio, "Component.tsx", testCase.source)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
 			}
 			if got := result.Diagnostics[0].Message.Id; got != testCase.want {
-				t.Fatalf("message id was %q", got)
+				test.Fatalf("message id was %q", got)
 			}
 		})
 	}
@@ -406,13 +407,13 @@ func TestNoUnwantedPolyfillioUsesStableMessageIds(t *testing.T) {
 // The security arm's text is constant rather than rendered, so nothing else in this file reads it,
 // and a mutation rewriting the sentence survived until this existed. Compared with equality rather
 // than containment: a containment check passes on a string that has grown extra text.
-func TestNoUnwantedPolyfillioSecurityMessageText(t *testing.T) {
-	t.Parallel()
+func TestNoUnwantedPolyfillioSecurityMessageText(test *testing.T) {
+	test.Parallel()
 
 	source := "export const A = () => <script src='https://polyfill.io/v3/polyfill.min.js' />;"
-	result := rule_testing.Run(t, NoUnwantedPolyfillio, "Component.tsx", source)
+	result := rule_testing.Run(test, NoUnwantedPolyfillio, "Component.tsx", source)
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
+		test.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
 	}
 	want := "This script loads from polyfill.io, whose domain was sold in 2024 and then used to " +
 		"serve malicious code to the sites embedding it. Every visitor runs whatever that domain " +
@@ -420,25 +421,25 @@ func TestNoUnwantedPolyfillioSecurityMessageText(t *testing.T) {
 		"https://cdnjs.cloudflare.com/polyfill/ or drop the polyfill and use the browser feature " +
 		"directly."
 	if got := result.Diagnostics[0].Message.Description; got != want {
-		t.Fatalf("security message was %q", got)
+		test.Fatalf("security message was %q", got)
 	}
 }
 
 // The security arm reports its own message and returns, so a URL that would also have qualified as
 // a duplicate is never described as one. This is the distinction a port folding the two arms into
 // one code path loses, and half the imported corpus still passes without it.
-func TestNoUnwantedPolyfillioSecurityArmReturnsBeforeTheFeatureCheck(t *testing.T) {
-	t.Parallel()
+func TestNoUnwantedPolyfillioSecurityArmReturnsBeforeTheFeatureCheck(test *testing.T) {
+	test.Parallel()
 
 	source := "export const A = () => <script src='https://cdn.polyfill.io/v2/polyfill.min.js?features=Promise' />;"
-	result := rule_testing.Run(t, NoUnwantedPolyfillio, "Component.tsx", source)
+	result := rule_testing.Run(test, NoUnwantedPolyfillio, "Component.tsx", source)
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
+		test.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
 	}
 	if result.Diagnostics[0].Message.Id != "noUnwantedPolyfillioSecurity" {
-		t.Fatalf("reported %q", result.Diagnostics[0].Message.Id)
+		test.Fatalf("reported %q", result.Diagnostics[0].Message.Id)
 	}
 	if strings.Contains(result.Diagnostics[0].Message.Description, "Promise") {
-		t.Fatalf("the security message named a feature: %q", result.Diagnostics[0].Message.Description)
+		test.Fatalf("the security message named a feature: %q", result.Diagnostics[0].Message.Description)
 	}
 }

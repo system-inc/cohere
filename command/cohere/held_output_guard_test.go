@@ -96,16 +96,21 @@ func heldOutputReport(stack string, waited time.Duration) string {
 	var report strings.Builder
 	fmt.Fprintf(&report, "a command exited and its output has stayed open at least %s since:\n\n%s\n\n",
 		waited.Round(time.Second), stack)
-	holders, err := pipeHolders()
+	holders, pipeHoldersError := pipeHolders()
 	switch {
-	case err != nil:
-		fmt.Fprintf(&report, "the holders could not be listed: %v\n", err)
+	case pipeHoldersError != nil:
+		fmt.Fprintf(&report, "the holders could not be listed: %v\n", pipeHoldersError)
 	case len(holders) == 0:
-		report.WriteString("no other process holds the other end of any pipe this process reads, so the read end was most " +
-			"likely closed out from under the poller: look for a second *os.File made on one descriptor (os.NewFile on a " +
-			"descriptor something else owns), whose finalizer closes it again after its number was reused\n")
+		report.WriteString(
+			"no other process holds the other end of any pipe this process reads, so the read end was most " +
+				"likely closed out from under the poller: look for a second *os.File made on one descriptor " +
+				"(os.NewFile on a descriptor something else owns), whose finalizer closes it again after its number " +
+				"was reused\n",
+		)
 	default:
-		report.WriteString("processes, other than this one's running children, holding the other end of a pipe this process reads:\n")
+		report.WriteString(
+			"processes, other than this one's running children, holding the other end of a pipe this process reads:\n",
+		)
 		for _, holder := range holders {
 			fmt.Fprintf(&report, "  %s\n", holder)
 		}
@@ -114,12 +119,12 @@ func heldOutputReport(stack string, waited time.Duration) string {
 }
 
 // pipeHolders lists, as "pid <pid> <command>: <parent, start and command line>", every process holding the
-// far end of a pipe this process has open past its standard streams, leaving out this process's own running children: a command
-// another test is still running holds its pipe as it should, and so does the lsof asking.
+// far end of a pipe this process has open past its standard streams, leaving out this process's own running children: a
+// command another test is still running holds its pipe as it should, and so does the lsof asking.
 func pipeHolders() ([]string, error) {
-	own, err := exec.Command("lsof", "-n", "-P", "-F", "pftdn", "-p", strconv.Itoa(os.Getpid())).Output()
-	if err != nil {
-		return nil, fmt.Errorf("lsof on this process: %w", err)
+	own, outputError := exec.Command("lsof", "-n", "-P", "-F", "pftdn", "-p", strconv.Itoa(os.Getpid())).Output()
+	if outputError != nil {
+		return nil, fmt.Errorf("lsof on this process: %w", outputError)
 	}
 	farEnds := map[string]bool{}
 	for _, open := range lsofFiles(own) {
@@ -134,9 +139,9 @@ func pipeHolders() ([]string, error) {
 	if len(farEnds) == 0 {
 		return nil, nil
 	}
-	everyone, err := exec.Command("lsof", "-n", "-P", "-F", "pcftdn").Output()
-	if err != nil && len(everyone) == 0 {
-		return nil, fmt.Errorf("lsof on every process: %w", err)
+	everyone, outputError := exec.Command("lsof", "-n", "-P", "-F", "pcftdn").Output()
+	if outputError != nil && len(everyone) == 0 {
+		return nil, fmt.Errorf("lsof on every process: %w", outputError)
 	}
 	self := strconv.Itoa(os.Getpid())
 	seen := map[string]bool{}
@@ -146,12 +151,16 @@ func pipeHolders() ([]string, error) {
 			continue
 		}
 		seen[open.pid] = true
+		// Ignored: ps exits nonzero for a pid it no longer finds, and its empty answer is read below.
 		started, _ := exec.Command("ps", "-o", "ppid=,lstart=,command=", "-p", open.pid).Output()
 		// A process ps no longer finds has exited and holds nothing now, the lsof that listed it included.
 		if fields := strings.Fields(string(started)); len(fields) == 0 || fields[0] == self {
 			continue
 		}
-		holders = append(holders, fmt.Sprintf("pid %s %s: %s", open.pid, open.command, strings.TrimSpace(string(started))))
+		holders = append(
+			holders,
+			fmt.Sprintf("pid %s %s: %s", open.pid, open.command, strings.TrimSpace(string(started))),
+		)
 	}
 	return holders, nil
 }
@@ -165,7 +174,8 @@ type lsofFile struct {
 // file, and t, d and n describe it.
 func lsofFiles(output []byte) []lsofFile {
 	var files []lsofFile
-	var pid, command string
+	var pid string
+	var command string
 	for _, line := range bytes.Split(output, []byte("\n")) {
 		if len(line) == 0 {
 			continue
@@ -196,14 +206,12 @@ func lsofFiles(output []byte) []lsofFile {
 	return files
 }
 
-// heldOutputFiringBound is how long the watch may take to fire on its 2s deadline before the test calls it
-// hung. It is not a speed check: load decides how long a healthy watch takes.
-const heldOutputFiringBound = 2 * time.Minute
-
 // failHeldOutput ends the test binary with the report, since no test can recover from a goroutine that
 // never returns and waiting for -timeout only delays the same failure with less said.
 func failHeldOutput(report string) {
-	fmt.Fprintf(os.Stderr, "\nheld output: %s", report)
+	// Ignored: the exit below fails the helper either way, and the test that started it fails on the report
+	// it does not find.
+	_, _ = fmt.Fprintf(os.Stderr, "\nheld output: %s", report)
 	os.Exit(2)
 }
 
@@ -212,55 +220,57 @@ func failHeldOutput(report string) {
 // the test's wait for output hangs exactly as a leaked descendant would make it. Run in a child test
 // binary, since the watch ends the binary it runs in.
 //
-// No bound here is a speed check, since load stretches the watch (#wwhrpm0). It took 25.27s at the load of
-// the cold rebuilds after a cache clear, which outlasted a 25s sleep and a 20s bound, and failed a healthy
-// run. The sleep is five minutes, so it outlasts the watch at any load seen, and the test kills it by the
-// pid the report names. The bound on firing is two minutes, a hang detector, with go test's -timeout behind
-// it.
-func TestAHeldOutputNamesItsHolder(t *testing.T) {
-	t.Parallel()
+// Nothing here times the watch, since load stretches it (#wwhrpm0). It took 25.27s at the load of the cold
+// rebuilds after a cache clear, which outlasted a 25s sleep and a 20s bound, and failed a healthy run. The
+// sleep never ends within a run, so it outlasts the watch at any load, and the test kills it by the pid the
+// report names. A watch that never fires leaves the helper waiting on the sleep, a hang go test's -timeout
+// fails.
+func TestAHeldOutputNamesItsHolder(test *testing.T) {
+	test.Parallel()
 	if os.Getenv("COHERE_HELD_OUTPUT_HELPER") == "1" {
 		watchForHeldOutput(2*time.Second, 200*time.Millisecond, failHeldOutput)
-		exec.Command("/bin/sh", "-c", "sleep 300 & echo started").CombinedOutput()
-		t.Fatal("the command's output closed while its background sleep still held it")
+		// Ignored: the command is here to hang on its output. The watch ends this binary first, or the Fatal
+		// below says it did not, so how the command ends is never read.
+		_, _ = exec.Command("/bin/sh", "-c", "sleep 100000 & echo started").CombinedOutput()
+		test.Fatal("the command's output closed while its background sleep still held it")
 	}
 	if runtime.GOOS == "windows" {
-		t.Skip("lsof names a pipe's holders, and Windows has no lsof")
+		test.Skip("lsof names a pipe's holders, and Windows has no lsof")
 	}
 
 	helper := exec.Command(os.Args[0], "-test.run=^TestAHeldOutputNamesItsHolder$", "-test.count=1")
 	helper.Env = append(os.Environ(), "COHERE_HELD_OUTPUT_HELPER=1")
-	outputFile, err := os.Create(t.TempDir() + "/output")
-	if err != nil {
-		t.Fatal(err)
+	outputFile, createError := os.Create(test.TempDir() + "/output")
+	if createError != nil {
+		test.Fatal(createError)
 	}
+	// Ignored: the helper writes it, through descriptors of its own, and this one is never written.
 	defer outputFile.Close()
 	// A file, not a buffer: the helper's sleep inherits whatever the helper writes to, and a buffer's pipe
 	// would hang this test on the same sleep.
 	helper.Stdout, helper.Stderr = outputFile, outputFile
-	started := time.Now()
-	err = helper.Run()
-	output, _ := os.ReadFile(outputFile.Name())
+	runError := helper.Run()
+	output, readError := os.ReadFile(outputFile.Name())
+	if readError != nil {
+		test.Fatal(readError)
+	}
 	if sleeper := regexp.MustCompile(`pid (\d+) sleep`).FindSubmatch(output); sleeper != nil {
 		if pid, convertError := strconv.Atoi(string(sleeper[1])); convertError == nil {
 			if process, findError := os.FindProcess(pid); findError == nil {
-				process.Kill()
+				// Ignored: a sleep already gone is the outcome the kill asks for.
+				_ = process.Kill()
 			}
 		}
 	}
-	if err == nil {
-		t.Fatalf("the helper passed, so the watch never fired:\n%s", output)
+	if runError == nil {
+		test.Fatalf("the helper passed, so the watch never fired:\n%s", output)
 	}
-	if elapsed := time.Since(started); elapsed > heldOutputFiringBound {
-		t.Errorf("the watch took %s to fire on a 2s deadline, past the %s that says it hung rather than ran slow",
-			elapsed, heldOutputFiringBound)
-	}
-	for _, want := range []string{"held output: a command exited", "TestAHeldOutputNamesItsHolder", "sleep 300"} {
+	for _, want := range []string{"held output: a command exited", "TestAHeldOutputNamesItsHolder", "sleep 100000"} {
 		if !bytes.Contains(output, []byte(want)) {
-			t.Errorf("the report does not say %q:\n%s", want, output)
+			test.Errorf("the report does not say %q:\n%s", want, output)
 		}
 	}
 	if bytes.Contains(output, []byte(" lsof:")) {
-		t.Errorf("the report names the lsof that asked, which is this process's own running child:\n%s", output)
+		test.Errorf("the report names the lsof that asked, which is this process's own running child:\n%s", output)
 	}
 }

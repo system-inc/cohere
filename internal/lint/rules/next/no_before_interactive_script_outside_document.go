@@ -145,14 +145,14 @@ var messageNoBeforeInteractiveScriptOutsideDocument = rule.Message{
 //
 // No fix. Upstream ships none, and the repair is either a move to another file or a change to what
 // the page does.
-var NoBeforeInteractiveScriptOutsideDocument = rule.Rule{
+var NoBeforeInteractiveScriptOutsideDocument = rule.Rule[rule.NoOptions]{
 	// No family prefix. The config writes `nextjs/no-before-interactive-script-outside-document` and
 	// matching strips the namespace on a `/` boundary, so a prefixed name matches nothing and runs
 	// on no files while its own tests stay green.
 	Name: "@next/next/no-before-interactive-script-outside-document",
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		fileName := ctx.SourceFile.FileName()
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		fileName := ruleContext.SourceFile.FileName()
 
 		// Hoisted, unlike upstream, which asks this at every opening element. Same answer, asked
 		// once. Returning no listeners is this tree's spelling of upstream's `should_run`.
@@ -160,7 +160,7 @@ var NoBeforeInteractiveScriptOutsideDocument = rule.Rule{
 			return nil
 		}
 
-		scriptLocalName, imported := localNameOfFirstNextScriptImport(ctx.SourceFile)
+		scriptLocalName, imported := localNameOfFirstNextScriptImport(ruleContext.SourceFile)
 		if !imported {
 			// Nothing in this file can be the framework's script component, so nothing can report.
 			// Upstream reaches the same conclusion later, after the strategy match, because its
@@ -182,7 +182,7 @@ var NoBeforeInteractiveScriptOutsideDocument = rule.Rule{
 			if nextjs.IsDocumentPage(fileName.AsString()) {
 				return
 			}
-			ctx.ReportNode(strategy, messageNoBeforeInteractiveScriptOutsideDocument)
+			ruleContext.ReportNode(strategy, messageNoBeforeInteractiveScriptOutsideDocument)
 		}
 
 		return rule.Listeners{
@@ -262,7 +262,7 @@ func firstBindingName(node *ast.Node) (string, bool) {
 	case ast.KindNamedImports:
 		// `imports.BindingsOf` answers which shapes a statement carries and is the right call almost
 		// everywhere, but it returns the three kinds as three separate fields and so discards the
-		// one thing this rule needs: which binding came FIRST. Upstream's `find_map` over the module
+		// one thing this rule needs: which binding came first. Upstream's `find_map` over the module
 		// record takes the first entry naming `next/script` whatever kind it is, so the order is the
 		// judgment rather than an implementation detail, and a caller reassembling it from three
 		// fields would be re-deriving what the grammar already fixed. Reached for directly for that
@@ -272,7 +272,7 @@ func firstBindingName(node *ast.Node) (string, bool) {
 			return "", false
 		}
 		for _, element := range elements.Nodes {
-			// The LOCAL name, which for `{ Foo as Bar }` is `Bar`. Probed: `<Bar>` reports and
+			// The local name, which for `{ Foo as Bar }` is `Bar`. Probed: `<Bar>` reports and
 			// `<Foo>` is silent, so reading the imported name here would invert both.
 			name := element.Name()
 			if name != nil && name.Kind == ast.KindIdentifier {

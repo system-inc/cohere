@@ -38,6 +38,27 @@ var locationRootPrefixes = map[string]bool{
 	"self":       true,
 }
 
+// assignmentOperators is every operator that writes to its left side.
+//
+// The original never reads the operator at all, so matching only `=` would drop the other four
+// while passing every `=` fixture. Listed rather than derived so the set is readable at the line.
+var assignmentOperators = map[ast.Kind]bool{
+	ast.KindEqualsToken:                   true,
+	ast.KindPlusEqualsToken:               true,
+	ast.KindMinusEqualsToken:              true,
+	ast.KindAsteriskEqualsToken:           true,
+	ast.KindAsteriskAsteriskEqualsToken:   true,
+	ast.KindSlashEqualsToken:              true,
+	ast.KindPercentEqualsToken:            true,
+	ast.KindLessThanLessThanEqualsToken:   true,
+	ast.KindAmpersandEqualsToken:          true,
+	ast.KindBarEqualsToken:                true,
+	ast.KindCaretEqualsToken:              true,
+	ast.KindBarBarEqualsToken:             true,
+	ast.KindAmpersandAmpersandEqualsToken: true,
+	ast.KindQuestionQuestionEqualsToken:   true,
+}
+
 // NoLocationAssignRelativeDestination flags a full page load to an internal destination.
 //
 //	valid:   location.assign('https://example.com')
@@ -93,12 +114,12 @@ var locationRootPrefixes = map[string]bool{
 // measured shape: a block-scoped shadow that has already closed. Upstream reads the global scope
 // rather than the lexical chain, so `{ const location = {}; } location.assign('/x')` reports there,
 // and the walk below agrees because the closed block is not an enclosing scope of the use.
-var NoLocationAssignRelativeDestination = rule.Rule{
+var NoLocationAssignRelativeDestination = rule.Rule[rule.NoOptions]{
 	// Bare, with no family prefix. The config writes `nextjs/no-location-assign-relative-destination`
 	// and the matcher strips the namespace on a `/` boundary, so a prefixed name here matches
 	// nothing and the rule runs on no files while every fixture passes.
 	Name: "@next/next/no-location-assign-relative-destination",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				call := node.AsCallExpression()
@@ -119,7 +140,7 @@ var NoLocationAssignRelativeDestination = rule.Rule{
 				if first.Kind == ast.KindSpreadElement {
 					return
 				}
-				reportIfRelative(ctx, node, first)
+				reportIfRelative(ruleContext, node, first)
 			},
 
 			// Assignment is a binary expression in this tree rather than its own node kind, so the
@@ -136,40 +157,19 @@ var NoLocationAssignRelativeDestination = rule.Rule{
 				if !readsGlobalLocation(memberReceiver(target)) {
 					return
 				}
-				reportIfRelative(ctx, node, binary.Right)
+				reportIfRelative(ruleContext, node, binary.Right)
 			},
 		}
 	},
 }
 
-// assignmentOperators is every operator that writes to its left side.
-//
-// The original never reads the operator at all, so matching only `=` would drop the other four
-// while passing every `=` fixture. Listed rather than derived so the set is readable at the line.
-var assignmentOperators = map[ast.Kind]bool{
-	ast.KindEqualsToken:                   true,
-	ast.KindPlusEqualsToken:               true,
-	ast.KindMinusEqualsToken:              true,
-	ast.KindAsteriskEqualsToken:           true,
-	ast.KindAsteriskAsteriskEqualsToken:   true,
-	ast.KindSlashEqualsToken:              true,
-	ast.KindPercentEqualsToken:            true,
-	ast.KindLessThanLessThanEqualsToken:   true,
-	ast.KindAmpersandEqualsToken:          true,
-	ast.KindBarEqualsToken:                true,
-	ast.KindCaretEqualsToken:              true,
-	ast.KindBarBarEqualsToken:             true,
-	ast.KindAmpersandAmpersandEqualsToken: true,
-	ast.KindQuestionQuestionEqualsToken:   true,
-}
-
 // reportIfRelative reports against reported when value resolves to an internal destination.
-func reportIfRelative(ctx rule.Context, reported *ast.Node, value *ast.Node) {
+func reportIfRelative(ruleContext rule.Context, reported *ast.Node, value *ast.Node) {
 	text, ok := staticStringPrefix(value, map[*ast.Node]bool{})
 	if !ok || absoluteDestination.MatchString(text) {
 		return
 	}
-	ctx.ReportNode(reported, messageNoLocationAssign)
+	ruleContext.ReportNode(reported, messageNoLocationAssign)
 }
 
 // accessesNamedProperty reports whether node reads the property `name` off something.
@@ -217,17 +217,17 @@ func memberReceiver(node *ast.Node) *ast.Node {
 // that has to be the real global is the outermost one, so a user binding of `window` silences a
 // `window.location.href` write just as a binding of `location` silences a bare one.
 func readsGlobalLocation(node *ast.Node) bool {
-	node = ast.SkipParentheses(node)
-	if node == nil {
+	unwrapped := ast.SkipParentheses(node)
+	if unwrapped == nil {
 		return false
 	}
-	if node.Kind == ast.KindIdentifier {
-		return node.Text() == "location" && isUnshadowedGlobal(node)
+	if unwrapped.Kind == ast.KindIdentifier {
+		return unwrapped.Text() == "location" && isUnshadowedGlobal(unwrapped)
 	}
-	if !accessesNamedProperty(node, "location") {
+	if !accessesNamedProperty(unwrapped, "location") {
 		return false
 	}
-	receiver := ast.SkipParentheses(memberReceiver(node))
+	receiver := ast.SkipParentheses(memberReceiver(unwrapped))
 	if receiver == nil || receiver.Kind != ast.KindIdentifier {
 		return false
 	}
@@ -393,36 +393,38 @@ func declaresParameterNamed(scope *ast.Node, name string) bool {
 // resolver overflows its stack and takes the whole lint run down on exactly that input. Diverging
 // here is deliberate, because a linter that crashes on a half-written file is worse than one that
 // declines to answer for it.
+//
+// Mutates: visited the walk marks each node it reaches, so one set spans the whole chain of bindings
 func staticStringPrefix(node *ast.Node, visited map[*ast.Node]bool) (string, bool) {
-	node = ast.SkipParentheses(node)
-	if node == nil || visited[node] {
+	unwrapped := ast.SkipParentheses(node)
+	if unwrapped == nil || visited[unwrapped] {
 		return "", false
 	}
-	visited[node] = true
+	visited[unwrapped] = true
 
-	switch node.Kind {
+	switch unwrapped.Kind {
 	case ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral:
-		return node.Text(), true
+		return unwrapped.Text(), true
 
 	case ast.KindTemplateExpression:
 		// The text before the first interpolation, cooked rather than raw, matching the original's
 		// `quasis[0].value.cooked`. An empty head is the common and load-bearing case: empty is
 		// relative, so a template opening with an interpolation reports.
-		head := node.AsTemplateExpression().Head
+		head := unwrapped.AsTemplateExpression().Head
 		if head == nil {
 			return "", false
 		}
 		return head.Text(), true
 
 	case ast.KindBinaryExpression:
-		binary := node.AsBinaryExpression()
+		binary := unwrapped.AsBinaryExpression()
 		if binary.OperatorToken.Kind != ast.KindPlusToken {
 			return "", false
 		}
 		return staticStringPrefix(binary.Left, visited)
 
 	case ast.KindIdentifier:
-		initializer := nearestBindingInitializer(node, node.Text())
+		initializer := nearestBindingInitializer(unwrapped, unwrapped.Text())
 		if initializer == nil {
 			return "", false
 		}

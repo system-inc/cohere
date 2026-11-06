@@ -27,7 +27,8 @@ import (
  *
  * So this reads the rules tree with type information. It takes every struct field reachable from an
  * option decode, the same decodes option_decoding_test.go finds, and looks in every non-test file
- * for a selector that reads it. Two uses are not reads:
+ * for a selector that reads it, or a conversion that copies its struct whole (`Entry(wire)`, which reads
+ * every field of wire though no selector names one). Two uses are not reads:
  *
  *   - the left side of a plain assignment, which is where a default is written;
  *   - the condition of an `if` whose body assigns that same field, which is the defaulting idiom
@@ -54,12 +55,6 @@ var unreadOptionFields = map[string]string{
 	// Captures matter only to a selector or a message template that reads them, and this port refuses
 	// both, so no value of it can change a finding.
 	"elementDescriptor.Capture": "read only by selector and template features this port refuses",
-	// The abbreviation vocabulary is a data file both engines read. These fields are its prose for
-	// whoever edits it, the why behind an entry, and no finding is built from them.
-	"abbreviationVocabularyFile.About":  "the vocabulary file's own description, for its editors",
-	"abbreviationEntry.Reason":          "why an entry exists, for the vocabulary's editors",
-	"allowedAbbreviatedName.Reason":     "why a name is allowed, for the vocabulary's editors",
-	"allowedAbbreviationSegment.Reason": "why a segment is allowed, for the vocabulary's editors",
 }
 
 // optionField is one struct field reachable from an option decode.
@@ -76,9 +71,14 @@ type optionReadFindings struct {
 
 // findUnreadOptionFields loads the packages matching patterns and reports each option field no
 // non-test file reads.
-func findUnreadOptionFields(t *testing.T, moduleRoot string, rulesRoot string, patterns ...string) optionReadFindings {
-	t.Helper()
-	loaded := loadRules(t, moduleRoot, patterns...)
+func findUnreadOptionFields(
+	test *testing.T,
+	moduleRoot string,
+	rulesRoot string,
+	patterns ...string,
+) optionReadFindings {
+	test.Helper()
+	loaded := loadRules(test, moduleRoot, patterns...)
 
 	// Every field an option decode reaches, by its declaring object.
 	fields := map[*types.Var]optionField{}
@@ -124,8 +124,14 @@ func findUnreadOptionFields(t *testing.T, moduleRoot string, rulesRoot string, p
 			findings.unread = append(findings.unread, described)
 		}
 	}
-	sort.Slice(findings.fields, func(first, second int) bool { return findings.fields[first].key < findings.fields[second].key })
-	sort.Slice(findings.unread, func(first, second int) bool { return findings.unread[first].key < findings.unread[second].key })
+	sort.Slice(
+		findings.fields,
+		func(first, second int) bool { return findings.fields[first].key < findings.fields[second].key },
+	)
+	sort.Slice(
+		findings.unread,
+		func(first, second int) bool { return findings.unread[first].key < findings.unread[second].key },
+	)
 	return findings
 }
 
@@ -133,13 +139,21 @@ func findUnreadOptionFields(t *testing.T, moduleRoot string, rulesRoot string, p
 // pointers, lists, maps, nested structs and promoted embedded structs. A type with its own
 // UnmarshalJSON is still entered: its decoder sets its fields, and the rule must read them all the
 // same.
-func collectOptionFields(valueType types.Type, fileSet *token.FileSet, rulesRoot string, fields map[*types.Var]optionField, seen map[types.Type]bool) {
-	valueType = types.Unalias(valueType)
-	if seen[valueType] {
+//
+// Mutates: seen the walk marks each type it enters, so a recursive type is walked once
+func collectOptionFields(
+	valueType types.Type,
+	fileSet *token.FileSet,
+	rulesRoot string,
+	fields map[*types.Var]optionField,
+	seen map[types.Type]bool,
+) {
+	unaliased := types.Unalias(valueType)
+	if seen[unaliased] {
 		return
 	}
-	seen[valueType] = true
-	switch shape := valueType.(type) {
+	seen[unaliased] = true
+	switch shape := unaliased.(type) {
 	case *types.Pointer:
 		collectOptionFields(shape.Elem(), fileSet, rulesRoot, fields, seen)
 	case *types.Slice:
@@ -160,7 +174,18 @@ func collectOptionFields(valueType types.Type, fileSet *token.FileSet, rulesRoot
 	}
 }
 
-func collectOptionStructFields(structure *types.Struct, owner string, fileSet *token.FileSet, rulesRoot string, fields map[*types.Var]optionField, seen map[types.Type]bool) {
+// collectOptionStructFields records each field of structure, owned by the type named owner, the way
+// collectOptionFields records a type's.
+//
+// Mutates: fields the walk records every exported field it reaches, so one map gathers a whole tree
+func collectOptionStructFields(
+	structure *types.Struct,
+	owner string,
+	fileSet *token.FileSet,
+	rulesRoot string,
+	fields map[*types.Var]optionField,
+	seen map[types.Type]bool,
+) {
 	for index := range structure.NumFields() {
 		field := structure.Field(index)
 		tag := reflect.StructTag(structure.Tag(index)).Get("json")
@@ -178,8 +203,8 @@ func collectOptionStructFields(structure *types.Struct, owner string, fileSet *t
 			continue
 		}
 		position := fileSet.Position(field.Pos())
-		relative, err := filepath.Rel(rulesRoot, position.Filename)
-		if err != nil {
+		relative, relativePathError := filepath.Rel(rulesRoot, position.Filename)
+		if relativePathError != nil {
 			relative = position.Filename
 		}
 		fields[field.Origin()] = optionField{
@@ -191,6 +216,8 @@ func collectOptionStructFields(structure *types.Struct, owner string, fileSet *t
 }
 
 // markOptionReads walks one file and marks each option field it reads.
+//
+// Mutates: read each field the file reads is marked, so one set gathers the reads of every file
 func markOptionReads(file *ast.File, info *types.Info, fields map[*types.Var]optionField, read map[*types.Var]bool) {
 	// The selectors that are not reads: plain assignment targets, and the conditions of a defaulting if.
 	notReads := map[*ast.SelectorExpr]bool{}
@@ -233,17 +260,50 @@ func markOptionReads(file *ast.File, info *types.Info, fields map[*types.Var]opt
 	})
 
 	ast.Inspect(file, func(node ast.Node) bool {
-		selector, isSelector := node.(*ast.SelectorExpr)
-		if !isSelector || notReads[selector] {
-			return true
-		}
-		if field := selectedField(info, selector); field != nil {
-			if _, isOption := fields[field]; isOption {
-				read[field] = true
+		switch expression := node.(type) {
+		case *ast.SelectorExpr:
+			if notReads[expression] {
+				return true
 			}
+			if field := selectedField(info, expression); field != nil {
+				if _, isOption := fields[field]; isOption {
+					read[field] = true
+				}
+			}
+		case *ast.CallExpr:
+			markConversionReads(expression, info, fields, read)
 		}
 		return true
 	})
+}
+
+// markConversionReads marks every option field of the struct a conversion copies. `Entry(wire)` reads
+// each field of wire into Entry without a selector naming one, which is how a decoder hands its wire
+// shape to the shape the rule reads. Only the operand's own fields need marking: a conversion needs
+// identical underlying types, so a nested or embedded named struct is the same type on both sides and
+// a read through the result is already a selector on the same field.
+//
+// Mutates: read each field the conversion copies is marked, into the set markOptionReads fills
+func markConversionReads(
+	call *ast.CallExpr, info *types.Info, fields map[*types.Var]optionField, read map[*types.Var]bool,
+) {
+	if len(call.Args) != 1 || !info.Types[call.Fun].IsType() {
+		return
+	}
+	operandType := types.Unalias(info.TypeOf(call.Args[0]))
+	if pointer, isPointer := operandType.(*types.Pointer); isPointer {
+		operandType = types.Unalias(pointer.Elem())
+	}
+	structure, isStruct := operandType.Underlying().(*types.Struct)
+	if !isStruct {
+		return
+	}
+	for index := range structure.NumFields() {
+		field := structure.Field(index).Origin()
+		if _, isOption := fields[field]; isOption {
+			read[field] = true
+		}
+	}
 }
 
 // selectedField is the field a selector expression selects, at its generic origin, or nil.
@@ -264,13 +324,13 @@ func selectedField(info *types.Info, expression ast.Expr) *types.Var {
 }
 
 // TestEveryOptionFieldARuleDecodesIsRead is the guard over the rules tree.
-func TestEveryOptionFieldARuleDecodesIsRead(t *testing.T) {
-	t.Parallel()
-	rulesRoot, err := filepath.Abs("../rules")
-	if err != nil {
-		t.Fatal(err)
+func TestEveryOptionFieldARuleDecodesIsRead(test *testing.T) {
+	test.Parallel()
+	rulesRoot, absolutePathError := filepath.Abs("../rules")
+	if absolutePathError != nil {
+		test.Fatal(absolutePathError)
 	}
-	findings := findUnreadOptionFields(t, "../../..", rulesRoot, "./internal/lint/rules/...")
+	findings := findUnreadOptionFields(test, "../../..", rulesRoot, "./internal/lint/rules/...")
 
 	unread := map[string]bool{}
 	for _, field := range findings.unread {
@@ -278,32 +338,35 @@ func TestEveryOptionFieldARuleDecodesIsRead(t *testing.T) {
 		if _, decided := unreadOptionFields[field.key]; decided {
 			continue
 		}
-		t.Errorf("%s %s is decoded from a config and nothing reads it, so setting it changes nothing. Port "+
+		test.Errorf("%s %s is decoded from a config and nothing reads it, so setting it changes nothing. Port "+
 			"what upstream does with it, or, if every value it can take already behaves as upstream does, "+
 			"name it in unreadOptionFields with that decision", field.position, field.key)
 	}
 	for key := range unreadOptionFields {
 		if !unread[key] {
-			t.Errorf("unreadOptionFields names %s, which is read now or no longer decoded; remove the entry", key)
+			test.Errorf("unreadOptionFields names %s, which is read now or no longer decoded; remove the entry", key)
 		}
 	}
 
 	// The floor is the control against a walk that loaded nothing or a matcher that stopped matching.
-	t.Logf("%d option fields reachable from a decode, %d unread", len(findings.fields), len(findings.unread))
+	test.Logf("%d option fields reachable from a decode, %d unread", len(findings.fields), len(findings.unread))
 	if len(findings.fields) < 400 {
-		t.Fatalf("found only %d option fields, so this walk examined too little to mean anything", len(findings.fields))
+		test.Fatalf(
+			"found only %d option fields, so this walk examined too little to mean anything",
+			len(findings.fields),
+		)
 	}
 }
 
 // TestTheOptionReadGuardSeesAnUnreadField runs the same walk over a planted package, so a clean result
 // above is a measurement rather than a matcher that never matches.
-func TestTheOptionReadGuardSeesAnUnreadField(t *testing.T) {
-	t.Parallel()
-	plantedRoot, err := filepath.Abs("testdata/optionreads")
-	if err != nil {
-		t.Fatal(err)
+func TestTheOptionReadGuardSeesAnUnreadField(test *testing.T) {
+	test.Parallel()
+	plantedRoot, absolutePathError := filepath.Abs("testdata/optionreads")
+	if absolutePathError != nil {
+		test.Fatal(absolutePathError)
 	}
-	findings := findUnreadOptionFields(t, "../../..", plantedRoot, "./internal/lint/registry/testdata/optionreads")
+	findings := findUnreadOptionFields(test, "../../..", plantedRoot, "./internal/lint/registry/testdata/optionreads")
 
 	unread := map[string]bool{}
 	for _, field := range findings.unread {
@@ -316,15 +379,16 @@ func TestTheOptionReadGuardSeesAnUnreadField(t *testing.T) {
 		"plantedNested.DeepUnread":       true,
 		"plantedEmbedded.PromotedUnread": true,
 		"plantedListEntry.EntryUnread":   true,
+		"plantedKeptWire.KeptUnread":     true,
 	}
 	for key := range want {
 		if !unread[key] {
-			t.Errorf("the planted unread field %s was not found; unread: %v", key, findings.unread)
+			test.Errorf("the planted unread field %s was not found; unread: %v", key, findings.unread)
 		}
 	}
 	for key := range unread {
 		if !want[key] {
-			t.Errorf("%s was reported unread, and the planted package reads it", key)
+			test.Errorf("%s was reported unread, and the planted package reads it", key)
 		}
 	}
 	// Control: the read ones are in the walk at all, so their silence above is a read and not an absence.
@@ -332,9 +396,13 @@ func TestTheOptionReadGuardSeesAnUnreadField(t *testing.T) {
 	for _, field := range findings.fields {
 		seen[field.key] = true
 	}
-	for _, key := range []string{"plantedOptions.Read", "plantedOptions.DefaultedThenRead", "plantedNested.DeepRead", "plantedEmbedded.PromotedRead", "plantedListEntry.EntryRead", "plantedSelfDecoding.Mode"} {
+	for _, key := range []string{
+		"plantedOptions.Read", "plantedOptions.DefaultedThenRead", "plantedNested.DeepRead",
+		"plantedEmbedded.PromotedRead", "plantedListEntry.EntryRead", "plantedSelfDecoding.Mode",
+		"plantedWireEntry.ConvertedElement", "plantedWireEntry.ConvertedMessage",
+	} {
 		if !seen[key] {
-			t.Errorf("the planted read field %s was not collected, so its silence proves nothing", key)
+			test.Errorf("the planted read field %s was not collected, so its silence proves nothing", key)
 		}
 	}
 }

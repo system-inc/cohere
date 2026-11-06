@@ -22,9 +22,13 @@ var graphQlQueryMethods = map[string]bool{
 
 // networkNoStringLiteralQueryText is the rule's message, whose wording lives in
 // `policy/messages/network-no-string-literal-query.json`.
-var networkNoStringLiteralQueryText = policy.MessageOf("structure/network-no-string-literal-query", "noStringLiteralGraphQlQuery")
+var networkNoStringLiteralQueryText = policy.MessageOf(
+	"structure/network-no-string-literal-query",
+	"noStringLiteralGraphQlQuery",
+)
 
-// messageNoStringLiteralGraphQlQuery is the finding, rendered when it is reported so the text comes from the current catalog.
+// messageNoStringLiteralGraphQlQuery is the finding, rendered when it is reported so the text comes from the current
+// catalog.
 func messageNoStringLiteralGraphQlQuery() rule.Message {
 	return rule.Message{
 		Id:          networkNoStringLiteralQueryText.Id,
@@ -48,9 +52,9 @@ func messageNoStringLiteralGraphQlQuery() rule.Message {
 // for a variable declaration of that name, which is the same search rather than a type query: this
 // rule has to work on a file that does not type-check, since a wrong document is exactly the kind of
 // mistake that arrives with other errors.
-var NetworkNoStringLiteralQuery = rule.Rule{
+var NetworkNoStringLiteralQuery = rule.Rule[rule.NoOptions]{
 	Name: "structure/network-no-string-literal-query",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				call := node.AsCallExpression()
@@ -63,7 +67,7 @@ var NetworkNoStringLiteralQuery = rule.Rule{
 
 				firstArgument := call.Arguments.Nodes[0]
 				if resolvesToStringLiteral(firstArgument, map[*ast.Node]bool{}) {
-					ctx.ReportNode(firstArgument, messageNoStringLiteralGraphQlQuery())
+					ruleContext.ReportNode(firstArgument, messageNoStringLiteralGraphQlQuery())
 				}
 			},
 		}
@@ -85,25 +89,27 @@ func isGraphQlMethodCall(call *ast.CallExpression) bool {
 // The visited set breaks the cycle in `const a = b; const b = a`, which is not valid code but is
 // reachable while someone is mid-edit, and a linter that hangs on a half-written file is worse than
 // one that misses a finding on it.
+//
+// Mutates: visited the walk marks each node it reaches, so one set spans the whole chain of bindings
 func resolvesToStringLiteral(node *ast.Node, visited map[*ast.Node]bool) bool {
-	node = ast.SkipParentheses(node)
-	if node == nil || visited[node] {
+	unwrapped := ast.SkipParentheses(node)
+	if unwrapped == nil || visited[unwrapped] {
 		return false
 	}
-	visited[node] = true
+	visited[unwrapped] = true
 
-	switch node.Kind {
+	switch unwrapped.Kind {
 	case ast.KindStringLiteral, ast.KindTemplateExpression, ast.KindNoSubstitutionTemplateLiteral:
 		return true
 
 	case ast.KindAsExpression:
-		return resolvesToStringLiteral(node.AsAsExpression().Expression, visited)
+		return resolvesToStringLiteral(unwrapped.AsAsExpression().Expression, visited)
 
 	case ast.KindTypeAssertionExpression:
-		return resolvesToStringLiteral(node.AsTypeAssertion().Expression, visited)
+		return resolvesToStringLiteral(unwrapped.AsTypeAssertion().Expression, visited)
 
 	case ast.KindIdentifier:
-		initializer := variableInitializerInScope(node, node.Text())
+		initializer := variableInitializerInScope(unwrapped, unwrapped.Text())
 		if initializer == nil {
 			return false
 		}

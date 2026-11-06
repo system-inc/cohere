@@ -27,8 +27,11 @@ func commentsOf(node Node) []Node {
 }
 
 // commentTest is upstream's getCommentTestFunction. A nil result means "every comment matches".
-func commentTest(flags commentCheckFlags, fn func(Node) bool) func(comment Node, index int, comments []Node) bool {
-	if flags == 0 && fn == nil {
+func commentTest(
+	flags commentCheckFlags,
+	predicate func(Node) bool,
+) func(comment Node, index int, comments []Node) bool {
+	if flags == 0 && predicate == nil {
 		return nil
 	}
 	return func(comment Node, index int, comments []Node) bool {
@@ -41,17 +44,17 @@ func commentTest(flags commentCheckFlags, fn func(Node) bool) func(comment Node,
 			flags&commentFirst != 0 && index != 0 ||
 			flags&commentLast != 0 && index != len(comments)-1 ||
 			flags&commentPrettierIgnore != 0 && !isPrettierIgnoreComment(comment) ||
-			fn != nil && !fn(comment))
+			predicate != nil && !predicate(comment))
 	}
 }
 
 // hasComment is upstream's hasComment(node, flags, fn).
-func hasComment(node Node, flags commentCheckFlags, fn func(Node) bool) bool {
+func hasComment(node Node, flags commentCheckFlags, predicate func(Node) bool) bool {
 	comments := commentsOf(node)
 	if len(comments) == 0 {
 		return false
 	}
-	test := commentTest(flags, fn)
+	test := commentTest(flags, predicate)
 	if test == nil {
 		return true
 	}
@@ -67,9 +70,9 @@ func hasComment(node Node, flags commentCheckFlags, fn func(Node) bool) bool {
 func hasAnyComment(node Node) bool { return hasComment(node, 0, nil) }
 
 // getComments is upstream's getComments(node, flags, fn).
-func getComments(node Node, flags commentCheckFlags, fn func(Node) bool) []Node {
+func getComments(node Node, flags commentCheckFlags, predicate func(Node) bool) []Node {
 	comments := commentsOf(node)
-	test := commentTest(flags, fn)
+	test := commentTest(flags, predicate)
 	if test == nil {
 		return comments
 	}

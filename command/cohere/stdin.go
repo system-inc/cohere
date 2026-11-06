@@ -46,10 +46,10 @@ type stdinRequest struct {
 //     typo; the gate reports it.
 //   - An error on stderr and nothing on stdout, exit 1, for a formatter or fixer that broke. The hook
 //     shows it and saves the buffer as typed.
-func runStdin(ctx context.Context, request stdinRequest, input io.Reader, output io.Writer) error {
-	buffer, err := io.ReadAll(input)
-	if err != nil {
-		return fmt.Errorf("reading the buffer from stdin: %w", err)
+func runStdin(callerContext context.Context, request stdinRequest, input io.Reader, output io.Writer) error {
+	buffer, readError := io.ReadAll(input)
+	if readError != nil {
+		return fmt.Errorf("reading the buffer from stdin: %w", readError)
 	}
 	text := string(buffer)
 
@@ -60,29 +60,29 @@ func runStdin(ctx context.Context, request stdinRequest, input io.Reader, output
 	path = filepath.Clean(path)
 
 	// The gate's own decision: formatting by default, left out by --no-format.
-	formatter, err := configuredFormatter(!request.NoFormat)
-	if err != nil {
-		return err
+	formatter, configuredFormatterError := configuredFormatter(!request.NoFormat)
+	if configuredFormatterError != nil {
+		return configuredFormatterError
 	}
 
-	propose, held, err := stdinProposals(ctx, request, path, text)
-	if err != nil {
-		return err
+	propose, held, stdinProposalsError := stdinProposals(callerContext, request, path, text)
+	if stdinProposalsError != nil {
+		return stdinProposalsError
 	}
-	transform, err := stdinTransform(formatter, request.Location, path, held)
-	if err != nil {
-		return err
+	transform, stdinTransformError := stdinTransform(formatter, request.Location, path, held)
+	if stdinTransformError != nil {
+		return stdinTransformError
 	}
 
-	result, err := edit.FixAndTransformText(path, text, propose, transform, request.MaxPasses)
-	if err != nil {
+	result, fixAndTransformTextError := edit.FixAndTransformText(path, text, propose, transform, request.MaxPasses)
+	if fixAndTransformTextError != nil {
 		// FixText refuses a buffer that does not parse before anything is applied, and that is a
 		// decline rather than a failure: the gate leaves such a file alone too.
 		if parses, _ := edit.Parses(path, text); !parses {
 			_, writeError := io.WriteString(output, text)
 			return writeError
 		}
-		return err
+		return fixAndTransformTextError
 	}
 	for _, rejection := range result.Rejected {
 		// A transform that errored is a broken formatter, which the gate reports and the save must not
@@ -92,14 +92,19 @@ func runStdin(ctx context.Context, request stdinRequest, input io.Reader, output
 			return fmt.Errorf("formatting %s: %s", path, rejection.Reason)
 		}
 	}
-	_, err = io.WriteString(output, result.Text)
-	return err
+	_, writeError := io.WriteString(output, result.Text)
+	return writeError
 }
 
 // stdinTransform is the gate's format transform for one named file: the same engine, the same ignore
 // layers, the same scope a run naming this path would have. A file outside it comes back skipped, and so
 // does an Adamic `.a` file the program does not hold (held is the program's `.a` files; see claimAdamic).
-func stdinTransform(formatter formatEngine, location projectLocation, path string, held map[string]struct{}) (edit.Transform, error) {
+func stdinTransform(
+	formatter formatEngine,
+	location projectLocation,
+	path string,
+	held map[string]struct{},
+) (edit.Transform, error) {
 	if formatter == nil {
 		return nil, nil
 	}
@@ -109,11 +114,11 @@ func stdinTransform(formatter formatEngine, location projectLocation, path strin
 		Description:        "1 named path",
 		RequestDescription: path,
 	}
-	enumeration, err := formatter.Enumerate(location.Root)
-	if err != nil {
+	enumeration, enumerateError := formatter.Enumerate(location.Root)
+	if enumerateError != nil {
 		// The gate withholds formatting when the walk fails; a save fails loudly instead, because a
 		// hook that silently stopped formatting would read as files that need none.
-		return nil, fmt.Errorf("enumerating what the formatter handles under %s: %w", location.Root, err)
+		return nil, fmt.Errorf("enumerating what the formatter handles under %s: %w", location.Root, enumerateError)
 	}
 	scope, _ = scope.narrowToEnumeration(enumeration).claimAdamic(held)
 	return scopedTransform(formatTransform(formatter), scope), nil
@@ -124,20 +129,25 @@ func stdinTransform(formatter formatEngine, location projectLocation, path strin
 // exactly as applyProposedFixes does. A file outside the program has no rules, so nothing is proposed
 // and only the format transform applies, which is what the gate does with a .md or a .css. held is the
 // program's Adamic `.a` files, for the format transform to know whether this one is source.
-func stdinProposals(ctx context.Context, request stdinRequest, path string, text string) (edit.Propose, map[string]struct{}, error) {
+func stdinProposals(
+	callerContext context.Context,
+	request stdinRequest,
+	path string,
+	text string,
+) (edit.Propose, map[string]struct{}, error) {
 	none := func(string, string) ([]edit.Proposal, error) { return nil, nil }
 	if !edit.TypeScriptParsable(path) {
 		return none, nil, nil
 	}
 
-	graph, err := program.Build(program.Options{
+	graph, buildError := program.Build(program.Options{
 		ConfigFileName:   request.Location.ConfigFileName,
 		CurrentDirectory: request.Location.Root,
 		SingleThreaded:   request.SingleThreaded,
 		Overlay:          map[string]string{path: text},
 	})
-	if err != nil {
-		return nil, nil, fmt.Errorf("building the type graph: %w", err)
+	if buildError != nil {
+		return nil, nil, fmt.Errorf("building the type graph: %w", buildError)
 	}
 	held := adamicHeld(graph)
 
@@ -153,17 +163,19 @@ func stdinProposals(ctx context.Context, request stdinRequest, path string, text
 		return none, held, nil
 	}
 
-	if _, err := configureLint(graph, request.Location, nil); err != nil {
-		return nil, nil, err
+	if _, configureLintError := configureLint(graph, request.Location, nil); configureLintError != nil {
+		return nil, nil, configureLintError
 	}
 	rules := registry.All()
-	walk, err := graph.Walk(ctx, []*ast.SourceFile{sourceFile}, rules)
-	if err != nil {
-		return nil, nil, fmt.Errorf("collecting proposals: %w", err)
+	walk, walkError := graph.Walk(callerContext, []*ast.SourceFile{sourceFile}, rules)
+	if walkError != nil {
+		return nil, nil, fmt.Errorf("collecting proposals: %w", walkError)
 	}
 	var firstPass []edit.Proposal
 	for _, diagnostic := range walk.Diagnostics {
-		if diagnostic.SourceFile == nil || len(diagnostic.Fixes) == 0 || diagnostic.SourceFile.FileName().AsString() != normalized {
+		if diagnostic.SourceFile == nil ||
+			len(diagnostic.Fixes) == 0 ||
+			diagnostic.SourceFile.FileName().AsString() != normalized {
 			continue
 		}
 		for _, proposed := range diagnostic.Fixes {
@@ -181,6 +193,8 @@ func stdinProposals(ctx context.Context, request stdinRequest, path string, text
 	}, held, nil
 }
 
-// errStdinNeedsFix is the refusal for --stdin-filepath without --fix: the mode answers what --fix
+// errorStdinNeedsFix is the refusal for --stdin-filepath without --fix: the mode answers what --fix
 // writes, and any other phase reports rather than writes, so there is nothing for it to answer.
-var errStdinNeedsFix = errors.New("--stdin-filepath answers what --fix writes for one file: pass --fix, and --format to format")
+var errorStdinNeedsFix = errors.New(
+	"--stdin-filepath answers what --fix writes for one file: pass --fix, and --format to format",
+)

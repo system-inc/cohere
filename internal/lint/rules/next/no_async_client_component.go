@@ -69,7 +69,7 @@ var messageNoAsyncClientComponent = rule.Message{
 //
 // No fix. The repair is to remove `async` and rewrite whatever the body awaited, which the rule
 // cannot know how to do.
-var NoAsyncClientComponent = rule.Rule{
+var NoAsyncClientComponent = rule.Rule[rule.NoOptions]{
 	Name: "@next/next/no-async-client-component",
 
 	// The indirect shapes resolve an exported identifier back to its declaration, which upstream
@@ -78,14 +78,14 @@ var NoAsyncClientComponent = rule.Rule{
 	// top-level statements, which is what the `@next` original does, is not the same rule.
 	NeedsTypeChecker: true,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			// The whole rule is one pass over the top-level statements, matching upstream's
 			// `run_once`. A `KindSourceFile` listener fires before its children, so the walk is
 			// done here rather than through per-kind listeners that would also see nested
 			// declarations upstream never looks at.
 			ast.KindSourceFile: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 
@@ -101,10 +101,10 @@ var NoAsyncClientComponent = rule.Rule{
 						// export into the declaration's modifiers rather than wrapping it, so this
 						// is a function declaration carrying the default modifier and not an
 						// export assignment.
-						reportDirectAsyncDefaultExport(ctx, statement)
+						reportDirectAsyncDefaultExport(ruleContext, statement)
 					case ast.KindExportAssignment:
 						// `export default MyComponent`, where the name is declared elsewhere.
-						reportIndirectAsyncDefaultExport(ctx, statement)
+						reportIndirectAsyncDefaultExport(ruleContext, statement)
 					}
 				}
 			},
@@ -117,7 +117,7 @@ var NoAsyncClientComponent = rule.Rule{
 // An anonymous default export is silent because there is no name to test, which is upstream's
 // behavior rather than an omission: its capitalization check reads through `func_decl.id`, and a
 // missing id fails the `is_some_and`.
-func reportDirectAsyncDefaultExport(ctx rule.Context, statement *ast.Node) {
+func reportDirectAsyncDefaultExport(ruleContext rule.Context, statement *ast.Node) {
 	if statement.ModifierFlags()&ast.ModifierFlagsDefault == 0 {
 		return
 	}
@@ -131,7 +131,7 @@ func reportDirectAsyncDefaultExport(ctx rule.Context, statement *ast.Node) {
 	// The identifier, not the statement. oxc labels `func_decl.id.span` and the `@next` original
 	// reports the whole export declaration; the snapshot pins oxc's narrower span and that is the
 	// one ported.
-	ctx.ReportNode(name, messageNoAsyncClientComponent)
+	ruleContext.ReportNode(name, messageNoAsyncClientComponent)
 }
 
 // reportIndirectAsyncDefaultExport handles `export default MyComponent`, resolving the name.
@@ -141,18 +141,18 @@ func reportDirectAsyncDefaultExport(ctx rule.Context, statement *ast.Node) {
 // between them. That reads as a double-report waiting to happen and is not one: a declaration
 // cannot be both kinds at once, so the second block's binding always fails when the first fired.
 // Written as a switch here, which says the same thing without the dead sequencing.
-func reportIndirectAsyncDefaultExport(ctx rule.Context, statement *ast.Node) {
+func reportIndirectAsyncDefaultExport(ruleContext rule.Context, statement *ast.Node) {
 	expression := statement.AsExportAssignment().Expression
 	if expression == nil || expression.Kind != ast.KindIdentifier {
 		return
 	}
 
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(expression)
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(expression)
 	if symbol == nil {
 		return
 	}
 
-	// The declaration that comes FIRST IN SOURCE ORDER, which is neither a loop nor an index-zero
+	// The declaration that comes first in source order, which is neither a loop nor an index-zero
 	// read, and every part of this was measured rather than reasoned.
 	//
 	// The standing advice in this tree is to loop over `symbol.Declarations` because indexing zero
@@ -161,7 +161,7 @@ func reportIndirectAsyncDefaultExport(ctx rule.Context, statement *ast.Node) {
 	// chances to match. It is wrong here, where the question is "what single thing is this name",
 	// and it is wrong in both of its halves.
 	//
-	// First, declarations are NOT in source order in typescript-go. Measured: an
+	// First, declarations are not in source order in typescript-go. Measured: an
 	// `interface MyComponent {}` written above `async function MyComponent() {}` still puts the
 	// function at index 0, because a value declaration sorts ahead of a type one no matter where it
 	// was written. So the input the loop advice exists to catch does not arise for this shape at
@@ -196,7 +196,7 @@ func reportIndirectAsyncDefaultExport(ctx rule.Context, statement *ast.Node) {
 		if name == nil || !react.IsLikelyComponentName(name.Text()) {
 			return
 		}
-		ctx.ReportNode(name, messageNoAsyncClientComponent)
+		ruleContext.ReportNode(name, messageNoAsyncClientComponent)
 		return
 	case ast.KindVariableDeclaration:
 		variableDeclaration := declaration.AsVariableDeclaration()
@@ -229,7 +229,7 @@ func reportIndirectAsyncDefaultExport(ctx rule.Context, statement *ast.Node) {
 		if !ast.IsAsyncFunction(initializer) {
 			return
 		}
-		ctx.ReportNode(name, messageNoAsyncClientComponent)
+		ruleContext.ReportNode(name, messageNoAsyncClientComponent)
 		return
 	}
 }

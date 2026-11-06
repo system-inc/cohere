@@ -73,9 +73,14 @@ type optionDecodingFindings struct {
 
 // findOptionDecodes loads the packages matching patterns from moduleRoot and walks every decode in
 // their non-test files.
-func findOptionDecodes(t *testing.T, moduleRoot string, rulesRoot string, patterns ...string) optionDecodingFindings {
-	t.Helper()
-	loaded := loadRules(t, moduleRoot, patterns...)
+func findOptionDecodes(
+	test *testing.T,
+	moduleRoot string,
+	rulesRoot string,
+	patterns ...string,
+) optionDecodingFindings {
+	test.Helper()
+	loaded := loadRules(test, moduleRoot, patterns...)
 
 	findings := optionDecodingFindings{lenientAt: map[string]bool{}}
 	untagged := map[string]bool{}
@@ -89,9 +94,9 @@ func findOptionDecodes(t *testing.T, moduleRoot string, rulesRoot string, patter
 			if strings.HasSuffix(fileName, "_test.go") {
 				continue
 			}
-			relative, err := filepath.Rel(rulesRoot, fileName)
-			if err != nil {
-				t.Fatalf("relating %s to %s: %v", fileName, rulesRoot, err)
+			relative, relativePathError := filepath.Rel(rulesRoot, fileName)
+			if relativePathError != nil {
+				test.Fatalf("relating %s to %s: %v", fileName, rulesRoot, relativePathError)
 			}
 			for _, declaration := range file.Decls {
 				function, isFunction := declaration.(*ast.FuncDecl)
@@ -116,7 +121,13 @@ func findOptionDecodes(t *testing.T, moduleRoot string, rulesRoot string, patter
 						target:   target,
 					}
 					findings.decodes = append(findings.decodes, decode)
-					reachesStruct := walkOptionType(target, loadedPackage.Fset, rulesRoot, untagged, map[types.Type]bool{})
+					reachesStruct := walkOptionType(
+						target,
+						loadedPackage.Fset,
+						rulesRoot,
+						untagged,
+						map[types.Type]bool{},
+					)
 					if reachesStruct && (name == "Unmarshal" || name == "Decode") {
 						if _, lenient := lenientOptionDecodes[site]; lenient {
 							findings.lenientAt[site] = true
@@ -160,7 +171,10 @@ func optionDecodeTarget(info *types.Info, call *ast.CallExpr) (string, types.Typ
 			return "", nil
 		}
 		object := info.Uses[selector.Sel]
-		if object != nil && object.Pkg() != nil && strings.HasSuffix(object.Pkg().Path(), "/lint/rule") && object.Name() == "DecodeOptionsInto" {
+		if object != nil &&
+			object.Pkg() != nil &&
+			strings.HasSuffix(object.Pkg().Path(), "/lint/rule") &&
+			object.Name() == "DecodeOptionsInto" {
 			return "DecodeOptionsInto", info.TypeOf(function.Index)
 		}
 	}
@@ -169,13 +183,21 @@ func optionDecodeTarget(info *types.Info, call *ast.CallExpr) (string, types.Typ
 
 // walkOptionType reports whether a decode into valueType reaches a struct, and records every field
 // it reaches that declares no `json` key, as `file:line Type.Field`.
-func walkOptionType(valueType types.Type, fileSet *token.FileSet, rulesRoot string, untagged map[string]bool, seen map[types.Type]bool) bool {
-	valueType = types.Unalias(valueType)
-	if seen[valueType] {
+//
+// Mutates: seen the walk marks each type it enters, so a recursive type is walked once
+func walkOptionType(
+	valueType types.Type,
+	fileSet *token.FileSet,
+	rulesRoot string,
+	untagged map[string]bool,
+	seen map[types.Type]bool,
+) bool {
+	unaliased := types.Unalias(valueType)
+	if seen[unaliased] {
 		return false
 	}
-	seen[valueType] = true
-	switch shape := valueType.(type) {
+	seen[unaliased] = true
+	switch shape := unaliased.(type) {
 	case *types.Pointer:
 		return walkOptionType(shape.Elem(), fileSet, rulesRoot, untagged, seen)
 	case *types.Slice:
@@ -201,7 +223,18 @@ func walkOptionType(valueType types.Type, fileSet *token.FileSet, rulesRoot stri
 	return false
 }
 
-func walkOptionStruct(structure *types.Struct, owner string, fileSet *token.FileSet, rulesRoot string, untagged map[string]bool, seen map[types.Type]bool) {
+// walkOptionStruct walks each field of structure, owned by the type named owner, the way walkOptionType
+// walks a type.
+//
+// Mutates: untagged the walk records every exported field with no `json` key, so one set gathers a whole tree
+func walkOptionStruct(
+	structure *types.Struct,
+	owner string,
+	fileSet *token.FileSet,
+	rulesRoot string,
+	untagged map[string]bool,
+	seen map[types.Type]bool,
+) {
 	for index := range structure.NumFields() {
 		field := structure.Field(index)
 		tag := reflect.StructTag(structure.Tag(index)).Get("json")
@@ -220,8 +253,8 @@ func walkOptionStruct(structure *types.Struct, owner string, fileSet *token.File
 		}
 		if key == "" {
 			position := fileSet.Position(field.Pos())
-			relative, err := filepath.Rel(rulesRoot, position.Filename)
-			if err != nil {
+			relative, relativePathError := filepath.Rel(rulesRoot, position.Filename)
+			if relativePathError != nil {
 				relative = position.Filename
 			}
 			untagged[fmt.Sprintf("%s:%d %s.%s", filepath.ToSlash(relative), position.Line, owner, field.Name())] = true
@@ -244,27 +277,27 @@ func unmarshalsItself(named *types.Named) bool {
 }
 
 // TestEveryOptionDecodeIsStrictAndEveryOptionFieldDeclaresItsKey is the guard over the rules tree.
-func TestEveryOptionDecodeIsStrictAndEveryOptionFieldDeclaresItsKey(t *testing.T) {
-	t.Parallel()
-	rulesRoot, err := filepath.Abs("../rules")
-	if err != nil {
-		t.Fatal(err)
+func TestEveryOptionDecodeIsStrictAndEveryOptionFieldDeclaresItsKey(test *testing.T) {
+	test.Parallel()
+	rulesRoot, absolutePathError := filepath.Abs("../rules")
+	if absolutePathError != nil {
+		test.Fatal(absolutePathError)
 	}
-	findings := findOptionDecodes(t, "../../..", rulesRoot, "./internal/lint/rules/...")
+	findings := findOptionDecodes(test, "../../..", rulesRoot, "./internal/lint/rules/...")
 
 	for _, decode := range findings.loose {
-		t.Errorf("%s (%s) decodes options into %s with json.%s, which drops an unknown key and matches "+
+		test.Errorf("%s (%s) decodes options into %s with json.%s, which drops an unknown key and matches "+
 			"case-insensitively. Use rule.UnmarshalOptions, or, if upstream's schema leaves this object "+
 			"open, name %s in lenientOptionDecodes and say so at the site",
 			decode.position, decode.site, types.TypeString(decode.target, shortPackageName), decode.call, decode.site)
 	}
 	for _, field := range findings.untagged {
-		t.Errorf("%s is an option field with no json tag, so no spelling is declared for it and its key "+
+		test.Errorf("%s is an option field with no json tag, so no spelling is declared for it and its key "+
 			"matches in any case. Tag it with upstream's exact key", field)
 	}
 	for site := range lenientOptionDecodes {
 		if !findings.lenientAt[site] {
-			t.Errorf("lenientOptionDecodes names %s, which no longer makes a loose decode; remove the entry", site)
+			test.Errorf("lenientOptionDecodes names %s, which no longer makes a loose decode; remove the entry", site)
 		}
 	}
 
@@ -278,23 +311,27 @@ func TestEveryOptionDecodeIsStrictAndEveryOptionFieldDeclaresItsKey(t *testing.T
 			strict++
 		}
 	}
-	t.Logf("%d option decodes, %d through rule.UnmarshalOptions or rule.DecodeOptionsInto, %d lenient by upstream's schema",
-		len(findings.decodes), strict, len(findings.lenientAt))
+	test.Logf(
+		"%d option decodes, %d through rule.UnmarshalOptions or rule.DecodeOptionsInto, %d lenient by upstream's schema",
+		len(findings.decodes),
+		strict,
+		len(findings.lenientAt),
+	)
 	if len(findings.decodes) < 200 || strict < 150 {
-		t.Fatalf("found %d option decodes, %d of them strict, so this walk examined too little to mean anything",
+		test.Fatalf("found %d option decodes, %d of them strict, so this walk examined too little to mean anything",
 			len(findings.decodes), strict)
 	}
 }
 
 // TestTheOptionDecodingGuardSeesALooseDecodeAndAnUntaggedField runs the same walk over a planted
 // package, so a clean result above is a measurement rather than a matcher that never matches.
-func TestTheOptionDecodingGuardSeesALooseDecodeAndAnUntaggedField(t *testing.T) {
-	t.Parallel()
-	plantedRoot, err := filepath.Abs("testdata/optiondecoding")
-	if err != nil {
-		t.Fatal(err)
+func TestTheOptionDecodingGuardSeesALooseDecodeAndAnUntaggedField(test *testing.T) {
+	test.Parallel()
+	plantedRoot, absolutePathError := filepath.Abs("testdata/optiondecoding")
+	if absolutePathError != nil {
+		test.Fatal(absolutePathError)
 	}
-	findings := findOptionDecodes(t, "../../..", plantedRoot, "./internal/lint/registry/testdata/optiondecoding")
+	findings := findOptionDecodes(test, "../../..", plantedRoot, "./internal/lint/registry/testdata/optiondecoding")
 
 	loose := map[string]bool{}
 	for _, decode := range findings.loose {
@@ -308,12 +345,12 @@ func TestTheOptionDecodingGuardSeesALooseDecodeAndAnUntaggedField(t *testing.T) 
 	}
 	for site := range want {
 		if !loose[site] {
-			t.Errorf("the planted loose decode in %s was not found", site)
+			test.Errorf("the planted loose decode in %s was not found", site)
 		}
 	}
 	for site := range loose {
 		if !want[site] {
-			t.Errorf("%s was reported loose, and the planted package decodes there strictly or into no struct", site)
+			test.Errorf("%s was reported loose, and the planted package decodes there strictly or into no struct", site)
 		}
 	}
 
@@ -322,13 +359,17 @@ func TestTheOptionDecodingGuardSeesALooseDecodeAndAnUntaggedField(t *testing.T) 
 		_, field, _ := strings.Cut(finding, " ")
 		untagged[field] = true
 	}
-	for _, field := range []string{"plantedOptions.Untagged", "plantedNested.Deep", "plantedStrictOptions.AlsoUntagged"} {
+	for _, field := range []string{
+		"plantedOptions.Untagged",
+		"plantedNested.Deep",
+		"plantedStrictOptions.AlsoUntagged",
+	} {
 		if !untagged[field] {
-			t.Errorf("the planted untagged field %s was not found; found %v", field, findings.untagged)
+			test.Errorf("the planted untagged field %s was not found; found %v", field, findings.untagged)
 		}
 	}
 	if len(untagged) != 3 {
-		t.Errorf("want exactly the three planted untagged fields, and a tagged, skipped, unexported, promoted "+
+		test.Errorf("want exactly the three planted untagged fields, and a tagged, skipped, unexported, promoted "+
 			"or self-decoding one was reported too: %v", findings.untagged)
 	}
 }

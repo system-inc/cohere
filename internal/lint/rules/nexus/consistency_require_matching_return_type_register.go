@@ -10,5 +10,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // No decoder: the rule takes no options. The principle is one spelling per kind of function, and a
 // knob that let a project prefer the other spelling would be two conventions under one name.
 func init() {
-	rule.Register(rule.Registration{Rule: ConsistencyRequireMatchingReturnType})
+	rule.Register(rule.Registration[rule.NoOptions]{Rule: ConsistencyRequireMatchingReturnType})
 }

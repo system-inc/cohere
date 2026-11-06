@@ -41,7 +41,7 @@ type JsxNoTargetBlankOptions struct {
 
 	// EnforceDynamicLinks decides whether `href={expression}` counts as an external link.
 	//
-	// The schema is an enum of `always` and `never` with NO default, and the rule supplies
+	// The schema is an enum of `always` and `never` with no default, and the rule supplies
 	// `configuration.enforceDynamicLinks || 'always'`. So the absent value means `always` and the
 	// zero value of this field must too, which is why the decoder inverts it into a bool rather
 	// than storing the string. See DecodeJsxNoTargetBlankOptions.
@@ -50,7 +50,7 @@ type JsxNoTargetBlankOptions struct {
 	// WarnOnSpreadAttributes treats a spread as possibly supplying target or href.
 	//
 	// False by default. It widens the rule in two directions at once: an element with a spread and
-	// no literal `target="_blank"` becomes reportable, and a `rel` written BEFORE the spread stops
+	// no literal `target="_blank"` becomes reportable, and a `rel` written before the spread stops
 	// counting as secure. Both were measured.
 	WarnOnSpreadAttributes bool `json:"warnOnSpreadAttributes"`
 
@@ -70,7 +70,7 @@ type JsxNoTargetBlankOptions struct {
 	// Forms extends the rule to `<form target="_blank" action=...>`.
 	//
 	// False by default, which is upstream's default and the reason the form arm is invisible unless
-	// asked for. The form arm also reports WITHOUT a fix, which is upstream's choice and not an
+	// asked for. The form arm also reports without a fix, which is upstream's choice and not an
 	// omission here; see the report site.
 	Forms bool `json:"forms"`
 }
@@ -79,7 +79,7 @@ type JsxNoTargetBlankOptions struct {
 //
 // Two fields need a translation layer and neither has an upstream counterpart to copy:
 // `enforceDynamicLinks` is a string enum whose absent value is `always`, and `links` defaults to
-// TRUE, so the Go zero value is wrong for it. Both are exactly the lines this project's brief says
+// `true`, so the Go zero value is wrong for it. Both are exactly the lines this project's brief says
 // end up untested when a fixture builds the options struct directly, so the fixtures route through
 // the exported decoder instead.
 type jsxNoTargetBlankWireOptions struct {
@@ -101,15 +101,15 @@ type jsxNoTargetBlankWireOptions struct {
 // A rule configured as a bare `"error"` is handed nil options, and `configuration.OptionsRegistry.Decode`
 // turns an empty body into nil for a non-required rule, so the nil path has to produce upstream's
 // defaults rather than the zero struct. It does, and a fixture bypasses the decoder to pin it.
-func DecodeJsxNoTargetBlankOptions(raw []byte) (any, error) {
+func DecodeJsxNoTargetBlankOptions(raw []byte) (JsxNoTargetBlankOptions, error) {
 	options := JsxNoTargetBlankOptions{Links: true}
 	if len(raw) == 0 {
 		return options, nil
 	}
 
 	var wire jsxNoTargetBlankWireOptions
-	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &wire); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 
 	options.AllowReferrer = wire.AllowReferrer
@@ -152,7 +152,7 @@ func DecodeJsxNoTargetBlankOptions(raw []byte) (any, error) {
 //
 // The faithful reading is the unconfigured answer rather than a guess at what a project might
 // configure. Five corpus cases carry `linkComponents` settings and all five were re-run with the
-// settings removed: every one goes CLEAN, because `<Link>` is not a link component by default.
+// settings removed: every one goes clean, because `<Link>` is not a link component by default.
 // Those five are recorded as clean fixtures with the reasoning at the line.
 //
 // So the components here are `a` and `form`, and their attributes are `href` and `action`.
@@ -160,7 +160,7 @@ func DecodeJsxNoTargetBlankOptions(raw []byte) (any, error) {
 // # `links: false` does nothing, and that is upstream's defect reproduced
 //
 // The schema declares `links` with `default: true`, the rule's `Object.assign` sets it, and
-// `configuration.links` is then read NOWHERE in the rule body. Grepped: the only `configuration.`
+// `configuration.links` is then read nowhere in the rule body. Grepped: the only `configuration.`
 // reads in the body are `configuration.forms`. Measured on the installed build, three ways:
 //
 //	{links: false}   <a target="_blank" href="http://x.com"></a>   REPORTS
@@ -170,11 +170,11 @@ func DecodeJsxNoTargetBlankOptions(raw []byte) (any, error) {
 // Reproduced rather than fixed. A port that wired it up would silence a whole class of finding on
 // any project that wrote `links: false` expecting it to be inert, and no imported fixture could see
 // the difference because the corpus writes `links: false` only alongside `forms: true` and asserts
-// the FORM finding. That pairing is exactly the shape that makes a wrong belief invisible.
+// the form finding. That pairing is exactly the shape that makes a wrong belief invisible.
 //
 // # Which attribute wins when one is written twice
 //
-// Every lookup is `findLastIndex`, so the LAST `target`, the LAST `href` and the LAST `rel` decide.
+// Every lookup is `findLastIndex`, so the last `target`, the last `href` and the last `rel` decide.
 // This is not a detail: `<a target="_self" target="_blank" href="http://x.com">` reports and
 // `<a target="_blank" href="http://x.com" href="/rel">` is clean, both measured, and a port using a
 // first-match search would answer the opposite on both.
@@ -189,7 +189,7 @@ func DecodeJsxNoTargetBlankOptions(raw []byte) (any, error) {
 // # What counts as a secure rel, and the conditional-pairing rule inside it
 //
 // `hasSecureRel` reads the last `rel` and reduces its value to a list of strings, then requires
-// EVERY one of them to contain `noreferrer` (or `noopener` under `allowReferrer`). Three value
+// every one of them to contain `noreferrer` (or `noopener` under `allowReferrer`). Three value
 // shapes reach it and the third is where the real work is:
 //
 //	rel="noopener noreferrer"       a literal, split on spaces, lowercased
@@ -198,9 +198,9 @@ func DecodeJsxNoTargetBlankOptions(raw []byte) (any, error) {
 //	rel={c ? 'noreferrer' : 'x'}    a conditional, and which branch is read depends on the TARGET
 //
 // That last one is the subtle part and it is measured in four directions. When the `rel` is a
-// conditional AND the `target` is a conditional AND both tests are the same plain identifier,
+// conditional and the `target` is a conditional and both tests are the same plain identifier,
 // upstream pairs the branches: it finds which of the target's two branches is `_blank` and reads
-// the rel branch at the SAME index. So:
+// the rel branch at the same index. So:
 //
 //	target={c ? '_blank' : '_self'} rel={c ? 'noreferrer' : 'x'}   clean, branches pair up
 //	target={c ? '_self' : '_blank'} rel={c ? 'x' : 'noreferrer'}   clean, same pairing inverted
@@ -233,21 +233,21 @@ func DecodeJsxNoTargetBlankOptions(raw []byte) (any, error) {
 // and carries no fix. Reproduced, because a fix invented here would be applied unattended on a
 // shape upstream deliberately leaves alone.
 //
-// The `noreferrer` written by the fixer is `noreferrer` even under `allowReferrer`, EXCEPT in the
+// The `noreferrer` written by the fixer is `noreferrer` even under `allowReferrer`, except in the
 // insertion arms, which write `relValue` and therefore write `noopener`. That asymmetry is
 // upstream's: `relValue` is computed from the flag and then only the two `insertText` calls use it,
 // while all three `replaceText` calls hardcode `noreferrer`. Measured both ways.
-var JsxNoTargetBlank = rule.Rule{
+var JsxNoTargetBlank = rule.Rule[JsxNoTargetBlankOptions]{
 	// No namespace prefix. The config writes `react/jsx-no-target-blank` and the parity guard
 	// strips the namespace on a `/` boundary, so a rule named `react-jsx-no-target-blank` would
 	// match no inventory entry and lint no files while passing every fixture in this package.
 	Name: "react/jsx-no-target-blank",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[JsxNoTargetBlankOptions]) rule.Listeners {
 		// An unconfigured rule reaches this with nil, and the comma-ok form yields the zero struct,
 		// whose `Links` is false rather than upstream's true. That difference decides nothing today
 		// because nothing reads `Links`, but relying on that would make a future wiring of `Links`
 		// silently wrong for every unconfigured file, so the default is restored explicitly.
-		settings, configured := rule.OptionsAs[JsxNoTargetBlankOptions](options)
+		settings, configured := options.Read()
 		if !configured {
 			settings = JsxNoTargetBlankOptions{Links: true}
 		}
@@ -269,10 +269,10 @@ var JsxNoTargetBlank = rule.Rule{
 			spreadIndex := lastSpreadAttributeIndex(properties)
 
 			if jsx.IsIntrinsicElementNamed(tagName, "a") {
-				checkTargetBlankLink(ctx, node, properties, targetIndex, spreadIndex, settings)
+				checkTargetBlankLink(ruleContext, node, properties, targetIndex, spreadIndex, settings)
 			}
 			if jsx.IsIntrinsicElementNamed(tagName, "form") {
-				checkTargetBlankForm(ctx, node, properties, targetIndex, spreadIndex, settings)
+				checkTargetBlankForm(ruleContext, node, properties, targetIndex, spreadIndex, settings)
 			}
 		}
 
@@ -290,7 +290,7 @@ var JsxNoTargetBlank = rule.Rule{
 
 // checkTargetBlankLink is the `<a>` arm, which reports with a fix.
 func checkTargetBlankLink(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	element *ast.Node,
 	properties []*ast.Node,
 	targetIndex int,
@@ -317,18 +317,18 @@ func checkTargetBlankLink(
 		insertedRelValue = "noopener"
 	}
 
-	fix, fixable := targetBlankFix(ctx, properties, targetIndex, spreadIndex, insertedRelValue)
+	fix, fixable := targetBlankFix(ruleContext, properties, targetIndex, spreadIndex, insertedRelValue)
 	if !fixable {
-		ctx.ReportNode(element, message)
+		ruleContext.ReportNode(element, message)
 		return
 	}
-	ctx.ReportNodeWithFixes(element, message, fix)
+	ruleContext.ReportNodeWithFixes(element, message, fix)
 }
 
-// checkTargetBlankForm is the `<form>` arm, which reports WITHOUT a fix.
+// checkTargetBlankForm is the `<form>` arm, which reports without a fix.
 //
 // The guard order here is upstream's and it is not the same as the link arm's. `hasSecureRel` is
-// called with ONE argument, so `allowReferrer`, `warnOnSpreadAttributes` and the spread index all
+// called with one argument, so `allowReferrer`, `warnOnSpreadAttributes` and the spread index all
 // arrive as undefined inside it: `allowReferrer` is falsy, so `rel="noopener"` never satisfies a
 // form even under `{allowReferrer: true, forms: true}`, and the spread check is skipped. Measured:
 // that exact configuration on `<form target="_blank" action="http://x.com" rel="noopener">` reports.
@@ -337,7 +337,7 @@ func checkTargetBlankLink(
 // form can report `noTargetBlankWithoutNoopener` while `noopener` would not have satisfied it,
 // which is upstream's inconsistency and is reproduced.
 func checkTargetBlankForm(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	element *ast.Node,
 	properties []*ast.Node,
 	targetIndex int,
@@ -347,7 +347,7 @@ func checkTargetBlankForm(
 	if !reachesTargetBlankCheck(properties, targetIndex, spreadIndex, settings.WarnOnSpreadAttributes) {
 		return
 	}
-	// The `forms` gate sits AFTER the target check upstream rather than before it, which changes
+	// The `forms` gate sits after the target check upstream rather than before it, which changes
 	// nothing observable and is kept in place so the two arms read the same way.
 	if !settings.Forms {
 		return
@@ -371,7 +371,7 @@ func checkTargetBlankForm(
 	}
 	// No fix. Upstream's form report call has no `fix` property where the link arm's does, and
 	// inventing one here would rewrite a shape upstream declines to touch.
-	ctx.ReportNode(element, message)
+	ruleContext.ReportNode(element, message)
 }
 
 // reachesTargetBlankCheck reproduces the guard both arms open with, verbatim in structure.
@@ -405,9 +405,12 @@ func reachesTargetBlankCheck(
 	return warnOnSpreadAttributes && spreadIndex >= 0
 }
 
+// targetBlankValue is the one target value this rule is about.
+const targetBlankValue = "_blank"
+
 // attributeValuePossiblyBlank reports whether an attribute could hold the string `_blank`.
 //
-// Three shapes answer, and the comparison is case-INSENSITIVE in every one of them because
+// Three shapes answer, and the comparison is case-insensitive in every one of them because
 // upstream lowercases before comparing. Measured: `target="_BLANK"` reports.
 //
 //	target="_blank"                  a string literal
@@ -448,9 +451,6 @@ func attributeValuePossiblyBlank(attribute *ast.Node) bool {
 		isStringLiteralValued(conditional.WhenTrue, targetBlankValue)
 }
 
-// targetBlankValue is the one target value this rule is about.
-const targetBlankValue = "_blank"
-
 // isStringLiteralValued reports whether a node is a non-empty string literal equal to want, ignoring case.
 //
 // The non-empty requirement is upstream's `expr.alternate.value &&` guard, which is truthiness
@@ -460,7 +460,7 @@ func isStringLiteralValued(node *ast.Node, want string) bool {
 		return false
 	}
 	text := node.Text()
-	// The non-empty test is EQUIVALENT while `want` is `_blank`, and is kept as documentation of
+	// The non-empty test is equivalent while `want` is `_blank`, and is kept as documentation of
 	// upstream's guard rather than as a discrimination this rule makes. Measured: a mutant dropping
 	// it survives the whole fixture set, and its inverse (forcing the guard false) is caught by
 	// eight lines, so the arm is reached and the fixtures can see it. No input can distinguish the
@@ -477,10 +477,10 @@ func isStringLiteralValued(node *ast.Node, want string) bool {
 // upstream's judgment rather than a simplification.
 //
 // The spread clause is the second half of upstream's return and it is separate from the literal
-// test: under `warnOnSpreadAttributes`, a link attribute written BEFORE a spread counts as
+// test: under `warnOnSpreadAttributes`, a link attribute written before a spread counts as
 // dangerous whatever its value, because the spread may overwrite it. `linkIndex` is -1 when there
 // is no link attribute at all, and -1 is less than any real spread index, so an element with a
-// spread and NO href is dangerous under that flag. Measured: `<a {...props} href="http://x">` with
+// spread and no href is dangerous under that flag. Measured: `<a {...props} href="http://x">` with
 // the flag reports, and so does `<a {...props}>` with a target.
 func hasExternalTargetBlankLink(
 	properties []*ast.Node,
@@ -526,7 +526,7 @@ func isExternalLinkText(text string) bool {
 
 // hasDynamicTargetBlankLink reports whether any link attribute holds an expression container.
 //
-// Upstream searches for the LAST such attribute and returns true if one exists, so the index it
+// Upstream searches for the last such attribute and returns true if one exists, so the index it
 // finds is discarded and only existence matters. Reproduced as existence, and the equivalence is
 // exact rather than a simplification: `findLastIndex(...) !== -1` and "any matches" are the same
 // predicate over the same list.
@@ -551,7 +551,7 @@ func hasDynamicTargetBlankLink(properties []*ast.Node, linkAttribute string) boo
 // `<a rel="noreferrer" {...props} target="_blank" href="http://x">` reports under that flag and is
 // clean without it.
 //
-// After that, the last `rel`'s value is reduced to a list of strings and EVERY one must be secure.
+// After that, the last `rel`'s value is reduced to a list of strings and every one must be secure.
 // The list is one element for a literal or a template, and two for an unpaired conditional; the
 // pairing rule that can shrink it back to one is in `relStringsFor`.
 func hasSecureTargetBlankRel(
@@ -578,7 +578,7 @@ func hasSecureTargetBlankRel(
 		return false
 	}
 	if len(values) == 0 {
-		// `[].concat([])` is `[]` and `[].every(...)` is TRUE. Upstream cannot reach this today,
+		// `[].concat([])` is `[]` and `[].every(...)` is `true`. Upstream cannot reach this today,
 		// because every resolved shape yields at least one string, but the vacuous-true is what
 		// the code says and inverting it here would be a silent divergence if a shape ever does.
 		return true
@@ -627,7 +627,7 @@ func isSecureRelValue(value string, allowReferrer bool) bool {
 //	rel={c ? 'a' : 'b'}       both branches, UNLESS the target is a conditional on the same test
 //
 // The pairing: when the target is also a conditional expression and both tests are plain
-// identifiers with the same name, upstream finds which target branch is `_blank` and returns ONLY
+// identifiers with the same name, upstream finds which target branch is `_blank` and returns only
 // the rel branch at that index. `[c,a].indexOf('_blank')` is -1 when neither branch is `_blank`,
 // and JavaScript's `arr[-1]` is undefined, so the list becomes `[undefined]`, which fails the
 // string test and reports. That -1 case is reachable only when the target reached here through the
@@ -720,7 +720,7 @@ func targetBlankBranchIndex(targetValue *ast.Node, relTest *ast.Node) (paired bo
 		return false, 0, false
 	}
 
-	// `[consequent.value, alternate.value].indexOf('_blank')`. The comparison here is EXACT rather
+	// `[consequent.value, alternate.value].indexOf('_blank')`. The comparison here is exact rather
 	// than case-insensitive, because `indexOf` is, unlike the two `toLowerCase` comparisons
 	// elsewhere in this rule. Upstream is inconsistent about it and this reproduces the
 	// inconsistency at the line where it lives.
@@ -756,11 +756,11 @@ func stringTextsOf(nodes []*ast.Node) ([]string, bool) {
 //	                                       supplying the real target and the edit could be wrong
 //	a spread exists and there is no rel     there is no safe place to put the insertion
 //
-// Note the first fires even when there is NO spread, because `targetIndex` is -1 then and
+// Note the first fires even when there is no spread, because `targetIndex` is -1 then and
 // `spreadIndex` is also -1, and -1 < -1 is false, so it does not. It fires when the target is
 // absent and a spread is present, which is exactly the warnOnSpreadAttributes case.
 func targetBlankFix(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	properties []*ast.Node,
 	targetIndex int,
 	spreadIndex int,
@@ -784,10 +784,10 @@ func targetBlankFix(
 		return rule.ReplaceRange(zeroWidthRangeAt(last.End()), " rel=\""+insertedRelValue+"\""), true
 	}
 
-	// The fixer finds the FIRST rel, not the last. `hasSecureRel` uses `findLastIndex` and the
+	// The fixer finds the first rel, not the last. `hasSecureRel` uses `findLastIndex` and the
 	// fixer uses `find`, so an element writing `rel` twice is judged on the last and repaired on
 	// the first. Measured: `<a href="http://x" target="_blank" rel="noreferrer" rel="x">` reports
-	// and its fix rewrites the FIRST rel. Reproduced rather than unified.
+	// and its fix rewrites the first rel. Reproduced rather than unified.
 	rel := properties[relIndex].AsJsxAttribute()
 	initializer := rel.Initializer
 
@@ -802,7 +802,7 @@ func targetBlankFix(
 	// above write `relValue`. Upstream's asymmetry, measured both ways.
 	if initializer.Kind == ast.KindStringLiteral {
 		return rule.ReplaceRange(
-			rule.TokenRange(ctx.SourceFile, initializer),
+			rule.TokenRange(ruleContext.SourceFile, initializer),
 			relLiteralWithNoreferrer(initializer.Text()),
 		), true
 	}
@@ -816,15 +816,15 @@ func targetBlankFix(
 	}
 	if expression.Kind == ast.KindStringLiteral {
 		return rule.ReplaceRange(
-			rule.TokenRange(ctx.SourceFile, expression),
+			rule.TokenRange(ruleContext.SourceFile, expression),
 			relLiteralWithNoreferrer(expression.Text()),
 		), true
 	}
-	// A numeric, boolean, null, or bigint literal replaces the WHOLE container rather than the
+	// A numeric, boolean, null, or bigint literal replaces the whole container rather than the
 	// expression inside it, so `rel={5}` becomes `rel="noreferrer"` and not `rel={"noreferrer"}`.
 	// Measured on `rel={5}` and `rel={null}`; the fix range covers the braces in both.
 	if isNonStringLiteralExpression(expression) {
-		return rule.ReplaceRange(rule.TokenRange(ctx.SourceFile, initializer), "\"noreferrer\""), true
+		return rule.ReplaceRange(rule.TokenRange(ruleContext.SourceFile, initializer), "\"noreferrer\""), true
 	}
 	// An identifier, a template, a conditional: upstream falls off the end and returns null.
 	return rule.Fix{}, false
@@ -834,8 +834,8 @@ func targetBlankFix(
 // and null" branch.
 //
 // Upstream reaches it by testing `expression.type === 'Literal'` and then `typeof value !== 'string'`,
-// so it is a LITERAL that is not a string. `undefined` is an identifier in JavaScript rather than a
-// literal and therefore does NOT reach that branch upstream, which is why it is absent here despite
+// so it is a literal that is not a string. `undefined` is an identifier in JavaScript rather than a
+// literal and therefore does not reach that branch upstream, which is why it is absent here despite
 // being named in upstream's own comment. Measured: `rel={undefined}` reports and carries no fix.
 func isNonStringLiteralExpression(expression *ast.Node) bool {
 	switch expression.Kind {
@@ -885,12 +885,12 @@ func attributesOf(attributes *ast.Node) []*ast.Node {
 
 // lastAttributeIndexNamed is upstream's `findLastIndex`, which is not `indexOf`.
 //
-// The LAST attribute of a name decides every question this rule asks except which one the fixer
+// The last attribute of a name decides every question this rule asks except which one the fixer
 // repairs. `<a target="_self" target="_blank" href="http://x">` reports and
 // `<a target="_blank" href="http://x" href="/rel">` is clean, both measured, and a first-match
 // search answers the opposite on both.
 //
-// The name comparison is EXACT. `jsx.AttributeName` declines a spread and a namespaced name, which
+// The name comparison is exact. `jsx.AttributeName` declines a spread and a namespaced name, which
 // matches upstream reading `attr.name.name`: a spread has no `name` and a namespaced name is a
 // different node shape whose `.name` is an object rather than a string.
 func lastAttributeIndexNamed(properties []*ast.Node, wanted string) int {

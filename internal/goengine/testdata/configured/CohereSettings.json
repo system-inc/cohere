@@ -1,0 +1,8 @@
+{
+	"go": {
+		"rules": {
+			"cohere-go/printf": "off",
+			"cohere-go/nilness": "warn"
+		}
+	}
+}

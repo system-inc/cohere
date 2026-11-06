@@ -9,7 +9,10 @@ import (
 
 // correctnessNoLoadTimeImportMetaPathText is the rule's message, whose wording lives in
 // `policy/messages/correctness-no-load-time-import-meta-path.json`.
-var correctnessNoLoadTimeImportMetaPathText = policy.MessageOf("nexus/correctness-no-load-time-import-meta-path", "loadTimeImportMetaPath")
+var correctnessNoLoadTimeImportMetaPathText = policy.MessageOf(
+	"nexus/correctness-no-load-time-import-meta-path",
+	"loadTimeImportMetaPath",
+)
 
 func messageLoadTimeImportMetaPath(name string) rule.Message {
 	return rule.Message{
@@ -39,9 +42,9 @@ func messageLoadTimeImportMetaPath(name string) rule.Message {
 //
 // No fix. Moving a path into a function means choosing the function and updating every reader of the
 // constant, which is a judgment one expression cannot make.
-var CorrectnessNoLoadTimeImportMetaPath = rule.Rule{
+var CorrectnessNoLoadTimeImportMetaPath = rule.Rule[rule.NoOptions]{
 	Name: "nexus/correctness-no-load-time-import-meta-path",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindMetaProperty: func(node *ast.Node) {
 				// The cheap structural gate first: `import.meta`, read for one of the two names.
@@ -49,7 +52,9 @@ var CorrectnessNoLoadTimeImportMetaPath = rule.Rule{
 					return
 				}
 				access := correctnessNoLoadTimeImportMetaPathOuterParentheses(node).Parent
-				if access == nil || correctnessNoLoadTimeImportMetaPathInnerParentheses(correctnessNoLoadTimeImportMetaPathAccessObject(access)) != node {
+				if access == nil || correctnessNoLoadTimeImportMetaPathInnerParentheses(
+					correctnessNoLoadTimeImportMetaPathAccessObject(access),
+				) != node {
 					return
 				}
 				name, ok := property.AccessedName(access, property.Textual|property.Templated)
@@ -62,13 +67,14 @@ var CorrectnessNoLoadTimeImportMetaPath = rule.Rule{
 				if !correctnessNoLoadTimeImportMetaPathRunsAtLoad(access) {
 					return
 				}
-				ctx.ReportNode(access, messageLoadTimeImportMetaPath(name))
+				ruleContext.ReportNode(access, messageLoadTimeImportMetaPath(name))
 			},
 		}
 	},
 }
 
-// correctnessNoLoadTimeImportMetaPathAccessObject is the object of a property or element access, or nil for any other node.
+// correctnessNoLoadTimeImportMetaPathAccessObject is the object of a property or element access, or nil for any other
+// node.
 func correctnessNoLoadTimeImportMetaPathAccessObject(node *ast.Node) *ast.Node {
 	switch node.Kind {
 	case ast.KindPropertyAccessExpression:
@@ -82,10 +88,11 @@ func correctnessNoLoadTimeImportMetaPathAccessObject(node *ast.Node) *ast.Node {
 // correctnessNoLoadTimeImportMetaPathOuterParentheses climbs past parentheses wrapping node, so
 // `(import.meta).dirname` reaches its access.
 func correctnessNoLoadTimeImportMetaPathOuterParentheses(node *ast.Node) *ast.Node {
-	for node.Parent != nil && node.Parent.Kind == ast.KindParenthesizedExpression {
-		node = node.Parent
+	outermost := node
+	for outermost.Parent != nil && outermost.Parent.Kind == ast.KindParenthesizedExpression {
+		outermost = outermost.Parent
 	}
-	return node
+	return outermost
 }
 
 // correctnessNoLoadTimeImportMetaPathInnerParentheses is ast.SkipParentheses with a nil guard, since

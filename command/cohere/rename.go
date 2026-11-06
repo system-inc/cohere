@@ -10,6 +10,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/system-inc/cohere/internal/rename"
+	"github.com/system-inc/cohere/internal/streams"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
@@ -17,7 +18,7 @@ import (
 //
 // A verb rather than a flag, and that separation is the design rather than a naming preference. Every
 // other write in this tool is a fix: a rule found something wrong, the repair is scoped to the file
-// the rule was looking at, and `--fix` runs by DEFAULT because a fix is meaning-preserving by
+// the rule was looking at, and `--fix` runs by default because a fix is meaning-preserving by
 // construction. A rename is none of those things. Nothing is wrong with the code, the user is
 // asserting an intention rather than accepting a repair, and the blast radius is wherever the symbol
 // lives. Folding it into `--fix` would mean a flag whose default is on could rewrite a symbol across
@@ -35,7 +36,7 @@ const renameVerbName = "rename"
 // intent, so the tool doing the obvious repair is a service rather than a surprise.
 //
 // A rename inverts every one of those. It is imperative rather than reactive, so the tool has no
-// independent judgment that the edit is correct — the user's assertion IS the justification. It is
+// independent judgment that the edit is correct: the user's assertion is the justification. It is
 // unbounded, reaching every file that mentions the symbol. And its characteristic failure is silent:
 // `internal/rule/rule.go` records a shipped case where a rename updated a usage, missed its
 // declaration, and produced a file that parsed while failing to compile. A rename that is subtly
@@ -48,21 +49,36 @@ const renameVerbName = "rename"
 // nobody read, and those are not comparable.
 func runRenameVerb(arguments []string) error {
 	flags := flag.NewFlagSet(renameVerbName, flag.ContinueOnError)
-	configFileName := flags.String("tsconfig", "tsconfig.json", "the tsconfig that defines the program, relative to --directory")
-	directory := flags.String("directory", "", "the working directory paths resolve against (default: the process's own)")
+	configurationFileName := flags.String(
+		"tsconfig",
+		"tsconfig.json",
+		"the tsconfig that defines the program, relative to --directory",
+	)
+	directory := flags.String(
+		"directory",
+		"",
+		"the working directory paths resolve against (default: the process's own)",
+	)
 	singleThreaded := flags.Bool("single-threaded", false, "use one checker instead of several")
 	write := flags.Bool("write", false, "apply the rename; without it nothing is written")
-	dryRun := flags.Bool("dry-run", false, "print the plan and write nothing (the default; accepted so it can be stated explicitly)")
+	dryRun := flags.Bool(
+		"dry-run",
+		false,
+		"print the plan and write nothing (the default; accepted so it can be stated explicitly)",
+	)
+	// The flag set's own lines, its defaults and a refused flag, go through the stream its usage does, so they
+	// arrive in the order they were written.
+	flags.SetOutput(streams.Errors)
 	flags.Usage = func() {
-		fmt.Fprintf(os.Stderr, "usage: cohere %s <file>:<line>:<column> <newName>\n", renameVerbName)
-		fmt.Fprintf(os.Stderr, "       cohere %s <name> <newName>\n\n", renameVerbName)
-		fmt.Fprintf(os.Stderr, "Renames a symbol everywhere the type graph says it is used.\n")
-		fmt.Fprintf(os.Stderr, "The position form is primary; a bare name is refused when it is ambiguous.\n")
-		fmt.Fprintf(os.Stderr, "Nothing is written without --write.\n\n")
+		fmt.Fprintf(streams.Errors, "usage: cohere %s <file>:<line>:<column> <newName>\n", renameVerbName)
+		fmt.Fprintf(streams.Errors, "       cohere %s <name> <newName>\n\n", renameVerbName)
+		fmt.Fprintf(streams.Errors, "Renames a symbol everywhere the type graph says it is used.\n")
+		fmt.Fprintf(streams.Errors, "The position form is primary; a bare name is refused when it is ambiguous.\n")
+		fmt.Fprintf(streams.Errors, "Nothing is written without --write.\n\n")
 		flags.PrintDefaults()
 	}
-	if err := flags.Parse(arguments); err != nil {
-		return err
+	if parseError := flags.Parse(arguments); parseError != nil {
+		return parseError
 	}
 
 	positional := flags.Args()
@@ -75,32 +91,37 @@ func runRenameVerb(arguments []string) error {
 	// Naming both is a contradiction the user should hear about rather than have silently resolved,
 	// exactly as `--fix` and `--no-fix` are handled in the main pipeline.
 	if *write && *dryRun {
-		return fmt.Errorf("--write and --dry-run contradict each other: --dry-run writes nothing, --write applies the rename")
+		return fmt.Errorf(
+			"--write and --dry-run contradict each other: --dry-run writes nothing, --write applies the rename",
+		)
 	}
 
 	if !rename.IsValidIdentifier(newName) {
-		return fmt.Errorf("%q cannot be written as an identifier, so the rename would produce source that does not parse", newName)
+		return fmt.Errorf(
+			"%q cannot be written as an identifier, so the rename would produce source that does not parse",
+			newName,
+		)
 	}
 
-	graph, err := program.Build(program.Options{
-		ConfigFileName:   *configFileName,
+	graph, buildError := program.Build(program.Options{
+		ConfigFileName:   *configurationFileName,
 		CurrentDirectory: *directory,
 		SingleThreaded:   *singleThreaded,
 	})
-	if err != nil {
+	if buildError != nil {
 		// A program that fails to build is a loud failure and never an empty result, for the same
 		// reason the main pipeline says so: an empty file list is indistinguishable from a tree with
 		// nothing to rename.
-		return fmt.Errorf("building the type graph: %w", err)
+		return fmt.Errorf("building the type graph: %w", buildError)
 	}
 
-	ctx := context.Background()
+	backgroundContext := context.Background()
 
 	position, isPosition := rename.ParsePosition(target)
 	if isPosition {
-		resolved, err := absolutePath(position.FileName, *directory)
-		if err != nil {
-			return err
+		resolved, absolutePathError := absolutePath(position.FileName, *directory)
+		if absolutePathError != nil {
+			return absolutePathError
 		}
 		// In the compiler's spelling, which is how the program names its files and what the anchor is
 		// matched against. On Windows Clean leaves `C:\work\a.ts`, which no program file's
@@ -110,18 +131,20 @@ func runRenameVerb(arguments []string) error {
 		// The bare-name form is sugar, and it refuses rather than guesses. A bare name is not a
 		// symbol: if three files each declare a local `err`, this has three valid answers and the
 		// cursor that would disambiguate in an editor does not exist on a command line.
-		candidates, symbols, err := rename.ResolveBareName(ctx, graph, target)
-		if err != nil {
-			return err
+		candidates, symbols, resolveBareNameError := rename.ResolveBareName(backgroundContext, graph, target)
+		if resolveBareNameError != nil {
+			return resolveBareNameError
 		}
 		if len(symbols) == 0 {
 			return fmt.Errorf(
-				"no declaration named %q in this project — name a position instead if the symbol is declared elsewhere",
+				"no declaration named %q in this project, so name a position instead if the symbol is declared elsewhere",
 				target,
 			)
 		}
 		if len(symbols) > 1 {
-			rename.WriteCandidates(os.Stdout, target, candidates)
+			if writeError := rename.WriteCandidates(streams.Output, target, candidates); writeError != nil {
+				return writeError
+			}
 			return fmt.Errorf("%q is ambiguous, so nothing was renamed", target)
 		}
 		position = rename.Position{
@@ -131,30 +154,34 @@ func runRenameVerb(arguments []string) error {
 		}
 	}
 
-	plan, err := rename.Build(ctx, graph, position, newName)
-	if err != nil {
-		return err
+	plan, buildError := rename.Build(backgroundContext, graph, position, newName)
+	if buildError != nil {
+		return buildError
 	}
 
 	if len(plan.Refusals) > 0 {
-		rename.Write(os.Stdout, plan, false)
+		if writeError := rename.Write(streams.Output, plan, false); writeError != nil {
+			return writeError
+		}
 		return fmt.Errorf("the rename was refused, so nothing was written")
 	}
 
 	if !*write {
-		rename.Write(os.Stdout, plan, false)
-		return nil
+		return rename.Write(streams.Output, plan, false)
 	}
 
-	// Printed BEFORE applying, so the record of what was about to happen exists even if the write
+	// Printed before applying, so the record of what was about to happen exists even if the write
 	// fails partway. A summary printed only on success cannot explain a tree that was half-written.
-	rename.Write(os.Stdout, plan, true)
-
-	written, err := rename.Apply(plan)
-	if err != nil {
-		return fmt.Errorf("applying the rename: %w", err)
+	if writeError := rename.Write(streams.Output, plan, true); writeError != nil {
+		return writeError
 	}
-	fmt.Printf("\nwrote %d files.\n", written)
+	streams.Show(streams.Output)
+
+	written, applyError := rename.Apply(plan)
+	if applyError != nil {
+		return fmt.Errorf("applying the rename: %w", applyError)
+	}
+	fmt.Fprintf(streams.Output, "\nwrote %d files.\n", written)
 	return nil
 }
 
@@ -168,9 +195,9 @@ func absolutePath(fileName string, directory string) (string, error) {
 	}
 	base := directory
 	if base == "" {
-		working, err := os.Getwd()
-		if err != nil {
-			return "", fmt.Errorf("resolving %s: %w", fileName, err)
+		working, workingDirectoryError := os.Getwd()
+		if workingDirectoryError != nil {
+			return "", fmt.Errorf("resolving %s: %w", fileName, workingDirectoryError)
 		}
 		base = working
 	}

@@ -11,13 +11,12 @@ import (
 // preprocess is src/language-markdown/print/preprocess.js for the markdown parser (the MDX branches are
 // not ported: no corpus holds .mdx).
 func preprocess(ast *Node, originalText string, tabWidth int, nodes *arena.Arena[Node]) *Node {
-	ast = addRawToText(ast, originalText)
-	ast = mergeContinuousTexts(ast, nodes)
-	ast = transformIndentedCodeblock(ast, originalText)
-	ast = markOriginalImageAndLinkAlt(ast, originalText)
-	ast = markAlignedList(ast, originalText, tabWidth)
-	ast = splitTextIntoSentences(ast, nodes)
-	return ast
+	withRaw := addRawToText(ast, originalText)
+	withMergedTexts := mergeContinuousTexts(withRaw, nodes)
+	withIndentedCode := transformIndentedCodeblock(withMergedTexts, originalText)
+	withOriginalAlt := markOriginalImageAndLinkAlt(withIndentedCode, originalText)
+	withAlignedLists := markAlignedList(withOriginalAlt, originalText, tabWidth)
+	return splitTextIntoSentences(withAlignedLists, nodes)
 }
 
 func addRawToText(ast *Node, originalText string) *Node {
@@ -31,7 +30,11 @@ func addRawToText(ast *Node, originalText string) *Node {
 	})
 }
 
-func mergeChildren(ast *Node, shouldMerge func(previous *Node, node *Node) bool, mergeNode func(previous *Node, node *Node) *Node) *Node {
+func mergeChildren(
+	ast *Node,
+	shouldMerge func(previous *Node, node *Node) bool,
+	mergeNode func(previous *Node, node *Node) *Node,
+) *Node {
 	return mapAst(ast, func(node *Node, _ int, _ []*Node) *Node {
 		if node.Children == nil {
 			return node
@@ -167,7 +170,12 @@ func splitTextIntoSentences(ast *Node, nodes *arena.Arena[Node]) *Node {
 			return nodes.New(Node{NodeType: "text", IsLiteral: true, Position: node.Position, Value: text})
 		}
 
-		return nodes.New(Node{NodeType: "sentence", Position: node.Position, IsParent: true, Children: nonNil(splitText(text, nodes))})
+		return nodes.New(Node{
+			NodeType: "sentence",
+			Position: node.Position,
+			IsParent: true,
+			Children: nonNil(splitText(text, nodes)),
+		})
 	})
 }
 
@@ -175,6 +183,9 @@ func splitTextIntoSentences(ast *Node, nodes *arena.Arena[Node]) *Node {
 // a file that reaches it is a file Prettier cannot format.
 func rawOf(node *Node) string {
 	if node.Raw == nil {
+		// Invariant: mdast's onEnterData extends the tail text rather than open a second one, and nothing
+		// else in the parser makes a text, so no two texts stand side by side for mergeContinuousTexts to
+		// merge, and every text keeps the raw addRawToText gave it.
 		panic("markdown: Cannot read properties of undefined (reading 'includes')")
 	}
 	return *node.Raw
@@ -214,7 +225,9 @@ func transformIndentedCodeblock(ast *Node, originalText string) *Node {
 			return node
 		}
 		// the first char may point to `\n`, e.g. `\n\t\tbar`, just ignore it
-		node.IsIndented = indentedCodePattern.MatchString(originalText[node.Position.Start.Offset:node.Position.End.Offset])
+		node.IsIndented = indentedCodePattern.MatchString(
+			originalText[node.Position.Start.Offset:node.Position.End.Offset],
+		)
 		return node
 	})
 }

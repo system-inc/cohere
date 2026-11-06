@@ -98,7 +98,7 @@ func insideAtRuleNode(path *astPath, atRuleNames ...string) bool {
 	return found && slices.Contains(atRuleNames, toLowerCase(atRuleAncestorNode.String("name")))
 }
 
-func insideURLFunctionInImportAtRuleNode(path *astPath) bool {
+func insideUrlFunctionInImportAtRuleNode(path *astPath) bool {
 	node := currentNode(path)
 	groups := node.List("groups")
 	if len(groups) == 0 || groups[0].String("value") != "url" || len(groups) != 2 {
@@ -108,11 +108,12 @@ func insideURLFunctionInImportAtRuleNode(path *astPath) bool {
 	return found && atRule.String("name") == "import"
 }
 
-func isURLFunctionNode(node *estree.Node) bool {
+func isUrlFunctionNode(node *estree.Node) bool {
 	return node.Type() == "value-func" && toLowerCase(node.String("value")) == "url"
 }
 
-func isVarFunctionNode(node *estree.Node) bool {
+// isVariableFunctionNode is upstream's isVarFunctionNode: whether a node calls CSS's var().
+func isVariableFunctionNode(node *estree.Node) bool {
 	return node.Type() == "value-func" && toLowerCase(node.String("value")) == "var"
 }
 
@@ -128,7 +129,7 @@ func isDetachedRulesetDeclarationNode(node *estree.Node) bool {
 	if !estree.IsTruthy(selector) {
 		return false
 	}
-	if text, isString := selector.(string); isString {
+	if text, isString := asString(selector); isString {
 		return detachedRulesetDeclarationPattern.MatchString(text)
 	}
 	selectorNode, _ := selector.(*estree.Node)
@@ -184,7 +185,7 @@ func isRelationalOperatorNode(node *estree.Node) bool {
 	return node.Type() == "value-word" && slices.Contains([]string{"<", ">", "<=", ">="}, node.String("value"))
 }
 
-func isSCSSControlDirectiveNode(node *estree.Node, options *printerOptions) bool {
+func isScssControlDirectiveNode(node *estree.Node, options *printerOptions) bool {
 	return parserOf(options) == "scss" &&
 		node.Type() == "css-atrule" &&
 		slices.Contains([]string{"if", "else", "for", "each", "while"}, node.String("name"))
@@ -193,8 +194,8 @@ func isSCSSControlDirectiveNode(node *estree.Node, options *printerOptions) bool
 var detachedRulesetCallPattern = regexp.MustCompile(`^\(` + javaScriptWhitespaceClass + `*\)$`)
 
 func isDetachedRulesetCallNode(node *estree.Node) bool {
-	params := rawString(node, "params")
-	return params != "" && detachedRulesetCallPattern.MatchString(params)
+	parameters := rawString(node, "params")
+	return parameters != "" && detachedRulesetCallPattern.MatchString(parameters)
 }
 
 func isTemplatePlaceholderNode(node *estree.Node) bool {
@@ -205,11 +206,13 @@ func isTemplatePropNode(node *estree.Node) bool {
 	return strings.HasPrefix(node.String("prop"), "@prettier-placeholder")
 }
 
-func isPostcssSimpleVarNode(currentNode *estree.Node, nextNode *estree.Node) bool {
+// isPostcssSimpleVariableNode is upstream's isPostcssSimpleVarNode: a `$$` function a word follows with no space
+// between, postcss-simple-vars' interpolation.
+func isPostcssSimpleVariableNode(currentNode *estree.Node, nextNode *estree.Node) bool {
 	return currentNode.String("value") == "$$" &&
 		currentNode.Type() == "value-func" &&
 		nextNode.Type() == "value-word" &&
-		!estree.IsTruthy(rawsOf(nextNode)["before"])
+		!isRawTruthy(nextNode, "before")
 }
 
 func hasComposesNode(node *estree.Node) bool {
@@ -229,7 +232,7 @@ func hasParensAroundNode(node *estree.Node) bool {
 }
 
 func hasEmptyRawBefore(node *estree.Node) bool {
-	before, isString := rawsOf(node)["before"].(string)
+	before, isString := rawStringIn(node, "before")
 	return isString && before == ""
 }
 
@@ -243,7 +246,7 @@ func isKeyValuePairInParenGroupNode(node *estree.Node) bool {
 	return node.Type() == "value-paren_group" && len(groups) > 0 && groups[0] != nil && isKeyValuePairNode(groups[0])
 }
 
-func isSCSSMapItemNode(path *astPath, options *printerOptions) bool {
+func isScssMapItemNode(path *astPath, options *printerOptions) bool {
 	if parserOf(options) != "scss" {
 		return false
 	}
@@ -311,11 +314,11 @@ func isSCSSMapItemNode(path *astPath, options *printerOptions) bool {
 
 // arrayLength is value.length for a groups or nodes array, whichever element type it holds (a url()
 // argument the value parser cannot handle leaves a string among the groups), and 0 for anything else.
-func arrayLength(value any) int {
+func arrayLength(value estree.Value) int {
 	switch typed := value.(type) {
-	case []*estree.Node:
+	case estree.Nodes:
 		return len(typed)
-	case []any:
+	case estree.Values:
 		return len(typed)
 	}
 	return 0
@@ -324,6 +327,8 @@ func arrayLength(value any) int {
 // mustGroups is node.groups read without optional chaining: an absent array is a TypeError upstream.
 func mustGroups(node *estree.Node) []*estree.Node {
 	if !mustNode(node).Has("groups") {
+		// Invariant: this is upstream's TypeError, not a crash: Format and PrintToDoc recover it into
+		// their error, as upstream's caller catches it.
 		panic("TypeError: Cannot read properties of undefined (reading 'some')")
 	}
 	return node.List("groups")
@@ -394,7 +399,10 @@ func isAtWordPlaceholderNode(node *estree.Node) bool {
 func isConfigurationNode(node *estree.Node, parentNode *estree.Node) bool {
 	if node.Child("open").String("value") != "(" ||
 		node.Child("close").String("value") != ")" ||
-		slices.ContainsFunc(node.List("groups"), func(group *estree.Node) bool { return group.Type() != "value-comma_group" }) {
+		slices.ContainsFunc(
+			node.List("groups"),
+			func(group *estree.Node) bool { return group.Type() != "value-comma_group" },
+		) {
 		return false
 	}
 	if parentNode.Type() == "value-comma_group" {

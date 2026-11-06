@@ -44,7 +44,7 @@ type PruneNonEscapingScopesResult struct {
 	MarkersPruned int
 	// PrunedScopes is which scopes were replaced by their own instructions.
 	//
-	// The block is REPLACED rather than marked, so after this pass nothing in the tree records that
+	// The block is replaced rather than marked, so after this pass nothing in the tree records that
 	// the scope existed. Upstream keeps the same structural result and its validator still knows,
 	// because it reads a `prunedScopes` set the pass wrote. Returning the set is how a consumer here
 	// can ask the same question.
@@ -73,7 +73,7 @@ func PruneNonEscapingScopes(tree *ReactiveFunction, function *Function,
 		graph:        NewMemoizationGraph(),
 		definitions:  map[static_single_assignment.DeclarationId]static_single_assignment.DeclarationId{},
 	}
-	for _, parameter := range function.Params {
+	for _, parameter := range function.Parameters {
 		collector.graph.Declare(declarationOf(function, parameter.Identifier))
 	}
 	collector.walk(tree.Body)
@@ -105,7 +105,7 @@ func PruneNonEscapingScopesWithScopes(tree *ReactiveFunction, function *Function
 		graph:        NewMemoizationGraph(),
 		definitions:  map[static_single_assignment.DeclarationId]static_single_assignment.DeclarationId{},
 	}
-	for _, parameter := range function.Params {
+	for _, parameter := range function.Parameters {
 		collector.graph.Declare(declarationOf(function, parameter.Identifier))
 	}
 	collector.walk(tree.Body)
@@ -126,218 +126,10 @@ func pruneNonEscapingScopesWith(tree *ReactiveFunction, function *Function,
 	return PruneNonEscapingScopesResult{
 		PrunedScopes:  prunedScopes,
 		Pruned:        pruned,
-		Declarations:  collector.graph.Len(),
+		Declarations:  collector.graph.Length(),
 		EscapingRoots: collector.graph.EscapingCount(),
 		Memoized:      len(memoized),
 		MarkersPruned: markers,
-	}
-}
-
-type memoizationCollector struct {
-	function     *Function
-	dependencies *ScopeDependencies
-	graph        *MemoizationGraph
-	// definitions resolves a `LoadLocal` indirection, so a value read into a temporary is recorded
-	// against the binding it came from rather than against the temporary.
-	//
-	// Upstream keeps the same map and consults it on every lvalue and rvalue. Without it a chain of
-	// loads produces a chain of distinct nodes and the propagation stops at the first one.
-	definitions map[static_single_assignment.DeclarationId]static_single_assignment.DeclarationId
-	// scopeStack is the scopes currently open, innermost last.
-	scopeStack []ScopeId
-}
-
-// resolve follows a `LoadLocal` indirection to the binding a value really names.
-func (c *memoizationCollector) resolve(declaration static_single_assignment.DeclarationId) static_single_assignment.DeclarationId {
-	if target, found := c.definitions[declaration]; found {
-		return target
-	}
-	return declaration
-}
-
-func (c *memoizationCollector) walk(block ReactiveBlock) {
-	for _, statement := range block {
-		switch shape := statement.(type) {
-		case *ReactiveInstructionStatement:
-			c.visitInstruction(shape.Instruction)
-
-		case *ReactiveScopeBlock:
-			c.scopeStack = append(c.scopeStack, shape.Scope)
-			// A variable reassigned inside a scope takes the whole chain of enclosing scopes as
-			// scopes of its own, this one included.
-			//
-			// Upstream's `CollectDependenciesVisitor.visitScope`. Without it a reassigned value that
-			// escapes does not force the scopes whose evaluation produced the new value, so their
-			// dependencies go unmemoized and the reassignment is invisible to the propagation.
-			//
-			// Measured inert today, and recorded as inert rather than described by what it is for:
-			// on `error.invalid-useCallback-captures-reassigned-context` the lowering produces a
-			// `StoreLocal` with `InstructionKindReassign`, but `ScopeDependencies.ReassignmentsOf`
-			// returns empty for every scope in that program, so this loop has nothing to iterate.
-			// The gate is `checkValidDependency`, one stage upstream in dependency collection, and
-			// it is a faithful transcription of upstream's own gate -- so the divergence is further
-			// up still and is not this pass's to fix. Filed as its own question rather than worked
-			// around here, because making this arm fire by loosening a gate it does not own would
-			// be fixture-shaped development.
-			for _, reassigned := range c.dependencies.ReassignmentsOf(shape.Scope) {
-				declaration := c.resolve(declarationOf(c.function, reassigned))
-				c.associateChain(declaration)
-			}
-			c.walk(shape.Instructions)
-			c.scopeStack = c.scopeStack[:len(c.scopeStack)-1]
-
-		case *ReactiveTerminalStatement:
-			c.visitTerminal(shape)
-		}
-	}
-}
-
-// visitInstruction records one instruction's lvalue, its level, and its operands as dependencies.
-func (c *memoizationCollector) visitInstruction(instruction *ReactiveInstruction) {
-	if instruction == nil || instruction.Value == nil {
-		return
-	}
-	level := MemoizationLevelOfReactiveValue(instruction.Value)
-
-	// Places split by role, because an instruction's assignment targets are lvalues and only the
-	// places it reads are dependencies. Collapsing the two inverts every store's edge: the binding
-	// written to would become a dependency of the temporary rather than a value depending on what
-	// was stored into it, and the propagation then walks away from the value it is looking for.
-	var operands []static_single_assignment.DeclarationId
-	var defines []Place
-	c.eachMemoizationOperand(instruction.Value, func(place Place, role PlaceRole) {
-		if role == PlaceRoleDefine {
-			defines = append(defines, place)
-			return
-		}
-		operands = append(operands, c.resolve(declarationOf(c.function, place.Identifier)))
-	})
-
-	if instruction.LValue != nil {
-		lvalue := c.resolve(declarationOf(c.function, instruction.LValue.Identifier))
-		c.graph.Record(lvalue, level, operands)
-		c.associate(lvalue)
-	}
-
-	// The assignment targets a value carries in addition to the instruction's own lvalue.
-	//
-	// Upstream returns `{lvalues, rvalues}` per kind, and seven kinds put a second place in
-	// `lvalues`: `StoreLocal`, `StoreContext`, `DeclareLocal`, `DeclareContext`, `PrefixUpdate`,
-	// `PostfixUpdate`, and every place bound by a `Destructure` pattern. Each carries its own level,
-	// which is not the level of the instruction that produced it.
-	for _, place := range defines {
-		declaration := c.resolve(declarationOf(c.function, place.Identifier))
-		c.graph.Record(declaration, memoizationLevelOfDefine(instruction.Value, place), operands)
-		c.associate(declaration)
-	}
-
-	for _, operand := range operands {
-		c.graph.Declare(operand)
-		c.associate(operand)
-	}
-
-	// The `LoadLocal` indirection, recorded after the operands so this instruction still reads
-	// through the previous definition rather than through the one it is establishing.
-	plain, isPlain := instruction.Value.(*ReactiveInstructionValue)
-	if !isPlain || plain.Value == nil || instruction.LValue == nil {
-		return
-	}
-	if load, isLoad := plain.Value.(*LoadLocal); isLoad {
-		c.definitions[declarationOf(c.function, instruction.LValue.Identifier)] =
-			c.resolve(declarationOf(c.function, load.Place.Identifier))
-		return
-	}
-
-	// A hook's arguments escape: React may retain them, which is why the closure passed to
-	// `useEffect` is memoized. Upstream skips this for a `noAlias` hook; that consultation is
-	// `MemoizationInputsGapCallSignatures` and is declined, so every hook argument escapes here.
-	// The gap direction is conservative -- more values held, never fewer.
-	switch call := plain.Value.(type) {
-	case *CallExpression:
-		if IsHookCallee(c.function, call.Callee.Identifier) {
-			for _, argument := range call.Args {
-				c.graph.MarkEscaping(c.resolve(declarationOf(c.function, argument.Place.Identifier)))
-			}
-		}
-	case *MethodCall:
-		if IsHookCallee(c.function, call.Property.Identifier) {
-			for _, argument := range call.Args {
-				c.graph.MarkEscaping(c.resolve(declarationOf(c.function, argument.Place.Identifier)))
-			}
-		}
-	}
-}
-
-// associate records that a declaration belongs to the innermost scope currently open.
-func (c *memoizationCollector) associate(declaration static_single_assignment.DeclarationId) {
-	if len(c.scopeStack) == 0 || c.dependencies == nil {
-		return
-	}
-	c.associateScope(declaration, c.scopeStack[len(c.scopeStack)-1])
-}
-
-// associateChain records that a declaration belongs to every scope currently open.
-//
-// Distinct from `associate`, which records only the innermost, and the difference is the point. An
-// ordinary value belongs to the scope it was computed in. A value that escapes from inside a nest of
-// scopes -- returned, or reassigned -- depends on all of them having been evaluated, so forcing it
-// has to force the whole chain or the outer scopes' dependencies are never held.
-func (c *memoizationCollector) associateChain(declaration static_single_assignment.DeclarationId) {
-	if c.dependencies == nil {
-		return
-	}
-	for _, scope := range c.scopeStack {
-		c.associateScope(declaration, scope)
-	}
-}
-
-// associateScope records that a declaration belongs to one named scope.
-func (c *memoizationCollector) associateScope(declaration static_single_assignment.DeclarationId, scope ScopeId) {
-	var scopeDependencies []static_single_assignment.DeclarationId
-	for _, dependency := range c.dependencies.DependenciesOf(scope) {
-		scopeDependencies = append(scopeDependencies,
-			c.resolve(declarationOf(c.function, dependency.Identifier)))
-	}
-	c.graph.AssociateScope(declaration, scope, scopeDependencies)
-}
-
-// visitTerminal descends, and records a returned value as escaping.
-func (c *memoizationCollector) visitTerminal(statement *ReactiveTerminalStatement) {
-	switch shape := statement.Terminal.(type) {
-	case *ReactiveReturn:
-		returned := c.resolve(declarationOf(c.function, shape.Value.Identifier))
-		c.graph.MarkEscaping(returned)
-		// A return inside scopes makes those scopes dependencies of the returned value, because they
-		// have to be evaluated for the return to happen. Upstream's `CollectDependenciesVisitor`
-		// arm for `ReturnTerminal`; without it the enclosing scopes' own dependencies are never
-		// forced and a returned value can be held while what produced it is not.
-		c.associateChain(returned)
-	case *ReactiveIf:
-		c.walk(shape.Consequent)
-		if shape.Alternate != nil {
-			c.walk(*shape.Alternate)
-		}
-	case *ReactiveSwitch:
-		for index := range shape.Cases {
-			if shape.Cases[index].Block != nil {
-				c.walk(*shape.Cases[index].Block)
-			}
-		}
-	case *ReactiveFor:
-		c.walk(shape.Loop)
-	case *ReactiveForOf:
-		c.walk(shape.Loop)
-	case *ReactiveForIn:
-		c.walk(shape.Loop)
-	case *ReactiveWhile:
-		c.walk(shape.Loop)
-	case *ReactiveDoWhile:
-		c.walk(shape.Loop)
-	case *ReactiveLabelTerminal:
-		c.walk(shape.Block)
-	case *ReactiveTry:
-		c.walk(shape.Block)
-		c.walk(shape.Handler)
 	}
 }
 
@@ -407,54 +199,22 @@ func isRestPlaceOfPattern(pattern Pattern, place Place) bool {
 	return false
 }
 
-// eachMemoizationOperand visits every aliased operand of a reactive value, composites included,
-// with its role.
-//
-// The role is carried rather than dropped because this pass reads it: a `PlaceRoleDefine` place is
-// an assignment target and becomes an lvalue, and everything else is a dependency.
-//
-// A sequence's prefix holds real instructions even when the sequence is nested inside a logical,
-// ternary, or optional value. Upstream's `computeMemoizationInputs(SequenceExpression)` visits each
-// prefix instruction while recursively computing the enclosing value's inputs. Visiting sequences
-// only when they are the top-level instruction loses allocations and `LoadLocal` definition edges
-// in nested arms, so an escaping result can look non-escaping and its scope is pruned.
-func (c *memoizationCollector) eachMemoizationOperand(value ReactiveValue, visit func(Place, PlaceRole)) {
-	switch shape := value.(type) {
-	case *ReactiveInstructionValue:
-		if shape.Value != nil {
-			EachPlace(shape.Value, visit)
-		}
-	case *ReactiveLogicalValue:
-		c.eachMemoizationOperand(shape.Left, visit)
-		c.eachMemoizationOperand(shape.Right, visit)
-	case *ReactiveTernaryValue:
-		// Keep the test in this port's conservative alias set. Upstream excludes it, but changing
-		// that policy is independent of reaching nested sequence instructions and needs its own
-		// corpus trade-off.
-		c.eachMemoizationOperand(shape.Test, visit)
-		c.eachMemoizationOperand(shape.Consequent, visit)
-		c.eachMemoizationOperand(shape.Alternate, visit)
-	case *ReactiveSequenceValue:
-		for _, nested := range shape.Instructions {
-			c.visitInstruction(nested)
-		}
-		// Prefix instructions are graph nodes of their own. Only the sequence's final value aliases
-		// the enclosing expression.
-		c.eachMemoizationOperand(shape.Value, visit)
-	case *ReactiveOptionalValue:
-		c.eachMemoizationOperand(shape.Value, visit)
-	}
-}
-
 // prunePassOverScopes replaces every scope with no memoized output by its own instructions.
 //
 // Upstream keeps a scope whose declarations and reassignments are both empty, or which carries an
 // early-return value: the memoized value is returned from inside it and `propagateEarlyReturns`
 // needs the scope standing. We have no early-return representation, so only the first half applies
 // and the second is why `PropagateEarlyReturns` is still open rather than declined.
-func prunePassOverScopes(tree *ReactiveFunction, function *Function,
-	dependencies *ScopeDependencies, memoized map[static_single_assignment.DeclarationId]bool,
-	prunedScopes map[ScopeId]bool, resolve func(static_single_assignment.DeclarationId) static_single_assignment.DeclarationId) int {
+//
+// Mutates: prunedScopes the caller gathers every scope pruned here, so the marker pass after it reads the set
+func prunePassOverScopes(
+	tree *ReactiveFunction,
+	function *Function,
+	dependencies *ScopeDependencies,
+	memoized map[static_single_assignment.DeclarationId]bool,
+	prunedScopes map[ScopeId]bool,
+	resolve func(static_single_assignment.DeclarationId) static_single_assignment.DeclarationId,
+) int {
 	pruned := 0
 	TransformReactiveFunction(tree, ReactiveTransformer{
 		Scope: func(scope *ReactiveScopeBlock, traverse func()) ReactiveTransformed {
@@ -537,7 +297,7 @@ func prunePassOverScopes(tree *ReactiveFunction, function *Function,
 // # The reassignment map, which is the half a shorter port would drop
 //
 // A `useMemo` that got inlined stores its result into a temporary and then reassigns, so the
-// marker's own value carries no scope and the question has to be asked of what was assigned INTO
+// marker's own value carries no scope and the question has to be asked of what was assigned into
 // it. Upstream builds that map from two instruction shapes and falls back to the marker's own
 // identifier when the map has no entry. Dropping it would leave every inlined memo unmarked, which
 // is the shape `prune-nonescaping-useMemo.ts` and its siblings are built from.
@@ -566,38 +326,38 @@ func prunePassOverMemoMarkers(tree *ReactiveFunction, function *Function, scopes
 				return KeepStatement()
 			}
 
-			switch value := plain.Value.(type) {
+			switch shape := plain.Value.(type) {
 			case *StoreLocal:
 				// Upstream keys this arm on `lvalue.kind === 'Reassign'`. This IR has no reassign
 				// kind on a store, so the same population is selected structurally: a store whose
 				// target carries no scope is the inlining temporary upstream is describing.
-				if scopeless(value.LValue.Identifier) {
-					target := declarationOf(function, value.LValue.Identifier)
-					reassignments[target] = append(reassignments[target], value.Value.Identifier)
+				if scopeless(shape.LValue.Identifier) {
+					target := declarationOf(function, shape.LValue.Identifier)
+					reassignments[target] = append(reassignments[target], shape.Value.Identifier)
 				}
 
 			case *LoadLocal:
 				// The simpler inlining shape: a direct assignment to the original lvalue. Upstream
-				// requires the loaded place to HAVE a scope and the lvalue to lack one, which is
+				// requires the loaded place to have a scope and the lvalue to lack one, which is
 				// what distinguishes it from an ordinary read.
-				if instruction.LValue != nil && !scopeless(value.Place.Identifier) &&
+				if instruction.LValue != nil && !scopeless(shape.Place.Identifier) &&
 					scopeless(instruction.LValue.Identifier) {
 					target := declarationOf(function, instruction.LValue.Identifier)
-					reassignments[target] = append(reassignments[target], value.Place.Identifier)
+					reassignments[target] = append(reassignments[target], shape.Place.Identifier)
 				}
 
 			case *FinishMemoize:
-				if value.Pruned {
+				if shape.Pruned {
 					return KeepStatement()
 				}
-				declarations := []static_single_assignment.IdentifierId{value.Value.Identifier}
-				if scopeless(value.Value.Identifier) {
+				declarations := []static_single_assignment.IdentifierId{shape.Value.Identifier}
+				if scopeless(shape.Value.Identifier) {
 					if inlined, found :=
-						reassignments[declarationOf(function, value.Value.Identifier)]; found {
+						reassignments[declarationOf(function, shape.Value.Identifier)]; found {
 						declarations = inlined
 					}
 				}
-				// Upstream's `every`: a marker is pruned when EVERY declaration it could name is
+				// Upstream's `every`: a marker is pruned when every declaration it could name is
 				// either scopeless or in a scope this pass just pruned. One surviving memoized
 				// declaration is enough to keep the claim alive.
 				all := true
@@ -609,7 +369,7 @@ func prunePassOverMemoMarkers(tree *ReactiveFunction, function *Function, scopes
 					}
 				}
 				if all {
-					value.Pruned = true
+					shape.Pruned = true
 					marked++
 				}
 			}

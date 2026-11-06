@@ -30,7 +30,8 @@ func printDecorators(path *Path, options *Options, print PrintFunc) Doc {
 	if len(decorators) == 0 || hasDecoratorsBeforeExport(parent) || isIgnored(path) {
 		return emptyDoc
 	}
-	shouldBreak := current.Is("ClassExpression", "ClassDeclaration") || hasNewlineBetweenOrAfterDecorators(current, options)
+	shouldBreak := current.Is("ClassExpression", "ClassDeclaration") ||
+		hasNewlineBetweenOrAfterDecorators(current, options)
 	var leading Doc = emptyDoc
 	switch {
 	case keyOf(path) == "declaration" && isExportDeclaration(parent):
@@ -70,7 +71,7 @@ func printIgnored(path *Path, options *Options) Doc {
 		text = ";" + text
 	}
 	if current.Is("ClassExpression") && len(current.List("decorators")) > 0 {
-		return concatIn(path, indentIn(path, concatIn(path, softline, text)), softline)
+		return concatIn(path, indentIn(path, concatIn(path, softline, textDoc(text))), softline)
 	}
-	return concatIn(path, text)
+	return concatIn(path, textDoc(text))
 }

@@ -20,8 +20,8 @@ const selfCompareFile = "/repository/source/SelfCompare.ts"
 // tokens rather than text: `this.#field` and `this['#field']` read almost the same characters and
 // are different tokens, accessing different things. Both orderings are written, which is upstream
 // pinning that the distinction is not an artifact of which side the private name sits on.
-func TestNoSelfCompareStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoSelfCompareStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -35,10 +35,10 @@ func TestNoSelfCompareStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.Run(t, NoSelfCompare, selfCompareFile, testCase.sourceText))
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.Run(test, NoSelfCompare, selfCompareFile, testCase.sourceText))
 		})
 	}
 }
@@ -49,8 +49,8 @@ func TestNoSelfCompareStaysSilent(t *testing.T) {
 // whitespace on both sides and reports, so a port comparing source text is silent on it. And
 // `this.#field === this.#field` reports while the two clean private-name cases above do not, which
 // is the pair that separates token equality from character equality.
-func TestNoSelfCompareFires(t *testing.T) {
-	t.Parallel()
+func TestNoSelfCompareFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -68,15 +68,17 @@ func TestNoSelfCompareFires(t *testing.T) {
 		{"x < x"},                 // errors=["comparingToSelf"]
 		{"x >= x"},                // errors=["comparingToSelf"]
 		{"x <= x"},                // errors=["comparingToSelf"]
-		{"foo.bar().baz.qux >= foo.bar ().baz .qux"},                   // errors=["comparingToSelf"]
-		{"class C { #field; foo() { this.#field === this.#field; } }"}, // errors=["comparingToSelf"] lang={"ecmaVersion":2022}
+		{"foo.bar().baz.qux >= foo.bar ().baz .qux"}, // errors=["comparingToSelf"]
+		{
+			"class C { #field; foo() { this.#field === this.#field; } }",
+		}, // errors=["comparingToSelf"] lang={"ecmaVersion":2022}
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoSelfCompare, selfCompareFile, testCase.sourceText), "comparingToSelf")
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, NoSelfCompare, selfCompareFile, testCase.sourceText), "comparingToSelf")
 		})
 	}
 }
@@ -90,8 +92,8 @@ func TestNoSelfCompareFires(t *testing.T) {
 // imported fixture stays green while it does, because upstream never wrote them.
 //
 // The equality operators are the control: same shape, same identical operands, and they report.
-func TestNoSelfCompareDeclinesInAndInstanceof(t *testing.T) {
-	t.Parallel()
+func TestNoSelfCompareDeclinesInAndInstanceof(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -102,15 +104,15 @@ func TestNoSelfCompareDeclinesInAndInstanceof(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoSelfCompare, selfCompareFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoSelfCompare, selfCompareFile, testCase.sourceText))
 		})
 	}
 
 	// The control, so the silence above is a measurement about the operator rather than about the
 	// declare-heavy shape of the inputs.
-	rule_testing.ExpectFindings(t, rule_testing.Run(t, NoSelfCompare, selfCompareFile,
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, NoSelfCompare, selfCompareFile,
 		"declare const x: any; export const a = x === x;"), "comparingToSelf")
 }
 
@@ -119,17 +121,17 @@ func TestNoSelfCompareDeclinesInAndInstanceof(t *testing.T) {
 // Upstream passes `node`, the BinaryExpression, rather than either operand or the operator token. A
 // port anchoring on the operator satisfies every assertion above and points a reader at two
 // characters in the middle of an expression.
-func TestNoSelfCompareReportsTheWholeComparison(t *testing.T) {
-	t.Parallel()
+func TestNoSelfCompareReportsTheWholeComparison(test *testing.T) {
+	test.Parallel()
 
 	const sourceText = "if (foo.bar >= foo.bar) { }"
-	result := rule_testing.Run(t, NoSelfCompare, selfCompareFile, sourceText)
+	result := rule_testing.Run(test, NoSelfCompare, selfCompareFile, sourceText)
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
+		test.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 	}
 	reported := sourceText[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 	if reported != "foo.bar >= foo.bar" {
-		t.Fatalf("reported %q, wanted the whole comparison", reported)
+		test.Fatalf("reported %q, wanted the whole comparison", reported)
 	}
 }
 
@@ -141,20 +143,24 @@ func TestNoSelfCompareReportsTheWholeComparison(t *testing.T) {
 // node does, which is why upstream's corpus, all of it plain JavaScript, never reached it. The answers are
 // ESLint 10.8.1's, read with the core Linter and jsx on: the two comparisons of a tag with itself report,
 // and the other two are clean.
-func TestNoSelfCompareReadsAJsxElementWithAnEmptyAttributeList(t *testing.T) {
-	t.Parallel()
+func TestNoSelfCompareReadsAJsxElementWithAnEmptyAttributeList(test *testing.T) {
+	test.Parallel()
 
 	const fileName = "/repository/source/SelfCompare.tsx"
 	for _, sourceText := range []string{"<a />>0;", "ReactDOM.render(<div />, x) === null;"} {
-		t.Run(sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoSelfCompare, fileName, sourceText))
+		test.Run(sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoSelfCompare, fileName, sourceText))
 		})
 	}
 	for _, sourceText := range []string{"<a /> === <a />;", "<a ></a> === <a ></a>;"} {
-		t.Run(sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.Run(t, NoSelfCompare, fileName, sourceText), "comparingToSelf")
+		test.Run(sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(
+				test,
+				rule_testing.Run(test, NoSelfCompare, fileName, sourceText),
+				"comparingToSelf",
+			)
 		})
 	}
 }

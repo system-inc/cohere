@@ -31,61 +31,6 @@ type ClassSegment struct {
 	Origin       ClassLiteralOrigin
 }
 
-// ClassSegmentsIn returns every run of static class text a node carries.
-//
-// Covers both plain strings and templates, over the same surfaces the other readers use, so a
-// rule built on this one cannot silently cover less than a rule built on those.
-func (r *ClassLiteralReader) ClassSegmentsIn(node *ast.Node) []ClassSegment {
-	if node == nil {
-		return nil
-	}
-
-	// A plain string literal is one segment with no holes on either side, unless it sits inside a
-	// template's hole, where an edge that touches the template's text once substituted keeps its
-	// whitespace as a separator (see holeEdges).
-	values := r.classValuesIn(node)
-	var segments []ClassSegment
-	for _, literal := range values.literals {
-		segments = append(segments, ClassSegment{
-			Text:         literal.Text,
-			Range:        literal.Range,
-			LeadingHole:  literal.Edges.Leading,
-			TrailingHole: literal.Edges.Trailing,
-			Origin:       literal.Origin,
-		})
-	}
-
-	// And every template with holes, broken into its static runs, whether or not literals were
-	// found. They used to be alternatives, and once the strings inside a template's holes were read,
-	// the template's own text would have been skipped whenever one of its holes held a string.
-	//
-	// Deliberately not routed through ClassTemplatesIn. That reader answers "where does static text
-	// meet an interpolation without whitespace", so it returns nothing for a template whose seams
-	// are all clean. `flex  ${x}  gap-2` has no boundary defects and two segments that still need
-	// their doubled spaces collapsed, and reusing the boundary reader here would have silently
-	// skipped exactly the templates that are otherwise well written.
-	for _, template := range values.templates {
-		segments = append(segments, segmentsOfTemplate(template)...)
-	}
-	return segments
-}
-
-// ClassTemplateSegmentsIn returns every template with holes a node carries, each as its static runs.
-//
-// Grouped per template rather than flattened, because a rule that orders classes orders each run on
-// its own and has to know which runs touch which holes, and that is the template's structure. Every
-// template in a value position is returned, including one inside a conditional or inside another
-// template's hole, which is where Prettier's Tailwind plugin finds them too.
-func (r *ClassLiteralReader) ClassTemplateSegmentsIn(node *ast.Node) [][]ClassSegment {
-	templates := [][]ClassSegment{}
-	for _, template := range r.classValuesIn(node).templates {
-		if segments := segmentsOfTemplate(template); len(segments) > 0 {
-			templates = append(templates, segments)
-		}
-	}
-	return templates
-}
-
 // segmentsOfTemplate walks a template's head and spans, recording each static run.
 //
 // The head has a hole on its right and nothing on its left. Every span has a hole on its left, and

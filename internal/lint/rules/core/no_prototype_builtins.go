@@ -75,10 +75,10 @@ var prototypeBuiltinMethods = map[string]struct{}{
 // without a repair keeps the rule out of the type phase. Note also that the repair upstream offers
 // is `Object.prototype.<name>.call` and not `Object.hasOwn`, which reads more modern but resolves
 // only `hasOwnProperty`, has no analogue for the other two names, and requires ES2022.
-var NoPrototypeBuiltins = rule.Rule{
+var NoPrototypeBuiltins = rule.Rule[rule.NoOptions]{
 	Name: "no-prototype-builtins",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -122,7 +122,7 @@ var NoPrototypeBuiltins = rule.Rule{
 				// The finding points at the member expression, matching oxc. ESLint points at the
 				// property name alone; oxc's span is the wider of the two and is what the imported
 				// corpus was snapshotted against.
-				ctx.ReportNode(callee, messageNoPrototypeBuiltins)
+				ruleContext.ReportNode(callee, messageNoPrototypeBuiltins)
 			},
 		}
 	},

@@ -78,50 +78,6 @@ func EliminateDeadCode(function *Function) DeadCodeEliminationResult {
 	return result
 }
 
-// liveIdentifiers is upstream's `State`: the set of values read, plus the names they carry.
-//
-// Two sets rather than one because a named binding is read by NAME across its versions. If any
-// version of `x` is read, every version must be kept, since sweeping one would leave a later read
-// resolving to nothing.
-type liveIdentifiers struct {
-	identifiers map[static_single_assignment.IdentifierId]bool
-	named       map[string]bool
-}
-
-// reference marks a value as read.
-func (l *liveIdentifiers) reference(function *Function, id static_single_assignment.IdentifierId) {
-	l.identifiers[id] = true
-	if identifier := function.Identifiers[id]; identifier != nil && identifier.Name != "" {
-		l.named[identifier.Name] = true
-	}
-}
-
-// usedByIdOrName reports whether this value, or any version of its name, is read.
-//
-// # A mutation making this ignore the name set SURVIVES
-//
-// Measured: id-only liveness scores identically -- goldens 25, ours 120, exact 20. No corpus fixture
-// currently has one version of a named binding read while another is swept, because the sweep runs
-// immediately after `DropManualMemoization` and the instructions it removes are freshly lowered
-// temporaries with no name at all.
-//
-// Kept because it is the guard against the one unrecoverable failure this pass has: sweeping a
-// version whose name is read later leaves that read resolving to nothing, which is a miscompile
-// rather than a lost optimisation. The verdict EXPIRES the moment this runs anywhere later in the
-// pipeline, where named reassignments are live across versions.
-func (l *liveIdentifiers) usedByIdOrName(function *Function, id static_single_assignment.IdentifierId) bool {
-	if l.identifiers[id] {
-		return true
-	}
-	identifier := function.Identifiers[id]
-	return identifier != nil && identifier.Name != "" && l.named[identifier.Name]
-}
-
-// usedById reports whether this exact value is read, ignoring its name.
-func (l *liveIdentifiers) usedById(id static_single_assignment.IdentifierId) bool {
-	return l.identifiers[id]
-}
-
 // findReferencedIdentifiers marks every value some surviving instruction reads.
 //
 // Blocks are walked in reverse and instructions within them in reverse, so a use is seen before its
@@ -132,7 +88,7 @@ func findReferencedIdentifiers(function *Function) *liveIdentifiers {
 		identifiers: map[static_single_assignment.IdentifierId]bool{},
 		named:       map[string]bool{},
 	}
-	// A mutation forcing this false SURVIVES: measured identical, because no corpus function
+	// A mutation forcing this false survives: measured identical, because no corpus function
 	// reaches the sweep with a loop whose liveness needs a second pass. It decides only how many
 	// times the loop below runs, so a wrong `false` costs an answer and a wrong `true` costs an
 	// iteration -- which is why it is computed rather than assumed either way.
@@ -156,18 +112,18 @@ func findReferencedIdentifiers(function *Function) *liveIdentifiers {
 				if instruction == nil {
 					continue
 				}
-				// # A mutation removing this pessimism SURVIVES
+				// # A mutation removing this pessimism survives
 				//
 				// Measured identical on every instrument. No fixture in this corpus reaches the
 				// sweep with a value block whose final instruction would otherwise be pruned,
 				// because the memo rewrite produces ordinary blocks. It is upstream's own guard and
 				// protects a structural invariant rather than a score: a value block's last
-				// instruction IS the block's value, so removing it leaves a block that produces
-				// nothing and a consumer reading an absent operand. The verdict EXPIRES if this
+				// instruction is the block's value, so removing it leaves a block that produces
+				// nothing and a consumer reading an absent operand. The verdict expires if this
 				// pass ever runs after ternaries and logical operators are lowered into value
 				// blocks that survive to this point.
 				//
-				// The last instruction of a value block IS that block's value, so it is never
+				// The last instruction of a value block is that block's value, so it is never
 				// eligible for pruning and its operands are all pessimistically live. Upstream:
 				// "Pessimistically consider all operands as used to avoid rewriting the last
 				// instruction".
@@ -191,7 +147,7 @@ func findReferencedIdentifiers(function *Function) *liveIdentifiers {
 					// A declaration's initializer is live only if the declared value itself is.
 					// A reassignment always reads its rvalue.
 					//
-					// A mutation making both arms live SURVIVES on this corpus: nothing here
+					// A mutation making both arms live survives on this corpus: nothing here
 					// declares a binding whose initializer is otherwise dead. Upstream's asymmetry
 					// is kept because it is the difference between `const x = f()` -- where dropping
 					// the call would lose an effect -- and a temporary store, and the arms are not
@@ -252,7 +208,7 @@ func functionHasBackEdge(function *Function) bool {
 
 // pruneableValue reports whether an instruction may be removed when its result is unread.
 //
-// Transcribed from upstream's switch of the same name. The default is NOT pruneable: an instruction
+// Transcribed from upstream's switch of the same name. The default is not pruneable: an instruction
 // kind this does not name is kept, so adding a value kind cannot silently start deleting it.
 func pruneableValue(function *Function, value InstructionValue, state *liveIdentifiers) bool {
 	switch shape := value.(type) {
@@ -270,6 +226,7 @@ func pruneableValue(function *Function, value InstructionValue, state *liveIdent
 	case *StartMemoize, *FinishMemoize:
 		// Upstream: "This instruction is used by the @enablePreserveExistingMemoizationGuarantees
 		// feature to preserve information about memoization semantics in the original code. We can't
+		//cohere:ignore consistency-no-shouting quotes upstream's text verbatim, so its capitals are theirs
 		// DCE without losing the memoization guarantees."
 		return false
 

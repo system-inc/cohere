@@ -21,21 +21,21 @@ import (
 //
 // # What it asserts, and what it deliberately does not
 //
-// It does NOT assert that all 33 pass. Scoring a fresh port against a golden set and demanding a
+// It does not assert that all 33 pass. Scoring a fresh port against a golden set and demanding a
 // perfect number is how a rule ends up shaped like its fixtures: the failures get patched
 // individually until the count is right, and the result matches the corpus rather than the
 // specification.
 //
-// What it asserts is that the rule RUNS on the corpus and produces a non-degenerate answer -- it
+// What it asserts is that the rule runs on the corpus and produces a non-degenerate answer -- it
 // fires on some fixtures and not others -- plus the current pass count as a floor, so the number can
 // only be driven up. The count is logged rather than pinned exactly, and the floor moves when
 // someone improves it.
-func TestPreserveManualMemoizationAgainstGoldens(t *testing.T) {
-	t.Parallel()
+func TestPreserveManualMemoizationAgainstGoldens(test *testing.T) {
+	test.Parallel()
 
-	fixtures, err := react_conformance.Load("../../rules/react/conformance/testdata/fixtures")
-	if err != nil {
-		t.Fatalf("loading the vendored corpus: %v", err)
+	fixtures, loadError := react_conformance.Load("../../rules/react/conformance/testdata/fixtures")
+	if loadError != nil {
+		test.Fatalf("loading the vendored corpus: %v", loadError)
 	}
 
 	// The fixtures whose golden carries this rule's message. Everything else is another rule's
@@ -47,24 +47,24 @@ func TestPreserveManualMemoizationAgainstGoldens(t *testing.T) {
 		if !strings.Contains(fixture.Expected.Raw, ruleMessage) {
 			continue
 		}
-		// Flow's `component Component(id) { ... }` declaration form is EXCLUDED, deliberately,
+		// Flow's `component Component(id) { ... }` declaration form is excluded, deliberately,
 		// because the vendored TypeScript parser does not model it and no work in this package can
 		// recover it.
 		//
 		// # What the parser actually produces, measured rather than assumed
 		//
 		// There is no `KindComponentDeclaration` anywhere in `typescript-go`, and the parser does
-		// not reject the syntax either -- it RECOVERS, into three unrelated top-level nodes:
+		// not reject the syntax either -- it recovers, into three unrelated top-level nodes:
 		//
 		//	component            ->  ExpressionStatement(Identifier)
 		//	Component(id)        ->  ExpressionStatement(CallExpression)
 		//	{ ... }              ->  Block                       (a detached block, not a body)
 		//
 		// So `ForEachFunctionLike` finds no function for the component. It descends into that
-		// detached `Block` and reaches the `useMemo`/`useCallback` CALLBACKS, which are ordinary
+		// detached `Block` and reaches the `useMemo`/`useCallback` callbacks, which are ordinary
 		// arrow functions, and lowers each one as though it were itself a top-level component. That
 		// is why these two fixtures report `lowered=true` with reactive scopes and yet record zero
-		// written dependencies: the `useMemo` CALL SITES live in the detached block, which is never
+		// written dependencies: the `useMemo` call sites live in the detached block, which is never
 		// lowered, so `DropManualMemoization` is never handed a call to recognise and no
 		// `StartMemoize` marker is ever constructed. The identical program written as
 		// `function Component(id)` lowers to one function with two markers carrying their deps,
@@ -75,7 +75,7 @@ func TestPreserveManualMemoizationAgainstGoldens(t *testing.T) {
 		// Lowering is keyed on `*ast.Symbol` identity throughout -- `builder.declarations`,
 		// `.identifiers` and `.captured` are all symbol-keyed. The binder never created a parameter
 		// binding for `id`, because there is no function to bind one into, so
-		// `GetSymbolAtLocation(id)` returns nil at its declaration site AND at its use inside the
+		// `GetSymbolAtLocation(id)` returns nil at its declaration site and at its use inside the
 		// dependency array, while resolving at an unrelated use. A dependency-array entry with no
 		// symbol cannot be built into a `ManualMemoDependency` and cannot be compared against an
 		// inferred dependency, so synthesising a function node here would produce a marker whose
@@ -93,7 +93,7 @@ func TestPreserveManualMemoizationAgainstGoldens(t *testing.T) {
 		// chain widening a mutable range through an invoked function -- work `#t28gsec` addresses --
 		// so it would likely stay silent even with a parser that handled the declaration.
 		//
-		// `RequiresFlow` is upstream's own test (the substring `@flow`), and on THIS population it
+		// `RequiresFlow` is upstream's own test (the substring `@flow`), and on this population it
 		// is exact: it selects these two fixtures and no others.
 		if fixture.RequiresFlow() {
 			flowOnly++
@@ -101,14 +101,14 @@ func TestPreserveManualMemoizationAgainstGoldens(t *testing.T) {
 		mine = append(mine, fixture)
 	}
 	if len(mine) == 0 {
-		t.Fatal("no fixture in the vendored corpus carries this rule's message; the corpus or the " +
+		test.Fatal("no fixture in the vendored corpus carries this rule's message; the corpus or the " +
 			"message string is wrong, and a zero score below would be meaningless")
 	}
 
 	fired, silent, unsupported, disowned := 0, 0, 0, 0
 	divergences := react_conformance.StatedDivergenceNames()
 	for _, fixture := range mine {
-		// The Flow-declaration exclusion documented above. This is checked BEFORE lowering rather
+		// The Flow-declaration exclusion documented above. This is checked before lowering rather
 		// than after, because these fixtures do lower -- into the wrong thing -- and so the `!ok`
 		// decline below cannot see them.
 		if fixture.RequiresFlow() {
@@ -125,7 +125,7 @@ func TestPreserveManualMemoizationAgainstGoldens(t *testing.T) {
 			disowned++
 			continue
 		}
-		findings, ok := findingsForSource(t, fixture.Source)
+		findings, ok := findingsForSource(test, fixture.Source)
 		if !ok {
 			unsupported++
 			continue
@@ -143,7 +143,7 @@ func TestPreserveManualMemoizationAgainstGoldens(t *testing.T) {
 	// Printing only `fixtures=33 fired=28` reads as five failures, and three of those five are the
 	// rule being right.
 	scoreable := len(mine) - unsupported - disowned
-	t.Logf("fixtures=%d scoreable=%d fired=%d silent=%d "+
+	test.Logf("fixtures=%d scoreable=%d fired=%d silent=%d "+
 		"(excluded: %d Flow, %d disowned upstream)",
 		len(mine), scoreable, fired, silent, unsupported, disowned)
 
@@ -152,24 +152,24 @@ func TestPreserveManualMemoizationAgainstGoldens(t *testing.T) {
 	// of these three being rewritten upstream, has to be re-justified rather than inherited.
 	const knownDisownedFixtures = 3
 	if disowned != knownDisownedFixtures {
-		t.Errorf("fixtures upstream disowns = %d, want %d; the exclusions in `statedDivergences` "+
+		test.Errorf("fixtures upstream disowns = %d, want %d; the exclusions in `statedDivergences` "+
 			"naming this test as their boundary have changed and the judgment has to be re-made",
 			disowned, knownDisownedFixtures)
 	}
 
 	// The exclusion is pinned to the exact population it was measured against. If the corpus is
-	// re-vendored and a THIRD Flow fixture appears -- or one of these two is rewritten in the
+	// re-vendored and a third Flow fixture appears -- or one of these two is rewritten in the
 	// ordinary `function` form -- this fires, and whoever sees it has to re-make the judgment above
 	// rather than inherit it. An exclusion that silently widens is how a denominator rots.
 	const knownFlowDeclarationFixtures = 2
 	if flowOnly != knownFlowDeclarationFixtures {
-		t.Errorf("Flow-declaration fixtures = %d, want %d; the exclusion documented above was "+
+		test.Errorf("Flow-declaration fixtures = %d, want %d; the exclusion documented above was "+
 			"measured against a population that has changed, and it has to be re-justified rather "+
 			"than widened", flowOnly, knownFlowDeclarationFixtures)
 	}
 
 	if fired == 0 {
-		t.Errorf("the rule fired on none of %d fixtures whose golden expects it; every one of "+
+		test.Errorf("the rule fired on none of %d fixtures whose golden expects it; every one of "+
 			"these is a program where upstream reports a lost memoization", len(mine))
 	}
 
@@ -179,7 +179,7 @@ func TestPreserveManualMemoizationAgainstGoldens(t *testing.T) {
 	//
 	// The clean-fixture rate below is pinned exactly and this side was not, so the two instruments
 	// were asymmetric in the one direction that matters: a change trading true positives away for
-	// false-positive removals moved the pinned number DOWN, which reads as the rule improving, while
+	// false-positive removals moved the pinned number down, which reads as the rule improving, while
 	// this side stayed green because it only asked for a non-zero.
 	//
 	// That is not hypothetical. Freezing component parameters in the aliasing graph took the clean
@@ -189,14 +189,14 @@ func TestPreserveManualMemoizationAgainstGoldens(t *testing.T) {
 	//
 	// The six were `error.useMemo-aliased-var` plus five optional-member-expression fixtures, and
 	// what they show is that the repair was in the wrong pass. Freezing a parameter suppressed the
-	// walk that carries a mutation ONWARD, so `x.push(props?.items)` stopped widening `x`, which is
+	// walk that carries a mutation onward, so `x.push(props?.items)` stopped widening `x`, which is
 	// mutated, rather than `props`, which is not. Upstream does not do this: oxc's `NodeValue` in
 	// `infer_mutation_aliasing_ranges.rs:72` is `Object | Phi` with no third element, and the
-	// parameter freeze lives in `InferMutationAliasingEffects` as a `MutateFrozen` EFFECT rather
+	// parameter freeze lives in `InferMutationAliasingEffects` as a `MutateFrozen` effect rather
 	// than as a node value this pass reads.
 	//
 	// So both directions are pinned, and a change moving either one has to say which it moved and
-	// why. Silence is not the right answer on ANY of these 33: each is a program where upstream
+	// why. Silence is not the right answer on any of these 33: each is a program where upstream
 	// reports a lost memoization.
 	// Raised from 15 by turning on the third firing condition, which had been gated since it was
 	// written. The gate's own unblock instruction was "turn this on when the hoistable analysis
@@ -257,13 +257,13 @@ func TestPreserveManualMemoizationAgainstGoldens(t *testing.T) {
 	// technically a false positive, but source is already breaking `exhaustive-deps`". Two real
 	// detections for two upstream calls a mistake.
 	//
-	// 27 once a ref's stability is decided the way upstream decides it, in `reactive.go`. The two
+	// 27 once a ref's stability is decided the way upstream decides it, in `reactivity.go`. The two
 	// that close are `error.ref-like-name-not-a-ref.js` and `error.ref-like-name-not-Ref.js`, and
 	// they are a matched pair with two clean fixtures that differ only in the variable's name.
 	// False positives are unmoved at 11, `under` holds at 0 fixtures / 0 scopes, and the dependency
 	// oracle is byte-identical at 74 matched with ours 119.
 	//
-	// 28 once a ref's STABILITY is seeded only by a hook call, separately from its shape. The one
+	// 28 once a ref's stability is seeded only by a hook call, separately from its shape. The one
 	// that closes is `error.preserve-use-memo-ref-missing-reactive.ts`, whose `ref` is a phi of two
 	// `useRef` results and is named `ref`. False positives hold at 11, `under` at 0 fixtures / 0
 	// scopes, and the dependency oracle is byte-identical at 74 matched with ours 119. Memo blocks
@@ -284,10 +284,10 @@ func TestPreserveManualMemoizationAgainstGoldens(t *testing.T) {
 	//
 	// Taken because the trade is measured and one-sided everywhere else: false positives 11 to 8
 	// with three real fixtures closing and none added, dependency `matched` 74 to 75 -- a golden row
-	// GAINED on the strongest oracle -- and `under` held at 0 fixtures / 0 scopes.
+	// gained on the strongest oracle -- and `under` held at 0 fixtures / 0 scopes.
 	const knownTruePositives = 28
 	if fired != knownTruePositives {
-		t.Errorf("true positives = %d, want %d; if this went UP the rule improved and this number "+
+		test.Errorf("true positives = %d, want %d; if this went UP the rule improved and this number "+
 			"should be raised deliberately, and if it went DOWN the rule stopped reporting programs "+
 			"upstream reports on, which the clean-fixture rate cannot see", fired, knownTruePositives)
 	}
@@ -320,12 +320,12 @@ func TestPreserveManualMemoizationAgainstGoldens(t *testing.T) {
 // count is asserted exactly rather than as a ceiling, because a ceiling cannot distinguish a fix
 // from a rule that went quiet, and this rule's registration is being held precisely on the strength
 // of this number.
-func TestPreserveManualMemoizationFalsePositiveRate(t *testing.T) {
-	t.Parallel()
+func TestPreserveManualMemoizationFalsePositiveRate(test *testing.T) {
+	test.Parallel()
 
-	fixtures, err := react_conformance.Load("../../rules/react/conformance/testdata/fixtures")
-	if err != nil {
-		t.Fatalf("loading the vendored corpus: %v", err)
+	fixtures, loadError := react_conformance.Load("../../rules/react/conformance/testdata/fixtures")
+	if loadError != nil {
+		test.Fatalf("loading the vendored corpus: %v", loadError)
 	}
 
 	const ruleMessage = "Existing memoization could not be preserved"
@@ -335,9 +335,9 @@ func TestPreserveManualMemoizationFalsePositiveRate(t *testing.T) {
 		if strings.HasPrefix(base, "error.") || strings.HasPrefix(base, "todo.error.") {
 			continue
 		}
-		if upstreamReportsInLogs(t, fixture.ExpectPath, ruleMessage) {
+		if upstreamReportsInLogs(test, fixture.ExpectPath, ruleMessage) {
 			// Upstream reports this rule on the fixture, in its `## Logs` block rather than in a
-			// `## Error` section. The population above is chosen by FILENAME, and `Expectation`
+			// `## Error` section. The population above is chosen by filename, and `Expectation`
 			// parses only `## Error`, so neither route can see it: the fixture reads as clean while
 			// upstream reports on it, and firing here was scored as a false positive.
 			//
@@ -353,7 +353,7 @@ func TestPreserveManualMemoizationFalsePositiveRate(t *testing.T) {
 			continue
 		}
 		clean++
-		findings, ok := findingsForSource(t, fixture.Source)
+		findings, ok := findingsForSource(test, fixture.Source)
 		if !ok {
 			unsupported++
 			continue
@@ -367,22 +367,22 @@ func TestPreserveManualMemoizationFalsePositiveRate(t *testing.T) {
 
 	const knownLogsOnly = 1
 	if logsOnly != knownLogsOnly {
-		t.Errorf("%d fixtures report this rule only in `## Logs`, want %d; that population is "+
+		test.Errorf("%d fixtures report this rule only in `## Logs`, want %d; that population is "+
 			"invisible to both the filename split and to `Expectation`, so a change in it moves "+
 			"the false-positive count for a reason unrelated to the rule", logsOnly, knownLogsOnly)
 	}
 	if clean+logsOnly != react_conformance.ExpectedCleanFixtureCount {
-		t.Fatalf("scored %d clean fixtures, want %d; the population this test measures is not the "+
+		test.Fatalf("scored %d clean fixtures, want %d; the population this test measures is not the "+
 			"one it believes it is", clean, react_conformance.ExpectedCleanFixtureCount)
 	}
 	// A declined fixture is not a correct silence. In particular, pin this at zero now that the
 	// false-positive count is zero: otherwise a lowering or pipeline regression could move a clean
 	// fixture from `silent` to `unsupported` while leaving the headline score green.
 	if unsupported != 0 {
-		t.Errorf("unsupported clean fixtures = %d, want 0; every clean fixture in the denominator "+
+		test.Errorf("unsupported clean fixtures = %d, want 0; every clean fixture in the denominator "+
 			"must reach validation before zero false positives is a meaningful result", unsupported)
 	}
-	t.Logf("cleanFixtures=%d silentCorrect=%d falsePositives=%d unsupported=%d (%.0f%% false-positive rate)",
+	test.Logf("cleanFixtures=%d silentCorrect=%d falsePositives=%d unsupported=%d (%.0f%% false-positive rate)",
 		clean, silent, fired, unsupported, 100*float64(fired)/float64(clean))
 
 	// Every one of these is the rule reporting a lost memoization on a program upstream compiles
@@ -392,13 +392,13 @@ func TestPreserveManualMemoizationFalsePositiveRate(t *testing.T) {
 	//
 	// The move is smaller than the measured ceiling of 23 and that is the informative part rather
 	// than a shortfall. Forcing every marker to read as pruned reaches 23, so 7 of those 8 belong to
-	// fixtures that ALSO fire the `StartMemoize` condition and stay in the count on that other
+	// fixtures that also fire the `StartMemoize` condition and stay in the count on that other
 	// finding. The marker pass itself prunes 36 of 68 markers on this corpus and leaves zero
 	// unpruned markers whose value carries no scope, so it is not under-firing.
 	// Lowered from 30 by declaring the four `Object` statics in the effect table. Three fixtures,
 	// exactly the three whose subject they are: `object-keys`, `object-values` and
 	// `repro-object-fromEntries-entries`, all now silent.
-	// The DENOMINATOR moved from 70 to 69 without this number moving, which is worth stating
+	// The denominator moved from 70 to 69 without this number moving, which is worth stating
 	// because the two are usually read together. `gating/dynamic-gating-bailout-nopanic.js` is now
 	// excluded: upstream reports this rule on it, in `## Logs` rather than in a `## Error` section,
 	// so it was counted as clean while both compilers agree it is a violation. It was not firing
@@ -515,7 +515,7 @@ func TestPreserveManualMemoizationFalsePositiveRate(t *testing.T) {
 	// call result from widening a frozen source. The final board is 28/28 goldens and 69/69 clean.
 	const knownFalsePositives = 0
 	if fired != knownFalsePositives {
-		t.Errorf("false positives = %d, want %d; if this went DOWN the rule improved and this "+
+		test.Errorf("false positives = %d, want %d; if this went DOWN the rule improved and this "+
 			"number should be lowered deliberately, and if it went UP something regressed",
 			fired, knownFalsePositives)
 	}
@@ -524,7 +524,7 @@ func TestPreserveManualMemoizationFalsePositiveRate(t *testing.T) {
 	// the error-fixture test above is what would catch that -- restated here so this test cannot
 	// pass alone by the rule ceasing to report.
 	if silent == 0 {
-		t.Error("the rule fired on every clean fixture, which is unconditional reporting")
+		test.Error("the rule fired on every clean fixture, which is unconditional reporting")
 	}
 }
 
@@ -533,35 +533,35 @@ func TestPreserveManualMemoizationFalsePositiveRate(t *testing.T) {
 // Returns false when the source does not lower, which is a decline rather than a silent zero -- the
 // distinction the conformance harness draws between `Declined` and `Failed`, and for the same
 // reason: an empty result is a claim, and a claim about a program that never parsed is a wrong one.
-func findingsForSource(t *testing.T, source string) ([]PreserveManualMemoizationFinding, bool) {
-	t.Helper()
+func findingsForSource(test *testing.T, source string) ([]PreserveManualMemoizationFinding, bool) {
+	test.Helper()
 
 	var all []PreserveManualMemoizationFinding
 	lowered := false
 
-	probe := rule.Rule{
+	probe := rule.Rule[rule.NoOptions]{
 		Name:             "preserve-manual-memoization-score",
 		NeedsTypeChecker: true,
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
-					if ctx.TypeChecker == nil {
+					if ruleContext.TypeChecker == nil {
 						return
 					}
 					forEachFunctionLike(node, func(functionNode *ast.Node) {
-						function := Lower(functionNode, ctx.TypeChecker)
+						function := Lower(functionNode, ruleContext.TypeChecker)
 						if function == nil {
 							return
 						}
 						Construct(function)
 						lowered = true
-						all = append(all, pipelineFindings(function, ctx.TypeChecker)...)
+						all = append(all, pipelineFindings(function, ruleContext.TypeChecker)...)
 					})
 				},
 			}
 		},
 	}
-	rule_testing.RunTypedFiles(t, probe, map[string]string{
+	rule_testing.RunTypedFiles(test, probe, map[string]string{
 		"/react.d.ts":  reactiveDeclarations,
 		"/fixture.tsx": source,
 	}, "/fixture.tsx")
@@ -591,10 +591,10 @@ func pipelineFindings(function *Function, checker *shimchecker.Checker) []Preser
 // asked is specifically "did upstream RECORD a diagnostic here", and a fixture whose `## Input`
 // happened to contain the sentence in a comment would answer yes to a whole-file search and be
 // silently dropped from the population.
-func upstreamReportsInLogs(t *testing.T, expectPath string, ruleMessage string) bool {
-	t.Helper()
-	body, err := os.ReadFile(expectPath)
-	if err != nil {
+func upstreamReportsInLogs(test *testing.T, expectPath string, ruleMessage string) bool {
+	test.Helper()
+	body, readError := os.ReadFile(expectPath)
+	if readError != nil {
 		return false
 	}
 	text := string(body)
