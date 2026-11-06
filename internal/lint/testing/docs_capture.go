@@ -38,7 +38,8 @@ func newCapturedRun[Options any](
 	}
 	captured := &capturedRun{rule: ruleName, file: fileName, otherFiles: otherFiles}
 	// Encoded here, while the options' type is known, so the record holds bytes rather than an untyped value.
-	if value, configured := options.Read(); configured {
+	// Read uncounted: recording what the run was handed is not the rule reaching its options.
+	if value, configured := options.ForDisplay(); configured {
 		captured.options, captured.optionsError = json.Marshal(value)
 	}
 	return captured
