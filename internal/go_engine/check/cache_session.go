@@ -1,6 +1,7 @@
 package check
 
 import (
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"runtime"
@@ -80,6 +81,10 @@ type CacheSession struct {
 	counts       CacheCounts
 	factsSkipped atomic.Int64
 
+	// exportDataReads counts the export data read from the store, which the load asks only of a package something
+	// that missed imports.
+	exportDataReads atomic.Int64
+
 	// problemsLock guards counts.Problems, which the load's goroutines never write but Run's may.
 	problemsLock sync.Mutex
 }
@@ -143,7 +148,7 @@ func (session *CacheSession) Restore(
 		if !stored {
 			continue
 		}
-		restored, decodeError := decodeEntry(session.known, keyed, contents)
+		restored, decodeError := decodeEntry(session.known, keyed, contents, session.exportDataReader(keyed, key))
 		if decodeError != nil {
 			continue
 		}
@@ -159,6 +164,41 @@ func (session *CacheSession) Restore(
 		restoring[hit] = restored.types
 	}
 	return restoring
+}
+
+// Kept is what a run kept in the session's store under key beside the entries, go list's answer for
+// load.ListingStore and gofmt's verdicts among it.
+func (session *CacheSession) Kept(key [sha256.Size]byte) ([]byte, bool) {
+	return session.caching.Store.Get(cache.Key(key))
+}
+
+// Keep keeps contents under key in the session's store.
+func (session *CacheSession) Keep(key [sha256.Size]byte, contents []byte) error {
+	return session.caching.Store.Put(cache.Key(key), contents)
+}
+
+// KeyFor is the key of what a run keeps under label that depends on the engine itself and the build, as gofmt's
+// verdicts depend on the gofmt the engine links: another engine or build never reads it.
+func (session *CacheSession) KeyFor(label string) [sha256.Size]byte {
+	digest := sha256.New()
+	for _, part := range append([]string{label, session.caching.Context.FormatVersion,
+		session.caching.Context.EngineIdentity}, session.caching.Context.Build...) {
+		// Ignored: a hash.Hash never returns an error from Write, and the zero byte ends each part.
+		_, _ = digest.Write(append([]byte(part), 0))
+	}
+	return [sha256.Size]byte(digest.Sum(nil))
+}
+
+// exportDataReader reads the export data of the package under key from the store, for the load.
+func (session *CacheSession) exportDataReader(keyed *packages.Package, key cache.Key) func() ([]byte, error) {
+	return func() ([]byte, error) {
+		session.exportDataReads.Add(1)
+		exportData, stored := session.caching.Store.Get(exportDataKey(key))
+		if !stored {
+			return nil, fmt.Errorf("the store holds no export data for %s", keyed.ID)
+		}
+		return exportData, nil
+	}
 }
 
 // dropShortHits makes a miss of every hit that does not hold what the run can ask of it, and reports whether there
@@ -295,10 +335,14 @@ func (session *CacheSession) save(
 		go func() {
 			defer group.Done()
 			defer func() { <-slots }()
-			entry, dropped, encodeError := encodeEntry(session.known, session.ruleOf, saved, actionsOf[saved],
-				withheld[saved], files[saved])
+			entry, exportData, dropped, encodeError := encodeEntry(session.known, session.ruleOf, saved,
+				actionsOf[saved], withheld[saved], files[saved])
 			var putError error
-			if encodeError == nil {
+			// The export data goes first, so an entry is never in the store before what it needs to be read.
+			if encodeError == nil && exportData != nil {
+				putError = session.caching.Store.Put(exportDataKey(session.keys[saved]), exportData)
+			}
+			if encodeError == nil && putError == nil {
 				putError = session.caching.Store.Put(session.keys[saved], entry)
 			}
 			countsLock.Lock()
