@@ -31,6 +31,14 @@ too, and Swift compiles in the same list, so every engine agrees on what an acro
 Kirk's ruling on the 2026-10-01 review: all caps belongs in backticks, single quotes or double quotes
 unless it is on the safe list. The safe list is the authority for what an acronym is.
 
+The rule takes no options. Kirk ruled on 2026-11-06 (#4b337jk, task #vrb5eqh) that there is no
+per-project allow list: the shared safe list is the one mechanism, so an acronym a project needs earns
+its place there with its reason, and a config that writes `allow` is refused by name
+(`TestConsistencyNoShoutingTakesNoOptions` reads the registration, and
+`TestTheShoutingRuleRefusesAnAllowList` writes the option through the config layer). The text rules
+corpus cannot carry that row, since a case's outcome is its findings and its adapter stops at a refused
+option. When the option went, no set and no consumer config wrote it, so no word moved to the safe list.
+
 ## The dictionary detection the review proposed, measured and declined
 
 The review's option C was to replace the vowel test with "is this token, lowercased, an English
