@@ -112,7 +112,7 @@ func DefaultOneVariableSettings() OneVariableSettings {
 //
 // # The variadic hazard does not apply here, and it is worth saying why
 //
-// `internal/lint/configuration/configuration.go` keeps only `tuple[1]`, so a rule whose upstream
+// `internal/lint/configuration/load.go` keeps only `tuple[1]`, so a rule whose upstream
 // option surface is variadic loses everything after the first value -- the defect measured on
 // `id-match`, whose flag object vanished while the rule went on looking configured. `one-var`'s
 // schema declares exactly one element, so the single value arrives intact and there is no second

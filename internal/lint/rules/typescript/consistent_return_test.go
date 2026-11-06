@@ -558,7 +558,7 @@ func TestConsistentReturnFires(test *testing.T) {
 // TestConsistentReturnDecoderAcceptsTheShapesTheConfigLayerDelivers crosses the config boundary.
 //
 // Every fixture above reaches the decoder with bytes this test file built. The config layer builds
-// different bytes: `internal/lint/configuration/configuration.go` parses a rule setting as
+// different bytes: `internal/lint/configuration/load.go` parses a rule setting as
 // `["severity", <options>]` and keeps `tuple[1]`, a single JSON value, while ESLint's
 // `context.options` is every element after the severity. A decoder wrong for the cohere shape is
 // right on every fixture and wrong on every real configuration, and nothing else in this file can

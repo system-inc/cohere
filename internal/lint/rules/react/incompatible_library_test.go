@@ -16,7 +16,7 @@ const incompatibleLibraryFile = "/repository/source/IncompatibleLibrary.tsx"
 
 // withSeededIncompatibleLibraryTable swaps the module table for the duration of one test.
 //
-// Unlike `configuration.go`'s equivalent seam, this one is a convenience rather than a necessity, and the
+// Unlike `config.go`'s equivalent seam, this one is a convenience rather than a necessity, and the
 // difference is the whole finding of this port. That rule cannot report on its shipped table at all,
 // so seeding is the only way to prove it is not inert. This rule's shipped table fires on real
 // library names with no configuration, which `TestIncompatibleLibraryFiresOnTheRealDefaultTable`
@@ -385,7 +385,7 @@ func TestIncompatibleLibraryStaysSilent(test *testing.T) {
 			"import {useForm} from 'react-hook-form';\n\nfunction Component() {\n  const form = useForm();\n  return <div>{form.watch}</div>;\n}\n",
 		},
 		// The module name is compared exactly. Both of these are measured silent at React 7.1.1,
-		// and both would report under a lowercasing or prefix-matching comparison. `configuration.go`'s
+		// and both would report under a lowercasing or prefix-matching comparison. `config.go`'s
 		// `isKnownReactModule` does lowercase, so this is the axis on which the two rules differ and
 		// a reader copying that helper here would introduce a false positive.
 		{
@@ -590,7 +590,7 @@ func TestIncompatibleLibraryMessageCarriesTheEntryText(test *testing.T) {
 // is the same reason the message test above does not compare to the rule's own constant.
 //
 // The last two rows are the exactness of the module comparison, which is the axis this table differs
-// from `configuration.go`'s `isKnownReactModule` on.
+// from `config.go`'s `isKnownReactModule` on.
 func TestDefaultIncompatibleLibraryTableMatchesUpstream(test *testing.T) {
 	test.Parallel()
 	cases := []struct {
