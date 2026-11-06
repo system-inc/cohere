@@ -21,6 +21,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/printf"
 
+	"github.com/system-inc/cohere/internal/goengine/cgotest"
 	"github.com/system-inc/cohere/internal/goengine/contract"
 	"github.com/system-inc/cohere/internal/goengine/rule"
 	"github.com/system-inc/cohere/internal/goengine/rules"
@@ -210,6 +211,11 @@ type endToEndCase struct {
 
 	exitCode int
 
+	// needsCgo marks a case whose project has cgo of its own, which the engine loads through go/packages and the cgo
+	// tool: it skips, named, where the toolchain has no cgo and under a runner's stand-in go, as Loom's, which
+	// refuses to compile (see cgotest).
+	needsCgo bool
+
 	// rules replaces the registry when set.
 	rules []rule.Rule
 
@@ -230,7 +236,7 @@ var endToEndCases = []endToEndCase{
 	{name: "type-error", exitCode: 1},
 	{name: "vet-finding", exitCode: 1},
 	{name: "workspace", exitCode: 0, verify: unchanged("third_party/lib/lib.go", "workspace")},
-	{name: "cgo", exitCode: 0},
+	{name: "cgo", exitCode: 0, needsCgo: true},
 	{name: "build-constrained", exitCode: 1, verify: unchanged("generated.go", "build-constrained")},
 	{name: "generated-house-rule", fixture: "build-constrained", exitCode: 1, rules: []rule.Rule{everyFileRule}},
 	{
@@ -286,6 +292,9 @@ func TestEndToEnd(test *testing.T) {
 // the case's expected files, or rewrites them under -update.
 func runCase(test *testing.T, endToEnd endToEndCase) {
 	test.Helper()
+	if endToEnd.needsCgo {
+		cgotest.RequireTranslation(test)
+	}
 	fixture := cmp.Or(endToEnd.fixture, endToEnd.name)
 	root := copyFixture(test, filepath.Join("testdata", fixture))
 	registered := endToEnd.rules
