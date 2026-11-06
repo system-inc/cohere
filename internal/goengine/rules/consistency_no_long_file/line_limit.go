@@ -5,7 +5,7 @@ import (
 	"strconv"
 )
 
-// lineLimit is the limit option's value. It is a flag.Value of its own, rather than flag.Int, so a limit below one,
+// lineLimit is the max option's value. It is a flag.Value of its own, rather than flag.Int, so a limit below one,
 // which would flag every file or name a line no file has, and a limit above the house's, which would let a file grow
 // past the ruling, are refused when it is set.
 type lineLimit int
@@ -28,7 +28,7 @@ func (limit *lineLimit) Set(text string) error {
 	}
 	if value > defaultLimit {
 		return fmt.Errorf("refusing a %s option of %d lines, since it may only be stricter than the house limit of %d",
-			limitOption, value, defaultLimit)
+			maximumOption, value, defaultLimit)
 	}
 	*limit = lineLimit(value)
 	return nil

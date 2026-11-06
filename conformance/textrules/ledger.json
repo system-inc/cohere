@@ -237,30 +237,6 @@
     },
     {
         "engine": "go",
-        "family": "long-file",
-        "case": "lf01",
-        "kind": "span",
-        "task": "se4za29",
-        "reason": "reports line 2001 with no end, where the span runs to the end of the file"
-    },
-    {
-        "engine": "go",
-        "family": "long-file",
-        "case": "lf02",
-        "kind": "verdict",
-        "task": "se4za29",
-        "reason": "reports `lf02.generated.go`, which is exempt by its name"
-    },
-    {
-        "engine": "go",
-        "family": "long-file",
-        "case": "lf05",
-        "kind": "verdict",
-        "task": "se4za29",
-        "reason": "refuses the option `max`, since its option is still `limit`"
-    },
-    {
-        "engine": "go",
         "family": "shouting",
         "case": "sh01",
         "kind": "span",
